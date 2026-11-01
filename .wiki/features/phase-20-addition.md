@@ -6811,3 +6811,17 @@ ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/com
 端到端只读复核（临时探针，运行后删除）：全新 HOME 下 `/connect login openai --api-key …` 后连接记录为 `gpt-5.3`，`/model list` 包含该模型并标为 active，`/context` 报 `Window: 400,000 tokens (catalog)` 而非「assuming 64000」，裸 `/model` 目录视图出现 `GitHub Copilot`。修复前同样流程得到 `gpt-4.1-mini`、不在列表中、`/context` 只能假设 64000。
 
 未做：没有真实 OpenAI/Copilot 请求，因此不能据此声称模型可用性；`github-copilot` 的可选模型仍取决于账号，目录里刻意保持为空。
+
+### 24.82 本批改动的自审边界（子代理未产出）
+
+本批曾派发一次只读 review（仅阅读与静态分析，未执行任何测试/构建），该子代理运行超过一小时未返回结论后停止；以下三点由主代理自行核对，结论与证据一并记录。
+
+**1. provenance 下标与归一化数组是否对齐。** `renderModelStatus` 用 `config.providerConnections.findIndex(...)` 取 provenance 的 children 下标，而 `normalizeProviderConnections` 会过滤条目，理论上可能错位。核对结论：`projectConfigOrigins` 以**归一化后的** `config` 为基准重新编号 children，因此运行时的下标就是归一化数组的下标。实测两条连接（`first`、`second`）得到 `children[0]=first`、`children[1]=second`，`model` 叶子都指向 `config.json`。再加入一条 `provider: 'not-a-provider'` 后，整份 user 配置被判为 `invalid-value; value ignored`，连接数组为空——不存在「过滤掉一部分后错位」的中间态，因为无效条目在进入运行时前就被拒绝。
+
+**2. `modelDefaultSource` 是否复刻解析链。** 与 `providerCredentials.ts` 的 `cliModel ?? activeConnectionProfile?.model ?? configProfile?.model` 对照：投影读的是 `activeConnection?.model` 与 `config.providerCredentials?.[provider]?.model`，顺序一致。区别只在投影不读 `cliModel`——命令行覆盖不是「已存的默认值」，`/model status` 另有一行 `Request model` 报告它，两者不重复。
+
+**3. `providerDefaultWritable` 放宽后是否还有保护缺口。** 见第 24.81 节记录的 CI 回归：删掉的「连接存在」在 `beforeCommit` 里承担竞态检测，已用 `providerScopeSelected` 精确恢复。放宽本身（所有权判断）不再以连接存在为条件，符合 24.78-A 的裁决。
+
+**4. 新增 `github-copilot` 目录条目的影响。** 与既有 `antigravity` 对比，可用性投影状态完全一致（`credential-missing` / `catalogued: true` / `models: 0`），未引入新的不一致。
+
+以上均为只读核对与一次性探针（探针运行后已删除），不构成对真实 provider、其他平台或完整性能的验收。
