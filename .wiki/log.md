@@ -11461,3 +11461,7 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 记录一处行为差异（非缺陷）：同模型同 `reasoning: true`、默认 auto 时，responses 捕获到 reasoning 而 messages 没有——auto 不设 `thinkingLevelName`，messages 因而不发 `thinking` 参数。直接验证端点：不带参数只返回 text，带 `thinking:{type:'enabled'}` 返回 thinking,text。显式 `/thinking high` 后 messages 立即捕获。若后续做 effort 投影，应把「auto 下该协议是否发 thinking」纳入说明。
 
 一处探针缺陷已修：`start()` 先注入共享 fixture 的 `--project` 再追加调用方的，导致后者被忽略、模型读到旧 fixture 并报 ENOENT，T31 首轮结果一度看似产品错误。改为调用方指定 `--project` 时不注入默认值。本批仅文档变更，未运行 build/vitest/全量回归，`verify:docs-drift:strict` 通过。
+
+### 2026-11-01：压缩触发可达性的结构性观察
+
+10 回合 × 约 200 词的会话在 60k 窗口下只到 6.0k（10%），压缩不触发——正确但说明阈值不易达到。把窗口压到 12k 时，工具 schema 约 5.4k 加默认 `maxOutputTokens` 4096 已占大半，第 8 回合直接判溢出且救援压缩因 would-not-shrink 拒绝。结论：能让阈值压缩自然触发的窗口区间很窄，用户实际会遇到「要么不压缩、要么直接溢出」。这不是缺陷，但印证 ADD-77（溢出错误说明占用构成）的必要性。构造稳定的压缩验收需同时下调 `maxOutputTokens` 与 `keepRecentTokens`，已记入后续验收方法。本批仅文档，未运行 build/vitest/全量回归。
