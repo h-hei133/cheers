@@ -131,8 +131,10 @@ export function approvalPicker(
     form: "panel",
     empty: "No options",
     filterable: false,
-    ...(prompt.context?.preview ? { initialSelection: 'deny', footer: prompt.context.previewKind === 'execution'
-      ? 'Preview closed. Choose Allow once to execute this request.' : 'Preview closed. Choose Allow once to apply this exact plan.' } : {}),
+    ...(prompt.context?.preview ? { initialSelection: 'deny', footer: prompt.context.grantOwner === 'caller'
+      ? 'Preview closed. Choose an approval for this request.'
+      : prompt.context.previewKind === 'execution'
+        ? 'Preview closed. Choose Allow once to execute this request.' : 'Preview closed. Choose Allow once to apply this exact plan.' } : {}),
     load: async (): Promise<readonly Option[]> => [
       ...(selectable ? [{ id: 'choose-groups', label: 'Choose groups…', detail: 'Apply only the selected groups of this plan',
         note: '4 / g' }] : []),
@@ -144,11 +146,15 @@ export function approvalPicker(
       },
       {
         id: "allow-always",
-        label: "Allow always for this project",
+        label: prompt.context?.grantOwner === 'caller'
+          ? prompt.options.find(option => option.value === 'allow-always')?.label ?? 'Allow and remember'
+          : "Allow always for this project",
         // It is written to the project's policy file, so it outlives this
         // session and this process. Saying "this session" here promised
         // something narrower than what was granted.
-        detail: "Remember this grant for this project and do not ask again",
+        detail: prompt.context?.grantOwner === 'caller'
+          ? prompt.options.find(option => option.value === 'allow-always')?.description
+          : "Remember this grant for this project and do not ask again",
         note: "2 / a",
       },
       {

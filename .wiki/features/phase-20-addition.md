@@ -465,8 +465,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---|---|---|---|---|
 | ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、24.68、第一百三十四批 | 本地验证 | 已移除prompt推导授权，普通/全屏实际拒绝及仅本次批准零永久grant；Node/单文件可执行程序的headless print路径已实际验证默认拒绝与显式仅本次，其他平台未验 |
 | ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、24.68、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定，验证续接文本不再授权当前调用；原reader完整预览、容量与绘制期限已验；Node/单文件可执行程序headless实际调用已核对目标、工具结果与终态；desktop原生适配器、其他平台仍缺；MCP仍禁止allow-always |
-| ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76、24.71 | 本地验证 | 已补共享dispatcher跨回合/项目隔离、工作目录绑定与普通/全屏声明替换；其他平台与单文件程序未验 |
-| ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77、24.71 | 本地验证 | 已补删除/编辑声明及待审批快照失效；已启动shell命令不属于本批取消范围 |
+| ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76、24.71、24.73 | 本地验证 | 已补声明快照/工作目录与独占hook授权；通用缓存/档位不代答，其他平台与单文件程序未验 |
+| ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77、24.71、24.73 | 本地验证 | 已补真实profile撤回与通用缓存不复活；已删除/编辑声明留下的历史指纹仍待核查 |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78、24.72 | 本地验证 | 已补普通resume/workspace切换、POSIX大小写及不读取权限的项目往返；Node普通/全屏实际重问/拒绝已验，单文件程序及其他平台未验 |
 | ADD-61 | P1 | 权限层与工具体使用同一个围栏判定 | 第一百二十七批 | 本地验证 | — |
 | ADD-62 | P1 | 观察者失败不得吞掉持久事件；`team` 定义名不由模型文本拼成 | 第一百三十七、一百三十九批、24.67 | 本地验证 | 同步/异步及原生取消已验；exe取消、其他平台与真实provider条件未验 |
@@ -6595,3 +6595,26 @@ Node20.3 TS 构建通过，build `1ccb732ef076b7c50d5645fcee59a20360088cfb9f0c5a
 一次延迟读取：48e2994c 的精确代码 CI41265797603 已 success；父提交 a594884e 的 CI41266906555 仍 in_progress，Watch41266906549 success，不以 Watch 代替代码 CI，不立即轮询。本批最终核验与交付另绑，本批 CI 未观察。
 
 最终五静态门、三份脚本语法、主代理独立证据verifier及diff check均exit0；七份当前TS路径状态（含删除）、六份父源字节、五源反转恢复、122项测试、current build manifest/inputs、两有效原生场景与单独失败收据均已核对。脚本以非可执行文本归档，owned scratch清理，工作树仅本批七个TS路径与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑；本批CI未观察，goal active。
+
+
+### 24.73 钩子授权独占持久化与真实 profile 撤回
+
+继续 ADD-58/59。真实生产入口配原审批 handler 的回归确认：主 turn 的 hook「记住」同时写入通用审批策略和 hook 信任库，`/trust forget` 只撤回后者；下一次通用缓存自动返回 allow-always，重新保存指纹并执行。通用键没有 matcher/声明来源，修改这些字段也可沿用旧回答；Git hook 更使用 bash/execute 身份，混入普通命令授权。session allow-all 和通用非交互 allow-always 同样可代答。首版20项实际16失败/4控制，先确认产品缺陷再修改。
+
+[共享 hook 审批适配器](../../packages/ts-shell/src/core/hooks/approval.ts) 现在供主 turn 与 Git 入口共用，完整指纹只作为精确绑定；标记 caller 拥有授权保存，由原 dispatcher 在快照/admission 复核之后独占写入 HookTrustStore。[通用审批 handler](../../packages/ts-shell/src/entrypoints/cliApprovalModule.ts) 在读取策略前分流，既不读/消耗通用缓存，也不让 session scope 或通用 CLI policy 代答；保留显式「记住」返回值，不借用会强制一次性的 explicitApproval。普通审批 wiring 跳过 caller 的保存，audit 只报告本层真实落盘，不能在 dispatcher 尚未确认前宣称已持久化。没有交互宿主时 hook 默认拒绝；已有精确 hook 信任和专用 hook bypass 仍由原 owner 决定。通用非交互审批策略不再隐式成为 hook bypass。旧普通授权不迁移、不自动删除，仍能经 `/permissions` 管理，也不会重新建立 hook 信任。
+
+净化后的 command/event 同时进入显示 context，完整 source/matcher/command 经已有 execution preview 阅读器展示；实际关闭预览后可选仅一次、记住或拒绝。复审发现只有 prompt.message 时全屏 host 根本不显示声明来源，现补 [实际 promptApproval host 回归](../../packages/ts-shell/src/core/hooks/approval.test.ts)，保留默认拒绝和完整预览，不增加第二个审批 UI 或信任库。caller 的「Allow and remember」也不再误称用户级 hook 为项目级普通授权。
+
+首场普通原生探针在记住/复用通过后，`/trust forget` 未真正撤回，保留为 unverified。随后两条生产入口的 captured-profile 单测均重现 ERR_INVALID_ARG_VALUE：命令为排除用户 hook，向 loader 传入带 NUL 的伪造 HOME；真实 CLI 的 profile 边界在读取项目文件前就拒绝了它。现 [hook loader](../../packages/ts-shell/src/core/hooks/config.ts) 使用显式 includeUser:false 懒跳过用户来源，[状态/撤回命令](../../packages/ts-shell/src/core/commands/trustCommandRuntime.ts) 均移除哨兵路径；默认用户加载和 profile 身份检查保留。命名 profile 回归确认状态查询成功、项目授权真实撤回、用户 hook 仍执行且只保留其指纹；没有放宽路径边界来通过测试。
+
+目标检查后定向只读比较 Codex 快照4210c08defe92fe8828f789b6f9fda287ad3709e 的 hook discovery 658–714/754–805：事件、matcher、handler 内容形成精确 hash，hook owner 依据自身信任或专用 bypass 选取 handler；registry 传入专用 hook trust 配置。Pi 快照f09d01b85e0384647fcab6779d35ab9dabe04be3 的资源 loader 534–555 提供项目信任发现边界，但该 seam 没有相应逐 hook 审批持久化合同；未据此推定它具备本批能力。复用本项目原 owner，没有复制参考代码。旧 producer/通用代答反转覆盖相反决策。
+
+最终 Node20.3、显式单 worker/heap768MiB、同一 nonblocking flock 串行八文件144项通过：真实 hook producer24、hook preview4、approval bridge18、wiring3、picker50、runtime invocation25、hook config6、profile sources14。profile 修复前后还分别有2失败/54通过的定向证据；未改的 lifecycle/trust command 合同在此前批次分别11/10通过。六反转分别为通用代答6、重复持久化4、旧双入口18、旧项目标签1、移除完整预览1、恢复 profile 哨兵2项失败；包含刻意禁止通用读取的 guard 抛错，不把所有失败都冒充 shell 效果断言。finally 均恢复原字节并记录哈希，随后最终集成144项重新通过。五静态门通过，118条既有 docs-source advisory 保留；TS build `cd21f5cfb73b69e72ce4df87ed88b87db144f198f1c2b2f9ae29ace3484c6894`，inputs `397e51e00085afddc15aa679e56dc74cc718cf5d6736e8eb8cd45eb61a5c34ad`，不重建单文件程序。
+
+最终普通/全屏生产 Node CLI 各实际五回合，脚本 loopback provider 各 GET5/POST5；先观察并关闭四次完整 hook 预览，再真实 a 记住、两次 Escape 拒绝及 y 仅一次。五阶段 shell marker 为1/2/2/3/3，hook指纹1/1/0/0/0，通用持久 grant 全为0；相同指纹复用没有第二审批，真实 `/trust forget` 后拒绝没有执行或恢复指纹，仅一次后的下一回合重新审批。各 run/end6（含 slash）、query.failed0、config/auth字节不变、Ctrl+D exit0、owned PID/start identity 非活跃、scratch删除。三次CLI含初次失败，60秒/2MiB/100ms采样768MiB守卫未触发；有效RSS451436/445868KiB，含初次最高572000KiB仅作小夹具观察。标准relay未单测cooked恢复；没有 raw PTY、请求/响应或真实凭据归档。
+
+只读委派最终 CLEAR，未让子代理执行验证；主代理独立证据核对另记。ignored证据归 `.omx/artifacts/phase20-addition-hook-approval/`，源码/脚本用非可执行文本快照，临时执行文件归档后清理。ADD-58/59保持本地验证，原47项外部条件及其他任务不升级；无真实provider、单文件程序hook审批、其他平台、全仓/15套件/20k PTY、judge或性能验收。另有独立静态线索：`/trust forget` 只枚举当前声明，已删除/编辑的旧指纹缺少可供按项目撤回的来源元数据；恢复旧声明可能重新命中历史授权，本批未动态复现/修复，留待下一轮，不能把ADD-59称为完全完成，goal active。
+
+一次延迟读取：a594884e代码CI41266906555已success；父提交b725f884代码CI41268173094仍in_progress、Watch41268173089 success，不以Watch替代代码CI，不反复轮询。本批最终证据与交付另绑，本批CI未观察。
+
+最终五静态门、三份脚本语法、主代理独立证据verifier与diff check均exit0；11份当前TS、8份父源原字节、六组反转恢复、144项最终测试、current build manifest/inputs、两有效原生收据与首场失败均已核对。执行脚本以非可执行文本归档，owned scratch清理，工作树仅本批11份TS与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。

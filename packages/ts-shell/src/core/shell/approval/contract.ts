@@ -23,6 +23,8 @@ export interface EscalationPrompt {
     callBinding?: string;
     /** This call needs a fresh answer; session scopes and cached grants cannot answer it. */
     explicitApproval?: boolean;
+    /** The caller checks and saves its own grants; the host collects a fresh answer only. */
+    grantOwner?: 'caller';
     /** A complete read-only approval preview; closing it never approves effects. */
     preview?: string;
     previewKind?: 'file-plan' | 'execution';

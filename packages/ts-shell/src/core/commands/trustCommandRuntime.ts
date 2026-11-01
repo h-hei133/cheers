@@ -63,7 +63,7 @@ export async function runTrustCommand(
  * to revoke.
  */
 function forgetHookApprovals(root: string): LocalCommandResult {
-  const { hooks } = loadHookDeclarations(root, { homeDir: path.join(root, "\u0000none") });
+  const { hooks } = loadHookDeclarations(root, { includeUser: false });
   const store = new HookTrustStore();
   const withdrawn = hooks.filter((hook) => hook.sourcePath.startsWith(root))
     .map((hook) => ({ hook, fingerprint: hookFingerprint(hook) }))
@@ -106,7 +106,7 @@ function describeTrust(root: string): string {
       : "No project resources that would run were detected.",
   );
 
-  const { hooks, problems } = loadHookDeclarations(root, { homeDir: path.join(root, "\u0000none") });
+  const { hooks, problems } = loadHookDeclarations(root, { includeUser: false });
   const projectHooks = hooks.filter((hook) => hook.sourcePath.startsWith(root));
   if (projectHooks.length > 0) {
     lines.push("", state === 'untrusted'

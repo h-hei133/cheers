@@ -1,6 +1,7 @@
 import type { Interface as ReadlineInterface } from "node:readline";
-import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
+import { ApprovalTrustPolicy, type ApprovalEvaluation } from "../core/shell/approvalTrustPolicy.js";
 import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
+import { buildScope } from '../core/shell/approval/store.js';
 import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
 import type { InteractiveApprovalResult } from "../cli/interactive/picker/approval.js";
@@ -72,10 +73,16 @@ export function createCliEscalationPromptHandler(
 
   return async (prompt) => {
     const projectRoot = getProjectRoot();
-    const evaluation = trustPolicy.evaluate(prompt, projectRoot);
+    // Some callers own a stricter grant identity and withdrawal contract. The
+    // host must neither read nor write a second policy that could revive it.
+    const callerScope = prompt.context.grantOwner === 'caller' ? buildScope(prompt) : undefined;
+    const evaluation: ApprovalEvaluation = callerScope ? {
+      cacheKey: `caller|${callerScope.scopeKey}`, scopeLabel: callerScope.scopeLabel,
+      projectScopedCandidates: [], sameOperationCandidates: [],
+    } : trustPolicy.evaluate(prompt, projectRoot);
     const isNonInteractive = rl === null && !promptInteractiveApproval;
     const requiresSelection = Boolean(prompt.context.selections?.length);
-    const requiresAnswer = requiresSelection || prompt.context.explicitApproval === true;
+    const requiresAnswer = requiresSelection || prompt.context.explicitApproval === true || Boolean(callerScope);
     const cliNonInteractiveDecision = isNonInteractive && !requiresAnswer
       ? getNonInteractiveDecision?.()
       : undefined;
@@ -281,14 +288,14 @@ export function createCliEscalationPromptHandler(
 
     if (!promptInteractiveApproval) {
       renderApprovalRequiredSurface(renderer, { prompt, includeRisk: true });
-      for (const line of trustPolicy.explain(
+      for (const line of callerScope ? [] : trustPolicy.explain(
         evaluation,
         projectRoot,
         getViewMode(),
       )) {
         renderer.renderLine(`- ${line}`);
       }
-      if (getViewMode() === "verbose") {
+      if (getViewMode() === "verbose" || callerScope) {
         renderer.renderLine(`- Recommended default: ${prompt.recommendedAction}`);
         renderer.renderLine("");
         renderer.renderLine(prompt.message);
@@ -399,9 +406,9 @@ export function createCliEscalationPromptHandler(
       decisionSource: isNonInteractive
         ? "default-deny"
         : "interactive-keypress",
-      persistent: decision === "allow-always",
+      persistent: Boolean(interactiveWiring.persistedGrant),
       cacheEffect:
-        decision === "allow-always" ? "allow-always-persisted" : "none",
+        interactiveWiring.persistedGrant ? "allow-always-persisted" : "none",
       projectRoot,
       cacheKey: evaluation.cacheKey,
       scopeLabel: evaluation.scopeLabel,

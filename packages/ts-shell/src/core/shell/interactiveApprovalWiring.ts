@@ -22,7 +22,7 @@ export function applyInteractiveApprovalDecisionWiring(input: {
   readonly trustPolicy: ApprovalTrustPolicy;
 }): InteractiveApprovalWiringResult {
   // The caller returns allow-once to the waiting request; it is not a future grant.
-  if (input.decision === "allow-always") {
+  if (input.decision === "allow-always" && input.prompt.context.grantOwner !== 'caller') {
     return {
       persistedGrant: input.trustPolicy.rememberAllowAlways(
         input.prompt,

@@ -11,8 +11,8 @@ import type { InteractiveAsk } from "../core/tools/ask/contract.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
-import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/registration.js";
-import { hookApprovalDecision, type HookApprovalDecision } from "../core/hooks/types.js";
+import { registerDeclaredHooks } from "../core/hooks/registration.js";
+import { createHookApprovalRequest } from "../core/hooks/approval.js";
 import { type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
 import type { ToolDiscovery } from "../core/tools/discovery/state.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
@@ -23,7 +23,6 @@ import type { RequestOverhead } from "../session/context.js";
 import { preparePromptRequest } from '../core/prompts/request.js';
 import { requestIdentity } from '../context/request/identity.js';
 export { requestIdentity } from '../context/request/identity.js';
-import { neutraliseForDisplay } from "../core/text/safety.js";
 import { pendingTurnInput } from "../turn/pendingInput.js";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
 import { runTurn, type CompactionSetup, type TurnRun, type TurnOptions } from "../turn/session.js";
@@ -292,55 +291,6 @@ function deferUntilReady(
 }
 
 /**
- * Ask the user whether one declared command may run.
- *
- * The command text is written by whoever wrote the repository, and it is shown at
- * the exact moment a person is deciding whether to trust them. Rendered verbatim
- * it could contain newlines that forge extra prompt lines, or control sequences
- * that repaint what is on screen, so it is neutralised first: the user has to be
- * able to trust what they are reading as much as what they are approving.
- *
- * A run with no way to ask refuses, which is what keeps a repository's commands
- * from executing unattended simply because nobody was present to object.
- */
-async function approveDeclaredHook(
-  request: CliRuntimeInvocationRequest,
-  hook: { readonly command: string; readonly event: string; readonly matcher?: string; readonly sourcePath: string },
-): Promise<HookApprovalDecision> {
-  if (!request.escalationPromptHandler) return "deny";
-
-  const response = await request.escalationPromptHandler({
-    id: `hook-approval-${Date.now()}`,
-    title: "Run a command this project asks for?",
-    message: [
-      `${neutraliseForDisplay(hook.sourcePath)} declares a command to run on the ${neutraliseForDisplay(hook.event)} event.`,
-      hook.matcher ? `Applies to: ${neutraliseForDisplay(hook.matcher)}` : "Applies to all tools.",
-      "",
-      "Command:",
-      `  ${neutraliseForDisplay(hook.command)}`,
-      "",
-      "Approval is remembered for this exact command in this file; changing either asks again.",
-    ].join("\n"),
-    context: {
-      toolName: "hook",
-      operation: hook.event,
-      target: hook.command,
-    },
-    options: [
-      { value: "allow-once", label: "Allow once", description: "Run it for this session." },
-      { value: "allow-always", label: "Allow and remember", description: "Run it until the command changes." },
-      { value: "deny", label: "Deny", description: "Do not run it." },
-    ],
-    defaultOption: "deny",
-    recommendedAction: "Review the command before allowing it.",
-    severity: "high",
-  });
-
-  // Only an explicit "remember" is persisted; "allow once" runs this hook once.
-  return hookApprovalDecision(response.decision);
-}
-
-/**
  * The compaction setup with the request's fixed overhead attached.
  *
  * A no-op when there is no compaction to configure. The overhead is attached to
@@ -381,7 +331,7 @@ async function startTurn(
   // up the start of the run.
   registerDeclaredHooks(hooks, request.workspaceRoot, {
     admission: request.admission,
-    requestApproval: (hook) => approveDeclaredHook(request, hook),
+    requestApproval: createHookApprovalRequest(request.escalationPromptHandler),
     bypassed: request.runtimeConfig?.allowUntrustedHooks === true,
   });
   const { tools, discovery, promptContext, currentOverhead } = await preparePromptRequest(request, dependencies.tools);

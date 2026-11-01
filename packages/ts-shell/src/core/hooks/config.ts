@@ -64,6 +64,8 @@ export interface HookConfigLoadResult {
 
 export interface HookConfigLoadOptions {
   readonly homeDir?: string;
+  /** Project inspection must not acquire the user's declaration source. */
+  readonly includeUser?: boolean;
 }
 
 /**
@@ -77,14 +79,11 @@ export function loadHookDeclarations(
   workspaceRoot: string,
   options?: HookConfigLoadOptions,
 ): HookConfigLoadResult {
-  const homeDir =
-    options?.homeDir ?? userHomeDir();
-
   const hooks: HookDeclaration[] = [];
   const problems: string[] = [];
 
   for (const configPath of [
-    resolveUserDataFile("hooks.json", homeDir),
+    ...(options?.includeUser === false ? [] : [resolveUserDataFile("hooks.json", options?.homeDir ?? userHomeDir())]),
     path.join(workspaceRoot, ".agents", "hooks.json"),
   ]) {
     const result = readOne(configPath);

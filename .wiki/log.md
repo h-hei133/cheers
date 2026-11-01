@@ -11342,3 +11342,14 @@ build d4dda071a4dc/current inputs与两exe哈希另由独立verifier核对。普
 普通/全屏真实Node CLI各真实Alt+P选allow-all，依次resume/attach/rebind切三根后ask/代次1/2/3，原bash审批实际Escape拒绝三次，零effect/grant且模型收到denial；各GET3/POST6、run/end6/failed0，config/auth字节保持、exit0、owned进程/scratch清理，workspace两次普通阅读器关闭后继续输入。首场普通探针仅第一阶段通过，attach后下一输入未形成POST，超时留unverified；补通用pager观测后两场通过，共三CLI。最高RSS含失败589532KiB仅夹具观察，未单测cooked。只读复审CLEAR，主代理独立证据另核；HANDOFF补代次及pager输入边界。无真实provider/exe/其他平台/全仓/15套件/20k/judge或性能验收，ADD-60本地验证、原47外部条件延后、goal active。延迟48e2994c代码CI success；a594884e代码CI41266906555仍in_progress、Watch41266906549 success，本批最终核验与交付另绑。
 
 最终五静态门、三份脚本语法、主代理独立证据verifier及diff check均exit0；七份当前TS路径状态（含删除）、六份父源字节、五源反转恢复、122项测试、current build manifest/inputs、两有效原生场景与单独失败收据均已核对。脚本以非可执行文本归档，owned scratch清理，工作树仅本批七个TS路径与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑；本批CI未观察，goal active。
+
+
+### 2026-11-01：钩子授权独占保存与真实 profile 撤回
+
+[addition24.73](features/phase-20-addition.md#2473-钩子授权独占持久化与真实-profile-撤回)继续ADD-58/59：实际主turn/Git producer配通用handler确认双持久化，撤回后通用缓存可恢复hook指纹；matcher/来源、session allow-all和通用headless policy也可代答。旧源20项16失败/4控制后，原hook owner增加共享审批adapter，通用层在读策略前按caller分流，只收集回答，不读写第二份grant；dispatcher仍复核后独占保存，普通grant及用户hook保留。复审补出全屏只收prompt.message不可见，现复用完整预览并测试实际host。首场原生记住/复用通过但撤回未生效，保留unverified；命名profile两回归确认NUL伪造HOME撞身份边界，改显式includeUser:false，两命令入口都移除哨兵，不放宽profile安全。六反转6/4/18/1/1/2项失败，逐字节恢复；最终Node20.3单worker/heap768MiB八文件144项及五静态门通过，118既有docs-source advisory保留，TS build cd21f5cfb73b/current inputs。
+
+普通/全屏生产Node CLI各真实五回合加/trust forget，四次完整预览后实际a/y/Escape：effect1/2/2/3/3、hookGrant1/1/0/0/0、通用grant全0，各GET5/POST5、run/end6/failed0，config/auth字节保持、exit0、owned进程及scratch清理。初次失败独立保留，总3CLI，最高572000KiB仅小夹具观察，未单测cooked。只读委派最终CLEAR，子代理无验证；主代理独立证据另绑，HANDOFF补双owner/真实预览和伪造HOME陷阱。无真实provider/exe/其他平台/全仓/15套件/20k/judge或性能验收；已删除/编辑的历史hook指纹撤回仍是单独静态待查，ADD-58/59本地验证、原47外部条件延后、goal active。
+
+延迟a594884e代码CI41266906555已success；b725f884代码CI41268173094仍in_progress、Watch41268173089 success，不轮询。本批最终核验、提交推送、remote SHA与clean交付由ignored收据另绑，本批CI未观察。
+
+最终五静态门、三份脚本语法、主代理独立证据verifier与diff check均exit0；11份当前TS、8份父源原字节、六组反转恢复、144项最终测试、current build manifest/inputs、两有效原生收据与首场失败均已核对。执行脚本以非可执行文本归档，owned scratch清理，工作树仅本批11份TS与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。

@@ -1875,3 +1875,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A workspace command completes, but the next prompt produces no request or approval.
 - **Root Cause**: Long slash output opens the ordinary reader; approval-preview observation alone misses that input owner.
 - **Rule**: Native probes must observe the generic pager after command settlement, close it through the actual key path, then wait for closure before typing the next prompt. Preserve earlier timeouts as unverified; command completion alone does not establish editor input ownership.
+
+
+### Hook Grant Ownership Must Survive Generic Approval Wiring
+- **Symptom**: Withdrawing a hook fingerprint silently recreates it, or an unchanged command under a different matcher/source runs without a new answer.
+- **Root Cause**: The ordinary approval host both caches the answer and returns allow-always to the hook dispatcher, creating a second grant with a weaker identity. Session scopes can also answer before hook review.
+- **Rule**: Mark caller-owned grants before reading generic policy; collect a fresh answer, preserve remember semantics, and leave persistence to the original dispatcher after its live guards. Keep generic audits limited to actual generic writes. Test both real producers with the real approval handler, actual withdrawal, old ordinary grants, once/default denial and user hooks. Exercise the actual preview host because prompt.message alone is invisible to the fullscreen picker.
+
+### Source Selection Must Not Spoof A Captured Home
+- **Symptom**: Trust status/forget works in no-profile unit fixtures but fails inside the actual CLI without withdrawing any hook grant.
+- **Root Cause**: A NUL sentinel home used to exclude user declarations reaches profile home identity validation, which correctly rejects it before project discovery.
+- **Rule**: Express project-only discovery as an explicit loader option that lazily skips user path resolution. Retain default profile validation. Include a captured named-profile command regression and preserve the failed native attempt; do not weaken identity checks or claim withdrawal from command settlement alone.
