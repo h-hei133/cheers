@@ -33,5 +33,12 @@ it.each(['', 'truncated', 'A'.repeat(64)])('refuses malformed bindings instead o
 
 it('retains the existing scope contract for tools outside this argument-binding repair', () => {
   expect(approvalCallBinding('bash', { command: 'printf read' })).toBeUndefined();
+  expect(approvalCallBinding('write', { path: 'file' }, { previewKind: 'file-plan', preview: 'changed content' })).toBeUndefined();
   expect(buildScope(buildToolEscalationPrompt('bash', 'execute', 'printf read', 'fixture')).scopeKey).toBe('bash:execute:exact:printf read');
+});
+
+it.each(['desktop', 'collaboration', 'native_operation', 'bash'])('binds prepared execution independently of the %s tool name', name => {
+  const first = approvalCallBinding(name, {}, { previewKind: 'execution', permissionArgs: { operation: 'send' }, preview: 'Complete request A' });
+  expect(first).toMatch(/^[a-f0-9]{64}$/);
+  expect(approvalCallBinding(name, {}, { previewKind: 'execution', permissionArgs: { operation: 'send' }, preview: 'Complete request B' })).not.toBe(first);
 });

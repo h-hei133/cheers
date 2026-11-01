@@ -9,6 +9,11 @@ import { createDefaultExecutionService } from '../runtime/execution/service.js';
 import { evaluateToolPermissionScope, planModeBlock } from '../core/query/toolPolicy.js';
 import { validateToolArguments } from '../core/tools/arguments.js';
 import type { CommandExecutionRequest, CommandExecutionResult } from '../runtime/execution/types.js';
+import { HookDispatcher } from '../core/hooks/hookDispatcher.js';
+import { ApprovalTrustPolicy } from '../core/shell/approvalTrustPolicy.js';
+import { createCliEscalationPromptHandler } from '../entrypoints/cliApprovalModule.js';
+import { StreamingRenderer } from '../presentation/terminal/streaming.js';
+import { runPreparedTool } from '../turn/invoke.js';
 
 let root: string;
 let focus: string;
@@ -56,6 +61,25 @@ async function observe(item: ReturnType<typeof setup>): Promise<string> {
   const result = await item.execute({ action: 'observe', scope: 'window', windowId: '42' }); expect(result.success).toBe(true);
   return JSON.parse(result.output!).snapshotId as string;
 }
+
+it('binds the complete desktop request through its actual preparation and approval gate', async () => {
+  const item = setup();
+  const interactive = vi.fn().mockResolvedValueOnce('allow-always').mockResolvedValue('deny');
+  const policyPath = path.join(root, 'policy.json');
+  const renderer = new StreamingRenderer(); vi.spyOn(renderer, 'renderLine').mockImplementation(() => {});
+  const handlerFor = () => createCliEscalationPromptHandler(renderer, null, () => 'compact', new ApprovalTrustPolicy(policyPath),
+    () => root, undefined, undefined, undefined, () => 'ask', interactive);
+  let handler = handlerFor();
+  const options = { ...item.context, permissionScope: 'ask' as const, hooks: new HookDispatcher(), emit() {},
+    escalationPromptHandler: (prompt: Parameters<typeof handler>[0]) => handler(prompt) };
+  const args = { action: 'observe', scope: 'window', windowId: '42' };
+  expect((await runPreparedTool(item.tool, args, options)).isError).toBe(false);
+  handler = handlerFor();
+  expect((await runPreparedTool(item.tool, args, options)).isError).toBe(false);
+  expect(interactive).toHaveBeenCalledOnce(); const before = requests.length;
+  expect((await runPreparedTool(item.tool, { ...args, scope: 'screen' }, options)).isError).toBe(true);
+  expect(requests).toHaveLength(before); expect(interactive).toHaveBeenCalledTimes(2);
+});
 
 it('requires explicit opt-in config and executable identity; capabilities is passive and only plan-eligible action', async () => {
   const item = setup(); expect((await item.execute({ action: 'capabilities' })).success).toBe(true); expect(requests).toHaveLength(0);

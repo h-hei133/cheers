@@ -11284,3 +11284,12 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 首轮真实保存238bytes并展开，但fetch计数器在模块链接后安装，diagnostics实见GET/POST各1而包装器posts0，断言失败且未重开；保留unverified及源码，含迭代5CLI/3GET/3POST。修复harness顺序后两场通过；无效answerDeltas字段明确不用作证据。60秒/2MiB/768MiB采样及heap守卫未触发，最高324740KiB不算性能。独立证据verifier passed，无正文/key/address正式留存，HANDOFF补linking边界；ADD-28按列出的条件完成，台账1完成/8部分完成/61本地验证/1未开始，其他provider/exe/平台、未落盘与扣留内容、原47及整体goal不升级。仅三份markdown，无新unit/build/反转/全仓/15套件/20k/judge/委派复审。延迟33ce9322代码CI41258181082仍in_progress、Watch41258181274 success，本批最终门与交付另绑。
 
 最终五静态门、三脚本语法检查、独立证据verifier及diff check均exit0；binding dangling0，118条既有docs-source advisory保留。仅三份markdown变更，提交推送、remote-main与clean状态另由ignored delivery收据绑定；本批交付CI未观察，整体goal保持active。
+
+
+### 2026-11-01：全部执行准备结果纳入完整审批身份
+
+[addition24.66](features/phase-20-addition.md#2466-执行预览的完整授权身份覆盖全部准备结果)继续ADD-57：四个工具名的绑定名单漏掉其他execution adapter，同target不同desktop scope/collaboration principal可复用摘要grant。先经实际producer与原桥接七回归确认旧实现失败、定向参考执行缓存合同，再仅改原binding按execution准备准入完整args/permissionArgs/preview；普通file-plan及未准备bash保持原合同，新adapter无需扩名单。八文件126项通过，owner反转11失败且逐字节还原后126再次全绿；三次参数/路径/工作目录设置失败单独保留，不当产品或反转证据。五静态门、TS/exe build8a7a4ea1e3d1/current inputs通过。
+
+普通/全屏真实Node CLI各四步原`/collab profile`：y一次选择A、a持久记住A、B实显principal正文并Escape拒绝不换client、相同A命中opaque grant实际选择；各4gate/3审批/3client选择/1grant，匹配false/false/false/true，loopback收到HTTP0。config/auth/private输入字节保持、exit0/cooked/owned进程及0700 scratch清理，最高462616KiB不算性能。judge import两项satisfied/exit0，两个未改interactiveMode函数上限使overall partial。HANDOFF补准备合同覆盖边界；修正12.14遗漏统计，台账仍1完成/8部分完成/61本地验证/1未开始。无真实desktop/远端服务效果、exe审批、其他平台或完整adapter矩阵，不跑全仓/15套件/20k或委派复审；ADD-57本地验证、原47外部条件延后、goal active。延迟33ce9322代码CI41258181082已success，43c09f3b代码CI41259305316仍in_progress、Watch41259305326 success，不轮询；本批最终核验与交付另绑。
+
+最终五静态门、三脚本语法、独立证据verifier与diff check均exit0；binding dangling0、118既有docs-source advisory保留，current compilerInputs及stable/不可变exe size/SHA一致。仅本批五个产品/测试文件与三份markdown变更；提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，整体goal保持active。

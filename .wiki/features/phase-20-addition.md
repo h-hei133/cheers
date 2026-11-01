@@ -464,7 +464,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、第一百三十四批 | 本地验证 | — |
-| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、第一百三十五批 | 本地验证 | 完整调用及任务/角色正文绑定；原 reader 可查完整指令/上下文；预览先验容量，慢帧不饿死；MCP 仍禁止 allow-always |
+| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定；原reader完整预览、容量与绘制期限已验；desktop仅模拟原生执行，其他原生适配器/平台仍缺；MCP仍禁止allow-always |
 | ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76 | 本地验证 | — |
 | ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77 | 本地验证 | — |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78 | 本地验证 | — |
@@ -515,14 +515,14 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 
 | 状态 | 数量 | 条目 |
 |---|---:|---|
-| 完成 | 0 | — |
+| 完成 | 1 | ADD-28 |
 | 部分完成 | 8 | ADD-01、02、03、07、08、25、41、70 |
-| 本地验证 | 62 | 其余已实施条目（含本轮 ADD-69、ADD-71） |
+| 本地验证 | 61 | 其余已实施条目（含本轮 ADD-69、ADD-71） |
 | 本地实现 | 0 | — |
 | 未开始 | 1 | ADD-30 |
 | **合计** | **71** | — |
 
-**没有一条达到"完成"。** 部分完成的 8 条各有明确缺口，其余条目停在"本地验证"；具体缺口以对应条目为准。第24.43–24.45节已补所选真实provider及Linux/Node/exe普通/全屏的计量链路，但不能替代其他条目的真实工作流、桌面输入法/剪贴板、macOS/Windows与完整性能矩阵，也不能把局部绿色证据兑换成整体验收完成。
+**ADD-28已满足本条列出的完成条件。** 部分完成的8条各有明确缺口，其余61条停在"本地验证"；具体缺口以对应条目为准。第24.43–24.45节已补所选真实provider及Linux/Node/exe普通/全屏的计量链路，第24.65节补当前provider的中断推理恢复现场；这些证据不能替代其他条目的真实工作流、桌面输入法/剪贴板、macOS/Windows与完整性能矩阵，也不能把局部绿色证据兑换成整体验收完成。
 
 原 Phase 20 的 47 项矩阵保持 **38 complete / 9 partial / 0 open**，与本表分开记录。
 
@@ -6475,3 +6475,20 @@ Node20.3 普通/全屏 × user/project 四条真实 CLI 顺序通过：暂存9�
 一次延迟读取33ce9322精确代码CI41258181082仍in_progress，Watch41258181274 success；不代替完整CI、不立即轮询。本批最终静态/语法/证据核验与提交推送另绑，本批交付CI未观察。
 
 最终五静态门、三脚本语法检查、独立证据verifier及diff check均exit0；binding dangling0，118条既有docs-source advisory保留。仅三份markdown变更，提交推送、remote-main与clean状态另由ignored delivery收据绑定；本批交付CI未观察，整体goal保持active。
+
+
+### 24.66 执行预览的完整授权身份覆盖全部准备结果
+
+继续ADD-57，检查[原绑定](../../packages/ts-shell/src/core/shell/approval/binding.ts)与[desktop准备](../../packages/ts-shell/src/desktop/preparation.ts)、[collaboration原生审批](../../packages/ts-shell/src/cli/collaboration/approval.ts)：24.63只准入四个工具名。其他adapter虽提供完整execution预览，却仍可能按简短target持久/once复用；desktop同windowId的window/screen观察、collaboration同操作不同principal均未被区分。七个新增回归在旧实现下全部失败，包括实际desktop producer与原collaboration approveOperation；这是产品授权身份缺口，非provider或终端时序故障。
+
+定向只读比较本地参考4210c08defe92fe8828f789b6f9fda287ad3709e的approvals.rs:233–270：执行缓存覆盖完整结构身份，没有可靠键的网络/MCP请求不缓存，文件授权另按其合同处理。本项目采用完整身份覆盖准备好的execution请求；原绑定函数除四类旧调用外，按previewKind准入execution，继续使用原args/permissionArgs/完整preview的稳定JSON及call-v1，不增缓存或另写adapter名单。普通文件计划与未准备bash原合同保持；旧摘要grant可列出/撤销，却不能授权新绑定请求。预览中捕获的参数变化保守要求新决定，不推导文本语义等价性。
+
+Linux Node20.3、heap768MiB、单worker串行八文件126项通过：binding16、原CLI绑定27、完整准备执行4、collaboration实际producer2、desktop7、approvalExecution6、trustPolicy10、turn/tools54。覆盖磁盘重载、相同请求复用、不同请求拒绝零执行、once不被另一请求消费、旧grant管理、无名单的新工具以及原文件/bash合同控制。反转完整绑定owner后11项失败，finally逐字节还原，八文件126项再次全绿。最初Vitest新版本参数不适用于0.34.6、一次反转入口相对路径错误及一次在workspace目录调用根build脚本均分别保留设置失败；不把非测试退出1当反转证据。五静态门、TS/exe构建通过，build 8a7a4ea1e3d1b08002c7de05ef6b1d9796c55d15e4580a0739b6fd6feb6d1588，inputs 94bfb429131dffaada8a960b3f2c0a5324a81491a80cc8a853bd85fbb7bdf916。
+
+普通/全屏各一条真实Node CLI与原`/collab profile`四步：先y一次选择A；再a记住同一A请求；仅principal不同的B重新显示实际reader正文，关闭后Escape拒绝，原client仍为A、选择次数不增；恢复A请求命中原opaque grant并实际替换同身份client。每模式四次gate、三次实际审批、三次实际client选择、一条grant，匹配false/false/false/true，loopback服务收到的HTTP请求0；只验证本地profile选择与授权，没有冒充远端服务或模型调用。配置/auth/两个private profile及token字节不变，exit0/cooked恢复，自有PID/start identity非活跃，0700 scratch删除。60秒/2MiB/100ms采样768MiB守卫未触发，最高462616KiB只作小夹具观察，不作性能验收。
+
+仓库bundle离线judge exit0，acyclic/unresolved satisfied；整体仍partial，两个未改interactiveMode模块的函数上限advisory保留。证据及执行源码快照归ignored .omx/artifacts/phase20-addition-prepared-approval/；HANDOFF补执行准备合同决定绑定覆盖范围。同步修正上一批遗漏的12.14统计与旧结论，台账仍1完成/8部分完成/61本地验证/1未开始。ADD-57保持本地验证；无真实桌面设备效果、远端collaboration服务效果、exe运行审批、其他平台、完整provider/adapter矩阵、全仓/15套件/20k真实PTY或委派复审；原47外部条件延后，goal active。
+
+一次延迟读取33ce9322精确代码CI41258181082已completed/success；43c09f3b代码CI41259305316仍in_progress、Watch41259305326已success。Watch不替代代码CI，不立即轮询；本批最终证据核验及提交推送另绑，本批交付CI尚未观察。
+
+最终五静态门、三脚本语法、独立证据verifier与diff check均exit0；binding dangling0、118既有docs-source advisory保留，current compilerInputs及stable/不可变exe size/SHA一致。仅本批五个产品/测试文件与三份markdown变更；提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，整体goal保持active。

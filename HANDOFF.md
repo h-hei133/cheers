@@ -1826,3 +1826,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A real request and reasoning stream occur, but a transparent fetch wrapper records zero POSTs and fails its own verification.
 - **Root Cause**: Product modules imported the transport function before the observer replaced its export; those already linked references bypass the wrapper.
 - **Rule**: Install request observation and bounds before importing product modules that can link the transport. Cross-check wrapper counts against native request diagnostics. Preserve a late-installed observer run as unverified instead of interpreting its zero counter as no request. Bind event counters to the actual event union and exclude unused or invalid counters from acceptance claims.
+
+### Prepared Execution Defines Approval Binding Coverage
+- **Symptom**: An adapter supplies a complete execution preview, but a grant for its short display target authorizes a different principal, scope or captured operation.
+- **Root Cause**: Complete call binding is restricted to a list of tool names, so other adapters using the same preparation contract fall back to summary identity.
+- **Rule**: Bind every execution preparation's original arguments, effective permission arguments and complete preview in the existing approval domain. Keep file-plan authorization under its separate contract. Test an unlisted tool and actual producers, persisted reload, exact reuse, denial before effects, once consumption and manageable legacy grants; a new adapter must not require another name added to the binding policy.

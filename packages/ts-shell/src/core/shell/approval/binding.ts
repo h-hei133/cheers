@@ -3,9 +3,12 @@ import { createHash } from 'node:crypto';
 /** Summaries may omit fields or truncate strings; they cannot identify a call. */
 export function approvalCallBinding(toolName: string, args: Record<string, unknown>, preparation?: {
   readonly permissionArgs?: Record<string, unknown>;
+  readonly previewKind?: 'file-plan' | 'execution';
   readonly preview: string;
 }): string | undefined {
-  if (!['task', 'team', 'browser', 'ssh'].includes(toolName)) return undefined;
+  // Every prepared execution carries authority in its captured request, even
+  // when its tool name or display target is shared by unrelated operations.
+  if (preparation?.previewKind !== 'execution' && !['task', 'team', 'browser', 'ssh'].includes(toolName)) return undefined;
   // Prepared requests may capture the command, document or selected authority in
   // their reviewed preview rather than in the model's original arguments.
   const serialized = canonical([args, preparation?.permissionArgs ?? null, preparation?.preview ?? null], 0);
