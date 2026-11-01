@@ -11465,3 +11465,13 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 ### 2026-11-01：压缩触发可达性的结构性观察
 
 10 回合 × 约 200 词的会话在 60k 窗口下只到 6.0k（10%），压缩不触发——正确但说明阈值不易达到。把窗口压到 12k 时，工具 schema 约 5.4k 加默认 `maxOutputTokens` 4096 已占大半，第 8 回合直接判溢出且救援压缩因 would-not-shrink 拒绝。结论：能让阈值压缩自然触发的窗口区间很窄，用户实际会遇到「要么不压缩、要么直接溢出」。这不是缺陷，但印证 ADD-77（溢出错误说明占用构成）的必要性。构造稳定的压缩验收需同时下调 `maxOutputTokens` 与 `keepRecentTokens`，已记入后续验收方法。本批仅文档，未运行 build/vitest/全量回归。
+
+### 2026-11-01：hook 来源与压缩设计的参照调研
+
+按要求只做调研、不改产品代码。围绕两个问题读了本地 oh-my-pi/pi/codex 源码，并用 TinyFish 检索了 Claude Code 的 hooks 与 settings 文档。
+
+**hook / 配置来源（ADD-74）**：Claude Code 没有「非法来源」概念，每键可在多层设置按优先级栈解析，安全键取较低层更严格的值，项目 hook 受 workspace trust 门控。Codex 的等价键 `bypass_hook_trust` 根本不在配置 schema 里，写了就是未知键、默认静默忽略；确需「此来源不许设」时用剥离+警告+精确补救提示，写路径是 `DocumentMut` 定点编辑不复活被忽略的键，另有 `ClearPath`/null 删除原语。结论：我们的三个症状（每次告警、写回、无法删除）源于「每键来源白名单 + 基于合并值重写文档」这一对设计；单纯给 `/settings` 加 unset 是治标，根因修复应让写路径不再复活被忽略的键。
+
+**压缩（ADD-77/78）**：三家全部用 provider 实测 usage 做阈值。pi 额外有回合前检查（`_prepareRun`，注释「catches aborted responses」），omp 与 codex 都没有，所以「缺回合前检查」不是我们独有。已按算术确证 16k 溢出的根因：阈值用含 overhead 的总量（16,618 > 14,000）判定该压缩，切点预算却用不含 overhead 的纯历史（8,789 < 11,952）判定无可压缩，两个口径不一致形成死角。另记 omp 把 keepRecent 钳到「恢复带（阈值×0.8）− reserve 底线」以保证压缩后不立刻再触发，以及默认 reserve 为 16384（我们 8000）。
+
+先前暂存的 `loop.ts` 预检查改动方向不对（应丢弃），`compaction.ts` 的口径统一改动是真正的修复。以上全部写入 `phase-20-addition.md` 24.87–24.90，含问题清单与五条待裁决事项。本轮仅文档变更，未运行 build/vitest/全量回归，`verify:docs-drift:strict` 与 `git diff --check` 通过。真实 HOME 配置在探针期间临时改过 16k，已按备份逐字节恢复并复核。

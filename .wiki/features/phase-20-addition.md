@@ -7036,3 +7036,333 @@ Warning: Config user allowUntrustedHooks: source-not-allowed; value ignored. Thi
 也就是说，在「工具 schema 约 5.4k、默认输出 4096」的前提下，**能让阈值压缩自然触发的窗口区间很窄**：窗口太小会被输出上限吃掉，窗口太大则需要极长会话。这不是缺陷（判定与拒绝都正确），但它解释了为什么阈值压缩在真实使用中不易观察到，也说明 ADD-77（溢出错误应说明占用构成）的价值——用户遇到的是「要么永远不压缩、要么直接溢出」。
 
 若要构造稳定的阈值压缩验收，应同时下调 `maxOutputTokens` 与 `keepRecentTokens`，并让历史真正超过阈值，而不是只调窗口。这一点记入后续验收方法，本轮未做。
+
+#### 16k 窗口实测：首回合前不检查压缩（产品缺陷）
+
+按用户建议把真实 HOME 的配置临时改为 `contextWindow: 16000`、`reserveTokens: 2000`、`maxOutputTokens: 2048`（原值已备份，测后恢复）。同一会话续接推进到约 8.8k tokens 历史后，下一次请求直接失败：
+
+```text
+Context overflow error: could not compact context automatically.
+```
+
+`run-error`，回合终止。手工核算：历史约 8.8k + 工具 schema 约 5.4k + 输出上限 2048 ≈ 16.2k，刚好越过 16k。**判定正确**，但压缩从未被尝试——[loop.ts](../../packages/ts-shell/src/core/agent/loop.ts) 的 `prepareNextStep` 位于 `if (completedStep)` 分支内，即只在**两步之间**运行：
+
+```ts
+while (hasMoreToolCalls || pending.length > 0) {
+  if (completedStep) {
+    const update = await config.prepareNextStep?.(completedStep, signal);
+    ...
+```
+
+于是：
+
+- 带工具的回合（多步）会在步骤之间检查压缩，能触发；
+- **单步回合（无工具调用）从不检查**——它从进入循环到发出请求之间没有 `completedStep`，直到 provider 拒绝才走 `recoverOverflow`，而救援压缩因 would-not-shrink 或切点不足拒绝，最终报溢出。
+
+对照 pi：`_prepareRun` 在**每次运行开始前**调用 `_checkCompaction`，并注明「catches aborted responses」——即上一回合中止后遗留的超大上下文也会在下一次运行前被处理。我们的实现在这一点上没有对应检查。
+
+这解释了 24.86 中「阈值压缩不易观察」的现象：不是窗口区间窄，而是**单步回合永远不会主动压缩**。带工具的回合会，无工具的不会。
+
+**这是本轮发现的最实质的产品缺陷**，登记为 ADD-78。它同时给 ADD-77 增加了依据：用户遇到溢出时，既得不到原因，也不知道本可以更早压缩。
+
+### 24.87 调研：hook 配置来源与信任（Codex / Claude Code）
+
+本轮只做只读调研，不改代码。目标是给 ADD-74 找参照：当配置键的来源受限、文件里出现该键时，成熟产品怎么处理。
+
+#### Claude Code：多来源合并 + 优先级栈 + 项目信任门控
+
+**来源分层**（`~/.claude/settings.json`、`.claude/settings.json`、`.claude/settings.local.json`、managed policy、插件 `hooks/hooks.json`、skill/subagent frontmatter）。优先级自高到低：managed → 命令行 `--settings` → project local → shared project → user。环境变量不在这条栈里，按每个键单独规定。
+
+**列表合并而非覆盖**：`permissions.allow` 这类列表键跨文件合并，每个文件都能追加而不会抹掉别处的条目。少数键例外（`fallbackModel` 取最高优先级整值、`availableModels` 在 managed 定义时整表生效）。
+
+**安全键可以「反向覆盖」**：文档明确写「对少数安全敏感键，Claude Code 采用较低层级中更严格的值，而不是 managed 值」。这与我们的「安全字段只收紧」原则一致。
+
+**hook 的项目来源受 workspace trust 门控**：项目 `.claude/settings.json` 里的 hook，只有在用户接受该文件夹的信任对话框后才注册；`-p`（非交互）运行**不算**接受。skill frontmatter 的 hook 也遵循同一 workspace trust 规则，但 project skill 的 frontmatter hook 在 `-p` 下、未信任文件夹中仍会注册——两者被显式区分。
+
+**hook 合并跨层级**：user、project、local 各自追加，不互相替换；`disableAllHooks` **不能**关闭 managed 层的 hook。`allowManagedHooksOnly` 可让管理员屏蔽用户/项目/本地/插件 hook。
+
+**`disableAllHooks` 与 `allowManagedHooksOnly` 是两个独立开关**，前者「全关（除 managed）」，后者「只留 managed」。这是把「谁可以定义」和「是否运行」分成两件事。
+
+#### 与本项目的对照
+
+| 维度 | Claude Code | 本项目（现状） |
+|---|---|---|
+| 来源策略 | 每键可在多层设置，按优先级栈解析 | 每字段声明 `sources` 白名单（如 `['override']`） |
+| 文件里出现非法来源 | 不存在「非法来源」概念——只要层级允许就生效 | 拒绝并告警，值被忽略 |
+| 安全键 | 低层级更严格值可以覆盖高层级 | 安全字段只收紧，一致 |
+| 项目 hook | workspace trust 门控，`-p` 不算接受 | 已有项目信任与 hook 授权 |
+| 关闭 hook | `disableAllHooks` / `allowManagedHooksOnly` 两个开关 | `allowUntrustedHooks`（仅命令行） |
+
+**关键差异**：Claude Code 的模型里没有「这个键只允许命令行设置，出现在文件里就是错误」这一档。它用「层级」表达谁说了算，用「安全键取更严格值」表达收紧。我们的 `sources: ['override']` 更接近「这个键不属于文件层」，语义上更严格，但也因此产生了 ADD-74 的僵局：键留在文件里永远不会消失，且没有产品内移除手段。
+
+**可借鉴的点**（不直接照搬）：
+1. 「谁可以定义」与「是否运行」分离（`allowManagedHooksOnly` vs `disableAllHooks`）。
+2. 对「文件里出现了不属于该层的键」，成熟做法是**忽略并说明**，而不是把它当成需要用户手动清理的错误——但前提是产品不会把它写回。
+3. 项目来源的执行能力受 workspace trust 门控，这一点我们已经具备。
+
+（Codex 与 omp/pi 的对照见 24.88；两项由子代理只读调研，结果未返回前本节只记录已核实的 Claude Code 部分。）
+
+### 24.88 调研：压缩与上下文显示（oh-my-pi 实测源码）
+
+只读源码，未改代码。oh-my-pi 的 `docs/compaction.md` 与 `packages/agent/src/compaction/compaction.ts` 给出了一套明显更成熟的模型，以下逐条对照我们的现状。
+
+#### 触发：六种，其中「回合前」不存在，但「工具循环边界」存在
+
+oh-my-pi 的触发点（`docs/compaction.md` §Triggers）：
+
+1. 手动 `/compact`；
+2. 溢出恢复（同一模型的 assistant error 匹配 context overflow）；
+3. 输出不完整恢复（`stopReason === "length"`）；
+4. **回合后阈值维护**：一次成功回合之后，context 超过阈值时；
+5. **回合内阈值维护**：`compaction.midTurnEnabled !== false` 时，工具循环的下一次 provider 请求之前；
+6. 空闲维护（`runIdleCompaction()`）。
+
+其中第 5 条绑在 `agent.setOnTurnEnd` 上（`agent-session.ts:2286`），条件是 `context?.willContinue`——**与我们的 `prepareNextStep` 位置等价，同样不在首次请求前检查**。
+
+因此「首次请求前不检查」并非我们独有。真正的差异在下面三条。
+
+#### 差异一：阈值用 provider 实测，不是估算
+
+oh-my-pi 的阈值判定用 `calculateContextTokens(usage)`（`compaction.ts:269`）：
+
+```ts
+const raw = usage.totalTokens || usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
+return Math.max(0, raw - orchestrationTotal);
+```
+
+即 **provider 返回的 input + cacheRead + cacheWrite**，天然包含 system prompt 与工具 schema。另外它会**扣除 provider 侧编排 token**（`orchestration`），因为那部分可计费但不会回放进对话前缀，计入会虚高阈值。
+
+我们的 `planCompaction` 用 `estimateRequestTokens(messages, policy.overhead)`，是本地字符数 ÷ 3.5 的估算；`overhead` 需要在运行时注入，而 24.86 的实测发现运行时构建 policy 时**没有设置 `overhead`**（`cli/runtime/compaction.ts` 的 policy 字面量里没有该键，只有 `withRequestOverhead` 在 `startTurn` 里事后注入——`--print` 路径是否走到那里尚未核实）。这是「估算 vs 实测」的实质差距。
+
+#### 差异二：keepRecent 的钳制目标是「压缩后落回阈值之下」
+
+oh-my-pi 在 `compaction.ts:1540-1555`：
+
+```ts
+const recoveryBand = Math.floor(resolveThresholdTokens(contextWindow, settings) * COMPACTION_RECOVERY_BAND); // 0.8
+const reserveFloor = Math.min(resolveBudgetReserveTokens(contextWindow, settings), settings.reserveTokens ?? DEFAULT_RESERVE_TOKENS);
+const tailBudget = recoveryBand > reserveFloor ? recoveryBand - reserveFloor : Math.floor(recoveryBand / 2);
+keepRecentTokens = Math.min(keepRecentTokens, Math.max(1, tailBudget));
+```
+
+注释说明了理由：「压缩后的上下文（保留尾部 + 摘要/prompt 开销）必须落在配置触发点之下的恢复带里，否则会立刻再次触发。触发点是用户的选择，所以让保留尾部让步，而不是让触发点让步。」
+
+另有一条按实测比例缩放：`keepRecentTokens = keepRecentTokens / (promptTokens / estimatedTokens)`，把估算误差折算进去。
+
+我们的钳制是 `Math.min(keepRecentTokens ?? 20000, availableTailTokens(policy))`，`availableTailTokens` = `window - reserve - output`（我刚加的改动再减去 overhead）。**没有「压缩后必须低于阈值」这一约束**，因此可能出现压缩完仍在阈值之上、下一回合立刻再压缩。
+
+另：oh-my-pi 的 `DEFAULT_RESERVE_TOKENS = 16384`（`compaction.ts:198`），我们是 8000。
+
+#### 差异三：上下文晋升（context promotion）优先于压缩
+
+oh-my-pi 在溢出与输出不完整两条恢复路径上都**先尝试换更大的模型**，不可用才压缩：
+
+> Context promotion is tried first; if a configured larger model is available, the agent switches model and retries without compacting.
+
+我们没有这个概念。
+
+#### 其他值得记录的设计
+
+- **payload 拒绝保护**：HTTP 413 不自动当作 token 溢出。窗口已知且本地估算至少有 10% 余量、或显式图片限制证据时，阻止自动继续并报 payload 预算警告，而不是压缩或换模型。
+- **speculation**：在阈值之下提前于后台生成摘要（`#startSpeculationRun`），真到阈值时直接应用。有「刷新即增长」策略：保留尾部增长超过 keepRecent 预算就重新生成。
+- **空闲维护**：与 prompt cache TTL 对齐（长 tier 约 54 分钟，提前 5 秒），让摘要请求仍能读到缓存前缀。默认 300 秒短 tier 的取舍被明确记录为「接受冷读，避免短暂停顿触发压缩」。
+- **恢复带 0.8**：`COMPACTION_RECOVERY_BAND = 0.8`，压缩后目标落在阈值的 80% 以下。
+
+#### 对我们 ADD-77 / ADD-78 的意义
+
+- ADD-77（溢出错误不说明构成）在 oh-my-pi 里对应的是「payload 预算警告」与「恢复失败时的可行动报告」，它们都区分了「窗口已知/未知」「有实测/仅估算」。
+- ADD-78 的定性需要修正：**oh-my-pi 同样不在首次请求前检查**，所以「缺少回合前检查」不是我们独有的缺口。
+
+**16k 溢出的根因已按算术确证**（不是推测）：
+
+| 量 | 值 |
+|---|---|
+| 历史（transcript 实测） | 8789 tokens |
+| 工具 schema（`/context` 报 18,865 bytes） | ≈5390 tokens |
+| system prompt | ≈391 tokens |
+| 输出上限 | 2048 |
+| 合计 | 16,618 > 窗口 16,000 |
+| 阈值（window − reserve） | 14,000 |
+
+阈值判定本应触发（16,618 > 14,000）。压缩却拒绝了，原因是切点预算：
+
+- 修复前 `availableTailTokens` = `16000 − 2000 − 2048` = **11,952**，不减工具 schema；
+- `keepRecentTokens` 被钳到 11,952；
+- 历史 8,789 < 11,952 → `fits-budget`，判定「整个对话都在保留尾部之内，无需压缩」；
+- 但请求真实总量 16,618 已溢出。
+
+也就是说：**阈值用「含 overhead 的总量」判断该不该压缩，切点预算却用「不含 overhead 的纯历史」判断能不能切**，两个口径不一致，于是出现「该压缩、却认为没什么可压」的死角。oh-my-pi 用 provider 实测 usage（天然含 overhead）做阈值，并把 keepRecent 钳到恢复带，口径统一。
+
+- 我先前暂存的 `loop.ts` 预检查改动（`git stash`）**方向不对**，应丢弃；正确的修复在 `availableTailTokens` 的口径统一（已实现并验证，见下）与 keepRecent 的恢复带钳制（尚未做）。
+
+#### pi 的对照（实测源码）
+
+| 维度 | pi | 我们 |
+|---|---|---|
+| 回合前检查 | **有**。`_prepareRun` 在每次运行开始时调用 `_checkCompaction(lastAssistant, false)`，注释写明「catches aborted responses」 | 无 |
+| 阈值来源 | **优先 provider 实测**：`calculateContextTokens(usage)` = `usage.totalTokens \|\| input+output+cacheRead+cacheWrite`；仅当 usage 缺失（error/全零）才回退到 `estimateContextTokens(messages)` | 纯估算 |
+| 阈值公式 | `contextTokens > contextWindow - reserveTokens`，`DEFAULT reserveTokens = 16384` | 同形式，但 reserve 默认 8000 |
+| keepRecent | `DEFAULT keepRecentTokens = 20000`，`findCutPoint` **不做窗口钳制**——走不动就返回起点（等价于「无可压缩」） | 钳到 `availableTailTokens` |
+| 陈旧 usage 防护 | 有：压缩后保留的旧消息带旧 usage，会误触发；pi 检查 usage 消息是否早于最近一次压缩边界 | 无（我们靠 `historyDigest` 匹配） |
+
+pi 与 omp 的共同点：**阈值优先用 provider 实测**。这是两家一致的判断，而我们用纯估算。
+
+#### 三家汇总（codex 部分待补）
+
+| 能力 | oh-my-pi | pi | 我们 |
+|---|---|---|---|
+| 回合前检查 | 无（mid-run 仅在 `willContinue`） | **有**（`_prepareRun`） | 无 |
+| 阈值数据源 | 实测 usage（扣编排 token） | 实测 usage（缺失才估算） | 纯估算 + 注入 overhead |
+| 切点预算口径 | 含 overhead（实测） | 实测，不做窗口钳制 | 纯历史（修复前不含 overhead） |
+| keepRecent 钳制 | 钳到「恢复带 − reserve 底线」 | 不钳制 | 钳到可用窗口 |
+| 上下文晋升 | 有（先换大模型再压缩） | 无 | 无 |
+| 摘要预生成 | 有（speculation） | 无 | 无 |
+
+### 24.89 调研：Codex 的 hook 信任与配置来源（实测源码）
+
+只读源码，未改代码。Codex（`codex-rs`，Rust）的模型与 Claude Code 不同，但对 ADD-74 更有参考价值。
+
+#### 没有「每键来源白名单」这一层
+
+Codex 的 `ConfigToml` 是单一 serde 结构体，所有层反序列化到它。不存在 `sources = ['override']` 这种声明。表达「谁说了算」只有四种机制：
+
+1. **层优先级**（`config_layer_source.rs:32-56`）：PackagedDefaults(−10) → Mdm(0) → System(10) → EnterpriseManaged(15) → User(20) → Project(25) → SessionFlags(30)。CLI `-c key=value` 作为 SessionFlags 最后压入，靠优先级胜出。
+2. **项目层拒绝名单**（`loader/mod.rs:75-88`）：`PROJECT_LOCAL_CONFIG_DENYLIST`，包含 `model_provider`、`notify`、`profiles`、`otel` 等 12 个键。应用方式是 `table.remove(*key)`——**剥离并警告，不是拒绝**。
+3. **仅 requirements 的键**：如 `allow_managed_hooks_only` 只存在于 `ConfigRequirementsToml`，写在 `config.toml` 里会被静默忽略（`config_loader_tests.rs:364-428` 显式断言这是 no-op）。
+4. **仅代码的键**：`bypass_hook_trust`（`config/mod.rs:912-917`，注释写明「runtime-only knob populated from invocation overrides, not from config files」），对应 CLI 标志 `--dangerously-bypass-hook-trust`。
+
+**这正是我们 `allowUntrustedHooks` 的对应物**，但处理方式完全不同：Codex 让它**根本不在配置 schema 里**，于是文件里写了就是未知键，默认静默忽略，只有 `--strict-config` 才报一行错。
+
+#### 未知键的三种处理，都区别于我们
+
+| 情形 | Codex | 我们 |
+|---|---|---|
+| 文件里有 schema 之外的键 | 默认静默忽略；`--strict-config` 才报 `unknown configuration field \`x\`` + file:line:col + `^^^^` 插入符 | 每次启动告警 |
+| 项目层设了拒绝名单里的键 | **剥离该键、继续运行、一条警告**，点名所有被剥离的键并给出精确补救：「If you want these settings to apply, manually set them in your user-level config.toml.」 | `source-not-allowed` + `value ignored` |
+| 值类型错误 | 无论是否 strict 都是致命错误 | 致命错误 |
+
+#### 写入路径不会复活被忽略的键
+
+Codex 的写入是对 `toml_edit::DocumentMut` 的**定点编辑**，从不重新序列化类型化结构体（`edit.rs:741-779`）：
+
+- 代码不认识的键**原样保留**（从未进入解析路径）；
+- 注释与格式保留；
+- 无变化时跳过写入（`if !mutated { return Ok(()) }`）；
+- 只允许写用户配置文件。
+
+**这与我们的行为正好相反**：我们基于「原始文档合并值」重写整份文档，于是被层加载器忽略的键在写入路径上被原样带回。Codex 天然没有这个问题，因为它的写路径根本看不见 schema。
+
+#### Codex 有一等的「删除键」原语
+
+- 引擎级 `ConfigEdit::ClearPath { segments }`（`edit.rs:78-79`），用于「取消设置、回到默认」——例如关闭默认 false 的 feature 时**清除键而不是写 false**（`edit.rs:881-905`）。
+- RPC 级：`null` 值即删除（`config_manager_service.rs:520-526, 593-601`），客户端助手 `clear_config_value` = `replace_config_value(key, Null)`（`config_update.rs:41-51`）。
+- CLI 级：`codex mcp remove`、`codex plugin remove`、`codex features disable`。**没有通用的 `codex config unset`**。
+
+#### hook 信任：声明与信任分离
+
+这是对 ADD-74 最有启发的一条：
+
+- **可信对象**不是项目、也不是文件，而是 hook 的**规范化身份哈希**（`discovery.rs:748-778`），注释说明「so equivalent hooks from config TOML and hooks.json converge on the same trust identity」。
+- **信任状态存在用户配置**的 `[hooks.state."<key>"]`，键格式 `"{key_source}:{event}:{group_index}:{handler_index}"`。
+- **只有 user 与 session-flag 层能写信任**（`config_rules.rs:15-31`）：项目、managed、插件层可以**发现** hook，但**不能写用户 hook 状态**。这就是「仓库能声明 hook，但不能自我授权」的实现方式。
+- **撤销是隐式的**：编辑 hook → 哈希变化 → 状态从 `Trusted` 降为 `Modified`（界面显示 "Modified since last trusted - review required"）。没有显式的 untrust 动作。
+- **启动时**：任何 `Untrusted`/`Modified` 的 hook 会弹出复核屏挡住会话；`--dangerously-bypass-hook-trust` 跳过并打印启动警告。
+
+对照我们：我们的 `allowUntrustedHooks` 是**一个布尔开关**，Codex 是**逐 hook 哈希 + 分层写入权限**。两者不是同一粒度的设计。
+
+#### 对 ADD-74 的结论
+
+我们观察到的三个问题在 Codex 里都不存在，原因是一条链：
+
+1. 键不在 schema → 文件里写了不算「非法来源」，只是未知键；
+2. 未知键默认静默 → 不会每次启动重复告警；
+3. 写路径是文档定点编辑 → 被忽略的键不会被写回；
+4. 另有 `ClearPath`/null 原语 → 需要时能显式删除。
+
+我们同时具备「告警、写回、无法删除」三个特征，是因为选择了「每键来源白名单 + 基于合并值重写文档」这一对设计。**修复方向不是给 `/settings` 加一个 unset 命令，而是让写路径不再复活被忽略的键**——这一点与 Codex 的做法一致，也解释了为什么单纯加命令只是治标。
+
+#### Codex 的对照（实测源码）
+
+| 维度 | Codex | 我们 |
+|---|---|---|
+| 检查位置 | **post-sampling**（每次模型调用后，`turn.rs:424-470`），由 `needs_follow_up` 驱动 | 步骤之间（`prepareNextStep`） |
+| 回合前检查 | 无 | 无 |
+| 阈值数据源 | **实测**：`sess.get_total_token_usage()`（`context_window.rs:57`） | 纯估算 |
+| 阈值 scope | 两种：`Total` 与 `BodyAfterPrefix`（后者扣掉 prefill 基线） | 单一总量 |
+| 硬上限 | 模型完整窗口独立于压缩阈值，两者取更严的 | 只有阈值 |
+| 缓冲 | `fallback_buffer_tokens` 仅在有 fallback prompt 时预留 | 无此概念 |
+| 压缩实现 | 三种：`ResponsesCompactionV2` / `ResponsesCompact` / 本地 `run_inline_auto_compact_task`，按 provider 能力选择 | 单一实现 |
+| 模型回退 | `compact_model_fallback.rs`：上一个模型压缩失败则用当前模型重试 | 无 |
+
+**Codex 的 `BodyAfterPrefix` scope 值得单独记一笔**：它把「请求前缀（system + tools）」当作固定成本，只对「前缀之后新增的 body」计阈值。这与我们 24.88 里发现的「阈值用总量、切点预算用纯历史」是同一问题的另一种解法——Codex 明确把两者分开定义并让用户可选。
+
+#### 三家在「回合前检查」上的分歧
+
+| | oh-my-pi | pi | codex | 我们 |
+|---|---|---|---|---|
+| 回合前检查 | 无 | **有** | 无 | 无 |
+
+只有 pi 有。它的注释说明了理由：「catches aborted responses」——上一回合被中止后遗留的超大上下文，在下一次运行前处理。这是 pi 独有的保护。
+
+因此 ADD-78 的定性应为：**我们缺少的不是「回合前检查」（三家中有两家也没有），而是阈值口径与切点预算口径不一致**。pi 之所以能靠回合前检查兜住，是因为它同时用实测 usage；我们没有实测兜底，又不检查，才会走到「该压缩却不认为可压缩」的死角。
+
+### 24.90 调研结论：问题清单与可选方案
+
+本轮只做调研，未改产品代码。以下把 24.83–24.89 的发现整理成「问题 → 三家怎么做 → 可选方案」，供裁决。
+
+#### A. hook / 配置来源（对应 ADD-74）
+
+**问题**：`allowUntrustedHooks` 这类「只允许命令行设置」的键，一旦被写进配置文件，会同时触发三个症状——每次启动告警、任何保存都把它写回、产品内无法删除。
+
+**三家怎么做**：
+
+| | 做法 |
+|---|---|
+| Claude Code | 没有「非法来源」概念。每键可在多层设置，按优先级栈解析；安全键取较低层更严格的值。项目 hook 受 workspace trust 门控。 |
+| Codex | 等价键 `bypass_hook_trust` **不在配置 schema 里**，写了就是未知键，默认静默忽略。需要「此来源不许设」时用剥离+警告+补救提示。写路径是 `DocumentMut` 定点编辑，不复活被忽略的键。有 `ClearPath`/null 删除原语。 |
+| oh-my-pi | 未在本轮核实该具体字段（其 hook 授权模型见 24.71–24.75 的历史记录）。 |
+
+**可选方案**（按改动面从小到大）：
+
+1. **只改警告文案**（已做，24.85）：说明来源与「可从文件移除」。治标。
+2. **写路径不再复活被忽略的键**：让 `persistConfigEdit` 在合并基线时排除 `source-not-allowed` 的键，使其在下一次保存时自然消失。与 Codex 的行为一致，改动集中在 `persistence.ts` 与 `layers.ts` 的交互处。
+3. **加 `ClearPath` 式删除原语**：`patchConfigDocument` 已有 `deletionEdits`，缺的是「用 `undefined` 表达删除」的契约与一个调用入口。
+4. **把该键移出配置 schema**（Codex 路线）：改动最大，会影响现有 `RuntimeConfigFile` 类型与所有读取点。
+
+倾向：方案 2 是根因修复，且不引入新命令；方案 3 可作为后续增强。方案 1 已交付，可保留。
+
+#### B. 压缩与上下文（对应 ADD-77 / ADD-78）
+
+**问题一（已确证）**：阈值用「含 overhead 的总量」判断，切点预算用「不含 overhead 的纯历史」判断，两个口径不一致，导致「该压缩、却认为无可压缩」的死角。16k 实测算术见 24.88。
+
+**三家怎么做**：三家全部用 **provider 实测 usage** 做阈值（pi/omp/codex 一致），天然含 overhead，不存在口径不一致。
+
+**可选方案**：
+
+1. **统一口径**：让 `availableTailTokens` 扣除 overhead（已实现并验证，暂存在 `git stash`），使切点预算与阈值同源。
+2. **改用实测 usage**：与三家对齐，但需要 provider 在首次请求前就有 usage——首回合没有，仍需估算兜底。
+3. **两者结合**：有实测用实测，无实测用「估算 + overhead」，并保持两个口径同源。
+
+倾向：方案 1 立即修根因；方案 3 作为与三家对齐的长期方向。
+
+**问题二**：`keepRecentTokens` 的钳制目标是「可用窗口」，而 oh-my-pi 钳到「恢复带（阈值 × 0.8）− reserve 底线」，保证压缩后落在阈值之下、不会立刻再次触发。我们的钳制没有这个约束。
+
+**可选方案**：引入恢复带概念，`keepRecent = min(keepRecent, recoveryBand − reserveFloor)`。
+
+**问题三**：默认 `reserveTokens` 我们是 8000，pi 与 oh-my-pi 都是 16384。小窗口下这个差异会显著改变可用空间。
+
+**问题四（ADD-77）**：溢出错误只说「无法自动压缩」，不说明占用构成，也不给动作。oh-my-pi 有「payload 预算警告」与「恢复失败的可行动报告」，并区分「窗口已知/未知」「有实测/仅估算」。
+
+**问题五（能力缺口，非缺陷）**：三家都有我们没有的能力——pi 的回合前检查、omp 的上下文晋升与 speculation、codex 的多实现压缩与模型回退。是否引入需单独裁决。
+
+#### C. 上下文显示
+
+我们的 `/context` 已有 measured/stale/unknown 四态，且明确「只显示可核对的量」，这一点比三家中的多数更严格（24.86 记录的 `Assembled request estimate` 与 `Provider prompt usage is unknown` 就是例证）。本轮未发现需要修改的地方，但若采纳「实测 usage 做阈值」，显示层与压缩层可以共用同一份数据，减少一次估算。
+
+#### 待裁决事项
+
+1. A 走方案 2（写路径不复活被忽略的键）还是方案 3/4。
+2. B 走方案 1（统一口径，已实现待取回）还是直接对齐实测 usage。
+3. 是否引入恢复带钳制与 16384 的 reserve 默认值。
+4. 是否引入 pi 的回合前检查（三家中有两家没有）。
+5. ADD-77 的呈现形式（复用 `/context` 的分类估算到错误路径）。
