@@ -7,6 +7,7 @@ import { createConfigInputs } from '../../../config/inputs/selection.js';
 import { projectTrust } from '../../security/trust/store.js';
 import { runModelCommand } from '../modelCommandRuntime.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
+import { SessionManager } from '../../../session/SessionManager.js';
 
 /**
  * The provider-level default is a separate slot from a connection's own
@@ -80,4 +81,22 @@ it('leaves a declared account pool serving the request, so its member keeps the 
   expect(preferences.providers?.openai?.model).toBe('provider-base');
   expect(preferences.connections?.find(item => item.id === 'named')?.model).toBe('provider-model');
   expect(result.output).toContain('Model switched to provider-model');
+});
+
+it('names a session selection through the real projection rather than as a stored default', async () => {
+  const session = new SessionManager().createNew(workspace);
+  expect((await runModelCommand(['use', 'session-model'], { cwd: workspace, projectRoot: workspace, sessionId: session.id }))
+    .output).toContain('Model switched to session-model');
+  const result = await runModelCommand(['status'], { cwd: workspace, projectRoot: workspace, sessionId: session.id });
+  expect(result.output).toContain('Model: session-model');
+  // The provider slot owns the request here, so the session overlays that leaf.
+  expect(result.output).toContain('Model source: provider (session selection).');
+  // The session's choice is not written into either stored default.
+  const [settings, auth] = documents();
+  const preferences = settings.modelPreferences as { providers?: Record<string, { model?: string }>;
+    connections?: Array<{ id: string; model?: string }> };
+  expect(preferences.providers?.openai?.model).toBe('provider-base');
+  expect(preferences.connections?.find(item => item.id === 'named')?.model).toBe('connection-model');
+  // Neither the credential document nor the session's own save moved a default.
+  expect((auth.providerConnections as Array<{ model?: string }>)[0]?.model).toBeUndefined();
 });

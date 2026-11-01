@@ -6766,8 +6766,12 @@ ADD-61 继续保持本地验证；Phase 20 总矩阵不变，ADD-30 不启动，
 
 只读输入的拒绝用例需要 `providerCredentials` 同时带 `apiKey`，否则命令在更早的「current request credential is unavailable」处就被挡住，到不了守卫；这属于既有准入顺序，未改动产品去迁就测试。
 
-ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/commands/model/defaultSource.test.ts) 逐条断言文案与 `effective`，并在 [modelCommandRuntime.test.ts](../../packages/ts-shell/src/core/commands/modelCommandRuntime.test.ts) 以真实 `runModelCommand(['status'])` 覆盖四态与「会话选择」标记；这些用例同时断言 `Model:` 的值不变，证明投影没有改变实际请求目标。
+ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/commands/model/defaultSource.test.ts) 逐条断言文案与 `effective`，并在 [modelCommandRuntime.test.ts](../../packages/ts-shell/src/core/commands/modelCommandRuntime.test.ts) 以真实 `runModelCommand(['status'])` 覆盖四态；这些用例同时断言 `Model:` 的值不变，证明投影没有改变实际请求目标。「会话选择」标记另有一条走真实投影链的用例（`providerDefault.test.ts`）：先 `/model use` 写入会话选择，再读 `/model status`，断言来源行为 `Model source: provider (session selection).` 且两个存储层都没有被这次选择改动。把 `sessionOwnsModel` 反转成恒 `false` 后，该用例与 `modelCommandRuntime` 中手工构造 provenance 的那条同时失败（2 项），逐字节恢复后 SHA-256 回到 `511f56c0cc1abb9382700d440901262e570b22f51738806c6b573cb1ce6604d9` 并重验通过。
 
-**聚焦验证与边界。** 单 worker / heap768MiB 串行执行四文件 114 项通过：`session/model/selection` 69、`modelCommandRuntime` 35、`providerDefault` 3、`defaultSource` 7；另跑 `model/policy` 10、`config/documents` 32、`config/preferences/documents` 11 确认两层并存与空记录压制的既有合同未变。静态门 `verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`verify:docs-drift:strict` 通过（118 条既有 docs-source advisory 保留），TS build 通过（当前 manifest `14503c0a3d63`）。`analyze:module-facades` 仍报告 `cli/interactive/interactiveMode.ts` 一个既有 advisory，本批未触碰该文件。
+池成员场景另有一条用例：声明 `accountPool` 后同一命令把默认写到池成员连接、provider 槽保持原值，说明守卫的保留项与实际服务请求的层一致。
+
+**聚焦验证与边界。** 单 worker / heap768MiB 串行执行四文件 115 项通过：`session/model/selection` 69、`modelCommandRuntime` 35、`providerDefault` 4、`defaultSource` 7；另跑 `model/policy` 10、`config/documents` 32、`config/preferences/documents` 11 确认两层并存与空记录压制的既有合同未变。静态门 `verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`verify:docs-drift:strict` 通过（118 条既有 docs-source advisory 保留），TS build 通过（当前 manifest `7463f851eba5`）。`analyze:module-facades` 仍报告 `cli/interactive/interactiveMode.ts` 一个既有 advisory，本批未触碰该文件。
+
+**一处未修的显示边界（已核实，未纳入本批）。** 当请求由 fallback 连接或 accountPool 成员服务、而 `activeProviderConnectionId` 未存储时，`/model status` 的 `Active connection: none` 与 `Model: unset` 会和下一行的 `Request model` 不一致。这不是 ADD-73 引入的：它由「已存储选择」与「解析后的请求」两个字段并列展示的既有设计决定，且 [modelCommandRuntime.test.ts](../../packages/ts-shell/src/core/commands/modelCommandRuntime.test.ts) 的 signer 与 missing-connection 用例已锁定该形态。改动它要同时决定 readiness 文案与 `Model:` 的语义，属于独立裁决，本批不动。
 
 本批证据仅限本地聚焦测试与静态门：没有真实终端观感验收、没有真实 provider 工作流、没有其他平台或完整性能矩阵，因此 ADD-72、ADD-73 记为「本地验证」，不提升 ADD-70。
