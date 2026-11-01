@@ -369,7 +369,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-14 | P0 | settings 顶部导航，左右键切分类、Tab 切条目与分节 | 第 32 项、21.2、21.15 | 本地验证 | 真实桌面鼠标/键盘；其他平台 |
 | ADD-15 | P2 | model 面板未就绪项置底、组内字母序、Not ready 分隔标题 | 第 35 项、21.5、21.16 | 本地验证 | 真实面板观感；窄屏分隔标题 |
 | ADD-16 | P1 | 区分 config.json 与 models.json 的归属，并显示目录加载诊断 | 第 31 项、19.5、21.1、21.14 | 本地验证 | 用户真实 models.json 现场 |
-| ADD-17 | P1 | settings 子面板返回、取消与失败后保留原 notice | 第 8、25、26 批、第24.60–24.61节 | 本地验证 | 真实文件系统故障 |
+| ADD-17 | P1 | settings 子面板返回、取消与失败后保留原 notice | 第 8、25、26 批、第24.60–24.62节 | 本地验证 | Linux真实目录权限拒绝/恢复已验；物理磁盘故障及其他平台仍缺 |
 | ADD-18 | P2 | 面板悬停、滚轮、侧栏独立滚动与非循环焦点 | 第 17–21 批、21.19 | 本地验证 | 真实桌面鼠标手感 |
 | ADD-19 | P2 | 面板鼠标选择后的键盘焦点与切类后的原字段恢复 | 第 17 批、21.19 | 本地验证 | 同上 |
 | ADD-20 | P2 | 角色动作退役、子面板返回与不可用档位的只读焦点 | 第 42–44 批、第八十至九十四批 | 本地验证 | 完整角色/认证矩阵 |
@@ -6401,3 +6401,16 @@ ADD-47表中的缺口是20.52尚未在真实CLI注入unknown。本批先检查�
 证据在 ignored 的 .omx/artifacts/phase20-addition-settings-scope-return/，baseline/fixed与探针快照、红绿/反转/build日志、初次失败和四条最终布尔/数值收据分开保留；独立verification已通过。HANDOFF将同一失败状态规则扩展到scope取消。无raw PTY/真实凭据/请求正文，无真实provider、当前exe故障注入、其他平台/真实磁盘故障、全仓/15套件/20k真实PTY、local NormProof或委派复审。本批不升级ADD-03，原47外部条件延后、ADD-30继续暂缓，goal active。
 
 一次延迟读取5acafcb3代码CI41254074206与c66fbc8a代码CI41252988169仍in_progress，各Watch41254074184/41252988065 success；不以Watch替代完整CI，不立即轮询。本批最终门及提交推送另绑，本批交付CI未观察。
+
+
+### 24.62 设置真实目录权限拒绝、子面板返回与恢复
+
+补 ADD-17 的实际文件系统失败证据，先读[原草稿](../../packages/ts-shell/src/cli/interactive/settings.ts)、[配置持久 owner](../../packages/ts-shell/src/config/persistence.ts)、[原锁](../../packages/ts-shell/src/session/store/sessionFileStore.ts)及原错误投影，确认已有 lock-failed/unchanged 与显式 reopen。保持已交付 b8670318 的产品源码及 build d0b773499bec73e957062a486bec2fa7a960db01861b40b1f4e56b2bde63b921、inputs c53a1bdf9389f3e7751abaca8dfe23dea92f8eb217d7298c81a71bb0cb7a6411；无新产品修补或重复构建。独立核验 current compilerInputs、原 Git owner 字节及 stable/不可变 exe size/SHA 一致。
+
+Node20.3 普通/全屏 × user/project 四条真实 CLI 顺序通过：暂存9后，harness 将隔离目标父目录改为0500；原 writer 的锁 openSync(wx)实际抛 EACCES，文件字节不变，面板真实提示 this attempt did not write。observer只转调原 openSync 并记录匹配的错误码/成功次数，原异常继续抛出，不伪造异常或 writer结果。在拒绝状态依次读来源并返回、移动到另一范围后取消、编辑成12并确认，三个子操作不save/reopen，原范围/失败信息保持。权限仍拒绝时下一次明确Apply再实际EACCES、原文件仍不变；恢复目录原权限后再明确Apply才成功保存12并重开Stored读回。每场三次save、两次reopen、两次实际锁拒绝、一次锁成功；注释/topP、另一scope/auth/session model保持，HTTP0、退出0/cooked恢复、权限恢复、owned PID/start identity非活跃及scratch清理。
+
+首条探针在第二次相同失败提示处立即认了旧frame，saves仍1而断言期望2，独立保留unverified及其源码；修正为要求overlay revision比重试前更新，四场使用同一冻结脚本。含初条共5次CLI，不计为五条有效矩阵。HANDOFF追加相同结果必须等待新面板代次的规则。每场45秒/2MiB/100ms采样768MiB守卫未触发，最高436708KiB只作小夹具观察，不算性能验收。
+
+证据归 ignored 的 .omx/artifacts/phase20-addition-settings-permission/，只保留脚本/快照及布尔数值收据，无raw PTY、真实凭据或请求正文；独立verification已通过。本批只改文档/HANDOFF，没有新unit、build、反转、全仓/15套件/20k真实PTY、local NormProof或委派复审。真实权限拒绝不等于物理磁盘故障；当前exe故障注入、真实provider及其他平台仍未验。ADD-17保持本地验证、ADD-03仍部分完成，原47外部条件延后、ADD-30继续暂缓、goal active。
+
+一次延迟读取b8670318代码CI41254557060与5acafcb3代码CI41254074206仍in_progress，各Watch41254557073/41254074184 success，不代替完整CI、不立即轮询。本批最终门与提交推送另绑，本批交付CI未观察。

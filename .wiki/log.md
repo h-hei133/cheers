@@ -11254,3 +11254,8 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition24.61](features/phase-20-addition.md#2461-失败-apply-经保存范围取消返回后仍可重试)补ADD-03/17相邻返回路径：scope取消传回原failure，避免冲突后再次保存consumed draft；确认范围仍按原合同丢弃pending。定向参考先于修补，旧owner2失败/132控制，反转2失败/132未选中，逐字节恢复后154项通过；五门及Node20.3 TS/exe build d0b773499bec、current inputs/两份exe核验通过。普通/全屏×user/project四条真实CLI均在另一scope焦点上Escape取消，原范围/pending/冲突保持且取消零save/reopen，下一明确Apply恰好一次reopen并保存/Stored读回；注释/兄弟字段/另一scope/auth/session保持、HTTP0、exit0/cooked/owned进程与scratch清理。首条观测失败单独unverified保留，修正观察收据原子发布/单帧读取后四场通过，含初条共5次CLI；未断言其唯一异常原因或改产品掩盖探针失败。最高采样575916KiB不算性能，独立核验passed，HANDOFF扩展同一规则。无真实provider/exe故障注入/其他平台/全仓/20k/judge/委派复审，ADD-03部分完成、原47外部条件延后、goal active；本批交付CI尚未观察。
 
 一次延迟读取5acafcb3与c66fbc8a代码CI41254074206/41252988169仍in_progress，各Watch41254074184/41252988065 success。最终门与提交推送另绑。
+
+
+### 2026-11-01：设置真实权限拒绝与显式恢复
+
+[addition24.62](features/phase-20-addition.md#2462-设置真实目录权限拒绝子面板返回与恢复)补ADD-17实际Linux权限场景，产品未改、沿用d0b773499bec及原Git owner/current inputs/两exe核验。Node20.3普通/全屏×user/project四真实CLI：目标父目录0500使原锁两次实际EACCES且文件字节保持，来源阅读/范围取消/编辑返回均保留失败，子操作零save/reopen；恢复原权限后明确Apply才一次锁成功并保存12/Stored读回。每场save3/reopen2、注释/topP/另一scope/auth/session保持，HTTP0、exit0/cooked、权限/owned进程/scratch清理。首条相同旧frame误认未验证保留，改等新overlay revision后四场通过，含初条5次CLI；HANDOFF记录同步规则。最高采样436708KiB不算性能，独立核验passed。本批仅三份markdown，无新产品/unit/build/反转/全仓/20k/judge/委派复审；权限拒绝不替代物理设备/其他平台/exe故障验收，ADD-17本地验证、ADD-03部分完成、原47外部条件延后、goal active。一次延迟读b8670318/5acafcb3代码CI41254557060/41254074206仍in_progress，各Watch41254557073/41254074184 success；本批CI未观察，最终门与提交推送另绑。

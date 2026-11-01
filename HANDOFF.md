@@ -1788,3 +1788,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: After a settings conflict, confirming/cancelling a value editor or cancelling a save-scope chooser hides the failed Apply and makes the next explicit Apply fail again.
 - **Root Cause**: The child return reconstructs the detail without its failure state, so the consumed draft is reused instead of reopening through its original binding checks.
 - **Rule**: Preserve the failure notice on editor returns and save-scope cancellation. Editing only stages a value; cancelling scope keeps the original scope and pending value; the next explicit Apply refreshes through the original draft and retains source/binding guards. Verify both user/project scopes, preserving external comments, sibling fields and the other scope. Confirming scope retains its separate contract of discarding pending state.
+
+### Repeated Identical Outcomes Need A New Panel Generation
+- **Symptom**: A native probe recognizes an unchanged failure frame immediately after sending another Apply, then observes only the previous save count.
+- **Root Cause**: Matching the same title, pending value and ready state cannot distinguish the previous result from the new action; stdin processing is asynchronous.
+- **Rule**: Capture the old overlay revision and require a newer rendered generation before asserting a repeated outcome. Pair the new frame with actual writer calls and filesystem results. Preserve failed observations separately; do not alter product behavior to compensate for probe timing.
