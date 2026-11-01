@@ -11266,3 +11266,12 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 [addition24.63](features/phase-20-addition.md#2463-审批摘要不得充当完整调用的授权身份)补ADD-57：task/team/browser截断、单anchor、trim及拼接使不同调用共享持久/once授权。目标先查、定向参考后，仅在原approval域绑定完整参数、准备permissionArgs/preview，原gate传入call-v1摘要；展示/deny语义保持，旧grant可撤销但不复用。有效旧owner基线18失败；四反转27/27/1/1失败并逐字节恢复，最终七文件165项、五静态门、Node20.3 TS/exe build0c9dd5ccc263通过。普通/全屏真实CLI各三回合：a批准第一任务、尾部不同第二任务重新询问且Escape拒绝零child、相同第三任务命中持久grant；各8POST/2child/1grant，审批与实际结果分别保真，auth不变、exit0/cooked/owned进程/scratch清理，最高451820KiB不算性能。三次早期观察失败独立unverified保留，n理由子模式不当直接deny；新输出/open计数/revision同步后两场通过。仓库bundle离线judge exit0、import两项satisfied，两个未改interactiveMode模块函数上限使总体partial；PATH缺命令记录保留。HANDOFF补完整身份与预览边界；无真实provider/browser/SSH效果、exe审批、其他平台/全仓/20k/委派复审，任务完整可视预览不属本批验收，ADD-57本地验证、原47延后、goal active。5acafcb3/c66fbc8a精确代码CI已success，b8670318/dc495c3e仍in_progress，Watch不代替代码CI；本批交付证据另绑。
 
 最终五静态门、三脚本语法、独立证据verifier及diff check均exit0；current inputs与stable/不可变exe的size/SHA一致。再次延迟观察dc495c3e精确代码CI41255073974已completed/success，b8670318代码CI41254557060仍in_progress，未重启或轮询追赶；本批交付CI未观察。
+
+
+### 2026-11-01：完整任务审批预览与待绘制帧期限
+
+[addition24.64](features/phase-20-addition.md#2464-任务完整预览角色内容绑定与待绘制帧期限)补ADD-57：原task准备文本纳入完整prompt/context和选中角色正文/策略，复用既有call-v1，保留单次definition/session/trust检查；字面转义避免伪造行。原approval先构造完整report再改host，分组超限沿settle拒绝，复用1MiB上限、不截断。定向参考先于各修补；任务/预检反转7/2失败且逐字节恢复。实际探针进一步实见慢帧后连续request重置唯一timer、搜索收到了但零新帧；原scheduler保留pending deadline，新确定性普通/全屏回归及反转各2失败。原engine两模拟器改为完成启动timer，原断言保留；197pass/2设置失败及六文件错误路径122pass分别留存。最终Node20.3串行九文件199项、五静态门、TS/exe build03239d1aec2d与current inputs/两exe size/SHA核验通过。
+
+最终普通/全屏实际CLI各三回合，原reader实际搜索+End在body显示完整指令/上下文尾部和角色；A批准实际child、参数相同角色B重新询问并Escape拒绝零child、恢复A命中旧grant实际child。各8POST/2child/1opaque grant，完整原prompt/context/角色A到实际wire，批准与工具结果分别核验；config/auth不变、exit0/cooked/owned进程和scratch清理。三条旧build停点仍unverified（第三次175request/1paint/898ms/backlog0诊断），含迭代5CLI/19POST，产品调度修补后才两有效场景。最高585092KiB不算性能；独立证据脚本passed，judge import两项satisfied/exit0，两个未改interactiveMode模块函数上限使overall partial。HANDOFF补三规则，无真实provider效果/exe审批/其他平台/全仓/15套件/20k/委派复审，ADD-57本地验证、原47延后、goal active。一次延迟读2a031940代码CI41256533865仍in_progress、Watch41256533763 success，不立即轮询；本批最终门与交付另绑。
+
+最终五静态门、三脚本语法、独立证据verifier和diff check均exit0，binding dangling0、118既有docs-source advisory保留。工作树仅本批八个产品/测试文件与三份markdown，提交推送、remote-main及clean状态由ignored delivery收据另绑；本批CI未观察，不声明整体任务完成。

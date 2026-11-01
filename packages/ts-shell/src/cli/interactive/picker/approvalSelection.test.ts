@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { approvalPicker, promptApproval } from './approval.js';
 import type { EscalationPrompt } from '../../../core/shell/approval/contract.js';
 import type { Picker } from '../overlay.js';
+import { REPORT_BYTES } from '../../../core/commands/report/contract.js';
 
 const prompt: EscalationPrompt = {
   id: 'esc_groups', title: 'apply patch', message: 'apply patch', context: { toolName: 'apply_patch', operation: 'write', target: 'a.txt',
@@ -170,4 +171,27 @@ it('cannot choose patch groups when the prompt offers only denial', async () => 
   expect((await picker.load()).map(row => row.id)).toEqual(['deny']);
   await picker.apply!(['choose-groups']);
   expect(choose).not.toHaveBeenCalled(); expect(settle).toHaveBeenCalledWith({ decision: 'deny' });
+});
+
+it('validates the complete initial preview before publishing or closing any host surface', async () => {
+  const oversized = { ...prompt, context: { ...prompt.context, preview: 'x'.repeat(REPORT_BYTES) } };
+  const host = { pager: { open: vi.fn(), close: vi.fn() }, overlay: { open: vi.fn(), close: vi.fn() }, render: vi.fn() };
+  await expect(promptApproval(oversized, host)).rejects.toThrow('resource limit');
+  expect(host.overlay.open).not.toHaveBeenCalled(); expect(host.overlay.close).not.toHaveBeenCalled();
+  expect(host.pager.open).not.toHaveBeenCalled(); expect(host.pager.close).not.toHaveBeenCalled(); expect(host.render).not.toHaveBeenCalled();
+});
+
+it('denies an oversized refined preview without publishing an approval for a partial plan', async () => {
+  const oversized = { ...prompt, context: { ...prompt.context,
+    selectionPreview: () => ({ preview: 'x'.repeat(REPORT_BYTES), revision: 'oversized' }) } };
+  const opened: Picker[] = [], controller = new AbortController();
+  const host = { pager: { open: vi.fn(), close: vi.fn() },
+    overlay: { open: (picker: Picker) => { opened.push(picker); }, close: vi.fn() }, render: vi.fn() };
+  const pending = promptApproval(oversized, host, controller.signal);
+  try {
+    await opened[0]!.apply!(['choose-groups']);
+    await expect(opened[1]!.apply!(['group-a'])).resolves.toBeUndefined();
+    expect(await pending).toMatchObject({ decision: 'deny', reason: expect.stringContaining('resource limit') });
+    expect(opened).toHaveLength(2); expect(host.pager.open).not.toHaveBeenCalled();
+  } finally { controller.abort(); }
 });

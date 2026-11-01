@@ -1804,3 +1804,19 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A PTY probe waits for choices while a preview covers them, or pressing n leaves the tool pending instead of returning a denial.
 - **Root Cause**: The preview and approval choices render at different times; n opens an optional reason draft. Old output can also satisfy a repeated preview marker.
 - **Rule**: Observe new-turn preview output and the new approval opening, close the preview, then wait for the actual choices and generation. Use Escape for a bare denial or explicitly submit the reason draft; wait for both resolved approval and the model's tool result before asserting no effect.
+
+
+### Reusable Task Grants Need The Selected Role Contents
+- **Symptom**: The same task arguments reuse an older persistent grant after a custom role's instructions or tool policy change, although the role is reloaded for each invocation.
+- **Root Cause**: A guard against definition changes during one pending approval does not bind role content across separate calls. Name/source/model metadata is insufficient.
+- **Rule**: Include the complete selected instructions and execution policy in the prepared, inspectable preview consumed by the existing call binding. Retain the original pending-definition guard. Verify both role-body and tool-policy changes through actual preparation and persisted-policy reload, plus unchanged-content reuse.
+
+### Preview Capacity Checks Must Precede Host Mutation
+- **Symptom**: An oversized approval preview replaces the existing surface before failing, or a selected patch preview throws while its original approval stays pending.
+- **Root Cause**: Report capacity validation occurs after publishing the approval UI and outside the refinement settlement boundary.
+- **Rule**: Construct the complete bounded report before closing or opening host surfaces. Preserve the initial Promise rejection contract, and settle refinement failures as denial before publishing a final approval. Reuse the report's existing capacity; never silently truncate an authorization preview. Reader checks must inspect body rows, since the search header echoes the query.
+
+### One Pending Frame Must Keep Its Deadline
+- **Symptom**: A reader accepts search or scroll input but never redraws while background status keeps requesting frames.
+- **Root Cause**: A costly frame raises the adaptive delay above the status tick interval. Continually replacing even one timer postpones every paint indefinitely.
+- **Rule**: Coalesce requests onto the already scheduled frame without moving its deadline; that frame reads the latest state. Preserve direct-paint cancellation, backpressure and stop behavior. Test continued progress with a deterministic costly frame and requests arriving faster than the adaptive delay in both screen modes. Simulated startup timers must run or be cancelled through their owner, not disappear from a mock queue.

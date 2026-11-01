@@ -8,6 +8,9 @@ import { createReport, reportText, span } from '../../../core/commands/report/pr
 export function promptApproval(prompt: EscalationPrompt, host: { readonly pager: Pick<Pager, 'open' | 'close'>;
   readonly overlay: Pick<OverlayHost, 'open' | 'close'>; readonly render: () => void }, signal?: AbortSignal): Promise<InteractiveApprovalResult> {
   if (signal?.aborted) return Promise.resolve({ decision: 'deny', reason: 'Operation cancelled before approval.' });
+  let preview: ReturnType<typeof approvalPreview>;
+  try { preview = approvalPreview(prompt); }
+  catch (error) { return Promise.reject(error); }
   host.pager.close();
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -41,30 +44,33 @@ export function promptApproval(prompt: EscalationPrompt, host: { readonly pager:
           return;
         }
         let refined: { readonly preview: string; readonly revision: string };
+        let refinedPrompt: EscalationPrompt;
+        let refinedPreview: ReturnType<typeof approvalPreview>;
         try {
           refined = prompt.context.selectionPreview(ids);
+          const selectedIds = new Set(ids);
+          refinedPrompt = {
+            ...prompt,
+            context: {
+              ...prompt.context,
+              preview: refined.preview,
+              previewKind: 'file-plan',
+              selections: prompt.context.selections?.filter(selection => selectedIds.has(selection.id)),
+              selectionRevision: refined.revision,
+            },
+          };
+          refinedPreview = approvalPreview(refinedPrompt);
         } catch (error) {
           settle({ decision: 'deny', reason: error instanceof Error ? error.message : 'The selected patch subset could not be prepared.' });
           return;
         }
-        const selectedIds = new Set(ids);
-        const refinedPrompt: EscalationPrompt = {
-          ...prompt,
-          context: {
-            ...prompt.context,
-            preview: refined.preview,
-            previewKind: 'file-plan',
-            selections: prompt.context.selections?.filter(selection => selectedIds.has(selection.id)),
-            selectionRevision: refined.revision,
-          },
-        };
+        if (settled) return;
         host.overlay.close();
         host.overlay.open(approvalPicker(refinedPrompt, decision => settle({
           ...decision,
           ...(decision.decision === 'deny' ? {} : { selected: ids, selectionRevision: refined.revision }),
         })));
-        const preview = approvalPreview(refinedPrompt);
-        if (preview) host.pager.open(preview.title, reportText(preview), preview);
+        if (refinedPreview) host.pager.open(refinedPreview.title, reportText(refinedPreview), refinedPreview);
         host.render();
       }, settle));
       host.render();
@@ -74,7 +80,6 @@ export function promptApproval(prompt: EscalationPrompt, host: { readonly pager:
     try {
       host.overlay.open(approvalPicker(prompt, settle, chooseGroups));
       if (settled) return;
-      const preview = approvalPreview(prompt);
       if (preview) host.pager.open(preview.title, reportText(preview), preview);
       host.render();
     } catch (error) {

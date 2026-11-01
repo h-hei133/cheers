@@ -464,7 +464,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、第一百三十四批 | 本地验证 | — |
-| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63、第一百三十五批 | 本地验证 | task/team/browser/ssh 完整参数及准备预览绑定；旧摘要 grant 不复用；MCP 仍禁止 allow-always |
+| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、第一百三十五批 | 本地验证 | 完整调用及任务/角色正文绑定；原 reader 可查完整指令/上下文；预览先验容量，慢帧不饿死；MCP 仍禁止 allow-always |
 | ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76 | 本地验证 | — |
 | ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77 | 本地验证 | — |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78 | 本地验证 | — |
@@ -6435,3 +6435,24 @@ Node20.3 普通/全屏 × user/project 四条真实 CLI 顺序通过：暂存9�
 一次延迟读取5acafcb3代码CI41254074206及c66fbc8a代码CI41252988169已completed/success；b8670318代码CI41254557060与dc495c3e代码CI41255073974仍in_progress，各Watch已success。Watch不替代完整CI。本批最终门、独立核验与提交推送另绑，本批交付CI尚未观察。
 
 最终五静态门、三脚本语法、独立证据verifier及diff check均exit0；current inputs与stable/不可变exe的size/SHA一致。再次延迟观察dc495c3e精确代码CI41255073974已completed/success，b8670318代码CI41254557060仍in_progress，未重启或轮询追赶；本批交付CI未观察。
+
+
+### 24.64 任务完整预览、角色内容绑定与待绘制帧期限
+
+继续 ADD-57，先检查[原 task owner](../../packages/ts-shell/src/core/tools/taskTool.ts)：旧准备预览只有角色名称、来源、model/effort，没有完整 prompt/context，也没有角色 systemPrompt/tools。24.63 已绑定完整参数与准备文本，但同一新调用之间修改自定义角色正文或工具策略、保持其他显示元数据时，旧持久 grant 仍会匹配；单次等待审批期间的原 identity 重验解决的是另一条边界。本批保留原身份/信任/session检查，用所属任务域的[preview](../../packages/ts-shell/src/core/subagents/task/preview.ts)展示完整请求与选中角色正文/策略；既有 call-v1 自动纳入完整预览，未增授权仓库。字段值用字面引号保留空白，转义控制符、分隔符和双向文本控制，避免伪造预览行；原 target 仍可简写。
+
+定向只读比较完整 AgentPromptDisplay 的正文展示、对话视图先构造再替换 host 的顺序，采用完整可检查文本和先验构造的决定；本项目复用原语义 report/Pager，不复制实现，也不按 Markdown 解释指令。发现 report 既有1MiB上限：初始超限原先先改界面再抛出，分组后的超限还会留下未结算审批。仅在[原 approval owner](../../packages/ts-shell/src/cli/interactive/picker/approval.ts)先构造完整 report，再操作 host；初始失败保留 Promise rejection，分组失败沿原 settle 拒绝，不发布部分计划或新审批。没有另加任务大小上限或截断正文。
+
+新任务测试9项在旧 owner下7失败/2控制；新增预检两项在旧界面下2失败/13控制。初次修补后正确七文件132项通过，任务/预检反转分别7/2项失败，finally逐字节恢复。另有一次错误路径只选中六文件122项，日志独立保存，不当成七文件证据；早先错误相对导入是零测试设置失败，初版以搜索header回显作正文证据的断言亦不采用，最终 reader 测试只检查 body。
+
+小型实际 CLI 探针又暴露[渲染调度](../../packages/ts-shell/src/presentation/tui/render/engine.ts)阻塞：较慢布局使 adaptive delay 达到200ms，后台连续刷新不断重置唯一timer，已接收的搜索没有第二帧。三个旧build普通模式观察均未验证并保留；第三次只读诊断实见175次request、一次Pager绘制、上一帧898ms、output backlog为0，已接受正确粘贴。对照参考调度器保留已排定帧的决定后，原 scheduleFrame 保留 pending deadline，帧执行时读取最新状态，仍至多一个timer；不改忙碌/审批/输出背压合同。新[确定性时钟测试](../../packages/ts-shell/src/presentation/tui/render/scheduling.test.ts)覆盖普通/全屏连续请求，旧实现及反转各2失败。原 engine 两测试此前直接删除模拟timer队列，改为正常完成启动帧，原断言保留；初轮197通过/2失败明确归为模拟器生命周期错误。
+
+最终 Linux Node20.3.0、heap768MiB、单worker串行 **九文件199项**通过：任务预览9、management8、taskWorkspace10、taskTool9、turn/tools54、approvalBinding27、approvalSelection15、engine65、scheduling2。含完整prompt/context/字面控制、32/80列正文搜索及End、角色正文/工具策略修改后的磁盘重载、批准实际dispatch及拒绝/取消零child、完整分组revision和调度背压/停止控制。五静态门、TS与exe构建通过；最终 build 03239d1aec2dd7736121bf34dcbc7dc1740683adba05a3af7dad43c2d1e905d9，inputs 1d718d53b56098bd9545981ca36a7df7740a7b077cab8e4ce9e797552db94f20。current compilerInputs及stable/不可变exe的size/SHA由独立证据脚本核对一致。
+
+最终普通/全屏两条实际 Node CLI → PTY → loopback HTTP各三回合通过：先在原reader实际搜索并End到完整任务指令尾部、上下文尾部及角色A正文（仅检查body），关闭预览按a持久批准并实际执行；第二回合参数相同、仅角色正文改为B，原grant不命中，再实读三字段后Escape拒绝、零child且主模型收到denial；恢复A正文后第三回合命中原grant并实际执行，子请求含原完整prompt/context/角色A。各8次POST、2次child、2次实际审批、1条opaque grant；approved/denied/approved与工具true/false/true分别保持。两场退出0/cooked恢复、config/auth原字节保持、owned PID/start identity非活跃及scratch清理。含旧build三次停点共5次CLI、19次POST；不能当成五场有效矩阵。
+
+45秒/2MiB/768MiB采样守卫均未触发，最终两场最高585092KiB只作小夹具观察，不作性能验收。仓库bundle离线judge exit0、acyclic/unresolved satisfied；整体仍partial，仅两个未改interactiveMode模块的函数上限advisory，保留既有disposition。证据及非可执行源码快照归 ignored 的 .omx/artifacts/phase20-addition-task-preview/，无raw PTY、真实凭据或请求正文；独立verification通过，HANDOFF补角色内容/预览容量/帧期限规则。没有真实provider效果、exe运行审批、其他平台、全仓/15套件/20k真实PTY或委派复审。ADD-57保持本地验证，原47外部条件延后、ADD-30暂缓、goal active。
+
+一次延迟读取上一批2a031940精确代码CI41256533865仍in_progress，Watch41256533763已success；不以Watch代替完整CI、不立即轮询。本批最终门及提交推送另绑，本批交付CI尚未观察。
+
+最终五静态门、三脚本语法、独立证据verifier和diff check均exit0，binding dangling0、118既有docs-source advisory保留。工作树仅本批八个产品/测试文件与三份markdown，提交推送、remote-main及clean状态由ignored delivery收据另绑；本批CI未观察，不声明整体任务完成。

@@ -501,7 +501,7 @@ describe("steady-state repaint", () => {
     tui.setFrameProvider(provider);
     tui.start();
     while (immediates.length) immediates.shift()!();
-    timers.length = 0;
+    while (timers.length) timers.shift()!.run();
     provider.layouts.length = 0;
 
     tui.requestRender();
@@ -534,7 +534,7 @@ describe("steady-state repaint", () => {
     const tui = new TUI(terminal, scheduler);
     tui.setFrameProvider(provider);
     tui.start();
-    timers.length = 0;
+    while (timers.length) timers.shift()!.run();
     provider.layouts.length = 0;
 
     tui.requestRender();            // queues a frame timer

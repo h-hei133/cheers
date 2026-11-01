@@ -7,6 +7,7 @@ import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { projectTrust } from "../security/projectTrust.js";
 import { bindRole } from '../subagents/admission.js';
 import type { SubagentRunResult } from '../subagents/runner.js';
+import { taskPreview } from '../subagents/task/preview.js';
 
 /**
  * /task & /agent tool
@@ -205,7 +206,7 @@ export function createTaskToolDefinition(
     const initial = loader.discover(trusted).effective.get(name.toLowerCase());
     const identity = initial?.definition?.identity;
     if (initial && (!initial.definition || initial.definition.enabled === false)) throw new Error('Agent is disabled or invalid; the task was not started.');
-    return { targets: [], permissionArgs: { ...args }, preview: `Delegate to ${name}; source=${initial?.source ?? 'dynamic'}; model=${initial?.definition?.model ?? 'inherit'}; effort=${initial?.definition?.effort === null ? 'auto' : initial?.definition?.effort ?? 'inherit'}. The selected definition identity is bound to this approval.`,
+    return { targets: [], permissionArgs: { ...args }, previewKind: 'execution', preview: taskPreview(args, name, initial?.definition),
       execute: async approved => {
         const currentTrust = !projectTrust.isProjectUntrusted(context.workspaceRoot);
         const current = loader.discover(currentTrust).effective.get(name.toLowerCase());

@@ -333,16 +333,12 @@ export class TUI {
   }
 
   /**
-   * The one pending frame timer.
-   *
-   * There is only ever one. Requests arrive far faster than frames can be
-   * painted — every streamed token asks for one — so a timer that was replaced
-   * without being cancelled left the old one to fire too: N requests produced N
-   * frames, each composing the whole screen, which is the opposite of the
-   * throttle the delay was there to provide.
+   * Keep the pending frame's deadline. Replacing it on each request lets a
+   * continuous stream postpone every paint after a costly frame increases the
+   * adaptive delay. The pending paint will read the latest provider state.
    */
   private scheduleFrame(delayMs: number): void {
-    this.scheduler.clearTimeout(this.frameTimer);
+    if (this.frameTimer !== undefined) return;
     this.frameTimer = this.scheduler.setTimeout(() => {
       this.frameTimer = undefined;
       this.renderNow();
