@@ -466,7 +466,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、24.68、第一百三十四批 | 本地验证 | 已移除prompt推导授权，普通/全屏实际拒绝及仅本次批准零永久grant；Node/单文件可执行程序的headless print路径已实际验证默认拒绝与显式仅本次，其他平台未验 |
 | ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、24.68、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定，验证续接文本不再授权当前调用；原reader完整预览、容量与绘制期限已验；Node/单文件可执行程序headless实际调用已核对目标、工具结果与终态；desktop原生适配器、其他平台仍缺；MCP仍禁止allow-always |
 | ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76、24.71、24.73 | 本地验证 | 已补声明快照/工作目录与独占hook授权；通用缓存/档位不代答，其他平台与单文件程序未验 |
-| ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77、24.71、24.73–24.74 | 本地验证 | 已补历史/旧格式授权与待定回答撤回、真实profile及通用缓存隔离；其他平台与单文件程序未验 |
+| ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77、24.71、24.73–24.75 | 本地验证 | 已补历史/旧格式授权与待定回答撤回、真实profile及通用缓存隔离；Linux Node及单文件程序普通/全屏来源撤回已验，其他平台与多机器锁/跨版本混写未验 |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78、24.72 | 本地验证 | 已补普通resume/workspace切换、POSIX大小写及不读取权限的项目往返；Node普通/全屏实际重问/拒绝已验，单文件程序及其他平台未验 |
 | ADD-61 | P1 | 权限层与工具体使用同一个围栏判定 | 第一百二十七批 | 本地验证 | — |
 | ADD-62 | P1 | 观察者失败不得吞掉持久事件；`team` 定义名不由模型文本拼成 | 第一百三十七、一百三十九批、24.67 | 本地验证 | 同步/异步及原生取消已验；exe取消、其他平台与真实provider条件未验 |
@@ -6645,3 +6645,24 @@ Node20.3 TS 构建通过，build `1ccb732ef076b7c50d5645fcee59a20360088cfb9f0c5a
 一次延迟读取：b725f884代码CI41268173094已success；父提交7d99aa3a代码CI41269474881仍in_progress、Watch41269474742 success，不以Watch代替代码CI，不轮询。本批最终证据和交付另绑，本批CI未观察。
 
 最终五静态门、三份脚本语法、主代理独立证据verifier与diff check均exit0；9份当前TS、7份父源、七组反转恢复、158项最终测试、current build manifest/inputs及两有效原生收据已核对。执行脚本以非可执行文本归档，owned scratch清理；工作树仅本批9份TS与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。
+
+
+### 24.75 单文件程序的钩子来源撤回验证
+
+继续 ADD-59 的已记录单文件程序证据缺口，本批没有改动产品源码。先只读核对 ADD-61，原外部 symlink 围栏修复仍在；随后检查普通 turn/native Git 取 cwd、trust command 取 projectRoot 是否造成来源失配。生产启动先提升 Git 子目录到项目根，再成对发布 cwd/projectRoot；resume、attach、rebind 也成对更新，add/remove 只更新附加根。委派只读调用链复核同样排除了当前合法 CLI 路径的该项失配，不把人工构造不等字段当成产品缺陷，也没有为此增加新根解析层。
+
+主代理先在同一 nonblocking flock 中串行运行五静态门与已有 build:exe，均 exit0，118 条既有 docs-source advisory 保留；未重复运行 TS 构建或产品测试。编译程序绑定 §24.74 原 TS build `140da0ee06cb268ad07491cc023d3adc31523d2b6afe90eaf1fde4e1f4b16fb8`、inputs `38811257f1454f7f572b403eaefdafb233f75b4ab036735873bbff01e9e07dca`，本次 Linux executable SHA-256 `d30117e801ee2c4223c016803b91d33410068553c0f0a8abb792d713905bdaed`。正式 build freshness、immutable executable 与 stable executable 哈希均已核对；没有修改构建行为或默认门。
+
+隔离命名 profile、项目、HOME 与 scripted loopback HTTP fixture，实际编译 CLI 普通/全屏各六回合，未向编译程序注入 observer 或替换产品模块。最终增强版每回合核对新 execution preview 中的完整 source、SessionStart、适用全部工具说明和原 command，真实 Escape 关闭后，再观察原 Permission: hook (SessionStart) 和 Allow once 选项，最后实际 a/y/Escape 回答。六阶段为记住；删除声明后原 CLI `/trust forget`、恢复并拒绝；再次记住；编辑 matcher 后原 CLI 撤回、恢复并拒绝；待定预览期间从独立 profile 绑定实例调用原 runTrustCommand 撤回，再回答仅一次；再次撤回待定回答并选择记住。两次待定撤回由 Node20.3 驱动调用相同原 command/store，证明编译 consumer 拒绝已失效回答，不冒充在同一个被 modal 占用的编译编辑器中执行第二条 slash，也不声称该驱动是另一个编译进程。
+
+每场实际副作用累计 `1/1/2/2/2/2`、hook grant `1/0/1/0/0/0`、通用 grant 全0；每回合均确认唯一编号的fixture回答已显示且进入原session的completed历史。各 GET6/POST6，两次编译 CLI 撤回后才恢复原声明；没有重用旧预览文本作为新回合屏障。每次原生撤回后实际关闭阅读器，输入唯一草稿并确认它出现在原 composer 的❯行，再用Ctrl+U清除才继续。config/auth最终精确字节相等，不声称没有瞬时写入；Ctrl+D exit0、owned PID/start identity非活跃、scratch删除。90秒/2MiB/100ms采样768MiB守卫未触发，最终两场子进程树RSS215320/214476KiB、输出72267/95203bytes仅为小夹具观察；RSS不含Node驱动/HTTP server，不能作为整场总内存上限或性能验收。标准relay未单独观察cooked flags。
+
+首轮两场六阶段均通过，但只有preview标题屏障，按原观察范围保留first-pass。复审后补预览正文、显式返回屏障与清理；期间一次fullscreen等待空placeholder重绘、两次regular发送Escape紧接以p开头的草稿均超时，分别保留unverified。三次都已真实撤回、GET1/POST1/effects1/hookGrant0，且owned进程/scratch清理；不支持产品或provider故障结论。空placeholder不保证重绘；相邻Escape+p会在40ms前缀窗口内被解码成Alt+P。最终按原decoder分离按键，以唯一草稿真实绘制确认输入归属，才取得上述两场增强通过。总8次CLI、5次通过/3次unverified；中间另一次增强regular成功，不能把重叠场景累计成更多独立覆盖。只读复审还指出pty.fork子进程拥有独立session；探针现在退出前重新捕获树和start identity，逐身份终止仍存活后代，确认非活跃才删scratch，setup同样进入finally。HANDOFF记录这两个可复用陷阱。
+
+ignored `.omx/artifacts/phase20-addition-hook-executable/` 保留构建、首轮/失败/最终原生收据、对应源脚本文本和独立证据核对。核对 §24.74 交付的9份TS原字节、current build/inputs/executable、两场六阶段的副作用与授权向量、真实退出及清理，均 exit0；执行脚本归档为非可执行文本后清理，没有 raw PTY、请求响应或真实凭据。没有新的产品实现，故不伪造红绿/反转或重复计入上批158项测试。
+
+本批补齐当前 Linux 编译 CLI 的这些来源撤回场景，ADD-59 保持本地验证，矩阵仍为1完成/8部分完成/61本地验证/1未开始，原47项外部条件延后，goal active。其他平台、多机器锁、跨版本混写、完整编译 hook 项目隔离/信任矩阵、native Git producer、未撤回时下一turn自动复用、单文件程序权限档位切换、真实 provider、完整性能矩阵与桌面条件仍未验；没有全仓/15套件/20k PTY 或 judge。
+
+一次延迟读取：7d99aa3a 精确代码 CI41269474881 已 success，69fdcdbf 的代码 CI41271010610 仍 in_progress、Watch41271010612 success；不以 Watch 代替代码 CI，不立即轮询。本批最终文档检查、复审及提交推送/remote-main/clean 状态另绑交付收据，本批 CI 尚未观察。
+
+最终增强双模式及独立证据核对均exit0，只读委派复审CLEAR，子代理未运行验证。两份执行脚本与非可执行归档逐字节比对后删除，task scratch目录已移除；最终工作树仅三份markdown，产品源码未改。最终文档门与diff检查、Git交付另绑收据；目标保持active。

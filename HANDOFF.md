@@ -1897,3 +1897,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A durable approval survives another instance's withdrawal through an in-memory fallback after lock cleanup fails.
 - **Root Cause**: A generic catch cannot distinguish failed publication from an already verified write; rereading after another writer's removal can look like permission to create fallback.
 - **Rule**: Carry verified-publication state out of storage failures. A grant that was verified on disk must never acquire a duplicate memory fallback, including when it disappears before the failure handler rereads. Test publish→other-store withdrawal→cleanup error as well as ordinary write failure; report uncertain withdrawal as unverified without rolling back newer state.
+
+
+### PTY Relay Groups Do Not Own Every Child Session
+- **Symptom**: Timeout cleanup can kill the relay process group while its terminal child remains alive, then remove files that child still owns.
+- **Root Cause**: A relay using pty.fork creates the terminal child in a separate session. Group membership and parentage are different process boundaries; a sampled RSS tree also excludes the driver and may miss short-lived descendants.
+- **Rule**: Capture the owned descendants and start identities again before shutdown, terminate only matching identities, and confirm they are inactive before deleting scratch state. Include fixture creation in the cleanup boundary. Report child-tree RSS as a sample rather than an entire probe memory limit.
+
+### A Standalone Escape Needs A Separate Input Sequence
+- **Symptom**: A native probe tries to close a reader and type a readiness draft, but the draft loses its first letter and never appears in the composer.
+- **Root Cause**: Adjacent Escape and text writes can coalesce into an Alt key sequence. A draft beginning with p becomes Alt+P within the decoder's 40 ms partial-prefix hold.
+- **Rule**: Separate a standalone Escape from following printable input beyond the decoder hold, or wait for an actual host acknowledgement. The short interval separates key semantics; it does not prove readiness. Confirm a unique draft on the actual composer line, clear it without submitting, and retain fresh preview/choices/durable-result barriers for the next operation. An empty placeholder need not be repainted by an optimized terminal renderer.

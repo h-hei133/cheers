@@ -11364,3 +11364,12 @@ build d4dda071a4dc/current inputs与两exe哈希另由独立verifier核对。普
 延迟b725f884代码CI41268173094已success；7d99aa3a代码CI41269474881仍in_progress、Watch41269474742 success，不轮询。本批最终验证与提交推送、remote SHA及clean状态由ignored收据另绑，本批CI未观察。
 
 最终五静态门、三份脚本语法、主代理独立证据verifier与diff check均exit0；9份当前TS、7份父源、七组反转恢复、158项最终测试、current build manifest/inputs及两有效原生收据已核对。执行脚本以非可执行文本归档，owned scratch清理；工作树仅本批9份TS与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。
+
+
+### 2026-11-01：单文件程序钩子来源撤回证据
+
+[addition24.75](features/phase-20-addition.md#2475-单文件程序的钩子来源撤回验证)继续ADD-59已记录的compiled缺口。ADD-61原修复仍在；只读生产调用链及委派复核排除了Git子目录启动/resume/workspace导致cwd与projectRoot来源失配，未改产品源码。五静态门与build:exe在同一flock串行exit0，沿用140da0ee06cb原TS build/current inputs，Linux exe SHA-256 d30117e801ee2c4223c016803b91d33410068553c0f0a8abb792d713905bdaed。
+
+实际编译CLI普通/全屏各六回合，确认每次新的完整preview与真实选项后a/y/Escape；删除/编辑后两次原CLI撤回并恢复拒绝，另两次待定预览中由独立Node实例原command撤回，编译consumer的仅一次/记住旧回答均不执行。effects1/1/2/2/2/2、hookGrant1/0/1/0/0/0、普通grant全0，各GET6/POST6、唯一回答显示并进入completed历史、config/auth字节不变、exit0、自有PID/start及scratch清理。最终两场子树RSS215320/214476KiB、输出72267/95203bytes仅小夹具观察且不含Node驱动，未测cooked；最终config/auth字节相等不声称无瞬时写。原生程序无observer/module替换。首轮两场标题屏障通过按原范围保留；增强中一场fullscreen空placeholder重绘屏障及两场regular Escape+p合并Alt+P导致返回屏障超时均留unverified，三次均已撤回并清理。最终核对完整source/event/适用范围/command，分离Escape与文本后实际唯一草稿在composer出现，再Ctrl+U清除并继续；总8CLI、5pass/3unverified，重叠不累计覆盖。清理补pty独立session后代PID/start身份确认，setup进入finally；HANDOFF补两陷阱。独立证据核对current源码9份、build/exe与两模式收据通过，不重复计上批158项或伪造反转。脚本仅.tmp执行并归档非可执行文本，证据ignored phase20-addition-hook-executable。其他平台/完整hook项目隔离与信任矩阵/compiled权限档位/多机器锁/跨版本混写/真实provider与性能仍缺；ADD-59本地验证、总矩阵不变、原47外部条件延后、goal active。延迟7d99aa3a代码CI success；69fdcdbf代码CI41271010610仍in_progress、Watch41271010612 success。本批最终文档/复审与Git交付另绑。
+
+最终增强双模式及独立证据核对均exit0，只读委派复审CLEAR，子代理未运行验证。两份执行脚本与非可执行归档逐字节比对后删除，task scratch目录已移除；最终工作树仅三份markdown，产品源码未改。最终文档门与diff检查、Git交付另绑收据；目标保持active。
