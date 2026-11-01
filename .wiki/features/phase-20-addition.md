@@ -7117,9 +7117,11 @@ oh-my-pi 的触发点（`docs/compaction.md` §Triggers）：
 5. **回合内阈值维护**：`compaction.midTurnEnabled !== false` 时，工具循环的下一次 provider 请求之前；
 6. 空闲维护（`runIdleCompaction()`）。
 
-其中第 5 条绑在 `agent.setOnTurnEnd` 上（`agent-session.ts:2286`），条件是 `context?.willContinue`——**与我们的 `prepareNextStep` 位置等价，同样不在首次请求前检查**。
+第 5 条绑在 `agent.setOnTurnEnd` 上（`agent-session.ts:2286`），条件是 `context?.willContinue`——**与我们的 `prepareNextStep` 位置等价**。
 
-因此「首次请求前不检查」并非我们独有。真正的差异在下面三条。
+**更正（本轮复核）**：我最初只搜索 `maintainContext*` 就断定 omp 没有回合前检查，这是错的。omp 另有 `runPrePromptCompactionIfNeeded`（`session-maintenance.ts:2735`），在 `agent.prompt` 之前调用（`agent-session.ts:8958-8960`），并注明 `agent.continue()` 路径也会调用（`:5307`）。所以 **omp 有回合前检查**。
+
+真正的差异在下面几条。
 
 #### 差异一：阈值用 provider 实测，不是估算
 
@@ -7286,7 +7288,7 @@ Codex 的写入是对 `toml_edit::DocumentMut` 的**定点编辑**，从不重�
 | 维度 | Codex | 我们 |
 |---|---|---|
 | 检查位置 | **post-sampling**（每次模型调用后，`turn.rs:424-470`），由 `needs_follow_up` 驱动 | 步骤之间（`prepareNextStep`） |
-| 回合前检查 | 无 | 无 |
+| 回合前检查 | **有**（`run_pre_sampling_compact`，`turn.rs:172`） | 无 |
 | 阈值数据源 | **实测**：`sess.get_total_token_usage()`（`context_window.rs:57`） | 纯估算 |
 | 阈值 scope | 两种：`Total` 与 `BodyAfterPrefix`（后者扣掉 prefill 基线） | 单一总量 |
 | 硬上限 | 模型完整窗口独立于压缩阈值，两者取更严的 | 只有阈值 |
@@ -7296,15 +7298,17 @@ Codex 的写入是对 `toml_edit::DocumentMut` 的**定点编辑**，从不重�
 
 **Codex 的 `BodyAfterPrefix` scope 值得单独记一笔**：它把「请求前缀（system + tools）」当作固定成本，只对「前缀之后新增的 body」计阈值。这与我们 24.88 里发现的「阈值用总量、切点预算用纯历史」是同一问题的另一种解法——Codex 明确把两者分开定义并让用户可选。
 
-#### 三家在「回合前检查」上的分歧
+#### 三家在「回合前检查」上的分歧（已复核更正）
 
 | | oh-my-pi | pi | codex | 我们 |
 |---|---|---|---|---|
-| 回合前检查 | 无 | **有** | 无 | 无 |
+| 回合前检查 | **有**（`runPrePromptCompactionIfNeeded`，`agent-session.ts:8958`） | **有**（`_prepareRun`，`agent-session.ts:1952`） | **有**（`run_pre_sampling_compact`，`turn.rs:172`） | **无** |
 
-只有 pi 有。它的注释说明了理由：「catches aborted responses」——上一回合被中止后遗留的超大上下文，在下一次运行前处理。这是 pi 独有的保护。
+**三家全部有，只有我们没有。** 我先前写的「两家没有」是搜索不完整导致的错误结论，已更正。
 
-因此 ADD-78 的定性应为：**我们缺少的不是「回合前检查」（三家中有两家也没有），而是阈值口径与切点预算口径不一致**。pi 之所以能靠回合前检查兜住，是因为它同时用实测 usage；我们没有实测兜底，又不检查，才会走到「该压缩却不认为可压缩」的死角。
+三家的共同点：都在**首次请求发出之前**用「消息 + 待发 prompt + 非消息开销」估算总量，超过阈值就先压缩再发。pi 的注释点出了它要解决的场景：「catches aborted responses」——上一回合被中止后遗留的超大上下文。
+
+因此 ADD-78 的定性恢复为：**我们缺少回合前检查，这是真实缺口**；同时阈值口径与切点预算口径不一致是另一个独立缺口（见差异一、二）。两者叠加，才会走到「该压缩却不认为可压缩」的死角。
 
 ### 24.90 调研结论：问题清单与可选方案
 
@@ -7333,17 +7337,27 @@ Codex 的写入是对 `toml_edit::DocumentMut` 的**定点编辑**，从不重�
 
 #### B. 压缩与上下文（对应 ADD-77 / ADD-78）
 
-**问题一（已确证）**：阈值用「含 overhead 的总量」判断，切点预算用「不含 overhead 的纯历史」判断，两个口径不一致，导致「该压缩、却认为无可压缩」的死角。16k 实测算术见 24.88。
+**问题一（已确证，但定性需要精确）**：阈值用「含 overhead 的总量」判断（8,789 + 5,781 = 14,570 > 14,000，应压缩），切点预算用「不含 overhead 的纯历史」判断（8,789 < 11,952，无切点）。于是压缩被静默跳过，请求带着 16,618 发出并溢出。
 
-**三家怎么做**：三家全部用 **provider 实测 usage** 做阈值（pi/omp/codex 一致），天然含 overhead，不存在口径不一致。
+**但「口径不一致」本身不是缺陷**。[compaction.ts](../../packages/ts-shell/src/session/compaction.ts) 的 `overhead` 注释明确论证了这个选择：切点预算关乎对话，overhead 是固定成本，不随历史缩小；把 provider 计数喂进切点会让「本来在预算内的对话仍产生切点，且切点随开销增长而缩小」。这个论证是成立的。
 
-**可选方案**：
+**真正的缺陷是「阈值已超、却无切点可做」这个状态被当作「无需压缩」静默放行。** 三家在这一点上的处理：
 
-1. **统一口径**：让 `availableTailTokens` 扣除 overhead（已实现并验证，暂存在 `git stash`），使切点预算与阈值同源。
-2. **改用实测 usage**：与三家对齐，但需要 provider 在首次请求前就有 usage——首回合没有，仍需估算兜底。
-3. **两者结合**：有实测用实测，无实测用「估算 + overhead」，并保持两个口径同源。
+| | 阈值已超但切不出东西时 |
+|---|---|
+| oh-my-pi | `findCutPoint` **总返回切点**——「Keep the newest group even when it alone exceeds the budget」（`compaction.ts:518-523`），不产生「无可压缩」状态 |
+| pi | 切点默认落到 `cutPoints[0]`（保留几乎全部），`prepareCompaction` 返回 undefined，`_runAutoCompaction` 静默 `return false`；但 pi 有**回合前检查 + 实测 usage** 双重兜底 |
+| codex | 无「拒绝」概念，总是压缩；请求溢出时丢最旧条目重试（`compact.rs:314-329`） |
+| 我们 | `locateCut` 返回 `fits-budget` → `planCompaction` 返回 undefined → 静默跳过，**且没有任何兜底** |
 
-倾向：方案 1 立即修根因；方案 3 作为与三家对齐的长期方向。
+**可选方案**（修正后）：
+
+1. **对齐 omp：切点永不拒绝**。保留最新的完整组，即使它单独超出预算。这消除了「无可压缩」这个状态，但会改变现有 `fits-budget` 的语义与测试。
+2. **对齐 pi/omp：加回合前检查**。在首次请求前用「消息 + overhead」判断，超阈值就先压缩。
+3. **改用实测 usage**：三家一致的做法，但首回合无 usage，仍需估算兜底。
+4. **保留现设计，只修呈现**：把「该压缩但无切点」明确报告给用户，而不是静默放行。
+
+倾向：方案 2 是最小且与三家一致的修复（我先前暂存的 `loop.ts` 改动方向其实是对的，被我自己误判为错误）；方案 3 是长期方向；方案 1 改动面最大，需单独评估。
 
 **问题二**：`keepRecentTokens` 的钳制目标是「可用窗口」，而 oh-my-pi 钳到「恢复带（阈值 × 0.8）− reserve 底线」，保证压缩后落在阈值之下、不会立刻再次触发。我们的钳制没有这个约束。
 
@@ -7359,10 +7373,37 @@ Codex 的写入是对 `toml_edit::DocumentMut` 的**定点编辑**，从不重�
 
 我们的 `/context` 已有 measured/stale/unknown 四态，且明确「只显示可核对的量」，这一点比三家中的多数更严格（24.86 记录的 `Assembled request estimate` 与 `Provider prompt usage is unknown` 就是例证）。本轮未发现需要修改的地方，但若采纳「实测 usage 做阈值」，显示层与压缩层可以共用同一份数据，减少一次估算。
 
-#### 待裁决事项
+#### 待裁决事项（已按复核更正）
 
 1. A 走方案 2（写路径不复活被忽略的键）还是方案 3/4。
-2. B 走方案 1（统一口径，已实现待取回）还是直接对齐实测 usage。
-3. 是否引入恢复带钳制与 16384 的 reserve 默认值。
-4. 是否引入 pi 的回合前检查（三家中有两家没有）。
-5. ADD-77 的呈现形式（复用 `/context` 的分类估算到错误路径）。
+2. B 走方案 2（回合前检查，三家一致）还是方案 1（切点永不拒绝，omp 路线）。
+3. 是否同时采纳「无切点时必须明确报告」——三家都不静默，只有我们静默。
+4. 是否改用实测 usage（三家一致），以及首回合的估算兜底。
+5. 是否引入恢复带钳制与 16384 的 reserve 默认值。
+6. ADD-77 的呈现形式（复用 `/context` 的分类估算到错误路径）。
+
+**关于已暂存的代码**：`git stash` 里有两项——`loop.ts` 的回合前检查（方向正确，与三家一致）与 `compaction.ts` 的 `availableTailTokens` 扣除 overhead（方向存疑：它把刻意的设计改成了统一口径，与 `overhead` 字段的论证冲突）。取回时应只取前者，后者需重新评估。
+
+#### 复核补充（子代理只读调研 + 主代理逐条验证）
+
+子代理的完整对照推翻了我此前的两处结论，以下为核实后的记录。
+
+**更正一：三家全部有回合前检查。** 我最初只搜索 `maintainContext*` 就断定 omp 没有，是搜索不完整。实测：
+
+- omp：`runPrePromptCompactionIfNeeded`（`session-maintenance.ts:2735`），在 `agent.prompt` 之前调用（`agent-session.ts:8958-8960`），auto-continue 路径也调用（`:5307`）。
+- pi：`_prepareRun` 里 `_checkCompaction(lastAssistant, false)`（`agent-session.ts:1952`）。注意它要求 `lastAssistant` 存在，所以**全新会话的首回合会跳过**。
+- codex：`run_pre_sampling_compact` 是 `run_turn` 的第一件事（`turn.rs:172`）。
+
+**更正二：「口径不一致」是刻意设计，不是缺陷。** `overhead` 字段的注释论证了切点预算为何不用它。真正缺陷是「阈值已超但无切点」被静默当作无需压缩。
+
+**新增对照细节：**
+
+- **omp 的切点永不拒绝**：`findCutPoint` 的注释写「Keep the newest group even when it alone exceeds the budget」（`compaction.ts:518-523`）。它没有 `fits-budget` 这个状态。
+- **omp 的预提示估算包含非消息开销**：`computeNonMessageTokens` 累加 system prompt + 工具 schema（`context-usage.ts:414-431`），并与 provider 锚定值取 max（`compactionContextTokens`）。
+- **omp 的拒绝是有声的**：无切点时返回 `COMPACTION_CHECK_BLOCK_AUTOMATIC_CONTINUATION` 阻止自动继续；摘要不缩小时发 warning notice 并尝试下一种方法；手动无操作抛 `ManualCompactionNoOpError` 记为 `skipped`。我们全程静默。
+- **codex 无「拒绝」概念**：总是压缩，压缩后无条件发一条「长线程会降低准确度」的警告；压缩请求本身溢出时丢最旧条目重试。
+- **codex 的 keep-recent 是常数**（本地 20,000 / 远程 v2 64,000），不从窗口派生，因此不存在「大于窗口」的问题。
+- **pi 的 keep-recent 完全不钳制**：超出窗口时切点落到第一条，`prepareCompaction` 返回 undefined，自动路径静默 `return false`，手动抛 `"Nothing to compact (session too small)"`。
+- **上下文显示**：只有 omp 有分类拆分（System prompt / System tools / System context / Skills / Messages，外加 Auto-compact buf 与 Free）；pi 只有百分比与 `?`；codex 显示「N% context left」，pending 时整行留空。我们的四态（measured/stale/unknown + estimated 前缀）比 pi/codex 更细，但状态栏没有 omp 那样的分类拆分。
+
+**对「倾向」的修正**：方案 2（回合前检查）并非「我先前判断错误」——那个判断本身就是错的，`loop.ts` 的暂存改动方向是对的。但仅加回合前检查不足以消除死角，因为首次请求前若仍无切点，同样会静默放行。更完整的修复需要「回合前检查 + 无切点时的明确报告」两项，或采用 omp 的「切点永不拒绝」。

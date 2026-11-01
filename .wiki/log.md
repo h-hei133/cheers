@@ -11475,3 +11475,15 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 **压缩（ADD-77/78）**：三家全部用 provider 实测 usage 做阈值。pi 额外有回合前检查（`_prepareRun`，注释「catches aborted responses」），omp 与 codex 都没有，所以「缺回合前检查」不是我们独有。已按算术确证 16k 溢出的根因：阈值用含 overhead 的总量（16,618 > 14,000）判定该压缩，切点预算却用不含 overhead 的纯历史（8,789 < 11,952）判定无可压缩，两个口径不一致形成死角。另记 omp 把 keepRecent 钳到「恢复带（阈值×0.8）− reserve 底线」以保证压缩后不立刻再触发，以及默认 reserve 为 16384（我们 8000）。
 
 先前暂存的 `loop.ts` 预检查改动方向不对（应丢弃），`compaction.ts` 的口径统一改动是真正的修复。以上全部写入 `phase-20-addition.md` 24.87–24.90，含问题清单与五条待裁决事项。本轮仅文档变更，未运行 build/vitest/全量回归，`verify:docs-drift:strict` 与 `git diff --check` 通过。真实 HOME 配置在探针期间临时改过 16k，已按备份逐字节恢复并复核。
+
+### 2026-11-01：调研结论的两处自我更正
+
+子代理的完整对照返回后逐条核实，推翻了我此前的两个结论，已就地更正：
+
+**更正一**：我此前称「回合前检查三家有两家没有」，错误。实测 omp 有 `runPrePromptCompactionIfNeeded`（`session-maintenance.ts:2735`，`agent-session.ts:8958` 在 `agent.prompt` 前调用），codex 有 `run_pre_sampling_compact`（`turn.rs:172`，`run_turn` 的第一件事）。**三家全部有，只有我们没有。** 原因是我最初只搜索 `maintainContext*` 一个词就下了结论。
+
+**更正二**：「阈值用总量、切点用纯历史」不是缺陷而是刻意设计，`overhead` 字段的注释有完整论证（切点预算关乎对话，overhead 是固定成本）。真正的缺陷是「阈值已超但无切点」被静默当作无需压缩。对照：omp 的 `findCutPoint` 永不拒绝（保留最新组即使超预算），且拒绝时有 warning notice 与阻止自动继续；codex 无拒绝概念、总是压缩；pi 与我们类似但有两重兜底。
+
+补充记录：omp 的预提示估算包含 system prompt + 工具 schema 并与 provider 锚定值取 max；codex 的 keep-recent 是常数（20k/64k）不从窗口派生；pi 的 keep-recent 完全不钳制；只有 omp 有分类拆分式上下文显示。
+
+由此修正待裁决清单，并注明 `git stash` 中 `loop.ts` 的回合前检查方向正确、`compaction.ts` 的扣除 overhead 与字段论证冲突需重新评估。本轮仅文档，未运行 build/vitest/全量回归。
