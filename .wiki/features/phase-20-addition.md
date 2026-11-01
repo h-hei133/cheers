@@ -7434,3 +7434,28 @@ condense. Lower keepRecentTokens to condense it now.
 **验证。** 单 worker / heap768MiB 串行四文件 95 项通过：`persistence` 32、`compaction` 38、`loop` 20、`cliRuntimeModule` 5。三次红灯分别成立：移除回合前检查（1 失败）、移除剔除规则（1 失败）、禁用 `compactionRefusal` 的阈值判断（1 失败），逐字节恢复后均再绿。五静态门与 `git diff --check` 通过（118 条既有 advisory 保留），TS build `78bd5c7c7116`。
 
 **未做与边界。** 未采纳 24.90 的第 4–6 项（实测 usage 已存在、恢复带钳制、16384 默认值）。本机 Node 24.15，未在 20.3 floor 复验。`git stash` 中 `compaction.ts` 的 overhead 扣除改动按 24.90 结论未取回，已随 stash 清理。
+
+### 24.92 第 4、5 项复核：不需要改动
+
+24.90 列出的第 4、5 项经核算后判定为「不需要改」，理由如下。
+
+**第 5 项（恢复带钳制）：数学上已满足。** oh-my-pi 引入恢复带是为了保证「压缩后落回阈值之下、不会立刻再次触发」。我们的钳制是：
+
+```
+availableTailTokens = window − reserve − outputTokens
+keepRecent          = min(configured ?? 20000, availableTailTokens)
+```
+
+而阈值是 `window − reserve`（软阈值为其 90%）。因为 `availableTailTokens` 恒等于 `threshold − outputTokens`，**保留尾部永远小于阈值**，不存在「压缩后仍在阈值上」的情况。实测三种典型窗口（16k / 128k / 200k）与三种极端 `keepRecentTokens` 配置（13000 / 11500 / 9000）均确认：压缩后尾部始终低于阈值。omp 需要恢复带，是因为它的尾部预算不扣输出上限，两者基线不同。
+
+**第 4 项（实测 usage）：已经实现。** `cli/runtime/compaction.ts` 的 `measureContextTokens` 已完整实现「provider 实测 + 之后的估算增量」，与三家参照一致：
+
+```ts
+const measured = measuredPromptContext(input.sessionId, {...}, { requireExpectedIdentity: true });
+if (!measured) return undefined;
+return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
+```
+
+真正的边界是**全新会话首回合没有测量记录**，只能估算。这与三家相同，不是缺口。
+
+**16384 的 reserve 默认值：不能采纳。** 我们的 `reserveLimitFailure` 规定 `reserve >= window` 即错误。16k 窗口配 16384 会直接触发 `reserveTokens must leave input space in the resolved context window.`，让所有小窗口配置失效。参照实现没有这条校验，所以能设 16384；我们的校验更严格，保留现状。

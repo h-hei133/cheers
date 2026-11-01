@@ -11495,3 +11495,7 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 顺带修复 print 模式的溢出裸栈：`cliRuntimeModule` 的 `executePrompt` 调用只有 `try/finally`，异常直接冒到顶层边界打印堆栈；新增 `catch`，print 模式渲染一行消息、交互模式照旧上抛。修复后 exit=0 无堆栈。
 
 验证：单 worker/heap768MiB 串行四文件 95 项通过（persistence 32、compaction 38、loop 20、cliRuntimeModule 5）；三次红灯各自成立并逐字节恢复；五静态门与 diff check 通过，TS build `78bd5c7c7116`。真实 CLI 在 16k 窗口下实际输出「about 12,780 tokens for a 16,000-token window ... Lower keepRecentTokens to condense it now.」。`git stash` 中另一项（compaction.ts 扣除 overhead）按 24.90 结论未取回，已清理。台账 78 项，未开始仅剩 ADD-30。未在 Node 20.3 floor 复验。
+
+### 2026-11-01：第 4、5 项复核为不需要改动
+
+24.90 建议清单里的第 4 项（实测 usage）与第 5 项（恢复带钳制）经核算判定无需改动。第 5 项：我们的 `availableTailTokens = window − reserve − outputTokens` 恒小于阈值 `window − reserve`，保留尾部数学上不可能留在阈值之上；实测 16k/128k/200k 三种窗口与 13000/11500/9000 三种 `keepRecentTokens` 配置均确认。omp 需要恢复带是因为它的尾部预算不扣输出上限，基线不同。第 4 项：`measureContextTokens` 已实现「provider 实测 + 增量估算」，与三家一致；首回合无测量记录只能估算，三家同样如此。16384 的 reserve 默认值不能采纳——我们的 `reserveLimitFailure` 规定 `reserve >= window` 即错误，16k 窗口配 16384 会直接让配置失效。本轮仅文档，未运行 build/vitest。
