@@ -80,6 +80,50 @@ describe("model command runtime", () => {
     expect(result.output).toContain("npm run verify:provider-readiness");
   });
 
+  it.each([
+    { name: 'both layers agree', connection: 'shared-model', provider: 'shared-model',
+      expected: 'Model source: connection, the same value as the provider default.' },
+    { name: 'the connection overrides a different provider default', connection: 'connection-model', provider: 'provider-model',
+      expected: 'Model source: connection, overriding the provider default provider-model.' },
+    { name: 'only the connection holds a default', connection: 'connection-model', provider: undefined,
+      expected: 'Model source: connection.' },
+    { name: 'only the provider holds a default', connection: undefined, provider: 'provider-model',
+      expected: 'Model source: provider default.' },
+  ])('names the effective layer when $name', async ({ connection, provider: providerModel, expected }) => {
+    const runtime = getRuntimeConfig(workspaceRoot);
+    const saved = runtime.providerConnections.find(item => item.id === runtime.activeProviderConnectionId)!;
+    const config = { ...runtime, providerConnections: [{ ...saved, model: connection }],
+      providerCredentials: { openai: { apiKey: 'synthetic-provider', ...(providerModel ? { model: providerModel } : {}) } } };
+    const result = await runModelCommand(['status'], { cwd: workspaceRoot, readConfiguration: () => ({ config, catalog: loadCatalogSnapshot().providers }) });
+    expect(result.output).toContain(expected);
+    // The line explains the value; it does not change which model is reported.
+    expect(result.output).toContain(`Model: ${connection ?? providerModel}`);
+  });
+
+  it('omits the source line when no layer holds a model', async () => {
+    const runtime = getRuntimeConfig(workspaceRoot);
+    const saved = runtime.providerConnections.find(item => item.id === runtime.activeProviderConnectionId)!;
+    const config = { ...runtime, providerConnections: [{ ...saved, model: undefined }], providerCredentials: {} };
+    const result = await runModelCommand(['status'], { cwd: workspaceRoot, readConfiguration: () => ({ config, catalog: loadCatalogSnapshot().providers }) });
+    expect(result.output).toContain('Model: unset');
+    expect(result.output).not.toContain('Model source:');
+  });
+
+  it('names a session selection rather than reporting it as a saved connection default', async () => {
+    const runtime = getRuntimeConfig(workspaceRoot);
+    const saved = runtime.providerConnections.find(item => item.id === runtime.activeProviderConnectionId)!;
+    const connectionsTrace = runtime.configProvenance.providerConnections;
+    const first = connectionsTrace.children!['0'];
+    const config = { ...runtime, providerConnections: [{ ...saved, model: 'session-model' }],
+      providerCredentials: { openai: { apiKey: 'synthetic-provider', model: 'provider-model' } },
+      configProvenance: { ...runtime.configProvenance, providerConnections: { ...connectionsTrace,
+        children: { '0': { ...first, children: { ...first.children,
+          model: { sources: ['session' as const], shadowed: ['user' as const], rejected: [] } } } } } } };
+    const result = await runModelCommand(['status'], { cwd: workspaceRoot, readConfiguration: () => ({ config, catalog: loadCatalogSnapshot().providers }) });
+    expect(result.output).toContain('Model: session-model');
+    expect(result.output).toContain('Model source: connection (session selection), overriding the provider default provider-model.');
+  });
+
   it.each(['bedrock', 'vertex'] as const)('reports current %s signing without requiring a named connection or claiming credentials', async provider => {
     const runtime = getRuntimeConfig(workspaceRoot);
     const baseUrl = provider === 'bedrock' ? 'https://bedrock-runtime.us-east-1.amazonaws.com'

@@ -15,7 +15,7 @@ confidence: mixed
 
 本文汇总2026-10-25至26日常使用反馈、[逐项核查](interaction-audit.md)及用户后续各轮更正，作为实施的需求与验收依据。
 
-**先看第12节。** 它是全部补充任务的唯一定义与状态来源：用户第十七至第三十七项、第 24 至 30 项、子代理 review 发现等散落在第 17–21 节的问题条目，已按职责归并为 ADD-01 至 ADD-71，同一件事只保留一个条目并附完成情况。第1至11节是初次定位与需求基线，第 13–16 节是验证规则与问题摘要，第 17–22 节是逐轮研究与实施记录——它们保留当时的证据，但**不再各自维护任务状态**，不得据其中某一节的局部绿色提升第12节的条目。
+**先看第12节。** 它是全部补充任务的唯一定义与状态来源：用户第十七至第三十七项、第 24 至 30 项、子代理 review 发现等散落在第 17–21 节的问题条目，已按职责归并为 ADD-01 至 ADD-73，同一件事只保留一个条目并附完成情况。第1至11节是初次定位与需求基线，第 13–16 节是验证规则与问题摘要，第 17–22 节是逐轮研究与实施记录——它们保留当时的证据，但**不再各自维护任务状态**，不得据其中某一节的局部绿色提升第12节的条目。
 
 上一轮文档核对的产品HEAD为`4abe6f11af3bd7966796f29b996f5321b16b0140`，需求收口提交为`91f0d3d343d9ecb107c6792b5e9ee1d12df40157`，只读参考oh-my-pi仍为下述快照。该轮只定位与完善文档；第三十八批随后补37项设置的73条scope操作链并修补搜索焦点，已交付为`05ecc6c8885f61d18e851a6a698597253f1165d7`。第三十九批继续修补失败Apply重试、保存范围确认和user来源换代，证据见第15节。下文的“初次定位”均指修补前机制；不能将旧机制写成当前仍有同样故障。前次文档核对HEAD为`2a5cf9949cff57876adc20ebb8179040d7e00254`，其后第三十七批已修正启动测量和目录测试合同。
 
@@ -485,6 +485,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-69 | P0 | 排队消息与已发送消息可区分；Enter 的 steer/排队语义稳定；队列可见可控 | 第 38 项、第 22.1 节、第 23.2 节 | 本地验证 | 真实终端按键节奏；提示行与待发送区的实际观感 |
 | ADD-70 | P0 | 凭据、模型目标、普通设置分文件；含密钥的文件强制 0600 | 第 39 项、第 22.2 节、第 23.3 节、第 24 节、第 24.3 节、第 24.6 至 24.35 节、第 24.58–24.59 节 | 部分完成 | 凭据拆分/权限、导入、新连接镜像停止、模型默认值移出 auth、历史脚本配置桥接、旧 CI 夹具修复、实际请求端点诊断、fallback/pool 模型绑定、目录精确身份/原生issuer与只读 affinity、tier/会话窗口偏好与写入准入收敛、显式旧格式配置导出及两代旧源码往返、director/handoff 账号元数据读取、新角色保留普通 tier 继承、辅助请求 tier、连接报告及签名端点委派/模型控制/会话偏好准入、目录与请求状态投影、交互目录和首次角色保存的显式 provider 范围收敛、未知协议目录保留与绑定拒绝、角色变更的默认请求池退避重验和带key未知协议首次保存拒绝、角色目标在state lock内的实际pool准入重验已实施；最新代码 CI、其余重复事实语义收敛、旧发布二进制回退与真实环境验收尚缺 |
 | ADD-71 | P1 | fullscreen 退出后不把会话写回主屏（方案 A 已裁决） | 第 40 项、第 22.3 节、第 23.1 节 | 本地验证 | 真实终端退出后的屏幕现场 |
+| ADD-72 | P0 | 放宽 provider 级默认写入守卫：连接存在不再是拒绝条件，仅只读输入与 accountPool 拒绝 | 第 24.78 节、24.78-A 裁决、第 24.79 节 | 本地验证 | 真实终端中的 provider 槽位写入、`/model status` 来源行观感 |
+| ADD-73 | P1 | `/model status` 显式说明生效模型来自 provider 层还是 connection 层 | 第 24.78 节、24.78-B 裁决、第 24.79 节 | 本地验证 | 真实终端展示；会话内选择与两层来源同时出现时的可读性 |
 
 ### 12.12 归并说明
 
@@ -499,6 +501,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 - 用户第三十一项与 19.5 合并为 **ADD-16**；用户第三十二项为 **ADD-14**；第三十四项为 **ADD-27**；第三十五项为 **ADD-15**；第三十七项为 **ADD-33**。
 - 子代理 review 的安全发现（21.74–21.78）原为"范围外缺陷"，因都属审批与授权语义，归入 **ADD-56 至 ADD-60**。
 - 第十轮（第 22 节）的第三十八至第四十项直接编为 **ADD-69 至 ADD-71**，此前没有旧编号，无需归并。
+- 第十一轮（第 24.78 节）的两项裁决新编为 **ADD-72、ADD-73**，分别对应 24.78-A（守卫放宽）与 24.78-B（来源展示）；两者来源相同但改动面不同（行为修正 vs 只读投影），因此不合并。
 
 ### 12.13 交付顺序
 
@@ -509,7 +512,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 3. **ADD-01 至 ADD-03**（面板）继续补操作链；**ADD-14 至 ADD-24** 的残余项随之收口。
 4. **ADD-41、ADD-42**（workspace 根）——改动面最大，需与 sandbox、ledger、路径投影一起验证。
 5. **ADD-50 至 ADD-52**（团队）——依赖前面的审批与证据绑定。
-6. 其余 P2 项按用户实际反馈调整。
+6. **ADD-72、ADD-73**（模型默认值作用域）——ADD-72 是行为修正，先做；ADD-73 依赖 ADD-72 确定的最终层语义再补展示。两者都在 `/model` 写入链上，应与 ADD-70 剩余的重复事实收敛一并考虑，避免二次改动同一处守卫。
+7. 其余 P2 项按用户实际反馈调整。
 
 ### 12.14 状态汇总
 
@@ -517,12 +521,14 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---:|---|
 | 完成 | 1 | ADD-28 |
 | 部分完成 | 8 | ADD-01、02、03、07、08、25、41、70 |
-| 本地验证 | 61 | 其余已实施条目（含本轮 ADD-69、ADD-71） |
+| 本地验证 | 63 | 其余已实施条目（含本轮 ADD-72、ADD-73） |
 | 本地实现 | 0 | — |
 | 未开始 | 1 | ADD-30 |
-| **合计** | **71** | — |
+| **合计** | **73** | — |
 
-**ADD-28已满足本条列出的完成条件。** 部分完成的8条各有明确缺口，其余61条停在"本地验证"；具体缺口以对应条目为准。第24.43–24.45节已补所选真实provider及Linux/Node/exe普通/全屏的计量链路，第24.65节补当前provider的中断推理恢复现场；这些证据不能替代其他条目的真实工作流、桌面输入法/剪贴板、macOS/Windows与完整性能矩阵，也不能把局部绿色证据兑换成整体验收完成。
+ADD-72/ADD-73 于 2026-11-01 按第 24.78 节裁决实施，证据见第 24.79 节：两项均已落地并只做本地聚焦验证，尚未经真实终端观感与真实 provider 工作流验收。ADD-30 仍按既有记录不启动（需要架构级租约）。
+
+**ADD-28已满足本条列出的完成条件。** 部分完成的8条各有明确缺口，其余63条停在"本地验证"；具体缺口以对应条目为准。第24.43–24.45节已补所选真实provider及Linux/Node/exe普通/全屏的计量链路，第24.65节补当前provider的中断推理恢复现场；这些证据不能替代其他条目的真实工作流、桌面输入法/剪贴板、macOS/Windows与完整性能矩阵，也不能把局部绿色证据兑换成整体验收完成。
 
 原 Phase 20 的 47 项矩阵保持 **38 complete / 9 partial / 0 open**，与本表分开记录。
 
@@ -6701,4 +6707,65 @@ ignored `.omx/artifacts/phase20-addition-hook-executable/` 保留构建、首轮
 
 红灯阶段新增 2 项均失败，确认 primary/registered root 读取受拒内容；修复后 [workspace approval 32 项](../../packages/ts-shell/src/turn/workspace/approval.test.ts)通过。移除 writer 两处 read guard 的反转为 6 项失败，源码逐字节恢复。最终聚焦 `workspace/approval`、`workspace`、`turn/tools` 与 MCP approval 四文件共 108 项通过；五静态门通过，TS build 与 Linux compiled executable fresh build 均通过。当前构建清单为 build `4294e65d1e43268a53e1a24ebbfe49ba4cb70a45218adde7e0346165b74c8c13`、inputs `e9a5ac8108d60cedfcc5efcdca1d1a668034d708f05e5827f60208a8de546df0`、executable `457ff4fb9b162ce6253878051fdadc6f6ea3b23e86dee92e0d3e8cd39d18f2bf`。最终 compiled Node20.3 headless/regular/fullscreen 真实 MCP 场景仍通过：headless effects `0/1/1/2/2/2`，交互各 `1/1/2`，旧 grant 不代答，config/auth 不变，owned PID/start identity inactive，scratch 清理。该证据使用 scripted loopback provider 与本地 stdio MCP fixture，不代表外部 provider、其他平台、desktop adapter 或完整性能验收。
 
-ADD-61 继续保持本地验证；Phase 20 总矩阵不变，ADD-30 不启动，原 47 项外部条件延后，goal active。
+ADD-61 继续保持本地验证；Phase 20 总矩阵不变，ADD-30 不启动，原 47 个外部条件延后，goal active。
+
+### 24.78 模型默认值的两层作用域与 `/connect` `/model` 职责边界
+
+继续 ADD-70。用户在实际迁移后提出：既有 `/connect` 又有 `/model`，两者看起来在争夺「模型默认值」，是否互相矛盾。只读复核确认这不是重复实现，而是**两个写入目标**，但暴露出一处实现不一致，需要记录并裁决。
+
+**职责边界（代码事实）。** `/connect` 只写 `auth.json` 的 `providerConnections`：`apiKey`、`baseUrl`、`authType`、`status` 与连接标识（[connect/syntax.ts](../../packages/ts-shell/src/core/commands/connect/syntax.ts)）。`/model use` 只写 `config.json` 的 `modelPreferences`：`model`、`thinkingEffort`、`serviceTier`（[preferences/contract.ts](../../packages/ts-shell/src/config/preferences/contract.ts) 的 `PREFERENCE_KEYS`）。凭据字段与模型控制字段在 schema 层就已分离：`credentialSchema` 不再声明这三个字段作为持久位置（[schema.ts](../../packages/ts-shell/src/config/schema.ts)），`partitionConfigDocuments` 按 `AUTH_FIELDS` 与 `PREFERENCE_FIELD` 分派（[documents.ts](../../packages/ts-shell/src/config/documents.ts)）。
+
+**两层默认同时存在是既有设计，且有测试锁定。** 请求解析按 `cliModel ?? connection.model ?? providerCredentials.model` 取值（[providerCredentials.ts:145-147](../../packages/ts-shell/src/core/shell/providerCredentials.ts#L145-L147)），effort 同样 connection 优先（`:149` 的 `preferredEffort(activeConnectionProfile, configProfile)`）。[preferences/documents.test.ts:39-50](../../packages/ts-shell/src/config/preferences/documents.test.ts#L39-L50) 明确构造了「provider 级 `provider-model` + connection 级 `old-model`」并存，并断言 `preferredEffort(connection, provider)` 取到 connection 的值；把 connection 的 effort 显式置 `null` 后得到 `null`，说明空记录用于压制继承而不是退回下层。也就是说：**两层并存、connection 覆盖 provider、空记录压制**，是已锁定的合同。
+
+**不一致点。** `/model use --global` 在 provider 槽位分支上有一条守卫 `providerDefaultWritable`（[selection.ts:309-312](../../packages/ts-shell/src/core/commands/model/selection.ts#L309-L312)）：只要 `activeProviderConnectionId` 存在，或该 provider 已有任何连接，或存在 `accountPool`，就拒绝写 provider 级默认，返回「Global model save refused: a connection, account pool or read-only config input owns these defaults.」（`:146-148`）。这与上面的两层并存合同直接冲突：前者说两层可以并存且 connection 覆盖，后者说只要有连接就不许写 provider 层。实测复现：迁移前（连接仍在 `config.json`）该命令被拒；迁移后（连接移到 `auth.json`）同一命令成功并写入 `modelPreferences.providers` 与 `modelPreferences.connections` 两处。**同一个操作、同一语义，只因凭据换了物理文件位置而结果不同**，说明该守卫判断的是「连接是否存在」这一事实，而不是拆分前后应等价的所有权关系。
+
+该守卫**没有任何测试锁定**：`grep 'Global model save'` 与 `grep providerDefaultWritable` 在全部 `*.test.ts` 中零命中。现有 `--global` 测试只覆盖无静态凭据的 signer provider（bedrock/vertex）路径（[session/model/selection.test.ts:108-131](../../packages/ts-shell/src/session/model/selection.test.ts#L108-L131)）。
+
+**参考对照（只读，未复制代码）。**
+
+| 项目 | 默认模型存放 | provider/credential 级默认 | 互斥守卫 |
+|---|---|---|---|
+| pi | `settings.json` 的 `defaultProvider` + `defaultModel`（[settings-schema.ts:215-216](../../../pi/packages/coding-agent/src/core/settings-schema.ts#L215-L216)） | provider 级只有**代码常量** `defaultModelPerProvider`（[model-resolver.ts:20-62](../../../pi/packages/coding-agent/src/core/model-resolver.ts#L20-L62)），不可持久化 | 无。解析优先级为 scoped → settings 默认 → 内置 provider 常量 → 首个可用（[model-resolver.ts:542-615](../../../pi/packages/coding-agent/src/core/model-resolver.ts#L542-L615)），三层**始终并存**，前者优先、后者兜底 |
+| omp | `config.yml` 的 `modelRoles`（`default` 是其中一个角色，[model-settings.ts:109](../../../oh-my-pi/packages/coding-agent/src/config/model-settings.ts#L109)）；会话级另存为 session 日志的 `model_change` 条目，不改设置 | 三层，均**不是**用户可写的 provider 字段：内置 `DEFAULT_MODEL_PER_PROVIDER`（[model-resolver.ts:39](../../../oh-my-pi/packages/coding-agent/src/config/model-resolver.ts#L39)）、catalog KDL 的 `default-model`、以及发现阶段按账号标出的 `isProviderDefault`（[types.ts:1805](../../../oh-my-pi/packages/catalog/src/types.ts#L1805)）。`models.yml` 的 provider schema 与 `modelOverrides` 均无 default 字段 | 无。真实启动路径在 [sdk.ts:2054-2132](../../../oh-my-pi/packages/coding-agent/src/sdk.ts#L2054-L2132) 与 [model-resolver.ts:89-126](../../../oh-my-pi/packages/coding-agent/src/config/model-resolver.ts#L89-L126)：CLI → 会话恢复 → `modelRoles.default` → 兜底 `pickDefaultAvailableModel`（先按具体凭据收缩候选池，账号默认覆盖内置默认）。**`findInitialModel` 全仓无调用者**，其文档注释与 `docs/models.md` 的优先级描述属于该仓自身的文档漂移，不能当作实际路径引用。account pool 只限制哪些凭据可用，不参与默认模型选择 |
+| codex | `config.toml` 的顶层 `model`（[config_toml.rs:153](../../../codex/codex-rs/config/src/config_toml.rs#L153)），profile 内 `ConfigProfile.model`（[profile_toml.rs:25](../../../codex/codex-rs/config/src/profile_toml.rs#L25)） | **不存在**。`ModelProviderInfo` 完全没有 model 字段（[lib.rs:96-127](../../../codex/codex-rs/model-provider-info/src/lib.rs#L96-L127)） | 无。`model` 与 `model_provider` 是两个独立字段并列（[profile_toml.rs:25-31](../../../codex/codex-rs/config/src/profile_toml.rs#L25-L31)），无互斥校验 |
+
+**pi 与 omp 都不存在 connection 级默认模型**，因为它们的凭据模型是一 provider 一凭据：pi 的 `auth.json` 是 `Record<providerId, Credential>`（[auth-storage.ts:17](../../../pi/packages/coding-agent/src/core/auth-storage.ts#L17)），凭据只通过 `filterModels` 影响**可用模型集合**，从不参与「默认选哪个」；omp 的 `ApiKeyCredential` / `OAuthCredential` 同样不含 model 字段，凭据只作可用性闸门与候选池收缩。codex 的 `ModelProviderInfo` 更是完全没有模型概念。三者的共同点是：**凭据是闸门，不是默认值来源；任何一层默认都不排斥另一层**。
+
+需要同时记录一处参考侧的准确性边界：omp 的 `docs/models.md`「Initial model selection priority」段落描述的是 `findInitialModel`，而该函数在当前源码中**没有任何调用者**（全仓 grep 仅剩定义）。实际启动顺序以 `sdk.ts` 为准，且比文档多出「账号发现默认覆盖内置默认」一层。引用参考的优先级时不能只抄其文档。
+
+**裁决（2026-11-01，用户已定）。** 两项都做，但本轮**只记录、不实施**；实施由后续批次负责。
+
+- **24.78-A（修缺陷）**：放宽 `providerDefaultWritable`。连接存在本身不再是拒绝条件；保留真正的只读边界——只读配置输入（`configProvenance` 中带 `position` 的文件）与 `accountPool` 仍拒绝，因为它们确实不由用户直接写入。放宽后必须有测试锁定：**有连接时写 provider 级默认成功，且不触碰 connection 级记录**；同时补一条反转，恢复旧守卫后该测试必须失败。
+- **24.78-B（补信息）**：当 provider 级与 connection 级同时存在且取值不同时，在 `/model status`（或等价的只读投影）显式说明当前生效值来自哪一层，说明「connection 覆盖 provider」这一事实。不新增持久化字段，不改变解析链；`/model status` 现有输出结构保留，只增补来源说明。
+
+实施前必须同时满足的既有约束：
+1. 解析链 `cliModel ?? connection.model ?? providerCredentials.model`（[providerCredentials.ts:145-147](../../packages/ts-shell/src/core/shell/providerCredentials.ts#L145-L147)）与 effort 的 connection 优先（`:149`）**不得改动**——这是已由 [preferences/documents.test.ts:39-50](../../packages/ts-shell/src/config/preferences/documents.test.ts#L39-L50) 锁定的合同。
+2. 空记录压制继承（`thinkingEffort: null` 得到 `null` 而非退回下层）必须保留。
+3. 24.78-A 的放宽不能绕过会话/工作区/CAS 的既有准入检查；`selection.ts` 中 `beforeCommit` 的锁内复验逻辑应保持等价收紧，只移除「连接存在」这一条。
+4. 24.78-B 只做展示层增补，不得让 `/model status` 变成写入入口，也不得因展示而额外读取凭据。
+
+**验证要求（实施批次）**：24.78-A 需在旧源码上先看到新测试失败（红），放宽后通过（绿），再做一次有效反转；24.78-B 需覆盖「两层同值」「两层异值」「只有一层」「都没有」四种投影，且断言不改变实际请求目标。两项均只跑聚焦 Vitest 与必要静态门，不默认全仓回归。
+
+本批只记录研究与裁决，未改产品代码、未改测试，未提升 ADD-70 状态。
+
+### 24.79 两层默认的写入守卫放宽与生效层来源
+
+按 24.78 的裁决实施 ADD-72 与 ADD-73。两项都只改 `/model` 的写入准入与只读投影，未触碰解析链、effort 优先级、空记录压制或 `beforeCommit` 的锁内复验。
+
+**ADD-72（守卫放宽）。** [selection.ts](../../packages/ts-shell/src/core/commands/model/selection.ts) 的 `providerDefaultWritable` 不再读取 `activeProviderConnectionId` 与 `providerConnections`，只剩两条真正的只读边界：该 provider 已声明 `accountPool`，或 `providerCredentials` 的 provenance 里存在带 `position` 的只读配置输入。拒绝文案同步去掉「a connection」，改为「an account pool or read-only config input owns these defaults」。函数本身留在原模块：它只被这一处写入路径使用，单独拆文件只会多一层没有语义的跳转。
+
+`beforeCommit` 中的同名调用保持不变，因此放宽只作用于「连接是否存在」这一条，锁内复验、会话/工作区/CAS 准入、catalog 与凭据身份比对全部保留。
+
+**ADD-73（来源投影）。** 新增 [model/defaultSource.ts](../../packages/ts-shell/src/core/commands/model/defaultSource.ts)：`modelDefaultSource` 把「connection → provider → account 默认 → unset」投影成四态，`modelDefaultSourceLine` 只负责一句话表述。四态分别是「两层同值」「两层异值（connection 覆盖并指名被覆盖的 provider 值）」「只有一层」「都没有」；都没有时不输出来源行，避免出现「Model source: unset」这类同义反复。`sessionOwnsModel` 读 `configProvenance` 的 `sources` 是否含 `session`，把会话选择与已存默认区分开——会话选择在投影时是覆盖到连接记录上的，若不加区分会把用户本回合的选择说成「已存的连接默认」。
+
+[modelCommandRuntime.ts](../../packages/ts-shell/src/core/commands/modelCommandRuntime.ts) 的 `renderModelStatus` 改为从该投影取 `Model:` 值，并在其后插入来源行；读取顺序与原实现一致（connection → providerCredentials → account 默认），所以显示的模型没有变化。provenance 的下标从 `config.providerConnections` 取，而不是从归一化后的副本取，因为 provenance 的 children 是按存储数组下标的。
+
+**验证。** 红灯阶段先在旧守卫上写 ADD-72 的新用例：[providerDefault.test.ts](../../packages/ts-shell/src/core/commands/model/providerDefault.test.ts) 的「有连接时写 provider 级默认成功」失败于 `Global model save refused`。放宽后通过。有效反转：把 `activeProviderConnectionId`/`providerConnections` 两条判断加回 `providerDefaultWritable`，该用例再次失败（`expected 'Global model save refused: an account…' to include 'Model switched to provider-model'`），逐字节恢复后 SHA-256 回到 `c635b15c799c6cf96216497c15f5b990d1a636f3ca6251d2ea892049af59ecc7` 并重验通过。
+
+只读输入的拒绝用例需要 `providerCredentials` 同时带 `apiKey`，否则命令在更早的「current request credential is unavailable」处就被挡住，到不了守卫；这属于既有准入顺序，未改动产品去迁就测试。
+
+ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/commands/model/defaultSource.test.ts) 逐条断言文案与 `effective`，并在 [modelCommandRuntime.test.ts](../../packages/ts-shell/src/core/commands/modelCommandRuntime.test.ts) 以真实 `runModelCommand(['status'])` 覆盖四态与「会话选择」标记；这些用例同时断言 `Model:` 的值不变，证明投影没有改变实际请求目标。
+
+**聚焦验证与边界。** 单 worker / heap768MiB 串行执行四文件 114 项通过：`session/model/selection` 69、`modelCommandRuntime` 35、`providerDefault` 3、`defaultSource` 7；另跑 `model/policy` 10、`config/documents` 32、`config/preferences/documents` 11 确认两层并存与空记录压制的既有合同未变。静态门 `verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`verify:docs-drift:strict` 通过（118 条既有 docs-source advisory 保留），TS build 通过（当前 manifest `14503c0a3d63`）。`analyze:module-facades` 仍报告 `cli/interactive/interactiveMode.ts` 一个既有 advisory，本批未触碰该文件。
+
+本批证据仅限本地聚焦测试与静态门：没有真实终端观感验收、没有真实 provider 工作流、没有其他平台或完整性能矩阵，因此 ADD-72、ADD-73 记为「本地验证」，不提升 ADD-70。

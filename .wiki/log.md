@@ -11391,3 +11391,27 @@ Node20.3显式单worker/heap768MiB/同一nonblocking flock串行七文件131项�
 [addition24.77](features/phase-20-addition.md#2477-写入-diff-读取遵守-read-deny)继续ADD-61。真实 registry/adaptTools/executeToolBatch 红灯确认 primary 与 registered writable root 的已有 write/edit 会读取被 `read` deny 拒绝的旧正文并写入 diff；缺失新文件保持控制语义。对照 Claude/Codex 的 read deny 与 write access 分离后，turn/tools 在 writer 读取已有正文前及 runtime read verify 边界复核 read 规则；目标在权限判断后出现也不能泄露，write-only 新建仍通过。
 
 Node20.3 单worker/heap768MiB 同一 flock：workspace approval 32 项、workspace 9、turn/tools 54、MCP approval 13，共108项通过；反转移除两处 writer read guard，6项失败，源码恢复。五静态门、TS build 与 Linux compiled executable fresh build 通过，当前 build `4294e65d1e43268a53e1a24ebbfe49ba4cb70a45218adde7e0346165b74c8c13`、inputs `e9a5ac8108d60cedfcc5efcdca1d1a668034d708f05e5827f60208a8de546df0`、exe `457ff4fb9b162ce6253878051fdadc6f6ea3b23e86dee92e0d3e8cd39d18f2bf`。compiled CLI 真实 headless/regular/fullscreen MCP 复验均通过：effects headless `0/1/1/2/2/2`、交互 `1/1/2`，旧 grant 不代答、config/auth 不变、退出与进程/scratch清理。审计保持 Node/loopback/std io fixture 证据边界；未声称外部provider、其他平台、desktop或完整性能。ADD-61本地验证，矩阵与goal active不变。
+
+### 2026-11-01：模型默认值的两层作用域与 /connect /model 职责边界
+
+[addition24.78](features/phase-20-addition.md#2478-模型默认值的两层作用域与-connect-model-职责边界)继续ADD-70。用户迁移真实HOME后提出 `/connect` 与 `/model` 是否在争夺模型默认值。只读复核确认两者是不同写入目标：`/connect` 只写 `auth.json` 的 `providerConnections`，`/model use` 只写 `config.json` 的 `modelPreferences`；凭据字段与 `model`/`thinkingEffort`/`serviceTier` 在 schema 层已分离。
+
+两层默认并存是既有合同并有测试锁定：解析按 `cliModel ?? connection.model ?? providerCredentials.model`，effort 同样 connection 优先（`providerCredentials.ts:145-149`），`preferences/documents.test.ts:39-50` 构造了 provider 级与 connection 级并存并断言 connection 覆盖、空记录压制继承。
+
+不一致点：`/model use --global` 的 `providerDefaultWritable`（`selection.ts:309-312`）以「存在连接或 accountPool」为由拒绝写 provider 级默认。实测迁移前该命令被拒、迁移后同一命令成功并双写两层，说明守卫判断的是连接存在性而非拆分前后应等价的所有权关系；该守卫在全部测试中零命中，现有 `--global` 测试只覆盖无静态凭据的 signer 路径。
+
+参考对照（只读，未复制）：pi 用 `settings.json` 的 `defaultProvider`+`defaultModel` 加代码常量 `defaultModelPerProvider` 兜底，三层并存无互斥；omp 用 `config.yml` 的 `modelRoles.default`，兜底为内置 `DEFAULT_MODEL_PER_PROVIDER`、catalog KDL 默认与账号发现的 `isProviderDefault`（账号默认覆盖内置默认），account pool 只限制可用凭据不参与默认选择；codex 的 `model` 与 `model_provider` 是两个独立顶层字段，`ModelProviderInfo` 完全不含 model 字段，无互斥校验。pi 与 omp 均无 connection 级默认模型，因为其凭据是一 provider 一凭据，凭据只作闸门。复核中发现 omp 的 `findInitialModel` 全仓无调用者，其 `docs/models.md` 的优先级段落与真实 `sdk.ts` 路径不一致，已按实际调用链引用并记录该文档漂移。
+
+用户随后裁决两项都做，但本轮**只记录、不实施**：已登记为 ADD-72（24.78-A，放宽守卫，P0，未开始）与 ADD-73（24.78-B，`/model status` 显示生效层来源，P1，未开始），写入第12节台账、归并说明与交付顺序。台账总数由 71 增至 73，未开始由 1 增至 3（含既有 ADD-30）。实施约束已写入 24.78：解析链与 effort 优先级、空记录压制继承、`beforeCommit` 锁内复验均不得改动；ADD-72 需红绿与有效反转，ADD-73 需四态投影且不改请求目标。本批仅改文档，未改产品代码、未改测试、未提升ADD-70状态；原47项外部条件延后、goal active。
+
+### 2026-11-01：两层默认的写入守卫放宽与 `/model status` 生效层来源
+
+[addition24.79](features/phase-20-addition.md#2479-两层默认的写入守卫放宽与生效层来源)实施 ADD-72 与 ADD-73（第 24.78 节裁决）。
+
+ADD-72：`selection.ts` 的 `providerDefaultWritable` 只保留两条真正的只读边界——该 provider 已声明 `accountPool`，或 `providerCredentials` provenance 中存在带 `position` 的只读配置输入；`activeProviderConnectionId` 与「该 provider 已有连接」不再是否决条件，拒绝文案同步去掉「a connection」。`beforeCommit` 的锁内复验、会话/工作区/CAS 准入、catalog 与凭据身份比对全部保留。
+
+ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connection → provider → account 默认 → unset 四态，异值时指名被覆盖的 provider 值，全空时不输出来源行），`renderModelStatus` 改由该投影取 `Model:` 并增补一行来源；`sessionOwnsModel` 读 provenance 的 `sources` 含 `session` 以区分本回合会话选择与已存默认。解析链、effort 优先级、空记录压制、`/model status` 只读性均未改动。
+
+验证：红灯先在旧守卫上失败（`Global model save refused`），放宽后通过；有效反转把两条判断加回后同一用例再失败，逐字节恢复并核对 SHA-256 `c635b15c799c6cf96216497c15f5b990d1a636f3ca6251d2ea892049af59ecc7` 后重验。单 worker/heap768MiB 串行四文件 114 项通过（selection 69、modelCommandRuntime 35、providerDefault 3、defaultSource 7），另跑 policy 10、documents 32、preferences/documents 11 确认既有合同未变；五静态门通过、118 条既有 docs-source advisory 保留，TS build manifest `14503c0a3d63`。`analyze:module-facades` 仍为既有 `interactiveMode.ts` 一条 advisory，本批未触碰。
+
+台账：ADD-72、ADD-73 由「未开始」改为「本地验证」，未开始由 3 降为 1（仅 ADD-30）；总数 73 不变。证据仅限本地聚焦测试与静态门，未声称真实终端观感、真实 provider 工作流、其他平台或完整性能验收；ADD-70 状态不变，goal active。

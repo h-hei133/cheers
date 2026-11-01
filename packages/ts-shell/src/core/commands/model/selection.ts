@@ -144,7 +144,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     return 'Global model save refused: the selected connection comes from a read-only config input. Save a session preference or edit its owning file explicitly.';
   }
   if (global && providerSlot && !providerDefaultWritable(loaded, provider)) {
-    return 'Global model save refused: a connection, account pool or read-only config input owns these defaults. Save a session preference or edit its owning configuration.';
+    return 'Global model save refused: an account pool or read-only config input owns these defaults. Save a session preference or edit its owning configuration.';
   }
   if (context.admission?.()) return 'Model switch blocked: session, workspace or configuration admission changed.';
   if ((context.runtimeConfig || context.readConfiguration) && ((!scoped && effective.activeProviderConnectionId?.trim() !== activeId)
@@ -306,7 +306,15 @@ function sessionFailure(error: unknown): string {
 function matchesRequestProvider(context: CommandContext, config: RuntimeConfig, provider: string): boolean {
   return !context.resolveConfigTarget || context.resolveConfigTarget(config).provider === provider;
 }
+/**
+ * A connection does not own the provider-level default: both layers are stored
+ * side by side and the connection wins at request time, so an existing
+ * connection is not a reason to refuse. What still refuses is a value this
+ * command cannot write — an account pool chooses the serving credential, and a
+ * read-only config input supplies the default from a file this command does not
+ * own.
+ */
 function providerDefaultWritable(config: RuntimeConfig, provider: RuntimeConfig['provider']): boolean {
-  return !config.activeProviderConnectionId && !config.providerConnections.some(item => item.provider === provider)
-    && !config.accountPool?.[provider] && !config.configProvenance.providerCredentials.files?.some(file => file.position !== undefined);
+  return !config.accountPool?.[provider]
+    && !config.configProvenance.providerCredentials.files?.some(file => file.position !== undefined);
 }

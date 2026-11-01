@@ -22,6 +22,7 @@ import { configurationApplicationNotice } from "./configuration.js";
 import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
 import { runModelPresetCommand } from './model/presetCommand.js';
 import { providerCredentialBaseUrl } from '../auth/account/target.js';
+import { modelDefaultSource, modelDefaultSourceLine, sessionOwnsModel } from './model/defaultSource.js';
 
 
 /**
@@ -127,12 +128,22 @@ function renderModelStatus(context: CommandContext): string {
     .some(entry => entry.active && entry.state === 'signed');
   const provider = activeConnection?.provider ?? config.provider ?? "openai";
   const authType = activeConnection?.authType ?? "api-key";
-  const model =
-    normalizeText(activeConnection?.model) ??
-    normalizeText(config.providerCredentials?.[provider]?.model) ??
-    (provider === "openai" && authType === "account-auth"
-      ? providerFacts("openai").accountAuthDefaultModel
-      : undefined);
+  // Provenance children are indexed by the stored array, so read the index
+  // from the configuration rather than from the normalized copy above.
+  const storedIndex = activeConnection
+    ? config.providerConnections.findIndex(item => item.id.trim() === activeId) : -1;
+  const connectionIndex = storedIndex < 0 ? undefined : storedIndex;
+  const source = modelDefaultSource({
+    connectionModel: activeConnection?.model,
+    providerModel: config.providerCredentials?.[provider]?.model,
+    accountDefault: provider === "openai" && authType === "account-auth"
+      ? providerFacts("openai").accountAuthDefaultModel : undefined,
+    // A projected session selection overwrites the stored leaf it shadows, so
+    // name it as the session's choice rather than as a saved default.
+    sessionSelected: sessionOwnsModel(config, provider, connectionIndex),
+  });
+  const model = source.effective;
+  const sourceLine = modelDefaultSourceLine(source);
 
   return [
     "Model selection status",
@@ -141,6 +152,7 @@ function renderModelStatus(context: CommandContext): string {
     `Auth type: ${authType}`,
     `Active connection: ${activeId ?? "none"}`,
     `Model: ${model ?? "unset"}`,
+    ...(sourceLine ? [sourceLine] : []),
     `Request provider: ${request.provider}`,
     `Request model: ${request.model ?? "unset"}`,
     ...(signed ? ['Request auth: authentication at request'] : []),
