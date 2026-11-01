@@ -6800,6 +6800,8 @@ ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/com
 
 **改动三：新增 [preset.test.ts](../../packages/ts-shell/src/core/commands/connect/preset.test.ts)**，逐个预设断言其 `defaultModel` 出现在对应目录条目里（目录条目模型为空则豁免，无条目则失败）。红灯阶段该测试在 `openai`（`gpt-4.1-mini` 不在列表中）与 `github-copilot`（无目录条目）两处失败；两处修复后 9 项全绿。
 
-**验证。** `connect/preset` 9、`connectCommandRuntime` 68、`modelCommandRuntime` 35、`catalogShape` 22、`catalogSurface` 40、`picker/model` 46 共 220 项通过；`verify:import-cycles`、`check:config-consumers`、`check:declarations` 通过，TS build 通过（manifest `18ad34012d19`）。
+**改动四：`resolveProviderTarget` 去掉不可达与重复的分支。** 该函数先查 `CONNECT_PRESETS`，只有别名才会落到后面的 `if` 链。`antigravity` 与 `claudecode` 已是预设 id，其内联分支永远走不到；`google` 同时出现在预设与内联分支里，内联那份复制了 `defaultBaseUrl`/`defaultModel` 两个值。现只保留两个真正可达的别名：`openai-compatible`（不指定模型，端点由用户提供）与 `gemini`（转指 `google` 预设，不再复制取值）。同时删掉 `preset.ts` 里未被使用的 `RuntimeConfigFile` 类型导入。
+
+**验证。** `connect/preset` 9、`connectCommandRuntime` 68、`modelCommandRuntime` 35、`catalogShape` 22、`catalogSurface` 40、`picker/model` 46 共 220 项通过；`verify:import-cycles`、`check:config-consumers`、`check:declarations` 通过，TS build 通过（manifest `18ad34012d19`，去重后 `tsc -p tsconfig.build.json` 仍通过）。
 
 未做：没有真实 OpenAI/Copilot 请求，因此不能据此声称模型可用性；`github-copilot` 的可选模型仍取决于账号，目录里刻意保持为空。

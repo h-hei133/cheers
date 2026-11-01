@@ -1,6 +1,5 @@
 import type {
   ProviderConnectionConfig,
-  RuntimeConfigFile,
   RuntimeProvider,
 } from "../../../config/runtimeConfig.js";
 import type { ConnectPreset } from "./types.js";
@@ -75,6 +74,14 @@ export const CONNECT_PRESETS: readonly ConnectPreset[] = [
   },
 ];
 
+/**
+ * The preset a name resolves to.
+ *
+ * The table answers first, so an id it already holds is never restated here.
+ * What remains is the aliases: a name a user may type that is not a preset id.
+ * `openai-compatible` deliberately names no model — the endpoint is the user's,
+ * so any id here would be a guess written into their connection.
+ */
 export function resolveProviderTarget(input?: string): ConnectPreset | null {
   const normalized = input?.trim().toLowerCase();
   if (!normalized) {
@@ -96,30 +103,10 @@ export function resolveProviderTarget(input?: string): ConnectPreset | null {
     };
   }
 
-  if (normalized === "google" || normalized === "gemini") {
-    return {
-      id: "google",
-      label: "Google Gemini",
-      provider: "google",
-      defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-      defaultModel: "gemini-2.5-flash",
-    };
-  }
-
-  if (normalized === "antigravity") {
-    return {
-      id: "antigravity",
-      label: "Antigravity",
-      provider: "antigravity",
-    };
-  }
-
-  if (normalized === "claudecode") {
-    return {
-      id: "claudecode",
-      label: "Anthropic-compatible proxy",
-      provider: "claudecode",
-    };
+  if (normalized === "gemini") {
+    // The provider is `google`; only the name a user types is an alias.
+    const google = CONNECT_PRESETS.find((candidate) => candidate.id === "google");
+    return google ?? null;
   }
 
   return null;
