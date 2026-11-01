@@ -11384,3 +11384,10 @@ Node20.3显式单worker/heap768MiB/同一nonblocking flock串行七文件131项�
 一次延迟读取：69fdcdbf代码CI41271010610已success；父提交f33bd2f5代码CI41272131055仍in_progress、Watch41272131053 success，不立即轮询。最终核验、提交推送、remote-main及clean状态由本批ignored收据另绑，本批CI未观察。
 
 最终五静态门、四份Node脚本语法、七文件131项、独立证据verifier与diff check均exit0；三父源/四当前TS、五组恢复、current build/inputs及全部原生收据已核对。五份执行脚本逐字节归档后删除，owned task scratch移除；最终文档门与Git交付另绑ignored收据，goal active。
+
+
+### 2026-11-01：写入 diff 读取遵守 read deny
+
+[addition24.77](features/phase-20-addition.md#2477-写入-diff-读取遵守-read-deny)继续ADD-61。真实 registry/adaptTools/executeToolBatch 红灯确认 primary 与 registered writable root 的已有 write/edit 会读取被 `read` deny 拒绝的旧正文并写入 diff；缺失新文件保持控制语义。对照 Claude/Codex 的 read deny 与 write access 分离后，turn/tools 在 writer 读取已有正文前及 runtime read verify 边界复核 read 规则；目标在权限判断后出现也不能泄露，write-only 新建仍通过。
+
+Node20.3 单worker/heap768MiB 同一 flock：workspace approval 32 项、workspace 9、turn/tools 54、MCP approval 13，共108项通过；反转移除两处 writer read guard，6项失败，源码恢复。五静态门、TS build 与 Linux compiled executable fresh build 通过，当前 build `4294e65d1e43268a53e1a24ebbfe49ba4cb70a45218adde7e0346165b74c8c13`、inputs `e9a5ac8108d60cedfcc5efcdca1d1a668034d708f05e5827f60208a8de546df0`、exe `457ff4fb9b162ce6253878051fdadc6f6ea3b23e86dee92e0d3e8cd39d18f2bf`。compiled CLI 真实 headless/regular/fullscreen MCP 复验均通过：effects headless `0/1/1/2/2/2`、交互 `1/1/2`，旧 grant 不代答、config/auth 不变、退出与进程/scratch清理。审计保持 Node/loopback/std io fixture 证据边界；未声称外部provider、其他平台、desktop或完整性能。ADD-61本地验证，矩阵与goal active不变。

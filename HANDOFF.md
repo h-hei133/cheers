@@ -1918,3 +1918,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A native probe treats a correct denied terminal as missing its model success text, or dereferences an absent snapshot after successful execution.
 - **Root Cause**: Product terminal mapping can replace a model answer after denial; prompt-specific continuation advice may intentionally be undefined after a completed turn.
 - **Rule**: Assert denial and success outcomes separately using effects, model tool results and persisted terminal facts. Use the unconditional session snapshot to read audits; use prompt-continuity APIs only when asking whether a new prompt should continue prior work. Preserve observation failures separately from product failures.
+
+### Writer Diff Reads Must Recheck Read Deny At The Read Boundary
+- **Symptom**: A writable workspace root lets `write` or `edit` include a protected old body in its diff even though `read` is denied; checking only permission admission misses a target created after that check.
+- **Root Cause**: Writers perform an internal read under write authority, and the target can change between permission evaluation and the execution service's verified read.
+- **Rule**: Evaluate read deny for existing writer targets in the selected root before the diff read, and reuse that callback at the verified read boundary after the handle is opened. Keep absent new-file writes allowed when no body is read. Cover primary roots, registered writable roots, and the creation race.

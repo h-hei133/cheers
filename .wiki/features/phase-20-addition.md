@@ -6689,3 +6689,16 @@ ignored `.omx/artifacts/phase20-addition-hook-executable/` 保留构建、首轮
 一次延迟读取：69fdcdbf 精确代码 CI41271010610 已 success；父提交 f33bd2f5 的代码 CI41272131055 仍 in_progress、Watch41272131053 success；不以 Watch 代替代码 CI，不立即轮询。本批最终核验与提交推送、remote-main/clean 另绑交付收据，本批 CI 未观察。
 
 最终五静态门、四份Node脚本语法、七文件131项、主代理独立证据verifier与diff check均exit0；三份父源、四份当前TS、五组反转恢复、current build/inputs、三场有效与三场中间收据均已核对。五份执行脚本与非可执行归档逐字节相等后删除，owned task scratch已移除。只读委派源码及证据复审已完成，frame口径已修正；提交推送、remote-main与clean状态由ignored delivery收据另绑，目标保持active。
+
+
+### 24.77 写入 diff 读取遵守 read deny
+
+继续 ADD-61。只读复核发现 `write`/`edit` 为生成 diff 会读取已有文件正文，但权限层只在未注册的外部文件访问分支检查 `read` deny；primary root 和 `/workspace add <path> --write` 注册根都能在 `accept-edits` 下直接把受拒读内容放进 diff 并写入。该路径由实际 registry、`adaptTools` 和 `executeToolBatch` 可达，不是人工伪造上下文。目标缺失时则没有旧正文，原有 write-only 新文件语义应保留。
+
+定向对照只读参考：Claude Code 的 filesystem permission 先检查 read deny/ask，再处理 edit implied read；Codex 的 filesystem access mode 将 Read/Write/Deny 与独立 read-deny matcher 分离，write 权限不会抹掉 read deny。采用相同的分离决定，未复制参考代码。
+
+现 [turn/tools.ts](../../packages/ts-shell/src/turn/tools.ts) 在 writer 读已有正文前，以每个实际 selected root 的 read 规则重新评估；初始权限阶段和 `runtime/execution/read.ts` 的打开后 verify 均会再次进入同一 `assertFileAccess`，因此目标在权限判断后被并发创建时也不会绕过 read deny。不存在的新文件不触发 read deny，仍可在已授权 writable root 创建。primary 与 registered writable root 的 write/edit、缺失新文件以及创建竞态均有回归覆盖。
+
+红灯阶段新增 2 项均失败，确认 primary/registered root 读取受拒内容；修复后 [workspace approval 32 项](../../packages/ts-shell/src/turn/workspace/approval.test.ts)通过。移除 writer 两处 read guard 的反转为 6 项失败，源码逐字节恢复。最终聚焦 `workspace/approval`、`workspace`、`turn/tools` 与 MCP approval 四文件共 108 项通过；五静态门通过，TS build 与 Linux compiled executable fresh build 均通过。当前构建清单为 build `4294e65d1e43268a53e1a24ebbfe49ba4cb70a45218adde7e0346165b74c8c13`、inputs `e9a5ac8108d60cedfcc5efcdca1d1a668034d708f05e5827f60208a8de546df0`、executable `457ff4fb9b162ce6253878051fdadc6f6ea3b23e86dee92e0d3e8cd39d18f2bf`。最终 compiled Node20.3 headless/regular/fullscreen 真实 MCP 场景仍通过：headless effects `0/1/1/2/2/2`，交互各 `1/1/2`，旧 grant 不代答，config/auth 不变，owned PID/start identity inactive，scratch 清理。该证据使用 scripted loopback provider 与本地 stdio MCP fixture，不代表外部 provider、其他平台、desktop adapter 或完整性能验收。
+
+ADD-61 继续保持本地验证；Phase 20 总矩阵不变，ADD-30 不启动，原 47 项外部条件延后，goal active。

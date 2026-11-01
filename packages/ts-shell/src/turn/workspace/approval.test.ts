@@ -152,6 +152,67 @@ describe('one-time external file approvals', () => {
     expect(fs.readFileSync(target, 'utf8')).toBe('protected body');
   });
 
+  it.each(['write', 'edit'] as const)('refuses registered writable-root %s when reading its original body is denied', async name => {
+    const target = path.join(outside, 'registered-secret.txt'); fs.writeFileSync(target, 'registered protected body');
+    const host = setup(undefined, {
+      workspaceRoots: [captureWorkspaceRoot(outside, primary, 'write')],
+      denyRules: [{ tool: 'read', pattern: 'registered-secret.txt' }],
+    });
+    const result = await host.run(name, { path: target, content: 'unsafe replacement' });
+    expect(host.approval).not.toHaveBeenCalled();
+    expect(JSON.stringify(result)).not.toContain('registered protected body');
+    expect(fs.readFileSync(target, 'utf8')).toBe('registered protected body');
+  });
+
+  it('keeps a denied read from blocking creation of a new writable-root file', async () => {
+    const target = path.join(outside, 'registered-new.txt');
+    const host = setup(undefined, {
+      workspaceRoots: [captureWorkspaceRoot(outside, primary, 'write')],
+      denyRules: [{ tool: 'read', pattern: 'registered-new.txt' }],
+    });
+    await host.run('write', { path: target, content: 'new file' });
+    expect(host.approval).not.toHaveBeenCalled();
+    expect(fs.readFileSync(target, 'utf8')).toBe('new file');
+  });
+
+  it.each(['primary', 'registered'] as const)('honors read denial before %s-root write diff reads', async rootKind => {
+    const root = rootKind === 'primary' ? primary : outside;
+    const target = path.join(root, `${rootKind}-secret.txt`);
+    fs.writeFileSync(target, 'private original');
+    const host = setup(undefined, {
+      ...(rootKind === 'registered' ? { workspaceRoots: [captureWorkspaceRoot(outside, primary, 'write')] } : {}),
+      denyRules: [{ tool: 'read', pattern: `${rootKind}-secret.txt` }],
+    });
+    const result = await host.run('write', { path: target, content: 'public replacement' });
+    expect(host.approval).not.toHaveBeenCalled();
+    expect(JSON.stringify(result)).not.toContain('private original');
+    expect(fs.readFileSync(target, 'utf8')).toBe('private original');
+  });
+
+  it('applies the primary-root read deny to a relative writer target', async () => {
+    const target = path.join(primary, 'relative-secret.txt'); fs.writeFileSync(target, 'relative private original');
+    const host = setup(undefined, { denyRules: [{ tool: 'read', pattern: 'relative-secret.txt' }] });
+    const result = await host.run('write', { path: 'relative-secret.txt', content: 'public replacement' });
+    expect(host.approval).not.toHaveBeenCalled();
+    expect(JSON.stringify(result)).not.toContain('relative private original');
+    expect(fs.readFileSync(target, 'utf8')).toBe('relative private original');
+  });
+
+  it('rechecks read denial if a concurrent creator appears before the writer reads', async () => {
+    const target = path.join(outside, 'race-secret.txt'); let created = false;
+    const host = setup(undefined, {
+      workspaceRoots: [captureWorkspaceRoot(outside, primary, 'write')],
+      denyRules: [{ tool: 'read', pattern: 'race-secret.txt' }],
+      admission: () => {
+        if (!created) { created = true; fs.writeFileSync(target, 'race protected body'); }
+        return undefined;
+      },
+    });
+    const result = await host.run('write', { path: target, content: 'unsafe replacement' });
+    expect(JSON.stringify(result)).not.toContain('race protected body');
+    expect(fs.readFileSync(target, 'utf8')).toBe('race protected body');
+  });
+
   it('rejects changed parent identity after approval', async () => {
     const target = path.join(outside, 'saved.txt');
     const host = setup(async prompt => {
