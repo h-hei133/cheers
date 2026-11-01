@@ -33,3 +33,17 @@ it('resolves the openai-compatible alias without inventing a model', () => {
   expect(resolveProviderTarget('openai-compatible')).toMatchObject({ provider: 'openai-compatible' });
   expect(resolveProviderTarget('openai-compatible')?.defaultModel).toBeUndefined();
 });
+
+/**
+ * The same disagreement can happen to the address. A preset's base URL is
+ * written into the connection, so a stale value sends requests to a host the
+ * catalogue no longer names — while `/model` describes the other one.
+ */
+it.each(CONNECT_PRESETS.flatMap(preset => preset.defaultBaseUrl === undefined ? []
+  : [{ id: preset.id, baseUrl: preset.defaultBaseUrl }]))(
+  'preset $id points at the address its provider publishes', ({ id, baseUrl }) => {
+  const entry = BUILTIN_PROVIDERS.find(candidate => candidate.id === id);
+  expect(entry, `no catalogue entry for ${id}`).toBeDefined();
+  if (entry!.baseUrl === undefined) return;
+  expect(entry!.baseUrl.replace(/\/+$/, '')).toBe(baseUrl.replace(/\/+$/, ''));
+});

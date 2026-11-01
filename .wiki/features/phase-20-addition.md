@@ -6798,7 +6798,7 @@ ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/com
 
 **改动二：给 `BUILTIN_PROVIDERS` 补 `github-copilot` 条目（`models: []`）。** 该 provider 在 `RUNTIME_PROVIDERS`、`facts.ts`、`CONNECT_PRESETS` 与 `/connect login` 里都存在，唯独目录里完全没有条目，于是 `/model` 的裸目录视图根本不列出它——而 `antigravity`、`claudecode` 这类同样「模型由账号或用户端点决定」的 provider 都是有空条目的。补空条目与既有处理一致；`auth: 'oauth'` 与 `facts.ts` 的 `accountAuthType: 'subscription'` 对齐。
 
-**改动三：新增 [preset.test.ts](../../packages/ts-shell/src/core/commands/connect/preset.test.ts)**，逐个预设断言其 `defaultModel` 出现在对应目录条目里（目录条目模型为空则豁免，无条目则失败）。红灯阶段该测试在 `openai`（`gpt-4.1-mini` 不在列表中）与 `github-copilot`（无目录条目）两处失败；两处修复后 9 项全绿。
+**改动三：新增 [preset.test.ts](../../packages/ts-shell/src/core/commands/connect/preset.test.ts)**，逐个预设断言其 `defaultModel` 出现在对应目录条目里（目录条目模型为空则豁免，无条目则失败）。红灯阶段该测试在 `openai`（`gpt-4.1-mini` 不在列表中）与 `github-copilot`（无目录条目）两处失败；两处修复后 9 项全绿。同一测试另覆盖 `defaultBaseUrl`：预设的地址也会写进连接，若与目录漂移，请求会发往目录已不再描述的 host。当前三处（siliconflow、google、google-ai）一致，用例共 12 项。
 
 **改动四：`resolveProviderTarget` 去掉不可达与重复的分支。** 该函数先查 `CONNECT_PRESETS`，只有别名才会落到后面的 `if` 链。`antigravity` 与 `claudecode` 已是预设 id，其内联分支永远走不到；`google` 同时出现在预设与内联分支里，内联那份复制了 `defaultBaseUrl`/`defaultModel` 两个值。现只保留两个真正可达的别名：`openai-compatible`（不指定模型，端点由用户提供）与 `gemini`（转指 `google` 预设，不再复制取值）。同时删掉 `preset.ts` 里未被使用的 `RuntimeConfigFile` 类型导入。
 
