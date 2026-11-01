@@ -10,7 +10,11 @@ export const CONNECT_PRESETS: readonly ConnectPreset[] = [
     id: "openai",
     label: "OpenAI",
     provider: "openai",
-    defaultModel: "gpt-4.1-mini",
+    // A model the shipped catalogue lists. This value is written into the new
+    // connection and becomes the next request's model, so a name the catalogue
+    // does not know leaves the user starting from a model missing from their
+    // own `/model list` — and `/context` can only guess its capacity.
+    defaultModel: "gpt-5.3",
   },
   {
     id: "anthropic",

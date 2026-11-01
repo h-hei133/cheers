@@ -523,6 +523,19 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     auth: "api-key",
     models: [],
   },
+  {
+    // Listed with no models for the same reason as the two above: the model
+    // names a Copilot subscription accepts are the account's, not this build's,
+    // so writing any here would be a guess. Without the entry the provider is
+    // absent from the catalogue entirely — `/model list github-copilot` still
+    // says "no models listed", but `/model` never offers the provider at all,
+    // even though `/connect login github-copilot` is supported.
+    id: "github-copilot",
+    label: "GitHub Copilot",
+    runtime: "github-copilot",
+    auth: "oauth",
+    models: [],
+  },
 ];
 
 /** A provider by id, from the built-in snapshot alone. */

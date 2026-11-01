@@ -6787,3 +6787,19 @@ ADD-73 的四态在 [defaultSource.test.ts](../../packages/ts-shell/src/core/com
 **验证。** `core/providers/facts.test.ts` 9 项、`core/commands/modelCommandRuntime.test.ts` 35 项通过；`check:config-consumers`、`check:node-floor`、`verify:docs-drift:strict` 通过（118 条既有 docs-source advisory 保留），TS build 通过（manifest `0ed549f0fc5b`）。本批只删声明，不改任何行为：删除前后 `providerFacts()` 的返回值除该字段外完全相同。
 
 证据仅限本地聚焦测试与静态门；没有真实 provider 请求，因此不据此提升 ADD-70。
+
+### 24.81 连接预设的默认模型与目录漂移
+
+继续 ADD-70 的重复事实收敛。`/connect login <provider>` 会把预设的 `defaultModel` 直接写进新连接，该值随即成为下一次请求的模型名。`openai` 预设写的是 `gpt-4.1-mini`，而自带目录 `BUILTIN_PROVIDERS` 的 openai 条目只列 `gpt-5.3`、`gpt-5.3-codex`、`gpt-5.1-mini`、`o4-mini`。实测：`/connect login openai --api-key …` 成功后连接记录里是 `gpt-4.1-mini`，`/model list` 里没有它，`/context` 只能报「No context window is known for openai/gpt-4.1-mini; assuming 64000」。
+
+这是同一事实的第二份副本漂移：目录负责「这个 provider 有哪些模型」，预设负责「新连接从哪个模型开始」，两者各自合法，谁也没有报错。参考侧同样把默认值当作目录的一部分（pi 的 `defaultModelPerProvider`、omp 的 catalog KDL `defaultModel` 都由目录派生），没有一份独立的预设副本。
+
+**改动一：把 openai 预设的默认模型改为目录确实列出的 `gpt-5.3`。** 只改这一条取值，其余预设未动。
+
+**改动二：给 `BUILTIN_PROVIDERS` 补 `github-copilot` 条目（`models: []`）。** 该 provider 在 `RUNTIME_PROVIDERS`、`facts.ts`、`CONNECT_PRESETS` 与 `/connect login` 里都存在，唯独目录里完全没有条目，于是 `/model` 的裸目录视图根本不列出它——而 `antigravity`、`claudecode` 这类同样「模型由账号或用户端点决定」的 provider 都是有空条目的。补空条目与既有处理一致；`auth: 'oauth'` 与 `facts.ts` 的 `accountAuthType: 'subscription'` 对齐。
+
+**改动三：新增 [preset.test.ts](../../packages/ts-shell/src/core/commands/connect/preset.test.ts)**，逐个预设断言其 `defaultModel` 出现在对应目录条目里（目录条目模型为空则豁免，无条目则失败）。红灯阶段该测试在 `openai`（`gpt-4.1-mini` 不在列表中）与 `github-copilot`（无目录条目）两处失败；两处修复后 9 项全绿。
+
+**验证。** `connect/preset` 9、`connectCommandRuntime` 68、`modelCommandRuntime` 35、`catalogShape` 22、`catalogSurface` 40、`picker/model` 46 共 220 项通过；`verify:import-cycles`、`check:config-consumers`、`check:declarations` 通过，TS build 通过（manifest `18ad34012d19`）。
+
+未做：没有真实 OpenAI/Copilot 请求，因此不能据此声称模型可用性；`github-copilot` 的可选模型仍取决于账号，目录里刻意保持为空。

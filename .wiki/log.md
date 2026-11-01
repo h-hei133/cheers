@@ -11421,3 +11421,11 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 [addition24.80](features/phase-20-addition.md#2480-providerfacts-中已无读者的-fallbackmodels)继续 ADD-70 的重复事实收敛。`ProviderFacts.fallbackModels` 自 `99c2192d` 起已无生产读者：那次改动把 `/model list` 改为读已接受的目录快照，`fallbackModelsForProvider` 一并删除，但接口成员与十一个 provider 的取值都留在声明表里。它成为同一事实的第三份副本——目录 `BUILTIN_PROVIDERS` 与 `CONNECT_PRESETS` 是仍在用的两份——而这一份永远不会被读到，漂移完全不可见。
 
 删除接口成员、其文档注释与十一条取值行。`check:config-consumers` 只覆盖配置字段、不覆盖 `ProviderFacts`，因此以全仓 `grep` 零命中与 `tsc -p tsconfig.build.json` 通过作为证据（若仍有读者，编译会失败）。`facts.test.ts` 9 项、`modelCommandRuntime.test.ts` 35 项通过，config-consumers/node-floor/docs-drift 通过（118 条既有 advisory 保留），TS build manifest `0ed549f0fc5b`。纯删除，不改行为；未运行真实 provider 请求，ADD-70 仍部分完成、goal active。
+
+### 2026-11-01：连接预设默认模型与目录漂移
+
+[addition24.81](features/phase-20-addition.md#2481-连接预设的默认模型与目录漂移)继续 ADD-70 的重复事实收敛。`/connect login <provider>` 把预设 `defaultModel` 写进新连接，该值随即成为下一次请求的模型。`openai` 预设写 `gpt-4.1-mini`，而自带目录只列 `gpt-5.3`/`gpt-5.3-codex`/`gpt-5.1-mini`/`o4-mini`；实测登录后 `/model list` 里没有该模型，`/context` 只能报「assuming 64000」。参考侧（pi 的 `defaultModelPerProvider`、omp 的 catalog KDL `defaultModel`）都由目录派生默认值，没有独立副本。
+
+三处改动：openai 预设默认模型改为目录列出的 `gpt-5.3`；给 `BUILTIN_PROVIDERS` 补 `github-copilot` 空条目（该 provider 在运行时联合、facts、connect 预设与 `/connect login` 中都存在，目录里却完全缺席，`/model` 裸目录视图因此不列出它；`antigravity`/`claudecode` 同类均为空条目，`auth: 'oauth'` 与 facts 的 subscription 对齐）；新增 `connect/preset.test.ts` 逐预设断言默认模型在对应目录条目内，空模型条目豁免、无条目失败。红灯阶段该测试在 openai 与 github-copilot 两处失败，修复后 9 项全绿。
+
+`connect/preset` 9、`connectCommandRuntime` 68、`modelCommandRuntime` 35、`catalogShape` 22、`catalogSurface` 40、`picker/model` 46 共 220 项通过；import-cycles/config-consumers/declarations 通过，TS build manifest `18ad34012d19`。未运行真实 OpenAI/Copilot 请求，不据此声称模型可用性；Copilot 可选模型仍取决于账号，目录保持为空。
