@@ -3,7 +3,6 @@ import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type {
   CliBootstrapRuntimeContext,
 } from "../bootstrap/cliBootstrapContext.js";
-import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import type { CliModePlan } from "../../entrypoints/cliModeDispatch.js";
@@ -25,9 +24,6 @@ export interface RunCliPrintModeRouterInput {
   readonly logger: StructuredLogger;
   readonly writeError: (message: string) => void;
   readonly exit: (code: number) => never;
-  readonly setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
   /** Passed through so a scripted `/permissions` writes the same trust store. */
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly stopRequested?: () => boolean;
@@ -48,9 +44,6 @@ export async function runCliPrintModeRouter(
     logger: input.logger,
     fallbackSessionId: input.bootstrapRuntime.recoveryCandidate?.id,
     lifecycleNotices: input.bootstrapRuntime.bootstrap.lifecycleNotices,
-    setActiveNonInteractiveApprovalMode:
-      input.setActiveNonInteractiveApprovalMode,
-    nonInteractiveCliApprovalMode: input.options.nonInteractiveApproval,
     approvalTrustPolicy: input.approvalTrustPolicy,
   };
 
@@ -63,9 +56,6 @@ export async function runCliPrintModeRouter(
       approvalTrustPolicy: input.approvalTrustPolicy,
       printMode: Boolean(input.options.printMode),
       jsonEvents: input.options.jsonEvents,
-      setActiveNonInteractiveApprovalMode:
-        input.setActiveNonInteractiveApprovalMode,
-      nonInteractiveCliApprovalMode: input.options.nonInteractiveApproval,
     });
     return true;
   }

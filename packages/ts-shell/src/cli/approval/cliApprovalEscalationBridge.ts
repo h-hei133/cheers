@@ -4,7 +4,6 @@ import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.j
 import {
   createCliEscalationPromptHandler,
 } from "../../entrypoints/cliApprovalModule.js";
-import type { ApprovalModeObject } from "./approvalModeContract.js";
 import type { PermissionScope } from "./permissionScope.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { EscalationPrompt, EscalationResponse } from "../../core/shell/approval/contract.js";
@@ -22,7 +21,6 @@ export function createCliApprovalEscalationBridge(input: {
     | "allow-once"
     | "allow-always"
     | undefined;
-  readonly getApprovalModeObject: () => ApprovalModeObject | undefined;
   readonly sessionManager: SessionManager;
   readonly getSessionId: () => string;
   /** How much the session may do before it has to ask. */
@@ -38,7 +36,7 @@ export function createCliApprovalEscalationBridge(input: {
     input.trustPolicy,
     input.getProjectRoot,
     input.getNonInteractiveDecision,
-    input.getApprovalModeObject,
+    undefined,
     (record) => {
       persistApprovalAuditDecision({
         sessionManager: input.sessionManager,

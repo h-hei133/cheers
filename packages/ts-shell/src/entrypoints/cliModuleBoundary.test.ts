@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  analyzeApprovalModeConflict,
-  materializeApprovalModeObject,
-} from "./cliApprovalModule.js";
-import {
   hasBlockedRootBindingDiagnostic,
   resolveSessionSwitchDiagnostics,
 } from "./cliSessionModule.js";
@@ -13,46 +9,6 @@ import {
 } from "./cliWorkspaceModule.js";
 
 describe("CLI module facades", () => {
-  it("materializes approval-mode objects only with verify continuation lineage", () => {
-    const continuation = {
-      lastVerificationResumeEligible: true,
-      lastVerificationCommand: "npm test",
-      lastContinuationEvidence: [
-        "verify-resume-eligible:true",
-        "verify-cwd-hint:/repo",
-        "verify-target-hint:src/app.ts",
-      ],
-      recentTargetFiles: ["fallback.ts"],
-    };
-
-    expect(
-      materializeApprovalModeObject({
-        prompt: "continue verification, allow once",
-        continuity: continuation,
-      }),
-    ).toMatchObject({
-      mode: "allow-once",
-      source: "prompt-explicit-verify-lineage",
-      command: "npm test",
-      commandCwd: "/repo",
-      targetPath: "src/app.ts",
-      executableNow: true,
-      missingFields: [],
-    });
-
-    const ambiguous = materializeApprovalModeObject({
-      prompt: "retry tests allow once and always allow",
-      continuity: continuation,
-    });
-    expect(ambiguous).toMatchObject({
-      mode: "deny",
-      source: "prompt-ambiguous-verify-lineage",
-      executableNow: false,
-      missingFields: ["approval-mode"],
-    });
-    expect(analyzeApprovalModeConflict(ambiguous).ambiguousStop).toBe(true);
-  });
-
   it("keeps session switch diagnostics scoped to root-binding mismatch", () => {
     expect(
       resolveSessionSwitchDiagnostics(

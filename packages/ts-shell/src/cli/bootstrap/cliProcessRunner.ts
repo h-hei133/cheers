@@ -30,9 +30,6 @@ import { versionLabel } from "../../core/version/current.js";
 import { checkForUpdate, formatUpdateNotice } from "../../core/update/check.js";
 import { time } from "../../observability/startupTiming.js";
 import {
-  createCliApprovalModeState,
-} from "../approval/cliApprovalModeState.js";
-import {
   createCliProviderRuntimeBridge,
 } from "../provider/cliProviderRuntimeBridge.js";
 import {
@@ -110,7 +107,6 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
   setGlobalTraceContext(createTraceContext());
   const logger = createComponentLogger("cli");
   const approvalTrustPolicy = new ApprovalTrustPolicy();
-  const approvalModeState = createCliApprovalModeState();
 
   const parsedCliArgs = parseCliArgs(input.args, { cwd: input.launchCwd });
   if (parsedCliArgs.ok === false) {
@@ -288,7 +284,6 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       runtimeContext,
       options,
       approvalTrustPolicy,
-      approvalModeState,
       providerRuntimeBridge,
       getReadline: () => readline,
       isStdinTty: () => Boolean(input.stdin.isTTY),
@@ -323,9 +318,6 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       logger,
       writeError: input.writeError,
       exit: input.exit,
-      setActiveNonInteractiveApprovalMode: (mode) => {
-        approvalModeState.set(mode);
-      },
       approvalTrustPolicy,
       stopRequested: () => requested !== undefined,
       onFirstFrame: startup.onFirstFrame,
@@ -355,9 +347,6 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       },
       setInteractiveApprovalPrompt: (handler) => {
         interactiveApprovalPrompt = handler;
-      },
-      setActiveNonInteractiveApprovalMode: (mode) => {
-        approvalModeState.set(mode);
       },
       ...(options.themePaths ? { themePaths: options.themePaths } : {}),
       exit: shutdown.exit,

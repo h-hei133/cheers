@@ -85,7 +85,7 @@ function runtime() {
   createCliSessionRuntime({ runtimeContext: context,
     providerRuntimeBridge: { resolveCredentialSnapshot: () => resolveProviderCredential({ runtimeConfig: context.runtimeConfig, env: {} }) },
     sessionManager, renderer: { renderLine }, options: {},
-    approvalTrustPolicy: {}, approvalModeState: { get: () => undefined }, getReadline: () => null,
+    approvalTrustPolicy: {}, getReadline: () => null,
   } as never);
   return { deps: fixture.deps!, context, renderLine };
 }

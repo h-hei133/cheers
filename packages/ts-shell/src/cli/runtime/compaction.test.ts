@@ -118,7 +118,7 @@ function runtime(withKey: boolean) {
     runtimeContext: { ...context, configuration },
     providerRuntimeBridge: { resolveCredentialSnapshot: () => fixture.resolution },
     sessionManager: manager,
-    renderer: { renderLine: vi.fn(), emit: vi.fn() }, options: {}, approvalTrustPolicy: {}, approvalModeState: { get: () => undefined }, getReadline: () => null,
+    renderer: { renderLine: vi.fn(), emit: vi.fn() }, options: {}, approvalTrustPolicy: {}, getReadline: () => null,
   } as never);
   return fixture.deps!;
 }

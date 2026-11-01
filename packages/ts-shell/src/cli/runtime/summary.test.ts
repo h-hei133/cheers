@@ -92,7 +92,7 @@ function runtime(setup: Awaited<ReturnType<typeof fixture>>) {
   createCliSessionRuntime({ runtimeContext: context, sessionManager: setup.manager,
     providerRuntimeBridge: { resolveCredentialSnapshot: () => resolveProviderCredential({ runtimeConfig: context.runtimeConfig, env: {} }) },
     renderer: { renderLine: vi.fn(), emit: vi.fn() }, options: {}, approvalTrustPolicy: {},
-    approvalModeState: { get: () => undefined }, getReadline: () => null,
+    getReadline: () => null,
   } as never);
   return { deps: observed.deps!, context };
 }

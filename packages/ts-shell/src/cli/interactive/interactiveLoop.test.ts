@@ -41,8 +41,7 @@ describe("interactive loop", () => {
       logger: { error: () => {}, info: () => {}, warn: () => {} } as never,
       approvalTrustPolicy: {} as never,
       initialMcpGateway: { close } as never,
-      setReadline: value => { readline = value; },
-      setActiveNonInteractiveApprovalMode: () => {}, exit: shutdown.exit,
+      setReadline: value => { readline = value; }, exit: shutdown.exit,
     });
     try {
       await vi.waitFor(() => expect(readline).not.toBeNull());
@@ -119,7 +118,6 @@ describe("interactive loop", () => {
       approvalTrustPolicy: {} as never,
       initialMcpGateway: {} as never,
       setReadline: () => undefined,
-      setActiveNonInteractiveApprovalMode: () => undefined,
       exit: () => undefined,
       stopSignal: stop.signal,
     });
@@ -182,7 +180,6 @@ describe("interactive loop", () => {
       approvalTrustPolicy: {} as never,
       initialMcpGateway: {} as never,
       setReadline: () => undefined,
-      setActiveNonInteractiveApprovalMode: () => undefined,
       exit: () => undefined,
       stopSignal: stop.signal,
     });
@@ -233,7 +230,6 @@ describe("interactive loop", () => {
       setReadline: (readline) => {
         capturedReadline = readline;
       },
-      setActiveNonInteractiveApprovalMode: () => undefined,
       exit: () => undefined,
       stopSignal: stop.signal,
     });
@@ -286,7 +282,6 @@ describe("interactive loop", () => {
       setReadline: (readline) => {
         capturedReadline = readline;
       },
-      setActiveNonInteractiveApprovalMode: () => undefined,
       exit,
     });
 
@@ -331,7 +326,6 @@ describe("interactive loop", () => {
       approvalTrustPolicy: {} as never,
       initialMcpGateway: {} as never,
       setReadline: () => undefined,
-      setActiveNonInteractiveApprovalMode: () => undefined,
       exit: () => undefined,
       stopSignal: stop.signal,
     });

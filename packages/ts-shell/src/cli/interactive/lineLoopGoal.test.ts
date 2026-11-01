@@ -82,7 +82,6 @@ it("settles a real detached goal scheduler when the line stop signal aborts", as
     approvalTrustPolicy: {} as never,
     initialMcpGateway: {} as never,
     setReadline() {},
-    setActiveNonInteractiveApprovalMode() {},
     exit: vi.fn(),
     stopSignal: stop.signal,
   });
@@ -154,7 +153,6 @@ it("fences late goal output when scheduler drain times out", async () => {
     approvalTrustPolicy: {} as never,
     initialMcpGateway: {} as never,
     setReadline() {},
-    setActiveNonInteractiveApprovalMode() {},
     exit: vi.fn(),
     stopSignal: stop.signal,
   });

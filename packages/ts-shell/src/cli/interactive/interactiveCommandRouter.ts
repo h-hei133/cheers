@@ -39,7 +39,6 @@ import type { StreamingRenderer } from "../../presentation/terminal/streaming.js
 import type { SessionManager } from "../../session/SessionManager.js";
 import { sessionUsageSink } from '../../session/store/usage.js';
 import { readSessionNavigation } from '../../session/query/navigation.js';
-import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import {
   buildCliCommandExecution,
 } from "../../entrypoints/cliCommandExecutionBridge.js";
@@ -91,9 +90,6 @@ export interface InteractiveCommandRouterInput {
   /** True when the terminal agreed to report modified keys. */
   readonly keyGuide?: readonly KeyBinding[];
   readonly modifierKeysReported?: boolean;
-  readonly setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
   /**
    * Re-read the user's keybindings.
    *
@@ -238,8 +234,6 @@ export async function routeInteractiveCommand(
       turnNumber: nextTurnNumber,
       sessionRuntime: input.sessionRuntime,
       logger: input.logger,
-      setActiveNonInteractiveApprovalMode:
-        input.setActiveNonInteractiveApprovalMode,
     });
     return {
       turnNumber: resumeResult.turnNumber,
@@ -434,8 +428,6 @@ export async function routeInteractiveCommand(
       logger: input.logger,
       renderer: input.renderer,
       turnNumber: nextTurnNumber,
-      setActiveNonInteractiveApprovalMode:
-        input.setActiveNonInteractiveApprovalMode,
     });
   } catch (error) {
     if (input.sessionRuntime.getState() !== "interrupted") {

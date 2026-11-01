@@ -12,7 +12,6 @@ import type { ToolGateOptions } from '../../turn/tools.js';
 import { filterVisibleToolNames } from '../../core/tools/prefilter.js';
 import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 import type { ApprovalTrustPolicy } from '../../core/shell/approvalTrustPolicy.js';
-import type { CliApprovalModeState } from '../approval/cliApprovalModeState.js';
 import type { CliOptions } from '../options/cliOptions.js';
 import type { Interface as ReadlineInterface } from 'node:readline';
 import type { EscalationPrompt } from '../../core/shell/approval/contract.js';
@@ -26,7 +25,6 @@ interface GitComposition {
   readonly renderer: StreamingRenderer;
   readonly getReadline: () => ReadlineInterface | null;
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
-  readonly approvalModeState: CliApprovalModeState;
   readonly options: CliOptions;
   readonly getPromptInteractiveApproval?: () => ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined;
 }
@@ -35,7 +33,7 @@ export function installGitCliRuntime(input: GitComposition, runtime: ShellSessio
     createCliApprovalEscalationBridge({ renderer: input.renderer, readline: input.getReadline, getViewMode: () => runtime.getViewMode(),
       trustPolicy: input.approvalTrustPolicy, getProjectRoot: () => input.runtimeContext.projectRoot,
       getNonInteractiveDecision: () => !isStdinTty() ? input.options.nonInteractiveApproval : undefined,
-      getApprovalModeObject: input.approvalModeState.get, sessionManager: input.sessionManager, getSessionId: () => input.runtimeContext.session.id,
+      sessionManager: input.sessionManager, getSessionId: () => input.runtimeContext.session.id,
       getPermissionScope: () => runtime.getPermissionScope(), promptInteractiveApproval: input.getPromptInteractiveApproval?.() }), tool);
   installGitRuntime(input.runtimeContext, input.sessionManager, runtime, gate);
   return gate;

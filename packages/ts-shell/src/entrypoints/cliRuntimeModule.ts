@@ -53,11 +53,6 @@ import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { sessionUsageSink } from '../session/store/usage.js';
 import {
-  analyzeApprovalModeConflict,
-  materializeApprovalModeObject,
-  type ApprovalModeObject,
-} from "./cliApprovalModule.js";
-import {
   buildCliCommandExecution as resolveTurnInputForExecution,
 } from "./cliCommandExecutionBridge.js";
 import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
@@ -83,10 +78,6 @@ export async function runNonTtyPromptStream(options: {
   lifecycleNotices?: readonly string[];
   /** Passed through so a scripted `/permissions` writes the same trust store. */
   approvalTrustPolicy: ApprovalTrustPolicy;
-  setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
-  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
   ruleControlsCommand?: import("../core/commands/types.js").CommandContext['ruleControlsCommand'];
   forceTool?: import("../core/commands/types.js").CommandContext['forceTool'];
   onFirstFrame?: () => void;
@@ -122,10 +113,6 @@ export async function runNonInteractivePrompt(options: {
    * paths now reach the same command rather than reporting it as interactive-only.
    */
   approvalTrustPolicy: ApprovalTrustPolicy;
-  setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
-  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
   ruleControlsCommand?: import("../core/commands/types.js").CommandContext['ruleControlsCommand'];
   forceTool?: import("../core/commands/types.js").CommandContext['forceTool'];
 }): Promise<"exit" | void> {
@@ -339,9 +326,6 @@ export async function runNonInteractivePrompt(options: {
             runtimeSeed: turnInput.runtimeSeed,
             continuityState: turnInput.continuityState,
             sessionManager: options.sessionManager,
-            setActiveNonInteractiveApprovalMode:
-              options.setActiveNonInteractiveApprovalMode,
-            nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
             runtimeContext: options.runtimeContext,
             sessionRuntime: options.sessionRuntime,
             logger: options.logger,
@@ -365,9 +349,6 @@ export async function runNonInteractivePrompt(options: {
     effectivePrompt: resolved.effectivePrompt,
     ...(resolved.promptMetadata ? { promptMetadata: resolved.promptMetadata } : {}),
     sessionManager: options.sessionManager,
-    setActiveNonInteractiveApprovalMode:
-      options.setActiveNonInteractiveApprovalMode,
-    nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
     runtimeContext: options.runtimeContext,
     sessionRuntime: options.sessionRuntime,
     logger: options.logger,
@@ -386,10 +367,6 @@ export async function executeResolvedPromptTurn(options: {
   runtimeSeed?: QueryRuntimeStateSeed;
   continuityState?: SessionContinuitySnapshot;
   sessionManager: SessionManager;
-  setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
-  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
   runtimeContext: ShellRuntimeContext;
   sessionRuntime: ShellSessionRuntime;
   logger: StructuredLogger;
@@ -438,33 +415,12 @@ export async function executeResolvedPromptTurn(options: {
         options.runtimeContext.session.id,
         options.effectivePrompt,
       );
-    const approvalModeObject = materializeApprovalModeObject({
-      prompt: options.effectivePrompt,
-      continuity: continuitySnapshot,
-    });
-    const approvalModeConflict =
-      analyzeApprovalModeConflict(approvalModeObject);
-    if (
-      approvalModeConflict.ambiguousStop &&
-      (options.source === "interactive" ||
-        !options.nonInteractiveCliApprovalMode)
-    ) {
-      turnEndStatus = "blocked";
-      renderTurnResultFallback(options.renderer, {
-        outcome: "blocked",
-        detail: approvalModeConflict.stopReason ?? "Approval mode is ambiguous.",
-        doNext:
-          "Re-run with an explicit verify continuation lineage or set --non-interactive-approval for this run.",
-      });
-      return;
-    }
     if (!options.printMode && !options.renderer.transcriptOwned) {
       options.renderer.renderLine(formatExecutionStartedLine(turnOrigin));
     }
     recordCount("cli.prompts", 1, {
       sessionId: options.runtimeContext.session.id,
     });
-    options.setActiveNonInteractiveApprovalMode(approvalModeObject);
     // The CLI owns one event writer across commands and turns. Suppress the
     // duplicate prose projection during the model turn, then restore its sink
     // so later command output still belongs to the same JSON stream.
@@ -524,7 +480,6 @@ export async function executeResolvedPromptTurn(options: {
     }
     throw error;
   } finally {
-    options.setActiveNonInteractiveApprovalMode(undefined);
     options.logger.info(
       options.source === "interactive"
         ? "CLI run completed"
@@ -561,10 +516,6 @@ export async function runReplayPromptScript(options: {
   lifecycleNotices?: readonly string[];
   /** Passed through so a scripted `/permissions` writes the same trust store. */
   approvalTrustPolicy: ApprovalTrustPolicy;
-  setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
-  nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
 }): Promise<void> {
   const resolvedReplayPath = path.resolve(process.cwd(), options.replayFile);
   if (!fs.existsSync(resolvedReplayPath)) {
@@ -599,9 +550,6 @@ export async function runReplayPromptScript(options: {
       fallbackSessionId: options.fallbackSessionId,
       lifecycleNotices: options.lifecycleNotices,
       approvalTrustPolicy: options.approvalTrustPolicy,
-      setActiveNonInteractiveApprovalMode:
-        options.setActiveNonInteractiveApprovalMode,
-      nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
     });
     if (outcome === "exit") break;
   }

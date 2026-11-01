@@ -27,7 +27,6 @@ it('forwards first-frame and user-intent hooks to the non-TTY stream host', asyn
     logger: {},
     writeError: vi.fn(),
     exit: vi.fn(),
-    setActiveNonInteractiveApprovalMode: vi.fn(),
     approvalTrustPolicy: {},
     onFirstFrame,
     onUserIntent,

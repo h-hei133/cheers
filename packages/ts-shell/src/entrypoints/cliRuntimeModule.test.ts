@@ -29,7 +29,6 @@ it('forwards recovery lifecycle hooks into the non-TTY stream', async () => {
     sessionRuntime: {},
     logger: {},
     approvalTrustPolicy: {},
-    setActiveNonInteractiveApprovalMode: () => {},
     onFirstFrame,
     onUserIntent,
   } as never);
@@ -59,7 +58,7 @@ it.each(['/help', ' \t/help  '])('renders print help for its exact session catal
     const renderLine = vi.fn(), controller = new AbortController();
     await runNonInteractivePrompt({ prompt, printMode: true, sessionManager, runtimeContext,
       sessionRuntime: { commands: { run: (operation: (signal: AbortSignal) => Promise<unknown>) => operation(controller.signal) } },
-      renderer: { renderLine }, logger: {}, approvalTrustPolicy: {}, setActiveNonInteractiveApprovalMode: () => {} } as never);
+      renderer: { renderLine }, logger: {}, approvalTrustPolicy: {}, } as never);
     const text = renderLine.mock.calls.flat().join('\n');
     expect(text).toContain('/guide-current'); expect(text).not.toContain('/guide-other');
     expect(text).not.toContain('synthetic-sensitive'); expect(execute).not.toHaveBeenCalled();
@@ -87,7 +86,7 @@ it.each([false, true])('preserves the original print source through actual compo
     const prompt = composed ? '  Compare /skill:one\nthen /skill:two /skill:one carefully  \n' : '  literal first line\nlast line  \n';
     await runNonInteractivePrompt({ prompt, printMode: true, sessionManager, runtimeContext,
       sessionRuntime: { executePrompt, getState: () => 'idle', commands: { run: (operation: (signal: AbortSignal) => Promise<unknown>) => operation(controller.signal) } },
-      renderer, logger: { info: () => {}, error: () => {} }, approvalTrustPolicy: {}, setActiveNonInteractiveApprovalMode: () => {} } as never);
+      renderer, logger: { info: () => {}, error: () => {} }, approvalTrustPolicy: {}, } as never);
     expect(executePrompt).toHaveBeenCalledTimes(1);
     const [id, effective, options] = executePrompt.mock.calls[0] as unknown as [string, string, { promptMetadata?: Record<string, unknown> }];
     expect(id).toBe(session.id);

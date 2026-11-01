@@ -45,7 +45,7 @@ function setup(overrides: Partial<LineLoopOptions> = {}) {
       getState: () => 'idle', terminate: () => {}, cancelCurrentRun: () => {} } as never,
     sessionManager: { sessionExists: () => false } as never, renderer,
     logger: { error() {}, info() {}, warn() {} } as never, approvalTrustPolicy: {} as never, initialMcpGateway: {} as never,
-    setReadline() {}, setActiveNonInteractiveApprovalMode() {}, exit, ...overrides });
+    setReadline() {}, exit, ...overrides });
   const loop = { stdin, stdout, renderer, processEvents, exit, running }; loops.push(loop); return loop;
 }
 const turn = () => new Promise<void>(resolve => setImmediate(resolve));
@@ -688,7 +688,6 @@ it('keeps turn boundaries in line mode even while renderer output is routed', as
     sessionManager: {
       buildPromptContinuitySnapshot: () => ({}),
     } as never,
-    setActiveNonInteractiveApprovalMode: () => {},
     runtimeContext: { session: { id: 'sess_line' } } as never,
     sessionRuntime: {
       executePrompt,

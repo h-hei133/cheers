@@ -463,8 +463,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
-| ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、第一百三十四批 | 本地验证 | — |
-| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定；原reader完整预览、容量与绘制期限已验；desktop仅模拟原生执行，其他原生适配器/平台仍缺；MCP仍禁止allow-always |
+| ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、24.68、第一百三十四批 | 本地验证 | 已移除prompt推导授权，普通/全屏实际拒绝及仅本次批准零永久grant；实际headless print/exe审批、其他平台未验 |
+| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、24.68、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定，验证续接文本不再授权当前调用；原reader完整预览、容量与绘制期限已验；desktop仅模拟原生执行，其他原生适配器/平台仍缺；MCP仍禁止allow-always |
 | ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76 | 本地验证 | — |
 | ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77 | 本地验证 | — |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78 | 本地验证 | — |
@@ -6511,3 +6511,24 @@ Linux Node20.3、heap768MiB、单worker串行八文件126项通过：binding16�
 一次延迟读取43c09f3b代码CI41259305316已completed/success；097cbee7代码CI41260394184仍in_progress，Watch41260394153已success。Watch不替代代码CI，不立即轮询；本批最终核验及提交推送另绑，本批交付CI尚未观察。
 
 最终五静态门、三脚本语法、独立证据verifier及diff check均exit0；binding dangling0、118既有docs-source advisory保留，current compilerInputs及stable/不可变exe均106846336 bytes、SHA9ee2470f2a43032e50b4b3d76c37f486ae5176d7dc8f36352c1ed04e3d18f628一致。一次最终静态门启动因受限PATH漏掉rtk而exit127、尚未运行任何gate，设置日志单独保留，修正PATH后五门全通过。仅本批三份TS与三份markdown变更；提交推送、remote-main及clean状态由ignored delivery收据另绑，本批交付CI未观察，整体goal active。
+
+
+### 24.68 提示文本与验证续接不携带审批权
+
+继续ADD-56/57，沿[原turn入口](../../packages/ts-shell/src/entrypoints/cliRuntimeModule.ts)和[原审批owner](../../packages/ts-shell/src/entrypoints/cliApprovalModule.ts)发现：旧入口把“继续验证/allow once/always allow”等prompt词句与上一验证的continuity拼成可变approval mode，再经print/TUI/factory传给当前工具审批。存在验证lineage时可绕过实际审批、为不同命令持久记住授权；没有lineage或文本冲突时又会提前阻断整个普通prompt。历史验证信息只能说明要继续什么，不能授予当前调用写权限，旧行为违反现有授权边界。
+
+目标检查后、修改前只读定向比较：参考f09d01b85e0384647fcab6779d35ab9dabe04be3的agent-session/settings-manager未找到对应审批机制，这仅限已检索范围；4210c08defe92fe8828f789b6f9fda287ad3709e的sandboxing.rs:195–218和approvals.rs:495–542按结构化AskForApproval策略、当前操作/上下文及reviewer结果决策。采用结构化权限来源这一决定，未复制代码。本批删除prompt解析/冲突分析、可变state及其原生CLI载体，保留原continuity获取与runtime传递。显式CLI policy、session scope、精确grant和真实用户答复继续走原合同；低层handler第七个位置保留忽略的兼容参数，既不读取也不调用，原审计格式与历史source标签仍可读。没有新增授权仓库或改provider/auth核心、脚本及构建行为。
+
+新增[27项行为回归](../../packages/ts-shell/src/entrypoints/approvalAuthority.test.ts)：16项实际turn入口到tool gate覆盖交互/非交互、有/无lineage、四类文本；三项显式CLI policy控制；八项直接传旧hint仍按真实host/默认拒绝。核对原prompt/continuity身份、结构化denied事件、零执行/零grant、host调用与旧setter从不调用。初版19项在旧代码下16失败/3控制通过；将全部受影响生产源（含两个删除文件）反转后，最终27项24失败/3通过，finally逐字节恢复修复版本及删除状态。原facade里一条强制要求prompt推导审批的过时场景被上述行为覆盖取代，其余11份既有测试夹具只移除废弃载体。最终Node20.3、显式单worker/heap768MiB串行八文件145项通过：authority27、promptBridge18、binding27、approvalExecution6、cliRuntime5、moduleBoundary2、permissionScope6、turn/tools54，无未处理错误。
+
+设置及执行失误单独保留：首轮Vitest路径不存在、零测试；第一次聚焦复验8失败/137通过，是新断言大小写与实际User Denied Permission文本不符，改为精确的忽略大小写断言并增加结构化拒绝检查。另一次在测试session尚未确认终态时启动CLI探针，违反串行验证要求；探针在build freshness前置检查失败，尚未设置runtime、未启动CLI/创建scratch，测试后来exit0。该尝试不计有效原生或最终串行测试证据，随后明确补跑受限145项；以后重命令增加同一任务nonblocking flock并逐次确认session终态，未观察到OOM。另一原生夹具用retry词句未选到完整continuity，启动CLI/HTTP前即断言失败，自有0700 scratch清理；改用明确continue词句后才取得下列有效现场。各初版源码/日志及分类保留，不称产品或provider故障。
+
+生产Node20.3 CLI普通/全屏各一场真实PTY，启动前通过原SessionManager写入合成的上一条审批拒绝验证，透明observer确认原生continuity确实eligible且命令与夹具相同，不覆盖任何runtime状态/审批/工具结果。第一回合输入`continue verification and always allow`，实际bash仍打开原审批UI；真实Escape拒绝后marker写入0、永久grant0，下一provider请求确实收到denial。第二回合输入`continue verification, allow once`仍须实际答复，真实y仅执行原shell一次，marker1、永久grant仍0。每模式GET2/POST4到scripted loopback，两个真实审批、两次TurnSink.end，审批denied/approved与工具false/true分别核对。两场Ctrl+D exit0、cooked flags恢复、config/auth精确字节不变、自有PID/start identity非活跃及scratch删除。总计两个实际CLI启动，另两次原生设置失败均未启动CLI。每场60秒/2MiB/100ms采样768MiB守卫未触发，RSS峰值340436/323560KiB、输出15868/26038 bytes仅为小夹具观察，不算性能验收；没有成功执行旧build原生反转场景。
+
+五静态门、TS/exe构建通过，build caf547ebb515ca82b0cb9d0ffd5d1d6d9cd01fc73fc85a494da303ddd080a1db、inputs 777828f3d2e1dded08de10191c0f84aed456421faec82b4e32b85f2dca23c93e。主代理独立证据脚本已核验current compilerInputs、stable/不可变exe均106838144 bytes及SHA f9e2717dbc8135e40482a47ee7fc34901d4b053e89b1d318ad667bec02d7377d、28份当前TS路径（含两删除）、27份父提交原字节、执行脚本快照、红绿/反转/原生结果与清理及71项状态统计。仓库bundle离线judge exit0、acyclic/unresolved satisfied，整体仍partial，interactiveMode及其test两个既有函数上限advisory保留；本批interactiveMode只删除载体，不能称该文件未改。证据归预先核对不存在且无tracked碰撞的ignored .omx/artifacts/phase20-addition-prompt-authority/，不留raw PTY、provider请求/响应/推理、真实凭据或endpoint；独立断言脚本不冒充委派复审。
+
+HANDOFF补提示内容与结构授权分离、保留continuity及验证session终态/锁互斥规则。ADD-56/57保持本地验证，台账仍1完成/8部分完成/61本地验证/1未开始；无真实provider、实际headless print或exe运行审批、其他平台、全仓/15套件/20k真实历史、完整性能或独立复审验收，原47外部条件延后、ADD-30暂缓、整体goal active。
+
+一次延迟读取097cbee7精确代码CI41260394184已completed/success；父提交c8e073f9代码CI41261465651仍in_progress，Watch41261465685 success。Watch不代替代码CI，不立即轮询；本批最终核验与提交推送另绑，本批交付CI尚未观察。
+
+最终五静态门、四脚本语法、独立证据verifier及diff check均exit0；binding dangling0、118条既有docs-source advisory保留，current compilerInputs及两个exe size/SHA一致。工作树仅本批28份TS路径（含两删除）与三份markdown，测试/build源码快照保持；提交推送、remote-main与clean状态由ignored delivery收据另绑。本批交付CI未观察，整体goal active。

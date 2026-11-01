@@ -57,7 +57,6 @@ function harness() {
     renderer: { renderLine: (line: string) => lines.push(line) } as never,
     readline: {} as never, mcpGateway: {} as never, logger: {} as never,
     approvalTrustPolicy: {} as never, turnNumber: 0,
-    setActiveNonInteractiveApprovalMode: () => {},
   };
   const layout = locateExistingSessionLayout(createSessionStoreLayout(), session.id);
   return { input, session, turns, summarize, lines, layout };

@@ -7,7 +7,6 @@ import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
-import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { buildInteractivePromptChrome, refreshInteractivePromptChrome } from "./promptChrome.js";
 import { installInteractiveSignalHandlers } from "./interactiveSignals.js";
@@ -61,7 +60,6 @@ export interface LineLoopOptions {
   readonly onUserIntent?: () => void;
   readonly initialMcpGateway: CliMcpGateway;
   readonly setReadline: (readline: ReadlineInterface | null) => void;
-  readonly setActiveNonInteractiveApprovalMode: (mode: ApprovalModeObject | undefined) => void;
   readonly exit: (code?: number) => void;
   readonly stopSignal?: AbortSignal;
 }
@@ -232,8 +230,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
           signal: controlAbort.signal,
           fallbackSessionId: options.fallbackSessionId, sessionManager: options.sessionManager,
           runtimeContext: options.runtimeContext, renderer, sessionRuntime: options.sessionRuntime,
-          logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber,
-          setActiveNonInteractiveApprovalMode: options.setActiveNonInteractiveApprovalMode });
+          logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber });
         turnNumber = result.turnNumber;
         if (result.retryDraft !== undefined && !closed) {
           input.write(result.retryDraft);
@@ -402,8 +399,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
         if (isQueueControl(controlSource) || (busy || questions.question()) && (media || evaluation || isGoalControl(controlSource) || isPlanningControl(controlSource) || handoffControl(controlSource) || directorControl(controlSource) || isAdvisorControl(controlSource) || isSecurityControl(controlSource) || isAgentsControl(controlSource) || isResearchControl(controlSource) || isExtensionControl(controlSource) || isMcpConfiguration(controlSource))) {
           trackControl(routeInteractiveCommand({ prompt: text, signal: controlAbort.signal, readline: activeQuestionInput, mcpGateway, sessionManager: options.sessionManager,
             runtimeContext: options.runtimeContext, renderer: options.renderer, sessionRuntime: options.sessionRuntime,
-            logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber,
-            setActiveNonInteractiveApprovalMode: options.setActiveNonInteractiveApprovalMode })
+            logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber })
             .then(() => { if (!closed) input.prompt(); })
           );
           return;

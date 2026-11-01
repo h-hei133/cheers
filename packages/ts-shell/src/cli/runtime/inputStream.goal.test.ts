@@ -46,7 +46,7 @@ it('activates the actual pipe scheduler and accepts show/pause while its model t
     runPrompt: async prompt => {
       const result = await runNonInteractivePrompt({ prompt, printMode: false, awaitGoalScheduling: false,
         sessionManager: manager, runtimeContext: context, sessionRuntime: runtime, renderer, logger,
-        approvalTrustPolicy: new ApprovalTrustPolicy(path.join(scratch, 'trust.json')), setActiveNonInteractiveApprovalMode: () => {} });
+        approvalTrustPolicy: new ApprovalTrustPolicy(path.join(scratch, 'trust.json')), });
       if (prompt === '/goal show') shown();
       if (prompt === '/goal pause') paused();
       return result;
@@ -76,7 +76,7 @@ it('drains an EOF goal activation through the closed pipe host without dispatchi
     const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, renderer, logger: { info: () => {} } as never,
       runPrompt: prompt => runNonInteractivePrompt({ prompt, printMode: false, awaitGoalScheduling: false,
         sessionManager: manager, runtimeContext: context, sessionRuntime: runtime, renderer, logger: { info: () => {} } as never,
-        approvalTrustPolicy: new ApprovalTrustPolicy(path.join(scratch, 'trust.json')), setActiveNonInteractiveApprovalMode: () => {} }) });
+        approvalTrustPolicy: new ApprovalTrustPolicy(path.join(scratch, 'trust.json')), }) });
     stdin.end('/goal set Finish later\n'); await run;
     expect(readGoalEdit(manager, session).goal).toMatchObject({ phase: 'paused', runOwner: null,
       scheduling: { pendingRound: false, drain: 'settled' } });

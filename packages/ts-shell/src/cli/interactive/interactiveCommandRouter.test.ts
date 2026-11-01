@@ -64,7 +64,6 @@ function createHarness(root = "/tmp/project-alpha") {
       } as never,
       approvalTrustPolicy: new ApprovalTrustPolicy(),
       turnNumber: 0,
-      setActiveNonInteractiveApprovalMode: () => undefined,
     },
     getAgentMode: () => agentMode,
     getViewMode: () => viewMode,

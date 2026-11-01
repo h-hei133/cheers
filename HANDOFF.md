@@ -1842,3 +1842,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A later test/build chain runs Vitest with default workers despite an earlier constrained run.
 - **Root Cause**: Environment values supplied through a command wrapper do not persist into subsequent tool calls; copying a combined command can omit worker limits while retaining the heap cap.
 - **Rule**: Include VITEST_MAX_THREADS=1, VITEST_MIN_THREADS=1 and NODE_OPTIONS=--max-old-space-size=768 on each independent focused validation command. Keep heavyweight stages serial. Preserve and identify any unconstrained attempt; rerun the affected focused files with explicit limits before claiming constrained evidence.
+
+
+### Continuation Context Carries No Approval Authority
+- **Symptom**: Verification continuation wording bypasses the actual tool approval, persists a grant for a different current command, or blocks an ordinary prompt when historical lineage is missing.
+- **Root Cause**: Prompt parsing manufactures a mutable approval mode and carries it into the tool gate. Prior verification context identifies work to resume but does not authorize a new operation.
+- **Rule**: Keep continuity acquisition and runtime handoff while removing prompt-derived authority and its state carriers. Decide through explicit policy, session scope, exact grants or actual approval answers. Exercise ingress through the real gate with and without lineage, legacy hint callers, default denial and explicit-policy controls; verify native denial and once approval with actual effects and permanent-grant counts.
+
+### A Yielded Verification Session Still Owns The Serial Lane
+- **Symptom**: A native probe starts before a preceding focused test session has been confirmed terminal, violating the serial validation constraint even if the probe fails its first precheck.
+- **Root Cause**: A tool response with a live session_id is mistaken for command completion; separate command invocations have no automatic mutual exclusion.
+- **Rule**: Confirm terminal exit for every verification session before launching another command. Use one shared nonblocking per-task flock around heavy test/build/probe/verifier invocations in addition to explicit worker and heap limits. Preserve any overlap attempt separately, exclude it from serial evidence and rerun affected validation serially; a precheck failure cannot retroactively establish serialization.

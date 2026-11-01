@@ -5,7 +5,6 @@ import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
-import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { InteractiveMode } from "./interactiveMode.js";
@@ -50,7 +49,6 @@ export interface InteractiveLoopInput {
   readonly setInteractiveApprovalPrompt?: (
     handler: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined,
   ) => void;
-  readonly setActiveNonInteractiveApprovalMode: (mode: ApprovalModeObject | undefined) => void;
   /** Theme paths this run was started with, so `/theme` can still select them. */
   readonly themePaths?: readonly string[];
   /** Owns resource cleanup and its total budget before terminating the process. */
@@ -93,7 +91,6 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
       onUserIntent: input.onUserIntent,
       initialMcpGateway: input.initialMcpGateway,
       setReadline: input.setReadline,
-      setActiveNonInteractiveApprovalMode: input.setActiveNonInteractiveApprovalMode,
       exit,
       stopSignal: input.stopSignal,
     });
@@ -123,7 +120,6 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
         scheduler: input.scheduler,
         setReadline: input.setReadline,
         setInteractiveApprovalPrompt: input.setInteractiveApprovalPrompt,
-        setActiveNonInteractiveApprovalMode: input.setActiveNonInteractiveApprovalMode,
         exit: code => { release(); exit(code); resolve(); },
       });
     } catch (error) { startup?.dispose(); reject(error); return; }

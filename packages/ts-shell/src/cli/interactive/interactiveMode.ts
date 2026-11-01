@@ -41,7 +41,6 @@ import { toolPoolFor } from '../runtime/tools.js';
 import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
-import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { goalCommandFor, isGoalControl } from '../runtime/goal.js';
 import { attachGoalSubmission, schedulerForRuntime } from '../runtime/goalScheduling.js';
 import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runtime/inputQueue.js';
@@ -151,7 +150,6 @@ export interface InteractiveModeOptions {
   readonly setInteractiveApprovalPrompt?: (
     handler: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined,
   ) => void;
-  readonly setActiveNonInteractiveApprovalMode?: (mode: ApprovalModeObject | undefined) => void;
   readonly exit?: (code?: number) => void;
   /** Theme paths this run was started with, so `/theme` can still select them. */
   readonly themePaths?: readonly string[];
@@ -1133,8 +1131,6 @@ export class InteractiveMode {
         turnNumber: this.turnNumber,
         modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
         keyGuide: this.preferences.keybindings.guide(this.alternateScreen),
-        setActiveNonInteractiveApprovalMode:
-          this.options.setActiveNonInteractiveApprovalMode ?? (() => {}),
         refreshKeybindings: () => this.preferences.reload(),
       });
       this.catalogs.invalidate();

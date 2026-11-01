@@ -3,7 +3,6 @@ import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type {
   CliBootstrapRuntimeContext,
 } from "../bootstrap/cliBootstrapContext.js";
-import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import {
   runReplayPromptScript,
@@ -19,10 +18,6 @@ export interface RunCliReplayModeInput {
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly printMode: boolean;
   readonly jsonEvents?: boolean;
-  readonly setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
-  readonly nonInteractiveCliApprovalMode: CliOptions["nonInteractiveApproval"];
 }
 
 export async function runCliReplayMode(
@@ -41,8 +36,5 @@ export async function runCliReplayMode(
     jsonEvents: input.jsonEvents,
     fallbackSessionId: input.bootstrapRuntime.recoveryCandidate?.id,
     lifecycleNotices: input.bootstrapRuntime.bootstrap.lifecycleNotices,
-    setActiveNonInteractiveApprovalMode:
-      input.setActiveNonInteractiveApprovalMode,
-    nonInteractiveCliApprovalMode: input.nonInteractiveCliApprovalMode,
   });
 }

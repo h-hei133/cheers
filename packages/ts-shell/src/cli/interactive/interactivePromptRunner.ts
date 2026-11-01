@@ -6,7 +6,6 @@ import type { ResumeLikeShellAction } from "../../core/shell/shellActionBridge.j
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
-import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import {
   executeResolvedPromptTurn,
 } from "../../entrypoints/cliRuntimeModule.js";
@@ -23,9 +22,6 @@ export async function runInteractiveResumeAction(input: {
   readonly turnNumber: number;
   readonly sessionRuntime: ShellSessionRuntime;
   readonly logger: StructuredLogger;
-  readonly setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
 }): Promise<{ readonly turnNumber: number }> {
   const resumeBridge = await runResumeLikeShellAction({
     ...(input.sessionSelection ? { sessionSelection: input.sessionSelection } : {}),
@@ -46,8 +42,6 @@ export async function runInteractiveResumeAction(input: {
         runtimeSeed: turnInput.runtimeSeed,
         continuityState: turnInput.continuityState,
         sessionManager: input.sessionManager,
-        setActiveNonInteractiveApprovalMode:
-          input.setActiveNonInteractiveApprovalMode,
         runtimeContext: input.runtimeContext,
         sessionRuntime: input.sessionRuntime,
         logger: input.logger,
@@ -72,9 +66,6 @@ export async function runInteractivePromptExecution(input: {
   readonly logger: StructuredLogger;
   readonly renderer: StreamingRenderer;
   readonly turnNumber: number;
-  readonly setActiveNonInteractiveApprovalMode: (
-    mode: ApprovalModeObject | undefined,
-  ) => void;
 }): Promise<void> {
   await executeResolvedPromptTurn({
     source: "interactive",
@@ -82,8 +73,6 @@ export async function runInteractivePromptExecution(input: {
     ...(input.promptMetadata ? { promptMetadata: input.promptMetadata } : {}),
     ...(input.attachments ? { attachments: input.attachments } : {}),
     sessionManager: input.sessionManager,
-    setActiveNonInteractiveApprovalMode:
-      input.setActiveNonInteractiveApprovalMode,
     runtimeContext: input.runtimeContext,
     sessionRuntime: input.sessionRuntime,
     logger: input.logger,

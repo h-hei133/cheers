@@ -25,7 +25,6 @@ import type { CliOptions } from "../options/cliOptions.js";
 import {
   createCliApprovalEscalationBridge,
 } from "../approval/cliApprovalEscalationBridge.js";
-import type { CliApprovalModeState } from "../approval/cliApprovalModeState.js";
 import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
 import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
@@ -79,7 +78,6 @@ export function createCliSessionRuntime(input: {
   readonly runtimeContext: ShellRuntimeContext;
   readonly options: CliOptions;
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
-  readonly approvalModeState: CliApprovalModeState;
   readonly providerRuntimeBridge: CliProviderRuntimeBridge;
   readonly getReadline: () => ReadlineInterface | null;
   readonly isStdinTty?: () => boolean;
@@ -230,7 +228,6 @@ export function createCliSessionRuntime(input: {
           !isStdinTty()
             ? input.options.nonInteractiveApproval
             : undefined,
-        getApprovalModeObject: input.approvalModeState.get,
         sessionManager: input.sessionManager,
         getSessionId: () => input.runtimeContext.session.id,
         getPermissionScope: () => sessionRuntime.getPermissionScope(),

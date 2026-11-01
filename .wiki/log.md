@@ -11304,3 +11304,14 @@ build d4dda071a4dc/current inputs与两exe哈希另由独立verifier核对。普
 延迟43c09f3b代码CI41259305316 success；097cbee7代码CI41260394184仍in_progress，Watch41260394153 success，不以Watch替代或反复轮询。本批最终静态/语法/独立证据与交付另绑，本批CI未观察。
 
 最终五静态门、三脚本语法、独立证据verifier及diff check均exit0；binding dangling0、118既有docs-source advisory保留，current compilerInputs及stable/不可变exe均106846336 bytes、SHA9ee2470f2a43032e50b4b3d76c37f486ae5176d7dc8f36352c1ed04e3d18f628一致。一次最终静态门启动因受限PATH漏掉rtk而exit127、尚未运行任何gate，设置日志单独保留，修正PATH后五门全通过。仅本批三份TS与三份markdown变更；提交推送、remote-main及clean状态由ignored delivery收据另绑，本批交付CI未观察，整体goal active。
+
+
+### 2026-11-01：提示文本与验证续接不再推导审批权
+
+[addition24.68](features/phase-20-addition.md#2468-提示文本与验证续接不携带审批权)继续ADD-56/57：旧CLI把prompt授权词句与上次验证lineage变成可变mode，可绕过真实审批、持久授权不同命令，或因缺lineage/冲突提前阻断整turn。目标检查及定向结构化审批参考后，删除解析/冲突分析、state与载体，保留continuity原传递、显式CLI/session scope/精确grant/实际答复；低层第七参数仅作忽略兼容槽，历史审计仍可读。新增27行为回归取代一条要求禁止推导行为的旧facade场景，其他夹具只删旧字段。旧初版16失败/3通过，全部生产源反转后24失败/3通过并逐字节还原；最终显式单worker/heap768MiB八文件145项通过。五静态门、TS/exe build caf547ebb515/current inputs通过，两个exe size/SHA由独立verifier核验。
+
+普通/全屏实际Node CLI各GET2/POST4原生两回合：合成上一验证由原SessionManager预写，实际continuity eligible；always allow文本仍开原UI，Escape后零effect/grant且模型收到denial；allow once文本再次要求实际y，原shell写一次、零永久grant。每场两审批/两end、exit0/cooked/config/auth/owned进程及scratch清理，最高340436KiB不算性能。两有效CLI；另两次设置失败均在CLI/HTTP前。首轮Vitest路径零测试、8个大小写断言失败、retry词句夹具失败均分开保留。一次未确认测试session终态便启动探针，违反串行要求，探针freshness前置失败且未启动CLI/建scratch；测试后来exit0，该段排除有效证据，已重新串行受限145项，后续任务锁互斥，未观察OOM。HANDOFF补授权与连续性边界、终态确认与锁规则。
+
+证据归ignored .omx/artifacts/phase20-addition-prompt-authority/，28份TS路径含两删除与27份父源/脚本快照、结果与失败记录由主代理独立verifier通过，不冒充委派复审。judge import两项satisfied/exit0，整体partial及两个既有函数上限advisory保留，interactiveMode本批仅删载体。无真实provider、实际headless print/exe审批、其他平台、全仓/15套件/20k或独立复审验收。台账仍1完成/8部分完成/61本地验证/1未开始，原47外部条件延后，goal active。延迟097cbee7代码CI41260394184 success，c8e073f9代码CI41261465651仍in_progress、Watch41261465685 success，不立即轮询；本批最终核验和交付另绑，本批CI未观察。
+
+最终五静态门、四脚本语法、独立证据verifier及diff check均exit0；binding dangling0、118条既有docs-source advisory保留，current compilerInputs及两个exe size/SHA一致。工作树仅本批28份TS路径（含两删除）与三份markdown，测试/build源码快照保持；提交推送、remote-main与clean状态由ignored delivery收据另绑。本批交付CI未观察，整体goal active。
