@@ -5,7 +5,7 @@ sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
 updated: 2026-11-01
 tags: [features, phase-20, additions, interaction, panels, completion]
-summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-71，已把七轮用户反馈与子代理review发现按职责归并，重复项合并，逐条记录完成情况。当前0完成、8部分完成、62本地验证、1未开始；其余章节保留研究过程与逐批证据。"
+summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-71，已把七轮用户反馈与子代理review发现按职责归并，重复项合并，逐条记录完成情况。当前1完成、8部分完成、61本地验证、1未开始；其余章节保留研究过程与逐批证据。"
 confidence: mixed
 ---
 
@@ -386,7 +386,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-25 | P0 | resume 打开/搜索/删除不整目录重扫，扫描不阻塞事件循环 | 第 29、33 项、19.6、21.3、21.11–21.13、21.18、21.25–21.26、第 24.41 节 | 部分完成 | 用户大目录真实体验；cold/warm 磁盘与总 heap |
 | ADD-26 | P1 | 会话退出有界、失败可见，信号关闭保留恢复证据 | 第 26、30 项、19.3、20.2、20.5、20.19、20.35、20.37、20.40、21.35–21.36、21.43 | 本地验证 | 用户故障设备；非 Linux；SIGKILL 不可捕获 |
 | ADD-27 | P1 | 双击 Esc 返回面板，失败时不静默 | 第 34 项、21.4、21.10 | 本地验证 | 真实终端按键节奏 |
-| ADD-28 | P1 | 中断会话的思考块保留与恢复 | 第 25 项、20.3、21.57 | 本地验证 | 真实推理模型被中断的现场 |
+| ADD-28 | P1 | 中断会话的思考块保留与恢复 | 第 25 项、20.3、21.57、24.65 | 完成 | —（当前 provider 的 Node 普通/全屏现场见24.65；不承诺恢复扣留或未落盘内容） |
 | ADD-29 | P1 | 用量记录损坏时保留健康分桶并显示未知，不伪造数字 | 19.8、20.6 | 本地验证 | 原损坏记录的生成原因 |
 | ADD-30 | P2 | 跨进程恢复的伪造结果（运行所有权租约） | 21.73 | 未开始（已记录不修） | 需要架构级租约；仓促实现会阻塞合法恢复 |
 
@@ -6456,3 +6456,22 @@ Node20.3 普通/全屏 × user/project 四条真实 CLI 顺序通过：暂存9�
 一次延迟读取上一批2a031940精确代码CI41256533865仍in_progress，Watch41256533763已success；不以Watch代替完整CI、不立即轮询。本批最终门及提交推送另绑，本批交付CI尚未观察。
 
 最终五静态门、三脚本语法、独立证据verifier和diff check均exit0，binding dangling0、118既有docs-source advisory保留。工作树仅本批八个产品/测试文件与三份markdown，提交推送、remote-main及clean状态由ignored delivery收据另绑；本批CI未观察，不声明整体任务完成。
+
+
+### 24.65 真实推理流中断后的原文保留与重开
+
+补 ADD-28 唯一列出的现场缺口，先沿[原 step](../../packages/ts-shell/src/turn/step.ts)的 shownReasoning/stamp、[原 thinking owner](../../packages/ts-shell/src/cli/interactive/turn/thinking.ts)、[会话恢复](../../packages/ts-shell/src/cli/interactive/history.ts)及原键盘 interrupt/ctrl+t 检查：失败或中断已展示的公开推理会作为无签名文本保存，恢复器重建独立 finalized/collapsed thinking。本批不修改产品或通过夹具预写 reasoning/interrupted；沿当前生产 Node20.3 launcher、实际已配置 provider 做两个小会话。
+
+普通/全屏各一场两次CLI启动，均在真实 HTTP200 流产生16次 reasoning.delta、原终端绘出 thought 行且 raw state仍active/原sink未end时，实际Escape取消。原会话随后 interrupted，pendingPrompt保持，原user精确一次；已观察的公开思考分别334/298 bytes，与原assistant.reasoning.text逐字相等，未附signature/redacted或另造replay authority。两场中断后的原界面均经真实Ctrl+T展开正文，再Ctrl+D正常退出。重开同一session后，原恢复器重建相同字节的独立thinking，实际再次Ctrl+T展开；零自动推理请求，pendingPrompt保留，没有把打开恢复视图当作继续推理或原任务完成。
+
+每有效场景实际GET1+POST1均HTTP200，重开阶段无HTTP；通过原undici diagnostics独立计数，并在产品模块链接前安装原fetch的透明转调观察与最多1 POST守卫。每请求输出cap2048、工具声明0，禁用tool/MCP/warming/retry，maxTurns1。没有消费/克隆/替换Response、改delta、强制状态、代替真实键盘或改writer。中断后的request:error事件保留为诊断事实，不自行归为网络/provider故障；未取得完整结算用量，不补0或计费金额。最终两场四次CLI都exit0/cooked flags恢复，临时配置与16个operator来源文件的原字节或缺失保持，自有PID/start identity非活跃，含凭据、原生会话和预期公开思考的0700 scratch删除。
+
+首轮普通模式已真实取消并精确保存238 bytes、展开和正常退出，但透明fetch包装安装在产品模块导入之后，已链接的函数绕过该计数器；原diagnostics实见GET/POST各1，而包装器posts为0，故断言失败、未进入重开，整轮unverified。修正观察器安装顺序后才取得上述两个有效场景。首轮源码/收据完整保留，含迭代共5次CLI、GET3/POST3，不将其计作第三个有效案例。观察器另一个未订阅实际message.delta的answerDeltas字段不作为任何正文/完成性证据；独立verifier明确标为无效且不使用该计数。
+
+保持已推送33ce9322的产品源码与 build 03239d1aec2dd7736121bf34dcbc7dc1740683adba05a3af7dad43c2d1e905d9、inputs 1d718d53b56098bd9545981ca36a7df7740a7b077cab8e4ce9e797552db94f20；current compilerInputs与stable/不可变exe size/SHA均由独立脚本核对一致，未因只补现场而重建。每次CLI60秒/2MiB/100ms采样768MiB守卫与Node heap768MiB均保持，最高324740KiB仅为小会话观察，不作heap或性能验收。
+
+证据归创建前核对不存在及无tracked碰撞的 ignored .omx/artifacts/phase20-addition-reasoning-interrupt/，各有效执行版本有非可执行精确快照；独立verification通过真实流/原生取消/字节比较/原视图与重开/请求数/来源与清理/旧失败保留核验，正式证据无实际思考/响应/请求正文、密钥、endpoint或prompt/session digest。HANDOFF补透明计数器必须先于模块链接的规则。ADD-28依据本条列出的完成条件改为完成，台账现1完成/8部分完成/61本地验证/1未开始；不升级整个第25项、其他provider/协议、exe运行、物理像素、其他平台、推理继续完成、金额或原Phase20矩阵。扣留推理及尚未写入就死亡的内容仍不能恢复。仅三份markdown改动，无新unit/build/反转/全仓/15套件/20k真实PTY/local judge或委派复审，整体goal active。
+
+一次延迟读取33ce9322精确代码CI41258181082仍in_progress，Watch41258181274 success；不代替完整CI、不立即轮询。本批最终静态/语法/证据核验与提交推送另绑，本批交付CI未观察。
+
+最终五静态门、三脚本语法检查、独立证据verifier及diff check均exit0；binding dangling0，118条既有docs-source advisory保留。仅三份markdown变更，提交推送、remote-main与clean状态另由ignored delivery收据绑定；本批交付CI未观察，整体goal保持active。

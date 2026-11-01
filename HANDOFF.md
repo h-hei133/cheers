@@ -1820,3 +1820,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A reader accepts search or scroll input but never redraws while background status keeps requesting frames.
 - **Root Cause**: A costly frame raises the adaptive delay above the status tick interval. Continually replacing even one timer postpones every paint indefinitely.
 - **Rule**: Coalesce requests onto the already scheduled frame without moving its deadline; that frame reads the latest state. Preserve direct-paint cancellation, backpressure and stop behavior. Test continued progress with a deterministic costly frame and requests arriving faster than the adaptive delay in both screen modes. Simulated startup timers must run or be cancelled through their owner, not disappear from a mock queue.
+
+
+### Transport Observers Must Precede Product Module Linking
+- **Symptom**: A real request and reasoning stream occur, but a transparent fetch wrapper records zero POSTs and fails its own verification.
+- **Root Cause**: Product modules imported the transport function before the observer replaced its export; those already linked references bypass the wrapper.
+- **Rule**: Install request observation and bounds before importing product modules that can link the transport. Cross-check wrapper counts against native request diagnostics. Preserve a late-installed observer run as unverified instead of interpreting its zero counter as no request. Bind event counters to the actual event union and exclude unused or invalid counters from acceptance claims.

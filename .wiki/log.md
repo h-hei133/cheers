@@ -11275,3 +11275,12 @@ ed4820cb CI41039139794/Watch41039139814均completed/success；ff084423 CI4104090
 最终普通/全屏实际CLI各三回合，原reader实际搜索+End在body显示完整指令/上下文尾部和角色；A批准实际child、参数相同角色B重新询问并Escape拒绝零child、恢复A命中旧grant实际child。各8POST/2child/1opaque grant，完整原prompt/context/角色A到实际wire，批准与工具结果分别核验；config/auth不变、exit0/cooked/owned进程和scratch清理。三条旧build停点仍unverified（第三次175request/1paint/898ms/backlog0诊断），含迭代5CLI/19POST，产品调度修补后才两有效场景。最高585092KiB不算性能；独立证据脚本passed，judge import两项satisfied/exit0，两个未改interactiveMode模块函数上限使overall partial。HANDOFF补三规则，无真实provider效果/exe审批/其他平台/全仓/15套件/20k/委派复审，ADD-57本地验证、原47延后、goal active。一次延迟读2a031940代码CI41256533865仍in_progress、Watch41256533763 success，不立即轮询；本批最终门与交付另绑。
 
 最终五静态门、三脚本语法、独立证据verifier和diff check均exit0，binding dangling0、118既有docs-source advisory保留。工作树仅本批八个产品/测试文件与三份markdown，提交推送、remote-main及clean状态由ignored delivery收据另绑；本批CI未观察，不声明整体任务完成。
+
+
+### 2026-11-01：真实推理中断后的思考原文恢复
+
+[addition24.65](features/phase-20-addition.md#2465-真实推理流中断后的原文保留与重开)补ADD-28明确现场缺口，产品未改、沿33ce9322及build03239d1aec2d/current inputs/两exe核验。生产Node20.3普通/全屏各真实provider HTTP200流、16次reasoning.delta且仍active时实际Escape；原生interrupted后334/298bytes公开思考与原assistant.reasoning.text精确相等、无签名，pending原提示和唯一user保持。原界面与重开同session均实际Ctrl+T展开正文，重开零HTTP/零自动推理，不冒充继续完成。两有效场景4CLI、GET2/POST2，配置/16个operator来源字节或缺失保持、exit0/cooked/owned进程与含凭据/原生思考scratch清理；未知用量/金额不补0，request:error不自行断言provider故障。
+
+首轮真实保存238bytes并展开，但fetch计数器在模块链接后安装，diagnostics实见GET/POST各1而包装器posts0，断言失败且未重开；保留unverified及源码，含迭代5CLI/3GET/3POST。修复harness顺序后两场通过；无效answerDeltas字段明确不用作证据。60秒/2MiB/768MiB采样及heap守卫未触发，最高324740KiB不算性能。独立证据verifier passed，无正文/key/address正式留存，HANDOFF补linking边界；ADD-28按列出的条件完成，台账1完成/8部分完成/61本地验证/1未开始，其他provider/exe/平台、未落盘与扣留内容、原47及整体goal不升级。仅三份markdown，无新unit/build/反转/全仓/15套件/20k/judge/委派复审。延迟33ce9322代码CI41258181082仍in_progress、Watch41258181274 success，本批最终门与交付另绑。
+
+最终五静态门、三脚本语法检查、独立证据verifier及diff check均exit0；binding dangling0，118条既有docs-source advisory保留。仅三份markdown变更，提交推送、remote-main与clean状态另由ignored delivery收据绑定；本批交付CI未观察，整体goal保持active。
