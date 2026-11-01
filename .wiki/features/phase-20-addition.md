@@ -464,7 +464,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、24.68、第一百三十四批 | 本地验证 | 已移除prompt推导授权，普通/全屏实际拒绝及仅本次批准零永久grant；Node/单文件可执行程序的headless print路径已实际验证默认拒绝与显式仅本次，其他平台未验 |
-| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、24.68、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定，验证续接文本不再授权当前调用；原reader完整预览、容量与绘制期限已验；Node/单文件可执行程序headless实际调用已核对目标、工具结果与终态；desktop原生适配器、其他平台仍缺；MCP仍禁止allow-always |
+| ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、24.68、24.76、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定，验证续接文本不再授权当前调用；原reader完整预览、容量与绘制期限已验；Node/单文件可执行程序headless实际调用已核对目标、工具结果与终态；desktop原生适配器、其他平台仍缺；MCP单次限制已覆盖headless、旧缓存与实际picker |
 | ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76、24.71、24.73 | 本地验证 | 已补声明快照/工作目录与独占hook授权；通用缓存/档位不代答，其他平台与单文件程序未验 |
 | ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77、24.71、24.73–24.75 | 本地验证 | 已补历史/旧格式授权与待定回答撤回、真实profile及通用缓存隔离；Linux Node及单文件程序普通/全屏来源撤回已验，其他平台与多机器锁/跨版本混写未验 |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78、24.72 | 本地验证 | 已补普通resume/workspace切换、POSIX大小写及不读取权限的项目往返；Node普通/全屏实际重问/拒绝已验，单文件程序及其他平台未验 |
@@ -6666,3 +6666,26 @@ ignored `.omx/artifacts/phase20-addition-hook-executable/` 保留构建、首轮
 一次延迟读取：7d99aa3a 精确代码 CI41269474881 已 success，69fdcdbf 的代码 CI41271010610 仍 in_progress、Watch41271010612 success；不以 Watch 代替代码 CI，不立即轮询。本批最终文档检查、复审及提交推送/remote-main/clean 状态另绑交付收据，本批 CI 尚未观察。
 
 最终增强双模式及独立证据核对均exit0，只读委派复审CLEAR，子代理未运行验证。两份执行脚本与非可执行归档逐字节比对后删除，task scratch目录已移除；最终工作树仅三份markdown，产品源码未改。最终文档门与diff检查、Git交付另绑收据；目标保持active。
+
+
+### 24.76 MCP 单次审批覆盖非交互策略与旧缓存
+
+继续 ADD-57。§21.75 已规定 MCP 不得记住审批，但原限制仅在交互答案收尾：非交互显式 allow-always 会提前写入通用 grant，旧永久记录及 name-only once cache 也会提前返回。实际 MCP descriptor 经 registry 注册后没有参数绑定，通用审批键只识别工具名，下一次不同参数仍可复用。新增真实 handler、policy、picker、registry/tool gate 回归，旧代码实际 6 失败/3 控制通过；其中工具门第二次不同参数错误执行，不是仅据字符串推断。
+
+修改前定向只读比较参考快照 `4210c08defe92fe8828f789b6f9fda287ad3709e` 的 `mcp_tool_call.rs`：1588–1620 按模式决定是否建立 session/persistent key，1416–1420 再决定是否查缓存；2030–2046 把不允许记住模式的长期答案归为当前调用；2062–2077 写入还要求对应 key 存在。采用读缓存资格、答案与存储多处约束的决定。参考 Auto 模式仍可记住 MCP，不能声称它全面禁止；本项目遵守既有更严格的一次性合同。另查本地 coding-agent 的 MCP tool/runtime seam，未建立等价审批机制，不据此推断其能力，也没有复制实现。
+
+原 [CLI审批owner](../../packages/ts-shell/src/entrypoints/cliApprovalModule.ts) 现在拒绝以旧 MCP once/always 缓存代答；显式 headless always 降为 allow-once，保留显式 once/deny。交互 host 收到的 options 去掉 always；[实际picker](../../packages/ts-shell/src/cli/interactive/picker/approval.ts) 对空 options 的旧 prompt 也不展示或接受永久选项，原 [保存wiring](../../packages/ts-shell/src/core/shell/interactiveApprovalWiring.ts) 再阻止 MCP 持久化。旧 host/readline 返回 always 仍兼容降为单次，说明不再把成功单次回答误写成用户拒绝；readline 菜单与策略说明同样遵守单次合同。旧记录不自动删除，仍可查看/撤回；普通工具永久/一次缓存、caller-owned hook 及显式 session scope 合同保留。未改 provider/auth core、包脚本、构建或默认门。
+
+最终聚焦集覆盖 [MCP 13项](../../packages/ts-shell/src/entrypoints/mcpApproval.test.ts)、授权文本27、hook34、调用绑定27、交互保存3、patch选择15、权限档位12，共七文件131项。五组反转分别恢复 headless 持久化、旧缓存、长期选项、保存边界及旧 host 归一化，实际 2/5/2/1/2 项断言失败，finally 逐字节恢复三份生产源；恢复后13项再次通过。主代理均使用 Node20.3、显式单 worker/heap768MiB、同一 nonblocking flock 串行验证。五静态门通过，118条既有 docs-source advisory 保留；TS build `5ed4b3755e79fd14f84f25887fceeaecbc13302e658f7e833d325aa1caaeeb1e`，inputs `f40238469929a0df20b33d8caf834f1a10f44e9d453eed97d85e687d74e44611`，构建 heap1536MiB。本批不重建单文件程序。
+
+隔离 HOME/profile/project，以环回 HTTP 模型响应和真实 stdio JSON-RPC MCP 夹具运行生产 Node CLI。最终 headless 六个独立进程依次默认拒绝、显式 always、不同参数默认拒绝、显式 once、显式 deny、预置旧 grant 后默认拒绝；副作用累计 `0/1/1/2/2/2`，只有第2/4次进入 MCP tools/call。新持久 grant 全0，最后预置的一条旧记录原字节保留仍不授权。各实际工具均出现在发给模型的工具定义中；模型确实收到对应拒绝/成功结果，各次退出0，GET6/POST12、6个 MCP 进程、2次实际调用。
+
+普通/全屏各一个实际 PTY、三回合真实 y/Escape/y，预置旧 grant 后每回合仍打开新审批；观察本轮生产 renderer 生成包含 once/deny、无 always 的 frame 后才发送按键，原宿主实际消费按键。收据的 Painted 字段表示此 frame 观察，未独立测量物理屏幕呈现。各副作用 `1/1/2`、GET3/POST6、MCP进程1/调用2、run/end3、审批 approved/denied/approved、tool success true/false/true、query.failed0。旧策略文件全程字节相等，没有新 grant；每回合由新 SessionManager 读取原落盘快照，audit 均非持久、cacheEffect none，拒绝为 stopped/stopped_error，执行成功为 success/completed。三场有效探针 config/auth 最终精确字节相等、退出0、owned PID/start identity 非活跃及 scratch 删除。
+
+三次中间 headless driver 尝试保留 unverified：前两场完成默认拒绝但错误要求终态包含模型成功文案；第三场默认拒绝、显式单次效果都成立，但使用可返回 undefined 的 prompt-continuity 建议接口读取成功后的审计。改为拒绝/成功分别核对终态，并使用原无条件 session snapshot 接口；没有修改产品迎合探针。含这些尝试共12次 CLI 启动，四个中间进程不计最终场景覆盖。30秒单次headless/90秒交互、2MiB输出及100ms采样子树768MiB守卫未触发；有效场景RSS最高479800KiB仅为小夹具子树观察，不含驱动/HTTP server，不作总内存或性能验收。标准relay未单测cooked恢复。
+
+只读委派源码复审CLEAR，未运行测试/build/脚本；主代理独立证据核对与最终交付另绑。ignored `.omx/artifacts/phase20-addition-mcp-approval/` 保留父源/当前文本、红绿、五组反转、三次中间收据及三个最终场景，执行脚本归档成非可执行文本后清理，不保存 raw PTY、provider 请求响应或真实凭据。HANDOFF 记录晚归一化绕不过早返回、终态观察与续接建议接口的区别。ADD-57 保持本地验证，矩阵仍1完成/8部分完成/61本地验证/1未开始，ADD-30保持不启动，原47项外部条件延后，goal active。本批未验证编译程序的新 MCP 修复、外部 MCP 服务/认证、真实 provider、desktop/macOS/Windows、全仓/15套件/20k PTY、judge或完整性能矩阵。
+
+一次延迟读取：69fdcdbf 精确代码 CI41271010610 已 success；父提交 f33bd2f5 的代码 CI41272131055 仍 in_progress、Watch41272131053 success；不以 Watch 代替代码 CI，不立即轮询。本批最终核验与提交推送、remote-main/clean 另绑交付收据，本批 CI 未观察。
+
+最终五静态门、四份Node脚本语法、七文件131项、主代理独立证据verifier与diff check均exit0；三份父源、四份当前TS、五组反转恢复、current build/inputs、三场有效与三场中间收据均已核对。五份执行脚本与非可执行归档逐字节相等后删除，owned task scratch已移除。只读委派源码及证据复审已完成，frame口径已修正；提交推送、remote-main与clean状态由ignored delivery收据另绑，目标保持active。

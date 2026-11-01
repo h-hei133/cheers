@@ -11373,3 +11373,14 @@ build d4dda071a4dc/current inputs与两exe哈希另由独立verifier核对。普
 实际编译CLI普通/全屏各六回合，确认每次新的完整preview与真实选项后a/y/Escape；删除/编辑后两次原CLI撤回并恢复拒绝，另两次待定预览中由独立Node实例原command撤回，编译consumer的仅一次/记住旧回答均不执行。effects1/1/2/2/2/2、hookGrant1/0/1/0/0/0、普通grant全0，各GET6/POST6、唯一回答显示并进入completed历史、config/auth字节不变、exit0、自有PID/start及scratch清理。最终两场子树RSS215320/214476KiB、输出72267/95203bytes仅小夹具观察且不含Node驱动，未测cooked；最终config/auth字节相等不声称无瞬时写。原生程序无observer/module替换。首轮两场标题屏障通过按原范围保留；增强中一场fullscreen空placeholder重绘屏障及两场regular Escape+p合并Alt+P导致返回屏障超时均留unverified，三次均已撤回并清理。最终核对完整source/event/适用范围/command，分离Escape与文本后实际唯一草稿在composer出现，再Ctrl+U清除并继续；总8CLI、5pass/3unverified，重叠不累计覆盖。清理补pty独立session后代PID/start身份确认，setup进入finally；HANDOFF补两陷阱。独立证据核对current源码9份、build/exe与两模式收据通过，不重复计上批158项或伪造反转。脚本仅.tmp执行并归档非可执行文本，证据ignored phase20-addition-hook-executable。其他平台/完整hook项目隔离与信任矩阵/compiled权限档位/多机器锁/跨版本混写/真实provider与性能仍缺；ADD-59本地验证、总矩阵不变、原47外部条件延后、goal active。延迟7d99aa3a代码CI success；69fdcdbf代码CI41271010610仍in_progress、Watch41271010612 success。本批最终文档/复审与Git交付另绑。
 
 最终增强双模式及独立证据核对均exit0，只读委派复审CLEAR，子代理未运行验证。两份执行脚本与非可执行归档逐字节比对后删除，task scratch目录已移除；最终工作树仅三份markdown，产品源码未改。最终文档门与diff检查、Git交付另绑收据；目标保持active。
+
+
+### 2026-11-01：MCP 单次审批覆盖非交互与历史缓存
+
+[addition24.76](features/phase-20-addition.md#2476-mcp-单次审批覆盖非交互策略与旧缓存)继续ADD-57。真实handler/registry/tool gate旧源9项6失败/3控制，确认headless always提前持久化、旧永久及once缓存按工具名覆盖不同参数，绕过交互收尾的单次限制。对照参考的缓存资格/答案归一化/存储守卫后，原owner在所有早返回前限制MCP缓存，显式headless always降为once；实际picker不展示或接受always，原wiring再阻止保存，旧host/readline兼容降一次。旧记录保留查看/撤回，普通工具、caller hook及session scope合同保留。
+
+Node20.3显式单worker/heap768MiB/同一nonblocking flock串行七文件131项通过，五反转2/5/2/1/2失败并逐字节恢复，恢复后13项再绿；五静态门通过、118既有docs-source advisory保留，TS build5ed4b3755e79/current inputs，build heap1536MiB。原生产Node CLI配环回模型和真实stdio MCP夹具：最终headless六进程effects0/1/1/2/2/2，新grant0，最后预置legacy1仍拒绝；GET6/POST12、MCP call2。普通/全屏各真实y/Escape/y三回合，原picker生成once/deny无always的frame，effects1/1/2、旧策略字节不变、GET3/POST6、call2、run/end3/failed0。每回合落盘audit非持久none，拒绝stopped、成功success；config/auth字节相等、exit0、owned身份与scratch清理。frame字段不冒充物理屏幕呈现。三次中间driver unverified单列：拒绝后错误要求成功文本，以及用可缺省续接建议接口读取审计，均属探针观察错误，未改产品迁就；最终3模式pass另计。只读复审源码CLEAR并收紧上述frame口径，主代理独立证据verifier与交付另绑，子代理无验证。HANDOFF补早返回限制与审计接口陷阱；脚本只在.tmp执行、归档文本后清理，证据ignored phase20-addition-mcp-approval。ADD-57本地验证、矩阵不变、ADD-30不启动、原47外部条件延后、goal active；无新exe/外部MCP认证或服务/真实provider/其他平台/全仓/15套件/20k/judge或性能验收。
+
+一次延迟读取：69fdcdbf代码CI41271010610已success；父提交f33bd2f5代码CI41272131055仍in_progress、Watch41272131053 success，不立即轮询。最终核验、提交推送、remote-main及clean状态由本批ignored收据另绑，本批CI未观察。
+
+最终五静态门、四份Node脚本语法、七文件131项、独立证据verifier与diff check均exit0；三父源/四当前TS、五组恢复、current build/inputs及全部原生收据已核对。五份执行脚本逐字节归档后删除，owned task scratch移除；最终文档门与Git交付另绑ignored收据，goal active。

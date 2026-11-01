@@ -73,6 +73,10 @@ export function createCliEscalationPromptHandler(
 
   return async (prompt) => {
     const projectRoot = getProjectRoot();
+    const isMcp = prompt.context.toolName.startsWith("mcp__");
+    if (isMcp) {
+      prompt = { ...prompt, options: prompt.options.filter(option => option.value !== "allow-always") };
+    }
     // Some callers own a stricter grant identity and withdrawal contract. The
     // host must neither read nor write a second policy that could revive it.
     const callerScope = prompt.context.grantOwner === 'caller' ? buildScope(prompt) : undefined;
@@ -86,8 +90,10 @@ export function createCliEscalationPromptHandler(
     const cliNonInteractiveDecision = isNonInteractive && !requiresAnswer
       ? getNonInteractiveDecision?.()
       : undefined;
-    const hasAllowOnceCache = !requiresAnswer && trustPolicy.hasAllowOnce(evaluation.cacheKey);
-    const hasAllowAlwaysGrant = !requiresAnswer && Boolean(evaluation.matchedGrant);
+    // MCP grants only identify the tool name, not the current arguments.
+    // Retain legacy entries for management without accepting their authority.
+    const hasAllowOnceCache = !requiresAnswer && !isMcp && trustPolicy.hasAllowOnce(evaluation.cacheKey);
+    const hasAllowAlwaysGrant = !requiresAnswer && !isMcp && Boolean(evaluation.matchedGrant);
     const hasCachedGrant = hasAllowOnceCache || hasAllowAlwaysGrant;
     // A session scope answers before anything is put to the user, and only in the
     // interactive channel: the non-interactive path has its own explicit policy,
@@ -157,7 +163,8 @@ export function createCliEscalationPromptHandler(
         includeRisk: true,
         decisionSource: nonInteractiveDecisionPlan.source,
       });
-      const resolvedDecision = nonInteractiveDecisionPlan.decision ?? "deny";
+      const resolvedDecision = isMcp && nonInteractiveDecisionPlan.decision === "allow-always"
+        ? "allow-once" : nonInteractiveDecisionPlan.decision;
       renderer.renderLine(
         formatNonInteractiveApprovalPolicyLine({
           resolvedDecision,
@@ -253,7 +260,7 @@ export function createCliEscalationPromptHandler(
         userComment: "CLI auto-approval from allow-once cache",
       });
     }
-    if (!requiresAnswer && evaluation.matchedGrant) {
+    if (hasAllowAlwaysGrant && evaluation.matchedGrant) {
       trustPolicy.recordLastHit({
         source: "allow-always-policy",
         projectRoot,
@@ -288,13 +295,14 @@ export function createCliEscalationPromptHandler(
 
     if (!promptInteractiveApproval) {
       renderApprovalRequiredSurface(renderer, { prompt, includeRisk: true });
-      for (const line of callerScope ? [] : trustPolicy.explain(
+      for (const line of callerScope || isMcp ? [] : trustPolicy.explain(
         evaluation,
         projectRoot,
         getViewMode(),
       )) {
         renderer.renderLine(`- ${line}`);
       }
+      if (isMcp) renderer.renderLine("- Extension tool approval covers this call only; stored grants are not reused.");
       if (getViewMode() === "verbose" || callerScope) {
         renderer.renderLine(`- Recommended default: ${prompt.recommendedAction}`);
         renderer.renderLine("");
@@ -304,7 +312,9 @@ export function createCliEscalationPromptHandler(
           "- Tip: use /view developer to see policy and full escalation details.",
         );
       }
-      renderer.renderLine(formatApprovalPromptDecisionMenuLine());
+      renderer.renderLine(isMcp
+        ? "Decision: y=allow-once, n=deny (default n)"
+        : formatApprovalPromptDecisionMenuLine());
     }
 
     let decision: "deny" | "allow-once" | "allow-always";
@@ -368,7 +378,7 @@ export function createCliEscalationPromptHandler(
     // so a remembered grant could only be keyed on its name — and would then
     // cover every later call with any arguments. One-time approval is the most
     // that can be promised truthfully.
-    if (prompt.context.toolName.startsWith("mcp__") && decision === "allow-always") {
+    if (isMcp && decision === "allow-always") {
       decision = "allow-once";
       decisionInputKey = "y";
       denialReason = "This tool comes from an extension; the grant covers this call only.";
@@ -430,7 +440,7 @@ export function createCliEscalationPromptHandler(
       promptId: prompt.id,
       decision,
       userComment: denialReason
-        ? `User denied with reason: ${denialReason}`
+        ? decision === "deny" ? `User denied with reason: ${denialReason}` : denialReason
         : formatExplicitApprovalComment({
             decision,
             hasApprovalModeObject: false,

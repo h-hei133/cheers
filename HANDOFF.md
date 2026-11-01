@@ -1908,3 +1908,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A native probe tries to close a reader and type a readiness draft, but the draft loses its first letter and never appears in the composer.
 - **Root Cause**: Adjacent Escape and text writes can coalesce into an Alt key sequence. A draft beginning with p becomes Alt+P within the decoder's 40 ms partial-prefix hold.
 - **Rule**: Separate a standalone Escape from following printable input beyond the decoder hold, or wait for an actual host acknowledgement. The short interval separates key semantics; it does not prove readiness. Confirm a unique draft on the actual composer line, clear it without submitting, and retain fresh preview/choices/durable-result barriers for the next operation. An empty placeholder need not be repainted by an optimized terminal renderer.
+
+### Approval Limits Must Precede Cache And Headless Shortcuts
+- **Symptom**: A tool advertised as once-only still writes a permanent grant or accepts an old name-only cache; changing arguments does not ask again.
+- **Root Cause**: The limit only normalizes the final interactive answer, after explicit headless policy and cache-hit branches have returned.
+- **Rule**: Apply cache eligibility before every fast path, normalize explicit policy before persistence, constrain actual offered/applied choices and guard the writer. Keep old entries manageable without accepting them as authority. Test real tool dispatch with different subsequent arguments, both channels and ordinary-tool controls.
+
+### Continuation Advice Is Not An Unconditional Audit Snapshot
+- **Symptom**: A native probe treats a correct denied terminal as missing its model success text, or dereferences an absent snapshot after successful execution.
+- **Root Cause**: Product terminal mapping can replace a model answer after denial; prompt-specific continuation advice may intentionally be undefined after a completed turn.
+- **Rule**: Assert denial and success outcomes separately using effects, model tool results and persisted terminal facts. Use the unconditional session snapshot to read audits; use prompt-continuity APIs only when asking whether a new prompt should continue prior work. Preserve observation failures separately from product failures.

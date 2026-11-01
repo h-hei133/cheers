@@ -121,7 +121,7 @@ export function approvalPicker(
   onChooseGroups?: () => void,
 ): Picker {
   const toolName = prompt.context?.toolName || "tool";
-  const persistentAllowed = toolName !== 'apply_patch';
+  const persistentAllowed = toolName !== 'apply_patch' && !toolName.startsWith('mcp__');
   const operation = prompt.context?.operation ? ` (${prompt.context.operation})` : "";
   const target = prompt.context?.target ? ` on '${prompt.context.target}'` : "";
   const permitted = (choice: ApprovalDecision) => !prompt.options.length || prompt.options.some(option => option.value === choice);
@@ -168,7 +168,7 @@ export function approvalPicker(
     apply: async (ids): Promise<undefined> => {
       if (ids[0] === 'choose-groups' && selectable && onChooseGroups) { onChooseGroups(); return undefined; }
       const choice = ids[0] as ApprovalDecision | undefined;
-      const decision = choice && permitted(choice) ? choice : "deny";
+      const decision = choice && permitted(choice) && (persistentAllowed || choice !== 'allow-always') ? choice : "deny";
       const selected = decision !== "deny" && prompt.context?.selections?.length
         ? prompt.context.selections.map(selection => selection.id) : undefined;
       onSettle({
