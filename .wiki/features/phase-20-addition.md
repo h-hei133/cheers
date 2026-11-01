@@ -7491,3 +7491,31 @@ return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
 倾向方案 1 或 3；方案 2 只是把问题说清楚，不解决。
 
 **影响**：用户可能在状态栏看到「还有余量」时突然遇到溢出。这与 24.84 记录的溢出体验是同一类问题，但根因不同——那次是压缩没有切点，这次是**显示滞后**。
+
+#### 24.93 补记：根因已精确定位
+
+继续核实后，问题的形状比「两套数值」更具体：**正确算式已经存在，但在忙碌时被丢掉了**。
+
+- [estimate.ts](../../packages/ts-shell/src/context/request/estimate.ts) 的 `estimatePrompt` 已经实现了与 oh-my-pi 一致的锚定算式：
+
+  ```ts
+  const tokens = calibrated
+    ? usage.lastPromptTokens! + estimateTokens(messages.slice(count))
+    : projectedTokens ?? estimateRequestTokens(messages, overhead);
+  ```
+
+  它产出 `calibrated` 状态，含义正是「实测 + 之后的增量」。
+
+- 这个函数只被 [preview.ts](../../packages/ts-shell/src/cli/runtime/context/preview.ts) 使用，结果经 `createContextController` 暴露为 `promptContext`。
+
+- 但 [interactiveMode.ts](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts:375) 只在**空闲**时提供它：
+
+  ```ts
+  ...(!this.busy ? { promptContext: this.promptContext.read() } : {}),
+  ```
+
+- 忙碌时 `readStatusFacts` 退回 [sessionFacts.ts](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts:91) 的 `measured` 分支——**不含增量**。
+
+所以准确的表述是：**空闲时状态栏正确（`calibrated`，含增量），忙碌时退回滞后值（`measured`）**。而忙碌恰恰是用户最需要看到增长的时刻。
+
+修复方向因此变得明确：忙碌时不应丢弃已有的 `calibrated` 读数。具体做法待参照实现调研结论确定（子代理进行中）。
