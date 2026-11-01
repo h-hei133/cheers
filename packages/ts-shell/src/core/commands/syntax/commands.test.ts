@@ -82,9 +82,8 @@ describe("trust command and storage boundaries", () => {
     expect(result.output).toContain("Withdrew 1 remembered approval");
     expect(store.isTrusted(hookFingerprint(here))).toBe(false);
     expect(store.isTrusted(hookFingerprint(elsewhere))).toBe(true);
-    // Said plainly when there was nothing to withdraw, rather than claiming a
-    // withdrawal that removed nothing.
-    expect((await runTrustCommand(["forget"], { cwd: workspace })).output).toContain("Nothing was withdrawn");
+    // No known removal is distinct from saving the source withdrawal barrier.
+    expect((await runTrustCommand(["forget"], { cwd: workspace })).output).toContain("No known stored approvals");
   });
 });
 

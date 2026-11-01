@@ -95,7 +95,7 @@ export class HookDispatcher {
    * A hook with no fingerprint did not come from a file — it was registered by
    * this process, which is the process's own code and needs no permission.
    */
-  private async declaredHookIsAllowed(hook: CommandHookConfig, workspaceRoot: string): Promise<boolean> {
+  private async declaredHookIsAllowed(hook: CommandHookConfig, workspaceRoot: string, sourceRevision?: string): Promise<boolean> {
     const trust = this.trust;
     if (trust?.admission?.()) return false;
     if (hook.fingerprint === undefined) return true;
@@ -115,7 +115,8 @@ export class HookDispatcher {
       );
       return false;
     }
-    if (this.trust.store.isTrusted(hook.fingerprint)) return true;
+    if (sourceRevision === undefined) return false;
+    if (this.trust.store.isTrusted(hook.fingerprint, hook.sourcePath ?? '(unknown)')) return true;
 
     const decision = await this.trust.requestApproval?.({
       command: hook.command,
@@ -127,12 +128,13 @@ export class HookDispatcher {
     // offered as two different promises. Treat it as one-shot so an untyped
     // caller can never turn "Run it for this session" into a permanent grant.
     const allowed = decision === true || decision === 'allow-once' || decision === 'allow-always';
-    if (!allowed || trust !== this.trust || trust?.admission?.()) {
+    if (!allowed || trust !== this.trust || trust?.admission?.()
+      || trust.store.sourceRevision(hook.sourcePath ?? '(unknown)') !== sourceRevision) {
       logger.info(`Declared hook '${hook.command}' was not approved and will not run.`);
       return false;
     }
     if (decision === 'allow-always') {
-      this.trust.store.recordTrust(hook.fingerprint, `${hook.event}:${hook.command}`);
+      if (!trust.store.recordTrust(hook.fingerprint, `${hook.event}:${hook.command}`, hook.sourcePath ?? '(unknown)', sourceRevision)) return false;
     }
     return true;
   }
@@ -236,8 +238,11 @@ export class HookDispatcher {
       // What the hook last wrote to stderr, which the block contract reads.
       let lastStderr = "";
       if (hook.event === relevantEvent && this.matches(hook.matcher, payload)) {
-        if (!(await this.declaredHookIsAllowed(hook, payload.workspaceRoot))) continue;
+        const sourceRevision = hook.fingerprint === undefined || trust?.bypassed ? undefined
+          : trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)');
+        if (!(await this.declaredHookIsAllowed(hook, payload.workspaceRoot, sourceRevision))) continue;
         if (trust !== this.trust || commandHooks !== this.commandHooks || trust?.admission?.()) continue;
+        if (sourceRevision !== undefined && trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') !== sourceRevision) continue;
         const timeoutMs = hook.timeoutMs ?? hookTimeoutMs(relevantEvent);
         const jsonPayload = JSON.stringify(payload);
 

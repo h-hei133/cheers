@@ -25,11 +25,11 @@
  * the gate would never ask anyone anything.
  */
 
-import fs from "node:fs";
 import path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { resolveUserDataFile } from "../../core/paths/userHome.js"
 import { assertProfileStorage, currentProfile } from '../paths/profile/context.js';
+import { HookTrustUpdateError, readHookTrust, updateHookTrust } from './trust/storage.js';
 
 /** The parts of a hook that decide what it does, and where it came from. */
 export interface HookIdentity {
@@ -43,11 +43,6 @@ export interface HookIdentity {
    * one repository from covering a different repository's hook.
    */
   readonly sourcePath: string;
-}
-
-interface TrustFile {
-  readonly version: 1;
-  readonly approved: Record<string, string>;
 }
 
 /**
@@ -68,105 +63,125 @@ export function hookFingerprint(hook: HookIdentity): string {
   return createHash("sha256").update(canonical).digest("hex");
 }
 
-/** The approvals this user has given, keyed by fingerprint. */
+interface SessionApproval {
+  readonly description: string;
+  readonly sourcePath?: string;
+  readonly revision: string;
+}
+
+export interface HookWithdrawal {
+  readonly status: 'saved' | 'unverified';
+  readonly removed: readonly { readonly fingerprint: string; readonly description: string }[];
+}
+
+/** The approvals this user has given, keyed by fingerprint in one source-aware store. */
 export class HookTrustStore {
   private readonly profile = currentProfile();
   private readonly storePath: string;
-  /** Approvals given during this session, for a store that cannot be written. */
-  private readonly sessionApprovals = new Set<string>();
+  private readonly sessionApprovals = new Map<string, SessionApproval>();
 
   constructor(customPath?: string) {
-    this.storePath =
-      customPath ??
-      resolveUserDataFile("hook-trust.json");
+    this.storePath = customPath ?? resolveUserDataFile('hook-trust.json');
     assertProfileStorage(this.storePath, this.profile);
   }
 
-  isTrusted(fingerprint: string): boolean {
-    try { assertProfileStorage(this.storePath, this.profile); } catch { return false; }
-    if (this.sessionApprovals.has(fingerprint)) return true;
-    return this.read().approved[fingerprint] !== undefined;
+  /** Undefined is unavailable; an empty token is a readable source never withdrawn. */
+  sourceRevision(sourcePath: string): string | undefined {
+    try { return readHookTrust(this.storePath, this.profile).withdrawals[path.resolve(sourcePath)] ?? ''; }
+    catch { return undefined; }
   }
 
-  /** Remember an approval, for this session and for later ones. */
-  recordTrust(fingerprint: string, description = ""): void {
+  isTrusted(fingerprint: string, sourcePath?: string): boolean {
+    try {
+      const data = readHookTrust(this.storePath, this.profile);
+      const memory = this.sessionApprovals.get(fingerprint);
+      const source = sourcePath === undefined ? data.sources[fingerprint]?.sourcePath ?? memory?.sourcePath : path.resolve(sourcePath);
+      const revision = source === undefined ? '' : data.withdrawals[source] ?? '';
+      if (memory && (memory.sourcePath === undefined ? revision === '' : memory.sourcePath === source && memory.revision === revision)) return true;
+      if (!Object.hasOwn(data.approved, fingerprint)) return false;
+      const attribution = data.sources[fingerprint];
+      if (attribution) return attribution.sourcePath === source && attribution.revision === revision;
+      // Old hashes carry no reversible source. They remain usable elsewhere,
+      // but a withdrawn source must ask again instead of adopting its old hash.
+      return revision === '';
+    } catch { return false; }
+  }
+
+  /** A stale answer cannot create a new grant. Failed publication may hold only the verified source generation in memory. */
+  recordTrust(fingerprint: string, description = '', sourcePath?: string, expectedRevision?: string): boolean {
     assertProfileStorage(this.storePath, this.profile);
-    const data = this.read();
-    const approved = { ...data.approved, [fingerprint]: description };
-    // Held in memory only when it could not be written. A durable record is read
-    // back from disk, so every store sees it — and every store sees a withdrawal
-    // too. A session-only copy would survive a withdrawal made elsewhere and keep
-    // granting what the user had just taken back.
-    if (this.write({ version: 1, approved })) this.sessionApprovals.delete(fingerprint);
-    else this.sessionApprovals.add(fingerprint);
+    const source = sourcePath === undefined ? undefined : path.resolve(sourcePath);
+    let verifiedRevision: string | undefined;
+    try {
+      const saved = updateHookTrust(this.storePath, this.profile, data => {
+        const revision = source === undefined ? '' : data.withdrawals[source] ?? '';
+        if (expectedRevision !== undefined && revision !== expectedRevision) return { value: false };
+        verifiedRevision = revision;
+        const sources = { ...data.sources };
+        if (source !== undefined) sources[fingerprint] = { sourcePath: source, revision };
+        else delete sources[fingerprint];
+        return { value: true, state: { ...data, approved: { ...data.approved, [fingerprint]: description }, sources } };
+      });
+      if (saved) this.sessionApprovals.delete(fingerprint);
+      return saved;
+    } catch (error) {
+      // A lock/read failure never admitted this answer. Even a verified write
+      // failure must reread the current source before it can hold a session grant.
+      if (verifiedRevision === undefined) return false;
+      try {
+        const current = readHookTrust(this.storePath, this.profile);
+        if ((source === undefined ? '' : current.withdrawals[source] ?? '') !== verifiedRevision) return false;
+        const attribution = current.sources[fingerprint];
+        if (Object.hasOwn(current.approved, fingerprint)
+          && (source === undefined ? !attribution : attribution?.sourcePath === source && attribution.revision === verifiedRevision)) {
+          this.sessionApprovals.delete(fingerprint);
+          return true;
+        }
+        if (error instanceof HookTrustUpdateError && error.publicationVerified) {
+          this.sessionApprovals.delete(fingerprint);
+          return false;
+        }
+        this.sessionApprovals.set(fingerprint, { description, sourcePath: source, revision: verifiedRevision });
+        return true;
+      } catch { return false; }
+    }
   }
 
-  /**
-   * Forget an approval.
-   *
-   * A grant nobody can withdraw is a grant that outlives the judgement behind it.
-   * The entry is removed rather than marked, so the store never accumulates a
-   * growing record of things that no longer mean anything; the hook itself is
-   * still declared, and the next time it would run the gate asks again.
-   *
-   * Returns whether an entry was actually removed, so the caller can tell
-   * "withdrawn" from "there was nothing to withdraw" instead of claiming either.
-   */
   forgetTrust(fingerprint: string): boolean {
     assertProfileStorage(this.storePath, this.profile);
-    const heldInMemory = this.sessionApprovals.delete(fingerprint);
-    const data = this.read();
-    const durable = data.approved[fingerprint] !== undefined;
-    if (durable) {
-      const approved = { ...data.approved };
-      delete approved[fingerprint];
-      // A withdrawal that could not be written has not withdrawn anything: the
-      // record on disk still grants it, so saying otherwise would be a claim the
-      // next read contradicts.
-      if (!this.write({ version: 1, approved })) return false;
-    }
-    return heldInMemory || durable;
+    const memory = this.sessionApprovals.delete(fingerprint);
+    try {
+      return updateHookTrust(this.storePath, this.profile, data => {
+        if (!Object.hasOwn(data.approved, fingerprint)) return { value: memory };
+        const approved = { ...data.approved }, sources = { ...data.sources };
+        delete approved[fingerprint]; delete sources[fingerprint];
+        return { value: true, state: { ...data, approved, sources } };
+      });
+    } catch { return false; }
   }
 
-  /** Every remembered approval, so a caller can show what is standing. */
+  /** Withdraw all historical grants for one declaring file, including unknown old hashes at lookup. */
+  forgetSource(sourcePath: string, currentFingerprints: readonly string[] = []): HookWithdrawal {
+    const source = path.resolve(sourcePath), current = new Set(currentFingerprints);
+    try {
+      const removed = updateHookTrust(this.storePath, this.profile, data => {
+        const approved = { ...data.approved }, sources = { ...data.sources };
+        const removed: HookWithdrawal['removed'][number][] = [];
+        for (const [fingerprint, description] of Object.entries(approved)) {
+          if (sources[fingerprint]?.sourcePath !== source && !current.has(fingerprint)) continue;
+          removed.push({ fingerprint, description }); delete approved[fingerprint]; delete sources[fingerprint];
+        }
+        return { value: removed, state: { ...data, approved, sources, withdrawals: { ...data.withdrawals, [source]: randomUUID() } } };
+      });
+      for (const [fingerprint, approval] of this.sessionApprovals) {
+        if (approval.sourcePath === source || current.has(fingerprint)) this.sessionApprovals.delete(fingerprint);
+      }
+      return { status: 'saved', removed };
+    } catch { return { status: 'unverified', removed: [] }; }
+  }
+
   entries(): ReadonlyArray<{ readonly fingerprint: string; readonly description: string }> {
-    try { assertProfileStorage(this.storePath, this.profile); } catch { return []; }
-    return Object.entries(this.read().approved)
-      .map(([fingerprint, description]) => ({ fingerprint, description }));
-  }
-
-  private read(): TrustFile {
-    try {
-      assertProfileStorage(this.storePath, this.profile);
-      const parsed = JSON.parse(fs.readFileSync(this.storePath, "utf8")) as TrustFile;
-      if (parsed?.version === 1 && parsed.approved) return parsed;
-    } catch {
-      // Absent or unreadable means nothing has been approved, which is the safe
-      // reading: an unreadable record must not grant what it cannot show.
-    }
-    return { version: 1, approved: {} };
-  }
-
-  /**
-   * Write the record, reporting whether it reached disk.
-   *
-   * The caller needs the answer: an approval that could not be written still
-   * has to hold for this session, and one that was written must not be shadowed
-   * by a session copy that a later withdrawal cannot reach.
-   */
-  private write(data: TrustFile): boolean {
-    try {
-      assertProfileStorage(this.storePath, this.profile);
-      fs.mkdirSync(path.dirname(this.storePath), { recursive: true });
-      const temporary = `${this.storePath}.tmp-${process.pid}-${Date.now()}`;
-      assertProfileStorage(temporary, this.profile);
-      fs.writeFileSync(temporary, JSON.stringify(data, null, 2), "utf8");
-      assertProfileStorage(this.storePath, this.profile);
-      fs.renameSync(temporary, this.storePath);
-      return true;
-    } catch {
-      // The session approval still holds; only persistence was lost.
-      return false;
-    }
+    try { return Object.entries(readHookTrust(this.storePath, this.profile).approved).map(([fingerprint, description]) => ({ fingerprint, description })); }
+    catch { return []; }
   }
 }

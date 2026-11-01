@@ -11353,3 +11353,14 @@ build d4dda071a4dc/current inputs与两exe哈希另由独立verifier核对。普
 延迟a594884e代码CI41266906555已success；b725f884代码CI41268173094仍in_progress、Watch41268173089 success，不轮询。本批最终核验、提交推送、remote SHA与clean交付由ignored收据另绑，本批CI未观察。
 
 最终五静态门、三份脚本语法、主代理独立证据verifier与diff check均exit0；11份当前TS、8份父源原字节、六组反转恢复、144项最终测试、current build manifest/inputs、两有效原生收据与首场失败均已核对。执行脚本以非可执行文本归档，owned scratch清理，工作树仅本批11份TS与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。
+
+
+### 2026-11-01：历史 hook 授权与待定回答的来源撤回
+
+[addition24.74](features/phase-20-addition.md#2474-历史钩子授权与待定回答遵守来源撤回)继续ADD-59：真实producer旧源34项10失败/24控制确认删除/编辑后恢复旧授权及撤回期间旧回答仍执行。原hook store升级version2记录来源/代次，读取旧version1但不从描述猜来源；精确来源撤回删除全部已归属历史grant并旋转token，未知旧哈希在该来源执行时拒绝，用户/其他项目保留。所有修改复用原lock/atomic owner，严格不可读/损坏状态不覆盖；dispatcher在回答后、锁内记住及spawn前复核，内存fallback也跟随可读代次。复审修正fallback来源推断与非法barrier；主代理及复审补已落盘后cleanup错误/交错撤回不能补回内存的publicationVerified事实。七反转3/16/5/1/1/1/1失败并逐字节还原，最终Node20.3单worker/heap768MiB八文件158通过，五静态门、TS build140da0ee06cb/current inputs通过，118既有docs-source advisory保留。
+
+普通/全屏Node CLI各六回合：真实a批准、删除/编辑后两次原CLI撤回及恢复后Escape、另两次预览等待中从另一实例原command撤回后实际y/a均失效。effect1/1/2/2/2/2、hookGrant1/0/1/0/0/0、普通grant全0，各GET6/POST6、run/end8/failed0，config/auth字节不变、exit0、owned进程及scratch清理。两场均首过，RSS最高466148KiB仅小夹具观察，未单测cooked。只读复审CLEAR、子代理无验证，主代理独立证据另绑；HANDOFF补来源token/历史哈希与已落盘错误边界。历史指纹缺口已补，本批无真实provider/exe/其他平台/多机器锁/跨版本混写/全仓/15套件/20k/judge或性能验收；ADD-59本地验证、原47外部条件延后、goal active。
+
+延迟b725f884代码CI41268173094已success；7d99aa3a代码CI41269474881仍in_progress、Watch41269474742 success，不轮询。本批最终验证与提交推送、remote SHA及clean状态由ignored收据另绑，本批CI未观察。
+
+最终五静态门、三份脚本语法、主代理独立证据verifier与diff check均exit0；9份当前TS、7份父源、七组反转恢复、158项最终测试、current build manifest/inputs及两有效原生收据已核对。执行脚本以非可执行文本归档，owned scratch清理；工作树仅本批9份TS与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。

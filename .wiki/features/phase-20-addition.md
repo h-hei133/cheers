@@ -466,7 +466,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-56 | P0 | 审批的「仅本次」不得变成永久授权 | 21.74、24.68、第一百三十四批 | 本地验证 | 已移除prompt推导授权，普通/全屏实际拒绝及仅本次批准零永久grant；Node/单文件可执行程序的headless print路径已实际验证默认拒绝与显式仅本次，其他平台未验 |
 | ADD-57 | P0 | 审批目标必须精确到实际调用，不得过粗 | 21.75、24.63–24.64、24.66、24.68、第一百三十五批 | 本地验证 | 完整调用及全部execution准备结果绑定，验证续接文本不再授权当前调用；原reader完整预览、容量与绘制期限已验；Node/单文件可执行程序headless实际调用已核对目标、工具结果与终态；desktop原生适配器、其他平台仍缺；MCP仍禁止allow-always |
 | ADD-58 | P0 | 钩子授权按项目隔离，项目拒绝覆盖钩子 | 21.76、24.71、24.73 | 本地验证 | 已补声明快照/工作目录与独占hook授权；通用缓存/档位不代答，其他平台与单文件程序未验 |
-| ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77、24.71、24.73 | 本地验证 | 已补真实profile撤回与通用缓存不复活；已删除/编辑声明留下的历史指纹仍待核查 |
+| ADD-59 | P0 | 钩子授权可撤回，持久授权不被内存副本遮蔽 | 21.77、24.71、24.73–24.74 | 本地验证 | 已补历史/旧格式授权与待定回答撤回、真实profile及通用缓存隔离；其他平台与单文件程序未验 |
 | ADD-60 | P0 | 权限档位不跨项目存活 | 21.78、24.72 | 本地验证 | 已补普通resume/workspace切换、POSIX大小写及不读取权限的项目往返；Node普通/全屏实际重问/拒绝已验，单文件程序及其他平台未验 |
 | ADD-61 | P1 | 权限层与工具体使用同一个围栏判定 | 第一百二十七批 | 本地验证 | — |
 | ADD-62 | P1 | 观察者失败不得吞掉持久事件；`team` 定义名不由模型文本拼成 | 第一百三十七、一百三十九批、24.67 | 本地验证 | 同步/异步及原生取消已验；exe取消、其他平台与真实provider条件未验 |
@@ -6618,3 +6618,30 @@ Node20.3 TS 构建通过，build `1ccb732ef076b7c50d5645fcee59a20360088cfb9f0c5a
 一次延迟读取：a594884e代码CI41266906555已success；父提交b725f884代码CI41268173094仍in_progress、Watch41268173089 success，不以Watch替代代码CI，不反复轮询。本批最终证据与交付另绑，本批CI未观察。
 
 最终五静态门、三份脚本语法、主代理独立证据verifier与diff check均exit0；11份当前TS、8份父源原字节、六组反转恢复、144项最终测试、current build manifest/inputs、两有效原生收据与首场失败均已核对。执行脚本以非可执行文本归档，owned scratch清理，工作树仅本批11份TS与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。
+
+
+### 24.74 历史钩子授权与待定回答遵守来源撤回
+
+继续 ADD-59，落实24.73留下的静态线索。原 `/trust forget` 只枚举磁盘上的当前声明：旧命令获批后删除/编辑声明再撤回，原指纹仍留在 store，恢复旧声明就能运行；无已保存指纹时，等待中的 allow-once/allow-always 回答也不受撤回影响。两条真实 producer（主turn/Git）配原审批handler的34项回归中，新增10项实际失败、原24项通过，确认的是实际 shell marker 增加，不把静态推断当作已复现。
+
+原 [HookTrustStore](../../packages/ts-shell/src/core/hooks/trust.ts) 现在在同一 `hook-trust.json` 中保存指纹的规范化声明来源及其撤回代次；[存储owner](../../packages/ts-shell/src/core/hooks/trust/storage.ts) 使用version2，能读取旧version1哈希→描述，但不从描述反推来源。旧二进制不识别version2会按原合同拒绝已有授权；本批没有旧二进制回退或跨版本混写验收。项目当前只有一个 `.agents/hooks.json` 来源，[loader](../../packages/ts-shell/src/core/hooks/config.ts) 与命令复用同一 `projectHookSource`；撤回按精确的 lexical path.resolve 来源，不用字符串前缀、目录猜测或第二个授权登记库，因此不撤回用户hook、其他项目或前缀邻居的授权。
+
+`forgetSource` 一次锁内删除该来源所有已归属历史指纹及仍能枚举的旧格式当前指纹，即使声明已不存在也持久旋转该来源的撤回token。旧格式不可逆哈希仍可保留给其他来源；被撤回来源的实际执行查询必须带来源，因此未知旧哈希在该来源不再授权，恢复声明也要重新明确批准。不得把旧授权在查询时自动晋升成新归属。新批准绑定当前代次，允许该精确hook重新记住；重复撤回每次都换token，而非仅记一个布尔，避免第二次撤回放过新一轮等待回答。
+
+[dispatcher](../../packages/ts-shell/src/core/hooks/hookDispatcher.ts) 在信任检查/提问前捕获可读来源代次，回答后复核；allow-always写入时还在存储锁内比较expectedRevision，失效就拒绝记录和执行。await已信任分支同样会让出微任务，所以实际spawn前再次核对，新增已授权分支的queueMicrotask撤回回归专门守住这一间隙。已启动的shell命令不属于本批取消范围；专用hook bypass仍为明确绕过，未更改其合同。
+
+所有hook store修改复用既有 `withFileLock` 与 `writeTextFileAtomic`，锁内重读/合并并核对实际发布字节；profile对目标和锁路径的边界保留。不存在的文件与损坏/未知版本/不可读/悬空链接分开，后者不允许覆盖成空库；version2来源必须为规范化绝对路径，撤回token不可为空，否则整体拒绝。保存失败的会话内授权仍受可读来源与代次约束，其他实例撤回能使其失效，锁/读取从未准入的回答不能产生内存fallback。主代理和复审分别发现并补测：无来源的查询漏掉内存授权来源；已实际落盘后锁清理报错可能产生内存副本，另一实例撤回后又被补回。存储层现在携带publicationVerified事实，已核对落盘的授权随后消失时绝不制造fallback。未核实或清理失败的来源撤回输出 unverified，不报告删除数量、不回写旧快照、不把实际可能已保存说成unchanged。
+
+命令不再靠当前声明数量声称整个撤回结果。已知删除数与「Withdrawal saved」独立表达；没有已知存储条目仍明确保存撤回边界，旧版未知哈希不被误称已删除。保留原项目/用户隔离与普通审批策略，不改provider/auth core、scripts、构建行为或默认门。
+
+目标与红灯检查后定向对照只读参考：Codex快照4210c08defe92fe8828f789b6f9fda287ad3709e 的hooks/lib.rs113–125用声明来源/事件/索引建立持久state key，discovery658–714在来源state上比较完整内容hash；config/hook_config.rs24–32保留可独立于当前命令文本管理的hook state。这里保留本项目完整指纹，并增加来源撤回代次，没有复制参考代码。Pi快照f09d01b85e0384647fcab6779d35ab9dabe04be3的已检查资源loader信任seam未提供对应逐hook撤回store，不据此假定等价能力。项目自身project trust storage已使用上述锁/atomic写原语，本批复用同一路径。
+
+最终Node20.3、每条命令显式单worker/heap768MiB、同一nonblocking flock串行八文件158项通过：实际producer34、trust21、来源withdrawal16、lifecycle12、command syntax41、profile sources14、registration14、config6。新增来源测试含跨实例内存失效、写入未确认/锁失败、已落盘后清理失败与交错撤回、旧格式保留/新明确授权、前缀隔离，以及损坏和不规范元数据；原行为基线未放宽。七反转分别为放行旧哈希3、跳过来源撤回16、取消待定回答复核5、去掉spawn前检查1、去掉锁内代次1、重复内存副本1、去掉verified-publication拒绝fallback1项失败；中间与最终代次分别保存恢复哈希，finally逐字节还原后再取得最终158项绿灯。五静态门通过，118条既有docs-source advisory保留。TS build `140da0ee06cb268ad07491cc023d3adc31523d2b6afe90eaf1fde4e1f4b16fb8`，inputs `38811257f1454f7f572b403eaefdafb233f75b4ab036735873bbff01e9e07dca`；不重建单文件程序。
+
+普通/全屏生产Node CLI各实际六回合：a记住；删除声明后通过真实CLI `/trust forget` 撤回，恢复后Escape拒绝；再次a记住；编辑matcher后真实CLI撤回，恢复后Escape拒绝；最后两个原审批预览等待中，从另一profile绑定实例调用同一原 `runTrustCommand` 撤回，再由真实键y/a回答。最后两步是跨实例撤回，不冒充在被modal占用的同一编辑器中执行slash。各六次完整预览均先观察再关闭选择，effect1/1/2/2/2/2、hookGrant1/0/1/0/0/0、普通grant全0；GET6/POST6、run/end8（含两次原生slash）、query.failed0。config/auth字节不变、Ctrl+D exit0、owned PID/start identity非活跃、scratch删除。两场首次均通过，RSS444752/466148KiB只作小夹具观察，60秒/2MiB/100ms采样768MiB守卫未触发；标准relay未单测cooked恢复。
+
+只读委派最终CLEAR，子代理未执行测试/构建/脚本；主代理独立证据核对另记。ignored `.omx/artifacts/phase20-addition-hook-withdrawal/` 保留当前/父源文本、红绿/反转/原生收据及复审记录；临时脚本归档成非可执行文本后清理，没有raw PTY、请求响应或真实凭据。ADD-59保持本地验证，原47外部条件及其他ADD状态不升级；本批补上历史指纹撤回缺口，但无真实provider、单文件程序、其他平台、多机器文件锁/跨版本混写、全仓/15套件/20k PTY、judge或性能验收，goal active。
+
+一次延迟读取：b725f884代码CI41268173094已success；父提交7d99aa3a代码CI41269474881仍in_progress、Watch41269474742 success，不以Watch代替代码CI，不轮询。本批最终证据和交付另绑，本批CI未观察。
+
+最终五静态门、三份脚本语法、主代理独立证据verifier与diff check均exit0；9份当前TS、7份父源、七组反转恢复、158项最终测试、current build manifest/inputs及两有效原生收据已核对。执行脚本以非可执行文本归档，owned scratch清理；工作树仅本批9份TS与三份markdown。提交推送、remote-main和clean状态由ignored delivery收据另绑，本批CI未观察，goal active。

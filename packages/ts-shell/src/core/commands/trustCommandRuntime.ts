@@ -5,7 +5,7 @@ import path from "node:path";
 import { resolveProjectConfigFile } from '../paths/project.js';
 import { projectTrust, TrustWriteError } from "../security/projectTrust.js";
 import { neutraliseForDisplay } from "../text/safety.js";
-import { loadHookDeclarations } from "../hooks/config.js";
+import { loadHookDeclarations, projectHookSource } from "../hooks/config.js";
 import { hookFingerprint, HookTrustStore } from "../hooks/trust.js";
 import { configurationApplicationNotice } from "./configuration.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
@@ -65,18 +65,19 @@ export async function runTrustCommand(
 function forgetHookApprovals(root: string): LocalCommandResult {
   const { hooks } = loadHookDeclarations(root, { includeUser: false });
   const store = new HookTrustStore();
-  const withdrawn = hooks.filter((hook) => hook.sourcePath.startsWith(root))
-    .map((hook) => ({ hook, fingerprint: hookFingerprint(hook) }))
-    .filter(({ fingerprint }) => store.forgetTrust(fingerprint));
+  const withdrawal = store.forgetSource(projectHookSource(root), hooks.map(hookFingerprint));
+  if (withdrawal.status !== 'saved') return { kind: 'local',
+    output: 'Hook withdrawal outcome is unverified. Inspect the trust store and retry.' };
+  const withdrawn = withdrawal.removed;
 
   if (withdrawn.length === 0) {
-    return { kind: "local", output: `No remembered approvals for ${neutraliseForDisplay(root)}. Nothing was withdrawn.` };
+    return { kind: "local", output: `No known stored approvals for ${neutraliseForDisplay(root)}. Withdrawal saved; restored declarations require approval.` };
   }
   return { kind: "local", output: [
     `Withdrew ${withdrawn.length} remembered approval${withdrawn.length === 1 ? "" : "s"} for ${neutraliseForDisplay(root)}.`,
-    ...withdrawn.map(({ hook }) => `  ${hook.event}: ${neutraliseForDisplay(hook.command)}`),
+    ...withdrawn.map(entry => `  ${neutraliseForDisplay(entry.description || entry.fingerprint.slice(0, 12))}`),
     "",
-    "Each hook will be put to you again the next time it would run.",
+    "Withdrawal saved. Restored declarations and legacy grants for this file require approval again.",
   ].join("\n") };
 }
 

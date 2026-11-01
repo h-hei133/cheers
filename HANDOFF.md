@@ -1886,3 +1886,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Trust status/forget works in no-profile unit fixtures but fails inside the actual CLI without withdrawing any hook grant.
 - **Root Cause**: A NUL sentinel home used to exclude user declarations reaches profile home identity validation, which correctly rejects it before project discovery.
 - **Rule**: Express project-only discovery as an explicit loader option that lazily skips user path resolution. Retain default profile validation. Include a captured named-profile command regression and preserve the failed native attempt; do not weaken identity checks or claim withdrawal from command settlement alone.
+
+
+### Source Withdrawal Must Outlive Missing Declarations And Pending Answers
+- **Symptom**: Restoring a removed hook restores its old approval, or an old pending answer executes after a second withdrawal.
+- **Root Cause**: Withdrawal reconstructs grants from current declarations, hash-only legacy grants cannot reveal their source, and a boolean withdrawal loses later generations.
+- **Rule**: Persist source attribution and a changing source withdrawal token in the existing trust store. Legacy lookups must carry source and refuse unknown hashes after that source is withdrawn. Recheck captured tokens after awaits, under the grant mutation lock and before spawn; bind session fallback to a readable current token. Keep unknown legacy retention and confirmed withdrawal distinct from known deletion counts.
+
+### Verified Publication Errors Must Not Recreate Revoked Memory Grants
+- **Symptom**: A durable approval survives another instance's withdrawal through an in-memory fallback after lock cleanup fails.
+- **Root Cause**: A generic catch cannot distinguish failed publication from an already verified write; rereading after another writer's removal can look like permission to create fallback.
+- **Rule**: Carry verified-publication state out of storage failures. A grant that was verified on disk must never acquire a duplicate memory fallback, including when it disappears before the failure handler rereads. Test publish→other-store withdrawal→cleanup error as well as ordinary write failure; report uncertain withdrawal as unverified without rolling back newer state.

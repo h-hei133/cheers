@@ -68,6 +68,10 @@ export interface HookConfigLoadOptions {
   readonly includeUser?: boolean;
 }
 
+export function projectHookSource(workspaceRoot: string): string {
+  return path.join(workspaceRoot, '.agents', 'hooks.json');
+}
+
 /**
  * Every hook declared for this workspace, project and user together.
  *
@@ -84,7 +88,7 @@ export function loadHookDeclarations(
 
   for (const configPath of [
     ...(options?.includeUser === false ? [] : [resolveUserDataFile("hooks.json", options?.homeDir ?? userHomeDir())]),
-    path.join(workspaceRoot, ".agents", "hooks.json"),
+    projectHookSource(workspaceRoot),
   ]) {
     const result = readOne(configPath);
     hooks.push(...result.hooks);

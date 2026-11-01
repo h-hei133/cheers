@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { HookDispatcher } from './hookDispatcher.js';
 import { registerDeclaredHooks } from './registration.js';
-import { HookTrustStore } from './trust.js';
+import { HookTrustStore, hookFingerprint } from './trust.js';
 import { projectTrust } from '../security/projectTrust.js';
 import { resolveUserDataFile } from '../paths/userHome.js';
 import type { HookApprovalRequest } from './types.js';
@@ -53,6 +53,21 @@ function effects(): string[] {
 }
 
 describe('declared hook snapshot ownership', () => {
+  it('rechecks source withdrawal after an already-trusted async gate and before spawn', async () => {
+    const root = path.join(scratch, 'project'), sourcePath = path.join(root, '.agents/hooks.json');
+    declare(root, command('retired')); const dispatcher = new HookDispatcher();
+    const fingerprint = hookFingerprint({ event: 'PreToolUse', matcher: 'bash', command: command('retired'), sourcePath });
+    store.recordTrust(fingerprint, 'retired', sourcePath, '');
+    const trusted = store.isTrusted.bind(store);
+    vi.spyOn(store, 'isTrusted').mockImplementation((fingerprint, source) => {
+      const result = trusted(fingerprint, source);
+      queueMicrotask(() => { store.forgetSource(sourcePath); }); return result;
+    });
+    const approval = vi.fn(async () => 'deny' as const); configure(dispatcher, root, approval);
+    await fire(dispatcher, root);
+    expect(effects()).toEqual([]); expect(approval).not.toHaveBeenCalled(); expect(store.entries()).toEqual([]);
+  });
+
   it('replaces repeated declarations while preserving process hooks exactly once', async () => {
     const root = path.join(scratch, 'project');
     declare(root, command('declared'));

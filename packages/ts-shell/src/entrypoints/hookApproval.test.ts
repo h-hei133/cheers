@@ -76,6 +76,40 @@ function setup(producer: 'invocation' | 'git', options: { scope?: PermissionScop
 }
 
 describe.each(['invocation', 'git'] as const)('%s hook approval ownership', producer => {
+  it.each(['deleted', 'edited'] as const)('withdraws historical approval while the declaration is %s', async change => {
+    declare(); const view = setup(producer); await view.run(); expect(effects()).toEqual(['effect']);
+    if (change === 'deleted') fs.unlinkSync(source); else declare(source, 'different');
+    await runTrustCommand(['forget'], { cwd: root });
+    declare(); view.answer.mockResolvedValue('deny'); await view.run();
+    expect(effects()).toEqual(['effect']); expect(view.answer).toHaveBeenCalledTimes(2);
+    expect(view.store.entries()).toEqual([]);
+  });
+
+  it('blocks restored hash-only legacy approvals while preserving other sources', async () => {
+    declare(); const view = setup(producer);
+    const identity = { event: 'SessionStart', matcher: '*', command, sourcePath: source };
+    const user = { ...identity, sourcePath: resolveUserDataFile('hooks.json') };
+    const other = { ...identity, sourcePath: path.join(scratch, 'other/.agents/hooks.json') };
+    for (const hook of [identity, user, other]) view.store.recordTrust(hookFingerprint(hook));
+    fs.unlinkSync(source); await runTrustCommand(['forget'], { cwd: root });
+    declare(); view.answer.mockResolvedValue('deny'); await view.run();
+    expect(effects()).toEqual([]); expect(view.answer).toHaveBeenCalledOnce();
+    expect(view.store.isTrusted(hookFingerprint(user))).toBe(true);
+    expect(view.store.isTrusted(hookFingerprint(other))).toBe(true);
+    view.answer.mockResolvedValue('allow-always'); await view.run(); await view.run();
+    expect(effects()).toEqual(['effect', 'effect']); expect(view.answer).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['allow-once', 'allow-always'] as const)('retires pending %s after each withdrawal of the same source', async decision => {
+    declare(); const view = setup(producer);
+    await runTrustCommand(['forget'], { cwd: root });
+    let release!: (answer: typeof decision) => void;
+    view.answer.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    const pending = view.run(); await vi.waitFor(() => expect(view.answer).toHaveBeenCalledOnce());
+    await runTrustCommand(['forget'], { cwd: root }); release(decision); await pending;
+    expect(effects()).toEqual([]); expect(view.store.entries()).toEqual([]);
+  });
+
   it('withdraws project hooks inside a captured profile while preserving user hooks', async () => {
     declare();
     const profile = createProfileContext({ name: 'hook-probe', homeDir: path.join(scratch, 'home'), env: {} });
