@@ -7831,3 +7831,47 @@ oh-my-pi 的补充事实：agent loop 本身（`packages/agent/src/agent-loop.ts
 1. 忙碌时保留最后一次 `calibrated` 读数（不因 `busy` 而丢弃）；
 2. 过期时保留 `tokens` 并标记 `stale`，而不是只返回 `{ source: 'stale' }`；
 3. 可选的长期对齐：引入 oh-my-pi 的 epoch 概念，拒绝压缩前的陈旧锚点。
+
+#### 24.97 决定性验证：压缩路径本身是好的
+
+上一轮把三个假设全部证伪，却没能给出方案——这是研究的失败。补做了一次直接验证后，结论变了。
+
+**验证方法**：用真实的 `runTurn`（不是 `planCompaction` 单测）驱动一个完整回合，传入真实的 `CompactionSetup`，观察 `summarize` 是否被调用。
+
+```
+历史 30 条 × 2000 字符，窗口 20000 / reserve 2000 / 输出 1024 / keepRecent 2000
+有 overhead：summarize 被调用 1 次
+无 overhead：summarize 被调用 1 次
+```
+
+**结论：从 `runTurn` 到 `createCompactionStep` 到 `condenseContext` 的整条自动压缩路径完全正常。** `summarize` 被调用，意味着 `planCompaction` 返回了计划、切点存在、阈值判定通过。
+
+#### 这把问题收敛到哪里
+
+排除法得到的结果：
+
+| 已排除 | 依据 |
+|---|---|
+| 压缩步骤没被调用 | 真实 `runTurn` 探针调用 1 次 |
+| `compaction` 为 undefined | 诊断 `compaction=yes tools=18` |
+| `--print` 有独立路径 | 工作流 H1 证伪 |
+| `driveLoop` pre-step 被跳过 | 工作流 H3 证伪 |
+| `withRequestOverhead` 丢失字段 | 展开保留全部字段 |
+
+**唯一剩下的可能：真实 CLI 运行时的 `policy` 数值或 `messages` 内容，与我构造的不同。**
+
+最可能的具体差异（按可能性排序）：
+
+1. **`policy.overhead` 的 getter 返回空**。`withRequestOverhead` 的 `get overhead()` 调用 `currentOverhead()`，而该闭包来自 `preparePromptRequest` 返回的 `currentOverhead`。如果工具池在该时刻是空数组（例如 dynamic 发现尚未加载完），`overhead.tools` 就是 `[]`，阈值判定会少算约 5.4k tokens。
+2. **真实请求的 `messages` 比持久化 transcript 少**。`planCompaction` 收到的是 loop 内的 `context`，而我的单测用的是 transcript 全文。
+3. **`measureContextTokens` 返回了实测值**，且该值小于估算——`--print` 每回合新进程时它返回 undefined，但同一进程内的多步回合会返回实测值。
+
+#### 下一步的确定性验证（一条命令即可）
+
+在 `planCompaction` 入口写一行诊断，记录 `policy.overhead?.tools?.length` 与 `tokensBefore`。若 `tools` 为 0 或 `tokensBefore` 明显小于估算，即命中第 1 项。
+
+这不需要改产品逻辑，只需要一次带诊断的构建与一次运行。
+
+#### 对上一轮表述的更正
+
+上一轮写「`planCompaction` 在真实运行中从未被调用，原因未查明」——**这个判断是错的**。真实 `runTurn` 会调用它。当时的依据是「诊断日志为空」，而那段诊断用了 ESM 里不可用的 `require()`，日志根本没写成功。我把「观测失败」误读成了「行为不存在」。

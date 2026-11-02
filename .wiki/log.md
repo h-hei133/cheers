@@ -11535,3 +11535,13 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 方法论教训单列：用 `require()` 在 ESM 里写诊断导致连续几轮误判；改用 `import` 后只验证了 `startTurn` 却默认 `planCompaction` 被调用过；三个假设全证伪说明假设集漏掉了最直接的那个。下一轮应先建立能区分「未调用」与「调用后拒绝」的观测，再继续推理。
 
 上下文显示的方案已明确：忙碌时保留 `calibrated` 读数、过期时保留 tokens 标 `stale`、可选引入 epoch。本轮仅文档，`verify:docs-drift:strict` 与 `git diff --check` 通过。
+
+### 2026-11-02：更正 auto-compact 的定性并收敛到具体候选
+
+上一轮把三个假设全部证伪却给不出方案，是研究的失败。补做直接验证后结论改变：用真实 `runTurn` 驱动完整回合并传入真实 `CompactionSetup`，`summarize` **被调用 1 次**（有 overhead 与无 overhead 都是）。说明从 `runTurn` 到 `createCompactionStep` 到 `condenseContext` 的自动压缩路径完全正常。
+
+据此排除五项：压缩步骤未调用、`compaction` 为 undefined、`--print` 独立路径、pre-step 被跳过、`withRequestOverhead` 丢字段。唯一剩下的可能是真实 CLI 的 `policy` 数值或 `messages` 内容与构造不同，按可能性排序为：`policy.overhead` 的 getter 返回空（工具池尚未加载）、真实 `messages` 比 transcript 少、`measureContextTokens` 返回更小的实测值。
+
+同时更正上一轮的表述：写「`planCompaction` 在真实运行中从未被调用」是错的——真实 `runTurn` 会调用它；当时的依据是一段用了 ESM 中不可用 `require()` 的诊断，日志没写成功，我把「观测失败」误读成「行为不存在」。
+
+下一步只需在 `planCompaction` 入口写一行诊断记录 `policy.overhead?.tools?.length` 与 `tokensBefore`，即可确认或排除第一项。本轮仅文档与研究探针（已删除），未改产品代码。
