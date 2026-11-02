@@ -11590,3 +11590,5 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 复查旧实现提交 `649c993c662750722390994d601bc8cd1731f3fc`：CI 41476897695 已 completed/failure，失败步骤为 Run Focused & Unit Tests；日志API未返回具体断言，不声称已定位全部旧CI失败。Architecture Watch 41476897415 success。此次提交须独立验证，不沿用旧CI状态。
 
 最终源码验证：五静态门/diff通过；TS build `f50df8479195` 后，隔离本地HTTP五进程验证再次通过，新增`/context`读取不调用模型；最终bundled judge仍为上述partial。护栏末尾空行使首次串行链在diff处短路，修正后继续，未在失败后并发执行后续命令。
+
+交付：实现、测试、合同、状态与护栏提交 `3bc0d7c36bf36385545e4193e19a19803a067f0c` 已推送 `origin/main`，远端refs精确匹配，工作区干净。此处单独文档提交记录交付；代码CI尚未计为通过。
