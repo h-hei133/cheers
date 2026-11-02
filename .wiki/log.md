@@ -11563,3 +11563,5 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 主代理 heap 768 MiB 串行验证直接相关 14 文件 278 项，分小批运行，全部有最终通过输出；五静态门与 diff check 通过；四项反转均红灯且逐字节恢复。TS build `976145d40770`，bundled NormProof 导入解析与循环通过、退出 0，总体 partial：两处既有 interactiveMode 函数上限 finding 未改变。
 
 隔离真实 provider 的 Node CLI 在 16 条消息、一个双 tool 结果组（每份41,727 bytes）、40k窗口中完成自动压缩；exit 0，持久 1 个 compaction 和匹配 commit marker，发布投影接受非空摘要，模型上下文剩8条。首次探针仅检查 prepared label 后作出不足判断，已按两阶段发布合同补验 marker，不以仅有摘要请求或 prepared event 声称成功。脱敏证据见 `.omx/artifacts/phase20-compaction-publication/`。没有真实PTY/20k压测，没有全套回归；Node 20.3/其他平台/interactive/exe/质量/billing/release 未验。
+
+交付：代码/测试/合同/台账提交 `eb6f573290cd5a84ec9fa9a675e1ffff76f2c14f` 已推送 `origin/main`，工作区干净。首次 GitHub API 列表读取 EOF；按精确 SHA 再次读取成功，CI [41448646497](https://github.com/h-hei133/cheers/actions/runs/41448646497) 为 in_progress，Architecture Watch [41448646435](https://github.com/h-hei133/cheers/actions/runs/41448646435) 已 completed/success。Watch workflow success 不改变本地 judge 的 partial 结论；代码 CI 尚不计为通过。
