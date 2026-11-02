@@ -62,6 +62,8 @@ export interface PromptMeasurementIdentity {
   readonly wireHistoryDigest?: string;
   /** How many projected messages carried this measurement. */
   readonly wireMessageCount?: number;
+  /** Estimated text tokens removed from the raw source in this request only. */
+  readonly wireRewriteTokens?: number;
   /** Credential and account state that selected the provider replay shape. */
   readonly replayBinding?: string;
 }

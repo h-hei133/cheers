@@ -11,10 +11,11 @@ import { cleanupAdvisorHarnesses, createAdvisorHarness } from '../../test-utils/
 import { createCompactionProviders } from './compaction.js';
 import { createProviderResources } from './resources.js';
 import { providerRequestTarget } from './requestTarget.js';
-import { markContextUnknown, recordSessionUsage, resetSessionUsage } from '../../observability/usageTelemetry.js';
+import { getSessionUsage, markContextUnknown, recordSessionUsage, resetSessionUsage } from '../../observability/usageTelemetry.js';
 import { historyDigest, requestIdentity } from '../../context/request/identity.js';
 import { outgoingProjection } from '../../turn/messages.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
+import { planCompaction } from '../../session/compaction.js';
 
 vi.mock('../../turn/cacheWarm.js', () => ({ createCacheWarmingRunner: () => ({ stop: vi.fn() }) }));
 
@@ -166,7 +167,7 @@ it('reports main compaction service-tier and provider-owned output refusals with
     reason: 'The selected provider does not accept the configured output limit for compaction.' });
 });
 
-it('reports actual microcompaction evaluator fallback even when the previous provider usage still exists', () => {
+it('calibrates the actual microcompaction evaluator without altering provider usage', () => {
   const input = fixture();
   const resources = createProviderResources({ ...input, sessionManager: setup.manager,
     providerRuntimeBridge: { resolveCredentialSnapshot: () => main } }, input.providers);
@@ -189,9 +190,19 @@ it('reports actual microcompaction evaluator fallback even when the previous pro
   expect(input.runtimeContext.compactionMeasurement?.()).toEqual({ source: 'measured' });
   const tail = Array.from({ length: 4 }, (_, index) => [{ role: 'user' as const, content: `next ${index}` },
     { role: 'assistant' as const, content: 'answer' }]).flat();
-  expect(compaction.policy.measureContextTokens?.([...messages, ...tail], identity)).toBeUndefined();
-  expect(input.runtimeContext.compactionMeasurement?.()).toEqual({ source: 'estimated',
-    reason: 'The compaction evaluator could not use a current provider measurement.' });
+  const corrected = compaction.policy.measureContextTokens?.([...messages, ...tail], identity);
+  expect(corrected).toBeDefined();
+  expect(corrected).toBeLessThan(900);
+  const grown = [...messages, ...tail];
+  // The raw estimate overstates the rewritten prompt. Threshold decisions
+  // must use the calibrated value on both sides of the soft boundary.
+  const calibratedPolicy = { ...compaction.policy, contextWindow: 400, reserveTokens: 0,
+    outputTokens: 1, keepRecentTokens: 20, promptIdentity: identity };
+  expect(planCompaction(grown, calibratedPolicy)).toBeUndefined();
+  expect(planCompaction(grown, { ...calibratedPolicy, contextWindow: 10 })?.tokensBefore).toBe(corrected);
+  expect(compaction.policy.measureContextTokens?.([...messages, ...tail], identity)).toBe(corrected);
+  expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(900);
+  expect(input.runtimeContext.compactionMeasurement?.()).toEqual({ source: 'measured' });
   expect(compaction.policy.measureContextTokens?.(messages, identity)).toBe(900);
   expect(input.runtimeContext.compactionMeasurement?.()).toEqual({ source: 'measured' });
   markContextUnknown(setup.session.id);

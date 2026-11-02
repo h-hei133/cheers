@@ -159,6 +159,7 @@ export function createProviderResources(input: {
             // Said before the request goes out, so the refusal that follows is
             // not the first thing the user hears about it.
             onDeclined: message => { input.renderer.renderLine(message); },
+            onDeadEnd: message => { input.renderer.renderLine(message); },
           }
         : undefined;
       const resources = { compaction, cacheWarming };

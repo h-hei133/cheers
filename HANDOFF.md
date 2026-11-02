@@ -1958,3 +1958,18 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A lock test never reaches its injected resume even though the product acquires the expected lock; switching to a namespace spy then fails with a non-configurable property.
 - **Root Cause**: A default node:fs spy and a namespace import can refer to different Vitest module bindings; native namespace exports cannot be redefined.
 - **Rule**: Inject the competing action through a partial mock of the existing lock owner, call the real lock afterward, and assert both interception and the persisted activation. Do not weaken the lock assertion to make an unexercised test pass.
+
+### Provider Rewrite Corrections Belong To The Measured Prefix
+- **Symptom**: Every preview subtracts old tool pruning from an already compacted provider count, or a closing instruction is charged twice.
+- **Root Cause**: Total projection savings are mistaken for new savings since the measured request; raw and wire counts differ when synthetic messages are appended. Clipped outputs can also deduplicate on a second pass after distinct originals become identical head/tail text.
+- **Rule**: Prove unchanged raw prefix and reconstruct its original wire digest. Subtract only additional reductions within that prefix, estimate the current wire tail, and use an empty tail for an identical complete wire request. Never mutate the provider aggregate. Preserve pruned text across both pruning and deduplication passes; count equality alone does not prove index identity.
+
+### A Compaction Dead End Follows Its Retained Boundary
+- **Symptom**: Appending a small result resumes repeated summaries of the same oversized tool group, or a refused publication leaves automatic compaction paused.
+- **Root Cause**: Whole-tail digests change on every append, and generation is mistaken for accepted publication. History-only progress counts omit fixed prompt cost.
+- **Rule**: Key run-local suppression to the first retained message, arm after accepted publication, and count fixed overhead with a distinct checkpoint allowance. Clear on cut advance or recovery; preserve overflow rescue. Native probes may legitimately publish twice at different cuts, so inspect kept boundaries before classifying repetition.
+
+### Resource Inspection Must Never Print Process Arguments
+- **Symptom**: A memory inspection exposes credentials carried on unrelated process command lines; multiple agent language servers also leave too little RAM for a focused check.
+- **Root Cause**: Full process argv was requested to diagnose memory, and each activated semantic server retains a large TypeScript graph.
+- **Rule**: Display only PID, parent PID, RSS and executable name. Inspect arguments privately only to verify ownership, never print them. Before verification, retire only identity-checked language-server children belonging to this session, then confirm available memory. Do not terminate unrelated services or treat heap limits as a total-process memory limit.

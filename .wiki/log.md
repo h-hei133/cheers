@@ -11565,3 +11565,15 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 隔离真实 provider 的 Node CLI 在 16 条消息、一个双 tool 结果组（每份41,727 bytes）、40k窗口中完成自动压缩；exit 0，持久 1 个 compaction 和匹配 commit marker，发布投影接受非空摘要，模型上下文剩8条。首次探针仅检查 prepared label 后作出不足判断，已按两阶段发布合同补验 marker，不以仅有摘要请求或 prepared event 声称成功。脱敏证据见 `.omx/artifacts/phase20-compaction-publication/`。没有真实PTY/20k压测，没有全套回归；Node 20.3/其他平台/interactive/exe/质量/billing/release 未验。
 
 交付：代码/测试/合同/台账提交 `eb6f573290cd5a84ec9fa9a675e1ffff76f2c14f` 已推送 `origin/main`，工作区干净。首次 GitHub API 列表读取 EOF；按精确 SHA 再次读取成功，CI [41448646497](https://github.com/h-hei133/cheers/actions/runs/41448646497) 为 in_progress，Architecture Watch [41448646435](https://github.com/h-hei133/cheers/actions/runs/41448646435) 已 completed/success。Watch workflow success 不改变本地 judge 的 partial 结论；代码 CI 尚不计为通过。
+
+### 2026-11-02：24.102 R5/R6 计量校正与自动压缩进度守卫
+
+实施最新 R5/R6，细节和设计修正见 `phase-20-addition.md` 24.103。微压缩不再使可证明的 provider 前缀锚点丢失：重建原 wire 身份，只扣已测量前缀的新增改写量，再加当前 wire 尾部。provider usage/成本不改，重复读取不累加扣量；preview、dispatch budget 与 compaction evaluator 同用证明。幂等修复涵盖重复裁剪与裁剪后去重，关闭请求不重复计其附加指令。
+
+自动压缩在接受发布后按完整请求和 checkpoint 独立预算检查进度。首保留消息身份钉住暂停切点，追加消息不解除；切点推进、进入恢复带或新 run 清除。拒绝/未知发布/取消不 arm，最新 tool 配对与正文保持，overflow/手动不套恢复带。两名 `gpt-6.1-sol` 辅助代理只读/分析/编辑，独立复核无阻塞发现，未委派任何验证。
+
+主代理单 worker、heap768MiB、共享flock串行小批验证直接8文件319项，通过；最后新增的新锚点与关闭 preview 分别聚焦通过。3次反转均断言红灯并逐字节恢复，恢复后3文件45项通过。五静态门/diff通过，TS build `de446c26467c` 通过。bundled NormProof exit0，循环/导入 satisfied，总体partial：2处既有interactiveMode函数上限finding。静态 docs 118条不加前缀源码引用仍为advisory，binding/current refs无dangling。
+
+隔离构建Node CLI + 本地HTTP夹具、6条消息：exit0，2次前台请求、read实际1次、暂停提示1次、2个prepared+2个commit marker；keptMessages 4→2证明两次切点不同。同切点抑制有单元证据，该native探针没有微压缩观测。新代码未真实provider/PTY/Node20.3/Windows/macOS/质量/billing复验；未运行全仓/15套件/20k真实PTY。证据 `.omx/artifacts/phase20-context-progress/`，临时脚本与home已清理。
+
+资源检查误打印完整process argv、暴露无关服务凭据，已明确告知用户并建议轮换；后续检查只显示PID/PPID/RSS/name。验证前只终止父身份核对属于本会话的语言服务子进程，释放约4GB，未操作其他服务。此失误与三处探针夹具失败均保留事实，不作为产品成功证据。

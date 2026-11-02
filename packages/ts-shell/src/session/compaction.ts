@@ -10,6 +10,7 @@ import { generateCompaction, CompactionStepUnknown } from './compaction/generati
 import type { CompactionAuthority, CompactionOperationInput, CompactionSource, SummarizeHistory, SummarizeTurnPrefix } from './compaction/contract.js';
 import { CompactionPublicationError } from './compaction/contract.js';
 import { COMPACTION_DECLINE_MESSAGES, CompactionSummaryError } from './compaction/failure.js';
+import { createCompactionProgress } from './compaction/progress.js';
 import { freezeDeep } from '../core/values/freeze.js';
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 
@@ -223,8 +224,8 @@ type CutSearch =
  *
  * When the budget is spent inside a run of tool results — the one case where it
  * cannot be met without starting the tail on a result — the newest legal cut
- * anywhere is used, which keeps less than the budget asked for rather than
- * giving up.
+ * anywhere is used. The newest complete call/result group stays verbatim even
+ * when that group alone exceeds the budget.
  */
 function locateCut(messages: readonly AgentMessage[], keepRecentTokens: number): CutSearch {
   const budgetChars = keepRecentTokens * CHARS_PER_TOKEN;
@@ -656,6 +657,8 @@ export interface CompactionStepOptions {
    * here — a context that still fits is silent by design.
    */
   readonly onDeclined?: (message: string) => void;
+  /** A published threshold compaction did not create enough room to continue compacting. */
+  readonly onDeadEnd?: (message: string) => void;
   readonly onCompact?: (input: {
     readonly summary: string;
     readonly keptMessages: number;
@@ -674,6 +677,7 @@ export function createCompactionStep(
   options: CompactionStepOptions,
 ): (snapshot: NextStepSnapshot, signal?: AbortSignal) => Promise<NextStepUpdate | undefined> {
   const reason = options.reason ?? "threshold";
+  const progress = reason === 'threshold' ? createCompactionProgress(policy, options.onDeadEnd) : undefined;
   // A refusal is reported once per run of identical context, not once per step.
   // The step runs before every model call in a tool loop, so a context that
   // cannot be condensed would otherwise repeat the same sentence on each one.
@@ -684,7 +688,9 @@ export function createCompactionStep(
     }
     // A compaction whose size is known before the summary is requested can be
     // refused by the caller without paying for a summary that gets thrown away.
-    const tokensBefore = planCompaction(snapshot.messages, policy)?.tokensBefore;
+    const prepared = planCompaction(snapshot.messages, policy);
+    if (progress?.blocks(snapshot.messages, prepared?.cut)) return undefined;
+    const tokensBefore = prepared?.tokensBefore;
     if (tokensBefore === undefined) {
       // Declining silently is right when the context still fits: there is
       // nothing to do and nothing to say. It is wrong when the budget is
@@ -753,6 +759,8 @@ export function createCompactionStep(
     }
     if (options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore }) === false) return undefined;
     await options.lifecycle?.after?.({ reason, summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
+    if (signal?.aborted) return undefined;
+    progress?.accepted(condensed.messages, plan.keptMessages);
     return { messages: condensed.messages };
   };
   return step;

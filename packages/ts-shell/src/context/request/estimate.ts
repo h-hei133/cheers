@@ -20,8 +20,13 @@ export function estimatePrompt(messages: readonly AgentMessage[], overhead: Requ
   identity: PromptMeasurementIdentity, usage: SessionUsageTelemetry,
   projected?: number | { readonly tokens: number; readonly method: PromptCountMethod;
     readonly tailContext?: PromptTailContext;
-    /** The measured source prefix as it appears in the current, unmodified wire projection. */
-    readonly prefixIdentity?: Pick<PromptMeasurementIdentity, 'wireHistoryDigest' | 'wireMessageCount'> }): PromptEstimate {
+    /** Current wire tail, including rewrites and any closing instruction. */
+    readonly tailMessages?: readonly AgentMessage[];
+    /** Validated wire identity of the measured prefix, with any proven new text reduction. */
+    readonly prefixIdentity?: Pick<PromptMeasurementIdentity, 'wireHistoryDigest' | 'wireMessageCount'> & {
+      /** Proven additional text reduction within the provider-measured prefix. */
+      readonly rewriteTokensRemoved?: number;
+    } }): PromptEstimate {
   const method = typeof projected === 'object' ? projected.method : 'characters/3.5';
   const projectedTokens = typeof projected === 'number' ? projected : projected?.tokens;
   const previous = usage.lastPromptIdentity;
@@ -30,9 +35,11 @@ export function estimatePrompt(messages: readonly AgentMessage[], overhead: Requ
   const sameWireIdentity = previous?.wireHistoryDigest === identity.wireHistoryDigest
     && previous?.wireMessageCount === identity.wireMessageCount;
   const prefixIdentity = typeof projected === 'object' ? projected.prefixIdentity : undefined;
+  const rewrite = prefixIdentity?.rewriteTokensRemoved ?? 0;
   const sameWirePrefix = prefixIdentity?.wireHistoryDigest !== undefined
     && previous?.wireHistoryDigest === prefixIdentity.wireHistoryDigest
-    && previous?.wireMessageCount === prefixIdentity.wireMessageCount;
+    && previous?.wireMessageCount === prefixIdentity.wireMessageCount
+    && Number.isSafeInteger(rewrite) && rewrite >= 0;
   const comparedReplayIdentity = previous?.replayBinding !== undefined || identity.replayBinding !== undefined;
   const sameReplayIdentity = previous?.replayBinding === identity.replayBinding;
   const compatible = previous && previous.provider === identity.provider && previous.model === identity.model
@@ -53,10 +60,12 @@ export function estimatePrompt(messages: readonly AgentMessage[], overhead: Requ
   const tailContext = typeof projected === 'object' && projected.tailContext
     ? { ...projected.tailContext, endpoint: identity.endpoint, provider: identity.provider, model: identity.model,
       replayBinding: identity.replayBinding } : undefined;
-  const tail = compatible ? estimatePromptTail(messages.slice(count), tailContext) : undefined;
+  const tailMessages = typeof projected === 'object' ? projected.tailMessages : undefined;
+  const tail = compatible ? estimatePromptTail(sameWireIdentity && count === messages.length ? []
+    : tailMessages ?? messages.slice(count), tailContext) : undefined;
   const calibrated = compatible && usage.lastPromptTokens !== undefined && tail !== undefined;
-  const tokens = calibrated ? usage.lastPromptTokens! + tail!
+  const tokens = calibrated ? Math.max(0, usage.lastPromptTokens! - (sameWirePrefix ? rewrite : 0)) + tail!
     : projectedTokens ?? estimateRequestTokens(messages, overhead);
   return { tokens, source: calibrated ? 'calibrated' : 'estimated', identity: { ...identity, historyDigest: historyDigest(messages) },
-    method: calibrated && count < messages.length ? 'characters/3.5' : method };
+    method: calibrated && (count < messages.length || rewrite > 0) ? 'characters/3.5' : method };
 }

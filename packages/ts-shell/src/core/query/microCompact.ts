@@ -28,6 +28,12 @@ const DEFAULT_MAX_OUTPUT_CHARS = 1000;
 const DEFAULT_HEAD_CHARS = 500;
 const DEFAULT_TAIL_CHARS = 500;
 
+/** Only the complete shape emitted by this pruner, including its boundaries. */
+function isPrunedToolContent(content: string, headChars: number, tailChars: number): boolean {
+  const middle = content.slice(headChars, content.length - tailChars);
+  return /^\n\n\[\.\.\. Omitted \d+ lines \/ \d+ characters from older tool output \.\.\.\]\n\n$/.test(middle);
+}
+
 /**
  * Prune single tool output text to Head + Omitted marker + Tail
  */
@@ -39,6 +45,10 @@ export function pruneToolContent(
   if (!content || content.length <= headChars + tailChars + 50) {
     return content;
   }
+
+  // Recognize our complete head/marker/tail shape, rather than any occurrence
+  // of an omission notice in a tool's own output. Reprojection must be stable.
+  if (isPrunedToolContent(content, headChars, tailChars)) return content;
 
   const head = content.slice(0, headChars);
   const tail = content.slice(-tailChars);
@@ -96,6 +106,9 @@ export function microcompactMessages<T extends ChatMessageLike>(
       const imageNotice = hasImages ? "\n[Older tool images omitted; re-read the source if visual content is needed.]" : '';
       const originalLen = typeof msg.content === 'string' ? msg.content.length
         : (msg.content ?? []).reduce((length, block) => length + (block.type === 'image' ? block.data.length : block.text.length), 0);
+      // Distinct original results can have identical clipped head/tail text.
+      // Do not deduplicate those projections on a later pass.
+      if (!hasImages && isPrunedToolContent(content, headChars, tailChars)) return msg;
 
       // Deduplicate identical outputs in older history using full content hash
       let hash = 0;

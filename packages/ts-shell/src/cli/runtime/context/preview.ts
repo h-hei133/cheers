@@ -17,6 +17,8 @@ import { selectModelContext } from '../../../session/context/selection.js';
 import { openingMessage } from '../../../turn/opening.js';
 import { getSessionUsage } from '../../../observability/usageTelemetry.js';
 import { estimatePrompt } from '../../../context/request/estimate.js';
+import { measuredProjectionPrefix } from '../../../turn/measurement.js';
+import { CHARS_PER_TOKEN } from '../../../session/context.js';
 import { historyDigest, requestIdentity } from '../../../context/request/identity.js';
 import { capturePromptSources } from '../../../context/request/sources.js';
 import { assertContextBounds, contextEntryPathWithinRoot } from '../../../context/attachment/entry.js';
@@ -203,13 +205,14 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     catalogModel(publication.catalog, resolution.provider, resolution.model, base)?.tokenizer);
   const usage = getSessionUsage(expected.id);
   const count = usage.lastPromptMessageCount;
-  const prefix = projection.sourceAligned && Number.isSafeInteger(count) && count >= 0 && count <= messages.length
-    ? projection.messages.slice(0, count) : undefined;
+  const prefixIdentity = measuredProjectionPrefix(messages, projection, usage, shape.assistantAfterToolResult);
   const estimate = estimatePrompt(messages, overhead, { provider: resolution.provider, model: resolution.model,
-    endpoint, endpointId, ...assembledIdentity, wireHistoryDigest, wireMessageCount: wireMessages.length, replayBinding },
+    endpoint, endpointId, ...assembledIdentity, wireHistoryDigest, wireMessageCount: wireMessages.length,
+    wireRewriteTokens: Math.ceil(projection.savedChars / CHARS_PER_TOKEN), replayBinding },
   usage, { ...counted, tailContext: { endpoint, provider: resolution.provider, model: resolution.model, replayBinding,
     reasoningReplayField: shape.reasoningReplayField, allowEmptySignature: shape.allowEmptySignature },
-    ...(prefix ? { prefixIdentity: { wireHistoryDigest: historyDigest(prefix), wireMessageCount: prefix.length } } : {}) });
+    tailMessages: wireMessages.slice(count).map(message => ({ ...message, content: message.content ?? '' })),
+    ...(prefixIdentity ? { prefixIdentity } : {}) });
   let suspended = false;
   const verify = () => {
     try {

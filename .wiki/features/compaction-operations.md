@@ -42,6 +42,8 @@ step      = 精确消息 + previousSummary + instructions + history/prefix/merge
 - 同 operation/step 只派发一次；完成材料直接复用，未知段使重启后整个原调度拒绝，不能跳过未知段继续生成。
 - 原有 checkpoint 与各 segment 的确定性文件足迹合并保留，不依赖摘要模型重新列出路径。
 - would-not-shrink、无合法切点、hook 拒绝和取消均不覆盖原历史；overflow 仍沿原有界救援路径。摘要未产出是 failed，自动路径显示安全失败原因；取消与阈值以内保持静默，unknown 不授权重发。
+- 阈值自动压缩在接受发布后检查完整残余请求（含系统与 schema）是否进入恢复带，并单独给 checkpoint 预算。未达标时提示一次，暂停同一保留切点的再次阈值压缩；追加消息不清除，切点推进、进入恢复带或新 run 清除。最新 tool call/result 原样保留。手动与 overflow 不受该暂停限制。
+- provider 锚点只校准原始前缀身份未变、可证明一一索引的文本投影。先重建锚点当时的 wire digest，再扣除当前已测量前缀相对旧 wire 的新增文本削减量，最后加入当前 wire 尾部估算。重复读取不累加削减，也不修改 provider usage/计费；新 provider 结果替换锚点。bridge、关闭附加消息、图片、opaque/foreign replay 或无法证明的重写回退估算；完全相同的关闭请求仍可直接使用其完整计量。校正是实测加字符估算，不冒充精确 tokenizer 数。
 
 ## 3. 原生条件发布
 

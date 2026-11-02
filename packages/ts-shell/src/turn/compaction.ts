@@ -17,6 +17,8 @@ export interface CompactionSetup {
   readonly onCompact: (input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }) => void;
   /** User-visible notice for a refusal or a safely projected automatic failure. */
   readonly onDeclined?: (message: string) => void;
+  /** A safely published threshold compaction left too little context headroom. */
+  readonly onDeadEnd?: (message: string) => void;
   readonly reason?: CompactionReason;
 }
 
@@ -38,6 +40,7 @@ export function turnCompaction(input: {
     summarizeTurnPrefix: setup.summarizeTurnPrefix,
     onCompact: setup.onCompact,
     onDeclined: setup.onDeclined,
+    onDeadEnd: setup.onDeadEnd,
     onError: error => { setup.onDeclined?.(`Compaction failed: ${compactionErrorMessage(error, input.workspaceRoot)}`); },
     authority: setup.authority,
     lifecycle: buildCompactionLifecycle({ hooks: input.hooks, sessionId: input.sessionId,

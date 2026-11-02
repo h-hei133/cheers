@@ -5,7 +5,7 @@ import { toChatMessages, type ChatMessage } from './prompt.js';
 /** Identical source projection for dispatch and local preview. */
 export function outgoingProjection(messages: readonly AgentMessage[], bridge: boolean) {
   const converted = toChatMessages(messages);
-  const { messages: compacted, prunedCount } = microcompactMessages(converted, { keepRecentTurns: 3, maxOutputChars: 1000 });
+  const { messages: compacted, prunedCount, savedChars } = microcompactMessages(converted, { keepRecentTurns: 3, maxOutputChars: 1000 });
   let result: ChatMessage[] = compacted;
   if (bridge) {
     result = [];
@@ -18,6 +18,13 @@ export function outgoingProjection(messages: readonly AgentMessage[], bridge: bo
   }
   return {
     messages: result,
+    savedChars,
+    // Count equality alone misses a removed orphan and an inserted result
+    // cancelling each other. A source-indexed prefix needs every index intact.
+    indexAligned: converted.length === messages.length && result.length === compacted.length
+      && converted.every((message, index) => message.role === messages[index]!.role
+        && message.tool_call_id === messages[index]!.tool_call_id
+        && message.content === messages[index]!.content),
     sourceAligned: converted.length === messages.length && prunedCount === 0 && result.length === compacted.length,
   };
 }

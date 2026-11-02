@@ -8,9 +8,12 @@ import type { AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
 import { parseJsonWithRepair } from "../model-adapters/jsonRepair.js";
-import { clearContextUsage, markContextUnknown, measuredPromptContext, recordSessionUsage, type SessionUsageRecord } from "../observability/usageTelemetry.js";
+import { clearContextUsage, getSessionUsage, markContextUnknown, measuredPromptContext, recordSessionUsage, type SessionUsageRecord } from "../observability/usageTelemetry.js";
 import { captureUsageAttribution } from '../observability/usage/identity.js';
 import { promptTokensFor, requestBudget } from '../context/request/budget.js';
+import { estimatePrompt } from '../context/request/estimate.js';
+import { measuredProjectionPrefix } from './measurement.js';
+import { CHARS_PER_TOKEN } from '../session/context.js';
 import { captureThinkingPreference } from '../core/models/preference.js';
 import { effortOutputFailure } from '../provider/endpoints/effort.js';
 import { effortCapability } from '../core/models/capability.js';
@@ -354,12 +357,24 @@ export function createStepFunction(request: StepRequest): StepFunction {
         historyDigest: messageDigest,
         wireHistoryDigest,
         wireMessageCount: finalMessages.length,
+        wireRewriteTokens: Math.ceil(projection.savedChars / CHARS_PER_TOKEN),
         replayBinding,
       };
-      const measured = options.agentMode || !projection.sourceAligned ? undefined : measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
+      const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
         model: request.provider.model, endpoint, schemaDigest, systemDigest,
         endpointId: usageAttribution.endpointId, historyDigest: messageDigest, wireHistoryDigest, replayBinding });
-      const prompt = promptTokensFor({ messages: budgetMessages, overhead, ...(measured ? { measured } : {}) });
+      const initial = promptTokensFor({ messages: budgetMessages, overhead, ...(measured ? { measured } : {}) });
+      const usage = getSessionUsage(request.sessionId);
+      const prefixIdentity = options.agentMode ? undefined
+        : measuredProjectionPrefix(messages, projection, usage, shape.assistantAfterToolResult);
+      const calibrated = prefixIdentity ? estimatePrompt(messages, overhead, promptIdentity, usage, {
+        tokens: initial.tokens, method: 'characters/3.5', prefixIdentity,
+        tailMessages: budgetMessages.slice(usage.lastPromptMessageCount),
+        tailContext: { endpoint, provider: promptIdentity.provider, model: promptIdentity.model, replayBinding,
+          reasoningReplayField: shape.reasoningReplayField, allowEmptySignature: shape.allowEmptySignature },
+      }) : undefined;
+      const prompt = calibrated?.source === 'calibrated'
+        ? { tokens: calibrated.tokens, measured: true } : initial;
       const budget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
         inputLimit: modelEntry?.inputLimit,
         promptTokens: prompt.tokens, outputTokens: output ?? shape.maxOutputCeiling,

@@ -132,7 +132,7 @@ it('estimates an empty startup through the actual tool projection without provid
   expect(files.map(target => fs.readFileSync(target))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
 });
 
-it('retains a measured tool history anchor until the live wire projection microcompacts its prefix', async () => {
+it('corrects a measured tool history anchor when the live wire projection microcompacts its prefix', async () => {
   const { load, session, layout, target, context, cwd } = fixture({ credential: true });
   resetSessionUsage(session.id);
   const resolution = context.resolveConfigTarget!(context.runtimeConfig)!;
@@ -170,8 +170,54 @@ it('retains a measured tool history anchor until the live wire projection microc
       append({ role: 'assistant', content: `next answer ${index}` });
     }
     const compacted = await load('continue');
-    expect(compacted.estimate.source).toBe('estimated');
+    expect(compacted.estimate.source).toBe('calibrated');
+    expect(compacted.estimate.tokens).toBeLessThan(30_000);
+    const tokens = compacted.estimate.tokens;
     compacted.dispose?.();
+    const repeated = await load('continue');
+    expect(repeated.estimate.tokens).toBe(tokens);
+    expect(getSessionUsage(session.id).lastPromptTokens).toBe(30_000);
+    repeated.dispose?.();
+    // Replace the anchor with the actual newly compacted request. Future reads
+    // must not subtract the old rewrite again from its provider usage.
+    const nextOpening = wire.mock.calls.at(-1)![1].messages.at(-1)!;
+    recordSessionUsage(session.id, { promptTokens: 24_000, promptMessageCount: session.turns.length + 1,
+      promptIdentity: repeated.estimate.identity,
+      attribution: captureUsageAttribution({ provider: target.provider, model: target.model, baseUrl: target.baseUrl }) });
+    append({ ...nextOpening, content: nextOpening.content ?? '' });
+    const anchored = await load('after compacted request');
+    expect(anchored.estimate.source).toBe('calibrated');
+    expect(anchored.estimate.tokens).toBeGreaterThan(24_000);
+    anchored.dispose?.();
+  } finally { resetSessionUsage(session.id); }
+});
+
+it('uses an identical closing preview anchor without charging its synthetic instruction twice', async () => {
+  const { load, context, session, layout, target } = fixture({ credential: true });
+  resetSessionUsage(session.id);
+  const config = { ...context.runtimeConfig, maxTurns: 1 };
+  Object.assign(context, { runtimeConfig: config,
+    configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
+  const call: SessionMessage = { role: 'assistant', content: '', tool_calls: [
+    { id: 'closing-read', type: 'function', function: { name: 'read', arguments: '{}' } },
+  ] };
+  for (const message of [{ role: 'user' as const, content: 'inspect' }, call,
+    { role: 'tool' as const, tool_call_id: 'closing-read', content: 'result' }]) {
+    appendSessionTurn({ session, message, timestamp: new Date().toISOString(),
+      append: event => appendTranscriptEvent(layout.transcriptPath, event),
+      writeMetadata: current => writeSessionMetadataRecord({ session: current, layout }),
+      writeState: current => writeSessionState({ session: current, layout }) });
+  }
+  try {
+    const first = await load('question');
+    expect(first.estimate.identity.wireMessageCount).toBe(session.turns.length + 2);
+    recordSessionUsage(session.id, { promptTokens: 1700, promptMessageCount: session.turns.length + 1,
+      promptIdentity: first.estimate.identity,
+      attribution: captureUsageAttribution({ provider: target.provider, model: target.model, baseUrl: target.baseUrl }) });
+    first.dispose?.();
+    const repeated = await load('question');
+    expect(repeated.estimate).toMatchObject({ source: 'calibrated', tokens: 1700 });
+    repeated.dispose?.();
   } finally { resetSessionUsage(session.id); }
 });
 

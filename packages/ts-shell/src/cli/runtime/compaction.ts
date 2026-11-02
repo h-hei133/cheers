@@ -30,6 +30,7 @@ import { configuredOutputLimit } from '../../provider/request/output.js';
 import { requestServiceTier } from '../../core/models/serviceTier.js';
 import { requestReplayBinding } from '../../provider/request/replay.js';
 import { outgoingProjection } from '../../turn/messages.js';
+import { measuredProjectionPrefix } from '../../turn/measurement.js';
 import { estimatePromptTail } from '../../context/request/tail.js';
 import { summaryBudget } from '../provider/summary/budget.js';
 
@@ -217,14 +218,11 @@ export function buildCompactionWiring(input: {
         const measuredMessageCount = usage.lastPromptMessageCount;
         if (!Number.isSafeInteger(measuredMessageCount) || measuredMessageCount < 0 || measuredMessageCount > messages.length) return undefined;
         if (identity?.historyDigest !== undefined && identity.historyDigest !== recordedHistory) return undefined;
-        if (recorded?.wireHistoryDigest !== undefined) {
-          // A changed projection may shorten earlier tool output or insert a bridge.
-          // An anchor cannot price that replacement as an append-only tail.
-          const projection = outgoingProjection(messages, mainShape.assistantAfterToolResult);
-          if (!projection.sourceAligned || recorded.wireMessageCount !== measuredMessageCount
-            || identity?.wireMessageCount !== recorded.wireMessageCount
-            || historyDigest(projection.messages.slice(0, measuredMessageCount)) !== recorded.wireHistoryDigest) return undefined;
-        }
+        const projection = outgoingProjection(messages, mainShape.assistantAfterToolResult);
+        const prefix = recorded?.wireHistoryDigest !== undefined
+          ? measuredProjectionPrefix(messages, projection, usage, mainShape.assistantAfterToolResult) : undefined;
+        if (recorded?.wireHistoryDigest !== undefined && (!prefix
+          || identity?.wireMessageCount !== recorded.wireMessageCount)) return undefined;
         const historyIdentity = recordedHistory !== undefined
           ? { historyDigest: historyDigest(messages.slice(0, measuredMessageCount)) }
           : {};
@@ -232,10 +230,12 @@ export function buildCompactionWiring(input: {
           endpoint, endpointId, ...(recorded?.replayBinding !== undefined ? { replayBinding } : {}), ...historyIdentity },
           { requireExpectedIdentity: true });
         if (!measured) return undefined;
-        const tail = estimatePromptTail(messages.slice(measuredMessageCount), { provider: provider.providerId,
+        const tailMessages = prefix ? projection.messages.slice(measuredMessageCount)
+          .map(message => ({ ...message, content: message.content ?? '' })) : messages.slice(measuredMessageCount);
+        const tail = estimatePromptTail(tailMessages, { provider: provider.providerId,
           model: provider.model, endpoint, replayBinding, reasoningReplayField: mainShape.reasoningReplayField,
           allowEmptySignature: mainShape.allowEmptySignature });
-        return tail === undefined ? undefined : measured.tokens + tail;
+        return tail === undefined ? undefined : Math.max(0, measured.tokens - (prefix?.rewriteTokensRemoved ?? 0)) + tail;
       },
     },
     summarize: Object.assign((request: Parameters<SummarizeHistory>[0]) => send(historyRequest(request)),
