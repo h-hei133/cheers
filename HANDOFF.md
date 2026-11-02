@@ -1938,3 +1938,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Compaction declines silently with `unsummarized` whenever the user's `maxOutputTokens` is modest, and nothing reaches the user.
 - **Root Cause**: The summarizer request reuses the foreground request's output ceiling, so a 1024-token ceiling truncates the summary; the truncated completion is classified as a failed summary and mapped to a silent decline.
 - **Rule**: Derive the summarizer's ceiling from the summary's own need, and set the segmentation budget from the same number so a segment can never exceed what the request may emit. A decline that means "the summary failed" must be reported; only "nothing worth condensing" may stay silent.
+
+### A Preflight Rejection Must Reach The Caller
+- **Symptom**: Auto-compaction never runs, yet every observable step reports success — the plan is produced, the hook dispatches, and no error appears anywhere.
+- **Root Cause**: The segment scheduler refuses an indivisible tool-call group larger than the segment budget before any request is sent; the step catches that rejection and reports it through an optional callback the turn layer never supplied, so it disappears.
+- **Rule**: Every caller of a step that can decline or refuse must supply both the decline and the error channels, and a summarizer failure must not share a status with "nothing worth condensing". A preflight that can veto an operation is part of the operation's contract, not an internal detail.

@@ -8425,3 +8425,157 @@ maxOutputTokens: summaryRole ? summaryRole.limits.maxOutputTokens
 三步各自独立，缺任何一步都会继续停在「链路通了但没效果」。
 
 **另一个教训**：诊断代码必须用**静态 import**。本轮第一次插桩又写了 `await import('node:fs')` 放进同步函数，构建失败后才发现——这是 HANDOFF 里已记录的坑，第二次犯。
+
+### 24.100 重新研究：auto-compact 的真实阻塞点（2026-11-02）
+
+24.99 给出的三个阻塞点是错的。本节用对抗性复核 + 四路子代理 + 插桩实测重新定位，结论**替换** 24.99.2 与 24.99.3。
+
+#### 24.100.1 先纠正 24.99 的三个错误结论
+
+| 24.99 的判断 | 复核结果 | 证据 |
+|---|---|---|
+| 「摘要被截断（`finish_reason: length`）后静默丢弃」 | **错**。截断确实会返回 `undefined`，但真实运行里摘要请求**根本没发出** | 插桩 `SUMMARY-HTTP`/`SUMMARY-FINISH`/`SUMMARY-EMPTY` 三个分支全部未命中 |
+| 「`metadata.json` 的 inode 让发布必然失败」 | **是真实存在的缺陷，但不是本次阻塞点**。我把 metadata 改成原地写（inode 稳定）后，压缩**仍然没有落地** | 实验构建 `37478fbc95ee`：改后仍无 compaction 事件 |
+| 「`measureContextTokens` 返回 `undefined` 是因为 wire 计数不等」 | **症状正确，归因错误**。它确实返回 `undefined`，但压缩触发**不依赖它**（回退估算足够） | 插桩实测 `plan=FIRES` 时 `measured=undef` |
+
+#### 24.100.2 真正的阻塞点：一个 38KB 的 tool 结果超过了 segment 预算
+
+插桩后的完整因果链（真实 CLI，`contextWindow: 40000`）：
+
+```
+turn.compaction prompt msgs=28 win=40000 res=2000 out=4096 keep=4000 tools=18 sys=1366 measured=undef
+plan=FIRES cut@7 below=false cutReason=no-legal-cut
+CONDENSE-THREW SummaryAdmissionError: Summary request refused: a legal message group exceeds its segment budget.
+```
+
+`createCompactionStep` 在 `planCompaction` 返回计划后，调用 `condenseContext` → `generateCompaction` → `scheduleSegments`。后者按 `legalUnits` 把消息分组：一个 assistant 的 `tool_calls` 与其全部 `tool` 结果构成一个**不可分割单元**（`schedule.ts:10-30`）。然后：
+
+```ts
+// session/compaction/schedule.ts:44-49
+for (const unit of legalUnits(input.messages)) {
+  const candidate = [...current, ...unit];
+  if (fits(candidate)) { current = candidate; continue; }
+  if (!current.length || !fits(unit)) throw new SummaryAdmissionError(
+    'Summary request refused: a legal message group exceeds its segment budget.');
+```
+
+`fits` 的判定是 `estimateTokens(messages) > maxTokens`，而 `maxTokens` 来自 `policy.segmentTokens`（`generation.ts:75`），生产路径**从未设置**，因此恒为 `DEFAULT_SEGMENT_TOKENS = 16_000`（`schedule.ts:7`）。
+
+测试会话里 `read` 工具返回了两个约 38KB 的文件内容，合计约 21,700 tokens——**单个不可分割单元就超过了 16,000**。于是：
+
+1. `planCompaction` 正常返回计划（它只看切点与阈值，不看 segment）；
+2. `PreCompact` 钩子正常派发；
+3. `scheduleSegments` 在**任何请求发出之前**抛出 `SummaryAdmissionError`；
+4. `createCompactionStep` 捕获后调用 `options.onError?.(error)`；
+5. **`turnCompaction` 没有传 `onError`**（`turn/compaction.ts:33-43`），错误被完全吞掉；
+6. 用户什么也看不到，压缩永远不发生。
+
+**这就是「链路每一步都成功、但功能从未生效」的完整解释。** 24.97 里「真实 `runTurn` 探针调用 `summarize` 1 次」之所以成立，是因为那个探针用的是小消息（2000 字符），没有触发 segment 上限。
+
+#### 24.100.3 三家的做法（子代理实测）
+
+**摘要输出预算**
+
+| | 输出上限 | 输入分段 | 截断处理 |
+|---|---|---|---|
+| codex | **不设置**（继承服务端默认） | 无分段；溢出时丢弃最旧条目重试（`compact.rs:314-330`） | `response.incomplete` → 可重试的 `Stream` 错误（`sse/responses.rs:470-477`） |
+| pi | **不设置**，直接用 `model.maxTokens`（`simple-options.ts:44-46`） | 无分段；只有 2000 字符的 tool 结果截断（`utils.ts:94`） | 识别为失败并报错，不重试（`compaction.ts:582-592`） |
+| oh-my-pi | **自己的**：`min(0.8 × reserve, 16384)`（`compaction.ts:923`） | **有**：`planSummaryWindows` 按 token 分窗，逐窗折叠（`compaction.ts:889-911`） | 识别为失败并抛出，尝试下一个压缩方法 |
+| **本项目** | 继承主请求的 `maxOutputTokens` | **有 `scheduleSegments`，但预算写死 16,000 且不可分割单元超限即拒绝** | 返回 `undefined` → `unsummarized` → 静默 |
+
+**关键差异**：omp 是唯一同时做了「独立输出预算」与「输入分窗」的。但即便 omp，它的分窗也是按 token 切的，**没有「单元超限就拒绝整次压缩」的规则**——它用 `clampConversationToBudget` 硬钳单个超大消息（`compaction.ts:869-874`）。
+
+**发布前的陈旧性检查**
+
+| | 检查什么 | 检查失败时 |
+|---|---|---|
+| codex | **什么都不查**。提交时重新取快照并无条件覆盖（`compact.rs:352` → `session/mod.rs:3615`） | 不适用 |
+| pi | **什么都不查**，只看 `signal.aborted`（`agent-session.ts:3256`） | 不适用 |
+| oh-my-pi（推测路径） | **entry id**：`snapshotLeafId` 必须在活动路径上，且其后无 compaction/reset 边界（`session-maintenance.ts:2487-2497`） | 静默丢弃 |
+| oh-my-pi（普通自动路径） | **什么都不查**（`session-maintenance.ts:5970`） | 不适用 |
+| **本项目** | `metadata.json` + `transcript.jsonl` 的 **inode**，加逻辑状态与历史摘要 | 拒绝并提示用户 |
+
+**三家都没有把会话文件身份（mtime/inode/hash）纳入陈旧性检查。** 本项目是唯一这么做的。这既解释了它为什么在真实运行中反复拒绝，也说明这是一个**过度约束**而非缺失。
+
+#### 24.100.4 为什么 codex 和 pi 不需要检查
+
+不是疏忽，是结构不同：
+
+- **codex**：任务串行化。`spawn_task` 会中止上一个任务（`tasks/mod.rs:271-280`），压缩作为 `SessionTask` 运行（`tasks/compact.rs`），期间到达的输入被缓冲到 `TurnState.pending_input` 供**下一回合**使用。没有并发写入，所以无需检查。
+- **pi**：`prompt()` 只在**手动**压缩时阻塞（`agent-session.ts:2131-2135` 检查 `_compactionAbortController`），自动压缩期间可以接受新 prompt。它靠「标题条目是 `firstKeptEntryId` 的后代」这一巧合容忍增长，没有任何强制。
+
+本项目是异步多写入的：`persistSessionUserPromptBarrier`、`markSessionTurnActive`、`saveSessionError`、`appendSessionTurn`、`saveSessionCompleted` 都会在压缩窗口内重写 metadata。
+
+实测时序（真实 CLI，毫秒级）：
+
+```
+092107 BEFORE-PROMPT-START
+092126 META-WRITE  markSessionTurnActive      ← 落在压缩检查内部
+092142 BEFORE-PROMPT-END
+```
+
+`markSessionTurnActive` 的写入**必然**发生在 `beforePrompt` 的摘要窗口内（因为 `sessionRuntime.ts:311` 在收到第一个事件时才标记 turn active，而压缩检查在 `core.prompt` 之前）。
+
+#### 24.100.5 解决方案
+
+**R1（P0）`segmentTokens` 必须有生产值，且超大单元必须被钳制而非拒绝。**
+
+两条都要做：
+
+1. 在 `buildCompactionWiring` 里设置 `policy.segmentTokens`，取值与摘要输出预算同源（见 R2）；
+2. `scheduleSegments` 遇到单个超限单元时**不应抛出**。改为：先尝试 `clampConversationToBudget` 式的截断（把超大 tool 结果按其文本长度截到预算内，保留首尾），再重新分组。omp 的做法（`compaction.ts:869-874`）可直接借鉴。
+
+完成条件：一个含 38KB tool 结果的会话，`generateCompaction` 能产出摘要而不是抛错。
+
+**R2（P0）摘要输出预算独立于主请求，并对齐 segment 预算。**
+
+现状 `cli/runtime/compaction.ts:136,141` 用 `configuredOutputLimit(runtimeConfig, ...)`，即主请求的 `maxOutputTokens`。改为：
+
+```ts
+const summaryOutput = Math.min(Math.max(configuredOutputLimit(...) ?? 0, 8_192), 16_384);
+```
+
+取 omp 的形状（`min(0.8 × reserve, 16384)`）但用本项目已有的 `reserveTokens`。然后 `policy.segmentTokens = summaryOutput`，使「一个分段能装进一次请求的输出预算」成立。
+
+**R3（P0）`turnCompaction` 必须传 `onError`。**
+
+`turn/compaction.ts:33-43` 没有 `onError`，`createCompactionStep` 的 `options.onError?.(error)`（`session/compaction.ts:725`）因此是空操作。这是本轮所有排查卡住的直接原因——错误被完全吞掉。
+
+```ts
+onError: error => renderer.renderLine(`Compaction failed: ${error instanceof Error ? error.message : String(error)}`),
+```
+
+同时把 `unsummarized` 从 `declined` 改为 `failed`：摘要失败不是「无事可做」。
+
+**R4（P1）发布前检查应只覆盖逻辑状态，不覆盖文件 inode。**
+
+三家都不检查文件身份。本项目的 `metadata.json` inode 在压缩窗口内必然变化（见 24.100.4 的时序），因此这项检查在真实运行中**必然失败**。
+
+但**不能简单删除**——`commit.test.ts:305` 明确断言「native resume 重发布未变更的 metadata 后，未知摘要不得重放」。正确做法是：
+
+- `identity` 保留 `transcript.jsonl` 的 inode（追加式写入，稳定）；
+- 保留 `logicalState`、`history`、`sourceActivePath`；
+- **移除** `fileIdentity(layout.metadataPath)`；
+- 把「会话被另一实例接管」的检测移到 `metadata.json` 的**内容摘要**上（标题 + status + createdAt），而不是 inode。
+
+完成条件：`commit.test.ts` 全部通过，且新增一个「生命周期写入发生在摘要窗口内」的用例，断言提交仍成功。
+
+**R5（P2）`measureContextTokens` 的 wire 计数对齐。**
+
+`turn/step.ts:633` 记录 `promptMessageCount: messages.length`（原始），而 `wireMessageCount` 是投影后数量。`cli/runtime/compaction.ts:212-214` 要求两者相等。应在 `projection.sourceAligned` 为真时才要求，否则只校验 `historyDigest` 前缀。
+
+这一项不影响压缩触发（回退估算已足够），只影响 `/context` 与拒绝消息显示的 `estimated` / `measured` 标记。
+
+#### 24.100.6 本轮方法论
+
+24.99.4 记的教训是「把链路通了当成功能可用」。本轮把它推进一步：
+
+**错误在于「用一个失败信号替代了完整因果链」。** 我在 24.99 看到 `FINISH length` 就认定摘要被截断，但那次插桩的构建里 `maxOutputTokens` 恰好是 1024；后来把配置改成 4096 后截断不再发生，我却没有重新验证，而是把旧结论带进了文档。
+
+**本轮有效的做法**：
+
+1. **对抗性复核**：专门派一个子代理去**证伪**自己的三个结论，而不是去确认；
+2. **每一步独立插桩**：`plan` 有没有产生、`capture` 有没有抛错、`condenseContext` 有没有抛错、摘要三个失败分支有没有命中——四个观测点分开记录，才定位到 `SummaryAdmissionError`；
+3. **实验性反证**：把 metadata 改成原地写，验证「inode 是阻塞点」这个假设**不成立**，从而排除它。
+
+**教训**：当「日志显示某步失败」时，先确认那次构建的**配置与其他输入**与当前一致。插桩本身会改变时序与配置，跨构建复用结论是这轮反复的根源。
