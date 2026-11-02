@@ -8647,7 +8647,7 @@ onError: error => renderer.renderLine(`Compaction failed: ${error instanceof Err
 
 #### 验证与真实产物
 
-- 最终聚焦批次 7 文件 **143 项通过**；publication/HTTP/core-shell/turn 的直接消费者另以串行小批覆盖：commit 44、runtime compaction 33、core shell 10、turn session 41。共 **14 个直接相关文件、278 项**已有最终通过输出，未跑全套回归。
+- 最终聚焦批次 7 文件 **143 项通过**；publication/HTTP/core-shell/turn 的直接消费者另以串行小批覆盖：commit 44、runtime compaction 33、core shell 10、turn session 41。共 **13 个直接相关文件、278 项**已有最终通过输出，未跑全套回归。
 - 四项反转均红灯成立：tool projection、独立摘要 output、自动 error callback、metadata inode fence；每次恢复原始字节。错误通知首轮过滤词没有选中目标测试，已改为精确测试名后验证红灯，不把空选通过当证据。
 - 五静态门与 `git diff --check` 通过。TS build `976145d40770`；bundled NormProof 退出 0，导入解析/循环义务 satisfied，但总体 **partial**，既有 `interactiveMode.ts` 与其测试超过函数上限，未提升为全绿。
 - 隔离真实 provider 的 Node `--print --session-id`：16 条合成消息，其中一个 tool group 含两份各 **41,727 bytes** 的结果，40k window、4096 foreground output、2000 reserve、4000 keepRecent。CLI exit 0；持久记录 **1 compaction + 1 匹配 compaction-commit**，`publishedCompactionEvents` 接受 1 份非空摘要，模型上下文缩至 **8 条**，没有可见失败。只保留脱敏计数，不留 provider 原始 body 或 credentials。

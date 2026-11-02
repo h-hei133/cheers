@@ -11560,7 +11560,7 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 
 只读对照当前摘要分窗/截断、发布身份决策；四个 gpt-6.1-sol 辅助代理仅阅读/分析/编辑。独立复核发现的 merge 输入双计、provider-owned 理论 output 上限、shadowed legacy registry 三处边界均修复。
 
-主代理 heap 768 MiB 串行验证直接相关 14 文件 278 项，分小批运行，全部有最终通过输出；五静态门与 diff check 通过；四项反转均红灯且逐字节恢复。TS build `976145d40770`，bundled NormProof 导入解析与循环通过、退出 0，总体 partial：两处既有 interactiveMode 函数上限 finding 未改变。
+主代理 heap 768 MiB 串行验证直接相关 13 文件 278 项，分小批运行，全部有最终通过输出；五静态门与 diff check 通过；四项反转均红灯且逐字节恢复。TS build `976145d40770`，bundled NormProof 导入解析与循环通过、退出 0，总体 partial：两处既有 interactiveMode 函数上限 finding 未改变。
 
 隔离真实 provider 的 Node CLI 在 16 条消息、一个双 tool 结果组（每份41,727 bytes）、40k窗口中完成自动压缩；exit 0，持久 1 个 compaction 和匹配 commit marker，发布投影接受非空摘要，模型上下文剩8条。首次探针仅检查 prepared label 后作出不足判断，已按两阶段发布合同补验 marker，不以仅有摘要请求或 prepared event 声称成功。脱敏证据见 `.omx/artifacts/phase20-compaction-publication/`。没有真实PTY/20k压测，没有全套回归；Node 20.3/其他平台/interactive/exe/质量/billing/release 未验。
 
