@@ -8579,3 +8579,51 @@ onError: error => renderer.renderLine(`Compaction failed: ${error instanceof Err
 3. **实验性反证**：把 metadata 改成原地写，验证「inode 是阻塞点」这个假设**不成立**，从而排除它。
 
 **教训**：当「日志显示某步失败」时，先确认那次构建的**配置与其他输入**与当前一致。插桩本身会改变时序与配置，跨构建复用结论是这轮反复的根源。
+
+#### 24.100.7 复核代理的裁定与本轮实测的交叉验证
+
+派了一个对抗性子代理专门**证伪** 24.99 的三条结论。它的裁定与本轮实测的对照：
+
+| 结论 | 子代理裁定 | 实测 | 谁对 |
+|---|---|---|---|
+| A 摘要截断 | **CONFIRMED**（机制真实，但截断是条件性的，非普遍） | 24.99 的 `FINISH length` 观测属实，但那是 `maxOutputTokens: 1024` 的构建 | 一致 |
+| B metadata inode | **REFUTED**——「正常回合中 capture 与 commit 之间没有 metadata 写入」 | **实测推翻该反驳**：`markSessionTurnActive` 在 capture 后 **13ms** 写入，commit 在 **43 秒**后 MISMATCH | **实测对** |
+| C wire 计数 | **PARTIALLY CORRECT**——真正的首因是 `!projection.sourceAligned`（微压缩裁剪），不是计数不等；且 undefined 不阻止压缩 | 与实测一致（`plan=FIRES` 时 `measured=undef`） | 一致 |
+
+**关于 B 的判定依据（实测时序，真实 CLI）：**
+
+```
+1793621693748 CAPTURE 998801b51def
+1793621693761 META  ...<markSessionTurnActive        ← 13ms 后
+1793621736891 COMMIT MISMATCH                        ← 43 秒后
+```
+
+子代理的推理是「metadata writers fire at message boundaries and run start/end」，因此不在窗口内。但 `sessionRuntime.ts:311` 的 `markTurnActive` 是在**消费第一个查询事件时**触发的，而 `beforePrompt` 的压缩检查已经在 `core.prompt` 之前运行——两者的相对顺序是「压缩检查开始 → 首个查询事件到达 → metadata 写入 → 压缩检查返回」，写入正好落在窗口内。
+
+**这条分歧本身是本轮最有价值的发现**：静态代码推理在这个点上会得出错误结论，因为触发条件藏在事件消费的时机里。
+
+#### 24.100.8 复核代理补充的拒绝分支可达性
+
+子代理枚举了压缩路径上全部 `declined` / `refused` 返回点，并标注了在正常前台回合中的可达性。其中**自动路径上完全静默**的有五个：
+
+| 位置 | 原因 | 可达性 |
+|---|---|---|
+| `session/compaction.ts:608` | `unsummarized` | **是**——摘要返回 undefined |
+| `session/compaction.ts:620` | `would-not-shrink` | 是——检查点加保留尾部不更小 |
+| `session/compaction.ts:586` | `blocked-by-hook` | 仅配置了阻塞钩子 |
+| `session/compaction.ts:603` | `step-unknown` | 仅崩溃/传输失败后 |
+| `session/compaction.ts:535/602/606` | `cancelled` | 仅中止 |
+
+只有两种拒绝会到达用户：无切点/未到阈值（`onDeclined`，`:686-697`）与提交被拒（`:740-742`）。
+
+**这解释了为什么本轮排查如此困难**：真实运行中最常命中的 `unsummarized` 与 `SummaryAdmissionError` 都属于静默类别。
+
+#### 24.100.9 对 R1–R5 的修正
+
+基于复核与实测，方案调整如下：
+
+- **R1（不变，优先级提升）**：`segmentTokens` 必须有生产值，超大单元应钳制而非拒绝。这是本轮实测到的**直接阻塞点**（`SummaryAdmissionError`）。
+- **R2（不变）**：摘要输出预算独立于主请求。
+- **R3（不变，优先级提升）**：`turnCompaction` 必须传 `onError`。复核代理确认 `SummaryAdmissionError` 正是被这个缺失吞掉的。
+- **R4（不变，但理由修正）**：移除 `metadata.json` inode 的依据不是「子代理说它不会变」，而是**实测证明它必然在窗口内变**。同时保留 `commit.test.ts:305` 的语义（resume 后不得重放未知摘要），改用内容摘要而非 inode。
+- **R5（降级为 P2，方向修正）**：锚点失配的**首因是 `!projection.sourceAligned`**（微压缩裁剪旧 tool 输出），不是计数不等。三家参考实现的做法是「校验失败就丢弃锚点、退回估算」——本项目已符合该模式，因此这不是缺陷。若要对齐，方向是 pi 的「把锚点绑定到 entry id」而非比较计数。
