@@ -11577,3 +11577,5 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 隔离构建Node CLI + 本地HTTP夹具、6条消息：exit0，2次前台请求、read实际1次、暂停提示1次、2个prepared+2个commit marker；keptMessages 4→2证明两次切点不同。同切点抑制有单元证据，该native探针没有微压缩观测。新代码未真实provider/PTY/Node20.3/Windows/macOS/质量/billing复验；未运行全仓/15套件/20k真实PTY。证据 `.omx/artifacts/phase20-context-progress/`，临时脚本与home已清理。
 
 资源检查误打印完整process argv、暴露无关服务凭据，已明确告知用户并建议轮换；后续检查只显示PID/PPID/RSS/name。验证前只终止父身份核对属于本会话的语言服务子进程，释放约4GB，未操作其他服务。此失误与三处探针夹具失败均保留事实，不作为产品成功证据。
+
+交付：实现/测试/合同/台账/日志提交 `649c993c662750722390994d601bc8cd1731f3fc` 已推送 `origin/main`，提交后工作区干净。重建当前提交产物 `d4c5588d3a89` 通过。2026-11-03 按该精确 SHA 一次读取：CI [41476897695](https://github.com/h-hei133/cheers/actions/runs/41476897695) 为 in_progress；Architecture Watch [41476897415](https://github.com/h-hei133/cheers/actions/runs/41476897415) completed/success。Watch workflow success 不改变本地 partial，代码 CI 尚未计为通过。此后单独文档提交记录本行，不能把其 CI 混为实现提交结果。
