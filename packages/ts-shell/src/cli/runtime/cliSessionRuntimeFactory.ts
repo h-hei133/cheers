@@ -280,6 +280,7 @@ export function createCliSessionRuntime(input: {
         onPromptIdentity: identity => {
           if (input.runtimeContext.session.id === sessionId) input.runtimeContext.promptIdentity = identity;
         },
+        readPromptIdentity: () => input.runtimeContext.session.id === sessionId ? input.runtimeContext.promptIdentity : undefined,
         ...((continuityContext || handoff || director) ? { continuityContext: [continuityContext, handoff?.contextText, director?.contextText].filter(Boolean).join('\n\n') } : {}),
         onPromptAccepted: handoffAcceptance(handoff, () => {
           input.runtimeContext.transientContextAttachments = undefined;

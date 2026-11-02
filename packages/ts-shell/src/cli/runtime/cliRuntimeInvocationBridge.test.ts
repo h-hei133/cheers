@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { createGitRepoFixture } from "../../test-utils/cliHarness.js";
+import type { PromptIdentitySnapshot } from '../../observability/usage/model.js';
 
 let scratch: string;
 let workspaceRoot: string;
@@ -24,10 +25,14 @@ afterEach(() => {
 });
 
 /** A synthetic run, which starts its turn without a readiness wait. */
-function start(overrides: { readonly providerModeEnv?: string; readonly onPromptAccepted?: () => void } = {}) {
+function start(overrides: { readonly providerModeEnv?: string; readonly onPromptAccepted?: () => void;
+  readonly readPromptIdentity?: () => PromptIdentitySnapshot | undefined;
+  readonly onPromptIdentity?: (identity: PromptIdentitySnapshot) => void } = {}) {
   return streamCliRuntimePrompt({
     prompt: "hello",
     onPromptAccepted: overrides.onPromptAccepted,
+    readPromptIdentity: overrides.readPromptIdentity,
+    onPromptIdentity: overrides.onPromptIdentity,
     sessionId: "sess_bridge",
     workspaceRoot,
     signal: new AbortController().signal,
@@ -44,6 +49,19 @@ function start(overrides: { readonly providerModeEnv?: string; readonly onPrompt
 }
 
 describe("CLI runtime invocation bridge", () => {
+  it('forwards the live session identity reader and publisher', async () => {
+    const previous = { provider: 'fixture', model: 'm', historyDigest: 'history', wireHistoryDigest: 'wire',
+      wireMessageCount: 1, replayBinding: 'replay' };
+    const readPromptIdentity = vi.fn(() => previous);
+    const published: PromptIdentitySnapshot[] = [];
+    const run = start({ readPromptIdentity, onPromptIdentity: identity => { published.push(identity); } });
+    for await (const _event of run.events) { /* drain the real synthetic turn */ }
+    expect(readPromptIdentity).toHaveBeenCalledOnce();
+    expect(published[0]).toMatchObject(previous);
+    expect(published[0]?.schemaDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(published[0]?.systemDigest).toMatch(/^[a-f0-9]{64}$/);
+  });
+
   it("forwards admission to the kernel exactly once", async () => {
     let accepted = 0;
     const run = start({ onPromptAccepted: () => { accepted++; } });

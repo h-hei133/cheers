@@ -346,6 +346,7 @@ export class InteractiveMode {
       if (text) this.options.sessionRuntime.input?.()?.followUp(text, `background:${task.id}`);
     });
     this.promptContext = createContextController({
+      scope: () => JSON.stringify([this.options.runtimeContext.session.id, this.options.runtimeContext.session.createdAt]),
       identity: () => this.busy || this.stopped || this.pickerPending ? undefined : JSON.stringify([
         this.options.runtimeContext.session.id, this.options.runtimeContext.session.createdAt, this.options.runtimeContext.cwd,
         this.options.runtimeContext.configuration.current.revision, this.state.editor.textRevision,
@@ -372,7 +373,7 @@ export class InteractiveMode {
             permissionScope: this.options.sessionRuntime.getPermissionScope(),
             queued: this.queue.length + (this.options.sessionRuntime.input?.()?.pending().followUps.length ?? 0),
             peers: readPeerSessionCount(this.options.runtimeContext.session.id, { refresh: !this.pager.active && !this.overlay.active }),
-            ...(!this.busy ? { promptContext: this.promptContext.read() } : {}),
+            promptContext: this.promptContext.read(),
           }),
         statusItems: () => {
           const revision = this.options.runtimeContext.configuration.current.revision;
@@ -507,6 +508,8 @@ export class InteractiveMode {
     for (const diagnostic of this.options.runtimeContext.runtimeConfig.configDiagnostics) {
       this.state.transcript.append(textBlock("notice", `Warning: ${diagnostic}`));
     }
+    const compactionUnavailable = this.options.runtimeContext.compactionUnavailable?.();
+    if (compactionUnavailable) this.state.transcript.append(textBlock('notice', `Auto-compaction unavailable: ${compactionUnavailable}`));
     // A tab among many needs to say which conversation it holds. The title is
     // session and project — the two things that identify a conversation — and
     // it is written once, here: the terminal owns it after that.
@@ -1333,6 +1336,8 @@ export class InteractiveMode {
         projectRoot: this.options.runtimeContext.projectRoot,
         runtimeConfig: this.options.runtimeContext.runtimeConfig,
         resolveConfigTarget: this.options.runtimeContext.resolveConfigTarget,
+        compactionUnavailable: this.options.runtimeContext.compactionUnavailable,
+        compactionMeasurement: this.options.runtimeContext.compactionMeasurement,
         ...(this.options.runtimeContext.promptIdentity
           ? { promptIdentity: this.options.runtimeContext.promptIdentity }
           : {}),

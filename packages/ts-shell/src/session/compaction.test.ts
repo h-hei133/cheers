@@ -409,7 +409,8 @@ describe("a decline is reported only when the budget is already spent", () => {
   // Silent is right while the context still fits: there is nothing to do. It is
   // wrong once the budget is spent and no cut can be made, because the request
   // then goes out and the provider refuses it with no explanation.
-  const policy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100_000 };
+  const policy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100_000,
+    overhead: { systemPrompt: 's'.repeat(4_000) } };
 
   it("reaches the same message through the step the runtime actually calls", async () => {
     // The unit assertions above call the helper directly. This one goes through
@@ -420,19 +421,19 @@ describe("a decline is reported only when the budget is already spent", () => {
       summarize: async () => "summary",
       onDeclined: message => { declined.push(message); },
     });
-    await step({ toolResults: [], messages: longHistory(4) }, undefined);
+    await step({ toolResults: [], messages: history(4) }, undefined);
     expect(declined).toHaveLength(1);
     expect(declined[0]).toContain("fits the recent tail");
   });
 
   it("says nothing while the context fits", () => {
-    expect(compactionRefusal([userMessage("short")], policy)).toBeUndefined();
+    expect(compactionRefusal([userMessage("short")], { ...policy, overhead: undefined })).toBeUndefined();
   });
 
   it("explains an over-budget context whose history fits the kept tail", () => {
     // A kept tail larger than the whole conversation leaves no cut to make,
     // which is the state that used to be silently treated as "nothing to do".
-    const messages = longHistory(4);
+    const messages = history(4);
     const refusal = compactionRefusal(messages, policy);
     expect(refusal).toBeDefined();
     expect(refusal).toContain("fits the recent tail");
@@ -445,13 +446,14 @@ describe("a refusal is reported once per identical context", () => {
   it("does not repeat the same sentence on every step", async () => {
     // The step runs before every model call in a tool loop. Without a guard the
     // user would see the same explanation on each one.
-    const policy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100_000 };
+    const policy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100_000,
+      overhead: { systemPrompt: 's'.repeat(4_000) } };
     const declined: string[] = [];
     const step = createCompactionStep(policy, {
       summarize: async () => "summary",
       onDeclined: message => { declined.push(message); },
     });
-    const messages = longHistory(4);
+    const messages = history(4);
     const snapshot = { toolResults: [], messages } as const;
 
     await step(snapshot, undefined);
@@ -464,17 +466,18 @@ describe("a refusal is reported once per identical context", () => {
   it("stays quiet when only the token count grows", async () => {
     // The message embeds a token count that grows with every tool result, so a
     // text-keyed guard would report again on each step of a long loop.
-    const policy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100_000 };
+    const policy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100_000,
+      overhead: { systemPrompt: 's'.repeat(4_000) } };
     const declined: string[] = [];
     const step = createCompactionStep(policy, {
       summarize: async () => "summary",
       onDeclined: message => { declined.push(message); },
     });
-    const base = longHistory(4);
+    const base = history(4);
 
     await step({ toolResults: [], messages: base }, undefined);
-    await step({ toolResults: [], messages: [...base, userMessage("extra ".repeat(200))] }, undefined);
-    await step({ toolResults: [], messages: [...base, userMessage("more ".repeat(400))] }, undefined);
+    await step({ toolResults: [], messages: [...base, userMessage("extra ".repeat(20))] }, undefined);
+    await step({ toolResults: [], messages: [...base, userMessage("more ".repeat(40))] }, undefined);
 
     expect(declined).toHaveLength(1);
   });
@@ -627,7 +630,8 @@ describe("a compaction that would not shrink the context", () => {
     // replace nothing and still cost its own size.
     const condensed = await condenseContext({
       messages: brief(),
-      policy: { contextWindow: 30, reserveTokens: 10, keepRecentTokens: 10_000 },
+      policy: { contextWindow: 1_000, reserveTokens: 10, keepRecentTokens: 10_000 },
+      force: true,
       summarize: async () => "summary",
     });
     expect(condensed).toEqual({ status: "declined", reason: "fits-budget" });
@@ -723,5 +727,17 @@ describe("repeated compaction", () => {
     if (condensed.status !== "condensed") throw new Error("unreachable");
     expect(condensed.summary).toBe("should not be called");
     expect(summarize).toHaveBeenCalledOnce();
+  });
+
+  it("reports a refused publication after a summary was generated", async () => {
+    const messages: AgentMessage[] = Array.from({ length: 6 }, (_, index) => ({ role: index % 2 ? "assistant" : "user", content: `${index} ${"x".repeat(500)}` }));
+    const refused = vi.fn();
+    const step = createCompactionStep({ contextWindow: 900, reserveTokens: 100, outputTokens: 100, keepRecentTokens: 100 }, {
+      summarize: async () => "older work", onCompact: () => {}, onDeclined: refused,
+      authority: { capture: () => ({ sessionId: "refused-publication", identity: "same", history: messages }),
+        commit: () => ({ status: "refused" as const, reason: "session publication changed" }) },
+    });
+    await expect(step({ messages, stepCount: 1 })).resolves.toBeUndefined();
+    expect(refused).toHaveBeenCalledWith("Automatic compaction was not published: session publication changed");
   });
 });

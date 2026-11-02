@@ -4,7 +4,8 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { previewContext } from './preview.js';
 import { projectSessionFileLayout } from '../../../session/store/sessionFileLayout.js';
-import { writeSessionRecord } from '../../../session/store/sessionStore.js';
+import { writeSessionMetadataRecord, writeSessionRecord } from '../../../session/store/sessionStore.js';
+import { writeSessionState } from '../../../session/store/sessionStateStore.js';
 import type { Session } from '../../../session/schema/sessionRecord.js';
 import type { SessionMessage } from '../../../session/schema/sessionMessage.js';
 import type { SessionManager } from '../../../session/SessionManager.js';
@@ -16,7 +17,7 @@ import { buildPromptWithFutureTurnInjections } from '../../../core/shell/session
 import type { CliMcpGateway } from '../../../entrypoints/cliMcpModule.js';
 import { readContextEntry } from '../../../context/attachment/entry.js';
 import { installCommandGate } from '../../data/access.js';
-import { appendTranscriptEvent } from '../../../session/transcript/sessionTranscript.js';
+import { appendSessionTurn, appendTranscriptEvent } from '../../../session/transcript/sessionTranscript.js';
 import { createMessageTranscriptEvent } from '../../../session/sessionEventCodec.js';
 import { requestIdentity } from '../../../context/request/identity.js';
 import { capturePromptSources } from '../../../context/request/sources.js';
@@ -44,7 +45,8 @@ import { gitCommandFor, gitWorkbenchFor, installGitRuntime } from '../git.js';
 import { gitFixture, gitGate, stubGitEnvironment } from '../../../test-utils/git.js';
 import { createStepFunction } from '../../../turn/step.js';
 import { runTurn } from '../../../turn/session.js';
-import { getSessionUsage, resetSessionUsage } from '../../../observability/usageTelemetry.js';
+import { getSessionUsage, recordSessionUsage, resetSessionUsage } from '../../../observability/usageTelemetry.js';
+import { captureUsageAttribution } from '../../../observability/usage/identity.js';
 import type { HookDispatcher } from '../../../core/hooks/hookDispatcher.js';
 import { configuredOutputLimit } from '../../../provider/request/output.js';
 import type { ToolDefinition } from '../../../tools/types.js';
@@ -128,6 +130,49 @@ it('estimates an empty startup through the actual tool projection without provid
   expect(result.estimate.identity.endpointId).toMatch(/^[a-f0-9]{64}$/);
   expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
   expect(files.map(target => fs.readFileSync(target))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
+});
+
+it('retains a measured tool history anchor until the live wire projection microcompacts its prefix', async () => {
+  const { load, session, layout, target, context, cwd } = fixture({ credential: true });
+  resetSessionUsage(session.id);
+  const resolution = context.resolveConfigTarget!(context.runtimeConfig)!;
+  const requestTarget = providerRequestTarget({ workspaceRoot: cwd, sessionId: session.id, resolution,
+    baseUrl: target.baseUrl, endpoint: 'openai-compatible' });
+  const history: SessionMessage[] = [
+    { role: 'user', content: 'inspect' },
+    { role: 'assistant', content: '', origin: { provider: target.provider, model: target.model, replayBinding: requestTarget.replayBinding },
+      tool_calls: [{ id: 'read-1', type: 'function', function: { name: 'read', arguments: '{}' } }] },
+    { role: 'tool', content: 'result '.repeat(600), tool_call_id: 'read-1' },
+  ];
+  const append = (message: SessionMessage) => appendSessionTurn({ session, message,
+    timestamp: new Date(Date.parse(session.createdAt) + session.turns.length * 1000).toISOString(),
+    append: event => appendTranscriptEvent(layout.transcriptPath, event),
+    writeMetadata: next => writeSessionMetadataRecord({ session: next, layout }),
+    writeState: next => writeSessionState({ session: next, layout }) });
+  for (const message of history) append(message);
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+  try {
+    const first = await load('question');
+    const sent = wire.mock.calls.at(-1)![1].messages;
+    recordSessionUsage(session.id, { promptTokens: 30_000, promptMessageCount: sent.length,
+      promptIdentity: first.estimate.identity,
+      attribution: captureUsageAttribution({ provider: target.provider, model: target.model, baseUrl: target.baseUrl }) });
+    const opening = sent.at(-1)!;
+    if (typeof opening.content !== 'string') throw new Error('Expected a text opening.');
+    append({ ...opening, content: opening.content });
+    first.dispose?.();
+    const next = await load('continue');
+    expect(next.estimate.source).toBe('calibrated');
+    expect(next.estimate.tokens).toBeGreaterThan(30_000);
+    next.dispose?.();
+    for (let index = 0; index < 4; index++) {
+      append({ role: 'user', content: `next question ${index}` });
+      append({ role: 'assistant', content: `next answer ${index}` });
+    }
+    const compacted = await load('continue');
+    expect(compacted.estimate.source).toBe('estimated');
+    compacted.dispose?.();
+  } finally { resetSessionUsage(session.id); }
 });
 
 it.each(['legacy', 'provider', 'session'] as const)('previews the bound %s session tier ahead of independently stored defaults', async scope => {

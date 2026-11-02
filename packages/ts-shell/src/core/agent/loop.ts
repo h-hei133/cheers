@@ -134,7 +134,7 @@ export async function runAgentLoop(
   config: AgentLoopConfig,
   emit: AgentEventSink,
   signal: AbortSignal | undefined,
-  options: { readonly skipInitialSteeringPoll?: boolean } = {},
+  options: { readonly skipInitialSteeringPoll?: boolean; readonly skipInitialPreparation?: boolean } = {},
 ): Promise<AgentMessage[]> {
   const produced: AgentMessage[] = [];
   const context: AgentMessage[] = [...seed, ...prompts];
@@ -148,7 +148,7 @@ export async function runAgentLoop(
     produced.push(prompt);
   }
   try {
-    await driveLoop(context, produced, config, emit, signal, !options.skipInitialSteeringPoll);
+    await driveLoop(context, produced, config, emit, signal, !options.skipInitialSteeringPoll, !options.skipInitialPreparation);
   } finally {
     // Flushed even when the turn failed: a run that fell over is exactly the one
     // whose numbers someone will want, and dropping them would make the metrics
@@ -242,6 +242,7 @@ async function driveLoop(
   emit: AgentEventSink,
   signal: AbortSignal | undefined,
   seedSteering: boolean,
+  prepareInitial = true,
 ): Promise<void> {
   const hooks: ToolHooks | undefined =
     config.beforeToolCall || config.afterToolCall
@@ -258,7 +259,7 @@ async function driveLoop(
   // out, the provider refused it, and the rescue path then declined for the
   // same reasons the scheduled one would have. Every other implementation of
   // this loop checks here for exactly that reason.
-  if (config.prepareNextStep) {
+  if (prepareInitial && config.prepareNextStep) {
     const first = await config.prepareNextStep({ toolResults: [], messages: context }, signal);
     if (first?.messages) {
       replaceContext(context, first.messages);

@@ -25,6 +25,7 @@ const descriptions = {
   maxOutputTokens: ['Request', 'Output token limit', 'Requested output token budget; model limits still apply'],
   contextWindow: ['Context', 'Context window', 'Override model window resolution; unset to use the model catalogue'],
   reserveTokens: ['Context', 'Reserved tokens', 'Tokens reserved outside the usable input budget'],
+  keepRecentTokens: ['Context', 'Recent tokens', 'Conversation tokens to retain during compaction; model token budgets take precedence'],
   modelTokenBudgets: ['Context', 'Model token budgets', 'JSON object mapping provider/model identifiers to reserveTokens and keepRecentTokens'],
   instructionBudgetBytes: ['Context', 'Instruction bytes', 'Project instruction byte budget; 0 disables loading'],
   cacheWarming: ['Session', 'Cache warming', 'Idle warming can incur charges without a new prompt'],

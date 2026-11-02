@@ -9,12 +9,9 @@ import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import {
   condenseContext,
-  createCompactionStep,
-  type CompactionPolicy,
-  type CompactionReason,
-  type SummarizeHistory,
-  type SummarizeTurnPrefix,
 } from "../session/compaction.js";
+import { turnCompaction, type CompactionSetup } from './compaction.js';
+export type { CompactionSetup } from './compaction.js';
 import { openingMessage } from './opening.js';
 import { buildCompactionLifecycle } from "../core/shell/compaction.js";
 import { concludeRun, TurnProjection } from "./projection.js";
@@ -39,26 +36,6 @@ import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
  * here, so the kernel stays a pure loop and the shell keeps reading the event
  * stream it always has.
  */
-
-export interface CompactionSetup {
-  readonly authority?: import('../session/compaction/contract.js').CompactionAuthority;
-  readonly policy: CompactionPolicy;
-  readonly summarize: SummarizeHistory;
-  /**
-   * Summarizes the opening of a turn the cut landed inside of.
-   *
-   * Only used when one turn is larger than the whole budget, which is the case
-   * the history summary cannot cover: its request would otherwise be dropped
-   * along with everything else.
-   */
-  readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
-  /** A checkpoint was written into the context; record it durably. */
-  readonly onCompact: (input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }) => void;
-  /** An automatic compaction that could not help, described for the user. */
-  readonly onDeclined?: (message: string) => void;
-  /** Why this compaction is allowed to run. Manual runs say so. */
-  readonly reason?: CompactionReason;
-}
 
 export interface TurnOptions {
   readonly configScope?: ToolGateOptions['configScope'];
@@ -222,6 +199,8 @@ export function runTurn(options: TurnOptions): TurnRun {
   const projection = new TurnProjection(opening);
   const toolPool = () => options.toolSnapshot?.() ?? options.tools;
   const hooks = createToolHooks(gate, toolPool);
+  const compaction = options.compaction ? turnCompaction({ setup: options.compaction,
+    sessionId: options.sessionId, workspaceRoot: options.workspaceRoot, hooks: options.hooks }) : undefined;
   const core = new AgentCore({
     initialState: { messages: options.history as readonly AgentMessage[] },
     // Absent means the kernel's own default, which is the same value the config
@@ -237,25 +216,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     afterToolCall: hooks.afterToolCall,
     streamStep: createTurnRequest(options, projection, channel),
     shouldStopAfterStep: () => projection.stepCount >= options.maxSteps,
-    prepareNextStep: options.compaction
-      ? createCompactionStep(options.compaction.policy, {
-          summarize: options.compaction.summarize,
-          sessionId: options.sessionId,
-          summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
-          onCompact: options.compaction.onCompact,
-          ...(options.compaction.onDeclined ? { onDeclined: options.compaction.onDeclined } : {}),
-          authority: options.compaction.authority,
-          // One builder for both entry points, so a hook sees the same event
-          // with the same reason whether the window filled up or the user asked.
-          lifecycle: buildCompactionLifecycle({
-            hooks: options.hooks,
-            sessionId: options.sessionId,
-            workspaceRoot: options.workspaceRoot,
-            reason: options.compaction.reason ?? "threshold",
-          }),
-          reason: options.compaction.reason ?? "threshold",
-        })
-      : undefined,
+    prepareNextStep: compaction?.beforeStep,
   });
 
   const queues = core.pendingQueues;
@@ -313,7 +274,9 @@ export function runTurn(options: TurnOptions): TurnRun {
     options.signal.addEventListener("abort", onAbort, { once: true });
     try {
       options.onPromptAccepted?.();
-      await core.prompt(opening);
+      if (compaction) core.state.messages = [...await compaction.beforePrompt(core.state.messages, opening, options.signal)];
+      if (options.signal.aborted) return;
+      await core.prompt(opening, { skipInitialPreparation: Boolean(compaction) });
       // Input that arrived as the run was ending is still owed a run: the
       // kernel restarts from its queues rather than leaving them behind.
       while (!options.signal.aborted && ((await recoverOverflow()) || core.hasQueuedMessages())) {

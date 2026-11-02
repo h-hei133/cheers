@@ -98,6 +98,10 @@ export interface CommandContext {
   readonly getToolPool?: (signal?: AbortSignal) => Promise<ReadonlyMap<string, ToolDefinition>>
   /** Current effective prompt identity, when the host can prove it. */
   readonly promptIdentity?: PromptIdentitySnapshot
+  /** Read-only prerequisite diagnosis from the active compaction owner. */
+  readonly compactionUnavailable?: () => string | undefined
+  /** Latest bound compaction evaluator decision, separate from historical usage. */
+  readonly compactionMeasurement?: () => { readonly source: 'measured' | 'estimated'; readonly reason?: string } | undefined
   /** False for scripted invocations; omitted by callers without a CLI host. */
   readonly interactive?: boolean
   /**

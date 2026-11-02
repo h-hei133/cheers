@@ -13,7 +13,7 @@ import { providerModelTransport } from '../../provider/request/transport.js';
 import { endpointShape, type EndpointKind } from '../../provider/endpoints/index.js';
 import { resolveRequestShape, type ResolvedRequestShape } from '../../core/models/requestShape.js';
 import { KEEP_RECENT_TOKENS, type CompactionPolicy, type SummarizeHistory, type SummarizeTurnPrefix } from '../../session/compaction.js';
-import { DEFAULT_RESERVE_TOKENS, estimateTokens } from '../../session/context.js';
+import { DEFAULT_RESERVE_TOKENS } from '../../session/context.js';
 import { historyDigest } from '../../context/request/identity.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import { prepareCompactionMessages, requestCompactionSummary, type CompactionChatMessage, type CompactionProvider as SummaryProvider } from '../../core/query/compaction/summarize.js';
@@ -28,6 +28,9 @@ import type { SessionManager } from '../../session/SessionManager.js';
 import type { ConfigPublication, ConfigState } from '../../config/state.js';
 import { configuredOutputLimit } from '../../provider/request/output.js';
 import { requestServiceTier } from '../../core/models/serviceTier.js';
+import { requestReplayBinding } from '../../provider/request/replay.js';
+import { outgoingProjection } from '../../turn/messages.js';
+import { estimatePromptTail } from '../../context/request/tail.js';
 
 /** Bind the captured publication and native session owner at each compaction entry point. */
 export function nativeCompactionAuthority(input: {
@@ -62,6 +65,7 @@ const windowLogger = createComponentLogger('model-window')
 
 export interface CompactionProvider extends SummaryProvider {
   readonly providerId: string;
+  readonly replayBinding?: string;
 }
 
 interface CompactionWiring {
@@ -95,6 +99,7 @@ export function buildCompactionWiring(input: {
     readonly shape?: ResolvedRequestShape;
     readonly credentialId?: string;
     readonly credentialGeneration?: string;
+    readonly replayBinding?: string;
   };
   readonly runtimeConfig: RuntimeConfig;
   /** Captured request identity, including its credential namespace. Never reselect here. */
@@ -156,8 +161,8 @@ export function buildCompactionWiring(input: {
   // the turn already resolved: the wiring site passes it on the provider. The
   // preflight runs before that provider is resolved, so it needs the same shape
   // or it would admit a tool-shaped message the send later rewrites.
-  const fallbackShape = summaryRole ? undefined
-    : input.provider.shape ?? resolveRequestShape(input.catalog, provider.providerId, provider.model, undefined, provider.baseUrl, provider.endpoint);
+  const mainShape = input.provider.shape ?? resolveRequestShape(input.catalog, provider.providerId, provider.model, undefined, provider.baseUrl, provider.endpoint);
+  const fallbackShape = summaryRole ? undefined : mainShape;
   const effectiveLimits = fallbackShape ? { ...summaryLimits, shape: fallbackShape } : summaryLimits;
   return {
     policy: {
@@ -182,7 +187,7 @@ export function buildCompactionWiring(input: {
         provider.providerId,
         provider.model,
         "keepRecentTokens",
-        undefined,
+        runtimeConfig.keepRecentTokens,
         KEEP_RECENT_TOKENS,
       ),
       // The provider's own count, plus whatever the conversation has gained
@@ -191,19 +196,38 @@ export function buildCompactionWiring(input: {
       measureContextTokens: (messages, identity) => {
         const endpointId = captureUsageAttribution({ provider: provider.providerId, model: provider.model,
           baseUrl: provider.baseUrl }).endpointId;
+        const endpoint = provider.endpoint ?? 'openai-compatible';
+        const replayBinding = provider.replayBinding ?? requestReplayBinding({ ...provider, provider: provider.providerId });
+        if ((identity?.provider !== undefined && identity.provider !== provider.providerId)
+          || (identity?.model !== undefined && identity.model !== provider.model)
+          || (identity?.endpoint !== undefined && identity.endpoint !== endpoint)
+          || (identity?.endpointId !== undefined && identity.endpointId !== endpointId)
+          || (identity?.replayBinding !== undefined && identity.replayBinding !== replayBinding)) return undefined;
         const usage = getSessionUsage(input.sessionId);
-        const recordedHistory = usage.lastPromptIdentity?.historyDigest;
+        const recorded = usage.lastPromptIdentity;
+        const recordedHistory = recorded?.historyDigest;
         const measuredMessageCount = usage.lastPromptMessageCount;
+        if (!Number.isSafeInteger(measuredMessageCount) || measuredMessageCount < 0 || measuredMessageCount > messages.length) return undefined;
+        if (identity?.historyDigest !== undefined && identity.historyDigest !== recordedHistory) return undefined;
+        if (recorded?.wireHistoryDigest !== undefined) {
+          // A changed projection may shorten earlier tool output or insert a bridge.
+          // An anchor cannot price that replacement as an append-only tail.
+          const projection = outgoingProjection(messages, mainShape.assistantAfterToolResult);
+          if (!projection.sourceAligned || recorded.wireMessageCount !== measuredMessageCount
+            || identity?.wireMessageCount !== recorded.wireMessageCount
+            || historyDigest(projection.messages.slice(0, measuredMessageCount)) !== recorded.wireHistoryDigest) return undefined;
+        }
         const historyIdentity = recordedHistory !== undefined
-          && Number.isSafeInteger(measuredMessageCount) && measuredMessageCount >= 0
-          && measuredMessageCount <= messages.length
           ? { historyDigest: historyDigest(messages.slice(0, measuredMessageCount)) }
           : {};
-        const measured = measuredPromptContext(input.sessionId, { provider: provider.providerId, model: provider.model,
-          endpoint: provider.endpoint ?? 'openai-compatible', endpointId, ...(identity ?? {}), ...historyIdentity },
+        const measured = measuredPromptContext(input.sessionId, { ...(identity ?? {}), provider: provider.providerId, model: provider.model,
+          endpoint, endpointId, ...(recorded?.replayBinding !== undefined ? { replayBinding } : {}), ...historyIdentity },
           { requireExpectedIdentity: true });
         if (!measured) return undefined;
-        return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
+        const tail = estimatePromptTail(messages.slice(measuredMessageCount), { provider: provider.providerId,
+          model: provider.model, endpoint, replayBinding, reasoningReplayField: mainShape.reasoningReplayField,
+          allowEmptySignature: mainShape.allowEmptySignature });
+        return tail === undefined ? undefined : measured.tokens + tail;
       },
     },
     summarize: Object.assign((request: Parameters<SummarizeHistory>[0]) => send(historyRequest(request)),

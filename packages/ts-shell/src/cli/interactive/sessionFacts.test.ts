@@ -71,6 +71,36 @@ describe("path shortening", () => {
   });
 });
 
+it('reports live compaction unavailability through the actual context command', async () => {
+  const runtime = context('status-compaction-unavailable');
+  const result = await runContextCommand([], { cwd: '/workspace/app', projectRoot: '/workspace/app',
+    sessionId: runtime.session.id, runtimeConfig: runtime.runtimeConfig,
+    readConfiguration: () => runtime.configuration.current, getToolPool: async () => new Map(),
+    compactionUnavailable: () => 'The selected provider is blocked.' });
+  expect(result.output).toContain('Auto-compaction unavailable: The selected provider is blocked.');
+  expect(result.report?.facts.compaction).toMatchObject({ available: false, reason: 'The selected provider is blocked.' });
+});
+
+it('keeps the evaluator fallback distinct from a still-valid provider measurement in context output', async () => {
+  const id = 'status-compaction-estimate';
+  resetSessionUsage(id);
+  const runtime = context(id);
+  const identity = { provider: 'openai', model: 'opus-5', endpoint: 'openai-compatible',
+    schemaDigest: 'a'.repeat(64), systemDigest: 'b'.repeat(64), historyDigest: 'c'.repeat(64) };
+  recordSessionUsage(id, { promptTokens: 30_000, promptMessageCount: 1, promptIdentity: identity,
+    attribution: captureUsageAttribution({ provider: identity.provider, model: identity.model, baseUrl: 'https://api.openai.com/v1' }) });
+  try {
+    const result = await runContextCommand([], { cwd: '/workspace/app', projectRoot: '/workspace/app', sessionId: id,
+      runtimeConfig: runtime.runtimeConfig, readConfiguration: () => runtime.configuration.current,
+      getToolPool: async () => new Map(), promptIdentity: identity,
+      compactionMeasurement: () => ({ source: 'estimated', reason: 'The current wire projection changed.' }) });
+    expect(result.report?.facts.prompt).toMatchObject({ status: 'measured', tokens: 30_000 });
+    expect(result.report?.facts.compaction).toMatchObject({ providerMeasurement: 'measured', source: 'estimated' });
+    expect(result.output).toContain('Last compaction check basis: estimated; provider measurement unavailable');
+    expect(result.output).toContain('The current wire projection changed.');
+  } finally { resetSessionUsage(id); }
+});
+
 describe("model name", () => {
   it("prefers the configured model for the active provider", () => {
     expect(activeModelName(context("s1"))).toBe("opus-5");
@@ -145,12 +175,15 @@ describe("status facts", () => {
     } finally { resetSessionUsage(id); }
   });
 
-  it('keeps estimates marked and stale numbers absent from the status band', () => {
+  it('keeps estimated and stale numbers explicitly marked in the status band', () => {
     const runtime = context('status-local-preview');
     const estimated = readStatusFacts(runtime, { promptContext: { tokens: 1700, source: 'estimated' } });
     expect(stripAnsi(renderStatusItem('context', estimated) ?? '')).toContain('~1.7k');
     const stale = readStatusFacts(runtime, { promptContext: { source: 'stale' } });
     expect(stale.contextUsed).toBeUndefined(); expect(stripAnsi(renderStatusItem('context', stale) ?? '')).toContain('? stale');
+    const retained = readStatusFacts(runtime, { promptContext: { tokens: 30_002, source: 'stale' } });
+    expect(retained).toMatchObject({ contextUsed: 30_002, contextSource: 'stale' });
+    expect(stripAnsi(renderStatusItem('context', retained) ?? '')).toContain('30k? stale/');
   });
   it('shows only the captured known subtotal when another destination has no prices, including after resume', () => {
     const id = 'status-captured-cost';
@@ -363,6 +396,10 @@ describe("status facts", () => {
     expect(readStatusFacts(runtime, { promptContext: { tokens: 900, source: "calibrated" } })).toMatchObject({
       contextUsed: 900,
       contextSource: "calibrated",
+    });
+    expect(readStatusFacts(runtime, { promptContext: { tokens: 9_500, source: 'stale' } })).toMatchObject({
+      contextUsed: 9_500,
+      contextSource: 'stale',
     });
     resetSessionUsage(id);
   });

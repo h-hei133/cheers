@@ -23,6 +23,8 @@ export interface ContextReading {
 /** One pending read, bounded debounce, no filesystem or network in frame callbacks. */
 export function createContextController(input: {
   readonly identity: () => string | undefined;
+  /** Prevent a retained display value from crossing session replacement. */
+  readonly scope?: () => string;
   readonly load: (signal: AbortSignal) => Promise<ContextPreview>;
   readonly repaint: () => void;
 }) {
@@ -36,6 +38,7 @@ export function createContextController(input: {
   let scheduled: ReturnType<typeof setTimeout> | undefined;
   let interval: ReturnType<typeof setInterval> | undefined;
   let source: ContextReading['source'] = 'unknown';
+  let retained: { readonly tokens: number; readonly scope: string | undefined } | undefined;
   let retryAt = 0;
   let checkedAt = 0;
   let expiresAt = 0;
@@ -64,7 +67,7 @@ export function createContextController(input: {
     if (scheduled) clearTimeout(scheduled); scheduled = undefined;
     const retired = previous;
     const inFlight = activeValue;
-    source = retired ? 'stale' : 'unknown'; previous = undefined;
+    source = retained ? 'stale' : 'unknown'; previous = undefined;
     activeValue = undefined; discard(retired, true); discard(inFlight, true);
   };
   const request = () => {
@@ -117,6 +120,7 @@ export function createContextController(input: {
         if (checking && Date.now() >= expiresAt) throw new Error('Context preview expired.');
         if (!checking && value.expiresAt !== undefined && Date.now() >= value.expiresAt) throw new Error('Context preview expired.');
         previous = value; source = value.estimate.source;
+        retained = { tokens: value.estimate.tokens, scope: input.scope?.() };
         checkedAt = Date.now(); if (!checking) expiresAt = value.expiresAt ?? checkedAt + 20000; input.repaint();
       }).catch(() => {
         const preserve = suspendedChecks.has(controller) && (currentValue === previous || activeValue === previous);
@@ -161,10 +165,13 @@ export function createContextController(input: {
     read: (): ContextReading => {
       // Draft/config changes are noticed synchronously, without inspecting their sources.
       let current: string | undefined;
-      try { current = input.identity(); } catch { return { source: 'unknown' }; }
-      if (!current || current !== key) return { source: 'unknown' };
-      if (previous && Date.now() >= expiresAt) return { source: 'stale' };
-      return previous ? { tokens: previous.estimate.tokens, source: previous.estimate.source } : { source };
+      let currentScope: string | undefined;
+      try { current = input.identity(); currentScope = input.scope?.(); } catch { return { source: 'unknown' }; }
+      if (retained && retained.scope !== currentScope) return { source: 'unknown' };
+      const stale = retained ? { tokens: retained.tokens, source: 'stale' as const } : { source: 'unknown' as const };
+      if (suspended || !current || current !== key || previous && Date.now() >= expiresAt) return stale;
+      return previous ? { tokens: previous.estimate.tokens, source: previous.estimate.source }
+        : retained ? stale : { source };
     },
     stop: () => {
       stopped = true; suspended = false; started = false; invalidate();

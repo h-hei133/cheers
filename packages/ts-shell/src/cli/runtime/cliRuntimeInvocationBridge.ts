@@ -31,6 +31,7 @@ export function streamCliRuntimePrompt(input: {
   readonly prepareProviderResources?: CliRuntimeInvocationInput['prepareProviderResources'];
   readonly prompt: string;
   readonly onPromptIdentity?: CliRuntimeInvocationInput['onPromptIdentity'];
+  readonly readPromptIdentity?: CliRuntimeInvocationInput['readPromptIdentity'];
   readonly continuityContext?: string;
   readonly onPromptAccepted?: () => void;
   readonly mcpGateway?: CoreMcpGateway;
@@ -86,6 +87,7 @@ export function streamCliRuntimePrompt(input: {
     sessionId: input.sessionId,
     prompt: input.prompt,
     ...(input.onPromptIdentity ? { onPromptIdentity: input.onPromptIdentity } : {}),
+    ...(input.readPromptIdentity ? { readPromptIdentity: input.readPromptIdentity } : {}),
     ...(input.onPromptAccepted ? { onPromptAccepted: input.onPromptAccepted } : {}),
     ...(input.continuityContext ? { continuityContext: input.continuityContext } : {}),
     ...(input.attachments ? { attachments: input.attachments } : {}),

@@ -20,6 +20,8 @@ import { createToolDiscovery } from "../core/tools/discovery/state.js";
 import { toolSchemas } from "../turn/tools.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
+import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
+import { historyDigest } from '../context/request/identity.js';
 import {
   buildCliRuntimeInvocation,
   runCliRuntimeInvocation,
@@ -152,6 +154,49 @@ describe("CLI runtime invocation", () => {
     expect(afterTools).toContain('write');
   });
 
+  it('retains the accepted request identity while recomputing live overhead digests', () => {
+    const compaction = { policy: { contextWindow: 10_000 }, summarize: async () => undefined, onCompact: () => {} };
+    let systemPrompt = 'current system';
+    const accepted = { provider: 'fixture', model: 'model', endpoint: 'openai-compatible', endpointId: 'relay',
+      schemaDigest: 'old schema', systemDigest: 'old system', historyDigest: 'history', wireHistoryDigest: 'wire',
+      wireMessageCount: 3, replayBinding: 'replay' };
+    const attached = withRequestOverhead(compaction, { systemPrompt, tools: [] },
+      () => ({ systemPrompt, tools: [] }), () => accepted)!;
+    expect(attached.policy.promptIdentity).toMatchObject({ provider: 'fixture', model: 'model', endpointId: 'relay',
+      historyDigest: 'history', wireHistoryDigest: 'wire', wireMessageCount: 3, replayBinding: 'replay' });
+    expect(attached.policy.promptIdentity?.schemaDigest).not.toBe(accepted.schemaDigest);
+    expect(attached.policy.promptIdentity?.systemDigest).not.toBe(accepted.systemDigest);
+    const before = attached.policy.promptIdentity?.systemDigest;
+    systemPrompt = 'changed system';
+    expect(attached.policy.promptIdentity?.systemDigest).not.toBe(before);
+    expect(accepted.systemDigest).toBe('old system');
+  });
+
+  it('updates the compaction identity after a request even without an external identity publisher', async () => {
+    let captured: Parameters<typeof turnSession.runTurn>[0] | undefined;
+    const original = turnSession.runTurn;
+    const spy = vi.spyOn(turnSession, 'runTurn').mockImplementation(options => { captured = options; return original(options); });
+    const previous = { provider: 'fixture', model: 'model', endpoint: 'openai-compatible', historyDigest: 'previous',
+      wireHistoryDigest: 'previous-wire', wireMessageCount: 1, replayBinding: 'replay' };
+    try {
+      const run = await runCliRuntimeInvocation(baseInput({ readPromptIdentity: () => previous,
+        compaction: { policy: { contextWindow: 10_000 }, summarize: async () => undefined, onCompact: () => {} } }), {
+        ...dependencies().deps,
+        createStep: () => async (messages, _signal, _listener, options) => {
+          options.onRequestSent?.({ url: 'https://fixture.test', headers: {}, body: '{}',
+            promptIdentity: { ...captured!.compaction!.policy.promptIdentity, provider: 'fixture', model: 'model',
+              endpoint: 'openai-compatible', historyDigest: historyDigest(messages), wireHistoryDigest: 'accepted-wire',
+              wireMessageCount: messages.length, replayBinding: 'replay' } });
+          return { text: 'done', toolCalls: [], stopReason: 'stop' };
+        },
+      });
+      await collect(run.events);
+      expect(captured?.compaction?.policy.promptIdentity).toMatchObject({ provider: 'fixture', model: 'model',
+        wireHistoryDigest: 'accepted-wire', replayBinding: 'replay' });
+      expect(captured?.compaction?.policy.promptIdentity?.historyDigest).not.toBe('previous');
+    } finally { spy.mockRestore(); }
+  });
+
   it("keeps compaction's system identity on the main request while discovery changes schemas", async () => {
     const compaction = {
       policy: { contextWindow: 10_000 },
@@ -163,7 +208,7 @@ describe("CLI runtime invocation", () => {
       ['special', { name: 'special', description: 'special', argsSchema: { type: 'object' }, execute: async () => ({ success: true, output: '' }) }],
     ]);
     let captured: Parameters<typeof turnSession.runTurn>[0] | undefined;
-    let notifiedIdentity: { readonly schemaDigest: string; readonly systemDigest: string } | undefined;
+    let notifiedIdentity: PromptIdentitySnapshot | undefined;
     const original = turnSession.runTurn;
     const spy = vi.spyOn(turnSession, 'runTurn').mockImplementation(options => {
       captured = options;

@@ -179,6 +179,8 @@ export interface RuntimeConfig {
    */
   readonly contextWindow?: number;
   readonly reserveTokens?: number;
+  /** Recent conversation tokens to retain; an exact per-model budget takes precedence. */
+  readonly keepRecentTokens?: number;
   /**
    * Token budgets for specific models, keyed `"provider/modelId"`.
    *
@@ -394,6 +396,7 @@ export interface RuntimeConfigFile {
   maxOutputTokens?: number;
   contextWindow?: number;
   reserveTokens?: number;
+  keepRecentTokens?: number;
   modelTokenBudgets?: Record<string, ModelTokenBudget>;
   instructionBudgetBytes?: number;
   offline?: boolean;
@@ -558,6 +561,7 @@ export function getRuntimeConfig(
     // be consulted.
     ...(merged.contextWindow !== undefined ? { contextWindow: merged.contextWindow } : {}),
     reserveTokens: merged.reserveTokens ?? DEFAULT_CONFIG.reserveTokens,
+    ...(merged.keepRecentTokens !== undefined ? { keepRecentTokens: merged.keepRecentTokens } : {}),
     modelTokenBudgets: merged.modelTokenBudgets ?? DEFAULT_CONFIG.modelTokenBudgets,
     instructionBudgetBytes:
       merged.instructionBudgetBytes ??

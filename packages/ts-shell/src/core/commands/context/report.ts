@@ -6,7 +6,7 @@ import type { RequestContext, TextSize } from '../../../context/request/model.js
 import { CHARS_PER_TOKEN } from '../../../session/context.js';
 import { requestDetails } from './request.js';
 import { reportMetadata } from '../report/metadata.js';
-import { requestBudget } from '../../../context/request/budget.js';
+import { requestBudgetThreshold } from '../../../context/request/budget.js';
 
 export function contextReport(input: {
   readonly resolution: ResolvedContextWindow;
@@ -17,6 +17,9 @@ export function contextReport(input: {
   readonly outputTokens?: number;
   readonly inputLimit?: number;
   readonly protocol?: string;
+  readonly compactionUnavailable?: string;
+  /** Last actual compaction evaluation, separate from the displayed provider measurement. */
+  readonly compactionMeasurement?: { readonly source: 'measured' | 'estimated'; readonly reason?: string };
   readonly schemaTokens: number;
   readonly schemaSize?: TextSize;
   readonly request?: RequestContext;
@@ -32,23 +35,21 @@ export function contextReport(input: {
     input.inputLimit ?? Number.POSITIVE_INFINITY,
   ));
   const free = used === undefined ? undefined : Math.max(0, inputCapacity - used - reserve);
-  const budget = input.outputTokens === undefined
-    ? input.inputLimit === undefined ? undefined : requestBudget({ window, promptTokens: 0,
-      inputLimit: input.inputLimit, outputTokens: 0, reserveTokens: reserve, measured: false })
-    : requestBudget({ window, promptTokens: 0, inputLimit: input.inputLimit,
-      outputTokens: input.outputTokens, reserveTokens: reserve, measured: false });
-  const compactAt = budget?.ok
-    ? budget.softLimit
-    : budget?.reason === "window"
-      ? 0
-      : input.inputLimit !== undefined
-        ? Math.max(0, Math.min(Math.floor(window * 0.9), input.inputLimit - reserve))
-        : Math.max(0, window - reserve);
+  const threshold = requestBudgetThreshold({ window, inputLimit: input.inputLimit,
+    outputTokens: input.outputTokens, reserveTokens: reserve });
+  const compactAt = threshold.tokens;
+  const unavailable = input.compactionUnavailable === undefined ? undefined : reportMetadata(input.compactionUnavailable, projectRoot);
+  const anchorReason = measurement === 'stale' ? 'request identity changed'
+    : input.turns === 0 ? 'no measured request yet' : 'no usable prompt usage';
+  const compactionMeasurement = input.compactionMeasurement;
+  const compactionReason = compactionMeasurement?.source === 'estimated'
+    ? reportMetadata(compactionMeasurement.reason ?? 'no usable prompt usage', projectRoot) : undefined;
   const warning = resolution.warning === undefined ? undefined : reportMetadata(resolution.warning, projectRoot);
   const lines: ReportLine[] = [
     { kind: 'text', bullet: true, spans: [span('Window: '), span(window.toLocaleString(), 'number'),
       span(` tokens (${resolution.source === 'default' ? 'assumed default' : resolution.source})`)] },
     ...(warning ? [{ kind: 'text' as const, bullet: true, spans: [span(`Warning: ${warning}`, 'warning')] }] : []),
+    ...(unavailable ? [{ kind: 'text' as const, bullet: true, spans: [span(`Auto-compaction unavailable: ${unavailable}`, 'warning')] }] : []),
   ];
   if (used === undefined) {
     lines.push({ kind: 'text', bullet: true, spans: [span('Discoverable tool catalogue estimate: '),
@@ -57,6 +58,7 @@ export function contextReport(input: {
       ? 'The last provider measurement belongs to a different model, endpoint or schema, so it is not the current context. No current measurement is available.'
       : 'Current prompt usage is unknown. No provider measurement is available for this context.')] },
     { kind: 'text', spans: [span('The inspection catalogue can include deferred tools absent from the next request. Its estimate is not a first-request estimate or a lower bound.')] });
+    if (!compactionMeasurement) lines.push({ kind: 'text', spans: [span(`Compaction basis: estimated; provider measurement unavailable (${anchorReason}).`)] });
   } else {
     lines.push({ kind: 'text', bullet: true, spans: [...bar(used, reserve, window), span('  '),
       span(`${((used / window) * 100).toFixed(1)}%`, `context-${contextPressure(used, window)}`), span(' used')] },
@@ -66,13 +68,16 @@ export function contextReport(input: {
     { kind: 'space' },
     { kind: 'columns', cells: [[span('Discoverable tool catalogue')], [span(`~${schemaTokens.toLocaleString()}`, 'number')],
       [span(`${toolCount} inspection definitions; character-based estimate`)]] },
-    { kind: 'columns', cells: [[span('Context input usage')], [span(used.toLocaleString(), 'number')], [span('reported by the provider')]] },
-    { kind: 'space' },
-    { kind: 'text', spans: [span('Auto-compaction runs when a request would exceed about '), span(compactAt.toLocaleString(), 'number'),
-      span(' tokens. '), span('/compact', 'command'), span(' runs it now.')] });
+    { kind: 'columns', cells: [[span('Context input usage')], [span(used.toLocaleString(), 'number')], [span('reported by the provider')]] });
     if (input.totalTokens > 0) lines.push({ kind: 'space' }, { kind: 'text', spans: [span('Across the whole session: '),
       span(input.totalTokens.toLocaleString(), 'number'), span(' tokens over '), span(input.turns, 'number'), span(input.turns === 1 ? ' turn.' : ' turns.')] });
   }
+  if (compactionMeasurement) lines.push({ kind: 'text', spans: [span(compactionMeasurement.source === 'estimated'
+    ? `Last compaction check basis: estimated; provider measurement unavailable (${compactionReason}).`
+    : 'Last compaction check basis: measured provider usage plus estimated tail.')] });
+  if (!unavailable) lines.push({ kind: 'space' },
+    { kind: 'text', spans: [span(`Auto-compaction runs when a request ${threshold.inclusive ? 'reaches' : 'would exceed'} about `), span(compactAt.toLocaleString(), 'number'),
+      span(' tokens. '), span('/compact', 'command'), span(' runs it now.')] });
   lines.push({ kind: 'text', spans: [span('The context gauge can include delegated requests. The foreground request below is captured separately.')] });
   if (input.schemaSize) lines.push({ kind: 'space' }, { kind: 'text', spans: [span(
     `Inspection tool definitions: ${input.schemaSize.bytes.toLocaleString()} UTF-8 bytes, ${input.schemaSize.codeUnits.toLocaleString()} UTF-16 code units of JSON; catalogue estimate divides code units by ${CHARS_PER_TOKEN}.`,
@@ -85,6 +90,11 @@ export function contextReport(input: {
       prompt: used === undefined ? { status: measurement === 'stale' ? 'stale' : 'unknown' }
         : { status: 'measured', tokens: used },
       reserveTokens: reserve, freeTokens: free ?? null, compactAtTokens: compactAt,
+      compaction: { ...(unavailable ? { available: false, reason: unavailable } : {}),
+        providerMeasurement: used === undefined ? measurement : 'measured',
+        ...(compactionMeasurement ? { source: compactionMeasurement.source,
+          ...(compactionReason ? { anchorUnavailable: compactionReason } : {}) }
+          : used === undefined ? { source: 'estimated', anchorUnavailable: anchorReason } : {}) },
       inputLimitTokens: input.inputLimit ?? null, outputReserveTokens: input.outputTokens ?? null,
       protocol: input.protocol ?? null,
       toolSchemas: { status: 'estimate', method: 'characters', tokens: schemaTokens, toolCount,

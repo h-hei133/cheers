@@ -14,7 +14,7 @@ it('keeps model request preferences in the file registry without declaring sessi
     'allowedModels', 'maxOutputTokens', 'maxTurns', 'temperature', 'topP',
   ]);
   expect(CONFIG_SETTINGS.filter(item => item.group === 'Context').map(item => item.key)).toEqual(expect.arrayContaining([
-    'contextWindow', 'reserveTokens', 'modelTokenBudgets', 'instructionBudgetBytes',
+    'contextWindow', 'reserveTokens', 'keepRecentTokens', 'modelTokenBudgets', 'instructionBudgetBytes',
   ]));
   expect(CONFIG_SETTINGS.filter(item => item.group === 'Providers').map(item => item.key)).toEqual(expect.arrayContaining([
     'retryEnabled', 'providerRetryMaxRetries', 'providerConnectTimeoutMs',
@@ -53,7 +53,7 @@ it('renders public file values as round-trippable JSON without terminal controls
 it('gives every public setting a typed editor, with no JSON fallback for numbers, lists, or text', () => {
   const expected: Record<string, string> = {
     maxTurns: 'number', temperature: 'number', topP: 'number', maxOutputTokens: 'number',
-    contextWindow: 'number', reserveTokens: 'number', instructionBudgetBytes: 'number',
+    contextWindow: 'number', reserveTokens: 'number', keepRecentTokens: 'number', instructionBudgetBytes: 'number',
     retryMaxRetries: 'number', providerRetryMaxRetries: 'number', retryBaseDelayMs: 'number',
     retryMaxDelayMs: 'number', providerConnectTimeoutMs: 'number', providerHeadersTimeoutMs: 'number',
     providerBodyTimeoutMs: 'number',
@@ -74,6 +74,9 @@ it('parses each editor shape without quoting text or coercing list items', () =>
   expect(parseSettingInput(byKey('maxTurns'), '12')).toEqual({ ok: true, value: 12 });
   expect(parseSettingInput(byKey('maxTurns'), '1.5').ok).toBe(false);
   expect(parseSettingInput(byKey('maxTurns'), 'abc').ok).toBe(false);
+  expect(parseSettingInput(byKey('keepRecentTokens'), '2000')).toEqual({ ok: true, value: 2000 });
+  expect(parseSettingInput(byKey('keepRecentTokens'), '0')).toEqual({ ok: true, value: 0 });
+  expect(parseSettingInput(byKey('keepRecentTokens'), '-1').ok).toBe(false);
   expect(parseSettingInput(byKey('hiddenToolPrefixes'), 'mcp.\nbrowser.')).toEqual({ ok: true, value: ['mcp.', 'browser.'] });
   expect(parseSettingInput(byKey('allowedTools'), '').value).toEqual([]);
   expect(parseSettingInput(byKey('allowedTools'), '["read","write"]')).toEqual({ ok: true, value: ['read', 'write'] });

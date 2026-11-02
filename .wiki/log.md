@@ -11545,3 +11545,11 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 同时更正上一轮的表述：写「`planCompaction` 在真实运行中从未被调用」是错的——真实 `runTurn` 会调用它；当时的依据是一段用了 ESM 中不可用 `require()` 的诊断，日志没写成功，我把「观测失败」误读成「行为不存在」。
 
 下一步只需在 `planCompaction` 入口写一行诊断记录 `policy.overhead?.tools?.length` 与 `tokensBefore`，即可确认或排除第一项。本轮仅文档与研究探针（已删除），未改产品代码。
+
+### 2026-11-02：24.98 S1–S7 修复与 compaction source identity 竞态
+
+完成 24.98 的 S1–S7：修复软限/保留预算耦合，声明顶层 `keepRecentTokens`，补全 prompt identity，统一协议级尾部计量，保留 busy/stale context 数字，报告 compaction unavailable/evaluator fallback，增加 session 层回合前检查，并让自动发布拒绝显示安全原因。
+
+真实隔离运行发现摘要期间 `query-event` 追加会改变 transcript 原始字节，旧 source identity 因此错误拒绝发布。`session/compaction/commit.ts` 现在按逻辑历史、分支、相关状态和文件身份校验，排除 query/lifecycle 原始 transcript 内容，同时继续拒绝消息、分支、配置和存储替换变化。新增回归覆盖该竞态；手动/自动竞争仍保证一次摘要和一次 durable publication。
+
+验证：隔离 HOME、单 worker、heap 768 MiB 下 22 个受影响测试文件 1002 项通过；`verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`verify:docs-drift:strict` 和 `git diff --check` 通过。真实 provider/platform/billing/release 证据仍未由本轮本地验证提供。

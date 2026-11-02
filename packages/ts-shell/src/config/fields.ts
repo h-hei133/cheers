@@ -60,6 +60,7 @@ export function createConfigFields(providers: readonly string[]) {
     maxOutputTokens: field(positiveSchema),
     contextWindow: field(positiveSchema),
     reserveTokens: field(countSchema),
+    keepRecentTokens: field(countSchema),
     modelTokenBudgets: field({ type: 'object', propertyNames: nameSchema, additionalProperties: objectSchema({ reserveTokens: countSchema, keepRecentTokens: countSchema }) }),
     instructionBudgetBytes: field(countSchema, withOverride, 'replace', false, { projectTrust: [0] }),
     offline: field(booleanSchema, withOverride, 'replace', false, { projectTrust: [true] }),

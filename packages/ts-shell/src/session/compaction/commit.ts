@@ -26,10 +26,31 @@ function capture(store: SessionStoreAccess, sessionId: string): CompactionSource
   const sourceActivePath = branch.path.map(entry => entry.id);
   const replayIdentity = digest([session.id, session.createdAt, storage, state.projectRoot, state.workspaceRoots,
     sourceActivePath, state.modelSelection, state.modelRevision, state.contextSelection, state.contextAttachments, history]);
+  // Query and lifecycle events are durable observations of a run. They append to
+  // the transcript while a summary is in flight, but they do not change the
+  // model history or the branch being summarized. Keep the source fence tied to
+  // logical session state and file ownership so those observations do not make a
+  // valid publication look stale, while message/branch changes still invalidate it.
+  const logicalState = {
+    projectRoot: state.projectRoot,
+    workspaceRoots: state.workspaceRoots,
+    // Use the resolved path plus navigation identity so equivalent lazy thread
+    // materialization is ignored while a branch round-trip still invalidates
+    // this source through its monotonic navigation revision.
+    thread: {
+      activeLeafId: sourceActivePath.at(-1),
+      activeBranchId: state.thread?.activeBranchId,
+      navigationRevision: state.thread?.navigationRevision,
+    },
+    modelSelection: state.modelSelection,
+    modelRevision: state.modelRevision,
+    contextSelection: state.contextSelection,
+    contextAttachments: state.contextAttachments,
+    pendingPrompt: state.pendingPrompt,
+    pendingPromptEntryId: state.pendingPromptEntryId,
+  };
   const identity = digest([session.id, session.createdAt, storage, fileIdentity(layout.metadataPath),
-    fs.readFileSync(layout.metadataPath, 'utf8'), fileIdentity(layout.transcriptPath), fs.readFileSync(layout.transcriptPath, 'utf8'),
-    state.projectRoot, state.workspaceRoots, state.thread, state.modelSelection, state.modelRevision,
-    state.contextSelection, state.contextAttachments, state.pendingPrompt, state.pendingPromptEntryId, history, sourceActivePath]);
+    fileIdentity(layout.transcriptPath), logicalState, history, sourceActivePath]);
   return freezeDeep({ sessionId, identity, replayIdentity, directory: layout.sessionDir, directoryIdentity: storage,
     history: structuredClone(history), sourceActivePath,
     ...(state.pendingPromptEntryId ? { promptEntryId: state.pendingPromptEntryId } : {}) });

@@ -137,6 +137,8 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
   const report = contextReport({ resolution, used: measured?.tokens, measurement, reserve, outputTokens,
     inputLimit: catalogModel(catalog, active.provider, active.model, activeBaseUrl)?.inputLimit,
     protocol: activeEndpoint,
+    compactionUnavailable: context.compactionUnavailable?.(),
+    compactionMeasurement: context.compactionMeasurement?.(),
     schemaTokens, schemaSize, request: telemetry?.requestContext, toolCount: registry.size, totalTokens: telemetry ? totalTokens(telemetry) : 0,
     turns: telemetry?.turnsCount ?? 0 }, context.cwd);
   return { kind: "local", output: reportText(report), report };

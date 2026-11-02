@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentMessage } from "../core/agent/state.js";
-import { estimateTokens } from "./context.js";
+import { CHARS_PER_TOKEN, estimateTokens } from "./context.js";
+import { requestBudget } from '../context/request/budget.js';
 import { findCompactionCut, planCompaction, planCompactionCut, type CompactionPolicy } from "./compaction.js";
 
 const u = (c: string): AgentMessage => ({ role: "user", content: c });
@@ -58,14 +59,14 @@ describe("the provider's measurement drives the threshold", () => {
       contextWindow: 64_000,
       reserveTokens: 8_000,
       keepRecentTokens: 600,
-      measureContextTokens: () => 48_000,
+      measureContextTokens: () => 38_400,
     };
 
     // The old reserve-only threshold was 56,000. With an 8,000-token output
-    // ceiling the shared budget's soft band is 48,000, so equality must fire.
+    // ceiling the shared budget's soft band is 38,400, so equality must fire.
     expect(planCompaction(messages, base)).toBeUndefined();
     expect(planCompaction(messages, { ...base, outputTokens: 8_000 })).not.toBeUndefined();
-    expect(planCompaction(messages, { ...base, outputTokens: 8_000, measureContextTokens: () => 47_999 })).toBeUndefined();
+    expect(planCompaction(messages, { ...base, outputTokens: 8_000, measureContextTokens: () => 38_399 })).toBeUndefined();
   });
 
   it("fires at an independent input ceiling even below the shared soft band", () => {
@@ -94,14 +95,14 @@ describe("the provider's measurement drives the threshold", () => {
       inputLimit: 50_000,
       reserveTokens: 8_000,
       keepRecentTokens: 600,
-      measureContextTokens: () => 42_000,
+      measureContextTokens: () => 33_600,
     })).not.toBeUndefined();
     expect(planCompaction(messages, {
       contextWindow: 64_000,
       inputLimit: 50_000,
       reserveTokens: 8_000,
       keepRecentTokens: 600,
-      measureContextTokens: () => 41_999,
+      measureContextTokens: () => 33_599,
     })).toBeUndefined();
   });
 
@@ -151,6 +152,28 @@ describe("the provider's measurement drives the threshold", () => {
     // nothing, and the overhead that made the request large is still there.
     expect(plan).toBeUndefined();
   });
+});
+
+describe('compaction while the request still fits', () => {
+  it.each([[20_000, 7_000], [64_000, 45_000]])(
+    'finds a cut before overflowing a %i-token window', (contextWindow, conversationTokens) => {
+      const messages: AgentMessage[] = Array.from({ length: 10 }, (_, index) => ({
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: 'x'.repeat(conversationTokens * CHARS_PER_TOKEN / 10),
+      }));
+      const policy = { contextWindow, reserveTokens: 8_000, outputTokens: 4_096 };
+      const promptTokens = estimateTokens(messages);
+      expect(promptTokens).toBe(conversationTokens);
+      expect(requestBudget({ window: contextWindow, ...policy, promptTokens, measured: false }))
+        .toMatchObject({ ok: true, soft: true });
+      // Keeping a tail inside a recovery band, as the reference does, makes
+      // the trigger and a legal cut reachable together even with default keep.
+      const plan = planCompaction(messages, policy);
+      expect(plan).toBeDefined();
+      expect(plan!.cut).toBeGreaterThan(0);
+      expect(plan!.keptMessages).toBeLessThan(messages.length);
+    },
+  );
 });
 
 describe("the provider's measurement never moves the cut", () => {

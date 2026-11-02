@@ -160,7 +160,8 @@ function renderContext(facts: StatusFacts): string | undefined {
   if (facts.contextUsed === undefined) return defaultTheme.fg('statusLineContext', `${facts.contextSource === 'stale' ? '? stale' : '?'}/${window}`);
   const percent = Math.min(100, Math.round((facts.contextUsed / facts.contextWindow) * 100));
   const marker = facts.contextSource === 'estimated' || facts.contextSource === 'calibrated' ? '~' : '';
-  const text = `${marker}${formatTokens(facts.contextUsed)}/${window} ${percent}%`;
+  const stale = facts.contextSource === 'stale' ? '? stale' : '';
+  const text = `${marker}${formatTokens(facts.contextUsed)}${stale}/${window} ${percent}%`;
   const token = { normal: 'statusLineContext', elevated: 'accent', high: 'warning', critical: 'error' } as const;
   return defaultTheme.fg(token[contextPressure(facts.contextUsed, facts.contextWindow)], text);
 }

@@ -83,10 +83,9 @@ export function readStatusFacts(
   const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, baseUrl: activeBaseUrl,
     configured: configuredContextWindow(config, active) });
   const preview = live.promptContext;
-  // A live reading is useful only when it still carries a number. Missing or
-  // expired draft previews must not hide the provider-measured request that
-  // established the conversation's current footprint.
-  const contextFact = preview?.tokens !== undefined && (preview.source === 'estimated' || preview.source === 'calibrated')
+  // Keep the latest request footprint during busy work and refreshes; a stale
+  // source remains explicit instead of reverting to an older measured prefix.
+  const contextFact = preview?.tokens !== undefined && preview.source !== 'unknown'
     ? { contextUsed: preview.tokens, contextSource: preview.source }
     : measured ? { contextUsed: measured.tokens, contextSource: 'measured' as const }
       : preview ? { contextSource: preview.source } : {};

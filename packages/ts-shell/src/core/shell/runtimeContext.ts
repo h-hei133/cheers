@@ -34,6 +34,10 @@ export interface ShellRuntimeContext {
   readonly profile?: import('../paths/profile/context.js').ProfileContext;
   /** Identity of the request shape most recently prepared by this runtime. */
   promptIdentity?: PromptIdentitySnapshot;
+  /** Current read-only provider prerequisite failure, separate from executable compaction. */
+  compactionUnavailable?: () => string | undefined;
+  /** Last actual compaction evaluator result for this session and provider target. */
+  compactionMeasurement?: () => { readonly source: 'measured' | 'estimated'; readonly reason?: string } | undefined;
   workspaceRevision?: number;
   /** Changes only when the primary project changes, including a later return. */
   projectRevision?: number;

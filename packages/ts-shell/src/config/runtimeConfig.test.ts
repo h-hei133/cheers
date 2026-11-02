@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { planCompactionCut } from '../session/compaction.js';
 import {
   getCandidateConfigPaths,
   getRuntimeConfig,
@@ -100,6 +101,22 @@ describe("runtime config", () => {
     // unbounded default would let one repository's file fill the prompt.
     const config = getRuntimeConfig(fakeRoot);
     expect(config.instructionBudgetBytes).toBe(32 * 1024);
+  });
+
+  it('loads a top-level recent-token budget from the isolated user config into planning', () => {
+    const configPath = getUserRuntimeConfigPath();
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ keepRecentTokens: 2_000 }), 'utf8');
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.keepRecentTokens).toBe(2_000);
+    expect(config.configDiagnostics.some(diagnostic => diagnostic.includes('unknown-field'))).toBe(false);
+    const messages = Array.from({ length: 10 }, (_, index) => ({
+      role: index % 2 === 0 ? 'user' as const : 'assistant' as const,
+      content: 'x'.repeat(1_750),
+    }));
+    const policy = { contextWindow: 64_000, reserveTokens: 8_000, outputTokens: 4_096 };
+    expect(planCompactionCut(messages, policy)).toBeUndefined();
+    expect(planCompactionCut(messages, { ...policy, keepRecentTokens: config.keepRecentTokens })).toMatchObject({ cut: 6 });
   });
 
   it("retries by default, with the turn layer carrying the retries", () => {

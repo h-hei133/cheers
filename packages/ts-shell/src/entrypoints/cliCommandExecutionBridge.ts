@@ -123,6 +123,8 @@ export interface BuildCliCommandExecutionInput {
   readonly runtimeConfig?: RuntimeConfig;
   readonly resolveConfigTarget?: CommandContext['resolveConfigTarget'];
   readonly promptIdentity?: CommandContext['promptIdentity'];
+  readonly compactionUnavailable?: CommandContext['compactionUnavailable'];
+  readonly compactionMeasurement?: CommandContext['compactionMeasurement'];
   readonly readConfiguration?: CommandContext['readConfiguration'];
   readonly recordAuxiliaryUsage?: CommandContext['recordAuxiliaryUsage'];
   readonly admission?: CommandContext['admission'];
@@ -223,6 +225,8 @@ export async function buildCliCommandExecution(
     runtimeConfig: input.runtimeConfig,
     resolveConfigTarget: input.resolveConfigTarget,
     promptIdentity: input.promptIdentity,
+    compactionUnavailable: input.compactionUnavailable,
+    compactionMeasurement: input.compactionMeasurement,
     readConfiguration: input.readConfiguration,
     recordAuxiliaryUsage: input.recordAuxiliaryUsage,
     admission: input.admission,

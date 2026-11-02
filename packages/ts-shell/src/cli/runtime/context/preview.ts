@@ -27,7 +27,7 @@ import { resolveProviderCredential } from '../../../core/shell/providerCredentia
 import {
   finalStepMessages,
   hasToolHistory,
-  outgoingMessages,
+  outgoingProjection,
   TOOL_HISTORY_UNSUPPORTED_MESSAGE,
 } from '../../../turn/messages.js';
 import { resolveRequestShape } from '../../../core/models/requestShape.js';
@@ -175,8 +175,9 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     throw new Error('Configured service tier is unavailable.');
   }
   const output = protocol.outputControl === 'provider' ? undefined : shape.maxOutputCeiling;
+  const projection = outgoingProjection(messages, shape.assistantAfterToolResult);
   const wireMessages = finalStepMessages(
-    outgoingMessages(messages, shape.assistantAfterToolResult),
+    projection.messages,
     allowTools,
     schemas.length > 0,
   );
@@ -200,9 +201,15 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const endpointId = captureUsageAttribution({ provider: resolution.provider, model: resolution.model, baseUrl: base }).endpointId;
   const counted = estimateWirePromptDetails(body, protocol.contextFields,
     catalogModel(publication.catalog, resolution.provider, resolution.model, base)?.tokenizer);
+  const usage = getSessionUsage(expected.id);
+  const count = usage.lastPromptMessageCount;
+  const prefix = projection.sourceAligned && Number.isSafeInteger(count) && count >= 0 && count <= messages.length
+    ? projection.messages.slice(0, count) : undefined;
   const estimate = estimatePrompt(messages, overhead, { provider: resolution.provider, model: resolution.model,
     endpoint, endpointId, ...assembledIdentity, wireHistoryDigest, wireMessageCount: wireMessages.length, replayBinding },
-  getSessionUsage(expected.id), counted);
+  usage, { ...counted, tailContext: { endpoint, provider: resolution.provider, model: resolution.model, replayBinding,
+    reasoningReplayField: shape.reasoningReplayField, allowEmptySignature: shape.allowEmptySignature },
+    ...(prefix ? { prefixIdentity: { wireHistoryDigest: historyDigest(prefix), wireMessageCount: prefix.length } } : {}) });
   let suspended = false;
   const verify = () => {
     try {

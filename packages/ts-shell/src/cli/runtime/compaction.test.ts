@@ -17,8 +17,16 @@ import type { RequestSigner } from "../../provider/request/fetch.js";
 import { createCacheWarmingRunner } from "../../turn/cacheWarm.js";
 import { loadCatalog } from '../../core/models/catalogStore.js';
 import { getSessionUsage, recordSessionUsage, resetSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
-import { historyDigest } from '../../context/request/identity.js';
+import { historyDigest, requestIdentity } from '../../context/request/identity.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
+import { withRequestOverhead } from '../../entrypoints/cliRuntimeInvocation.js';
+import { createStepFunction } from '../../turn/step.js';
+import type { PromptIdentitySnapshot } from '../../observability/usage/model.js';
+import { estimateTokens } from '../../session/context.js';
+import { requestReplayBinding } from '../../provider/request/replay.js';
+import { outgoingProjection } from '../../turn/messages.js';
+import { estimatePrompt } from '../../context/request/estimate.js';
+import { resolveRequestShape } from '../../core/models/requestShape.js';
 
 const fixture = vi.hoisted(() => ({
   deps: undefined as SessionRuntimeDependencies | undefined,
@@ -201,6 +209,110 @@ it.each([['main', 'fixture-model', 32000], ['sibling', 'fixture-model', 6000], [
       sessionId: 'signed-summary', catalog: loadCatalog() });
     expect(wiring.policy.contextWindow).toBe(expected);
   });
+
+it.each([undefined, 1200])('uses the top-level retention budget unless the model overrides it (%s)', modelBudget => {
+  const wiring = buildCompactionWiring({ provider: { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture' },
+    runtimeConfig: { ...fixture.config, keepRecentTokens: 2000,
+      ...(modelBudget === undefined ? {} : { modelTokenBudgets: { 'fixture/fixture-model': { keepRecentTokens: modelBudget } } }) } as never,
+    sessionId: 'signed-summary', catalog: loadCatalog() });
+  expect(wiring.policy.keepRecentTokens).toBe(modelBudget ?? 2000);
+});
+
+it('uses a successful request anchor through the actual compaction and overhead wiring', async () => {
+  const provider = { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' as const };
+  const catalog = [{ id: 'fixture', endpoint: 'openai-compatible' as const, models: [{ id: 'fixture-model', contextWindow: 64000 }] }];
+  const overhead = { systemPrompt: 'effective main system', tools: [] };
+  const wiring = buildCompactionWiring({ provider, runtimeConfig: { ...fixture.config, reserveTokens: 0, maxOutputTokens: 128 } as never,
+    sessionId: 'signed-summary', catalog });
+  let accepted: PromptIdentitySnapshot | undefined;
+  const attached = withRequestOverhead({ ...wiring, onCompact: () => {} }, overhead, () => overhead, () => accepted)!;
+  const messages = [{ role: 'user' as const, content: 'selected history' }];
+  expect(attached.policy.measureContextTokens!(messages, attached.policy.promptIdentity)).toBeUndefined();
+  const step = createStepFunction({ provider: { ...provider, provider: provider.providerId },
+    workspaceRoot: scratch, sessionId: 'signed-summary', catalog, ...overhead,
+    fetchImpl: async () => new Response(JSON.stringify({ choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 900, completion_tokens: 1 } }), { headers: { 'content-type': 'application/json' } }) });
+  const response = await step(messages, undefined, {}, { allowTools: true,
+    onRequestSent: sent => { accepted = sent.promptIdentity; } });
+  expect(response.stopReason).toBe('stop');
+  const identity = attached.policy.promptIdentity!;
+  expect(identity).toMatchObject({ provider: 'fixture', model: 'fixture-model', endpoint: 'openai-compatible',
+    historyDigest: historyDigest(messages), wireMessageCount: messages.length });
+  expect(identity.wireHistoryDigest).toMatch(/^[a-f0-9]{64}$/);
+  expect(identity.replayBinding).toMatch(/^[a-f0-9]{64}$/);
+  expect(attached.policy.measureContextTokens!(messages, identity)).toBe(900);
+  const tail = [{ role: 'assistant' as const, content: 'ok' }, { role: 'user' as const, content: 'next question' }];
+  expect(attached.policy.measureContextTokens!([...messages, ...tail], identity)).toBe(900 + estimateTokens(tail));
+  expect(attached.policy.measureContextTokens!([{ ...messages[0]!, content: 'edited' }], identity)).toBeUndefined();
+  for (const changed of [{ provider: 'other' }, { model: 'other' }, { endpoint: 'other' }, { endpointId: 'other' },
+    { replayBinding: 'other' }, { historyDigest: 'other' }, { wireHistoryDigest: 'other' }, { wireMessageCount: 0 }]) {
+    expect(attached.policy.measureContextTokens!(messages, { ...identity, ...changed })).toBeUndefined();
+  }
+  overhead.systemPrompt = 'changed system';
+  expect(attached.policy.measureContextTokens!(messages, attached.policy.promptIdentity)).toBeUndefined();
+});
+
+it.each([-1, 0.5, 20])('rejects an invalid or mismatched wire anchor count (%s)', wireMessageCount => {
+  const provider = { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' as const };
+  const messages = [{ role: 'user' as const, content: 'selected' }];
+  const identity = { provider: provider.providerId, model: provider.model, endpoint: provider.endpoint,
+    ...requestIdentity({ tools: [] }), historyDigest: historyDigest(messages), wireHistoryDigest: historyDigest(messages),
+    wireMessageCount, replayBinding: requestReplayBinding({ ...provider, provider: provider.providerId }) };
+  recordSessionUsage('signed-summary', { promptTokens: 900, promptMessageCount: messages.length, promptIdentity: identity,
+    attribution: captureUsageAttribution({ provider: provider.providerId, model: provider.model, baseUrl }) });
+  const wiring = buildCompactionWiring({ provider, runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog: loadCatalog() });
+  expect(wiring.policy.measureContextTokens!(messages, identity)).toBeUndefined();
+});
+
+it('rejects a prefix whose tool output is reprojected after later turns arrive', () => {
+  const provider = { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' as const };
+  const messages = [{ role: 'user' as const, content: 'read' }, { role: 'assistant' as const, content: '', tool_calls: [
+    { id: 'read-1', type: 'function' as const, function: { name: 'read', arguments: '{}' } },
+  ] }, { role: 'tool' as const, tool_call_id: 'read-1', content: 'result '.repeat(1000) }];
+  const identity = { provider: provider.providerId, model: provider.model, endpoint: provider.endpoint,
+    ...requestIdentity({ tools: [] }), historyDigest: historyDigest(messages),
+    wireHistoryDigest: historyDigest(outgoingProjection(messages, false).messages), wireMessageCount: messages.length,
+    replayBinding: requestReplayBinding({ ...provider, provider: provider.providerId }) };
+  recordSessionUsage('signed-summary', { promptTokens: 900, promptMessageCount: messages.length, promptIdentity: identity,
+    attribution: captureUsageAttribution({ provider: provider.providerId, model: provider.model, baseUrl }) });
+  const wiring = buildCompactionWiring({ provider, runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog: loadCatalog() });
+  expect(wiring.policy.measureContextTokens!(messages, identity)).toBe(900);
+  const tail = Array.from({ length: 4 }, (_, index) => [{ role: 'user' as const, content: `next ${index}` },
+    { role: 'assistant' as const, content: 'answer' }]).flat();
+  expect(wiring.policy.measureContextTokens!([...messages, ...tail], identity)).toBeUndefined();
+});
+
+it.each([true, false])('shares calibrated public reasoning tail accounting with the prompt display (declared=%s)', declared => {
+  const provider = { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' as const };
+  const messages = [{ role: 'user' as const, content: 'selected' }];
+  const overhead = { systemPrompt: 'system', tools: [] };
+  const attribution = captureUsageAttribution({ provider: provider.providerId, model: provider.model, baseUrl });
+  const replayBinding = requestReplayBinding({ ...provider, provider: provider.providerId });
+  const identity = { provider: provider.providerId, model: provider.model, endpoint: provider.endpoint, endpointId: attribution.endpointId,
+    ...requestIdentity(overhead), historyDigest: historyDigest(messages), wireHistoryDigest: historyDigest(messages),
+    wireMessageCount: messages.length, replayBinding };
+  recordSessionUsage('signed-summary', { promptTokens: 900, promptMessageCount: messages.length, promptIdentity: identity, attribution });
+  const reasoningReplayField = declared ? 'reasoning_content' as const : undefined;
+  const catalog = [{ id: provider.providerId, baseUrl, endpoint: provider.endpoint, models: [{ id: provider.model, contextWindow: 64000,
+    ...(reasoningReplayField ? { compat: { reasoningReplayField } } : {}) }] }];
+  expect(resolveRequestShape(catalog, provider.providerId, provider.model, undefined, baseUrl, provider.endpoint).reasoningReplayField)
+    .toBe(reasoningReplayField);
+  const wiring = buildCompactionWiring({ provider, runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog });
+  const tail = [{ role: 'assistant' as const, content: 'answer', reasoning: { text: 'r'.repeat(40_000) },
+    origin: { provider: provider.providerId, model: provider.model, replayBinding } }];
+  const current = [...messages, ...tail];
+  const compactTokens = wiring.policy.measureContextTokens!(current, identity);
+  const displayed = estimatePrompt(current, overhead, { ...identity, wireHistoryDigest: historyDigest(current), wireMessageCount: current.length },
+    getSessionUsage('signed-summary'), { tokens: 14_000, method: 'characters/3.5',
+      prefixIdentity: { wireHistoryDigest: identity.wireHistoryDigest, wireMessageCount: messages.length },
+      tailContext: { endpoint: provider.endpoint, provider: provider.providerId, model: provider.model, replayBinding, reasoningReplayField } });
+  expect(displayed.source).toBe('calibrated');
+  expect(compactTokens).toBe(displayed.tokens);
+  if (declared) expect(compactTokens).toBeGreaterThan(12_000);
+  else expect(compactTokens).toBe(902);
+  expect(wiring.policy.measureContextTokens!([...messages, { ...tail[0]!, reasoning: { ...tail[0]!.reasoning, signature: 'opaque' } }], identity))
+    .toBeUndefined();
+});
 
 it("declines a compaction measurement without the complete prompt identity", () => {
   const deps = runtime(true);

@@ -8286,3 +8286,11 @@ const promptIdentity = () => runtimePromptIdentity() ?? requestIdentity(current(
 6. 更新本节与 12.1 台账。
 
 **禁止**：并发运行测试；20k 消息全量 PTY 压测；子代理执行任何 build/test。
+
+#### 24.98.14 S1–S7 实施与发布竞态修复（2026-11-02）
+
+按本节方案完成 S1–S7：软限与保留预算分离并统一投影到 `context/request/budget.ts`；顶层 `keepRecentTokens` 纳入配置声明和 settings；请求 identity 传递 endpoint、wire/history digest、replay binding；工具历史与公开 reasoning 使用协议级尾部计量；忙碌和 stale 读数保留可验证的 tokens；`/context` 显示压缩不可用和 evaluator fallback 原因；回合前检查在 session 层执行并保留 queued continuation 的初始检查；自动发布拒绝显示 report-safe 原因。
+
+真实隔离 CLI 先发现另一个并发问题：摘要生成期间追加的 `query-event`/生命周期事件只改变 transcript 原始字节，不改变逻辑历史，原 source identity 却把整个 `metadata.json` 与 `transcript.jsonl` 纳入摘要，导致合法发布被拒绝。现已改为校验逻辑历史、分支、模型/上下文状态和文件身份，排除无关 transcript 事件；消息或分支变化仍会拒绝发布。新增摘要期间追加 query event 的回归测试，并保留手动/自动竞争只提交一次的断言。
+
+验证：隔离 HOME、Node 20 floor 兼容的单 worker/768 MiB 串行聚焦集合 **22 文件、1002 项通过**；五个静态门和 `git diff --check` 通过。provider/平台/真实账单等外部验收仍按 Phase 20 台账单独记录，不从本地测试推导完成。

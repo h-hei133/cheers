@@ -18,7 +18,7 @@ it('debounces drafts, serializes cancelled reads and discards late results', asy
   expect(lateDispose).toHaveBeenCalledTimes(1);
   await vi.advanceTimersByTimeAsync(150); expect(load).toHaveBeenCalledTimes(2);
   finish(preview(200)); await vi.advanceTimersByTimeAsync(0); expect(controller.read()).toEqual({ tokens: 200, source: 'estimated' });
-  controller.stop(); expect(controller.read()).toEqual({ source: 'stale' });
+  controller.stop(); expect(controller.read()).toEqual({ tokens: 200, source: 'stale' });
 });
 
 it('disposes a published preview when its identity changes or the controller stops', async () => {
@@ -46,7 +46,9 @@ it('suspends automatic invalidation until the caller resumes', async () => {
   await vi.advanceTimersByTimeAsync(150); expect(controller.read().tokens).toBe(100);
   controller.suspend();
   expect(suspend).toHaveBeenCalledTimes(1);
+  expect(controller.read()).toEqual({ tokens: 100, source: 'stale' });
   key = 'b'; controller.update();
+  expect(controller.read()).toEqual({ tokens: 100, source: 'stale' });
   expect(invalidate).not.toHaveBeenCalled(); expect(dispose).not.toHaveBeenCalled();
   controller.resume();
   expect(resume).toHaveBeenCalledTimes(1);
@@ -73,7 +75,7 @@ it('uses the request reservation expiry for the displayed preview', async () => 
   const value = { ...preview(100), expiresAt: Date.now() + 1000, verifyContent: vi.fn(async () => {}) };
   const controller = createContextController({ identity: () => 'a', load: async () => value, repaint: vi.fn() }); controller.start();
   await vi.advanceTimersByTimeAsync(150); expect(controller.read().tokens).toBe(100);
-  await vi.advanceTimersByTimeAsync(900); expect(controller.read()).toEqual({ source: 'stale' });
+  await vi.advanceTimersByTimeAsync(900); expect(controller.read()).toEqual({ tokens: 100, source: 'stale' });
   controller.stop();
 });
 
@@ -103,14 +105,14 @@ it('disposes an in-flight preview when the controller stops before verification 
   await vi.advanceTimersByTimeAsync(150); controller.stop(); expect(dispose).toHaveBeenCalledTimes(1);
 });
 
-it('keeps frame reads pure and drops stale values after source checks', async () => {
+it('keeps frame reads pure and retains stale numbers after source checks', async () => {
   let changed = false; const verify = vi.fn(() => { if (changed) throw new Error('changed'); });
   const controller = createContextController({ identity: () => 'a', load: async () => preview(100, verify), repaint: vi.fn() }); controller.start();
   await vi.advanceTimersByTimeAsync(150); const calls = verify.mock.calls.length;
   for (let i = 0; i < 30; i++) expect(controller.read().tokens).toBe(100);
   expect(verify).toHaveBeenCalledTimes(calls);
   changed = true; await vi.advanceTimersByTimeAsync(2500);
-  expect(controller.read()).toEqual({ source: 'stale' }); controller.stop();
+  expect(controller.read()).toEqual({ tokens: 100, source: 'stale' }); controller.stop();
 });
 
 it('handles synchronous failures and stopping during debounce without publication', async () => {
@@ -143,7 +145,7 @@ it('waits for a cancelled content check to settle before loading a new identity'
   await vi.advanceTimersByTimeAsync(150);
   value.verifyContent.mockImplementation(signal => { signals.push(signal); return new Promise<void>(resolve => { finish = resolve; }); });
   await vi.advanceTimersByTimeAsync(2500); key = 'b'; controller.update(); expect(signals[1]!.aborted).toBe(true);
-  await vi.advanceTimersByTimeAsync(2000); expect(load).toHaveBeenCalledTimes(1); expect(controller.read()).toEqual({ source: 'stale' });
+  await vi.advanceTimersByTimeAsync(2000); expect(load).toHaveBeenCalledTimes(1); expect(controller.read()).toEqual({ tokens: 100, source: 'stale' });
   value.verifyContent.mockResolvedValue(undefined); finish(); await vi.advanceTimersByTimeAsync(650);
   expect(load).toHaveBeenCalledTimes(2); expect(controller.read().tokens).toBe(100); controller.stop();
 });
@@ -154,7 +156,7 @@ it('does not extend preview expiry through successful periodic byte checks', asy
   const controller = createContextController({ identity: () => 'a', load, repaint: vi.fn() }); controller.start();
   await vi.advanceTimersByTimeAsync(150); await vi.advanceTimersByTimeAsync(20000);
   expect(value.verifyContent.mock.calls.length).toBeGreaterThan(2); expect(load).toHaveBeenCalledTimes(1);
-  expect(controller.read()).toEqual({ source: 'stale' });
+  expect(controller.read()).toEqual({ tokens: 100, source: 'stale' });
   await vi.advanceTimersByTimeAsync(5500); expect(load).toHaveBeenCalledTimes(2); controller.stop();
 });
 
@@ -165,8 +167,8 @@ it('expires and aborts a pending check without publishing its late success', asy
   await vi.advanceTimersByTimeAsync(15150);
   value.verifyContent.mockImplementation(signal => { checkingSignal = signal; return new Promise<void>(resolve => { finish = resolve; }); });
   await vi.advanceTimersByTimeAsync(2500); expect(checkingSignal.aborted).toBe(false);
-  await vi.advanceTimersByTimeAsync(3000); expect(checkingSignal.aborted).toBe(true); expect(controller.read()).toEqual({ source: 'stale' });
-  finish(); await vi.advanceTimersByTimeAsync(0); expect(controller.read()).toEqual({ source: 'stale' }); controller.stop();
+  await vi.advanceTimersByTimeAsync(3000); expect(checkingSignal.aborted).toBe(true); expect(controller.read()).toEqual({ tokens: 100, source: 'stale' });
+  finish(); await vi.advanceTimersByTimeAsync(0); expect(controller.read()).toEqual({ tokens: 100, source: 'stale' }); controller.stop();
 });
 
 it('marks timed-out content checks stale and retains the pending slot until settlement', async () => {
@@ -176,18 +178,31 @@ it('marks timed-out content checks stale and retains the pending slot until sett
   const controller = createContextController({ identity: () => 'a', load, repaint: vi.fn() }); controller.start();
   await vi.advanceTimersByTimeAsync(150);
   value.verifyContent.mockImplementation(checking => { signal = checking; return new Promise<void>(resolve => { finish = resolve; }); });
-  await vi.advanceTimersByTimeAsync(13000); expect(signal.aborted).toBe(true); expect(controller.read()).toEqual({ source: 'stale' });
+  await vi.advanceTimersByTimeAsync(13000); expect(signal.aborted).toBe(true); expect(controller.read()).toEqual({ tokens: 100, source: 'stale' });
   await vi.advanceTimersByTimeAsync(7000); expect(load).toHaveBeenCalledTimes(1);
   value.verifyContent.mockResolvedValue(undefined); finish(); await vi.advanceTimersByTimeAsync(650);
   expect(load).toHaveBeenCalledTimes(2); controller.stop();
 });
 
-it('withdraws a published estimate when its periodic content check fails', async () => {
+it('marks the retained number stale when its periodic content check fails', async () => {
   const value = { ...preview(200), verifyContent: vi.fn(async () => {}) }; const load = vi.fn(async () => value);
   const controller = createContextController({ identity: () => 'a', load, repaint: vi.fn() }); controller.start();
   await vi.advanceTimersByTimeAsync(150); expect(controller.read().tokens).toBe(200);
   value.verifyContent.mockRejectedValue(new Error('Source changed.')); await vi.advanceTimersByTimeAsync(2500);
-  expect(controller.read()).toEqual({ source: 'stale' }); expect(load).toHaveBeenCalledTimes(1); controller.stop();
+  expect(controller.read()).toEqual({ tokens: 200, source: 'stale' }); expect(load).toHaveBeenCalledTimes(1); controller.stop();
+});
+
+it('does not carry a stale number into a replacement session', async () => {
+  let scope = 'first'; let key = 'a';
+  const controller = createContextController({ scope: () => scope, identity: () => key,
+    load: async () => preview(30_000), repaint: vi.fn() });
+  controller.start(); await vi.advanceTimersByTimeAsync(150);
+  controller.suspend(); expect(controller.read()).toEqual({ tokens: 30_000, source: 'stale' });
+  scope = 'second'; key = 'b';
+  expect(controller.read()).toEqual({ source: 'unknown' });
+  controller.resume(); expect(controller.read()).toEqual({ source: 'unknown' });
+  await vi.advanceTimersByTimeAsync(150); expect(controller.read()).toEqual({ tokens: 30_000, source: 'estimated' });
+  controller.stop();
 });
 
 it('invalidates rather than disposes a preview when verification fails', async () => {

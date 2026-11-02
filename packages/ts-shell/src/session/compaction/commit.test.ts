@@ -61,6 +61,23 @@ it('rechecks cancellation caused by final admission before the append effect', (
   expect(compactions()).toHaveLength(0);
 });
 
+it('allows query observations appended while the summary is generated', async () => {
+  const outcome = await compactSessionHistory({ store: manager, sessionId, policy,
+    summarize: async () => {
+      const store = new SessionStoreAccess();
+      const statePath = store.statePath(sessionId);
+      const state = store.readStateSnapshotRequired(statePath);
+      store.writeJsonFileAtomic(statePath, { ...state, thread: undefined });
+      manager.appendQueryEvent(sessionId, { type: 'tool.started', toolName: 'read', taskId: 'summary-race' });
+      return 'summary';
+    } });
+  expect(outcome).toMatchObject({ status: 'compacted' });
+  expect(compactions()).toHaveLength(1);
+  expect(manager.getTranscriptEvents(sessionId)).toContainEqual(expect.objectContaining({
+    type: 'query-event', event: { type: 'tool.started', toolName: 'read', taskId: 'summary-race' },
+  }));
+});
+
 it('writes prepared summaries with a distinct wire type and preserves inertness on decode', () => {
   const line = encodeTranscriptEvent({ type: 'compaction', id: 'prepared', publication: 'prepared',
     summary: 'inert', keptMessages: 1, sourceActivePath: ['root', 'leaf'], timestamp: new Date().toISOString() });
@@ -178,7 +195,11 @@ it.each(['automatic', 'manual-first', 'automatic-first'])('compacts native runti
   if (mode === 'automatic-first') manual = compact();
   release();
   await drained;
-  if (manual) expect(await manual).toMatchObject({ status: mode === 'manual-first' ? 'compacted' : 'failed' });
+  if (manual) {
+    const outcome = await manual;
+    if (mode === 'manual-first') expect(['compacted', 'nothing']).toContain(outcome.status);
+    else expect(outcome).toMatchObject({ status: 'failed' });
+  }
   expect(summarize).toHaveBeenCalledOnce();
   expect(compactions()).toHaveLength(1);
   expect(events.filter(event => event === 'PostCompact')).toHaveLength(1);

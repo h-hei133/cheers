@@ -1923,3 +1923,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A writable workspace root lets `write` or `edit` include a protected old body in its diff even though `read` is denied; checking only permission admission misses a target created after that check.
 - **Root Cause**: Writers perform an internal read under write authority, and the target can change between permission evaluation and the execution service's verified read.
 - **Rule**: Evaluate read deny for existing writer targets in the selected root before the diff read, and reuse that callback at the verified read boundary after the handle is opened. Keep absent new-file writes allowed when no body is read. Cover primary roots, registered writable roots, and the creation race.
+
+### Compaction Source Identity Must Ignore Observation-Only Transcript Events
+- **Symptom**: A summary generated while a run is emitting `query-event` or lifecycle records is refused as stale even though the model history and branch are unchanged.
+- **Root Cause**: The publication fence hashed raw metadata and transcript bytes, so append-only observation records changed identity during an otherwise valid summary.
+- **Rule**: Build compaction identity from logical history, active branch, model/context state, and file ownership identity. Exclude observation-only transcript bytes while retaining message/branch/configuration/storage change checks. Add a summary-time query-event regression and keep durable append verification separate from source identity.

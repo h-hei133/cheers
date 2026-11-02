@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { contextReport } from './report.js';
 import { reportText } from '../report/projection.js';
 import { requestContext } from '../../../context/request/projection.js';
+import { availableTailTokens, reachedBudgetThreshold } from '../../../session/compaction/budget.js';
 
 const input = { resolution: { window: 200000, source: 'catalog' as const }, reserve: 17000,
   schemaTokens: 8000, toolCount: 22, totalTokens: 72000, turns: 2 };
@@ -91,16 +92,33 @@ it('retains independent measured, estimated and unknown context facts', () => {
 it('reports the same output-aware soft threshold used by compaction', () => {
   const report = contextReport({ ...input, resolution: { window: 1000, source: 'catalog' }, reserve: 100,
     outputTokens: 200, protocol: 'openai-compatible', used: 500 });
-  expect(report.facts.compactAtTokens).toBe(700);
+  expect(report.facts.compactAtTokens).toBe(560);
   expect(report.facts.protocol).toBe('openai-compatible');
-  expect(reportText(report)).toContain('about 700 tokens');
+  expect(reportText(report)).toContain('about 560 tokens');
 });
 
 it('uses an independent input ceiling when the provider owns the output limit', () => {
   const report = contextReport({ ...input, resolution: { window: 1000, source: 'catalog' }, reserve: 100,
     inputLimit: 500, used: 300 });
-  expect(report.facts.compactAtTokens).toBe(400);
-  expect(reportText(report)).toContain('about 400 tokens');
+  expect(report.facts.compactAtTokens).toBe(320);
+  expect(reportText(report)).toContain('about 320 tokens');
+});
+
+it.each([
+  { outputTokens: undefined, inputLimit: undefined, tokens: 900, inclusive: false },
+  { outputTokens: undefined, inputLimit: 5_000, tokens: 900, inclusive: true },
+  { outputTokens: undefined, inputLimit: 500, tokens: 320, inclusive: true },
+  { outputTokens: 200, inputLimit: undefined, tokens: 560, inclusive: true },
+])('reports the engine boundary for optional output $outputTokens and input $inputLimit', ({ outputTokens, inputLimit, tokens, inclusive }) => {
+  const policy = { contextWindow: 1_000, reserveTokens: 100, outputTokens, inputLimit };
+  const report = contextReport({ ...input, resolution: { window: 1_000, source: 'catalog' }, reserve: 100,
+    outputTokens, inputLimit, used: 300 });
+  expect(report.facts.compactAtTokens).toBe(tokens);
+  expect(reportText(report)).toContain(`${inclusive ? 'reaches' : 'would exceed'} about ${tokens} tokens`);
+  expect(reachedBudgetThreshold(tokens - 1, policy, false)).toBe(false);
+  expect(reachedBudgetThreshold(tokens, policy, false)).toBe(inclusive);
+  expect(reachedBudgetThreshold(tokens + 1, policy, false)).toBe(true);
+  expect(availableTailTokens(policy)).toBe(Math.floor(tokens * 0.8));
 });
 
 it('reports no input capacity when the reserve exhausts the input ceiling', () => {
@@ -114,7 +132,43 @@ it('reports free input capacity against the independent input ceiling', () => {
   const report = contextReport({ ...input, resolution: { window: 1_000_000, source: 'catalog' },
     inputLimit: 200_000, outputTokens: 10_000, reserve: 8_000, used: 150_000 });
   expect(report.facts.freeTokens).toBe(42_000);
-  expect(report.facts.compactAtTokens).toBe(192_000);
+  expect(report.facts.compactAtTokens).toBe(153_600);
+});
+
+it('distinguishes a cold estimate from an invalidated provider anchor', () => {
+  const cold = contextReport({ ...input, used: undefined, turns: 0 });
+  expect(reportText(cold)).toContain('estimated; provider measurement unavailable (no measured request yet)');
+  expect(cold.facts.compaction).toMatchObject({ source: 'estimated', anchorUnavailable: 'no measured request yet' });
+  const stale = contextReport({ ...input, used: undefined, measurement: 'stale' });
+  expect(reportText(stale)).toContain('estimated; provider measurement unavailable (request identity changed)');
+  expect(stale.facts.compaction).toMatchObject({ source: 'estimated', anchorUnavailable: 'request identity changed' });
+  expect(contextReport({ ...input, used: 30_000 }).facts.compaction).toMatchObject({ providerMeasurement: 'measured' });
+});
+
+it('keeps a measured gauge separate from the actual compaction estimate fallback', () => {
+  const report = contextReport({ ...input, used: 30_000,
+    compactionMeasurement: { source: 'estimated', reason: 'request replay identity unavailable' } });
+  expect(report.facts.prompt).toEqual({ status: 'measured', tokens: 30_000 });
+  expect(report.facts.compaction).toMatchObject({ providerMeasurement: 'measured', source: 'estimated',
+    anchorUnavailable: 'request replay identity unavailable' });
+  expect(reportText(report)).toContain('Last compaction check basis: estimated; provider measurement unavailable (request replay identity unavailable).');
+});
+
+it('reports one actual evaluation basis and sanitizes its reason', () => {
+  const report = contextReport({ ...input, used: undefined,
+    compactionMeasurement: { source: 'estimated', reason: 'password=synthetic-sensitive-reason' } });
+  expect(reportText(report).match(/Last compaction check basis:/g)).toHaveLength(1);
+  expect(JSON.stringify(report)).not.toContain('synthetic-sensitive-reason');
+  const measured = contextReport({ ...input, used: 30_000, compactionMeasurement: { source: 'measured' } });
+  expect(measured.facts.compaction).toMatchObject({ providerMeasurement: 'measured', source: 'measured' });
+  expect(measured.facts.compaction).not.toHaveProperty('anchorUnavailable');
+  expect(reportText(measured)).toContain('Last compaction check basis: measured provider usage plus estimated tail.');
+});
+
+it('reports compaction unavailability without turning it into an executable setup', () => {
+  const report = contextReport({ ...input, used: undefined, compactionUnavailable: 'The selected provider is blocked.' });
+  expect(reportText(report)).toContain('Auto-compaction unavailable: The selected provider is blocked.');
+  expect(report.facts.compaction).toMatchObject({ available: false, reason: 'The selected provider is blocked.' });
 });
 
 it.each([[49, 'normal'], [50, 'elevated'], [70, 'high'], [90, 'critical']] as const)(

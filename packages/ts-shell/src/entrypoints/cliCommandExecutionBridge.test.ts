@@ -37,6 +37,17 @@ function bridge(result: CommandExecutionResult | null): CliCommandExecutionBridg
 }
 
 describe("CLI command execution bridge", () => {
+  it.each([false, true])('passes bound compaction diagnostics to context commands with printMode=%s', async printMode => {
+    const compactionUnavailable = () => 'The selected provider is blocked.';
+    const compactionMeasurement = () => ({ source: 'estimated' as const, reason: 'The current wire projection changed.' });
+    const contextSeen: unknown[] = [];
+    await buildCliCommandExecution({ prompt: '/context', cwd: '/workspace', renderer: renderer() as StreamingRenderer,
+      printMode, interactive: !printMode, compactionUnavailable, compactionMeasurement }, {
+      routeSlashCommand: async (_prompt, context) => { contextSeen.push(context); return { kind: 'local', output: 'context' }; },
+    });
+    expect(contextSeen).toEqual([expect.objectContaining({ compactionUnavailable, compactionMeasurement })]);
+  });
+
   it("records only successful todo mutations and replays immutable state across aliases", async () => {
     const sessionId = "local-checklist";
     forgetSessionTodos(sessionId);

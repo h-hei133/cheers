@@ -71,6 +71,8 @@ export interface CliRuntimeInvocationInput {
   readonly thinkingPreference?: ReturnType<typeof captureThinkingPreference>;
   /** Receives the exact schema/system identity prepared for this run. */
   readonly onPromptIdentity?: (identity: PromptIdentitySnapshot) => void;
+  /** Last accepted request identity from this same live session. */
+  readonly readPromptIdentity?: () => PromptIdentitySnapshot | undefined;
   readonly background?: TurnOptions['background'];
   readonly featureTools?: readonly ToolDefinition[];
   /** One-use model tool restriction selected by `/force`; ordinary gates remain active. */
@@ -302,10 +304,11 @@ export function withRequestOverhead(
   compaction: CompactionSetup | undefined,
   overhead: RequestOverhead,
   currentOverhead?: () => RequestOverhead,
+  currentPromptIdentity?: () => PromptIdentitySnapshot | undefined,
 ): CompactionSetup | undefined {
   if (!compaction) return undefined;
   const current = () => currentOverhead?.() ?? overhead;
-  const promptIdentity = () => requestIdentity(current());
+  const promptIdentity = () => ({ ...currentPromptIdentity?.(), ...requestIdentity(current()) });
   return { ...compaction, policy: { ...compaction.policy,
     get overhead() { return current(); },
     get promptIdentity() { return promptIdentity(); } } };
@@ -335,12 +338,14 @@ async function startTurn(
     bypassed: request.runtimeConfig?.allowUntrustedHooks === true,
   });
   const { tools, discovery, promptContext, currentOverhead } = await preparePromptRequest(request, dependencies.tools);
-  const publishPromptIdentity = (): void => {
-    request.onPromptIdentity?.(requestIdentity(currentOverhead()));
+  let runtimePromptIdentity = request.readPromptIdentity?.();
+  const publishPromptIdentity = (identity?: PromptIdentitySnapshot): void => {
+    runtimePromptIdentity = identity ?? { ...runtimePromptIdentity, ...requestIdentity(currentOverhead()) };
+    request.onPromptIdentity?.(runtimePromptIdentity);
   };
   publishPromptIdentity();
   discovery?.subscribe(publishPromptIdentity);
-  const compaction = withRequestOverhead(request.compaction, currentOverhead(), currentOverhead);
+  const compaction = withRequestOverhead(request.compaction, currentOverhead(), currentOverhead, () => runtimePromptIdentity);
   // The step and the tool set both exist here, so this is where a subagent's
   // run can be bound. The tool layer receives a function and never the model
   // side, which is what keeps a provider out of a layer that has no business
@@ -366,7 +371,7 @@ async function startTurn(
     background: request.background,
     checkpoint: request.checkpoint,
     checkpointError: request.checkpointError,
-    ...(request.onPromptIdentity ? { onPromptIdentity: request.onPromptIdentity } : {}),
+    onPromptIdentity: publishPromptIdentity,
     commandProof: request.commandProof,
     correlationId: request.correlationId,
     goalObjective: request.goalObjective,

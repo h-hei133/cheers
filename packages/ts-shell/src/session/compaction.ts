@@ -2,18 +2,19 @@ import { messageToText } from "../model-adapters/multimodal.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
-import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
-import { requestBudget } from '../context/request/budget.js';
+import { CHARS_PER_TOKEN, estimateRequestTokens, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
+import { availableTailTokens, formatBudgetBreakdown, reachedBudgetThreshold } from './compaction/budget.js';
 import { digest } from './compaction/state.js';
 import { formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
 import { generateCompaction, CompactionStepUnknown } from './compaction/generation.js';
 import type { CompactionAuthority, CompactionOperationInput, CompactionSource, SummarizeHistory, SummarizeTurnPrefix } from './compaction/contract.js';
 import { CompactionPublicationError } from './compaction/contract.js';
 import { freezeDeep } from '../core/values/freeze.js';
-import type { PromptMeasurementIdentity } from '../observability/usage/model.js';
+import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 
 export type { SummarizeHistory, SummarizeRequest, SummarizeTurnPrefix } from './compaction/contract.js';
 export { CONTEXT_CHECKPOINT_MARKER, formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
+export { shouldCompact } from './compaction/budget.js';
 
 export const KEEP_RECENT_TOKENS = 20_000;
 
@@ -61,9 +62,9 @@ export interface CompactionPolicy {
    * budget still produced a cut, and the cut shrank as that overhead grew.
    */
   readonly measureContextTokens?: (messages: readonly AgentMessage[],
-    identity?: Pick<PromptMeasurementIdentity, 'schemaDigest' | 'systemDigest'>) => number | undefined;
-  /** Effective schema/system identity of the request that produced the measurement. */
-  readonly promptIdentity?: Pick<PromptMeasurementIdentity, 'schemaDigest' | 'systemDigest'>;
+    identity?: PromptIdentitySnapshot) => number | undefined;
+  /** Captured endpoint, request-shape and replay identity for the measured prefix. */
+  readonly promptIdentity?: PromptIdentitySnapshot;
   /**
    * What the request carries besides the conversation: the instruction, and the
    * tool declarations.
@@ -127,67 +128,6 @@ export interface CompactionLifecycle {
     readonly keptMessages: number;
     readonly tokensBefore: number;
   }) => Promise<void> | void;
-}
-
-export function shouldCompact(
-  tokens: number,
-  contextWindow: number,
-  reserveTokens: number,
-  enabled = true,
-): boolean {
-  if (!enabled) {
-    return false;
-  }
-  return tokens > contextWindow - reserveTokens;
-}
-
-/**
- * Whether the request has reached the budget's soft band.
- *
- * The old reserve-only check could not see output headroom. A model with a
- * large output ceiling could therefore be treated as having more input room
- * than it did, and a model with a small ceiling compacted later than its soft
- * budget. The budget owner already defines the shared calculation; this helper
- * only decides whether it is a trigger.
- */
-function reachedBudgetThreshold(tokens: number, policy: CompactionPolicy, measured: boolean): boolean {
-  if (policy.enabled === false) return false;
-  if (policy.outputTokens === undefined && policy.inputLimit === undefined) {
-    return shouldCompact(tokens, policy.contextWindow, policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS,
-      policy.enabled ?? true);
-  }
-  const budget = requestBudget({
-    window: policy.contextWindow,
-    inputLimit: policy.inputLimit,
-    promptTokens: tokens,
-    outputTokens: policy.outputTokens,
-    reserveTokens: policy.reserveTokens,
-    measured,
-  });
-  if (budget.ok) return budget.soft;
-  // A provider-owned output ceiling leaves the full window unproven, but the
-  // independent input limit is still a usable bound. Apply the same soft band
-  // to that bound instead of falling back to the older reserve-only threshold.
-  if (budget.reason === 'unknown' && policy.inputLimit !== undefined) {
-    const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-    const availableInput = Math.max(0, policy.inputLimit - reserve);
-    const softLimit = Math.min(Math.floor(policy.contextWindow * 0.9), availableInput);
-    return tokens >= softLimit || tokens + reserve > policy.inputLimit;
-  }
-  // Unknown limits keep the old conservative behavior rather than claiming a
-  // threshold the runtime cannot prove.
-  if (budget.reason === 'unknown') {
-    return shouldCompact(tokens, policy.contextWindow, policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS,
-      policy.enabled ?? true);
-  }
-  return true;
-}
-
-function availableTailTokens(policy: CompactionPolicy): number {
-  const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-  const windowInput = policy.contextWindow - reserve - (policy.outputTokens ?? 0);
-  const limitInput = policy.inputLimit === undefined ? Number.POSITIVE_INFINITY : policy.inputLimit - reserve;
-  return Math.max(0, Math.min(windowInput, limitInput));
 }
 
 /**
@@ -362,10 +302,11 @@ export function compactionRefusalReason(
   const reason = explainNoCut(messages, policy);
   const measured = policy.measureContextTokens?.(messages, policy.promptIdentity);
   const tokens = measured ?? estimateRequestTokens(messages, policy.overhead);
-  const state = `the request needs about ${Math.round(tokens).toLocaleString('en-US')} tokens for a ${policy.contextWindow.toLocaleString('en-US')}-token window`;
+  const state = `the prompt uses about ${Math.round(tokens).toLocaleString('en-US')} ${measured === undefined ? 'estimated' : 'provider-measured'} tokens for a ${policy.contextWindow.toLocaleString('en-US')}-token window`;
+  const breakdown = formatBudgetBreakdown(messages, policy);
   return reason === "no-legal-cut"
-    ? { key: reason, message: `Context ${state}, but every point it could be split at would separate a tool call from its result. Finish the turn, then compact.` }
-    : { key: reason, message: `Context ${state}, but the conversation still fits the recent tail compaction keeps, so there is nothing to condense. Lower keepRecentTokens to condense it now.` };
+    ? { key: reason, message: `Context ${state}, but every point it could be split at would separate a tool call from its result. Finish the turn, then compact. ${breakdown}` }
+    : { key: reason, message: `Context ${state}, but the conversation still fits the recent tail compaction keeps, so there is nothing to condense. Lower keepRecentTokens to condense it now. ${breakdown}` };
 }
 
 /**
@@ -409,10 +350,8 @@ export function planCompactionCut(
 ): CompactionPlan | undefined {
   const available = availableTailTokens(policy);
   const estimated = estimateTokens(messages);
-  // A budget at or above what the window can hold would swallow the whole
-  // conversation, so no cut would ever be found and compaction would never run
-  // — the opposite of what the budget is for. Clamp it to the space that
-  // actually exists.
+  // A tail as large as the input ceiling can swallow all history when the
+  // soft trigger fires. Leave the recovery margin below that trigger.
   const keepRecent = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available);
   const cut = findCompactionCut(messages, keepRecent);
   if (cut === undefined) {
@@ -798,7 +737,10 @@ export function createCompactionStep(
       const committed = options.authority.commit({ source, summary, keptMessages: plan.keptMessages,
         tokensBefore: plan.tokensBefore, signal, admission: options.authority.admission });
       if (committed.status === 'unverified') throw new CompactionPublicationError();
-      if (committed.status !== 'committed') return undefined;
+      if (committed.status !== 'committed') {
+        options.onDeclined?.(`Automatic compaction was not published: ${committed.reason}`);
+        return undefined;
+      }
     }
     if (options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore }) === false) return undefined;
     await options.lifecycle?.after?.({ reason, summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });

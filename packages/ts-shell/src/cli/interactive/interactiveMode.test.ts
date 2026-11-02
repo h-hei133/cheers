@@ -545,6 +545,17 @@ function build(overrides: {
   return { mode, renderer, readline, terminal, approval };
 }
 
+it.each(['regular', 'fullscreen'] as const)('shows compaction unavailability on %s startup', tuiMode => {
+  const { mode } = build({ tuiMode });
+  const host = mode as unknown as { view: InteractiveView; options: { runtimeContext: ShellRuntimeContext } };
+  host.options.runtimeContext.compactionUnavailable = () => 'The selected provider is blocked.';
+  mode.start();
+  try {
+    expect(host.view.transcript.all().map(block => block.text).join('\n'))
+      .toContain('Auto-compaction unavailable: The selected provider is blocked.');
+  } finally { mode.stop(); }
+});
+
 it.each(['regular', 'fullscreen'] as const)('binds unanswered approval to the current run cancellation in the actual %s host', async kind => {
   const { mode, approval, terminal } = build({ tuiMode: kind }), controller = new AbortController();
   const host = mode as unknown as { overlay: OverlayHost; options: { sessionRuntime: ShellSessionRuntime } };
@@ -1541,7 +1552,7 @@ it('withdraws the prompt estimate when context selection changes', async () => {
     host.options.runtimeContext.session = { ...host.options.runtimeContext.session,
       contextSelection: { version: 1, revision: 2, entries: [{ id: first.id, hash: contextMessageHash(first), modes: ['elide'] }] } };
     host.promptContext.update();
-    expect(host.promptContext.read()).toEqual({ source: 'stale' });
+    expect(host.promptContext.read()).toEqual({ tokens: 100, source: 'stale' });
   } finally {
     host.promptContext.stop();
     mode.stop();
@@ -1551,7 +1562,7 @@ it('withdraws the prompt estimate when context selection changes', async () => {
 });
 
 it.each(['regular', 'fullscreen'] as const)(
-  'keeps the completed request measurement visible after the %s draft preview expires',
+  'keeps the latest footprint marked stale after the %s draft preview expires',
   async tuiMode => {
     vi.useFakeTimers();
     fs.mkdirSync('/tmp/cheers-test', { recursive: true });
@@ -1603,10 +1614,9 @@ it.each(['regular', 'fullscreen'] as const)(
       expect(frame()).toContain('~700/');
 
       vi.setSystemTime(Date.now() + 20_001);
-      expect(host.promptContext.read()).toEqual({ source: 'stale' });
-      expect(host.view.context.facts()).toMatchObject({ contextUsed: 568, contextSource: 'measured' });
-      expect(frame()).toContain('568/');
-      expect(frame()).not.toContain('? stale');
+      expect(host.promptContext.read()).toEqual({ tokens: 700, source: 'stale' });
+      expect(host.view.context.facts()).toMatchObject({ contextUsed: 700, contextSource: 'stale' });
+      expect(frame()).toContain('700? stale/');
     } finally {
       mode.stop(); route.mockRestore(); load.mockRestore(); resetSessionUsage(sessionId);
       vi.useRealTimers(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
@@ -1630,6 +1640,7 @@ it('keeps a published preview reservation while a user submission is busy', asyn
   const host = mode as unknown as {
     busy: boolean;
     promptContext: { start(): void; update(): void; suspend(): void; resume(): void; read(): { tokens?: number }; stop(): void };
+    view: InteractiveView & { context: { facts(): { contextUsed?: number; contextSource?: string } } };
     options: { runtimeContext: ShellRuntimeContext };
     run(text: string): Promise<void>;
   };
@@ -1642,6 +1653,7 @@ it('keeps a published preview reservation while a user submission is busy', asyn
     const running = host.run('/review');
     expect(route).toHaveBeenCalledTimes(1);
     expect(host.busy).toBe(true);
+    expect(host.view.context.facts()).toMatchObject({ contextUsed: 100, contextSource: 'stale' });
     await vi.advanceTimersByTimeAsync(500);
     expect(invalidate).not.toHaveBeenCalled();
     finish();

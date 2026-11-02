@@ -62,9 +62,10 @@ export class AgentCore {
     };
   }
 
-  public async prompt(input: AgentMessage | readonly AgentMessage[]): Promise<void> {
+  /** A session may prepare this prompt before entry; queued restarts still prepare normally. */
+  public async prompt(input: AgentMessage | readonly AgentMessage[], options: { readonly skipInitialPreparation?: boolean } = {}): Promise<void> {
     const messages = Array.isArray(input) ? [...input] : [input];
-    await this.runPromptMessages(messages);
+    await this.runPromptMessages(messages, options);
   }
 
   public async continue(): Promise<void> {
@@ -100,7 +101,7 @@ export class AgentCore {
 
   private async runPromptMessages(
     messages: readonly AgentMessage[],
-    options: { readonly skipInitialSteeringPoll?: boolean } = {},
+    options: { readonly skipInitialSteeringPoll?: boolean; readonly skipInitialPreparation?: boolean } = {},
   ): Promise<void> {
     await this.runWithLifecycle(async (signal) => {
       await runAgentLoop(
