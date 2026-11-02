@@ -9030,3 +9030,98 @@ if (corrected === undefined) return undefined;  // 退回未校准路径
 这不是「照抄三家」能解决的问题——三家都没做对。它是本项目在**比 oh-my-pi 更严格的身份校验**之上，自然暴露出来的下一个边界。
 
 值得记录的是：**oh-my-pi 有同样的潜在缺陷，只是它的触发条件更难满足**（需要同一锚点生命周期内多次改写）。本项目因为每次投影都重新计算 `removedChars`，更容易撞上。
+
+### 24.104 跨进程锚点：`--print` 下 `/context` 永远显示 estimated（2026-11-03）
+
+#### 24.104.1 现象
+
+`649c993c` 的 R5 修复在**同一进程内**生效（实测 `measureContextTokens` 从 3000 修正到 1031），但真实 `--print` 运行中 `/context` 仍显示：
+
+```
+Current prompt usage is unknown. No provider measurement is available for this context.
+Compaction basis: estimated; provider measurement unavailable (no usable prompt usage).
+```
+
+#### 24.104.2 根因：锚点三个字段都是纯内存态
+
+`SessionUsageSnapshot` 的 `Pick` 列表（`observability/usage/model.ts:194-195`）明确排除：
+
+```ts
+export type SessionUsageSnapshot = Pick<SessionUsageTelemetry,
+  "schemaVersion" | "usageHealth" | "byModel" | "turnsCount" | "toolCallsCount" | "lastBucketKey" | "lastUpdated" | "recentRequests">;
+```
+
+`lastPromptTokens`、`lastPromptMessageCount`、`lastPromptIdentity` **都不在其中**。测试 `observability/usage/persistence.test.ts:27` 断言恢复后 `lastPromptTokens` 是 `undefined`——**这是刻意设计**。
+
+后果：每次 `--print` 是新进程，锚点从零开始。R5 的修正只在同一进程的多步回合内有效。
+
+#### 24.104.3 三家的对照
+
+| | 锚点存在哪 | 是否持久化 | 重启后如何恢复 |
+|---|---|---|---|
+| **codex** | `TokenUsageInfo.last_token_usage` | **是**，写进 rollout | `last_token_info_from_rollout(&rollout_items)`（`session/mod.rs:1408-1410`、`:1428-1430`）恢复 |
+| **pi** | `AssistantMessage.usage` | **是**，随消息一起 | `getLastAssistantUsageInfo`（`compaction/compaction.ts:184-190`）从最后一条带 usage 的 assistant 消息恢复 |
+| **oh-my-pi** | `AssistantMessage.contextSnapshot` | **是**，随消息一起（`ai/src/types.ts:1293`） | 同样从消息上读回 |
+| **本项目** | `SessionUsageTelemetry.lastPromptTokens` | **否**，纯内存 | 无 |
+
+**三家都把锚点存在消息上**，因此天然随会话持久化。本项目把锚点放在会话级遥测里，而遥测的快照类型刻意只保留**累计**计数（`byModel`、`recentRequests`），不保留**当前**测量。
+
+#### 24.104.4 本项目的结构性障碍
+
+`recentRequests` 确实持久化了，且每条都有 `promptTokens`（`usage/model.ts:160`）。但它**缺少两个关键字段**：
+
+```ts
+export interface UsageHistoryEntry {
+  readonly promptTokens: number;        // ← 有
+  readonly purpose?: string;            // ← 有
+  // 缺 promptMessageCount
+  // 缺 promptIdentity（schemaDigest / systemDigest / wireHistoryDigest / replayBinding ...）
+}
+```
+
+**没有 message count 和 identity，就无法安全地把这条记录当作锚点**——不知道它覆盖多少条消息、对应哪个模型/schema/投影。
+
+更根本的是：`SessionMessage` 与 `AgentMessage` **都没有 `usage` 字段**（`session/schema/sessionMessage.ts`、`core/agent/state.ts` 中 grep `usage` 无结果）。这是与 pi/omp 的根本差异。
+
+#### 24.104.5 方案
+
+**方案 A（推荐，与 pi/omp 对齐）：把锚点写到消息上。**
+
+在 `SessionMessage` 增加可选字段，记录产生该消息的请求的测量：
+
+```ts
+interface SessionMessage {
+  // ...
+  /** Provider measurement of the request that produced this assistant message. */
+  readonly promptMeasurement?: {
+    readonly tokens: number;
+    readonly messageCount: number;
+    readonly identity: PromptMeasurementIdentity;
+  };
+}
+```
+
+- 写入点：`turn/session.ts` 的 `persist()`，在 `message_end` 时附带当前锚点；
+- 恢复点：`restoreSessionUsage` 之后，扫描最后一条带 `promptMeasurement` 的 assistant 消息，重建 `lastPromptTokens` / `lastPromptMessageCount` / `lastPromptIdentity`；
+- 失效：消息本身被压缩替换时，锚点自然消失——这正是想要的语义。
+
+代价：transcript 每条 assistant 消息多几十字节；需要处理旧会话没有该字段的兼容路径。
+
+**方案 B（最小改动）：扩展 `UsageHistoryEntry`。**
+
+给 `UsageHistoryEntry` 增加 `promptMessageCount` 与 `promptIdentity`，在 `restoreSessionUsage` 时用最后一条 `purpose === 'turn'` 的记录重建锚点。
+
+代价小，但语义不够直接——`recentRequests` 是有界的环形缓冲（会被裁剪），锚点可能因此丢失；而消息上的锚点与消息同生命周期。
+
+**方案 C（不做）**：接受 `--print` 下 `/context` 显示 `estimated`，只在交互模式提供实测值。
+
+**建议 A**。理由：它与三家一致，语义最直接（锚点描述的就是这条消息），且不会因为环形缓冲裁剪而丢失。
+
+#### 24.104.6 与 R5 的关系
+
+R5 的修正是**必要但不充分**的：
+
+- **必要**：没有它，即使锚点存在，微压缩也会让它失效；
+- **不充分**：锚点本身跨进程不存在，修正无从谈起。
+
+两项必须都做，`/context` 才能在 `--print` 下显示实测值。
