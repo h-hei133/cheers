@@ -1928,3 +1928,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A summary generated while a run is emitting `query-event` or lifecycle records is refused as stale even though the model history and branch are unchanged.
 - **Root Cause**: The publication fence hashed raw metadata and transcript bytes, so append-only observation records changed identity during an otherwise valid summary.
 - **Rule**: Build compaction identity from logical history, active branch, model/context state, and file ownership identity. Exclude observation-only transcript bytes while retaining message/branch/configuration/storage change checks. Add a summary-time query-event regression and keep durable append verification separate from source identity.
+
+### A Compaction Fence Must Not Include Files That Lifecycle Rewrites
+- **Symptom**: A summary generates successfully, then every commit is refused with "The session source changed while its summary was generated", so auto-compaction never lands even though every earlier step reports success.
+- **Root Cause**: The capture identity digests `metadata.json`'s inode, but metadata is published by atomic write (temp file + rename), so every lifecycle write — the prompt barrier, turn-active, error, completion — mints a new inode. Those writes happen after the compaction check and during generation, so the fence is guaranteed to move.
+- **Rule**: A publication fence may cover only state that the summarized history depends on: the append-only transcript's identity, the logical state fields, the history, and the active path. Display fields (title, status, updatedAt) belong outside it; if takeover detection is needed, compare content digests rather than inodes, because atomic publication always changes the inode. Test by generating a summary while a lifecycle write runs, and assert the commit still lands.
+
+### A Summary Request Needs Its Own Output Budget
+- **Symptom**: Compaction declines silently with `unsummarized` whenever the user's `maxOutputTokens` is modest, and nothing reaches the user.
+- **Root Cause**: The summarizer request reuses the foreground request's output ceiling, so a 1024-token ceiling truncates the summary; the truncated completion is classified as a failed summary and mapped to a silent decline.
+- **Rule**: Derive the summarizer's ceiling from the summary's own need, and set the segmentation budget from the same number so a segment can never exceed what the request may emit. A decline that means "the summary failed" must be reported; only "nothing worth condensing" may stay silent.

@@ -8294,3 +8294,134 @@ const promptIdentity = () => runtimePromptIdentity() ?? requestIdentity(current(
 真实隔离 CLI 先发现另一个并发问题：摘要生成期间追加的 `query-event`/生命周期事件只改变 transcript 原始字节，不改变逻辑历史，原 source identity 却把整个 `metadata.json` 与 `transcript.jsonl` 纳入摘要，导致合法发布被拒绝。现已改为校验逻辑历史、分支、模型/上下文状态和文件身份，排除无关 transcript 事件；消息或分支变化仍会拒绝发布。新增摘要期间追加 query event 的回归测试，并保留手动/自动竞争只提交一次的断言。
 
 验证：隔离 HOME、Node 20 floor 兼容的单 worker/768 MiB 串行聚焦集合 **22 文件、1002 项通过**；五个静态门和 `git diff --check` 通过。provider/平台/真实账单等外部验收仍按 Phase 20 台账单独记录，不从本地测试推导完成。
+
+### 24.99 修复验证与真实 auto-compact 测试（2026-11-02）
+
+针对 commit `77b81369` 与 `4f26bcf1` 做了逐项核查，并按用户要求在真实 CLI 中跑通压缩链路。结论：**用户修复了 24.98 提出的 S1/S1b/S2/S3/S4/S5/S7，但真实运行中压缩仍然无法落地，原因是两个此前未发现的阻塞点。**
+
+#### 24.99.1 已修复项核实（有测试或探针证据）
+
+| 24.98 条目 | 实现位置 | 核实方式 | 结论 |
+|---|---|---|---|
+| S1 软限必须低于硬限 | `context/request/budget.ts` 新增 `requestBudgetLimits`，`softLimit = min(floor(w*0.9), floor(availableInput*0.8))` | 探针实测 20k 窗口带宽从 **0 → 1,581**；64k 从 **0 → 10,381** | 已修复 |
+| S1b 切点预算钳到阈值以下 | `session/compaction/budget.ts` 的 `availableTailTokens = floor(threshold * 0.8)` | 64k 窗口 keepTail 从 51,904 → **33,218** | 已修复 |
+| S2 `keepRecentTokens` 成为已声明字段 | `config/fields.ts:63` + `config/settings.ts:28` + `runtimeConfig.ts:564` | 隔离 home 写入后 `getRuntimeConfig().keepRecentTokens` 有值 | 已修复 |
+| S3 `policy.promptIdentity` 携带完整身份 | `cliRuntimeInvocation.ts` 的 `withRequestOverhead` 增加 `currentPromptIdentity`，`cliSessionRuntimeFactory.ts:283` 提供 `readPromptIdentity` | 探针：`policy.promptIdentity` 现在有 10 个字段；`measureContextTokens` 返回 **12345** 而非 `undefined` | 已修复 |
+| S4 显示层保留读数 | `interactiveMode.ts:376` 去掉 `!this.busy`；`controller.ts` 增加 `retained` + `scope`；`items.ts` 渲染 `<tokens>? stale` | 探针：含工具调用的历史现在仍是 `calibrated 30,572` | 已修复 |
+| S5 压缩不可见 | `runtimeContext.compactionUnavailable` + `/context` 的 `Compaction basis` 行 + 启动 notice | `context/report.ts` 有对应字段与渲染 | 已修复 |
+| S7 预算拆分 | `formatBudgetBreakdown`（`session/compaction/budget.ts`） | 拒绝消息包含 tool schemas / system / history 三项 | 已修复 |
+
+**静态门与聚焦测试**：`verify:import-cycles`、`check:config-consumers`（62/62）、`check:declarations`（18/18、13/13）全部通过；压缩相关 163 项测试通过。`sessionFacts.test.ts` 的 11 项失败是**真实 `~/.cheers/models.json` 覆盖了测试 fixture 的目录**，隔离 HOME 下 28/28 通过，不是产品缺陷。
+
+#### 24.99.2 真实 auto-compact 测试：三个阻塞点
+
+测试环境：隔离 home（`/tmp/cheers-test/auto2/home`）、真实 provider（`bailu-2.8`）、`contextWindow: 40000`、`reserveTokens: 2000`、`maxOutputTokens: 4096`、`keepRecentTokens: 4000`。用 `read` 工具反复读入 33KB 文件把上下文推过阈值。
+
+日志与探针确认的事实：
+
+```
+turn.compaction Checking context budget {"boundary":"prompt","messageCount":14}
+probe: window=40000 reserve=2000 output=4096 keep=4000 tools=18 sysChars=1366 measured=undefined
+planCompaction = FIRES（requestEstimate 38,730 > threshold 27,123）
+```
+
+**压缩确实被调用、判定确实触发、`PreCompact` 钩子确实派发。** 但最终没有落地，依次卡在三个点：
+
+**阻塞点 1：摘要请求返回 `finish_reason: "length"`，被静默丢弃。**
+
+诊断输出（临时插桩，已回退）：
+
+```
+FINISH length
+DECLINED reason=unsummarized
+```
+
+`requestCompactionSummary` 把 `length` 与 `error`/`refusal`/`content_filter` 一起当作失败返回 `undefined`（`core/query/compaction/summarize.ts:249`），而 `generateContext` 把 `undefined` 映射为 `declined: unsummarized`（`session/compaction.ts:608`）。**整条路径没有任何用户可见输出**——既没有 `onError`，也没有 `onDeclined`。
+
+原因：摘要请求的输出上限直接复用 `configuredOutputLimit(runtimeConfig)`（`cli/runtime/compaction.ts:136`、`:141`），也就是主请求的 `maxOutputTokens`。而摘要要把整段历史压成一条消息，输出需求与主请求无关。测试里 `maxOutputTokens: 1024` 时必然截断。
+
+`policy.segmentTokens` 是为此存在的字段（`session/compaction.ts:25`，`schedule.ts:7` 的默认 `16_000`），但**生产路径从未设置它**——`grep segmentTokens` 在 `cli/`、`turn/` 下无赋值点。所以分段机制在真实运行中永远走默认值，而实际发送上限仍由 `maxOutputTokens` 决定，两者不一致。
+
+**阻塞点 2：`metadata.json` 的 inode 在摘要生成期间被改写，导致发布必然被拒。**
+
+诊断输出（临时插桩，已回退）：
+
+```
+moved=["metadataFile"]
+   metadataFile: "2096:786583:1793610021773" -> "2096:784022:1793610022157"
+```
+
+`capture()` 把 `fileIdentity(layout.metadataPath)` 计入 `identity`（`session/compaction/commit.ts:52`）：
+
+```ts
+const identity = digest([session.id, session.createdAt, storage, fileIdentity(layout.metadataPath),
+  fileIdentity(layout.transcriptPath), logicalState, history, sourceActivePath]);
+```
+
+而 `writeSessionMetadataRecord` 用**原子写**（`sessionFileStore.ts:190` 的 `writeTextFileAtomic`：写临时文件 + `rename`），每次都会产生**新 inode**。日志显示一次普通回合里 metadata 被重写 5 次：
+
+```
+activateSession
+persistSessionUserPromptBarrier
+markSessionTurnActive
+saveSessionError
+saveSessionCompleted
+```
+
+其中 `persistSessionUserPromptBarrier` 与 `markSessionTurnActive` 都发生在压缩检查**之后、摘要生成期间**。因此只要摘要耗时超过这两个写入，`commit` 的 identity 比较必然失败，返回 `The session source changed while its summary was generated.`
+
+**这是设计缺陷而非竞态偶然**：`identity` 的注释明确写着「Keep the source fence tied to logical session state and file ownership so those observations do not make a valid publication look stale」。但 `metadata.json` 的 inode 恰恰是「观测」而非「逻辑状态」——标题、`updatedAt`、`status` 的写入不改变要摘要的历史。把它的 inode 计入 identity，等于让每一次生命周期写入都作废一次进行中的摘要。
+
+`state.json` 同理，但它没有被计入（只在 `logicalState` 里取字段），说明这个区分是刻意做过的，`metadataPath` 是被漏掉的一项。
+
+**阻塞点 3（未验证但已定位）：`measureContextTokens` 仍返回 `undefined`。**
+
+诊断输出 `measured=undefined`，而 24.99.1 的探针在构造环境下返回了 12,345。差异在于真实运行的 `recorded.wireHistoryDigest` 与 `outgoingProjection(messages, mainShape.assistantAfterToolResult)` 的切片不一致——`cli/runtime/compaction.ts` 要求 `recorded.wireMessageCount === measuredMessageCount` 且切片摘要相同。真实运行中 `measuredMessageCount` 是**原始消息数**（`turn/step.ts:633` 的 `promptMessageCount: messages.length`），而 `wireMessageCount` 是**投影后消息数**，两者在工具桥接或关闭步时不等。
+
+这一项不影响触发（估算回退仍能触发），但会让拒绝消息与 `/context` 一直显示「estimated」，与用户实际看到的 provider 用量不符。
+
+#### 24.99.3 三个阻塞点的修复方案
+
+**F1（P0）摘要输出上限必须独立于主请求。**
+
+```ts
+// cli/runtime/compaction.ts:136 与 :141
+maxOutputTokens: summaryRole ? summaryRole.limits.maxOutputTokens
+  : resolveSummaryOutputLimit(runtimeConfig, provider.endpoint),
+```
+
+`resolveSummaryOutputLimit` 取 `max(configuredOutputLimit(...), SUMMARY_MIN_OUTPUT)`，其中 `SUMMARY_MIN_OUTPUT` 取模型 `maxTokens` 的一个保守比例（或固定 8,192）。同时把 `policy.segmentTokens` 设为同一数值，让分段预算与发送上限一致。
+
+**F2（P0）把 `metadata.json` 的 inode 移出 `identity`。**
+
+`metadata.json` 携带的是标题、`status`、`updatedAt`、`hasReportHistory` 等展示字段，不参与「要摘要的历史」。`identity` 应只覆盖：
+
+- `transcriptPath` 的 inode（追加式写入，inode 稳定）；
+- `logicalState`（已包含 `pendingPrompt`、`thread`、`modelSelection` 等真正的逻辑状态）；
+- `history` 与 `sourceActivePath`。
+
+删除 `fileIdentity(layout.metadataPath)` 一项即可。若仍需检测元数据被替换（例如会话被另一实例接管），应比较**内容摘要**而非 inode，因为原子写必然换 inode。
+
+**F3（P1）摘要失败必须可见。**
+
+`turnCompaction` 没有把 `onError` 传给 `createCompactionStep`（`turn/compaction.ts:33-43`）。应增加 `onError: error => renderer.renderLine(...)`，与 `onDeclined` 走同一条用户可见通道。当前 `unsummarized` 是一个 `declined` 而非 `error`，所以即便加了 `onError` 也覆盖不到——**`unsummarized` 应当被区分为失败**，或在 `onDeclined` 里区分「无事可做」与「摘要失败」。
+
+**F4（P2）`measureContextTokens` 的 wire 计数对齐。**
+
+`turn/step.ts:633` 的 `promptMessageCount: messages.length` 记录的是原始消息数，而 `wireMessageCount` 是投影后数量。`cli/runtime/compaction.ts` 的校验同时要求两者相等，实际只应在 `sourceAligned` 时要求，否则退化为「只校验 historyDigest 前缀」。这一项影响显示一致性，不影响压缩触发。
+
+#### 24.99.4 本轮的方法论修正
+
+24.98.10 记下的教训是「单测通过而真实运行不通过时，先对比输入对象」。本轮进一步验证了它的价值，也暴露了新的失败模式：
+
+**失败模式：把「链路通了」当成「功能可用」。** 我先后确认了 `PreCompact` 派发、`planCompaction` 返回计划、`condenseContext` 被调用，据此认为压缩「应该成功了」。真正的事实是每一步都成功，但最后一步的发布被拒——而拒绝信息被 `onDeclined` 打印出来时，我一度把它当成「已经修好」的证据读了过去。
+
+**修正方法**：在真实链路里，每一步的「成功」都必须有独立证据，且**最后一步的产物必须可观察**。本轮最后靠三件事定位：
+
+1. 在 `createCompactionStep` 的每个 `declined` 分支写诊断 → 得到 `unsummarized`；
+2. 在 `requestCompactionSummary` 的三个失败分支写诊断 → 得到 `FINISH length`；
+3. 在 `commit` 的 identity 比较处 dump 分量 → 得到 `moved=["metadataFile"]`。
+
+三步各自独立，缺任何一步都会继续停在「链路通了但没效果」。
+
+**另一个教训**：诊断代码必须用**静态 import**。本轮第一次插桩又写了 `await import('node:fs')` 放进同步函数，构建失败后才发现——这是 HANDOFF 里已记录的坑，第二次犯。
