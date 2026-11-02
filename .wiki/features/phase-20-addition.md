@@ -7875,3 +7875,414 @@ oh-my-pi 的补充事实：agent loop 本身（`packages/agent/src/agent-loop.ts
 #### 对上一轮表述的更正
 
 上一轮写「`planCompaction` 在真实运行中从未被调用，原因未查明」——**这个判断是错的**。真实 `runTurn` 会调用它。当时的依据是「诊断日志为空」，而那段诊断用了 ESM 里不可用的 `require()`，日志根本没写成功。我把「观测失败」误读成了「行为不存在」。
+
+### 24.98 深度研究：三个未解问题的根因与方案（2026-11-02）
+
+上一轮以「全部证伪」收尾，没有给出方案。本轮换了方法：**先建立可复现的观测，再解释现象**。结果是三个问题都找到了确定性根因，且都不是我之前猜的那些。
+
+#### 24.98.1 结论先行
+
+| 问题 | 上一轮的猜测 | 实际根因 | 证据 |
+|---|---|---|---|
+| auto-compact 从不触发 | 假设 `prepareNextStep` 没执行 | **切点预算与阈值取自同一个 `available`，且 `softLimit` 在窗口 ≤ 120,960 时恒等于 `available`，导致「提前压缩」的窗口宽度为零** | `planCompaction` 返回 `undefined`；`compactionRefusalReason` 返回 `fits-budget` |
+| 24.95 实验「判定应触发却没触发」 | 「原因未查明」 | **实验在 config.json 写了 `keepRecentTokens: 2000`，但该键不是已声明字段，加载时被静默丢弃**；单测直接传 policy 所以生效 | 探针输出 `keepRecentTokens = undefined`，诊断 `unknown-field; value ignored` |
+| 上下文显示滞后 | 「两套数值」 | **锚点根本没被用上**：`policy.promptIdentity` 只有 `{schemaDigest, systemDigest}`，而 `measuredPromptContext` 要求 `endpoint`/`historyDigest`/`wireHistoryDigest`/`replayBinding` 同时匹配，任一缺失即返回 `undefined` | 生产 `buildCompactionWiring` + `withRequestOverhead` 实测返回 `undefined` |
+| 显示层在忙碌时丢失数字 | 「busy 时丢弃」 | 确实如此，但更根本的是：即使不 busy，**含工具调用的历史会让 `estimatePrompt` 的 `compatible` 判定失败**，calibrated 直接退化为纯估算 | 同一份历史：无工具 → `calibrated 30,572`；含一个工具调用 → `estimated 6,290` |
+
+**这四条合起来解释了我之前所有「反复修改却没有效果」的现象。**
+
+#### 24.98.2 问题一：调度压缩的触发带宽度为零（auto-compact 的真根因）
+
+`reachedBudgetThreshold` 用 `requestBudget` 判「是否到软限」，而软限的定义是：
+
+```ts
+// context/request/budget.ts:76-78
+const softLimit = Math.min(Math.floor(input.window * fraction), availableInput);
+```
+
+其中 `availableInput = window - output - reserve`（`:74`）。于是**触发带**是 `[softLimit, availableInput]`，宽度为：
+
+```
+availableInput - min(floor(window*0.9), availableInput)  =  max(0, availableInput - floor(window*0.9))
+```
+
+而 `availableInput = window - output - reserve`。所以当 `output + reserve >= window * 0.1` 时，`availableInput <= floor(window*0.9)`，**触发带宽度为 0**。
+
+用真实默认值（`maxOutputTokens = 4096`、`reserveTokens = 8000`，合计 12,096）：
+
+| 窗口 | availableInput | softLimit | **触发带宽度** |
+|---|---|---|---|
+| 20,000 | 7,904 | 7,904 | **0** |
+| 64,000 | 51,904 | 51,904 | **0** |
+| 120,960 | 108,864 | 108,864 | **0** |
+| 121,000 | 108,904 | 108,900 | 4 |
+| 128,000 | 115,904 | 115,200 | 704 |
+| 200,000 | 187,904 | 180,000 | 7,904 |
+| 1,000,000 | 987,904 | 900,000 | 87,904 |
+
+**任何 ≤ 120,960 tokens 的窗口，调度压缩的触发带宽度都是零。** 这不是「压缩很少触发」，而是「压缩在这个窗口下不存在可触发的区间」。
+
+实测（探针 `bandverify.ts`）——在 20k 与 64k 窗口下扫描对话规模，看「请求是否还装得下」与「压缩是否触发」的关系：
+
+```
+window=20,000  available=16,976  soft=16,976  keep=16,976
+  conv= 15,000 request FITS     → plan=no
+  conv= 17,000 request OVERFLOW → plan=no
+  conv= 18,000 request OVERFLOW → plan=no
+  conv= 19,000 request OVERFLOW → plan=FIRES
+
+window=64,000  available=51,904  soft=51,904  keep=20,000
+  conv= 50,000 request FITS     → plan=no
+  conv= 52,000 request OVERFLOW → plan=FIRES
+```
+
+**结论：调度压缩从来不会在请求还装得下的时候触发。它只在请求已经装不下之后才触发，而此时 `step.ts:369` 的本地预算检查会直接返回 `CONTEXT_OVERFLOW_PREFIX` 错误，根本不发请求。**
+
+所以完整链路是：
+
+1. 对话增长到 `softLimit` 以下 → 压缩不触发（正确）；
+2. 对话跨过 `softLimit`，但因为触发带宽度为 0，`softLimit == availableInput`，同一刻请求也已经装不下；
+3. `prepareNextStep` 在下一步之前跑，发现 `planCompaction` 要么无切点（`fits-budget`，因为 keep 预算也被钳到 `availableInput`）要么已超窗；
+4. 即便它返回了计划，`step.ts:363` 的 `requestBudget` 也会在下一次请求前拒绝，返回 `Context overflow:` 错误。
+
+**这才是「压缩从未成功执行过一次」的结构性原因。** 它不是接线问题，不是 `prepareNextStep` 没被调用，而是**触发条件在数学上不可达**。
+
+再看 24.95 的对照实验（探针 `exact95.ts`，按真实数字构造）：
+
+```
+conversation=12582  request=18165  available=16976  softLimit=16976
+
+unit test used keepRecent=2000         effective keep=2000   plan=TRIGGERS  refusal=no-legal-cut
+live run used the default 20,000       effective keep=16976  plan=none      refusal=fits-budget
+```
+
+单测之所以「TRIGGERS」，是因为它**直接传了 `keepRecentTokens: 2000`**，让切点存在于 2,000 tokens 处；真实运行用的是默认 20,000，被钳到 16,976，切点不存在。**两者的差别不是接线，是切点预算。**
+
+再看用户当前配置（bailu-2.8，1M 窗口）：触发带宽度 87,904，第一个触发点约在 **891,001 tokens**。用户环境里最大的真实会话是 **20,707 tokens**（35 个会话统计）。所以：**在用户当前配置下，压缩永远不会发生，因为没有任何会话能接近 89 万 tokens。** 这是窗口与阈值匹配的结果，但它意味着「压缩从未被验证」在用户环境下是**结构性的**。
+
+#### 24.98.3 问题二：`keepRecentTokens` 不是已声明字段（实验失败的根因）
+
+`keepRecentTokens` 在 `RuntimeConfig` 接口上存在（`config/runtimeConfig.ts:35`，属于 `ModelTokenBudget`），但**不在 `createConfigFields` 的字段表里**（`config/fields.ts:63` 只声明了 `modelTokenBudgets` 的**子对象**形状）。实测：
+
+```
+keepRecentTokens     NOT DECLARED  ← 写在 config.json 里的值会被静默丢弃
+reserveTokens        DECLARED
+contextWindow        DECLARED
+modelTokenBudgets    DECLARED
+```
+
+用隔离 home 写入 `keepRecentTokens: 2000` 后加载（探针 `dropped.ts`）：
+
+```
+contextWindow      = 20000
+reserveTokens      = 2000
+maxOutputTokens    = 1024
+keepRecentTokens   = undefined   ← 24.95 实验设置的值
+diagnostics        = ["Config user (unknown): unknown-field; value ignored."]
+```
+
+诊断确实产生了（`config/layers.ts:89`），且会出现在启动界面（`core/shell/bootstrap.ts:339`、`cli/interactive/interactiveMode.ts:507`），但**只出现在启动时的一行诊断里**，不会告诉用户「你的压缩预算没有生效」。
+
+**这是本轮最重要的可迁移结论**：一个只存在于 `ModelTokenBudget` 子对象里的字段，用户无法在顶层设置；想调压缩保留量，唯一途径是写 `modelTokenBudgets["provider/model"].keepRecentTokens`，而这条路径没有任何界面提示。
+
+#### 24.98.4 问题三：锚点从未被用上（显示滞后 + 压缩判定的共同根因）
+
+`buildCompactionWiring` 的 `measureContextTokens` 会调用 `measuredPromptContext(..., { requireExpectedIdentity: true })`：
+
+```ts
+// cli/runtime/compaction.ts:191-207
+measureContextTokens: (messages, identity) => {
+  ...
+  const measured = measuredPromptContext(input.sessionId, { provider, model, endpoint, endpointId,
+    ...(identity ?? {}), ...historyIdentity }, { requireExpectedIdentity: true });
+  if (!measured) return undefined;
+  return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
+}
+```
+
+`identity` 来自 `policy.promptIdentity`，而 `withRequestOverhead` 把它定义成：
+
+```ts
+// entrypoints/cliRuntimeInvocation.ts:308-312
+const promptIdentity = () => requestIdentity(current());
+return { ...compaction, policy: { ...compaction.policy,
+  get overhead() { return current(); },
+  get promptIdentity() { return promptIdentity(); } } };
+```
+
+`requestIdentity` 只返回两个字段：
+
+```ts
+// context/request/identity.ts
+export function requestIdentity(overhead) {
+  return { schemaDigest: ..., systemDigest: ... };   // 仅此两个
+}
+```
+
+而 `measuredPromptContext` 在 `requireExpectedIdentity: true` 时要求：
+
+```ts
+// observability/usageTelemetry.ts:280-285
+if (options.requireExpectedIdentity) {
+  if (expected.endpoint === undefined || expected.schemaDigest === undefined || expected.systemDigest === undefined) return undefined;
+  if (identity.endpoint !== expected.endpoint) return undefined;
+  ...
+}
+// 且在此之前（:271-272）：
+if (identity.wireHistoryDigest !== undefined && expected.wireHistoryDigest === undefined) return undefined;
+if (identity.replayBinding !== undefined && expected.replayBinding === undefined) return undefined;
+```
+
+`step.ts` 记录的 identity **一定包含** `wireHistoryDigest` 与 `replayBinding`（`turn/step.ts:347-361`，`replayBinding` 由 `requestReplayBinding` 无条件生成，`:256`）。于是：
+
+**只要请求成功过一次，`policy.promptIdentity` 就永远缺 `wireHistoryDigest`/`replayBinding`/`historyDigest`，`measuredPromptContext` 永远返回 `undefined`。**
+
+实测（探针 `wiringmeasure.ts`，用真实 `buildCompactionWiring` + 真实 `withRequestOverhead` + 真实 `recordSessionUsage`）：
+
+```
+policy.promptIdentity keys = [ 'schemaDigest', 'systemDigest' ]
+measureContextTokens       = undefined  ← provider anchor discarded
+estimateRequestTokens      = 26
+```
+
+再逐字段隔离（探针 `identity4.ts`）——只有四个字段**同时**存在才返回数值：
+
+```
+policy shape (schema+system only)              undefined
+missing only replayBinding                     undefined
+missing only wireHistoryDigest                 undefined
+missing only historyDigest                     undefined
+all present                                    { tokens: 900, messageCount: 3 }
+```
+
+**两个后果**：
+
+1. **压缩判定**永远走 `estimateRequestTokens` 回退路径（字符/3.5），provider 实测的 12,345 tokens 被丢弃，回退估算得到 26 tokens。这是「判定数值与显示数值不一致」的**真正**来源——不是两套算式，而是**一套算式从未拿到锚点**。
+2. **状态栏**同样走 `runtimeContext.promptIdentity`，同样只有两个字段，同样拿不到测量值。
+
+#### 24.98.5 问题四：`estimatePrompt` 的 calibrated 在含工具历史时失效
+
+即使把完整 identity 传进去，`estimatePrompt` 还有第二道门：
+
+```ts
+// context/request/estimate.ts:30-41
+const compatible = previous && ... 
+  && previous.historyDigest === historyDigest(messages.slice(0, count))
+  // Tool microcompaction and opaque multimodal/reasoning replay are not additive.
+  && messages.every(message => ['user', 'assistant'].includes(message.role) && typeof message.content === 'string'
+    && !message.reasoning && !message.tool_calls?.length && !message.tool_call_id && !message.origin?.replayBinding);
+```
+
+**任何一条 tool 消息、任何一条带 `tool_calls` 的 assistant 消息，都会让 `compatible` 为 false**，calibrated 退化为纯估算。实测（探针 `calibrate.ts`）：
+
+```
+history with no tool traffic                 source=calibrated  tokens=30,572
+history containing one tool call + result    source=estimated   tokens=6,290
+
+char estimate of withTools = 6,290 (anchor alone is 30,000)
+```
+
+一个已经消耗 30,000 tokens 的会话，因为中间有过一次工具调用，状态栏显示 **6,290**。
+
+这与注释的意图（「工具微压缩与不透明重放不可加」）不一致：不可加的是**被微压缩改写过的消息**，不是**所有含工具的历史**。当前实现把一个必要条件的否定，扩大成了整段历史的排除。
+
+#### 24.98.6 三家的做法（本轮子代理实测）
+
+**pi**（`/home/wang/projects/pi`）：
+
+- 检查位置：`_prepareRun`（`agent-session.ts:1947`）在 `agent.prompt` 之前 + `prepareNextTurnWithContext`（`:920`）在每步之后。**都不在 `agent-loop.ts` 内**。
+- 锚点：`estimateContextTokens`（`compaction/compaction.ts:196`）= 最后一条可用 assistant 的 usage + 其后每条消息的 `estimateTokens`。aborted/error/零 usage 的 assistant 被跳过。
+- **切点预算与阈值是两个设置**：`shouldCompact` 只用 `reserveTokens`（`:267`），切点只用 `keepRecentTokens`（`:885`）。二者无任何校验关系。
+- 整段小于 keep：`cutIndex` 停在第一个合法切点，`messagesToSummarize` 为空 → `prepareCompaction` 返回 `undefined` → **静默跳过**（`agent-session.ts:3193`）。
+- 显示：`getContextUsage`（`:4318`）**与逐步阈值检查用同一个 `estimateProjectedContextTokens`**；压缩后无新 usage 时返回 `percent: null`，footer 渲染 `?/<window>`。
+- 拒绝：自动路径静默；手动路径区分 `Already compacted` / `Nothing to compact (session too small)`（`:2865-2873`）；**没有 `would-not-shrink` 概念**。
+
+**oh-my-pi**（`/home/wang/projects/oh-my-pi`）：
+
+- 检查位置：`runPrePromptCompactionIfNeeded`（`session-maintenance.ts:2735`）每 prompt 一次，在 `#promptWithMessage`（`agent-session.ts:8954`）内、`agent.prompt` 之前；另有 `maintainContextMidRun`（`:2812`）挂在 `onTurnEnd`。**`agent-loop.ts` 内无压缩调用。**
+- 锚点：`#anchoredUsedTokens`（`session-stats.ts:128`）= `base + nonMessageDelta + countMessages(activeMessages.slice(anchorIndex+1)) + pendingTokens`。**schema 增量带符号**，roster 收缩时数字能下降。另有 `#compactionEpoch`（`:101`）拒绝压缩前的陈旧锚点。
+- **切点预算被显式钳制到恢复带**（`compaction/compaction.ts:1547-1555`）：
+  ```ts
+  const recoveryBand = Math.floor(resolveThresholdTokens(contextWindow, settings) * COMPACTION_RECOVERY_BAND);
+  const tailBudget = recoveryBand > reserveFloor ? recoveryBand - reserveFloor : Math.floor(recoveryBand / 2);
+  keepRecentTokens = Math.min(keepRecentTokens, Math.max(1, tailBudget));
+  ```
+  这与本项目的 `Math.min(keepRecent, available)` **方向相同但结果相反**：omp 钳制到阈值的 80% 以下，保证「切点存在」与「阈值已到」能同时成立；本项目钳制到阈值**本身**，两者永远无法同时成立。
+- 显示：状态栏用 anchored breakdown，但**触发判定取 `max(anchored, localEstimate)`**（`session-maintenance.ts:2696`），所以触发点可以高于显示值——这一点比本项目更保守，方向是对的。
+- 拒绝：四类全部区分且有用户可见文本——`#compactionDeadEndWarning`（`:4252`）、`would not reduce context`（`:5823`）、`Auto-compaction failed:` / `Context overflow recovery failed:`（`:5892`）。
+
+**codex**（`/home/wang/projects/codex`）：
+
+- 检查位置：`run_pre_sampling_compact`（`session/turn.rs:1033`）在 `run_turn` 开头、采样循环（`:304`）之前。**检查无条件，压缩有条件**（`:1041-1059`：`if token_status.token_limit_reached { run_auto_compact(...) }`）。
+- 锚点：`get_total_token_usage`（`context_manager/history.rs:424-456`）= `last_token_usage.total_tokens` + **最后一条 model-generated item 之后**的本地估算。冷启动时返回 **0**（`token_info` 为 `None`，且无 model-generated item）。
+- **阈值与保留预算完全分离**：阈值是 `auto_compact_token_limit`（默认窗口 90%，`protocol/openai_models.rs:499-510`）；保留是本地摘要的 `COMPACT_USER_MESSAGE_MAX_TOKENS = 20_000`（`compact.rs:62`，只保留最新 user 消息）。
+- **不存在「合法切点」概念**：越过阈值就无条件压缩。整段小于保留预算时全量保留、静默。
+- 显示：footer 用 `last_token_usage`（**不含尾部增量**，`protocol/protocol.rs:2348`），内部预算用 `get_total_token_usage`（含尾部）——**显示与判定数值不同，且 codex 接受这个差异**。
+- 拒绝：**没有用户可见的「无法压缩」报告**。`below threshold` 静默；`summarizer failed` 走通用 turn error；provider 的 `ContextWindowExceeded` 标记 `set_total_tokens_full` 后失败该回合，**下一回合**的 pre-sampling 检查才压缩。
+
+#### 24.98.7 对照表
+
+| | 检查位置 | 阈值与切点预算 | keep 钳制 | 整段小于 keep | 显示与判定同源 | 拒绝分类 |
+|---|---|---|---|---|---|---|
+| pi | loop 外（`_prepareRun`）+ loop 内（`prepareNextTurn`） | **分离**（`reserveTokens` / `keepRecentTokens`） | 无 | 静默跳过 | 逐步检查同源；pre-request 不同源 | 手动分两类，自动静默 |
+| oh-my-pi | loop 外（每 prompt）+ loop 内（`onTurnEnd`） | **分离** | **钳到阈值的 80% 以下** | 返回 undefined | 判定取 `max(锚点, 本地)` | **四类全区分** |
+| codex | loop 外（`run_turn` 开头，无条件） | **分离**（90% 窗口 / 20k 保留） | 无 | 全量保留 | **不同源，且接受差异** | 基本无分类 |
+| **本项目** | loop 内（`driveLoop` 开头） | **耦合**（同一 `available`） | **钳到 `available` 本身** | `fits-budget`（有提示） | 同源但**锚点丢失** | 分两类（`fits-budget`/`no-legal-cut`） |
+
+#### 24.98.8 方案
+
+按优先级排序，每条都给出可验证的完成条件。
+
+**S1（P0）软限必须真正低于硬限，否则调度压缩不存在可触发区间。**
+
+根因在 `requestBudget`（`context/request/budget.ts:76-78`）：
+
+```ts
+const softLimit = Math.min(Math.floor(input.window * fraction), availableInput);
+```
+
+`availableInput = window - output - reserve`。当 `output + reserve >= window * 0.1` 时，软限等于硬限，触发带宽度为 0。真实默认值（4,096 + 8,000 = 12,096）使这个条件在**任何 ≤ 120,960 的窗口**成立。
+
+修法有两种，必须选一种并配测试：
+
+- **(a) 软限按可用输入空间的比例定义**，而不是按窗口比例：
+  ```ts
+  const softLimit = Math.min(Math.floor(input.window * fraction), Math.floor(availableInput * 0.8));
+  ```
+  实测效果（探针 `bandwidth.ts`）：
+
+  | 窗口 | availableInput | 现 softLimit | 现带宽 | 新 softLimit | 新带宽 |
+  |---|---|---|---|---|---|
+  | 20,000 | 7,904 | 7,904 | **0** | 6,323 | 1,581 |
+  | 64,000 | 51,904 | 51,904 | **0** | 41,523 | 10,381 |
+  | 120,960 | 108,864 | 108,864 | **0** | 87,091 | 21,773 |
+  | 1,000,000 | 987,904 | 900,000 | 87,904 | 790,323 | 197,581 |
+
+- **(b) 阈值判定不用 `requestBudget`**，改用与保留预算同源的独立数值（omp 的做法：阈值是 `resolveThresholdTokens`，切点是 `keepRecentTokens`，两者不共享变量）。
+
+建议 **(a)**：它只改一个常数，影响面最小，且同时修复 `step.ts` 的预算检查（那里也用同一个函数）。但要注意 (a) 会让 20k 窗口的软限从 16,976 降到 6,323——对已按旧行为调优的配置是行为变化，需要在 `/context` 里显示新的触发点。
+
+**S1b（P0）切点预算的上限必须是阈值，而不是可用空间。**
+
+现状 `keepRecent = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available)`（`session/compaction.ts:416`）。当 S1 修好后，`available > softLimit`，但 keep 仍可能等于 `available`，导致切点预算吃掉全部空间、切点不存在。应改为：
+
+```ts
+const keepRecent = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS,
+  Math.max(1, Math.floor(softLimit * 0.8)));
+```
+
+完成条件（两条一起验）：窗口 64k 时，一段 45,000 tokens 的对话能产出 `planCompaction !== undefined` **且该请求仍装得下窗口**；窗口 20k 时，一段 7,000 tokens 的对话同样能产出计划且装得下。这两条在修改前**都是 false**（见 24.98.2 的 `bandverify` 输出）。
+
+**S2（P0）`keepRecentTokens` 必须成为已声明字段。**
+
+两条路，选其一：
+
+- (a) 在 `config/fields.ts` 增加顶层 `keepRecentTokens: field(countSchema)`，并入 `resolveTokenBudget` 的 `ordinary` 参数；
+- (b) 不增加顶层字段，但在 `constrainRuntimeConfig` 里对「用户写了未声明的 `keepRecentTokens`」产出**notice 而非 unknown-field**，并提示正确的 `modelTokenBudgets` 写法。
+
+建议 (a)：`reserveTokens` 已经是顶层字段，`keepRecentTokens` 与它同级、同语义，没有理由只允许按模型设置。
+
+完成条件：隔离 home 写入 `keepRecentTokens: 2000` 后，`getRuntimeConfig().keepRecentTokens === 2000`，且 `planCompaction` 用该值。
+
+**S3（P0）`policy.promptIdentity` 必须携带完整身份。**
+
+`withRequestOverhead` 当前只用 `requestIdentity(current())`。应改为读取 `runtimeContext.promptIdentity`（`turn/step.ts` 已在每次请求后通过 `onPromptIdentity` 写入，`cliSessionRuntimeFactory.ts:280`）：
+
+```ts
+// 建议
+const promptIdentity = () => runtimePromptIdentity() ?? requestIdentity(current());
+```
+
+其中 `runtimePromptIdentity()` 返回完整的 `PromptIdentitySnapshot`。`measureContextTokens` 已经有 `historyIdentity` 逻辑（`cli/runtime/compaction.ts:196-201`），只需让 `policy.promptIdentity` 提供 `endpoint`/`wireHistoryDigest`/`replayBinding`/`historyDigest`。
+
+若拿不到完整身份，**必须显式退化而不是静默**：`measureContextTokens` 返回 `undefined` 是正确行为，但调用方（`planCompaction`/`compactionRefusalReason`）应在 `measureContextTokens` 存在却返回 `undefined` 时记录一次「锚点不可用」，让 `/context` 能显示「当前判定基于估算，provider 测量不可用」。
+
+完成条件：一次成功请求后，`policy.measureContextTokens(messages, policy.promptIdentity)` 返回数值而非 `undefined`；该数值与状态栏显示一致。
+
+**S4（P0）显示层与判定层必须用同一个数。**
+
+三处改动：
+
+1. `interactiveMode.ts:375`：去掉 `!this.busy` 条件。忙碌时保留最后一次读数（`read()` 本身有 identity 校验，不会显示过期数据）。
+2. `context/controller.ts:166`：`stale` 时保留 `tokens`，只标记来源，而不是返回 `{ source: 'stale' }` 丢掉数字。`items.ts:160` 已经支持 `? stale` 的渲染，需要扩展成 `<tokens>? stale`。
+3. `context/request/estimate.ts:40`：把 `messages.every(...)` 的排除范围收窄到**真正不可加的**情况——只排除 `origin.replayBinding` 与 `reasoning.redacted`，不再排除所有 `tool_calls`/`tool_call_id`/`reasoning`。
+
+完成条件：一段含工具调用、锚点为 30,000 tokens 的历史，`estimatePrompt` 返回 `source === 'calibrated'`；忙碌中与过期后状态栏数字不消失。
+
+**S5（P1）压缩不可用时必须可见。**
+
+`resources.ts:99` 的 `activeProvider ? {...} : undefined` 使压缩能力静默依赖 provider 解析。`compactionTarget`（`cli/provider/compaction.ts:41-57`）有五个提前返回。
+
+建议：`CompactionSetup` 增加 `unavailable?: string`，在 `resources.ts` 的 else 分支填具体原因（复用 `compactionTarget` 的返回信息），`/context` 与启动界面各显示一行。
+
+完成条件：构造一个 `blocked` 的 provider，`/context` 输出包含「自动压缩不可用：<原因>」。
+
+**S6（P1）回合前检查上移到 session 层。**
+
+三家都在 loop 外。本项目放在 `driveLoop` 开头（`core/agent/loop.ts:261`），后果是「loop 未启动」与「检查未触发」无法区分——这正是 24.97 反复卡住的原因之一。
+
+建议：在 `runTurn` 的 `drive()` 里、`core.prompt(opening)` 之前调用一次 `prepareNextStep`，并保留 loop 内的 per-step 检查（与 pi 的双层结构一致）。这样「回合开始前的检查」有了独立的调用点，日志可区分。
+
+完成条件：`runTurn` 在 `core.prompt` 之前有一次可观测的压缩检查；两个调用点各有独立诊断。
+
+**S7（P2）拒绝报告按预算拆分。**
+
+`compactionRefusalReason` 目前只给整体数值。应在消息里给出三段：工具 schema（`overhead.tools` 序列化长度）、历史（`estimateTokens(messages)`）、输出与保留（`outputTokens` + `reserveTokens`）。
+
+完成条件：拒绝消息包含三个分项数字，且三项之和等于报告的总数。
+
+#### 24.98.9 与「推翻之前方案」的关系
+
+用户上一轮质疑「addition 里不像是研究清楚了解决方案，而是推翻了之前的方案」。本轮的直接回应：
+
+- 24.97 的结论「压缩路径本身是好的」**仍然成立**——真实 `runTurn` 确实调用了 `summarize`。但它是在**单测构造的 policy** 下调用的，那个 policy 的 `keepRecentTokens` 是直接传入的 2000。
+- 24.97 列出的三个候选（`overhead` 为空 / `messages` 更小 / `measureContextTokens` 返回更小值）**全部不是根因**。真根因是第四项：**keep 预算与阈值同源，导致切点不存在**。
+- 之前所有「压缩修复只在拒绝分支验证过」的记录仍然准确，但现在知道：**拒绝分支就是唯一可达的分支**（在窗口 ≤ 约 120k 时）。
+
+本节的方案 S1–S7 全部是新增的可执行条目，不再依赖「先加诊断再判断」的循环。
+
+#### 24.98.10 本轮方法论
+
+上一轮的失败模式是「假设集漏掉了最直接的一项」。本轮的修正方法是：
+
+1. **先把结论变成可执行探针**。每个假设都写成一个能在 `/tmp` 跑的脚本，直接调用生产函数（`planCompaction`、`buildCompactionWiring`、`withRequestOverhead`、`measuredPromptContext`），而不是推理调用链。
+2. **用生产构造路径而非手写参数**。`wiringmeasure.ts` 用的是真实的 `buildCompactionWiring` + 真实的 `withRequestOverhead`，这才暴露出「单测传的 identity 比生产多两个字段」。
+3. **对比单测与真实运行的输入差异**。24.95 的单测与真实运行只差一个 `keepRecentTokens`，找到这个差异就结束了整轮排查。
+
+教训：**当单测通过而真实运行不通过时，第一件事应该是逐字段对比两者的输入对象，而不是继续追调用链。**
+
+#### 24.98.11 对 24.97「三个候选」的最终判定
+
+24.97 末尾列了三个候选，本轮全部排除：
+
+| 24.97 的候选 | 判定 | 排除依据 |
+|---|---|---|
+| `policy.overhead` 的 getter 返回空 | **不是根因** | `withRequestOverhead` 的 getter 确实读闭包，但实测 `currentOverhead()` 返回 19 个工具；且即使 overhead 为空，20k 窗口下触发带宽度仍是 0 |
+| 真实 `messages` 比持久化 transcript 少 | **不是根因** | `runAgentLoop` 的 `context = [...seed, ...prompts]`（`core/agent/loop.ts:143`），与 transcript 同源；实测 transcript 重放得到相同的 `planCompaction` 结果 |
+| `measureContextTokens` 返回了更小的实测值 | **方向相反** | 它返回的是 `undefined`（见 24.98.4），判定因此走**估算**路径，数值只会更小，不会更大 |
+
+真根因是 24.98.2 的触发带宽度为零，加上 24.98.3 的实验字段被丢弃。两者叠加，使 24.95 的单测与真实运行在任何维度上都不可比。
+
+#### 24.98.12 与三家的最终差异表（用于决定改哪一处）
+
+| 维度 | pi | oh-my-pi | codex | 本项目 | 建议 |
+|---|---|---|---|---|---|
+| 阈值数值来源 | `contextWindow - reserveTokens` | `resolveThresholdTokens` | 窗口 90% | `requestBudget` 软限 | **S1**：软限必须低于硬限 |
+| 切点预算 | `keepRecentTokens`，独立 | `keepRecentTokens`，钳到阈值 80% | 20k 保留（只留 user） | `min(keepRecentTokens, available)` | **S1b**：钳到软限 80% |
+| 检查位置 | loop 外 + loop 内 | loop 外 + loop 内 | loop 外（无条件） | 仅 loop 内 | **S6**：上移到 `runTurn` |
+| 锚点身份 | 最后 assistant 的 usage | anchored + epoch | `last_token_usage` | **从未生效** | **S3**：传完整 identity |
+| 显示与判定 | 逐步检查同源 | 判定取 `max(锚,本地)` | 不同源且接受 | 同源但锚点丢失 | **S4**：修锚点后自然同源 |
+| 拒绝分类 | 2 类 | **4 类** | 基本无 | 2 类 | **S7**：加预算拆分 |
+
+**一句话**：三家的「阈值」与「保留」都是两个独立数值；本项目把它们放进同一个 `available` 变量，并在软限等于硬限时使调度压缩不可达。这是唯一的**结构性**差异，其余都是派生问题。
+
+#### 24.98.13 验证计划（实施后按序执行，不得并发）
+
+1. `npm run verify:import-cycles && npm run check:config-consumers && npm run check:declarations`（亚秒级静态门）；
+2. 新增聚焦单测：`requestBudget` 的触发带宽度（窗口 20k/64k/120,960/121,000/1M 五档）；`planCompaction` 在「对话装得下且已过软限」时必须返回计划；`estimatePrompt` 在含工具历史时仍为 `calibrated`；`policy.measureContextTokens` 在真实 `buildCompactionWiring` + `withRequestOverhead` 下返回数值；
+3. `vitest run <上述测试文件>`（单进程、串行）；
+4. 真实 CLI：隔离 home、20k 窗口、默认 keep，跑到 8,000 tokens 观察压缩**在请求仍装得下时**触发；
+5. 真实 CLI：默认 64k 窗口，跑到 45,000 tokens 观察同样行为；
+6. 更新本节与 12.1 台账。
+
+**禁止**：并发运行测试；20k 消息全量 PTY 压测；子代理执行任何 build/test。
