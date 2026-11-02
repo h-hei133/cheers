@@ -80,7 +80,7 @@ export function normalizeReplayTranscriptEvents(
       event.role === "assistant" &&
       messageToText(event.content).trim().length === 0 &&
       !(Array.isArray(event.content) && event.content.some((block) => block.type === "image")) &&
-      !event.tool_calls?.length && !event.reasoning && !event.failureClass && !event.metadata
+      !event.tool_calls?.length && !event.reasoning && !event.failureClass && !event.metadata && !event.promptMeasurement
     ) {
       return false;
     }

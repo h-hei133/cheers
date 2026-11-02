@@ -49,6 +49,7 @@ export function createTurnRequest(
   options: RequestOptions,
   projection: { readonly stepCount: number },
   channel: EventChannel<QueryEvent>,
+  promptSource?: { readonly opening: SessionMessage; readonly stored: SessionMessage },
 ): AgentCoreOptions['streamStep'] {
   // Captured wire identity belongs to this request, never rebuilt from history.
   let lastSentRequest: SentRequest | undefined;
@@ -70,6 +71,7 @@ export function createTurnRequest(
       },
       {
         allowTools: projection.stepCount < options.maxSteps,
+        ...(promptSource ? { promptSource } : {}),
         ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}),
         requestPurpose: requestPurposeFor(messages),
         requestId: request?.requestId,

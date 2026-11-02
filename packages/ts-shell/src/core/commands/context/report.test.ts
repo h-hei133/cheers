@@ -89,6 +89,14 @@ it('retains independent measured, estimated and unknown context facts', () => {
   expect(reportText(stale)).toContain('not a first-request estimate or a lower bound');
 });
 
+it('labels restored provider anchors with estimated changes as calibrated', () => {
+  const report = contextReport({ ...input, used: 3000, measurement: 'calibrated' });
+  expect(report.facts.prompt).toEqual({ status: 'calibrated', tokens: 3000 });
+  expect(reportText(report)).toContain('Current context (calibrated)');
+  expect(reportText(report)).toContain('provider measurement plus estimated context changes');
+  expect(reportText(report)).not.toContain('reported by the provider');
+});
+
 it('reports the same output-aware soft threshold used by compaction', () => {
   const report = contextReport({ ...input, resolution: { window: 1000, source: 'catalog' }, reserve: 100,
     outputTokens: 200, protocol: 'openai-compatible', used: 500 });

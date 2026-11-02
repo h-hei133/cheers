@@ -9125,3 +9125,17 @@ R5 的修正是**必要但不充分**的：
 - **不充分**：锚点本身跨进程不存在，修正无从谈起。
 
 两项必须都做，`/context` 才能在 `--print` 下显示实测值。
+
+#### 24.104.7 24.103 上界与方案 A 的实施（2026-11-03）
+
+最新 24.103 上界修复与 24.104 方案 A 已实施。`turn/measurement.ts` 在总估算扣减达到 provider 锚点时拒绝证明；`context/request/estimate.ts` 与 CLI compaction evaluator 独立守卫，退回估算，不再静默钳零。原 900-token/7000字符夹具改为3000，并单列等于、超过和仍有正余额的用例。参考决策采用无效测量回退估算；对无上界累加后钳零的实现明确不采用。
+
+`SessionMessage.promptMeasurement` 随 assistant transcript 持久化原始 tokens、messageCount、完整请求身份。实际响应在 `turn/step.ts` 生成字段，经既有 loop/message_end 写入，避免从全局遥测复制另一个请求。编解码只保留白名单字段；坏的可选测量丢弃，不丢对话。旧记录缺字段仍可加载。恢复在累计 usage 之后读取当前 model-context 的最后一条 assistant，校验位置、前缀摘要及 origin；不越过新消息的缺失/坏测量，不越过 durable gap/reset，也不增加计费、请求数或 recentRequests。压缩、分支和有效内容编辑由原身份检查拒绝旧测量。
+
+实施中确认设计遗漏：真实请求 opening 带环境前缀，而 prompt barrier 保存原用户内容。仅把锚点保存下来，重启仍然失配。现由实际 barrier 消息与 opening 对象在发送前绑定，单独记录持久前缀的 history/wire digest、微压缩基线和瞬态前缀的估算移除量；原 provider tokens/identity 不改。普通文本前缀可证明时，恢复后的估算扣除该量并叠加新增微压缩差值及当前尾部。同进程原始前缀优先，不重复扣；同长度内容替换不能借复制 wire digest 绕过原始/持久摘要检查。媒体、opaque replay、bridge/索引重排或不可证明的附件改写仍保守估算；没有恢复被丢弃的正文或改变模型历史语义。
+
+`/context` 通过既有只读 preview owner 核对当前系统提示、schema、实际目标与历史，新增校准读取不发送 provider 请求或连接 MCP（既有工具目录检查仍保留自己的 MCP 边界），不增加一个空 opening，不清除既有 review/research 草稿。显示 `calibrated` 与“provider measurement plus estimated context changes”，不把调整后的数字说成 provider 原始实测。tool/preview 异步成功与失败后都复查同一配置 publication、取消和会话 admission；独立静态复核发现的两处竞态已修复。
+
+主代理全程单 worker、768MiB heap、共享 flock 串行执行；12个直接相关文件425项测试有最终通过输出，分1–3文件小批，重跑不累加。四项反转（生产者上界、消费者钳零、消息写入、前缀扣减）均断言红灯并逐字节恢复；恢复后的3文件40项通过。五静态门通过。TS build 与隔离 Node CLI 已通过：5个独立进程、2次本地HTTP模型请求，两次重启的 `/context` 均 calibrated 且零新增模型请求，schema切换后拒绝旧锚点；原用户内容和累计请求数保留，测量字段未进入HTTP正文。验证没有使用真实PTY、20k消息、全套回归或并行重任务。
+
+初次构建发现类型收窄与可选 gateway 两个类型问题，已修复。首轮CLI因新增测试改变build输入而被新鲜度检查拒绝；重建后通过。负例曾在 `--no-context-files` 下改指令文件，因该文件本来不生效而未改变请求；改为实际工具schema切换验证拒绝，保留旧失败收据，没有为断言修改产品。bundled judge循环/导入解析通过，整体partial仍为两处既有interactiveMode函数上限。两个被中断的辅助任务未提供独立审查，不计为审查通过；实际完成的独立静态复核结果单列。脱敏收据及非执行脚本快照归档 `.omx/artifacts/phase20-context-anchor/`。本批未新增真实provider、真实PTY、其他平台、摘要质量或billing证据；原47项与ADD整体状态不提升。Git及CI按精确提交记录在开发日志。

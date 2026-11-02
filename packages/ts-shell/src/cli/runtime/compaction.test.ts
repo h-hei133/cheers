@@ -25,6 +25,7 @@ import type { PromptIdentitySnapshot } from '../../observability/usage/model.js'
 import { estimateTokens } from '../../session/context.js';
 import { requestReplayBinding } from '../../provider/request/replay.js';
 import { outgoingProjection } from '../../turn/messages.js';
+import * as measurement from '../../turn/measurement.js';
 import { estimatePrompt } from '../../context/request/estimate.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
 
@@ -243,6 +244,11 @@ it('uses a successful request anchor through the actual compaction and overhead 
   expect(attached.policy.measureContextTokens!(messages, identity)).toBe(900);
   const tail = [{ role: 'assistant' as const, content: 'ok' }, { role: 'user' as const, content: 'next question' }];
   expect(attached.policy.measureContextTokens!([...messages, ...tail], identity)).toBe(900 + estimateTokens(tail));
+  // A fresh process has no sent-request identity yet; live schema/system plus
+  // the strict persisted prefix proof can still evaluate the recovered anchor.
+  accepted = undefined;
+  expect(attached.policy.measureContextTokens!([...messages, ...tail], attached.policy.promptIdentity))
+    .toBe(900 + estimateTokens(tail));
   expect(attached.policy.measureContextTokens!([{ ...messages[0]!, content: 'edited' }], identity)).toBeUndefined();
   for (const changed of [{ provider: 'other' }, { model: 'other' }, { endpoint: 'other' }, { endpointId: 'other' },
     { replayBinding: 'other' }, { historyDigest: 'other' }, { wireHistoryDigest: 'other' }, { wireMessageCount: 0 }]) {
@@ -264,7 +270,7 @@ it.each([-1, 0.5, 20])('rejects an invalid or mismatched wire anchor count (%s)'
   expect(wiring.policy.measureContextTokens!(messages, identity)).toBeUndefined();
 });
 
-it('rejects a prefix whose tool output is reprojected after later turns arrive', () => {
+it.each(['below', 'equal to', 'above'] as const)('handles actual tool-output removal %s its provider anchor after later turns arrive', relation => {
   const provider = { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' as const };
   const messages = [{ role: 'user' as const, content: 'read' }, { role: 'assistant' as const, content: '', tool_calls: [
     { id: 'read-1', type: 'function' as const, function: { name: 'read', arguments: '{}' } },
@@ -273,14 +279,53 @@ it('rejects a prefix whose tool output is reprojected after later turns arrive',
     ...requestIdentity({ tools: [] }), historyDigest: historyDigest(messages),
     wireHistoryDigest: historyDigest(outgoingProjection(messages, false).messages), wireMessageCount: messages.length,
     replayBinding: requestReplayBinding({ ...provider, provider: provider.providerId }) };
-  recordSessionUsage('signed-summary', { promptTokens: 900, promptMessageCount: messages.length, promptIdentity: identity,
-    attribution: captureUsageAttribution({ provider: provider.providerId, model: provider.model, baseUrl }) });
-  const wiring = buildCompactionWiring({ provider, runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog: loadCatalog() });
-  expect(wiring.policy.measureContextTokens!(messages, identity)).toBe(900);
   const tail = Array.from({ length: 4 }, (_, index) => [{ role: 'user' as const, content: `next ${index}` },
     { role: 'assistant' as const, content: 'answer' }]).flat();
-  expect(wiring.policy.measureContextTokens!([...messages, ...tail], identity)).toBeUndefined();
+  const current = [...messages, ...tail];
+  const projected = outgoingProjection(current, false);
+  const removedTokens = Math.floor((messages[2]!.content.length - projected.messages[2]!.content!.length) / 3.5);
+  expect(removedTokens).toBeGreaterThan(0);
+  expect(removedTokens).toBeLessThan(3000);
+  // The valid fixture pays for its 7000-character result plus request overhead;
+  // the other rows deliberately supply stale anchors at the exact boundary.
+  const anchorTokens = relation === 'below' ? 3000 : removedTokens - (relation === 'above' ? 1 : 0);
+  recordSessionUsage('signed-summary', { promptTokens: anchorTokens, promptMessageCount: messages.length, promptIdentity: identity,
+    attribution: captureUsageAttribution({ provider: provider.providerId, model: provider.model, baseUrl }) });
+  const wiring = buildCompactionWiring({ provider, runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog: loadCatalog() });
+  expect(wiring.policy.measureContextTokens!(messages, identity)).toBe(anchorTokens);
+  const expected = relation === 'below' ? anchorTokens - removedTokens + estimateTokens(tail) : undefined;
+  expect(wiring.policy.measureContextTokens!(current, identity)).toBe(expected);
+  expect(wiring.policy.measureContextTokens!(current, identity)).toBe(expected);
+  expect(getSessionUsage('signed-summary').lastPromptTokens).toBe(anchorTokens);
 });
+
+it.each([
+  ['below', 899, 1], ['equal to', 900, undefined], ['above', 901, undefined],
+] as const)('checks a supplied rewrite %s its provider anchor independently of the proof producer',
+  (_relation, removedTokens, correctedTokens) => {
+    const provider = { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' as const };
+    const messages = [{ role: 'user' as const, content: 'selected' }];
+    const identity = { provider: provider.providerId, model: provider.model, endpoint: provider.endpoint,
+      ...requestIdentity({ tools: [] }), historyDigest: historyDigest(messages), wireHistoryDigest: historyDigest(messages),
+      wireMessageCount: messages.length, replayBinding: requestReplayBinding({ ...provider, provider: provider.providerId }) };
+    recordSessionUsage('signed-summary', { promptTokens: 900, promptMessageCount: messages.length, promptIdentity: identity,
+      attribution: captureUsageAttribution({ provider: provider.providerId, model: provider.model, baseUrl }) });
+    const wiring = buildCompactionWiring({ provider, runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog: loadCatalog() });
+    const tail = [{ role: 'user' as const, content: 'next' }];
+    // Inject a future producer's proof so its own upper bound cannot mask a
+    // regression in the evaluator's independent consumption check.
+    const proof = vi.spyOn(measurement, 'measuredProjectionPrefix').mockReturnValue({
+      wireHistoryDigest: identity.wireHistoryDigest, wireMessageCount: messages.length, rewriteTokensRemoved: removedTokens,
+    });
+    try {
+      expect(wiring.policy.measureContextTokens!([...messages, ...tail], identity))
+        .toBe(correctedTokens === undefined ? undefined : correctedTokens + estimateTokens(tail));
+      expect(proof).toHaveBeenCalled();
+      expect(getSessionUsage('signed-summary').lastPromptTokens).toBe(900);
+    } finally {
+      proof.mockRestore();
+    }
+  });
 
 it.each([true, false])('shares calibrated public reasoning tail accounting with the prompt display (declared=%s)', declared => {
   const provider = { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' as const };

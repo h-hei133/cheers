@@ -12,7 +12,7 @@ import { clearContextUsage, getSessionUsage, markContextUnknown, measuredPromptC
 import { captureUsageAttribution } from '../observability/usage/identity.js';
 import { promptTokensFor, requestBudget } from '../context/request/budget.js';
 import { estimatePrompt } from '../context/request/estimate.js';
-import { measuredProjectionPrefix } from './measurement.js';
+import { measuredProjectionPrefix, storedPromptProjection } from './measurement.js';
 import { CHARS_PER_TOKEN } from '../session/context.js';
 import { captureThinkingPreference } from '../core/models/preference.js';
 import { effortOutputFailure } from '../provider/endpoints/effort.js';
@@ -38,6 +38,7 @@ import type { PromptSource } from '../context/request/model.js';
 import { requestContext } from '../context/request/projection.js';
 import { estimateWirePrompt } from '../context/request/wire.js';
 import { historyDigest } from '../context/request/identity.js';
+import { decodePromptMeasurement } from '../context/request/measurement.js';
 import {
   REFUSAL,
   isRetryableStatus,
@@ -110,6 +111,8 @@ export interface StepListener {
 }
 
 export interface StepOptions {
+  /** Exact opening object and the accepted user content retained by the prompt barrier. */
+  readonly promptSource?: { readonly opening: AgentMessage; readonly stored: AgentMessage };
   readonly requestId?: string;
   /** Whether the model may call tools on this step; the last step may not. */
   readonly allowTools: boolean;
@@ -360,6 +363,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
         wireRewriteTokens: Math.ceil(projection.savedChars / CHARS_PER_TOKEN),
         replayBinding,
       };
+      const promptProjection = storedPromptProjection(messages, projection, options.promptSource,
+        shape.assistantAfterToolResult, promptIdentity.wireMessageCount);
       const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
         model: request.provider.model, endpoint, schemaDigest, systemDigest,
         endpointId: usageAttribution.endpointId, historyDigest: messageDigest, wireHistoryDigest, replayBinding });
@@ -651,6 +656,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             // declarations: allowed tools and agent mode can change what was
             // actually sent, and a measurement from the wrong request is stale.
             promptIdentity,
+            promptProjection,
             purpose: options.requestPurpose ?? (options.agentMode ? 'subagent' : 'turn'),
           };
           if (options.agentMode && request.recordAuxiliaryUsage) request.recordAuxiliaryUsage(record);
@@ -664,9 +670,15 @@ export function createStepFunction(request: StepRequest): StepFunction {
           || shape.reasoningReplayField && completion.reasoning && !completion.reasoningSignature && !completion.reasoningRedacted;
         const completed = ownsReplay && origin
           ? { ...decoded, origin: { ...origin, replayBinding } } : decoded;
-        return stamp(shownAnything && completed.stopReason === "error"
-          ? { ...completed, retriesExhausted: true }
-          : completed);
+        const counted = hasUsage(usage) ? usageFromProvider(usage) : undefined;
+        const promptMeasurement = !options.agentMode && counted && typeof usage?.prompt_tokens === 'number'
+          && Number.isSafeInteger(usage.prompt_tokens) && usage.prompt_tokens >= 0
+          && completed.stopReason !== 'error' && completed.stopReason !== 'aborted'
+          ? decodePromptMeasurement({ tokens: counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens,
+            messageCount: messages.length, identity: promptIdentity,
+            projection: promptProjection }) : undefined;
+        return stamp({ ...completed, ...(promptMeasurement ? { promptMeasurement } : {}),
+          ...(shownAnything && completed.stopReason === 'error' ? { retriesExhausted: true } : {}) });
       } catch (error) {
         if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         if (error instanceof ModelAdmissionError) return stamp({ ...failedStep(error.message, shown, undefined, true), admissionFailure: error.code });

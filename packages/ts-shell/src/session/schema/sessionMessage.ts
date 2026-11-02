@@ -8,6 +8,7 @@ export interface SessionToolCall {
 }
 
 import type { MultimodalContentBlock } from "../../model-adapters/multimodal.js";
+import type { PromptMeasurement } from "../../context/request/model.js";
 
 export interface SessionMessage {
   id?: string;
@@ -56,6 +57,8 @@ export interface SessionMessage {
    * on every other message, and on failures that were not the provider's.
    */
   failureClass?: string;
+  /** Provider measurement bound to the request that produced this assistant message. */
+  readonly promptMeasurement?: PromptMeasurement;
   /**
    * The working out an assistant answer came with, and the provider's signature
    * over it.

@@ -1973,3 +1973,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A memory inspection exposes credentials carried on unrelated process command lines; multiple agent language servers also leave too little RAM for a focused check.
 - **Root Cause**: Full process argv was requested to diagnose memory, and each activated semantic server retains a large TypeScript graph.
 - **Rule**: Display only PID, parent PID, RSS and executable name. Inspect arguments privately only to verify ownership, never print them. Before verification, retire only identity-checked language-server children belonging to this session, then confirm available memory. Do not terminate unrelated services or treat heap limits as a total-process memory limit.
+
+### Restored Measurements Need The Actual Persisted Prompt Projection
+- **Symptom**: A provider anchor survives restart, but every next request still falls back to estimation; overly large rewrite deductions can also reduce the calibrated prefix to zero.
+- **Root Cause**: The request opening includes transient environment framing while the prompt barrier retains raw user content. Copying global telemetry at message persistence can select a different request, and identity checks alone do not bound estimated removal.
+- **Rule**: Bind usage and original identity to the response that produced the assistant. Capture a separate proven persisted-prefix projection before dispatch; keep provider tokens unchanged and reject total removal at or above that count. Restore only the newest assistant on the selected history, preserve explicit invalidation, and revalidate current schema/system/target before calibration. Test actual fresh CLI processes; manually persisting the framed opening hides this mismatch.
+
+### Context Reports Must Recheck Both Successful And Failed Acquisitions
+- **Symptom**: A newly calibrated count is displayed with old limits, or an unavailable estimate publishes after the session changes.
+- **Root Cause**: Configuration publication and session admission can change during asynchronous tool/preview reads, including a rejected read.
+- **Rule**: Recheck exact configuration publication, cancellation and session admission after acquisition and its failure path. Keep the report's limits and estimate bound to the same publication; do not validate a saved anchor against its own stored identity.

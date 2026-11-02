@@ -58,10 +58,9 @@ import { providerRequestTarget } from '../../provider/requestTarget.js';
 /** A local estimate never connects MCP, accepts an injection or starts a driver. */
 export async function previewContext(context: ShellRuntimeContext, manager: SessionManager, gateway: CliMcpGateway,
   draft: string, attachments: PromptAttachments | undefined, agentMode: 'plan' | 'build', permissionScope: import('../../approval/permissionScope.js').PermissionScope,
-  signal: AbortSignal) {
+  signal: AbortSignal, currentHistory = false) {
   signal.throwIfAborted();
-  clearReviewPreview(context);
-  clearResearchPreview(context);
+  if (!currentHistory) { clearReviewPreview(context); clearResearchPreview(context); }
   const operation = configurationOperation(context);
   const { config, publication, admission } = operation;
   const expected = context.session; const cwd = context.cwd;
@@ -145,9 +144,9 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   if (!base) throw new Error('Model request destination is unavailable.');
   const endpoint = providerCredentialEndpoint(publication.catalog, resolution, base) ?? DEFAULT_ENDPOINT_KIND;
   const protocol = endpointShape(endpoint);
-  const messages = [...selectModelContext(session.session), openingMessage({ workspaceRoot: cwd,
+  const messages = [...selectModelContext(session.session), ...(currentHistory ? [] : [openingMessage({ workspaceRoot: cwd,
     workspaceRoots: expected.workspaceRoots, permissionScope, goalObjective: session.goalObjective, continuityContext: session.continuityContextFor(effectivePrompt),
-    prompt: promptWithContext(injected.prompt, entries), attachments })];
+    prompt: promptWithContext(injected.prompt, entries), attachments })])];
   // Ownership also binds public text; only opaque payloads prevent local measurement.
   if (messages.some(message => message.reasoning?.signature || message.reasoning?.redacted)) {
     throw new Error('Opaque replay has no complete local token estimate.');
@@ -266,7 +265,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   };
   await verifyContent(signal);
   research?.publish(verifyContent);
-  if (!review) clearStaleReviewPreview(context);
+  if (!review && !currentHistory) clearStaleReviewPreview(context);
   const reviewExpiresAt = review?.publish(verifyContent, attachments);
   return { estimate, verify, verifyContent,
     ...(reviewExpiresAt !== undefined ? { expiresAt: reviewExpiresAt } : {}),

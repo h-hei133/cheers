@@ -1,7 +1,7 @@
 import { currentUsage, sessionTelemetries } from './usage/state.js';
 import { randomUUID } from 'node:crypto';
 import type { ModelCostRates } from "../core/models/catalog.js";
-import type { RequestContext } from '../context/request/model.js';
+import type { PromptMeasurement, RequestContext } from '../context/request/model.js';
 import type { PromptMeasurementIdentity, UsageAttribution } from './usage/model.js';
 import { attributedBucketKey, bucketRates, cacheIdentity, decodeAttribution, usageBucketKey } from './usage/identity.js';
 export { splitBucketKey, usageBucketKey } from './usage/identity.js';
@@ -12,6 +12,8 @@ import { MAX_RECENT_REQUESTS, type ModelUsageBucket, type SessionUsageTelemetry,
   type UsageHistoryEntry, type SessionUsageSnapshot } from "./usage/model.js";
 import { decodeUsageSnapshot, freezeUsageSnapshot, mergeUsageDelta, mergeUsageHealth } from "./usage/snapshot.js";
 import { preserveUsageBaseline, recoverUsageSnapshot } from './usage/recovery.js';
+import { restorablePromptMeasurement } from './usage/measurement.js';
+import type { SessionMessage } from '../session/schema/sessionMessage.js';
 import { createComponentLogger } from './structuredLogger.js';
 export { MAX_RECENT_REQUESTS };
 export type { ModelUsageBucket, SessionUsageTelemetry, UsageHistoryEntry, SessionUsageSnapshot } from "./usage/model.js";
@@ -120,6 +122,8 @@ export function recordSessionUsage(
     promptMessageCount?: number;
     /** Which model/schema the measurement belongs to; absent means provider/model only. */
     promptIdentity?: PromptMeasurementIdentity;
+    /** Proven persisted-prefix projection; provider tokens retain their original identity. */
+    promptProjection?: PromptMeasurement['projection'];
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
     /** Why this request was sent, when the caller can prove it from the wire context. */
@@ -178,6 +182,7 @@ export function recordSessionUsage(
     existing.lastPromptMessageCount = promptMeasured ? usage.promptMessageCount ?? 0 : 0;
     existing.lastPromptIdentity = promptMeasured && usage.promptIdentity
       ? { ...usage.promptIdentity, ...(usage.attribution ? { endpointId: usage.attribution.endpointId } : {}) } : undefined;
+    existing.lastPromptProjection = promptMeasured && usage.promptProjection ? { ...usage.promptProjection } : undefined;
   }
   existing.turnsCount += 1;
   existing.toolCallsCount += usage.toolCallsCount ?? 0;
@@ -303,6 +308,7 @@ export function invalidatePromptMeasurement(sessionId: string): void {
   existing.lastPromptTokens = undefined;
   existing.lastPromptMessageCount = 0;
   existing.lastPromptIdentity = undefined;
+  existing.lastPromptProjection = undefined;
 }
 
 export function getSessionUsage(sessionId: string): SessionUsageTelemetry {
@@ -322,6 +328,7 @@ export function clearContextUsage(sessionId: string): void {
   existing.lastPromptTokens = undefined;
   existing.lastPromptMessageCount = 0;
   existing.lastPromptIdentity = undefined;
+  existing.lastPromptProjection = undefined;
 }
 
 /**
@@ -358,14 +365,21 @@ export function resetSessionUsage(sessionId: string): void {
 }
 
 /** Restore once on activation. Never replace live, possibly unflushed usage. */
-export function restoreSessionUsage(sessionId: string, snapshot: unknown): void {
+export function restoreSessionUsage(sessionId: string, snapshot: unknown, messages: readonly SessionMessage[] = []): void {
   if (currentUsage(sessionId)) return;
   const restored = recoverUsageSnapshot(snapshot);
-  if (!restored) return;
+  const measurement = restorablePromptMeasurement(messages, restored?.recentRequests);
+  if (!restored && !measurement) return;
   const telemetry = Object.assign(emptyTelemetry(), restored);
+  if (measurement) {
+    telemetry.lastPromptTokens = measurement.tokens;
+    telemetry.lastPromptMessageCount = measurement.messageCount;
+    telemetry.lastPromptIdentity = measurement.identity;
+    telemetry.lastPromptProjection = measurement.projection;
+  }
   sessionTelemetries().set(sessionId, telemetry);
-  persistedBaselines.set(telemetry, decodeUsageSnapshot(restored)!);
-  if (restored.usageHealth) createComponentLogger('session-usage').warn(
+  if (restored) persistedBaselines.set(telemetry, decodeUsageSnapshot(restored)!);
+  if (restored?.usageHealth) createComponentLogger('session-usage').warn(
     'Persisted session usage is incomplete; recovered counters are partial and missing costs are unknown.',
     { ...restored.usageHealth });
 }

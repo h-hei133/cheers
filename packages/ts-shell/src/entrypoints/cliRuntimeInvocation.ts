@@ -108,6 +108,7 @@ export interface CliRuntimeInvocationInput {
   readonly permissionScope?: PermissionScope;
   readonly interactiveAsk?: InteractiveAsk;
   readonly historyMessages?: readonly SessionMessage[];
+  readonly storedPrompt?: SessionMessage;
   readonly onTurnMessage?: (message: SessionMessage) => void;
   readonly compaction?: CompactionSetup;
   readonly cacheWarming?: CacheWarmingRunner;
@@ -405,6 +406,7 @@ async function startTurn(
     escalationPromptHandler: request.escalationPromptHandler,
     interactiveAsk: request.interactiveAsk,
     history: request.historyMessages ?? [],
+    storedPrompt: request.storedPrompt,
     onMessage: request.onTurnMessage ?? (() => {}),
     step,
     tools,

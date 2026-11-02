@@ -1,0 +1,102 @@
+import { afterEach, expect, it } from 'vitest';
+import type { SessionMessage } from '../session/schema/sessionMessage.js';
+import type { HookDispatcher } from '../core/hooks/hookDispatcher.js';
+import { createStepFunction } from './step.js';
+import { runTurn } from './session.js';
+import { openingMessage } from './opening.js';
+import { outgoingProjection } from './messages.js';
+import { measuredProjectionPrefix, storedPromptProjection } from './measurement.js';
+import { historyDigest, requestIdentity } from '../context/request/identity.js';
+import { estimatePrompt } from '../context/request/estimate.js';
+import { getSessionUsage, resetSessionUsage, restoreSessionUsage, totalTokens } from '../observability/usageTelemetry.js';
+import { createMessageTranscriptEvent, transcriptEventToSessionMessage } from '../session/sessionEventCodec.js';
+
+const id = 'capture-measurement';
+const provider = { provider: 'fixture', model: 'model', baseUrl: 'https://fixture.invalid/v1', headers: {} };
+const overhead = { systemPrompt: 'Answer briefly.', tools: [] };
+const hooks = { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher;
+afterEach(() => resetSessionUsage(id));
+
+it('rejects unrelated stored prompts and a framing reduction that exhausts the measured anchor', async () => {
+  const opening = openingMessage({ workspaceRoot: '/fixture', prompt: 'actual' });
+  const messages = [opening]; const projection = outgoingProjection(messages, false);
+  expect(storedPromptProjection(messages, projection, { opening, stored: { role: 'user', content: 'other' } }, false, 1))
+    .toBeUndefined();
+  const stored = { role: 'user' as const, content: 'actual' };
+  const canonical = storedPromptProjection(messages, projection, { opening, stored }, false, 1)!;
+  const usage = { ...getSessionUsage(id), lastPromptTokens: canonical.removedTokens, lastPromptMessageCount: 1,
+    lastPromptIdentity: { ...requestIdentity(overhead), provider: 'fixture', model: 'model',
+      historyDigest: historyDigest(messages), wireHistoryDigest: historyDigest(projection.messages), wireMessageCount: 1 },
+    lastPromptProjection: canonical };
+  expect(measuredProjectionPrefix([stored], outgoingProjection([stored], false), usage, false)).toBeUndefined();
+});
+
+it('carries the current response through the loop and codec, then calibrates the raw prompt after restart', async () => {
+  const stored: SessionMessage = { id: 'user', role: 'user', content: 'hello' };
+  const persisted: SessionMessage[] = [stored];
+  let sent: SessionMessage[] = [];
+  const step = createStepFunction({ provider, sessionId: id, workspaceRoot: '/fixture', ...overhead,
+    fetchImpl: async (_url, init) => {
+      const body = JSON.parse(String(init?.body)); sent = body.messages;
+      expect(JSON.stringify(body)).not.toContain('promptMeasurement');
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 3000, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 1000 } } }),
+      { headers: { 'content-type': 'application/json' } });
+    } });
+  const run = runTurn({ sessionId: id, workspaceRoot: '/fixture', prompt: 'hello', storedPrompt: stored,
+    history: [], onMessage: message => persisted.push(message), step, tools: new Map(), hooks, maxSteps: 3,
+    signal: new AbortController().signal });
+  for await (const _event of run.events) { /* Drain the actual turn. */ }
+  expect(persisted).toHaveLength(2);
+  const measurement = persisted[1]!.promptMeasurement!;
+  expect(measurement).toMatchObject({ tokens: 3000, messageCount: 1,
+    projection: { historyDigest: historyDigest([stored]) } });
+  expect(measurement.identity.historyDigest).not.toBe(measurement.projection!.historyDigest);
+  expect(measurement.projection!.removedTokens).toBeGreaterThan(0);
+  expect(JSON.stringify(measurement)).not.toContain('/fixture');
+  expect(sent[1]!.content).toContain('[Environment Context:');
+  expect(totalTokens(getSessionUsage(id))).toBe(3005);
+  // A live run can still use its actual framed prefix without applying the
+  // stored-history reduction a second time.
+  const live = [openingMessage({ workspaceRoot: '/fixture', prompt: 'hello' }), persisted[1]!];
+  expect(measuredProjectionPrefix(live, outgoingProjection(live, false), getSessionUsage(id), false)
+    ?.rewriteTokensRemoved).toBe(0);
+  const decoded = persisted.map(message => transcriptEventToSessionMessage(JSON.parse(JSON.stringify(
+    createMessageTranscriptEvent({ ...message, timestamp: '2026-11-03T00:00:00Z' }))))!);
+  resetSessionUsage(id);
+  restoreSessionUsage(id, undefined, decoded);
+  expect(totalTokens(getSessionUsage(id))).toBe(0);
+  const current = [...decoded, openingMessage({ workspaceRoot: '/fixture', prompt: 'next' })];
+  const projection = outgoingProjection(current, false);
+  const usage = getSessionUsage(id);
+  const proof = measuredProjectionPrefix(current, projection, usage, false)!;
+  expect(proof.rewriteTokensRemoved).toBe(measurement.projection!.removedTokens);
+  const estimate = estimatePrompt(current, overhead, { ...measurement.identity,
+    historyDigest: historyDigest(current), wireHistoryDigest: historyDigest(projection.messages),
+    wireMessageCount: current.length }, usage, { tokens: 9999, method: 'characters/3.5', prefixIdentity: proof });
+  expect(estimate.source).toBe('calibrated');
+  expect(estimate.tokens).toBeGreaterThan(3000 - proof.rewriteTokensRemoved);
+  expect(estimate.tokens).toBeLessThan(3100);
+  current[0] = { ...current[0]!, content: 'replaced' };
+  expect(measuredProjectionPrefix(current, outgoingProjection(current, false), usage, false)).toBeUndefined();
+  const changed = estimatePrompt(decoded, { ...overhead, systemPrompt: 'Changed' }, { ...measurement.identity,
+    ...requestIdentity({ ...overhead, systemPrompt: 'Changed' }) }, usage);
+  expect(changed.source).toBe('estimated');
+});
+
+it.each(['missing', 'completion-only', 'error', 'delegated'] as const)(
+  'does not attach an old measurement to a %s response', async kind => {
+    const source = [{ role: 'user' as const, content: 'hello' }];
+    let responses = 0;
+    const step = createStepFunction({ provider, sessionId: id, workspaceRoot: '/fixture', ...overhead,
+      fetchImpl: async () => {
+        responses++;
+        const usage = responses === 1 || kind === 'delegated' ? { prompt_tokens: 3000, completion_tokens: 5 }
+          : kind === 'completion-only' ? { completion_tokens: 5 } : undefined;
+        return new Response(JSON.stringify({ choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }], usage }),
+          { status: responses > 1 && kind === 'error' ? 400 : 200, headers: { 'content-type': 'application/json' } });
+      } });
+    expect((await step(source, undefined, {}, { allowTools: true })).promptMeasurement?.tokens).toBe(3000);
+    const next = await step(source, undefined, {}, { allowTools: true, ...(kind === 'delegated' ? { agentMode: 'build' } as const : {}) });
+    expect(next.promptMeasurement).toBeUndefined();
+  });

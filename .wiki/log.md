@@ -11579,3 +11579,14 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 资源检查误打印完整process argv、暴露无关服务凭据，已明确告知用户并建议轮换；后续检查只显示PID/PPID/RSS/name。验证前只终止父身份核对属于本会话的语言服务子进程，释放约4GB，未操作其他服务。此失误与三处探针夹具失败均保留事实，不作为产品成功证据。
 
 交付：实现/测试/合同/台账/日志提交 `649c993c662750722390994d601bc8cd1731f3fc` 已推送 `origin/main`，提交后工作区干净。重建当前提交产物 `d4c5588d3a89` 通过。2026-11-03 按该精确 SHA 一次读取：CI [41476897695](https://github.com/h-hei133/cheers/actions/runs/41476897695) 为 in_progress；Architecture Watch [41476897415](https://github.com/h-hei133/cheers/actions/runs/41476897415) completed/success。Watch workflow success 不改变本地 partial，代码 CI 尚未计为通过。此后单独文档提交记录本行，不能把其 CI 混为实现提交结果。
+
+
+### 2026-11-03：24.103 锚点扣减上界与 24.104 消息持久化方案 A
+
+实施范围及修正见 `phase-20-addition.md` 24.104.7。锚点移除估算必须小于 provider 原始计量；生产者与两消费者独立拒绝钳零。实际请求测量经 assistant 消息持久化、按当前 model-context 恢复，累计计费不重复。补齐真实 opening 与原用户 prompt 的投影差异；严格身份校验下保留原计量，单独使用估算扣减。`/context` 在重启后由现有只读 preview 核对当前请求形状，显示 calibrated，schema 改变后拒绝旧锚点。
+
+12个直接相关文件425项主代理单worker/768MiB heap串行通过；4项反转均预期断言失败并逐字节恢复。独立静态复核发现异步配置publication/失败路径admission两处竞态，修复并聚焦通过。两个中断辅助任务未提供独立审查，不计批准。五静态门通过，TS build及本地HTTP Node CLI五进程/两请求验证通过；无PTY/20k/全仓回归。bundled NormProof循环/导入满足、整体partial，两处既有interactiveMode函数上限。证据 `.omx/artifacts/phase20-context-anchor/`，最终新鲜build及Git交付另绑定。
+
+复查旧实现提交 `649c993c662750722390994d601bc8cd1731f3fc`：CI 41476897695 已 completed/failure，失败步骤为 Run Focused & Unit Tests；日志API未返回具体断言，不声称已定位全部旧CI失败。Architecture Watch 41476897415 success。此次提交须独立验证，不沿用旧CI状态。
+
+最终源码验证：五静态门/diff通过；TS build `f50df8479195` 后，隔离本地HTTP五进程验证再次通过，新增`/context`读取不调用模型；最终bundled judge仍为上述partial。护栏末尾空行使首次串行链在diff处短路，修正后继续，未在失败后并发执行后续命令。

@@ -55,6 +55,48 @@ function catalog(extra = 'accepted-only', window = 16000) {
     custom: { runtime: 'openai-compatible', baseUrl: `https://${extra}.invalid`, models: [{ id: extra }] },
   } }));
 }
+
+it('accepts only a live calibrated context result and preserves cancellation during inspection', async () => {
+  const { context } = fixture();
+  const target = context.resolveConfigTarget!(context.runtimeConfig!, context.sessionId);
+  const attribution = captureUsageAttribution({ provider: target.provider, model: target.model!, baseUrl: target.baseUrl! });
+  const read = vi.fn(async () => ({ tokens: 3000, source: 'calibrated' as const, method: 'characters/3.5' as const,
+    identity: { provider: target.provider, model: target.model!, endpoint: 'openai-compatible', endpointId: attribution.endpointId } }));
+  const result = await runContextCommand([], { ...context, contextEstimate: read, getToolPool: async () => new Map() });
+  expect(result.report?.facts.prompt).toEqual({ status: 'calibrated', tokens: 3000 });
+  expect(read).toHaveBeenCalledTimes(1);
+  const changed = await runContextCommand([], { ...context, getToolPool: async () => new Map(),
+    contextEstimate: async signal => ({ ...await read(), identity: { ...(await read()).identity, model: 'other' } }) });
+  expect(changed.report?.facts.prompt).toEqual({ status: 'unknown' });
+  const controller = new AbortController();
+  await expect(runContextCommand([], { ...context, signal: controller.signal, getToolPool: async () => new Map(),
+    contextEstimate: async () => { controller.abort(); throw new Error('stale'); } })).rejects.toThrow();
+});
+
+it.each(['tool pool', 'estimate', 'estimate failure'] as const)('refuses a configuration publication replaced during %s', async phase => {
+  const { shell, context } = fixture();
+  let publication = shell.configuration.current;
+  const replace = () => { publication = { ...publication, config: { ...publication.config, reserveTokens: 999 } }; };
+  const result = await runContextCommand([], { ...context, readConfiguration: () => publication,
+    getToolPool: async () => { if (phase === 'tool pool') replace(); return new Map(); },
+    contextEstimate: async () => {
+      replace();
+      if (phase === 'estimate failure') throw new Error('unavailable');
+      return { tokens: 3000, source: 'calibrated', method: 'characters/3.5',
+        identity: { provider: 'google', model: 'chosen', endpoint: 'openai-compatible',
+          endpointId: captureUsageAttribution({ provider: 'google', model: 'chosen', baseUrl: 'https://chosen.invalid' }).endpointId } };
+    } });
+  expect(result.output).toBe('Context changed during inspection.');
+  expect(result.report).toBeUndefined();
+});
+
+it('rechecks admission when current context estimation fails', async () => {
+  const { context } = fixture(); let stale = false;
+  const result = await runContextCommand([], { ...context,
+    admission: () => stale ? 'Session changed' : undefined,
+    contextEstimate: async () => { stale = true; throw new Error('unavailable'); } });
+  expect(result).toEqual({ kind: 'local', output: 'Session changed' });
+});
 function fixture() {
   const shell = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
     rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },

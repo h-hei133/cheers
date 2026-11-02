@@ -75,6 +75,29 @@ it('does not subtract newly pruned unmeasured outputs from the provider prefix',
   expect(proof.rewriteTokensRemoved).toBeLessThan(Math.floor(projected.savedChars / 3.5));
 });
 
+it.each([
+  ['equals', 0], ['exceeds', 1],
+] as const)('rejects a measured-prefix rewrite whose removal %s its provider anchor', (_relation, excess) => {
+  const old = turn(0);
+  const current = [...old, ...turn(1), ...turn(2), ...turn(3), ...turn(4)];
+  const projection = outgoingProjection(current, false);
+  const removedTokens = Math.floor(((old[2]!.content as string).length
+    - (projection.messages[2]!.content as string).length) / 3.5);
+  expect(removedTokens).toBeGreaterThan(1);
+  // A positive remainder is valid even when a character estimate would suggest
+  // a larger retained prefix. Only an exhausted anchor invalidates the proof.
+  expect(measuredProjectionPrefix(current, projection, anchor(old, removedTokens + 1), false))
+    .toMatchObject({ rewriteTokensRemoved: removedTokens });
+  expect(measuredProjectionPrefix(current, projection, anchor(old, removedTokens - excess), false)).toBeUndefined();
+});
+
+it.each([undefined, -1, 0, 0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+  'rejects an absent or invalid provider anchor before proving a rewrite (%s)', lastPromptTokens => {
+    const old = turn(0);
+    const usage = { ...anchor(old), lastPromptTokens };
+    expect(measuredProjectionPrefix(old, outgoingProjection(old, false), usage, false)).toBeUndefined();
+  });
+
 it('rejects changed source, baseline, wire, bridge, image, opaque and balanced conversion identities', () => {
   const old = turn(0), usage = anchor(old);
   const current = [...old, ...turn(1), ...turn(2), ...turn(3)];

@@ -9,6 +9,7 @@ import process from "node:process";
 import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import { runResumeLikeShellAction } from "../core/shell/continueShellActionRuntime.js";
 import { toolPoolFor } from "../cli/runtime/tools.js";
+import { contextEstimateFor } from '../cli/runtime/context/status.js';
 import { dataTransferFor } from '../cli/data/transfer.js';
 import { sessionCommandFor } from '../cli/runtime/sessionCommands.js';
 import { goalCommandFor, goalPolicyFor } from '../cli/runtime/goal.js';
@@ -179,6 +180,8 @@ export async function runNonInteractivePrompt(options: {
     printMode: options.printMode,
     interactive: false,
     getToolPool: toolPoolFor(options.runtimeContext, options.mcpGateway),
+    ...(options.mcpGateway ? { contextEstimate: contextEstimateFor(options.runtimeContext, options.sessionManager,
+      options.mcpGateway, options.sessionRuntime) } : {}),
     sessionId: options.runtimeContext.session.id,
     workspaceRoots: options.runtimeContext.session.workspaceRoots,
     onTurnMessage: (message) => options.sessionManager.addTurn(options.runtimeContext.session.id, message),

@@ -51,6 +51,8 @@ export interface TurnOptions {
   /** Where the session's files live, when the caller knows. Carried into the event stream. */
   readonly sessionPath?: string;
   readonly prompt: string;
+  /** Accepted prompt-barrier message before transient request framing. */
+  readonly storedPrompt?: SessionMessage;
   /** Historical context for this run; never persisted as a new user prompt. */
   readonly continuityContext?: string;
   /** Commit prepared prompt context after startup checks, immediately before kernel entry. */
@@ -214,7 +216,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     ),
     beforeToolCall: hooks.beforeToolCall,
     afterToolCall: hooks.afterToolCall,
-    streamStep: createTurnRequest(options, projection, channel),
+    streamStep: createTurnRequest(options, projection, channel, options.storedPrompt ? { opening, stored: options.storedPrompt } : undefined),
     shouldStopAfterStep: () => projection.stepCount >= options.maxSteps,
     prepareNextStep: compaction?.beforeStep,
   });
@@ -434,7 +436,8 @@ export function runTurn(options: TurnOptions): TurnRun {
  */
 function persist(onMessage: (message: SessionMessage) => void, message: AgentMessage): void {
   if (message.role === "assistant" && !message.content && !message.tool_calls?.length
-    && !message.reasoning?.text.trim() && !message.reasoning?.signature && !message.reasoning?.redacted) return;
+    && !message.reasoning?.text.trim() && !message.reasoning?.signature && !message.reasoning?.redacted
+    && !message.promptMeasurement) return;
   if (message.role === "system") return;
   const { stopReason: _stopReason, errorMessage: _errorMessage, ...stored } = message;
   onMessage(stored);

@@ -38,6 +38,7 @@ import { renderSignInProgress } from '../output/command.js';
 import { ConfigWriteError } from '../../config/outcome.js';
 import { reportText } from '../../core/commands/report/projection.js';
 import { toolPoolFor } from '../runtime/tools.js';
+import { contextEstimateFor } from '../runtime/context/status.js';
 import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
@@ -1343,6 +1344,8 @@ export class InteractiveMode {
           : {}),
         readConfiguration: () => this.options.runtimeContext.configuration.current,
         getToolPool: toolPoolFor(this.options.runtimeContext, this.options.initialMcpGateway),
+        contextEstimate: contextEstimateFor(this.options.runtimeContext, this.options.sessionManager,
+          this.options.initialMcpGateway, this.options.sessionRuntime),
         refreshRuntimeConfig: scope => refreshShellRuntimeConfig(this.options.runtimeContext, scope),
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,

@@ -3,6 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { previewContext } from './preview.js';
+import { contextEstimateFor } from './status.js';
 import { projectSessionFileLayout } from '../../../session/store/sessionFileLayout.js';
 import { writeSessionMetadataRecord, writeSessionRecord } from '../../../session/store/sessionStore.js';
 import { writeSessionState } from '../../../session/store/sessionStateStore.js';
@@ -130,6 +131,22 @@ it('estimates an empty startup through the actual tool projection without provid
   expect(result.estimate.identity.endpointId).toMatch(/^[a-f0-9]{64}$/);
   expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
   expect(files.map(target => fs.readFileSync(target))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
+});
+
+it('inspects current history without adding a pending opening or connecting the gateway', async () => {
+  const { context, manager, gateway, layout } = fixture();
+  const before = [layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file));
+  const body = vi.spyOn(endpoints, 'endpointTurnBody');
+  const read = contextEstimateFor(context, manager, gateway, { getAgentMode: () => 'build', getPermissionScope: () => 'ask' });
+  try {
+    const estimate = await read(new AbortController().signal);
+    expect(estimate.identity.wireMessageCount).toBe(0);
+    expect(body.mock.calls.at(-1)![1].messages).toEqual([]);
+    expect(gateway.snapshot).not.toHaveBeenCalled();
+    expect([layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file))).toEqual(before);
+    const cancelled = new AbortController(); cancelled.abort();
+    await expect(read(cancelled.signal)).rejects.toThrow();
+  } finally { body.mockRestore(); }
 });
 
 it('corrects a measured tool history anchor when the live wire projection microcompacts its prefix', async () => {

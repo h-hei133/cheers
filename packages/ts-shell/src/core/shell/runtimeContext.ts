@@ -7,6 +7,7 @@ import type { WorkflowGitContext } from '../../workflow/gitContext.js'
 import path from 'node:path'
 import { forgetSessionTodos, replayTodosFromMessages } from '../commands/todoCommandRuntime.js'
 import { restoreSessionUsage } from '../../observability/usageTelemetry.js'
+import { selectModelContext } from '../../session/context/selection.js';
 import type { CommandContext } from '../commands/types.js'
 import type { ContextEntry } from '../../context/attachment/entry.js';
 import { currentProfile } from '../paths/profile/context.js';
@@ -144,7 +145,7 @@ export function createShellRuntimeContext(input: {
   session: Session
   resumeProvenance?: SessionResumeProvenance;
 }): ShellRuntimeContext {
-  restoreSessionUsage(input.session.id, input.session.usage)
+  restoreSessionUsage(input.session.id, input.session.usage, selectModelContext(input.session))
   const configuration = initialConfiguration(input);
   return {
     profile: currentProfile(),
@@ -245,7 +246,7 @@ export function applyShellSubstrateTransition(
   // authorize the new one, even when the session id stays the same.
   context.promptIdentity = undefined
   if (nextSession.id !== context.session.id) {
-    restoreSessionUsage(nextSession.id, nextSession.usage)
+    restoreSessionUsage(nextSession.id, nextSession.usage, selectModelContext(nextSession))
     forgetSessionTodos(context.session.id)
     forgetSessionTodos(nextSession.id)
     replayTodosFromMessages(nextSession.id, nextSession.turns)

@@ -297,6 +297,7 @@ export function createCliSessionRuntime(input: {
         interactiveAsk: (questions, askSignal) =>
           promptInteractiveQuestions(input.getReadline(), questions, askSignal),
         historyMessages,
+        ...(historyMessages.length < allTurns.length ? { storedPrompt: allTurns.at(-1) } : {}),
         onTurnMessage: (message) => {
           const id = message.id ?? createTranscriptEntryId("turn");
           input.sessionManager.addTurn(sessionId, { ...message, id });

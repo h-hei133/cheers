@@ -24,6 +24,7 @@ export function estimatePrompt(messages: readonly AgentMessage[], overhead: Requ
     readonly tailMessages?: readonly AgentMessage[];
     /** Validated wire identity of the measured prefix, with any proven new text reduction. */
     readonly prefixIdentity?: Pick<PromptMeasurementIdentity, 'wireHistoryDigest' | 'wireMessageCount'> & {
+      readonly historyDigest?: string;
       /** Proven additional text reduction within the provider-measured prefix. */
       readonly rewriteTokensRemoved?: number;
     } }): PromptEstimate {
@@ -42,6 +43,10 @@ export function estimatePrompt(messages: readonly AgentMessage[], overhead: Requ
     && Number.isSafeInteger(rewrite) && rewrite >= 0;
   const comparedReplayIdentity = previous?.replayBinding !== undefined || identity.replayBinding !== undefined;
   const sameReplayIdentity = previous?.replayBinding === identity.replayBinding;
+  const prefixDigest = prefixIdentity?.historyDigest ?? previous?.historyDigest;
+  const provedHistory = prefixDigest === previous?.historyDigest
+    || usage.lastPromptProjection !== undefined && prefixDigest === usage.lastPromptProjection.historyDigest
+      && rewrite >= usage.lastPromptProjection.removedTokens;
   const compatible = previous && previous.provider === identity.provider && previous.model === identity.model
     && (method === 'characters/3.5' || comparedWireIdentity && (count === messages.length || sameWirePrefix))
     && previous.endpoint === identity.endpoint && previous.schemaDigest === identity.schemaDigest
@@ -50,7 +55,9 @@ export function estimatePrompt(messages: readonly AgentMessage[], overhead: Requ
     && (!comparedWireIdentity || sameWireIdentity && count === messages.length || sameWirePrefix)
     && (!comparedReplayIdentity || sameReplayIdentity)
     && Number.isSafeInteger(count) && count >= 0 && count <= messages.length
-    && previous.historyDigest === historyDigest(messages.slice(0, count))
+    && (!sameWirePrefix || provedHistory)
+    && (sameWirePrefix ? prefixDigest : previous.historyDigest)
+      === historyDigest(messages.slice(0, count))
     // Ordinary tool calls and results are additive; rewritten or opaque replay is not.
     && messages.every(message => typeof message.content === 'string'
       && message.reasoning?.signature === undefined && !message.reasoning?.redacted
@@ -63,8 +70,12 @@ export function estimatePrompt(messages: readonly AgentMessage[], overhead: Requ
   const tailMessages = typeof projected === 'object' ? projected.tailMessages : undefined;
   const tail = compatible ? estimatePromptTail(sameWireIdentity && count === messages.length ? []
     : tailMessages ?? messages.slice(count), tailContext) : undefined;
-  const calibrated = compatible && usage.lastPromptTokens !== undefined && tail !== undefined;
-  const tokens = calibrated ? Math.max(0, usage.lastPromptTokens! - (sameWirePrefix ? rewrite : 0)) + tail!
+  const anchorTokens = usage.lastPromptTokens;
+  const removedTokens = sameWirePrefix ? rewrite : 0;
+  const corrected = anchorTokens !== undefined && Number.isSafeInteger(anchorTokens) && removedTokens < anchorTokens
+    ? anchorTokens - removedTokens : undefined;
+  const calibrated = compatible && corrected !== undefined && tail !== undefined;
+  const tokens = calibrated ? corrected! + tail!
     : projectedTokens ?? estimateRequestTokens(messages, overhead);
   return { tokens, source: calibrated ? 'calibrated' : 'estimated', identity: { ...identity, historyDigest: historyDigest(messages) },
     method: calibrated && (count < messages.length || rewrite > 0) ? 'characters/3.5' : method };

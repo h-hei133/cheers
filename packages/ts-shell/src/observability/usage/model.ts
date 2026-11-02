@@ -7,8 +7,9 @@
  * amount nobody would be billed: the counts were measured correctly and then
  * attributed to the wrong model.
  */
-import type { RequestContext } from '../../context/request/model.js';
+import type { PromptMeasurementIdentity, RequestContext } from '../../context/request/model.js';
 import type { ModelCostRates } from '../../core/models/catalog.js';
+export type { PromptMeasurementIdentity } from '../../context/request/model.js';
 
 /**
  * Bound the durable per-request history as well as the live view. The history
@@ -47,31 +48,11 @@ export interface UsageHealth {
   readonly invalidSnapshot: boolean;
 }
 
-export interface PromptMeasurementIdentity {
-  readonly provider: string;
-  readonly model: string;
-  readonly endpoint?: string;
-  /** Opaque identity of the actual destination, independent of protocol name. */
-  readonly endpointId?: string;
-  /** Serialized tool schema and assembled system text, hashed. */
-  readonly schemaDigest?: string;
-  readonly systemDigest?: string;
-  /** Ordered, selected messages before endpoint projection, hashed. */
-  readonly historyDigest?: string;
-  /** Ordered messages after compaction, bridging and closing policy, hashed. */
-  readonly wireHistoryDigest?: string;
-  /** How many projected messages carried this measurement. */
-  readonly wireMessageCount?: number;
-  /** Estimated text tokens removed from the raw source in this request only. */
-  readonly wireRewriteTokens?: number;
-  /** Credential and account state that selected the provider replay shape. */
-  readonly replayBinding?: string;
-}
-
 /** Partial identity captured before a request is accepted. */
 export type PromptIdentitySnapshot = Partial<PromptMeasurementIdentity>;
 
 export interface SessionUsageTelemetry {
+  lastPromptProjection?: import('../../context/request/model.js').PromptMeasurement['projection'];
   readonly schemaVersion?: 2;
   usageHealth?: UsageHealth;
   /** Last accepted foreground request in this runtime, never persisted as cumulative usage. */

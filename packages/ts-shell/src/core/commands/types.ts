@@ -98,6 +98,7 @@ export interface CommandContext {
   readonly getToolPool?: (signal?: AbortSignal) => Promise<ReadonlyMap<string, ToolDefinition>>
   /** Current effective prompt identity, when the host can prove it. */
   readonly promptIdentity?: PromptIdentitySnapshot
+  readonly contextEstimate?: (signal: AbortSignal) => Promise<import('../../context/request/estimate.js').PromptEstimate>
   /** Read-only prerequisite diagnosis from the active compaction owner. */
   readonly compactionUnavailable?: () => string | undefined
   /** Latest bound compaction evaluator decision, separate from historical usage. */

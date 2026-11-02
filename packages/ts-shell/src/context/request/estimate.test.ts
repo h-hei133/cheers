@@ -10,6 +10,16 @@ const identity = { provider: 'openai', model: 'm', endpoint: 'openai-compatible'
 const usage = () => ({ ...getSessionUsage('estimate-fixture'), lastPromptTokens: 500, lastPromptMessageCount: prefix.length,
   lastPromptIdentity: { ...identity, historyDigest: historyDigest(prefix) } });
 
+it('refuses a copied wire proof with an unrelated replacement history digest', () => {
+  const old = { ...usage(), lastPromptIdentity: { ...usage().lastPromptIdentity,
+    wireHistoryDigest: historyDigest(prefix), wireMessageCount: prefix.length } };
+  const replaced = [{ ...prefix[0]!, content: 'different' }, prefix[1]!];
+  expect(estimatePrompt(replaced, overhead, { ...old.lastPromptIdentity, wireHistoryDigest: historyDigest(replaced) }, old,
+    { tokens: 900, method: 'characters/3.5', prefixIdentity: { wireHistoryDigest: old.lastPromptIdentity.wireHistoryDigest,
+      wireMessageCount: prefix.length, historyDigest: historyDigest(replaced), rewriteTokensRemoved: 0 } }))
+    .toMatchObject({ source: 'estimated', tokens: 900 });
+});
+
 it('uses provider usage only for an unchanged text prefix and a proven destination', () => {
   const messages: AgentMessage[] = [...prefix, { role: 'user', content: 'next' }];
   expect(estimatePrompt(messages, overhead, identity, usage(), 800)).toMatchObject({ source: 'calibrated', tokens: 502 });
@@ -75,6 +85,30 @@ it('calibrates a projected tool prefix only when its current wire representation
   expect(estimatePrompt([...foreignTools, messages.at(-1)!], overhead, current, foreignMeasured, projected))
     .toMatchObject({ source: 'estimated', tokens: 6_290 });
 });
+
+it.each([
+  ['below', 499, 'calibrated', 3],
+  ['equal to', 500, 'estimated', 800],
+  ['above', 501, 'estimated', 800],
+] as const)('handles a supplied prefix removal %s the provider anchor independently of the proof producer',
+  (_relation, rewriteTokensRemoved, source, tokens) => {
+    const anchor = { ...identity, historyDigest: historyDigest(prefix), wireHistoryDigest: 'c'.repeat(64),
+      wireMessageCount: prefix.length };
+    const measured = { ...usage(), lastPromptIdentity: anchor };
+    const messages: AgentMessage[] = [...prefix, { role: 'user', content: 'next' }];
+    const current = { ...anchor, wireHistoryDigest: 'd'.repeat(64), wireMessageCount: messages.length };
+    const projected = { tokens: 800, method: 'o200k_base' as const,
+      prefixIdentity: { wireHistoryDigest: anchor.wireHistoryDigest, wireMessageCount: prefix.length, rewriteTokensRemoved } };
+    expect(estimatePrompt(messages, overhead, current, measured, projected))
+      .toMatchObject({ source, tokens, method: source === 'calibrated' ? 'characters/3.5' : 'o200k_base' });
+    expect(measured.lastPromptTokens).toBe(500);
+  });
+
+it.each([undefined, -1, 0, 0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+  'does not calibrate an absent or invalid provider anchor (%s)', lastPromptTokens => {
+    expect(estimatePrompt(prefix, overhead, identity, { ...usage(), lastPromptTokens }, 800))
+      .toMatchObject({ source: 'estimated', tokens: 800 });
+  });
 
 it('calibrates only an identical recorded wire request', () => {
   const wireIdentity = {

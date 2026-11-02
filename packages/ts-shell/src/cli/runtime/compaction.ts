@@ -218,24 +218,29 @@ export function buildCompactionWiring(input: {
         const measuredMessageCount = usage.lastPromptMessageCount;
         if (!Number.isSafeInteger(measuredMessageCount) || measuredMessageCount < 0 || measuredMessageCount > messages.length) return undefined;
         if (identity?.historyDigest !== undefined && identity.historyDigest !== recordedHistory) return undefined;
+        if (identity?.wireHistoryDigest !== undefined && identity.wireHistoryDigest !== recorded?.wireHistoryDigest) return undefined;
         const projection = outgoingProjection(messages, mainShape.assistantAfterToolResult);
         const prefix = recorded?.wireHistoryDigest !== undefined
           ? measuredProjectionPrefix(messages, projection, usage, mainShape.assistantAfterToolResult) : undefined;
         if (recorded?.wireHistoryDigest !== undefined && (!prefix
-          || identity?.wireMessageCount !== recorded.wireMessageCount)) return undefined;
+          || identity?.wireMessageCount !== undefined && identity.wireMessageCount !== recorded.wireMessageCount)) return undefined;
         const historyIdentity = recordedHistory !== undefined
-          ? { historyDigest: historyDigest(messages.slice(0, measuredMessageCount)) }
+          ? { historyDigest: prefix ? recordedHistory : historyDigest(messages.slice(0, measuredMessageCount)) }
           : {};
         const measured = measuredPromptContext(input.sessionId, { ...(identity ?? {}), provider: provider.providerId, model: provider.model,
-          endpoint, endpointId, ...(recorded?.replayBinding !== undefined ? { replayBinding } : {}), ...historyIdentity },
+          endpoint, endpointId, ...(recorded?.replayBinding !== undefined ? { replayBinding } : {}), ...historyIdentity,
+          ...(prefix ? { wireHistoryDigest: prefix.wireHistoryDigest } : {}) },
           { requireExpectedIdentity: true });
         if (!measured) return undefined;
+        const removedTokens = prefix?.rewriteTokensRemoved ?? 0;
+        if (!Number.isSafeInteger(measured.tokens) || !Number.isSafeInteger(removedTokens)
+          || removedTokens < 0 || removedTokens >= measured.tokens) return undefined;
         const tailMessages = prefix ? projection.messages.slice(measuredMessageCount)
           .map(message => ({ ...message, content: message.content ?? '' })) : messages.slice(measuredMessageCount);
         const tail = estimatePromptTail(tailMessages, { provider: provider.providerId,
           model: provider.model, endpoint, replayBinding, reasoningReplayField: mainShape.reasoningReplayField,
           allowEmptySignature: mainShape.allowEmptySignature });
-        return tail === undefined ? undefined : Math.max(0, measured.tokens - (prefix?.rewriteTokensRemoved ?? 0)) + tail;
+        return tail === undefined ? undefined : measured.tokens - removedTokens + tail;
       },
     },
     summarize: Object.assign((request: Parameters<SummarizeHistory>[0]) => send(historyRequest(request)),

@@ -48,6 +48,7 @@ export function streamCliRuntimePrompt(input: {
   readonly permissionScope?: PermissionScope;
   readonly interactiveAsk?: InteractiveAsk;
   readonly historyMessages?: readonly SessionMessage[];
+  readonly storedPrompt?: SessionMessage;
   readonly onTurnMessage?: (message: SessionMessage) => void;
   readonly compaction?: CompactionSetup;
   readonly providerRuntimeBridge: CliProviderRuntimeBridge;
@@ -101,6 +102,7 @@ export function streamCliRuntimePrompt(input: {
     ...(input.permissionScope ? { permissionScope: input.permissionScope } : {}),
     ...(input.interactiveAsk ? { interactiveAsk: input.interactiveAsk } : {}),
     ...(input.historyMessages ? { historyMessages: input.historyMessages } : {}),
+    ...(input.storedPrompt ? { storedPrompt: input.storedPrompt } : {}),
     ...(input.onTurnMessage ? { onTurnMessage: input.onTurnMessage } : {}),
     ...(input.compaction ? { compaction: input.compaction } : {}),
     providerModeEnv: input.providerRuntimeBridge.providerModeEnv(),

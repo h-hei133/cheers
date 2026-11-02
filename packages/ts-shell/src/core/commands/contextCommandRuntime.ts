@@ -93,6 +93,7 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
   context.signal?.throwIfAborted();
   const registry = context.getToolPool ? await context.getToolPool(context.signal) : createCoreToolRegistry();
   context.signal?.throwIfAborted();
+  if (publication && context.readConfiguration?.() !== publication) return { kind: 'local', output: 'Context changed during inspection.' };
   const blocked = context.admission?.();
   context.signal?.throwIfAborted();
   if (blocked) return { kind: "local", output: blocked };
@@ -132,9 +133,24 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
     ? measuredPromptContext(sessionId, expectedIdentity,
       { requireExpectedIdentity: hasExpectedIdentity })
     : undefined;
-  const measurement = measured ? 'measured' as const
+  let calibrated: number | undefined;
+  if (!measured && context.contextEstimate) {
+    try {
+      const estimate = await context.contextEstimate(context.signal ?? new AbortController().signal);
+      context.signal?.throwIfAborted();
+      if (context.admission?.()) return { kind: 'local', output: 'Context changed during inspection.' };
+      if (estimate.source === 'calibrated' && Number.isSafeInteger(estimate.tokens) && estimate.tokens >= 0
+        && estimate.identity.provider === active.provider && estimate.identity.model === active.model
+        && estimate.identity.endpoint === activeEndpoint && estimate.identity.endpointId === expectedEndpointId) calibrated = estimate.tokens;
+    } catch { context.signal?.throwIfAborted(); }
+  }
+  context.signal?.throwIfAborted();
+  const lateRefusal = context.admission?.();
+  if (lateRefusal) return { kind: 'local', output: lateRefusal };
+  if (publication && context.readConfiguration?.() !== publication) return { kind: 'local', output: 'Context changed during inspection.' };
+  const measurement = calibrated !== undefined ? 'calibrated' as const : measured ? 'measured' as const
     : telemetry?.lastPromptTokens !== undefined ? 'stale' as const : 'unknown' as const;
-  const report = contextReport({ resolution, used: measured?.tokens, measurement, reserve, outputTokens,
+  const report = contextReport({ resolution, used: calibrated ?? measured?.tokens, measurement, reserve, outputTokens,
     inputLimit: catalogModel(catalog, active.provider, active.model, activeBaseUrl)?.inputLimit,
     protocol: activeEndpoint,
     compactionUnavailable: context.compactionUnavailable?.(),

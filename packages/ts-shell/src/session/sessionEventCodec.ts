@@ -1,5 +1,6 @@
 import type { MultimodalContentBlock } from "../model-adapters/multimodal.js";
 import { randomUUID } from "node:crypto";
+import { decodePromptMeasurement } from '../context/request/measurement.js';
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage, SessionToolCall } from "./schema/sessionMessage.js";
 import { isReadableTranscriptEvent } from "./transcript/validation.js";
@@ -61,6 +62,7 @@ export type TranscriptEvent =
       type: "message";
       id?: string;
       role: SessionMessage["role"];
+      promptMeasurement?: SessionMessage['promptMeasurement'];
       /** Text, or text with images; see `SessionMessage.content`. */
       content: string | readonly MultimodalContentBlock[];
       tool_calls?: readonly SessionToolCall[];
@@ -201,6 +203,7 @@ export function legacyTranscriptEntryId(lineNumber: number): string {
 export function createMessageTranscriptEvent(
   message: SessionMessage & { timestamp: string },
 ): Extract<TranscriptEvent, { type: "message" }> {
+  const promptMeasurement = message.role === 'assistant' ? decodePromptMeasurement(message.promptMeasurement) : undefined;
   return {
     type: "message",
     // The message's own id when it has one, so the transcript and the turn list
@@ -208,6 +211,7 @@ export function createMessageTranscriptEvent(
     // two would drift apart if each generated its own.
     id: message.id ?? createTranscriptEntryId("msg"),
     role: message.role,
+    ...(promptMeasurement ? { promptMeasurement } : {}),
     content: message.content,
     ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
     ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
@@ -345,9 +349,11 @@ export function transcriptEventToSessionMessage(
   if (event.type !== "message") {
     return undefined;
   }
+  const promptMeasurement = event.role === 'assistant' ? decodePromptMeasurement(event.promptMeasurement) : undefined;
   return {
     ...(event.id ? { id: event.id } : {}),
     role: event.role,
+    ...(promptMeasurement ? { promptMeasurement } : {}),
     content: event.content,
     tool_calls: event.tool_calls,
     tool_call_id: event.tool_call_id,

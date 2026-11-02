@@ -21,6 +21,8 @@ import {
 } from "./tools.js";
 
 export interface AssistantStep {
+  /** Measurement belongs to this completed request, not the session's last response. */
+  readonly promptMeasurement?: AgentMessage['promptMeasurement'];
   readonly admissionFailure?: import('./request/model.js').ModelAdmissionError['code'];
   readonly text: string;
   readonly toolCalls: readonly AgentToolCall[];
@@ -309,6 +311,7 @@ async function driveLoop(
         ...(step.admissionFailure ? { admissionFailure: step.admissionFailure } : {}),
         ...(step.reasoning ? { reasoning: step.reasoning } : {}),
         ...(step.origin ? { origin: step.origin } : {}),
+        ...(step.promptMeasurement ? { promptMeasurement: step.promptMeasurement } : {}),
       };
       await emit({ type: "message_start", message: assistant });
       await emit({ type: "message_end", message: assistant });
