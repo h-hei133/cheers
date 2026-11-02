@@ -98,7 +98,7 @@ it("shows exactly the model pool, including skills and MCP, then reflects change
   expect((await runToolsCommand([], { cwd: root, getToolPool })).output).toContain("### Tools (0)");
   expect(snapshot).toHaveBeenCalledTimes(3);
   configuration.publish(configuration.begin(binding), { ...runtimeConfig, configValidation: { valid: false, securityBlocked: true } }, binding);
-  await expect(getToolPool()).rejects.toThrow('Configuration safety validation failed');
+  await expect(getToolPool()).rejects.toThrow('Configuration cannot be used for requests');
   expect(snapshot).toHaveBeenCalledTimes(3);
 });
 

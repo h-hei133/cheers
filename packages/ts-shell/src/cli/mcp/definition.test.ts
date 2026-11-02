@@ -50,7 +50,7 @@ it.each(['session', 'root', 'substrate', 'revalidated'])('rejects an original wi
     f.context.configuration.transition(binding);
     f.context.configuration.publish(f.context.configuration.begin(binding), config, binding);
   }
-  expect(await f.add('project', 'local', { command: 'server', args: [] })).toMatch(kind === 'substrate' ? /validation failed/i : /changed|unavailable/i);
+  expect(await f.add('project', 'local', { command: 'server', args: [] })).toMatch(kind === 'substrate' ? /Configuration cannot be used for requests/i : /changed|unavailable/i);
   expect(f.approve).not.toHaveBeenCalled(); expect(fs.existsSync(f.target)).toBe(false);
 });
 

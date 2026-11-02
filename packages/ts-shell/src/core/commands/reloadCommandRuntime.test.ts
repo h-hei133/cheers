@@ -104,7 +104,7 @@ it('prepares themes on workspace transitions and blocks the new binding on prepa
   fs.writeFileSync(file, '{"theme":"missing-fixture"}');
   applyShellSubstrateTransition(context, { cwd: path.join(root, 'subdir') });
   expect(currentTheme()).toBe('light'); expect(context.runtimeConfig.theme).toBe('light');
-  expect(configurationAdmission(context)()).toContain('safety validation failed');
+  expect(configurationAdmission(context)()).toContain('Configuration cannot be used for requests');
 });
 
 it('reports missing sessions and unexpected refresh errors without claiming success', async () => {

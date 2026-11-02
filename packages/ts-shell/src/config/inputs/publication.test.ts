@@ -55,7 +55,7 @@ it('retains the complete accepted config, catalogue and theme on bad reload, the
   expect(invalid.status).toBe('rejected'); expect(invalid.admissionBlocked).toBe(true);
   expect(shell.configuration.current.config).toBe(before.config); expect(shell.configuration.current.catalog).toBe(before.catalog);
   expect(installed).toBe('dark'); expect(prepare).not.toHaveBeenCalled();
-  expect(configurationAdmission(shell)()).toContain('Configuration safety validation');
+  expect(configurationAdmission(shell)()).toContain('Configuration cannot be used for requests');
   fs.writeFileSync(file, '{"maxTurns":41,"theme":"light"}');
   const revision = shell.configuration.current.revision;
   expect(refreshShellRuntimeConfig(shell).status).toBe('applied');
