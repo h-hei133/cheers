@@ -26,6 +26,7 @@ function capture(store: SessionStoreAccess, sessionId: string): CompactionSource
   const sourceActivePath = branch.path.map(entry => entry.id);
   const replayIdentity = digest([session.id, session.createdAt, storage, state.projectRoot, state.workspaceRoots,
     sourceActivePath, state.modelSelection, state.modelRevision, state.contextSelection, state.contextAttachments, history]);
+  const activation = store.readCurrentSessionSelection(session.projectRoot);
   // Query and lifecycle events are durable observations of a run. They append to
   // the transcript while a summary is in flight, but they do not change the
   // model history or the branch being summarized. Keep the source fence tied to
@@ -49,7 +50,12 @@ function capture(store: SessionStoreAccess, sessionId: string): CompactionSource
     pendingPrompt: state.pendingPrompt,
     pendingPromptEntryId: state.pendingPromptEntryId,
   };
-  const identity = digest([session.id, session.createdAt, storage, fileIdentity(layout.metadataPath),
+  // Native resume republishes the project's activation even when history and
+  // timestamps are unchanged. Lifecycle/title writes only publish metadata and
+  // state, so their atomic renames must not retire this source. Activation is a
+  // publication fence; replay still uses the logical identity above so an
+  // unknown summary request cannot be sent again after resume.
+  const identity = digest([session.id, session.createdAt, storage, [activation?.sessionId, activation?.activationId],
     fileIdentity(layout.transcriptPath), logicalState, history, sourceActivePath]);
   return freezeDeep({ sessionId, identity, replayIdentity, directory: layout.sessionDir, directoryIdentity: storage,
     history: structuredClone(history), sourceActivePath,

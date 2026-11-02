@@ -201,6 +201,24 @@ it('changes the dedicated summary identity when only its credential tier default
   expect(setup.requests).toEqual([]);
 });
 
+it('keeps the exact summary role budget independent of the foreground output preference', async () => {
+  const setup = await fixture();
+  writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model =>
+    model.id === 'namespace/summary' ? { ...model, maxTokens: 10_000 } : model) })));
+  const identities: string[] = [];
+  for (const maxOutputTokens of [256, 1_024]) {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, maxOutputTokens }, edit);
+    const summary = captureSummaryRole({ config: projectSessionModel(getRuntimeConfig(setup.root), setup.session.id),
+      catalog: loadCatalog(), workspaceRoot: setup.root })!;
+    expect(summary.limits.maxOutputTokens).toBe(7_975);
+    expect(summary.segmentTokens).toBe(11_940);
+    identities.push(summary.identity);
+  }
+  expect(identities[1]).toBe(identities[0]);
+  expect(setup.requests).toEqual([]);
+});
+
 it.each(summaryKinds.flatMap(kind => ['model', 'protocol'].map(capability => ({ kind, capability }))))(
   'refuses an unsupported $capability tier before $kind summary renewal or dispatch', async ({ kind, capability }) => {
     const setup = await fixture('gpt-5.4');
@@ -339,16 +357,16 @@ it.each(['manual', 'automatic', 'branch', 'prefix'])('routes %s summaries to the
   }
 });
 
-it.each(['deleted', 'provider-reused', 'scope', 'effort', 'window', 'output', 'thinking-output'])('refuses a %s summary target without sending to the parent or changing history', async change => {
+it.each(['deleted', 'provider-reused', 'scope', 'effort', 'window', 'thinking-output'])('refuses a %s summary target without sending to the parent or changing history', async change => {
   const setup = await fixture(); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   if (change === 'provider-reused') {
     writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.filter(item => item.id !== 'b') }, edit);
   }
-  if (['effort', 'window', 'output', 'thinking-output'].includes(change)) {
+  if (['effort', 'window', 'thinking-output'].includes(change)) {
     const catalog = loadCatalog().map(provider => ({ ...provider,
       ...(change === 'thinking-output' ? { endpoint: 'anthropic-messages' } : {}),
       models: provider.models.map(model => model.id === 'namespace/summary'
-      ? { ...model, ...(change === 'effort' ? { reasoning: false } : change === 'window' ? { contextWindow: 500 } : change === 'output' ? { maxTokens: 50 } : {}) } : model) }));
+      ? { ...model, ...(change === 'effort' ? { reasoning: false } : change === 'window' ? { contextWindow: 500 } : {}) } : model) }));
     writeCatalogCache(catalog);
   } else writeUserRuntimeConfigFile({ ...edit.values,
     ...(change === 'scope' ? { allowedModels: ['openai/main'] } : {}),
@@ -365,6 +383,18 @@ it.each(['deleted', 'provider-reused', 'scope', 'effort', 'window', 'output', 't
     expect(await deps.compactHistory!(setup.session.id, setup.signal)).toMatchObject({ status: 'failed', reason: expect.stringContaining('Summary request refused') });
     expect(setup.requests).toEqual([]);
   }
+});
+
+it('narrows the exact summary role output to a smaller catalogue ceiling', async () => {
+  const setup = await fixture();
+  writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model =>
+    model.id === 'namespace/summary' ? { ...model, maxTokens: 50 } : model) })));
+  const unchanged = unchangedPreferences(setup);
+  const { deps } = runtime(setup);
+  expect(await deps.compactHistory!(setup.session.id, setup.signal)).toMatchObject({ status: 'compacted' });
+  expect(setup.requests.length).toBeGreaterThan(0);
+  for (const request of setup.requests) expect(request).toMatchObject({ model: 'namespace/summary', body: { max_tokens: 50 } });
+  unchanged();
 });
 
 it('does not reuse a completed summary after the role effort changes', async () => {

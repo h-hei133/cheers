@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from './SessionManager.js';
-import { condenseContext, type CompactionPolicy } from './compaction.js';
+import { condenseContext, createCompactionStep, type CompactionPolicy } from './compaction.js';
 import { claimCompactionStep, completeCompactionStep, compactionOperationsPath, dispatchCompactionStep, markCompactionStepUnknown } from './compactionOperation.js';
 import type { AgentMessage } from '../core/agent/state.js';
 
@@ -97,10 +97,20 @@ it('does not join concurrent compactions with different input ceilings', async (
 it('declines an unknown step without calling the summarizer again', async () => {
   const summarize = vi.fn(async () => undefined as string | undefined);
   const first = await condenseContext({ messages: messages(), policy, summarize, force: true, operation: { sessionId } });
-  expect(first).toMatchObject({ status: 'declined', reason: 'unsummarized' });
+  expect(first).toMatchObject({ status: 'failed', reason: 'unsummarized' });
   summarize.mockClear();
   const repeated = await condenseContext({ messages: messages(), policy, summarize, force: true, operation: { sessionId } });
   expect(repeated).toMatchObject({ status: 'declined', reason: 'step-unknown' });
+  expect(summarize).not.toHaveBeenCalled();
+  const onDeclined = vi.fn();
+  const onError = vi.fn();
+  const automatic = createCompactionStep(policy, { sessionId, summarize, onDeclined, onError });
+  const snapshot = { messages: messages(), toolResults: [] };
+  await expect(automatic(snapshot)).resolves.toBeUndefined();
+  await expect(automatic(snapshot)).resolves.toBeUndefined();
+  expect(onDeclined).toHaveBeenCalledOnce();
+  expect(onDeclined.mock.calls[0][0]).toContain('it was not repeated');
+  expect(onError).not.toHaveBeenCalled();
   expect(summarize).not.toHaveBeenCalled();
 });
 

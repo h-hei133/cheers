@@ -2,7 +2,7 @@
 title: "压缩操作与步骤幂等"
 category: article
 created: 2026-10-17
-updated: 2026-10-19
+updated: 2026-11-02
 tags: [context, compaction, phase-20]
 summary: "摘要的有界分段、永久重播证据与原生会话条件发布；不确定发送和未验证写入不能变成成功。"
 ---
@@ -16,7 +16,7 @@ operation = session + provider + model + policy + instructions + logical source 
 step      = 精确消息 + previousSummary + instructions + history/prefix/merge stage
 ```
 
-策略包含 window、reserve、keepRecent、enabled、segmentTokens 与有效摘要目标限制。明确 summary 角色还绑定 connection/model/effort、凭据代际和目录能力的非秘密摘要；fallback 也包含实际摘要限制。逻辑重播身份与提交时的精确新鲜度分开：同内容指令 touch、恢复 metadata、临时配置 publication 和分支往返不能授权重发 unknown，但会使原在途提交失效。
+策略包含 window、reserve、keepRecent、enabled、segmentTokens、mergeTokens 与有效摘要目标限制。明确 summary 角色还绑定 connection/model/effort、凭据代际和目录能力的非秘密摘要；fallback 也包含实际摘要限制。逻辑重播身份与提交时的精确新鲜度分开：同内容指令 touch、显式 resume、临时配置 publication 和分支往返不能授权重发 unknown，但会使原在途提交失效。普通 metadata 生命周期或标题更新不使摘要失效。
 
 ## 1. 持久步骤
 
@@ -35,16 +35,17 @@ step      = 精确消息 + previousSummary + instructions + history/prefix/merge
 
 ## 2. 有界生成与请求计量
 
-- 合法单元保留 tool call/result 配对，重复 tool id 或不可分的大组拒绝。最多 64 个 source segment，每 segment 最多 512 条消息、默认估算 16000 tokens；source 与 merge 合计最多 128 次发送，过大的合并输入同样拒绝。
+- 合法单元保留 tool call/result 配对，重复 tool id 或未完成调用拒绝。单组超限时仅在摘要投影中缩短 tool 结果的文本，保留首尾、截断标记、调用 ID、参数和非文本块，原历史不变；固定结构或最小投影仍超限时拒绝。最多 64 个 source segment，每 segment 最多 512 条消息。
+- 摘要输出独立于主请求偏好，从摘要模型窗口、独立输入限制、输出能力和 reserve 推导；常规模型以 8192–16384 为目标，并在小窗口/输出能力较小时收窄。输入 segment 预留上一份摘要与提示词，merge 使用不重复预留上一份摘要的完整输入预算。完整请求仍先预检；merge 材料不可有损裁剪。账户端点保持 provider-owned 输出，规划预留不冒充已证明的输出上限。
 - history、prefix 和 merge 分别走原请求预算、attempt ledger、credential attribution 和 usage owner。每次完整返回的用量先记录，再验证摘要；拒绝、取消后的完整材料仍保留已知成本。
 - 纯预算预检先于 claim。真实 dispatch 在已有 transport 的实际交接点持久化；明确未交接的本次 prepared 可释放，未知交接不能自动重试。
 - 同 operation/step 只派发一次；完成材料直接复用，未知段使重启后整个原调度拒绝，不能跳过未知段继续生成。
 - 原有 checkpoint 与各 segment 的确定性文件足迹合并保留，不依赖摘要模型重新列出路径。
-- would-not-shrink、无合法切点、hook 拒绝和取消均不覆盖原历史；overflow 仍沿原有界救援路径。
+- would-not-shrink、无合法切点、hook 拒绝和取消均不覆盖原历史；overflow 仍沿原有界救援路径。摘要未产出是 failed，自动路径显示安全失败原因；取消与阈值以内保持静默，unknown 不授权重发。
 
 ## 3. 原生条件发布
 
-生成前捕获 profile/store、metadata 与 transcript 的 inode/字节、分支路径和导航 revision、模型、上下文及指令/config authority。普通 transcript 和 metadata writer 复用原 session state lock；metadata 仅能委托给当前同步持锁 owner，其他 state transaction 不提供一般重入。
+生成前捕获 profile/store、transcript 文件身份、逻辑历史、分支路径和导航 revision、模型、上下文及指令/config authority。metadata 原子写产生的 inode、标题和状态属于观察信息，不纳入历史新鲜度。每项目显式会话激活的 activationId 负责识别 resume/选择往返；同毫秒 resume 也生成新身份。它不进入逻辑重播身份。registry set/clear 共用原文件锁并在锁内重读；其他项目写入不能恢复旧激活或误使本项目失效。普通 transcript 和 metadata writer 复用原 session state lock；metadata 仅能委托给当前同步持锁 owner，其他 state transaction 不提供一般重入。
 
 提交在该锁内重新准入并捕获完整 source，最后一次准入后再次捕获，再紧邻 append 检查取消。新 turn、分支 A→B→A、模型/上下文、指令或配置发布变化使迟到摘要拒绝。摘要材料及已知成本可以保留，但拒绝不是历史写入成功。
 

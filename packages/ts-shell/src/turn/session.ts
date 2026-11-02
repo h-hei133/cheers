@@ -326,7 +326,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     // A decline here leaves the run reporting the overflow it already hit: the
     // engine judged that condensing would not make the context smaller, so
     // retrying the same request would fail the same way.
-    if (!condensed || condensed.status === "declined") return false;
+    if (!condensed || condensed.status !== "condensed") return false;
     if (options.signal.aborted) return false;
     const { plan } = condensed;
     if (source && options.compaction.authority) {

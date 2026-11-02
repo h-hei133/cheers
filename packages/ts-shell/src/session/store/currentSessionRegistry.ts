@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
-import { writeJsonFileAtomic } from "./sessionFileStore.js";
+import { randomUUID } from 'node:crypto';
+import { withFileLock, writeJsonFileAtomic } from "./sessionFileStore.js";
 import type { Session } from "../schema/sessionRecord.js";
 import {
   createEmptyCurrentSessionSelectionStore,
@@ -54,6 +55,33 @@ export function readMergedSessionRegistryStore(
   return { store: merged, readError };
 }
 
+/** Read one project's activation without loading a session or repairing its selection. */
+export function readCurrentSessionSelection(input: {
+  readonly storePaths: readonly string[];
+  readonly projectRoot: string;
+}): CurrentSessionSelectionRecord | undefined {
+  const root = normalizePathIdentity(input.projectRoot);
+  if (!root) throw new Error('Current session activation is unavailable.');
+  for (const storePath of input.storePaths) {
+    const registry = readSessionRegistryStoreAt(storePath);
+    // A corrupt newer source could contain the project's authoritative record;
+    // never fall through it. Once a valid record is found, older sources are
+    // shadowed for this project and cannot invalidate that activation.
+    if (registry.readError) throw new Error('Current session activation is unavailable.');
+    const selected = Object.prototype.hasOwnProperty.call(registry.store.byProjectRoot, root)
+      ? registry.store.byProjectRoot[root] : registry.store.byProjectRoot[root.toLowerCase()];
+    if (selected === undefined) continue;
+    if (!selected || typeof selected.sessionId !== 'string' || !selected.sessionId.trim()
+      || typeof selected.updatedAt !== 'string'
+      || (selected.activationId !== undefined && (typeof selected.activationId !== 'string' || !selected.activationId.trim()))) {
+      throw new Error('Current session activation is unavailable.');
+    }
+    return Object.freeze({ sessionId: selected.sessionId, updatedAt: selected.updatedAt,
+      ...(selected.activationId === undefined ? {} : { activationId: selected.activationId }) });
+  }
+  return undefined;
+}
+
 function readSessionRegistryStoreAt(storePath: string): SessionRegistryReadResult {
   if (!fs.existsSync(storePath)) {
     return {
@@ -87,15 +115,19 @@ export function projectCurrentSessionSelectionStore(input: {
   readonly normalizedProjectRoot: string;
   readonly sessionId: string;
   readonly updatedAt: string;
+  readonly activationId?: string;
 }): CurrentSessionSelectionStore {
   return {
     schemaVersion: 1,
     byProjectRoot: {
       ...input.current.byProjectRoot,
-      [input.normalizedProjectRoot]: projectCurrentSessionMetadata({
-        sessionId: input.sessionId,
-        updatedAt: input.updatedAt,
-      }),
+      [input.normalizedProjectRoot]: {
+        ...projectCurrentSessionMetadata({
+          sessionId: input.sessionId,
+          updatedAt: input.updatedAt,
+        }),
+        ...(input.activationId === undefined ? {} : { activationId: input.activationId }),
+      },
     },
   };
 }
@@ -222,16 +254,21 @@ export function setCurrentSessionSelection(input: {
     return;
   }
 
-  const current = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]).store;
-  writeSessionRegistryStore({
-    storePath: input.storePath,
-    store: projectCurrentSessionSelectionStore({
-      current,
-      normalizedProjectRoot,
-      sessionId: normalizedSessionId,
-      updatedAt: input.updatedAt,
-    }),
-  });
+  // Whole-registry writers must reread after acquisition so an unrelated
+  // project's stale snapshot cannot resurrect a superseded activation.
+  withFileLock(`${input.storePath}.lock`, () => {
+    const current = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]).store;
+    writeSessionRegistryStore({
+      storePath: input.storePath,
+      store: projectCurrentSessionSelectionStore({
+        current,
+        normalizedProjectRoot,
+        sessionId: normalizedSessionId,
+        updatedAt: input.updatedAt,
+        activationId: randomUUID(),
+      }),
+    });
+  }, { recovery: 'local-dead' });
 }
 
 export function clearCurrentSessionSelection(input: {
@@ -242,17 +279,19 @@ export function clearCurrentSessionSelection(input: {
   if (!input.normalizedProjectRoot) {
     return;
   }
-  const current = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]).store;
-  const next = removeCurrentSessionSelectionFromStore({
-    current,
-    normalizedProjectRoot: input.normalizedProjectRoot,
-  });
-  if (next) {
-    writeSessionRegistryStore({
-      storePath: input.storePath,
-      store: next,
+  withFileLock(`${input.storePath}.lock`, () => {
+    const current = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]).store;
+    const next = removeCurrentSessionSelectionFromStore({
+      current,
+      normalizedProjectRoot: input.normalizedProjectRoot,
     });
-  }
+    if (next) {
+      writeSessionRegistryStore({
+        storePath: input.storePath,
+        store: next,
+      });
+    }
+  }, { recovery: 'local-dead' });
 }
 
 export function clearCurrentSessionSelectionForProject(input: {

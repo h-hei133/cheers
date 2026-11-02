@@ -3,6 +3,7 @@ import type { AgentMessage } from '../core/agent/state.js';
 import type { HookDispatcher } from '../core/hooks/hookDispatcher.js';
 import { buildCompactionLifecycle } from '../core/shell/compaction.js';
 import { historyDigest } from '../context/request/identity.js';
+import { compactionErrorMessage } from '../session/compaction/failure.js';
 import { createComponentLogger } from '../observability/structuredLogger.js';
 import { createCompactionStep, type CompactionPolicy, type CompactionReason,
   type SummarizeHistory, type SummarizeTurnPrefix } from '../session/compaction.js';
@@ -14,6 +15,7 @@ export interface CompactionSetup {
   readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
   /** Record the accepted checkpoint durably. */
   readonly onCompact: (input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }) => void;
+  /** User-visible notice for a refusal or a safely projected automatic failure. */
   readonly onDeclined?: (message: string) => void;
   readonly reason?: CompactionReason;
 }
@@ -36,6 +38,7 @@ export function turnCompaction(input: {
     summarizeTurnPrefix: setup.summarizeTurnPrefix,
     onCompact: setup.onCompact,
     onDeclined: setup.onDeclined,
+    onError: error => { setup.onDeclined?.(`Compaction failed: ${compactionErrorMessage(error, input.workspaceRoot)}`); },
     authority: setup.authority,
     lifecycle: buildCompactionLifecycle({ hooks: input.hooks, sessionId: input.sessionId,
       workspaceRoot: input.workspaceRoot, reason: setup.reason ?? 'threshold' }),

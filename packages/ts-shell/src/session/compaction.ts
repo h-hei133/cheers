@@ -9,6 +9,7 @@ import { formatContextCheckpoint, readContextCheckpoint } from './compaction/che
 import { generateCompaction, CompactionStepUnknown } from './compaction/generation.js';
 import type { CompactionAuthority, CompactionOperationInput, CompactionSource, SummarizeHistory, SummarizeTurnPrefix } from './compaction/contract.js';
 import { CompactionPublicationError } from './compaction/contract.js';
+import { COMPACTION_DECLINE_MESSAGES, CompactionSummaryError } from './compaction/failure.js';
 import { freezeDeep } from '../core/values/freeze.js';
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 
@@ -21,8 +22,10 @@ export const KEEP_RECENT_TOKENS = 20_000;
 export interface CompactionPolicy {
   /** Digest of the captured summary target, effort and model capabilities; never credentials. */
   readonly summaryIdentity?: string;
-  /** Maximum tokens per legal history/prefix/merge request. */
+  /** Maximum history/prefix input tokens, leaving room for a carried summary. */
   readonly segmentTokens?: number;
+  /** Complete input allowance for combining summaries without a carried-summary field. */
+  readonly mergeTokens?: number;
   readonly contextWindow: number;
   /** Independent prompt ceiling when the model publishes one. */
   readonly inputLimit?: number;
@@ -445,14 +448,13 @@ export type CompactionDecline =
   | "no-legal-cut"
   /** The summary would cost at least what it replaces, so the context could only grow. */
   | "would-not-shrink"
-  /** The summarizer produced nothing usable. */
-  | "unsummarized"
   /** A previous step may already have been sent; replaying it is not authorized. */
   | "step-unknown"
   | "cancelled";
 
 export type CondenseOutcome =
   | ({ readonly status: "condensed" } & CondensedContext)
+  | { readonly status: "failed"; readonly reason: "unsummarized" }
   | { readonly status: "declined"; readonly reason: CompactionDecline };
 
 /**
@@ -465,9 +467,8 @@ export type CondenseOutcome =
  * used to compute it separately, which is how the rescue path came to run
  * without the budget clamp the scheduled path applied.
  *
- * Reports a decline, rather than nothing, whenever there was no condensation to
- * make: a caller that can speak to the user has to tell "there was nothing worth
- * replacing" apart from "the summarizer failed".
+ * Reports an explicit decision or failure whenever no condensation was made,
+ * so callers can distinguish "nothing worth replacing" from a missing summary.
  */
 export interface CondenseInput {
   readonly messages: readonly AgentMessage[];
@@ -525,7 +526,7 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
       identity: captured.operation.source.replayIdentity ?? captured.operation.source.identity } },
     captured.messages, captured.instructions, captured.policy.summaryIdentity,
     captured.policy.contextWindow, captured.policy.inputLimit, captured.policy.reserveTokens,
-    captured.policy.outputTokens, captured.policy.keepRecentTokens, captured.policy.segmentTokens,
+    captured.policy.outputTokens, captured.policy.keepRecentTokens, captured.policy.segmentTokens, captured.policy.mergeTokens,
     captured.policy.enabled, Boolean(captured.summarizeTurnPrefix)]) : undefined;
   const joined = key ? pendingCompactions.get(key) : undefined;
   const pending = joined ?? generateContext(captured);
@@ -590,13 +591,13 @@ async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
   const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, head), plan.cut) : [];
   const operation = input.operation ? { ...input.operation,
     policyDigest: digest([input.policy.contextWindow, input.policy.reserveTokens, input.policy.outputTokens, input.policy.keepRecentTokens,
-      input.policy.enabled, input.policy.summaryIdentity, input.policy.segmentTokens, input.instructions, plan,
-      'bounded-segments-v2', Boolean(input.summarizeTurnPrefix),
+      input.policy.enabled, input.policy.summaryIdentity, input.policy.segmentTokens, input.policy.mergeTokens, input.instructions, plan,
+      'bounded-segments-v3', Boolean(input.summarizeTurnPrefix),
       input.messages]) } : undefined;
   let summary: string | undefined;
   try {
     summary = await generateCompaction({ history, prefix, previousSummary, instructions: input.instructions,
-      signal: input.signal, maxTokens: input.policy.segmentTokens, operation,
+      signal: input.signal, maxTokens: input.policy.segmentTokens, maxMergeTokens: input.policy.mergeTokens, operation,
       summarize: input.summarize, summarizeTurnPrefix: input.summarizeTurnPrefix });
   } catch (error) {
     if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
@@ -605,7 +606,7 @@ async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
   }
   if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
   if (!summary) {
-    return { status: "declined", reason: "unsummarized" };
+    return { status: "failed", reason: "unsummarized" };
   }
   const messages = applyCompaction(input.messages, plan, summary);
   // A compaction earns its cost by leaving the context smaller than it found
@@ -697,7 +698,6 @@ export function createCompactionStep(
       }
       return undefined;
     }
-    reportedRefusal = undefined;
     // The lifecycle travels into `condenseContext` rather than being invoked
     // here: one place dispatches the hooks, so the manual and automatic paths
     // cannot report different payloads for the same event.
@@ -725,13 +725,22 @@ export function createCompactionStep(
       options.onError?.(error);
       return undefined;
     }
-    // A decline is not a failure: the engine found the context either too small
-    // to cut or a summary that would not pay for itself. Either way the step
-    // runs on the context it already has.
-    if (condensed.status === "declined") {
+    if (signal?.aborted) return undefined;
+    if (condensed.status === 'failed') {
+      options.onError?.(new CompactionSummaryError());
       return undefined;
     }
-    if (signal?.aborted) return undefined;
+    // Decisions after the threshold was crossed still need an explanation.
+    // Unknown sends retain their decline state and never authorize a replay.
+    if (condensed.status === "declined") {
+      if ((condensed.reason === 'blocked-by-hook' || condensed.reason === 'would-not-shrink'
+        || condensed.reason === 'step-unknown') && reportedRefusal !== condensed.reason) {
+        reportedRefusal = condensed.reason;
+        options.onDeclined?.(COMPACTION_DECLINE_MESSAGES[condensed.reason]);
+      }
+      return undefined;
+    }
+    reportedRefusal = undefined;
     const { plan, summary } = condensed;
     if (source && options.authority) {
       const committed = options.authority.commit({ source, summary, keptMessages: plan.keptMessages,

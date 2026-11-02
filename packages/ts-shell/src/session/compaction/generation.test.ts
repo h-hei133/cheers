@@ -9,6 +9,10 @@ import { compactionOperationsPath } from './state.js';
 import type { AgentMessage } from '../../core/agent/state.js';
 import { requestCompactionSummary } from '../../core/query/compaction/summarize.js';
 import { parseFileFootprintXml } from '../../core/query/compaction/fileFootprint.js';
+import { summaryBudget } from '../../cli/provider/summary/budget.js';
+import { prepareCompactionMessages } from '../../core/query/compaction/summarize.js';
+import { estimateTokens } from '../context.js';
+import { legalUnits } from './schedule.js';
 
 let home: string;
 let sessionId: string;
@@ -24,6 +28,20 @@ function history(): AgentMessage[] {
     { role: 'assistant' as const, content: '', tool_calls: [{ id: String(index), type: 'function' as const, function: { name: 'read', arguments: '{}' } }] },
     { role: 'tool' as const, tool_call_id: String(index), content: 'y'.repeat(400) }]).flat();
 }
+
+it('merges valid small-window summaries using the complete input allowance', async () => {
+  const budget = summaryBudget({ contextWindow: 10_000, reserveTokens: 500, providerOwnedOutput: false });
+  const summarize = Object.assign(vi.fn(async (request: Parameters<SummarizeHistory>[0]) =>
+    request.messages.length === 1 ? 'detail '.repeat(1_000) : 'merged work'), {
+    preflight: (request: Parameters<SummarizeHistory>[0]) => { prepareCompactionMessages({ ...request,
+      provider: { contextWindow: 10_000, reserveTokens: 500, maxOutputTokens: budget.maxOutputTokens } }); },
+  });
+  const messages: AgentMessage[] = [{ role: 'user', content: 'x'.repeat(8_000) }, { role: 'assistant', content: 'y'.repeat(8_000) }];
+  expect(await generateCompaction({ history: messages, prefix: [], maxTokens: budget.segmentTokens,
+    maxMergeTokens: budget.mergeTokens, summarize })).toBe('merged work');
+  expect(summarize).toHaveBeenCalledTimes(3);
+  expect(estimateTokens(summarize.mock.calls[2]![0].messages)).toBeGreaterThan(budget.segmentTokens);
+});
 
 it('sends bounded legal tool-paired segments and metered merge steps', async () => {
   const sent: AgentMessage[][] = [];
@@ -49,6 +67,43 @@ it('sends bounded legal tool-paired segments and metered merge steps', async () 
   expect(summarize).toHaveBeenCalledTimes(calls);
 });
 
+it('generates and durably reuses a summary of a 38KB result without changing the source history', async () => {
+  const resultText = 'BEGIN\n' + 'x'.repeat(38 * 1024) + '\nEND';
+  const messages: AgentMessage[] = [
+    { role: 'assistant', content: '', tool_calls: [{ id: 'large-read', type: 'function',
+      function: { name: 'read', arguments: '{"path":"src/large.ts"}' } }] },
+    { role: 'tool', tool_call_id: 'large-read', content: resultText },
+  ];
+  const before = JSON.stringify(messages);
+  const summarize = vi.fn(async (request: Parameters<SummarizeHistory>[0]) => {
+    expect(estimateTokens(request.messages)).toBeLessThanOrEqual(8192);
+    expect(legalUnits(request.messages)).toHaveLength(1);
+    expect(request.messages[0]!.tool_calls).toEqual(messages[0]!.tool_calls);
+    expect(request.messages[1]!.tool_call_id).toBe('large-read');
+    expect(request.messages[1]!.content).toMatch(/^BEGIN\n[\s\S]*truncated for summary[\s\S]*\nEND$/);
+    return 'Read src/large.ts.';
+  });
+  const input = { history: messages, prefix: [], maxTokens: 8192,
+    operation: { sessionId, policyDigest: 'large-result-policy' }, summarize };
+  expect(await generateCompaction(input)).toBe('Read src/large.ts.');
+  expect(await generateCompaction(input)).toBe('Read src/large.ts.');
+  expect(summarize).toHaveBeenCalledOnce();
+  expect(JSON.stringify(messages)).toBe(before);
+});
+
+it('refuses fixed call overhead before claiming or sending a summary', async () => {
+  const messages: AgentMessage[] = [
+    { role: 'assistant', content: '', tool_calls: [{ id: 'large-read', type: 'function',
+      function: { name: 'read', arguments: JSON.stringify({ path: 'p'.repeat(2000) }) } }] },
+    { role: 'tool', tool_call_id: 'large-read', content: 'x'.repeat(38 * 1024) },
+  ];
+  const summarize = vi.fn(async () => 'must not send');
+  await expect(generateCompaction({ history: messages, prefix: [], maxTokens: 100,
+    operation: { sessionId, policyDigest: 'fixed-overhead-policy' }, summarize })).rejects.toThrow(/segment budget/);
+  expect(summarize).not.toHaveBeenCalled();
+  expect(fs.existsSync(compactionOperationsPath(sessionId))).toBe(false);
+});
+
 it('fences cancellation for a joined subscriber without cancelling another caller', async () => {
   const messages: AgentMessage[] = Array.from({ length: 10 }, (_, index) => ({ role: index % 2 ? 'assistant' : 'user', content: 'x'.repeat(500) }));
   const policy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100 };
@@ -62,6 +117,25 @@ it('fences cancellation for a joined subscriber without cancelling another calle
   expect(await first).toMatchObject({ status: 'condensed' });
   expect(await joined).toEqual({ status: 'declined', reason: 'cancelled' });
   expect(summarize).toHaveBeenCalledOnce();
+});
+
+it('does not share pending generation across different summary merge allowances', async () => {
+  const messages: AgentMessage[] = Array.from({ length: 10 }, (_, index) => ({ role: index % 2 ? 'assistant' : 'user', content: 'x'.repeat(500) }));
+  const policy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 100, segmentTokens: 300 };
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const first = condenseContext({ messages, policy: { ...policy, mergeTokens: 1 }, force: true,
+    operation: { sessionId }, summarize: async () => { await pending; return 'summary'; } });
+  const secondSummary = vi.fn(async () => 'other summary');
+  const second = condenseContext({ messages, policy: { ...policy, mergeTokens: 1_000 }, force: true,
+    operation: { sessionId }, summarize: secondSummary });
+  const settled = Promise.allSettled([first, second]);
+  release();
+  const [limited, admitted] = await settled;
+  expect(limited.status).toBe('rejected');
+  if (limited.status === 'rejected') expect(limited.reason.message).toMatch(/segment budget/);
+  expect(admitted).toMatchObject({ status: 'fulfilled', value: { status: 'condensed' } });
+  expect(secondSummary).toHaveBeenCalled();
 });
 
 it('refuses an unresolved segment on restart without resending completed predecessors', async () => {
@@ -90,9 +164,9 @@ it('releases a dispatch-aware proven unsent failure but preserves a handed-off f
   expect(retry).not.toHaveBeenCalled();
 });
 
-it('refuses oversized indivisible tool groups and oversized merge material', async () => {
+it('refuses oversized non-tool source prose and oversized merge material', async () => {
   const summarize = vi.fn(async () => 'x'.repeat(1000));
-  await expect(generateCompaction({ history: history(), prefix: [], maxTokens: 50, summarize })).rejects.toThrow(/segment budget/);
+  await expect(generateCompaction({ history: [history()[0]!], prefix: [], maxTokens: 50, summarize })).rejects.toThrow(/segment budget/);
   expect(summarize).not.toHaveBeenCalled();
   await expect(generateCompaction({ history: history(), prefix: [], maxTokens: 300, summarize })).rejects.toThrow(/merged material/);
 });

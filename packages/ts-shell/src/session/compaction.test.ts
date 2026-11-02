@@ -385,6 +385,49 @@ describe("compaction pairing and policy guards", () => {
     expect(errors).toHaveLength(1);
   });
 
+  it('reports a missing summary as a failure without replacing history or repeating generation', async () => {
+    const onError = vi.fn();
+    const onCompact = vi.fn();
+    const summarize = vi.fn(async () => undefined);
+    const step = createCompactionStep(longPolicy, { summarize, onError, onCompact });
+    const messages = longHistory(4);
+    await expect(step({ messages, toolResults: [] })).resolves.toBeUndefined();
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0][0]).toMatchObject({ message: 'The provider returned no summary.' });
+    expect(onCompact).not.toHaveBeenCalled();
+    expect(summarize).toHaveBeenCalledOnce();
+    expect(messages).toEqual(longHistory(4));
+  });
+
+  it.each(['blocked-by-hook', 'would-not-shrink'] as const)('explains %s after the threshold is crossed', async reason => {
+    const onDeclined = vi.fn();
+    const onError = vi.fn();
+    const summarize = vi.fn(async () => 'large summary '.repeat(2_000));
+    const step = createCompactionStep(longPolicy, { summarize, onDeclined, onError,
+      ...(reason === 'blocked-by-hook' ? { lifecycle: { before: () => false } } : {}) });
+    await expect(step({ messages: longHistory(4), toolResults: [] })).resolves.toBeUndefined();
+    expect(onDeclined).toHaveBeenCalledOnce();
+    expect(onDeclined.mock.calls[0][0]).toContain(reason === 'blocked-by-hook' ? 'PreCompact hook' : 'would not free any context');
+    expect(onError).not.toHaveBeenCalled();
+    if (reason === 'blocked-by-hook') expect(summarize).not.toHaveBeenCalled();
+    else expect(summarize).toHaveBeenCalledOnce();
+  });
+
+  it('retains cancellation when an aborted summarizer returns no summary', async () => {
+    const controller = new AbortController();
+    const onError = vi.fn();
+    const onDeclined = vi.fn();
+    const summarize = async () => { controller.abort(); return undefined; };
+    expect(await condenseContext({ messages: longHistory(4), policy: longPolicy, summarize,
+      signal: controller.signal })).toEqual({ status: 'declined', reason: 'cancelled' });
+    const second = new AbortController();
+    const step = createCompactionStep(longPolicy, { summarize: async () => { second.abort(); return undefined; },
+      onError, onDeclined });
+    await expect(step({ messages: longHistory(4), toolResults: [] }, second.signal)).resolves.toBeUndefined();
+    expect(onError).not.toHaveBeenCalled();
+    expect(onDeclined).not.toHaveBeenCalled();
+  });
+
   it("stays silent on abort without reporting failure", async () => {
     const errors: unknown[] = [];
     const controller = new AbortController();
@@ -591,7 +634,7 @@ describe("a single turn larger than the budget", () => {
       summarize: async () => "history summary",
       summarizeTurnPrefix: async () => undefined,
     });
-    expect(condensed).toEqual({ status: 'declined', reason: 'unsummarized' });
+    expect(condensed).toEqual({ status: 'failed', reason: 'unsummarized' });
   });
 
   it("refuses to drop history it could not summarize", async () => {
@@ -603,7 +646,7 @@ describe("a single turn larger than the budget", () => {
     });
     // The opener alone does not describe the turns being discarded, so replacing
     // the head with it would lose them without a trace.
-    expect(condensed).toEqual({ status: "declined", reason: "unsummarized" });
+    expect(condensed).toEqual({ status: "failed", reason: "unsummarized" });
   });
 });
 

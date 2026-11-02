@@ -1943,3 +1943,18 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: Auto-compaction never runs, yet every observable step reports success — the plan is produced, the hook dispatches, and no error appears anywhere.
 - **Root Cause**: The segment scheduler refuses an indivisible tool-call group larger than the segment budget before any request is sent; the step catches that rejection and reports it through an optional callback the turn layer never supplied, so it disappears.
 - **Rule**: Every caller of a step that can decline or refuse must supply both the decline and the error channels, and a summarizer failure must not share a status with "nothing worth condensing". A preflight that can veto an operation is part of the operation's contract, not an internal detail.
+
+### Summary Projection And Merge Budgets Are Different Inputs
+- **Symptom**: A large tool result blocks all summarization before dispatch, or two valid summaries are refused by the history segment ceiling.
+- **Root Cause**: A legal tool group is indivisible but its result prose is not; a history segment reserves a carried summary while a merge already includes both summaries in its input. Reusing either the foreground output preference or the history segment ceiling confuses these budgets.
+- **Rule**: Clamp only tool text in the summary projection, retaining both ends, a loss marker, call/result identities and non-text blocks. Validate the minimal projection and complete request. Derive separate output, segment and merge allowances from one summary model snapshot; keep provider-owned output unknown and never subtract its theoretical maximum as observed output. Do not clip merge material or mutate persisted history.
+
+### Explicit Activation Must Fence Resume Independently Of Metadata
+- **Symptom**: Lifecycle atomic writes refuse valid summaries, while replacing their inode fence with metadata content lets a same-millisecond resume replay an old source.
+- **Root Cause**: Display metadata and native session activation have different lifetimes. Title/status/time digests cannot distinguish them; an unlocked whole-registry writer can also restore an older activation.
+- **Rule**: Fence publication with each project's explicit activationId, outside the logical replay identity. Generate it on every explicit selection, serialize registry set/clear and reread under that lock. Test unchanged metadata bytes across resume, lifecycle publication, unrelated projects and authoritative versus shadowed legacy registry failures.
+
+### Native Filesystem Spies Must Match The Imported Binding
+- **Symptom**: A lock test never reaches its injected resume even though the product acquires the expected lock; switching to a namespace spy then fails with a non-configurable property.
+- **Root Cause**: A default node:fs spy and a namespace import can refer to different Vitest module bindings; native namespace exports cannot be redefined.
+- **Rule**: Inject the competing action through a partial mock of the existing lock owner, call the real lock afterward, and assert both interception and the persisted activation. Do not weaken the lock assertion to make an unexercised test pass.

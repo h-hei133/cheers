@@ -1,6 +1,7 @@
 import type { AgentMessage } from '../../core/agent/state.js';
 import { estimateTokens } from '../context.js';
 import { SummaryAdmissionError } from './contract.js';
+import { clampToolResults } from './projection.js';
 
 export const MAX_SEGMENTS = 64;
 export const MAX_SEGMENT_MESSAGES = 512;
@@ -29,7 +30,7 @@ export function legalUnits(messages: readonly AgentMessage[]): readonly (readonl
   return units;
 }
 
-/** Pure budget checks happen before any request claim. Oversized indivisible units refuse. */
+/** Pure checks precede claims; oversized tool prose is projected within its legal group. */
 export function scheduleSegments(input: {
   readonly messages: readonly AgentMessage[];
   readonly maxTokens?: number;
@@ -39,17 +40,24 @@ export function scheduleSegments(input: {
   if (!Number.isSafeInteger(maxTokens) || maxTokens <= 0) throw new Error('Summary segment budget is invalid.');
   const fits = (messages: readonly AgentMessage[]): boolean => {
     if (messages.length > MAX_SEGMENT_MESSAGES || estimateTokens(messages) > maxTokens) return false;
-    try { input.validate?.(messages); return true; } catch { return false; }
+    try { input.validate?.(messages); return true; }
+    catch (error) {
+      if (error instanceof SummaryAdmissionError) return false;
+      throw error;
+    }
   };
   const segments: AgentMessage[][] = [];
   let current: AgentMessage[] = [];
   for (const unit of legalUnits(input.messages)) {
     const candidate = [...current, ...unit];
     if (fits(candidate)) { current = candidate; continue; }
-    if (!current.length || !fits(unit)) throw new SummaryAdmissionError('Summary request refused: a legal message group exceeds its segment budget.');
-    segments.push(current);
-    current = [...unit];
-    if (segments.length >= MAX_SEGMENTS) throw new SummaryAdmissionError('Summary request refused: the bounded segment schedule is full.');
+    const projected = fits(unit) ? unit : clampToolResults(unit, maxTokens, fits);
+    if (!projected) throw new SummaryAdmissionError('Summary request refused: a legal message group exceeds its segment budget.');
+    if (current.length) {
+      segments.push(current);
+      if (segments.length >= MAX_SEGMENTS) throw new SummaryAdmissionError('Summary request refused: the bounded segment schedule is full.');
+    }
+    current = [...projected];
   }
   if (current.length) segments.push(current);
   return segments;

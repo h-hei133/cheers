@@ -1,5 +1,6 @@
 import type {
   CurrentSessionSelectionResolution,
+  CurrentSessionSelectionRecord,
 } from "./currentSelection.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type {
@@ -8,6 +9,7 @@ import type {
 } from "../schema/sessionStateSnapshot.js";
 import {
   clearCurrentSessionSelectionForProject,
+  readCurrentSessionSelection,
   resolveCurrentSessionForProject,
   setCurrentSessionSelection,
 } from "./currentSessionRegistry.js";
@@ -164,6 +166,11 @@ export class SessionStoreAccess extends SessionStorePaths {
   getCurrentSessionForProject(projectRoot: string, options?: { readonly readOnly?: boolean }): Session | null {
     const resolution = this.resolveCurrentSessionForProject(projectRoot, options);
     return resolution.ok ? resolution.session : null;
+  }
+
+  readCurrentSessionSelection(projectRoot: string): CurrentSessionSelectionRecord | undefined {
+    assertSessionStoreProfile(this.storeLayout, this.storeLayout.currentSessionStorePath);
+    return readCurrentSessionSelection({ storePaths: this.storeLayout.currentSessionStoreSearchPaths, projectRoot });
   }
 
   resolveCurrentSessionForProject(

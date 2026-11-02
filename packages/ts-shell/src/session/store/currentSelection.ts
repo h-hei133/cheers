@@ -3,6 +3,8 @@ import type { Session } from "../schema/sessionRecord.js";
 export interface CurrentSessionSelectionRecord {
   readonly sessionId: string;
   readonly updatedAt: string;
+  /** Each explicit activation has a new identity, including same-session resume. */
+  readonly activationId?: string;
 }
 
 export interface CurrentSessionSelectionStore {
@@ -62,7 +64,8 @@ export function parseCurrentSessionSelectionStore(
   if (
     parsed.schemaVersion !== 1 ||
     !parsed.byProjectRoot ||
-    typeof parsed.byProjectRoot !== "object"
+    typeof parsed.byProjectRoot !== "object" ||
+    Array.isArray(parsed.byProjectRoot)
   ) {
     return {
       store: createEmptyCurrentSessionSelectionStore(),

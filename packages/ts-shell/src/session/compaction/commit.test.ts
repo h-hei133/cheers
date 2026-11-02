@@ -13,6 +13,19 @@ import { CompactionPublicationError } from './contract.js';
 import { runTurn } from '../../turn/session.js';
 import type { AgentMessage } from '../../core/agent/state.js';
 
+const lockProbe = vi.hoisted(() => ({ beforeRegistryLock: undefined as (() => void) | undefined }));
+vi.mock('../store/sessionFileStore.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../store/sessionFileStore.js')>();
+  return { ...actual, withFileLock: (...args: Parameters<typeof actual.withFileLock>) => {
+    if (args[0].endsWith('current-session.json.lock') && lockProbe.beforeRegistryLock) {
+      const before = lockProbe.beforeRegistryLock;
+      lockProbe.beforeRegistryLock = undefined;
+      before();
+    }
+    return actual.withFileLock(...args);
+  } };
+});
+
 let home: string;
 let manager: SessionManager;
 let sessionId: string;
@@ -23,7 +36,7 @@ beforeEach(() => {
   manager = new SessionManager(); sessionId = manager.createNew(home).id;
   for (let index = 0; index < 12; index++) manager.addTurn(sessionId, { role: index % 2 ? 'assistant' : 'user', content: `${index}:` + 'x'.repeat(500) });
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { force: true, recursive: true }); });
+afterEach(() => { lockProbe.beforeRegistryLock = undefined; vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { force: true, recursive: true }); });
 const compactions = () => manager.getTranscriptEvents(sessionId).filter(event => event.type === 'compaction');
 
 it('keeps replay identity stable across unchanged configuration publications and instruction touches', async () => {
@@ -43,13 +56,23 @@ it('keeps replay identity stable across unchanged configuration publications and
   expect(summarize).toHaveBeenCalledOnce();
 });
 
-it('rechecks native metadata writes made by final admission before appending', () => {
+it('rechecks native resume made by final admission before appending', () => {
   const source = manager.captureCompactionSource(sessionId);
   let checks = 0;
   const result = manager.appendCompactionIfCurrent({ source, summary: 'stale', keptMessages: 1, tokensBefore: 2000,
-    admission: () => { if (++checks === 2) manager.renameSession(sessionId, 'Concurrent rename'); return undefined; } });
+    admission: () => { if (++checks === 2) manager.resume(sessionId); return undefined; } });
   expect(result.status).toBe('refused');
   expect(compactions()).toHaveLength(0);
+});
+
+it('allows a display rename made by final admission before appending', () => {
+  const source = manager.captureCompactionSource(sessionId);
+  let checks = 0;
+  const result = manager.appendCompactionIfCurrent({ source, summary: 'summary', keptMessages: 1, tokensBefore: 2000,
+    admission: () => { if (++checks === 2) manager.renameSession(sessionId, 'Concurrent rename'); return undefined; } });
+  expect(result.status).toBe('committed');
+  expect(compactions()).toHaveLength(1);
+  expect(manager.getSession(sessionId)!.title).toBe('Concurrent rename');
 });
 
 it('rechecks cancellation caused by final admission before the append effect', () => {
@@ -78,6 +101,147 @@ it('allows query observations appended while the summary is generated', async ()
   }));
 });
 
+it.each(['turn-active', 'metadata', 'error', 'interrupted'] as const)(
+  'allows %s lifecycle publication while the summary is generated', async kind => {
+    const store = new SessionStoreAccess();
+    const metadataPath = store.metadataPath(sessionId);
+    const beforeMetadata = fs.lstatSync(metadataPath);
+    const source = manager.captureCompactionSource(sessionId);
+    const outcome = await compactSessionHistory({ store: manager, sessionId, policy,
+      summarize: async () => {
+        if (kind === 'turn-active') manager.markTurnActive(sessionId);
+        if (kind === 'error') manager.saveError(sessionId, 'Synthetic lifecycle update');
+        if (kind === 'interrupted') manager.saveInterrupted(sessionId);
+        if (kind === 'metadata') store.writeJsonFileAtomic(metadataPath, {
+          ...JSON.parse(fs.readFileSync(metadataPath, 'utf8')), title: 'Display metadata changed', updatedAt: '2026-11-02T12:00:00.000Z',
+        });
+        const afterMetadata = fs.lstatSync(metadataPath);
+        expect(`${afterMetadata.dev}:${afterMetadata.ino}`).not.toBe(`${beforeMetadata.dev}:${beforeMetadata.ino}`);
+        expect(manager.captureCompactionSource(sessionId).identity).toBe(source.identity);
+        return 'summary';
+      } });
+    expect(outcome).toMatchObject({ status: 'compacted' });
+    expect(compactions()).toHaveLength(1);
+  });
+
+it('allows another project activation while the summary is generated', async () => {
+  const source = manager.captureCompactionSource(sessionId);
+  const outcome = await compactSessionHistory({ store: manager, sessionId, policy,
+    summarize: async () => {
+      manager.createNew(path.join(home, 'other-project'));
+      expect(manager.captureCompactionSource(sessionId).identity).toBe(source.identity);
+      return 'summary';
+    } });
+  expect(outcome).toMatchObject({ status: 'compacted' });
+  expect(compactions()).toHaveLength(1);
+});
+
+it.each(['set', 'clear'] as const)(
+  'rereads the whole registry under its lock before an unrelated project %s', kind => {
+    const store = new SessionStoreAccess();
+    const otherProject = path.join(home, 'other-project');
+    const otherSession = manager.createNew(otherProject);
+    const source = manager.captureCompactionSource(sessionId);
+    const registryLock = path.join(path.dirname(store.sessionsDir), 'current-session.json.lock');
+    let intervened = false;
+    let resumedActivation: string | undefined;
+    lockProbe.beforeRegistryLock = () => {
+      intervened = true;
+      // A competing native resume completed immediately before this writer
+      // acquired the lock. Its activation must survive the unrelated write.
+      manager.resume(sessionId);
+      resumedActivation = store.readCurrentSessionSelection(home)!.activationId;
+    };
+    if (kind === 'set') store.setCurrentSessionForProject(otherProject, otherSession.id);
+    else store.clearCurrentSessionForProject(otherProject);
+    expect(intervened).toBe(true);
+    expect(store.readCurrentSessionSelection(home)!.activationId).toBe(resumedActivation);
+    expect(manager.appendCompactionIfCurrent({ source, summary: 'stale', keptMessages: 1, tokensBefore: 2000 })).toMatchObject({ status: 'refused' });
+    expect(compactions()).toHaveLength(0);
+    expect(fs.existsSync(registryLock)).toBe(false);
+  });
+
+it('refuses publication after native resume within the same millisecond', () => {
+  const store = new SessionStoreAccess();
+  vi.spyOn(Date.prototype, 'toISOString').mockReturnValue('2026-11-02T12:00:00.000Z');
+  manager.resume(sessionId);
+  const selection = store.readCurrentSessionSelection(home)!;
+  const source = manager.captureCompactionSource(sessionId);
+  manager.resume(sessionId);
+  const resumedSelection = store.readCurrentSessionSelection(home)!;
+  expect(resumedSelection.updatedAt).toBe(selection.updatedAt);
+  expect(resumedSelection.activationId).not.toBe(selection.activationId);
+  expect(manager.captureCompactionSource(sessionId).replayIdentity).toBe(source.replayIdentity);
+  expect(manager.appendCompactionIfCurrent({ source, summary: 'stale', keptMessages: 1, tokensBefore: 2000 })).toMatchObject({ status: 'refused' });
+  expect(compactions()).toHaveLength(0);
+});
+
+it('reads legacy project selections without upgrading or repairing them', () => {
+  const store = new SessionStoreAccess();
+  const registry = path.join(home, '.cheers', 'current-session.json');
+  const contents = JSON.parse(fs.readFileSync(registry, 'utf8'));
+  const projectKey = Object.keys(contents.byProjectRoot)[0]!;
+  delete contents.byProjectRoot[projectKey].activationId;
+  fs.writeFileSync(registry, JSON.stringify(contents));
+  const before = fs.readFileSync(registry);
+  expect(store.readCurrentSessionSelection(home)).toEqual(contents.byProjectRoot[projectKey]);
+  const source = manager.captureCompactionSource(sessionId);
+  manager.markTurnActive(sessionId);
+  expect(fs.readFileSync(registry)).toEqual(before);
+  expect(manager.captureCompactionSource(sessionId).identity).toBe(source.identity);
+  expect(manager.appendCompactionIfCurrent({ source, summary: 'legacy summary', keptMessages: 1, tokensBefore: 2000 })).toMatchObject({ status: 'committed' });
+});
+
+it('allows lifecycle publication when a corrupt legacy registry is shadowed by the current activation', async () => {
+  const legacyRegistry = path.join(home, '.cheer', 'current-session.json');
+  fs.mkdirSync(path.dirname(legacyRegistry), { recursive: true });
+  fs.writeFileSync(legacyRegistry, '{');
+  manager = new SessionManager();
+  const source = manager.captureCompactionSource(sessionId);
+  const outcome = await compactSessionHistory({ store: manager, sessionId, policy,
+    summarize: async () => {
+      manager.markTurnActive(sessionId);
+      expect(manager.captureCompactionSource(sessionId).identity).toBe(source.identity);
+      return 'summary';
+    } });
+  expect(outcome).toMatchObject({ status: 'compacted' });
+  expect(compactions()).toHaveLength(1);
+  expect(fs.readFileSync(legacyRegistry, 'utf8')).toBe('{');
+});
+
+it('refuses a corrupt current registry even when an older valid activation exists', () => {
+  const registry = path.join(home, '.cheers', 'current-session.json');
+  const legacyRegistry = path.join(home, '.cheer', 'current-session.json');
+  fs.mkdirSync(path.dirname(legacyRegistry), { recursive: true });
+  fs.copyFileSync(registry, legacyRegistry);
+  manager = new SessionManager();
+  const store = new SessionStoreAccess();
+  const source = manager.captureCompactionSource(sessionId);
+  fs.writeFileSync(registry, '{');
+  expect(() => store.readCurrentSessionSelection(home)).toThrow('activation is unavailable');
+  expect(manager.appendCompactionIfCurrent({ source, summary: 'stale', keptMessages: 1, tokensBefore: 2000 })).toMatchObject({ status: 'refused' });
+  expect(compactions()).toHaveLength(0);
+  expect(fs.readFileSync(registry, 'utf8')).toBe('{');
+});
+
+it.each(['record', 'activation', 'array-store', 'unreadable'] as const)(
+  'refuses a malformed %s activation without repairing its registry', kind => {
+    const store = new SessionStoreAccess();
+    const source = manager.captureCompactionSource(sessionId);
+    const registry = path.join(home, '.cheers', 'current-session.json');
+    const contents = JSON.parse(fs.readFileSync(registry, 'utf8'));
+    const projectKey = Object.keys(contents.byProjectRoot)[0]!;
+    if (kind === 'record') contents.byProjectRoot[projectKey] = null;
+    if (kind === 'activation') contents.byProjectRoot[projectKey].activationId = 7;
+    if (kind === 'array-store') contents.byProjectRoot = [];
+    fs.writeFileSync(registry, kind === 'unreadable' ? '{' : JSON.stringify(contents));
+    const before = fs.readFileSync(registry);
+    expect(() => store.readCurrentSessionSelection(home)).toThrow('activation is unavailable');
+    expect(manager.appendCompactionIfCurrent({ source, summary: 'stale', keptMessages: 1, tokensBefore: 2000 })).toMatchObject({ status: 'refused' });
+    expect(compactions()).toHaveLength(0);
+    expect(fs.readFileSync(registry)).toEqual(before);
+  });
+
 it('writes prepared summaries with a distinct wire type and preserves inertness on decode', () => {
   const line = encodeTranscriptEvent({ type: 'compaction', id: 'prepared', publication: 'prepared',
     summary: 'inert', keptMessages: 1, sourceActivePath: ['root', 'leaf'], timestamp: new Date().toISOString() });
@@ -96,7 +260,7 @@ it('propagates uncertain automatic publication without updating context or PostC
   expect(after).not.toHaveBeenCalled(); expect(onCompact).not.toHaveBeenCalled();
 });
 
-it.each(['cancel', 'turn', 'branch-return', 'model', 'rebind', 'replacement', 'profile-replacement'])('refuses a late manual append after %s', async kind => {
+it.each(['cancel', 'turn', 'branch-return', 'model', 'rebind', 'replacement', 'profile-replacement', 'resume', 'session-return'])('refuses a late manual append after %s', async kind => {
   const before = manager.getSession(sessionId)!.turns;
   const controller = new AbortController();
   const events: string[] = [];
@@ -116,6 +280,8 @@ it.each(['cancel', 'turn', 'branch-return', 'model', 'rebind', 'replacement', 'p
         store.writeJsonFileAtomic(target, { ...store.readStateSnapshotRequired(target), modelRevision: 'next' });
       }
       if (kind === 'rebind') manager.rebindSessionProjectRoot(sessionId, path.join(home, 'next'));
+      if (kind === 'resume') manager.resume(sessionId);
+      if (kind === 'session-return') { manager.createNew(home); manager.resume(sessionId); }
       if (kind === 'replacement') {
         const directory = manager.getSessionDirPath(sessionId); const copy = `${directory}-copy`;
         fs.cpSync(directory, copy, { recursive: true }); fs.rmSync(directory, { recursive: true }); fs.renameSync(copy, directory);
@@ -303,11 +469,15 @@ it.each(['raw provider output: Bearer synthetic-secret response body', 'Summary 
 });
 
 it('does not replay an unknown summary after native resume republishes unchanged metadata', async () => {
+  vi.spyOn(Date.prototype, 'toISOString').mockReturnValue(manager.getSession(sessionId)!.updatedAt);
   const summary = vi.fn(async () => undefined);
   expect(await compactSessionHistory({ store: manager, sessionId, policy, summarize: summary })).toMatchObject({ status: 'failed' });
   const before = manager.captureCompactionSource(sessionId);
+  const metadata = new SessionStoreAccess().metadataPath(sessionId);
+  const beforeMetadata = fs.readFileSync(metadata);
   manager.resume(sessionId);
   const after = manager.captureCompactionSource(sessionId);
+  expect(fs.readFileSync(metadata)).toEqual(beforeMetadata);
   expect(after.history).toEqual(before.history);
   expect(after.identity).not.toBe(before.identity);
   expect(after.replayIdentity).toBe(before.replayIdentity);

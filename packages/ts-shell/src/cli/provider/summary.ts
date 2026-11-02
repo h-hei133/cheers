@@ -19,6 +19,7 @@ import { delegatedTarget } from './target.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
 import { configuredOutputLimit } from '../../provider/request/output.js';
 import { requestServiceTier } from '../../core/models/serviceTier.js';
+import { summaryBudget } from './summary/budget.js';
 
 /** Capture an exact summary role; refresh its account only when a summary is requested. */
 export function captureSummaryRole(input: {
@@ -27,7 +28,7 @@ export function captureSummaryRole(input: {
   readonly workspaceRoot?: string;
   readonly admission?: Admission;
   readonly onCredentialPersisted?: () => void;
-}): { readonly identity: string; readonly limits: Pick<CompactionProvider, 'contextWindow' | 'inputLimit' | 'maxOutputTokens' | 'reserveTokens' | 'shape'>;
+}): { readonly identity: string; readonly segmentTokens: number; readonly mergeTokens: number; readonly limits: Pick<CompactionProvider, 'contextWindow' | 'inputLimit' | 'maxOutputTokens' | 'reserveTokens' | 'shape'>;
   readonly resolve: () => Promise<CompactionProvider> } | undefined {
   const role = input.config.sessionModelRoles?.summary;
   if (!role) return undefined;
@@ -42,9 +43,11 @@ export function captureSummaryRole(input: {
   const endpoint = providerCredentialEndpoint(input.catalog, selected, resolution.baseUrl);
   const serviceTier = requestServiceTier(input.config, resolution, input.catalog, resolution.baseUrl, endpoint);
   const shape = resolveRequestShape(input.catalog, role.provider, role.model, role.thinkingEffort ?? undefined, resolution.baseUrl, endpoint);
-  const maxOutputTokens = configuredOutputLimit(input.config, endpoint)
-    ?? (endpointShape(endpoint).outputControl === 'provider' ? undefined : shape.maxOutputCeiling);
+  configuredOutputLimit(input.config, endpoint);
   const reserveTokens = resolveTokenBudget(input.config.modelTokenBudgets, role.provider, role.model, 'reserveTokens', input.config.reserveTokens, 0);
+  const { maxOutputTokens, segmentTokens, mergeTokens } = summaryBudget({ contextWindow: model.contextWindow,
+    inputLimit: model.inputLimit, maxOutputCeiling: model.maxTokens, reserveTokens,
+    providerOwnedOutput: endpointShape(endpoint).outputControl === 'provider' });
   const failure = outputLimitFailure(maxOutputTokens, model.maxTokens, model.contextWindow)
     ?? (model.contextWindow ? reserveLimitFailure(reserveTokens, model.contextWindow) : undefined)
     ?? (role.thinkingEffort ? effortOutputFailure(endpointShape(endpoint), maxOutputTokens) : undefined);
@@ -70,7 +73,7 @@ export function captureSummaryRole(input: {
       shape, contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens,
     };
   };
-  return { identity, limits: { contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens, shape }, resolve: () => {
+  return { identity, segmentTokens, mergeTokens, limits: { contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens, shape }, resolve: () => {
     assertAdmission(input.admission);
     // History and turn-prefix steps share one captured credential renewal.
     return pending ??= renew();

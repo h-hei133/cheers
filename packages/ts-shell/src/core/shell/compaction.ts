@@ -19,6 +19,7 @@ import type { CompactionAuthority, CompactionCommit, CompactionCommitInput, Comp
 import { digest } from '../../session/compaction/state.js';
 import { CompactionOperationError, SummaryAdmissionError } from '../../session/compaction/contract.js';
 import { ModelAdmissionError } from '../agent/request/model.js';
+import { SUMMARY_MISSING } from '../../session/compaction/failure.js';
 
 /**
  * The lifecycle a compaction reports through, built once for both entry points.
@@ -179,8 +180,6 @@ function declineOutcome(reason: CompactionDecline): CompactionOutcome {
         reason:
           "The summary would be at least as large as the messages it replaces, so compacting would not free any context.",
       };
-    case "unsummarized":
-      return { status: "failed", reason: "The provider returned no summary." };
     case "step-unknown":
       return { status: "failed", reason: "A previous summary step may already have been sent; it was not repeated. Add a turn or change the instructions, then retry." };
     case 'cancelled': return { status: 'failed', reason: 'Compaction was cancelled.' };
@@ -233,6 +232,7 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
   if (condensed.status === "declined") {
     return declineOutcome(condensed.reason);
   }
+  if (condensed.status === 'failed') return { status: 'failed', reason: SUMMARY_MISSING };
   if (input.signal?.aborted) return { status: 'failed', reason: 'Compaction was cancelled.' };
   const commitInput: CompactionCommitInput = { source,
     summary: condensed.summary,

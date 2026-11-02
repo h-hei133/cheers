@@ -373,7 +373,7 @@ it('uses one accepted catalogue per operation for requests and compaction after 
   expect(original.policy.contextWindow).toBe(10_000);
 });
 
-it('binds fallback summary replay to effective output limits across unchanged publication reloads', () => {
+it('keeps summary replay independent of foreground output and binds it to the summary model ceiling', () => {
   const deps = runtime(true);
   deps.runPrompt('before reload', new AbortController().signal);
   const original = fixture.compaction!.policy.summaryIdentity;
@@ -384,9 +384,29 @@ it('binds fallback summary replay to effective output limits across unchanged pu
   expect(fixture.compaction!.policy.summaryIdentity).toBe(original);
   const current = configuration.current;
   configuration.publish(configuration.begin(current.binding), { ...current.config, maxOutputTokens: 256 }, current.binding);
-  deps.runPrompt('changed summary output', new AbortController().signal);
+  deps.runPrompt('changed foreground output', new AbortController().signal);
+  expect(fixture.compaction!.policy.summaryIdentity).toBe(original);
+  const accepted = configuration.current;
+  const catalog = structuredClone(accepted.catalog);
+  Object.assign(catalog[0]!.models[0]!, { maxTokens: 1_024 });
+  configuration.publish(configuration.begin(accepted.binding), accepted.config, accepted.binding, undefined, catalog);
+  deps.runPrompt('changed summary model ceiling', new AbortController().signal);
   expect(fixture.compaction!.policy.summaryIdentity).not.toBe(original);
   expect(received).toEqual([]);
+});
+
+it('sends independent summary output with a production input segment budget', async () => {
+  const provider = { providerId: 'fixture', model: 'fixture-model', endpoint: 'test-signed-summary', baseUrl, headers: {} };
+  for (const maxOutputTokens of [256, 1_024]) {
+    const wiring = buildCompactionWiring({ provider, runtimeConfig: { ...fixture.config, maxOutputTokens, reserveTokens: 2_000 } as never,
+      sessionId: 'signed-summary', catalog: [{ id: 'fixture', endpoint: 'test-signed-summary',
+        models: [{ id: 'fixture-model', contextWindow: 40_000, maxTokens: 10_000 }] }] });
+    expect(wiring.policy.outputTokens).toBe(maxOutputTokens);
+    expect(wiring.policy.segmentTokens).toBe(16_000);
+    expect(await wiring.summarize({ messages: [{ role: 'user', content: 'Summarize this work' }], signal: new AbortController().signal }))
+      .toContain('SUMMARY_ANSWER');
+    expect((received.at(-1)!.body as { inferenceConfig: { maxTokens: number } }).inferenceConfig.maxTokens).toBe(8_192);
+  }
 });
 
 it.each([true, false])("allows signed background refresh eligibility without a static key (apiKey=%s)", withKey => {

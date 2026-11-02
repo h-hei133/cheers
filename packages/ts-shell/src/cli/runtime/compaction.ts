@@ -31,6 +31,7 @@ import { requestServiceTier } from '../../core/models/serviceTier.js';
 import { requestReplayBinding } from '../../provider/request/replay.js';
 import { outgoingProjection } from '../../turn/messages.js';
 import { estimatePromptTail } from '../../context/request/tail.js';
+import { summaryBudget } from '../provider/summary/budget.js';
 
 /** Bind the captured publication and native session owner at each compaction entry point. */
 export function nativeCompactionAuthority(input: {
@@ -133,12 +134,12 @@ export function buildCompactionWiring(input: {
       modelTransport: providerModelTransport(runtimeConfig, summaryProvider.endpoint, input.admission) });
   };
   const historyRequest = (request: Parameters<SummarizeHistory>[0]) => ({
-    requestPolicy: input.requestPolicy, maxOutputTokens: summaryRole ? summaryRole.limits.maxOutputTokens : configuredOutputLimit(runtimeConfig, provider.endpoint),
+    requestPolicy: input.requestPolicy, maxOutputTokens: summaryLimits.maxOutputTokens,
     messages: toCompactionMessages(request.messages), previousSummary: request.previousSummary,
     instructions: request.instructions, signal: request.signal, dispatch: request.dispatch,
   });
   const prefixRequest = (messages: readonly AgentMessage[], signal?: AbortSignal, dispatch?: CompactionDispatch) => ({
-    requestPolicy: input.requestPolicy, maxOutputTokens: summaryRole ? summaryRole.limits.maxOutputTokens : configuredOutputLimit(runtimeConfig, provider.endpoint), purpose: 'turn-summary' as const,
+    requestPolicy: input.requestPolicy, maxOutputTokens: summaryLimits.maxOutputTokens, purpose: 'turn-summary' as const,
     messages: toCompactionMessages(messages), prompt: TURN_PREFIX_COMPACTION_PROMPT, signal, dispatch,
   });
   // Resolved per model rather than read from one global number: the catalog
@@ -155,8 +156,13 @@ export function buildCompactionWiring(input: {
   if (resolvedWindow.warning !== undefined) {
     windowLogger.warn(resolvedWindow.warning);
   }
+  const summaryReserve = resolveTokenBudget(runtimeConfig.modelTokenBudgets, provider.providerId, provider.model,
+    'reserveTokens', runtimeConfig.reserveTokens, 0);
+  const fallbackBudget = summaryBudget({ contextWindow: resolvedWindow.window, inputLimit: mainModel?.inputLimit,
+    maxOutputCeiling: mainModel?.maxTokens, reserveTokens: summaryReserve,
+    providerOwnedOutput: endpointShape(provider.endpoint).outputControl === 'provider' });
   const summaryLimits = summaryRole?.limits ?? { contextWindow: resolvedWindow.window, inputLimit: mainModel?.inputLimit,
-    maxOutputTokens: configuredOutputLimit(runtimeConfig, provider.endpoint), reserveTokens: runtimeConfig.reserveTokens };
+    maxOutputTokens: fallbackBudget.maxOutputTokens, reserveTokens: summaryReserve };
   // The fallback summarizer is the main model, so its request shape is the one
   // the turn already resolved: the wiring site passes it on the provider. The
   // preflight runs before that provider is resolved, so it needs the same shape
@@ -167,6 +173,8 @@ export function buildCompactionWiring(input: {
   return {
     policy: {
       summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, effectiveLimits, serviceTier])).digest('hex'),
+      segmentTokens: summaryRole?.segmentTokens ?? fallbackBudget.segmentTokens,
+      mergeTokens: summaryRole?.mergeTokens ?? fallbackBudget.mergeTokens,
       contextWindow: resolvedWindow.window,
       inputLimit: mainModel?.inputLimit,
       // Per-model budgets where the user set them, the global value otherwise.

@@ -490,8 +490,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-74 | P1 | 文件里出现来源被拒的字段时，用户能在产品内移除它，而不是每次启动都看到同一条警告 | 第 24.83 节第 1 条、24.85、24.89、24.91 | 本地验证 | 写路径已不再复活该键（下次保存即消失，真实 CLI 已验证）；未做独立 unset 命令，与 Codex 一致 |
 | ADD-75 | P0 | 配置约束失败不得呈现为裸栈致命错误；交互模式给出可读原因并保留可恢复入口 | 第 24.83 节第 2 条、第 24.85 节 | 本地验证 | 已改为具名原因 + exit 1；未覆盖 profile 切换中的同类拒绝与 Node 20.3 floor 复验 |
 | ADD-76 | P1 | `--doctor` 覆盖目录解析与配置约束失败，与启动时看到的拒绝一致 | 第 24.83 节第 3 条、第 24.85 节 | 本地验证 | 已复用运行时约束判定并输出可用性结论；目录解析诊断另列，未做跨平台复验 |
-| ADD-77 | P1 | 上下文溢出的回合错误要说明占用构成并给出可执行动作，而不是只说「无法自动压缩」 | 第 24.84 节、24.88、24.91 | 本地验证 | 已按「超预算且无切点」给出具名原因与动作；未做逐类占用拆分（工具 schema/历史/输出） |
-| ADD-78 | P0 | 首次请求前检查预算：到达时已超预算的会话（resumed 或上回合无工具调用）应在发出请求前压缩 | 第 24.88、24.90、24.91 节 | 本地验证 | 已在 loop 入口实现并经反转与单测验证；未在 Node 20.3 floor 与真实 provider 复核 |
+| ADD-77 | P1 | 上下文溢出的回合错误要说明占用构成并给出可执行动作，而不是只说「无法自动压缩」 | 第 24.84 节、24.88、24.91、24.98、24.101 | 本地验证 | 已实现工具 schema/系统/历史/输出/预留占用拆分，自动摘要 admission/未产出安全报告；平台体验仍待实机复核 |
+| ADD-78 | P0 | 首次请求前检查预算：到达时已超预算的会话（resumed 或上回合无工具调用）应在发出请求前压缩 | 第 24.88、24.90、24.91、24.101 | 本地验证 | loop 与 session 回合前检查、反转和单测已验证；隔离真实 provider 的 Node CLI 已发布摘要与匹配 commit marker；未在 Node 20.3 floor 与真实交互终端复验 |
 
 ### 12.12 归并说明
 
@@ -8627,3 +8627,29 @@ onError: error => renderer.renderLine(`Compaction failed: ${error instanceof Err
 - **R3（不变，优先级提升）**：`turnCompaction` 必须传 `onError`。复核代理确认 `SummaryAdmissionError` 正是被这个缺失吞掉的。
 - **R4（不变，但理由修正）**：移除 `metadata.json` inode 的依据不是「子代理说它不会变」，而是**实测证明它必然在窗口内变**。同时保留 `commit.test.ts:305` 的语义（resume 后不得重放未知摘要），改用内容摘要而非 inode。
 - **R5（降级为 P2，方向修正）**：锚点失配的**首因是 `!projection.sourceAligned`**（微压缩裁剪旧 tool 输出），不是计数不等。三家参考实现的做法是「校验失败就丢弃锚点、退回估算」——本项目已符合该模式，因此这不是缺陷。若要对齐，方向是 pi 的「把锚点绑定到 entry id」而非比较计数。
+
+### 24.101 24.99/24.100 的实施与持久发布验证（2026-11-02）
+
+按 24.100 的最新修正实施 R1–R4，R5 保留已有 projection identity 校验与估算回退。本轮没有重做 24.98 已提交的功能，也没有运行真实 PTY 或 20,000 条消息压测。四个辅助代理均使用 `gpt-6.1-sol`，只读/静态分析/编辑；所有验证由主代理单进程串行执行。
+
+#### 实施与方案修正
+
+| 项 | 当前行为 | 验收证据 |
+|---|---|---|
+| R1 | `session/compaction/projection.ts` 仅缩短摘要输入中的 tool 文本，保留首尾、截断标记、call/result ID、参数、图片等非文本块和原始历史；最小投影及完整 preflight 仍超限时具名拒绝 | 38KB 单结果、多结果、Unicode、冻结输入、固定开销拒绝、零 dispatch/claim、durable step 复用测试 |
+| R2 | `cli/provider/summary/budget.ts` 为 fallback 和显式 summary role 共用模型限制推导；摘要输出独立于主请求偏好，常规模型目标 8192–16384，小窗口/输入/输出上限收窄；生产 policy 有 segmentTokens 与 mergeTokens | 实际 HTTP body、exact role、模型上限、provider-owned 输出、合法合并与不同 merge policy 不共享 pending generation 回归 |
+| R3 | 摘要未产出为 failed；自动 step 的 onError 到达原用户通知通道，本地拒绝经 redactor，任意 provider 异常仅通用文案；阈值以内/取消静默，unknown 不重发 | 真实 turn adapter 的 preflight 零发送、missing summary 一次发送/保留历史、秘密文本隔离、hook/would-not-shrink/unknown notice |
+| R4 | metadata inode 移出 fence；每项目显式 selection activationId 区分普通生命周期与 resume/选择往返，逻辑 replay identity 独立；registry set/clear 锁内重读 | 44 项 commit 测试，包含同毫秒且 metadata 字节相同的 resume、生命周期原子写、无关项目、旧快照 writer、legacy shadow/malformed、历史/分支/模型/存储变化 |
+
+对研究方案的两处必要修正：**输入分段不等于输出预算**，它要扣掉摘要输出、上一摘要和提示词；merge 的输入已包含两个摘要，不能重复扣一份 carried summary。参考当前只读实现 `oh-my-pi/packages/agent/src/compaction/compaction.ts` 的独立输入/输出预算及分窗后钳制、`pi` 的摘要专用 tool 文本序列化，与本项目的合法工具成组和预检结合，未复制巨类。metadata 的 title/status 内容摘要也不能识别 resume，因为这些字段会被正常生命周期更新；采用现有 registry 中每项目激活身份，并保护锁内重读。
+
+独立只读复核发现并修复三处在途边界：merge 误用 segment ceiling、provider-owned 理论 maxTokens 使输入变为 1 token、被覆盖的坏 legacy registry 否决当前有效 activation。最终复核未发现遗留行为缺陷；这不替代运行证据。
+
+#### 验证与真实产物
+
+- 最终聚焦批次 7 文件 **143 项通过**；publication/HTTP/core-shell/turn 的直接消费者另以串行小批覆盖：commit 44、runtime compaction 33、core shell 10、turn session 41。共 **14 个直接相关文件、278 项**已有最终通过输出，未跑全套回归。
+- 四项反转均红灯成立：tool projection、独立摘要 output、自动 error callback、metadata inode fence；每次恢复原始字节。错误通知首轮过滤词没有选中目标测试，已改为精确测试名后验证红灯，不把空选通过当证据。
+- 五静态门与 `git diff --check` 通过。TS build `976145d40770`；bundled NormProof 退出 0，导入解析/循环义务 satisfied，但总体 **partial**，既有 `interactiveMode.ts` 与其测试超过函数上限，未提升为全绿。
+- 隔离真实 provider 的 Node `--print --session-id`：16 条合成消息，其中一个 tool group 含两份各 **41,727 bytes** 的结果，40k window、4096 foreground output、2000 reserve、4000 keepRecent。CLI exit 0；持久记录 **1 compaction + 1 匹配 compaction-commit**，`publishedCompactionEvents` 接受 1 份非空摘要，模型上下文缩至 **8 条**，没有可见失败。只保留脱敏计数，不留 provider 原始 body 或 credentials。
+
+本地证据目录：`.omx/artifacts/phase20-compaction-publication/`，含反转输出、结构报告与脱敏 native result。探针和含凭据的隔离 HOME 在收尾删除。尚无 Node 20.3 实际运行、Windows/macOS 实机、真实 interactive/exe、摘要质量或 billing/release 验收；原 Phase 20 延后项保持延后，ADD 状态未升为全量完成。提交、推送与 CI 的精确状态见开发日志。

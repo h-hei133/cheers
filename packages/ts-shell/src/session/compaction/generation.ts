@@ -61,6 +61,7 @@ export async function generateCompaction(input: {
   readonly instructions?: string;
   readonly signal?: AbortSignal;
   readonly maxTokens?: number;
+  readonly maxMergeTokens?: number;
   readonly operation?: CompactionOperationInput;
   readonly summarize: SummarizeHistory;
   readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
@@ -98,7 +99,7 @@ export async function generateCompaction(input: {
         if (index + 1 === summaries.length) { merged.push(summaries[index]!); continue; }
         const value = request(summaries.slice(index, index + 2).map(content => ({ role: 'user', content })));
         // Merge pairs remain indivisible; oversized summaries refuse instead of lossy slicing.
-        if (scheduleSegments({ messages: value.messages, maxTokens: input.maxTokens,
+        if (scheduleSegments({ messages: value.messages, maxTokens: input.maxMergeTokens ?? input.maxTokens,
           validate: messages => input.summarize.preflight?.({ ...value, messages }) }).length !== 1) {
           throw new SummaryAdmissionError('Summary request refused: merged material exceeds its request budget.');
         }
