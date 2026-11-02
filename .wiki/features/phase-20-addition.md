@@ -8653,3 +8653,107 @@ onError: error => renderer.renderLine(`Compaction failed: ${error instanceof Err
 - 隔离真实 provider 的 Node `--print --session-id`：16 条合成消息，其中一个 tool group 含两份各 **41,727 bytes** 的结果，40k window、4096 foreground output、2000 reserve、4000 keepRecent。CLI exit 0；持久记录 **1 compaction + 1 匹配 compaction-commit**，`publishedCompactionEvents` 接受 1 份非空摘要，模型上下文缩至 **8 条**，没有可见失败。只保留脱敏计数，不留 provider 原始 body 或 credentials。
 
 本地证据目录：`.omx/artifacts/phase20-compaction-publication/`，含反转输出、结构报告与脱敏 native result。探针和含凭据的隔离 HOME 在收尾删除。尚无 Node 20.3 实际运行、Windows/macOS 实机、真实 interactive/exe、摘要质量或 billing/release 验收；原 Phase 20 延后项保持延后，ADD 状态未升为全量完成。提交、推送与 CI 的精确状态见开发日志。
+
+### 24.102 压缩保留尾部超出预算：一个 44KB tool 结果让压缩近乎失效（2026-11-02）
+
+用户质疑：真实测试中压缩后 prompt 只从 21,585 降到 19,025（11.8%），这算压缩吗？
+
+**结论：压缩算法本身正确，但保留尾部的预算在「单个 tool 结果超过预算」时失效。**
+
+#### 24.102.1 两个数字不是同一口径
+
+之前把 `tokensBefore: 29,725`（对话 tokens）与 `21,585 → 19,025`（请求 tokens）放在一起比较，这是错的。真实降幅要用同一口径重算。
+
+用真实形状重建（3 个 turn，每个含一个 44,263 字符的 tool 结果）：
+
+```
+messages        = 12
+conversation    = 38,029 tokens
+plan: cut@9, kept 3 messages
+kept tail       = 12,661 tokens  ← 预算是 4,000
+```
+
+**保留尾部是预算的 3.2 倍。**
+
+#### 24.102.2 根因：不可分割的 tool 单元
+
+`locateCut`（`session/compaction.ts:229`）从最新消息往回累加字符：
+
+```
+i=11 assistant     38 chars  acc=     38
+i=10 tool       44,265 chars  acc= 44,303  ← 超预算
+```
+
+累计到 `i=10` 时已超预算 3 倍。`newestCutBelow`（`:176`）不能把 tool 当切点（`canStartTail` 拒绝 `role === 'tool'`），只能退到 `i=9` 的 assistant。**那 44KB 原封不动留在保留尾部。**
+
+代码注释写的是：
+
+> "the newest legal cut anywhere is used, which **keeps less** than the budget asked for rather than giving up."
+
+**实际是 keeps more。** 文档与实现不符。
+
+#### 24.102.3 后果：每次大读取都要压缩一次
+
+```
+after compaction  = 13,232 tokens
+threshold         = 27,123 tokens
+headroom          = 13,891 tokens
+one more 44KB read = 12,647 tokens
+→ compactions per large read: 0.9
+```
+
+压缩后只剩 13,891 tokens 余量，而一次 44KB 读取要 12,647——**几乎每次大读取都会触发一次压缩**。用户看到「压缩频繁但降幅有限」正是这个原因。
+
+#### 24.102.4 算法本身没有问题
+
+同一算法在不同形状下的降幅：
+
+| 形状 | 压缩前 | 压缩后 | 降幅 |
+|---|---|---|---|
+| 3 turns × 44KB | 38,029 | 13,238 | **65.2%** |
+| 6 turns × 44KB | 76,058 | 13,238 | **82.6%** |
+| 3 turns × 44KB + 3 small | 38,547 | 13,756 | **64.3%** |
+
+**切点选择与摘要生成都是对的。** 问题只在「保留尾部的下限」——它没有下限，一个不可分割单元可以撑破整个预算。
+
+#### 24.102.5 三家的做法：超支是被刻意接受的
+
+子代理核查结果**否定了我此前的修法建议**（「截断保留的 tool 内容」）。三家都没有这么做。
+
+| | 保留尾部超预算时 | 是否截断 tool 结果 |
+|---|---|---|
+| oh-my-pi | **刻意超支**。`findCutPoint` 的 `cutIndex` 初始化为最新切点，循环无法越过它（`compaction.ts:560-573`）。契约写在 `:519-523`：「Keep the newest group even when it alone exceeds the budget」 | **否**，`recentMessages` 原样切片（`:1580`） |
+| pi | **同样超支**。`cutPoints.find(c => c >= i)` 把切点退到 assistant tool call，8KB 结果整块保留（`compaction.ts:471-478`） | **否**，且有测试 #9740（`test/compaction.test.ts:378-411`）钉死该行为 |
+| codex | **不保留 tool 结果**。只保留 user 消息，边界消息用 `truncate_text` 中段截断（`compact.rs:666-685`） | 不适用——tool 结果根本不进入保留集 |
+
+**三家在 tool call / result 配对上的处理完全一致**：绝不把切点放在 tool result 上，因此配对永远不会被拆散。超支是配对的代价。
+
+oh-my-pi 的测试文件直接描述了这一后果（`agent-session-auto-compaction-progress-guard.test.ts:55-58`）：
+
+> "prepareCompaction keeps it verbatim (findCutPoint never cuts at tool results), so a 'successful' compaction leaves context still above threshold."
+
+#### 24.102.6 真正的缺陷不是超支，是缺少进度守卫
+
+既然超支是三家共有的设计，本项目的问题就**不是**「保留尾部超预算」本身。真正的问题是：
+
+**压缩没有腾出足够空间时，下一回合立刻再次触发，形成无进展的循环。**
+
+实测证据：真实会话中连续两次 `compaction-prepared`，`tokensBefore` 分别是 29,725 与 30,288——第二次压缩后上下文仍在阈值附近。
+
+oh-my-pi 为此有专门机制：`agent-session-auto-compaction-progress-guard.test.ts` 描述的「post-maintenance headroom check」，**检测到压缩未腾出足够空间时阻止自动继续，而不是再次触发**。
+
+本项目的 `createCompactionStep` 没有任何等价逻辑：`planCompaction` 返回计划就执行，执行完下一回合再判断——如果保留尾部本身就接近阈值，就会反复压缩。
+
+#### 24.102.7 修正后的方案
+
+- **R6（P1）压缩进度守卫**：若一次压缩后的估算上下文仍高于阈值的某个比例（例如 90%），则标记该会话的自动压缩为「无进展」，在上下文真正增长前不再触发。参考 oh-my-pi 的 progress guard。
+- **不采纳**「截断保留的 tool 结果」：三家都不这么做，且 pi 有测试钉死相反行为。
+- **R5 保持 P2**：锚点失配是显示精度问题，不是压缩缺陷（见 24.102.8）。
+
+**若用户仍希望降低压缩频率**，正确途径是调大 `keepRecentTokens`（让保留尾部与 tool 结果规模匹配），而不是改算法。当前默认 20,000 对 44KB 级别的 tool 结果偏小。
+
+#### 24.102.8 R5 记录
+
+`/context` 仍显示 `Compaction basis: estimated; provider measurement unavailable`。首因是 `!projection.sourceAligned`（微压缩裁剪旧 tool 输出使投影与存储不再对齐），不是计数不等。
+
+三家参考实现（codex / pi / oh-my-pi）的共同模式是「校验失败就丢弃锚点、退回估算」，本项目已符合该模式。因此这是**显示精度问题**，不是压缩功能缺陷。若要改善，方向是 pi 的做法：把锚点绑定到 entry id 而非比较计数。
