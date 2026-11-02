@@ -8942,3 +8942,91 @@ R5 从 P2 **提升为 P1**：它同时影响 `/context` 显示精度**和**压�
 本轮资源检查误用了完整进程 argv，暴露了无关服务的凭据。已明确告知用户，后续只显示PID/PPID/RSS/name；未重抄凭据。验证前只结束了核对父身份的本会话语言服务子进程，释放约4GB，未动其他服务。
 
 R5/R6 新增部分状态为**本地实现 + 本地HTTP Node CLI验证**；未取得真实 provider、真实 PTY、Node20.3、Windows/macOS、摘要质量与计费新证据。原47项与补充78项的完成状态不因此升级。提交/推送与精确SHA CI由开发日志记录。
+
+### 24.103 锚点修正的上界缺失（2026-11-03）
+
+`649c993c` 实现了 R5 的锚点修正，但暴露了一个边界缺陷。本节记录根因、三家的对照，以及修法。
+
+#### 24.103.1 现象
+
+`cli/runtime/compaction.test.ts` 的 `rejects a prefix whose tool output is reprojected after later turns arrive` 失败：
+
+```
+AssertionError: expected 14 to be undefined
+```
+
+测试 fixture 里锚点 `promptTokens: 900`，而后续 turn 到来后旧 tool 结果被裁剪掉 1,694 tokens。两处消费者都写成：
+
+```ts
+// cli/runtime/compaction.ts:238
+return tail === undefined ? undefined : Math.max(0, measured.tokens - (prefix?.rewriteTokensRemoved ?? 0)) + tail;
+// context/request/estimate.ts:67
+const tokens = calibrated ? Math.max(0, usage.lastPromptTokens! - (sameWirePrefix ? rewrite : 0)) + tail!;
+```
+
+`Math.max(0, 900 - 1694)` 得到 0，加尾部估算 14，于是返回 14。
+
+**14 是一个无意义的数字**：它声称「整个 prompt 只用 14 tokens」，而实际上那段被裁剪的历史本身就有 900 tokens 的实测值。
+
+#### 24.103.2 根因：`measuredProjectionPrefix` 只校验符号，不校验量级
+
+`turn/measurement.ts` 的校验非常严谨——身份摘要、wire 计数、索引对齐、replay binding、codec 重建——但最后一关只检查了符号：
+
+```ts
+// turn/measurement.ts:33
+if (removedChars < 0) return undefined;
+return { wireHistoryDigest: recorded.wireHistoryDigest, wireMessageCount: count,
+  rewriteTokensRemoved: Math.floor(removedChars / CHARS_PER_TOKEN) };
+```
+
+**它从未把裁剪量与锚点比较。** 而 `usage.lastPromptTokens` 就在它手边（函数签名里有 `usage`）。
+
+#### 24.103.3 三家的对照：都没有这个守卫
+
+| | 锚点失效时 | 是否有「裁剪量 > 锚点」的守卫 |
+|---|---|---|
+| **oh-my-pi** | 不丢弃，减差值 | **没有**。`correctedPromptTokens` 是无守卫的 `Math.max(0, ...)`；`recordAnchoredHistoryRewrite`（`session-stats.ts:443-466`）是**无上界的累加器** |
+| **pi** | 丢弃锚点，全量估算 | 不适用——它从不做减法，只做序数判定（`usageEntryIndex > latestInvalidatingEntryIndex`） |
+| **codex** | 不保留 provider 数字 | 不适用——`recompute_token_usage` 用本地估算**覆盖**，所有字段归零 |
+
+**oh-my-pi 的具体问题**（子代理实测）：
+
+- `correctedPromptTokens`（`session-stats.ts:56-59`）只有盲目的 `Math.max(0, ...)`，全仓 8 处非测试引用，**没有任何 `removed < promptTokens` 的不变量**；
+- `recordAnchoredHistoryRewrite` 是纯累加，无上限。N 次改写可以把和推到远超 `promptTokens`，此后 `correctedPromptTokens` 永远返回 0——**与本项目观察到的失败模式完全相同**；
+- 唯一的「重置」是新 provider 响应创建新的 `contextSnapshot`（`agent-session.ts:4180-4184`），或 `rebaseAfterCompaction`（`:477-491`）；
+- 去重靠上游的破坏性操作幂等（`session-maintenance.ts:869-871` 的 `if (removed === 0) return`），不是显式的幂等键；
+- **一个真实的重复计数窗口**：region-shake 路径在 `session-maintenance.ts:1054` 记录，而 `catch` 恢复了条目快照却**不回滚计数器**，重试会加两次。
+
+**结论：本项目在这里比 oh-my-pi 更早暴露问题，但三家都没有可照抄的守卫。**
+
+#### 24.103.4 修法
+
+**主守卫（必须）**：在 `measuredProjectionPrefix` 里，裁剪量达到锚点即拒绝。
+
+```ts
+// turn/measurement.ts，在 removedChars 计算之后
+const removedTokens = Math.floor(removedChars / CHARS_PER_TOKEN);
+const anchorTokens = usage.lastPromptTokens;
+if (anchorTokens === undefined || !Number.isSafeInteger(anchorTokens)
+  || removedTokens >= anchorTokens) return undefined;
+```
+
+**理由**：被测量的前缀永远不会被完全抹掉——`count` 条消息仍在 wire 上，加上 system prompt 与 tool schemas，这些锚点都付过费。所以 `removed >= anchor` 只可能意味着「锚点描述的已不是当前内容」，此时**返回 `undefined` 让下游退回估算**，正是 pi 与 codex 的行为。
+
+**消费者侧加固（建议）**：把 `Math.max(0, anchor - rewrite)` 换成显式分支，避免未来任何新的 producer 重新引入静默钳零。
+
+```ts
+// 两处消费点
+const corrected = rewrite < anchor ? anchor - rewrite : undefined;
+if (corrected === undefined) return undefined;  // 退回未校准路径
+```
+
+**可选的更紧守卫（不建议默认启用）**：要求 `anchor - removed >= 残留下缀的估算`。子代理指出 `CHARS_PER_TOKEN = 3.5` 对英文散文略微高估 token，这个检查可能在密集文本上**误拒合法锚点**。若要启用，需用更保守的比率（如 `chars/4`）或加容差。
+
+**测试 fixture 需要同时修正**：`promptTokens: 900` 对一个含 7000 字符 tool 结果的历史是不合理的（仅该 tool 结果就约 2000 tokens）。改成 3000 之类的真实值，并新增一个「裁剪量超过锚点」的用例断言返回 `undefined`。
+
+#### 24.103.5 这一项的定位
+
+这不是「照抄三家」能解决的问题——三家都没做对。它是本项目在**比 oh-my-pi 更严格的身份校验**之上，自然暴露出来的下一个边界。
+
+值得记录的是：**oh-my-pi 有同样的潜在缺陷，只是它的触发条件更难满足**（需要同一锚点生命周期内多次改写）。本项目因为每次投影都重新计算 `removedChars`，更容易撞上。
