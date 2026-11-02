@@ -8744,16 +8744,174 @@ oh-my-pi 为此有专门机制：`agent-session-auto-compaction-progress-guard.t
 
 本项目的 `createCompactionStep` 没有任何等价逻辑：`planCompaction` 返回计划就执行，执行完下一回合再判断——如果保留尾部本身就接近阈值，就会反复压缩。
 
-#### 24.102.7 修正后的方案
+#### 24.102.7 R6 方案（子代理实测，可直接实施）
 
-- **R6（P1）压缩进度守卫**：若一次压缩后的估算上下文仍高于阈值的某个比例（例如 90%），则标记该会话的自动压缩为「无进展」，在上下文真正增长前不再触发。参考 oh-my-pi 的 progress guard。
-- **不采纳**「截断保留的 tool 结果」：三家都不这么做，且 pi 有测试钉死相反行为。
-- **R5 保持 P2**：锚点失配是显示精度问题，不是压缩缺陷（见 24.102.8）。
+**三家的实际情况**：只有 oh-my-pi 有进度守卫；pi 和 codex **都没有**。
 
-**若用户仍希望降低压缩频率**，正确途径是调大 `keepRecentTokens`（让保留尾部与 tool 结果规模匹配），而不是改算法。当前默认 20,000 对 44KB 级别的 tool 结果偏小。
+- pi 的 `estimatedTokensAfter`（`agent-session.ts:3261`）算出来只是**报告**，从不比较；
+- codex 在 `turn.rs:472` 明说依赖「compaction works well enough」，没有 gate。
 
-#### 24.102.8 R5 记录
+所以这一项只能照 oh-my-pi 做。
 
-`/context` 仍显示 `Compaction basis: estimated; provider measurement unavailable`。首因是 `!projection.sourceAligned`（微压缩裁剪旧 tool 输出使投影与存储不再对齐），不是计数不等。
+**oh-my-pi 的机制有两层**，本项目需要的是第二层：
 
-三家参考实现（codex / pi / oh-my-pi）的共同模式是「校验失败就丢弃锚点、退回估算」，本项目已符合该模式。因此这是**显示精度问题**，不是压缩功能缺陷。若要改善，方向是 pi 的做法：把锚点绑定到 entry id 而非比较计数。
+1. **提交前** `#compactionReducesContext`（`session-maintenance.ts:4184-4223`）——投影必须严格变小。本项目已有等价物：`generateContext` 的 `would-not-shrink`（`session/compaction.ts:618-622`）。
+2. **提交后** `#compactionCreatedHeadroom`（`:4283-4302`）——残余必须落进恢复带：
+
+```ts
+const recoveryBand = Math.floor(thresholdTokens * COMPACTION_RECOVERY_BAND);  // 0.8
+return residualTokens <= recoveryBand;
+```
+
+关键细节（`:4296-4300` 的注释）：**刻意不再要求 `residual < trigger`**，因为裁剪可能已把 trigger 压到带以下，严格递减会产生假死锁。
+
+**死锁后的动作**：oh-my-pi 阻止的是**自动继续**（`automaticContinuationBlocked`，`agent-session.ts:5174-5179` 提前 return，跳过 rewind/plan-mode/todo/session_stop/自动继续 prompt），**不是阻止下一次压缩**。
+
+**状态与清除**（全部内存态）：
+
+- `#midTurnCompactionDeadEnds = new WeakMap<AgentMessage[], string|null>()`（`:543`），键是**实时消息数组身份**，值是 `firstKeptEntryId`；
+- 清除条件是**切点推进**（`:2883-2900`）：`prep.firstKeptEntryId !== deadEndFirstKeptId` 就 delete；
+- **新用户 prompt 不清除**——`resetForNewPrompt()` 只重置 `#incompleteRecoveryAttempts`。
+
+**对本项目的适配**：
+
+| 关注点 | oh-my-pi | 本项目 |
+|---|---|---|
+| 无进展判据 | `residual <= floor(threshold × 0.8)` | `tokensAfter <= availableTailTokens(policy) + checkpointTokens` |
+| 常量 | `COMPACTION_RECOVERY_BAND = 0.8` | `RECOVERY_FRACTION = 0.8`（`session/compaction/budget.ts:13`，**已存在**） |
+| 状态位置 | `WeakMap<消息数组, firstKeptEntryId>` | `createCompactionStep` 闭包里的 `let deadEnd`（`session/compaction.ts:680` 旁） |
+| 身份键 | `firstKeptEntryId` | `historyDigest(保留尾部)`（`context/request/identity.ts:22`，同目录已用） |
+| 阻止什么 | 自动继续 | **同一剪贴点上的下一次压缩**（本项目无自动继续 prompt，且 `NextStepUpdate` 只带 `messages`） |
+| 清除条件 | 切点推进 / 新 prompt 不清 | 新 run（自动）/ 切点推进 / 落入带内 |
+
+**`checkpointTokens` 修正**：本项目的 `tokensAfter` 含 checkpoint（`applyCompaction` 在 `compaction.ts:634-639` 前置），而 oh-my-pi 的带是量整个残余。所以要写成 `tokensAfter <= band + checkpointTokens`，否则保留尾部接近上限时带永远不可达。
+
+**不要**用裸的 `!reachedBudgetThreshold(tokensAfter)` 作判据——那正是 #2275 描述的「每回合只回收一点点、永远压在线下」的失败模式。
+
+**实施位置**：
+
+1. `session/compaction.ts:651-658` 的 `CompactionStepOptions` 增加 `onDeadEnd?: (message: string) => void`；
+2. `createCompactionStep` 闭包增加 `deadEnd` 状态，在 `condenseContext` 前做便宜的预检；
+3. 成功压缩后判定进度，未达标则 arm + 报告一次；
+4. `turn/compaction.ts:40` 转接；
+5. `cli/provider/resources.ts:161` 渲染（当前 `onDeclined` 直接 `renderer.renderLine`）。
+
+**提示文案**（改编自 oh-my-pi `:4260-4263`）：
+
+> Compaction freed too little context to make progress — pausing automatic compaction on this history. The most recent turn alone is too large to reduce further; clear large tool output or start a new session.
+
+**`recoverOverflow` 不要套用带**：oh-my-pi 的溢出重试路径用的是更松的「装得下就行」（`#compactionCreatedRetryFit`），套用带会把可恢复的溢出变成死锁（#3412）。
+
+**不采纳**「截断保留的 tool 结果」：三家都不这么做，pi 有测试 #9740 钉死相反行为。
+
+**若用户希望降低压缩频率**：调大 `keepRecentTokens`，让保留尾部与 tool 结果规模匹配。当前默认 20,000，对 44KB 级别的 tool 结果偏小。
+
+#### 24.102.8 R5 方案：用改写差值修正锚点（主代理实测）
+
+**此前的「保持 P2、只记方向」是研究不足。** 本节给出可实施的完整方案。
+
+##### 根因复核
+
+`/context` 显示 `estimated` 的直接原因在 `turn/step.ts:361`：
+
+```ts
+const measured = options.agentMode || !projection.sourceAligned ? undefined : measuredPromptContext(...);
+```
+
+而 `sourceAligned`（`turn/messages.ts:21`）要求 `prunedCount === 0`。**只要历史超过 3 个 turn 且有旧 tool 输出，这个条件必然为假**——不是边界情况，是任何真实编码会话的常态。
+
+##### 关键事实：微压缩是 1:1 映射，锚点索引从未失效
+
+`microcompactMessages` 用 `messages.map(...)`（`core/query/microCompact.ts:91`），**消息数不变，只有内容被改写**。
+
+实测（6 轮 × 44KB tool 结果）：
+
+```
+messages before = 18   after = 18   count preserved: true
+prunedCount     = 3
+savedChars      = 131570
+tokens before   = 75907
+tokens after    = 38316
+actual delta    = 37591
+savedChars/3.5  = 37592      ← 只差 1（取整）
+```
+
+**所以 `prunedCount === 0` 这个条件是过度保守的。锚点没有失效，只是它的数值需要减去被改写的量。**
+
+##### oh-my-pi 的做法：不丢弃锚点，减去差值
+
+```ts
+// session-stats.ts:56-59
+function correctedPromptTokens(assistant: AssistantMessage): number {
+  return Math.max(0, providerPromptTokens - (assistant.contextSnapshot?.historyRewriteTokensRemoved ?? 0));
+}
+```
+
+`recordAnchoredHistoryRewrite`（`:443-465`）把差值**累加到锚点消息自己的快照**上，而不是全局计数。调用点在 shake/prune/drop-images 之后（`session-maintenance.ts:872`、`:944`、`:1054`）。
+
+##### 本项目的实施设计
+
+`microCompact` 已经算好了 `savedChars`（`:140`），但**生产代码从未消费**——`grep savedChars` 只命中两个测试文件。
+
+**设计**：
+
+1. `microCompactMessages` 已返回 `savedChars`，无需改签名。
+2. 在 `turn/step.ts` 记录 `promptIdentity` 时，增加一个字段：
+
+```ts
+// turn/step.ts:347 附近的 promptIdentity
+wireRewriteTokens: Math.ceil(projection.savedChars / CHARS_PER_TOKEN),   // 新增
+```
+
+3. `PromptMeasurementIdentity`（`observability/usage/model.ts:50`）增加 `wireRewriteTokens?: number`。
+4. `measuredPromptContext` 返回时应用修正：
+
+```ts
+// observability/usageTelemetry.ts，返回处
+const corrected = Math.max(0, telemetry.lastPromptTokens - (identity.wireRewriteTokens ?? 0));
+```
+
+5. `turn/step.ts:361` 去掉 `!projection.sourceAligned` 这个前置条件，改为：只要 `converted.length === messages.length`（消息数一致）就允许使用锚点，内容改写由 `wireRewriteTokens` 修正。
+
+**实测验证**（用真实 `microcompactMessages`）：
+
+```
+provider-reported (raw history) = 75907
+rewrite delta                   = 37592
+corrected anchor                = 38315
+actual wire estimate            = 38316
+error                           = 1 token (0.00%)
+```
+
+##### 必须注意的两个陷阱
+
+**陷阱 1：微压缩不幂等。** 实测同一段历史裁两次，第二次仍裁掉 3 字符：
+
+```
+first  pass: pruned=3 savedChars=131570
+second pass: pruned=1 savedChars=3
+```
+
+原因是 `pruneToolContent`（`microCompact.ts:46-48`）的标记文本里嵌了「Omitted N characters」，第二次裁剪时这个数字又变了。
+
+**后果**：不能「每次投影累加 delta」。必须**以锚点消息为准，记录生成该锚点时的投影 delta**，而不是累加多次投影的差值。
+
+这同时是一个独立的真实缺陷（虽然只有 3 字符）：`pruneToolContent` 应当幂等，即对已裁剪的内容直接返回原样。
+
+**陷阱 2：`historyDigest` 也会变。** 内容改写后 `historyDigest(messages)` 与锚点记录的不同，`measuredPromptContext` 的 `requireExpectedIdentity` 校验会失败。所以第 5 步必须同时放宽 `historyDigest` 的比对——或者在 identity 里记录**改写前**的摘要，由 `wireRewriteTokens` 证明差异是被裁剪而非被替换。
+
+##### 与三家的对照
+
+| | 锚点失效时 |
+|---|---|
+| codex | 无锚点概念；重写后 `recompute_token_usage` 用本地估算覆盖 |
+| pi | 丢弃锚点，退回全量估算 |
+| oh-my-pi | **不丢弃**，用 `historyRewriteTokensRemoved` 修正 |
+| 本项目现状 | 丢弃，退回估算 |
+| 本项目目标 | **学 oh-my-pi 修正** |
+
+**只有 oh-my-pi 保留了 provider 锚点。** 这也是它唯一一个能在长会话中持续显示实测值的原因。
+
+##### 优先级修正
+
+R5 从 P2 **提升为 P1**：它同时影响 `/context` 显示精度**和**压缩阈值判定（当前用字符估算而非 provider 实测）。但它是**独立缺陷**，不影响压缩能否执行——压缩触发已由估算路径保证。
