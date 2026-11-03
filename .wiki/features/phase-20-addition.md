@@ -3,7 +3,7 @@ title: "Phase 20 日常交互补充要求与任务规划"
 category: article
 sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
-updated: 2026-11-03
+updated: 2026-11-04
 tags: [features, phase-20, additions, interaction, panels, completion]
 summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-79，已把七轮用户反馈、子代理review发现与真实provider探针结果按职责归并，重复项合并，逐条记录完成情况。当前1完成、8部分完成、68本地验证、1本地实现、1未开始；其余章节保留研究过程与逐批证据。"
 confidence: mixed
@@ -9961,3 +9961,241 @@ bash 与 git 的结果此前把完整 `result.stdout`/`result.stderr` 再写进 
 - 聚焦串行：report/sessionFacts/configuration 82 项、bash 相关 82+6 项通过；五静态门、`test:scripts` 191 项、TS build 通过。
 - NormProof（仓库内 archive 解包后运行）：循环与未解析导入 satisfied，唯一失败项仍是两处既有的 `interactiveMode` 函数上限，`blocking: false`，`verdictStatus: partial`——与上一轮相同，不是本次新增。
 - **未做**：真实 provider/PTY/Node 20.3 floor 复验；未运行全仓回归、20k 压力或并发验证（遵守 OOM 红线）。
+
+### 24.109 新一轮深度研究：研究对象模块划分（2026-11-04）
+
+本轮只做研究与验证，不实施。划分的是**研究分工**，不是项目模块；每一块可以独立查完，查完立即写入本文，发现矛盾就地修正。
+
+| 模块 | 研究对象 | 要回答的问题 |
+|---|---|---|
+| **M1 收尾步骤生命周期** | `FINAL_STEP_MESSAGE` 从判定、定价、组装、记录到复用的整条链 | 收尾请求与普通请求在哪一步开始分叉？每个消费者是否知道这个分叉？ |
+| **M2 锚点坐标系** | `promptMessageCount`（原始）与 `wireMessageCount`（实际发送）的关系 | 24.105 的「两个坐标系一致」结论，在收尾步骤和协议桥接下是否仍成立？ |
+| **M3 预算口径一致性** | compaction 阈值 / step 预算 / preview / 状态栏四处 | 同一请求是否被四处估成同一个数？差异从哪来、方向是保守还是危险？ |
+| **M4 失败与救援** | overflow 救援、摘要拒绝、dead-end 抑制 | 新字段（`toolsAllowed`）在这三条路径上是否被传递？ |
+| **M5 参照对照** | Claude Code / pi / oh-my-pi / codex | 别家如何处理「步数上限」与「本轮禁止工具」？ |
+
+**选择 M1 作为切入点的理由**：24.105 的生命周期研究完成于 2026-11-03，而收尾步骤的定价与传递是同日之后才落地的（`519c2a01` 至 `4aec7e4f`）。生命周期研究覆盖的是「普通请求」，收尾步骤是一条**新增的、未被该研究覆盖的分叉**。研究它等价于检验旧结论在新分叉上是否仍然成立。
+
+#### 24.109.1 方法
+
+1. 先读目标代码，确认分叉点；
+2. 用真实函数（不是复刻逻辑）构造最小输入，测量两侧数值；
+3. 对照参照项目，判断这是「设计选择」还是「实现缺口」；
+4. 只有能给出可复现输入的结论才写入，推测单独标注。
+
+#### 24.109.2 M1 第一项：收尾请求的预算，与压缩阈值口径不一致（已复现）
+
+**分叉点**在 [step.ts](../../packages/ts-shell/src/turn/step.ts)：
+
+```ts
+const wireTools = allowTools ? tools : [];          // :291 收尾请求不声明任何工具
+const overhead = { systemPrompt, tools: wireTools }; // :292
+```
+
+而 `systemPrompt` 在收尾请求里也换了内容：`regeneratedPrompt`（`:283-287`）为真时走 `systemPromptFor(agentMode, toolNames, toolCalling)`，而 [prompt.ts](../../packages/ts-shell/src/turn/prompt.ts:91-112) 的两套文案完全不同——带工具那套列举了每个工具名与使用规则，不带工具那套是「No tools are available for this turn」。
+
+**压缩阈值侧**（[compaction/budget.ts](../../packages/ts-shell/src/session/compaction/budget.ts)）只加了收尾指令的字符数：
+
+```ts
+export function closingCharsFor(toolsAllowed) {
+  return toolsAllowed === false ? messageCharCount({ role: 'user', content: FINAL_STEP_MESSAGE }) : 0;
+}
+```
+
+`estimateWithClosing` 仍然用 `policy.overhead`，也就是**带工具**的 system prompt 与 schema。
+
+**实测差异**（`.tmp/ctx-research/closing-budget.ts`，18 个代表性工具 + 3 条消息）：
+
+| 口径 | tokens |
+|---|---|
+| 压缩阈值（`estimateWithClosing`） | 2,747 |
+| 收尾请求实际携带（`estimateRequestTokens`，无 schema + 无工具版 system） | 1,600 |
+| **差** | **1,147** |
+
+差值的构成：schema 1,148 + 指令 54 − 无工具版 system 比带工具版短 859 字符（≈245 tokens）≈ 1,147。
+
+**方向判断**：压缩阈值**高估**了收尾请求 1,147 tokens。这是保守方向——它会更早触发压缩，不会让请求溢出。**因此它不是溢出风险，而是「本不必压缩却压缩了」的浪费**。
+
+**与 24.93 的关系**：24.93 记录的是「显示与阈值用不同数值」。这一项不同——**阈值与请求本身**用不同数值，且只在收尾步骤出现。
+
+**为什么不是设计意图**：`closingCharsFor` 的注释写的是「every estimate that prices a closing request has to add it explicitly」，说明作者知道要补指令，但没有把「收尾请求同时撤掉 schema、换掉 system」这一半也补上。缺的不是判断，是实现。
+
+**尚待确认**：`systemPromptFor` 只在 `regeneratedPrompt` 为真时生效，而它的条件是 `options.agentMode !== undefined || !toolCalling`。主 turn 的 `agentMode` 来自哪、是否为 `undefined`，决定了生产路径是否真的会切换 system 文案。见 24.109.3。
+
+#### 24.109.3 M1 第二项：收尾请求自身无法校准（已复现，判定为正确行为）
+
+**假设**：收尾步骤记下的锚点，会被下一步复用。
+
+**实测**（`.tmp/ctx-research/closing-anchor5.ts`，走真实的 `measuredProjectionPrefix` + `estimatePrompt`）：
+
+| 上一步类型 | 原始 count | wire count | 前缀证明 | 下一步来源 | tokens |
+|---|---|---|---|---|---|
+| 普通步骤 | 3 | 3 | 成功 | `calibrated` | 903 |
+| 收尾步骤 | 3 | 4 | **失败** | `estimated` | 31 |
+
+**根因**：[measurement.ts](../../packages/ts-shell/src/turn/measurement.ts:46) 要求 `recorded.wireMessageCount === count`，而收尾步骤的 wire 比原始多一条合成指令，该等式必然不成立。
+
+**但这不是缺陷。** 继续追问「能否复用」：
+
+1. 收尾锚点的 tokens 包含指令、且**不含任何 schema**（`schemaDigest` 是空数组的摘要）；
+2. 下一步是普通请求，有 schema、无指令。
+
+两个请求的 `schemaDigest` 不同，[step.ts](../../packages/ts-shell/src/turn/step.ts:368-370) 的 `measuredPromptContext` 本来就会因身份不符返回 `undefined`。所以前缀证明失败与身份门控失败指向同一结论：**这个锚点确实不能描述下一步的请求**。
+
+**结论**：守卫正确，代价是「用尽步数的回合之后，下一回合的首个请求退回字符估算」。这是可接受的，因为请求形状确实变了；要消除它需要建模「锚点 − 指令 + schema」，属于设计变更而非修 bug。**记录为已解释，不记为缺陷。**
+
+#### 24.109.4 M1 第三项：收尾步骤可能触发一次本不必要的压缩（已复现）
+
+**构造**（`.tmp/ctx-research/closing-trigger2.ts`）：会话 12 轮工具调用 + 4,000 字符结果，窗口 18,500。此时
+- 压缩阈值 = `floor(18500 × 0.8)` = **14,800**；
+- 收尾请求的真实大小（无 schema，含指令）= **14,242** —— **低于阈值，能放下**；
+- 压缩判定实际使用的大小（带 schema）= **15,187** —— 高于阈值。
+
+`createCompactionStep` 的实际判定是 **compacted**：收尾请求本来放得下，却先付了一次摘要的钱，并在最后一答之前重写了历史。
+
+同一构造下窗口 20,000（阈值 16,000）时两侧都判 no-op，说明差异只在窄带内可观察，不是普遍性的重复压缩。
+
+**原因**：`closingCharsFor` 只补了指令的 54 个字符，没有扣除收尾请求不再携带的 1,148 个 schema tokens。24.109.2 的差异在这里表现为一个具体的错误决策，而不只是一个数字。
+
+**两条路径都高估**（`.tmp/ctx-research/measured-closing.ts`）：
+
+| 路径 | 计算 | tokens | 高估 |
+|---|---|---|---|
+| 已测量（anchor + tail） | 2,485 锚点 + 54 指令 | **2,539** | **945** |
+| 回退估算（`estimateWithClosing`） | 见 24.109.2 | **2,546** | **946** |
+| 收尾请求实际 | 无 schema + 指令 | **1,594** | — |
+
+已测量路径的高估更值得注意：锚点 2,485 是**上一次带工具的请求**的实测值，它天然包含 schema；而收尾请求撤掉了 schema。所以「锚点 + 增量」这个算式在收尾步骤上系统性地多算了整整一份 schema。
+
+**这意味着**：不是「回退路径没算对」，而是「收尾步骤改变了请求形状，而两条定价路径都按上一个形状算」。修法必须同时覆盖两者，只改 `closingCharsFor` 不够。
+
+**方向**：这是「过度压缩」，不是「溢出」。它不会让请求失败，但会让最需要完整上下文的最后一答读到被改写过的历史。
+
+**为什么值得修**：`toolsAllowed === false` 这个事实在收尾步骤是**已知的**，代码已经把它传到了 `planCompaction` / `isBelowThreshold` / `compactionRefusalReason`。缺的是「已知不收工具时，overhead 也不该计 schema」。这是信息已经到位、但没被使用。
+
+**未做**：没有改代码。本轮只研究与验证。
+
+#### 24.109.5 M1 第四项：收尾步骤不声明工具，但模型坚持调用时仍会执行（已复现）
+
+[step.ts](../../packages/ts-shell/src/turn/step.ts:275) 的 `allowTools` 只决定**请求里是否声明工具**（`:291` `wireTools = allowTools ? tools : []`）。[loop.ts](../../packages/ts-shell/src/core/agent/loop.ts:350-368) 执行 `executeToolBatch` 用的是完整工具池，且发生在 `shouldStopAfterStep`（`:384`）**之前**。
+
+**实测**（`.tmp/ctx-research/closing-tools2.ts`，按生产结构让 step 自己判 `allowTools = steps < maxSteps`，`maxSteps = 2`）：模型在收尾步骤仍然返回一个 tool_call，结果 `toolsExecuted: 2`，即**收尾步骤的工具被真的执行了**。
+
+**这算不算缺陷，取决于意图**：
+- 若意图是「收尾步骤绝不执行工具」——是缺陷，且 `FINAL_STEP_MESSAGE` 的措辞（"You cannot call any more tools on this turn."）描述的是拒绝；
+- 若意图是「不声明但万一坚持就做完」——行为正确，措辞过强。
+
+**参照对照**：Claude Code 的压缩子调用（`services/compact/prompt.ts:15-23`）明确选了相反方向，并在注释里写出理由：`maxTurns: 1` 下被拒绝的工具调用意味着没有文本输出，会浪费唯一的一轮，所以提示里**强调调用会被拒绝**。它用「拒绝」，本项目用「执行」。
+
+**待裁决**：两种都能成立，但文案与行为必须一致。当前不一致。
+
+#### 24.109.6 ~~M1 第五项：`maxTurns: 1` 的会话永远无法校准~~（**已被本轮自查推翻**）
+
+**我先前的推断**：`maxTurns: 1` 下每次请求都是收尾形状，schemaDigest / systemDigest / replayBinding 全同，锚点本可复用，却被 `wireMessageCount === count` 拒掉。
+
+**推翻依据**（`.tmp/ctx-research/single-step-wire.ts`、`single-step-wire2.ts`）：收尾指令被**追加在 wire 的末尾**，不是固定前缀。
+
+```
+turn1 wire: [user, user]                       ← 历史 + 指令
+turn2 wire: [user, assistant, user, user]      ← 指令移到末尾，历史插在中间
+wire1IsPrefix: false
+```
+
+所以「上一步的 wire」在新历史下**不再是前缀**——锚点确实不能描述下一步请求。守卫拒绝是**正确**的，`wireMessageCount === count` 只是恰好也失败，不是唯一原因。
+
+**为什么会推断错**：我把 `wireMessageCount = count + 1` 当成了「恒定的形状偏移」，但真正的偏移发生在**末尾**，而前缀复用要求偏移在**末尾之后**。这与普通步骤的差别是结构性的，不是判据选错了维度。
+
+**结论**：24.109.3 的结论**扩大到 `maxTurns: 1` 也成立**。收尾锚点一律不可复用，因为指令永远在最后一条。不记为缺陷。
+
+#### 24.109.7 M3：四个预算消费者在同一请求上的分歧（已复现）
+
+同一份「收尾请求」（3 条消息 + 指令，18 个工具 schema，固定 system）在四处被定价：
+
+| 消费者 | 位置 | tokens | 说明 |
+|---|---|---|---|
+| 压缩阈值 | `estimateWithClosing(messages, policy.overhead, closingChars)` | **2,546** | 带 schema + 指令 |
+| step 预算 | `promptTokensFor({ messages: closingMessages, overhead: closingOverhead })` | **1,600** | 无 schema + 指令 |
+| 线上实际 | `estimateRequestTokens(closingMessages, closingOverhead)` | **1,600** | 与 step 一致 ✅ |
+| tail 估算 | `estimatePromptTail(closingMessages, …)` | **1,212** | 只算消息，不含 system |
+
+（`.tmp/ctx-research/four-budgets.ts`）
+
+**逐项判断**：
+
+- **step 与线上实际一致**——这是最重要的两个，它们没有分歧。
+- **tail 不含 system 是正确的**：它算的是「锚点之后的增量」，system 已在锚点里。不构成分歧。
+- **压缩阈值比线上实际高 946**：与 24.109.2 同源，只是这次把 system 换成固定文本，差值就只剩 schema 那一半（1,148 − system 差 202）。
+
+**preview 与 step 一致**（`.tmp/ctx-research/preview-vs-step.ts`）：`maxTurns: 1` 时 preview 判 `allowTools = false` 并计入指令，`maxTurns: 15` 时判 true 并计入 schema。两处用的是同一个 `maxTurns > 1` 判断，**没有分歧**。
+
+**结论**：四处里三处一致，唯一不一致的是压缩阈值，且只在 `toolsAllowed === false` 时出现。这不是「四处各自为政」的系统性问题，而是**一个点上的口径缺口**。
+
+#### 24.109.8 M2：协议桥接下锚点也无法复用（已复现，条件性）
+
+**背景**：某些兼容协议要求 tool 结果之后必须紧跟 assistant 消息，`outgoingProjection(messages, bridge=true)` 会在每个「tool → user」边界插入一条合成的 `assistant: "I have processed the tool results."`。
+
+**实测**（`.tmp/ctx-research/bridge-growth.ts`）：
+
+| bridge | indexAligned | 前缀证明 | 下一步来源 |
+|---|---|---|---|
+| false | true | 成功 | `calibrated` (903) |
+| true | false | **失败** | `estimated` (32) |
+
+**触发条件**（`.tmp/ctx-research/bridge-scope.ts`）：只有「tool 结果后面跟着 user 消息」时才插入；`tool → assistant`、tool 在末尾、无工具三种情况都保持对齐。也就是说，**只要会话里出现过一次「工具跑完后用户又说话」，之后每次请求都会插入**，锚点从此不可复用。
+
+**是不是缺陷**：与 24.109.6 同类——插入发生在**中间**，改变了后续所有索引，锚点确实无法描述新请求。守卫正确。
+
+**但代价比收尾步骤大**：收尾步骤只影响最后一步，桥接影响**之后整个会话的每一次请求**。这是一个持续的精度损失，而不是一次性的。
+
+**适用范围**：`assistantAfterToolResult` 只能由用户目录里的 `compat.assistantAfterToolResult: true` 打开（[requestShape.ts](../../packages/ts-shell/src/core/models/requestShape.ts:186)），内置 provider 没有开启的。所以这是**用户显式选择的协议适配**带来的已知代价，不是默认路径问题。
+
+**记录理由**：它解释了「为什么某些用户会看到上下文数字一直是 `estimated`」，而这个原因在代码和文档里都没有写出来。
+
+#### 24.109.9 M4：overflow 救援不带收尾标志（代码确认，影响可忽略）
+
+[turn/session.ts](../../packages/ts-shell/src/turn/session.ts:305-356) 的 `recoverOverflow` 调用 `condenseContext({ ..., force: true })`，**没有传 `toolsAllowed`**。
+
+**影响**：`force: true` 时 `planCompactionCut` 只用 `estimateTokens(messages)`，根本不读 overhead（[compaction.ts](../../packages/ts-shell/src/session/compaction.ts:404-418)）；`condenseContext` 里 `tokensBefore` 在 force 分支也走 `estimateTokens(original)`。所以**少传这个标志不会改变任何判定**，只影响 `tokensBefore` 的报告口径。
+
+**结论**：不是缺陷。记录它是因为「新字段没有覆盖所有调用点」这种形状值得核对——核对结果是覆盖到了需要它的地方，force 路径不需要它。
+
+#### 24.109.10 M5：参照项目对照
+
+| 项目 | 是否有步数上限 | 到上限时是否追加收尾指令 | 是否撤掉工具声明 | 模型坚持调用工具时 |
+|---|---|---|---|---|
+| 本项目 | 有（`maxTurns`，默认 15） | **有**（`FINAL_STEP_MESSAGE`） | **是**（`wireTools = []`） | **执行** |
+| Claude Code | 有（`maxTurns`） | 无（直接产出 `max_turns_reached` 附件并结束） | 不适用 | 不适用 |
+| pi | 有（`durable` 的 `AgentState.maxTurns`） | 无 | 不适用 | 不适用 |
+| oh-my-pi | 有（`if-bench` 的 `maxTurns`，属评测脚手架） | 无 | 不适用 | 不适用 |
+| codex | 未见 `max_turns` 配置 | 不适用 | 不适用 | 不适用 |
+
+**关键差异**：**收尾指令是本项目独有的设计**。三家参照都是「到上限就停」，本项目是「到上限再给模型一次机会说完」。
+
+这个设计本身有价值——`maxTurns` 触发时模型往往刚跑完工具、还没解释结果，直接停会让用户看到一堆工具卡片而没有结论。**保留这个设计**。
+
+但它带来的后果必须自己承担：既然引入了「最后一条 wire 比历史多一条」的形状，所有基于「wire 前缀可复用」的假设都要重新检验。24.109.3 / 24.109.6 / 24.109.8 都是这个检验的结果。
+
+**Claude Code 的对照点**（`services/compact/prompt.ts:15-23`）值得单独记：它在同类场景里明确选择了「工具调用会被拒绝」，并写了理由（浪费唯一一轮）。本项目选择了「执行」。见 24.109.5。
+
+#### 24.109.11 研究小结与修正记录
+
+**本轮可复现的结论**（按严重度排序）：
+
+| 编号 | 结论 | 严重度 | 方向 |
+|---|---|---|---|
+| 24.109.4 | 收尾步骤的压缩阈值高估约一份 schema（已测量路径 945、回退路径 946），可能触发本不必要的压缩 | 中 | 过度压缩，非溢出 |
+| 24.109.5 | 收尾步骤不声明工具，但模型坚持调用时仍会执行，与提示文案相反 | 中 | 文案与行为不一致 |
+| 24.109.8 | 开启协议桥接后，锚点在整个会话内不可复用 | 低 | 用户显式选择带来的已知代价 |
+| 24.109.3 | 收尾锚点不可复用 | — | 守卫正确，已解释 |
+| 24.109.6 | ~~`maxTurns: 1` 永久不可校准~~ | — | **已被本轮自查推翻** |
+| 24.109.9 | overflow 救援不带收尾标志 | — | 无影响 |
+
+**本轮被自己推翻的两条**（记录过程，不只记录结论）：
+
+1. **24.109.6**：我先把 `wireMessageCount = count + 1` 当成「恒定偏移」，据此断言 `maxTurns: 1` 下锚点本可复用。实测 `single-step-wire.ts` 显示指令在**末尾**，历史增长时指令后移，旧 wire 不再是前缀。**推断错在把「数量差」当成了「位置关系」。**
+
+2. **24.109.2 的初版测量**：第一次比较用了「无工具版 system prompt」，得出 1,147 的差。但生产主 turn 的 `StepOptions.agentMode` 是 `undefined`（[request.ts](../../packages/ts-shell/src/turn/request.ts) 不传该字段），`systemPromptFor` 不生效，system 文本保持不变。改用固定 system 重测，差值为 946/945，几乎全是 schema。**结论方向不变，但数字与成因被修正了。**
+
+**两条测量污染，都是同一类错误**：用「我认为生产会走的输入」代替「生产实际走的输入」。这与 24.96 记录的方法论失误同源。修正办法是每次测量前先读调用点确认入参。
+
+**未做**：本轮没有改任何产品代码。所有探针在 `.tmp/ctx-research/`（git-ignored），验证均为单进程串行，未运行任何测试套件或构建。
