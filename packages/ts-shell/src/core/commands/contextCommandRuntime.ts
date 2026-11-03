@@ -103,7 +103,6 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
   // discovery snapshots and for a cwd that differs from the project root. A
   // command-side reconstruction from the full inspection pool would describe a
   // different request, not the one whose tokens are being reported.
-  const recorded = sessionId ? getSessionUsage(sessionId).lastPromptIdentity : undefined;
   const expectedSchemaDigest = context.promptIdentity?.schemaDigest;
   const expectedSystemDigest = context.promptIdentity?.systemDigest;
   const expectedHistoryDigest = context.promptIdentity?.historyDigest;
@@ -126,12 +125,11 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
   // A complete stored identity is not evidence that it still describes the
   // current runtime. Only the live request identity can authorize it; otherwise
   // a reload that cleared the live identity would validate the record against
-  // itself. Identity-free records remain the legacy compatibility path.
-  const legacyMeasurement = recorded === undefined && context.promptIdentity === undefined;
+  // itself. Unbound records cannot authorize measured context.
 
-  const measured = sessionId && expectedIdentity && activeEndpoint && (hasExpectedIdentity || legacyMeasurement)
+  const measured = sessionId && expectedIdentity && activeEndpoint && hasExpectedIdentity
     ? measuredPromptContext(sessionId, expectedIdentity,
-      { requireExpectedIdentity: hasExpectedIdentity })
+      { requireExpectedIdentity: true })
     : undefined;
   let calibrated: number | undefined;
   if (!measured && context.contextEstimate) {

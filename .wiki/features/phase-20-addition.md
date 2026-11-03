@@ -9516,3 +9516,8 @@ existing.lastPromptIdentity = usable ? { ...usage.promptIdentity, ... } : undefi
 上一实现 `3bc0d7c36bf36385545e4193e19a19803a067f0c` 的 CI 41521555550 已 completed/failure（Run Focused & Unit Tests），Watch 41521555538 success；日志接口返回空内容，未据此宣称具体失败原因或旧 CI 已修复。当前提交与 GitHub 状态在交付记录中单独绑定。
 
 最终五静态门与 TS build 串行通过，build `210a336ff2d6bf2889ee777a03cae3e833b8183b835e14594ad31087d81e3aad`；在该产物上重跑 7 进程 CLI 验证通过，所有 child PID 已确认退出。GitHub checks annotations 仅给出旧 CI exit 1，没有更多断言。
+
+
+**提交后复核**：主实现 `217dddb515893e16fca4ed786ce768b97403fe8d` 已推送，远端 main 精确一致。继续检查时删除 `/context` 中已失效的 identity-free 分支与注释，调用点明确要求当前完整身份。对应 configuration 25 项通过；status 28 项中最初 10 项受本机认证/目录配置污染，补齐该文件的隔离 HOME/USERPROFILE/CHEERS_TEST_ROOT 后 28 项全过。未把这些失败归因于产品测量逻辑，未修改默认配置来迎合夹具。五静态门、build `32cab6f6df70` 与新产物上的 7 进程/3 请求 CLI 串行再次通过。此后续补丁单独提交。
+
+延后读取主实现 CI：41567612081 in_progress；Watch 41567612121 completed/success。Watch success 不改变架构 partial，CI 不计通过。正式证据与所有失败日志保留在上述目录。

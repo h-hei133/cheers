@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import os from "node:os";
+import fs from 'node:fs';
 import { activeModelName, readStatusFacts, shortenPath } from "./sessionFacts.js";
 import { recordSessionUsage, resetSessionUsage, markContextUnknown, getSessionUsage, restoreSessionUsage } from "../../observability/usageTelemetry.js";
 import { renderStatusItem } from '../../presentation/tui/chrome/items.js';
@@ -16,6 +17,18 @@ import { selectPooledConnection } from '../../core/auth/account/pool.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
 import { DEFAULT_ENDPOINT_KIND } from '../../provider/endpoints/index.js';
+
+let testHome: string;
+beforeEach(() => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  testHome = fs.mkdtempSync('/tmp/cheers-test/status-facts-');
+  for (const name of ['HOME', 'USERPROFILE', 'CHEERS_TEST_ROOT']) vi.stubEnv(name, testHome);
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  fs.rmSync(testHome, { recursive: true, force: true });
+});
 
 function context(sessionId: string, overrides: Partial<RuntimeConfig> = {}): ShellRuntimeContext {
   return withConfiguration({

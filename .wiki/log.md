@@ -11600,3 +11600,6 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 验证主代理单进程串行：核心3文件69项，受影响夹具只按名称运行并逐项修复setup失败；计量/辅助隔离2文件36项（29项重跑，不重复累计覆盖）；5项反转预期失败且逐字节恢复；TS build与隔离Node CLI7进程/3请求通过。五静态门通过，bundled judge整体partial，仅两处既有interactiveMode函数上限。无PTY、20k或全仓回归，真实provider/平台验收未增加。失败runner路径、反转未选中、原生探针错误断言、夹具目录污染的事实均归档于`.omx/artifacts/phase20-context-lifecycle/`，详见补充规划24.105.16。
 
 上一实现`3bc0d7c36bf36385545e4193e19a19803a067f0c`：CI41521555550 failure，Watch41521555538 success。失败步骤为Run Focused & Unit Tests，日志接口空内容，未归因或计为已修。当前源码与Git交付单独绑定。
+
+
+24.105 主实现 `217dddb515893e16fca4ed786ce768b97403fe8d` 已推送 origin/main，远端一致。后续继续清理 `/context` 失效的无身份测量分支，并隔离 status 测试本机认证输入；configuration25/status28 项通过，五静态门/build `32cab6f6df70`/7进程3请求 CLI 串行通过。最初status10项环境失败保留，未归因产品。延后读取主实现CI41567612081仍in_progress，Watch41567612121success，代码CI尚未计通过。后续补丁Git记录另绑定。
