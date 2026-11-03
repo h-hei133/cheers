@@ -9560,7 +9560,7 @@ newest assistant @7: messageCount=7  match=true   ← 索引对
   expected=90b4c209b2bfe213  actual=278fa6a58ede0ab2
 ```
 
-#### 24.106.4 根因：`content` 与 `metadata.stdout` 双轨
+#### 24.106.4 ~~根因：`content` 与 `metadata.stdout` 双轨~~（**错误**：historyDigest 不读 metadata，见 24.107）
 
 `historyDigest` 只哈希 `[role, content, reasoning, tool_calls, tool_call_id, origin]`——**不哈希 metadata**。
 
@@ -9575,7 +9575,7 @@ newest assistant @7: messageCount=7  match=true   ← 索引对
 
 执行层把 stdout 写进 `metadata`（`runtime/execution/service.ts:94` 的 `withCommandExecutionProjection`），而消息的 `content` 是另一个字段。
 
-#### 24.106.5 影响面
+#### 24.106.5 ~~影响面~~（**错误**：锚点不受影响）
 
 这不是锚点特有的问题——**任何依赖 `historyDigest` 的机制都受影响**：
 
@@ -9585,7 +9585,7 @@ newest assistant @7: messageCount=7  match=true   ← 索引对
 
 只要会话里出现过 bash 工具调用（几乎必然），锚点就无法跨进程恢复。
 
-#### 24.106.6 修法方向
+#### 24.106.6 ~~修法方向~~（**基于错误前提**；`metadata.stdout` 冗余可作为独立优化）
 
 需要在**两个方向**中选一个，并保持压缩期与恢复期一致：
 
@@ -9663,7 +9663,7 @@ return approvedResult(finalOutput, {
 
 #### 24.106.9 这一发现的更广意义
 
-`content` 与 `metadata` 双轨不是 bash 工具独有的问题。任何「content 存一份、metadata 再存一份」的工具都会让 `historyDigest` 失真。
+~~`content` 与 `metadata` 双轨不是 bash 工具独有的问题。~~ **错误**：`historyDigest` 只哈希六个字段且不含 metadata，双轨不会让它失真。冗余仍然存在（转录体积翻倍），但那是独立的存储优化项，不是缺陷。
 
 **建议在 `createToolResultMessage` 层加约束**：metadata 不得包含与 content 重复的大字段。或者更简单——`historyDigest` 若要在 metadata 存在时保持稳定，就必须确保 content 是唯一真相。
 
