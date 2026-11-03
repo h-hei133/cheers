@@ -40,7 +40,10 @@ it('persists a local restore notice after invalidating attributed context throug
   const manager = new SessionManager();
   manager.createNewWithId(ID, directory);
   const attribution = captureUsageAttribution({ provider: 'fixture', model: 'same', baseUrl: 'https://relay.invalid/v1' });
-  recordSessionUsage(ID, { attribution, promptTokens: 100, completionTokens: 20 });
+  const identity = { provider: attribution.provider, model: attribution.model, endpoint: 'openai-compatible',
+    endpointId: attribution.endpointId };
+  recordSessionUsage(ID, { attribution, promptTokens: 100, completionTokens: 20, promptIdentity: identity });
+  expect(getSessionUsage(ID).lastPromptTokens).toBe(100);
   manager.addTurn(ID, { role: 'assistant', content: 'Public fixture edited files.' });
   const metadata = { fileUndo: { operationId: 'turn:fixture', status: 'partial',
     files: [{ path: 'b.txt', status: 'restored-verified' }] } };
@@ -126,7 +129,9 @@ describe("session usage persistence seams", () => {
     } as unknown as SessionStoreAccess;
     handleApplyQueryEventToState(store, ID, { type: "message.delta", role: "coder", delta: "done" });
     expect(read()?.usage?.byModel["one/org/model"]?.totalTokens).toBe(100);
-    recordSessionUsage(ID, { provider: "two", model: "org/model", promptTokens: 200 });
+    const identity = { provider: "two", model: "org/model", endpoint: "openai-compatible" };
+    recordSessionUsage(ID, { provider: "two", model: "org/model", promptTokens: 200, promptIdentity: identity });
+    expect(getSessionUsage(ID).lastPromptTokens).toBe(200);
     writeSessionState({ session, layout });
     expect(read()?.usage?.turnsCount).toBe(2);
     writeSessionState({ session, layout });
@@ -143,9 +148,11 @@ describe("session usage persistence seams", () => {
     expect(totalTokens(getSessionUsage(ID))).toBe(300);
     expect(getSessionUsage(ID).lastPromptTokens).toBeUndefined();
     expect(getSessionUsage(ID).recentRequests.map(entry => entry.promptTokens)).toEqual([100, 200]);
-    recordSessionUsage(ID, { provider: "one", model: "org/model", promptTokens: 10 });
+    const liveIdentity = { provider: "one", model: "org/model", endpoint: "openai-compatible" };
+    recordSessionUsage(ID, { provider: "one", model: "org/model", promptTokens: 10, promptIdentity: liveIdentity });
     switchActiveSession(context, context.session);
     expect(getSessionUsage(ID).lastPromptTokens).toBe(10);
+    expect(getSessionUsage(ID).lastPromptIdentity).toEqual(liveIdentity);
     writeSessionState({ session: context.session, layout });
     expect(read()?.usage?.byModel["one/org/model"]?.totalTokens).toBe(110);
 
@@ -161,7 +168,10 @@ it("flushes background accounting without rewriting lifecycle, branch or transcr
   const layout = projectSessionFileLayout({ sessionsDir: directory, sessionId: ID });
   const session: Session = { id: ID, projectRoot: directory, createdAt: "now", updatedAt: "now", status: "active", turns: [] };
   writeSessionRecord({ session, layout });
-  recordSessionUsage(ID, { provider: "one", model: "main", promptTokens: 100, promptMessageCount: 3 });
+  const identity = { provider: "one", model: "main", endpoint: "openai-compatible" };
+  recordSessionUsage(ID, { provider: "one", model: "main", promptTokens: 100, promptMessageCount: 3,
+    promptIdentity: identity });
+  expect(getSessionUsage(ID).lastPromptTokens).toBe(100);
   writeSessionState({ session, layout });
   const before = JSON.parse(fs.readFileSync(layout.statePath, "utf8"));
   recordSessionUsage(ID, { provider: "two", model: "warm", promptTokens: 5, cacheReadTokens: 200, completionTokens: 1 }, { affectsContext: false });
@@ -170,6 +180,7 @@ it("flushes background accounting without rewriting lifecycle, branch or transcr
   expect({ ...after, usage: before.usage }).toEqual(before);
   expect(after.usage.byModel["two/warm"].totalTokens).toBe(206);
   expect(getSessionUsage(ID).lastPromptTokens).toBe(100);
+  expect(getSessionUsage(ID).lastPromptIdentity).toEqual(identity);
   writeSessionUsage(ID, layout);
   expect(JSON.parse(fs.readFileSync(layout.statePath, "utf8"))).toEqual(after);
   resetSessionUsage(ID);
@@ -191,7 +202,10 @@ it('binds late auxiliary billing to its captured home, destination and prices wi
   const layout = locateExistingSessionLayout(createSessionStoreLayout(), ID);
   const session: Session = { id: ID, projectRoot: directory, createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] };
   writeSessionRecord({ session, layout });
-  recordSessionUsage(ID, { provider: 'main', model: 'same', promptTokens: 400, promptMessageCount: 3 });
+  const identity = { provider: 'main', model: 'same', endpoint: 'openai-compatible' };
+  recordSessionUsage(ID, { provider: 'main', model: 'same', promptTokens: 400, promptMessageCount: 3,
+    promptIdentity: identity });
+  expect(getSessionUsage(ID).lastPromptTokens).toBe(400);
   const recent = structuredClone(getSessionUsage(ID).recentRequests);
   const prices = { promptPerMTok: 3, completionPerMTok: 6, cacheReadPerMTok: 1 };
   const usageFor = sessionUsageRecorder(ID);
@@ -220,7 +234,8 @@ it('binds late auxiliary billing to its captured home, destination and prices wi
   expect(rows.map(row => row.attribution?.rates)).toEqual(expect.arrayContaining([null, { promptPerMTok: 3, completionPerMTok: 6, cacheReadPerMTok: 1 }]));
   expect(rows.find(row => row.attribution?.rates)?.estimate.usd).toBeCloseTo(0.000152);
   expect(JSON.stringify(saved.usage)).not.toContain('secret');
-  expect(getSessionUsage(ID)).toMatchObject({ lastPromptTokens: 400, lastPromptMessageCount: 3, recentRequests: recent });
+  expect(getSessionUsage(ID)).toMatchObject({ lastPromptTokens: 400, lastPromptMessageCount: 3,
+    lastPromptIdentity: identity, recentRequests: recent });
   const before = fs.readFileSync(layout.statePath, 'utf8');
   record(undefined);
   expect(fs.readFileSync(layout.statePath, 'utf8')).toBe(before);

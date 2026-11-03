@@ -1983,3 +1983,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A newly calibrated count is displayed with old limits, or an unavailable estimate publishes after the session changes.
 - **Root Cause**: Configuration publication and session admission can change during asynchronous tool/preview reads, including a rejected read.
 - **Rule**: Recheck exact configuration publication, cancellation and session admission after acquisition and its failure path. Keep the report's limits and estimate bound to the same publication; do not validate a saved anchor against its own stored identity.
+
+### A Rejected Anchor Needs The Same Live And Durable Boundary
+- **Symptom**: An error response supplies a live context count that disappears after restart, or clearing an unbound report lets the previous assistant's anchor return on activation.
+- **Root Cause**: In-memory accounting admitted usage before result classification while message persistence used a stricter gate; an unbound report left a normal request marker even when no newer assistant was appended.
+- **Rule**: Use one validated response measurement for live reuse and message persistence, while retaining billed usage independently. Persist a usage gap when a foreground report cannot bind an anchor. Keep old message measurements intact and test reactivation when the newer assistant is absent, after both compaction and selection projection.
+
+### A Measurement Fixture Must Exist In The Store And Match Its Target
+- **Symptom**: A consumer regression passes after its guard is removed, or a bound status fixture unexpectedly becomes unknown.
+- **Root Cause**: Reading absent usage returns a detached empty value; mutating it never seeds the registry. Live status also compares the effective destination digest, so a provider/model-only fixture cannot prove the current target.
+- **Rule**: Seed registered usage before corrupting its identity, and assert the stored count first. Capture the effective target for status fixtures. Use an explicit isolated catalogue when testing missing limits; ambient catalogue contents cannot be a test prerequisite. Resolve the installed test runner from the current dependency layout rather than assuming a prior installation still exists.

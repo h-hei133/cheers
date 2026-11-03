@@ -76,7 +76,8 @@ describe('message prompt measurement restoration', () => {
     const manager = start();
     const anchor = measurement(selectModelContext(manager.getSession(ID)!));
     recordSessionUsage(ID, { provider: 'fixture', model: 'fixture-model', promptTokens: 250,
-      cacheReadTokens: 20, cacheWriteTokens: 5, completionTokens: 10, toolCallsCount: 1 });
+      cacheReadTokens: 20, cacheWriteTokens: 5, completionTokens: 10, toolCallsCount: 1,
+      promptMessageCount: anchor.messageCount, promptIdentity: anchor.identity });
     answer(manager, anchor);
     const persisted = manager.getSession(ID)!.usage!;
     const loaded = reopen();
@@ -163,6 +164,41 @@ describe('message prompt measurement restoration', () => {
     expect(getSessionUsage(ID).recentRequests.at(-1)?.kind).toBe(kind);
   });
 
+  it('does not revive a persisted anchor after an unbound report without a newer assistant', () => {
+    const manager = start();
+    const anchor = measurement(selectModelContext(manager.getSession(ID)!));
+    recordSessionUsage(ID, { provider: anchor.identity.provider, model: anchor.identity.model,
+      promptTokens: anchor.tokens, completionTokens: 5, promptMessageCount: anchor.messageCount,
+      promptIdentity: anchor.identity });
+    answer(manager, anchor);
+    manager.addTurn(ID, { role: 'user', content: 'next question' });
+    recordSessionUsage(ID, { provider: anchor.identity.provider, model: anchor.identity.model,
+      promptTokens: 500, completionTokens: 10, cacheReadTokens: 40, cacheWriteTokens: 5,
+      toolCallsCount: 2, promptMessageCount: manager.getSession(ID)!.turns.length });
+    writeSessionUsage(ID, locateExistingSessionLayout(createSessionStoreLayout(), ID));
+    const persisted = manager.getSession(ID)!.usage!;
+    const loaded = reopen();
+    expect(loaded.turns.at(-1)?.role).toBe('user');
+    expect(loaded.turns.filter(message => message.role === 'assistant')).toHaveLength(1);
+    expect(loaded.turns.find(message => message.role === 'assistant')?.promptMeasurement).toEqual(anchor);
+    const usage = getSessionUsage(ID);
+    expect(usage.lastPromptTokens).toBeUndefined();
+    expect(usage.lastPromptMessageCount).toBe(0);
+    expect(usage.lastPromptIdentity).toBeUndefined();
+    expect(usage.lastPromptProjection).toBeUndefined();
+    expect(totalTokens(usage)).toBe(835);
+    expect(usage.turnsCount).toBe(2);
+    expect(usage.toolCallsCount).toBe(2);
+    expect(Object.values(usage.byModel)).toEqual([expect.objectContaining({
+      promptTokens: 775, completionTokens: 15, cacheReadTokens: 40, cacheWriteTokens: 5,
+      totalTokens: 835, turnsCount: 2,
+    })]);
+    expect(usage.recentRequests).toEqual(persisted.recentRequests);
+    expect(usage.recentRequests.at(-1)).toMatchObject({
+      kind: 'usage-gap', promptTokens: 545, completionTokens: 10, cacheReadTokens: 40, cacheWriteTokens: 5,
+    });
+  });
+
   it('restores an unchanged effective selection and refuses its later restoration', () => {
     const manager = start([{ role: 'assistant', content: '', tool_calls: [
       { id: 'call', type: 'function', function: { name: 'read', arguments: '{}' } },
@@ -177,6 +213,50 @@ describe('message prompt measurement restoration', () => {
     updateContextSelection(manager, loaded, undefined);
     reopen();
     expect(getSessionUsage(ID).lastPromptTokens).toBeUndefined();
+  });
+
+  it.each(['original', 'compacted'])('requires the selected prefix when restoring a %s transcript', kind => {
+    let manager = start([{ role: 'user', content: 'earlier question' },
+      { role: 'assistant', content: '', tool_calls: [
+        { id: 'call', type: 'function', function: { name: 'read', arguments: '{}' } },
+      ] }, { role: 'tool', tool_call_id: 'call', content: 'x'.repeat(4096) }]);
+    if (kind === 'compacted') {
+      appendCompactionEvent(path.join(manager.getSessionDirPath(ID), 'transcript.jsonl'), {
+        summary: 'replacement context', keptMessages: 2, timestamp: new Date().toISOString() });
+      manager = new SessionManager();
+      manager.resume(ID, directory);
+    }
+    const current = manager.getSession(ID)!;
+    const plan = planContextSelection(current, 'elide');
+    expect(plan.changed).toBe(1);
+    const selected = updateContextSelection(manager, current, plan.selection);
+    const selectedPrefix = selectModelContext(selected);
+    const anchor = measurement(selectedPrefix);
+    expect(anchor.identity.historyDigest).not.toBe(historyDigest(selected.turns));
+    answer(manager, anchor);
+
+    const loaded = new SessionManager().resume(ID, directory);
+    expect(loaded.turns.find(message => message.role === 'tool')?.content).toHaveLength(4096);
+    expect(loaded.contextSelection).toEqual(selected.contextSelection);
+    expect(loaded.turns.at(-1)?.promptMeasurement).toEqual(anchor);
+    if (kind === 'compacted') expect(loaded.turns[0]?.content).toContain('replacement context');
+    resetSessionUsage(ID);
+    restoreSessionUsage(ID, loaded.usage, loaded.turns);
+    const refused = getSessionUsage(ID);
+    expect(refused.lastPromptTokens).toBeUndefined();
+    expect(refused.lastPromptMessageCount).toBe(0);
+    expect(refused.lastPromptIdentity).toBeUndefined();
+    expect(refused.lastPromptProjection).toBeUndefined();
+
+    resetSessionUsage(ID);
+    activate(loaded);
+    const restored = getSessionUsage(ID);
+    expect(restored.lastPromptTokens).toBe(anchor.tokens);
+    expect(restored.lastPromptMessageCount).toBe(selectedPrefix.length);
+    expect(restored.lastPromptIdentity).toEqual(anchor.identity);
+    expect(totalTokens(restored)).toBe(0);
+    expect(restored.turnsCount).toBe(0);
+    expect(restored.recentRequests).toEqual([]);
   });
 
   it('refuses a measurement of raw turns after an effective context edit', () => {

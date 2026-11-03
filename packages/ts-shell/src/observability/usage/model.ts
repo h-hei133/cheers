@@ -96,7 +96,8 @@ export interface SessionUsageTelemetry {
    * Prompt tokens of the most recent request. This, not the cumulative total, is
    * the session's live context footprint: every request resends the whole
    * conversation, so the sum across turns counts the same context many times over.
-   * Undefined means no current provider measurement; a reported zero stays zero.
+   * Undefined means no provider measurement bound to a request identity;
+   * a bound reported zero stays zero. Unbound usage still counts toward spend.
    */
   lastPromptTokens: number | undefined;
   /**
@@ -164,8 +165,9 @@ export interface UsageHistoryEntry {
    * follows shares nothing with the one before. Comparing them would count the
    * whole rebuilt prompt as a miss that should have been a cache read, which is
    * the opposite of what happened.
-   * A usage-gap marks a completed request without a usable prompt count; its
-   * numeric fields are placeholders and never included as measured history.
+   * A usage-gap marks a request without a reusable, request-bound prompt count; its
+   * numeric fields may retain reported usage but never establish measured
+   * context or cache continuity. Cumulative billing remains in the buckets.
    */
   readonly kind: "request" | "context-reset" | "usage-gap";
 }

@@ -45,7 +45,10 @@ it.each(['stop', 'content_filter', 'empty'])('persists side-question fees for a 
   const setup = createAdvisorHarness(false, false);
   const prices = { promptPerMTok: 3, completionPerMTok: 6 };
   vi.mocked(loadCatalog).mockReturnValue([{ id: 'fixture', models: [{ id: 'm', cost: prices }] }] as never);
-  recordSessionUsage(setup.session.id, { provider: 'main', model: 'm', promptTokens: 400, promptMessageCount: 2 });
+  const identity = { provider: 'main', model: 'm', endpoint: 'openai-compatible' };
+  recordSessionUsage(setup.session.id, { provider: 'main', model: 'm', promptTokens: 400, promptMessageCount: 2,
+    promptIdentity: identity });
+  expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(400);
   const foreground = structuredClone(getSessionUsage(setup.session.id));
   const turns = structuredClone(setup.manager.getSession(setup.session.id)!.turns);
   vi.mocked(providerFetchForEndpoint).mockReturnValue((async () => {
@@ -62,7 +65,7 @@ it.each(['stop', 'content_filter', 'empty'])('persists side-question fees for a 
   });
   expect(costModel(getSessionUsage(setup.session.id), []).buckets.find(bucket => bucket.attribution)?.estimate.usd).toBeCloseTo(0.000312);
   expect(getSessionUsage(setup.session.id)).toMatchObject({ lastPromptTokens: 400, lastPromptMessageCount: 2,
-    lastBucketKey: foreground.lastBucketKey, recentRequests: foreground.recentRequests });
+    lastPromptIdentity: identity, lastBucketKey: foreground.lastBucketKey, recentRequests: foreground.recentRequests });
   expect(setup.manager.getSession(setup.session.id)!.turns).toEqual(turns);
   resetSessionUsage(setup.session.id);
 });

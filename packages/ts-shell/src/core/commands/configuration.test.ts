@@ -12,6 +12,7 @@ import { recordRequestContext, recordSessionUsage } from '../../observability/us
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import type { CommandReport } from './report/contract.js';
 import { requestContext } from '../../context/request/projection.js';
+import { requestIdentity } from '../../context/request/identity.js';
 import * as transport from '../../provider/request/fetch.js';
 import * as refresh from '../models/catalogRefresh.js';
 import { runBtwCommand } from './btwCommandRuntime.js';
@@ -254,9 +255,16 @@ it('keeps menus, completion, and context on the accepted catalogue until success
   expect(models.some(row => row.label === 'accepted-only')).toBe(true);
   expect(models.some(row => row.label === 'pending-only')).toBe(false);
   catalog('pending-only', 24000);
-  recordSessionUsage(shell.session.id, { promptTokens: 1000, completionTokens: 10, provider: 'google', model: 'chosen' });
+  const measurementIdentity = { provider: 'google', model: 'chosen', endpoint: 'openai-compatible',
+    endpointId: captureUsageAttribution({ provider: 'google', model: 'chosen', baseUrl: 'https://chosen.invalid' }).endpointId,
+    ...requestIdentity({ tools: [] }) };
+  shell.promptIdentity = measurementIdentity;
+  context.promptIdentity = measurementIdentity;
+  recordSessionUsage(shell.session.id, { promptTokens: 1000, completionTokens: 10, provider: 'google', model: 'chosen',
+    promptIdentity: measurementIdentity });
   const facts = readStatusFacts(shell);
-  expect(facts).toMatchObject({ provider: 'google', model: 'chosen', contextWindow: 16000, contextWindowSource: 'catalog', costRates: 'catalog' });
+  expect(facts).toMatchObject({ provider: 'google', model: 'chosen', contextUsed: 1000,
+    contextWindow: 16000, contextWindowSource: 'catalog', costRates: 'catalog' });
   expect(facts.costUsd).toBeCloseTo(0.016);
   expect(activeModelName(shell)).toBe('chosen');
   expect(readWelcomeState(shell, undefined, false).model).toBe('chosen');
@@ -264,6 +272,7 @@ it('keeps menus, completion, and context on the accepted catalogue until success
   expect((await connections.load()).find(row => row.id === 'login:custom')?.detail).toContain('accepted-only');
   expect((await connections.apply(['login:custom']))?.draft).toContain('--model accepted-only');
   const report = await runContextCommand([], context);
+  expect(report.report?.facts.prompt).toEqual({ status: 'measured', tokens: 1000 });
   expect(report.output).toContain('of 16,000 tokens');
   expect(report.output).toContain('13,976 free before the 0-token reserve');
   expect(report.output).toContain('0 inspection definitions');

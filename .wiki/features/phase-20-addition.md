@@ -406,8 +406,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ID | 优先级 | 交付内容 | 来源（旧章节/用户编号） | 状态 | 尚缺 |
 |---|---|---|---|---|---|
 | ADD-07 | P1 | 提前 TUI 首帧与 runtime 一次交接 | 第 6、第四批、第三十七批、第 24.39 节 | 部分完成 | Node/exe 普通/全屏的生产加载期输入、取消与错误恢复已验证；冷缓存、桌面全矩阵及完整性能验收仍缺 |
-| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43–24.47、24.103 节 | 部分完成 | 纯组合、模板、原生研究/review preview、目录词表及按需加载已实施；Node/exe真实TUI计量衔接、context身份转交及受限工具目录的实际schema/估算已修补验证；默认动态首请求18个schema与4325/4588估算/实测已取证；不支持的control/workflow仍unknown；R5 微压缩前缀校正已本地实现与调用链验证，真实 provider/终端复验尚缺；历史1.7k/4.9k同快照差额、其他环境/provider/词表、完整媒体/协议与性能验收尚缺 |
-| ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批、第 24.44–24.45、24.103 节 | 本地验证 | 当前报告身份经真实 slash 桥接与 Node/exe TUI 验证；本轮 R5 preview/dispatch/evaluator 聚焦验证通过，新增校正未真实 provider 复验；不借此宣称 ADD-08 完成 |
+| ADD-08 | P1 | 启动上下文估算、实测衔接与差额调查 | 第 7、第五批、22–24 批、第三十三批、第一百零四至一百零五批、第 24.35–24.38、24.40、24.43–24.47、24.103–24.105 节 | 部分完成 | 纯组合、模板、原生研究/review preview、目录词表及按需加载已实施；Node/exe真实TUI计量衔接、context身份转交及受限工具目录的实际schema/估算已修补验证；默认动态首请求18个schema与4325/4588估算/实测已取证；不支持的control/workflow仍unknown；R5 微压缩前缀校正已本地实现与调用链验证，真实 provider/终端复验尚缺；历史1.7k/4.9k同快照差额、其他环境/provider/词表、完整媒体/协议与性能验收尚缺 |
+| ADD-09 | P1 | `/context` 目录/请求估算口径修正 | 第 7、第四批、第 24.44–24.45、24.103–24.105 节 | 本地验证 | 当前报告身份经真实 slash 桥接与 Node/exe TUI 验证；本轮 R5 preview/dispatch/evaluator 聚焦验证通过，新增校正未真实 provider 复验；不借此宣称 ADD-08 完成 |
 | ADD-35 | P2 | 状态栏 live 估算与 provider 实测的优先级 | 第一百零五批、21.28–21.30 | 本地验证 | 真实 provider 延迟 |
 | ADD-36 | P2 | 目录刷新来源标记与能力上限准入 | 第一百零六至一百零八批 | 本地验证 | 真实外部索引内容与端到端 compaction |
 
@@ -9177,9 +9177,9 @@ R5 的修正是**必要但不充分**的：
 - 显示走 `estimatePrompt`（`context/request/estimate.ts`）；
 - 压缩阈值走 `measureContextTokens`（`cli/runtime/compaction.ts`）。
 
-两者都读 `lastPrompt*`，但修正逻辑分别实现。**需要确认它们在所有情况下给出相同数值。**
+两者都读 `lastPrompt*`，但修正逻辑分别实现。**需要先确认它们是否描述同一请求快照，再比较数值与失效边界；24.105.16 已撤回无条件相等的要求。**
 
-（研究进行中，后续小节按阶段补充。）
+（研究与实施已收口，当前结论见 24.105.16；下文保留研究中的假设及证伪过程。）
 
 #### 24.105.3 阶段 1-2：产生与记录（主代理已核实）
 
@@ -9204,7 +9204,7 @@ const promptMeasurement = !options.agentMode && counted && typeof usage?.prompt_
 
 **token 构成**：`promptTokens + cacheReadTokens + cacheWriteTokens`。包含缓存读写，因为它们同样占据上下文。
 
-（其余阶段的代理研究结果返回后补充。）
+（以上为实施前的持久化门控；24.105.16 已将同一门控用于内存态，计费独立保留。）
 
 #### 24.105.4 阶段 3：持久化（主代理已核实）
 
@@ -9262,37 +9262,28 @@ readonly promptMeasurement?: PromptMeasurement;
 
 **已确认**（见 24.105.13）：共 13 种变换，12 种显式处理，项目重绑经 `systemDigest` 间接处理。
 
-#### 24.105.7 阶段 5 详查：显示与阈值可能给出不同数值（子代理实测）
+#### 24.105.7 阶段 5 详查：消费者的测量时点（实施前复核已修正）
 
-**矛盾 B 确认成立。** 两条路径共享三个原语（`measuredPromptContext`、`measuredProjectionPrefix`、`estimatePromptTail`），但**不是同一个函数**，有四处会分叉：
+两条路径共享 `measuredPromptContext`、`measuredProjectionPrefix`、`estimatePromptTail`，但输入并非总是同一请求快照。**不能由数值不同推导存在缺陷，也不应强制共用一个不区分时点的数字。**
 
-| # | 分叉点 | 压缩阈值（`measureContextTokens`） | 显示（`estimatePrompt` / preview） |
+| # | 分叉点 | 压缩阈值（`measureContextTokens`） | 请求 preview |
 |---|---|---|---|
-| 1 | **尾部来源** | `projection.messages.slice(count)`——**不含** `FINAL_STEP_MESSAGE` | `wireMessages.slice(count)`——**含**关闭指令 |
-| 2 | 门控严格度 | 无 `endpointId`/`replayBinding`/`provedHistory` 要求 | 全部要求 |
-| 3 | 无 prefix 时 | 回退到原始 `messages.slice(count)` | 始终用 wire 消息 |
-| 4 | 记录态 wire 摘要存在但 prefix 失败 | **硬失败**（返回 `undefined`） | 仍可经 `sameWireIdentity` 校准 |
+| 1 | 尾部来源 | prePrompt/preStep 的当前历史投影 | 待发请求的 wire 消息；仅 `!allowTools && hadTools` 时附加关闭指令 |
+| 2 | 身份检查 | 从有效 provider 推导 endpointId/replayBinding；逐项比较已有身份，由 prefix 证明历史 | 比较当前完整 wire/schema/system/目标与 prefix 证明 |
+| 3 | 无 prefix | 旧式无 wire 身份的记录可估算原始尾部；存在 wire 身份而无法证明则拒绝 | 完整 wire 相同时可直接复用，否则要求 prefix 证明 |
+| 4 | 拒绝后的处理 | 返回 undefined，交给压缩 evaluator 的估算 | 使用当前请求的估算值，并标为 estimated |
 
-**第 1 项是实质差异**：在需要 `FINAL_STEP_MESSAGE` 的回合里，压缩阈值算出的数值会比显示少一条消息的量。
+关闭指令与 allowTools/schema 可能同时变化；旧记录的「状态栏 50% / 压缩 73%」是历史示例，不是本轮同快照复现。报告单独给出压缩基准，能表达其阈值来源，不能据此断言显示实现错误。
 
-代码库自己记录了这种分歧（`.wiki/features/phase-20-addition.md:7603`）：状态栏 50% vs 压缩 73%，同一个 8k 锚点 + 3.6k 尾部、16k 窗口。
+| 消费者 | 当前优先级与含义 |
+|---|---|
+| step 预算 | 先由 `promptTokensFor` 得到基线；存在可证明的 wire prefix 时由 `estimatePrompt` 校正 |
+| preview | 校正后的测量前缀 + 当前 wire 尾部；否则本地请求估算 |
+| 压缩阈值 | 校正后的测量前缀 + 当前历史尾部；不成立时由 evaluator 估算 |
+| 状态栏 | 有数字的 live preview（包括明确标注 stale 的值）优先；其次是匹配当前身份的上次测量 |
+| `/context` | 匹配的上次测量优先；无匹配时才获取 calibrated preview，其他情况显示 stale/unknown |
 
-`report.ts:76-78` 用**单独一行**报告压缩基准，而不是与 `used` 对齐——这是承认分歧而非消除它。
-
-**消费者的 RAW / CORRECTED 分布**：
-
-| 消费者 | 取值 | 回退 |
-|---|---|---|
-| `estimatePrompt`（step 预算） | **CORRECTED** + 尾部 | `estimateRequestTokens` |
-| `estimatePrompt`（preview） | **CORRECTED** + wire 尾部 | `counted.tokens` |
-| `measureContextTokens`（压缩） | **CORRECTED** + 尾部 | `undefined` → 估算 |
-| 状态栏 | **RAW**（无修正、无尾部） | preview 读数 |
-| `/context` | RAW 或 CORRECTED（calibrated 优先） | `stale` / `unknown` 标签 |
-| `promptTokensFor`（发送前） | **RAW** + `estimateTokens(trailing)` | `estimateRequestTokens` |
-
-**状态栏用 RAW 是正确的**——它没有消息数组可以估算尾部。但代价是**系统性高估 `removedTokens` 且滞后一个尾部**。
-
-**`lastPromptProjection` 的消费者极少**：只有 `turn/measurement.ts:44` 和 `context/request/estimate.ts:48-49` 直接读。其余全部经 `measuredProjectionPrefix` 间接使用。
+本轮没有发现必须强制统一以上快照的证据，保留现有 owner 与计算原语。实际修复的是身份缺失及失败响应造成的生命周期不一致，见 24.105.16。
 
 #### 24.105.8 阶段 4：恢复（见 24.105.9-24.105.12）
 
@@ -9429,8 +9420,8 @@ restorablePromptMeasurement     G1-G9 九道守卫
 使用
   ├→ estimatePrompt         CORRECTED + 尾部（显示 / step 预算）
   ├→ measureContextTokens   CORRECTED + 尾部（压缩阈值）
-  ├→ 状态栏                  RAW（无尾部）
-  └→ /context               RAW 或 CORRECTED（calibrated 优先）
+  ├→ 状态栏                  live preview 优先，其次匹配的 RAW
+  └→ /context               匹配的 RAW 优先，其次 calibrated preview
 
 失效
   ├→ 微压缩      → 修正，不丢弃
@@ -9499,4 +9490,29 @@ existing.lastPromptIdentity = usable ? { ...usage.promptIdentity, ... } : undefi
 
 代价：一个只报 prompt_tokens 不报 identity 的路径会失去锚点。但当前唯一的生产者（`turn/step.ts`）**总是**构造 `promptIdentity`，所以这个改动在现有代码里是 no-op，只是堵住了未来 producer 的漏洞。
 
-**验证条件**：现有测试全过；新增一个用例断言「无 identity 的记录不产生锚点」。
+**原验证条件**：现有测试全过；新增一个用例断言「无 identity 的记录不产生锚点」。本轮按用户最新 OOM 红线改为直接相关文件与受影响名称过滤用例，未执行全仓回归；证据与范围见 24.105.16。
+
+
+#### 24.105.16 生命周期合同实施与证据（2026-11-03）
+
+**交付范围**：24.105.15 两项方案与本轮复核发现的同类生命周期缺口；原 Phase 20 的真实环境待办继续延后，ADD-08/09 不因此升级整体状态。
+
+1. **投影恢复前提**：`restorablePromptMeasurement` 与公开入口 `restoreSessionUsage` 统一使用 `projectedMessages` 并明确 JSDoc。准确顺序是转录加载应用压缩，再由 `selectModelContext` 应用用户选择，不能把压缩职责归给后者。原始/压缩后两种回归均证明：直接传未选择的 turns 拒绝；实际 activation 传正确投影则恢复，费用与请求数不增加。没有引入无法可靠区分数组形状的守卫。
+2. **身份缺失**：无 `promptIdentity` 的报告不能创建/保留四个 `lastPrompt*` 字段；消费入口也拒绝孤立数字。累计计费、原始 prompt/cache/output 数值继续记录。复核发现只清内存仍可在新 assistant 未落盘时复活旧锚点，因此该报告持久化为 `usage-gap`，中断校准与缓存连续性；已有合法测量不会被从转录物理删除。真实存储回归保留旧 assistant，证明重启拒绝旧锚点且累计 835 tokens/2 requests 不丢失。
+3. **产生端一致性**：实施前 `turn/step.ts` 在解码 stop reason 之前写内存，HTTP 200 空 choices/错误 finish reason 或非法 token 数可进入内存，但消息持久化会拒绝。同一 `decodePromptMeasurement` 结果现在同时控制内存可用性与消息字段；错误、空结果、cache-only、小数/非安全整数均拒绝，正常和 length 结果允许。费用和 usage 回调仍先于可能失败的显示回调；辅助请求不覆盖主上下文。取消中的未完成流仍没有已组装 usage，不新增费用承诺。
+4. **参考决策**：在目标代码确认后，定向比较本地参考的 `core/session-manager.ts` 投影→选择顺序、`core/compaction/compaction.ts` 对后续编辑/压缩边界和 error/aborted usage 的拒绝，以及 `core/agent-session.ts` 对显示/阈值不同快照的处理。采纳投影后读取、失败测量不可复用；本项目保留精确摘要/请求身份及 durable gap，不复制参考的计数坐标或强制合并消费者。对应反转见下。
+
+**验证全部由主代理串行执行**，Vitest 单 worker、768 MiB Node heap；无 20k PTY、无全仓回归、子代理未执行任何验证。
+
+- 核心 3 文件 69 项通过（usageTelemetry、session/store/measurement、turn/capture）。受影响夹具只按名称运行：首次 43 通过/3 失败/1 文件转换失败；后续 5 文件 16 通过/1 失败，最后剩余 1 项通过。失败依次属于夹具目标摘要缺失、变量重名和环境目录污染，均保留日志并修复，不修改产品以适配旧夹具。
+- 计量测试与辅助请求隔离另外 2 文件 36 项通过；其中 29 项是因补全测试 projection 类型字段而重跑，7 项覆盖辅助请求成功/缺 usage/错误/取消及隔离，不重复累加成新覆盖。
+- 5 项反转均产生预期 AssertionError，并逐字节恢复：无身份记录、孤立消费者、durable gap、activation 绕过选择、响应门控。响应反转首次 name filter 未选中任何测试，不计证据，修正 filter 后才记录预期失败。
+- TypeScript build 通过；隔离本地 HTTP 的真实 Node CLI 共 7 个顺序进程/3 次请求：原始 prompt 保持、两次跨进程 calibrated、schema 变更拒绝、错误响应 exit 1 且计费、旧 assistant 测量保留但重启 `/context` unknown。此为本地 transport 证据，不是外部 provider 或 PTY 验收。首次探针误要求错误响应新增 assistant，已按空响应保留旧消息的真实合同修正并重跑。
+- 五静态门通过。bundled NormProof judge exit 0、整体 partial：循环/未解析导入两项满足，只有 `cli/interactive/interactiveMode.ts` 与其测试两处既有函数上限 advisory，未改 disposition。独立静态复核发现并促成 durable gap 与假阳性测试修复；最终 step 复核无新增有证据缺陷，不代替动态验证。
+- 初次 Vitest 包内路径不存在，未收集测试；根据实际依赖树切换到仓库安装的 runner 后通过。NormProof no-install 首次未命中本地包，随后以仓库 tgz 运行通过。所有失败尝试均归档。
+
+证据归档：`.omx/artifacts/phase20-context-lifecycle/`。验证前只退休本会话身份核对过的语言服务子进程，可用 RAM 从约 3.4 GiB 恢复至约 6.3 GiB；未读取到输出或保存任何真实凭据。临时脚本与运行状态清理后只保留证据副本。
+
+上一实现 `3bc0d7c36bf36385545e4193e19a19803a067f0c` 的 CI 41521555550 已 completed/failure（Run Focused & Unit Tests），Watch 41521555538 success；日志接口返回空内容，未据此宣称具体失败原因或旧 CI 已修复。当前提交与 GitHub 状态在交付记录中单独绑定。
+
+最终五静态门与 TS build 串行通过，build `210a336ff2d6bf2889ee777a03cae3e833b8183b835e14594ad31087d81e3aad`；在该产物上重跑 7 进程 CLI 验证通过，所有 child PID 已确认退出。GitHub checks annotations 仅给出旧 CI exit 1，没有更多断言。

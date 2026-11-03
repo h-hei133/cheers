@@ -14,7 +14,10 @@ function record(id: string, tokens: number, provider = "first", model = "org/mod
 describe("durable usage", () => {
   it("round trips opaque provider/model keys without restoring a context measurement", () => {
     record(A, 100);
-    record(A, 200, "second");
+    const identity = { provider: "second", model: "org/model" };
+    recordSessionUsage(A, { ...identity, promptTokens: 200, cacheReadTokens: 5, toolCallsCount: 1,
+      promptIdentity: identity });
+    expect(getSessionUsage(A).lastPromptTokens).toBe(205);
     let saved: SessionUsageSnapshot | undefined;
     persistSessionUsage(A, undefined, (next) => { saved = next; });
     markContextUnknown(A); // Context changes after the last state write.
@@ -77,10 +80,14 @@ describe("durable usage", () => {
     record(A, 100);
     let disk: SessionUsageSnapshot | undefined;
     persistSessionUsage(A, undefined, (next) => { disk = next; });
-    record(A, 20);
+    const identity = { provider: "first", model: "org/model" };
+    recordSessionUsage(A, { ...identity, promptTokens: 20, cacheReadTokens: 5, toolCallsCount: 1,
+      promptIdentity: identity });
+    expect(getSessionUsage(A).lastPromptTokens).toBe(25);
     restoreSessionUsage(A, disk);
     expect(totalTokens(getSessionUsage(A))).toBe(130);
     expect(getSessionUsage(A).lastPromptTokens).toBe(25);
+    expect(getSessionUsage(A).lastPromptIdentity).toEqual(identity);
   });
 
   it("decodes prototype-like keys as own buckets", () => {

@@ -202,7 +202,9 @@ describe("createStepFunction", () => {
     { usage: { prompt_tokens: 0, completion_tokens: 3 }, expected: 0 },
   ])('replaces the previous context measurement with the current usage presence: $expected', async ({ usage, expected }) => {
     const id = 'status-step'; resetSessionUsage(id);
-    recordSessionUsage(id, { promptTokens: 1000, completionTokens: 10, model: 'm' });
+    const identity = { provider: 'openai', model: 'm', endpoint: 'openai-compatible', ...requestIdentity(request) };
+    recordSessionUsage(id, { promptTokens: 1000, completionTokens: 10, model: 'm', promptIdentity: identity });
+    expect(getSessionUsage(id).lastPromptTokens).toBe(1000);
     const step = createStepFunction({ ...request, sessionId: id, fetchImpl: async () =>
       jsonResponse({ choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }], usage }),
     });

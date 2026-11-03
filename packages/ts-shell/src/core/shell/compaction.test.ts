@@ -36,7 +36,9 @@ describe("session compaction", () => {
   it("condenses the older messages, keeps the tail, and forgets the stale context gauge", async () => {
     const turns = exchange(6);
     const target = store(turns);
-    recordSessionUsage("sess_compact", { promptTokens: 9_000, completionTokens: 100 });
+    const identity = { provider: "fixture", model: "fixture", endpoint: "openai-compatible" };
+    recordSessionUsage("sess_compact", { promptTokens: 9_000, completionTokens: 100, promptIdentity: identity });
+    expect(getSessionUsage("sess_compact").lastPromptTokens).toBe(9_000);
     const requests: SummarizeRequest[] = [];
     const outcome = await compactSessionHistory({
       store: target,
@@ -60,6 +62,7 @@ describe("session compaction", () => {
     expect(requests[0]!.messages).toHaveLength(9);
     expect(target.entries).toEqual([{ summary: "checkpoint summary", keptMessages: 3 }]);
     expect(getSessionUsage("sess_compact").lastPromptTokens).toBeUndefined();
+    expect(getSessionUsage("sess_compact").lastPromptIdentity).toBeUndefined();
     // Summed across the per-model buckets: the session total is derived, not stored.
     expect(totalTokens(getSessionUsage("sess_compact"))).toBe(9_100);
   });

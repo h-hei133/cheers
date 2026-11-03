@@ -37,13 +37,16 @@ it('retains the captured cache destination and prices without changing foregroun
     provider: { providerId: 'fixture', model: 'fixture' }, baseUrl: url, rates: prices,
     isCurrent: () => true, renewHeaders: async () => ({}),
   });
-  recordSessionUsage(sessionId, { provider: 'main', model: 'm', promptTokens: 400 });
+  const identity = { provider: 'main', model: 'm', endpoint: 'openai-compatible' };
+  recordSessionUsage(sessionId, { provider: 'main', model: 'm', promptTokens: 400, promptIdentity: identity });
+  expect(getSessionUsage(sessionId).lastPromptTokens).toBe(400);
   const key = getSessionUsage(sessionId).lastBucketKey;
   prices.promptPerMTok = 99;
   const usage = await cache.refresh!(captured(), new AbortController().signal);
   expect(usage).toMatchObject({ prompt_tokens: 100, completion_tokens: 1 });
   expect(readBoundSessionState(setup.manager, setup.session).state.usage).toMatchObject({ turnsCount: 2 });
-  expect(getSessionUsage(sessionId)).toMatchObject({ lastBucketKey: key, lastPromptTokens: 400 });
+  expect(getSessionUsage(sessionId)).toMatchObject({ lastBucketKey: key, lastPromptTokens: 400,
+    lastPromptIdentity: identity });
   expect(getSessionUsage(sessionId).recentRequests).toHaveLength(1);
   const bucket = costModel(getSessionUsage(sessionId), []).buckets.find(item => item.provider === 'fixture');
   expect(bucket).toMatchObject({ rateBasis: 'captured', rates: { promptPerMTok: 3 }, promptTokens: 100, completionTokens: 1 });

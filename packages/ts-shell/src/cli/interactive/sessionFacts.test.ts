@@ -13,6 +13,9 @@ import type { ProviderCredentialResolution } from '../../core/auth/credential.js
 import { ConfigState } from '../../config/state.js';
 import { resolveCliCredential } from '../provider/cliProviderRuntimeBridge.js';
 import { selectPooledConnection } from '../../core/auth/account/pool.js';
+import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
+import { DEFAULT_ENDPOINT_KIND } from '../../provider/endpoints/index.js';
 
 function context(sessionId: string, overrides: Partial<RuntimeConfig> = {}): ShellRuntimeContext {
   return withConfiguration({
@@ -27,6 +30,17 @@ function context(sessionId: string, overrides: Partial<RuntimeConfig> = {}): She
       ...overrides,
     },
   } as unknown as ShellRuntimeContext);
+}
+
+function measurementIdentity(runtime: ShellRuntimeContext) {
+  const { config, catalog } = runtime.configuration.current;
+  const target = runtime.resolveConfigTarget?.(config, runtime.session.id)
+    ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: runtime.session.id } });
+  const baseUrl = providerCredentialBaseUrl(catalog, target);
+  if (!target.model || !baseUrl) throw new Error('The fixture requires a resolved model destination.');
+  return { provider: target.provider, model: target.model,
+    endpoint: providerCredentialEndpoint(catalog, target, baseUrl) ?? DEFAULT_ENDPOINT_KIND,
+    endpointId: captureUsageAttribution({ provider: target.provider, model: target.model, baseUrl }).endpointId };
 }
 
 function pooledContext(sessionId: string): ShellRuntimeContext {
@@ -223,7 +237,14 @@ describe("status facts", () => {
   it('retains totals across context reset and resume without reviving the old prompt size', async () => {
     const id = 'status-reset'; resetSessionUsage(id);
     const runtime = context(id, { contextWindow: undefined });
-    recordSessionUsage(id, { promptTokens: 9000, completionTokens: 100 });
+    Object.assign(runtime, {
+      resolveConfigTarget: () => ({ provider: 'openai', model: 'unlisted-fixture',
+        baseUrl: 'https://fixture.invalid/v1', expectedEnvVarName: 'FIXTURE' }),
+      configuration: new ConfigState(runtime.configuration.current.config, runtime.configuration.current.binding, []),
+    });
+    const identity = measurementIdentity(runtime);
+    recordSessionUsage(id, { promptTokens: 9000, completionTokens: 100, promptIdentity: identity });
+    expect(readStatusFacts(runtime).contextUsed).toBe(9000);
     const totals = structuredClone(getSessionUsage(id)); markContextUnknown(id);
     for (const resumed of [false, true]) {
       if (resumed) { resetSessionUsage(id); restoreSessionUsage(id, totals); }
@@ -234,12 +255,14 @@ describe("status facts", () => {
       expect(stripAnsi(renderStatusItem('cost', facts)!)).toContain('est $');
       expect(facts.costRates).toBe('assumed');
       const report = await runContextCommand([], { cwd: runtime.projectRoot, sessionId: id, runtimeConfig: runtime.runtimeConfig,
-        readConfiguration: () => runtime.configuration.current, getToolPool: async () => new Map() });
+        readConfiguration: () => runtime.configuration.current, resolveConfigTarget: runtime.resolveConfigTarget,
+        getToolPool: async () => new Map() });
       expect(report.output).toContain('Current prompt usage is unknown');
       expect(report.output).toContain('(assumed default)'); expect(report.output).toContain('Warning:');
       expect(report.output).not.toContain('No request has been sent');
     }
-    recordSessionUsage(id, { promptTokens: 0, completionTokens: 1 });
+    recordSessionUsage(id, { promptTokens: 0, completionTokens: 1, promptIdentity: identity });
+    expect(getSessionUsage(id).lastPromptIdentity).toEqual(identity);
     expect(readStatusFacts(runtime).contextUsed).toBe(0);
     expect(stripAnsi(renderStatusItem('context', readStatusFacts(runtime))!)).toBe('0/64k assumed 0%');
     resetSessionUsage(id);
@@ -247,9 +270,12 @@ describe("status facts", () => {
 
   it("uses the latest request's prompt size as the live footprint", () => {
     resetSessionUsage("used");
-    recordSessionUsage("used", { promptTokens: 5_000, completionTokens: 100 });
-    recordSessionUsage("used", { promptTokens: 9_000, completionTokens: 100 });
-    const state = readStatusFacts(context("used"));
+    const runtime = context("used");
+    const identity = measurementIdentity(runtime);
+    recordSessionUsage("used", { promptTokens: 5_000, completionTokens: 100, promptIdentity: identity });
+    expect(readStatusFacts(runtime).contextUsed).toBe(5_000);
+    recordSessionUsage("used", { promptTokens: 9_000, completionTokens: 100, promptIdentity: identity });
+    const state = readStatusFacts(runtime);
     expect(state.contextUsed).toBe(9_000);
     expect(state.contextWindow).toBe(200_000);
     expect(state.costUsd).toBeGreaterThan(0);

@@ -120,7 +120,7 @@ export function recordSessionUsage(
     attribution?: UsageAttribution;
     /** How many messages the request carried, so trailing ones can be counted. */
     promptMessageCount?: number;
-    /** Which model/schema the measurement belongs to; absent means provider/model only. */
+    /** Which request the measurement belongs to; required for context reuse. */
     promptIdentity?: PromptMeasurementIdentity;
     /** Proven persisted-prefix projection; provider tokens retain their original identity. */
     promptProjection?: PromptMeasurement['projection'];
@@ -178,11 +178,14 @@ export function recordSessionUsage(
   // Session-level fields that are not per-model: the context gauge describes the
   // conversation, not the model that last read it.
   if (options.affectsContext !== false) {
-    existing.lastPromptTokens = promptMeasured ? promptTotal : undefined;
-    existing.lastPromptMessageCount = promptMeasured ? usage.promptMessageCount ?? 0 : 0;
-    existing.lastPromptIdentity = promptMeasured && usage.promptIdentity
+    // Accounting can use an unbound report; a reusable context anchor cannot.
+    // Clear every part of the old anchor when the latest request is unbound.
+    const usable = promptMeasured && usage.promptIdentity !== undefined;
+    existing.lastPromptTokens = usable ? promptTotal : undefined;
+    existing.lastPromptMessageCount = usable ? usage.promptMessageCount ?? 0 : 0;
+    existing.lastPromptIdentity = usable && usage.promptIdentity
       ? { ...usage.promptIdentity, ...(usage.attribution ? { endpointId: usage.attribution.endpointId } : {}) } : undefined;
-    existing.lastPromptProjection = promptMeasured && usage.promptProjection ? { ...usage.promptProjection } : undefined;
+    existing.lastPromptProjection = usable && usage.promptProjection ? { ...usage.promptProjection } : undefined;
   }
   existing.turnsCount += 1;
   existing.toolCallsCount += usage.toolCallsCount ?? 0;
@@ -208,7 +211,8 @@ export function recordSessionUsage(
       // cannot establish that the new request supports cache accounting.
       reportedCache: cacheRead + cacheWrite > 0 || Boolean(previous?.reportedCache &&
         cacheIdentity(previous.bucketKey, previous.attribution) === cacheIdentity(key, attribution)),
-      kind: promptMeasured ? "request" : "usage-gap",
+      // Persist the refusal even if the newer assistant is never appended.
+      kind: promptMeasured && usage.promptIdentity ? "request" : "usage-gap",
     });
   }
 
@@ -259,14 +263,7 @@ export function measuredPromptContext(sessionId: string, expected: {
 }, options: { readonly requireExpectedIdentity?: boolean } = {}): { readonly tokens: number; readonly messageCount: number } | undefined {
   const telemetry = getSessionUsage(sessionId);
   const identity = telemetry.lastPromptIdentity;
-  if (telemetry.lastPromptTokens === undefined) return undefined;
-  // A record written before identity existed is still the latest measurement;
-  // model changes after it clear the value through invalidatePromptMeasurement.
-  if (!identity) {
-    return options.requireExpectedIdentity
-      ? undefined
-      : { tokens: telemetry.lastPromptTokens, messageCount: telemetry.lastPromptMessageCount };
-  }
+  if (telemetry.lastPromptTokens === undefined || !identity) return undefined;
   if (identity.provider !== expected.provider || identity.model !== expected.model) return undefined;
   // A recorded identity field is evidence of request-specific scope. If the
   // caller cannot produce the same live field, it cannot prove the measurement
@@ -364,11 +361,15 @@ export function resetSessionUsage(sessionId: string): void {
   sessionTelemetries().delete(sessionId);
 }
 
-/** Restore once on activation. Never replace live, possibly unflushed usage. */
-export function restoreSessionUsage(sessionId: string, snapshot: unknown, messages: readonly SessionMessage[] = []): void {
+/**
+ * Restore once on activation. Never replace live, possibly unflushed usage.
+ * projectedMessages must come from selectModelContext on the loaded session,
+ * applying user selection to the turns already projected through compaction.
+ */
+export function restoreSessionUsage(sessionId: string, snapshot: unknown, projectedMessages: readonly SessionMessage[] = []): void {
   if (currentUsage(sessionId)) return;
   const restored = recoverUsageSnapshot(snapshot);
-  const measurement = restorablePromptMeasurement(messages, restored?.recentRequests);
+  const measurement = restorablePromptMeasurement(projectedMessages, restored?.recentRequests);
   if (!restored && !measurement) return;
   const telemetry = Object.assign(emptyTelemetry(), restored);
   if (measurement) {

@@ -172,7 +172,9 @@ describe("runCostCommand", () => {
   });
   it('keeps a positive cache estimate visible below four decimal places', async () => {
     const session = 'tiny-cache'; resetSessionUsage(session);
-    for (let index = 0; index < 2; index++) recordSessionUsage(session, { provider: 'priced', model: 'meter', promptTokens: 1025 });
+    const identity = { provider: 'priced', model: 'meter', endpoint: 'openai-compatible' };
+    for (let index = 0; index < 2; index++) recordSessionUsage(session, { provider: 'priced', model: 'meter', promptTokens: 1025,
+      promptIdentity: identity });
     vi.spyOn(catalogStore, 'loadCatalog').mockReturnValue([{ id: 'priced', models: [{ id: 'meter', cost: { promptPerMTok: 0.001, completionPerMTok: 1, cacheReadPerMTok: 0 } }] }]);
     const result = await runCostCommand([], { cwd: workspace(), sessionId: session });
     expect(result.output).toContain('Estimated extra cost against a cache read: <$0.0001');
@@ -222,7 +224,10 @@ describe("runCostCommand", () => {
 
   it('does not price cache comparisons when the cache-read rate is missing', async () => {
     const session = 'cache-unpriced'; resetSessionUsage(session);
-    for (let index = 0; index < 2; index++) recordSessionUsage(session, { provider: 'priced', model: 'meter', promptTokens: 99_999, cacheWriteTokens: 1 });
+    const identity = { provider: 'priced', model: 'meter', endpoint: 'openai-compatible' };
+    for (let index = 0; index < 2; index++) recordSessionUsage(session, { provider: 'priced', model: 'meter', promptTokens: 99_999,
+      cacheWriteTokens: 1, promptIdentity: identity });
+    expect(getSessionUsage(session).recentRequests.map(entry => entry.kind)).toEqual(['request', 'request']);
     vi.spyOn(catalogStore, 'loadCatalog').mockReturnValue([{ id: 'priced', models: [{ id: 'meter', cost: { promptPerMTok: 3, completionPerMTok: 15 } }] }]);
     const result = await runCostCommand([], { cwd: workspace(), sessionId: session });
     expect(result.output).toContain('Prompt cache hit rate: 0.0%'); expect(result.output).not.toContain('Estimated extra cost');
@@ -337,8 +342,11 @@ describe("runCostCommand", () => {
     resetSessionUsage(session);
     // Two requests of the same 100k prompt with nothing read from cache: the
     // second should have been a read, and was not.
-    recordSessionUsage(session, { promptTokens: 99_999, cacheWriteTokens: 1, completionTokens: 0, model: "meter", provider: "priced" });
-    recordSessionUsage(session, { promptTokens: 99_999, cacheWriteTokens: 1, completionTokens: 0, model: "meter", provider: "priced" });
+    const identity = { provider: "priced", model: "meter", endpoint: "openai-compatible" };
+    recordSessionUsage(session, { promptTokens: 99_999, cacheWriteTokens: 1, completionTokens: 0, model: "meter", provider: "priced",
+      promptIdentity: identity });
+    recordSessionUsage(session, { promptTokens: 99_999, cacheWriteTokens: 1, completionTokens: 0, model: "meter", provider: "priced",
+      promptIdentity: identity });
     const result = await runCostCommand([], contextFor(session, workspace()));
 
     expect(result.output).toContain("Prompt cache hit rate: 0.0%");
@@ -361,13 +369,16 @@ describe("runCostCommand", () => {
 
     const session = "sess_cost_nocache";
     resetSessionUsage(session);
-    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "meter", provider: "priced" });
+    const identity = { provider: "priced", model: "meter", endpoint: "openai-compatible" };
+    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "meter", provider: "priced",
+      promptIdentity: identity });
     recordSessionUsage(session, {
       promptTokens: 100_000,
       completionTokens: 0,
       model: "meter",
       provider: "priced",
       cacheReadTokens: 100_000,
+      promptIdentity: identity,
     });
 
     const result = await runCostCommand([], contextFor(session, workspace()));
@@ -401,6 +412,7 @@ describe("runCostCommand", () => {
       model: "meter",
       provider: "priced",
       cacheReadTokens: 100_000,
+      promptIdentity: { provider: "priced", model: "meter", endpoint: "openai-compatible" },
     });
 
     const result = await runCostCommand([], contextFor(session, workspace()));
@@ -429,8 +441,10 @@ describe("runCostCommand", () => {
 
     const session = "sess_cost_switch";
     resetSessionUsage(session);
-    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "meter", provider: "priced" });
-    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "other", provider: "priced" });
+    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "meter", provider: "priced",
+      promptIdentity: { provider: "priced", model: "meter", endpoint: "openai-compatible" } });
+    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "other", provider: "priced",
+      promptIdentity: { provider: "priced", model: "other", endpoint: "openai-compatible" } });
 
     const result = await runCostCommand([], contextFor(session, workspace()));
     expect(result.output).toContain("Prompt cache");

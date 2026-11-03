@@ -53,9 +53,10 @@ it('binds prompt measurements to the actual relay without retaining its address'
 });
 
 it('breaks cache comparison across an unmeasured request without claiming a context rebuild', () => {
-  recordSessionUsage(SESSION, { model: 'm', promptTokens: 9000, cacheReadTokens: 1000 });
+  const promptIdentity = { provider: '', model: 'm' };
+  recordSessionUsage(SESSION, { model: 'm', promptTokens: 9000, cacheReadTokens: 1000, promptIdentity });
   markContextUnknown(SESSION, 'usage-gap');
-  recordSessionUsage(SESSION, { model: 'm', promptTokens: 10000, cacheReadTokens: 0 });
+  recordSessionUsage(SESSION, { model: 'm', promptTokens: 10000, cacheReadTokens: 0, promptIdentity });
   const history = getSessionUsage(SESSION).recentRequests;
   const rates = () => ({ promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1 });
   expect(history.map(entry => entry.kind)).toEqual(['request', 'usage-gap', 'request']);
@@ -105,7 +106,8 @@ describe("bucketing", () => {
 
   it("keeps the context gauge session-level, not per model", () => {
     // The gauge describes the conversation, not the model that last read it.
-    recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 7, model: "m" });
+    recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 7, model: "m",
+      promptIdentity: { provider: 'openai', model: 'm' } });
     const telemetry = getSessionUsage(SESSION);
     expect(telemetry.lastPromptTokens).toBe(500);
     expect(telemetry.lastPromptMessageCount).toBe(7);
@@ -168,11 +170,39 @@ describe("bucketing", () => {
     expect(measuredPromptContext(SESSION, identity, { requireExpectedIdentity: true })).toBeUndefined();
   });
 
-  it("keeps a legacy measurement usable until a model change clears it", () => {
-    recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 7, model: 'm', provider: 'openai' });
-    expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm' })).toEqual({ tokens: 500, messageCount: 7 });
-    invalidatePromptMeasurement(SESSION);
+  it.each([false, true])("accounts for an unbound report without retaining an anchor (prior=%s)", (prior) => {
+    const identity = { provider: 'openai', model: 'm' };
+    const projection = { historyDigest: 'a'.repeat(64), wireHistoryDigest: 'b'.repeat(64),
+      wireRewriteTokens: 0, removedTokens: 20 };
+    if (prior) recordSessionUsage(SESSION, { promptTokens: 100, promptMessageCount: 3,
+      ...identity, promptIdentity: identity, promptProjection: projection });
+    recordSessionUsage(SESSION, { promptTokens: 500, completionTokens: 10, cacheReadTokens: 40,
+      promptMessageCount: 7, promptProjection: projection, ...identity });
+    const usage = getSessionUsage(SESSION);
+    expect(usage).toMatchObject({ lastPromptMessageCount: 0, turnsCount: prior ? 2 : 1 });
+    expect(usage.lastPromptTokens).toBeUndefined();
+    expect(usage.lastPromptIdentity).toBeUndefined();
+    expect(usage.lastPromptProjection).toBeUndefined();
+    expect(measuredPromptContext(SESSION, identity)).toBeUndefined();
+    expect(measuredPromptContext(SESSION, identity, { requireExpectedIdentity: true })).toBeUndefined();
+    expect(usage.recentRequests.at(-1)).toMatchObject({ kind: 'usage-gap', promptTokens: 540,
+      completionTokens: 10, cacheReadTokens: 40 });
+    expect(totalTokens(usage)).toBe(prior ? 650 : 550);
+  });
+
+  it("refuses an orphaned in-memory measurement at the consumer boundary", () => {
+    recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 7,
+      promptIdentity: { provider: 'openai', model: 'm' } });
+    const usage = getSessionUsage(SESSION);
+    delete usage.lastPromptIdentity;
+    expect(getSessionUsage(SESSION).lastPromptTokens).toBe(500);
     expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm' })).toBeUndefined();
+  });
+
+  it("keeps a measured zero when its request identity is known", () => {
+    const identity = { provider: 'openai', model: 'm' };
+    recordSessionUsage(SESSION, { ...identity, promptTokens: 0, promptIdentity: identity });
+    expect(measuredPromptContext(SESSION, identity)).toEqual({ tokens: 0, messageCount: 0 });
   });
 
   it("keeps cache tokens with the model that reported them", () => {
@@ -315,7 +345,8 @@ describe("estimateUsageCost", () => {
 
 it("records background spend without replacing the live context or cache comparison", () => {
   resetSessionUsage(SESSION);
-  recordSessionUsage(SESSION, { provider: "one", model: "live", promptTokens: 100, promptMessageCount: 4 });
+  recordSessionUsage(SESSION, { provider: "one", model: "live", promptTokens: 100, promptMessageCount: 4,
+    promptIdentity: { provider: 'one', model: 'live' } });
   const prior = structuredClone(getSessionUsage(SESSION));
   recordSessionUsage(SESSION, { provider: "two", model: "background", promptTokens: 5, completionTokens: 1, cacheReadTokens: 200 }, { affectsContext: false });
   const usage = getSessionUsage(SESSION);

@@ -145,7 +145,10 @@ it.each(summaryKinds.flatMap(kind => ['main', 'different-model', 'sibling', 'inh
     } } }, modelEdit);
     expect(setSessionServiceTier(setup.context, 'flex')).toContain('Service tier set to flex');
     const unchanged = unchangedPreferences(setup);
-    recordSessionUsage(setup.session.id, { provider: 'openai', model: 'main', promptTokens: 400, completionTokens: 1 });
+    const identity = { provider: 'openai', model: 'main', endpoint: 'openai-compatible' };
+    recordSessionUsage(setup.session.id, { provider: 'openai', model: 'main', promptTokens: 400, completionTokens: 1,
+      promptIdentity: identity });
+    expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(400);
     const recent = structuredClone(getSessionUsage(setup.session.id).recentRequests);
     await sendSummary(setup, kind);
     const count = kind === 'manual' || kind === 'automatic' ? 2 : 1;
@@ -158,6 +161,7 @@ it.each(summaryKinds.flatMap(kind => ['main', 'different-model', 'sibling', 'inh
     expect(totalTokens(getSessionUsage(setup.session.id))).toBe(401 + 5 * count);
     if (kind !== 'manual') {
       expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(400);
+      expect(getSessionUsage(setup.session.id).lastPromptIdentity).toEqual(identity);
       expect(getSessionUsage(setup.session.id).recentRequests).toEqual(recent);
     }
     unchanged();
@@ -319,7 +323,10 @@ it.each([false, true])('refuses duplicate relay claims before compaction sends (
 
 it.each(['manual', 'automatic', 'branch', 'prefix'])('routes %s summaries to the exact role while preserving the main window and shared ledger', async kind => {
   const setup = await fixture(); const global = fs.readFileSync(getUserRuntimeConfigPath());
-  recordSessionUsage(setup.session.id, { provider: 'openai', model: 'main', promptTokens: 400, completionTokens: 1 });
+  const identity = { provider: 'openai', model: 'main', endpoint: 'openai-compatible' };
+  recordSessionUsage(setup.session.id, { provider: 'openai', model: 'main', promptTokens: 400, completionTokens: 1,
+    promptIdentity: identity });
+  expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(400);
   const history = structuredClone(getSessionUsage(setup.session.id).recentRequests);
   const { deps } = runtime(setup);
   const prepare = vi.spyOn(attempts, 'prepareRequestAttempt');
@@ -353,6 +360,7 @@ it.each(['manual', 'automatic', 'branch', 'prefix'])('routes %s summaries to the
     .toBeCloseTo(0.000012 * count);
   if (kind !== 'manual') {
     expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(400);
+    expect(getSessionUsage(setup.session.id).lastPromptIdentity).toEqual(identity);
     expect(getSessionUsage(setup.session.id).recentRequests).toEqual(history);
   }
 });

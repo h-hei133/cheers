@@ -640,9 +640,21 @@ export function createStepFunction(request: StepRequest): StepFunction {
         const completion = await readCompletion(response, watched, endpoint);
         traceLogger.info("provider request completed", { requestId, endpoint, provider: request.provider.provider, model: request.provider.model, attempt: streamAttempts, usage: Boolean(completion.usage), durationMs: requestAcceptedAt === undefined ? undefined : Math.max(0, Date.now() - requestAcceptedAt) });
         const usage = completion.usage;
-        if (hasUsage(usage)) {
+        const choice = completion.choices?.[0];
+        const stopReason = choice?.message ? stopReasonOf(choice.finish_reason) : 'error';
+        const counted = hasUsage(usage) ? usageFromProvider(usage) : undefined;
+        // Both live reuse and persistence depend on this exact validated count.
+        // Classify before accounting without invoking display callbacks: their
+        // failure must not discard usage the provider has already reported.
+        const promptMeasurement = !options.agentMode && counted && typeof usage?.prompt_tokens === 'number'
+          && Number.isSafeInteger(usage.prompt_tokens) && usage.prompt_tokens >= 0
+          && stopReason !== 'error' && stopReason !== 'aborted'
+          ? decodePromptMeasurement({ tokens: counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens,
+            messageCount: messages.length, identity: promptIdentity,
+            projection: promptProjection }) : undefined;
+        if (usage && counted) {
           const record: SessionUsageRecord = {
-            ...usageFromProvider(usage),
+            ...counted,
             attribution: usageAttribution,
             model: request.provider.model,
             // Recorded with the bucket, not looked up later: a provider switch must
@@ -661,22 +673,15 @@ export function createStepFunction(request: StepRequest): StepFunction {
           };
           if (options.agentMode && request.recordAuxiliaryUsage) request.recordAuxiliaryUsage(record);
           else recordSessionUsage(request.sessionId, record, { affectsContext: !options.agentMode,
-            promptMeasured: typeof usage.prompt_tokens === 'number' && Number.isFinite(usage.prompt_tokens) && usage.prompt_tokens >= 0 });
+            promptMeasured: Boolean(promptMeasurement) });
           options.onRequestUsage?.(usage);
         } else if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         responseAttempt?.settle(usage);
-        const decoded = toStep(completion, watched);
+        const decoded = toStep(completion, watched, stopReason);
         const ownsReplay = completion.reasoningSignature && protocol.opaqueReplay
           || shape.reasoningReplayField && completion.reasoning && !completion.reasoningSignature && !completion.reasoningRedacted;
         const completed = ownsReplay && origin
           ? { ...decoded, origin: { ...origin, replayBinding } } : decoded;
-        const counted = hasUsage(usage) ? usageFromProvider(usage) : undefined;
-        const promptMeasurement = !options.agentMode && counted && typeof usage?.prompt_tokens === 'number'
-          && Number.isSafeInteger(usage.prompt_tokens) && usage.prompt_tokens >= 0
-          && completed.stopReason !== 'error' && completed.stopReason !== 'aborted'
-          ? decodePromptMeasurement({ tokens: counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens,
-            messageCount: messages.length, identity: promptIdentity,
-            projection: promptProjection }) : undefined;
         return stamp({ ...completed, ...(promptMeasurement ? { promptMeasurement } : {}),
           ...(shownAnything && completed.stopReason === 'error' ? { retriesExhausted: true } : {}) });
       } catch (error) {
@@ -759,7 +764,8 @@ async function readCompletion(
 }
 
 /** Shape the assembled response into a kernel step. */
-export function toStep(completion: CompletionShape, listener: StepListener): AssistantStep {
+export function toStep(completion: CompletionShape, listener: StepListener,
+  stopReason: AgentStopReason = stopReasonOf(completion.choices?.[0]?.finish_reason)): AssistantStep {
   const choice = completion.choices?.[0];
   const message = choice?.message;
   if (!message) return errorStep("Empty response from provider");
@@ -778,7 +784,7 @@ export function toStep(completion: CompletionShape, listener: StepListener): Ass
   return {
     text,
     toolCalls: calls.map(toToolCall),
-    stopReason: stopReasonOf(choice?.finish_reason),
+    stopReason,
     // Carried so the next request in this trajectory can hand the reasoning back
     // signed. It is not shown a second time — the deltas already were — but a
     // provider that signed it rejects the request that omits it.

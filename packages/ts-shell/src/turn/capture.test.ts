@@ -10,6 +10,7 @@ import { historyDigest, requestIdentity } from '../context/request/identity.js';
 import { estimatePrompt } from '../context/request/estimate.js';
 import { getSessionUsage, resetSessionUsage, restoreSessionUsage, totalTokens } from '../observability/usageTelemetry.js';
 import { createMessageTranscriptEvent, transcriptEventToSessionMessage } from '../session/sessionEventCodec.js';
+import type { ProviderUsage } from './completion.js';
 
 const id = 'capture-measurement';
 const provider = { provider: 'fixture', model: 'model', baseUrl: 'https://fixture.invalid/v1', headers: {} };
@@ -100,3 +101,100 @@ it.each(['missing', 'completion-only', 'error', 'delegated'] as const)(
     const next = await step(source, undefined, {}, { allowTools: true, ...(kind === 'delegated' ? { agentMode: 'build' } as const : {}) });
     expect(next.promptMeasurement).toBeUndefined();
   });
+
+it.each<{
+  name: string; finishReason: string; missingMessage?: boolean; usage: ProviderUsage;
+  stopReason: 'stop' | 'length' | 'error'; anchor?: number; reported: number;
+}>([
+  { name: 'successful', finishReason: 'stop', usage: { prompt_tokens: 3000, completion_tokens: 5 },
+    stopReason: 'stop', anchor: 3000, reported: 3005 },
+  { name: 'length-limited', finishReason: 'length', usage: { prompt_tokens: 3000, completion_tokens: 5 },
+    stopReason: 'length', anchor: 3000, reported: 3005 },
+  { name: 'unsupported stop reason', finishReason: 'content_filter', usage: { prompt_tokens: 3000, completion_tokens: 5 },
+    stopReason: 'error', reported: 3005 },
+  { name: 'missing response message', finishReason: 'stop', missingMessage: true,
+    usage: { prompt_tokens: 3000, completion_tokens: 5 }, stopReason: 'error', reported: 3005 },
+  { name: 'cache-only', finishReason: 'stop', usage: { cache_read_input_tokens: 120 },
+    stopReason: 'stop', reported: 120 },
+  { name: 'fractional prompt count', finishReason: 'stop', usage: { prompt_tokens: 3000.5, completion_tokens: 5 },
+    stopReason: 'stop', reported: 3005.5 },
+  { name: 'unsafe prompt count', finishReason: 'stop', usage: { prompt_tokens: Number.MAX_SAFE_INTEGER + 1 },
+    stopReason: 'stop', reported: Number.MAX_SAFE_INTEGER + 1 },
+  { name: 'unsafe inclusive count', finishReason: 'stop',
+    usage: { prompt_tokens: Number.MAX_SAFE_INTEGER, cache_read_input_tokens: 1 },
+    stopReason: 'stop', reported: Number.MAX_SAFE_INTEGER + 1 },
+])('uses one live and durable anchor gate for a $name response while retaining accounting', async scenario => {
+  const source = [{ role: 'user' as const, content: 'hello' }];
+  let responses = 0;
+  const observed: ProviderUsage[] = [];
+  const step = createStepFunction({ provider, sessionId: id, workspaceRoot: '/fixture', ...overhead,
+    fetchImpl: async () => {
+      const first = responses++ === 0;
+      return new Response(JSON.stringify({
+        choices: !first && scenario.missingMessage ? []
+          : [{ message: { content: 'answer' }, finish_reason: first ? 'stop' : scenario.finishReason }],
+        usage: first ? { prompt_tokens: 1000, completion_tokens: 5 } : scenario.usage,
+      }), { headers: { 'content-type': 'application/json' } });
+    } });
+  expect((await step(source, undefined, {}, { allowTools: true })).promptMeasurement?.tokens).toBe(1000);
+  const next = await step(source, undefined, {}, { allowTools: true, onRequestUsage: usage => observed.push(usage) });
+  expect(next.stopReason).toBe(scenario.stopReason);
+  expect(next.promptMeasurement?.tokens).toBe(scenario.anchor);
+  const usage = getSessionUsage(id);
+  expect(usage.lastPromptTokens).toBe(scenario.anchor);
+  expect(usage.recentRequests.at(-1)?.kind).toBe(scenario.anchor === undefined ? 'usage-gap' : 'request');
+  if (scenario.anchor === undefined) {
+    expect(usage.lastPromptMessageCount).toBe(0);
+    expect(usage.lastPromptIdentity).toBeUndefined();
+    expect(usage.lastPromptProjection).toBeUndefined();
+  } else {
+    expect(usage.lastPromptMessageCount).toBe(next.promptMeasurement!.messageCount);
+    expect(usage.lastPromptIdentity).toEqual(next.promptMeasurement!.identity);
+  }
+  expect(totalTokens(usage)).toBe(1005 + scenario.reported);
+  expect(usage.turnsCount).toBe(2);
+  expect(observed).toEqual([scenario.usage]);
+});
+
+it('keeps reported accounting when a display callback fails after a response', async () => {
+  const step = createStepFunction({ provider, sessionId: id, workspaceRoot: '/fixture', ...overhead,
+    fetchImpl: async () => new Response(JSON.stringify({
+      choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 3000, completion_tokens: 5 },
+    }), { headers: { 'content-type': 'application/json' } }) });
+  let observed = 0;
+  const next = await step([{ role: 'user', content: 'hello' }], undefined,
+    { onText: () => { throw new Error('Display unavailable'); } },
+    { allowTools: true, onRequestUsage: () => { observed++; } });
+  expect(next.stopReason).toBe('error');
+  expect(next.promptMeasurement).toBeUndefined();
+  expect(getSessionUsage(id).lastPromptTokens).toBeUndefined();
+  expect(totalTokens(getSessionUsage(id))).toBe(3005);
+  expect(observed).toBe(1);
+});
+
+it('clears a prior anchor when a stream is cancelled after reporting prompt usage', async () => {
+  const controller = new AbortController();
+  let responses = 0;
+  const step = createStepFunction({ provider, sessionId: id, workspaceRoot: '/fixture', ...overhead,
+    fetchImpl: async (_url, init) => {
+      if (responses++ === 0) return new Response(JSON.stringify({
+        choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 1000, completion_tokens: 5 },
+      }), { headers: { 'content-type': 'application/json' } });
+      return new Response(new ReadableStream<Uint8Array>({ start(stream) {
+        stream.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+          choices: [{ delta: { content: 'partial answer' } }], usage: { prompt_tokens: 3000 },
+        })}\n\n`));
+        init?.signal?.addEventListener('abort', () => stream.error(new Error('Request cancelled')), { once: true });
+      } }), { headers: { 'content-type': 'text/event-stream' } });
+    } });
+  const source = [{ role: 'user' as const, content: 'hello' }];
+  expect((await step(source, undefined, {}, { allowTools: true })).promptMeasurement?.tokens).toBe(1000);
+  const next = await step(source, controller.signal, { onText: () => controller.abort() }, { allowTools: true });
+  expect(next.stopReason).toBe('aborted');
+  expect(next.promptMeasurement).toBeUndefined();
+  expect(getSessionUsage(id).lastPromptTokens).toBeUndefined();
+  expect(getSessionUsage(id).recentRequests.at(-1)?.kind).toBe('usage-gap');
+  expect(totalTokens(getSessionUsage(id))).toBe(1005);
+});

@@ -388,7 +388,9 @@ describe("runTurn", () => {
   it.each(["unmetered", "unfinished", "refused"])("does not warm a %s response using the previous context gauge", async kind => {
     const sessionId = `warming-${kind}`;
     const cacheWarming = { noteRequest: vi.fn(), noteSettled: vi.fn(), stop: vi.fn(), status: () => ({ mode: "idle" as const }) };
-    recordSessionUsage(sessionId, { model: "fixture", promptTokens: 500000 });
+    const identity = { provider: "fixture", model: "fixture", endpoint: "openai-compatible" };
+    recordSessionUsage(sessionId, { model: "fixture", promptTokens: 500000, promptIdentity: identity });
+    expect(getSessionUsage(sessionId).lastPromptTokens).toBe(500000);
     const body = { choices: [{ message: { content: "answer" }, finish_reason: kind === "refused" ? "content_filter" : "stop" }],
       ...(kind === "refused" ? { usage: { prompt_tokens: 500000 } } : {}),
     };

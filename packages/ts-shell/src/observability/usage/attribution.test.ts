@@ -12,6 +12,10 @@ const A = 'attributed-a', B = 'attributed-b';
 const rates = { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1 };
 const capture = (baseUrl = 'https://relay.invalid/v1', prices = rates) => captureUsageAttribution({ provider: 'p', model: 'org/model', baseUrl, rates: prices });
 const record = (session = A, attribution = capture(), tokens = 1_000_000) => recordSessionUsage(session, { attribution, promptTokens: tokens });
+const recordRequest = (session = A, attribution = capture(), tokens = 1_000_000) => recordSessionUsage(session, {
+  attribution, promptTokens: tokens, promptIdentity: { provider: attribution.provider, model: attribution.model,
+    endpoint: 'openai-compatible', endpointId: attribution.endpointId },
+});
 afterEach(() => { resetSessionUsage(A); resetSessionUsage(B); });
 
 it('keeps actual destinations and request-time prices separate through catalog edits and resume', () => {
@@ -126,9 +130,9 @@ it.each(['missing', 'price', 'endpoint', 'origin', 'negative', 'unknown-version'
 });
 
 it('uses current captured cache prices while separating price edits from destination changes', () => {
-  record(A, capture(), 10_000);
-  record(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 10_000);
-  record(A, capture('https://relay.invalid/v2', { ...rates, promptPerMTok: 5 }), 10_000);
+  recordRequest(A, capture(), 10_000);
+  recordRequest(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 10_000);
+  recordRequest(A, capture('https://relay.invalid/v2', { ...rates, promptPerMTok: 5 }), 10_000);
   const result = findCacheWaste(getSessionUsage(A).recentRequests, () => { throw new Error('must not reprice'); });
   expect(result.misses).toMatchObject([
     { modelChanged: false, endpointChanged: false },
@@ -139,15 +143,19 @@ it('uses current captured cache prices while separating price edits from destina
 });
 
 it('does not infer cache continuity between a legacy request and an attributed one', () => {
-  recordSessionUsage(A, { provider: 'p', model: 'org/model', promptTokens: 10_000 });
-  record(A, capture(), 10_000);
+  recordSessionUsage(A, { provider: 'p', model: 'org/model', promptTokens: 10_000,
+    promptIdentity: { provider: 'p', model: 'org/model' } });
+  recordRequest(A, capture(), 10_000);
+  expect(getSessionUsage(A).recentRequests.map(entry => entry.kind)).toEqual(['request', 'request']);
   expect(findCacheWaste(getSessionUsage(A).recentRequests, () => rates).misses).toEqual([]);
 });
 
 it('keeps cache accounting across price edits without inferring support at another destination', () => {
-  recordSessionUsage(A, { attribution: capture(), promptTokens: 100, cacheReadTokens: 100 });
-  record(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 200);
-  record(A, capture('https://relay.invalid/v2'), 300);
+  const attribution = capture();
+  recordSessionUsage(A, { attribution, promptTokens: 100, cacheReadTokens: 100,
+    promptIdentity: { provider: attribution.provider, model: attribution.model, endpointId: attribution.endpointId } });
+  recordRequest(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 200);
+  recordRequest(A, capture('https://relay.invalid/v2'), 300);
   const history = getSessionUsage(A).recentRequests;
   expect(history.map(entry => entry.reportedCache)).toEqual([true, true, false]);
   expect(summarizeCacheUsage(history)).toEqual({ promptTokens: 400, cacheReadTokens: 100, hitRate: 25, requestCount: 2 });
@@ -155,25 +163,34 @@ it('keeps cache accounting across price edits without inferring support at anoth
 
 it('does not inherit cache accounting from a legacy model named like an attributed cache identity', () => {
   const attribution = capture();
-  recordSessionUsage(A, { model: cacheIdentity('', attribution), promptTokens: 100, cacheReadTokens: 100 });
-  recordSessionUsage(A, { attribution, promptTokens: 300 });
+  const model = cacheIdentity('', attribution);
+  recordSessionUsage(A, { model, promptTokens: 100, cacheReadTokens: 100, promptIdentity: { provider: '', model } });
+  recordRequest(A, attribution, 300);
   const history = getSessionUsage(A).recentRequests;
   expect(history.map(entry => entry.reportedCache)).toEqual([true, false]);
   expect(summarizeCacheUsage(history)).toEqual({ promptTokens: 200, cacheReadTokens: 100, hitRate: 50, requestCount: 1 });
 });
 
 it('keeps background attribution out of the foreground measurement and cache history', () => {
-  record();
+  const attribution = capture();
+  const identity = { provider: attribution.provider, model: attribution.model, endpoint: 'openai-compatible',
+    endpointId: attribution.endpointId };
+  recordSessionUsage(A, { attribution, promptTokens: 1_000_000, promptIdentity: identity });
   const previous = getSessionUsage(A);
+  expect(previous.lastPromptTokens).toBe(1_000_000);
   const key = previous.lastBucketKey, history = [...previous.recentRequests];
   recordSessionUsage(A, { attribution: capture('https://other.invalid'), promptTokens: 10 }, { affectsContext: false });
-  expect(getSessionUsage(A)).toMatchObject({ lastBucketKey: key, lastPromptTokens: 1_000_000, recentRequests: history });
+  expect(getSessionUsage(A)).toMatchObject({ lastBucketKey: key, lastPromptTokens: 1_000_000,
+    lastPromptIdentity: identity, recentRequests: history });
   expect(totalTokens(getSessionUsage(A))).toBe(1_000_010);
 });
 
 it.each(['context-reset', 'usage-gap'] as const)('persists %s after attributed usage without losing identity or adding requests', kind => {
   const foreground = capture();
-  recordSessionUsage(A, { attribution: foreground, promptTokens: 100, cacheReadTokens: 20 });
+  const identity = { provider: foreground.provider, model: foreground.model, endpoint: 'openai-compatible',
+    endpointId: foreground.endpointId };
+  recordSessionUsage(A, { attribution: foreground, promptTokens: 100, cacheReadTokens: 20, promptIdentity: identity });
+  expect(getSessionUsage(A).lastPromptTokens).toBe(120);
   recordSessionUsage(A, { attribution: capture('https://other.invalid'), promptTokens: 10 }, { affectsContext: false });
   let disk: SessionUsageSnapshot | undefined;
   persistSessionUsage(A, undefined, next => { disk = next; });
@@ -188,7 +205,8 @@ it.each(['context-reset', 'usage-gap'] as const)('persists %s after attributed u
   expect(getSessionUsage(B).usageHealth).toBeUndefined();
   expect(getSessionUsage(B).recentRequests).toEqual(disk?.recentRequests);
   expect(getSessionUsage(A).lastPromptTokens).toBeUndefined();
-  recordSessionUsage(B, { attribution: foreground, promptTokens: 200 });
+  recordSessionUsage(B, { attribution: foreground, promptTokens: 200, promptIdentity: identity });
+  expect(getSessionUsage(B).recentRequests.at(-1)?.kind).toBe('request');
   persistSessionUsage(B, disk, next => { disk = next; });
   expect(totalTokens(getSessionUsage(B))).toBe(330);
   expect(findCacheWaste(disk!.recentRequests, () => rates).misses).toEqual([]);
