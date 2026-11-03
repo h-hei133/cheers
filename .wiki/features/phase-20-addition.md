@@ -9861,3 +9861,62 @@ onMessage(stored);
 **这不是问题**：`step.ts:649` 的门控已经保证只有 `stopReason !== 'error' && !== 'aborted'` 的请求才产生测量。落盘后虽然看不到 `stopReason`，但「有测量」本身就蕴含「当时成功」。
 
 **恢复路径不需要重新判断成功与否**，它只需要知道「这条测量对应的是哪段前缀」——由 `messageCount` 和 `historyDigest` 回答。
+
+#### 24.107.13 对抗性复核结果（主代理逐条验证）
+
+两个对抗代理各读近 4MB 仍未收敛（无界搜索），已停止。改为自己逐条验证。
+
+**C1：`historyDigest` 忽略 metadata —— 确认**
+
+```ts
+// context/request/identity.ts:22-28
+digest.update(JSON.stringify([
+  message.role, message.content, message.reasoning, message.tool_calls, message.tool_call_id, message.origin,
+]) + '\n');
+```
+
+六个字段，**没有 metadata**。构造上就不可能受 metadata 影响。
+
+**C2：压缩后恢复 —— 确认，且验证了四个反例**
+
+| 反例 | 结果 |
+|---|---|
+| 连续压缩（checkpoint of checkpoint） | **替换而非堆叠**。实测两次 `applyCompaction` 后只有 1 个 checkpoint（`SUMMARY-2`），与投影的 `checkpoints.length = 0` 一致 |
+| `keptMessages: 0` | 不可能（`keptMessages = length - cut`，`cut >= 2`） |
+| `keptMessages` 缺失 | 不可能（`commit.ts:84` 无条件写入） |
+| `branch_summary` 打乱索引 | **会发生**，但分支导航先 `markContextUnknown` 清锚点（`navigation.ts:204`），不冲突 |
+
+**C3：`metadata.stdout` 冗余但无害 —— 确认**
+
+```bash
+grep -rn "\.stdout" packages/ts-shell/src/presentation packages/ts-shell/src/core/commands | grep -i metadata
+# 无结果
+```
+
+UI 与命令层都不读它。它是纯存储冗余。
+
+#### 24.107.14 最终裁定
+
+| 结论 | 状态 |
+|---|---|
+| 锚点生命周期无缺陷 | **确认** |
+| 24.106 全部结论作废 | **确认** |
+| 压缩后发一次请求即可恢复 | **确认**（真实 CLI：`calibrated: 8,379`） |
+| `metadata.stdout` 冗余但无害 | **确认** |
+| 连续压缩不会破坏投影 | **新确认** |
+
+**唯一遗留**：`metadata.stdout` 的存储冗余（转录体积翻倍）。这是独立的优化项，不影响任何功能。
+
+**可改进项**：`/context` 在「压缩后未再请求」时应说明原因，而不是笼统的「No provider measurement available」。
+
+#### 24.107.15 本轮方法论总结
+
+**用户要求「用测试找问题 + 子代理对抗 + 主代理复核」，实际执行：**
+
+1. **测试驱动**：真实 CLI 跑通压缩→重启→`/context`，用实测数据推翻上一轮结论
+2. **子代理对抗**：派出两个，但因任务范围过宽（「枚举所有失败条件」）而读到 4MB 仍不收敛
+3. **主代理复核**：自己逐条验证三个结论 + 四个反例
+
+**教训**：对抗性代理的任务必须**窄且有界**。「枚举所有 X」会变成无界搜索；应改为「验证这三个具体断言」或「找出这一个现象的原因」。
+
+**更重要的教训**：本轮推翻了上一轮，而上一轮也推翻了再上一轮。根因是我反复**用错误的读取方式观察数据**（`require` 在 ESM、`e.message` 字段位置、跳过解码层）。**在断言产品有缺陷之前，必须先证明观察本身可靠。**
