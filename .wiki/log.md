@@ -11611,3 +11611,5 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 `/context` 现在在锚点缺失且 usage 历史记录原因为 `context-reset`/`usage-gap` 时说明原因（上下文重建或文件恢复 / 上次请求无可测量用量），并在 `facts.prompt.anchor` 暴露该原因；`stale` 与已测量两种情形不附加，避免混淆不同事实。独立只读代理复核后修正两处措辞：`/undo` 的文件恢复也会写 `context-reset`，损坏用量记录恢复会合成 `usage-gap`。未覆盖：`/model` 切换清锚点但不写历史，仍显示原文案。
 
 验证：新增 `bashResult.test.ts` 两项并做反转（加回两键即红，逐字节恢复后绿）；report/sessionFacts/configuration 82 项、bash 相关 82+6 项、`test:scripts` 191 项通过；五静态门与 TS build 通过；NormProof 经仓库 archive 解包运行，循环/未解析导入 satisfied，唯一失败仍是既有两处 `interactiveMode` 函数上限（non-blocking，partial）。未运行全仓回归、20k 压力、真实 provider/PTY 或并发验证。交付提交另行绑定。
+
+交付：ADD-79 实现与测试提交 `3e195a644c510e6c6bfc605e2915582f69e73ad9` 已推送 `origin/main`，远端 refs 精确匹配，工作区干净。该提交的 CI 结果另行读取，不计为已通过。
