@@ -9377,3 +9377,61 @@ promptMeasured: typeof usage.prompt_tokens === 'number' && ...
 **`resetSessionUsage` 在生产代码中无调用者**（仅测试）。
 
 **jobs/agent 路径的压缩不调用 `markContextUnknown`**（`cli/jobs/agent/runtime.ts:135`），依赖 `compactSessionHistory` 内部的清理（`core/shell/compaction.ts:253`）。
+
+#### 24.105.13 阶段 6：失效触发完整表（主代理逐项验证）
+
+| # | 变换 | 改消息数 | 改内容摘要 | 捕获守卫 | 结论 |
+|---|---|---|---|---|---|
+| 1 | **微压缩** | **否**（`messages.map` 1:1） | 是 | `measuredProjectionPrefix` 逐条比对 + `rewriteTokensRemoved` 修正 | 已处理 |
+| 2 | **压缩** | **是**（前缀→checkpoint） | 是 | G1（`context-reset` 历史）+ G4（索引）+ G5（前缀摘要） | 已处理，三重保障 |
+| 3 | **上下文选择**（elide） | 否 | 是 | G5 前缀摘要；且锚点是在**选择后**的数组上记录的 | 已处理（测试双向覆盖） |
+| 4 | **模型切换** | 否 | 否 | `invalidatePromptMeasurement`（`model/selection.ts:272`） | 已处理 |
+| 5 | **schema 变化** | 否 | 否 | `schemaDigest` 比对 | 已处理 |
+| 6 | **系统提示变化** | 否 | 否 | `systemDigest` 比对 | 已处理 |
+| 7 | **凭据/replay 变化** | 否 | 否 | `replayBinding` 比对 | 已处理 |
+| 8 | **会话恢复** | — | — | `restoreSessionUsage` 从消息重建 | 已处理 |
+| 9 | **项目重绑** | 否 | **是** | **无显式清除**，但 `environmentLine` 把 `cwd` 写进系统提示（`turn/prompt.ts:134-137`），`systemDigest` 变化后自然失效 | 间接处理 |
+| 10 | **分支导航** | 是 | 是 | `markContextUnknown`（`cli/runtime/navigation.ts:204`） | 已处理 |
+| 11 | **`/shake` 上下文选择变更** | 否 | 是 | `markContextUnknown`（`cli/runtime/sessionCommands.ts:141,150`） | 已处理 |
+| 12 | **文件撤销** | 否 | 否 | `markContextUnknown`（`edit/recovery/undo/service.ts:111`） | 已处理 |
+| 13 | **opening 环境前缀** | 否 | 是 | `storedPromptProjection` 专门处理（`turn/measurement.ts:9-36`） | 已处理 |
+
+**唯一没有显式处理的是 #9（项目重绑）**，但它通过 `systemDigest` 间接失效，行为正确。
+
+**所有清除路径都清四个字段**（`invalidatePromptMeasurement` 与 `clearContextUsage` 均含 `lastPromptProjection`，`usageTelemetry.ts:305-312`、`:325-332`）。这很重要——如果漏清 projection，下一次修正会基于错误的基线。
+
+**没有任何清除函数会修改消息。** 消息上的 `promptMeasurement` 只能被逻辑失效（G4/G5），不能物理删除。
+
+#### 24.105.14 生命周期总览
+
+```
+provider 响应
+  ↓  [turn/step.ts:673-681] 三个门控：非 agentMode / 非 error-aborted / prompt_tokens 有效
+promptMeasurement {tokens, messageCount, identity, projection?}
+  ↓  两条路径，写时一致
+  ├→ 内存 lastPrompt*        ← recordSessionUsage，affectsContext=true
+  └→ 消息字段                ← persist() → transcript.jsonl
+
+重启
+  ↓
+transcript.jsonl
+  ↓  projectTranscriptMessages  应用压缩 → [checkpoint, ...keptTail]
+session.turns（已压缩投影）
+  ↓  selectModelContext         应用用户选择
+restorablePromptMeasurement     G1-G9 九道守卫
+  ↓
+内存 lastPrompt*（重建）
+
+使用
+  ├→ estimatePrompt         CORRECTED + 尾部（显示 / step 预算）
+  ├→ measureContextTokens   CORRECTED + 尾部（压缩阈值）
+  ├→ 状态栏                  RAW（无尾部）
+  └→ /context               RAW 或 CORRECTED（calibrated 优先）
+
+失效
+  ├→ 微压缩      → 修正，不丢弃
+  ├→ 压缩        → G1/G4/G5 拒绝
+  └→ 其他变换    → 各自摘要守卫
+```
+
+**已确认无遗漏的环节**：产生、记录、持久化、恢复、使用、失效六个阶段全部覆盖。
