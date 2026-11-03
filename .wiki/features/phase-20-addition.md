@@ -9734,7 +9734,7 @@ newest assistant @3: count=3 match=true digest=true
 
 **这是一个独立的存储冗余问题**（每条 bash 结果多存一份完整输出），与锚点无关。可以作为独立优化项，但不是缺陷修复。
 
-#### 24.107.5 那 `/context` 之前为什么显示 estimated
+#### 24.107.5 ~~那 `/context` 之前为什么显示 estimated~~（**已由 24.107.9 回答**）
 
 上一轮失败的会话（`sess_c5bf6fe7`）与本轮成功的会话（`sess_1d32541f`）关键差异：
 
@@ -9758,7 +9758,7 @@ newest assistant @3: count=3 match=true digest=true
 | `metadata.stdout` 冗余但无害 | grep 零消费者；摘要不受影响 |
 | 24.106 的三条结论全错 | 三次读取错误 |
 
-**仍未解释**：上一轮失败会话的确切原因。需要复现才能定位。
+**已解释**（见 24.107.9）：压缩后没有再发请求，`context-reset` 历史条目仍在末尾，恢复被正确拒绝。
 
 #### 24.107.7 方法论教训（第三次同类错误）
 
