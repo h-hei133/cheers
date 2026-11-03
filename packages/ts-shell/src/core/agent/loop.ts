@@ -281,7 +281,9 @@ async function driveLoop(
   // same reasons the scheduled one would have. Every other implementation of
   // this loop checks here for exactly that reason.
   if (prepareInitial && config.prepareNextStep) {
-    const first = await config.prepareNextStep({ toolResults: [], messages: context }, signal);
+    // A copy, like every later snapshot: the caller may cache against array
+    // identity, and this context is mutated in place as the run proceeds.
+    const first = await config.prepareNextStep({ toolResults: [], messages: [...context] }, signal);
     if (first?.messages) {
       replaceContext(context, first.messages);
       config.onContextReplaced?.(first.messages);
