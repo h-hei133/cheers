@@ -17,6 +17,7 @@ import type { RequestSigner } from "../../provider/request/fetch.js";
 import { createCacheWarmingRunner } from "../../turn/cacheWarm.js";
 import { loadCatalog } from '../../core/models/catalogStore.js';
 import { getSessionUsage, recordSessionUsage, resetSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
+import { FINAL_STEP_MESSAGE } from '../../turn/messages.js';
 import { historyDigest, requestIdentity } from '../../context/request/identity.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import { withRequestOverhead } from '../../entrypoints/cliRuntimeInvocation.js';
@@ -244,6 +245,14 @@ it('uses a successful request anchor through the actual compaction and overhead 
   expect(attached.policy.measureContextTokens!(messages, identity)).toBe(900);
   const tail = [{ role: 'assistant' as const, content: 'ok' }, { role: 'user' as const, content: 'next question' }];
   expect(attached.policy.measureContextTokens!([...messages, ...tail], identity)).toBe(900 + estimateTokens(tail));
+  // A closing step is answered with an instruction instead of tools, so the
+  // budget for that request must include it. Without the flag the same
+  // messages price lower, which is what a run that still has tools sees.
+  const closing = attached.policy.measureContextTokens!([...messages, ...tail], identity, false);
+  const closingCost = estimateTokens([{ role: 'user', content: FINAL_STEP_MESSAGE }]);
+  // Rounding differs by at most one token between the two ceilings.
+  expect(closing! - (900 + estimateTokens(tail))).toBeGreaterThanOrEqual(closingCost - 1);
+  expect(closing! - (900 + estimateTokens(tail))).toBeLessThanOrEqual(closingCost + 1);
   // A fresh process has no sent-request identity yet; live schema/system plus
   // the strict persisted prefix proof can still evaluate the recovered anchor.
   accepted = undefined;

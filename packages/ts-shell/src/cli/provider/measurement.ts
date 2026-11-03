@@ -28,8 +28,8 @@ export function createCompactionMeasurement(revision: () => readonly unknown[] =
       configurable: true,
       enumerable: Object.prototype.propertyIsEnumerable.call(policy, 'measureContextTokens'),
       writable: true,
-      value: (messages: readonly AgentMessage[], identity?: PromptIdentitySnapshot) => {
-        const result = original.call(policy, messages, identity);
+      value: (messages: readonly AgentMessage[], identity?: PromptIdentitySnapshot, toolsAllowed?: boolean) => {
+        const result = original.call(policy, messages, identity, toolsAllowed);
         observe(owner, result);
         return result;
       },

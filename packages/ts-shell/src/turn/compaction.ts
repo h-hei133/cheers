@@ -30,6 +30,14 @@ export function turnCompaction(input: {
   readonly hooks: HookDispatcher;
   /** Steps this run may take; a run limited to one starts on its closing step. */
   readonly maxSteps: number;
+  /**
+   * Whether the run has any tool to offer.
+   *
+   * A closing step only carries its instruction when there were tools to
+   * withhold; a run with none is answered directly and the request stays as
+   * short as the conversation.
+   */
+  readonly hasTools: boolean;
 }): {
   readonly beforePrompt: (history: readonly AgentMessage[], opening: AgentMessage, signal: AbortSignal) => Promise<readonly AgentMessage[]>;
   readonly beforeStep: NonNullable<AgentLoopConfig['prepareNextStep']>;
@@ -58,7 +66,7 @@ export function turnCompaction(input: {
       // The first step carries tools unless the run is limited to that one
       // step, in which case it is already the closing step.
       const update = await check('prompt', { messages: [...history, opening], toolResults: [],
-        toolsAllowed: input.maxSteps > 1 }, signal);
+        toolsAllowed: input.maxSteps > 1 && input.hasTools }, signal);
       if (!update?.messages || signal.aborted) return history;
       // Generation clones its input. Keep the exact opening object that the
       // turn projection owns, and let core.prompt append it exactly once.

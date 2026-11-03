@@ -114,6 +114,15 @@ export interface AgentLoopConfig {
   readonly beforeToolCall?: ToolHooks["beforeToolCall"];
   readonly afterToolCall?: ToolHooks["afterToolCall"];
   readonly shouldStopAfterStep?: (snapshot: NextStepSnapshot) => boolean | Promise<boolean>;
+  /**
+   * Whether the request after this step may call tools.
+   *
+   * `shouldStopAfterStep` answers "stop now", which is a different question:
+   * the last step a run may take is still sent, and it is sent as the closing
+   * step. A caller that knows its own step budget answers here so a budget
+   * computed for the next request prices the instruction that request carries.
+   */
+  readonly toolsAllowedOnNextStep?: () => boolean;
   readonly prepareNextStep?: (
     snapshot: NextStepSnapshot,
     signal?: AbortSignal,
@@ -371,7 +380,8 @@ async function driveLoop(
       // instruction instead of tools, so the next request carries one more
       // message than the conversation does.
       const stopping = await config.shouldStopAfterStep?.(snapshot);
-      completedStep = { ...snapshot, toolsAllowed: !stopping };
+      const toolsAllowed = config.toolsAllowedOnNextStep?.();
+      completedStep = { ...snapshot, ...(toolsAllowed !== undefined ? { toolsAllowed } : {}) };
       if (stopping) {
         await emit({ type: "agent_end", messages: [...produced] });
         return;

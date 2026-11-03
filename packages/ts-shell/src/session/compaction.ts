@@ -516,6 +516,13 @@ export interface CondenseInput {
   readonly lifecycleReason?: CompactionReason;
   /** Durable step identity; absent disables cross-restart reuse (tests, callers without a session). */
   readonly operation?: Omit<CompactionOperationInput, "policyDigest">;
+  /**
+   * Whether the next request may call tools.
+   *
+   * The threshold was already decided with this fact; re-deciding without it
+   * would undo an approval that included the closing instruction.
+   */
+  readonly toolsAllowed?: boolean;
 }
 
 const pendingCompactions = new Map<string, Promise<CondenseOutcome>>();
@@ -526,7 +533,7 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
   const source = input.operation?.source;
   // Triggering uses the caller's complete request; generation uses the same
   // captured stored conversation for manual, automatic and overflow callers.
-  if (source && !input.force && isBelowThreshold(original, input.policy)) {
+  if (source && !input.force && isBelowThreshold(original, input.policy, input.toolsAllowed)) {
     return { status: 'declined', reason: 'below-threshold' };
   }
   const captured = { ...input, messages: source ? freezeDeep(structuredClone(source.history)) : original,
@@ -563,12 +570,12 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
 async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
   const plan = input.force
     ? planCompactionCut(input.messages, input.policy)
-    : planCompaction(input.messages, input.policy);
+    : planCompaction(input.messages, input.policy, input.toolsAllowed);
   if (!plan) {
     // Which refusal this is matters to whoever reads it. An explicit `/compact`
     // skips the threshold, so its refusal is always about the conversation's
     // shape; a scheduled step can also be refusing because nothing is due yet.
-    if (!input.force && isBelowThreshold(input.messages, input.policy)) {
+    if (!input.force && isBelowThreshold(input.messages, input.policy, input.toolsAllowed)) {
       return { status: "declined", reason: "below-threshold" };
     }
     return { status: "declined", reason: explainNoCut(input.messages, input.policy) };
@@ -727,6 +734,7 @@ export function createCompactionStep(
         summarize: options.summarize,
         summarizeTurnPrefix: options.summarizeTurnPrefix,
         signal,
+        ...(snapshot.toolsAllowed !== undefined ? { toolsAllowed: snapshot.toolsAllowed } : {}),
         ...(options.lifecycle ? { lifecycle: options.lifecycle } : {}),
         lifecycleReason: reason,
         ...(options.sessionId ? { operation: { sessionId: options.sessionId,

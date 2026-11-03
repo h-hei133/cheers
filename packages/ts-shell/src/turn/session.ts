@@ -203,7 +203,7 @@ export function runTurn(options: TurnOptions): TurnRun {
   const hooks = createToolHooks(gate, toolPool);
   const compaction = options.compaction ? turnCompaction({ setup: options.compaction,
     sessionId: options.sessionId, workspaceRoot: options.workspaceRoot, hooks: options.hooks,
-    maxSteps: options.maxSteps }) : undefined;
+    maxSteps: options.maxSteps, hasTools: toolPool().size > 0 }) : undefined;
   const core = new AgentCore({
     initialState: { messages: options.history as readonly AgentMessage[] },
     // Absent means the kernel's own default, which is the same value the config
@@ -219,6 +219,11 @@ export function runTurn(options: TurnOptions): TurnRun {
     afterToolCall: hooks.afterToolCall,
     streamStep: createTurnRequest(options, projection, channel, options.storedPrompt ? { opening, stored: options.storedPrompt } : undefined),
     shouldStopAfterStep: () => projection.stepCount >= options.maxSteps,
+    // The request layer allows tools while the step counter is below the
+    // budget, and that counter has already advanced when the request is built.
+    // Answering for "the step after this one" keeps a compaction budget and
+    // the request it predicts on the same question.
+    toolsAllowedOnNextStep: () => projection.stepCount + 1 < options.maxSteps,
     prepareNextStep: compaction?.beforeStep,
   });
 

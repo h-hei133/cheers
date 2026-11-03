@@ -14,6 +14,7 @@ export interface AgentCoreOptions {
   readonly beforeToolCall?: ToolHooks["beforeToolCall"];
   readonly afterToolCall?: ToolHooks["afterToolCall"];
   readonly shouldStopAfterStep?: AgentLoopConfig["shouldStopAfterStep"];
+  readonly toolsAllowedOnNextStep?: AgentLoopConfig["toolsAllowedOnNextStep"];
   readonly prepareNextStep?: AgentLoopConfig["prepareNextStep"];
   readonly steeringMode?: "one-at-a-time" | "all";
   readonly followUpMode?: "one-at-a-time" | "all";
@@ -172,6 +173,7 @@ export class AgentCore {
       beforeToolCall: this.options.beforeToolCall,
       afterToolCall: this.options.afterToolCall,
       shouldStopAfterStep: this.options.shouldStopAfterStep,
+      toolsAllowedOnNextStep: this.options.toolsAllowedOnNextStep,
       prepareNextStep: this.options.prepareNextStep,
       ...(this.options.retry ? { retry: this.options.retry } : {}),
       onContextReplaced: (messages) => {

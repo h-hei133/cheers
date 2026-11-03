@@ -162,4 +162,5 @@ describe('session compaction boundaries', () => {
     expect(prepare).toHaveBeenCalledTimes(1);
     expect(prepared[0].at(-1)).toMatchObject({ content: 'queued' });
   });
+
 });
