@@ -2,7 +2,7 @@ import { messageToText } from "../model-adapters/multimodal.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
-import { CHARS_PER_TOKEN, estimateRequestTokens, estimateTokens, messageCharCount, overheadCharCount, type RequestOverhead } from "./context.js";
+import { CHARS_PER_TOKEN, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
 import { availableTailTokens, closingCharsFor, estimateWithClosing, formatBudgetBreakdown, reachedBudgetThreshold } from './compaction/budget.js';
 import { digest } from './compaction/state.js';
 import { formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
@@ -47,6 +47,11 @@ const measuredTokensCache = new WeakMap<CompactionPolicy, {
   readonly toolsAllowed: boolean | undefined;
   readonly tokens: number | undefined;
 }>();
+
+/** Drop the cached answer for a policy, before re-measuring across an await. */
+function forgetMeasurement(policy: CompactionPolicy): void {
+  measuredTokensCache.delete(policy);
+}
 
 function measureContextOnce(policy: CompactionPolicy, messages: readonly AgentMessage[],
   toolsAllowed: boolean | undefined): number | undefined {
@@ -595,6 +600,9 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
     if (result.status !== 'condensed' || !source) return result;
     // Shared generation never shares a caller's runtime system prefix or opening
     // envelope. Rebuild its checkpoint and exact kept tail from that caller.
+    // The await above may have let a request record new usage, so the answer
+    // cached before it no longer describes the same measurement.
+    forgetMeasurement(input.policy);
     const offset = original.length - captured.messages.length;
     const plan = { ...result.plan, cut: result.plan.cut + offset,
       turnStart: result.plan.turnStart < 0 ? -1 : result.plan.turnStart + offset,

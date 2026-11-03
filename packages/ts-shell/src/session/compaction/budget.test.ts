@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import type { AgentMessage } from '../../core/agent/state.js';
 import { compactionRefusalReason } from '../compaction.js';
 import { estimateRequestTokens } from '../context.js';
-import { closingCharsFor, formatBudgetBreakdown } from './budget.js';
+import { closingCharsFor, estimateWithClosing, formatBudgetBreakdown } from './budget.js';
 
 const messages: AgentMessage[] = [{ role: 'user', content: 'xxxxxxx' }, { role: 'assistant', content: 'yyyyyyy' }];
 const overhead = { tools: [{ name: 'read' }], systemPrompt: 's'.repeat(350) };
@@ -48,11 +48,13 @@ it('adds the closing instruction to the breakdown and the total together', () =>
   // The instruction is a real cost, so both the history line and the total
   // move by the same amount; it must not appear as "shared rounding".
   expect(closing).not.toBe(open);
-  // 1,400 chars of history plus the 188-char instruction: 454 tokens in total,
-  // 400 without it. The instruction is history-sized, not rounding-sized.
   expect(open).toContain('history 400');
-  expect(closing).toContain('history 454');
-  // It must not be folded into "shared rounding", which is what the estimate
-  // reports when it cannot attribute a difference.
+  // The total must equal the headline the refusal prints, which rounds once
+  // over the whole request. Deriving the parts from a separately-rounded
+  // instruction would make the two lines disagree by one token.
+  const headline = estimateWithClosing(messages, policy.overhead, closingCharsFor(false));
+  expect(closing).toContain(`= ${headline + 10 + 20} tokens.`);
+  // And the instruction must not be folded into "shared rounding", which is
+  // what the estimate reports when it cannot attribute a difference.
   expect(closing).not.toContain('shared rounding 54');
 });

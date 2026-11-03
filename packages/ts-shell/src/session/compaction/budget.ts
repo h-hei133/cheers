@@ -46,19 +46,18 @@ export function formatBudgetBreakdown(messages: readonly AgentMessage[], policy:
   readonly outputTokens?: number;
   readonly reserveTokens?: number;
 }, closingChars = 0): string {
-  // The closing instruction travels outside the messages, so it is added to
-  // both the history and the total from the same character sum. Rounding the
-  // two separately would let the breakdown disagree with the headline by one.
-  const closingTokens = closingChars === 0 ? 0
-    : Math.ceil((messages.reduce((total, message) => total + messageCharCount(message), 0) + closingChars)
-      / CHARS_PER_TOKEN) - estimateTokens(messages);
-  const history = estimateTokens(messages) + closingTokens;
+  // One rounding over the whole request, exactly as the headline does it.
+  // Rounding the instruction separately and adding the results is not the same
+  // number, and the message states both.
+  const prompt = estimateWithClosing(messages, policy.overhead, closingChars);
+  // History is what the conversation contributes to that total, so the
+  // instruction's share is whatever the single rounding attributed to it.
+  const history = estimateTokens(messages) + (prompt - estimateRequestTokens(messages, policy.overhead));
   const tools = policy.overhead?.tools;
   const toolChars = tools?.length ? JSON.stringify(tools).length : 0;
   const systemChars = policy.overhead?.systemPrompt?.length ?? 0;
   const schemaTokens = Math.ceil(toolChars / CHARS_PER_TOKEN);
   const systemTokens = Math.ceil(systemChars / CHARS_PER_TOKEN);
-  const prompt = estimateRequestTokens(messages, policy.overhead) + closingTokens;
   const rounding = prompt - history - schemaTokens - systemTokens;
   const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
   const fixed = schemaTokens + systemTokens + rounding;
