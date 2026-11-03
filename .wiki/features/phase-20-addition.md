@@ -9231,7 +9231,7 @@ readonly promptMeasurement?: PromptMeasurement;
 
 重启后从消息重建内存锚点——这正是 `restorablePromptMeasurement` 的职责，也是矛盾 A 所在。
 
-#### 24.105.5 阶段 5：消费者（主代理已定位，细节待代理补充）
+#### 24.105.5 阶段 5：消费者（主代理定位，详见 24.105.7）
 
 `measuredPromptContext` 有四个调用点：
 
@@ -9244,9 +9244,9 @@ readonly promptMeasurement?: PromptMeasurement;
 
 **关键观察**：`step.ts:368` 的调用带 `options.agentMode ? undefined :`，即子代理不参与。
 
-**待确认**：这四处是否都使用修正后的值（减去 `rewriteTokensRemoved`），以及当锚点不可用时各自的回退是否一致。
+**已确认**（见 24.105.7）：四处对 RAW / CORRECTED 的选择不同，回退也不一致。
 
-#### 24.105.6 阶段 6：失效（部分已确认）
+#### 24.105.6 阶段 6：失效（初步，完整表见 24.105.13）
 
 已知的失效触发与捕获守卫：
 
@@ -9260,7 +9260,7 @@ readonly promptMeasurement?: PromptMeasurement;
 | 凭据/replay 变化 | 否 | 否 | `replayBinding` 比对 |
 | opening 环境前缀 | 否 | 是 | `storedPromptProjection` 专门处理 |
 
-**待代理确认**：是否有遗漏的变换（上下文选择、会话恢复、项目重绑）。
+**已确认**（见 24.105.13）：共 13 种变换，12 种显式处理，项目重绑经 `systemDigest` 间接处理。
 
 #### 24.105.7 阶段 5 详查：显示与阈值可能给出不同数值（子代理实测）
 
@@ -9293,6 +9293,10 @@ readonly promptMeasurement?: PromptMeasurement;
 **状态栏用 RAW 是正确的**——它没有消息数组可以估算尾部。但代价是**系统性高估 `removedTokens` 且滞后一个尾部**。
 
 **`lastPromptProjection` 的消费者极少**：只有 `turn/measurement.ts:44` 和 `context/request/estimate.ts:48-49` 直接读。其余全部经 `measuredProjectionPrefix` 间接使用。
+
+#### 24.105.8 阶段 4：恢复（见 24.105.9-24.105.12）
+
+恢复路径的核心结论在后续四个小节：假设证伪（24.105.9）、压缩后的三重拒绝（24.105.10）、投影假设未表达的风险（24.105.11）、以及持久化代理的其余发现（24.105.12）。
 
 #### 24.105.9 假设 A 的证伪：压缩坐标系本来就是对齐的
 
@@ -9435,3 +9439,64 @@ restorablePromptMeasurement     G1-G9 九道守卫
 ```
 
 **已确认无遗漏的环节**：产生、记录、持久化、恢复、使用、失效六个阶段全部覆盖。
+
+#### 24.105.15 两个新风险的方案
+
+24.105.11 与 24.105.12 记录了本轮发现但尚未给出方案的两个风险。补上。
+
+**风险 1：投影假设没有被表达。**
+
+`restorablePromptMeasurement(messages, history)` 的正确性依赖「`messages` 是压缩投影后的数组」这个前提，但它：
+
+- 参数名叫 `messages`，没有表达投影；
+- 文档注释只说「the exact selected prefix」，没说压缩；
+- 没有守卫检查（例如「数组首条若是 checkpoint 且后续长度不匹配则拒绝」）；
+- 没有测试断言调用方传的是投影数组。
+
+**方案（低成本，高收益）**：
+
+1. 参数改名为 `projectedMessages`，并在注释里写明「必须来自 `selectModelContext`，它已应用压缩投影与用户选择」；
+2. 在 `restoreSessionUsage` 的 JSDoc 里重复这个前提（它是唯一的公开入口）；
+3. 增加一个测试：直接传 `session.turns` 的原始形态（未经 `selectModelContext`）时，若存在上下文选择则必须拒绝——这个测试目前不存在。
+
+**不建议**加强制守卫：无法可靠区分「投影后恰好形状相同」与「未投影但形状相同」，守卫会误伤。
+
+**风险 2：身份丢失会静默降级锚点。**
+
+```ts
+// observability/usageTelemetry.ts:178-186
+if (options.affectsContext !== false) {
+  existing.lastPromptTokens = promptMeasured ? promptTotal : undefined;
+  existing.lastPromptMessageCount = promptMeasured ? usage.promptMessageCount ?? 0 : 0;
+  existing.lastPromptIdentity = promptMeasured && usage.promptIdentity
+    ? { ...usage.promptIdentity, ... } : undefined;
+  ...
+}
+```
+
+`promptMeasured` 为真但 `usage.promptIdentity` 缺失时，`lastPromptTokens` 会被写入而 `lastPromptIdentity` 变成 `undefined`——锚点降级为 legacy 模式。
+
+而 `measuredPromptContext`（`:265-269`）在 `identity` 缺失时会走：
+
+```ts
+if (!identity) {
+  return options.requireExpectedIdentity
+    ? undefined
+    : { tokens: telemetry.lastPromptTokens, messageCount: telemetry.lastPromptMessageCount };
+}
+```
+
+**两个消费者的行为不同**：压缩路径用 `requireExpectedIdentity: true`（安全），状态栏与 `/context` 用 `false`（会接受 legacy 锚点）。
+
+**方案**：当 `promptMeasured && !usage.promptIdentity` 时，**不写 `lastPromptTokens`**——没有身份的测量无法安全复用。改为：
+
+```ts
+const usable = promptMeasured && usage.promptIdentity !== undefined;
+existing.lastPromptTokens = usable ? promptTotal : undefined;
+existing.lastPromptMessageCount = usable ? usage.promptMessageCount ?? 0 : 0;
+existing.lastPromptIdentity = usable ? { ...usage.promptIdentity, ... } : undefined;
+```
+
+代价：一个只报 prompt_tokens 不报 identity 的路径会失去锚点。但当前唯一的生产者（`turn/step.ts`）**总是**构造 `promptIdentity`，所以这个改动在现有代码里是 no-op，只是堵住了未来 producer 的漏洞。
+
+**验证条件**：现有测试全过；新增一个用例断言「无 identity 的记录不产生锚点」。
