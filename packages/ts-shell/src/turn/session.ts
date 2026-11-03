@@ -202,7 +202,8 @@ export function runTurn(options: TurnOptions): TurnRun {
   const toolPool = () => options.toolSnapshot?.() ?? options.tools;
   const hooks = createToolHooks(gate, toolPool);
   const compaction = options.compaction ? turnCompaction({ setup: options.compaction,
-    sessionId: options.sessionId, workspaceRoot: options.workspaceRoot, hooks: options.hooks }) : undefined;
+    sessionId: options.sessionId, workspaceRoot: options.workspaceRoot, hooks: options.hooks,
+    maxSteps: options.maxSteps }) : undefined;
   const core = new AgentCore({
     initialState: { messages: options.history as readonly AgentMessage[] },
     // Absent means the kernel's own default, which is the same value the config

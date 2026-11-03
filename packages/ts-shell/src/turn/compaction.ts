@@ -28,6 +28,8 @@ export function turnCompaction(input: {
   readonly sessionId: string;
   readonly workspaceRoot: string;
   readonly hooks: HookDispatcher;
+  /** Steps this run may take; a run limited to one starts on its closing step. */
+  readonly maxSteps: number;
 }): {
   readonly beforePrompt: (history: readonly AgentMessage[], opening: AgentMessage, signal: AbortSignal) => Promise<readonly AgentMessage[]>;
   readonly beforeStep: NonNullable<AgentLoopConfig['prepareNextStep']>;
@@ -53,9 +55,10 @@ export function turnCompaction(input: {
   };
   return {
     beforePrompt: async (history, opening, signal) => {
-      // The run is about to take its first step, so tools are still allowed
-      // and the request carries no closing instruction.
-      const update = await check('prompt', { messages: [...history, opening], toolResults: [], toolsAllowed: true }, signal);
+      // The first step carries tools unless the run is limited to that one
+      // step, in which case it is already the closing step.
+      const update = await check('prompt', { messages: [...history, opening], toolResults: [],
+        toolsAllowed: input.maxSteps > 1 }, signal);
       if (!update?.messages || signal.aborted) return history;
       // Generation clones its input. Keep the exact opening object that the
       // turn projection owns, and let core.prompt append it exactly once.
