@@ -9522,7 +9522,7 @@ existing.lastPromptIdentity = usable ? { ...usage.promptIdentity, ... } : undefi
 
 延后读取主实现 CI：41567612081 in_progress；Watch 41567612121 completed/success。Watch success 不改变架构 partial，CI 不计通过。正式证据与所有失败日志保留在上述目录。
 
-### 24.106 真实测试发现：tool 结果的 content 与 metadata 双轨导致锚点无法恢复（2026-11-03）
+### 24.106 ~~真实测试发现：tool 结果的 content 与 metadata 双轨导致锚点无法恢复~~（**已被 24.107 推翻**）
 
 #### 24.106.1 已修复项确认
 
@@ -9666,3 +9666,108 @@ return approvedResult(finalOutput, {
 `content` 与 `metadata` 双轨不是 bash 工具独有的问题。任何「content 存一份、metadata 再存一份」的工具都会让 `historyDigest` 失真。
 
 **建议在 `createToolResultMessage` 层加约束**：metadata 不得包含与 content 重复的大字段。或者更简单——`historyDigest` 若要在 metadata 存在时保持稳定，就必须确保 content 是唯一真相。
+
+### 24.107 测试驱动的复核：24.106 的结论是错的（2026-11-03）
+
+用户要求「用测试去找问题，完成后派子代理对抗复核」。本轮用真实 CLI 测试直接推翻了 24.106。
+
+#### 24.107.1 24.106 错在哪
+
+**24.106 声称**：bash 工具把 `content`（截断）和 `metadata.stdout`（完整）存两份，而 `historyDigest` 只哈希 `content`，导致压缩期与恢复期的摘要不匹配，锚点无法跨进程恢复。
+
+**这个因果链是错的。** 实测证明：
+
+1. `historyDigest` **完全不读 metadata**——metadata 的差异不可能影响摘要；
+2. 真实压缩会话的摘要**匹配**：`stored === actual`；
+3. 压缩后 `/context` **显示 `calibrated`**。
+
+#### 24.107.2 决定性测试
+
+隔离 home、`bailu-2.7`、40k 窗口，用 bash 加载三个 60KB 日志文件触发压缩：
+
+```
+compactions: 2
+  compaction-prepared | kept: 6
+  compaction-prepared | kept: 2
+tokens: 31,357
+```
+
+**重启进程后**：
+
+```
+/context → Current context (calibrated): 8,379 of 40,000 tokens
+```
+
+投影验证：
+
+```
+projected messages: 4
+  0 user       pm=-
+  1 assistant  pm=7
+  2 tool       pm=-
+  3 assistant  pm=3     ← 最新
+restorable → tokens=8328 count=3
+newest assistant @3: count=3 match=true digest=true
+```
+
+**锚点在压缩后、跨进程恢复成功。**
+
+#### 24.107.3 24.106 的三次误判来源
+
+| 误判 | 真实原因 |
+|---|---|
+| 「原始事件 content=0」 | 读的是 `e.message ?? e`，但转录事件的字段在**顶层**，`e.message` 是 undefined，于是取到空字符串 |
+| 「投影后 12 条而非 7 条」 | 直接 `JSON.parse` 跳过 `decodeTranscriptLine`，`type` 是 `compaction-prepared` 而非 `compaction` |
+| 「摘要不匹配」 | 基于前两个错误数据得出的推论 |
+
+**三次都是读取方式错误，不是产品缺陷。**
+
+#### 24.107.4 `metadata.stdout` 的真实状态
+
+它**确实存在**（bash 结果：content 7,649 / metadata.stdout 13,893），且**确实冗余**（生产代码零消费者）。
+
+但它**不影响锚点**，因为 `historyDigest` 只哈希六个字段：
+
+```ts
+[role, content, reasoning, tool_calls, tool_call_id, origin]
+```
+
+**这是一个独立的存储冗余问题**（每条 bash 结果多存一份完整输出），与锚点无关。可以作为独立优化项，但不是缺陷修复。
+
+#### 24.107.5 那 `/context` 之前为什么显示 estimated
+
+上一轮失败的会话（`sess_c5bf6fe7`）与本轮成功的会话（`sess_1d32541f`）关键差异：
+
+| | 失败会话 | 成功会话 |
+|---|---|---|
+| 压缩次数 | 1 | 2 |
+| 最新 assistant 的 `messageCount` | 7 | 3 |
+| 投影后消息数 | 8 | 4 |
+| 恢复结果 | `undefined` | `tokens=8328` |
+
+失败会话的 `messageCount=7` 而投影索引也是 7——**索引是匹配的**。真正失败的是 `digest` 比较。
+
+但那次会话已被清理，无法复现。**在复现之前，不能断言原因。**
+
+#### 24.107.6 当前确认的事实
+
+| 事实 | 证据 |
+|---|---|
+| 压缩后锚点能跨进程恢复 | 真实 CLI，`calibrated: 8,379` |
+| `historyDigest` 忽略 metadata | 代码 + 实测 `stored === actual` |
+| `metadata.stdout` 冗余但无害 | grep 零消费者；摘要不受影响 |
+| 24.106 的三条结论全错 | 三次读取错误 |
+
+**仍未解释**：上一轮失败会话的确切原因。需要复现才能定位。
+
+#### 24.107.7 方法论教训（第三次同类错误）
+
+这是我在这个问题上**第三次**把「读取方式错误」当成「产品缺陷」：
+
+1. 24.97：用 `require()` 在 ESM 里写诊断，异常被吞，误判「未被调用」
+2. 24.106 第一次：跳过 `decodeTranscriptLine`，误判事件类型
+3. 24.106 第二次：读 `e.message` 而字段在顶层，误判 content 为空
+
+**共同模式**：直接操作原始数据（`JSON.parse`、`e.message`、`require`），绕过了产品自己的解码层。
+
+**规则**：诊断脚本必须走产品的解码路径（`decodeTranscriptLine`、`projectTranscriptMessages`），或者至少先打印一次原始结构确认字段位置。
