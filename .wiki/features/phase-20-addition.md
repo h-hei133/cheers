@@ -9828,3 +9828,36 @@ if (latestRequest?.kind === 'context-reset' || latestRequest?.kind === 'usage-ga
 **唯一真实的遗留项**：`metadata.stdout` 是存储冗余（每条 bash 结果多存一份完整输出，转录体积翻倍）。这是独立优化项，与锚点无关。
 
 **为什么看起来像缺陷**：`/context` 在「压缩后未再请求」时显示 `estimated`，这是正确的——但用户看不到「为什么」，容易误判为故障。**可改进项**：在这种情况下，`/context` 应说明「上下文已被压缩，尚无新的 provider 测量」，而不是笼统的「No provider measurement available」。
+
+#### 24.107.11 内存锚点与消息测量同源（主代理核实）
+
+之前担心「内存 `lastPrompt*` 与消息上的 `promptMeasurement` 可能不一致」。代码证明它们是**同一份数据的两次写入**：
+
+```ts
+// turn/step.ts:649-651  消息上的测量
+const promptMeasurement = !options.agentMode && counted && ... ? decodePromptMeasurement({...}) : undefined;
+
+// turn/step.ts:676      内存锚点的门控
+promptMeasured: Boolean(promptMeasurement)
+
+// turn/step.ts:666      两者的 messageCount 都用同一个值
+promptMessageCount: messages.length,
+```
+
+`promptMeasured` 直接由 `Boolean(promptMeasurement)` 决定——**内存锚点存在当且仅当消息测量存在**。不存在「一个有一个没有」的情况。
+
+这消除了 24.105.12 记录的「身份静默降级」担忧的另一半：不仅 `promptIdentity` 缺失时不写锚点（24.105.15 已修），连「有 tokens 无测量」的组合也不会出现。
+
+#### 24.107.12 `persist` 剥离 `stopReason` 但不剥离测量
+
+```ts
+// turn/session.ts:444
+const { stopReason: _stopReason, errorMessage: _errorMessage, ...stored } = message;
+onMessage(stored);
+```
+
+`stopReason` 被剥离，`promptMeasurement` 保留。
+
+**这不是问题**：`step.ts:649` 的门控已经保证只有 `stopReason !== 'error' && !== 'aborted'` 的请求才产生测量。落盘后虽然看不到 `stopReason`，但「有测量」本身就蕴含「当时成功」。
+
+**恢复路径不需要重新判断成功与否**，它只需要知道「这条测量对应的是哪段前缀」——由 `messageCount` 和 `historyDigest` 回答。
