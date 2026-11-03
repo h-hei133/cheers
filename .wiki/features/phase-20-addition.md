@@ -9771,3 +9771,18 @@ newest assistant @3: count=3 match=true digest=true
 **共同模式**：直接操作原始数据（`JSON.parse`、`e.message`、`require`），绕过了产品自己的解码层。
 
 **规则**：诊断脚本必须走产品的解码路径（`decodeTranscriptLine`、`projectTranscriptMessages`），或者至少先打印一次原始结构确认字段位置。
+
+#### 24.107.8 边界条件核实（主代理）
+
+在等待对抗代理期间，逐项核实了投影与压缩的形状一致性：
+
+| 边界 | 结论 |
+|---|---|
+| `keptMessages: 0` | **不可能**。`keptMessages = length - cut`，而 `cut >= 2`（`session/compaction.ts:182`），所以最小为 2 |
+| `keptMessages` 缺失 | **不可能**。`commit.ts:84` 无条件写入；类型上的可选只是历史兼容 |
+| `system` 消息 | **不出现**。生产代码零处构造 `role: 'system'`；`applyCompaction` 与投影的 `head` 分支是防御性的，实际不触发 |
+| `branch_summary` 打乱索引 | **会发生**，但分支导航时 `markContextUnknown` 已清锚点，不冲突 |
+| 模型切换后 `origin` 失配 | **不会走到**。`invalidatePromptMeasurement` 已先清锚点 |
+| 压缩事件 `sourceActivePath` 不匹配 | 分支切换时压缩被忽略——**这是正确语义** |
+
+**结论**：投影与压缩的形状在所有可达路径上一致，`messageCount === index` 的坐标系假设成立。
