@@ -9139,3 +9139,241 @@ R5 的修正是**必要但不充分**的：
 主代理全程单 worker、768MiB heap、共享 flock 串行执行；12个直接相关文件425项测试有最终通过输出，分1–3文件小批，重跑不累加。四项反转（生产者上界、消费者钳零、消息写入、前缀扣减）均断言红灯并逐字节恢复；恢复后的3文件40项通过。五静态门通过。TS build 与隔离 Node CLI 已通过：5个独立进程、2次本地HTTP模型请求，两次重启的 `/context` 均 calibrated 且零新增模型请求，schema切换后拒绝旧锚点；原用户内容和累计请求数保留，测量字段未进入HTTP正文。验证没有使用真实PTY、20k消息、全套回归或并行重任务。
 
 初次构建发现类型收窄与可选 gateway 两个类型问题，已修复。首轮CLI因新增测试改变build输入而被新鲜度检查拒绝；重建后通过。负例曾在 `--no-context-files` 下改指令文件，因该文件本来不生效而未改变请求；改为实际工具schema切换验证拒绝，保留旧失败收据，没有为断言修改产品。bundled judge循环/导入解析通过，整体partial仍为两处既有interactiveMode函数上限。两个被中断的辅助任务未提供独立审查，不计为审查通过；实际完成的独立静态复核结果单列。脱敏收据及非执行脚本快照归档 `.omx/artifacts/phase20-context-anchor/`。本批未新增真实provider、真实PTY、其他平台、摘要质量或billing证据；原47项与ADD整体状态不提升。Git及CI按精确提交记录在开发日志。
+
+### 24.105 上下文锚点完整生命周期研究（2026-11-03）
+
+前几轮的失败模式是**增量修补**：每轮只研究当前暴露的问题，修完又撞下一个。本节改为一次性把锚点从产生到失效的完整生命周期查清楚。
+
+**锚点** = provider 报告的 token 测量值，用于两处：上下文显示（`/context`、状态栏）与压缩阈值判定。
+
+#### 24.105.1 生命周期六阶段
+
+| 阶段 | 关键问题 |
+|---|---|
+| 1. 产生 | provider 返回 usage 后，哪些路径会记录它？ |
+| 2. 记录 | `recordSessionUsage` 写入哪些字段，各自的门控是什么？ |
+| 3. 持久化 | 哪些字段进磁盘，哪些只留在内存？ |
+| 4. 恢复 | 进程重启后如何重建？压缩后的上下文如何对齐？ |
+| 5. 使用 | 每个消费者拿的是原始值还是修正值？ |
+| 6. 失效 | 哪些变换会让锚点失效，各自由哪个守卫捕获？ |
+
+#### 24.105.2 研究起点：两个待验证的假设
+
+**假设 A（后来被证伪）：锚点存在两个坐标系。**
+
+我最初推断：`promptMeasurement.messageCount` 是压缩后的相对值，而转录保留全部历史，恢复路径用绝对索引比对会失败。
+
+实测数据似乎支持这个推断（21 条转录，1 次压缩）：
+
+```
+索引 18 的 assistant: messageCount=5
+索引 20 的 assistant: messageCount=7
+```
+
+**但这个推断是错的。** 见 24.105.9 的证伪过程——`selectModelContext` 返回的**已经是压缩投影后的数组**，两个坐标系本就一致。
+
+**矛盾 B：同一份数据，显示与阈值可能走不同路径。**
+
+- 显示走 `estimatePrompt`（`context/request/estimate.ts`）；
+- 压缩阈值走 `measureContextTokens`（`cli/runtime/compaction.ts`）。
+
+两者都读 `lastPrompt*`，但修正逻辑分别实现。**需要确认它们在所有情况下给出相同数值。**
+
+（研究进行中，后续小节按阶段补充。）
+
+#### 24.105.3 阶段 1-2：产生与记录（主代理已核实）
+
+**唯一的锚点产生点**是 `turn/step.ts` 的 provider 响应处理：
+
+```ts
+// turn/step.ts:673-679
+const counted = hasUsage(usage) ? usageFromProvider(usage) : undefined;
+const promptMeasurement = !options.agentMode && counted && typeof usage?.prompt_tokens === 'number'
+  && Number.isSafeInteger(usage.prompt_tokens) && usage.prompt_tokens >= 0
+  && completed.stopReason !== 'error' && completed.stopReason !== 'aborted'
+  ? decodePromptMeasurement({ tokens: counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens,
+    messageCount: messages.length, identity: promptIdentity,
+    projection: promptProjection }) : undefined;
+```
+
+三个门控条件值得注意：
+
+1. **`!options.agentMode`** —— 子代理的测量不写进锚点。这是正确的：子代理的上下文不是主会话的上下文。
+2. **`stopReason !== 'error' && !== 'aborted'`** —— 失败/中止的请求不产生锚点。**这解释了为什么转录里有些 assistant 消息没有 `promptMeasurement`**（实测 21 条消息里只有 10 条带测量）。
+3. **`messageCount: messages.length`** —— **记录的是发送时的上下文长度**，不是转录索引。这正是矛盾 A 的源头。
+
+**token 构成**：`promptTokens + cacheReadTokens + cacheWriteTokens`。包含缓存读写，因为它们同样占据上下文。
+
+（其余阶段的代理研究结果返回后补充。）
+
+#### 24.105.4 阶段 3：持久化（主代理已核实）
+
+`promptMeasurement` 作为 `SessionMessage` 的可选字段（`session/schema/sessionMessage.ts:60-61`）：
+
+```ts
+/** Provider measurement bound to the request that produced this assistant message. */
+readonly promptMeasurement?: PromptMeasurement;
+```
+
+**解码器是严格的**（`context/request/measurement.ts:decodePromptMeasurement`），逐字段校验：
+
+- `tokens`、`messageCount` 必须是非负安全整数；
+- `identity` 的 `endpointId`/`schemaDigest`/`systemDigest`/`historyDigest`/`wireHistoryDigest`/`replayBinding` **必须是 64 位十六进制摘要**；
+- `projection.removedTokens >= tokens` 时**直接拒绝**。
+
+**最后一条很重要**：上界守卫不止在 `measuredProjectionPrefix` 里，**解码层也有一份**。这意味着即使某个 producer 写出了不合法的值，读回时也会被拒绝，而不是污染锚点。
+
+**内存态的部分**：`SessionUsageSnapshot`（`observability/usage/model.ts:194-195`）的 `Pick` 列表排除 `lastPromptTokens`/`lastPromptMessageCount`/`lastPromptIdentity`/`lastPromptProjection`。这些只在内存里，进程重启即失。
+
+**所以持久化策略是「双轨」**：
+- **磁盘**：`promptMeasurement` 挂在 assistant 消息上（随转录持久化）；
+- **内存**：`lastPrompt*` 用于快速读取。
+
+重启后从消息重建内存锚点——这正是 `restorablePromptMeasurement` 的职责，也是矛盾 A 所在。
+
+#### 24.105.5 阶段 5：消费者（主代理已定位，细节待代理补充）
+
+`measuredPromptContext` 有四个调用点：
+
+| 消费者 | 位置 | 用途 |
+|---|---|---|
+| 请求预算 | `turn/step.ts:368` | 发送前的 `requestBudget` 判定 |
+| `/context` 命令 | `core/commands/contextCommandRuntime.ts:133` | 报告显示 |
+| 状态栏 | `cli/interactive/sessionFacts.ts:70` | 实时上下文百分比 |
+| 压缩阈值 | `cli/runtime/compaction.ts:230` | `measureContextTokens` |
+
+**关键观察**：`step.ts:368` 的调用带 `options.agentMode ? undefined :`，即子代理不参与。
+
+**待确认**：这四处是否都使用修正后的值（减去 `rewriteTokensRemoved`），以及当锚点不可用时各自的回退是否一致。
+
+#### 24.105.6 阶段 6：失效（部分已确认）
+
+已知的失效触发与捕获守卫：
+
+| 变换 | 改变消息数 | 改变内容摘要 | 捕获守卫 |
+|---|---|---|---|
+| 微压缩（`microCompact`） | **否**（1:1 map） | **是** | `measuredProjectionPrefix` 的逐条内容比对 + `rewriteTokensRemoved` 修正 |
+| 压缩（`applyCompaction`） | **是**（前缀换成 checkpoint） | 是 | `messageCount` 不再匹配（**但见矛盾 A**） |
+| 模型切换 | 否 | 否 | `invalidatePromptMeasurement` |
+| schema 变化 | 否 | 否 | `schemaDigest` 比对 |
+| 系统提示变化 | 否 | 否 | `systemDigest` 比对 |
+| 凭据/replay 变化 | 否 | 否 | `replayBinding` 比对 |
+| opening 环境前缀 | 否 | 是 | `storedPromptProjection` 专门处理 |
+
+**待代理确认**：是否有遗漏的变换（上下文选择、会话恢复、项目重绑）。
+
+#### 24.105.7 阶段 5 详查：显示与阈值可能给出不同数值（子代理实测）
+
+**矛盾 B 确认成立。** 两条路径共享三个原语（`measuredPromptContext`、`measuredProjectionPrefix`、`estimatePromptTail`），但**不是同一个函数**，有四处会分叉：
+
+| # | 分叉点 | 压缩阈值（`measureContextTokens`） | 显示（`estimatePrompt` / preview） |
+|---|---|---|---|
+| 1 | **尾部来源** | `projection.messages.slice(count)`——**不含** `FINAL_STEP_MESSAGE` | `wireMessages.slice(count)`——**含**关闭指令 |
+| 2 | 门控严格度 | 无 `endpointId`/`replayBinding`/`provedHistory` 要求 | 全部要求 |
+| 3 | 无 prefix 时 | 回退到原始 `messages.slice(count)` | 始终用 wire 消息 |
+| 4 | 记录态 wire 摘要存在但 prefix 失败 | **硬失败**（返回 `undefined`） | 仍可经 `sameWireIdentity` 校准 |
+
+**第 1 项是实质差异**：在需要 `FINAL_STEP_MESSAGE` 的回合里，压缩阈值算出的数值会比显示少一条消息的量。
+
+代码库自己记录了这种分歧（`.wiki/features/phase-20-addition.md:7603`）：状态栏 50% vs 压缩 73%，同一个 8k 锚点 + 3.6k 尾部、16k 窗口。
+
+`report.ts:76-78` 用**单独一行**报告压缩基准，而不是与 `used` 对齐——这是承认分歧而非消除它。
+
+**消费者的 RAW / CORRECTED 分布**：
+
+| 消费者 | 取值 | 回退 |
+|---|---|---|
+| `estimatePrompt`（step 预算） | **CORRECTED** + 尾部 | `estimateRequestTokens` |
+| `estimatePrompt`（preview） | **CORRECTED** + wire 尾部 | `counted.tokens` |
+| `measureContextTokens`（压缩） | **CORRECTED** + 尾部 | `undefined` → 估算 |
+| 状态栏 | **RAW**（无修正、无尾部） | preview 读数 |
+| `/context` | RAW 或 CORRECTED（calibrated 优先） | `stale` / `unknown` 标签 |
+| `promptTokensFor`（发送前） | **RAW** + `estimateTokens(trailing)` | `estimateRequestTokens` |
+
+**状态栏用 RAW 是正确的**——它没有消息数组可以估算尾部。但代价是**系统性高估 `removedTokens` 且滞后一个尾部**。
+
+**`lastPromptProjection` 的消费者极少**：只有 `turn/measurement.ts:44` 和 `context/request/estimate.ts:48-49` 直接读。其余全部经 `measuredProjectionPrefix` 间接使用。
+
+#### 24.105.9 假设 A 的证伪：压缩坐标系本来就是对齐的
+
+**我之前的推断错了。** 完整链路是：
+
+```
+transcript.jsonl (全部历史 + compaction 事件)
+  → projectTranscriptMessages  ← 应用压缩，重建 [checkpoint, ...keptTail]
+  → session.turns              ← 已经是压缩投影后的数组
+  → selectModelContext         ← 再应用用户选择（elide/images/thinking）
+  → restorablePromptMeasurement(messages)  ← 收到的就是压缩后的数组
+```
+
+`projectTranscriptMessages`（`session/transcript/sessionTranscript.ts:195-255`）在遇到 `compaction` 事件时：
+
+```ts
+if (event.type === "compaction") {
+  const offset = event.keptMessages && event.keptMessages > 0 ? Math.trunc(-event.keptMessages) : undefined;
+  ...
+  checkpoints.push({ role: "user", content: `[Context Checkpoint]\n${event.summary}`, ... });
+}
+...
+return checkpoints.reverse().concat(messages.slice(firstMessage));
+```
+
+**输出形状是 `[checkpoint, ...keptTail]`，与 `applyCompaction` 完全一致。**
+
+所以 `messageCount` 与 `index` 在**同一个坐标系**里。`measurement.messageCount !== index` 这个守卫是正确的。
+
+**那我之前的实测数据为什么显示 `7 !== 20`？**
+
+因为我当时直接读了 `transcript.jsonl` 的原始行，**没有经过 `projectTranscriptMessages`**。转录里有 21 条 message 事件，但投影后只有 7 条。我数错了对象。
+
+**这是一次典型的「读原始数据而跳过投影层」导致的错误推断。**
+
+#### 24.105.10 压缩后的恢复：三种拒绝路径，都是对的
+
+压缩前的锚点在新进程里**必须被拒绝**，代码有三重保障：
+
+| 守卫 | 机制 | 位置 |
+|---|---|---|
+| **G1** 持久化拒绝 | 两条压缩路径都调用 `markContextUnknown`，写入 `kind: 'context-reset'` 历史条目；恢复时检查 `history.at(-1)` | `usage/measurement.ts:12-14` |
+| **G4** 索引不匹配 | 压缩后 assistant 在投影数组里的位置变了 | `usage/measurement.ts:20` |
+| **G5** 前缀摘要不匹配 | 前缀变成 `[checkpoint, ...]`，与原摘要不同 | `usage/measurement.ts:22-23` |
+
+测试 `session/store/measurement.test.ts:191-200`（`refuses a precompaction anchor even when its assistant is retained`）钉死了这个行为：压缩后 assistant **仍带** `promptMeasurement`，但 `lastPromptTokens` 是 `undefined`。
+
+**所以「压缩后恢复失败」不是缺陷，是正确行为。** 真正的问题是：**压缩后的新请求为什么没能建立新锚点**——那是另一个问题（见 24.105.11）。
+
+#### 24.105.11 真正的缺口：投影层的假设没有被表达
+
+持久化代理指出的架构风险值得记录：
+
+> **没有任何守卫或注释在 `restorablePromptMeasurement` 里声明「输入必须是压缩投影后的数组」这个前提。** 它只依赖每个调用方记得传 `selectModelContext(...)`。
+
+当前两个调用点（`core/shell/runtimeContext.ts:148`、`:249`）都正确传了。但：
+
+- 没有测试断言「`restoreSessionUsage` 不会被传入原始 turns」；
+- 未来任何新调用点传 `session.turns` 的原始形态（虽然 `session.turns` 本身已是投影后，但若有人从 transcript 直接读）就会静默破坏不变量。
+
+**建议**：在 `restorablePromptMeasurement` 的文档注释里明确写出这个前提，并加一个类型层面的约束（例如参数命名为 `projectedMessages` 而非 `messages`）。
+
+#### 24.105.12 持久化代理的其余关键发现
+
+**锚点的唯一持久副本是消息上的 `promptMeasurement`**（`transcript.jsonl`）。`state.json` 只有累计计数，`metadata.json` 什么都没有。
+
+**`promptMeasured` 与 `hasUsage` 的微妙差异**：
+
+```ts
+// provider/response/usage.ts:4-8
+// hasUsage: 只要有任一 token 字段是有限非负数就返回 true
+// 不要求 prompt_tokens 存在
+
+// turn/step.ts:658
+promptMeasured: typeof usage.prompt_tokens === 'number' && ...
+```
+
+**后果**：一个只报告 cache 计数的 provider 会通过 `hasUsage`，但 `promptMeasured` 为 false，锚点被设为 `undefined`，并写入 `usage-gap` 历史。**这是正确的**——cache-only 报告无法确定 prompt 总量。
+
+**`recordSessionUsage` 的静默降级**：`affectsContext: true` 时，即使新记录没有 identity/projection，也会无条件覆盖 `lastPrompt*`。这意味着**身份丢失会静默把锚点降级为 legacy 模式**，而 `measuredPromptContext` 在未设 `requireExpectedIdentity` 时会接受它。
+
+**`resetSessionUsage` 在生产代码中无调用者**（仅测试）。
+
+**jobs/agent 路径的压缩不调用 `markContextUnknown`**（`cli/jobs/agent/runtime.ts:135`），依赖 `compactSessionHistory` 内部的清理（`core/shell/compaction.ts:253`）。
