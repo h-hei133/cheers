@@ -3,9 +3,9 @@ title: "Phase 20 日常交互补充要求与任务规划"
 category: article
 sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
-updated: 2026-11-01
+updated: 2026-11-03
 tags: [features, phase-20, additions, interaction, panels, completion]
-summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-77，已把七轮用户反馈、子代理review发现与真实provider探针结果按职责归并，重复项合并，逐条记录完成情况。当前1完成、8部分完成、63本地验证、5未开始；其余章节保留研究过程与逐批证据。"
+summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-79，已把七轮用户反馈、子代理review发现与真实provider探针结果按职责归并，重复项合并，逐条记录完成情况。当前1完成、8部分完成、68本地验证、1本地实现、1未开始；其余章节保留研究过程与逐批证据。"
 confidence: mixed
 ---
 
@@ -492,6 +492,7 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-76 | P1 | `--doctor` 覆盖目录解析与配置约束失败，与启动时看到的拒绝一致 | 第 24.83 节第 3 条、第 24.85 节 | 本地验证 | 已复用运行时约束判定并输出可用性结论；目录解析诊断另列，未做跨平台复验 |
 | ADD-77 | P1 | 上下文溢出的回合错误要说明占用构成并给出可执行动作，而不是只说「无法自动压缩」 | 第 24.84 节、24.88、24.91、24.98、24.101、24.103 | 本地验证 | 已实现工具 schema/系统/历史/输出/预留占用拆分，自动摘要 admission/未产出安全报告；R6 同切点进度暂停与隔离 Node CLI 提示已验证；真实 provider/平台体验仍待实机复核 |
 | ADD-78 | P0 | 首次请求前检查预算：到达时已超预算的会话（resumed 或上回合无工具调用）应在发出请求前压缩 | 第 24.88、24.90、24.91、24.101、24.103 | 本地验证 | loop 与 session 回合前检查、反转和单测已验证；隔离真实 provider 的 Node CLI 已发布摘要与匹配 commit marker；R5/R6 本轮新增逻辑只具聚焦测试和本地 HTTP Node CLI 证据；未在 Node 20.3 floor 与真实交互终端复验 |
+| ADD-79 | P2 | 工具结果不再把完整 stdout/stderr 复制进 metadata；`/context` 说明未知锚点的原因 | 第 24.106.8、24.107.4、24.107.10、24.108 节 | 本地实现 | 删除两键与零消费者 `runGitCommand`、纠正失实的有界注释、持久化重启后的重建说明均已聚焦验证并有反转；未做真实 CLI/PTY 观察，未验证转录体积在真实长会话中的实际下降 |
 
 ### 12.12 归并说明
 
@@ -526,14 +527,14 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---:|---|
 | 完成 | 1 | ADD-28 |
 | 部分完成 | 8 | ADD-01、02、03、07、08、25、41、70 |
-| 本地验证 | 68 | 其余已实施条目（含本轮 ADD-72 至 ADD-78） |
-| 本地实现 | 0 | — |
+| 本地验证 | 68 | 其余已实施条目（含 ADD-72 至 ADD-78） |
+| 本地实现 | 1 | ADD-79（第 24.108 节） |
 | 未开始 | 1 | ADD-30（已裁决不启动，需架构级租约） |
-| **合计** | **78** | — |
+| **合计** | **79** | — |
 
 ADD-72/ADD-73 于 2026-11-01 按第 24.78 节裁决实施，证据见第 24.79 节：两项均已落地并只做本地聚焦验证，尚未经真实终端观感与真实 provider 工作流验收。ADD-30 仍按既有记录不启动（需要架构级租约）。
 
-**ADD-28已满足本条列出的完成条件。** 部分完成的8条各有明确缺口，其余63条停在"本地验证"；具体缺口以对应条目为准。第24.43–24.45节已补所选真实provider及Linux/Node/exe普通/全屏的计量链路，第24.65节补当前provider的中断推理恢复现场；这些证据不能替代其他条目的真实工作流、桌面输入法/剪贴板、macOS/Windows与完整性能矩阵，也不能把局部绿色证据兑换成整体验收完成。
+**ADD-28已满足本条列出的完成条件。** 部分完成的8条各有明确缺口，其余68条停在"本地验证"；具体缺口以对应条目为准。ADD-79 只做了本地实现与聚焦验证，尚未经真实 CLI 观察，因此不并入"本地验证"。第24.43–24.45节已补所选真实provider及Linux/Node/exe普通/全屏的计量链路，第24.65节补当前provider的中断推理恢复现场；这些证据不能替代其他条目的真实工作流、桌面输入法/剪贴板、macOS/Windows与完整性能矩阵，也不能把局部绿色证据兑换成整体验收完成。
 
 原 Phase 20 的 47 项矩阵保持 **38 complete / 9 partial / 0 open**，与本表分开记录。
 
@@ -9920,3 +9921,43 @@ UI 与命令层都不读它。它是纯存储冗余。
 **教训**：对抗性代理的任务必须**窄且有界**。「枚举所有 X」会变成无界搜索；应改为「验证这三个具体断言」或「找出这一个现象的原因」。
 
 **更重要的教训**：本轮推翻了上一轮，而上一轮也推翻了再上一轮。根因是我反复**用错误的读取方式观察数据**（`require` 在 ESM、`e.message` 字段位置、跳过解码层）。**在断言产品有缺陷之前，必须先证明观察本身可靠。**
+
+### 24.108 24.107 两项遗留的实施（2026-11-03）
+
+24.107 的最终裁定留下两项：`metadata.stdout` 的存储冗余，以及 `/context` 在「压缩后未再请求」时的笼统提示。两项均已实施，均**不改动锚点生命周期**。
+
+#### 24.108.1 `metadata.stdout`/`metadata.stderr` 移除
+
+bash 与 git 的结果此前把完整 `result.stdout`/`result.stderr` 再写进 `metadata`，而 `finalOutput` 已经承载模型读到的那份内容。两条路径（成功/失败）各删这两个键，保留 `status`、`exitCode`、`failureKind`、`executionPath`、`errorClass`、`recoveryReason`。
+
+**对照**：pi 的 bash 工具把结构化字段放在 `details`（截断信息与 `fullOutputPath`），从不复制完整流；oh-my-pi 的 `BashToolDetails` 同样是时长、退出码与超时状态；codex 的 `FunctionCallOutput` 只有一份 output。三家都没有「正文一份、metadata 再一份完整副本」的形状。
+
+**被删除的零消费者代码**：`runGitCommand`（自 `68b63be5` 移除 git 工具后即无引用）及随之无用的 `fs`、`truncateHead`、`truncateLineWidth`、`parsePathSelector`、`ToolExecutionResult` 导入。
+
+**顺带纠正的失实注释**：`sessionEventCodec.ts` 与 `core/agent/tools.ts` 都声称 metadata「在事件边界有界」，但转录写入路径（`createMessageTranscriptEvent` → `encodeTranscriptEvent` → `appendFileSync`）**没有任何大小限制**。已改为如实描述：本层不设预算，生产者必须自行约束。
+
+**不做什么**：没有给 metadata 加通用截断。TODO 清单、`contextSummary`、读页续读信息（`nextOffset`）等都在 metadata 里，通用截断会静默破坏恢复语义。正确的约束是「不要把正文复制进 metadata」，这正是本次删除的内容。
+
+#### 24.108.2 `/context` 说明未知锚点的原因
+
+`contextCommandRuntime` 在 `measurement === 'unknown'` 时读取 usage 历史最后一条的 `kind`，作为 `promptAnchor` 传给报告：
+
+| 历史最后一条 | 报告文本 | `facts.prompt` |
+|---|---|---|
+| `context-reset` | 上下文被重建或文件被恢复，下一次请求会建立新测量 | `{ status: 'unknown', anchor: 'context-reset' }` |
+| `usage-gap` | 上次请求没有留下可用的 prompt 测量 | `{ status: 'unknown', anchor: 'usage-gap' }` |
+| 无 / `request` | 保持原文案 | `{ status: 'unknown' }` |
+
+措辞经过独立复核后修正了两处：`context-reset` 也由 `/undo` 的文件恢复触发（`edit/recovery/undo/service.ts:111`），所以不能只说「上下文被重建」；`usage-gap` 也由损坏的用量记录恢复时合成（`usage/recovery.ts:32-33`），所以不能断言「请求已完成」。
+
+**可证明性边界**：只有当锚点确实缺失（`lastPromptTokens === undefined`，即 `measurement === 'unknown'`）时才附带原因；`stale`（模型/端点/schema 变更）与已测量两种情形不附加，避免把两种不同事实混为一谈。该条件同时保证不会出现「有测量却声称已重建」的组合——`markContextUnknown` 总是先 `clearContextUsage`，而 `restorablePromptMeasurement` 在历史以 reset/gap 结尾时拒绝恢复测量。
+
+**未覆盖的情形（如实记录）**：`/model` 切换走 `invalidatePromptMeasurement`，它清锚点但不写历史，因此仍显示原文案；请求刚被接受、用量未到时的窗口同理。两者都不是「已重建」，不应套用新文案。
+
+#### 24.108.3 验证与边界
+
+- 新增 `bashResult.test.ts`（成功/失败两条）：断言保留 provenance、不含 `stdout`/`stderr`、序列化后不含正文。反转实验：把两个键加回，两项断言均失败；逐字节恢复后通过。
+- `context/report.test.ts` 新增四种 `promptAnchor` 情形与「stale/measured 不附加原因」；`sessionFacts.test.ts` 新增**持久化重启**用例（写盘 → `markContextUnknown` → 重启恢复 → `/context`），复现 24.107.9 诊断的真实场景。
+- 聚焦串行：report/sessionFacts/configuration 82 项、bash 相关 82+6 项通过；五静态门、`test:scripts` 191 项、TS build 通过。
+- NormProof（仓库内 archive 解包后运行）：循环与未解析导入 satisfied，唯一失败项仍是两处既有的 `interactiveMode` 函数上限，`blocking: false`，`verdictStatus: partial`——与上一轮相同，不是本次新增。
+- **未做**：真实 provider/PTY/Node 20.3 floor 复验；未运行全仓回归、20k 压力或并发验证（遵守 OOM 红线）。

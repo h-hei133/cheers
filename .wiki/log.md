@@ -11603,3 +11603,11 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 
 
 24.105 主实现 `217dddb515893e16fca4ed786ce768b97403fe8d` 已推送 origin/main，远端一致。后续继续清理 `/context` 失效的无身份测量分支，并隔离 status 测试本机认证输入；configuration25/status28 项通过，五静态门/build `32cab6f6df70`/7进程3请求 CLI 串行通过。最初status10项环境失败保留，未归因产品。延后读取主实现CI41567612081仍in_progress，Watch41567612121success，代码CI尚未计通过。后续补丁Git记录另绑定。
+
+### 2026-11-03：24.107 两项遗留收口（ADD-79）
+
+实施见 `phase-20-addition.md` 24.108。bash/git 工具结果不再把完整 `stdout`/`stderr` 复制进 metadata（`finalOutput` 已承载同一内容，生产代码零消费者）；同时删除自 `68b63be5` 起即无引用的 `runGitCommand` 与其失效导入。`sessionEventCodec` 与 `core/agent/tools` 两处声称 metadata「在事件边界有界」的注释与实际写入路径不符，已改为如实描述——本层不设预算，约束落在生产者。没有加通用 metadata 截断：TODO 清单、`contextSummary`、读页 `nextOffset` 都在 metadata 内，通用截断会静默破坏恢复语义。
+
+`/context` 现在在锚点缺失且 usage 历史记录原因为 `context-reset`/`usage-gap` 时说明原因（上下文重建或文件恢复 / 上次请求无可测量用量），并在 `facts.prompt.anchor` 暴露该原因；`stale` 与已测量两种情形不附加，避免混淆不同事实。独立只读代理复核后修正两处措辞：`/undo` 的文件恢复也会写 `context-reset`，损坏用量记录恢复会合成 `usage-gap`。未覆盖：`/model` 切换清锚点但不写历史，仍显示原文案。
+
+验证：新增 `bashResult.test.ts` 两项并做反转（加回两键即红，逐字节恢复后绿）；report/sessionFacts/configuration 82 项、bash 相关 82+6 项、`test:scripts` 191 项通过；五静态门与 TS build 通过；NormProof 经仓库 archive 解包运行，循环/未解析导入 satisfied，唯一失败仍是既有两处 `interactiveMode` 函数上限（non-blocking，partial）。未运行全仓回归、20k 压力、真实 provider/PTY 或并发验证。交付提交另行绑定。

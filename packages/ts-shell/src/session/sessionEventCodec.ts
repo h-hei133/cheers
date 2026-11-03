@@ -69,8 +69,10 @@ export type TranscriptEvent =
       tool_call_id?: string;
       /**
        * Structured facts recorded beside a tool's prose; see
-       * `SessionMessage.metadata`. Bounded when the event is written, so a
-       * large record cannot swell the transcript.
+       * `SessionMessage.metadata`. Written as given: this layer has no budget,
+       * so a producer that would put large content here has to bound it (or,
+       * better, keep the content in `content` and record only what a later
+       * reader needs to replay).
        */
       metadata?: Record<string, unknown>;
       /**

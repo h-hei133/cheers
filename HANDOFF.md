@@ -482,6 +482,16 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Root Cause**: Busy identity was treated as a normal automatic identity change, and aborting a pending verifier did not distinguish controller suspension from a real source failure. A reservation take was also cleared before diff and final checks completed.
 - **Rule**: Suspend the context controller before setting busy and resume it in the turn's `finally`. Let suspension mark/abort in-flight checks without owner invalidation, but keep real source failures reportable. Retain the review lease through prompt/diff and final checks, and settle it by epoch on every success or failure path.
 
+### Tool Metadata Is Not Bounded At The Transcript Boundary
+- **Symptom**: A comment in the transcript codec says a tool result's `metadata` is "bounded when the event is written", so a large record cannot swell the transcript. No bound exists anywhere on that path, and bash results were carrying a second full copy of stdout and stderr in metadata.
+- **Root Cause**: The claim was aspirational. `createMessageTranscriptEvent` passes `metadata` through unchanged, `encodeTranscriptEvent` only renames one event type, and the append path is `appendFileSync`. Nothing measures metadata size, so a producer that copies prose into it doubles the durable record of every tool result.
+- **Rule**: Treat metadata as unbounded. Keep the content in `content` and put only what a later reader must replay into metadata; never copy the result's prose there. Do not add a generic metadata truncation to fix this: TODO state, `contextSummary` and read `nextOffset` live in metadata, and cutting it silently breaks restore. Check a producer claim against the writer before repeating it in a comment.
+
+### Unknown Context Anchors Need A Recorded Reason
+- **Symptom**: `/context` reported a bare "No provider measurement is available" after compaction, making correct invalidation read like a fault.
+- **Root Cause**: The usage history already records why an anchor was dropped (`context-reset`, `usage-gap`), but the report never read it.
+- **Rule**: Derive the explanation from the last history entry's `kind`, and attach it only when the anchor is genuinely absent. `context-reset` covers file restore and `/undo` as well as compaction and branch moves, so the wording must not claim a rebuild only; `usage-gap` is also synthesized when a damaged usage record is recovered, so it must not claim the request completed. Cases that clear the anchor without writing history (`/model` switch, the window between request acceptance and usage) keep the plain text rather than borrowing a reason that does not apply.
+
 ### Prose Path Guards Must Branch Before Command Discovery
 - **Symptom**: A quoted UNC path gets no prose completion, a directory candidate rereads a prefix-matched template body, or accepting a command-colliding file later composes it as a slash command.
 - **Root Cause**: Quoted and unquoted values were checked by separate raw-prefix and decoded-value predicates; collision lookup ran for every slash-prefixed candidate before candidate role was known; source-offset behavior covered only offset zero.

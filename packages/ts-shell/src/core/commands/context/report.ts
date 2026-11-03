@@ -13,6 +13,15 @@ export function contextReport(input: {
   readonly used: number | undefined;
   /** Whether the measurement describes the current request identity. */
   readonly measurement?: 'measured' | 'calibrated' | 'stale' | 'unknown';
+  /**
+   * Why the live anchor is absent, when the usage history can say.
+   *
+   * A rebuilt context and an unmeasured request both leave no anchor, but they
+   * ask different things of the reader: one is waiting for the next request, the
+   * other is a provider report that never arrived. Without this the report could
+   * only say "unknown", which reads like a fault.
+   */
+  readonly promptAnchor?: 'context-reset' | 'usage-gap';
   readonly reserve: number;
   readonly outputTokens?: number;
   readonly inputLimit?: number;
@@ -40,7 +49,18 @@ export function contextReport(input: {
   const compactAt = threshold.tokens;
   const unavailable = input.compactionUnavailable === undefined ? undefined : reportMetadata(input.compactionUnavailable, projectRoot);
   const anchorReason = measurement === 'stale' ? 'request identity changed'
-    : input.turns === 0 ? 'no measured request yet' : 'no usable prompt usage';
+    : input.promptAnchor === 'context-reset' ? 'the context was rebuilt or files were restored'
+      : input.promptAnchor === 'usage-gap' ? 'the last request reported no prompt usage'
+        : input.turns === 0 ? 'no measured request yet' : 'no usable prompt usage';
+  const unknownPrompt = measurement === 'stale'
+    ? 'The last provider measurement belongs to a different model, endpoint or schema, so it is not the current context. No current measurement is available.'
+    : input.promptAnchor === 'context-reset'
+      // A rebuild or a restore invalidates the old number on purpose; saying
+      // only "unknown" made correct behaviour read like a missing measurement.
+      ? 'Current prompt usage is unknown. The context was rebuilt, or the files it described were restored, so the previous measurement no longer describes it; the next request will establish a new one.'
+      : input.promptAnchor === 'usage-gap'
+        ? 'Current prompt usage is unknown. The last request left no usable prompt measurement, so no anchor was recorded; the next request will establish one.'
+        : 'Current prompt usage is unknown. No provider measurement is available for this context.';
   const compactionMeasurement = input.compactionMeasurement;
   const compactionReason = compactionMeasurement?.source === 'estimated'
     ? reportMetadata(compactionMeasurement.reason ?? 'no usable prompt usage', projectRoot) : undefined;
@@ -54,9 +74,7 @@ export function contextReport(input: {
   if (used === undefined) {
     lines.push({ kind: 'text', bullet: true, spans: [span('Discoverable tool catalogue estimate: '),
       span(`~${schemaTokens.toLocaleString()}`, 'number'), span(` tokens (${toolCount} tools)`)] },
-    { kind: 'space' }, { kind: 'text', spans: [span(measurement === 'stale'
-      ? 'The last provider measurement belongs to a different model, endpoint or schema, so it is not the current context. No current measurement is available.'
-      : 'Current prompt usage is unknown. No provider measurement is available for this context.')] },
+    { kind: 'space' }, { kind: 'text', spans: [span(unknownPrompt)] },
     { kind: 'text', spans: [span('The inspection catalogue can include deferred tools absent from the next request. Its estimate is not a first-request estimate or a lower bound.')] });
     if (!compactionMeasurement) lines.push({ kind: 'text', spans: [span(`Compaction basis: estimated; provider measurement unavailable (${anchorReason}).`)] });
   } else {
@@ -88,7 +106,8 @@ export function contextReport(input: {
   return createReport({ title: 'Context window',
     columns: [{ label: 'What', minWidth: 20 }, { label: 'Value', align: 'right', minWidth: 8 }, { label: 'How it is known', minWidth: 24 }],
     lines, facts: { window: { tokens: window, source: resolution.source, warning: warning ?? null },
-      prompt: used === undefined ? { status: measurement === 'stale' ? 'stale' : 'unknown' }
+      prompt: used === undefined ? { status: measurement === 'stale' ? 'stale' : 'unknown',
+        ...(measurement === 'unknown' && input.promptAnchor ? { anchor: input.promptAnchor } : {}) }
         : { status: measurement === 'calibrated' ? 'calibrated' : 'measured', tokens: used },
       reserveTokens: reserve, freeTokens: free ?? null, compactAtTokens: compactAt,
       compaction: { ...(unavailable ? { available: false, reason: unavailable } : {}),

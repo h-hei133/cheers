@@ -1,4 +1,3 @@
-import fs from 'node:fs/promises'
 import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
 import { resolveWorkspaceRoot } from '../workspace/roots.js'
@@ -14,9 +13,8 @@ import {
   withLineEnding,
 } from '../../runtime/execution/fileText.js'
 import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
-import { truncateHead, truncateTail, truncateLineWidth } from './truncation.js'
+import { truncateTail } from './truncation.js'
 import { ArtifactManager } from '../session/artifactManager.js'
-import { parsePathSelector } from './selectorParser.js'
 import {
   createDefaultExecutionService,
   type ExecutionAuthority,
@@ -43,7 +41,6 @@ import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { resolveToolTarget } from './permissionContext.js'
 import { validateToolArguments } from './arguments.js'
 import { approvedResult, deniedResult, runtimeErrorResult } from './toolResultLifecycle.js'
-import type { ToolExecutionResult } from '../../tools/types.js'
 import { networkNotice, readSandboxRules } from '../../sandbox/osSandbox.js'
 import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
 import { createPatchToolDefinition } from '../../edit/patch/tool.js'
@@ -214,6 +211,12 @@ async function runCommandTool(
   // How the result was classified and which executor answered are decided by the
   // execution service; dropping them here would make the tool result unable to
   // say what kind of failure this was.
+  //
+  // The raw streams are deliberately absent. `finalOutput` already carries what
+  // the model reads, and a second copy under `metadata` would be written into
+  // the transcript beside every command result — doubling its size, without a
+  // consumer: no reader of a tool result's metadata looks at `stdout`/`stderr`.
+  // A reader that needs the full bytes is pointed at the artifact instead.
   const executionProvenance = {
     executionPath: result.executionPath,
     errorClass: result.errorClass,
@@ -224,54 +227,11 @@ async function runCommandTool(
       ...executionProvenance,
       status: result.status,
       exitCode: result.exitCode,
-      stdout: result.stdout,
-      stderr: result.stderr,
     })
   }
 
   return deniedResult(finalOutput, {
     ...executionProvenance,
-    status: result.status,
-    exitCode: result.exitCode,
-    stdout: result.stdout,
-    stderr: result.stderr,
-    failureKind: inferFailureKind(result),
-    recoveryReason: result.recoveryReason,
-  })
-}
-
-async function runGitCommand(
-  executionService: ExecutionService,
-  command: string,
-  context: ToolExecutionContext,
-) {
-  const parts = command.trim().split(/\s+/)
-  const bin = parts[0] || 'git'
-  const args = parts.slice(1)
-
-  const result = await executionService.runCommand({
-    operationKind: 'command.run',
-    command: bin,
-    args,
-    cwd: context.workspaceRoot,
-    workspaceRoot: context.workspaceRoot,
-    authority: TOOL_APPROVED_COMMAND_AUTHORITY,
-    caller: 'core-tool:git',
-    reason: 'Run an approved git inspection command.',
-    reportSafeCommand: command,
-    abortSignal: context.abortSignal,
-  })
-
-  if (result.status === 'completed' && result.exitCode === 0) {
-    return approvedResult(result.stdout || 'No changes', {
-      status: result.status,
-      exitCode: result.exitCode,
-      stdout: result.stdout,
-      stderr: result.stderr,
-    })
-  }
-
-  return deniedResult(result.stderr || result.recoveryReason || 'Command failed', {
     status: result.status,
     exitCode: result.exitCode,
     failureKind: inferFailureKind(result),

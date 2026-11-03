@@ -148,7 +148,15 @@ async function inspectContext(context: CommandContext): Promise<LocalCommandResu
   if (publication && context.readConfiguration?.() !== publication) return { kind: 'local', output: 'Context changed during inspection.' };
   const measurement = calibrated !== undefined ? 'calibrated' as const : measured ? 'measured' as const
     : telemetry?.lastPromptTokens !== undefined ? 'stale' as const : 'unknown' as const;
+  // Why no anchor exists, when the accounting history records a reason. A
+  // rebuilt context and a request that reported no usage both leave the gauge
+  // unknown; the report can say which, instead of presenting correct behaviour
+  // as a missing measurement.
+  const lastHistoryKind = telemetry?.recentRequests.at(-1)?.kind;
+  const promptAnchor = measurement === 'unknown' && (lastHistoryKind === 'context-reset' || lastHistoryKind === 'usage-gap')
+    ? lastHistoryKind : undefined;
   const report = contextReport({ resolution, used: calibrated ?? measured?.tokens, measurement, reserve, outputTokens,
+    ...(promptAnchor ? { promptAnchor } : {}),
     inputLimit: catalogModel(catalog, active.provider, active.model, activeBaseUrl)?.inputLimit,
     protocol: activeEndpoint,
     compactionUnavailable: context.compactionUnavailable?.(),

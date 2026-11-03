@@ -153,6 +153,32 @@ it('distinguishes a cold estimate from an invalidated provider anchor', () => {
   expect(contextReport({ ...input, used: 30_000 }).facts.compaction).toMatchObject({ providerMeasurement: 'measured' });
 });
 
+it.each([
+  ['context-reset', 'The context was rebuilt, or the files it described were restored', 'the context was rebuilt or files were restored'],
+  ['usage-gap', 'The last request left no usable prompt measurement', 'the last request reported no prompt usage'],
+] as const)('explains an unknown prompt anchor recorded as %s', (promptAnchor, explanation, compactionReason) => {
+  const report = contextReport({ ...input, used: undefined, promptAnchor });
+  expect(report.facts.prompt).toEqual({ status: 'unknown', anchor: promptAnchor });
+  expect(reportText(report)).toContain(explanation);
+  expect(reportText(report)).not.toContain('No provider measurement is available for this context.');
+  expect(reportText(report)).toContain(`provider measurement unavailable (${compactionReason})`);
+});
+
+it('keeps the plain unknown wording when no anchor reason was recorded', () => {
+  const report = contextReport({ ...input, used: undefined });
+  expect(report.facts.prompt).toEqual({ status: 'unknown' });
+  expect(reportText(report)).toContain('No provider measurement is available for this context.');
+});
+
+it('does not attach an anchor reason to a stale or measured prompt', () => {
+  const stale = contextReport({ ...input, used: undefined, measurement: 'stale', promptAnchor: 'context-reset' });
+  expect(stale.facts.prompt).toEqual({ status: 'stale' });
+  expect(reportText(stale)).not.toContain('The context was rebuilt');
+  const measured = contextReport({ ...input, used: 30_000, promptAnchor: 'context-reset' });
+  expect(measured.facts.prompt).toEqual({ status: 'measured', tokens: 30_000 });
+  expect(measured.facts.compaction).toMatchObject({ providerMeasurement: 'measured' });
+});
+
 it('keeps a measured gauge separate from the actual compaction estimate fallback', () => {
   const report = contextReport({ ...input, used: 30_000,
     compactionMeasurement: { source: 'estimated', reason: 'request replay identity unavailable' } });

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import os from "node:os";
 import fs from 'node:fs';
 import { activeModelName, readStatusFacts, shortenPath } from "./sessionFacts.js";
-import { recordSessionUsage, resetSessionUsage, markContextUnknown, getSessionUsage, restoreSessionUsage } from "../../observability/usageTelemetry.js";
+import { recordSessionUsage, resetSessionUsage, markContextUnknown, getSessionUsage, restoreSessionUsage,
+  persistSessionUsage } from "../../observability/usageTelemetry.js";
 import { renderStatusItem } from '../../presentation/tui/chrome/items.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 import { runContextCommand } from '../../core/commands/contextCommandRuntime.js';
@@ -271,6 +272,15 @@ describe("status facts", () => {
         readConfiguration: () => runtime.configuration.current, resolveConfigTarget: runtime.resolveConfigTarget,
         getToolPool: async () => new Map() });
       expect(report.output).toContain('Current prompt usage is unknown');
+      // The live reset is recorded in the accounting history, so the report can
+      // say why the gauge is unknown instead of presenting correct behaviour as
+      // a missing measurement. A resumed snapshot taken before the reset holds
+      // no such entry, so it keeps the plain wording.
+      if (resumed) expect(report.output).toContain('No provider measurement is available for this context.');
+      else {
+        expect(report.output).toContain('The context was rebuilt');
+        expect(report.output).not.toContain('No provider measurement is available for this context.');
+      }
       expect(report.output).toContain('(assumed default)'); expect(report.output).toContain('Warning:');
       expect(report.output).not.toContain('No request has been sent');
     }
@@ -281,8 +291,31 @@ describe("status facts", () => {
     resetSessionUsage(id);
   });
 
-  it("uses the latest request's prompt size as the live footprint", () => {
-    resetSessionUsage("used");
+  it('explains a rebuilt context after a restart instead of reporting a missing measurement', async () => {
+    const id = 'status-reset-durable'; resetSessionUsage(id);
+    const runtime = context(id);
+    const identity = measurementIdentity(runtime);
+    recordSessionUsage(id, { promptTokens: 9_000, completionTokens: 100, promptIdentity: identity });
+    // The state write that follows a compaction persists the reset entry; the
+    // process that made it then exits without another request.
+    let disk: unknown;
+    persistSessionUsage(id, undefined, next => { disk = next; });
+    markContextUnknown(id);
+    persistSessionUsage(id, disk, next => { disk = next; });
+    resetSessionUsage(id);
+    restoreSessionUsage(id, JSON.parse(JSON.stringify(disk)));
+    expect(getSessionUsage(id).lastPromptTokens).toBeUndefined();
+    const report = await runContextCommand([], { cwd: runtime.projectRoot, sessionId: id,
+      runtimeConfig: runtime.runtimeConfig, readConfiguration: () => runtime.configuration.current,
+      resolveConfigTarget: runtime.resolveConfigTarget, getToolPool: async () => new Map() });
+    expect(report.output).toContain('Current prompt usage is unknown');
+    expect(report.output).toContain('The context was rebuilt');
+    expect(report.output).toContain('the next request will establish a new one');
+    expect(report.report?.facts.prompt).toEqual({ status: 'unknown', anchor: 'context-reset' });
+    resetSessionUsage(id);
+  });
+
+  it("uses the latest request's prompt size as the live footprint", () => {    resetSessionUsage("used");
     const runtime = context("used");
     const identity = measurementIdentity(runtime);
     recordSessionUsage("used", { promptTokens: 5_000, completionTokens: 100, promptIdentity: identity });
