@@ -1,8 +1,9 @@
 import { messageToText } from "../model-adapters/multimodal.js";
+import { FINAL_STEP_MESSAGE } from "../turn/messages.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
-import { CHARS_PER_TOKEN, estimateRequestTokens, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
+import { CHARS_PER_TOKEN, estimateRequestTokens, estimateTokens, messageCharCount, overheadCharCount, type RequestOverhead } from "./context.js";
 import { availableTailTokens, formatBudgetBreakdown, reachedBudgetThreshold } from './compaction/budget.js';
 import { digest } from './compaction/state.js';
 import { formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
@@ -17,6 +18,32 @@ import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 export type { SummarizeHistory, SummarizeRequest, SummarizeTurnPrefix } from './compaction/contract.js';
 export { CONTEXT_CHECKPOINT_MARKER, formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
 export { shouldCompact } from './compaction/budget.js';
+
+/**
+ * Characters the closing instruction adds to a request that is about to be
+ * answered without tools.
+ *
+ * A closing step carries one more message than the conversation does, and the
+ * estimate must include it or the threshold is decided on a request the
+ * provider will never see. Characters rather than tokens: the shared estimate
+ * rounds once over the whole request, and a pre-rounded addend would drift by
+ * one token against it.
+ *
+ * Only the fallback path needs this. The measured path prices the instruction
+ * itself, and callers there pass the same flag through.
+ */
+function estimateWithClosing(messages: readonly AgentMessage[], overhead: RequestOverhead | undefined,
+  closingChars: number): number {
+  if (closingChars === 0) return estimateRequestTokens(messages, overhead);
+  const chars = messages.reduce((total, message) => total + messageCharCount(message), 0)
+    + overheadCharCount(overhead) + closingChars;
+  return Math.ceil(chars / CHARS_PER_TOKEN);
+}
+
+function closingCharsFor(toolsAllowed: boolean | undefined): number {
+  return toolsAllowed === false
+    ? messageCharCount({ role: 'user', content: FINAL_STEP_MESSAGE } as AgentMessage) : 0;
+}
 
 export const KEEP_RECENT_TOKENS = 20_000;
 
@@ -313,7 +340,7 @@ export function compactionRefusalReason(
   if (isBelowThreshold(messages, policy, toolsAllowed)) return undefined;
   const reason = explainNoCut(messages, policy);
   const measured = policy.measureContextTokens?.(messages, policy.promptIdentity, toolsAllowed);
-  const tokens = measured ?? estimateRequestTokens(messages, policy.overhead);
+  const tokens = measured ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed));
   const state = `the prompt uses about ${Math.round(tokens).toLocaleString('en-US')} ${measured === undefined ? 'estimated' : 'provider-measured'} tokens for a ${policy.contextWindow.toLocaleString('en-US')}-token window`;
   const breakdown = formatBudgetBreakdown(messages, policy);
   return reason === "no-legal-cut"
@@ -384,7 +411,7 @@ export function planCompaction(
   // The provider's own count wins when it exists: it measured the prompt that
   // was actually sent, while the estimate only measures the text we kept.
   const measuredTokens = policy.measureContextTokens?.(messages, policy.promptIdentity, toolsAllowed);
-  const tokensBefore = measuredTokens ?? estimateRequestTokens(messages, policy.overhead);
+  const tokensBefore = measuredTokens ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed));
   const measured = measuredTokens !== undefined;
   if (!reachedBudgetThreshold(tokensBefore, policy, measured)) {
     return undefined;
@@ -406,7 +433,7 @@ function isBelowThreshold(
   toolsAllowed?: boolean,
 ): boolean {
   const measuredTokens = policy.measureContextTokens?.(messages, policy.promptIdentity, toolsAllowed);
-  const tokensBefore = measuredTokens ?? estimateRequestTokens(messages, policy.overhead);
+  const tokensBefore = measuredTokens ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed));
   const measured = measuredTokens !== undefined;
   return !reachedBudgetThreshold(tokensBefore, policy, measured);
 }
@@ -559,7 +586,8 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
     const plan = { ...result.plan, cut: result.plan.cut + offset,
       turnStart: result.plan.turnStart < 0 ? -1 : result.plan.turnStart + offset,
       tokensBefore: input.force ? estimateTokens(original)
-        : input.policy.measureContextTokens?.(original, input.policy.promptIdentity) ?? estimateRequestTokens(original, input.policy.overhead) };
+        : input.policy.measureContextTokens?.(original, input.policy.promptIdentity, input.toolsAllowed)
+          ?? estimateWithClosing(original, input.policy.overhead, closingCharsFor(input.toolsAllowed)) };
     const messages = applyCompaction(original, plan, result.summary);
     return { ...result, plan, messages, tokensAfter: estimateTokens(messages) };
   } finally {

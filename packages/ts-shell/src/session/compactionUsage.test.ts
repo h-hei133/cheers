@@ -129,7 +129,9 @@ describe("the provider's measurement drives the threshold", () => {
       promptIdentity: identity,
       measureContextTokens: measured,
     });
-    expect(measured).toHaveBeenCalledWith(messages, identity);
+    // The third argument is the closing-step flag; absent here because the
+    // caller has no step budget to consult.
+    expect(measured).toHaveBeenCalledWith(messages, identity, undefined);
   });
 
   it("declines when the request is large only because of overhead, not the conversation", () => {
@@ -339,5 +341,17 @@ describe("the request's fixed overhead", () => {
     expect(planCompactionCut(messages, { ...base, overhead })?.cut).toBe(
       planCompactionCut(messages, base)?.cut,
     );
+  });
+
+  it("counts the closing instruction on the fallback path", () => {
+    // Sized so the conversation alone sits just under the threshold: the
+    // closing instruction is what pushes the request over it. Without the fix
+    // this compaction is skipped and the closing request overflows.
+    const messages = longConversation(43);
+    const policy = { contextWindow: 11_950, reserveTokens: 2_000, keepRecentTokens: 600 };
+    expect(planCompaction(messages, policy, true)).toBeUndefined();
+    const closing = planCompaction(messages, policy, false);
+    expect(closing).toBeDefined();
+    expect(closing!.tokensBefore).toBeGreaterThan(9_950);
   });
 });
