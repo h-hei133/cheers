@@ -9521,3 +9521,148 @@ existing.lastPromptIdentity = usable ? { ...usage.promptIdentity, ... } : undefi
 **提交后复核**：主实现 `217dddb515893e16fca4ed786ce768b97403fe8d` 已推送，远端 main 精确一致。继续检查时删除 `/context` 中已失效的 identity-free 分支与注释，调用点明确要求当前完整身份。对应 configuration 25 项通过；status 28 项中最初 10 项受本机认证/目录配置污染，补齐该文件的隔离 HOME/USERPROFILE/CHEERS_TEST_ROOT 后 28 项全过。未把这些失败归因于产品测量逻辑，未修改默认配置来迎合夹具。五静态门、build `32cab6f6df70` 与新产物上的 7 进程/3 请求 CLI 串行再次通过。此后续补丁单独提交。
 
 延后读取主实现 CI：41567612081 in_progress；Watch 41567612121 completed/success。Watch success 不改变架构 partial，CI 不计通过。正式证据与所有失败日志保留在上述目录。
+
+### 24.106 真实测试发现：tool 结果的 content 与 metadata 双轨导致锚点无法恢复（2026-11-03）
+
+#### 24.106.1 已修复项确认
+
+`217dddb5` 与 `77805a84` 按 24.105.15 的方案实现了两项：
+
+| 项 | 实现 |
+|---|---|
+| 投影假设表达 | `restorablePromptMeasurement` 参数改名为 `projectedMessages`，注释写明「must come from selectModelContext」 |
+| 身份静默降级 | `recordSessionUsage` 增加 `const usable = promptMeasured && usage.promptIdentity !== undefined`，四个字段统一门控 |
+| legacy 锚点路径 | `/context` 移除 `legacyMeasurement`，改为 `requireExpectedIdentity: true` |
+
+静态门全过，198 项聚焦测试通过。
+
+#### 24.106.2 真实测试：`/context` 仍显示 estimated
+
+隔离 home、`bailu-2.7`、40k 窗口，加载 3 个 44KB 文件后：
+
+```
+messages 12  tokens 37090
+promptMeasurement 数量 6
+/context → Current prompt usage is unknown
+```
+
+#### 24.106.3 逐层排查（三次诊断错误后定位）
+
+**第一次错误**：直接 `JSON.parse` 转录行，`type` 是 `compaction-prepared` 而非 `compaction`，导致投影未应用。
+
+**第二次错误**：修正为 `decodeTranscriptLine` 后投影正确（12 条 → 8 条），但 `restorable` 仍 `undefined`。
+
+**真正原因**（第三次定位）：
+
+```
+newest assistant @7: messageCount=7  match=true   ← 索引对
+  digest match=false
+  expected=90b4c209b2bfe213  actual=278fa6a58ede0ab2
+```
+
+#### 24.106.4 根因：`content` 与 `metadata.stdout` 双轨
+
+`historyDigest` 只哈希 `[role, content, reasoning, tool_calls, tool_call_id, origin]`——**不哈希 metadata**。
+
+实测同一条 tool 消息在两个时点的表示完全不同：
+
+| 时点 | content 长度 | metadata.stdout |
+|---|---|---|
+| 原始转录事件 | **0** | 无 metadata |
+| 投影后消息 | **43,281** | 43,281 |
+
+**压缩时的摘要基于空 content，恢复时的摘要基于 43KB content，必然不匹配。**
+
+执行层把 stdout 写进 `metadata`（`runtime/execution/service.ts:94` 的 `withCommandExecutionProjection`），而消息的 `content` 是另一个字段。
+
+#### 24.106.5 影响面
+
+这不是锚点特有的问题——**任何依赖 `historyDigest` 的机制都受影响**：
+
+- 锚点恢复（本处）
+- `measuredProjectionPrefix` 的 `historyDigest` 比对
+- `restorablePromptMeasurement` 的 G5 守卫
+
+只要会话里出现过 bash 工具调用（几乎必然），锚点就无法跨进程恢复。
+
+#### 24.106.6 修法方向
+
+需要在**两个方向**中选一个，并保持压缩期与恢复期一致：
+
+**方向 A：让 content 成为唯一真相。** 执行层把 stdout 同时写入 `content`，metadata 只保留摘要字段（exitCode、status）。代价：转录体积翻倍（content + metadata 各一份），除非 metadata 不再存完整 stdout。
+
+**方向 B：让 historyDigest 覆盖 metadata。** 把 `metadata` 加入哈希输入。代价：metadata 含易变字段（timestamp 等）时会误判。
+
+**已定位**：`core/tools/registry.ts:225-231` 的 bash 工具返回：
+
+```ts
+return approvedResult(finalOutput, {
+  ...executionProvenance,
+  status: result.status,
+  exitCode: result.exitCode,
+  stdout: result.stdout,   // ← 完整未截断
+  stderr: result.stderr,
+})
+```
+
+- `content` = `finalOutput`，经过 `truncateTail(rawOutput, { maxLines: 1500, maxBytes: 50 * 1024 })`；
+- `metadata.stdout` = **完整 `result.stdout`**，未截断。
+
+**两者是不同的字符串**，而 `historyDigest` 只哈希 `content`。
+
+所以真实差异不是「空 vs 43KB」（那是我观察到的中间态），而是**截断后的 content vs 完整 stdout**。
+
+**推荐方向**：`metadata` 不应保存完整 stdout 的第二份副本。它只需要供 UI/诊断用的摘要（`exitCode`、`status`、`executionPath`、`errorClass`）。完整输出已在 `content` 里（或已存 artifact）。
+
+这样同时解决三件事：
+
+1. `historyDigest` 不再依赖「哪个字段是真相」；
+2. 转录体积减半（不再存两份 44KB）；
+3. `metadata` 的语义回归为「关于这次执行的元信息」，而不是「输出的另一份拷贝」。
+
+**需要确认**：是否有消费者依赖 `metadata.stdout` 的完整性（例如 UI 展开完整输出）。若有，应改为从 artifact 读取，而不是从 metadata。
+
+#### 24.106.7 本轮方法论
+
+三次诊断错误，前两次都是**跳过了某一层**：
+
+1. 跳过 `decodeTranscriptLine` → 事件类型错误；
+2. 跳过 `projectTranscriptMessages` → 消息数错误；
+3. 跳过 metadata → 摘要差异归因错误。
+
+**教训**：当摘要不匹配时，必须逐字段比对 `historyDigest` 实际哈希的六个字段，而不是只看 `content` 长度。
+
+#### 24.106.8 修法确认：`metadata.stdout` 是纯冗余
+
+`grep -rn "metadata.stdout\|metadata?.stdout" packages/ts-shell/src --include=*.ts | grep -v test` **无任何结果**。
+
+**生产代码中没有任何消费者读取 `metadata.stdout`。** 它只是 `result.stdout` 的第二份拷贝，白白让每条 bash 结果在转录里存两份 44KB。
+
+修法确定：
+
+```ts
+// core/tools/registry.ts:225-231，删除 stdout/stderr
+return approvedResult(finalOutput, {
+  ...executionProvenance,
+  status: result.status,
+  exitCode: result.exitCode,
+})
+```
+
+- `content` 保持 `finalOutput`（已截断，已含 artifact 指针）；
+- `metadata` 只留执行元信息。
+
+**完成条件**：
+
+1. 现有测试全过；
+2. 新增测试：bash 结果的 `metadata` 不含 `stdout`/`stderr`；
+3. 真实测试：加载大文件后重启进程，`/context` 显示 `measured` 而非 `estimated`；
+4. 转录体积对比：同一次会话的 `transcript.jsonl` 应显著变小。
+
+**风险**：若有未发现的外部消费者（插件、报告生成），需要先确认。当前 grep 覆盖了 `packages/ts-shell/src`，未覆盖测试与脚本。
+
+#### 24.106.9 这一发现的更广意义
+
+`content` 与 `metadata` 双轨不是 bash 工具独有的问题。任何「content 存一份、metadata 再存一份」的工具都会让 `historyDigest` 失真。
+
+**建议在 `createToolResultMessage` 层加约束**：metadata 不得包含与 content 重复的大字段。或者更简单——`historyDigest` 若要在 metadata 存在时保持稳定，就必须确保 content 是唯一真相。
