@@ -9786,3 +9786,45 @@ newest assistant @3: count=3 match=true digest=true
 | 压缩事件 `sourceActivePath` 不匹配 | 分支切换时压缩被忽略——**这是正确语义** |
 
 **结论**：投影与压缩的形状在所有可达路径上一致，`messageCount === index` 的坐标系假设成立。
+
+#### 24.107.9 上一轮失败会话的真正原因（已定位）
+
+`markContextUnknown` 会 push 一条 `kind: 'context-reset'` 的历史条目（`usageTelemetry.ts:344`）。而**两条压缩路径都调用它**（`cli/provider/resources.ts:156` 的 `onCompact`、`core/shell/compaction.ts:253`）。
+
+恢复守卫 G1：
+
+```ts
+// observability/usage/measurement.ts:12-14
+const latestRequest = history.at(-1);
+if (latestRequest?.kind === 'context-reset' || latestRequest?.kind === 'usage-gap') return undefined;
+```
+
+**只要 `recentRequests` 的最后一条是 `context-reset`，恢复就直接返回 `undefined`。**
+
+而成功请求会 push 一条 `kind: 'request'` 的条目（`usageTelemetry.ts:201-215`），覆盖掉它。
+
+所以行为完全正确：
+
+| 场景 | 最后一条历史 | 恢复结果 | 是否正确 |
+|---|---|---|---|
+| 压缩后**又发了请求** | `request` | 成功 | ✅ 锚点由新请求重建 |
+| 压缩后**没有再发请求** | `context-reset` | 拒绝 | ✅ 旧锚点确实失效 |
+
+**上一轮的失败会话正是后者**——压缩后进程就结束了，没有新请求。`/context` 显示 `estimated` 是**正确行为**，不是缺陷。
+
+而本轮成功，是因为压缩之后又跑了 bash 请求，产生了新的 `request` 条目。
+
+#### 24.107.10 最终结论
+
+**锚点生命周期没有缺陷。** 24.106 的全部结论作废。
+
+| 曾经怀疑的问题 | 最终判定 |
+|---|---|
+| `metadata.stdout` 破坏锚点 | **不存在**。`historyDigest` 不读 metadata |
+| 压缩后无法恢复 | **不存在**。压缩后发一次请求即可恢复 |
+| 坐标系不一致 | **不存在**。投影与 `applyCompaction` 同形状 |
+| 锚点跨进程丢失 | **不存在**。消息上的 `promptMeasurement` 是持久副本 |
+
+**唯一真实的遗留项**：`metadata.stdout` 是存储冗余（每条 bash 结果多存一份完整输出，转录体积翻倍）。这是独立优化项，与锚点无关。
+
+**为什么看起来像缺陷**：`/context` 在「压缩后未再请求」时显示 `estimated`，这是正确的——但用户看不到「为什么」，容易误判为故障。**可改进项**：在这种情况下，`/context` 应说明「上下文已被压缩，尚无新的 provider 测量」，而不是笼统的「No provider measurement available」。
