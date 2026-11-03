@@ -1,6 +1,7 @@
 import type { AgentMessage } from '../../core/agent/state.js';
 import { requestBudget, requestBudgetThreshold } from '../../context/request/budget.js';
-import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens, type RequestOverhead } from '../context.js';
+import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens, messageCharCount, overheadCharCount, type RequestOverhead } from '../context.js';
+import { FINAL_STEP_MESSAGE } from '../../turn/messages.js';
 
 interface BudgetPolicy {
   readonly contextWindow: number;
@@ -44,14 +45,20 @@ export function formatBudgetBreakdown(messages: readonly AgentMessage[], policy:
   readonly overhead?: RequestOverhead;
   readonly outputTokens?: number;
   readonly reserveTokens?: number;
-}): string {
-  const history = estimateTokens(messages);
+}, closingChars = 0): string {
+  // The closing instruction travels outside the messages, so it is added to
+  // both the history and the total from the same character sum. Rounding the
+  // two separately would let the breakdown disagree with the headline by one.
+  const closingTokens = closingChars === 0 ? 0
+    : Math.ceil((messages.reduce((total, message) => total + messageCharCount(message), 0) + closingChars)
+      / CHARS_PER_TOKEN) - estimateTokens(messages);
+  const history = estimateTokens(messages) + closingTokens;
   const tools = policy.overhead?.tools;
   const toolChars = tools?.length ? JSON.stringify(tools).length : 0;
   const systemChars = policy.overhead?.systemPrompt?.length ?? 0;
   const schemaTokens = Math.ceil(toolChars / CHARS_PER_TOKEN);
   const systemTokens = Math.ceil(systemChars / CHARS_PER_TOKEN);
-  const prompt = estimateRequestTokens(messages, policy.overhead);
+  const prompt = estimateRequestTokens(messages, policy.overhead) + closingTokens;
   const rounding = prompt - history - schemaTokens - systemTokens;
   const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
   const fixed = schemaTokens + systemTokens + rounding;
@@ -62,4 +69,23 @@ export function formatBudgetBreakdown(messages: readonly AgentMessage[], policy:
     return `Estimated budget: ${parts} + reserve ${format(reserve)} = ${format(prompt + reserve)} known tokens; output is provider-selected and unknown.`;
   }
   return `Estimated budget: ${parts} + output ${format(policy.outputTokens)} + reserve ${format(reserve)} = ${format(prompt + policy.outputTokens + reserve)} tokens.`;
+}
+/**
+ * Characters the closing instruction adds to a request answered without tools.
+ *
+ * The instruction travels outside the message list, so every estimate that
+ * prices a closing request has to add it explicitly.
+ */
+export function closingCharsFor(toolsAllowed: boolean | undefined): number {
+  return toolsAllowed === false
+    ? messageCharCount({ role: 'user', content: FINAL_STEP_MESSAGE } as AgentMessage) : 0;
+}
+
+/** The request's cost with the closing instruction folded in before rounding. */
+export function estimateWithClosing(messages: readonly AgentMessage[], overhead: RequestOverhead | undefined,
+  closingChars: number): number {
+  if (closingChars === 0) return estimateRequestTokens(messages, overhead);
+  const chars = messages.reduce((total, message) => total + messageCharCount(message), 0)
+    + overheadCharCount(overhead) + closingChars;
+  return Math.ceil(chars / CHARS_PER_TOKEN);
 }

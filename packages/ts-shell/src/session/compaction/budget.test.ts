@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import type { AgentMessage } from '../../core/agent/state.js';
 import { compactionRefusalReason } from '../compaction.js';
 import { estimateRequestTokens } from '../context.js';
+import { closingCharsFor, formatBudgetBreakdown } from './budget.js';
 
 const messages: AgentMessage[] = [{ role: 'user', content: 'xxxxxxx' }, { role: 'assistant', content: 'yyyyyyy' }];
 const overhead = { tools: [{ name: 'read' }], systemPrompt: 's'.repeat(350) };
@@ -37,4 +38,21 @@ it('labels provider-selected output unknown instead of counting it as zero', () 
   const refusal = compactionRefusalReason(messages, { contextWindow: 100, reserveTokens: 10, overhead });
   expect(refusal?.message).toContain('+ reserve 10 = 119 known tokens; output is provider-selected and unknown.');
   expect(refusal?.message).not.toContain('output 0');
+});
+
+it('adds the closing instruction to the breakdown and the total together', () => {
+  const messages = [{ role: 'user' as const, content: 'x'.repeat(1_400) }];
+  const policy = { overhead: { systemPrompt: 's', tools: [] }, reserveTokens: 10, outputTokens: 20 };
+  const open = formatBudgetBreakdown(messages, policy);
+  const closing = formatBudgetBreakdown(messages, policy, closingCharsFor(false));
+  // The instruction is a real cost, so both the history line and the total
+  // move by the same amount; it must not appear as "shared rounding".
+  expect(closing).not.toBe(open);
+  // 1,400 chars of history plus the 188-char instruction: 454 tokens in total,
+  // 400 without it. The instruction is history-sized, not rounding-sized.
+  expect(open).toContain('history 400');
+  expect(closing).toContain('history 454');
+  // It must not be folded into "shared rounding", which is what the estimate
+  // reports when it cannot attribute a difference.
+  expect(closing).not.toContain('shared rounding 54');
 });

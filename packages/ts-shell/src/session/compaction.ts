@@ -1,10 +1,9 @@
 import { messageToText } from "../model-adapters/multimodal.js";
-import { FINAL_STEP_MESSAGE } from "../turn/messages.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import { CHARS_PER_TOKEN, estimateRequestTokens, estimateTokens, messageCharCount, overheadCharCount, type RequestOverhead } from "./context.js";
-import { availableTailTokens, formatBudgetBreakdown, reachedBudgetThreshold } from './compaction/budget.js';
+import { availableTailTokens, closingCharsFor, estimateWithClosing, formatBudgetBreakdown, reachedBudgetThreshold } from './compaction/budget.js';
 import { digest } from './compaction/state.js';
 import { formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
 import { generateCompaction, CompactionStepUnknown } from './compaction/generation.js';
@@ -32,17 +31,30 @@ export { shouldCompact } from './compaction/budget.js';
  * Only the fallback path needs this. The measured path prices the instruction
  * itself, and callers there pass the same flag through.
  */
-function estimateWithClosing(messages: readonly AgentMessage[], overhead: RequestOverhead | undefined,
-  closingChars: number): number {
-  if (closingChars === 0) return estimateRequestTokens(messages, overhead);
-  const chars = messages.reduce((total, message) => total + messageCharCount(message), 0)
-    + overheadCharCount(overhead) + closingChars;
-  return Math.ceil(chars / CHARS_PER_TOKEN);
-}
+/**
+ * One measurement per policy, message array and closing flag.
+ *
+ * A refusal asks the same question three times — the plan, the threshold and
+ * the refusal text — and each answer walks the messages to rebuild a prefix
+ * digest. The three calls are synchronous, so the array cannot change between
+ * them; a later call with different arguments simply overwrites the entry.
+ *
+ * Keyed on the policy object so a cloned policy (a shared generation freezes
+ * its own copy) measures for itself rather than reusing another's answer.
+ */
+const measuredTokensCache = new WeakMap<CompactionPolicy, {
+  readonly messages: readonly AgentMessage[];
+  readonly toolsAllowed: boolean | undefined;
+  readonly tokens: number | undefined;
+}>();
 
-function closingCharsFor(toolsAllowed: boolean | undefined): number {
-  return toolsAllowed === false
-    ? messageCharCount({ role: 'user', content: FINAL_STEP_MESSAGE } as AgentMessage) : 0;
+function measureContextOnce(policy: CompactionPolicy, messages: readonly AgentMessage[],
+  toolsAllowed: boolean | undefined): number | undefined {
+  const cached = measuredTokensCache.get(policy);
+  if (cached && cached.messages === messages && cached.toolsAllowed === toolsAllowed) return cached.tokens;
+  const tokens = policy.measureContextTokens?.(messages, policy.promptIdentity, toolsAllowed);
+  measuredTokensCache.set(policy, { messages, toolsAllowed, tokens });
+  return tokens;
 }
 
 export const KEEP_RECENT_TOKENS = 20_000;
@@ -320,8 +332,9 @@ export function explainNoCut(
  * change — a conversation that fits the kept tail needs a smaller tail, one
  * whose calls are all open needs the turn to finish.
  */
-export function compactionRefusal(messages: readonly AgentMessage[], policy: CompactionPolicy): string | undefined {
-  return compactionRefusalReason(messages, policy)?.message;
+export function compactionRefusal(messages: readonly AgentMessage[], policy: CompactionPolicy,
+  toolsAllowed?: boolean): string | undefined {
+  return compactionRefusalReason(messages, policy, toolsAllowed)?.message;
 }
 
 /**
@@ -339,10 +352,10 @@ export function compactionRefusalReason(
 ): { readonly key: 'fits-budget' | 'no-legal-cut'; readonly message: string } | undefined {
   if (isBelowThreshold(messages, policy, toolsAllowed)) return undefined;
   const reason = explainNoCut(messages, policy);
-  const measured = policy.measureContextTokens?.(messages, policy.promptIdentity, toolsAllowed);
+  const measured = measureContextOnce(policy, messages, toolsAllowed);
   const tokens = measured ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed));
   const state = `the prompt uses about ${Math.round(tokens).toLocaleString('en-US')} ${measured === undefined ? 'estimated' : 'provider-measured'} tokens for a ${policy.contextWindow.toLocaleString('en-US')}-token window`;
-  const breakdown = formatBudgetBreakdown(messages, policy);
+  const breakdown = formatBudgetBreakdown(messages, policy, closingCharsFor(toolsAllowed));
   return reason === "no-legal-cut"
     ? { key: reason, message: `Context ${state}, but every point it could be split at would separate a tool call from its result. Finish the turn, then compact. ${breakdown}` }
     : { key: reason, message: `Context ${state}, but the conversation still fits the recent tail compaction keeps, so there is nothing to condense. Lower keepRecentTokens to condense it now. ${breakdown}` };
@@ -410,7 +423,7 @@ export function planCompaction(
   }
   // The provider's own count wins when it exists: it measured the prompt that
   // was actually sent, while the estimate only measures the text we kept.
-  const measuredTokens = policy.measureContextTokens?.(messages, policy.promptIdentity, toolsAllowed);
+  const measuredTokens = measureContextOnce(policy, messages, toolsAllowed);
   const tokensBefore = measuredTokens ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed));
   const measured = measuredTokens !== undefined;
   if (!reachedBudgetThreshold(tokensBefore, policy, measured)) {
@@ -432,7 +445,7 @@ function isBelowThreshold(
   policy: CompactionPolicy,
   toolsAllowed?: boolean,
 ): boolean {
-  const measuredTokens = policy.measureContextTokens?.(messages, policy.promptIdentity, toolsAllowed);
+  const measuredTokens = measureContextOnce(policy, messages, toolsAllowed);
   const tokensBefore = measuredTokens ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed));
   const measured = measuredTokens !== undefined;
   return !reachedBudgetThreshold(tokensBefore, policy, measured);
@@ -586,7 +599,7 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
     const plan = { ...result.plan, cut: result.plan.cut + offset,
       turnStart: result.plan.turnStart < 0 ? -1 : result.plan.turnStart + offset,
       tokensBefore: input.force ? estimateTokens(original)
-        : input.policy.measureContextTokens?.(original, input.policy.promptIdentity, input.toolsAllowed)
+        : measureContextOnce(input.policy, original, input.toolsAllowed)
           ?? estimateWithClosing(original, input.policy.overhead, closingCharsFor(input.toolsAllowed)) };
     const messages = applyCompaction(original, plan, result.summary);
     return { ...result, plan, messages, tokensAfter: estimateTokens(messages) };
@@ -734,7 +747,7 @@ export function createCompactionStep(
     // A compaction whose size is known before the summary is requested can be
     // refused by the caller without paying for a summary that gets thrown away.
     const prepared = planCompaction(snapshot.messages, policy, snapshot.toolsAllowed);
-    if (progress?.blocks(snapshot.messages, prepared?.cut)) return undefined;
+    if (progress?.blocks(snapshot.messages, prepared?.cut, snapshot.toolsAllowed)) return undefined;
     const tokensBefore = prepared?.tokensBefore;
     if (tokensBefore === undefined) {
       // Declining silently is right when the context still fits: there is
@@ -806,7 +819,7 @@ export function createCompactionStep(
     if (options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore }) === false) return undefined;
     await options.lifecycle?.after?.({ reason, summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
     if (signal?.aborted) return undefined;
-    progress?.accepted(condensed.messages, plan.keptMessages);
+    progress?.accepted(condensed.messages, plan.keptMessages, snapshot.toolsAllowed);
     return { messages: condensed.messages };
   };
   return step;
