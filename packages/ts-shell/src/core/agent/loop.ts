@@ -91,6 +91,16 @@ export interface NextStepSnapshot {
   readonly message?: AgentMessage;
   readonly toolResults: readonly AgentMessage[];
   readonly messages: readonly AgentMessage[];
+  /**
+   * Whether the next request may still call tools.
+   *
+   * A closing step carries an extra instruction, so a budget computed without
+   * it under-counts the request that is about to be sent. Compaction and the
+   * per-step budget must agree on which messages the request will carry.
+   *
+   * Absent when the caller has no such notion, which reads as "may call tools".
+   */
+  readonly toolsAllowed?: boolean;
 }
 
 export interface NextStepUpdate {
@@ -356,8 +366,13 @@ async function driveLoop(
       }
 
       await emit({ type: "turn_end", message: assistant, toolResults, willContinue: hasMoreToolCalls });
-      completedStep = { message: assistant, toolResults, messages: [...context] };
-      if (await config.shouldStopAfterStep?.(completedStep)) {
+      const snapshot: NextStepSnapshot = { message: assistant, toolResults, messages: [...context] };
+      // A step that reached the run's limit is answered with a closing
+      // instruction instead of tools, so the next request carries one more
+      // message than the conversation does.
+      const stopping = await config.shouldStopAfterStep?.(snapshot);
+      completedStep = { ...snapshot, toolsAllowed: !stopping };
+      if (stopping) {
         await emit({ type: "agent_end", messages: [...produced] });
         return;
       }

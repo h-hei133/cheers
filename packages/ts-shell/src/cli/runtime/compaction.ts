@@ -29,7 +29,7 @@ import type { ConfigPublication, ConfigState } from '../../config/state.js';
 import { configuredOutputLimit } from '../../provider/request/output.js';
 import { requestServiceTier } from '../../core/models/serviceTier.js';
 import { requestReplayBinding } from '../../provider/request/replay.js';
-import { outgoingProjection } from '../../turn/messages.js';
+import { FINAL_STEP_MESSAGE, outgoingProjection } from '../../turn/messages.js';
 import { measuredProjectionPrefix } from '../../turn/measurement.js';
 import { estimatePromptTail } from '../../context/request/tail.js';
 import { summaryBudget } from '../provider/summary/budget.js';
@@ -202,7 +202,7 @@ export function buildCompactionWiring(input: {
       // The provider's own count, plus whatever the conversation has gained
       // since that request. Falls back to the estimate inside planCompaction
       // when no request has reported usage yet.
-      measureContextTokens: (messages, identity) => {
+      measureContextTokens: (messages, identity, toolsAllowed) => {
         const endpointId = captureUsageAttribution({ provider: provider.providerId, model: provider.model,
           baseUrl: provider.baseUrl }).endpointId;
         const endpoint = provider.endpoint ?? 'openai-compatible';
@@ -237,7 +237,12 @@ export function buildCompactionWiring(input: {
           || removedTokens < 0 || removedTokens >= measured.tokens) return undefined;
         const tailMessages = prefix ? projection.messages.slice(measuredMessageCount)
           .map(message => ({ ...message, content: message.content ?? '' })) : messages.slice(measuredMessageCount);
-        const tail = estimatePromptTail(tailMessages, { provider: provider.providerId,
+        // A closing step is answered with an instruction instead of tools, so
+        // the request carries one more message than the conversation does. The
+        // step layer prices that message; this budget must agree with it.
+        const closing = toolsAllowed === false
+          ? [...tailMessages, { role: 'user' as const, content: FINAL_STEP_MESSAGE }] : tailMessages;
+        const tail = estimatePromptTail(closing, { provider: provider.providerId,
           model: provider.model, endpoint, replayBinding, reasoningReplayField: mainShape.reasoningReplayField,
           allowEmptySignature: mainShape.allowEmptySignature });
         return tail === undefined ? undefined : measured.tokens - removedTokens + tail;

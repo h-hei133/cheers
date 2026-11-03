@@ -53,7 +53,9 @@ export function turnCompaction(input: {
   };
   return {
     beforePrompt: async (history, opening, signal) => {
-      const update = await check('prompt', { messages: [...history, opening], toolResults: [] }, signal);
+      // The run is about to take its first step, so tools are still allowed
+      // and the request carries no closing instruction.
+      const update = await check('prompt', { messages: [...history, opening], toolResults: [], toolsAllowed: true }, signal);
       if (!update?.messages || signal.aborted) return history;
       // Generation clones its input. Keep the exact opening object that the
       // turn projection owns, and let core.prompt append it exactly once.

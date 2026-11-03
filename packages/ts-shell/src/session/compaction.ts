@@ -65,8 +65,15 @@ export interface CompactionPolicy {
    * the system prompt and tool schemas, so a conversation comfortably inside the
    * budget still produced a cut, and the cut shrank as that overhead grew.
    */
+  /**
+   * What the request would cost, given the messages on hand.
+   *
+   * `toolsAllowed` is the same fact the step layer uses to decide whether the
+   * request carries a closing instruction. A budget that ignores it prices a
+   * request the provider will never see.
+   */
   readonly measureContextTokens?: (messages: readonly AgentMessage[],
-    identity?: PromptIdentitySnapshot) => number | undefined;
+    identity?: PromptIdentitySnapshot, toolsAllowed?: boolean) => number | undefined;
   /** Captured endpoint, request-shape and replay identity for the measured prefix. */
   readonly promptIdentity?: PromptIdentitySnapshot;
   /**
@@ -301,10 +308,11 @@ export function compactionRefusal(messages: readonly AgentMessage[], policy: Com
 export function compactionRefusalReason(
   messages: readonly AgentMessage[],
   policy: CompactionPolicy,
+  toolsAllowed?: boolean,
 ): { readonly key: 'fits-budget' | 'no-legal-cut'; readonly message: string } | undefined {
-  if (isBelowThreshold(messages, policy)) return undefined;
+  if (isBelowThreshold(messages, policy, toolsAllowed)) return undefined;
   const reason = explainNoCut(messages, policy);
-  const measured = policy.measureContextTokens?.(messages, policy.promptIdentity);
+  const measured = policy.measureContextTokens?.(messages, policy.promptIdentity, toolsAllowed);
   const tokens = measured ?? estimateRequestTokens(messages, policy.overhead);
   const state = `the prompt uses about ${Math.round(tokens).toLocaleString('en-US')} ${measured === undefined ? 'estimated' : 'provider-measured'} tokens for a ${policy.contextWindow.toLocaleString('en-US')}-token window`;
   const breakdown = formatBudgetBreakdown(messages, policy);
@@ -367,6 +375,7 @@ export function planCompactionCut(
 export function planCompaction(
   messages: readonly AgentMessage[],
   policy: CompactionPolicy,
+  toolsAllowed?: boolean,
 ): CompactionPlan | undefined {
   const plan = planCompactionCut(messages, policy);
   if (!plan) {
@@ -374,7 +383,7 @@ export function planCompaction(
   }
   // The provider's own count wins when it exists: it measured the prompt that
   // was actually sent, while the estimate only measures the text we kept.
-  const measuredTokens = policy.measureContextTokens?.(messages, policy.promptIdentity);
+  const measuredTokens = policy.measureContextTokens?.(messages, policy.promptIdentity, toolsAllowed);
   const tokensBefore = measuredTokens ?? estimateRequestTokens(messages, policy.overhead);
   const measured = measuredTokens !== undefined;
   if (!reachedBudgetThreshold(tokensBefore, policy, measured)) {
@@ -394,8 +403,9 @@ export function planCompaction(
 function isBelowThreshold(
   messages: readonly AgentMessage[],
   policy: CompactionPolicy,
+  toolsAllowed?: boolean,
 ): boolean {
-  const measuredTokens = policy.measureContextTokens?.(messages, policy.promptIdentity);
+  const measuredTokens = policy.measureContextTokens?.(messages, policy.promptIdentity, toolsAllowed);
   const tokensBefore = measuredTokens ?? estimateRequestTokens(messages, policy.overhead);
   const measured = measuredTokens !== undefined;
   return !reachedBudgetThreshold(tokensBefore, policy, measured);
@@ -688,7 +698,7 @@ export function createCompactionStep(
     }
     // A compaction whose size is known before the summary is requested can be
     // refused by the caller without paying for a summary that gets thrown away.
-    const prepared = planCompaction(snapshot.messages, policy);
+    const prepared = planCompaction(snapshot.messages, policy, snapshot.toolsAllowed);
     if (progress?.blocks(snapshot.messages, prepared?.cut)) return undefined;
     const tokensBefore = prepared?.tokensBefore;
     if (tokensBefore === undefined) {
@@ -697,7 +707,7 @@ export function createCompactionStep(
       // already spent and no cut can be made, because the request then goes out
       // and the provider refuses it with no explanation of why nothing was
       // condensed. That case is reported so the user can act before the failure.
-      const refusal = compactionRefusalReason(snapshot.messages, policy);
+      const refusal = compactionRefusalReason(snapshot.messages, policy, snapshot.toolsAllowed);
       if (refusal && refusal.key !== reportedRefusal) {
         reportedRefusal = refusal.key;
         options.onDeclined?.(refusal.message);
