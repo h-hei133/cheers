@@ -10341,6 +10341,25 @@ MCP 常规 fixture 改为 2 步：先执行普通请求，再文字收尾；审�
 
 **「已查」只表示有证据，「未查」不表示有问题**。本轮从标「几乎未查」的模块开始。
 
+#### 24.111.4 覆盖进度
+
+| 模块 | 状态 | 记录 |
+|---|---|---|
+| M1 入口与交互面 | **已查，无确定缺陷** | 24.119 |
+| M2 回合内核 | 未查（24.109 只覆盖了收尾步骤） | — |
+| M3 提供方与模型 | **已查部分**，1 项发现 | 24.120 |
+| M4 工具与执行 | 未查 | — |
+| M5 上下文与压缩 | 24.105 / 24.109 有覆盖，未用本轮方法重扫 | — |
+| M6 会话与持久化 | 未查 | — |
+| M7 编辑与工作区 | **已查**，2 项发现 | 24.112 |
+| M8 记忆与知识 | **已查**，3 项发现 | 24.113 |
+| M9 编排与委派 | **已查**，1 项发现 | 24.115、24.117 |
+| M10 配置与策略 | 未查 | — |
+| M11 观测与证据 | **已查**，2 项发现 | 24.114、24.116 |
+| M12 生命周期与媒体 | 未查 | — |
+
+已查 6 / 12。未查的 6 个模块在下一轮继续，不把「未查」当作「无问题」。
+
 #### 24.111.3 方法
 
 1. 每模块先读**拥有者与阶段**，画出产生→失效的链路；
@@ -10723,4 +10742,100 @@ function createOutputFilePath(prefix: string, extension: string): string {
 **修法方向**（不改代码，只记方案）：持久化时保留配对，即把 `{claim, evidenceId}` 作为**一条记录**存储，而不是两个平行数组。恢复时直接读出配对，不再重建。这与 `observation.ts:433` 的 `pushUniqueClaimEvidence` 已经在用的形状一致——**同一个模块里已经有一份配对的表示，只是持久化时被拆掉了**。
 
 **这是本轮唯一一条「参照实现帮不上忙」的发现**，如实记录。
+
+
+### 24.119 M1 入口与交互面：查过，无确定缺陷
+
+M1 拥有物是**用户输入 → 命令/对话 → 屏幕帧**。检查重点是「关闭后仍有回调活着」「某条退出路径跳过清理」。
+
+| 检查项 | 结论 | 证据 |
+|---|---|---|
+| overlay 关闭后迟到结果 | **已防** | `overlay.ts:156` 的 `generation` 计数器；`:527/529/531` 三处在 `close()` 与 `back()` 前后各复验一次 |
+| 父面板构造期间被替换 | **已防** | `:529` `if (this.picker \|\| this.generation !== generation + 1) return true;` |
+| `stop()` 部分清理失败 | **已防** | `interactiveMode.ts:637-660` 用 cleanup 数组逐项执行，前一项抛错不阻断后续，只记录首个失败 |
+| shutdown 顺序 | **正确** | `:1599-1626` 先 `stdin.dispose()` 再 `drainInput()` 再 `stop()`，注释写明「单个 stdin chunk 可能同时含退出键与后续按键」 |
+| 定时器泄漏 | **已防** | `tick` 在 `stop()` 的 cleanup 数组与 `:1167` 两处清理 |
+| 准入谓词分歧 | **无分歧** | 提交队列、目标提交、picker 三条路径用同一组 `busy \|\| pickerPending \|\| overlay.active \|\| stopped \|\| questions.question()` |
+
+**结论**：M1 是第二个「查过但无确定缺陷」的模块（第一个是 M11）。这与 24.112 的 M7 形成对比——M7 的写入链路同样扎实，但周边有未接线的门面。
+
+**为什么值得记录「无缺陷」**：划分的目的是逐模块覆盖，不是逐模块找问题。把「查过、没有」写清楚，与把「查到什么」写清楚同等重要，否则下一轮会重复查同一片区域。
+
+
+### 24.120 M3 提供方与模型：预留账本在读取失败时悬空
+
+M3 的拥有物是**一次 provider 请求的身份与额度**：解析 → 准入 → 预留 → 签名 → 传输 → 结算 → 轮换。
+
+#### 24.120.1 账本设计已核实成立的部分
+
+`RequestPolicy` 的三段式设计是清晰的（[model.ts:79-91](../../packages/ts-shell/src/core/agent/request/model.ts:79)）：
+
+| 方法 | 语义 | 位置 |
+|---|---|---|
+| `reserve` | 预留一次请求的额度，写入 `pending` | `ledger.ts:22-31` |
+| `dispatch` | 标记已发出，此后不可 `confirmUnsent` | `ledger.ts:33-39` |
+| `settle` | 用真实用量结算并移出 `pending` | `ledger.ts:49-69` |
+| `confirmUnsent` | 只允许在 `dispatched === false` 时撤销预留 | `ledger.ts:41-47` |
+
+`dispatchRequest:36` 拒绝重放（`attempt.dispatched` 为真时抛 `replay`），`settleRequest:53` 同样拒绝未 dispatch 的结算。**状态机是闭合的。**
+
+#### 24.120.2 真实发现：读取响应体失败时预留不结算
+
+[completion.ts:127-134](../../packages/ts-shell/src/provider/request/completion.ts:127)：
+
+```ts
+try {
+  completion = await readCompletion(kind, res);
+} catch (error) {
+  if (error instanceof SyntaxError) { request.onFailure?.(classifyProviderFailure({ message: "invalid response json" })); }
+  throw error;        // ← 没有 attempt.settle()
+}
+```
+
+响应已收到（`!res.ok` 分支已在 `:123` 结算），但**读取流/解析 JSON 抛错**这条路径直接 `throw`，`attempt` 留在 `pending`。
+
+同样的形状在 [step.ts](../../packages/ts-shell/src/turn/step.ts:687-705) 的 `catch` 分支：那里 `markContextUnknown` 了，`failedStep` 了，但 `responseAttempt` **没有 settle**。
+
+**后果**（[ledger.ts:77](../../packages/ts-shell/src/core/agent/request/ledger.ts:77)）：
+
+```ts
+const retained = Object.values(scope.pending).reduce((total, attempt) => total + boundTotal(attempt), 0);
+const committed = scope.inputTokens + scope.outputTokens + retained;
+if (committed >= cap && ...) throw new ModelAdmissionError('exhausted');
+```
+
+**未结算的预留会永久计入已用额度**。一次网络中断或 JSON 解析失败就永久吃掉一份额度，累积到 cap 后整个会话以 `exhausted` 拒绝所有后续请求——而用户看到的只是「额度用尽」，不是「某次请求没结算」。
+
+**可达性**：`requestPolicy` 只在 `/goal` 会话中非空（[budget.ts:14](../../packages/ts-shell/src/planning/goal/budget.ts:14) 无活跃 goal 时返回 `undefined`）。所以这是**目标会话专属**的缺陷，普通对话不受影响。
+
+**为什么算缺陷而不是设计**：`catch` 分支里已经有 `markContextUnknown` 与 `failedStep`，说明作者知道「这条路径失败了」；缺的是把同一事实告诉账本。`ModelAttempt` 没有「失败结算」方法，只有 `settle(usage?)` 与 `confirmUnsent()`，而后者在 `dispatched === true` 后会抛 `replay`——**契约里根本没有为「已发出但读取失败」准备出口**。
+
+#### 24.120.3 与参照实现的对照
+
+pi 与 oh-my-pi 都没有「请求额度账本」这个概念（`requestLedger` / `RequestPolicy.reserve` 在三家参照中零命中），这是本项目独有。**因此无法从参照学习修法**，只能靠契约自洽：既然 `dispatch` 之后不可 `confirmUnsent`，就必须有第三条路——「已发出、结果未知」的结算。
+
+**方案方向**（不实施）：给 `ModelAttempt` 增加 `settleUnknown()`，语义是「已发出，用量未知」。
+
+**但必须看清 `historyUnknown` 的代价**：`ledger.ts:76` 是
+
+```ts
+if (scope.historyUnknown || ...) throw new ModelAdmissionError('history-unknown');
+```
+
+它**不是**一个温和的降级状态，而是**拒绝一切后续请求**。`planning/goal/run/safety.ts:25` 与 `acceptance/complete.ts:29` 同样把它当作阻断条件。
+
+所以两条路各有代价：
+
+| 方案 | 后果 |
+|---|---|
+| 保留悬空 pending（现状） | 额度被永久占用，最终以 `exhausted` 拒绝——**症状误导**（用户以为额度用尽） |
+| 改为 `historyUnknown` | 立即以 `history-unknown` 拒绝——**症状准确**（用量确实不可知），但会话就此中断 |
+
+**现状更糟的地方不在「是否中断」，而在「中断的理由是错的」**：`exhausted` 暗示用户该去加额度，而真实原因是某次请求没结算。这正是 `AGENTS.md`「Do not hide unverified write outcomes behind success-like terminal states」的同一条原则——**失败的理由必须真实**。
+
+真正的修法可能需要第三种状态：既保留额度（不假称已用），又允许继续（不因一次未知而终止）。这需要先确认账本是否真的无法容纳「未知但可继续」。**本轮不下结论。**
+
+#### 24.120.4 一处未完成的对照
+
+M3 的其余生命周期（凭据轮换、目录合并、签名）本轮**没有查到接缝**，但也没有做到逐阶段覆盖。如实记为「已查部分无发现」，不是「已确认无缺陷」。
 
