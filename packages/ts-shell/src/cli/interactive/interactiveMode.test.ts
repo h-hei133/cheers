@@ -3622,7 +3622,7 @@ describe("session wiring", () => {
       const directory = path.join(root, name), child = path.join(directory, 'child');
       const file = path.join(child, 'report.txt');
       fs.mkdirSync(child, { recursive: true }); fs.writeFileSync(file, 'fixture');
-      const { mode, terminal } = build();
+      const { mode, terminal } = build({ tuiMode: kind });
       const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void;
         options: { runtimeContext: ShellRuntimeContext } };
       host.options.runtimeContext = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root,
@@ -3634,10 +3634,12 @@ describe("session wiring", () => {
       const suffix = '\n后文 /skill:follow';
       mode.start();
       try {
+        expect(terminal.writes.join('').includes('\x1b[?1049h')).toBe(kind === 'fullscreen');
         terminal.input(`\x1b[200~阅读 ${root}/pickold${suffix}\x1b[201~`);
         terminal.input('\x1b[D'.repeat(('old' + suffix).length));
         for (const target of [directory + '/', child + '/', file]) {
-          await vi.waitFor(() => expect(host.view.suggestions.current()?.value).toBe(target));
+          // Catalog acquisition permits 75 ms debounce plus a 1500 ms load.
+          await vi.waitFor(() => expect(host.view.suggestions.current()?.value).toBe(target), { timeout: 2000 });
           terminal.input('\t');
           const snapshot = host.view.editor.snapshot();
           expect(snapshot.text.startsWith('阅读 ')).toBe(true);

@@ -2028,3 +2028,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: MCP approval/cancellation never starts and goal continuation pauses immediately after strict closing admission is enforced.
 - **Root Cause**: Injected model fixtures use a one-step budget yet return tools on that sole closing request; the old execution loophole accidentally made those tests pass.
 - **Rule**: Give tool workflow fixtures an ordinary step followed by a compliant closing answer, and assert the admission sequence as well as the actual effect. Keep explicit one-step refusal cases for zero approval/dispatch and durable scheduler pause. An automatic goal may continue after a bounded compliant answer; a refused closing call must retain its failure and must not be retried as an unfinished success.
+
+### Completion Fixtures Need The Catalogue's Full Time Budget
+- **Symptom**: A host test times out before its first path candidate appears, or a regular-mode parameter silently exercises fullscreen.
+- **Root Cause**: The default 1,000 ms assertion wait is shorter than the catalogue's 75 ms debounce plus 1,500 ms acquisition budget. Replacing runtime context after construction also cannot change the captured screen mode.
+- **Rule**: Bound the observation beyond the allowed catalogue lifetime without extending the product deadline; verify with delayed real acquisition and preserve missing-result failure. Pass mode before construction and assert the actual screen sequence. A matching controlled timeout proves a test-budget defect, not the unobserved timing cause of a particular CI failure.
