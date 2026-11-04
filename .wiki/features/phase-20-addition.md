@@ -11041,3 +11041,25 @@ async #loadTodoList(source: AgentViewSession = this.session): Promise<void> {
 
 **注意**：这个探针本身也暴露了一个使用细节——`ModelUsage` 必须带 `version: 1`，否则 `validModelUsage` 拒绝，`settle` 静默不生效（我第一次就踩到了）。这说明**结算路径对输入格式是严格的**，进一步印证「缺的不是校验，是根本没有为读取失败准备出口」。
 
+
+#### 24.115.4 可达性复核：产物清理缺陷不是边缘情形
+
+24.115.2 说「删除会话不清工作区产物」。补查谁在**写**产物，判断这条缺陷的触发频率：
+
+```
+core/tools/read.ts:42            ← 每次读大文件
+core/tools/grep.ts:263           ← 每次搜索命中过多
+core/tools/glob.ts:122           ← 每次 glob 结果过多
+core/tools/directoryListing.ts:111
+core/tools/registry.ts:193
+core/tools/shell/background.ts:20
+```
+
+**五个常用工具 + 后台命令**都在调 `ArtifactManager.getShared(...).save(...)`。
+
+**所以**：只要用户在会话里读过一次大文件、或跑过一次结果很多的搜索，那个会话的 `.ts-shell/sessions/<id>/artifacts/` 就有内容；删除会话后它留在工作区。**这不是边缘路径，是日常使用必然触发。**
+
+`ArtifactManager` 也没有任何上限（24.115.2 已确认全文件无 `MAX_`/`prune`/`evict`），所以这是**只增不减**的。
+
+**严重度重估**：初版记为「磁盘泄漏，不是安全或正确性问题」。可达性确认后应当提升——长期使用的项目目录会积累每一个历史会话的全部工具产物，且用户没有任何清理入口。
+
