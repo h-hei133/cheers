@@ -10970,17 +10970,17 @@ async #loadTodoList(source: AgentViewSession = this.session): Promise<void> {
 
 | 模块 | 对照对象 | 三家做法 | 本项目做法 | 判断 |
 |---|---|---|---|---|
-| **M7 编辑** | oh-my-pi `edit` 工具、pi `edit` | 均用「先读后改 + 内容指纹」；omp 的 `apply_patch` 语义与本项目 `applyHunks` 一致（精确上下文、唯一匹配） | `applyHunks` 唯一匹配 + `commitWorkspaceFile` 身份绑定 | **对齐**，无差距 |
+| **M7 编辑** | oh-my-pi `edit`（三种模式：默认 `hashline`、`replace`、`apply_patch`） | omp 把编辑形态做成**可配置模式**，默认是行哈希锚定；`apply_patch` 只是其中一种。`replace` 模式用 `old_string`/`new_string`（`cursor-bridge-tools.ts:40-50`） | 单一形态：`applyHunks` 精确上下文 + 唯一匹配 | **不同设计，非差距**：omp 用模式适配不同模型能力，本项目只用一种；本项目的唯一匹配 + 身份绑定在安全性上不弱于 omp |
 | **M7 写入门面** | 三家均无独立「写入权威」门面 | 直接调各自的写函数 | 148 行门面零生产调用 | **本项目独有冗余**（24.112.2） |
-| **M8 记忆** | omp `memory`、pi 无 | omp 的记忆条目带结构化字段并由提取器产出 | `structuredFact` 读取侧完整、写入侧不存在 | **本项目内部不自洽**（24.113.1） |
+| **M8 记忆** | oh-my-pi `session/session-memory.ts` | omp 的「记忆」是**后端转换**模型：`SessionMemory` 管理记忆后端的切换（`#memoryBackendTransition`、`#queuedApply`），条目形态由后端决定，不是本项目的「带结构化字段的记录」 | 项目级记忆记录，含 `structuredFact`/`source`/`evidence` 等字段 | **不可比**：两家解决的不是同一个问题。本项目 `structuredFact` 的自相矛盾只能靠本仓一致性判定（24.113.1），**无参照可抄** |
 | **M9 产物清理** | omp `deleteSessionWithArtifacts`、pi `tmpdir()` | 两家都能清理（omp 随会话删，pi 不落工作区） | 删会话不删产物 | **落后于两家**（24.117） |
 | **M6 todo 重放** | omp `#loadTodoList` 无条件赋值 | 空列表也覆盖 | `if (latest !== undefined)` 才写 | **落后于 omp**（24.121.3） |
-| **M11 崩溃日志** | 三家均无 `/crash` 命令 | 不适用 | 两个消费者两套判据 | **本项目独有**（24.116.3） |
-| **M3 预留账本** | 三家均无请求额度账本 | 不适用 | 悬空预留 | **本项目独有**（24.120） |
-| **M1 交互面** | omp `overlay` / pi `session-selector` | 均有 generation/生命周期守卫 | generation 计数器 + cleanup 数组 | **对齐**，无差距 |
-| **M4 工具批量** | pi `agent-loop` 工具批次 | 同样补齐未配对结果 | `executeToolBatch` 补齐 abort 结果 | **对齐**，无差距 |
-| **M10 配置发布** | 三家均有 publication/revision 概念 | omp 用 `revision` 守卫 | 双代数（generation + substrate） | **对齐**，无差距 |
-| **M12 钩子** | codex `hooks` | codex 同样是 fail-closed | `PreToolUse` 失败即 block | **对齐**，无差距 |
+| **M11 崩溃日志** | pi `core/crash-log.ts` | 路径与文件名**与本项目完全相同**（`<agentDir>/crashes.json`），上限也相同（`MAX_CRASH_RECORDS = 5`、7 天）。读取只有一个入口 `readCrashLog`，损坏时统一返回 `[]`——**没有第二个消费者**，因此不存在「两套判据」 | 本项目有 `readCrashLog`（无限读取、丢弃状态）与 `inspectCrashLog`（有界、返回状态）两个入口 | **本项目独有缺陷**：pi 用单一入口避开了分叉；本项目在加入 `/debug crashes` 时新增了第二个入口，但没有把第一个改成委托它（24.116.3） |
+| **M3 预留账本** | 三家均无请求额度账本 | 注意同名不同义：omp 也有 `RequestPolicy`，但它是**协议方言**（`completionsReasoningMode`、`anthropicThinking` 等，见 `catalog/src/compat/types.ts:753-760`），与额度无关 | 请求额度预留/结算账本 | **本项目独有**（24.120），无参照可抄 |
+| **M1 交互面** | oh-my-pi `tui/src/overlays/oauth-selector.ts:199-231` | 用 `#validationGeneration` 守卫异步校验的迟到结果：递增后比对，不等即 `return` | `overlay.ts:156` 的 `generation` 计数器，在 `close()`/`back()`/`open()` 前后**三处**复验 | **对齐**：同一手法（代数守卫迟到结果）。本项目多覆盖了「父面板构造期间被替换」这一段 |
+| **M4 工具批量** | pi `executeToolCallsSequential`（`agent-loop.ts:540-590`） | abort 时**直接 `break`**，剩余调用**不补齐**——工具结果与 assistant 的 `tool_calls` 数量会不等 | `executeToolBatch:281-290` 遍历全部 `calls`，未配对的补一条 `abortedResult` | **本项目更强**：保证 call/result 配对完整。pi 的 break 会让下游见到「有调用无结果」的历史 |
+| **M10 配置发布** | oh-my-pi `config/registry.ts` | omp 用 `settings.revision` + `sameInputs` **双重**判断缓存是否有效（`registry.ts:259-275`），并保留值的 identity 稳定 | 双代数（`generation` + `substrateGeneration`），`freezeDeep` 发布不可变快照 | **对齐**：两家都用「代数 + 输入比较」避免陈旧缓存，本项目多一条 substrate 代数用于工作区切换 |
+| **M12 钩子** | codex `hooks` | codex 把失败**分成两种**：`FailedContinue`（继续执行后续钩子）与 `FailedAbort`（中止操作），见 `hooks/src/types.rs:18-23`；`PreToolUse` 的阻断走独立的 `should_block`/`block_reason`（`hook_runtime.rs:211-237`） | `PreToolUse` 失败一律 block；观测类事件只记录 | **部分对齐**：本项目的「准入类失败即拒」与 codex 的 `block` 语义一致，但 codex 的 `FailedContinue`/`FailedAbort` 二分本项目没有对应物 |
 | **M5 上下文** | pi `estimateProjectedContextTokens` | pi 先投影再定价 | 已在 24.109/24.110 对齐 | **已对齐**（本轮修复后） |
 
 #### 24.123.1 从对照里读出的形状
@@ -10993,4 +10993,30 @@ async #loadTodoList(source: AgentViewSession = this.session): Promise<void> {
 4. **本项目独有冗余（1 项）**：M7 的写入门面。
 
 **这个分布本身就是结论**：主干靠抄参照对齐得很好；出问题的全在「参照没有的部分」和「收尾阶段」。这与 24.117 发现的「正确做法在代码里已有先例，只是没覆盖全」是同一形状。
+
+**但本节的分类在复核后改过**（见 24.123.2）：初版把 M4、M7 判为「对齐」，复核后 M4 实为「本项目更强」、M7 为「不同设计非差距」。**修正后的分布是：对齐/更强 7 项，落后 2 项（M9、M6），独有缺陷 2 项（M3、M11），独有冗余 1 项。**
+
+
+#### 24.123.2 对照表的自我复核记录
+
+24.123 的初版表格里有 **4 处未经核实的断言**，复核时全部推翻。记录在这里，因为它们说明「对照」这一步最容易出错。
+
+| 初版写的 | 实际情况 | 类型 |
+|---|---|---|
+| 「codex 同样是 fail-closed」 | codex 把失败分成 `FailedContinue` / `FailedAbort` 两类（`hooks/src/types.rs:18-23`），`PreToolUse` 阻断另走 `should_block`/`block_reason` | **过度简化** |
+| 「omp 的 `apply_patch` 语义与本项目一致」 | omp 默认 `hashline` 模式，`apply_patch` 只是三种模式之一（`cursor-bridge-tools.ts:40-50`） | **把一种模式当成全部** |
+| 「pi 同样补齐未配对结果」 | pi 的 abort 分支直接 `break`，**不补齐**；本项目才是补齐的一方（`agent-loop.ts:585-587`） | **方向写反** |
+| 「三家均无 `/crash` 命令」 | pi 有 `core/crash-log.ts`，路径、文件名、上限都与本项目相同 | **事实错误** |
+| 「omp 的记忆条目带结构化字段并由提取器产出」 | omp 的 `SessionMemory` 是**后端转换**模型，与本项目的条目存储不可比 | **编造** |
+
+**共同的错法**：凭「这类项目大概会这么做」写对照，而不是去读。五次里有三次是**把相似的名字当成了相同的机制**（`RequestPolicy`、`apply_patch`、`crash-log`）。
+
+**修正后的净结果**：
+- 一条从「对齐」改为「部分对齐」（M12）；
+- 一条从「对齐」改为「本项目更强」（M4）；
+- 一条从「对齐」改为「不同设计，非差距」（M7）；
+- 一条从「本项目独有」改为「pi 有，本项目分叉出错」（M11）；
+- 一条从「不可比但暗示落后」改为「完全不可比」（M8）。
+
+**这改变了 24.123.1 的形状判断**：原来说「落后于参照 2 项」，修正后 M4 与 M7 都是**本项目更强或不同**，真正落后的只剩 M9（产物清理）与 M6（todo 重放）。**「主干对齐、末端失守」这个结论仍成立，但「落后」的项比初版少。**
 
