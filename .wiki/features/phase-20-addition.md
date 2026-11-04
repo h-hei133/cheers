@@ -10594,7 +10594,11 @@ artifactFiles: ["spill-1.log"]
 
 第二个只读子代理扫 M11 与证据链，返回 6 条。我逐条复核，**2 条成立、1 条成立但当前不可达、3 条被否定或降级**。
 
-#### 24.116.1 成立：主张与证据被拆成两个数组，恢复时按索引重配
+#### 24.116.1 ~~成立：主张与证据被拆成两个数组，恢复时按索引重配~~（**实施时被推翻**）
+
+> **结论修正**：准备修复时发现**按索引配对本来就是设计**。见 24.126。保留原文作为过程记录。
+
+
 
 **写入**（[taskState.ts](../../packages/ts-shell/src/core/query/runtime/taskState.ts:114-115)）：
 
@@ -11247,4 +11251,51 @@ add(subject: string, predicate: string, object: string, options?: TripleWriteOpt
 **真正的理由是工作量与风险**：要让它工作，需要（1）决定三元组从哪来（提取器还是模型显式写入），（2）给记录加时间有效性，（3）迁移已有的记录格式。这是一项独立功能，不是缺陷修复。
 
 **记录为「能力未完成」，不是「缺陷待修」**。这与 M7 门面同型：代码在，但链路没接完。
+
+
+### 24.126 实施时被推翻：claim 与 evidence 本来就是按索引配对的
+
+准备修复 24.116.1 时，我在 `observation.ts:204-211` 找到了原始配对逻辑：
+
+```ts
+function claimEvidenceFor(result: CodingResultSummary): QueryRuntimeArtifactClaimObservation[] {
+  return result.taskSatisfaction.requiredEvidence.map((claim, index) => ({
+    claim,
+    ...(result.taskSatisfaction.observedEvidence[index]
+      ? { evidenceId: result.taskSatisfaction.observedEvidence[index] }
+      : {}),
+  }))
+}
+```
+
+**`requiredEvidence[index]` ↔ `observedEvidence[index]` 是契约**，不是巧合。再查产生端：
+
+`browser/executionEvidencePolicy.ts:34-58` 的 `requiredEvidenceForAction` 返回一份**固定清单**（`"action request id"`、`"runtime/backend"`、`"sandbox decision"`…），按 action kind 分支，**无重复项**。`observedEvidence` 是对同一清单逐项给出的观测结果。
+
+**所以索引对应是成立的**，`taskState.ts:260` 的重建是忠实的。两个数组各自 `uniqueStrings` 只是防御（防止上游意外产生重复），在正常输入下长度与顺序都一致。
+
+**我 24.116.1 的复现为什么能「成功」**：我构造了 `{claim:'tests pass', evidence:'E1'}, {claim:'tests pass', evidence:'E2'}` 这种输入，但**真实产生端不会产生两条同名 claim**——清单是固定的、去重的。我用自己的非法输入证明了「这个输入会出错」，然后当成「生产会出错」。
+
+**这是本轮第四次同一类错误**：用自造输入代替生产输入。前三次是 24.121.5（todo）、24.123.2（对照表）、24.112.4（门面）。
+
+**改动已撤回**：`git checkout packages/ts-shell/src/core/query/runtime/taskState.ts`。
+
+#### 24.126.1 仍然成立的部分
+
+`taskState.ts:262` 的 `claim: claims[index] ?? evidenceId` 在**长度不等时**会造出一条以证据 ID 为内容的主张。正常输入下不会走到，但它是一行**没有守卫的兜底**。若要加固，应当是「长度不等时拒绝重建并标记状态未知」，而不是「静默造一条」。
+
+**记录为「防御性缺口」，不是「活缺陷」**——与 24.123 里 M4 的判定同类。
+
+#### 24.126.2 四次推翻的共同形状
+
+| 编号 | 我构造的输入 | 生产实际 |
+|---|---|---|
+| 24.121.5 | 转录不含 todo 时应当清空 | 两条测试明确要求保持不动 |
+| 24.123.2 | 凭印象写参照实现的行为 | 五处全错 |
+| 24.112.4 | 门面只是转发 | 它做别名规范化，8 条测试作证 |
+| 24.126 | 同名 claim 会出现两次 | 清单固定且去重 |
+
+**四次都不是「分析错」，是「没去看能证伪我的那部分」**：测试、参照源码、真实的输入产生端。这比单纯的分析错误更值得记录，因为它是**方法**层面的缺陷。
+
+**已经生效的修正**：此后每次下结论前，先找「什么能证伪这条」并去读它。本轮后两次（24.125 的 M8、24.124 的两项实施）都先读了参照与测试。
 
