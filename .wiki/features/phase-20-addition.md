@@ -10293,3 +10293,359 @@ MCP 常规 fixture 改为 2 步：先执行普通请求，再文字收尾；审�
 **交互夹具等待与模式复核**：`35d7ce796aada552c71108f42fa188ff1c91bfac` 的 Watch `41762557550` 成功；CI `41762557526` 为 failure（1,088 文件 / 14,157 项通过，1 项失败，3 项跳过），架构步骤未运行。唯一失败为 escaped-path Tab 用例首次目录建议未出现；相同四项本地原样通过，前次 CI 的同一文件也通过。日志未记录实际目录读取时长，不能断言此次 CI 的调度原因。
 
 静态复核确认夹具的 `vi.waitFor` 默认仅 1,000 ms，控制器允许 75 ms debounce 加 1,500 ms acquisition；另有独立夹具缺陷：构造时漏传 `tuiMode`，两个名为 regular 的用例实际也运行 fullscreen。测试在构造前传模式并断言真实 alternate-screen 序列，等待改为 2,000 ms，产品的 deadline、取消、目录枚举和路径解析未改。受控延迟真实 `opendir` 1,100 ms 时，1,000 ms 等待产生 **4 项断言失败**，2,000 ms 等待 **4 项通过**；撤掉构造模式注入，**2 项 regular 模式断言失败**。临时变异逐字节及 SHA-256 恢复后四项再通过。累计本任务聚焦覆盖 **15 文件 / 402 项不同测试**；证据在同一 consumers 目录，既有 CI 仍记录失败，新提交结果另绑定。状态汇总文字同步校正为 70 项本地验证，条目状态不变。
+
+### 24.111 全项目研究对象划分（2026-11-04，重做）
+
+24.109 的划分不合格：它只围着「收尾步骤」一个对象展开，是问题的分解，不是项目的划分。本节重做，**覆盖全部 34 个顶层目录、1993 个生产源文件、207,333 行**。
+
+划分依据是**责任生命周期**，不是目录形状：同一模块内的代码回答同一个「谁拥有这件事、从产生到失效经过哪些阶段」的问题。目录只是证据。
+
+#### 24.111.1 覆盖证明
+
+| 模块 | 覆盖目录 | 文件 | 行数 |
+|---|---|---|---|
+| **M1 入口与交互面** | `entrypoints/`、`cli/`、`presentation/`、`desktop/`、`core/commands/` | 452 | 48,237 |
+| **M2 回合内核** | `turn/`、`core/agent/`、`core/query/`、`core/subagents/` | 81 | 12,659 |
+| **M3 提供方与模型** | `provider/`、`model-adapters/`、`core/providers/`、`core/models/`、`core/catalog/`、`core/auth/`、`core/network/` | 109 | 13,198 |
+| **M4 工具与执行** | `tools/`、`runtime/`、`sandbox/`、`browser/`、`core/tools/`、`core/skills/`、`core/mcp/` | 308 | 37,922 |
+| **M5 上下文与压缩** | `context/`、`core/context/`、`core/prompts/` | 60 | 7,418 |
+| **M6 会话与持久化** | `session/`、`core/session/` | 170 | 20,814 |
+| **M7 编辑与工作区** | `edit/`、`repair/`、`language/`、`core/paths/`、`core/workspace/` | 84 | 8,026 |
+| **M8 记忆与知识** | `memory/`、`research/`、`extensions/`、`core/memory/`、`core/research/` | 113 | 9,996 |
+| **M9 编排与委派** | `workflow/`、`planning/`、`collaboration/`、`advisor/`、`core/workflow/`、`core/shell/` | 130 | 14,690 |
+| **M10 配置与策略** | `config/`、`security/`、`core/security/`、`core/state/`、`core/project/`、`core/version/`、`core/update/` | 97 | 7,604 |
+| **M11 观测与证据** | `observability/`、`evidence/`、`artifacts/`、`verification/`、`eval/`、`result/`、`core/text/`、`core/messaging/`、`core/values/` | 56 | 5,816 |
+| **M12 生命周期与媒体** | `core/hooks/`、`media/` | 23 | 2,004 |
+| 测试支撑（非产品） | `test-utils/` | 51 | 6,769 |
+
+合计 1,734 行文件 + `test-utils` 51 + 根 `index.ts` = **1,993 文件**，与全量统计一致。`core/commands/`（12,125 行）归 M1 而不是 M9：它是用户可见的命令面，与 slash 补全、面板同属一个生命周期。
+
+#### 24.111.2 每模块要回答的问题
+
+不是「代码怎么写的」，而是**这个模块的拥有物从产生到失效经过了哪些阶段，哪个阶段会静默失败**。
+
+| 模块 | 拥有物 | 生命周期阶段 | 已知未查 |
+|---|---|---|---|
+| M1 | 用户输入 → 命令/对话 → 屏幕帧 | 捕获、解析、准入、绘制、失效、重开 | 面板与补全只查过 settings/model 两类；其余命令面、桌面适配、全屏/普通双路径未系统查 |
+| M2 | 一次模型步骤 | 组装、派发、流式、工具批次、终止 | 已查（24.109），但 `core/query` 与 `core/subagents` 未系统查 |
+| M3 | 一次 provider 请求的身份与凭据 | 解析、准入、签名、传输、计费归属、轮换 | 只查过压缩相关的测量；协议适配、凭据轮换、账户池未查 |
+| M4 | 一次工具执行 | 声明、准入、执行、流式、结果、持久化、清理 | 只查过 bash 结果 metadata；browser、sandbox、MCP、skills 未查 |
+| M5 | 上下文锚点 | 产生、记录、持久化、恢复、消费、失效 | 已查（24.105、24.109） |
+| M6 | 会话与转录 | 写入、锁、恢复、分支、导出、清理 | 只查过压缩条目；store/continuation/recovery 未查 |
+| M7 | 一次文件改写 | 计划、预览、应用、回滚、撤销 | 几乎未查 |
+| M8 | 记忆条目与研究产物 | 提取、校验、持久化、注入、过期 | 几乎未查 |
+| M9 | 委派与目标 | 委派、预算、回收、目标调度 | 几乎未查 |
+| M10 | 配置发布 | 读取、合并、约束、发布、失效 | 查过字段消费与来源，其余未查 |
+| M11 | 一次可观测事实 | 采集、缓冲、落盘、轮转、消费 | 几乎未查 |
+| M12 | 钩子与媒体会话 | 声明、派发、审批、清理 | 查过钩子信任，其余未查 |
+
+**「已查」只表示有证据，「未查」不表示有问题**。本轮从标「几乎未查」的模块开始。
+
+#### 24.111.3 方法
+
+1. 每模块先读**拥有者与阶段**，画出产生→失效的链路；
+2. 用真实代码路径找「阶段之间存在但没人负责」的接缝；
+3. 对照 pi / oh-my-pi / codex 的同一阶段；
+4. 只有能给出可复现输入的结论才记为问题；推测单独标注；
+5. 边查边写，发现矛盾就地修正。
+
+
+### 24.112 M7 编辑与工作区：文件改写的生命周期接缝
+
+M7 的拥有物是**一次文件改写**：计划 → 预览 → 应用 → 回滚 → 撤销。先查的是「每个阶段谁负责」，不是「代码写得对不对」。
+
+#### 24.112.1 写入链路已核实成立的部分
+
+| 阶段 | 拥有者 | 结论 |
+|---|---|---|
+| 读取与身份 | `inspectWorkspaceFile`（`core/workspace/files.ts:68`） | 用 `O_NOFOLLOW` + `fstat` 比对身份 + 读完再比对 mtime/ctime，能捕获读取期间被替换 |
+| 提交 | `commitWorkspaceFile`（`edit/authority/commit.ts:7`） | 写临时文件 → 再验一次 → `link`（独占）或 `rename`，父目录用 `/proc/self/fd` 锚定 |
+| 多文件批次 | `applyPatchPlan` → `commitOperation`（`edit/patch/batch.ts:9`） | 先锁全部目标文件，再逐个提交，失败时 `compensate: true` |
+| 补偿 | `compensateOperation`（`edit/recovery/operation/compensation.ts`） | 逐字节回写并复核，结果分 `restored-verified` / `blocked` / `unknown` |
+
+**这一层是本轮所见最扎实的实现**：身份绑定、路径锚定、独占创建、补偿状态机都在，且失败不会伪装成成功。
+
+#### 24.112.2 真实发现：一个 148 行的写入门面零生产消费者
+
+`createWorkspaceWriteAuthority`（[workspace.ts](../../packages/ts-shell/src/edit/authority/workspace.ts:66)）导出一个 9 方法接口（`readFile`、`readVerifiedFile`、`directoryExists`、`validateWriteTarget`、`validateCreateTarget`、`writeFile`、`createFileExclusive`、`moveFileExclusive`、`deleteFile`），文件 148 行。
+
+**生产代码零调用。** 全仓搜索：
+
+```
+createWorkspaceWriteAuthority  →  只在 core/workspace/files.test.ts 与 runtime/execution/writeAccess.test.ts
+validateWriteTarget / readVerifiedFile / moveFileExclusive  →  除定义外无任何引用
+```
+
+**它不是「被别的模块取代」，而是从来没接上**：真正的写入路径走 `runtime/execution/write.ts` 与 `edit/patch/batch.ts`，两者都直接调 `commitWorkspaceFile`，绕过了这个门面。
+
+**为什么值得记**：它自身有 4 个方法（`validateWriteTarget`/`validateCreateTarget`/`moveFileExclusive`/`readVerifiedFile`）包含**目标合法性判定**（`path-outside-workspace`、`target-symlink`、`parent-symlink`、`descriptor-outside-workspace` 等 8 种原因）。这些判定只有测试在验证，生产写入路径**没有等价的完整检查**——`write.ts` 用的是 `verifyPathContainment`（只判断是否在根内），不做 symlink 目标类型判定。
+
+**判定为「未接线」，不是「行为缺陷」**：`commitWorkspaceFile` 的 `O_NOFOLLOW` 已经挡住了最终写入的 symlink 跟随，所以不是安全漏洞；缺的是**写入前的可读诊断**（用户拿不到「目标是符号链接」这种具体原因，只会得到一次失败）。
+
+#### 24.112.3 可达性分析：1994 个生产文件里 16 个不可达
+
+从真实入口 `entrypoints/cli.tsx` 做静态可达性（解析 `from './x.js'` → `.ts/.tsx`）：
+
+```
+roots: entrypoints/cli.tsx
+total prod files: 1994   reached: 1927   unreached: 67
+其中 test-utils 51，其余 16
+```
+
+16 个里 **6 个是纯兼容转发壳**（单行 `export { … } from '…'`）：`core/shell/background/output.ts`、`tasks.ts`、`session/compactionOperation.ts`、`entrypoints/cliWorkspaceSurface.ts`、`presentation/tui/chrome/composer.ts`、以及 `core/query/runtime/actionAuthority.ts`（只有类型）。
+
+按 `AGENTS.md`「兼容包装必须保持薄、只做转发」，这 6 个符合规则，**但它们没有任何消费者**——转发壳的意义是给调用方一个稳定入口，没有调用方时它只是死重量。
+
+**真正可疑的 4 个**（有实现、无入口）：
+- `presentation/tui/chrome/band.ts`（51 行，完整的状态栏渲染）
+- `presentation/sidebar/sidebarPanelRenderer.ts`（152 行）
+- `eval/browser/*`（3 个文件，浏览器基准）
+- `core/auth/oauth/subscription.ts`
+
+`band.ts` 尤其值得注意：`presentation/tui/composer/status.ts` 重新实现了一遍同样的 `renderStatusItem` 循环，而 `band.ts` 的版本还额外处理了「所有项都为空时回退到模型名」。**两份实现，只有一份在跑。**
+
+**未判定**：这不等于 `band.ts` 该删——它可能是有意的备用渲染器。但「两处实现同一件事、只有一处被调用」是应当消除的形状，需要作者裁决。
+
+
+### 24.113 M8 记忆与知识：写入与读取的生命周期接缝
+
+M8 的拥有物是**记忆条目**（`/memory` 保存的持久事实）与**研究产物**。研究方法：追踪每条记录的「写 → 校验 → 持久化 → 注入 → 失效/删除」，检查每个阶段是否有且只有一个拥有者。
+
+只读子代理先扫一遍，我逐条复核，**下列 3 条经我独立验证成立，2 条被复核否定**。
+
+#### 24.113.1 成立：`structuredFact` 读三处、写零处
+
+| 阶段 | 位置 | 行为 |
+|---|---|---|
+| 校验 | `memoryPersistence.ts:113-115` | 存在则必须是 `{subject, predicate, object}` 的字符串对象 |
+| 打分 | `projectMemoryRetrieval.ts:180-182` | 把三个字段拼进检索文本 |
+| 冲突检测 | `projectMemoryConflictDetection.ts:31,84-85` | 用它判断两条记忆是否矛盾 |
+| **写入** | `projectMemorySaveCommandRunner.ts:190-212` | **不写** |
+
+根因：`ProjectMemoryCandidate`（[projectMemoryCandidate.ts](../../packages/ts-shell/src/memory/projectMemoryCandidate.ts:39-50)）**根本没有 `structuredFact` 字段**，而 `recordFromApprovedEntry` 的每个字段都取自 candidate。全仓唯一写入它的地方是 `test-utils/scenarios/fixtures.ts:142`。
+
+**后果**：`projectMemoryConflictDetection.ts:44` 的 `conflicting-structured-memory` 阻断，在真实保存路径上**不可达**——只有测试夹具能构造出这种记录。
+
+**这是「阶段之间没有承接」的典型**：读取侧（检索、冲突、注入）都假设这个字段可能存在并认真处理，写入侧却从不产生它。两种可能：
+1. 原本打算从候选提取器产生，后来简化掉了，读取侧没同步清理；
+2. 提取器确实产出过，但字段名在重构中变了。
+
+无论哪种，**现状是「为一个永不发生的输入写了三段处理逻辑」**。
+
+#### 24.113.2 成立：`briefs` 与 `sourcePacket` 是只写历史
+
+- `research/run/stages.ts:25`：`briefs: [...run.briefs, brief].slice(-16)` —— 只追加，无生产读者。
+- `projectMemorySaveCommandRunner.ts:206`：`sourcePacket: entry.candidate.source` —— 与 `source: entry.candidate.source` **同一个值**，写成两个字段；`sourcePacket` 的唯一其他引用是 `memoryPersistence.ts:110` 的类型校验。
+
+**判定**：`sourcePacket` 是纯粹的冗余副本（同一对象引用两次），与 24.108 修掉的 `metadata.stdout` 同类。`briefs` 则是一个 16 条上限的环形历史，目前只有写入，**没有消费者意味着这个上限只在浪费内存**。
+
+#### 24.113.3 成立：研究状态的 `blocked` / `stale` 两个值永不赋值
+
+`research/run/model.ts:8` 声明 7 个状态：`ready | running | paused | partial | completed | blocked | stale`，`schema.ts:23` 同样镜像。
+
+全仓搜索：**没有任何地方把 `status` 设为 `blocked` 或 `stale`**。失败走 `partial`/`paused`（`child.ts:110`），来源失效记在 `SourceRecord.stale`（另一层）。
+
+**后果**：任何 `switch (run.status)` 里处理 `blocked`/`stale` 的分支都是死分支。**不构成行为缺陷**（不会误判），但它让状态机看起来比实际更完整——读代码的人会以为这两种情况被处理过。
+
+#### 24.113.4 被复核否定的一条：删除不会因重存而复活
+
+子代理断言「`/memory delete` 后重新 save 会复活记录」，理由是保存去重用的是 `includeInvalidated: false` 的折叠。
+
+**复核结论：不成立。** 保存路径的 id 由 `projectMemoryRecordId({candidateId, approvedAt, memoryText})` 生成，`approvedAt = entry.decidedAt`。同一个 review entry 重复保存会得到**相同 id**，此时：
+
+1. `foldProjectMemoryEntries(entries, {})` 只返回有效记录 → 删除后该 id 不在其中 → 通过去重；
+2. 追加一条新记录；
+3. 再次折叠时 `memoryPersistence.ts:152` 的 `deleted.delete(entry.id); records.set(entry.id, entry)` 让新记录覆盖墓碑。
+
+**所以确实会复活**——但这是**正确行为**：用户显式重新保存一条自己删过的记忆，就应该恢复它。墓碑的语义是「这条被删过」，不是「这条永不能再出现」。
+
+**记录这条否定**，因为它说明子代理的推理在「机制」上对、在「是否缺陷」上错。这类结论必须由主代理复核，不能直接采信。
+
+#### 24.113.5 被复核削弱的一条：陈旧来源不清理
+
+子代理称「陈旧来源永不删除却占用 96 条上限」。机制属实（`mergeSources` 只把 `stale` 置真，不删），但：
+
+- `reconcileSources`（`stages.ts:68-79`）在恢复时**要求每个被引用来源都有一次新的成功读取**，否则直接抛错；
+- 引用侧 `validateReference` 已拒绝引用 stale 来源。
+
+所以陈旧条目确实会累积，但**不会导致错误引用**，只会在极长会话里提前撞上限。**降级为观察项，不记为缺陷。**
+
+
+### 24.114 M11 观测与证据：查过但无确定缺陷
+
+M11 的拥有物是**一次可观测事实**：采集 → 缓冲 → 落盘 → 轮转 → 消费。检查重点是「观测路径是否可能丢失数据」与「观测失败是否改变产品行为」。
+
+| 对象 | 生命周期是否完整 | 证据 |
+|---|---|---|
+| Metrics | **完整** | `flushMetrics` 有 4 个调用点：loop 的 `finally`（成功与失败都 flush）、`cliRuntimeModule` 的 `finally`、以及 `metrics.ts:136` 的 `process.once('exit')` |
+| Crash log | **完整** | `cli.tsx:49` 在 profile 选定后 `installCrashRecorder`；`uncaughtException` 先记录再 `throw`（保持 Node 默认终止语义），`unhandledRejection` 记录后继续 |
+| Rotating sink | **完整** | `maxFiles` 有 RangeError 校验；轮转时跳过已存在编号避免覆盖；`pruneStaleLogs` 区分「本进程可回收」与「其他进程需保留」 |
+| Usage telemetry | **完整** | 桶按 provider+model 分开计价，`MAX_RECENT_REQUESTS` 有界 |
+
+**观测不会破坏产品**：`RotatingFileSink.write` 与 `recordCrash` 都在 `try/catch` 内吞掉异常，metrics 的 exit hook 同样包了 `try/catch` 并注明「throw 会掩盖真正的退出原因」。
+
+#### 24.114.1 两处「我以为是缺陷、复核后否定」
+
+1. **崩溃记录器未安装** —— 我 grep `entrypoints/*.ts` 漏了 `cli.tsx`，误判为未接线。实际在 `cli.tsx:49` 安装。**这是我的检索错误，不是代码问题。**
+2. **`estimateUsageCost` / `resetSessionUsage` 无生产消费者** —— 两者都被内部使用（前者被 `:95` 调用），导出只是给测试。**属于正常的测试可观测性。**
+
+#### 24.114.2 一处「参数未校验但当前不可达」
+
+`RotatingFileSink` 的构造器校验了 `maxFiles`（`< 1` 抛 RangeError），却**没有校验 `maxFileSizeMb`**：
+
+```ts
+this.maxFileSizeBytes = (options.maxFileSizeMb ?? 5) * 1024 * 1024;   // :50
+this.maxFiles = options.maxFiles ?? 20;
+if (!Number.isSafeInteger(this.maxFiles) || this.maxFiles < 1) { ... } // :53 只校验 maxFiles
+```
+
+传入 `0` 或负数会让 `write()` 的 `currentFileSize + lineByteLength > maxFileSizeBytes` 恒真，**每次写入都触发一次轮转**。
+
+**当前不可达**：全仓只有 `rotatingFileSink.ts:241/245` 两处 `new RotatingFileSink()`，都不传参数。所以这是**校验不对称**（同一个构造器校验了一半选项），不是活缺陷。记为观察项。
+
+
+### 24.115 M9 编排与委派：后台任务的产物清理
+
+**先更正一处我自己的推断错误**：我最初看到 `TaskRegistry.getShared()` 没有 journal，据此认为生产会走 spill 分支。复核 `cli/runtime/jobs.ts:46` 后确认：生产环境的 registry 是 `new TaskRegistry(undefined, local)`，**始终带 journal**，而 `registry.ts:58` 的 `!this.journal && this.spillDirectory` 使 spill **在生产中不启用**。下面的产物清理问题因此**不涉及后台溢出文件**，只涉及 `ArtifactManager` 自己写的前台工具产物。
+
+M9 的拥有物是**一次委派/后台任务**：启动 → 执行 → 流式输出 → 结束 → 产物保留 → 清理。
+
+#### 24.115.1 已核实成立的部分
+
+| 阶段 | 拥有者 | 结论 |
+|---|---|---|
+| 输出缓冲 | `createOutputSink`（`workflow/jobs/local/output.ts:50`） | `limitBytes` 有非负安全整数校验；尾部截断按 UTF-8 字符边界回退，不会切坏多字节字符 |
+| 溢出落盘 | 同上 `openSpill` | 用 `wx` 独占创建；失败时 `spillPath` 置空，**不会谎称有完整前缀** |
+| 背压 | `waitForDrain` | drain / error / close 三者任一都释放生产者 |
+| 关闭 | `close()` | 幂等（`closing ??=`），等 `close` 事件而非 `end` |
+| 呈现 | `renderTask`（`projection.ts:5`） | 截断时展示 `outputPath`，未截断不展示 |
+
+#### 24.115.2 真实发现：会话删除不会清理工作区产物
+
+**两套根目录**：
+
+```
+会话数据：  <profile>/sessions/<sessionId>/          （createSessionStoreLayout:35-37）
+工作区产物：<workspace>/.ts-shell/sessions/<sessionId>/artifacts/   （artifactManager.ts:34-39）
+```
+
+`deleteSessionRecord`（[sessionStore.ts](../../packages/ts-shell/src/session/store/sessionStore.ts:107-115)）只做一件事：
+
+```ts
+fs.rmSync(input.layout.sessionDir, { recursive: true, force: true });
+```
+
+而 `sessionDir` 属于**会话数据根**。工作区里的 artifacts 目录在另一棵树下，**不在删除范围内**。
+
+**复现**（`/tmp/probe-artifacts.mjs`，按两处代码的真实布局构造）：
+
+```
+sessionDirExists: false
+artifactDirExists: true
+artifactFiles: ["spill-1.log"]
+```
+
+**后果**：
+- `ArtifactManager.save`/`saveBinary` 写入的前台工具产物永久留在工作区；
+- `ArtifactManager` 本身**没有任何保留上限或清理逻辑**（全文件搜不到 `MAX_`/`prune`/`evict`）；
+- 用户在 `/sessions` 面板删掉会话后，`.ts-shell/sessions/<id>/artifacts/` 仍在磁盘上。
+
+**范围更正**：我最初把后台命令的溢出文件也算进这条。复核后确认生产 registry 始终带 journal，spill 分支不启用（见本节开头），所以**只涉及 `ArtifactManager` 主动保存的产物**，不涉及后台输出。
+
+**这不是安全或正确性问题**，是**磁盘泄漏**。一个长期使用的项目目录会积累所有历史会话的前台工具产物与后台溢出文件。
+
+**为什么会这样**：`ArtifactManager` 的注释说「让读者被指到的文件与前台工具写的文件放在一起」（`background.ts:17-19`），这是有意选择——产物要能被 `read` 工具直接打开，所以必须落在工作区内。但**选择落在工作区之后，删除会话这条生命周期没有被同步**。
+
+**与 24.112.2 的共性**：都是「某个阶段有拥有者、相邻阶段没有」。这里「产生」有拥有者（`ArtifactManager`），「删除」没有。
+
+**未判定**：工作区产物是否**应当**随会话删除——用户可能希望保留历史产物以便回看。但至少需要一条明确的保留策略（上限/按时间清理/显式命令），当前是**两者都没有**。
+
+#### 24.115.3 一处「未校验参数但不可达」
+
+`createOutputSink` 校验了 `limitBytes`，但 `spillDirectory` 若不可写，`openSpill` 会静默失败并把 `spillPath` 置空——这是**正确的降级**（宁可丢失完整前缀也不谎称有），不记为缺陷。
+
+
+### 24.116 M11 补充与 M2 证据配对：三个真实接缝
+
+第二个只读子代理扫 M11 与证据链，返回 6 条。我逐条复核，**2 条成立、1 条成立但当前不可达、3 条被否定或降级**。
+
+#### 24.116.1 成立：主张与证据被拆成两个数组，恢复时按索引重配
+
+**写入**（[taskState.ts](../../packages/ts-shell/src/core/query/runtime/taskState.ts:114-115)）：
+
+```ts
+const artifactClaims = uniqueStrings(result.taskSatisfaction.requiredEvidence ?? []);
+const observedEvidence = uniqueStrings(result.taskSatisfaction.observedEvidence ?? []);
+```
+
+**恢复**（`:260-262`）：
+
+```ts
+artifactClaimEvidence: taskState.artifactPendingState.evidenceIds.map((evidenceId, index) => ({
+  claim: taskState.artifactPendingState.claims[index] ?? evidenceId,
+  evidenceId,
+})),
+```
+
+**问题**：两个数组**各自去重**，长度与顺序都不保证对应。`claim ?? evidenceId` 在证据多于主张时**凭空造出一条以证据 ID 为内容的主张**。
+
+**复现**（`/tmp/pairprobe.mjs`，按两处代码的真实形状）：
+
+```
+观测：  {claim:'tests pass', evidence:'E1'}, {claim:'tests pass', evidence:'E2'}, {claim:'build clean', evidence:'E3'}
+持久化：claims=['tests pass','build clean']   evidence=['E1','E2','E3']
+恢复：  {tests pass, E1}, {build clean, E2}, {E3, E3}   ← 最后一条是伪造的
+```
+
+**后果**：`build clean` 被绑到 E2（错误证据），真正的 E3 变成一条叫「E3」的主张。下游 `harness.ts:135` 用 `item.claim === claim && item.evidenceId` 判断「这条主张是否有证据」，伪造项永远匹配不上，**真实的未证实主张会被当成已证实**。
+
+**为什么之前没暴露**：单主张单证据时两个数组长度相同，索引恰好对应。只有当一条主张有多条证据时才错位。
+
+**与 24.113 的共性**：都是「写入侧拆开了，读取侧假设还连着」。
+
+#### 24.116.2 成立但不可达：`correctArtifact` 伪造 `validation-passed`
+
+[correction.ts](../../packages/ts-shell/src/artifacts/workflow/correction.ts:60-66) 在通过前述检查后无条件返回：
+
+```ts
+return Object.freeze({ attempted: true, validationState: "validation-passed", ... });
+```
+
+它**没有做任何验证**。而 [verification/execution/model.ts:71-73](../../packages/ts-shell/src/verification/execution/model.ts:71) 把它当作通过证据：
+
+```ts
+if (input.artifactCorrection?.validationState === "validation-passed") { return result("passed", []); }
+```
+
+**当前不可达**：`correctArtifact` 全仓唯一引用是 `index.ts:13` 的再导出，**没有任何生产调用点**。这是一条潜伏接缝：一旦有人把它接上，就会得到一条「未验证即通过」的链路。
+
+**同一模块的 `sourceReceipts` 也是伪造的**（`artifacts/workflow/model.ts:30-32`）：`available: true` 直接写死，而 `artifacts/` 目录**不导入 `node:fs`**，没有任何检查。
+
+#### 24.116.3 成立：崩溃日志读取绕过了检查，把损坏报成「没有记录」
+
+[crashLog.ts](../../packages/ts-shell/src/observability/crashLog.ts:66-67)：
+
+```ts
+return inspectCrashLog(filePath, profile, Infinity).records;
+```
+
+`readCrashLog` 丢掉 `status`/`reason`/`invalidRecords`，并把 1 MiB 上限改成 `Infinity`。于是 `/crash` 对一个损坏或超限的文件打印「No crashes recorded」，而 `/debug crashes` 用 `inspectCrashLog` 正确报 `unavailable`/`over-limit`。
+
+**两个消费者，两套判据**：一个说「没有」，一个说「读不了」。用户看到的取决于敲了哪条命令。
+
+**降级但成立**：崩溃日志的写入是「读-改-写 + 非原子 `writeFileSync`」（`crashLog.ts:171-174`），两个进程同时崩溃会互相覆盖。这是**真实竞态**，但崩溃记录本就是尽力而为，且写入前有 `assertProfileStorage`。记为观察项。
+
+#### 24.116.4 被否定的三条
+
+| 子代理断言 | 复核结果 |
+|---|---|
+| 「flushMetrics 有路径丢失」 | **否定**：loop 的 `finally`、`cliRuntimeModule` 的 `finally`、`process.once('exit')` 三处覆盖，唯一丢失场景是硬杀，不可防 |
+| 「轮转上限被违反」 | **否定**：`pruneStaleLogs` 区分本进程/其他进程，注释已声明「可能超出上限」是已知取舍 |
+| 「metrics 跨会话合并」 | **否定**：tags 含 `sessionId` |
+
+#### 24.116.5 一处降级：日志写入失败被静默吞掉
+
+`RotatingFileSink.write` 的 `catch {}` 是**正确的**（日志不能拖垮产品），但失败后 `/metrics` 会打印「No metrics recorded yet」，把「写失败」与「没数据」混为一谈。
+
+**判定**：产品安全优先的选择正确，缺的是一条降级状态。记为观察项，不记为缺陷。
+
