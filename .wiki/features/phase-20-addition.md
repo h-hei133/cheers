@@ -12843,12 +12843,46 @@ const THINKING_BUDGET_TOKENS: Record<ThinkingLevel, number> = { ... }
 
 **参照**：oh-my-pi 有 8 项 LSP 设置（`lsp/settings.ts`），包括 `diagnosticsOnWrite`、`diagnosticsOnEdit`、`formatOnWrite`、`deduplicate`、`requestTimeout`——它的 LSP 是**自动在写入/编辑后返回诊断**。
 
-**判定**：**这是设计差异，不是配置缺失。**
+**差异的确切位置**（已核实到调用点）：
 
-- 本项目的模型要主动调 `lsp` 工具才拿诊断，因此不存在「写入后是否自动诊断」这个开关——那个行为本身不存在。
-- 加 `diagnosticsOnWrite` 等于新增一个自动诊断行为，是**功能开发**不是配置补全。
+**oh-my-pi 的编辑工具会自己请求诊断**（`edit/index.ts:174-176`）：
 
-**建议**：不做。若要自动诊断，应先作为独立功能立项，而不是以「补设置」的名义加。
+```ts
+const enableDiagnostics = enableLsp && cfgLspDiagnosticsOnEdit.get(session.settings);
+const enableFormat = enableLsp && cfgLspFormatOnWrite.get(session.settings);
+const deduplicate = enableDiagnostics && cfgLspDiagnosticsDeduplicate.get(session.settings);
+```
+
+编辑完成后，它按这三个设置决定：是否取诊断、是否格式化、是否去重。**诊断是编辑流程的一部分**，所以那三个开关有实际控制对象。
+
+**本项目的编辑工具完全不碰 LSP**（`edit/patch/tool.ts` 与 `batch.ts` 中 `language`/`lsp`/`diagnostic` 零命中，只有一处提到「language edit proposal 的哈希」作为参数校验）。
+
+本项目的 LSP 是一个**独立工具**（`language/tool.ts:18`）：
+
+```ts
+operation: { enum: ['definition','references','hover','documentSymbol','workspaceSymbol','diagnostics','rename','status','restart','shutdown'] }
+```
+
+模型必须**显式调用** `lsp` 并指定 `operation: 'diagnostics'` 才拿到诊断。
+
+**所以差异是**：
+
+| | oh-my-pi | 本项目 |
+|---|---|---|
+| 诊断何时产生 | **编辑/写入后自动** | **模型主动请求** |
+| 控制它的设置 | `diagnosticsOnEdit`、`diagnosticsOnWrite`、`formatOnWrite`、`deduplicate` | **不存在对应行为，所以没有开关** |
+| LSP 的形态 | 编辑流程的内嵌能力 | 独立的模型工具 |
+
+**判定**：加 `diagnosticsOnWrite` 不是「补一个配置项」，而是**新增一个自动诊断行为**——而那个行为在本项目里根本不存在，设置会控制一个不存在的流程。
+
+**建议**：不做。
+
+**如果确实想要自动诊断**，那是独立功能：编辑完成后由 `edit/patch/batch.ts` 调用 `language/service.ts` 取诊断，再按设置决定是否附加到工具结果。这需要：
+1. 编辑流程持有 LSP 服务实例（当前没有）；
+2. 决定诊断附加到 tool result 还是作为下一条消息；
+3. 处理「无 LSP 服务器可用」的降级。
+
+**这是功能立项，不是配置补全。**
 
 ---
 
