@@ -12686,7 +12686,10 @@ omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
 **现状**：产物在 `<workspace>/.ts-shell/sessions/<id>/artifacts/`，会话记录在 `<profile>/sessions/`。`deleteSessionRecord` 只删后者，产物永久残留。`read`/`grep`/`glob`/目录列表/后台命令五个工具都写产物，`ArtifactManager` 无任何上限。
 
 **参照**：
-- **oh-my-pi**：`deleteSessionWithArtifacts`（`indexed-session-storage.ts:416`），按会话路径前缀收集**同目录下所有文件**一并删除。产物与会话文件在同一目录，所以删除天然覆盖。
+- **oh-my-pi**：`deleteSessionWithArtifacts`（`indexed-session-storage.ts:416-445`），三个细节值得学：
+  1. **从索引枚举**（`this.#index.keys()` 按路径前缀过滤），**不扫描文件系统**——所以不会误删索引外的东西；
+  2. **先删索引条目，再删文件**，失败时 `#failFrame` 回滚索引状态，保证索引与磁盘一致；
+  3. 产物与会话文件**在同一目录**，所以「会话路径去掉 `.jsonl` 后缀」就是产物根。
 - **pi**：产物写系统临时目录（`output-files.ts:21-26`），不落在工作区，清理交给 OS。
 
 **建议**：采用 oh-my-pi 的思路——删除会话时同时清两棵树。
@@ -12712,7 +12715,21 @@ omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
 
 **参照**：
 - **codex**：`ext/goal/src/accounting.rs:177-198` 按 provider 用量**增量记账**，无预留概念，因此不会悬空。
-- **oh-my-pi**：`goals/runtime.ts:330-345` 同样按增量；预算耗尽时把状态翻成 **`budget-limited`** 并**发一条 steer 消息**告诉模型（`#sendBudgetLimitSteer`）。用户可调高预算，状态自动翻回 `active`。
+- **oh-my-pi**：`goals/runtime.ts:330-345` 同样按增量；预算耗尽时把状态翻成 **`budget-limited`**，并发一条 **steer 消息**（`:521-529`）：
+
+```ts
+async #sendBudgetLimitSteer(goal: Goal): Promise<void> {
+  if (this.#budgetReportedFor === goal.id) return;   // ← 每个 goal 只发一次
+  this.#budgetReportedFor = goal.id;
+  await this.#host.sendHiddenMessage({
+    customType: "goal-budget-limit",
+    content: renderGoalPrompt("budget-limit", goal),
+    deliverAs: "steer",
+  });
+}
+```
+
+**三个细节**：`deliverAs: "steer"`（不打断当前步骤）、`sendHiddenMessage`（用户看不到这条）、`#budgetReportedFor` 去重（避免每轮都发）。用户调高预算后状态自动翻回 `active`。
 
 **建议**：保留 `pending` 不动（防重发不变），但**预算耗尽时发一条 steer 消息**，让模型总结当前进展。错误文案区分「额度用尽」与「上次结果未知」。
 
@@ -12732,13 +12749,27 @@ omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
 
 **建议**：按 `(cwd, runtimeConfig 相关字段)` 缓存 registry。
 
-**关键难点（必须先解决）**：`createCommandRegistry` 依赖 `runtimeConfig`，而它是**每次配置发布都会变的对象**。缓存键必须选对：
+**缓存键可以很简单**（已核实完整输入集）：
 
-| 候选键 | 问题 |
+`createCommandRegistry` 实际只读四样东西：
+
+| 输入 | 使用位置 |
 |---|---|
-| 对象身份 | 每次配置发布都失效，缓存等于没有 |
-| `revision` | 需确认 revision 覆盖所有影响 registry 的字段（`disabledTools`、`hiddenToolPrefixes`、`allowedTools`、`toolDiscovery`、模板列表） |
-| 上述字段的序列化 | 最准确，但序列化成本需实测 |
+| `cwd` | 模板加载 |
+| `runtimeConfig.enableMcpTools` | `:416-417`（**唯一一处读 runtimeConfig**） |
+| `options.templates` | `:1050` |
+| `options.includeTemplates` | `:1050` |
+
+**不需要整个 `runtimeConfig` 做键**——只需要 `enableMcpTools` 一个布尔值。这消除了我原先担心的「配置每次发布都失效」问题。
+
+**另一处实测推翻了推断**：我以为 `TemplateLoader` 的目录扫描是主要开销，但实测：
+
+```
+带模板:   14.62ms
+不带模板: 16.61ms    ← 反而更慢（噪声范围内）
+```
+
+**模板加载不是瓶颈。开销就是 73 个闭包 + 102 个对象的分配本身。**
 
 **代价**：需要先确认 registry 的完整输入集，否则会缓存到过期结果。
 
@@ -12764,7 +12795,43 @@ omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
 
 **风险**：本项目的 `null` 有双重含义（`thinkingLevelMap[level] === null` 表示「没有这个档位」；`ThinkingPreference = ... | null` 表示「auto」）。扩档位时不要混淆。
 
-**代价**：五处改动，其中预算值是产品决策（每个档位对应多少 token）。
+**预算值有直接参照**：oh-my-pi 的档位描述里就写着 token 数（`tui/src/thinking.ts:20-47`）：
+
+| 档位 | omp 描述 | 本项目现值 |
+|---|---|---|
+| minimal | ~1k tokens | — |
+| low | ~2k tokens | **2,048** ✅ 一致 |
+| medium | ~8k tokens | **8,192** ✅ 一致 |
+| high | ~16k tokens | **16,384** ✅ 一致 |
+| xhigh | ~32k tokens | — |
+| max | 模型支持的最大值 | — |
+
+**本项目现有三档与 omp 完全一致**，所以新增三档可以直接对齐：`minimal: 1_024`、`xhigh: 32_768`、`max` 需要「模型上限」的语义（不能写死数字）。
+
+**`max` 的语义已有现成机制**：
+
+`googleWire.ts:180-186`：
+
+```ts
+export function thinkingConfigFor(budgetTokens: number | undefined, summary?: boolean) {
+  if (budgetTokens === undefined && summary !== true) return undefined;
+  return { thinkingConfig: { ...(budgetTokens !== undefined ? { thinkingBudget: budgetTokens } : {}), ... } };
+}
+```
+
+**`budgetTokens === undefined` 时就省略 `thinkingBudget`**，provider 用自己的上限。
+
+所以 `max` 只需**不设预算**，不需要哨兵值或新类型。唯一改动是把
+
+```ts
+const THINKING_BUDGET_TOKENS: Record<ThinkingLevel, number> = { ... }
+```
+
+改成 `Record<ThinkingLevel, number | undefined>`，并让 `max` 为 `undefined`。
+
+**代价降低**：不是「需要设计新语义」，而是「类型从 `number` 放宽到 `number | undefined`」。
+
+**代价**：五处改动；`max` 的语义需要额外设计。
 
 **不做的话**：用户无法选择 minimal/xhigh/max，且选完模型后无法快捷改档位。
 
@@ -12815,15 +12882,30 @@ omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
 
 #### 建议 8：崩溃日志统一为单一读取入口
 
-**现状**：`readCrashLog`（无限读取、丢弃状态）与 `inspectCrashLog`（有界、返回状态）两个入口，导致 `/crash` 与 `/debug crashes` 对同一个损坏文件给出相反结论。
+**现状**：`readCrashLog`（`crashLog.ts:66-68`）**已经委托**给 `inspectCrashLog`，但只取 `.records`、丢弃 `status`：
 
-**参照**：pi 只有 `readCrashLog` 一个入口（`core/crash-log.ts:25`），损坏时统一返回 `[]`——**没有第二个消费者，因此不存在分叉**。
+```ts
+export function readCrashLog(filePath = crashLogPath(), profile = currentProfile()): CrashRecord[] {
+  return inspectCrashLog(filePath, profile, Infinity).records;
+}
+```
 
-**建议**：让 `readCrashLog` 委托 `inspectCrashLog`，保留状态。
+两个消费者：
 
-**代价**：小。需要确认 `/crash` 的输出格式是否需要显示「损坏」状态。
+| 命令 | 用的入口 | 后果 |
+|---|---|---|
+| `/crash`（`crashCommandRuntime.ts:26`） | `readCrashLog` | 损坏时得到空数组 → 报「没有记录」 |
+| `/debug crashes`（`debugCommandRuntime.ts:33`） | `inspectCrashLog` | 正确报 `unavailable`/`over-limit` |
 
-**优先级**：低——只在文件损坏时可见。
+**所以不是两套实现，是同一实现被两种方式消费。**
+
+**参照**：pi 只有 `readCrashLog` 一个入口（`core/crash-log.ts:25`），损坏时返回 `[]`——它**没有 `/debug crashes` 这样的第二消费者**，因此不存在分叉。
+
+**建议**：`/crash` 改用 `inspectCrashLog`，在 `status !== 'reported'` 时说明原因。
+
+**代价**：小，改一处调用 + 文案。**注意**：`readCrashLog` 还传了 `Infinity` 绕过 1 MiB 上限，改用时要去掉这个绕过，否则超限文件仍会被读。
+
+**优先级**：低——只在文件损坏或超限时可见。
 
 ---
 
