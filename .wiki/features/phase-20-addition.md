@@ -10649,3 +10649,78 @@ return inspectCrashLog(filePath, profile, Infinity).records;
 
 **判定**：产品安全优先的选择正确，缺的是一条降级状态。记为观察项，不记为缺陷。
 
+
+### 24.117 参照对照：产物清理（补 24.115.2 的跨项目证据）
+
+24.115.2 只写了本仓事实。按条件要求补上参照实现的做法——**三家都做了这件事，只有本项目没做**。
+
+#### 24.117.1 oh-my-pi：删除会话即删除产物
+
+它的存储接口直接叫 `deleteSessionWithArtifacts`（[indexed-session-storage.ts:416](../../../oh-my-pi/packages/coding-agent/src/session/indexed-session-storage.ts:416)），实现是：
+
+```ts
+const artifactsDir = sessionPath.slice(0, -6);     // 去掉 ".jsonl"
+const prefix = artifactsDir.endsWith("/") ? artifactsDir : `${artifactsDir}/`;
+const paths = [sessionPath];
+for (const key of this.#index.keys()) {
+  if (key.startsWith(prefix)) paths.push(key);     // 会话目录下的全部文件
+}
+```
+
+**关键设计**：产物与会话文件**在同一个目录下**，所以「删会话」天然覆盖「删产物」，不需要第二条清理逻辑。
+
+调用点有 3 处（`main.ts:243`、`session-manager.ts:2501`、`2951`），且 `builtin-session.ts:279-283` 的注释解释了为什么要走 `SessionManager` 而不是直接删文件：否则活动 writer 仍指向已删除路径，下一次 prompt 会「复活或损坏」已删文件。
+
+#### 24.117.2 pi：产物根本不在工作区
+
+pi 的大输出写到**系统临时目录**（[output-files.ts:21-26](../../../pi/packages/coding-agent/src/utils/output-files.ts:21)）：
+
+```ts
+function createOutputFilePath(prefix: string, extension: string): string {
+  return join(tmpdir(), `${prefix}-${randomBytes(8).toString("hex")}${extension}`);
+}
+```
+
+文件注释写明了理由：「Every output file is created here, so where they are stored can change in one place. Today they go to the OS temp directory.」权限 `0o600`，`wx` 独占创建。
+
+**代价**：产物与工作区分离，模型要读它得跨目录。pi 接受这个代价。
+
+#### 24.117.3 本项目：产物在工作区，但删除路径没跟上
+
+```
+会话：  <profile>/sessions/<id>/                        ← 删除范围
+产物：  <workspace>/.ts-shell/sessions/<id>/artifacts/   ← 不在删除范围
+```
+
+`ArtifactManager` 的注释说明了**为什么放在工作区**：让读者被指到的文件与前台工具写的文件放在一起（`core/tools/shell/background.ts:17-19`）。这个理由成立——产物必须能被 `read` 工具直接打开。
+
+**但 oh-my-pi 证明了「放在一起」与「一起删除」可以同时做到**：它的产物也在会话旁边，只是它的「会话」包含产物目录，删除时按前缀一并清。
+
+**本项目的缺口是具体的**：`deleteSessionRecord`（`session/store/sessionStore.ts:107-115`）只有一行 `fs.rmSync(sessionDir)`，而 `sessionDir` 与 `artifactsDir` 分属两棵根树，这一行够不着。
+
+#### 24.117.4 三个可选方向
+
+| 方向 | 做法 | 代价 |
+|---|---|---|
+| A（对齐 oh-my-pi） | 让 artifacts 落在会话目录内，或让删除按会话 id 同时清两棵树 | 改动 `ArtifactManager` 的布局，历史产物需要迁移 |
+| B（对齐 pi） | 产物移出工作区到临时目录 | 违背「产物可被 read 直接打开」的设计，且临时目录不持久 |
+| C（显式保留策略） | 保留工作区布局，增加上限/按时间清理/显式命令 | 不解决「删会话后仍残留」，只是延后泄漏 |
+
+**倾向 A**：它与现有设计意图冲突最小（产物仍在工作区），且 oh-my-pi 已经证明可行。**本轮只研究，不实施。**
+
+
+### 24.118 参照对照：主张-证据配对（补 24.116.1）
+
+24.116.1 的缺陷是「两个数组各自去重后按索引重配」。补查三家是否也有同类结构。
+
+**结论：三家都没有这个概念。** 全仓搜索 `requiredEvidence` / `observedEvidence` / `taskSatisfaction` 在 pi、oh-my-pi、codex 中**零命中**。
+
+这意味着两件事：
+
+1. **不能靠抄参照修**。这是本项目独有的「任务满足度」模型，没有现成实现可对齐。
+2. **缺陷的判据只能来自本仓自身的一致性**：写入侧把配对拆开、读取侧假设还连着，这本身就是自相矛盾，不需要外部参照就能判定。
+
+**修法方向**（不改代码，只记方案）：持久化时保留配对，即把 `{claim, evidenceId}` 作为**一条记录**存储，而不是两个平行数组。恢复时直接读出配对，不再重建。这与 `observation.ts:433` 的 `pushUniqueClaimEvidence` 已经在用的形状一致——**同一个模块里已经有一份配对的表示，只是持久化时被拆掉了**。
+
+**这是本轮唯一一条「参照实现帮不上忙」的发现**，如实记录。
+
