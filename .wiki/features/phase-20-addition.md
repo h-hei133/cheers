@@ -10883,11 +10883,16 @@ export function replayTodosFromMessages(sessionId: string, messages: readonly Se
 压缩后: 0
 ```
 
-**触发条件**（三条，任一即可）：
+**触发条件**（收窄后只有两条）：
 
 1. **压缩丢弃了 todo 消息**。[applyCompaction](../../packages/ts-shell/src/session/compaction.ts:698-709) 只保留 `[system?, checkpoint, ...尾部]`，落在切点之前的所有 todo 元数据随之消失。压缩后重放找不到任何 todo，内存保留压缩前的列表。
-2. **`/todo clear` 之后的转录**。[todoCommandRuntime.ts:55](../../packages/ts-shell/src/core/commands/todoCommandRuntime.ts:55) 的 `clear` 发布空数组，`validTodoItems([])` 若为真则能覆盖；但一旦这条记录被压缩或不在窗口内，就退化为情形 1。
-3. **会话切换回一个从未有过 todo 的会话**。`runtimeContext.ts:250-251` 恰好先 `forgetSessionTodos` 再 `replayTodosFromMessages`，所以**这条路径是对的**——反过来说，**其余调用点没有这个前置清理**。
+2. **转录里从来没有 todo，而内存里有**（例如上一个会话留下的同 id 状态）。其余五个调用点没有前置 `forget`。
+
+**我最初列出的第三条「`/todo clear` 不能清空」不成立**：`validTodoItems([])` 返回 `true`（`todo/model.ts:9-21` 只检查 `Array.isArray` 与元素合法性，空数组直接通过），所以 `clear` 发布的空数组会被 `setSessionTodos` 接受并覆盖。**`/todo clear` 这条路径是好的。**
+
+**会话切换路径也是好的**：`runtimeContext.ts:250-251` 先 `forgetSessionTodos` 再 `replayTodosFromMessages`，正是正确的两步。
+
+**所以缺陷只落在「压缩之后」与「五个缺少前置清理的调用点」上**，范围比初版小。
 
 **其余调用点**（`cliRuntimeModule.ts:143`、`bootstrap.ts:272`、`history.ts:169`、`navigation.ts:205`、`session.ts:22`）都**只调用 `replayTodosFromMessages`，没有先 `forget`**。
 
