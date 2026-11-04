@@ -10386,7 +10386,11 @@ M7 的拥有物是**一次文件改写**：计划 → 预览 → 应用 → 回�
 
 **这一层是本轮所见最扎实的实现**：身份绑定、路径锚定、独占创建、补偿状态机都在，且失败不会伪装成成功。
 
-#### 24.112.2 真实发现：一个 148 行的写入门面零生产消费者
+#### 24.112.2 ~~真实发现：一个 148 行的写入门面零生产消费者~~（**实施时被推翻**）
+
+> **结论修正**：准备删除这个门面时，把它测试的断言改到 `workspaceFilePath`/`inspectWorkspaceFile` 上，**8 条测试立刻失败**。门面做的路径规范化与生产函数不等价。保留门面，实际结论见 **24.112.4**。
+
+
 
 `createWorkspaceWriteAuthority`（[workspace.ts](../../packages/ts-shell/src/edit/authority/workspace.ts:66)）导出一个 9 方法接口（`readFile`、`readVerifiedFile`、`directoryExists`、`validateWriteTarget`、`validateCreateTarget`、`writeFile`、`createFileExclusive`、`moveFileExclusive`、`deleteFile`），文件 148 行。
 
@@ -11170,3 +11174,32 @@ fs.rmSync(sessionDir, { recursive: true, force: true });
 | M11 主张-证据索引重配 | 修法涉及持久化格式变更，需要迁移方案 |
 | M7 148 行零消费者门面 | 删除会影响测试引用面，需要确认无外部消费者 |
 
+
+#### 24.112.4 实施时被推翻：门面不是死代码，但它的接线缺口是真的
+
+准备删除 `createWorkspaceWriteAuthority` 时，我把 `files.test.ts` 里 8 条依赖它的断言改写成等价的 `workspaceFilePath` / `inspectWorkspaceFile` 调用。**8 条全部失败**，失败形式有两类：
+
+```
+expected: - outside        received: + File target contains a symlink.
+```
+
+**这说明门面做的不是「转发」**：
+
+- `workspaceFilePath(root, abs)` 直接 `path.resolve(root, abs)` 后判包含，遇到符号链接抛 `symlink`；
+- 门面先按**选定根**做词法比较、再按**规范化根**做真实路径比较，能接受「选定根与规范化根不同」的别名工作区。
+
+两者在别名场景下**行为不同**，我原来的判断（「它只是转发」）是错的。
+
+**所以门面不能删。** 撤回全部测试改写，`git checkout` 恢复两个测试文件。
+
+**但 24.112.2 的另一半仍然成立**：门面**没有生产调用者**。这不是「代码该删」，而是「这段能力只在测试里被验证过」：
+
+| 事实 | 状态 |
+|---|---|
+| 门面的路径规范化能力 | 真实且被 13 条测试覆盖 |
+| 生产写入路径是否用它 | **否**——走 `commitWorkspaceFile` + `verifyPathContainment` |
+| 生产路径是否具备同等的别名规范化 | **未验证**。`commitWorkspaceFile` 用 `fs.realpathSync(workspaceRoot)` 先规范化根，可能等价，但没有测试断言过 |
+
+**修正后的结论**：不是「删除死代码」，而是「**一个被充分测试的写入门面没有接进生产路径**」。要么把它接上（让生产写入也走它），要么补测试证明生产路径有同等保证。
+
+**这是本轮第三次「先下结论、实施时被测试推翻」**（前两次：24.121.5 todo、24.123.2 对照表）。三次的共同点是：**只读了实现，没读测试**。测试里写着设计意图，而我把测试当成了「实现的附属品」。
