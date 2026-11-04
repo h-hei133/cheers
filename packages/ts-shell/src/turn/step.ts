@@ -304,7 +304,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       // displayed still belongs in history. It receives no replay authority.
       const recorded = !step.reasoning && shownReasoning && (step.stopReason === 'error' || step.stopReason === 'aborted')
         ? { ...step, reasoning: { text: shownReasoning } } : step;
-      return origin ? { ...recorded, origin: recorded.origin ?? origin } : recorded;
+      return { ...recorded, toolsAllowed: allowTools, ...(origin ? { origin: recorded.origin ?? origin } : {}) };
     };
     // Older direct adapters supplied only a model and URL. Without the runtime
     // provider identity, retain their unique-model catalogue lookup.

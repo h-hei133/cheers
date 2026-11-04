@@ -23,7 +23,8 @@ import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import { withRequestOverhead } from '../../entrypoints/cliRuntimeInvocation.js';
 import { createStepFunction } from '../../turn/step.js';
 import type { PromptIdentitySnapshot } from '../../observability/usage/model.js';
-import { estimateTokens } from '../../session/context.js';
+import { estimateRequestTokens, estimateTokens } from '../../session/context.js';
+import { planCompaction, planCompactionCut } from '../../session/compaction.js';
 import { requestReplayBinding } from '../../provider/request/replay.js';
 import { outgoingProjection } from '../../turn/messages.js';
 import * as measurement from '../../turn/measurement.js';
@@ -220,6 +221,57 @@ it.each([undefined, 1200])('uses the top-level retention budget unless the model
   expect(wiring.policy.keepRecentTokens).toBe(modelBudget ?? 2000);
 });
 
+it.each([false, true])('prices projected tool history before fallback compaction (bridge=%s)', bridge => {
+  const catalog = [{ id: 'fixture', endpoint: 'openai-compatible' as const, models: [
+    { id: 'fixture-model', contextWindow: 50_000, compat: { assistantAfterToolResult: bridge } },
+  ] }];
+  const wiring = buildCompactionWiring({
+    provider: { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' },
+    runtimeConfig: { ...fixture.config, reserveTokens: 0, maxOutputTokens: 128, keepRecentTokens: 600 } as never,
+    sessionId: 'signed-summary', catalog,
+  });
+  const messages = Array.from({ length: 40 }, (_, index) => [
+    { role: 'user' as const, content: `read ${index}` },
+    { role: 'assistant' as const, content: '', tool_calls: [
+      { id: `read-${index}`, type: 'function' as const, function: { name: 'read', arguments: '{}' } },
+    ] },
+    { role: 'tool' as const, tool_call_id: `read-${index}`, content: `${index}:` + 'x'.repeat(4_000) },
+  ]).flat();
+  const original = structuredClone(messages);
+  const overhead = { systemPrompt: 'main system', tools: [{ name: 'read' }] };
+  const attached = withRequestOverhead({ ...wiring, onCompact: () => {} }, overhead)!;
+  const projected = outgoingProjection(messages, bridge).messages.map(message => ({ ...message, content: message.content ?? '' }));
+  const wireTokens = estimateRequestTokens(projected, overhead);
+  const rawTokens = estimateRequestTokens(messages, overhead);
+  expect(attached.policy.projectMessages!(messages)).toEqual(projected);
+  expect(rawTokens).toBeGreaterThan(40_000);
+  expect(wireTokens).toBeLessThan(20_000);
+  expect(planCompaction(messages, { ...attached.policy, projectMessages: undefined })).toBeDefined();
+  expect(planCompaction(messages, attached.policy)).toBeUndefined();
+  const invalidIdentity = { provider: 'fixture', model: 'fixture-model', endpoint: 'openai-compatible' as const,
+    ...requestIdentity(overhead), historyDigest: historyDigest(messages), wireHistoryDigest: historyDigest(projected),
+    wireMessageCount: projected.length + 1, replayBinding: requestReplayBinding({ provider: 'fixture', model: 'fixture-model', baseUrl,
+      endpoint: 'openai-compatible' }) };
+  recordSessionUsage('signed-summary', { promptTokens: 60_000, promptMessageCount: messages.length,
+    promptIdentity: invalidIdentity, attribution: captureUsageAttribution({ provider: 'fixture', model: 'fixture-model', baseUrl }) },
+  { promptMeasured: true });
+  expect(attached.policy.measureContextTokens!(messages, attached.policy.promptIdentity)).toBeUndefined();
+  // Rejecting an invalid anchor must return to projected pricing too, rather
+  // than immediately compressing the much larger raw history.
+  expect(planCompaction([...messages], attached.policy)).toBeUndefined();
+  expect(planCompaction([...messages], { ...attached.policy, projectMessages: undefined })).toBeDefined();
+  // A genuinely oversized projected request still compacts; only the trigger
+  // projection changes, while the retained cut keeps its raw-history indexes.
+  const oversizedPolicy = { ...attached.policy, contextWindow: wireTokens - 1 };
+  const rawPlan = planCompactionCut(messages, oversizedPolicy)!;
+  const plan = planCompaction(messages, oversizedPolicy);
+  expect(plan?.tokensBefore).toBe(wireTokens);
+  expect(plan).toEqual({ ...rawPlan, tokensBefore: wireTokens });
+  expect(messages.slice(plan!.cut)).toEqual(original.slice(rawPlan.cut));
+  if (bridge) expect(projected.length).toBeGreaterThan(messages.length);
+  expect(messages).toEqual(original);
+});
+
 it('uses a successful request anchor through the actual compaction and overhead wiring', async () => {
   const provider = { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' as const };
   const catalog = [{ id: 'fixture', endpoint: 'openai-compatible' as const, models: [{ id: 'fixture-model', contextWindow: 64000 }] }];
@@ -245,14 +297,10 @@ it('uses a successful request anchor through the actual compaction and overhead 
   expect(attached.policy.measureContextTokens!(messages, identity)).toBe(900);
   const tail = [{ role: 'assistant' as const, content: 'ok' }, { role: 'user' as const, content: 'next question' }];
   expect(attached.policy.measureContextTokens!([...messages, ...tail], identity)).toBe(900 + estimateTokens(tail));
-  // A closing step is answered with an instruction instead of tools, so the
-  // budget for that request must include it. Without the flag the same
-  // messages price lower, which is what a run that still has tools sees.
+  // This request never offered any tools, so the false flag does not make it
+  // a closing request and must not invent an instruction it will never send.
   const closing = attached.policy.measureContextTokens!([...messages, ...tail], identity, false);
-  const closingCost = estimateTokens([{ role: 'user', content: FINAL_STEP_MESSAGE }]);
-  // Rounding differs by at most one token between the two ceilings.
-  expect(closing! - (900 + estimateTokens(tail))).toBeGreaterThanOrEqual(closingCost - 1);
-  expect(closing! - (900 + estimateTokens(tail))).toBeLessThanOrEqual(closingCost + 1);
+  expect(closing).toBe(900 + estimateTokens(tail));
   // A fresh process has no sent-request identity yet; live schema/system plus
   // the strict persisted prefix proof can still evaluate the recovered anchor.
   accepted = undefined;
@@ -265,6 +313,28 @@ it('uses a successful request anchor through the actual compaction and overhead 
   }
   overhead.systemPrompt = 'changed system';
   expect(attached.policy.measureContextTokens!(messages, attached.policy.promptIdentity)).toBeUndefined();
+});
+
+it('rejects a tool-enabled anchor for the closing request and estimates its schema-free wire', () => {
+  const provider = { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' as const };
+  const messages = [{ role: 'user' as const, content: 'selected' }];
+  const overhead = { systemPrompt: 'effective main system', tools: [{ name: 'read', description: 'x'.repeat(5_000) }] };
+  const identity = { provider: provider.providerId, model: provider.model, endpoint: provider.endpoint,
+    ...requestIdentity(overhead), historyDigest: historyDigest(messages), wireHistoryDigest: historyDigest(messages),
+    wireMessageCount: messages.length, replayBinding: requestReplayBinding({ ...provider, provider: provider.providerId }) };
+  recordSessionUsage('signed-summary', { promptTokens: 9_000, promptMessageCount: messages.length, promptIdentity: identity,
+    attribution: captureUsageAttribution({ provider: provider.providerId, model: provider.model, baseUrl }) }, { promptMeasured: true });
+  const wiring = buildCompactionWiring({ provider, runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog: loadCatalog() });
+  const attached = withRequestOverhead({ ...wiring, onCompact: () => {} }, overhead)!;
+  expect(attached.policy.measureContextTokens!(messages, attached.policy.promptIdentity)).toBe(9_000);
+  expect(attached.policy.measureContextTokens!(messages, attached.policy.promptIdentity, false)).toBeUndefined();
+  const longer = [...messages, { role: 'assistant' as const, content: 'answer'.repeat(40) },
+    { role: 'user' as const, content: 'next'.repeat(40) }];
+  const policy = { ...attached.policy, contextWindow: 100, reserveTokens: 0, keepRecentTokens: 1 };
+  const plan = planCompaction(longer, policy, false);
+  const expected = estimateRequestTokens([...longer, { role: 'user' as const, content: FINAL_STEP_MESSAGE }],
+    { ...overhead, tools: [] });
+  expect(plan?.tokensBefore).toBe(expected);
 });
 
 it.each([-1, 0.5, 20])('rejects an invalid or mismatched wire anchor count (%s)', wireMessageCount => {

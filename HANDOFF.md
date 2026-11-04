@@ -2003,3 +2003,18 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A consumer regression passes after its guard is removed, or a bound status fixture unexpectedly becomes unknown.
 - **Root Cause**: Reading absent usage returns a detached empty value; mutating it never seeds the registry. Live status also compares the effective destination digest, so a provider/model-only fixture cannot prove the current target.
 - **Rule**: Seed registered usage before corrupting its identity, and assert the stored count first. Capture the effective target for status fixtures. Use an explicit isolated catalogue when testing missing limits; ambient catalogue contents cannot be a test prerequisite. Resolve the installed test runner from the current dependency layout rather than assuming a prior installation still exists.
+
+### Compaction Triggers Must Price The Request Projection
+- **Symptom**: Old large tool results trigger a summary even though the actual outbound request has ample headroom; a closing request still pays for withheld schemas.
+- **Root Cause**: Threshold and recovery checks count raw history while dispatch applies micro-compaction and bridging. A normal provider anchor also includes schemas that a closing request omits.
+- **Rule**: Share the outbound projection for fallback threshold, breakdown and recovery checks, but retain raw indexes for cuts and raw history for durable generation. Reject an anchor whose request shape changed instead of subtracting estimated schema cost from provider usage. Distinguish an empty tool pool from a closing instruction. Budget fixtures must declare output limits when asserting the soft band.
+
+### Tool Admission Must Survive The Response And Its Consumer
+- **Symptom**: A closing or no-tools request executes an unexpected model call, or a delegated refusal returns its narration as success before exhausting its budget.
+- **Root Cause**: Withholding schemas constrains the request but not execution; wrappers discard the effective admission and result classification checks only the step limit.
+- **Rule**: Carry effective tool admission through provider and caller wrappers without widening false. Reject before hooks, permission and execution, retain paired failed results, and classify delegated refusal independently of budget exhaustion. Cover native, inline and truncated calls plus an early refusal. Match persisted calls by result ID because the host may append a separate silence explanation afterward.
+
+### Resource Ownership Checks Need Parsed Executable Arguments
+- **Symptom**: A resource cleanup script identifies its own command shell as a language service and exits 143 after otherwise retiring the intended services.
+- **Root Cause**: Substring searches across complete command text match the script's embedded process-name literals.
+- **Rule**: Parse NUL-delimited argv and match actual executable/script path arguments, rejecting multiline shell text. Verify parent ancestry and start identity before signaling; print only safe PID/parent/start facts. Recheck remaining services and available memory after cleanup, and preserve the interrupted observation separately from verification results.

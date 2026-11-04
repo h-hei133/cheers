@@ -11,6 +11,7 @@ interface ProgressPolicy {
   readonly reserveTokens?: number;
   readonly outputTokens?: number;
   readonly overhead?: RequestOverhead;
+  readonly projectMessages?: (messages: readonly AgentMessage[]) => readonly AgentMessage[];
 }
 
 const DEAD_END_NOTICE = 'Compaction freed too little context to make progress — pausing automatic compaction on this history. '
@@ -24,7 +25,7 @@ function hasHeadroom(messages: readonly AgentMessage[], policy: ProgressPolicy,
     ? estimateTokens([checkpoint]) : 0;
   // A closing request carries an instruction the conversation does not, so the
   // residual must be measured against the request that will actually be sent.
-  const prompt = estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed));
+  const prompt = estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed, policy.overhead), policy.projectMessages);
   return prompt <= availableTailTokens(policy) + checkpointTokens;
 }
 

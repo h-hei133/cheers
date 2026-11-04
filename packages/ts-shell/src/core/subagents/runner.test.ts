@@ -146,6 +146,30 @@ describe("running a subagent", () => {
     expect(seen).toEqual([true, true, false]);
   });
 
+  it.each([1, 2])('refuses tools returned by the closing delegated step with limit %s', async maxTurns => {
+    let executed = 0; let before = 0; let after = 0;
+    const paired: AgentMessage[] = [];
+    let requests = 0;
+    const result = await runSubagent({
+      definition: { name: 'bounded', description: 'bounded', systemPrompt: 'Finish.', maxTurns, source: 'builtin' },
+      prompt: 'Inspect the fixture.', workspace: '/tmp',
+      events: event => { if (event.type === 'message_end' && event.message.role === 'tool') paired.push(event.message); },
+    }, { tools: new Map([['read', tool('read', () => { executed += 1; })]]), defaultMaxSteps: maxTurns,
+      beforeToolCall: async () => { before += 1; return undefined; },
+      afterToolCall: async () => { after += 1; return undefined; },
+      step: async () => ({ text: '', toolCalls: [{ id: `call-${++requests}`, name: 'read', args: {} }], stopReason: 'stop' }),
+    });
+    expect(requests).toBe(maxTurns);
+    expect(executed).toBe(maxTurns - 1);
+    expect(before).toBe(maxTurns - 1);
+    expect(after).toBe(maxTurns - 1);
+    expect(paired.at(-1)).toMatchObject({ tool_call_id: `call-${maxTurns}`, metadata: { status: 'failed' },
+      content: expect.stringContaining('this request does not allow tools') });
+    expect(result.failed).toBe(true);
+    expect(result.failure).toContain(`all ${maxTurns}`);
+    expect(result.finalText).toBe('');
+  });
+
   it("reports a run that used every step without finishing as a failure", async () => {
     // Narration is not an answer. A caller that reads it as one acts on a
     // half-finished delegation believing it succeeded.
@@ -167,6 +191,31 @@ describe("running a subagent", () => {
 
     expect(result.failed).toBe(true);
     expect(result.failure).toContain("2");
+  });
+
+  it('reports disallowed calls as a failure before the delegated step limit', async () => {
+    let requests = 0; let executed = 0; let before = 0; let after = 0;
+    const paired: AgentMessage[] = [];
+    const result = await runSubagent({
+      definition: { name: 'text-only', description: 'text only', systemPrompt: 'Answer from context.', maxTurns: 10, source: 'builtin' },
+      prompt: 'Inspect the fixture.', workspace: '/tmp',
+      events: event => { if (event.type === 'message_end' && event.message.role === 'tool') paired.push(event.message); },
+    }, { tools: new Map([['read', tool('read', () => { executed += 1; })]]), defaultMaxSteps: 10,
+      beforeToolCall: async () => { before += 1; return undefined; },
+      afterToolCall: async () => { after += 1; return undefined; },
+      step: async () => { requests += 1; return { text: 'Unverified narration', toolsAllowed: false,
+        toolCalls: [{ id: 'disallowed-call', name: 'read', args: {} }], stopReason: 'stop' }; },
+    });
+    expect(requests).toBe(1);
+    expect(executed).toBe(0);
+    expect(before).toBe(0);
+    expect(after).toBe(0);
+    expect(paired).toEqual([expect.objectContaining({ tool_call_id: 'disallowed-call', metadata: { status: 'failed' },
+      content: expect.stringContaining('this request does not allow tools') })]);
+    expect(result.steps).toBe(1);
+    expect(result.failed).toBe(true);
+    expect(result.failure).toContain('request that does not allow tools');
+    expect(result.failure).not.toContain('all 10');
   });
 
   it("does not call a run that answers on its last step a failure", async () => {

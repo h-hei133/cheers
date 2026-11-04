@@ -55,7 +55,7 @@ import { adaptTools } from "../turn/tools.js";
 import { assertAdmission, admittedFetch, type Admission } from '../core/network/admission.js';
 import { decodeWorkspaceRoots, type WorkspaceRoot } from '../core/workspace/model.js';
 import type { RequestPolicy } from '../core/agent/request/model.js';
-import { createProviderStep, delegatedSteps } from '../cli/provider/step.js';
+import { createProviderStep, delegatedSteps, providerToolsAvailable } from '../cli/provider/step.js';
 import { scopedRuntimeConfig, assertScopedModel } from '../config/scope/projection.js';
 import { credentialBlockMessage } from '../core/shell/providerCredentials.js';
 import { scopeAdmission } from '../config/scope/admission.js';
@@ -338,7 +338,9 @@ async function startTurn(
     requestApproval: createHookApprovalRequest(request.escalationPromptHandler),
     bypassed: request.runtimeConfig?.allowUntrustedHooks === true,
   });
-  const { tools, discovery, promptContext, currentOverhead } = await preparePromptRequest(request, dependencies.tools);
+  const { tools, discovery, promptContext, currentOverhead } = await preparePromptRequest({
+    ...request, toolsAvailable: providerToolsAvailable(request),
+  }, dependencies.tools);
   let runtimePromptIdentity = request.readPromptIdentity?.();
   const publishPromptIdentity = (identity?: PromptIdentitySnapshot): void => {
     runtimePromptIdentity = identity ?? { ...runtimePromptIdentity, ...requestIdentity(currentOverhead()) };

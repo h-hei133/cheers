@@ -167,6 +167,30 @@ describe("runAgentLoop", () => {
     expect(messages[messages.length - 1].stopReason).toBe("error");
   });
 
+  it.each(['stop', 'length'] as const)("refuses tool calls returned by a request that disallowed tools (%s)", async stopReason => {
+    const call: AgentToolCall = { id: "call-final", name: "read", args: { path: "a.txt" } };
+    const { seen, streamStep } = scriptedStream([{ ...toolStep([call], stopReason), toolsAllowed: false }]);
+    const { events, emit } = collect();
+    let executed = 0;
+    let hooks = 0;
+    const messages = await runAgentLoop([userMessage("finish")], [], {
+      streamStep,
+      beforeToolCall: async () => { hooks += 1; return undefined; },
+      tools: [{ name: "read", execute: async () => { executed += 1; return { output: "must not run", isError: false }; } }],
+    }, emit, undefined);
+
+    expect(executed).toBe(0);
+    expect(hooks).toBe(0);
+    expect(seen).toHaveLength(1);
+    expect(messages.find(message => message.role === "tool")).toMatchObject({
+      tool_call_id: call.id, content: expect.stringContaining("this request does not allow tools"), metadata: { status: 'failed' },
+    });
+    expect(events.filter(event => event.type === "tool_execution_end")).toEqual([
+      { type: "tool_execution_end", toolCallId: call.id, toolName: call.name, isError: true },
+    ]);
+    expect(events.at(-2)).toMatchObject({ type: "turn_end", willContinue: false });
+  });
+
   it("injects steering messages before the next assistant response", async () => {
     const { seen, streamStep } = scriptedStream([toolStep([]), textStep("steered")]);
     const { events, emit } = collect();

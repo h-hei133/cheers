@@ -5,7 +5,7 @@ sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
 updated: 2026-11-04
 tags: [features, phase-20, additions, interaction, panels, completion]
-summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-79，已把七轮用户反馈、子代理review发现与真实provider探针结果按职责归并，重复项合并，逐条记录完成情况。当前1完成、8部分完成、68本地验证、1本地实现、1未开始；其余章节保留研究过程与逐批证据。"
+summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-81，已把七轮用户反馈、子代理review发现与真实provider探针结果按职责归并，重复项合并，逐条记录完成情况。当前1完成、8部分完成、70本地验证、1本地实现、1未开始；其余章节保留研究过程与逐批证据。"
 confidence: mixed
 ---
 
@@ -493,6 +493,8 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-77 | P1 | 上下文溢出的回合错误要说明占用构成并给出可执行动作，而不是只说「无法自动压缩」 | 第 24.84 节、24.88、24.91、24.98、24.101、24.103 | 本地验证 | 已实现工具 schema/系统/历史/输出/预留占用拆分，自动摘要 admission/未产出安全报告；R6 同切点进度暂停与隔离 Node CLI 提示已验证；真实 provider/平台体验仍待实机复核 |
 | ADD-78 | P0 | 首次请求前检查预算：到达时已超预算的会话（resumed 或上回合无工具调用）应在发出请求前压缩 | 第 24.88、24.90、24.91、24.101、24.103 | 本地验证 | loop 与 session 回合前检查、反转和单测已验证；隔离真实 provider 的 Node CLI 已发布摘要与匹配 commit marker；R5/R6 本轮新增逻辑只具聚焦测试和本地 HTTP Node CLI 证据；未在 Node 20.3 floor 与真实交互终端复验 |
 | ADD-79 | P2 | 工具结果不再把完整 stdout/stderr 复制进 metadata；`/context` 说明未知锚点的原因 | 第 24.106.8、24.107.4、24.107.10、24.108 节 | 本地实现 | 删除两键与零消费者 `runGitCommand`、纠正失实的有界注释、持久化重启后的重建说明均已聚焦验证并有反转；未做真实 CLI/PTY 观察，未验证转录体积在真实长会话中的实际下降 |
+| ADD-80 | P1 | 自动压缩按实际发送投影估算；收尾撤掉 schema 并保留一次指令 | 第 24.109.2、24.109.7、24.109.12、24.110 节 | 本地验证 | 聚焦测试、反转与两个隔离 Node CLI 通过；按实际投影保留 headroom，收尾无 schema 且只有一次指令；真实 provider、平台矩阵仍缺 |
+| ADD-81 | P1 | 收尾与无工具请求返回的调用在执行前拒绝，委派及主回合如实停止 | 第 24.109.5、24.110 节 | 本地验证 | 主回合及委派拒绝已聚焦验证并有反转；隔离 Node CLI 未落盘恶意写入，call/result 配对 failed，持久终态 stopped；真实 provider 行为仍缺 |
 
 ### 12.12 归并说明
 
@@ -527,10 +529,10 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---:|---|
 | 完成 | 1 | ADD-28 |
 | 部分完成 | 8 | ADD-01、02、03、07、08、25、41、70 |
-| 本地验证 | 68 | 其余已实施条目（含 ADD-72 至 ADD-78） |
+| 本地验证 | 70 | 其余已实施条目（含 ADD-72 至 ADD-78、ADD-80/81） |
 | 本地实现 | 1 | ADD-79（第 24.108 节） |
 | 未开始 | 1 | ADD-30（已裁决不启动，需架构级租约） |
-| **合计** | **79** | — |
+| **合计** | **81** | — |
 
 ADD-72/ADD-73 于 2026-11-01 按第 24.78 节裁决实施，证据见第 24.79 节：两项均已落地并只做本地聚焦验证，尚未经真实终端观感与真实 provider 工作流验收。ADD-30 仍按既有记录不启动（需要架构级租约）。
 
@@ -10239,3 +10241,39 @@ wirePrice =  9,715      ← 实际发出的大小
 - 锚点的值是 provider 测得的 **wire**，不是原文。
 
 补正的办法只有一个：**测量前先读调用点，确认每个参数从哪来、经过哪些变换**。
+
+
+### 24.110 收尾准入与压缩请求投影实施（2026-11-03，America/Los_Angeles）
+
+按用户最新指令实施 24.109，研究记录的“只研究”边界不再作为本轮限制。新增 ADD-80/81，原 47 项矩阵、ADD-79 和所有外部验收缺口保持原记录。
+
+**裁决**：24.109.12 与 24.109.2/7 修复实际请求的回退预算；24.109.5 选择严格拒绝工具，与现有收尾指令一致。24.109.3/6 的收尾锚点守卫、24.109.8 的 bridge 前缀拒绝及 24.109.9 的 force 救援保留。不会把上一普通请求中包含 schema 的 provider 用量，减去一个估算 schema 后冒充已测量收尾请求。
+
+| 责任 | 实施 |
+|---|---|
+| 压缩阈值与报告 | `CompactionPolicy.projectMessages` 由原 CLI composition 接入 `outgoingProjection`，fallback 阈值、拒绝拆分与发布后的恢复带检查使用同一投影。切点和保留尾部仍基于原历史；摘要输入和持久原文不因此被剪裁 |
+| 收尾预算 | 有工具可撤下时，加入一次收尾指令并撤掉 schema；显式空工具池不虚构收尾消息。普通工具请求锚点不能定价无 schema 请求，失配回退投影估算；provider usage 与费用不修改 |
+| 无工具能力的模型 | 原 prompt preparation 接收已捕获模型的工具能力，提供实际无工具 system 与空 schema，同时保留工具池供原 gate/discovery 使用；preview 已有正确组装，不另建路径 |
+| 调用准入 | foreground、provider 和 delegated wrapper 各保留有效 admission，不能将底层 false 放大为 true。loop 在参数准备、hook、审批和执行前拒绝，逐个保留 call/result 配对与 failed metadata，停止继续请求；length 与 inline 调用同样适用 |
+| 结果真实性 | 主回合保留 stopped 终态；委派在预算未耗尽时发生 no-tools 拒绝也返回失败，不将模型旁白当作成功 |
+
+**定向对照**：只读 pi 的 `agent-session.ts` `_exceedsCompactionThreshold` 使用已投影上下文后判断阈值，本轮同意；切点仍保留本项目原历史索引。只读压缩提示的明确工具拒绝约束，本轮同意拒绝执行；保留本项目最后一次文字收尾机会，不改成直接停止。实际读取路径与新回归分别覆盖这两项决定；参考源码未复制到产品。
+
+**独立复核**：两个只读 `gpt-6.1-sol` 分别审查预算和执行。执行复核发现“委派在第 1/10 步拒绝工具却仍返回 failed:false”，已在原 runner 修正并添加回归；预算复核未发现具体产品缺陷，补强投影恢复带、bridge 原切点和失效锚点 fallback 的断言。两个实现代理也均为 `gpt-6.1-sol`，未派发任何验证命令。
+
+**主代理串行验证**：11 个直接相关测试文件，共 346 项不同测试通过；测试单线程、768 MiB heap，并隔离 HOME、USERPROFILE、CHEERS_TEST_ROOT 和 Git 向上发现边界。
+
+| 覆盖 | 测试文件（各责任目录内） | 通过 |
+|---|---|---:|
+| 投影阈值、原切点与恢复带 | runtime compaction、compaction budget、progress | 66 |
+| 工具拒绝、委派与持久终态 | agent loop、subagent runner、turn session | 87 |
+| 模型能力与实际 overhead | CLI invocation、provider step、prompt request | 47 |
+| 直接修改模块的既有行为 | turn step、session compaction | 146 |
+
+五项有效反转分别撤掉投影、加回收尾 schema、绕过执行拒绝、撤掉委派早期失败分类、忽略无工具能力；断言分别失败 **2 / 1 / 4 / 1 / 1**。所有变异均逐字节及 SHA-256 恢复；恢复后的四个受影响文件再跑 111 项通过，不重复计入 346 项。初次 runner 参数不兼容、预算 fixture 漏配输出限额和错误选择最后 assistant 的观察分别保留，均不计为产品失败或有效反转。
+
+五静态门（import cycles、config consumers、declarations、Node floor、strict docs drift）、`git diff --check` 与 TS build 通过，buildId 为 `5c266d80a648d6708902134727b4a293b5d34937479a7ee2f3580e8d4b74d910`。`analyze:module-facades` 只报告既有 `interactiveMode.ts` 22 名；仓库自带 NormProof archive 解包后 judge 退出 0，循环和未解析导入均 satisfied，总裁决仍 **partial**：既有 `interactiveMode.test.ts` 21 名与 `interactiveMode.ts` 22 名产生 1 项 advisory failed、2 个 proof gaps，无 blocking obligations/gaps。没有将退出 0 写成全面 proven。
+
+**隔离原生 CLI**：构建后的 Node CLI 对本地 HTTP fixture，顺序启动 maxTurns=2 和 maxTurns=1 两个独立进程。各自恢复 160 条消息（40 组小工具交互），原历史估算 **46,612** tokens，实际投影 **14,771** tokens，窗口 50,000；摘要请求和 compaction marker 均为 0。两步回合先发送 2 个 schema 并实际读取小文件，随后在收尾请求保留读取结果、撤掉全部 schema、只加 1 次收尾指令；一步回合直接采用同一收尾形状。fixture 在收尾返回恶意 write，两个进程都拒绝，目标文件不存在，持久 call/result 配对且结果 metadata 为 failed，`query.completed` 持久结果为 **stopped_error / stopped**。原历史正文、调用身份和内存输入保持不变，CLI 退出均 0、stderr 均 0 字节；进程退出码不代表回合成功。
+
+**证据与边界**：日志、反转回执、构建及 native 结果保存在 `.omx/artifacts/phase20-closing/`，临时运行目录已清理。本轮没有真实 provider、真实 PTY、单文件 exe、其他平台、Node 20.3 运行时、全仓回归或 20k 压力证据；Node 版本为 24.15.0，Node floor 静态门不能替代最低版本实跑。ADD-80/81 仅提升至本地验证，原 47 项仍为 38 完成 / 9 部分完成 / 0 未开始；外部条件继续延期。Git 提交、远端一致性与 CI 状态另以实际交付回执绑定，不从上述本地验证推断。

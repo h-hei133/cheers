@@ -281,7 +281,7 @@ function explainSilence(messages: readonly AgentMessage[], stepExplanation: stri
   // would print `[object Object]` where the tool's output should be.
   const lastToolText = messageToText(lastTool?.content);
   if (lastToolText) {
-    return `The tools ran but no answer followed. What the last one returned:\n\n${lastToolText.slice(0, 1000)}`;
+    return `No answer followed the last tool result:\n\n${lastToolText.slice(0, 1000)}`;
   }
   return stepExplanation ?? "The model returned nothing at all. Ask again, or check the provider with `/connect`.";
 }

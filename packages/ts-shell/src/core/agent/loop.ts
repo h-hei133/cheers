@@ -13,6 +13,7 @@ import {
 } from "./retry.js";
 import {
   executeToolBatch,
+  failDisallowedCalls,
   failTruncatedCalls,
   type AgentTool,
   type AgentToolCall,
@@ -21,6 +22,8 @@ import {
 } from "./tools.js";
 
 export interface AssistantStep {
+  /** Whether the request that produced this step admitted tool calls. */
+  readonly toolsAllowed?: boolean;
   /** Measurement belongs to this completed request, not the session's last response. */
   readonly promptMeasurement?: AgentMessage['promptMeasurement'];
   readonly admissionFailure?: import('./request/model.js').ModelAdmissionError['code'];
@@ -348,7 +351,10 @@ async function driveLoop(
       const toolResults: AgentMessage[] = [];
       hasMoreToolCalls = false;
       if (step.toolCalls.length > 0) {
-        if (step.stopReason === "length") {
+        if (step.toolsAllowed === false) {
+          const failed = await failDisallowedCalls(step.toolCalls, emit);
+          toolResults.push(...failed);
+        } else if (step.stopReason === "length") {
           const failed = await failTruncatedCalls(step.toolCalls, emit);
           toolResults.push(...failed);
           hasMoreToolCalls = true;

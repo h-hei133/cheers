@@ -14,10 +14,12 @@ import { resetSessionUsage } from '../../observability/usageTelemetry.js';
 import { cleanupAdvisorHarnesses, createAdvisorHarness } from '../../test-utils/advisor.js';
 import { runTurn } from '../../turn/session.js';
 import { CONTEXT_OVERFLOW_PREFIX } from '../../turn/step.js';
+import { FINAL_STEP_MESSAGE, outgoingProjection } from '../../turn/messages.js';
 import { condenseContext, createCompactionStep, planCompaction, type CompactionPolicy } from '../compaction.js';
 import { estimateRequestTokens, estimateTokens } from '../context.js';
 import { availableTailTokens, compactionThreshold } from './budget.js';
 import { CompactionPublicationError, type CompactionAuthority } from './contract.js';
+import { createCompactionProgress } from './progress.js';
 
 vi.mock('../../turn/cacheWarm.js', () => ({ createCacheWarmingRunner: () => ({ stop: vi.fn() }) }));
 
@@ -143,6 +145,33 @@ describe('threshold compaction progress', () => {
     expect(await step(snapshot(compacted))).toBeDefined();
     expect(summarize).toHaveBeenCalledTimes(2);
     expect(onDeadEnd).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears suppression using projected closing headroom without the withheld schemas', () => {
+    const messages: AgentMessage[] = Array.from({ length: 8 }, (_, index) => [
+      { id: `user-${index}`, role: 'user' as const, content: `read ${index}` },
+      ...toolGroup(`projected-${index}`, 4_000),
+    ]).flat();
+    const overhead = { systemPrompt: 'main system', tools: [{ name: 'read', description: 's'.repeat(35_000) }] };
+    const projectMessages = (source: readonly AgentMessage[]) => outgoingProjection(source, false).messages
+      .map(message => ({ ...message, content: message.content ?? '' }));
+    const projectedPolicy = { ...policy, contextWindow: 12_000, overhead, projectMessages };
+    const projected = projectMessages(messages);
+    const closing = { role: 'user' as const, content: FINAL_STEP_MESSAGE };
+    const headroom = availableTailTokens(projectedPolicy);
+    expect(estimateRequestTokens(projected, overhead)).toBeGreaterThan(headroom);
+    expect(estimateRequestTokens([...messages, closing], { ...overhead, tools: [] })).toBeGreaterThan(headroom);
+    expect(estimateRequestTokens([...projected, closing], { ...overhead, tools: [] })).toBeLessThanOrEqual(headroom);
+    const onDeadEnd = vi.fn();
+    const progress = createCompactionProgress(projectedPolicy, onDeadEnd);
+    const cut = messages.length - 3;
+    progress.accepted(messages, 3, true);
+    expect(progress.blocks(messages, cut, true)).toBe(true);
+    expect(onDeadEnd).toHaveBeenCalledOnce();
+    // Neither the original text nor the offered schema pool changed. Both
+    // projection and schema withdrawal are required to regain this headroom.
+    expect(progress.blocks(messages, cut, false)).toBe(false);
+    expect(progress.blocks(messages, cut, true)).toBe(false);
   });
 
   it('counts fixed instructions and schemas in both the publication and recovery checks', async () => {

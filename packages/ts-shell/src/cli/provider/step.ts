@@ -45,6 +45,17 @@ export interface ProviderStepHost {
   readonly onCredentialPersisted?: (rotation?: AccountRotation) => boolean | void;
 }
 
+/** The same captured catalogue address and model used by the request adapter. */
+export function providerToolsAvailable(request: Pick<ProviderStepHost,
+  'providerMode' | 'providerCredentialResolution' | 'providerCatalog'>, catalog?: readonly CatalogProvider[]): boolean {
+  if (request.providerMode === 'synthetic') return true;
+  const accepted = catalog ?? request.providerCatalog ?? loadCatalog();
+  const resolution = request.providerCredentialResolution;
+  const address = providerCredentialBaseUrl(accepted, resolution);
+  return resolveRequestShape(accepted, resolution.provider, resolution.model ?? resolution.credential?.model,
+    undefined, address ?? undefined).toolCalling;
+}
+
 export function createProviderStep(
   request: ProviderStepHost,
   tools: ReadonlyMap<string, ToolDefinition>,
@@ -63,7 +74,7 @@ export function createProviderStep(
   const endpoint = providerCredentialEndpoint(catalog, resolution, baseUrl);
   const configuredTier = requestServiceTier(request.runtimeConfig, resolution, catalog, baseUrl, endpoint, request.serviceTier);
   const contextWindow = configuredContextWindow(request.runtimeConfig, resolution);
-  const system = systemPromptSnapshot(request.agentMode, promptContext);
+  const system = systemPromptSnapshot(request.agentMode, promptContext, providerToolsAvailable(request, catalog));
   const targetIdentity = providerRequestTarget({
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
@@ -169,9 +180,7 @@ export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<str
     const step: StepFunction = async (...args) => { args[1]?.throwIfAborted(); await prepare(); args[1]?.throwIfAborted(); return active(...args); };
     // The same catalogue address the step itself resolves, so a delegated
     // instruction cannot claim tools the target model is declared not to take.
-    const address = providerCredentialBaseUrl(catalog, resolution);
-    const acceptsTools = resolveRequestShape(catalog, resolution.provider, resolution.model, undefined,
-      address ?? undefined).toolCalling;
+    const acceptsTools = providerToolsAvailable(selected, catalog);
     return { step, prepare, acceptsTools };
   };
   return Object.assign((...args: Parameters<typeof select>): StepFunction => select(...args).step,

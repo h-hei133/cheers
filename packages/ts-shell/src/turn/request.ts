@@ -60,6 +60,7 @@ export function createTurnRequest(
     lastSentRequest = undefined;
     let sentRequest: SentRequest | undefined;
     let inputTokens = 0;
+    const toolsAllowed = projection.stepCount < options.maxSteps;
     const step = await options.step(
       messages,
       signal,
@@ -70,7 +71,7 @@ export function createTurnRequest(
         onReplace: (text) => channel.push({ type: "message.replace", role: "coder", text }),
       },
       {
-        allowTools: projection.stepCount < options.maxSteps,
+        allowTools: toolsAllowed,
         ...(promptSource ? { promptSource } : {}),
         ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}),
         requestPurpose: requestPurposeFor(messages),
@@ -97,6 +98,6 @@ export function createTurnRequest(
       lastSentRequest = sentRequest;
       options.cacheWarming?.noteRequest(inputTokens, sentRequest);
     }
-    return step;
+    return { ...step, toolsAllowed: toolsAllowed && step.toolsAllowed !== false };
   };
 }

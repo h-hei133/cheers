@@ -45,25 +45,28 @@ export function formatBudgetBreakdown(messages: readonly AgentMessage[], policy:
   readonly overhead?: RequestOverhead;
   readonly outputTokens?: number;
   readonly reserveTokens?: number;
+  readonly projectMessages?: (messages: readonly AgentMessage[]) => readonly AgentMessage[];
 }, closingChars = 0): string {
   // One rounding over the whole request, exactly as the headline does it.
   // Rounding the instruction separately and adding the results is not the same
   // number, and the message states both.
-  const prompt = estimateWithClosing(messages, policy.overhead, closingChars);
+  const projected = policy.projectMessages?.(messages) ?? messages;
+  const overhead = closingChars === 0 ? policy.overhead : { ...policy.overhead, tools: [] };
+  const prompt = estimateWithClosing(projected, overhead, closingChars);
   // History is what the conversation contributes to that total, so the
   // instruction's share is whatever the single rounding attributed to it.
-  const history = estimateTokens(messages) + (prompt - estimateRequestTokens(messages, policy.overhead));
-  const tools = policy.overhead?.tools;
+  const history = estimateTokens(projected) + (prompt - estimateRequestTokens(projected, overhead));
+  const tools = overhead?.tools;
   const toolChars = tools?.length ? JSON.stringify(tools).length : 0;
-  const systemChars = policy.overhead?.systemPrompt?.length ?? 0;
+  const systemChars = overhead?.systemPrompt?.length ?? 0;
   const schemaTokens = Math.ceil(toolChars / CHARS_PER_TOKEN);
   const systemTokens = Math.ceil(systemChars / CHARS_PER_TOKEN);
   const rounding = prompt - history - schemaTokens - systemTokens;
   const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
   const fixed = schemaTokens + systemTokens + rounding;
   const format = (tokens: number) => tokens.toLocaleString('en-US');
-  const overhead = `fixed overhead ${format(fixed)} (tool schemas ${format(schemaTokens)}, system instructions ${format(systemTokens)}${rounding ? `, shared rounding ${rounding}` : ''})`;
-  const parts = `history ${format(history)} + ${overhead}`;
+  const fixedDescription = `fixed overhead ${format(fixed)} (tool schemas ${format(schemaTokens)}, system instructions ${format(systemTokens)}${rounding ? `, shared rounding ${rounding}` : ''})`;
+  const parts = `history ${format(history)} + ${fixedDescription}`;
   if (policy.outputTokens === undefined) {
     return `Estimated budget: ${parts} + reserve ${format(reserve)} = ${format(prompt + reserve)} known tokens; output is provider-selected and unknown.`;
   }
@@ -75,16 +78,23 @@ export function formatBudgetBreakdown(messages: readonly AgentMessage[], policy:
  * The instruction travels outside the message list, so every estimate that
  * prices a closing request has to add it explicitly.
  */
-export function closingCharsFor(toolsAllowed: boolean | undefined): number {
-  return toolsAllowed === false
+export function closingCharsFor(toolsAllowed: boolean | undefined, overhead?: RequestOverhead): number {
+  // Production callers supply the current overhead, so an empty tool pool is
+  // a direct-answer request rather than a closing step. Retain the old flag-
+  // only contract for policies that have no request overhead to describe it.
+  return toolsAllowed === false && (overhead === undefined || (overhead.tools?.length ?? 0) > 0)
     ? messageCharCount({ role: 'user', content: FINAL_STEP_MESSAGE } as AgentMessage) : 0;
 }
 
 /** The request's cost with the closing instruction folded in before rounding. */
 export function estimateWithClosing(messages: readonly AgentMessage[], overhead: RequestOverhead | undefined,
-  closingChars: number): number {
-  if (closingChars === 0) return estimateRequestTokens(messages, overhead);
-  const chars = messages.reduce((total, message) => total + messageCharCount(message), 0)
-    + overheadCharCount(overhead) + closingChars;
+  closingChars: number,
+  projectMessages?: (messages: readonly AgentMessage[]) => readonly AgentMessage[],
+): number {
+  const projected = projectMessages?.(messages) ?? messages;
+  if (closingChars === 0) return estimateRequestTokens(projected, overhead);
+  const closingOverhead = { ...overhead, tools: [] };
+  const chars = projected.reduce((total, message) => total + messageCharCount(message), 0)
+    + overheadCharCount(closingOverhead) + closingChars;
   return Math.ceil(chars / CHARS_PER_TOKEN);
 }

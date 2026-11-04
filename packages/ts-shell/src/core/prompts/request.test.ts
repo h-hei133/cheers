@@ -38,6 +38,20 @@ it('uses allowed and forced selections before building prompt names and refuses 
   await expect(preparePromptRequest(input, () => new Map())).rejects.toThrow('no longer available');
 });
 
+it('prices a no-tools model without withdrawing the gate and discovery tool pool', async () => {
+  const prepared = await preparePromptRequest({ workspaceRoot: root, catalogContent, toolsAvailable: false, agentMode: 'plan',
+    runtimeConfig: { toolDiscovery: 'dynamic', disabledTools: [], hiddenToolPrefixes: [] } as unknown as RuntimeConfig },
+  () => new Map([['read', tool('read')], ['deferred', tool('deferred')]]));
+  const before = prepared.currentOverhead();
+  expect(before.tools).toEqual([]);
+  expect(before.systemPrompt).toContain('No tools are available for this turn');
+  expect(before.systemPrompt).toContain('PLAN MODE ACTIVE: Answer from the conversation');
+  expect(prepared.currentTools().has('read')).toBe(true);
+  prepared.discovery!.load(['deferred']);
+  expect(prepared.currentTools().has('deferred')).toBe(true);
+  expect(prepared.currentOverhead()).toEqual(before);
+});
+
 it('reports higher-priority, missing and recursively imported instruction dependencies', async () => {
   const agents = path.join(root, 'AGENTS.md'); const nested = path.join(root, 'nested.md'); const missing = path.join(root, 'missing.md');
   fs.writeFileSync(agents, 'root\n@./nested.md'); fs.writeFileSync(nested, 'nested\n@./missing.md');

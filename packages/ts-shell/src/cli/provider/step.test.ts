@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
 import { createSubagentRunner } from '../../turn/subagent.js';
-import { createProviderStep, delegatedSteps, type ProviderStepHost } from './step.js';
+import { createProviderStep, delegatedSteps, providerToolsAvailable, type ProviderStepHost } from './step.js';
 import { declareEndpoint, endpointShape } from '../../provider/endpoints/index.js';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
@@ -24,6 +24,7 @@ import { modelPicker } from '../interactive/picker/model.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../session/model/state.js';
 import { writeCatalogCache } from '../../core/models/catalogStore.js';
 import { projectSessionModel } from '../../session/model/projection.js';
+import { preparePromptRequest } from '../../core/prompts/request.js';
 
 const servers: http.Server[] = [];
 afterEach(async () => {
@@ -89,11 +90,16 @@ it('uses the host plan mode for a foreground model that cannot call tools', asyn
       ? { ...model, toolCalling: false }
       : model),
   }));
-  const step = createProviderStep({
+  const request: ProviderStepHost = {
     ...server.request,
     agentMode: 'plan',
     providerCatalog,
-  }, new Map(), {});
+  };
+  const tools = new Map([['task', createTaskToolDefinition()]]);
+  const prepared = await preparePromptRequest({ workspaceRoot: setup.root, sessionId: setup.session.id,
+    agentMode: request.agentMode, toolsAvailable: providerToolsAvailable(request),
+    catalogContent: { skills: new Map(), tools: [] } }, () => tools);
+  const step = createProviderStep(request, prepared.tools, prepared.promptContext, prepared.discovery);
 
   const result = await step([{ role: 'user', content: 'Plan without tools' }], setup.signal, {}, { allowTools: true });
 
@@ -104,6 +110,8 @@ it('uses the host plan mode for a foreground model that cannot call tools', asyn
   expect(messages[0]?.content).toContain('PLAN MODE ACTIVE: Answer from the conversation');
   expect(messages[0]?.content).not.toContain('BUILD MODE ACTIVE');
   expect(messages[0]?.content).not.toContain('equipped with real tools');
+  expect(prepared.currentTools().has('task')).toBe(true);
+  expect(prepared.currentOverhead()).toEqual({ systemPrompt: messages[0]?.content, tools: [] });
 });
 
 it('keeps an explicit request tier ahead of the session, resolved connection and provider defaults', async () => {

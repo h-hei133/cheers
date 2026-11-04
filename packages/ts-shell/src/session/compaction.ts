@@ -136,6 +136,8 @@ export interface CompactionPolicy {
    * and the overhead is a fixed cost that does not shrink as history is dropped.
    */
   readonly overhead?: RequestOverhead;
+  /** The outbound message projection used when a provider measurement is unavailable. */
+  readonly projectMessages?: (messages: readonly AgentMessage[]) => readonly AgentMessage[];
 }
 
 /**
@@ -358,9 +360,9 @@ export function compactionRefusalReason(
   if (isBelowThreshold(messages, policy, toolsAllowed)) return undefined;
   const reason = explainNoCut(messages, policy);
   const measured = measureContextOnce(policy, messages, toolsAllowed);
-  const tokens = measured ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed));
+  const tokens = measured ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed, policy.overhead), policy.projectMessages);
   const state = `the prompt uses about ${Math.round(tokens).toLocaleString('en-US')} ${measured === undefined ? 'estimated' : 'provider-measured'} tokens for a ${policy.contextWindow.toLocaleString('en-US')}-token window`;
-  const breakdown = formatBudgetBreakdown(messages, policy, closingCharsFor(toolsAllowed));
+  const breakdown = formatBudgetBreakdown(messages, policy, closingCharsFor(toolsAllowed, policy.overhead));
   return reason === "no-legal-cut"
     ? { key: reason, message: `Context ${state}, but every point it could be split at would separate a tool call from its result. Finish the turn, then compact. ${breakdown}` }
     : { key: reason, message: `Context ${state}, but the conversation still fits the recent tail compaction keeps, so there is nothing to condense. Lower keepRecentTokens to condense it now. ${breakdown}` };
@@ -429,7 +431,7 @@ export function planCompaction(
   // The provider's own count wins when it exists: it measured the prompt that
   // was actually sent, while the estimate only measures the text we kept.
   const measuredTokens = measureContextOnce(policy, messages, toolsAllowed);
-  const tokensBefore = measuredTokens ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed));
+  const tokensBefore = measuredTokens ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed, policy.overhead), policy.projectMessages);
   const measured = measuredTokens !== undefined;
   if (!reachedBudgetThreshold(tokensBefore, policy, measured)) {
     return undefined;
@@ -451,7 +453,7 @@ function isBelowThreshold(
   toolsAllowed?: boolean,
 ): boolean {
   const measuredTokens = measureContextOnce(policy, messages, toolsAllowed);
-  const tokensBefore = measuredTokens ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed));
+  const tokensBefore = measuredTokens ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed, policy.overhead), policy.projectMessages);
   const measured = measuredTokens !== undefined;
   return !reachedBudgetThreshold(tokensBefore, policy, measured);
 }
@@ -608,7 +610,7 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
       turnStart: result.plan.turnStart < 0 ? -1 : result.plan.turnStart + offset,
       tokensBefore: input.force ? estimateTokens(original)
         : measureContextOnce(input.policy, original, input.toolsAllowed)
-          ?? estimateWithClosing(original, input.policy.overhead, closingCharsFor(input.toolsAllowed)) };
+          ?? estimateWithClosing(original, input.policy.overhead, closingCharsFor(input.toolsAllowed, input.policy.overhead), input.policy.projectMessages) };
     const messages = applyCompaction(original, plan, result.summary);
     return { ...result, plan, messages, tokensAfter: estimateTokens(messages) };
   } finally {

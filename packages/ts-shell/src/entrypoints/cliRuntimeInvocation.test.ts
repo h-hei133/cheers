@@ -467,6 +467,28 @@ describe("CLI runtime invocation", () => {
     expect(readiness).toHaveBeenCalledTimes(1); expect(step).toHaveBeenCalledTimes(1);
   });
 
+  it('prepares foreground compaction overhead for the captured no-tools model', async () => {
+    const catalog = [{ id: 'openai', baseUrl: 'https://fixture.invalid/v1', models: [{ id: 'text-only', toolCalling: false }] }];
+    const tools = new Map([['task', createTaskToolDefinition()]]);
+    const { deps } = dependencies();
+    let captured: Parameters<typeof turnSession.runTurn>[0] | undefined;
+    const original = turnSession.runTurn;
+    const spy = vi.spyOn(turnSession, 'runTurn').mockImplementation(options => { captured = options; return original(options); });
+    try {
+      const run = await runCliRuntimeInvocation(baseInput({ providerModeEnv: 'real', providerCatalog: catalog,
+        providerCredentialResolution: { ...providerCredentialResolution, model: 'text-only', baseUrl: 'https://fixture.invalid/v1' },
+        catalogContent: { skills: new Map(), tools: [] }, agentMode: 'plan',
+        compaction: { policy: { contextWindow: 10_000 }, summarize: async () => undefined, onCompact: () => {} },
+      }), { ...deps, tools: () => tools });
+      await collect(run.events);
+      expect(captured?.tools.has('task')).toBe(true);
+      expect(captured?.compaction?.policy.overhead?.tools).toEqual([]);
+      expect(captured?.compaction?.policy.overhead?.systemPrompt).toContain('No tools are available for this turn');
+      expect(captured?.compaction?.policy.overhead?.systemPrompt).toContain('PLAN MODE ACTIVE: Answer from the conversation');
+      expect(captured?.compaction?.policy.promptIdentity?.schemaDigest).toBe(createHash('sha256').update('[]').digest('hex'));
+    } finally { spy.mockRestore(); }
+  });
+
   it("preserves real-provider readiness stop before the turn starts", async () => {
     const { deps, calls } = dependencies();
     const failingDeps: CliRuntimeInvocationDependencies = {

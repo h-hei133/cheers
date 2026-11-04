@@ -172,17 +172,36 @@ export async function failTruncatedCalls(
   calls: readonly AgentToolCall[],
   emit: AgentEventSink,
 ): Promise<AgentMessage[]> {
+  return failToolCalls(calls, emit, call =>
+    `Tool call "${call.name}" was not executed: the response hit the output token limit, so its arguments may be truncated. Re-issue the tool call with complete arguments.`,
+  );
+}
+
+/** Pair tool calls that arrive on a request that explicitly disallowed tools. */
+export async function failDisallowedCalls(
+  calls: readonly AgentToolCall[],
+  emit: AgentEventSink,
+): Promise<AgentMessage[]> {
+  return failToolCalls(calls, emit, call =>
+    `Tool call "${call.name}" was not executed: this request does not allow tools. Answer from the information already available.`,
+    { status: 'failed' },
+  );
+}
+
+async function failToolCalls(
+  calls: readonly AgentToolCall[],
+  emit: AgentEventSink,
+  messageFor: (call: AgentToolCall) => string,
+  metadata?: Record<string, unknown>,
+): Promise<AgentMessage[]> {
   const messages: AgentMessage[] = [];
   for (const call of calls) {
     await emit({ type: "tool_execution_start", toolCallId: call.id, toolName: call.name, args: call.args });
-    const result: AgentToolResult = {
-      output: `Tool call "${call.name}" was not executed: the response hit the output token limit, so its arguments may be truncated. Re-issue the tool call with complete arguments.`,
-      isError: true,
-    };
+    const result: AgentToolResult = { output: messageFor(call), isError: true };
     await emitExecutionEnd(emit, call, true);
     messages.push(
       await emitToolResultMessage(
-        createToolResultMessage(call.id, result.output, result.metadata),
+        createToolResultMessage(call.id, result.output, metadata),
         emit,
       ),
     );

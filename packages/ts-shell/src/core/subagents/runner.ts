@@ -193,6 +193,7 @@ export async function runSubagent(
   });
 
   let steps = 0;
+  let lastToolsAllowed = true;
   let failure: string | undefined;
   const messages: AgentMessage[] = [
     { role: "user", content: instruction },
@@ -210,7 +211,10 @@ export async function runSubagent(
           errorMessage: 'Delegated request admission refused.', retriesExhausted: true });
         if (request?.requestId) await input.onRequest?.(request.requestId);
         steps += 1;
-        return host.step(context, signal, { allowTools: steps < maxSteps, allowedTools: allowed, requestId: request?.requestId });
+        const toolsAllowed = steps < maxSteps;
+        const step = await host.step(context, signal, { allowTools: toolsAllowed, allowedTools: allowed, requestId: request?.requestId });
+        lastToolsAllowed = toolsAllowed && step.toolsAllowed !== false;
+        return { ...step, toolsAllowed: lastToolsAllowed };
       },
       shouldStopAfterStep: () => steps >= maxSteps,
       ...(host.beforeToolCall ? { beforeToolCall: host.beforeToolCall } : {}),
@@ -245,6 +249,8 @@ export async function runSubagent(
     // concluded. A run that answers on its final step is not this case, which is
     // why the check is the step still wanting tools rather than the count alone.
     failure = `the subagent used all ${maxSteps} of its steps without finishing`;
+  } else if (!lastToolsAllowed && lastAssistant?.tool_calls?.length) {
+    failure = 'the subagent returned tool calls for a request that does not allow tools';
   }
 
   return {

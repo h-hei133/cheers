@@ -2,7 +2,7 @@
 title: "压缩操作与步骤幂等"
 category: article
 created: 2026-10-17
-updated: 2026-11-02
+updated: 2026-11-03
 tags: [context, compaction, phase-20]
 summary: "摘要的有界分段、永久重播证据与原生会话条件发布；不确定发送和未验证写入不能变成成功。"
 ---
@@ -44,6 +44,8 @@ step      = 精确消息 + previousSummary + instructions + history/prefix/merge
 - would-not-shrink、无合法切点、hook 拒绝和取消均不覆盖原历史；overflow 仍沿原有界救援路径。摘要未产出是 failed，自动路径显示安全失败原因；取消与阈值以内保持静默，unknown 不授权重发。
 - 阈值自动压缩在接受发布后检查完整残余请求（含系统与 schema）是否进入恢复带，并单独给 checkpoint 预算。未达标时提示一次，暂停同一保留切点的再次阈值压缩；追加消息不清除，切点推进、进入恢复带或新 run 清除。最新 tool call/result 原样保留。手动与 overflow 不受该暂停限制。
 - provider 锚点只校准原始前缀身份未变、可证明一一索引的文本投影。先重建锚点当时的 wire digest，再扣除当前已测量前缀相对旧 wire 的新增文本削减量，最后加入当前 wire 尾部估算。重复读取不累加削减，也不修改 provider usage/计费；新 provider 结果替换锚点。bridge、关闭附加消息、图片、opaque/foreign replay 或无法证明的重写回退估算；完全相同的关闭请求仍可直接使用其完整计量。校正是实测加字符估算，不冒充精确 tokenizer 数。
+
+自动阈值无可用 provider 锚点时，按当前 outbound 投影（包括微压缩与兼容桥接）估算，不能将未发送的旧工具正文计入触发条件；切点仍按原历史选择。收尾请求按原 system、空 schema 和一次收尾指令定价；没有工具可撤下时不附加指令。包含工具 schema 的普通锚点不用于收尾请求。发布后的恢复带检查使用相同投影和开销口径。
 
 ## 3. 原生条件发布
 

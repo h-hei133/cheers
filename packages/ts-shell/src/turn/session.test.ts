@@ -12,6 +12,7 @@ import { requestContext } from '../context/request/projection.js';
 import { TurnSink } from '../cli/interactive/turnSink.js';
 import { restoreConversation } from '../cli/interactive/history.js';
 import { Transcript } from '../presentation/tui/transcript/container.js';
+import { FINAL_STEP_MESSAGE } from './messages.js';
 
 /**
  * The turn is where the kernel's lifecycle meets the shell's contract. These
@@ -276,6 +277,50 @@ async function drain(events: AsyncIterable<QueryEvent>): Promise<QueryEvent[]> {
 }
 
 describe("runTurn", () => {
+  it.each([
+    { maxSteps: 1, inline: false }, { maxSteps: 2, inline: false },
+    { maxSteps: 1, inline: true }, { maxSteps: 2, inline: true },
+  ])('rejects tools returned by the actual closing request (%j)', async ({ maxSteps, inline }) => {
+    const sessionId = `closing-refusal-${maxSteps}-${inline}`;
+    const bodies: Record<string, unknown>[] = [];
+    const execute = vi.fn(async () => ({ success: true, output: 'observed once' }));
+    const definition = { ...echoTool('read', 'observed once'), execute };
+    const step = createStepFunction({ provider: { provider: 'fixture', model: 'm', baseUrl: 'https://fixture.invalid/v1', headers: {} },
+      sessionId, workspaceRoot: process.cwd(), systemPrompt: 'Answer the question.',
+      tools: [{ type: 'function', function: { name: 'read', parameters: { type: 'object' } } }],
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        const closing = bodies.length === maxSteps;
+        const id = closing ? 'call-final' : 'call-ordinary';
+        const message = closing && inline
+          ? { content: '<｜DSML｜invoke name="read"><｜DSML｜parameter name="arguments">{}</｜DSML｜parameter></｜DSML｜invoke>' }
+          : { content: '', tool_calls: [{ id, type: 'function', function: { name: 'read', arguments: '{}' } }] };
+        return new Response(JSON.stringify({ choices: [{ message, finish_reason: 'tool_calls' }] }),
+          { headers: { 'content-type': 'application/json' } });
+      },
+    });
+    const setup = options({ sessionId, step, maxSteps, tools: new Map([['read', definition]]) });
+    try {
+      const events = await drain(runTurn(setup).events);
+      expect(bodies).toHaveLength(maxSteps);
+      expect(execute).toHaveBeenCalledTimes(maxSteps - 1);
+      expect(bodies.at(-1)).not.toHaveProperty('tools');
+      expect(JSON.stringify(bodies.at(-1)?.messages)).toContain(FINAL_STEP_MESSAGE);
+      const result = setup.persisted.filter(message => message.role === 'tool').at(-1)!;
+      const assistant = setup.persisted.find(message => message.role === 'assistant'
+        && message.tool_calls?.some(call => call.id === result.tool_call_id))!;
+      expect(assistant.tool_calls).toHaveLength(1);
+      expect(result.tool_call_id).toBe(assistant.tool_calls![0]!.id);
+      expect(result.metadata).toMatchObject({ status: 'failed' });
+      expect(result.content).toContain('was not executed: this request does not allow tools');
+      expect(events.filter(event => event.type === 'tool.result').at(-1)).toMatchObject({ success: false });
+      expect(events.find(event => event.type === 'query.completed')).toMatchObject({ result: {
+        status: 'stopped_error', terminalClassification: 'stopped',
+        finalOutput: expect.stringContaining('No answer followed the last tool result'),
+      } });
+    } finally { resetSessionUsage(sessionId); }
+  });
+
   it("attributes the request after a discovery result without inferring from prose", () => {
     const search: SessionMessage[] = [
       { role: "assistant", content: "", tool_calls: [{ id: "s", type: "function",

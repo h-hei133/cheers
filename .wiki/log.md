@@ -11613,3 +11613,11 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 验证：新增 `bashResult.test.ts` 两项并做反转（加回两键即红，逐字节恢复后绿）；report/sessionFacts/configuration 82 项、bash 相关 82+6 项、`test:scripts` 191 项通过；五静态门与 TS build 通过；NormProof 经仓库 archive 解包运行，循环/未解析导入 satisfied，唯一失败仍是既有两处 `interactiveMode` 函数上限（non-blocking，partial）。未运行全仓回归、20k 压力、真实 provider/PTY 或并发验证。交付提交另行绑定。
 
 交付：ADD-79 实现与测试提交 `3e195a644c510e6c6bfc605e2915582f69e73ad9` 已推送 `origin/main`，远端 refs 精确匹配，工作区干净。该提交的 CI 结果另行读取，不计为已通过。
+
+### 2026-11-03：24.109 请求预算与收尾工具拒绝（ADD-80/81）
+
+实施见 `phase-20-addition.md` 24.110。自动压缩 fallback 与发布后的恢复带共用现有 outbound 投影，避免把未发送的大段工具正文计入阈值；原历史切点保持不变。收尾按空 schema 和一次指令定价，拒绝沿用带 schema 的普通请求锚点。无工具模型的 prompt 与 overhead 使用已捕获能力。有效工具准入贯通 provider、foreground 与 delegated wrapper，loop 在 hook/审批/执行前拒绝越界调用并持久配对失败结果。独立只读复核发现的委派早期拒绝仍返回成功问题已修复并加回归。
+
+主代理单线程串行验证：11 文件 346 项通过，五项反转产生 2/1/4/1/1 个断言失败，逐字节恢复后 111 项再通过；五静态门、diff check 与 TS build `5c266d80a648` 通过。NormProof 循环/未解析导入 satisfied，总裁决 partial，仅既有交互模块及测试的函数上限提示。两个隔离 Node CLI 对本地 HTTP fixture，160 条历史从原估算 46,612 降至投影 14,771 tokens，未误触摘要；普通读取实际执行，收尾无 schema、单次指令、恶意写入未落盘，持久终态 stopped_error/stopped。日志与回执在 `.omx/artifacts/phase20-closing/`。
+
+ADD-80/81 记本地验证，补充表共 81 项（1 完成 / 8 部分完成 / 70 本地验证 / 1 本地实现 / 1 未开始）；原 47 项矩阵不变。未跑真实 provider/PTY、exe、跨平台、Node 20.3、全仓或 20k；Git 与 CI 另绑定实际交付证据。

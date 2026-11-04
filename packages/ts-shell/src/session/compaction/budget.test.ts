@@ -42,9 +42,10 @@ it('labels provider-selected output unknown instead of counting it as zero', () 
 
 it('adds the closing instruction to the breakdown and the total together', () => {
   const messages = [{ role: 'user' as const, content: 'x'.repeat(1_400) }];
-  const policy = { overhead: { systemPrompt: 's', tools: [] }, reserveTokens: 10, outputTokens: 20 };
+  const policy = { overhead: { systemPrompt: 's', tools: [{ name: 'read' }] }, reserveTokens: 10, outputTokens: 20 };
   const open = formatBudgetBreakdown(messages, policy);
-  const closing = formatBudgetBreakdown(messages, policy, closingCharsFor(false));
+  const closingChars = closingCharsFor(false, policy.overhead);
+  const closing = formatBudgetBreakdown(messages, policy, closingChars);
   // The instruction is a real cost, so both the history line and the total
   // move by the same amount; it must not appear as "shared rounding".
   expect(closing).not.toBe(open);
@@ -52,9 +53,28 @@ it('adds the closing instruction to the breakdown and the total together', () =>
   // The total must equal the headline the refusal prints, which rounds once
   // over the whole request. Deriving the parts from a separately-rounded
   // instruction would make the two lines disagree by one token.
-  const headline = estimateWithClosing(messages, policy.overhead, closingCharsFor(false));
+  const headline = estimateWithClosing(messages, policy.overhead, closingChars);
   expect(closing).toContain(`= ${headline + 10 + 20} tokens.`);
+  expect(closing).toContain('tool schemas 0');
   // And the instruction must not be folded into "shared rounding", which is
   // what the estimate reports when it cannot attribute a difference.
   expect(closing).not.toContain('shared rounding 54');
+});
+
+it('keeps an explicitly empty tool pool free of the closing instruction', () => {
+  const overhead = { systemPrompt: 'direct answer system', tools: [] };
+  expect(closingCharsFor(false, overhead)).toBe(0);
+  expect(estimateWithClosing(messages, overhead, closingCharsFor(false, overhead)))
+    .toBe(estimateRequestTokens(messages, overhead));
+});
+
+it('uses projected history for the refusal headline and additive breakdown', () => {
+  const projected = [{ role: 'user' as const, content: 'x'.repeat(350) }];
+  const messages = [{ role: 'user' as const, content: 'x'.repeat(35_000) }];
+  const policy = { contextWindow: 100, reserveTokens: 0, outputTokens: 20,
+    overhead: { systemPrompt: 's'.repeat(350), tools: [] }, projectMessages: () => projected };
+  const refusal = compactionRefusalReason(messages, policy);
+  expect(refusal?.message).toContain('about 200 estimated tokens');
+  expect(refusal?.message).toContain('history 100 + fixed overhead 100');
+  expect(refusal?.message).toContain('= 220 tokens.');
 });

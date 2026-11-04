@@ -14,7 +14,7 @@ import { endpointShape, type EndpointKind } from '../../provider/endpoints/index
 import { resolveRequestShape, type ResolvedRequestShape } from '../../core/models/requestShape.js';
 import { KEEP_RECENT_TOKENS, type CompactionPolicy, type SummarizeHistory, type SummarizeTurnPrefix } from '../../session/compaction.js';
 import { DEFAULT_RESERVE_TOKENS } from '../../session/context.js';
-import { historyDigest } from '../../context/request/identity.js';
+import { historyDigest, requestIdentity } from '../../context/request/identity.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import { prepareCompactionMessages, requestCompactionSummary, type CompactionChatMessage, type CompactionProvider as SummaryProvider } from '../../core/query/compaction/summarize.js';
 import { TURN_PREFIX_COMPACTION_PROMPT } from '../../core/query/compaction/summarizer.js';
@@ -171,6 +171,7 @@ export function buildCompactionWiring(input: {
   const mainShape = input.provider.shape ?? resolveRequestShape(input.catalog, provider.providerId, provider.model, undefined, provider.baseUrl, provider.endpoint);
   const fallbackShape = summaryRole ? undefined : mainShape;
   const effectiveLimits = fallbackShape ? { ...summaryLimits, shape: fallbackShape } : summaryLimits;
+  const emptySchemaDigest = requestIdentity({ tools: [] }).schemaDigest;
   return {
     policy: {
       summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, effectiveLimits, serviceTier])).digest('hex'),
@@ -199,6 +200,15 @@ export function buildCompactionWiring(input: {
         runtimeConfig.keepRecentTokens,
         KEEP_RECENT_TOKENS,
       ),
+      // The fallback threshold must price the same projected history that the
+      // request path sends. In particular, micro-compaction can remove most of
+      // a large tool result before it reaches the provider, and protocol
+      // bridging can add an assistant acknowledgement in the middle.
+      projectMessages: (messages: readonly AgentMessage[]) => outgoingProjection(messages,
+        mainShape.assistantAfterToolResult).messages.map(message => ({
+        ...message,
+        content: message.content ?? '',
+      })),
       // The provider's own count, plus whatever the conversation has gained
       // since that request. Falls back to the estimate inside planCompaction
       // when no request has reported usage yet.
@@ -214,6 +224,10 @@ export function buildCompactionWiring(input: {
           || (identity?.replayBinding !== undefined && identity.replayBinding !== replayBinding)) return undefined;
         const usage = getSessionUsage(input.sessionId);
         const recorded = usage.lastPromptIdentity;
+        // An ordinary provider measurement includes the tool schemas. A
+        // closing request sends none, so that whole-request anchor cannot
+        // describe it and must fall back to the projected estimate instead.
+        if (toolsAllowed === false && recorded?.schemaDigest !== emptySchemaDigest) return undefined;
         const recordedHistory = recorded?.historyDigest;
         const measuredMessageCount = usage.lastPromptMessageCount;
         if (!Number.isSafeInteger(measuredMessageCount) || measuredMessageCount < 0 || measuredMessageCount > messages.length) return undefined;
@@ -240,7 +254,7 @@ export function buildCompactionWiring(input: {
         // A closing step is answered with an instruction instead of tools, so
         // the request carries one more message than the conversation does. The
         // step layer prices that message; this budget must agree with it.
-        const closing = toolsAllowed === false
+        const closing = toolsAllowed === false && mainShape.toolCalling && identity?.schemaDigest !== emptySchemaDigest
           ? [...tailMessages, { role: 'user' as const, content: FINAL_STEP_MESSAGE }] : tailMessages;
         const tail = estimatePromptTail(closing, { provider: provider.providerId,
           model: provider.model, endpoint, replayBinding, reasoningReplayField: mainShape.reasoningReplayField,
