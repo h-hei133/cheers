@@ -46,6 +46,29 @@ export function confirmRequestUnsent(ledger: RequestLedger, scopeId: string, seq
   return removeAttempt(ledger, scope, sequence);
 }
 
+/**
+ * Retire a request that was sent but whose response could not be read.
+ *
+ * Neither existing exit fits: `confirmUnsent` refuses once dispatched, because
+ * the bytes may have reached the provider, and `settle` needs a usage report
+ * that a failed read never produced. Leaving the attempt in `pending` is worse
+ * than either — the reservation keeps counting against the cap, so one
+ * unreadable response eventually refuses every later request with `exhausted`,
+ * which names a cause that is not true.
+ *
+ * The attempt is removed and the scope is marked history-unknown, which is what
+ * the ledger already means by "tokens were spent and we cannot say how many".
+ * That is a stricter state than a normal settlement, so a caller that can prove
+ * nothing was consumed should still use `confirmUnsent`.
+ */
+export function retireUnreadableRequest(ledger: RequestLedger, scopeId: string, sequence: number): RequestLedger {
+  const scope = requiredScope(ledger, scopeId);
+  if (finalizedSequence(scope.finalized, sequence)) return ledger;
+  const attempt = scope.pending[sequence];
+  if (!attempt?.dispatched) throw new ModelAdmissionError('replay');
+  return removeAttempt(ledger, { ...scope, historyUnknown: true }, sequence);
+}
+
 export function settleRequest(ledger: RequestLedger, scopeId: string, sequence: number, usage?: ModelUsage): RequestLedger {
   const scope = requiredScope(ledger, scopeId);
   if (finalizedSequence(scope.finalized, sequence)) return ledger;

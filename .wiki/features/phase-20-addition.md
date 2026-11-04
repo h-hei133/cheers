@@ -10855,7 +10855,11 @@ M6 的拥有物是**会话与转录**：写入 → 加锁 → 恢复 → 分支 
 | 用量恢复 | `restoreSessionUsage` | `currentUsage` 已存在时不覆盖；`restorablePromptMeasurement` 有 5 道守卫 |
 | 会话切换 | `runtimeContext.ts:248-253` | 切换时 `forgetSessionTodos` 新旧各一次，再 `replayTodosFromMessages` |
 
-#### 24.121.2 真实发现：todo 重放只写不清
+#### 24.121.2 ~~真实发现：todo 重放只写不清~~（**实施时被既有测试推翻**）
+
+> **结论修正**：本节的分析在实施阶段被两条既有测试推翻。保留原文作为过程记录，实际结论见 **24.121.5**。
+
+
 
 [replayTodosFromMessages](../../packages/ts-shell/src/core/commands/todoCommandRuntime.ts:93-101)：
 
@@ -11063,3 +11067,36 @@ core/tools/shell/background.ts:20
 
 **严重度重估**：初版记为「磁盘泄漏，不是安全或正确性问题」。可达性确认后应当提升——长期使用的项目目录会积累每一个历史会话的全部工具产物，且用户没有任何清理入口。
 
+
+#### 24.121.5 实施时被推翻：当前语义是被测试明确固定的
+
+准备按 24.121.2 修改 `replayTodosFromMessages` 时，发现 `todoPersistence.test.ts` 里有两条测试**明确固定了相反的行为**：
+
+```ts
+it("leaves the list alone when the turns say nothing about it", () => {
+  setSessionTodos("s-untouched", [{ id: 1, text: "keeps", status: "pending" }]);
+  replayTodosFromMessages("s-untouched", [{ role: "user", content: "hello" }, ...]);
+  expect(getSessionTodos("s-untouched").map((item) => item.text)).toEqual(["keeps"]);   // ← 保持不动
+});
+
+it("ignores a malformed record rather than adopting it", () => {
+  setSessionTodos("s-malformed", [{ id: 1, text: "real", status: "pending" }]);
+  replayTodosFromMessages("s-malformed", [{ role: "tool", metadata: { todo: [{ id: "one", text: 2, status: "maybe" }] } }]);
+  expect(getSessionTodos("s-malformed").map((item) => item.text)).toEqual(["real"]);     // ← 不覆盖
+});
+```
+
+**第二条尤其重要**：我原来的改法会让「转录里有一条格式非法的 todo」直接**清空**用户的清单。那不是修复，是把「显示陈旧」换成「数据丢失」。
+
+**所以 24.121.2 的定位错了。** 正确的定位是：
+
+| 位置 | 是不是缺陷 |
+|---|---|
+| 读取时「找不到就不动」 | **不是**。这是被测试固定的保守语义：无法证明转录说过什么时，保持现状比清空安全 |
+| 压缩时丢弃 todo 元数据 | **是**。信息在**写入历史**时就丢了，读取侧无论怎么写都救不回来 |
+
+**修法因此应当在压缩侧**：让 `applyCompaction` 把最近一条 todo 元数据保留到 checkpoint 之后（或作为 checkpoint 的附带字段），而不是改重放语义。
+
+**这条记录的价值**：它说明「读代码看出的不自洽」不一定是不自洽——**两处测试写明了为什么这样设计**，而我只读了实现。这与 24.123.2 的教训同型：**没读全就下结论**。
+
+**未实施**：压缩侧的改动涉及 checkpoint 格式与 `applyCompaction` 的契约，超出本轮范围，留作记录。

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRequestLedger, initializeRequestScope, reserveRequest, dispatchRequest, settleRequest, confirmRequestUnsent } from './ledger.js';
+import { createRequestLedger, initializeRequestScope, reserveRequest, dispatchRequest, settleRequest, confirmRequestUnsent, retireUnreadableRequest } from './ledger.js';
 import { decodeRequestLedger } from './codec.js';
 import { requestLedgerFacts } from './projection.js';
 import type { PreparedRequest } from './model.js';
@@ -95,5 +95,31 @@ describe('credential attribution', () => {
     const corrupt = JSON.parse(JSON.stringify(reserved.ledger));
     corrupt.scopes.goal.pending['1'].credentialGeneration = 'not-a-generation';
     expect(decodeRequestLedger(corrupt)).toBeUndefined();
+  });
+});
+
+describe('unreadable responses', () => {
+  it('retires a sent attempt whose answer could not be read, and says history is unknown', () => {
+    const first = reserveRequest(fresh(), scope.id, request, 20);
+    const sent = dispatchRequest(first.ledger, scope.id, first.value, 20);
+    // Without retiring it, the reservation blocks every later request.
+    expect(() => reserveRequest(sent, scope.id, request, 20)).toThrow(/exhausted/);
+
+    const retired = retireUnreadableRequest(sent, scope.id, first.value);
+    expect(retired.scopes.goal).toMatchObject({ pending: {}, historyUnknown: true });
+    // The scope now refuses for the honest reason rather than claiming the budget ran out.
+    expect(() => reserveRequest(retired, scope.id, request, 20)).toThrow(/history-unknown/);
+  });
+
+  it('refuses to retire an attempt that was never dispatched', () => {
+    const first = reserveRequest(fresh(), scope.id, request, 20);
+    expect(() => retireUnreadableRequest(first.ledger, scope.id, first.value)).toThrow(/replay/);
+  });
+
+  it('is idempotent once the sequence is finalized', () => {
+    const first = reserveRequest(fresh(), scope.id, request, 20);
+    const sent = dispatchRequest(first.ledger, scope.id, first.value, 20);
+    const retired = retireUnreadableRequest(sent, scope.id, first.value);
+    expect(retireUnreadableRequest(retired, scope.id, first.value)).toBe(retired);
   });
 });

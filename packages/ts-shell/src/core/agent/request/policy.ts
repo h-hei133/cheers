@@ -1,4 +1,4 @@
-import { confirmRequestUnsent, dispatchRequest, reserveRequest, settleRequest } from './ledger.js';
+import { confirmRequestUnsent, dispatchRequest, reserveRequest, retireUnreadableRequest, settleRequest } from './ledger.js';
 import type { ModelAttempt, RequestLedgerStore, RequestPolicy } from './model.js';
 import { ModelAdmissionError } from './model.js';
 
@@ -20,6 +20,7 @@ export function createRequestPolicy(store: RequestLedgerStore, scopeId: string, 
         id: `${scopeId}/${sequence}`,
         dispatch: () => store.transaction(true, (ledger, constraint) => ({ ledger: dispatchRequest(ledger, scopeId, sequence, available(constraint.cap)), value: undefined })),
         confirmUnsent: () => store.transaction(false, ledger => ({ ledger: confirmRequestUnsent(ledger, scopeId, sequence), value: undefined })),
+        retireUnreadable: () => store.transaction(false, ledger => ({ ledger: retireUnreadableRequest(ledger, scopeId, sequence), value: undefined })),
         settle: usage => {
           const breached = store.transaction(false, ledger => {
             const next = settleRequest(ledger, scopeId, sequence, usage);

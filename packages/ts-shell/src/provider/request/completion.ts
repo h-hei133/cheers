@@ -131,6 +131,10 @@ export async function requestSimpleCompletion(
     if (error instanceof SyntaxError) {
       request.onFailure?.(classifyProviderFailure({ message: "invalid response json" }));
     }
+    // The request was sent; only its answer is unreadable. Retiring the attempt
+    // keeps the reservation from counting as spent forever, which would refuse
+    // every later request with a budget error that describes the wrong cause.
+    try { attempt.retireUnreadable(); } catch { /* A lost ledger write must not replace the read failure. */ }
     throw error;
   }
   request.onUsage?.(completion.usage);
