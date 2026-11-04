@@ -11396,3 +11396,41 @@ const artifactsDir = path.join(privateWorkspace ?? path.join(path.resolve(worksp
 
 **这一步是怎么发现的**：写完 M9 后我按「什么能证伪这条」自查——`getShared` 有没有前置依赖？`realpathSync` 就是。这正是 24.126.2 记录的方法修正第一次生效。
 
+
+#### 24.127.6 补充验证：`finalized` 确实能防重发
+
+24.127.4 的修法假设「把序列加入 `finalized` 就能防重发」。用真实账本函数验证（`.tmp/probe/retry-guard.ts`，现已清理）：
+
+```json
+{ "finalized": [[1, 1]], "redispatch": "blocked: replay", "nextReserve": "allowed at seq 2" }
+```
+
+**结论**：把 attempt 移出 `pending` 并加入 `finalized` 之后——
+- 同一序列再次 `dispatchRequest` → **`replay` 拒绝**（防重发成立）；
+- 下一次 `reserveRequest` → **成功，seq 2**（额度释放成立）。
+
+**所以 24.127.4 的修法在技术上可行**：`finalized` 已经承担了防重发职责，`pending` 不必再兼一份。
+
+#### 24.127.7 但既有测试断言的是实现细节
+
+`budget.test.ts:150-153` 在同一个用例里同时断言了两件事：
+
+```ts
+expect(fetchImpl).toHaveBeenCalledOnce();                    // ← 行为：不重发
+expect(scope().pending['1']).toMatchObject({ dispatched: true });  // ← 实现：pending 里有记录
+expect(Object.keys(scope().pending)).toEqual(['1']);          // ← 实现：只有这一条
+```
+
+**我的改动只破坏了后两行**，第一行（真正的安全属性）在失败日志里没有报错。
+
+**这不是我能单方面裁决的**：
+
+| 选择 | 后果 |
+|---|---|
+| 改实现（回到 pending 保留） | 现状，已撤回。额度永久占用 + 错误文案说 `exhausted` |
+| 改测试（断言改为「不能再次 dispatch」） | 语义等价、额度可释放、文案可改真话；但改动了既有测试 |
+
+**倾向第二个，但需要作者确认**：`finalized` 已验证能防重发，测试的意图（`admits only one send`）在新实现下仍成立，只是断言方式需要从「pending 存在」改为「重发被拒」。
+
+**未实施**。当前代码状态是撤回后的原始实现，CI 会绿。
+
