@@ -12401,3 +12401,85 @@ omp 的 363 项里，多数依赖它特有的后端：
 
 **照抄这些会是「四不像」**：加了配置项，但背后没有实现。
 
+
+### 24.136 裁决：thinking level 的两条路径（2026-11-04）
+
+**用户裁决**：
+
+> thinking 命令有啥用？至于 thinking level 我们只做选模型时调、命令面板（/effort 无参数开面板），参数后缀已经实现就不用管了
+
+#### 24.136.1 先回答「`/thinking` 有什么用」
+
+`thinkingCommandRuntime.ts` 有两个分支：
+
+| 调用 | 行为 |
+|---|---|
+| `/thinking low\|medium\|high` | 调 `setModel([], context, global, effort)` **设置 effort** |
+| `/thinking off`（别名 `auto`、`none`） | 设为 `null`，让 provider 决定 |
+| `/thinking --global <level>` | 同时改全局默认 |
+| `/thinking`（无参数） | **只打印当前状态**，共 5 行：当前档位、模型、来源说明、提示、语法帮助 |
+
+语法定义（`thinking/syntax.ts:11-19`）确认了这些动作。
+
+**所以它是有用的**——设置 effort 的**唯一命令行入口**。缺的只是「无参数时打开面板」这个交互形式。
+
+#### 24.136.2 本项目的档位与 omp 不同
+
+```ts
+export const THINKING_LEVELS = ['low', 'medium', 'high'] as const;
+export type ThinkingPreference = ThinkingLevel | null;   // null = provider decides
+```
+
+**三档 + auto**，而 omp 是 `minimal / low / medium / high / xhigh / max` 六档 + auto。
+
+**这是有意的差异，不是缺口**：档位集合要与 provider 能力对齐，多出来的档位没有对应实现就是假的。**面板只显示这三档 + auto。**
+
+#### 24.136.3 裁决：只做两条路径
+
+| 路径 | 裁决 | 说明 |
+|---|---|---|
+| **选模型时调 effort** | ✅ 做 | 在模型选择流程里提供 effort 入口 |
+| **`/effort` 无参数开面板** | ✅ 做 | 复用已有的 thinking picker |
+| **参数后缀 `model:level`** | ✅ 已有，不管 | `/model --effort <level>` 已实现 |
+| **`shift+tab` 快捷键循环** | ❌ 不做 | 键位冲突，且用户未要求 |
+| **`app.thinking.cycle` 改名** | 待定 | 命名缺陷，与本次裁决无关，另行处理 |
+
+**`shift+tab` 冲突因此消失**：既然不做快捷键循环，`shift+tab` 继续用于 plan/build 切换，无需改动。
+
+#### 24.136.4 两条路径的实施要点（不实施，仅记录）
+
+**路径 1：选模型时调 effort**
+
+现状：模型详情面板的「Choose effort」**只在 `reason === 'reasoning effort unsupported'` 时出现**（`model.ts:217`）。
+
+要做的是**放宽这个条件**——让它在模型支持 reasoning 时也出现，而不只是出错补救。
+
+需要确认：
+- 哪些模型「支持 reasoning」——`modelEntry.reasoning !== false`（与 `requestShape.ts:176` 同一判据）；
+- 可选档位从哪来——`edit.efforts`（`role.ts:18` 已有此逻辑）或 `THINKING_LEVELS` 全量。
+
+**路径 2：`/effort` 无参数开面板**
+
+现状：返回 `{ kind: 'local', output: '...' }`（纯文本）。
+
+要改为返回 `{ kind: 'shell-action', action: 'thinking-panel' }` 之类，由交互层打开面板。
+
+**必须复用已有的 picker**：`picker/model/thinking.ts` 的 `modelRoleThinkingPicker` 已实现「当前档位 + 可选档位 + 不可用档位只读聚焦 + 归属复验」。需要泛化其签名（当前绑定 `SessionModelRole`），否则会造出第三套 thinking 选择器（24.135.3）。
+
+**泛化点**：
+
+```ts
+// 现在
+modelRoleThinkingPicker(current: SessionModelRole, efforts, assign: (e) => RoleResult, ...)
+// 泛化后
+thinkingPicker(current: { label: string; active: ThinkingPreference }, efforts, assign: (e) => void, ...)
+```
+
+角色面板与 `/thinking` 面板共用同一实现。
+
+#### 24.136.5 与 settings 缺口的关系
+
+24.134.7 列出的四类缺口（LSP、思考块折叠、压缩开关、中断行为）**不受本次裁决影响**——它们仍是独立的待办。
+
+thinking level 的配置维度**本来就有**（`/thinking` 能设），只是面板形式缺失。这与「功能不可配置」是两回事。
+
