@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ArtifactPublicationError, publishArtifact, publishTextArtifact } from './artifacts/publication.js';
 import { verifyPathContainment } from '../security/pathJail.js';
-import { assertProfileStorage, currentProfile, type ProfileIdentity } from '../paths/profile/context.js';
+import { assertProfileStorage, currentProfile } from '../paths/profile/context.js';
 import { profileScope } from '../paths/profile/scope.js';
 import { profileWorkspaceDir } from '../paths/profile/workspace.js';
 
@@ -59,72 +59,6 @@ export class ArtifactManager {
   get directory(): string {
     assertProfileStorage(this.artifactsDir, this.profile);
     return this.artifactsDir;
-  }
-
-  /**
-   * Remove this session's artifacts.
-   *
-   * They live in the workspace, not beside the session file, so deleting the
-   * session record does not reach them — the two roots are different trees. Left
-   * alone they accumulate for the life of the workspace, with no bound and no
-   * command to clear them, and every ordinary tool that truncates its output
-   * writes one.
-   *
-   * Removes the session directory rather than only `artifacts`, so nothing this
-   * class created is orphaned. The path is rebuilt from the session id under a
-   * fresh canonical workspace, so a workspace that has since moved is left alone
-   * rather than resolved through a stale path.
-   */
-  /**
-   * Remove a session's artifacts without requiring the workspace to still exist.
-   *
-   * `getShared` canonicalises the workspace first, which throws when the
-   * directory has been moved or deleted — the case where the artifacts are most
-   * likely to be orphaned. The layout is a pure function of the workspace path
-   * and the session id, so it can be computed directly; the removal re-checks
-   * the two path segments before deleting anything.
-   */
-  static removeSessionArtifactsAt(workspaceRoot: string, sessionId: string, profile: ProfileIdentity | undefined = currentProfile()): void {
-    if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) return;
-    // `profileWorkspaceDir` canonicalises too, so a missing workspace throws here
-    // as well. A named profile keeps its artifacts under the profile root, and
-    // that path cannot be derived from a workspace that no longer exists — so
-    // there is nothing to address and nothing to remove.
-    let privateWorkspace: string | undefined;
-    try { privateWorkspace = profileWorkspaceDir(workspaceRoot, profile); }
-    catch { return; }
-    const artifactsDir = path.join(privateWorkspace ?? path.join(path.resolve(workspaceRoot), '.ts-shell'),
-      "sessions", sessionId, "artifacts");
-    const sessionDir = path.dirname(artifactsDir);
-    const sessionsRoot = path.dirname(sessionDir);
-    try {
-      if (profile) assertProfileStorage(sessionDir, profile);
-      if (path.basename(artifactsDir) !== "artifacts" || path.basename(sessionsRoot) !== "sessions"
-        || sessionDir === sessionsRoot) return;
-      if (!fs.existsSync(sessionDir)) return;
-      fs.rmSync(sessionDir, { recursive: true, force: true });
-    } catch {
-      // Best-effort: the session record is already gone, and a cleanup failure
-      // must not surface as an error the user has to act on.
-    }
-  }
-
-  removeSessionArtifacts(): void {
-    const sessionDir = path.dirname(this.artifactsDir);
-    // `<root>/sessions/<id>/artifacts` — the directory we remove is `<id>`, and
-    // the one that must not be crossed is `sessions`.
-    const sessionsRoot = path.dirname(sessionDir);
-    try {
-      assertProfileStorage(sessionDir, this.profile);
-      if (path.basename(this.artifactsDir) !== "artifacts" || path.basename(sessionsRoot) !== "sessions"
-        || path.basename(sessionDir) === "" || sessionDir === sessionsRoot) return;
-      if (!fs.existsSync(sessionDir)) return;
-      fs.rmSync(sessionDir, { recursive: true, force: true });
-    } catch {
-      // Cleanup is best-effort: a session that was deleted stays deleted, and a
-      // failure here must not turn that into an error the user has to act on.
-    }
-    ArtifactManager.instances.delete(profileScope(JSON.stringify([this.storageRoot, path.basename(sessionDir)])));
   }
 
   static getShared(workspaceRoot: string = process.cwd(), sessionId: string = "default"): ArtifactManager {
