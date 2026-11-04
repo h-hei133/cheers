@@ -11203,3 +11203,48 @@ expected: - outside        received: + File target contains a symlink.
 **修正后的结论**：不是「删除死代码」，而是「**一个被充分测试的写入门面没有接进生产路径**」。要么把它接上（让生产写入也走它），要么补测试证明生产路径有同等保证。
 
 **这是本轮第三次「先下结论、实施时被测试推翻」**（前两次：24.121.5 todo、24.123.2 对照表）。三次的共同点是：**只读了实现，没读测试**。测试里写着设计意图，而我把测试当成了「实现的附属品」。
+
+### 24.125 M8 复核：`structuredFact` 与 `structuredFacts` 是两回事
+
+实施前复核发现我 24.113.1 的表述把两个不同的东西混在一起，需要拆开。
+
+| 名称 | 形态 | 生产者 | 消费者 | 状态 |
+|---|---|---|---|---|
+| `structuredFacts`（复数） | 7 个字符串数组（`stableProjectFacts`、`routeDecisions`…） | `projectMemoryFutureTurnAdapter.ts:96-119`，由 `candidateKind` 派生 | 注入质量、上下文格式化 | **正常** |
+| `structuredFact`（单数） | `{subject, predicate, object}` 三元组 | **无** | 检索打分（`retrieval.ts:180-182`）、冲突检测（`conflictDetection.ts:31,84-85`）、校验（`memoryValidation.ts:17-19`） | **只有读者** |
+
+**所以 24.113.1 的「读三处写零处」指的是单数形式**，这一点成立；但说「记忆条目带结构化字段」时我混淆了两者——复数形式是正常工作的。
+
+#### 24.125.1 参照对照：omp 有一个完整的三元组存储
+
+oh-my-pi 的 `mnemopi` 有一个独立的三元组表（`core/triples.ts`）：
+
+```ts
+add(subject: string, predicate: string, object: string, options?: TripleWriteOptions): number {
+  // 写入前先把同一 (subject, predicate) 的旧行 valid_until 置为现在
+  this.conn.run("UPDATE triples SET valid_until = ? WHERE subject = ? AND predicate = ? AND valid_until IS NULL", ...);
+  const result = this.conn.run("INSERT INTO triples (subject, predicate, object, valid_from, source, confidence) VALUES (...)", ...);
+}
+```
+
+**关键差异**：
+
+| 维度 | oh-my-pi | 本项目 |
+|---|---|---|
+| 存储 | 独立三元组表 | 记忆记录上的可选字段 |
+| 时间有效性 | `valid_from` / `valid_until`，写入时自动关闭旧值 | 无 |
+| 来源与置信度 | `source`、`confidence` | 无 |
+| 写入入口 | `add(...)`，明确 | **无** |
+
+**结论**：本项目抄了「三元组」这个形状（`subject/predicate/object` 三字段、冲突检测按 subject+predicate 分组），但**没有抄让它能工作的部分**——时间有效性、来源、以及最重要的写入入口。
+
+**这解释了为什么读取侧写得那么认真**：冲突检测、检索打分、校验三处都按「可能有多条同 subject+predicate 的事实」设计，而 omp 的 `valid_until` 正是为此存在的。本项目的 `structuredFact` 是单值字段，没有时间维度，**即使写入了也无法表达「这个事实曾经成立、现在不成立了」**。
+
+#### 24.125.2 不实施的理由（修正）
+
+24.124.4 说「需要先判定是否应当产生该字段，是产品决策」。查过参照后这个理由不成立——**应当产生**，omp 已经证明这个能力有用。
+
+**真正的理由是工作量与风险**：要让它工作，需要（1）决定三元组从哪来（提取器还是模型显式写入），（2）给记录加时间有效性，（3）迁移已有的记录格式。这是一项独立功能，不是缺陷修复。
+
+**记录为「能力未完成」，不是「缺陷待修」**。这与 M7 门面同型：代码在，但链路没接完。
+
