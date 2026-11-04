@@ -11621,3 +11621,5 @@ ADD-73：新增 `core/commands/model/defaultSource.ts` 做只读投影（connect
 主代理单线程串行验证：11 文件 346 项通过，五项反转产生 2/1/4/1/1 个断言失败，逐字节恢复后 111 项再通过；五静态门、diff check 与 TS build `5c266d80a648` 通过。NormProof 循环/未解析导入 satisfied，总裁决 partial，仅既有交互模块及测试的函数上限提示。两个隔离 Node CLI 对本地 HTTP fixture，160 条历史从原估算 46,612 降至投影 14,771 tokens，未误触摘要；普通读取实际执行，收尾无 schema、单次指令、恶意写入未落盘，持久终态 stopped_error/stopped。日志与回执在 `.omx/artifacts/phase20-closing/`。
 
 ADD-80/81 记本地验证，补充表共 81 项（1 完成 / 8 部分完成 / 70 本地验证 / 1 本地实现 / 1 未开始）；原 47 项矩阵不变。未跑真实 provider/PTY、exe、跨平台、Node 20.3、全仓或 20k；Git 与 CI 另绑定实际交付证据。
+
+实现 `ea557a062566493cfd3b1345b197156ca6d4e407` 已推送且远端一致。延后读取时该提交 CI/Watch 仍运行；上一研究提交 `182e8d86` 的 CI 唯一失败是 provider compaction 的旧校准 fixture。直接 job 日志取得断言并单文件复现后，确认 900-token 锚点低于需要扣除的削减量，产品拒绝正确。修正合成计量与软边界窗口，保留原 900 的拒绝回归；22 项通过、双层守卫反转红、精确恢复后 22 项再绿。本轮合计 12 文件 368 项不同测试、6 项有效反转；后续仅测试/文档补丁，不将本地修正记为 CI 已通过。

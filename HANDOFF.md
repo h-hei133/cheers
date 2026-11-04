@@ -2018,3 +2018,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A resource cleanup script identifies its own command shell as a language service and exits 143 after otherwise retiring the intended services.
 - **Root Cause**: Substring searches across complete command text match the script's embedded process-name literals.
 - **Rule**: Parse NUL-delimited argv and match actual executable/script path arguments, rejecting multiline shell text. Verify parent ancestry and start identity before signaling; print only safe PID/parent/start facts. Recheck remaining services and available memory after cleanup, and preserve the interrupted observation separately from verification results.
+
+### Calibration Fixtures Must Admit Their Own Rewrite
+- **Symptom**: A calibration test expects a provider count after pruning but receives undefined; increasing its anchor then crosses an unrelated hardcoded soft threshold.
+- **Root Cause**: The synthetic provider count is smaller than the later text deduction, so the existing prefix guard correctly rejects it. The window was chosen for the old invalid count.
+- **Rule**: Seed a plausible original-wire count, keep it distinct from local fallback, and bracket the actual corrected count with the test's threshold. Retain the undersized count as a refusal case without changing billed usage. When validating a reversal, check both prefix and caller guards; removing only a redundant outer check is not an effective reversal. If the run-level CI log is empty, read the failed job log before diagnosing the failure.

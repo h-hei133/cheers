@@ -16,6 +16,7 @@ import { historyDigest, requestIdentity } from '../../context/request/identity.j
 import { outgoingProjection } from '../../turn/messages.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import { planCompaction } from '../../session/compaction.js';
+import { estimateTokens } from '../../session/context.js';
 
 vi.mock('../../turn/cacheWarm.js', () => ({ createCacheWarmingRunner: () => ({ stop: vi.fn() }) }));
 
@@ -183,38 +184,49 @@ it('calibrates the actual microcompaction evaluator without altering provider us
     ...requestIdentity({ tools: [] }), historyDigest: historyDigest(messages),
     wireHistoryDigest: historyDigest(outgoingProjection(messages, false).messages), wireMessageCount: messages.length,
     replayBinding: provider.replayBinding };
-  recordSessionUsage(setup.session.id, { promptTokens: 900, promptMessageCount: messages.length, promptIdentity: identity,
+  // Seed a plausible synthetic count for the measured wire. The old constant
+  // was smaller than the later rewrite deduction and correctly failed admission.
+  // Keep provider accounting distinct from the local fallback estimate.
+  const promptTokens = estimateTokens(outgoingProjection(messages, false).messages) + 100;
+  recordSessionUsage(setup.session.id, { promptTokens, promptMessageCount: messages.length, promptIdentity: identity,
     attribution: captureUsageAttribution({ provider: main.provider, model: main.model!, baseUrl: main.baseUrl! }) });
   expect(input.runtimeContext.compactionMeasurement?.()).toBeUndefined();
-  expect(compaction.policy.measureContextTokens?.(messages, identity)).toBe(900);
+  expect(compaction.policy.measureContextTokens?.(messages, identity)).toBe(promptTokens);
   expect(input.runtimeContext.compactionMeasurement?.()).toEqual({ source: 'measured' });
   const tail = Array.from({ length: 4 }, (_, index) => [{ role: 'user' as const, content: `next ${index}` },
     { role: 'assistant' as const, content: 'answer' }]).flat();
   const corrected = compaction.policy.measureContextTokens?.([...messages, ...tail], identity);
   expect(corrected).toBeDefined();
-  expect(corrected).toBeLessThan(900);
+  expect(corrected).toBeLessThan(promptTokens);
   const grown = [...messages, ...tail];
+  expect(corrected).toBeGreaterThan(estimateTokens(outgoingProjection(grown, false).messages));
   // The raw estimate overstates the rewritten prompt. Threshold decisions
   // must use the calibrated value on both sides of the soft boundary.
-  const calibratedPolicy = { ...compaction.policy, contextWindow: 400, reserveTokens: 0,
+  const calibratedPolicy = { ...compaction.policy, contextWindow: 600, reserveTokens: 0,
     outputTokens: 1, keepRecentTokens: 20, promptIdentity: identity };
   expect(planCompaction(grown, calibratedPolicy)).toBeUndefined();
   expect(planCompaction(grown, { ...calibratedPolicy, contextWindow: 10 })?.tokensBefore).toBe(corrected);
   expect(compaction.policy.measureContextTokens?.([...messages, ...tail], identity)).toBe(corrected);
-  expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(900);
+  expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(promptTokens);
   expect(input.runtimeContext.compactionMeasurement?.()).toEqual({ source: 'measured' });
-  expect(compaction.policy.measureContextTokens?.(messages, identity)).toBe(900);
+  expect(compaction.policy.measureContextTokens?.(messages, identity)).toBe(promptTokens);
   expect(input.runtimeContext.compactionMeasurement?.()).toEqual({ source: 'measured' });
   markContextUnknown(setup.session.id);
   expect(input.runtimeContext.compactionMeasurement?.()).toBeUndefined();
-  recordSessionUsage(setup.session.id, { promptTokens: 900, promptMessageCount: messages.length, promptIdentity: identity,
+  recordSessionUsage(setup.session.id, { promptTokens, promptMessageCount: messages.length, promptIdentity: identity,
     attribution: captureUsageAttribution({ provider: main.provider, model: main.model!, baseUrl: main.baseUrl! }) });
-  expect(compaction.policy.measureContextTokens?.(messages, identity)).toBe(900);
+  expect(compaction.policy.measureContextTokens?.(messages, identity)).toBe(promptTokens);
   expect(input.runtimeContext.compactionMeasurement?.()).toEqual({ source: 'measured' });
   input.runtimeContext.promptIdentity = { ...identity };
   expect(input.runtimeContext.compactionMeasurement?.()).toBeUndefined();
-  expect(compaction.policy.measureContextTokens?.(messages, identity)).toBe(900);
+  expect(compaction.policy.measureContextTokens?.(messages, identity)).toBe(promptTokens);
   expect(input.runtimeContext.compactionMeasurement?.()).toEqual({ source: 'measured' });
+  recordSessionUsage(setup.session.id, { promptTokens: 900, promptMessageCount: messages.length, promptIdentity: identity,
+    attribution: captureUsageAttribution({ provider: main.provider, model: main.model!, baseUrl: main.baseUrl! }) });
+  expect(compaction.policy.measureContextTokens?.(grown, identity)).toBeUndefined();
+  expect(input.runtimeContext.compactionMeasurement?.()).toEqual({ source: 'estimated',
+    reason: 'The compaction evaluator could not use a current provider measurement.' });
+  expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(900);
   compaction.onCompact?.({} as never);
   expect(input.runtimeContext.compactionMeasurement?.()).toBeUndefined();
 });
