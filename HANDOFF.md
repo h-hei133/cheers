@@ -2023,3 +2023,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A calibration test expects a provider count after pruning but receives undefined; increasing its anchor then crosses an unrelated hardcoded soft threshold.
 - **Root Cause**: The synthetic provider count is smaller than the later text deduction, so the existing prefix guard correctly rejects it. The window was chosen for the old invalid count.
 - **Rule**: Seed a plausible original-wire count, keep it distinct from local fallback, and bracket the actual corrected count with the test's threshold. Retain the undersized count as a refusal case without changing billed usage. When validating a reversal, check both prefix and caller guards; removing only a redundant outer check is not an effective reversal. If the run-level CI log is empty, read the failed job log before diagnosing the failure.
+
+### Consumer Fixtures Must Leave An Ordinary Tool Step
+- **Symptom**: MCP approval/cancellation never starts and goal continuation pauses immediately after strict closing admission is enforced.
+- **Root Cause**: Injected model fixtures use a one-step budget yet return tools on that sole closing request; the old execution loophole accidentally made those tests pass.
+- **Rule**: Give tool workflow fixtures an ordinary step followed by a compliant closing answer, and assert the admission sequence as well as the actual effect. Keep explicit one-step refusal cases for zero approval/dispatch and durable scheduler pause. An automatic goal may continue after a bounded compliant answer; a refused closing call must retain its failure and must not be retried as an unfinished success.

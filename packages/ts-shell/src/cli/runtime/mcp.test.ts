@@ -32,7 +32,8 @@ function input(): CliRuntimeInvocationInput {
     prompt: "hello",
     workspaceRoot: root,
     signal: new AbortController().signal,
-    maxTurns: 1,
+    // Approval and cancellation require an ordinary step before closing.
+    maxTurns: 2,
     escalationPromptHandler: async prompt => ({ promptId: prompt.id, decision: "deny", respondedAt: 1 }),
     providerCredentialResolution: { provider: "openai", expectedEnvVarName: "OPENAI_API_KEY" },
     agentMode: "build",
@@ -104,20 +105,46 @@ it("shows exactly the model pool, including skills and MCP, then reflects change
 
 it.each(["allow-once", "deny"] as const)("runs an annotated plan MCP call only after %s", async decision => {
   const approve = vi.fn(async (prompt: { id: string }) => ({ promptId: prompt.id, decision, respondedAt: 1 }));
+  const admissions: boolean[] = [];
   const run = await runCliRuntimeInvocation({ ...input(), providerModeEnv: "real", agentMode: "plan",
     permissionScope: "ask", escalationPromptHandler: approve, mcpGateway: gateway,
   }, {
     checkProviderReadiness: async () => ({ ok: true }), hooks: new HookDispatcher(),
-    createStep: () => async messages => messages.some(message => message.role === "tool")
-      ? { text: "finished", toolCalls: [], stopReason: "stop" }
-      : { text: "", toolCalls: [{ id: "lookup", name: "mcp__local__echo_message", args: { message: "plan-check" } }], stopReason: "stop" },
+    createStep: () => async (messages, _signal, _listener, options) => {
+      admissions.push(options.allowTools);
+      return messages.some(message => message.role === "tool")
+        ? { text: "finished", toolCalls: [], stopReason: "stop" }
+        : { text: "", toolCalls: [{ id: "lookup", name: "mcp__local__echo_message", args: { message: "plan-check" } }], stopReason: "stop" };
+    },
   });
   const events = [];
   for await (const event of run.events) events.push(event);
   expect(approve, JSON.stringify(events)).toHaveBeenCalledOnce();
+  expect(admissions).toEqual([true, false]);
   const calls = fs.readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line)).filter(event => event.event === "tools/call");
   expect(calls).toHaveLength(decision === "allow-once" ? 1 : 0);
   expect(events.find(event => event.type === "tool.result")).toMatchObject({ success: decision === "allow-once" });
+});
+
+it('refuses a closing MCP call before approval and transport dispatch', async () => {
+  const approve = vi.fn(async (prompt: { id: string }) => ({ promptId: prompt.id, decision: 'allow-once' as const, respondedAt: 1 }));
+  const run = await runCliRuntimeInvocation({ ...input(), maxTurns: 1, providerModeEnv: 'real', agentMode: 'plan',
+    permissionScope: 'ask', escalationPromptHandler: approve, mcpGateway: gateway,
+  }, { checkProviderReadiness: async () => ({ ok: true }), hooks: new HookDispatcher(),
+    createStep: () => async (_messages, _signal, _listener, options) => {
+      expect(options.allowTools).toBe(false);
+      return { text: '', toolCalls: [{ id: 'closing-mcp', name: 'mcp__local__echo_message', args: { message: 'must-not-run' } }], stopReason: 'stop' };
+    },
+  });
+  const events = []; for await (const event of run.events) events.push(event);
+  expect(approve).not.toHaveBeenCalled();
+  const calls = fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line)).filter(event => event.event === 'tools/call');
+  expect(calls).toHaveLength(0);
+  expect(events.find(event => event.type === 'tool.result')).toMatchObject({ success: false,
+    output: expect.stringContaining('this request does not allow tools') });
+  expect(events.find(event => event.type === 'query.completed')).toMatchObject({ result: {
+    status: 'stopped_error', terminalClassification: 'stopped',
+  } });
 });
 
 it.each(['annotations', 'inputSchema', 'outputSchema', 'connection'] as const)(

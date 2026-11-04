@@ -38,20 +38,21 @@ afterEach(async () => {
 function command(args: string[]) { return runSessionGoalCommand(args, { cwd: root, projectRoot: root, sessionId: session.id }, manager, session); }
 function goal() { return readGoalEdit(manager, session).goal!; }
 
-function setup(step: StepFunction, submitOverride?: (run: (prompt: string, metadata: Record<string, unknown>) => Promise<void>, prompt: string, metadata: Record<string, unknown>) => Promise<void>) {
+function setup(step: StepFunction, submitOverride?: (run: (prompt: string, metadata: Record<string, unknown>) => Promise<void>, prompt: string, metadata: Record<string, unknown>) => Promise<void>, maxSteps = 2) {
   let scheduler!: GoalScheduler;
   const lines: string[] = [];
   const renderer = { renderLine: (line: string) => { lines.push(line); }, renderChunk: (delta: string) => { lines.push(delta); },
     renderReasoningDelta: () => {}, renderBlock: () => {} } as unknown as StreamingRenderer;
+  const read = vi.fn(async () => ({ success: true, output: 'observed' }));
   const runtime = new ShellSessionRuntime({ sessionManager: manager, renderer, onCancelRequested: () => scheduler.interrupt(),
     runPrompt: (prompt, signal) => runTurn({ sessionId: session.id, workspaceRoot: root, prompt, signal, step,
-      history: manager.getSession(session.id)!.turns.slice(0, -1), onMessage: message => manager.addTurn(session.id, message), hooks, maxSteps: 1, permissionScope: 'allow-all',
-      tools: new Map([['read', { name: 'read', description: 'Read-only fixture', argsSchema: { type: 'object' }, execute: async () => ({ success: true, output: 'observed' }) }]]) }) });
+      history: manager.getSession(session.id)!.turns.slice(0, -1), onMessage: message => manager.addTurn(session.id, message), hooks, maxSteps, permissionScope: 'allow-all',
+      tools: new Map([['read', { name: 'read', description: 'Read-only fixture', argsSchema: { type: 'object' }, execute: read }]]) }) });
   const run = async (prompt: string, promptMetadata: Record<string, unknown>) => { await runtime.executePrompt(session.id, prompt, { promptMetadata }); };
   scheduler = new GoalScheduler({ store: manager, current: () => session, cancel: () => runtime.cancelCurrentRun(), report: message => lines.push(message),
     host: { ready: () => runtime.getCurrentRunController() === null, submit: (prompt, metadata) => submitOverride ? submitOverride(run, prompt, metadata) : run(prompt, metadata) } });
   runtime.observeEvents(event => scheduler.observe(event), { renders: false }); schedulers.push(scheduler);
-  return { scheduler, runtime, lines };
+  return { scheduler, runtime, lines, read };
 }
 
 function completed(): Extract<QueryEvent, { type: 'query.completed' }> {
@@ -95,24 +96,49 @@ describe('durable goal scheduling', () => {
     } finally { vi.clearAllTimers(); vi.useRealTimers(); }
   });
 
-  it('continues beyond per-turn model step limits and retains actual prompt persistence and human origin', async () => {
+  it('continues across bounded turns after compliant closing answers and retains prompt persistence and human origin', async () => {
     manager.persistUserPromptBarrier(session.id, 'The human request'); manager.saveCompleted(session.id);
     let count = 0;
-    const step: StepFunction = vi.fn(async (_messages, _signal, listener) => {
+    const admissions: boolean[] = [];
+    const step: StepFunction = vi.fn(async (_messages, _signal, listener, options) => {
+      admissions.push(options.allowTools);
       listener.onText?.('another observation');
+      if (!options.allowTools) return { text: 'another observation', toolCalls: [], stopReason: 'stop' };
       return { text: 'another observation', toolCalls: [{ id: `read-${++count}`, name: 'read', args: {} }], stopReason: 'stop' };
     });
-    const { scheduler, lines } = setup(step);
+    const { scheduler, lines, read } = setup(step);
     expect(scheduler.start()).toBeUndefined();
-    await vi.waitFor(() => expect(goal().scheduling).toMatchObject({ phase: 'ready', round: 4, lastOutcome: 'step-limit', pendingRound: false }), { timeout: 3000, interval: 5 });
+    await vi.waitFor(() => expect(goal().scheduling).toMatchObject({ phase: 'ready', round: 4, lastOutcome: 'answer', pendingRound: false }), { timeout: 3000, interval: 5 });
     await command(['pause']); await scheduler.stop();
     const stopped = count;
     await new Promise(resolve => setTimeout(resolve, 120));
     expect(count).toBe(stopped); expect(stopped).toBeGreaterThanOrEqual(4);
+    expect(read).toHaveBeenCalledTimes(stopped);
+    expect(admissions).toEqual(Array.from({ length: stopped }, () => [true, false]).flat());
     expect(goal()).toMatchObject({ phase: 'paused', runOwner: null }); expect(goal().completion).toBeUndefined();
     expect(manager.getSession(session.id)!.turns.filter(turn => turn.role === 'user' && turn.metadata?.source === 'goal-continuation')).toHaveLength(stopped);
     expect(manager.buildContinuitySnapshot(session.id).lastUserIntent).toBe('The human request');
     expect(lines.join('\n')).toContain('another observation');
+  });
+
+  it('pauses after a closing tool refusal without executing or scheduling another round', async () => {
+    const step: StepFunction = vi.fn(async (_messages, _signal, _listener, options) => {
+      expect(options.allowTools).toBe(false);
+      return { text: 'Unverified narration', toolCalls: [{ id: 'closing-read', name: 'read', args: {} }], stopReason: 'stop' };
+    });
+    const { scheduler, read } = setup(step, undefined, 1);
+    expect(scheduler.start()).toBeUndefined();
+    await vi.waitFor(() => expect(goal()).toMatchObject({ phase: 'paused', runOwner: null,
+      scheduling: { phase: 'paused', round: 1, lastOutcome: 'refused', reason: 'refused', pendingRound: false, drain: 'settled' } }));
+    await scheduler.wait();
+    await new Promise(resolve => setTimeout(resolve, 120));
+    expect(step).toHaveBeenCalledOnce();
+    expect(read).not.toHaveBeenCalled();
+    expect(goal().completion).toBeUndefined();
+    const stored = manager.getSession(session.id)!;
+    expect(stored.turns.filter(turn => turn.metadata?.source === 'goal-continuation')).toHaveLength(1);
+    expect(stored.turns.find(turn => turn.tool_call_id === 'closing-read')).toMatchObject({ metadata: { status: 'failed' } });
+    expect(readGoalEdit(manager, session).state).toMatchObject({ terminalReason: 'stopped_error', terminalClassification: 'stopped' });
   });
 
   it('keeps a live scheduling owner during reentry and fences other request owners', async () => {
