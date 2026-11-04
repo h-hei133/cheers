@@ -11820,3 +11820,389 @@ const relative = lexical === '..' || lexical.startsWith(`..${path.sep}`) || path
 
 **本轮不实施**——这是研究结论。
 
+
+### 24.131 slash 命令执行与卡顿：registry 在输入路径上被反复重建
+
+本轮针对 slash 命令做专项研究。先量测，再对照。
+
+#### 24.131.1 实测：一次 registry 构建 10–120ms，102 个命令
+
+两次独立测量：
+
+| 探针 | 结果 |
+|---|---|
+| 单次构建 | `buildMs: 25.6`，102 个命令 |
+| 连续 6 次 | `[31.6, 21, 12.2, 9.9, 10.6, 18.6]` |
+| 交替测 registry 与 catalogContributions 共 10 轮 | **平均 117ms** |
+
+**区间跨度大（10–120ms）**，说明受 JIT、GC 与同进程其他活动影响。保守取**首次约 26ms、稳态约 10–20ms**，但**在长进程里可能显著更高**（117ms 那次与 `catalogContributions` 交替调用，可能是模块加载竞争）。
+
+`catalogContributions` 本身极快（**0.01ms**），不是瓶颈。
+
+（探针见 `.tmp/probe/registry-cost.ts`、`why-slow.ts`、`hot-path.ts`，本机 Node 24.15）
+
+**即便按最保守的 10ms 计**，它在输入路径上被反复触发也不可忽略。
+
+#### 24.131.2 四处构建点，两处在热路径上
+
+| 位置 | 触发时机 | 是否热路径 |
+|---|---|---|
+| `slashRouter.ts:12` | 每次提交一条命令 | 每次回车一次 |
+| `interactiveMode.ts:832` | `onSubmit` 判断是否是 `/exit` | **每次提交** |
+| `interactiveMode.ts:1030` | `onSubmit` 里 busy 时判断是否需要 composition | **每次提交** |
+| `preview.ts:77` | 每次上下文预览 | 150ms 防抖，**输入时持续触发** |
+
+**`:832` 与 `:1030` 在同一个 `onSubmit` 里**（`onSubmit` 覆盖 `:824-1055`）——一次回车最多构建两次 registry，再叠加 `slashRouter.ts:12` 的一次，**单次提交最多 3 次构建**。
+
+按实测区间估算：保守 30–80ms，长进程可达 350ms。
+
+`preview.ts:77` 更频繁，而且机制更明确：
+
+`interactiveMode.ts:351-359` 的 `identity()` **包含 `this.state.editor.textRevision`**：
+
+```ts
+identity: () => this.busy || this.stopped || this.pickerPending ? undefined : JSON.stringify([
+  ..., this.state.editor.textRevision, ...
+])
+```
+
+而 `context/controller.ts:77`：
+
+```ts
+if (actual !== key) { invalidate(); key = actual; retryAt = 0; input.repaint(); }
+```
+
+**每次按键都改变 `textRevision` → identity 变化 → `invalidate()` → 150ms 后重建预览 → `preview.ts:77` 重建 registry。**
+
+所以输入时**每停顿 150ms 就重建一次 registry**。这是比 `onSubmit` 更频繁的来源。
+
+#### 24.131.3 补全路径已有缓存（不是卡顿来源）
+
+`slashSuggestions.ts:13-37` 用模块级 `cached` + `cachedScope` + `subscribeSlashCommands` 失效订阅，**输入时不会重建**。这一层做得对。
+
+**所以问题定位很明确**：补全有缓存，提交与预览没有。
+
+#### 24.131.4 参照对照
+
+子代理检查了 oh-my-pi 的 settings 面板，其做法是**去中心化注册表 + 通用投影**（`src/config/registry.ts` 的 `register({... ui: {tab, group}})`，约 602 处注册）。本项目的 `createCommandRegistry` 是**一个 1,062 行的函数字面量**，每次调用重新构造 102 个命令对象。
+
+| 维度 | 本项目 | oh-my-pi（settings 面板） |
+|---|---|---|
+| 注册方式 | 单一巨型函数字面量 | 各域文件 `register()` |
+| 构建成本 | 每次 26ms | 一次性注册表，读取是投影 |
+| 缓存 | 补全有，提交/预览无 | 注册表常驻 |
+
+**结论**：卡顿不是某个命令慢，是**注册表构建被放在了热路径上**。可选方向：
+
+1. **缓存 registry**，按 `(cwd, configRevision)` 失效——最小改动，预计消除 78ms/次；
+2. 把 `/exit` 判断与 `needsComposition` 判断移到已缓存的 registry 上；
+3. 长期可考虑拆分为去中心化注册（对齐 omp），但那是重构。
+
+#### 24.131.5 未验证的部分
+
+- 26ms 是**单次同步构建**，未测量它在真实按键延迟中的占比（需要 PTY 实测）；
+- `preview.ts` 的实际触发频率未实测，只从代码推断（150ms 防抖）；
+- 未测量 `catalogContributions` 的开销（`slashRouter.ts:15` 与 `interactiveMode.ts:1030` 都调用它）。
+
+**以上都需要真实 PTY 测量才能定量**，本轮只做代码定位。
+
+
+### 24.132 model 与 thinking level：本项目缺三条快捷路径
+
+用户反馈：「选择模型的时候没法调 thinking level，选完模型之后也没法快捷更改 thinking level」。
+
+子代理逐条读了 oh-my-pi 的实现，我逐条核对本项目现状。
+
+#### 24.132.1 oh-my-pi 有四条路径
+
+| 路径 | 机制 | 位置 |
+|---|---|---|
+| **选择模型时** | `/model` 全屏 hub 分配角色后**自动打开 thinking 条** | `model-hub.ts:1305` `#openThinkingStrip(...)`；条脚注 `:2783` 「←→ thinking level · enter apply · cancel keep」 |
+| **选择后快捷键** | `shift+tab` **循环** thinking level | `app-keybindings.ts:116-119`；`input-controller.ts:3032-3040` |
+| **选择后命令** | `/effort [level]`，无参数打开 `ThinkingSelectorComponent` | `builtin-modes.ts:851,890`；`thinking-selector.ts:13` |
+| **参数后缀** | `model:level` 语法 | `model-selector.ts:33-70` |
+
+**注意**：alt+p 的紧凑模型选择器**没有** thinking 选择（`selector-controller.ts:860` 传 `undefined`），只有 `/model` 全屏 hub 有。**omp 自己也只在一个入口做了这件事。**
+
+#### 24.132.2 本项目现状
+
+| 路径 | 本项目 | 差距 |
+|---|---|---|
+| 选择模型时调 effort | 详情面板**有**「Choose effort」，但条件极窄：仅当 `reason === 'reasoning effort unsupported'`（`model.ts:217`）——即**当前 effort 不被该模型支持时才出现**。正常选择流程无入口 | **缺（只有出错补救）** |
+| 选择后快捷键 | `shift+tab` 绑定的是 **plan/build 模式切换**（`keybindings.ts:85`），不是 thinking 循环 | **缺，且键位冲突** |
+| 选择后命令 | `/thinking`（别名 `/effort`）存在，但**无参数时只打印文本**，不打开面板（`thinkingCommandRuntime.ts:20-26`） | **缺面板** |
+| 参数后缀 | `/model --effort <level>` 存在（`modelCommandRuntime.ts:81`） | 有 |
+
+**三条缺两条半。**
+
+**精确说明「选择模型时调 effort」的现状**：`model.ts` 的详情面板共有 4 个动作（`detailActions.push` 4 次）：
+
+| 动作 | 条件 |
+|---|---|
+| `Choose effort` | **仅当** `reason === 'reasoning effort unsupported'`（`:217`） |
+| `Account sign-in` | 有可用 sign-in 时（`:230`） |
+| `Configure connection` | 有 draft 或 signIn 时（`:232`、`:236`） |
+
+所以 effort 入口**存在但只在出错时出现**——用户正常选完模型，没有任何地方可以调 thinking level。这正是用户描述的现象。
+
+#### 24.132.3 关键冲突：`shift+tab` 已被占用
+
+```
+本项目：app.thinking.cycle → shift+tab → "Switch between planning and building"
+omp：  app.thinking.cycle → shift+tab → "Cycle thinking level"
+```
+
+**同一个键、同一个内部名（`app.thinking.cycle`），语义完全不同。** 本项目用它切 plan/build，omp 用它循环 thinking。
+
+这意味着「加 shift+tab 循环 thinking」**会与现有功能冲突**。三个选择：
+
+1. 把 plan/build 换到别的键（如 `ctrl+tab` 或 `alt+m`），`shift+tab` 让给 thinking——对齐 omp；
+2. thinking 循环用别的键（如 `alt+t`），保留 plan/build 的 `shift+tab`；
+3. 不做快捷键，只做 `/thinking` 面板。
+
+**需要裁决**，不是研究能定的。
+
+#### 24.132.4 `/thinking` 面板：改动最小、价值明确
+
+现状（`thinkingCommandRuntime.ts:20-26`）无参数时输出四行文本。改为返回 `shell-action` 打开面板，与 `/model` 的 `role.ts:thinking.ts` 已有实现同构：
+
+`picker/model/thinking.ts` 的 `modelRoleThinkingPicker` 已经实现了「当前档位 + 可选档位 + 不可用档位只读」的完整逻辑，可以复用。
+
+**这是三条里唯一不涉及键位冲突、可直接实施的。**
+
+#### 24.132.5 选择模型时调 effort
+
+omp 的做法是「分配角色后自动弹 thinking 条」。本项目的模型面板是 `category → row → details → configure` 结构（`picker/model/`），要加类似能力需要在 details 层插入一步。
+
+**难点**：本项目的 effort 是**每模型能力不同**的（`THINKING_LEVELS` + 目录能力），omp 用 `getSupportedEfforts(model)` 过滤。本项目已有 `role.ts:18` 的 `edit.efforts` 处理这个，可以复用。
+
+#### 24.132.6 本轮不实施
+
+按指令只做研究。上述三条路径的差距、`shift+tab` 冲突、可复用组件都已定位。
+
+
+### 24.133 ~~resume 面板：全屏模式下退化为静态文本~~（**自查时推翻**）
+
+> **结论修正**：`onSubmit` 在 `interactiveMode.ts:1020` 就用 `opensPicker` 拦截了 `/resume` 并打开 TUI picker，**根本走不到** `cliSessionModule.ts` 的降级分支。那个分支是给非交互宿主用的。详见 24.133.6。
+
+
+
+#### 24.133.1 发现
+
+`entrypoints/cliSessionModule.ts:83-91`：
+
+```ts
+// The interactive panel drives stdin keypresses itself. A host that captures
+// renderer output owns raw stdin, so the panel would fight it for keystrokes;
+// such hosts get the non-interactive overview instead.
+if (!input.readline || input.renderer.captured) {
+  renderSessionSurfaceOverview(input.renderer, input.sessionManager, input.runtimeContext);
+  return;
+}
+```
+
+而 `renderer.captured` 在 sink 被设置时返回 true（`presentation/terminal/streaming.ts:51-53`）：
+
+```ts
+get captured(): boolean { return this.sink !== undefined; }
+```
+
+**全屏 TUI 正是通过 sink 渲染的**，所以 `/resume` 在全屏模式下**永远走静态概览分支**，拿不到可交互的会话面板。
+
+#### 24.133.2 这不是设计意图
+
+注释写的理由是「captured 的宿主自己拥有 raw stdin，面板会和它抢按键」。但**全屏 TUI 有自己的输入分发**（`interactiveMode.ts` 的 `stdin.feed`），完全可以驱动面板——它已经驱动了 `overlay`、`pager`、各种 picker。
+
+**准确的表述**：这个判断是**为一种旧的宿主形态写的**（外部捕获输出、自己读 stdin 的脚本宿主），但它用了 `captured` 这个过于宽泛的条件，把全屏 TUI 也误伤了。
+
+#### 24.133.3 影响
+
+用户在**全屏模式**（默认 `tuiMode: "fullscreen"`）下输入 `/resume`，得到的是静态列表，**不能用方向键选择、不能切换会话**。必须切到 regular 模式才有交互面板。
+
+#### 24.133.4 参照
+
+oh-my-pi 的会话选择器是 `SessionSelectorComponent`（`session-selector.ts`），在 TUI 内正常工作，没有「captured 就降级」的分支。
+
+#### 24.133.5 修法方向（不实施）
+
+把判断从「`renderer.captured`」改为「**宿主是否提供了交互输入通道**」。`interactiveMode` 有 `stdin.feed`，应当被识别为可交互；而真正的外部捕获宿主没有。
+
+具体可加一个显式能力标志，而不是复用 `captured` 这个描述渲染路径的属性。
+
+
+### 24.134 settings 面板：与 oh-my-pi 的结构差距
+
+子代理完整读了 omp 的 settings 实现，我核对本项目现状。
+
+#### 24.134.1 oh-my-pi 的结构
+
+| 维度 | 实现 |
+|---|---|
+| 注册 | **去中心化**：各域文件调用 `register({... ui: {tab, group}})`，共约 602 处 |
+| 面板 | **通用投影**：遍历 `orderedSettings()` 按 tab 过滤（`config/settings-ui.ts:61-92`），不硬编码任何设置 |
+| 标签页 | 10 个固定：Appearance、Model、Interaction、Context、Memory、Files、Shell、Tools、Tasks、Providers（+ Plugins） |
+| 可编辑项 | **约 442 项**（tools 79、model 65、interaction 56、appearance 48、tasks 44、providers 41、context 31、memory 31、files 29、shell 18） |
+| 编辑器 | 由 `schemaType` + `ui.options` 派生：布尔→切换、枚举→循环或子菜单、数字→步进器、字符串→文本（凭据掩码）、数组→多选、记录→JSON |
+| 写入 | **立即生效**，无 Apply/Discard；后台防抖持久化 |
+| 预览 | **只在悬停时**（主题、状态栏），Esc 撤销 |
+| 只读/需重启 | **无结构化标志**，靠描述文本说明或直接隐藏 |
+
+#### 24.134.2 本项目的结构
+
+| 维度 | 本项目 |
+|---|---|
+| 注册 | `config/fields.ts` 的 `field()` 声明 + `settings.ts` 的分类映射 |
+| 面板 | `cli/interactive/picker/settings/`，按分类渲染 |
+| 标签页 | 11 类：`all / Appearance / Model / Interaction / Context / Memory / Files / Shell / Tools / Tasks / Providers` |
+| 可编辑项 | **62 个已声明字段**（`check-config-consumers` 报 `fields=62`） |
+| 写入 | **staged + Apply**（与 omp 相反） |
+| 预览 | 有主题预览 |
+
+#### 24.134.3 精确数字：43 个字段声明，35 个进面板，9 个缺失
+
+初版写「62 对 442」用的是 `check-config-consumers` 报的字段数，那是**包含嵌套子字段**的统计，不是面板项数。逐项比对后的准确数字：
+
+```
+fields.ts 声明: 43      settings.ts 面板项: 35      缺失: 9
+```
+
+**9 个缺失逐一核对**：
+
+| 字段 | 是否应当进面板 |
+|---|---|
+| `providerCredentials`、`accountPool`、`providerConnections`、`activeProviderConnectionId` | **不应**——凭据类，有专用面板 |
+| `provider` | **不应**——由 `/connect` `/model` 管理 |
+| `modelPreferences` | **不应**——由 `/model` 管理 |
+| `schemaVersion` | **不应**——内部字段 |
+| `allowUntrustedHooks` | **不应**——安全开关，不宜在通用面板暴露 |
+| `tui` | **不应**——父对象本身不进面板，但它的**子项以点号形式单独声明**（`'tui.composerShape'`、`'tui.statusItems'` 见 `settings.ts:55-56`），已计入 35 项 |
+
+**所以真正的缺口是零。** 9 个缺失字段全部是有意排除（凭据、内部、安全开关、父对象）。
+
+**这与用户说的「settings 面板中还有很多没有实现」不符**——至少在「已声明字段是否有面板入口」这个维度上，答案是「全部有」。用户感受到的「没实现」更可能指**功能本身不存在**（对照 omp 的 442 项），而不是**已有功能没有入口**。
+
+**但这不改变可扩展性判断**：omp 的面板是**注册表的投影**，加一个设置只需在该域文件 `register()` 一次，面板自动出现；本项目加一个设置要改 `fields.ts` + `settings.ts` + 可能的专用面板代码。
+
+**这是可扩展性差距，不是功能数量差距。**
+
+#### 24.134.4 用户说的「settings 面板中还有很多没有实现」
+
+需要区分两种「没实现」：
+
+1. **字段已声明但面板无入口**——可以用 `check-config-consumers` 反向查（它已确认 62 个字段都有生产读者，但**不检查是否有面板入口**）；
+2. **功能本身不存在**——需要对照 omp 的 442 项逐项比对，工作量大。
+
+**本轮只定位了第 1 种的方法，没有逐项比对**。这是后续工作。
+
+#### 24.134.5 写入语义：本项目与 omp 相反，且本项目的更安全
+
+| | 本项目 | omp |
+|---|---|---|
+| 写入 | staged，按 Apply 提交 | 立即写入 |
+| 取消 | Discard 丢弃 | 无（只能手动改回） |
+
+**本项目在这点上更好**：设置面板误触不会立即改配置。omp 的「立即写入」在误触时已经落盘。
+
+**不建议对齐 omp 的写入语义。**
+
+
+#### 24.131.6 自查修正：两处比初版写的更严重
+
+初版写完后我逐条复核，两处需要修正。
+
+**修正 1：`/resume` 的降级不只在全屏模式**
+
+初版写「全屏 TUI 通过 sink 渲染，所以 `captured` 为真」。复核 `interactiveMode.ts:1119`：
+
+```ts
+this.sink.begin(text.startsWith("/") ? "command" : "turn", command);
+this.options.renderer.setSink(this.sink);      // ← 每次运行命令/回合前都设置
+try { const result = await routeInteractiveCommand({ ... }); }
+```
+
+**它在每次运行命令或回合前都会 `setSink`**，与 tuiMode 无关。所以 `/resume` 在**普通模式和全屏模式都会降级**——比初版说的范围更大。
+
+**修正 2：`app.thinking.cycle` 是一个命名错误**
+
+```ts
+// keybindings.ts:85
+"app.thinking.cycle": { defaultKeys: ["shift+tab"], description: "Switch between planning and building" },
+// keymap.ts:255-258
+case "app.thinking.cycle":
+  actions.cycleAgentMode();          // ← 切换 plan/build，与 thinking 无关
+```
+
+而 `app.thinking.toggle`（`ctrl+t`）做的是**折叠思考块**（`toggleCollapsed("thinking")`）。
+
+**两个以 `app.thinking.*` 命名的绑定，没有一个控制 thinking level。** 这不是「键位被占用」那么简单——**名字在说谎**。任何按名字推断行为的人（包括做 omp 对照的我）都会得出错误结论。
+
+**这是一个独立的缺陷**：绑定 id 应当描述它实际做的事。`app.thinking.cycle` 应改为 `app.agentMode.cycle` 之类。
+
+
+#### 24.133.6 自查推翻：`/resume` 在交互模式下走的是 TUI picker
+
+24.133.1 的结论「全屏模式下降级为静态文本」是**错的**。推翻过程：
+
+**第一步**：确认 `setSink` 确实在每次命令前执行（`interactiveMode.ts:1119`）——这部分成立。
+
+**第二步**：但 `onSubmit` 在此之前就拦截了 `/resume`（`interactiveMode.ts:1020-1023`）：
+
+```ts
+if (!this.busy && opensPicker(text, catalogScope(this.options.runtimeContext))) {
+  this.openPicker(text);
+  return;        // ← 在这里返回，不会走到 run()
+}
+```
+
+而 `PICKERS` 里确实注册了 `resume: host => savedSessionPicker(host, 'resume')`（`picker/registry.ts:109`）。
+
+**第三步**：所以交互模式下 `/resume` 打开的是 **`picker/session.ts` 的 TUI 版本**，`cliSessionModule.ts:83-91` 的降级分支**只对非交互宿主生效**。
+
+**那个降级分支的注释也印证了这一点**：「A host that captures renderer output owns raw stdin」——它描述的是**外部捕获宿主**，不是 TUI。
+
+#### 24.133.7 真正的问题：同一个功能有两套实现
+
+| 实现 | 位置 | 使用场景 |
+|---|---|---|
+| **TUI picker** | `picker/session.ts` + `registry.ts:109` | 交互模式 `/resume` |
+| **raw-mode 面板** | `entrypoints/sessionsPanel.ts` | 非交互宿主 |
+
+`sessionsPanel.ts:19-21` 自己操作 `process.stdin`/`process.stdout`，`:43` 自己做 `setRawMode(true)`——**完全绕开 TUI 的渲染与输入分发**。
+
+**这是真实的结构问题**：同一个「选择会话」功能有两套独立实现，行为可能不一致（例如 TUI 版有 `pin`/`delete`/`rename`，raw-mode 版未必）。
+
+**但不是用户报告的卡顿或功能缺失**——交互模式下用的是 TUI 版，功能完整。
+
+**记录为「重复实现」观察项，不记为缺陷。**
+
+
+### 24.135 本轮 slash 命令研究总表
+
+| 编号 | 结论 | 类型 | 证据强度 |
+|---|---|---|---|
+| 24.131 | `createCommandRegistry` 在输入热路径上被反复构建（`onSubmit` 2 次 + `slashRouter` 1 次；预览每次按键 1 次） | **卡顿根因** | 代码定位 + 实测 10–120ms |
+| 24.131.3 | 补全路径**有缓存**，不是卡顿来源 | 排除项 | `slashSuggestions.ts:13-37` |
+| 24.132.3 | `shift+tab` 被绑到 plan/build 切换，与 omp 的 thinking 循环冲突 | **功能缺口 + 键位冲突** | `keybindings.ts:85` + `keymap.ts:255` |
+| 24.132.4 | `/thinking` 无参数只打印文本，不打开面板 | **功能缺口** | `thinkingCommandRuntime.ts:20-26` |
+| 24.132.5 | 模型详情面板的「Choose effort」仅在 effort 不受支持时出现 | **功能缺口（只有出错补救）** | `model.ts:217` |
+| 24.131.6 | `app.thinking.cycle` / `app.thinking.toggle` 两个绑定**都不控制 thinking level** | **命名缺陷** | `keymap.ts:255-262` |
+| 24.133.6 | `/resume` 交互模式走 TUI picker，**不降级** | 排除项（初版结论被推翻） | `interactiveMode.ts:1020` |
+| 24.133.7 | 「选择会话」有两套实现（TUI picker 与 raw-mode 面板） | 重复实现观察项 | `picker/session.ts` vs `sessionsPanel.ts` |
+| 24.134.3 | settings 面板 43 个声明字段中 35 个有入口，9 个缺失**全部是有意排除** | 排除项（初版「27 项没实现」被推翻） | 逐项核对 |
+| 24.134.5 | 本项目 settings 是 staged+Apply，omp 是立即写入；**本项目的更安全** | 不建议对齐 | 两家实现对比 |
+
+#### 24.135.1 需要裁决的三项
+
+| 项 | 选项 |
+|---|---|
+| **`shift+tab` 冲突** | ① plan/build 换键，`shift+tab` 给 thinking（对齐 omp）；② thinking 用别的键；③ 不做快捷键，只做 `/thinking` 面板 |
+| **`/thinking` 面板** | 复用已有的 `picker/model/thinking.ts`，改动最小 |
+| **registry 缓存** | 按 `(cwd, configRevision)` 缓存，预计消除每次提交 2 次、每次按键 1 次重建 |
+
+#### 24.135.2 未做的部分（如实记录）
+
+- **没有真实 PTY 测量**按键延迟。10–120ms 是函数级微基准，不等于用户感知的输入延迟。
+- **没有测量 `preview.ts` 的完整开销**（它还包括 `preparePromptRequest`、工具 schema 序列化等，registry 只是其中一项）。
+- **settings 面板的「功能本身缺失」未逐项比对**。本轮只证明了「已声明字段都有入口」，没有对照 omp 的 442 项找出本项目缺哪些功能。
+- **resume 的 TUI picker 未实际打开验证**，只从 `PICKERS` 注册与 `opensPicker` 分支推断。
+
