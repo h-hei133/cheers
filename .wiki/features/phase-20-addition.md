@@ -12253,3 +12253,151 @@ export function modelRoleThinkingPicker(current: SessionModelRole, efforts: read
 
 **这与 24.133.7 的「重复实现」是同一类风险**——如果不泛化就新写一个，会变成第三套 thinking 选择器。
 
+
+#### 24.131.7 参照对照：pi 的命令表是纯数据常量
+
+**pi**（`core/slash-commands.ts:19-44`）：
+
+```ts
+export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
+  { name: "settings", description: "Open settings menu" },
+  { name: "model", description: "Select model (opens selector UI)", argumentHint: "<provider/model>" },
+  ...
+];
+```
+
+**整个文件 44 行、26 个命令，是模块级常量，没有函数。**
+
+补全用的 `slashCommands` 也只是从这个常量 `map` 出纯数据（`interactive-mode.ts:739-743`）。需要参数补全的命令**单独挂**（`:745` 的 `modelCommand.getArgumentCompletions = ...`），不是每个命令都带闭包。
+
+**本项目**（`registry.ts`）：
+
+- 1,062 行，`createCommandRegistry` 是一个巨型函数字面量；
+- **73 个 `execute` 闭包**（其中 69 个是 `execute: (args, context) => ...` 形式）；
+- 每次调用都重新创建这 73 个函数对象，以及 102 个命令对象。
+
+**这就是 10–120ms 的来源**：不是「计算慢」，是**每次都在分配 175+ 个对象和闭包**。
+
+#### 24.131.8 三条修法，成本递增
+
+| 方案 | 做法 | 预期 |
+|---|---|---|
+| **A 缓存** | 按 `(cwd, configRevision)` 缓存 registry，失效时重建 | 消除 99% 的重建，改动最小 |
+| **B 拆数据与执行** | 命令表变纯数据常量（对齐 pi），`execute` 由分发器按名字查找 | 构建成本降到接近零，但改动大 |
+| **C 去中心化注册** | 各域文件 `register()`（对齐 omp settings 的做法） | 最彻底，是重构 |
+
+**倾向 A**：改动最小、收益最大。B/C 是长期方向，但 A 做完之后 B/C 的收益会变小（因为不再频繁构建）。
+
+**A 的失效条件必须想清楚**：registry 依赖 `cwd`（工作区）与 `runtimeConfig`（禁用工具、模板列表等）。缓存键至少要包含这两项，而 `runtimeConfig` 是**每次配置发布都会变的对象**——如果按对象身份比较，配置每次发布都会失效；如果按 `revision` 比较，需要确认 revision 覆盖了所有影响 registry 的字段。
+
+
+#### 24.131.9 缓存的实测收益
+
+```
+20 次构建:  616.3ms   →  每次 30.81ms
+20 次缓存读:  7.0ms   →  每次  0.35ms
+每次调用节省: 30.46ms
+```
+
+（`.tmp/probe/registry-cache-sim.ts`，本机 Node 24.15）
+
+**按调用频率折算**（保守估计，用户正常打字）：
+
+| 场景 | 每秒重建次数 | 每秒浪费 |
+|---|---|---|
+| 打一条 `/model ...` 参数 | ~7（150ms 防抖） | **~213ms/s** |
+| 提交一条命令 | 2–3（一次性） | **~61–91ms** |
+| 空闲（无输入） | 0 | 0 |
+
+**输入参数时每秒浪费约 213ms**，占满一个核心的 21%。这与「打字卡顿」的体感一致。
+
+**注意**：这是**同步阻塞**的 CPU 时间，在单线程 Node 里会直接延迟按键处理。所以即使 30ms 单次不算大，**高频累积**就是可感知的卡顿。
+
+
+#### 24.134.6 功能差距：不是「入口缺失」，是「可配置维度少一个数量级」
+
+逐项对照后的准确数字：
+
+| | 本项目 | oh-my-pi |
+|---|---|---|
+| 面板项 | **38** | 约 363（不含 tools 的 79） |
+| 内部分类 | 7 个小节（Session / Request / Context / Retries / Network / Tools / Display） | 10 个标签页 |
+
+**本项目的 38 项**（全部）：
+
+```
+attentionOnIdle, offline, maxTurns, temperature, topP, maxOutputTokens,
+contextWindow, reserveTokens, keepRecentTokens, modelTokenBudgets,
+instructionBudgetBytes, cacheWarming, agentMode, steeringMode, followUpMode,
+retryEnabled, retryMaxRetries, providerRetryMaxRetries, retryBaseDelayMs,
+retryMaxDelayMs, providerConnectTimeoutMs, providerHeadersTimeoutMs,
+providerBodyTimeoutMs, allowedTools, allowedModels, pathRules, disabledTools,
+hiddenToolPrefixes, denyRules, enableMcpTools, toolDiscovery, theme, vimMode,
+backgroundFollowUp, tuiMode, tui.composerShape, tui.statusItems, tui.diagrams
+```
+
+**omp 在每个类别里都有本项目完全没有的维度**：
+
+| 类别 | omp 有、本项目没有的（举例） |
+|---|---|
+| Appearance | `statusLine.transparent`、`statusLine.leftSegments`、`images.blockImages`、`tui.maxInlineImageColumns` |
+| Model | `expandThinkingBlocks`、`omitThinking`、`externalThinking`、`prewalk.into` |
+| Interaction | `interruptMode`、`btw.inject`、`stt.language` |
+| Context | `compaction.midTurnEnabled`、`compaction.asyncEnabled`、`compaction.remoteStreamingV2Enabled` |
+| Memory | `mnemopi.retainEveryNTurns`、`hindsight.bankIdPrefix` |
+| Files | `lsp.lazy`、`lsp.diagnosticsOnWrite`、`lsp.diagnosticsOnEdit`、`lsp.diagnosticsDeduplicate` |
+| Shell | `eval.js`、`eval.autoProvision`、`eval.autoBackground.enabled` |
+| Tasks | `plan.defaultOnStartup`、`skills.enableCodexUser`、`commands.enableClaudeProject` |
+| Providers | `providers.webSearchTimeoutSeconds`、`exa.searchDelayMs`、`searxng.token` |
+
+**但大部分不可比**：
+
+- **Memory / Providers 的多数项**依赖 omp 特有的后端（mnemopi、hindsight、exa、searxng）——本项目没有这些后端。
+- **Tasks 的多数项**是「启用某家外部 agent 的资源目录」——本项目不读外部格式。
+- **Shell 的 `eval.*`** 是 omp 的 JS 求值工具——本项目没有。
+
+**真正可比的缺口**：
+
+| 缺口 | 为什么可比 |
+|---|---|
+| **`lsp.*` 四项**（files） | 本项目**有 LSP 客户端**（`language/`），但诊断行为不可配置 |
+| **`expandThinkingBlocks` / `omitThinking`**（model） | 本项目有思考块渲染与折叠，但只有快捷键 `ctrl+t`，没有持久化设置 |
+| **`compaction.midTurnEnabled` / `asyncEnabled`**（context） | 本项目有压缩，但压缩时机不可配置 |
+| **`interruptMode`**（interaction） | 本项目有中断语义，但行为固定 |
+| **`statusLine.leftSegments`**（appearance） | 本项目有 `tui.statusItems`，但只有位置不可调 |
+
+**结论**：用户说「settings 面板中还有很多没有实现」，准确的表述是——**面板机制完整（38 项都有入口、都有生产读者），但可配置的维度比 omp 少一个数量级**，且缺的集中在 LSP、思考块、压缩时机、中断行为这四类**已有功能但不可配置**的地方。
+
+**这四类才是真正值得补的**，而不是照抄 omp 的 363 项。
+
+
+#### 24.134.7 四类可比缺口，逐项核实
+
+24.134.6 列出的四类「已有功能但不可配置」，逐项验证：
+
+| 缺口 | 功能是否存在 | 配置是否存在 | 结论 |
+|---|---|---|---|
+| **LSP 诊断** | ✅ 存在（`language/` 10 个文件，含 `client.ts`、`tool.ts`） | ❌ `fields.ts` 零 LSP 字段 | **真实缺口** |
+| **思考块折叠** | ✅ 存在（`interactiveMode.ts:772` `toggleCollapsed`） | ❌ 只在内存，不持久化 | **真实缺口** |
+| **压缩开关** | ✅ `policy.enabled`（`compaction.ts:94`） | ❌ 无配置字段暴露 | **真实缺口（且连开关都没暴露）** |
+| **中断行为** | ✅ 存在 | ❌ 无配置 | **需进一步确认可配置的维度** |
+
+**前三项已确认**，第四项（中断行为）本轮未细查。
+
+**为什么这四类值得补**：
+
+- 它们是**已有能力缺少控制**，不是缺功能。补配置的成本远低于造功能。
+- LSP 尤其明显：客户端写完了（含 `scanner.ts`、`documents.ts`），但用户无法决定「保存时是否诊断」「是否去重」。
+- 压缩开关更基础：`policy.enabled` 这个字段已经存在并且参与 `summaryIdentity` 计算，但没有任何配置能设它。
+
+#### 24.134.8 不建议照抄的部分
+
+omp 的 363 项里，多数依赖它特有的后端：
+
+- Memory 的 `mnemopi.*`、`hindsight.*`——本项目没有这些后端；
+- Providers 的 `exa.*`、`searxng.*`——本项目没有这些搜索后端；
+- Tasks 的 `skills.enableCodexUser`、`commands.enableClaudeProject`——本项目不读外部 agent 的资源格式；
+- Shell 的 `eval.*`——本项目没有 JS 求值工具。
+
+**照抄这些会是「四不像」**：加了配置项，但背后没有实现。
+
