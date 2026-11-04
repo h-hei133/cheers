@@ -10,8 +10,6 @@ export interface RequestAttempt {
   readonly id?: string;
   send(input: RequestInfo | URL, init: RequestInit, fetchImpl: typeof fetch, transport?: ModelTransport): Promise<Response>;
   settle(usage?: ProviderUsage): void;
-  /** The request was sent but its answer could not be read. */
-  retireUnreadable(): void;
 }
 
 /** Reserve exact final bytes before signing; only a proven pre-handoff failure releases. */
@@ -64,6 +62,5 @@ export async function prepareRequestAttempt(request: {
       }
     },
     settle: usage => { attempt?.settle(modelUsage(usage, request.endpoint)); },
-    retireUnreadable: () => { attempt?.retireUnreadable(); },
   };
 }

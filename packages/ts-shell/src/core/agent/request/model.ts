@@ -81,16 +81,6 @@ export interface ModelAttempt {
   dispatch(): void;
   confirmUnsent(): void;
   settle(usage?: ModelUsage): void;
-  /**
-   * Release an attempt that was sent but whose response could not be read.
-   *
-   * The reservation cannot stay, because the ledger counts it as spent and will
-   * eventually refuse every request with `exhausted`. It cannot be confirmed
-   * unsent either, because the bytes may have reached the provider. This retires
-   * it and marks the scope's history unknown, which is the honest description of
-   * "spent, amount unreadable".
-   */
-  retireUnreadable(): void;
 }
 export interface RequestPolicy {
   reserve(request: PreparedRequest): ModelAttempt;

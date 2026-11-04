@@ -11113,7 +11113,11 @@ it("ignores a malformed record rather than adopting it", () => {
 
 研究阶段结束，本轮开始实现。只改了两项已复现的缺陷，其余记录在案未动。
 
-#### 24.124.1 M3：为「已发出、答案读不出」增加出口
+#### 24.124.1 ~~M3：为「已发出、答案读不出」增加出口~~（**CI 判定为回归，已撤回**）
+
+> **结论修正**：CI 在 `planning/goal/budget.test.ts` 的 `admits only one send for empty-stream-retry` 用例上失败。该测试明确要求流读取失败后预留**留在 pending**，以防止同一请求被重发。我的改动破坏了这条安全属性。全部改动已撤回，见 24.127。
+
+
 
 **契约变更**：`ModelAttempt` 增加 `retireUnreadable()`（`core/agent/request/model.ts:79-95`），`RequestAttempt` 增加同名转发（`provider/request/attempt.ts:9-15`）。
 
@@ -11298,4 +11302,71 @@ function claimEvidenceFor(result: CodingResultSummary): QueryRuntimeArtifactClai
 **四次都不是「分析错」，是「没去看能证伪我的那部分」**：测试、参照源码、真实的输入产生端。这比单纯的分析错误更值得记录，因为它是**方法**层面的缺陷。
 
 **已经生效的修正**：此后每次下结论前，先找「什么能证伪这条」并去读它。本轮后两次（24.125 的 M8、24.124 的两项实施）都先读了参照与测试。
+
+
+### 24.127 CI 抓到的回归：预留悬空是**有意的安全属性**
+
+24.124.1 的「修复」被 CI 判为回归。这是本轮唯一一个**本地测试全绿、CI 失败**的改动，值得完整记录。
+
+#### 24.127.1 失败的具体断言
+
+`planning/goal/budget.test.ts:144-154`：
+
+```ts
+it.each(['http-retry', 'reasoning-downgrade', 'empty-stream-retry'] as const)('admits only one send for %s', async kind => {
+  // empty-stream-retry: 一个 start() 就 error 的 ReadableStream
+  const result = await step(fetchImpl)([{ role: 'user', content: 'hello' }], undefined, {}, { allowTools: false });
+  expect(fetchImpl).toHaveBeenCalledOnce();                       // ← 只发一次
+  expect(scope().pending['1']).toMatchObject({ dispatched: true }); // ← 预留必须留着
+  expect(Object.keys(scope().pending)).toEqual(['1']);
+});
+```
+
+CI 报错：`AssertionError: expected undefined to match object { dispatched: true }`——我的 `retireUnreadable` 把 `pending['1']` 删掉了。
+
+#### 24.127.2 测试想防什么
+
+三种失败（HTTP 500、reasoning 降级、空流）都必须满足：**同一次逻辑请求只能真正发出去一次**。
+
+机制是：预留留在 `pending` 且 `dispatched: true`，后续 `reserveRequest` 会因为 `assertBudget` 看到这笔未结算的额度而拒绝（或 `dispatchRequest` 因 `dispatched` 抛 `replay`）。**「额度被占住」正是阻止重发的手段**。
+
+我 24.120.2 把「悬空预留」当成缺陷，只看到了它的**副作用**（额度耗尽、错误文案误导），没看到它的**用途**（防止重复发送）。CI 用一条测试把用途说清楚了。
+
+#### 24.127.3 撤回范围
+
+`git checkout 1a9c84be^` 恢复了 7 个文件：
+
+```
+core/agent/request/{ledger,model,policy,ledger.test}.ts
+provider/request/{attempt,completion}.ts
+turn/step.ts
+```
+
+**保留**：M9 的产物清理（`artifactManager.ts`、`sessionStoreAccess.ts`）——那是独立提交 `fe2f2202`，CI 尚未判定。
+
+验证：`budget.test.ts` + `ledger.test.ts` **18 项通过**。
+
+#### 24.127.4 正确的修法是什么（只记录，不实施）
+
+测试防的是「重发」，我的改动想解决的是「额度永久占用 + 错误文案误导」。两者可以同时满足：
+
+| 目标 | 机制 |
+|---|---|
+| 防重发 | `finalized` 里记下该序列，后续 `dispatchRequest` 对已 finalize 的序列抛 `replay` |
+| 释放额度 | 从 `pending` 移除，让 `assertBudget` 不再计入 |
+| 说真话 | 错误文案改为「上次请求结果未知」，而不是 `exhausted` |
+
+关键在于**第一行**：`ledger.ts:36` 的 `dispatchRequest` 已经检查 `finalizedSequence(scope.finalized, sequence)`，所以「移出 pending 但加入 finalized」能同时满足防重发与释放额度。我原来的实现走了 `removeAttempt`，它**确实调用了 `finalizeSequence`**——所以理论上防重发是保住的。
+
+**那为什么测试会失败？** 因为测试断言的是**实现细节**（`pending['1']` 存在），而不是行为（`fetchImpl` 只调用一次）。`expect(fetchImpl).toHaveBeenCalledOnce()` 在同一个用例里也断言了，它**没有**失败。
+
+**所以这是一次「实现细节断言」与「行为断言」的冲突**。当前应当尊重既有测试（它代表设计意图），但如果确认 `finalized` 已经能防重发，那么修改这条测试的断言（从「pending 存在」改为「不能再次 dispatch」）是合理的。
+
+**本轮不这么做**：需要先证明 `finalized` 在所有相关路径上都生效，而这是一次独立的验证工作。已撤回，留作记录。
+
+#### 24.127.5 这一条的方法论价值
+
+前四次推翻都发生在**写代码之前**（读测试、读参照）。这一次发生在**CI 上**——本地测试全绿，因为我的三条新测试只验证了「退休生效」，没有验证「防重发仍然成立」。
+
+**教训**：改一条安全机制时，要问「它现在防住的是什么」，而不只是「它造成什么问题」。**副作用与用途常常是同一段代码**。
 

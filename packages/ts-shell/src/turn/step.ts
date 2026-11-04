@@ -686,10 +686,6 @@ export function createStepFunction(request: StepRequest): StepFunction {
           ...(shownAnything && completed.stopReason === 'error' ? { retriesExhausted: true } : {}) });
       } catch (error) {
         if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
-        // An accepted response whose body could not be read was still sent. Its
-        // reservation has to leave `pending` or it counts as spent for the rest
-        // of the session; the retry below reuses this attempt, so only the final
-        // failure retires it.
         if (error instanceof ModelAdmissionError) return stamp({ ...failedStep(error.message, shown, undefined, true), admissionFailure: error.code });
         if (signal?.aborted) return stamp(abortedStep(shown));
         const detail = error instanceof Error ? error.message : String(error);
@@ -700,7 +696,6 @@ export function createStepFunction(request: StepRequest): StepFunction {
           if (!waited) return stamp(abortedStep(""));
           continue;
         }
-        try { responseAttempt?.retireUnreadable(); } catch { /* A lost ledger write must not replace the read failure. */ }
         // The text already streamed is kept and the step is still marked failed.
         // Keeping it alone would present a truncated answer as a finished one —
         // the user has read the opening and nothing says the rest is missing —
