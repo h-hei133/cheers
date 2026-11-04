@@ -11462,3 +11462,20 @@ workspaceRoots = [...new Set([session.projectRoot, ...(session.workspaceRoots ??
 
 **这是怎么发现的**：不是测试失败，是问「这个字段一定存在吗」。与 24.124.5 同一个方法——**实现后立刻去找能证伪它的前提**。
 
+
+#### 24.124.7 可达性：清理确实接在用户删除路径上
+
+`ArtifactManager.removeSessionArtifactsAt` 必须真的被用户操作触发，否则修了等于没修。链路：
+
+```
+/sessions 面板删除
+  → sessionsPanel.ts:165  sessionManager.deleteSession(current.id)
+  → lifecycle/management.ts:93  manager.deleteSession(id)
+  → store/sessionStoreAccess.ts:106  deleteSession(sessionId)     ← 本次接入点
+  → ArtifactManager.removeSessionArtifactsAt(projectRoot, sessionId)
+```
+
+`management.ts:93-95` 还会在删除后验证 `!manager.sessionExists(id) && directoryMissing(layout.sessionDir)`，说明这条路径本身已有「删除必须被证实」的检查——我的清理在 `deleteSessionRecord` **之后**执行，不会影响那个判定。
+
+**同时确认另一条路径**：`lifecycle/sessionLifecycleWrites.ts:227` 的空会话丢弃也调 `host.store.deleteSession(sessionId)`，因此同样受益。
+
