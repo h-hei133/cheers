@@ -11020,3 +11020,19 @@ async #loadTodoList(source: AgentViewSession = this.session): Promise<void> {
 
 **这改变了 24.123.1 的形状判断**：原来说「落后于参照 2 项」，修正后 M4 与 M7 都是**本项目更强或不同**，真正落后的只剩 M9（产物清理）与 M6（todo 重放）。**「主干对齐、末端失守」这个结论仍成立，但「落后」的项比初版少。**
 
+
+#### 24.120.5 运行验证：悬空预留确实耗尽额度（已复现）
+
+24.120.2 只是代码推理。用真实 `createRequestPolicy` + `createRequestLedger` 跑一遍（`.tmp/probe/ledger2.ts`，cap 3,000，每次请求 bound 2,000）：
+
+| 场景 | 第 1 次 | 第 2 次 | 第 3 次 |
+|---|---|---|---|
+| **正常结算**（dispatch → settle） | ✅ 预留，pending 0 | ✅ 预留，pending 0 | ❌ `exhausted`（累计 2,000 已用） |
+| **读取失败**（dispatch → 不 settle） | ✅ 预留，pending **1** | ❌ `exhausted` | ❌ `exhausted` |
+
+**关键对比**：正常路径能发 2 次请求后耗尽（符合预期：2 × 2,000 ≥ 3,000）；悬空路径**一次之后就无法再发**——那一次请求的额度永远不释放。
+
+**症状确认**：错误码是 `exhausted`，文案是「Model request admission exhausted」。用户看到的是「额度用尽」，真实原因是「一次请求没结算」。这与 24.120.2 的推理完全一致，现在有运行证据。
+
+**注意**：这个探针本身也暴露了一个使用细节——`ModelUsage` 必须带 `version: 1`，否则 `validModelUsage` 拒绝，`settle` 静默不生效（我第一次就踩到了）。这说明**结算路径对输入格式是严格的**，进一步印证「缺的不是校验，是根本没有为读取失败准备出口」。
+
