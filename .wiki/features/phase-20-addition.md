@@ -12622,6 +12622,8 @@ omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
 
 本节汇总本轮所有研究中**记录但未实施**的任务，按文档章节索引。**不含原 Phase 20 的 47 项矩阵**（那部分在 `phase-20-decisions.md`）。
 
+> **状态更新**：24.139.0 已对其中 16 项作出裁决（采纳 14 项、不做 2 项）。本节保留原始索引，**裁决后的执行清单以 24.139.0 为准**。
+
 #### 24.138.1 已有裁决，等待实施
 
 | 任务 | 章节 | 裁决内容 |
@@ -12677,11 +12679,54 @@ omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
 
 本节汇总所有**已确认缺陷**与**有研究结论的任务**的改进建议，供逐条裁决。每条给出：现状、参照实现、建议、代价。
 
-**裁决方式**：直接回复编号（如「1 采纳」「2 不做」「3 改为……」），我据此更新文档后再实施。
+#### 24.139.0 裁决结果（2026-11-04）
+
+**用户裁决**：「5 LSP 配置暂且不做，看后续需求；14 resume 两套实现不做；其他的都做。」
+
+| 编号 | 任务 | 裁决 |
+|---|---|---|
+| 1 | 会话删除清理产物 | ✅ **做** |
+| 2 | goal 预算耗尽发 steer 消息 | ✅ **做** |
+| 3 | registry 缓存 | ✅ **做** |
+| 4 | thinking level 六档 + 两条面板路径 | ✅ **做** |
+| 5 | LSP 配置 | ❌ **不做**（设计差异，看后续需求） |
+| 6 | 思考块折叠持久化 | ✅ **做** |
+| 7 | 压缩开关暴露 | ✅ **做** |
+| 8 | 崩溃日志统一读取入口 | ✅ **做** |
+| 9 | `app.thinking.cycle` 改名 | ✅ **做** |
+| 10 | `sourcePacket` 冗余副本 | ✅ **做** |
+| 11 | 研究状态死值 | ✅ **做** |
+| 12 | `correctArtifact` 伪造通过 | ✅ **做** |
+| 13 | `RotatingFileSink.maxFileSizeMb` 未校验 | ✅ **做** |
+| 14 | resume 两套实现 | ❌ **不做**（服务于不同宿主形态） |
+| 15 | 门面测试转移 | ✅ **做** |
+| 16 | M8 三元组记忆（层次 1） | ✅ **做** |
+
+**采纳 14 项，不做 2 项。**
+
+**执行顺序建议**（按依赖与风险）：
+
+1. **先做低风险、独立的小项**：13（一行校验）、10（删字段）、11（删状态值）、12（删函数或补验证）——这些互不影响，可一次提交；
+2. **再做有明确参照的中项**：1（产物清理）、7（压缩开关）、8（崩溃日志）、6（折叠持久化）、16（三元组层次 1）；
+3. **然后做需要设计的**：4（六档 + 两条面板，含 `max` 的 `undefined` 语义）、2（steer 消息，需要通道）；
+4. **最后做改动最大的**：3（registry 缓存，需要先确认失效边界）、9（绑定改名，需要迁移策略）、15（测试转移，需逐条验证）。
+
+**实施前必须确认的三处**：
+
+| 项 | 需要确认什么 |
+|---|---|
+| 9 改名 | 用户自定义键位按 id 存，改名会破坏现有配置。需保留旧 id 作别名或提供迁移 |
+| 3 缓存 | 已确认只依赖 `cwd` + `enableMcpTools` + `options`，但要确认模板列表变化是否需要失效 |
+| 4 六档 | `max` 对应 `thinkingBudgetTokens: undefined`，需把 `Record<ThinkingLevel, number>` 放宽为 `number \| undefined` |
+
+**本轮不实施**，仅记录裁决。
 
 ---
 
 #### 建议 1：会话删除时清理工作区产物
+
+> **✅ 已裁决：做（24.139.0）**
+
 
 **现状**：产物在 `<workspace>/.ts-shell/sessions/<id>/artifacts/`，会话记录在 `<profile>/sessions/`。`deleteSessionRecord` 只删后者，产物永久残留。`read`/`grep`/`glob`/目录列表/后台命令五个工具都写产物，`ArtifactManager` 无任何上限。
 
@@ -12710,6 +12755,9 @@ omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
 ---
 
 #### 建议 2：goal 预算耗尽时给模型一次说话的机会
+
+> **✅ 已裁决：做（24.139.0）**
+
 
 **现状**：`/goal` 会话中，若响应已发出但读取失败，预留留在 `pending` 被永久计入已用额度，后续请求以 `exhausted` 拒绝。**这个行为是有意的**（防止同一请求重发，`budget.test.ts:144-154` 锁定）。
 
@@ -12740,6 +12788,9 @@ async #sendBudgetLimitSteer(goal: Goal): Promise<void> {
 ---
 
 #### 建议 3：registry 缓存
+
+> **✅ 已裁决：做（24.139.0）**
+
 
 **现状**：`createCommandRegistry` 每次构造 102 个命令对象 + 73 个 `execute` 闭包，实测 **30.8ms/次**。它在输入热路径上被反复调用：`onSubmit` 2 次、参数补全每次按键、预览每 150ms。
 
@@ -12778,6 +12829,9 @@ async #sendBudgetLimitSteer(goal: Goal): Promise<void> {
 ---
 
 #### 建议 4：thinking level 扩到六档 + 两条面板路径
+
+> **✅ 已裁决：做（24.139.0）**
+
 
 **现状**：`THINKING_LEVELS = ['low','medium','high']` 三档。过滤机制已完整（`role.ts:93-95` 用 `effortCapability === 'supported'`），只是档位集合少。
 
@@ -12839,6 +12893,9 @@ const THINKING_BUDGET_TOKENS: Record<ThinkingLevel, number> = { ... }
 
 #### 建议 5：LSP 配置——**建议不做**
 
+> **❌ 已裁决：不做，看后续需求（24.139.0）**
+
+
 **现状**：本项目 LSP 是**显式调用的工具**（`operation: 'diagnostics'`），用户主动请求才返回诊断。
 
 **参照**：oh-my-pi 有 8 项 LSP 设置（`lsp/settings.ts`），包括 `diagnosticsOnWrite`、`diagnosticsOnEdit`、`formatOnWrite`、`deduplicate`、`requestTimeout`——它的 LSP 是**自动在写入/编辑后返回诊断**。
@@ -12888,6 +12945,9 @@ operation: { enum: ['definition','references','hover','documentSymbol','workspac
 
 #### 建议 6：思考块折叠持久化
 
+> **✅ 已裁决：做（24.139.0）**
+
+
 **现状**：`toggleCollapsed`（`interactiveMode.ts:772`）只在内存，重启后恢复默认。
 
 **参照**：oh-my-pi 有 `expandThinkingBlocks`、`omitThinking` 设置。
@@ -12902,6 +12962,9 @@ operation: { enum: ['definition','references','hover','documentSymbol','workspac
 
 #### 建议 7：压缩开关暴露
 
+> **✅ 已裁决：做（24.139.0）**
+
+
 **现状**：`policy.enabled`（`session/compaction.ts:94`）存在且参与 `summaryIdentity` 计算，但**没有任何配置字段能设它**。
 
 **参照**：oh-my-pi 有 `compaction.midTurnEnabled`、`asyncEnabled` 等。
@@ -12915,6 +12978,9 @@ operation: { enum: ['definition','references','hover','documentSymbol','workspac
 ---
 
 #### 建议 8：崩溃日志统一为单一读取入口
+
+> **✅ 已裁决：做（24.139.0）**
+
 
 **现状**：`readCrashLog`（`crashLog.ts:66-68`）**已经委托**给 `inspectCrashLog`，但只取 `.records`、丢弃 `status`：
 
@@ -12945,6 +13011,9 @@ export function readCrashLog(filePath = crashLogPath(), profile = currentProfile
 
 #### 建议 9：`app.thinking.cycle` 改名
 
+> **✅ 已裁决：做（24.139.0）**
+
+
 **现状**：`app.thinking.cycle`（`shift+tab`）实际调用 `cycleAgentMode()`（切换 plan/build）；`app.thinking.toggle`（`ctrl+t`）折叠思考块。**两个以 thinking 命名的绑定都不控制 thinking level。**
 
 **参照**：oh-my-pi 的 `app.thinking.cycle` 确实循环 thinking level，语义一致。
@@ -12958,6 +13027,9 @@ export function readCrashLog(filePath = crashLogPath(), profile = currentProfile
 ---
 
 #### 建议 10：`sourcePacket` 冗余副本
+
+> **✅ 已裁决：做（24.139.0）**
+
 
 **现状**：`projectMemorySaveCommandRunner.ts:206` 同时写 `source` 与 `sourcePacket`，值完全相同。
 
@@ -12973,6 +13045,9 @@ export function readCrashLog(filePath = crashLogPath(), profile = currentProfile
 
 #### 建议 11：研究状态的死值
 
+> **✅ 已裁决：做（24.139.0）**
+
+
 **现状**：`research/run/model.ts:8` 声明 7 个状态，`blocked` 与 `stale` **永不赋值**。
 
 **建议**：要么删掉这两个值，要么让失败路径真正使用它们。
@@ -12984,6 +13059,9 @@ export function readCrashLog(filePath = crashLogPath(), profile = currentProfile
 ---
 
 #### 建议 12：`correctArtifact` 的伪造通过
+
+> **✅ 已裁决：做（24.139.0）**
+
 
 **现状**：`correction.ts:60-66` 无条件返回 `validation-passed`，而 `verification/execution/model.ts:71` 把它当作通过证据。**当前无生产调用**。
 
@@ -12997,6 +13075,9 @@ export function readCrashLog(filePath = crashLogPath(), profile = currentProfile
 
 #### 建议 13：`RotatingFileSink.maxFileSizeMb` 未校验
 
+> **✅ 已裁决：做（24.139.0）**
+
+
 **现状**：构造器校验了 `maxFiles` 却不校验 `maxFileSizeMb`。传 `0` 或负数会让每次写入都轮转。**当前生产不传该参数**。
 
 **建议**：补一行校验，与 `maxFiles` 对称。
@@ -13008,6 +13089,9 @@ export function readCrashLog(filePath = crashLogPath(), profile = currentProfile
 ---
 
 #### 建议 14：resume 的两套实现
+
+> **❌ 已裁决：不做（24.139.0）**
+
 
 **现状**：`picker/session.ts`（TUI）与 `entrypoints/sessionsPanel.ts`（raw-mode）都实现会话选择。交互模式用前者，后者给非交互宿主。
 
@@ -13021,6 +13105,9 @@ export function readCrashLog(filePath = crashLogPath(), profile = currentProfile
 
 #### 建议 15：门面测试转移
 
+> **✅ 已裁决：做（24.139.0）**
+
+
 **现状**：`createWorkspaceWriteAuthority` 零生产调用，但 13 条测试覆盖它，其中 8 条测「别名工作区读写」——这个属性在生产路径上**未经测试**。
 
 **建议**：把 8 条测试的断言对象改为生产路径（`writeTextFile`），确认全绿后再删门面。
@@ -13032,6 +13119,9 @@ export function readCrashLog(filePath = crashLogPath(), profile = currentProfile
 ---
 
 #### 建议 16：M8 三元组记忆
+
+> **✅ 已裁决：做层次 1（24.139.0）**
+
 
 **现状**：`structuredFact`（单数）读三处写零处，冲突检测的阻断在真实保存路径上不可达。
 
