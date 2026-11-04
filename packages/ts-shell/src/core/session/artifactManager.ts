@@ -86,7 +86,13 @@ export class ArtifactManager {
    */
   static removeSessionArtifactsAt(workspaceRoot: string, sessionId: string, profile: ProfileIdentity | undefined = currentProfile()): void {
     if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) return;
-    const privateWorkspace = profileWorkspaceDir(workspaceRoot, profile);
+    // `profileWorkspaceDir` canonicalises too, so a missing workspace throws here
+    // as well. A named profile keeps its artifacts under the profile root, and
+    // that path cannot be derived from a workspace that no longer exists — so
+    // there is nothing to address and nothing to remove.
+    let privateWorkspace: string | undefined;
+    try { privateWorkspace = profileWorkspaceDir(workspaceRoot, profile); }
+    catch { return; }
     const artifactsDir = path.join(privateWorkspace ?? path.join(path.resolve(workspaceRoot), '.ts-shell'),
       "sessions", sessionId, "artifacts");
     const sessionDir = path.dirname(artifactsDir);

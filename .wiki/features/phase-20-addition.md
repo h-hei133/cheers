@@ -11479,3 +11479,40 @@ workspaceRoots = [...new Set([session.projectRoot, ...(session.workspaceRoots ??
 
 **同时确认另一条路径**：`lifecycle/sessionLifecycleWrites.ts:227` 的空会话丢弃也调 `host.store.deleteSession(sessionId)`，因此同样受益。
 
+
+#### 24.124.8 M9 的第三个缺陷：`profileWorkspaceDir` 也做 realpath
+
+24.124.5 说「不经过 `realpathSync` 就能计算路径」，但那只对**默认 profile** 成立。
+
+`profile/workspace.ts:7-13`：
+
+```ts
+export function profileWorkspaceDir(workspace: string, profile = currentProfile()): string | undefined {
+  if (!profile || profile.id === 'default') return undefined;   // ← 默认 profile 提前返回
+  const canonical = fs.realpathSync(workspace);                 // ← 非默认 profile 会抛
+  ...
+}
+```
+
+**实测**（工作区已删除、profile 非默认）：
+
+```
+THREW: ENOENT: no such file or directory, lstat '/tmp/gone2-3qhIQD'
+```
+
+而我在 `removeSessionArtifactsAt` 里调用它时**没有 try 保护**——异常会穿透到 `deleteSession` 的 catch，被吞掉，清理不执行。
+
+**改法**：
+
+```ts
+let privateWorkspace: string | undefined;
+try { privateWorkspace = profileWorkspaceDir(workspaceRoot, profile); }
+catch { return; }
+```
+
+**为什么 `return` 而不是继续**：命名 profile 的产物在 profile 根下，路径由**工作区的规范化路径**派生。工作区不存在 → 无法派生 → **没有可寻址的目录**。这与默认 profile 不同（后者直接在工作区内，路径是字面的）。
+
+**新增测试**：命名 profile + 已删除的工作区，`removeSessionArtifactsAt` 不抛。
+
+**这是同一处的第三次前提假设**（`getShared` 的 realpath、`workspaceRoots` 的可选性、`profileWorkspaceDir` 的 realpath）。三次都不是逻辑错，是**没检查被调用方的前置条件**。
+

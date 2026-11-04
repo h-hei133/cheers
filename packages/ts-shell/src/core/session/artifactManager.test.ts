@@ -222,3 +222,14 @@ describe("workspace candidates", () => {
     expect(fs.existsSync(artifactsDir)).toBe(false);
   });
 });
+
+describe("a named profile whose workspace is gone", () => {
+  it("returns instead of throwing when the workspace cannot be canonicalised", () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-named-"));
+    fs.rmSync(workspace, { recursive: true, force: true });
+    const named = { id: "work", root: "/tmp/fake-profile", homeDir: "/tmp/fake-home" } as never;
+    // profileWorkspaceDir canonicalises the workspace, so a deleted workspace
+    // throws there. Cleanup is best-effort and must not surface that.
+    expect(() => ArtifactManager.removeSessionArtifactsAt(workspace, "sess_named", named)).not.toThrow();
+  });
+});
