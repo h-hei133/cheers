@@ -12672,3 +12672,266 @@ omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
 | settings 立即写入语义 | 24.134.5 | 本项目的 staged+Apply 更安全 |
 | 对齐 pi 的产物临时目录 | 24.117.4 | 违背「产物可被 read 直接打开」 |
 
+
+### 24.139 待裁决建议汇总（2026-11-04）
+
+本节汇总所有**已确认缺陷**与**有研究结论的任务**的改进建议，供逐条裁决。每条给出：现状、参照实现、建议、代价。
+
+**裁决方式**：直接回复编号（如「1 采纳」「2 不做」「3 改为……」），我据此更新文档后再实施。
+
+---
+
+#### 建议 1：会话删除时清理工作区产物
+
+**现状**：产物在 `<workspace>/.ts-shell/sessions/<id>/artifacts/`，会话记录在 `<profile>/sessions/`。`deleteSessionRecord` 只删后者，产物永久残留。`read`/`grep`/`glob`/目录列表/后台命令五个工具都写产物，`ArtifactManager` 无任何上限。
+
+**参照**：
+- **oh-my-pi**：`deleteSessionWithArtifacts`（`indexed-session-storage.ts:416`），按会话路径前缀收集**同目录下所有文件**一并删除。产物与会话文件在同一目录，所以删除天然覆盖。
+- **pi**：产物写系统临时目录（`output-files.ts:21-26`），不落在工作区，清理交给 OS。
+
+**建议**：采用 oh-my-pi 的思路——删除会话时同时清两棵树。
+
+| 要点 | 具体 |
+|---|---|
+| 定位工作区 | `projectRoot`（必填）+ `workspaceRoots[]`（可选）**都作为候选** |
+| 避开 realpath | `getShared` 与 `profileWorkspaceDir` 都会 `realpathSync`，工作区已删时会抛 |
+| 越界校验 | 确认路径是 `<root>/sessions/<id>/artifacts`，`sessionId` 匹配 `[A-Za-z0-9_-]+` |
+| 删除范围 | 删 `<id>` 目录，不是整个 `sessions` |
+| 失败处理 | 尽力而为，清理失败不得让已成功的删除变成错误 |
+| 接线点 | `SessionStoreAccess.deleteSession`（`/sessions` 面板与空会话丢弃的共同入口） |
+
+**代价**：新增一个静态方法 + 改一处调用；历史遗留产物不会被自动清理（无法从会话 id 反推工作区）。
+
+**不做的话**：每个会话都在工作区留下不可回收的文件，长期使用后 `.ts-shell/` 无限增长。
+
+---
+
+#### 建议 2：goal 预算耗尽时给模型一次说话的机会
+
+**现状**：`/goal` 会话中，若响应已发出但读取失败，预留留在 `pending` 被永久计入已用额度，后续请求以 `exhausted` 拒绝。**这个行为是有意的**（防止同一请求重发，`budget.test.ts:144-154` 锁定）。
+
+**参照**：
+- **codex**：`ext/goal/src/accounting.rs:177-198` 按 provider 用量**增量记账**，无预留概念，因此不会悬空。
+- **oh-my-pi**：`goals/runtime.ts:330-345` 同样按增量；预算耗尽时把状态翻成 **`budget-limited`** 并**发一条 steer 消息**告诉模型（`#sendBudgetLimitSteer`）。用户可调高预算，状态自动翻回 `active`。
+
+**建议**：保留 `pending` 不动（防重发不变），但**预算耗尽时发一条 steer 消息**，让模型总结当前进展。错误文案区分「额度用尽」与「上次结果未知」。
+
+**代价**：需要新增一条 steer 通道调用；`budget.test.ts` 的断言不需改动（它断言的是 `pending` 存在与 `fetchImpl` 只调用一次，两者都保留）。
+
+**不做的话**：用户看到「额度用尽」，真实原因可能是「上次结果未知」，且没有任何阶段性结论。
+
+---
+
+#### 建议 3：registry 缓存
+
+**现状**：`createCommandRegistry` 每次构造 102 个命令对象 + 73 个 `execute` 闭包，实测 **30.8ms/次**。它在输入热路径上被反复调用：`onSubmit` 2 次、参数补全每次按键、预览每 150ms。
+
+**参照**：
+- **pi**：`BUILTIN_SLASH_COMMANDS` 是 **44 行纯数据常量**，无函数；需要参数补全的命令单独挂 `getArgumentCompletions`。
+- **oh-my-pi**：去中心化 `register()`，面板是注册表的投影。
+
+**建议**：按 `(cwd, runtimeConfig 相关字段)` 缓存 registry。
+
+**关键难点（必须先解决）**：`createCommandRegistry` 依赖 `runtimeConfig`，而它是**每次配置发布都会变的对象**。缓存键必须选对：
+
+| 候选键 | 问题 |
+|---|---|
+| 对象身份 | 每次配置发布都失效，缓存等于没有 |
+| `revision` | 需确认 revision 覆盖所有影响 registry 的字段（`disabledTools`、`hiddenToolPrefixes`、`allowedTools`、`toolDiscovery`、模板列表） |
+| 上述字段的序列化 | 最准确，但序列化成本需实测 |
+
+**代价**：需要先确认 registry 的完整输入集，否则会缓存到过期结果。
+
+**不做的话**：打字时每秒浪费约 213ms 同步 CPU。
+
+---
+
+#### 建议 4：thinking level 扩到六档 + 两条面板路径
+
+**现状**：`THINKING_LEVELS = ['low','medium','high']` 三档。过滤机制已完整（`role.ts:93-95` 用 `effortCapability === 'supported'`），只是档位集合少。
+
+**参照**：oh-my-pi 六档 `minimal/low/medium/high/xhigh/max`，每模型用 `thinking.efforts` 声明子集，**永不为空**；未声明的档位不出现在任何 picker 中。
+
+**建议**：
+
+| 改动 | 文件 |
+|---|---|
+| 加三档 | `core/models/effort.ts:2` |
+| 补预算值 | `core/models/requestShape.ts:226-230`（`Record<ThinkingLevel, number>` 会强制） |
+| 加语法动作 | `thinking/syntax.ts:11-19` |
+| 面板：选模型时调 | 放宽 `model.ts:217` 的条件（当前只在 effort 不受支持时出现） |
+| 面板：`/effort` 无参数 | 泛化 `picker/model/thinking.ts` 后复用 |
+
+**风险**：本项目的 `null` 有双重含义（`thinkingLevelMap[level] === null` 表示「没有这个档位」；`ThinkingPreference = ... | null` 表示「auto」）。扩档位时不要混淆。
+
+**代价**：五处改动，其中预算值是产品决策（每个档位对应多少 token）。
+
+**不做的话**：用户无法选择 minimal/xhigh/max，且选完模型后无法快捷改档位。
+
+---
+
+#### 建议 5：LSP 配置——**建议不做**
+
+**现状**：本项目 LSP 是**显式调用的工具**（`operation: 'diagnostics'`），用户主动请求才返回诊断。
+
+**参照**：oh-my-pi 有 8 项 LSP 设置（`lsp/settings.ts`），包括 `diagnosticsOnWrite`、`diagnosticsOnEdit`、`formatOnWrite`、`deduplicate`、`requestTimeout`——它的 LSP 是**自动在写入/编辑后返回诊断**。
+
+**判定**：**这是设计差异，不是配置缺失。**
+
+- 本项目的模型要主动调 `lsp` 工具才拿诊断，因此不存在「写入后是否自动诊断」这个开关——那个行为本身不存在。
+- 加 `diagnosticsOnWrite` 等于新增一个自动诊断行为，是**功能开发**不是配置补全。
+
+**建议**：不做。若要自动诊断，应先作为独立功能立项，而不是以「补设置」的名义加。
+
+---
+
+#### 建议 6：思考块折叠持久化
+
+**现状**：`toggleCollapsed`（`interactiveMode.ts:772`）只在内存，重启后恢复默认。
+
+**参照**：oh-my-pi 有 `expandThinkingBlocks`、`omitThinking` 设置。
+
+**建议**：加一个 `collapseThinking` 布尔设置，默认 `false`（与当前默认一致）。
+
+**代价**：小。但需要确认折叠状态是「会话级」还是「全局」——当前是渲染器状态，没有归属概念。
+
+**优先级**：低。
+
+---
+
+#### 建议 7：压缩开关暴露
+
+**现状**：`policy.enabled`（`session/compaction.ts:94`）存在且参与 `summaryIdentity` 计算，但**没有任何配置字段能设它**。
+
+**参照**：oh-my-pi 有 `compaction.midTurnEnabled`、`asyncEnabled` 等。
+
+**建议**：加 `compactionEnabled` 布尔设置，默认 `true`。这是**最小的一步**——字段已存在，只是没有暴露。
+
+**代价**：极小。需要确认关闭压缩后溢出救援的行为（`turn/session.ts` 的 `recoverOverflow` 也以 `options.compaction` 为前提）。
+
+**优先级**：中——它让用户能在「上下文总是溢出」时临时关掉压缩排查问题。
+
+---
+
+#### 建议 8：崩溃日志统一为单一读取入口
+
+**现状**：`readCrashLog`（无限读取、丢弃状态）与 `inspectCrashLog`（有界、返回状态）两个入口，导致 `/crash` 与 `/debug crashes` 对同一个损坏文件给出相反结论。
+
+**参照**：pi 只有 `readCrashLog` 一个入口（`core/crash-log.ts:25`），损坏时统一返回 `[]`——**没有第二个消费者，因此不存在分叉**。
+
+**建议**：让 `readCrashLog` 委托 `inspectCrashLog`，保留状态。
+
+**代价**：小。需要确认 `/crash` 的输出格式是否需要显示「损坏」状态。
+
+**优先级**：低——只在文件损坏时可见。
+
+---
+
+#### 建议 9：`app.thinking.cycle` 改名
+
+**现状**：`app.thinking.cycle`（`shift+tab`）实际调用 `cycleAgentMode()`（切换 plan/build）；`app.thinking.toggle`（`ctrl+t`）折叠思考块。**两个以 thinking 命名的绑定都不控制 thinking level。**
+
+**参照**：oh-my-pi 的 `app.thinking.cycle` 确实循环 thinking level，语义一致。
+
+**建议**：改名为 `app.agentMode.cycle` 与 `app.thinkingBlocks.toggle`。
+
+**代价**：小，但**会破坏用户自定义键位**（`keybindings.ts` 里用户的覆盖配置按 id 存）。需要提供迁移或保留旧 id 作为别名。
+
+**优先级**：低，但**改名的时机越早越好**——越晚迁移成本越高。
+
+---
+
+#### 建议 10：`sourcePacket` 冗余副本
+
+**现状**：`projectMemorySaveCommandRunner.ts:206` 同时写 `source` 与 `sourcePacket`，值完全相同。
+
+**参照**：无直接对照（omp 无此字段）。
+
+**建议**：删除 `sourcePacket`，或说明它与 `source` 的预期差异。
+
+**代价**：需确认无消费者（24.113.2 已确认只有类型校验引用它）。
+
+**优先级**：低——与 24.108 修掉的 `metadata.stdout` 同类，属存储冗余。
+
+---
+
+#### 建议 11：研究状态的死值
+
+**现状**：`research/run/model.ts:8` 声明 7 个状态，`blocked` 与 `stale` **永不赋值**。
+
+**建议**：要么删掉这两个值，要么让失败路径真正使用它们。
+
+**代价**：小。但需要判断「blocked」与「partial」的语义差异是否值得区分。
+
+**优先级**：低——不构成行为缺陷，只是状态机看起来比实际更完整。
+
+---
+
+#### 建议 12：`correctArtifact` 的伪造通过
+
+**现状**：`correction.ts:60-66` 无条件返回 `validation-passed`，而 `verification/execution/model.ts:71` 把它当作通过证据。**当前无生产调用**。
+
+**建议**：删除该函数，或让它真正验证。
+
+**代价**：小（无消费者）。但它是 `index.ts` 的公开导出，删除会改变公共 API。
+
+**优先级**：低——潜伏缺陷，一旦接线就会产生假通过。
+
+---
+
+#### 建议 13：`RotatingFileSink.maxFileSizeMb` 未校验
+
+**现状**：构造器校验了 `maxFiles` 却不校验 `maxFileSizeMb`。传 `0` 或负数会让每次写入都轮转。**当前生产不传该参数**。
+
+**建议**：补一行校验，与 `maxFiles` 对称。
+
+**代价**：极小。
+
+**优先级**：低——当前不可达，但对称性成本几乎为零。
+
+---
+
+#### 建议 14：resume 的两套实现
+
+**现状**：`picker/session.ts`（TUI）与 `entrypoints/sessionsPanel.ts`（raw-mode）都实现会话选择。交互模式用前者，后者给非交互宿主。
+
+**建议**：**保持现状**。两者服务于不同的宿主形态，强行合并会增加耦合。
+
+**代价**：无。
+
+**优先级**：观察项，不处理。
+
+---
+
+#### 建议 15：门面测试转移
+
+**现状**：`createWorkspaceWriteAuthority` 零生产调用，但 13 条测试覆盖它，其中 8 条测「别名工作区读写」——这个属性在生产路径上**未经测试**。
+
+**建议**：把 8 条测试的断言对象改为生产路径（`writeTextFile`），确认全绿后再删门面。
+
+**代价**：中等（需逐条改写并验证）。若有一条失败，说明覆盖不完整，此时应接上而非删除。
+
+**优先级**：低——门面不造成运行时问题，只是冗余。
+
+---
+
+#### 建议 16：M8 三元组记忆
+
+**现状**：`structuredFact`（单数）读三处写零处，冲突检测的阻断在真实保存路径上不可达。
+
+**参照**：oh-my-pi 有完整三元组表（`valid_from`/`valid_until`/`source`/`confidence` + `add()` 写入入口），**由模型通过 `triple_add` 工具显式写入**。
+
+**建议**：分三层，**只做层次 1**：
+
+| 层次 | 内容 | 建议 |
+|---|---|---|
+| 1 | 给候选加 `structuredFact`，让已有冲突检测可达 | **做** |
+| 2 | 加时间有效性（`validFrom`/`validUntil`） | 暂不做 |
+| 3 | 模型通过工具显式写入 | **不做** |
+
+**不做层次 3 的理由**：本项目的记忆是**经用户批准**的持久事实（`/memory save` 从 approved candidate 生成），与 omp 的「模型直接写库」是不同产品形态。引入模型直接写入会绕开现有的安全校验（`containsSecret`、`containsHiddenReasoning`）。
+
+**代价**：层次 1 改 3 个文件，无 schema 迁移。
+
+**优先级**：中——三个消费者写得那么认真却永不触发，是明显的浪费。
+
