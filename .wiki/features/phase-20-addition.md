@@ -10735,7 +10735,30 @@ function createOutputFilePath(prefix: string, extension: string): string {
 | B（对齐 pi） | 产物移出工作区到临时目录 | 违背「产物可被 read 直接打开」的设计，且临时目录不持久 |
 | C（显式保留策略） | 保留工作区布局，增加上限/按时间清理/显式命令 | 不解决「删会话后仍残留」，只是延后泄漏 |
 
-**倾向 A**：它与现有设计意图冲突最小（产物仍在工作区），且 oh-my-pi 已经证明可行。**本轮只研究，不实施。**
+**倾向 A**：它与现有设计意图冲突最小（产物仍在工作区），且 oh-my-pi 已经证明可行。
+
+#### 24.117.5 裁决（2026-11-04）：采用 A
+
+**用户裁决**：选 A——删会话时同时清两棵树。
+
+**为什么 A 而不是 B 或 C**：
+
+- **A 保留现有布局**。产物继续留在工作区，`read` 工具仍能直接打开，这与 `background.ts:17-19` 的设计意图一致（「让读者被指到的文件与前台工具写的文件放在一起」）。
+- **B 会让产物不可直接读取**。系统临时目录不持久，且模型要跨目录访问。
+- **C 不解决问题**。它只是延后泄漏，删会话后依然残留。
+
+**实施要点**（记录裁决，不在本轮实施）：
+
+| 要点 | 说明 |
+|---|---|
+| 定位工作区 | 会话记录的 `projectRoot` 是必填字段；`workspaceRoots` 是可选的，只在 rebind/branch 时写入。**两者都要作为候选** |
+| 避免 `realpathSync` | `ArtifactManager.getShared()` 与 `profileWorkspaceDir()` 都会对工作区做 `realpathSync`，工作区已删除时抛异常——而那正是最需要清理的场景 |
+| 越界校验 | 删除前必须确认路径确实是 `<root>/sessions/<id>/artifacts`，且 `sessionId` 符合 `[A-Za-z0-9_-]+` |
+| 删除范围 | 删 `<id>` 目录（含 `artifacts`），不是整个 `sessions` |
+| 失败处理 | 尽力而为；清理失败不得让已经成功的会话删除变成错误 |
+| 接线点 | `SessionStoreAccess.deleteSession`——它是 `/sessions` 面板删除与空会话丢弃的共同入口，且在删除记录前能 `load` 到工作区 |
+
+**不在 A 的范围内**：历史遗留产物（本次改动之前的）不会被自动清理，因为无法从会话 id 反推它们属于哪个工作区。如需清理，应另设命令。
 
 
 ### 24.118 参照对照：主张-证据配对（补 24.116.1）
@@ -11515,4 +11538,116 @@ catch { return; }
 **新增测试**：命名 profile + 已删除的工作区，`removeSessionArtifactsAt` 不抛。
 
 **这是同一处的第三次前提假设**（`getShared` 的 realpath、`workspaceRoots` 的可选性、`profileWorkspaceDir` 的 realpath）。三次都不是逻辑错，是**没检查被调用方的前置条件**。
+
+
+### 24.128 M8 深度研究：三元组记忆的完整实现方案
+
+24.113 与 24.125 只说了「本项目读三写零」。本节把参照实现看清楚，给出可落地的方案。
+
+#### 24.128.1 oh-my-pi 的完整设计
+
+**存储**（`mnemopi/src/core/triples.ts:11-20`）：
+
+```sql
+id, subject, predicate, object, valid_from, valid_until, source, confidence, created_at
+```
+
+**写入**（`triples.ts:249-262`）：
+
+```ts
+add(subject, predicate, object, options?) {
+  const validFrom = normalized.validFrom ?? today();
+  // 先把同一 (subject, predicate) 的旧行关闭
+  this.conn.run("UPDATE triples SET valid_until = ? WHERE subject = ? AND predicate = ? AND valid_until IS NULL",
+    [validFrom, subject, predicate]);
+  this.conn.run("INSERT INTO triples (subject, predicate, object, valid_from, source, confidence) VALUES (?, ?, ?, ?, ?, ?)", ...);
+}
+```
+
+**关键点**：写入时**自动关闭同主谓的旧值**。一个 `(subject, predicate)` 在同一时刻只有一条有效行，但历史行保留，可以查询「过去某个时间点是什么值」。
+
+**查询**（`triples.ts:266-297`）：
+
+```ts
+conditions.push("valid_from <= ?", "(valid_until IS NULL OR valid_until > ?)");
+const effectiveAsOf = options.asOf ?? today();   // ← 支持时间旅行
+```
+
+**产生者**（`mcp-tools.ts:661-677`）：
+
+```ts
+async function handleTripleAdd(args) {
+  const tripleId = addTriple(subject, predicate, object, {
+    validFrom: optionalStringArg(args, "valid_from"),
+    source: stringArg(args, "source", "conversation"),
+    confidence: numberArg(args, "confidence", 1.0),
+  });
+  return { status: "stored", triple_id: tripleId, store: "triples", bank };
+}
+```
+
+**这是最重要的一点**：三元组**不是自动提取的，而是模型通过 MCP 工具显式写入**。`triple_add` / `triple_query` 是模型可调用的工具，`source` 默认 `"conversation"`，`confidence` 默认 `1.0`。
+
+#### 24.128.2 本项目的现状
+
+| 环节 | 本项目 | oh-my-pi |
+|---|---|---|
+| 存储形态 | 记忆记录上的可选字段 `structuredFact?: {subject?, predicate?, object?}` | 独立三元组表 |
+| 时间有效性 | **无** | `valid_from` / `valid_until` |
+| 来源与置信度 | **无** | `source` / `confidence` |
+| 写入入口 | **无** | `add()` + `triple_add` 工具 |
+| 消费者 | 检索打分、冲突检测、校验 | 查询、时间旅行、冲突检测 |
+| 提取器 | `projectMemoryCandidateExtractor.ts` 产生 7 类候选，**均无 `structuredFact`** | 不自动提取，模型显式写入 |
+
+**冲突检测为什么写得那么认真**：`projectMemoryConflictDetection.ts` 按 `(subject, predicate)` 分组，找同一个键下的不同 `object`。这个逻辑**只有在能表达「同一主谓、不同时期不同值」时才有意义**——而那正是 `valid_until` 提供的。本项目没有时间维度，所以冲突检测只能看到「两条记录同时存在且矛盾」，无法区分「旧值已被取代」和「真的冲突」。
+
+#### 24.128.3 方案：三个层次，按成本递增
+
+**层次 1：最小可用（让字段能被写入）**
+
+给 `ProjectMemoryCandidate` 加可选 `structuredFact`，由 `extractFromUserPreferenceFacts` 等少数提取点填充。
+
+- 成本：低，改 2-3 个文件
+- 收益：冲突检测的阻断路径**第一次可达**
+- 局限：仍无时间维度，冲突检测只能报「矛盾」不能报「已取代」
+
+**层次 2：加时间有效性（对齐 omp 的语义）**
+
+给 `ProjectMemoryRecord` 加 `validFrom` / `validUntil`，写入时关闭同主谓旧值。
+
+- 成本：中，改记录 schema + 持久化 + 折叠逻辑 + 迁移
+- 收益：冲突检测能区分「旧值」与「真冲突」；支持「过去某时刻是什么」
+- 风险：`memoryPersistence.ts` 的折叠是追加式（`foldProjectMemoryEntries`），加时间维度要改折叠规则
+
+**层次 3：模型显式写入（对齐 omp 的产生方式）**
+
+新增 `memory_fact` 工具，模型可显式声明三元组。
+
+- 成本：高，新增工具 + 审批 + 准入
+- 收益：与 omp 完全对齐，模型能主动维护事实
+- 风险：新增工具面，需要审批语义
+
+#### 24.128.4 建议
+
+**先做层次 1**，理由：
+
+1. 它让**已有的**冲突检测逻辑第一次真正可用——三个消费者写得那么认真，却因为无写入而永不触发，这是最直接的浪费。
+2. 成本低，不涉及 schema 迁移。
+3. 如果层次 1 证明这个能力有用，再考虑层次 2/3。
+
+**不做层次 3 的理由**：本项目的记忆写入是 `/memory` 命令 + 候选评审流程（`/memory save` 从 approved candidate 生成记录），与 omp 的「模型直接调工具写库」是**不同的产品形态**。引入模型直接写入会绕开现有的评审与安全校验（`memoryValidation.ts` 的 `containsSecret`、`containsHiddenReasoning` 等），风险大于收益。
+
+**这是与 omp 的有意分歧，不是落后**：omp 的记忆是模型的草稿本，本项目的记忆是**经用户批准**的持久事实。两者对「谁能写」的答案不同。
+
+#### 24.128.5 层次 1 的具体改动点（供实施时参考，本轮不实施）
+
+| 文件 | 改动 |
+|---|---|
+| `projectMemoryCandidate.ts` | `ProjectMemoryCandidate` 加 `readonly structuredFact?: { subject?: string; predicate?: string; object?: string }` |
+| `projectMemoryCandidateExtractor.ts` | 在 `extractFromUserPreferenceFacts` 等能识别主谓宾的提取点填充该字段 |
+| `projectMemorySaveCommandRunner.ts` | `recordFromApprovedEntry` 透传 `entry.candidate.structuredFact` |
+| `memoryValidation.ts` | 已有校验逻辑，无需改（它已经在检查这个字段） |
+| 测试 | 新增：带 `structuredFact` 的候选保存后，冲突检测能触发 `conflicting-structured-memory` |
+
+**验证方式**：构造两条 `subject`/`predicate` 相同、`object` 不同的记忆，注入时应报告冲突。
 
