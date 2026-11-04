@@ -11876,11 +11876,23 @@ if (actual !== key) { invalidate(); key = actual; retryAt = 0; input.repaint(); 
 
 所以输入时**每停顿 150ms 就重建一次 registry**。这是比 `onSubmit` 更频繁的来源。
 
-#### 24.131.3 补全路径已有缓存（不是卡顿来源）
+#### 24.131.3 补全路径：命令名有缓存，**参数补全没有**
 
-`slashSuggestions.ts:13-37` 用模块级 `cached` + `cachedScope` + `subscribeSlashCommands` 失效订阅，**输入时不会重建**。这一层做得对。
+`slashSuggestions.ts:13-37` 的 `candidates()` 有模块级 `cached` + `cachedScope` + 失效订阅，**命令名补全确实不重建**。
 
-**所以问题定位很明确**：补全有缓存，提交与预览没有。
+**但参数补全没有缓存**。`slashSuggestions:48`：
+
+```ts
+const invocation = getSlashInvocation(command.value, scope);
+```
+
+而 `getSlashInvocation`（`slashCommandRegistry.ts:152-154`）调用 `allCommands(scope, ...)`，后者（`:103-106`）调用 `builtinCommands`，再经 `listVisibleCommands`（`registry.ts:1054-1061`）落到 **`createCommandRegistry`**。
+
+**所以输入 `/model ` 之后继续打字时，每次按键都会重建一次 registry。**
+
+（初版写「补全有缓存、不是卡顿来源」是**不完整的**——只覆盖了命令名补全。）
+
+**问题定位修正为**：命令名补全有缓存；**参数补全、提交、预览三处都没有**。
 
 #### 24.131.4 参照对照
 
@@ -12181,7 +12193,7 @@ if (!this.busy && opensPicker(text, catalogScope(this.options.runtimeContext))) 
 | 编号 | 结论 | 类型 | 证据强度 |
 |---|---|---|---|
 | 24.131 | `createCommandRegistry` 在输入热路径上被反复构建（`onSubmit` 2 次 + `slashRouter` 1 次；预览每次按键 1 次） | **卡顿根因** | 代码定位 + 实测 10–120ms |
-| 24.131.3 | 补全路径**有缓存**，不是卡顿来源 | 排除项 | `slashSuggestions.ts:13-37` |
+| 24.131.3 | 命令名补全**有缓存**；**参数补全没有**（`getSlashInvocation` → `createCommandRegistry`） | 卡顿来源之一 | `slashSuggestions.ts:48` + `slashCommandRegistry.ts:152` |
 | 24.132.3 | `shift+tab` 被绑到 plan/build 切换，与 omp 的 thinking 循环冲突 | **功能缺口 + 键位冲突** | `keybindings.ts:85` + `keymap.ts:255` |
 | 24.132.4 | `/thinking` 无参数只打印文本，不打开面板 | **功能缺口** | `thinkingCommandRuntime.ts:20-26` |
 | 24.132.5 | 模型详情面板的「Choose effort」仅在 effort 不受支持时出现 | **功能缺口（只有出错补救）** | `model.ts:217` |
@@ -12199,10 +12211,45 @@ if (!this.busy && opensPicker(text, catalogScope(this.options.runtimeContext))) 
 | **`/thinking` 面板** | 复用已有的 `picker/model/thinking.ts`，改动最小 |
 | **registry 缓存** | 按 `(cwd, configRevision)` 缓存，预计消除每次提交 2 次、每次按键 1 次重建 |
 
-#### 24.135.2 未做的部分（如实记录）
+#### 24.135.2 对抗性验证记录
+
+对抗验证子代理**第三次卡死**（输出停在 131 字节、7 分钟无增长），已停止，由我逐条完成。四条主张的结果：
+
+| 主张 | 结果 | 依据 |
+|---|---|---|
+| `onSubmit` 内两次构建 registry | **CONFIRMED** | `onSubmit` 覆盖 `:824-1055`，`:832` 只在 `/exit` 时 return，否则继续到 `:1030`；末尾 `:1051` 才调用 `run` |
+| 补全路径有缓存 | **PARTIAL → 已修正** | 命令名有缓存；**参数补全走 `getSlashInvocation` → `allCommands` → `createCommandRegistry`，无缓存** |
+| `/resume` 全屏降级 | **REFUTED** | `onSubmit:1016-1018` 用 `opensPicker` 拦截并 `openPicker`（`pickerFor` → `overlay.open`），走不到 `cliSessionModule` 的降级分支 |
+| `shift+tab` 绑定冲突 | **CONFIRMED** | `keybindings.ts:85` 描述是「Switch between planning and building」，`keymap.ts:255-258` 调 `cycleAgentMode()` |
+
+**两条被推翻/修正**（Claim 2 部分、Claim 3 全部），与我此前五次推翻同型：**没把调用链走到底**。
+
+#### 24.135.3 未做的部分（如实记录）
 
 - **没有真实 PTY 测量**按键延迟。10–120ms 是函数级微基准，不等于用户感知的输入延迟。
 - **没有测量 `preview.ts` 的完整开销**（它还包括 `preparePromptRequest`、工具 schema 序列化等，registry 只是其中一项）。
 - **settings 面板的「功能本身缺失」未逐项比对**。本轮只证明了「已声明字段都有入口」，没有对照 omp 的 442 项找出本项目缺哪些功能。
 - **resume 的 TUI picker 未实际打开验证**，只从 `PICKERS` 注册与 `opensPicker` 分支推断。
+
+
+#### 24.135.3 `/thinking` 面板复用评估：可复用逻辑，但需泛化
+
+`picker/model/thinking.ts` 的 `modelRoleThinkingPicker` 实现质量高：
+
+- **不可用档位仍可聚焦但只读**（`:33-35` 的 `disabled: true, focusable: true`），并标注「active · unavailable」；
+- 每次动作前复验归属（`ownsAction`），关闭后迟到回调不生效；
+- 准入检查在构造子面板与保存前各做一次（`admission?.()`）。
+
+**但它绑定在角色模型上**：
+
+```ts
+export function modelRoleThinkingPicker(current: SessionModelRole, efforts: readonly ThinkingPreference[],
+  assign: (effort: ThinkingPreference) => RoleResult, ...)
+```
+
+`current: SessionModelRole` 与 `assign: RoleResult` 都是角色专用类型。
+
+**复用方案**（不实施）：把 `current` 泛化为 `{ label: string; active: ThinkingPreference | null }`，把 `assign` 泛化为 `(effort) => void`。这样角色面板与 `/thinking` 面板共用同一实现，避免造第二套。
+
+**这与 24.133.7 的「重复实现」是同一类风险**——如果不泛化就新写一个，会变成第三套 thinking 选择器。
 
