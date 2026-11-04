@@ -206,3 +206,19 @@ describe("removing artifacts after the workspace is gone", () => {
     expect(fs.existsSync(workspace)).toBe(true);
   });
 });
+
+describe("workspace candidates", () => {
+  let workspace: string;
+  beforeEach(() => { workspace = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-cand-")); });
+  afterEach(() => { try { fs.rmSync(workspace, { recursive: true, force: true }); } catch { /* best effort */ } });
+
+  it("removes artifacts addressed by a session's projectRoot alone", async () => {
+    // Most sessions carry only projectRoot; workspaceRoots is written only on
+    // rebind, branch or explicit root sets. The cleanup must work for both.
+    const manager = ArtifactManager.getShared(workspace, "sess_proj");
+    await manager.save("output", "read");
+    const artifactsDir = manager.directory;
+    ArtifactManager.removeSessionArtifactsAt(workspace, "sess_proj");
+    expect(fs.existsSync(artifactsDir)).toBe(false);
+  });
+});

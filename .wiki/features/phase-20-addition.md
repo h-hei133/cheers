@@ -11434,3 +11434,31 @@ expect(Object.keys(scope().pending)).toEqual(['1']);          // ← 实现：�
 
 **未实施**。当前代码状态是撤回后的原始实现，CI 会绿。
 
+
+#### 24.124.6 M9 的第二个缺陷：普通会话没有 `workspaceRoots`
+
+补强时发现：`deleteSession` 用 `session.workspaceRoots?.[0]?.path` 定位工作区，但——
+
+`sessionRecord.ts:13-14`：
+
+```ts
+projectRoot: string;                                  // 必填
+workspaceRoots?: readonly WorkspaceRoot[];            // 可选
+```
+
+而 `workspaceRoots` 只在**rebind**（`sessionProjectRootRebind.ts:66,74`）、**branch**（`branch/create.ts:55`）、**continuation workspace 写入**（`continuation/workspace.ts:86`）三处产生。**普通会话只有 `projectRoot`。**
+
+所以我的实现对绝大多数会话**静默跳过清理**——功能等于没做。
+
+**改法**：两个字段都作为候选。
+
+```ts
+workspaceRoots = [...new Set([session.projectRoot, ...(session.workspaceRoots ?? []).map(root => root.path)].filter(Boolean))];
+```
+
+对每个候选调一次 `removeSessionArtifactsAt`——不存在的那条是无操作，代价为零。
+
+**新增测试**：只用 `projectRoot` 定位的会话也能清掉产物。
+
+**这是怎么发现的**：不是测试失败，是问「这个字段一定存在吗」。与 24.124.5 同一个方法——**实现后立刻去找能证伪它的前提**。
+

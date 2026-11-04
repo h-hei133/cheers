@@ -109,19 +109,28 @@ export class SessionStoreAccess extends SessionStorePaths {
     // where they are. A record that cannot be read is still deleted — a session
     // the user asked to remove must not survive because its artifacts could not
     // be located.
-    let workspaceRoot: string | undefined;
-    try { workspaceRoot = this.load(sessionId).workspaceRoots?.[0]?.path; } catch { workspaceRoot = undefined; }
+    let workspaceRoots: readonly string[] = [];
+    try {
+      const session = this.load(sessionId);
+      // `workspaceRoots` is optional and only written when a session was rebound,
+      // branched or given an explicit root set, so most sessions have only
+      // `projectRoot`. Both are candidates: an artifact directory may sit under
+      // either, and removing one that does not exist costs nothing.
+      workspaceRoots = [...new Set([session.projectRoot, ...(session.workspaceRoots ?? []).map(root => root.path)].filter(Boolean))];
+    } catch { workspaceRoots = []; }
     deleteSessionRecord({
       sessionId,
       layout: locateExistingSessionLayout(this.storeLayout, sessionId),
     });
-    if (workspaceRoot === undefined) return;
-    // `getShared` canonicalises the workspace, which throws when the workspace is
-    // already gone — exactly the case where the artifacts most need removing.
-    // The layout is deterministic, so the directory is addressed directly and
-    // the removal re-checks that it really is a session artifact directory.
-    try { ArtifactManager.removeSessionArtifactsAt(workspaceRoot, sessionId); }
-    catch { /* Cleanup is best-effort; the session record is already gone. */ }
+    // `getShared` canonicalises the workspace, which throws when the directory has
+    // been moved or deleted — exactly the case where the artifacts most need
+    // removing. The layout is deterministic, so each candidate is addressed
+    // directly and the removal re-checks that it really is a session artifact
+    // directory.
+    for (const root of workspaceRoots) {
+      try { ArtifactManager.removeSessionArtifactsAt(root, sessionId); }
+      catch { /* Cleanup is best-effort; the session record is already gone. */ }
+    }
   }
 
   listSessions(onSource?: (target: string) => void): Session[] {
