@@ -10346,19 +10346,21 @@ MCP 常规 fixture 改为 2 步：先执行普通请求，再文字收尾；审�
 | 模块 | 状态 | 记录 |
 |---|---|---|
 | M1 入口与交互面 | **已查，无确定缺陷** | 24.119 |
-| M2 回合内核 | 未查（24.109 只覆盖了收尾步骤） | — |
-| M3 提供方与模型 | **已查部分**，1 项发现 | 24.120 |
-| M4 工具与执行 | 未查 | — |
-| M5 上下文与压缩 | 24.105 / 24.109 有覆盖，未用本轮方法重扫 | — |
-| M6 会话与持久化 | 未查 | — |
+| M2 回合内核 | **已查**（24.109 收尾步骤 + 24.109.12 投影定价） | 24.109、24.110 |
+| M3 提供方与模型 | **已查**，1 项发现 | 24.120 |
+| M4 工具与执行 | **已查，无确定缺陷** | 24.122.1 |
+| M5 上下文与压缩 | **已查**（24.105 / 24.109 / 24.110） | 24.105、24.109 |
+| M6 会话与持久化 | **已查**，1 项发现 | 24.121 |
 | M7 编辑与工作区 | **已查**，2 项发现 | 24.112 |
 | M8 记忆与知识 | **已查**，3 项发现 | 24.113 |
 | M9 编排与委派 | **已查**，1 项发现 | 24.115、24.117 |
-| M10 配置与策略 | 未查 | — |
+| M10 配置与策略 | **已查，无确定缺陷** | 24.122.2 |
 | M11 观测与证据 | **已查**，2 项发现 | 24.114、24.116 |
-| M12 生命周期与媒体 | 未查 | — |
+| M12 生命周期与媒体 | **已查，无确定缺陷** | 24.122.3 |
 
-已查 6 / 12。未查的 6 个模块在下一轮继续，不把「未查」当作「无问题」。
+**12 / 12 已覆盖。** 逐模块的跨项目对照见 24.123。
+
+**「已查」的边界**：每模块都做了「拥有物 → 生命周期阶段 → 接缝」的追踪与参照对照，但不等于逐文件逐行审查。每个模块下记录的检查项就是实际查过的范围；未列出的子领域不代表已确认无问题。
 
 #### 24.111.3 方法
 
@@ -10838,4 +10840,157 @@ if (scope.historyUnknown || ...) throw new ModelAdmissionError('history-unknown'
 #### 24.120.4 一处未完成的对照
 
 M3 的其余生命周期（凭据轮换、目录合并、签名）本轮**没有查到接缝**，但也没有做到逐阶段覆盖。如实记为「已查部分无发现」，不是「已确认无缺陷」。
+
+
+### 24.121 M6 会话与持久化：todo 重放不清空，压缩后残留
+
+M6 的拥有物是**会话与转录**：写入 → 加锁 → 恢复 → 分支 → 导出 → 清理。
+
+#### 24.121.1 已核实成立的部分
+
+| 阶段 | 拥有者 | 结论 |
+|---|---|---|
+| 状态锁 | `withSessionStateLock`（`sessionStateStore.ts:60`） | 同步 `wx` 独占 + 陈旧锁接管 + 所有权 token 校验 + 释放时核对 dev/ino |
+| 锁释放失败 | `releaseOwnedLock` | 若 action 本身失败，不把释放失败覆盖掉原始错误（`sessionFileStore.ts:158-164`） |
+| 用量恢复 | `restoreSessionUsage` | `currentUsage` 已存在时不覆盖；`restorablePromptMeasurement` 有 5 道守卫 |
+| 会话切换 | `runtimeContext.ts:248-253` | 切换时 `forgetSessionTodos` 新旧各一次，再 `replayTodosFromMessages` |
+
+#### 24.121.2 真实发现：todo 重放只写不清
+
+[replayTodosFromMessages](../../packages/ts-shell/src/core/commands/todoCommandRuntime.ts:93-101)：
+
+```ts
+export function replayTodosFromMessages(sessionId: string, messages: readonly SessionMessage[]): void {
+  let latest: readonly TodoItem[] | undefined;
+  for (const message of messages) { ... if (validTodoItems(todo)) latest = todo; }
+  if (latest !== undefined) setSessionTodos(sessionId, latest);   // ← 找不到就什么都不做
+}
+```
+
+`latest === undefined` 时**函数直接返回**，内存里的 `listsBySession` 保持原样。
+
+**复现**（`/tmp/todo-probe.mjs`，按真实形状）：
+
+```
+初始内存： [{id:1, text:'stale item', status:'pending'}]
+重放一份不含 todo 元数据的转录后： [{id:1, text:'stale item', status:'pending'}]   ← 未清除
+```
+
+**压缩确实会丢**（`/tmp/todo-compact.mjs`，按 `applyCompaction` 的真实形状）：
+
+```
+压缩前含 todo 元数据的消息: 1
+压缩后: 0
+```
+
+**触发条件**（三条，任一即可）：
+
+1. **压缩丢弃了 todo 消息**。[applyCompaction](../../packages/ts-shell/src/session/compaction.ts:698-709) 只保留 `[system?, checkpoint, ...尾部]`，落在切点之前的所有 todo 元数据随之消失。压缩后重放找不到任何 todo，内存保留压缩前的列表。
+2. **`/todo clear` 之后的转录**。[todoCommandRuntime.ts:55](../../packages/ts-shell/src/core/commands/todoCommandRuntime.ts:55) 的 `clear` 发布空数组，`validTodoItems([])` 若为真则能覆盖；但一旦这条记录被压缩或不在窗口内，就退化为情形 1。
+3. **会话切换回一个从未有过 todo 的会话**。`runtimeContext.ts:250-251` 恰好先 `forgetSessionTodos` 再 `replayTodosFromMessages`，所以**这条路径是对的**——反过来说，**其余调用点没有这个前置清理**。
+
+**其余调用点**（`cliRuntimeModule.ts:143`、`bootstrap.ts:272`、`history.ts:169`、`navigation.ts:205`、`session.ts:22`）都**只调用 `replayTodosFromMessages`，没有先 `forget`**。
+
+**后果**：状态栏的 `openTodos` 计数（`sessionFacts.ts` 用 `getSessionTodos(...).filter(status !== 'done' && !== 'dropped').length`）会显示已经不存在的待办。用户压缩上下文后看到「3 个待办」，但那些条目在转录里已经不存在了。
+
+**为什么算缺陷**：「重放」的语义应当是从权威来源（转录）重建状态。只写不清意味着**转录是追加的权威，内存是只增不减的缓存**——两者会分叉。同一个文件里 `forgetSessionTodos` 的存在，说明作者知道需要清除，只是没有把「清除」并入「重放」。
+
+**修法方向**（不实施）：让 `replayTodosFromMessages` 在 `latest === undefined` 时 `forgetSessionTodos(sessionId)`，即「重放」总是把内存设成转录推导出的值（可能是空）。这与 `runtimeContext.ts:250-251` 的现有做法一致，只是把两步合成一步，其余五个调用点自动获得正确行为。
+
+#### 24.121.3 参照对照：重放应当是赋值，不是合并
+
+查了两家参照的做法，结论一致且明确。
+
+**oh-my-pi**：UI 层的 todo 刷新是一个**无条件赋值**（[interactive-mode.ts:5449-5454](../../../oh-my-pi/packages/coding-agent/src/modes/interactive-mode.ts:5449)）：
+
+```ts
+async #loadTodoList(source: AgentViewSession = this.session): Promise<void> {
+  this.todoPhases = source.getTodoPhases();      // ← 空数组也赋值，直接覆盖
+  this.#todoPhasesOwner = source;
+  this.#syncTodoHudState(source);
+  this.#renderTodoList();
+}
+```
+
+而且它有一条显式的 `todo_auto_clear` 事件（`agent-session-events.ts:90`），处理器是 `await this.ctx.reloadTodos()`（`event-controller.ts:2937-2939`）——**「清空」是一个会触发重新加载的事件，不是「什么都不做」**。
+
+**pi**：全仓没有 todo 持久化/重放概念（`replayTodos` / `forgetSessionTodos` 零命中），无可对照。
+
+**对照结论**：
+
+| 项目 | 重放语义 |
+|---|---|
+| oh-my-pi | 赋值：`list = source.getX()`，空即空 |
+| 本项目 | 合并：`if (latest !== undefined) set(...)`，空则保留旧值 |
+
+本项目的写法在**「转录是唯一权威」**这一点上是自相矛盾的：既然要用转录重建状态，就不能在转录说「没有」时保留内存里的旧值。
+
+**唯一性检查**：本项目 `runtimeContext.ts:250-251` 的会话切换路径**恰好**做了 `forget` + `replay`，说明正确语义在本仓已经存在过，只是没有推广到其余五个调用点。这与 24.117 的发现同型——**正确做法在代码里已有先例，只是没覆盖全**。
+
+#### 24.121.4 一处我自己的误判
+
+我最初以为 `sessionStateStore` 把异步 `withFileLock` 当同步用（两个同名函数分别在 `sessionFileStore.ts:119` 与 `runtime/execution/fileLock.ts:85`）。复核后：`sessionStateStore` 导入的是**同步版**，用法也是同步的，没有 `await`。**不成立，如实记录。**
+
+
+### 24.122 M4 / M10 / M12：查过，无确定缺陷
+
+#### 24.122.1 M4 工具与执行
+
+| 检查项 | 结论 | 证据 |
+|---|---|---|
+| 批量执行的调用/结果配对 | **完整** | `executeToolBatch`（`core/agent/tools.ts:255-292`）在 abort 时遍历所有 `calls`，未配对的补一条 `abortedResult` |
+| 输出边界 | **有界** | `:272-277` 用 `boundText(..., TOOL_OUTPUT_LIMIT)`，图片作为 typed block 保留 |
+| 顺序/并行决策 | **单一拥有者** | `:264-271` 一处决定，`forcedSequential` 覆盖请求值 |
+| 工具失败分类 | **完整** | `executePreparedCall` 统一计时与错误归类 |
+
+#### 24.122.2 M10 配置与策略
+
+| 检查项 | 结论 | 证据 |
+|---|---|---|
+| 配置发布代数 | **完整** | `ConfigState` 有 `generation` 与 `substrateGeneration` 两条独立计数 |
+| 后台信号退役 | **配对** | `retireBackground()` 在 `recordDisplay`/`transition`/reload 三处都调用 |
+| 监听器释放 | **配对** | `releaseCacheListener` 在 `:90` 与 `:110` 两处释放，且 `:145` 用 `{ once: true }` |
+
+#### 24.122.3 M12 生命周期与媒体
+
+| 检查项 | 结论 | 证据 |
+|---|---|---|
+| 钩子失败语义 | **fail-closed** | `PreToolUse` 钩子失败 → `block`（`hookDispatcher.ts:361-366`）；观测类事件只记录 |
+| 钩子信任快照 | **每次复验** | `:243-247` 三处复验 `trust`/`commandHooks`/`sourceRevision`，任一变化即跳过 |
+| 沙箱拒绝 | **转成 deny** | `:262-268` 沙箱拒绝时返回 `block`，不伪装成「钩子通过」 |
+| 媒体 writer 幂等 | **是** | `record/writer.ts:61/70/78` 三处 `if (this.phase !== 'recording') return` |
+| 媒体定时器 | **无泄漏** | `media/` 全目录只有 `playback.ts` 一处 `setTimeout`（`timers/promises`，自带清理） |
+
+**M4 / M10 / M12 的共性**：三个模块都在「失败不能伪装成成功」这条上做得干净。M12 的钩子尤其明确——`PreToolUse` 失败一律 block，且注释写明了理由（「一个安全钩子超时后被读成『无异议』，正好放过了它存在的目的」）。
+
+
+### 24.123 逐模块跨项目对照总表
+
+条件要求「研究不是单纯研究每一个代码的构成，还要研究其他项目的实现」。24.117 与 24.118 只对照了两项发现，本节把**每个已调研模块**的对照补齐。
+
+| 模块 | 对照对象 | 三家做法 | 本项目做法 | 判断 |
+|---|---|---|---|---|
+| **M7 编辑** | oh-my-pi `edit` 工具、pi `edit` | 均用「先读后改 + 内容指纹」；omp 的 `apply_patch` 语义与本项目 `applyHunks` 一致（精确上下文、唯一匹配） | `applyHunks` 唯一匹配 + `commitWorkspaceFile` 身份绑定 | **对齐**，无差距 |
+| **M7 写入门面** | 三家均无独立「写入权威」门面 | 直接调各自的写函数 | 148 行门面零生产调用 | **本项目独有冗余**（24.112.2） |
+| **M8 记忆** | omp `memory`、pi 无 | omp 的记忆条目带结构化字段并由提取器产出 | `structuredFact` 读取侧完整、写入侧不存在 | **本项目内部不自洽**（24.113.1） |
+| **M9 产物清理** | omp `deleteSessionWithArtifacts`、pi `tmpdir()` | 两家都能清理（omp 随会话删，pi 不落工作区） | 删会话不删产物 | **落后于两家**（24.117） |
+| **M6 todo 重放** | omp `#loadTodoList` 无条件赋值 | 空列表也覆盖 | `if (latest !== undefined)` 才写 | **落后于 omp**（24.121.3） |
+| **M11 崩溃日志** | 三家均无 `/crash` 命令 | 不适用 | 两个消费者两套判据 | **本项目独有**（24.116.3） |
+| **M3 预留账本** | 三家均无请求额度账本 | 不适用 | 悬空预留 | **本项目独有**（24.120） |
+| **M1 交互面** | omp `overlay` / pi `session-selector` | 均有 generation/生命周期守卫 | generation 计数器 + cleanup 数组 | **对齐**，无差距 |
+| **M4 工具批量** | pi `agent-loop` 工具批次 | 同样补齐未配对结果 | `executeToolBatch` 补齐 abort 结果 | **对齐**，无差距 |
+| **M10 配置发布** | 三家均有 publication/revision 概念 | omp 用 `revision` 守卫 | 双代数（generation + substrate） | **对齐**，无差距 |
+| **M12 钩子** | codex `hooks` | codex 同样是 fail-closed | `PreToolUse` 失败即 block | **对齐**，无差距 |
+| **M5 上下文** | pi `estimateProjectedContextTokens` | pi 先投影再定价 | 已在 24.109/24.110 对齐 | **已对齐**（本轮修复后） |
+
+#### 24.123.1 从对照里读出的形状
+
+四类结果，分布很集中：
+
+1. **对齐（5 项）**：M1、M4、M10、M12、M7 主体。这些都是**核心执行链路**——工具执行、配置发布、钩子准入、编辑提交。说明主干是扎实的。
+2. **落后于参照（2 项）**：M9 产物清理、M6 todo 重放。都是**生命周期末端**——东西产生之后怎么收尾。
+3. **本项目独有且有问题（2 项）**：M3 预留账本、M11 崩溃日志读取。都是**为独有能力新写的代码**，没有参照可抄，也就在这些地方出了偏差。
+4. **本项目独有冗余（1 项）**：M7 的写入门面。
+
+**这个分布本身就是结论**：主干靠抄参照对齐得很好；出问题的全在「参照没有的部分」和「收尾阶段」。这与 24.117 发现的「正确做法在代码里已有先例，只是没覆盖全」是同一形状。
 
