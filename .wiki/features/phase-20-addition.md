@@ -11100,3 +11100,73 @@ it("ignores a malformed record rather than adopting it", () => {
 **这条记录的价值**：它说明「读代码看出的不自洽」不一定是不自洽——**两处测试写明了为什么这样设计**，而我只读了实现。这与 24.123.2 的教训同型：**没读全就下结论**。
 
 **未实施**：压缩侧的改动涉及 checkpoint 格式与 `applyCompaction` 的契约，超出本轮范围，留作记录。
+
+### 24.124 实施：M3 预留账本与 M9 产物清理（2026-11-04）
+
+研究阶段结束，本轮开始实现。只改了两项已复现的缺陷，其余记录在案未动。
+
+#### 24.124.1 M3：为「已发出、答案读不出」增加出口
+
+**契约变更**：`ModelAttempt` 增加 `retireUnreadable()`（`core/agent/request/model.ts:79-95`），`RequestAttempt` 增加同名转发（`provider/request/attempt.ts:9-15`）。
+
+**账本实现**（`core/agent/request/ledger.ts:49-67`）：
+
+```ts
+export function retireUnreadableRequest(ledger, scopeId, sequence): RequestLedger {
+  const scope = requiredScope(ledger, scopeId);
+  if (finalizedSequence(scope.finalized, sequence)) return ledger;      // 幂等
+  const attempt = scope.pending[sequence];
+  if (!attempt?.dispatched) throw new ModelAdmissionError('replay');    // 未发出应走 confirmUnsent
+  return removeAttempt(ledger, { ...scope, historyUnknown: true }, sequence);
+}
+```
+
+**两个调用点**：
+
+| 位置 | 时机 |
+|---|---|
+| `provider/request/completion.ts:130-138` | `readCompletion` 抛错时立即退休（该函数没有重试循环） |
+| `turn/step.ts:687-706` | **重试循环放弃之后**才退休，否则会把即将复用的 attempt 提前退休 |
+
+**验证**：
+- 新增 3 条回归测试（退休生效、未发出时拒绝、重复调用幂等）；
+- 反转实验：去掉 `historyUnknown: true` → 1 项失败，逐字节恢复后 10 项通过；
+- `tsc -p tsconfig.build.json` 通过；ledger/completion/step 三文件 **129 项**通过。
+
+**语义代价（如实记录）**：`historyUnknown` 会让该 scope **立即拒绝后续请求**，而不是像原来那样「先耗尽再拒绝」。两者都会中断，但现在的理由是真实的（用量不可知），不是误导性的（额度用尽）。这与 `AGENTS.md`「Do not hide unverified write outcomes behind success-like terminal states」一致。
+
+#### 24.124.2 M9：删除会话时清理工作区产物
+
+**新增** `ArtifactManager.removeSessionArtifacts()`（`core/session/artifactManager.ts:64-92`）：
+
+```ts
+const sessionDir = path.dirname(this.artifactsDir);      // <root>/sessions/<id>
+const sessionsRoot = path.dirname(sessionDir);            // <root>/sessions
+if (path.basename(this.artifactsDir) !== "artifacts" || path.basename(sessionsRoot) !== "sessions"
+  || sessionDir === sessionsRoot) return;                 // 拒绝越界
+fs.rmSync(sessionDir, { recursive: true, force: true });
+```
+
+**接线**（`session/store/sessionStoreAccess.ts:105-121`）：`deleteSession` 在删记录**之前** `load` 会话取出 `workspaceRoots[0].path`——删完之后就没有任何东西能说明产物在哪。读不到记录时仍然删除（用户要求删除的会话不能因为找不到产物而存活）。
+
+**验证**：
+- 新增 3 条测试：只删本会话、保留工作区与 sessions 根、无产物时无操作；
+- 反转实验：把 `rmSync` 换成 `return` → 1 项失败，恢复后 12 项通过；
+- session store 与 SessionManager **313 项**通过。
+
+**过程中修掉的一个自身缺陷**：首版越界校验写成 `path.dirname(path.dirname(sessionDir)) !== this.storageRoot`，路径层级算错一层，导致清理永不执行。测试立刻抓到（12 项里 1 项失败），改为按 basename 校验。
+
+#### 24.124.3 撤掉的一项：M6 todo 重放
+
+按 24.121.2 的结论修改 `replayTodosFromMessages` 后，发现 `todoPersistence.test.ts` 有**两条既有测试明确固定了相反行为**，其中一条防止「格式非法的记录覆盖真实清单」。我的改法会让非法记录**清空**用户数据。
+
+**已 `git checkout` 撤销该文件**，结论改写进 24.121.5：缺陷在**压缩丢弃元数据**，不在读取语义。修法应在压缩侧，涉及 checkpoint 格式，未实施。
+
+#### 24.124.4 未实施的三项（如实记录）
+
+| 项 | 为什么没做 |
+|---|---|
+| M8 `structuredFact` 读三写零 | 需要先判定「是否应当产生该字段」，是产品决策不是缺陷修复 |
+| M11 主张-证据索引重配 | 修法涉及持久化格式变更，需要迁移方案 |
+| M7 148 行零消费者门面 | 删除会影响测试引用面，需要确认无外部消费者 |
+

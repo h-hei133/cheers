@@ -3,6 +3,7 @@ import type {
   CurrentSessionSelectionRecord,
 } from "./currentSelection.js";
 import type { Session } from "../schema/sessionRecord.js";
+import { ArtifactManager } from "../../core/session/artifactManager.js";
 import type {
   SessionStateSnapshot,
   SessionStateSnapshotOverrides,
@@ -103,10 +104,20 @@ export class SessionStoreAccess extends SessionStorePaths {
   }
 
   deleteSession(sessionId: string): void {
+    // Read the workspace before the record goes: artifacts live in the workspace,
+    // not beside the session, so after deletion there is nothing left to say
+    // where they are. A record that cannot be read is still deleted — a session
+    // the user asked to remove must not survive because its artifacts could not
+    // be located.
+    let workspaceRoot: string | undefined;
+    try { workspaceRoot = this.load(sessionId).workspaceRoots?.[0]?.path; } catch { workspaceRoot = undefined; }
     deleteSessionRecord({
       sessionId,
       layout: locateExistingSessionLayout(this.storeLayout, sessionId),
     });
+    if (workspaceRoot === undefined) return;
+    try { ArtifactManager.getShared(workspaceRoot, sessionId).removeSessionArtifacts(); }
+    catch { /* Cleanup is best-effort; the session record is already gone. */ }
   }
 
   listSessions(onSource?: (target: string) => void): Session[] {

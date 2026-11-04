@@ -147,3 +147,38 @@ describe("ArtifactManager In-Session Spilling", () => {
     await expect(tools.get('read')!.execute({ path: uri }, { ...context, sessionId: 'other' })).rejects.toThrow('not found');
   });
 });
+
+describe("artifact lifetime", () => {
+  let workspace: string;
+  beforeEach(() => { workspace = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-life-")); });
+  afterEach(() => { try { fs.rmSync(workspace, { recursive: true, force: true }); } catch { /* best effort */ } });
+
+  it("removes this session's artifacts and leaves another session's alone", async () => {
+    const first = ArtifactManager.getShared(workspace, "sess_first");
+    const second = ArtifactManager.getShared(workspace, "sess_second");
+    await first.save("first output", "read");
+    await second.save("second output", "read");
+    expect(fs.existsSync(first.directory)).toBe(true);
+    expect(fs.existsSync(second.directory)).toBe(true);
+
+    first.removeSessionArtifacts();
+
+    expect(fs.existsSync(first.directory)).toBe(false);
+    expect(fs.existsSync(second.directory)).toBe(true);
+  });
+
+  it("leaves the workspace and the sessions root in place", async () => {
+    const manager = ArtifactManager.getShared(workspace, "sess_keep");
+    await manager.save("output", "read");
+    manager.removeSessionArtifacts();
+    // Only the session directory goes; the workspace itself is not ours to delete.
+    expect(fs.existsSync(workspace)).toBe(true);
+    expect(fs.existsSync(path.join(workspace, ".ts-shell", "sessions"))).toBe(true);
+  });
+
+  it("is a no-op for a session that never wrote an artifact", () => {
+    const manager = ArtifactManager.getShared(workspace, "sess_empty");
+    expect(() => manager.removeSessionArtifacts()).not.toThrow();
+    expect(fs.existsSync(workspace)).toBe(true);
+  });
+});

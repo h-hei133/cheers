@@ -61,6 +61,38 @@ export class ArtifactManager {
     return this.artifactsDir;
   }
 
+  /**
+   * Remove this session's artifacts.
+   *
+   * They live in the workspace, not beside the session file, so deleting the
+   * session record does not reach them — the two roots are different trees. Left
+   * alone they accumulate for the life of the workspace, with no bound and no
+   * command to clear them, and every ordinary tool that truncates its output
+   * writes one.
+   *
+   * Removes the session directory rather than only `artifacts`, so nothing this
+   * class created is orphaned. The path is rebuilt from the session id under a
+   * fresh canonical workspace, so a workspace that has since moved is left alone
+   * rather than resolved through a stale path.
+   */
+  removeSessionArtifacts(): void {
+    const sessionDir = path.dirname(this.artifactsDir);
+    // `<root>/sessions/<id>/artifacts` — the directory we remove is `<id>`, and
+    // the one that must not be crossed is `sessions`.
+    const sessionsRoot = path.dirname(sessionDir);
+    try {
+      assertProfileStorage(sessionDir, this.profile);
+      if (path.basename(this.artifactsDir) !== "artifacts" || path.basename(sessionsRoot) !== "sessions"
+        || path.basename(sessionDir) === "" || sessionDir === sessionsRoot) return;
+      if (!fs.existsSync(sessionDir)) return;
+      fs.rmSync(sessionDir, { recursive: true, force: true });
+    } catch {
+      // Cleanup is best-effort: a session that was deleted stays deleted, and a
+      // failure here must not turn that into an error the user has to act on.
+    }
+    ArtifactManager.instances.delete(profileScope(JSON.stringify([this.storageRoot, path.basename(sessionDir)])));
+  }
+
   static getShared(workspaceRoot: string = process.cwd(), sessionId: string = "default"): ArtifactManager {
     const root = fs.realpathSync(workspaceRoot);
     const key = profileScope(JSON.stringify([root, sessionId]));
