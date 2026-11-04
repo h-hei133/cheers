@@ -12483,3 +12483,192 @@ thinkingPicker(current: { label: string; active: ThinkingPreference }, efforts, 
 
 thinking level 的配置维度**本来就有**（`/thinking` 能设），只是面板形式缺失。这与「功能不可配置」是两回事。
 
+
+### 24.137 六档 thinking level：omp 的实现与本项目现状
+
+**用户要求**：把档位改为六档，并且按配置中模型的实际能力显示——「配置中只配置了 max，thinking 面板就只显示 max」。
+
+#### 24.137.1 oh-my-pi 的完整机制
+
+**1. 六档定义**（`catalog/src/effort.ts:2-18`）：
+
+```ts
+export const enum Effort { Minimal="minimal", Low="low", Medium="medium", High="high", XHigh="xhigh", Max="max" }
+export const THINKING_EFFORTS = [Minimal, Low, Medium, High, XHigh, Max];
+```
+
+agent 层再加 `inherit` 与 `off`（`agent/src/thinking.ts:8-17`）。
+
+**2. 每模型声明子集**（`catalog/src/types.ts:136-145`）：
+
+```ts
+export interface ThinkingConfig {
+  mode: ThinkingControlMode;
+  /** 支持的档位，从弱到强有序。永不为空：没有可调 effort 的推理模型用 `thinking: undefined`，而不是空数组。 */
+  efforts: readonly Effort[];
+}
+```
+
+**这条注释很关键**：「永不为空」——要么有列表，要么整个 `thinking` 字段不存在。这避免了「空数组」与「不支持」两种含义混在一起。
+
+**3. 查询**（`model-thinking.ts:23-28`）：
+
+```ts
+export function getSupportedEfforts(model) {
+  if (!model.reasoning) return [];
+  return model.thinking?.efforts ?? [];
+}
+```
+
+**未声明的模型返回 `[]`，读取时不给默认阶梯**。
+
+**4. 不支持时的处理是「钳制」不是「拒绝」**（`model-thinking.ts:51-87`）：
+
+```
+完全匹配 → effortMap 别名（仅当别名能原样上线） → 最近的低档 → levels[0]
+```
+
+非推理模型或 `thinking: undefined` → `undefined`。**未知字符串 → `undefined`**。
+
+**5. picker 不自己过滤**（`selector-controller.ts:2507-2513`）：
+
+```ts
+viewed.getAvailableEffortSelectors()   // ← session 层已过滤好
+```
+
+渲染器 `thinking-selector.ts:25` 只做 `availableLevels.map(...)`，**不做二次过滤**。
+
+`model-controls.ts:625-636` 的 `getAvailableEffortSelectors()`：非推理返回 `[]`，否则 `[Off, ...(未验证 ? [] : [AUTO]), ...selectable]`。
+
+**「未声明的档位不出现在任何 picker 中」，没有回退列表，不与全局阶梯求并集。**
+
+#### 24.137.2 本项目已经有的部分（比预想完整）
+
+用户要的两件事，本项目**已经有基础设施**：
+
+| 能力 | 本项目 | 位置 |
+|---|---|---|
+| 每模型声明档位 | ✅ `thinkingLevelMap?: Partial<Record<ThinkingLevel, string \| null>>` | `catalog.ts:64` |
+| 判定档位是否支持 | ✅ 三态：`supported` / `unsupported` / `unverified` | `capability.ts:13-17` |
+| 不支持时降级 | ✅ `levelNameFor` 向下再向上找最近档位 | `requestShape.ts:201-214` |
+| 按模型过滤档位 | ✅ `role.ts:93` 已按 `model.reasoning !== false` 过滤 | `role.ts:93` |
+| 从 provider 声明自动生成 | ✅ `catalogRefresh.ts:216-223` | 已有 |
+
+**唯一缺的是档位集合本身只有三档**（`effort.ts:2`）：
+
+```ts
+export const THINKING_LEVELS = ['low', 'medium', 'high'] as const;
+```
+
+#### 24.137.3 扩展到六档的改动面
+
+**因为用的是穷尽类型 `Record<ThinkingLevel, number>`，TypeScript 会强制补齐**：
+
+| 文件 | 改动 | 编译器是否强制 |
+|---|---|---|
+| `core/models/effort.ts:2` | 加 `minimal`、`xhigh`、`max` | — |
+| `core/models/requestShape.ts:226-230` | `THINKING_BUDGET_TOKENS` 补三个值 | ✅ `Record<ThinkingLevel, number>` 会报错 |
+| `thinking/syntax.ts:11-19` | 加三个 action | ❌ 不强制 |
+| 其余 `THINKING_LEVELS.map(...)` | 自动跟随 | ✅ 无需改 |
+
+**会报错的地方正是最需要人工决策的地方**（预算 token 数），这是好的类型设计。
+
+#### 24.137.4 与 omp 的关键差异：本项目的 `null` 有双重含义
+
+```ts
+// catalog.ts:64 的 thinkingLevelMap
+readonly thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>;
+```
+
+- **`undefined`**（键不存在）= 用档位自己的名字；
+- **`null`** = 该模型**没有这个档位**，搜索继续。
+
+而 `ThinkingPreference = ThinkingLevel | null` 里的 `null` 是**「让 provider 决定」**。
+
+**两个 `null` 含义不同**：一个在 map 里（档位不存在），一个在偏好里（auto）。扩展档位时要小心不要混淆。
+
+omp 用 `efforts: readonly Effort[]` 表达「有哪些」，用 `thinking: undefined` 表达「不可调」，**没有双重含义问题**。
+
+#### 24.137.5 面板显示逻辑（按用户要求）
+
+用户要求：「配置中只配置了 max，thinking 面板就只显示 max」。
+
+**本项目的过滤逻辑已经完全正确**（`role.ts:93-95`，完整代码）：
+
+```ts
+const levels = available && model?.reasoning !== false ? THINKING_LEVELS.filter(level =>
+  effortCapability(choice.catalog, current.provider, current.model, level, baseUrl) === 'supported') : [];
+const efforts: readonly ThinkingPreference[] = levels.length ? [null, ...levels] : [];
+```
+
+`effortCapability`（`capability.ts:13-17`）的判定包含 `thinkingLevelMap?.[effort] === null` → `'unsupported'`。
+
+**所以「配置里只有 max 就只显示 max」这个行为，本项目已经实现了**——只要 `THINKING_LEVELS` 包含 `max`，且目录里该模型的 `thinkingLevelMap` 把其他档位标为 `null`，面板就只显示 `max`。
+
+`setEffort` 也会拒绝不在 `efforts` 里的值（`:96-97`），形成闭环。
+
+**唯一缺的是档位集合本身。**
+
+#### 24.137.6 与 omp 的一处有意分歧
+
+omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
+
+本项目的 `role.ts` 保留「当前档位只读聚焦」（24.135.3 提到的 `disabled: true, focusable: true`），让用户能看到当前值但改不了。
+
+**这是本项目更好的地方**：空列表会让用户以为功能坏了；只读显示说明了「当前是什么、为什么不能改」。
+
+
+### 24.138 未完成任务总表（截至 2026-11-04）
+
+本节汇总本轮所有研究中**记录但未实施**的任务，按文档章节索引。**不含原 Phase 20 的 47 项矩阵**（那部分在 `phase-20-decisions.md`）。
+
+#### 24.138.1 已有裁决，等待实施
+
+| 任务 | 章节 | 裁决内容 |
+|---|---|---|
+| **产物清理** | 24.117.5 | 采用方案 A：删会话时同时清两棵树。实施要点、接线点、越界校验已记录 |
+| **thinking level 两条路径** | 24.136.3 | ①选模型时调 effort；②`/effort` 无参数开面板。`shift+tab` 循环不做 |
+| **六档 thinking level** | 24.137 | 档位从 3 扩到 6（`minimal`/`low`/`medium`/`high`/`xhigh`/`max`），按模型能力过滤已实现 |
+
+#### 24.138.2 已有研究结论，尚无裁决
+
+| 任务 | 章节 | 现状 |
+|---|---|---|
+| **registry 缓存** | 24.131.8 | 三条方案（A 缓存 / B 拆数据与执行 / C 去中心化），倾向 A。实测每次省 30.5ms |
+| **goal 预算的 steer 消息** | 24.129.5 | 参照两家都在预算耗尽时给模型一次说话机会，本项目直接 `exhausted` 拒绝 |
+| **M8 三元组记忆（层次 1）** | 24.128.5 | 给候选加 `structuredFact`，让已有冲突检测第一次可达。层次 2/3 未裁决 |
+| **门面测试转移** | 24.130.5 | 判定为冗余；建议先把 8 条别名测试转到生产路径，确认全绿后再删 |
+
+#### 24.138.3 已确认的缺陷，未决定是否修
+
+| 缺陷 | 章节 | 严重度 |
+|---|---|---|
+| **会话删除不清产物** | 24.115.2 / 24.117 | 中——五个常用工具都写，无上限 |
+| **崩溃日志两个消费者两套判据** | 24.116.3 | 低——损坏时报「没有记录」 |
+| **`correctArtifact` 伪造 validation-passed** | 24.116.2 | 潜伏——当前无生产调用 |
+| **`app.thinking.cycle` 命名与行为不符** | 24.131.6 | 低——误导读者 |
+| **resume 有两套实现** | 24.133.7 | 观察项——交互模式用 TUI 版，功能完整 |
+| **`sourcePacket` 冗余副本** | 24.113.2 | 低——与 `source` 同值 |
+| **研究状态 `blocked`/`stale` 永不赋值** | 24.113.3 | 低——死分支 |
+| **`RotatingFileSink.maxFileSizeMb` 未校验** | 24.114.2 | 潜伏——当前不可达 |
+
+#### 24.138.4 已确认的配置缺口（24.134.7）
+
+四类「已有功能但不可配置」，均未实施：
+
+| 缺口 | 功能位置 |
+|---|---|
+| LSP 诊断 | `language/` 10 个文件，零配置字段 |
+| 思考块折叠 | `toggleCollapsed`，只在内存 |
+| 压缩开关 | `policy.enabled` 存在但未暴露 |
+| 中断行为 | 存在，维度未细查 |
+
+#### 24.138.5 明确不做的
+
+| 项 | 章节 | 理由 |
+|---|---|---|
+| `shift+tab` 循环 thinking | 24.136.3 | 用户裁决不做；键位继续给 plan/build |
+| 照抄 omp 的 363 项设置 | 24.134.8 | 多数依赖本项目没有的后端，照抄会成四不像 |
+| settings 立即写入语义 | 24.134.5 | 本项目的 staged+Apply 更安全 |
+| 对齐 pi 的产物临时目录 | 24.117.4 | 违背「产物可被 read 直接打开」 |
+
