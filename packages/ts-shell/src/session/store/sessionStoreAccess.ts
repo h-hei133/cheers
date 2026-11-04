@@ -116,7 +116,11 @@ export class SessionStoreAccess extends SessionStorePaths {
       layout: locateExistingSessionLayout(this.storeLayout, sessionId),
     });
     if (workspaceRoot === undefined) return;
-    try { ArtifactManager.getShared(workspaceRoot, sessionId).removeSessionArtifacts(); }
+    // `getShared` canonicalises the workspace, which throws when the workspace is
+    // already gone — exactly the case where the artifacts most need removing.
+    // The layout is deterministic, so the directory is addressed directly and
+    // the removal re-checks that it really is a session artifact directory.
+    try { ArtifactManager.removeSessionArtifactsAt(workspaceRoot, sessionId); }
     catch { /* Cleanup is best-effort; the session record is already gone. */ }
   }
 

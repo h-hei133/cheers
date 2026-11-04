@@ -11370,3 +11370,25 @@ turn/step.ts
 
 **教训**：改一条安全机制时，要问「它现在防住的是什么」，而不只是「它造成什么问题」。**副作用与用途常常是同一段代码**。
 
+
+#### 24.124.5 M9 的补强：工作区已消失时仍能清理
+
+实现后自查发现一个真实缺陷：`ArtifactManager.getShared()` 的第一步是 `fs.realpathSync(workspaceRoot)`（`artifactManager.ts:31`）。**工作区已被删除或移动时它抛异常**——而这恰恰是最需要清理产物的场景（用户删了项目目录，产物留在 `.ts-shell/` 里成了孤儿）。
+
+**改法**：新增静态 `removeSessionArtifactsAt(workspaceRoot, sessionId, profile)`，直接按布局计算路径，**不经过 `realpathSync`**：
+
+```ts
+const artifactsDir = path.join(privateWorkspace ?? path.join(path.resolve(workspaceRoot), '.ts-shell'),
+  "sessions", sessionId, "artifacts");
+```
+
+删除前的两道校验保留（`basename(artifactsDir) === "artifacts"`、`basename(sessionsRoot) === "sessions"`、`sessionDir !== sessionsRoot`），`sessionId` 也按 `[A-Za-z0-9_-]+` 过滤。
+
+`deleteSession` 改为调用它。
+
+**新增 2 条测试**：
+- 工作区整个删除后，`removeSessionArtifactsAt` 不抛错（原实现会在 `realpathSync` 处抛）；
+- `sessionId = "../escape"` 被拒绝，工作区不受影响。
+
+**这一步是怎么发现的**：写完 M9 后我按「什么能证伪这条」自查——`getShared` 有没有前置依赖？`realpathSync` 就是。这正是 24.126.2 记录的方法修正第一次生效。
+

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ArtifactPublicationError, publishArtifact, publishTextArtifact } from './artifacts/publication.js';
 import { verifyPathContainment } from '../security/pathJail.js';
-import { assertProfileStorage, currentProfile } from '../paths/profile/context.js';
+import { assertProfileStorage, currentProfile, type ProfileIdentity } from '../paths/profile/context.js';
 import { profileScope } from '../paths/profile/scope.js';
 import { profileWorkspaceDir } from '../paths/profile/workspace.js';
 
@@ -75,6 +75,34 @@ export class ArtifactManager {
    * fresh canonical workspace, so a workspace that has since moved is left alone
    * rather than resolved through a stale path.
    */
+  /**
+   * Remove a session's artifacts without requiring the workspace to still exist.
+   *
+   * `getShared` canonicalises the workspace first, which throws when the
+   * directory has been moved or deleted — the case where the artifacts are most
+   * likely to be orphaned. The layout is a pure function of the workspace path
+   * and the session id, so it can be computed directly; the removal re-checks
+   * the two path segments before deleting anything.
+   */
+  static removeSessionArtifactsAt(workspaceRoot: string, sessionId: string, profile: ProfileIdentity | undefined = currentProfile()): void {
+    if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) return;
+    const privateWorkspace = profileWorkspaceDir(workspaceRoot, profile);
+    const artifactsDir = path.join(privateWorkspace ?? path.join(path.resolve(workspaceRoot), '.ts-shell'),
+      "sessions", sessionId, "artifacts");
+    const sessionDir = path.dirname(artifactsDir);
+    const sessionsRoot = path.dirname(sessionDir);
+    try {
+      if (profile) assertProfileStorage(sessionDir, profile);
+      if (path.basename(artifactsDir) !== "artifacts" || path.basename(sessionsRoot) !== "sessions"
+        || sessionDir === sessionsRoot) return;
+      if (!fs.existsSync(sessionDir)) return;
+      fs.rmSync(sessionDir, { recursive: true, force: true });
+    } catch {
+      // Best-effort: the session record is already gone, and a cleanup failure
+      // must not surface as an error the user has to act on.
+    }
+  }
+
   removeSessionArtifacts(): void {
     const sessionDir = path.dirname(this.artifactsDir);
     // `<root>/sessions/<id>/artifacts` — the directory we remove is `<id>`, and

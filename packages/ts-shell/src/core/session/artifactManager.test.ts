@@ -182,3 +182,27 @@ describe("artifact lifetime", () => {
     expect(fs.existsSync(workspace)).toBe(true);
   });
 });
+
+describe("removing artifacts after the workspace is gone", () => {
+  let workspace: string;
+  beforeEach(() => { workspace = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-gone-")); });
+  afterEach(() => { try { fs.rmSync(workspace, { recursive: true, force: true }); } catch { /* best effort */ } });
+
+  it("still removes the session directory when the workspace no longer resolves", async () => {
+    const manager = ArtifactManager.getShared(workspace, "sess_gone");
+    await manager.save("output", "read");
+    const artifactsDir = manager.directory;
+    // The workspace itself is deleted; getShared would throw on realpathSync here.
+    fs.rmSync(workspace, { recursive: true, force: true });
+    expect(fs.existsSync(artifactsDir)).toBe(false);
+
+    ArtifactManager.removeSessionArtifactsAt(workspace, "sess_gone");
+    // Nothing to remove is a no-op rather than an error.
+    expect(() => ArtifactManager.removeSessionArtifactsAt(workspace, "sess_gone")).not.toThrow();
+  });
+
+  it("refuses an id that would escape the sessions root", () => {
+    expect(() => ArtifactManager.removeSessionArtifactsAt(workspace, "../escape")).not.toThrow();
+    expect(fs.existsSync(workspace)).toBe(true);
+  });
+});
