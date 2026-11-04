@@ -1,14 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { inspectWorkspaceFile, readTextFile, readTextFileAsync, workspaceFilePath } from './files.js';
-import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js';
+import { inspectWorkspaceFile, readTextFile, readTextFileAsync, workspaceFilePath, workspaceRelativePath } from './files.js';
 
 let fixture: string;
 let workspace: string;
 let sibling: string;
 beforeEach(() => {
-  fixture = fs.mkdtempSync(path.join(process.cwd(), '.tmp-workspace-files-'));
+  fs.mkdirSync('/tmp/cheers-test/', { recursive: true });
+  fixture = fs.mkdtempSync(path.join('/tmp/cheers-test/', 'workspace-files-'));
   workspace = path.join(fixture, 'Root'); sibling = path.join(fixture, 'Outside');
   fs.mkdirSync(workspace); fs.mkdirSync(sibling);
   fs.writeFileSync(path.join(workspace, 'inside.txt'), '\ufeffinside\r\n');
@@ -51,24 +51,6 @@ it('rejects the case sibling before opening its pre-read', () => {
   expect(open).not.toHaveBeenCalled();
 });
 
-it('rejects the case sibling before the shared authority writes', () => {
-  foldLexicalCase();
-  const authority = createWorkspaceWriteAuthority(workspace);
-  expect(() => authority.writeFile('../Outside/outside.txt', 'changed')).toThrow('outside');
-  expect(fs.readFileSync(path.join(sibling, 'outside.txt'), 'utf8')).toBe('outside');
-  expect(fs.readdirSync(sibling).sort()).toEqual(['inside.txt', 'outside.txt']);
-});
-
-it('does not remap an absolute case sibling file onto a same-named authorized file', () => {
-  foldLexicalCase();
-  expect(createWorkspaceWriteAuthority(workspace).readFile(path.join(sibling, 'inside.txt'))).toBeUndefined();
-});
-
-it('does not remap an absolute case sibling directory onto the authorized root', () => {
-  foldLexicalCase();
-  expect(createWorkspaceWriteAuthority(workspace).directoryExists(sibling)).toBe(false);
-});
-
 it('keeps normalized contained paths and their exact bytes readable', () => {
   foldLexicalCase();
   expect(workspaceFilePath(workspace, '../Root/inside.txt')).toBe(path.join(workspace, 'inside.txt'));
@@ -79,26 +61,6 @@ it('keeps internal source symlinks refused', () => {
   const alias = path.join(workspace, 'alias.txt'); fs.writeFileSync(alias, 'link placeholder');
   modelAlias(alias, path.join(workspace, 'inside.txt'));
   expect(() => workspaceFilePath(workspace, 'alias.txt')).toThrow('symlink');
-  expect(createWorkspaceWriteAuthority(workspace).readFile(alias)).toBeUndefined();
-});
-
-it('accepts both selected-root aliases and their canonical absolute files', () => {
-  const alias = path.join(fixture, 'selected'); fs.mkdirSync(alias);
-  modelAlias(alias, workspace);
-  const authority = createWorkspaceWriteAuthority(alias);
-  expect(authority.readFile(path.join(alias, 'inside.txt'))).toBe('\ufeffinside\r\n');
-  expect(authority.readFile(path.join(workspace, 'inside.txt'))).toBe('\ufeffinside\r\n');
-  expect(authority.directoryExists(alias)).toBe(true);
-  expect(authority.directoryExists(workspace)).toBe(true);
-});
-
-it('accepts selected and canonical roots when lexical comparison folds the selected alias', () => {
-  modelAlias(sibling, workspace); foldLexicalCase();
-  const authority = createWorkspaceWriteAuthority(sibling);
-  expect(authority.readFile(path.join(sibling, 'inside.txt'))).toBe('\ufeffinside\r\n');
-  expect(authority.readFile(path.join(workspace, 'inside.txt'))).toBe('\ufeffinside\r\n');
-  expect(authority.directoryExists(sibling)).toBe(true);
-  expect(authority.directoryExists(workspace)).toBe(true);
 });
 
 it('inspects the actual sibling file link before a folded relative path discards its prefix', () => {
@@ -106,7 +68,6 @@ it('inspects the actual sibling file link before a folded relative path discards
   fs.writeFileSync(path.join(workspace, 'bounce.txt'), 'different authorized file');
   modelAlias(alias, path.join(workspace, 'inside.txt')); foldLexicalCase();
   expect(() => workspaceFilePath(workspace, '../Outside/bounce.txt')).toThrow('symlink');
-  expect(createWorkspaceWriteAuthority(workspace).readFile(alias)).toBeUndefined();
 });
 
 it('inspects the actual sibling directory link before remapping its children', () => {
@@ -115,17 +76,13 @@ it('inspects the actual sibling directory link before remapping its children', (
   fs.writeFileSync(path.join(workspace, 'bounce', 'inside.txt'), 'different authorized file');
   modelAlias(alias, workspace); foldLexicalCase();
   expect(() => workspaceFilePath(workspace, '../Outside/bounce/inside.txt')).toThrow('symlink');
-  const authority = createWorkspaceWriteAuthority(workspace);
-  expect(authority.directoryExists(alias)).toBe(false);
-  expect(authority.readFile(path.join(alias, 'inside.txt'))).toBeUndefined();
+  expect(() => workspaceRelativePath(workspace, path.join(alias, 'inside.txt'))).toThrow('symlink');
 });
 
 it('refuses an unselected root link whose canonical target is the authorized root', () => {
   modelAlias(sibling, workspace); foldLexicalCase();
   expect(() => workspaceFilePath(workspace, '../Outside/inside.txt')).toThrow('symlink');
-  const authority = createWorkspaceWriteAuthority(workspace);
-  expect(authority.readFile(path.join(sibling, 'inside.txt'))).toBeUndefined();
-  expect(authority.directoryExists(sibling)).toBe(false);
+  expect(() => workspaceRelativePath(workspace, path.join(sibling, 'inside.txt'))).toThrow('symlink');
 });
 
 it.each(['after ancestry inspection', 'during descriptor acquisition'])('refuses parent-link replacement %s when reading text', stage => {

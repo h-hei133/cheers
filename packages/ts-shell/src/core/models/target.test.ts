@@ -59,3 +59,12 @@ it('keeps historical provider/model-only prices independent from the current def
   expect(resolveModelCost(entries, 'openai', 'shared')).toEqual({ promptPerMTok: 8, completionPerMTok: 16 });
   expect(resolveModelCost(entries, 'openai', 'shared', 'https://a.invalid/v1')).toEqual({ promptPerMTok: 1, completionPerMTok: 2 });
 });
+
+
+it.each(['minimal', 'xhigh', 'max'] as const)('requires explicit %s admission independently of broad reasoning support', effort => {
+  expect(effortCapability(catalog, 'openai', 'shared', effort, 'https://a.invalid/v1')).toBe('unsupported');
+  expect(effortCapability([], 'custom', 'unknown', effort)).toBe('unsupported');
+  const declared = catalog.map(provider => provider.id === 'relay-a' ? { ...provider,
+    models: provider.models.map(model => ({ ...model, thinkingLevelMap: { ...model.thinkingLevelMap, [effort]: effort } })) } : provider);
+  expect(effortCapability(declared, 'openai', 'shared', effort, 'https://a.invalid/v1')).toBe('supported');
+});

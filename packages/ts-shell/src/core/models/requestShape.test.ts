@@ -292,6 +292,14 @@ describe("resolveRequestShape", () => {
     expect(shape.thinkingLevelName).toBe("high");
   });
 
+  it("does not promote an old three-level catalogue to undeclared minimal", () => {
+    const shape = resolveRequestShape(
+      catalogWith({ thinkingLevelMap: { low: null, medium: 'medium', high: 'high' } }),
+      "vendor", "m", "low",
+    );
+    expect(shape.thinkingLevelName).toBe("medium");
+  });
+
   it("uses the level's own name when the model mapped only other levels", () => {
     // `medium` is unmapped, so it travels as `medium` — the endpoints that use
     // these names are the common case, and a model that mapped only its
@@ -368,4 +376,11 @@ describe("resolveRequestShape", () => {
     ];
     expect(resolveRequestShape(catalog, "c", "shared", undefined)).toEqual(DEFAULT_REQUEST_SHAPE);
   });
+});
+
+
+it.each([['minimal', 1024], ['xhigh', 32768], ['max', undefined]] as const)('retains explicitly declared %s effort with its budget', (level, budget) => {
+  const shape = resolveRequestShape(catalogWith({ reasoning: true, thinkingLevelMap: { [level]: level } }), 'vendor', 'm', level);
+  expect(shape.thinkingLevelName).toBe(level);
+  expect(shape.thinkingBudgetTokens).toBe(budget);
 });

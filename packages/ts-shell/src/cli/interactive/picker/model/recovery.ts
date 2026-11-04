@@ -37,7 +37,8 @@ export function modelEffortPicker(selection: EffortSelection): Picker {
     async load() {
       if (retired) return [];
       offered = true;
-      return choices.map(({ effort, capability }) => ({ id: effort ?? 'auto', label: effort ?? 'auto (provider decides)',
+      return choices.filter(({ effort, capability }) => capability !== 'unsupported'
+        || effort === selection.current || !['minimal', 'xhigh', 'max'].includes(effort ?? '')).map(({ effort, capability }) => ({ id: effort ?? 'auto', label: effort ?? 'auto (provider decides)',
         note: `${capability}${effort === selection.current ? ' · current preference' : ''}`,
         ...(capability === 'unsupported' ? { disabled: true, ...(effort === selection.current ? { focusable: true } : {}) } : {}) }));
     },

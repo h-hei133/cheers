@@ -88,7 +88,8 @@ function converseBody(input: TurnRequest): Record<string, unknown> {
   const maxTokens = input.maxOutputTokens ?? 4096;
   // Keep the requested output ceiling and reserve room for the answer. A budget
   // below 1024 is rejected by the model, so small ceilings get no thinking.
-  const budget = Math.min(input.thinkingBudgetTokens ?? 0, maxTokens - MIN_ANSWER_TOKENS);
+  const budget = Math.min(input.thinkingBudgetMaximum ? maxTokens - MIN_ANSWER_TOKENS
+    : input.thinkingBudgetTokens ?? 0, maxTokens - MIN_ANSWER_TOKENS);
   const toolConfig = toolConfigFor({
     tools: input.tools,
     allowTools: input.allowTools,
@@ -332,6 +333,7 @@ function simpleAsTurn(input: SimpleRequest): TurnRequest {
     reasoningEffort: input.reasoningEffort ?? false,
     thinkingLevelName: input.thinkingLevelName,
     thinkingBudgetTokens: input.thinkingBudgetTokens,
+    thinkingBudgetMaximum: input.thinkingBudgetMaximum,
     maxTokensField: input.maxTokensField ?? 'max_tokens',
     assistantAfterToolResult: false,
   };

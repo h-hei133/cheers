@@ -2,7 +2,7 @@ import { crashSyntax } from "./crash/syntax.js";
 import { parseSyntax } from "./syntax/parse.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import { crashLogPath, MAX_CRASH_AGE_MS, MAX_CRASH_RECORDS, readCrashLog, readRecentCrashes } from "../../observability/crashLog.js";
+import { crashLogPath, inspectCrashLog, MAX_CRASH_AGE_MS, MAX_CRASH_RECORDS } from "../../observability/crashLog.js";
 
 /**
  * `/crash` — the runs that ended by falling over.
@@ -22,20 +22,31 @@ export async function runCrashCommand(
   const syntax = parseSyntax(crashSyntax, args);
   if (!syntax.ok) return { kind: "local", output: `Invalid /crash arguments: ${syntax.reason}\n${syntaxHelp(crashSyntax)}` };
   const filePath = crashLogPath();
-  const records = readRecentCrashes(filePath);
-  const heldBack = readCrashLog(filePath).length - records.length;
+  const inspected = inspectCrashLog(filePath);
+  const records = inspected.records.filter((record) => {
+    const written = Date.parse(record.timestamp);
+    return Number.isFinite(written) && Date.now() - written <= MAX_CRASH_AGE_MS;
+  });
+  const heldBack = inspected.status === 'reported' || inspected.status === 'partial'
+    ? inspected.records.length - records.length : undefined;
   const wantsStack = syntax.flags.has("stack");
 
   if (records.length === 0) {
+    const source = inspected.status === 'unavailable'
+      ? `Crash records could not be read (${inspected.reason ?? 'unavailable'}); the count is unknown.`
+      : `No crashes recorded in \`${filePath}\`${heldBack && heldBack > 0 ? ` in the last ${formatAge(MAX_CRASH_AGE_MS)}` : ""}.`;
     return {
       kind: "local",
       output: [
         "### Crashes",
         "",
-        `No crashes recorded in \`${filePath}\`${heldBack > 0 ? ` in the last ${formatAge(MAX_CRASH_AGE_MS)}` : ""}.`,
+        ...(inspected.status !== 'reported'
+          ? [`Inspection status: ${inspected.status}${inspected.reason ? ` (${inspected.reason})` : ''}.`, ""]
+          : []),
+        source,
         "",
         `The last ${MAX_CRASH_RECORDS} uncaught exceptions and unhandled rejections are kept here when they happen.`,
-        ...(heldBack > 0
+        ...(heldBack !== undefined && heldBack > 0
           ? ["", `${heldBack} older ${heldBack === 1 ? "record is" : "records are"} still on disk.`]
           : []),
       ].join("\n"),
@@ -48,6 +59,9 @@ export async function runCrashCommand(
     `${records.length} of the last ${MAX_CRASH_RECORDS} recorded, oldest first:`,
     "",
   ];
+  if (inspected.status !== 'reported') {
+    lines.splice(2, 0, `Inspection status: ${inspected.status}${inspected.reason ? ` (${inspected.reason})` : ''}.`);
+  }
 
   // Newest last in the file, so newest last here too: reading a crash report
   // means reading forward through what happened.
@@ -60,7 +74,7 @@ export async function runCrashCommand(
     }
   }
 
-  if (heldBack > 0) {
+  if (heldBack !== undefined && heldBack > 0) {
     lines.push(
       "",
       `${heldBack} older ${heldBack === 1 ? "record is" : "records are"} not shown: more than ${formatAge(MAX_CRASH_AGE_MS)} old. Still on disk, and included in a bug report.`,

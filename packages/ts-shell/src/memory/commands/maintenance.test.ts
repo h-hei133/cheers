@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runMemoryCommand } from "../../core/commands/memoryCommandRuntime.js";
@@ -20,6 +21,24 @@ beforeEach(() => {
     projectMemoryReviewStateStore: createProjectMemoryReviewStateStore(), projectMemoryInjectionStateStore: createProjectMemoryInjectionStateStore() };
 });
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+it("reads and imports historical source copies without republishing them", async () => {
+  const legacy = { ...record("pmr:legacy", "Legacy memory remains readable."), sourcePacket: "system-derived" };
+  const records = [legacy];
+  const content = JSON.stringify({ kind: "project-memory-view", version: 1,
+    revision: createHash("sha256").update(JSON.stringify(records)).digest("hex"), records });
+  expect(importKnowledge(content)).toHaveLength(1);
+  expect(importKnowledge(content)[0]).not.toHaveProperty("sourcePacket");
+  expect(serializeKnowledge(records)).not.toContain("sourcePacket");
+  fs.writeFileSync(path.join(root, "project-memory.jsonl"), `${JSON.stringify(legacy)}\n`);
+  const store = context.projectMemoryStore!;
+  const listed = await store.list();
+  expect(listed.records).toHaveLength(1);
+  expect(listed.records[0]).not.toHaveProperty("sourcePacket");
+  const next = { ...legacy, id: "pmr:next" };
+  expect((await store.write({ record: next, storeRef: store.ref })).written).toBe(true);
+  expect(fs.readFileSync(path.join(root, "project-memory.jsonl"), "utf8").trim().split("\n")[1]).not.toContain("sourcePacket");
+});
 
 describe("memory maintenance uses the existing review and store owners", () => {
   it("queues a statement, reviews and approves without writing, then separately saves", async () => {
@@ -44,7 +63,8 @@ describe("memory maintenance uses the existing review and store owners", () => {
   });
 
   it("imports historical approvals as pending candidates and exports only through approval port", async () => {
-    const original = record("pmr:external", "Imported knowledge needs current local approval.");
+    const structuredFact = { subject: "project", predicate: "language", object: "TypeScript" };
+    const original = { ...record("pmr:external", "Imported knowledge needs current local approval."), structuredFact };
     const content = serializeKnowledge([original]);
     const read = vi.fn().mockResolvedValue({ outcome: "read", content });
     const write = vi.fn().mockResolvedValue({ outcome: "denied", reason: "Approval denied." });
@@ -55,10 +75,12 @@ describe("memory maintenance uses the existing review and store owners", () => {
     const state = context.projectMemoryReviewStateStore!.get("session:maintenance");
     expect(state.approvedCandidates).toEqual([]);
     expect(state.decisions[0]!.decision).toBe("pending");
+    expect(state.latestCandidates[0]!.structuredFact).toEqual(structuredFact);
     expect((await runMemoryCommand(["save", "approved"], context)).output).toContain("Outcome: blocked");
     expect((await context.projectMemoryStore!.list()).records).toEqual([]);
     await runMemoryCommand(["approve", state.latestCandidates[0]!.candidateId], context);
     await runMemoryCommand(["save", "approved"], context);
+    expect((await context.projectMemoryStore!.list()).records[0]!.structuredFact).toEqual(structuredFact);
     const exported = await runMemoryCommand(["export", "memory-out.json"], context);
     expect(exported.output).toContain("outcome: denied");
     expect(write).toHaveBeenCalledOnce();

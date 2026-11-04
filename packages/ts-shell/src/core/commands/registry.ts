@@ -155,12 +155,25 @@ export interface CommandRegistryOptions {
   readonly includeTemplates?: boolean;
 }
 
-export function createCommandRegistry(
-  cwd: string = process.cwd(),
-  runtimeConfig: RuntimeConfig = getRuntimeConfig(cwd),
-  onSource?: (target: string, content?: Buffer) => void,
-  options: CommandRegistryOptions = {},
-): ReadonlyMap<string, CommandDefinition> {
+/**
+ * Built-ins capture no workspace, profile, or configuration beyond MCP visibility.
+ * Keep only the two possible shapes; template discovery remains live on each call.
+ */
+const builtinRegistryCache = new Map<boolean, {
+  readonly commands: readonly CommandDefinition[];
+  readonly reserved: ReadonlySet<string>;
+}>();
+
+/** Copy metadata before freezing: some factories borrow shared syntax arrays. */
+function immutableMetadata<T>(value: T): T {
+  if (Array.isArray(value)) return Object.freeze(value.map(immutableMetadata)) as T;
+  if (value !== null && typeof value === 'object') {
+    return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, immutableMetadata(entry)]))) as T;
+  }
+  return value;
+}
+
+function buildBuiltinCommands(enableMcpTools: boolean): readonly CommandDefinition[] {
   const commands: CommandDefinition[] = [
     ...sessionCommandDefinitions(),
     forceCommandDefinition(),
@@ -413,8 +426,8 @@ export function createCommandRegistry(
       name: "mcp",
       kind: "shell-action",
       supportsNonInteractive: true,
-      availability: runtimeConfig.enableMcpTools ? "available" : "hidden",
-      enabled: runtimeConfig.enableMcpTools,
+      availability: enableMcpTools ? "available" : "hidden",
+      enabled: enableMcpTools,
       summary: "inspect and recover MCP state",
       group: "diagnostics",
       argumentHint: syntaxHint(mcpSyntax),
@@ -1046,9 +1059,27 @@ export function createCommandRegistry(
     },
   ];
 
-  const reserved = new Set(commands.flatMap(command => [command.name, ...(command.aliases ?? []), ...(command.invocations?.map(invocation => invocation.name) ?? [])]));
+  return immutableMetadata(commands);
+}
+
+export function createCommandRegistry(
+  cwd: string = process.cwd(),
+  runtimeConfig: RuntimeConfig = getRuntimeConfig(cwd),
+  onSource?: (target: string, content?: Buffer) => void,
+  options: CommandRegistryOptions = {},
+): ReadonlyMap<string, CommandDefinition> {
+  const key = runtimeConfig.enableMcpTools;
+  let cached = builtinRegistryCache.get(key);
+  if (!cached) {
+    const commands = buildBuiltinCommands(key);
+    const reserved = new Set(commands.flatMap(command => [command.name, ...(command.aliases ?? []), ...(command.invocations?.map(invocation => invocation.name) ?? [])]));
+    cached = { commands, reserved };
+    builtinRegistryCache.set(key, cached);
+  }
+  const { commands, reserved } = cached;
   const templates = options.includeTemplates === false ? [] : templateCommands(cwd, onSource, options.templates);
-  return new Map([...commands, ...templates.filter(template => !reserved.has(template.name))].map((command) => [command.name, command]));
+  return new Map([...commands, ...templates.filter(template => !reserved.has(template.name))]
+    .map(command => [command.name, command]));
 }
 
 export function listVisibleCommands(

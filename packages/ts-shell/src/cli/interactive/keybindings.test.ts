@@ -46,10 +46,23 @@ describe("keybindings", () => {
     expect(bindings.actionFor("ctrl+g")).toBe("app.editor.external");
   });
 
+  it("migrates historical thinking action ids to their current names", () => {
+    writeConfig(JSON.stringify({ "app.thinking.cycle": "f6", "app.thinking.toggle": "f7" }));
+    const loaded = loadUserKeybindings();
+    expect(loaded.problems).toEqual([]);
+    const bindings = new Keybindings(loaded.config);
+    expect(bindings.actionFor("f6")).toBe("app.agentMode.cycle");
+    expect(bindings.actionFor("f7")).toBe("app.thinkingBlocks.toggle");
+    const direct = new Keybindings({ "app.thinking.cycle": "f6", "app.thinking.toggle": [] });
+    expect(direct.actionFor("f6")).toBe("app.agentMode.cycle");
+    expect(direct.actionFor("ctrl+t")).toBeUndefined();
+    expect(direct.getUserConfig()).toEqual({ "app.agentMode.cycle": "f6", "app.thinkingBlocks.toggle": [] });
+  });
+
   it('keeps grouped-picker bindings separate from editor bindings and resolves their own conflicts', () => {
     const bindings = new Keybindings();
     expect(bindings.actionFor('tab')).toBe('tui.input.tab');
-    expect(bindings.actionFor('shift+tab')).toBe('app.thinking.cycle');
+    expect(bindings.actionFor('shift+tab')).toBe('app.agentMode.cycle');
     expect(bindings.actionFor('tab', 'overlay')).toBe('tui.overlay.nextGroup');
     expect(bindings.actionFor('shift+tab', 'overlay')).toBe('tui.overlay.previousGroup');
     expect(bindings.conflicts()).toEqual([]);

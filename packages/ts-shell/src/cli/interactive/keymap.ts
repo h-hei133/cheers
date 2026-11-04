@@ -252,12 +252,12 @@ function runAction(action: string, event: ParsedKeyEvent, context: KeymapContext
       submitDraft(context);
       actions.reportNotice?.("No turn is running; the message was sent now instead of queued.");
       return "redrawn";
-    case "app.thinking.cycle":
+    case "app.agentMode.cycle":
       // Tab is completion, so mode cycling takes the shifted form.
       actions.cycleAgentMode();
       actions.redraw();
       return "redrawn";
-    case "app.thinking.toggle":
+    case "app.thinkingBlocks.toggle":
       actions.toggleCollapsed("thinking");
       actions.redraw();
       return "redrawn";

@@ -20,6 +20,18 @@ export interface KeybindingDefinition {
   readonly scope?: 'overlay';
 }
 
+/** Historical ids accepted when reading user keybindings. Values are written and
+ * dispatched under the current names, so renaming an action never strands a
+ * user's existing shortcut file. */
+export const KEY_ACTION_ALIASES: Readonly<Record<string, string>> = {
+  "app.thinking.cycle": "app.agentMode.cycle",
+  "app.thinking.toggle": "app.thinkingBlocks.toggle",
+};
+
+export function canonicalKeyActionId(actionId: string): string {
+  return Object.hasOwn(KEY_ACTION_ALIASES, actionId) ? KEY_ACTION_ALIASES[actionId]! : actionId;
+}
+
 /**
  * Every rebindable action.
  *
@@ -82,8 +94,8 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
   "app.exit": { defaultKeys: ["ctrl+d"], description: "Exit when the draft is empty" },
   "app.clearScreen": { defaultKeys: ["ctrl+l"], description: "Clear the screen" },
   "app.message.followUp": { defaultKeys: ["ctrl+q"], description: "Queue the draft to run after the turn; sends it now when idle" },
-  "app.thinking.cycle": { defaultKeys: ["shift+tab"], description: "Switch between planning and building" },
-  "app.thinking.toggle": { defaultKeys: ["ctrl+t"], description: "Collapse or expand thinking blocks" },
+  "app.agentMode.cycle": { defaultKeys: ["shift+tab"], description: "Switch between planning and building" },
+  "app.thinkingBlocks.toggle": { defaultKeys: ["ctrl+t"], description: "Collapse or expand thinking blocks" },
   "app.tools.expand": { defaultKeys: ["ctrl+o"], description: "Collapse or expand tool output" },
   "app.permission.cycle": { defaultKeys: ["alt+p"], description: "Cycle the permission scope" },
   "app.retry": { defaultKeys: ["f5"], description: "Retry the last prompt" },
@@ -153,7 +165,8 @@ export function loadUserKeybindings(root?: string): LoadedKeybindings {
     // silently never fires is the hardest kind of mistake to find. `Object.hasOwn`
     // rather than `in`: every object inherits `toString` and `constructor`, so a
     // membership test against the prototype chain accepts ids no action declares.
-    if (!Object.hasOwn(KEY_ACTIONS, actionId)) {
+    const canonicalId = canonicalKeyActionId(actionId);
+    if (!Object.hasOwn(KEY_ACTIONS, canonicalId)) {
       problems.push({ message: `Unknown action id \`${actionId}\`; it is ignored.` });
       continue;
     }
@@ -172,7 +185,7 @@ export function loadUserKeybindings(root?: string): LoadedKeybindings {
           "which this terminal cannot produce (known modifiers: ctrl, alt, shift, meta).",
       });
     }
-    const scope = KEY_ACTIONS[actionId]!.scope;
+    const scope = KEY_ACTIONS[canonicalId]!.scope;
     const reserved = keys.filter(key => !availableKey(key, scope));
     if (reserved.length) problems.push({
       message: `\`${actionId}\` names reserved picker controls ${reserved.map(key => `\`${key}\``).join(', ')}; those bindings are ignored.`,
@@ -181,7 +194,7 @@ export function loadUserKeybindings(root?: string): LoadedKeybindings {
     // make the disk path disagree with handing the same object to `setUserConfig`
     // — the omitted action keeps its default keys, so a rebind the user asked for
     // to a chord this terminal cannot send silently leaves the old key in place.
-    config[actionId] = keys.filter(key => availableKey(key, scope));
+    config[canonicalId] = keys.filter(key => availableKey(key, scope));
   }
   return { config, problems };
 }
@@ -289,7 +302,7 @@ export class Keybindings {
   private readonly conflictList: KeybindingConflict[] = [];
 
   constructor(private config: KeybindingsConfig = {}) {
-    this.rebuild();
+    this.setUserConfig(config);
   }
 
   /** The action a key is bound to, or nothing when no action claims it. */
@@ -327,7 +340,9 @@ export class Keybindings {
 
   /** Replace the user's bindings; the defaults for everything else stay. */
   setUserConfig(config: KeybindingsConfig): void {
-    this.config = config;
+    const canonical: KeybindingsConfig = {};
+    for (const [actionId, value] of Object.entries(config)) canonical[canonicalKeyActionId(actionId)] = value;
+    this.config = canonical;
     this.rebuild();
   }
 

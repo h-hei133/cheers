@@ -210,7 +210,7 @@ Modules are responsibility boundaries, not directories.
 
 - Responsibility: approval/trust policy, workspace authority, command allowlist, MCP/browser/provider opt-in policy.
 - Main files: `approvalTrustPolicy.ts`, `approvalPromptBridge.ts`, `approvalFlow.ts`, `permissionContext.ts`, `approvalAuthorityProjection.ts`, `patchResult/workspaceAuthority.ts`, `boundedWritePolicy.ts`, `browserToolPolicy.ts`, `browserExecutionPolicy.ts`.
-- Facade/public functions: `ApprovalTrustPolicy`, `createCliEscalationPromptHandler`, `createWorkspaceWriteAuthority`, `appendCurrentRequestScopeEvidence`.
+- Facade/public functions: `ApprovalTrustPolicy`, `createCliEscalationPromptHandler`, `appendCurrentRequestScopeEvidence`.
 - Upstream modules: CLI, Agent Loop, Tool runtime, workspace root.
 - Downstream modules: Edit / Patch, Tool runtime, Browser, Provider, Result Surface, Session / Continue.
 - Owned lifecycle stages: policy, evidence, transcript, redaction.

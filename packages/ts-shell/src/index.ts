@@ -10,7 +10,6 @@ export {
   type VerificationExecutionState,
 } from "./verification/execution/model.js";
 export {
-  correctArtifact,
   createArtifactReceipt,
   type ArtifactCorrection,
   type ArtifactReceipt,

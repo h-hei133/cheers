@@ -242,7 +242,11 @@ export interface RuntimeConfig {
   readonly theme?: string;
   /** Modal editing in the prompt; Insert is the starting mode. */
   readonly vimMode?: boolean;
+  /** Initial display state of new and restored reasoning blocks. */
+  readonly collapseThinking?: boolean;
   readonly backgroundFollowUp?: boolean;
+  /** Whether threshold and overflow compaction run; explicit /compact stays available. */
+  readonly compactionEnabled?: boolean;
   /**
    * Explicit override of the interactive surface.
    *
@@ -405,7 +409,9 @@ export interface RuntimeConfigFile {
   agentMode?: "plan" | "build";
   theme?: string;
   vimMode?: boolean;
+  collapseThinking?: boolean;
   backgroundFollowUp?: boolean;
+  compactionEnabled?: boolean;
   tuiMode?: "regular" | "fullscreen";
   tui?: TuiPreferences;
   retryEnabled?: boolean;
@@ -447,7 +453,10 @@ export const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProven
   agentMode: "build",
   theme: "dark",
   vimMode: false,
+  // Thinking blocks were collapsed before the preference existed.
+  collapseThinking: true,
   backgroundFollowUp: false,
+  compactionEnabled: true,
   // The surface took the alternate screen unconditionally before this field was
   // wired, so that is the behaviour a default has to preserve: wiring a field
   // must not change how the product looks for someone who never set it. The
@@ -575,7 +584,9 @@ export function getRuntimeConfig(
     agentMode: merged.agentMode ?? DEFAULT_CONFIG.agentMode,
     theme: merged.theme ?? DEFAULT_CONFIG.theme,
     vimMode: merged.vimMode ?? DEFAULT_CONFIG.vimMode,
+    collapseThinking: merged.collapseThinking ?? DEFAULT_CONFIG.collapseThinking,
     backgroundFollowUp: merged.backgroundFollowUp ?? DEFAULT_CONFIG.backgroundFollowUp,
+    compactionEnabled: merged.compactionEnabled ?? DEFAULT_CONFIG.compactionEnabled,
     tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,
     tui: merged.tui ?? DEFAULT_CONFIG.tui,
     retryEnabled: merged.retryEnabled ?? DEFAULT_CONFIG.retryEnabled,

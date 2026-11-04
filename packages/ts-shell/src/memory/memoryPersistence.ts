@@ -79,7 +79,7 @@ function decodeMemoryEntries(content: string, result: MemoryRead): MemoryRead {
     try {
       const entry: unknown = JSON.parse(line);
       if (!isStoreEntry(entry)) throw new Error("Invalid memory entry");
-      result.entries.push(entry);
+      result.entries.push(isLifecycleTombstone(entry) ? entry : withoutLegacySourcePacket(entry));
     } catch {
       result.diagnostics.push(`Memory store line ${index + 1} is invalid; changes are blocked.`);
     }
@@ -107,7 +107,7 @@ function isStoreEntry(value: unknown): value is ProjectMemoryStoreEntry {
     || !RECORD_SOURCES.has(entry.source as string)) return false;
   if (!["evidence", "routeReferences", "redactions"].every((key) =>
     Array.isArray(entry[key]) && (entry[key] as unknown[]).every((item) => typeof item === "string"))) return false;
-  if (!["sourcePacket", "invalidatedAt", "invalidationReason", "invalidatedBySourceCommand"]
+  if (!["invalidatedAt", "invalidationReason", "invalidatedBySourceCommand"]
     .every((key) => entry[key] === undefined || typeof entry[key] === "string")) return false;
   if (entry.invalidatedBySourceCommand !== undefined && entry.invalidatedBySourceCommand !== "/memory") return false;
   if (entry.structuredFact !== undefined) {
@@ -120,6 +120,13 @@ function isStoreEntry(value: unknown): value is ProjectMemoryStoreEntry {
 
 export function isMemoryRecord(value: unknown): value is ProjectMemoryRecord {
   return isStoreEntry(value) && !isLifecycleTombstone(value);
+}
+
+/** Historical records may carry the redundant source copy; never republish it. */
+export function withoutLegacySourcePacket(value: ProjectMemoryRecord): ProjectMemoryRecord {
+  const record = { ...value } as ProjectMemoryRecord & { sourcePacket?: unknown };
+  delete record.sourcePacket;
+  return record;
 }
 
 export function foldProjectMemoryEntries(

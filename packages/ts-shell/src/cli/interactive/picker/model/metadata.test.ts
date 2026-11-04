@@ -42,7 +42,7 @@ it('shows an unconfigured relay model using its exact metadata rather than the s
   expect(details).toContain('Images: unsupported');
   expect(details).toContain('Tool calls: unverified');
   expect(details).toContain('Reasoning settings: supported');
-  expect(details).toContain('Effort levels: low supported · medium supported · high unsupported');
+  expect(details).toContain('Effort levels: minimal unsupported · low supported · medium supported · high unsupported · xhigh unsupported · max unsupported');
   expect(details).toContain('Price per 1M tokens: input 0 · output 2 · cache read 0');
 });
 
@@ -51,7 +51,7 @@ it('keeps absent capabilities unverified and does not invent free pricing or a c
   const details = picker.detail!(target('unknown'));
   expect(details).toContain('Images: unverified'); expect(details).toContain('Reasoning settings: unverified');
   expect(details).toContain('Tool calls: unverified');
-  expect(details).toContain('Effort levels: low unverified · medium unverified · high unverified');
+  expect(details).toContain('Effort levels: minimal unsupported · low unverified · medium unverified · high unverified · xhigh unsupported · max unsupported');
   expect(details.join('\n')).not.toMatch(/Context:|Input limit:|Max output:|Price per/);
 });
 

@@ -24,6 +24,7 @@ const descriptions = {
   topP: ['Request', 'Top P', 'Sampling probability threshold from 0 to 1'],
   maxOutputTokens: ['Request', 'Output token limit', 'Requested output token budget; model limits still apply'],
   contextWindow: ['Context', 'Context window', 'Override model window resolution; unset to use the model catalogue'],
+  compactionEnabled: ['Context', 'Auto compaction', 'Automatically compact at the context threshold or after overflow; explicit /compact remains available'],
   reserveTokens: ['Context', 'Reserved tokens', 'Tokens reserved outside the usable input budget'],
   keepRecentTokens: ['Context', 'Recent tokens', 'Conversation tokens to retain during compaction; model token budgets take precedence'],
   modelTokenBudgets: ['Context', 'Model token budgets', 'JSON object mapping provider/model identifiers to reserveTokens and keepRecentTokens'],
@@ -50,6 +51,7 @@ const descriptions = {
   toolDiscovery: ['Tools', 'Tool discovery', 'dynamic starts with pinned tools and loads the rest on request; full sends every schema'],
   theme: ['Display', 'Theme', 'Theme name, including custom themes and auto'],
   vimMode: ['Display', 'Vim mode', 'Normal/Insert/Visual/Visual-Line/Replace editing in the prompt; starts in Insert'],
+  collapseThinking: ['Display', 'Collapse thinking', 'Start new and restored thinking blocks collapsed; Ctrl+T changes visible blocks only'],
   backgroundFollowUp: ['Session', 'Background follow-up', 'Send a finished background task as a model follow-up; off means a local notice only'],
   tuiMode: ['Display', 'Terminal mode', 'Regular or fullscreen; changes require restart'],
   'tui.composerShape': ['Display', 'Input shape', 'Input appearance; project leaves take precedence. Unset uses default'],
@@ -72,6 +74,7 @@ function settingNavigation(key: string, group: string): { group: string; section
   if (key === 'theme') return { group: 'Appearance', section: 'Theme' };
   if (key.startsWith('tui.') || key === 'tuiMode') return { group: 'Appearance', section: key.includes('status') ? 'Status line' : key.includes('composer') ? 'Composer' : 'Display' };
   if (key === 'vimMode') return { group: 'Interaction', section: 'Input' };
+  if (key === 'collapseThinking') return { group: 'Appearance', section: 'Display' };
   if (key === 'attentionOnIdle') return { group: 'Interaction', section: 'Notifications' };
   if (key === 'offline') return { group: 'Interaction', section: 'Requests' };
   if (key === 'pathRules') return { group: 'Files', section: 'Path policies' };

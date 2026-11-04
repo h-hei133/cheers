@@ -296,6 +296,13 @@ describe("a message with an image", () => {
     expect(body.additionalModelRequestFields?.thinking).toEqual({ type: "enabled", budget_tokens: 4096 });
   });
 
+  it.each([4096, 64000])("uses the largest legal max budget inside ceiling %s", ceiling => {
+    const body = endpointTurnBody("bedrock-converse-stream", { ...BASE, thinkingLevelName: "vendor-max",
+      thinkingBudgetMaximum: true, maxOutputTokens: ceiling });
+    expect(body.inferenceConfig).toMatchObject({ maxTokens: ceiling });
+    expect(body.additionalModelRequestFields).toEqual({ thinking: { type: "enabled", budget_tokens: ceiling - 1024 } });
+  });
+
   it("omits the thinking field when no budget was configured", () => {
     const body = endpointTurnBody("bedrock-converse-stream", BASE) as { additionalModelRequestFields?: unknown };
     expect(body.additionalModelRequestFields).toBeUndefined();

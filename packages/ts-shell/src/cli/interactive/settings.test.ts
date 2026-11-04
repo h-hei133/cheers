@@ -41,6 +41,7 @@ function runtime(overrides?: RuntimeConfigOverrides) {
 }
 
 it.each([
+  { key: 'collapseThinking', value: false, raw: undefined },
   { key: 'attentionOnIdle', value: true, raw: undefined },
   { key: 'steeringMode', value: 'all', raw: undefined },
   { key: 'maxTurns', value: 24, raw: '24' },
@@ -99,6 +100,10 @@ it.each([
     await press('\x1b'); expect(fs.readFileSync(file)).toEqual(before);
     await open(); await stage(); await press('\r');
     expect(openSettings(context, redraw).values[key].stored).toEqual(value);
+    if (key === 'collapseThinking') {
+      expect(context.runtimeConfig.collapseThinking).toBe(false);
+      expect(getRuntimeConfig(root).collapseThinking).toBe(false);
+    }
     await open(); const capture = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), capture);
     if (setting.choices || key === 'theme') {
       const choices = key === 'theme' ? host.themes.names() : setting.choices!;

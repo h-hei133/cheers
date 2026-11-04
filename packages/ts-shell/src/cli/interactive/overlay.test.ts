@@ -30,6 +30,32 @@ const press = (overlay: OverlayHost, data: string, apply = vi.fn()): boolean =>
   overlay.handleKey(parseKeyEvent(data), apply);
 
 describe("pointer focus", () => {
+  it('routes Ctrl+Enter on an admitted row to inspection while Enter keeps activation', async () => {
+    const { overlay } = host();
+    const activate = vi.fn(async () => undefined), inspect = vi.fn(async () => undefined);
+    const chosen = picker({ inspect, apply: activate });
+    overlay.open(chosen); await Promise.resolve(); await Promise.resolve();
+    let outcome: Promise<unknown> | undefined;
+    expect(parseKeyEvent('\x1b[13;5u').keyId).toBe('ctrl+enter');
+    press(overlay, '\x1b[13;5u', (selected: Picker, ids: readonly string[]) => { outcome = selected.apply(ids); });
+    await outcome;
+    expect(inspect).toHaveBeenCalledWith('a'); expect(activate).not.toHaveBeenCalled();
+    overlay.open(chosen); await Promise.resolve(); await Promise.resolve();
+    press(overlay, '\r', (selected: Picker, ids: readonly string[]) => { outcome = selected.apply(ids); });
+    await outcome;
+    expect(activate).toHaveBeenCalledWith(['a']); expect(inspect).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves panels without inspection and multi-select panels open on Ctrl+Enter', async () => {
+    for (const overrides of [{}, { multiple: true, inspect: vi.fn(async () => undefined) }]) {
+      const { overlay } = host(), apply = vi.fn();
+      overlay.open(picker(overrides)); await Promise.resolve(); await Promise.resolve();
+      press(overlay, '\x1b[13;5u', apply);
+      expect(overlay.active).toBe(true); expect(apply).not.toHaveBeenCalled();
+      overlay.close();
+    }
+  });
+
   it('routes Enter on a browsable disabled row to inspection and never activation', async () => {
     const { overlay } = host();
     const activate = vi.fn(); const inspect = vi.fn(async () => ({ note: 'configure exact target' }));

@@ -4,8 +4,31 @@ import { projectContextState } from "../core/context/model/contextStateProjectio
 import { extractProjectMemoryCandidates } from "./projectMemoryCandidateExtractor.js";
 import { evaluateProjectMemoryCandidateQuality } from "./projectMemoryCandidateQuality.js";
 import { renderProjectMemoryCandidateSurface } from "./projectMemoryCandidateSurface.js";
+import { createProjectMemoryCandidate } from "./projectMemoryCandidate.js";
 
 describe("project memory candidate extraction", () => {
+  it("preserves explicit facts, binds candidate identity to them and avoids inventing triples from prose", () => {
+    const structuredFact = { subject: "project", predicate: "language", object: "TypeScript" };
+    const input = { routeHandoffFacts: [{ summary: "Project language is recorded.", stable: true, structuredFact }] };
+    const [candidate] = extractProjectMemoryCandidates(input);
+    expect(candidate.structuredFact).toEqual(structuredFact);
+    expect(extractProjectMemoryCandidates({ routeHandoffFacts: [{ ...input.routeHandoffFacts[0],
+      structuredFact: { ...structuredFact, object: "JavaScript" } }] })[0].candidateId).not.toBe(candidate.candidateId);
+    structuredFact.object = "changed after extraction";
+    expect(candidate.structuredFact?.object).toBe("TypeScript");
+    expect(extractProjectMemoryCandidates({ routeHandoffFacts: [{ summary: "Project language is TypeScript.", stable: true }] })[0].structuredFact).toBeUndefined();
+  });
+
+  it.each(["RAW_FILE_CONTENT", "hidden reasoning", "sk-1234567890abcdef"])("rejects forbidden structured fact values: %s", object => {
+    const structuredFact = { subject: "project", predicate: "language", object };
+    const [candidate] = extractProjectMemoryCandidates({ routeHandoffFacts: [{ summary: "Safe summary.", stable: true, structuredFact }] });
+    expect(candidate).toMatchObject({ candidateKind: "rejected", safety: "unsafe", retentionClass: "never-remember" });
+    expect(candidate.structuredFact).toBeUndefined();
+    const direct = createProjectMemoryCandidate({ candidateKind: "project-fact", retentionClass: "project-scoped-candidate",
+      confidence: "high", source: "system-derived", summary: "Safe summary.", reason: "Explicit source.", evidence: ["source:fact"], structuredFact });
+    expect(evaluateProjectMemoryCandidateQuality([direct]).qualityStatus).toBe("reject");
+  });
+
   it.each([
     ["用户偏好中文输出", "用户偏好英文输出"],
     ["Keep a stable project guideline. ".repeat(5) + "alpha", "Keep a stable project guideline. ".repeat(5) + "beta"],

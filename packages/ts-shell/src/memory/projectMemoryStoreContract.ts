@@ -31,7 +31,6 @@ export interface ProjectMemoryRecord {
   };
   readonly evidence: readonly string[];
   readonly source: ProjectMemoryCandidateSource;
-  readonly sourcePacket?: string;
   readonly routeReferences: readonly string[];
   readonly safety: Exclude<ProjectMemoryCandidateSafety, "unsafe">;
   readonly redactions: readonly string[];

@@ -570,7 +570,6 @@ function record(
     memoryText,
     evidence: ["route85:test"],
     source: "system-derived",
-    sourcePacket: "route85-test",
     routeReferences: ["route85"],
     safety: "safe",
     redactions: [],

@@ -142,7 +142,6 @@ export async function seedProjectMemoryRecord(
     structuredFact: input.structuredFact,
     evidence: input.evidence ?? ["agent-scenario-fixture:memory-record"],
     source: input.source ?? "system-derived",
-    sourcePacket: input.sourcePacket ?? "agent-scenario-fixture",
     routeReferences: input.routeReferences ?? ["route95"],
     safety: input.safety ?? "safe",
     redactions: input.redactions ?? [],

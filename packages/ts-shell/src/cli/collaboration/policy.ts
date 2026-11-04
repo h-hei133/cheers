@@ -25,7 +25,7 @@ export function collaborationPolicyFor(context: ShellRuntimeContext, policy: Req
   const check = () => { if (admission()) throw new ModelAdmissionError('inactive'); };
   const base = policy ?? roomPolicy(host, active);
   const original = base.withAdmission?.(check) ?? base;
-  return { reserve: request => {
+  return { claimBudgetSummary: original.claimBudgetSummary, reserve: request => {
     check();
     return original.reserve({ ...request, purpose: `${request.purpose}/collaboration/${active.acceptance.principal}/${active.acceptance.acceptanceId}` });
   }, withAdmission: extra => collaborationPolicyFor(context, original.withAdmission?.(() => { check(); extra(); }) ?? original)!,

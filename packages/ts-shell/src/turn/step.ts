@@ -314,7 +314,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       if (catalogProvider(request.catalog ?? [], request.provider.provider ?? '', catalogAddress).ambiguous) {
         return stamp(errorStep('The model catalogue has multiple entries for this endpoint. Resolve them before sending.'));
       }
-      if (explicitEffort && effort && effortCapability(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, effort, catalogAddress) === 'unsupported') {
+      if (effort && (explicitEffort || ['minimal', 'xhigh', 'max'].includes(effort))
+        && effortCapability(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, effort, catalogAddress) === 'unsupported') {
         return stamp(errorStep('The selected model does not support this reasoning effort. Select another level or use /thinking auto.'));
       }
       if (!toolCalling && hasToolHistory(messages)) {
@@ -441,6 +442,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             : {}),
           ...(shape.allowEmptySignature ? { allowEmptySignature: true } : {}),
           supportsTemperature: shape.supportsTemperature,
+          ...(shape.thinkingBudgetMaximum ? { thinkingBudgetMaximum: true } : {}),
           ...(shape.thinkingBudgetTokens !== undefined
             ? { thinkingBudgetTokens: shape.thinkingBudgetTokens }
             : {}),

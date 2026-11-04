@@ -324,12 +324,10 @@ describe("refreshing the catalogue", () => {
       expect(result.ok).toBe(true);
       const models = readCache(result.cachePath!).demo?.models ?? [];
       expect(models.find(model => model.id === "partial")?.thinkingLevelMap).toEqual({
-        low: "low",
-        medium: null,
-        high: "high",
+        minimal: null, low: "low", medium: null, high: "high", xhigh: null, max: null,
       });
-      const unsupported = { low: null, medium: null, high: null };
-      for (const id of ["empty", "special", "toggle", "budget"]) {
+      const unsupported = { minimal: null, low: null, medium: null, high: null, xhigh: null, max: null };
+      for (const id of ["empty", "toggle", "budget"]) {
         expect(models.find(model => model.id === id)?.thinkingLevelMap).toEqual(unsupported);
       }
       for (const id of ["absent", "malformed", "nonarray", "future"]) {
@@ -337,6 +335,9 @@ describe("refreshing the catalogue", () => {
         expect(models.find(model => model.id === id)).not.toHaveProperty("thinkingLevelMap");
       }
 
+      expect(models.find(model => model.id === "special")?.thinkingLevelMap).toEqual({
+        minimal: "minimal", low: null, medium: null, high: null, xhigh: "xhigh", max: "max",
+      });
       const catalog = loadCatalog();
       expect(effortCapability(catalog, "demo", "partial", "low")).toBe("supported");
       expect(effortCapability(catalog, "demo", "partial", "medium")).toBe("unsupported");

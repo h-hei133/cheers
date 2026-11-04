@@ -636,6 +636,12 @@ describe("the sampling settings a reasoning request may carry", () => {
     expect(request.thinking).toEqual({ type: "enabled", budget_tokens: 16_384 });
   });
 
+  it.each([4096, 64000])("uses the largest legal max budget inside ceiling %s without raising output", ceiling => {
+    const request = body({ thinkingLevelName: "vendor-max", thinkingBudgetMaximum: true, maxOutputTokens: ceiling });
+    expect(request.max_tokens).toBe(ceiling);
+    expect(request.thinking).toEqual({ type: "enabled", budget_tokens: ceiling - 1024 });
+  });
+
   it("uses a budget even when the caller resolved none", () => {
     const request = body({ thinkingLevelName: "high" });
 

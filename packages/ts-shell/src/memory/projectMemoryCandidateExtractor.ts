@@ -11,10 +11,12 @@ import {
   type ProjectMemoryCandidateConfidence,
   type ProjectMemoryCandidateKind,
   type ProjectMemoryCandidateSource,
+  type ProjectMemoryStructuredFact,
 } from "./projectMemoryCandidate.js";
 
 export interface ProjectMemorySourceFact {
   readonly summary: string;
+  readonly structuredFact?: ProjectMemoryStructuredFact;
   readonly kind?: ProjectMemoryCandidateKind;
   readonly source?: ProjectMemoryCandidateSource;
   readonly evidence?: readonly string[];
@@ -24,6 +26,7 @@ export interface ProjectMemorySourceFact {
 
 export interface ExplicitUserPreferenceFact {
   readonly summary: string;
+  readonly structuredFact?: ProjectMemoryStructuredFact;
   readonly explicit: boolean;
   readonly evidence?: readonly string[];
 }
@@ -81,13 +84,13 @@ export function extractProjectMemoryCandidates(
 
   return dedupeProjectMemoryCandidates(
     candidates.map((candidate) =>
-      isUnsafeSummary(candidate.summary)
+      [candidate.summary, ...Object.values(candidate.structuredFact ?? {})].some(isUnsafeSummary)
         ? createRejectedCandidate({
             summary: redactUnsafeSummary(candidate.summary),
             source: candidate.source,
             reason: "Candidate text looked like raw content, secret material, provider credentials, or hidden reasoning.",
             evidence: candidate.evidence,
-            redactions: [...candidate.redactions, "candidate.summary"],
+            redactions: [...candidate.redactions, "candidate.summary", ...(candidate.structuredFact ? ["candidate.structuredFact"] : [])],
           })
         : candidate,
     ),
@@ -122,6 +125,7 @@ function extractFromCompactPacket(
         confidence: "high",
         source: "compact-packet",
         summary: `Edit capability closeout status is ${packet.editCapability.closeoutStatus}.`,
+        structuredFact: { subject: "edit capability", predicate: "closeout status", object: packet.editCapability.closeoutStatus },
         reason: "Compact packet carries the current edit capability closeout state without raw edit content.",
         evidence: compactEvidence(packet, "compact-packet:editCapability.closeoutStatus"),
       }),
@@ -136,6 +140,7 @@ function extractFromCompactPacket(
         confidence: "high",
         source: "compact-packet",
         summary: `${blocked.id} is blocked by design.`,
+        structuredFact: { subject: blocked.id, predicate: "availability", object: "blocked by design" },
         reason: blocked.reason,
         evidence: compactEvidence(packet, "compact-packet:editCapability.blockedByDesign"),
       }),
@@ -243,6 +248,7 @@ function extractFromRouteHandoffFacts(
         confidence: fact.confidence ?? (fact.stable ? "high" : "medium"),
         source: fact.source ?? "route-handoff",
         summary: fact.summary,
+        structuredFact: fact.structuredFact,
         reason: fact.stable
           ? "Route handoff marked this fact as stable."
           : "Route handoff fact remains session-only until reviewed.",
@@ -288,6 +294,7 @@ function extractFromEditCloseoutFacts(
         confidence: "high",
         source: "system-derived",
         summary: `Edit capability closeout status is ${edit.status}.`,
+        structuredFact: { subject: "edit capability", predicate: "closeout status", object: edit.status },
         reason: "Edit closeout facts are explicit route evidence.",
         evidence,
       }),
@@ -301,6 +308,7 @@ function extractFromEditCloseoutFacts(
         confidence: "high",
         source: "system-derived",
         summary: `${blocked.id} is blocked by design.`,
+        structuredFact: { subject: blocked.id, predicate: "availability", object: "blocked by design" },
         reason: blocked.reason,
         evidence,
       }),
@@ -332,6 +340,7 @@ function extractFromUserPreferenceFacts(
         source: "user-stated-preference",
         safety: "needs-review",
         summary: fact.summary,
+        structuredFact: fact.structuredFact,
         reason: "User explicitly stated this preference; future review must decide whether to persist it.",
         evidence: fact.evidence ?? ["user-preference:explicit"],
       }),

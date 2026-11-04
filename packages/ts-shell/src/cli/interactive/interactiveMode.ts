@@ -464,7 +464,7 @@ export class InteractiveMode {
       // scrolled away, which is a statement that they are reading something else.
       if (this.view.scrolledBack === 0) this.view.scrollToEnd();
       this.tui.requestRender();
-    });
+    }, Date.now, () => this.options.runtimeContext.runtimeConfig.collapseThinking ?? true);
     this.questions = new QuestionBridge({
       ask: (question) => this.onQuestion(question),
       settle: () => this.onQuestionSettled(),
@@ -505,7 +505,7 @@ export class InteractiveMode {
         ),
     });
     const session = this.options.runtimeContext.session;
-    if (session.turns?.length || session.reports?.length) appendConversation(this.state, session);
+    if (session.turns?.length || session.reports?.length) appendConversation(this.historyTarget(), session);
     for (const diagnostic of this.options.runtimeContext.runtimeConfig.configDiagnostics) {
       this.state.transcript.append(textBlock("notice", `Warning: ${diagnostic}`));
     }

@@ -11,7 +11,11 @@ export function effortCapability(catalog: readonly CatalogProvider[], provider: 
 /** Reuse the same capability decision for an already resolved exact model. */
 export function declaredEffortCapability(entry: CatalogModel | undefined, effort: ThinkingPreference): 'supported' | 'unsupported' | 'unverified' {
   if (effort === null) return 'supported';
-  if (!entry) return 'unverified';
+  const extended = effort === 'minimal' || effort === 'xhigh' || effort === 'max';
+  if (!entry) return extended ? 'unsupported' : 'unverified';
   if (entry.reasoning === false || entry.compat?.reasoningEffort === false || entry.thinkingLevelMap?.[effort] === null) return 'unsupported';
+  // The historical three levels keep their compatibility fallback. Additional
+  // wire values require an exact declaration rather than reasoning:true.
+  if (extended && typeof entry.thinkingLevelMap?.[effort] !== 'string') return 'unsupported';
   return entry.reasoning === true || entry.compat?.reasoningEffort === true || typeof entry.thinkingLevelMap?.[effort] === 'string' ? 'supported' : 'unverified';
 }

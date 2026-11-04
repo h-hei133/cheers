@@ -21,6 +21,11 @@ import { runSubagent } from '../../core/subagents/runner.js';
 import { readGoalEdit } from './store.js';
 import { runSessionGoalCommand } from './command.js';
 import { goalRequestPolicy } from './budget.js';
+import { runTurn } from '../../turn/session.js';
+import type { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
+import { getSessionUsage, recordRequestContext } from '../../observability/usageTelemetry.js';
+import { claimGoalRun } from './run/store.js';
+import { createRunOwner } from './run/owner.js';
 
 let scratch: string; let root: string; let manager: SessionManager; let session: Session;
 const boundedEndpoint = 'goal-budget-test';
@@ -57,6 +62,34 @@ function answer() { return Response.json({ choices: [{ message: { content: 'answ
   usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12, prompt_tokens_details: { cached_tokens: 8 } } }); }
 
 describe('goal request policies', () => {
+  it('shares the one-shot closing claim across policies and reopens it only for a changed budget or goal', async () => {
+    await command(['budget', '20']);
+    const first = goalRequestPolicy(manager, session)!;
+    expect(first.claimBudgetSummary?.()).toBe(true);
+    expect(goalRequestPolicy(manager, session)!.claimBudgetSummary?.()).toBe(false);
+    expect(first.withAdmission?.(() => {}).claimBudgetSummary?.()).toBe(false);
+    expect(first.withCompletionReserve?.(() => 0).claimBudgetSummary?.()).toBe(false);
+    await command(['budget', '40']);
+    expect(first.claimBudgetSummary?.()).toBe(true);
+    expect(goalRequestPolicy(manager, session)!.claimBudgetSummary?.()).toBe(false);
+    await command(['drop']); await command(['set', 'A different goal']); await command(['budget', '40']);
+    expect(first.claimBudgetSummary?.()).toBe(false);
+    expect(goalRequestPolicy(manager, session)!.claimBudgetSummary?.()).toBe(true);
+  });
+
+  it('does not let a stale phase or owner consume the current closing claim', async () => {
+    await command(['budget', '20']);
+    const active = goalRequestPolicy(manager, session)!;
+    await command(['pause']);
+    expect(active.claimBudgetSummary?.()).toBe(false);
+    expect(goalRequestPolicy(manager, session)!.claimBudgetSummary?.()).toBe(true);
+    await command(['budget', '40']); await command(['resume']);
+    const unowned = goalRequestPolicy(manager, session)!;
+    const owner = createRunOwner(); claimGoalRun(manager, session, owner);
+    expect(unowned.claimBudgetSummary?.()).toBe(false);
+    expect(goalRequestPolicy(manager, session, owner.token)!.claimBudgetSummary?.()).toBe(true);
+  });
+
   it('creates a known-zero scope atomically, keeps usage and other owners across writes, and validates exact budget args', async () => {
     expect(scope()).toMatchObject({ inputTokens: 0, outputTokens: 0, historyUnknown: false, nextSequence: 1 });
     for (const invalid of ['-1', '01', '1e2', '+2', '2.5', '9007199254740992']) {
@@ -148,7 +181,7 @@ catch (error) { console.log(error.code); }
       : new Response(new ReadableStream<Uint8Array>({ start(controller) { controller.error(new Error('socket closed')); } }), { headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch;
     const result = await step(fetchImpl)([{ role: 'user', content: 'hello' }], undefined, {}, { allowTools: false });
     expect(fetchImpl).toHaveBeenCalledOnce(); expect(result).toMatchObject({ stopReason: 'error', retriesExhausted: true });
-    expect(result.errorMessage).toContain(kind === 'empty-stream-retry' ? 'socket closed' : 'exhausted');
+    expect(result.errorMessage).toContain(kind === 'empty-stream-retry' ? 'socket closed' : 'history-unknown');
     expect(scope().pending['1']).toMatchObject({ dispatched: true });
     expect(Object.keys(scope().pending)).toEqual(['1']);
   });
@@ -163,6 +196,65 @@ catch (error) { console.log(error.code); }
     const messages = await runAgentLoop([{ role: 'user', content: 'hello' }], [], { tools: [], streamStep: (messages, signal) => modelStep(messages, signal, {}, { allowTools: false }),
       retry: { maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 } }, () => {});
     expect(fetchImpl).toHaveBeenCalledOnce(); expect(messages.at(-1)?.errorMessage).toContain('exhausted');
+  });
+
+  it('keeps a refused budget-summary attempt on the same strict cap without another send', async () => {
+    await command(['budget', '20']);
+    const fetchImpl = vi.fn(async () => answer()) as unknown as typeof fetch;
+    const policy = goalRequestPolicy(manager, session)!;
+    const modelStep = step(fetchImpl);
+    await modelStep([{ role: 'user', content: 'hello' }], undefined, {}, { allowTools: false });
+    expect(policy.claimBudgetSummary?.()).toBe(true);
+    const closing = await modelStep([{ role: 'user', content: 'Summarize progress and stop.' }], undefined, {}, { allowTools: false });
+    expect(closing).toMatchObject({ stopReason: 'error', admissionFailure: 'exhausted' });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(scope()).toMatchObject({ inputTokens: 10, outputTokens: 2, pending: {} });
+  });
+
+  it('admits a smaller actual no-tools closing request through the original policy without persisting its instruction', async () => {
+    await command(['budget', '20']);
+    declareEndpoint(boundedEndpoint, { ...wire, requestBound: value => {
+      const body = JSON.parse(value.body) as Record<string, unknown>;
+      return { inputTokens: Array.isArray(body.tools) && body.tools.length ? 30 : 10, outputTokens: 10,
+        source: 'isolated-test-protocol', version: '1' };
+    } });
+    const policy = goalRequestPolicy(manager, session)!;
+    const sent: RequestInit[] = [];
+    const previousContext = { provider: 'old', model: 'old', endpoint: 'old', capturedAt: 'old', body: { bytes: 1, codeUnits: 1 } };
+    recordRequestContext(session.id, previousContext);
+    const publishIdentity = vi.fn();
+    const noteRequest = vi.fn();
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => { sent.push(init!); return answer(); });
+    const modelStep = createStepFunction({ provider: { headers: {}, baseUrl: 'https://example.test', provider: 'test', model: 'm', endpoint: boundedEndpoint },
+      workspaceRoot: root, sessionId: session.id, systemPrompt: 'test', tools: [{ type: 'function', function: {
+        name: 'read', description: 'Read fixture', parameters: { type: 'object' } } }],
+      maxOutputTokens: 10, fetchImpl: fetchImpl as typeof fetch, requestPolicy: policy });
+    const run = runTurn({ sessionId: session.id, workspaceRoot: root, prompt: 'Continue the goal', history: [],
+      step: modelStep, maxSteps: 2, tools: new Map(), claimBudgetSummary: policy.claimBudgetSummary,
+      signal: new AbortController().signal,
+      onPromptIdentity: publishIdentity, cacheWarming: { noteRequest, noteSettled() {} } as never,
+      hooks: { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher,
+      onMessage: message => manager.addTurn(session.id, message) });
+    const events = [];
+    for await (const event of run.events) events.push(event);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const body = JSON.parse(String(sent[0]?.body));
+    expect(body.tools).toBeUndefined();
+    expect(JSON.stringify(body.messages)).toContain('Summarize progress');
+    expect(JSON.stringify(manager.getSession(session.id)!.turns)).not.toContain('Summarize progress');
+    expect(manager.getSession(session.id)!.turns.every(message => message.promptMeasurement === undefined)).toBe(true);
+    expect(getSessionUsage(session.id).requestContext).not.toBe(previousContext);
+    expect(getSessionUsage(session.id).requestContext).toMatchObject({ provider: 'test', model: 'm', endpoint: boundedEndpoint,
+      body: { bytes: Buffer.byteLength(String(sent[0]?.body)) }, promptTokens: 10 });
+    expect(publishIdentity).toHaveBeenCalledOnce();
+    expect(publishIdentity).toHaveBeenCalledWith(expect.objectContaining({
+      schemaDigest: getSessionUsage(session.id).lastPromptIdentity?.schemaDigest,
+      historyDigest: getSessionUsage(session.id).lastPromptIdentity?.historyDigest,
+    }));
+    expect(noteRequest).not.toHaveBeenCalled();
+    expect(events.some(event => event.type === 'message.delivered')).toBe(false);
+    expect(events.at(-1)).toMatchObject({ type: 'query.failed', admissionFailure: 'exhausted' });
+    expect(scope()).toMatchObject({ inputTokens: 10, outputTokens: 2, pending: {} });
   });
 
   it('routes side questions, history summaries and cache replays through the same actual send boundary', async () => {

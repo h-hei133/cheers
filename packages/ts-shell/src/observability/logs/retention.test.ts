@@ -12,10 +12,18 @@ const entry: StructuredLogEntry = {
   component: "retention", message: "a log record", fields: {},
 };
 
-beforeEach(() => { root = fs.mkdtempSync(path.join(process.cwd(), ".tmp-log-retention-")); });
+beforeEach(() => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  root = fs.mkdtempSync('/tmp/cheers-test/log-retention-');
+});
 afterEach(() => { vi.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }); });
 
 describe("log retention", () => {
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])("rejects an invalid file size before writing (%s)", maxFileSizeMb => {
+    expect(() => new RotatingFileSink({ logDir: root, maxFileSizeMb })).toThrow("maxFileSizeMb must be a positive finite number");
+    expect(fs.readdirSync(root)).toEqual([]);
+  });
+
   it.each([0, 1.5, Number.NaN, Number.POSITIVE_INFINITY])("rejects an invalid file limit (%s)", (maxFiles) => {
     expect(() => new RotatingFileSink({ logDir: root, maxFiles })).toThrow("maxFiles must be a positive safe integer");
   });

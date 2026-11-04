@@ -193,7 +193,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     systemPrompt, messages: wireMessages,
     tools: schemas, allowTools, vision: shape.vision, temperature: config.temperature ?? 0.7,
     topP: config.topP, maxOutputTokens: configuredOutput ?? output, serviceTier,
-    thinkingLevelName: shape.thinkingLevelName, thinkingBudgetTokens: shape.thinkingBudgetTokens,
+    thinkingLevelName: shape.thinkingLevelName, thinkingBudgetTokens: shape.thinkingBudgetTokens, thinkingBudgetMaximum: shape.thinkingBudgetMaximum,
     allowEmptySignature: shape.allowEmptySignature, supportsTemperature: shape.supportsTemperature,
     systemRole: shape.systemRole, reasoningEffort: shape.reasoningEffort, reasoningSummary: shape.reasoningSummary,
     reasoningReplayField: shape.reasoningReplayField,

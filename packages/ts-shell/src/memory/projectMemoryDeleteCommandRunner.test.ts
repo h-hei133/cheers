@@ -163,7 +163,6 @@ function record(
     memoryText,
     evidence: ["route84:test"],
     source: "system-derived",
-    sourcePacket: "route84-test",
     routeReferences: ["route84"],
     safety: "safe",
     redactions: [],

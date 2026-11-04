@@ -4,6 +4,12 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createProjectMemoryCandidate } from "./projectMemoryCandidate.js";
 import { createProjectMemoryLocalStore } from "./projectMemoryLocalStore.js";
+import { extractProjectMemoryCandidates } from "./projectMemoryCandidateExtractor.js";
+import { createProjectMemoryInjectionStateStore } from "./projectMemoryInjectionState.js";
+import { planProjectMemoryFutureTurnInjection } from "./projectMemoryFutureTurnInjection.js";
+import { runCompactCommand } from "../context/compact/command/compactCommandRunner.js";
+import { runProjectMemoryReviewCommand } from "./projectMemoryReviewCommandRunner.js";
+import { normalizeProjectMemoryReviewCommandRequest } from "./projectMemoryReviewCommandContract.js";
 import {
   normalizeProjectMemorySaveCommandRequest,
   parseProjectMemorySaveCommandArgs,
@@ -28,6 +34,37 @@ describe("project memory save command runner", () => {
 
   afterEach(() => {
     fs.rmSync(storeRoot, { recursive: true, force: true });
+  });
+
+  it("carries extracted facts through explicit approval/save and blocks conflicting future-turn injection", async () => {
+    const packet = runCompactCommand({ mode: "render", source: "route" }).packet;
+    const candidates = ["ready", "partial"].flatMap(status => extractProjectMemoryCandidates({
+      compactPacket: { ...packet, editCapability: { ...packet.editCapability, closeoutStatus: status } },
+    }).filter(candidate => candidate.structuredFact?.predicate === "closeout status"));
+    const memoryStore = createProjectMemoryLocalStore({ ref: { mode: "test-only", root: storeRoot } });
+    const pending = await runProjectMemorySaveCommand({ request: parseProjectMemorySaveCommandArgs(["save", "approved"]),
+      reviewSessionId: "structured", candidates, reviewStore, memoryStore });
+    expect(pending.outcome).toBe("blocked");
+    expect((await memoryStore.list()).records).toEqual([]);
+    for (const candidate of candidates) {
+      const review = runProjectMemoryReviewCommand({ request: normalizeProjectMemoryReviewCommandRequest({ mode: "approve", candidateId: candidate.candidateId }),
+        reviewSessionId: "structured", candidates, store: reviewStore });
+      expect(review.outcome).toBe("approved");
+      expect(review.output).toContain(`[edit capability / closeout status / ${candidate.structuredFact!.object}]`);
+    }
+    const saved = await runProjectMemorySaveCommand({ request: parseProjectMemorySaveCommandArgs(["save", "approved"]),
+      reviewSessionId: "structured", candidates, reviewStore, memoryStore });
+    expect(saved.outcome).toBe("saved");
+    const records = (await memoryStore.list()).records;
+    expect(records.map(record => record.structuredFact)).toEqual(candidates.map(candidate => candidate.structuredFact));
+    expect(records).toHaveLength(2);
+    const states = createProjectMemoryInjectionStateStore();
+    const staged = states.markPending({ sessionScopeId: "structured", mode: "wake", recordIds: records.map(record => record.id), sourceCommand: "/memory use" });
+    const plan = await planProjectMemoryFutureTurnInjection({ mode: "prepare", memoryStore, injectionState: staged,
+      markConsumed: input => states.markConsumed(input) });
+    expect(plan.shouldInject).toBe(false);
+    expect(plan.injectedContext).toBeUndefined();
+    expect(plan.warnings.map(warning => warning.id)).toContain("conflicting-structured-memory");
   });
 
   it.each([

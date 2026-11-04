@@ -10,7 +10,7 @@ export function preference(record: RawDocument): Preference {
   for (const key of PREFERENCE_KEYS) {
     if (!Object.hasOwn(record, key) || record[key] === undefined) continue;
     const value = record[key];
-    if (key === 'thinkingEffort' ? ![null, 'low', 'medium', 'high'].includes(value as null | string) : typeof value !== 'string') {
+    if (key === 'thinkingEffort' ? ![null, 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(value as null | string) : typeof value !== 'string') {
       throw new PreferenceDocumentError();
     }
     result[key] = value;

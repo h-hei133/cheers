@@ -56,6 +56,8 @@ describe("which commands open a chooser", () => {
         readConfiguration: () => ({ config, catalog: loadCatalog() }),
         resolveConfigTarget: () => ({ provider: "deepseek", model: "deepseek-reasoner" }) } as unknown as CommandContext;
       expect(opensPicker("/thinking")).toBe(true);
+      expect(opensPicker("/effort")).toBe(true);
+      expect(pickerFor("/effort", { commandContext: context } as unknown as PickerHost)?.title).toBe('Thinking effort');
       const picker = pickerFor("/thinking", { commandContext: context } as unknown as PickerHost)!;
       const rows = await picker.load();
       expect(rows.map(row => row.id)).toEqual(["auto", "low", "medium", "high"]);

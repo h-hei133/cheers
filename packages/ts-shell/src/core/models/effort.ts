@@ -1,5 +1,5 @@
 /** A null preference explicitly leaves the choice to the provider. */
-export const THINKING_LEVELS = ['low', 'medium', 'high'] as const;
+export const THINKING_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 export type ThinkingPreference = ThinkingLevel | null;
 

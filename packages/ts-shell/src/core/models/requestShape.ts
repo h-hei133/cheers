@@ -97,6 +97,8 @@ export interface ResolvedRequestShape {
    * between "think this much" and "the provider decides".
    */
   readonly thinkingBudgetTokens?: number;
+  /** Use the largest legal numeric budget inside the selected output ceiling. */
+  readonly thinkingBudgetMaximum?: boolean;
 }
 
 /**
@@ -152,7 +154,7 @@ export function resolveRequestShape(
   if (!entry) {
     return {
       ...DEFAULT_REQUEST_SHAPE,
-      ...(level ? { thinkingLevelName: level, thinkingBudgetTokens: THINKING_BUDGET_TOKENS[level] } : {}),
+      ...(level ? { thinkingLevelName: level, ...(level === 'max' ? { thinkingBudgetMaximum: true } : {}), thinkingBudgetTokens: THINKING_BUDGET_TOKENS[level] } : {}),
     };
   }
 
@@ -188,6 +190,7 @@ export function resolveRequestShape(
     supportsTemperature: compat.supportsTemperature !== false,
     vision: entry.vision === true,
     ...(reasoningEffort && level ? { thinkingLevelName: levelNameFor(entry, level) } : {}),
+    ...(reasoningEffort && level === 'max' ? { thinkingBudgetMaximum: true } : {}),
     ...(reasoningEffort && level ? { thinkingBudgetTokens: THINKING_BUDGET_TOKENS[level] } : {}),
   };
 }
@@ -209,6 +212,10 @@ function levelNameFor(entry: CatalogModel, level: ThinkingLevel): string | undef
       // means this model does not have that level, so the search continues.
       const mapped = map?.[name];
       if (mapped === null) continue;
+      // The original three levels retain the historical absent-map fallback;
+      // newly introduced levels require an exact declaration.
+      const extended = name === 'minimal' || name === 'xhigh' || name === 'max';
+      if (extended && typeof mapped !== 'string') continue;
       return mapped ?? name;
     }
   }
@@ -224,8 +231,11 @@ function levelNameFor(entry: CatalogModel, level: ThinkingLevel): string | undef
  * providers' own guidance describes: enough to think through a problem, with
  * room left for the answer under the request's ceiling.
  */
-const THINKING_BUDGET_TOKENS: Record<ThinkingLevel, number> = {
+const THINKING_BUDGET_TOKENS: Record<ThinkingLevel, number | undefined> = {
+  minimal: 1_024,
   low: 2_048,
   medium: 8_192,
   high: 16_384,
+  xhigh: 32_768,
+  max: undefined,
 };

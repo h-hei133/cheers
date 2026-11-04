@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { isMemoryRecord } from "../memoryPersistence.js";
+import { isMemoryRecord, withoutLegacySourcePacket } from "../memoryPersistence.js";
 import { recordHasForbiddenContent, containsRawContent, containsSecret, containsHiddenReasoning } from "../memoryValidation.js";
 import { createProjectMemoryCandidate, type ProjectMemoryCandidate } from "../projectMemoryCandidate.js";
 import type { ProjectMemoryRecord } from "../projectMemoryStoreContract.js";
@@ -15,6 +15,7 @@ export interface KnowledgeView {
 }
 
 export function knowledgeView(records: readonly ProjectMemoryRecord[]): KnowledgeView {
+  records = records.map(withoutLegacySourcePacket);
   return { kind: "project-memory-view", version: 1,
     revision: createHash("sha256").update(JSON.stringify(records)).digest("hex"), records };
 }
@@ -39,13 +40,15 @@ export function importKnowledge(content: string): readonly ProjectMemoryCandidat
     || !document.records.every(boundedRecord)) throw new Error("Knowledge import requires bounded project-memory-view version 1 records.");
   const records = document.records as ProjectMemoryRecord[];
   if (new Set(records.map((record) => record.id)).size !== records.length
-    || knowledgeView(records).revision !== document.revision) throw new Error("Knowledge import has duplicate IDs or a mismatched revision.");
+    || createHash("sha256").update(JSON.stringify(records)).digest("hex") !== document.revision) throw new Error("Knowledge import has duplicate IDs or a mismatched revision.");
   if (records.some((record) => record.invalidatedAt || record.safety !== "safe" || record.retentionClass === "never-remember" || record.candidateKind === "rejected")) {
     throw new Error("Invalidated or unsafe knowledge cannot enter the approval queue.");
   }
   return records.map((record) => createProjectMemoryCandidate({
     candidateKind: record.candidateKind, retentionClass: record.retentionClass, confidence: "medium",
     source: record.source, safety: "safe", summary: record.memoryText,
+    ...(record.structuredFact?.subject && record.structuredFact.predicate && record.structuredFact.object
+      ? { structuredFact: { subject: record.structuredFact.subject, predicate: record.structuredFact.predicate, object: record.structuredFact.object } } : {}),
     reason: "Imported knowledge requires a fresh local approval and separate save.",
     evidence: [QUEUED_MEMORY_EVIDENCE, `memory-import:revision:${document.revision}`, `memory-import:record:${record.id}`, ...record.evidence],
     redactions: record.redactions,
@@ -54,14 +57,15 @@ export function importKnowledge(content: string): readonly ProjectMemoryCandidat
 
 function boundedRecord(value: unknown): value is ProjectMemoryRecord {
   if (!isMemoryRecord(value) || recordHasForbiddenContent(value)) return false;
-  const permitted = ["id", "version", "createdAt", "candidateId", "candidateKind", "retentionClass", "approvedAt", "approvedBySourceCommand", "memoryText", "structuredFact", "evidence", "source", "sourcePacket", "routeReferences", "safety", "redactions", "invalidatedAt", "invalidationReason", "invalidatedBySourceCommand"];
-  if (Object.keys(value).some((key) => !permitted.includes(key)) || !value.memoryText.trim()
-    || value.memoryText.length > KNOWLEDGE_LIMITS.text) return false;
-  for (const entry of Object.values(value)) {
+  const record = withoutLegacySourcePacket(value);
+  const permitted = ["id", "version", "createdAt", "candidateId", "candidateKind", "retentionClass", "approvedAt", "approvedBySourceCommand", "memoryText", "structuredFact", "evidence", "source", "routeReferences", "safety", "redactions", "invalidatedAt", "invalidationReason", "invalidatedBySourceCommand"];
+  if (Object.keys(record).some((key) => !permitted.includes(key)) || !record.memoryText.trim()
+    || record.memoryText.length > KNOWLEDGE_LIMITS.text) return false;
+  for (const entry of Object.values(record)) {
     if (typeof entry === "string" && (entry.length > KNOWLEDGE_LIMITS.text || containsRawContent(entry) || containsSecret(entry) || containsHiddenReasoning(entry))) return false;
     if (Array.isArray(entry) && (entry.length > KNOWLEDGE_LIMITS.references || entry.some((reference) => typeof reference !== "string" || reference.length > KNOWLEDGE_LIMITS.reference))) return false;
   }
-  if (value.structuredFact && (Object.keys(value.structuredFact).some((key) => !["subject", "predicate", "object"].includes(key))
-    || Object.values(value.structuredFact).some((entry) => typeof entry !== "string" || entry.length > KNOWLEDGE_LIMITS.text))) return false;
+  if (record.structuredFact && (Object.keys(record.structuredFact).some((key) => !["subject", "predicate", "object"].includes(key))
+    || Object.values(record.structuredFact).some((entry) => typeof entry !== "string" || entry.length > KNOWLEDGE_LIMITS.text))) return false;
   return true;
 }

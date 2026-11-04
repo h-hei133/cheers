@@ -35,6 +35,13 @@ const CONVERSATION = [
 ];
 
 describe("restoring a conversation", () => {
+  it('uses the current display preference for restored thinking blocks', () => {
+    const message = { ...turn('assistant', 'answer'), reasoning: { text: 'reasoning' } };
+    expect(restoreConversation([message]).blocks[0]?.collapsed).toBe(true);
+    const transcript = new Transcript();
+    appendConversation({ transcript, context: { runtimeConfig: { collapseThinking: false } } as never }, { id: 'expanded', turns: [message] } as never);
+    expect(transcript.all().find(block => block.kind === 'thinking')?.collapsed).toBe(false);
+  });
   it('restores original composed source and indentation into the transcript and editor history', () => {
     const source = '  问题 /skill:a\n/skill:b  ';
     const message = { ...turn('user', '<skill>expanded instructions</skill>'), metadata: { originalInput: source } };
@@ -308,7 +315,7 @@ describe("showing a session", () => {
   it('rebuilds thinking once per stored turn when a session is shown repeatedly', () => {
     const transcript = new Transcript();
     const session = { id: 'thinking-shown', turns: [{ ...turn('assistant', 'answer'), reasoning: { text: 'Plan' } }] };
-    const target = { transcript, context: { session: { id: session.id } },
+    const target = { transcript, context: { session: { id: session.id }, runtimeConfig: { collapseThinking: true } },
       sessionManager: { getSession: () => session } } as never;
     showConversation(target); showConversation(target);
     expect(transcript.all().map(block => [block.kind, block.text])).toEqual([['thinking', 'Plan'], ['assistant', 'answer']]);
@@ -333,7 +340,7 @@ describe("showing a session", () => {
         createNew: () => ({ id: "new" } as never),
         discardIfEmpty: () => true,
       },
-      context: { session: { id: "s-shown" } } as never,
+      context: { session: { id: "s-shown" }, runtimeConfig: { collapseThinking: true } } as never,
     });
 
     expect(getSessionTodos("s-shown").map((item) => item.text)).toEqual(["switch me"]);

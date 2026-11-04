@@ -12,8 +12,9 @@ import type { Option } from '../../../presentation/tui/chrome/options.js';
 import type { Picker, PickerOutcome } from '../overlay.js';
 import { modelBrowserOwned } from './model/owner.js';
 import { providerCredentialBaseUrl } from '../../../core/auth/account/target.js';
+import { THINKING_LEVELS } from '../../../core/models/effort.js';
 
-const LEVELS = ['auto', 'low', 'medium', 'high'] as const;
+const LEVELS = ['auto', ...THINKING_LEVELS] as const;
 
 /**
  * Reasoning-effort chooser.
@@ -53,18 +54,21 @@ export function thinkingPicker(context: CommandContext, back?: (notice?: string)
       initial = current.thinkingEffort ?? 'auto';
       const ambiguous = catalogProvider(catalog, provider, baseUrl).ambiguous;
       offered = choice !== undefined;
-      return LEVELS.map(level => {
+      return LEVELS.flatMap(level => {
         const effort = level === 'auto' ? null : level;
         const capability = effortCapability(catalog, provider, model, effort, baseUrl);
         const active = current.thinkingEffort === effort;
-        return {
+        if (['minimal', 'xhigh', 'max'].includes(level) && capability === 'unsupported' && !active) return [];
+        return [{
           id: level,
           label: level === 'auto' ? 'auto (provider decides)' : level,
-          detail: level === 'auto' ? 'No explicit effort is sent.' : `Request ${level} reasoning effort.`,
+          detail: level === 'auto' ? 'No explicit effort is sent.' : level === 'max'
+            ? 'Request max effort; numeric budgets use the output ceiling, while Google retains provider control.'
+            : `Request ${level} reasoning effort.`,
           note: ambiguous ? 'model catalogue endpoint is ambiguous' : active ? 'active' : capability,
           disabled: ambiguous || capability === 'unsupported',
           ...(active && (ambiguous || capability === 'unsupported') ? { focusable: true } : {}),
-        };
+        }];
       });
     },
     async apply(ids: readonly string[], stillOwned?: () => boolean): Promise<PickerOutcome | undefined> {

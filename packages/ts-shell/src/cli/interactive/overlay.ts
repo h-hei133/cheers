@@ -513,7 +513,7 @@ export class OverlayHost {
       if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
       return true;
     }
-    if (this.loading && ['enter', 'delete', 'ctrl+d', 'ctrl+r', 'ctrl+p'].includes(event.keyId)) return true;
+    if (this.loading && ['enter', 'ctrl+enter', 'delete', 'ctrl+d', 'ctrl+r', 'ctrl+p'].includes(event.keyId)) return true;
     const isApprovalPicker = !this.input && (
       picker.title.startsWith("Permission:") ||
       (this.model.visible.some((o) => o.id === "allow-once") &&
@@ -779,6 +779,9 @@ export class OverlayHost {
         }
         this.accept(picker, apply);
         return true;
+      case "ctrl+enter":
+        if (!isApprovalPicker && picker.inspect && !picker.multiple) this.accept(picker, apply, undefined, true);
+        return true;
       default:
         if (event.ctrl && (event.keyId === "c" || event.keyId === "ctrl+c")) {
           this.close();
@@ -875,12 +878,12 @@ export class OverlayHost {
     });
   }
 
-  private accept(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void, directIds?: readonly string[]): void {
+  private accept(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void, directIds?: readonly string[], inspect = false): void {
     const acceptedGeneration = this.generation;
     const stillOwned = (): boolean => this.generation === acceptedGeneration;
     if (directIds?.some(id => !this.model.visible.some(option => option.id === id && !option.disabled))) return;
     const current = this.model.current();
-    if (directIds === undefined && !picker.multiple && current?.disabled) {
+    if (directIds === undefined && !picker.multiple && current && (inspect || current.disabled)) {
       if (!picker.inspect) return;
       const inspect = picker.inspect;
       this.release();

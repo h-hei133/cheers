@@ -135,7 +135,7 @@ function normalize(raw: Record<string, unknown>): ProjectState {
     }
   }
   if (typeof raw.fastSampling === "boolean") state.fastSampling = raw.fastSampling;
-  if (raw.thinkingEffort === "low" || raw.thinkingEffort === "medium" || raw.thinkingEffort === "high") {
+  if (raw.thinkingEffort === "minimal" || raw.thinkingEffort === "low" || raw.thinkingEffort === "medium" || raw.thinkingEffort === "high" || raw.thinkingEffort === "xhigh" || raw.thinkingEffort === "max") {
     state.thinkingEffort = raw.thinkingEffort;
   }
   return state;

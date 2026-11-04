@@ -47,7 +47,11 @@ export class RotatingFileSink {
     const defaultDir = path.join(userDataDir(), "logs");
     this.logDir = options.logDir ?? (configuredDir || defaultDir);
     assertProfileStorage(this.logDir, this.profile);
-    this.maxFileSizeBytes = (options.maxFileSizeMb ?? 5) * 1024 * 1024;
+    const maxFileSizeMb = options.maxFileSizeMb ?? 5;
+    if (!Number.isFinite(maxFileSizeMb) || maxFileSizeMb <= 0) {
+      throw new RangeError("maxFileSizeMb must be a positive finite number.");
+    }
+    this.maxFileSizeBytes = maxFileSizeMb * 1024 * 1024;
     this.maxHistoryDays = options.maxHistoryDays ?? 7;
     this.maxFiles = options.maxFiles ?? 20;
     if (!Number.isSafeInteger(this.maxFiles) || this.maxFiles < 1) {

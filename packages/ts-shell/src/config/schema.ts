@@ -34,7 +34,7 @@ const accountAuth = objectSchema({
 
 export const credentialSchema = objectSchema({
   apiKey: referenceSchema, baseUrl: referenceSchema, model: referenceSchema, serviceTier: nameSchema, accountAuth,
-  thinkingEffort: { enum: ['low', 'medium', 'high', null] },
+  thinkingEffort: { enum: ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', null] },
 });
 
 export function connectionSchema(providers: readonly string[]): AnySchemaObject {

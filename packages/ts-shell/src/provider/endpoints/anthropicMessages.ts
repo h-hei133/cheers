@@ -103,6 +103,8 @@ export interface AnthropicRequestInput {
    * `ResolvedRequestShape.thinkingBudgetTokens`.
    */
   readonly thinkingBudgetTokens?: number;
+  /** Use the largest legal numeric budget inside the selected output ceiling. */
+  readonly thinkingBudgetMaximum?: boolean;
 }
 
 /** The headers this endpoint authenticates with, given an API key. */
@@ -169,7 +171,8 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
     // with the shipped defaults (`maxOutputTokens: 4096`, level `high`) every
     // request asked for 17,408 tokens of output.
     const ceiling = input.maxOutputTokens ?? DEFAULT_MAX_TOKENS;
-    const wanted = input.thinkingBudgetTokens ?? DEFAULT_THINKING_BUDGET_TOKENS;
+    const wanted = input.thinkingBudgetMaximum ? ceiling - MIN_ANSWER_TOKENS
+      : input.thinkingBudgetTokens ?? DEFAULT_THINKING_BUDGET_TOKENS;
     const budget = Math.min(wanted, ceiling - MIN_ANSWER_TOKENS);
     // A ceiling too small to hold a budget and an answer at all: thinking is
     // omitted rather than sent as a request the API refuses. The answer is what
@@ -777,6 +780,7 @@ declareEndpoint("anthropic-messages", {
       stream: false,
       ...(input.reasoningEffort && input.thinkingLevelName ? { thinkingLevelName: input.thinkingLevelName } : {}),
       ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
+      ...(input.thinkingBudgetMaximum ? { thinkingBudgetMaximum: true } : {}),
       ...(input.allowEmptySignature ? { allowEmptySignature: true } : {}),
       ...(input.supportsTemperature !== undefined ? { supportsTemperature: input.supportsTemperature } : {}),
       ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
@@ -804,6 +808,7 @@ declareEndpoint("anthropic-messages", {
       ...(input.allowEmptySignature ? { allowEmptySignature: true } : {}),
       ...(input.supportsTemperature !== undefined ? { supportsTemperature: input.supportsTemperature } : {}),
       ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
+      ...(input.thinkingBudgetMaximum ? { thinkingBudgetMaximum: true } : {}),
     }),
   refreshBody: (body) => {
     // A different budget changes the message cache key; retaining it defeats

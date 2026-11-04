@@ -6,6 +6,8 @@ import type { Session } from '../../session/schema/sessionRecord.js';
 import { decodeGoal } from './codec.js';
 import { goalIsDetached, readGoalEdit, type GoalStoreHost } from './store.js';
 
+const summaries = new WeakMap<GoalStoreHost, Map<string, number>>();
+
 /** Capture an identity, then consult its live cap and phase at every reservation/handoff. */
 export function goalRequestPolicy(host: GoalStoreHost, session: Session, ownerToken?: string): RequestPolicy | undefined {
   try {
@@ -25,8 +27,28 @@ export function goalRequestPolicy(host: GoalStoreHost, session: Session, ownerTo
         || (current.runOwner !== null && current.runOwner.token !== ownerToken)) throw new ModelAdmissionError('inactive');
       return { cap: current.tokenBudget };
     });
-    return createRequestPolicy(store, goal.id);
+    return summaryPolicy(createRequestPolicy(store, goal.id), () => {
+      let latest: ReturnType<typeof readGoalEdit>;
+      try { latest = readGoalEdit(host, session); } catch { return false; }
+      const current = latest.goal;
+      if (!current || goalIsDetached(latest) || current.id !== goal.id || current.phase !== goal.phase
+        || current.tokenBudget === undefined || current.sessionId !== session.id || current.sessionCreatedAt !== session.createdAt
+        || current.workspace.path !== scope.workspacePath || current.workspace.identity !== scope.workspaceIdentity
+        || (ownerToken !== undefined && current.runOwner?.token !== ownerToken)
+        || (current.runOwner !== null && current.runOwner.token !== ownerToken)) return false;
+      let goals = summaries.get(host);
+      if (!goals) { goals = new Map(); summaries.set(host, goals); }
+      if (goals.get(goal.id) === current.tokenBudget) return false;
+      goals.set(goal.id, current.tokenBudget);
+      return true;
+    });
   } catch { return blockedPolicy('unavailable'); }
+}
+
+function summaryPolicy(policy: RequestPolicy, claim: () => boolean): RequestPolicy {
+  return { ...policy, claimBudgetSummary: claim,
+    ...(policy.withCompletionReserve ? { withCompletionReserve: (tokens: () => number) => summaryPolicy(policy.withCompletionReserve!(tokens), claim) } : {}),
+    ...(policy.withAdmission ? { withAdmission: (admit: () => void) => summaryPolicy(policy.withAdmission!(admit), claim) } : {}) };
 }
 
 function blockedPolicy(code: ModelAdmissionError['code']): RequestPolicy {

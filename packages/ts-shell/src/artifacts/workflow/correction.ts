@@ -1,70 +1,9 @@
 import type {
-  ArtifactCorrection,
-  ArtifactCorrectionInput,
   ArtifactKind,
   ArtifactReceiptInput,
   ArtifactValidationState,
 } from "./types.js";
 import { claimEvidenceSatisfied } from "./claim.js";
-
-export function correctArtifact(input: ArtifactCorrectionInput): ArtifactCorrection | undefined {
-  if (!input.receipt) {
-    return undefined;
-  }
-  const canCorrect = input.actions.includes("artifact") && input.receipt.sourceReceipts.every((source) => source.available);
-  if (!canCorrect) {
-    return Object.freeze({
-      attempted: false,
-      validationState: input.receipt.validationState,
-      correctedPath: input.receipt.outputPath,
-      blockers: input.receipt.blockers.length > 0 ? input.receipt.blockers : ["artifact correction unavailable"],
-      terminalSuccessClaim: false,
-    });
-  }
-  if (input.receipt.validationState === "unsafe-path") {
-    return Object.freeze({
-      attempted: false,
-      validationState: "unsafe-path",
-      correctedPath: input.receipt.outputPath,
-      blockers: ["unsafe artifact path"],
-      terminalSuccessClaim: false,
-    });
-  }
-  if (input.receipt.validationState === "source-missing") {
-    return Object.freeze({
-      attempted: false,
-      validationState: "source-missing",
-      correctedPath: input.receipt.outputPath,
-      blockers: ["artifact source missing"],
-      terminalSuccessClaim: false,
-    });
-  }
-  if (input.receipt.validationState === "claim-evidence-missing") {
-    return Object.freeze({
-      attempted: false,
-      validationState: "claim-evidence-missing",
-      correctedPath: input.receipt.outputPath,
-      blockers: ["artifact claim evidence missing"],
-      terminalSuccessClaim: false,
-    });
-  }
-  if (input.receipt.claimEvidenceReceipts.some((receipt) => !receipt.proven)) {
-    return Object.freeze({
-      attempted: false,
-      validationState: "claim-evidence-missing",
-      correctedPath: input.receipt.outputPath,
-      blockers: ["artifact claim evidence missing"],
-      terminalSuccessClaim: false,
-    });
-  }
-  return Object.freeze({
-    attempted: true,
-    validationState: "validation-passed",
-    correctedPath: input.receipt.outputPath,
-    blockers: [],
-    terminalSuccessClaim: false,
-  });
-}
 
 export function artifactKindFor(taskKind: string, outputPath: string | undefined): ArtifactKind {
   if (taskKind === "docs-report") {

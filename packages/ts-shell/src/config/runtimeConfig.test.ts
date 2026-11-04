@@ -62,6 +62,14 @@ describe("runtime config", () => {
     expect(config.tuiMode).not.toBe("regular");
   });
 
+  it('preserves collapsed thinking by default and reloads an explicit expanded preference', () => {
+    expect(getRuntimeConfig(fakeRoot).collapseThinking).toBe(true);
+    const file = getUserRuntimeConfigPath();
+    writeUserRuntimeConfigFile({ collapseThinking: false }, readRuntimeConfigEditAt(file));
+    expect(readUserRuntimeConfigFile().collapseThinking).toBe(false);
+    expect(getRuntimeConfig(fakeRoot).collapseThinking).toBe(false);
+  });
+
   it("honours tuiMode when a config file asks for the main screen", () => {
     fs.writeFileSync(
       path.join(fakeRoot, ".cheers.json"),

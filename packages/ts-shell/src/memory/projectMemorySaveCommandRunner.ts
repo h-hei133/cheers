@@ -201,9 +201,9 @@ function recordFromApprovedEntry(
     approvedAt,
     approvedBySourceCommand: "/memory",
     memoryText,
+    ...(entry.candidate.structuredFact ? { structuredFact: { ...entry.candidate.structuredFact } } : {}),
     evidence: entry.candidate.evidence,
     source: entry.candidate.source,
-    sourcePacket: entry.candidate.source,
     routeReferences: entry.candidate.evidence.filter((value) =>
       /route|compact|context|manifest/i.test(value),
     ),

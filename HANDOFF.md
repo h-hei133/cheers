@@ -2033,3 +2033,48 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A host test times out before its first path candidate appears, or a regular-mode parameter silently exercises fullscreen.
 - **Root Cause**: The default 1,000 ms assertion wait is shorter than the catalogue's 75 ms debounce plus 1,500 ms acquisition budget. Replacing runtime context after construction also cannot change the captured screen mode.
 - **Rule**: Bound the observation beyond the allowed catalogue lifetime without extending the product deadline; verify with delayed real acquisition and preserve missing-result failure. Pass mode before construction and assert the actual screen sequence. A matching controlled timeout proves a test-budget defect, not the unobserved timing cause of a particular CI failure.
+
+### Budget Closing Instructions Must Precede Terminal Failure
+- **Symptom**: A budget-limit steer never reaches the model, or a hidden instruction becomes a persisted user message.
+- **Root Cause**: Ordinary steering queues stop being consumed after query failure and carry user-message delivery semantics.
+- **Rule**: Attempt a request-local closing instruction in the request consumer before terminal failure. Keep the original request policy, strict cap and no-tools admission. Preserve dispatched unknown reservations and never trigger closing retries from history-unknown. A successful progress summary must still leave the goal incomplete.
+
+### Validate Historical Digests Before Compatibility Projection
+- **Symptom**: A valid historical memory import fails after removing a redundant legacy field.
+- **Root Cause**: Compatibility stripping changes the record bytes before their stored revision is verified.
+- **Rule**: Validate the original imported records and digest first, then project away legacy sourcePacket data for reads, new writes and exports. Keep a digest-valid historical import regression alongside the field-removal regression.
+
+### Extended Effort Admission Must Also Govern Legacy Fallback
+- **Symptom**: An old catalogue that disables low effort starts receiving undeclared minimal requests after adding new effort vocabulary.
+- **Root Cause**: Fallback iteration treats an absent map entry as supported for every level, while explicit admission requires declarations for the new levels.
+- **Rule**: Apply the same declared capability rule while selecting fallback effort. Keep historical three-level fixtures unchanged so they detect accidental promotion to a newly introduced wire value.
+
+### Maximum Effort Needs A Separate Numeric-Budget Intent
+- **Symptom**: A `max` effort with an undefined token budget silently uses Anthropic's default budget or disables Bedrock thinking; a vendor mapping can also hide the original `max` name.
+- **Root Cause**: An omitted numeric budget means provider/default control and cannot by itself identify an explicit maximum request.
+- **Rule**: Carry maximum-budget intent independently of the mapped wire effort. Numeric-budget adapters reserve answer room inside the actual output ceiling without increasing it; Google omission remains provider-controlled. New effort vocabulary requires an exact model declaration rather than a broad reasoning flag.
+
+### Display Preference Defaults Must Preserve The Existing Renderer
+- **Symptom**: Adding a thinking-collapse preference unexpectedly expands all reasoning after upgrading.
+- **Root Cause**: A planning note called the existing default false while both live and restored block owners actually used `collapsed: true`.
+- **Rule**: Check the owning rendering code before choosing a migration default. Keep collapseThinking true by default, apply it to new/restored blocks through accepted configuration, and keep local Ctrl+T toggles separate from explicit Settings Apply persistence.
+
+### Writer Path Tests Must Exercise the Production Entry
+- **Symptom**: Workspace-authority tests reject a folded sibling while the actual writer still drops its original path prefix before inspection.
+- **Root Cause**: Tests exercise an unused facade instead of writeTextFile, leaving equivalent-looking path preparation untested in production.
+- **Rule**: Keep alias/canonical-root, folded sibling and internal-link regressions on writeTextFile, and validate the original requested path before converting it to a workspace-relative path.
+
+### Renamed Actions Need Canonical Dispatch With Legacy Config Aliases
+- **Symptom**: Renaming a keybinding action makes existing `keybindings.json` entries silently unknown, or routing still switches on the retired id.
+- **Root Cause**: Disk configuration, lookup tables, and keymap dispatch each carry the action id independently.
+- **Rule**: Keep a read-time alias map for retired ids, canonicalize direct `setUserConfig` inputs too, and dispatch only the new ids; test both migrated disk entries and default routing.
+
+### Session Artifact Cleanup Must Revalidate the Artifact Owner
+- **Symptom**: Deleting a session can remove a different workspace's files when its artifact directory was replaced by a symlink.
+- **Root Cause**: Session deletion knows the persisted workspace candidates, while artifact storage is profile-aware and mutable between writes.
+- **Rule**: Derive cleanup candidates from the session's project/workspace roots, then recheck profile storage, containment, directory identity and symlink status immediately before best-effort removal; cleanup failures must not change successful session deletion.
+
+### Nested CLI Fixtures Need Their Own Workspace Boundary
+- **Symptom**: A probe launched with an explicit temporary project still displays the outer repository and loads its project configuration.
+- **Root Cause**: A temporary directory inside the target repository remains part of its Git workspace; isolating HOME and Git environment does not change the product's workspace discovery.
+- **Rule**: Initialize an independent Git repository in nested CLI fixtures and assert the persisted projectRoot equals that fixture before exercising behavior. Keep runtime state isolated and remove the fixture afterward.

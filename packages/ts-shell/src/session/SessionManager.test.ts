@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLongSessionContinuityFixture } from "../test-utils/longSessionContinuityFixtures.js";
 import { SessionManager } from "./SessionManager.js";
 import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
+import * as sessionRecords from "./store/sessionStore.js";
+import { ArtifactManager } from "../core/session/artifactManager.js";
+import { createProfileContext, withProfile } from "../core/paths/profile/context.js";
 import { forgetSessionTodos, getSessionTodos, setSessionTodos } from "../core/commands/todoCommandRuntime.js";
 import { toChatMessages } from "../turn/prompt.js";
 
@@ -189,6 +192,113 @@ describe("SessionManager", () => {
     manager[operation](session.id);
     expect(manager.sessionExists(session.id)).toBe(false);
     expect(getSessionTodos(session.id)).toEqual([]);
+  });
+
+  it.each(["deleteSession", "discardIfEmpty"] as const)("cleans session artifacts across persisted roots through %s", async operation => {
+    const primary = path.join(fakeHome, 'primary'), additional = path.join(fakeHome, 'additional');
+    fs.mkdirSync(primary); fs.mkdirSync(additional);
+    const stat = fs.statSync(additional);
+    const manager = new SessionManager();
+    const session = manager.createNew(primary, { workspaceRoots: [{ path: additional, access: 'write',
+      identity: `${stat.dev}:${stat.ino}:${stat.birthtimeMs}` }] });
+    const selected = new ArtifactManager(primary, session.id), extra = new ArtifactManager(additional, session.id);
+    const retained = new ArtifactManager(primary, 'other-session');
+    await selected.save('primary'); await extra.save('additional'); await retained.save('retain');
+
+    manager[operation](session.id);
+
+    expect(manager.sessionExists(session.id)).toBe(false);
+    expect(fs.existsSync(selected.directory)).toBe(false);
+    expect(fs.existsSync(extra.directory)).toBe(false);
+    expect(fs.readFileSync(retained.resolve('artifact://0')!, 'utf8')).toBe('retain');
+  });
+
+  it('deletes an unreadable session without requiring artifact discovery', () => {
+    const manager = new SessionManager(), session = manager.createNew();
+    fs.writeFileSync(manager.getSessionFilePath(session.id), '{invalid');
+    expect(() => manager.deleteSession(session.id)).not.toThrow();
+    expect(manager.sessionExists(session.id)).toBe(false);
+  });
+
+  it('keeps successful deletion when artifact cleanup unexpectedly fails', () => {
+    const manager = new SessionManager(), session = manager.createNew();
+    const cleanup = vi.spyOn(ArtifactManager, 'cleanupSessionArtifacts').mockImplementationOnce(() => { throw new Error('unavailable'); });
+    try {
+      expect(() => manager.deleteSession(session.id)).not.toThrow();
+      expect(manager.sessionExists(session.id)).toBe(false);
+    } finally { cleanup.mockRestore(); }
+  });
+
+  it('does not create an artifact store when deleting a session that produced none', () => {
+    const project = path.join(fakeHome, 'unused'); fs.mkdirSync(project);
+    const manager = new SessionManager(), session = manager.createNew(project);
+    manager.deleteSession(session.id);
+    expect(fs.readdirSync(project)).toEqual([]);
+  });
+
+  it('retains artifacts when storage deletion fails', async () => {
+    const project = path.join(fakeHome, 'retained'); fs.mkdirSync(project);
+    const manager = new SessionManager(), session = manager.createNew(project);
+    const artifacts = new ArtifactManager(project, session.id);
+    const saved = await artifacts.save('retain');
+    // The store imports native fs as a namespace; intercept its owning module,
+    // rather than a different native default-import binding in this test.
+    const failure = vi.spyOn(sessionRecords, 'deleteSessionRecord').mockImplementationOnce(() => {
+      throw new Error('storage unavailable');
+    });
+    try {
+      expect(() => manager.deleteSession(session.id)).toThrow('storage unavailable');
+      expect(failure).toHaveBeenCalledOnce();
+      expect(manager.sessionExists(session.id)).toBe(true);
+      expect(fs.readFileSync(saved.path, 'utf8')).toBe('retain');
+    } finally { failure.mockRestore(); }
+  });
+
+  it('deletes a session whose workspace has disappeared without recreating it', () => {
+    const project = path.join(fakeHome, 'gone'); fs.mkdirSync(project);
+    const manager = new SessionManager(), session = manager.createNew(project);
+    fs.rmSync(project, { recursive: true });
+    expect(() => manager.deleteSession(session.id)).not.toThrow();
+    expect(manager.sessionExists(session.id)).toBe(false);
+    expect(fs.existsSync(project)).toBe(false);
+  });
+
+  it('cleans artifacts in the captured session profile even under another active profile', async () => {
+    const project = path.join(fakeHome, 'profile-project'); fs.mkdirSync(project);
+    const a = createProfileContext({ homeDir: fakeHome, name: 'a', env: {} });
+    const b = createProfileContext({ homeDir: fakeHome, name: 'b', env: {} });
+    const manager = withProfile(a, () => new SessionManager());
+    withProfile(a, () => manager.createNewWithId('shared-session', project));
+    const selected = withProfile(a, () => new ArtifactManager(project, 'shared-session'));
+    const retained = withProfile(b, () => new ArtifactManager(project, 'shared-session'));
+    await withProfile(a, () => selected.save('profile A'));
+    await withProfile(b, () => retained.save('profile B'));
+
+    withProfile(b, () => manager.deleteSession('shared-session'));
+
+    expect(manager.sessionExists('shared-session')).toBe(false);
+    expect(fs.existsSync(selected.directory)).toBe(false);
+    expect(fs.readFileSync(retained.resolve('artifact://0')!, 'utf8')).toBe('profile B');
+    expect(fs.existsSync(path.join(project, '.ts-shell'))).toBe(false);
+  });
+
+  it.each(['removed', 'moved'] as const)('cleans named-profile artifacts after their workspace is %s', async change => {
+    const project = path.join(fakeHome, 'vanishing-project'); fs.mkdirSync(project);
+    const profile = createProfileContext({ homeDir: fakeHome, name: 'vanishing', env: {} });
+    const manager = withProfile(profile, () => new SessionManager());
+    const session = withProfile(profile, () => manager.createNew(project));
+    const artifacts = withProfile(profile, () => new ArtifactManager(project, session.id));
+    const saved = await withProfile(profile, () => artifacts.save('retained outside the workspace'));
+    expect(fs.existsSync(saved.path)).toBe(true);
+    if (change === 'removed') fs.rmSync(project, { recursive: true });
+    else fs.renameSync(project, `${project}-moved`);
+
+    withProfile(profile, () => manager.deleteSession(session.id));
+
+    expect(manager.sessionExists(session.id)).toBe(false);
+    expect(fs.existsSync(artifacts.directory)).toBe(false);
+    expect(fs.existsSync(path.dirname(artifacts.directory))).toBe(false);
+    expect(fs.existsSync(project)).toBe(false);
   });
 
   it("keeps todos when a nonempty session is retained", () => {

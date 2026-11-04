@@ -22,6 +22,34 @@ import { FINAL_STEP_MESSAGE } from './messages.js';
 
 const quietHooks = { dispatch: async () => ({ decision: "allow" as const }) } as unknown as HookDispatcher;
 
+it.each(['summary', 'no-room', 'tool-refusal', 'unknown'] as const)('keeps the goal budget closing instruction internal for %s', async kind => {
+  const claimBudgetSummary = vi.fn(() => true);
+  const execute = vi.fn(async () => ({ success: true, output: 'must not run' }));
+  let calls = 0;
+  const step: StepFunction = vi.fn(async (messages, _signal, listener, request) => {
+    if (++calls === 1) return {
+      text: '', toolCalls: [], stopReason: 'error', retriesExhausted: true,
+      admissionFailure: kind === 'unknown' ? 'history-unknown' : 'exhausted', errorMessage: 'budget admission stopped',
+    };
+    expect(request.allowTools).toBe(false);
+    expect(messages.at(-1)?.content).toContain('Summarize progress');
+    if (kind === 'no-room') return { text: '', toolCalls: [], stopReason: 'error', retriesExhausted: true,
+      admissionFailure: 'exhausted', errorMessage: 'No remaining budget for a summary.' };
+    listener.onText?.('Recorded progress');
+    return { text: 'Recorded progress', toolCalls: kind === 'tool-refusal' ? [{ id: 'denied', name: 'read', args: {} }] : [], stopReason: 'stop' };
+  });
+  const setup = options({ step, claimBudgetSummary, tools: new Map([['read', { name: 'read', description: 'test',
+    argsSchema: { type: 'object' }, execute }]]) });
+  const events = await drain(runTurn(setup).events);
+  expect(step).toHaveBeenCalledTimes(kind === 'unknown' ? 1 : 2);
+  expect(claimBudgetSummary).toHaveBeenCalledTimes(kind === 'unknown' ? 0 : 1);
+  expect(events.some(event => event.type === 'message.delivered')).toBe(false);
+  expect(JSON.stringify(setup.persisted)).not.toContain('Summarize progress');
+  expect(execute).not.toHaveBeenCalled();
+  if (kind === 'tool-refusal') expect(events).toContainEqual(expect.objectContaining({ type: 'tool.result', success: false, taskId: 'denied' }));
+  if (kind === 'summary') expect(events).toContainEqual(expect.objectContaining({ type: 'query.failed', admissionFailure: 'exhausted' }));
+});
+
 it.each(['compatible-eof', 'responses-failed', 'responses-eof'] as const)(
   'preserves only already displayed public reasoning after %s without granting replay', async failure => {
     const sessionId = `partial-thinking-${failure}`;
@@ -568,6 +596,18 @@ describe("runTurn", () => {
     const terminal = events.at(-1);
     expect(terminal?.type).toBe("query.completed");
     if (terminal?.type === "query.completed") expect(terminal.result.finalOutput).toBe("answered after compaction");
+  });
+
+  it("retains an overflow failure without summarizing or retrying when auto compaction is disabled", async () => {
+    const summarize = vi.fn(async () => "older work");
+    const step = vi.fn(async () => ({ text: "", toolCalls: [], stopReason: "error" as const,
+      errorMessage: `${CONTEXT_OVERFLOW_PREFIX}too big` }));
+    const setup = options({ step, history: [{ role: 'user', content: 'x'.repeat(4_000) }],
+      compaction: { policy: { contextWindow: 500, enabled: false, keepRecentTokens: 10 }, summarize, onCompact: vi.fn() } });
+    const events = await drain(runTurn(setup).events);
+    expect(summarize).not.toHaveBeenCalled();
+    expect(step).toHaveBeenCalledOnce();
+    expect(events.at(-1)?.type).toBe('query.failed');
   });
 
   it("tells a hook the rescue compaction is an overflow", async () => {

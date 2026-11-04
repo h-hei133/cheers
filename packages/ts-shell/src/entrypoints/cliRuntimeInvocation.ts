@@ -378,6 +378,7 @@ async function startTurn(
     commandProof: request.commandProof,
     correlationId: request.correlationId,
     goalObjective: request.goalObjective,
+    claimBudgetSummary: request.requestPolicy?.claimBudgetSummary,
     admission: request.admission,
     commandEnv: commandEnvironmentFor(request),
     subagentHost: {

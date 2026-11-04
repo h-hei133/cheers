@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js'
 import { captureRecoveryAuthorityRecord } from '../../edit/recovery/recoveryAuthorityStore.js'
 import { createCoreToolRegistry } from '../../core/tools/registry.js'
 import { createDefaultExecutionService } from './service.js'
@@ -17,7 +16,8 @@ let root: string
 let workspace: string
 let target: string
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(process.cwd(), '.tmp-write-access-'))
+  fs.mkdirSync('/tmp/cheers-test/', { recursive: true })
+  root = fs.mkdtempSync('/tmp/cheers-test/write-access-')
   workspace = path.join(root, 'workspace')
   fs.mkdirSync(workspace)
   target = path.join(workspace, 'note.txt')
@@ -73,7 +73,7 @@ it('pre-cancelled writes create no directories', async () => {
   }))).rejects.toThrow()
   expect(fs.readdirSync(workspace)).toEqual([])
 })
-it('checks the opened write object before truncation and closes it on denial', () => {
+it('checks the opened write object before mutation and closes it on denial', async () => {
   fs.writeFileSync(target, 'original')
   const moved = path.join(workspace, 'denied.txt')
   const open = fs.openSync
@@ -87,9 +87,9 @@ it('checks the opened write object before truncation and closes it on denial', (
     }
     return fd
   })
-  expect(() => createWorkspaceWriteAuthority(workspace).writeFile('note.txt', 'new', (actual) => {
-    if (actual === moved) throw new Error('denied')
-  })).toThrow('denied')
+  await expect(createDefaultExecutionService().writeTextFile(request({
+    assertFileAccess: (actual) => { if (actual === moved) throw new Error('denied') },
+  }))).rejects.toThrow('denied')
   expect(fs.readFileSync(moved, 'utf8')).toBe('original')
   expect(close).toHaveBeenCalledWith(descriptor)
 })

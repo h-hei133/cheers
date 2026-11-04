@@ -5,7 +5,7 @@ export const directorSyntax: CommandSyntax = { name: 'director', defaultAction: 
   { name: 'status', summary: 'inspect the preset and retained worker state' },
   { name: 'on', summary: 'enable a director with explicit persistent workers', flags: [
     { name: 'model', kind: 'text', summary: 'worker model on the current connection' },
-    { name: 'effort', kind: 'text', values: ['auto', 'low', 'medium', 'high'], summary: 'worker reasoning effort' }] },
+    { name: 'effort', kind: 'text', values: ['auto', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], summary: 'worker reasoning effort' }] },
   { name: 'off', summary: 'revoke the preset and clean up its exact workers' },
   { name: 'spawn', summary: 'approve a persistent worker assignment', parameters: [prompt] },
   { name: 'send', summary: 'approve a fresh assignment at a settled worker checkpoint', parameters: [id, prompt] },

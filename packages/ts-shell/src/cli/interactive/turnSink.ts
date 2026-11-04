@@ -37,12 +37,12 @@ export class TurnSink implements RendererSink {
   private proseTitle = "";
   private failed = false;
   private lastNotice: { block: Block; tag?: string; timestamp: number } | undefined;
-  constructor(transcript: Transcript, onChange: () => void, now: () => number = Date.now) {
+  constructor(transcript: Transcript, onChange: () => void, now: () => number = Date.now, collapseThinking: () => boolean = () => true) {
     this.transcript = transcript;
     this.onChange = onChange;
     this.now = now;
     this.tools = new ToolCards(transcript, onChange, () => this.now());
-    this.thinking = new Thinking(transcript, () => this.now(), () => { this.label = "working"; });
+    this.thinking = new Thinking(transcript, () => this.now(), () => { this.label = "working"; }, collapseThinking);
   }
 
   /** Open a block that collects prose for one submitted input. */

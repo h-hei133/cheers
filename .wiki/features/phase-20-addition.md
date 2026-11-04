@@ -5,7 +5,7 @@ sources: [interaction-audit.md, phase-20-decisions.md, phase-20-contract.md]
 created: 2026-10-26
 updated: 2026-11-04
 tags: [features, phase-20, additions, interaction, panels, completion]
-summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-81，已把七轮用户反馈、子代理review发现与真实provider探针结果按职责归并，重复项合并，逐条记录完成情况。当前1完成、8部分完成、70本地验证、1本地实现、1未开始；其余章节保留研究过程与逐批证据。"
+summary: "全部补充任务的唯一定义与状态在第12节：ADD-01至ADD-95，含24.139裁决采纳的14项。当前1完成、8部分完成、72本地验证、13本地实现、1未开始；其余章节保留研究过程与逐批证据。"
 confidence: mixed
 ---
 
@@ -495,6 +495,20 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 | ADD-79 | P2 | 工具结果不再把完整 stdout/stderr 复制进 metadata；`/context` 说明未知锚点的原因 | 第 24.106.8、24.107.4、24.107.10、24.108 节 | 本地实现 | 删除两键与零消费者 `runGitCommand`、纠正失实的有界注释、持久化重启后的重建说明均已聚焦验证并有反转；未做真实 CLI/PTY 观察，未验证转录体积在真实长会话中的实际下降 |
 | ADD-80 | P1 | 自动压缩按实际发送投影估算；收尾撤掉 schema 并保留一次指令 | 第 24.109.2、24.109.7、24.109.12、24.110 节 | 本地验证 | 聚焦测试、反转与两个隔离 Node CLI 通过；按实际投影保留 headroom，收尾无 schema 且只有一次指令；真实 provider、平台矩阵仍缺 |
 | ADD-81 | P1 | 收尾与无工具请求返回的调用在执行前拒绝，委派及主回合如实停止 | 第 24.109.5、24.110 节 | 本地验证 | 主回合及委派拒绝已聚焦验证并有反转；隔离 Node CLI 未落盘恶意写入，call/result 配对 failed，持久终态 stopped；真实 provider 行为仍缺 |
+| ADD-82 | P1 | 删除或丢弃会话时清理捕获 profile 下各工作区产物 | 第24.139建议1、24.140节 | 本地实现 | 聚焦测试与反转通过；真实 CLI 删除及其他平台尚缺 |
+| ADD-83 | P1 | goal 预算拒绝后尝试一次隐藏收尾，保留严格 cap 与未知预留 | 第24.139建议2、24.140节 | 本地实现 | 实际 HTTP 回合、去重与反转通过；真实 provider 与 CLI 调度现场尚缺 |
+| ADD-84 | P2 | 缓存不可变内建命令，模板和来源观测保持实时 | 第24.139建议3、24.140节 | 本地实现 | 跨工作区/profile及反转通过；实际输入延迟与 CLI 热路径测量尚缺 |
+| ADD-85 | P1 | 六档 effort、精确能力准入及两条真实面板入口 | 第24.139建议4、24.140节 | 本地验证 | 协议/角色面板聚焦与反转通过；regular/fullscreen 隔离原生 CLI 展示六档并持久化 max，Ctrl+Enter 打开模型详情 effort 操作；真实 provider 与平台矩阵尚缺 |
+| ADD-86 | P2 | 思考块折叠偏好由 Settings Apply 持久化并用于新建/恢复块 | 第24.139建议6、24.140节 | 本地实现 | 保存重读、渲染与反转通过；真实终端重启观感尚缺 |
+| ADD-87 | P2 | 暴露自动压缩开关，关闭阈值触发及溢出救援 | 第24.139建议7、24.140节 | 本地实现 | 策略/溢出/手动摘要与反转通过；真实 provider 工作流尚缺 |
+| ADD-88 | P2 | `/crash` 共用有界检查并保留未知/部分读取事实 | 第24.139建议8、24.140节 | 本地验证 | 超限/损坏来源及反转通过；隔离原生 print CLI 展示 over-limit 与未知计数，不误报无崩溃；其他平台尚缺 |
+| ADD-89 | P2 | agent mode 与思考块键位命名明确，旧 ID 配置兼容 | 第24.139建议9、24.140节 | 本地实现 | 旧配置/解绑/路由与反转通过；真实自定义键盘现场尚缺 |
+| ADD-90 | P2 | 去除新记忆 sourcePacket 副本，兼容历史读取与摘要校验 | 第24.139建议10、24.140节 | 本地实现 | 旧 JSONL/导入/新写/导出与反转通过；真实历史库导入尚缺 |
+| ADD-91 | P2 | 移除从未产出的研究 blocked/stale 状态声明 | 第24.139建议11、24.140节 | 本地实现 | 解析/运行与静态回退对照通过；真实研究 CLI 回归尚缺 |
+| ADD-92 | P2 | 移除零消费者且伪造验证通过的 correctArtifact API | 第24.139建议12、24.140节 | 本地实现 | owner 测试与静态回退对照通过；真实 artifact 工作流回归尚缺 |
+| ADD-93 | P2 | 日志文件大小只接受正有限数 | 第24.139建议13、24.140节 | 本地实现 | 非法值零写入及反转通过；真实长时日志轮转尚缺 |
+| ADD-94 | P1 | 门面回归迁至真实 writer，补原始请求路径校验并移除门面 | 第24.139建议15、24.140节 | 本地实现 | 真实 writer/权限拒绝/别名/符号链接与反转通过；跨平台现场尚缺 |
+| ADD-95 | P1 | 三元组贯通候选、审核、保存与未来回合冲突阻断 | 第24.139建议16、24.140节 | 本地实现 | 提取至冲突注入全链及反转通过；真实用户记忆工作流尚缺 |
 
 ### 12.12 归并说明
 
@@ -529,10 +543,10 @@ ADD-13处理入口与配置发现性，属于已发现但次于主反馈的改�
 |---|---:|---|
 | 完成 | 1 | ADD-28 |
 | 部分完成 | 8 | ADD-01、02、03、07、08、25、41、70 |
-| 本地验证 | 70 | 其余已实施条目（含 ADD-72 至 ADD-78、ADD-80/81） |
-| 本地实现 | 1 | ADD-79（第 24.108 节） |
+| 本地验证 | 72 | 其余已实施条目（含 ADD-72 至 ADD-78、ADD-80/81、ADD-85、ADD-88） |
+| 本地实现 | 13 | ADD-79、ADD-82至ADD-84、ADD-86/87、ADD-89至ADD-95（第24.108、24.140节） |
 | 未开始 | 1 | ADD-30（已裁决不启动，需架构级租约） |
-| **合计** | **81** | — |
+| **合计** | **95** | — |
 
 ADD-72/ADD-73 于 2026-11-01 按第 24.78 节裁决实施，证据见第 24.79 节：两项均已落地并只做本地聚焦验证，尚未经真实终端观感与真实 provider 工作流验收。ADD-30 仍按既有记录不启动（需要架构级租约）。
 
@@ -10392,7 +10406,7 @@ M7 的拥有物是**一次文件改写**：计划 → 预览 → 应用 → 回�
 
 
 
-`createWorkspaceWriteAuthority`（[workspace.ts](../../packages/ts-shell/src/edit/authority/workspace.ts:66)）导出一个 9 方法接口（`readFile`、`readVerifiedFile`、`directoryExists`、`validateWriteTarget`、`validateCreateTarget`、`writeFile`、`createFileExclusive`、`moveFileExclusive`、`deleteFile`），文件 148 行。
+研究时的 `createWorkspaceWriteAuthority` 导出一个 9 方法接口（`readFile`、`readVerifiedFile`、`directoryExists`、`validateWriteTarget`、`validateCreateTarget`、`writeFile`、`createFileExclusive`、`moveFileExclusive`、`deleteFile`），文件 148 行。该无生产消费者的门面已在第24.140节移除，写入行为与安全回归现由实际 [write owner](../../packages/ts-shell/src/runtime/execution/write.ts) 承担。
 
 **生产代码零调用。** 全仓搜索：
 
@@ -12719,7 +12733,7 @@ omp 在非推理模型上返回 `[]`，**picker 里一个档位都不显示**。
 | 3 缓存 | 已确认只依赖 `cwd` + `enableMcpTools` + `options`，但要确认模板列表变化是否需要失效 |
 | 4 六档 | `max` 对应 `thinkingBudgetTokens: undefined`，需把 `Record<ThinkingLevel, number>` 放宽为 `number \| undefined` |
 
-**本轮不实施**，仅记录裁决。
+**本节记录裁决时未实施**；后续实施与证据见第24.140节。
 
 ---
 
@@ -13140,4 +13154,26 @@ export function readCrashLog(filePath = crashLogPath(), profile = currentProfile
 **代价**：层次 1 改 3 个文件，无 schema 迁移。
 
 **优先级**：中——三个消费者写得那么认真却永不触发，是明显的浪费。
+
+### 24.140 第24.139节采纳建议实施（2026-11-04）
+
+本批按用户裁决实施建议1、2、3、4、6至13、15、16，共14项，分别登记为ADD-82至ADD-95。建议5与14仍不启动；原Phase 20的47项验收矩阵不变。
+
+会话删除先捕获会话的projectRoot、workspaceRoots及profile，再删除会话记录，最后尽力清理产物。缺失工作区仍可按已持久化的规范根定位命名profile私有目录，默认profile不重建已消失目录。清理复核profile、containment、真实目录及符号链接，仅删除产物和空会话容器，保留未知兄弟内容。删除记录失败时保留产物，清理失败不推翻已经成功的删除。
+
+goal预算拒绝后的总结在真实请求消费者、终态之前尝试。指令仅属于该请求，不进入用户消息生命周期或持久化；收尾继续走原policy、严格cap及no-tools守卫，余额不足时不发送。按host、goal及预算数值去重，旧phase/owner不能消费当前资格。已派发但未知的预留保留，分类为history-unknown且不触发收尾重发。总结更新实际请求上下文和账单用量，撤掉无法匹配持久前缀的计量锚点，不安排cache warming；总结成功仍不等于goal完成。
+
+registry只缓存两份不捕获cwd/profile的不可变内建声明，由MCP开关区分；每次调用返回独立Map。模板正文、列表、工作区/profile来源观测、取消与字节预算仍逐次读取，避免把实时输入缓存为过期结果。
+
+六档为minimal/low/medium/high/xhigh/max；新增三档要求精确模型map声明，不能从reasoning:true推导。`/effort`无参数打开现有面板；模型浏览的Ctrl+Enter进入详情/Choose effort，Enter保持直接选用。默认模型沿原原子事务保存模型与effort，角色路径沿原角色owner保存。`max`保留undefined数字映射，同时单独携带最大预算意图：Anthropic/Bedrock在实际输出上限内保留回答空间，Google维持provider控制，不能把省略预算宣称为保证最大值。
+
+原建议有三处据实际owner修正：折叠偏好默认true，保留旧直播与恢复渲染行为，Ctrl+T局部展开不自动写配置；compactionEnabled只控制自动阈值与溢出救援，显式`/compact`仍可用；结构化事实沿候选→审核→保存进入原冲突检测，冲突阻断未来回合注入，不新增保存拒绝契约。三元组复制与候选身份覆盖其内容，修改事实使旧批准失效，不从普通正文猜测三元组。
+
+`/crash`复用一次有界inspect；旧键位ID在读配置时归一为app.agentMode.cycle与app.thinkingBlocks.toggle。sourcePacket仅作为历史输入兼容，先校验原始导入摘要再剥离，新写/导出不再发布。研究死状态与零消费者correctArtifact/API输入已移除，真实receipt投影保留。日志大小拒绝0、负数、NaN及无穷值。门面测试迁到writeTextFile后发现原请求路径先被relativize而失去来源边界，已在真实writer预读之前调用原workspaceRelativePath策略，并删除无生产消费者的门面。
+
+验证证据保存在`.omx/artifacts/phase20-accepted/`。主代理以threads=false、2GiB堆上限单进程串行运行小批聚焦测试，44文件1063项不同测试及脚本测试191项通过；15处动态反转均产生断言失败并逐字节恢复。前13处恢复后13文件340项再绿，后两处恢复后requestShape40项与overlay79项再绿，另有研究死状态/API删除的两项静态回退对照。独立只读复核发现并修复命名profile在工作区移除后的清理遗漏，以及旧三档map回退发送未声明minimal的问题；总结/ledger、角色owner和键盘派发的后续复核未发现其他具体缺陷。辅助代理未执行验证。
+
+五静态门、diff check与TypeScript build通过；构建`1d9edaa48081ab67b15134570c73b52bb191b5fd7c988887bef3efc2605a3ce2`绑定本轮最终源码。regular/fullscreen两模式均从零历史、隔离HOME与独立Git工作区启动实际Node CLI，展示六档，选择max并读回会话持久状态；Ctrl+Enter到达模型详情的Choose effort，未派发模型消息。独立print CLI对超限crash文件显示over-limit/count is unknown，未误报No crashes recorded。该探针使用synthetic模式，未调用provider；不是真实账户、物理终端像素、exe、Node20.3或跨平台验收。首次因过期构建拒绝启动、随后普通模式观察器误用全屏解析而超时，均为探针失败；修正观察器后通过。嵌套临时目录最初采用外层Git根，最终用独立Git仓库并断言持久projectRoot完成隔离后重验，未改产品行为。
+
+最终bundled NormProof judge退出0，循环与未解析导入满足、阻塞义务0；总体仍partial（1项advisory失败、2项proof gap），仅既有interactiveMode及其测试的函数上限finding，既有disposition不改变裁决。未执行全仓回归、并发验证或20k真实PTY；真实provider/platform/input/billing/release证据没有增加。ADD-85/88升为本地验证，其余新项保留本地实现，原47项Phase20矩阵及延期条件不变。Git交付另绑定实际提交与远端读回，不把本地成功写成CI已通过。
 

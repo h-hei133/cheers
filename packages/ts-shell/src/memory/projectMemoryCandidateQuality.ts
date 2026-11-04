@@ -45,7 +45,16 @@ export function evaluateProjectMemoryCandidateQuality(
 function checksForCandidate(
   candidate: ProjectMemoryCandidate,
 ): readonly ProjectMemoryCandidateQualityCheck[] {
+  const factValues = candidate.structuredFact ? Object.values(candidate.structuredFact) : [];
+  const text = [candidate.summary, candidate.reason, ...factValues];
   return [
+    check(
+      !candidate.structuredFact || [candidate.structuredFact.subject, candidate.structuredFact.predicate,
+        candidate.structuredFact.object].every(value => typeof value === "string" && value.trim().length > 0),
+      "structured-fact-complete",
+      "Structured facts require a subject, predicate and object.",
+      candidate.candidateId,
+    ),
     check(
       Boolean(candidate.source && candidate.evidence.length > 0),
       "has-source-evidence",
@@ -54,21 +63,21 @@ function checksForCandidate(
     ),
     check(
       candidate.candidateKind === "rejected" ||
-        (!containsRawContent(candidate.summary) && !containsRawContent(candidate.reason)),
+        !text.some(containsRawContent),
       "no-raw-content",
       "Candidate does not contain raw file or recovery content.",
       candidate.candidateId,
     ),
     check(
       candidate.candidateKind === "rejected" ||
-        (!containsSecret(candidate.summary) && !containsSecret(candidate.reason)),
+        !text.some(containsSecret),
       "no-secret",
       "Candidate does not contain secret-looking values or provider credentials.",
       candidate.candidateId,
     ),
     check(
       candidate.candidateKind === "rejected" ||
-        (!containsHiddenReasoning(candidate.summary) && !containsHiddenReasoning(candidate.reason)),
+        !text.some(containsHiddenReasoning),
       "no-hidden-reasoning",
       "Candidate does not contain hidden reasoning markers.",
       candidate.candidateId,

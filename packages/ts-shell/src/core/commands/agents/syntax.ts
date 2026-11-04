@@ -9,7 +9,7 @@ export const agentsSyntax: CommandSyntax = { name: 'agents', defaultAction: 'lis
   ...['create', 'import', 'edit'].map(name => ({ name, summary: 'approve a bounded Markdown definition in an explicit scope', parameters: [...scoped, text('markdown-file')] })),
   ...['delete', 'enable', 'disable'].map(name => ({ name, summary: 'approve a scoped definition change; builtins remain read-only', parameters: scoped })),
   { name: 'model', summary: 'approve a request-local model target; inherit removes the override', parameters: [...scoped, text('target-or-inherit')] },
-  { name: 'effort', summary: 'approve request-local effort without changing the main preference', parameters: [...scoped, { ...text('effort'), values: ['low', 'medium', 'high', 'auto', 'inherit'] }] },
+  { name: 'effort', summary: 'approve request-local effort without changing the main preference', parameters: [...scoped, { ...text('effort'), values: ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'auto', 'inherit'] }] },
   { name: 'export', summary: 'approve exporting one definition to a workspace file', parameters: [text('name'), text('path')] },
 ] };
 export function parseAgentsArgs(args: readonly string[]) { return parseSyntax(agentsSyntax, args); }

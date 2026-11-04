@@ -179,14 +179,13 @@ function finite(value: unknown): number | undefined {
 /**
  * Project only exact project-level effort names.
  *
- * Models.dev has a wider vocabulary. `minimal`, `xhigh`, and `max` are not
- * interchangeable with this project's levels, while `none` disables reasoning
+ * Models.dev also has non-level values: `none` disables reasoning
  * and `default` is not the same as automatic. Guessing those names would turn a
  * capability claim into a request the endpoint may reject.
  *
  * Valid options without an exact named level cannot authorize a raw project
  * effort. Budget-only, toggle-only, and empty declarations therefore make all
- * three explicit project levels unsupported while automatic effort remains
+ * explicit project levels unsupported while automatic effort remains
  * available. Structurally unknown metadata stays unprojected for compatibility.
  */
 function projectThinkingLevelMap(options: unknown): CatalogModel["thinkingLevelMap"] | undefined {

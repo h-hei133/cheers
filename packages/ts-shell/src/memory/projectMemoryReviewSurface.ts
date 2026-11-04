@@ -1,4 +1,4 @@
-import type { ProjectMemoryCandidateQualityResult } from "./projectMemoryCandidateQuality.js";
+import { evaluateProjectMemoryCandidateQuality, type ProjectMemoryCandidateQualityResult } from "./projectMemoryCandidateQuality.js";
 import type { ProjectMemoryStoreHealth } from "./projectMemoryStoreContract.js";
 import { renderProjectMemoryHealth } from "./store/health.js";
 import type {
@@ -84,10 +84,13 @@ function entryLines(
 }
 
 function formatEntry(entry: ProjectMemoryReviewEntry): string {
+  const fact = entry.candidate.structuredFact;
+  const structured = fact && evaluateProjectMemoryCandidateQuality([entry.candidate]).qualityStatus !== "reject"
+    ? ` [${fact.subject} / ${fact.predicate} / ${fact.object}]` : "";
   return [
     `  - ${entry.candidateId}`,
     `[${entry.candidate.candidateKind}; ${entry.candidate.retentionClass}; ${entry.candidate.safety}]`,
-    entry.candidate.summary,
+    `${entry.candidate.summary}${structured}`,
   ].join(" ");
 }
 

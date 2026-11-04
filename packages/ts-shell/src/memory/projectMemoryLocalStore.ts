@@ -27,6 +27,7 @@ import {
   entryTargetsRecord,
   foldProjectMemoryEntries,
   isMemoryRecord,
+  withoutLegacySourcePacket,
   readEntriesSync,
   recordsFileFor,
 } from "./memoryPersistence.js";
@@ -119,14 +120,15 @@ function writeRecord(
       "Memory record contains raw content, hidden reasoning, or secret-looking material.",
     );
   }
+  const record = withoutLegacySourcePacket(request.record);
   try {
     return withMemoryStoreLock(ref, (lockedRef) => {
       const snapshot = readEntriesSync(lockedRef);
       if (snapshot.diagnostics.length) return blocked("project-memory-local-store:damaged", snapshot.diagnostics.join(" "));
       const records = foldProjectMemoryEntries(snapshot.entries, {});
-      if (records.some((record) => record.id === request.record.id)) {
+      if (records.some((existing) => existing.id === record.id)) {
         return {
-          record: request.record,
+          record,
           written: false,
           skipped: true,
           blocker: "Record already exists in the explicit local memory store.",
@@ -136,9 +138,9 @@ function writeRecord(
           ],
         };
       }
-      fs.appendFileSync(recordsFileFor(lockedRef), `${snapshot.appendPrefix}${JSON.stringify(request.record)}\n`, { encoding: "utf8", mode: 0o600 });
+      fs.appendFileSync(recordsFileFor(lockedRef), `${snapshot.appendPrefix}${JSON.stringify(record)}\n`, { encoding: "utf8", mode: 0o600 });
       return {
-        record: request.record,
+        record,
         written: true,
         skipped: false,
         evidence: [

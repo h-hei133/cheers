@@ -5,7 +5,7 @@ import type { SourceRecord, ClaimRecord, ResearchDraft } from '../evidence/model
 import type { ReviewRecord } from '../review/model.js';
 
 export type ResearchStage = 'brief' | 'investigate' | 'gaps' | 'draft' | 'review' | 'report' | 'reconcile';
-export type ResearchStatus = 'ready' | 'running' | 'paused' | 'partial' | 'completed' | 'blocked' | 'stale';
+export type ResearchStatus = 'ready' | 'running' | 'paused' | 'partial' | 'completed';
 export interface ResearchChild {
   readonly id: string;
   readonly stage: ResearchStage;

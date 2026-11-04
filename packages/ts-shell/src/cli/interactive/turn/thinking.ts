@@ -11,6 +11,7 @@ export class Thinking {
     private readonly transcript: Transcript,
     private readonly now: () => number,
     private readonly onSettle: () => void,
+    private readonly collapseThinking: () => boolean = () => true,
   ) {}
 
   clear(): void {
@@ -22,7 +23,7 @@ export class Thinking {
     // Empty frame ticks cannot restart a block whose answer already started.
     if (!text && !this.live) return false;
     if (!this.block) {
-      this.block = this.transcript.append({ kind: 'thinking', text: '', finalized: false, collapsed: true });
+      this.block = this.transcript.append({ kind: 'thinking', text: '', finalized: false, collapsed: this.collapseThinking() });
     }
     if (!this.live) {
       this.startedAt = this.now() - (this.block.elapsedMs ?? 0);

@@ -18,7 +18,7 @@ describe('durable request accounting', () => {
     expect(() => confirmRequestUnsent(sent, scope.id, first.value)).toThrow(/replay/);
     const unknown = settleRequest(sent, scope.id, first.value);
     expect(requestLedgerFacts(unknown.scopes.goal!)).toMatchObject({ retainedTokens: 20, unknownAttempts: 1 });
-    expect(() => reserveRequest(unknown, scope.id, request, 20)).toThrow(/exhausted/);
+    expect(() => reserveRequest(unknown, scope.id, request, 20)).toThrow(/history-unknown/);
     const unsent = confirmRequestUnsent(first.ledger, scope.id, first.value);
     expect(reserveRequest(unsent, scope.id, request, 20).value).toBe(2);
   });

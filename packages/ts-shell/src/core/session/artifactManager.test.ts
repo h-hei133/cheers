@@ -5,6 +5,7 @@ import os from "node:os";
 import { ArtifactManager } from "./artifactManager.js";
 import { createCoreToolRegistry } from '../tools/registry.js';
 import { createDefaultExecutionService } from '../../runtime/execution/service.js';
+import { createProfileContext, withProfile } from '../paths/profile/context.js';
 
 describe("ArtifactManager In-Session Spilling", () => {
   let tempWorkspace: string;
@@ -119,6 +120,90 @@ describe("ArtifactManager In-Session Spilling", () => {
     expect(path.dirname(saved.path)).toBe(manager.directory);
     expect(manager.resolve(saved.uri)).toBe(saved.path);
     for (const session of ['../escape', '.', '..', 'nested/session']) expect(() => new ArtifactManager(tempWorkspace, session)).toThrow('identity');
+  });
+
+  it('cleans only the requested session artifacts and tolerates invalid roots', async () => {
+    const current = new ArtifactManager(tempWorkspace, 'remove-me');
+    const retained = new ArtifactManager(tempWorkspace, 'keep-me');
+    await current.save('remove');
+    await retained.save('retain');
+
+    ArtifactManager.cleanupSessionArtifacts('remove-me', [tempWorkspace, path.join(tempWorkspace, 'missing')]);
+
+    expect(fs.existsSync(current.directory)).toBe(false);
+    expect(fs.existsSync(path.dirname(current.directory))).toBe(false);
+    expect(fs.existsSync(retained.directory)).toBe(true);
+  });
+
+  it('retains other contents in an artifact session container', async () => {
+    const manager = new ArtifactManager(tempWorkspace, 'shared-container');
+    await manager.save('remove');
+    const other = path.join(path.dirname(manager.directory), 'other-owner.txt');
+    fs.writeFileSync(other, 'retain');
+
+    ArtifactManager.cleanupSessionArtifacts('shared-container', [tempWorkspace]);
+
+    expect(fs.existsSync(manager.directory)).toBe(false);
+    expect(fs.readFileSync(other, 'utf8')).toBe('retain');
+  });
+
+  it('does not remove an artifact directory replaced by a symlink', async () => {
+    const manager = new ArtifactManager(tempWorkspace, 'symlinked');
+    const outside = path.join(tempWorkspace, 'outside');
+    fs.mkdirSync(outside);
+    fs.writeFileSync(path.join(outside, 'keep.txt'), 'keep');
+    fs.mkdirSync(path.dirname(manager.directory), { recursive: true });
+    fs.rmSync(manager.directory, { recursive: true, force: true });
+    fs.symlinkSync(outside, manager.directory, 'dir');
+
+    ArtifactManager.cleanupSessionArtifacts('symlinked', [tempWorkspace]);
+
+    expect(fs.existsSync(path.join(outside, 'keep.txt'))).toBe(true);
+    expect(fs.lstatSync(manager.directory).isSymbolicLink()).toBe(true);
+  });
+
+  it('refuses missing-workspace cleanup when the persisted canonical identity is not established', async () => {
+    const workspace = path.join(tempWorkspace, 'project'); fs.mkdirSync(workspace);
+    const profile = createProfileContext({ homeDir: tempWorkspace, name: 'identity', env: {} });
+    const artifacts = withProfile(profile, () => new ArtifactManager(workspace, 'retain'));
+    const saved = await withProfile(profile, () => artifacts.save('retain'));
+    fs.rmSync(workspace, { recursive: true });
+
+    for (const unknown of [path.relative(process.cwd(), workspace), `${workspace}${path.sep}..${path.sep}project`]) {
+      ArtifactManager.cleanupSessionArtifacts('retain', [unknown], { profile });
+      expect(fs.readFileSync(saved.path, 'utf8')).toBe('retain');
+    }
+  });
+
+  it('refuses missing-workspace cleanup through a replaced ancestor', async () => {
+    const parent = path.join(tempWorkspace, 'projects'), workspace = path.join(parent, 'project');
+    fs.mkdirSync(workspace, { recursive: true });
+    const profile = createProfileContext({ homeDir: tempWorkspace, name: 'linked', env: {} });
+    const artifacts = withProfile(profile, () => new ArtifactManager(workspace, 'retain'));
+    const saved = await withProfile(profile, () => artifacts.save('retain'));
+    fs.renameSync(parent, `${parent}-moved`);
+    const replacement = path.join(tempWorkspace, 'replacement'); fs.mkdirSync(replacement);
+    fs.symlinkSync(replacement, parent, 'dir');
+
+    ArtifactManager.cleanupSessionArtifacts('retain', [workspace], { profile });
+
+    expect(fs.readFileSync(saved.path, 'utf8')).toBe('retain');
+  });
+
+  it('refuses missing-workspace cleanup after captured profile storage changes identity', async () => {
+    const workspace = path.join(tempWorkspace, 'project'); fs.mkdirSync(workspace);
+    const profile = createProfileContext({ homeDir: tempWorkspace, name: 'changed', env: {} });
+    const artifacts = withProfile(profile, () => new ArtifactManager(workspace, 'retain'));
+    const saved = await withProfile(profile, () => artifacts.save('retain'));
+    fs.rmSync(workspace, { recursive: true });
+    fs.renameSync(profile.root, `${profile.root}-retained`);
+    fs.mkdirSync(profile.root);
+    const retained = saved.path.replace(profile.root, `${profile.root}-retained`);
+
+    ArtifactManager.cleanupSessionArtifacts('retain', [workspace], { profile });
+
+    expect(fs.readFileSync(retained, 'utf8')).toBe('retain');
+    expect(fs.readdirSync(profile.root)).toEqual([]);
   });
 
   it('does not create a store or publish through an escaped parent directory', async () => {

@@ -87,7 +87,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       return refreshFailed ? rows.map(row => ({ ...row, disabled: true,
         focusable: isFocusable(row), note: 'unverified' })) : rows;
     },
-    footer: '↑↓ browse · Tab: navigation/content · ←→: parent/content · Enter: inspect or activate · Esc: back',
+    footer: '↑↓ browse · Tab: navigation/content · ←→: parent/content · Enter: activate · Ctrl+Enter: details / effort · Esc: back',
     async load(): Promise<readonly Option[]> {
       refreshFailed = true;
       inspectionAdmission = undefined;
@@ -191,6 +191,22 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             details.set(id, lines);
             const inspection = () => modelDetailsPicker(detailSourceFor(id, model.id, id));
             const detailActions: ModelDetailAction[] = [];
+            const captured = choice;
+            if ((!reason || reason === 'reasoning effort unsupported') && captured) {
+              const resolution = targetResolutionIdentity(inspectionContext, config, target);
+              detailActions.push({ id: 'effort', label: 'Choose effort', run: (returnTo, inspect) => ({ next: modelEffortPicker({
+                target, current: assignedEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection,
+                back: note => note === undefined ? inspect() : returnTo(note), canReturn: () => modelBrowserOwned(context),
+                save: async (effort, stillOwned = () => true) => assigning && connection
+                  ? (modelActionAdmission(admitInspection, stillOwned) ?? assigning.assign({ connectionId: connection.connectionId,
+                    provider: connection.provider, model: model.id, thinkingEffort: effort }).output)
+                  : setReviewedModelTarget({ ...target, thinkingEffort: effort }, { ...context, admission: () => {
+                    const refusal = admitInspection();
+                    return stillOwned && !stillOwned() ? 'Model selection cancelled. Reopen the model picker.' : refusal;
+                  } }, { baseline: captured.baseline, resolution }),
+                done: result => assigning ? assigning.back(result) : parent ? parent(result) : returnTo(result),
+              }) }) });
+            }
             if (reason) {
               const endpoint = config.providerConnections.find(item => item.id === connection?.connectionId)?.baseUrl
                 ?? effectiveResolution?.baseUrl ?? provider.baseUrl;
@@ -213,20 +229,6 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               const childBack = (returnTo: (notice?: string) => Picker, origin?: ModelDetailOrigin) =>
                 (fresh: CommandContext, result?: string, connectionId?: string) =>
                   result === undefined && connectionId === undefined ? returnTo() : back(fresh, result, connectionId, origin);
-              const captured = choice;
-              if (reason === 'reasoning effort unsupported' && captured) {
-                const resolution = targetResolutionIdentity(inspectionContext, config, target);
-                detailActions.push({ id: 'effort', label: 'Choose effort', run: (returnTo, inspect) => ({ next: modelEffortPicker({
-                  target, current: thinkingEffort, catalog, baseUrl: modelAddress, lines, admission: admitInspection,
-                  back: note => note === undefined ? inspect() : returnTo(note), canReturn: () => modelBrowserOwned(context),
-                  save: (effort, stillOwned) => setReviewedModelTarget({ ...target, thinkingEffort: effort }, { ...context, admission: () => {
-                    const refusal = admitInspection();
-                    return stillOwned && !stillOwned() ? 'Model selection cancelled. Reopen the model picker.' : refusal;
-                  } },
-                    { baseline: captured.baseline, resolution }),
-                  done: result => parent ? parent(result) : returnTo(result),
-                }) }) });
-              }
               if (account && signIn) detailActions.push({ id: 'account', label: 'Account sign-in',
                 run: (returnTo, _inspect, origin) => ({ next: modelSignInPicker(context, provider.runtime, signIn, childBack(returnTo, origin)) }) });
               if (draft && signIn) detailActions.push({ id: 'configure', label: 'Configure connection',
@@ -235,8 +237,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
                   childBack(returnTo, origin)) }) });
               else if (draft) detailActions.push({ id: 'configure', label: 'Configure connection',
                 detail: 'Prepare a login command for this exact model.', run: () => ({ draft }) });
-              inspections.set(id, inspection);
             }
+            inspections.set(id, inspection);
             detailRecords.set(id, { identity: id, view: {
               label: model.id, lines, actions: detailActions, available: true, revision: observedRevision, admission: admitInspection,
             } });

@@ -174,6 +174,7 @@ export function buildCompactionWiring(input: {
   const emptySchemaDigest = requestIdentity({ tools: [] }).schemaDigest;
   return {
     policy: {
+      enabled: runtimeConfig.compactionEnabled,
       summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, effectiveLimits, serviceTier])).digest('hex'),
       segmentTokens: summaryRole?.segmentTokens ?? fallbackBudget.segmentTokens,
       mergeTokens: summaryRole?.mergeTokens ?? fallbackBudget.mergeTokens,

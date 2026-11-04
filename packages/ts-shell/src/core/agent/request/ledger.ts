@@ -72,10 +72,13 @@ export function assertBudget(scope: ScopeLedger, cap: number | undefined, additi
   if (scope.breach) throw new ModelAdmissionError('breach');
   if (cap === undefined) return;
   if (!Number.isSafeInteger(cap) || cap < 0) throw new ModelAdmissionError('unavailable');
-  if (cap === 0) throw new ModelAdmissionError('exhausted');
+  if (cap === 0) throw new ModelAdmissionError(Object.values(scope.pending).some(attempt => attempt.dispatched) ? 'history-unknown' : 'exhausted');
   if (scope.historyUnknown || Object.values(scope.pending).some(attempt => !attempt.bound)) throw new ModelAdmissionError('history-unknown');
   const retained = Object.values(scope.pending).reduce((total, attempt) => total + boundTotal(attempt), 0);
   const committed = scope.inputTokens + scope.outputTokens + retained;
+  if ((committed >= cap && (additional === undefined || additional > 0 || committed > cap)
+    || additional !== undefined && committed + additional > cap)
+    && Object.values(scope.pending).some(attempt => attempt.dispatched)) throw new ModelAdmissionError('history-unknown');
   if (committed >= cap && (additional === undefined || additional > 0 || committed > cap)) throw new ModelAdmissionError('exhausted');
   if (additional === undefined) throw new ModelAdmissionError('unsupported');
   if (committed + additional > cap) throw new ModelAdmissionError('exhausted');

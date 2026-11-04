@@ -128,7 +128,7 @@ export interface EndpointShape {
 
 /** A request with no tools, which is what a summarizer or a side question sends. */
 export interface SimpleRequest extends Partial<Pick<TurnRequest,
-  'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'reasoningSummary' | 'reasoningReplayField' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'allowEmptySignature' | 'serviceTier'>> {
+  'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'reasoningSummary' | 'reasoningReplayField' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'thinkingBudgetMaximum' | 'allowEmptySignature' | 'serviceTier'>> {
   readonly model: string;
   readonly provider?: string;
   readonly replayBinding?: string;
@@ -195,6 +195,8 @@ export interface TurnRequest {
    * protocol takes a budget, so the others ignore it.
    */
   readonly thinkingBudgetTokens?: number;
+  /** Use the largest legal numeric budget inside the selected output ceiling. */
+  readonly thinkingBudgetMaximum?: boolean;
   /** The role carrying the system instruction. */
   readonly systemRole: "system" | "developer";
   /** Whether the level may be sent at all. */

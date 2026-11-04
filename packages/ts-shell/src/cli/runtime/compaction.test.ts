@@ -519,6 +519,18 @@ it('keeps summary replay independent of foreground output and binds it to the su
   expect(received).toEqual([]);
 });
 
+it('projects the automatic compaction switch without disabling explicit summarization', async () => {
+  const provider = { providerId: 'fixture', model: 'fixture-model', endpoint: 'test-signed-summary', baseUrl, headers: {} };
+  const wiring = buildCompactionWiring({ provider, runtimeConfig: { ...fixture.config, compactionEnabled: false } as never,
+    sessionId: 'signed-summary', catalog: loadCatalog() });
+  expect(wiring.policy.enabled).toBe(false);
+  expect(planCompaction(Array.from({ length: 8 }, (_, index) => ({ role: index % 2 ? 'assistant' as const : 'user' as const,
+    content: 'x'.repeat(2_000) })), { ...wiring.policy, contextWindow: 500, keepRecentTokens: 10 })).toBeUndefined();
+  expect(await wiring.summarize({ messages: [{ role: 'user', content: 'Summarize explicitly' }], signal: new AbortController().signal }))
+    .toContain('SUMMARY_ANSWER');
+  expect(received).toHaveLength(1);
+});
+
 it('sends independent summary output with a production input segment budget', async () => {
   const provider = { providerId: 'fixture', model: 'fixture-model', endpoint: 'test-signed-summary', baseUrl, headers: {} };
   for (const maxOutputTokens of [256, 1_024]) {

@@ -2,6 +2,7 @@ import { Ajv } from 'ajv';
 import { RUNTIME_PROVIDERS } from '../../runtimeConfig.js';
 import { booleanSchema, enumSchema, listSchema, nameSchema, objectSchema, positiveSchema, textSchema } from '../../schema.js';
 import { nonsecretUrl } from './config.js';
+import { THINKING_LEVELS } from '../../../core/models/effort.js';
 
 const number = { type: 'number', minimum: 0 };
 const model = objectSchema({
@@ -10,7 +11,7 @@ const model = objectSchema({
   tokenizer: { enum: ['cl100k_base', 'o200k_base', false] },
   cost: objectSchema({ promptPerMTok: number, completionPerMTok: number, cacheReadPerMTok: number, cacheWritePerMTok: number }, ['promptPerMTok', 'completionPerMTok']),
   promptCache: objectSchema({ short: positiveSchema, long: positiveSchema }),
-  thinkingLevelMap: objectSchema(Object.fromEntries(['low', 'medium', 'high'].map(key => [key, { type: ['string', 'null'] }]))),
+  thinkingLevelMap: objectSchema(Object.fromEntries(THINKING_LEVELS.map(key => [key, { type: ['string', 'null'] }]))),
   compat: objectSchema({ endpoint: nameSchema, systemRole: enumSchema(['system', 'developer']), maxTokensField: enumSchema(['max_tokens', 'max_completion_tokens']),
     reasoningEffort: booleanSchema, reasoningSummary: booleanSchema, assistantAfterToolResult: booleanSchema, allowEmptySignature: booleanSchema, supportsTemperature: booleanSchema }),
 }, ['id']);

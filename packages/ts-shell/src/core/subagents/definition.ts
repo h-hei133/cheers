@@ -47,7 +47,7 @@ export function parseDefinition(raw: string, source: SubagentDefinition['source'
   if (meta.model !== undefined && (typeof meta.model !== 'string' || !meta.model || meta.model.length > 512 || /[\s\x00-\x1f\x7f]/.test(meta.model))) throw new Error('Invalid model target.');
   if (meta.maxTurns !== undefined && (!Number.isInteger(meta.maxTurns) || Number(meta.maxTurns) < 1 || Number(meta.maxTurns) > 1000)) throw new Error('maxTurns must be an integer from 1 to 1000.');
   if (meta.enabled !== undefined && typeof meta.enabled !== 'boolean') throw new Error('enabled must be true or false.');
-  const effort = enumeration(meta, 'effort', ['low', 'medium', 'high', 'auto'] as const);
+  const effort = enumeration(meta, 'effort', ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'auto'] as const);
   return { name, description: meta.description.trim(), systemPrompt: match[2]!.trim() || `You are ${name}, an autonomous subagent for: ${meta.description.trim()}`,
     source, ...(filePath ? { filePath } : {}), tools: list(meta.tools), disallowedTools: list(meta.disallowedTools),
     model: meta.model as string | undefined, enabled: meta.enabled as boolean | undefined,

@@ -6,7 +6,7 @@ export const PREFERENCE_KEYS = ['model', 'thinkingEffort', 'serviceTier'] as con
 
 export interface Preference {
   readonly model?: string;
-  readonly thinkingEffort?: 'low' | 'medium' | 'high' | null;
+  readonly thinkingEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
   readonly serviceTier?: string;
 }
 
@@ -28,7 +28,7 @@ export class PreferenceDocumentError extends Error {
 /** Only model controls belong here; credential and transport declarations do not. */
 export function createPreferenceSchema(providers: readonly string[]): AnySchemaObject {
   const fields = { model: { ...textSchema, environment: true }, serviceTier: nameSchema,
-    thinkingEffort: { enum: ['low', 'medium', 'high', null] } };
+    thinkingEffort: { enum: ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', null] } };
   return objectSchema({ providers: objectSchema(Object.fromEntries(providers.map(provider => [provider, objectSchema(fields)]))),
     connections: listSchema(objectSchema({ ...fields, id: nameSchema, provider: enumSchema(providers) }, ['id', 'provider'])) });
 }

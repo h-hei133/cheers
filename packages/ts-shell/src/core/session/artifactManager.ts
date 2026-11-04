@@ -2,9 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { ArtifactPublicationError, publishArtifact, publishTextArtifact } from './artifacts/publication.js';
 import { verifyPathContainment } from '../security/pathJail.js';
-import { assertProfileStorage, currentProfile } from '../paths/profile/context.js';
+import { assertProfileStorage, currentProfile, type ProfileContext } from '../paths/profile/context.js';
 import { profileScope } from '../paths/profile/scope.js';
-import { profileWorkspaceDir } from '../paths/profile/workspace.js';
+import { profileWorkspaceDir, profileWorkspaceDirForCanonicalRoot } from '../paths/profile/workspace.js';
 
 export interface StoredArtifact {
   readonly id: string;
@@ -23,10 +23,11 @@ export class ArtifactManager {
   private static readonly instances = new Map<string, ArtifactManager>();
   private readonly storageRoot: string;
   private readonly artifactsDir: string;
-  private readonly profile = currentProfile();
+  private readonly profile: ProfileContext | undefined;
   private counter: number = 0;
 
-  constructor(workspaceRoot: string = process.cwd(), sessionId: string = "default") {
+  constructor(workspaceRoot: string = process.cwd(), sessionId: string = "default", owner = { profile: currentProfile() }) {
+    this.profile = owner.profile;
     if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) throw new Error('Invalid artifact session identity.');
     const canonicalWorkspace = fs.realpathSync(workspaceRoot);
     const privateWorkspace = profileWorkspaceDir(canonicalWorkspace, this.profile);
@@ -70,6 +71,38 @@ export class ArtifactManager {
       ArtifactManager.instances.set(key, instance);
     }
     return instance;
+  }
+
+  /** Remove this session's private artifact directories under the supplied roots. */
+  static cleanupSessionArtifacts(sessionId: string, workspaceRoots: readonly string[], owner = { profile: currentProfile() }): void {
+    if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) return;
+    for (const workspaceRoot of new Set(workspaceRoots)) {
+      try {
+        const profile = owner.profile;
+        const privateWorkspace = profile && profile.id !== 'default'
+          ? fs.existsSync(workspaceRoot) ? profileWorkspaceDir(workspaceRoot, profile)
+            : profileWorkspaceDirForCanonicalRoot(workspaceRoot, profile) : undefined;
+        if (!privateWorkspace && !fs.existsSync(workspaceRoot)) continue;
+        const manager = privateWorkspace ? undefined : new ArtifactManager(workspaceRoot, sessionId, owner);
+        const directory = privateWorkspace ? path.join(privateWorkspace, 'sessions', sessionId, 'artifacts') : manager!.directory;
+        const storageRoot = privateWorkspace ? profile!.root : manager!.storageRoot;
+        assertProfileStorage(directory, profile);
+        if (!fs.existsSync(directory) || !fs.lstatSync(directory).isDirectory()) continue;
+        const checked = verifyPathContainment(directory, storageRoot);
+        if (!checked.allowed || checked.resolvedPath !== directory) continue;
+        if (fs.realpathSync(directory) !== directory) continue;
+        fs.rmSync(directory, { recursive: true, force: true });
+        const container = path.dirname(directory);
+        assertProfileStorage(container, profile);
+        const containerCheck = verifyPathContainment(container, storageRoot);
+        if (!containerCheck.allowed || containerCheck.resolvedPath !== container || fs.realpathSync(container) !== container) continue;
+        // Only retire an empty artifact session container. Other owners' files
+        // must never become collateral of recursive artifact removal.
+        fs.rmdirSync(container);
+      } catch {
+        // Session deletion must remain successful when artifact cleanup is unavailable.
+      }
+    }
   }
 
   async save(content: string, toolType: string = "output"): Promise<StoredArtifact> {

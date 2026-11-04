@@ -46,6 +46,7 @@ import {
   formatListSessionsFailureWarning,
   formatUnreadableSessionDirectoryWarning,
 } from "../presentation/sessionWarningSurface.js";
+import { ArtifactManager } from "../../core/session/artifactManager.js";
 
 export class SessionStoreAccess extends SessionStorePaths {
   readonly files: SessionFiles;
@@ -103,10 +104,22 @@ export class SessionStoreAccess extends SessionStorePaths {
   }
 
   deleteSession(sessionId: string): void {
+    let artifactRoots: string[] = [];
+    try {
+      const session = this.load(sessionId);
+      artifactRoots = [session.projectRoot, ...(session.workspaceRoots ?? []).map((root) => root.path)];
+    } catch {
+      // Preserve deletion behavior for unreadable or partially-written sessions.
+    }
     deleteSessionRecord({
       sessionId,
       layout: locateExistingSessionLayout(this.storeLayout, sessionId),
     });
+    try {
+      ArtifactManager.cleanupSessionArtifacts(sessionId, artifactRoots, { profile: this.storeLayout.profile });
+    } catch {
+      // Artifact cleanup is advisory and cannot turn a completed deletion into a failure.
+    }
   }
 
   listSessions(onSource?: (target: string) => void): Session[] {

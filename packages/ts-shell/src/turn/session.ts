@@ -45,6 +45,8 @@ export interface TurnOptions {
   readonly commandProof?: ToolGateOptions['commandProof'];
   /** Current-session objective, projected by the goal owner at CLI composition. */
   readonly goalObjective?: string;
+  /** Claims the native budget owner's one closing attempt, without authorizing a send. */
+  readonly claimBudgetSummary?: () => boolean;
   readonly workspaceRoots?: ToolGateOptions['workspaceRoots'];
   readonly admission?: ToolGateOptions['admission'];
   readonly sessionId: string;
@@ -305,7 +307,8 @@ export function runTurn(options: TurnOptions): TurnRun {
   const recoverOverflow = async (): Promise<boolean> => {
     const messages = core.state.messages;
     const last = messages[messages.length - 1];
-    if (!last || last.role !== "assistant" || !isOverflowFailure(last) || !options.compaction) return false;
+    if (!last || last.role !== "assistant" || !isOverflowFailure(last) || !options.compaction
+      || options.compaction.policy.enabled === false) return false;
     if (overflowRecovered) return false;
     overflowRecovered = true;
     // The same operation the scheduled path uses, so the rescue cannot cut

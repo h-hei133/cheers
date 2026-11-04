@@ -449,7 +449,7 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 
 本批补齐 write/edit 到写入执行服务及文件 authority 的拒绝与取消接线，不将 SAFE-02 标为完成。上一批 grep 提交 `b57b0052` 已推送，Architecture Watch `37336646995` 已成功，CI `37336646967` 最近查询仍 in_progress，未计为通过。
 
-- [写入服务](../../packages/ts-shell/src/runtime/execution/service.ts) 在创建父目录前检查 canonical containment、逐文件拒绝及预取消；目录创建和快照持久化返回后再次检查。已有文件在 [文件 authority](../../packages/ts-shell/src/edit/authority/workspace.ts) 打开并核验描述符后，以实际对象路径检查策略，再截断与写入，拒绝时始终关闭句柄。创建路径在排他打开前及打开后分别检查，不再只依赖工具预读时的检查。
+- [写入服务](../../packages/ts-shell/src/runtime/execution/service.ts) 在创建父目录前检查 canonical containment、逐文件拒绝及预取消；目录创建和快照持久化返回后再次检查。已有文件在 [当时的文件 authority（当前共享检查 owner）](../../packages/ts-shell/src/core/workspace/files.ts) 打开并核验描述符后，以实际对象路径检查策略，再截断与写入，拒绝时始终关闭句柄。创建路径在排他打开前及打开后分别检查，不再只依赖工具预读时的检查。
 - [工具接线](../../packages/ts-shell/src/core/tools/registry.ts) 将 assertFileAccess 与 abortSignal 传到最终写入请求；保留现有锁、精确 expectedContent 比较及快照机制。authority 使用核验后的 canonical workspace，支持符号链接工作区根；完整父目录段判断允许 ..notes 等普通文件名，不将其当作目录逃逸。
 - 定向比较：按 [17 号研究](17-tools-maturity-and-multifile-edit.md) 实读参考写工具的 mutation queue、目录创建和写入流程；采用“异步操作完成后检查取消，未结束前不释放锁”的决定。参考的可注入 mkdir/writeFile 没有本项目的最终对象拒绝契约，本批保留现有描述符 authority 并接入策略，不复制直接按路径写入实现。
 - 验证：Linux、Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT，execution、core/tools、edit、turn/tools、sandbox 和工具策略共 53 文件/455 项通过，build:ts 通过。新增 10 项覆盖创建前拒绝/取消、外部父目录链接零新建目录、快照后取消/拒绝、打开后目标改名到拒绝路径、write/edit 接线、双点文件名与链接工作区。初轮 mock 未保留快照模块辅助导出，修正测试 setup；并行环境中 fd 可被其他线程复用，关闭断言改为核对实际 close 调用，保留内容不变与拒绝断言。
@@ -460,7 +460,7 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 
 ### 8.6 SAFE-02 — 写前快照实际读取对象（2026-10-06，进行中）
 
-- [文件 authority](../../packages/ts-shell/src/edit/authority/workspace.ts) 的 readVerifiedFile 接收可选实际路径检查；打开并核验句柄后，在读取正文前调用，检查失败直接传播并关闭句柄。只把原有正文 IO 错误保留为 undefined，拒绝/取消不被 catch 转成“没有旧内容”。[写入服务](../../packages/ts-shell/src/runtime/execution/service.ts) 的首次快照读取和持久化后的 expectedContent 复查均传入同一检查。
+- [当时的文件 authority（当前共享检查 owner）](../../packages/ts-shell/src/core/workspace/files.ts) 的 readVerifiedFile 接收可选实际路径检查；打开并核验句柄后，在读取正文前调用，检查失败直接传播并关闭句柄。只把原有正文 IO 错误保留为 undefined，拒绝/取消不被 catch 转成“没有旧内容”。[写入服务](../../packages/ts-shell/src/runtime/execution/service.ts) 的首次快照读取和持久化后的 expectedContent 复查均传入同一检查。
 - 沿 [17 号研究](17-tools-maturity-and-multifile-edit.md) 再次定向检查参考只读目标解析：授权评估与执行之间可能发生符号链接替换，执行必须重新解析并验证。同意实际使用前复验；本项目在已有句柄 authority 内完成，不增加另一个快照读取系统。保留未传检查参数的其他 authority 调用兼容性，不将它们也宣称为已接入逐文件策略。
 - Linux、Node 20.3、仓内隔离环境下 execution/core-tools/edit/turn-tools 共 51 文件/426 项通过，build:ts 通过。新增两项在首次快照读取和条件复查打开后，将文件改名到拒绝路径，验证拒绝、零正文读取、关闭句柄与正确的快照调用次数。移除两处策略接线时 2 失败/10 通过，精确恢复后组合套件通过。
 - 编译模块探针经真实写入服务与 authority 验证打开后改名到拒绝目标时零正文读取、无快照产物、原文不变；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过，NormProof 无阻断项，仍有 6 项既有函数数量 advisory。未运行独立审查、PTY、跨平台验收。
@@ -2369,7 +2369,7 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 
 原生 Windows Node20.3 的工作区文件 owner 仍使用会折叠大小写的 `path.relative`：不同 inode 的 `Root/root` 被视为同一根，既有/新建/缺失祖先目标准入，pre-read 泄出外部正文，实际 `authority.writeFile` 改写外部文件。绝对路径 facade 还把 sibling 的同名文件映射为授权根内的另一个文件。隔离 baseline 保留实际改写并立即恢复原字节；七项回归在原实现上真实失败，三个控制通过。
 
-裁决在 [core/workspace/files](../../packages/ts-shell/src/core/workspace/files.ts) 复用原 `verifyPathContainment`，同一 owner 在转换为相对路径前沿**原请求路径**向上检查组件，并用 lstat 身份确认已选根或其规范根。内部链接和未选的根链接都拒绝，显式已选根别名与其规范绝对路径继续允许。[写入 facade](../../packages/ts-shell/src/edit/authority/workspace.ts) 委派该 owner，原 guarded committer、undefined/false 拒绝契约和公开结果保持。定向比较 pathname 工具与原生 no-follow 决策后，不把规范目标在根内当作原始路径无链接的证明；没有新执行平面、产品依赖或重复校验系统。
+裁决在 [core/workspace/files](../../packages/ts-shell/src/core/workspace/files.ts) 复用原 `verifyPathContainment`，同一 owner 在转换为相对路径前沿**原请求路径**向上检查组件，并用 lstat 身份确认已选根或其规范根。内部链接和未选的根链接都拒绝，显式已选根别名与其规范绝对路径继续允许。[当时的写入 facade（当前生产写入 owner）](../../packages/ts-shell/src/runtime/execution/write.ts) 委派该 owner，原 guarded committer、undefined/false 拒绝契约和公开结果保持。定向比较 pathname 工具与原生 no-follow 决策后，不把规范目标在根内当作原始路径无链接的证明；没有新执行平面、产品依赖或重复校验系统。
 
 独立两路拒绝了初版的 source-link 漏检/错误映射及测试夹具的大小写敏感要求；中间版本又误拒绝与规范根词法折叠等价的已选别名。原 HIGH/REQUEST CHANGES/BLOCK、失败探针及中间字节均保留；最终修复实际 source walk 与两个显式根身份。测试用 `Root/Outside`、保留后缀拼写的局部词法模拟和不依赖 symlink 权限的局部 fs 模拟；实链接另外由隔离 Linux 探针验证。
 

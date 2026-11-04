@@ -8,7 +8,7 @@ import { SessionManager } from '../../../../session/SessionManager.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../../session/model/state.js';
 import { resolveProviderCredential } from '../../../../core/shell/providerCredentials.js';
 import { modelPicker } from '../model.js';
-import { OverlayHost } from '../../overlay.js';
+import { OverlayHost, type Picker, type PickerOutcome } from '../../overlay.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
 import { defaultHookDispatcher } from '../../../../core/hooks/hookDispatcher.js';
@@ -77,6 +77,76 @@ it('selects the exact relay and compatible effort in one session transaction, re
   const active = resolveProviderCredential({ runtimeConfig: runtime.runtimeConfig });
   expect(active).toMatchObject({ provider: 'openai', model: 'shared', baseUrl: 'https://relay.invalid/v1', thinkingEffort: 'medium', credential: { connectionId: 'relay' } });
   expect(configBytes()).toEqual(before);
+});
+
+it.each(['minimal', 'xhigh', 'max'] as const)('offers %s while selecting a model whose current effort is supported', async level => {
+  writeCatalogCache([{ id: 'relay', runtime: 'openai', baseUrl: 'https://relay.invalid/v1',
+    models: [{ id: 'shared', contextWindow: 128000, reasoning: true, thinkingLevelMap: { [level]: level } }] }]);
+  const { runtime, commands } = host();
+  const before = configBytes(), original = readSessionModel(runtime.session.id)!;
+  const { effort } = await recovery(commands);
+  expect((await effort.load()).find(row => row.id === level)?.disabled).not.toBe(true);
+  expect(readSessionModel(runtime.session.id)).toEqual(original);
+  expect((await effort.apply([level]))?.note).toContain('shared');
+  expect(readSessionModel(runtime.session.id)).toMatchObject({ connectionId: 'relay', thinkingEffort: level, roles: original.roles });
+  expect(configBytes()).toEqual(before);
+});
+
+it.each(['default', 'advisor'] as const)('opens admitted %s model effort through real Ctrl+Enter and preserves its write owner', async owner => {
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'shared', contextWindow: 128000, reasoning: true }] },
+    { id: 'relay', runtime: 'openai', baseUrl: 'https://relay.invalid/v1',
+    models: [{ id: 'shared', contextWindow: 128000, reasoning: true }] }]);
+  const { runtime, commands } = host(), original = readSessionModel(runtime.session.id)!;
+  const before = configBytes(), overlay = new OverlayHost(() => {});
+  const frame = () => stripAnsi(overlay.render(180, 32).join('\n'));
+  const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+  const key = async (raw: string): Promise<PickerOutcome | undefined> => {
+    let pending: ReturnType<Picker['apply']> | undefined;
+    overlay.handleKey(parseKeyEvent(raw), (selected, ids) => { pending = selected.apply(ids, overlay.acceptanceFor(selected)); });
+    const outcome = await pending;
+    if (outcome?.next) overlay.open(outcome.next);
+    await settle();
+    return outcome;
+  };
+  try {
+    overlay.open(modelPicker(commands, owner === 'default' ? target : 'role:advisor')); await settle();
+    if (owner === 'advisor') {
+      await key('\r'); await key('\r');
+      // A role browser may initially focus the current main connection. Search
+      // through real editor keys to select the ready prospective relay exactly.
+      for (const character of 'shared relay') await key(character);
+      // Both the canonical alias and the exact relay expose this model. The
+      // exact relay follows its canonical alias in the accepted catalogue.
+      await key('\x1b[B');
+      const searchedFrame = frame();
+      expect(searchedFrame, `Full advisor browser frame after search:\n${searchedFrame}`).toContain('▸ shared');
+      expect(searchedFrame, `Full advisor browser frame after search:\n${searchedFrame}`).toContain('relay.invalid');
+      expect(searchedFrame, `Full advisor browser frame after search:\n${searchedFrame}`).toMatch(/▸ shared[^\n]*relay[^\n]*relay[^\n]*credential present/);
+    }
+    expect(frame()).toContain('Ctrl+Enter: details / effort');
+    await key('\x1b[13;5u');
+    const detailsFrame = frame();
+    expect(detailsFrame, `Full model details frame after Ctrl+Enter:\n${detailsFrame}`).toContain('Choose effort');
+    expect(readSessionModel(runtime.session.id)).toEqual(original);
+    await key('\x1b[B'); await key('\r');
+    expect(frame()).toContain('Enter uses this model and effort');
+    await key('\x1b');
+    expect(frame()).toContain('Choose effort');
+    expect(readSessionModel(runtime.session.id)).toEqual(original);
+    await key('\x1b[B'); await key('\r');
+    await key('\x1b[A'); // high -> medium; advisor low -> auto
+    const outcome = await key('\r');
+    expect(outcome?.note).toContain(owner === 'default' ? 'Model switched' : 'advisor uses');
+    if (owner === 'default') expect(readSessionModel(runtime.session.id)).toMatchObject({ connectionId: 'relay',
+      thinkingEffort: 'medium', roles: original.roles });
+    else {
+      const saved = readSessionModel(runtime.session.id)!;
+      expect(saved).toMatchObject({ connectionId: original.connectionId, provider: original.provider,
+        model: original.model, thinkingEffort: original.thinkingEffort });
+      expect(saved.roles?.advisor).toMatchObject({ connectionId: 'relay', provider: 'openai', model: 'shared', thinkingEffort: null });
+    }
+    expect(configBytes()).toEqual(before);
+  } finally { overlay.close(); }
 });
 
 it('offers provider-decides recovery for a model with no reasoning parameter and keeps explicit effort disabled', async () => {

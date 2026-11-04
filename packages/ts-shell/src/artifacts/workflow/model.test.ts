@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { correctArtifact, createArtifactReceipt, projectArtifactClaimEvidence, projectArtifactLifecycle } from "./model.js";
+import { createArtifactReceipt, projectArtifactClaimEvidence, projectArtifactLifecycle } from "./model.js";
 
 describe("artifact workflow model", () => {
   it("records report artifact intent, sources, validation, and non-success truth", () => {
@@ -177,66 +177,6 @@ describe("artifact workflow model", () => {
       { claim: "source covered", evidenceId: "artifact-check:source-coverage:passed", proven: false },
       { claim: "verification passed", evidenceId: "source-receipt", proven: false },
     ]);
-  });
-
-  it("corrects invalid artifacts only when source receipts and artifact action are available", () => {
-    const receipt = createArtifactReceipt({
-      taskKind: "data-artifact",
-      outputKind: "artifact",
-      requiredPaths: ["artifacts/totals.json"],
-      workspacePaths: ["data/input.csv", "artifacts/totals.json"],
-      verificationState: "selected-failed",
-      failureCategories: ["artifact invalid"],
-      requiredContentMarkers: ["total"],
-      observedContentMarkers: ["total"],
-      verificationEvidence: ["artifact-check:json-parse:failed"],
-    });
-
-    expect(correctArtifact({ receipt, actions: ["artifact", "verify"] })).toMatchObject({
-      attempted: true,
-      validationState: "validation-passed",
-      correctedPath: "artifacts/totals.json",
-      terminalSuccessClaim: false,
-    });
-    expect(correctArtifact({ receipt, actions: ["read"] })?.attempted).toBe(false);
-
-    const missingClaimEvidence = createArtifactReceipt({
-      taskKind: "docs-report",
-      outputKind: "artifact",
-      requiredPaths: ["reports/summary.md"],
-      workspacePaths: ["notes/source.md", "reports/summary.md"],
-      verificationState: "selected-passed",
-      failureCategories: [],
-      verificationEvidence: ["artifact-check:source-coverage:passed"],
-      claimEvidence: [{ claim: "verification passed" }],
-    });
-
-    expect(correctArtifact({ receipt: missingClaimEvidence, actions: ["artifact"] })).toMatchObject({
-      attempted: false,
-      validationState: "claim-evidence-missing",
-      blockers: ["artifact claim evidence missing"],
-      terminalSuccessClaim: false,
-    });
-
-    const invalidClaimEvidence = createArtifactReceipt({
-      taskKind: "docs-report",
-      outputKind: "artifact",
-      requiredPaths: ["reports/summary.md"],
-      workspacePaths: ["notes/source.md", "reports/summary.md"],
-      verificationState: "selected-failed",
-      failureCategories: ["artifact invalid"],
-      requiredContentMarkers: ["source-receipt"],
-      observedContentMarkers: ["source-receipt"],
-      verificationEvidence: ["artifact-check:source-coverage:failed"],
-      claimEvidence: [{ claim: "verification passed" }],
-    });
-
-    expect(correctArtifact({ receipt: invalidClaimEvidence, actions: ["artifact"] })).toMatchObject({
-      attempted: false,
-      validationState: "claim-evidence-missing",
-      blockers: ["artifact claim evidence missing"],
-      terminalSuccessClaim: false,
-    });
   });
 
   it("projects missing claim evidence with semantic matching for policy consumers", () => {

@@ -84,6 +84,8 @@ export interface ModelAttempt {
 }
 export interface RequestPolicy {
   reserve(request: PreparedRequest): ModelAttempt;
+  /** Native budget owner admits one closing attempt; this never grants token admission. */
+  readonly claimBudgetSummary?: () => boolean;
   /** Native owner may reserve room for later stages; no-cap admission is unchanged. */
   readonly withCompletionReserve?: (tokens: () => number) => RequestPolicy;
   /** Additional native admission is checked under the same ledger transaction. */
@@ -96,7 +98,9 @@ export type ModelTransport = (input: RequestInfo | URL, init: RequestInit,
 export class ModelAdmissionError extends Error {
   constructor(readonly code: 'unsupported' | 'exhausted' | 'history-unknown' | 'breach' | 'inactive' | 'replay' | 'unavailable',
     readonly persistence: 'unchanged' | 'unknown' | 'persisted' = 'unchanged') {
-    super(`Model request admission ${code}; persistence ${persistence}.`);
+    super(`Model request admission ${code}; persistence ${persistence}.${code === 'history-unknown'
+      ? ' Previous request usage or results are unknown. Retained reservations are not released or resent.'
+      : code === 'exhausted' ? ' The remaining token budget cannot admit this request.' : ''}`);
     this.name = 'ModelAdmissionError';
   }
 }

@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runCrashCommand } from "./crashCommandRuntime.js";
 import { runTimingsCommand } from "./timingsCommandRuntime.js";
-import { recordCrash } from "../../observability/crashLog.js";
+import { crashLogPath, recordCrash } from "../../observability/crashLog.js";
 import type { CommandContext } from "./types.js";
 
 /**
@@ -38,6 +38,23 @@ afterEach(() => {
 });
 
 describe("runCrashCommand", () => {
+  it("reports an oversized crash source without claiming that no crashes occurred", async () => {
+    const file = crashLogPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, " ".repeat(1024 * 1024 + 1));
+    const result = await runCrashCommand([], context);
+    expect(result.output).toContain("over-limit");
+    expect(result.output).toContain("count is unknown");
+    expect(result.output).not.toContain("No crashes recorded");
+  });
+
+  it("preserves partial inspection when malformed records are skipped", async () => {
+    const file = crashLogPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify([null]));
+    expect((await runCrashCommand([], context)).output).toContain("Inspection status: partial");
+  });
+
   it("says so when nothing has crashed", async () => {
     const result = await runCrashCommand([], context);
     expect(result.output).toContain("No crashes recorded");

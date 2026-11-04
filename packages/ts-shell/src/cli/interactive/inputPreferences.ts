@@ -49,7 +49,7 @@ export class InputPreferences {
     return this.bindings.keysFor(actionId).find(key => this.bindings.actionFor(key) === actionId);
   }
 
-  readonly thinkingShortcut = (): string | undefined => this.shortcut('app.thinking.toggle');
+  readonly thinkingShortcut = (): string | undefined => this.shortcut('app.thinkingBlocks.toggle');
 
   /**
    * Re-read everything on disk.

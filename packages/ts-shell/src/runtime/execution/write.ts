@@ -3,6 +3,7 @@ import path from 'node:path';
 import { verifyPathContainment } from '../../core/security/pathJail.js';
 import { commitWorkspaceFile } from '../../edit/authority/commit.js';
 import { inspectWorkspaceFile } from '../../edit/authority/state.js';
+import { workspaceRelativePath } from '../../core/workspace/files.js';
 import { buildEditSnapshotStoreConfig } from '../../edit/recovery/editSnapshot.js';
 import { captureRecoveryAuthorityRecord } from '../../edit/recovery/recoveryAuthorityStore.js';
 import { commitOperation, prepareOperation } from '../../edit/recovery/operation/write.js';
@@ -21,8 +22,9 @@ async function writeUnlocked(request: TextFileWriteExecutionRequest): Promise<Te
   const checked = verifyPathContainment(request.absolutePath, request.workspaceRoot);
   if (!checked.allowed) throw new Error('Write target is outside the selected workspace.');
   const lexical = path.relative(path.resolve(request.workspaceRoot), request.absolutePath);
-  const relative = lexical === '..' || lexical.startsWith(`..${path.sep}`) || path.isAbsolute(lexical)
-    ? path.relative(root, checked.resolvedPath) : lexical;
+  const selectedRoot = lexical === '..' || lexical.startsWith(`..${path.sep}`) || path.isAbsolute(lexical)
+    ? root : request.workspaceRoot;
+  const relative = workspaceRelativePath(selectedRoot, request.absolutePath);
   const checkAccess = (absolute: string): void => {
     request.abortSignal?.throwIfAborted();
     if (!verifyPathContainment(absolute, root).allowed) throw new Error('Write target is outside the selected workspace.');

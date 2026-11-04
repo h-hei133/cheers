@@ -79,7 +79,7 @@ export async function runAgentsCommand(args: readonly string[], host: AgentManag
         let definition: SubagentDefinition = { ...base.definition, source: scope };
         if (action === 'enable' || action === 'disable') definition = { ...definition, enabled: action === 'enable' };
         else if (action === 'model') definition = { ...definition, model: values[2] === 'inherit' ? undefined : values[2] };
-        else if (action === 'effort') definition = { ...definition, effort: values[2] === 'inherit' ? undefined : values[2] === 'auto' ? null : values[2] as 'low' | 'medium' | 'high' };
+        else if (action === 'effort') definition = { ...definition, effort: values[2] === 'inherit' ? undefined : values[2] === 'auto' ? null : values[2] as 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' };
         next = formatDefinition(definition); parseDefinition(next, scope);
       }
     }

@@ -33,7 +33,7 @@ export interface RestoredHistory {
 }
 
 /** Blocks for a session's conversation, oldest first, bounded. */
-export function restoreConversation(turns: readonly SessionMessage[], reports: readonly SessionReport[] = []): RestoredHistory {
+export function restoreConversation(turns: readonly SessionMessage[], reports: readonly SessionReport[] = [], collapseThinking = true): RestoredHistory {
   const blocks: Block[] = [];
   const reportGroups = groupReports(turns, reports);
   blocks.push(...(reportGroups.get(undefined) ?? []));
@@ -59,7 +59,7 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
         blocks.push({
           kind: "thinking",
           text: reasoning.redacted ? "(provider withheld)" : reasoning.text,
-          collapsed: true,
+          collapsed: collapseThinking,
           finalized: true,
         });
       }
@@ -160,14 +160,14 @@ export function showConversation(target: HistoryTarget, snapshot?: Session): voi
 }
 
 /** Startup keeps its welcome and diagnostics while using the same history projection. */
-export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'editor'>, session: Session): void {
+export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'editor'> & Partial<Pick<HistoryTarget, 'context'>>, session: Session): void {
   // The checklist belongs to the session being shown, and switching to a
   // session is the moment to say so. Doing it here rather than at each command
   // that can switch is what makes `/resume`, the sessions panel, a fork, and a
   // rewind all correct: they establish a session by calling this, and a session
   // that is being shown is a session whose checklist has just been restored.
   replayTodosFromMessages(session.id, session.turns);
-  const restored = restoreConversation(session.turns, session.reports);
+  const restored = restoreConversation(session.turns, session.reports, target.context?.runtimeConfig.collapseThinking ?? true);
   target.transcript.retainEarlier(restored.earlier);
   if (restored.omitted > 0) {
     target.transcript.append(

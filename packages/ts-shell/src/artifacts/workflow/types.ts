@@ -54,11 +54,6 @@ export interface ArtifactReceipt {
   readonly terminalSuccessClaim: false;
 }
 
-export interface ArtifactCorrectionInput {
-  readonly receipt?: ArtifactReceipt;
-  readonly actions: readonly string[];
-}
-
 export interface ArtifactCorrection {
   readonly attempted: boolean;
   readonly validationState: ArtifactValidationState;

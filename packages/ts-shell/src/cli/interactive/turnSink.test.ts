@@ -19,6 +19,21 @@ function build(): { sink: TurnSink; transcript: Transcript; rows: () => string }
 }
 
 describe("streaming assistant text", () => {
+  it('reads the current collapse preference only when a new thinking block opens', () => {
+    const transcript = new Transcript();
+    let collapsed = false;
+    const sink = new TurnSink(transcript, () => {}, Date.now, () => collapsed);
+    sink.begin('turn', 'turn');
+    sink.think('first');
+    const first = transcript.last()!;
+    expect(first.collapsed).toBe(false);
+    collapsed = true;
+    sink.think(' continuation');
+    expect(first.collapsed).toBe(false);
+    sink.handleEvent({ type: 'message.started', role: 'coder' } as QueryEvent);
+    sink.think('second');
+    expect(transcript.last()?.collapsed).toBe(true);
+  });
   it("accumulates deltas into one block", () => {
     const { sink, rows } = build();
     sink.begin("turn", "turn");

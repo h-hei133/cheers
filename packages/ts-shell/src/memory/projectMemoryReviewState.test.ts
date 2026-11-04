@@ -19,6 +19,7 @@ describe("memory review retention", () => {
     { safety: "needs-review" as const },
     { reason: "Changed justification" },
     { redactions: ["removed detail"] },
+    { structuredFact: { subject: "project", predicate: "language", object: "TypeScript" } },
   ])("requires review again when the approved candidate changes: %j", change => {
     const store = createProjectMemoryReviewStateStore();
     const original = candidate(0);

@@ -199,7 +199,6 @@ function record(
     memoryText,
     evidence: ["route83:test"],
     source: candidateKind === "user-preference-candidate" ? "user-stated-preference" : "system-derived",
-    sourcePacket: "route83-test",
     routeReferences: ["route83"],
     safety: "safe",
     redactions: [],

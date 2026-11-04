@@ -169,8 +169,7 @@ export interface ModelRequestShape {
 /**
  * The reasoning levels a user can choose, in order.
  *
- * Three, because that is what the surface offers and what the project state
- * stores. A model may name them differently, which is what `thinkingLevelMap`
+ * A model may name them differently, which is what `thinkingLevelMap`
  * is for — the level is the choice, the mapping is how it is said.
  */
 export { THINKING_LEVELS, type ThinkingLevel } from './effort.js';

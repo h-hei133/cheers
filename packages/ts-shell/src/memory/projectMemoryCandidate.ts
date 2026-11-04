@@ -36,6 +36,12 @@ export type ProjectMemoryCandidateSource = typeof PROJECT_MEMORY_SOURCES[number]
 
 export type ProjectMemoryCandidateSafety = "safe" | "needs-review" | "unsafe";
 
+export interface ProjectMemoryStructuredFact {
+  readonly subject: string;
+  readonly predicate: string;
+  readonly object: string;
+}
+
 export interface ProjectMemoryCandidate {
   readonly candidateId: string;
   readonly candidateKind: ProjectMemoryCandidateKind;
@@ -44,6 +50,7 @@ export interface ProjectMemoryCandidate {
   readonly source: ProjectMemoryCandidateSource;
   readonly safety: ProjectMemoryCandidateSafety;
   readonly summary: string;
+  readonly structuredFact?: ProjectMemoryStructuredFact;
   readonly reason: string;
   readonly evidence: readonly string[];
   readonly redactions: readonly string[];
@@ -56,6 +63,7 @@ export interface CreateProjectMemoryCandidateInput {
   readonly source: ProjectMemoryCandidateSource;
   readonly safety?: ProjectMemoryCandidateSafety;
   readonly summary: string;
+  readonly structuredFact?: ProjectMemoryStructuredFact;
   readonly reason: string;
   readonly evidence: readonly string[];
   readonly redactions?: readonly string[];
@@ -64,11 +72,17 @@ export interface CreateProjectMemoryCandidateInput {
 export function createProjectMemoryCandidate(
   input: CreateProjectMemoryCandidateInput,
 ): ProjectMemoryCandidate {
+  const structuredFact = input.structuredFact && Object.freeze({
+    subject: input.structuredFact.subject.trim(),
+    predicate: input.structuredFact.predicate.trim(),
+    object: input.structuredFact.object.trim(),
+  });
   return {
     candidateId: projectMemoryCandidateId(
       input.candidateKind,
       input.source,
       input.summary,
+      structuredFact,
     ),
     candidateKind: input.candidateKind,
     retentionClass: input.retentionClass,
@@ -76,6 +90,7 @@ export function createProjectMemoryCandidate(
     source: input.source,
     safety: input.safety ?? "safe",
     summary: input.summary.trim(),
+    ...(structuredFact ? { structuredFact } : {}),
     reason: input.reason.trim(),
     evidence: unique(input.evidence),
     redactions: unique(input.redactions ?? []),
@@ -86,12 +101,14 @@ export function projectMemoryCandidateId(
   kind: ProjectMemoryCandidateKind,
   source: ProjectMemoryCandidateSource,
   summary: string,
+  structuredFact?: ProjectMemoryStructuredFact,
 ): string {
   return [
     "pmc",
     kind,
     source,
-    createHash("sha256").update(summary.trim()).digest("hex").slice(0, 24),
+    createHash("sha256").update(structuredFact ? JSON.stringify([summary.trim(),
+      structuredFact.subject, structuredFact.predicate, structuredFact.object]) : summary.trim()).digest("hex").slice(0, 24),
   ].join(":");
 }
 
