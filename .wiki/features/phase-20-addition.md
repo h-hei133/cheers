@@ -11651,3 +11651,172 @@ async function handleTripleAdd(args) {
 
 **验证方式**：构造两条 `subject`/`predicate` 相同、`object` 不同的记忆，注入时应报告冲突。
 
+
+### 24.129 深度研究：goal 预算在参照实现中的做法
+
+24.120 / 24.127 只讨论了本项目内部的账本语义。本节看两家有同类功能的参照实现，结论**改变了问题的性质**。
+
+#### 24.129.1 codex：`ext/goal`，按增量记账，无预留
+
+**数据结构**（`ext/goal/src/accounting.rs:30-43`）：
+
+```rust
+struct GoalTurnAccounting {
+    current_token_usage: TokenUsage,
+    last_accounted_token_usage: TokenUsage,   // ← 上一次已记账的快照
+    active_goal_id: Option<String>,
+    account_tokens: bool,
+    ...
+}
+```
+
+**记账**（`accounting.rs:177-198`）：
+
+```rust
+pub(crate) fn record_token_usage(&self, turn_id, total_usage: &TokenUsage) -> Option<RecordedTokenDelta> {
+    let turn = inner.turns.get_mut(&turn_id)?;
+    turn.current_token_usage = total_usage.clone();       // ← 累计用量直接覆盖
+    if !turn.account_tokens { return None; }
+    let delta = turn.token_delta_since_last_accounting(); // ← 与上次的差
+    if delta <= 0 { return None; }
+    Some(RecordedTokenDelta { turn_delta: delta, ... })
+}
+```
+
+**关键点**：
+- **没有 `reserve` / `dispatch` / `settle` 三段式**。用量是 provider 报告后**直接累加**。
+- 因此**不存在「预留悬空」**——没有预留这个概念。
+- 预算检查是 `tokens_used >= budget` 的**事后判断**，不是事前的准入。
+
+#### 24.129.2 oh-my-pi：`goals/runtime.ts`，同样按增量
+
+**记账**（`goals/runtime.ts:330-345`）：
+
+```ts
+const tokenDelta = goalTokenDelta(usage, this.#turnSnapshot.baselineUsage);
+...
+state.goal.tokensUsed += tokenDelta;
+const flippedToBudgetLimited =
+  state.goal.tokenBudget !== undefined &&
+  state.goal.tokensUsed >= state.goal.tokenBudget &&
+  state.goal.status === "active";
+if (flippedToBudgetLimited) state.goal.status = "budget-limited";
+```
+
+**关键点**：
+- 同样**只记录已完成的用量增量**（`baselineUsage` 快照相减）。
+- 预算耗尽不是「拒绝下一个请求」，而是把 goal 状态翻成 **`budget-limited`**，并**发一条 steer 消息**告诉模型（`#sendBudgetLimitSteer`）。
+- 用户可以调高预算（`onBudgetMutated`），状态会自动翻回 `active`。
+
+#### 24.129.3 pi：无 goal 预算
+
+pi 没有 `/goal` 或等价的长期目标功能（全仓 `goalTokenBudget` / `token_budget` 零命中）。**无可对照。**
+
+#### 24.129.4 结论：本项目是三家唯一做「事前预留」的
+
+| 维度 | codex | oh-my-pi | 本项目 |
+|---|---|---|---|
+| 记账方式 | provider 用量增量 | provider 用量增量 | **事前预留 + 事后结算** |
+| 预算耗尽时 | 事后判断 | 状态翻 `budget-limited` + steer 模型 | **拒绝下一个请求（`exhausted`）** |
+| 悬空预留 | 不可能 | 不可能 | **可能** |
+| 并发保护 | 无（单线程 turn） | 无 | **有**（预留防并发超支） |
+
+**这解释了本项目为什么会有这个问题**：事前预留是为了**防止并发请求同时超支**（`budget.test.ts` 里的并发用例 `expect(results.sort()).toEqual(['admitted', 'exhausted'])` 正是验证这一点）。两家参照都没有这个需求，因为它们不做并发准入。
+
+**所以问题不是「本项目的实现有缺陷」，而是「事前预留这个设计本身要额外处理『已发出但结果未知』」**——两家参照因为不做预留，天然绕过了这个问题。
+
+#### 24.129.5 参照给出的解法：改变语义，而不是修补状态机
+
+两家参照都在**预算耗尽时给模型一次说话的机会**：
+
+- codex：`BudgetLimitedGoalDisposition { KeepActive, ClearActive }`（`accounting.rs:66-69`）
+- oh-my-pi：翻成 `budget-limited` 并发 steer 消息
+
+**本项目现在是直接 `exhausted` 拒绝**，模型和用户都只看到「额度用尽」。
+
+**建议的方向**（不实施）：
+
+| 改动 | 收益 | 与参照的关系 |
+|---|---|---|
+| 预算耗尽时发一条 steer 消息（「预算已用尽，请总结当前进展」） | 用户拿到阶段性结论，而不是突然中断 | 对齐两家 |
+| 保留 `pending` 不动（防重发不变） | 不改安全属性 | — |
+| 错误文案区分「额度用尽」与「上次结果未知」 | 用户知道该做什么 | 本项目独有需求 |
+
+**前两条与参照一致，第三条是本项目特有的**——因为只有本项目有「结果未知」这个状态。
+
+**结论**：24.127 的「改测试断言」不是唯一出路。参照提示了第三条路——**不改状态机，改耗尽时的行为**。这既保留了防重发，又让用户拿到有用的东西，而且与两家参照对齐。
+
+**未实施**。这是研究结论，不是实施计划。
+
+
+### 24.130 门面裁决的研究：生产路径已覆盖别名场景
+
+用户裁决：不测试证明等价，而是直接判断——「如果已经覆盖了别名场景，那门面就是冗余的，测试转移到生产路径上；如果没有覆盖，那就接上它」。
+
+本节用真实代码与探针给出判断。
+
+#### 24.130.1 门面到底做了什么不同的事
+
+`createWorkspaceWriteAuthority`（`edit/authority/workspace.ts:66-72`）：
+
+```ts
+const root = fs.realpathSync(workspaceRootInput);
+const relative = (absolute: string) => {
+  const lexical = path.relative(path.resolve(workspaceRootInput), path.resolve(absolute));
+  const selected = lexical === '..' || lexical.startsWith(`..${path.sep}`) || path.isAbsolute(lexical)
+    ? root : workspaceRootInput;
+  return workspaceRelativePath(selected, absolute);
+};
+```
+
+它的**输入是绝对路径**，需要自己判断「这个绝对路径相对哪个根」，再转成相对路径。
+
+#### 24.130.2 实测：两者的差异只在「绝对路径」输入
+
+| 输入形态 | 门面 | `commitWorkspaceFile` / `workspaceFilePath` |
+|---|---|---|
+| 别名根 + **相对路径** | ✅ 可读可写 | ✅ 可写（探针验证：`commitViaAlias: "ok"`） |
+| 别名根 + **别名下的绝对路径** | ✅ 可读（`facade_absolute: "original"`） | ❌ 抛 `File target is outside the selected workspace.` |
+
+**所以差异是真的**：门面能处理「绝对路径落在别名根下」这种输入，生产函数直接拒绝。
+
+#### 24.130.3 但生产路径根本不会产生这种输入
+
+`runtime/execution/write.ts:22-24`：
+
+```ts
+const lexical = path.relative(path.resolve(request.workspaceRoot), request.absolutePath);
+const relative = lexical === '..' || lexical.startsWith(`..${path.sep}`) || path.isAbsolute(lexical)
+  ? path.relative(root, checked.resolvedPath) : lexical;   // ← 与门面同一套判断
+```
+
+**生产路径自己做了与门面完全相同的转换**：
+
+1. 先算词法相对路径（`lexical`）；
+2. 如果词法路径越界（`..` 或绝对），改用 `path.relative(root, checked.resolvedPath)`——`root` 是规范化根，`resolvedPath` 是 `verifyPathContainment` 解析出的真实路径；
+3. 交给 `commitWorkspaceFile` 的永远是**相对路径**。
+
+**所以别名场景在生产路径上是被覆盖的**，只是覆盖点从「门面」移到了「调用方自己算相对路径」。
+
+#### 24.130.4 判定：门面冗余
+
+| 问题 | 答案 |
+|---|---|
+| 生产路径是否覆盖别名场景？ | **是**，`write.ts:22-24` 用与门面相同的判断 |
+| 门面是否有生产路径没有的能力？ | 有（接受绝对路径），但**生产路径不产生这种输入** |
+| 删除门面会丢失什么？ | 13 条测试里，8 条断言的是「别名工作区的读写」，而这些行为在生产路径上**未经测试断言** |
+
+**结论：门面是冗余的，但它的测试有价值。**
+
+#### 24.130.5 处置建议
+
+**不删除门面，也不接上它。** 而是：
+
+1. **把 8 条别名测试的断言对象改为生产路径**（`write.ts` 的 `writeTextFile` 或 `commitWorkspaceFile` + 调用方转换），断言内容不变——它们测的是「别名工作区能否正常读写」，这个属性应当在生产路径上被验证。
+2. 改完后，门面**再无任何引用**，可以删除。
+3. 若第 1 步中有任何一条测试在生产路径上失败，说明覆盖不完整，此时应**接上它**而不是删。
+
+**为什么不是直接删**：直接删会让「别名工作区读写」这个属性失去测试保护。先转移测试、确认全绿、再删门面，才是安全的顺序。
+
+**本轮不实施**——这是研究结论。
+
