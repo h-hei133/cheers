@@ -4,6 +4,8 @@ import type { HookTrustStore } from "./trust.js";
 import { execFile } from "node:child_process";
 import path from "node:path";
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
+import { checkWriteHookArtifact, writeHookCommand } from './artifact.js';
+import { applyWriteHookPolicy, canonicalToolName, hookUnknown, normalizeHookVeto, translateWriteInput, translateWriteResult } from './translation.js';
 import type {
   HookEventPayload,
   HookDecision,
@@ -48,6 +50,7 @@ class CommandHookFailure extends Error {
     readonly exitCode: number | undefined,
     readonly stderr: string,
     readonly timedOut: boolean,
+    readonly stdout: string = '',
   ) {
     super(message);
     this.name = "CommandHookFailure";
@@ -209,7 +212,8 @@ export class HookDispatcher {
     for (const hook of this.inProcessHooks) {
       if (hook.event === relevantEvent && this.matches(hook.matcher, payload)) {
         try {
-          const decision = await hook.handler(payload);
+          const returned = await hook.handler(payload);
+          const decision = relevantEvent === 'PreToolUse' ? normalizeHookVeto(returned) ?? returned : returned;
           if (decision) {
             if (decision.decision === "block" || decision.decision === "retry") {
               logger.warn(`Hook ${hook.name || "in-process"} returned blocking decision: ${decision.decision}`, {
@@ -237,14 +241,34 @@ export class HookDispatcher {
       if (trust !== this.trust || commandHooks !== this.commandHooks) break;
       // What the hook last wrote to stderr, which the block contract reads.
       let lastStderr = "";
-      if (hook.event === relevantEvent && this.matches(hook.matcher, payload)) {
+      const translated = relevantEvent === 'PreToolUse' && hook.writeGate !== undefined;
+      const matchPayload = translated ? { ...payload, toolName: canonicalToolName((payload as PreToolUsePayload).toolName) } : payload;
+      if (hook.event === relevantEvent && (translated || this.matches(hook.matcher, matchPayload))) {
         const sourceRevision = hook.fingerprint === undefined || trust?.bypassed ? undefined
           : trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)');
         if (!(await this.declaredHookIsAllowed(hook, payload.workspaceRoot, sourceRevision))) continue;
         if (trust !== this.trust || commandHooks !== this.commandHooks || trust?.admission?.()) continue;
         if (sourceRevision !== undefined && trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') !== sourceRevision) continue;
         const timeoutMs = hook.timeoutMs ?? hookTimeoutMs(relevantEvent);
-        const jsonPayload = JSON.stringify(payload);
+        let jsonPayload: string;
+        if (translated) {
+          const input = translateWriteInput(payload as PreToolUsePayload, timeoutMs);
+          if ('decision' in input) {
+            logger.info('Write hook result', input.hookVerdict);
+            if (input.decision === 'block') return input;
+            accumulatedDecision = input;
+            continue;
+          }
+          if (!this.matches(hook.matcher, matchPayload)) continue;
+          const invalidArtifact = checkWriteHookArtifact(hook.writeGate, payload.workspaceRoot);
+          if (invalidArtifact) {
+            logger.warn('Write hook failed', invalidArtifact.hookVerdict);
+            return invalidArtifact;
+          }
+          try { jsonPayload = JSON.stringify(input); }
+          catch { return hookUnknown('invalid_input'); }
+        } else jsonPayload = JSON.stringify(payload);
+        const command = translated ? writeHookCommand(hook.writeGate) : hook.command;
 
         // Run under the same isolation the bash tool uses. A hook is a shell
         // command, and leaving it unconfined while confining the commands the user
@@ -257,7 +281,7 @@ export class HookDispatcher {
         // wrapper's own shell before it ever reached the sandbox.
         const sandbox = planSandboxedCommand({
           shell: SHELL_BIN,
-          shellArgs: ["-c", hook.command],
+          shellArgs: ["-c", command],
           workspaceRoot: payload.workspaceRoot,
         });
         if (sandbox.state === "refused") {
@@ -272,7 +296,7 @@ export class HookDispatcher {
           logger.warn(sandbox.notice, { event: relevantEvent, command: hook.command });
         }
         const program = sandbox.command ?? SHELL_BIN;
-        const programArgs = sandbox.args ?? ["-c", hook.command];
+        const programArgs = sandbox.args ?? ["-c", command];
 
         try {
           const stdout = await new Promise<string>((resolve, reject) => {
@@ -294,6 +318,7 @@ export class HookDispatcher {
                         : undefined,
                       stderrBuf,
                       error instanceof Error && (error as { killed?: boolean }).killed === true,
+                      stdoutBuf,
                     ),
                   );
                 } else {
@@ -314,13 +339,19 @@ export class HookDispatcher {
             }
           });
 
-          if (stdout && stdout.trim()) {
+          if (translated) {
+            const result = applyWriteHookPolicy(translateWriteResult(stdout));
+            logger.info('Write hook result', result.hookVerdict ?? { status: result.decision });
+            if (result.decision === 'block' || result.decision === 'retry') return result;
+            if (accumulatedDecision?.decision !== 'unsupported' || result.decision === 'unsupported') accumulatedDecision = result;
+          } else if (stdout && stdout.trim()) {
             // Parsed inside its own guard so unreadable output is reported as
             // what it is: the hook produced something, and it could not be
             // understood, which is not the same as the hook saying nothing.
             let parsed: HookDecision;
             try {
               parsed = JSON.parse(stdout.trim()) as HookDecision;
+              if (relevantEvent === 'PreToolUse') parsed = normalizeHookVeto(parsed) ?? parsed;
             } catch {
               logger.error(
                 `Command hook returned output that is not valid JSON for event ${relevantEvent}`,
@@ -331,7 +362,7 @@ export class HookDispatcher {
             if (parsed.decision === "block" || parsed.decision === "retry") {
               return parsed;
             }
-            if (parsed.feedback || parsed.hookSpecificOutput) {
+            if ((parsed.feedback || parsed.hookSpecificOutput) && accumulatedDecision?.decision !== 'unsupported') {
               accumulatedDecision = parsed;
             }
           }
@@ -342,6 +373,14 @@ export class HookDispatcher {
           // now a refusal rather than a shrug; on the observing events it stays a
           // logged failure, since there is nothing to refuse.
           const failure = err instanceof CommandHookFailure ? err : undefined;
+          if (translated) {
+            const parsed = translateWriteResult(failure?.stdout ?? '');
+            const result = failure?.timedOut ? hookUnknown('timeout')
+              : (parsed.decision === 'block' || parsed.decision === 'retry') && parsed.hookVerdict?.source !== 'adapter'
+                ? parsed : hookUnknown('process_failed');
+            logger.warn('Write hook failed', result.hookVerdict ?? { status: result.decision });
+            return result;
+          }
           const detail = err instanceof Error ? err.message : String(err);
           logger.error(`Command hook failed for event ${relevantEvent}`, {
             event: relevantEvent,

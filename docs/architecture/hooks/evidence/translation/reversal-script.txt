@@ -1,0 +1,22 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+const file = 'packages/ts-shell/src/core/hooks/translation.ts';
+const original = readFileSync(file, 'utf8');
+const cases = [
+  ['nested-veto', "if (isRecord(value.hookSpecificOutput) && value.hookSpecificOutput.permissionDecision === 'deny')", "if (false)", 'normalizes a nested deny'],
+  ['canonical-name', "write: 'Write', edit: 'Edit'", "write: 'write', edit: 'edit'", 'preserves the full call'],
+  ['unknown-policy', "return result.decision === 'unknown' ?", "return false ?", 'keeps could_not_decide'],
+];
+try {
+  for (const [name, before, after, filter] of cases) {
+    if (!original.includes(before)) throw Error('Missing mutation anchor');
+    writeFileSync(file, original.replace(before, after));
+    const result = spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', '--root', 'packages/ts-shell',
+      'src/core/hooks/translation.test.ts', '-t', filter], { encoding: 'utf8', timeout: 60000,
+      env: { ...process.env, VITEST_MAX_THREADS: '1', VITEST_MIN_THREADS: '1' } });
+    writeFileSync(`.tmp/hook-translation/reversal-${name}.log`, result.stdout + result.stderr);
+    const detected = result.status === 1 && /Tests\s+[1-9][0-9]* failed/.test(result.stdout);
+    console.log(JSON.stringify({ mutation: name, exit: result.status, detected }));
+    if (!detected) throw Error('Reversal was not detected');
+  }
+} finally { writeFileSync(file, original); }

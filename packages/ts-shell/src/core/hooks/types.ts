@@ -22,13 +22,19 @@ export type HookEventName =
   | "Stop"
   | "StopFailure";
 
-export type HookDecisionKind = "allow" | "block" | "retry" | "ask" | "defer";
+export type HookDecisionKind = "allow" | "block" | "retry" | "ask" | "defer" | "unknown" | "unsupported";
 
 export interface HookDecision {
   readonly decision: HookDecisionKind;
   readonly reason?: string;
   readonly feedback?: string;
   readonly hookSpecificOutput?: Record<string, unknown>;
+  readonly hookVerdict?: {
+    readonly status: 'allow' | 'block' | 'unknown' | 'unsupported';
+    readonly source: 'adapter' | 'hook';
+    readonly reasonCode: string;
+    readonly policy?: 'block';
+  };
 }
 
 export interface BaseHookEventPayload {
@@ -174,6 +180,8 @@ export interface InProcessHookConfig {
 }
 
 export interface CommandHookConfig {
+  /** Opt-in canonical write translation. Invalid declarations fail closed at dispatch. */
+  readonly writeGate?: unknown;
   readonly name?: string;
   readonly description?: string;
   readonly event: HookEventName;

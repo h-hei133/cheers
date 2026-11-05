@@ -1,0 +1,300 @@
+npm notice run cheers@0.1.0 verify:import-cycles
+npm notice run node scripts/check-import-cycles.mjs
+scc-gate root=packages/ts-shell/src files=3090
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+npm notice run cheers@0.1.0 check:config-consumers
+npm notice run node scripts/check-config-consumers.mjs
+config-consumer-check fields=64 read=64 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+npm notice run cheers@0.1.0 check:declarations
+npm notice run node scripts/check-declarations.mjs
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+npm notice run cheers@0.1.0 check:node-floor
+npm notice run node scripts/check-node-floor.mjs
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+npm notice run cheers@0.1.0 verify:docs-drift:strict
+npm notice run node scripts/verify-docs-and-rules-drift.mjs --strict
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run cheers@0.1.0 test:scripts
+npm notice run node --test scripts/*.test.mjs
+✔ defaults to warm cache and rejects unknown controls (1.517509ms)
+✔ allows global cold control only on Linux (0.140814ms)
+✔ warm control prepares without running commands (0.928124ms)
+✔ global cold control syncs then drops caches without a password prompt (0.16956ms)
+✔ global cold control fails closed on command errors (1.398127ms)
+✔ cache evidence rejects missing or mislabeled preparations (0.284633ms)
+✔ early frame requires the real Loading editor and keeps readiness separate (1.099357ms)
+✔ line and pipe retain their own surfaces without inventing an interactive frame (0.225549ms)
+✔ startup output acquisition is bounded (3.604425ms)
+✔ process timing distinguishes early input and write from runtime adoption and write (0.690953ms)
+✔ missing, duplicated, invalid or out-of-order startup evidence is rejected (0.853308ms)
+✔ key measurement ignores unrelated output and waits for complete UTF-8 input (0.712565ms)
+✔ key measurement fails on timeout and releases listeners (11.082438ms)
+✔ key measurement fails when output closes or the input write fails (0.59149ms)
+✔ process settlement waits for stream close, including a signal exit (2.072608ms)
+✔ launch errors are retained until close and remain observable (0.525121ms)
+✔ an observation timeout does not settle or relaunch the live process (5.512143ms)
+✔ cleanup forwards termination and waits for actual close (1.075907ms)
+✔ hard timeout cannot look successful even if the wrapper closes with zero (5.071149ms)
+✔ Linux PTY termination closes the wrapper and its actual target (2042.643898ms)
+✔ Linux target observation distinguishes a zombie from a running process (2023.979792ms)
+✔ a module whose exported function nothing calls is reported (42.887743ms)
+✔ an import is not a call (37.874389ms)
+✔ a call through an object literal counts, so the module is not reported (39.625763ms)
+✔ a module that registers itself on import is not reported (38.954278ms)
+✔ an entry point is exempt, because the process calls it (39.534627ms)
+✔ a name mentioned only inside a comment does not count as a call (37.95701ms)
+✔ a name inside a string literal does not count as a call (39.501661ms)
+✔ a call to a three-letter name counts, so it is not reported (35.006525ms)
+✔ a call from a .tsx file counts, so the callee is not reported (35.194611ms)
+✔ the gate passes on a tree where everything is called (37.731554ms)
+✔ an exported singleton counts as a use of the class it instantiates (37.539314ms)
+✔ a tree with no source files cannot pass (34.659835ms)
+✔ a spread call counts, so the callee is not reported (43.148019ms)
+✔ passes when every declared field has a production reader (51.054212ms)
+✔ reports a field that is declared, defaulted and merged but never read (39.509497ms)
+✔ reports a field read only by a test as having no production reader (37.198877ms)
+✔ counts a field read from another production module as consumed (38.676638ms)
+✔ does not count a member access as reading the config field of the same name (35.740543ms)
+✔ fails loudly when a required interface cannot be found (36.492582ms)
+✔ fails loudly when an interface declares no readonly fields (36.512021ms)
+✔ fails loudly when the config module is absent (30.970402ms)
+✔ passes when every event dispatches and every factory is registered (38.79268ms)
+✔ reports a hook event that nothing dispatches (43.596905ms)
+✔ reports a tool factory the registry never calls (38.099035ms)
+✔ an exempted factory name is reported as recorded, not as a finding (42.963541ms)
+✔ does not count the declaration module itself as a dispatch site (39.832876ms)
+✔ counts a dispatch from any production module (38.406353ms)
+✔ fails loudly when the hook union is not found (42.487236ms)
+✔ fails loudly when the union parses to fewer members than the floor (37.228573ms)
+✔ fails loudly when no tool factory is found (40.811427ms)
+✔ fails loudly when the source tree is missing (39.843745ms)
+✔ passes when nothing newer than the declared floor is used (43.362074ms)
+✔ reports the API that actually reached the tree (38.052435ms)
+✔ reports the line the call is on, not the line after a collapsed comment (36.241823ms)
+✔ finds a use written after a string containing two slashes (35.038762ms)
+✔ does not report an API named only in a comment (36.083996ms)
+✔ passes when the declared floor is new enough (36.37548ms)
+✔ fails loudly when the floor cannot be read (39.345828ms)
+✔ fails loudly when the tree holds no source (32.98339ms)
+✔ ignores test files, which may name an API while asserting about it (36.452739ms)
+✔ split documents join defaults and leave all user state unchanged (940.810965ms)
+✔ auth-only, settings-only and legacy sources use runtime fallback without migration (2674.814146ms)
+✔ absent documents and missing HOME never create user directories (1715.930936ms)
+✔ named profile isolates default/legacy credentials and refuses missing or linked profiles (2538.62996ms)
+✔ malformed, invalid and unreadable documents refuse with value-free diagnostics (3310.133119ms)
+✔ environment priority, pending connection and closed pool use the credential owner (3743.581905ms)
+✔ explicit empty model owner prevents legacy defaults from reviving (838.895404ms)
+✔ readiness preflight accepts split defaults and reports invalid sources without secrets (1739.424376ms)
+✔ doctor accepts auth-only documents while keeping authentication unverified (5702.603899ms)
+✔ daily and broader select explicit auth-only HOME and read its joined active connection (3270.745598ms)
+✔ baseline uses split model and exact authorization, drains stream and reports no body (948.142624ms)
+✔ mismatched baseline and pending connection never dispatch requests (2504.651542ms)
+✔ HTTP refusal and redirects never report response bodies or forward credentials (1754.085528ms)
+✔ a stream that breaks after its first chunk remains inconclusive (927.452585ms)
+✔ stable links work but same-byte auth retarget during response refuses publication (1735.419237ms)
+✔ settings and catalogue changes during the baseline refuse stale success (1751.722027ms)
+✔ a SIGINT interruption stops the owned runner and restores process listeners (96.691544ms)
+✔ a SIGTERM interruption stops the owned runner and restores process listeners (89.816169ms)
+✔ a timed out runner settles and preserves cleanup truth for owned descendants (1510.504879ms)
+✔ a timed out runner settles and preserves cleanup truth for escaped descendants (4545.184447ms)
+✔ the installed archive and adapted entries match the reproducible artifact (10.067978ms)
+✔ a graph above the old capacity reaches the real evaluator and late missing imports remain visible (69.992702ms)
+✔ the declared capacity is accepted exactly and one additional edge fails without a partial graph (106.350993ms)
+✔ wide imports, literal dynamic imports and TSX paths cannot disappear or resolve to a different explicit file (3.145423ms)
+✔ the complete repository declaration graph matches TypeScript and remains acyclic (5838.31162ms)
+✔ the unchanged blocking obligation rejects a native CLI workspace with a missing TSX import (303.819646ms)
+✔ ASI declarations cannot hide a missing side-effect import from the native blocking obligation (297.490579ms)
+✔ a native self import remains a cycle under the unchanged advisory obligation (297.500757ms)
+✔ literal syntax and file grammar retain targets, while parse errors discard the entire collection (2.583042ms)
+✔ bounded large ASI export input cannot cause quadratic clause scanning (481.081496ms)
+✔ the Phase 20 audit covers every declared task ID exactly once (2.190798ms)
+✔ a missing or extra task ID fails the audit (1.681969ms)
+✔ complete rows cannot retain missing evidence and partial rows cannot hide it (0.248112ms)
+✔ the current matrix does not claim Phase 20 completion (0.608092ms)
+✔ waits for the complete copy result and targets the relocated painted diff (2.003564ms)
+✔ handles native success without changing source geometry (0.416449ms)
+✔ refuses a source row that was erased or only partially painted (2.45212ms)
+✔ waits for the initial source row to finish painting across output chunks (0.431258ms)
+✔ still rejects wrong-side source even when both copy operations emit OSC52 (0.421699ms)
+✔ waits when another source row repaint is incomplete after the copy result (0.526513ms)
+✔ isolates the packaged PTY probe from real homes, credentials and Git config (9.260488ms)
+✔ relays terminal input and output without a parent TTY (169.318372ms)
+✔ the run manifest binds every evidence class and rejects later changes (12.934235ms)
+✔ ratings extend the manifest without blessing changed or extra evidence (15.072676ms)
+✔ the run manifest decoder rejects unsafe, duplicate and unsorted entries (0.24664ms)
+✔ the shipped quality corpus is bounded and includes a blind-human task (1.698542ms)
+✔ the formal corpus covers every preregistered category and language-neutral task shape (1.037426ms)
+✔ a qualifying corpus cannot silently drop a required category (0.587481ms)
+✔ the tokenizer corpus requires all four language strata (0.839001ms)
+✔ a corpus cannot self-promote or omit its qualification state (0.31901ms)
+✔ a deterministic task cannot pass without an observable check (0.248804ms)
+✔ a corpus cannot override harness-owned provider, config or session arguments (0.438963ms)
+✔ quality event parsing rejects prose and non-monotonic order (0.312056ms)
+✔ run projection keeps tool, discovery, final-text and usage facts separate (0.621919ms)
+✔ run projection measures turns, approvals, argument failures, cache and priced cost (0.42741ms)
+✔ run projection falls back to the terminal result when turn content is empty (4.434268ms)
+✔ deterministic scoring reads final files and never treats a blind rubric as a pass (0.688899ms)
+✔ deterministic scoring distinguishes attempted, successful, denied and absent-file facts (0.309301ms)
+✔ blind ratings require two independent values and adjudicate disagreement (0.390228ms)
+✔ blind ratings update only subjective outcomes and preserve execution facts (0.243824ms)
+✔ raw evidence hashes model text instead of persisting the response body (0.738134ms)
+✔ blind review text is redacted before it can be written as an artifact (0.974704ms)
+✔ paired risk difference is deterministic and retains discordant counts (8.020788ms)
+✔ tokenizer error is reported by language without promoting missing strata (1.883671ms)
+✔ report status remains inconclusive or partial when evidence is missing (3.125444ms)
+✔ complete requires a qualifying corpus, measured runtime, ratings and policy evidence (197.988835ms)
+✔ a policy violation prevents a complete quality verdict (0.933475ms)
+✔ restore acceptance compares exact workspace, record and blob bytes (8.945321ms)
+✔ session acceptance requires persisted successful results for every tool call (5.287606ms)
+✔ uses Linux script options for a real terminal (1.561965ms)
+✔ uses the Python PTY relay on macOS (0.212743ms)
+✔ refuses terminal modes on Windows instead of faking a PTY (0.399977ms)
+✔ preserves Node execution options when launching the verified child (1.266712ms)
+✔ does not inherit the launcher inspector in a real child process (30.289615ms)
+✔ applies launcher Node execution options in a real child process (34.346435ms)
+✔ accepts a complete immutable build and returns its contained entry (58.07562ms)
+✔ binds a single-file executable to the published build and rejects tampering (39.192631ms)
+✔ restricts executable output to a file directly inside dist/bin (2.076115ms)
+✔ keeps the executable suffix Bun requires for a Windows compile target (0.28269ms)
+✔ recognizes both host target spellings and keeps other targets cross-target (0.130293ms)
+✔ names immutable Windows executables with the .exe suffix (59.942017ms)
+✔ restores the previous manifest when executable verification fails (29.588125ms)
+✔ refuses to bind an executable without compiler provenance (22.553995ms)
+✔ refuses to attach an executable after build inputs change (25.572311ms)
+✔ rejects an empty executable and keeps the previous manifest (22.43389ms)
+✔ does not claim a cross-target executable was host-verified (32.483863ms)
+✔ rejects host verification recorded for a different target (24.086741ms)
+✔ rejects host verification recorded for a different build version (28.323568ms)
+✔ publishes a complete build through the transaction (30.056785ms)
+✔ binds enumerated compiler inputs outside known type roots (50.361931ms)
+✔ rejects missing, outdated and version-mismatched manifests (21.622011ms)
+✔ rejects a missing immutable build directory (21.532529ms)
+✔ rejects a manifest that omits required runtime assets (25.297636ms)
+✔ rejects changed build inputs before executing an old artifact (22.864327ms)
+✔ binds compiler libraries and the build mode (73.97966ms)
+✔ rejects input changes between compilation and publication (26.785047ms)
+✔ rejects changed or extra emitted bytes (51.480271ms)
+✔ rejects missing emitted assets and changed launcher bytes (64.343222ms)
+✔ rejects symlinked build inputs and emitted artifacts (43.24108ms)
+✔ rejects an ancestor symlink around the immutable build set (20.754897ms)
+✔ rejects entries outside or unlisted by the immutable build (43.666296ms)
+✔ rejects malformed artifact metadata without throwing (21.885956ms)
+✔ refuses to overwrite an existing build with different bytes (21.891375ms)
+✔ does not publish when a required final artifact is missing (15.030493ms)
+✔ restores the previous launcher when compilation or publication fails (21.759368ms)
+✔ rolls back the package main pointer when manifest publication fails (34.148058ms)
+✔ recovers a publish journal before a new publication (21.693972ms)
+✔ does not recover a transaction while its build lock is active (21.315377ms)
+✔ fails closed on a stale build lock without changing the transaction (25.380969ms)
+✔ holds the build lock before recovering a transaction (22.991493ms)
+✔ preserves the TypeScript compiler exit code (31.770798ms)
+✔ does not remove a lock owned by another build (9.097261ms)
+✔ fails publication without removing a lock replaced during compilation (23.739649ms)
+✔ repairs a launcher with the correct bytes and wrong mode (12.084577ms)
+[pass] test-valid
+[product-regression] test-failed - apply_patch reported a failed or compensated result
+{"schemaVersion":"run-event-stream.v1","eventType":"approval.resolved","order":8,"facts":{"toolName":"apply_patch","taskId":"call-1","outcome":"approved"},"toolCallId":"call-1","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"tool.result","order":10,"facts":{"toolName":"apply_patch","taskId":"call-1","success":false,"output":"committed","metadata":{"files":[{"compensation":"none"}]}},"toolCallId":"call-1","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"query.completed","order":11,"facts":{"result":{"status":"completed"}},"truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+[product-regression] test-order - apply_patch approval/result ordering or correlation is invalid
+{"schemaVersion":"run-event-stream.v1","eventType":"approval.resolved","order":12,"facts":{"toolName":"apply_patch","taskId":"call-1","outcome":"approved"},"toolCallId":"call-1","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"tool.result","order":10,"facts":{"toolName":"apply_patch","taskId":"call-1","success":true,"output":"committed","metadata":{"files":[{"compensation":"none"}]}},"toolCallId":"call-1","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"query.completed","order":11,"facts":{"result":{"status":"completed"}},"truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+[product-regression] test-correlation - apply_patch approval/result ordering or correlation is invalid
+{"schemaVersion":"run-event-stream.v1","eventType":"approval.resolved","order":8,"facts":{"toolName":"apply_patch","taskId":"call-1","outcome":"approved"},"toolCallId":"call-other","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"tool.result","order":10,"facts":{"toolName":"apply_patch","taskId":"call-1","success":true,"output":"committed","metadata":{"files":[{"compensation":"none"}]}},"toolCallId":"call-1","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"query.completed","order":11,"facts":{"result":{"status":"completed"}},"truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+✔ accepts a correlated successful approval and tool result (1.324755ms)
+✔ rejects a tool result that reports failure (0.274253ms)
+✔ rejects approval ordering after the tool result (0.220509ms)
+✔ rejects approval and result call-id mismatch (0.219777ms)
+✔ routing requires current suites and executed critical scenarios (4.610745ms)
+✔ local execution requires current suites and executed critical scenarios (1.916323ms)
+✔ error taxonomy requires current suites and executed critical scenarios (0.742793ms)
+✔ error taxonomy pins both report-safety variants (0.110335ms)
+✔ accepts a report only with executed passing contract assertions (0.991988ms)
+✔ rejects skipped, pending, todo and failed assertions despite runner success (0.291847ms)
+✔ rejects runner or suite failure and malformed reports (0.166874ms)
+✔ rejects a missing required scenario even when its suite has other passing assertions (0.274423ms)
+✔ requires every declared variant of a parameterized contract scenario (0.228163ms)
+✔ classifies contract failures without collapsing product and setup states (1.077484ms)
+✔ release orchestration preserves every gate exit classification (0.229266ms)
+✔ successful gate cleanup reports an uncertain retained artifact (0.151074ms)
+ℹ tests 191
+ℹ suites 0
+ℹ pass 191
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 36315.933065
+npm notice run cheers@0.1.0 build
+npm notice run npm run build:ts
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest 9c64b16f9aa7 for @cheers/ts-shell@0.1.0
+
+ RUN  v0.34.6 <cheers>/packages/ts-shell
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > nested deny prevents the actual native write
+{"probe":"nested-deny-native-write","targetExists":false,"result":"Blocked by Hook: fixture rule"}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > flat deny prevents the actual native write
+{"probe":"flat-deny-native-write","targetExists":false,"result":"Blocked by Hook: fixture rule"}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > malformed blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"malformed","result":{"decision":"block","reason":"The write hook could not be evaluated (invalid_output).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"invalid_output"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > timeout blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"timeout","result":{"decision":"block","reason":"The write hook could not be evaluated (timeout).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"timeout"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > version blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"version","result":{"decision":"block","reason":"The write hook could not be evaluated (version_mismatch).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"version_mismatch"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > empty blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"empty","result":{"decision":"block","reason":"The write hook could not be evaluated (empty_output).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"empty_output"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > nonzero blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"nonzero","result":{"decision":"block","reason":"The write hook could not be evaluated (process_failed).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"process_failed"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > loads canonical configuration, binds trust identity and sends complete metadata
+{"probe":"unsupported","toolName":"apply_patch","result":{"decision":"unsupported","reason":"A patch may contain multiple targets, while content rules apply per file; patch normalization is not implemented.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"patch_targets"}}}
+{"probe":"unsupported","toolName":"bash","result":{"decision":"unsupported","reason":"Shell commands do not describe their final per-file content.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"shell_effects"}}}
+{"probe":"unsupported","toolName":"mcp__write","result":{"decision":"unsupported","reason":"This tool (including MCP tools) has no declared single-file content semantics.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"tool_semantics"}}}
+{"probe":"unsupported","toolName":"browser","result":{"decision":"unsupported","reason":"Browser and desktop actions are not single-file content operations.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"external_effects"}}}
+{"probe":"unsupported","toolName":"MultiEdit","result":{"decision":"unsupported","reason":"Multiple edits have no verified single-file replacement projection.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"multiple_edits"}}}
+{"probe":"unsupported","toolName":"NotebookEdit","result":{"decision":"unsupported","reason":"Notebook cell operations are not full file replacement content.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"notebook_cells"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > runs the pinned artifact for write to allow and block without changing ordinary permission
+{"probe":"pinned-artifact","node":"v20.3.0","toolName":"write","allowed":{"decision":"allow","hookVerdict":{"status":"allow","source":"hook","reasonCode":"no_violation"}},"blocked":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- no-import: imports private/x.ts\n  Keep private imports out.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > runs the pinned artifact for edit to allow and block without changing ordinary permission
+{"probe":"pinned-artifact","node":"v20.3.0","toolName":"edit","allowed":{"decision":"allow","hookVerdict":{"status":"allow","source":"hook","reasonCode":"no_violation"}},"blocked":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- no-import: imports private/x.ts\n  Keep private imports out.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+ ✓ src/core/hooks/translation.integration.test.ts  (15 tests) 1728ms
+ ✓ src/core/hooks/translation.test.ts  (27 tests) 8ms
+stdout | src/entrypoints/writeHook.test.ts > normal turn uses the shared declared translation with real artifact output
+{"probe":"normal turn","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/entrypoints/writeHook.test.ts > native prepared uses the shared declared translation with real artifact output
+{"probe":"native prepared","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/entrypoints/writeHook.test.ts > native security uses the shared declared translation with real artifact output
+{"probe":"native security","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/entrypoints/writeHook.test.ts > native Git uses the shared declared translation with real artifact output
+{"probe":"native Git","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reason":"native shell policy"}}
+
+ ✓ src/entrypoints/writeHook.test.ts  (4 tests) 1040ms
+
+ Test Files  3 passed (3)
+      Tests  46 passed (46)
+   Start at  19:05:52
+   Duration  6.91s (transform 3.51s, setup 0ms, collect 9.29s, tests 2.78s, environment 0ms, prepare 211ms)
+

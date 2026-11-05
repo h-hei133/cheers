@@ -1,0 +1,47 @@
+npm notice run cheers@0.1.0 test:ts
+npm notice run npm run test -w packages/ts-shell src/core/hooks/translation.test.ts src/core/hooks/translation.integration.test.ts
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/hooks/translation.test.ts src/core/hooks/translation.integration.test.ts
+
+ RUN  v0.34.6 <repository>/packages/ts-shell
+
+ ✓ src/core/hooks/translation.test.ts  (27 tests) 9ms
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > nested deny prevents the actual native write
+{"probe":"nested-deny-native-write","targetExists":false,"result":"Blocked by Hook: fixture rule"}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > flat deny prevents the actual native write
+{"probe":"flat-deny-native-write","targetExists":false,"result":"Blocked by Hook: fixture rule"}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > malformed blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"malformed","result":{"decision":"block","reason":"The write hook could not be evaluated (invalid_output).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"invalid_output"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > timeout blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"timeout","result":{"decision":"block","reason":"The write hook could not be evaluated (timeout).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"timeout"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > version blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"version","result":{"decision":"block","reason":"The write hook could not be evaluated (version_mismatch).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"version_mismatch"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > empty blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"empty","result":{"decision":"block","reason":"The write hook could not be evaluated (empty_output).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"empty_output"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > nonzero blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"nonzero","result":{"decision":"block","reason":"The write hook could not be evaluated (process_failed).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"process_failed"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > loads canonical configuration, binds trust identity and sends complete metadata
+{"probe":"unsupported","toolName":"apply_patch","result":{"decision":"unsupported","reason":"A patch may contain multiple targets, while content rules apply per file; patch normalization is not implemented.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"patch_targets"}}}
+{"probe":"unsupported","toolName":"bash","result":{"decision":"unsupported","reason":"Shell commands do not describe their final per-file content.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"shell_effects"}}}
+{"probe":"unsupported","toolName":"mcp__write","result":{"decision":"unsupported","reason":"This tool (including MCP tools) has no declared single-file content semantics.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"tool_semantics"}}}
+{"probe":"unsupported","toolName":"browser","result":{"decision":"unsupported","reason":"Browser and desktop actions are not single-file content operations.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"external_effects"}}}
+{"probe":"unsupported","toolName":"MultiEdit","result":{"decision":"unsupported","reason":"Multiple edits have no verified single-file replacement projection.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"multiple_edits"}}}
+{"probe":"unsupported","toolName":"NotebookEdit","result":{"decision":"unsupported","reason":"Notebook cell operations are not full file replacement content.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"notebook_cells"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > runs the pinned artifact to allow and block without changing ordinary permission
+{"probe":"pinned-artifact","node":"v24.15.0","allowed":{"decision":"allow","hookVerdict":{"status":"allow","source":"hook","reasonCode":"no_violation"}},"blocked":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- no-import: imports private/x.ts\n  Keep private imports out.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+ ✓ src/core/hooks/translation.integration.test.ts  (13 tests) 685ms
+
+ Test Files  2 passed (2)
+      Tests  40 passed (40)
+   Start at  18:28:59
+   Duration  5.07s (transform 3.13s, setup 0ms, collect 4.19s, tests 694ms, environment 0ms, prepare 116ms)
+

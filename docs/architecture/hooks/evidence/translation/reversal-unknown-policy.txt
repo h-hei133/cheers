@@ -1,0 +1,42 @@
+
+ RUN  v0.34.6 <repository>/packages/ts-shell
+
+ ❯ src/core/hooks/translation.test.ts  (27 tests | 1 failed | 26 skipped) 7ms
+   ❯ src/core/hooks/translation.test.ts > hook output authority > keeps could_not_decide unknown until the explicit Cheers block policy
+     → expected { decision: 'unknown', …(2) } to match object { decision: 'block', …(1) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 skipped (27)
+   Start at  18:42:13
+   Duration  289ms (transform 47ms, setup 0ms, collect 48ms, tests 7ms, environment 0ms, prepare 55ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/hooks/translation.test.ts > hook output authority > keeps could_not_decide unknown until the explicit Cheers block policy
+AssertionError: expected { decision: 'unknown', …(2) } to match object { decision: 'block', …(1) }
+
+- Expected
++ Received
+
+  Object {
+-   "decision": "block",
++   "decision": "unknown",
+    "hookVerdict": Object {
+-     "policy": "block",
++     "reasonCode": "could_not_decide",
+      "source": "hook",
+      "status": "unknown",
+    },
++   "reason": "The write gate could not reach a decision.",
+  }
+
+ ❯ src/core/hooks/translation.test.ts:61:42
+     59|     const result = translateWriteResult('{"decision":"allow","reasonCo…
+     60|     expect(result).toMatchObject({ decision: 'unknown', hookVerdict: {…
+     61|     expect(applyWriteHookPolicy(result)).toMatchObject({ decision: 'bl…
+       |                                          ^
+     62|     expect(result.decision).toBe('unknown');
+     63|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

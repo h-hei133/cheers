@@ -1,0 +1,41 @@
+
+ RUN  v0.34.6 <repository>/packages/ts-shell
+
+ ❯ src/core/hooks/translation.test.ts  (27 tests | 1 failed | 26 skipped) 7ms
+   ❯ src/core/hooks/translation.test.ts > hook output authority > normalizes a nested deny before considering a conflicting allow
+     → expected { decision: 'block', …(2) } to deeply equal { decision: 'block', …(1) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 skipped (27)
+   Start at  18:42:12
+   Duration  285ms (transform 42ms, setup 0ms, collect 45ms, tests 7ms, environment 0ms, prepare 52ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/hooks/translation.test.ts > hook output authority > normalizes a nested deny before considering a conflicting allow
+AssertionError: expected { decision: 'block', …(2) } to deeply equal { decision: 'block', …(1) }
+
+- Expected
++ Received
+
+  Object {
+    "decision": "block",
+-   "reason": "rule denied",
++   "hookVerdict": Object {
++     "reasonCode": "invalid_output",
++     "source": "adapter",
++     "status": "unknown",
++   },
++   "reason": "The write hook could not be evaluated (invalid_output).",
+  }
+
+ ❯ src/core/hooks/translation.test.ts:53:8
+     51|   it('normalizes a nested deny before considering a conflicting allow'…
+     52|     expect(translateWriteResult(JSON.stringify({ decision: 'allow', ho…
+     53|       .toEqual({ decision: 'block', reason: 'rule denied' });
+       |        ^
+     54|   });
+     55|   it.each(['no_violation', 'not_configured'])('keeps explicit allow re…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

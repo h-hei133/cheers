@@ -2083,3 +2083,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A native operation reuses a hook approval collected by a normal turn despite constructing a fresh dispatcher; passing a temporary registration `homeDir` does not isolate its approval writes.
 - **Root Cause**: Registration's `homeDir` controls declaration loading only. Its default `HookTrustStore` resolves the active user/profile path, and durable fingerprints contain event, matcher, command and source path rather than the dispatcher or route.
 - **Rule**: Test one-shot and durable grants separately across actual registration producers. Isolate HOME/USERPROFILE before loading singleton owners, or pass an explicit temporary trust store as well as `homeDir`. Distinguish refusing to run a hook from refusing the ordinary tool action; a skipped hook has not issued a veto.
+
+### Hook Coverage Must Survive Later Feedback
+- **Symptom**: A translated hook reports unsupported, then a later native feedback object makes dispatch appear allowed.
+- **Root Cause**: One accumulated result slot treated coverage status and optional feedback as interchangeable.
+- **Rule**: Preserve unknown/unsupported classifications through aggregation; only explicit block/retry may supersede them. Test a semantic gap followed by native feedback and an explicit allow. Keep upstream could_not_decide separate from adapter errors and apply the host policy explicitly.

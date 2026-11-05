@@ -1,6 +1,28 @@
-# Cheers 宿主能力矩阵（C0）
+# Cheers 宿主能力矩阵
 
-观测基点：`0057eb604ecc8d154ce691794b494c354e89755b`，2026-11-05，Linux x64 / Node `v24.15.0`。这是现状证据，不是 C1 translation adapter 或 C2 completion gate 的交付。六个合成探针的输入、观察点、真实输出见 [探针记录](probes.md) 与 [机器记录](results.json)；命令、边界及 commit message 版本见 [执行记录](execution.md)。
+原 C0 观测基点：`0057eb604ecc8d154ce691794b494c354e89755b`，2026-11-05，Linux x64 / Node `v24.15.0`。原六个合成探针见 [探针记录](probes.md)、[机器记录](results.json) 与 [执行记录](execution.md)。下列新增表记录 C1 的能力变化；后面的 C0 表保留历史观测，凡有差异以新增表及 [翻译契约](translation.md) 为当前实现。Stop 仍未实现 completion enforcement。
+
+## 翻译适配器后的能力变化
+
+所有行仍受声明批准、workspace/准入检查和普通 permission 约束。实际输出及命令见
+[翻译执行记录](translation-execution.md)。新能力只在明确配置 `writeGate` 后生效；
+PreToolUse nested deny 的 flat 归一化同时适用于普通 command 和 in-process hook。
+
+| 事件/工具 | C0 | C1 当前能力 | 依据/限制 |
+| --- | --- | --- | --- |
+| PreToolUse write/path+content | 可阻断但缺翻译 | 可判，canonical Write；nested deny 阻断 native write | 原生 tool gate + 实际 artifact 正反例；普通权限独立 |
+| PreToolUse edit/path+content | 待翻译 | 可判，canonical Edit | 完整单文件替换；局部或混合参数仍 unsupported |
+| MultiEdit / NotebookEdit | 无形状合同 | unsupported，分别为 multiple_edits / notebook_cells | 单项、多项都无已验证的完整文件投影 |
+| apply_patch | 拟议 adapter unsupported | unsupported / patch_targets | 已有 parsePatch 可取路径；一个 patch 可含多个目标，内容规则逐文件；尚未实现逐文件归一化 |
+| bash / native Git | 无最终文件效果 | unsupported / shell_effects | 其他 native flat hook 仍能拒绝 shell 调用 |
+| MCP / browser / desktop | 无通用副作用映射 | unsupported / tool_semantics 或 external_effects | 不宣传外部写保护 |
+| malformed / timeout / version | 原生 command failure | adapter block + unknown 原因码 | 原因及诊断不含 payload/堆栈；空 stdout 和不可解析非零也阻断 |
+| could_not_decide | 原 wire allow，宿主可继续 | 翻译 unknown → Cheers policy block | 保留 hook 来源与 policy:block；不成为 allow/proven |
+| normal / prepared / security | 原生 flat 已接入 | 两条注册路径共用翻译，实际 artifact block | 4 个路径测试含 native Git；不改变普通 permission |
+| Node 20.3.0 | 未验证 | 适配器与独立 pinned artifact 实测 allow/block | Linux x64，46 项测试；旧 Node ≥24 judge bundle 不变 |
+| timeout/re-entry | JSON timeout 丢弃/无重入 | writeGate 的 timeoutMs 保留并纳入指纹；无重入明确记录 | 普通 command 声明的旧 timeout 行为不变；Stop 不变 |
+
+## C0 历史观测（以下表格不含 C1 更新）
 
 依据：只读的 `/home/wang/projects/normproof/.wiki/features/phase-1-decisions.md`，C0（1793–1810）、P1-C7/C8（1613–1635）、P1-C17/C18（1893–1904）、P1-C23/C24（1971–1983）。**实测修正附件的一处前提：两条注册路径的 dispatcher 独立，不等于持久批准记录独立。**同一 home/profile 和相同 fingerprint 时，两条路径读取同一信任文件；`allow-once` 不持久化，`allow-always` 可跨路径复用。
 

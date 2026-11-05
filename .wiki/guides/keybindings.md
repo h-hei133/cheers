@@ -91,8 +91,8 @@ In Settings, Left/Right changes the top category; Tab or Shift+Tab toggles rows 
 | `app.exit` | `ctrl+d` | Exit when the draft is empty |
 | `app.clearScreen` | `ctrl+l` | Clear the screen |
 | `app.message.followUp` | `ctrl+q` | Queue the draft to run after the turn; sends it now when idle |
-| `app.thinking.cycle` | `shift+tab` | Switch between planning and building |
-| `app.thinking.toggle` | `ctrl+t` | Collapse or expand thinking blocks |
+| `app.agentMode.cycle` | `shift+tab` | Switch between planning and building |
+| `app.thinkingBlocks.toggle` | `ctrl+t` | Collapse or expand thinking blocks |
 | `app.tools.expand` | `ctrl+o` | Collapse or expand tool output |
 | `app.permission.cycle` | `alt+p` | Cycle the permission scope |
 | `app.retry` | `f5` | Retry the last prompt |

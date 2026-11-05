@@ -17,6 +17,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { HookEventName } from "./types.js";
+import { writeHookCommand } from './artifact.js';
 import { resolveUserDataFile, userDataDir, userHomeDir } from "../../core/paths/userHome.js"
 
 /**
@@ -49,6 +50,8 @@ const HOOK_EVENTS: readonly HookEventName[] = [
 
 /** One hook a configuration declared, resolved to the fields that matter. */
 export interface HookDeclaration {
+  readonly writeGate?: unknown;
+  readonly timeoutMs?: number;
   readonly event: HookEventName;
   readonly matcher?: string;
   readonly command: string;
@@ -152,7 +155,7 @@ function readOne(configPath: string): HookConfigLoadResult {
         continue;
       }
       for (const command of commands) {
-        hooks.push({ event: eventName, matcher, command, sourcePath: configPath });
+        hooks.push({ event: eventName, matcher, ...command, sourcePath: configPath });
       }
     }
   }
@@ -167,16 +170,22 @@ function readOne(configPath: string): HookConfigLoadResult {
  * established configuration files use, and a shape people already have is worth
  * matching even when a flatter one would do.
  */
-function readCommands(group: unknown): string[] {
+function readCommands(group: unknown): Pick<HookDeclaration, 'command' | 'writeGate' | 'timeoutMs'>[] {
   if (typeof group !== "object" || group === null || !("hooks" in group)) return [];
   const handlers = group.hooks;
   if (!Array.isArray(handlers)) return [];
 
-  const commands: string[] = [];
+  const commands: Pick<HookDeclaration, 'command' | 'writeGate' | 'timeoutMs'>[] = [];
   for (const handler of handlers) {
-    if (typeof handler !== "object" || handler === null || !("command" in handler)) continue;
+    if (typeof handler !== "object" || handler === null) continue;
+    if ('writeGate' in handler) {
+      commands.push({ command: writeHookCommand(handler.writeGate), writeGate: handler.writeGate,
+        ...('timeoutMs' in handler && typeof handler.timeoutMs === 'number' ? { timeoutMs: handler.timeoutMs } : {}) });
+      continue;
+    }
+    if (!("command" in handler)) continue;
     const command = handler.command;
-    if (typeof command === "string" && command.trim() !== "") commands.push(command);
+    if (typeof command === "string" && command.trim() !== "") commands.push({ command });
   }
   return commands;
 }

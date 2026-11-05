@@ -22,7 +22,7 @@ import { filterVisibleToolNames } from '../../../../core/tools/prefilter.js';
 
 const choices: Readonly<Record<string, unknown>> = {
   attentionOnIdle: true, offline: true, maxTurns: 24, temperature: 0.2, topP: 0.8, maxOutputTokens: 2048,
-  contextWindow: 65536, reserveTokens: 1000, keepRecentTokens: 2000,
+  contextWindow: 65536, reserveTokens: 1000, keepRecentTokens: 2000, compactionEnabled: false,
   modelTokenBudgets: { 'openai/fixture': { reserveTokens: 1000, keepRecentTokens: 2000 } },
   instructionBudgetBytes: 1024, cacheWarming: 'off', agentMode: 'plan', steeringMode: 'all', followUpMode: 'all',
   retryEnabled: false, retryMaxRetries: 2, providerRetryMaxRetries: 1, retryBaseDelayMs: 1000, retryMaxDelayMs: 10000,
@@ -30,7 +30,7 @@ const choices: Readonly<Record<string, unknown>> = {
   allowedTools: ['read', 'write'], allowedModels: ['openai/fixture'],
   pathRules: [{ path: '.', settings: { maxTurns: 3 } }], disabledTools: ['fixture.a', 'fixture.b'],
   hiddenToolPrefixes: ['fixture.'], denyRules: [{ tool: 'bash', pattern: 'fixture' }],
-  enableMcpTools: false, toolDiscovery: 'full', theme: 'light', vimMode: true, backgroundFollowUp: true,
+  enableMcpTools: false, toolDiscovery: 'full', theme: 'light', vimMode: true, backgroundFollowUp: true, collapseThinking: true,
   tuiMode: 'regular', 'tui.composerShape': 'box', 'tui.statusItems': ['model', 'cost'], 'tui.diagrams': 'off',
 };
 const cases = CONFIG_SETTINGS.flatMap(setting => (['user', 'project'] as const)
@@ -100,7 +100,7 @@ function surface(scope: SettingsScope) {
 
 it('requires an explicit valid exercise for every real setting and every editable scope', () => {
   expect(Object.keys(choices).sort()).toEqual(CONFIG_SETTINGS.map(setting => setting.key).sort());
-  expect(cases).toHaveLength(75);
+  expect(cases).toHaveLength(79);
   expect(cases.filter(test => test.scope === 'project').map(test => test.key)).not.toContain('cacheWarming');
 });
 

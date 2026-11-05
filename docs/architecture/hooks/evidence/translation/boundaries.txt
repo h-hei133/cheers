@@ -1,0 +1,9 @@
+{
+  "artifactSha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+  "artifactDigestMatches": true,
+  "sourceCommit": "a6ff094ac14049843b6c471eabd2aaa4a55ac8fb",
+  "sourceInputHashesMatched": 11,
+  "sourceInputHashesTotal": 11,
+  "upstreamWorktreeClean": true,
+  "untouchedTaskBoundaries": true
+}

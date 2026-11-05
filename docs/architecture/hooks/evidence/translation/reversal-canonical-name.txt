@@ -1,0 +1,66 @@
+
+ RUN  v0.34.6 <repository>/packages/ts-shell
+
+ ❯ src/core/hooks/translation.test.ts  (27 tests | 2 failed | 25 skipped) 9ms
+   ❯ src/core/hooks/translation.test.ts > canonical write translation > preserves the full call and budget for write without changing its args
+     → expected { decision: 'unsupported', …(2) } to deeply equal { version: 1, …(14) }
+   ❯ src/core/hooks/translation.test.ts > canonical write translation > preserves the full call and budget for edit without changing its args
+     → expected { decision: 'unsupported', …(2) } to deeply equal { version: 1, …(14) }
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 25 skipped (27)
+   Start at  18:42:13
+   Duration  287ms (transform 44ms, setup 0ms, collect 44ms, tests 9ms, environment 0ms, prepare 55ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/hooks/translation.test.ts > canonical write translation > preserves the full call and budget for write without changing its args
+ FAIL  src/core/hooks/translation.test.ts > canonical write translation > preserves the full call and budget for edit without changing its args
+AssertionError: expected { decision: 'unsupported', …(2) } to deeply equal { version: 1, …(14) }
+
+- Expected
++ Received
+
+  Object {
+-   "agentId": "worker",
+-   "args": Object {
+-     "content": "",
+-     "path": "a.ts",
+-   },
+-   "cwd": "/workspace",
+-   "event": "PreToolUse",
+-   "hook_event_name": "PreToolUse",
+-   "reentry": Object {
+-     "active": false,
+-     "supported": false,
+-   },
+-   "sessionId": "session",
+-   "timeoutMs": 4321,
+-   "timestamp": "2026-11-05T00:00:00Z",
+-   "toolCallId": "call",
+-   "toolName": "write",
+-   "tool_input": Object {
+-     "content": "",
+-     "file_path": "a.ts",
++   "decision": "unsupported",
++   "hookVerdict": Object {
++     "reasonCode": "tool_semantics",
++     "source": "adapter",
++     "status": "unsupported",
+    },
+-   "tool_name": "Write",
+-   "version": 1,
+-   "workspaceRoot": "/workspace",
++   "reason": "This tool (including MCP tools) has no declared single-file content semantics.",
+  }
+
+ ❯ src/core/hooks/translation.test.ts:12:24
+     10|     const input = { ...payload, toolName };
+     11|     const translated = translateWriteInput(input, 4321);
+     12|     expect(translated).toEqual({ version: 1, event: 'PreToolUse', work…
+       |                        ^
+     13|       timestamp: payload.timestamp, agentId: 'worker', toolName, toolC…
+     14|       timeoutMs: 4321, reentry: { supported: false, active: false }, h…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+

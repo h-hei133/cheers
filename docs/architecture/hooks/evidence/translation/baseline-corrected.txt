@@ -1,0 +1,12 @@
+
+ RUN  v0.34.6 <cheers>/packages/ts-shell
+
+ ✓ src/cli/interactive/picker/settings/fields.test.ts  (140 tests) 7348ms
+ ✓ src/cli/interactive/keyGuide.test.ts  (6 tests) 21ms
+ ✓ src/cli/interactive/firstFrame.test.ts  (24 tests) 692ms
+
+ Test Files  3 passed (3)
+      Tests  170 passed (170)
+   Start at  19:04:25
+   Duration  14.46s (transform 9.76s, setup 0ms, collect 15.34s, tests 8.06s, environment 1ms, prepare 191ms)
+

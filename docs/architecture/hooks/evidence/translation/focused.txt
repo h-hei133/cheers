@@ -1,0 +1,77 @@
+npm notice run cheers@0.1.0 test:ts
+npm notice run npm run test -w packages/ts-shell src/core/hooks/translation.test.ts src/core/hooks/translation.integration.test.ts src/core/hooks/config.test.ts src/core/hooks/registration.test.ts src/core/hooks/lifecycle.test.ts src/core/hooks/trust.test.ts src/core/hooks/trust/withdrawal.test.ts src/turn/tools.test.ts src/turn/approval.test.ts
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/hooks/translation.test.ts src/core/hooks/translation.integration.test.ts src/core/hooks/config.test.ts src/core/hooks/registration.test.ts src/core/hooks/lifecycle.test.ts src/core/hooks/trust.test.ts src/core/hooks/trust/withdrawal.test.ts src/turn/tools.test.ts src/turn/approval.test.ts
+
+ RUN  v0.34.6 <repository>/packages/ts-shell
+
+ ✓ src/core/hooks/lifecycle.test.ts  (12 tests) 205ms
+ ✓ src/core/hooks/trust.test.ts  (21 tests) 530ms
+ ✓ src/core/hooks/registration.test.ts  (14 tests) 138ms
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > nested deny prevents the actual native write
+{"probe":"nested-deny-native-write","targetExists":false,"result":"Blocked by Hook: fixture rule"}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > flat deny prevents the actual native write
+{"probe":"flat-deny-native-write","targetExists":false,"result":"Blocked by Hook: fixture rule"}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > malformed blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"malformed","result":{"decision":"block","reason":"The write hook could not be evaluated (invalid_output).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"invalid_output"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > timeout blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"timeout","result":{"decision":"block","reason":"The write hook could not be evaluated (timeout).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"timeout"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > version blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"version","result":{"decision":"block","reason":"The write hook could not be evaluated (version_mismatch).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"version_mismatch"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > empty blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"empty","result":{"decision":"block","reason":"The write hook could not be evaluated (empty_output).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"empty_output"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > nonzero blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"nonzero","result":{"decision":"block","reason":"The write hook could not be evaluated (process_failed).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"process_failed"}}}
+
+ ✓ src/turn/tools.test.ts  (54 tests) 223ms
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > loads canonical configuration, binds trust identity and sends complete metadata
+{"probe":"unsupported","toolName":"apply_patch","result":{"decision":"unsupported","reason":"A patch may contain multiple targets, while content rules apply per file; patch normalization is not implemented.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"patch_targets"}}}
+{"probe":"unsupported","toolName":"bash","result":{"decision":"unsupported","reason":"Shell commands do not describe their final per-file content.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"shell_effects"}}}
+{"probe":"unsupported","toolName":"mcp__write","result":{"decision":"unsupported","reason":"This tool (including MCP tools) has no declared single-file content semantics.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"tool_semantics"}}}
+{"probe":"unsupported","toolName":"browser","result":{"decision":"unsupported","reason":"Browser and desktop actions are not single-file content operations.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"external_effects"}}}
+{"probe":"unsupported","toolName":"MultiEdit","result":{"decision":"unsupported","reason":"Multiple edits have no verified single-file replacement projection.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"multiple_edits"}}}
+{"probe":"unsupported","toolName":"NotebookEdit","result":{"decision":"unsupported","reason":"Notebook cell operations are not full file replacement content.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"notebook_cells"}}}
+
+ ❯ src/core/hooks/translation.integration.test.ts  (13 tests | 1 failed) 653ms
+   ❯ src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > runs the pinned artifact to allow and block without changing ordinary permission
+     → ENOENT: no such file or directory, open '<projects>/.normproof/write-gate/artifact.json'
+ ✓ src/core/hooks/translation.test.ts  (27 tests) 8ms
+ ✓ src/core/hooks/trust/withdrawal.test.ts  (16 tests) 74ms
+ ✓ src/core/hooks/config.test.ts  (6 tests) 15ms
+ ✓ src/turn/approval.test.ts  (4 tests) 33ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > runs the pinned artifact to allow and block without changing ordinary permission
+Error: ENOENT: no such file or directory, open '<projects>/.normproof/write-gate/artifact.json'
+ ❯ Object.readFileSync node:fs:441:20
+ ❯ src/core/hooks/translation.integration.test.ts:116:36
+    114|   it('runs the pinned artifact to allow and block without changing ord…
+    115|     const repo = path.resolve(path.dirname(fileURLToPath(import.meta.u…
+    116|     const metadata = JSON.parse(fs.readFileSync(path.join(repo, '.norm…
+       |                                    ^
+    117|     const { provenance: _provenance, ...writeGate } = metadata;
+    118|     writeGate.path = path.join(repo, writeGate.path);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { errno: -2, code: 'ENOENT', syscall: 'open', path: '<projects>/.normproof/write-gate/artifact.json' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed | 8 passed (9)
+      Tests  1 failed | 166 passed (167)
+   Start at  18:28:21
+   Duration  8.73s (transform 4.23s, setup 1ms, collect 13.22s, tests 1.88s, environment 1ms, prepare 596ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path <repository>/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location <repository>/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/core/hooks/translation.test.ts src/core/hooks/translation.integration.test.ts src/core/hooks/config.test.ts src/core/hooks/registration.test.ts src/core/hooks/lifecycle.test.ts src/core/hooks/trust.test.ts src/core/hooks/trust/withdrawal.test.ts src/turn/tools.test.ts src/turn/approval.test.ts

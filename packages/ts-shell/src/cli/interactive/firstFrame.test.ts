@@ -36,6 +36,7 @@ function boot(
       projectRoot: "/workspace",
       session: { id: "sess_first_frame" },
       gitContext: { branch: "main" },
+      resolveConfigTarget: () => ({ provider: "openai", model: "opus-5" }),
       runtimeConfig: {
         provider: "openai",
         providerCredentials: { openai: { model: "opus-5" } },

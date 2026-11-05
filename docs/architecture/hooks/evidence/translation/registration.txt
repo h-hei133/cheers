@@ -1,0 +1,27 @@
+npm notice run cheers@0.1.0 test:ts
+npm notice run npm run test -w packages/ts-shell src/entrypoints/writeHook.test.ts src/entrypoints/hookApproval.test.ts
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/entrypoints/writeHook.test.ts src/entrypoints/hookApproval.test.ts
+
+ RUN  v0.34.6 <repository>/packages/ts-shell
+
+stdout | src/entrypoints/writeHook.test.ts > normal turn uses the shared declared translation with real artifact output
+{"probe":"normal turn","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/entrypoints/writeHook.test.ts > native prepared uses the shared declared translation with real artifact output
+{"probe":"native prepared","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/entrypoints/writeHook.test.ts > native security uses the shared declared translation with real artifact output
+{"probe":"native security","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/entrypoints/writeHook.test.ts > native Git uses the shared declared translation with real artifact output
+{"probe":"native Git","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reason":"native shell policy"}}
+
+ ✓ src/entrypoints/writeHook.test.ts  (4 tests) 423ms
+ ✓ src/entrypoints/hookApproval.test.ts  (34 tests) 2558ms
+
+ Test Files  2 passed (2)
+      Tests  38 passed (38)
+   Start at  18:30:40
+   Duration  12.01s (transform 5.08s, setup 0ms, collect 14.42s, tests 2.98s, environment 0ms, prepare 106ms)
+
