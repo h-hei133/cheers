@@ -1,0 +1,8 @@
+v24.15.0
+cheers engines.node=>=20.3.0
+bundled normproof 0.1.0 engines.node=>=24
+.github/workflows/normproof-watch.yml:25:          node-version: 24
+.github/workflows/normproof-watch.yml:35:          normproof judge --format sarif
+.github/workflows/normproof-watch.yml:37:          exit 0   # Observation mode: record, never gate.
+.github/workflows/ci.yml:26:          node-version: 20.3.0
+.github/workflows/ci.yml:82:          npx --package .normproof/normproof-*.tgz normproof judge

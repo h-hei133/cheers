@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+
+const [mode, capture] = process.argv.slice(2);
+const input = fs.readFileSync(0, 'utf8');
+if (capture) fs.appendFileSync(capture, `${input}\n`);
+switch (mode) {
+  case 'nested-deny': console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'synthetic nested refusal' } })); break;
+  case 'block': console.log(JSON.stringify({ decision: 'block', reason: 'synthetic flat refusal' })); break;
+  case 'retry': console.log(JSON.stringify({ decision: 'retry', reason: 'synthetic retry' })); break;
+  case 'allow': console.log(JSON.stringify({ decision: 'allow' })); break;
+  case 'unknown': console.log(JSON.stringify({ decision: 'allow', feedback: 'could-not-decide (synthetic)' })); break;
+  case 'empty': break;
+  case 'invalid': console.log('not-json'); break;
+  case 'exit-2': process.stderr.write('synthetic exit-2 refusal'); process.exitCode = 2; break;
+  case 'exit-1': process.exitCode = 1; break;
+  case 'timeout': setTimeout(() => {}, 10_000); break;
+  default: throw new Error('Unknown fixture mode');
+}

@@ -2078,3 +2078,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A probe launched with an explicit temporary project still displays the outer repository and loads its project configuration.
 - **Root Cause**: A temporary directory inside the target repository remains part of its Git workspace; isolating HOME and Git environment does not change the product's workspace discovery.
 - **Rule**: Initialize an independent Git repository in nested CLI fixtures and assert the persisted projectRoot equals that fixture before exercising behavior. Keep runtime state isolated and remove the fixture afterward.
+
+### Separate Hook Dispatchers Do Not Imply Separate Durable Grants
+- **Symptom**: A native operation reuses a hook approval collected by a normal turn despite constructing a fresh dispatcher; passing a temporary registration `homeDir` does not isolate its approval writes.
+- **Root Cause**: Registration's `homeDir` controls declaration loading only. Its default `HookTrustStore` resolves the active user/profile path, and durable fingerprints contain event, matcher, command and source path rather than the dispatcher or route.
+- **Rule**: Test one-shot and durable grants separately across actual registration producers. Isolate HOME/USERPROFILE before loading singleton owners, or pass an explicit temporary trust store as well as `homeDir`. Distinguish refusing to run a hook from refusing the ordinary tool action; a skipped hook has not issued a veto.

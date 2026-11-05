@@ -1,0 +1,17 @@
+[
+  {
+    "source": ".tmp/c0-hooks/run.mjs",
+    "snapshot": "docs/architecture/hooks/evidence/run.mjs.txt",
+    "sha256": "5e5381d45fd44296ba05feac0abbbb0cb4408528d9df517dc2e2b10c7e50c243"
+  },
+  {
+    "source": ".tmp/c0-hooks/reply.mjs",
+    "snapshot": "docs/architecture/hooks/evidence/reply.mjs.txt",
+    "sha256": "bef27632b45f12cfeb12e4ea911def198c1de4f3e5d995d962adfc80d4cebbd3"
+  },
+  {
+    "source": ".tmp/c0-hooks/probes.mts",
+    "snapshot": "docs/architecture/hooks/evidence/probes.mts.txt",
+    "sha256": "c59dceab8cb42f9a3169cae68305ab52697343c8604aa55d5a97f0d4bf682c34"
+  }
+]

@@ -1,0 +1,1116 @@
+{
+  "host": {
+    "commit": "0057eb604ecc8d154ce691794b494c354e89755b",
+    "node": "v24.15.0",
+    "platform": "linux",
+    "arch": "x64",
+    "measuredAt": "2026-11-05T08:13:57.233Z"
+  },
+  "scope": {
+    "realProviderCalls": 0,
+    "fetchCalls": 0,
+    "inheritedCredentials": false,
+    "runtimeState": "<runtime> (removed by launcher)",
+    "productChanges": false,
+    "builtinModelStep": "not used; deterministic injected step",
+    "sandbox": "default off in empty temporary home/project"
+  },
+  "sourceHashes": {
+    "packages/ts-shell/src/core/hooks/types.ts": "ac2acf0a14057c9066bcedf7b36074103f33b1ce2f0d5cac1c8efbe37794eef3",
+    "packages/ts-shell/src/core/hooks/hookDispatcher.ts": "067543deaa83d9ae21b2c1e42961ddcac2f4266c931a9cd94be6aaa6bb94565b",
+    "packages/ts-shell/src/core/hooks/config.ts": "312720fd84c531c8853ae06ee69ee60fda20eaa59f24a3f46cb919208bc4294a",
+    "packages/ts-shell/src/core/hooks/registration.ts": "f710f93c7476d2163be3522cf0527ec02afcfa42283a7bc857a1f5a8da283bba",
+    "packages/ts-shell/src/core/hooks/trust.ts": "5560c54972cf9dcc41a2bd3b41b76d85933db2f73bfb2b9faa36a88251e94eb8",
+    "packages/ts-shell/src/core/hooks/approval.ts": "67503275eed85b8632fc9d7e4df7917792ec114f65d61964899f3c699fc35723",
+    "packages/ts-shell/src/turn/tools.ts": "33b6f7f21de636aa576ac867493913ddc66637d97d0143f491bfeef24aead6ff",
+    "packages/ts-shell/src/turn/session.ts": "ffe61817f10ffd98665cc7bccbedb963bea81211fec56cbae5ead85cca1dc661",
+    "packages/ts-shell/src/turn/invoke.ts": "7b8820581434d370a0ae6745f4502c11f2608d30e0d213452420101a5e01904a",
+    "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts": "fe7d8d7c22bbd3305da83f11db00c38bfb6a37e2e2ce922f908e8ea611e71050",
+    "packages/ts-shell/src/cli/runtime/gitGate.ts": "01569c95e6f8d78c1ce0b71cc631579df84193de000ad6b8009c816b7cb6e847",
+    ".github/workflows/ci.yml": "cecd53a2b90b07b21e10b2072b858da2779e4d3496a79f434d8faac76d8888dd",
+    ".github/workflows/normproof-watch.yml": "03b9e3f04e97164b1f4f716e8cf4ad2cc7e42a5ba25806932d2ff385328fda65",
+    ".normproof/normproof-0.1.0.tgz": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985"
+  },
+  "records": [
+    {
+      "name": "pretooluse-nested-deny",
+      "status": "observed",
+      "input": {
+        "args": {
+          "path": "fixture.txt",
+          "content": "synthetic only\n"
+        },
+        "response": {
+          "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": "synthetic nested refusal"
+          }
+        }
+      },
+      "observation": "Real shell JSON stdin/stdout -> HookDispatcher -> runPreparedTool/createToolHooks -> synthetic prepared target effect counter",
+      "result": {
+        "mode": "nested-deny",
+        "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'nested-deny' '<runtime>/project/pre-nested-deny.jsonl'",
+        "override": {},
+        "received": [
+          {
+            "eventName": "PreToolUse",
+            "sessionId": "c0",
+            "workspaceRoot": "<runtime>/project",
+            "timestamp": "2026-11-05T08:13:49.713Z",
+            "toolName": "write",
+            "toolCallId": "c0-call",
+            "args": {
+              "path": "fixture.txt",
+              "content": "synthetic only\n"
+            }
+          }
+        ],
+        "dispatch": {
+          "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": "synthetic nested refusal"
+          }
+        },
+        "result": {
+          "output": "synthetic effect",
+          "isError": false
+        },
+        "effects": 1
+      },
+      "evidence": [
+        "packages/ts-shell/src/core/hooks/hookDispatcher.ts:313-331",
+        "packages/ts-shell/src/turn/tools.ts:311-350",
+        "packages/ts-shell/src/turn/invoke.ts:15-28"
+      ]
+    },
+    {
+      "name": "pretooluse-flat-block",
+      "status": "observed",
+      "input": {
+        "modes": [
+          "block",
+          "retry",
+          "allow",
+          "empty",
+          "unknown",
+          "invalid",
+          "exit-2",
+          "exit-1",
+          "timeout"
+        ],
+        "timeoutMs": 300,
+        "unmatchedMatcher": "Write|Edit|MultiEdit",
+        "tool": "write"
+      },
+      "observation": "Real command completion/failure plus actual pre-use consumer; empty/unknown host continuation is not proof of a clean verdict",
+      "result": {
+        "cases": [
+          {
+            "mode": "block",
+            "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'block' '<runtime>/project/pre-block.jsonl'",
+            "override": {},
+            "received": [
+              {
+                "eventName": "PreToolUse",
+                "sessionId": "c0",
+                "workspaceRoot": "<runtime>/project",
+                "timestamp": "2026-11-05T08:13:49.766Z",
+                "toolName": "write",
+                "toolCallId": "c0-call",
+                "args": {
+                  "path": "fixture.txt",
+                  "content": "synthetic only\n"
+                }
+              }
+            ],
+            "dispatch": {
+              "decision": "block",
+              "reason": "synthetic flat refusal"
+            },
+            "result": {
+              "isError": true,
+              "output": "Native operation refused by its ordinary permission or hook gate."
+            },
+            "effects": 0
+          },
+          {
+            "mode": "retry",
+            "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'retry' '<runtime>/project/pre-retry.jsonl'",
+            "override": {},
+            "received": [
+              {
+                "eventName": "PreToolUse",
+                "sessionId": "c0",
+                "workspaceRoot": "<runtime>/project",
+                "timestamp": "2026-11-05T08:13:49.818Z",
+                "toolName": "write",
+                "toolCallId": "c0-call",
+                "args": {
+                  "path": "fixture.txt",
+                  "content": "synthetic only\n"
+                }
+              }
+            ],
+            "dispatch": {
+              "decision": "retry",
+              "reason": "synthetic retry"
+            },
+            "result": {
+              "isError": true,
+              "output": "Native operation refused by its ordinary permission or hook gate."
+            },
+            "effects": 0
+          },
+          {
+            "mode": "allow",
+            "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'allow' '<runtime>/project/pre-allow.jsonl'",
+            "override": {},
+            "received": [
+              {
+                "eventName": "PreToolUse",
+                "sessionId": "c0",
+                "workspaceRoot": "<runtime>/project",
+                "timestamp": "2026-11-05T08:13:49.856Z",
+                "toolName": "write",
+                "toolCallId": "c0-call",
+                "args": {
+                  "path": "fixture.txt",
+                  "content": "synthetic only\n"
+                }
+              }
+            ],
+            "dispatch": {
+              "decision": "allow"
+            },
+            "result": {
+              "output": "synthetic effect",
+              "isError": false
+            },
+            "effects": 1
+          },
+          {
+            "mode": "empty",
+            "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'empty' '<runtime>/project/pre-empty.jsonl'",
+            "override": {},
+            "received": [
+              {
+                "eventName": "PreToolUse",
+                "sessionId": "c0",
+                "workspaceRoot": "<runtime>/project",
+                "timestamp": "2026-11-05T08:13:49.900Z",
+                "toolName": "write",
+                "toolCallId": "c0-call",
+                "args": {
+                  "path": "fixture.txt",
+                  "content": "synthetic only\n"
+                }
+              }
+            ],
+            "dispatch": {
+              "decision": "allow"
+            },
+            "result": {
+              "output": "synthetic effect",
+              "isError": false
+            },
+            "effects": 1
+          },
+          {
+            "mode": "unknown",
+            "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'unknown' '<runtime>/project/pre-unknown.jsonl'",
+            "override": {},
+            "received": [
+              {
+                "eventName": "PreToolUse",
+                "sessionId": "c0",
+                "workspaceRoot": "<runtime>/project",
+                "timestamp": "2026-11-05T08:13:49.942Z",
+                "toolName": "write",
+                "toolCallId": "c0-call",
+                "args": {
+                  "path": "fixture.txt",
+                  "content": "synthetic only\n"
+                }
+              }
+            ],
+            "dispatch": {
+              "decision": "allow",
+              "feedback": "could-not-decide (synthetic)"
+            },
+            "result": {
+              "output": "synthetic effect",
+              "isError": false
+            },
+            "effects": 1
+          },
+          {
+            "mode": "invalid",
+            "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'invalid' '<runtime>/project/pre-invalid.jsonl'",
+            "override": {},
+            "received": [
+              {
+                "eventName": "PreToolUse",
+                "sessionId": "c0",
+                "workspaceRoot": "<runtime>/project",
+                "timestamp": "2026-11-05T08:13:49.986Z",
+                "toolName": "write",
+                "toolCallId": "c0-call",
+                "args": {
+                  "path": "fixture.txt",
+                  "content": "synthetic only\n"
+                }
+              }
+            ],
+            "dispatch": {
+              "decision": "block",
+              "reason": "The PreToolUse hook 'exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'invalid' '<runtime>/project/pre-invalid.jsonl'' could not run (hook returned invalid JSON output), so the action was not allowed."
+            },
+            "result": {
+              "isError": true,
+              "output": "Native operation refused by its ordinary permission or hook gate."
+            },
+            "effects": 0
+          },
+          {
+            "mode": "exit-2",
+            "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'exit-2' '<runtime>/project/pre-exit-2.jsonl'",
+            "override": {},
+            "received": [
+              {
+                "eventName": "PreToolUse",
+                "sessionId": "c0",
+                "workspaceRoot": "<runtime>/project",
+                "timestamp": "2026-11-05T08:13:50.027Z",
+                "toolName": "write",
+                "toolCallId": "c0-call",
+                "args": {
+                  "path": "fixture.txt",
+                  "content": "synthetic only\n"
+                }
+              }
+            ],
+            "dispatch": {
+              "decision": "block",
+              "reason": "synthetic exit-2 refusal"
+            },
+            "result": {
+              "isError": true,
+              "output": "Native operation refused by its ordinary permission or hook gate."
+            },
+            "effects": 0
+          },
+          {
+            "mode": "exit-1",
+            "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'exit-1' '<runtime>/project/pre-exit-1.jsonl'",
+            "override": {},
+            "received": [
+              {
+                "eventName": "PreToolUse",
+                "sessionId": "c0",
+                "workspaceRoot": "<runtime>/project",
+                "timestamp": "2026-11-05T08:13:50.066Z",
+                "toolName": "write",
+                "toolCallId": "c0-call",
+                "args": {
+                  "path": "fixture.txt",
+                  "content": "synthetic only\n"
+                }
+              }
+            ],
+            "dispatch": {
+              "decision": "block",
+              "reason": "The PreToolUse hook 'exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'exit-1' '<runtime>/project/pre-exit-1.jsonl'' could not run (Command failed: /bin/sh -c exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'exit-1' '<runtime>/project/pre-exit-1.jsonl'\n), so the action was not allowed."
+            },
+            "result": {
+              "isError": true,
+              "output": "Native operation refused by its ordinary permission or hook gate."
+            },
+            "effects": 0
+          },
+          {
+            "mode": "timeout",
+            "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'timeout' '<runtime>/project/pre-timeout.jsonl'",
+            "override": {
+              "timeoutMs": 300
+            },
+            "received": [
+              {
+                "eventName": "PreToolUse",
+                "sessionId": "c0",
+                "workspaceRoot": "<runtime>/project",
+                "timestamp": "2026-11-05T08:13:50.105Z",
+                "toolName": "write",
+                "toolCallId": "c0-call",
+                "args": {
+                  "path": "fixture.txt",
+                  "content": "synthetic only\n"
+                }
+              }
+            ],
+            "dispatch": {
+              "decision": "block",
+              "reason": "The PreToolUse hook 'exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'timeout' '<runtime>/project/pre-timeout.jsonl'' could not run (Command failed: /bin/sh -c exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'timeout' '<runtime>/project/pre-timeout.jsonl'\n), so the action was not allowed."
+            },
+            "result": {
+              "isError": true,
+              "output": "Native operation refused by its ordinary permission or hook gate."
+            },
+            "effects": 0
+          }
+        ],
+        "matcher": {
+          "mode": "block",
+          "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'block' '<runtime>/project/pre-block.jsonl'",
+          "override": {
+            "matcher": "Write|Edit|MultiEdit"
+          },
+          "received": [
+            {
+              "eventName": "PreToolUse",
+              "sessionId": "c0",
+              "workspaceRoot": "<runtime>/project",
+              "timestamp": "2026-11-05T08:13:49.766Z",
+              "toolName": "write",
+              "toolCallId": "c0-call",
+              "args": {
+                "path": "fixture.txt",
+                "content": "synthetic only\n"
+              }
+            }
+          ],
+          "dispatch": {
+            "decision": "allow"
+          },
+          "result": {
+            "output": "synthetic effect",
+            "isError": false
+          },
+          "effects": 1,
+          "newlyExecutedCommands": 0
+        }
+      },
+      "evidence": [
+        "packages/ts-shell/src/core/hooks/hookDispatcher.ts:174-193",
+        "packages/ts-shell/src/core/hooks/hookDispatcher.ts:250-371",
+        "packages/ts-shell/src/turn/tools.ts:325-338"
+      ]
+    },
+    {
+      "name": "stop-dispatch-result-discard",
+      "status": "observed",
+      "input": {
+        "modes": [
+          "block",
+          "retry",
+          "exit-2",
+          "invalid",
+          "timeout"
+        ],
+        "timeout": "default, no override",
+        "syntheticSteps": 1
+      },
+      "observation": "Actual runTurn event stream after real Stop command; block/retry/exit-2 results discarded; timeout and no re-entry observed separately",
+      "result": [
+        {
+          "mode": "block",
+          "elapsedMs": 49,
+          "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'block' '<runtime>/project/stop-block.jsonl'",
+          "input": {
+            "eventName": "Stop",
+            "sessionId": "c0-stop-block",
+            "workspaceRoot": "<runtime>/project",
+            "timestamp": "2026-11-05T08:13:50.422Z",
+            "turnsExecuted": 1,
+            "finalOutput": "Synthetic answer"
+          },
+          "dispatch": {
+            "decision": "block",
+            "reason": "synthetic flat refusal"
+          },
+          "steps": 1,
+          "eventTypes": [
+            "query.started",
+            "message.started",
+            "message.finished",
+            "query.completed"
+          ],
+          "completed": {
+            "type": "query.completed",
+            "result": {
+              "status": "completed",
+              "terminalClassification": "success",
+              "terminalReason": "completed",
+              "transcript": [],
+              "sharedContext": {
+                "sessionId": "c0-stop-block",
+                "initialPrompt": "Synthetic completion",
+                "notes": [
+                  "steps: 1"
+                ],
+                "handoffs": []
+              },
+              "finalOutput": "Synthetic answer"
+            }
+          }
+        },
+        {
+          "mode": "retry",
+          "elapsedMs": 37,
+          "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'retry' '<runtime>/project/stop-retry.jsonl'",
+          "input": {
+            "eventName": "Stop",
+            "sessionId": "c0-stop-retry",
+            "workspaceRoot": "<runtime>/project",
+            "timestamp": "2026-11-05T08:13:50.464Z",
+            "turnsExecuted": 1,
+            "finalOutput": "Synthetic answer"
+          },
+          "dispatch": {
+            "decision": "retry",
+            "reason": "synthetic retry"
+          },
+          "steps": 1,
+          "eventTypes": [
+            "query.started",
+            "message.started",
+            "message.finished",
+            "query.completed"
+          ],
+          "completed": {
+            "type": "query.completed",
+            "result": {
+              "status": "completed",
+              "terminalClassification": "success",
+              "terminalReason": "completed",
+              "transcript": [],
+              "sharedContext": {
+                "sessionId": "c0-stop-retry",
+                "initialPrompt": "Synthetic completion",
+                "notes": [
+                  "steps: 1"
+                ],
+                "handoffs": []
+              },
+              "finalOutput": "Synthetic answer"
+            }
+          }
+        },
+        {
+          "mode": "exit-2",
+          "elapsedMs": 39,
+          "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'exit-2' '<runtime>/project/stop-exit-2.jsonl'",
+          "input": {
+            "eventName": "Stop",
+            "sessionId": "c0-stop-exit-2",
+            "workspaceRoot": "<runtime>/project",
+            "timestamp": "2026-11-05T08:13:50.502Z",
+            "turnsExecuted": 1,
+            "finalOutput": "Synthetic answer"
+          },
+          "dispatch": {
+            "decision": "block",
+            "reason": "synthetic exit-2 refusal"
+          },
+          "steps": 1,
+          "eventTypes": [
+            "query.started",
+            "message.started",
+            "message.finished",
+            "query.completed"
+          ],
+          "completed": {
+            "type": "query.completed",
+            "result": {
+              "status": "completed",
+              "terminalClassification": "success",
+              "terminalReason": "completed",
+              "transcript": [],
+              "sharedContext": {
+                "sessionId": "c0-stop-exit-2",
+                "initialPrompt": "Synthetic completion",
+                "notes": [
+                  "steps: 1"
+                ],
+                "handoffs": []
+              },
+              "finalOutput": "Synthetic answer"
+            }
+          }
+        },
+        {
+          "mode": "invalid",
+          "elapsedMs": 39,
+          "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'invalid' '<runtime>/project/stop-invalid.jsonl'",
+          "input": {
+            "eventName": "Stop",
+            "sessionId": "c0-stop-invalid",
+            "workspaceRoot": "<runtime>/project",
+            "timestamp": "2026-11-05T08:13:50.540Z",
+            "turnsExecuted": 1,
+            "finalOutput": "Synthetic answer"
+          },
+          "dispatch": {
+            "decision": "allow"
+          },
+          "steps": 1,
+          "eventTypes": [
+            "query.started",
+            "message.started",
+            "message.finished",
+            "query.completed"
+          ],
+          "completed": {
+            "type": "query.completed",
+            "result": {
+              "status": "completed",
+              "terminalClassification": "success",
+              "terminalReason": "completed",
+              "transcript": [],
+              "sharedContext": {
+                "sessionId": "c0-stop-invalid",
+                "initialPrompt": "Synthetic completion",
+                "notes": [
+                  "steps: 1"
+                ],
+                "handoffs": []
+              },
+              "finalOutput": "Synthetic answer"
+            }
+          }
+        },
+        {
+          "mode": "timeout",
+          "elapsedMs": 3006,
+          "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'timeout' '<runtime>/project/stop-timeout.jsonl'",
+          "input": {
+            "eventName": "Stop",
+            "sessionId": "c0-stop-timeout",
+            "workspaceRoot": "<runtime>/project",
+            "timestamp": "2026-11-05T08:13:50.579Z",
+            "turnsExecuted": 1,
+            "finalOutput": "Synthetic answer"
+          },
+          "dispatch": {
+            "decision": "allow"
+          },
+          "steps": 1,
+          "eventTypes": [
+            "query.started",
+            "message.started",
+            "message.finished",
+            "query.completed"
+          ],
+          "completed": {
+            "type": "query.completed",
+            "result": {
+              "status": "completed",
+              "terminalClassification": "success",
+              "terminalReason": "completed",
+              "transcript": [],
+              "sharedContext": {
+                "sessionId": "c0-stop-timeout",
+                "initialPrompt": "Synthetic completion",
+                "notes": [
+                  "steps: 1"
+                ],
+                "handoffs": []
+              },
+              "finalOutput": "Synthetic answer"
+            }
+          }
+        }
+      ],
+      "evidence": [
+        "packages/ts-shell/src/core/hooks/hookDispatcher.ts:64-68",
+        "packages/ts-shell/src/core/hooks/hookDispatcher.ts:355-371",
+        "packages/ts-shell/src/turn/session.ts:363-390"
+      ]
+    },
+    {
+      "name": "unknown-event-registration",
+      "status": "observed",
+      "input": {
+        "TaskCompleted": [
+          {
+            "hooks": [
+              {
+                "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'block' '<runtime>/unknown/unknown.jsonl'"
+              }
+            ]
+          }
+        ]
+      },
+      "observation": "loadHookDeclarations and real registration boundary; unknown event was never dispatched",
+      "result": {
+        "loaded": {
+          "hooks": [],
+          "problems": [
+            "<runtime>/unknown/.agents/hooks.json declares unknown hook event 'TaskCompleted'"
+          ]
+        },
+        "registration": {
+          "registered": 0,
+          "problems": [
+            "<runtime>/unknown/.agents/hooks.json declares unknown hook event 'TaskCompleted'"
+          ]
+        },
+        "installedCommandHooks": 0,
+        "dispatchCalls": 0,
+        "commandExecuted": false,
+        "conclusion": "从未被 dispatch"
+      },
+      "evidence": [
+        "packages/ts-shell/src/core/hooks/config.ts:29-48",
+        "packages/ts-shell/src/core/hooks/config.ts:134-157",
+        "packages/ts-shell/src/core/hooks/registration.ts:81-110"
+      ]
+    },
+    {
+      "name": "config-timeout-retention",
+      "status": "observed",
+      "input": {
+        "Stop": [
+          {
+            "matcher": "*",
+            "timeout": 91,
+            "hooks": [
+              {
+                "type": "command",
+                "command": "synthetic-command",
+                "timeout": 92,
+                "timeoutMs": 93,
+                "name": "lost-name",
+                "description": "lost-description",
+                "extra": "lost"
+              },
+              {
+                "type": "prompt",
+                "command": "also-retained",
+                "timeout": 94
+              },
+              {
+                "type": "command",
+                "timeout": 95
+              }
+            ]
+          }
+        ]
+      },
+      "observation": "Actual JSON loader projection and installed command configs; no fixture command executed",
+      "result": {
+        "loaded": {
+          "hooks": [
+            {
+              "event": "Stop",
+              "matcher": "*",
+              "command": "synthetic-command",
+              "sourcePath": "<runtime>/config/.agents/hooks.json"
+            },
+            {
+              "event": "Stop",
+              "matcher": "*",
+              "command": "also-retained",
+              "sourcePath": "<runtime>/config/.agents/hooks.json"
+            }
+          ],
+          "problems": []
+        },
+        "installed": [
+          {
+            "name": "hooks.json:Stop",
+            "event": "Stop",
+            "matcher": "*",
+            "command": "synthetic-command",
+            "fingerprint": "440742c213ec4ca389424bb376da4f8d06c6a80166d6e0dfb69bd6d766eb7211",
+            "sourcePath": "<runtime>/config/.agents/hooks.json"
+          },
+          {
+            "name": "hooks.json:Stop",
+            "event": "Stop",
+            "matcher": "*",
+            "command": "also-retained",
+            "fingerprint": "04e308bae05cb896378d2a0db295f6642fec3858bd5bf9992a6bb486a9498834",
+            "sourcePath": "<runtime>/config/.agents/hooks.json"
+          }
+        ],
+        "retainedHandlerKeys": [
+          "command"
+        ],
+        "retainedGroupKeys": [
+          "matcher"
+        ],
+        "eventFromMapKey": true,
+        "discardedHandlerKeys": [
+          "type",
+          "timeout",
+          "timeoutMs",
+          "name",
+          "description",
+          "extra"
+        ],
+        "groupTimeoutDiscarded": true
+      },
+      "evidence": [
+        "packages/ts-shell/src/core/hooks/config.ts:134-184",
+        "packages/ts-shell/src/core/hooks/registration.ts:91-101",
+        "packages/ts-shell/src/core/hooks/types.ts:187-199"
+      ]
+    },
+    {
+      "name": "registration-path-isolation",
+      "status": "observed",
+      "input": {
+        "projectSource": "<runtime>/registration/.agents/hooks.json",
+        "command": "exec '/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/cheers/.tmp/c0-hooks/reply.mjs' 'block' '<runtime>/registration/registered.jsonl'",
+        "approvalSequence": [
+          [
+            "normal",
+            "allow-once"
+          ],
+          [
+            "git",
+            "allow-once"
+          ],
+          [
+            "prepared",
+            "allow-once"
+          ],
+          [
+            "security",
+            "allow-once"
+          ],
+          [
+            "normal",
+            "allow-always"
+          ],
+          [
+            "git",
+            "deny"
+          ],
+          [
+            "prepared",
+            "deny"
+          ],
+          [
+            "security",
+            "deny"
+          ],
+          [
+            "git",
+            "deny"
+          ]
+        ],
+        "ordinaryPermissionScope": "allow-all for synthetic targets",
+        "providerMode": "real branch with injected readiness and deterministic StepFunction; no provider transport"
+      },
+      "observation": "Actual normal registration and gitGateFor; runNativeGit/runPreparedTool/runSecurityTool consumers; temporary default trust store vs explicit separate file",
+      "result": {
+        "cases": [
+          {
+            "route": "normal",
+            "answer": "allow-once",
+            "approvals": 1,
+            "commands": 1,
+            "effects": 0,
+            "result": [
+              {
+                "type": "tool.result",
+                "toolName": "write",
+                "taskId": "normal-write",
+                "success": false,
+                "failureReason": "Blocked by Hook: synthetic flat refusal",
+                "output": "Blocked by Hook: synthetic flat refusal"
+              },
+              {
+                "type": "query.completed",
+                "result": {
+                  "status": "completed",
+                  "terminalClassification": "success",
+                  "terminalReason": "completed",
+                  "transcript": [],
+                  "sharedContext": {
+                    "sessionId": "sess_cd4b0140e041a946_1793866436740",
+                    "initialPrompt": "Synthetic probe",
+                    "notes": [
+                      "steps: 2"
+                    ],
+                    "handoffs": []
+                  },
+                  "finalOutput": "Synthetic result observed"
+                }
+              }
+            ]
+          },
+          {
+            "route": "git",
+            "answer": "allow-once",
+            "approvals": 1,
+            "commands": 1,
+            "effects": 0,
+            "result": {
+              "status": "blocked",
+              "note": "Blocked by Hook: synthetic flat refusal"
+            }
+          },
+          {
+            "route": "prepared",
+            "answer": "allow-once",
+            "approvals": 1,
+            "commands": 1,
+            "effects": 0,
+            "result": {
+              "isError": true,
+              "output": "Native operation refused by its ordinary permission or hook gate."
+            }
+          },
+          {
+            "route": "security",
+            "answer": "allow-once",
+            "approvals": 1,
+            "commands": 1,
+            "effects": 0,
+            "result": {
+              "isError": true,
+              "output": "Security operation refused by its ordinary permission or hook gate."
+            }
+          },
+          {
+            "route": "normal",
+            "answer": "allow-always",
+            "approvals": 1,
+            "commands": 1,
+            "effects": 0,
+            "result": [
+              {
+                "type": "tool.result",
+                "toolName": "write",
+                "taskId": "normal-write",
+                "success": false,
+                "failureReason": "Blocked by Hook: synthetic flat refusal",
+                "output": "Blocked by Hook: synthetic flat refusal"
+              },
+              {
+                "type": "query.completed",
+                "result": {
+                  "status": "completed",
+                  "terminalClassification": "success",
+                  "terminalReason": "completed",
+                  "transcript": [],
+                  "sharedContext": {
+                    "sessionId": "sess_cd4b0140e041a946_1793866436740",
+                    "initialPrompt": "Synthetic probe",
+                    "notes": [
+                      "steps: 2"
+                    ],
+                    "handoffs": []
+                  },
+                  "finalOutput": "Synthetic result observed"
+                }
+              }
+            ]
+          },
+          {
+            "route": "git",
+            "answer": "deny",
+            "approvals": 0,
+            "commands": 1,
+            "effects": 0,
+            "result": {
+              "status": "blocked",
+              "note": "Blocked by Hook: synthetic flat refusal"
+            }
+          },
+          {
+            "route": "prepared",
+            "answer": "deny",
+            "approvals": 0,
+            "commands": 1,
+            "effects": 0,
+            "result": {
+              "isError": true,
+              "output": "Native operation refused by its ordinary permission or hook gate."
+            }
+          },
+          {
+            "route": "security",
+            "answer": "deny",
+            "approvals": 0,
+            "commands": 1,
+            "effects": 0,
+            "result": {
+              "isError": true,
+              "output": "Security operation refused by its ordinary permission or hook gate."
+            }
+          },
+          {
+            "route": "git",
+            "answer": "deny",
+            "approvals": 1,
+            "commands": 0,
+            "effects": 0,
+            "result": {
+              "status": "blocked",
+              "note": "git.identity is not a function"
+            }
+          }
+        ],
+        "requests": [
+          {
+            "route": "normal",
+            "tool": "hook",
+            "decision": "allow-once"
+          },
+          {
+            "route": "git",
+            "tool": "hook",
+            "decision": "allow-once"
+          },
+          {
+            "route": "prepared",
+            "tool": "hook",
+            "decision": "allow-once"
+          },
+          {
+            "route": "security",
+            "tool": "hook",
+            "decision": "allow-once"
+          },
+          {
+            "route": "normal",
+            "tool": "hook",
+            "decision": "allow-always"
+          },
+          {
+            "route": "git",
+            "tool": "hook",
+            "decision": "deny"
+          }
+        ],
+        "received": [
+          {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_cd4b0140e041a946_1793866436740",
+            "workspaceRoot": "<runtime>/registration",
+            "timestamp": "2026-11-05T08:13:56.803Z",
+            "toolName": "write",
+            "toolCallId": "normal-write",
+            "args": {
+              "path": "fixture.txt",
+              "content": "synthetic"
+            }
+          },
+          {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_cd4b0140e041a946_1793866436740",
+            "workspaceRoot": "<runtime>/registration",
+            "timestamp": "2026-11-05T08:13:56.861Z",
+            "toolName": "bash",
+            "toolCallId": "c0-git",
+            "args": {
+              "command": "git status"
+            }
+          },
+          {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_cd4b0140e041a946_1793866436740",
+            "workspaceRoot": "<runtime>/registration",
+            "timestamp": "2026-11-05T08:13:56.915Z",
+            "toolName": "write",
+            "toolCallId": "c0-prepared",
+            "args": {
+              "path": "fixture.txt",
+              "content": "synthetic"
+            }
+          },
+          {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_cd4b0140e041a946_1793866436740",
+            "workspaceRoot": "<runtime>/registration",
+            "timestamp": "2026-11-05T08:13:56.956Z",
+            "toolName": "write",
+            "toolCallId": "c0-security",
+            "args": {
+              "path": "fixture.txt",
+              "content": "synthetic"
+            }
+          },
+          {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_cd4b0140e041a946_1793866436740",
+            "workspaceRoot": "<runtime>/registration",
+            "timestamp": "2026-11-05T08:13:57.018Z",
+            "toolName": "write",
+            "toolCallId": "normal-write",
+            "args": {
+              "path": "fixture.txt",
+              "content": "synthetic"
+            }
+          },
+          {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_cd4b0140e041a946_1793866436740",
+            "workspaceRoot": "<runtime>/registration",
+            "timestamp": "2026-11-05T08:13:57.067Z",
+            "toolName": "bash",
+            "toolCallId": "c0-git",
+            "args": {
+              "command": "git status"
+            }
+          },
+          {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_cd4b0140e041a946_1793866436740",
+            "workspaceRoot": "<runtime>/registration",
+            "timestamp": "2026-11-05T08:13:57.112Z",
+            "toolName": "write",
+            "toolCallId": "c0-prepared",
+            "args": {
+              "path": "fixture.txt",
+              "content": "synthetic"
+            }
+          },
+          {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_cd4b0140e041a946_1793866436740",
+            "workspaceRoot": "<runtime>/registration",
+            "timestamp": "2026-11-05T08:13:57.159Z",
+            "toolName": "write",
+            "toolCallId": "c0-security",
+            "args": {
+              "path": "fixture.txt",
+              "content": "synthetic"
+            }
+          }
+        ],
+        "sameDispatcherNormalVsGit": false,
+        "freshNativeDispatcherPerOperation": true,
+        "oneShotPersisted": 0,
+        "persistedAfterAlways": 1,
+        "persistedTrustSharedAcrossRoutes": true,
+        "trustPath": "<runtime>/home/.cheers/hook-trust.json",
+        "separateStoreTrusted": false,
+        "wrongWorkspace": {
+          "commandExecutions": 0,
+          "hostReturn": {
+            "decision": "allow"
+          },
+          "verdict": "unknown; hook skipped, not an adapter allow"
+        },
+        "note": "Different dispatcher/store objects do not isolate durable approval records when their default path/profile is the same."
+      },
+      "evidence": [
+        "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts:331-341",
+        "packages/ts-shell/src/cli/runtime/gitGate.ts:41-53",
+        "packages/ts-shell/src/core/hooks/registration.ts:88-110",
+        "packages/ts-shell/src/core/hooks/trust.ts:78-131",
+        "packages/ts-shell/src/core/hooks/hookDispatcher.ts:98-140",
+        "packages/ts-shell/src/workflow/git/operation/gate.ts:10-34",
+        "packages/ts-shell/src/turn/invoke.ts:14-30",
+        "packages/ts-shell/src/security/analysis/gate.ts:7-24"
+      ]
+    }
+  ]
+}

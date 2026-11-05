@@ -1,0 +1,9 @@
+npm notice run cheers@0.1.0 verify:import-cycles
+npm notice run node scripts/check-import-cycles.mjs
+scc-gate root=packages/ts-shell/src files=3085
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+npm notice run cheers@0.1.0 check:declarations
+npm notice run node scripts/check-declarations.mjs
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded

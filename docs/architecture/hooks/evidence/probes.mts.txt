@@ -1,0 +1,258 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+
+const repository = process.cwd();
+const runtime = process.env.C0_RUNTIME!;
+assert.ok(runtime.startsWith(path.join(repository, '.tmp/c0-hooks/runtime-')));
+const project = path.join(runtime, 'project');
+const scratch = path.join(repository, '.tmp/c0-hooks');
+let fetchCalls = 0;
+globalThis.fetch = async () => { fetchCalls++; throw new Error('Network is forbidden in C0 probes'); };
+const source = (file: string) => import(pathToFileURL(path.join(repository, 'packages/ts-shell/src', file)).href);
+const { setFilePersistenceEnabled, setStructuredLogSink } = await source('observability/structuredLogger.ts');
+setFilePersistenceEnabled(false);
+const diagnosticLogs: unknown[] = [];
+setStructuredLogSink((entry: unknown) => diagnosticLogs.push(entry));
+const { HookDispatcher, defaultHookDispatcher } = await source('core/hooks/hookDispatcher.ts');
+const { HookTrustStore, hookFingerprint } = await source('core/hooks/trust.ts');
+const { registerDeclaredHooks } = await source('core/hooks/registration.ts');
+const { loadHookDeclarations } = await source('core/hooks/config.ts');
+const { runPreparedTool } = await source('turn/invoke.ts');
+const { runTurn } = await source('turn/session.ts');
+const { resolveUserDataFile } = await source('core/paths/userHome.ts');
+const records: any[] = [];
+const stable = (value: unknown) => JSON.parse(JSON.stringify(value).replaceAll(runtime, '<runtime>'));
+const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+const command = (mode: string, capture: string) => `exec ${quote(process.execPath)} ${quote(path.join(scratch, 'reply.mjs'))} ${quote(mode)} ${quote(capture)}`;
+const lines = (file: string) => fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
+const payload = (root = project) => ({ eventName: 'PreToolUse', sessionId: 'c0', workspaceRoot: root, timestamp: '2026-11-05T00:00:00.000Z', toolName: 'write', toolCallId: 'c0-call', args: { path: 'fixture.txt', content: 'synthetic only\n' } });
+function record(name: string, input: unknown, observation: string, result: unknown, evidence: string[]) {
+  const row = stable({ name, status: 'observed', input, observation, result, evidence });
+  records.push(row); console.log(JSON.stringify(row));
+}
+function instrument(hooks: any) {
+  const observed: any[] = [];
+  const dispatch = hooks.dispatch.bind(hooks);
+  hooks.dispatch = async (input: unknown) => {
+    const decision = await dispatch(input); observed.push({ input, decision }); return decision;
+  };
+  return observed;
+}
+function definition(name = 'write', effect?: () => void) {
+  return { name, description: 'Synthetic C0 target', argsSchema: { type: 'object' },
+    prepare: () => ({ targets: [], preview: 'Synthetic operation', execute: async () => { effect?.(); return { success: true, output: 'synthetic effect' }; } }),
+    execute: async () => { throw new Error('Prepared execution required'); } };
+}
+async function preCase(mode: string, extras: Record<string, unknown> = {}) {
+  const capture = path.join(project, `pre-${mode}${extras.matcher ? '-matcher' : ''}.jsonl`);
+  const hooks = new HookDispatcher();
+  hooks.registerCommandHook({ event: 'PreToolUse', command: command(mode, capture), ...extras });
+  const dispatches = instrument(hooks);
+  let effects = 0;
+  const input = payload();
+  const logsBefore = diagnosticLogs.length;
+  const began = performance.now();
+  const result = await runPreparedTool(definition('write', () => { effects++; }), input.args,
+    { sessionId: input.sessionId, workspaceRoot: project, permissionScope: 'allow-all', agentMode: 'build', hooks, emit() {} },
+    undefined, input.toolCallId);
+  return { mode, command: command(mode, capture), override: extras, elapsedMs: Math.round(performance.now() - began),
+    diagnostics: diagnosticLogs.slice(logsBefore), received: lines(capture),
+    dispatch: dispatches.find(entry => entry.input.eventName === 'PreToolUse')?.decision, result, effects };
+}
+function declare(root: string, hooks: unknown) {
+  fs.mkdirSync(path.join(root, '.agents'), { recursive: true });
+  const file = path.join(root, '.agents/hooks.json');
+  fs.writeFileSync(file, JSON.stringify({ hooks })); return file;
+}
+async function drain(events: AsyncIterable<any>) { const values = []; for await (const event of events) values.push(event); return values; }
+
+const nested = await preCase('nested-deny');
+assert.equal(nested.dispatch.decision, undefined); assert.equal(nested.dispatch.hookSpecificOutput.permissionDecision, 'deny');
+assert.equal(nested.effects, 1); assert.equal(nested.result.isError, false);
+assert.deepEqual(nested.received[0].args, payload().args);
+record('pretooluse-nested-deny', { args: payload().args, response: { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'synthetic nested refusal' } } },
+  'Real shell JSON stdin/stdout -> HookDispatcher -> runPreparedTool/createToolHooks -> synthetic prepared target effect counter', nested,
+  ['packages/ts-shell/src/core/hooks/hookDispatcher.ts:313-331', 'packages/ts-shell/src/turn/tools.ts:311-350', 'packages/ts-shell/src/turn/invoke.ts:15-28']);
+
+const flat = [];
+for (const mode of ['block', 'retry', 'allow', 'empty', 'unknown', 'invalid', 'exit-2', 'exit-1', 'timeout']) {
+  const observed = await preCase(mode, mode === 'timeout' ? { timeoutMs: 300 } : {});
+  assert.equal(observed.effects, ['allow', 'empty', 'unknown'].includes(mode) ? 1 : 0);
+  flat.push(observed);
+}
+const matcher = await preCase('block', { matcher: 'Write|Edit|MultiEdit' });
+assert.equal(matcher.effects, 1);
+assert.equal(matcher.received.length, 0);
+record('pretooluse-flat-block', { modes: flat.map(row => row.mode), timeoutMs: 300, unmatchedMatcher: 'Write|Edit|MultiEdit', tool: 'write' },
+  'Real command completion/failure plus actual pre-use consumer; empty/unknown host continuation is not proof of a clean verdict', { cases: flat, matcher: { ...matcher, newlyExecutedCommands: 0 } },
+  ['packages/ts-shell/src/core/hooks/hookDispatcher.ts:174-193', 'packages/ts-shell/src/core/hooks/hookDispatcher.ts:250-371', 'packages/ts-shell/src/turn/tools.ts:325-338']);
+
+const stops = [];
+for (const mode of ['block', 'retry', 'exit-2', 'invalid', 'timeout']) {
+  const hooks = new HookDispatcher(); const capture = path.join(project, `stop-${mode}.jsonl`);
+  hooks.registerCommandHook({ event: 'Stop', command: command(mode, capture) });
+  const dispatches = instrument(hooks); let steps = 0;
+  const began = performance.now(); const logsBefore = diagnosticLogs.length;
+  const events = await drain(runTurn({ sessionId: `c0-stop-${mode}`, workspaceRoot: project, prompt: 'Synthetic completion',
+    history: [], onMessage() {}, tools: new Map(), hooks, maxSteps: 2, permissionScope: 'allow-all',
+    signal: new AbortController().signal, step: async () => { steps++; return { text: 'Synthetic answer', toolCalls: [], stopReason: 'stop' }; },
+  }).events);
+  const decision = dispatches.find(row => row.input.eventName === 'Stop')?.decision;
+  assert.equal(events.filter(event => event.type === 'query.completed').length, 1);
+  assert.equal(steps, 1); assert.equal(events.some(event => event.type === 'query.failed'), false);
+  assert.equal(decision.decision, ['invalid', 'timeout'].includes(mode) ? 'allow' : mode === 'retry' ? 'retry' : 'block');
+  stops.push({ mode, elapsedMs: Math.round(performance.now() - began), command: command(mode, capture),
+    input: lines(capture)[0], dispatch: decision, diagnostics: diagnosticLogs.slice(logsBefore), steps,
+    eventTypes: events.map(event => event.type), completed: events.find(event => event.type === 'query.completed') });
+}
+record('stop-dispatch-result-discard', { modes: stops.map(row => row.mode), timeout: 'default, no override', syntheticSteps: 1 },
+  'Actual runTurn event stream after real Stop command; block/retry/exit-2 results discarded; timeout and no re-entry observed separately', stops,
+  ['packages/ts-shell/src/core/hooks/hookDispatcher.ts:64-68', 'packages/ts-shell/src/core/hooks/hookDispatcher.ts:355-371', 'packages/ts-shell/src/turn/session.ts:363-390']);
+
+const unknownRoot = path.join(runtime, 'unknown');
+const unknownCapture = path.join(unknownRoot, 'unknown.jsonl');
+const unknownInput = { TaskCompleted: [{ hooks: [{ command: command('block', unknownCapture) }] }] };
+declare(unknownRoot, unknownInput);
+const loaded = loadHookDeclarations(unknownRoot, { homeDir: process.env.HOME });
+const unknownDispatcher = new HookDispatcher(); let registrations = 0;
+const setTrust = unknownDispatcher.setCommandHookTrust.bind(unknownDispatcher);
+unknownDispatcher.setCommandHookTrust = (trust: unknown, hooks: unknown[]) => { registrations += hooks.length; return setTrust(trust, hooks); };
+const registration = registerDeclaredHooks(unknownDispatcher, unknownRoot, { homeDir: process.env.HOME, trustStore: new HookTrustStore(path.join(runtime, 'unknown-trust.json')) });
+assert.equal(loaded.hooks.length, 0); assert.equal(registrations, 0); assert.equal(fs.existsSync(unknownCapture), false);
+record('unknown-event-registration', unknownInput, 'loadHookDeclarations and real registration boundary; unknown event was never dispatched',
+  { loaded, registration, installedCommandHooks: registrations, dispatchCalls: 0, commandExecuted: false, conclusion: '从未被 dispatch' },
+  ['packages/ts-shell/src/core/hooks/config.ts:29-48', 'packages/ts-shell/src/core/hooks/config.ts:134-157', 'packages/ts-shell/src/core/hooks/registration.ts:81-110']);
+
+const configRoot = path.join(runtime, 'config');
+const configInput = { Stop: [{ matcher: '*', timeout: 91, hooks: [
+  { type: 'command', command: 'synthetic-command', timeout: 92, timeoutMs: 93, name: 'lost-name', description: 'lost-description', extra: 'lost' },
+  { type: 'prompt', command: 'also-retained', timeout: 94 },
+  { type: 'command', timeout: 95 },
+] }] };
+declare(configRoot, configInput);
+const configLoaded = loadHookDeclarations(configRoot, { homeDir: process.env.HOME });
+const configDispatcher = new HookDispatcher(); let installed: any[] = [];
+const install = configDispatcher.setCommandHookTrust.bind(configDispatcher);
+configDispatcher.setCommandHookTrust = (trust: unknown, hooks: any[]) => { installed = hooks; return install(trust, hooks); };
+registerDeclaredHooks(configDispatcher, configRoot, { homeDir: process.env.HOME, trustStore: new HookTrustStore(path.join(runtime, 'config-trust.json')) });
+assert.equal(configLoaded.hooks.length, 2);
+assert.deepEqual(Object.keys(configLoaded.hooks[0]).sort(), ['command', 'event', 'matcher', 'sourcePath']);
+assert.ok(installed.every(hook => !('timeout' in hook) && !('timeoutMs' in hook)));
+record('config-timeout-retention', configInput, 'Actual JSON loader projection and installed command configs; no fixture command executed',
+  { loaded: configLoaded, installed, retainedHandlerKeys: ['command'], retainedGroupKeys: ['matcher'], eventFromMapKey: true,
+    discardedHandlerKeys: ['type', 'timeout', 'timeoutMs', 'name', 'description', 'extra'], groupTimeoutDiscarded: true },
+  ['packages/ts-shell/src/core/hooks/config.ts:134-184', 'packages/ts-shell/src/core/hooks/registration.ts:91-101', 'packages/ts-shell/src/core/hooks/types.ts:187-199']);
+
+const { runCliRuntimeInvocation } = await source('entrypoints/cliRuntimeInvocation.ts');
+const { gitGateFor } = await source('cli/runtime/gitGate.ts');
+const { bootstrapShellRuntime } = await source('core/shell/bootstrap.ts');
+const { SessionManager } = await source('session/SessionManager.ts');
+const { getRuntimeConfig } = await source('config/runtimeConfig.ts');
+const { getWorkflowGitContext } = await source('workflow/gitContext.ts');
+const { StreamingRenderer } = await source('presentation/terminal/streaming.ts');
+const { runSecurityTool } = await source('security/analysis/gate.ts');
+const { runNativeGit } = await source('workflow/git/operation/gate.ts');
+const registrationRoot = path.join(runtime, 'registration'); fs.mkdirSync(registrationRoot);
+const capture = path.join(registrationRoot, 'registered.jsonl');
+const declaredCommand = command('block', capture);
+const declaringFile = declare(registrationRoot, { PreToolUse: [{ matcher: '^(write|bash)$', hooks: [{ command: declaredCommand }] }] });
+const manager = new SessionManager(); const config = getRuntimeConfig(registrationRoot);
+const renderer = new StreamingRenderer(); renderer.renderLine = () => {};
+const context = bootstrapShellRuntime({ cwd: registrationRoot, runtimeConfig: config,
+  gitContext: getWorkflowGitContext(registrationRoot), sessionManager: manager, renderer, emitLifecycleMessages: false }).context;
+assert.equal(context.projectRoot, registrationRoot); assert.equal(context.cwd, registrationRoot);
+const shellRuntime = { getAgentMode: () => 'build', getPermissionScope: () => 'allow-all' };
+let approvalAnswer = 'allow-once', activeRoute = '', effectCount = 0;
+const requests: any[] = [];
+const approval = async (prompt: any) => { requests.push({ route: activeRoute, tool: prompt.context.toolName, decision: approvalAnswer });
+  return { promptId: prompt.id, decision: approvalAnswer, respondedAt: 1 }; };
+const routeCases = [];
+const dispatchers: any[] = [];
+async function normal() {
+  let calls = 0;
+  const turn = await runCliRuntimeInvocation({ sessionId: context.session.id, workspaceRoot: registrationRoot, prompt: 'Synthetic probe',
+    signal: new AbortController().signal, maxTurns: 3, agentMode: 'build', permissionScope: 'allow-all', runtimeConfig: config,
+    providerCredentialResolution: { provider: 'openai', expectedEnvVarName: 'OPENAI_API_KEY' }, providerModeEnv: 'real', escalationPromptHandler: approval,
+  }, { tools: () => new Map([['write', definition('write', () => { effectCount++; })]]),
+    checkProviderReadiness: async () => ({ ok: true }), createReadinessTerminalEvent: () => { throw new Error('Fixture readiness failure'); },
+    createStep: () => async () => ++calls === 1 ? { text: '', toolCalls: [{ id: 'normal-write', name: 'write', args: { path: 'fixture.txt', content: 'synthetic' } }], stopReason: 'tool_use' }
+      : { text: 'Synthetic result observed', toolCalls: [], stopReason: 'stop' },
+  });
+  dispatchers.push(defaultHookDispatcher);
+  return (await drain(turn.events)).filter(event => ['tool.result', 'query.completed', 'query.failed'].includes(event.type));
+}
+async function native(route: string) {
+  const gate = gitGateFor(context, manager, shellRuntime, approval, route === 'git' ? 'bash' : 'write'); dispatchers.push(gate.hooks);
+  if (route === 'git') {
+    const git = { root: registrationRoot };
+    const plan = { id: 'c0-git', snapshot: { root: registrationRoot }, summary: 'git status', preview: 'synthetic prepared Git command', targets: [], args: ['status'],
+      run: async () => { effectCount++; return { status: 'succeeded', note: 'synthetic Git effect' }; } };
+    return runNativeGit(git, plan, gate, () => {});
+  }
+  const tool = definition('write', () => { effectCount++; });
+  const input = { path: 'fixture.txt', content: 'synthetic' };
+  return route === 'security' ? runSecurityTool(tool, input, gate, undefined, 'c0-security')
+    : runPreparedTool(tool, input, gate, undefined, 'c0-prepared');
+}
+async function routeCase(route: string, answer: string) {
+  activeRoute = route; approvalAnswer = answer;
+  const before = { commands: lines(capture).length, approvals: requests.length, effects: effectCount };
+  const result = route === 'normal' ? await normal() : await native(route);
+  const row = { route, answer, approvals: requests.length - before.approvals, commands: lines(capture).length - before.commands,
+    effects: effectCount - before.effects, result }; routeCases.push(row); return row;
+}
+for (const route of ['normal', 'git', 'prepared', 'security']) {
+  const row = await routeCase(route, 'allow-once'); assert.equal(row.approvals, 1); assert.equal(row.commands, 1); assert.equal(row.effects, 0);
+}
+assert.equal(new HookTrustStore().entries().length, 0);
+await routeCase('normal', 'allow-always');
+for (const route of ['git', 'prepared', 'security']) {
+  const row = await routeCase(route, 'deny'); assert.equal(row.approvals, 0); assert.equal(row.commands, 1); assert.equal(row.effects, 0);
+}
+const store = new HookTrustStore(); assert.equal(store.entries().length, 1);
+const trustPath = resolveUserDataFile('hook-trust.json'); assert.ok(trustPath.startsWith(runtime));
+const persistedAfterAlways = store.entries().length;
+const fingerprint = hookFingerprint({ event: 'PreToolUse', matcher: '^(write|bash)$', command: declaredCommand, sourcePath: declaringFile });
+assert.equal(store.forgetTrust(fingerprint), true);
+// Once the hook itself is denied, its skipping does not deny the ordinary synthetic operation.
+const denied = await routeCase('prepared', 'deny'); assert.equal(denied.commands, 0); assert.equal(denied.approvals, 1);
+assert.equal(denied.effects, 1); assert.equal(denied.result.isError, false);
+const separate = new HookTrustStore(path.join(runtime, 'separate-trust.json'));
+store.recordTrust(fingerprint, 'synthetic shared record', declaringFile);
+assert.equal(separate.isTrusted(fingerprint, declaringFile), false);
+const wrongDispatcher = new HookDispatcher();
+registerDeclaredHooks(wrongDispatcher, registrationRoot, { homeDir: process.env.HOME, trustStore: store });
+const beforeWrong = lines(capture).length;
+const wrongResult = await wrongDispatcher.dispatch(payload(project));
+assert.equal(lines(capture).length, beforeWrong);
+record('registration-path-isolation', { projectSource: declaringFile, command: declaredCommand, approvalSequence: routeCases.map(row => [row.route, row.answer]),
+    ordinaryPermissionScope: 'allow-all for synthetic targets', providerMode: 'real branch with injected readiness and deterministic StepFunction; no provider transport' },
+  'Actual normal registration and gitGateFor; runNativeGit/runPreparedTool/runSecurityTool consumers; temporary default trust store vs explicit separate file',
+  { cases: routeCases, requests, received: lines(capture), sameDispatcherNormalVsGit: dispatchers[0] === dispatchers[1],
+    freshNativeDispatcherPerOperation: dispatchers[1] !== dispatchers[2], actualWorkspaceMatchesFixture: true, oneShotPersisted: 0, persistedAfterAlways,
+    persistedTrustSharedAcrossRoutes: true, trustPath, separateStoreTrusted: false,
+    wrongWorkspace: { commandExecutions: 0, hostReturn: wrongResult, verdict: 'unknown; hook skipped, not an adapter allow' },
+    note: 'Different dispatcher/store objects do not isolate durable approval records when their default path/profile is the same.' },
+  ['packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts:331-341', 'packages/ts-shell/src/cli/runtime/gitGate.ts:41-53',
+    'packages/ts-shell/src/core/hooks/registration.ts:88-110', 'packages/ts-shell/src/core/hooks/trust.ts:78-131',
+    'packages/ts-shell/src/core/hooks/hookDispatcher.ts:98-140', 'packages/ts-shell/src/workflow/git/operation/gate.ts:10-34',
+    'packages/ts-shell/src/turn/invoke.ts:14-30', 'packages/ts-shell/src/security/analysis/gate.ts:7-24']);
+assert.equal(fetchCalls, 0);
+const files = [
+  'packages/ts-shell/src/core/hooks/types.ts', 'packages/ts-shell/src/core/hooks/hookDispatcher.ts', 'packages/ts-shell/src/core/hooks/config.ts',
+  'packages/ts-shell/src/core/hooks/registration.ts', 'packages/ts-shell/src/core/hooks/trust.ts', 'packages/ts-shell/src/core/hooks/approval.ts',
+  'packages/ts-shell/src/turn/tools.ts', 'packages/ts-shell/src/turn/session.ts', 'packages/ts-shell/src/turn/invoke.ts',
+  'packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts', 'packages/ts-shell/src/cli/runtime/gitGate.ts',
+  '.github/workflows/ci.yml', '.github/workflows/normproof-watch.yml', '.normproof/normproof-0.1.0.tgz',
+];
+const report = { host: { commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), node: process.version,
+  platform: process.platform, arch: process.arch, measuredAt: new Date().toISOString() },
+  scope: { realProviderCalls: 0, fetchCalls, inheritedCredentials: false, runtimeState: '<runtime> (removed by launcher)',
+    productChanges: false, builtinModelStep: 'not used; deterministic injected step', sandbox: 'default off in empty temporary home/project' },
+  sourceHashes: Object.fromEntries(files.map(file => [file, createHash('sha256').update(fs.readFileSync(file)).digest('hex')])), records };
+fs.writeFileSync(path.join(scratch, 'results.json'), JSON.stringify(report, null, 2) + '\n');
+console.log(JSON.stringify({ summary: '6/6 named probes observed', names: records.map(row => row.name), fetchCalls, host: report.host }));

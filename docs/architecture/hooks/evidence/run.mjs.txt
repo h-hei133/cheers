@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const repository = path.resolve(directory, '../..');
+const runtime = fs.mkdtempSync(path.join(directory, 'runtime-'));
+for (const name of ['home', 'temp', 'data', 'project']) fs.mkdirSync(path.join(runtime, name));
+// Construct a fresh environment: no inherited provider credentials or user configuration.
+const result = spawnSync(process.execPath, [path.join(repository, 'node_modules/tsx/dist/cli.mjs'), path.join(directory, 'probes.mts')], {
+  cwd: repository, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 120_000,
+  env: {
+    PATH: process.env.PATH ?? '/usr/bin:/bin', LANG: 'C.UTF-8',
+    HOME: path.join(runtime, 'home'), USERPROFILE: path.join(runtime, 'home'),
+    TMPDIR: path.join(runtime, 'temp'), CHEERS_TEST_ROOT: path.join(runtime, 'data'),
+    GIT_CEILING_DIRECTORIES: runtime, C0_RUNTIME: runtime,
+  },
+});
+if (result.stdout) process.stdout.write(result.stdout);
+if (result.stderr) process.stderr.write(result.stderr);
+fs.rmSync(runtime, { recursive: true, force: true });
+if (result.error) console.error(result.error.message);
+process.exitCode = result.status ?? 1;
