@@ -1,0 +1,52 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/turn/stop.test.ts  (18 tests | 1 failed | 17 skipped) 13ms
+   ❯ src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade unknown to completed
+     → expected { type: 'query.completed', …(1) } to match object { type: 'query.failed', …(1) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 skipped (18)
+   Start at  21:39:15
+   Duration  2.76s (transform 1.90s, setup 0ms, collect 2.51s, tests 13ms, environment 0ms, prepare 55ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade unknown to completed
+AssertionError: expected { type: 'query.completed', …(1) } to match object { type: 'query.failed', …(1) }
+
+- Expected
++ Received
+
+  Object {
+-   "stopStatus": "unknown",
+-   "type": "query.failed",
++   "result": Object {
++     "finalOutput": "Candidate answer",
++     "sharedContext": Object {
++       "handoffs": Array [],
++       "initialPrompt": "repair",
++       "notes": Array [
++         "steps: 1",
++       ],
++       "sessionId": "stop-fixture",
++     },
++     "status": "completed",
++     "terminalClassification": "success",
++     "terminalReason": "completed",
++     "transcript": Array [],
++   },
++   "type": "query.completed",
+  }
+
+ ❯ src/turn/stop.test.ts:101:27
+     99|     const events = await drain(f.options);
+    100|     expect(f.step).toHaveBeenCalledTimes(1);
+    101|     expect(events.at(-1)).toMatchObject({ type: 'query.failed', stopSt…
+       |                           ^
+    102|     expect(events.some(e => e.type === 'query.completed')).toBe(false);
+    103|     report(probe, events, f.attempts.length);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

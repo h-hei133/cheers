@@ -1,5 +1,6 @@
 import { isRecord as record } from "../../core/values/record.js";
 import { readableOutput, readableQueryResult, readableToolEvent } from "./output.js";
+import { readableLifecycleRecord } from './lifecycle.js';
 
 const ROLES: ReadonlySet<unknown> = new Set(["system", "user", "assistant", "tool"]);
 const AGENT_ROLES: ReadonlySet<unknown> = new Set(["planner", "coder", "reviewer"]);
@@ -37,6 +38,7 @@ function message(value: Record<string, unknown>): boolean {
 /** Nested containers dereferenced by replay must be present before admission. */
 function queryEvent(value: unknown): boolean {
   if (!record(value) || typeof value.type !== "string") return false;
+  if (value.type === 'lifecycle.record') return readableLifecycleRecord(value);
   if (value.type === "turn.completed") return readableOutput(value.output);
   if (value.type === "query.completed") return readableQueryResult(value.result);
   if (value.type === "turn.started") return AGENT_ROLES.has(value.role) && Number.isInteger(value.turn) && Number(value.turn) >= 0;

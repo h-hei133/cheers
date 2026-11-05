@@ -12,6 +12,7 @@ import type {
 import type { QueryRuntimeProofProjection } from './proof.js'
 
 export type QueryEvent =
+  | import('./lifecycle.js').LifecycleRecord
   | { readonly type: 'execution.command'; readonly proof: import('../../../runtime/execution/proof.js').NativeCommandProof; readonly sourcePromptEntryId: string }
   | {
       readonly type: 'query.started';
@@ -137,7 +138,7 @@ export type QueryEvent =
   | { readonly type: 'lifecycle.cancelled'; readonly reason: string }
   | { readonly type: 'lifecycle.error'; readonly error: string }
   | { readonly type: 'query.completed'; readonly result: OrchestrationResult }
-  | { readonly type: 'query.failed'; readonly error: string; readonly admissionFailure?: import('../../agent/request/model.js').ModelAdmissionError['code'] }
+  | { readonly type: 'query.failed'; readonly error: string; readonly stopStatus?: import('./lifecycle.js').StopTerminalStatus; readonly admissionFailure?: import('../../agent/request/model.js').ModelAdmissionError['code'] }
 
 /**
  * Whether this event belongs in the durable transcript.

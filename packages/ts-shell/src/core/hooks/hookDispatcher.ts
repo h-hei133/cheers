@@ -3,6 +3,9 @@ import { HOOK_TRUST_BYPASS_NOTICE } from "./types.js";
 import type { HookTrustStore } from "./trust.js";
 import { execFile } from "node:child_process";
 import path from "node:path";
+import { dispatchStop } from './stop/dispatch.js';
+import type { StopDispatchOptions } from './stop/model.js';
+import type { StopPayload } from './types.js';
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
 import { checkWriteHookArtifact, writeHookCommand } from './artifact.js';
 import { applyWriteHookPolicy, canonicalToolName, hookUnknown, normalizeHookVeto, translateWriteInput, translateWriteResult } from './translation.js';
@@ -98,7 +101,7 @@ export class HookDispatcher {
    * A hook with no fingerprint did not come from a file — it was registered by
    * this process, which is the process's own code and needs no permission.
    */
-  private async declaredHookIsAllowed(hook: CommandHookConfig, workspaceRoot: string, sourceRevision?: string): Promise<boolean> {
+  private async declaredHookIsAllowed(hook: CommandHookConfig, workspaceRoot: string, sourceRevision?: string, active: () => boolean = () => true): Promise<boolean> {
     const trust = this.trust;
     if (trust?.admission?.()) return false;
     if (hook.fingerprint === undefined) return true;
@@ -131,7 +134,7 @@ export class HookDispatcher {
     // offered as two different promises. Treat it as one-shot so an untyped
     // caller can never turn "Run it for this session" into a permanent grant.
     const allowed = decision === true || decision === 'allow-once' || decision === 'allow-always';
-    if (!allowed || trust !== this.trust || trust?.admission?.()
+    if (!allowed || !active() || trust !== this.trust || trust?.admission?.()
       || trust.store.sourceRevision(hook.sourcePath ?? '(unknown)') !== sourceRevision) {
       logger.info(`Declared hook '${hook.command}' was not approved and will not run.`);
       return false;
@@ -196,9 +199,18 @@ export class HookDispatcher {
     }
   }
 
-  async dispatch(payload: HookEventPayload): Promise<HookDecision> {
+  async dispatch(payload: HookEventPayload, stopOptions: StopDispatchOptions = {}): Promise<HookDecision> {
     const trust = this.trust;
     const commandHooks = this.commandHooks;
+    const inProcessHooks = this.inProcessHooks;
+    if (payload.eventName === 'Stop') return dispatchStop({ payload: payload as StopPayload,
+      inProcess: inProcessHooks, commands: commandHooks, options: stopOptions,
+      current: () => trust === this.trust && commandHooks === this.commandHooks && inProcessHooks === this.inProcessHooks && !trust?.admission?.(),
+      allowed: async (hook, active) => {
+        const revision = hook.fingerprint === undefined || trust?.bypassed ? undefined : trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)');
+        return await this.declaredHookIsAllowed(hook, payload.workspaceRoot, revision, active)
+          && (revision === undefined || trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') === revision);
+      } });
     const eventType = payload.eventName;
     logger.debug(`Dispatching lifecycle hook event: ${eventType}`, {
       event: eventType,

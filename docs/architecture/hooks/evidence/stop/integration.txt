@@ -1,0 +1,131 @@
+npm notice run cheers@0.1.0 verify:import-cycles
+npm notice run node scripts/check-import-cycles.mjs
+scc-gate root=packages/ts-shell/src files=3099
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+npm notice run cheers@0.1.0 check:declarations
+npm notice run node scripts/check-declarations.mjs
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+npm notice run cheers@0.1.0 check:node-floor
+npm notice run node scripts/check-node-floor.mjs
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+npm notice run cheers@0.1.0 test:ts
+npm notice run npm run test -w packages/ts-shell src/turn/stop.test.ts src/core/hooks/stop/dispatch.test.ts src/core/hooks/translation.integration.test.ts src/core/hooks/trust.test.ts src/core/hooks/registration.test.ts src/core/shell/sessionRuntime.test.ts src/core/query/runtime/events.test.ts
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/turn/stop.test.ts src/core/hooks/stop/dispatch.test.ts src/core/hooks/translation.integration.test.ts src/core/hooks/trust.test.ts src/core/hooks/registration.test.ts src/core/shell/sessionRuntime.test.ts src/core/query/runtime/events.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > uses handler timeoutMs=80 from hooks.json with isolated trust and measured execution
+{"probe":"hooks-json-timeout","configuration":{"hooks":{"Stop":[{"hooks":[{"command":"sleep 0.35; printf '%s' '{\"decision\":\"allow\",\"reasonCode\":\"proven\",\"proofVerdict\":\"proven\"}'","timeoutMs":80}]}]}},"elapsedMs":90,"approvalCalls":1,"decision":"unknown","reasonCode":"timeout"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > uses handler timeoutMs=1200 from hooks.json with isolated trust and measured execution
+{"probe":"hooks-json-timeout","configuration":{"hooks":{"Stop":[{"hooks":[{"command":"sleep 0.35; printf '%s' '{\"decision\":\"allow\",\"reasonCode\":\"proven\",\"proofVerdict\":\"proven\"}'","timeoutMs":1200}]}]}},"elapsedMs":356,"approvalCalls":1,"decision":"allow","reasonCode":"explicit_allow"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process nonzero
+{"probe":"nonzero","decision":"unknown","reasonCode":"process_failed"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process empty
+{"probe":"empty","decision":"unknown","reasonCode":"empty_output"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process malformed
+{"probe":"malformed","decision":"unknown","reasonCode":"invalid_output"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process unknown
+{"probe":"unknown","decision":"unknown","reasonCode":"unknown"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process wire-unknown
+{"probe":"wire-unknown","decision":"unknown","reasonCode":"could_not_judge"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process exit-2
+{"probe":"exit-2","decision":"block","reasonCode":"exit_2"}
+
+ ✓ src/core/hooks/stop/dispatch.test.ts  (18 tests) 653ms
+ ✓ src/core/hooks/trust.test.ts  (21 tests) 494ms
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > nested deny prevents the actual native write
+{"probe":"nested-deny-native-write","targetExists":false,"result":"Blocked by Hook: fixture rule"}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > flat deny prevents the actual native write
+{"probe":"flat-deny-native-write","targetExists":false,"result":"Blocked by Hook: fixture rule"}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > malformed blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"malformed","result":{"decision":"block","reason":"The write hook could not be evaluated (invalid_output).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"invalid_output"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > timeout blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"timeout","result":{"decision":"block","reason":"The write hook could not be evaluated (timeout).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"timeout"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > version blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"version","result":{"decision":"block","reason":"The write hook could not be evaluated (version_mismatch).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"version_mismatch"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > empty blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"empty","result":{"decision":"block","reason":"The write hook could not be evaluated (empty_output).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"empty_output"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > nonzero blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"nonzero","result":{"decision":"block","reason":"The write hook could not be evaluated (process_failed).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"process_failed"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > loads canonical configuration, binds trust identity and sends complete metadata
+{"probe":"unsupported","toolName":"apply_patch","result":{"decision":"unsupported","reason":"A patch may contain multiple targets, while content rules apply per file; patch normalization is not implemented.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"patch_targets"}}}
+{"probe":"unsupported","toolName":"bash","result":{"decision":"unsupported","reason":"Shell commands do not describe their final per-file content.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"shell_effects"}}}
+{"probe":"unsupported","toolName":"mcp__write","result":{"decision":"unsupported","reason":"This tool (including MCP tools) has no declared single-file content semantics.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"tool_semantics"}}}
+{"probe":"unsupported","toolName":"browser","result":{"decision":"unsupported","reason":"Browser and desktop actions are not single-file content operations.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"external_effects"}}}
+{"probe":"unsupported","toolName":"MultiEdit","result":{"decision":"unsupported","reason":"Multiple edits have no verified single-file replacement projection.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"multiple_edits"}}}
+{"probe":"unsupported","toolName":"NotebookEdit","result":{"decision":"unsupported","reason":"Notebook cell operations are not full file replacement content.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"notebook_cells"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > runs the pinned artifact for write to allow and block without changing ordinary permission
+{"probe":"pinned-artifact","node":"v24.15.0","toolName":"write","allowed":{"decision":"allow","hookVerdict":{"status":"allow","source":"hook","reasonCode":"no_violation"}},"blocked":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- no-import: imports private/x.ts\n  Keep private imports out.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+ ✓ src/core/shell/sessionRuntime.test.ts  (50 tests) 565ms
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > runs the pinned artifact for edit to allow and block without changing ordinary permission
+{"probe":"pinned-artifact","node":"v24.15.0","toolName":"edit","allowed":{"decision":"allow","hookVerdict":{"status":"allow","source":"hook","reasonCode":"no_violation"}},"blocked":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- no-import: imports private/x.ts\n  Keep private imports out.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+ ✓ src/core/hooks/translation.integration.test.ts  (15 tests) 1015ms
+ ✓ src/core/hooks/registration.test.ts  (14 tests) 185ms
+ ✓ src/core/query/runtime/events.test.ts  (8 tests) 3ms
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > withholds completed during block and resumes exactly once with feedback and stable identity
+{"probe":"block-repair-allow","attempts":2,"reentries":1,"completed":1,"terminal":{"type":"lifecycle.record","attemptId":"adb2e11a-3d41-4109-a8c3-bbe9b6b7bd1b","reentryCount":1,"stop_hook_active":true,"sequence":11,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"proven","proofVerdict":"proven","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"accepted","reasonCode":"explicit_allow","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=false
+{"probe":"same-fingerprint","attempts":2,"reentries":1,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"92fe8f51-991c-4d40-af67-f1a41ded2720","reentryCount":1,"stop_hook_active":true,"sequence":12,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"repeated_block","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=true
+{"probe":"different-block-limit","attempts":2,"reentries":1,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"d9d11bdc-bf0d-4991-9214-96cdad385e83","reentryCount":1,"stop_hook_active":true,"sequence":12,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:c"]}]},"kind":"stop_state","state":"blocked","reasonCode":"reentry_limit","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade unknown to completed
+{"probe":"unknown","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"d5b05d0a-1987-407f-9800-f23ef4b380c5","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"unknown","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"unknown","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade could_not_decide to completed
+{"probe":"could_not_decide","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"2aeff285-5ed3-445f-86af-2f5d833af7b2","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"could_not_decide","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"could_not_decide","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade could_not_judge to completed
+{"probe":"could_not_judge","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"7c60b70f-e4ad-4abd-b68c-a77ce88265fc","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"could_not_judge","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"could_not_judge","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade already_blocked_once to completed
+{"probe":"already_blocked_once","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"7e48b3c7-6599-4f0d-bde4-3f87d75ecdd8","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"already_blocked_once","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"already_blocked_once","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade unsupported to completed
+{"probe":"unsupported","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"5c42ee69-7543-4a50-9421-acb52f937918","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"unsupported","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"unsupported","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > keeps timeout and handler failure unknown
+{"probe":"timeout","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"0b585dfa-fea9-4ecf-812e-cc73a1a9e769","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"759e8ade59ec78efaa8dd06dcdc232af6cef3d6c099e5d33dc1f532b8cc61d18","reasonCode":"timeout","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"timeout","terminal":true}}
+{"probe":"handler_failed","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"a4349e63-661c-4737-94d0-d91635f9400b","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"759e8ade59ec78efaa8dd06dcdc232af6cef3d6c099e5d33dc1f532b8cc61d18","reasonCode":"handler_failed","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"handler_failed","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not complete after real command nonzero
+{"probe":"command-nonzero","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"22bdae94-74a3-4ad7-a64c-2dc7f3c01908","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"1a21be8bb1dc4721d30cc1850ead617faa55ae9aebf416da4369668bdeaf0824","reasonCode":"process_failed","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"process_failed","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not complete after real command timeout
+{"probe":"command-timeout","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"3f00824a-265d-4897-b421-7d61fac5aa00","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"3906086191bf13c41da5550a6cfe1f55a0021462dafb65e1d123ce0a0b71db4f","reasonCode":"timeout","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"timeout","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not complete after real command empty
+{"probe":"command-empty","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"eccbe275-8989-4696-b585-40e085f0188e","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b","reasonCode":"empty_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"empty_output","terminal":true}}
+
+stdout | src/turn/stop.test.ts > persists five distinct kinds through the real shell and manager, then accepts another user turn
+PERSISTED_STOP_RECORDS=[{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"hook_result","result":{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","decision":"block","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"],"durationMs":5}},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"proof_verdict","command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","verdict":"refuted","evidenceIdentity":["unit:a","unit:b"]},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"open_obligations","terminal":false},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":6,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"repairing","reasonCode":"hook_blocked","terminal":false},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":7,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"model_answer","step":2,"status":"answered","messageIdentity":"802bf6996f666b73d8a21d81aa5572bcd8d4d65b4a50169b751f2f593270aa17"},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":8,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"permission","toolName":"bash","taskId":"repair-call","status":"requested"},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":9,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"permission","toolName":"bash","taskId":"repair-call","status":"approved"},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":10,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"execution","toolName":"bash","taskId":"repair-call","status":"reported_success"},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":11,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"model_answer","step":3,"status":"answered","messageIdentity":"f7d050f669149f98a3d09ea951ecfb6194a6a4bc90b10365617380694b5b9826"},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":12,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":13,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"hook_result","result":{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","decision":"block","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":14,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"proof_verdict","command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","verdict":"refuted","evidenceIdentity":["unit:a","unit:b"]},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":15,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"open_obligations","terminal":false},{"type":"lifecycle.record","attemptId":"c484024a-f4ea-47fb-97ef-5e7c46e1517a","reentryCount":1,"stop_hook_active":true,"sequence":16,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"repeated_block","terminal":true}]
+
+ ✓ src/turn/stop.test.ts  (18 tests) 435ms
+
+ Test Files  7 passed (7)
+      Tests  144 passed (144)
+   Start at  21:15:52
+   Duration  6.78s (transform 3.07s, setup 0ms, collect 8.14s, tests 3.35s, environment 1ms, prepare 329ms)
+

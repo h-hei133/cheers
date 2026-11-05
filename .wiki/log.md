@@ -11641,3 +11641,9 @@ ADD-80/81 记本地验证，补充表共 81 项（1 完成 / 8 部分完成 / 70
 隔离HOME、独立Git工作区、零历史的regular/fullscreen原生Node CLI均展示六档、持久max，并由Ctrl+Enter进入Choose effort；未派发模型消息。print CLI超限crash显示未知计数。首次过期构建、普通观察器及嵌套工作区隔离的探针问题保留事实，最终修正夹具后重验；未为探针修改产品。证据在`.omx/artifacts/phase20-accepted/`，临时脚本/工作区清理后保留正式回执。无并发、全仓、20k或真实provider请求，Node20.3/其他平台/真实输入/billing/release未补验。ADD-85/88记本地验证，其余新项记本地实现；总95项为1完成/8部分完成/72本地验证/13本地实现/1未开始，建议5/14不启动、原47项矩阵及延期保持。Git与CI结果单独绑定实际交付，不计为本地通过的一部分。
 
 交付：实现/测试/状态/护栏提交`d22bfdbfd4122ed9c0685c6b3777a8179abad290`已推送`origin/main`，远端refs精确匹配，提交后工作区干净；提交后checkBuild仍确认`1d9edaa48081`新鲜。本行由后续纯文档提交记录；代码CI尚未计为通过，后续实际读取回执单列于正式证据目录。
+
+### 2026-11-05：C2 Stop 的有界完成生命周期
+
+Stop dispatch 返回值进入完成判断，首次 block/retry 转 blocked→repairing，在同一 AgentCore、原模型预算与取消域最多重入一次；稳定 attemptId/count/active 和结构化 progressFingerprint 区分首次与复查。重复阻断、预算/次数上限不发 completed，timeout/unknown/失败保留未知；取消保留原 interrupted 语义，不终止会话。handler timeoutMs 贯通加载和注册，PreToolUse 判断不变。query lifecycle.record 经真实 manager.appendQueryEvent 落盘，模型、hook、审批、执行与 proof verdict 分开。
+
+执行契约、状态图、能力矩阵及测试生成记录见 `docs/architecture/hooks/stop-execution.md`。本地 40 项 Stop 聚焦与 Node20.3 同套通过；6 项有效反转断言失败并逐字节恢复；五静态门、191 scripts、build f32e6a807497 通过。完整链 1097 文件14321项通过、2既有跳过，1160.22秒。首次全量7项因旧构建拒绝启动已分类保留，最终同链全部通过。bundle judge 无阻塞、循环/导入满足，partial 仅既有 interactiveMode两处函数上限。无真实provider/跨平台/远端CI声明；未提交、未推送。

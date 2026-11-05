@@ -1,0 +1,9 @@
+
+npm notice run cheers@0.1.0 test:ts
+npm notice run npm run test -w packages/ts-shell src/turn/stop.test.ts -t stops a second block
+npm warn "stops a second block" is being parsed as a normal command line argument.
+npm error code EUNKNOWNCONFIG
+npm error Unknown cli flag:
+npm error   - --t
+npm error Run `npm help config` for supported options.
+npm error A complete log of this run can be found in: /home/wang/.npm/_logs/2026-11-05T13_37_57_668Z-debug-0.log

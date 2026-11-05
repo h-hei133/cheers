@@ -420,7 +420,7 @@ export class ShellSessionRuntime {
         this.stateMachine.interruptRun();
         provenanceOutcome = 'cancelled';
       } else {
-        const errorSave = projectRuntimeFailureSessionSave({
+        const errorSave = terminalState.terminalClassification === 'stopped' ? projectErrorSessionSave(terminalState) : projectRuntimeFailureSessionSave({
           error,
           lastContinuationReason: terminalState.lastContinuationReason,
         });

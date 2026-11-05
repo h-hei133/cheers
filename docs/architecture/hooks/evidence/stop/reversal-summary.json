@@ -1,0 +1,32 @@
+[
+  {
+    "reversal": "completion-consumption",
+    "exitCode": 1,
+    "restored": true
+  },
+  {
+    "reversal": "reentry-cap",
+    "exitCode": 1,
+    "restored": true
+  },
+  {
+    "reversal": "reason-identity",
+    "exitCode": 1,
+    "restored": true
+  },
+  {
+    "reversal": "active-flag",
+    "exitCode": 1,
+    "restored": true
+  },
+  {
+    "reversal": "timeout-loader",
+    "exitCode": 1,
+    "restored": true
+  },
+  {
+    "reversal": "unknown-policy",
+    "exitCode": 1,
+    "restored": true
+  }
+]

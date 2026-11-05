@@ -1,0 +1,37 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/turn/stop.test.ts  (18 tests | 2 failed | 16 skipped) 17ms
+   ❯ src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=false
+     → expected [ { eventName: 'Stop', …(8) } ] to have a length of 2 but got 1
+   ❯ src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=true
+     → expected [ { eventName: 'Stop', …(8) } ] to have a length of 2 but got 1
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 16 skipped (18)
+   Start at  21:39:02
+   Duration  2.79s (transform 1.88s, setup 0ms, collect 2.52s, tests 17ms, environment 0ms, prepare 56ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=false
+ FAIL  src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=true
+AssertionError: expected [ { eventName: 'Stop', …(8) } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ src/turn/stop.test.ts:80:24
+     78|     const events = await drain(f.options);
+     79|     expect(MAX_STOP_REENTRIES).toBe(1);
+     80|     expect(f.attempts).toHaveLength(2);
+       |                        ^
+     81|     expect(f.step).toHaveBeenCalledTimes(2);
+     82|     expect(events.some(e => e.type === 'query.completed')).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+

@@ -1,0 +1,61 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=true
+{"probe":"different-block-limit","attempts":2,"reentries":1,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"28a75280-b6fa-49a0-bd87-cd417515c28e","reentryCount":1,"stop_hook_active":true,"sequence":12,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"Changed reason /path/1/1793885951007","proofVerdict":"refuted","evidenceIdentity":["unit:c"]}]},"kind":"stop_state","state":"blocked","reasonCode":"reentry_limit","terminal":true}}
+
+ ❯ src/turn/stop.test.ts  (18 tests | 1 failed | 16 skipped) 19ms
+   ❯ src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=false
+     → expected { type: 'lifecycle.record', …(9) } to match object { kind: 'stop_state', …(3) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 16 skipped (18)
+   Start at  21:39:08
+   Duration  2.74s (transform 1.87s, setup 0ms, collect 2.49s, tests 19ms, environment 0ms, prepare 54ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=false
+AssertionError: expected { type: 'lifecycle.record', …(9) } to match object { kind: 'stop_state', …(3) }
+
+- Expected
++ Received
+
+  Object {
++   "attemptId": "987ed337-c0cf-462b-988f-abe4c50c1ce9",
+    "kind": "stop_state",
+-   "reasonCode": "repeated_block",
++   "progressFingerprint": Object {
++     "checks": Array [
++       Object {
++         "command": "f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622",
++         "evidenceIdentity": Array [
++           "unit:a",
++           "unit:b",
++         ],
++         "proofVerdict": "refuted",
++         "reasonCode": "Changed reason /path/1/1793885950997",
++       },
++     ],
++     "version": 1,
++   },
++   "reasonCode": "reentry_limit",
++   "reentryCount": 1,
++   "sequence": 12,
+    "state": "blocked",
++   "stop_hook_active": true,
+    "terminal": true,
++   "type": "lifecycle.record",
+  }
+
+ ❯ src/turn/stop.test.ts:84:22
+     82|     expect(events.some(e => e.type === 'query.completed')).toBe(false);
+     83|     const terminal = records(events).at(-1);
+     84|     expect(terminal).toMatchObject({ kind: 'stop_state', state: 'block…
+       |                      ^
+     85|       reasonCode: changed ? 'reentry_limit' : 'repeated_block' });
+     86|     const checks = records(events).filter(e => e.kind === 'hook_result…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

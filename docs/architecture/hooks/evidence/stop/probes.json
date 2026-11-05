@@ -1,0 +1,466 @@
+[
+  {
+    "probe": "hooks-json-timeout",
+    "configuration": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "sleep 0.35; printf '%s' '{\"decision\":\"allow\",\"reasonCode\":\"proven\",\"proofVerdict\":\"proven\"}'",
+                "timeoutMs": 80
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "elapsedMs": 90,
+    "approvalCalls": 1,
+    "decision": "unknown",
+    "reasonCode": "timeout"
+  },
+  {
+    "probe": "hooks-json-timeout",
+    "configuration": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "sleep 0.35; printf '%s' '{\"decision\":\"allow\",\"reasonCode\":\"proven\",\"proofVerdict\":\"proven\"}'",
+                "timeoutMs": 1200
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "elapsedMs": 359,
+    "approvalCalls": 1,
+    "decision": "allow",
+    "reasonCode": "explicit_allow"
+  },
+  {
+    "probe": "nonzero",
+    "decision": "unknown",
+    "reasonCode": "process_failed"
+  },
+  {
+    "probe": "empty",
+    "decision": "unknown",
+    "reasonCode": "empty_output"
+  },
+  {
+    "probe": "malformed",
+    "decision": "unknown",
+    "reasonCode": "invalid_output"
+  },
+  {
+    "probe": "unknown",
+    "decision": "unknown",
+    "reasonCode": "unknown"
+  },
+  {
+    "probe": "wire-unknown",
+    "decision": "unknown",
+    "reasonCode": "could_not_judge"
+  },
+  {
+    "probe": "exit-2",
+    "decision": "block",
+    "reasonCode": "exit_2"
+  },
+  {
+    "probe": "block-repair-allow",
+    "attempts": 2,
+    "reentries": 1,
+    "completed": 1,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "c915e07c-5bd5-4992-8ea3-a10adaa282f8",
+      "reentryCount": 1,
+      "stop_hook_active": true,
+      "sequence": 11,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622",
+            "reasonCode": "proven",
+            "proofVerdict": "proven",
+            "evidenceIdentity": [
+              "unit:a",
+              "unit:b"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "accepted",
+      "reasonCode": "explicit_allow",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "same-fingerprint",
+    "attempts": 2,
+    "reentries": 1,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "e81ed23a-6731-41ce-bbb6-ec43a2d1d79b",
+      "reentryCount": 1,
+      "stop_hook_active": true,
+      "sequence": 12,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622",
+            "reasonCode": "open_obligations",
+            "proofVerdict": "refuted",
+            "evidenceIdentity": [
+              "unit:a",
+              "unit:b"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "blocked",
+      "reasonCode": "repeated_block",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "different-block-limit",
+    "attempts": 2,
+    "reentries": 1,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "6da5584b-91ad-4fdd-9212-bf43eb10f11a",
+      "reentryCount": 1,
+      "stop_hook_active": true,
+      "sequence": 12,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622",
+            "reasonCode": "open_obligations",
+            "proofVerdict": "refuted",
+            "evidenceIdentity": [
+              "unit:c"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "blocked",
+      "reasonCode": "reentry_limit",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "unknown",
+    "attempts": 1,
+    "reentries": 0,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "b765a22a-e22e-4a26-bebd-f85c05019f34",
+      "reentryCount": 0,
+      "stop_hook_active": false,
+      "sequence": 5,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622",
+            "reasonCode": "unknown",
+            "proofVerdict": "unknown",
+            "evidenceIdentity": [
+              "unspecified"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "unknown",
+      "reasonCode": "unknown",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "could_not_decide",
+    "attempts": 1,
+    "reentries": 0,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "89924109-7079-4437-be2f-39cfd5e61293",
+      "reentryCount": 0,
+      "stop_hook_active": false,
+      "sequence": 5,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622",
+            "reasonCode": "could_not_decide",
+            "proofVerdict": "unknown",
+            "evidenceIdentity": [
+              "unspecified"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "unknown",
+      "reasonCode": "could_not_decide",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "could_not_judge",
+    "attempts": 1,
+    "reentries": 0,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "4c9e719f-be2d-4e9c-a284-6fb3a05a8582",
+      "reentryCount": 0,
+      "stop_hook_active": false,
+      "sequence": 5,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622",
+            "reasonCode": "could_not_judge",
+            "proofVerdict": "unknown",
+            "evidenceIdentity": [
+              "unspecified"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "unknown",
+      "reasonCode": "could_not_judge",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "already_blocked_once",
+    "attempts": 1,
+    "reentries": 0,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "294c0542-1a2e-4030-9a0b-2f568b704038",
+      "reentryCount": 0,
+      "stop_hook_active": false,
+      "sequence": 5,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622",
+            "reasonCode": "already_blocked_once",
+            "proofVerdict": "unknown",
+            "evidenceIdentity": [
+              "unspecified"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "unknown",
+      "reasonCode": "already_blocked_once",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "unsupported",
+    "attempts": 1,
+    "reentries": 0,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "f1a86ad9-6b1f-4c8d-bcd1-c32e7e8b5055",
+      "reentryCount": 0,
+      "stop_hook_active": false,
+      "sequence": 5,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622",
+            "reasonCode": "unsupported",
+            "proofVerdict": "unknown",
+            "evidenceIdentity": [
+              "unspecified"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "unknown",
+      "reasonCode": "unsupported",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "timeout",
+    "attempts": 1,
+    "reentries": 0,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "1b918b46-21f3-49e9-a13d-7a245a0bd7f5",
+      "reentryCount": 0,
+      "stop_hook_active": false,
+      "sequence": 5,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "759e8ade59ec78efaa8dd06dcdc232af6cef3d6c099e5d33dc1f532b8cc61d18",
+            "reasonCode": "timeout",
+            "proofVerdict": "unknown",
+            "evidenceIdentity": [
+              "unspecified"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "unknown",
+      "reasonCode": "timeout",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "handler_failed",
+    "attempts": 1,
+    "reentries": 0,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "c4113138-d4a3-4fb8-83e6-9c8e43d84bd5",
+      "reentryCount": 0,
+      "stop_hook_active": false,
+      "sequence": 5,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "759e8ade59ec78efaa8dd06dcdc232af6cef3d6c099e5d33dc1f532b8cc61d18",
+            "reasonCode": "handler_failed",
+            "proofVerdict": "unknown",
+            "evidenceIdentity": [
+              "unspecified"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "unknown",
+      "reasonCode": "handler_failed",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "command-nonzero",
+    "attempts": 1,
+    "reentries": 0,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "9f9b9bd1-926c-4e9f-a82f-23bb1f481208",
+      "reentryCount": 0,
+      "stop_hook_active": false,
+      "sequence": 5,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "1a21be8bb1dc4721d30cc1850ead617faa55ae9aebf416da4369668bdeaf0824",
+            "reasonCode": "process_failed",
+            "proofVerdict": "unknown",
+            "evidenceIdentity": [
+              "unspecified"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "unknown",
+      "reasonCode": "process_failed",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "command-timeout",
+    "attempts": 1,
+    "reentries": 0,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "8dbe1ba1-0bd9-4502-8353-379ae79a4462",
+      "reentryCount": 0,
+      "stop_hook_active": false,
+      "sequence": 5,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "3906086191bf13c41da5550a6cfe1f55a0021462dafb65e1d123ce0a0b71db4f",
+            "reasonCode": "timeout",
+            "proofVerdict": "unknown",
+            "evidenceIdentity": [
+              "unspecified"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "unknown",
+      "reasonCode": "timeout",
+      "terminal": true
+    }
+  },
+  {
+    "probe": "command-empty",
+    "attempts": 1,
+    "reentries": 0,
+    "completed": 0,
+    "terminal": {
+      "type": "lifecycle.record",
+      "attemptId": "ba4a64b8-e3c5-4b11-8d51-7f5831b501db",
+      "reentryCount": 0,
+      "stop_hook_active": false,
+      "sequence": 5,
+      "progressFingerprint": {
+        "version": 1,
+        "checks": [
+          {
+            "command": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+            "reasonCode": "empty_output",
+            "proofVerdict": "unknown",
+            "evidenceIdentity": [
+              "unspecified"
+            ]
+          }
+        ]
+      },
+      "kind": "stop_state",
+      "state": "unknown",
+      "reasonCode": "empty_output",
+      "terminal": true
+    }
+  }
+]

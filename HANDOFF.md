@@ -2088,3 +2088,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A translated hook reports unsupported, then a later native feedback object makes dispatch appear allowed.
 - **Root Cause**: One accumulated result slot treated coverage status and optional feedback as interchangeable.
 - **Rule**: Preserve unknown/unsupported classifications through aggregation; only explicit block/retry may supersede them. Test a semantic gap followed by native feedback and an explicit allow. Keep upstream could_not_decide separate from adapter errors and apply the host policy explicitly.
+
+### Stop Re-entry Must Keep Cancellation, Budget And Check Identity
+- **Symptom**: A cancellation delivered after a repair event still starts a new model request; removing the blocking hook makes the repair look accepted; a shell timeout leaves descendants holding output pipes.
+- **Root Cause**: Completion-check admission, asynchronous event consumption, model-loop lifetime and process lifetime are separate boundaries. Empty dispatch and empty hook output also represent different facts.
+- **Rule**: Recheck cancellation immediately before core continuation, retain the original step/recovery budgets and blocking command identity, and require that check to explicitly allow after repair. Keep configured silent/unknown checks unknown. Use a bounded Stop process group and preserve the existing quiet cancellation envelope while recording the structured stopped state. Load and register timeoutMs from each handler, and isolate both declaration homeDir and trustStore in tests.

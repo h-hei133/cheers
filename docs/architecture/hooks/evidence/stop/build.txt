@@ -1,0 +1,25 @@
+npm notice run cheers@0.1.0 check:config-consumers
+npm notice run node scripts/check-config-consumers.mjs
+config-consumer-check fields=64 read=64 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+npm notice run cheers@0.1.0 verify:docs-drift:strict
+npm notice run node scripts/verify-docs-and-rules-drift.mjs --strict
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run cheers@0.1.0 build
+npm notice run npm run build:ts
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+packages/ts-shell/src/core/hooks/stop/run.ts(46,35): error TS2769: No overload matches this call.
+  Overload 1 of 8, '(file: string, args: readonly string[] | null | undefined, options: ExecFileOptionsWithBufferEncoding, callback?: ((error: ExecFileException | null, stdout: NonSharedBuffer, stderr: NonSharedBuffer) => void) | undefined): ChildProcess', gave the following error.
+    Object literal may only specify known properties, and 'detached' does not exist in type 'ExecFileOptionsWithBufferEncoding'.
+  Overload 2 of 8, '(file: string, args: readonly string[] | null | undefined, options: ExecFileOptionsWithStringEncoding, callback?: ((error: ExecFileException | null, stdout: string, stderr: string) => void) | undefined): ChildProcess', gave the following error.
+    Object literal may only specify known properties, and 'detached' does not exist in type 'ExecFileOptionsWithStringEncoding'.
+  Overload 3 of 8, '(file: string, args: readonly string[] | null | undefined, options: ExecFileOptions | null | undefined, callback: ((error: ExecFileException | null, stdout: string | NonSharedBuffer, stderr: string | NonSharedBuffer) => void) | null | undefined): ChildProcess', gave the following error.
+    Object literal may only specify known properties, and 'detached' does not exist in type 'ExecFileOptions'.
+packages/ts-shell/src/core/hooks/stop/run.ts(47,9): error TS7006: Parameter 'error' implicitly has an 'any' type.
+packages/ts-shell/src/core/hooks/stop/run.ts(47,16): error TS7006: Parameter 'stdout' implicitly has an 'any' type.
+packages/ts-shell/src/core/hooks/stop/run.ts(47,24): error TS7006: Parameter 'stderr' implicitly has an 'any' type.
+Build failed: TypeScript build failed with exit 2.

@@ -25,6 +25,10 @@ export type HookEventName =
 export type HookDecisionKind = "allow" | "block" | "retry" | "ask" | "defer" | "unknown" | "unsupported";
 
 export interface HookDecision {
+  readonly reasonCode?: string;
+  readonly proofVerdict?: import('./stop/model.js').ProofVerdict;
+  readonly evidenceIdentity?: readonly string[];
+  readonly stopChecks?: readonly import('./stop/model.js').StopCheck[];
   readonly decision: HookDecisionKind;
   readonly reason?: string;
   readonly feedback?: string;
@@ -101,6 +105,9 @@ export interface WorktreeRemovePayload extends BaseHookEventPayload {
 }
 
 export interface StopPayload extends BaseHookEventPayload {
+  readonly attemptId: string;
+  readonly reentryCount: number;
+  readonly stop_hook_active: boolean;
   readonly eventName: "Stop";
   readonly turnsExecuted: number;
   readonly finalOutput: string;
@@ -172,6 +179,7 @@ export type HookEventPayload =
   | BaseHookEventPayload;
 
 export interface InProcessHookConfig {
+  readonly timeoutMs?: number;
   readonly name?: string;
   readonly description?: string;
   readonly event: HookEventName;

@@ -1,6 +1,24 @@
 # Cheers 宿主能力矩阵
 
-原 C0 观测基点：`0057eb604ecc8d154ce691794b494c354e89755b`，2026-11-05，Linux x64 / Node `v24.15.0`。原六个合成探针见 [探针记录](probes.md)、[机器记录](results.json) 与 [执行记录](execution.md)。下列新增表记录 C1 的能力变化；后面的 C0 表保留历史观测，凡有差异以新增表及 [翻译契约](translation.md) 为当前实现。Stop 仍未实现 completion enforcement。
+原 C0 观测基点：`0057eb604ecc8d154ce691794b494c354e89755b`，2026-11-05，Linux x64 / Node `v24.15.0`。原六个合成探针见 [探针记录](probes.md)、[机器记录](results.json) 与 [执行记录](execution.md)。新增表记录 C1/C2 的能力变化；后面的 C0 表保留历史观测，凡有差异以新增表、[翻译契约](translation.md) 和 [Stop 执行契约](stop-execution.md) 为当前实现。
+
+## Stop 生命周期（C2）
+
+| 事件 | invocation guarantee | timeout | input fidelity | deny / failure | re-entry | 持久载体 / CI authority |
+| --- | --- | --- | --- | --- | --- | --- |
+| Stop | 每次非 provider-failed 候选完成；匹配声明必须经原信任与工作区准入 | handler `timeoutMs` 正整数毫秒；默认 3000；命令与进程内 handler 均有期限；审批独立有界 | 原 payload + 稳定 attemptId、reentryCount、stop_hook_active；命令 stdin 另带 hook_event_name/cwd | block/retry 消费于完成发布前；timeout、空输出、unknown、进程失败、未批准检查均保留 unknown；无成功 completed | 同一 AgentCore 最多 1 次；共享剩余模型预算、权限与取消；重复结构化 fingerprint 终态 blocked；移除阻断 hook 不算复查成功 | `manager.appendQueryEvent` 写 `lifecycle.record`；model_answer / hook_result / permission / execution / proof_verdict 分开；不增加 CI authority |
+
+配置生效位置是 `.agents/hooks.json` 的 `hooks.Stop[].hooks[]` handler 对象，例如
+`{"command":"check-completion","timeoutMs":3000}`。该事件无关字段现在同时保留于普通 command
+声明与 writeGate 声明；PreToolUse 的判断与权限顺序不变。无效 timeoutMs 会报告问题并采用默认值。
+
+这是可消费的完成阻断与一次受控修复。候选 model answer 仍可显示，只有检查接纳后才发布原
+query.completed；原结果若已 stopped，不会被 Stop allow 升级。proof 缺失记 `not_reported`，
+explicit allow 不自动成为 proven。旧 NormProof completion hook 会将多个 allow/unknown 原因
+都省略 stdout，故该旧静默协议在这里是 unknown；本变更没有修改或交付 NormProof completion
+适配器。没有 Stop 声明时沿用原完成路径，记录 not_configured。
+
+命令、真实输出、测量和测试产出的持久轨迹见 [Stop 执行记录](stop-execution.md)。
 
 ## 翻译适配器后的能力变化
 
@@ -20,9 +38,9 @@ PreToolUse nested deny 的 flat 归一化同时适用于普通 command 和 in-pr
 | could_not_decide | 原 wire allow，宿主可继续 | 翻译 unknown → Cheers policy block | 保留 hook 来源与 policy:block；不成为 allow/proven |
 | normal / prepared / security | 原生 flat 已接入 | 两条注册路径共用翻译，实际 artifact block | 4 个路径测试含 native Git；不改变普通 permission |
 | Node 20.3.0 | 未验证 | 适配器与独立 pinned artifact 实测 allow/block | Linux x64，46 项测试；旧 Node ≥24 judge bundle 不变 |
-| timeout/re-entry | JSON timeout 丢弃/无重入 | writeGate 的 timeoutMs 保留并纳入指纹；无重入明确记录 | 普通 command 声明的旧 timeout 行为不变；Stop 不变 |
+| timeout/re-entry | JSON timeout 丢弃/无重入 | C1：writeGate 的 timeoutMs 保留并纳入指纹；C2：普通 handler 的 timeoutMs 同样传递 | PreToolUse 无自动重入；Stop 的独立合同见上表 |
 
-## C0 历史观测（以下表格不含 C1 更新）
+## C0 历史观测（以下表格不含 C1/C2 更新）
 
 依据：只读的 `/home/wang/projects/normproof/.wiki/features/phase-1-decisions.md`，C0（1793–1810）、P1-C7/C8（1613–1635）、P1-C17/C18（1893–1904）、P1-C23/C24（1971–1983）。**实测修正附件的一处前提：两条注册路径的 dispatcher 独立，不等于持久批准记录独立。**同一 home/profile 和相同 fingerprint 时，两条路径读取同一信任文件；`allow-once` 不持久化，`allow-always` 可跨路径复用。
 

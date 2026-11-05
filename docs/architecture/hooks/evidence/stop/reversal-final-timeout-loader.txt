@@ -1,0 +1,55 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/hooks/stop/dispatch.test.ts  (22 tests | 2 failed | 20 skipped) 12ms
+   ❯ src/core/hooks/stop/dispatch.test.ts > Stop command boundary > uses handler timeoutMs=80 from hooks.json with isolated trust and measured execution
+     → expected undefined to be 80 // Object.is equality
+   ❯ src/core/hooks/stop/dispatch.test.ts > Stop command boundary > uses handler timeoutMs=1200 from hooks.json with isolated trust and measured execution
+     → expected undefined to be 1200 // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 20 skipped (22)
+   Start at  21:39:14
+   Duration  503ms (transform 213ms, setup 0ms, collect 262ms, tests 12ms, environment 0ms, prepare 51ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/hooks/stop/dispatch.test.ts > Stop command boundary > uses handler timeoutMs=80 from hooks.json with isolated trust and measured execution
+AssertionError: expected undefined to be 80 // Object.is equality
+
+- Expected: 
+80
+
++ Received: 
+undefined
+
+ ❯ src/core/hooks/stop/dispatch.test.ts:51:72
+     49|     const homeDir = path.join(root, 'home');
+     50|     fs.mkdirSync(homeDir);
+     51|     expect(loadHookDeclarations(root, { homeDir }).hooks[0].timeoutMs)…
+       |                                                                        ^
+     52|     const hooks = new HookDispatcher();
+     53|     const approval = vi.fn(async () => 'allow-once' as const);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/core/hooks/stop/dispatch.test.ts > Stop command boundary > uses handler timeoutMs=1200 from hooks.json with isolated trust and measured execution
+AssertionError: expected undefined to be 1200 // Object.is equality
+
+- Expected: 
+1200
+
++ Received: 
+undefined
+
+ ❯ src/core/hooks/stop/dispatch.test.ts:51:72
+     49|     const homeDir = path.join(root, 'home');
+     50|     fs.mkdirSync(homeDir);
+     51|     expect(loadHookDeclarations(root, { homeDir }).hooks[0].timeoutMs)…
+       |                                                                        ^
+     52|     const hooks = new HookDispatcher();
+     53|     const approval = vi.fn(async () => 'allow-once' as const);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

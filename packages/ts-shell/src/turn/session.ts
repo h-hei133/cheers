@@ -25,6 +25,7 @@ import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { CacheWarmingRunner } from "./cacheWarm.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
+import { StopLifecycle } from './stop.js';
 
 /**
  * One user turn, driven through the kernel.
@@ -192,7 +193,8 @@ function gateOptionsFor(
 
 export function runTurn(options: TurnOptions): TurnRun {
   const channel = new EventChannel<QueryEvent>();
-  const parentGate = gateOptionsFor(options, (event) => channel.push(event));
+  const stop = new StopLifecycle(event => channel.push(event));
+  const parentGate = gateOptionsFor(options, event => stop.query(event));
   const runSubagent = options.subagentHost
     ? createSubagentRunner(options.subagentHost, options.tools, parentGate)
     : undefined;
@@ -236,7 +238,8 @@ export function runTurn(options: TurnOptions): TurnRun {
   ]);
   core.subscribe(async (event: AgentLifecycleEvent, signal) => {
     if (event.type === "message_end" && event.message !== opening) persist(options.onMessage, event.message);
-    for (const projected of projection.project(event)) channel.push(projected);
+    for (const projected of projection.project(event)) stop.query(projected);
+    stop.observe(event, projection.stepCount);
     await options.observe?.(event, signal);
     if (event.type === 'turn_end' && options.checkpoint && runSubagent) {
       try { await options.checkpoint({ messages: core.state.messages, step: projection.stepCount,
@@ -292,11 +295,15 @@ export function runTurn(options: TurnOptions): TurnRun {
       while (!options.signal.aborted && ((await recoverOverflow()) || core.hasQueuedMessages())) {
         await core.continue();
       }
+      while (!options.signal.aborted && await conclude()) {
+        if (options.signal.aborted) break;
+        await core.continue();
+        while (!options.signal.aborted && ((await recoverOverflow()) || core.hasQueuedMessages())) await core.continue();
+      }
+      if (options.signal.aborted) stop.finish('stopped', 'cancelled', false);
     } finally {
       options.signal.removeEventListener("abort", onAbort);
     }
-    if (options.signal.aborted) return;
-    await conclude();
   };
 
   /**
@@ -359,10 +366,11 @@ export function runTurn(options: TurnOptions): TurnRun {
   };
 
   /** Report how the run ended, in the terms the shell reads. */
-  const conclude = async (): Promise<void> => {
+  const conclude = async (): Promise<boolean> => {
     const outcome = concludeRun(core.state.messages, options.prompt, options.sessionId, projection.stepCount,
       projection.stepCount >= options.maxSteps && Boolean(core.state.messages.filter(message => message.role === 'assistant').at(-1)?.tool_calls?.length));
     if (outcome.kind === "failed") {
+      stop.finish('stopped', 'model_failed', false);
       await options.hooks.dispatch({
         eventName: "StopFailure",
         sessionId: options.sessionId,
@@ -372,26 +380,37 @@ export function runTurn(options: TurnOptions): TurnRun {
         error: outcome.error,
       });
       channel.push({ type: "query.failed", error: outcome.error, ...(outcome.admissionFailure ? { admissionFailure: outcome.admissionFailure } : {}) });
-      return;
+      return false;
     }
     if (outcome.explained) {
       channel.push({ type: "message.delta", role: "coder", delta: outcome.finalOutput });
       options.onMessage({ role: "assistant", content: outcome.finalOutput });
     }
-    await options.hooks.dispatch({
+    stop.beginCheck();
+    const decision = await options.hooks.dispatch({
       eventName: "Stop",
+      ...stop.attempt(),
       sessionId: options.sessionId,
       workspaceRoot: options.workspaceRoot,
       timestamp: new Date().toISOString(),
       turnsExecuted: projection.stepCount,
       finalOutput: outcome.finalOutput,
-    });
+    }, { signal: options.signal, onResult: result => stop.checked(result) });
+    if (options.signal.aborted) { stop.finish('stopped', 'cancelled', false); return false; }
+    const next = stop.decide(decision, projection.stepCount < options.maxSteps);
+    if (next === 'terminal') return false;
+    if (next === 'repair') {
+      core.state.messages = [...core.state.messages, { role: 'system', content: stop.repairMessage(decision) }];
+      return true;
+    }
     channel.push(outcome.completed);
+    return false;
   };
 
   void drive()
     .catch((error: unknown) => {
-      if (options.signal.aborted) return;
+      if (options.signal.aborted) { stop.finish('stopped', 'cancelled', false); return; }
+      stop.finish('stopped', 'runtime_failed', false);
       channel.push({ type: "query.failed", error: error instanceof Error ? error.message : String(error),
         ...(error instanceof ModelAdmissionError ? { admissionFailure: error.code } : {}) });
     })

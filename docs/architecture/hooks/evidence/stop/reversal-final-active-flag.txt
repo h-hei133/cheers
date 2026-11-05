@@ -1,0 +1,43 @@
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/turn/stop.test.ts  (18 tests | 1 failed | 17 skipped) 64ms
+   ❯ src/turn/stop.test.ts > Stop completion lifecycle > withholds completed during block and resumes exactly once with feedback and stable identity
+     → expected [ [ +0, false ], [ 1, false ] ] to deeply equal [ [ +0, false ], [ 1, true ] ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 skipped (18)
+   Start at  21:39:11
+   Duration  2.81s (transform 1.89s, setup 1ms, collect 2.51s, tests 64ms, environment 0ms, prepare 55ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/stop.test.ts > Stop completion lifecycle > withholds completed during block and resumes exactly once with feedback and stable identity
+AssertionError: expected [ [ +0, false ], [ 1, false ] ] to deeply equal [ [ +0, false ], [ 1, true ] ]
+
+- Expected
++ Received
+
+  Array [
+    Array [
+      0,
+      false,
+    ],
+    Array [
+      1,
+-     true,
++     false,
+    ],
+  ]
+
+ ❯ src/turn/stop.test.ts:68:71
+     66|     expect(records(events)).toContainEqual(expect.objectContaining({ k…
+     67|     release(); await consume;
+     68|     expect(f.attempts.map(a => [a.reentryCount, a.stop_hook_active])).…
+       |                                                                       ^
+     69|     expect(new Set(f.attempts.map(a => a.attemptId)).size).toBe(1);
+     70|     expect(events.filter(e => e.type === 'query.completed')).toHaveLen…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -49,6 +49,14 @@ export function applyTerminalQueryEvent(
   state: SessionTerminalState,
   event: QueryEvent,
 ): void {
+  if (event.type === 'query.failed' && event.stopStatus) {
+    state.sawTerminalEvent = true;
+    state.terminalStatus = 'stopped_error';
+    state.terminalReason = 'stopped_error';
+    state.terminalClassification = 'stopped';
+    state.terminalStopReason = event.error;
+    return;
+  }
   if (event.type !== "query.completed") {
     return;
   }

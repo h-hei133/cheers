@@ -149,7 +149,7 @@ function readOne(configPath: string): HookConfigLoadResult {
           && typeof group.matcher === "string"
           ? group.matcher
           : undefined;
-      const commands = readCommands(group);
+      const commands = readCommands(group, problems, configPath);
       if (commands.length === 0) {
         problems.push(`${configPath} declares a '${eventName}' handler with no command`);
         continue;
@@ -170,7 +170,7 @@ function readOne(configPath: string): HookConfigLoadResult {
  * established configuration files use, and a shape people already have is worth
  * matching even when a flatter one would do.
  */
-function readCommands(group: unknown): Pick<HookDeclaration, 'command' | 'writeGate' | 'timeoutMs'>[] {
+function readCommands(group: unknown, problems: string[], configPath: string): Pick<HookDeclaration, 'command' | 'writeGate' | 'timeoutMs'>[] {
   if (typeof group !== "object" || group === null || !("hooks" in group)) return [];
   const handlers = group.hooks;
   if (!Array.isArray(handlers)) return [];
@@ -178,14 +178,17 @@ function readCommands(group: unknown): Pick<HookDeclaration, 'command' | 'writeG
   const commands: Pick<HookDeclaration, 'command' | 'writeGate' | 'timeoutMs'>[] = [];
   for (const handler of handlers) {
     if (typeof handler !== "object" || handler === null) continue;
+    const timeoutMs = 'timeoutMs' in handler && typeof handler.timeoutMs === 'number' && Number.isSafeInteger(handler.timeoutMs) && handler.timeoutMs > 0
+      ? handler.timeoutMs as number : undefined;
+    if ('timeoutMs' in handler && timeoutMs === undefined) problems.push(`${configPath}: timeoutMs must be a positive integer in milliseconds; using the default timeout`);
     if ('writeGate' in handler) {
       commands.push({ command: writeHookCommand(handler.writeGate), writeGate: handler.writeGate,
-        ...('timeoutMs' in handler && typeof handler.timeoutMs === 'number' ? { timeoutMs: handler.timeoutMs } : {}) });
+        ...(timeoutMs === undefined ? {} : { timeoutMs }) });
       continue;
     }
     if (!("command" in handler)) continue;
     const command = handler.command;
-    if (typeof command === "string" && command.trim() !== "") commands.push({ command });
+    if (typeof command === "string" && command.trim() !== "") commands.push({ command, ...(timeoutMs === undefined ? {} : { timeoutMs }) });
   }
   return commands;
 }

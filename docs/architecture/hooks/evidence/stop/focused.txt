@@ -1,0 +1,86 @@
+npm notice run cheers@0.1.0 test:ts
+npm notice run npm run test -w packages/ts-shell src/turn/stop.test.ts src/turn/session.test.ts src/core/hooks/translation.test.ts src/core/hooks/config.test.ts
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/turn/stop.test.ts src/turn/session.test.ts src/core/hooks/translation.test.ts src/core/hooks/config.test.ts
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > withholds completed during block and resumes exactly once with feedback and stable identity
+{"probe":"block-repair-allow","attempts":2,"reentries":1,"completed":1,"terminal":{"type":"lifecycle.record","attemptId":"fea677db-d6e3-49cc-9402-89d6c5813898","reentryCount":1,"stop_hook_active":true,"sequence":11,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"proven","proofVerdict":"proven","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"accepted","reasonCode":"explicit_allow","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=false
+{"probe":"same-fingerprint","attempts":2,"reentries":1,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"74cf1ac6-e5f1-4ff7-b664-74765468830e","reentryCount":1,"stop_hook_active":true,"sequence":12,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"repeated_block","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=true
+{"probe":"different-block-limit","attempts":2,"reentries":1,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"b04bc89d-6e44-4af0-b54f-979c3561e393","reentryCount":1,"stop_hook_active":true,"sequence":12,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:c"]}]},"kind":"stop_state","state":"blocked","reasonCode":"reentry_limit","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade unknown to completed
+{"probe":"unknown","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"01e81ffc-2961-44a3-a5d8-748e0e7ecbdb","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"unknown","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"unknown","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade could_not_decide to completed
+{"probe":"could_not_decide","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"422e2faa-ffbb-4c39-8f77-47193447e64d","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"could_not_decide","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"could_not_decide","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade could_not_judge to completed
+{"probe":"could_not_judge","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"de4853b9-b730-4c24-9872-584d0d0630da","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"could_not_judge","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"could_not_judge","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade already_blocked_once to completed
+{"probe":"already_blocked_once","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"fe9dfcf6-2b33-4015-99ab-32dc5db6069d","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"already_blocked_once","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"already_blocked_once","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade unsupported to completed
+{"probe":"unsupported","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"db8385f3-dfc8-444b-a8cd-b5d630c07b90","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"unsupported","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"unsupported","terminal":true}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > keeps timeout and handler failure unknown
+{"probe":"timeout","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"9551b70f-9425-4099-aee8-0639a206a74a","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"759e8ade59ec78efaa8dd06dcdc232af6cef3d6c099e5d33dc1f532b8cc61d18","reasonCode":"timeout","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"timeout","terminal":true}}
+{"probe":"handler_failed","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"1ccc5b03-c0ac-4609-a285-c04688ef3dd2","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"759e8ade59ec78efaa8dd06dcdc232af6cef3d6c099e5d33dc1f532b8cc61d18","reasonCode":"handler_failed","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"handler_failed","terminal":true}}
+
+ ❯ src/turn/session.test.ts  (50 tests | 1 failed) 552ms
+   ❯ src/turn/session.test.ts > runTurn > ends quietly when interrupted, keeping what was already said
+     → expected true to be false // Object.is equality
+ ✓ src/core/hooks/config.test.ts  (6 tests) 16ms
+ ✓ src/core/hooks/translation.test.ts  (27 tests) 7ms
+stdout | src/turn/stop.test.ts > persists five distinct kinds through the real shell and manager, then accepts another user turn
+PERSISTED_STOP_RECORDS=[{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"hook_result","result":{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","decision":"block","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"proof_verdict","command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","verdict":"refuted","evidenceIdentity":["unit:a","unit:b"]},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"open_obligations","terminal":false},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":6,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"repairing","reasonCode":"hook_blocked","terminal":false},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":7,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"model_answer","step":2,"status":"answered","messageIdentity":"802bf6996f666b73d8a21d81aa5572bcd8d4d65b4a50169b751f2f593270aa17"},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":8,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"permission","toolName":"bash","taskId":"repair-call","status":"requested"},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":9,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"permission","toolName":"bash","taskId":"repair-call","status":"approved"},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":10,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"execution","toolName":"bash","taskId":"repair-call","status":"reported_success"},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":11,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"model_answer","step":3,"status":"answered","messageIdentity":"f7d050f669149f98a3d09ea951ecfb6194a6a4bc90b10365617380694b5b9826"},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":12,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":13,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"hook_result","result":{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","decision":"block","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"],"durationMs":3}},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":14,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"proof_verdict","command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","verdict":"refuted","evidenceIdentity":["unit:a","unit:b"]},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":15,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"open_obligations","terminal":false},{"type":"lifecycle.record","attemptId":"64b40468-3610-4211-abe0-11d5c7fd75b0","reentryCount":1,"stop_hook_active":true,"sequence":16,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"repeated_block","terminal":true}]
+
+ ❯ src/turn/stop.test.ts  (14 tests | 1 failed) 30348ms
+   ❯ src/turn/stop.test.ts > Stop completion lifecycle > cancels during repairing without a late completed event
+     → Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/session.test.ts > runTurn > ends quietly when interrupted, keeping what was already said
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/turn/session.test.ts:546:67
+    544|     });
+    545|     const events = await drain(runTurn(setup).events);
+    546|     expect(events.some((event) => event.type === "query.failed")).toBe…
+       |                                                                   ^
+    547|     expect(events.some((event) => event.type === "query.completed")).t…
+    548|     expect(setup.persisted).toEqual([{ role: "assistant", content: "pa…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/turn/stop.test.ts > Stop completion lifecycle > cancels during repairing without a late completed event
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  2 failed | 2 passed (4)
+      Tests  2 failed | 95 passed (97)
+   Start at  21:11:02
+   Duration  32.62s (transform 1.55s, setup 0ms, collect 4.40s, tests 30.92s, environment 1ms, prepare 270ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/turn/stop.test.ts src/turn/session.test.ts src/core/hooks/translation.test.ts src/core/hooks/config.test.ts
