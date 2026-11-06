@@ -22,7 +22,7 @@ import { createCliShutdown } from '../../../cli/runtime/shutdown.js';
 
 let scratch: string; let root: string; let manager: SessionManager; let session: Session;
 const schedulers: GoalScheduler[] = [];
-const hooks = { dispatch: async () => ({ decision: 'allow' as const }) } as unknown as HookDispatcher;
+const hooks = { dispatch: async () => ({ decision: 'allow' as const, stopChecks: [] }) } as unknown as HookDispatcher;
 beforeEach(async () => {
   const base = path.resolve('../../.tmp'); fs.mkdirSync(base, { recursive: true }); scratch = fs.mkdtempSync(path.join(base, 'goal-run-'));
   root = path.join(scratch, 'project'); const home = path.join(scratch, 'home');
@@ -38,7 +38,7 @@ afterEach(async () => {
 function command(args: string[]) { return runSessionGoalCommand(args, { cwd: root, projectRoot: root, sessionId: session.id }, manager, session); }
 function goal() { return readGoalEdit(manager, session).goal!; }
 
-function setup(step: StepFunction, submitOverride?: (run: (prompt: string, metadata: Record<string, unknown>) => Promise<void>, prompt: string, metadata: Record<string, unknown>) => Promise<void>, maxSteps = 2) {
+function setup(step: StepFunction, submitOverride?: (run: (prompt: string, metadata: Record<string, unknown>) => Promise<void>, prompt: string, metadata: Record<string, unknown>) => Promise<void>, maxSteps = 2, completionHooks = hooks) {
   let scheduler!: GoalScheduler;
   const lines: string[] = [];
   const renderer = { renderLine: (line: string) => { lines.push(line); }, renderChunk: (delta: string) => { lines.push(delta); },
@@ -46,7 +46,7 @@ function setup(step: StepFunction, submitOverride?: (run: (prompt: string, metad
   const read = vi.fn(async () => ({ success: true, output: 'observed' }));
   const runtime = new ShellSessionRuntime({ sessionManager: manager, renderer, onCancelRequested: () => scheduler.interrupt(),
     runPrompt: (prompt, signal) => runTurn({ sessionId: session.id, workspaceRoot: root, prompt, signal, step,
-      history: manager.getSession(session.id)!.turns.slice(0, -1), onMessage: message => manager.addTurn(session.id, message), hooks, maxSteps, permissionScope: 'allow-all',
+      history: manager.getSession(session.id)!.turns.slice(0, -1), onMessage: message => manager.addTurn(session.id, message), hooks: completionHooks, maxSteps, permissionScope: 'allow-all',
       tools: new Map([['read', { name: 'read', description: 'Read-only fixture', argsSchema: { type: 'object' }, execute: read }]]) }) });
   const run = async (prompt: string, promptMetadata: Record<string, unknown>) => { await runtime.executePrompt(session.id, prompt, { promptMetadata }); };
   scheduler = new GoalScheduler({ store: manager, current: () => session, cancel: () => runtime.cancelCurrentRun(), report: message => lines.push(message),
@@ -61,6 +61,16 @@ function completed(): Extract<QueryEvent, { type: 'query.completed' }> {
 }
 
 describe('durable goal scheduling', () => {
+  it('settles unproven rounds neutrally and continues without inferring goal completion', async () => {
+    const completionHooks = { dispatch: async () => ({ decision: 'allow', reasonCode: 'not_configured', proofVerdict: 'not_reported' }) } as unknown as HookDispatcher;
+    const { scheduler, lines } = setup(async () => ({ text: 'Unproven answer', toolCalls: [], stopReason: 'stop' }), undefined, 2, completionHooks);
+    expect(scheduler.start()).toBeUndefined();
+    await vi.waitFor(() => expect(goal().scheduling).toMatchObject({ phase: 'ready', round: 2, lastOutcome: 'completed_unproven', pendingRound: false }), { timeout: 3000, interval: 5 });
+    await command(['pause']); await scheduler.stop();
+    expect(goal().completion).toBeUndefined(); expect(goal().scheduling?.reason).not.toBe('failure');
+    expect(lines.join('\n')).toContain('completed_unproven');
+    expect(manager.getRecoverySnapshot(session.id).terminalClassification).toBe('completed_unproven');
+  });
   it('preserves manual terminal output with a passive goal scheduler observer installed', async () => {
     const lines: string[] = [];
     const runtime = new ShellSessionRuntime({ sessionManager: manager,

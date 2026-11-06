@@ -14,7 +14,7 @@ export interface GoalScheduling {
   readonly updatedAt: string;
   readonly reason?: GoalRunReason;
   readonly drain?: 'settled' | 'pending' | 'unknown';
-  readonly lastOutcome?: 'answer' | 'step-limit' | 'failure' | 'refused' | 'cancelled';
+  readonly lastOutcome?: 'answer' | 'completed_unproven' | 'step-limit' | 'failure' | 'refused' | 'cancelled';
 }
 
 export interface GoalSubmissionHost {

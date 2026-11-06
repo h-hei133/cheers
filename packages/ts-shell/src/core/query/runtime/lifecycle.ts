@@ -1,7 +1,7 @@
 import type { ProgressFingerprint, StopAttempt, StopCheck } from '../../hooks/stop/model.js';
 
-export type StopTerminalStatus = 'stopped' | 'blocked' | 'unknown';
-export type StopState = 'checking' | 'blocked' | 'repairing' | 'accepted' | 'stopped' | 'unknown';
+export type StopTerminalStatus = 'stopped' | 'blocked' | 'unknown' | 'completed_unproven';
+export type StopState = 'checking' | 'blocked' | 'repairing' | 'accepted' | 'stopped' | 'unknown' | 'completed_unproven';
 
 export type LifecycleFact =
   | { readonly kind: 'model_answer'; readonly messageIdentity: string; readonly step: number; readonly status: 'answered' | 'failed' }

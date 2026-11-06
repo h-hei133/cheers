@@ -1,0 +1,8 @@
+{
+  "mutation": "require closed reason for unversioned flat hooks",
+  "exit": 1,
+  "failedCases": 6,
+  "assertionError": true,
+  "restoredExactBytes": true,
+  "restoredSha256": "1acb84c97f250ab81df0afae36acf68108b1c8c973d44a223d620f4f8abc5895"
+}

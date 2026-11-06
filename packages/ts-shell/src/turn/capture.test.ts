@@ -15,7 +15,7 @@ import type { ProviderUsage } from './completion.js';
 const id = 'capture-measurement';
 const provider = { provider: 'fixture', model: 'model', baseUrl: 'https://fixture.invalid/v1', headers: {} };
 const overhead = { systemPrompt: 'Answer briefly.', tools: [] };
-const hooks = { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher;
+const hooks = { dispatch: async () => ({ decision: 'allow', stopChecks: [] }) } as unknown as HookDispatcher;
 afterEach(() => resetSessionUsage(id));
 
 it('rejects unrelated stored prompts and a framing reduction that exhausts the measured anchor', async () => {

@@ -31,14 +31,16 @@ export function saveSessionCompleted(
   terminal?: TerminalPersistence,
 ): void {
   const session = callbacks.loadSession(sessionId);
-  session.status = "completed";
+  const unproven = terminal?.terminalClassification === 'completed_unproven';
+  session.status = unproven ? 'completed_unproven' : "completed";
   delete session.lastError;
   delete session.pendingPrompt;
   session.updatedAt = callbacks.now();
   callbacks.appendTranscriptEvent(
     sessionId,
     createLifecycleTranscriptEvent({
-      event: "run-completed",
+      event: unproven ? 'run-completed-unproven' : "run-completed",
+      ...(unproven ? { detail: terminal?.terminalReasonCode } : {}),
       timestamp: session.updatedAt,
     }),
   );
@@ -48,6 +50,7 @@ export function saveSessionCompleted(
     interruptedKind: undefined,
     terminalReason: terminal?.terminalReason ?? "completed",
     terminalClassification: terminal?.terminalClassification ?? "success",
+    terminalReasonCode: terminal?.terminalReasonCode,
     lastContinuationReason: terminal?.lastContinuationReason,
     pendingLifecycle: createEmptyLifecycleIndex(),
   });
@@ -83,6 +86,7 @@ export function saveSessionError(
     interruptedKind: undefined,
     terminalReason: terminal?.terminalReason,
     terminalClassification,
+    terminalReasonCode: undefined,
     lastContinuationReason: terminal?.lastContinuationReason,
     pendingLifecycle: createEmptyLifecycleIndex(),
   });

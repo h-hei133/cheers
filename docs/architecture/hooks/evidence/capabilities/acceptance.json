@@ -1,0 +1,51 @@
+{
+  "verification": "reused completed R0b full chain after exact product byte, inventory, manifest and build checks",
+  "originalEvidence": "docs/architecture/hooks/evidence/stop-envelope/full-suite.txt",
+  "originalOutputSha256": "c2cdc269208d1d0340a1aa2eaf6357a87cc6336241801235cc253f6b20011121",
+  "originalIdentitySha256": "5bafa92424edce492c02135fbcbcdbc7ba549764306bc4490c6ceeca81916905",
+  "originalMembersSha256": "403f80df5fe59532f12e60f5cf6b29b29f89e54ba3d6bd4264ffce40d99b8248",
+  "command": "rtk proxy sh -c 'npm run verify:import-cycles && npm run check:declarations && npm run check:node-floor && CHEERS_R0A_CLI=/home/wang/projects/normproof/dist/adapters/cli/normproof.js VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=2 npm run test:ts'",
+  "exitCode": 0,
+  "sourceDrift": 0,
+  "productFiles": 3116,
+  "frozenFiles": 3119,
+  "productDigest": "87b53e6e8d5cc525821cfc6ff04f993508cfc5643cae0f3dac997f0dc4a73c2a",
+  "testFilesPassed": 1098,
+  "testsPassed": 14358,
+  "testsSkipped": 2,
+  "buildId": "46d83ccb6c7589434fcddf0ba5a5c10901e0a355b01022be6512871362701114",
+  "identity": {
+    "sourceSnapshot": {
+      "commit": "a5c600f78a800ca6517d6dc1a9ab3112125ef869",
+      "sha256": "a33d3bd1a8d0ea31820154958211ad29a48e3f2c51b98a26d2e5d6db1d254eb0"
+    },
+    "profile": {
+      "id": "software-structure-v0",
+      "sha256": "2a69c9e14ed8e9b6b38c6a795920c4d574850662d16a9ac8a0ce17bdc0db81db"
+    },
+    "bundleDigest": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985",
+    "bundleMetadataDigest": "cbcc3d3814fba42232a96f187c509fb2e3225b6f5bbe6835d563d3914255cf2c",
+    "artifactSha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+    "artifactMetadataDigest": "ffc27bb7407b2f13056487cacc392cac77a7601c9fc385187a4f73b6a07384ee",
+    "artifactProvenance": {
+      "package": "normproof",
+      "commit": "a6ff094ac14049843b6c471eabd2aaa4a55ac8fb",
+      "entry": "src/adapters/write-gate/hook.ts",
+      "bundler": "esbuild@0.27.7",
+      "inputs": {
+        "src/adapters/sidecar-file/module-graph.ts": "9bc4ce90144c797805610183c8a8aa87c4fe64562b18d6c4d47b616b5b7aab61",
+        "src/adapters/write-gate/facts.ts": "caeeafc3fa4b41da6dfd5b66c9b96750b8abff0ec22e2b81336c61f396d9d5da",
+        "src/adapters/write-gate/hook.ts": "d2f64bb6c0f557b0b09b7c97ada8866dc02f9bff623f478fce3d02fd00190583",
+        "src/contracts/base/workspace-config.ts": "f7f7b432e6de79b121022adbf96e5d49bb5370603c68c18387b33803fc6819b8",
+        "src/contracts/hooks/write-gate-contracts.ts": "f8d4feaa231be302826d5a0b4509bb91c229b11ada9263c4fa57df62f0e15826",
+        "src/contracts/hooks/write-rule-contracts.ts": "25b0c65c6be986237bbaa25ea11036502a553152b1f8a11eb986016430b55d9a",
+        "src/runtime/run-records/record-paths.ts": "a6d31c5701a79956e7b691267bf97915a49c9072b02d104cebd1c7500074e0b0",
+        "src/runtime/write-gate/decision.ts": "2c0ed08de763d50193cb76ed9dead03fdc816fa1e3f78bdfbf215b15d2d2b7dc",
+        "src/utils/canonical-json.ts": "decb8f9e1eb2e38af400a8f19bbd77b7514c7f8ef4a3b3e72904a610f9c739e2",
+        "src/utils/deep-freeze.ts": "436710b90b3f4329a70055cfe349dfea0e0f338db9b18c3c13a0a3a18a0ab6ef",
+        "src/utils/glob-pattern.ts": "4cb4acf85eabf7f0c7a7e2ad67eb80bcda8e883806e11b3a64f9a789c21a49f8"
+      }
+    }
+  },
+  "scope": "Full suite covers unchanged product and manifests; J2 scripts are separately checked and exercised. No new full-suite process was launched."
+}

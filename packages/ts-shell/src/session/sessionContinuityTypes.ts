@@ -18,6 +18,7 @@ export interface SessionContinuitySnapshot {
   readonly lastUserIntent?: string;
   readonly lastAssistantOutput?: string;
   readonly lastTerminalClassification?: TerminalClassification;
+  readonly lastTerminalReasonCode?: import('../core/hooks/stop/model.js').UnprovenCompletionReason;
   readonly lastTerminalReason?: TerminalReason;
   readonly lastFailure?: string;
   readonly lastTaskKind?: CodingTaskKind;

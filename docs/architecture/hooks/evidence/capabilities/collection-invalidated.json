@@ -1,0 +1,13 @@
+{
+  "recordedAt": "2026-11-06T09:11:48.221Z",
+  "currentSourceStatus": "source changed during collection; all local cells stale",
+  "sourceSnapshot": {
+    "commit": "a5c600f78a800ca6517d6dc1a9ab3112125ef869",
+    "sha256": "2f40bd5818c340ac9af574e5dcd965911f82ec9eccebecaa756a6d97280cab6e"
+  },
+  "rows": 165,
+  "statuses": {
+    "stale": 165
+  },
+  "reason": "Retired by a later collection because actual shared source changed during collection; raw observations are historical, not current verification."
+}

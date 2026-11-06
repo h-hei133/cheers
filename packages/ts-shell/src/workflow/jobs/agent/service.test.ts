@@ -37,6 +37,19 @@ it('establishes a permanent run fence before invoking the native runner and refu
   const restarted = new AgentService(journal); expect(restarted.hasLive(job.id)).toBe(false);
   expect(() => restarted.start(journal.get(job.id), host)).toThrow(); expect(dispatches).toBe(1);
 });
+it('retains a neutral agent receipt and requires explicit continuation after restart', async () => {
+  const host = runtime(async input => ({ status: 'completed_unproven', checkpoint: input.run.checkpoint }));
+  const job = service.create('Task without new proof', { kind: 'local' }, host); await service.drain();
+  const retained = journal.get(job.id);
+  expect(retained).toMatchObject({ status: 'completed_unproven', output: 'complete',
+    runs: [expect.objectContaining({ status: 'completed_unproven', dispatchPossible: true })] });
+  const restarted = new AgentService(journal);
+  expect(() => restarted.start(retained, host)).toThrow(); expect(dispatches).toBe(1);
+  restarted.start(retained, runtime(async input => ({ status: 'completed', checkpoint: input.run.checkpoint })), 'New explicit request');
+  await restarted.drain();
+  expect(journal.get(job.id).runs.map(run => run.status)).toEqual(['completed_unproven', 'completed']);
+  expect(dispatches).toBe(2);
+});
 it('waits for actual cleanup before claiming pause and permits only a fresh continuation run', async () => {
   let release!: () => void; const hold = new Promise<void>(resolve => { release = resolve; });
   let ready!: () => void; const began = new Promise<void>(resolve => { ready = resolve; });

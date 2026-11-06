@@ -41,7 +41,7 @@ export class AgentJournal {
   }
   arm(expected: AgentJob, checkpoint: AgentCheckpoint, instruction: string): AgentJob {
     if (!prompt(instruction) || !expected.child || !sameValue(checkpoint, expected.checkpoint)
-      || !['queued', 'paused', 'completed', 'failed', 'cancelled'].includes(expected.status) || expected.runs.length >= 16
+      || !['queued', 'paused', 'completed', 'completed_unproven', 'failed', 'cancelled'].includes(expected.status) || expected.runs.length >= 16
       || this.list().filter(job => job.id !== expected.id && ['queued', 'paused', 'running', 'unknown'].includes(job.status)).length >= 2)
       throw new JobStateError('conflict');
     const run = { id: randomUUID(), prompt: instruction, createdAt: Date.now(), dispatchPossible: true as const, status: 'running' as const, checkpoint };

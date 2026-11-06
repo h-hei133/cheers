@@ -15,9 +15,10 @@ export interface RecoverySnapshot {
   readonly lastError?: string;
   readonly runPhase?: "idle" | "prompt-persisted" | "turn-active";
   readonly interruptedKind?: "prompt" | "turn";
-  readonly durableStatus?: "success" | "stopped" | "error";
+  readonly durableStatus?: "success" | "stopped" | "error" | "completed_unproven";
   readonly terminalReason?: TerminalReason;
   readonly terminalClassification?: TerminalClassification;
+  readonly terminalReasonCode?: import('../../core/hooks/stop/model.js').UnprovenCompletionReason;
   readonly lastContinuationReason?: ContinuationReason;
   readonly pendingLifecycle: DurableLifecycleIndex;
   readonly repairSummary: QueryRuntimeRepairSummary;

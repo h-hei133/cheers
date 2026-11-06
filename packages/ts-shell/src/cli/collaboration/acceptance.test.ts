@@ -6,7 +6,7 @@ import { invalidateCollaborationAdmission, settleCollaborationPrompt } from './a
 
 afterEach(() => vi.restoreAllMocks());
 
-it('fences settlement by provenance and controller, and a delayed reply cannot abort or erase a replacement run', async () => {
+it.each(['completed', 'completed_unproven'] as const)('fences %s settlement by provenance and controller, and a delayed reply cannot abort or erase a replacement run', async outcome => {
   const context = {} as ShellRuntimeContext; const prior = new AbortController(); const replacement = new AbortController();
   let release!: () => void; const reply = new Promise<void>(resolve => { release = resolve; });
   const request = vi.fn(async () => { await reply; });
@@ -14,11 +14,12 @@ it('fences settlement by provenance and controller, and a delayed reply cannot a
   const host = { active, host: { request }, accepted: new Map() } as unknown as CollaborationComposition;
   collaborationHosts.set(context, host);
   try {
-    await settleCollaborationPrompt(context, { collaboration: { acceptanceId: 'other' } }, prior.signal, 'completed');
-    await settleCollaborationPrompt(context, { collaboration: { acceptanceId: 'prior' } }, replacement.signal, 'completed');
+    await settleCollaborationPrompt(context, { collaboration: { acceptanceId: 'other' } }, prior.signal, outcome);
+    await settleCollaborationPrompt(context, { collaboration: { acceptanceId: 'prior' } }, replacement.signal, outcome);
     expect(request).not.toHaveBeenCalled(); expect(host.active).toBe(active);
-    const settlement = settleCollaborationPrompt(context, { collaboration: { acceptanceId: 'prior' } }, prior.signal, 'completed');
+    const settlement = settleCollaborationPrompt(context, { collaboration: { acceptanceId: 'prior' } }, prior.signal, outcome);
     expect(host.active).toBeUndefined(); expect(request).toHaveBeenCalledOnce();
+    expect(request).toHaveBeenCalledWith('settle', { acceptanceId: 'prior', outcome });
     invalidateCollaborationAdmission(host); expect(replacement.signal.aborted).toBe(false);
     const next = { ...active, controller: replacement, acceptance: { acceptanceId: 'replacement' } };
     host.active = next as unknown as CollaborationComposition['active']; release(); await settlement;

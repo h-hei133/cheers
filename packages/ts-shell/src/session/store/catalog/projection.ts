@@ -34,7 +34,7 @@ export async function decodeSessionSummary(id: string, metadataText: string, sta
     || typeof metadata.updatedAt !== 'string' || !Number.isFinite(Date.parse(metadata.updatedAt))
     || (metadata.title !== undefined && typeof metadata.title !== 'string')) throw new Error('Invalid session metadata.');
   const state = stateText === undefined ? undefined : JSON.parse(stateText.trim()) as SessionStateSnapshot;
-  if (stateText !== undefined && (!state || !['active', 'interrupted', 'completed', 'error', 'terminated'].includes(state.status)
+  if (stateText !== undefined && (!state || !['active', 'interrupted', 'completed', 'completed_unproven', 'error', 'terminated'].includes(state.status)
     || (state.pendingPrompt !== undefined && typeof state.pendingPrompt !== 'string'))) throw new Error('Invalid session state.');
   const root = typeof metadata.projectRoot === 'string' && metadata.projectRoot.trim()
     || (typeof state?.projectRoot === 'string' && state.projectRoot.trim());

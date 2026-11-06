@@ -24,7 +24,7 @@ import { createCompactionProgress } from './progress.js';
 vi.mock('../../turn/cacheWarm.js', () => ({ createCacheWarmingRunner: () => ({ stop: vi.fn() }) }));
 
 const policy: CompactionPolicy = { contextWindow: 1_000, reserveTokens: 100, outputTokens: 100, keepRecentTokens: 100 };
-const hooks = { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher;
+const hooks = { dispatch: async () => ({ decision: 'allow', stopChecks: [] }) } as unknown as HookDispatcher;
 
 function toolGroup(id: string, chars = 2_300): AgentMessage[] {
   return [{ id: `message-${id}`, role: 'assistant', content: '', tool_calls: [

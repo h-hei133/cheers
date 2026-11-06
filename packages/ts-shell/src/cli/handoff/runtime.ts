@@ -108,12 +108,12 @@ export class HandoffRun {
   commandSettled(result: { readonly terminationFailed?: boolean; readonly outputFailed?: boolean }): void {
     this.uncertain ||= result.terminationFailed === true || result.outputFailed === true;
   }
-  settle(outcome: 'completed' | 'failed' | 'cancelled' | 'unknown'): void {
+  settle(outcome: 'completed' | 'completed_unproven' | 'failed' | 'cancelled' | 'unknown'): void {
     try {
       // A finalized tool whose transcript never reached this observer has no durable result proof.
       this.uncertain ||= [...this.toolResults.values()].some(result => ['edit', 'write', 'apply_patch'].includes(result.name));
       const phase = this.uncertain || outcome === 'unknown' ? 'unknown' : outcome === 'failed' ? 'failed' : outcome;
-      this.row = this.store.change(this.row, { phase: this.row.phase === 'armed' && phase === 'completed' ? 'failed' : phase, endedAt: Date.now() });
+      this.row = this.store.change(this.row, { phase: this.row.phase === 'armed' && (phase === 'completed' || phase === 'completed_unproven') ? 'failed' : phase, endedAt: Date.now() });
     } catch { this.notice('Model handoff settlement is unverified; inspect /handover status.'); }
     finally { if (liveHandoffs.get(this.context) === this) liveHandoffs.delete(this.context); }
   }

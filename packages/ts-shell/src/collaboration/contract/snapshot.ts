@@ -5,7 +5,7 @@ import type { ExportPayload } from '../../session/export/model.js';
 
 const roles = ['user', 'assistant', 'tool', 'system', 'command'];
 const kinds: readonly EventKind[] = ['query.started', 'turn.started', 'turn.completed', 'tool.started', 'tool.settled',
-  'approval.requested', 'approval.approved', 'approval.denied', 'query.completed', 'query.failed', 'lifecycle.cancelled', 'lifecycle.error', 'relay.gap'];
+  'approval.requested', 'approval.approved', 'approval.denied', 'query.completed', 'query.completed_unproven', 'query.failed', 'lifecycle.cancelled', 'lifecycle.error', 'relay.gap'];
 
 /** Only complete, scrubbed text is disclosed. Large text is omitted as a whole. */
 export function projectSnapshot(payload: ExportPayload, cutover: number): Snapshot {

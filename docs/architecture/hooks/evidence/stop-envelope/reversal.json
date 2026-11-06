@@ -1,0 +1,92 @@
+[
+  {
+    "mutation": "reason-disposition",
+    "file": "core/hooks/stop/result.ts",
+    "command": [
+      "npm",
+      "run",
+      "test",
+      "-w",
+      "packages/ts-shell",
+      "--",
+      "src/turn/stop.envelope.test.ts",
+      "-t",
+      "preserves neutral"
+    ],
+    "exit": 1,
+    "assertionFailure": true,
+    "sha256": "2c358805ea1b90a65a6f158d2fded89f3aa4ba44c5084b58a9ad48665964b9ad"
+  },
+  {
+    "mutation": "unknown-proof",
+    "file": "core/hooks/stop/result.ts",
+    "command": [
+      "npm",
+      "run",
+      "test",
+      "-w",
+      "packages/ts-shell",
+      "--",
+      "src/turn/stop.envelope.test.ts",
+      "-t",
+      "with unknown proof failed"
+    ],
+    "exit": 1,
+    "assertionFailure": true,
+    "sha256": "2c358805ea1b90a65a6f158d2fded89f3aa4ba44c5084b58a9ad48665964b9ad"
+  },
+  {
+    "mutation": "contract-version",
+    "file": "core/hooks/stop/result.ts",
+    "command": [
+      "npm",
+      "run",
+      "test",
+      "-w",
+      "packages/ts-shell",
+      "--",
+      "src/turn/stop.envelope.test.ts",
+      "-t",
+      "fails incompatible_contract"
+    ],
+    "exit": 1,
+    "assertionFailure": true,
+    "sha256": "2c358805ea1b90a65a6f158d2fded89f3aa4ba44c5084b58a9ad48665964b9ad"
+  },
+  {
+    "mutation": "neutral-event",
+    "file": "turn/session.ts",
+    "command": [
+      "npm",
+      "run",
+      "test",
+      "-w",
+      "packages/ts-shell",
+      "--",
+      "src/turn/stop.envelope.test.ts",
+      "-t",
+      "preserves neutral"
+    ],
+    "exit": 1,
+    "assertionFailure": true,
+    "sha256": "42ffab9bc0d541c70dbae091fc47350c091860d96614332edc525189c32922dd"
+  },
+  {
+    "mutation": "session-status",
+    "file": "session/lifecycle/sessionTerminalStore.ts",
+    "command": [
+      "npm",
+      "run",
+      "test",
+      "-w",
+      "packages/ts-shell",
+      "--",
+      "src/turn/stop.envelope.test.ts",
+      "-t",
+      "preserves neutral"
+    ],
+    "exit": 1,
+    "assertionFailure": true,
+    "sha256": "f0ebfe5bc0a95a02471a9f559aa87df7b55ce4bf64fcd459d70b9408abaf15fa"
+  }
+]

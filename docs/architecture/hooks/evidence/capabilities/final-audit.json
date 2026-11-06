@@ -1,0 +1,26 @@
+{
+  "at": "2026-11-06T10:32:59.445Z",
+  "sourceSnapshot": {
+    "commit": "a5c600f78a800ca6517d6dc1a9ab3112125ef869",
+    "sha256": "a33d3bd1a8d0ea31820154958211ad29a48e3f2c51b98a26d2e5d6db1d254eb0"
+  },
+  "statuses": {
+    "observed": 109,
+    "unsupported": 12,
+    "unavailable": 47
+  },
+  "evidenceDigests": {
+    "matrix.json": "249530e54652189557d4a57582f3e048ad297ed5eea4223072ba947bafc39a56",
+    "source-members.json": "8305cee9f3cc378bbe55ee21b1162ce940ca2525d127d030b266f2fd59f1b5c7",
+    "upstream-members.json": "0e48b0d5b7db5997cb549acbb2f28455e5157219d3eee62280df6eed00331422",
+    "acceptance.json": "8199ee4ba656669ea4789c00c9798ba85de5b121f766a2dc0e8caf5abff26c1e",
+    "acceptance.txt": "c4bd457ad554aeace946ce428cc3dab22e1ba72159f07caa8069f165262ab9ae",
+    "final-identity-check.txt": "7732b73df684a8aaaed3873a34cec4522d7d58086c0105bb13b9f938c1882a68",
+    "final-docs-check.txt": "43762e726a21ccdb912397db662d7ab7f62c5fb15487d628904e1208fbe14416"
+  },
+  "documentationLinks": "resolved",
+  "scratchPresent": false,
+  "commit": "not created",
+  "push": "not performed",
+  "remoteAuthority": "unavailable"
+}

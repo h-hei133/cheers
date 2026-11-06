@@ -96,7 +96,7 @@ export type SessionModelEdit = ModelEdit;
 function requiredState(statePath: string) {
   const state = readStateSnapshotRequired(statePath);
   if (!state || typeof state !== 'object' || Array.isArray(state)
-    || !['active', 'interrupted', 'completed', 'error', 'terminated'].includes(state.status)
+    || !['active', 'interrupted', 'completed', 'completed_unproven', 'error', 'terminated'].includes(state.status)
     || (state.projectRoot !== undefined && typeof state.projectRoot !== 'string')
     || (state.modelRevision !== undefined && typeof state.modelRevision !== 'string')
     || (state.modelSelection !== undefined && !decodeSessionModel(state.modelSelection))) {

@@ -25,6 +25,8 @@ export type HookEventName =
 export type HookDecisionKind = "allow" | "block" | "retry" | "ask" | "defer" | "unknown" | "unsupported";
 
 export interface HookDecision {
+  /** Stop-only host disposition; it grants neither proof nor tool authority. */
+  readonly stopDisposition?: 'completed_unproven';
   readonly reasonCode?: string;
   readonly proofVerdict?: import('./stop/model.js').ProofVerdict;
   readonly evidenceIdentity?: readonly string[];

@@ -5,7 +5,7 @@ import { hasResultSummary } from "./summaryFormatter.js";
 
 export const RESULT_FIELDS = [
   "resultSource",
-  "lastTaskKind", "lastTerminalClassification", "lastTerminalReason", "lastFailure",
+  "lastTaskKind", "lastTerminalClassification", "lastTerminalReason", "lastTerminalReasonCode", "lastFailure",
   "lastActionHandoffSummary", "lastWriterStarted", "lastWriteEffect", "lastWriteRequiresUserInspection",
   "lastWriteEffectTarget", "lastSeedInfluence", "lastSeedInfluenceHandoffSummary",
   "lastFailureHandoffDiagnostic", "lastSuccessHandoffDiagnostic", "taskState",
@@ -25,9 +25,11 @@ export function readStoredResultSource(workingMemory: unknown): StoredResultSour
   return {
     taskKind: member(continuity.lastTaskKind, ["chat", "inspect-files", "repo-explain", "read-file", "write-file", "edit-file", "run-command", "browser"]),
     terminal: {
-      terminalClassification: member(continuity.lastTerminalClassification, ["success", "stopped", "error"]),
-      terminalReason: member(continuity.lastTerminalReason, ["completed", "stopped_cycle", "stopped_max_turns", "stopped_invalid_handoff", "stopped_not_proven", "stopped_error"]),
-      stopReason: typeof continuity.lastFailure === "string" ? continuity.lastFailure.trim() || undefined : undefined,
+      terminalClassification: member(continuity.lastTerminalClassification, ["success", "stopped", "error", "completed_unproven"]),
+      terminalReason: member(continuity.lastTerminalReason, ["completed", "completed_unproven", "stopped_cycle", "stopped_max_turns", "stopped_invalid_handoff", "stopped_not_proven", "stopped_error"]),
+      terminalReasonCode: member(continuity.lastTerminalReasonCode, ['already_blocked_once', 'not_configured']),
+      stopReason: typeof continuity.lastFailure === "string" ? continuity.lastFailure.trim() || undefined
+        : member(continuity.lastTerminalReasonCode, ['already_blocked_once', 'not_configured']),
     },
   };
 }

@@ -51,7 +51,7 @@ export function selectBranchResultMemory(
   const scope = continuityBranchScope(thread, events);
   const matching = source ? events.find(event => event.id === source.eventId) : undefined;
   const consistent = !matching || (matching.type === "query-event" &&
-    matching.event.type === "query.completed" && matching.sourceEntryId === source?.entryId);
+    (matching.event.type === "query.completed" || matching.event.type === "query.completed_unproven") && matching.sourceEntryId === source?.entryId);
   if (consistent && (continuity.resultSource === undefined
     ? scope.allowLegacy : source && scope.admitsEntry(source.entryId))) return memory;
   const retained = { ...continuity };
@@ -87,7 +87,7 @@ export function latestContinuityFailure(events: readonly TranscriptEvent[]): {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const entry = events[index]!;
     if (entry.type !== "query-event") continue;
-    if (entry.event.type === "query.completed") return undefined;
+    if (entry.event.type === "query.completed" || entry.event.type === "query.completed_unproven") return undefined;
     if (entry.event.type === "query.failed" || entry.event.type === "lifecycle.error") return { entry, error: entry.event.error };
   }
   return undefined;

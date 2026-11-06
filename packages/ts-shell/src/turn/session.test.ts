@@ -20,7 +20,7 @@ import { FINAL_STEP_MESSAGE } from './messages.js';
  * end, what an interruption leaves behind, and how input typed mid-run lands.
  */
 
-const quietHooks = { dispatch: async () => ({ decision: "allow" as const }) } as unknown as HookDispatcher;
+const quietHooks = { dispatch: async () => ({ decision: "allow" as const, stopChecks: [] }) } as unknown as HookDispatcher;
 
 it.each(['summary', 'no-room', 'tool-refusal', 'unknown'] as const)('keeps the goal budget closing instruction internal for %s', async kind => {
   const claimBudgetSummary = vi.fn(() => true);

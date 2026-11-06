@@ -1,0 +1,1 @@
+{"rows":165,"statuses":{"observed":106,"unsupported":12,"unavailable":47},"evidence":"docs/architecture/hooks/evidence/capabilities"}

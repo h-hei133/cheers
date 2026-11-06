@@ -26,7 +26,7 @@ export function readSessionManagementSnapshot(layout: SessionFileLayout, id: str
     || (metadata.title !== undefined && typeof metadata.title !== 'string')
     || (metadata.projectRoot !== undefined && typeof metadata.projectRoot !== 'string')
     || !state || typeof state !== 'object' || Array.isArray(state)
-    || !['active', 'interrupted', 'completed', 'error', 'terminated'].includes(state.status)
+    || !['active', 'interrupted', 'completed', 'completed_unproven', 'error', 'terminated'].includes(state.status)
     || (state.projectRoot !== undefined && typeof state.projectRoot !== 'string')) {
     throw new Error('The saved session management state is invalid.');
   }

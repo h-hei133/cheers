@@ -61,7 +61,7 @@ export class StopLifecycle {
       evidenceIdentity: result.evidenceIdentity });
   }
 
-  decide(returned: HookDecision, canRepair: boolean): 'accepted' | 'repair' | 'terminal' {
+  decide(returned: HookDecision, canRepair: boolean, candidateCompletes = true): 'accepted' | 'repair' | 'terminal' | 'completed_unproven' {
     const result = normalizeStopResult(returned);
     // Lightweight injected dispatchers use the same policy; production reports each check in order.
     if (returned.stopChecks === undefined) this.checked(stopCheck('in-process:dispatcher', result, 0));
@@ -69,6 +69,12 @@ export class StopLifecycle {
       if (this.blockedCommand && !this.checks.some(check => check.command === this.blockedCommand && check.decision === 'allow')) {
         this.finish('unknown', 'missing_recheck');
         return 'terminal';
+      }
+      if (result.stopDisposition === 'completed_unproven' && returned.stopChecks?.length !== 0) {
+        if (!candidateCompletes) { this.finish('stopped', 'candidate_stopped', false); return 'accepted'; }
+        this.ended = true;
+        this.state('completed_unproven', result.reasonCode!, true);
+        return 'completed_unproven';
       }
       this.ended = true;
       this.state('accepted', returned.reasonCode ?? 'explicit_allow', true);
@@ -96,7 +102,7 @@ export class StopLifecycle {
     return `Completion was blocked by a Stop check. Repair the reported gap within the remaining budget, then answer again. This feedback grants no tool permissions.\n${redactExportText(result.reason ?? result.feedback ?? result.reasonCode ?? 'The completion check requested repair.').slice(0, 4_000)}`;
   }
 
-  finish(status: StopTerminalStatus, reasonCode: string, publish = true): void {
+  finish(status: Exclude<StopTerminalStatus, 'completed_unproven'>, reasonCode: string, publish = true): void {
     if (this.ended) return;
     this.ended = true;
     this.state(status, reasonCode, true);

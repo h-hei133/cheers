@@ -10,7 +10,7 @@ export interface Snapshot {
   warnings: string[];
 }
 export type EventKind = 'query.started' | 'turn.started' | 'turn.completed' | 'tool.started' | 'tool.settled'
-  | 'approval.requested' | 'approval.approved' | 'approval.denied' | 'query.completed' | 'query.failed'
+  | 'approval.requested' | 'approval.approved' | 'approval.denied' | 'query.completed' | 'query.completed_unproven' | 'query.failed'
   | 'lifecycle.cancelled' | 'lifecycle.error' | 'relay.gap';
 export interface RelayEvent { sequence: number; kind: EventKind; timestamp: number }
 export interface Owner { generation: number; token: string }
@@ -19,7 +19,7 @@ export interface Proposal {
   id: string; principal: string; kind: 'ask' | 'cancel'; text?: string; target?: string; digest: string;
   status: 'proposed' | 'accepted' | 'dispatched' | 'settled' | 'rejected' | 'unknown';
   createdAt: number; acceptanceId?: string; acceptedBy?: string; generation?: number;
-  outcome?: 'completed' | 'failed' | 'cancelled' | 'unknown'; sourceEntryId?: string;
+  outcome?: 'completed' | 'completed_unproven' | 'failed' | 'cancelled' | 'unknown'; sourceEntryId?: string;
 }
 export interface Room extends Binding {
   id: string; owner: string; epoch: string; aclRevision: number; acl: Record<string, Right[]>;

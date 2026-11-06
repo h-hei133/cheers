@@ -34,7 +34,7 @@ import { transcriptEventToSessionMessage } from "../sessionEventCodec.js";
 import { latestTranscriptRunStart, startsTranscriptScope } from "../transcript/scope.js";
 
 export interface ReplayTranscriptState {
-  readonly status: "active" | "interrupted" | "completed" | "error" | "terminated";
+  readonly status: "active" | "interrupted" | "completed" | "completed_unproven" | "error" | "terminated";
   readonly runPhase?: "idle" | "prompt-persisted" | "turn-active";
 }
 
@@ -180,7 +180,7 @@ export function prepareReplayTranscript(
   const interruptedTerminalQueries = repaired.filter(
     (event): boolean =>
       event.type === "query-event" &&
-      (event.event.type === "query.completed" ||
+      (event.event.type === "query.completed" || event.event.type === "query.completed_unproven" ||
         event.event.type === "query.failed"),
   ).length;
 
@@ -189,7 +189,7 @@ export function prepareReplayTranscript(
       ? repaired.filter(
           (event): boolean =>
             event.type !== "query-event" ||
-            (event.event.type !== "query.completed" &&
+            ((event.event.type !== "query.completed" && event.event.type !== "query.completed_unproven") &&
               event.event.type !== "query.failed"),
         )
       : repaired;
@@ -247,14 +247,14 @@ export function buildReplayTurnPairingState(
       continue;
     }
     if (event.type === "lifecycle" &&
-      (event.event === "run-completed" || event.event === "run-error" || event.event === "run-terminated")) {
+      ((event.event === "run-completed" || event.event === "run-completed-unproven") || event.event === "run-error" || event.event === "run-terminated")) {
       openTurn = undefined;
     }
     if (event.type !== "query-event") {
       continue;
     }
 
-    if (event.event.type === "query.completed" || event.event.type === "query.failed") {
+    if (event.event.type === "query.completed" || event.event.type === "query.completed_unproven" || event.event.type === "query.failed") {
       openTurn = undefined;
       continue;
     }

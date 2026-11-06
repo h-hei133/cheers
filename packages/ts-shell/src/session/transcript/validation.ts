@@ -40,7 +40,16 @@ function queryEvent(value: unknown): boolean {
   if (!record(value) || typeof value.type !== "string") return false;
   if (value.type === 'lifecycle.record') return readableLifecycleRecord(value);
   if (value.type === "turn.completed") return readableOutput(value.output);
-  if (value.type === "query.completed") return readableQueryResult(value.result);
+  if (value.type === "query.completed") return readableQueryResult(value.result) && record(value.result)
+    && value.result.status !== 'completed_unproven' && value.result.terminalClassification !== 'completed_unproven'
+    && value.result.terminalReason !== 'completed_unproven';
+  if (value.type === 'query.completed_unproven') return typeof value.attemptId === 'string' && value.attemptId.length > 0
+    && Number.isSafeInteger(value.reentryCount) && Number(value.reentryCount) >= 0 && Number(value.reentryCount) <= 1
+    && value.stop_hook_active === (Number(value.reentryCount) > 0) && value.proofVerdict === 'not_reported'
+    && ['already_blocked_once', 'not_configured'].includes(String(value.reasonCode))
+    && readableQueryResult(value.result) && record(value.result) && value.result.status === 'completed_unproven'
+    && value.result.terminalClassification === 'completed_unproven' && value.result.terminalReason === 'completed_unproven'
+    && value.result.stopReason === value.reasonCode;
   if (value.type === "turn.started") return AGENT_ROLES.has(value.role) && Number.isInteger(value.turn) && Number(value.turn) >= 0;
   if (value.type === "query.started") return typeof value.sessionId === "string" && typeof value.prompt === "string";
   if (value.type === "query.failed" || value.type === "lifecycle.error") return typeof value.error === "string";

@@ -1,0 +1,17 @@
+{
+  "command": [
+    "tar",
+    "-xzf",
+    "<cheers>/.normproof/normproof-0.1.0.tgz",
+    "-C",
+    "<scratch>/pinned"
+  ],
+  "cwd": "<cheers>",
+  "stdin": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 63,
+  "error": null,
+  "stdout": "",
+  "stderr": ""
+}

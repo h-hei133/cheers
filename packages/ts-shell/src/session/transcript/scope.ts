@@ -28,8 +28,8 @@ export function latestTranscriptRunStart(events: readonly TranscriptEvent[]): nu
     const event = events[index]!;
     if ((event.type === "message" && event.role === "user") ||
       (event.type === "query-event" && event.event.type === "turn.started")) hasNewWork = true;
-    if ((event.type === "query-event" && (event.event.type === "query.completed" || event.event.type === "query.failed")) ||
-      (event.type === "lifecycle" && (event.event === "run-completed" || event.event === "run-error" || event.event === "run-terminated"))) {
+    if ((event.type === "query-event" && ((event.event.type === "query.completed" || event.event.type === "query.completed_unproven") || event.event.type === "query.failed")) ||
+      (event.type === "lifecycle" && ((event.event === "run-completed" || event.event === "run-completed-unproven") || event.event === "run-error" || event.event === "run-terminated"))) {
       if (hasNewWork) return index + 1;
     }
   }

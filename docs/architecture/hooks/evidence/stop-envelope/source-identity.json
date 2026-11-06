@@ -1,0 +1,21 @@
+{
+  "head": "a5c600f78a800ca6517d6dc1a9ab3112125ef869",
+  "sourceFiles": 3116,
+  "frozenFiles": 3119,
+  "sourceSha256": "87b53e6e8d5cc525821cfc6ff04f993508cfc5643cae0f3dac997f0dc4a73c2a",
+  "sourceDigestFormat": "SHA-256 of JSON.stringify of source-files.json entries sorted by localeCompare path",
+  "sourceFileHashes": "source-files.json",
+  "build": "46d83ccb6c75",
+  "buildId": "46d83ccb6c7589434fcddf0ba5a5c10901e0a355b01022be6512871362701114",
+  "fullSuiteExit": 0,
+  "fullSuiteSourceDrift": 0,
+  "testFilesPassed": 1098,
+  "testsPassed": 14358,
+  "testsSkipped": 2,
+  "fullSuiteDurationSeconds": 1110.6,
+  "hashes": {
+    "package.json": "b67005f92f61f9b48ca499143cbbe7826b2ae6c6d40d674ebcbd5d4ac339750b",
+    "package-lock.json": "b50f8018fb97fba96ed015dec88ad17db93e37e445a9a8cf16a5ebc6cbfc7c7b",
+    "packages/ts-shell/package.json": "15483cfc5d2dcb230285f97ceee604d92d23304e52016d1e1131af88af49a5bc"
+  }
+}

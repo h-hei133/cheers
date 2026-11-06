@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+    "<scratch>/r0a/dist/adapters/protocol/stdio-server.js"
+  ],
+  "cwd": "<cheers>",
+  "stdin": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"local-script\",\"version\":\"1\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"check_file_write\",\"arguments\":{\"workspaceRoot\":\"<scratch>/compliant\",\"path\":\"allowed.ts\",\"content\":\"export const fixture = 1;\\n\",\"rules\":{\"version\":\"0.1.0\",\"rules\":[{\"kind\":\"pathBoundary\",\"id\":\"protected\",\"deny\":[\"target.ts\"],\"message\":\"Choose an allowed source file.\"}]}}}}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"check_file_write\",\"arguments\":{\"workspaceRoot\":\"<scratch>/compliant\",\"path\":\"target.ts\",\"content\":\"export const fixture = 1;\\n\",\"rules\":{\"version\":\"0.1.0\",\"rules\":[{\"kind\":\"pathBoundary\",\"id\":\"protected\",\"deny\":[\"target.ts\"],\"message\":\"Choose an allowed source file.\"}]}}}}\n",
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 269,
+  "error": null,
+  "stdout": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"tools\":{\"listChanged\":false}},\"serverInfo\":{\"name\":\"NormProof\",\"version\":\"0.1.0\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"decision\\\":\\\"allow\\\",\\\"reasonCode\\\":\\\"no_violation\\\"}\"}]}}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"decision\\\":\\\"deny\\\",\\\"reason\\\":\\\"NormProof write gate: this write violates a declared rule.\\\\n\\\\nPath: target.ts\\\\n\\\\n- protected: path is inside a denied boundary\\\\n  Choose an allowed source file.\\\\n\\\\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate.\\\"}\"}]}}\n",
+  "stderr": ""
+}

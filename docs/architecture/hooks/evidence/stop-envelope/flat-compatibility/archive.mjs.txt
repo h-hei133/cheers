@@ -1,0 +1,45 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { checkBuild } from '../../scripts/start-lib.mjs';
+
+const scratch = '.tmp/stop-flat-validation';
+const evidence = 'docs/architecture/hooks/evidence/stop-envelope/flat-compatibility';
+const hashes = JSON.parse(fs.readFileSync(`${scratch}/source-files.json`, 'utf8'));
+const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+const drift = Object.entries(hashes).filter(([file, hash]) => !fs.existsSync(file) || sha(fs.readFileSync(file)) !== hash);
+if (drift.length) throw new Error(`Source drift: ${drift.map(([file]) => file).join(', ')}`);
+const output = fs.readFileSync(`${scratch}/focused-final.txt`, 'utf8');
+if (!/Test Files\s+13 passed \(13\)/.test(output) || !/Tests\s+279 passed \(279\)/.test(output)) throw new Error('Unexpected focused result');
+const version = JSON.parse(fs.readFileSync('packages/ts-shell/package.json', 'utf8')).version;
+const build = checkBuild({ root: process.cwd(), dist: path.resolve('packages/ts-shell/dist'), version });
+if (!build.ok) throw new Error(build.reason);
+const manifest = JSON.parse(fs.readFileSync('packages/ts-shell/dist/build-manifest.json', 'utf8'));
+const reference = '/home/wang/projects/normproof';
+const referenceStatus = execFileSync('git', ['-C', reference, 'status', '--porcelain'], { encoding: 'utf8' }).trim();
+if (referenceStatus) throw new Error('Reference worktree changed');
+fs.mkdirSync(evidence, { recursive: true });
+for (const [source, destination] of [
+  ['before.txt', 'before.txt'], ['after.txt', 'first-fix.txt'], ['focused-build.txt', 'focused-build.txt'],
+  ['focused-final.txt', 'focused-final.txt'], ['final-gates.txt', 'final-gates.txt'], ['structure.txt', 'structure.txt'],
+  ['reversal.txt', 'reversal.txt'], ['reversal.json', 'reversal.json'], ['reversal.mjs', 'reversal.mjs.txt'],
+  ['result-before.ts.txt', 'result-before.ts.txt'], ['source-files.json', 'source-files.json'],
+  ['judge-output/verdict.json', 'verdict.json'],
+]) fs.copyFileSync(path.join(scratch, source), path.join(evidence, destination));
+const probes = output.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line));
+fs.writeFileSync(`${evidence}/probes.json`, `${JSON.stringify(probes, null, 2)}\n`);
+const structureRow = fs.readFileSync(`${scratch}/structure.txt`, 'utf8').split('\n').find(line => line.trimEnd().endsWith(' core/hooks/stop/result.ts'));
+if (!structureRow?.includes('within-ceiling')) throw new Error('Result module is not within ceiling');
+const identity = {
+  head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  sourceFiles: Object.keys(hashes).length, sourceSha256: sha(JSON.stringify(hashes)),
+  sourceDigestFormat: 'SHA-256 of JSON.stringify of parsed source-files.json',
+  sourceDrift: 0, buildId: manifest.buildId, buildFresh: true,
+  testFilesPassed: 13, testsPassed: 279, focusedExit: 0, fullSuiteRerun: false,
+  runtime: process.version, platform: `${process.platform}-${process.arch}`,
+  referenceHead: execFileSync('git', ['-C', reference, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), referenceClean: true,
+  changedModuleStructure: structureRow.trim(),
+};
+fs.writeFileSync(`${evidence}/source-identity.json`, `${JSON.stringify(identity, null, 2)}\n`);
+console.log(JSON.stringify(identity));

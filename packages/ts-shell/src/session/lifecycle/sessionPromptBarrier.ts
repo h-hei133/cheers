@@ -64,6 +64,7 @@ export function persistSessionUserPromptBarrier(input: {
     interruptedKind: undefined,
     terminalReason: undefined,
     terminalClassification: undefined,
+    terminalReasonCode: undefined,
     lastContinuationReason: undefined,
     pendingLifecycle: createEmptyLifecycleIndex(),
   });

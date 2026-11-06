@@ -1,0 +1,309 @@
+{
+  "version": "0.8",
+  "runId": "generated-structure-judge",
+  "generatedAt": "2026-11-06T10:26:57.261Z",
+  "manifest": {
+    "taskId": "generated-structure-judge",
+    "mode": "read_only",
+    "allowsMutation": false
+  },
+  "normProfile": {
+    "id": "software-structure-v0",
+    "version": "0"
+  },
+  "compiledObligations": {
+    "profile": {
+      "id": "software-structure-v0",
+      "version": "0"
+    },
+    "obligations": [
+      {
+        "id": "source_graph_is_acyclic",
+        "templateId": "source_graph_is_acyclic",
+        "title": "No dependency cycle among source modules",
+        "source": "norm-profile",
+        "severity": "advisory",
+        "status": "satisfied",
+        "reason": "Obligation source_graph_is_acyclic holds.",
+        "requiredWhen": {
+          "kind": "always"
+        },
+        "requiredEvidence": [
+          "source_module_graph"
+        ],
+        "evidenceRefs": [
+          "source_module_graph"
+        ],
+        "requiredAuthority": "A0",
+        "profile": {
+          "id": "software-structure-v0",
+          "version": "0"
+        },
+        "expression": {
+          "kind": "acyclic",
+          "evidenceId": "source_module_graph"
+        }
+      },
+      {
+        "id": "source_graph_has_no_unresolved_specifiers",
+        "templateId": "source_graph_has_no_unresolved_specifiers",
+        "title": "Every module import resolves within the declared source graph",
+        "source": "norm-profile",
+        "severity": "blocking",
+        "status": "failed",
+        "reason": "Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: src/module.ts -> ./missing.js",
+        "requiredWhen": {
+          "kind": "always"
+        },
+        "requiredEvidence": [
+          "source_module_graph"
+        ],
+        "evidenceRefs": [
+          "source_module_graph"
+        ],
+        "requiredAuthority": "A0",
+        "profile": {
+          "id": "software-structure-v0",
+          "version": "0"
+        },
+        "expression": {
+          "kind": "none",
+          "evidenceId": "source_module_graph",
+          "matches": "unresolved: */**"
+        },
+        "proofGap": {
+          "kind": "contradictory_evidence",
+          "reason": "Record unresolved: src/module.ts -> ./missing.js does not satisfy source_graph_has_no_unresolved_specifiers.",
+          "claimId": "unresolved: src/module.ts -> ./missing.js"
+        },
+        "proofGaps": [
+          {
+            "kind": "contradictory_evidence",
+            "reason": "Record unresolved: src/module.ts -> ./missing.js does not satisfy source_graph_has_no_unresolved_specifiers.",
+            "claimId": "unresolved: src/module.ts -> ./missing.js"
+          }
+        ]
+      },
+      {
+        "id": "declared_functions_within_module_ceiling",
+        "templateId": "declared_functions_within_module_ceiling",
+        "title": "No module declares more function-like names than the responsibility ceiling allows",
+        "source": "norm-profile",
+        "severity": "advisory",
+        "status": "satisfied",
+        "reason": "Obligation declared_functions_within_module_ceiling holds.",
+        "requiredWhen": {
+          "kind": "always"
+        },
+        "requiredEvidence": [
+          "source_module_functions"
+        ],
+        "evidenceRefs": [
+          "source_module_functions"
+        ],
+        "requiredAuthority": "A0",
+        "profile": {
+          "id": "software-structure-v0",
+          "version": "0"
+        },
+        "expression": {
+          "kind": "groupSizeUnder",
+          "evidenceId": "source_module_functions",
+          "ceiling": 20,
+          "onEmpty": "unsatisfied"
+        }
+      }
+    ],
+    "sourceSummary": {
+      "norm-profile": 3
+    }
+  },
+  "obligationSourceSummary": {
+    "norm-profile": 3
+  },
+  "schemaContracts": {
+    "version": "0.8.1",
+    "ledger": {
+      "artifactPath": "ledger.json",
+      "schemaId": "https://normproof.local/schemas/ledger-v0.8.schema.json",
+      "schemaVersion": "0.8",
+      "validationStatus": "pass",
+      "errors": []
+    },
+    "validationResults": [
+      {
+        "artifactPath": "ledger.json",
+        "schemaId": "https://normproof.local/schemas/ledger-v0.8.schema.json",
+        "schemaVersion": "0.8",
+        "status": "pass",
+        "errors": []
+      }
+    ]
+  },
+  "evidenceRegistry": {
+    "version": "0.8",
+    "items": [
+      {
+        "id": "task",
+        "kind": "task",
+        "path": "task.md",
+        "authority": "A1",
+        "present": false,
+        "createdBy": "run-directory",
+        "summary": "Original user task."
+      },
+      {
+        "id": "task_manifest",
+        "kind": "task_manifest",
+        "path": "task.json",
+        "authority": "A1",
+        "present": false,
+        "createdBy": "run-directory",
+        "summary": "task.json manifest for the run."
+      },
+      {
+        "id": "run_metadata",
+        "kind": "run_metadata",
+        "path": "run-metadata.json",
+        "authority": "A1",
+        "present": false,
+        "createdBy": "run-directory",
+        "summary": "Metadata recorded when the run directory was initialized."
+      },
+      {
+        "id": "source_module_graph",
+        "kind": "source_module_graph",
+        "path": "src/**/*.ts",
+        "authority": "A0",
+        "present": true,
+        "createdBy": "verification-capture",
+        "summary": "Dynamically registered source_module_graph evidence."
+      },
+      {
+        "id": "source_module_functions",
+        "kind": "source_module_functions",
+        "path": "src/**/*.ts",
+        "authority": "A0",
+        "present": true,
+        "createdBy": "verification-capture",
+        "summary": "Dynamically registered source_module_functions evidence."
+      }
+    ],
+    "summary": {
+      "presentCount": 2,
+      "missingCount": 3,
+      "byAuthority": {
+        "A0": 2
+      }
+    }
+  },
+  "obligations": [
+    {
+      "id": "source_graph_is_acyclic",
+      "title": "No dependency cycle among source modules",
+      "status": "satisfied",
+      "blocking": false,
+      "requiredAuthority": "A0",
+      "providedAuthorities": [
+        "A0"
+      ],
+      "evidenceIds": [
+        "source_module_graph"
+      ],
+      "reason": "Obligation source_graph_is_acyclic holds."
+    },
+    {
+      "id": "source_graph_has_no_unresolved_specifiers",
+      "title": "Every module import resolves within the declared source graph",
+      "status": "failed",
+      "blocking": true,
+      "requiredAuthority": "A0",
+      "providedAuthorities": [
+        "A0"
+      ],
+      "evidenceIds": [
+        "source_module_graph"
+      ],
+      "reason": "Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: src/module.ts -> ./missing.js"
+    },
+    {
+      "id": "declared_functions_within_module_ceiling",
+      "title": "No module declares more function-like names than the responsibility ceiling allows",
+      "status": "satisfied",
+      "blocking": false,
+      "requiredAuthority": "A0",
+      "providedAuthorities": [
+        "A0"
+      ],
+      "evidenceIds": [
+        "source_module_functions"
+      ],
+      "reason": "Obligation declared_functions_within_module_ceiling holds."
+    }
+  ],
+  "evidenceBindings": [
+    {
+      "obligationId": "source_graph_is_acyclic",
+      "requiredEvidenceKind": "source_module_graph",
+      "evidenceId": "source_module_graph",
+      "bindingStatus": "bound",
+      "authority": "A0",
+      "requiredAuthority": "A0",
+      "reason": "Bound source_module_graph to source_module_graph."
+    },
+    {
+      "obligationId": "source_graph_has_no_unresolved_specifiers",
+      "requiredEvidenceKind": "source_module_graph",
+      "evidenceId": "source_module_graph",
+      "bindingStatus": "bound",
+      "authority": "A0",
+      "requiredAuthority": "A0",
+      "reason": "Bound source_module_graph to source_module_graph."
+    },
+    {
+      "obligationId": "declared_functions_within_module_ceiling",
+      "requiredEvidenceKind": "source_module_functions",
+      "evidenceId": "source_module_functions",
+      "bindingStatus": "bound",
+      "authority": "A0",
+      "requiredAuthority": "A0",
+      "reason": "Bound source_module_functions to source_module_functions."
+    }
+  ],
+  "proofGaps": [
+    {
+      "obligationId": "source_graph_has_no_unresolved_specifiers",
+      "kind": "contradictory_evidence",
+      "reason": "Record unresolved: src/module.ts -> ./missing.js does not satisfy source_graph_has_no_unresolved_specifiers.",
+      "claimId": "unresolved: src/module.ts -> ./missing.js"
+    }
+  ],
+  "summary": {
+    "statusCounts": {
+      "open": 0,
+      "satisfied": 2,
+      "failed": 1,
+      "not_proven": 0,
+      "waived": 0
+    },
+    "openCount": 0,
+    "failedCount": 1,
+    "proofGapCount": 1,
+    "obligationFirings": {
+      "source_graph_is_acyclic": 0,
+      "source_graph_has_no_unresolved_specifiers": 1,
+      "declared_functions_within_module_ceiling": 0
+    }
+  },
+  "derivation": {
+    "verdictStatus": "failed",
+    "blockingProblemCount": 1,
+    "failedBlockingObligationCount": 1,
+    "missingBlockingObligationCount": 0,
+    "blockingProofGapCount": 1,
+    "failedBlockingProofGapCount": 1,
+    "summary": "1 blocking obligation(s) are open or failed; 1 blocking proof gap(s) remain.",
+    "ledgerStatus": "failed",
+    "inputVerdictStatus": "failed"
+  }
+}

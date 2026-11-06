@@ -5,13 +5,16 @@ export function projectCompletedSessionSave(
   terminalState: SessionTerminalState,
 ): {
   terminalReason: TerminalReason;
-  terminalClassification: "success" | "stopped" | "error";
+  terminalClassification: "success" | "stopped" | "error" | "completed_unproven";
   lastContinuationReason?: ContinuationReason;
+  terminalReasonCode?: import('../hooks/stop/model.js').UnprovenCompletionReason;
 } {
   return {
     terminalReason: terminalState.terminalReason,
     terminalClassification: terminalState.terminalClassification,
     lastContinuationReason: terminalState.lastContinuationReason,
+    terminalReasonCode: terminalState.terminalClassification === 'completed_unproven'
+      ? terminalState.terminalStopReason as import('../hooks/stop/model.js').UnprovenCompletionReason : undefined,
   };
 }
 
@@ -21,7 +24,7 @@ export function projectErrorSessionSave(
   error: string;
   options: {
     terminalReason: TerminalReason;
-    terminalClassification: "success" | "stopped" | "error";
+    terminalClassification: "success" | "stopped" | "error" | "completed_unproven";
     lastContinuationReason?: ContinuationReason;
   };
 } {

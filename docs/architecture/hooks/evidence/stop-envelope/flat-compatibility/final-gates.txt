@@ -1,0 +1,72 @@
+npm notice run cheers@0.1.0 verify:import-cycles
+npm notice run node scripts/check-import-cycles.mjs
+scc-gate root=packages/ts-shell/src files=3101
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+npm notice run cheers@0.1.0 check:config-consumers
+npm notice run node scripts/check-config-consumers.mjs
+config-consumer-check fields=64 read=64 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+npm notice run cheers@0.1.0 check:declarations
+npm notice run node scripts/check-declarations.mjs
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+npm notice run cheers@0.1.0 check:node-floor
+npm notice run node scripts/check-node-floor.mjs
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+npm notice run cheers@0.1.0 verify:docs-drift:strict
+npm notice run node scripts/verify-docs-and-rules-drift.mjs --strict
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run cheers@0.1.0 analyze:module-facades
+npm notice run node scripts/analyze-module-facades.mjs --all
+[2026-11-06T11:12:46.892Z] [check-run] [INFO] Harness Check Event Trace
+[2026-11-06T11:12:46.896Z] [check-run] [INFO] Check-run evaluation completed with status: partial
+{
+  "contract": {
+    "name": "normproof.sidecar.check-run",
+    "version": "0.22.0",
+    "compatibility": {
+      "hostNeutral": true,
+      "piShadowInternalsRequired": false,
+      "rawEvidenceContentRequired": false
+    }
+  },
+  "verdictStatus": "partial",
+  "artifactPaths": {
+    "verdict": "verdict.json",
+    "ledger": "ledger.json",
+    "enforcement": "enforcement.json",
+    "openObligationsSummary": "open-obligations-summary.json",
+    "report": "report.md",
+    "runTrace": "evidence/run-trace.jsonl",
+    "contextBundle": "context-bundle.json",
+    "normReviewResult": "norm-review-result.json",
+    "feedbackToNormProposal": "feedback-to-norm-proposal.json",
+    "sidecarResult": "sidecar-result.json"
+  },
+  "contextCostTelemetry": {
+    "taskTextBytes": 59,
+    "evidencePointerCount": 2,
+    "evidencePointerMetadataBytes": 225,
+    "declaredEvidenceContentBytes": 2336647,
+    "presentEvidenceCount": 2,
+    "missingEvidenceCount": 0,
+    "openObligationCount": 0,
+    "failedObligationCount": 1,
+    "proofGapCount": 2,
+    "reportArtifactBytes": 3340,
+    "ledgerArtifactBytes": 9918,
+    "contextBundleArtifactBytes": 0,
+    "fullContextEstimatedBytes": 2350381,
+    "minimalContextEstimatedBytes": 251,
+    "omittedEstimatedBytes": 2350130
+  },
+  "hostClaim": {
+    "completionClaimed": false,
+    "acceptedAsProof": false
+  },
+  "errors": []
+}

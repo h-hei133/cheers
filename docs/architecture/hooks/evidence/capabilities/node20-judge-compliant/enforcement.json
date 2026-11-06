@@ -1,0 +1,15 @@
+{
+  "enforcementVersion": "0.10",
+  "runId": "generated-structure-judge",
+  "mode": "shadow",
+  "sourceVerdict": "proven",
+  "wouldBlock": false,
+  "didBlock": false,
+  "exitCode": 0,
+  "reason": "Proof verdict is proven; enforcement does not block.",
+  "openBlockingObligationCount": 0,
+  "openBlockingObligations": [],
+  "proofGapSummary": [],
+  "repairPlanAvailable": false,
+  "createdAt": "2026-11-06T10:26:56.939Z"
+}

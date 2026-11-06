@@ -1,0 +1,19 @@
+{
+  "command": [
+    "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+    "<scratch>/pinned/package/dist/adapters/cli/normproof.js",
+    "judge",
+    "<scratch>/violating/.normproof/judge-input.json",
+    "<scratch>/node24-judge-violating",
+    "--evidence-manifest",
+    "<scratch>/violating/.normproof/evidence-manifest.json"
+  ],
+  "cwd": "<scratch>/violating",
+  "stdin": null,
+  "exitCode": 2,
+  "signal": null,
+  "elapsedMs": 272,
+  "error": null,
+  "stdout": "{\n  \"contract\": {\n    \"name\": \"normproof.sidecar.check-run\",\n    \"version\": \"0.22.0\",\n    \"compatibility\": {\n      \"hostNeutral\": true,\n      \"piShadowInternalsRequired\": false,\n      \"rawEvidenceContentRequired\": false\n    }\n  },\n  \"verdictStatus\": \"failed\",\n  \"artifactPaths\": {\n    \"verdict\": \"verdict.json\",\n    \"ledger\": \"ledger.json\",\n    \"enforcement\": \"enforcement.json\",\n    \"openObligationsSummary\": \"open-obligations-summary.json\",\n    \"report\": \"report.md\",\n    \"runTrace\": \"evidence/run-trace.jsonl\",\n    \"contextBundle\": \"context-bundle.json\",\n    \"normReviewResult\": \"norm-review-result.json\",\n    \"feedbackToNormProposal\": \"feedback-to-norm-proposal.json\",\n    \"sidecarResult\": \"sidecar-result.json\"\n  },\n  \"contextCostTelemetry\": {\n    \"taskTextBytes\": 59,\n    \"evidencePointerCount\": 2,\n    \"evidencePointerMetadataBytes\": 204,\n    \"declaredEvidenceContentBytes\": 62,\n    \"presentEvidenceCount\": 2,\n    \"missingEvidenceCount\": 0,\n    \"openObligationCount\": 0,\n    \"failedObligationCount\": 1,\n    \"proofGapCount\": 1,\n    \"reportArtifactBytes\": 3603,\n    \"ledgerArtifactBytes\": 9480,\n    \"contextBundleArtifactBytes\": 0,\n    \"fullContextEstimatedBytes\": 13536,\n    \"minimalContextEstimatedBytes\": 187,\n    \"omittedEstimatedBytes\": 13349\n  },\n  \"hostClaim\": {\n    \"completionClaimed\": false,\n    \"acceptedAsProof\": false\n  },\n  \"errors\": []\n}\n",
+  "stderr": "[2026-11-06T10:27:19.180Z] [check-run] [INFO] Harness Check Event Trace\n[2026-11-06T10:27:19.186Z] [check-run] [INFO] Check-run evaluation completed with status: failed\n"
+}

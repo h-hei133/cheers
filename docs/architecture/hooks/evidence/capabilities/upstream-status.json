@@ -1,0 +1,17 @@
+{
+  "command": [
+    "git",
+    "-C",
+    "/home/wang/projects/normproof",
+    "status",
+    "--porcelain"
+  ],
+  "cwd": "<cheers>",
+  "stdin": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 9,
+  "error": null,
+  "stdout": "",
+  "stderr": ""
+}

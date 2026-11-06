@@ -1,0 +1,14 @@
+{
+  "command": [
+    "<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+    "--version"
+  ],
+  "cwd": "<cheers>",
+  "stdin": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 10,
+  "error": null,
+  "stdout": "v20.3.0\n",
+  "stderr": ""
+}

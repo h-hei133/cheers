@@ -1,0 +1,81 @@
+command: gh api repos/h-hei133/cheers/actions/jobs/127297446095/logs
+exit: 0
+2026-11-05T14:31:24.4947550Z ##[group]Run npx --package .normproof/normproof-*.tgz normproof judge
+2026-11-05T14:31:24.4947908Z [36;1mnpx --package .normproof/normproof-*.tgz normproof judge[0m
+2026-11-05T14:31:24.4965492Z shell: /usr/bin/bash -e {0}
+2026-11-05T14:31:24.4965654Z ##[endgroup]
+2026-11-05T14:31:24.8848770Z npm WARN exec The following package was not found and will be installed: file:.normproof/normproof-0.1.0.tgz
+2026-11-05T14:31:25.0239328Z npm WARN EBADENGINE Unsupported engine {
+2026-11-05T14:31:25.0239961Z npm WARN EBADENGINE   package: 'normproof@0.1.0',
+2026-11-05T14:31:25.0240408Z npm WARN EBADENGINE   required: { node: '>=24' },
+2026-11-05T14:31:25.0240883Z npm WARN EBADENGINE   current: { node: 'v20.3.0', npm: '9.6.7' }
+2026-11-05T14:31:25.0241556Z npm WARN EBADENGINE }
+2026-11-05T14:31:28.7335129Z [2026-11-05T14:31:28.732Z] [check-run] [INFO] Harness Check Event Trace
+2026-11-05T14:31:28.7375067Z [2026-11-05T14:31:28.737Z] [check-run] [INFO] Check-run evaluation completed with status: partial
+2026-11-05T14:31:28.7392841Z {
+2026-11-05T14:31:28.7393180Z   "contract": {
+2026-11-05T14:31:28.7393673Z     "name": "normproof.sidecar.check-run",
+2026-11-05T14:31:28.7393945Z     "version": "0.22.0",
+2026-11-05T14:31:28.7394151Z     "compatibility": {
+2026-11-05T14:31:28.7394356Z       "hostNeutral": true,
+2026-11-05T14:31:28.7394608Z       "piShadowInternalsRequired": false,
+2026-11-05T14:31:28.7394924Z       "rawEvidenceContentRequired": false
+2026-11-05T14:31:28.7395163Z     }
+2026-11-05T14:31:28.7395322Z   },
+2026-11-05T14:31:28.7395507Z   "verdictStatus": "partial",
+2026-11-05T14:31:28.7395731Z   "artifactPaths": {
+2026-11-05T14:31:28.7395946Z     "verdict": "verdict.json",
+2026-11-05T14:31:28.7396165Z     "ledger": "ledger.json",
+2026-11-05T14:31:28.7396411Z     "enforcement": "enforcement.json",
+2026-11-05T14:31:28.7396751Z     "openObligationsSummary": "open-obligations-summary.json",
+2026-11-05T14:31:28.7397102Z     "report": "report.md",
+2026-11-05T14:31:28.7397382Z     "runTrace": "evidence/run-trace.jsonl",
+2026-11-05T14:31:28.7397679Z     "contextBundle": "context-bundle.json",
+2026-11-05T14:31:28.7397981Z     "normReviewResult": "norm-review-result.json",
+2026-11-05T14:31:28.7398365Z     "feedbackToNormProposal": "feedback-to-norm-proposal.json",
+2026-11-05T14:31:28.7398717Z     "sidecarResult": "sidecar-result.json"
+2026-11-05T14:31:28.7398949Z   },
+2026-11-05T14:31:28.7399132Z   "contextCostTelemetry": {
+2026-11-05T14:31:28.7399347Z     "taskTextBytes": 59,
+2026-11-05T14:31:28.7399575Z     "evidencePointerCount": 2,
+2026-11-05T14:31:28.7399833Z     "evidencePointerMetadataBytes": 225,
+2026-11-05T14:31:28.7400121Z     "declaredEvidenceContentBytes": 2333679,
+2026-11-05T14:31:28.7400394Z     "presentEvidenceCount": 2,
+2026-11-05T14:31:28.7400634Z     "missingEvidenceCount": 0,
+2026-11-05T14:31:28.7400859Z     "openObligationCount": 0,
+2026-11-05T14:31:28.7401100Z     "failedObligationCount": 1,
+2026-11-05T14:31:28.7401321Z     "proofGapCount": 2,
+2026-11-05T14:31:28.7401555Z     "reportArtifactBytes": 3340,
+2026-11-05T14:31:28.7401800Z     "ledgerArtifactBytes": 9918,
+2026-11-05T14:31:28.7402050Z     "contextBundleArtifactBytes": 0,
+2026-11-05T14:31:28.7402324Z     "fullContextEstimatedBytes": 2347413,
+2026-11-05T14:31:28.7402602Z     "minimalContextEstimatedBytes": 251,
+2026-11-05T14:31:28.7402869Z     "omittedEstimatedBytes": 2347162
+2026-11-05T14:31:28.7403479Z   },
+2026-11-05T14:31:28.7403635Z   "hostClaim": {
+2026-11-05T14:31:28.7403839Z     "completionClaimed": false,
+2026-11-05T14:31:28.7404067Z     "acceptedAsProof": false
+2026-11-05T14:31:28.7404273Z   },
+2026-11-05T14:31:28.7404427Z   "errors": []
+2026-11-05T14:31:28.7404595Z }
+2026-11-05T14:31:28.7812103Z Post job cleanup.
+2026-11-05T14:31:28.8746862Z (node:51681) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-05T14:31:28.8747386Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-05T14:31:28.8749331Z Cache hit occurred on the primary key node-cache-Linux-x64-npm-275d94d507d9cca41129a3661a77d2adc302ca9d222330b5b6d40943b2ba15a4, not saving cache.
+2026-11-05T14:31:28.8876833Z Post job cleanup.
+2026-11-05T14:31:28.9526874Z [command]/usr/bin/git version
+2026-11-05T14:31:28.9598272Z git version 2.56.0
+2026-11-05T14:31:28.9628077Z Temporarily overriding HOME='/home/runner/work/_temp/9bb91ce7-1e30-4bb9-9cdf-b323885fd732' before making global git config changes
+2026-11-05T14:31:28.9628953Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-05T14:31:28.9637232Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/cheers/cheers
+2026-11-05T14:31:28.9684680Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-05T14:31:28.9721073Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-05T14:31:28.9984619Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-05T14:31:29.0012691Z http.https://github.com/.extraheader
+2026-11-05T14:31:29.0024163Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-05T14:31:29.0088453Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-05T14:31:29.0349001Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-05T14:31:29.0394752Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-05T14:31:29.0769913Z Cleaning up orphan processes
+2026-11-05T14:31:29.1028530Z Terminate orphan process: pid (23620) (sleep)
+2026-11-05T14:31:29.1119532Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -397,11 +397,19 @@ export function runTurn(options: TurnOptions): TurnRun {
       finalOutput: outcome.finalOutput,
     }, { signal: options.signal, onResult: result => stop.checked(result) });
     if (options.signal.aborted) { stop.finish('stopped', 'cancelled', false); return false; }
-    const next = stop.decide(decision, projection.stepCount < options.maxSteps);
+    const next = stop.decide(decision, projection.stepCount < options.maxSteps, outcome.completed.result.status === 'completed');
     if (next === 'terminal') return false;
     if (next === 'repair') {
       core.state.messages = [...core.state.messages, { role: 'system', content: stop.repairMessage(decision) }];
       return true;
+    }
+    if (next === 'completed_unproven') {
+      channel.push({ type: 'query.completed_unproven', ...stop.attempt(),
+        reasonCode: decision.reasonCode as import('../core/hooks/stop/model.js').UnprovenCompletionReason,
+        proofVerdict: 'not_reported', result: { ...outcome.completed.result,
+          status: 'completed_unproven', terminalReason: 'completed_unproven', terminalClassification: 'completed_unproven',
+          stopReason: decision.reasonCode } });
+      return false;
     }
     channel.push(outcome.completed);
     return false;

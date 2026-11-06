@@ -1,0 +1,57 @@
+command: gh api repos/h-hei133/cheers/actions/jobs/127785826972/logs
+exit: 0
+2026-11-06T08:11:02.7806169Z ##[group]Run set +e
+2026-11-06T08:11:02.7806347Z [36;1mset +e[0m
+2026-11-06T08:11:02.7806478Z [36;1mnormproof judge --format sarif[0m
+2026-11-06T08:11:02.7806657Z [36;1mecho "exitcode=$?" >> "$GITHUB_OUTPUT"[0m
+2026-11-06T08:11:02.7806877Z [36;1mexit 0   # Observation mode: record, never gate.[0m
+2026-11-06T08:11:02.7849149Z shell: /usr/bin/bash -e {0}
+2026-11-06T08:11:02.7849299Z ##[endgroup]
+2026-11-06T08:11:05.8273967Z [2026-11-06T08:11:05.826Z] [check-run] [INFO] Harness Check Event Trace
+2026-11-06T08:11:05.8292058Z [2026-11-06T08:11:05.829Z] [check-run] [INFO] Check-run evaluation completed with status: partial
+2026-11-06T08:11:05.8316774Z {
+2026-11-06T08:11:05.8317121Z   "contract": {
+2026-11-06T08:11:05.8317751Z     "name": "normproof.sidecar.check-run",
+2026-11-06T08:11:05.8318032Z     "version": "0.22.0",
+2026-11-06T08:11:05.8318238Z     "compatibility": {
+2026-11-06T08:11:05.8318508Z       "hostNeutral": true,
+2026-11-06T08:11:05.8318839Z       "piShadowInternalsRequired": false,
+2026-11-06T08:11:05.8319141Z       "rawEvidenceContentRequired": false
+2026-11-06T08:11:05.8319393Z     }
+2026-11-06T08:11:05.8319561Z   },
+2026-11-06T08:11:05.8319754Z   "verdictStatus": "partial",
+2026-11-06T08:11:05.8319986Z   "artifactPaths": {
+2026-11-06T08:11:05.8320212Z     "verdict": "verdict.json",
+2026-11-06T08:11:05.8320444Z     "ledger": "ledger.json",
+2026-11-06T08:11:05.8320703Z     "enforcement": "enforcement.json",
+2026-11-06T08:11:05.8321105Z     "openObligationsSummary": "open-obligations-summary.json",
+2026-11-06T08:11:05.8321447Z     "report": "report.md",
+2026-11-06T08:11:05.8321699Z     "runTrace": "evidence/run-trace.jsonl",
+2026-11-06T08:11:05.8322046Z     "contextBundle": "context-bundle.json",
+2026-11-06T08:11:05.8322321Z     "normReviewResult": "norm-review-result.json",
+2026-11-06T08:11:05.8322602Z     "feedbackToNormProposal": "feedback-to-norm-proposal.json",
+2026-11-06T08:11:05.8322843Z     "sidecarResult": "sidecar-result.json"
+2026-11-06T08:11:05.8323021Z   },
+2026-11-06T08:11:05.8323172Z   "contextCostTelemetry": {
+2026-11-06T08:11:05.8323321Z     "taskTextBytes": 59,
+2026-11-06T08:11:05.8323479Z     "evidencePointerCount": 2,
+2026-11-06T08:11:05.8323667Z     "evidencePointerMetadataBytes": 225,
+2026-11-06T08:11:05.8323922Z     "declaredEvidenceContentBytes": 2333679,
+2026-11-06T08:11:05.8324111Z     "presentEvidenceCount": 2,
+2026-11-06T08:11:05.8324278Z     "missingEvidenceCount": 0,
+2026-11-06T08:11:05.8324429Z     "openObligationCount": 0,
+2026-11-06T08:11:05.8324594Z     "failedObligationCount": 1,
+2026-11-06T08:11:05.8324746Z     "proofGapCount": 2,
+2026-11-06T08:11:05.8324900Z     "reportArtifactBytes": 3340,
+2026-11-06T08:11:05.8325069Z     "ledgerArtifactBytes": 9918,
+2026-11-06T08:11:05.8325238Z     "contextBundleArtifactBytes": 0,
+2026-11-06T08:11:05.8325419Z     "fullContextEstimatedBytes": 2347413,
+2026-11-06T08:11:05.8325603Z     "minimalContextEstimatedBytes": 251,
+2026-11-06T08:11:05.8326041Z     "omittedEstimatedBytes": 2347162
+2026-11-06T08:11:05.8326188Z   },
+2026-11-06T08:11:05.8326303Z   "hostClaim": {
+2026-11-06T08:11:05.8326471Z     "completionClaimed": false,
+2026-11-06T08:11:05.8326629Z     "acceptedAsProof": false
+2026-11-06T08:11:05.8326763Z   },
+2026-11-06T08:11:05.8326872Z   "errors": []
+2026-11-06T08:11:05.8326987Z }

@@ -1,0 +1,3 @@
+command: gh api repos/h-hei133/cheers/actions/jobs/127148765484/logs
+exit: 0
+No judge command segment observed.

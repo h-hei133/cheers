@@ -9,6 +9,7 @@ export type TranscriptLifecycleEventName =
   | "run-started"
   | "run-interrupted"
   | "run-completed"
+  | "run-completed-unproven"
   | "run-error"
   | "run-terminated";
 

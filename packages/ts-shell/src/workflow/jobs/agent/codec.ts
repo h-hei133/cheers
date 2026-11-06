@@ -5,7 +5,7 @@ import type { AgentJob } from './model.js';
 import { text, valid, validateOrigin, validateScope } from '../validation.js';
 
 const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
-const statuses = ['queued', 'running', 'paused', 'completed', 'failed', 'cancelled', 'unknown'];
+const statuses = ['queued', 'running', 'paused', 'completed', 'completed_unproven', 'failed', 'cancelled', 'unknown'];
 export function agentDigest(job: Pick<AgentJob, 'id' | 'scope' | 'origin' | 'createdAt' | 'prompt'>): string {
   return createHash('sha256').update(JSON.stringify([job.id, job.scope, job.origin, job.createdAt, job.prompt])).digest('hex');
 }
@@ -35,7 +35,7 @@ export function validateAgent(value: unknown, scope: BoundSessionScope): asserts
       && !['queued'].includes(String(run.status)) && checkpoint(run.checkpoint));
     ids.add(String(run.id));
   }
-  valid(value.status !== 'completed' || value.runs.length > 0 && value.output === 'complete');
+  valid(!['completed', 'completed_unproven'].includes(String(value.status)) || value.runs.length > 0 && value.output === 'complete');
   valid(value.status !== 'running' || value.runs.length > 0 && value.runs.at(-1).status === 'running');
   valid(value.status !== 'queued' || value.runs.length === 0);
   valid(value.digest === agentDigest(value as unknown as AgentJob));

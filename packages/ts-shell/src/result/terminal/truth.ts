@@ -4,6 +4,7 @@ export interface ContinuityTerminalFacts {
   readonly terminalClassification?: TerminalClassification;
   readonly terminalReason?: TerminalReason;
   readonly stopReason?: string;
+  readonly terminalReasonCode?: import('../../core/hooks/stop/model.js').UnprovenCompletionReason;
 }
 
 export function selectContinuityTerminalSource(input: {

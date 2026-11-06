@@ -33,7 +33,7 @@ export interface Session {
   parentSession?: string;
   createdAt: string;
   updatedAt: string;
-  status: "active" | "interrupted" | "completed" | "error" | "terminated";
+  status: "active" | "interrupted" | "completed" | "completed_unproven" | "error" | "terminated";
   turns: SessionMessage[];
   /** Read-only observations; excluded from model messages and runtime lifecycle. */
   reports?: readonly SessionReport[];

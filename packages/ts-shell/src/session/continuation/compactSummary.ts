@@ -89,7 +89,8 @@ function applyResult(continuity: Record<string, unknown>, input: CompactContinui
   if (input.source) continuity.resultSource = input.source;
   if (input.terminal?.terminalClassification) continuity.lastTerminalClassification = input.terminal.terminalClassification;
   if (input.terminal?.terminalReason) continuity.lastTerminalReason = input.terminal.terminalReason;
-  if (input.terminal?.stopReason) continuity.lastFailure = input.terminal.stopReason;
+  if (input.terminal?.terminalReasonCode) continuity.lastTerminalReasonCode = input.terminal.terminalReasonCode;
+  if (input.terminal?.stopReason && input.terminal.terminalClassification !== 'completed_unproven') continuity.lastFailure = input.terminal.stopReason;
   if (input.actionHandoffSummary) {
     continuity.lastActionHandoffSummary = input.actionHandoffSummary;
   }

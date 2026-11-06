@@ -9,7 +9,7 @@ export function selectPrintTerminalOutput(input: {
   readonly terminalStopReason?: string;
   readonly codingResult?: CodingResultSummary;
 }): string | undefined {
-  if (input.terminalStatus === "completed") {
+  if (input.terminalStatus === "completed" || input.terminalStatus === 'completed_unproven') {
     return input.finalOutput.length > 0 ? input.finalOutput : undefined;
   }
   if (

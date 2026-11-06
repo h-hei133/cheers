@@ -57,12 +57,12 @@ export interface PromptAttachments {
 export type PromptRun =
   | AsyncIterable<QueryEvent>
   | { readonly events: AsyncIterable<QueryEvent>; readonly input?: TurnInput; readonly sourceEntryId?: () => string | undefined;
-      readonly settled?: (outcome: { readonly status: 'completed' | 'error'; readonly finalOutput: string }) => void };
+      readonly settled?: (outcome: { readonly status: 'completed' | 'completed_unproven' | 'error'; readonly finalOutput: string }) => void };
 
 export interface SessionRuntimeDependencies {
   /** Native provenance owner may validate a one-use submission before durable prompt publication. */
   readonly admitPrompt?: (prompt: string, metadata: Record<string, unknown> | undefined, signal: AbortSignal) => Promise<void>;
-  readonly promptSettled?: (metadata: Record<string, unknown> | undefined, signal: AbortSignal, outcome: 'completed' | 'failed' | 'cancelled' | 'unknown') => Promise<void>;
+  readonly promptSettled?: (metadata: Record<string, unknown> | undefined, signal: AbortSignal, outcome: 'completed' | 'completed_unproven' | 'failed' | 'cancelled' | 'unknown') => Promise<void>;
   /** Cancellation reaches the owner of work scheduled across individual prompts. */
   readonly onCancelRequested?: () => void;
   readonly configuredAgentMode?: () => 'plan' | 'build' | undefined;
@@ -249,7 +249,7 @@ export class ShellSessionRuntime {
     const structuredOutput = !printMode && this.renderingObservers.size > 0;
     let sourceEntryId: (() => string | undefined) | undefined;
     let settled: Exclude<PromptRun, AsyncIterable<QueryEvent>>['settled'];
-    let provenanceOutcome: 'completed' | 'failed' | 'cancelled' | 'unknown' = 'unknown';
+    let provenanceOutcome: 'completed' | 'completed_unproven' | 'failed' | 'cancelled' | 'unknown' = 'unknown';
     /** The run's outcome was decided; a later throw is a storage failure. */
     let terminalOutcomeRecorded = false;
 
@@ -340,6 +340,7 @@ export class ShellSessionRuntime {
         applyTerminalQueryEvent(terminalState, event);
         switch (event.type) {
           case "query.completed":
+          case "query.completed_unproven":
             sawTerminalEvent = true;
             break;
           case "query.failed":
@@ -371,7 +372,7 @@ export class ShellSessionRuntime {
       // finished, and appending a cancellation or error would make the durable
       // record disagree with what actually happened.
       terminalOutcomeRecorded = true;
-      if (terminalState.terminalStatus === "completed") {
+      if (terminalState.terminalStatus === "completed" || terminalState.terminalStatus === 'completed_unproven') {
         this.deps.sessionManager.saveCompleted(
           sessionId,
           projectCompletedSessionSave(terminalState),
@@ -385,10 +386,12 @@ export class ShellSessionRuntime {
         );
       }
       this.stateMachine.completeRun();
-      provenanceOutcome = terminalState.terminalStatus === 'completed' ? 'completed' : 'failed';
+      provenanceOutcome = terminalState.terminalStatus === 'completed_unproven' ? 'completed_unproven'
+        : terminalState.terminalStatus === 'completed' ? 'completed' : 'failed';
       this.currentRunController = null;
       this.currentInput = undefined;
-      settled?.({ status: terminalState.terminalStatus === 'completed' ? 'completed' : 'error', finalOutput: terminalState.finalOutput });
+      settled?.({ status: terminalState.terminalStatus === 'completed_unproven' ? 'completed_unproven'
+        : terminalState.terminalStatus === 'completed' ? 'completed' : 'error', finalOutput: terminalState.finalOutput });
       return terminalState.finalOutput;
     } catch (error) {
       // A failure after the terminal state was decided is a storage failure, not

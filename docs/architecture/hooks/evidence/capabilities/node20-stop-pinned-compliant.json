@@ -1,0 +1,17 @@
+{
+  "command": [
+    "<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+    "<scratch>/pinned/package/dist/adapters/cli/normproof.js",
+    "gate",
+    "stop",
+    "--emit-result"
+  ],
+  "cwd": "<scratch>/compliant",
+  "stdin": "{\"cwd\":\"<scratch>/compliant\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}",
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 321,
+  "error": null,
+  "stdout": "",
+  "stderr": "[2026-11-06T10:27:03.645Z] [check-run] [INFO] Harness Check Event Trace\n[2026-11-06T10:27:03.652Z] [check-run] [INFO] Check-run evaluation completed with status: proven\n"
+}

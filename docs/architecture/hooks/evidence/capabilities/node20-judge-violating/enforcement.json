@@ -1,0 +1,24 @@
+{
+  "enforcementVersion": "0.10",
+  "runId": "generated-structure-judge",
+  "mode": "shadow",
+  "sourceVerdict": "failed",
+  "wouldBlock": true,
+  "didBlock": false,
+  "exitCode": 0,
+  "reason": "Shadow mode records that the proof verdict would block in blocking mode but does not block.",
+  "openBlockingObligationCount": 1,
+  "openBlockingObligations": [
+    {
+      "id": "source_graph_has_no_unresolved_specifiers",
+      "title": "Every module import resolves within the declared source graph",
+      "status": "failed",
+      "reason": "Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: src/module.ts -> ./missing.js"
+    }
+  ],
+  "proofGapSummary": [
+    "source_graph_has_no_unresolved_specifiers: failed - Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: src/module.ts -> ./missing.js"
+  ],
+  "repairPlanAvailable": false,
+  "createdAt": "2026-11-06T10:26:57.262Z"
+}

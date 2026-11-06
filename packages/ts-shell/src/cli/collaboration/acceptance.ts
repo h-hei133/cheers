@@ -36,7 +36,7 @@ export function updateCollaborationAdmission(host: CollaborationComposition, pro
 export function invalidateCollaborationAdmission(host: CollaborationComposition): void {
   host.accepted.clear(); host.active?.controller.abort();
 }
-export async function settleCollaborationRun(host: CollaborationComposition, outcome: 'completed' | 'failed' | 'cancelled' | 'unknown'): Promise<void> {
+export async function settleCollaborationRun(host: CollaborationComposition, outcome: 'completed' | 'completed_unproven' | 'failed' | 'cancelled' | 'unknown'): Promise<void> {
   const active = host.active; if (!active) return;
   // Clear before awaiting; a delayed settlement never owns a later local run.
   host.active = undefined;
@@ -44,7 +44,7 @@ export async function settleCollaborationRun(host: CollaborationComposition, out
     ...(active.sourceEntryId ? { sourceEntryId: active.sourceEntryId } : {}) }); } catch { /* Service retains dispatched/unknown; no replay or manufactured completion. */ }
 }
 export async function settleCollaborationPrompt(context: ShellRuntimeContext, metadata: Record<string, unknown> | undefined, signal: AbortSignal,
-  outcome: 'completed' | 'failed' | 'cancelled' | 'unknown'): Promise<void> {
+  outcome: 'completed' | 'completed_unproven' | 'failed' | 'cancelled' | 'unknown'): Promise<void> {
   const host = collaborationHosts.get(context); const origin = metadata?.collaboration as Partial<Acceptance> | undefined;
   if (host?.active && host.active.controller.signal === signal && host.active.acceptance.acceptanceId === origin?.acceptanceId)
     await settleCollaborationRun(host, outcome);

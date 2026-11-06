@@ -33,7 +33,9 @@ export function persistedRoundOutcome(goal: SessionGoal, state: SessionStateSnap
     && event.metadata.ownerToken === goal.runOwner?.token && event.metadata.round === goal.scheduling?.round);
   if (opening < 0 || events.slice(opening + 1).some(event => event.type === 'lifecycle' && event.event === 'run-started')) throw new GoalRunError('recovery-required');
   const terminal = events.slice(opening + 1).filter(event => event.type === 'lifecycle').at(-1);
-  if (terminal?.type !== 'lifecycle' || !['run-completed', 'run-error'].includes(terminal.event)) throw new GoalRunError('recovery-required');
+  if (terminal?.type !== 'lifecycle' || !['run-completed', 'run-completed-unproven', 'run-error'].includes(terminal.event)) throw new GoalRunError('recovery-required');
+  if (state.status === 'completed_unproven' && state.terminalReason === 'completed_unproven'
+    && state.terminalClassification === 'completed_unproven' && terminal.event === 'run-completed-unproven') return 'completed_unproven';
   if (state.terminalReason === 'stopped_max_turns' && state.terminalClassification === 'stopped') return 'step-limit';
   if (state.status === 'completed' && state.terminalReason === 'completed' && state.terminalClassification === 'success' && terminal.event === 'run-completed') return 'answer';
   if (state.status === 'error' && terminal.event === 'run-error') return state.terminalClassification === 'stopped' ? 'refused' : 'failure';

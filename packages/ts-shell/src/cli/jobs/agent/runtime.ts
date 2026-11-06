@@ -88,6 +88,7 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
       const config = publication.config; const catalog = publication.catalog;
       const endpoint = providerCredentialEndpoint(catalog, resolution, providerCredentialBaseUrl(catalog, resolution));
       let status: AgentOutcome['status'] = 'failed';
+      let unproven: Extract<import('../../../core/query/runtime/events.js').QueryEvent, { type: 'query.completed_unproven' }> | undefined;
       try {
         if (admit()) throw new Error('Agent admission refused.'); signal.throwIfAborted();
         const { runCliRuntimeInvocation } = await import('../../../entrypoints/cliRuntimeInvocation.js');
@@ -139,6 +140,7 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
           if (admit()) throw new Error('Agent event publication admission changed.'); host.manager.appendQueryEvent(session.id, event);
           if (event.type === 'message.delta') output(event.delta);
           if (event.type === 'query.completed') status = event.result.terminalReason === 'completed' ? 'completed' : 'failed';
+          if (event.type === 'query.completed_unproven') { status = 'completed_unproven'; unproven = event; }
           if (event.type === 'query.failed' || event.type === 'lifecycle.error') status = 'failed';
         }
       } catch (error) {
@@ -149,16 +151,19 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
         await background.close(); forgetSessionTodos(session.id);
       }
       if (proof.unknown || backgroundStore.read().local?.some(command => ['running', 'unknown'].includes(command.status))) status = 'unknown';
-      return settleChild(host, sessions, child, signal, status);
+      return settleChild(host, sessions, child, signal, status, unproven?.reasonCode);
     } };
 }
-function settleChild(host: JobsComposition, sessions: AgentSessions, child: AgentChild, signal: AbortSignal, status: AgentOutcome['status']): AgentOutcome {
+function settleChild(host: JobsComposition, sessions: AgentSessions, child: AgentChild, signal: AbortSignal, status: AgentOutcome['status'], reasonCode?: import('../../../core/hooks/stop/model.js').UnprovenCompletionReason): AgentOutcome {
   sessions.read(child);
   if (status === 'unknown') {
     host.manager.saveError(child.scope.sessionId, 'Agent execution cleanup or output is unverified; inspect the retained job and child transcript.');
     return { status };
   }
   if (signal.aborted) host.manager.saveInterrupted(child.scope.sessionId, 'turn');
+  else if (status === 'completed_unproven') host.manager.saveCompleted(child.scope.sessionId, {
+    terminalReason: 'completed_unproven', terminalClassification: 'completed_unproven', terminalReasonCode: reasonCode,
+  });
   else if (status === 'completed') host.manager.saveCompleted(child.scope.sessionId);
   else host.manager.saveError(child.scope.sessionId, 'Agent run failed; inspect the retained child transcript.');
   return { status, checkpoint: sessions.checkpoint(child) };

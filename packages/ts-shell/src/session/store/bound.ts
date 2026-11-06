@@ -117,7 +117,7 @@ function readCurrent(layout: SessionFileLayout, expected: Session, limits?: Boun
 }
 function projectBoundRead(metadata: SessionMetadata | undefined, state: SessionStateSnapshot, expected: Session) {
   if (!metadata || metadata.id !== expected.id || metadata.createdAt !== expected.createdAt || !state || typeof state !== 'object'
-    || Array.isArray(state) || !['active', 'interrupted', 'completed', 'error', 'terminated'].includes(state.status)
+    || Array.isArray(state) || !['active', 'interrupted', 'completed', 'completed_unproven', 'error', 'terminated'].includes(state.status)
     || typeof metadata.projectRoot !== 'string' || typeof state.projectRoot !== 'string') throw new SessionPublicationError('unavailable');
   const workspace = captureWorkspaceRoot(metadata.projectRoot, metadata.projectRoot, 'read');
   const supplied = captureWorkspaceRoot(expected.projectRoot, expected.projectRoot, 'read');

@@ -4,6 +4,12 @@
 状态：C2 本地实现及全部七条验收完成；未提交、未推送、未验证远端 CI。下列契约在产品代码修改前写入。
 仅修改 Cheers。
 
+2026-11-06 的 R0b 实现及验收见 [信封执行记录](stop-envelope-execution.md)。操作者已解除
+中性事件协议的停止条件，授权新增 query.completed_unproven 和全部消费方。
+already_blocked_once / not_configured + not_reported 现在中性结束，仍不声称 proven；其余
+unknown 类继续失败。下文是 C2 原始契约及历史证据，第 5 条中的两类原因由 R0b 明确分流，
+原 unknown 无完成断言与 bounded re-entry 守卫仍保留，不能用 C2 历史回执替代 R0b 验收。
+
 ## Re-entry 契约原文
 
 1. Stop 是本轮完成检查。候选 model answer 不等于成功完成。首次 `block/retry`

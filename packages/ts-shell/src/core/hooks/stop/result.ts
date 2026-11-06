@@ -4,7 +4,12 @@ import type { HookDecision } from '../types.js';
 import type { ProgressFingerprint, ProofVerdict, StopCheck } from './model.js';
 
 const VERDICTS = new Set(['proven', 'partial', 'refuted', 'failed', 'not_proven', 'unknown', 'not_reported']);
-const UNCERTAIN = new Set(['could_not_decide', 'could_not_judge', 'already_blocked_once', 'not_configured']);
+const UNCERTAIN = new Set(['could_not_decide', 'could_not_judge', 'invalid_output', 'empty_output', 'timeout',
+  'process_failed', 'handler_failed', 'cancelled', 'registration_changed', 'not_authorized', 'sandbox_refused',
+  'output_limit', 'conflicting_verdict', 'incompatible_contract', 'invalid_input', 'internal_error', 'unknown', 'unsupported']);
+const UNPROVEN = new Set(['already_blocked_once', 'not_configured']);
+const WIRE_REASONS = new Set(['proven', 'advisory_only', 'already_blocked_once', 'not_configured',
+  'could_not_judge', 'actionable_gap', 'invalid_input', 'internal_error']);
 
 export function commandIdentity(command: string): string {
   return createHash('sha256').update(command.trim()).digest('hex');
@@ -17,23 +22,41 @@ export function stopUnknown(reasonCode: string): HookDecision {
 /** Reason prose is feedback, never identity. Missing proof is never synthesized. */
 export function normalizeStopResult(value: unknown): HookDecision {
   if (!isRecord(value)) return stopUnknown('empty_output');
-  if (value.proofVerdict !== undefined && !VERDICTS.has(String(value.proofVerdict))) return stopUnknown('invalid_output');
+  if (value.contract !== undefined && (!isRecord(value.contract)
+    || value.contract.name !== 'normproof.completion-gate.stop' || value.contract.version !== '0.1.0')) {
+    return stopUnknown('incompatible_contract');
+  }
+  if (value.contract !== undefined && value.proofVerdict === undefined) return stopUnknown('invalid_output');
+  if (value.proofVerdict !== undefined && (typeof value.proofVerdict !== 'string'
+    || !VERDICTS.has(value.proofVerdict))) return stopUnknown('invalid_output');
+  // Versioned envelopes use a closed reason set; legacy flat hooks retain their optional code.
   const reasonCode = typeof value.reasonCode === 'string' && /^[a-z][a-z0-9_]{0,79}$/.test(value.reasonCode)
     ? value.reasonCode : undefined;
+  if (value.contract !== undefined && (!reasonCode || !WIRE_REASONS.has(reasonCode))) return stopUnknown('invalid_output');
   const proofVerdict = typeof value.proofVerdict === 'string' && VERDICTS.has(value.proofVerdict)
     ? value.proofVerdict as ProofVerdict : 'not_reported';
   const evidenceIdentity = Array.isArray(value.evidenceIdentity) && value.evidenceIdentity.length > 0
     && value.evidenceIdentity.every(id => typeof id === 'string' && /^[a-zA-Z0-9_:.-]{1,160}$/.test(id))
     ? [...new Set(value.evidenceIdentity as string[])].sort() : ['unspecified'];
+  if (value.decision === 'allow' && ['refuted', 'failed', 'not_proven'].includes(proofVerdict)
+    || value.contract !== undefined && (proofVerdict === 'proven' && value.decision !== 'allow'
+      || reasonCode === 'proven' && proofVerdict !== 'proven' || reasonCode === 'advisory_only' && proofVerdict !== 'partial')
+    || UNPROVEN.has(reasonCode ?? '') && proofVerdict !== 'not_reported' && proofVerdict !== 'unknown') {
+    return { ...stopUnknown('conflicting_verdict'), proofVerdict, evidenceIdentity };
+  }
+  if (value.contract !== undefined && reasonCode && !wireDecisionMatches(value.decision, reasonCode)) {
+    return { ...stopUnknown('conflicting_verdict'), proofVerdict, evidenceIdentity };
+  }
   if (UNCERTAIN.has(reasonCode ?? '') || proofVerdict === 'unknown'
     || (isRecord(value.hookVerdict) && value.hookVerdict.status === 'unknown')) {
     return { ...stopUnknown(reasonCode ?? 'unknown'), evidenceIdentity };
   }
+  if (UNPROVEN.has(reasonCode ?? '') && (value.decision === 'allow'
+    || value.decision === 'unsupported' && reasonCode === 'not_configured')) {
+    return { decision: 'allow', stopDisposition: 'completed_unproven', reasonCode, proofVerdict: 'not_reported', evidenceIdentity };
+  }
   if (value.decision === 'unknown' || value.decision === 'unsupported') return { ...stopUnknown(reasonCode ?? value.decision), evidenceIdentity };
   if (!['allow', 'block', 'retry'].includes(String(value.decision))) return stopUnknown('invalid_output');
-  if (value.decision === 'allow' && ['refuted', 'failed', 'not_proven'].includes(proofVerdict)) {
-    return { ...stopUnknown('conflicting_verdict'), proofVerdict, evidenceIdentity };
-  }
   return { decision: value.decision as 'allow' | 'block' | 'retry',
     reasonCode: reasonCode ?? (value.decision === 'allow' ? 'explicit_allow' : 'hook_blocked'),
     proofVerdict,
@@ -42,10 +65,23 @@ export function normalizeStopResult(value: unknown): HookDecision {
     ...(typeof value.feedback === 'string' ? { feedback: value.feedback.slice(0, 4_000) } : {}) };
 }
 
+function wireDecisionMatches(decision: unknown, reasonCode: string): boolean {
+  switch (reasonCode) {
+    case 'proven': case 'advisory_only': case 'already_blocked_once': return decision === 'allow';
+    case 'not_configured': return decision === 'allow' || decision === 'unsupported';
+    case 'could_not_judge': return decision === 'unknown' || decision === 'allow';
+    case 'actionable_gap': return decision === 'block';
+    case 'invalid_input': return decision === 'unsupported';
+    case 'internal_error': return decision === 'failed';
+    default: return false;
+  }
+}
+
 export function stopCheck(command: string, result: HookDecision, durationMs: number): StopCheck {
   return { command: commandIdentity(command), decision: result.decision as StopCheck['decision'],
     reasonCode: result.reasonCode ?? 'unknown', proofVerdict: result.proofVerdict ?? 'not_reported',
-    evidenceIdentity: result.evidenceIdentity ?? ['unspecified'], durationMs };
+    evidenceIdentity: result.evidenceIdentity ?? ['unspecified'], durationMs,
+    ...(result.stopDisposition ? { stopDisposition: result.stopDisposition } : {}) };
 }
 
 export function progressFingerprint(checks: readonly StopCheck[]): ProgressFingerprint {

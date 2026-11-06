@@ -43,7 +43,7 @@ export class HandoffStore {
 
 function transition(before: Handoff['phase'], after: Handoff['phase']): boolean {
   if (before === 'armed') return ['running', 'cancelled', 'failed', 'unknown'].includes(after);
-  if (before === 'running') return ['switched', 'completed', 'failed', 'cancelled', 'unknown'].includes(after);
-  if (before === 'switched') return ['completed', 'failed', 'cancelled', 'unknown'].includes(after);
+  if (before === 'running') return ['switched', 'completed', 'completed_unproven', 'failed', 'cancelled', 'unknown'].includes(after);
+  if (before === 'switched') return ['completed', 'completed_unproven', 'failed', 'cancelled', 'unknown'].includes(after);
   return before === 'unknown' && after === 'unknown';
 }

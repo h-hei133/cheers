@@ -12,7 +12,7 @@ const history: SessionMessage[] = Array.from({ length: 6 }, (_, index) => [
   { role: 'user' as const, content: `question ${index} ${'x'.repeat(200)}` },
   { role: 'assistant' as const, content: `answer ${index} ${'y'.repeat(200)}` },
 ]).flat();
-const hooks = { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher;
+const hooks = { dispatch: async () => ({ decision: 'allow', stopChecks: [] }) } as unknown as HookDispatcher;
 const overBudgetHistory = history.map(message => ({ ...message, content: `${message.content}${'z'.repeat(300)}` }));
 
 function options(overrides: Partial<TurnOptions> = {}): TurnOptions {

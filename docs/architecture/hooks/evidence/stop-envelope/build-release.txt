@@ -1,0 +1,5 @@
+npm notice run cheers@0.1.0 build
+npm notice run npm run build:ts
+npm notice run cheers@0.1.0 build:ts
+npm notice run node scripts/build-cli.mjs
+Wrote build manifest fb137bcca3b3 for @cheers/ts-shell@0.1.0

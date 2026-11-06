@@ -110,7 +110,7 @@ export function rebindSessionProjectRootContinuity(input: RebindInput): Session 
 function readCurrentState(input: RebindInput): SessionStateSnapshot {
   const state: unknown = input.readStateSnapshot();
   if (!isRecord(state) || typeof state.status !== "string" ||
-    !["active", "interrupted", "completed", "error", "terminated"].includes(state.status) ||
+    !["active", "interrupted", "completed", "completed_unproven", "error", "terminated"].includes(state.status) ||
     (state.projectRoot !== undefined && (typeof state.projectRoot !== "string" || !normalizePathIdentity(state.projectRoot)))) {
     throw new Error("Session state is missing or invalid");
   }

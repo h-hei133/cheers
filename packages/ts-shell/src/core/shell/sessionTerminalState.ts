@@ -27,7 +27,7 @@ export interface SessionTerminalState {
   terminalStatus: OrchestrationStatus;
   terminalStopReason?: string;
   terminalReason: TerminalReason;
-  terminalClassification: "success" | "stopped" | "error";
+  terminalClassification: "success" | "stopped" | "error" | "completed_unproven";
   lastContinuationReason?: ContinuationReason;
   terminalCodingResult?: CodingResultSummary;
   terminalNotes: readonly string[];
@@ -49,6 +49,18 @@ export function applyTerminalQueryEvent(
   state: SessionTerminalState,
   event: QueryEvent,
 ): void {
+  if (event.type === 'query.completed_unproven') {
+    state.sawTerminalEvent = true;
+    state.finalOutput = event.result.finalOutput;
+    state.terminalStatus = 'completed_unproven';
+    state.terminalReason = 'completed_unproven';
+    state.terminalClassification = 'completed_unproven';
+    state.terminalStopReason = event.reasonCode;
+    state.terminalCodingResult = event.result.codingResult;
+    state.terminalNotes = event.result.sharedContext.notes;
+    state.lastContinuationReason = event.result.lastContinuationReason;
+    return;
+  }
   if (event.type === 'query.failed' && event.stopStatus) {
     state.sawTerminalEvent = true;
     state.terminalStatus = 'stopped_error';
@@ -131,13 +143,13 @@ export function renderSessionTerminalSurface(input: {
   if (
     !input.startedRendering &&
     terminalState.finalOutput.length > 0 &&
-    terminalState.terminalStatus === "completed"
+    (terminalState.terminalStatus === "completed" || terminalState.terminalStatus === 'completed_unproven')
   ) {
     input.renderer.renderLine("\nAssistant:");
     input.renderer.renderLine(terminalState.finalOutput);
   }
 
-  if (input.startedRendering && terminalState.terminalStatus === "completed") {
+  if (input.startedRendering && (terminalState.terminalStatus === "completed" || terminalState.terminalStatus === 'completed_unproven')) {
     input.renderer.renderLine("");
   }
 
@@ -180,7 +192,7 @@ function renderTerminalNextSteps(
   renderer: StreamingRenderer,
   terminalState: SessionTerminalState,
 ): void {
-  if (terminalState.terminalStatus === "completed") {
+  if (terminalState.terminalStatus === "completed" || terminalState.terminalStatus === 'completed_unproven') {
     return;
   }
   const terminalDetail =
@@ -201,7 +213,7 @@ function renderTerminalResultBlock(
   renderer: StreamingRenderer,
   input: {
     status: OrchestrationStatus;
-    terminalClassification: "success" | "stopped" | "error";
+    terminalClassification: "success" | "stopped" | "error" | "completed_unproven";
     terminalStopReason?: string;
     terminalReason: TerminalReason;
     codingResult?: CodingResultSummary;
@@ -213,7 +225,7 @@ function renderTerminalResultBlock(
       ? "success"
       : input.terminalClassification === "stopped"
         ? "stopped"
-        : "error";
+        : input.terminalClassification === 'completed_unproven' ? 'completed_unproven' : "error";
   if (input.mode === "minimal") {
     const detail =
       input.status === "completed"
@@ -259,7 +271,7 @@ function renderTerminalResultBlock(
 function deriveSessionTerminalBlockerDetail(input: {
   stopReason?: string;
   codingResult?: CodingResultSummary;
-  terminalClassification: "success" | "stopped" | "error";
+  terminalClassification: "success" | "stopped" | "error" | "completed_unproven";
 }) {
   const projection = projectSessionResultParity({
     terminalClassification: input.terminalClassification,

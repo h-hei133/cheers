@@ -8,7 +8,7 @@ export function projectHistoricalWriteInspection(events: readonly TranscriptEven
   const recent: string[] = [];
   for (let index = events.length - 1; index >= 0; index--) {
     const entry = events[index]!;
-    if (entry.type !== "query-event" || entry.event.type !== "query.completed") continue;
+    if (entry.type !== "query-event" || (entry.event.type !== "query.completed" && entry.event.type !== "query.completed_unproven")) continue;
     const write = buildStoppedSessionWriteContinuity(entry.event.result.codingResult);
     if (!write?.writerStarted || (write.writeEffect !== "unknown" && write.writeEffect !== "unverified")) continue;
     count++;

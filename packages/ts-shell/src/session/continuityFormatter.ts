@@ -130,6 +130,7 @@ export function formatPromptContinuityContext(
       `- last-terminal: ${snapshot.lastTerminalClassification ?? "unknown"} (${snapshot.lastTerminalReason ?? "unknown"})`,
     );
   }
+  if (snapshot.lastTerminalReasonCode) lines.push(`- last-stop-reason: ${snapshot.lastTerminalReasonCode} (no new proof)`);
   if (snapshot.lastFailure) {
     lines.push(`- last-failure: ${compactContinuityText(snapshot.lastFailure)}`);
   }

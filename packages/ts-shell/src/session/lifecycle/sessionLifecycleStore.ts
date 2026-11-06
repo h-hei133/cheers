@@ -79,6 +79,7 @@ export function markSessionRunStarted(
     pendingPromptEntryId: undefined,
     terminalReason: undefined,
     terminalClassification: undefined,
+    terminalReasonCode: undefined,
     lastContinuationReason: undefined,
     pendingLifecycle: createEmptyLifecycleIndex(),
   });
@@ -97,6 +98,7 @@ export function markSessionTurnActive(
     interruptedKind: undefined,
     terminalReason: undefined,
     terminalClassification: undefined,
+    terminalReasonCode: undefined,
     lastContinuationReason: undefined,
     pendingLifecycle: createEmptyLifecycleIndex(),
   });
@@ -118,6 +120,7 @@ export function markSessionRecoveryReentry(
     interruptedKind: boundary === "mid-turn-reentry" ? "turn" : "prompt",
     terminalReason: undefined,
     terminalClassification: undefined,
+    terminalReasonCode: undefined,
     lastContinuationReason: undefined,
   });
 }
@@ -144,6 +147,7 @@ export function saveSessionInterrupted(
     interruptedKind,
     terminalReason: undefined,
     terminalClassification: undefined,
+    terminalReasonCode: undefined,
     lastContinuationReason: undefined,
   });
 }
@@ -170,6 +174,7 @@ export function saveSessionTerminated(
     interruptedKind: undefined,
     terminalReason: undefined,
     terminalClassification: undefined,
+    terminalReasonCode: undefined,
     lastContinuationReason: undefined,
     pendingLifecycle: createEmptyLifecycleIndex(),
   });

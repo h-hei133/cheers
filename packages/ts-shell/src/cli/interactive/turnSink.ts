@@ -280,6 +280,12 @@ export class TurnSink implements RendererSink {
           this.onChange();
         }
         return;
+      case 'query.completed_unproven':
+        this.finalizeAssistant();
+        this.label = 'completed_unproven';
+        this.transcript.append({ kind: 'notice', title: 'completed_unproven', text: event.reasonCode, finalized: true });
+        this.onChange();
+        return;
       case "lifecycle.cancelled":
       case "lifecycle.error":
       case "query.failed":

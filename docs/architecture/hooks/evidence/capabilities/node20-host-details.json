@@ -1,0 +1,5019 @@
+[
+  {
+    "id": "host-normal-block",
+    "status": "observed",
+    "evidenceTier": "local-product-path-scripted",
+    "node": "v20.3.0",
+    "event": "PreToolUse",
+    "tool": "write",
+    "timeoutMs": 4321,
+    "inputFidelity": "path + full content, call identity, workspace; adapter retains raw args and canonical Write",
+    "failureDirection": "artifact violation blocks; ordinary approval independent",
+    "denyShape": "nested deny translated to flat block",
+    "reentry": false,
+    "canBlock": true,
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "SessionStart",
+            "sessionId": "sess_f53589dbabd91084_1793960829969",
+            "workspaceRoot": "<scratch>/normal-block",
+            "timestamp": "2026-11-06T10:27:10.103Z",
+            "resumed": false
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "UserPromptSubmit",
+            "sessionId": "sess_f53589dbabd91084_1793960829969",
+            "workspaceRoot": "<scratch>/normal-block",
+            "timestamp": "2026-11-06T10:27:10.104Z",
+            "prompt": "Exercise the local capability fixture"
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_f53589dbabd91084_1793960829969",
+            "workspaceRoot": "<scratch>/normal-block",
+            "timestamp": "2026-11-06T10:27:10.127Z",
+            "toolName": "write",
+            "toolCallId": "write-call",
+            "args": {
+              "path": "target.txt",
+              "content": "capability fixture\n"
+            }
+          },
+          "result": {
+            "decision": "block",
+            "reasonCode": "violation",
+            "reason": "NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."
+          }
+        },
+        {
+          "payload": {
+            "eventName": "Stop",
+            "attemptId": "419b41ab-71a4-45c6-a523-304c6c8d671f",
+            "reentryCount": 0,
+            "stop_hook_active": false,
+            "sessionId": "sess_f53589dbabd91084_1793960829969",
+            "workspaceRoot": "<scratch>/normal-block",
+            "timestamp": "2026-11-06T10:27:10.187Z",
+            "turnsExecuted": 2,
+            "finalOutput": "Fixture ended"
+          },
+          "result": {
+            "decision": "allow",
+            "reasonCode": "not_configured",
+            "stopChecks": []
+          }
+        },
+        {
+          "payload": {
+            "eventName": "SessionEnd",
+            "sessionId": "sess_f53589dbabd91084_1793960829969",
+            "workspaceRoot": "<scratch>/normal-block",
+            "timestamp": "2026-11-06T10:27:10.187Z",
+            "turnsExecuted": 2
+          },
+          "result": {
+            "decision": "allow"
+          }
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960830128",
+          "decision": "allow-once"
+        }
+      ],
+      "events": [
+        {
+          "type": "query.started",
+          "sessionId": "sess_f53589dbabd91084_1793960829969",
+          "prompt": "Exercise the local capability fixture",
+          "sessionPath": "<scratch>/home/.cheers/sessions/sess_f53589dbabd91084_1793960829969"
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "419b41ab-71a4-45c6-a523-304c6c8d671f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 1,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "model_answer",
+          "step": 1,
+          "status": "answered",
+          "messageIdentity": "c91b57e91e79c5feed69baec12472778fe56db8cb088d3c52faee20fdd926caf"
+        },
+        {
+          "type": "tool.started",
+          "toolName": "write",
+          "taskId": "write-call",
+          "args": {
+            "path": "target.txt",
+            "content": "capability fixture\n"
+          }
+        },
+        {
+          "type": "tool.settled",
+          "toolName": "write",
+          "taskId": "write-call",
+          "success": false
+        },
+        {
+          "type": "tool.result",
+          "toolName": "write",
+          "taskId": "write-call",
+          "success": false,
+          "failureReason": "Blocked by Hook: NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is insi",
+          "output": "Blocked by Hook: NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "419b41ab-71a4-45c6-a523-304c6c8d671f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "execution",
+          "toolName": "write",
+          "taskId": "write-call",
+          "status": "reported_failure"
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "419b41ab-71a4-45c6-a523-304c6c8d671f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "model_answer",
+          "step": 2,
+          "status": "answered",
+          "messageIdentity": "72a65080c8691d42b60c61d1989f0ab407598b893956ebe4b2810d36e4bad633"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "419b41ab-71a4-45c6-a523-304c6c8d671f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 4,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "419b41ab-71a4-45c6-a523-304c6c8d671f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "accepted",
+          "reasonCode": "not_configured",
+          "terminal": true
+        },
+        {
+          "type": "query.completed",
+          "result": {
+            "status": "completed",
+            "terminalClassification": "success",
+            "terminalReason": "completed",
+            "transcript": [],
+            "sharedContext": {
+              "sessionId": "sess_f53589dbabd91084_1793960829969",
+              "initialPrompt": "Exercise the local capability fixture",
+              "notes": [
+                "steps: 2"
+              ],
+              "handoffs": []
+            },
+            "finalOutput": "Fixture ended"
+          }
+        }
+      ],
+      "targetExists": false,
+      "content": null
+    },
+    "rules": {
+      "version": "0.1.0",
+      "rules": [
+        {
+          "id": "protected",
+          "kind": "pathBoundary",
+          "deny": [
+            "target.txt"
+          ],
+          "message": "Choose an allowed file."
+        }
+      ]
+    },
+    "declaredConfig": {
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "^(?:Write|Edit|MultiEdit|NotebookEdit)$",
+            "hooks": [
+              {
+                "writeGate": {
+                  "version": 1,
+                  "path": "<cheers>/.normproof/write-gate/cli.mjs",
+                  "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+                  "nodeFloor": "20.3.0"
+                },
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "host-normal-allow",
+    "status": "observed",
+    "evidenceTier": "local-product-path-scripted",
+    "node": "v20.3.0",
+    "event": "PreToolUse",
+    "tool": "write",
+    "timeoutMs": 4321,
+    "inputFidelity": "path + full content, call identity, workspace; adapter retains raw args and canonical Write",
+    "failureDirection": "artifact violation blocks; ordinary approval independent",
+    "denyShape": "nested deny translated to flat block",
+    "reentry": false,
+    "canBlock": false,
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "SessionStart",
+            "sessionId": "sess_d89876551badad5f_1793960830304",
+            "workspaceRoot": "<scratch>/normal-allow",
+            "timestamp": "2026-11-06T10:27:10.409Z",
+            "resumed": false
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "UserPromptSubmit",
+            "sessionId": "sess_d89876551badad5f_1793960830304",
+            "workspaceRoot": "<scratch>/normal-allow",
+            "timestamp": "2026-11-06T10:27:10.410Z",
+            "prompt": "Exercise the local capability fixture"
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_d89876551badad5f_1793960830304",
+            "workspaceRoot": "<scratch>/normal-allow",
+            "timestamp": "2026-11-06T10:27:10.412Z",
+            "toolName": "write",
+            "toolCallId": "write-call",
+            "args": {
+              "path": "allowed.txt",
+              "content": "capability fixture\n"
+            }
+          },
+          "result": {
+            "decision": "allow",
+            "hookVerdict": {
+              "status": "allow",
+              "source": "hook",
+              "reasonCode": "no_violation"
+            }
+          }
+        },
+        {
+          "payload": {
+            "eventName": "PostToolUse",
+            "sessionId": "sess_d89876551badad5f_1793960830304",
+            "workspaceRoot": "<scratch>/normal-allow",
+            "timestamp": "2026-11-06T10:27:10.558Z",
+            "toolName": "write",
+            "toolCallId": "write-call",
+            "args": {
+              "path": "allowed.txt",
+              "content": "capability fixture\n"
+            },
+            "output": "Wrote allowed.txt (original unreadable, no diff)",
+            "success": true
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "Stop",
+            "attemptId": "42b2f86a-c9ad-4ab9-a543-8b591ee5f1b7",
+            "reentryCount": 0,
+            "stop_hook_active": false,
+            "sessionId": "sess_d89876551badad5f_1793960830304",
+            "workspaceRoot": "<scratch>/normal-allow",
+            "timestamp": "2026-11-06T10:27:10.560Z",
+            "turnsExecuted": 2,
+            "finalOutput": "Fixture ended"
+          },
+          "result": {
+            "decision": "allow",
+            "reasonCode": "not_configured",
+            "stopChecks": []
+          }
+        },
+        {
+          "payload": {
+            "eventName": "SessionEnd",
+            "sessionId": "sess_d89876551badad5f_1793960830304",
+            "workspaceRoot": "<scratch>/normal-allow",
+            "timestamp": "2026-11-06T10:27:10.560Z",
+            "turnsExecuted": 2
+          },
+          "result": {
+            "decision": "allow"
+          }
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960830413",
+          "decision": "allow-once"
+        }
+      ],
+      "events": [
+        {
+          "type": "query.started",
+          "sessionId": "sess_d89876551badad5f_1793960830304",
+          "prompt": "Exercise the local capability fixture",
+          "sessionPath": "<scratch>/home/.cheers/sessions/sess_d89876551badad5f_1793960830304"
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "42b2f86a-c9ad-4ab9-a543-8b591ee5f1b7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 1,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "model_answer",
+          "step": 1,
+          "status": "answered",
+          "messageIdentity": "9b26f8503e535bbc8cadf504dfd86267e157017ff4127c129f84b8847491fa82"
+        },
+        {
+          "type": "tool.started",
+          "toolName": "write",
+          "taskId": "write-call",
+          "args": {
+            "path": "allowed.txt",
+            "content": "capability fixture\n"
+          }
+        },
+        {
+          "type": "tool.settled",
+          "toolName": "write",
+          "taskId": "write-call",
+          "success": true
+        },
+        {
+          "type": "tool.result",
+          "toolName": "write",
+          "taskId": "write-call",
+          "success": true,
+          "output": "Wrote allowed.txt (original unreadable, no diff)"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "42b2f86a-c9ad-4ab9-a543-8b591ee5f1b7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "execution",
+          "toolName": "write",
+          "taskId": "write-call",
+          "status": "reported_success"
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "42b2f86a-c9ad-4ab9-a543-8b591ee5f1b7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "model_answer",
+          "step": 2,
+          "status": "answered",
+          "messageIdentity": "72a65080c8691d42b60c61d1989f0ab407598b893956ebe4b2810d36e4bad633"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "42b2f86a-c9ad-4ab9-a543-8b591ee5f1b7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 4,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "42b2f86a-c9ad-4ab9-a543-8b591ee5f1b7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "accepted",
+          "reasonCode": "not_configured",
+          "terminal": true
+        },
+        {
+          "type": "query.completed",
+          "result": {
+            "status": "completed",
+            "terminalClassification": "success",
+            "terminalReason": "completed",
+            "transcript": [],
+            "sharedContext": {
+              "sessionId": "sess_d89876551badad5f_1793960830304",
+              "initialPrompt": "Exercise the local capability fixture",
+              "notes": [
+                "steps: 2"
+              ],
+              "handoffs": []
+            },
+            "finalOutput": "Fixture ended"
+          }
+        }
+      ],
+      "targetExists": true,
+      "content": "capability fixture\n"
+    },
+    "rules": {
+      "version": "0.1.0",
+      "rules": [
+        {
+          "id": "protected",
+          "kind": "pathBoundary",
+          "deny": [
+            "target.txt"
+          ],
+          "message": "Choose an allowed file."
+        }
+      ]
+    },
+    "declaredConfig": {
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "^(?:Write|Edit|MultiEdit|NotebookEdit)$",
+            "hooks": [
+              {
+                "writeGate": {
+                  "version": 1,
+                  "path": "<cheers>/.normproof/write-gate/cli.mjs",
+                  "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+                  "nodeFloor": "20.3.0"
+                },
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "host-prepared-block",
+    "status": "observed",
+    "evidenceTier": "local-product-path-scripted",
+    "node": "v20.3.0",
+    "event": "PreToolUse",
+    "tool": "write",
+    "timeoutMs": 4321,
+    "inputFidelity": "path + full content, call identity, workspace; adapter retains raw args and canonical Write",
+    "failureDirection": "artifact violation blocks; ordinary approval independent",
+    "denyShape": "nested deny translated to flat block",
+    "reentry": false,
+    "canBlock": true,
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_e65a42cceea1fdcc_1793960830666",
+            "workspaceRoot": "<scratch>/prepared-block",
+            "timestamp": "2026-11-06T10:27:10.769Z",
+            "toolName": "write",
+            "toolCallId": "write-call",
+            "args": {
+              "path": "target.txt",
+              "content": "capability fixture\n"
+            }
+          },
+          "result": {
+            "decision": "block",
+            "reasonCode": "violation",
+            "reason": "NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."
+          }
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960830770",
+          "decision": "allow-once"
+        }
+      ],
+      "result": {
+        "isError": true,
+        "output": "Native operation refused by its ordinary permission or hook gate."
+      },
+      "events": [],
+      "targetExists": false,
+      "content": null
+    },
+    "rules": {
+      "version": "0.1.0",
+      "rules": [
+        {
+          "id": "protected",
+          "kind": "pathBoundary",
+          "deny": [
+            "target.txt"
+          ],
+          "message": "Choose an allowed file."
+        }
+      ]
+    },
+    "declaredConfig": {
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "^(?:Write|Edit|MultiEdit|NotebookEdit)$",
+            "hooks": [
+              {
+                "writeGate": {
+                  "version": 1,
+                  "path": "<cheers>/.normproof/write-gate/cli.mjs",
+                  "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+                  "nodeFloor": "20.3.0"
+                },
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "host-prepared-allow",
+    "status": "observed",
+    "evidenceTier": "local-product-path-scripted",
+    "node": "v20.3.0",
+    "event": "PreToolUse",
+    "tool": "write",
+    "timeoutMs": 4321,
+    "inputFidelity": "path + full content, call identity, workspace; adapter retains raw args and canonical Write",
+    "failureDirection": "artifact violation blocks; ordinary approval independent",
+    "denyShape": "nested deny translated to flat block",
+    "reentry": false,
+    "canBlock": false,
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_09a1e6482b6b6af3_1793960830929",
+            "workspaceRoot": "<scratch>/prepared-allow",
+            "timestamp": "2026-11-06T10:27:11.026Z",
+            "toolName": "write",
+            "toolCallId": "write-call",
+            "args": {
+              "path": "allowed.txt",
+              "content": "capability fixture\n"
+            }
+          },
+          "result": {
+            "decision": "allow",
+            "hookVerdict": {
+              "status": "allow",
+              "source": "hook",
+              "reasonCode": "no_violation"
+            }
+          }
+        },
+        {
+          "payload": {
+            "eventName": "PostToolUse",
+            "sessionId": "sess_09a1e6482b6b6af3_1793960830929",
+            "workspaceRoot": "<scratch>/prepared-allow",
+            "timestamp": "2026-11-06T10:27:11.158Z",
+            "toolName": "write",
+            "toolCallId": "write-call",
+            "args": {
+              "path": "allowed.txt",
+              "content": "capability fixture\n"
+            },
+            "output": "Wrote allowed.txt (original unreadable, no diff)",
+            "success": true
+          },
+          "result": {
+            "decision": "allow"
+          }
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960831027",
+          "decision": "allow-once"
+        }
+      ],
+      "result": {
+        "output": "Wrote allowed.txt (original unreadable, no diff)",
+        "isError": false,
+        "metadata": {
+          "status": "committed",
+          "operationId": "op-5c318d8f-fad2-420e-af9b-6924ba34b120"
+        }
+      },
+      "events": [],
+      "targetExists": true,
+      "content": "capability fixture\n"
+    },
+    "rules": {
+      "version": "0.1.0",
+      "rules": [
+        {
+          "id": "protected",
+          "kind": "pathBoundary",
+          "deny": [
+            "target.txt"
+          ],
+          "message": "Choose an allowed file."
+        }
+      ]
+    },
+    "declaredConfig": {
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "^(?:Write|Edit|MultiEdit|NotebookEdit)$",
+            "hooks": [
+              {
+                "writeGate": {
+                  "version": 1,
+                  "path": "<cheers>/.normproof/write-gate/cli.mjs",
+                  "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+                  "nodeFloor": "20.3.0"
+                },
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "host-security-block",
+    "status": "observed",
+    "evidenceTier": "local-product-path-scripted",
+    "node": "v20.3.0",
+    "event": "PreToolUse",
+    "tool": "write",
+    "timeoutMs": 4321,
+    "inputFidelity": "path + full content, call identity, workspace; adapter retains raw args and canonical Write",
+    "failureDirection": "artifact violation blocks; ordinary approval independent",
+    "denyShape": "nested deny translated to flat block",
+    "reentry": false,
+    "canBlock": true,
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_680a1768e48674d0_1793960831267",
+            "workspaceRoot": "<scratch>/security-block",
+            "timestamp": "2026-11-06T10:27:11.355Z",
+            "toolName": "write",
+            "toolCallId": "write-call",
+            "args": {
+              "path": "target.txt",
+              "content": "capability fixture\n"
+            }
+          },
+          "result": {
+            "decision": "block",
+            "reasonCode": "violation",
+            "reason": "NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."
+          }
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960831355",
+          "decision": "allow-once"
+        }
+      ],
+      "result": {
+        "isError": true,
+        "output": "Security operation refused by its ordinary permission or hook gate."
+      },
+      "events": [],
+      "targetExists": false,
+      "content": null
+    },
+    "rules": {
+      "version": "0.1.0",
+      "rules": [
+        {
+          "id": "protected",
+          "kind": "pathBoundary",
+          "deny": [
+            "target.txt"
+          ],
+          "message": "Choose an allowed file."
+        }
+      ]
+    },
+    "declaredConfig": {
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "^(?:Write|Edit|MultiEdit|NotebookEdit)$",
+            "hooks": [
+              {
+                "writeGate": {
+                  "version": 1,
+                  "path": "<cheers>/.normproof/write-gate/cli.mjs",
+                  "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+                  "nodeFloor": "20.3.0"
+                },
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "host-security-allow",
+    "status": "observed",
+    "evidenceTier": "local-product-path-scripted",
+    "node": "v20.3.0",
+    "event": "PreToolUse",
+    "tool": "write",
+    "timeoutMs": 4321,
+    "inputFidelity": "path + full content, call identity, workspace; adapter retains raw args and canonical Write",
+    "failureDirection": "artifact violation blocks; ordinary approval independent",
+    "denyShape": "nested deny translated to flat block",
+    "reentry": false,
+    "canBlock": false,
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_9012a14bbf6771bf_1793960831516",
+            "workspaceRoot": "<scratch>/security-allow",
+            "timestamp": "2026-11-06T10:27:11.616Z",
+            "toolName": "write",
+            "toolCallId": "write-call",
+            "args": {
+              "path": "allowed.txt",
+              "content": "capability fixture\n"
+            }
+          },
+          "result": {
+            "decision": "allow",
+            "hookVerdict": {
+              "status": "allow",
+              "source": "hook",
+              "reasonCode": "no_violation"
+            }
+          }
+        },
+        {
+          "payload": {
+            "eventName": "PostToolUse",
+            "sessionId": "sess_9012a14bbf6771bf_1793960831516",
+            "workspaceRoot": "<scratch>/security-allow",
+            "timestamp": "2026-11-06T10:27:11.744Z",
+            "toolName": "write",
+            "toolCallId": "write-call",
+            "args": {
+              "path": "allowed.txt",
+              "content": "capability fixture\n"
+            },
+            "output": "Wrote allowed.txt (original unreadable, no diff)",
+            "success": true
+          },
+          "result": {
+            "decision": "allow"
+          }
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960831617",
+          "decision": "allow-once"
+        }
+      ],
+      "result": {
+        "output": "Wrote allowed.txt (original unreadable, no diff)",
+        "isError": false,
+        "metadata": {
+          "status": "committed",
+          "operationId": "op-778b874e-8759-4426-bfa2-d7919c49cf06"
+        }
+      },
+      "events": [],
+      "targetExists": true,
+      "content": "capability fixture\n"
+    },
+    "rules": {
+      "version": "0.1.0",
+      "rules": [
+        {
+          "id": "protected",
+          "kind": "pathBoundary",
+          "deny": [
+            "target.txt"
+          ],
+          "message": "Choose an allowed file."
+        }
+      ]
+    },
+    "declaredConfig": {
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "^(?:Write|Edit|MultiEdit|NotebookEdit)$",
+            "hooks": [
+              {
+                "writeGate": {
+                  "version": 1,
+                  "path": "<cheers>/.normproof/write-gate/cli.mjs",
+                  "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+                  "nodeFloor": "20.3.0"
+                },
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "host-git-block",
+    "status": "observed",
+    "evidenceTier": "local-product-path-scripted",
+    "node": "v20.3.0",
+    "event": "PreToolUse",
+    "tool": "bash",
+    "timeoutMs": 4321,
+    "inputFidelity": "command, call identity and workspace; shell final effects unsupported by write adapter",
+    "failureDirection": "flat hook blocks before Git; unsupported alone grants no protection",
+    "denyShape": "flat block",
+    "reentry": false,
+    "canBlock": true,
+    "command": "printf '%s' '{\"decision\":\"block\",\"reason\":\"local native Git refusal\"}'",
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_6292aed43a1556e8_1793960831866",
+            "workspaceRoot": "<scratch>/git-block",
+            "timestamp": "2026-11-06T10:27:12.141Z",
+            "toolName": "bash",
+            "toolCallId": "git-call",
+            "args": {
+              "command": "git add -- git-target.txt"
+            }
+          },
+          "result": {
+            "decision": "block",
+            "reason": "local native Git refusal"
+          }
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960832142",
+          "decision": "allow-once"
+        }
+      ],
+      "result": {
+        "status": "blocked",
+        "note": "Blocked by Hook: local native Git refusal"
+      },
+      "index": ""
+    },
+    "rules": {
+      "version": "0.1.0",
+      "rules": [
+        {
+          "id": "protected",
+          "kind": "pathBoundary",
+          "deny": [
+            "target.txt"
+          ],
+          "message": "Choose an allowed file."
+        }
+      ]
+    },
+    "declaredConfig": {
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "^(?:Write|Edit|MultiEdit|NotebookEdit)$",
+            "hooks": [
+              {
+                "writeGate": {
+                  "version": 1,
+                  "path": "<cheers>/.normproof/write-gate/cli.mjs",
+                  "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+                  "nodeFloor": "20.3.0"
+                },
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "host-git-allow",
+    "status": "observed",
+    "evidenceTier": "local-product-path-scripted",
+    "node": "v20.3.0",
+    "event": "PreToolUse",
+    "tool": "bash",
+    "timeoutMs": 4321,
+    "inputFidelity": "command, call identity and workspace; shell final effects unsupported by write adapter",
+    "failureDirection": "flat hook blocks before Git; unsupported alone grants no protection",
+    "denyShape": "flat block",
+    "reentry": false,
+    "canBlock": false,
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "PreToolUse",
+            "sessionId": "sess_81c4cf53ea541011_1793960832302",
+            "workspaceRoot": "<scratch>/git-allow",
+            "timestamp": "2026-11-06T10:27:12.572Z",
+            "toolName": "bash",
+            "toolCallId": "git-call",
+            "args": {
+              "command": "git add -- git-target.txt"
+            }
+          },
+          "result": {
+            "decision": "unsupported",
+            "reason": "Shell commands do not describe their final per-file content.",
+            "hookVerdict": {
+              "status": "unsupported",
+              "source": "adapter",
+              "reasonCode": "shell_effects"
+            }
+          }
+        },
+        {
+          "payload": {
+            "eventName": "PostToolUse",
+            "sessionId": "sess_81c4cf53ea541011_1793960832302",
+            "workspaceRoot": "<scratch>/git-allow",
+            "timestamp": "2026-11-06T10:27:12.768Z",
+            "toolName": "bash",
+            "toolCallId": "git-call",
+            "args": {
+              "command": "git add -- git-target.txt"
+            },
+            "output": "git add -- git-target.txt completed.",
+            "success": true
+          },
+          "result": {
+            "decision": "allow"
+          }
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960832572",
+          "decision": "allow-once"
+        }
+      ],
+      "result": {
+        "status": "succeeded",
+        "note": "git add -- git-target.txt completed.",
+        "receipts": [
+          {
+            "receiptId": "execution-receipt:command.run:git-workflow:completed:success:git-add----git-target.txt",
+            "caller": "git-workflow",
+            "operationKind": "command.run",
+            "authorityMode": "approved-for-write",
+            "requestedActionSummary": "git \"add\" \"--\" \"git-target.txt\"",
+            "executionStatus": "success",
+            "errorClass": "success",
+            "exitCode": 0,
+            "timedOut": false,
+            "cancelled": false,
+            "outputSummaryRedactionStatus": "report-safe",
+            "evidenceCorrelationId": "execution-receipt:success:completed",
+            "notProvenClaims": [
+              "terminal-task-success",
+              "provider-success",
+              "verification-success",
+              "repair-success"
+            ],
+            "redaction": {
+              "status": "report-safe",
+              "redactions": []
+            }
+          }
+        ]
+      },
+      "index": "git-target.txt\n"
+    },
+    "rules": {
+      "version": "0.1.0",
+      "rules": [
+        {
+          "id": "protected",
+          "kind": "pathBoundary",
+          "deny": [
+            "target.txt"
+          ],
+          "message": "Choose an allowed file."
+        }
+      ]
+    },
+    "declaredConfig": {
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "^(?:Write|Edit|MultiEdit|NotebookEdit)$",
+            "hooks": [
+              {
+                "writeGate": {
+                  "version": 1,
+                  "path": "<cheers>/.normproof/write-gate/cli.mjs",
+                  "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+                  "nodeFloor": "20.3.0"
+                },
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "config-project",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-config-command",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 4321,
+    "inputFidelity": "resolved declaration + handler timeoutMs + sourcePath",
+    "failureDirection": "explicit block consumed by Stop dispatcher",
+    "denyShape": "flat block",
+    "reentry": "configuration does not itself reenter",
+    "canBlock": true,
+    "sourcePath": "<scratch>/config/project/project/.agents/hooks.json",
+    "profile": "isolated-default",
+    "loaded": {
+      "hooks": [
+        {
+          "event": "Stop",
+          "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+          "timeoutMs": 4321,
+          "sourcePath": "<scratch>/config/project/project/.agents/hooks.json"
+        }
+      ],
+      "problems": []
+    },
+    "registration": {
+      "registered": 1,
+      "problems": []
+    },
+    "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "config-fixture",
+      "workspaceRoot": "<scratch>/config/project/project",
+      "timestamp": "2026-11-06T10:27:12.797Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "config-attempt",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "sandbox": {
+      "state": "off"
+    },
+    "output": {
+      "decision": "block",
+      "reasonCode": "open_obligations",
+      "proofVerdict": "not_reported",
+      "evidenceIdentity": [
+        "unspecified"
+      ],
+      "stopChecks": [
+        {
+          "command": "e639cbfcd5f7f7a54e7d401cedec8dcf8eb7e988cab62094707279ad01daff71",
+          "decision": "block",
+          "reasonCode": "open_obligations",
+          "proofVerdict": "not_reported",
+          "evidenceIdentity": [
+            "unspecified"
+          ],
+          "durationMs": 18
+        }
+      ]
+    }
+  },
+  {
+    "id": "config-.cheers",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-config-command",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 4321,
+    "inputFidelity": "resolved declaration + handler timeoutMs + sourcePath",
+    "failureDirection": "explicit block consumed by Stop dispatcher",
+    "denyShape": "flat block",
+    "reentry": "configuration does not itself reenter",
+    "canBlock": true,
+    "sourcePath": "<scratch>/config/.cheers/home/.cheers/hooks.json",
+    "profile": "isolated-default",
+    "loaded": {
+      "hooks": [
+        {
+          "event": "Stop",
+          "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+          "timeoutMs": 4321,
+          "sourcePath": "<scratch>/config/.cheers/home/.cheers/hooks.json"
+        }
+      ],
+      "problems": []
+    },
+    "registration": {
+      "registered": 1,
+      "problems": []
+    },
+    "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "config-fixture",
+      "workspaceRoot": "<scratch>/config/.cheers/project",
+      "timestamp": "2026-11-06T10:27:12.819Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "config-attempt",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "sandbox": {
+      "state": "off"
+    },
+    "output": {
+      "decision": "block",
+      "reasonCode": "open_obligations",
+      "proofVerdict": "not_reported",
+      "evidenceIdentity": [
+        "unspecified"
+      ],
+      "stopChecks": [
+        {
+          "command": "e639cbfcd5f7f7a54e7d401cedec8dcf8eb7e988cab62094707279ad01daff71",
+          "decision": "block",
+          "reasonCode": "open_obligations",
+          "proofVerdict": "not_reported",
+          "evidenceIdentity": [
+            "unspecified"
+          ],
+          "durationMs": 12
+        }
+      ]
+    }
+  },
+  {
+    "id": "config-.cheer",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-config-command",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 4321,
+    "inputFidelity": "resolved declaration + handler timeoutMs + sourcePath",
+    "failureDirection": "explicit block consumed by Stop dispatcher",
+    "denyShape": "flat block",
+    "reentry": "configuration does not itself reenter",
+    "canBlock": true,
+    "sourcePath": "<scratch>/config/.cheer/home/.cheer/hooks.json",
+    "profile": "isolated-default",
+    "loaded": {
+      "hooks": [
+        {
+          "event": "Stop",
+          "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+          "timeoutMs": 4321,
+          "sourcePath": "<scratch>/config/.cheer/home/.cheer/hooks.json"
+        }
+      ],
+      "problems": []
+    },
+    "registration": {
+      "registered": 1,
+      "problems": []
+    },
+    "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "config-fixture",
+      "workspaceRoot": "<scratch>/config/.cheer/project",
+      "timestamp": "2026-11-06T10:27:12.834Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "config-attempt",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "sandbox": {
+      "state": "off"
+    },
+    "output": {
+      "decision": "block",
+      "reasonCode": "open_obligations",
+      "proofVerdict": "not_reported",
+      "evidenceIdentity": [
+        "unspecified"
+      ],
+      "stopChecks": [
+        {
+          "command": "e639cbfcd5f7f7a54e7d401cedec8dcf8eb7e988cab62094707279ad01daff71",
+          "decision": "block",
+          "reasonCode": "open_obligations",
+          "proofVerdict": "not_reported",
+          "evidenceIdentity": [
+            "unspecified"
+          ],
+          "durationMs": 17
+        }
+      ]
+    }
+  },
+  {
+    "id": "config-.private-agents",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-config-command",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 4321,
+    "inputFidelity": "resolved declaration + handler timeoutMs + sourcePath",
+    "failureDirection": "explicit block consumed by Stop dispatcher",
+    "denyShape": "flat block",
+    "reentry": "configuration does not itself reenter",
+    "canBlock": true,
+    "sourcePath": "<scratch>/config/.private-agents/home/.private-agents/hooks.json",
+    "profile": "isolated-default",
+    "loaded": {
+      "hooks": [
+        {
+          "event": "Stop",
+          "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+          "timeoutMs": 4321,
+          "sourcePath": "<scratch>/config/.private-agents/home/.private-agents/hooks.json"
+        }
+      ],
+      "problems": []
+    },
+    "registration": {
+      "registered": 1,
+      "problems": []
+    },
+    "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "config-fixture",
+      "workspaceRoot": "<scratch>/config/.private-agents/project",
+      "timestamp": "2026-11-06T10:27:12.854Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "config-attempt",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "sandbox": {
+      "state": "off"
+    },
+    "output": {
+      "decision": "block",
+      "reasonCode": "open_obligations",
+      "proofVerdict": "not_reported",
+      "evidenceIdentity": [
+        "unspecified"
+      ],
+      "stopChecks": [
+        {
+          "command": "e639cbfcd5f7f7a54e7d401cedec8dcf8eb7e988cab62094707279ad01daff71",
+          "decision": "block",
+          "reasonCode": "open_obligations",
+          "proofVerdict": "not_reported",
+          "evidenceIdentity": [
+            "unspecified"
+          ],
+          "durationMs": 13
+        }
+      ]
+    }
+  },
+  {
+    "id": "config-.coding-agents",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-config-command",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 4321,
+    "inputFidelity": "resolved declaration + handler timeoutMs + sourcePath",
+    "failureDirection": "explicit block consumed by Stop dispatcher",
+    "denyShape": "flat block",
+    "reentry": "configuration does not itself reenter",
+    "canBlock": true,
+    "sourcePath": "<scratch>/config/.coding-agents/home/.coding-agents/hooks.json",
+    "profile": "isolated-default",
+    "loaded": {
+      "hooks": [
+        {
+          "event": "Stop",
+          "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+          "timeoutMs": 4321,
+          "sourcePath": "<scratch>/config/.coding-agents/home/.coding-agents/hooks.json"
+        }
+      ],
+      "problems": []
+    },
+    "registration": {
+      "registered": 1,
+      "problems": []
+    },
+    "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "config-fixture",
+      "workspaceRoot": "<scratch>/config/.coding-agents/project",
+      "timestamp": "2026-11-06T10:27:12.870Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "config-attempt",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "sandbox": {
+      "state": "off"
+    },
+    "output": {
+      "decision": "block",
+      "reasonCode": "open_obligations",
+      "proofVerdict": "not_reported",
+      "evidenceIdentity": [
+        "unspecified"
+      ],
+      "stopChecks": [
+        {
+          "command": "e639cbfcd5f7f7a54e7d401cedec8dcf8eb7e988cab62094707279ad01daff71",
+          "decision": "block",
+          "reasonCode": "open_obligations",
+          "proofVerdict": "not_reported",
+          "evidenceIdentity": [
+            "unspecified"
+          ],
+          "durationMs": 18
+        }
+      ]
+    }
+  },
+  {
+    "id": "config-named-profile",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-config-command",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 4321,
+    "inputFidelity": "resolved declaration + handler timeoutMs + sourcePath",
+    "failureDirection": "explicit block consumed by Stop dispatcher",
+    "denyShape": "flat block",
+    "reentry": "configuration does not itself reenter",
+    "canBlock": true,
+    "sourcePath": "<scratch>/config/named-profile/home/.cheers/profiles/capability/hooks.json",
+    "profile": "capability",
+    "loaded": {
+      "hooks": [
+        {
+          "event": "Stop",
+          "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+          "timeoutMs": 4321,
+          "sourcePath": "<scratch>/config/named-profile/home/.cheers/profiles/capability/hooks.json"
+        }
+      ],
+      "problems": []
+    },
+    "registration": {
+      "registered": 1,
+      "problems": []
+    },
+    "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "config-fixture",
+      "workspaceRoot": "<scratch>/config/named-profile/project",
+      "timestamp": "2026-11-06T10:27:12.896Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "config-attempt",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "sandbox": {
+      "state": "off"
+    },
+    "output": {
+      "decision": "block",
+      "reasonCode": "open_obligations",
+      "proofVerdict": "not_reported",
+      "evidenceIdentity": [
+        "unspecified"
+      ],
+      "stopChecks": [
+        {
+          "command": "e639cbfcd5f7f7a54e7d401cedec8dcf8eb7e988cab62094707279ad01daff71",
+          "decision": "block",
+          "reasonCode": "open_obligations",
+          "proofVerdict": "not_reported",
+          "evidenceIdentity": [
+            "unspecified"
+          ],
+          "durationMs": 19
+        }
+      ]
+    }
+  },
+  {
+    "id": "config-project-only",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-config-command",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 4321,
+    "inputFidelity": "resolved declaration + handler timeoutMs + sourcePath",
+    "failureDirection": "explicit block consumed by Stop dispatcher",
+    "denyShape": "flat block",
+    "reentry": "configuration does not itself reenter",
+    "canBlock": true,
+    "sourcePath": "<scratch>/config/project-only/project/.agents/hooks.json",
+    "profile": "isolated-default",
+    "loaded": {
+      "hooks": [
+        {
+          "event": "Stop",
+          "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+          "timeoutMs": 4321,
+          "sourcePath": "<scratch>/config/project-only/project/.agents/hooks.json"
+        }
+      ],
+      "problems": []
+    },
+    "registration": {
+      "registered": 1,
+      "problems": []
+    },
+    "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\"}'",
+                "timeoutMs": 4321
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "config-fixture",
+      "workspaceRoot": "<scratch>/config/project-only/project",
+      "timestamp": "2026-11-06T10:27:12.919Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "config-attempt",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "sandbox": {
+      "state": "off"
+    },
+    "output": {
+      "decision": "block",
+      "reasonCode": "open_obligations",
+      "proofVerdict": "not_reported",
+      "evidenceIdentity": [
+        "unspecified"
+      ],
+      "stopChecks": [
+        {
+          "command": "e639cbfcd5f7f7a54e7d401cedec8dcf8eb7e988cab62094707279ad01daff71",
+          "decision": "block",
+          "reasonCode": "open_obligations",
+          "proofVerdict": "not_reported",
+          "evidenceIdentity": [
+            "unspecified"
+          ],
+          "durationMs": 15
+        }
+      ]
+    }
+  },
+  {
+    "id": "stop-parser-pinned-compliant",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "real-command-host-parser",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "actual CLI stdout parsed by current host; explicit false on first attempt",
+    "failureDirection": "unknown cannot prove completion",
+    "denyShape": "R0a envelope or legacy flat block",
+    "reentry": "C2 at most one; observe current parser disposition on host flag",
+    "canBlock": false,
+    "boundary": "pinned",
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "stop-boundary",
+      "workspaceRoot": "<scratch>/compliant",
+      "timestamp": "2026-11-06T10:27:12.934Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "runtime-pair",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "output": {
+      "decision": "unknown",
+      "reasonCode": "empty_output",
+      "proofVerdict": "unknown"
+    }
+  },
+  {
+    "id": "stop-parser-pinned-violating",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "real-command-host-parser",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "actual CLI stdout parsed by current host; explicit false on first attempt",
+    "failureDirection": "unknown cannot prove completion",
+    "denyShape": "R0a envelope or legacy flat block",
+    "reentry": "C2 at most one; observe current parser disposition on host flag",
+    "canBlock": false,
+    "boundary": "pinned",
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "stop-boundary",
+      "workspaceRoot": "<scratch>/violating",
+      "timestamp": "2026-11-06T10:27:13.293Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "runtime-pair",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "output": {
+      "decision": "unknown",
+      "reasonCode": "invalid_output",
+      "proofVerdict": "unknown"
+    }
+  },
+  {
+    "id": "stop-parser-pinned-not-configured",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "real-command-host-parser",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "actual CLI stdout parsed by current host; explicit false on first attempt",
+    "failureDirection": "unknown cannot prove completion",
+    "denyShape": "R0a envelope or legacy flat block",
+    "reentry": "C2 at most one; observe current parser disposition on host flag",
+    "canBlock": false,
+    "boundary": "pinned",
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "stop-boundary",
+      "workspaceRoot": "<scratch>/not-configured",
+      "timestamp": "2026-11-06T10:27:13.619Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "runtime-pair",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "output": {
+      "decision": "unknown",
+      "reasonCode": "empty_output",
+      "proofVerdict": "unknown"
+    }
+  },
+  {
+    "id": "stop-parser-pinned-reentry",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "real-command-host-parser",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "actual CLI stdout parsed by current host; explicit false on first attempt",
+    "failureDirection": "unknown cannot prove completion",
+    "denyShape": "R0a envelope or legacy flat block",
+    "reentry": "C2 at most one; observe current parser disposition on host flag",
+    "canBlock": false,
+    "boundary": "pinned",
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "stop-boundary",
+      "workspaceRoot": "<scratch>/violating",
+      "timestamp": "2026-11-06T10:27:13.924Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "runtime-pair",
+      "reentryCount": 1,
+      "stop_hook_active": true
+    },
+    "output": {
+      "decision": "unknown",
+      "reasonCode": "empty_output",
+      "proofVerdict": "unknown"
+    }
+  },
+  {
+    "id": "stop-parser-r0a-compliant",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "real-command-host-parser",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "actual CLI stdout parsed by current host; explicit false on first attempt",
+    "failureDirection": "explicit producer decision retained",
+    "denyShape": "R0a envelope or legacy flat block",
+    "reentry": "C2 at most one; observe current parser disposition on host flag",
+    "canBlock": false,
+    "boundary": "r0a",
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "stop-boundary",
+      "workspaceRoot": "<scratch>/compliant",
+      "timestamp": "2026-11-06T10:27:14.267Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "runtime-pair",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "output": {
+      "decision": "allow",
+      "reasonCode": "proven",
+      "proofVerdict": "proven",
+      "evidenceIdentity": [
+        "run_metadata",
+        "source_module_functions",
+        "source_module_graph",
+        "task",
+        "task_manifest"
+      ],
+      "reason": "Every blocking obligation holds."
+    }
+  },
+  {
+    "id": "stop-parser-r0a-violating",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "real-command-host-parser",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "actual CLI stdout parsed by current host; explicit false on first attempt",
+    "failureDirection": "explicit producer decision retained",
+    "denyShape": "R0a envelope or legacy flat block",
+    "reentry": "C2 at most one; observe current parser disposition on host flag",
+    "canBlock": true,
+    "boundary": "r0a",
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "stop-boundary",
+      "workspaceRoot": "<scratch>/violating",
+      "timestamp": "2026-11-06T10:27:14.616Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "runtime-pair",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "output": {
+      "decision": "block",
+      "reasonCode": "actionable_gap",
+      "proofVerdict": "failed",
+      "evidenceIdentity": [
+        "run_metadata",
+        "source_module_functions",
+        "source_module_graph",
+        "task",
+        "task_manifest"
+      ],
+      "reason": "NormProof completion gate: blocking obligations are still open.\n\n- source_graph_has_no_unresolved_specifiers: Every module import resolves within the declared source graph\n  status: failed\n  why: Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: src/module.ts -> ./missing.js\n\nClose these obligations, then finish. If one cannot be closed, say so and stop rather than working around the gate."
+    }
+  },
+  {
+    "id": "stop-parser-r0a-not-configured",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "real-command-host-parser",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "actual CLI stdout parsed by current host; explicit false on first attempt",
+    "failureDirection": "neutral completion disposition; no new proof",
+    "denyShape": "R0a envelope or legacy flat block",
+    "reentry": "C2 at most one; observe current parser disposition on host flag",
+    "canBlock": false,
+    "boundary": "r0a",
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "stop-boundary",
+      "workspaceRoot": "<scratch>/not-configured",
+      "timestamp": "2026-11-06T10:27:15.001Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "runtime-pair",
+      "reentryCount": 0,
+      "stop_hook_active": false
+    },
+    "output": {
+      "decision": "allow",
+      "stopDisposition": "completed_unproven",
+      "reasonCode": "not_configured",
+      "proofVerdict": "not_reported",
+      "evidenceIdentity": [
+        "unspecified"
+      ]
+    }
+  },
+  {
+    "id": "stop-parser-r0a-reentry",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "real-command-host-parser",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "actual CLI stdout parsed by current host; explicit false on first attempt",
+    "failureDirection": "neutral completion disposition; no new proof",
+    "denyShape": "R0a envelope or legacy flat block",
+    "reentry": "C2 at most one; observe current parser disposition on host flag",
+    "canBlock": false,
+    "boundary": "r0a",
+    "payload": {
+      "eventName": "Stop",
+      "sessionId": "stop-boundary",
+      "workspaceRoot": "<scratch>/violating",
+      "timestamp": "2026-11-06T10:27:15.388Z",
+      "finalOutput": "candidate",
+      "turnsExecuted": 1,
+      "attemptId": "runtime-pair",
+      "reentryCount": 1,
+      "stop_hook_active": true
+    },
+    "output": {
+      "decision": "allow",
+      "stopDisposition": "completed_unproven",
+      "reasonCode": "already_blocked_once",
+      "proofVerdict": "not_reported",
+      "evidenceIdentity": [
+        "run_metadata",
+        "source_module_functions",
+        "source_module_graph",
+        "task",
+        "task_manifest"
+      ]
+    }
+  },
+  {
+    "id": "stop-parser-version-mismatch",
+    "status": "observed",
+    "evidenceTier": "local-synthetic-parser-input",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": null,
+    "inputFidelity": "explicit incompatible envelope passed directly to the production parser",
+    "failureDirection": "unknown for incompatible contract",
+    "denyShape": "unknown/incompatible_contract",
+    "reentry": false,
+    "canBlock": "no execution attempted",
+    "reason": "Actual parser refused incompatible contract version",
+    "node": "v20.3.0",
+    "output": {
+      "decision": "unknown",
+      "reasonCode": "incompatible_contract",
+      "proofVerdict": "unknown"
+    }
+  },
+  {
+    "id": "completion-proven",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-product-path-scripted",
+    "boundary": "r0a",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "real CLI envelope + normal registration + actual repair write; scripted model step",
+    "failureDirection": "block withholds completion; unknown cannot prove completion; neutral result stays unproven",
+    "denyShape": "versioned Stop envelope",
+    "reentry": "observe exact attemptId/count/active in lifecycle",
+    "canBlock": false,
+    "command": "'<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node' '<scratch>/r0a/dist/adapters/cli/normproof.js' gate stop --emit-result",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "'<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node' '<scratch>/r0a/dist/adapters/cli/normproof.js' gate stop --emit-result",
+                "timeoutMs": 3000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "SessionStart",
+            "sessionId": "completion-proven",
+            "workspaceRoot": "<scratch>/completion-proven",
+            "timestamp": "2026-11-06T10:27:15.799Z",
+            "resumed": false
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "UserPromptSubmit",
+            "sessionId": "completion-proven",
+            "workspaceRoot": "<scratch>/completion-proven",
+            "timestamp": "2026-11-06T10:27:15.799Z",
+            "prompt": "Observe the completion capability fixture"
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "Stop",
+            "attemptId": "34f34035-66cc-49bc-84e1-d80ae7d89509",
+            "reentryCount": 0,
+            "stop_hook_active": false,
+            "sessionId": "completion-proven",
+            "workspaceRoot": "<scratch>/completion-proven",
+            "timestamp": "2026-11-06T10:27:15.800Z",
+            "turnsExecuted": 1,
+            "finalOutput": "Candidate answer"
+          },
+          "result": {
+            "decision": "allow",
+            "reasonCode": "explicit_allow",
+            "stopChecks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "decision": "allow",
+                "reasonCode": "proven",
+                "proofVerdict": "proven",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ],
+                "durationMs": 365
+              }
+            ]
+          }
+        },
+        {
+          "payload": {
+            "eventName": "SessionEnd",
+            "sessionId": "completion-proven",
+            "workspaceRoot": "<scratch>/completion-proven",
+            "timestamp": "2026-11-06T10:27:16.165Z",
+            "turnsExecuted": 1
+          },
+          "result": {
+            "decision": "allow"
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "query.started",
+          "sessionId": "completion-proven",
+          "prompt": "Observe the completion capability fixture"
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "34f34035-66cc-49bc-84e1-d80ae7d89509",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 1,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "model_answer",
+          "step": 1,
+          "status": "answered",
+          "messageIdentity": "a204da5522ac27697ac4cdb02d97b43a5b847ebe7dbe3fedcdacb21841cbcd81"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "34f34035-66cc-49bc-84e1-d80ae7d89509",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "34f34035-66cc-49bc-84e1-d80ae7d89509",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "proven",
+                "proofVerdict": "proven",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "allow",
+            "reasonCode": "proven",
+            "proofVerdict": "proven",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "durationMs": 365
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "34f34035-66cc-49bc-84e1-d80ae7d89509",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 4,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "proven",
+                "proofVerdict": "proven",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "proof_verdict",
+          "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+          "verdict": "proven",
+          "evidenceIdentity": [
+            "run_metadata",
+            "source_module_functions",
+            "source_module_graph",
+            "task",
+            "task_manifest"
+          ]
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "34f34035-66cc-49bc-84e1-d80ae7d89509",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "proven",
+                "proofVerdict": "proven",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "accepted",
+          "reasonCode": "explicit_allow",
+          "terminal": true
+        },
+        {
+          "type": "query.completed",
+          "result": {
+            "status": "completed",
+            "terminalClassification": "success",
+            "terminalReason": "completed",
+            "transcript": [],
+            "sharedContext": {
+              "sessionId": "completion-proven",
+              "initialPrompt": "Observe the completion capability fixture",
+              "notes": [
+                "steps: 1"
+              ],
+              "handoffs": []
+            },
+            "finalOutput": "Candidate answer"
+          }
+        }
+      ],
+      "checks": [
+        {
+          "type": "lifecycle.record",
+          "attemptId": "34f34035-66cc-49bc-84e1-d80ae7d89509",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "proven",
+                "proofVerdict": "proven",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "allow",
+            "reasonCode": "proven",
+            "proofVerdict": "proven",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "durationMs": 365
+          }
+        }
+      ],
+      "states": [
+        {
+          "type": "lifecycle.record",
+          "attemptId": "34f34035-66cc-49bc-84e1-d80ae7d89509",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "34f34035-66cc-49bc-84e1-d80ae7d89509",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "proven",
+                "proofVerdict": "proven",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "accepted",
+          "reasonCode": "explicit_allow",
+          "terminal": true
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960835801",
+          "decision": "allow-once"
+        }
+      ],
+      "steps": 1,
+      "completed": 1,
+      "completedUnproven": 0,
+      "failed": 0,
+      "finalSource": "export function run() { return 1; }\n"
+    }
+  },
+  {
+    "id": "completion-blocked",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-product-path-scripted",
+    "boundary": "r0a",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "real CLI envelope + normal registration + actual repair write; scripted model step",
+    "failureDirection": "block withholds completion; unknown cannot prove completion; neutral result stays unproven",
+    "denyShape": "versioned Stop envelope",
+    "reentry": "observe exact attemptId/count/active in lifecycle",
+    "canBlock": true,
+    "command": "'<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node' '<scratch>/r0a/dist/adapters/cli/normproof.js' gate stop --emit-result",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "'<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node' '<scratch>/r0a/dist/adapters/cli/normproof.js' gate stop --emit-result",
+                "timeoutMs": 3000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "SessionStart",
+            "sessionId": "completion-blocked",
+            "workspaceRoot": "<scratch>/completion-blocked",
+            "timestamp": "2026-11-06T10:27:16.222Z",
+            "resumed": false
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "UserPromptSubmit",
+            "sessionId": "completion-blocked",
+            "workspaceRoot": "<scratch>/completion-blocked",
+            "timestamp": "2026-11-06T10:27:16.222Z",
+            "prompt": "Observe the completion capability fixture"
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "Stop",
+            "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+            "reentryCount": 0,
+            "stop_hook_active": false,
+            "sessionId": "completion-blocked",
+            "workspaceRoot": "<scratch>/completion-blocked",
+            "timestamp": "2026-11-06T10:27:16.223Z",
+            "turnsExecuted": 1,
+            "finalOutput": "Candidate answer"
+          },
+          "result": {
+            "decision": "block",
+            "reasonCode": "actionable_gap",
+            "proofVerdict": "failed",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "reason": "NormProof completion gate: blocking obligations are still open.\n\n- source_graph_has_no_unresolved_specifiers: Every module import resolves within the declared source graph\n  status: failed\n  why: Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: src/module.ts -> ./missing.js\n\nClose these obligations, then finish. If one cannot be closed, say so and stop rather than working around the gate.",
+            "stopChecks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "decision": "block",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ],
+                "durationMs": 373
+              }
+            ]
+          }
+        },
+        {
+          "payload": {
+            "eventName": "Stop",
+            "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+            "reentryCount": 1,
+            "stop_hook_active": true,
+            "sessionId": "completion-blocked",
+            "workspaceRoot": "<scratch>/completion-blocked",
+            "timestamp": "2026-11-06T10:27:16.598Z",
+            "turnsExecuted": 2,
+            "finalOutput": "Candidate answer"
+          },
+          "result": {
+            "decision": "allow",
+            "stopDisposition": "completed_unproven",
+            "reasonCode": "already_blocked_once",
+            "proofVerdict": "not_reported",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "stopChecks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "decision": "allow",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ],
+                "durationMs": 350,
+                "stopDisposition": "completed_unproven"
+              }
+            ]
+          }
+        },
+        {
+          "payload": {
+            "eventName": "SessionEnd",
+            "sessionId": "completion-blocked",
+            "workspaceRoot": "<scratch>/completion-blocked",
+            "timestamp": "2026-11-06T10:27:16.948Z",
+            "turnsExecuted": 2
+          },
+          "result": {
+            "decision": "allow"
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "query.started",
+          "sessionId": "completion-blocked",
+          "prompt": "Observe the completion capability fixture"
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 1,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "model_answer",
+          "step": 1,
+          "status": "answered",
+          "messageIdentity": "a204da5522ac27697ac4cdb02d97b43a5b847ebe7dbe3fedcdacb21841cbcd81"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "block",
+            "reasonCode": "actionable_gap",
+            "proofVerdict": "failed",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "durationMs": 373
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 4,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "proof_verdict",
+          "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+          "verdict": "failed",
+          "evidenceIdentity": [
+            "run_metadata",
+            "source_module_functions",
+            "source_module_graph",
+            "task",
+            "task_manifest"
+          ]
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "blocked",
+          "reasonCode": "actionable_gap",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 6,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "repairing",
+          "reasonCode": "hook_blocked",
+          "terminal": false
+        },
+        {
+          "type": "query.retrying",
+          "role": "coder",
+          "turn": 1,
+          "attempt": 1,
+          "reason": "Stop check blocked completion; attempting repair (1/1)."
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 7,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "model_answer",
+          "step": 2,
+          "status": "answered",
+          "messageIdentity": "a204da5522ac27697ac4cdb02d97b43a5b847ebe7dbe3fedcdacb21841cbcd81"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 8,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 9,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "allow",
+            "reasonCode": "already_blocked_once",
+            "proofVerdict": "not_reported",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "durationMs": 350,
+            "stopDisposition": "completed_unproven"
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 10,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "proof_verdict",
+          "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+          "verdict": "not_reported",
+          "evidenceIdentity": [
+            "run_metadata",
+            "source_module_functions",
+            "source_module_graph",
+            "task",
+            "task_manifest"
+          ]
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 11,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "completed_unproven",
+          "reasonCode": "already_blocked_once",
+          "terminal": true
+        },
+        {
+          "type": "query.completed_unproven",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "reasonCode": "already_blocked_once",
+          "proofVerdict": "not_reported",
+          "result": {
+            "status": "completed_unproven",
+            "terminalClassification": "completed_unproven",
+            "terminalReason": "completed_unproven",
+            "transcript": [],
+            "sharedContext": {
+              "sessionId": "completion-blocked",
+              "initialPrompt": "Observe the completion capability fixture",
+              "notes": [
+                "steps: 2"
+              ],
+              "handoffs": []
+            },
+            "finalOutput": "Candidate answer",
+            "stopReason": "already_blocked_once"
+          }
+        }
+      ],
+      "checks": [
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "block",
+            "reasonCode": "actionable_gap",
+            "proofVerdict": "failed",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "durationMs": 373
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 9,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "allow",
+            "reasonCode": "already_blocked_once",
+            "proofVerdict": "not_reported",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "durationMs": 350,
+            "stopDisposition": "completed_unproven"
+          }
+        }
+      ],
+      "states": [
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "blocked",
+          "reasonCode": "actionable_gap",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 6,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "repairing",
+          "reasonCode": "hook_blocked",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 8,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "cb2756da-6902-4dbf-9b12-8b9e35a9673d",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 11,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "completed_unproven",
+          "reasonCode": "already_blocked_once",
+          "terminal": true
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960836223",
+          "decision": "allow-once"
+        },
+        {
+          "promptId": "hook-approval-1793960836599",
+          "decision": "allow-once"
+        }
+      ],
+      "steps": 2,
+      "completed": 0,
+      "completedUnproven": 1,
+      "failed": 0,
+      "finalSource": "import { missing } from \"./missing.js\";\nexport function run() { return missing; }\n"
+    }
+  },
+  {
+    "id": "completion-repair",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-product-path-scripted",
+    "boundary": "r0a",
+    "event": "Stop",
+    "tool": "write",
+    "timeoutMs": 3000,
+    "inputFidelity": "real CLI envelope + normal registration + actual repair write; scripted model step",
+    "failureDirection": "block withholds completion; unknown cannot prove completion; neutral result stays unproven",
+    "denyShape": "versioned Stop envelope",
+    "reentry": "observe exact attemptId/count/active in lifecycle",
+    "canBlock": false,
+    "command": "'<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node' '<scratch>/r0a/dist/adapters/cli/normproof.js' gate stop --emit-result",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "'<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node' '<scratch>/r0a/dist/adapters/cli/normproof.js' gate stop --emit-result",
+                "timeoutMs": 3000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "SessionStart",
+            "sessionId": "completion-repair",
+            "workspaceRoot": "<scratch>/completion-repair",
+            "timestamp": "2026-11-06T10:27:16.995Z",
+            "resumed": false
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "UserPromptSubmit",
+            "sessionId": "completion-repair",
+            "workspaceRoot": "<scratch>/completion-repair",
+            "timestamp": "2026-11-06T10:27:16.995Z",
+            "prompt": "Observe the completion capability fixture"
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "Stop",
+            "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+            "reentryCount": 0,
+            "stop_hook_active": false,
+            "sessionId": "completion-repair",
+            "workspaceRoot": "<scratch>/completion-repair",
+            "timestamp": "2026-11-06T10:27:16.995Z",
+            "turnsExecuted": 1,
+            "finalOutput": "Candidate answer"
+          },
+          "result": {
+            "decision": "block",
+            "reasonCode": "actionable_gap",
+            "proofVerdict": "failed",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "reason": "NormProof completion gate: blocking obligations are still open.\n\n- source_graph_has_no_unresolved_specifiers: Every module import resolves within the declared source graph\n  status: failed\n  why: Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: src/module.ts -> ./missing.js\n\nClose these obligations, then finish. If one cannot be closed, say so and stop rather than working around the gate.",
+            "stopChecks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "decision": "block",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ],
+                "durationMs": 343
+              }
+            ]
+          }
+        },
+        {
+          "payload": {
+            "eventName": "PreToolUse",
+            "sessionId": "completion-repair",
+            "workspaceRoot": "<scratch>/completion-repair",
+            "timestamp": "2026-11-06T10:27:17.343Z",
+            "toolName": "write",
+            "toolCallId": "repair-write",
+            "args": {
+              "path": "src/module.ts",
+              "content": "export function run() { return 1; }\n"
+            }
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "PostToolUse",
+            "sessionId": "completion-repair",
+            "workspaceRoot": "<scratch>/completion-repair",
+            "timestamp": "2026-11-06T10:27:17.422Z",
+            "toolName": "write",
+            "toolCallId": "repair-write",
+            "args": {
+              "path": "src/module.ts",
+              "content": "export function run() { return 1; }\n"
+            },
+            "output": "Updated src/module.ts\n\n```diff\n--- a/src/module.ts\n+++ b/src/module.ts\n@@ -1,3 +1,2 @@\n-import { missing } from \"./missing.js\";\n-export function run() { return missing; }\n+export function run() { return 1; }\n \n```",
+            "success": true
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "Stop",
+            "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+            "reentryCount": 1,
+            "stop_hook_active": true,
+            "sessionId": "completion-repair",
+            "workspaceRoot": "<scratch>/completion-repair",
+            "timestamp": "2026-11-06T10:27:17.428Z",
+            "turnsExecuted": 3,
+            "finalOutput": "Candidate answer"
+          },
+          "result": {
+            "decision": "allow",
+            "stopDisposition": "completed_unproven",
+            "reasonCode": "already_blocked_once",
+            "proofVerdict": "not_reported",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "stopChecks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "decision": "allow",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ],
+                "durationMs": 351,
+                "stopDisposition": "completed_unproven"
+              }
+            ]
+          }
+        },
+        {
+          "payload": {
+            "eventName": "SessionEnd",
+            "sessionId": "completion-repair",
+            "workspaceRoot": "<scratch>/completion-repair",
+            "timestamp": "2026-11-06T10:27:17.780Z",
+            "turnsExecuted": 3
+          },
+          "result": {
+            "decision": "allow"
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "query.started",
+          "sessionId": "completion-repair",
+          "prompt": "Observe the completion capability fixture"
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 1,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "model_answer",
+          "step": 1,
+          "status": "answered",
+          "messageIdentity": "a204da5522ac27697ac4cdb02d97b43a5b847ebe7dbe3fedcdacb21841cbcd81"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "block",
+            "reasonCode": "actionable_gap",
+            "proofVerdict": "failed",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "durationMs": 343
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 4,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "proof_verdict",
+          "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+          "verdict": "failed",
+          "evidenceIdentity": [
+            "run_metadata",
+            "source_module_functions",
+            "source_module_graph",
+            "task",
+            "task_manifest"
+          ]
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "blocked",
+          "reasonCode": "actionable_gap",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 6,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "repairing",
+          "reasonCode": "hook_blocked",
+          "terminal": false
+        },
+        {
+          "type": "query.retrying",
+          "role": "coder",
+          "turn": 1,
+          "attempt": 1,
+          "reason": "Stop check blocked completion; attempting repair (1/1)."
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 7,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "model_answer",
+          "step": 2,
+          "status": "answered",
+          "messageIdentity": "70b95778e42d7d5c44d57edf85c4685df2dfe1838295b26739a9715d00a1378e"
+        },
+        {
+          "type": "tool.started",
+          "toolName": "write",
+          "taskId": "repair-write",
+          "args": {
+            "path": "src/module.ts",
+            "content": "export function run() { return 1; }\n"
+          }
+        },
+        {
+          "type": "tool.settled",
+          "toolName": "write",
+          "taskId": "repair-write",
+          "success": true
+        },
+        {
+          "type": "tool.result",
+          "toolName": "write",
+          "taskId": "repair-write",
+          "success": true,
+          "output": "Updated src/module.ts\n\n```diff\n--- a/src/module.ts\n+++ b/src/module.ts\n@@ -1,3 +1,2 @@\n-import { missing } from \"./missing.js\";\n-export function run() { return missing; }\n+export function run() { return 1; }\n \n```"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 8,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "execution",
+          "toolName": "write",
+          "taskId": "repair-write",
+          "status": "reported_success"
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 9,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "model_answer",
+          "step": 3,
+          "status": "answered",
+          "messageIdentity": "a204da5522ac27697ac4cdb02d97b43a5b847ebe7dbe3fedcdacb21841cbcd81"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 10,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 11,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "allow",
+            "reasonCode": "already_blocked_once",
+            "proofVerdict": "not_reported",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "durationMs": 351,
+            "stopDisposition": "completed_unproven"
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 12,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "proof_verdict",
+          "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+          "verdict": "not_reported",
+          "evidenceIdentity": [
+            "run_metadata",
+            "source_module_functions",
+            "source_module_graph",
+            "task",
+            "task_manifest"
+          ]
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 13,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "completed_unproven",
+          "reasonCode": "already_blocked_once",
+          "terminal": true
+        },
+        {
+          "type": "query.completed_unproven",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "reasonCode": "already_blocked_once",
+          "proofVerdict": "not_reported",
+          "result": {
+            "status": "completed_unproven",
+            "terminalClassification": "completed_unproven",
+            "terminalReason": "completed_unproven",
+            "transcript": [],
+            "sharedContext": {
+              "sessionId": "completion-repair",
+              "initialPrompt": "Observe the completion capability fixture",
+              "notes": [
+                "steps: 3"
+              ],
+              "handoffs": []
+            },
+            "finalOutput": "Candidate answer",
+            "stopReason": "already_blocked_once"
+          }
+        }
+      ],
+      "checks": [
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "block",
+            "reasonCode": "actionable_gap",
+            "proofVerdict": "failed",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "durationMs": 343
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 11,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "allow",
+            "reasonCode": "already_blocked_once",
+            "proofVerdict": "not_reported",
+            "evidenceIdentity": [
+              "run_metadata",
+              "source_module_functions",
+              "source_module_graph",
+              "task",
+              "task_manifest"
+            ],
+            "durationMs": 351,
+            "stopDisposition": "completed_unproven"
+          }
+        }
+      ],
+      "states": [
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "blocked",
+          "reasonCode": "actionable_gap",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 6,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "repairing",
+          "reasonCode": "hook_blocked",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 10,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "actionable_gap",
+                "proofVerdict": "failed",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "0156e3b5-af72-41f5-9c99-826eb936e9a7",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 13,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "already_blocked_once",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "run_metadata",
+                  "source_module_functions",
+                  "source_module_graph",
+                  "task",
+                  "task_manifest"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "completed_unproven",
+          "reasonCode": "already_blocked_once",
+          "terminal": true
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960836996",
+          "decision": "allow-once"
+        },
+        {
+          "promptId": "hook-approval-1793960837429",
+          "decision": "allow-once"
+        }
+      ],
+      "steps": 3,
+      "completed": 0,
+      "completedUnproven": 1,
+      "failed": 0,
+      "finalSource": "export function run() { return 1; }\n"
+    }
+  },
+  {
+    "id": "completion-not-configured",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-product-path-scripted",
+    "boundary": "r0a",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "real CLI envelope + normal registration + actual repair write; scripted model step",
+    "failureDirection": "block withholds completion; unknown cannot prove completion; neutral result stays unproven",
+    "denyShape": "versioned Stop envelope",
+    "reentry": "observe exact attemptId/count/active in lifecycle",
+    "canBlock": false,
+    "command": "'<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node' '<scratch>/r0a/dist/adapters/cli/normproof.js' gate stop --emit-result",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "'<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node' '<scratch>/r0a/dist/adapters/cli/normproof.js' gate stop --emit-result",
+                "timeoutMs": 3000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "SessionStart",
+            "sessionId": "completion-not-configured",
+            "workspaceRoot": "<scratch>/completion-not-configured",
+            "timestamp": "2026-11-06T10:27:17.826Z",
+            "resumed": false
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "UserPromptSubmit",
+            "sessionId": "completion-not-configured",
+            "workspaceRoot": "<scratch>/completion-not-configured",
+            "timestamp": "2026-11-06T10:27:17.826Z",
+            "prompt": "Observe the completion capability fixture"
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "Stop",
+            "attemptId": "1c645c7b-5154-4861-96d0-cdc9792e2a1f",
+            "reentryCount": 0,
+            "stop_hook_active": false,
+            "sessionId": "completion-not-configured",
+            "workspaceRoot": "<scratch>/completion-not-configured",
+            "timestamp": "2026-11-06T10:27:17.827Z",
+            "turnsExecuted": 1,
+            "finalOutput": "Candidate answer"
+          },
+          "result": {
+            "decision": "allow",
+            "stopDisposition": "completed_unproven",
+            "reasonCode": "not_configured",
+            "proofVerdict": "not_reported",
+            "evidenceIdentity": [
+              "unspecified"
+            ],
+            "stopChecks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "decision": "allow",
+                "reasonCode": "not_configured",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "unspecified"
+                ],
+                "durationMs": 310,
+                "stopDisposition": "completed_unproven"
+              }
+            ]
+          }
+        },
+        {
+          "payload": {
+            "eventName": "SessionEnd",
+            "sessionId": "completion-not-configured",
+            "workspaceRoot": "<scratch>/completion-not-configured",
+            "timestamp": "2026-11-06T10:27:18.137Z",
+            "turnsExecuted": 1
+          },
+          "result": {
+            "decision": "allow"
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "query.started",
+          "sessionId": "completion-not-configured",
+          "prompt": "Observe the completion capability fixture"
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1c645c7b-5154-4861-96d0-cdc9792e2a1f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 1,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "model_answer",
+          "step": 1,
+          "status": "answered",
+          "messageIdentity": "a204da5522ac27697ac4cdb02d97b43a5b847ebe7dbe3fedcdacb21841cbcd81"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1c645c7b-5154-4861-96d0-cdc9792e2a1f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1c645c7b-5154-4861-96d0-cdc9792e2a1f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "not_configured",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "unspecified"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "allow",
+            "reasonCode": "not_configured",
+            "proofVerdict": "not_reported",
+            "evidenceIdentity": [
+              "unspecified"
+            ],
+            "durationMs": 310,
+            "stopDisposition": "completed_unproven"
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1c645c7b-5154-4861-96d0-cdc9792e2a1f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 4,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "not_configured",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "unspecified"
+                ]
+              }
+            ]
+          },
+          "kind": "proof_verdict",
+          "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+          "verdict": "not_reported",
+          "evidenceIdentity": [
+            "unspecified"
+          ]
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1c645c7b-5154-4861-96d0-cdc9792e2a1f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "not_configured",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "unspecified"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "completed_unproven",
+          "reasonCode": "not_configured",
+          "terminal": true
+        },
+        {
+          "type": "query.completed_unproven",
+          "attemptId": "1c645c7b-5154-4861-96d0-cdc9792e2a1f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "reasonCode": "not_configured",
+          "proofVerdict": "not_reported",
+          "result": {
+            "status": "completed_unproven",
+            "terminalClassification": "completed_unproven",
+            "terminalReason": "completed_unproven",
+            "transcript": [],
+            "sharedContext": {
+              "sessionId": "completion-not-configured",
+              "initialPrompt": "Observe the completion capability fixture",
+              "notes": [
+                "steps: 1"
+              ],
+              "handoffs": []
+            },
+            "finalOutput": "Candidate answer",
+            "stopReason": "not_configured"
+          }
+        }
+      ],
+      "checks": [
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1c645c7b-5154-4861-96d0-cdc9792e2a1f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "not_configured",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "unspecified"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+            "decision": "allow",
+            "reasonCode": "not_configured",
+            "proofVerdict": "not_reported",
+            "evidenceIdentity": [
+              "unspecified"
+            ],
+            "durationMs": 310,
+            "stopDisposition": "completed_unproven"
+          }
+        }
+      ],
+      "states": [
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1c645c7b-5154-4861-96d0-cdc9792e2a1f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1c645c7b-5154-4861-96d0-cdc9792e2a1f",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "84f14ca7798ba34bb3464ec345e846ee098e96387d4fc32ea8e4a0166919573d",
+                "reasonCode": "not_configured",
+                "proofVerdict": "not_reported",
+                "evidenceIdentity": [
+                  "unspecified"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "completed_unproven",
+          "reasonCode": "not_configured",
+          "terminal": true
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960837827",
+          "decision": "allow-once"
+        }
+      ],
+      "steps": 1,
+      "completed": 0,
+      "completedUnproven": 1,
+      "failed": 0,
+      "finalSource": "import { missing } from \"./missing.js\";\nexport function run() { return missing; }\n"
+    }
+  },
+  {
+    "id": "completion-repeated-block",
+    "status": "observed",
+    "node": "v20.3.0",
+    "evidenceTier": "local-product-path-scripted",
+    "event": "Stop",
+    "tool": null,
+    "timeoutMs": 3000,
+    "inputFidelity": "real CLI envelope + normal registration + actual repair write; scripted model step",
+    "failureDirection": "block withholds completion; unknown cannot prove completion; neutral result stays unproven",
+    "denyShape": "native flat block",
+    "reentry": "observe exact attemptId/count/active in lifecycle",
+    "canBlock": true,
+    "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\",\"proofVerdict\":\"not_proven\",\"evidenceIdentity\":[\"fixture:gap\"]}'",
+    "declaredConfig": {
+      "hooks": {
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "command": "printf '%s' '{\"decision\":\"block\",\"reasonCode\":\"open_obligations\",\"proofVerdict\":\"not_proven\",\"evidenceIdentity\":[\"fixture:gap\"]}'",
+                "timeoutMs": 3000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "output": {
+      "observed": [
+        {
+          "payload": {
+            "eventName": "SessionStart",
+            "sessionId": "completion-repeated-block",
+            "workspaceRoot": "<scratch>/completion-repeated-block",
+            "timestamp": "2026-11-06T10:27:18.180Z",
+            "resumed": false
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "UserPromptSubmit",
+            "sessionId": "completion-repeated-block",
+            "workspaceRoot": "<scratch>/completion-repeated-block",
+            "timestamp": "2026-11-06T10:27:18.180Z",
+            "prompt": "Observe the completion capability fixture"
+          },
+          "result": {
+            "decision": "allow"
+          }
+        },
+        {
+          "payload": {
+            "eventName": "Stop",
+            "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+            "reentryCount": 0,
+            "stop_hook_active": false,
+            "sessionId": "completion-repeated-block",
+            "workspaceRoot": "<scratch>/completion-repeated-block",
+            "timestamp": "2026-11-06T10:27:18.181Z",
+            "turnsExecuted": 1,
+            "finalOutput": "Candidate answer"
+          },
+          "result": {
+            "decision": "block",
+            "reasonCode": "open_obligations",
+            "proofVerdict": "not_proven",
+            "evidenceIdentity": [
+              "fixture:gap"
+            ],
+            "stopChecks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "decision": "block",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ],
+                "durationMs": 18
+              }
+            ]
+          }
+        },
+        {
+          "payload": {
+            "eventName": "Stop",
+            "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+            "reentryCount": 1,
+            "stop_hook_active": true,
+            "sessionId": "completion-repeated-block",
+            "workspaceRoot": "<scratch>/completion-repeated-block",
+            "timestamp": "2026-11-06T10:27:18.200Z",
+            "turnsExecuted": 2,
+            "finalOutput": "Candidate answer"
+          },
+          "result": {
+            "decision": "block",
+            "reasonCode": "open_obligations",
+            "proofVerdict": "not_proven",
+            "evidenceIdentity": [
+              "fixture:gap"
+            ],
+            "stopChecks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "decision": "block",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ],
+                "durationMs": 13
+              }
+            ]
+          }
+        },
+        {
+          "payload": {
+            "eventName": "SessionEnd",
+            "sessionId": "completion-repeated-block",
+            "workspaceRoot": "<scratch>/completion-repeated-block",
+            "timestamp": "2026-11-06T10:27:18.213Z",
+            "turnsExecuted": 2
+          },
+          "result": {
+            "decision": "allow"
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "query.started",
+          "sessionId": "completion-repeated-block",
+          "prompt": "Observe the completion capability fixture"
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 1,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "model_answer",
+          "step": 1,
+          "status": "answered",
+          "messageIdentity": "a204da5522ac27697ac4cdb02d97b43a5b847ebe7dbe3fedcdacb21841cbcd81"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+            "decision": "block",
+            "reasonCode": "open_obligations",
+            "proofVerdict": "not_proven",
+            "evidenceIdentity": [
+              "fixture:gap"
+            ],
+            "durationMs": 18
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 4,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "proof_verdict",
+          "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+          "verdict": "not_proven",
+          "evidenceIdentity": [
+            "fixture:gap"
+          ]
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "blocked",
+          "reasonCode": "open_obligations",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 6,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "repairing",
+          "reasonCode": "hook_blocked",
+          "terminal": false
+        },
+        {
+          "type": "query.retrying",
+          "role": "coder",
+          "turn": 1,
+          "attempt": 1,
+          "reason": "Stop check blocked completion; attempting repair (1/1)."
+        },
+        {
+          "type": "message.started",
+          "role": "coder"
+        },
+        {
+          "type": "message.finished",
+          "role": "coder"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 7,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "model_answer",
+          "step": 2,
+          "status": "answered",
+          "messageIdentity": "a204da5522ac27697ac4cdb02d97b43a5b847ebe7dbe3fedcdacb21841cbcd81"
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 8,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 9,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+            "decision": "block",
+            "reasonCode": "open_obligations",
+            "proofVerdict": "not_proven",
+            "evidenceIdentity": [
+              "fixture:gap"
+            ],
+            "durationMs": 13
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 10,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "proof_verdict",
+          "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+          "verdict": "not_proven",
+          "evidenceIdentity": [
+            "fixture:gap"
+          ]
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 11,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "blocked",
+          "reasonCode": "open_obligations",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 12,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "blocked",
+          "reasonCode": "repeated_block",
+          "terminal": true
+        },
+        {
+          "type": "query.failed",
+          "stopStatus": "blocked",
+          "error": "Stop check blocked (repeated_block)."
+        }
+      ],
+      "checks": [
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 3,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+            "decision": "block",
+            "reasonCode": "open_obligations",
+            "proofVerdict": "not_proven",
+            "evidenceIdentity": [
+              "fixture:gap"
+            ],
+            "durationMs": 18
+          }
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 9,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "hook_result",
+          "result": {
+            "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+            "decision": "block",
+            "reasonCode": "open_obligations",
+            "proofVerdict": "not_proven",
+            "evidenceIdentity": [
+              "fixture:gap"
+            ],
+            "durationMs": 13
+          }
+        }
+      ],
+      "states": [
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 2,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": []
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 0,
+          "stop_hook_active": false,
+          "sequence": 5,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "blocked",
+          "reasonCode": "open_obligations",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 6,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "repairing",
+          "reasonCode": "hook_blocked",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 8,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "checking",
+          "reasonCode": "candidate_answer",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 11,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "blocked",
+          "reasonCode": "open_obligations",
+          "terminal": false
+        },
+        {
+          "type": "lifecycle.record",
+          "attemptId": "1d98c0de-c954-4d09-b4db-23031b99eb0c",
+          "reentryCount": 1,
+          "stop_hook_active": true,
+          "sequence": 12,
+          "progressFingerprint": {
+            "version": 1,
+            "checks": [
+              {
+                "command": "3b06675bd6a5d835051f39c6399cdee87e3305022e4d3528946693d48c69aacc",
+                "reasonCode": "open_obligations",
+                "proofVerdict": "not_proven",
+                "evidenceIdentity": [
+                  "fixture:gap"
+                ]
+              }
+            ]
+          },
+          "kind": "stop_state",
+          "state": "blocked",
+          "reasonCode": "repeated_block",
+          "terminal": true
+        }
+      ],
+      "approvals": [
+        {
+          "promptId": "hook-approval-1793960838181",
+          "decision": "allow-once"
+        },
+        {
+          "promptId": "hook-approval-1793960838200",
+          "decision": "allow-once"
+        }
+      ],
+      "steps": 2,
+      "completed": 0,
+      "completedUnproven": 0,
+      "failed": 1,
+      "finalSource": "import { missing } from \"./missing.js\";\nexport function run() { return missing; }\n"
+    }
+  }
+]

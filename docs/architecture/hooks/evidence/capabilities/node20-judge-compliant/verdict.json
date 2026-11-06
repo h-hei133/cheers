@@ -1,0 +1,60 @@
+{
+  "runId": "generated-structure-judge",
+  "status": "proven",
+  "obligations": [
+    {
+      "id": "source_graph_is_acyclic",
+      "title": "No dependency cycle among source modules",
+      "blocking": false,
+      "status": "satisfied",
+      "evidenceIds": [
+        "source_module_graph"
+      ],
+      "reason": "Obligation source_graph_is_acyclic holds."
+    },
+    {
+      "id": "source_graph_has_no_unresolved_specifiers",
+      "title": "Every module import resolves within the declared source graph",
+      "blocking": true,
+      "status": "satisfied",
+      "evidenceIds": [
+        "source_module_graph"
+      ],
+      "reason": "Obligation source_graph_has_no_unresolved_specifiers holds."
+    },
+    {
+      "id": "declared_functions_within_module_ceiling",
+      "title": "No module declares more function-like names than the responsibility ceiling allows",
+      "blocking": false,
+      "status": "satisfied",
+      "evidenceIds": [
+        "source_module_functions"
+      ],
+      "reason": "Obligation declared_functions_within_module_ceiling holds."
+    }
+  ],
+  "evidence": [
+    {
+      "id": "task",
+      "kind": "task",
+      "path": "task.md",
+      "authority": "A1",
+      "summary": "Original user task."
+    },
+    {
+      "id": "source_module_graph",
+      "kind": "source_module_graph",
+      "path": "src/**/*.ts",
+      "authority": "A0",
+      "summary": "Registered source_module_graph evidence."
+    },
+    {
+      "id": "source_module_functions",
+      "kind": "source_module_functions",
+      "path": "src/**/*.ts",
+      "authority": "A0",
+      "summary": "Registered source_module_functions evidence."
+    }
+  ],
+  "summary": "All blocking obligations are satisfied by compiled norm obligations."
+}

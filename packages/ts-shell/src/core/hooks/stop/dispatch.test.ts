@@ -39,7 +39,7 @@ describe('Stop command boundary', () => {
   });
 
   it.each(['failed', 'not_proven', 'refuted'] as const)('preserves %s proof without accepting a contradictory allow', proofVerdict => {
-    expect(normalizeStopResult({ decision: 'allow', proofVerdict, evidenceIdentity: ['proof:one'] }))
+    expect(normalizeStopResult({ decision: 'allow', reasonCode: 'proven', proofVerdict, evidenceIdentity: ['proof:one'] }))
       .toMatchObject({ decision: 'unknown', reasonCode: 'conflicting_verdict', proofVerdict, evidenceIdentity: ['proof:one'] });
   });
   it.each([80, 1200])('uses handler timeoutMs=%s from hooks.json with isolated trust and measured execution', async timeoutMs => {

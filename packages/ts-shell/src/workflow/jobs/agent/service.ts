@@ -36,7 +36,7 @@ export class AgentService {
     return job;
   }
   start(expected: AgentJob, runtime: AgentRuntime, instruction?: string): AgentJob {
-    if (this.closing || this.hasLive(expected.id) || runtime.admission() || !['queued', 'paused', 'completed', 'failed', 'cancelled'].includes(expected.status)
+    if (this.closing || this.hasLive(expected.id) || runtime.admission() || !['queued', 'paused', 'completed', 'completed_unproven', 'failed', 'cancelled'].includes(expected.status)
       || !sameValue(expected, this.journal.get(expected.id))) throw new JobStateError('conflict');
     if (instruction === undefined && expected.runs.length > 0) throw new JobStateError('conflict');
     let job = expected;

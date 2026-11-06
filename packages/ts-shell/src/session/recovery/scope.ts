@@ -91,6 +91,10 @@ export function selectedRecoveryTerminal(events: readonly TranscriptEvent[]): Pa
   for (let index = current.length - 1; index >= 0; index -= 1) {
     const entry = current[index]!;
     if (entry.type !== "query-event") continue;
+    if (entry.event.type === 'query.completed_unproven') return {
+      status: 'completed_unproven', durableStatus: 'completed_unproven', terminalClassification: 'completed_unproven',
+      terminalReason: 'completed_unproven', terminalReasonCode: entry.event.reasonCode, lastError: undefined,
+    };
     if (entry.event.type === "query.failed" || entry.event.type === "lifecycle.error") return {
       durableStatus: "error", terminalClassification: "error", terminalReason: "stopped_error", lastError: entry.event.error,
     };

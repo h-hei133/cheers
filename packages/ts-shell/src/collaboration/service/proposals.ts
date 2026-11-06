@@ -44,10 +44,10 @@ export function dispatchProposal(room: Room, principal: string, request: Service
 }
 export function settleProposal(room: Room, principal: string, request: ServiceRequest, now: number): unknown {
   assertOwner(room, principal, request.owner, now); const selected = object(request.data); keys(selected, ['acceptanceId', 'outcome', 'sourceEntryId']);
-  requireValue(['completed', 'failed', 'cancelled', 'unknown'].includes(String(selected.outcome)));
+  requireValue(['completed', 'completed_unproven', 'failed', 'cancelled', 'unknown'].includes(String(selected.outcome)));
   const proposal = room.proposals.find(item => item.acceptanceId === uuid(selected.acceptanceId));
   requireValue(proposal && ['dispatched', 'unknown'].includes(proposal.status) && proposal.generation === room.generation, 'stale');
-  if (selected.outcome === 'completed') {
+  if (selected.outcome === 'completed' || selected.outcome === 'completed_unproven') {
     requireValue(proposal.status === 'dispatched', 'stale');
     assertRight(room, proposal.principal, proposal.kind === 'ask' ? 'ask' : 'control');
   }

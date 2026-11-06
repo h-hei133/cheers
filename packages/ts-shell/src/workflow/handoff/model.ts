@@ -8,7 +8,7 @@ export interface Handoff {
   readonly target: ModelChoice;
   readonly modelRevision?: string;
   readonly createdAt: number;
-  readonly phase: 'armed' | 'running' | 'switched' | 'completed' | 'failed' | 'cancelled' | 'unknown';
+  readonly phase: 'armed' | 'running' | 'switched' | 'completed' | 'completed_unproven' | 'failed' | 'cancelled' | 'unknown';
   readonly runId?: string;
   readonly promptEntryId?: string;
   readonly switchedBy?: string;

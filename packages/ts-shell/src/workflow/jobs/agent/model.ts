@@ -14,7 +14,7 @@ export interface AgentRun {
   readonly prompt: string;
   readonly createdAt: number;
   readonly dispatchPossible: boolean;
-  readonly status: JobStatus | 'paused';
+  readonly status: JobStatus | 'paused' | 'completed_unproven';
   readonly checkpoint: AgentCheckpoint;
 }
 export interface AgentJob {
@@ -30,14 +30,14 @@ export interface AgentJob {
   readonly child?: AgentChild;
   readonly checkpoint?: AgentCheckpoint;
   readonly runs: readonly AgentRun[];
-  readonly status: JobStatus | 'paused';
+  readonly status: JobStatus | 'paused' | 'completed_unproven';
   readonly text: string;
   readonly truncated: boolean;
   readonly output: 'pending' | 'complete' | 'interrupted' | 'unknown';
   readonly note: string;
 }
 export interface AgentOutcome {
-  readonly status: 'completed' | 'failed' | 'unknown';
+  readonly status: 'completed' | 'completed_unproven' | 'failed' | 'unknown';
   readonly checkpoint?: AgentCheckpoint;
 }
 export interface AgentRuntime {

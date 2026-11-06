@@ -1,0 +1,1361 @@
+npm notice run cheers@0.1.0 verify:import-cycles
+npm notice run node scripts/check-import-cycles.mjs
+scc-gate root=packages/ts-shell/src files=3101
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+npm notice run cheers@0.1.0 check:declarations
+npm notice run node scripts/check-declarations.mjs
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+npm notice run cheers@0.1.0 check:node-floor
+npm notice run node scripts/check-node-floor.mjs
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+npm notice run cheers@0.1.0 test:ts
+npm notice run npm run test -w packages/ts-shell
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/test-utils/browser/healing/cli/scenarios.test.ts  (12 tests) 81899ms
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Interactive cleanup failed; terminal restoration was not fully verified.
+
+Interactive cleanup failed; terminal restoration was not fully verified.
+
+
+ ✓ src/cli/interactive/interactiveMode.test.ts  (405 tests) 71538ms
+(node:5828) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/cli/evaluation/runtime.test.ts  (14 tests) 61808ms
+ ✓ src/cli/print/profile.test.ts  (2 tests) 50903ms
+ ✓ src/cli/print/result.test.ts  (5 tests) 43118ms
+ ✓ src/test-utils/browser/skills/execution.test.ts  (5 tests) 42539ms
+ ✓ src/cli/print/commands.test.ts  (5 tests) 39769ms
+ ✓ src/cli-baseline.test.ts  (41 tests) 423653ms
+ ✓ src/test-utils/browser/execution/external/scenarios.test.ts  (5 tests) 36495ms
+ ✓ src/test-utils/browser/cache/scenarios.test.ts  (6 tests) 31410ms
+ ✓ src/provider/aws/credentials.test.ts  (25 tests) 30094ms
+ ✓ src/test-utils/browser/receipt/scenarios.test.ts  (6 tests) 26901ms
+ ✓ src/workflow/git/worktree/worktree.test.ts  (12 tests) 22161ms
+ ✓ src/workflow/git/operation/operation.test.ts  (24 tests) 23903ms
+ ✓ src/cli/runtime/context/preview.test.ts  (114 tests) 26861ms
+ ✓ src/test-utils/browser/execution/cli.test.ts  (4 tests) 22650ms
+ ✓ src/test-utils/browser/execution/browser.test.ts  (5 tests) 25988ms
+ ✓ src/test-utils/browser/skills/runner.test.ts  (3 tests) 21331ms
+(node:5828) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/test-utils/cli/scenarios.test.ts  (4 tests) 17835ms
+ ✓ src/extensions/extensions.test.ts  (61 tests) 15937ms
+ ✓ src/core/skills/skillLoader.test.ts  (54 tests) 14564ms
+ ✓ src/cli/interactive/picker/session.test.ts  (75 tests) 15891ms
+ ✓ src/cli/interactive/picker/restore/lifetime.test.ts  (2 tests) 10914ms
+ ✓ src/session/model/provider.test.ts  (200 tests) 12795ms
+ ✓ src/core/auth/account/renewal.test.ts  (77 tests) 9897ms
+ ✓ src/cli/runtime/summary.test.ts  (49 tests) 7185ms
+ ✓ src/cli/runtime/advisor.test.ts  (38 tests) 7864ms
+ ✓ src/edit/recovery/catalog.test.ts  (11 tests) 7443ms
+ ✓ src/planning/goal/acceptance/acceptance.test.ts  (14 tests) 5885ms
+ ✓ src/session/longSessionDurability.test.ts  (2 tests) 10784ms
+ ✓ src/cli/runtime/usage.test.ts  (35 tests) 5254ms
+ ✓ src/cli/jobs/dag/command.test.ts  (18 tests) 8396ms
+ ✓ src/core/workflow/gitWorktreeManager.test.ts  (23 tests) 8443ms
+ ✓ src/runtime/execution/view/native.test.ts  (41 tests) 7732ms
+ ✓ src/edit/recovery/undo/history.test.ts  (23 tests) 7871ms
+ ✓ src/cli/interactive/picker/settings/fields.test.ts  (140 tests) 7147ms
+ ✓ src/core/commands/slashCommandsWorkflow.test.ts  (13 tests) 3627ms
+ ✓ src/cli/print/cancellation.test.ts  (3 tests) 5694ms
+ ✓ src/session/compaction/commit.test.ts  (44 tests) 4014ms
+ ✓ src/core/mcp/lifecycle.test.ts  (14 tests) 5721ms
+ ✓ src/cli/jobs/agent/command.test.ts  (11 tests) 5777ms
+ ✓ src/cli/bootstrap/startup.test.ts  (8 tests) 5095ms
+ ✓ src/test-utils/browser/execution/process.test.ts  (1 test) 4605ms
+ ✓ src/test-utils/browser/network/external/handoff.test.ts  (11 tests) 4627ms
+ ✓ src/test-utils/browser/network/controlled/scenarios.test.ts  (10 tests) 4668ms
+ ✓ src/test-utils/browser/network/public/scenarios.test.ts  (13 tests) 4574ms
+ ✓ src/research/report/recovery.test.ts  (6 tests) 4194ms
+ ✓ src/core/shell/background/tasks.test.ts  (21 tests) 4618ms
+ ✓ src/test-utils/browser/network/egress.test.ts  (5 tests) 4722ms
+ ✓ src/session/model/catalog.test.ts  (54 tests) 4528ms
+ ✓ src/test-utils/browser/network/external/execution.test.ts  (8 tests) 4660ms
+ ✓ src/test-utils/browser/network/public/smoke.test.ts  (7 tests | 1 skipped) 4623ms
+ ✓ src/core/commands/reviewCommandRuntime.test.ts  (14 tests) 1712ms
+ ✓ src/edit/recovery/undo/lifetime.test.ts  (3 tests) 3375ms
+ ✓ src/cli/interactive/picker/model/auth.test.ts  (24 tests) 2346ms
+ ✓ src/planning/goal/run/scheduler.test.ts  (14 tests) 4077ms
+ ✓ src/turn/completion.test.ts  (37 tests) 4030ms
+ ✓ src/cli/interactive/picker/model/category.test.ts  (68 tests) 4285ms
+ ✓ src/cli/handoff/runtime.test.ts  (17 tests) 3840ms
+ ✓ src/session/model/selection.test.ts  (69 tests) 3969ms
+ ✓ src/cli/interactive/picker/restore.test.ts  (19 tests) 3622ms
+ ✓ src/session/model/effort.test.ts  (26 tests) 1452ms
+ ✓ src/cli/print/tools.test.ts  (1 test) 3534ms
+ ✓ src/cli/print/review.test.ts  (1 test) 3591ms
+ ✓ src/session/SessionManager.test.ts  (95 tests) 3234ms
+ ✓ src/cli/director/runtime.test.ts  (15 tests) 4050ms
+ ✓ src/edit/recovery/operation/index.test.ts  (16 tests) 1143ms
+ ✓ src/cli/runtime/navigation.test.ts  (41 tests) 3522ms
+ ✓ src/core/shell/recovery.test.ts  (24 tests) 4070ms
+ ✓ src/session/store/catalog/query.test.ts  (13 tests) 3617ms
+ ✓ src/cli/interactive/picker/model.test.ts  (46 tests) 3382ms
+ ✓ src/test-utils/cli/process.test.ts  (2 tests) 3320ms
+ ✓ src/core/tools/searchFiles.test.ts  (10 tests) 3158ms
+ ✓ src/core/commands/connectCommandRuntime.test.ts  (68 tests) 2674ms
+ ✓ src/cli/interactive/picker/help.test.ts  (13 tests) 4001ms
+ ✓ src/runtime/execution/ignoreRules.test.ts  (17 tests) 3298ms
+ ✓ src/provider/request/fetch.test.ts  (29 tests) 3048ms
+ ✓ src/entrypoints/hookApproval.test.ts  (34 tests) 3193ms
+ ✓ src/cli/interactive/picker/settings/session.test.ts  (28 tests) 3208ms
+ ✓ src/core/tools/grepRipgrep.test.ts  (18 tests) 3911ms
+ ✓ src/cli/interactive/picker/thinking.test.ts  (36 tests) 1746ms
+ ✓ src/advisor/runtime.test.ts  (9 tests) 2672ms
+ ✓ src/language/client.test.ts  (21 tests) 2804ms
+ ✓ src/cli/interactive/picker/model/recovery.test.ts  (41 tests) 3106ms
+Warning: Config project maxTurns: trust-not-established; value ignored.
+ ✓ src/session/store/catalog/index.test.ts  (36 tests) 3031ms
+Resumed session sess_84361f463684453f_1793958466303
+Resumed session sess_7c2af41599f3706e_1793958466405 with migrated project root /tmp/cheers-bootstrap-S07jkX/session-root-rebind-18w0KZ -> /tmp/cheers-bootstrap-S07jkX/session-root-rebind-18w0KZ/nested/entry
+Resumed session sess_956c33bfed4942c0_1793958466549 with migrated project root /tmp/cheers-bootstrap-OZlYFu/project-a-migrate-l1zrGs -> /tmp/cheers-bootstrap-OZlYFu/project-b-migrate-qrc0W2
+Resumed session sess_b6e902340386f940_1793958467450
+Current session pointer sess_febf53e88f061b61_1793958467976 could not be resumed for /tmp/cheers-bootstrap-O8uhi3/project-stale-current-7V5YYP; starting a fresh session.
+Resumed session sess_31e6f3d864d8d707_1793958468221
+ ✓ src/core/shell/bootstrap.test.ts  (28 tests) 2938ms
+ ✓ src/core/commands/slashCommandsModern.test.ts  (11 tests) 2586ms
+ ✓ src/core/tools/grepStream.test.ts  (14 tests) 2673ms
+ ✓ src/cli/collaboration/command.test.ts  (9 tests) 2424ms
+ ✓ src/core/mcp/http.test.ts  (9 tests) 2475ms
+ ✓ src/cli/interactive/slashSuggestions.test.ts  (41 tests) 2186ms
+ ✓ src/runtime/execution/media/pdf.test.ts  (11 tests) 1919ms
+ ✓ src/core/mcp/content.test.ts  (16 tests) 2474ms
+ ✓ src/core/commands/slashRouter.test.ts  (49 tests) 2520ms
+ ✓ src/session/store/lockStaleness.test.ts  (15 tests) 2259ms
+ ✓ src/workflow/git/read/read.test.ts  (3 tests) 2617ms
+ ✓ src/workflow/git/operation/remote.test.ts  (2 tests) 2449ms
+ ✓ src/extensions/runtime/registration.test.ts  (8 tests) 2222ms
+ ✓ src/core/tools/glob.test.ts  (19 tests) 2205ms
+ ✓ src/cli/print/grep.test.ts  (1 test) 1892ms
+ ✓ src/core/auth/account/replay.test.ts  (11 tests) 1596ms
+ ✓ src/browser/sessionManager.integration.test.ts  (9 tests) 1586ms
+ ✓ src/cli/interactive/picker/model/activation.test.ts  (23 tests) 2321ms
+ ✓ src/cli/interactive/picker/model/role.test.ts  (46 tests) 1978ms
+ ✓ src/edit/recovery/undo/service.test.ts  (16 tests) 1874ms
+ ✓ src/collaboration/service.test.ts  (16 tests) 1354ms
+ ✓ src/cli/interactive/picker/tree/lifetime.test.ts  (6 tests) 1790ms
+ ✓ src/edit/patch/batch.test.ts  (45 tests) 1765ms
+ ✓ src/session/continuation/retention.test.ts  (17 tests) 1508ms
+ ✓ src/cli/interactive/picker/model/publication.test.ts  (19 tests) 2458ms
+ ✓ src/core/commands/newCommands.test.ts  (16 tests) 1859ms
+ ✓ src/config/concurrency.test.ts  (3 tests) 1485ms
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > preserves neutral already_blocked_once through terminal consumers
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.completed_unproven","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":1,"stop_hook_active":true,"reasonCode":"already_blocked_once","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_5f9a5e73dcfd898e_1793958504986","initialPrompt":"fixture","notes":["steps: 2"],"handoffs":[]},"finalOutput":"Candidate 2","stopReason":"already_blocked_once"}},"steps":2,"eventSequence":[{"type":"query.started","sessionId":"sess_5f9a5e73dcfd898e_1793958504986","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"block","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"not_proven","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"blocked","reasonCode":"actionable_gap","terminal":false},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":1,"stop_hook_active":true,"sequence":6,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"repairing","reasonCode":"hook_blocked","terminal":false},{"type":"query.retrying","role":"coder","turn":1,"attempt":1,"reason":"Stop check blocked completion; attempting repair (1/1)."},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":1,"stop_hook_active":true,"sequence":7,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"model_answer","step":2,"status":"answered","messageIdentity":"30ab336ee952f64676a76eeaa8bbe3ada2f284b3ede3290c4b6a777c8d2e1af8"},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":1,"stop_hook_active":true,"sequence":8,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":1,"stop_hook_active":true,"sequence":9,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"allow","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["unspecified"],"durationMs":3,"stopDisposition":"completed_unproven"}},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":1,"stop_hook_active":true,"sequence":10,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"not_reported","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":1,"stop_hook_active":true,"sequence":11,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"completed_unproven","reasonCode":"already_blocked_once","terminal":true},{"type":"query.completed_unproven","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":1,"stop_hook_active":true,"reasonCode":"already_blocked_once","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_5f9a5e73dcfd898e_1793958504986","initialPrompt":"fixture","notes":["steps: 2"],"handoffs":[]},"finalOutput":"Candidate 2","stopReason":"already_blocked_once"}}],"projections":{"session":{"status":"completed_unproven","durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"already_blocked_once"},"recovery":{"durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"already_blocked_once"},"continuity":{"classification":"completed_unproven","reasonCode":"already_blocked_once"},"cli":["Candidate 2","Result","- Outcome: completed_unproven","- Detail: already_blocked_once","","\nExecution summary","- Provider retries: 1",""],"sinkInterrupted":false,"settlement":["completed_unproven"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":18,"kind":"query.completed_unproven","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_26c77d47","sourceEntryId":"turn_a5e701e9","event":{"type":"query.started","sessionId":"sess_5f9a5e73dcfd898e_1793958504986","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.028Z"},{"type":"query-event","id":"qevt_7fcfc40d","sourceEntryId":"turn_4102dd1d","event":{"type":"query.retrying","role":"coder","turn":1,"attempt":1,"reason":"Stop check blocked completion; attempting repair (1/1)."},"timestamp":"2026-11-06T09:48:25.064Z"},{"type":"query-event","id":"qevt_25df1978","sourceEntryId":"turn_cb3d794d","event":{"type":"query.completed_unproven","attemptId":"0c601607-7a36-4f60-bfb4-f4cb6948f764","reentryCount":1,"stop_hook_active":true,"reasonCode":"already_blocked_once","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_5f9a5e73dcfd898e_1793958504986","initialPrompt":"fixture","notes":["steps: 2"],"handoffs":[]},"finalOutput":"Candidate 2","stopReason":"already_blocked_once"}},"timestamp":"2026-11-06T09:48:25.094Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > preserves neutral not_configured through terminal consumers
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.completed_unproven","attemptId":"502797de-20cb-4e80-b8db-1cf1e96a6be9","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_11ec454b020a65a4_1793958505205","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_11ec454b020a65a4_1793958505205","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"502797de-20cb-4e80-b8db-1cf1e96a6be9","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"502797de-20cb-4e80-b8db-1cf1e96a6be9","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"502797de-20cb-4e80-b8db-1cf1e96a6be9","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"allow","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"],"durationMs":3,"stopDisposition":"completed_unproven"}},{"type":"lifecycle.record","attemptId":"502797de-20cb-4e80-b8db-1cf1e96a6be9","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"not_reported","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"502797de-20cb-4e80-b8db-1cf1e96a6be9","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"completed_unproven","reasonCode":"not_configured","terminal":true},{"type":"query.completed_unproven","attemptId":"502797de-20cb-4e80-b8db-1cf1e96a6be9","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_11ec454b020a65a4_1793958505205","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}}],"projections":{"session":{"status":"completed_unproven","durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"not_configured"},"recovery":{"durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"not_configured"},"continuity":{"classification":"completed_unproven","reasonCode":"not_configured"},"cli":["Candidate 1","Result","- Outcome: completed_unproven","- Detail: not_configured",""],"sinkInterrupted":false,"settlement":["completed_unproven"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.completed_unproven","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_8a21f992","sourceEntryId":"turn_175dbca3","event":{"type":"query.started","sessionId":"sess_11ec454b020a65a4_1793958505205","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.225Z"},{"type":"query-event","id":"qevt_038b5e0b","sourceEntryId":"turn_1d18aea1","event":{"type":"query.completed_unproven","attemptId":"502797de-20cb-4e80-b8db-1cf1e96a6be9","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_11ec454b020a65a4_1793958505205","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}},"timestamp":"2026-11-06T09:48:25.253Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > keeps already_blocked_once with unknown proof failed
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (already_blocked_once)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_545a7688d6abd213_1793958505323","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"57456fd8-301f-4bd7-97f6-35694b48f886","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"57456fd8-301f-4bd7-97f6-35694b48f886","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"57456fd8-301f-4bd7-97f6-35694b48f886","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"already_blocked_once","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"already_blocked_once","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":3}},{"type":"lifecycle.record","attemptId":"57456fd8-301f-4bd7-97f6-35694b48f886","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"already_blocked_once","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"57456fd8-301f-4bd7-97f6-35694b48f886","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"already_blocked_once","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"already_blocked_once","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (already_blocked_once)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_51da3b59","sourceEntryId":"turn_cec9a530","event":{"type":"query.started","sessionId":"sess_545a7688d6abd213_1793958505323","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.347Z"},{"type":"query-event","id":"qevt_440b24b5","sourceEntryId":"turn_f34893d9","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (already_blocked_once)."},"timestamp":"2026-11-06T09:48:25.373Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > keeps not_configured with unknown proof failed
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (not_configured)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_4a9a777b2da84ea3_1793958505391","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"b235678a-6ba5-42d5-9f3d-e51a7695965e","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"b235678a-6ba5-42d5-9f3d-e51a7695965e","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"b235678a-6ba5-42d5-9f3d-e51a7695965e","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"not_configured","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":3}},{"type":"lifecycle.record","attemptId":"b235678a-6ba5-42d5-9f3d-e51a7695965e","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"b235678a-6ba5-42d5-9f3d-e51a7695965e","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"not_configured","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (not_configured)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_78eebc9a","sourceEntryId":"turn_a858dc0d","event":{"type":"query.started","sessionId":"sess_4a9a777b2da84ea3_1793958505391","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.411Z"},{"type":"query-event","id":"qevt_cbaaf1ce","sourceEntryId":"turn_1ad10113","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (not_configured)."},"timestamp":"2026-11-06T09:48:25.441Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails could_not_judge from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (could_not_judge)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_e871f09892941c9f_1793958505457","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"9fe14d7b-8018-4842-8f84-ccd30eb97efe","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"9fe14d7b-8018-4842-8f84-ccd30eb97efe","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"9fe14d7b-8018-4842-8f84-ccd30eb97efe","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"could_not_judge","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"could_not_judge","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":3}},{"type":"lifecycle.record","attemptId":"9fe14d7b-8018-4842-8f84-ccd30eb97efe","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"could_not_judge","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"9fe14d7b-8018-4842-8f84-ccd30eb97efe","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"could_not_judge","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"could_not_judge","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (could_not_judge)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_d12673f3","sourceEntryId":"turn_acca0127","event":{"type":"query.started","sessionId":"sess_e871f09892941c9f_1793958505457","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.476Z"},{"type":"query-event","id":"qevt_49dea545","sourceEntryId":"turn_35e41dc0","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (could_not_judge)."},"timestamp":"2026-11-06T09:48:25.500Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails could_not_decide from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (could_not_decide)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_b3c8c5ad9e22cb34_1793958505522","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"a993978a-794d-4090-947e-db1dfee00071","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"a993978a-794d-4090-947e-db1dfee00071","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"a993978a-794d-4090-947e-db1dfee00071","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"could_not_decide","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"could_not_decide","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"a993978a-794d-4090-947e-db1dfee00071","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"could_not_decide","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"a993978a-794d-4090-947e-db1dfee00071","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"could_not_decide","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"could_not_decide","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (could_not_decide)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_42e200c1","sourceEntryId":"turn_815dd641","event":{"type":"query.started","sessionId":"sess_b3c8c5ad9e22cb34_1793958505522","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.542Z"},{"type":"query-event","id":"qevt_32a23739","sourceEntryId":"turn_23d30aa7","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (could_not_decide)."},"timestamp":"2026-11-06T09:48:25.572Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails invalid_output from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (invalid_output)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_0e5a7e0649a439a2_1793958505588","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"b55c0eb6-d1cd-4709-810e-8e5c61603b55","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"b55c0eb6-d1cd-4709-810e-8e5c61603b55","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"b55c0eb6-d1cd-4709-810e-8e5c61603b55","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"b55c0eb6-d1cd-4709-810e-8e5c61603b55","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"b55c0eb6-d1cd-4709-810e-8e5c61603b55","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"invalid_output","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (invalid_output)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_11c0b465","sourceEntryId":"turn_6ab2f899","event":{"type":"query.started","sessionId":"sess_0e5a7e0649a439a2_1793958505588","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.606Z"},{"type":"query-event","id":"qevt_a7a09c90","sourceEntryId":"turn_14b9b013","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (invalid_output)."},"timestamp":"2026-11-06T09:48:25.635Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails invalid_output from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (invalid_output)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_15c6f43d7c7a4112_1793958505650","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"d879f950-bcda-4b06-8d7e-533b4e53dd72","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"d879f950-bcda-4b06-8d7e-533b4e53dd72","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"d879f950-bcda-4b06-8d7e-533b4e53dd72","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"d879f950-bcda-4b06-8d7e-533b4e53dd72","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"d879f950-bcda-4b06-8d7e-533b4e53dd72","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"invalid_output","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (invalid_output)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_6d86a752","sourceEntryId":"turn_e115d28b","event":{"type":"query.started","sessionId":"sess_15c6f43d7c7a4112_1793958505650","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.673Z"},{"type":"query-event","id":"qevt_b9ee5d08","sourceEntryId":"turn_d1214a2a","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (invalid_output)."},"timestamp":"2026-11-06T09:48:25.705Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails invalid_output from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (invalid_output)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_0f91c53c96821163_1793958505724","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"ab600280-2b0e-401f-8b6b-86720d186010","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"ab600280-2b0e-401f-8b6b-86720d186010","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"ab600280-2b0e-401f-8b6b-86720d186010","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"ab600280-2b0e-401f-8b6b-86720d186010","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"ab600280-2b0e-401f-8b6b-86720d186010","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"invalid_output","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (invalid_output)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_4c551c34","sourceEntryId":"turn_adadbcc8","event":{"type":"query.started","sessionId":"sess_0f91c53c96821163_1793958505724","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.744Z"},{"type":"query-event","id":"qevt_31d5c249","sourceEntryId":"turn_aa1f7060","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (invalid_output)."},"timestamp":"2026-11-06T09:48:25.779Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails incompatible_contract from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (incompatible_contract)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_dd6b8f8789bab136_1793958505795","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"d482f501-63cd-4598-b1ed-2015d5f2d605","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"d482f501-63cd-4598-b1ed-2015d5f2d605","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"d482f501-63cd-4598-b1ed-2015d5f2d605","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"incompatible_contract","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"incompatible_contract","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":3}},{"type":"lifecycle.record","attemptId":"d482f501-63cd-4598-b1ed-2015d5f2d605","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"incompatible_contract","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"d482f501-63cd-4598-b1ed-2015d5f2d605","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"incompatible_contract","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"incompatible_contract","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (incompatible_contract)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_32b43653","sourceEntryId":"turn_1535bbe1","event":{"type":"query.started","sessionId":"sess_dd6b8f8789bab136_1793958505795","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.821Z"},{"type":"query-event","id":"qevt_59df7564","sourceEntryId":"turn_203dd712","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (incompatible_contract)."},"timestamp":"2026-11-06T09:48:25.846Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails incompatible_contract from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (incompatible_contract)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_f72d11597c88780b_1793958505867","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"a0f7126a-d94b-4a33-84ef-b412a58cdb86","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"a0f7126a-d94b-4a33-84ef-b412a58cdb86","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"a0f7126a-d94b-4a33-84ef-b412a58cdb86","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"incompatible_contract","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"incompatible_contract","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"a0f7126a-d94b-4a33-84ef-b412a58cdb86","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"incompatible_contract","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"a0f7126a-d94b-4a33-84ef-b412a58cdb86","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"incompatible_contract","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"incompatible_contract","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (incompatible_contract)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_4fb6193e","sourceEntryId":"turn_6461ce8a","event":{"type":"query.started","sessionId":"sess_f72d11597c88780b_1793958505867","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.884Z"},{"type":"query-event","id":"qevt_031b263e","sourceEntryId":"turn_3013b2cd","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (incompatible_contract)."},"timestamp":"2026-11-06T09:48:25.910Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails conflicting_verdict from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_9ccc7bac1709cef4_1793958505926","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"e94cf73f-1570-4e2d-8446-ddf08a6c393c","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"e94cf73f-1570-4e2d-8446-ddf08a6c393c","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"e94cf73f-1570-4e2d-8446-ddf08a6c393c","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"not_proven","evidenceIdentity":["proof:fixture"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"conflicting_verdict","proofVerdict":"not_proven","evidenceIdentity":["proof:fixture"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"e94cf73f-1570-4e2d-8446-ddf08a6c393c","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"not_proven","evidenceIdentity":["proof:fixture"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"not_proven","evidenceIdentity":["proof:fixture"]},{"type":"lifecycle.record","attemptId":"e94cf73f-1570-4e2d-8446-ddf08a6c393c","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"not_proven","evidenceIdentity":["proof:fixture"]}]},"kind":"stop_state","state":"unknown","reasonCode":"conflicting_verdict","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_3d59e36e","sourceEntryId":"turn_59a975c1","event":{"type":"query.started","sessionId":"sess_9ccc7bac1709cef4_1793958505926","prompt":"fixture"},"timestamp":"2026-11-06T09:48:25.955Z"},{"type":"query-event","id":"qevt_bc8d8c97","sourceEntryId":"turn_f14bebb5","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."},"timestamp":"2026-11-06T09:48:25.989Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails conflicting_verdict from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_76e30db9002fc185_1793958506004","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"1b720816-e41e-4005-88a5-07f99d0e6c90","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"1b720816-e41e-4005-88a5-07f99d0e6c90","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"1b720816-e41e-4005-88a5-07f99d0e6c90","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"proven","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"conflicting_verdict","proofVerdict":"proven","evidenceIdentity":["unspecified"],"durationMs":3}},{"type":"lifecycle.record","attemptId":"1b720816-e41e-4005-88a5-07f99d0e6c90","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"proven","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"proven","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"1b720816-e41e-4005-88a5-07f99d0e6c90","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"proven","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"conflicting_verdict","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_a7c3cc4d","sourceEntryId":"turn_c9b6e3e6","event":{"type":"query.started","sessionId":"sess_76e30db9002fc185_1793958506004","prompt":"fixture"},"timestamp":"2026-11-06T09:48:26.026Z"},{"type":"query-event","id":"qevt_acfdcdd5","sourceEntryId":"turn_3b8aef1c","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."},"timestamp":"2026-11-06T09:48:26.049Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails conflicting_verdict from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_6a642fa034eab61f_1793958506067","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"977cc504-a25b-4f81-b88f-7d6875ad7361","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"977cc504-a25b-4f81-b88f-7d6875ad7361","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"977cc504-a25b-4f81-b88f-7d6875ad7361","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"proven","evidenceIdentity":["proof:fixture"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"conflicting_verdict","proofVerdict":"proven","evidenceIdentity":["proof:fixture"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"977cc504-a25b-4f81-b88f-7d6875ad7361","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"proven","evidenceIdentity":["proof:fixture"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"proven","evidenceIdentity":["proof:fixture"]},{"type":"lifecycle.record","attemptId":"977cc504-a25b-4f81-b88f-7d6875ad7361","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"proven","evidenceIdentity":["proof:fixture"]}]},"kind":"stop_state","state":"unknown","reasonCode":"conflicting_verdict","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_7ccef544","sourceEntryId":"turn_85967504","event":{"type":"query.started","sessionId":"sess_6a642fa034eab61f_1793958506067","prompt":"fixture"},"timestamp":"2026-11-06T09:48:26.087Z"},{"type":"query-event","id":"qevt_f0e22251","sourceEntryId":"turn_f4458f5c","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."},"timestamp":"2026-11-06T09:48:26.117Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails conflicting_verdict from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_033327bbf85f95a2_1793958506144","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"94753fb4-4d6c-4e8f-93fb-eee4cf4c04b8","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"94753fb4-4d6c-4e8f-93fb-eee4cf4c04b8","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"94753fb4-4d6c-4e8f-93fb-eee4cf4c04b8","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"conflicting_verdict","proofVerdict":"not_reported","evidenceIdentity":["unspecified"],"durationMs":3}},{"type":"lifecycle.record","attemptId":"94753fb4-4d6c-4e8f-93fb-eee4cf4c04b8","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"not_reported","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"94753fb4-4d6c-4e8f-93fb-eee4cf4c04b8","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"conflicting_verdict","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"conflicting_verdict","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_ebeefeb7","sourceEntryId":"turn_af4abed5","event":{"type":"query.started","sessionId":"sess_033327bbf85f95a2_1793958506144","prompt":"fixture"},"timestamp":"2026-11-06T09:48:26.162Z"},{"type":"query-event","id":"qevt_eb3b4000","sourceEntryId":"turn_234a8746","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (conflicting_verdict)."},"timestamp":"2026-11-06T09:48:26.185Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > fails internal_error from malformed, incompatible or uncertain envelopes
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (internal_error)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_5c7461bc5cd78ce9_1793958506199","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"cb7b8cdc-4d38-4aac-9f8d-03038b1d2dc8","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"cb7b8cdc-4d38-4aac-9f8d-03038b1d2dc8","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"cb7b8cdc-4d38-4aac-9f8d-03038b1d2dc8","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"internal_error","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"unknown","reasonCode":"internal_error","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":3}},{"type":"lifecycle.record","attemptId":"cb7b8cdc-4d38-4aac-9f8d-03038b1d2dc8","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"internal_error","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"cb7b8cdc-4d38-4aac-9f8d-03038b1d2dc8","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"internal_error","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"internal_error","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (internal_error)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_958f7225","sourceEntryId":"turn_36227b60","event":{"type":"query.started","sessionId":"sess_5c7461bc5cd78ce9_1793958506199","prompt":"fixture"},"timestamp":"2026-11-06T09:48:26.218Z"},{"type":"query-event","id":"qevt_1171a81a","sourceEntryId":"turn_d484c615","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (internal_error)."},"timestamp":"2026-11-06T09:48:26.242Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > accepts the compatible proven positive control and defaults evidence identity
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.completed","result":{"status":"completed","terminalClassification":"success","terminalReason":"completed","transcript":[],"sharedContext":{"sessionId":"sess_25e089a9871daf37_1793958506259","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1"}},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_25e089a9871daf37_1793958506259","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"bc9ba606-92ca-4a93-a38f-81d56d4de11e","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"bc9ba606-92ca-4a93-a38f-81d56d4de11e","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"bc9ba606-92ca-4a93-a38f-81d56d4de11e","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"proven","proofVerdict":"proven","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"allow","reasonCode":"proven","proofVerdict":"proven","evidenceIdentity":["unspecified"],"durationMs":3}},{"type":"lifecycle.record","attemptId":"bc9ba606-92ca-4a93-a38f-81d56d4de11e","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"proven","proofVerdict":"proven","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"proven","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"bc9ba606-92ca-4a93-a38f-81d56d4de11e","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"proven","proofVerdict":"proven","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"accepted","reasonCode":"explicit_allow","terminal":true},{"type":"query.completed","result":{"status":"completed","terminalClassification":"success","terminalReason":"completed","transcript":[],"sharedContext":{"sessionId":"sess_25e089a9871daf37_1793958506259","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1"}}],"projections":{"session":{"status":"completed","durableStatus":"success","classification":"success"},"recovery":{"durableStatus":"success","classification":"success"},"continuity":{"classification":"success"},"cli":["Candidate 1","Result","- Outcome: success","- Detail: completed",""],"sinkInterrupted":false,"settlement":["completed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.completed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_8be74140","sourceEntryId":"turn_d6c7b901","event":{"type":"query.started","sessionId":"sess_25e089a9871daf37_1793958506259","prompt":"fixture"},"timestamp":"2026-11-06T09:48:26.276Z"},{"type":"query-event","id":"qevt_06d4c52e","sourceEntryId":"turn_852b83f2","event":{"type":"query.completed","result":{"status":"completed","terminalClassification":"success","terminalReason":"completed","transcript":[],"sharedContext":{"sessionId":"sess_25e089a9871daf37_1793958506259","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1"}},"timestamp":"2026-11-06T09:48:26.298Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > replaces stale terminal facts at compaction and excludes neutral facts from another branch
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.completed_unproven","attemptId":"de16ded8-b349-42ba-b67f-fa802b443ebc","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_696ae800cee06a6d_1793958506323","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_696ae800cee06a6d_1793958506323","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"de16ded8-b349-42ba-b67f-fa802b443ebc","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"de16ded8-b349-42ba-b67f-fa802b443ebc","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"de16ded8-b349-42ba-b67f-fa802b443ebc","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"allow","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"],"durationMs":3,"stopDisposition":"completed_unproven"}},{"type":"lifecycle.record","attemptId":"de16ded8-b349-42ba-b67f-fa802b443ebc","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"not_reported","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"de16ded8-b349-42ba-b67f-fa802b443ebc","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"completed_unproven","reasonCode":"not_configured","terminal":true},{"type":"query.completed_unproven","attemptId":"de16ded8-b349-42ba-b67f-fa802b443ebc","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_696ae800cee06a6d_1793958506323","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}}],"projections":{"session":{"status":"completed_unproven","durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"not_configured"},"recovery":{"durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"not_configured"},"continuity":{"classification":"completed_unproven","reasonCode":"not_configured"},"cli":["Candidate 1","Result","- Outcome: completed_unproven","- Detail: not_configured",""],"sinkInterrupted":false,"settlement":["completed_unproven"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.completed_unproven","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_1e5ebce7","sourceEntryId":"turn_65a4122e","event":{"type":"query.started","sessionId":"sess_696ae800cee06a6d_1793958506323","prompt":"fixture"},"timestamp":"2026-11-06T09:48:26.342Z"},{"type":"query-event","id":"qevt_4e7d9d17","sourceEntryId":"turn_0e99b59d","event":{"type":"query.completed_unproven","attemptId":"de16ded8-b349-42ba-b67f-fa802b443ebc","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_696ae800cee06a6d_1793958506323","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}},"timestamp":"2026-11-06T09:48:26.368Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > consumes the same command block then re-entry yield without a fresh proof
+{"probe":"command-reentry","command":"'/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/normproof/dist/adapters/cli/normproof.js' gate stop --emit-result","realNormProof":true}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > consumes the same command block then re-entry yield without a fresh proof
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.completed_unproven","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":1,"stop_hook_active":true,"reasonCode":"already_blocked_once","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_d4fd33f319adca33_1793958506384","initialPrompt":"fixture","notes":["steps: 2"],"handoffs":[]},"finalOutput":"Candidate 2","stopReason":"already_blocked_once"}},"steps":2,"eventSequence":[{"type":"query.started","sessionId":"sess_d4fd33f319adca33_1793958506384","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]}]},"kind":"hook_result","result":{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","decision":"block","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"],"durationMs":313}},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]}]},"kind":"proof_verdict","command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","verdict":"not_proven","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]}]},"kind":"stop_state","state":"blocked","reasonCode":"actionable_gap","terminal":false},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":1,"stop_hook_active":true,"sequence":6,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]}]},"kind":"stop_state","state":"repairing","reasonCode":"hook_blocked","terminal":false},{"type":"query.retrying","role":"coder","turn":1,"attempt":1,"reason":"Stop check blocked completion; attempting repair (1/1)."},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":1,"stop_hook_active":true,"sequence":7,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]}]},"kind":"model_answer","step":2,"status":"answered","messageIdentity":"30ab336ee952f64676a76eeaa8bbe3ada2f284b3ede3290c4b6a777c8d2e1af8"},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":1,"stop_hook_active":true,"sequence":8,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]}]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":1,"stop_hook_active":true,"sequence":9,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]}]},"kind":"hook_result","result":{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","decision":"allow","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"],"durationMs":304,"stopDisposition":"completed_unproven"}},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":1,"stop_hook_active":true,"sequence":10,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]}]},"kind":"proof_verdict","command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","verdict":"not_reported","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]},{"type":"lifecycle.record","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":1,"stop_hook_active":true,"sequence":11,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["adapter_sources","agent_invariants","core_filesystem_references","core_sources","engine_closures","guard_tests","product_direction","run_metadata","runtime_adapter_references","runtime_sources","source_module_functions","source_module_graph","structure_ownership","task","task_manifest"]}]},"kind":"stop_state","state":"completed_unproven","reasonCode":"already_blocked_once","terminal":true},{"type":"query.completed_unproven","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":1,"stop_hook_active":true,"reasonCode":"already_blocked_once","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_d4fd33f319adca33_1793958506384","initialPrompt":"fixture","notes":["steps: 2"],"handoffs":[]},"finalOutput":"Candidate 2","stopReason":"already_blocked_once"}}],"projections":{"session":{"status":"completed_unproven","durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"already_blocked_once"},"recovery":{"durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"already_blocked_once"},"continuity":{"classification":"completed_unproven","reasonCode":"already_blocked_once"},"cli":["Candidate 2","Result","- Outcome: completed_unproven","- Detail: already_blocked_once","","\nExecution summary","- Provider retries: 1",""],"sinkInterrupted":false,"settlement":["completed_unproven"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":18,"kind":"query.completed_unproven","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_773569a5","sourceEntryId":"turn_f441e687","event":{"type":"query.started","sessionId":"sess_d4fd33f319adca33_1793958506384","prompt":"fixture"},"timestamp":"2026-11-06T09:48:26.404Z"},{"type":"query-event","id":"qevt_ac0d0926","sourceEntryId":"turn_69100bd9","event":{"type":"query.retrying","role":"coder","turn":1,"attempt":1,"reason":"Stop check blocked completion; attempting repair (1/1)."},"timestamp":"2026-11-06T09:48:26.744Z"},{"type":"query-event","id":"qevt_e7006422","sourceEntryId":"turn_5bc25299","event":{"type":"query.completed_unproven","attemptId":"a1519ec9-05a0-4b24-a368-7c1b9a3f58cd","reentryCount":1,"stop_hook_active":true,"reasonCode":"already_blocked_once","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_d4fd33f319adca33_1793958506384","initialPrompt":"fixture","notes":["steps: 2"],"handoffs":[]},"finalOutput":"Candidate 2","stopReason":"already_blocked_once"}},"timestamp":"2026-11-06T09:48:27.071Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > keeps the old gate stop command without --emit-result unknown
+{"probe":"legacy-command","command":"'/home/wang/.nvm/versions/node/v24.15.0/bin/node' '/home/wang/projects/normproof/dist/adapters/cli/normproof.js' gate stop","realNormProof":true}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > keeps the old gate stop command without --emit-result unknown
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (empty_output)."},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_6db44a6d32ab63ad_1793958507089","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"7dfba63d-5022-4516-b062-bcae6b40379d","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"7dfba63d-5022-4516-b062-bcae6b40379d","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"7dfba63d-5022-4516-b062-bcae6b40379d","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"0e355e2464f506b9cdd9ebc811b9d9efbe5f534881b04b6cdb090bf5e28553f1","reasonCode":"empty_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"0e355e2464f506b9cdd9ebc811b9d9efbe5f534881b04b6cdb090bf5e28553f1","decision":"unknown","reasonCode":"empty_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"],"durationMs":283}},{"type":"lifecycle.record","attemptId":"7dfba63d-5022-4516-b062-bcae6b40379d","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"0e355e2464f506b9cdd9ebc811b9d9efbe5f534881b04b6cdb090bf5e28553f1","reasonCode":"empty_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"0e355e2464f506b9cdd9ebc811b9d9efbe5f534881b04b6cdb090bf5e28553f1","verdict":"unknown","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"7dfba63d-5022-4516-b062-bcae6b40379d","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"0e355e2464f506b9cdd9ebc811b9d9efbe5f534881b04b6cdb090bf5e28553f1","reasonCode":"empty_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"empty_output","terminal":true},{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (empty_output)."}],"projections":{"session":{"status":"error","durableStatus":"stopped","classification":"stopped"},"recovery":{"durableStatus":"error","classification":"error"},"continuity":{"classification":"error"},"cli":[],"sinkInterrupted":true,"settlement":["failed"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.failed","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_dd9d01e3","sourceEntryId":"turn_0de44861","event":{"type":"query.started","sessionId":"sess_6db44a6d32ab63ad_1793958507089","prompt":"fixture"},"timestamp":"2026-11-06T09:48:27.110Z"},{"type":"query-event","id":"qevt_b47a10c5","sourceEntryId":"turn_86e8937e","event":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (empty_output)."},"timestamp":"2026-11-06T09:48:27.420Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > keeps the old gate stop command without --emit-result unknown
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.completed_unproven","attemptId":"7baab098-5c31-4df4-aed0-5d4abc395d58","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_b4f93e8024fd3608_1793958507434","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_b4f93e8024fd3608_1793958507434","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"7baab098-5c31-4df4-aed0-5d4abc395d58","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"7baab098-5c31-4df4-aed0-5d4abc395d58","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"7baab098-5c31-4df4-aed0-5d4abc395d58","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","decision":"allow","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"],"durationMs":278,"stopDisposition":"completed_unproven"}},{"type":"lifecycle.record","attemptId":"7baab098-5c31-4df4-aed0-5d4abc395d58","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","verdict":"not_reported","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"7baab098-5c31-4df4-aed0-5d4abc395d58","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"016997e0c24216f6d71e12583bc5c58ee527a8a8955bba238440f3c17694fc88","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"completed_unproven","reasonCode":"not_configured","terminal":true},{"type":"query.completed_unproven","attemptId":"7baab098-5c31-4df4-aed0-5d4abc395d58","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_b4f93e8024fd3608_1793958507434","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}}],"projections":{"session":{"status":"completed_unproven","durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"not_configured"},"recovery":{"durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"not_configured"},"continuity":{"classification":"completed_unproven","reasonCode":"not_configured"},"cli":["Candidate 1","Result","- Outcome: completed_unproven","- Detail: not_configured",""],"sinkInterrupted":false,"settlement":["completed_unproven"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.completed_unproven","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_ff6b0618","sourceEntryId":"turn_ddbf34f2","event":{"type":"query.started","sessionId":"sess_b4f93e8024fd3608_1793958507434","prompt":"fixture"},"timestamp":"2026-11-06T09:48:27.458Z"},{"type":"query-event","id":"qevt_f4b74dd4","sourceEntryId":"turn_f4c31b74","event":{"type":"query.completed_unproven","attemptId":"7baab098-5c31-4df4-aed0-5d4abc395d58","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_b4f93e8024fd3608_1793958507434","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}},"timestamp":"2026-11-06T09:48:27.760Z"}]}}
+
+ ✓ src/turn/stop.envelope.test.ts  (21 tests) 2791ms
+ ✓ src/cli/interactive/picker/model/admission.test.ts  (44 tests) 1085ms
+ ✓ src/workflow/jobs/local/journal.test.ts  (19 tests) 1633ms
+ ✓ src/cli/interactive/completion/sources.test.ts  (9 tests) 1703ms
+ ✓ src/cli/interactive/picker/tools/lifetime.test.ts  (5 tests) 1486ms
+ ✓ src/security/service.test.ts  (13 tests | 1 skipped) 1561ms
+(node:5828) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/core/tools/backgroundTools.test.ts  (14 tests) 1710ms
+ ✓ src/cli/runtime/mcp.test.ts  (17 tests) 1840ms
+ ✓ src/cli/print/research.test.ts  (1 test) 1680ms
+ ✓ src/language/tool.test.ts  (17 tests) 1506ms
+ ✓ src/cli/interactive/picker/skills/lifetime.test.ts  (8 tests) 1633ms
+ ✓ src/core/shell/close.test.ts  (12 tests) 1544ms
+ ✓ src/cli/provider/policy.test.ts  (8 tests) 1782ms
+Synthetic reply: Public synthetic fixtureSynthetic reply: Public synthetic fixture ✓ src/cli/interactive/permissionScope.test.ts  (12 tests) 1523ms
+ ✓ src/session/lifecycle/management.test.ts  (39 tests) 1552ms
+ ✓ src/runtime/execution/local.process.test.ts  (6 tests) 1596ms
+ ✓ src/cli/media/live.test.ts  (9 tests) 1472ms
+ ✓ src/presentation/tui/clipboardImage.test.ts  (2 tests) 1144ms
+ ✓ src/config/persistence.test.ts  (33 tests) 1512ms
+ ✓ src/provider/request/client.native.test.ts  (1 test) 1485ms
+ ✓ src/research/run/runtime.test.ts  (12 tests) 1503ms
+ ✓ src/cli/jobs/command.test.ts  (6 tests) 1346ms
+ ✓ src/cli/interactive/picker/restore/selection.test.ts  (14 tests) 1227ms
+ ✓ src/turn/workspace/approval.test.ts  (32 tests) 1774ms
+ ✓ src/runtime/execution/view/absence.test.ts  (11 tests) 1592ms
+ ✓ src/core/mcp/management.test.ts  (9 tests) 1277ms
+ ✓ src/cli/interactive/lineLoopGoal.test.ts  (2 tests) 1305ms
+ ✓ src/core/tools/grepPaths.test.ts  (12 tests) 1299ms
+ ✓ src/core/skills/skillCatalog.test.ts  (11 tests) 1268ms
+ ✓ src/entrypoints/cliRuntimeInvocation.test.ts  (28 tests) 1369ms
+ ✓ src/core/shell/background/settlement.test.ts  (4 tests) 1262ms
+ ✓ src/core/tools/shell/promotion.test.ts  (4 tests) 1185ms
+ ✓ src/core/commands/composition.test.ts  (43 tests) 1097ms
+ ✓ src/session/store/recovery.test.ts  (7 tests) 1232ms
+ ✓ src/edit/recovery/operation/read.test.ts  (9 tests) 1053ms
+ ✓ src/core/auth/account/google.test.ts  (17 tests) 1279ms
+ ✓ src/provider/request/client.test.ts  (9 tests) 1193ms
+ ✓ src/presentation/tui/transcript/markdown.test.ts  (59 tests) 943ms
+ ✓ src/cli/interactive/picker/session/lifetime.test.ts  (8 tests) 1101ms
+ ✓ src/cli/interactive/interactiveCommandRouter.test.ts  (39 tests) 1134ms
+ ✓ src/cli/interactive/completion/sessionWatch.test.ts  (6 tests) 1091ms
+ ✓ src/cli/media/record.test.ts  (8 tests) 1085ms
+ ✓ src/planning/goal/budget.test.ts  (15 tests) 1056ms
+ ✓ src/workflow/gitContext.test.ts  (4 tests) 1012ms
+ ✓ src/cli/interactive/picker/model/key.test.ts  (9 tests) 1629ms
+ ✓ src/cli/interactive/picker/rewind/lifetime.test.ts  (3 tests) 1136ms
+ ✓ src/cli/ssh/command.test.ts  (11 tests) 1073ms
+ ✓ src/workflow/jobs/agent/service.test.ts  (8 tests) 1075ms
+ ✓ src/edit/recovery/undo/command.test.ts  (7 tests) 1057ms
+ ✓ src/config/profiles/import/runtime.test.ts  (23 tests) 955ms
+ ✓ src/core/tools/readBudget.test.ts  (7 tests) 1102ms
+ ✓ src/runtime/execution/view/tracked.test.ts  (6 tests) 1108ms
+ ✓ src/core/shell/continueShellActionRuntime.test.ts  (9 tests) 1054ms
+ ✓ src/cli/provider/step.test.ts  (14 tests) 1092ms
+ ✓ src/core/auth/oauth/subscription.test.ts  (40 tests) 1031ms
+ ✓ src/core/commands/modelCommandRuntime.test.ts  (35 tests) 1000ms
+ ✓ src/core/auth/oauth/deviceCode.test.ts  (15 tests) 1014ms
+ ✓ src/cli/interactive/settings.test.ts  (45 tests) 1037ms
+ ✓ src/config/constraints.test.ts  (35 tests) 865ms
+ ✓ src/cli/interactive/picker/usage.test.ts  (11 tests) 1040ms
+ ✓ src/runtime/execution/ignoreSyntax.test.ts  (14 tests) 1159ms
+ ✓ src/cli/interactive/picker/model/focus.test.ts  (20 tests) 955ms
+ ✓ src/core/commands/model/presetCommand.test.ts  (11 tests) 993ms
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > nested deny prevents the actual native write
+{"probe":"nested-deny-native-write","targetExists":false,"result":"Blocked by Hook: fixture rule"}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > flat deny prevents the actual native write
+{"probe":"flat-deny-native-write","targetExists":false,"result":"Blocked by Hook: fixture rule"}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > malformed blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"malformed","result":{"decision":"block","reason":"The write hook could not be evaluated (invalid_output).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"invalid_output"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > timeout blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"timeout","result":{"decision":"block","reason":"The write hook could not be evaluated (timeout).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"timeout"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > version blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"version","result":{"decision":"block","reason":"The write hook could not be evaluated (version_mismatch).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"version_mismatch"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > empty blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"empty","result":{"decision":"block","reason":"The write hook could not be evaluated (empty_output).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"empty_output"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > nonzero blocks with an unknown code and no payload or stack in reason or diagnostics
+{"probe":"nonzero","result":{"decision":"block","reason":"The write hook could not be evaluated (process_failed).","hookVerdict":{"status":"unknown","source":"adapter","reasonCode":"process_failed"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > loads canonical configuration, binds trust identity and sends complete metadata
+{"probe":"unsupported","toolName":"apply_patch","result":{"decision":"unsupported","reason":"A patch may contain multiple targets, while content rules apply per file; patch normalization is not implemented.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"patch_targets"}}}
+{"probe":"unsupported","toolName":"bash","result":{"decision":"unsupported","reason":"Shell commands do not describe their final per-file content.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"shell_effects"}}}
+{"probe":"unsupported","toolName":"mcp__write","result":{"decision":"unsupported","reason":"This tool (including MCP tools) has no declared single-file content semantics.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"tool_semantics"}}}
+{"probe":"unsupported","toolName":"browser","result":{"decision":"unsupported","reason":"Browser and desktop actions are not single-file content operations.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"external_effects"}}}
+{"probe":"unsupported","toolName":"MultiEdit","result":{"decision":"unsupported","reason":"Multiple edits have no verified single-file replacement projection.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"multiple_edits"}}}
+{"probe":"unsupported","toolName":"NotebookEdit","result":{"decision":"unsupported","reason":"Notebook cell operations are not full file replacement content.","hookVerdict":{"status":"unsupported","source":"adapter","reasonCode":"notebook_cells"}}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > runs the pinned artifact for write to allow and block without changing ordinary permission
+{"probe":"pinned-artifact","node":"v24.15.0","toolName":"write","allowed":{"decision":"allow","hookVerdict":{"status":"allow","source":"hook","reasonCode":"no_violation"}},"blocked":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- no-import: imports private/x.ts\n  Keep private imports out.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/core/hooks/translation.integration.test.ts > write hook through the native tool gate > runs the pinned artifact for edit to allow and block without changing ordinary permission
+{"probe":"pinned-artifact","node":"v24.15.0","toolName":"edit","allowed":{"decision":"allow","hookVerdict":{"status":"allow","source":"hook","reasonCode":"no_violation"}},"blocked":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- no-import: imports private/x.ts\n  Keep private imports out.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+ ✓ src/core/hooks/translation.integration.test.ts  (15 tests) 1145ms
+ ✓ src/research/run/composition.test.ts  (18 tests) 910ms
+ ✓ src/session/store/measurement.test.ts  (24 tests) 963ms
+ ✓ src/core/subagents/discovery.test.ts  (2 tests) 777ms
+ ✓ src/cli/interactive/picker/pickers.test.ts  (50 tests) 859ms
+ ✓ src/core/commands/syntax/commands.test.ts  (41 tests) 869ms
+ ✓ src/core/shell/sessionAdmission.test.ts  (22 tests) 736ms
+ ✓ src/cli/interactive/picker/auth.test.ts  (21 tests) 613ms
+ ✓ src/core/tools/taskWorkspace.test.ts  (10 tests) 849ms
+ ✓ src/session/compaction/state.test.ts  (8 tests) 790ms
+ ✓ src/core/mcp/snapshot.test.ts  (11 tests) 829ms
+ ✓ src/cli/runtime/renewal.test.ts  (12 tests) 1301ms
+ ✓ src/cli/interactive/picker/model/current.test.ts  (11 tests) 799ms
+ ✓ src/observability/crashLog.test.ts  (22 tests) 765ms
+ ✓ src/cli/interactive/completion/stores.test.ts  (3 tests) 863ms
+ ✓ src/runtime/execution/service.test.ts  (8 tests) 830ms
+ ✓ src/core/commands/model/policy.test.ts  (10 tests) 1019ms
+ ✓ src/cli/interactive/lifetime.test.ts  (8 tests) 978ms
+ ✓ src/test-utils/browser/runtime/adapter/scenarios.test.ts  (10 tests) 913ms
+ ✓ src/runtime/execution/fileWalk.test.ts  (11 tests) 804ms
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > uses handler timeoutMs=80 from hooks.json with isolated trust and measured execution
+{"probe":"hooks-json-timeout","configuration":{"hooks":{"Stop":[{"hooks":[{"command":"sleep 0.35; printf '%s' '{\"decision\":\"allow\",\"reasonCode\":\"proven\",\"proofVerdict\":\"proven\"}'","timeoutMs":80}]}]}},"elapsedMs":102,"approvalCalls":1,"decision":"unknown","reasonCode":"timeout"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > uses handler timeoutMs=1200 from hooks.json with isolated trust and measured execution
+{"probe":"hooks-json-timeout","configuration":{"hooks":{"Stop":[{"hooks":[{"command":"sleep 0.35; printf '%s' '{\"decision\":\"allow\",\"reasonCode\":\"proven\",\"proofVerdict\":\"proven\"}'","timeoutMs":1200}]}]}},"elapsedMs":374,"approvalCalls":1,"decision":"allow","reasonCode":"explicit_allow"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process nonzero
+{"probe":"nonzero","decision":"unknown","reasonCode":"process_failed"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process empty
+{"probe":"empty","decision":"unknown","reasonCode":"empty_output"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process malformed
+{"probe":"malformed","decision":"unknown","reasonCode":"invalid_output"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process unknown
+{"probe":"unknown","decision":"unknown","reasonCode":"unknown"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process wire-unknown
+{"probe":"wire-unknown","decision":"unknown","reasonCode":"could_not_judge"}
+
+stdout | src/core/hooks/stop/dispatch.test.ts > Stop command boundary > classifies actual process exit-2
+{"probe":"exit-2","decision":"block","reasonCode":"exit_2"}
+
+ ✓ src/core/hooks/stop/dispatch.test.ts  (22 tests) 776ms
+ ✓ src/cli/mcp/definition.test.ts  (15 tests) 762ms
+ ✓ src/cli/interactive/externalEditor.test.ts  (21 tests) 724ms
+ ✓ src/core/subagents/management.test.ts  (8 tests) 789ms
+ ✓ src/cli/provider/renewal.test.ts  (7 tests) 846ms
+ ✓ src/session/continuation/snapshot.test.ts  (42 tests) 701ms
+ ✓ src/cli/interactive/firstFrame.test.ts  (24 tests) 749ms
+ ✓ src/cli/workspace/command.test.ts  (7 tests) 726ms
+ ✓ src/browser/smoke/request.test.ts  (23 tests) 713ms
+ ✓ src/core/tools/webTransport.test.ts  (4 tests) 705ms
+ ✓ src/session/recovery/selection.test.ts  (10 tests) 672ms
+ ✓ src/cli/interactive/completion/themes.test.ts  (4 tests) 696ms
+ ✓ src/core/commands/configuration.test.ts  (25 tests) 670ms
+ ✓ src/entrypoints/approvalExecution.test.ts  (6 tests) 644ms
+ ✓ src/cli/interactive/attention.test.ts  (14 tests) 779ms
+ ✓ src/cli/interactive/picker/settings/lifecycle.test.ts  (20 tests) 819ms
+ ✓ src/turn/workspace.test.ts  (9 tests) 688ms
+ ✓ src/cli/interactive/picker/theme.test.ts  (7 tests) 666ms
+ ✓ src/core/tools/bashResult.test.ts  (2 tests) 633ms
+ ✓ src/memory/store/concurrency.test.ts  (1 test) 525ms
+ ✓ src/security/findings/store.test.ts  (3 tests) 599ms
+ ✓ src/advisor/apply.test.ts  (11 tests) 563ms
+ ✓ src/cli/interactive/completion/skills.test.ts  (2 tests) 568ms
+ ✓ src/entrypoints/slashCommandRegistry.test.ts  (14 tests) 602ms
+ ✓ src/session/store/catalog/list.test.ts  (8 tests) 594ms
+ ✓ src/research/sources/papers.test.ts  (3 tests) 601ms
+ ✓ src/cli/runtime/compaction.test.ts  (42 tests) 595ms
+ ✓ src/entrypoints/renewal.test.ts  (8 tests) 488ms
+ ✓ src/session/compaction/generation.test.ts  (11 tests) 505ms
+ ✓ src/planning/plan/plan.test.ts  (10 tests) 475ms
+ ✓ src/edit/recovery/restore/read.test.ts  (21 tests) 575ms
+ ✓ src/session/recovery/branch.test.ts  (17 tests) 526ms
+stdout | src/entrypoints/writeHook.test.ts > normal turn uses the shared declared translation with real artifact output
+{"probe":"normal turn","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/entrypoints/writeHook.test.ts > native prepared uses the shared declared translation with real artifact output
+{"probe":"native prepared","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/entrypoints/writeHook.test.ts > native security uses the shared declared translation with real artifact output
+{"probe":"native security","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reasonCode":"violation","reason":"NormProof write gate: this write violates a declared rule.\n\nPath: target.txt\n\n- protected: path is inside a denied boundary\n  Choose an allowed file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."}}
+
+stdout | src/entrypoints/writeHook.test.ts > native Git uses the shared declared translation with real artifact output
+{"probe":"native Git","hookApprovalCalls":1,"effects":0,"decision":{"decision":"block","reason":"native shell policy"}}
+
+ ✓ src/entrypoints/writeHook.test.ts  (4 tests) 545ms
+ ✓ src/config/validation.test.ts  (34 tests) 740ms
+ ✓ src/core/hooks/trust.test.ts  (21 tests) 603ms
+ ✓ src/advisor/checkpoint.test.ts  (7 tests) 614ms
+ ✓ src/observability/metrics.test.ts  (11 tests) 526ms
+ ✓ src/test-utils/browser/runtime/scenarios.test.ts  (2 tests) 592ms
+ ✓ src/core/mcp/gateway.test.ts  (28 tests) 574ms
+ ✓ src/test-utils/browser/replay/persistent.test.ts  (6 tests) 541ms
+ ✓ src/cli/runtime/security.test.ts  (21 tests) 602ms
+ ✓ src/cli/provider/compaction.test.ts  (22 tests) 518ms
+ ✓ src/memory/store/health.test.ts  (7 tests) 557ms
+ ✓ src/core/tools/readImprovements.test.ts  (19 tests) 483ms
+ ✓ src/cli/interactive/completion/request.test.ts  (30 tests) 454ms
+ ✓ src/core/commands/commitCommandRuntime.test.ts  (1 test) 508ms
+ ✓ src/cli/interactive/picker/settings/source.test.ts  (10 tests) 684ms
+ ✓ src/presentation/themes/watch.test.ts  (9 tests) 451ms
+ ✓ src/runtime/execution/ignore/git.test.ts  (8 tests) 574ms
+ ✓ src/cli/interactive/picker/rewind.test.ts  (31 tests) 628ms
+ ✓ src/session/model/state.test.ts  (26 tests) 525ms
+ ✓ src/turn/session.test.ts  (50 tests) 435ms
+ ✓ src/core/commands/themeCommandRuntime.test.ts  (6 tests) 453ms
+ ✓ src/research/report/save.test.ts  (3 tests) 502ms
+ ✓ src/session/store/catalog/browse.test.ts  (23 tests) 495ms
+ ✓ src/core/auth/account/pool.test.ts  (35 tests) 318ms
+ ✓ src/cli/runtime/security/refresh.test.ts  (4 tests) 490ms
+ ✓ src/edit/recovery/operation/restore.test.ts  (8 tests) 437ms
+ ✓ src/core/tools/highValueTools.test.ts  (26 tests) 491ms
+ ✓ src/research/run/resume.test.ts  (3 tests) 476ms
+ ✓ src/runtime/execution/local.handle.test.ts  (4 tests) 444ms
+ ✓ src/cli/interactive/picker/navigation.test.ts  (22 tests) 452ms
+ ✓ src/config/syntax.test.ts  (29 tests) 391ms
+ ✓ src/cli/provider/identity.test.ts  (5 tests) 417ms
+ ✓ src/cli/interactive/completion/prose.test.ts  (70 tests) 439ms
+ ✓ src/research/brief/input.test.ts  (5 tests) 476ms
+ ✓ src/cli/provider/target.test.ts  (19 tests) 446ms
+ ✓ src/core/tools/arguments.test.ts  (29 tests) 499ms
+ ✓ src/config/documents.test.ts  (32 tests) 428ms
+ ✓ src/turn/step.test.ts  (100 tests) 413ms
+ ✓ src/cli/interactive/completion/watch.test.ts  (2 tests) 414ms
+ ✓ src/core/shell/sessionRuntime.test.ts  (50 tests) 429ms
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > withholds completed during block and resumes exactly once with feedback and stable identity
+{"probe":"block-repair-allow","attempts":2,"reentries":1,"completed":1,"terminal":{"type":"lifecycle.record","attemptId":"a86b8eec-dc21-45c2-bfe4-9e387803b91c","reentryCount":1,"stop_hook_active":true,"sequence":11,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"proven","proofVerdict":"proven","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"accepted","reasonCode":"explicit_allow","terminal":true},"finalEvent":{"type":"query.completed","result":{"status":"completed","terminalClassification":"success","terminalReason":"completed","transcript":[],"sharedContext":{"sessionId":"stop-fixture","initialPrompt":"repair","notes":["steps: 2"],"handoffs":[]},"finalOutput":"Repaired"}}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=false
+{"probe":"same-fingerprint","attempts":2,"reentries":1,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"f91c79be-147e-4f35-a37d-2a4f40d8224f","reentryCount":1,"stop_hook_active":true,"sequence":12,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"repeated_block","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"blocked","error":"Stop check blocked (repeated_block)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > stops a second block despite dynamic reason text, changed identity=true
+{"probe":"different-block-limit","attempts":2,"reentries":1,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"747ee95f-7fa1-4b57-b11e-bf8de171f1a4","reentryCount":1,"stop_hook_active":true,"sequence":12,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:c"]}]},"kind":"stop_state","state":"blocked","reasonCode":"reentry_limit","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"blocked","error":"Stop check blocked (reentry_limit)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade unknown to completed
+{"probe":"unknown","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"d36df1f4-0d1d-4b56-bbb8-5cc4af660982","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"unknown","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"unknown","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (unknown)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade could_not_decide to completed
+{"probe":"could_not_decide","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"e0a01751-f75f-494d-a60e-5e5fd282ddf2","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"could_not_decide","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"could_not_decide","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (could_not_decide)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade could_not_judge to completed
+{"probe":"could_not_judge","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"90668d94-5681-4847-a8ee-b8c58db37ad5","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"could_not_judge","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"could_not_judge","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (could_not_judge)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade invalid_output to completed
+{"probe":"invalid_output","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"9a3b12f5-f834-49a3-8b60-a6bf14e7fd18","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"invalid_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"invalid_output","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (invalid_output)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade empty_output to completed
+{"probe":"empty_output","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"796af48e-6a70-4cf2-9463-5ff240baf03c","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"empty_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"empty_output","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (empty_output)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade process_failed to completed
+{"probe":"process_failed","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"aefcc327-09d8-4fd7-9013-44ade5c907f8","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"process_failed","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"process_failed","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (process_failed)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not upgrade unsupported to completed
+{"probe":"unsupported","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"67d585c4-5b1f-41df-802b-dd8a33a5762f","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"unsupported","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"unsupported","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (unsupported)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > settles already_blocked_once without proof, completed or failure
+{"probe":"already_blocked_once","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"1fa9174f-b557-410a-a1b8-5235ed133faa","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"completed_unproven","reasonCode":"already_blocked_once","terminal":true},"finalEvent":{"type":"query.completed_unproven","attemptId":"1fa9174f-b557-410a-a1b8-5235ed133faa","reentryCount":0,"stop_hook_active":false,"reasonCode":"already_blocked_once","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"stop-fixture","initialPrompt":"repair","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate answer","stopReason":"already_blocked_once"}}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > settles not_configured without proof, completed or failure
+{"probe":"not_configured","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"89ed3545-b267-4d0e-9d92-063dce26c943","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"completed_unproven","reasonCode":"not_configured","terminal":true},"finalEvent":{"type":"query.completed_unproven","attemptId":"89ed3545-b267-4d0e-9d92-063dce26c943","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"stop-fixture","initialPrompt":"repair","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate answer","stopReason":"not_configured"}}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > keeps timeout and handler failure unknown
+{"probe":"timeout","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"1d74d317-3f39-41fb-ad3d-4a9446655a22","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"759e8ade59ec78efaa8dd06dcdc232af6cef3d6c099e5d33dc1f532b8cc61d18","reasonCode":"timeout","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"timeout","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (timeout)."}}
+{"probe":"handler_failed","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"82e706fe-89ae-4c3d-b4fa-7d7a3d502a23","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"759e8ade59ec78efaa8dd06dcdc232af6cef3d6c099e5d33dc1f532b8cc61d18","reasonCode":"handler_failed","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"handler_failed","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (handler_failed)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not complete after real command nonzero
+{"probe":"command-nonzero","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"3b15cc23-3c2f-472b-8013-c03c39adf13c","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"1a21be8bb1dc4721d30cc1850ead617faa55ae9aebf416da4369668bdeaf0824","reasonCode":"process_failed","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"process_failed","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (process_failed)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not complete after real command timeout
+{"probe":"command-timeout","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"797cb7f5-9c1f-4d8d-834d-5aff8e567d34","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"3906086191bf13c41da5550a6cfe1f55a0021462dafb65e1d123ce0a0b71db4f","reasonCode":"timeout","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"timeout","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (timeout)."}}
+
+stdout | src/turn/stop.test.ts > Stop completion lifecycle > does not complete after real command empty
+{"probe":"command-empty","attempts":1,"reentries":0,"completed":0,"terminal":{"type":"lifecycle.record","attemptId":"9b0da94c-ec1b-4401-b400-6d03e3a9732d","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b","reasonCode":"empty_output","proofVerdict":"unknown","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"unknown","reasonCode":"empty_output","terminal":true},"finalEvent":{"type":"query.failed","stopStatus":"unknown","error":"Stop check unknown (empty_output)."}}
+
+stdout | src/turn/stop.test.ts > persists five distinct kinds through the real shell and manager, then accepts another user turn
+PERSISTED_STOP_RECORDS=[{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"hook_result","result":{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","decision":"block","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"],"durationMs":5}},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"proof_verdict","command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","verdict":"refuted","evidenceIdentity":["unit:a","unit:b"]},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"open_obligations","terminal":false},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":6,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"repairing","reasonCode":"hook_blocked","terminal":false},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":7,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"model_answer","step":2,"status":"answered","messageIdentity":"802bf6996f666b73d8a21d81aa5572bcd8d4d65b4a50169b751f2f593270aa17"},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":8,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"permission","toolName":"bash","taskId":"repair-call","status":"requested"},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":9,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"permission","toolName":"bash","taskId":"repair-call","status":"approved"},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":10,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"execution","toolName":"bash","taskId":"repair-call","status":"reported_success"},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":11,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"model_answer","step":3,"status":"answered","messageIdentity":"f7d050f669149f98a3d09ea951ecfb6194a6a4bc90b10365617380694b5b9826"},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":12,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":13,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"hook_result","result":{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","decision":"block","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"],"durationMs":3}},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":14,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"proof_verdict","command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","verdict":"refuted","evidenceIdentity":["unit:a","unit:b"]},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":15,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"open_obligations","terminal":false},{"type":"lifecycle.record","attemptId":"53094fc4-3178-4e14-8f43-d3e11e5e3432","reentryCount":1,"stop_hook_active":true,"sequence":16,"progressFingerprint":{"version":1,"checks":[{"command":"f5f76a0493bead75f35796c72ae5d310ca56065a118defb23924fe25bfaaf622","reasonCode":"open_obligations","proofVerdict":"refuted","evidenceIdentity":["unit:a","unit:b"]}]},"kind":"stop_state","state":"blocked","reasonCode":"repeated_block","terminal":true}]
+
+ ✓ src/turn/stop.test.ts  (23 tests) 452ms
+ ✓ src/config/profiles/export/runtime.test.ts  (19 tests) 550ms
+ ✓ src/browser/skill/execution/executor.test.ts  (3 tests) 392ms
+ ✓ src/core/tools/readImage.test.ts  (3 tests) 396ms
+ ✓ src/runtime/execution/listAccess.test.ts  (10 tests) 414ms
+ ✓ src/core/hooks/lifecycle.test.ts  (12 tests) 338ms
+ ✓ src/presentation/theme/preview.test.ts  (7 tests) 361ms
+ ✓ src/cli/interactive/keymap.test.ts  (80 tests) 278ms
+ ✓ src/runtime/execution/directoryBudget.test.ts  (12 tests) 324ms
+ ✓ src/cli/runtime/goal.test.ts  (4 tests) 379ms
+ ✓ src/cli/interactive/picker/copy/lifetime.test.ts  (4 tests) 326ms
+ ✓ src/test-utils/git.test.ts  (2 tests) 365ms
+ ✓ src/edit/recovery/operation/preview.test.ts  (5 tests) 456ms
+ ✓ src/core/auth/account/lease.test.ts  (25 tests) 348ms
+ ✓ src/cli/bootstrap/cliProcessRunner.test.ts  (7 tests) 371ms
+ ✓ src/context/request/wire.test.ts  (41 tests) 298ms
+ ✓ src/config/inputs/publication.test.ts  (10 tests) 397ms
+ ✓ src/presentation/tui/surface/benchmark.test.ts  (10 tests) 308ms
+ ✓ src/security/inspection.test.ts  (6 tests) 349ms
+ ✓ src/planning/goal/goal.test.ts  (9 tests) 366ms
+ ✓ src/core/commands/navigation/syntax.test.ts  (27 tests) 340ms
+ ✓ src/cli/runtime/rules.test.ts  (3 tests) 368ms
+ ✓ src/cli/interactive/picker/tree.test.ts  (34 tests) 355ms
+ ✓ src/core/commands/model/presetStore.test.ts  (4 tests) 392ms
+ ✓ src/edit/recovery/preview/read.test.ts  (11 tests) 308ms
+ ✓ src/cli/interactive/picker/model/metadata.test.ts  (10 tests) 367ms
+ ✓ src/core/shell/runtimeContext.test.ts  (9 tests) 380ms
+ ✓ src/workflow/jobs/service.test.ts  (9 tests) 377ms
+ ✓ src/session/store/usage.test.ts  (12 tests) 355ms
+ ✓ src/context/request/tokenizer.test.ts  (8 tests) 315ms
+ ✓ src/edit/recovery/undo/turnRestore.test.ts  (8 tests) 297ms
+ ✓ src/session/reentryIndex.test.ts  (12 tests) 369ms
+ ✓ src/test-utils/browser/replay/scenarios.test.ts  (5 tests) 342ms
+ ✓ src/runtime/execution/media/read.test.ts  (8 tests) 369ms
+ ✓ src/browser/runtime/external/runner.test.ts  (4 tests) 342ms
+ ✓ src/core/session/artifactManager.test.ts  (15 tests) 311ms
+ ✓ src/cli/interactive/completion/controller.test.ts  (14 tests) 391ms
+ ✓ src/runtime/execution/page.test.ts  (27 tests) 354ms
+ ✓ src/runtime/execution/conditionalWrite.test.ts  (11 tests) 285ms
+ ✓ src/config/profiles/command.test.ts  (6 tests) 348ms
+ ✓ src/edit/recovery/operation/profile.test.ts  (4 tests) 290ms
+ ✓ src/cli/interactive/overlay.test.ts  (79 tests) 300ms
+ ✓ src/provider/google/auth.test.ts  (15 tests) 250ms
+ ✓ src/cli/interactive/completion/paths.test.ts  (18 tests) 304ms
+ ✓ src/config/inputs/runtime.test.ts  (20 tests) 263ms
+
+
+ ✓ src/cli/interactive/picker/panels.test.ts  (11 tests) 204ms
+]0;cheers — project-alpha — sess_1234567890abcdef[?1049h[?1002h[?1006h[?1006l[?1002l[?1049l ✓ src/cli/interactive/interactiveLoop.test.ts  (7 tests) 252ms
+ ✓ src/edit/recovery/index/read.test.ts  (20 tests) 307ms
+ ✓ src/presentation/themes/trust.test.ts  (16 tests) 307ms
+ ✓ src/test-utils/browser/runtime/capability/scenarios.test.ts  (13 tests) 259ms
+ ✓ src/runtime/execution/read.test.ts  (23 tests) 317ms
+ ✓ src/core/hooks/registration.test.ts  (14 tests) 304ms
+ ✓ src/research/run/reservation.test.ts  (12 tests) 286ms
+ ✓ src/collaboration/client.test.ts  (8 tests) 230ms
+ ✓ src/cli/interactive/picker/tools.test.ts  (20 tests) 248ms
+ ✓ src/session/export/collect.test.ts  (14 tests) 257ms
+ ✓ src/core/tools/searchFailure.test.ts  (15 tests) 248ms
+ ✓ src/cli/runtime/inputStream.goal.test.ts  (2 tests) 249ms
+ ✓ src/core/commands/exportCommandRuntime.test.ts  (21 tests) 281ms
+ ✓ src/runtime/execution/ignoreQueries.test.ts  (12 tests) 302ms
+ ✓ src/research/run/policy.test.ts  (4 tests) 263ms
+ ✓ src/test-utils/scenarios/scenarios.test.ts  (4 tests) 267ms
+ ✓ src/browser/tool/features.test.ts  (8 tests) 293ms
+ ✓ src/runtime/execution/view/condition.test.ts  (2 tests) 260ms
+ ✓ src/turn/subagent.test.ts  (22 tests) 254ms
+ ✓ src/browser/runtime/process.test.ts  (6 tests) 254ms
+ ✓ src/turn/media.test.ts  (8 tests) 238ms
+ ✓ src/core/commands/loopCommandRuntime.test.ts  (9 tests) 221ms
+ ✓ src/core/commands/reportCommand.test.ts  (14 tests) 256ms
+ ✓ src/entrypoints/cliArgs.test.ts  (61 tests) 237ms
+ ✓ src/presentation/theme/theme.test.ts  (19 tests) 252ms
+ ✓ src/edit/recovery/catalog/read.test.ts  (22 tests) 247ms
+ ✓ src/config/runtimeConfig.test.ts  (37 tests) 307ms
+ ✓ src/core/skills/observation.test.ts  (10 tests) 253ms
+ ✓ src/core/tools/taskTool.test.ts  (9 tests) 256ms
+ ✓ src/cli/interactive/completion/memory.test.ts  (16 tests) 222ms
+ ✓ src/cli/interactive/completion/navigation.test.ts  (28 tests) 225ms
+ ✓ src/cli/bootstrap/profile/handoff.test.ts  (7 tests) 238ms
+ ✓ src/research/run/preparation.test.ts  (9 tests) 218ms
+ ✓ src/core/commands/report/window.test.ts  (4 tests) 229ms
+ ✓ src/core/commands/costCommand.test.ts  (26 tests) 245ms
+ ✓ src/cli/runtime/cliRuntimeInvocationBridge.test.ts  (4 tests) 218ms
+ ✓ src/core/commands/tools/report.test.ts  (14 tests) 185ms
+ ✓ src/presentation/tui/surface/view.test.ts  (54 tests) 224ms
+ ✓ src/session/store/atomic.test.ts  (4 tests) 237ms
+ ✓ src/cli/interactive/completion/references.test.ts  (14 tests) 274ms
+ ✓ src/presentation/tui/composer/geometry.test.ts  (8 tests) 221ms
+ ✓ src/core/tools/grep.test.ts  (3 tests) 219ms
+ ✓ src/runtime/execution/directory.test.ts  (14 tests) 222ms
+ ✓ src/cli/data/access.test.ts  (9 tests) 246ms
+ ✓ src/session/store/threadState.test.ts  (15 tests) 228ms
+ ✓ src/context/request/loading.test.ts  (1 test) 240ms
+ ✓ src/core/tools/browserUnified.test.ts  (9 tests) 205ms
+ ✓ src/session/compactionOperation.test.ts  (9 tests) 246ms
+ ✓ src/core/security/trust/store.test.ts  (26 tests) 203ms
+ ✓ src/core/tools/readCleanup.test.ts  (16 tests) 191ms
+ ✓ src/observability/metrics/report.test.ts  (2 tests) 201ms
+ ✓ src/cli/bootstrap/profile.test.ts  (11 tests) 230ms
+ ✓ src/core/commands/entriesCommand.test.ts  (8 tests) 212ms
+ ✓ src/turn/stepStream.test.ts  (3 tests) 206ms
+ ✓ src/cli/bootstrap/profile/invocation.test.ts  (1 test) 207ms
+ ✓ src/config/profiles/import/scope.test.ts  (4 tests) 195ms
+(node:5828) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/sandbox/process.test.ts  (2 tests) 185ms
+ ✓ src/core/commands/model/providerDefault.test.ts  (4 tests) 290ms
+ ✓ src/session/store/catalog/projection.test.ts  (5 tests) 198ms
+ ✓ src/session/branch/create.test.ts  (5 tests) 235ms
+ ✓ src/config/trust.test.ts  (14 tests) 202ms
+ ✓ src/config/inputs/model.test.ts  (3 tests) 267ms
+ ✓ src/test-utils/browser/cache/persistence.test.ts  (7 tests) 222ms
+ ✓ src/research/review/validation.test.ts  (3 tests) 183ms
+ ✓ src/browser/controlledNetworkExecutor.test.ts  (7 tests) 191ms
+ ✓ src/core/subagents/memory.test.ts  (5 tests) 214ms
+ ✓ src/extensions/storage.test.ts  (28 tests) 184ms
+ ✓ src/advisor/store.test.ts  (3 tests) 193ms
+ ✓ src/core/paths/profile/storage.test.ts  (9 tests) 185ms
+ ✓ src/cli/interactive/picker/plugins.test.ts  (9 tests) 143ms
+ ✓ src/core/commands/context/report.test.ts  (28 tests) 159ms
+ ✓ src/cli/interactive/picker/copy.test.ts  (13 tests) 178ms
+ ✓ src/core/commands/syntax/preferences.test.ts  (17 tests) 235ms
+ ✓ src/core/commands/syntax/entity.test.ts  (5 tests) 179ms
+ ✓ src/cli/interactive/completion/servers.test.ts  (36 tests) 145ms
+ ✓ src/edit/recovery/restoreExecutionBridge.test.ts  (4 tests) 184ms
+ ✓ src/core/commands/nonInteractive.test.ts  (11 tests) 154ms
+ ✓ src/core/commands/syntax/connect.test.ts  (15 tests) 172ms
+ ✓ src/entrypoints/cliCommandExecutionBridge.test.ts  (16 tests) 155ms
+ ✓ src/core/commands/syntax/empty.test.ts  (17 tests) 183ms
+ ✓ src/config/project.test.ts  (10 tests) 159ms
+ ✓ src/core/commands/reloadCommandRuntime.test.ts  (9 tests) 167ms
+ ✓ src/core/commands/pluginsAndMarketplace.test.ts  (9 tests) 156ms
+ ✓ src/research/evidence/validation.test.ts  (6 tests) 173ms
+ ✓ src/session/continuation/observation.test.ts  (5 tests) 150ms
+ ✓ src/core/auth/oauth/flow.test.ts  (37 tests) 184ms
+ ✓ src/runtime/execution/walk/budget.test.ts  (24 tests) 162ms
+ ✓ src/presentation/themes/index.test.ts  (16 tests) 183ms
+ ✓ src/session/reports/persistence.test.ts  (5 tests) 189ms
+ ✓ src/browser/runtime/external/executor.test.ts  (3 tests) 182ms
+ ✓ src/presentation/themes/presets.test.ts  (7 tests) 148ms
+ ✓ src/cli/interactive/sessionFacts.test.ts  (29 tests) 118ms
+ ✓ src/entrypoints/cliRuntimeModule.test.ts  (5 tests) 161ms
+ ✓ src/edit/recovery/restoreCommandRunner.test.ts  (4 tests) 121ms
+ ✓ src/test-utils/browser/execution/sandbox.test.ts  (4 tests) 118ms
+ ✓ src/test-utils/browser/execution/local.test.ts  (3 tests) 136ms
+ ✓ src/provider/endpoints/responses/stream.test.ts  (69 tests) 151ms
+ ✓ src/core/paths/profile/sources.test.ts  (14 tests) 121ms
+ ✓ src/cli/interactive/lineLoop.test.ts  (31 tests) 147ms
+ ✓ src/core/models/catalogSurface.test.ts  (40 tests) 131ms
+ ✓ src/session/transcript/source.test.ts  (8 tests) 135ms
+ ✓ src/config/publication.test.ts  (12 tests) 154ms
+ ✓ src/core/commands/browserCommandRuntime.test.ts  (5 tests) 137ms
+ ✓ src/cli/interactive/overlay/wheel.test.ts  (12 tests) 129ms
+ ✓ src/cli/interactive/completion/grants.test.ts  (9 tests) 156ms
+ ✓ src/cli/interactive/picker/skills.test.ts  (30 tests) 129ms
+ ✓ src/core/commands/subscriptionReachability.test.ts  (5 tests) 131ms
+ ✓ src/cli/interactive/overlay/hover.test.ts  (16 tests) 137ms
+ ✓ src/config/scope/resolution.test.ts  (8 tests) 138ms
+ ✓ src/core/security/trust/command.test.ts  (10 tests) 128ms
+ ✓ src/session/transcript/projection.test.ts  (5 tests) 124ms
+ ✓ src/entrypoints/cliDoctor.test.ts  (3 tests) 154ms
+ ✓ src/core/network/connection.test.ts  (13 tests) 128ms
+ ✓ src/core/mcp/http/bearer.test.ts  (11 tests) 132ms
+ ✓ src/context/request/projection.test.ts  (11 tests) 165ms
+ ✓ src/edit/recovery/restorePrimitive.test.ts  (5 tests) 143ms
+ ✓ src/core/commands/help/report.test.ts  (5 tests) 99ms
+ ✓ src/cli/collaboration/export.test.ts  (3 tests) 114ms
+ ✓ src/core/commands/btwCommandRuntime.test.ts  (18 tests) 115ms
+ ✓ src/cli/interactive/completion/catalog.test.ts  (3 tests) 126ms
+ ✓ src/core/commands/model/serviceTier.test.ts  (9 tests) 85ms
+ ✓ src/config/scope/admission.test.ts  (5 tests) 96ms
+ ✓ src/cli/provider/admission.test.ts  (2 tests) 104ms
+ ✓ src/config/account.test.ts  (15 tests) 112ms
+ ✓ src/core/research/collector.test.ts  (9 tests) 117ms
+ ✓ src/core/subagents/task/preview.test.ts  (9 tests) 81ms
+ ✓ src/turn/subagentWorkspace.test.ts  (1 test) 107ms
+ ✓ src/browser/receipt/profile.test.ts  (7 tests) 120ms
+ ✓ src/runtime/execution/writeAccess.test.ts  (12 tests) 107ms
+ ✓ src/cli/interactive/picker/rewind/source.test.ts  (11 tests) 126ms
+ ✓ src/cli/interactive/picker/rewind/boundary.test.ts  (7 tests) 89ms
+ ✓ src/browser/receipt/lifecycle.test.ts  (15 tests) 131ms
+ ✓ src/core/auth/oauth/lifetime.test.ts  (25 tests) 107ms
+ ✓ src/cli/interactive/model.test.ts  (1 test) 130ms
+ ✓ src/turn/tools.test.ts  (54 tests) 114ms
+ ✓ src/cli/data/links.test.ts  (4 tests) 81ms
+ ✓ src/session/context/preview.test.ts  (5 tests) 112ms
+ ✓ src/core/tools/lsp.test.ts  (13 tests) 109ms
+ ✓ src/cli/runtime/context/injection.test.ts  (11 tests) 117ms
+ ✓ src/cli/data/transfer.test.ts  (2 tests) 100ms
+ ✓ src/test-utils/browser/scenarios.test.ts  (3 tests) 130ms
+ ✓ src/core/commands/skillful.test.ts  (5 tests) 105ms
+ ✓ src/cli/runtime/settings.test.ts  (2 tests) 105ms
+ ✓ src/session/compaction/progress.test.ts  (18 tests) 109ms
+ ✓ src/config/provenance.test.ts  (12 tests) 110ms
+ ✓ src/security/analysis/sarif.test.ts  (4 tests) 105ms
+ ✓ src/presentation/tui/composer/shapes.test.ts  (15 tests) 118ms
+ ✓ src/session/store/catalog/files.test.ts  (17 tests) 88ms
+ ✓ src/browser/receipt/observation.test.ts  (15 tests) 148ms
+ ✓ src/core/commands/reportObservability.test.ts  (2 tests) 101ms
+ ✓ src/test-utils/browser/healing/scenarios.test.ts  (11 tests) 105ms
+ ✓ src/turn/protocol.test.ts  (23 tests) 67ms
+ ✓ src/cli/interactive/startup.test.ts  (24 tests) 88ms
+ ✓ src/core/mcp/client.test.ts  (8 tests) 90ms
+ ✓ src/cli/interactive/completion/connections.test.ts  (20 tests) 104ms
+ ✓ src/test-utils/browser/healing/manifest.test.ts  (10 tests) 83ms
+ ✓ src/cli/interactive/picker/settings.test.ts  (49 tests) 112ms
+ ✓ src/presentation/tui/chrome/panel.test.ts  (14 tests) 72ms
+ ✓ src/desktop/tool.test.ts  (7 tests) 86ms
+ ✓ src/edit/recovery/recoveryAuthorityIndex.test.ts  (5 tests) 71ms
+ ✓ src/cli/runtime/cache.test.ts  (6 tests) 84ms
+ ✓ src/cli/interactive/completion.test.ts  (14 tests) 99ms
+ ✓ src/test-utils/browser/healing/apply.test.ts  (11 tests) 78ms
+ ✓ src/test-utils/browser/replay/repair.test.ts  (9 tests) 86ms
+ ✓ src/cli/output/navigation.test.ts  (2 tests) 86ms
+ ✓ src/entrypoints/approvalAuthority.test.ts  (27 tests) 59ms
+ ✓ src/core/tools/webRequests.test.ts  (44 tests) 78ms
+ ✓ src/core/tools/teamReads.test.ts  (7 tests) 91ms
+ ✓ src/session/context/state.test.ts  (2 tests) 75ms
+ ✓ src/edit/recovery/restorePreview.test.ts  (3 tests) 102ms
+ ✓ src/edit/recovery/recoveryAuthorityStore.test.ts  (5 tests) 75ms
+ ✓ src/browser/runtime/core/cancellation.test.ts  (8 tests) 84ms
+ ✓ src/cli/interactive/history.test.ts  (29 tests) 122ms
+ ✓ src/cli/runtime/sessionCommands.test.ts  (2 tests) 105ms
+ ✓ src/core/models/catalogRefresh.test.ts  (11 tests) 76ms
+ ✓ src/provider/endpoints/googleAccount.test.ts  (5 tests) 80ms
+ ✓ src/cli/interactive/picker/cleanse.test.ts  (12 tests) 71ms
+ ✓ src/core/mcp/transportHonesty.test.ts  (6 tests) 80ms
+ ✓ src/runtime/execution/readCleanup.test.ts  (12 tests) 63ms
+(node:5828) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/sandbox/osSandbox.test.ts  (17 tests) 76ms
+ ✓ src/core/tools/ask.test.ts  (21 tests) 75ms
+ ✓ src/core/security/projectTrust.test.ts  (19 tests) 74ms
+ ✓ src/core/workflow/workflow.test.ts  (17 tests) 100ms
+ ✓ src/cli/interactive/completion/models.test.ts  (19 tests) 86ms
+ ✓ src/cli/interactive/completion/mcp.test.ts  (1 test) 71ms
+ ✓ src/browser/receipt/store.test.ts  (5 tests) 69ms
+ ✓ src/core/commands/syntax/ecosystem.test.ts  (4 tests) 74ms
+ ✓ src/cli/interactive/picker/debug.test.ts  (17 tests) 87ms
+ ✓ src/core/commands/debug/report.test.ts  (3 tests) 68ms
+ ✓ src/core/tools/readFreshness.test.ts  (6 tests) 71ms
+ ✓ src/core/commands/model/preset.test.ts  (3 tests) 66ms
+ ✓ src/turn/capture.test.ts  (16 tests) 40ms
+ ✓ src/core/hooks/trust/withdrawal.test.ts  (16 tests) 75ms
+ ✓ src/memory/commands/syntax.test.ts  (32 tests) 63ms
+ ✓ src/context/instructions/projectInstructions.test.ts  (20 tests) 68ms
+ ✓ src/presentation/theme/selection.test.ts  (2 tests) 54ms
+ ✓ src/core/commands/syntax/actions.test.ts  (21 tests) 77ms
+ ✓ src/cli/interactive/picker/session/listing.test.ts  (10 tests) 92ms
+ ✓ src/core/commands/metricsCommand.test.ts  (13 tests) 65ms
+ ✓ src/runtime/execution/view/status.test.ts  (12 tests) 92ms
+ ✓ src/memory/projectMemoryFutureTurnInjection.test.ts  (15 tests) 68ms
+ ✓ src/runtime/execution/writeWorkspace.test.ts  (9 tests) 62ms
+ ✓ src/entrypoints/approvalBinding.test.ts  (27 tests) 59ms
+ ✓ src/core/commands/research/syntax.test.ts  (1 test) 65ms
+ ✓ src/turn/usage.test.ts  (7 tests) 71ms
+ ✓ src/browser/receipt/persistence.test.ts  (8 tests) 64ms
+ ✓ src/context/instructions/importExpansion.test.ts  (19 tests) 60ms
+ ✓ src/core/commands/debugCommandRuntime.test.ts  (18 tests) 60ms
+ ✓ src/provider/request/authorization.test.ts  (15 tests) 64ms
+ ✓ src/smoke.test.ts  (3 tests) 63ms
+ ✓ src/provider/endpoints/bedrockConverse.test.ts  (47 tests) 40ms
+ ✓ src/turn/scope.test.ts  (4 tests) 56ms
+ ✓ src/security/analysis/json.test.ts  (12 tests) 65ms
+ ✓ src/memory/projectMemoryChain.test.ts  (6 tests) 60ms
+ ✓ src/cli/interactive/picker/input.test.ts  (21 tests) 81ms
+ ✓ src/workflow/rules/proposal.test.ts  (6 tests) 48ms
+ ✓ src/config/scope/tools.test.ts  (4 tests) 52ms
+ ✓ src/context/request/sources.test.ts  (7 tests) 50ms
+ ✓ src/planning/goal/guidance/question.test.ts  (2 tests) 52ms
+ ✓ src/core/commands/sidebarOverlay.test.ts  (3 tests) 57ms
+ ✓ src/edit/recovery/read.test.ts  (11 tests) 51ms
+ ✓ src/core/commands/memoryCommandRuntime.test.ts  (13 tests) 76ms
+ ✓ src/config/environment.test.ts  (4 tests) 47ms
+ ✓ src/core/prompts/templateLoader.test.ts  (21 tests) 55ms
+ ✓ src/presentation/theme/syntax.test.ts  (29 tests) 50ms
+ ✓ src/core/prompts/request.test.ts  (5 tests) 52ms
+ ✓ src/cli/runtime/shutdown.test.ts  (11 tests) 49ms
+ ✓ src/core/commands/browserAuthOnboarding.test.ts  (1 test) 23ms
+ ✓ src/cli/interactive/pointer.test.ts  (70 tests) 49ms
+ ✓ src/browser/receipt/compaction.test.ts  (4 tests) 29ms
+ ✓ src/session/history/import.test.ts  (2 tests) 54ms
+ ✓ src/core/memory/memory.test.ts  (10 tests) 49ms
+ ✓ src/browser/executionCommandRunner.test.ts  (13 tests) 43ms
+ ✓ src/cli/interactive/completion/state.test.ts  (1 test) 45ms
+ ✓ src/session/store/files.test.ts  (8 tests) 48ms
+ ✓ src/session/transcript/sessionTranscript.test.ts  (22 tests) 43ms
+ ✓ src/presentation/tui/render/mainScreen.test.ts  (28 tests) 71ms
+ ✓ src/cli/interactive/picker/input/reader.test.ts  (3 tests) 48ms
+ ✓ src/observability/logs/retention.test.ts  (16 tests) 71ms
+ ✓ src/browser/receipt/validation.test.ts  (27 tests) 40ms
+ ✓ src/context/startup/startupWarmContextHealth.test.ts  (15 tests) 34ms
+ ✓ src/provider/endpoints/openaiCompatible.test.ts  (38 tests) 42ms
+ ✓ src/memory/commands/maintenance.test.ts  (5 tests) 45ms
+ ✓ src/core/commands/logCommand.test.ts  (7 tests) 44ms
+ ✓ src/session/continuation/rebase.test.ts  (43 tests) 41ms
+ ✓ src/session/store/currentSessionRegistry.test.ts  (5 tests) 39ms
+ ✓ src/context/request/capture.test.ts  (5 tests) 43ms
+ ✓ src/core/commands/marketplace/store.test.ts  (7 tests) 42ms
+ ✓ src/entrypoints/mcpApproval.test.ts  (13 tests) 44ms
+ ✓ src/turn/retry.test.ts  (9 tests) 41ms
+ ✓ src/memory/projectMemorySaveCommandRunner.test.ts  (11 tests) 34ms
+ ✓ src/test-utils/browser/execution/extraction.test.ts  (7 tests) 43ms
+ ✓ src/cli/interactive/picker/cleanse/selection.test.ts  (19 tests) 43ms
+ ✓ src/browser/replayCommandRunner.test.ts  (4 tests) 49ms
+ ✓ src/observability/traceDashboard.test.ts  (2 tests) 40ms
+ ✓ src/config/preferences/documents.test.ts  (11 tests) 66ms
+ ✓ src/cli/interactive/keyGuide.test.ts  (6 tests) 19ms
+ ✓ src/core/tools/teamAdoption.test.ts  (19 tests) 52ms
+ ✓ src/session/export/graph.test.ts  (3 tests) 49ms
+ ✓ src/core/hooks/hooks.test.ts  (6 tests) 26ms
+ ✓ src/session/store/sessionStore.test.ts  (5 tests) 55ms
+ ✓ src/core/commands/syntax/loop.test.ts  (11 tests) 70ms
+ ✓ src/memory/memoryPersistence.test.ts  (19 tests) 35ms
+ ✓ src/presentation/tui/editor.test.ts  (65 tests) 28ms
+ ✓ src/presentation/tui/pastes.test.ts  (49 tests) 37ms
+ ✓ src/core/tools/teamProposals.test.ts  (8 tests) 41ms
+ ✓ src/turn/approval.test.ts  (4 tests) 46ms
+ ✓ src/cli/interactive/keybindings.test.ts  (26 tests) 42ms
+ ✓ src/memory/store/transaction.test.ts  (8 tests) 39ms
+ ✓ src/core/agent/retry.test.ts  (36 tests) 35ms
+ ✓ src/provider/endpoints/googleGenAI.test.ts  (38 tests) 21ms
+ ✓ src/runtime/execution/ssh/transport.test.ts  (3 tests) 29ms
+ ✓ src/memory/projectMemoryRecallCommandRunner.test.ts  (7 tests) 30ms
+ ✓ src/provider/endpoints/responses/consumer.test.ts  (12 tests) 34ms
+ ✓ src/core/subagents/subagent.test.ts  (5 tests) 39ms
+ ✓ src/core/workspace/files.test.ts  (12 tests) 34ms
+ ✓ src/core/commands/report/codec.test.ts  (2 tests) 31ms
+ ✓ src/cli/runtime/extensions.test.ts  (3 tests) 38ms
+ ✓ src/observability/diagnostics.test.ts  (5 tests) 33ms
+ ✓ src/core/shell/platform/shell.test.ts  (17 tests) 32ms
+ ✓ src/core/models/catalogReachability.test.ts  (15 tests) 18ms
+ ✓ src/core/mcp/config.test.ts  (8 tests) 34ms
+ ✓ src/observability/usage/attribution.test.ts  (23 tests) 26ms
+ ✓ src/core/commands/copyCommandRuntime.test.ts  (12 tests) 32ms
+ ✓ src/presentation/tui/chrome/pager.test.ts  (16 tests) 43ms
+ ✓ src/session/export/source.test.ts  (1 test) 33ms
+ ✓ src/provider/request/sentRequest.test.ts  (37 tests) 28ms
+ ✓ src/core/shell/providerReadiness.test.ts  (29 tests) 18ms
+ ✓ src/core/state/projectState.test.ts  (8 tests) 34ms
+ ✓ src/presentation/theme/color.test.ts  (13 tests) 32ms
+ ✓ src/provider/endpoints/termination.test.ts  (23 tests) 24ms
+ ✓ src/core/commands/syntax/diagnostics.test.ts  (16 tests) 34ms
+ ✓ src/cli/interactive/picker/lifecycle.test.ts  (35 tests) 39ms
+ ✓ src/presentation/tui/transcript/mermaid.test.ts  (14 tests) 31ms
+ ✓ src/cli/interactive/turnSink.test.ts  (55 tests) 29ms
+ ✓ src/core/commands/syntax/context.test.ts  (4 tests) 31ms
+ ✓ src/core/commands/reportCommands.test.ts  (6 tests) 20ms
+ ✓ src/provider/endpoints/sse.test.ts  (19 tests) 30ms
+ ✓ src/core/commands/registryCache.test.ts  (4 tests) 29ms
+ ✓ src/core/paths/profile/context.test.ts  (7 tests) 42ms
+ ✓ src/presentation/tui/render/engine.test.ts  (65 tests) 34ms
+ ✓ src/provider/endpoints/google/replay.test.ts  (34 tests) 46ms
+ ✓ src/cli/jobs/projection.test.ts  (6 tests) 31ms
+ ✓ src/cli/collaboration/approval.test.ts  (2 tests) 26ms
+ ✓ src/session/store/management.test.ts  (14 tests) 28ms
+ ✓ src/provider/endpoints/googleRequests.test.ts  (10 tests) 24ms
+ ✓ src/browser/commandRunner.test.ts  (13 tests) 11ms
+ ✓ src/memory/store/read.test.ts  (3 tests) 27ms
+ ✓ src/provider/aws/eventStream.test.ts  (14 tests) 14ms
+ ✓ src/core/shell/sessionIdle.test.ts  (6 tests) 13ms
+ ✓ src/session/continuation/projectRootRebaseProjection.test.ts  (17 tests) 11ms
+ ✓ src/presentation/tui/chrome/composer.test.ts  (18 tests) 11ms
+ ✓ src/core/commands/deepResearchCommandRuntime.test.ts  (5 tests) 26ms
+ ✓ src/presentation/tui/chrome/tree.test.ts  (3 tests) 56ms
+ ✓ src/browser/cliExecutionBridge.test.ts  (7 tests) 9ms
+ ✓ src/research/run/parse.test.ts  (5 tests) 30ms
+ ✓ src/presentation/tui/report/renderer.test.ts  (3 tests) 25ms
+ ✓ src/provider/endpoints/anthropicMessages.test.ts  (48 tests) 25ms
+ ✓ src/provider/request/backoff.test.ts  (15 tests) 21ms
+ ✓ src/session/export/htmlRender.test.ts  (40 tests) 42ms
+ ✓ src/presentation/tui/chrome/picker.test.ts  (16 tests) 25ms
+ ✓ src/core/models/catalogStore.test.ts  (10 tests) 27ms
+ ✓ src/turn/measurement.test.ts  (15 tests) 23ms
+ ✓ src/core/tools/permissionContext.test.ts  (8 tests) 39ms
+ ✓ src/presentation/tui/editor/draftStash.test.ts  (10 tests) 23ms
+ ✓ src/entrypoints/mcpControlCliSurface.test.ts  (15 tests) 12ms
+ ✓ src/core/agent/loop.test.ts  (22 tests) 19ms
+ ✓ src/turn/compaction.test.ts  (8 tests) 49ms
+ ✓ src/core/shell/compaction.test.ts  (10 tests) 21ms
+ ✓ src/core/commands/navigation/continuation.test.ts  (5 tests) 22ms
+ ✓ src/core/commands/syntax/prompts.test.ts  (12 tests) 24ms
+ ✓ src/session/compaction.test.ts  (46 tests) 27ms
+ ✓ src/browser/receipt/integrity.test.ts  (4 tests) 20ms
+ ✓ src/core/agent/agent.test.ts  (24 tests) 20ms
+ ✓ src/session/recovery/scope.test.ts  (21 tests) 10ms
+ ✓ src/presentation/tui/input/appearance.test.ts  (15 tests) 24ms
+ ✓ src/config/scope/path.test.ts  (5 tests) 10ms
+ ✓ src/core/mcp/errorTaxonomy.test.ts  (2 tests) 5ms
+ ✓ src/provider/endpoints/responses/account.test.ts  (17 tests) 38ms
+ ✓ src/provider/aws/signature.test.ts  (15 tests) 21ms
+ ✓ src/runtime/execution/local.test.ts  (14 tests) 20ms
+ ✓ src/core/shell/background/output.test.ts  (9 tests) 21ms
+ ✓ src/presentation/tui/transcript/source.test.ts  (21 tests) 21ms
+ ✓ src/cli/interactive/picker/copy/source.test.ts  (5 tests) 20ms
+ ✓ src/memory/projectMemoryDeleteCommandRunner.test.ts  (3 tests) 19ms
+ ✓ src/entrypoints/approvalPromptBridge.test.ts  (18 tests) 21ms
+ ✓ src/model-adapters/providerFetch.test.ts  (4 tests) 5ms
+ ✓ src/core/update/check.test.ts  (8 tests) 4ms
+ ✓ src/provider/request/completion.test.ts  (19 tests) 20ms
+ ✓ src/cli/interactive/context/controller.test.ts  (19 tests) 33ms
+ ✓ src/presentation/tui/chrome/hints.test.ts  (6 tests) 5ms
+ ✓ src/presentation/tui/transcript/blocks.test.ts  (19 tests) 17ms
+ ✓ src/session/sessionManagerBoundary.test.ts  (13 tests) 25ms
+ ✓ src/context/attachment/verify.test.ts  (5 tests) 18ms
+ ✓ src/core/network/address.test.ts  (49 tests) 29ms
+ ✓ src/core/shell/approvalTrustPolicy.test.ts  (10 tests) 18ms
+ ✓ src/core/shell/sessionFutureTurnProjection.test.ts  (1 test) 4ms
+ ✓ src/core/shell/sessionRuntimeBoundary.test.ts  (8 tests) 17ms
+ ✓ src/core/tools/teamTool.test.ts  (25 tests) 17ms
+ ✓ src/runtime/execution/fileLock.test.ts  (8 tests) 18ms
+ ✓ src/session/continuation/sessionProjectRootRebind.test.ts  (28 tests) 16ms
+ ✓ src/session/export/template.test.ts  (10 tests) 15ms
+ ✓ src/presentation/tui/composer/layout.test.ts  (10 tests) 25ms
+ ✓ src/cli/interactive/picker/model/watch.test.ts  (7 tests) 15ms
+ ✓ src/browser/sessionManager.test.ts  (13 tests) 14ms
+ ✓ src/turn/cacheWarm.test.ts  (29 tests) 15ms
+ ✓ src/context/startup/startupWarmContextBuilder.test.ts  (3 tests) 12ms
+ ✓ src/observability/usage/recovery.test.ts  (19 tests) 16ms
+ ✓ src/planning/execution/model.test.ts  (4 tests) 5ms
+ ✓ src/presentation/sidebar/sidebarLivePanelRuntime.test.ts  (4 tests) 13ms
+ ✓ src/cli/interactive/picker/mcpAdd.test.ts  (29 tests) 15ms
+ ✓ src/language/protocol.test.ts  (6 tests) 17ms
+ ✓ src/context/compact/injection/compactFutureTurnInjection.test.ts  (5 tests) 17ms
+ ✓ src/memory/projectMemoryReviewCommandRunner.test.ts  (5 tests) 13ms
+ ✓ src/observability/structuredLogger.test.ts  (4 tests) 14ms
+ ✓ src/cli/interactive/selection.test.ts  (42 tests) 17ms
+ ✓ src/cli/interactive/fileSuggestions.test.ts  (39 tests) 16ms
+ ✓ src/core/agent/tools.test.ts  (28 tests) 13ms
+ ✓ src/core/messaging/agentRegistryScanner.test.ts  (2 tests) 14ms
+ ✓ src/core/shell/sessionStateSurface.test.ts  (4 tests) 5ms
+ ✓ src/core/query/toolPolicy.test.ts  (38 tests) 20ms
+ ✓ src/presentation/sidebar/sidebarPanelLayout.test.ts  (4 tests) 11ms
+ ✓ src/provider/response/usage.test.ts  (15 tests) 13ms
+ ✓ src/session/store/sessionFileStore.test.ts  (7 tests) 14ms
+ ✓ src/browser/runtime/core/preflight.test.ts  (9 tests) 16ms
+ ✓ src/core/query/compaction/summarize.test.ts  (11 tests) 27ms
+ ✓ src/presentation/tui/transcript/diff.test.ts  (34 tests) 17ms
+ ✓ src/memory/projectMemoryCandidateExtractor.test.ts  (12 tests) 13ms
+ ✓ src/browser/command/syntax.test.ts  (13 tests) 15ms
+ ✓ src/context/startup/startupWarmCommandRunner.test.ts  (7 tests) 14ms
+ ✓ src/core/tools/taskWait.test.ts  (11 tests) 16ms
+ ✓ src/observability/usage/persistence.test.ts  (11 tests) 13ms
+ ✓ src/presentation/sidebar/sidebarEventSink.test.ts  (2 tests) 4ms
+ ✓ src/presentation/themes/schema.test.ts  (14 tests) 16ms
+ ✓ src/provider/request/replay.test.ts  (6 tests) 6ms
+ ✓ src/cli/runtime/inputStream.test.ts  (9 tests) 17ms
+ ✓ src/cli/interactive/picker/hubOutput.test.ts  (5 tests) 13ms
+ ✓ src/browser/selfHealingManifestPatchWriter.test.ts  (3 tests) 10ms
+ ✓ src/memory/projectMemoryReviewState.test.ts  (9 tests) 25ms
+ ✓ src/observability/usageTelemetry.test.ts  (29 tests) 14ms
+ ✓ src/browser/session/action.test.ts  (11 tests) 29ms
+ ✓ src/core/models/requestShape.test.ts  (40 tests) 12ms
+ ✓ src/core/network/policy.test.ts  (7 tests) 4ms
+ ✓ src/core/network/response.test.ts  (7 tests) 15ms
+ ✓ src/core/paths/userHome.test.ts  (9 tests) 22ms
+ ✓ src/core/subagents/runner.test.ts  (20 tests) 14ms
+ ✓ src/cli/interactive/picker/approvalSelection.test.ts  (15 tests) 16ms
+ ✓ src/context/compact/checkpoint/compactLiveCheckpoint.test.ts  (3 tests) 13ms
+ ✓ src/core/commands/syntax/compact.test.ts  (3 tests) 33ms
+ ✓ src/core/commands/syntax/flags.test.ts  (21 tests) 14ms
+ ✓ src/core/subagents/team/run.test.ts  (16 tests) 15ms
+ ✓ src/cli/interactive/interactiveAskBridge.test.ts  (17 tests) 11ms
+ ✓ src/context/attachment/entry.test.ts  (3 tests) 9ms
+ ✓ src/core/hooks/config.test.ts  (6 tests) 13ms
+ ✓ src/core/tools/discovery/state.test.ts  (10 tests) 12ms
+ ✓ src/core/commands/fresh.test.ts  (2 tests) 2ms
+ ✓ src/core/security/pathJail.test.ts  (16 tests) 13ms
+ ✓ src/edit/recovery/recoverySurfaceProjection.test.ts  (3 tests) 4ms
+ ✓ src/session/continuation/sessionSeedInfluence.test.ts  (1 test) 2ms
+ ✓ src/provider/endpoints/simple.test.ts  (12 tests) 31ms
+ ✓ src/presentation/tui/chrome/band.test.ts  (18 tests) 13ms
+ ✓ src/presentation/tui/transcript/container.test.ts  (18 tests) 14ms
+ ✓ src/workflow/git/operation/intent.test.ts  (8 tests) 11ms
+ ✓ src/core/security/egressGuard.test.ts  (25 tests) 12ms
+ ✓ src/core/version/current.test.ts  (4 tests) 3ms
+ ✓ src/core/tools/webTools.test.ts  (17 tests) 11ms
+ ✓ src/repair/flow/strategy.test.ts  (3 tests) 2ms
+ ✓ src/session/history/source.test.ts  (1 test) 13ms
+ ✓ src/session/recovery/work.test.ts  (13 tests) 3ms
+ ✓ src/session/replay/builder.test.ts  (19 tests) 14ms
+ ✓ src/core/commands/planning/syntax.test.ts  (1 test) 3ms
+ ✓ src/presentation/tui/chrome/navigation.test.ts  (6 tests) 10ms
+ ✓ src/presentation/tui/editor/modal/state.test.ts  (19 tests) 12ms
+ ✓ src/browser/replayRepairReadiness.test.ts  (7 tests) 12ms
+ ✓ src/entrypoints/cliMcpModule.test.ts  (9 tests) 10ms
+ ✓ src/observability/startupTiming.test.ts  (4 tests) 10ms
+ ✓ src/browser/receipt/lock.test.ts  (2 tests) 7ms
+ ✓ src/core/network/body.test.ts  (1 test) 10ms
+ ✓ src/observability/logs/stream.test.ts  (2 tests) 12ms
+ ✓ src/presentation/tui/terminal.test.ts  (7 tests) 12ms
+ ✓ src/provider/aws/sts.test.ts  (3 tests) 12ms
+ ✓ src/provider/endpoints/signer.integration.test.ts  (4 tests) 9ms
+ ✓ src/core/tools/catalog.test.ts  (10 tests) 11ms
+ ✓ src/session/lifecycle/title.test.ts  (4 tests) 3ms
+ ✓ src/cli/interactive/picker/servers.test.ts  (8 tests) 11ms
+ ✓ src/core/shell/platform/termination.test.ts  (10 tests) 11ms
+ ✓ src/context/graph/ast/parser.test.ts  (8 tests) 10ms
+ ✓ src/core/subagents/team/fanOut.test.ts  (9 tests) 12ms
+ ✓ src/browser/replayExecutor.test.ts  (4 tests) 8ms
+ ✓ src/browser/urlAdmission.test.ts  (20 tests) 11ms
+ ✓ src/sandbox/workspace.test.ts  (2 tests) 10ms
+ ✓ src/session/compactionUsage.test.ts  (20 tests) 10ms
+ ✓ src/session/sessionEventCodec.test.ts  (19 tests) 10ms
+ ✓ src/turn/synthetic.test.ts  (6 tests) 4ms
+ ✓ src/cli/interactive/compact.test.ts  (14 tests) 8ms
+ ✓ src/core/models/catalogShape.test.ts  (22 tests) 7ms
+ ✓ src/core/tools/editEngine.test.ts  (25 tests) 10ms
+ ✓ src/core/workspace/tools.test.ts  (4 tests) 11ms
+ ✓ src/observability/logs/files.test.ts  (1 test) 10ms
+ ✓ src/session/compaction/schedule.test.ts  (13 tests) 10ms
+ ✓ src/context/compact/command/compactCommandRunner.test.ts  (2 tests) 9ms
+ ✓ src/context/compact/injection/compactInjectionMergePolicy.test.ts  (2 tests) 9ms
+ ✓ src/runtime/execution/ssh/profile.test.ts  (1 test) 10ms
+ ✓ src/browser/persistentReceiptCache.test.ts  (4 tests) 10ms
+ ✓ src/provider/endpoints/responses/body.test.ts  (19 tests) 12ms
+ ✓ src/browser/selfHealingProposal.test.ts  (5 tests) 9ms
+ ✓ src/session/sessionCompactModule.test.ts  (4 tests) 7ms
+ ✓ src/config/settings.test.ts  (7 tests) 8ms
+ ✓ src/session/sessionProjection.test.ts  (11 tests) 8ms
+ ✓ src/cli/interactive/team.test.ts  (6 tests) 12ms
+ ✓ src/cli/runtime/inputQueue.test.ts  (5 tests) 8ms
+ ✓ src/cli/interactive/toolCards.test.ts  (14 tests) 9ms
+ ✓ src/context/request/estimate.test.ts  (19 tests) 8ms
+ ✓ src/core/models/availability.test.ts  (23 tests) 9ms
+ ✓ src/core/prompts/tokens.test.ts  (22 tests) 8ms
+ ✓ src/core/security/writeTarget.test.ts  (16 tests) 9ms
+ ✓ src/core/shell/providerCredentials.test.ts  (28 tests) 9ms
+ ✓ src/core/tools/browserCancellation.test.ts  (11 tests) 11ms
+ ✓ src/presentation/sidebar/sidebarCommandEventAdapter.test.ts  (7 tests) 7ms
+ ✓ src/provider/aws/profile.test.ts  (18 tests) 9ms
+ ✓ src/session/continuation/stoppedSessionContinuity.test.ts  (19 tests) 8ms
+ ✓ src/session/recovery/resumeContextBuilder.test.ts  (12 tests) 9ms
+ ✓ src/context/compact/checkpoint/compactCheckpointSurface.test.ts  (3 tests) 8ms
+ ✓ src/context/compact/command/compactCommandContract.test.ts  (14 tests) 8ms
+ ✓ src/context/compact/continuity/compactContinuityQuality.test.ts  (2 tests) 8ms
+ ✓ src/context/compact/delivery/compactSessionSurface.test.ts  (1 test) 8ms
+ ✓ src/context/compact/injection/compactFutureTurnAdapter.test.ts  (1 test) 9ms
+ ✓ src/context/compact/injection/compactInjectedContextFormatter.test.ts  (1 test) 7ms
+ ✓ src/core/commands/todo/operations.test.ts  (4 tests) 7ms
+ ✓ src/core/tools/discovery/evaluation.test.ts  (6 tests) 9ms
+ ✓ src/presentation/tui/input/stdinBuffer.test.ts  (27 tests) 7ms
+ ✓ src/presentation/tui/transcript/viewport.test.ts  (15 tests) 8ms
+ ✓ src/browser/actionCache.test.ts  (3 tests) 8ms
+ ✓ src/browser/externalNetworkHandoffProtocol.test.ts  (2 tests) 10ms
+ ✓ src/browser/playwrightLifecycle.test.ts  (6 tests) 8ms
+ ✓ src/observability/traceContext.e2e.test.ts  (1 test) 8ms
+ ✓ src/browser/session/startup.test.ts  (6 tests) 8ms
+ ✓ src/core/mcp/surface.test.ts  (1 test) 8ms
+ ✓ src/core/models/window.test.ts  (26 tests) 9ms
+ ✓ src/core/prompts/expansion.test.ts  (23 tests) 8ms
+ ✓ src/core/shell/observers.test.ts  (4 tests) 8ms
+ ✓ src/context/compact/checkpoint/changes.test.ts  (1 test) 8ms
+ ✓ src/core/commands/report/projection.test.ts  (4 tests) 8ms
+ ✓ src/core/agent/request/ledger.test.ts  (7 tests) 9ms
+ ✓ src/core/shell/approval/evaluator.test.ts  (40 tests) 9ms
+ ✓ src/presentation/tui/chrome/chips.test.ts  (3 tests) 5ms
+ ✓ src/presentation/tui/chrome/suggestions.test.ts  (15 tests) 8ms
+ ✓ src/collaboration/projection.test.ts  (2 tests) 6ms
+ ✓ src/browser/cliExecutorInjection.test.ts  (6 tests) 7ms
+ ✓ src/browser/executionLifecycleSurface.test.ts  (1 test) 8ms
+ ✓ src/browser/replayPlanner.test.ts  (3 tests) 8ms
+ ✓ src/browser/replayPolicy.test.ts  (4 tests) 7ms
+ ✓ src/cli/bootstrap/recoveryHint.test.ts  (10 tests) 8ms
+ ✓ src/cli/collaboration/projection.test.ts  (2 tests) 8ms
+ ✓ src/cli/interactive/historyStore.test.ts  (3 tests) 7ms
+ ✓ src/context/selection/model.test.ts  (8 tests) 6ms
+ ✓ src/core/hooks/approval.test.ts  (4 tests) 7ms
+ ✓ src/core/hooks/translation.test.ts  (27 tests) 7ms
+ ✓ src/core/commands/resumeCommandRuntime.test.ts  (13 tests) 7ms
+ ✓ src/core/prompts/skills.test.ts  (26 tests) 8ms
+ ✓ src/cli/runtime/jobs.test.ts  (5 tests) 8ms
+ ✓ src/core/security/paths.test.ts  (22 tests) 7ms
+ ✓ src/core/security/redaction.test.ts  (17 tests) 7ms
+ ✓ src/presentation/sidebar/report.test.ts  (2 tests) 11ms
+ ✓ src/presentation/sidebar/sidebarPanelCommandRunner.test.ts  (2 tests) 8ms
+ ✓ src/presentation/sidebar/sidebarStateProjection.test.ts  (5 tests) 7ms
+ ✓ src/core/tools/mcpForwarding.test.ts  (6 tests) 7ms
+ ✓ src/presentation/tui/image.test.ts  (13 tests) 7ms
+ ✓ src/session/compaction/dispatch.test.ts  (2 tests) 18ms
+ ✓ src/session/continuation/legacyPermissionRebase.test.ts  (7 tests) 7ms
+ ✓ src/tools/policy/strategy.test.ts  (14 tests) 21ms
+ ✓ src/cli/interactive/completion/skillsWatch.test.ts  (1 test) 7ms
+ ✓ src/context/compact/continuity/routeContinuityHandoff.test.ts  (1 test) 7ms
+ ✓ src/context/compact/delivery/compactHandoffRenderer.test.ts  (1 test) 6ms
+ ✓ src/core/commands/model/completion.test.ts  (8 tests) 8ms
+ ✓ src/core/mcp/http/stream.test.ts  (3 tests) 8ms
+ ✓ src/core/query/compaction/fileFootprint.test.ts  (16 tests) 8ms
+ ✓ src/presentation/tui/chrome/options.test.ts  (22 tests) 8ms
+ ✓ src/presentation/tui/surface/paneDiffSource.test.ts  (2 tests) 6ms
+ ✓ src/presentation/tui/transcript/diffPage.test.ts  (6 tests) 6ms
+ ✓ src/browser/actionCacheEntry.test.ts  (2 tests) 6ms
+ ✓ src/browser/executionReceipt.test.ts  (2 tests) 5ms
+ ✓ src/browser/playwrightLocalExecutor.test.ts  (4 tests) 7ms
+ ✓ src/memory/projectMemoryInjectionState.test.ts  (2 tests) 5ms
+ ✓ src/turn/prompt.test.ts  (12 tests) 7ms
+ ✓ src/artifacts/workflow/model.test.ts  (6 tests) 5ms
+ ✓ src/context/budget/lines.test.ts  (14 tests) 7ms
+ ✓ src/context/request/budget.test.ts  (12 tests) 5ms
+ ✓ src/context/request/tail.test.ts  (16 tests) 7ms
+ ✓ src/core/commands/brainstormCommandRuntime.test.ts  (9 tests) 7ms
+ ✓ src/core/commands/todoPersistence.test.ts  (9 tests) 5ms
+ ✓ src/core/providers/facts.test.ts  (9 tests) 5ms
+ ✓ src/core/shell/signalHandlers.test.ts  (9 tests) 6ms
+ ✓ src/core/subagents/boundary.test.ts  (14 tests) 6ms
+ ✓ src/core/version/compare.test.ts  (9 tests) 5ms
+ ✓ src/evidence/task/proof.test.ts  (15 tests) 5ms
+ ✓ src/presentation/sidebar/sidebarLiveEventStore.test.ts  (4 tests) 6ms
+ ✓ src/presentation/terminal/jsonEvents.test.ts  (8 tests) 8ms
+ ✓ src/provider/endpoints/googleVertex.test.ts  (13 tests) 5ms
+ ✓ src/provider/endpoints/kinds.test.ts  (17 tests) 8ms
+ ✓ src/repair/loop/model.test.ts  (9 tests) 6ms
+ ✓ src/session/compaction/budget.test.ts  (7 tests) 6ms
+ ✓ src/session/continuation/compactSummary.test.ts  (3 tests) 5ms
+ ✓ src/session/query/sessionEntries.test.ts  (16 tests) 6ms
+ ✓ src/session/history/model.test.ts  (5 tests) 6ms
+ ✓ src/session/transcript/compactionTranscript.test.ts  (2 tests) 6ms
+ ✓ src/session/transcript/output.test.ts  (6 tests) 4ms
+ ✓ src/browser/runtime/external/manifest.test.ts  (4 tests) 5ms
+ ✓ src/core/context/model/contextStateProjection.test.ts  (6 tests) 5ms
+ ✓ src/core/mcp/config/bearer.test.ts  (15 tests) 6ms
+ ✓ src/core/shell/approval/binding.test.ts  (16 tests) 7ms
+ ✓ src/core/shell/platform/processTree.test.ts  (5 tests) 5ms
+ ✓ src/core/subagents/team/convergence.test.ts  (12 tests) 7ms
+ ✓ src/presentation/tui/chrome/progress.test.ts  (4 tests) 5ms
+ ✓ src/presentation/tui/editor/editorParts.test.ts  (19 tests) 5ms
+ ✓ src/presentation/tui/input/drain.test.ts  (3 tests) 6ms
+ ✓ src/presentation/tui/editor/replacement.test.ts  (6 tests) 6ms
+ ✓ src/presentation/tui/text/layout.test.ts  (14 tests) 6ms
+ ✓ src/presentation/tui/transcript/math.test.ts  (8 tests) 6ms
+ ✓ src/presentation/tui/transcript/search.test.ts  (19 tests) 6ms
+ ✓ src/collaboration/host.test.ts  (1 test) 4ms
+ ✓ src/browser/evidenceBundle.test.ts  (2 tests) 5ms
+ ✓ src/browser/executionReceiptSurface.test.ts  (1 test) 5ms
+ ✓ src/browser/playwrightCliExecutor.test.ts  (2 tests) 4ms
+ ✓ src/browser/selfHealingApplyPolicy.test.ts  (5 tests) 4ms
+ ✓ src/entrypoints/cliPrintModeRunner.test.ts  (3 tests) 4ms
+ ✓ src/entrypoints/cliWorkspaceSurface.test.ts  (3 tests) 4ms
+ ✓ src/evidence/verdictFacade.test.ts  (7 tests) 5ms
+ ✓ src/memory/projectMemoryConflictDetection.test.ts  (8 tests) 5ms
+ ✓ src/memory/reviewChanges.test.ts  (1 test) 4ms
+ ✓ src/model-adapters/multimodal.test.ts  (26 tests) 7ms
+ ✓ src/session/mutationContinuityState.test.ts  (15 tests) 5ms
+ ✓ src/entrypoints/cliModuleBoundary.test.ts  (2 tests) 5ms
+ ✓ src/cli/bootstrap/startupNotice.test.ts  (4 tests) 5ms
+ ✓ src/cli/interactive/backgroundNotice.test.ts  (6 tests) 5ms
+ ✓ src/cli/interactive/ambientFacts.test.ts  (4 tests) 5ms
+ ✓ src/cli/interactive/inputQueue.test.ts  (4 tests) 4ms
+ ✓ src/cli/interactive/clickSelect.test.ts  (12 tests) 6ms
+ ✓ src/cli/provider/measurement.test.ts  (5 tests) 5ms
+ ✓ src/cli/interactive/interactiveSignals.test.ts  (3 tests) 4ms
+ ✓ src/browser/receipt/manifest.test.ts  (3 tests) 4ms
+ ✓ src/cli/provider/publication.test.ts  (6 tests) 4ms
+ ✓ src/context/request/measurement.test.ts  (11 tests) 6ms
+ ✓ src/core/agent/queue.test.ts  (8 tests) 4ms
+ ✓ src/config/preferences/projection.test.ts  (2 tests) 5ms
+ ✓ src/core/commands/forceCommandRuntime.test.ts  (2 tests) 4ms
+ ✓ src/core/commands/cleanseCommandRuntime.test.ts  (1 test) 4ms
+ ✓ src/core/commands/usageCommandRuntime.test.ts  (2 tests) 5ms
+ ✓ src/core/commands/restoreCommandRuntime.test.ts  (3 tests) 5ms
+ ✓ src/core/models/cacheEconomics.test.ts  (12 tests) 5ms
+ ✓ src/core/models/serviceTier.test.ts  (6 tests) 6ms
+ ✓ src/core/models/target.test.ts  (8 tests) 5ms
+ ✓ src/core/query/compaction.test.ts  (7 tests) 6ms
+ ✓ src/core/shell/providerFailureRedaction.test.ts  (4 tests) 3ms
+ ✓ src/core/state/owner.test.ts  (3 tests) 3ms
+ ✓ src/core/shell/configurationRefusal.test.ts  (6 tests) 4ms
+ ✓ src/core/text/safety.test.ts  (10 tests) 3ms
+ ✓ src/core/tools/skill.test.ts  (11 tests) 5ms
+ ✓ src/edit/result/editCapabilityCloseoutManifest.test.ts  (3 tests) 5ms
+ ✓ src/presentation/sidebar/sidebarActivityProjection.test.ts  (2 tests) 14ms
+ ✓ src/presentation/sidebar/sidebarPanelRenderer.test.ts  (1 test) 5ms
+ ✓ src/presentation/terminal/streaming.test.ts  (7 tests) 15ms
+ ✓ src/presentation/theme/defaults.test.ts  (6 tests) 6ms
+ ✓ src/provider/endpoints/toolSurface.test.ts  (5 tests) 6ms
+ ✓ src/repair/iteration/projection.test.ts  (6 tests) 4ms
+ ✓ src/session/context/selection.test.ts  (4 tests) 19ms
+ ✓ src/session/continuation/branch.test.ts  (9 tests) 5ms
+ ✓ src/session/continuation/inspection.test.ts  (3 tests) 14ms
+ ✓ src/session/recovery/sessionResume.test.ts  (5 tests) 5ms
+ ✓ src/session/store/sessionListStore.test.ts  (2 tests) 6ms
+ ✓ src/session/transcript/sessionQueryEventPersistence.test.ts  (3 tests) 4ms
+ ✓ src/verification/selection/model.test.ts  (5 tests) 5ms
+ ✓ src/browser/skill/execution/protocol.test.ts  (2 tests) 4ms
+ ✓ src/browser/skill/execution/surface.test.ts  (1 test) 7ms
+ ✓ src/context/compact/policy/compactRedactionPolicy.test.ts  (1 test) 4ms
+ ✓ src/core/auth/account/target.test.ts  (7 tests) 6ms
+ ✓ src/core/commands/connect/preset.test.ts  (12 tests) 4ms
+ ✓ src/core/commands/security/syntax.test.ts  (1 test) 6ms
+ ✓ src/core/shell/approval/deny.test.ts  (13 tests) 6ms
+ ✓ src/core/subagents/team/evidence.test.ts  (7 tests) 4ms
+ ✓ src/presentation/tui/input/mouse.test.ts  (9 tests) 4ms
+ ✓ src/presentation/tui/render/scheduling.test.ts  (2 tests) 4ms
+ ✓ src/presentation/tui/text/measure.test.ts  (16 tests) 5ms
+ ✓ src/presentation/tui/transcript/searchState.test.ts  (6 tests) 5ms
+ ✓ src/test-utils/browser/runtime/decision.test.ts  (5 tests) 4ms
+ ✓ src/browser/evidenceSafety.test.ts  (3 tests) 5ms
+ ✓ src/browser/externalNetworkRunnerManifest.test.ts  (2 tests) 4ms
+ ✓ src/browser/localExecutionAuthority.test.ts  (3 tests) 3ms
+ ✓ src/browser/playwrightLocalEvidence.test.ts  (1 test) 4ms
+ ✓ src/browser/replayReadiness.test.ts  (2 tests) 6ms
+ ✓ src/browser/stealthPreload.test.ts  (3 tests) 4ms
+ ✓ src/edit/sanitize.test.ts  (2 tests) 4ms
+ ✓ src/entrypoints/cliCoreSplit.test.ts  (6 tests) 4ms
+ ✓ src/entrypoints/cliStdinModeRunner.test.ts  (4 tests) 4ms
+ ✓ src/entrypoints/providerReadinessCliSurface.test.ts  (2 tests) 3ms
+ ✓ src/model-adapters/jsonRepair.test.ts  (5 tests) 5ms
+ ✓ src/session/context.test.ts  (11 tests) 4ms
+ ✓ src/session/permissionRequestMemoryCodec.test.ts  (5 tests) 4ms
+ ✓ src/session/sessionRecoverySelection.test.ts  (10 tests) 5ms
+ ✓ src/turn/pendingInput.test.ts  (5 tests) 4ms
+ ✓ src/cli/approval/permissionScope.test.ts  (6 tests) 1ms
+ ✓ src/cli/collaboration/acceptance.test.ts  (2 tests) 6ms
+ ✓ src/turn/projection.test.ts  (9 tests) 4ms
+ ✓ src/cli/interactive/questionBridge.test.ts  (5 tests) 4ms
+ ✓ src/cli/mcp/content.test.ts  (1 test) 4ms
+ ✓ src/cli/ssh/projection.test.ts  (2 tests) 5ms
+ ✓ src/core/commands/arguments.test.ts  (18 tests) 4ms
+ ✓ src/cli/provider/requestTarget.test.ts  (1 test) 5ms
+ ✓ src/core/commands/changelogCommandRuntime.test.ts  (1 test) 4ms
+ ✓ src/core/query/doomLoopDetector.test.ts  (9 tests) 4ms
+ ✓ src/core/shell/interactiveApprovalWiring.test.ts  (3 tests) 4ms
+ ✓ src/core/shell/printPromptInput.test.ts  (8 tests) 4ms
+ ✓ src/core/tools/prefilter.test.ts  (8 tests) 4ms
+ ✓ src/core/shell/shellActionBridge.test.ts  (3 tests) 4ms
+ ✓ src/core/tools/toolPolicyResult.test.ts  (7 tests) 4ms
+ ✓ src/edit/recovery/restoreCommandContract.test.ts  (4 tests) 4ms
+ ✓ src/edit/result/editCapabilityReadiness.test.ts  (3 tests) 4ms
+ ✓ src/presentation/sidebar/sidebarToolAvailability.test.ts  (2 tests) 4ms
+ ✓ src/provider/endpoints/serviceTier.test.ts  (3 tests) 4ms
+ ✓ src/provider/endpoints/copilotHeaders.test.ts  (6 tests) 4ms
+ ✓ src/result/task/verdict.test.ts  (3 tests) 4ms
+ ✓ src/provider/response/metering.test.ts  (3 tests) 4ms
+ ✓ src/runtime/execution/commandTimeout.test.ts  (5 tests) 3ms
+ ✓ src/runtime/execution/receipt.test.ts  (2 tests) 4ms
+ ✓ src/session/approval/memoryCodec.test.ts  (5 tests) 4ms
+ ✓ src/session/continuation/legacyContinuityMemory.test.ts  (5 tests) 5ms
+ ✓ src/session/continuation/retentionPlanner.test.ts  (7 tests) 5ms
+ ✓ src/session/continuation/sessionRootRebase.test.ts  (1 test) 3ms
+ ✓ src/session/harness/state.test.ts  (3 tests) 5ms
+ ✓ src/session/lifecycle/sessionLifecycleStore.test.ts  (3 tests) 4ms
+ ✓ src/session/lifecycle/sessionPromptBarrier.test.ts  (4 tests) 3ms
+ ✓ src/session/query/navigation.test.ts  (2 tests) 4ms
+ ✓ src/session/recovery/sessionRecoverySnapshot.test.ts  (1 test) 3ms
+ ✓ src/session/recovery/sessionResumeEligibility.test.ts  (7 tests) 4ms
+ ✓ src/session/store/currentSelection.test.ts  (2 tests) 4ms
+ ✓ src/session/replay/sessionReplayFacade.test.ts  (2 tests) 4ms
+ ✓ src/browser/runtime/core/dependencyPolicy.test.ts  (3 tests) 3ms
+ ✓ src/browser/runtime/external/protocol.test.ts  (2 tests) 4ms
+ ✓ src/browser/skill/execution/bridge.test.ts  (2 tests) 3ms
+ ✓ src/browser/skill/runner/binding.test.ts  (2 tests) 3ms
+ ✓ src/browser/skill/runner/metadata.test.ts  (2 tests) 3ms
+ ✓ src/context/acquisition/code/source.test.ts  (4 tests) 4ms
+ ✓ src/context/compact/injection/compactInjectedContextBudget.test.ts  (2 tests) 5ms
+ ✓ src/context/compact/injection/compactInjectionState.test.ts  (3 tests) 5ms
+ ✓ src/core/subagents/team/proposal.test.ts  (14 tests) 5ms
+ ✓ src/presentation/tui/input/keyboardProtocol.test.ts  (15 tests) 5ms
+ ✓ src/presentation/tui/input/keys.test.ts  (17 tests) 4ms
+ ✓ src/presentation/tui/surface/scroll.test.ts  (6 tests) 4ms
+ ✓ src/presentation/tui/text/sgr.test.ts  (8 tests) 3ms
+ ✓ src/test-utils/browser/receipt/assertions.test.ts  (1 test) 4ms
+ ✓ src/browser/executionEvidenceRedactor.test.ts  (1 test) 4ms
+ ✓ src/browser/localFixture.test.ts  (1 test) 4ms
+ ✓ src/browser/localFixtureManifest.test.ts  (3 tests) 4ms
+ ✓ src/browser/playwrightAvailability.test.ts  (3 tests) 4ms
+ ✓ src/entrypoints/cliInteractiveLoopState.test.ts  (2 tests) 2ms
+ ✓ src/entrypoints/cliModeDispatch.test.ts  (8 tests) 4ms
+ ✓ src/model-adapters/strictAndMultimodal.test.ts  (2 tests) 3ms
+ ✓ src/observability/cacheWaste.test.ts  (2 tests) 2ms
+ ✓ src/observability/traceContext.test.ts  (3 tests) 4ms
+ ✓ src/session/sessionResultParity.test.ts  (3 tests) 4ms
+ ✓ src/test-utils/ptyCapabilityDetector.test.ts  (6 tests) 4ms
+ ✓ src/turn/intents.test.ts  (4 tests) 3ms
+ ✓ src/turn/opening.test.ts  (1 test) 3ms
+ ✓ src/cli/approval/cliApprovalAuditBridge.test.ts  (1 test) 3ms
+ ✓ src/cli/bootstrap/cliStartupSurface.test.ts  (3 tests) 2ms
+ ✓ src/cli/errors/cliFatalErrorBoundary.test.ts  (3 tests) 3ms
+ ✓ src/cli/interactive/surfaceCapability.test.ts  (4 tests) 2ms
+ ✓ src/cli/print/printModeRouter.test.ts  (1 test) 4ms
+ ✓ src/context/attachment/binding.test.ts  (1 test) 3ms
+ ✓ src/core/agent/state.test.ts  (3 tests) 14ms
+ ✓ src/core/commands/restartCommandRuntime.test.ts  (1 test) 3ms
+ ✓ src/core/shell/restoreSurfaceSummary.test.ts  (3 tests) 13ms
+ ✓ src/core/shell/startupSurfaceRenderer.test.ts  (1 test) 3ms
+ ✓ src/core/shell/turnBoundarySurface.test.ts  (4 tests) 3ms
+ ✓ src/core/tools/selectorParser.test.ts  (5 tests) 3ms
+ ✓ src/core/tools/truncation.test.ts  (4 tests) 12ms
+ ✓ src/edit/patch/types.test.ts  (3 tests) 3ms
+ ✓ src/provider/endpoints/copilot.test.ts  (2 tests) 2ms
+ ✓ src/provider/request/packet.test.ts  (1 test) 4ms
+ ✓ src/repair/flow/hypothesis.test.ts  (2 tests) 3ms
+ ✓ src/runtime/execution/commandEnvironment.test.ts  (6 tests) 4ms
+ ✓ src/runtime/execution/error.test.ts  (1 test) 3ms
+ ✓ src/runtime/execution/fileText.test.ts  (5 tests) 6ms
+ ✓ src/session/approval/sessionApprovalContinuity.test.ts  (1 test) 2ms
+ ✓ src/session/approval/sessionRequestScopeMemory.test.ts  (1 test) 3ms
+ ✓ src/session/compaction/publication.test.ts  (2 tests) 3ms
+ ✓ src/session/recovery/sessionLifecycleReadModel.test.ts  (6 tests) 3ms
+ ✓ src/session/recovery/sessionLifecycleReconciliation.test.ts  (1 test) 3ms
+ ✓ src/session/schema/sessionStateSnapshot.test.ts  (1 test) 3ms
+ ✓ src/session/store/projectBindingPolicy.test.ts  (3 tests) 2ms
+ ✓ src/session/store/sessionCreation.test.ts  (2 tests) 16ms
+ ✓ src/verification/execution/model.test.ts  (9 tests) 4ms
+ ✓ src/cli/provider/summary/budget.test.ts  (7 tests) 4ms
+ ✓ src/browser/runtime/core/availabilitySurface.test.ts  (2 tests) 3ms
+ ✓ src/browser/runtime/external/policy.test.ts  (4 tests) 3ms
+ ✓ src/browser/runtime/external/surface.test.ts  (1 test) 3ms
+ ✓ src/browser/skill/runner/readiness.test.ts  (3 tests) 3ms
+ ✓ src/browser/skill/runner/surface.test.ts  (1 test) 2ms
+ ✓ src/context/compact/governance/contextGovernance.test.ts  (1 test) 3ms
+ ✓ src/core/context/model/contextContinuityManifest.test.ts  (5 tests) 3ms
+ ✓ src/core/commands/model/defaultSource.test.ts  (7 tests) 3ms
+ ✓ src/core/query/runtime/events.test.ts  (8 tests) 4ms
+ ✓ src/presentation/tui/text/link.test.ts  (3 tests) 2ms
+ ✓ src/presentation/tui/text/motion.test.ts  (3 tests) 3ms
+ ✓ src/presentation/tui/transcript/table.test.ts  (5 tests) 3ms
+ ✓ src/test-utils/browser/cache/report.test.ts  (1 test) 2ms
+ ✓ src/browser/skillManagedRunnerPolicy.test.ts  (2 tests) 2ms
+ ✓ src/cli/interactive/promptChrome.test.ts  (2 tests) 3ms
+ ✓ src/context/request/identity.test.ts  (1 test) 3ms
+ ✓ src/cli/provider/cliProviderRuntimeBridge.test.ts  (2 tests) 3ms
+ ✓ src/core/shell/sessionPrintOutputProjection.test.ts  (2 tests) 2ms
+ ✓ src/core/shell/stateMachine.test.ts  (2 tests) 3ms
+ ✓ src/core/state/changes.test.ts  (2 tests) 3ms
+ ✓ src/provider/registry/provider.test.ts  (1 test) 3ms
+ ✓ src/result/terminal/truth.test.ts  (4 tests) 2ms
+ ✓ src/session/approval/auditProjection.test.ts  (3 tests) 3ms
+ ✓ src/session/continuation/sessionPromptContinuity.test.ts  (1 test) 3ms
+ ✓ src/session/lifecycle/durableStatusProjection.test.ts  (4 tests) 3ms
+ ✓ src/session/lifecycle/sessionTerminalStore.test.ts  (2 tests) 3ms
+ ✓ src/session/presentation/sessionWarningSurface.test.ts  (2 tests) 2ms
+ ✓ src/session/store/sessionProjectBinding.test.ts  (1 test) 3ms
+ ✓ src/browser/skill/runner/capability.test.ts  (2 tests) 3ms
+ ✓ src/advisor/review.test.ts  (13 tests) 966ms
+ ✓ src/turn/fileAccess.test.ts  (3 tests) 1089ms
+ ✓ src/session/query/navigation/source.test.ts  (21 tests) 1761ms
+
+ Test Files  1098 passed (1098)
+      Tests  14357 passed | 2 skipped (14359)
+   Start at  17:35:02
+   Duration  1124.58s (transform 8.70s, setup 38ms, collect 318.25s, tests 1704.91s, environment 131ms, prepare 46.01s)
+

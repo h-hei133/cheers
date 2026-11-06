@@ -1,0 +1,8 @@
+npm notice run cheers@0.1.0 verify:docs-drift:strict
+npm notice run node scripts/verify-docs-and-rules-drift.mjs --strict
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=25 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+0.1.0
+{"head":"a5c600f78a800ca6517d6dc1a9ab3112125ef869","sourceFiles":3119,"sourceSha256":"5dd60d319afad5baa58bd9a179730c52f0c475d3d736f2187282affcfae14460","sourceDigestFormat":"SHA-256 of JSON.stringify of parsed source-files.json","sourceDrift":0,"buildId":"008c420bf49f9b3f21f277ef466b2a8d93b3963dcdb9300d4a37946d7da5478f","buildFresh":true,"testFilesPassed":13,"testsPassed":279,"focusedExit":0,"fullSuiteRerun":false,"runtime":"v24.15.0","platform":"linux-x64","referenceHead":"716cfea2d7c3d6857f45cb58242e6197c9d47a11","referenceClean":true,"changedModuleStructure":"within-ceiling     6    93        0.17          3        15.5  core/hooks/stop/result.ts"}

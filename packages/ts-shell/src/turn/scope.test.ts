@@ -30,7 +30,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { re
 
 function options(scope: ToolScopeBinding = binding) {
   return { sessionId: 'sess_scope', workspaceRoot: root, configScope: scope,
-    hooks: { dispatch: async () => ({ decision: 'allow' as const }) } as unknown as HookDispatcher,
+    hooks: { dispatch: async () => ({ decision: 'allow' as const, stopChecks: [] }) } as unknown as HookDispatcher,
     emit: () => {} };
 }
 

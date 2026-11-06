@@ -19,9 +19,10 @@ export interface SessionReentrySummary {
   readonly pendingPrompt?: string;
   readonly runPhase?: "idle" | "prompt-persisted" | "turn-active";
   readonly lastError?: string;
-  readonly durableStatus?: "success" | "stopped" | "error";
+  readonly durableStatus?: "success" | "stopped" | "error" | "completed_unproven";
   readonly terminalReason?: TerminalReason;
   readonly terminalClassification?: TerminalClassification;
+  readonly terminalReasonCode?: string;
   readonly lastUserMessage?: string;
   readonly lastAssistantMessage?: string;
   readonly recoverable: boolean;
@@ -68,6 +69,7 @@ export function projectSessionReentrySummary(input: {
     durableStatus: recoverySnapshot.durableStatus,
     terminalReason: recoverySnapshot.terminalReason,
     terminalClassification: recoverySnapshot.terminalClassification,
+    terminalReasonCode: recoverySnapshot.terminalReasonCode,
     lastUserMessage: messageToText(recoverySnapshot.lastUserMessage?.content),
     lastAssistantMessage: messageToText(recoverySnapshot.lastAssistantMessage?.content),
     recoverable: trustBoundary.recoverable,

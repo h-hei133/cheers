@@ -177,6 +177,9 @@ export function buildSessionContinuitySnapshot(input: {
     lastAssistantOutput: findLastTurnContent(selectedTurns, "assistant"),
     lastTerminalClassification: continuityTerminalSource?.terminalClassification,
     lastTerminalReason: continuityTerminalSource?.terminalReason,
+    lastTerminalReasonCode: lastQueryCompletion?.event.type === 'query.completed_unproven'
+      ? lastQueryCompletion.event.reasonCode : continuityTerminalSource?.terminalReasonCode
+        ?? (allowTerminalFallback ? recoverySnapshot.terminalReasonCode : undefined),
     lastFailure: unresolvedProjection.lastFailure,
     lastTaskKind: useStoredResult ? storedResult.taskKind : lastCodingResult?.taskKind,
     ...(lastCodingResult?.lastActionResultSeed

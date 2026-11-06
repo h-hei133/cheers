@@ -13,9 +13,11 @@ export async function dispatchStop(input: {
   readonly options: StopDispatchOptions;
 }): Promise<HookDecision> {
   const checks: StopCheck[] = [];
+  let unproven: HookDecision | undefined;
   const { payload, options } = input;
   const accept = (identity: string, result: HookDecision, started: number): HookDecision => {
     const check = stopCheck(identity, result, Date.now() - started);
+    if (result.stopDisposition === 'completed_unproven') unproven ??= result;
     checks.push(check);
     options.onResult?.(check);
     return { ...result, stopChecks: [...checks] };
@@ -40,5 +42,5 @@ export async function dispatchStop(input: {
     const decision = accept(hook.command, input.current() ? result : stopUnknown('registration_changed'), started);
     if (decision.decision !== 'allow') return decision;
   }
-  return { decision: 'allow', reasonCode: checks.length ? 'explicit_allow' : 'not_configured', stopChecks: checks };
+  return { ...(unproven ?? { decision: 'allow', reasonCode: checks.length ? 'explicit_allow' : 'not_configured' }), stopChecks: checks };
 }

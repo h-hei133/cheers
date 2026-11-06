@@ -323,7 +323,7 @@ export function findLastQueryCompletionEvent(
   transcriptEvents: readonly TranscriptEvent[],
 ):
   | Extract<TranscriptEvent, { type: "query-event" }> & {
-      event: Extract<QueryEvent, { type: "query.completed" }>;
+      event: Extract<QueryEvent, { type: "query.completed" | "query.completed_unproven" }>;
     }
   | undefined {
   for (let index = transcriptEvents.length - 1; index >= 0; index -= 1) {
@@ -331,9 +331,9 @@ export function findLastQueryCompletionEvent(
     if (event?.type !== "query-event") {
       continue;
     }
-    if (event.event.type === "query.completed") {
+    if (event.event.type === "query.completed" || event.event.type === "query.completed_unproven") {
       return event as Extract<TranscriptEvent, { type: "query-event" }> & {
-        event: Extract<QueryEvent, { type: "query.completed" }>;
+        event: Extract<QueryEvent, { type: "query.completed" | "query.completed_unproven" }>;
       };
     }
   }
@@ -360,12 +360,12 @@ export function findLastCodingCompletionEvent(
   transcriptEvents: readonly TranscriptEvent[],
 ):
   | (Extract<TranscriptEvent, { type: "query-event" }> & {
-      event: Extract<QueryEvent, { type: "query.completed" }>;
+      event: Extract<QueryEvent, { type: "query.completed" | "query.completed_unproven" }>;
     })
   | undefined {
   let fallback:
     | (Extract<TranscriptEvent, { type: "query-event" }> & {
-        event: Extract<QueryEvent, { type: "query.completed" }>;
+        event: Extract<QueryEvent, { type: "query.completed" | "query.completed_unproven" }>;
       })
     | undefined;
   for (let index = transcriptEvents.length - 1; index >= 0; index -= 1) {
@@ -373,13 +373,13 @@ export function findLastCodingCompletionEvent(
     if (event?.type !== "query-event") {
       continue;
     }
-    if (event.event.type !== "query.completed") {
+    if (event.event.type !== "query.completed" && event.event.type !== "query.completed_unproven") {
       continue;
     }
     const codingResult = event.event.result.codingResult;
     if (codingResult) {
       const typedEvent = event as Extract<TranscriptEvent, { type: "query-event" }> & {
-        event: Extract<QueryEvent, { type: "query.completed" }>;
+        event: Extract<QueryEvent, { type: "query.completed" | "query.completed_unproven" }>;
       };
       if (codingResult.taskKind !== "chat") {
         return typedEvent;
@@ -402,7 +402,7 @@ export function collectRecentCodingResults(
       break;
     }
     const event = transcriptEvents[index];
-    if (event?.type !== "query-event" || event.event.type !== "query.completed") {
+    if (event?.type !== "query-event" || (event.event.type !== "query.completed" && event.event.type !== "query.completed_unproven")) {
       continue;
     }
     const codingResult = event.event.result.codingResult;

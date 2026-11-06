@@ -1,0 +1,46 @@
+{
+  "summaryVersion": "0.10.1",
+  "runId": "generated-structure-judge",
+  "sourceVerdict": "partial",
+  "enforcementMode": "shadow",
+  "wouldBlock": false,
+  "didBlock": false,
+  "openBlockingObligationCount": 0,
+  "openBlockingObligations": [],
+  "topProofGaps": [
+    {
+      "obligationId": "declared_functions_within_module_ceiling",
+      "kind": "contradictory_evidence",
+      "reason": "21 declared names against a ceiling of 20",
+      "claimId": "packages/ts-shell/src/cli/interactive/interactiveMode.test.ts"
+    },
+    {
+      "obligationId": "declared_functions_within_module_ceiling",
+      "kind": "contradictory_evidence",
+      "reason": "22 declared names against a ceiling of 20",
+      "claimId": "packages/ts-shell/src/cli/interactive/interactiveMode.ts"
+    }
+  ],
+  "nextEvidenceNeeded": [],
+  "repairItemSummaries": [],
+  "artifactPaths": {
+    "verdict": "verdict.json",
+    "ledger": "ledger.json",
+    "enforcement": "enforcement.json",
+    "report": "report.md"
+  },
+  "scopeHints": {
+    "capacityStatus": "healthy",
+    "totalGapsCount": 2,
+    "totalObligationsCount": 0,
+    "totalRepairItemsCount": 0,
+    "isTruncated": false,
+    "message": "Capacity usage is within safe limits."
+  },
+  "tokenBudgetHint": {
+    "estimatedCategory": "medium",
+    "recommendedLimit": 4000,
+    "contextSizeRecommendation": "Suitable for medium-context analysis."
+  },
+  "createdAt": "2026-11-06T10:27:26.394Z"
+}

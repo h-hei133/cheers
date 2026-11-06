@@ -109,6 +109,7 @@ export function hasDeterministicTerminalEvidence(
 
   return (
     snapshot.lastLifecycleEvent?.event === "run-completed" ||
+    snapshot.lastLifecycleEvent?.event === "run-completed-unproven" ||
     snapshot.lastLifecycleEvent?.event === "run-error" ||
     snapshot.lastLifecycleEvent?.event === "run-terminated"
   );

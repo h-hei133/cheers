@@ -1,0 +1,65 @@
+npm notice run cheers@0.1.0 verify:import-cycles
+npm notice run node scripts/check-import-cycles.mjs
+scc-gate root=packages/ts-shell/src files=3100
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+npm notice run cheers@0.1.0 check:declarations
+npm notice run node scripts/check-declarations.mjs
+declaration-check hook_events=18 dispatched=18 tool_factories=13 registered=13 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+npm notice run cheers@0.1.0 check:node-floor
+npm notice run node scripts/check-node-floor.mjs
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+npm notice run cheers@0.1.0 test:ts
+npm notice run npm run test -w packages/ts-shell
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/test-utils/browser/healing/cli/scenarios.test.ts  (12 tests) 82206ms
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Interactive cleanup failed; terminal restoration was not fully verified.
+
+Interactive cleanup failed; terminal restoration was not fully verified.
+
+
+ ✓ src/cli/interactive/interactiveMode.test.ts  (405 tests) 71670ms
+ ❯ src/cli/print/profile.test.ts  (2 tests | 1 failed) 45310ms
+   ❯ src/cli/print/profile.test.ts > pipe isolates profile connections and one-time approval across fresh CLI processes
+     → Command failed: /home/wang/.nvm/versions/node/v24.15.0/bin/node --max-old-space-size=512 /home/wang/projects/cheers/node_modules/tsx/dist/cli.mjs /home/wang/projects/cheers/packages/ts-shell/src/entrypoints/cli.tsx --profile beta --project /tmp/cheers-test/profile-cli-vGvN2b/workspace --print --non-interactive-approval allow-once
+Transform failed with 1 error:
+/home/wang/projects/cheers/packages/ts-shell/src/session/continuation/inspection.ts:11:47: ERROR: Expected identifier but found "("
+
+(node:41173) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/cli/evaluation/runtime.test.ts  (14 tests) 56397ms
+Terminated
+npm error Lifecycle script `test` failed with error:
+npm error code 143
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run

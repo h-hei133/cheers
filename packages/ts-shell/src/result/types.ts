@@ -5,12 +5,13 @@ export type AgentRole = 'planner' | 'coder' | 'reviewer'
 export type ContinuationReason = 'handoff' | 'retryable-error'
 export type TerminalReason =
   | 'completed'
+  | 'completed_unproven'
   | 'stopped_cycle'
   | 'stopped_max_turns'
   | 'stopped_invalid_handoff'
   | 'stopped_not_proven'
   | 'stopped_error'
-export type TerminalClassification = 'success' | 'stopped' | 'error'
+export type TerminalClassification = 'success' | 'stopped' | 'error' | 'completed_unproven'
 
 export interface HandoffRecord {
   readonly from: AgentRole

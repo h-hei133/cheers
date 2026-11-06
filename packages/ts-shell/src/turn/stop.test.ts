@@ -43,7 +43,8 @@ function records(events: readonly QueryEvent[]): LifecycleRecord[] {
 
 function report(probe: string, events: readonly QueryEvent[], attempts: number) {
   console.log(JSON.stringify({ probe, attempts, reentries: Math.max(0, attempts - 1), completed: events.filter(e => e.type === 'query.completed').length,
-    terminal: records(events).filter(e => e.kind === 'stop_state' && e.terminal).at(-1) }));
+    terminal: records(events).filter(e => e.kind === 'stop_state' && e.terminal).at(-1),
+    finalEvent: events.at(-1) }));
 }
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
@@ -89,18 +90,33 @@ describe('Stop completion lifecycle', () => {
   });
 
   it.each([
-    ['unknown', { decision: 'unknown' }],
+    ['unknown', { decision: 'unknown', reasonCode: 'unknown' }],
     ['could_not_decide', { decision: 'allow', reasonCode: 'could_not_decide' }],
     ['could_not_judge', { decision: 'allow', reasonCode: 'could_not_judge' }],
-    ['already_blocked_once', { decision: 'allow', reasonCode: 'already_blocked_once' }],
-    ['unsupported', { decision: 'unsupported' }],
+    ['invalid_output', { decision: 'unknown', reasonCode: 'invalid_output' }],
+    ['empty_output', { decision: 'unknown', reasonCode: 'empty_output' }],
+    ['process_failed', { decision: 'unknown', reasonCode: 'process_failed' }],
+    ['unsupported', { decision: 'unsupported', reasonCode: 'unsupported' }],
   ] as const)('does not upgrade %s to completed', async (probe, result) => {
     const f = fixture(() => result);
     const events = await drain(f.options);
     expect(f.step).toHaveBeenCalledTimes(1);
     expect(events.at(-1)).toMatchObject({ type: 'query.failed', stopStatus: 'unknown' });
     expect(events.some(e => e.type === 'query.completed')).toBe(false);
+    expect(events.some(e => e.type === 'query.completed_unproven')).toBe(false);
     report(probe, events, f.attempts.length);
+  });
+
+  // C2 required query.failed for already_blocked_once to prevent unverified success.
+  // R0b keeps that no-success assertion and requires a separate neutral terminal event.
+  it.each(['already_blocked_once', 'not_configured'] as const)('settles %s without proof, completed or failure', async reasonCode => {
+    const f = fixture(() => ({ decision: 'allow', reasonCode, proofVerdict: 'not_reported' }));
+    const events = await drain(f.options);
+    expect(events.at(-1)).toMatchObject({ type: 'query.completed_unproven', reasonCode, proofVerdict: 'not_reported',
+      result: { terminalClassification: 'completed_unproven' } });
+    expect(events.some(e => e.type === 'query.completed' || e.type === 'query.failed')).toBe(false);
+    expect(records(events)).toContainEqual(expect.objectContaining({ kind: 'proof_verdict', verdict: 'not_reported' }));
+    report(reasonCode, events, f.attempts.length);
   });
 
   it('keeps timeout and handler failure unknown', async () => {
@@ -113,6 +129,7 @@ describe('Stop completion lifecycle', () => {
       const events = await drain(f.options);
       expect(events.at(-1)).toMatchObject({ type: 'query.failed', stopStatus: 'unknown', error: expect.stringContaining(failure) });
       expect(events.some(e => e.type === 'query.completed')).toBe(false);
+      expect(events.some(e => e.type === 'query.completed_unproven')).toBe(false);
       expect(JSON.stringify(events)).not.toContain('private failure detail');
       report(failure, events, 1);
     }
@@ -127,6 +144,18 @@ describe('Stop completion lifecycle', () => {
       stopReason: 'error', errorMessage: 'synthetic provider failure' }) });
     expect((await drain(failed.options)).at(-1)).toMatchObject({ type: 'query.failed' });
     expect(failed.attempts).toHaveLength(0);
+  });
+
+  it('keeps a closing tool refusal stopped even when Stop reports no new proof', async () => {
+    const execute = vi.fn(async () => ({ success: true, output: 'must not execute' }));
+    const f = fixture(() => ({ decision: 'allow', reasonCode: 'not_configured', proofVerdict: 'not_reported' }), {
+      maxSteps: 1, tools: new Map([['read', { name: 'read', description: 'fixture', argsSchema: { type: 'object' }, execute }]]) });
+    f.step.mockImplementationOnce(async () => ({ text: 'Candidate', toolCalls: [{ id: 'closing', name: 'read', args: {} }], stopReason: 'stop' }));
+    const events = await drain(f.options);
+    expect(execute).not.toHaveBeenCalled();
+    expect(events.at(-1)).toMatchObject({ type: 'query.completed', result: { terminalClassification: 'stopped' } });
+    expect(events.some(event => event.type === 'query.completed_unproven')).toBe(false);
+    expect(records(events).at(-1)).toMatchObject({ kind: 'stop_state', state: 'stopped', terminal: true, reasonCode: 'candidate_stopped' });
   });
 
   it('keeps the remaining-step closing tool refusal active during repair', async () => {
@@ -151,6 +180,7 @@ describe('Stop completion lifecycle', () => {
     const events = await drain(f.options);
     expect(events.some(e => e.type === 'query.completed')).toBe(false);
     expect(events.at(-1)).toMatchObject({ type: 'query.failed', stopStatus: 'unknown' });
+    expect(events.some(e => e.type === 'query.completed_unproven')).toBe(false);
     expect(f.step).toHaveBeenCalledTimes(1);
     report(`command-${failure}`, events, 1);
   });

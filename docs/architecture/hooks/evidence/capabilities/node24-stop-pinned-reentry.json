@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+    "<scratch>/pinned/package/dist/adapters/cli/normproof.js",
+    "gate",
+    "stop",
+    "--emit-result"
+  ],
+  "cwd": "<scratch>/violating",
+  "stdin": "{\"cwd\":\"<scratch>/violating\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":true}",
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 295,
+  "error": null,
+  "stdout": "",
+  "stderr": "[2026-11-06T10:27:27.557Z] [check-run] [INFO] Harness Check Event Trace\n[2026-11-06T10:27:27.561Z] [check-run] [INFO] Check-run evaluation completed with status: failed\n"
+}

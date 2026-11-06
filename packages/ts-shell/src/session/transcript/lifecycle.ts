@@ -1,7 +1,7 @@
 import { isRecord } from '../../core/values/record.js';
 
 const VERDICTS = new Set<unknown>(['proven', 'partial', 'refuted', 'failed', 'not_proven', 'unknown', 'not_reported']);
-const STATES = new Set<unknown>(['checking', 'blocked', 'repairing', 'accepted', 'stopped', 'unknown']);
+const STATES = new Set<unknown>(['checking', 'blocked', 'repairing', 'accepted', 'stopped', 'unknown', 'completed_unproven']);
 const HASH = /^[a-f0-9]{64}$/;
 
 function strings(value: unknown): boolean {
@@ -33,7 +33,9 @@ export function readableLifecycleRecord(value: Record<string, unknown>): boolean
       && ['requested', 'approved', 'denied'].includes(String(value.status));
     case 'execution': return typeof value.toolName === 'string' && typeof value.taskId === 'string'
       && ['reported_success', 'reported_failure'].includes(String(value.status));
-    case 'stop_state': return STATES.has(value.state) && typeof value.reasonCode === 'string' && typeof value.terminal === 'boolean';
+    case 'stop_state': return STATES.has(value.state) && typeof value.reasonCode === 'string' && typeof value.terminal === 'boolean'
+      && (value.state !== 'completed_unproven' || value.terminal === true
+        && ['already_blocked_once', 'not_configured'].includes(value.reasonCode));
     default: return false;
   }
 }

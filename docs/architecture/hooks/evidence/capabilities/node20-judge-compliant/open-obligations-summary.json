@@ -1,0 +1,33 @@
+{
+  "summaryVersion": "0.10.1",
+  "runId": "generated-structure-judge",
+  "sourceVerdict": "proven",
+  "enforcementMode": "shadow",
+  "wouldBlock": false,
+  "didBlock": false,
+  "openBlockingObligationCount": 0,
+  "openBlockingObligations": [],
+  "topProofGaps": [],
+  "nextEvidenceNeeded": [],
+  "repairItemSummaries": [],
+  "artifactPaths": {
+    "verdict": "verdict.json",
+    "ledger": "ledger.json",
+    "enforcement": "enforcement.json",
+    "report": "report.md"
+  },
+  "scopeHints": {
+    "capacityStatus": "healthy",
+    "totalGapsCount": 0,
+    "totalObligationsCount": 0,
+    "totalRepairItemsCount": 0,
+    "isTruncated": false,
+    "message": "Capacity usage is within safe limits."
+  },
+  "tokenBudgetHint": {
+    "estimatedCategory": "low",
+    "recommendedLimit": 2000,
+    "contextSizeRecommendation": "Suitable for low-context analysis."
+  },
+  "createdAt": "2026-11-06T10:26:56.939Z"
+}

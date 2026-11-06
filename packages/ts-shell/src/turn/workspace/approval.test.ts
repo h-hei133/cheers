@@ -27,7 +27,7 @@ afterEach(() => { vi.unstubAllEnvs(); fs.rmSync(fixture, { recursive: true, forc
 function setup(handler?: (prompt: EscalationPrompt) => Promise<EscalationResponse>, overrides: Partial<ToolGateOptions> = {}) {
   const approval = vi.fn(handler ?? (async prompt => ({ promptId: prompt.id, respondedAt: Date.now(), decision: 'allow-once' })));
   const options: ToolGateOptions = { sessionId: 'sess_external', workspaceRoot: primary, permissionScope: 'accept-edits',
-    hooks: { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher,
+    hooks: { dispatch: async () => ({ decision: 'allow', stopChecks: [] }) } as unknown as HookDispatcher,
     escalationPromptHandler: approval, emit: () => {}, ...overrides };
   const definitions = createCoreToolRegistry();
   const tools = adaptTools(definitions, options), hooks = createToolHooks(options, definitions);

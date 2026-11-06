@@ -1,0 +1,108 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/turn/stop.envelope.test.ts -t preserves neutral
+
+ RUN  v0.34.6 /home/wang/projects/cheers/packages/ts-shell
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > preserves neutral already_blocked_once through terminal consumers
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.completed_unproven","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":1,"stop_hook_active":true,"reasonCode":"already_blocked_once","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_282162f3bbab3060_1793956092196","initialPrompt":"fixture","notes":["steps: 2"],"handoffs":[]},"finalOutput":"Candidate 2","stopReason":"already_blocked_once"}},"steps":2,"eventSequence":[{"type":"query.started","sessionId":"sess_282162f3bbab3060_1793956092196","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"block","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"],"durationMs":4}},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"not_proven","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"blocked","reasonCode":"actionable_gap","terminal":false},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":1,"stop_hook_active":true,"sequence":6,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"repairing","reasonCode":"hook_blocked","terminal":false},{"type":"query.retrying","role":"coder","turn":1,"attempt":1,"reason":"Stop check blocked completion; attempting repair (1/1)."},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":1,"stop_hook_active":true,"sequence":7,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"model_answer","step":2,"status":"answered","messageIdentity":"30ab336ee952f64676a76eeaa8bbe3ada2f284b3ede3290c4b6a777c8d2e1af8"},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":1,"stop_hook_active":true,"sequence":8,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"actionable_gap","proofVerdict":"not_proven","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":1,"stop_hook_active":true,"sequence":9,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"allow","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["unspecified"],"durationMs":4,"stopDisposition":"completed_unproven"}},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":1,"stop_hook_active":true,"sequence":10,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"not_reported","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":1,"stop_hook_active":true,"sequence":11,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"completed_unproven","reasonCode":"already_blocked_once","terminal":true},{"type":"query.completed_unproven","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":1,"stop_hook_active":true,"reasonCode":"already_blocked_once","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_282162f3bbab3060_1793956092196","initialPrompt":"fixture","notes":["steps: 2"],"handoffs":[]},"finalOutput":"Candidate 2","stopReason":"already_blocked_once"}}],"projections":{"session":{"status":"completed","durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"already_blocked_once"},"recovery":{"durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"already_blocked_once"},"continuity":{"classification":"completed_unproven","reasonCode":"already_blocked_once"},"cli":["Candidate 2","Result","- Outcome: completed_unproven","- Detail: already_blocked_once","","\nExecution summary","- Provider retries: 1",""],"sinkInterrupted":false,"settlement":["completed_unproven"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":18,"kind":"query.completed_unproven","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_4cc7d093","sourceEntryId":"turn_250ba92e","event":{"type":"query.started","sessionId":"sess_282162f3bbab3060_1793956092196","prompt":"fixture"},"timestamp":"2026-11-06T09:08:12.231Z"},{"type":"query-event","id":"qevt_e808ff18","sourceEntryId":"turn_9e25b140","event":{"type":"query.retrying","role":"coder","turn":1,"attempt":1,"reason":"Stop check blocked completion; attempting repair (1/1)."},"timestamp":"2026-11-06T09:08:12.271Z"},{"type":"query-event","id":"qevt_721d4445","sourceEntryId":"turn_f359a923","event":{"type":"query.completed_unproven","attemptId":"ca7dd80b-274c-45a4-ad56-3a5156f0bca7","reentryCount":1,"stop_hook_active":true,"reasonCode":"already_blocked_once","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_282162f3bbab3060_1793956092196","initialPrompt":"fixture","notes":["steps: 2"],"handoffs":[]},"finalOutput":"Candidate 2","stopReason":"already_blocked_once"}},"timestamp":"2026-11-06T09:08:12.299Z"}]}}
+
+stdout | src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > preserves neutral not_configured through terminal consumers
+{"probe":"envelope-lifecycle","finalEvent":{"type":"query.completed_unproven","attemptId":"b9e2bbb5-59ce-4609-8774-3f34eff0789b","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_a556aa65820faebc_1793956092330","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}},"steps":1,"eventSequence":[{"type":"query.started","sessionId":"sess_a556aa65820faebc_1793956092330","prompt":"fixture"},{"type":"message.started","role":"coder"},{"type":"message.finished","role":"coder"},{"type":"lifecycle.record","attemptId":"b9e2bbb5-59ce-4609-8774-3f34eff0789b","reentryCount":0,"stop_hook_active":false,"sequence":1,"progressFingerprint":{"version":1,"checks":[]},"kind":"model_answer","step":1,"status":"answered","messageIdentity":"cdbccb3dedb25783bf261938a9b95a8bb78e4ddd31ba849ffb75e6007ac69d74"},{"type":"lifecycle.record","attemptId":"b9e2bbb5-59ce-4609-8774-3f34eff0789b","reentryCount":0,"stop_hook_active":false,"sequence":2,"progressFingerprint":{"version":1,"checks":[]},"kind":"stop_state","state":"checking","reasonCode":"candidate_answer","terminal":false},{"type":"lifecycle.record","attemptId":"b9e2bbb5-59ce-4609-8774-3f34eff0789b","reentryCount":0,"stop_hook_active":false,"sequence":3,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"hook_result","result":{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","decision":"allow","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"],"durationMs":3,"stopDisposition":"completed_unproven"}},{"type":"lifecycle.record","attemptId":"b9e2bbb5-59ce-4609-8774-3f34eff0789b","reentryCount":0,"stop_hook_active":false,"sequence":4,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"proof_verdict","command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","verdict":"not_reported","evidenceIdentity":["unspecified"]},{"type":"lifecycle.record","attemptId":"b9e2bbb5-59ce-4609-8774-3f34eff0789b","reentryCount":0,"stop_hook_active":false,"sequence":5,"progressFingerprint":{"version":1,"checks":[{"command":"bf0d7336a1a7999a24a61a3226678b851b8852549568e50ef149c5acc77a02f3","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}]},"kind":"stop_state","state":"completed_unproven","reasonCode":"not_configured","terminal":true},{"type":"query.completed_unproven","attemptId":"b9e2bbb5-59ce-4609-8774-3f34eff0789b","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_a556aa65820faebc_1793956092330","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}}],"projections":{"session":{"status":"completed","durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"not_configured"},"recovery":{"durableStatus":"completed_unproven","classification":"completed_unproven","reasonCode":"not_configured"},"continuity":{"classification":"completed_unproven","reasonCode":"not_configured"},"cli":["Candidate 1","Result","- Outcome: completed_unproven","- Detail: not_configured",""],"sinkInterrupted":false,"settlement":["completed_unproven"],"relay":[{"sequence":1,"kind":"query.started","timestamp":0},{"sequence":9,"kind":"query.completed_unproven","timestamp":0}],"replayTerminal":[{"type":"query-event","id":"qevt_fc883d58","sourceEntryId":"turn_36798518","event":{"type":"query.started","sessionId":"sess_a556aa65820faebc_1793956092330","prompt":"fixture"},"timestamp":"2026-11-06T09:08:12.353Z"},{"type":"query-event","id":"qevt_944a00fe","sourceEntryId":"turn_75511234","event":{"type":"query.completed_unproven","attemptId":"b9e2bbb5-59ce-4609-8774-3f34eff0789b","reentryCount":0,"stop_hook_active":false,"reasonCode":"not_configured","proofVerdict":"not_reported","result":{"status":"completed_unproven","terminalClassification":"completed_unproven","terminalReason":"completed_unproven","transcript":[],"sharedContext":{"sessionId":"sess_a556aa65820faebc_1793956092330","initialPrompt":"fixture","notes":["steps: 1"],"handoffs":[]},"finalOutput":"Candidate 1","stopReason":"not_configured"}},"timestamp":"2026-11-06T09:08:12.381Z"}]}}
+
+ ❯ src/turn/stop.envelope.test.ts  (21 tests | 2 failed | 19 skipped) 205ms
+   ❯ src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > preserves neutral already_blocked_once through terminal consumers
+     → expected { status: 'completed', …(9) } to match object { status: 'completed_unproven', …(4) }
+   ❯ src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > preserves neutral not_configured through terminal consumers
+     → expected { status: 'completed', …(9) } to match object { status: 'completed_unproven', …(4) }
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > preserves neutral already_blocked_once through terminal consumers
+ FAIL  src/turn/stop.envelope.test.ts > versioned Stop envelope end-to-end > preserves neutral not_configured through terminal consumers
+AssertionError: expected { status: 'completed', …(9) } to match object { status: 'completed_unproven', …(4) }
+
+- Expected
++ Received
+
+  Object {
+    "durableStatus": "completed_unproven",
++   "pendingLifecycle": Object {
++     "pendingApprovals": Object {},
++     "pendingTools": Object {},
++     "taskStates": Object {},
++   },
++   "projectRoot": "/home/wang/projects/cheers/.tmp/stop-envelope-validation/session-qpbdT3",
+    "runPhase": "idle",
+-   "status": "completed_unproven",
++   "status": "completed",
+    "terminalClassification": "completed_unproven",
++   "terminalReason": "completed_unproven",
+    "terminalReasonCode": "already_blocked_once",
++   "thread": Object {
++     "activeLeafId": "turn_f359a923",
++     "branches": Array [],
++     "compactions": Array [],
++     "entries": Array [
++       Object {
++         "id": "sess_282162f3bbab3060_1793956092196:root",
++         "kind": "session-root",
++         "order": 0,
++         "timestamp": "2026-11-06T09:08:12.196Z",
++       },
++       Object {
++         "id": "turn_250ba92e",
++         "kind": "turn-message",
++         "order": 1,
++         "parentId": "sess_282162f3bbab3060_1793956092196:root",
++         "role": "user",
++         "timestamp": "2026-11-06T09:08:12.216Z",
++       },
++       Object {
++         "id": "turn_9e25b140",
++         "kind": "turn-message",
++         "order": 2,
++         "parentId": "turn_250ba92e",
++         "role": "assistant",
++         "timestamp": "2026-11-06T09:08:12.237Z",
++       },
++       Object {
++         "id": "turn_f359a923",
++         "kind": "turn-message",
++         "order": 3,
++         "parentId": "turn_9e25b140",
++         "role": "assistant",
++         "timestamp": "2026-11-06T09:08:12.275Z",
++       },
++     ],
++     "schemaVersion": 1,
++   },
++   "workingMemory": Object {
++     "sourceEventCount": 14,
++     "sourceTurnCount": 1,
++     "updatedAt": "2026-11-06T09:08:12.300Z",
++   },
+  }
+
+ ❯ expectNeutral src/turn/stop.envelope.test.ts:75:24
+     73|     result: { status: 'completed_unproven', terminalClassification: 'c…
+     74|   expect(result.events.some(event => event.type === 'query.completed' …
+     75|   expect(result.state).toMatchObject({ status: 'completed_unproven', d…
+       |                        ^
+     76|     terminalClassification: 'completed_unproven', terminalReasonCode: …
+     77|   expect(result.state.lastError).toBeUndefined(); expect(result.state.…
+ ❯ src/turn/stop.envelope.test.ts:94:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 19 skipped (21)
+   Start at  17:08:08
+   Duration  3.50s (transform 2.27s, setup 0ms, collect 3.05s, tests 205ms, environment 0ms, prepare 58ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/turn/stop.envelope.test.ts -t 'preserves neutral'

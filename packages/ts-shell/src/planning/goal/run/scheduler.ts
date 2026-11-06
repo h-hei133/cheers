@@ -57,7 +57,9 @@ export class GoalScheduler {
 
   observe(event: QueryEvent): void {
     if (!this.active) return;
-    if (event.type === 'query.completed') {
+    if (event.type === 'query.completed_unproven') {
+      this.outcome = 'completed_unproven';
+    } else if (event.type === 'query.completed') {
       this.outcome = event.result.terminalReason === 'stopped_max_turns' ? 'step-limit'
         : event.result.terminalClassification !== 'success' ? 'refused' : 'answer';
       if (this.outcome === 'refused') this.failure = 'refused';

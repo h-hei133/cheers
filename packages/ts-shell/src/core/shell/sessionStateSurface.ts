@@ -145,7 +145,7 @@ export function formatCurrentSessionLines(
   }
   if (summary.terminalClassification || summary.terminalReason) {
     lines.push(
-      `- Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
+      `- Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReasonCode ? ` (${summary.terminalReasonCode})` : summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
     );
   }
   if (!summary.recoverable && summary.blockedDetail) {
@@ -176,7 +176,7 @@ export function formatSwitchedSessionLines(
   }
   if (summary.terminalClassification || summary.terminalReason) {
     lines.push(
-      `Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
+      `Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReasonCode ? ` (${summary.terminalReasonCode})` : summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
     );
   }
   return lines;

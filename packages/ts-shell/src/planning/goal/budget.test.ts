@@ -233,7 +233,7 @@ catch (error) { console.log(error.code); }
       step: modelStep, maxSteps: 2, tools: new Map(), claimBudgetSummary: policy.claimBudgetSummary,
       signal: new AbortController().signal,
       onPromptIdentity: publishIdentity, cacheWarming: { noteRequest, noteSettled() {} } as never,
-      hooks: { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher,
+      hooks: { dispatch: async () => ({ decision: 'allow', stopChecks: [] }) } as unknown as HookDispatcher,
       onMessage: message => manager.addTurn(session.id, message) });
     const events = [];
     for await (const event of run.events) events.push(event);

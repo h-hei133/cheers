@@ -57,11 +57,12 @@ export interface SessionStateSnapshot {
   pendingPromptEntryId?: string;
   lastError?: string;
   workingMemory?: unknown;
-  durableStatus?: "success" | "stopped" | "error";
+  durableStatus?: "success" | "stopped" | "error" | "completed_unproven";
   runPhase?: "idle" | "prompt-persisted" | "turn-active";
   interruptedKind?: "prompt" | "turn";
   terminalReason?: TerminalReason;
   terminalClassification?: TerminalClassification;
+  terminalReasonCode?: import('../../core/hooks/stop/model.js').UnprovenCompletionReason;
   lastContinuationReason?: ContinuationReason;
   pendingLifecycle?: DurableLifecycleIndex;
   harness?: SessionHarnessState;
@@ -69,6 +70,7 @@ export interface SessionStateSnapshot {
 }
 
 export interface TerminalPersistence {
+  readonly terminalReasonCode?: import('../../core/hooks/stop/model.js').UnprovenCompletionReason;
   readonly terminalReason?: TerminalReason;
   readonly terminalClassification?: TerminalClassification;
   readonly lastContinuationReason?: ContinuationReason;
@@ -82,6 +84,7 @@ export type SessionStateSnapshotOverrides = Partial<
     | "interruptedKind"
     | "terminalReason"
     | "terminalClassification"
+    | "terminalReasonCode"
     | "lastContinuationReason"
     | "pendingLifecycle"
     | "harness"
@@ -154,6 +157,8 @@ export function buildSessionStateSnapshot(
       )
         ? overrides.terminalClassification
         : current?.terminalClassification,
+    terminalReasonCode: overrides && Object.prototype.hasOwnProperty.call(overrides, 'terminalReasonCode')
+      ? overrides.terminalReasonCode : current?.terminalReasonCode,
     durableStatus: projectDurableStatus(
       overrides &&
         Object.prototype.hasOwnProperty.call(

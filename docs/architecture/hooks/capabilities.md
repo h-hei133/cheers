@@ -2,23 +2,60 @@
 
 原 C0 观测基点：`0057eb604ecc8d154ce691794b494c354e89755b`，2026-11-05，Linux x64 / Node `v24.15.0`。原六个合成探针见 [探针记录](probes.md)、[机器记录](results.json) 与 [执行记录](execution.md)。新增表记录 C1/C2 的能力变化；后面的 C0 表保留历史观测，凡有差异以新增表、[翻译契约](translation.md) 和 [Stop 执行契约](stop-execution.md) 为当前实现。
 
-## Stop 生命周期（C2）
+## J2 跨宿主、运行时与 CI 实测
+
+2026-11-06 的 [扩展矩阵](runtime-matrix.md)、[逐格机器记录](evidence/capabilities/matrix.json)
+和 [执行记录](runtime-execution.md) 覆盖 Linux x64 / Node 20.3.0 与 24.15.0。
+R0b 完成本地验收后重新采集并校验：168 格身份匹配，109 observed、12 unsupported、
+47 unavailable，0 stale。完整验收复用同一产品字节的已完成运行，来源与复核见执行记录。
+每格携带 source snapshot、profile、bundle digest、artifact SHA-256；身份不匹配为 stale，
+缺身份为 unknown。observed 是实际观察，不能读作 pass/proven。
+
+后续 flat Stop 兼容修复已改变产品字节；本节 J2 数量及观测是采集时的历史证据，不能当作
+当前修复源码的验证。当前 Linux/Node24 聚焦证据见 [R0b 兼容修复记录](stop-envelope-execution.md)。
+
+| 必须分开的运行时边界 | Node 20.3.0 实测 | Node 24.15.0 实测 | 发布限制 |
+| --- | --- | --- | --- |
+| pre-action 独立 pinned 写门，nodeFloor=20.3.0 | allow/no_violation；block/violation | 同左 | 保留原 SHA-256/provenance 与 Cheers floor |
+| post-action 旧 pinned judge/Stop，包声明 engines >=24，**没有独立 Node20 Stop artifact** | judge 可执行：合规 exit 0、违规 exit 2、实际仓库 partial/exit 0；旧 Stop 合规空 stdout→unknown | 同左 | engines 声明没有导致实测 crash；这不补足显式信封/版本验证 |
+| R0a 当前只读 dist，独立身份 | 显式 allow/proven 与 block/actionable_gap 可解析；not_configured/reentry 进入 completed_unproven/not_reported；未知版本拒绝 | 同左 | 此 dist 未替换 Cheers pinned bundle；重入让出没有新增 proof，实际修复后也保留 unproven |
+
+normal/prepared/security 的实际写入与 native Git 索引正反例见扩展矩阵。
+安全扫描器全链、真实模型可选 MCP、产品强制 MCP、macOS/Windows、其他真实宿主及
+远端 judge 非零退出传播均有 unavailable 行；watch 保持 observation。
+采集时旧 pinned Stop 的违规输出成为 unknown/invalid_output，合规空输出成为
+unknown/empty_output；不能把 CLI 可运行写成 Stop 信封兼容。新版 MCP 正反协商与脚本
+tools/call 分别记录；实际拒绝文本 decision=deny，未执行真实模型自愿或产品强制 MCP。
+
+## Stop 生命周期（C2 / R0b）
 
 | 事件 | invocation guarantee | timeout | input fidelity | deny / failure | re-entry | 持久载体 / CI authority |
 | --- | --- | --- | --- | --- | --- | --- |
-| Stop | 每次非 provider-failed 候选完成；匹配声明必须经原信任与工作区准入 | handler `timeoutMs` 正整数毫秒；默认 3000；命令与进程内 handler 均有期限；审批独立有界 | 原 payload + 稳定 attemptId、reentryCount、stop_hook_active；命令 stdin 另带 hook_event_name/cwd | block/retry 消费于完成发布前；timeout、空输出、unknown、进程失败、未批准检查均保留 unknown；无成功 completed | 同一 AgentCore 最多 1 次；共享剩余模型预算、权限与取消；重复结构化 fingerprint 终态 blocked；移除阻断 hook 不算复查成功 | `manager.appendQueryEvent` 写 `lifecycle.record`；model_answer / hook_result / permission / execution / proof_verdict 分开；不增加 CI authority |
+| Stop | 每次非 provider-failed 候选完成；匹配声明经过原信任与工作区准入 | handler `timeoutMs` 正整数毫秒，默认 3000；命令、进程内 handler 和审批有期限 | 原 payload + attemptId、reentryCount、stop_hook_active；stdin 另带 hook_event_name/cwd；带 contract 的 R0a 信封验证名称、0.1.0 版本、reason 闭集及 verdict 一致性；flat 恢复可选 reasonCode、原格式约束和默认值 | 现在能区分 allow/unknown；旧 flat block/retry 在完成发布前消费；already_blocked_once / not_configured + not_reported 产生独立 query.completed_unproven；unknown、空/无效输出、timeout、进程失败继续 query.failed | 同一 AgentCore 最多 1 次，共享剩余预算、权限与取消；重复 fingerprint 终态 blocked；missing_recheck 仍检测原阻断 hook 被移除 | manager.appendQueryEvent 写 lifecycle.record 与独立中性终端；session、goal round、CLI、replay、transcript、recovery、handoff、agent job、relay/settlement 保留分类；不增加证明/CI authority；真实第三方产品、当前源码 Node20 完整消费链、真实 provider 和跨平台仍未覆盖；J2 是前次源码历史证据 |
 
 配置生效位置是 `.agents/hooks.json` 的 `hooks.Stop[].hooks[]` handler 对象，例如
-`{"command":"check-completion","timeoutMs":3000}`。该事件无关字段现在同时保留于普通 command
-声明与 writeGate 声明；PreToolUse 的判断与权限顺序不变。无效 timeoutMs 会报告问题并采用默认值。
+`{"command":"check-completion","timeoutMs":3000}`。PreToolUse 判断与权限顺序保留；无效
+handler timeoutMs 报告问题并采用默认值。
 
-这是可消费的完成阻断与一次受控修复。候选 model answer 仍可显示，只有检查接纳后才发布原
-query.completed；原结果若已 stopped，不会被 Stop allow 升级。proof 缺失记 `not_reported`，
-explicit allow 不自动成为 proven。旧 NormProof completion hook 会将多个 allow/unknown 原因
-都省略 stdout，故该旧静默协议在这里是 unknown；本变更没有修改或交付 NormProof completion
-适配器。没有 Stop 声明时沿用原完成路径，记录 not_configured。
+普通 allow 接纳检查后发布原 query.completed；already_blocked_once 与 not_configured 显式
+分到 completed_unproven disposition，候选结果原本已经 stopped 时仍保留 stopped。
+新事件保留原原因、attempt identity 与 not_reported，既不发送普通 query.completed，也不发送
+query.failed；新用户请求可继续，goal 完成仍需要独立验收。
 
-命令、真实输出、测量和测试产出的持久轨迹见 [Stop 执行记录](stop-execution.md)。
+真实 R0a `gate stop --emit-result` 使用冻结 0.1.0 信封。not_configured 的实际 decision 是
+unsupported；附件要求的 allow 变体同样中性结束。不带 --emit-result 的旧命令仍可能 exit 0
+且 stdout 为空，保持 unknown/empty_output。完全没有 Stop 声明的原完成路径保留，空
+stopChecks 特例不作为外部信封的放行依据。
+
+旧 flat `{decision:"block", reason:"…"}` 恢复 hook_blocked 并触发一次修复；flat allow 缺省
+explicit_allow，合法自定义 reasonCode 保留。真实旧 NormProof command 首次 block 后，重入
+仍静默，因此最终 empty_output/unknown；兼容恢复不把这条 silent yield 当作完成证明。
+
+操作者已解除前置审计发现的事件协议停止条件，授权新增中性协议和下游实现。
+兼容修复后 13 文件 / 279 项聚焦验收使用真实 NormProof CLI、真实会话文件和本地模型响应夹具；
+不把前一份 J2 源码快照下的 Node20/24 解析观测当成本次源码证据。
+命令、最终事件序列、语义对照、五态归类和逐项验收见
+[R0b 信封执行记录](stop-envelope-execution.md)；C2 历史见 [Stop 执行记录](stop-execution.md)。
 
 ## 翻译适配器后的能力变化
 

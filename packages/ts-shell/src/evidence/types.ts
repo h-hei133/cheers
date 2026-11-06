@@ -63,7 +63,7 @@ export type ProductVerdictStatus =
   | "BLOCKED"
   | "NOT_PROVEN";
 
-export type ProductTerminalClassification = "success" | "stopped" | "error";
+export type ProductTerminalClassification = "success" | "stopped" | "error" | "completed_unproven";
 
 export type ProductRedactionStatus =
   | "raw-content-excluded"

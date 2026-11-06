@@ -1,0 +1,205 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { test } from 'node:test';
+import { buildCompletionGateResultOutput } from '/home/wang/projects/normproof/dist/contracts/hooks/completion-gate-contracts.js';
+import { HookDispatcher } from '../../packages/ts-shell/src/core/hooks/hookDispatcher.js';
+import { runStopCommand } from '../../packages/ts-shell/src/core/hooks/stop/run.js';
+import { normalizeStopResult } from '../../packages/ts-shell/src/core/hooks/stop/result.js';
+import { StopLifecycle } from '../../packages/ts-shell/src/turn/stop.js';
+import { runTurn } from '../../packages/ts-shell/src/turn/session.js';
+import { ShellSessionRuntime } from '../../packages/ts-shell/src/core/shell/sessionRuntime.js';
+import { SessionManager } from '../../packages/ts-shell/src/session/SessionManager.js';
+import { createSessionTerminalState, applyTerminalQueryEvent } from '../../packages/ts-shell/src/core/shell/sessionTerminalState.js';
+import { isReadableTranscriptEvent } from '../../packages/ts-shell/src/session/transcript/validation.js';
+import { isDurableQueryEvent } from '../../packages/ts-shell/src/core/query/runtime/events.js';
+import { selectedRecoveryTerminal } from '../../packages/ts-shell/src/session/recovery/scope.js';
+
+const root = path.resolve('.tmp/stop-envelope-audit');
+const reports: unknown[] = [];
+const cli = '/home/wang/projects/normproof/dist/adapters/cli/normproof.js';
+const quote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`;
+const command = `${quote(process.execPath)} ${quote(cli)} gate stop`;
+const proven = buildCompletionGateResultOutput({ decision: { decision: 'allow', reasonCode: 'proven' }, verdictStatus: 'proven' });
+
+function report(probe: string, details: unknown): void {
+  reports.push({ probe, details });
+  console.log(JSON.stringify({ probe, details }));
+  fs.writeFileSync(path.join(root, 'probes.json'), JSON.stringify(reports, null, 2) + '\n');
+}
+
+async function run(probe: string, handler?: (payload: any) => any, cmd?: string): Promise<any> {
+  const home = fs.mkdtempSync(path.join(root, 'home-'));
+  const previous = new Map(['HOME', 'USERPROFILE', 'CHEERS_TEST_ROOT', 'GIT_CEILING_DIRECTORIES'].map(key => [key, process.env[key]]));
+  for (const key of ['HOME', 'USERPROFILE', 'CHEERS_TEST_ROOT']) process.env[key] = home;
+  process.env.GIT_CEILING_DIRECTORIES = home;
+  try {
+    const manager = new SessionManager();
+    const session = manager.createNew(home);
+    const hooks = new HookDispatcher();
+    if (handler) hooks.registerInProcessHook({ event: 'Stop', name: 'stable-completion-check', handler });
+    if (cmd) hooks.registerCommandHook({ event: 'Stop', command: cmd });
+    const events: any[] = [];
+    let steps = 0;
+    const runtime = new ShellSessionRuntime({ sessionManager: manager,
+      renderer: { renderLine() {}, renderChunk() {} } as never,
+      runPrompt: async function* (prompt, signal) {
+        const execution = runTurn({ sessionId: session.id, prompt, workspaceRoot: home, history: [],
+          onMessage: message => manager.addTurn(session.id, message), hooks, tools: new Map(), maxSteps: 5, signal,
+          step: async () => { steps++; return { text: `Candidate ${steps}`, toolCalls: [], stopReason: 'stop' }; } });
+        for await (const event of execution.events) { events.push(event); yield event; }
+      } });
+    let resolved = false;
+    let error: string | undefined;
+    try { await runtime.executePrompt(session.id, 'audit'); resolved = true; }
+    catch (failure) { error = (failure as Error).message; }
+    const fresh = new SessionManager();
+    const transcript = fresh.getTranscriptEvents(session.id);
+    const state = JSON.parse(fs.readFileSync(path.join(manager.getSessionDirPath(session.id), 'state.json'), 'utf8'));
+    const recovery = fresh.getRecoverySnapshot(session.id);
+    const replay = fresh.getReplayPlan(session.id);
+    const terminal = createSessionTerminalState();
+    for (const event of events) applyTerminalQueryEvent(terminal, event);
+    const summarize = (entry: any) => entry.type === 'lifecycle.record'
+      ? { type: entry.type, kind: entry.kind, state: entry.state, reasonCode: entry.reasonCode, verdict: entry.verdict,
+        result: entry.result, terminal: entry.terminal, reentryCount: entry.reentryCount }
+      : { type: entry.type, error: entry.error, stopStatus: entry.stopStatus, result: entry.result && {
+        status: entry.result.status, terminalClassification: entry.result.terminalClassification, finalOutput: entry.result.finalOutput } };
+    const details = { steps, resolved, error, finalEvent: summarize(events.at(-1)), eventSequence: events.map(summarize),
+      projections: {
+        shell: { state: runtime.getState(), sawTerminalEvent: terminal.sawTerminalEvent,
+          status: terminal.terminalStatus, terminalClassification: terminal.terminalClassification },
+        session: { status: fresh.getSession(session.id)?.status, durableStatus: state.durableStatus,
+          terminalClassification: state.terminalClassification, terminalReason: state.terminalReason },
+        recovery: { durableStatus: recovery.durableStatus, terminalClassification: recovery.terminalClassification,
+          terminalReason: recovery.terminalReason, lastError: recovery.lastError },
+        transcript: { allReadable: transcript.every(isReadableTranscriptEvent),
+          queryTerminals: transcript.filter((e: any) => e.type === 'query-event' && /^query\.(completed|failed)$/.test(e.event.type)).map((e: any) => summarize(e.event)),
+          lifecycle: transcript.filter(e => e.type === 'lifecycle').map((e: any) => e.event) },
+        replay: { terminalEvents: replay.normalizedTranscriptEvents.filter((e: any) => e.type === 'query-event' && /^query\.(completed|failed)$/.test(e.event.type)).map((e: any) => summarize(e.event)),
+          continuationPrompt: replay.continuationPrompt },
+      } };
+    report(probe, details);
+    return { ...details, events };
+  } finally {
+    for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+}
+
+for (const reasonCode of ['already_blocked_once', 'not_configured', 'could_not_judge', 'could_not_decide']) {
+  test(`baseline allow/${reasonCode} ends query.failed`, async () => {
+    const observed = await run(`allow-${reasonCode}`, () => ({ decision: 'allow', reasonCode }));
+    assert.equal(observed.finalEvent.type, 'query.failed');
+    assert.equal(observed.finalEvent.stopStatus, 'unknown');
+    assert.equal(observed.resolved, false);
+    assert.equal(observed.events.some((e: any) => e.type === 'query.completed'), false);
+  });
+}
+
+test('positive control: explicit proven completes', async () => {
+  const observed = await run('proven-control', () => proven);
+  assert.equal(observed.resolved, true);
+  assert.equal(observed.finalEvent.type, 'query.completed');
+  assert.equal(observed.projections.session.terminalClassification, 'success');
+});
+
+test('no Stop declarations completes through empty-list exception', async () => {
+  const observed = await run('no-stop-declarations');
+  assert.equal(observed.resolved, true);
+  assert.equal(observed.finalEvent.type, 'query.completed');
+});
+
+test('R0a block then already_blocked_once/not_reported still fails same lifecycle', async () => {
+  const envelope = buildCompletionGateResultOutput({ decision: { decision: 'allow', reasonCode: 'already_blocked_once' }, verdictStatus: null });
+  assert.equal(envelope.proofVerdict, 'not_reported');
+  const observed = await run('r0a-block-reentry', payload => payload.reentryCount === 0
+    ? buildCompletionGateResultOutput({ decision: { decision: 'block', reason: 'Synthetic actionable gap.' }, verdictStatus: 'not_proven' }) : envelope);
+  assert.equal(observed.steps, 2);
+  assert.equal(observed.finalEvent.type, 'query.failed');
+  assert.match(observed.finalEvent.error, /already_blocked_once/);
+});
+
+test('unknown proof independently short-circuits the reentry result', () => {
+  const events: any[] = [];
+  const lifecycle = new StopLifecycle(event => events.push(event));
+  lifecycle.beginCheck();
+  assert.equal(lifecycle.decide({ decision: 'block', reasonCode: 'actionable_gap', proofVerdict: 'not_proven' }, true), 'repair');
+  lifecycle.beginCheck();
+  assert.equal(lifecycle.decide({ decision: 'allow', reasonCode: 'already_blocked_once', proofVerdict: 'unknown' }, true), 'terminal');
+  assert.equal(events.at(-1).type, 'query.failed');
+  report('proof-unknown-short-circuit', { finalEvent: events.at(-1) });
+});
+
+test('real legacy gate stop without emit-result remains unknown/empty_output', async () => {
+  const home = fs.mkdtempSync(path.join(root, 'legacy-'));
+  try {
+    const payload = { eventName: 'Stop' as const, sessionId: 'legacy-audit', workspaceRoot: home,
+      timestamp: '2026-11-06T00:00:00Z', turnsExecuted: 1, finalOutput: 'candidate', attemptId: 'audit', reentryCount: 0, stop_hook_active: false };
+    const old = spawnSync(process.execPath, [cli, 'gate', 'stop'], { cwd: home, input: JSON.stringify({ ...payload, cwd: home }), encoding: 'utf8' });
+    assert.equal(old.status, 0);
+    assert.equal(old.stdout, '');
+    const result = await runStopCommand(command, payload, 3000);
+    assert.equal(result.decision, 'unknown');
+    assert.equal(result.reasonCode, 'empty_output');
+    const current = spawnSync(process.execPath, [cli, 'gate', 'stop', '--emit-result'], { cwd: home, input: JSON.stringify({ ...payload, cwd: home }), encoding: 'utf8' });
+    assert.equal(current.status, 0);
+    const envelope = JSON.parse(current.stdout);
+    assert.deepEqual(envelope.contract, { name: 'normproof.completion-gate.stop', version: '0.1.0' });
+    assert.equal(envelope.reasonCode, 'not_configured');
+    assert.equal(envelope.decision, 'unsupported');
+    assert.equal(envelope.proofVerdict, 'not_reported');
+    report('real-old-vs-emit', { command, node: process.version, oldExit: old.status, oldStdout: old.stdout,
+      normalizedOld: result, currentExit: current.status, currentEnvelope: envelope });
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+  const observed = await run('real-legacy-lifecycle', undefined, command);
+  assert.equal(observed.finalEvent.type, 'query.failed');
+  assert.match(observed.finalEvent.error, /empty_output/);
+  const current = await run('real-r0a-not-configured', undefined, command + ' --emit-result');
+  assert.equal(current.finalEvent.type, 'query.failed');
+  assert.match(current.finalEvent.error, /not_configured/);
+});
+
+test('proof conflict stays unknown and failed with original verdict', async () => {
+  const observed = await run('conflicting-verdict', () => ({ ...proven, proofVerdict: 'not_proven' }));
+  assert.equal(observed.finalEvent.type, 'query.failed');
+  assert.match(observed.finalEvent.error, /conflicting_verdict/);
+});
+
+test('baseline exposes missing contract/version validation', async () => {
+  for (const contract of [{ name: 'normproof.completion-gate.stop', version: '99.0.0' }, { name: 'unrecognized', version: '0.1.0' }]) {
+    report('contract-input', { contract, normalized: normalizeStopResult({ ...proven, contract }) });
+    const observed = await run('incompatible-contract-accepted-baseline', () => ({ ...proven, contract }));
+    assert.equal(observed.finalEvent.type, 'query.completed');
+  }
+});
+
+test('baseline exposes missing closed reason admission', async () => {
+  for (const reasonCode of [undefined, 'unrecognized_reason']) {
+    report('reason-input', { reasonCode: reasonCode ?? null, normalized: normalizeStopResult({ ...proven, reasonCode }) });
+    const observed = await run('invalid-reason-accepted-baseline', () => ({ ...proven, reasonCode }));
+    assert.equal(observed.finalEvent.type, 'query.completed');
+  }
+  assert.deepEqual(normalizeStopResult({ decision: 'allow', reasonCode: 'proven' }).evidenceIdentity, ['unspecified']);
+  report('evidence-default', normalizeStopResult({ decision: 'allow', reasonCode: 'proven' }));
+});
+
+test('existing neutral proposal is readable but not a recognized terminal protocol', () => {
+  const neutral = { type: 'query.completed_unproven', reasonCode: 'already_blocked_once', proofVerdict: 'not_reported', finalOutput: 'candidate' };
+  const entry = { type: 'query-event', timestamp: '2026-11-06T00:00:00Z', event: neutral };
+  assert.equal(isDurableQueryEvent(neutral as never), true);
+  assert.equal(isReadableTranscriptEvent(entry), true);
+  const terminal = createSessionTerminalState();
+  applyTerminalQueryEvent(terminal, neutral as never);
+  assert.equal(terminal.sawTerminalEvent, false);
+  assert.deepEqual(selectedRecoveryTerminal([entry] as never), {});
+  const lifecycleEvents: any[] = [];
+  const stop = new StopLifecycle(event => lifecycleEvents.push(event));
+  stop.finish('completed_unproven' as never, 'already_blocked_once');
+  const stateReadable = isReadableTranscriptEvent({ type: 'query-event', timestamp: entry.timestamp, event: lifecycleEvents[0] });
+  assert.equal(stateReadable, false);
+  assert.equal(lifecycleEvents.at(-1).type, 'query.failed');
+  report('neutral-protocol-stop-condition', { isDurable: true, isReadable: true, shellSawTerminal: false,
+    recoveryTerminal: {}, newStopStateReadable: stateReadable, forcedFinishEvent: lifecycleEvents.at(-1) });
+});

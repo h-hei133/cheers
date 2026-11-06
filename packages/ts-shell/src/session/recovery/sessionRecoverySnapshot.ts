@@ -74,6 +74,7 @@ export function buildSessionRecoverySnapshot(input: {
     durableStatus: terminal.durableStatus,
     terminalReason: terminal.terminalReason,
     terminalClassification: terminal.terminalClassification,
+    terminalReasonCode: terminal.terminalReasonCode,
     lastContinuationReason: scope.useLegacyState ? input.state.lastContinuationReason : undefined,
     lastError: terminal.lastError,
     pendingLifecycle: readModelLifecycle,

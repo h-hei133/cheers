@@ -95,7 +95,8 @@ async function drive(signal = new AbortController().signal, extra: { readonly be
   const bound = readBoundSessionState(manager, context.session);
   const scope = { id: context.session.id, workspacePath: bound.scope.workspace.path, workspaceIdentity: bound.scope.workspace.identity };
   const policy = createRequestPolicy(sessionRequestStore(manager, context.session, scope, () => ({})), scope.id);
-  let outcome: 'completed' | 'failed' | 'cancelled' = 'failed';
+  let outcome: 'completed' | 'completed_unproven' | 'failed' | 'cancelled' = 'failed';
+  let neutralReason: string | undefined;
   const events = [];
   try {
     const invocation = await runCliRuntimeInvocation({
@@ -111,11 +112,13 @@ async function drive(signal = new AbortController().signal, extra: { readonly be
     for await (const event of invocation.events) {
       events.push(event);
       if (event.type === 'query.completed') outcome = event.result.terminalReason === 'completed' ? 'completed' : 'failed';
+      if (event.type === 'query.completed_unproven') { outcome = 'completed_unproven'; neutralReason = event.reasonCode; }
       if (event.type === 'query.failed') outcome = 'failed';
     }
   } finally {
     if (signal.aborted) outcome = 'cancelled';
     if (outcome === 'completed') manager.saveCompleted(context.session.id);
+    else if (outcome === 'completed_unproven') manager.saveCompleted(context.session.id, { terminalClassification: 'completed_unproven', terminalReason: 'completed_unproven', terminalReasonCode: neutralReason });
     else if (outcome === 'cancelled') manager.saveInterrupted(context.session.id, 'turn');
     else manager.saveError(context.session.id, 'Fixture turn stopped');
     settleHandoffPrompt(context, signal, outcome);
@@ -128,6 +131,23 @@ function planningScript(_body: Record<string, any>, response: http.ServerRespons
   else if (requests.length === 3) respond(response, [{ id: 'second-write', name: 'write', args: { path: 'second.txt', content: 'target' } }]);
   else respond(response);
 }
+
+it.each(['already_blocked_once', 'not_configured'] as const)('persists a neutral %s handoff after native model switching', async reasonCode => {
+  reply = planningScript; await command('arm executor');
+  hooks.registerInProcessHook({ event: 'Stop', name: 'neutral-stop', handler: payload => {
+    const active = (payload as { stop_hook_active: boolean }).stop_hook_active;
+    return { contract: { name: 'normproof.completion-gate.stop', version: '0.1.0' },
+      decision: reasonCode === 'already_blocked_once' && !active ? 'block' : 'allow',
+      reasonCode: reasonCode === 'already_blocked_once' && !active ? 'actionable_gap' : reasonCode,
+      proofVerdict: reasonCode === 'already_blocked_once' && !active ? 'not_proven' : 'not_reported' };
+  } });
+  const events = await drive();
+  expect(events.at(-1)).toMatchObject({ type: 'query.completed_unproven', reasonCode, proofVerdict: 'not_reported' });
+  expect(events.some(event => event.type === 'query.completed' || event.type === 'query.failed')).toBe(false);
+  expect(new HandoffStore(manager, context.session).read().cycles[0]).toMatchObject({ phase: 'completed_unproven', switchedBy: 'first-write' });
+  expect(new SessionManager().getRecoverySnapshot(context.session.id)).toMatchObject({ durableStatus: 'completed_unproven', terminalReasonCode: reasonCode });
+  expect(liveHandoffs.has(context)).toBe(false);
+});
 it.each(['account', 'api-key'] as const)('bounds handoff compaction by the actual %s target catalogue', async auth => {
   const current = context.configuration.current;
   const origin = 'https://generativelanguage.googleapis.com';

@@ -31,6 +31,10 @@ export function evaluateSessionResumeEligibility(input: {
   ) => RecoveryTrustBoundaryBlock;
 }): SessionResumeEligibility {
   const { session } = input;
+  if (session.status === 'completed_unproven') return {
+    recoverable: false, disposition: 'not-resumable', autoResumeReady: false,
+    detail: 'The previous run completed without a new Stop proof; a new user request may continue the session.',
+  };
   // A process killed without a clean shutdown never writes `interrupted`: the
   // prompt barrier left it `active`. Refusing on the status alone would turn
   // away exactly the sessions bootstrap adopts as unfinished work, so the

@@ -1,0 +1,46 @@
+{
+  "contract": {
+    "name": "normproof.sidecar.check-run",
+    "version": "0.22.0",
+    "compatibility": {
+      "hostNeutral": true,
+      "piShadowInternalsRequired": false,
+      "rawEvidenceContentRequired": false
+    }
+  },
+  "verdictStatus": "proven",
+  "artifactPaths": {
+    "verdict": "verdict.json",
+    "ledger": "ledger.json",
+    "enforcement": "enforcement.json",
+    "openObligationsSummary": "open-obligations-summary.json",
+    "report": "report.md",
+    "runTrace": "evidence/run-trace.jsonl",
+    "contextBundle": "context-bundle.json",
+    "normReviewResult": "norm-review-result.json",
+    "feedbackToNormProposal": "feedback-to-norm-proposal.json",
+    "sidecarResult": "sidecar-result.json"
+  },
+  "contextCostTelemetry": {
+    "taskTextBytes": 59,
+    "evidencePointerCount": 2,
+    "evidencePointerMetadataBytes": 203,
+    "declaredEvidenceContentBytes": 20,
+    "presentEvidenceCount": 2,
+    "missingEvidenceCount": 0,
+    "openObligationCount": 0,
+    "failedObligationCount": 0,
+    "proofGapCount": 0,
+    "reportArtifactBytes": 2695,
+    "ledgerArtifactBytes": 8352,
+    "contextBundleArtifactBytes": 0,
+    "fullContextEstimatedBytes": 11329,
+    "minimalContextEstimatedBytes": 59,
+    "omittedEstimatedBytes": 11270
+  },
+  "hostClaim": {
+    "completionClaimed": false,
+    "acceptedAsProof": false
+  },
+  "errors": []
+}

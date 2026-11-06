@@ -1,7 +1,7 @@
 import { isRecord } from "../../core/values/record.js";
 
 const ROLES = new Set<unknown>(["planner", "coder", "reviewer"]);
-const TERMINALS = new Set<unknown>(["completed", "stopped_cycle", "stopped_max_turns", "stopped_invalid_handoff", "stopped_not_proven", "stopped_error"]);
+const TERMINALS = new Set<unknown>(["completed", "completed_unproven", "stopped_cycle", "stopped_max_turns", "stopped_invalid_handoff", "stopped_not_proven", "stopped_error"]);
 const VERIFICATION = new Set<unknown>(["passed", "failed", "blocked", "skipped", "not-requested"]);
 
 function strings(value: unknown): boolean {
@@ -81,7 +81,7 @@ export function readableOutput(value: unknown): boolean {
 
 export function readableQueryResult(value: unknown): boolean {
   if (!isRecord(value) || !TERMINALS.has(value.status) || !TERMINALS.has(value.terminalReason) ||
-    typeof value.terminalClassification !== "string" || !["success", "stopped", "error"].includes(value.terminalClassification) || typeof value.finalOutput !== "string" ||
+    typeof value.terminalClassification !== "string" || !["success", "stopped", "error", "completed_unproven"].includes(value.terminalClassification) || typeof value.finalOutput !== "string" ||
     !optionalStrings(value, ["stopReason", "lastContinuationReason"]) || !codingResult(value.codingResult)) return false;
   const context = value.sharedContext;
   return Array.isArray(value.transcript) && value.transcript.every(readableOutput) && isRecord(context) &&

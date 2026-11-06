@@ -17,7 +17,7 @@ export function decodeScheduling(value: unknown): GoalScheduling | undefined {
     || typeof value.pendingRound !== 'boolean' || typeof value.updatedAt !== 'string' || !Number.isFinite(Date.parse(value.updatedAt))
     || (value.reason !== undefined && !REASONS.has(String(value.reason)))
     || (value.drain !== undefined && !['settled', 'pending', 'unknown'].includes(String(value.drain)))
-    || (value.lastOutcome !== undefined && !['answer', 'step-limit', 'failure', 'refused', 'cancelled'].includes(String(value.lastOutcome)))
+    || (value.lastOutcome !== undefined && !['answer', 'completed_unproven', 'step-limit', 'failure', 'refused', 'cancelled'].includes(String(value.lastOutcome)))
     || ((value.phase === 'running' || value.phase === 'draining') && !value.pendingRound)
     || (value.phase === 'ready' && value.pendingRound)) return undefined;
   return { schemaVersion: 1, phase: value.phase as GoalScheduling['phase'], round: value.round, pendingRound: value.pendingRound, updatedAt: value.updatedAt,

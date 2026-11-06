@@ -1,0 +1,320 @@
+packages/ts-shell/src/turn/session.ts:382:      channel.push({ type: "query.failed", error: outcome.error, ...(outcome.admissionFailure ? { admissionFailure: outcome.admissionFailure } : {}) });
+packages/ts-shell/src/turn/session.ts:414:      channel.push({ type: "query.failed", error: error instanceof Error ? error.message : String(error),
+packages/ts-shell/src/turn/stop.ts:103:    if (publish) this.emit({ type: 'query.failed', stopStatus: status, error: `Stop check ${status} (${reasonCode}).` });
+packages/ts-shell/src/turn/projection.ts:147:      readonly completed: Extract<QueryEvent, { type: "query.completed" }>;
+packages/ts-shell/src/turn/projection.ts:183:        type: "query.completed",
+packages/ts-shell/src/turn/projection.ts:186:          terminalClassification: "stopped",
+packages/ts-shell/src/turn/projection.ts:187:          terminalReason: "stopped_error",
+packages/ts-shell/src/turn/projection.ts:203:        type: "query.completed",
+packages/ts-shell/src/turn/projection.ts:206:          terminalClassification: "stopped",
+packages/ts-shell/src/turn/projection.ts:207:          terminalReason: "stopped_error",
+packages/ts-shell/src/turn/projection.ts:216:  const terminalReason = stepLimitReached ? 'stopped_max_turns' : explained ? 'stopped_error' : 'completed';
+packages/ts-shell/src/turn/projection.ts:222:      type: "query.completed",
+packages/ts-shell/src/turn/projection.ts:224:        status: terminalReason,
+packages/ts-shell/src/turn/projection.ts:225:        terminalClassification: terminalReason === 'completed' ? 'success' : 'stopped',
+packages/ts-shell/src/turn/projection.ts:226:        terminalReason,
+packages/ts-shell/src/entrypoints/providerReadinessCliSurface.ts:15:    type: "query.completed",
+packages/ts-shell/src/entrypoints/providerReadinessCliSurface.ts:18:      terminalReason: "stopped_error",
+packages/ts-shell/src/entrypoints/providerReadinessCliSurface.ts:19:      terminalClassification: "error",
+packages/ts-shell/src/test-utils/cli/baseline.ts:44:        terminalClassification?: string;
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:89:        terminalReason: "stopped_error",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:90:        terminalClassification: "stopped",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:91:        durableStatus: "stopped",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:110:          type: "query.completed",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:113:            terminalReason: "stopped_error",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:114:            terminalClassification: "stopped",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:283:        terminalReason: "stopped_error",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:284:        terminalClassification: "stopped",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:285:        durableStatus: "stopped",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:304:          type: "query.completed",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:307:            terminalReason: "stopped_error",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:308:            terminalClassification: "stopped",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:510:        terminalReason: "stopped_error",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:511:        terminalClassification: "stopped",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:512:        durableStatus: "stopped",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:531:          type: "query.completed",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:534:            terminalReason: "stopped_error",
+packages/ts-shell/src/test-utils/stoppedRecoveryFixture.ts:535:            terminalClassification: "stopped",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:100:      type: "query.completed",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:109:  manager.appendQueryEvent(session.id, { type: "query.completed", result });
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:117:      terminalReason: "completed",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:118:      terminalClassification: "success",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:122:      terminalReason: "stopped_error",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:123:      terminalClassification: "stopped",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:158:    type: "query.completed",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:166:    terminalReason: "completed",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:167:    terminalClassification: "success",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:220:      lines.push(`- focus-terminal: ${snapshot?.lastTerminalClassification ?? "unknown"}`);
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:312:    terminalReason: "completed",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:313:    terminalClassification: "success",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:331:    terminalReason: "completed",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:332:    terminalClassification: "success",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:446:    terminalReason: "completed",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:447:    terminalClassification: "success",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:541:    terminalReason: "stopped_error",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:542:    terminalClassification: "stopped",
+packages/ts-shell/src/test-utils/longSessionDurabilityProcess.ts:560:    lastTerminalClassification: snapshot.lastTerminalClassification,
+packages/ts-shell/src/result/terminal/truth.ts:1:import type { TerminalClassification, TerminalReason } from "../types.js";
+packages/ts-shell/src/result/terminal/truth.ts:4:  readonly terminalClassification?: TerminalClassification;
+packages/ts-shell/src/result/terminal/truth.ts:5:  readonly terminalReason?: TerminalReason;
+packages/ts-shell/src/result/terminal/truth.ts:13:  if (!input.query?.terminalClassification) return input.coding ?? input.query;
+packages/ts-shell/src/result/terminal/truth.ts:14:  return input.query.terminalClassification === "success" && input.coding &&
+packages/ts-shell/src/result/terminal/truth.ts:15:    input.coding.terminalClassification !== "success" ? input.coding : input.query;
+packages/ts-shell/src/result/task/verdict.ts:10:  readonly terminalClassification: "success" | "stopped";
+packages/ts-shell/src/result/task/verdict.ts:29:    terminalClassification: completeProof ? "success" : "stopped",
+packages/ts-shell/src/result/types.ts:13:export type TerminalClassification = 'success' | 'stopped' | 'error'
+packages/ts-shell/src/result/types.ts:299:  readonly terminalReason: TerminalReason
+packages/ts-shell/src/result/types.ts:300:  readonly terminalClassification: TerminalClassification
+packages/ts-shell/src/evidence/verdictFacade.ts:19:  type ProductTerminalClassification,
+packages/ts-shell/src/evidence/verdictFacade.ts:27:  readonly terminalClassification: ProductTerminalClassification;
+packages/ts-shell/src/evidence/verdictFacade.ts:50:      terminalClassification: "success",
+packages/ts-shell/src/evidence/verdictFacade.ts:72:    terminalClassification: "stopped",
+packages/ts-shell/src/evidence/verdictFacade.ts:118:      terminalClassification: "stopped",
+packages/ts-shell/src/evidence/verdictFacade.ts:132:      terminalClassification: "stopped",
+packages/ts-shell/src/evidence/verdictFacade.ts:146:      terminalClassification: "stopped",
+packages/ts-shell/src/evidence/verdictFacade.ts:160:      terminalClassification: "success",
+packages/ts-shell/src/evidence/verdictFacade.ts:173:    terminalClassification: "stopped",
+packages/ts-shell/src/evidence/verdictFacade.ts:190:    terminalClassification: verdict.terminalClassification,
+packages/ts-shell/src/evidence/verdictFacade.ts:202:  readonly legacyTerminalClassification?: ProductTerminalClassification;
+packages/ts-shell/src/evidence/verdictFacade.ts:211:    input.legacyTerminalClassification &&
+packages/ts-shell/src/evidence/verdictFacade.ts:212:    input.legacyTerminalClassification !== "success" &&
+packages/ts-shell/src/evidence/verdictFacade.ts:213:    input.verdict.terminalClassification === "success"
+packages/ts-shell/src/evidence/compatibility/historicalReportVerdict.ts:32:      terminalClassification: "stopped",
+packages/ts-shell/src/evidence/compatibility/historicalReportVerdict.ts:49:      terminalClassification: "success",
+packages/ts-shell/src/evidence/compatibility/historicalReportVerdict.ts:63:      terminalClassification: "stopped",
+packages/ts-shell/src/evidence/compatibility/historicalReportVerdict.ts:77:      terminalClassification: "stopped",
+packages/ts-shell/src/evidence/compatibility/historicalReportVerdict.ts:90:    terminalClassification: "stopped",
+packages/ts-shell/src/core/query/runtime/events.ts:140:  | { readonly type: 'query.completed'; readonly result: OrchestrationResult }
+packages/ts-shell/src/core/query/runtime/events.ts:141:  | { readonly type: 'query.failed'; readonly error: string; readonly stopStatus?: import('./lifecycle.js').StopTerminalStatus; readonly admissionFailure?: import('../../agent/request/model.js').ModelAdmissionError['code'] }
+packages/ts-shell/src/evidence/types.ts:66:export type ProductTerminalClassification = "success" | "stopped" | "error";
+packages/ts-shell/src/evidence/types.ts:108:  readonly terminalClassification: ProductTerminalClassification;
+packages/ts-shell/src/collaboration/client/host.ts:38:        if (event.type === 'query.completed' || event.type === 'query.failed' || event.type === 'lifecycle.cancelled') this.dirty++;
+packages/ts-shell/src/collaboration/client/events.ts:9:    case 'approval.requested': case 'query.completed': case 'query.failed': case 'lifecycle.cancelled': case 'lifecycle.error': kind = event.type; break;
+packages/ts-shell/src/collaboration/contract/snapshot.ts:8:  'approval.requested', 'approval.approved', 'approval.denied', 'query.completed', 'query.failed', 'lifecycle.cancelled', 'lifecycle.error', 'relay.gap'];
+packages/ts-shell/src/collaboration/contract/model.ts:13:  | 'approval.requested' | 'approval.approved' | 'approval.denied' | 'query.completed' | 'query.failed'
+packages/ts-shell/src/test-utils/longSessionContinuityFixtures.ts:69:      type: "query.completed",
+packages/ts-shell/src/test-utils/longSessionContinuityFixtures.ts:108:    type: "query.completed",
+packages/ts-shell/src/test-utils/longSessionContinuityFixtures.ts:116:    terminalReason: "stopped_error",
+packages/ts-shell/src/test-utils/longSessionContinuityFixtures.ts:117:    terminalClassification: scenario === "verification-failed" ? "error" : "stopped",
+packages/ts-shell/src/test-utils/longSessionContinuityFixtures.ts:191:    terminalReason: "completed",
+packages/ts-shell/src/test-utils/longSessionContinuityFixtures.ts:192:    terminalClassification: "success",
+packages/ts-shell/src/test-utils/longSessionContinuityFixtures.ts:230:    terminalReason: "stopped_error",
+packages/ts-shell/src/test-utils/longSessionContinuityFixtures.ts:231:    terminalClassification:
+packages/ts-shell/src/planning/plan/capture.ts:17:  if (edit.bound.state.status !== 'completed' || edit.bound.state.runPhase !== 'idle' || edit.bound.state.terminalClassification !== 'success'
+packages/ts-shell/src/core/shell/continueShellActionRuntime.ts:71:      targetSummary?.terminalClassification === "stopped"
+packages/ts-shell/src/core/shell/continueShellActionRuntime.ts:92:      if (targetSummary.terminalClassification === "stopped") {
+packages/ts-shell/src/core/shell/continueShellActionRuntime.ts:122:    if (targetSummary?.terminalClassification === "stopped") {
+packages/ts-shell/src/core/shell/sessionRuntime.ts:342:          case "query.completed":
+packages/ts-shell/src/core/shell/sessionRuntime.ts:345:          case "query.failed":
+packages/ts-shell/src/core/shell/sessionRuntime.ts:423:        const errorSave = terminalState.terminalClassification === 'stopped' ? projectErrorSessionSave(terminalState) : projectRuntimeFailureSessionSave({
+packages/ts-shell/src/core/shell/providerReadiness.ts:343:    type: "query.completed",
+packages/ts-shell/src/core/shell/providerReadiness.ts:346:      terminalReason: "stopped_error",
+packages/ts-shell/src/core/shell/providerReadiness.ts:347:      terminalClassification: "error",
+packages/ts-shell/src/planning/goal/acceptance/complete.ts:26:    if (state.status !== 'completed' || state.terminalReason !== 'completed' || state.terminalClassification !== 'success') return state;
+packages/ts-shell/src/planning/goal/acceptance/complete.ts:34:    if (projectHistoricalWriteInspection(events).length || events.filter(event => event.type === 'lifecycle').at(-1)?.event !== 'run-completed') return state;
+packages/ts-shell/src/planning/goal/acceptance/evaluate.ts:26:    return inner.type === 'lifecycle.cancelled' || inner.type === 'query.failed' || inner.type === 'lifecycle.error';
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:7:  terminalReason: TerminalReason;
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:8:  terminalClassification: "success" | "stopped" | "error";
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:12:    terminalReason: terminalState.terminalReason,
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:13:    terminalClassification: terminalState.terminalClassification,
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:23:    terminalReason: TerminalReason;
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:24:    terminalClassification: "success" | "stopped" | "error";
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:31:      terminalReason: terminalState.terminalReason,
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:32:      terminalClassification: terminalState.terminalClassification,
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:44:    terminalReason: "stopped_error";
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:45:    terminalClassification: "error";
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:52:      terminalReason: "stopped_error",
+packages/ts-shell/src/core/shell/sessionPersistenceProjection.ts:53:      terminalClassification: "error",
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:29:  terminalReason: TerminalReason;
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:30:  terminalClassification: "success" | "stopped" | "error";
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:41:    terminalReason: "completed",
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:42:    terminalClassification: "success",
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:52:  if (event.type === 'query.failed' && event.stopStatus) {
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:55:    state.terminalReason = 'stopped_error';
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:56:    state.terminalClassification = 'stopped';
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:60:  if (event.type !== "query.completed") {
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:67:  state.terminalReason = event.result.terminalReason;
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:68:  state.terminalClassification = event.result.terminalClassification;
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:98:      terminalClassification: terminalState.terminalClassification,
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:100:      terminalReason: terminalState.terminalReason,
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:148:    terminalClassification: terminalState.terminalClassification,
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:150:    terminalReason: terminalState.terminalReason,
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:204:    terminalClassification: "success" | "stopped" | "error";
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:206:    terminalReason: TerminalReason;
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:212:    input.terminalClassification === "success"
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:214:      : input.terminalClassification === "stopped"
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:225:      terminalClassification: input.terminalClassification,
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:241:    terminalClassification: input.terminalClassification,
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:245:  renderer.renderLine(`- Terminal reason: ${input.terminalReason}`);
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:262:  terminalClassification: "success" | "stopped" | "error";
+packages/ts-shell/src/core/shell/sessionTerminalState.ts:265:    terminalClassification: input.terminalClassification,
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:121:  if (summary.durableStatus) {
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:122:    lines.push(`- Durable status: ${summary.durableStatus}`);
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:146:  if (summary.terminalClassification || summary.terminalReason) {
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:148:      `- Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:164:    ...(summary.durableStatus ? [`durable=${summary.durableStatus}`] : []),
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:177:  if (summary.terminalClassification || summary.terminalReason) {
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:179:      `Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:223:  if (input.summary.durableStatus) {
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:224:    lines.push(`- DurableStatus: ${input.summary.durableStatus}`);
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:278:  if (summary.durableStatus) {
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:279:    labels.push(`durable=${summary.durableStatus}`);
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:284:  if (summary.terminalClassification) {
+packages/ts-shell/src/core/shell/sessionStateSurface.ts:285:    labels.push(`terminal=${summary.terminalClassification}`);
+packages/ts-shell/src/planning/goal/run/scheduler.ts:60:    if (event.type === 'query.completed') {
+packages/ts-shell/src/planning/goal/run/scheduler.ts:61:      this.outcome = event.result.terminalReason === 'stopped_max_turns' ? 'step-limit'
+packages/ts-shell/src/planning/goal/run/scheduler.ts:62:        : event.result.terminalClassification !== 'success' ? 'refused' : 'answer';
+packages/ts-shell/src/planning/goal/run/scheduler.ts:64:    } else if (event.type === 'query.failed' || event.type === 'lifecycle.error') {
+packages/ts-shell/src/planning/goal/run/scheduler.ts:65:      this.outcome = 'failure'; this.failure = event.type === 'query.failed' && event.admissionFailure
+packages/ts-shell/src/core/shell/recovery.ts:617:  if (summary.terminalClassification || summary.terminalReason) {
+packages/ts-shell/src/core/shell/recovery.ts:619:      `Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
+packages/ts-shell/src/planning/goal/run/safety.ts:36:  if (terminal?.type !== 'lifecycle' || !['run-completed', 'run-error'].includes(terminal.event)) throw new GoalRunError('recovery-required');
+packages/ts-shell/src/planning/goal/run/safety.ts:37:  if (state.terminalReason === 'stopped_max_turns' && state.terminalClassification === 'stopped') return 'step-limit';
+packages/ts-shell/src/planning/goal/run/safety.ts:38:  if (state.status === 'completed' && state.terminalReason === 'completed' && state.terminalClassification === 'success' && terminal.event === 'run-completed') return 'answer';
+packages/ts-shell/src/planning/goal/run/safety.ts:39:  if (state.status === 'error' && terminal.event === 'run-error') return state.terminalClassification === 'stopped' ? 'refused' : 'failure';
+packages/ts-shell/src/session/replay/builder.ts:183:      (event.event.type === "query.completed" ||
+packages/ts-shell/src/session/replay/builder.ts:184:        event.event.type === "query.failed"),
+packages/ts-shell/src/session/replay/builder.ts:192:            (event.event.type !== "query.completed" &&
+packages/ts-shell/src/session/replay/builder.ts:193:              event.event.type !== "query.failed"),
+packages/ts-shell/src/session/replay/builder.ts:250:      (event.event === "run-completed" || event.event === "run-error" || event.event === "run-terminated")) {
+packages/ts-shell/src/session/replay/builder.ts:257:    if (event.event.type === "query.completed" || event.event.type === "query.failed") {
+packages/ts-shell/src/session/sessionEventCodec.ts:11:  | "run-completed"
+packages/ts-shell/src/session/sessionEventCodec.ts:12:  | "run-error"
+packages/ts-shell/src/cli/jobs/agent/runtime.ts:141:          if (event.type === 'query.completed') status = event.result.terminalReason === 'completed' ? 'completed' : 'failed';
+packages/ts-shell/src/cli/jobs/agent/runtime.ts:142:          if (event.type === 'query.failed' || event.type === 'lifecycle.error') status = 'failed';
+packages/ts-shell/src/session/sessionCompactModule.ts:28:    input.event.type === "query.completed" ? input.event : undefined;
+packages/ts-shell/src/session/sessionCompactModule.ts:71:            terminalClassification: queryCompleted.result.terminalClassification,
+packages/ts-shell/src/session/sessionCompactModule.ts:72:            terminalReason: queryCompleted.result.terminalReason,
+packages/ts-shell/src/session/presentation/sessionReentrySurface.ts:3:  TerminalClassification,
+packages/ts-shell/src/session/presentation/sessionReentrySurface.ts:22:  readonly durableStatus?: "success" | "stopped" | "error";
+packages/ts-shell/src/session/presentation/sessionReentrySurface.ts:23:  readonly terminalReason?: TerminalReason;
+packages/ts-shell/src/session/presentation/sessionReentrySurface.ts:24:  readonly terminalClassification?: TerminalClassification;
+packages/ts-shell/src/session/presentation/sessionReentrySurface.ts:68:    durableStatus: recoverySnapshot.durableStatus,
+packages/ts-shell/src/session/presentation/sessionReentrySurface.ts:69:    terminalReason: recoverySnapshot.terminalReason,
+packages/ts-shell/src/session/presentation/sessionReentrySurface.ts:70:    terminalClassification: recoverySnapshot.terminalClassification,
+packages/ts-shell/src/session/presentation/sessionReentrySurface.ts:146:  if (summary.terminalClassification === "success") {
+packages/ts-shell/src/cli/jobs/hub.ts:34:      runPhase: bound.state.runPhase, sourceEntryId: bound.state.pendingPromptEntryId, stopReason: bound.state.terminalReason },
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:7:  TerminalClassification,
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:10:import { projectDurableStatus } from "../lifecycle/durableStatusProjection.js";
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:60:  durableStatus?: "success" | "stopped" | "error";
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:63:  terminalReason?: TerminalReason;
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:64:  terminalClassification?: TerminalClassification;
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:72:  readonly terminalReason?: TerminalReason;
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:73:  readonly terminalClassification?: TerminalClassification;
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:83:    | "terminalReason"
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:84:    | "terminalClassification"
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:144:    terminalReason:
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:146:      Object.prototype.hasOwnProperty.call(overrides, "terminalReason")
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:147:        ? overrides.terminalReason
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:148:        : current?.terminalReason,
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:149:    terminalClassification:
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:153:        "terminalClassification",
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:155:        ? overrides.terminalClassification
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:156:        : current?.terminalClassification,
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:157:    durableStatus: projectDurableStatus(
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:161:          "terminalClassification",
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:163:        ? overrides.terminalClassification
+packages/ts-shell/src/session/schema/sessionStateSnapshot.ts:164:        : current?.terminalClassification,
+packages/ts-shell/src/session/SessionManager.ts:258:        | "terminalReason"
+packages/ts-shell/src/session/SessionManager.ts:259:        | "terminalClassification"
+packages/ts-shell/src/session/sessionContinuityModule.ts:326:      event: Extract<QueryEvent, { type: "query.completed" }>;
+packages/ts-shell/src/session/sessionContinuityModule.ts:334:    if (event.event.type === "query.completed") {
+packages/ts-shell/src/session/sessionContinuityModule.ts:336:        event: Extract<QueryEvent, { type: "query.completed" }>;
+packages/ts-shell/src/session/sessionContinuityModule.ts:363:      event: Extract<QueryEvent, { type: "query.completed" }>;
+packages/ts-shell/src/session/sessionContinuityModule.ts:368:        event: Extract<QueryEvent, { type: "query.completed" }>;
+packages/ts-shell/src/session/sessionContinuityModule.ts:376:    if (event.event.type !== "query.completed") {
+packages/ts-shell/src/session/sessionContinuityModule.ts:382:        event: Extract<QueryEvent, { type: "query.completed" }>;
+packages/ts-shell/src/session/sessionContinuityModule.ts:405:    if (event?.type !== "query-event" || event.event.type !== "query.completed") {
+packages/ts-shell/src/session/lifecycle/sessionLifecycleStore.ts:80:    terminalReason: undefined,
+packages/ts-shell/src/session/lifecycle/sessionLifecycleStore.ts:81:    terminalClassification: undefined,
+packages/ts-shell/src/session/lifecycle/sessionLifecycleStore.ts:98:    terminalReason: undefined,
+packages/ts-shell/src/session/lifecycle/sessionLifecycleStore.ts:99:    terminalClassification: undefined,
+packages/ts-shell/src/session/lifecycle/sessionLifecycleStore.ts:119:    terminalReason: undefined,
+packages/ts-shell/src/session/lifecycle/sessionLifecycleStore.ts:120:    terminalClassification: undefined,
+packages/ts-shell/src/session/lifecycle/sessionLifecycleStore.ts:145:    terminalReason: undefined,
+packages/ts-shell/src/session/lifecycle/sessionLifecycleStore.ts:146:    terminalClassification: undefined,
+packages/ts-shell/src/session/lifecycle/sessionLifecycleStore.ts:171:    terminalReason: undefined,
+packages/ts-shell/src/session/lifecycle/sessionLifecycleStore.ts:172:    terminalClassification: undefined,
+packages/ts-shell/src/session/recovery/resumeContextBuilder.ts:64:    lastTerminalClassification: snapshot.lastTerminalClassification,
+packages/ts-shell/src/session/recovery/resumeContextBuilder.ts:344:    | NonNullable<Extract<QueryEvent, { type: "query.completed" }>["result"]["codingResult"]>
+packages/ts-shell/src/session/lifecycle/durableStatusProjection.ts:1:import type { TerminalClassification } from "../../result/types.js";
+packages/ts-shell/src/session/lifecycle/durableStatusProjection.ts:13:  terminalClassification: TerminalClassification | undefined,
+packages/ts-shell/src/session/lifecycle/durableStatusProjection.ts:16:  if (terminalClassification === "success" || status === "completed") {
+packages/ts-shell/src/session/lifecycle/durableStatusProjection.ts:20:  if (terminalClassification === "stopped") {
+packages/ts-shell/src/session/lifecycle/durableStatusProjection.ts:24:  if (terminalClassification === "error" || status === "error") {
+packages/ts-shell/src/session/sessionContinuationProjection.ts:102:  if (snapshot.durableStatus) {
+packages/ts-shell/src/session/sessionContinuationProjection.ts:106:  if (snapshot.terminalClassification || snapshot.terminalReason) {
+packages/ts-shell/src/session/sessionContinuationProjection.ts:111:    snapshot.lastLifecycleEvent?.event === "run-completed" ||
+packages/ts-shell/src/session/sessionContinuationProjection.ts:112:    snapshot.lastLifecycleEvent?.event === "run-error" ||
+packages/ts-shell/src/session/lifecycle/sessionTerminalStore.ts:41:      event: "run-completed",
+packages/ts-shell/src/session/lifecycle/sessionTerminalStore.ts:49:    terminalReason: terminal?.terminalReason ?? "completed",
+packages/ts-shell/src/session/lifecycle/sessionTerminalStore.ts:50:    terminalClassification: terminal?.terminalClassification ?? "success",
+packages/ts-shell/src/session/lifecycle/sessionTerminalStore.ts:63:  const terminalClassification = terminal?.terminalClassification ?? "error";
+packages/ts-shell/src/session/lifecycle/sessionTerminalStore.ts:66:  if (terminalClassification === "stopped") {
+packages/ts-shell/src/session/lifecycle/sessionTerminalStore.ts:75:      event: "run-error",
+packages/ts-shell/src/session/lifecycle/sessionTerminalStore.ts:84:    terminalReason: terminal?.terminalReason,
+packages/ts-shell/src/session/lifecycle/sessionTerminalStore.ts:85:    terminalClassification,
+packages/ts-shell/src/session/lifecycle/sessionPromptBarrier.ts:65:    terminalReason: undefined,
+packages/ts-shell/src/session/lifecycle/sessionPromptBarrier.ts:66:    terminalClassification: undefined,
+packages/ts-shell/src/session/recovery/scope.ts:94:    if (entry.event.type === "query.failed" || entry.event.type === "lifecycle.error") return {
+packages/ts-shell/src/session/recovery/scope.ts:95:      durableStatus: "error", terminalClassification: "error", terminalReason: "stopped_error", lastError: entry.event.error,
+packages/ts-shell/src/session/recovery/scope.ts:97:    if (entry.event.type === "query.completed") return {
+packages/ts-shell/src/session/recovery/scope.ts:98:      durableStatus: entry.event.result.terminalClassification,
+packages/ts-shell/src/session/recovery/scope.ts:99:      terminalClassification: entry.event.result.terminalClassification,
+packages/ts-shell/src/session/recovery/scope.ts:100:      terminalReason: entry.event.result.terminalReason,
+packages/ts-shell/src/session/recovery/scope.ts:101:      lastError: entry.event.result.terminalClassification === "success" ? undefined : entry.event.result.stopReason,
+packages/ts-shell/src/session/recovery/sessionResumeEligibility.ts:156:  if (snapshot.durableStatus === "stopped") {
+packages/ts-shell/src/session/recovery/types.ts:7:  TerminalClassification,
+packages/ts-shell/src/session/recovery/types.ts:18:  readonly durableStatus?: "success" | "stopped" | "error";
+packages/ts-shell/src/session/recovery/types.ts:19:  readonly terminalReason?: TerminalReason;
+packages/ts-shell/src/session/recovery/types.ts:20:  readonly terminalClassification?: TerminalClassification;
+packages/ts-shell/src/session/transcript/output.ts:83:  if (!isRecord(value) || !TERMINALS.has(value.status) || !TERMINALS.has(value.terminalReason) ||
+packages/ts-shell/src/session/transcript/output.ts:84:    typeof value.terminalClassification !== "string" || !["success", "stopped", "error"].includes(value.terminalClassification) || typeof value.finalOutput !== "string" ||
+packages/ts-shell/src/session/recovery/work.ts:8:    || snapshot.durableStatus === 'stopped'
+packages/ts-shell/src/session/recovery/work.ts:9:    || snapshot.terminalClassification === 'stopped'
+packages/ts-shell/src/session/recovery/work.ts:10:    || snapshot.terminalReason !== undefined && snapshot.terminalReason !== 'completed'
+packages/ts-shell/src/session/transcript/scope.ts:31:    if ((event.type === "query-event" && (event.event.type === "query.completed" || event.event.type === "query.failed")) ||
+packages/ts-shell/src/session/transcript/scope.ts:32:      (event.type === "lifecycle" && (event.event === "run-completed" || event.event === "run-error" || event.event === "run-terminated"))) {
+packages/ts-shell/src/session/recovery/sessionRecoverySnapshot.ts:8:  TerminalClassification,
+packages/ts-shell/src/session/recovery/sessionRecoverySnapshot.ts:74:    durableStatus: terminal.durableStatus,
+packages/ts-shell/src/session/recovery/sessionRecoverySnapshot.ts:75:    terminalReason: terminal.terminalReason,
+packages/ts-shell/src/session/recovery/sessionRecoverySnapshot.ts:76:    terminalClassification: terminal.terminalClassification,
+packages/ts-shell/src/cli/interactive/turnSink.ts:266:      case "query.completed":
+packages/ts-shell/src/cli/interactive/turnSink.ts:275:            kind: event.result.terminalClassification === "error" ? "error" : "notice",
+packages/ts-shell/src/cli/interactive/turnSink.ts:276:            title: event.result.terminalClassification === "error" ? "error" : "stopped",
+packages/ts-shell/src/cli/interactive/turnSink.ts:285:      case "query.failed":
+packages/ts-shell/src/cli/interactive/turnSink.ts:368:  private recordFailure(event: Extract<QueryEvent, { type: "lifecycle.cancelled" | "lifecycle.error" | "query.failed" }>): void {
+packages/ts-shell/src/session/transcript/validation.ts:43:  if (value.type === "query.completed") return readableQueryResult(value.result);
+packages/ts-shell/src/session/transcript/validation.ts:46:  if (value.type === "query.failed" || value.type === "lifecycle.error") return typeof value.error === "string";
+packages/ts-shell/src/session/recovery/reentry/codec.ts:12:  durableStatus: ['success', 'stopped', 'error'],
+packages/ts-shell/src/session/recovery/reentry/codec.ts:13:  terminalReason: ['completed', 'stopped_cycle', 'stopped_max_turns', 'stopped_invalid_handoff', 'stopped_not_proven', 'stopped_error'],
+packages/ts-shell/src/session/recovery/reentry/codec.ts:14:  terminalClassification: ['success', 'stopped', 'error'],
+packages/ts-shell/src/session/sessionContinuityTypes.ts:5:  TerminalClassification,
+packages/ts-shell/src/session/sessionContinuityTypes.ts:20:  readonly lastTerminalClassification?: TerminalClassification;
+packages/ts-shell/src/session/sessionResultParity.ts:8:  TerminalClassification,
+packages/ts-shell/src/session/sessionResultParity.ts:13:  readonly terminalClassification: TerminalClassification;
+packages/ts-shell/src/session/sessionResultParity.ts:20:  readonly terminalClassification: TerminalClassification;
+packages/ts-shell/src/session/sessionResultParity.ts:39:    terminalClassification: input.terminalClassification,
+packages/ts-shell/src/session/continuation/inspection.ts:11:    if (entry.type !== "query-event" || entry.event.type !== "query.completed") continue;
+packages/ts-shell/src/session/continuation/sessionContinuitySnapshot.ts:75:    (lastQueryCompletion !== undefined && lastQueryCompletion.event.result.terminalClassification !== "success" && terminalOrder === undefined) ||
+packages/ts-shell/src/session/continuation/sessionContinuitySnapshot.ts:78:  const lastRunErrorEvent = allowTerminalFallback ? findLastLifecycleEvent(transcriptEvents, "run-error") : undefined;
+packages/ts-shell/src/session/continuation/sessionContinuitySnapshot.ts:140:    query: resultOrderUnknown ? undefined : queryFailure ? { terminalClassification: "error", terminalReason: "stopped_error", stopReason: queryFailure }
+packages/ts-shell/src/session/continuation/sessionContinuitySnapshot.ts:178:    lastTerminalClassification: continuityTerminalSource?.terminalClassification,
+packages/ts-shell/src/session/continuation/sessionContinuitySnapshot.ts:179:    lastTerminalReason: continuityTerminalSource?.terminalReason,
+packages/ts-shell/src/session/continuation/source.ts:8:  "lastTaskKind", "lastTerminalClassification", "lastTerminalReason", "lastFailure",
+packages/ts-shell/src/session/continuation/source.ts:28:      terminalClassification: member(continuity.lastTerminalClassification, ["success", "stopped", "error"]),
+packages/ts-shell/src/session/continuation/source.ts:29:      terminalReason: member(continuity.lastTerminalReason, ["completed", "stopped_cycle", "stopped_max_turns", "stopped_invalid_handoff", "stopped_not_proven", "stopped_error"]),
+packages/ts-shell/src/session/continuation/sessionSeedInfluence.ts:6:  result: Extract<QueryEvent, { type: "query.completed" }>["result"] | undefined,
+packages/ts-shell/src/session/continuation/compactSummary.ts:90:  if (input.terminal?.terminalClassification) continuity.lastTerminalClassification = input.terminal.terminalClassification;
+packages/ts-shell/src/session/continuation/compactSummary.ts:91:  if (input.terminal?.terminalReason) continuity.lastTerminalReason = input.terminal.terminalReason;
+packages/ts-shell/src/session/continuation/sessionUnresolvedItems.ts:24:    input.continuityTerminalSource?.terminalClassification &&
+packages/ts-shell/src/session/continuation/sessionUnresolvedItems.ts:25:    input.continuityTerminalSource.terminalClassification !==
+packages/ts-shell/src/session/continuation/sessionUnresolvedItems.ts:29:      `terminal:${input.continuityTerminalSource.terminalClassification} (${input.continuityTerminalSource.terminalReason})`,
+packages/ts-shell/src/session/continuation/sessionUnresolvedItems.ts:41:      `previous-run-error:${compactContinuityText(
+packages/ts-shell/src/session/agent/compaction.ts:28:      event.type === "query.completed" ? event.result : undefined,
+packages/ts-shell/src/session/continuityFormatter.ts:128:  if (snapshot.lastTerminalClassification || snapshot.lastTerminalReason) {
+packages/ts-shell/src/session/continuityFormatter.ts:130:      `- last-terminal: ${snapshot.lastTerminalClassification ?? "unknown"} (${snapshot.lastTerminalReason ?? "unknown"})`,
+packages/ts-shell/src/session/continuation/branch.ts:54:    matching.event.type === "query.completed" && matching.sourceEntryId === source?.entryId);
+packages/ts-shell/src/session/continuation/branch.ts:90:    if (entry.event.type === "query.completed") return undefined;
+packages/ts-shell/src/session/continuation/branch.ts:91:    if (entry.event.type === "query.failed" || entry.event.type === "lifecycle.error") return { entry, error: entry.event.error };
+packages/ts-shell/src/session/continuation/retentionPlanner.ts:32:  const turnCompleted = input.event.type === "query.completed";

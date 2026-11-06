@@ -1,5 +1,10 @@
 # HANDOFF.md — Project Pitfalls & Operational Guardrails
 
+### Capability Evidence Must Retire When Another Task Changes Its Source
+- **Symptom**: A capability collector passed, but a later full suite sees syntax errors while another task edits the shared worktree.
+- **Root Cause**: Commit identity stayed constant while uncommitted product bytes changed; a running test process can consume different source generations. Runtime-pair probes can also reuse the first runtime's index or profile unless their fixtures are reset.
+- **Rule**: Bind evidence to actual source bytes including new probe files, isolate each runtime's fixtures, and recheck source identity before completion. If another task changes it, retain raw results as historical, mark cells stale and stop the invalidated verification; reacquire a frozen source before rerunning. Do not repair or revert the other task's work from the evidence lane.
+
 This file records non-obvious technical pitfalls, environment hazards, and operational lessons discovered during development.
 **Rule**: Read this file before starting a new task to avoid repeating past mistakes. When you hit and resolve a non-obvious trap during a task, append a concise entry (Symptom / Root Cause / Rule) before finishing. Keep entries factual and actionable; do not use this file as a task log or changelog.
 
@@ -2093,3 +2098,23 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A cancellation delivered after a repair event still starts a new model request; removing the blocking hook makes the repair look accepted; a shell timeout leaves descendants holding output pipes.
 - **Root Cause**: Completion-check admission, asynchronous event consumption, model-loop lifetime and process lifetime are separate boundaries. Empty dispatch and empty hook output also represent different facts.
 - **Rule**: Recheck cancellation immediately before core continuation, retain the original step/recovery budgets and blocking command identity, and require that check to explicitly allow after repair. Keep configured silent/unknown checks unknown. Use a bounded Stop process group and preserve the existing quiet cancellation envelope while recording the structured stopped state. Load and register timeoutMs from each handler, and isolate both declaration homeDir and trustStore in tests.
+
+### Readable Stop Records Do Not Prove Terminal Consumption
+- **Symptom**: A proposed neutral completion query event passes transcript readability, while the shell's terminal projection ignores it; changing only a Stop status can still emit query.failed. Recovery can also reclassify a saved Stop failure from stopped to error.
+- **Root Cause**: Unknown query events pass the transcript's permissive fallback, but shell, replay, recovery, goal and callback consumers have their own closed terminal classifications. StopLifecycle.finish publishes query.failed for every status.
+- **Rule**: Verify the final event and persisted session, selected recovery and replay classifications together before claiming a terminal category works. A new enum or readable lifecycle record alone is insufficient; propagate the category through terminal consumers and settlement callbacks while preserving the original proof verdict and reason.
+
+### Neutral Terminal Reasons Must Not Become Failure Summaries
+- **Symptom**: A run ends with a neutral completion event, but recovery or continuity renders its reason as the last error; a later request can retain that reason after clearing the classification.
+- **Root Cause**: Generic terminal projections reused stopReason as lastFailure, and lifecycle reset writers cleared old terminal fields without clearing the newly added reason field.
+- **Rule**: Keep neutral reason identity separate from lastFailure, clear it at every new-run/interruption reset, and verify the actual persisted state plus recovery, compact, branch and CLI projections. Assert the next request sees no stale reason before its terminal event.
+
+### MCP Denial And Completion Yield Have Different Wire Meanings
+- **Symptom**: A capability verifier expects MCP `block` but actual text says `deny`; an actual repair followed by `already_blocked_once` can also appear to prove completion.
+- **Root Cause**: Write CLI, MCP and Stop expose different decision contracts. A re-entry yield reports no new proof, even when the preceding tool changed source successfully.
+- **Rule**: Assert each boundary against its literal stdout and consuming host behavior. Keep MCP allow/deny separate from write allow/block, and require independent proof before promoting repaired or yielded completion beyond completed_unproven/not_reported.
+
+### Versioned Stop Validation Must Preserve Legacy Flat Hooks
+- **Symptom**: A legacy `{decision: 'block', reason: '...'}` is classified as invalid output, preventing the bounded repair path; flat allow and custom reason codes also stop working.
+- **Root Cause**: A versioned envelope's mandatory closed reason set was applied to all hook output, deleting the legacy optional-code defaults. Adding explicit reason codes to fixtures concealed the regression.
+- **Rule**: Apply mandatory closed reason validation only to contract-bearing envelopes. Preserve flat code format checks and default block/retry to hook_blocked, allow to explicit_allow; unknown proof and empty stdout remain unknown. Test actual command output through final events, including legacy block and subsequent silent yield, and retain fixtures with omitted fields.

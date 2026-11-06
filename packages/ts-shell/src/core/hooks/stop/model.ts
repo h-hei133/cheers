@@ -9,6 +9,7 @@ export interface StopAttempt {
 }
 
 export type ProofVerdict = 'proven' | 'partial' | 'refuted' | 'failed' | 'not_proven' | 'unknown' | 'not_reported';
+export type UnprovenCompletionReason = 'already_blocked_once' | 'not_configured';
 
 export interface ProgressFingerprint {
   readonly version: 1;
@@ -28,6 +29,7 @@ export interface StopCheck {
   readonly proofVerdict: ProofVerdict;
   readonly evidenceIdentity: readonly string[];
   readonly durationMs: number;
+  readonly stopDisposition?: 'completed_unproven';
 }
 
 export interface StopDispatchOptions {

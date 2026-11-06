@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+    "<cheers>/node_modules/tsx/dist/cli.mjs",
+    "<cheers>/scripts/hooks/capabilities/host.mts"
+  ],
+  "cwd": "<cheers>",
+  "stdin": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 4010,
+  "error": null,
+  "stdout": "",
+  "stderr": "node:fs:1350\n  const result = binding.mkdir(\n                         ^\n\nError: EEXIST: file already exists, mkdir '<scratch>/config/project/project'\n    at Object.mkdirSync (node:fs:1350:26)\n    at configuration (<cheers>/scripts/hooks/capabilities/host.mts:111:52)\n    at <anonymous> (<cheers>/scripts/hooks/capabilities/host.mts:143:9) {\n  errno: -17,\n  code: 'EEXIST',\n  syscall: 'mkdir',\n  path: '<scratch>/config/project/project'\n}\n\nNode.js v24.15.0\n"
+}

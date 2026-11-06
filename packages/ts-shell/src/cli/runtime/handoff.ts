@@ -32,7 +32,7 @@ export function handoffRunFor(context: ShellRuntimeContext, manager: SessionMana
   liveHandoffs.set(context, run); return run;
 }
 export function settleHandoffPrompt(context: ShellRuntimeContext, signal: AbortSignal,
-  outcome: 'completed' | 'failed' | 'cancelled' | 'unknown'): void {
+  outcome: 'completed' | 'completed_unproven' | 'failed' | 'cancelled' | 'unknown'): void {
   const run = liveHandoffs.get(context); if (run?.signal === signal) run.settle(outcome);
 }
 export function handoffSettlement(context: ShellRuntimeContext,

@@ -104,6 +104,20 @@ it('runs a native turn on the child and creates a fresh checkpoint run without r
   expect(next.runs[1]!.checkpoint).toEqual(complete.checkpoint);
   expect(hubProjection(host).parents).toContainEqual({ childId: child.id, parentId: context.session.id, parentKind: 'session' });
 });
+it.each(['already_blocked_once', 'not_configured'] as const)('preserves native child %s in job and hub projections without proof', async reasonCode => {
+  const original = HookDispatcher.prototype.dispatch;
+  vi.spyOn(HookDispatcher.prototype, 'dispatch').mockImplementation(function (this: HookDispatcher, payload, options) {
+    if (payload.eventName === 'Stop') return Promise.resolve({ decision: 'allow', reasonCode, proofVerdict: 'not_reported' });
+    return original.call(this, payload, options);
+  });
+  await command('agent Inspect without new proof');
+  const host = jobsFor(context)!; const job = await settled(host.agents.journal.list()[0]!.id);
+  expect(job).toMatchObject({ status: 'completed_unproven', output: 'complete', runs: [{ status: 'completed_unproven', dispatchPossible: true }] });
+  expect(new SessionManager().getRecoverySnapshot(job.childSessionId)).toMatchObject({ durableStatus: 'completed_unproven', terminalReasonCode: reasonCode });
+  expect(hubProjection(host).jobs.find(row => row.id === job.id)).toMatchObject({ status: 'completed_unproven', completionProof: false });
+  expect(host.agents.hasLive(job.id)).toBe(false);
+  expect(() => host.agents.start(job, {} as never)).toThrow();
+});
 it('requires fresh approval after reinstallation for the same undispatched job', async () => {
   await command('agent --queue Inspect after restart'); const original = jobsFor(context)!.agents.journal.list()[0]!;
   expect(original.runs).toHaveLength(0); await closeJobsFor(context); install();

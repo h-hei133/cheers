@@ -1,0 +1,13 @@
+{
+  "command": [
+    "gh",
+    "run",
+    "view",
+    "41998866447",
+    "--json",
+    "jobs,headSha,conclusion,url"
+  ],
+  "exitCode": 0,
+  "stdout": "{\"conclusion\":\"failure\",\"headSha\":\"48907cc206727a666fb06f10db7e044b74ad2223\",\"jobs\":[{\"completedAt\":\"2026-11-05T09:26:15Z\",\"conclusion\":\"failure\",\"databaseId\":127148765484,\"name\":\"Build & Test\",\"startedAt\":\"2026-11-05T09:00:40Z\",\"status\":\"completed\",\"steps\":[{\"conclusion\":\"success\",\"name\":\"Set up job\",\"number\":1,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Run actions/checkout@v4\",\"number\":2,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Run actions/setup-node@v4\",\"number\":3,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Install dependencies\",\"number\":4,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Check for dependency cycles\",\"number\":5,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Check config fields have consumers\",\"number\":6,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Check declared hooks dispatch and tools are registered\",\"number\":7,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Check nothing needs a newer Node than the declared floor\",\"number\":8,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Check the gates still detect\",\"number\":9,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Check for docs and rules drift\",\"number\":10,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Build TypeScript packages\",\"number\":11,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Install native execution test dependencies\",\"number\":12,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Install Chromium test dependency\",\"number\":13,\"status\":\"completed\"},{\"conclusion\":\"failure\",\"name\":\"Run Focused & Unit Tests\",\"number\":14,\"status\":\"completed\"},{\"conclusion\":\"skipped\",\"name\":\"Validate NormProof Architecture\",\"number\":15,\"status\":\"completed\"},{\"conclusion\":\"skipped\",\"name\":\"Post Run actions/setup-node@v4\",\"number\":29,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Post Run actions/checkout@v4\",\"number\":30,\"status\":\"completed\"},{\"conclusion\":\"success\",\"name\":\"Complete job\",\"number\":31,\"status\":\"completed\"}],\"url\":\"https://github.com/h-hei133/cheers/actions/runs/41998866447/job/127148765484\"}],\"url\":\"https://github.com/h-hei133/cheers/actions/runs/41998866447\"}\n",
+  "stderr": ""
+}

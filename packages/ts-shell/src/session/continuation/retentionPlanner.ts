@@ -29,7 +29,7 @@ export function applyCompactRetentionPlan(
   const root = { ...((input.workingMemory ?? {}) as Record<string, unknown>) };
   const previousEventCount = normalizeCount(root.sourceEventCount);
   const previousTurnCount = normalizeCount(root.sourceTurnCount);
-  const turnCompleted = input.event.type === "query.completed";
+  const turnCompleted = (input.event.type === "query.completed" || input.event.type === "query.completed_unproven");
   const nextEventCount = previousEventCount + 1;
   const nextTurnCount = previousTurnCount + (turnCompleted ? 1 : 0);
   root.sourceEventCount = nextEventCount;

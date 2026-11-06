@@ -1,0 +1,14 @@
+{
+  "command": [
+    "<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+    "<scratch>/r0a/dist/adapters/protocol/stdio-server.js"
+  ],
+  "cwd": "<cheers>",
+  "stdin": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"unknown-version\",\"capabilities\":{},\"clientInfo\":{\"name\":\"cheers-capability-probe\",\"version\":\"1\"}}}\n",
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 290,
+  "error": null,
+  "stdout": "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"Unsupported protocol version; supported: 2026-07-28, 2025-11-25\",\"data\":{\"supportedProtocolVersions\":[\"2026-07-28\",\"2025-11-25\"]}}}\n",
+  "stderr": ""
+}

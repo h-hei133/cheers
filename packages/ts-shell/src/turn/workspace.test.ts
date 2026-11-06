@@ -24,7 +24,7 @@ afterEach(() => { vi.unstubAllEnvs(); fs.rmSync(fixture, { recursive: true, forc
 function setup(overrides: Partial<ToolGateOptions> = {}) {
   const options: ToolGateOptions = { sessionId: 'sess_roots', workspaceRoot: primary,
     workspaceRoots: [captureWorkspaceRoot(extra, primary, 'read'), captureWorkspaceRoot(writable, primary, 'write')],
-    permissionScope: 'accept-edits', hooks: { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher,
+    permissionScope: 'accept-edits', hooks: { dispatch: async () => ({ decision: 'allow', stopChecks: [] }) } as unknown as HookDispatcher,
     emit: () => {}, ...overrides };
   const definitions = createCoreToolRegistry();
   const tools = new Map(adaptTools(definitions, options).map(tool => [tool.name, tool]));

@@ -1,0 +1,29 @@
+from pathlib import Path
+import subprocess, os, json, hashlib
+base=Path.cwd()
+src=base/'packages/ts-shell/src'
+cases=[
+ ('reason-disposition','core/hooks/stop/result.ts',"const UNCERTAIN = new Set([", "const UNCERTAIN = new Set(['already_blocked_once', 'not_configured',",'preserves neutral'),
+ ('unknown-proof','core/hooks/stop/result.ts',"UNCERTAIN.has(reasonCode) || proofVerdict === 'unknown'", "UNCERTAIN.has(reasonCode)",'with unknown proof failed'),
+ ('contract-version','core/hooks/stop/result.ts'," || value.contract.version !== '0.1.0'", "",'fails incompatible_contract'),
+ ('neutral-event','turn/session.ts',"channel.push({ type: 'query.completed_unproven'", "channel.push({ type: 'query.completed'",'preserves neutral'),
+ ('session-status','session/lifecycle/sessionTerminalStore.ts',"const unproven = terminal?.terminalClassification === 'completed_unproven';", "const unproven = false;",'preserves neutral'),
+]
+records=[]
+for name,file,old,new,pattern in cases:
+ p=src/file; raw=p.read_bytes(); before=hashlib.sha256(raw).hexdigest()
+ try:
+  content=raw.decode(); assert content.count(old)==1,(name,content.count(old))
+  p.write_bytes(content.replace(old,new,1).encode())
+  env={**os.environ,'VITEST_MAX_THREADS':'2','VITEST_MIN_THREADS':'2'}
+  cmd=['npm','run','test','-w','packages/ts-shell','--','src/turn/stop.envelope.test.ts','-t',pattern]
+  with (base/'.tmp/stop-envelope-validation'/('reversal-'+name+'.txt')).open('wb') as log:
+   result=subprocess.run(cmd,env=env,stdout=log,stderr=subprocess.STDOUT)
+  output=(base/'.tmp/stop-envelope-validation'/('reversal-'+name+'.txt')).read_text()
+  assert result.returncode==1 and 'AssertionError' in output,(name,result.returncode,output[-1000:])
+  records.append({'mutation':name,'file':file,'command':cmd,'exit':result.returncode,'assertionFailure':True,'sha256':before})
+ finally:
+  p.write_bytes(raw)
+  assert p.read_bytes()==raw
+  print(name+' restored exact bytes',flush=True)
+(base/'.tmp/stop-envelope-validation/reversal.json').write_text(json.dumps(records,indent=2)+'\n')

@@ -1,0 +1,30 @@
+import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+
+const file = 'packages/ts-shell/src/core/hooks/stop/result.ts';
+const original = fs.readFileSync(file);
+const target = "if (value.contract !== undefined && (!reasonCode || !WIRE_REASONS.has(reasonCode))) return stopUnknown('invalid_output');";
+const mutation = "if (!reasonCode || !WIRE_REASONS.has(reasonCode)) return stopUnknown('invalid_output');";
+if (!original.toString().includes(target)) throw new Error('Mutation target missing');
+let result;
+try {
+  fs.writeFileSync(file, original.toString().replace(target, mutation));
+  result = spawnSync('rtk', ['proxy', 'npm', 'run', 'test', '--workspace', '@cheers/ts-shell', '--',
+    'src/turn/stop.envelope.test.ts', '-t', 'preserves flat'], {
+    encoding: 'utf8', env: { ...process.env, VITEST_MAX_THREADS: '2', VITEST_MIN_THREADS: '2' },
+  });
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  fs.writeFileSync('.tmp/stop-flat-validation/reversal.txt', output);
+  if (result.status !== 1 || !output.includes('AssertionError') || !/6 failed/.test(output)) {
+    throw new Error(`Reversal did not prove six flat paths: status=${result.status}`);
+  }
+} finally {
+  fs.writeFileSync(file, original);
+  if (!fs.readFileSync(file).equals(original)) throw new Error('Restoration changed source bytes');
+}
+const summary = { mutation: 'require closed reason for unversioned flat hooks', exit: result.status,
+  failedCases: 6, assertionError: true, restoredExactBytes: true,
+  restoredSha256: createHash('sha256').update(original).digest('hex') };
+fs.writeFileSync('.tmp/stop-flat-validation/reversal.json', `${JSON.stringify(summary, null, 2)}\n`);
+console.log(JSON.stringify(summary));

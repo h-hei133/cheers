@@ -16,7 +16,8 @@ export function projectSessionUnresolvedItems(input: {
   const lastFailure =
     input.sessionLastError?.trim() ||
     input.lastRunErrorEvent?.detail?.trim() ||
-    input.continuityTerminalSource?.stopReason?.trim();
+    (input.continuityTerminalSource?.terminalClassification === 'completed_unproven'
+      ? undefined : input.continuityTerminalSource?.stopReason?.trim());
   if (lastFailure) {
     unresolvedItems.push(`last-error:${lastFailure}`);
   }

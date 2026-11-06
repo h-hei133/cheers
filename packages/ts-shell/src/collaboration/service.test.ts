@@ -76,14 +76,15 @@ it('claims and dispatches a proposal once and retains digest-bound receipts for 
   expect(object(s.request('alice', 'receipt', { data: { requestId: dispatchId } }).result).status).toBe('committed');
   expect(object(s.request('carol', 'receipt', { data: { requestId: dispatchId } }).result).status).toBe('unknown');
 });
-it('rejects accepted work revoked before dispatch and stale cancellation after its target settled', () => {
+it.each(['completed', 'completed_unproven'] as const)('rejects accepted work revoked before dispatch and stale cancellation after its target settled %s', outcome => {
   const s = setup(); const host = hostFields(s.begin()); const ticket = String(object(s.request('bob', 'join', { roomId: host.roomId, data: {} }).result).ticket);
   const ask = object(s.request('bob', 'propose', { roomId: host.roomId, ticket, data: { kind: 'ask', text: 'A prompt' } }).result);
   const accepted = object(s.request('alice', 'claim', { ...host, data: { proposalId: ask.proposalId } }).result);
   s.request('alice', 'dispatch', { ...host, data: { acceptanceId: accepted.acceptanceId, digest: accepted.digest } });
   const cancel = object(s.request('bob', 'propose', { roomId: host.roomId, ticket, data: { kind: 'cancel', target: accepted.acceptanceId } }).result);
   const control = object(s.request('alice', 'claim', { ...host, data: { proposalId: cancel.proposalId } }).result);
-  s.request('alice', 'settle', { ...host, data: { acceptanceId: accepted.acceptanceId, outcome: 'completed' } });
+  s.request('alice', 'settle', { ...host, data: { acceptanceId: accepted.acceptanceId, outcome } });
+  expect(s.store.transaction(state => state.rooms[0]!.proposals[0])).toMatchObject({ status: 'settled', outcome });
   expect(() => s.request('alice', 'dispatch', { ...host, data: { acceptanceId: control.acceptanceId, digest: control.digest } })).toThrow();
   const second = object(s.request('bob', 'propose', { roomId: host.roomId, ticket, data: { kind: 'ask', text: 'Another prompt' } }).result);
   const waiting = object(s.request('alice', 'claim', { ...host, data: { proposalId: second.proposalId } }).result);
@@ -121,7 +122,10 @@ it('preserves dispatched uncertainty when takeover is followed by revocation', (
   expect(retained.map(proposal => proposal.status)).toEqual(['unknown', 'unknown']);
   expect(retained.every(proposal => proposal.outcome === undefined)).toBe(true);
 });
-it.each(['revoke-regrant', 'takeover'] as const)('refuses a completed outcome for fenced work after %s', change => {
+it.each([
+  ['revoke-regrant', 'completed'], ['takeover', 'completed'],
+  ['revoke-regrant', 'completed_unproven'], ['takeover', 'completed_unproven'],
+] as const)('refuses a terminal outcome for fenced work after %s (%s)', (change, outcome) => {
   const s = setup(); let host = hostFields(s.begin());
   const ticket = String(object(s.request('bob', 'join', { roomId: host.roomId, data: {} }).result).ticket);
   const ask = object(s.request('bob', 'propose', { roomId: host.roomId, ticket, data: { kind: 'ask', text: 'Adopt once' } }).result);
@@ -135,7 +139,7 @@ it.each(['revoke-regrant', 'takeover'] as const)('refuses a completed outcome fo
     host = hostFields(object(s.request('alice', 'lease', { roomId: host.roomId, data: { binding: bound, snapshot: emptySnapshot,
       epoch: plan.epoch, aclRevision: plan.aclRevision, generation: plan.generation } }).result));
   }
-  expect(() => s.request('alice', 'settle', { ...host, data: { acceptanceId: claimed.acceptanceId, outcome: 'completed' } })).toThrow(/stale/);
+  expect(() => s.request('alice', 'settle', { ...host, data: { acceptanceId: claimed.acceptanceId, outcome } })).toThrow(/stale/);
   expect(s.store.transaction(state => state.rooms[0]!.proposals[0])).toMatchObject({ status: 'unknown' });
 });
 it('enforces authenticated share ACL, expiry, revoke/delete and private state without link authority', () => {

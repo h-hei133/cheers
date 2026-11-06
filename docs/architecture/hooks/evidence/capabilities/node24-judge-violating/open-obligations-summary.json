@@ -1,0 +1,53 @@
+{
+  "summaryVersion": "0.10.1",
+  "runId": "generated-structure-judge",
+  "sourceVerdict": "failed",
+  "enforcementMode": "shadow",
+  "wouldBlock": true,
+  "didBlock": false,
+  "openBlockingObligationCount": 1,
+  "openBlockingObligations": [
+    {
+      "obligationId": "source_graph_has_no_unresolved_specifiers",
+      "title": "Every module import resolves within the declared source graph",
+      "status": "failed",
+      "blocking": true,
+      "topGapTypes": [
+        "contradictory_evidence"
+      ],
+      "neededEvidence": [],
+      "repairItemIds": [],
+      "reason": "Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: src/module.ts -> ./missing.js"
+    }
+  ],
+  "topProofGaps": [
+    {
+      "obligationId": "source_graph_has_no_unresolved_specifiers",
+      "kind": "contradictory_evidence",
+      "reason": "Record unresolved: src/module.ts -> ./missing.js does not satisfy source_graph_has_no_unresolved_specifiers.",
+      "claimId": "unresolved: src/module.ts -> ./missing.js"
+    }
+  ],
+  "nextEvidenceNeeded": [],
+  "repairItemSummaries": [],
+  "artifactPaths": {
+    "verdict": "verdict.json",
+    "ledger": "ledger.json",
+    "enforcement": "enforcement.json",
+    "report": "report.md"
+  },
+  "scopeHints": {
+    "capacityStatus": "healthy",
+    "totalGapsCount": 1,
+    "totalObligationsCount": 1,
+    "totalRepairItemsCount": 0,
+    "isTruncated": false,
+    "message": "Capacity usage is within safe limits."
+  },
+  "tokenBudgetHint": {
+    "estimatedCategory": "low",
+    "recommendedLimit": 2000,
+    "contextSizeRecommendation": "Suitable for low-context analysis."
+  },
+  "createdAt": "2026-11-06T10:27:19.179Z"
+}

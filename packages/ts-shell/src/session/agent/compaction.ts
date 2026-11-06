@@ -25,7 +25,7 @@ export function applyAutoCompactRetention(
     historyLimit: options?.historyLimit ?? DEFAULT_APPROVAL_AUDIT_HISTORY_LIMIT,
     now: options?.now ?? new Date().toISOString(),
     seedInfluence: extractSeedInfluenceFromQueryResult(
-      event.type === "query.completed" ? event.result : undefined,
+      (event.type === "query.completed" || event.type === "query.completed_unproven") ? event.result : undefined,
     ),
   });
 }

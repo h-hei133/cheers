@@ -7,6 +7,6 @@ export function hasUnfinishedSessionWork(snapshot: RecoverySnapshot): boolean {
     || snapshot.interruptedKind !== undefined
     || snapshot.durableStatus === 'stopped'
     || snapshot.terminalClassification === 'stopped'
-    || snapshot.terminalReason !== undefined && snapshot.terminalReason !== 'completed'
+    || snapshot.terminalReason !== undefined && snapshot.terminalReason !== 'completed' && snapshot.terminalReason !== 'completed_unproven'
     || Boolean(snapshot.taskState?.unverifiedFiles.length);
 }

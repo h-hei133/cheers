@@ -616,7 +616,7 @@ function renderResumedContextSummary(
   }
   if (summary.terminalClassification || summary.terminalReason) {
     renderLine(
-      `Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
+      `Last terminal: ${summary.terminalClassification ?? "unknown"}${summary.terminalReasonCode ? ` (${summary.terminalReasonCode})` : summary.terminalReason ? ` (${summary.terminalReason})` : ""}`,
     );
   }
   if (summary.stagedRepairStepCount && summary.stagedRepairStepCount > 1) {

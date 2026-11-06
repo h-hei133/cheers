@@ -138,7 +138,11 @@ export type QueryEvent =
   | { readonly type: 'lifecycle.cancelled'; readonly reason: string }
   | { readonly type: 'lifecycle.error'; readonly error: string }
   | { readonly type: 'query.completed'; readonly result: OrchestrationResult }
-  | { readonly type: 'query.failed'; readonly error: string; readonly stopStatus?: import('./lifecycle.js').StopTerminalStatus; readonly admissionFailure?: import('../../agent/request/model.js').ModelAdmissionError['code'] }
+  | (import('../../hooks/stop/model.js').StopAttempt & { readonly type: 'query.completed_unproven';
+      readonly reasonCode: import('../../hooks/stop/model.js').UnprovenCompletionReason; readonly proofVerdict: 'not_reported';
+      readonly result: OrchestrationResult & { readonly status: 'completed_unproven'; readonly terminalReason: 'completed_unproven';
+        readonly terminalClassification: 'completed_unproven' } })
+  | { readonly type: 'query.failed'; readonly error: string; readonly stopStatus?: Exclude<import('./lifecycle.js').StopTerminalStatus, 'completed_unproven'>; readonly admissionFailure?: import('../../agent/request/model.js').ModelAdmissionError['code'] }
 
 /**
  * Whether this event belongs in the durable transcript.

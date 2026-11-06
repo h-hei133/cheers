@@ -25,7 +25,7 @@ export function applySessionCompactRetention(input: {
   readonly source?: ContinuitySource;
 }): unknown {
   const queryCompleted =
-    input.event.type === "query.completed" ? input.event : undefined;
+    (input.event.type === "query.completed" || input.event.type === "query.completed_unproven") ? input.event : undefined;
   const approvalAudit = decodeApprovalMemory(input.workingMemory);
   const approvalAuditHistory = decodeApprovalMemoryHistory(
     input.workingMemory,
@@ -71,6 +71,7 @@ export function applySessionCompactRetention(input: {
             terminalClassification: queryCompleted.result.terminalClassification,
             terminalReason: queryCompleted.result.terminalReason,
             stopReason: queryCompleted.result.stopReason,
+            terminalReasonCode: queryCompleted.type === 'query.completed_unproven' ? queryCompleted.reasonCode : undefined,
           },
           actionHandoffSummary,
           writeContinuity: stoppedSessionContinuity?.writeContinuity,

@@ -35,7 +35,7 @@ export class CollaborationHost {
     this.unsubscribe = this.ports.observe(event => {
       try {
         if (this.closed || this.failed || !this.ports.current()) return;
-        if (event.type === 'query.completed' || event.type === 'query.failed' || event.type === 'lifecycle.cancelled') this.dirty++;
+        if (event.type === 'query.completed' || event.type === 'query.completed_unproven' || event.type === 'query.failed' || event.type === 'lifecycle.cancelled') this.dirty++;
         const projected = projectEvent(event, this.sequence + this.queued.length + 1, Date.now()); if (!projected) return;
         if (this.queued.length >= 127) {
           if (!this.dropped && this.queued.length === 127) { this.queued.push({ ...projected, kind: 'relay.gap' }); this.dropped = true; }

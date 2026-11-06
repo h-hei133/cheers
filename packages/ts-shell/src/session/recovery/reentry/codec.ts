@@ -2,16 +2,16 @@ import { isRecord } from '../../../core/values/record.js';
 import type { SessionReentrySummary } from '../../presentation/sessionReentrySurface.js';
 
 const requiredText = ['id', 'projectRoot', 'createdAt', 'updatedAt', 'resumeDetail'] as const;
-const optionalText = ['title', 'pendingPrompt', 'lastError', 'lastUserMessage', 'lastAssistantMessage', 'blockedDetail'] as const;
+const optionalText = ['title', 'pendingPrompt', 'lastError', 'lastUserMessage', 'lastAssistantMessage', 'blockedDetail', 'terminalReasonCode'] as const;
 const requiredBoolean = ['recoverable', 'autoResumeReady', 'hasConversation'] as const;
 const optionalSteps = ['stagedRepairStepCount', 'stagedRepairCompletedStep', 'stagedRepairBlockedStep', 'stagedRepairNextStep'] as const;
 const choices = {
-  status: ['active', 'interrupted', 'completed', 'error', 'terminated'],
+  status: ['active', 'interrupted', 'completed', 'completed_unproven', 'error', 'terminated'],
   resumeDisposition: ['fully-resumable', 'partially-resumable', 'not-resumable'],
   runPhase: ['idle', 'prompt-persisted', 'turn-active'],
-  durableStatus: ['success', 'stopped', 'error'],
-  terminalReason: ['completed', 'stopped_cycle', 'stopped_max_turns', 'stopped_invalid_handoff', 'stopped_not_proven', 'stopped_error'],
-  terminalClassification: ['success', 'stopped', 'error'],
+  durableStatus: ['success', 'stopped', 'error', 'completed_unproven'],
+  terminalReason: ['completed', 'completed_unproven', 'stopped_cycle', 'stopped_max_turns', 'stopped_invalid_handoff', 'stopped_not_proven', 'stopped_error'],
+  terminalClassification: ['success', 'stopped', 'error', 'completed_unproven'],
   blockedReason: ['session-corrupt', 'terminal-evidence-indeterminate', 'continuation-evidence-missing'],
 } as const satisfies Partial<Record<keyof SessionReentrySummary, readonly string[]>>;
 

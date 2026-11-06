@@ -4,7 +4,7 @@ import { isRecord } from '../../core/values/record.js';
 import type { BoundSessionScope } from '../../session/store/contract.js';
 import type { HandoffState } from './model.js';
 
-const phases = new Set(['armed', 'running', 'switched', 'completed', 'failed', 'cancelled', 'unknown']);
+const phases = new Set(['armed', 'running', 'switched', 'completed', 'completed_unproven', 'failed', 'cancelled', 'unknown']);
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 function text(value: unknown, limit = 512): value is string {
   return typeof value === 'string' && value.length > 0 && Buffer.byteLength(value) <= limit && !/[\x00-\x1f\x7f-\x9f]/.test(value);
