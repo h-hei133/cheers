@@ -377,3 +377,75 @@ longer binds the current bytes. Conformance was re-run on the corrected
 contract (10 pass); the full chain was not. No patch, bundle, severity or
 workflow change.
 ```
+
+## 2026-11-07：C4 current-bound disposition audit (N4b handoff)
+
+This is an audit-record update only. No product source, NormProof package, patch, bundle, profile,
+severity, CI workflow, or external NormProof file was changed. The selected N4b option is the
+append-only current view; conditional baseline retirement remains unapplied.
+
+### Evidence binding
+
+The `.normproof/dispositions.md` prefix was read before the append: 51,979 bytes, 125 rows,
+SHA-256 `75ef8dad56072d021e8d216db1462fe202a7f7c2026dffd9761c49c71fb3a03b`. Current source
+identity is HEAD `fcaeac2d2d4abc30028826166c18b20afc83a738` plus the adapter's 3,102-file package
+TS/TSX snapshot `31c0436efd28d5730bfaa3a14897f914ac6bef5caa8dcc4b934a16ab12a52b66`. The live
+profile SHA-256 is `2a69c9e14ed8e9b6b38c6a795920c4d574850662d16a9ac8a0ce17bdc0db81db` and its
+exact IDs are `source_graph_is_acyclic`, `source_graph_has_no_unresolved_specifiers`, and
+`declared_functions_within_module_ceiling`.
+
+The old capture was used only to label historical absence: external
+`counter-external.json` SHA-256 `3369e93395541486e8123a27d8c98dffec2f806b510c48ac382d0ae02d9a37d9`,
+revision `c7219e6aa0fdae09ca2de06c2090f57098add057`, source snapshot
+`70abf3d223b23969707f9b4ff8989c2b4754bfe0a9c98e25a53ade6376e185c1`, 3,092 files, zero
+capture failures. The current recheck, independently run against today's tree, found 46 absent
+rows across 28 paths, 54 present explicit-path rows, 21 external IDs, and 58 exact-ID review
+candidates. The old 125/21/46 values were not adopted as current statistics.
+
+### Current proof and option
+
+The fresh shadow run was observed (`canBlock=false`, host/underlying exit `0`, proof verdict
+`partial`, verdict SHA-256
+`bde1828f6c8039143c540794d5bf0d9bb704fa55ed0750ea9fe59c501307bbf7`). Both graph obligations
+were `satisfied`; the advisory function-ceiling obligation was `failed` with exactly two current
+proof gaps: `interactiveMode.test.ts` (21 names) and `interactiveMode.ts` (22 names). Those
+paths already have original disposition rows 141 and 139. No new `fix`/`defer`/`ignore` row was
+created, and no external ID was renamed.
+
+### Independent checks
+
+The append was checked as a byte-prefix operation against the recorded pre-append SHA. A replay
+simulation using the C4 section marker produced no second append and preserved the same prefix.
+Two judge invocations with the same `judge-input.json`, projected manifest, profile, pinned archive,
+and package source produced the same `partial` verdict and verdict SHA; the audit document is not a
+judge input. Temporary shadow output was removed from `.tmp/` after inspection. `git diff --check`
+was clean; no build or test was run because this change is confined to audit Markdown records.
+
+Recorded checker output:
+
+```text
+dispositions_prefix_ok=true
+dispositions_prefix_sha256=75ef8dad56072d021e8d216db1462fe202a7f7c2026dffd9761c49c71fb3a03b
+dispositions_marker_count=1
+replay_no_duplicate=true
+execution_prefix_ok=true
+execution_marker_count=1
+same_input_verdict_a=partial
+same_input_verdict_sha256=bde1828f6c8039143c540794d5bf0d9bb704fa55ed0750ea9fe59c501307bbf7
+same_input_source_snapshot=31c0436efd28d5730bfaa3a14897f914ac6bef5caa8dcc4b934a16ab12a52b66
+same_input_verdict_stable=true
+```
+
+### Proposed commit message (not executed)
+
+```text
+docs: append current-bound C4 disposition audit
+
+Bind the N4b append-only disposition view to the live profile and source
+snapshot, preserving every historical byte and external-tool identifier.
+Recompute current path absence and review candidates, then record the two
+current function-ceiling findings from a fresh shadow verdict.
+
+Keep baseline retirement conditional and leave product, proof, package, and
+release artifacts unchanged. Validate prefix preservation and replay idempotence.
+```

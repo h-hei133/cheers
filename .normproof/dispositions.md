@@ -139,3 +139,125 @@ Recording here never changes the verdict; judge keeps reporting every run.
 - declared_functions_within_module_ceiling | packages/ts-shell/src/cli/interactive/interactiveMode.ts remains123 against ff084423 when counting its constructor, InputPreferences7 to8 | reviewed 2026-10-30 | decision: defer | reason: Draft recovery notices reuse accepted input bindings and add no host callable. This count includes the constructor unlike the prior122 count; inherited host decomposition remains a separate lifecycle task and no verdict is changed.
 
 - declared_functions_within_module_ceiling | packages/ts-shell/src/cli/interactive/interactiveMode.test.ts exceeds the 20-name ceiling in the current judge | reviewed 2026-11-01 | decision: defer | reason: Unchanged host integration coverage needs its own fixture decomposition and terminal lifecycle validation; the approval identity repair adds no callable to this module and does not waive the advisory.
+
+## C4 — current-bound reconciliation (2026-11-07)
+
+This appendix is the N4b **Choice A** current view. It preserves every preceding byte and
+does not change a verdict, severity, or any historical `fix`/`defer`/`ignore` decision. The
+conditional baseline-retirement option was not applied: no baseline input or baseline-capable
+judgement path is declared by the current workspace.
+
+### Bound inputs and live loading path
+
+The immutable prefix before this appendix is 51,979 bytes, 125 disposition rows, and SHA-256
+`75ef8dad56072d021e8d216db1462fe202a7f7c2026dffd9761c49c71fb3a03b`. The live binding is
+current HEAD `fcaeac2d2d4abc30028826166c18b20afc83a738`, profile
+`.normproof/norm-packs/software-structure-v0/profile.json` SHA-256
+`2a69c9e14ed8e9b6b38c6a795920c4d574850662d16a9ac8a0ce17bdc0db81db`, and the 3,102-file
+TS/TSX package source snapshot SHA-256
+`31c0436efd28d5730bfaa3a14897f914ac6bef5caa8dcc4b934a16ab12a52b66`. The snapshot is the
+byte identity produced by `.normproof/adapter/artifact.mjs` `sourceSnapshot`; it is not a
+dependency or semantic proof.
+
+The current consumer chain is `.normproof/judge-input.json` (`software-structure-v0`, read-only),
+`.normproof/evidence-manifest.json` (the `source_module_graph` and `source_module_functions`
+entries), `.normproof/adapter/shadow.mjs` (manifest projection and judge invocation), and the
+profile's `obligationTemplates`. The live profile IDs are exactly:
+`source_graph_is_acyclic`, `source_graph_has_no_unresolved_specifiers`, and
+`declared_functions_within_module_ceiling`.
+
+The historical capture used for absence comparison is read-only external evidence:
+`/home/wang/projects/normproof/docs/validation/counter-external.json`, file SHA-256
+`3369e93395541486e8123a27d8c98dffec2f806b510c48ac382d0ae02d9a37d9`, revision
+`c7219e6aa0fdae09ca2de06c2090f57098add057`, source snapshot
+`sha256:70abf3d223b23969707f9b4ff8989c2b4754bfe0a9c98e25a53ade6376e185c1`, 3,092 captured
+files, and zero capture failures. Its counts are historical context only; the current counts
+below were recomputed against this file, the live profile, and today's source tree.
+
+### Recomputed classification
+
+| Current audit | Result | Scope |
+| --- | ---: | --- |
+| disposition rows | 125 | Current `.normproof/dispositions.md` rows beginning `- ` |
+| exact current-profile IDs | 104 | 102 function-ceiling rows plus 2 unresolved-specifier rows |
+| external-tool IDs | 21 | Lines 78–88 and 97–106; kept with their original tool provenance |
+| explicit function-path rows | 100 | Exact `packages/ts-shell/src/**/*.ts[x]` findings |
+| current source paths present | 54 rows | Rechecked against the current package tree |
+| current source paths absent | 46 rows / 28 distinct paths | Current absence, independently recomputed; also historical absence in the old capture |
+| eligible current-review rows | 58 | Exact current-profile IDs after excluding those 46 absent-path rows; candidates, not current findings |
+
+The 21 external IDs are `unreachable-code-retention` (8), `call-unreferenced` (5),
+`duplicate-implementation-retention` (2), `unreachable-singleton-retention` (2), and one each
+of `contract-seam-inert`, `dependency-direction`, `query-runtime-orphan-retention`, and
+`browser-layout-retention`. They are not mapped to similarly worded NormProof obligations.
+
+The 46 currently absent rows are bound to these 28 paths; the parenthesized values are original
+line numbers and remain historical references:
+
+| Path | Original rows |
+| --- | --- |
+| `packages/ts-shell/src/context/discovery/scan.ts` | 11, 45, 66 |
+| `packages/ts-shell/src/context/readWindowContinuation.ts` | 12, 46, 67 |
+| `packages/ts-shell/src/core/context/memory/projectMemoryLocalStore.ts` | 14, 52 |
+| `packages/ts-shell/src/core/paths/legacyRootRebase.ts` | 15, 61, 69 |
+| `packages/ts-shell/src/core/query/runtime/harnessSpine.test.ts` | 17 |
+| `packages/ts-shell/src/core/query/runtime/policy.ts` | 18 |
+| `packages/ts-shell/src/core/query/runtime/workspaceRepairVerification.test.ts` | 19 |
+| `packages/ts-shell/src/core/query/runtime/workspaceTaskState.test.ts` | 20 |
+| `packages/ts-shell/src/daemon/client.ts` | 23, 49, 71 |
+| `packages/ts-shell/src/edit/authority/projection/approval.ts` | 24 |
+| `packages/ts-shell/src/edit/multifile/model.ts` | 25, 56, 74 |
+| `packages/ts-shell/src/edit/patch/plan/candidate.test.ts` | 26 |
+| `packages/ts-shell/src/edit/patch/plan/perFile.ts` | 27, 57 |
+| `packages/ts-shell/src/evidence/projection/claim/ledger.ts` | 28 |
+| `packages/ts-shell/src/orchestration/continuationPlanning.ts` | 29 |
+| `packages/ts-shell/src/orchestration/mutationRoutingProjection.test.ts` | 30 |
+| `packages/ts-shell/src/orchestration/patchResult/editCompatibilityGauntlet.test.ts` | 31 |
+| `packages/ts-shell/src/orchestration/patchResult/mixedFileWriteRoute.test.ts` | 32 |
+| `packages/ts-shell/src/orchestration/patchResult/mixedFileWriteRoute.ts` | 33 |
+| `packages/ts-shell/src/orchestration/providerExactPatchContract.ts` | 34, 50 |
+| `packages/ts-shell/src/planning/runtime/engine.ts` | 35, 59 |
+| `packages/ts-shell/src/planning/runtime/projection.ts` | 36 |
+| `packages/ts-shell/src/planning/runtime/proposal.ts` | 37, 60 |
+| `packages/ts-shell/src/presentation/surface/model.ts` | 38, 58 |
+| `packages/ts-shell/src/runtime/evaluation/model.ts` | 39 |
+| `packages/ts-shell/src/runtime/evaluation/task/liveRun.ts` | 40 |
+| `packages/ts-shell/src/runtime/evaluation/task/model.ts` | 41 |
+| `packages/ts-shell/src/tools/toolBatchDispatch.ts` | 44, 55, 72 |
+
+The 58 eligible original rows are: 9, 10, 13, 16, 21, 22, 42, 43, 47, 48, 51, 53, 54,
+62, 63, 64, 65, 68, 70, 73, 75, 76, 77, 89, 90, 91, 92, 93, 94, 95, 108, 110, 111,
+112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 128, 129,
+130, 132, 133, 135, 137, 138, 139, 141. This is a review queue only. It does not certify
+that any historical row is a current finding.
+
+### Current proof candidates
+
+A fresh shadow run on the binding above was observed with Node `v24.15.0`, host exit `0`,
+underlying judge exit `0`, `canBlock=false`, and proof verdict `partial`. Its input SHA-256 is
+`bbc748511adf459d53c40be992a6e7f1e3af9e5e7bf1f06c906fe766671f68b1`, source-manifest SHA-256
+`d41cf5ab7301600a73d4361713c9cb98ccf17651edc48bca3f2633cefe2b3481`, projected-manifest
+SHA-256 `977b70d0fabf6008e521366940e15dc0efb8fe8bdf23e7fbd0775aad9c6df00d`, and verdict
+SHA-256 `bde1828f6c8039143c540794d5bf0d9bb704fa55ed0750ea9fe59c501307bbf7`.
+
+| Exact current ID | Current result | Current candidate |
+| --- | --- | --- |
+| `source_graph_is_acyclic` | satisfied, advisory | none |
+| `source_graph_has_no_unresolved_specifiers` | satisfied, blocking | none |
+| `declared_functions_within_module_ceiling` | failed, advisory; 2 proof gaps | `packages/ts-shell/src/cli/interactive/interactiveMode.test.ts` — 21 names; `packages/ts-shell/src/cli/interactive/interactiveMode.ts` — 22 names |
+
+The two current candidates already have historical rows 139 and 141 respectively. This appendix
+does not add another decision row or rename either finding. They remain review candidates until a
+separate owner decision and current evidence support a new append-only disposition.
+
+### Choice and invariants
+
+The selected disposition is the N4b append-only current-view repair: retain the immutable history,
+exclude external IDs from the NormProof current view, exclude source-absent rows from the current
+path-finding view, and admit only exact IDs from the live profile. No old action, counter, or
+verdict is rewritten. Conditional retirement remains a proposal for a future baseline adoption;
+it is not current authorization.
+
+The prefix hash, current-profile/source binding, current proof result, and replay check are recorded
+in the C4 execution entry in `docs/validation/adapter-execution.md`. A repeated C4 application
+must detect this section marker and append no second copy; the original prefix remains byte-exact.
