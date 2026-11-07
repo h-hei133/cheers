@@ -1,0 +1,55 @@
+tree dfbfe80ffd1af8eb0dfacae37aea0aad6568cf8f
+parent 7754ee2a24fe5b51bbfba45138737993ff1fd1d9
+author hei <hhei3234@gmail.com> 1793967071 +0800
+committer hei <hhei3234@gmail.com> 1793967071 +0800
+
+feat(J3): record cohort provenance and separate replay evidence tiers
+
+J3 executes P1-D18 under P1-F38/P1-F39. J0 reported 8/30 normalized,
+12/30 final-byte and 0/30 trajectory agreement but carried no provenance, so
+none of those numbers could be traced to a tier, a source identity or a
+missing observation. This commit adds that record without rerunning J0.
+
+Scope is reprojection only: no provider, host, detector or model ran. The 2802
+raw result files, the 147 frozen/registered files and PREREGISTRATION.md keep
+their original bytes; the audit compares against Git blobs at 7754ee2 rather
+than trusting file existence.
+
+Changes:
+- harness/provenance.py emits one manifest per cohort/pass (11 total, 233
+  retained runs). Every observation carries value/status/source/scope, so a
+  reader can tell a checked fact from an unverified one and from a fact that
+  does not exist. Redacted requests keep model/seed/temperature/top_p/
+  max_tokens/stream plus HTTP outcome; no token, header, prompt, tool argument
+  or response body is copied.
+- harness/replay.py extracts the original normal/trajectory comparisons into
+  shared code and adds two columns: final_source_bytes (path set plus UTF-8
+  bytes) and raw_verdict_bytes (artifact bytes, unmatched paths counted
+  separately). The old fields and their per-pair values are preserved.
+- REPLAY.md and CLAIMS.md state the tier of every number. Fixed scripted replay
+  is local observed stability; same-harness model replay is partial internal
+  replication; independent replication is unavailable at n=0 and is never
+  substituted by the first two.
+- harness/cohort.mjs captures start/finish manifests for future authorized
+  cohorts and refuses admission when archive, dependency, runtime, host source
+  or material identity has drifted. The registered runner is unchanged so the
+  historical validation chain stays intact.
+
+Verified independently of the audit script:
+- 70 replay rows unchanged in count; L3 stays 8/30, 12/30, 0/30; fixed stays
+  40/40 and 24/24 raw verdicts. No historical number moved.
+- 2802 raw files and 147 frozen files byte-identical to HEAD; no diff under
+  results/raw, frozen/ or PREREGISTRATION.md.
+- Provenance regenerates byte-identically: 11 manifest hashes match index.json
+  after a clean re-run, and 18 generated files are stable across regeneration.
+- 12 synthetic fixture checks pass (harness/check-j3.py); no model or judge ran.
+
+Two dependency-cache drifts are recorded rather than repaired: Cheers
+node_modules/.vitest/results.json and NormProof node_modules/.vite/vitest/
+.../results.json changed after J0 froze its inventory, both written by test runs
+today. They stay unverified and block any determinism promotion.
+
+seed acceptance remains unverified; independent replication, trusted billing,
+cost and provider backend identity remain unavailable. Cheers packaged build
+artifact is unavailable, so the CLI artifact claim is withheld. Nothing here
+supports a product, platform, release-readiness or intervention-efficacy claim.

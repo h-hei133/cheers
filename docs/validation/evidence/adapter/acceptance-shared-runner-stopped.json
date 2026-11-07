@@ -1,0 +1,19 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "npm run verify:import-cycles && npm run check:declarations && npm run check:node-floor && npm run test:ts -- -- --threads=false"
+  ],
+  "cwd": "/home/wang/projects/cheers",
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=2048",
+    "VITEST_MAX_THREADS": "1",
+    "VITEST_MIN_THREADS": "1"
+  },
+  "exitCode": null,
+  "signal": "SIGTERM",
+  "error": null,
+  "elapsedMs": 1677844,
+  "output": "docs/validation/evidence/adapter/acceptance.txt",
+  "outputSha256": "7033c26f4e43c1fe8a3df9f6fb778b8734e7458dc347f23aee2d70426bf7a676"
+}

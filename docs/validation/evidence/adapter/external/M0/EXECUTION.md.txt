@@ -1,0 +1,86 @@
+# M0 execution record
+
+## 前置现状说明
+
+J0 的写前 `truth.known` unknown 有四种成因，处置不同：
+
+* (a) observer 保留绝对路径，而路径实际在 trial root 内；这是本次 M0 修复的测量缺陷，先保留原始字节，再映射为 root-relative canonical path。
+* (b) 路径实际越过 trial root；这是 `path_out_of_root` 安全事件，独立于合规性，不能标为合规或不合规。
+* (c) 路径在 root 内，但不属于 `src/**/*.js` 冻结 scope；这是 `outside_frozen_scope`，属于 oracle 边界。
+* (d) 路径在 scope 内，但内容超出 Acorn oracle 可解析范围；这是 `syntax_outside_oracle`，属于 oracle 边界。
+
+`path_ambiguous` 单独保留给空值、NUL、解析失败或无法安全消歧的路径。只有
+`canonicalPath !== null` 的 proposal 才进入写前真值计算；其他 proposal 保留
+unknown 并携带原因码。
+
+## 实施
+
+`harness/path-mapping.mjs` 对相对路径和绝对路径做 lexical containment，再对
+trial root 与目标做 realpath containment；缺失的最终文件允许映射，dangling symlink
+会进入 `path_ambiguous`。`harness/runner.mjs` 保留 `args.path` 原样，并在 proposal
+顶层新增 `canonicalPath`、`canonicalFailure`；历史 `results/raw/**/proposals.json`
+不被重写。`harness/remap-proposals.mjs` 只读重算 J0 formal p1/p2 的 110 行。
+
+## 六种 fixture
+
+命令：
+
+```text
+rtk node harness/check-path-mapping.mjs
+```
+
+实际输出摘要：
+
+```json
+{
+  "passed": 6,
+  "relative path": "src/inside.js",
+  "absolute path inside root": "src/inside.js",
+  "absolute path outside root": "path_out_of_root",
+  "symlink to root inside": "src/inside.js",
+  "symlink to root outside": "path_out_of_root",
+  "same file alternate spelling": "src/inside.js"
+}
+```
+
+六种输入均通过；最后一项与第一项得到相同 canonical path。
+越界样本的分类输出为 `canonicalPath: null`、`canonicalFailure: "path_out_of_root"`、
+`known: false`、`compliant: false`，因此没有被记为合规或不合规。
+
+## J0 只读映射计数
+
+命令：
+
+```text
+rtk node harness/remap-proposals.mjs
+```
+
+实际计数：
+
+| 项目 | 数量 |
+|---|---:|
+| formal proposal rows | 110 |
+| archived rows still `truth.known:false` | 33 |
+| raw absolute paths | 33 |
+| raw absolute paths mapped | 33 |
+| `canonicalPath !== null` | 110 |
+| `path_out_of_root` | 0 |
+| `path_ambiguous` | 0 |
+| `outside_frozen_scope` | 0 |
+| `syntax_outside_oracle` | 0 |
+| known compliant | 110 |
+| known noncompliant | 0 |
+
+构造的越界样本不进入合规/不合规分数。
+
+另行构造的 root 内 scope 外路径和不可解析内容分别输出
+`reason: "outside_frozen_scope"` 与 `reason: "syntax_outside_oracle"`；两者的
+`canonicalPath` 非空，但 `known` 仍为 false，保持 oracle 固有限制。
+
+## 历史保留与提交
+
+J0 的原始 33 行 unknown **历史行未重打分**；只读 remap 的 110 行结果没有写回
+任何 `results/raw/**/proposals.json`，历史结论不变。`git diff --stat results/`
+应为空；`git status --short --branch` 仅显示本次 harness 和执行记录变更。
+
+Commit message：`fix(M0): canonicalize proposal paths without rewriting J0 history`

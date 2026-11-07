@@ -1,0 +1,142 @@
+# Execution clarifications and retained failures
+
+Before trials, source inspection found C1's `nodeFloor` input is a closed literal `20.3.0`.
+The declaration therefore uses that required literal while the actual executable is pinned Node
+24.15.0, satisfying NormProof's >=24 requirement. No Node 20 compatibility claim is made.
+The preregistered runtime/artifact/commands are unchanged. No model request or experimental trial
+ran before preregistration commit f34cffb.
+
+Initial source snapshot extraction failed on a tracked absolute symlink; a second attempt tried
+to overwrite the already-read-only snapshot. Both setup failures are retained under logs. Exact
+archives were retained and all materialized regular file bytes checked against their archive.
+Symlinks are preserved as links and are never followed for experiment input or mutation.
+
+Setup01 (five C01 trajectories, not scored) observed Stop unknown/empty_output even when the
+workspace is proven by both MCP and CLI. Live source and the N3-5 historical commit confirm
+`--emit-result` is implemented for gate write only. Gate stop silently ignores it and emits
+nothing for allow. This is a measured compatibility gap, not a reason to modify either product
+or substitute another Stop command. Keep the exact registered Stop treatment and report unknown.
+The N3 execution document's old commit IDs were rewritten; current main has the same relevant
+behavior. N2/N3/C2 source is present but separate completion of those projects does not establish
+end-to-end compatibility. No experimental inference that all prerequisites integrate is made.
+
+Before scored runs, instrumentation was completed: child startup logging counts real invocations;
+native prepared patch execution is observed without replacing its permission or execution owner;
+the scripted patch uses native `input` rather than an invalid `patch` argument. Frozen inputs and
+oracle are unchanged. Setup01 logs remain. The actual Node runtime remains 24.15.0 throughout.
+
+Smoke01 real provider: four HTTP 200 requests reached native reads and a successful write;
+the fifth request timed out at the preregistered 120 s request deadline. The trial is retained as
+a development smoke, not replaced or scored in the fixed schedule. It is not a product failure.
+No uncertain write is retried; the final filesystem and all observed events are preserved.
+
+Calibration initial passes (80 runs, prefix calibration) found C08 never reached its intended
+PreToolUse seam: native apply_patch requires an explicit group selection even under allow-all.
+This is a harness omission. The full initial passes remain as observed and are not merged into
+the calibrated estimand. The harness now supplies the experiment-authorized one-time selection
+using the native prompt's exact revision, and creates a real isolated session via SessionManager.
+The same frozen 80 cases are rerun as calibration-fixed; both cohorts and their counts are reported.
+No task/oracle/rule/seed or product source changed. Real held-out trials have not begun.
+
+While the first live pass runs, the runner startup now checks its durable provider-stop record
+before beginning a second pass. This corrects the shell sequence so the preregistered stop applies
+across both passes; it changes no active trial. A stopped pass is never automatically resumed.
+
+Final formal live sequence: T03/post-action, T03/combined, T02/CI-only each failed its first
+provider request at the 120 s deadline. The pass wrote `results/stop-live-p1.json`; pass two
+exited before configuration or network calls. Formal sample is 3/60 attempted, with 57 unrun;
+two arms have n=0/unavailable. This does not satisfy the intended live five-arm comparison.
+
+Aggregation explicitly distinguishes compliant residual source from completion of a scripted
+write task. A denied draft leaves compliant baseline files but did not perform its fixed task;
+false-completion and recovery tables require the requested exact file bytes as well as compliance.
+The raw `final.complete` field is the frozen source oracle's result when no functional task was
+passed, so on scripted rows it represents compliance only; report.py applies the frozen task
+requirement separately. No oracle or raw result was rewritten.
+
+Installed dependency bytes were inventoried after execution in `dependency-manifests.json`.
+Package/lockfile identities were registered before execution, but a whole installed dependency
+tree digest was not. Same-process fixed replays observed stable results; future reproduction
+checks every installed byte and refuses drift. This is a provenance limitation, not a claim
+that npm install always produces identical bytes.
+
+Final report verification initially found CRLF CSV lines reported as trailing whitespace by
+`git diff --check`. The first validation receipt incorrectly marked that gate passed before its
+result was inspected. This was a reporting error, corrected explicitly: CSV serialization now
+uses LF; the original gate failure is retained and the corrected gate reruns below. No measured
+sample, judgement, preregistration or oracle changed. Development scripted and live smokes are
+also separated into different rows so their model identities are never pooled.
+
+## Separately registered continuation
+
+On goal continuation, the original source commits, installed dependency digests and preregistration
+were revalidated. `provider-health-01.json` observed an HTTP 200 reply from the unchanged default
+model through Cheers' providerFetchFor; this short availability probe is not a task sample.
+Commit bbde7c8 prospectively registered a new cohort with the same input/host/detector/seed and
+native Cheers network dispatch. Commit 6bef7b6 corrected only the verifier's bounded Git read
+buffer before any trial; no registration text was modified.
+
+That continuation attempted T03/post-action, T03/combined, T02/CI-only. It received three HTTP 200
+responses across the latter two tasks (native reads only), but every task ended with a subsequent
+120 s provider request timeout. The first task's first request timed out. Its independent stop
+record is `results/stop-continuation-p1.json`; pass two exited before requests. All three results
+are retained separately from the original three failed formal attempts. A short successful health
+request therefore did not establish full agent-request availability. The root cause remains
+unproven; do not attribute the original failures solely to global fetch or the later failures to
+NormProof/Cheers product semantics. No third cohort is automatically started.
+
+The continuation records all full-file write proposals before treatment, but none occurred in its
+three trials, so harmful-write prevention and denial recovery in real model execution remain
+unmeasured. Fixed trajectory measurements are unchanged. Aggregate reports may be regenerated;
+all original raw outcomes and both preregistrations remain byte-identical to their commits.
+
+## User-selected BaiLu / bailu-2.7 cohort
+
+The user selected `BaiLu/bailu-2.7` after both bailu-2.8 stops. Commit 4594789
+prospectively registered a new native smoke and conditional 60-trial cohort.
+Resolution confirmed the existing `bailucode.com` connection and runtime provider
+`openai-compatible`; only `cliModel` changes in memory. Global config is unchanged.
+The development T01/pre-action smoke completed in 16.44 s with four HTTP 200
+responses, native reads/write, correct final source and host completion. It remains
+separate from formal results. This complete tool cycle passed the registered gate.
+
+The immutable proposal observer records `write` paths literally, so absolute paths
+can yield unknown proposed-state oracle truth even when the native write is valid
+and the final relative-path oracle is known. These opportunities remain unknown
+and excluded from confusion/prevention scoring; no raw result, oracle or executable
+is changed mid-cohort. The report exposes unknown full-file proposal counts.
+This is a measurement limitation, not a detector denial or a false-negative label.
+
+Separate model-trajectory comparisons normalize tool-call IDs and trial-root paths,
+but preserve assistant text, tool names/arguments, and stop reasons. They are
+reported alongside the existing normalized outcome comparison and final byte
+equality. Identical outcomes do not imply identical model behavior.
+
+Audit-script development failures are retained in logs/bailu27-audit-development.txt.
+They concern symlink manifest interpretation and comparing a running raw dataset
+with an earlier report snapshot, not source drift or changed experimental labels.
+Final audits run only after the formal passes settle and reports are regenerated.
+
+During pass 2, T01/pre-action had two HTTP 200 responses and native reads, then a
+provider_network failure after about 300 ms on its third request. No source write
+or completion claim occurred. The trial is retained, not retried. The next trial
+succeeded, so the three-consecutive-provider-failure stop did not trigger. A single
+provider failure must not be interpreted as a harmful pre-action intervention.
+
+An intermediate user update misstated pass-1 request count as 108; the raw-request
+arithmetic immediately corrected it to 106 formal requests (the separate smoke
+has four). Final tables derive directly from retained requests and usage.
+
+The model sometimes requested unprovided glob/shell/grep tools despite their
+absence from the transmitted schemas. The host returned Tool ... not found. These
+calls, errors and later recovery remain in transcripts and trajectory comparisons;
+they are not detector denials or gate recovery opportunities.
+
+## M0 observer path canonicalization
+
+M0 adds a root- and realpath-checked canonical mapping layer while retaining each observer
+`args.path` byte-for-byte. J0's original 33/110 absolute-path rows remain unknown in the
+archived raw files: **历史行未重打分**. A read-only remap maps all 110 formal rows and reports
+the four separate reason classes; it does not rewrite historical proposals, results, or
+conclusions. `path_out_of_root` remains a separate safety event and is never treated as a
+compliance verdict.

@@ -1,0 +1,44 @@
+tree 43d5d204b2a69ad31ec7797f1629d08502e7bd42
+parent 477d932a5fd0eacb7609f78378f55dd732845a31
+author hei <hhei3234@gmail.com> 1793952568 +0800
+committer hei <hhei3234@gmail.com> 1793953303 +0800
+
+fix(M0): canonicalize proposal paths without rewriting J0 history
+
+M0 executes P1-D15 under P1-F36. J0's observer stored write paths literally,
+so 33/110 proposals carried an absolute path while the oracle keyed on
+root-relative paths; those rows scored truth.known === false and were excluded
+from the confusion matrix. The defect was in measurement, not in any gate.
+
+The unknown rows had four distinct causes that must not be pooled:
+(a) an absolute path that does map inside the trial root -- the defect M0 fixes;
+(b) a path that genuinely escapes the trial root -- path_out_of_root, a security
+    observation independent of compliance, never labelled compliant or not;
+(c) inside the root but outside src/**/*.js -- outside_frozen_scope, an oracle
+    boundary that M0 cannot and should not remove;
+(d) inside scope but unparseable -- syntax_outside_oracle, also an oracle
+    boundary.
+Only (a) is repaired. (c) and (d) remain unknown with their own reason codes.
+
+Changes:
+- harness/path-mapping.mjs canonicalizes against the trial root with lexical
+  containment first, then realpath containment so a symlink cannot escape.
+  Missing final files map; dangling symlinks become path_ambiguous.
+- harness/runner.mjs keeps args.path byte-identical and adds canonicalPath and
+  canonicalFailure beside it, so audit still sees what the model wrote.
+- harness/remap-proposals.mjs recomputes the 110 J0 formal rows read-only.
+- Six fixtures cover relative, absolute-inside, absolute-outside,
+  symlink-inside, symlink-outside, and duplicate-path spellings.
+
+Ran:
+- node harness/check-path-mapping.mjs: 6/6 fixtures passed; the out-of-root
+  sample classifies as canonicalPath null, path_out_of_root, known false,
+  compliant false -- it is not scored either way
+- node harness/remap-proposals.mjs: 110 rows, 33 raw absolute paths, 33 mapped,
+  110 canonical non-null, 0 path_out_of_root, 0 path_ambiguous, 0
+  outside_frozen_scope, 0 syntax_outside_oracle
+- git diff --stat results/: empty; all 110 archived proposals byte-unchanged
+- node --check on all four harness files: pass
+
+The 33 historical unknown rows are not relabelled and no historical conclusion
+moves. J0 remains a partial integration baseline.

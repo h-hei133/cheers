@@ -1,0 +1,375 @@
+{
+  "recordedAt": "2026-11-06T13:09:30.585993+00:00",
+  "repository": "/home/wang/projects/normproof-experiment",
+  "remoteOutput": "",
+  "verification": "read-only local Git commit/tree/blob and retained manifest bytes; no harness, provider or fixture rerun",
+  "candidateBinding": "unbound; these artifacts identify external historical evidence, not the J4 candidate",
+  "deliveries": {
+    "M0": {
+      "commit": "7754ee2a24fe5b51bbfba45138737993ff1fd1d9",
+      "tree": "43d5d204b2a69ad31ec7797f1629d08502e7bd42",
+      "date": "2026-11-06 16:09:28 +0800",
+      "message": "fix(M0): canonicalize proposal paths without rewriting J0 history",
+      "status": "observed_external_candidate_unbound",
+      "members": {
+        "EXECUTION.md": {
+          "blob": "6471effa3cf41eefdefc9f8c09d540407fb8df18",
+          "sha256": "17d57cd2b9c748c44fd72e666d0e37cf3bcbed76597d945b4d62c85eca7873df",
+          "bytes": 3232,
+          "snapshot": "docs/validation/evidence/adapter/external/M0/EXECUTION.md.txt",
+          "gitObjectVerified": true
+        },
+        "DEVIATIONS.md": {
+          "blob": "7d7f47284c3bdfe2077ddb097cda746e4c6baf0f",
+          "sha256": "d9c6de96542aa738a5e4433c5a49781063180700fc6dbf580e4a7249fddb784f",
+          "bytes": 10139,
+          "snapshot": "docs/validation/evidence/adapter/external/M0/DEVIATIONS.md.txt",
+          "gitObjectVerified": true
+        },
+        "harness/path-mapping.mjs": {
+          "blob": "0325173974f49798adcb37cdc5452880bfbfddac",
+          "sha256": "37a17ba800650a77c5cd8cf414422981314f412ffbffd6e71bcef041bd617e92",
+          "bytes": 3171,
+          "snapshot": "docs/validation/evidence/adapter/external/M0/harness__path-mapping.mjs.txt",
+          "gitObjectVerified": true
+        },
+        "harness/check-path-mapping.mjs": {
+          "blob": "3b8924a6ee05c10357d3d3b5681a1b4d7cbc60ac",
+          "sha256": "8d27afee11b37ba029afcafa2f1b8f7e48c5c75ca3f99e8dc098765fec8692bb",
+          "bytes": 2946,
+          "snapshot": "docs/validation/evidence/adapter/external/M0/harness__check-path-mapping.mjs.txt",
+          "gitObjectVerified": true
+        },
+        "harness/remap-proposals.mjs": {
+          "blob": "22513a09e9422ec2f889e62f22fc99685417bfa5",
+          "sha256": "56ae90b1223493de72ea55511215d34f54f0df622fc8e34bb5e506be9976cb15",
+          "bytes": 3558,
+          "snapshot": "docs/validation/evidence/adapter/external/M0/harness__remap-proposals.mjs.txt",
+          "gitObjectVerified": true
+        }
+      }
+    },
+    "J3": {
+      "commit": "b0cf3c3d4735ae79f8bec390509fc03aee3210c2",
+      "tree": "dfbfe80ffd1af8eb0dfacae37aea0aad6568cf8f",
+      "date": "2026-11-06 20:11:11 +0800",
+      "message": "feat(J3): record cohort provenance and separate replay evidence tiers",
+      "status": "observed_external_candidate_unbound",
+      "members": {
+        "J3-EXECUTION.md": {
+          "blob": "eaadd6b1fb7f023fd903a791b35078acadb4e4d1",
+          "sha256": "0811c9b6928a0ec1d43ee9a64c9051381b7363dafdb51c1f62ae92b74f40fad5",
+          "bytes": 17238,
+          "snapshot": "docs/validation/evidence/adapter/external/J3/J3-EXECUTION.md.txt",
+          "gitObjectVerified": true
+        },
+        "REPLAY.md": {
+          "blob": "e515d2a72dc80a96b2801634c26b994d827a4264",
+          "sha256": "38dfe93381ba55d019ff831b5d22ad2d37679eae60e002df90b67f9e8336f86a",
+          "bytes": 3276,
+          "snapshot": "docs/validation/evidence/adapter/external/J3/REPLAY.md.txt",
+          "gitObjectVerified": true
+        },
+        "CLAIMS.md": {
+          "blob": "c1e60a82ac7233be81f6a2c440b98aaeafe993c1",
+          "sha256": "8177a58536bdb3d613c886a6765993177ec09dfaf5c4c794bbad3ae9bb06e090",
+          "bytes": 3448,
+          "snapshot": "docs/validation/evidence/adapter/external/J3/CLAIMS.md.txt",
+          "gitObjectVerified": true
+        },
+        "results/provenance/index.json": {
+          "blob": "f9926f9a5753485b8c78a9d0c28b9058d6765862",
+          "sha256": "ad7e0dc13765add81db2117df40424b485552b9fdbfc69354bfb490c624c1adf",
+          "bytes": 1767,
+          "snapshot": "docs/validation/evidence/adapter/external/J3/results__provenance__index.json.txt",
+          "gitObjectVerified": true
+        },
+        "results/replay-tiers.json": {
+          "blob": "09b101ffde088c689cc8d16ad905884019799d83",
+          "sha256": "fb90a6f4753b8add5102cc9f38a83efbd699dd4a1a3dbef33be4feb89d204ee8",
+          "bytes": 6157,
+          "snapshot": "docs/validation/evidence/adapter/external/J3/results__replay-tiers.json.txt",
+          "gitObjectVerified": true
+        }
+      },
+      "provenance": {
+        "capture": "retrospective",
+        "cohortPasses": 11,
+        "retainedTrials": 233,
+        "manifestHashChecks": [
+          {
+            "path": "results/provenance/bailu27-p1.json",
+            "sha256": "bf9884bdba249389fda2a149617f9f6d107d102ec7879391f2947b458d607f7c",
+            "matchesIndex": true
+          },
+          {
+            "path": "results/provenance/bailu27-p2.json",
+            "sha256": "417f9a32d8fc322bac49ceed924dc4931350f8f50ade6bcac216b5ea42294dfd",
+            "matchesIndex": true
+          },
+          {
+            "path": "results/provenance/bailu27-smoke-p1.json",
+            "sha256": "c6ede84d4d2bc658b7f4c4f779292b4412df35c2e26beae8f7e77cf1a29acf3a",
+            "matchesIndex": true
+          },
+          {
+            "path": "results/provenance/calibration-fixed-p1.json",
+            "sha256": "1a418b224a0a92400c84464507c8ad2ab67a0fb66aa86a7eb559ec14739302c7",
+            "matchesIndex": true
+          },
+          {
+            "path": "results/provenance/calibration-fixed-p2.json",
+            "sha256": "b51c6a3f141266785127f4e42fa87cac83cec0ed1a4d0bd8d8e45e4040b26ef5",
+            "matchesIndex": true
+          },
+          {
+            "path": "results/provenance/calibration-p1.json",
+            "sha256": "6d53ef8753d08f47d2e6d2034d6bbc843ed690eb5af8a8841f0bc6fbcaf5e19a",
+            "matchesIndex": true
+          },
+          {
+            "path": "results/provenance/calibration-p2.json",
+            "sha256": "f9512acbbf0026b748dfc986093b1e5991bbe8da010ee0b669834fe53d97fa18",
+            "matchesIndex": true
+          },
+          {
+            "path": "results/provenance/continuation-p1.json",
+            "sha256": "9797a4bf8faebb464b1e077bb3ed65a59839a53502c66d83f3d867a108be984a",
+            "matchesIndex": true
+          },
+          {
+            "path": "results/provenance/live-p1.json",
+            "sha256": "0800226e30ca2cf00fd59f6c01d44ea39b1a8a69aa63902165f380eec90401f9",
+            "matchesIndex": true
+          },
+          {
+            "path": "results/provenance/setup01-p1.json",
+            "sha256": "b41cd6e5cbfedf9c4788acadfc541f83fa154e43e5357d0493ebe10185d20e34",
+            "matchesIndex": true
+          },
+          {
+            "path": "results/provenance/smoke01-p1.json",
+            "sha256": "3106a7a87b7798bdff4f42f679ad6bcef0f0053fa150f81b91e599543b833acf",
+            "matchesIndex": true
+          }
+        ]
+      },
+      "replay": {
+        "definitions": {
+          "normalized_result": {
+            "criterion": "Exact structural equality of the J0 normal(row) projection: ordered checks (seam, state, truth, confusion, reasonCode), final.files, known, compliant, fulfilled, claimed, hostCompleted, firstDenial(seam,changed), invocation counts and failure.",
+            "exclusions": [
+              "elapsed times",
+              "temporary root paths",
+              "generated run/session/attempt IDs"
+            ]
+          },
+          "final_source_bytes": {
+            "criterion": "Same relative src path set and equal UTF-8 bytes reconstructed from retained final.files strings, including whitespace/newlines. A null/symlink or U+FFFD makes byte comparison unavailable.",
+            "exclusions": [
+              "non-src files",
+              "filesystem modes",
+              "how files were produced"
+            ]
+          },
+          "raw_verdict_bytes": {
+            "criterion": "For every verdict.json relative artifact path in either trial, compare actual retained bytes without normalization. Artifact denominator includes only paths available on both sides; unmatched paths are reported separately. Trial set equality is unavailable for empty or asymmetric sets.",
+            "exclusions": [
+              "no byte normalization",
+              "deleted Stop verdicts cannot be reconstructed"
+            ]
+          },
+          "action_trajectory": {
+            "criterion": "Exact structural equality of ordered model/scripted steps: text, ordered tool name/args, stopReason and failure. Normalize only recorded workspace/trial identities.",
+            "exclusions": [
+              "step duration",
+              "tool-call IDs",
+              "reasoning",
+              "usage",
+              "host event timestamps"
+            ]
+          }
+        },
+        "rows": [
+          {
+            "cohort": "fixed calibration",
+            "metadata": "S",
+            "evidence_tier": "fixed scripted replay",
+            "fixed_scripted_replay": 40,
+            "same_harness_model_replay": "unavailable",
+            "independent_replication": "unavailable",
+            "independent_n": 0,
+            "trials": 80,
+            "paired_trials": 80,
+            "unpaired_trials": 0,
+            "matched_pairs": 40,
+            "evidence_grade": "local observed stability; provenance partial",
+            "normalized_result": {
+              "equal": 40,
+              "n": 40,
+              "unavailable": 0
+            },
+            "final_source_bytes": {
+              "equal": 40,
+              "n": 40,
+              "unavailable": 0
+            },
+            "raw_verdict_bytes": {
+              "equal": 24,
+              "n": 24,
+              "unmatched": 0,
+              "trial_sets": {
+                "equal": 24,
+                "n": 24,
+                "unavailable": 16
+              }
+            },
+            "action_trajectory": {
+              "equal": 40,
+              "n": 40,
+              "unavailable": 0
+            },
+            "cost": "unavailable"
+          },
+          {
+            "cohort": "live model",
+            "metadata": "L",
+            "evidence_tier": "same-harness model replay",
+            "fixed_scripted_replay": "unavailable",
+            "same_harness_model_replay": 0,
+            "independent_replication": "unavailable",
+            "independent_n": 0,
+            "trials": 3,
+            "paired_trials": 0,
+            "unpaired_trials": 3,
+            "matched_pairs": 0,
+            "evidence_grade": "unavailable; no paired trials",
+            "normalized_result": {
+              "equal": 0,
+              "n": 0,
+              "unavailable": 0
+            },
+            "final_source_bytes": {
+              "equal": 0,
+              "n": 0,
+              "unavailable": 0
+            },
+            "raw_verdict_bytes": {
+              "equal": 0,
+              "n": 0,
+              "unmatched": 0,
+              "trial_sets": {
+                "equal": 0,
+                "n": 0,
+                "unavailable": 0
+              }
+            },
+            "action_trajectory": {
+              "equal": 0,
+              "n": 0,
+              "unavailable": 0
+            },
+            "cost": "unavailable"
+          },
+          {
+            "cohort": "continuation live model",
+            "metadata": "L2",
+            "evidence_tier": "same-harness model replay",
+            "fixed_scripted_replay": "unavailable",
+            "same_harness_model_replay": 0,
+            "independent_replication": "unavailable",
+            "independent_n": 0,
+            "trials": 3,
+            "paired_trials": 0,
+            "unpaired_trials": 3,
+            "matched_pairs": 0,
+            "evidence_grade": "unavailable; no paired trials",
+            "normalized_result": {
+              "equal": 0,
+              "n": 0,
+              "unavailable": 0
+            },
+            "final_source_bytes": {
+              "equal": 0,
+              "n": 0,
+              "unavailable": 0
+            },
+            "raw_verdict_bytes": {
+              "equal": 0,
+              "n": 0,
+              "unmatched": 0,
+              "trial_sets": {
+                "equal": 0,
+                "n": 0,
+                "unavailable": 0
+              }
+            },
+            "action_trajectory": {
+              "equal": 0,
+              "n": 0,
+              "unavailable": 0
+            },
+            "cost": "unavailable"
+          },
+          {
+            "cohort": "bailu-2.7 live model",
+            "metadata": "L3",
+            "evidence_tier": "same-harness model replay",
+            "fixed_scripted_replay": "unavailable",
+            "same_harness_model_replay": 30,
+            "independent_replication": "unavailable",
+            "independent_n": 0,
+            "trials": 60,
+            "paired_trials": 60,
+            "unpaired_trials": 0,
+            "matched_pairs": 30,
+            "evidence_grade": "partial internal replication",
+            "normalized_result": {
+              "equal": 8,
+              "n": 30,
+              "unavailable": 0
+            },
+            "final_source_bytes": {
+              "equal": 12,
+              "n": 30,
+              "unavailable": 0
+            },
+            "raw_verdict_bytes": {
+              "equal": 12,
+              "n": 12,
+              "unmatched": 1,
+              "trial_sets": {
+                "equal": 12,
+                "n": 12,
+                "unavailable": 18
+              }
+            },
+            "action_trajectory": {
+              "equal": 0,
+              "n": 30,
+              "unavailable": 0
+            },
+            "cost": "unavailable"
+          },
+          {
+            "cohort": "independent replication",
+            "metadata": "unavailable",
+            "evidence_tier": "independent replication",
+            "fixed_scripted_replay": "unavailable",
+            "same_harness_model_replay": "unavailable",
+            "independent_replication": "unavailable",
+            "independent_n": 0,
+            "trials": 0,
+            "matched_pairs": 0,
+            "evidence_grade": "unavailable",
+            "normalized_result": "unavailable",
+            "final_source_bytes": "unavailable",
+            "raw_verdict_bytes": "unavailable",
+            "action_trajectory": "unavailable",
+            "cost": "unavailable"
+          }
+        ]
+      }
+    }
+  }
+}

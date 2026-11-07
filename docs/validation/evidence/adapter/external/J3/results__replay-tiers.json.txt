@@ -1,0 +1,216 @@
+{
+  "definitions": {
+    "normalized_result": {
+      "criterion": "Exact structural equality of the J0 normal(row) projection: ordered checks (seam, state, truth, confusion, reasonCode), final.files, known, compliant, fulfilled, claimed, hostCompleted, firstDenial(seam,changed), invocation counts and failure.",
+      "exclusions": [
+        "elapsed times",
+        "temporary root paths",
+        "generated run/session/attempt IDs"
+      ]
+    },
+    "final_source_bytes": {
+      "criterion": "Same relative src path set and equal UTF-8 bytes reconstructed from retained final.files strings, including whitespace/newlines. A null/symlink or U+FFFD makes byte comparison unavailable.",
+      "exclusions": [
+        "non-src files",
+        "filesystem modes",
+        "how files were produced"
+      ]
+    },
+    "raw_verdict_bytes": {
+      "criterion": "For every verdict.json relative artifact path in either trial, compare actual retained bytes without normalization. Artifact denominator includes only paths available on both sides; unmatched paths are reported separately. Trial set equality is unavailable for empty or asymmetric sets.",
+      "exclusions": [
+        "no byte normalization",
+        "deleted Stop verdicts cannot be reconstructed"
+      ]
+    },
+    "action_trajectory": {
+      "criterion": "Exact structural equality of ordered model/scripted steps: text, ordered tool name/args, stopReason and failure. Normalize only recorded workspace/trial identities.",
+      "exclusions": [
+        "step duration",
+        "tool-call IDs",
+        "reasoning",
+        "usage",
+        "host event timestamps"
+      ]
+    }
+  },
+  "rows": [
+    {
+      "cohort": "fixed calibration",
+      "metadata": "S",
+      "evidence_tier": "fixed scripted replay",
+      "fixed_scripted_replay": 40,
+      "same_harness_model_replay": "unavailable",
+      "independent_replication": "unavailable",
+      "independent_n": 0,
+      "trials": 80,
+      "paired_trials": 80,
+      "unpaired_trials": 0,
+      "matched_pairs": 40,
+      "evidence_grade": "local observed stability; provenance partial",
+      "normalized_result": {
+        "equal": 40,
+        "n": 40,
+        "unavailable": 0
+      },
+      "final_source_bytes": {
+        "equal": 40,
+        "n": 40,
+        "unavailable": 0
+      },
+      "raw_verdict_bytes": {
+        "equal": 24,
+        "n": 24,
+        "unmatched": 0,
+        "trial_sets": {
+          "equal": 24,
+          "n": 24,
+          "unavailable": 16
+        }
+      },
+      "action_trajectory": {
+        "equal": 40,
+        "n": 40,
+        "unavailable": 0
+      },
+      "cost": "unavailable"
+    },
+    {
+      "cohort": "live model",
+      "metadata": "L",
+      "evidence_tier": "same-harness model replay",
+      "fixed_scripted_replay": "unavailable",
+      "same_harness_model_replay": 0,
+      "independent_replication": "unavailable",
+      "independent_n": 0,
+      "trials": 3,
+      "paired_trials": 0,
+      "unpaired_trials": 3,
+      "matched_pairs": 0,
+      "evidence_grade": "unavailable; no paired trials",
+      "normalized_result": {
+        "equal": 0,
+        "n": 0,
+        "unavailable": 0
+      },
+      "final_source_bytes": {
+        "equal": 0,
+        "n": 0,
+        "unavailable": 0
+      },
+      "raw_verdict_bytes": {
+        "equal": 0,
+        "n": 0,
+        "unmatched": 0,
+        "trial_sets": {
+          "equal": 0,
+          "n": 0,
+          "unavailable": 0
+        }
+      },
+      "action_trajectory": {
+        "equal": 0,
+        "n": 0,
+        "unavailable": 0
+      },
+      "cost": "unavailable"
+    },
+    {
+      "cohort": "continuation live model",
+      "metadata": "L2",
+      "evidence_tier": "same-harness model replay",
+      "fixed_scripted_replay": "unavailable",
+      "same_harness_model_replay": 0,
+      "independent_replication": "unavailable",
+      "independent_n": 0,
+      "trials": 3,
+      "paired_trials": 0,
+      "unpaired_trials": 3,
+      "matched_pairs": 0,
+      "evidence_grade": "unavailable; no paired trials",
+      "normalized_result": {
+        "equal": 0,
+        "n": 0,
+        "unavailable": 0
+      },
+      "final_source_bytes": {
+        "equal": 0,
+        "n": 0,
+        "unavailable": 0
+      },
+      "raw_verdict_bytes": {
+        "equal": 0,
+        "n": 0,
+        "unmatched": 0,
+        "trial_sets": {
+          "equal": 0,
+          "n": 0,
+          "unavailable": 0
+        }
+      },
+      "action_trajectory": {
+        "equal": 0,
+        "n": 0,
+        "unavailable": 0
+      },
+      "cost": "unavailable"
+    },
+    {
+      "cohort": "bailu-2.7 live model",
+      "metadata": "L3",
+      "evidence_tier": "same-harness model replay",
+      "fixed_scripted_replay": "unavailable",
+      "same_harness_model_replay": 30,
+      "independent_replication": "unavailable",
+      "independent_n": 0,
+      "trials": 60,
+      "paired_trials": 60,
+      "unpaired_trials": 0,
+      "matched_pairs": 30,
+      "evidence_grade": "partial internal replication",
+      "normalized_result": {
+        "equal": 8,
+        "n": 30,
+        "unavailable": 0
+      },
+      "final_source_bytes": {
+        "equal": 12,
+        "n": 30,
+        "unavailable": 0
+      },
+      "raw_verdict_bytes": {
+        "equal": 12,
+        "n": 12,
+        "unmatched": 1,
+        "trial_sets": {
+          "equal": 12,
+          "n": 12,
+          "unavailable": 18
+        }
+      },
+      "action_trajectory": {
+        "equal": 0,
+        "n": 30,
+        "unavailable": 0
+      },
+      "cost": "unavailable"
+    },
+    {
+      "cohort": "independent replication",
+      "metadata": "unavailable",
+      "evidence_tier": "independent replication",
+      "fixed_scripted_replay": "unavailable",
+      "same_harness_model_replay": "unavailable",
+      "independent_replication": "unavailable",
+      "independent_n": 0,
+      "trials": 0,
+      "matched_pairs": 0,
+      "evidence_grade": "unavailable",
+      "normalized_result": "unavailable",
+      "final_source_bytes": "unavailable",
+      "raw_verdict_bytes": "unavailable",
+      "action_trajectory": "unavailable",
+      "cost": "unavailable"
+    }
+  ]
+}

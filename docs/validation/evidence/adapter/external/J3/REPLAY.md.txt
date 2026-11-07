@@ -1,0 +1,21 @@
+# J3 replay evidence
+
+J0 retained observations only; no rerun. All tiers and denominators remain separate.
+
+| Cohort | Metadata | Fixed scripted replay (pairs) | Same-harness model replay (pairs) | Independent replication (n) | Trials / unpaired | Evidence grade | Normalized result | Final source bytes | Raw verdict bytes (artifact pairs; unmatched) | Action trajectory | Cost |
+|---|---|---:|---:|---|---|---|---:|---:|---|---:|---|
+| fixed calibration | S | 40 | unavailable | unavailable (0) | 80 / 0 | local observed stability; provenance partial | 40/40 | 40/40 | 24/24; unmatched 0 | 40/40 | unavailable |
+| live model | L | unavailable | 0 | unavailable (0) | 3 / 3 | unavailable; no paired trials | unavailable | unavailable | unavailable | unavailable | unavailable |
+| continuation live model | L2 | unavailable | 0 | unavailable (0) | 3 / 3 | unavailable; no paired trials | unavailable | unavailable | unavailable | unavailable | unavailable |
+| bailu-2.7 live model | L3 | unavailable | 30 | unavailable (0) | 60 / 0 | partial internal replication | 8/30 | 12/30 | 12/12; unmatched 1 | 0/30 | unavailable |
+| independent replication | unavailable | unavailable | unavailable | unavailable (0) | 0 / 0 | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable |
+
+**normalized_result**: Exact structural equality of the J0 normal(row) projection: ordered checks (seam, state, truth, confusion, reasonCode), final.files, known, compliant, fulfilled, claimed, hostCompleted, firstDenial(seam,changed), invocation counts and failure. Exclusions: elapsed times, temporary root paths, generated run/session/attempt IDs.
+
+**final_source_bytes**: Same relative src path set and equal UTF-8 bytes reconstructed from retained final.files strings, including whitespace/newlines. A null/symlink or U+FFFD makes byte comparison unavailable. Exclusions: non-src files, filesystem modes, how files were produced.
+
+**raw_verdict_bytes**: For every verdict.json relative artifact path in either trial, compare actual retained bytes without normalization. Artifact denominator includes only paths available on both sides; unmatched paths are reported separately. Trial set equality is unavailable for empty or asymmetric sets. Exclusions: no byte normalization, deleted Stop verdicts cannot be reconstructed.
+
+**action_trajectory**: Exact structural equality of ordered model/scripted steps: text, ordered tool name/args, stopReason and failure. Normalize only recorded workspace/trial identities. Exclusions: step duration, tool-call IDs, reasoning, usage, host event timestamps.
+
+Raw verdict denominators count artifact paths available on both sides, not trial pairs. S: 24/24 available trial sets, 16/40 unavailable; L3: 12/12 available trial sets, 18/30 unavailable. Stop bytes absent on both sides are unavailable, not equal. All L3 pairs include the retained network failure. Fixed scripted replay supports only observed stability of these frozen trajectories. Same-harness model replay is partial internal replication. Independent replication, trusted billing/cost and provider backend identity are unavailable; seed acceptance remains unverified. Current material/runtime drift or missing historical linkage prevents a general determinism claim.

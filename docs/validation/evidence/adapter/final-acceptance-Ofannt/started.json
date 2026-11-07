@@ -1,0 +1,24 @@
+{
+  "startedAt": "2026-11-06T15:26:27.844Z",
+  "runnerPid": 24332,
+  "childPid": 24343,
+  "command": [
+    "bash",
+    "-c",
+    "npm run verify:import-cycles && npm run check:declarations && npm run check:node-floor && npm run test:ts"
+  ],
+  "cwd": "/home/wang/projects/cheers",
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=2048",
+    "VITEST_MAX_THREADS": "1",
+    "VITEST_MIN_THREADS": "1"
+  },
+  "head": "5447a538224fd7ed00d98d3e5a19284431431c4b",
+  "sourceSha256": "56706b49074326724c58cb2abd7077d6fa991fa8cd0732a559600b2c7889411d",
+  "sourceMembers": "source-members.json",
+  "runtime": "v24.15.0",
+  "platform": "linux",
+  "arch": "x64",
+  "archiveSha256": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985",
+  "output": "output.txt"
+}

@@ -1,0 +1,51 @@
+{
+  "capture": "retrospective",
+  "cohort_passes": 11,
+  "retained_trials": 233,
+  "manifests": [
+    {
+      "path": "results/provenance/bailu27-p1.json",
+      "sha256": "bf9884bdba249389fda2a149617f9f6d107d102ec7879391f2947b458d607f7c"
+    },
+    {
+      "path": "results/provenance/bailu27-p2.json",
+      "sha256": "417f9a32d8fc322bac49ceed924dc4931350f8f50ade6bcac216b5ea42294dfd"
+    },
+    {
+      "path": "results/provenance/bailu27-smoke-p1.json",
+      "sha256": "c6ede84d4d2bc658b7f4c4f779292b4412df35c2e26beae8f7e77cf1a29acf3a"
+    },
+    {
+      "path": "results/provenance/calibration-fixed-p1.json",
+      "sha256": "1a418b224a0a92400c84464507c8ad2ab67a0fb66aa86a7eb559ec14739302c7"
+    },
+    {
+      "path": "results/provenance/calibration-fixed-p2.json",
+      "sha256": "b51c6a3f141266785127f4e42fa87cac83cec0ed1a4d0bd8d8e45e4040b26ef5"
+    },
+    {
+      "path": "results/provenance/calibration-p1.json",
+      "sha256": "6d53ef8753d08f47d2e6d2034d6bbc843ed690eb5af8a8841f0bc6fbcaf5e19a"
+    },
+    {
+      "path": "results/provenance/calibration-p2.json",
+      "sha256": "f9512acbbf0026b748dfc986093b1e5991bbe8da010ee0b669834fe53d97fa18"
+    },
+    {
+      "path": "results/provenance/continuation-p1.json",
+      "sha256": "9797a4bf8faebb464b1e077bb3ed65a59839a53502c66d83f3d867a108be984a"
+    },
+    {
+      "path": "results/provenance/live-p1.json",
+      "sha256": "0800226e30ca2cf00fd59f6c01d44ea39b1a8a69aa63902165f380eec90401f9"
+    },
+    {
+      "path": "results/provenance/setup01-p1.json",
+      "sha256": "b41cd6e5cbfedf9c4788acadfc541f83fa154e43e5357d0493ebe10185d20e34"
+    },
+    {
+      "path": "results/provenance/smoke01-p1.json",
+      "sha256": "3106a7a87b7798bdff4f42f679ad6bcef0f0053fa150f81b91e599543b833acf"
+    }
+  ]
+}

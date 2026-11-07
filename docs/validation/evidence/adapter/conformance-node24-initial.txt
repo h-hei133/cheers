@@ -1,0 +1,49 @@
+{"archiveSha256":"6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985","patchSha256":"3cb6617066340386b1658b62c4a0fc8fbbbc21d403cc3d278f8886a077b6e833","members":{"package/dist/adapters/sidecar-file/module-graph.js":"d55723ea4aa21ae24264ad724e07d734b64326b01771a226a30524bce4e64faa","package/dist/engine/proof/expression/evaluate.js":"8c723a91502b9e164c1da7881639aebd1be046d2be7a509e31a776c2d3adb988"},"parserVersion":"5.9.3","packageNodeEngine":">=24","node":"v24.15.0","writeArtifactSha256":"817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d","writeProvenance":{"package":"normproof","commit":"a6ff094ac14049843b6c471eabd2aaa4a55ac8fb","entry":"src/adapters/write-gate/hook.ts","bundler":"esbuild@0.27.7","inputs":{"src/adapters/sidecar-file/module-graph.ts":"9bc4ce90144c797805610183c8a8aa87c4fe64562b18d6c4d47b616b5b7aab61","src/adapters/write-gate/facts.ts":"caeeafc3fa4b41da6dfd5b66c9b96750b8abff0ec22e2b81336c61f396d9d5da","src/adapters/write-gate/hook.ts":"d2f64bb6c0f557b0b09b7c97ada8866dc02f9bff623f478fce3d02fd00190583","src/contracts/base/workspace-config.ts":"f7f7b432e6de79b121022adbf96e5d49bb5370603c68c18387b33803fc6819b8","src/contracts/hooks/write-gate-contracts.ts":"f8d4feaa231be302826d5a0b4509bb91c229b11ada9263c4fa57df62f0e15826","src/contracts/hooks/write-rule-contracts.ts":"25b0c65c6be986237bbaa25ea11036502a553152b1f8a11eb986016430b55d9a","src/runtime/run-records/record-paths.ts":"a6d31c5701a79956e7b691267bf97915a49c9072b02d104cebd1c7500074e0b0","src/runtime/write-gate/decision.ts":"2c0ed08de763d50193cb76ed9dead03fdc816fa1e3f78bdfbf215b15d2d2b7dc","src/utils/canonical-json.ts":"decb8f9e1eb2e38af400a8f19bbd77b7514c7f8ef4a3b3e72904a610f9c739e2","src/utils/deep-freeze.ts":"436710b90b3f4329a70055cfe349dfea0e0f338db9b18c3c13a0a3a18a0ab6ef","src/utils/glob-pattern.ts":"4cb4acf85eabf7f0c7a7e2ad67eb80bcda8e883806e11b3a64f9a789c21a49f8"}},"hunks":6}
+✔ artifact: actual archive still carries all six pinned hunks; stale bytes and runtime are refused (2.045552ms)
+✔ paths: explicit .js only TS/TSX; explicit .ts/.tsx only themselves; extensionless and self edges survive (6.045292ms)
+✔ ast/comment: AST declarations, escapes, literal dynamics, TSX and whole-collection syntax refusal (6.845146ms)
+✖ capacity: 16384 edges admitted by collector and evaluator, next edge oversized without partial evidence (124.288193ms)
+{"paths":{"id":"graph","path":"packages/**/*.ts*","present":false,"byteSize":0,"contentLoaded":false,"error":"oversized: module set exceeds the 4096 path ceiling; narrow the pattern"},"sourceFileBytes":1048577,"shadow":{"underlyingExitCode":2,"hostExitCode":0,"proofVerdict":"not_proven"}}
+{"exitCode":0,"verdict":"partial","advisoryVisible":true,"failedOnlySectionIncludesAdvisory":false}
+{"surface":"pinned Stop","output":null,"capability":"unsupported R0a envelope"}
+{"surface":"pinned Stop","output":"{\"decision\":\"block\",\"reason\":\"NormProof completion gate: blocking obligations are still open.\\n\\n- source_graph_has_no_unresolved_specifiers: Every module import resolves within the declared source graph\\n  status: failed\\n  why: Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: packages/entry.ts -> ./missing.js\\n\\nClose these obligations, then finish. If one cannot be closed, say so and stop rather than working around the gate.\"}","capability":"unsupported R0a envelope"}
+
+{"protocolVersion":"2025-11-25","output":{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found: initialize"}},"capability":"unsupported"}
+{"protocolVersion":"2026-07-28","output":{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found: initialize"}},"capability":"unsupported"}
+{"protocolVersion":"unknown-version","output":{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found: initialize"}},"capability":"unsupported"}
+{"mode":"shadow","canBlock":false,"underlyingExitCode":2,"hostExitCode":0,"proofVerdict":"failed"}
+✔ capacity: 4096 paths admitted, 4097 refused; 1 MiB enforced by shadow manifest and native verdict is not_proven (3247.801123ms)
+✔ report: native advisory cycle/name ceiling remain visible with partial verdict and exit 0 (264.930857ms)
+✔ hooks: pinned write allow/block JSON; legacy Stop silence and block lack R0a envelope (629.955822ms)
+✔ hooks: current host consumes captured R0a envelopes; fixture producer is not the pinned release (138.689341ms)
+✔ MCP initialize: old pinned server returns explicit unsupported for known and unknown versions (723.157691ms)
+✔ shadow: a real blocking failure remains failed while observation exits 0; blocking command is unavailable (541.590379ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 9
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6185.236919
+
+✖ failing tests:
+
+test at scripts/normproof-conformance.test.mjs:70:1
+✖ capacity: 16384 edges admitted by collector and evaluator, next edge oversized without partial evidence (124.288193ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'oversized'
+  
+      at TestContext.<anonymous> (file:///home/wang/projects/cheers/scripts/normproof-conformance.test.mjs:88:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'oversized',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

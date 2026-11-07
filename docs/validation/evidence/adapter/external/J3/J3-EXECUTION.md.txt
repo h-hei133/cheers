@@ -1,0 +1,151 @@
+# J3 execution record
+
+## 前置回答（实施前）
+
+现有 `results/replay.json` 中 L3 的 30 个同一 task/condition 的 p1/p2 配对：
+
+* **8/30 标准化结果一致**：`harness/report.py::normal` 比较有序检查（seam、state、truth、confusion、reasonCode）、最终源文件内容、known/compliant、任务兑现、模型完成声明、host completion、首次拒绝/泄漏、实际调用次数及失败分类。它排除耗时、随机标识和临时根路径。
+* **12/30 最终源文件字节一致**：比较 `final.files` 的相对路径集合和每个路径的内容。这个维度不检查如何得到这些文件。
+* **0/30 动作轨迹一致**：`harness/report.py::trajectory` 比较有序模型步骤中的 text、工具 name/args、stopReason、failure；只替换 trial/workspace 标识，排除耗时和 tool-call ID。
+
+现有数据说明它们不能替代：T01 combined 的最终源文件相同，但 `changed_fields:["checks"]`，因此标准化结果不同；T01 CI-only 的标准化结果和最终文件均相同，但轨迹不同。T03 MCP-only 的最终文件相同，但检查和调用次数不同。T01 pre-action 包含保留的网络失败，标准化结果、最终文件和轨迹都不同。所有配对均保留，失败不能从分母移除。
+
+Raw verdict 字节是第四个独立维度：`harness/replay-bailu27.py` 比较相同 artifact 相对路径的 `verdict.json` 原始字节。L3 的 12/12 个双方均可用 verdict 配对相同，另有 1 个单边 MCP verdict；它的分母不是 30 个 trial 配对，不能替换上述任一数字。
+
+## 范围与依据
+
+依据只读 NormProof `phase-1-decisions.md` 的 P1-D18、P1-F38、P1-F39、J3；已读 PREREGISTRATION.md:75-90、AUDIT.md:37-49、RESULTS.md replay 段及现有比较代码。只编辑本仓库。J3 仅重制表，不运行 provider、host、detector 或新实验；PREREGISTRATION.md 和历史 raw 记录保持原字节。历史缺失 provenance 只作事后补录，不能声称已在 J0 执行时捕获。
+
+## Commit message 版本
+
+`feat(J3): record cohort provenance and separate replay evidence tiers`
+
+下文保存实际命令、输出和逐项验收。
+
+## 实施与范围
+
+新增 `harness/provenance.py`，对全部 11 个 cohort/pass 分组（正式、固定脚本、初始脚本、smoke、诊断、停止批次）生成 manifest，保留全部 233 个结果运行。完整样本为 [bailu27-p1.json](results/provenance/bailu27-p1.json)，每个观测字段携带 value/status/source/scope。其 SHA256 是 `bf9884bdba249389fda2a149617f9f6d107d102ec7879391f2947b458d607f7c`；包含 30 个 trial 的 106 个脱敏请求，仅复制 model/seed/temperature/top_p/output cap/stream 和有限结果元数据，不含 token、授权头、prompt、工具参数或响应体。
+
+历史 runtime 元数据只能标注为 unverified；归档/lock/build/package 字节在 J3 当前验证，不冒充历史 attestation。两个产品当前 HEAD 已在 J3 开始/结束核对，不能用当前 HEAD 替换 J0 archive commit。依赖冻结清单覆盖 NormProof 4650、Cheers 8728 个条目，其中分别 1 项缓存漂移，未修改它们。
+
+`harness/cohort.mjs` 为后续获授权 cohort 提供 start/finish 自动捕获，保留失败/中断的子进程状态和不可用字段。它检查归档、全部记录依赖、runtime、实际 host source 和 dependency links，发现漂移就先写 start manifest 再阻止执行；既有尝试和停止批次不能重启。J3 未运行该入口产生新实验数据，仅以本仓库隔离夹具验证。原注册 runner 未改，以保留历史验证链。
+
+`harness/replay.py` 提取原 normal/trajectory 逻辑为制表共用，原指标不变；生成 `results/replay.json` 的每个配对携带 tier、证据等级、provenance 和四个维度排除项。`results/replay-tiers.json`、[REPLAY.md](REPLAY.md) 与 RESULTS.md 使用同一个投影。比较列为 normalized_result、final_source_bytes、raw_verdict_bytes、action_trajectory；保留兼容的旧字段并逐对核对原值。
+
+## 验收 1：完整 provenance 样本
+
+命令：`rtk proxy python3 harness/provenance.py`
+
+真实输出：
+
+```json
+{"cohort_passes": 11, "retained_trials": 233, "capture": "retrospective", "independent_replication": "unavailable", "trusted_billing": "unavailable", "backend_identity": "unavailable", "seed_acceptance": "unverified"}
+```
+
+命令：`rtk proxy python3 harness/provenance.py --inspect results/provenance/bailu27-p1.json`
+
+实际全字段索引输出保存在 [logs/j3-sample.txt](logs/j3-sample.txt)，完整值在 manifest。主要字段如下；verified 只指 source/scope 所定义的验证范围。
+
+| 字段 | 实际值 | 状态 | 来源与验证范围 |
+|---|---|---|---|
+| normproof.repository_commit | `5f7baa60a0e37339e5487d8ad7d4244361efb5b0` | verified | snapshots/normproof.tar; artifacts/source-baseline.json; git archive pax comment agrees with retained baseline; not the current product HEAD |
+| normproof.archive_sha256 | `6affa7b0309e447813b17eb27466f9955b223272c38f41fa7d6abe4ccfbf16fb` | verified | snapshots/normproof.tar; artifacts/source-baseline.json; retained archive bytes hashed now |
+| normproof.package_version | `0.1.0` | verified | snapshots/normproof.tar; artifacts/source-baseline.json; package.json in retained source archive |
+| normproof.package_json_sha256 | `174949e493e7f90f5dd43d38d0ee1f315046951ca2fcddd56c41ca9adeb4c346` | verified | snapshots/normproof.tar; artifacts/source-baseline.json; frozen/digests.json; exact package.json member bytes |
+| normproof.dependency_lock_sha256 | `8ec56cda9494e9d03d08bae820b49d491e5f98f3becb21dee5b7e9c17c1d0f06` | verified | snapshots/normproof.tar; artifacts/source-baseline.json; frozen/digests.json; exact package-lock.json bytes in retained archive |
+| normproof.runtime_artifact_sha256 | `254889d11d1513699a274dd4b3108b745f91a98059987f2006ed00f429316905` | verified | artifacts/normproof/dist; frozen/digests.json; retained detector build bytes; historical digest guard is distinct from a signed build attestation |
+| normproof.dependency_bytes | `4649/4650 entries match; inventory 1b380f1a2bcaa917deb181540be8d279aeb9d64cecc00c2ac33059d67afb2e9f` | unverified | artifacts/dependency-manifests.json; /home/wang/projects/normproof/node_modules (read-only); all recorded installed-file bytes and symlink targets checked now; does not prove J0 process loaded every entry |
+| cheers.repository_commit | `a5c600f78a800ca6517d6dc1a9ab3112125ef869` | verified | snapshots/cheers.tar; artifacts/source-baseline.json; git archive pax comment agrees with retained baseline; not the current product HEAD |
+| cheers.archive_sha256 | `454a9f7caab866d45b23b1b1e5d7e7e8a1cd57f96870a64035a2d2f5c6ba3e43` | verified | snapshots/cheers.tar; artifacts/source-baseline.json; retained archive bytes hashed now |
+| cheers.package_version | `0.1.0` | verified | snapshots/cheers.tar; artifacts/source-baseline.json; package.json in retained source archive |
+| cheers.package_json_sha256 | `b67005f92f61f9b48ca499143cbbe7826b2ae6c6d40d674ebcbd5d4ac339750b` | verified | snapshots/cheers.tar; artifacts/source-baseline.json; frozen/digests.json; exact package.json member bytes |
+| cheers.dependency_lock_sha256 | `b50f8018fb97fba96ed015dec88ad17db93e37e445a9a8cf16a5ebc6cbfc7c7b` | verified | snapshots/cheers.tar; artifacts/source-baseline.json; frozen/digests.json; exact package-lock.json bytes in retained archive |
+| cheers.runtime_artifact_sha256 | `bf905ce8fa36de3ebb1a418ec4807a6c33a9c5726500d1dd342eac8c10d4c3cd` | verified | snapshots/cheers.tar; artifacts/source-baseline.json; actual host source inputs; J0 did not execute a packaged CLI |
+| cheers.build_artifact_sha256 | `unavailable` | unavailable | frozen/versions.json; harness/bailu27.mjs; J0 Cheers packaged build |
+| cheers.dependency_bytes | `8727/8728 entries match; inventory bf863ce26ccc24602acf8133528a56174a2de3f0b7c8dd0dbc0a0f110b421ed8` | unverified | artifacts/dependency-manifests.json; /home/wang/projects/cheers/node_modules (read-only); all recorded installed-file bytes and symlink targets checked now; does not prove J0 process loaded every entry |
+| typescript | `5.9.3` | verified | artifacts/dependency-manifests.json; /home/wang/projects/normproof/node_modules/typescript/package.json (read-only); package metadata matches recorded installed dependency bytes now |
+| acorn | `8.16.0` | verified | artifacts/dependency-manifests.json; /home/wang/projects/cheers/node_modules/acorn/package.json (read-only); package metadata matches recorded installed dependency bytes now |
+| host_tsx | `4.21.0` | verified | artifacts/dependency-manifests.json; /home/wang/projects/cheers/node_modules/tsx/package.json (read-only); package metadata matches recorded installed dependency bytes now |
+| recorded_runtime | `Node v24.15.0; Linux x64; host 0.1.0 / source via tsx; detector 0.1.0; harness j0-3-bailu27` | unverified | retained result metadata; frozen/versions.json; declared child runtime metadata |
+| capture_runtime | `"unavailable"` | unavailable | retained result metadata; frozen/versions.json; historical live OS/runtime attestation |
+| provider_route | `{"provider":"openai-compatible","endpoint_host":"bailucode.com","requested_models":["bailu-2.7"]}` | verified | retained result metadata; frozen/versions.json; retained requested route, not provider backend |
+| seed_sent | `[271828]` | verified | results/raw/bailu27-p1-*/requests.json; seed present in retained outbound body; does not prove acceptance |
+| seed_acceptance | `"unverified"` | unverified | retained result metadata; PREREGISTRATION.md:80-82; provider acceptance/semantics of seed 271828 |
+| provider_backend_identity | `"unavailable"` | unavailable | retained result metadata; harness/bailu27.mjs; harness/runner.mjs; actual provider serving backend identity |
+| trusted_billing | `"unavailable"` | unavailable | results/summary.json; PREREGISTRATION.md; trusted billing receipt |
+| cost | `"unavailable"` | unavailable | results/summary.json; observed monetary cost |
+| independent_replication | `"unavailable"` | unavailable | AUDIT.md; CONCLUSION.md; another implementation, environment or laboratory |
+
+Cheers **没有可补造的打包构建哈希**。其 source inventory 是实际执行输入的等价字节标识，build_artifact_sha256 保持 unavailable。
+
+## 验收 2、3：三级证据表、四列定义与 J0 投影
+
+命令：`rtk proxy python3 harness/report.py`
+
+真实输出：
+
+```json
+{"rows": 233, "cohorts": {"bailu-2.7 live model": 60, "bailu-2.7 native smoke": 1, "fixed calibration": 80, "initial calibration (selection omission)": 80, "continuation live model": 3, "live model": 3, "development scripted smoke": 5, "development live smoke": 1}, "replay_pairs": 70}
+```
+
+命令：`rtk proxy cat REPLAY.md`
+
+真实完整表和四列定义见 [logs/j3-tiers.txt](logs/j3-tiers.txt) 与 [REPLAY.md](REPLAY.md)。表按 fixed scripted、same-harness model、independent 三个独立列呈现，逐行含 n、元数据与证据等级。关键投影：
+
+| tier / cohort | trial n / pair n | 标准化结果 | 最终源文件字节 | raw verdict artifact 字节 | 动作轨迹 | 证据等级 |
+|---|---:|---:|---:|---|---:|---|
+| fixed scripted / S | 80 / 40 | 40/40 | 40/40 | 24/24；16 trial pair 不可用 | 40/40 | local observed stability; provenance partial |
+| same-harness model / L3 | 60 / 30 | 8/30 | 12/30 | 12/12；1 单边文件；18 trial pair 不可用 | 0/30 | partial internal replication |
+| same-harness model / L | 3 / 0 | unavailable | unavailable | unavailable | unavailable | 无成对观察 |
+| same-harness model / L2 | 3 / 0 | unavailable | unavailable | unavailable | unavailable | 无成对观察 |
+| independent replication | 0 / 0 | unavailable | unavailable | unavailable | unavailable | unavailable |
+
+命令：`rtk proxy python3 harness/replay-bailu27.py`
+
+真实输出：
+
+```json
+{"kind": "same-harness live repetitions; conditional on potentially different model-generated states", "pairs": 30, "available_verdict_pairs": 12, "byte_equal_verdict_pairs": 12, "unmatched_verdicts": 1}
+```
+
+Raw verdict 比较实际字节；两个空集合不是 0/0 成功。Stop 删除且未保留的 verdict 不做 JSON 重建。最终源字节从已留存 UTF-8 final.files 重构；保留原始 files 投影并检查当前行无 null/U+FFFD。该列不覆盖非 src 文件、mode 或原本未保留的二进制字节。
+
+## 验收 4：unavailable / unverified 清单
+
+[results/provenance/unavailable.json](results/provenance/unavailable.json) 每个 manifest 单独列出独立复现、可信账单、cost、provider backend identity（均 unavailable）和 seed acceptance（unverified）；各项附来源/范围/原因。完整样本命令的实际输出也逐项列出这些字段。额外 unavailable 为 Cheers packaged build、历史 live OS/runtime attestation；未验证的历史 linkage 和当前依赖字节漂移不能提升声明。seed 已发送不等于服务接受；HTTP 200 不反证这一限制。
+
+## 验收 5：可下的声明
+
+命令：`rtk proxy cat CLAIMS.md`
+
+真实输出见 [logs/j3-claims.txt](logs/j3-claims.txt)，交付清单见 [CLAIMS.md](CLAIMS.md)。每条明确依赖证据级别，并分别限定 fixed 40/40 与 24/24、L3 8/30/12/30/0/30 与条件性 12/12；确定性、服务 seed 接受、independent replication、货币成本、打包 CLI 和发布/干预有效性声明均未获授权证据。
+
+## 实现验证与原字节边界
+
+命令：`rtk proxy python3 harness/check-j3.py`
+
+真实输出：
+
+```json
+{"fixture_checks": 12, "passed": ["timing and tool-call IDs excluded", "action change independent of normalized/final equality", "check change independent of final bytes", "whitespace changes bytes; unknown/symlink bytes unavailable", "empty/asymmetric verdict unavailable; formatting is a byte mismatch", "allowlist excludes synthetic secrets and request content", "synthetic failed child retains start/finish and exit status", "existing capture cannot be overwritten", "interrupted child retains terminal manifest", "runtime drift recorded before child admission", "actual host source drift prevents child admission", "material drift recorded before child admission"], "models_or_judges_run": 0, "scope": "synthetic contracts and launcher lifecycle only; not provider or independent replication"}
+```
+
+12 项全为本地合成夹具：时间/tool-call ID 排除，动作和检查变化独立，换行字节/unknown，空与单边 verdict、JSON 格式差异，脱敏秘密，失败/中断 manifest，重复捕获拒绝，runtime/source/dependency 漂移阻断。没有运行真实 provider 或 judge。
+
+命令：`rtk proxy python3 harness/audit-j3.py`
+
+真实输出：
+
+```json
+{"acceptance": "passed", "scope": "J3 local reprojection and provenance delivery; no new J0/provider/detector run", "historical_bytes_unchanged": {"frozen_registered_files": 147, "raw_files": 2802}, "product_repos": {"normproof": {"start_head": "716cfea2d7c3d6857f45cb58242e6197c9d47a11", "end_head": "716cfea2d7c3d6857f45cb58242e6197c9d47a11", "status": "", "unchanged": true}, "cheers": {"start_head": "5447a538224fd7ed00d98d3e5a19284431431c4b", "end_head": "5447a538224fd7ed00d98d3e5a19284431431c4b", "status": "", "unchanged": true}}, "retained_trials": 233, "cohort_pass_manifests": 11, "j0_legacy_projection_pairs_unchanged": 70, "j0_other_metric_files_unchanged": 5, "manifest_field_status_counts": {"unverified": 77, "verified": 55, "unavailable": 55}, "sample": "results/provenance/bailu27-p1.json", "sample_requests": 106, "l3": {"pairs": 30, "normalized_equal": 8, "final_source_bytes_equal": 12, "action_trajectory_equal": 0, "raw_verdict_equal": 12, "raw_verdict_available": 12, "unmatched_verdicts": 1}, "fixed": {"pairs": 40, "normalized_equal": 40, "raw_verdict_equal": 24, "raw_verdict_available": 24}, "unavailable": ["independent_replication", "trusted_billing", "cost", "provider_backend_identity", "cheers_packaged_build"], "unverified": ["seed_acceptance", "historical_runtime_linkage", "current_dependency_bytes"], "dependency_drift": {"normproof": [".vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json"], "cheers": [".vitest/results.json"]}, "synthetic_fixture_checks": 12}
+```
+
+该检查对照 J3 前提交 `7754ee2a24fe5b51bbfba45138737993ff1fd1d9` 的 Git blob 字节，确认 2802 个 raw 文件与 147 个冻结/注册文件不变；70 对旧 replay 字段不变；另外五个 J0 指标文件原字节不变。产品仓库当前 HEAD 与干净状态与本次开始一致。检查还直接重算 manifest/material/pair 和四列分母，核对保留失败、未知状态和所有 trial 的覆盖，而非只确认文件存在。`git diff --check`、`node --check harness/cohort.mjs` 也通过。
+
+再生成 provenance/report 后 18 个生成文件 SHA256 均不变：
+
+```json
+{"generated_files": 18, "byte_identical_after_regeneration": true, "model_or_detector_reruns": 0}
+```
+
+完整命令退出码索引：[artifacts/j3-validation.json](artifacts/j3-validation.json)；证据为本地验证，没有 push/remote CI/独立复现/新模型运行。执行记录包含 commit message 版本，当前变更尚未提交。

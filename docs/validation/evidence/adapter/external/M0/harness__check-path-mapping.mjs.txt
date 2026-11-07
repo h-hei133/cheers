@@ -1,0 +1,53 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { canonicalizeProposalPath, proposalTruth } from './path-mapping.mjs';
+import { inspectSource } from './oracle.mjs';
+
+const base = fs.mkdtempSync(path.join(os.tmpdir(), 'normproof-path-mapping-'));
+const root = path.join(base, 'trial');
+const outside = path.join(base, 'outside.js');
+fs.mkdirSync(path.join(root, 'src'), { recursive: true });
+fs.writeFileSync(path.join(root, 'src', 'inside.js'), 'export function inside() { return 1; }\n');
+fs.writeFileSync(outside, 'export function outside() { return 0; }\n');
+fs.symlinkSync(path.join(root, 'src', 'inside.js'), path.join(root, 'src', 'link-in.js'));
+fs.symlinkSync(outside, path.join(root, 'src', 'link-out.js'));
+
+const relative = path.join('src', 'inside.js');
+const absolute = path.join(root, relative);
+const cases = [
+  { name: 'relative path', rawPath: relative, expected: { canonicalPath: 'src/inside.js', canonicalFailure: null } },
+  { name: 'absolute path inside root', rawPath: absolute, expected: { canonicalPath: 'src/inside.js', canonicalFailure: null } },
+  { name: 'absolute path outside root', rawPath: outside, expected: { canonicalPath: null, canonicalFailure: 'path_out_of_root' } },
+  { name: 'symlink to root inside', rawPath: 'src/link-in.js', expected: { canonicalPath: 'src/inside.js', canonicalFailure: null } },
+  { name: 'symlink to root outside', rawPath: 'src/link-out.js', expected: { canonicalPath: null, canonicalFailure: 'path_out_of_root' } },
+  { name: 'same file alternate spelling', rawPath: relative, expected: { canonicalPath: 'src/inside.js', canonicalFailure: null }, duplicateOf: 'absolute path inside root' }
+];
+
+const results = cases.map(testCase => ({
+  ...testCase,
+  actual: canonicalizeProposalPath(root, testCase.rawPath)
+}));
+for (const result of results) {
+  if (result.actual.canonicalPath !== result.expected.canonicalPath || result.actual.canonicalFailure !== result.expected.canonicalFailure) {
+    throw new Error(`fixture failed: ${result.name}: expected ${JSON.stringify(result.expected)}, got ${JSON.stringify(result.actual)}`);
+  }
+}
+const duplicate = results.find(result => result.duplicateOf);
+if (duplicate.actual.canonicalPath !== results.find(result => result.name === duplicate.duplicateOf).actual.canonicalPath) {
+  throw new Error('duplicate-path fixture failed: canonical paths differ');
+}
+
+console.log(JSON.stringify({
+  fixtureRoot: root,
+  passed: results.length,
+  cases: results.map(({ name, rawPath, expected, actual, duplicateOf }) => ({ name, rawPath, expected, actual, ...(duplicateOf ? { duplicateOf } : {}) })),
+  outOfRootClassification: proposalTruth({
+    trialRoot: root,
+    rawPath: outside,
+    content: 'export function outside() { return 0; }\n',
+    before: { 'src/inside.js': 'export function inside() { return 1; }\n' },
+    inspectSource
+  })
+}, null, 2));
+fs.rmSync(base, { recursive: true, force: true });

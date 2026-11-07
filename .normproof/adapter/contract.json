@@ -1,0 +1,37 @@
+{
+  "name": "cheers.normproof.adapter",
+  "version": "1.0.0",
+  "mode": "shadow",
+  "owner": "Cheers packaging/release maintainer (operator role)",
+  "returnDate": "2026-11-20",
+  "bundleMetadataSha256": "cbcc3d3814fba42232a96f187c509fb2e3225b6f5bbe6835d563d3914255cf2c",
+  "archiveSha256": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985",
+  "writeArtifactSha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+  "parserVersion": "5.9.3",
+  "nodeFloor": "20.3.0",
+  "packageNodeEngine": ">=24",
+  "limits": {
+    "graphEdges": 16384,
+    "setPaths": 4096,
+    "sourceFileBytes": 1048576,
+    "reachabilitySteps": 20000,
+    "processTimeoutMs": 180000,
+    "processOutputBytes": 4194304
+  },
+  "surfaces": {
+    "judge": "shadow-only",
+    "write": "separate pinned artifact; JSON allow/block is not an exit-code verdict",
+    "stop": "unsupported: legacy bundle lacks R0a envelope",
+    "mcpInitialize": "unsupported: legacy bundle returns -32601",
+    "report": "raw report retains advisory findings; failed-only section omits them"
+  },
+  "forkDisposition": "temporarily frozen pending operator release decision; no refresh authorized",
+  "hunks": [
+    { "id": "G1", "header": "@@ -1,23 +1,15 @@", "owner": "Cheers packaging maintainer + NormProof collector owner", "classification": "mixed: AST/vendor packaging upstream-equivalent; capacity remains local", "conformance": ["artifact", "ast", "capacity"], "refresh": "Remove AST/vendor replacement only after pinned parser closure verification; resolve capacity with bounded collector/engine design, never port constant alone.", "returnDate": "2026-11-20" },
+    { "id": "G2", "header": "@@ -127,63 +119,56 @@", "owner": "NormProof source-parser owner; Cheers packaging maintainer tracks return", "classification": "NOT upstream-equivalent: upstream records <runtime-require> for every call named require, and Cheers has four such files (two production), so this hunk currently keeps the blocking unresolved-specifier obligation satisfied", "conformance": ["ast"], "refresh": "Do NOT drop on refresh: retiring it flips source_graph_has_no_unresolved_specifiers from satisfied to failed. First convert the four literal require() call sites in Cheers, or obtain an upstream change distinguishing literal require from a dynamic one; re-verify the blocking obligation before any retirement.", "returnDate": "2026-11-20" },
+    { "id": "G3", "header": "@@ -235,8 +220,7 @@", "owner": "NormProof collector documentation owner; Cheers packaging maintainer tracks return", "classification": "local comment correction", "conformance": ["ast", "comment"], "refresh": "Return the literal-dynamic comment correction to upstream source; retire generated comment patch after verification.", "returnDate": "2026-11-20" },
+    { "id": "G4", "header": "@@ -246,7 +230,13 @@", "owner": "NormProof collector/source-parser owner; Cheers packaging maintainer tracks return", "classification": "upstream has behavior since d18beb4", "conformance": ["ast"], "refresh": "Drop on authorized refresh; preserve whole-collection syntax refusal with upstream invalid/unsupported causes.", "returnDate": "2026-11-20" },
+    { "id": "G5", "header": "@@ -262,20 +252,19 @@", "owner": "NormProof module-graph collector owner + Cheers packaging maintainer", "classification": "mixed: local explicit-path restriction and honest overflow wording; TSX/self-edge upstream", "conformance": ["paths", "capacity"], "refresh": "Return narrow explicit-extension candidate policy and collection-incomplete wording with positive/negative fixtures; remove only upstream-equivalent self-edge/TSX portions.", "returnDate": "2026-11-20" },
+    { "id": "E1", "header": "@@ -24,7 +24,7 @@", "owner": "NormProof bounded evidence-reader owner + collector owner; Cheers packaging maintainer tracks return", "classification": "local evaluator capacity constant", "conformance": ["capacity"], "refresh": "Resolve together with G1 under bounded capacity design; never upstream the constant bump independently. If unresolved, retain oversized/not_proven and shadow-only.", "returnDate": "2026-11-20" }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "startedAt": "2026-11-06T15:26:27.844Z",
+  "runnerPid": 24332,
+  "childPid": 24343,
+  "command": [
+    "bash",
+    "-c",
+    "npm run verify:import-cycles && npm run check:declarations && npm run check:node-floor && npm run test:ts"
+  ],
+  "cwd": "/home/wang/projects/cheers",
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=2048",
+    "VITEST_MAX_THREADS": "1",
+    "VITEST_MIN_THREADS": "1"
+  },
+  "head": "5447a538224fd7ed00d98d3e5a19284431431c4b",
+  "sourceSha256": "56706b49074326724c58cb2abd7077d6fa991fa8cd0732a559600b2c7889411d",
+  "sourceMembers": "source-members.json",
+  "runtime": "v24.15.0",
+  "platform": "linux",
+  "arch": "x64",
+  "archiveSha256": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985",
+  "output": "output.txt",
+  "finishedAt": "2026-11-06T16:01:28.707Z",
+  "elapsedMs": 2100863,
+  "exitCode": 0,
+  "signal": null,
+  "interruption": null,
+  "launchError": null,
+  "sourceDrift": false,
+  "finalSourceSha256": "56706b49074326724c58cb2abd7077d6fa991fa8cd0732a559600b2c7889411d",
+  "outputSha256": "0dfd3be8ce6354463a4b1e251b1c5d87cff36102540ac53368601c77f09d373c",
+  "testFilesPassed": 1098,
+  "testsPassed": 14376,
+  "testsSkipped": 2,
+  "terminalSummaryPresent": true
+}

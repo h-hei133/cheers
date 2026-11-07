@@ -1,0 +1,69 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { inspectSource } from './oracle.mjs';
+import { proposalTruth } from './path-mapping.mjs';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const rawRoot = path.join(root, 'results/raw');
+
+function trialRootFor(file, rawPath) {
+  const match = String(rawPath).match(/^(.*[\\/]work[\\/]trials[\\/][^\\/]+)/);
+  if (match) return match[1];
+  const id = path.basename(path.dirname(file));
+  return path.join(root, 'work/trials', id);
+}
+
+function proposalFiles() {
+  const files = [];
+  for (const entry of fs.readdirSync(rawRoot, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (!entry.isDirectory() || !/^bailu27-p[12]-/.test(entry.name)) continue;
+    const file = path.join(rawRoot, entry.name, 'proposals.json');
+    if (fs.existsSync(file)) files.push(file);
+  }
+  return files;
+}
+
+const rows = proposalFiles().flatMap(file => JSON.parse(fs.readFileSync(file, 'utf8')).map((proposal, index) => ({
+  file: path.relative(root, file), index, proposal
+})));
+const mapped = rows.map(({ file, index, proposal }) => {
+  const rawPath = proposal.args?.path;
+  const trialRoot = trialRootFor(file, rawPath);
+  const truth = proposalTruth({
+    trialRoot,
+    rawPath,
+    content: proposal.args?.content,
+    before: proposal.before ?? {},
+    inspectSource
+  });
+  return { file, index, rawPath, trialRoot, proposal, ...truth };
+});
+
+const counts = {
+  total: mapped.length,
+  archivedUnknown: mapped.filter(row => row.proposal?.truth?.known === false).length,
+  rawAbsolutePath: mapped.filter(row => path.isAbsolute(String(row.rawPath))).length,
+  rawAbsolutePathMapped: mapped.filter(row => path.isAbsolute(String(row.rawPath)) && row.canonicalPath !== null).length,
+  canonicalPathNonNull: mapped.filter(row => row.canonicalPath !== null).length,
+  canonicalPathNull: mapped.filter(row => row.canonicalPath === null).length,
+  path_out_of_root: mapped.filter(row => row.reason === 'path_out_of_root').length,
+  path_ambiguous: mapped.filter(row => row.reason === 'path_ambiguous').length,
+  outside_frozen_scope: mapped.filter(row => row.reason === 'outside_frozen_scope').length,
+  syntax_outside_oracle: mapped.filter(row => row.reason === 'syntax_outside_oracle').length,
+  known_compliant: mapped.filter(row => row.known && row.compliant).length,
+  known_noncompliant: mapped.filter(row => row.known && !row.compliant).length
+};
+const duplicateCanonicalPaths = Object.entries(mapped.reduce((groups, row) => {
+  if (row.canonicalPath) (groups[row.canonicalPath] ??= []).push(`${row.file}#${row.index}`);
+  return groups;
+}, {})).filter(([, rowsForPath]) => rowsForPath.length > 1).map(([canonicalPath, rowsForPath]) => ({ canonicalPath, rows: rowsForPath }));
+
+console.log(JSON.stringify({
+  scope: 'J0 formal bailu27 p1/p2 raw proposals; archived files are read-only',
+  counts,
+  duplicateCanonicalPathCount: duplicateCanonicalPaths.length,
+  duplicateCanonicalPathExamples: duplicateCanonicalPaths.slice(0, 3),
+  path_out_of_root_examples: mapped.filter(row => row.reason === 'path_out_of_root').slice(0, 3).map(row => ({ file: row.file, rawPath: row.rawPath, canonicalPath: row.canonicalPath, reason: row.reason })),
+  remapped_absolute_examples: mapped.filter(row => path.isAbsolute(String(row.rawPath)) && row.canonicalPath).slice(0, 3).map(row => ({ file: row.file, rawPath: row.rawPath, canonicalPath: row.canonicalPath, known: row.known, compliant: row.compliant }))
+}, null, 2));

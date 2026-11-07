@@ -1,0 +1,19 @@
+# J3 可下的声明
+
+| 声明 | 依赖证据级别 | 当前处置与证据 |
+|---|---|---|
+| J0 固定脚本在保留的 40 个 task/condition 配对中，标准化结果、最终源文件和动作轨迹均相同 | fixed scripted replay / S，本地观察 | 可以下，仅限这些冻结脚本；results/replay.json、REPLAY.md。不是模型稳定性或一般确定性证明 |
+| J0 固定脚本双方可用的 24 个 raw verdict artifact 配对字节一致 | fixed scripted replay / S，本地字节证据 | 可以下；16 个 trial 配对没有归档 verdict，不能记为字节相同；results/replay-tiers.json |
+| J0 L3 同一 harness/provider 的 30 个重复配对中，标准化结果 8/30、最终源文件 12/30、动作轨迹 0/30 相同 | same-harness model replay / L3，partial internal replication | 可以下，保留网络失败；三个维度不能合并；results/replay.json |
+| J0 L3 双方可用的 12 个 raw verdict artifact 配对字节一致，另有 1 个单边 MCP verdict | same-harness model replay / L3，条件性字节证据 | 可以下；不是 30/30 trial 一致，也不是 detector 独立复现；results/bailu27-artifact-replay.json |
+| J0 源码归档、detector 构建和 lockfile 字节当前可复核 | provenance，本地当前字节证据 | 可以下；results/provenance/materials.json。archive commit 是 J0 冻结提交，不是当前产品 HEAD；事后补录不能证明历史进程状态 |
+| 所有 233 个结果运行和失败均保留，11 个 cohort/pass 均有事后 manifest | provenance，本地文件证据 | 可以下；results/provenance/index.json、J3 验收原字节检查。诊断、smoke、初始 calibration 不进入正式 replay 分母 |
+| seed 271828 被放入保留的请求 body | same-harness model replay / 请求元数据 | 可以下；manifest 的 seed_sent 和脱敏请求。服务是否接受 seed 仍为 unverified |
+| 模型或 provider 已确定性复现；seed 已被服务接受 | 需要经验证的 provider seed/backend/runtime 与相应重复证据 | **不可下**。HTTP 200、重复结果相同或固定脚本一致不能替代接受状态。backend identity unavailable；历史 runtime linkage unverified |
+| 当前环境依赖与 J0 完全字节相同 | provenance，依赖字节验证 | **不可下**。两处 Vitest 缓存与冻结清单不同：Cheers `.vitest/results.json`；NormProof `.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json`。保持 unverified，launcher 在预检漂移时停止 |
+| Cheers 打包 CLI 的构建产物已复现 | 需要实际打包 artifact 证据 | **不可下**。J0 使用固定源码经 tsx；保留 source inventory，build_artifact_sha256 unavailable |
+| 已 independent replication | independent replication / 另一实现、环境或实验室 | **不可下**，unavailable，n=0。固定脚本、same-harness 重复和 provider health probe 均不能提升为该级 |
+| 已观测到货币成本或可用 token 数证明账单 | 可信账单证据 | **不可下**，trusted_billing 与 cost 均 unavailable，不计算估计成本 |
+| 这些重复证明产品、平台或发布就绪，或证明干预有效 | 另需平台/发布与非零拒绝机会的注册实验 | **不可下**。J3 只重投影 J0，没有新增这些层级的证据 |
+
+每项声明只依赖上表指定级别。缺失信息和依赖漂移不会重写 J0 数字，也不会把历史级别提升为确定性或独立复现。

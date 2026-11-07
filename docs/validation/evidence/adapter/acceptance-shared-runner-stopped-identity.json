@@ -1,0 +1,28 @@
+{
+  "contract": "1.0.0",
+  "recordedAt": "2026-11-06T12:53:48.099Z",
+  "head": "5447a538224fd7ed00d98d3e5a19284431431c4b",
+  "sourceSha256": "a992f4e72f5ce0998933d80c8f4235f0e2614841507cc9882920dee815a2fd35",
+  "sourceDrift": false,
+  "runtime": "v24.15.0",
+  "platform": "linux",
+  "arch": "x64",
+  "archiveSha256": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985",
+  "command": [
+    "bash",
+    "-c",
+    "npm run verify:import-cycles && npm run check:declarations && npm run check:node-floor && npm run test:ts -- -- --threads=false"
+  ],
+  "cwd": "/home/wang/projects/cheers",
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=2048",
+    "VITEST_MAX_THREADS": "1",
+    "VITEST_MIN_THREADS": "1"
+  },
+  "exitCode": null,
+  "signal": "SIGTERM",
+  "error": null,
+  "elapsedMs": 1677844,
+  "output": "docs/validation/evidence/adapter/acceptance.txt",
+  "outputSha256": "7033c26f4e43c1fe8a3df9f6fb778b8734e7458dc347f23aee2d70426bf7a676"
+}

@@ -1,0 +1,80 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const OUTSIDE_ROOT = 'path_out_of_root';
+const AMBIGUOUS = 'path_ambiguous';
+
+function isContained(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+function realpathWithMissingTail(candidate) {
+  let current = path.resolve(candidate);
+  const missing = [];
+  while (true) {
+    try {
+      // lstat sees dangling symlinks, while existsSync would incorrectly treat
+      // them as ordinary missing final files.
+      fs.lstatSync(current);
+      let resolved;
+      try {
+        resolved = fs.realpathSync.native(current);
+      } catch {
+        return null;
+      }
+      for (const part of missing) resolved = path.join(resolved, part);
+      return resolved;
+    } catch (error) {
+      if (error?.code !== 'ENOENT') return null;
+      const parent = path.dirname(current);
+      if (parent === current) return null;
+      missing.unshift(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
+/** Map an observer path to a trial-root-relative path without changing rawPath. */
+export function canonicalizeProposalPath(trialRoot, rawPath) {
+  if (typeof rawPath !== 'string' || rawPath.length === 0 || rawPath.includes('\0')) {
+    return { canonicalPath: null, canonicalFailure: AMBIGUOUS };
+  }
+
+  const root = path.resolve(trialRoot);
+  const rootReal = realpathWithMissingTail(root);
+  if (!rootReal) return { canonicalPath: null, canonicalFailure: AMBIGUOUS };
+
+  const lexical = path.isAbsolute(rawPath) ? path.normalize(rawPath) : path.resolve(root, rawPath);
+  if (!isContained(root, lexical)) return { canonicalPath: null, canonicalFailure: OUTSIDE_ROOT };
+
+  const resolved = realpathWithMissingTail(lexical);
+  if (!resolved) return { canonicalPath: null, canonicalFailure: AMBIGUOUS };
+  if (!isContained(rootReal, resolved)) return { canonicalPath: null, canonicalFailure: OUTSIDE_ROOT };
+
+  const canonicalPath = path.relative(rootReal, resolved).split(path.sep).join('/');
+  if (!canonicalPath || canonicalPath === '.' || canonicalPath.startsWith('../') || canonicalPath.includes('\0')) {
+    return { canonicalPath: null, canonicalFailure: AMBIGUOUS };
+  }
+  return { canonicalPath, canonicalFailure: null };
+}
+
+export function proposalTruth({ trialRoot, rawPath, content, before, inspectSource }) {
+  const mapping = canonicalizeProposalPath(trialRoot, rawPath);
+  if (!mapping.canonicalPath) {
+    return { ...mapping, known: false, compliant: false, reason: mapping.canonicalFailure };
+  }
+  const virtual = { ...before, [mapping.canonicalPath]: String(content) };
+  const states = Object.entries(virtual).map(([file, value]) => (
+    value === null ? { known: false, reason: 'path_ambiguous' } : inspectSource(file, value)
+  ));
+  const unknown = states.find(state => !state.known);
+  return {
+    ...mapping,
+    known: !unknown,
+    compliant: !unknown && states.every(state => state.compliant),
+    ...(unknown ? { reason: unknown.reason } : {})
+  };
+}
+
+export const canonicalFailureCodes = Object.freeze({ OUTSIDE_ROOT, AMBIGUOUS });

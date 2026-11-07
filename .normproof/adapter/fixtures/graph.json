@@ -1,0 +1,17 @@
+{
+  "paths": [
+    { "name": "explicit js prefers TS", "specifier": "./dep.js", "modules": ["dep.ts", "dep.tsx", "dep/index.ts"], "target": "dep.ts" },
+    { "name": "explicit js permits TSX", "specifier": "./dep.js", "modules": ["dep.tsx"], "target": "dep.tsx" },
+    { "name": "explicit js rejects index", "specifier": "./dep.js", "modules": ["dep/index.ts", "dep/index.tsx"], "target": null },
+    { "name": "explicit ts only itself", "specifier": "./dep.ts", "modules": ["dep.ts"], "target": "dep.ts" },
+    { "name": "explicit ts rejects TSX and index", "specifier": "./dep.ts", "modules": ["dep.tsx", "dep/index.ts"], "target": null },
+    { "name": "explicit tsx only itself", "specifier": "./dep.tsx", "modules": ["dep.tsx"], "target": "dep.tsx" },
+    { "name": "explicit tsx rejects TS and index", "specifier": "./dep.tsx", "modules": ["dep.ts", "dep/index.tsx"], "target": null },
+    { "name": "extensionless permits index TSX", "specifier": "./dep", "modules": ["dep/index.tsx"], "target": "dep/index.tsx" },
+    { "name": "self edge remains visible", "specifier": "./entry.js", "modules": [], "target": "entry.ts" }
+  ],
+  "astSource": "import './static.js'; export {v} from './export.js'; import legacy = require('./legacy.js'); type T = import('./types.js').T; const lazy = import(`./lazy.js`); import './esc\\u0061ped.js'; const text = \"import './phantom.js'\"; // import './comment.js'\n",
+  "astTargets": ["./static.js", "./export.js", "./legacy.js", "./types.js", "./lazy.js", "./escaped.js"],
+  "syntaxFailure": "import { broken from './missing.js';",
+  "legacyBlindSpots": "const computed = import(path); const required = require('./runtime.js');"
+}

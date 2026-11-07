@@ -1,0 +1,20 @@
+{
+  "recordedAt": "2026-11-06T13:11:37.861193+00:00",
+  "goalStatus": "paused",
+  "sessionId": 58675,
+  "sessionObservation": "unknown process id; handle no longer exists",
+  "knownProcessIdsAbsent": [
+    3136,
+    3147,
+    3216,
+    3228,
+    3252,
+    5476,
+    6088,
+    6099
+  ],
+  "terminalExitReceipt": false,
+  "terminalSuiteSummary": false,
+  "validationStatus": "stopped_unverified",
+  "log": "docs/validation/evidence/adapter/acceptance.txt"
+}

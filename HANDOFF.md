@@ -12,6 +12,16 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Bundle Metadata Limits Need An Actual Consumer
+- **Symptom**: A pinned bundle declares a 1 MiB source-file limit, but direct judge accepts larger source files.
+- **Root Cause**: `bundle.json` is packaging metadata; the collector reads `maxFileBytes` from the evidence manifest and defaults to Infinity when it is absent. Metadata does not configure that reader.
+- **Rule**: Trace every declared limit to its runtime input and test the exact overflow through the actual CLI. A shadow adapter may project the existing manifest limit without adding another collector; retain the native oversized/not_proven result and record the original manifest's missing enforcement separately.
+
+### TypeScript Test Launchers Need A Terminal Test Summary
+- **Symptom**: A tsx child exits zero on Node24 with `--test` but produces no tests, making a parent fixture look green.
+- **Root Cause**: That launcher/Node combination returns before the test file executes; exit status alone does not prove test discovery.
+- **Rule**: Run the TypeScript test file through the supported launcher form and require its terminal test count/pass count as well as exit zero. Preserve the initial empty observation separately and validate the invocation on the declared Node floor.
+
 ### PID Existence Does Not Prove A Terminated Target Is Running
 - **Symptom**: A PTY wrapper and its streams close, but a termination test fails because kill(pid, 0) still succeeds.
 - **Root Cause**: Linux keeps an exited zombie's PID until reaping; PID reuse also makes the same number identify a different process. A wrapper close alone does not resolve these cases.
