@@ -1,0 +1,47 @@
+[
+  {
+    "id": "legacy-allow",
+    "wire": { "decision": "allow" },
+    "expected": { "decision": "allow", "reasonCode": "explicit_allow", "status": "allow", "policy": "permission" }
+  },
+  {
+    "id": "legacy-block",
+    "wire": { "decision": "block", "reason": "legacy rule" },
+    "expected": { "decision": "block", "reason": "legacy rule" }
+  },
+  {
+    "id": "legacy-retry",
+    "wire": { "decision": "retry", "reason": "repair" },
+    "expected": { "decision": "retry", "reason": "repair" }
+  },
+  {
+    "id": "versioned-allow",
+    "wire": { "decision": "allow", "reasonCode": "no_violation", "reason": "clean local rule result" },
+    "expected": { "decision": "allow", "reasonCode": "no_violation", "status": "allow", "policy": "permission" }
+  },
+  {
+    "id": "versioned-block",
+    "wire": { "decision": "block", "reasonCode": "violation", "reason": "rule fired" },
+    "expected": { "decision": "block", "reasonCode": "violation", "status": "block", "policy": "block" }
+  },
+  {
+    "id": "versioned-could-not-decide",
+    "wire": { "decision": "allow", "reasonCode": "could_not_decide" },
+    "expected": { "decision": "block", "reasonCode": "could_not_decide", "status": "unknown", "policy": "block" }
+  },
+  {
+    "id": "versioned-not-configured",
+    "wire": { "decision": "allow", "reasonCode": "not_configured" },
+    "expected": { "decision": "allow", "reasonCode": "not_configured", "status": "unknown", "policy": "observe-only" }
+  },
+  {
+    "id": "versioned-not-judged",
+    "wire": { "decision": "allow", "reasonCode": "not_a_judged_write" },
+    "expected": { "decision": "unsupported", "reasonCode": "not_a_judged_write", "status": "unsupported", "policy": "observe-only" }
+  },
+  {
+    "id": "future-reason",
+    "wire": { "decision": "allow", "reasonCode": "future_reason" },
+    "expected": { "decision": "block", "reasonCode": "version_mismatch", "status": "unknown", "policy": "block" }
+  }
+]

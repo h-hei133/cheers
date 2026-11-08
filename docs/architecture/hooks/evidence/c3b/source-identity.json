@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "task": "C3b",
+  "capturedAt": "2026-11-07T14:17:10.484Z",
+  "productSource": {
+    "baseCommit": "0150d342aab28234b50a7bfd5b9acae0ef4ae275",
+    "dirty": true,
+    "status": [
+      " M .wiki/features/phase-1-execution.md",
+      " M docs/architecture/hooks/capabilities.md",
+      " M docs/architecture/hooks/translation.md",
+      " M packages/ts-shell/src/core/hooks/hookDispatcher.ts",
+      " M packages/ts-shell/src/core/hooks/translation.integration.test.ts",
+      " M packages/ts-shell/src/core/hooks/translation.test.ts",
+      " M packages/ts-shell/src/core/hooks/translation.ts",
+      " M packages/ts-shell/src/core/hooks/types.ts",
+      "?? docs/architecture/hooks/evidence/c3b/",
+      "?? packages/ts-shell/src/core/hooks/fixtures/"
+    ],
+    "files": {
+      "packages/ts-shell/src/core/hooks/types.ts": "95ce0d302aa308473535321f2b9b1bb62e84fa6f423ed9f5a94b4ca431559559",
+      "packages/ts-shell/src/core/hooks/translation.ts": "6dd56c7146f411959fe08ac6fa3362e1f6f4b7709c4f6b640c3eb89a6a4ffab8",
+      "packages/ts-shell/src/core/hooks/hookDispatcher.ts": "98ce3695285167a3c11073bc4b63100be82801925407a0db2f86f2683e0e9f01",
+      "packages/ts-shell/src/core/hooks/translation.test.ts": "2349a300a628de5bee3cf55aff96e84de05cb4d8dfe8aeab3aaca4a39d55f07f",
+      "packages/ts-shell/src/core/hooks/translation.integration.test.ts": "d0ea0ef58776db0c100cd1c0133c093fe77ef9346d7ff0e8b00957aea965293d",
+      "packages/ts-shell/src/core/hooks/fixtures/write-gate-results.json": "5f876379776612ce7f769312807c7e7f3d717a6add01257647afbbcfe715aeb3"
+    }
+  },
+  "c3aContract": {
+    "repository": "/home/wang/projects/normproof",
+    "commit": "11cd6ba0b429865a43fbfffa3cb994ae31cfb634",
+    "contractFileSha256": "e5e599904df4c9cfd78abb4504ffbb359c7ba64f1225f80138f1f5dab8b2823f",
+    "fixtureSha256": "a1c57f4a5b566d284cfc75b223313964f11697a876e9ca64bbc0aec9b66e55f2",
+    "readOnly": true
+  },
+  "artifact": {
+    "path": ".normproof/write-gate/cli.mjs",
+    "fileSha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+    "payloadSha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+    "provenanceCommit": "a6ff094ac14049843b6c471eabd2aaa4a55ac8fb",
+    "nodeFloor": "20.3.0",
+    "configFile": ".normproof/write-gate/artifact.json",
+    "configSha256": "ffc27bb7407b2f13056487cacc392cac77a7601c9fc385187a4f73b6a07384ee"
+  },
+  "experimentInput": {
+    "rulesPath": ".normproof/write-rules.json",
+    "rulesSha256": "0e8960273bddcf3a56705693929ae8a7bdb0367d6e72652cee437cbd89e491a2",
+    "policy": "block-unknown-observe-unsupported",
+    "supportedTools": [
+      "Write",
+      "Edit"
+    ],
+    "directRuleKinds": [
+      "forbiddenImport",
+      "filenameTokens"
+    ],
+    "wholeWorkspaceComparison": "separate"
+  },
+  "limitations": [
+    "The pinned artifact provenance predates the C3a unknown-on-missing-or-invalid-content fix.",
+    "apply_patch, bash, MCP, browser, desktop, MultiEdit, and NotebookEdit remain unsupported for this seam.",
+    "This record is a dirty working-tree handoff for C5a; it is not a commit, CI, release, or proof verdict."
+  ]
+}

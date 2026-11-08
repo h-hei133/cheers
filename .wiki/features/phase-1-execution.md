@@ -295,3 +295,48 @@ read probe-image.png
 | 完整 RPC 协议（双向 command/response） | 需定义新契约，属 Phase 5 |
 | `OURS-ONLY` 的 16 项 | 维护者指示暂缓 |
 | `context/compact/` 域（5,186 行） | 与 `session/compaction.ts` 的关系未理清前不动压缩层 |
+
+## [2026-11-07 21:43] C3b — 消费 C3a 写前合同并保留未知分类
+
+- **Executes.** C3/C3b、P1-F47、P1-C28；为 C5a 提供当前消费 seam、artifact、配置和源码身份。
+- **Changed.** `packages/ts-shell/src/core/hooks/translation.ts` 增加 C3b
+  `block-unknown-observe-unsupported` policy、legacy flat allow/block/retry 兼容、versioned
+  reasonCode 闭集、输入不完整 unknown 和多 adapter gap 保留；`hookDispatcher.ts` 不再用后续
+  clean allow 覆盖 unknown/unsupported；`types.ts` 显式记录 permission/observe-only/block。
+  `translation.test.ts`、`translation.integration.test.ts` 与
+  `fixtures/write-gate-results.json` 覆盖 literal legacy/versioned 正反 fixture、普通
+  permission、direct-layering block、timeout/input gap、not_configured/not_a_judged_write 和
+  future reason；新增 pinned artifact contract cases 覆盖新/既有 `-temp` 文件、合法 alias、
+  empty、invalid、wrong-root、missing-config；`translation.md`、`capabilities.md` 记录 scope、
+  差异和 C5a 限制。
+- **Ran.** `rtk env VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=2 npm run test:ts --
+  src/core/hooks/translation.test.ts src/core/hooks/translation.integration.test.ts`：2 files，
+  62 passed，0 failed；`rtk npm run test:scripts`：201 passed，0 failed；
+  `rtk npm run verify:import-cycles`：runtime_cycles=0、type_only_cycles=0；
+  `rtk npm run check:config-consumers`：64/64 read，0 findings；
+  `rtk npm run check:declarations`：18/18 hook events、13/13 tool factories，0 findings；
+  `rtk npm run check:node-floor`：pass；`rtk npx tsc -p packages/ts-shell/tsconfig.build.json --noEmit`：
+  No errors found；`rtk npm run build`：manifest `9c753a83246d`。`rtk npm run verify:docs-drift:strict`：rules 0
+  dangling，但 current-state docs 有 28 个既有 dangling refs，exit 1；本次新增 C3b 引用均存在，
+  未扩大无关文档修复。补充 pinned artifact contract cases、普通 feedback 与多 adapter 优先级反例后
+  focused suite 为 62 passed；
+  `git diff --check` 通过。
+- **Artifacts.** `docs/architecture/hooks/evidence/c3b/source-identity.json` 绑定基点
+  `0150d342aab28234b50a7bfd5b9acae0ef4ae275`、当前 dirty working tree、六个适配器文件哈希、
+  C3a 合同 commit `11cd6ba0b429865a43fbfffa3cb994ae31cfb634`、pinned artifact commit
+  `a6ff094ac14049843b6c471eabd2aaa4a55ac8fb`、payload SHA-256 和 `.normproof/write-rules.json`
+  SHA-256。
+- **Deviated.** 未修改 NormProof、未复制 collector/kernel、未刷新现有 pinned artifact。
+  C3a 最新 source 对缺失/非法内容的 unknown 修复尚未进入 Cheers artifact；消费层先把缺失
+  replacement content 标成 `input_incomplete`，非法 content 仍列为 C5a refresh gap。
+- **Left open.** C5a 需在冻结 source/artifact/config 后决定 artifact refresh，并重新采集
+  invalid/empty/wrong-root、Node20.3、release/CI 和未支持 mutation 面；docs strict 的 28 个
+  既有 current-state dangling refs 仍待独立文档维护任务处理。
+- **Proposed commit message.** `fix(hooks): consume C3a write verdicts without hiding gaps`
+
+  Preserve legacy flat hook results while validating the versioned write-gate reason set. Block
+  unknown and input-incomplete outcomes, keep unsupported and not-configured coverage visible,
+  preserve ordinary permission authority, and retain the strongest result across multiple adapters.
+  Add contract fixtures, pinned-artifact state probes, capability documentation, and source identity
+  evidence for the C5a handoff. The pinned artifact remains unchanged; its invalid-content gap and
+  non-provider/platform/CI evidence remain explicitly open.

@@ -85,6 +85,23 @@ describe('write hook through the native tool gate', () => {
     expect(await dispatcher(reply({ decision: 'allow', reasonCode: 'could_not_decide' })).dispatch(payload()))
       .toMatchObject({ decision: 'block', hookVerdict: { status: 'unknown', reasonCode: 'could_not_decide', policy: 'block' } });
   });
+  it('blocks a partial edit before the older artifact can call it clean', async () => {
+    const result = await dispatcher(reply({ decision: 'allow', reasonCode: 'no_violation' })).dispatch({
+      ...payload(), toolName: 'edit', args: { path: 'target.ts' },
+    });
+    expect(result).toMatchObject({ decision: 'block', reasonCode: 'input_incomplete', hookVerdict: { status: 'unknown', policy: 'block' } });
+  });
+  it.each([
+    ['legacy allow', { decision: 'allow' }, 'allow', 'explicit_allow', 'permission'],
+    ['versioned allow', { decision: 'allow', reasonCode: 'no_violation' }, 'allow', 'no_violation', 'permission'],
+    ['versioned block', { decision: 'block', reasonCode: 'violation', reason: 'fixture rule' }, 'block', 'violation', 'block'],
+    ['not configured observe-only', { decision: 'allow', reasonCode: 'not_configured' }, 'allow', 'not_configured', 'observe-only'],
+    ['not judged observe-only', { decision: 'allow', reasonCode: 'not_a_judged_write' }, 'unsupported', 'not_a_judged_write', 'observe-only'],
+    ['future reason blocks', { decision: 'allow', reasonCode: 'future_reason' }, 'block', 'version_mismatch', 'block'],
+  ] as const)('%s remains an explicit C3b outcome', async (_label, wire, decision, reasonCode, policy) => {
+    const result = await dispatcher(reply(wire)).dispatch(payload());
+    expect(result).toMatchObject({ decision, hookVerdict: { reasonCode, policy } });
+  });
   it('preserves nonzero flat vetoes but never trusts a nonzero allow', async () => {
     expect(await dispatcher(reply({ decision: 'retry', reason: 'repair' }) + 'process.exitCode=2;').dispatch(payload())).toEqual({ decision: 'retry', reason: 'repair' });
     expect(await dispatcher(reply({ decision: 'allow', reasonCode: 'no_violation' }) + 'process.exitCode=2;').dispatch(payload()))
@@ -127,6 +144,39 @@ describe('write hook through the native tool gate', () => {
     expect(blocked.decision).toBe('block');
     console.log(JSON.stringify({ probe: 'pinned-artifact', node: process.version, toolName, allowed, blocked }));
   });
+  it('records the pinned artifact states for filename, layering, fidelity, root and configuration cases', async () => {
+    const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..');
+    const metadata = JSON.parse(fs.readFileSync(path.join(repo, '.normproof/write-gate/artifact.json'), 'utf8'));
+    const { provenance: _provenance, ...writeGate } = metadata;
+    writeGate.path = path.join(repo, writeGate.path);
+    fs.mkdirSync(path.join(root, '.normproof'));
+    fs.mkdirSync(path.join(root, 'src/runtime'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src/runtime/legacy-temp.ts'), 'export const oldValue = 1;');
+    fs.writeFileSync(path.join(root, '.normproof/write-rules.json'), JSON.stringify({ version: '0.1.0', rules: [
+      { id: 'no-temp', kind: 'filenameTokens', tokens: ['-temp', '-new'], pattern: 'src/runtime/**', message: 'Use a responsibility-based filename.' },
+      { id: 'no-adapter-import', kind: 'forbiddenImport', from: 'src/runtime/**', to: 'src/adapters/**', message: 'Keep the adapter behind a runtime boundary.' },
+    ] }));
+    const hooks = new HookDispatcher({ commandHooks: [{ event: 'PreToolUse', matcher: CANONICAL_WRITE_MATCHER, command: 'unused', writeGate }] });
+    const run = (toolName: string, target: string, content: string) => hooks.dispatch({ ...payload(), toolName, args: { path: target, content } });
+    const newFilename = await run('write', 'src/runtime/new-temp.ts', 'export const value = 1;');
+    const existingFilename = await run('edit', 'src/runtime/legacy-temp.ts', 'export const value = 2;');
+    const legalAlias = await run('write', 'src/runtime/alias.ts', 'import { value } from "@/adapters/value.js";');
+    const empty = await run('write', 'src/runtime/empty.ts', '');
+    const invalid = await run('write', 'src/runtime/broken.ts', 'function broken( {');
+    const wrongRoot = await run('write', '../outside.ts', 'export const value = 1;');
+    expect(newFilename).toMatchObject({ decision: 'block', reasonCode: 'violation' });
+    expect(existingFilename).toMatchObject({ decision: 'allow', reasonCode: 'no_violation' });
+    expect(legalAlias).toMatchObject({ decision: 'allow', reasonCode: 'no_violation' });
+    expect(empty).toMatchObject({ decision: 'allow', reasonCode: 'no_violation' });
+    // The pinned artifact predates C3a's invalid-content fix; retain this observed gap for C5a.
+    expect(invalid).toMatchObject({ decision: 'allow', reasonCode: 'no_violation' });
+    expect(wrongRoot).toMatchObject({ decision: 'block', reasonCode: 'could_not_decide', hookVerdict: { status: 'unknown', policy: 'block' } });
+    fs.unlinkSync(path.join(root, '.normproof/write-rules.json'));
+    const missingConfig = await run('write', 'src/runtime/config.ts', 'export const value = 1;');
+    expect(missingConfig).toMatchObject({ decision: 'allow', reasonCode: 'not_configured', hookVerdict: { status: 'unknown', policy: 'observe-only' } });
+    console.log(JSON.stringify({ probe: 'pinned-artifact-contract-cases', node: process.version,
+      cases: { newFilename, existingFilename, legalAlias, empty, invalid, wrongRoot, missingConfig } }));
+  });
   it('does not replace unsupported with later native feedback or adapter allow', async () => {
     const second = artifact(reply({ decision: 'allow', reasonCode: 'no_violation' }));
     // Separate file so the first pinned script is not replaced.
@@ -138,5 +188,16 @@ describe('write hook through the native tool gate', () => {
       { event: 'PreToolUse', command: `exec '${process.execPath}' -e 'console.log(JSON.stringify({decision:"allow",feedback:"note"}))'` }] });
     expect((await firstHooks.dispatch(payload())).decision).toBe('unsupported');
     expect((await firstHooks.dispatch({ ...payload(), toolName: 'bash' })).decision).toBe('unsupported');
+  });
+  it('does not replace not_configured with later native feedback', async () => {
+    const first = reply({ decision: 'allow', reasonCode: 'not_configured' });
+    const firstPath = path.join(root, 'first-not-configured.mjs');
+    fs.writeFileSync(firstPath, first);
+    const hooks = new HookDispatcher({ commandHooks: [
+      { event: 'PreToolUse', command: 'unused', writeGate: { ...artifact(first), path: firstPath } },
+      { event: 'PreToolUse', command: `exec '${process.execPath}' -e 'console.log(JSON.stringify({decision:"allow",feedback:"note"}))'` },
+    ] });
+    expect(await hooks.dispatch(payload())).toMatchObject({ decision: 'allow', reasonCode: 'not_configured',
+      hookVerdict: { status: 'unknown', policy: 'observe-only' } });
   });
 });

@@ -8,7 +8,7 @@ import type { StopDispatchOptions } from './stop/model.js';
 import type { StopPayload } from './types.js';
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
 import { checkWriteHookArtifact, writeHookCommand } from './artifact.js';
-import { applyWriteHookPolicy, canonicalToolName, hookUnknown, normalizeHookVeto, translateWriteInput, translateWriteResult } from './translation.js';
+import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInput, translateWriteResult } from './translation.js';
 import type {
   HookEventPayload,
   HookDecision,
@@ -268,7 +268,7 @@ export class HookDispatcher {
           if ('decision' in input) {
             logger.info('Write hook result', input.hookVerdict);
             if (input.decision === 'block') return input;
-            accumulatedDecision = input;
+            accumulatedDecision = mergeWriteHookResult(accumulatedDecision, input);
             continue;
           }
           if (!this.matches(hook.matcher, matchPayload)) continue;
@@ -355,7 +355,7 @@ export class HookDispatcher {
             const result = applyWriteHookPolicy(translateWriteResult(stdout));
             logger.info('Write hook result', result.hookVerdict ?? { status: result.decision });
             if (result.decision === 'block' || result.decision === 'retry') return result;
-            if (accumulatedDecision?.decision !== 'unsupported' || result.decision === 'unsupported') accumulatedDecision = result;
+            accumulatedDecision = mergeWriteHookResult(accumulatedDecision, result);
           } else if (stdout && stdout.trim()) {
             // Parsed inside its own guard so unreadable output is reported as
             // what it is: the hook produced something, and it could not be
@@ -374,8 +374,8 @@ export class HookDispatcher {
             if (parsed.decision === "block" || parsed.decision === "retry") {
               return parsed;
             }
-            if ((parsed.feedback || parsed.hookSpecificOutput) && accumulatedDecision?.decision !== 'unsupported') {
-              accumulatedDecision = parsed;
+            if (parsed.feedback || parsed.hookSpecificOutput) {
+              accumulatedDecision = mergeWriteHookResult(accumulatedDecision, parsed);
             }
           }
         } catch (err: unknown) {

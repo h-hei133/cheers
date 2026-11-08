@@ -77,6 +77,28 @@ PreToolUse nested deny 的 flat 归一化同时适用于普通 command 和 in-pr
 | Node 20.3.0 | 未验证 | 适配器与独立 pinned artifact 实测 allow/block | Linux x64，46 项测试；旧 Node ≥24 judge bundle 不变 |
 | timeout/re-entry | JSON timeout 丢弃/无重入 | C1：writeGate 的 timeoutMs 保留并纳入指纹；C2：普通 handler 的 timeoutMs 同样传递 | PreToolUse 无自动重入；Stop 的独立合同见上表 |
 
+## C3b 受限实验 seam
+
+C3b 选择 `block-unknown-observe-unsupported`，只在显式配置 `writeGate` 的 PreToolUse seam
+生效。`Write`/`Edit` 的完整单文件替换继续经过普通 permission；`forbiddenImport` 的真实
+`violation` 会阻断。`could_not_decide`、空输出、timeout、非零退出、artifact/version/runtime
+错误和输入不完整都投影为 unknown 并阻断；`not_configured` 与 `not_a_judged_write` 保留为
+observe-only/unsupported，二者不进入已判合规分母。unknown、unsupported 与 ordinary permission
+allow 的三层状态都保留原因码。
+
+| C3b seam | 当前观察 | 能力差异与限制 |
+| --- | --- | --- |
+| legacy flat block/retry/allow | 三种 literal 输入均保持兼容 | 无 `reasonCode` 的 flat allow 仅为 `explicit_allow`，不产生 proof 或写授权 |
+| versioned allow/block | `no_violation` 交回 permission；`violation` 实际阻断 | `reasonCode` 闭集；未来值或 decision/reason 冲突为 unknown/version_mismatch |
+| collection/input failure | `could_not_decide`、timeout、空/坏输出、缺失 replacement content 均阻断 | 不把失败转成 clean allow；旧 pinned artifact 对非法 content 的不足仍待 C5a refresh |
+| unsupported mutation面 | apply_patch/bash/MCP/browser/desktop/MultiEdit/NotebookEdit 保持各自 gap | C3b 不扩默认 tool 覆盖，不复制 collector/kernel |
+| direct layering config | opt-in `.normproof/write-rules.json` 的 `forbiddenImport` 正反例可消费 | 只判单次 direct relative import；baseline、transitive reachability、alias/target existence 属 whole-workspace gap |
+| pinned artifact contract cases | 新 `-temp` 文件为 `violation`；既有 `-temp`、合法 alias、empty 为 `no_violation`；wrong-root 为 `could_not_decide`；missing config 为 `not_configured` | 当前 pinned artifact 对 invalid content 仍返回 `no_violation`，保留为 C5a refresh gap |
+
+合同 fixture、当前 source/artifact/config identity 与未解决差异见
+`docs/architecture/hooks/evidence/c3b/source-identity.json`；C3b 不刷新 pinned artifact，也不
+把本地实验 lane 提升为全量 release 或 NormProof proof verdict。
+
 ## C0 历史观测（以下表格不含 C1/C2 更新）
 
 依据：只读的 `/home/wang/projects/normproof/.wiki/features/phase-1-decisions.md`，C0（1793–1810）、P1-C7/C8（1613–1635）、P1-C17/C18（1893–1904）、P1-C23/C24（1971–1983）。**实测修正附件的一处前提：两条注册路径的 dispatcher 独立，不等于持久批准记录独立。**同一 home/profile 和相同 fingerprint 时，两条路径读取同一信任文件；`allow-once` 不持久化，`allow-always` 可跨路径复用。

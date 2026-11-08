@@ -39,7 +39,8 @@ export interface HookDecision {
     readonly status: 'allow' | 'block' | 'unknown' | 'unsupported';
     readonly source: 'adapter' | 'hook';
     readonly reasonCode: string;
-    readonly policy?: 'block';
+    /** How this adapter outcome is consumed. Ordinary permission remains separate. */
+    readonly policy?: 'block' | 'observe-only' | 'permission';
   };
 }
 
