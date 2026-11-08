@@ -340,3 +340,60 @@ read probe-image.png
   Add contract fixtures, pinned-artifact state probes, capability documentation, and source identity
   evidence for the C5a handoff. The pinned artifact remains unchanged; its invalid-content gap and
   non-provider/platform/CI evidence remain explicitly open.
+
+## [2026-11-08 11:54] C5a — freeze the experiment candidate and reacquire current capability rows
+
+- **Executes.** C5a under C5; P1-F46, P1-F49, P1-F50, and P1-C31. This is the
+  selected J5/J6 single-file Write/Edit experiment seam plus bounded J7 Stop
+  compatibility. It is separate from a full pinned deployment refresh.
+- **Changed.** Added docs/architecture/hooks/evidence/c5a/ with identity.json,
+  source-members.json, upstream-members.json, capabilities.json,
+  compatibility.json, commands.json, handoff.md, direct Edit/Write receipts,
+  shadow receipts, raw producer and judge outputs, conformance/focused outputs,
+  and non-executable source fixtures. The prior
+  docs/architecture/hooks/evidence/capabilities/matrix.json remains unchanged.
+  No product source, pinned archive, contract, CI workflow, severity, or
+  NormProof repository file was changed.
+- **Ran.** rtk node scripts/hooks/capabilities/run.mjs
+  .tmp/capabilities/c5a-run: exit 0; 165 rows, 106 observed, 12 unsupported,
+  47 unavailable. rtk node --test scripts/normproof-conformance.test.mjs:
+  exit 0; 10 passed, 0 failed. rtk env VITEST_MAX_THREADS=2
+  VITEST_MIN_THREADS=2 npm run test:ts -- src/core/hooks/translation.test.ts
+  src/core/hooks/translation.integration.test.ts: exit 0; 2 files, 62
+  passed, 0 failed. Isolated Node 20.3/24.15 direct Write/Edit probe:
+  16 rows with matching allow/block, not_configured, and could_not_decide
+  results; invalid direct content remains no_violation. Isolated shadow probe:
+  four runs with host exit 0; compliant underlying exit 0/proven and
+  violating underlying exit 2/failed; blocking command exit 1.
+- **Artifacts.** The current candidate is bound to source snapshot
+  6bad3dbc6a45017fe51b3f54f92f9af7e26f666c /
+  666b86e8fdf8e0d1294195168cf002f9929bba546b2b1be494053f26d7c177ce,
+  contract 0a1a4584f8a209087c0094127d575c5d343bb703ba33660db8f4c55b93f92747,
+  archive 6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985,
+  write artifact 817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d,
+  parser 5.9.3, and read-only NormProof producer
+  f0ed6e211c9044faba9657bd1539d1d410ff0811. See identity.json for all
+  profile, manifest, member, runtime, dependency, and upstream hashes.
+- **Deviated.** The pinned artifact was not refreshed and no full release
+  acceptance was rerun. The direct artifact still exposes the known invalid
+  content gap; C3b input-incomplete handling remains the host safety boundary.
+  Edit product invocation, real provider, platform, remote CI, billing, and
+  independent replication remain unavailable. The first shadow helper stopped
+  before probing due to a fixture-name typo; its temporary directory was
+  removed and the corrected isolated probe is the receipt retained above.
+- **Left open.** M1/J5/J6/J7 must treat this as a read-only experiment
+  handoff. Full refresh still depends on N5/N6/N7 and a separate release
+  decision; no blocking promotion is implied. The prior a5c600f matrix and
+  drifted J4 receipt stay historical.
+- **Proposed commit message.** docs(hooks): freeze C5a experiment evidence
+
+  Bind the selected J5/J6 Write/Edit seam and bounded J7 Stop compatibility
+  rows to the current source, profile, parser, dependency, archive, contract,
+  and runtime identities. Preserve legacy and versioned output distinctions,
+  shadow/underlying/host exit layers, and explicit provider/platform/CI gaps.
+  Leave the shipped artifact, release authority, and historical matrices
+  unchanged.
+- **Additional validation.** rtk npm run verify:docs-drift:strict exited 1 with
+  rules dangling 0 and 28 current-state document references already dangling
+  from the product tree. The C5a paths added in this lane did not add a new
+  dangling reference; the existing docs-drift product-regression remains open.

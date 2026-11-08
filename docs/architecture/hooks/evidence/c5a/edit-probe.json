@@ -1,0 +1,384 @@
+{
+  "schemaVersion": 1,
+  "task": "C5a",
+  "producer": {
+    "path": ".normproof/write-gate/cli.mjs",
+    "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+    "mode": "--emit-result",
+    "contract": "versioned write-gate JSON"
+  },
+  "fixture": {
+    "configuredRules": "pathBoundary deny target.ts",
+    "noSecrets": true
+  },
+  "rows": [
+    {
+      "id": "node20-write-allow",
+      "runtime": {
+        "node": "v20.3.0",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "command": [
+        "/home/wang/projects/cheers/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"allowed.ts\",\"content\":\"export const value = 1;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"no_violation\",\"reason\":\"The applicable write rules found no violation.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "no_violation",
+        "reason": "The applicable write rules found no violation."
+      }
+    },
+    {
+      "id": "node20-write-block",
+      "runtime": {
+        "node": "v20.3.0",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "command": [
+        "/home/wang/projects/cheers/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"target.ts\",\"content\":\"export const value = 1;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"block\",\"reasonCode\":\"violation\",\"reason\":\"NormProof write gate: this write violates a declared rule.\\n\\nPath: target.ts\\n\\n- protected: path is inside a denied boundary\\n  Choose an allowed source file.\\n\\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "block",
+        "reasonCode": "violation",
+        "reason": "NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- protected: path is inside a denied boundary\n  Choose an allowed source file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."
+      }
+    },
+    {
+      "id": "node20-edit-allow",
+      "runtime": {
+        "node": "v20.3.0",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "command": [
+        "/home/wang/projects/cheers/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"allowed.ts\",\"content\":\"export const value = 2;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"no_violation\",\"reason\":\"The applicable write rules found no violation.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "no_violation",
+        "reason": "The applicable write rules found no violation."
+      }
+    },
+    {
+      "id": "node20-edit-block",
+      "runtime": {
+        "node": "v20.3.0",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "command": [
+        "/home/wang/projects/cheers/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"target.ts\",\"content\":\"export const value = 2;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"block\",\"reasonCode\":\"violation\",\"reason\":\"NormProof write gate: this write violates a declared rule.\\n\\nPath: target.ts\\n\\n- protected: path is inside a denied boundary\\n  Choose an allowed source file.\\n\\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "block",
+        "reasonCode": "violation",
+        "reason": "NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- protected: path is inside a denied boundary\n  Choose an allowed source file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."
+      }
+    },
+    {
+      "id": "node20-edit-empty",
+      "runtime": {
+        "node": "v20.3.0",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "command": [
+        "/home/wang/projects/cheers/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"allowed-empty.ts\",\"content\":\"\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"no_violation\",\"reason\":\"The applicable write rules found no violation.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "no_violation",
+        "reason": "The applicable write rules found no violation."
+      }
+    },
+    {
+      "id": "node20-edit-invalid",
+      "runtime": {
+        "node": "v20.3.0",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "command": [
+        "/home/wang/projects/cheers/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"broken.ts\",\"content\":\"function broken( {\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"no_violation\",\"reason\":\"The applicable write rules found no violation.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "no_violation",
+        "reason": "The applicable write rules found no violation."
+      }
+    },
+    {
+      "id": "node20-edit-not-configured",
+      "runtime": {
+        "node": "v20.3.0",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "command": [
+        "/home/wang/projects/cheers/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/missing\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"allowed.ts\",\"content\":\"export const value = 3;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"not_configured\",\"reason\":\"No write rules are configured for this workspace.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "not_configured",
+        "reason": "No write rules are configured for this workspace."
+      }
+    },
+    {
+      "id": "node20-edit-wrong-root",
+      "runtime": {
+        "node": "v20.3.0",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "command": [
+        "/home/wang/projects/cheers/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"../outside.ts\",\"content\":\"export const value = 4;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"could_not_decide\",\"reason\":\"The write gate could not reach a decision.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "could_not_decide",
+        "reason": "The write gate could not reach a decision."
+      }
+    },
+    {
+      "id": "node24-write-allow",
+      "runtime": {
+        "node": "v24.15.0",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "command": [
+        "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"allowed.ts\",\"content\":\"export const value = 1;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"no_violation\",\"reason\":\"The applicable write rules found no violation.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "no_violation",
+        "reason": "The applicable write rules found no violation."
+      }
+    },
+    {
+      "id": "node24-write-block",
+      "runtime": {
+        "node": "v24.15.0",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "command": [
+        "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"target.ts\",\"content\":\"export const value = 1;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"block\",\"reasonCode\":\"violation\",\"reason\":\"NormProof write gate: this write violates a declared rule.\\n\\nPath: target.ts\\n\\n- protected: path is inside a denied boundary\\n  Choose an allowed source file.\\n\\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "block",
+        "reasonCode": "violation",
+        "reason": "NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- protected: path is inside a denied boundary\n  Choose an allowed source file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."
+      }
+    },
+    {
+      "id": "node24-edit-allow",
+      "runtime": {
+        "node": "v24.15.0",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "command": [
+        "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"allowed.ts\",\"content\":\"export const value = 2;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"no_violation\",\"reason\":\"The applicable write rules found no violation.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "no_violation",
+        "reason": "The applicable write rules found no violation."
+      }
+    },
+    {
+      "id": "node24-edit-block",
+      "runtime": {
+        "node": "v24.15.0",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "command": [
+        "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"target.ts\",\"content\":\"export const value = 2;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"block\",\"reasonCode\":\"violation\",\"reason\":\"NormProof write gate: this write violates a declared rule.\\n\\nPath: target.ts\\n\\n- protected: path is inside a denied boundary\\n  Choose an allowed source file.\\n\\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "block",
+        "reasonCode": "violation",
+        "reason": "NormProof write gate: this write violates a declared rule.\n\nPath: target.ts\n\n- protected: path is inside a denied boundary\n  Choose an allowed source file.\n\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate."
+      }
+    },
+    {
+      "id": "node24-edit-empty",
+      "runtime": {
+        "node": "v24.15.0",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "command": [
+        "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"allowed-empty.ts\",\"content\":\"\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"no_violation\",\"reason\":\"The applicable write rules found no violation.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "no_violation",
+        "reason": "The applicable write rules found no violation."
+      }
+    },
+    {
+      "id": "node24-edit-invalid",
+      "runtime": {
+        "node": "v24.15.0",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "command": [
+        "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"broken.ts\",\"content\":\"function broken( {\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"no_violation\",\"reason\":\"The applicable write rules found no violation.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "no_violation",
+        "reason": "The applicable write rules found no violation."
+      }
+    },
+    {
+      "id": "node24-edit-not-configured",
+      "runtime": {
+        "node": "v24.15.0",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "command": [
+        "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/missing\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"allowed.ts\",\"content\":\"export const value = 3;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"not_configured\",\"reason\":\"No write rules are configured for this workspace.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "not_configured",
+        "reason": "No write rules are configured for this workspace."
+      }
+    },
+    {
+      "id": "node24-edit-wrong-root",
+      "runtime": {
+        "node": "v24.15.0",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "command": [
+        "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+        "/home/wang/projects/cheers/.normproof/write-gate/cli.mjs",
+        "--emit-result"
+      ],
+      "cwd": "/home/wang/projects/cheers",
+      "input": "{\"cwd\":\"<scratch>/configured\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"../outside.ts\",\"content\":\"export const value = 4;\\n\"}}",
+      "exitCode": 0,
+      "signal": null,
+      "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"could_not_decide\",\"reason\":\"The write gate could not reach a decision.\"}\n",
+      "stderr": "",
+      "result": {
+        "decision": "allow",
+        "reasonCode": "could_not_decide",
+        "reason": "The write gate could not reach a decision."
+      }
+    }
+  ]
+}

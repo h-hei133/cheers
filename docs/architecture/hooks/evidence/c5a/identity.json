@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 1,
+  "task": "C5a",
+  "capturedAt": "2026-11-08T03:32:46.107Z",
+  "scope": {
+    "J5": "single-file Write/Edit content replacement with explicit existing write-rule grammar and isolated fixtures",
+    "J6": "prose/pre/CI feedback comparison input; only the current Write/Edit seam is admitted",
+    "J7": "bounded Stop producer/parser compatibility and fixed scripted completion probe"
+  },
+  "deliveryCommit": {
+    "commit": "6bad3dbc6a45017fe51b3f54f92f9af7e26f666c",
+    "worktreeAtCollectionStart": "clean",
+    "role": "delivery commit; does not stand in for the observed snapshot"
+  },
+  "observedSnapshot": {
+    "before": {
+      "commit": "6bad3dbc6a45017fe51b3f54f92f9af7e26f666c",
+      "sha256": "666b86e8fdf8e0d1294195168cf002f9929bba546b2b1be494053f26d7c177ce"
+    },
+    "after": {
+      "commit": "6bad3dbc6a45017fe51b3f54f92f9af7e26f666c",
+      "sha256": "666b86e8fdf8e0d1294195168cf002f9929bba546b2b1be494053f26d7c177ce"
+    },
+    "unchanged": true,
+    "sourceMembers": "source-members.json",
+    "worktreeAtCollectionStart": "clean",
+    "sourceScopeDirty": false,
+    "worktreeAfterCuration": "dirty only in the C5a execution record and evidence directory"
+  },
+  "artifactIdentity": {
+    "hashes": {
+      "contract": {
+        "path": ".normproof/adapter/contract.json",
+        "sha256": "0a1a4584f8a209087c0094127d575c5d343bb703ba33660db8f4c55b93f92747"
+      },
+      "adapterCli": {
+        "path": ".normproof/adapter/cli.mjs",
+        "sha256": "41647f846ca65a26791cc5dafa9b6ee46a6804019de1b4c3b67b51dfb8ff402c"
+      },
+      "bundleMetadata": {
+        "path": ".normproof/bundle.json",
+        "sha256": "cbcc3d3814fba42232a96f187c509fb2e3225b6f5bbe6835d563d3914255cf2c"
+      },
+      "archive": {
+        "path": ".normproof/normproof-0.1.0.tgz",
+        "sha256": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985"
+      },
+      "patch": {
+        "path": ".normproof/patches/graph.patch",
+        "sha256": "3cb6617066340386b1658b62c4a0fc8fbbbc21d403cc3d278f8886a077b6e833"
+      },
+      "writeArtifactMetadata": {
+        "path": ".normproof/write-gate/artifact.json",
+        "sha256": "ffc27bb7407b2f13056487cacc392cac77a7601c9fc385187a4f73b6a07384ee"
+      },
+      "writeArtifactCli": {
+        "path": ".normproof/write-gate/cli.mjs",
+        "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d"
+      },
+      "profile": {
+        "path": ".normproof/norm-packs/software-structure-v0/profile.json",
+        "sha256": "2a69c9e14ed8e9b6b38c6a795920c4d574850662d16a9ac8a0ce17bdc0db81db"
+      },
+      "evidenceManifest": {
+        "path": ".normproof/evidence-manifest.json",
+        "sha256": "d41cf5ab7301600a73d4361713c9cb98ccf17651edc48bca3f2633cefe2b3481"
+      },
+      "judgeInput": {
+        "path": ".normproof/judge-input.json",
+        "sha256": "bbc748511adf459d53c40be992a6e7f1e3af9e5e7bf1f06c906fe766671f68b1"
+      },
+      "writeRules": {
+        "path": ".normproof/write-rules.json",
+        "sha256": "0e8960273bddcf3a56705693929ae8a7bdb0367d6e72652cee437cbd89e491a2"
+      },
+      "package": {
+        "path": "package.json",
+        "sha256": "b67005f92f61f9b48ca499143cbbe7826b2ae6c6d40d674ebcbd5d4ac339750b"
+      },
+      "lockfile": {
+        "path": "package-lock.json",
+        "sha256": "b50f8018fb97fba96ed015dec88ad17db93e37e445a9a8cf16a5ebc6cbfc7c7b"
+      },
+      "parserDependency": {
+        "path": "node_modules/typescript/lib/typescript.js",
+        "sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675"
+      }
+    },
+    "contract": {
+      "name": "cheers.normproof.adapter",
+      "version": "1.0.0",
+      "mode": "shadow",
+      "returnDate": "2026-11-20",
+      "parserVersion": "5.9.3",
+      "nodeFloor": "20.3.0",
+      "packageNodeEngine": ">=24",
+      "limits": {
+        "graphEdges": 16384,
+        "setPaths": 4096,
+        "sourceFileBytes": 1048576,
+        "reachabilitySteps": 20000,
+        "processTimeoutMs": 180000,
+        "processOutputBytes": 4194304
+      },
+      "hunkIds": [
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "E1"
+      ],
+      "hunkHeaders": [
+        "@@ -1,23 +1,15 @@",
+        "@@ -127,63 +119,56 @@",
+        "@@ -235,8 +220,7 @@",
+        "@@ -246,7 +230,13 @@",
+        "@@ -262,20 +252,19 @@",
+        "@@ -24,7 +24,7 @@"
+      ]
+    },
+    "bundle": {
+      "baseCommit": "e712ec48acd4282fd7214ad46e9c24bd21909b35",
+      "metadataSourceSha256": "d79b5d94d4e80cb1df99315920494a440859f9cad1a638c9b27f3e6a05a5923e",
+      "archiveSha256": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985",
+      "patchSha256": "3cb6617066340386b1658b62c4a0fc8fbbbc21d403cc3d278f8886a077b6e833",
+      "members": {
+        "package/dist/adapters/sidecar-file/module-graph.js": {
+          "before": "93ed2d104a7aa41d508ab6a7f9011dcb477e21dcf2807aa0c3d97261a340e50e",
+          "after": "d55723ea4aa21ae24264ad724e07d734b64326b01771a226a30524bce4e64faa"
+        },
+        "package/dist/engine/proof/expression/evaluate.js": {
+          "before": "be674a694f6a7ad32855e5b07857a1c3b241fa321f6141fc33a305575b204feb",
+          "after": "8c723a91502b9e164c1da7881639aebd1be046d2be7a509e31a776c2d3adb988"
+        }
+      },
+      "vendor": {
+        "name": "typescript",
+        "version": "5.9.3",
+        "license": "Apache-2.0",
+        "files": [
+          {
+            "source": "node_modules/typescript/lib/typescript.js",
+            "target": "package/dist/vendor/typescript.cjs",
+            "sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675"
+          },
+          {
+            "source": "node_modules/typescript/LICENSE.txt",
+            "target": "package/dist/vendor/LICENSE.txt",
+            "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+          },
+          {
+            "source": "node_modules/typescript/ThirdPartyNoticeText.txt",
+            "target": "package/dist/vendor/ThirdPartyNoticeText.txt",
+            "sha256": "1af3c68039c57e539422da82a4faada506ce6d0ea6f90e0b699d02dbcdb7a90c"
+          }
+        ]
+      }
+    },
+    "writeArtifact": {
+      "provenance": {
+        "package": "normproof",
+        "commit": "a6ff094ac14049843b6c471eabd2aaa4a55ac8fb",
+        "entry": "src/adapters/write-gate/hook.ts",
+        "bundler": "esbuild@0.27.7",
+        "inputs": {
+          "src/adapters/sidecar-file/module-graph.ts": "9bc4ce90144c797805610183c8a8aa87c4fe64562b18d6c4d47b616b5b7aab61",
+          "src/adapters/write-gate/facts.ts": "caeeafc3fa4b41da6dfd5b66c9b96750b8abff0ec22e2b81336c61f396d9d5da",
+          "src/adapters/write-gate/hook.ts": "d2f64bb6c0f557b0b09b7c97ada8866dc02f9bff623f478fce3d02fd00190583",
+          "src/contracts/base/workspace-config.ts": "f7f7b432e6de79b121022adbf96e5d49bb5370603c68c18387b33803fc6819b8",
+          "src/contracts/hooks/write-gate-contracts.ts": "f8d4feaa231be302826d5a0b4509bb91c229b11ada9263c4fa57df62f0e15826",
+          "src/contracts/hooks/write-rule-contracts.ts": "25b0c65c6be986237bbaa25ea11036502a553152b1f8a11eb986016430b55d9a",
+          "src/runtime/run-records/record-paths.ts": "a6d31c5701a79956e7b691267bf97915a49c9072b02d104cebd1c7500074e0b0",
+          "src/runtime/write-gate/decision.ts": "2c0ed08de763d50193cb76ed9dead03fdc816fa1e3f78bdfbf215b15d2d2b7dc",
+          "src/utils/canonical-json.ts": "decb8f9e1eb2e38af400a8f19bbd77b7514c7f8ef4a3b3e72904a610f9c739e2",
+          "src/utils/deep-freeze.ts": "436710b90b3f4329a70055cfe349dfea0e0f338db9b18c3c13a0a3a18a0ab6ef",
+          "src/utils/glob-pattern.ts": "4cb4acf85eabf7f0c7a7e2ad67eb80bcda8e883806e11b3a64f9a789c21a49f8"
+        }
+      },
+      "sha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+      "metadataSha256": "ffc27bb7407b2f13056487cacc392cac77a7601c9fc385187a4f73b6a07384ee"
+    }
+  },
+  "parserAndDependencies": {
+    "parserVersion": "5.9.3",
+    "vendoredParserSha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675",
+    "typescriptDependencySha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675",
+    "packageJsonSha256": "b67005f92f61f9b48ca499143cbbe7826b2ae6c6d40d674ebcbd5d4ac339750b",
+    "packageLockSha256": "b50f8018fb97fba96ed015dec88ad17db93e37e445a9a8cf16a5ebc6cbfc7c7b"
+  },
+  "runtimes": {
+    "node20": {
+      "node": "v20.3.0",
+      "platform": "linux",
+      "arch": "x64",
+      "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+    },
+    "node24": {
+      "node": "v24.15.0",
+      "platform": "linux",
+      "arch": "x64",
+      "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+    }
+  },
+  "upstreamProducer": {
+    "repository": "/home/wang/projects/normproof",
+    "commit": "f0ed6e211c9044faba9657bd1539d1d410ff0811",
+    "worktree": "clean",
+    "distTreeSha256": "dd1c61ce8c7b8ec90743a6cac223b75b8fc571c7032bc9a9c888bd0611d14ad3",
+    "cliSha256": "8821e6fe50ffc0602f8c3afdd6fe544abb8e426c739646a218dd574450e8409a",
+    "typescriptSha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675",
+    "readOnly": true
+  },
+  "historicalEvidence": {
+    "priorMatrix": {
+      "path": "docs/architecture/hooks/evidence/capabilities/matrix.json",
+      "observedCommit": "a5c600f78a800ca6517d6dc1a9ab3112125ef869",
+      "disposition": "historical; left untouched"
+    },
+    "driftedJ4FullAcceptance": {
+      "sourceSha256": "56706b49074326724c58cb2abd7077d6fa991fa8cd0732a559600b2c7889411d",
+      "currentContractSha256": "0a1a4584f8a209087c0094127d575c5d343bb703ba33660db8f4c55b93f92747",
+      "disposition": "retired for current-candidate claims after contract correction; not reused"
+    }
+  },
+  "verification": {
+    "matrixStatus": "bound",
+    "matrixRows": 165,
+    "matrixStatusCounts": {
+      "observed": 106,
+      "unsupported": 12,
+      "unavailable": 47
+    },
+    "conformance": "validation/conformance.txt: 10 pass, 0 fail",
+    "focusedConsumer": "validation/focused.txt: 2 files, 62 passed, 0 failed",
+    "freshConsumerDoesNotImportNormProofSource": true,
+    "sourceDriftDuringCollection": false,
+    "shadow": "shadow-probe.json"
+  },
+  "limitations": [
+    "This is an experiment-lane snapshot; it does not refresh the shipped pinned artifact or retire any hunk.",
+    "The pinned artifact remains shadow-only; blocking promotion is separately unavailable.",
+    "Real provider, platform, remote CI, billing, and independent replication evidence are unavailable.",
+    "The current artifact still returns no_violation for direct invalid content; C3b host input-incomplete handling remains the safety boundary.",
+    "The prior a5c600f matrix and drifted J4 receipt remain historical and were not overwritten."
+  ],
+  "engineAdmission": {
+    "cheersNodeFloor": "20.3.0",
+    "pinnedBundleNodeEngine": ">=24",
+    "directNode20Runtime": "observed v20.3.0",
+    "directNode24Runtime": "observed v24.15.0",
+    "npmInstallAdmission": "not measured; declaration retained separately from direct execution"
+  }
+}

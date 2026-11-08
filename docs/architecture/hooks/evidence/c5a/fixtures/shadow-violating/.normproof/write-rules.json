@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "rules": [
+    {
+      "kind": "filenameTokens",
+      "id": "filenames_carry_no_phase_labels",
+      "message": "Name the file for what it does, not for when it was written. A version or phase label in a filename outlives the phase.",
+      "tokens": [
+        "-v2",
+        "-v3",
+        "-new",
+        "-old",
+        "-temp",
+        "-tmp",
+        "-copy",
+        "-final",
+        "-mvp",
+        "-phase"
+      ],
+      "pattern": "packages/**/*.ts"
+    }
+  ]
+}

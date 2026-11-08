@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+    "<scratch>/r0a/dist/adapters/cli/normproof.js",
+    "gate",
+    "stop",
+    "--emit-result"
+  ],
+  "cwd": "<scratch>/compliant",
+  "stdin": "{\"cwd\":\"<scratch>/compliant\",\"hook_event_name\":\"Stop\",\"stop_hook_active\":false}",
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 305,
+  "error": null,
+  "stdout": "{\"contract\":{\"name\":\"normproof.completion-gate.stop\",\"version\":\"0.1.0\"},\"decision\":\"allow\",\"reasonCode\":\"proven\",\"reason\":\"Every blocking obligation holds.\",\"runId\":\"generated-structure-judge\",\"evidenceIdentity\":[\"run_metadata\",\"source_module_functions\",\"source_module_graph\",\"task\",\"task_manifest\"],\"proofVerdict\":\"proven\"}\n",
+  "stderr": "[2026-11-08T03:32:32.818Z] [check-run] [INFO] Harness Check Event Trace\n[2026-11-08T03:32:32.822Z] [check-run] [INFO] Check-run evaluation completed with status: proven\n"
+}

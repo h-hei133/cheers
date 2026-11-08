@@ -1,0 +1,15 @@
+{
+  "command": [
+    "<cheers>/.omx/cache/node-floor/node-v20.3.0-linux-x64/bin/node",
+    "<cheers>/node_modules/tsx/dist/cli.mjs",
+    "<cheers>/scripts/hooks/capabilities/host.mts"
+  ],
+  "cwd": "<cheers>",
+  "stdin": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 10804,
+  "error": null,
+  "stdout": "",
+  "stderr": ""
+}

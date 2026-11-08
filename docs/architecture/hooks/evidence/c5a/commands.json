@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "task": "C5a",
+  "commands": [
+    {
+      "command": "rtk node scripts/hooks/capabilities/run.mjs .tmp/capabilities/c5a-run",
+      "result": "exit 0; 165 rows; observed 106, unsupported 12, unavailable 47",
+      "artifact": "capabilities.json"
+    },
+    {
+      "command": "rtk node --test scripts/normproof-conformance.test.mjs",
+      "result": "exit 0; 10 tests passed, 0 failed",
+      "artifact": "validation/conformance.txt"
+    },
+    {
+      "command": "rtk env VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=2 npm run test:ts -- src/core/hooks/translation.test.ts src/core/hooks/translation.integration.test.ts",
+      "result": "exit 0; 2 files, 62 tests passed, 0 failed",
+      "artifact": "validation/focused.txt"
+    },
+    {
+      "command": "isolated Node20.3/Node24.15 direct Write/Edit probe",
+      "result": "16 rows; both runtimes agree on allow/block, not_configured, could_not_decide; invalid content remains no_violation",
+      "artifact": "edit-probe.json"
+    },
+    {
+      "command": "isolated Node20.3/Node24.15 shadow probe plus blocking command",
+      "result": "4 shadow rows exit 0 with hostExitCode 0; violating rows underlyingExitCode 2/proof failed; blocking command exit 1",
+      "artifact": "shadow-probe.json"
+    },
+    {
+      "command": "rtk npm run verify:docs-drift:strict",
+      "result": "exit 1; rules dangling 0, current-state docs dangling 28 (pre-existing product-regression)",
+      "artifact": "not applicable; no new C5a dangling reference"
+    }
+  ],
+  "sourceCheck": {
+    "before": {
+      "commit": "6bad3dbc6a45017fe51b3f54f92f9af7e26f666c",
+      "sha256": "666b86e8fdf8e0d1294195168cf002f9929bba546b2b1be494053f26d7c177ce"
+    },
+    "after": {
+      "commit": "6bad3dbc6a45017fe51b3f54f92f9af7e26f666c",
+      "sha256": "666b86e8fdf8e0d1294195168cf002f9929bba546b2b1be494053f26d7c177ce"
+    },
+    "unchanged": true,
+    "temporaryOutput": ".tmp/capabilities/c5a-run (removed only after curation is complete)"
+  },
+  "gaps": [
+    "No current real provider request or billing/cost evidence.",
+    "No current Windows/macOS or external platform evidence.",
+    "No remote CI run bound to this candidate; local exit 0 is not CI authority.",
+    "Edit product invocation is unavailable in the capability run; direct artifact and focused host tests cover the admitted single-file seam only."
+  ]
+}

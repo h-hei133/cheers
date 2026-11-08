@@ -1,0 +1,1 @@
+{"version":"0.1.0","rules":[{"kind":"pathBoundary","id":"protected","deny":["target.txt"],"message":"Choose an allowed file."}]}

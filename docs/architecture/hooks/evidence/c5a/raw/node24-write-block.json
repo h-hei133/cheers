@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+    "<cheers>/.normproof/write-gate/cli.mjs",
+    "--emit-result"
+  ],
+  "cwd": "<cheers>",
+  "stdin": "{\"cwd\":\"<scratch>/compliant\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"target.txt\",\"content\":\"fixture\\n\"}}",
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 53,
+  "error": null,
+  "stdout": "{\"decision\":\"block\",\"reasonCode\":\"violation\",\"reason\":\"NormProof write gate: this write violates a declared rule.\\n\\nPath: target.txt\\n\\n- protected: path is inside a denied boundary\\n  Choose an allowed file.\\n\\nAdjust the write to satisfy the rule. If the rule is wrong, say so and stop rather than working around the gate.\"}\n",
+  "stderr": ""
+}

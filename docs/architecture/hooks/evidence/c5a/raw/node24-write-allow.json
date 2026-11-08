@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/home/wang/.nvm/versions/node/v24.15.0/bin/node",
+    "<cheers>/.normproof/write-gate/cli.mjs",
+    "--emit-result"
+  ],
+  "cwd": "<cheers>",
+  "stdin": "{\"cwd\":\"<scratch>/compliant\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"allowed.txt\",\"content\":\"fixture\\n\"}}",
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 43,
+  "error": null,
+  "stdout": "{\"decision\":\"allow\",\"reasonCode\":\"no_violation\",\"reason\":\"The applicable write rules found no violation.\"}\n",
+  "stderr": ""
+}

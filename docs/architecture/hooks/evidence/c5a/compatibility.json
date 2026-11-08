@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "task": "C5a",
+  "scope": "current Write/Edit seam plus bounded Stop compatibility",
+  "producer": {
+    "directWriteEdit": "edit-probe.json",
+    "pinnedStopProducerStdout": "raw/node20-stop-pinned-*.json and raw/node24-stop-pinned-*.json",
+    "r0aStopProducerStdout": "raw/node20-stop-r0a-*.json and raw/node24-stop-r0a-*.json"
+  },
+  "legacyFlat": [
+    {
+      "wire": {
+        "decision": "allow"
+      },
+      "observed": {
+        "decision": "allow",
+        "reasonCode": "explicit_allow",
+        "policy": "permission"
+      },
+      "source": "packages/ts-shell/src/core/hooks/fixtures/write-gate-results.json"
+    },
+    {
+      "wire": {
+        "decision": "block",
+        "reason": "legacy rule"
+      },
+      "observed": {
+        "decision": "block",
+        "reason": "legacy rule"
+      },
+      "source": "packages/ts-shell/src/core/hooks/fixtures/write-gate-results.json"
+    },
+    {
+      "wire": {
+        "decision": "retry",
+        "reason": "repair"
+      },
+      "observed": {
+        "decision": "retry",
+        "reason": "repair"
+      },
+      "source": "packages/ts-shell/src/core/hooks/fixtures/write-gate-results.json"
+    }
+  ],
+  "versionedClosedSet": [
+    {
+      "wireReasonCode": "no_violation",
+      "observed": "allow/permission"
+    },
+    {
+      "wireReasonCode": "violation",
+      "observed": "block"
+    },
+    {
+      "wireReasonCode": "could_not_decide",
+      "observed": "unknown then block"
+    },
+    {
+      "wireReasonCode": "not_configured",
+      "observed": "unknown/observe-only"
+    },
+    {
+      "wireReasonCode": "not_a_judged_write",
+      "observed": "unsupported/observe-only"
+    },
+    {
+      "wireReasonCode": "future_reason",
+      "observed": "unknown/version_mismatch then block"
+    }
+  ],
+  "reverseChecks": {
+    "invalidOutput": "validation/focused.txt records invalid_output, empty_output, timeout, process_failed and version_mismatch as unknown/block",
+    "unsupportedTools": "validation/focused.txt records apply_patch, bash, MCP, browser, desktop, MultiEdit and NotebookEdit as unsupported/observe-only",
+    "partialEdit": "validation/focused.txt records input_incomplete before the older artifact can call the edit clean",
+    "directInvalidContent": "edit-probe.json records the pinned artifact returning no_violation; retained as C5a refresh gap"
+  },
+  "validation": "validation/focused.txt",
+  "producerVsReplay": "Actual pinned and R0a producer stdout stays in raw/node*-stop-*.json. Current Cheers parser replay stays in raw/node*-host.json and is classified by stop-parser-* rows. The two are never merged into one producer or lifecycle claim.",
+  "replay": {
+    "currentCheersParser": "raw/node20-host.json and raw/node24-host.json, rows named stop-parser-*",
+    "r0aParserRows": "stop-parser-r0a-* replays of the producer stdout; these are host observations, not producer output"
+  }
+}

@@ -1,0 +1,2970 @@
+{
+  "schemaVersion": 1,
+  "task": "C5a",
+  "recordedAt": "2026-11-08T03:32:46.107Z",
+  "collectionCommand": "rtk node scripts/hooks/capabilities/run.mjs .tmp/capabilities/c5a-run",
+  "binding": {
+    "sourceSnapshot": {
+      "commit": "6bad3dbc6a45017fe51b3f54f92f9af7e26f666c",
+      "sha256": "666b86e8fdf8e0d1294195168cf002f9929bba546b2b1be494053f26d7c177ce"
+    },
+    "profile": {
+      "id": "software-structure-v0",
+      "sha256": "2a69c9e14ed8e9b6b38c6a795920c4d574850662d16a9ac8a0ce17bdc0db81db"
+    },
+    "bundleDigest": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985",
+    "artifactSha256": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+    "upstreamProducer": {
+      "sourceSnapshot": {
+        "commit": "6bad3dbc6a45017fe51b3f54f92f9af7e26f666c",
+        "sha256": "666b86e8fdf8e0d1294195168cf002f9929bba546b2b1be494053f26d7c177ce"
+      },
+      "profile": {
+        "id": "software-structure-v0",
+        "sha256": "2a69c9e14ed8e9b6b38c6a795920c4d574850662d16a9ac8a0ce17bdc0db81db"
+      },
+      "bundleDigest": "dd1c61ce8c7b8ec90743a6cac223b75b8fc571c7032bc9a9c888bd0611d14ad3",
+      "artifactSha256": "8821e6fe50ffc0602f8c3afdd6fe544abb8e426c739646a218dd574450e8409a",
+      "producerSnapshot": "f0ed6e211c9044faba9657bd1539d1d410ff0811",
+      "producerWorktree": "clean",
+      "distribution": "copied read-only current dist; independently hashed, not the Cheers pinned release",
+      "dependency": {
+        "typescript": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675"
+      }
+    },
+    "status": "bound"
+  },
+  "statusCounts": {
+    "observed": 106,
+    "unsupported": 12,
+    "unavailable": 47
+  },
+  "selectedRows": [
+    {
+      "id": "node20-write-allow",
+      "status": "observed",
+      "surface": "pre-action pinned artifact",
+      "event": "PreToolUse",
+      "tool": "Write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "allow",
+      "reasonCode": "no_violation",
+      "proofVerdict": null,
+      "canBlock": "requires Cheers consumer, observed in host cells",
+      "reason": null,
+      "evidence": "node20-write-allow.json"
+    },
+    {
+      "id": "node20-write-block",
+      "status": "observed",
+      "surface": "pre-action pinned artifact",
+      "event": "PreToolUse",
+      "tool": "Write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "block",
+      "reasonCode": "violation",
+      "proofVerdict": null,
+      "canBlock": "requires Cheers consumer, observed in host cells",
+      "reason": null,
+      "evidence": "node20-write-block.json"
+    },
+    {
+      "id": "node20-judge-repository",
+      "status": "observed",
+      "surface": "pinned judge / actual Cheers source",
+      "event": "judge",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": 0,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-judge-repository.json",
+      "verdict": {
+        "status": "partial",
+        "obligations": [
+          {
+            "id": "source_graph_is_acyclic",
+            "blocking": false,
+            "status": "satisfied"
+          },
+          {
+            "id": "source_graph_has_no_unresolved_specifiers",
+            "blocking": true,
+            "status": "satisfied"
+          },
+          {
+            "id": "declared_functions_within_module_ceiling",
+            "blocking": false,
+            "status": "failed"
+          }
+        ],
+        "summary": "0 blocking obligation(s) are open or failed; 0 blocking proof gap(s) remain."
+      }
+    },
+    {
+      "id": "node20-stop-pinned-compliant",
+      "status": "observed",
+      "surface": "pinned Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": 0,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node20-stop-pinned-compliant.json"
+    },
+    {
+      "id": "node20-stop-pinned-violating",
+      "status": "observed",
+      "surface": "pinned Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": 0,
+      "decision": "block",
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node20-stop-pinned-violating.json"
+    },
+    {
+      "id": "node20-stop-pinned-not-configured",
+      "status": "observed",
+      "surface": "pinned Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": 0,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node20-stop-pinned-not-configured.json"
+    },
+    {
+      "id": "node20-stop-pinned-reentry",
+      "status": "observed",
+      "surface": "pinned Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": 0,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node20-stop-pinned-reentry.json"
+    },
+    {
+      "id": "node20-stop-r0a-compliant",
+      "status": "observed",
+      "surface": "r0a Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": 0,
+      "decision": "allow",
+      "reasonCode": "proven",
+      "proofVerdict": "proven",
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node20-stop-r0a-compliant.json"
+    },
+    {
+      "id": "node20-stop-r0a-violating",
+      "status": "observed",
+      "surface": "r0a Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": 0,
+      "decision": "block",
+      "reasonCode": "actionable_gap",
+      "proofVerdict": "failed",
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node20-stop-r0a-violating.json"
+    },
+    {
+      "id": "node20-stop-r0a-not-configured",
+      "status": "observed",
+      "surface": "r0a Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": 0,
+      "decision": "unsupported",
+      "reasonCode": "not_configured",
+      "proofVerdict": "not_reported",
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node20-stop-r0a-not-configured.json"
+    },
+    {
+      "id": "node20-stop-r0a-reentry",
+      "status": "observed",
+      "surface": "r0a Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": 0,
+      "decision": "allow",
+      "reasonCode": "already_blocked_once",
+      "proofVerdict": "not_reported",
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node20-stop-r0a-reentry.json"
+    },
+    {
+      "id": "node20-mcp-pinned-2025-11-25",
+      "status": "unsupported",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-mcp-pinned-2025-11-25.json"
+    },
+    {
+      "id": "node20-mcp-pinned-2026-07-28",
+      "status": "unsupported",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-mcp-pinned-2026-07-28.json"
+    },
+    {
+      "id": "node20-mcp-pinned-unknown-version",
+      "status": "unsupported",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-mcp-pinned-unknown-version.json"
+    },
+    {
+      "id": "node20-mcp-pinned-direct",
+      "status": "observed",
+      "surface": "MCP explicit scripted call",
+      "event": "tools/call",
+      "tool": "check_file_write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-mcp-pinned-direct.json"
+    },
+    {
+      "id": "node20-mcp-current-2025-11-25",
+      "status": "observed",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-mcp-current-2025-11-25.json"
+    },
+    {
+      "id": "node20-mcp-current-2026-07-28",
+      "status": "observed",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-mcp-current-2026-07-28.json"
+    },
+    {
+      "id": "node20-mcp-current-unknown-version",
+      "status": "observed",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-mcp-current-unknown-version.json"
+    },
+    {
+      "id": "node20-mcp-current-direct",
+      "status": "observed",
+      "surface": "MCP explicit scripted call",
+      "event": "tools/call",
+      "tool": "check_file_write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-mcp-current-direct.json"
+    },
+    {
+      "id": "node20-host-normal-block",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-host-normal-allow",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-host-prepared-block",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-host-prepared-allow",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-host-security-block",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-host-security-allow",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-host-git-block",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "bash",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-host-git-allow",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "bash",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-stop-parser-pinned-compliant",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "unknown",
+      "reasonCode": "empty_output",
+      "proofVerdict": "unknown",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-stop-parser-pinned-violating",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "block",
+      "reasonCode": "hook_blocked",
+      "proofVerdict": "not_reported",
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-stop-parser-pinned-not-configured",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "unknown",
+      "reasonCode": "empty_output",
+      "proofVerdict": "unknown",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-stop-parser-pinned-reentry",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "unknown",
+      "reasonCode": "empty_output",
+      "proofVerdict": "unknown",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-stop-parser-r0a-compliant",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "allow",
+      "reasonCode": "proven",
+      "proofVerdict": "proven",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-stop-parser-r0a-violating",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "block",
+      "reasonCode": "actionable_gap",
+      "proofVerdict": "failed",
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-stop-parser-r0a-not-configured",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "allow",
+      "reasonCode": "not_configured",
+      "proofVerdict": "not_reported",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-stop-parser-r0a-reentry",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "allow",
+      "reasonCode": "already_blocked_once",
+      "proofVerdict": "not_reported",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-stop-parser-version-mismatch",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": "unknown",
+      "reasonCode": "incompatible_contract",
+      "proofVerdict": "unknown",
+      "canBlock": "no execution attempted",
+      "reason": "Actual parser refused incompatible contract version",
+      "evidence": "node20-host.json"
+    },
+    {
+      "id": "node20-completion-proven",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json",
+      "terminal": {
+        "completed": 1,
+        "completedUnproven": 0,
+        "failed": 0,
+        "steps": 1
+      }
+    },
+    {
+      "id": "node20-completion-blocked",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node20-host.json",
+      "terminal": {
+        "completed": 0,
+        "completedUnproven": 1,
+        "failed": 0,
+        "steps": 2
+      }
+    },
+    {
+      "id": "node20-completion-repair",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": "write",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json",
+      "terminal": {
+        "completed": 0,
+        "completedUnproven": 1,
+        "failed": 0,
+        "steps": 3
+      }
+    },
+    {
+      "id": "node20-completion-not-configured",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node20-host.json",
+      "terminal": {
+        "completed": 0,
+        "completedUnproven": 1,
+        "failed": 0,
+        "steps": 1
+      }
+    },
+    {
+      "id": "node20-completion-repeated-block",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node20-host.json",
+      "terminal": {
+        "completed": 0,
+        "completedUnproven": 0,
+        "failed": 1,
+        "steps": 2
+      }
+    },
+    {
+      "id": "node20-event-Stop",
+      "status": "observed",
+      "surface": "Cheers event inventory",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "Actual product dispatch, declarations may be absent for this event",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-StopFailure",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "StopFailure",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-tool-edit",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "edit",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node24-write-allow",
+      "status": "observed",
+      "surface": "pre-action pinned artifact",
+      "event": "PreToolUse",
+      "tool": "Write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "allow",
+      "reasonCode": "no_violation",
+      "proofVerdict": null,
+      "canBlock": "requires Cheers consumer, observed in host cells",
+      "reason": null,
+      "evidence": "node24-write-allow.json"
+    },
+    {
+      "id": "node24-write-block",
+      "status": "observed",
+      "surface": "pre-action pinned artifact",
+      "event": "PreToolUse",
+      "tool": "Write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "block",
+      "reasonCode": "violation",
+      "proofVerdict": null,
+      "canBlock": "requires Cheers consumer, observed in host cells",
+      "reason": null,
+      "evidence": "node24-write-block.json"
+    },
+    {
+      "id": "node24-judge-repository",
+      "status": "observed",
+      "surface": "pinned judge / actual Cheers source",
+      "event": "judge",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": 0,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-judge-repository.json",
+      "verdict": {
+        "status": "partial",
+        "obligations": [
+          {
+            "id": "source_graph_is_acyclic",
+            "blocking": false,
+            "status": "satisfied"
+          },
+          {
+            "id": "source_graph_has_no_unresolved_specifiers",
+            "blocking": true,
+            "status": "satisfied"
+          },
+          {
+            "id": "declared_functions_within_module_ceiling",
+            "blocking": false,
+            "status": "failed"
+          }
+        ],
+        "summary": "0 blocking obligation(s) are open or failed; 0 blocking proof gap(s) remain."
+      }
+    },
+    {
+      "id": "node24-stop-pinned-compliant",
+      "status": "observed",
+      "surface": "pinned Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": 0,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node24-stop-pinned-compliant.json"
+    },
+    {
+      "id": "node24-stop-pinned-violating",
+      "status": "observed",
+      "surface": "pinned Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": 0,
+      "decision": "block",
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node24-stop-pinned-violating.json"
+    },
+    {
+      "id": "node24-stop-pinned-not-configured",
+      "status": "observed",
+      "surface": "pinned Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": 0,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node24-stop-pinned-not-configured.json"
+    },
+    {
+      "id": "node24-stop-pinned-reentry",
+      "status": "observed",
+      "surface": "pinned Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": 0,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node24-stop-pinned-reentry.json"
+    },
+    {
+      "id": "node24-stop-r0a-compliant",
+      "status": "observed",
+      "surface": "r0a Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": 0,
+      "decision": "allow",
+      "reasonCode": "proven",
+      "proofVerdict": "proven",
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node24-stop-r0a-compliant.json"
+    },
+    {
+      "id": "node24-stop-r0a-violating",
+      "status": "observed",
+      "surface": "r0a Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": 0,
+      "decision": "block",
+      "reasonCode": "actionable_gap",
+      "proofVerdict": "failed",
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node24-stop-r0a-violating.json"
+    },
+    {
+      "id": "node24-stop-r0a-not-configured",
+      "status": "observed",
+      "surface": "r0a Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": 0,
+      "decision": "unsupported",
+      "reasonCode": "not_configured",
+      "proofVerdict": "not_reported",
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node24-stop-r0a-not-configured.json"
+    },
+    {
+      "id": "node24-stop-r0a-reentry",
+      "status": "observed",
+      "surface": "r0a Stop producer",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": 0,
+      "decision": "allow",
+      "reasonCode": "already_blocked_once",
+      "proofVerdict": "not_reported",
+      "canBlock": "host parser cell required",
+      "reason": null,
+      "evidence": "node24-stop-r0a-reentry.json"
+    },
+    {
+      "id": "node24-mcp-pinned-2025-11-25",
+      "status": "unsupported",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-mcp-pinned-2025-11-25.json"
+    },
+    {
+      "id": "node24-mcp-pinned-2026-07-28",
+      "status": "unsupported",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-mcp-pinned-2026-07-28.json"
+    },
+    {
+      "id": "node24-mcp-pinned-unknown-version",
+      "status": "unsupported",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-mcp-pinned-unknown-version.json"
+    },
+    {
+      "id": "node24-mcp-pinned-direct",
+      "status": "observed",
+      "surface": "MCP explicit scripted call",
+      "event": "tools/call",
+      "tool": "check_file_write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-mcp-pinned-direct.json"
+    },
+    {
+      "id": "node24-mcp-current-2025-11-25",
+      "status": "observed",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-mcp-current-2025-11-25.json"
+    },
+    {
+      "id": "node24-mcp-current-2026-07-28",
+      "status": "observed",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-mcp-current-2026-07-28.json"
+    },
+    {
+      "id": "node24-mcp-current-unknown-version",
+      "status": "observed",
+      "surface": "MCP initialize",
+      "event": "initialize",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-mcp-current-unknown-version.json"
+    },
+    {
+      "id": "node24-mcp-current-direct",
+      "status": "observed",
+      "surface": "MCP explicit scripted call",
+      "event": "tools/call",
+      "tool": "check_file_write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-mcp-current-direct.json"
+    },
+    {
+      "id": "node24-host-normal-block",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-host-normal-allow",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-host-prepared-block",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-host-prepared-allow",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-host-security-block",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-host-security-allow",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-host-git-block",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "bash",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-host-git-allow",
+      "status": "observed",
+      "surface": null,
+      "event": "PreToolUse",
+      "tool": "bash",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-stop-parser-pinned-compliant",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "unknown",
+      "reasonCode": "empty_output",
+      "proofVerdict": "unknown",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-stop-parser-pinned-violating",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "block",
+      "reasonCode": "hook_blocked",
+      "proofVerdict": "not_reported",
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-stop-parser-pinned-not-configured",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "unknown",
+      "reasonCode": "empty_output",
+      "proofVerdict": "unknown",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-stop-parser-pinned-reentry",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "unknown",
+      "reasonCode": "empty_output",
+      "proofVerdict": "unknown",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-stop-parser-r0a-compliant",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "allow",
+      "reasonCode": "proven",
+      "proofVerdict": "proven",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-stop-parser-r0a-violating",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "block",
+      "reasonCode": "actionable_gap",
+      "proofVerdict": "failed",
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-stop-parser-r0a-not-configured",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "allow",
+      "reasonCode": "not_configured",
+      "proofVerdict": "not_reported",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-stop-parser-r0a-reentry",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "allow",
+      "reasonCode": "already_blocked_once",
+      "proofVerdict": "not_reported",
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-stop-parser-version-mismatch",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": "unknown",
+      "reasonCode": "incompatible_contract",
+      "proofVerdict": "unknown",
+      "canBlock": "no execution attempted",
+      "reason": "Actual parser refused incompatible contract version",
+      "evidence": "node24-host.json"
+    },
+    {
+      "id": "node24-completion-proven",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json",
+      "terminal": {
+        "completed": 1,
+        "completedUnproven": 0,
+        "failed": 0,
+        "steps": 1
+      }
+    },
+    {
+      "id": "node24-completion-blocked",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node24-host.json",
+      "terminal": {
+        "completed": 0,
+        "completedUnproven": 1,
+        "failed": 0,
+        "steps": 2
+      }
+    },
+    {
+      "id": "node24-completion-repair",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": "write",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json",
+      "terminal": {
+        "completed": 0,
+        "completedUnproven": 1,
+        "failed": 0,
+        "steps": 3
+      }
+    },
+    {
+      "id": "node24-completion-not-configured",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": false,
+      "reason": null,
+      "evidence": "node24-host.json",
+      "terminal": {
+        "completed": 0,
+        "completedUnproven": 1,
+        "failed": 0,
+        "steps": 1
+      }
+    },
+    {
+      "id": "node24-completion-repeated-block",
+      "status": "observed",
+      "surface": null,
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": true,
+      "reason": null,
+      "evidence": "node24-host.json",
+      "terminal": {
+        "completed": 0,
+        "completedUnproven": 0,
+        "failed": 1,
+        "steps": 2
+      }
+    },
+    {
+      "id": "node24-event-Stop",
+      "status": "observed",
+      "surface": "Cheers event inventory",
+      "event": "Stop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "Actual product dispatch, declarations may be absent for this event",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-StopFailure",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "StopFailure",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-tool-edit",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "edit",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "unavailable-macOS/Node20",
+      "status": "unavailable",
+      "surface": "macOS/Node20",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-macOS/Node24",
+      "status": "unavailable",
+      "surface": "macOS/Node24",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-Windows/Node20",
+      "status": "unavailable",
+      "surface": "Windows/Node20",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-Windows/Node24",
+      "status": "unavailable",
+      "surface": "Windows/Node24",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-Claude Code real host",
+      "status": "unavailable",
+      "surface": "Claude Code real host",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-Codex real host",
+      "status": "unavailable",
+      "surface": "Codex real host",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-pi real host",
+      "status": "unavailable",
+      "surface": "pi real host",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-native security scanner end-to-end",
+      "status": "unavailable",
+      "surface": "native security scanner end-to-end",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-MCP voluntary model invocation",
+      "status": "unavailable",
+      "surface": "MCP voluntary model invocation",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "Only explicit protocol calls executed; no live model trajectory or product forced judgement boundary.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-MCP Cheers host-forced judgement",
+      "status": "unavailable",
+      "surface": "MCP Cheers host-forced judgement",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "Only explicit protocol calls executed; no live model trajectory or product forced judgement boundary.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-remote CI nonzero judge propagation / J0 O5",
+      "status": "unavailable",
+      "surface": "remote CI nonzero judge propagation / J0 O5",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No observed remote judge-nonzero job; recent failing job stopped in tests. Local nonzero is not CI evidence.",
+      "evidence": "matrix.json"
+    }
+  ],
+  "unavailableRows": [
+    {
+      "id": "node20-event-PostToolUseFailure",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PostToolUseFailure",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-PermissionRequest",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PermissionRequest",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-PermissionDenied",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PermissionDenied",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-PreModelSwitch",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PreModelSwitch",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-PostModelSwitch",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PostModelSwitch",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-PreCompact",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PreCompact",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-PostCompact",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PostCompact",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-SubagentStart",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "SubagentStart",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-SubagentStop",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "SubagentStop",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-WorktreeCreate",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "WorktreeCreate",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-WorktreeRemove",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "WorktreeRemove",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-event-StopFailure",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "StopFailure",
+      "tool": null,
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-tool-edit",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "edit",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-tool-apply_patch",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "apply_patch",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-tool-MCP tool via Cheers gate",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "MCP tool via Cheers gate",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-tool-browser",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "browser",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-tool-desktop",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "desktop",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node20-tool-unknown tool",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "unknown tool",
+      "runtime": {
+        "node": "v20.3.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "2e8101ad32a3c58ff605e544d1548c74a54aaf66db23bf6ac93167269d92afd3"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node20-host-details.json"
+    },
+    {
+      "id": "node24-event-PostToolUseFailure",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PostToolUseFailure",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-PermissionRequest",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PermissionRequest",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-PermissionDenied",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PermissionDenied",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-PreModelSwitch",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PreModelSwitch",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-PostModelSwitch",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PostModelSwitch",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-PreCompact",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PreCompact",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-PostCompact",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "PostCompact",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-SubagentStart",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "SubagentStart",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-SubagentStop",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "SubagentStop",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-WorktreeCreate",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "WorktreeCreate",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-WorktreeRemove",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "WorktreeRemove",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-event-StopFailure",
+      "status": "unavailable",
+      "surface": "Cheers event inventory",
+      "event": "StopFailure",
+      "tool": null,
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "see dedicated consumer cells; no promotion from dispatch alone",
+      "reason": "No dynamic dispatch for this event in this run; historical source-only row is not platform evidence",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-tool-edit",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "edit",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-tool-apply_patch",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "apply_patch",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-tool-MCP tool via Cheers gate",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "MCP tool via Cheers gate",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-tool-browser",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "browser",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-tool-desktop",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "desktop",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "node24-tool-unknown tool",
+      "status": "unavailable",
+      "surface": "tool family inventory",
+      "event": "PreToolUse",
+      "tool": "unknown tool",
+      "runtime": {
+        "node": "v24.15.0",
+        "platform": "linux",
+        "arch": "x64",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No actual product tool invocation for this family in this run. Historical source/translation evidence does not prove platform effects.",
+      "evidence": "node24-host-details.json"
+    },
+    {
+      "id": "unavailable-macOS/Node20",
+      "status": "unavailable",
+      "surface": "macOS/Node20",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-macOS/Node24",
+      "status": "unavailable",
+      "surface": "macOS/Node24",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-Windows/Node20",
+      "status": "unavailable",
+      "surface": "Windows/Node20",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-Windows/Node24",
+      "status": "unavailable",
+      "surface": "Windows/Node24",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-Claude Code real host",
+      "status": "unavailable",
+      "surface": "Claude Code real host",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-Codex real host",
+      "status": "unavailable",
+      "surface": "Codex real host",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-pi real host",
+      "status": "unavailable",
+      "surface": "pi real host",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-native security scanner end-to-end",
+      "status": "unavailable",
+      "surface": "native security scanner end-to-end",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No execution on this platform/host in this run.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-MCP voluntary model invocation",
+      "status": "unavailable",
+      "surface": "MCP voluntary model invocation",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "Only explicit protocol calls executed; no live model trajectory or product forced judgement boundary.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-MCP Cheers host-forced judgement",
+      "status": "unavailable",
+      "surface": "MCP Cheers host-forced judgement",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "Only explicit protocol calls executed; no live model trajectory or product forced judgement boundary.",
+      "evidence": "matrix.json"
+    },
+    {
+      "id": "unavailable-remote CI nonzero judge propagation / J0 O5",
+      "status": "unavailable",
+      "surface": "remote CI nonzero judge propagation / J0 O5",
+      "event": null,
+      "tool": null,
+      "runtime": null,
+      "exitCode": null,
+      "decision": null,
+      "reasonCode": null,
+      "proofVerdict": null,
+      "canBlock": "unavailable",
+      "reason": "No observed remote judge-nonzero job; recent failing job stopped in tests. Local nonzero is not CI evidence.",
+      "evidence": "matrix.json"
+    }
+  ],
+  "evidencePolicy": {
+    "observedMeansCommandReturned": true,
+    "observedDoesNotMeanProof": true,
+    "unknownUnsupportedUnavailableRemainVisible": true,
+    "rawProducerAndCapturedR0aReplayAreSeparate": true,
+    "shadowHostAndUnderlyingExitAreSeparate": true
+  },
+  "handoff": {
+    "J5": "direct single-file Write/Edit content replacement; fixture rules are explicit and isolated",
+    "J6": "prose/pre/CI comparison may use the current Write/Edit seam; remote CI remains unavailable",
+    "J7": "bounded Stop compatibility and fixed scripted completion rows are available; no real-provider lifecycle claim"
+  }
+}
