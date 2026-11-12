@@ -11647,3 +11647,65 @@ ADD-80/81 记本地验证，补充表共 81 项（1 完成 / 8 部分完成 / 70
 Stop dispatch 返回值进入完成判断，首次 block/retry 转 blocked→repairing，在同一 AgentCore、原模型预算与取消域最多重入一次；稳定 attemptId/count/active 和结构化 progressFingerprint 区分首次与复查。重复阻断、预算/次数上限不发 completed，timeout/unknown/失败保留未知；取消保留原 interrupted 语义，不终止会话。handler timeoutMs 贯通加载和注册，PreToolUse 判断不变。query lifecycle.record 经真实 manager.appendQueryEvent 落盘，模型、hook、审批、执行与 proof verdict 分开。
 
 执行契约、状态图、能力矩阵及测试生成记录见 `docs/architecture/hooks/stop-execution.md`。本地 40 项 Stop 聚焦与 Node20.3 同套通过；6 项有效反转断言失败并逐字节恢复；五静态门、191 scripts、build f32e6a807497 通过。完整链 1097 文件14321项通过、2既有跳过，1160.22秒。首次全量7项因旧构建拒绝启动已分类保留，最终同链全部通过。bundle judge 无阻塞、循环/导入满足，partial 仅既有 interactiveMode两处函数上限。无真实provider/跨平台/远端CI声明；未提交、未推送。
+
+
+### 2026-11-11：显式 SSE API 错误的安全分类
+
+NB-075 将 completion 的原始错误字符串改为 response owner 的固定安全消息和 failureClass；turn 保留 partial text、拒绝失败响应工具并禁止接受后的自动重试。两文件 167 项、两项有效反转（12/2 项预期失败）、逐字节恢复后的 167 项、生产 TypeScript 和 diff check 通过。四静态门通过，strict docs drift 仍失败于 28 个既有 disposition 路径。证据位于 `/home/wang/projects/normproof-experiment/artifacts/nofx-provider-error/`，实际补丁以 NB-074 冻结输入为基线，保留其他未提交修改。没有真实请求、产品默认传输变更、commit、push 或 CI 声明；净收益目标仍 active。
+
+
+### 2026-11-11：原生传输原因的安全诊断
+
+NB-083 在 request owner 将已知 native cause code 投影为固定安全诊断，区分连接、响应头和响应体超时；两个 turn 错误出口都替换当前尝试分类，避免旧 HTTP 分类残留。未知错误不猜原因、不暴露原文。response owner 用明确类型保留四个 decoder 的未完成流诊断；Anthropic 内部 wrapper 保留原 cause。取消、已接受响应/部分输出后的不重试、失败工具拒绝及未知用量保持。没有调整默认超时或产品鉴权。
+
+9 文件 406 项、生产 build e39f470c8811 通过；旧 step 反转 18 项中 17 项失败，逐字节恢复后 134 项通过。前两次聚焦运行的 4 项 EOF 提示退化和 1 项内部 wrapper 提示退化均保留并修复。四静态门通过，strict docs 仍有 28 个既有 disposition 失效路径；test-inclusive program 有 1328 个诊断，原 step 的 91 个与修改前完全一致，新增 transport 测试零诊断。默认代理只读复核无新增缺陷；不是独立 Sol 完成复审。证据在 `/home/wang/projects/normproof-experiment/artifacts/nofx-request-error/validation.json`。无真实 provider 请求、全仓测试、commit、push 或 CI 声明。
+
+NB-082 两行后因连接/缺计量终止，358 行未开始；24 请求、477890 已知 reported tokens 加一次未知用量请求。历史约 120 秒失败未保留 cause，不能借本次修复追认响应头超时。注册、旧结果和 alpha 账本不改；净收益仍未证明。
+
+### 2026-11-11：保留历史的原生翻页与批量导航
+
+NB-084 将未推广的历史分页实现安装到 Cheers 的 transcript/surface owner。绘制窗口顶端的 PageUp 每次最多展示 60 个原始保留块，原 conversation 数组、copy 顺序、用户草稿和 authored notice 保持；只更新明确跟踪的合成遗漏提示。缓存独立在 transcript/cache 中，避免为函数上限拆分而丢失真实缓存行为。所有六个生产模块都不超过 20 个命名声明。
+
+同时修复首次 repaint 前的新输入被旧恢复锚点覆盖：按最新 painted block/offset 映射 prepend，PageDown、wheel、search、thumb 的后续导航生效。End 取消恢复但保留 hit-test 映射至实际 paint；文档替换拒绝旧 hit，unavailable/document/invalidated frame 不允许加载下一源页。
+
+主代理串行 9 文件 299 项、原公开 20-case oracle 的新 admission、生产 build 7d562556946d、四静态门和 diff check 通过；原 NB070 pane 精确反转 6 失败/13 通过，恢复后 19 项通过。新增 paging fixture 的三项类型错误已修复，同一 test-inclusive program 对它零诊断，全 program 仍有 1328 项既有诊断。strict docs 仍因 28 个 disposition 历史路径失败。独立 pinned bundle judge 的循环和未解析导入满足，整体 partial 仅既有 interactiveMode 与其测试的函数上限。
+
+实际 Node CLI 采用隔离 HOME、独立 Git 工作区、synthetic 模式及 205 条消息：fullscreen 12 次 PageUp 可见最老原文，PageDown 与空草稿 Ctrl+End 生效；regular 不展示保留前缀。草稿、paging 期间的 state/transcript/metadata/workspace 原字节及 active leaf 保持，两模式正常 exit 0，零模型请求。探针早先把边界 notice 当成最老 viewport 内容及误用普通 End 的两项 fixture 失败保留。证据在 `/home/wang/projects/normproof-experiment/artifacts/retained-history-product/validation.json`。NB070 历史仍 partial、D0 不重跑，本次不计净收益或确认性证据；无 full suite、20k、跨平台、commit、push 或 CI 声明。
+
+
+### 2026-11-11：独立 Sol 证据复核与 SSE 取消诊断
+
+NB085 的实际HTTP200 SSE审查未结算，精确进程终止exit143，usage/charge unknown；header快照不证明后续wire静默。三JSON加八SSE控制在串行外部超时监督下通过（一次错误timeout fixture分类原样保留并单独修正），未复现产品取消bug、未改provider或runtime。
+
+NB086单独前瞻准入更小的scope材料，原字段/注册源码保留，oracle/nativejoin/rawlogs明确省略；单请求零工具/重试、180s caller/205s外部进程cap。实际gpt-6.1-sol经配置NOFX原生request完成stop/DONE，76497ms、66826完整reportedtokens，child退出0/reaped；observer eoffalse与完成保持分离，源绑定不变。独立A3意见是五门槛均notproven、无已证明续检构造，遗漏原始材料仍需只读补充；不是完成批准、统计样本或Proof Kernel。证据在 `/home/wang/projects/normproof-experiment/artifacts/sol-evidence-review-bounded/`。目标active、旧alpha不返还、无新solver/commit/push/CI。
+
+### 2026-11-11：原始研究证据补充与新的前瞻推断契约审阅稿
+
+NB087不可变补充包与内部原始字段核对完成：57模型attempts、56完整usage、1unknown；NB08224次已含unknown，旧终止／评分／alpha保持。NB088纯统计反例保留原成本CLT限制，没有历史重跑或效用样本。用户NB089明确选择修改推断契约并审阅新的方案；具体文档在 `/home/wang/projects/normproof-experiment/research/net-benefit/prospective-inference-contract.md` 和 `/home/wang/projects/normproof-experiment/.omx/plans/net-benefit-prospective.md`。
+
+建议新的单一前瞻family`.05`、固定128pairs／256rows，保留原五门槛及已耗尽`.04+.01`；成本fixed-product只有truePRErawsupport及独立pair条件下有效。可信token/time支持未成立，内部数学审阅不是实际Sol完成复核。已提供安全内容捕获、实际invocationcoverage、独立heartbeat／processsupervisor、冻结时槽及非接受停止规则；未注册、零新模型／产品运行改动，不自动Bayesian／扩样／重放。目标active、净收益未证明，无commit/push/CI。
+
+### 2026-11-11：已接受 A 的支持准入结果
+
+NB090用户接受A先落实准入；有界local/read-onlymetadata审查取得六GET、九exactcurrent源码文本及Linuxsignal/sched契约摘录，没有模型生成或产品修改。NOFX模型metadata无numericlimits；compatibleendpoint无trustedrequestBound，context/output字段与响应后计量不能给rawR；deadline/kill/局部结算不能给实际Btime／远端carryover证明。结果 `support_not_established`／`launchReady=false` 在 `/home/wang/projects/normproof-experiment/artifacts/prospective-admission/admission.json` 与 `research/net-benefit/prospective-admission.md`。原已接受文稿及历史不改，不启动readiness／solver或自动换检验；目标active、净收益未证明，无commit/push/CI。
+
+
+### 2026-11-11：支持来源不可得，B 推断备选独立供审阅
+
+NB090用户答复“无”可指定 NOFX raw usage／tokenizer／output 或实际结算合同来源；A 保持 accepted/support_not_established，exact 已接受文稿及旧历史不改。NB091备好 `/home/wang/projects/normproof-experiment/research/net-benefit/prospective-bayesian-contract.md` 与 `.omx/plans/net-benefit-bayesian.md`：32blocks／128pairs／256场、64benign、原五门槛及 raw arithmetic means，81个预定联合DP模型均需 all-five posterior lower≥.95。公开估计对象／likelihood／iid／观测可忽略／尾部假设的改变，不提供频率学 .05 净收益保证。
+
+内部预审修正先验零费用支持、actual/adverse与真实invocation、随机remainder联合误差、KL两方向计算证书与iid／有向舍入未验证门禁。B只是另审提案，数值／native readiness尚未实施，无新模型／solver／registration或产品改动；旧 .04+.01 全额支出与 unknown/失败保持。目标active、净收益未证明，NormProof独立，研究posterior不进kernel。无build/test/judge、commit/push/CI，既有strict docs失败不改判。
+
+
+### 2026-11-11：B 的可行性补充与合法计算复用
+
+NB092在B仍未采用时完成一次.46s纯合成诊断；q4/κ8的benign零净差后验估计约.504，不是认证joint界、真实效果或全模型可达证明。同契约跨模型共享随机量可将normal／exp生成工作从4.078b／3.871b降至84.48m／245.76m，内部只读核对确认不改变单模型law/5000iid/256sticks/βδ；尚未实现高精度adapter或benchmark，6h预算未证。MPFR4.2.1runtime存在但未取得完整interval/sampler证书。补充在 `/home/wang/projects/normproof-experiment/research/net-benefit/bayesian-feasibility.md`。A/B原文、旧结果／chargedalpha不改；无模型请求、产品修改、build/test/judge、commit/push/CI，净收益仍未证明。
+
+
+### 2026-11-12：B 采用后的产品交付复核
+
+用户接受 B 并授权 Cheers、NormProof、实验仓库的已完成修复分类提交推送。当前复核实际发现 quota/content-filter 私有不重试分类没有进入内层 provider retry：配置2次重试的两个反例均发出2次请求。turn owner 现按同一 failure.retryable 决定内外层重试，原未知用量 attempt 保持未结算。修复前2失败/2通过；修复后包含该场景的29文件849项通过，另Google/工具/滚动5文件114项通过；201脚本检查通过，生产构建另行记录。
+
+strict docs 首次重现28个旧 disposition 路径失败；追加式历史记录中每项绑定其审阅日期和源版本，不能被索引当成当前源码清单。只把 DOC_STATUS 的该项更正为 historical，dispositions 原文和 gate 代码逐字节保持；五静态门全通过，119个既有未加根路径提示仍 advisory。没有改变结构判定或删除历史决定。
+
+这些证据支持本地产品修复和交付，不证明 NormProof 净收益；B 数值和 native 准入尚未完成，旧失败不改判。分类提交、远端推送和 CI 以新交付回执为准。

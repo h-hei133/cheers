@@ -31,6 +31,9 @@ C3b 在同一消费边界固定了 C3a 的结果分类：版本化结果使用�
 ```
 
 相对 artifact path 按实际 workspace 解析；用户范围声明可使用已安装 artifact 的绝对路径。
+写门产物上限为 8 MiB，以容纳包含源码解析器的独立 bundle。校验通过同一文件描述符分块读取，
+最多读取上限加 1 byte；超限、读取期间大小或时间戳变化均保留 `artifact_invalid`，摘要不匹配
+保留 `version_mismatch`。该检查不承诺校验后到进程启动之间的路径替换具有原子性。
 `artifact.json` 中的 `provenance` 是构建证据，不是 `writeGate` 配置字段。配置闭合验证只接纳
 上面四个字段；版本、floor 或哈希不匹配返回 block/unknown。handler 的 command 由固定
 artifact 生成，执行 `node <artifact> gate write --emit-result`，不信任另一个自由填写的 command。
@@ -67,8 +70,17 @@ rtk proxy node .normproof/write-gate/package.mjs <clean-pinned-source-checkout>
 
 canonical matcher 在 host 名称映射后匹配；没有修改 upstream generator。已启用的 adapter
 先报告不可判形状，即使该工具不在 matcher 中，也不会将其计为 clean allow。
-仅 `write`/`edit` 完整单文件替换可判；字符串可以为空。局部 oldText/newText/edits、混合
-content 与局部替换参数、多目标字段不重建、不读取原文件拼接，返回具体 unsupported。
+`write` 和 `edit` 的完整单文件替换可判，字符串可以为空。原生 `edit` 也支持
+`oldText/newText` 和单文件 `edits`：编辑所有者在 preparation 中读取一次原始内容，沿用
+既有匹配及 BOM／换行语义生成完整候选。普通 permission 和 hook 仍收到原始局部参数；
+write adapter 只通过原参数对象的内部绑定取得完整候选，不自行读取或重建文件。
+绑定限定当前 runtime、工具和 call，拒绝模型字段伪造、克隆参数、参数后续变更和重复使用。
+执行消费同一候选，并通过 `expectedContent` 检查原始字节；准备新文件时用
+`expectedAbsent` 拒绝期间出现的目标。写入前及异步快照之后仍重验文件与工作区，
+这不承诺跨进程原子提交。未经过原生准备的局部参数、多目标字段，以及 content 与局部
+参数混用仍 unsupported；无候选且缺失 content 保留 input_incomplete。
+原生 writer 需要读取提交后的文件来核验结果，因此明确的 read deny 也会阻断向不存在路径
+进行 write/edit；拒绝发生在 PreToolUse 和写入前。不能用实际出现了文件替代成功的写入回执。
 MultiEdit 与 NotebookEdit 暂无已验证的无损单文件投影，所以单项和多项形状都 unsupported。
 `apply_patch` 已有 parser 能取路径，但一个 patch 可含多个目标，内容规则按文件判断；
 是否复用 parsePatch 做完整逐文件投影留待独立决定。

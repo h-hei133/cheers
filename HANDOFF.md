@@ -2128,3 +2128,90 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom**: A legacy `{decision: 'block', reason: '...'}` is classified as invalid output, preventing the bounded repair path; flat allow and custom reason codes also stop working.
 - **Root Cause**: A versioned envelope's mandatory closed reason set was applied to all hook output, deleting the legacy optional-code defaults. Adding explicit reason codes to fixtures concealed the regression.
 - **Rule**: Apply mandatory closed reason validation only to contract-bearing envelopes. Preserve flat code format checks and default block/retry to hook_blocked, allow to explicit_allow; unknown proof and empty stdout remain unknown. Test actual command output through final events, including legacy block and subsequent silent yield, and retain fixtures with omitted fields.
+
+### Steering Can Change Source Retention Before The Context Is Full
+- **Symptom**: An execution reminder advances old tool-output clipping, so a prompt comparison also changes the source the model can see.
+- **Root Cause**: Outbound micro-compaction counts user/assistant boundaries and applies its fixed recent-turn window independently of remaining context capacity. Full raw tool records do not prove full outbound history.
+- **Rule**: Compare the actual request projection when evaluating steering. Reconstruct native output bounding and exact harness schemas before checking saved full-body hashes; distinguish all code lines from exact bytes across read-page boundaries. Missing public reasoning replay is a separate exact-model contract, and a successful synthetic roundtrip does not prove real-model task improvement.
+
+
+### Final Tool Arguments Need Complete JSON Before Batch Admission
+- **Symptom:** A normally ended response contains one complete write and one truncated argument string, yet structural JSON repair makes both executable.
+- **Root Cause:** The final provider decoder reused a permissive parser that can close strings and braces; whole-response length refusal covers only an explicit length ending.
+- **Rule:** Parse final tool arguments as complete JSON objects, reject the entire malformed response before hooks or dispatch, retain usage and report-safe failure, and grant no reasoning replay authority to that failed response. Preserve the separate length refusal path.
+
+### Parser Bundles Need A Bounded Artifact Size Contract
+- **Symptom:** A valid standalone write gate with its TypeScript parser is refused as artifact_invalid before any norm is checked.
+- **Root Cause:** The host's 2 MiB artifact cap predates a roughly 3.6 MB parser bundle; stat followed by unbounded read also fails to bound concurrent growth.
+- **Rule:** Use the declared 8 MiB ceiling, hash through an opened descriptor with bounded reads and change detection, and test both a realistic parser-sized artifact and the limit. A correct digest does not make check-then-execute path replacement atomic.
+
+
+### Final Admission Must See Malformed Tool Envelopes
+- **Symptom:** A stream contains a valid write plus an unnamed or damaged sibling, yet the valid write executes.
+- **Root Cause:** Stream assembly discarded empty-name calls before strict final admission, hiding the malformed batch. Signed and opaque reasoning also carried replay authority independently of public-field origin bindings.
+- **Rule:** Preserve every assembled envelope until final validation; reject missing/non-string/blank final names as one response. Refused malformed responses retain public text only, never signatures or opaque replay payloads. Keep zero-hook/zero-dispatch and actual subsequent endpoint-serialization regressions; later empty name deltas must still preserve a previously supplied name.
+
+### Reversal Fixtures Need A Finite Continuation
+- **Symptom:** Reverting an admission fix makes its synthetic loop spin instead of producing an assertion failure.
+- **Root Cause:** A fixture returns the same tool response forever; the reversed implementation dispatches it and requests another. A timer cannot reliably bound an always-resolving microtask loop.
+- **Rule:** Give synthetic providers a finite terminal response after the tested envelope, then assert no continuation or dispatch. Treat a killed reversal as inconclusive, preserve it, and rerun the bounded counterexample before claiming regression evidence.
+
+### Edit Hooks Must Judge The Candidate That Execution Consumes
+- **Symptom:** A full-file write can be judged, while a targeted edit is unsupported or its checked content differs from the committed file.
+- **Root Cause:** Reconstructing edits only at execution puts their final content after the pre-use hook; reconstructing in the hook creates a second semantic owner and a stale-read window.
+- **Rule:** Prepare the candidate once in the native edit owner. Bind it to the original prepared call, preserve ordinary delta arguments for permissions and hooks, and consume the same candidate after approval. Reject changed arguments, source bytes, workspace identity and a newly created target before committing; retain the post-snapshot recheck. The in-process lock does not establish cross-process atomicity.
+
+### Creating A File Still Requires Its Write Verification To Be Authorized
+- **Symptom:** A write to a read-denied new path creates the expected bytes, then reports an unknown edit operation; a test asserting only file presence incorrectly treats this as success.
+- **Root Cause:** The permission gate exempted absent targets from read denial, but the shared commit owner reads the published output to verify it. That later read is denied after mutation.
+- **Rule:** Native write and edit must reject explicit read-denied targets before publication, including absent files, while preserving ordinary readable creation. Test the native result, pre-use dispatch and disk together. Do not bypass post-write access checks or treat a landed file as a successful receipt; a write-only verification capability would need a separately bound output descriptor and authority contract.
+
+### Retaining Tool Text Requires Consistent Projection And Measurement
+- **Symptom:** Old source text disappears even with ample configured context, or a preview still credits measurements of a differently pruned request after text retention is selected.
+- **Root Cause:** Age-based text pruning is independent of context pressure; preview, dispatch, prefix reconstruction and automatic compaction each consume its projection. Mixed tool output also contains images whose removal has a separate purpose.
+- **Rule:** Capture one text policy and pass it to every projection and measurement consumer. Preserve existing image removal and initial output bounds, reject incompatible raw/wire/replay identities, and test known overflow before dispatch. Persist real transcript entries and exact catalogue/replay bindings in consumer fixtures. An exact retained source span proves delivery only, not model understanding, task success or remote capacity.
+
+### Passing Fixture Execution Does Not Establish Fixture Type Correctness
+- **Symptom:** Native request tests pass and the production build succeeds, while the new test's provider catalogue is missing required fields.
+- **Root Cause:** Vitest transpiles the test without checking its types, and the production TypeScript configuration excludes tests.
+- **Rule:** Type shared-contract fixtures at their declaration. When a test-only shape error is found, inspect its diagnostics in the original test-inclusive program and report that focused result separately from production build and full-program health. Do not classify newly introduced fixture errors as pre-existing debt.
+
+### In-Band API Errors Need A Safe Response Boundary
+- **Symptom:** HTTP 200 carries an explicit API error, but the turn records it as a network error and includes private provider detail.
+- **Root Cause:** Stream parsing throws a plain Error containing the raw message, which reaches the generic transport catch. Preserving a retryable category without preserving response acceptance can also trigger a second request.
+- **Rule:** Classify explicit error frames in the response owner and carry only a closed failure class and fixed safe message. Preserve visible partial text, reject tools from that response, and retain the no-retry boundary after acceptance. Prose mentioning HTTP status does not establish HTTP metadata; verify the actual agent loop with a rate-limit frame and a finite second-response fixture.
+
+
+### Fetch Wrappers Can Hide The Deadline That Ended A Request
+- **Symptom:** A request stops near a configured deadline but only reports `fetch failed` or `terminated`; a prior HTTP attempt can also leave its failure class on the final transport failure.
+- **Root Cause:** Both turn catches discarded native cause codes, and the send catch did not replace the earlier attempt's class. Redacting arbitrary errors also erased the known incomplete-stream diagnostic and could change text-based retry eligibility.
+- **Rule:** Project recognized native codes to fixed safe messages at the request owner, replace the class on every failed attempt, and preserve private retry exclusions before discarding detail. Carry decoder-owned incomplete-stream errors by type and retain underlying causes through internal wrappers. Keep cancellation and accepted/partial-response non-replay ahead of transport classification. Elapsed time alone does not prove which deadline or remote failure fired; dispatched requests without usage remain unknown.
+
+### Retained Pages Must Respect Navigation Before Their First Paint
+- **Symptom:** PageUp prepends retained blocks, then a PageDown, wheel, search or thumb action issued before the next paint is overwritten by the original anchor; hit testing can also select a newly inserted block.
+- **Root Cause:** The source array changes immediately while scroll coordinates and block indexes still belong to the last painted frame. A fixed restoration anchor ignores later input, and clearing the mapping on End invalidates those indexes too early.
+- **Rule:** Map the latest painted block and within-block offset through the pending prepend. End cancels restoration while retaining index mapping until paint. Revoke page admission on unavailable or invalidated frames, discard stale hits after document replacement, and preserve original copy-source order and the tracked omission notice. A fitting two-block window distinguishes anchor preservation from following End. Native Ctrl+End targets transcript bottom only on an empty draft; the omission notice stays at its original boundary and need not appear beside the oldest visible source.
+
+
+### A Native Review Deadline Needs Independent Process Supervision
+- **Symptom:** An actual HTTP200 SSE review remained unsettled past its caller deadline; its last saved header snapshot showed bytes0/eoffalse. Local JSON controls passed and initially missed the stream path.
+- **Root Cause:** The header-only receipt did not observe subsequent activity or prove the timer fired. JSON controls exercised a different reader. Observer EOF also stays false when the native consumer cancels after DONE; it is not a completion criterion. Matching SSE controls did not reproduce the long-request cause.
+- **Rule:** Preserve failed dispatched attempts with unknown usage/charge, exercise the actual stream media, and record timer/composite/native settlement separately. Admit any later request separately, with exact-child external process supervision and periodic safe structural snapshots. Keep native completion/DONE/usage independent of EOF and retain omitted review scope. Never expose process argv/environment inventories when locating owned children.
+
+
+### Bayesian Summaries Need Prior Support And A Stated Observation Model
+- **Symptom:** A model that excludes exact zero cost is updated with real zero records, or a complete-capture gate is treated as a full likelihood.
+- **Root Cause:** Joint DP conjugacy needs prior support; posterior conditioning on endpoint summaries does not automatically incorporate informative capture/settlement events. Fixed stick remainder error is also distinct from sampler and rounding error.
+- **Rule:** Fix raw zero support before new data, preserve actual/adverse and unknown states, and disclose summary-likelihood plus observation-ignorability assumptions. Keep the random remainder, joint error allocation and fixed numerical caps explicit. Model-conditional posterior probability never silently becomes a frequentist guarantee, native execution permission or Proof Kernel truth.
+
+
+### A Validator Loop Must Not Rebind Its Mutation Owner
+- **Symptom:** A validation decision was appended to a report instead of its ledger; the final prefix assertion detected the wrong target.
+- **Root Cause:** One path variable named the ledger before a later document loop reassigned it. Earlier identity checks did not bind the eventual write owner.
+- **Rule:** Give ledger/document/source paths distinct names, revalidate the exact ledger immediately before append, then check original prefix and parsed last record. Preserve the initial failed artifact and restore only a report suffix whose record proves the original report hash before rerunning a corrected validator.
+
+
+### Private Retry Exclusions Must Reach Both Retry Loops
+- **Symptom:** A quota or content-filter failure marked nonretryable still dispatches a second provider request when its inner retry count is nonzero.
+- **Root Cause:** The safe failure projection preserved the outer-turn retry flag but set the inner loop's transient flag unconditionally. Tests exercised only the default zero inner retries.
+- **Rule:** Carry the semantic retryability into both loops before discarding private detail. Cover configured inner retries with a finite second-response fixture; a dispatched failed attempt without usage stays unknown and must not be released as unsent.

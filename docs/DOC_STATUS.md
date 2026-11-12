@@ -22,7 +22,7 @@ It does not claim every historical note is perfectly classified.
 | `GOAL.md` | active | Strategic Evolution Roadmap: SOTA benchmark alignment, Phase 4-7 deliverables, and NormProof governance. |  | Architecture / Project Leadership |
 | `.wiki/_index.md` | active | Master project knowledge base, architecture concepts, RFCs, and references. |  | Documentation / Wiki Manager |
 | `.normproof/EXPERIENCE.md` | active | Retrospective on formal structural proof vs runtime semantic review. |  | Architecture / NormProof |
-| `.normproof/dispositions.md` | active | Formal register of reviewed module ceiling obligations and modular decomposition decisions. |  | Architecture / NormProof |
+| `.normproof/dispositions.md` | historical | Append-only dated decisions and source-bound audits. Paths describe the reviewed source generation; current findings require a fresh judge. |  | Architecture / NormProof |
 | `.wiki/refactor/plan.md` | active | Module-boundary refactor plan: current file counts, reachability, the rules a change must follow, and the per-step record. Read this before any structural change. |  | Architecture |
 | `.wiki/refactor/architecture-exploration-2026-09-18.md` | active | Where modules are still mis-placed, and whether tests need their own tree. |  | Architecture |
 | `.wiki/refactor/drift-exploration-2026-09-18.md` | active | Documentation and rule drift: what is stale, and what actually blocks deleting it. |  | Architecture |

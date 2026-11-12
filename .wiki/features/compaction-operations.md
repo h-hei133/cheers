@@ -2,7 +2,7 @@
 title: "压缩操作与步骤幂等"
 category: article
 created: 2026-10-17
-updated: 2026-11-03
+updated: 2026-11-10
 tags: [context, compaction, phase-20]
 summary: "摘要的有界分段、永久重播证据与原生会话条件发布；不确定发送和未验证写入不能变成成功。"
 ---
@@ -46,6 +46,12 @@ step      = 精确消息 + previousSummary + instructions + history/prefix/merge
 - provider 锚点只校准原始前缀身份未变、可证明一一索引的文本投影。先重建锚点当时的 wire digest，再扣除当前已测量前缀相对旧 wire 的新增文本削减量，最后加入当前 wire 尾部估算。重复读取不累加削减，也不修改 provider usage/计费；新 provider 结果替换锚点。bridge、关闭附加消息、图片、opaque/foreign replay 或无法证明的重写回退估算；完全相同的关闭请求仍可直接使用其完整计量。校正是实测加字符估算，不冒充精确 tokenizer 数。
 
 自动阈值无可用 provider 锚点时，按当前 outbound 投影（包括微压缩与兼容桥接）估算，不能将未发送的旧工具正文计入触发条件；切点仍按原历史选择。收尾请求按原 system、空 schema 和一次收尾指令定价；没有工具可撤下时不附加指令。包含工具 schema 的普通锚点不用于收尾请求。发布后的恢复带检查使用相同投影和开销口径。
+
+### 旧工具文本保留
+
+`pruneToolText` 默认为 `true`，沿用按消息年龄裁剪旧工具文本和省略重复正文的策略。在受信任的项目或用户配置中设为 `false`，可在后续操作中保留已进入历史的工具文本；Settings 的 Context 分组中对应 “Prune older tool text”。原生调用方也可通过 `StepRequest.pruneToolText` 选择同一行为。
+
+关闭裁剪会增加发送输入和累计用量。它不会恢复读取时已截断的内容，也不会关闭旧工具图片移除、自动摘要或 overflow 处理。用户图片与近期工具图片继续沿用原有策略。预览、实际发送、自动摘要阈值及历史计量重建使用同一捕获值；正文改变后，身份不匹配的旧计量不再复用。已知输入或窗口上限仍能在发送前拒绝请求，未知容量仍为未知，不能把配置窗口当作上游容量保证。
 
 ## 3. 原生条件发布
 
