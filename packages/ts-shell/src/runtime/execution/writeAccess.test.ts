@@ -103,7 +103,21 @@ it.each(['write', 'edit'])('forwards %s access and cancellation to the final wri
   await registry.get(name)!.execute({ path: 'note.txt', content: 'new' }, {
     workspaceRoot: workspace, taskId: 'test', assertFileAccess: check, abortSignal: controller.signal,
   })
-  expect(write).toHaveBeenCalledWith(expect.objectContaining({ assertFileAccess: check, abortSignal: controller.signal }))
+  expect(write).toHaveBeenCalledOnce()
+  expect(write).toHaveBeenCalledWith(expect.objectContaining({
+    absolutePath: target, content: 'new', assertFileAccess: expect.any(Function), abortSignal: controller.signal,
+    ...(name === 'edit' ? { expectedContent: 'original' } : {}),
+  }))
+  // A prepared edit wraps the caller's guard with workspace revalidation. The
+  // final writer must execute that guard rather than preserve its identity.
+  expect(check).toHaveBeenCalledWith(target)
+  const finalRequest = write.mock.calls[0]![0]
+  check.mockClear()
+  finalRequest.assertFileAccess!(target)
+  expect(check).toHaveBeenCalledOnce()
+  expect(check).toHaveBeenCalledWith(target)
+  check.mockImplementation(() => { throw new Error('caller access denied') })
+  expect(() => finalRequest.assertFileAccess!(target)).toThrow('caller access denied')
   expect(fs.readFileSync(target, 'utf8')).toBe('new')
 })
 it('allows ordinary double-dot-prefixed names', async () => {

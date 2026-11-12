@@ -11709,3 +11709,10 @@ NB092在B仍未采用时完成一次.46s纯合成诊断；q4/κ8的benign零净�
 strict docs 首次重现28个旧 disposition 路径失败；追加式历史记录中每项绑定其审阅日期和源版本，不能被索引当成当前源码清单。只把 DOC_STATUS 的该项更正为 historical，dispositions 原文和 gate 代码逐字节保持；五静态门全通过，119个既有未加根路径提示仍 advisory。没有改变结构判定或删除历史决定。
 
 这些证据支持本地产品修复和交付，不证明 NormProof 净收益；B 数值和 native 准入尚未完成，旧失败不改判。分类提交、远端推送和 CI 以新交付回执为准。
+
+
+### 2026-11-12：首次产品交付 CI 的旧 fixture 修正
+
+CI 43158106512 在 7c7153c1 上实际失败：3文件5项失败，1100文件14528项通过，1文件3项跳过；后续 NormProof 架构步骤未执行。失败来自旧测试仍要求私有 socket 错误原文、prepared edit 前的 callback identity，以及未覆盖新增 pruneToolText 设置。仅修正三个测试：保留单次 dispatch／未知用量 pending；改验证最终写入守卫的真实调用与拒绝传播、同一 abortSignal 和 expectedContent；补齐 user/project 真实键盘设置流程，不改生产代码。
+
+五静态门与单次串行聚焦验证通过，3文件169项；原失败日志、修正日志与分类回执在实验仓 artifacts/revision-review/cheers-ci-correction.json。修正提交推送后另跑 CI，旧失败不改写，不用聚焦通过替代最终远端结果。B 尚未发出新真实请求，净收益仍未证明。

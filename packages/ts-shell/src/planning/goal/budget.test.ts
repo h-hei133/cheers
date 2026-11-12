@@ -178,10 +178,15 @@ catch (error) { console.log(error.code); }
     await command(['budget', '20']);
     const fetchImpl = vi.fn(async () => kind === 'http-retry' ? new Response('try again', { status: 500 })
       : kind === 'reasoning-downgrade' ? new Response('reasoning_effort rejected', { status: 400 })
-      : new Response(new ReadableStream<Uint8Array>({ start(controller) { controller.error(new Error('socket closed')); } }), { headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch;
+      : new Response(new ReadableStream<Uint8Array>({ start(controller) { controller.error(new Error('socket closed PRIVATE_GOAL_TRANSPORT_CANARY')); } }), { headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch;
     const result = await step(fetchImpl)([{ role: 'user', content: 'hello' }], undefined, {}, { allowTools: false });
     expect(fetchImpl).toHaveBeenCalledOnce(); expect(result).toMatchObject({ stopReason: 'error', retriesExhausted: true });
-    expect(result.errorMessage).toContain(kind === 'empty-stream-retry' ? 'socket closed' : 'history-unknown');
+    if (kind === 'empty-stream-retry') {
+      expect(result.errorMessage).toBe('Network error: request failed. Details withheld.');
+      expect(result.failureClass).toBeUndefined();
+      expect(JSON.stringify(result)).not.toContain('socket closed');
+      expect(JSON.stringify(result)).not.toContain('PRIVATE_GOAL_TRANSPORT_CANARY');
+    } else expect(result.errorMessage).toContain('history-unknown');
     expect(scope().pending['1']).toMatchObject({ dispatched: true });
     expect(Object.keys(scope().pending)).toEqual(['1']);
   });
