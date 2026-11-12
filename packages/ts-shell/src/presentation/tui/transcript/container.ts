@@ -1,6 +1,7 @@
-import { defaultTheme } from "../../theme/theme.js";
-import { type Block, renderBlock, type BlockRenderOptions } from "./blocks.js";
-import { sourceLinesFor, type SourceLine } from "./source.js";
+import { type Block, type BlockRenderOptions } from "./blocks.js";
+import { type SourceLine } from "./source.js";
+import { TranscriptCache } from './cache.js';
+import { RetainedWindow } from './retained.js';
 
 /**
  * Ordered transcript.
@@ -15,40 +16,6 @@ import { sourceLinesFor, type SourceLine } from "./source.js";
  * frame from a long conversation costs an array walk rather than a re-layout.
  */
 
-interface CacheEntry {
-  /** The render options the cached rows were built with; protocol changes re-render. */
-  options?: BlockRenderOptions;
-  readonly width: number;
-  /** The palette revision the rows were rendered with. */
-  readonly revision: number;
-  readonly rows: readonly string[];
-  /**
-   * The block's position in the transcript, which its source lines carry.
-   *
-   * A block's index is stable while it is in the transcript — blocks are only
-   * ever appended or cleared wholesale — so it is recorded rather than
-   * re-keyed, and checked so a reused entry cannot serve stale lines.
-   */
-  blockIndex: number;
-  /** Derived from `rows` and the same key; computed on first use. */
-  sources?: readonly (SourceLine | undefined)[];
-}
-
-/**
- * How many widths one block's rows are kept for.
- *
- * One is not enough. A frame asks about a block twice at different widths: the
- * surface measures the transcript at the full width to decide whether a
- * scrollbar is needed, then renders it one column narrower because the scrollbar
- * takes the last one. With a single slot the two questions evict each other and
- * every block is re-laid-out on every frame — measured at 18ms a frame against
- * 0.9ms with the rows held, on a conversation of 8,000 blocks.
- *
- * Two would cover that pair exactly; four leaves room for the pair a reflow
- * produces without a resize throwing away what it is about to ask for again.
- */
-const MAX_CACHED_WIDTHS = 4;
-
 const EMPTY: readonly string[] = [];
 
 export interface RenderedTranscript {
@@ -61,9 +28,9 @@ export interface RenderedTranscript {
 
 export class Transcript {
   private blocks: Block[] = [];
-  private earlier: readonly Block[] = [];
+  private readonly retained = new RetainedWindow();
   private revisionValue = 0;
-  private readonly cache = new WeakMap<Block, CacheEntry[]>();
+  private readonly cache = new TranscriptCache();
 
   /** Add a block to the end of the transcript. */
   append(block: Block): Block {
@@ -89,18 +56,30 @@ export class Transcript {
   }
 
   /** Restored source blocks outside the initial display window remain copyable. */
-  retainEarlier(blocks: readonly Block[]): void {
-    this.earlier = [...blocks];
+  retainEarlier(blocks: readonly Block[], notice?: Block): void {
+    this.retained.retain(blocks, notice);
     this.revisionValue++;
   }
 
+  /** Expose one preceding source page without changing the conversation array. */
+  revealEarlier(): number {
+    const page = this.retained.takePage();
+    if (page.blocks.length === 0) return 0;
+    this.blocks.splice(0, 0, ...page.blocks);
+    this.revisionValue++;
+    if (page.notice) this.setText(page.notice, page.remaining > 0
+      ? `${page.remaining} earlier messages are not shown.`
+      : 'All earlier messages are shown.');
+    return page.blocks.length;
+  }
+
   copyable(): readonly Block[] {
-    return [...this.earlier, ...this.blocks];
+    return [...this.retained.sources(), ...this.blocks];
   }
 
   /** Visit retained source without allocating a combined history array. */
   *copySources(): Generator<Block> {
-    yield* this.earlier;
+    yield* this.retained.sources();
     yield* this.blocks;
   }
 
@@ -159,7 +138,7 @@ export class Transcript {
   update(block: Block, mutate: (block: Block) => void): void {
     mutate(block);
     this.revisionValue++;
-    this.cache.delete(block);
+    this.cache.invalidate(block);
   }
 
   /** Mark every block finished, so its rendering is stable and cacheable. */
@@ -171,14 +150,14 @@ export class Transcript {
   /** Forget everything. */
   clear(): void {
     this.blocks = [];
-    this.earlier = [];
+    this.retained.clear();
     this.revisionValue++;
   }
 
   /** Rows the whole transcript occupies at `width`. */
   rowCount(width: number): number {
     let total = 0;
-    for (let index = 0; index < this.blocks.length; index++) total += this.rowsFor(this.blocks[index]!, index, width).length;
+    for (let index = 0; index < this.blocks.length; index++) total += this.cache.rowsFor(this.blocks[index]!, index, width).length;
     return total;
   }
 
@@ -197,8 +176,8 @@ export class Transcript {
     const sources: (SourceLine | undefined)[] = [];
     for (let index = 0; index < this.blocks.length; index++) {
       const block = this.blocks[index]!;
-      const blockRows = this.rowsFor(block, index, width, options);
-      const blockSources = this.sourcesFor(block, index, width, blockRows, options);
+      const blockRows = this.cache.rowsFor(block, index, width, options);
+      const blockSources = this.cache.sourcesFor(block, index, width, blockRows, options);
       for (let row = 0; row < blockRows.length; row++) {
         rows.push(blockRows[row]!);
         owners.push(index);
@@ -208,66 +187,4 @@ export class Transcript {
     return { rows, owners, sources };
   }
 
-  /**
-   * Source lines for one block, memoised alongside its rows.
-   *
-   * Deriving them re-runs the Markdown layout and, for a diff, searches every
-   * row offset for the frame — per block, per frame. A finished block cannot
-   * change, so the answer is cached with the rows it was computed against. The
-   * block index is part of the key because it is written into every line.
-   */
-  private sourcesFor(
-    block: Block,
-    index: number,
-    width: number,
-    rows: readonly string[],
-    options?: BlockRenderOptions,
-  ): readonly (SourceLine | undefined)[] {
-    if (!block.finalized) return sourceLinesFor(block, index, width, rows);
-    const entry = this.cache.get(block)?.find(candidate => candidate.width === width
-      && candidate.revision === defaultTheme.colorRevision
-      && candidate.options?.imageProtocol === options?.imageProtocol
-      && candidate.options?.thinkingShortcut === options?.thinkingShortcut);
-    if (entry?.sources) return entry.sources;
-    const sources = sourceLinesFor(block, index, width, rows);
-    if (entry) entry.sources = sources;
-    return sources;
-  }
-
-  /**
-   * Rendered rows for one block, memoised while the block cannot change.
-   *
-   * The entry also carries the block's current index so the source cache built
-   * beside it can be keyed by the same facts.
-   */
-  private rowsFor(block: Block, index: number, width: number, options?: BlockRenderOptions): readonly string[] {
-    if (!block.finalized) return renderBlock(block, width, options);
-    const entries = this.cache.get(block);
-    // The palette is recolored in place, so the same block at the same width
-    // renders differently after a theme change. Keying on width alone left the
-    // scrollback in the old theme until a resize happened to invalidate it.
-    const revision = defaultTheme.colorRevision;
-    const hit = entries?.find(entry =>
-      entry.width === width &&
-      entry.revision === revision &&
-      entry.options?.imageProtocol === options?.imageProtocol &&
-      entry.options?.thinkingShortcut === options?.thinkingShortcut);
-    if (hit) {
-      // The rows are the same at any index; the source lines name the position,
-      // so an entry whose index moved is kept for its rows but loses them.
-      if (hit.blockIndex !== index) {
-        hit.blockIndex = index;
-        hit.sources = undefined;
-      }
-      return hit.rows;
-    }
-
-    const rows = renderBlock(block, width, options);
-    // An entry from a superseded palette is worth nothing, so those go first
-    // and the width list stays bounded.
-    const kept = (entries ?? []).filter((entry) => entry.revision === revision);
-    kept.unshift({ width, revision, rows, options, blockIndex: index });
-    this.cache.set(block, kept.slice(0, MAX_CACHED_WIDTHS));
-    return rows;
-  }
 }

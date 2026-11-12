@@ -168,12 +168,11 @@ export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'e
   // that is being shown is a session whose checklist has just been restored.
   replayTodosFromMessages(session.id, session.turns);
   const restored = restoreConversation(session.turns, session.reports, target.context?.runtimeConfig.collapseThinking ?? true);
-  target.transcript.retainEarlier(restored.earlier);
-  if (restored.omitted > 0) {
-    target.transcript.append(
-      textBlock("notice", `${restored.omitted} earlier messages are not shown.`),
-    );
-  }
+  const notice = restored.omitted > 0
+    ? textBlock("notice", `${restored.omitted} earlier messages are not shown.`)
+    : undefined;
+  target.transcript.retainEarlier(restored.earlier, notice);
+  if (notice) target.transcript.append(notice);
   for (const block of restored.blocks) target.transcript.append(block);
   target.transcript.finalizeAll();
   const userPrompts = session.turns

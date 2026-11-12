@@ -45,6 +45,10 @@ export class TranscriptPane {
   private selectionRevisionValue = 0;
   private lastTranscriptRevision = -1;
   private lastSelectionWidth = -1;
+  private layout: FrameLayout | undefined;
+  private pageAvailable = false;
+  /** Painted indexes stay valid until the next frame by accounting for this prepend. */
+  private pendingPage: { readonly added: number; restore: boolean } | undefined;
 
   constructor(private readonly transcript: Transcript) {}
 
@@ -65,8 +69,11 @@ export class TranscriptPane {
     if (documentChanged) {
       this.scroller.scrollToEnd();
       this.document = document;
+      this.pendingPage = undefined;
     }
+    this.layout = layout;
     const safeWidth = Math.max(1, Math.floor(width));
+    this.pageAvailable = layout === 'viewport' && width > 0 && capacity > 0;
     const selectionLayoutChanged = documentChanged || safeWidth !== this.lastSelectionWidth
       || this.transcript.revision !== this.lastTranscriptRevision;
     const hasScrollbar = layout === "viewport" && needsScrollbar(
@@ -81,13 +88,20 @@ export class TranscriptPane {
     // A resize re-wraps every row, so an absolute scrollTop no longer names the
     // same content. Keep the block at the top and its offset inside that block.
     const previousTop = this.scroller.scrollTop;
-    const anchor = !this.scroller.isFollowingEnd ? this.owners[previousTop] : undefined;
-    const anchorOffset = anchor === undefined ? 0 : previousTop - this.owners.indexOf(anchor);
+    const pending = this.pendingPage;
+    // Navigation after a prepend still targets the last painted coordinates.
+    // Keep its latest Block/offset, unless that input deliberately followed the end.
+    const restorePage = pending?.restore && !(this.scroller.isFollowingEnd && previousTop > 0);
+    const oldOwner = restorePage || !this.scroller.isFollowingEnd ? this.owners[previousTop] : undefined;
+    const anchor = oldOwner === undefined ? undefined : oldOwner + (pending?.added ?? 0);
+    const anchorOffset = oldOwner === undefined ? 0 : previousTop - this.owners.indexOf(oldOwner);
     this.scroller.updateLayout(rows.length, safeCapacity);
-    if (anchor !== undefined && !this.scroller.isFollowingEnd) {
+    if (anchor !== undefined && (restorePage || !this.scroller.isFollowingEnd)) {
       const start = owners.indexOf(anchor);
-      if (start >= 0) this.scroller.scrollTo(Math.min(owners.length - 1, start + anchorOffset));
+      const end = owners.lastIndexOf(anchor);
+      if (start >= 0) this.scroller.scrollTo(Math.min(end, start + anchorOffset));
     }
+    this.pendingPage = undefined;
     const top = this.scroller.scrollTop;
     if (selectionLayoutChanged) {
       this.selectionRevisionValue++;
@@ -161,11 +175,30 @@ export class TranscriptPane {
 
   /** Scroll by whole screens, for PageUp and PageDown. */
   scrollPage(direction: -1 | 1): boolean {
+    if (direction === -1 && this.pageAvailable && this.layout === 'viewport' && this.capacity > 0
+      && this.window.layout.visible > 0 && this.window.layout.top === 0 && this.scroller.scrollTop === 0
+      && this.document === this.transcript.all() && !this.pendingPage) {
+      const owner = this.owners[0];
+      const block = owner === undefined ? undefined : this.transcript.blockAt(owner);
+      if (owner !== undefined && block) {
+        const added = this.transcript.revealEarlier();
+        if (added > 0) {
+          this.pendingPage = { added, restore: true };
+          return true;
+        }
+      }
+    }
     return this.scroll(direction * Math.max(1, this.capacity - 1));
+  }
+
+  /** A surface frame without a transcript cannot admit a retained-page action. */
+  invalidatePageAvailability(): void {
+    this.pageAvailable = false;
   }
 
   /** Jump to the newest rows, which is also what any new output implies. */
   scrollToEnd(): void {
+    if (this.pendingPage) this.pendingPage.restore = false;
     this.scroller.scrollToEnd();
   }
 
@@ -207,8 +240,9 @@ export class TranscriptPane {
 
   /** The block under screen row `row`, or nothing for padding and chrome. */
   blockAtScreenRow(row: number): Block | undefined {
+    if (this.document !== this.transcript.all()) return undefined;
     const index = this.window.blockIndexAt(row);
-    return index === undefined ? undefined : this.transcript.blockAt(index);
+    return index === undefined ? undefined : this.transcript.blockAt(index + (this.pendingPage?.added ?? 0));
   }
 
   /**

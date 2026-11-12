@@ -56,12 +56,14 @@ export class InteractiveSurface implements InteractiveView {
     const width = Math.max(0, Math.floor(dimensions.columns));
     const height = Math.max(0, Math.floor(dimensions.rows));
     if (width === 0 || height === 0) {
+      this.pane.invalidatePageAvailability();
       this.lastComposerGeometry = undefined;
       this.choiceRegions = {};
       return { rows: [], chromeRows: [] };
     }
     const chrome = renderChrome(this.context, this, width, height);
     if (this.context.overlayFullScreen()) {
+      this.pane.invalidatePageAvailability();
       this.choiceRegions = { overlay: { top: 0, height } };
       this.lastComposerGeometry = undefined;
       // A full-screen overlay owns every row, so there is no fixed block to
@@ -70,6 +72,7 @@ export class InteractiveSurface implements InteractiveView {
         pointerMotion: this.context.overlayPointerMotion?.() === true };
     }
     const capacity = Math.max(0, height - chrome.rows.length);
+    if (capacity === 0) this.pane.invalidatePageAvailability();
     const transcriptRows = capacity === 0 && layout !== "document" ? [] : this.pane.render(
       width,
       capacity,
@@ -182,6 +185,7 @@ export class InteractiveSurface implements InteractiveView {
   }
 
   invalidateLayout(): void {
+    this.pane.invalidatePageAvailability();
     this.lastComposerGeometry = undefined;
     this.pointerGeometry = undefined;
     this.choiceRegions = {};
