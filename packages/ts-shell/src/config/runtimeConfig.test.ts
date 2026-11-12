@@ -47,6 +47,7 @@ describe("runtime config", () => {
     expect(config.disabledTools).toEqual([]);
     expect(config.hiddenToolPrefixes).toEqual([]);
     expect(config.enableMcpTools).toBe(true);
+    expect(config.pruneToolText).toBe(true);
     expect(config.activeProviderConnectionId).toBeUndefined();
     expect(config.providerConnections).toEqual([]);
     expect(config.providerCredentials).toEqual({});
@@ -68,6 +69,34 @@ describe("runtime config", () => {
     writeUserRuntimeConfigFile({ collapseThinking: false }, readRuntimeConfigEditAt(file));
     expect(readUserRuntimeConfigFile().collapseThinking).toBe(false);
     expect(getRuntimeConfig(fakeRoot).collapseThinking).toBe(false);
+  });
+
+  it('loads tool-text retention from trusted project, user and operation overrides', () => {
+    const projectPath = path.join(fakeRoot, '.cheers.json');
+    fs.writeFileSync(projectPath, JSON.stringify({ pruneToolText: false }));
+    expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(true);
+    expect(getRuntimeConfig(fakeRoot).configProvenance.pruneToolText.rejected)
+      .toEqual([{ source: 'project', reason: 'trust-not-established' }]);
+    projectTrust.setProjectTrust(fakeRoot, 'session-only');
+    expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(false);
+    const userPath = getUserRuntimeConfigPath();
+    writeUserRuntimeConfigFile({ pruneToolText: true }, readRuntimeConfigEditAt(userPath));
+    expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(true);
+    expect(getRuntimeConfig(fakeRoot, { pruneToolText: false }).pruneToolText).toBe(false);
+    writeUserRuntimeConfigFile({ pruneToolText: false }, readRuntimeConfigEditAt(userPath));
+    expect(readUserRuntimeConfigFile().pruneToolText).toBe(false);
+    expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(false);
+  });
+
+  it('rejects malformed tool-text retention without treating it as a disabled policy', () => {
+    const file = getUserRuntimeConfigPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ pruneToolText: 'false' }));
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.pruneToolText).toBe(true);
+    expect(config.configValidation.valid).toBe(false);
+    expect(config.configProvenance.pruneToolText.rejected)
+      .toEqual([{ source: 'user', reason: 'invalid-value' }]);
   });
 
   it("honours tuiMode when a config file asks for the main screen", () => {

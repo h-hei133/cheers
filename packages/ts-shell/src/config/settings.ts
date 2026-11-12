@@ -25,6 +25,7 @@ const descriptions = {
   maxOutputTokens: ['Request', 'Output token limit', 'Requested output token budget; model limits still apply'],
   contextWindow: ['Context', 'Context window', 'Override model window resolution; unset to use the model catalogue'],
   compactionEnabled: ['Context', 'Auto compaction', 'Automatically compact at the context threshold or after overflow; explicit /compact remains available'],
+  pruneToolText: ['Context', 'Prune older tool text', 'Off retains older text and increases input; images and auto compaction use separate policies'],
   reserveTokens: ['Context', 'Reserved tokens', 'Tokens reserved outside the usable input budget'],
   keepRecentTokens: ['Context', 'Recent tokens', 'Conversation tokens to retain during compaction; model token budgets take precedence'],
   modelTokenBudgets: ['Context', 'Model token budgets', 'JSON object mapping provider/model identifiers to reserveTokens and keepRecentTokens'],

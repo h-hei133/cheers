@@ -5,13 +5,13 @@ import path from "node:path";
 import { createStepFunction, emptyAnswerExplanation, CONTEXT_OVERFLOW_PREFIX, isContextOverflow } from "./step.js";
 import { getSessionUsage, resetSessionUsage, recordSessionUsage, totalTokens } from "../observability/usageTelemetry.js";
 import { writeProjectState } from "../core/state/projectState.js";
-import { declareEndpoint } from "../provider/endpoints/index.js";
+import { declareEndpoint, endpointTurnBody } from "../provider/endpoints/index.js";
 import { crc32 } from "../provider/aws/eventStream.js";
 import { runAgentLoop } from "../core/agent/loop.js";
 import { sendSentRequest, type SentRequest } from "../provider/request/sentRequest.js";
 import { historyDigest, requestIdentity } from '../context/request/identity.js';
 import { BUILTIN_PROVIDERS } from '../core/models/catalog.js';
-import { buildSystemPrompt } from './prompt.js';
+import { buildSystemPrompt, toChatMessages } from './prompt.js';
 import { estimateRequestTokens } from '../session/context.js';
 import { FINAL_STEP_MESSAGE, outgoingProjection } from './messages.js';
 import { countRequestText } from '../context/request/tokenizer.js';
@@ -552,6 +552,77 @@ describe("createStepFunction", () => {
     expect(produced.at(-1)).toMatchObject({ stopReason: "error" });
   });
 
+  it.each([
+    [false, 'upstream_error', 'provider_endpoint'],
+    [true, 'upstream_error', 'provider_endpoint'],
+    [false, 'rate_limit_error', 'provider_rate_limited'],
+    [true, 'rate_limit_error', 'provider_rate_limited'],
+  ] as const)('keeps an SSE API failure report-safe with partial text %s and type %s', async (partialText, errorType, failureClass) => {
+    const sessionId = 'sse-provider-error-' + partialText + '-' + errorType;
+    resetSessionUsage(sessionId);
+    const canary = 'SSE_PRIVATE_CANARY';
+    const text = partialText ? 'Partial answer.' : '';
+    let requests = 0, admitted = 0, executed = 0;
+    const shown: string[] = [];
+    const events: string[] = [];
+    const step = createStepFunction({
+      ...request,
+      sessionId,
+      tools: [{ type: 'function', function: { name: 'write', parameters: { type: 'object' } } }],
+      retry: { enabled: true, maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+      fetchImpl: async () => {
+        requests++;
+        // A reversed retry guard terminates with an observable second request.
+        if (requests > 1) return jsonResponse({ choices: [{ message: { content: 'Must not retry' }, finish_reason: 'stop' }] });
+        const frames = [
+          { choices: [{ delta: { ...(partialText ? { content: text } : {}), tool_calls: [{
+            index: 0, id: 'untrusted-write', type: 'function',
+            function: { name: 'write', arguments: JSON.stringify({ path: 'refused.txt', content: 'must not dispatch' }) },
+          }] } }] },
+          { error: { type: errorType, message: canary + ' capacity unavailable; socket hang up; HTTP 401' } },
+        ];
+        return new Response(frames.map(frame => 'data: ' + JSON.stringify(frame) + '\n\n').join('') + 'data: [DONE]\n\n',
+          { headers: { 'content-type': 'text/event-stream' } });
+      },
+    });
+    let observed: Awaited<ReturnType<typeof step>> | undefined;
+    try {
+      const produced = await runAgentLoop([{ role: 'user', content: 'Update the file' }], [], {
+        retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+        streamStep: async (messages, signal) => {
+          observed = await step(messages, signal, { onText: value => { shown.push(value); } }, { allowTools: true });
+          return observed;
+        },
+        beforeToolCall: async () => { admitted++; return undefined; },
+        tools: [{ name: 'write', execute: async () => {
+          executed++;
+          return { output: 'unexpected dispatch', isError: false };
+        } }],
+      }, event => { events.push(event.type); }, undefined);
+
+      expect(requests).toBe(1);
+      expect(shown).toEqual(partialText ? [text] : []);
+      expect(observed).toMatchObject({
+        text, toolCalls: [], stopReason: 'error', failureClass, retriesExhausted: true,
+        errorMessage: 'Provider reported an error: ' + failureClass + '. Response details withheld.',
+      });
+      expect(produced.at(-1)).toMatchObject({
+        content: text, stopReason: 'error', failureClass,
+        errorMessage: 'Provider reported an error: ' + failureClass + '. Response details withheld.',
+      });
+      expect(produced.at(-1)?.tool_calls).toBeUndefined();
+      expect(admitted).toBe(0);
+      expect(executed).toBe(0);
+      expect(events).not.toContain('tool_execution_start');
+      expect(events).not.toContain('retry_scheduled');
+      expect(events).not.toContain('retry_attempt_start');
+      expect(JSON.stringify(observed)).not.toContain(canary);
+      expect(JSON.stringify(produced)).not.toContain(canary);
+      expect(observed?.errorMessage).not.toContain('Network error');
+      expect(observed?.errorMessage).not.toContain('HTTP');
+    } finally { resetSessionUsage(sessionId); }
+  });
+
   it("marks returned error completions after visible output as non-retryable", async () => {
     const step = createStepFunction({ ...request, fetchImpl: async () => jsonResponse({
       choices: [{ message: { content: "partial answer" }, finish_reason: "error" }],
@@ -571,6 +642,7 @@ describe("createStepFunction", () => {
     const result = await step([], undefined, {}, { allowTools: true });
     expect(result.stopReason).toBe("error");
     expect(result.errorMessage).toMatch(/stream ended/i);
+    expect(result.failureClass).toBe('provider_stream_protocol_error');
     expect(result.toolCalls).toEqual([]);
   });
 
@@ -702,6 +774,226 @@ describe("createStepFunction", () => {
     expect(result.stopReason).toBe("length");
     expect(result.toolCalls).toHaveLength(1);
   });
+
+  it.each([
+    ['json', 'stop'], ['json', 'tool_calls'],
+    ['stream', 'stop'], ['stream', 'tool_calls'],
+  ] as const)('refuses every call when final %s arguments are malformed (%s)', async (transport, finishReason) => {
+    for (const malformed of [
+      '{"path":"second.txt","content":"INCOMPLETE_ARGUMENT_DATA"',
+      '{"path":"second.txt","content":"INCOMPLETE_ARGUMENT_DATA',
+      '{"path":"second.txt","content":"raw\ncontrol"}',
+      '[]', 'null', '',
+    ]) {
+      const root = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(root, { recursive: true });
+      const workspace = fs.mkdtempSync(path.join(root, 'final-arguments-'));
+      const first = path.join(workspace, 'first.txt'); fs.writeFileSync(first, 'unchanged');
+      let requests = 0, admitted = 0, executed = 0;
+      const sessionId = `final-arguments-${transport}-${finishReason}`; resetSessionUsage(sessionId);
+      const calls = [
+        { id: 'complete', type: 'function' as const, function: { name: 'write', arguments: JSON.stringify({ path: 'first.txt', content: 'complete replacement' }) } },
+        { id: 'incomplete', type: 'function' as const, function: { name: 'write', arguments: malformed } },
+      ];
+      const step = createStepFunction({ ...request, sessionId, workspaceRoot: workspace, retry: { maxRetries: 0 },
+        fetchImpl: async () => {
+          requests++;
+          if (requests > 1) return jsonResponse({ choices: [{ message: { content: 'Must not retry' }, finish_reason: 'stop' }] });
+          const usage = { prompt_tokens: 8, completion_tokens: 12, total_tokens: 20 };
+          if (transport === 'json') return jsonResponse({ choices: [{ message: { content: 'Preparing changes.', tool_calls: calls }, finish_reason: finishReason }], usage });
+          const fragments = [
+            { choices: [{ delta: { content: 'Preparing changes.', tool_calls: calls.map((call, index) => ({ ...call, index,
+              function: { ...call.function, arguments: call.function.arguments.slice(0, 10) } })) } }] },
+            { choices: [{ delta: { tool_calls: calls.map((call, index) => ({ index,
+              function: { arguments: call.function.arguments.slice(10) } })) }, finish_reason: finishReason }], usage },
+          ];
+          return new Response(fragments.map(fragment => `data: ${JSON.stringify(fragment)}\n\n`).join('') + 'data: [DONE]\n\n',
+            { headers: { 'content-type': 'text/event-stream' } });
+        },
+      });
+      try {
+        const events: string[] = [];
+        const produced = await runAgentLoop([{ role: 'user', content: 'Update both files' }], [], {
+          streamStep: (messages, signal) => step(messages, signal, {}, { allowTools: true }),
+          retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+          beforeToolCall: async () => { admitted++; return undefined; },
+          tools: [{ name: 'write', execute: async (_id, args) => {
+            executed++; fs.writeFileSync(path.join(workspace, String(args.path)), String(args.content));
+            return { output: 'written', isError: false };
+          } }],
+        }, event => { events.push(event.type); }, undefined);
+        expect(requests).toBe(1);
+        expect(admitted).toBe(0);
+        expect(executed).toBe(0);
+        expect(fs.readFileSync(first, 'utf8')).toBe('unchanged');
+        expect(fs.existsSync(path.join(workspace, 'second.txt'))).toBe(false);
+        expect(events).not.toContain('tool_execution_start');
+        expect(produced.at(-1)).toMatchObject({ content: 'Preparing changes.', stopReason: 'error',
+          errorMessage: 'Provider returned malformed tool arguments. No tool calls were executed.' });
+        expect(produced.at(-1)?.tool_calls).toBeUndefined();
+        expect(JSON.stringify(produced)).not.toContain('INCOMPLETE_ARGUMENT_DATA');
+        expect(totalTokens(getSessionUsage(sessionId))).toBe(20);
+      } finally { fs.rmSync(workspace, { recursive: true, force: true }); }
+    }
+  });
+
+  it('preserves complete tool JSON objects without repairing their literal values', async () => {
+    const args = { path: 'complete.txt', content: 'literal \\n, quote " and Unicode Ω', nested: { values: [1, null, true] } };
+    const step = createStepFunction({ ...request, fetchImpl: async () => jsonResponse({ choices: [{
+      message: { content: '', tool_calls: [{ id: 'complete', type: 'function', function: { name: 'write', arguments: JSON.stringify(args) } }] },
+      finish_reason: 'tool_calls',
+    }] }) });
+    const result = await step([], undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe('stop');
+    expect(result.toolCalls).toEqual([{ id: 'complete', name: 'write', args }]);
+  });
+
+  it('keeps length refusal for a complete call beside incomplete final arguments', async () => {
+    let sends = 0, executed = 0;
+    const step = createStepFunction({ ...request, fetchImpl: async () => {
+      if (sends++ > 0) return jsonResponse({ choices: [{ message: { content: 'Request smaller changes' }, finish_reason: 'stop' }] });
+      return jsonResponse({ choices: [{ message: { content: '', tool_calls: [
+        { id: 'complete', type: 'function', function: { name: 'write', arguments: '{"path":"first.txt","content":"complete"}' } },
+        { id: 'incomplete', type: 'function', function: { name: 'write', arguments: '{"path":"second.txt","content":"partial' } },
+      ] }, finish_reason: 'length' }] });
+    } });
+    const produced = await runAgentLoop([{ role: 'user', content: 'Update both files' }], [], {
+      streamStep: (messages, signal) => step(messages, signal, {}, { allowTools: true }),
+      tools: [{ name: 'write', execute: async () => { executed++; return { output: 'must not run', isError: false }; } }],
+    }, () => {}, undefined);
+    expect(executed).toBe(0);
+    expect(produced.find(message => message.role === 'assistant')?.stopReason).toBe('length');
+    expect(produced.filter(message => message.role === 'tool')).toHaveLength(2);
+    expect(produced.at(-1)?.content).toBe('Request smaller changes');
+  });
+
+  it('does not grant replay authority to reasoning beside malformed final calls', async () => {
+    const target = { provider: 'fixture', model: 'm', baseUrl: 'https://fixture.invalid/v1', headers: {} };
+    const step = createStepFunction({ ...request, provider: target,
+      catalog: [{ id: target.provider, baseUrl: target.baseUrl, models: [{ id: target.model,
+        compat: { reasoningReplayField: 'reasoning_content' } }] }],
+      fetchImpl: async () => jsonResponse({ choices: [{ message: { content: 'Preparing changes.', reasoning_content: 'Synthetic public reasoning',
+        tool_calls: [{ id: 'incomplete', type: 'function', function: { name: 'write', arguments: '{"path":"a","content":"partial' } }] },
+      finish_reason: 'stop' }] }),
+    });
+    const result = await step([], undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe('error');
+    expect(result.reasoning).toEqual({ text: 'Synthetic public reasoning' });
+    expect(result.origin?.replayBinding).toBeUndefined();
+    expect(result.toolCalls).toEqual([]);
+  });
+
+  it.each(['json', 'stream'] as const)('refuses every %s tool envelope with a missing or empty name', async transport => {
+    for (const name of [undefined, '', ' ', null, 1]) {
+      for (const completeArgs of [true, false]) {
+        let requests = 0, admitted = 0, dispatched = 0;
+        const usage = { prompt_tokens: 8, completion_tokens: 12, total_tokens: 20 };
+        const sessionId = `unnamed-envelope-${transport}`; resetSessionUsage(sessionId);
+        const calls = [
+          { id: 'complete', type: 'function', function: { name: 'write', arguments: '{"path":"first","content":"complete"}' } },
+          { id: 'unnamed', type: 'function', function: { ...(name === undefined ? {} : { name }),
+            arguments: completeArgs ? '{"path":"second","content":"complete"}' : '{"path":"second","content":"partial' } },
+        ];
+        const step = createStepFunction({ ...request, sessionId, fetchImpl: async () => {
+          requests++;
+          // A reversed decoder may dispatch and continue. Settle that trajectory
+          // so the admission assertions fail instead of spinning the test loop.
+          if (requests > 1) return jsonResponse({ choices: [{ message: { content: 'Counterexample settled.' }, finish_reason: 'stop' }], usage });
+          if (transport === 'json') return jsonResponse({ choices: [{ message: { content: 'Preparing changes.', tool_calls: calls }, finish_reason: 'tool_calls' }], usage });
+          return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Preparing changes.',
+            tool_calls: calls.map((call, index) => ({ ...call, index })) }, finish_reason: 'tool_calls' }], usage })}\n\ndata: [DONE]\n\n`,
+          { headers: { 'content-type': 'text/event-stream' } });
+        } });
+        const events: string[] = [];
+        const produced = await runAgentLoop([{ role: 'user', content: 'Update both files' }], [], {
+          streamStep: (messages, signal) => step(messages, signal, {}, { allowTools: true }),
+          beforeToolCall: async () => { admitted++; return undefined; },
+          tools: [{ name: 'write', execute: async () => { dispatched++; return { output: 'must not run', isError: false }; } }],
+        }, event => { events.push(event.type); }, undefined);
+        expect(requests).toBe(1); expect(admitted).toBe(0); expect(dispatched).toBe(0);
+        expect(events).not.toContain('tool_execution_start');
+        expect(produced.at(-1)).toMatchObject({ stopReason: 'error', errorMessage: 'Provider returned malformed tool calls. No tool calls were executed.' });
+        expect(produced.at(-1)?.tool_calls).toBeUndefined();
+        expect(totalTokens(getSessionUsage(sessionId))).toBe(20);
+      }
+    }
+  });
+
+  it.each(['anthropic-signed', 'anthropic-redacted', 'bedrock-signed'] as const)(
+    'does not replay signed or opaque reasoning after malformed calls (%s)', async variant => {
+      const endpoint = variant === 'bedrock-signed' ? 'bedrock-converse-stream' : 'anthropic-messages';
+      const sessionId = `malformed-signed-${variant}`; resetSessionUsage(sessionId);
+      const publicText = 'Synthetic public reasoning';
+      const authority = 'SYNTHETIC_FAILED_REPLAY_AUTHORITY';
+      const malformedArgs = '{"path":"second","content":"partial';
+      const encoder = new TextEncoder();
+      const frame = (name: string, payload: unknown): Uint8Array => {
+        const headers: number[] = [];
+        for (const [key, value] of [[":message-type", "event"], [":event-type", name]]) {
+          const k = encoder.encode(key), v = encoder.encode(value);
+          headers.push(k.length, ...k, 7, v.length >> 8, v.length & 255, ...v);
+        }
+        const data = encoder.encode(JSON.stringify(payload));
+        const bytes = new Uint8Array(16 + headers.length + data.length), view = new DataView(bytes.buffer);
+        view.setUint32(0, bytes.length); view.setUint32(4, headers.length); view.setUint32(8, crc32(bytes.subarray(0, 8)));
+        bytes.set(headers, 12); bytes.set(data, 12 + headers.length);
+        view.setUint32(bytes.length - 4, crc32(bytes.subarray(0, bytes.length - 4)));
+        return bytes;
+      };
+      const events = variant === 'bedrock-signed' ? [] : [
+        { type: 'message_start', message: { usage: { input_tokens: 8, output_tokens: 0 } } },
+        { type: 'content_block_start', index: 0, content_block: variant === 'anthropic-redacted'
+          ? { type: 'redacted_thinking', data: authority } : { type: 'thinking', thinking: '' } },
+        ...(variant === 'anthropic-signed' ? [
+          { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: publicText } },
+          { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: authority } },
+        ] : []),
+        { type: 'content_block_stop', index: 0 },
+        { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'complete', name: 'write', input: {} } },
+        { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{"path":"first","content":"complete"}' } },
+        { type: 'content_block_stop', index: 1 },
+        { type: 'content_block_start', index: 2, content_block: { type: 'tool_use', id: 'incomplete', name: 'write', input: {} } },
+        { type: 'content_block_delta', index: 2, delta: { type: 'input_json_delta', partial_json: malformedArgs } },
+        { type: 'content_block_stop', index: 2 },
+        { type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 12 } },
+        { type: 'message_stop' },
+      ];
+      const step = createStepFunction({ ...request, sessionId, provider: { ...request.provider, provider: 'fixture', endpoint },
+        fetchImpl: async () => variant !== 'bedrock-signed'
+          ? new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''), { headers: { 'content-type': 'text/event-stream' } })
+          : new Response(new ReadableStream<Uint8Array>({ start(controller) {
+            controller.enqueue(frame('contentBlockDelta', { contentBlockIndex: 0, delta: { reasoningContent: { text: publicText } } }));
+            controller.enqueue(frame('contentBlockDelta', { contentBlockIndex: 0, delta: { reasoningContent: { signature: authority } } }));
+            for (const [index, args] of ['{"path":"first","content":"complete"}', malformedArgs].entries()) {
+              controller.enqueue(frame('contentBlockStart', { contentBlockIndex: index + 1, start: { toolUse: { toolUseId: `call-${index}`, name: 'write' } } }));
+              controller.enqueue(frame('contentBlockDelta', { contentBlockIndex: index + 1, delta: { toolUse: { input: args } } }));
+            }
+            controller.enqueue(frame('messageStop', { stopReason: 'tool_use' }));
+            controller.enqueue(frame('metadata', { usage: { inputTokens: 8, outputTokens: 12, totalTokens: 20 } }));
+            controller.close();
+          } }), { headers: { 'content-type': 'application/vnd.amazon.eventstream' } }),
+      });
+      let hooks = 0, dispatched = 0;
+      const produced = await runAgentLoop([{ role: 'user', content: 'Update both files' }], [], {
+        streamStep: (messages, signal) => step(messages, signal, {}, { allowTools: true }),
+        beforeToolCall: async () => { hooks++; return undefined; },
+        tools: [{ name: 'write', execute: async () => { dispatched++; return { output: 'must not run', isError: false }; } }],
+      }, () => {}, undefined);
+      const failed = produced.at(-1)!;
+      expect(failed.stopReason).toBe('error'); expect(failed.tool_calls).toBeUndefined();
+      expect(hooks).toBe(0); expect(dispatched).toBe(0);
+      expect(failed.reasoning?.signature).toBeUndefined(); expect(failed.origin?.replayBinding).toBeUndefined();
+      expect(JSON.stringify(produced)).not.toContain(authority);
+      if (variant === 'anthropic-redacted') expect(failed.reasoning).toEqual({ text: '[reasoning withheld by the provider]' });
+      else expect(failed.reasoning).toEqual({ text: publicText });
+      expect(totalTokens(getSessionUsage(sessionId))).toBe(20);
+      const history = toChatMessages([{ role: 'user', content: 'Update both files' }, ...produced,
+        { role: 'user', content: 'Report the failure' }]);
+      const next = endpointTurnBody(endpoint, { model: 'm', provider: 'fixture', systemPrompt: 'brief', messages: history,
+        tools: [], allowTools: false, vision: false, temperature: 0.7, systemRole: 'system', reasoningEffort: false,
+        maxTokensField: 'max_tokens', maxOutputTokens: 2048, assistantAfterToolResult: false });
+      expect(JSON.stringify(next)).not.toMatch(/SYNTHETIC_FAILED_REPLAY_AUTHORITY|"type":"thinking"|redacted_thinking|reasoningContent/);
+    },
+  );
 
   it("forbids tools on the closing step by not sending them", async () => {
     // Omitted rather than sent with `tool_choice: "none"`. Both stop the call,
@@ -998,9 +1290,7 @@ describe("createStepFunction", () => {
     expect(result.failureClass).toBe("provider_safety_block");
   });
 
-  it("records no class for a network failure the provider never answered", async () => {
-    // There is no status to classify, and the transport failure already has its
-    // own wording. Recording a class here would mean inventing one.
+  it("withholds private transport detail when no structured cause is known", async () => {
     const step = createStepFunction({
       ...request,
       fetchImpl: async () => {
@@ -1011,7 +1301,7 @@ describe("createStepFunction", () => {
     const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
 
     expect(result.failureClass).toBeUndefined();
-    expect(result.errorMessage).toContain("socket hang up");
+    expect(result.errorMessage).toBe("Network error: request failed. Details withheld.");
   });
 
   it("waits the delay the server asked for", async () => {

@@ -8,7 +8,7 @@ import type { PromptMeasurement } from '../context/request/model.js';
 /** Bind the known transient opening rewrite without persisting its environment or attached source text. */
 export function storedPromptProjection(messages: readonly AgentMessage[], projection: ReturnType<typeof outgoingProjection>,
   source: { readonly opening: AgentMessage; readonly stored: AgentMessage } | undefined,
-  bridge: boolean, wireMessageCount: number): PromptMeasurement['projection'] {
+  bridge: boolean, wireMessageCount: number, pruneToolText = true): PromptMeasurement['projection'] {
   if (!source || source.opening.role !== 'user' || source.stored.role !== 'user'
     || typeof source.opening.content !== 'string' || typeof source.stored.content !== 'string'
     || !projection.indexAligned || wireMessageCount !== messages.length) return undefined;
@@ -20,7 +20,7 @@ export function storedPromptProjection(messages: readonly AgentMessage[], projec
   if (!source.opening.content.endsWith(`\n\n${source.stored.content}`)) return undefined;
   const canonical = messages.map((message, position) => position === index
     ? { ...message, content: source.stored.content } : message);
-  const projected = outgoingProjection(canonical, bridge);
+  const projected = outgoingProjection(canonical, bridge, pruneToolText);
   if (!projected.indexAligned) return undefined;
   let removedChars = 0;
   for (let position = 0; position < messages.length; position++) {
@@ -37,7 +37,7 @@ export function storedPromptProjection(messages: readonly AgentMessage[], projec
 
 /** Prove a source-indexed text rewrite against the exact request the provider measured. */
 export function measuredProjectionPrefix(messages: readonly AgentMessage[],
-  projection: ReturnType<typeof outgoingProjection>, usage: SessionUsageTelemetry, bridge: boolean) {
+  projection: ReturnType<typeof outgoingProjection>, usage: SessionUsageTelemetry, bridge: boolean, pruneToolText = true) {
   const count = usage.lastPromptMessageCount;
   const recorded = usage.lastPromptIdentity;
   const currentDigest = historyDigest(messages.slice(0, count));
@@ -52,7 +52,7 @@ export function measuredProjectionPrefix(messages: readonly AgentMessage[],
   // Reconstruct the old request from the unchanged raw prefix. This checks the
   // codec and pruning decisions as well as the source digest; a changed wire
   // digest alone never licenses reuse of an anchor.
-  const original = outgoingProjection(messages.slice(0, count), bridge);
+  const original = outgoingProjection(messages.slice(0, count), bridge, pruneToolText);
   if (!original.indexAligned || historyDigest(original.messages) !== (stored?.wireHistoryDigest ?? recorded.wireHistoryDigest)) return undefined;
   const baseline = Math.ceil(original.savedChars / CHARS_PER_TOKEN);
   const recordedRewrite = stored?.wireRewriteTokens ?? recorded.wireRewriteTokens;

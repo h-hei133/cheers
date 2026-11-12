@@ -18,6 +18,33 @@ const overhead = { systemPrompt: 'Answer briefly.', tools: [] };
 const hooks = { dispatch: async () => ({ decision: 'allow', stopChecks: [] }) } as unknown as HookDispatcher;
 afterEach(() => resetSessionUsage(id));
 
+it('keeps the selected text projection when removing only a transient opening', () => {
+  const opening = openingMessage({ workspaceRoot: '/fixture', prompt: 'inspect' });
+  const stored: SessionMessage = { role: 'user', content: 'inspect' };
+  const tail: SessionMessage[] = [
+    { role: 'assistant', content: '', tool_calls: [{ id: 'source', type: 'function',
+      function: { name: 'read', arguments: '{}' } }] },
+    { role: 'tool', content: 'source\n'.repeat(900), tool_call_id: 'source' },
+    ...Array.from({ length: 4 }, (_, index): SessionMessage[] => [
+      { role: 'user', content: `continue ${index}` }, { role: 'assistant', content: 'working' },
+    ]).flat(),
+  ];
+  const messages = [opening, ...tail];
+  const projection = outgoingProjection(messages, false, false);
+  const canonical = storedPromptProjection(messages, projection, { opening, stored }, false, messages.length, false)!;
+  expect(canonical.wireRewriteTokens).toBe(0);
+  const storedMessages = [stored, ...tail];
+  expect(canonical.wireHistoryDigest).toBe(historyDigest(outgoingProjection(storedMessages, false, false).messages));
+  const usage = { ...getSessionUsage(id), lastPromptTokens: 9000, lastPromptMessageCount: messages.length,
+    lastPromptIdentity: { ...requestIdentity(overhead), provider: 'fixture', model: 'model',
+      historyDigest: historyDigest(messages), wireHistoryDigest: historyDigest(projection.messages),
+      wireMessageCount: messages.length, wireRewriteTokens: 0 }, lastPromptProjection: canonical };
+  expect(measuredProjectionPrefix(storedMessages, outgoingProjection(storedMessages, false, false), usage, false, false)
+    ?.rewriteTokensRemoved).toBe(canonical.removedTokens);
+  expect(measuredProjectionPrefix(storedMessages, outgoingProjection(storedMessages, false, true), usage, false, true))
+    .toBeUndefined();
+});
+
 it('rejects unrelated stored prompts and a framing reduction that exhausts the measured anchor', async () => {
   const opening = openingMessage({ workspaceRoot: '/fixture', prompt: 'actual' });
   const messages = [opening]; const projection = outgoingProjection(messages, false);

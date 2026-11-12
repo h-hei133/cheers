@@ -1,4 +1,5 @@
 import { streamTracer } from '../observability/logs/stream.js';
+import { IncompleteStreamError, providerResponseError } from '../provider/response/error.js';
 
 /**
  * Reading a chat completion as it arrives.
@@ -283,7 +284,7 @@ export async function* readCompletionStream(
   if (tail) yield { kind: "text", text: tail };
 
   if (!ended && !settled) {
-    throw new Error("Provider stream ended before it reported the message was complete");
+    throw new IncompleteStreamError();
   }
 
   traceStream(`turn ended finish_reason=${state.finishReason ?? "-"} content_chars=${state.content.length} calls=${state.calls.length} usage=${state.usage ? "yes" : "no"}`);
@@ -318,10 +319,7 @@ function absorb(
   // the fragments already yielded looking like an answer. The caller keeps
   // them as the text the user has already read; the throw is what stops them
   // from being taken for the answer.
-  if (parsed.error) {
-    const detail = parsed.error.message || parsed.error.type || String(parsed.error.code ?? "unknown error");
-    throw new Error(`Provider reported an error mid-stream: ${detail}`);
-  }
+  if (parsed.error) throw providerResponseError(parsed.error);
   if (parsed.usage) state.usage = parsed.usage;
   const choice = parsed.choices?.[0];
   if (choice?.finish_reason) state.finishReason = choice.finish_reason;
@@ -499,18 +497,16 @@ function assemble(state: StreamState): StreamedCompletion {
   const ordered = state.calls.every((call) => call.index !== undefined)
     ? [...state.calls].sort((left, right) => left.index! - right.index!)
     : state.calls;
-  const toolCalls = ordered
-    // A call with no name cannot be dispatched. With empty names no longer
-    // erasing real ones, reaching here means the host truly never sent one.
-    .filter((call) => call.name.length > 0)
-    .map((call, position) => ({
-      id: call.id.length > 0 ? call.id : `call_stream_${position}`,
-      type: "function" as const,
-      function: {
-        name: call.name,
-        arguments: call.object ? JSON.stringify(call.object) : call.args,
-      },
-    }));
+  // Preserve malformed envelopes so final admission can refuse their entire
+  // response. Dropping an unnamed sibling would authorize a partial batch.
+  const toolCalls = ordered.map((call, position) => ({
+    id: call.id.length > 0 ? call.id : `call_stream_${position}`,
+    type: "function" as const,
+    function: {
+      name: call.name,
+      arguments: call.object ? JSON.stringify(call.object) : call.args,
+    },
+  }));
 
   return {
     message: {

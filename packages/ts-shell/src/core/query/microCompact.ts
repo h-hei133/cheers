@@ -1,5 +1,7 @@
 import { messageToText, type MultimodalContentBlock } from "../../model-adapters/multimodal.js";
 export interface MicrocompactOptions {
+  /** False retains tool text; older tool images still follow the media policy. */
+  readonly pruneToolText?: boolean;
   readonly keepRecentTurns?: number;
   readonly maxOutputChars?: number;
   readonly headChars?: number;
@@ -106,6 +108,12 @@ export function microcompactMessages<T extends ChatMessageLike>(
       const imageNotice = hasImages ? "\n[Older tool images omitted; re-read the source if visual content is needed.]" : '';
       const originalLen = typeof msg.content === 'string' ? msg.content.length
         : (msg.content ?? []).reduce((length, block) => length + (block.type === 'image' ? block.data.length : block.text.length), 0);
+      if (options.pruneToolText === false) {
+        if (!hasImages) return msg;
+        prunedCount++;
+        savedChars += Math.max(0, originalLen - content.length - imageNotice.length);
+        return { ...msg, content: content + imageNotice };
+      }
       // Distinct original results can have identical clipped head/tail text.
       // Do not deduplicate those projections on a later pass.
       if (!hasImages && isPrunedToolContent(content, headChars, tailChars)) return msg;

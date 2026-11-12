@@ -60,6 +60,7 @@ export function createConfigFields(providers: readonly string[]) {
     maxOutputTokens: field(positiveSchema),
     contextWindow: field(positiveSchema),
     reserveTokens: field(countSchema),
+    pruneToolText: field(booleanSchema, withOverride),
     keepRecentTokens: field(countSchema),
     modelTokenBudgets: field({ type: 'object', propertyNames: nameSchema, additionalProperties: objectSchema({ reserveTokens: countSchema, keepRecentTokens: countSchema }) }),
     instructionBudgetBytes: field(countSchema, withOverride, 'replace', false, { projectTrust: [0] }),

@@ -18,6 +18,7 @@
  */
 
 import { formatNonVisionFallback, messageToText, type MultimodalContentBlock } from "../../model-adapters/multimodal.js";
+import { IncompleteStreamError } from '../response/error.js';
 import type { CompletedBody, StreamFragment, StreamedCompletion } from "../../turn/completion.js";
 import { validGoogleFrame } from './google/frame.js';
 import type { GooglePart, GoogleContent, GoogleMessage } from './google/model.js';
@@ -374,7 +375,7 @@ export async function* readGoogleStream(
   }
 
   if (finishReason === undefined) {
-    throw new Error("Provider stream ended before it reported the message was complete");
+    throw new IncompleteStreamError();
   }
 
   const valid = googleOutput(output.parts);

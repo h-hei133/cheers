@@ -221,6 +221,29 @@ it.each([undefined, 1200])('uses the top-level retention budget unless the model
   expect(wiring.policy.keepRecentTokens).toBe(modelBudget ?? 2000);
 });
 
+it('prices retained tool text for summary pressure while respecting the automatic compaction switch', () => {
+  const messages = Array.from({ length: 8 }, (_, index) => [
+    { role: 'user' as const, content: `read ${index}` },
+    { role: 'assistant' as const, content: '', tool_calls: [{ id: `read-${index}`, type: 'function' as const,
+      function: { name: 'read', arguments: '{}' } }] },
+    { role: 'tool' as const, tool_call_id: `read-${index}`, content: `${index}:` + 'source\n'.repeat(600) },
+  ]).flat();
+  const provider = { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' as const };
+  const catalog = [{ id: 'fixture', models: [{ id: 'fixture-model', contextWindow: 10000, maxTokens: 128 }] }];
+  const overhead = { systemPrompt: 'main', tools: [] };
+  const policyFor = (pruneToolText: boolean, compactionEnabled = true) => withRequestOverhead({
+    ...buildCompactionWiring({ provider, runtimeConfig: { ...fixture.config, reserveTokens: 0, maxOutputTokens: 128,
+      keepRecentTokens: 600, pruneToolText, compactionEnabled } as never, sessionId: 'signed-summary', catalog }),
+    onCompact: () => {},
+  }, overhead)!.policy;
+  const retained = policyFor(false);
+  expect(retained.projectMessages!(messages)).toEqual(messages);
+  expect(estimateRequestTokens(retained.projectMessages!(messages), overhead)).toBeGreaterThan(8000);
+  expect(planCompaction(messages, retained)).toBeDefined();
+  expect(planCompaction(messages, policyFor(true))).toBeUndefined();
+  expect(planCompaction(messages, policyFor(false, false))).toBeUndefined();
+});
+
 it.each([false, true])('prices projected tool history before fallback compaction (bridge=%s)', bridge => {
   const catalog = [{ id: 'fixture', endpoint: 'openai-compatible' as const, models: [
     { id: 'fixture-model', contextWindow: 50_000, compat: { assistantAfterToolResult: bridge } },

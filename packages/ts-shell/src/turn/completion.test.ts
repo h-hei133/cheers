@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ProviderResponseError } from '../provider/response/error.js';
 import {
   isEventStream,
   readCompletionStream,
@@ -96,12 +97,14 @@ describe("reading a streamed completion", () => {
     expect(result.message.tool_calls?.map((call) => call.id)).toEqual(["a", "b"]);
   });
 
-  it("drops a tool call that never received a name", async () => {
+  it("retains a tool call that never received a name for final refusal", async () => {
     const { result } = await collect(
       streamOf(chunk({ tool_calls: [{ index: 0, function: { arguments: "{}" } }] }), "data: [DONE]\n\n"),
     );
 
-    expect(result.message.tool_calls).toBeUndefined();
+    expect(result.message.tool_calls).toEqual([
+      { id: "call_stream_0", type: "function", function: { name: "", arguments: "{}" } },
+    ]);
   });
 
   it("carries the finish reason and the usage totals", async () => {
@@ -144,24 +147,53 @@ describe("reading a streamed completion", () => {
 });
 
 describe("an error the provider reports mid-stream", () => {
-  it("throws instead of presenting the text so far as a finished answer", async () => {
-    // The transport succeeded and the answer did not. Without this the reader
-    // treats the chunk as an empty delta, and the turn reports "Hello" as the
-    // complete answer to a request the provider refused.
-    await expect(
-      collect(
-        streamOf(
-          chunk({ content: "Hello" }),
-          `data: ${JSON.stringify({ error: { message: "upstream exploded", type: "server_error" } })}\n\n`,
-        ),
-      ),
-    ).rejects.toThrow("Provider reported an error mid-stream: upstream exploded");
+  it("throws a report-safe failure instead of finishing the text so far", async () => {
+    const canary = 'SSE_PRIVATE_CANARY';
+    const failed = collect(streamOf(
+      chunk({ content: "Hello" }),
+      'data: ' + JSON.stringify({ error: { message: canary + ' upstream exploded', type: "server_error" } }) + '\n\n',
+    ));
+
+    await expect(failed).rejects.toBeInstanceOf(ProviderResponseError);
+    await expect(failed).rejects.toMatchObject({
+      name: 'ProviderResponseError',
+      failureClass: 'provider_endpoint',
+      message: 'Provider reported an error: provider_endpoint. Response details withheld.',
+    });
+    await expect(failed).rejects.not.toThrow(canary);
+    await expect(failed).rejects.not.toHaveProperty('cause');
   });
 
-  it("names the error type when the frame carries no message", async () => {
-    await expect(
-      collect(streamOf(`data: ${JSON.stringify({ error: { type: "overloaded_error" } })}\n\n`)),
-    ).rejects.toThrow("Provider reported an error mid-stream: overloaded_error");
+  it("withholds an unrecognized error type when the frame has no message", async () => {
+    const failed = collect(streamOf('data: ' + JSON.stringify({ error: { type: "overloaded_error" } }) + '\n\n'));
+    await expect(failed).rejects.toMatchObject({
+      failureClass: 'provider_endpoint',
+      message: 'Provider reported an error: provider_endpoint. Response details withheld.',
+    });
+    await expect(failed).rejects.not.toThrow('overloaded_error');
+  });
+
+  it.each([
+    [{ type: 'authentication_error' }, 'provider_auth'],
+    [{ code: 'invalid_api_key' }, 'provider_auth'],
+    [{ type: 'permission_error' }, 'provider_auth'],
+    [{ type: 'rate_limit_error' }, 'provider_rate_limited'],
+    [{ code: 'rate_limit_exceeded' }, 'provider_rate_limited'],
+    [{ message: 'ThrottlingException: rate exceeded SSE_PRIVATE_CANARY' }, 'provider_rate_limited'],
+    [{ type: 'content_filter' }, 'provider_safety_block'],
+    [{ message: 'HTTP 401: invalid API key SSE_PRIVATE_CANARY' }, 'provider_endpoint'],
+    [{ type: 'upstream_error', message: 'capacity unavailable SSE_PRIVATE_CANARY' }, 'provider_endpoint'],
+    [{ type: 'socket_error', message: 'connection lost SSE_PRIVATE_CANARY' }, 'provider_endpoint'],
+    [{ code: 429 }, 'provider_endpoint'],
+  ] as const)("classifies an in-band error without inventing HTTP evidence (%j)", async (error, failureClass) => {
+    const failed = collect(streamOf('data: ' + JSON.stringify({ error }) + '\n\n'));
+    await expect(failed).rejects.toMatchObject({
+      failureClass,
+      message: 'Provider reported an error: ' + failureClass + '. Response details withheld.',
+    });
+    await expect(failed).rejects.not.toThrow('SSE_PRIVATE_CANARY');
+    await expect(failed).rejects.not.toHaveProperty('status');
+    await expect(failed).rejects.not.toHaveProperty('cause');
   });
 });
 
@@ -214,6 +246,21 @@ describe("reasoning that arrives beside the answer", () => {
 });
 
 describe("hosts that disagree with the wire contract", () => {
+  it.each([undefined, '', ' '] as const)('retains an unnamed sibling for final refusal (%s)', async name => {
+    const usage = { prompt_tokens: 8, completion_tokens: 12, total_tokens: 20 };
+    const { result } = await collect(streamOf(
+      chunk({ tool_calls: [
+        { index: 0, id: 'complete', function: { name: 'write', arguments: '{"path":"first","content":"complete"}' } },
+        { index: 1, id: 'unnamed', function: { ...(name === undefined ? {} : { name }), arguments: '{"path":"second","content":"partial' } },
+      ] }, { finish_reason: 'tool_calls' }),
+      `data: ${JSON.stringify({ choices: [], usage })}\n\n`, 'data: [DONE]\n\n',
+    ));
+    expect(result.message.tool_calls).toHaveLength(2);
+    expect(result.message.tool_calls?.[1]).toMatchObject({ id: 'unnamed', function: { name: name ?? '', arguments: '{"path":"second","content":"partial' } });
+    expect(result.finishReason).toBe('tool_calls');
+    expect(result.usage).toEqual(usage);
+  });
+
   it("keeps the name a host sent once and then re-sent as an empty string", async () => {
     // The shape a real DeepSeek host streams: the opening entry carries id, type
     // and name; every argument chunk after it repeats the keys as `""` and `null`.

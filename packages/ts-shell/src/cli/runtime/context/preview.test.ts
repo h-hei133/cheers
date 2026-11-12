@@ -149,6 +149,50 @@ it('inspects current history without adding a pending opening or connecting the 
   } finally { body.mockRestore(); }
 });
 
+it.each([true, false])('matches retained source in current-history preview and native dispatch (prune=%s)', async pruneToolText => {
+  const { context, manager, gateway, session, layout, cwd, target } = fixture();
+  const config = { ...context.runtimeConfig, pruneToolText, maxTurns: 3, contextWindow: 100_000 };
+  Object.assign(context, { runtimeConfig: config,
+    configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
+  const fact = 'Retain the cross-file rendering order.';
+  const text = 'prefix\n'.repeat(300) + fact + '\nsuffix'.repeat(600);
+  const history: SessionMessage[] = [
+    { role: 'user', content: 'inspect' },
+    { role: 'assistant', content: '', tool_calls: [{ id: 'source', type: 'function',
+      function: { name: 'read', arguments: '{"path":"source.ts"}' } }] },
+    { role: 'tool', tool_call_id: 'source', content: text },
+    ...Array.from({ length: 4 }, (_, index): SessionMessage[] => [
+      { role: 'user', content: `continue ${index}` }, { role: 'assistant', content: 'working' },
+    ]).flat(),
+  ];
+  for (const message of history) appendSessionTurn({ session, message,
+    timestamp: new Date(Date.parse(session.createdAt) + session.turns.length * 1000).toISOString(),
+    append: event => appendTranscriptEvent(layout.transcriptPath, event),
+    writeMetadata: next => writeSessionMetadataRecord({ session: next, layout }),
+    writeState: next => writeSessionState({ session: next, layout }) });
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+  const preview = await previewContext(context, manager, gateway, '', undefined, 'build', 'ask',
+    new AbortController().signal, true);
+  preview.verify();
+  const [endpoint, input] = wire.mock.calls.at(-1)!;
+  const previewBody = JSON.stringify(wire.mock.results.at(-1)!.value);
+  expect(previewBody.includes(fact)).toBe(!pruneToolText);
+  let sent = '';
+  const step = createStepFunction({ workspaceRoot: cwd, sessionId: session.id,
+    provider: { ...target, endpoint, headers: {} }, catalog: context.configuration.current.catalog,
+    systemPrompt: input.systemPrompt, tools: input.tools, temperature: input.temperature, topP: input.topP,
+    maxOutputTokens: input.maxOutputTokens, thinkingEffort: null, pruneToolText,
+    fetchImpl: async (_url, init) => { sent = String(init?.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'done' }, finish_reason: 'stop' }] }),
+        { headers: { 'content-type': 'application/json' } }); } });
+  try {
+    expect((await step(history, undefined, {}, { allowTools: input.allowTools })).text).toBe('done');
+    expect(sent).toBe(previewBody);
+    expect(preview.estimate.tokens).toBe(estimateWirePrompt(JSON.parse(sent), endpoints.endpointShape(endpoint).contextFields));
+    expect(gateway.snapshot).not.toHaveBeenCalled();
+  } finally { resetSessionUsage(session.id); preview.dispose?.(); }
+});
+
 it('corrects a measured tool history anchor when the live wire projection microcompacts its prefix', async () => {
   const { load, session, layout, target, context, cwd } = fixture({ credential: true });
   resetSessionUsage(session.id);

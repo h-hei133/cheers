@@ -135,6 +135,7 @@ export function createProviderStep(
     maxOutputTokens: configuredOutputLimit(request.runtimeConfig, endpoint),
     ...(contextWindow !== undefined ? { contextWindow } : {}),
     ...(request.runtimeConfig?.reserveTokens !== undefined ? { reserveTokens: request.runtimeConfig.reserveTokens } : {}),
+    pruneToolText: request.runtimeConfig?.pruneToolText,
     retry: {
       enabled: request.runtimeConfig?.retryEnabled,
       maxRetries: request.runtimeConfig?.providerRetryMaxRetries,

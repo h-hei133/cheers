@@ -19,14 +19,44 @@ const turn = (index: number): AgentMessage[] => [
     function: { name: 'read', arguments: '{}' } }] },
   { role: 'tool', content: `${index}:` + 'x'.repeat(5000), tool_call_id: `call-${index}` },
 ];
-const anchor = (messages: AgentMessage[], tokens = 20_000) => {
-  const original = outgoingProjection(messages, false);
+const anchor = (messages: AgentMessage[], tokens = 20_000, pruneToolText = true) => {
+  const original = outgoingProjection(messages, false, pruneToolText);
   return { ...getSessionUsage(sessionId), lastPromptTokens: tokens, lastPromptMessageCount: messages.length,
     lastPromptIdentity: { ...identity, historyDigest: historyDigest(messages),
       wireHistoryDigest: historyDigest(original.messages), wireMessageCount: messages.length,
       wireRewriteTokens: Math.ceil(original.savedChars / 3.5) } };
 };
 afterEach(() => resetSessionUsage(sessionId));
+
+it.each([true, false])('rejects an incompatible measured text projection when changing pruning from %s', before => {
+  const old = [...turn(0), ...turn(1), ...turn(2), ...turn(3), ...turn(4)];
+  old[5] = { ...old[5]!, content: old[2]!.content };
+  const usage = anchor(old, 20_000, before);
+  const current = [...old, ...turn(5)];
+  const projection = outgoingProjection(current, false, !before);
+  const proof = measuredProjectionPrefix(current, projection, usage, false, !before);
+  expect(proof).toBeUndefined();
+  const estimate = estimatePrompt(current, overhead, { ...identity,
+    historyDigest: historyDigest(current), wireHistoryDigest: historyDigest(projection.messages),
+    wireMessageCount: current.length }, usage, { tokens: 42_000, method: 'characters/3.5' });
+  expect(estimate).toMatchObject({ source: 'estimated', tokens: 42_000 });
+  expect(usage.lastPromptTokens).toBe(20_000);
+});
+
+it('retains a valid unpruned measurement without inventing freed tokens', () => {
+  const old = [...turn(0), ...turn(1), ...turn(2), ...turn(3), ...turn(4)];
+  const current = [...old, ...turn(5), ...turn(6)];
+  const usage = anchor(old, 20_000, false);
+  const projection = outgoingProjection(current, false, false);
+  expect(projection.savedChars).toBe(0);
+  expect(measuredProjectionPrefix(current, projection, usage, false, false)?.rewriteTokensRemoved).toBe(0);
+  const short = turn(0);
+  const extended = [...short, ...turn(1), ...turn(2), ...turn(3), ...turn(4)];
+  const equivalentAnchor = anchor(short, 20_000, false);
+  expect(historyDigest(outgoingProjection(short, false, true).messages)).toBe(equivalentAnchor.lastPromptIdentity.wireHistoryDigest);
+  expect(measuredProjectionPrefix(extended, outgoingProjection(extended, false, true), equivalentAnchor, false, true)
+    ?.rewriteTokensRemoved).toBeGreaterThan(0);
+});
 
 it('keeps pruning idempotent while retaining text that merely mentions an omission', () => {
   const pruned = pruneToolContent('a'.repeat(5000));

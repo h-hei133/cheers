@@ -9,6 +9,7 @@ import type { ToolSchema } from "../../turn/tools.js";
 import type { ProviderUsage, StreamFragment, StreamedCompletion, StreamedToolCall } from "../../turn/completion.js";
 import { copilotRequestHeaders } from "./copilotHeaders.js";
 import { declareEndpoint } from "./kinds.js";
+import { IncompleteStreamError } from '../response/error.js';
 
 /**
  * The Anthropic Messages wire shape.
@@ -517,7 +518,7 @@ export async function* readAnthropicStream(
         // Kept, not swallowed. Returning here would present a truncated answer as
         // a finished one: the caller sees a normal message with no finish reason
         // and has nothing to tell the user that anything went wrong.
-        throw new Error(`Stream interrupted: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(`Stream interrupted: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
       }
       if (chunk.done) {
         // A complete final JSON event may arrive without its blank separator.
@@ -553,7 +554,7 @@ export async function* readAnthropicStream(
   // one without the other. Requiring both would fail requests that were
   // answered, so a stream that reported either is left alone.
   if (finishReason === undefined && !sawMessageStop) {
-    throw new Error("Provider stream ended before it reported the message was complete");
+    throw new IncompleteStreamError();
   }
 
   return {

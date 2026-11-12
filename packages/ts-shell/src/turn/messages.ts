@@ -3,9 +3,10 @@ import type { AgentMessage } from '../core/agent/state.js';
 import { toChatMessages, type ChatMessage } from './prompt.js';
 
 /** Identical source projection for dispatch and local preview. */
-export function outgoingProjection(messages: readonly AgentMessage[], bridge: boolean) {
+export function outgoingProjection(messages: readonly AgentMessage[], bridge: boolean, pruneToolText = true) {
   const converted = toChatMessages(messages);
-  const { messages: compacted, prunedCount, savedChars } = microcompactMessages(converted, { keepRecentTurns: 3, maxOutputChars: 1000 });
+  const { messages: compacted, prunedCount, savedChars } = microcompactMessages(converted,
+    { keepRecentTurns: 3, maxOutputChars: 1000, pruneToolText });
   let result: ChatMessage[] = compacted;
   if (bridge) {
     result = [];
@@ -29,8 +30,8 @@ export function outgoingProjection(messages: readonly AgentMessage[], bridge: bo
   };
 }
 
-export function outgoingMessages(messages: readonly AgentMessage[], bridge: boolean): readonly ChatMessage[] {
-  return outgoingProjection(messages, bridge).messages;
+export function outgoingMessages(messages: readonly AgentMessage[], bridge: boolean, pruneToolText = true): readonly ChatMessage[] {
+  return outgoingProjection(messages, bridge, pruneToolText).messages;
 }
 
 export const FINAL_STEP_MESSAGE =

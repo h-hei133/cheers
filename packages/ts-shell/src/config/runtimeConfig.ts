@@ -179,6 +179,8 @@ export interface RuntimeConfig {
    */
   readonly contextWindow?: number;
   readonly reserveTokens?: number;
+  /** Reduce older tool text before dispatch; images and automatic summaries use separate policies. */
+  readonly pruneToolText?: boolean;
   /** Recent conversation tokens to retain; an exact per-model budget takes precedence. */
   readonly keepRecentTokens?: number;
   /**
@@ -400,6 +402,7 @@ export interface RuntimeConfigFile {
   maxOutputTokens?: number;
   contextWindow?: number;
   reserveTokens?: number;
+  pruneToolText?: boolean;
   keepRecentTokens?: number;
   modelTokenBudgets?: Record<string, ModelTokenBudget>;
   instructionBudgetBytes?: number;
@@ -444,6 +447,7 @@ export const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProven
   topP: 1.0,
   maxOutputTokens: 4096,
   reserveTokens: 8_000,
+  pruneToolText: true,
   modelTokenBudgets: {},
   instructionBudgetBytes: 32 * 1024,
   allowUntrustedHooks: false,
@@ -497,6 +501,7 @@ export const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProven
  */
 export interface RuntimeConfigOverrides {
   readonly attentionOnIdle?: boolean;
+  readonly pruneToolText?: boolean;
   readonly theme?: string;
   readonly instructionBudgetBytes?: number
   /** Skip self-initiated requests; `undefined` leaves the configured value. */
@@ -570,6 +575,7 @@ export function getRuntimeConfig(
     // be consulted.
     ...(merged.contextWindow !== undefined ? { contextWindow: merged.contextWindow } : {}),
     reserveTokens: merged.reserveTokens ?? DEFAULT_CONFIG.reserveTokens,
+    pruneToolText: merged.pruneToolText ?? DEFAULT_CONFIG.pruneToolText,
     ...(merged.keepRecentTokens !== undefined ? { keepRecentTokens: merged.keepRecentTokens } : {}),
     modelTokenBudgets: merged.modelTokenBudgets ?? DEFAULT_CONFIG.modelTokenBudgets,
     instructionBudgetBytes:

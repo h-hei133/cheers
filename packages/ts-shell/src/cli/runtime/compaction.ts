@@ -206,7 +206,7 @@ export function buildCompactionWiring(input: {
       // a large tool result before it reaches the provider, and protocol
       // bridging can add an assistant acknowledgement in the middle.
       projectMessages: (messages: readonly AgentMessage[]) => outgoingProjection(messages,
-        mainShape.assistantAfterToolResult).messages.map(message => ({
+        mainShape.assistantAfterToolResult, runtimeConfig.pruneToolText).messages.map(message => ({
         ...message,
         content: message.content ?? '',
       })),
@@ -234,9 +234,9 @@ export function buildCompactionWiring(input: {
         if (!Number.isSafeInteger(measuredMessageCount) || measuredMessageCount < 0 || measuredMessageCount > messages.length) return undefined;
         if (identity?.historyDigest !== undefined && identity.historyDigest !== recordedHistory) return undefined;
         if (identity?.wireHistoryDigest !== undefined && identity.wireHistoryDigest !== recorded?.wireHistoryDigest) return undefined;
-        const projection = outgoingProjection(messages, mainShape.assistantAfterToolResult);
+        const projection = outgoingProjection(messages, mainShape.assistantAfterToolResult, runtimeConfig.pruneToolText);
         const prefix = recorded?.wireHistoryDigest !== undefined
-          ? measuredProjectionPrefix(messages, projection, usage, mainShape.assistantAfterToolResult) : undefined;
+          ? measuredProjectionPrefix(messages, projection, usage, mainShape.assistantAfterToolResult, runtimeConfig.pruneToolText) : undefined;
         if (recorded?.wireHistoryDigest !== undefined && (!prefix
           || identity?.wireMessageCount !== undefined && identity.wireMessageCount !== recorded.wireMessageCount)) return undefined;
         const historyIdentity = recordedHistory !== undefined

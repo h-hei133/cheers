@@ -4,10 +4,9 @@ import { createComponentLogger } from "../observability/structuredLogger.js";
 import { ModelAdmissionError, type ModelTransport, type RequestPolicy } from '../core/agent/request/model.js';
 import { prepareRequestAttempt, type RequestAttempt } from '../provider/request/attempt.js';
 import { hasUsage, usageFromProvider } from "../provider/response/usage.js";
-import type { AgentToolCall } from "../core/agent/tools.js";
+import { parseToolArgs, type AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
-import { parseJsonWithRepair } from "../model-adapters/jsonRepair.js";
 import { clearContextUsage, getSessionUsage, markContextUnknown, measuredPromptContext, recordSessionUsage, type SessionUsageRecord } from "../observability/usageTelemetry.js";
 import { captureUsageAttribution } from '../observability/usage/identity.js';
 import { promptTokensFor, requestBudget } from '../context/request/budget.js';
@@ -24,6 +23,8 @@ import { DEFAULT_ENDPOINT_KIND, endpointKind, endpointShape, endpointTurnBody, e
 import { requestReplayBinding } from '../provider/request/replay.js';
 import type { SentRequest } from "../provider/request/sentRequest.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../provider/registry/provider.js";
+import { IncompleteStreamError, ProviderResponseError } from '../provider/response/error.js';
+import { providerRequestError } from '../provider/request/error.js';
 import { type ChatMessage } from "./prompt.js";
 import {
   outgoingProjection,
@@ -171,6 +172,8 @@ export interface StepRequest {
   readonly contextWindow?: number;
   /** Headroom held back from the shared window. */
   readonly reserveTokens?: number;
+  /** Retain bounded tool text when false; media and request limits still apply. */
+  readonly pruneToolText?: boolean;
   readonly fetchImpl?: typeof fetch;
   /**
    * The catalog to ask how this model wants requests shaped.
@@ -340,7 +343,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       const modelEntry = catalogModel(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, catalogAddress);
       const usageAttribution = captureUsageAttribution({ provider: request.provider.provider ?? '', model: request.provider.model,
         baseUrl: request.provider.baseUrl, rates: modelEntry?.cost });
-      const projection = outgoingProjection(messages, shape.assistantAfterToolResult);
+      const projection = outgoingProjection(messages, shape.assistantAfterToolResult, request.pruneToolText);
       const finalMessages = finalStepMessages(
         projection.messages,
         allowTools,
@@ -365,14 +368,14 @@ export function createStepFunction(request: StepRequest): StepFunction {
         replayBinding,
       };
       const promptProjection = storedPromptProjection(messages, projection, options.promptSource,
-        shape.assistantAfterToolResult, promptIdentity.wireMessageCount);
+        shape.assistantAfterToolResult, promptIdentity.wireMessageCount, request.pruneToolText);
       const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
         model: request.provider.model, endpoint, schemaDigest, systemDigest,
         endpointId: usageAttribution.endpointId, historyDigest: messageDigest, wireHistoryDigest, replayBinding });
       const initial = promptTokensFor({ messages: budgetMessages, overhead, ...(measured ? { measured } : {}) });
       const usage = getSessionUsage(request.sessionId);
       const prefixIdentity = options.agentMode ? undefined
-        : measuredProjectionPrefix(messages, projection, usage, shape.assistantAfterToolResult);
+        : measuredProjectionPrefix(messages, projection, usage, shape.assistantAfterToolResult, request.pruneToolText);
       const calibrated = prefixIdentity ? estimatePrompt(messages, overhead, promptIdentity, usage, {
         tokens: initial.tokens, method: 'characters/3.5', prefixIdentity,
         tailMessages: budgetMessages.slice(usage.lastPromptMessageCount),
@@ -520,6 +523,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           : releaseStream.signal;
         let requestedDelayMs: number | undefined;
         let transient = false;
+        let retryableAtTurn = true;
         let releaseNow = true;
         try {
           const body = JSON.stringify(payload);
@@ -592,10 +596,13 @@ export function createStepFunction(request: StepRequest): StepFunction {
         } catch (error) {
           if (error instanceof ModelAdmissionError) return stamp({ ...errorStep(error.message, true), admissionFailure: error.code });
           if (signal?.aborted) return stamp(abortedStep(""));
-          // The request never arrived, which is the failure a second attempt
-          // most often fixes.
-          refusal = `Network error: ${error instanceof Error ? error.message : String(error)}`;
-          transient = true;
+          // No response was observed. This does not establish whether the
+          // provider received or charged the dispatched request.
+          const failure = providerRequestError(error);
+          refusal = failure.message;
+          refusalClass = failure.failureClass;
+          retryableAtTurn = failure.retryable;
+          transient = failure.retryable;
         } finally {
           // An attempt whose body is not being read releases its connection now.
           if (releaseNow) releaseStream.abort();
@@ -608,7 +615,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           // the only layer that can — marking it then would leave a transient
           // failure with no retry at all, which is worse than the doubling this
           // exists to prevent.
-          const tried = retry.maxRetries > 0;
+          const tried = retry.maxRetries > 0 || !retryableAtTurn;
           return stamp({
             ...(refusalClass
               ? failedStep(refusal, "", refusalClass, tried)
@@ -680,8 +687,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
         } else if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         responseAttempt?.settle(usage);
         const decoded = toStep(completion, watched, stopReason);
-        const ownsReplay = completion.reasoningSignature && protocol.opaqueReplay
-          || shape.reasoningReplayField && completion.reasoning && !completion.reasoningSignature && !completion.reasoningRedacted;
+        const ownsReplay = decoded.stopReason !== 'error' && decoded.stopReason !== 'aborted'
+          && (completion.reasoningSignature && protocol.opaqueReplay
+            || shape.reasoningReplayField && completion.reasoning && !completion.reasoningSignature && !completion.reasoningRedacted);
         const completed = ownsReplay && origin
           ? { ...decoded, origin: { ...origin, replayBinding } } : decoded;
         return stamp({ ...completed, ...(promptMeasurement ? { promptMeasurement } : {}),
@@ -690,6 +698,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
         if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         if (error instanceof ModelAdmissionError) return stamp({ ...failedStep(error.message, shown, undefined, true), admissionFailure: error.code });
         if (signal?.aborted) return stamp(abortedStep(shown));
+        if (error instanceof ProviderResponseError || error instanceof IncompleteStreamError) {
+          return stamp(failedStep(error.message, shown, error.failureClass,
+            acceptedResponse || shownAnything || streamAttempts > 0));
+        }
         const detail = error instanceof Error ? error.message : String(error);
         if (!acceptedResponse && !shownAnything && !REFUSAL.test(detail) && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {
           streamAttempts += 1;
@@ -704,8 +716,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
         // and discarding it would take away what they already saw. Both facts
         // travel: the text is what was said, `stopReason` is that it stopped
         // early.
-        return stamp(failedStep(`Network error: ${error instanceof Error ? error.message : String(error)}`, shown, undefined,
-          acceptedResponse || shownAnything || streamAttempts > 0));
+        const failure = providerRequestError(error);
+        return stamp(failedStep(failure.message, shown, failure.failureClass,
+          acceptedResponse || shownAnything || streamAttempts > 0 || !failure.retryable));
       } finally {
         // Reading ends as soon as the answer is complete, which can be before
         // the host closes the stream — a keep-alive proxy holds the connection
@@ -782,36 +795,44 @@ export function toStep(completion: CompletionShape, listener: StepListener,
     if (completion.streamed === undefined) listener.onText?.(text);
     else if (text !== completion.streamed) listener.onReplace?.(text);
   }
+  const malformedEnvelope = calls.some(call => typeof call?.function?.name !== 'string'
+    || call.function.name.trim().length === 0);
+  const toolCalls = malformedEnvelope ? [] : calls.map(toToolCall);
+  // Final arguments authorize execution. An incomplete sibling cannot be
+  // repaired into a write or let the complete portion of its response run.
+  const malformedArguments = stopReason !== 'length'
+    && toolCalls.some(call => typeof call.args[PARSE_ERROR_KEY] === 'string');
+  const malformed = malformedEnvelope || malformedArguments;
+  // Signed and opaque blocks carry replay authority independently of origin.
+  // A refused response retains only public reasoning text, never that authority.
+  const replayReasoning = stopReason !== 'error' && stopReason !== 'aborted' && !malformed;
+  const reasoningText = completion.reasoningRedacted && !replayReasoning ? undefined : completion.reasoning;
   const silent = !text && calls.length === 0;
   return {
     text,
-    toolCalls: calls.map(toToolCall),
-    stopReason,
+    toolCalls: malformed ? [] : toolCalls,
+    stopReason: malformed ? 'error' : stopReason,
     // Carried so the next request in this trajectory can hand the reasoning back
     // signed. It is not shown a second time — the deltas already were — but a
     // provider that signed it rejects the request that omits it.
-    ...(completion.reasoning || completion.reasoningSignature
+    ...(reasoningText || replayReasoning && completion.reasoningSignature
       ? {
           reasoning: {
-            text: completion.reasoning ?? '',
-            ...(completion.reasoningSignature ? { signature: completion.reasoningSignature } : {}),
-            ...(completion.reasoningRedacted ? { redacted: true } : {}),
+            text: reasoningText ?? '',
+            ...(replayReasoning && completion.reasoningSignature ? { signature: completion.reasoningSignature } : {}),
+            ...(replayReasoning && completion.reasoningRedacted ? { redacted: true } : {}),
           },
         }
       : {}),
-    ...(silent ? { errorMessage: emptyAnswerExplanation(choice?.finish_reason, completion.reasoning?.length ?? 0) } : {}),
+    ...(malformed ? { errorMessage: malformedEnvelope ? 'Provider returned malformed tool calls. No tool calls were executed.'
+      : 'Provider returned malformed tool arguments. No tool calls were executed.', retriesExhausted: true }
+      : silent ? { errorMessage: emptyAnswerExplanation(choice?.finish_reason, completion.reasoning?.length ?? 0) } : {}),
   };
 }
-function toToolCall(call: StreamedToolCall): AgentToolCall {
-  let args: unknown;
-  try {
-    args = parseJsonWithRepair<Record<string, unknown>>(call.function.arguments || "{}");
-  } catch (error) {
-    args = {
-      [PARSE_ERROR_KEY]: `Invalid JSON arguments: ${error instanceof Error ? error.message : String(error)}. Raw: ${call.function.arguments.slice(0, 500)}`,
-    };
-  }
-  return { id: call.id, name: call.function.name, args };
+function toToolCall(call: StreamedToolCall): AgentToolCall & { readonly args: Record<string, unknown> } {
+  const parsed = parseToolArgs(call.function.arguments);
+  return { id: call.id, name: call.function.name,
+    args: 'args' in parsed ? parsed.args : { [PARSE_ERROR_KEY]: 'Tool arguments must be a complete JSON object.' } };
 }
 
 /**
@@ -888,9 +909,8 @@ function errorStep(message: string, retriesExhausted = false): AssistantStep {
  * arrived.
  *
  * `failureClass` is recorded alongside `message` rather than folded into it.
- * The message is the provider's own words, which is what makes a failure
- * diagnosable; the class is what lets a reader act on it without matching
- * against prose every provider phrases differently.
+ * The message is a report-safe explanation; private provider detail stays
+ * within its classifier. The class lets a reader act without matching prose.
  */
 function failedStep(
   message: string,

@@ -14,6 +14,7 @@
  */
 
 import { declareEndpoint } from "./kinds.js";
+import { IncompleteStreamError } from '../response/error.js';
 import type { EndpointShape, SimpleRequest, TurnRequest } from "./kinds.js";
 import { readEventStream, type EventMessage } from "../aws/eventStream.js";
 import { resolveCredentials } from "../aws/credentials.js";
@@ -285,7 +286,7 @@ async function* readConverseStream(
   if (!sawMessageStop) {
     // A stream without completion evidence is a truncated answer, and saying
     // so beats returning the part that arrived as though it were the whole thing.
-    throw new Error("Provider stream ended before it reported the message was complete");
+    throw new IncompleteStreamError();
   }
 
   return {

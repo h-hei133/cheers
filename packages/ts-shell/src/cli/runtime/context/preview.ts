@@ -176,7 +176,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     throw new Error('Configured service tier is unavailable.');
   }
   const output = protocol.outputControl === 'provider' ? undefined : shape.maxOutputCeiling;
-  const projection = outgoingProjection(messages, shape.assistantAfterToolResult);
+  const projection = outgoingProjection(messages, shape.assistantAfterToolResult, config.pruneToolText);
   const wireMessages = finalStepMessages(
     projection.messages,
     allowTools,
@@ -204,7 +204,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     catalogModel(publication.catalog, resolution.provider, resolution.model, base)?.tokenizer);
   const usage = getSessionUsage(expected.id);
   const count = usage.lastPromptMessageCount;
-  const prefixIdentity = measuredProjectionPrefix(messages, projection, usage, shape.assistantAfterToolResult);
+  const prefixIdentity = measuredProjectionPrefix(messages, projection, usage, shape.assistantAfterToolResult, config.pruneToolText);
   const estimate = estimatePrompt(messages, overhead, { provider: resolution.provider, model: resolution.model,
     endpoint, endpointId, ...assembledIdentity, wireHistoryDigest, wireMessageCount: wireMessages.length,
     wireRewriteTokens: Math.ceil(projection.savedChars / CHARS_PER_TOKEN), replayBinding },

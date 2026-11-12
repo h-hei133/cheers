@@ -85,6 +85,58 @@ describe("2-Layer Compaction Subsystem", () => {
       expect(compacted.messages[1].content).toContain('same dimensions');
       expect(compacted.messages[1].content).toContain('re-read the source');
     });
+
+    it('retains old text and duplicate results only when text pruning is explicitly disabled', () => {
+      const content = 'first\n' + 'source line\n'.repeat(400) + 'last';
+      const history = [
+        { role: 'tool' as const, content, tool_call_id: 'one' },
+        { role: 'tool' as const, content, tool_call_id: 'two' },
+        { role: 'user' as const, content: 'continue' },
+        { role: 'assistant' as const, content: 'working' },
+      ];
+      const ordinary = microcompactMessages(history, { keepRecentTurns: 1 });
+      expect(ordinary.messages[0].content).toContain('[... Omitted');
+      expect(ordinary.messages[1].content).toContain('Duplicate tool output');
+      expect(microcompactMessages(history, { keepRecentTurns: 1, pruneToolText: true })).toEqual(ordinary);
+      const retained = microcompactMessages(history, { keepRecentTurns: 1, pruneToolText: false });
+      expect(retained).toEqual({ messages: history, prunedCount: 0, savedChars: 0 });
+      expect(retained.messages[0]).toBe(history[0]);
+      expect(microcompactMessages(ordinary.messages, { keepRecentTurns: 1, pruneToolText: false }).messages)
+        .toEqual(ordinary.messages);
+    });
+
+    it('retains bounded mixed text while still removing only older tool images', () => {
+      const text = 'Useful source Ω 😀\n'.repeat(150);
+      const content = [{ type: 'text' as const, text },
+        { type: 'image' as const, mimeType: 'image/png', data: 'a'.repeat(2000) },
+        { type: 'text' as const, text: 'after image' },
+        { type: 'image' as const, mimeType: 'image/png', data: 'b'.repeat(1800) }];
+      const history = [
+        { role: 'user' as const, content },
+        { role: 'assistant' as const, content: 'read' },
+        { role: 'tool' as const, content, tool_call_id: 'old' },
+        { role: 'user' as const, content: 'continue' },
+        { role: 'assistant' as const, content: 'read again' },
+        { role: 'tool' as const, content, tool_call_id: 'recent' },
+      ];
+      const options = { keepRecentTurns: 1, pruneToolText: false };
+      const retained = microcompactMessages(history, options);
+      const old = retained.messages[2].content;
+      expect(typeof old).toBe('string');
+      expect(old).toContain(text);
+      expect(old).toContain('after image');
+      expect(old).toContain('Older tool images omitted; re-read the source');
+      expect(old).not.toContain('a'.repeat(2000));
+      expect(old).not.toContain('[... Omitted');
+      expect(retained.messages[0].content).toBe(content);
+      expect(retained.messages[5].content).toBe(content);
+      expect(retained.prunedCount).toBe(1);
+      expect(retained.savedChars).toBe(Math.max(0, text.length + 'after image'.length + 3800 - (old as string).length));
+      expect(microcompactMessages(retained.messages, options)).toEqual({ messages: retained.messages, prunedCount: 0, savedChars: 0 });
+      expect(microcompactMessages(history, { keepRecentTurns: 1, pruneToolText: true }))
+        .toEqual(microcompactMessages(history, { keepRecentTurns: 1 }));
+      expect(history[2].content).toBe(content);
+    });
   });
 
   describe("Layer 2: 8-Section Checkpoint Summarizer", () => {

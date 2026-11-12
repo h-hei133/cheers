@@ -81,6 +81,29 @@ function ordinaryTurn(setup: ReturnType<typeof createAdvisorHarness>, server: Aw
   return { messages, finished: (async () => { for await (const _event of turn.events) { /* consume actual native turn */ } })() };
 }
 
+it('forwards configured tool-text retention through the provider host to the outgoing request', async () => {
+  const setup = createAdvisorHarness(false, false);
+  const server = await wire(setup);
+  const resultText = 'HEAD_'.repeat(120) + 'RETAIN_THIS_OLD_TOOL_MIDDLE'.repeat(100) + 'TAIL_'.repeat(120);
+  const messages = [
+    { role: 'user' as const, content: 'Inspect the source' },
+    { role: 'assistant' as const, content: '', tool_calls: [{ id: 'old-source', type: 'function' as const,
+      function: { name: 'read', arguments: '{"path":"source.ts"}' } }] },
+    { role: 'tool' as const, tool_call_id: 'old-source', content: resultText },
+    ...Array.from({ length: 6 }, (_, index) => ({ role: 'assistant' as const, content: `Continue ${index}` })),
+  ];
+  for (const pruneToolText of [false, true]) {
+    const step = createProviderStep({ ...server.request,
+      runtimeConfig: { ...server.request.runtimeConfig!, pruneToolText, reserveTokens: 0 } }, new Map(), {});
+    await step(messages, setup.signal, {}, { allowTools: true });
+  }
+  const retained = server.received[0]?.messages as Array<{ role: string; content?: string }>;
+  const pruned = server.received[1]?.messages as Array<{ role: string; content?: string }>;
+  expect(retained.find(message => message.role === 'tool')?.content).toBe(resultText);
+  expect(pruned.find(message => message.role === 'tool')?.content).not.toContain('RETAIN_THIS_OLD_TOOL_MIDDLE');
+  expect(pruned.find(message => message.role === 'tool')?.content).toContain('characters from older tool output');
+});
+
 it('uses the host plan mode for a foreground model that cannot call tools', async () => {
   const setup = createAdvisorHarness(false, false);
   const server = await wire(setup);
