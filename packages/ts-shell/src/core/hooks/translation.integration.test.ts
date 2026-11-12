@@ -38,6 +38,13 @@ function dispatcher(script: string, timeoutMs = 15000) {
 const reply = (value: unknown) => `process.stdout.write(${JSON.stringify(JSON.stringify(value))});`;
 
 describe('write hook through the native tool gate', () => {
+  it('runs a parser-sized 3.6 MiB pinned artifact with a matching digest', async () => {
+    const script = '/*' + ' '.repeat(Math.ceil(3.6 * 1024 * 1024)) + '*/\n'
+      + reply({ decision: 'allow', reasonCode: 'no_violation' });
+    const result = await dispatcher(script).dispatch(payload());
+    expect(result).toMatchObject({ decision: 'allow', hookVerdict: { status: 'allow', reasonCode: 'no_violation' } });
+  });
+
   it.each(['nested', 'flat'] as const)('%s deny prevents the actual native write', async form => {
     const hooks = dispatcher(reply(form === 'nested'
       ? { hookSpecificOutput: { permissionDecision: 'deny', permissionDecisionReason: 'fixture rule' } }

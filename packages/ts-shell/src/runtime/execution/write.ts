@@ -18,6 +18,8 @@ export function writeTextFile(request: TextFileWriteExecutionRequest): Promise<T
 async function writeUnlocked(request: TextFileWriteExecutionRequest): Promise<TextFileWriteResult> {
   request.abortSignal?.throwIfAborted();
   if (request.authority.mode !== 'approved-for-write') throw new Error('File write requires approved write authority.');
+  if ((request.expectedAbsent !== undefined && typeof request.expectedAbsent !== 'boolean')
+    || (request.expectedAbsent !== undefined && request.expectedContent !== undefined)) throw new Error('File write conditions are invalid.');
   const root = realpathSync(request.workspaceRoot);
   const checked = verifyPathContainment(request.absolutePath, request.workspaceRoot);
   if (!checked.allowed) throw new Error('Write target is outside the selected workspace.');
@@ -31,6 +33,7 @@ async function writeUnlocked(request: TextFileWriteExecutionRequest): Promise<Te
     request.assertFileAccess?.(absolute);
   };
   const before = inspectWorkspaceFile(root, relative, checkAccess);
+  if (request.expectedAbsent && before.state !== 'absent') throw new FileContentConflictError(request.reportSafeTarget);
   if (request.expectedContent !== undefined && (before.state !== 'exists' || before.content !== request.expectedContent)) {
     throw new FileContentConflictError(request.reportSafeTarget);
   }

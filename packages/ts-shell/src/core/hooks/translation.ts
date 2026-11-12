@@ -1,5 +1,6 @@
 import { isRecord } from '../values/record.js';
 import type { HookDecision, PreToolUsePayload } from './types.js';
+import { preparedWriteCandidate } from '../../tools/preparation.js';
 
 export const CANONICAL_WRITE_MATCHER = '^(?:Write|Edit|MultiEdit|NotebookEdit)$';
 /** C3b's opt-in experiment policy: block uncertainty, observe unsupported coverage. */
@@ -43,7 +44,7 @@ function unsupported(reasonCode: string, reason: string): HookDecision {
   return { decision: 'unsupported', reasonCode, reason, hookVerdict: { status: 'unsupported', source: 'adapter', reasonCode, policy: 'observe-only' } };
 }
 
-/** No reads or edit reconstruction: only full single-file replacement content is judged. */
+/** Consume the native prepared candidate, or an explicit full-file replacement; never reconstruct edits. */
 export function translateWriteInput(payload: PreToolUsePayload, timeoutMs: number): CanonicalHookInput | HookDecision {
   if (payload.eventName !== 'PreToolUse' || typeof payload.workspaceRoot !== 'string' || !payload.workspaceRoot
     || typeof payload.sessionId !== 'string' || typeof payload.toolCallId !== 'string'
@@ -58,23 +59,27 @@ export function translateWriteInput(payload: PreToolUsePayload, timeoutMs: numbe
   if (tool === 'browser' || tool === 'desktop') return unsupported('external_effects', 'Browser and desktop actions are not single-file content operations.');
   if (tool !== 'Write' && tool !== 'Edit') return unsupported('tool_semantics', 'This tool (including MCP tools) has no declared single-file content semantics.');
   const args = payload.args;
+  let candidate;
+  try { candidate = preparedWriteCandidate(args, payload.toolName, payload.toolCallId); }
+  catch { return hookUnknown('prepared_input_changed'); }
   if (typeof args.path !== 'string' || !args.path.trim()) {
     return unsupported('full_content_required', 'A single path and complete replacement content are required; partial edits are not judged.');
   }
   // These forms can take precedence over content in the native edit owner. Never judge a decoy.
-  if (['edits', 'oldText', 'newText', 'replaceAll', 'files', 'targets', 'operations', 'new_string', 'new_source'].some(key => key in args)) {
+  if (['files', 'targets', 'operations', 'new_string', 'new_source'].some(key => key in args)
+    || !candidate && ['edits', 'oldText', 'newText', 'replaceAll'].some(key => key in args)) {
     return unsupported('ambiguous_content', 'Mixed replacement, multi-target or cell arguments cannot be reduced losslessly to one file.');
   }
   // C3a treats missing content as an input-fidelity gap. Do not let the older pinned
   // artifact's empty-import fallback turn a partial edit into a clean allow.
-  if (typeof args.content !== 'string') return hookUnknown('input_incomplete');
+  if (!candidate && typeof args.content !== 'string') return hookUnknown('input_incomplete');
   return { version: 1, event: 'PreToolUse', workspaceRoot: payload.workspaceRoot, sessionId: payload.sessionId,
     toolName: payload.toolName, toolCallId: payload.toolCallId, args: { ...args }, timeoutMs,
     reentry: { supported: false, active: false }, timestamp: payload.timestamp,
     ...(payload.agentId === undefined ? {} : { agentId: payload.agentId }),
     ...(payload.agentType === undefined ? {} : { agentType: payload.agentType }),
     hook_event_name: 'PreToolUse', cwd: payload.workspaceRoot, tool_name: tool,
-    tool_input: { file_path: args.path, content: args.content } };
+    tool_input: { file_path: candidate?.path ?? args.path, content: candidate?.content ?? args.content as string } };
 }
 
 /** Native flat vetoes retain their full payload; nested vetoes enter the same consumer. */

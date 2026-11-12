@@ -1,17 +1,10 @@
 import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
 import { resolveWorkspaceRoot } from '../workspace/roots.js'
-import { replaceInContent, replaceManyInContent } from './editEngine.js'
 import { startBackgroundCommand, createTaskOutputToolDefinition, createTaskStopToolDefinition, createTaskWaitToolDefinition } from './shell/background.js';
 import { planCommandLaunch } from './shell/launch.js';
 import { TOOL_APPROVED_COMMAND_AUTHORITY } from './shell/authority.js';
 import { withFileLock } from '../../runtime/execution/fileLock.js'
-import {
-  detectLineEnding,
-  splitByteOrderMark,
-  toUnixLines,
-  withLineEnding,
-} from '../../runtime/execution/fileText.js'
 import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
 import { truncateTail } from './truncation.js'
 import { ArtifactManager } from '../session/artifactManager.js'
@@ -44,6 +37,7 @@ import { approvedResult, deniedResult, runtimeErrorResult } from './toolResultLi
 import { networkNotice, readSandboxRules } from '../../sandbox/osSandbox.js'
 import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
 import { createPatchToolDefinition } from '../../edit/patch/tool.js'
+import { createEditToolDefinition } from '../../edit/tool.js'
 import { startCommandProof } from '../../runtime/execution/proof.js'
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
@@ -333,191 +327,7 @@ export function createCoreToolRegistry(options?: {
           })
       },
     },
-    {
-      name: 'edit',
-      description: 'Edit an existing file: several targeted replacements in one call, or full replacement content. Each file commits independently; multi-file edits are not atomic. If editing a later file fails, earlier changes remain. Use /undo to inspect the latest snapshot or /restore to explicitly restore individual recorded edits.',
-      argsSchema: {
-        type: 'object',
-        properties: {
-          path: {
-            type: 'string',
-            description: 'The relative path of the file to edit.',
-          },
-          content: {
-            type: 'string',
-            description:
-              'The full replacement content for the file. An alternative to edits/oldText+newText, not a companion: give one form.',
-          },
-          edits: {
-            type: 'array',
-            minItems: 1,
-            description:
-              'Targeted replacements, applied as one edit or none. Each is matched against the original file, not against the result of the previous one, and they must not overlap — merge nearby changes into one edit instead.',
-            items: {
-              type: 'object',
-              properties: {
-                oldText: { type: 'string', description: 'The exact or fuzzy block of text to replace.' },
-                newText: { type: 'string', description: 'The text to put in its place.' },
-              },
-              required: ['oldText', 'newText'],
-            },
-          },
-          oldText: {
-            type: 'string',
-            description: 'The exact or fuzzy block of text to replace (single-replacement form).',
-          },
-          newText: {
-            type: 'string',
-            description: 'The new text to replace oldText with.',
-          },
-          replaceAll: {
-            type: 'boolean',
-            description:
-              'Whether to replace every occurrence of oldText. Applies to the single-replacement form only.',
-          },
-        },
-        required: ['path'],
-        oneOf: [
-          { required: ['content'], not: { anyOf: [{ required: ['edits'] }, { required: ['oldText'] }, { required: ['newText'] }, { required: ['replaceAll'] }] } },
-          { required: ['edits'], not: { anyOf: [{ required: ['content'] }, { required: ['oldText'] }, { required: ['newText'] }, { required: ['replaceAll'] }] } },
-          { required: ['oldText', 'newText'], not: { anyOf: [{ required: ['content'] }, { required: ['edits'] }] } },
-        ],
-      },
-      async execute(args, context) {
-        // Read-modify-write under one lock. The read is what decides the write,
-        // so locking only the write would still let two edits read the same
-        // original and lose the first one's change without an error.
-        validateToolArguments(this.argsSchema, args)
-        return withFileLock(resolveToolTarget(args, 'path', context.workspaceRoot), async () => {
-        const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        // No attached roots means the primary root is the only authority, and the
-          // lexical fence below already describes that refusal without touching
-          // the filesystem.
-          const root = context.workspaceRoots?.length
-            ? resolveWorkspaceRoot(context.workspaceRoot, context.workspaceRoots, target, 'write') ?? context.workspaceRoot
-            : context.workspaceRoot
-        const containment = verifyPathContainment(target, root)
-        if (!containment.allowed) {
-          throw new Error(outsideWorkspaceMessage(containment.reason, target, root))
-        }
-
-        const relPath = path.relative(root, containment.resolvedPath)
-        let original = ''
-        let originalUnreadable = false
-        let finalContent = ''
-        let expectedContent: string | undefined
-        const segmentEdits = args.edits as Array<{ oldText: string; newText: string }> | undefined
-        if (segmentEdits) {
-          const raw = await executionService.readTextFile({
-            operationKind: 'file.read',
-            assertFileAccess: context.assertFileAccess,
-            abortSignal: context.abortSignal,
-            absolutePath: containment.resolvedPath,
-            workspaceRoot: root,
-            authority: TOOL_APPROVED_READ_AUTHORITY,
-            caller: 'core-tool:edit',
-            reason: 'Read original content for targeted replacements.',
-            reportSafeTarget: containment.resolvedPath,
-          })
-          // Same treatment as the single-edit form: the file's own shape is
-          // separated out before matching and put back before writing, because a
-          // model never types the mark or the carriage returns.
-          const { bom, text: content } = splitByteOrderMark(raw)
-          expectedContent = raw
-          const lineEnding = detectLineEnding(content)
-          original = content
-          const replaceRes = replaceManyInContent(
-            toUnixLines(content),
-            segmentEdits.map((segment) => ({
-              oldText: toUnixLines(splitByteOrderMark(segment.oldText).text),
-              newText: toUnixLines(splitByteOrderMark(segment.newText).text),
-            })),
-          )
-          if (!replaceRes.success) {
-            throw new Error(replaceRes.error ?? 'Failed to apply replacements.')
-          }
-          finalContent = bom + withLineEnding(replaceRes.content, lineEnding)
-        } else if (typeof args.oldText === 'string' && typeof args.newText === 'string') {
-          const raw = await executionService.readTextFile({
-            operationKind: 'file.read',
-            assertFileAccess: context.assertFileAccess,
-            abortSignal: context.abortSignal,
-            absolutePath: containment.resolvedPath,
-            workspaceRoot: root,
-            authority: TOOL_APPROVED_READ_AUTHORITY,
-            caller: 'core-tool:edit',
-            reason: 'Read original content for resilient replacement.',
-            reportSafeTarget: containment.resolvedPath,
-          })
-          // The file's own shape is separated out before matching and put back
-          // before writing. A model never types the mark or the carriage returns,
-          // so leaving them in the text makes a pattern that cannot be found, and
-          // returning them untouched is the only way the file keeps its style.
-          const { bom, text: content } = splitByteOrderMark(raw)
-          expectedContent = raw
-          const lineEnding = detectLineEnding(content)
-          original = content
-          // If the model copied a leading BOM into oldText (or newText), strip it
-          // so matching operates on clean text, while preserving the file's BOM on write.
-          const cleanOld = splitByteOrderMark(args.oldText).text
-          const cleanNew = splitByteOrderMark(args.newText).text
-          const replaceRes = replaceInContent(
-            toUnixLines(content),
-            toUnixLines(cleanOld),
-            toUnixLines(cleanNew),
-            { replaceAll: Boolean(args.replaceAll) },
-          )
-          if (!replaceRes.success) {
-            throw new Error(replaceRes.error ?? 'Failed to apply replacement.')
-          }
-          finalContent = bom + withLineEnding(replaceRes.content, lineEnding)
-        } else if (typeof args.content === 'string') {
-          try {
-            original = await executionService.readTextFile({
-              operationKind: 'file.read',
-              assertFileAccess: context.assertFileAccess,
-              abortSignal: context.abortSignal,
-              absolutePath: containment.resolvedPath,
-              workspaceRoot: root,
-              authority: TOOL_APPROVED_READ_AUTHORITY,
-              caller: 'core-tool:edit',
-              reason: 'Read original content for diff.',
-              reportSafeTarget: containment.resolvedPath,
-            })
-            expectedContent = original
-          } catch (error) {
-            if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
-            originalUnreadable = true
-          }
-          finalContent = args.content
-        } else {
-          throw new Error("Must provide 'content', 'edits', or both 'oldText' and 'newText'.")
-        }
-
-        const written = await executionService.writeTextFile({
-          operationKind: 'file.write',
-            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: context.artifactRoot ?? context.workspaceRoot, callId: context.taskId, correlationId: context.correlationId } } : {}),
-          assertFileAccess: context.assertFileAccess,
-          abortSignal: context.abortSignal,
-          absolutePath: target,
-          content: finalContent,
-          expectedContent,
-          workspaceRoot: root,
-          authority: TOOL_APPROVED_WRITE_AUTHORITY,
-          caller: 'core-tool:edit',
-          reason: 'Replace an approved workspace file target.',
-          reportSafeTarget: containment.resolvedPath,
-        })
-        const diff = original && original !== finalContent ? createUnifiedDiff(relPath, original, finalContent) : ''
-        const output = diff
-          ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\``
-          : originalUnreadable
-            ? `Updated ${relPath} (original unreadable, no diff)`
-            : `Updated ${relPath}`
-        return approvedResult(output, written ? { ...written } : { status: 'unverified' })
-        })
-      },
-    },
+    createEditToolDefinition(executionService),
     createGlobToolDefinition(executionService),
     createGrepToolDefinition(executionService),
     {

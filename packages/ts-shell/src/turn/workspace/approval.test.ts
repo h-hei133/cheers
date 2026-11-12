@@ -164,15 +164,19 @@ describe('one-time external file approvals', () => {
     expect(fs.readFileSync(target, 'utf8')).toBe('registered protected body');
   });
 
-  it('keeps a denied read from blocking creation of a new writable-root file', async () => {
+  it.each(['write', 'edit'] as const)('refuses read-denied %s creation in a writable root before pre-use hooks', async name => {
     const target = path.join(outside, 'registered-new.txt');
+    const dispatch = vi.fn(async (_payload: { eventName: string }) => ({ decision: 'allow' as const, stopChecks: [] }));
     const host = setup(undefined, {
       workspaceRoots: [captureWorkspaceRoot(outside, primary, 'write')],
       denyRules: [{ tool: 'read', pattern: 'registered-new.txt' }],
+      hooks: { dispatch } as unknown as HookDispatcher,
     });
-    await host.run('write', { path: target, content: 'new file' });
+    const result = await host.run(name, { path: target, content: 'new file' });
+    expect(JSON.stringify(result)).toContain('Refused by a rule');
     expect(host.approval).not.toHaveBeenCalled();
-    expect(fs.readFileSync(target, 'utf8')).toBe('new file');
+    expect(dispatch.mock.calls.some(([payload]) => payload.eventName === 'PreToolUse')).toBe(false);
+    expect(fs.existsSync(target)).toBe(false);
   });
 
   it.each(['primary', 'registered'] as const)('honors read denial before %s-root write diff reads', async rootKind => {

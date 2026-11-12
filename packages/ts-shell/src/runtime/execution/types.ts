@@ -206,6 +206,8 @@ export interface TextFileWriteExecutionRequest extends ExecutionRequestMetadata<
   readonly content: string
   /** Exact text read to compute this edit, including BOM and line endings. */
   readonly expectedContent?: string
+  /** A prepared creation must still find no target before its write begins. */
+  readonly expectedAbsent?: boolean
 }
 
 export interface TextPageReadRequest extends TextFileReadExecutionRequest {

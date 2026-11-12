@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import { boundText, TOOL_OUTPUT_LIMIT, type AgentTool, type AgentToolResult, type ToolHooks } from "../core/agent/tools.js";
@@ -19,6 +18,7 @@ import { workspaceToolBinding } from '../core/workspace/tools.js';
 import type { WorkspaceRoot } from '../core/workspace/model.js';
 import {
   authorizeToolCall,
+  bindPreparedToolCall,
   consumeToolCall,
   discardToolCall,
   preparedSelection,
@@ -225,11 +225,9 @@ async function executeTool(
         }
         const actualArgs = { ...args, path: absolutePath, filePath: absolutePath };
         const access = fileAccessOptions(tool.name, args, options, absolutePath);
-        // Recheck at the actual read boundary as a concurrent writer may have
-        // created the target after the permission gate saw an absent file.
-        // This preserves creation of new files while keeping a later body read
-        // subject to the user's read deny rules.
-        if ((tool.name === 'write' || tool.name === 'edit') && fs.existsSync(absolutePath)) {
+        // Original reads and post-publication verification require read access.
+        // Recheck it at every file boundary, including absent creation targets.
+        if (tool.name === 'write' || tool.name === 'edit') {
           for (const root of new Set([options.workspaceRoot, binding.root])) {
             const read = evaluateToolPermissionScope('read', actualArgs, options.permissionScope, root, denyRules);
             if (read.denied) throw new Error(read.reason);
@@ -308,6 +306,7 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
       if (afterApproval) return { block: true, reason: afterApproval };
       toolScopePolicy(call.name, args, options, preparedToolCall(args, options));
       if (permission.approved) approvals.set(call.id, permission.approved);
+      bindPreparedToolCall(args, options, call.name, call.id);
       const decision = await options.hooks.dispatch({
         eventName: "PreToolUse",
         sessionId: options.sessionId,
@@ -560,13 +559,9 @@ function evaluateWorkspacePermission(toolName: string, args: Record<string, unkn
   if (original.denied) return original;
   const access = fileAccessOptions(toolName, args, options);
   const binding = workspaceToolBinding(toolName, args, options.workspaceRoot, roots ?? access.workspaceRoots);
-  // Writers read an existing target to compute the diff. That read is a
-  // separate capability: a writable root must not erase a user's read deny.
-  // New targets do not need the old body, so keep write-only creation working.
-  const writerReadsExisting = (toolName === 'write' || toolName === 'edit')
-    && typeof binding.args.path === 'string'
-    && fs.existsSync(path.resolve(binding.root, binding.args.path));
-  if (writerReadsExisting) {
+  // Writers read originals and verify their published bytes. Refuse read-denied
+  // targets before hooks or writes, even when the target does not exist yet.
+  if ((toolName === 'write' || toolName === 'edit') && typeof binding.args.path === 'string') {
     for (const root of new Set([options.workspaceRoot, binding.root])) {
       const read = evaluateToolPermissionScope('read', binding.args, options.permissionScope, root, denyRules);
       if (read.denied) return read;

@@ -42,6 +42,42 @@ function request(expectedContent?: string): TextFileWriteExecutionRequest {
 }
 
 describe('conditional workspace writes', () => {
+  it('rejects an existing target before snapshot capture when absence was expected', async () => {
+    await fs.writeFile(target, 'external creation\n')
+    await expect(createDefaultExecutionService().writeTextFile({ ...request(), expectedAbsent: true }))
+      .rejects.toMatchObject({ code: 'FILE_CONTENT_CHANGED' })
+    expect(captureRecoveryAuthorityRecord).not.toHaveBeenCalled()
+    expect(await fs.readFile(target, 'utf8')).toBe('external creation\n')
+  })
+
+  it('checks an expected creation again after asynchronous snapshot persistence', async () => {
+    vi.mocked(captureRecoveryAuthorityRecord).mockImplementationOnce(async () => {
+      await fs.writeFile(target, 'created during snapshot\n')
+      throw new Error('snapshot storage failed')
+    })
+    await expect(createDefaultExecutionService().writeTextFile({ ...request(), expectedAbsent: true }))
+      .rejects.toMatchObject({ code: 'FILE_CONTENT_CHANGED' })
+    expect(await fs.readFile(target, 'utf8')).toBe('created during snapshot\n')
+  })
+
+  it('refuses a same-content file replacement while snapshot persistence yields', async () => {
+    await fs.writeFile(target, 'before\n')
+    vi.mocked(captureRecoveryAuthorityRecord).mockImplementationOnce(async () => {
+      await fs.rename(target, path.join(workspaceRoot, 'retired.txt'))
+      await fs.writeFile(target, 'before\n')
+      throw new Error('snapshot storage failed')
+    })
+    await expect(createDefaultExecutionService().writeTextFile(request('before\n')))
+      .rejects.toMatchObject({ code: 'FILE_CONTENT_CHANGED' })
+    expect(await fs.readFile(target, 'utf8')).toBe('before\n')
+  })
+
+  it.each([true, false])('rejects simultaneous absence (%s) and content expectations before inspecting the source', async expectedAbsent => {
+    await expect(createDefaultExecutionService().writeTextFile({ ...request('before'), expectedAbsent }))
+      .rejects.toThrow('File write conditions are invalid')
+    expect(captureRecoveryAuthorityRecord).not.toHaveBeenCalled()
+  })
+
   it('rejects stale content before recording a recovery snapshot', async () => {
     await fs.writeFile(target, 'external change\n')
     await expect(createDefaultExecutionService().writeTextFile(request('before\n')))

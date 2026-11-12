@@ -78,6 +78,8 @@ export interface ToolDefinition<Preparation = ToolPreparation | Promise<ToolPrep
 }
 
 export interface ToolPreparation {
+  /** Host-computed single-file content, retained outside model arguments and hook JSON. */
+  readonly writeCandidate?: PreparedWriteCandidate
   /** A native execution adapter may retain ordinary bash command policy. */
   readonly permissionToolName?: 'bash' | 'task'
   /** Execution tools may bind a complete non-file request to the same approval lifecycle. */
@@ -102,4 +104,11 @@ export interface ToolPreparation {
     selection?: readonly string[],
     approval?: { readonly revision?: string },
   ) => Promise<ToolExecutionResult>
+}
+
+export interface PreparedWriteCandidate {
+  readonly path: string
+  readonly content: string
+  /** Report-safe identity of the original bytes used to compute the candidate. */
+  readonly before: { readonly state: 'absent' } | { readonly state: 'exists'; readonly sha256: string }
 }
