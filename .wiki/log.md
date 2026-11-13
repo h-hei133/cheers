@@ -11721,3 +11721,13 @@ CI 43158106512 在 7c7153c1 上实际失败：3文件5项失败，1100文件1452
 
 - 对照 `/home/wang/projects/pi`（截至 2026-11-13 最新提交）与 `/home/wang/projects/cheers/packages/ts-shell/src` 进行全面源码审计，沉淀原始证据笔记 `.wiki/raw/notes/2026-11-13-pi-vs-cheers-strict-audit.md` 与编译文章 `.wiki/wiki/references/pi-vs-cheers-deep-gap-analysis-2026-11.md`。
 - 识别出 8 大核心差距：Prompt Cache 历史前缀自毁与断点缺失、`TOOL_OUTPUT_LIMIT=10_000` 隐形腰斩、`edit` Schema 复杂度与四重序列化、缺少 `codemode` 与 `NestedToolCallRunner`、`tool_search` 朴素匹配与两步往返、Agent Loop 缺少 `prepareRequest`/虚拟模型路由与 `output-guard`、Linux-only `/bin/sh` 扩展限制，以及 `packages/ts-shell` 单包巨石膨胀。
+
+## [2026-11-13] compile | Pi vs. Cheers 全仓严格架构与能力差距审计
+
+- 派遣 5 路只读 `scout` 子代理对 `/home/wang/projects/pi`（`47e9d74f9`）12 个包 + `apps/p2`/`p2-mac` 与 `/home/wang/projects/cheers`（`380dcc58`）全部 37+ 源码域展开无死角源码比对，沉淀原始笔记 `.wiki/raw/notes/2026-11-13-pi-vs-cheers-full-monorepo-audit.md` 与编译文章 `.wiki/wiki/references/pi-vs-cheers-full-audit-2026-11.md`。
+- 核心发现包括：`380dcc58` 存在 5 处未接通/空桩缺陷（`rpcServer.ts` 漏 `case "abort":`、`AgentCore` 未透传 `prepareRequest`、`turn/step.ts` 未接入 `VirtualModelRegistry`/`cacheRetention`/`initialTools`/`anthropic-beta`、生产 `execute.ts` 扩展接口为空函数桩）；全仓对比进一步暴露 TUI 写入分块/OSC/Unicode/N-API 缺失、22 子目录会话碎片化 vs `pi-durable`/`chord` 事务同步、`pi/packages/env` Rust 远程守护进程 vs 每调用重拉 SSH、`createAgentSession` SDK 与 `pi install` 生态缺失，以及 `packages/ts-shell` 单包 37+ 垂直域膨胀和缺少 linter/拆包工具链问题。
+
+## [2026-11-13] fix & roadmap | 修通 4 处断链并编制 Pi 对齐优先级路线图
+
+- 修通 `380dcc58` 遗留的 4 处断链并通过 `verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`analyze:module-facades`（0 monoliths）、`npm run build`、`test:scripts`（201/201）及 9 个 Vitest 套件（333/333）验证。
+- 新增编译路线图 `.wiki/wiki/references/pi-parity-prioritized-roadmap-2026-11.md`，将剩余 Pi 差距划分为 P0–P3、合并执行批次（Batch A–F）与必须隔离推进的独立轨道（Track 1–6）。

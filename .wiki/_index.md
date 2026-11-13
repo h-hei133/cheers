@@ -6,8 +6,8 @@ Last updated: 2026-11-13
 
 ## Statistics
 
-- Sources: 12 raw documents (including RFC-001 to RFC-004)
-- Articles: 7 compiled wiki articles (including master thesis)
+- Sources: 13 raw documents (including RFC-001 to RFC-004)
+- Articles: 9 compiled wiki articles (including master thesis)
 - Feature research documents: 37 (01–37, contiguous; merged from 53 after de-duplication)
   - **Current work (2026-10-17): Phase 20 configuration foundations.** Profile identity and management have exact-SHA CI evidence; ordered configuration inputs are undergoing delivery verification, followed by operation scope rules. Start with [Phase 20 decisions](features/phase-20-decisions.md), [Profile boundaries](features/profiles.md), [Configuration inputs](features/config-inputs.md), [32 Review register](features/32-defect-register-2026-10.md), and [36 Outstanding work](features/36-outstanding-work.md). [37 Command audit](features/37-command-implementation-audit.md) traces 102 declared entries; it does not prove every action works.
   - **Historical (01–22):** earlier phase research. Many of their verdicts were already implemented or corrected later — read each document's own "更正" section before citing it.
@@ -65,6 +65,8 @@ Last updated: 2026-11-13
 - [[normproof-structural-governance|NormProof Structural Governance]] ([NormProof Structural Governance](wiki/topics/normproof-structural-governance.md))
 - [[local-reference-repositories|Local Reference Repositories]] ([Local Reference Repositories](wiki/references/local-reference-repositories.md))
 - [[pi-vs-cheers-deep-gap-analysis-2026-11|Pi vs. Cheers 深度架构与实现差距审计（2026-11-13）]] ([Pi vs. Cheers Deep Gap Analysis](wiki/references/pi-vs-cheers-deep-gap-analysis-2026-11.md))
+- [[pi-vs-cheers-full-audit-2026-11|Pi vs. Cheers 全仓严格架构与能力差距审计（2026-11-13）]] ([Pi vs. Cheers Full-Repo Audit](wiki/references/pi-vs-cheers-full-audit-2026-11.md))
+- [[pi-parity-prioritized-roadmap-2026-11|Pi 对齐剩余缺陷优先级与任务编排路线图（2026-11-13）]] ([Pi Parity Prioritized Roadmap](wiki/references/pi-parity-prioritized-roadmap-2026-11.md))
 - [[tui-framework-selection|TUI Framework Selection]] ([TUI Framework Selection](articles/tui-framework-selection.md))
 - [[tui-phase-1-components|TUI Phase 1: Component Adapters]] ([Phase 1 Components](articles/tui-phase-1-components.md))
 - [[tui-phase-2-products|TUI Phase 2: Product Components]] ([Phase 2 Products](articles/tui-phase-2-products.md))
@@ -76,6 +78,8 @@ Last updated: 2026-11-13
 ## Recent Activity
 
 - 2026-11-13: Ingested and compiled strict evidence-backed architectural and implementation gap audit against Pi (`pi-vs-cheers-deep-gap-analysis-2026-11.md`).
+- 2026-11-13: Ingested and compiled full-monorepo strict comparative audit against Pi (`pi-vs-cheers-full-audit-2026-11.md`).
+- 2026-11-13: Compiled prioritized Pi parity execution roadmap (`pi-parity-prioritized-roadmap-2026-11.md`).
 
 - 2026-10-17: Reviewed and corrected all feature studies 23–37, recorded explicit product choices, and compiled the Phase 20 implementation plan. This round changed documentation only.
 

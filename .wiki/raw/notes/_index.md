@@ -19,6 +19,7 @@ Last updated: 2026-11-13
 | [2026-08-28-battle-3-terminal-surface-and-tui.md](2026-08-28-battle-3-terminal-surface-and-tui.md) | Terminal surface presentation model, ANSI status badges, and TUI componentization. | presentation, surface, tui, statusBadge, box, pi | 2026-08-28 |
 | [2026-08-28-battle-4-planning-and-proposals.md](2026-08-28-battle-4-planning-and-proposals.md) | Planning runtime decomposition, bounded workspace proposal context, and dry-run contract retry loop. | planning, proposal, attempt, retry, mini-swe-agent | 2026-08-28 |
 | [2026-11-13-pi-vs-cheers-strict-audit.md](2026-11-13-pi-vs-cheers-strict-audit.md) | Strict evidence-backed comparative audit between Pi (up to 2026-11-13) and Cheers across prompt caching, tool pipeline, compaction, extensions, codemode, and package modularity. | references, pi, gap-analysis, prompt-caching, tools, compaction, codemode, architecture | 2026-11-13 |
+| [2026-11-13-pi-vs-cheers-full-monorepo-audit.md](2026-11-13-pi-vs-cheers-full-monorepo-audit.md) | Full-monorepo comparative audit between Pi (12 packages + apps/p2 + p2-mac at 47e9d74f9) and Cheers (37+ ts-shell domains at 380dcc58) verifying unwired features, TUI/protocol gaps, durable/chord state, remote env, SDK/extensions, and horizontal sprawl. | pi, cheers, gap-analysis, monorepo, tui, durable, chord, providers, extensions, rpc, sdk | 2026-11-13 |
 
 ## Recent Changes
 
@@ -26,4 +27,5 @@ Last updated: 2026-11-13
 - 2026-08-28: Ingested deep research audit on architectural debts and top-tier project gaps
 - 2026-08-28: Ingested battles 1-4 modernization notes
 - 2026-11-13: Ingested strict comparative audit between Pi and Cheers (`2026-11-13-pi-vs-cheers-strict-audit.md`)
+- 2026-11-13: Ingested full-monorepo comparative audit (`2026-11-13-pi-vs-cheers-full-monorepo-audit.md`)
 
