@@ -2,7 +2,7 @@
 
 > Internal developer notes, sprint context, and architectural decisions.
 
-Last updated: 2026-08-28
+Last updated: 2026-11-13
 
 ## Contents
 
@@ -18,10 +18,12 @@ Last updated: 2026-08-28
 | [2026-08-28-battle-2-edit-and-patch-planning.md](2026-08-28-battle-2-edit-and-patch-planning.md) | Multi-file mutation graph, conflict detection, per-file patch planning, and fuzzy diff normalization. | edit, multifile, patch, diffNormalize, pi | 2026-08-28 |
 | [2026-08-28-battle-3-terminal-surface-and-tui.md](2026-08-28-battle-3-terminal-surface-and-tui.md) | Terminal surface presentation model, ANSI status badges, and TUI componentization. | presentation, surface, tui, statusBadge, box, pi | 2026-08-28 |
 | [2026-08-28-battle-4-planning-and-proposals.md](2026-08-28-battle-4-planning-and-proposals.md) | Planning runtime decomposition, bounded workspace proposal context, and dry-run contract retry loop. | planning, proposal, attempt, retry, mini-swe-agent | 2026-08-28 |
+| [2026-11-13-pi-vs-cheers-strict-audit.md](2026-11-13-pi-vs-cheers-strict-audit.md) | Strict evidence-backed comparative audit between Pi (up to 2026-11-13) and Cheers across prompt caching, tool pipeline, compaction, extensions, codemode, and package modularity. | references, pi, gap-analysis, prompt-caching, tools, compaction, codemode, architecture | 2026-11-13 |
 
 ## Recent Changes
 
 - 2026-08-28: Ingested technical specifications RFC-001 through RFC-004
 - 2026-08-28: Ingested deep research audit on architectural debts and top-tier project gaps
 - 2026-08-28: Ingested battles 1-4 modernization notes
+- 2026-11-13: Ingested strict comparative audit between Pi and Cheers (`2026-11-13-pi-vs-cheers-strict-audit.md`)
 

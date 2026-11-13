@@ -11716,3 +11716,8 @@ strict docs 首次重现28个旧 disposition 路径失败；追加式历史记�
 CI 43158106512 在 7c7153c1 上实际失败：3文件5项失败，1100文件14528项通过，1文件3项跳过；后续 NormProof 架构步骤未执行。失败来自旧测试仍要求私有 socket 错误原文、prepared edit 前的 callback identity，以及未覆盖新增 pruneToolText 设置。仅修正三个测试：保留单次 dispatch／未知用量 pending；改验证最终写入守卫的真实调用与拒绝传播、同一 abortSignal 和 expectedContent；补齐 user/project 真实键盘设置流程，不改生产代码。
 
 五静态门与单次串行聚焦验证通过，3文件169项；原失败日志、修正日志与分类回执在实验仓 artifacts/revision-review/cheers-ci-correction.json。修正提交推送后另跑 CI，旧失败不改写，不用聚焦通过替代最终远端结果。B 尚未发出新真实请求，净收益仍未证明。
+
+## [2026-11-13] compile | Pi vs. Cheers 深度架构与实现差距审计
+
+- 对照 `/home/wang/projects/pi`（截至 2026-11-13 最新提交）与 `/home/wang/projects/cheers/packages/ts-shell/src` 进行全面源码审计，沉淀原始证据笔记 `.wiki/raw/notes/2026-11-13-pi-vs-cheers-strict-audit.md` 与编译文章 `.wiki/wiki/references/pi-vs-cheers-deep-gap-analysis-2026-11.md`。
+- 识别出 8 大核心差距：Prompt Cache 历史前缀自毁与断点缺失、`TOOL_OUTPUT_LIMIT=10_000` 隐形腰斩、`edit` Schema 复杂度与四重序列化、缺少 `codemode` 与 `NestedToolCallRunner`、`tool_search` 朴素匹配与两步往返、Agent Loop 缺少 `prepareRequest`/虚拟模型路由与 `output-guard`、Linux-only `/bin/sh` 扩展限制，以及 `packages/ts-shell` 单包巨石膨胀。
