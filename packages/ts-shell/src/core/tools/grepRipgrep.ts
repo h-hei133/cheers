@@ -123,7 +123,6 @@ export function forgetRipgrepBinary(): void {
 function searchOptions(input: RipgrepSearchInput): string[] {
   const args = ["--no-config", "--color=never", "--hidden"];
   if (input.ignoreCase) args.push("--ignore-case");
-  for (const directory of PRUNED_DIRECTORIES) args.push("--glob", `!${directory}`);
   if (input.glob && input.glob.trim() !== "") {
     args.push("--glob", input.glob.trim());
     // The in-process walk compiles its glob with `nocase`, so `*.ts` finds
@@ -132,6 +131,9 @@ function searchOptions(input: RipgrepSearchInput): string[] {
     // are supposed to answer the same question.
     args.push("--glob-case-insensitive");
   }
+  // ripgrep gives later globs precedence. A caller's positive glob must not
+  // reinclude pruned metadata that native ignore handling materializes.
+  for (const directory of PRUNED_DIRECTORIES) args.push("--glob", `!${directory}`);
   // The in-process walk skips files larger than this, so the fast path must too:
   // a search that reports a hit inside a file the fallback would never read is a
   // divergence, and the size cap exists to keep a minified bundle or a data dump

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { execFileSync } from "node:child_process";
 import { createGrepToolDefinition } from "./grep.js";
 import { createCoreToolRegistry } from "./registry.js";
 import { createDefaultExecutionService } from "../../runtime/execution/service.js";
@@ -53,6 +54,22 @@ describe("Grep Tool & Read Pagination", () => {
     expect(result.success).toBe(true);
     expect(result.output).toContain("package.json:2:");
     expect(result.output).not.toContain("src/index.ts");
+  });
+
+  it.each(['**/*', '.git/**'])("keeps Git metadata out of a positive %s search", async (glob) => {
+    execFileSync('git', ['init', '--quiet', tempDir]);
+    await fs.appendFile(path.join(tempDir, '.git', 'info', 'exclude'), '\n# GIT_METADATA_MARKER\n');
+    await fs.writeFile(path.join(tempDir, 'visible.txt'), 'VISIBLE_SEARCH_MARKER\n');
+    const grepTool = createGrepToolDefinition(createDefaultExecutionService());
+
+    const result = await grepTool.execute(
+      { pattern: 'GIT_METADATA_MARKER|VISIBLE_SEARCH_MARKER', path: '', glob },
+      { workspaceRoot: tempDir, taskId: 'test-task' },
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.output).not.toContain('GIT_METADATA_MARKER');
+    if (glob === '**/*') expect(result.output).toContain('visible.txt:1: VISIBLE_SEARCH_MARKER');
   });
 
   it("supports offset and limit pagination in read tool", async () => {

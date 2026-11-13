@@ -2215,3 +2215,10 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A quota or content-filter failure marked nonretryable still dispatches a second provider request when its inner retry count is nonzero.
 - **Root Cause:** The safe failure projection preserved the outer-turn retry flag but set the inner loop's transient flag unconditionally. Tests exercised only the default zero inner retries.
 - **Rule:** Carry the semantic retryability into both loops before discarding private detail. Cover configured inner retries with a finite second-response fixture; a dispatched failed attempt without usage stays unknown and must not be released as unsent.
+
+
+### Caller Globs Can Override Fixed Native Pruning
+
+- **Symptom:** A broad grep glob returns `.git/info/exclude` even though directory traversal prunes `.git`.
+- **Root Cause:** Native ignore handling materializes selected Git metadata, and ripgrep gives the later caller inclusion glob precedence over earlier fixed exclusions. A sentinel that is never materialized cannot expose the bug.
+- **Rule:** Put fixed directory exclusions after caller globs. Exercise actual Git metadata plus an ordinary positive match through native search; preserve metadata reads needed for ignore semantics and verified content handles. Keep the original failing control and distinguish tool-path repair from any experiment readiness or task-success claim.
