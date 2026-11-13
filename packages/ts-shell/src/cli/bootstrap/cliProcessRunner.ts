@@ -194,7 +194,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
         closeCollaborationFor(runtimeContext), closeExtensionsFor(runtimeContext), closeTraceDashboard(), mcpGateway.close(),
         Promise.resolve().then(async () => { if (await runtimeContext.freshState?.clearCache?.() === 'unknown') throw new Error('Provider cache cleanup is unverified.'); }),
       ]);
-      if (options.jsonEvents) {
+      if (options.jsonEvents || options.rpcMode) {
         await flushRawStdout();
         restoreStdout();
       }
@@ -202,7 +202,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       if (failure?.status === 'rejected') throw failure.reason;
     }, process: input.process, exit: input.exit, writeError: input.writeError,
     streams: [input.stdin, input.process.stdout, input.process.stderr],
-    handleInterrupt: options.printMode === true || options.jsonEvents === true || !input.stdin.isTTY,
+    handleInterrupt: options.printMode === true || options.jsonEvents === true || options.rpcMode === true || !input.stdin.isTTY,
   });
   // These bridges are installed after bootstrap has the real resource owners.
   // Only bootstrap can retire this host and read back a new runtime generation.
@@ -305,6 +305,9 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
     isBusy = () => sessionRuntime.getCurrentRunController() !== null;
     if (bootstrapRuntime.writeJsonEvent) {
       sessionRuntime.observeEvents(bootstrapRuntime.writeJsonEvent);
+    } else if (options.rpcMode) {
+      const { attachRpcEventBridge } = await import("../rpc/events.js");
+      attachRpcEventBridge(sessionRuntime);
     }
     if (recovery) {
       const saved = sessionManager.getSession(runtimeContext.session.id);

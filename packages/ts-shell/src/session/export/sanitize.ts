@@ -21,6 +21,8 @@ export function sanitizeExport(payload: ExportPayload): ExportPayload {
     },
     entries: payload.entries.map(entry => ({
       ...entry, id: identity(entry.id), timestamp: optionalText(entry.timestamp),
+      ...(entry.reasoning === undefined ? {} : { reasoning: { ...entry.reasoning, text: redactExportText(entry.reasoning.text) } }),
+      ...(entry.toolDiff === undefined ? {} : { toolDiff: redactExportText(entry.toolDiff) }),
       ...(entry.sourceEntryId === undefined ? {} : { sourceEntryId: identity(entry.sourceEntryId) }),
       toolCallId: entry.toolCallId === undefined ? undefined : identity(entry.toolCallId),
       toolCalls: entry.toolCalls?.map(call => ({ ...call, id: identity(call.id), name: redactExportText(call.name) })),
@@ -32,5 +34,8 @@ export function sanitizeExport(payload: ExportPayload): ExportPayload {
     })),
     leafId: payload.leafId === null ? null : identity(payload.leafId),
     warnings: payload.warnings,
+    ...(payload.stats === undefined ? {} : {
+      stats: { ...payload.stats, models: payload.stats.models.map(model => redactExportText(model)) },
+    }),
   };
 }

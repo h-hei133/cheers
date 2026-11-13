@@ -1,3 +1,4 @@
+import hljs from "highlight.js";
 import { scanBlocks, type MarkdownBlock } from "../../presentation/tui/transcript/markdownScan.js";
 import { createMathFinder, latexToDisplayText } from "../../presentation/tui/transcript/math.js";
 import { splitTableRow } from "../../presentation/tui/transcript/table.js";
@@ -78,6 +79,7 @@ function renderInlineHtmlAt(text: string, context?: InlineContext): string {
 /** Code and emphasis, on text that has already had its links taken out. */
 function renderEmphasisHtml(text: string): string {
   return text
+    .replace(/~~([^~\n]+)~~/g, "<del>$1</del>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
 }
@@ -193,13 +195,27 @@ function renderBlockHtml(block: Grouped): string {
   }
 }
 
+const HIGHLIGHT_MAX_CHARS = 32 * 1024;
+
 function renderFenceHtml(lines: readonly string[], language: string): string {
-  const body = escapeHtml(lines.join("\n"));
-  // The language is echoed as a label rather than used to highlight. There is no
-  // highlighter here, and a label that claims one would be the only part of the
-  // block a reader could not trust.
+  const source = lines.join("\n");
   const label = language === "" ? "" : `<span class="fence-lang">${escapeHtml(language)}</span>`;
-  return `<pre class="fence">${label}<code>${body}</code></pre>`;
+  const trimmedLang = language.trim();
+  let highlighted: string;
+  let codeClass = "hljs";
+  if (source.length <= HIGHLIGHT_MAX_CHARS && trimmedLang !== "") {
+    if (hljs.getLanguage(trimmedLang)) {
+      highlighted = hljs.highlight(source, { language: trimmedLang, ignoreIllegals: true }).value;
+      codeClass = `hljs language-${escapeHtml(trimmedLang)}`;
+    } else {
+      highlighted = escapeHtml(source);
+    }
+  } else if (source.length <= HIGHLIGHT_MAX_CHARS && source.trim() !== "") {
+    highlighted = hljs.highlightAuto(source).value;
+  } else {
+    highlighted = escapeHtml(source);
+  }
+  return `<pre class="fence">${label}<code class="${codeClass}">${highlighted}</code></pre>`;
 }
 
 function renderTableHtml(header: string, rows: readonly string[]): string {

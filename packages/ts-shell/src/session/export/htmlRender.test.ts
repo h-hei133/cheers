@@ -152,19 +152,20 @@ describe("blocks", () => {
     expect(html).toContain("x".repeat(40));
   });
 
-  it("renders a fenced block as code, not as markup", () => {
+  it("renders a fenced block as syntax-highlighted code, not as markup", () => {
     const html = renderMarkdownHtml("```ts\nconst x = 1;\n```");
-    expect(html).toContain("<code>const x = 1;</code>");
+    expect(html).toContain('<code class="hljs language-ts">');
+    expect(html).toContain("hljs-keyword");
+    expect(html).toContain("const");
     expect(html).toContain("fence-lang");
   });
 
   it("keeps markup inside a fence as text", () => {
     // The case that matters: an answer showing HTML must display it, not run it.
     const html = renderMarkdownHtml("```html\n<script>alert(1)</script>\n```");
-    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("&lt;");
     expect(html).not.toContain("<script>");
   });
-
   it("keeps markup in prose as text too", () => {
     expect(renderMarkdownHtml("<img onerror=alert(1)>")).toBe(
       "<p>&lt;img onerror=alert(1)&gt;</p>",
@@ -219,9 +220,9 @@ describe("blocks", () => {
 });
 
 describe("inline spans", () => {
-  it("renders emphasis, strong, and code", () => {
-    expect(renderInlineHtml("**b** and `c` and *i*")).toBe(
-      "<strong>b</strong> and <code>c</code> and <em>i</em>",
+  it("renders emphasis, strong, strikethrough, and code", () => {
+    expect(renderInlineHtml("**b** and *i* and ~~del~~ and `c`")).toBe(
+      "<strong>b</strong> and <em>i</em> and <del>del</del> and <code>c</code>",
     );
   });
 

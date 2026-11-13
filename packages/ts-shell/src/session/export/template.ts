@@ -72,7 +72,8 @@ header button:hover { border-color: var(--accent); }
 .tree-row .role.assistant { color: var(--accent); }
 .tree-row .role.tool { color: var(--tool); }
 .tree-row .preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#conversation { overflow: auto; padding: 16px 20px 60vh; }
+#conversation-wrap { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+#conversation { flex: 1; overflow: auto; padding: 16px 20px 60vh; }
 .turn { margin: 0 0 18px; border-left: 3px solid var(--border); padding-left: 12px; }
 .turn.user { border-color: var(--user); }
 .turn.assistant { border-color: var(--accent); }
@@ -122,6 +123,51 @@ a { color: var(--user); }
   color: var(--muted); padding: 3px; font: inherit;
 }
 .empty { color: var(--muted); font-style: italic; }
+.stats-bar {
+  padding: 6px 20px; border-bottom: 1px solid var(--border); background: var(--panel);
+  display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted);
+}
+.stats-bar strong { color: var(--text); font-weight: 600; }
+.thinking {
+  margin: 6px 0 8px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel);
+}
+.thinking > summary { cursor: pointer; padding: 5px 10px; font-size: 12px; color: var(--muted); font-style: italic; }
+.thinking-text {
+  margin: 0; padding: 8px 10px; border-top: 1px solid var(--border);
+  white-space: pre-wrap; word-break: break-word; font-size: 12.5px; color: var(--muted);
+}
+.tool-diff {
+  margin: 0; padding: 8px 10px; border-top: 1px solid var(--border);
+  background: var(--code-bg); overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.45;
+}
+.tool-diff .diff-line { white-space: pre; }
+.tool-diff .diff-added { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.tool-diff .diff-removed { color: var(--error); background: color-mix(in srgb, var(--error) 12%, transparent); }
+.tool-diff .diff-hunk { color: var(--user); }
+.tool-diff .diff-context { color: var(--muted); }
+.msg-images { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.msg-image {
+  max-width: 280px; max-height: 200px; border-radius: 6px; border: 1px solid var(--border);
+  cursor: zoom-in; object-fit: contain; background: var(--code-bg);
+}
+#image-modal {
+  display: none; position: fixed; inset: 0; z-index: 20;
+  background: rgba(0, 0, 0, 0.82); align-items: center; justify-content: center; padding: 24px;
+}
+#image-modal.open { display: flex; }
+#image-modal img { max-width: 92vw; max-height: 90vh; border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+.hljs { color: var(--text); }
+.hljs-keyword, .hljs-selector-tag, .hljs-title.class_ { color: #c792ea; }
+.hljs-string, .hljs-attr, .hljs-addition { color: var(--ok); }
+.hljs-number, .hljs-literal, .hljs-built_in { color: var(--accent); }
+.hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
+.hljs-function, .hljs-title, .hljs-title.function_ { color: var(--user); }
+.hljs-variable, .hljs-params, .hljs-deletion { color: var(--error); }
+@media (prefers-color-scheme: light) {
+  .hljs-keyword, .hljs-selector-tag, .hljs-title.class_ { color: #7c3aed; }
+}
 `;
 
 /**
@@ -150,6 +196,7 @@ export const PAGE_SCRIPT = String.raw`
   var selected = data.leafId || (flat.length ? flat[flat.length - 1].node.id : null);
   var query = '';
   var usersOnly = false;
+  var thinkingExpanded = true;
   var outputChecks = new WeakMap();
   var outputResize = typeof ResizeObserver === 'function' ? new ResizeObserver(function (entries) {
     entries.forEach(function (entry) {
@@ -241,7 +288,7 @@ export const PAGE_SCRIPT = String.raw`
       });
       if (entry.role === 'tool' && pending.has(entry.toolCallId)) {
         var call = pending.get(entry.toolCallId);
-        if (call) results.set(call, entry.content);
+        if (call) results.set(call, entry);
         pending.delete(entry.toolCallId);
       }
     });
@@ -273,22 +320,102 @@ export const PAGE_SCRIPT = String.raw`
     return node;
   }
 
+  function renderDiff(diffText) {
+    var box = el('div', 'tool-diff');
+    diffText.split(/\r?\n/).forEach(function (line) {
+      var cls = 'diff-context';
+      if (line.indexOf('+++') === 0 || line.indexOf('---') === 0 || line.indexOf('@@') === 0) cls = 'diff-hunk';
+      else if (line.indexOf('+') === 0) cls = 'diff-added';
+      else if (line.indexOf('-') === 0) cls = 'diff-removed';
+      box.appendChild(el('div', 'diff-line ' + cls, line));
+    });
+    return box;
+  }
+
+  function openImageModal(src) {
+    var modal = document.getElementById('image-modal');
+    var modalImg = document.getElementById('modal-image');
+    if (!modal || !modalImg) return;
+    modalImg.setAttribute('src', src);
+    modal.classList.add('open');
+  }
+
+  function renderImages(images) {
+    if (!images || !images.length) return null;
+    var wrap = el('div', 'msg-images');
+    images.forEach(function (img) {
+      if (!img || typeof img.mediaType !== 'string' || typeof img.data !== 'string') return;
+      var src = 'data:' + img.mediaType + ';base64,' + img.data;
+      var node = document.createElement('img');
+      node.className = 'msg-image';
+      node.setAttribute('src', src);
+      node.setAttribute('alt', 'Attached image');
+      node.addEventListener('click', function () { openImageModal(src); });
+      wrap.appendChild(node);
+    });
+    return wrap.children.length ? wrap : null;
+  }
+
+  function renderStats() {
+    var bar = document.getElementById('stats');
+    if (!bar) return;
+    bar.textContent = '';
+    var s = data.stats;
+    if (!s) return;
+    var items = [
+      ['Messages', String((s.userMessages || 0) + (s.assistantMessages || 0))],
+      ['Tool calls', String(s.toolCalls || 0)],
+    ];
+    if (s.models && s.models.length) items.push(['Models', s.models.join(', ')]);
+    if (s.tokens) {
+      items.push(['Tokens', (s.tokens.input || 0) + ' in / ' + (s.tokens.output || 0) + ' out']);
+    }
+    if (typeof s.costUsd === 'number') {
+      items.push(['Cost', '$' + s.costUsd.toFixed(4)]);
+    }
+    items.forEach(function (pair) {
+      var span = el('span', 'stat');
+      span.appendChild(el('strong', null, pair[0] + ': '));
+      span.appendChild(el('span', null, pair[1]));
+      bar.appendChild(span);
+    });
+  }
+
   function renderTurn(entry, results) {
     var turn = el('div', 'turn ' + (entry.role || ''));
     turn.id = 'entry-' + entry.id;
-    turn.appendChild(el('div', 'who', entry.role + (entry.timestamp ? ' · ' + entry.timestamp : '')));
+    var whoParts = [entry.role];
+    if (entry.origin && entry.origin.model) whoParts.push(entry.origin.model);
+    if (entry.timestamp) whoParts.push(entry.timestamp);
+    turn.appendChild(el('div', 'who', whoParts.join(' · ')));
+    if (entry.reasoning && (entry.reasoning.text || entry.reasoning.redacted)) {
+      var thinking = el('details', 'thinking');
+      if (thinkingExpanded) thinking.open = true;
+      thinking.appendChild(el('summary', null, entry.reasoning.redacted ? 'Thinking (redacted)' : 'Thinking'));
+      if (entry.reasoning.text) thinking.appendChild(el('div', 'thinking-text', entry.reasoning.text));
+      turn.appendChild(thinking);
+    }
     var body = el('div', 'body');
     body.innerHTML = entry.html || '';
     turn.appendChild(body);
+    var imgRow = renderImages(entry.images);
+    if (imgRow) turn.appendChild(imgRow);
+    if (entry.role === 'tool' && entry.toolDiff) {
+      turn.appendChild(renderDiff(entry.toolDiff));
+    }
     (entry.toolCalls || []).forEach(function (call) {
       var details = el('details', 'call');
       var summary = el('summary', null, 'called ' + call.name);
       details.appendChild(summary);
       details.appendChild(el('div', 'args', call.arguments));
-      var result = results.get(call);
-      if (result !== undefined) {
-        var output = el('div', 'result', result);
+      var paired = results.get(call);
+      if (paired !== undefined) {
+        var resultText = typeof paired === 'string' ? paired : paired.content;
+        var output = el('div', 'result' + (paired.isError ? ' is-error' : ''), resultText);
         details.appendChild(output);
+        if (paired.toolDiff) details.appendChild(renderDiff(paired.toolDiff));
+        var pairedImages = renderImages(paired.images);
+        if (pairedImages) details.appendChild(pairedImages);
         var measured = false;
         var checkOutput = function () {
           // Layout is available only after this card is mounted and opened.
@@ -347,9 +474,30 @@ export const PAGE_SCRIPT = String.raw`
   document.getElementById('toggle-sidebar').addEventListener('click', function () {
     document.body.classList.toggle('no-sidebar');
   });
+  var toggleThinking = document.getElementById('toggle-thinking');
+  if (toggleThinking) {
+    toggleThinking.addEventListener('click', function () {
+      thinkingExpanded = !thinkingExpanded;
+      renderConversation();
+    });
+  }
+  var imageModal = document.getElementById('image-modal');
+  if (imageModal) {
+    imageModal.addEventListener('click', function () { imageModal.classList.remove('open'); });
+  }
+  if (typeof document.addEventListener === 'function') {
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && imageModal) imageModal.classList.remove('open');
+      else if ((event.key === 't' || event.key === 'T') && event.target && event.target.tagName !== 'INPUT') {
+        thinkingExpanded = !thinkingExpanded;
+        renderConversation();
+      }
+    });
+  }
 
   var fromHash = (location.hash || '').replace(/^#/, '');
   if (fromHash && nodesById.has(fromHash)) selected = fromHash;
+  renderStats();
   renderSidebar();
   renderConversation();
 })();
@@ -374,6 +522,7 @@ export function renderPage(input: {
   <h1>${escapeForTitle(input.title)}</h1>
   <span class="meta">${escapeForTitle(input.subtitle)}</span>
   <span class="spacer"></span>
+  <button id="toggle-thinking" type="button">Thinking (T)</button>
   <button id="toggle-sidebar" type="button">Sidebar</button>
 </header>
 <aside id="sidebar">
@@ -381,7 +530,11 @@ export function renderPage(input: {
   <label class="meta"><input id="users-only" type="checkbox"> Only my messages</label>
   <ul id="tree"></ul>
 </aside>
-<main id="conversation"><noscript>This page needs JavaScript to show the conversation.</noscript></main>
+<main id="conversation-wrap">
+  <div id="stats" class="stats-bar"></div>
+  <div id="conversation"><noscript>This page needs JavaScript to show the conversation.</noscript></div>
+</main>
+<div id="image-modal" role="dialog" aria-label="Expanded image"><img id="modal-image" src="" alt="Expanded attachment"></div>
 <script id="${DATA_ELEMENT_ID}" type="text/plain">${input.payloadBase64}</script>
 <script>${PAGE_SCRIPT.replace("document.getElementById('DATA')", `document.getElementById('${DATA_ELEMENT_ID}')`)}</script>
 </body>

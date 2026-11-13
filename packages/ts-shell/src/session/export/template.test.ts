@@ -35,15 +35,16 @@ class Element {
     this.children.splice(index, 0, child);
     child.parentNode = this;
   }
+  attributes = new Map<string, string>();
   addEventListener(name: string, action: () => void) { this.listeners.set(name, action); }
-  setAttribute() {}
+  setAttribute(name: string, value: string) { this.attributes.set(name, value); }
   scrollIntoView() {}
 }
 
 function runPage(payload: unknown) {
   const observed = new Set<Element>();
   let resized: ((entries: { target: Element }[]) => void) | undefined;
-  const elements = new Map(["DATA", "tree", "conversation", "filter", "users-only", "toggle-sidebar"].map(id => [id, new Element()]));
+  const elements = new Map(["DATA", "tree", "conversation", "filter", "users-only", "toggle-sidebar", "toggle-thinking", "stats", "image-modal", "modal-image"].map(id => [id, new Element()]));
   elements.get("conversation")!.connected = true;
   elements.get("DATA")!.textContent = Buffer.from(JSON.stringify(payload)).toString("base64");
   vm.runInNewContext(PAGE_SCRIPT, {
@@ -175,5 +176,29 @@ describe("exported page branch traversal", () => {
     const unknown = runPage({ entries, tree: [node("a"), node("b", "a")], leafId: "b", warnings: ["1 unreadable transcript line was omitted."] });
     expect(unknown.get("conversation")!.children[0]!.textContent).not.toContain("NEW_CALL_RESULT");
     expect(unknown.get("conversation")!.children).toHaveLength(2);
+  });
+
+  it("renders thinking blocks, tool diffs, stats bar, and image modal interactions", () => {
+    const elements = runPage({
+      entries: [
+        entry("u", "user", { images: [{ mediaType: "image/png", data: "AAAA" }] }),
+        entry("a", "assistant", { reasoning: { text: "step 1" }, toolCalls: [call("call_0")] }),
+        entry("t", "tool", { toolCallId: "call_0", content: "updated", toolDiff: "@@ -1 +1 @@\n-old\n+new", isError: true }),
+      ],
+      tree: [node("u"), node("a", "u"), node("t", "a")],
+      leafId: "t",
+      stats: { userMessages: 1, assistantMessages: 1, toolCalls: 1, models: ["openai/gpt-5"], tokens: { input: 10, output: 5 }, costUsd: 0.001 },
+    });
+    expect(elements.get("stats")!.textContent).toContain("openai/gpt-5");
+    expect(elements.get("stats")!.textContent).toContain("10 in / 5 out");
+    const conv = elements.get("conversation")!;
+    expect(conv.textContent).toContain("step 1");
+    expect(conv.textContent).toContain("-old");
+    const userImg = conv.children[0]!.children[2]!.children[0]!;
+    userImg.listeners.get("click")?.();
+    expect(elements.get("image-modal")!.className).toContain("open");
+    expect(elements.get("modal-image")!.attributes.get("src")).toBe("data:image/png;base64,AAAA");
+    elements.get("image-modal")!.listeners.get("click")?.();
+    expect(elements.get("image-modal")!.className).not.toContain("open");
   });
 });

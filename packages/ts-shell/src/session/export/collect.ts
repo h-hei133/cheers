@@ -7,13 +7,13 @@ import { renderMarkdownHtml } from "./htmlRender.js";
 import { projectExportTree } from "./graph.js";
 import { sanitizeExport } from "./sanitize.js";
 import { readExportSource, readExportThread } from "./source.js";
-import type { ExportEntry, ExportPayload } from "./model.js";
+import type { ExportEntry, ExportEntryUsage, ExportImage, ExportPayload } from "./model.js";
+import { computeExportStats } from "./stats.js";
 import { restoreReport } from '../reports/projection.js';
 import type { ReportTranscriptEntry } from '../reports/model.js';
 import type { SessionStoreLayout } from '../store/sessionFileLayout.js';
 import type { ReadTranscript } from '../transcript/sessionTranscript.js';
-export type { ExportEntry, ExportPayload, ExportTreeNode } from "./model.js";
-
+export type { ExportEntry, ExportPayload, ExportSessionStats, ExportTreeNode } from "./model.js";
 export type ExportGatherResult =
   | { readonly ok: true; readonly payload: ExportPayload }
   | { readonly ok: false; readonly reason: string };
@@ -59,13 +59,61 @@ export function gatherExport(input: {
   }
   const tree = projectExportTree(snapshot, entries);
   const warnings = [...tree.warnings, ...transcript.warnings];
+  const sanitized = sanitizeExport({
+    header: { sessionId: input.sessionId, exportedAt: (input.now ?? (() => new Date()))().toISOString(), workspace: input.workspace },
+    tree: tree.nodes, entries, leafId: tree.leafId, warnings,
+  });
   return {
     ok: true,
-    payload: sanitizeExport({
-      header: { sessionId: input.sessionId, exportedAt: (input.now ?? (() => new Date()))().toISOString(), workspace: input.workspace },
-      tree: tree.nodes, entries, leafId: tree.leafId, warnings,
-    }),
+    payload: {
+      ...sanitized,
+      stats: computeExportStats(sanitized.entries, sanitized.tree),
+    },
   };
+}
+
+const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+const BASE64_PATTERN = /^[A-Za-z0-9+/=]+$/;
+
+function extractImages(content: Extract<TranscriptEvent, { type: "message" }>["content"]): readonly ExportImage[] | undefined {
+  if (typeof content === "string") return undefined;
+  const images: ExportImage[] = [];
+  for (const block of content) {
+    if (block.type !== "image") continue;
+    const mimeType = block.mimeType.trim().toLowerCase();
+    const data = block.data.trim();
+    if (ALLOWED_IMAGE_MIMES.has(mimeType) && data.length > 0 && BASE64_PATTERN.test(data)) {
+      images.push({ mediaType: mimeType, data });
+    }
+  }
+  return images.length > 0 ? images : undefined;
+}
+
+function extractToolDiff(event: Extract<TranscriptEvent, { type: "message" }>, contentText: string): string | undefined {
+  const metaDiff = event.metadata?.diff;
+  if (typeof metaDiff === "string" && metaDiff.trim()) return redactExportText(metaDiff);
+  if (event.role !== "tool") return undefined;
+  const fenced = /```diff\r?\n([\s\S]*?)```/.exec(contentText);
+  return fenced?.[1]?.trim() ? redactExportText(fenced[1].replace(/\r?\n$/, "")) : undefined;
+}
+
+function extractUsage(event: Extract<TranscriptEvent, { type: "message" }>): ExportEntryUsage | undefined {
+  const raw = event.metadata?.usage;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const rec = raw as Record<string, unknown>;
+    const inputTokens = typeof rec.inputTokens === "number" ? rec.inputTokens : typeof rec.promptTokens === "number" ? rec.promptTokens : 0;
+    const outputTokens = typeof rec.outputTokens === "number" ? rec.outputTokens : typeof rec.completionTokens === "number" ? rec.completionTokens : 0;
+    const cacheReadTokens = typeof rec.cacheReadTokens === "number" ? rec.cacheReadTokens : undefined;
+    const cacheWriteTokens = typeof rec.cacheWriteTokens === "number" ? rec.cacheWriteTokens : undefined;
+    const costUsd = typeof rec.costUsd === "number" ? rec.costUsd : typeof rec.cost === "number" ? rec.cost : undefined;
+    if (inputTokens > 0 || outputTokens > 0 || (cacheReadTokens ?? 0) > 0 || (cacheWriteTokens ?? 0) > 0 || costUsd !== undefined) {
+      return { inputTokens, outputTokens, ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}), ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}), ...(costUsd !== undefined ? { costUsd } : {}) };
+    }
+  }
+  if (event.promptMeasurement && event.promptMeasurement.tokens > 0) {
+    return { inputTokens: event.promptMeasurement.tokens, outputTokens: 0 };
+  }
+  return undefined;
 }
 
 function toExportEntry(event: Extract<TranscriptEvent, { type: "message" }>): ExportEntry {
@@ -73,10 +121,22 @@ function toExportEntry(event: Extract<TranscriptEvent, { type: "message" }>): Ex
     id: call.id, name: call.function.name, arguments: redactExportText(call.function.arguments),
   }));
   const content = redactExportText(messageToText(event.content, { placeholderForImages: true }));
+  const images = extractImages(event.content);
+  const toolDiff = extractToolDiff(event, content);
+  const usage = extractUsage(event);
+  const isError = event.metadata?.isError === true || event.failureClass !== undefined;
+  const reasoning = event.reasoning?.text || event.reasoning?.redacted
+    ? { text: redactExportText(event.reasoning.text ?? ""), ...(event.reasoning.redacted ? { redacted: true } : {}) }
+    : undefined;
   return {
     id: event.id ?? "", role: event.role, content, html: renderMarkdownHtml(content),
+    ...(reasoning !== undefined ? { reasoning } : {}),
+    ...(images !== undefined ? { images } : {}),
     ...(toolCalls?.length ? { toolCalls } : {}),
     ...(event.tool_call_id !== undefined ? { toolCallId: event.tool_call_id } : {}),
+    ...(toolDiff !== undefined ? { toolDiff } : {}),
+    ...(isError ? { isError: true } : {}),
+    ...(usage !== undefined ? { usage } : {}),
     ...(event.origin !== undefined ? { origin: event.origin } : {}),
     timestamp: event.timestamp,
   };

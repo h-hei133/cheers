@@ -1,6 +1,9 @@
 import readline from 'node:readline';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
-import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
+import type { PromptAttachments, ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
+import type { SessionManager } from '../../session/SessionManager.js';
+import type { Session } from '../../session/schema/sessionRecord.js';
+import { writeRawStdout } from '../../core/shell/outputGuard.js';
 import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 import type { StructuredLogger } from '../../observability/structuredLogger.js';
 import { formatCliContextTag } from '../../entrypoints/cliInteractiveLoopState.js';
@@ -24,15 +27,20 @@ import { directorControl } from './director.js';
 import { evaluationControl, cancelEvaluationFor } from './evaluation.js';
 import { mediaControl, cancelMediaCommand, withoutRecordingInput } from './media.js';
 import { attachGoalSubmission, schedulerForRuntime } from './goalScheduling.js';
-import { handleRpcCommand, tryParseRpcCommand } from '../rpc/rpcServer.js';
+import { handleRpcCommand, tryParseRpcCommand, tryParseRpcUiResponse } from '../rpc/rpcServer.js';
+import { createRpcUiBridge, type RpcUiBridge } from '../rpc/uiBridge.js';
+import { createRuntimeRpcHost } from '../rpc/runtimeHost.js';
 
 export async function runPromptInputStream(options: {
   readonly stdin?: NodeJS.ReadableStream;
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionRuntime: ShellSessionRuntime;
+  readonly sessionManager?: SessionManager;
   readonly renderer: StreamingRenderer;
   readonly logger: StructuredLogger;
-  readonly runPrompt: (prompt: string) => Promise<'exit' | void>;
+  readonly runPrompt: (prompt: string, attachments?: PromptAttachments) => Promise<'exit' | void>;
+  readonly switchSession?: (session: Session) => boolean;
+  readonly onRpcUiBridge?: (bridge: RpcUiBridge) => void;
   readonly onFirstFrame?: () => void;
   readonly onUserIntent?: () => void;
   readonly rpcMode?: boolean;
@@ -42,17 +50,18 @@ export async function runPromptInputStream(options: {
       projectRoot: options.runtimeContext.projectRoot,
       sessionId: options.runtimeContext.session.id,
     });
-  options.renderer.renderLine(
-    `Non-TTY stdin mode ${contextTag()}: waiting for newline-delimited prompts.`,
-  );
-  options.renderer.renderLine(
-    "Send one prompt per line, or paste fenced/multiline content. Close stdin to finish.\n",
-  );
+  if (!options.rpcMode) {
+    options.renderer.renderLine(
+      `Non-TTY stdin mode ${contextTag()}: waiting for newline-delimited prompts.`,
+    );
+    options.renderer.renderLine(
+      "Send one prompt per line, or paste fenced/multiline content. Close stdin to finish.\n",
+    );
+  }
   options.onFirstFrame?.();
   options.logger.info("CLI non-TTY stdin stream mode started", {
     sessionId: options.runtimeContext.session.id,
   });
-
   const stdinReader = readline.createInterface({
     input: options.stdin ?? process.stdin,
     crlfDelay: Infinity,
@@ -78,11 +87,11 @@ export async function runPromptInputStream(options: {
   const queue = new SubmissionQueue(() => options.runtimeContext.session, () => {
     options.renderer.renderLine('Queued input was not executed because the session changed. Queue it again explicitly.');
   });
-  const dispatch = async (prompt: string): Promise<void> => {
+  const dispatch = async (prompt: string, attachments?: PromptAttachments): Promise<void> => {
     if (exitRequested) return;
     processedCount += 1;
     withoutRecordingInput(options.runtimeContext, () => options.renderer.renderLine(`${contextTag()} > ${prompt}`));
-    const outcome = await options.runPrompt(prompt);
+    const outcome = await options.runPrompt(prompt, attachments);
     if (outcome === 'exit') { exitRequested = true; pendingPrompt = null; queue.splice(0); stdinReader.close(); }
   };
   const drain = (): void => {
@@ -97,11 +106,12 @@ export async function runPromptInputStream(options: {
         if (cancellation === contentCancellation) break;
       }
       const prompt = queue.shift(); if (prompt === undefined || exitRequested) return;
+      const attachments = queue.takeAttachments();
       busy = true;
-      try { await dispatch(prompt); } finally { busy = false; }
+      try { await dispatch(prompt, attachments); } finally { busy = false; }
     }).catch(error => options.renderer.renderLine(`Run failed: ${error instanceof Error ? error.message : 'runtime failure'}`));
   };
-  const enqueuePrompt = (prompt: string): void => {
+  const enqueuePrompt = (prompt: string, attachments?: PromptAttachments): void => {
     const media = mediaControl(prompt);
     if (media) {
       if (media.stop) {
@@ -148,7 +158,7 @@ export async function runPromptInputStream(options: {
       if (cancellingContent) contentCancellation = controlChain;
       return;
     }
-    queue.push(prompt); drain();
+    queue.push(prompt, attachments); drain();
   };
   const releaseQueue = attachInputQueue(options.sessionRuntime, { control: queue.control, enqueue: text => queue.push(text), drain });
   const releaseGoal = attachGoalSubmission(options.sessionRuntime, {
@@ -159,6 +169,23 @@ export async function runPromptInputStream(options: {
     },
     settled: () => { busy = false; releaseRound?.(); releaseRound = undefined; },
   });
+
+  const rpcUiBridge = options.rpcMode
+    ? createRpcUiBridge(request => writeRawStdout(`${JSON.stringify(request)}\n`))
+    : undefined;
+  if (rpcUiBridge) options.onRpcUiBridge?.(rpcUiBridge);
+  const rpcHost = options.rpcMode
+    ? createRuntimeRpcHost({
+        runtimeContext: options.runtimeContext,
+        sessionRuntime: options.sessionRuntime,
+        sessionManager: options.sessionManager,
+        queue,
+        isStreaming: () => busy,
+        enqueuePrompt,
+        switchSession: options.switchSession,
+        ui: rpcUiBridge,
+      })
+    : undefined;
 
   const flushPendingPrompt = () => {
     if (!pendingPrompt) {
@@ -199,34 +226,17 @@ export async function runPromptInputStream(options: {
       return;
     }
 
+    const uiResponse = rpcUiBridge ? tryParseRpcUiResponse(normalizedLine) : undefined;
+    if (uiResponse && rpcUiBridge) {
+      rpcUiBridge.handleUiResponse(uiResponse);
+      return;
+    }
+
     const rpcCommand = options.rpcMode ? tryParseRpcCommand(normalizedLine) : undefined;
-    if (rpcCommand) {
+    if (rpcCommand && rpcHost) {
       pendingControls++;
       localControlChain = localControlChain
-        .then(() =>
-          handleRpcCommand(rpcCommand, {
-            sessionId: options.runtimeContext.session.id,
-            workspaceRoot: options.runtimeContext.projectRoot,
-            isStreaming: () => busy,
-            getMessages: () => options.runtimeContext.session.turns,
-            enqueuePrompt,
-            steer: (msg) => {
-              const activeInput = options.sessionRuntime.input?.();
-              if (activeInput) activeInput.steer(msg);
-              else enqueuePrompt(msg);
-            },
-            followUp: (msg) => {
-              const activeInput = options.sessionRuntime.input?.();
-              if (activeInput) activeInput.followUp(msg);
-              else enqueuePrompt(msg);
-            },
-            clearQueue: () => queue.splice(0).length,
-            abort: () => {
-              queue.splice(0);
-              options.sessionRuntime.cancelCurrentRun();
-            },
-          }).then(() => undefined),
-        )
+        .then(() => handleRpcCommand(rpcCommand, rpcHost).then(() => undefined))
         .finally(() => {
           pendingControls--;
         });
@@ -267,11 +277,14 @@ export async function runPromptInputStream(options: {
     if (localControls === localControlChain && controls === controlChain && turns === turnChain) break;
   }
   await schedulerForRuntime(options.sessionRuntime)?.stop('cancelled');
+  rpcUiBridge?.dispose();
   releaseGoal?.();
   releaseQueue();
-  options.renderer.renderLine(
-    `\nStdin stream closed. Processed ${processedCount} prompt(s).\n`,
-  );
+  if (!options.rpcMode) {
+    options.renderer.renderLine(
+      `\nStdin stream closed. Processed ${processedCount} prompt(s).\n`,
+    );
+  }
   options.logger.info("CLI non-TTY stdin stream mode closed", {
     sessionId: options.runtimeContext.session.id,
     processedCount,

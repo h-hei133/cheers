@@ -85,12 +85,17 @@ export async function runNonTtyPromptStream(options: {
   onUserIntent?: () => void;
   rpcMode?: boolean;
 }): Promise<void> {
-  await runPromptInputStream({ runtimeContext: options.runtimeContext, sessionRuntime: options.sessionRuntime,
-    renderer: options.renderer, logger: options.logger,
+  await runPromptInputStream({
+    runtimeContext: options.runtimeContext,
+    sessionRuntime: options.sessionRuntime,
+    sessionManager: options.sessionManager,
+    renderer: options.renderer,
+    logger: options.logger,
     onFirstFrame: options.onFirstFrame,
     onUserIntent: options.onUserIntent,
     rpcMode: options.rpcMode,
-    runPrompt: prompt => runNonInteractivePrompt({ ...options, prompt, printMode: false, jsonEvents: options.rpcMode === true, awaitGoalScheduling: false }),
+    switchSession: session => switchRuntimeSessionProjectContext(options.runtimeContext, session),
+    runPrompt: (prompt, attachments) => runNonInteractivePrompt({ ...options, prompt, attachments, printMode: false, jsonEvents: options.rpcMode === true, awaitGoalScheduling: false }),
   });
 }
 
@@ -99,6 +104,7 @@ export async function runNonInteractivePrompt(options: {
   /** A live stdin host owns scheduler drainage while continuing to accept controls. */
   awaitGoalScheduling?: boolean;
   prompt: string;
+  attachments?: PromptAttachments;
   sessionManager: SessionManager;
   mcpGateway?: CoreMcpGateway;
   runtimeContext: ShellRuntimeContext;
@@ -354,6 +360,7 @@ export async function runNonInteractivePrompt(options: {
   await executeResolvedPromptTurn({
     source: "non-interactive",
     effectivePrompt: resolved.effectivePrompt,
+    ...(options.attachments ? { attachments: options.attachments } : {}),
     ...(resolved.promptMetadata ? { promptMetadata: resolved.promptMetadata } : {}),
     sessionManager: options.sessionManager,
     runtimeContext: options.runtimeContext,

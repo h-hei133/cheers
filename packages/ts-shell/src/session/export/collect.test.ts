@@ -235,4 +235,82 @@ describe("gathering a session for export", () => {
     if (!result.ok) return;
     expect(result.payload).not.toHaveProperty("results");
   });
+
+  it("collects reasoning, safe images, tool diffs, usage, and aggregate stats while redacting secrets", () => {
+    const storeLayout = createSessionStoreLayout(home);
+    const layout = projectSessionFileLayout({ sessionsDir: storeLayout.sessionsDir, sessionId });
+    const base: Session = {
+      id: sessionId,
+      projectRoot: workspace,
+      createdAt: "2026-09-25T00:00:00.000Z",
+      updatedAt: "2026-09-25T00:00:09.000Z",
+      status: "active",
+      turns: [],
+    };
+    writeSessionRecord({ session: base, layout });
+    const recorded: Session = { ...base, turns: [] };
+    const pngB64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+    appendSessionTurn({
+      session: recorded,
+      message: {
+        role: "user",
+        content: [
+          { type: "text", text: "inspect screenshot" },
+          { type: "image", data: pngB64, mimeType: "image/png" },
+          { type: "image", data: "PHN2Zz48L3N2Zz4=", mimeType: "image/svg+xml" },
+        ],
+      },
+      timestamp: "2026-09-25T00:00:01.000Z",
+      append: (event) => appendTranscriptEvent(layout.transcriptPath, event),
+      writeMetadata: (session) => writeSessionMetadataRecord({ session, layout }),
+      writeState: (session) => writeSessionState({ session, layout }),
+    });
+    appendSessionTurn({
+      session: recorded,
+      message: {
+        role: "assistant",
+        content: "Editing file",
+        origin: { provider: "openai", model: "gpt-5" },
+        reasoning: { text: "check secret sk-1234567890abcdef12345678" },
+        tool_calls: [{ id: "call-edit", type: "function", function: { name: "edit", arguments: "{}" } }],
+        metadata: { usage: { inputTokens: 120, outputTokens: 40, costUsd: 0.0025 } },
+      },
+      timestamp: "2026-09-25T00:00:02.000Z",
+      append: (event) => appendTranscriptEvent(layout.transcriptPath, event),
+      writeMetadata: (session) => writeSessionMetadataRecord({ session, layout }),
+      writeState: (session) => writeSessionState({ session, layout }),
+    });
+    appendSessionTurn({
+      session: recorded,
+      message: {
+        role: "tool",
+        tool_call_id: "call-edit",
+        content: "Updated a.ts\n\n```diff\n-old\n+new\n```",
+        metadata: { isError: false },
+      },
+      timestamp: "2026-09-25T00:00:03.000Z",
+      append: (event) => appendTranscriptEvent(layout.transcriptPath, event),
+      writeMetadata: (session) => writeSessionMetadataRecord({ session, layout }),
+      writeState: (session) => writeSessionState({ session, layout }),
+    });
+
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.entries[0]?.images).toEqual([{ mediaType: "image/png", data: pngB64 }]);
+    expect(result.payload.entries[1]?.reasoning?.text).not.toContain("sk-1234567890abcdef12345678");
+    expect(result.payload.entries[2]?.toolDiff).toBe("-old\n+new");
+    expect(result.payload.stats).toMatchObject({
+      userMessages: 1,
+      assistantMessages: 1,
+      toolResults: 1,
+      toolCalls: 1,
+      models: ["openai/gpt-5"],
+      tokens: { input: 120, output: 40, total: 160 },
+      costUsd: 0.0025,
+    });
+    const html = renderExportHtml(result.payload);
+    expect(html).toContain("image-modal");
+    expect(html).toContain("toggle-thinking");
+  });
 });

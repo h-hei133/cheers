@@ -98,13 +98,18 @@ export function createCliBootstrapRuntimeContext(
   const sessionManager = new SessionManager();
   const renderer = new StreamingRenderer();
   if (input.options.jsonEvents || input.options.rpcMode) takeOverStdout();
-  const writeJsonEvent = input.options.jsonEvents || input.options.rpcMode
+  const writeJsonEvent = input.options.jsonEvents
     ? createJsonEventWriter((line) => writeRawStdout(line))
     : undefined;
   if (writeJsonEvent) {
     renderer.setSink({
       line: (text, report) => writeJsonEvent({ type: "cli.output", text: `${text}\n`, ...(report ? { report } : {}) }),
       chunk: (text) => writeJsonEvent({ type: "cli.output", text }),
+    });
+  } else if (input.options.rpcMode) {
+    renderer.setSink({
+      line: (text, report) => writeRawStdout(`${JSON.stringify({ type: "cli.output", text: `${text}\n`, ...(report ? { report } : {}) })}\n`),
+      chunk: (text) => writeRawStdout(`${JSON.stringify({ type: "cli.output", text })}\n`),
     });
   }
   // Recovery suggestions are discovered after the first frame. The interactive

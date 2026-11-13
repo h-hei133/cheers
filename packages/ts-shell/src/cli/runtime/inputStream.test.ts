@@ -181,3 +181,52 @@ it('stops media controls during a held turn and removes parameterized queued sta
   stdin.end('/record start pending.cast --retain keep\n/live start --seconds 10\n/live stop\n/record stop\n');
   await stop; await run; expect(seen).toEqual(['HELD', '/live stop', '/record stop']);
 });
+
+it('routes RPC commands, attachments, queue clears, and extension_ui_response in rpcMode without emitting the non-TTY prose banner', async () => {
+  const stdin = new PassThrough();
+  const rendered: string[] = [];
+  const runs: Array<{ prompt: string; attachments?: unknown }> = [];
+  let started!: () => void;
+  let release!: () => void;
+  const firstStarted = new Promise<void>(resolve => { started = resolve; });
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let uiBridgeRef: import('../rpc/uiBridge.js').RpcUiBridge | undefined;
+  const context = {
+    session: { id: 'rpc-sess', createdAt: '2026-10-01T00:00:00Z', projectRoot: '/workspace', turns: [] },
+    projectRoot: '/workspace',
+    cwd: '/workspace',
+    runtimeConfig: { provider: 'openai', compactionEnabled: true, retryEnabled: true },
+  } as unknown as ShellRuntimeContext;
+  const run = runPromptInputStream({
+    stdin,
+    runtimeContext: context,
+    sessionRuntime: { waitForIdle: async () => {}, cancelCurrentRun: () => {} } as unknown as ShellSessionRuntime,
+    renderer: { renderLine: (line: string) => rendered.push(line) } as never,
+    logger: { info: () => {} } as never,
+    rpcMode: true,
+    onRpcUiBridge: bridge => { uiBridgeRef = bridge; },
+    runPrompt: async (prompt, attachments) => {
+      runs.push({ prompt, attachments });
+      if (prompt === 'see img') {
+        started();
+        await held;
+      }
+    },
+  });
+  const selectPromise = uiBridgeRef!.select('Choose', ['a', 'b']);
+  stdin.write('{"id":"p1","type":"prompt","message":"see img","images":[{"type":"image","data":"AAAA","mimeType":"image/png"}]}\n');
+  await firstStarted;
+  stdin.write('{"id":"p2","type":"prompt","message":"stale","images":[{"type":"image","data":"BBBB","mimeType":"image/png"}]}\n');
+  stdin.write('{"id":"cq","type":"clear_queue"}\n');
+  await new Promise<void>(resolve => setImmediate(resolve));
+  release();
+  uiBridgeRef?.dispose();
+  await expect(selectPromise).resolves.toBeUndefined();
+  stdin.end('{"id":"p3","type":"prompt","message":"after"}\n');
+  await run;
+  expect(rendered.some(line => line.includes('Non-TTY stdin mode'))).toBe(false);
+  expect(runs).toEqual([
+    { prompt: 'see img', attachments: { images: [{ type: 'image', data: 'AAAA', mimeType: 'image/png' }] } },
+    { prompt: 'after', attachments: undefined },
+  ]);
+});
