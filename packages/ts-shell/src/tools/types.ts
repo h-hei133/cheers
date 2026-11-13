@@ -45,6 +45,12 @@ export interface ToolExecutionContext {
    */
   readonly runSubagent?: SubagentRunner
   readonly interactiveAsk?: InteractiveAsk
+  /** Execute a nested tool call through the host's full permission, plan-mode, and hook gate. */
+  readonly executeNestedTool?: (
+    name: string,
+    args: Record<string, unknown>,
+    callId: string,
+  ) => Promise<ToolExecutionResult>
 }
 
 export interface ToolExecutionResult {
@@ -67,6 +73,7 @@ export interface ToolDefinition<Preparation = ToolPreparation | Promise<ToolPrep
   readonly name: string
   readonly description: string
   readonly argsSchema: Record<string, unknown>
+  readonly validateArguments?: (args: Record<string, unknown>) => void
   /** Server-declared capability hints; these never replace permission checks. */
   readonly mcpAnnotations?: { readonly readOnlyHint: boolean }
   /** A complete immutable request prepared before permission hooks, with no target effects. */
@@ -80,6 +87,8 @@ export interface ToolDefinition<Preparation = ToolPreparation | Promise<ToolPrep
 export interface ToolPreparation {
   /** Host-computed single-file content, retained outside model arguments and hook JSON. */
   readonly writeCandidate?: PreparedWriteCandidate
+  /** Host-computed multi-file content candidates for multi-target patches. */
+  readonly writeCandidates?: readonly PreparedWriteCandidate[]
   /** A native execution adapter may retain ordinary bash command policy. */
   readonly permissionToolName?: 'bash' | 'task'
   /** Execution tools may bind a complete non-file request to the same approval lifecycle. */

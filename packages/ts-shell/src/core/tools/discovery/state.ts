@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { ToolDefinition, ToolPreparation } from '../../../tools/types.js';
-
+import { rankToolsByBm25 } from './ranker.js';
 /**
  * The tools a run starts with, and the catalogue it may load from.
  *
@@ -10,7 +10,7 @@ import type { ToolDefinition, ToolPreparation } from '../../../tools/types.js';
  * mechanism: a loaded tool still goes through the same schema validation,
  * permission gate and sandbox as a pinned one.
  */
-export const PINNED_TOOL_NAMES = ['read', 'glob', 'grep', 'bash', 'edit', 'write', 'apply_patch', 'ask', 'task', 'taskOutput', 'taskWait', 'taskStop', 'todo'] as const;
+export const PINNED_TOOL_NAMES = ['read', 'glob', 'grep', 'bash', 'edit', 'write'] as const;
 export const DISCOVERY_SEARCH_TOOL = 'tool_search';
 export const DISCOVERY_LOAD_TOOL = 'tool_load';
 const LOADED_LIMIT = 32;
@@ -51,11 +51,37 @@ export function createToolDiscovery(input: {
   const notify = (): void => {
     for (const listener of [...listeners]) listener();
   };
-  const generation = (): string => createHash('sha256').update(JSON.stringify([...input.catalog.entries()]
-    .map(([name, tool]) => [name, tool.description, tool.argsSchema])
-    .sort((left, right) => String(left[0]).localeCompare(String(right[0]))))).digest('hex');
-  const toolFingerprint = (tool: ToolDefinition): string => JSON.stringify([tool.description, tool.argsSchema]);
-
+  const fingerprints = new WeakMap<ToolDefinition, string>();
+  const toolFingerprint = (tool: ToolDefinition): string => {
+    let fp = fingerprints.get(tool);
+    if (fp === undefined) {
+      fp = JSON.stringify([tool.description, tool.argsSchema]);
+      fingerprints.set(tool, fp);
+    }
+    return fp;
+  };
+  let cachedEntries: Array<{ readonly name: string; readonly tool: ToolDefinition; readonly fingerprint: string }> = [];
+  let cachedDigest = '';
+  const generation = (): string => {
+    if (
+      cachedDigest &&
+      cachedEntries.length === input.catalog.size &&
+      cachedEntries.every(entry => {
+        const current = input.catalog.get(entry.name);
+        return current === entry.tool && toolFingerprint(current) === entry.fingerprint;
+      })
+    ) {
+      return cachedDigest;
+    }
+    const sorted = [...input.catalog.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, tool]) => ({ name, tool, fingerprint: toolFingerprint(tool) }));
+    cachedEntries = sorted;
+    cachedDigest = createHash('sha256')
+      .update(sorted.map(entry => `${entry.name}\0${entry.fingerprint}`).join('\n'))
+      .digest('hex');
+    return cachedDigest;
+  };
   const guard = (tool: ToolDefinition, snapshotGeneration: string, catalogueOwned: boolean): ToolDefinition => {
     const fingerprint = toolFingerprint(tool);
     const verify = (): void => {
@@ -103,22 +129,16 @@ export function createToolDiscovery(input: {
     },
     snapshot,
     search: (query, limit = 8) => {
-      const text = query.trim().toLowerCase();
-      if (!text) return [];
+      if (!query.trim()) return [];
       const bounded = Math.max(1, Math.min(20, Math.trunc(limit)));
-      return [...input.catalog.values()]
-        .filter(tool => tool.name !== DISCOVERY_SEARCH_TOOL && tool.name !== DISCOVERY_LOAD_TOOL)
-        .map(tool => {
-          const name = tool.name.toLowerCase();
-          const description = tool.description.toLowerCase();
-          const score = name === text ? 0 : name.startsWith(text) ? 1 : name.includes(text) ? 2 : description.includes(text) ? 3 : 4;
-          return { tool, score };
-        })
-        .filter(match => match.score < 4)
-        .sort((left, right) => left.score - right.score || left.tool.name.localeCompare(right.tool.name))
-        .slice(0, bounded)
-        .map(match => ({ name: match.tool.name, summary: match.tool.description.split('\n')[0]!.slice(0, 240),
-          loaded: loaded.has(match.tool.name), pinned: pinned.has(match.tool.name) }));
+      const searchable = [...input.catalog.values()]
+        .filter(tool => tool.name !== DISCOVERY_SEARCH_TOOL && tool.name !== DISCOVERY_LOAD_TOOL);
+      return rankToolsByBm25(query, searchable, bounded).map(tool => ({
+        name: tool.name,
+        summary: tool.description.split('\n')[0]!.slice(0, 240),
+        loaded: loaded.has(tool.name),
+        pinned: pinned.has(tool.name),
+      }));
     },
     load: names => {
       const accepted: string[] = []; const rejected: string[] = [];

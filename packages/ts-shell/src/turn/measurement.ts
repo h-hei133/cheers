@@ -8,7 +8,7 @@ import type { PromptMeasurement } from '../context/request/model.js';
 /** Bind the known transient opening rewrite without persisting its environment or attached source text. */
 export function storedPromptProjection(messages: readonly AgentMessage[], projection: ReturnType<typeof outgoingProjection>,
   source: { readonly opening: AgentMessage; readonly stored: AgentMessage } | undefined,
-  bridge: boolean, wireMessageCount: number, pruneToolText = true): PromptMeasurement['projection'] {
+  bridge: boolean, wireMessageCount: number, pruneToolText = false): PromptMeasurement['projection'] {
   if (!source || source.opening.role !== 'user' || source.stored.role !== 'user'
     || typeof source.opening.content !== 'string' || typeof source.stored.content !== 'string'
     || !projection.indexAligned || wireMessageCount !== messages.length) return undefined;
@@ -37,7 +37,7 @@ export function storedPromptProjection(messages: readonly AgentMessage[], projec
 
 /** Prove a source-indexed text rewrite against the exact request the provider measured. */
 export function measuredProjectionPrefix(messages: readonly AgentMessage[],
-  projection: ReturnType<typeof outgoingProjection>, usage: SessionUsageTelemetry, bridge: boolean, pruneToolText = true) {
+  projection: ReturnType<typeof outgoingProjection>, usage: SessionUsageTelemetry, bridge: boolean, pruneToolText = false) {
   const count = usage.lastPromptMessageCount;
   const recorded = usage.lastPromptIdentity;
   const currentDigest = historyDigest(messages.slice(0, count));

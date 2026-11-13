@@ -12,31 +12,74 @@ import type { ExecutionService } from '../runtime/execution/service.js';
 import type { ToolDefinition, ToolExecutionContext, ToolPreparation } from '../tools/types.js';
 import { createUnifiedDiff } from '../presentation/tui/transcript/diff.js';
 
-const schema = {
-  type: 'object', properties: {
+const wireSchema = {
+  type: 'object',
+  properties: {
     path: { type: 'string', description: 'The relative path of the file to edit.' },
-    content: { type: 'string', description: 'The full replacement content for the file. An alternative to edits/oldText+newText, not a companion: give one form.' },
-    edits: { type: 'array', minItems: 1,
-      description: 'Targeted replacements, applied as one edit or none. Each is matched against the original file, not against the result of the previous one, and they must not overlap — merge nearby changes into one edit instead.',
-      items: { type: 'object', properties: {
-        oldText: { type: 'string', description: 'The exact or fuzzy block of text to replace.' },
-        newText: { type: 'string', description: 'The text to put in its place.' },
-      }, required: ['oldText', 'newText'] } },
-    oldText: { type: 'string', description: 'The exact or fuzzy block of text to replace (single-replacement form).' },
-    newText: { type: 'string', description: 'The new text to replace oldText with.' },
-    replaceAll: { type: 'boolean', description: 'Whether to replace every occurrence of oldText. Applies to the single-replacement form only.' },
-  }, required: ['path'], oneOf: [
+    edits: {
+      type: 'array',
+      minItems: 1,
+      description: 'One or more targeted replacements. Each is matched against the original file, not incrementally. Do not include overlapping edits — merge nearby changes into one edit instead.',
+      items: {
+        type: 'object',
+        properties: {
+          oldText: { type: 'string', description: 'The exact or fuzzy block of text to replace.' },
+          newText: { type: 'string', description: 'The text to put in its place.' },
+        },
+        required: ['oldText', 'newText'],
+      },
+    },
+  },
+  required: ['path', 'edits'],
+};
+
+const acceptedSchema = {
+  type: 'object',
+  properties: {
+    path: wireSchema.properties.path,
+    content: { type: 'string' },
+    edits: wireSchema.properties.edits,
+    oldText: { type: 'string' },
+    newText: { type: 'string' },
+    replaceAll: { type: 'boolean' },
+  },
+  required: ['path'],
+  oneOf: [
     { required: ['content'], not: { anyOf: [{ required: ['edits'] }, { required: ['oldText'] }, { required: ['newText'] }, { required: ['replaceAll'] }] } },
     { required: ['edits'], not: { anyOf: [{ required: ['content'] }, { required: ['oldText'] }, { required: ['newText'] }, { required: ['replaceAll'] }] } },
     { required: ['oldText', 'newText'], not: { anyOf: [{ required: ['content'] }, { required: ['edits'] }] } },
   ],
 };
 
+function isSingleEdit(value: unknown): value is { oldText: string; newText: string } {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value)
+    && typeof (value as Record<string, unknown>).oldText === 'string'
+    && typeof (value as Record<string, unknown>).newText === 'string');
+}
+
+export function prepareEditArguments(args: Record<string, unknown>): Record<string, unknown> {
+  if (typeof args.edits === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(args.edits);
+      if (Array.isArray(parsed)) args.edits = parsed;
+      else if (isSingleEdit(parsed)) args.edits = [parsed];
+    } catch { /* Let schema validation report invalid stringified edits. */ }
+  } else if (isSingleEdit(args.edits)) {
+    args.edits = [args.edits];
+  }
+  return args;
+}
+
+function validateEditArguments(args: Record<string, unknown>): void {
+  validateToolArguments(acceptedSchema, prepareEditArguments(args));
+}
+
 export function createEditToolDefinition(service: ExecutionService): ToolDefinition<Promise<ToolPreparation>> {
   return {
     name: 'edit',
-    description: 'Edit an existing file: several targeted replacements in one call, or full replacement content. Each file commits independently; multi-file edits are not atomic. If editing a later file fails, earlier changes remain. Use /undo to inspect the latest snapshot or /restore to explicitly restore individual recorded edits.',
-    argsSchema: schema,
+    description: 'Edit an existing file using targeted text replacements (`edits: [{ oldText, newText }]`). Each edit matches the original file and must not overlap. Use /undo to inspect the latest snapshot or /restore to restore recorded edits.',
+    argsSchema: wireSchema,
+    validateArguments: validateEditArguments,
     prepare: (args, context) => prepareEdit(service, args, context),
     // Low-level callers retain their read-modify-write lock. The host always
     // consumes its approved preparation instead of calling this compatibility entry.
@@ -46,7 +89,7 @@ export function createEditToolDefinition(service: ExecutionService): ToolDefinit
 }
 
 async function prepareEdit(service: ExecutionService, args: Record<string, unknown>, context: ToolExecutionContext): Promise<ToolPreparation> {
-  validateToolArguments(schema, args);
+  validateEditArguments(args);
   const target = resolveToolTarget(args, 'path', context.workspaceRoot);
   return withFileLock(target, async () => {
     context.abortSignal?.throwIfAborted();

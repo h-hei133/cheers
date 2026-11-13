@@ -36,7 +36,7 @@ import { createComponentLogger } from "../observability/structuredLogger.js";
 import type { ToolScopeBinding } from '../config/scope/tools.js';
 import { bindToolScope, forgetToolScope, toolScopePolicy } from './scope.js';
 import { authorizeFileAccess, bindFileAccess, captureFileAccess, fileAccessArguments, fileAccessOptions, fileAccessPrompt, forgetFileAccess, requireFileAccess } from './workspace.js';
-
+import { createGatedNestedToolExecutor } from './nestedTools.js';
 const traceLogger = createComponentLogger("tool-call");
 
 /** A tool definition in the shape a chat completion request takes. */
@@ -124,37 +124,47 @@ export function adaptTools(
   tools: ReadonlyMap<string, ToolDefinition>,
   options: ToolGateOptions,
 ): readonly AgentTool[] {
+  const prepareArgsFor = (tool: ToolDefinition, args: unknown, signal: AbortSignal | undefined) => {
+    const prepared = prepareArguments(tool.name, args);
+    if (tool.validateArguments) tool.validateArguments(prepared);
+    else validateToolArguments(tool.argsSchema, prepared);
+    captureFileAccess(tool.name, prepared, options);
+    if (!tool.prepare) return prepared;
+    const context = preparationContext(tool.name, options, signal, prepared);
+    let refusal: 'blocked' | 'failed' = 'failed';
+    const verify = () => {
+      signal?.throwIfAborted();
+      const blocked = options.admission?.() ?? planModeBlock(options.agentMode, tool.name, prepared, tool);
+      if (blocked) { refusal = 'blocked'; throw new Error(blocked); }
+    };
+    const refused = (error: unknown): never => {
+      forgetFileAccess(prepared);
+      tool.onRefusal?.(prepared, context, signal?.aborted && error === signal.reason ? 'cancelled' : refusal);
+      throw error;
+    };
+    try {
+      verify();
+      const result = prepareToolCall(tool, prepared, context, options, verify);
+      if (result instanceof Promise) return result.then(selected => { bindToolScope(prepared, selected, options); bindFileAccess(prepared, selected); return selected; }).catch(refused);
+      bindToolScope(prepared, result, options);
+      bindFileAccess(prepared, result);
+      return result;
+    } catch (error) { return refused(error); }
+  };
   return [...tools.values()].map((tool) => ({
     name: tool.name,
     ...(tool.prepare ? { executionMode: 'sequential' as const } : {}),
-    prepareArguments: (args, signal) => {
-      const prepared = prepareArguments(tool.name, args);
-      validateToolArguments(tool.argsSchema, prepared);
-      captureFileAccess(tool.name, prepared, options);
-      if (!tool.prepare) return prepared;
-      const context = preparationContext(tool.name, options, signal, prepared);
-      let refusal: 'blocked' | 'failed' = 'failed';
-      const verify = () => {
-        signal?.throwIfAborted();
-        const blocked = options.admission?.() ?? planModeBlock(options.agentMode, tool.name, prepared, tool);
-        if (blocked) { refusal = 'blocked'; throw new Error(blocked); }
-      };
-      const refused = (error: unknown): never => {
-        forgetFileAccess(prepared);
-        tool.onRefusal?.(prepared, context, signal?.aborted && error === signal.reason ? 'cancelled' : refusal);
-        throw error;
-      };
-      try {
-        verify();
-        const result = prepareToolCall(tool, prepared, context, options, verify);
-        if (result instanceof Promise) return result.then(selected => { bindToolScope(prepared, selected, options); bindFileAccess(prepared, selected); return selected; }).catch(refused);
-        bindToolScope(prepared, result, options);
-        bindFileAccess(prepared, result);
-        return result;
-      } catch (error) { return refused(error); }
-    },
+    prepareArguments: (args, signal) => prepareArgsFor(tool, args, signal),
     execute: (toolCallId, args, signal, onUpdate) =>
-      executeTool(tool, toolCallId, args, signal, options, onUpdate),
+      executeTool(tool, toolCallId, args, signal, options, onUpdate, tool.name === 'codemode'
+        ? createGatedNestedToolExecutor({
+            tools,
+            hooks: createToolHooks(options, tools),
+            prepare: (nestedTool, nestedArgs, nestedSignal) => prepareArgsFor(nestedTool, nestedArgs, nestedSignal),
+            execute: (nestedTool, nestedCallId, nestedArgs, nestedSignal) =>
+              executeTool(nestedTool, nestedCallId, nestedArgs, nestedSignal, options),
+          }, signal)
+        : undefined),
   }));
 }
 
@@ -177,6 +187,7 @@ async function executeTool(
   signal: AbortSignal | undefined,
   options: ToolGateOptions,
   onUpdate?: (partialResult: unknown) => void,
+  executeNestedTool?: ToolExecutionContext['executeNestedTool'],
 ): Promise<AgentToolResult> {
   let streamed = "";
   const startedAt = Date.now();
@@ -184,7 +195,8 @@ async function executeTool(
   try {
     const blocked = options.admission?.();
     if (blocked) throw new Error(blocked);
-    validateToolArguments(tool.argsSchema, args);
+    if (tool.validateArguments) tool.validateArguments(args);
+    else validateToolArguments(tool.argsSchema, args);
     toolScopePolicy(tool.name, args, options, preparedToolCall(args, options));
     requireFileAccess(args, toolCallId);
     const accessOptions = fileAccessOptions(tool.name, args, options);
@@ -255,7 +267,7 @@ async function executeTool(
       ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
       ...(options.background ? { background: options.background } : {}),
       ...(options.runSubagent ? { runSubagent: options.runSubagent } : {}),
-      // A tool that reports progress passes it on; one that does not is
+      ...(executeNestedTool ? { executeNestedTool } : {}),
       // unaffected, since the callback only fires if the tool calls it.
       onOutput: (chunk: string) => {
         streamed = (streamed + chunk).slice(0, TOOL_OUTPUT_LIMIT + 1);

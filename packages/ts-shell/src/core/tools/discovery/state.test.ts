@@ -24,10 +24,12 @@ it('starts from pinned tools plus the discovery entry points', () => {
   expect(value.snapshot().has('browser')).toBe(false);
 });
 
-it('offers the background wait advertised by bash in the initial request', async () => {
+it('loads background taskWait advertised by bash on demand while keeping initial pinned surface compact', async () => {
   const value = createToolDiscovery({ catalog: createCoreToolRegistry() });
+  expect(PINNED_TOOL_NAMES).toEqual(['read', 'glob', 'grep', 'bash', 'edit', 'write']);
+  expect(value.snapshot().get('bash')!.description).toContain('taskWait');
+  expect(value.load(['taskWait']).loaded).toEqual(['taskWait']);
   const tools = value.snapshot();
-  expect(tools.get('bash')!.description).toContain('taskWait');
   expect(tools.has('taskWait')).toBe(true);
   expect(tools.get('taskWait')!.argsSchema.required).toEqual(['taskId']);
   // Being offered never bypasses the ordinary owner or task identity checks.
@@ -122,4 +124,30 @@ it('executes search and load through their declared argument shapes', async () =
   expect(loaded.success).toBe(true);
   expect(JSON.parse(loaded.output!)).toMatchObject({ loaded: ['web_search'], rejected: [] });
   expect(value.snapshot().has('web_search')).toBe(true);
+});
+
+it('ranks multi-word, stemmed, and schema-parameter queries with BM25 and supports single-step load', async () => {
+  const rich = new Map<string, ToolDefinition>([
+    ...catalog(),
+    ['mcp__github__list_issues', {
+      name: 'mcp__github__list_issues',
+      description: 'List repository items.',
+      argsSchema: {
+        type: 'object',
+        $defs: { Filter: { type: 'object', properties: { milestone: { type: 'string', description: 'Milestone slug filter' } } } },
+        properties: { filter: { $ref: '#/$defs/Filter' }, repositoryOwner: { type: 'string' } },
+      },
+      execute: async () => ({ success: true, output: 'ok' }),
+    }],
+  ]);
+  const value = createToolDiscovery({ catalog: rich });
+  value.attachMeta(discoveryTools(value));
+
+  expect(value.search('issue milestone').map(m => m.name)).toContain('mcp__github__list_issues');
+  expect(value.search('repository owner').map(m => m.name)).toContain('mcp__github__list_issues');
+
+  const [search] = discoveryTools(value);
+  const oneStep = await search!.execute({ query: 'milestone', load: true }, {} as never);
+  expect(JSON.parse(oneStep.output!)).toMatchObject({ loaded: ['mcp__github__list_issues'], rejected: [] });
+  expect(value.snapshot().has('mcp__github__list_issues')).toBe(true);
 });

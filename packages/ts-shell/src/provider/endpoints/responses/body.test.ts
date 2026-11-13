@@ -123,4 +123,16 @@ describe('Responses requests', () => {
     expect(JSON.stringify(body)).not.toContain('opaque-ciphertext');
     expect(body.input).toContainEqual({ type: 'function_call', call_id: 'call_1', name: 'read', arguments: messages[0]!.tool_calls[0]!.function.arguments });
   });
+  it('forwards clamped prompt_cache_key only for official OpenAI baseUrls or explicit opt-in', () => {
+    const sessionId = 'session-'.repeat(12);
+    const official = endpointTurnBody('openai-responses', { ...turn, sessionId, baseUrl: 'https://api.openai.com/v1' });
+    expect(official.prompt_cache_key).toBe(sessionId.slice(0, 64));
+    const relay = endpointTurnBody('openai-responses', { ...turn, sessionId, baseUrl: 'https://relay.example.invalid/v1' });
+    expect(relay).not.toHaveProperty('prompt_cache_key');
+    const longRetention = endpointTurnBody('openai-responses', { ...turn, sessionId, supportsPromptCacheKey: true, cacheRetention: 'long' });
+    expect(longRetention.prompt_cache_retention).toBe('24h');
+    expect(longRetention).not.toHaveProperty('prompt_cache_options');
+    const disabled = endpointTurnBody('openai-responses', { ...turn, sessionId, baseUrl: 'https://api.openai.com/v1', cacheRetention: 'none' });
+    expect(disabled).not.toHaveProperty('prompt_cache_key');
+  });
 });

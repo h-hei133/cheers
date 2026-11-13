@@ -1,6 +1,6 @@
 import { isRecord } from '../values/record.js';
 import type { HookDecision, PreToolUsePayload } from './types.js';
-import { preparedWriteCandidate } from '../../tools/preparation.js';
+import { preparedWriteCandidate, preparedWriteCandidates } from '../../tools/preparation.js';
 
 export const CANONICAL_WRITE_MATCHER = '^(?:Write|Edit|MultiEdit|NotebookEdit)$';
 /** C3b's opt-in experiment policy: block uncertainty, observe unsupported coverage. */
@@ -51,8 +51,24 @@ export function translateWriteInput(payload: PreToolUsePayload, timeoutMs: numbe
     || typeof payload.toolName !== 'string' || !isRecord(payload.args)
     || !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return hookUnknown('invalid_input');
   const tool = canonicalToolName(payload.toolName);
-  if (tool === 'apply_patch') return unsupported('patch_targets',
-    'A patch may contain multiple targets, while content rules apply per file; patch normalization is not implemented.');
+  if (tool === 'apply_patch') {
+    let candidate;
+    try { candidate = preparedWriteCandidate(payload.args, payload.toolName, payload.toolCallId); }
+    catch { return hookUnknown('prepared_input_changed'); }
+    if (!candidate) {
+      return unsupported('patch_targets',
+        'A patch may contain multiple targets, while content rules apply per file; patch normalization is not implemented.');
+    }
+    return {
+      version: 1, event: 'PreToolUse', workspaceRoot: payload.workspaceRoot, sessionId: payload.sessionId,
+      toolName: payload.toolName, toolCallId: payload.toolCallId, args: { ...payload.args }, timeoutMs,
+      reentry: { supported: false, active: false }, timestamp: payload.timestamp,
+      ...(payload.agentId === undefined ? {} : { agentId: payload.agentId }),
+      ...(payload.agentType === undefined ? {} : { agentType: payload.agentType }),
+      hook_event_name: 'PreToolUse', cwd: payload.workspaceRoot, tool_name: 'Edit',
+      tool_input: { file_path: candidate.path, content: candidate.content },
+    };
+  }
   if (tool === 'MultiEdit') return unsupported('multiple_edits', 'Multiple edits have no verified single-file replacement projection.');
   if (tool === 'NotebookEdit') return unsupported('notebook_cells', 'Notebook cell operations are not full file replacement content.');
   if (tool === 'bash') return unsupported('shell_effects', 'Shell commands do not describe their final per-file content.');
@@ -80,6 +96,34 @@ export function translateWriteInput(payload: PreToolUsePayload, timeoutMs: numbe
     ...(payload.agentType === undefined ? {} : { agentType: payload.agentType }),
     hook_event_name: 'PreToolUse', cwd: payload.workspaceRoot, tool_name: tool,
     tool_input: { file_path: candidate?.path ?? args.path, content: candidate?.content ?? args.content as string } };
+}
+
+/** Translate single-file or multi-file prepared write operations into canonical PreToolUse hook inputs. */
+export function translateWriteInputs(payload: PreToolUsePayload, timeoutMs: number): readonly CanonicalHookInput[] | HookDecision {
+  if (payload.eventName !== 'PreToolUse' || typeof payload.workspaceRoot !== 'string' || !payload.workspaceRoot
+    || typeof payload.sessionId !== 'string' || typeof payload.toolCallId !== 'string'
+    || typeof payload.toolName !== 'string' || !isRecord(payload.args)
+    || !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return hookUnknown('invalid_input');
+  const tool = canonicalToolName(payload.toolName);
+  if (tool === 'apply_patch') {
+    let candidates;
+    try { candidates = preparedWriteCandidates(payload.args, payload.toolName, payload.toolCallId); }
+    catch { return hookUnknown('prepared_input_changed'); }
+    if (candidates && candidates.length > 0) {
+      return candidates.map(candidate => ({
+        version: 1 as const, event: 'PreToolUse' as const, workspaceRoot: payload.workspaceRoot, sessionId: payload.sessionId,
+        toolName: payload.toolName, toolCallId: payload.toolCallId, args: { ...payload.args }, timeoutMs,
+        reentry: { supported: false as const, active: false as const }, timestamp: payload.timestamp,
+        ...(payload.agentId === undefined ? {} : { agentId: payload.agentId }),
+        ...(payload.agentType === undefined ? {} : { agentType: payload.agentType }),
+        hook_event_name: 'PreToolUse' as const, cwd: payload.workspaceRoot,
+        tool_name: candidate.before.state === 'absent' ? 'Write' : 'Edit',
+        tool_input: { file_path: candidate.path, content: candidate.content },
+      }));
+    }
+  }
+  const single = translateWriteInput(payload, timeoutMs);
+  return 'decision' in single ? single : [single];
 }
 
 /** Native flat vetoes retain their full payload; nested vetoes enter the same consumer. */

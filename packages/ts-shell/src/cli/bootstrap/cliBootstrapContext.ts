@@ -12,6 +12,7 @@ import {
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { createJsonEventWriter } from "../../presentation/terminal/jsonEvents.js";
+import { takeOverStdout, writeRawStdout } from "../../core/shell/outputGuard.js";
 import type { StructuredLogger } from "../../observability/index.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { sessionWorkspaceAdmission } from '../../session/continuation/workspace.js';
@@ -96,8 +97,9 @@ export function createCliBootstrapRuntimeContext(
 ): CliBootstrapRuntimeContext {
   const sessionManager = new SessionManager();
   const renderer = new StreamingRenderer();
-  const writeJsonEvent = input.options.jsonEvents
-    ? createJsonEventWriter((line) => process.stdout.write(line))
+  if (input.options.jsonEvents || input.options.rpcMode) takeOverStdout();
+  const writeJsonEvent = input.options.jsonEvents || input.options.rpcMode
+    ? createJsonEventWriter((line) => writeRawStdout(line))
     : undefined;
   if (writeJsonEvent) {
     renderer.setSink({

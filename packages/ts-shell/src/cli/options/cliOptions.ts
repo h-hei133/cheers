@@ -17,6 +17,8 @@ export interface CliOptions {
   readonly printMode?: boolean;
   /** Emit the run's events as JSON lines on stdout instead of prose. */
   readonly jsonEvents?: boolean;
+  /** Run headless bidirectional JSONL RPC server over stdin/stdout. */
+  readonly rpcMode?: boolean;
   readonly promptArg?: string;
   readonly migrateSessionRoot?: boolean;
   readonly nonInteractiveApproval?: NonInteractiveApprovalMode;

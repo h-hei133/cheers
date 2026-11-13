@@ -6,7 +6,7 @@ import { planCommandLaunch } from './shell/launch.js';
 import { TOOL_APPROVED_COMMAND_AUTHORITY } from './shell/authority.js';
 import { withFileLock } from '../../runtime/execution/fileLock.js'
 import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
-import { truncateTail } from './truncation.js'
+import { OutputAccumulator } from './outputAccumulator.js'
 import { ArtifactManager } from '../session/artifactManager.js'
 import {
   createDefaultExecutionService,
@@ -39,6 +39,7 @@ import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_
 import { createPatchToolDefinition } from '../../edit/patch/tool.js'
 import { createEditToolDefinition } from '../../edit/tool.js'
 import { startCommandProof } from '../../runtime/execution/proof.js'
+import { createCodemodeToolDefinition } from './codemode/tool.js'
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
@@ -190,7 +191,10 @@ async function runCommandTool(
     ? (result.stdout || 'Command completed with no output')
     : ([result.stderr, result.stdout].filter(Boolean).join('\n') || result.recoveryReason || `Command failed with exit code ${result.exitCode}`)
 
-  const truncated = truncateTail(rawOutput, { maxLines: 1500, maxBytes: 50 * 1024 })
+  const accumulator = new OutputAccumulator({ maxLines: 2000, maxBytes: 50 * 1024 })
+  accumulator.append(rawOutput)
+  accumulator.finish()
+  const truncated = accumulator.snapshot().truncation
   let finalOutput = truncated.content
   const sandboxNotices = [sandbox.notice, sandbox.state === 'isolated' ? networkNotice(readSandboxRules(context.workspaceRoot)) : undefined].filter(Boolean)
   if (sandboxNotices.length > 0) {
@@ -332,7 +336,7 @@ export function createCoreToolRegistry(options?: {
     createGrepToolDefinition(executionService),
     {
       name: 'bash',
-      description: 'Execute shell commands, including Git operations. Plan mode permits classified inspection commands such as git branch --show-current and git rev-parse --show-toplevel. Git status, diff, log, and show require approval because repository configuration can run helpers. Set runInBackground for a command that outlives this turn; wait for it with taskWait, read it with taskOutput, and end it with taskStop. To wait for something, use taskWait rather than sleeping in this tool.',
+      description: 'Execute shell commands, including Git operations. Plan mode permits classified inspection commands such as git branch --show-current and git rev-parse --show-toplevel. Git status, diff, log, and show require approval because repository configuration can run helpers. Set runInBackground for a command that outlives this turn; load taskWait/taskOutput/taskStop via tool_load to inspect or stop background jobs rather than sleeping.',
       argsSchema: {
         type: 'object',
         properties: {
@@ -423,5 +427,8 @@ export function createCoreToolRegistry(options?: {
       },
     })
   }
-  return new Map(tools.map(tool => [tool.name, tool]))
+  let toolMap = new Map<string, ToolDefinition>()
+  tools.push(createCodemodeToolDefinition(() => toolMap))
+  toolMap = new Map(tools.map(tool => [tool.name, tool]))
+  return toolMap
 }

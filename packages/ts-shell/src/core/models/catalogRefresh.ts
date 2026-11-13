@@ -1,5 +1,5 @@
 import { THINKING_LEVELS, type CatalogProvider, type CatalogModel, type ModelCostRates } from "./catalog.js";
-import { writeCatalogCache } from "./catalogStore.js";
+import { readCatalogCacheEtag, updateCatalogCacheEtag, writeCatalogCache } from "./catalogStore.js";
 import { positiveTokenLimit } from "./limits.js";
 
 /**
@@ -21,6 +21,8 @@ export interface RefreshResult {
   readonly ok: boolean;
   readonly providers: number;
   readonly models: number;
+  readonly notModified?: boolean;
+  readonly etag?: string;
   readonly cachePath?: string;
   readonly error?: string;
 }
@@ -36,6 +38,7 @@ interface IndexProvider {
 /** One model as the index describes it. */
 interface IndexModel {
   readonly id?: string;
+  readonly type?: string;
   readonly limit?: { readonly context?: number; readonly input?: number; readonly output?: number };
   /** Whether the model reasons and whether it accepts sampling temperature. */
   readonly reasoning?: boolean;
@@ -69,21 +72,40 @@ interface IndexReasoningOption {
   readonly values?: readonly unknown[];
 }
 
-export async function refreshCatalog(indexUrl: string = DEFAULT_INDEX): Promise<RefreshResult> {
+export async function refreshCatalog(
+  indexUrl: string = DEFAULT_INDEX,
+  options?: { readonly etag?: string },
+): Promise<RefreshResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(indexUrl, { signal: controller.signal });
+    const validator = options?.etag ?? readCatalogCacheEtag(indexUrl);
+    const response = await fetch(indexUrl, {
+      signal: controller.signal,
+      ...(validator ? { headers: { "if-none-match": validator } } : {}),
+    });
+    if (response.status === 304) {
+      const rotatedEtag = response.headers.get("etag") ?? validator;
+      if (rotatedEtag) updateCatalogCacheEtag(rotatedEtag, indexUrl);
+      return { ok: true, providers: 0, models: 0, notModified: true, ...(rotatedEtag ? { etag: rotatedEtag } : {}) };
+    }
     if (!response.ok) {
       return { ok: false, providers: 0, models: 0, error: `index returned ${response.status}` };
     }
+    const responseEtag = response.headers.get("etag") ?? undefined;
     const index = (await response.json()) as Record<string, IndexProvider>;
     const providers = projectIndex(index);
     if (providers.length === 0) {
       return { ok: false, providers: 0, models: 0, error: "index held no providers" };
     }
     const models = providers.reduce((total, provider) => total + (provider.models?.length ?? 0), 0);
-    return { ok: true, providers: providers.length, models, cachePath: writeCatalogCache(providers) };
+    return {
+      ok: true,
+      providers: providers.length,
+      models,
+      ...(responseEtag ? { etag: responseEtag } : {}),
+      cachePath: writeCatalogCache(providers, responseEtag ? { etag: responseEtag, indexUrl } : { indexUrl }),
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, providers: 0, models: 0, error: message };
@@ -120,8 +142,12 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
       const compat = typeof model?.temperature === "boolean"
         ? { supportsTemperature: model.temperature }
         : undefined;
+      const modelType = model?.type === "image" || model?.type === "classifier" || model?.type === "chat"
+        ? model.type
+        : undefined;
       models.push({
         id: resolved,
+        ...(modelType ? { modelType } : {}),
         ...(context !== undefined ? { contextWindow: context } : {}),
         ...(inputLimit !== undefined ? { inputLimit } : {}),
         ...(maxTokens !== undefined ? { maxTokens } : {}),

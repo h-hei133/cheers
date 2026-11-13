@@ -197,6 +197,8 @@ it('corrects a measured tool history anchor when the live wire projection microc
   const { load, session, layout, target, context, cwd } = fixture({ credential: true });
   resetSessionUsage(session.id);
   const resolution = context.resolveConfigTarget!(context.runtimeConfig)!;
+  Object.assign(context, { runtimeConfig: { ...context.runtimeConfig, pruneToolText: true },
+    configuration: new ConfigState({ ...context.runtimeConfig, pruneToolText: true }, configurationBinding(context), context.configuration.current.catalog) });
   const requestTarget = providerRequestTarget({ workspaceRoot: cwd, sessionId: session.id, resolution,
     baseUrl: target.baseUrl, endpoint: 'openai-compatible' });
   const history: SessionMessage[] = [

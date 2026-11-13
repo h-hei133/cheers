@@ -66,6 +66,7 @@ export async function runCliPrintModeRouter(
       runStream: () =>
         runNonTtyPromptStream({
           ...runtimeInput,
+          rpcMode: input.options.rpcMode === true,
           onFirstFrame: input.onFirstFrame,
           onUserIntent: input.onUserIntent,
         }),

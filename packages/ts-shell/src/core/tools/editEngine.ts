@@ -87,28 +87,31 @@ function originalSpanFor(
   return { start: originalStart, end: lastOriginalStart + lastWidth };
 }
 
-function levenshteinRatio(a: string, b: string): number {
+function levenshteinRatio(a: string, b: string, minRatio = 0): number {
   if (a === b) return 1.0;
   if (!a.length || !b.length) return 0.0;
-  const matrix: number[][] = [];
-  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  const short = a.length <= b.length ? a : b;
+  const long = a.length <= b.length ? b : a;
+  const maxLen = long.length;
+  if (minRatio > 0 && short.length / maxLen < minRatio) return 0.0;
 
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j - 1] + 1,
-        );
-      }
+  const cols = short.length;
+  let prev = new Int32Array(cols + 1);
+  let curr = new Int32Array(cols + 1);
+  for (let j = 0; j <= cols; j++) prev[j] = j;
+
+  for (let i = 1; i <= maxLen; i++) {
+    curr[0] = i;
+    const longChar = long.charCodeAt(i - 1);
+    for (let j = 1; j <= cols; j++) {
+      const cost = longChar === short.charCodeAt(j - 1) ? 0 : 1;
+      curr[j] = Math.min(prev[j]! + 1, curr[j - 1]! + 1, prev[j - 1]! + cost);
     }
+    const tmp = prev;
+    prev = curr;
+    curr = tmp;
   }
-  const maxLen = Math.max(a.length, b.length);
-  return 1.0 - matrix[b.length][a.length] / maxLen;
+  return 1.0 - prev[cols]! / maxLen;
 }
 
 function isDisproportionateMatch(matchedText: string, oldText: string): boolean {
@@ -201,7 +204,7 @@ export function locateInContent(originalContent: string, oldText: string): Locat
       for (let j = minEnd; j <= maxEnd; j++) {
         if (origLines[j]!.trim() !== lastAnchor) continue;
         const interiorCandidate = origLines.slice(i + 1, j).map((line) => line.trim()).join("\n");
-        const ratio = levenshteinRatio(interiorCandidate, interiorSearch);
+        const ratio = levenshteinRatio(interiorCandidate, interiorSearch, 0.45);
         if (ratio >= 0.45 && (!best || ratio > best.ratio)) best = { first: i, last: j, ratio };
       }
     }

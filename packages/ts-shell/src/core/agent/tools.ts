@@ -88,7 +88,7 @@ export interface ExecutedToolBatch {
   readonly terminate: boolean;
 }
 
-export const TOOL_OUTPUT_LIMIT = 10_000;
+export const TOOL_OUTPUT_LIMIT = 50 * 1024;
 
 export function parseToolArgs(
   raw: string,

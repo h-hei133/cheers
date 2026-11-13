@@ -4,6 +4,23 @@
   "description": "TypeScript CLI shell and orchestration layer",
   "type": "module",
   "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./core/agent": "./dist/core/agent/loop.js",
+    "./core/models": "./dist/core/models/catalog.js",
+    "./core/models/virtual": "./dist/core/models/virtualModels.js",
+    "./core/tools": "./dist/core/tools/registry.js",
+    "./core/tools/codemode": "./dist/core/tools/codemode/tool.js",
+    "./provider/endpoints": "./dist/provider/endpoints/index.js",
+    "./rpc": "./dist/cli/rpc/rpcServer.js",
+    "./extensions": "./dist/extensions/service.js",
+    "./session/export": "./dist/session/export/html.js",
+    "./browser": "./dist/browser/playwrightRuntime.js",
+    "./desktop": "./dist/desktop/tool.js",
+    "./media": "./dist/runtime/execution/media/index.js",
+    "./collaboration": "./dist/cli/collaboration/control.js",
+    "./planning": "./dist/cli/runtime/planning.js"
+  },
   "files": [
     "dist",
     "src"

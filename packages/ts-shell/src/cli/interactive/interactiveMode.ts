@@ -75,7 +75,11 @@ import { createViewState, type ViewState } from "../../presentation/tui/surface/
 import { promptApproval, type InteractiveApprovalResult } from "./picker/approval.js";
 import { resetVimState, routeKey } from "./keymap.js";
 import { InputPreferences } from "./inputPreferences.js";
+import { copyDraftSelection, replaceDraftState, stashDraftState } from "./draftActions.js";
 import { QuestionBridge } from "./questionBridge.js";
+import { turnCacheMissNotice } from "../../observability/cacheWaste.js";
+import { getSessionUsage } from "../../observability/usageTelemetry.js";
+import { catalogModel } from "../../core/models/catalog.js";
 import { readAmbientFacts, readPeerSessionCount } from "./ambientFacts.js";
 import { appendConversation, showConversation, startFreshSession, type HistoryTarget } from "./history.js";
 import { startupObservers, time } from '../../observability/startupTiming.js';
@@ -729,7 +733,7 @@ export class InteractiveMode {
         interrupt: () => void this.interrupt(),
         exit: () => this.shutdown(),
         redraw: () => this.tui.requestRender(),
-        clearScreen: () => this.clearScreen(),
+        clearScreen: () => { this.state.transcript.clear(); this.tui.requestRender({ force: true }); },
         cycleAgentMode: () => this.cycleAgentMode(),
         cyclePermissionScope: () => this.cyclePermissionScope(),
         scroll: (rows) => {
@@ -764,7 +768,7 @@ export class InteractiveMode {
           setTimeout(() => this.tui.requestRender(), delayMs).unref?.();
         },
         syncSuggestions: (mayOpen) => this.syncSuggestions(mayOpen),
-        copySelection: selection => selection ? this.copySourceSelection(selection) : this.pointer.copySelection(),
+        copySelection: selection => selection ? copyDraftSelection({ editor: this.state.editor, clearSelection: () => { this.vimSelection = undefined; }, copy: text => this.clipboard.copy(text) }, selection) : this.pointer.copySelection(),
         reportNotice: (message) => {
           this.state.transcript.append(textBlock("notice", message));
         },
@@ -772,7 +776,16 @@ export class InteractiveMode {
         toggleCollapsed: (only) => this.view.toggleCollapsed(only),
         openExternalEditor: () => this.preferences.openExternalEditor(this.state.editor.getText()),
         attachClipboardImage: () => void this.preferences.attachClipboardImage(),
-        stashDraft: () => this.stashDraft(),
+        stashDraft: () => stashDraftState({
+          editor: this.state.editor,
+          stash: this.stash,
+          shortcut: id => this.preferences.shortcut(id),
+          copy: text => this.clipboard.copy(text),
+          clearSelection: () => { this.vimSelection = undefined; },
+          syncSuggestions: mayOpen => this.syncSuggestions(mayOpen),
+          setToast: message => { this.toast = message; },
+          requestRender: () => this.tui.requestRender(),
+        }),
       },
     });
   }
@@ -1142,7 +1155,14 @@ export class InteractiveMode {
         this.lastPrompt = text;
         this.lastAttachments = attachments;
       }
+      const turnAdvanced = result.turnNumber > this.turnNumber;
       this.turnNumber = result.turnNumber;
+      if (!text.startsWith("/") && turnAdvanced) {
+        const catalog = this.options.runtimeContext.configuration.current.catalog;
+        const notice = turnCacheMissNotice(getSessionUsage(this.options.runtimeContext.session.id).recentRequests, (provider, model) =>
+          catalogModel(catalog, provider, model)?.cost);
+        if (notice) this.sink.notify(notice, "cache-miss");
+      }
       if (result.retryDraft !== undefined) {
         const images = attachments?.images.map(image => this.state.pastes.holdImage(image)).join(' ') ?? '';
         this.replaceExternalDraft([result.retryDraft, images, this.state.editor.getText()].filter(Boolean).join('\n\n'));
@@ -1482,76 +1502,9 @@ export class InteractiveMode {
     this.replaceExternalDraft([...undelivered, draft].filter((part) => part.trim()).join("\n\n"));
     this.tui.requestRender();
   }
-
-  /** Programmatic replacements start a fresh Vim mode and undo-safe draft. */
-  /**
-   * Set the draft aside, or take it back.
-   *
-   * Three cases, and the third is why the key is useful beyond a scratchpad:
-   *
-   * - Nothing stashed, text in the prompt: the text is stashed and the prompt
-   *   cleared.
-   * - A draft stashed, prompt empty: it comes back, caret included.
-   * - A draft stashed, text in the prompt: the two swap. This is what an
-   *   external rewrite leaves behind — the polished text in the prompt and the
-   *   original in the slot — so one press puts the original back, and pressing
-   *   again puts the rewrite back.
-   *
-   * A press with nothing in either place says so rather than looking broken.
-   */
-  private stashDraft(): void {
-    const snapshot = this.state.editor.snapshot();
-    const hasText = snapshot.text.trim().length > 0;
-    if (hasText && !this.stash.hasDraft) {
-      if (!this.stash.stash({ text: snapshot.text, cursor: snapshot.cursor })) {
-        this.toast = "A draft is already stashed; take it back before setting this one aside.";
-        this.tui.requestRender();
-        return;
-      }
-      resetVimState(this.state.editor);
-      this.vimSelection = undefined;
-      this.state.editor.clear();
-      this.syncSuggestions(false);
-      const key = this.preferences.shortcut('tui.input.stash');
-      this.toast = key ? `Draft stashed · ${key} takes it back` : 'Draft stashed (shortcut unbound)';
-      this.tui.requestRender();
-      return;
-    }
-    const restored = this.stash.restore();
-    if (!restored) {
-      this.toast = "No stashed draft.";
-      this.tui.requestRender();
-      return;
-    }
-    // Swapping keeps the prompt's text rather than dropping it: the two drafts
-    // trade places, so the key is reversible without thinking about which one
-    // it will produce.
-    if (hasText) this.stash.stash({ text: snapshot.text, cursor: snapshot.cursor });
-    resetVimState(this.state.editor);
-    this.vimSelection = undefined;
-    this.state.editor.setDraftText(restored.text);
-    this.state.editor.setCursorOffset(restored.cursor);
-    this.syncSuggestions(false);
-    this.tui.requestRender();
-  }
-
   private replaceExternalDraft(text: string): void {
-    resetVimState(this.state.editor);
-    this.vimSelection = undefined;
-    this.state.editor.setDraftText(text);
+    replaceDraftState({ editor: this.state.editor, clearSelection: () => { this.vimSelection = undefined; } }, text);
   }
-
-  private copySourceSelection(selection: SourceSelection): boolean {
-    const snapshot = this.state.editor.snapshot();
-    this.vimSelection = undefined;
-    if (selection.sourceRevision !== snapshot.revision || selection.start < 0
-      || selection.end > snapshot.text.length || selection.start >= selection.end) return false;
-    const text = snapshot.text.slice(selection.start, selection.end);
-    if (!text) return false;
-    this.clipboard.copy(text);
-    return true;
-  }
-
   /**
    * Swap between planning and building. This replaces four commands that each
    * did one leg of the same toggle, and puts it on a key so the mode can be
@@ -1580,21 +1533,6 @@ export class InteractiveMode {
     this.tui.requestRender();
   }
 
-  /**
-   * Drop the transcript the surface holds.
-   *
-   * On the alternate screen this empties what the session shows. On the
-   * terminal's own screen the rows already written are history, and history
-   * cannot be erased by a repaint — rewriting those rows would append a second
-   * copy of them, which is the one thing this mode must not do. There the
-   * conversation stays in the scrollback, and clearing the terminal itself is
-   * the user's to do; saying so here is honest, pretending it was cleared is
-   * not.
-   */
-  private clearScreen(): void {
-    this.state.transcript.clear();
-    this.tui.requestRender({ force: true });
-  }
 
   private async shutdown(): Promise<void> {
     if (this.closing || this.stopped) return;

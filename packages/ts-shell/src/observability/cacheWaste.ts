@@ -150,6 +150,44 @@ export function findCacheWaste(
   };
 }
 
+/** Detect whether the most recent request in `history` suffered a prompt cache miss. */
+export function detectLatestCacheMiss(
+  history: readonly UsageHistoryEntry[],
+  rateFor: CacheRateLookup,
+): CacheMiss | undefined {
+  if (history.length < 2) return undefined;
+  const previousEntry = history.at(-2)!;
+  const currentEntry = history.at(-1)!;
+  if (previousEntry.kind !== "request" || currentEntry.kind !== "request") return undefined;
+  const previous = comparable(previousEntry, rateFor);
+  const current = comparable(currentEntry, rateFor);
+  return previous && current ? detectMiss(previous, current) : undefined;
+}
+
+/** Render a single-line human-readable warning for a detected prompt cache miss. */
+export function formatCacheMissNotice(miss: CacheMiss): string {
+  const tokens = miss.missedTokens.toLocaleString("en-US");
+  const cost = miss.missedCost > 0 ? ` (+$${miss.missedCost.toFixed(4)})` : "";
+  const cause = miss.modelChanged
+    ? " [model changed]"
+    : miss.endpointChanged
+      ? " [endpoint changed]"
+      : miss.idleMs > CACHE_TTL_MS
+        ? ` [idle ${Math.round(miss.idleMs / 1000)}s > TTL]`
+        : "";
+  return `Cache miss: ${tokens} prompt tokens re-billed${cost}${cause}.`;
+}
+
+/** Return a turn-end warning string when the latest priced request had a material cache miss. */
+export function turnCacheMissNotice(
+  history: readonly UsageHistoryEntry[],
+  rateFor: CacheRateLookup,
+): string | undefined {
+  const miss = detectLatestCacheMiss(history, rateFor);
+  if (!miss || miss.missedCost <= 0) return undefined;
+  return formatCacheMissNotice(miss);
+}
+
 /**
  * The one request shaped for comparison, or nothing when it cannot be judged.
  *

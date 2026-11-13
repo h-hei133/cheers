@@ -35,7 +35,7 @@ function unique(values: readonly string[]): void { if (new Set(values.map(value 
 export function manifest(value: unknown): ExtensionManifest {
   if (!isRecord(value) || value.schema !== 1 || !isRecord(value.permissions) || !['read', 'write'].includes(String(value.permissions.workspace)) || value.permissions.network !== 'none') throw new Error('Unsupported extension manifest or permissions.');
   const scripts = list(value.scripts).map(entry => ({ name: name(entry.name), path: relativePath(entry.path) }));
-  if (scripts.some(entry => !entry.path.endsWith('.sh'))) throw new Error('Only isolated shell scripts are supported.');
+  if (scripts.some(entry => !/\.(?:sh|js|mjs|ts)$/.test(entry.path))) throw new Error('Only isolated shell or in-process JS/TS scripts are supported.');
   const skills = list(value.skills).map(entry => ({ path: relativePath(entry.path) }));
   const commands = list(value.commands).map(entry => {
     if (entry.aliases !== undefined && (!Array.isArray(entry.aliases) || entry.aliases.length > 8)) throw new Error('Malformed command aliases.');

@@ -97,9 +97,7 @@ export function systemPromptSnapshot(
     "For Cheers keyboard shortcut help, direct the user to /hotkey in their interactive session; it shows effective bindings, overrides, and terminal limitations.",
     "1. When you run tools and gather facts, you MUST provide a final, comprehensive, structured markdown answer to the user.",
     "2. NEVER stop after running tools without giving your findings, explanation, and answer in text.",
-    "3. For web searching: use `web_search` to retrieve online technical references.",
-    "4. For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests/git).",
-    "5. User Permission & Denial Feedback: When a tool execution is denied by the user, immediately respect the decision. If the user provided feedback or alternative instructions (e.g. changing filenames, using different arguments, or avoiding certain actions), you MUST strictly follow their feedback and not retry the rejected action.",
+    ...toolUsageRules(context?.toolNames),
   ] : [
     "You are an expert autonomous coding agent. No tools are available for this turn.",
     agentMode === "plan"
@@ -122,6 +120,30 @@ export function systemPromptSnapshot(
   const sources: PromptSource[] = parts.map(part => Object.freeze({ kind: part.kind, ...textSize(part.text) }));
   sources.push(Object.freeze({ kind: 'separators', ...textSize('\n'.repeat(parts.length - 1)) }));
   return { text, sources: Object.freeze(sources) };
+}
+
+function toolUsageRules(toolNames?: readonly string[]): readonly string[] {
+  const available = toolNames ? new Set(toolNames) : undefined;
+  const has = (name: string) => available === undefined || available.has(name);
+  const rules: string[] = [];
+  if (has('web_search')) {
+    rules.push('3. For web searching: use `web_search` to retrieve online technical references.');
+  }
+  const workspaceTools = [
+    has('glob') ? '`glob` (to find paths)' : undefined,
+    has('grep') ? '`grep` (to search contents)' : undefined,
+    has('read') ? '`read` (to inspect files)' : undefined,
+    has('edit') || has('write')
+      ? `${[has('edit') ? '`edit`' : undefined, has('write') ? '`write`' : undefined].filter(Boolean).join('/')} (to update code)`
+      : undefined,
+    has('bash') ? '`bash` (to run commands/tests/git)' : undefined,
+  ].filter((entry): entry is string => entry !== undefined);
+  if (workspaceTools.length > 0) {
+    rules.push(`${rules.length > 0 ? '4' : '3'}. For workspace files: use ${workspaceTools.join(', ')}.`);
+  }
+  const nextNumber = rules.length + 3;
+  rules.push(`${nextNumber}. User Permission & Denial Feedback: When a tool execution is denied by the user, immediately respect the decision. If the user provided feedback or alternative instructions (e.g. changing filenames, using different arguments, or avoiding certain actions), you MUST strictly follow their feedback and not retry the rejected action.`);
+  return rules;
 }
 
 /**

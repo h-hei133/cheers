@@ -545,4 +545,33 @@ describe("step retry", () => {
 
     expect(attempts).toBe(1);
   });
+
+  it("invokes prepareRequest with user/retry routing reasons before each step", async () => {
+    const reasons: string[] = [];
+    const { emit } = collect();
+    const fallbackStep = async () => ({ text: "fallback", toolCalls: [], stopReason: "stop" as const });
+
+    const produced = await runAgentLoop(
+      [userMessage("hi")],
+      [],
+      {
+        retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 },
+        prepareRequest: ({ reason }) => {
+          reasons.push(reason);
+          return reason === "retry" ? { streamStep: fallbackStep } : undefined;
+        },
+        streamStep: async () => ({
+          text: "",
+          toolCalls: [],
+          stopReason: "error",
+          errorMessage: "Provider HTTP 503: temporary",
+        }),
+      },
+      emit,
+      undefined,
+    );
+
+    expect(reasons).toEqual(["user", "retry"]);
+    expect(produced.at(-1)?.content).toBe("fallback");
+  });
 });

@@ -24,6 +24,7 @@ import { directorControl } from './director.js';
 import { evaluationControl, cancelEvaluationFor } from './evaluation.js';
 import { mediaControl, cancelMediaCommand, withoutRecordingInput } from './media.js';
 import { attachGoalSubmission, schedulerForRuntime } from './goalScheduling.js';
+import { handleRpcCommand, tryParseRpcCommand } from '../rpc/rpcServer.js';
 
 export async function runPromptInputStream(options: {
   readonly stdin?: NodeJS.ReadableStream;
@@ -34,6 +35,7 @@ export async function runPromptInputStream(options: {
   readonly runPrompt: (prompt: string) => Promise<'exit' | void>;
   readonly onFirstFrame?: () => void;
   readonly onUserIntent?: () => void;
+  readonly rpcMode?: boolean;
 }): Promise<void> {
   const contextTag = (): string =>
     formatCliContextTag({
@@ -194,6 +196,40 @@ export async function runPromptInputStream(options: {
     }
 
     if (normalizedLine.trim().length === 0) {
+      return;
+    }
+
+    const rpcCommand = options.rpcMode ? tryParseRpcCommand(normalizedLine) : undefined;
+    if (rpcCommand) {
+      pendingControls++;
+      localControlChain = localControlChain
+        .then(() =>
+          handleRpcCommand(rpcCommand, {
+            sessionId: options.runtimeContext.session.id,
+            workspaceRoot: options.runtimeContext.projectRoot,
+            isStreaming: () => busy,
+            getMessages: () => options.runtimeContext.session.turns,
+            enqueuePrompt,
+            steer: (msg) => {
+              const activeInput = options.sessionRuntime.input?.();
+              if (activeInput) activeInput.steer(msg);
+              else enqueuePrompt(msg);
+            },
+            followUp: (msg) => {
+              const activeInput = options.sessionRuntime.input?.();
+              if (activeInput) activeInput.followUp(msg);
+              else enqueuePrompt(msg);
+            },
+            clearQueue: () => queue.splice(0).length,
+            abort: () => {
+              queue.splice(0);
+              options.sessionRuntime.cancelCurrentRun();
+            },
+          }).then(() => undefined),
+        )
+        .finally(() => {
+          pendingControls--;
+        });
       return;
     }
 

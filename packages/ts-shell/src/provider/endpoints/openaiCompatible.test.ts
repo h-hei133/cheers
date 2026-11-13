@@ -302,3 +302,35 @@ it('sends protocol history fields at the actual compatible request boundary', as
       { role: 'assistant', content: 'Prior answer' }, { role: 'user', content: 'continue' }]);
   } finally { resetSessionUsage(sessionId); }
 });
+
+it('sends clamped prompt_cache_key on official OpenAI or explicit compat without leaking to unknown relays', () => {
+  const longSession = 's'.repeat(80);
+  const baseRequest = {
+    model: 'gpt-5.4',
+    systemPrompt: 'brief',
+    messages: [{ role: 'user' as const, content: 'hi' }],
+    tools: [],
+    allowTools: false,
+    vision: false,
+    temperature: 0.2,
+    systemRole: 'system' as const,
+    reasoningEffort: false,
+    maxTokensField: 'max_tokens' as const,
+    assistantAfterToolResult: false,
+    sessionId: longSession,
+  };
+  const official = endpointTurnBody('openai-compatible', { ...baseRequest, baseUrl: 'https://api.openai.com/v1' });
+  expect(official.prompt_cache_key).toBe('s'.repeat(64));
+
+  const relay = endpointTurnBody('openai-compatible', { ...baseRequest, baseUrl: 'https://relay.invalid/v1' });
+  expect(relay).not.toHaveProperty('prompt_cache_key');
+
+  const explicit = endpointTurnBody('openai-compatible', {
+    ...baseRequest,
+    baseUrl: 'https://relay.invalid/v1',
+    supportsPromptCacheKey: true,
+    cacheRetention: 'long',
+  });
+  expect(explicit.prompt_cache_key).toBe('s'.repeat(64));
+  expect(explicit.prompt_cache_retention).toBe('24h');
+});

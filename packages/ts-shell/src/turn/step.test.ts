@@ -309,7 +309,7 @@ describe("createStepFunction", () => {
       { role: "assistant" as const, content: "done" },
       { role: "user" as const, content: "current" },
     ];
-    const projection = outgoingProjection(messages, false);
+    const projection = outgoingProjection(messages, false, true);
     expect(projection.sourceAligned).toBe(false);
     expect(JSON.stringify(projection.messages)).toContain("Omitted");
     const overhead = { systemPrompt: request.systemPrompt, tools: [] };
@@ -325,6 +325,7 @@ describe("createStepFunction", () => {
     const step = createStepFunction({
       ...request,
       sessionId: id,
+      pruneToolText: true,
       contextWindow: wireTokens + 1,
       maxOutputTokens: 1,
       provider: { ...request.provider, provider: "fixture" },

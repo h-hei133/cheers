@@ -26,6 +26,10 @@ export function resolveCliMode(input: ResolveCliModeInput): CliModePlan {
     return { kind: "replay", replayFile: input.options.replayFile };
   }
 
+  if (input.options.rpcMode === true) {
+    return { kind: "stdin-stream" };
+  }
+
   if (input.options.jsonEvents === true) {
     return { kind: "print" };
   }

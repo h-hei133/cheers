@@ -127,4 +127,12 @@ describe("buildSystemPrompt", () => {
     expect(prompt).not.toContain('`read`');
     expect(prompt).not.toContain('`web_search`');
   });
+  it("filters tool usage rules to the active toolNames when supplied", () => {
+    const prompt = buildSystemPrompt('build', { toolNames: ['read', 'edit'] });
+    expect(prompt).toContain('`read`');
+    expect(prompt).toContain('`edit`');
+    expect(prompt).not.toContain('`web_search`');
+    expect(prompt).not.toContain('`bash`');
+    expect(prompt).not.toContain('`glob`');
+  });
 });

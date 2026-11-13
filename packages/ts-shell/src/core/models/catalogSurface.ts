@@ -1,5 +1,6 @@
 import type { CatalogProvider } from "./catalog.js";
 import { availabilityLabel, endpointLabel, type CatalogAvailability } from "./availability.js";
+import { getModelType } from "./virtualModels.js";
 
 /**
  * Rendering the catalogue.
@@ -56,8 +57,10 @@ function renderProvider(provider: CatalogProvider, view: CatalogView): string[] 
   const lines = [head, ""];
   for (const model of provider.models) {
     const active = entry?.active && model.id === entry.activeModel;
+    const modelType = getModelType(model);
+    const typeTag = modelType !== "chat" ? ` · ${modelType}` : "";
     const window = model.contextWindow ? ` · ${Math.round(model.contextWindow / 1000)}k` : "";
-    lines.push(`- \`${model.id}\`${window}${active ? " ← active" : ""}`);
+    lines.push(`- \`${model.id}\`${typeTag}${window}${active ? " ← active" : ""}`);
   }
   lines.push("");
   return lines;

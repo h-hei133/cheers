@@ -31,7 +31,7 @@ export function createReadToolDefinition(executionService: ExecutionService): To
         },
         limit: {
           type: 'number',
-          description: 'Maximum text lines or directory entries (default: 500, max: 1000); for PDF, pages (default/max: 5).',
+          description: 'Maximum text lines (default/max: 2000) or directory entries (default: 500, max: 1000); for PDF, pages (default/max: 5).',
         },
       },
       required: ['path'],
@@ -131,8 +131,8 @@ export function createReadToolDefinition(executionService: ExecutionService): To
       const offset = selector.hasSelector ? selector.startLine ?? 1
         : typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : 1
       const limit = selector.hasSelector
-        ? selector.endLine === undefined ? selector.isRaw ? 1000 : 500 : Math.min(1000, selector.endLine - offset + 1)
-        : typeof args.limit === 'number' && args.limit > 0 ? Math.min(1000, Math.floor(args.limit)) : 500
+        ? selector.endLine === undefined ? 2000 : Math.min(2000, selector.endLine - offset + 1)
+        : typeof args.limit === 'number' && args.limit > 0 ? Math.min(2000, Math.floor(args.limit)) : 2000
       const page = await executionService.readTextPage({ ...request, offset, limit })
       context.abortSignal?.throwIfAborted()
       const formatted = formatPage(page)

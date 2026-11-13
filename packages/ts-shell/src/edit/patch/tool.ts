@@ -38,7 +38,27 @@ export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
       }), 'Files commit separately. A later failure may require guarded compensation.'].join('\n\n');
       const preview = renderPreview(plan);
       if (Buffer.byteLength(preview) > patchLimits.previewBytes) throw new Error('Patch preview is too large; split the operation before requesting approval.');
-      return Object.freeze({ targets, preview, selections, selectionRevision: plan.revision, selectionPreview: (chosen: readonly string[]) => {
+      const singleFile = plan.files.length === 1 ? plan.files[0]! : undefined;
+      const writeCandidate = singleFile && singleFile.content !== undefined && !singleFile.rename
+        ? Object.freeze({
+            path: path.join(singleFile.workspaceRoot, singleFile.relativePath),
+            content: singleFile.content,
+            before: singleFile.before.state === 'exists'
+              ? Object.freeze({ state: 'exists' as const, sha256: hashContent(singleFile.before.content) })
+              : Object.freeze({ state: 'absent' as const }),
+          })
+        : undefined;
+      const writtenFiles = plan.files.filter(file => file.content !== undefined);
+      const writeCandidates = writtenFiles.length > 0
+        ? Object.freeze(writtenFiles.map(file => Object.freeze({
+            path: path.join(file.workspaceRoot, file.rename?.target ?? file.relativePath),
+            content: file.content!,
+            before: file.before.state === 'exists'
+              ? Object.freeze({ state: 'exists' as const, sha256: hashContent(file.before.content) })
+              : Object.freeze({ state: 'absent' as const }),
+          })))
+        : undefined;
+      return Object.freeze({ targets, preview, ...(writeCandidate ? { writeCandidate } : {}), ...(writeCandidates ? { writeCandidates } : {}), selections, selectionRevision: plan.revision, selectionPreview: (chosen: readonly string[]) => {
         const selectedPlan = planPatchSelection(args.input as string, { ...context, sessionId: context.sessionId!, workspaceRoot: root }, chosen, plan);
         const selectedPreview = renderPreview(selectedPlan);
         if (Buffer.byteLength(selectedPreview) > patchLimits.previewBytes) throw new Error('Selected patch preview is too large; split the operation before requesting approval.');

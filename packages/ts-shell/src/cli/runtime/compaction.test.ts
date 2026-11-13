@@ -250,7 +250,7 @@ it.each([false, true])('prices projected tool history before fallback compaction
   ] }];
   const wiring = buildCompactionWiring({
     provider: { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: 'openai-compatible' },
-    runtimeConfig: { ...fixture.config, reserveTokens: 0, maxOutputTokens: 128, keepRecentTokens: 600 } as never,
+    runtimeConfig: { ...fixture.config, pruneToolText: true, reserveTokens: 0, maxOutputTokens: 128, keepRecentTokens: 600 } as never,
     sessionId: 'signed-summary', catalog,
   });
   const messages = Array.from({ length: 40 }, (_, index) => [
@@ -263,7 +263,7 @@ it.each([false, true])('prices projected tool history before fallback compaction
   const original = structuredClone(messages);
   const overhead = { systemPrompt: 'main system', tools: [{ name: 'read' }] };
   const attached = withRequestOverhead({ ...wiring, onCompact: () => {} }, overhead)!;
-  const projected = outgoingProjection(messages, bridge).messages.map(message => ({ ...message, content: message.content ?? '' }));
+  const projected = outgoingProjection(messages, bridge, true).messages.map(message => ({ ...message, content: message.content ?? '' }));
   const wireTokens = estimateRequestTokens(projected, overhead);
   const rawTokens = estimateRequestTokens(messages, overhead);
   expect(attached.policy.projectMessages!(messages)).toEqual(projected);
@@ -379,12 +379,12 @@ it.each(['below', 'equal to', 'above'] as const)('handles actual tool-output rem
   ] }, { role: 'tool' as const, tool_call_id: 'read-1', content: 'result '.repeat(1000) }];
   const identity = { provider: provider.providerId, model: provider.model, endpoint: provider.endpoint,
     ...requestIdentity({ tools: [] }), historyDigest: historyDigest(messages),
-    wireHistoryDigest: historyDigest(outgoingProjection(messages, false).messages), wireMessageCount: messages.length,
+    wireHistoryDigest: historyDigest(outgoingProjection(messages, false, true).messages), wireMessageCount: messages.length,
     replayBinding: requestReplayBinding({ ...provider, provider: provider.providerId }) };
   const tail = Array.from({ length: 4 }, (_, index) => [{ role: 'user' as const, content: `next ${index}` },
     { role: 'assistant' as const, content: 'answer' }]).flat();
   const current = [...messages, ...tail];
-  const projected = outgoingProjection(current, false);
+  const projected = outgoingProjection(current, false, true);
   const removedTokens = Math.floor((messages[2]!.content.length - projected.messages[2]!.content!.length) / 3.5);
   expect(removedTokens).toBeGreaterThan(0);
   expect(removedTokens).toBeLessThan(3000);
@@ -393,7 +393,7 @@ it.each(['below', 'equal to', 'above'] as const)('handles actual tool-output rem
   const anchorTokens = relation === 'below' ? 3000 : removedTokens - (relation === 'above' ? 1 : 0);
   recordSessionUsage('signed-summary', { promptTokens: anchorTokens, promptMessageCount: messages.length, promptIdentity: identity,
     attribution: captureUsageAttribution({ provider: provider.providerId, model: provider.model, baseUrl }) });
-  const wiring = buildCompactionWiring({ provider, runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog: loadCatalog() });
+  const wiring = buildCompactionWiring({ provider, runtimeConfig: { ...fixture.config, pruneToolText: true } as never, sessionId: 'signed-summary', catalog: loadCatalog() });
   expect(wiring.policy.measureContextTokens!(messages, identity)).toBe(anchorTokens);
   const expected = relation === 'below' ? anchorTokens - removedTokens + estimateTokens(tail) : undefined;
   expect(wiring.policy.measureContextTokens!(current, identity)).toBe(expected);

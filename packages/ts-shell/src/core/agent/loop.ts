@@ -145,6 +145,15 @@ export interface AgentLoopConfig {
    * own default fills the rest.
    */
   readonly retry?: Partial<RetryPolicy>;
+  readonly prepareRequest?: (
+    input: {
+      readonly reason: 'user' | 'continuation' | 'retry';
+      readonly attempt: number;
+      readonly messages: readonly AgentMessage[];
+    },
+    signal?: AbortSignal,
+  ) => { readonly messages?: readonly AgentMessage[]; readonly streamStep?: AgentLoopConfig['streamStep'] } | undefined
+    | Promise<{ readonly messages?: readonly AgentMessage[]; readonly streamStep?: AgentLoopConfig['streamStep'] } | undefined>;
   readonly streamStep: (
     messages: readonly AgentMessage[],
     signal?: AbortSignal,
@@ -205,7 +214,11 @@ async function retryStep(
   const request = Object.freeze({ requestId: randomUUID() });
   let attempt = 0;
   for (;;) {
-    const step = await config.streamStep(context, signal, request);
+    const reason = attempt > 0 ? 'retry' : context.at(-1)?.role === 'user' ? 'user' : 'continuation';
+    const prepared = await config.prepareRequest?.({ reason, attempt, messages: context }, signal);
+    const activeStep = prepared?.streamStep ?? config.streamStep;
+    const activeMessages = prepared?.messages ?? context;
+    const step = await activeStep(activeMessages, signal, request);
     // A step whose own layer already retried is not retried again here. The
     // provider layer sees the status and the server's delay, so it is the one
     // that knows whether asking again is worth anything; by the time it gives up

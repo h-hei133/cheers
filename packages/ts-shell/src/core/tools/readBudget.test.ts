@@ -25,8 +25,12 @@ it('retains file continuation and tells the model to recover omitted page text b
   const output = await modelOutput('read', { path: 'page.txt' })
   expect(output.length).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT)
   expect(output).toMatch(/offset=\d+ to continue/)
-  expect(output).toContain('offset=1 and a smaller limit before advancing')
-  expect(output).toContain('byte-range inspection')
+  expect(output).not.toContain('output truncated')
+  await fs.writeFile(path.join(root, 'full-cap.txt'), ('x'.repeat(511) + '\n').repeat(200))
+  const capped = await modelOutput('read', { path: 'full-cap.txt' })
+  expect(capped.length).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT)
+  expect(capped).toContain('offset=1 and a smaller limit before advancing')
+  expect(capped).toContain('byte-range inspection')
   const small = await modelOutput('read', { path: 'page.txt', limit: 1 })
   expect(small).toContain('x'.repeat(200))
   expect(small).toContain('offset=2 to continue')
@@ -44,6 +48,17 @@ it.each(['read', 'glob'])('keeps accurate selected-page artifact notices from %s
   const uri = /artifact:\/\/\d+/.exec(output)![0]
   const saved = await fs.readFile(ArtifactManager.getShared(root, 'paging').resolve(uri)!, 'utf8')
   expect(saved.split('\n')).toHaveLength(500)
+})
+
+it('reads a 1000-line source file in one call without 10KB truncation', async () => {
+  const lines = Array.from({ length: 1000 }, (_, i) => `const line_${i + 1} = ${i + 1};`)
+  await fs.writeFile(path.join(root, 'thousand.ts'), lines.join('\n'))
+  const output = await modelOutput('read', { path: 'thousand.ts' })
+  expect(output.length).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT)
+  expect(output).toContain('const line_1 = 1;')
+  expect(output).toContain('const line_1000 = 1000;')
+  expect(output).not.toContain('output truncated')
+  expect(output).not.toContain('offset=')
 })
 
 it('reads a short page without reading or buffering the rest of the file', async () => {
@@ -83,9 +98,9 @@ it('applies the same bounded paging to selectors and session artifacts', async (
   expect(result.output).toContain('two')
   expect(result.output).not.toContain('three')
   expect(result.metadata?.read).toMatchObject({ startLine: 2, endLine: 2, nextOffset: 3, stopReason: 'line-limit' })
-  await fs.writeFile(path.join(root, 'many.txt'), 'line\n'.repeat(2000))
+  await fs.writeFile(path.join(root, 'many.txt'), 'line\n'.repeat(2500))
   const raw = await read.execute({ path: 'many.txt:raw' }, { workspaceRoot: root, taskId: 'raw' })
-  expect(raw.metadata?.read).toMatchObject({ startLine: 1, endLine: 1000, nextOffset: 1001, stopReason: 'line-limit' })
+  expect(raw.metadata?.read).toMatchObject({ startLine: 1, endLine: 2000, nextOffset: 2001, stopReason: 'line-limit' })
 })
 
 it('does not reread or spill the complete source after reaching the page byte cap', async () => {

@@ -169,7 +169,7 @@ describe("the request this endpoint is sent", () => {
     expect(messages[0]?.role).toBe("user");
     expect(messages[0]?.content).toEqual([
       { type: "tool_result", tool_use_id: "call-1", content: "one" },
-      { type: "tool_result", tool_use_id: "call-2", content: "two" },
+      { type: "tool_result", tool_use_id: "call-2", content: "two", cache_control: { type: "ephemeral" } },
     ]);
   });
 
@@ -499,6 +499,7 @@ describe("a message carrying an image", () => {
     expect(blocks).toContainEqual({
       type: "image",
       source: { type: "base64", media_type: "image/png", data: "aGVsbG8=" },
+      cache_control: { type: "ephemeral" },
     });
   });
 
@@ -777,3 +778,105 @@ it("rejects an in-band error without waiting for EOF and cancels the reader", as
   await expect(reader.next()).rejects.toThrow("overloaded");
   expect(cancelled).toBe(true);
 }, 1000);
+
+describe("conversation history cache breakpoints", () => {
+  it("marks only the final user turn's last content block and respects cacheRetention", () => {
+    const messages = [
+      { role: "user" as const, content: "first" },
+      { role: "assistant" as const, content: "reply" },
+      { role: "user" as const, content: "second" },
+    ];
+    const shortBody = anthropicRequestBody({
+      model: "claude-sonnet-4-5",
+      systemPrompt: "sys",
+      messages,
+      tools: [],
+      allowTools: false,
+    });
+    const shortWire = shortBody.messages as Array<{ role: string; content: Array<Record<string, unknown>> }>;
+    expect(shortWire[0]!.content[0]).toEqual({ type: "text", text: "first" });
+    expect(shortWire[1]!.content[0]).toEqual({ type: "text", text: "reply" });
+    expect(shortWire[2]!.content[0]).toEqual({
+      type: "text",
+      text: "second",
+      cache_control: { type: "ephemeral" },
+    });
+
+    const longBody = anthropicRequestBody({
+      model: "claude-sonnet-4-5",
+      systemPrompt: "sys",
+      messages,
+      tools: [],
+      allowTools: false,
+      cacheRetention: "long",
+    });
+    expect(longBody.system).toEqual([
+      { type: "text", text: "sys", cache_control: { type: "ephemeral", ttl: "1h" } },
+    ]);
+    expect((longBody.messages as Array<{ content: Array<Record<string, unknown>> }>)[2]!.content[0]).toEqual({
+      type: "text",
+      text: "second",
+      cache_control: { type: "ephemeral", ttl: "1h" },
+    });
+
+    const noneBody = anthropicRequestBody({
+      model: "claude-sonnet-4-5",
+      systemPrompt: "sys",
+      messages,
+      tools: [],
+      allowTools: false,
+      cacheRetention: "none",
+    });
+    expect(noneBody.system).toEqual([{ type: "text", text: "sys" }]);
+    expect((noneBody.messages as Array<{ content: Array<Record<string, unknown>> }>)[2]!.content[0]).toEqual({
+      type: "text",
+      text: "second",
+    });
+  });
+
+  it("preserves prompt cache across mid-conversation tool changes and effort changes", () => {
+    const initialTools = [
+      { type: "function" as const, function: { name: "read", description: "read file", parameters: { type: "object" } } },
+    ];
+    const currentTools = [
+      ...initialTools,
+      { type: "function" as const, function: { name: "web_search", description: "search web", parameters: { type: "object" } } },
+    ];
+    const body = anthropicRequestBody({
+      model: "claude-opus-4-6",
+      systemPrompt: "sys",
+      messages: [{ role: "user", content: "find docs" }],
+      tools: currentTools,
+      initialTools,
+      allowTools: true,
+      supportsMidConvoToolChanges: true,
+      supportsMidConvoEffort: true,
+      thinkingLevelName: "high",
+    });
+    expect(body.tools).toEqual([
+      { name: "read", description: "read file", input_schema: { type: "object" }, cache_control: { type: "ephemeral" } },
+      { type: "tool_search_tool_bm25_20250305", name: "tool_search" },
+    ]);
+    expect(body.thinking).toEqual({
+      type: "adaptive",
+      display: "summarized",
+      block_binding: { prefix_mismatch_behavior: "drop_block" },
+    });
+    expect(body.output_config).toEqual({ effort: "low" });
+    const wire = body.messages as Array<Record<string, unknown>>;
+    expect(wire.at(-2)).toEqual({
+      role: "system",
+      content: [],
+      output_config: { effort: "high" },
+    });
+    expect(wire.at(-1)).toMatchObject({
+      role: "system",
+      content: [
+        {
+          type: "tool_addition",
+          tool: { type: "tool_definition", definition: { name: "web_search", description: "search web" } },
+        },
+      ],
+    });
+  });
+});

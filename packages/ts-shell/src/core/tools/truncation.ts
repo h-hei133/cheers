@@ -24,8 +24,8 @@ export interface TruncationResult {
   readonly firstLineBytes?: number;
 }
 
-const DEFAULT_MAX_LINES = 2000;
-const DEFAULT_MAX_BYTES = 50 * 1024; // 50KB
+export const DEFAULT_MAX_LINES = 2000;
+export const DEFAULT_MAX_BYTES = 50 * 1024; // 50KB
 
 export function truncateHead(
   content: string,

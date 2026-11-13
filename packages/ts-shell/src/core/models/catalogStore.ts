@@ -24,6 +24,8 @@ const USER_FILE = "models.json";
 const CACHE_FILE = "models-cache.json";
 
 interface StoredCatalog {
+  readonly etag?: string;
+  readonly indexUrl?: string;
   readonly providers?: Record<string, Partial<CatalogProvider>>;
 }
 
@@ -70,15 +72,53 @@ export function loadCatalogSnapshot(): CatalogSnapshot {
 }
 
 /** Write a fetched catalogue into the cache the next load will read. */
-export function writeCatalogCache(providers: readonly Partial<CatalogProvider>[]): string {
+export function writeCatalogCache(
+  providers: readonly Partial<CatalogProvider>[],
+  metadata?: { readonly etag?: string; readonly indexUrl?: string },
+): string {
   const target = catalogCachePath();
   const byId: Record<string, Partial<CatalogProvider>> = {};
   for (const provider of providers) {
     if (provider.id) byId[provider.id] = provider;
   }
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, `${JSON.stringify({ providers: byId }, null, 2)}\n`, "utf8");
+  fs.writeFileSync(
+    target,
+    `${JSON.stringify({
+      ...(metadata?.etag ? { etag: metadata.etag } : {}),
+      ...(metadata?.indexUrl ? { indexUrl: metadata.indexUrl } : {}),
+      providers: byId,
+    }, null, 2)}\n`,
+    "utf8",
+  );
   return target;
+}
+
+export function readCatalogCacheEtag(indexUrl?: string): string | undefined {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(catalogCachePath(), "utf8")) as StoredCatalog;
+    if (indexUrl && parsed?.indexUrl && parsed.indexUrl !== indexUrl) return undefined;
+    if (indexUrl && !parsed?.indexUrl) return undefined;
+    return typeof parsed?.etag === "string" && parsed.etag ? parsed.etag : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function updateCatalogCacheEtag(etag: string, indexUrl: string): void {
+  try {
+    const target = catalogCachePath();
+    const parsed = JSON.parse(fs.readFileSync(target, "utf8")) as StoredCatalog;
+    if (parsed && typeof parsed === "object" && parsed.providers) {
+      fs.writeFileSync(
+        target,
+        `${JSON.stringify({ ...parsed, etag, indexUrl }, null, 2)}\n`,
+        "utf8",
+      );
+    }
+  } catch {
+    // Ignore if cache file is absent or unreadable.
+  }
 }
 
 /**

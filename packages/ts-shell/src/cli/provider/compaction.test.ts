@@ -172,7 +172,7 @@ it('calibrates the actual microcompaction evaluator without altering provider us
   const input = fixture();
   const resources = createProviderResources({ ...input, sessionManager: setup.manager,
     providerRuntimeBridge: { resolveCredentialSnapshot: () => main } }, input.providers);
-  const prepare = resources.startRun({ config: input.config, catalog, publication: input.configuration.current,
+  const prepare = resources.startRun({ config: { ...input.config, pruneToolText: true }, catalog, publication: input.configuration.current,
     backgroundSignal: new AbortController().signal, sessionId: setup.session.id,
     admission: () => undefined, getSourceEntryId: () => undefined });
   const compaction = prepare(main).compaction!;
@@ -182,12 +182,12 @@ it('calibrates the actual microcompaction evaluator without altering provider us
   const provider = input.providers.provider(main, catalog)!;
   const identity = { provider: main.provider, model: main.model!, endpoint: provider.endpoint,
     ...requestIdentity({ tools: [] }), historyDigest: historyDigest(messages),
-    wireHistoryDigest: historyDigest(outgoingProjection(messages, false).messages), wireMessageCount: messages.length,
+    wireHistoryDigest: historyDigest(outgoingProjection(messages, false, true).messages), wireMessageCount: messages.length,
     replayBinding: provider.replayBinding };
   // Seed a plausible synthetic count for the measured wire. The old constant
   // was smaller than the later rewrite deduction and correctly failed admission.
   // Keep provider accounting distinct from the local fallback estimate.
-  const promptTokens = estimateTokens(outgoingProjection(messages, false).messages) + 100;
+  const promptTokens = estimateTokens(outgoingProjection(messages, false, true).messages) + 100;
   recordSessionUsage(setup.session.id, { promptTokens, promptMessageCount: messages.length, promptIdentity: identity,
     attribution: captureUsageAttribution({ provider: main.provider, model: main.model!, baseUrl: main.baseUrl! }) });
   expect(input.runtimeContext.compactionMeasurement?.()).toBeUndefined();
@@ -199,7 +199,7 @@ it('calibrates the actual microcompaction evaluator without altering provider us
   expect(corrected).toBeDefined();
   expect(corrected).toBeLessThan(promptTokens);
   const grown = [...messages, ...tail];
-  expect(corrected).toBeGreaterThan(estimateTokens(outgoingProjection(grown, false).messages));
+  expect(corrected).toBeGreaterThan(estimateTokens(outgoingProjection(grown, false, true).messages));
   // The raw estimate overstates the rewritten prompt. Threshold decisions
   // must use the calibrated value on both sides of the soft boundary.
   const calibratedPolicy = { ...compaction.policy, contextWindow: 600, reserveTokens: 0,

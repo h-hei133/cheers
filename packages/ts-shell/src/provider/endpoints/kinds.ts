@@ -128,7 +128,7 @@ export interface EndpointShape {
 
 /** A request with no tools, which is what a summarizer or a side question sends. */
 export interface SimpleRequest extends Partial<Pick<TurnRequest,
-  'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'reasoningSummary' | 'reasoningReplayField' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'thinkingBudgetMaximum' | 'allowEmptySignature' | 'serviceTier'>> {
+  'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'reasoningSummary' | 'reasoningReplayField' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'thinkingBudgetMaximum' | 'allowEmptySignature' | 'serviceTier' | 'sessionId' | 'baseUrl' | 'cacheRetention' | 'supportsPromptCacheKey'>> {
   readonly model: string;
   readonly provider?: string;
   readonly replayBinding?: string;
@@ -211,6 +211,18 @@ export interface TurnRequest {
   readonly assistantAfterToolResult: boolean;
   /** Provider service tier selected by the session, when supported. */
   readonly serviceTier?: string;
+  /** Session identifier used for provider-side prompt cache routing (clamped to 64 chars on wire). */
+  readonly sessionId?: string;
+  /** Target base URL used to gate optional cache routing fields on compatible relays. */
+  readonly baseUrl?: string;
+  /** Prompt cache retention preference (`short` | `long` | `none`). */
+  readonly cacheRetention?: 'short' | 'long' | 'none';
+  /** Explicit override for OpenAI `prompt_cache_key` support. */
+  readonly supportsPromptCacheKey?: boolean;
+  /** Initial tool schemas for mid-conversation cache-preserving `tool_addition`/`tool_removal`. */
+  readonly initialTools?: readonly ToolSchema[];
+  readonly supportsMidConvoToolChanges?: boolean;
+  readonly supportsMidConvoEffort?: boolean;
 }
 
 /**

@@ -10,7 +10,7 @@ import type { VersionRecord } from '../model.js';
 import type { ToolExecutionContext, ToolExecutionResult } from '../../tools/types.js';
 import type { DenyRule } from '../../core/shell/approval/deny.js';
 import { sourceFile } from '../registry/sources.js';
-
+import { executeInProcessScript } from './inProcessLoader.js';
 export interface ExecutionHost {
   readonly file: string;
   readonly root: string;
@@ -26,13 +26,26 @@ export function scriptArgs(value: unknown): string[] {
 export async function executeScript(host: ExecutionHost, record: VersionRecord, script: string, argv: readonly string[], current: () => void,
   context: ToolExecutionContext): Promise<ToolExecutionResult> {
   current(); host.check();
+  const owned = versionPath(record, host.file); assertInventory(owned, record);
+  const entry = record.manifest.scripts.find(value => value.name === script); if (!entry) throw new Error('Unknown extension script.');
+  const absolute = path.join(owned, entry.path);
+  if (/\.(?:js|mjs|ts)$/.test(entry.path)) {
+    const stored = readSandboxRules(host.root);
+    if ((stored.network?.allowedDomains ?? []).length) throw new Error('Extension network grant is unsupported; execution was refused.');
+    if ((stored.filesystem?.allowRead ?? []).length || (stored.filesystem?.allowWrite ?? []).length) throw new Error('Extension scripts cannot inherit broader filesystem sandbox grants.');
+    return executeInProcessScript({
+      root: host.root,
+      scriptFile: absolute,
+      record,
+      argv,
+      denyRules: host.denyRules,
+      context,
+    });
+  }
   if (process.platform !== 'linux') throw new Error('Isolated extension script execution currently requires Linux bubblewrap.');
   // Shell code cannot prove path-specific compliance. Refuse policies the current
   // sandbox cannot enforce rather than letting an approved process evade file denials.
   if (host.denyRules().some(rule => ['read', 'write', 'edit', 'apply_patch', 'glob', 'grep', '*'].includes(rule.tool))) throw new Error('Extension scripts are unavailable with file deny rules that cannot be enforced by this sandbox.');
-  const owned = versionPath(record, host.file); assertInventory(owned, record);
-  const entry = record.manifest.scripts.find(value => value.name === script); if (!entry) throw new Error('Unknown extension script.');
-  const absolute = path.join(owned, entry.path);
   const parent = path.dirname(host.file); fs.mkdirSync(parent, { recursive: true, mode: 0o700 });
   const home = fs.mkdtempSync(path.join(parent, '.run-')); fs.chmodSync(home, 0o700);
   let result: CommandExecutionResult | undefined; let dispatched = false; let cleanupUnknown = false; let output = ''; let bytes = 0;

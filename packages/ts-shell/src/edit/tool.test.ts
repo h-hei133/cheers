@@ -276,3 +276,25 @@ describe('prepared edit through ordinary permission and hooks', () => {
     expect(result.messages[0]?.content).toContain(decision === 'allow' ? 'Updated note.txt' : 'candidate checked');
   });
 });
+
+describe('edit wire schema and argument normalization', () => {
+  it('exposes a flat { path, edits } wire schema without oneOf or content', () => {
+    const tool = createEditToolDefinition(createDefaultExecutionService());
+    expect(tool.argsSchema).not.toHaveProperty('oneOf');
+    expect(tool.argsSchema.required).toEqual(['path', 'edits']);
+    expect((tool.argsSchema.properties as Record<string, unknown>).content).toBeUndefined();
+  });
+
+  it('silently normalizes stringified edits and single-object edits', async () => {
+    const file = path.join(root, 'note.txt');
+    fs.writeFileSync(file, 'ALPHA\nBETA\n');
+    const hooks = new HookDispatcher();
+    const stringified = await run({ path: 'note.txt', edits: JSON.stringify([{ oldText: 'ALPHA', newText: 'ONE' }]) }, hooks);
+    expect(stringified.messages[0]?.content).toContain('Updated note.txt');
+    expect(fs.readFileSync(file, 'utf8')).toBe('ONE\nBETA\n');
+
+    const single = await run({ path: 'note.txt', edits: { oldText: 'BETA', newText: 'TWO' } }, hooks);
+    expect(single.messages[0]?.content).toContain('Updated note.txt');
+    expect(fs.readFileSync(file, 'utf8')).toBe('ONE\nTWO\n');
+  });
+});

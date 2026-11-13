@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import fixtures from './fixtures/write-gate-results.json';
-import { applyWriteHookPolicy, CANONICAL_WRITE_MATCHER, canonicalToolName, mergeWriteHookResult, normalizeHookVeto, translateWriteInput, translateWriteResult } from './translation.js';
+import { applyWriteHookPolicy, CANONICAL_WRITE_MATCHER, canonicalToolName, hookUnknown, mergeWriteHookResult,
+  normalizeHookVeto, translateWriteInput, translateWriteInputs, translateWriteResult } from './translation.js';
+import { bindPreparedToolCall, discardToolCall, prepareToolCall } from '../../tools/preparation.js';
 import type { PreToolUsePayload } from './types.js';
+import fixtures from './fixtures/write-gate-results.json';
 
 const payload: PreToolUsePayload = { eventName: 'PreToolUse', workspaceRoot: '/workspace', sessionId: 'session',
   timestamp: '2026-11-05T00:00:00Z', agentId: 'worker', toolName: 'write', toolCallId: 'call', args: { path: 'a.ts', content: '' } };
@@ -44,6 +46,60 @@ describe('canonical write translation', () => {
   it('classifies missing replacement content as an input-fidelity unknown', () => {
     expect(translateWriteInput({ ...payload, toolName: 'edit', args: { path: 'a.ts' } }, 15000))
       .toMatchObject({ decision: 'block', hookVerdict: { status: 'unknown', reasonCode: 'input_incomplete', policy: 'block' } });
+  });
+  it('translates a prepared single-file apply_patch candidate to canonical Edit input', async () => {
+    const candidate = { path: '/workspace/a.ts', content: 'next\n', before: { state: 'exists' as const, sha256: 'a'.repeat(64) } };
+    const tool = {
+      name: 'apply_patch',
+      description: 'fixture',
+      argsSchema: {},
+      prepare: () => ({ targets: [{ path: '/workspace/a.ts', operation: 'write' as const }], preview: 'diff', writeCandidate: candidate, execute: async () => ({ success: true }) }),
+      execute: async () => ({ success: true }),
+    };
+    const owner = {};
+    const args = await prepareToolCall(tool, { input: '*** Begin Patch' }, { workspaceRoot: '/workspace', taskId: 'call' }, owner);
+    bindPreparedToolCall(args, owner, 'apply_patch', 'call');
+    try {
+      const translated = translateWriteInput({ ...payload, toolName: 'apply_patch', args }, 15000);
+      expect(translated).toMatchObject({
+        toolName: 'apply_patch',
+        tool_name: 'Edit',
+        tool_input: { file_path: '/workspace/a.ts', content: 'next\n' },
+      });
+    } finally {
+      discardToolCall(args);
+    }
+  });
+  it('translates multi-file apply_patch writeCandidates into per-file canonical Edit inputs', async () => {
+    const candidates = [
+      { path: '/workspace/a.ts', content: 'next-a\n', before: { state: 'exists' as const, sha256: 'a'.repeat(64) } },
+      { path: '/workspace/b.ts', content: 'next-b\n', before: { state: 'absent' as const } },
+    ];
+    const tool = {
+      name: 'apply_patch',
+      description: 'fixture',
+      argsSchema: {},
+      prepare: () => ({
+        targets: [
+          { path: '/workspace/a.ts', operation: 'write' as const },
+          { path: '/workspace/b.ts', operation: 'write' as const },
+        ],
+        preview: 'diff',
+        writeCandidates: candidates,
+        execute: async () => ({ success: true }),
+      }),
+      execute: async () => ({ success: true }),
+    };
+    const owner = {};
+    const args = await prepareToolCall(tool, { input: '*** Begin Patch' }, { workspaceRoot: '/workspace', taskId: 'call-multi' }, owner);
+    bindPreparedToolCall(args, owner, 'apply_patch', 'call-multi');
+    try {
+      const translated = translateWriteInputs({ ...payload, toolName: 'apply_patch', toolCallId: 'call-multi', args }, 15000);
+      expect(Array.isArray(translated)).toBe(true);
+      expect(translated).toHaveLength(2);
+    } finally {
+      discardToolCall(args);
+    }
   });
 });
 

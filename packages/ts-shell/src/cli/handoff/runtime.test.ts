@@ -49,7 +49,7 @@ beforeEach(async () => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${(server.address() as { port: number }).port}/v1`;
   manager = new SessionManager(); context = { session: manager.createNew(root), cwd: root, projectRoot: root } as ShellRuntimeContext;
-  const config = { ...getRuntimeConfig(root), provider: 'openai-compatible' as const, maxOutputTokens: 512, reserveTokens: 1024,
+  const config = { ...getRuntimeConfig(root), provider: 'openai-compatible' as const, toolDiscovery: 'full' as const, maxOutputTokens: 512, reserveTokens: 1024,
     retryEnabled: false, providerRetryMaxRetries: 0, maxTurns: 8, cacheWarming: 'off' as const,
     providerConnections: [{ id: 'fixture', provider: 'openai-compatible' as const, model: 'planner', apiKey: 'synthetic-fixture', baseUrl,
       authType: 'api-key' as const, status: 'connected' as const, thinkingEffort: null, createdAt: '2026-10-10T00:00:00Z', updatedAt: '2026-10-10T00:00:00Z' }],

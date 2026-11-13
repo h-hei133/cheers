@@ -13,13 +13,18 @@ export function discoveryTools(discovery: ToolDiscovery): readonly ToolDefinitio
   return [
     {
       name: DISCOVERY_SEARCH_TOOL,
-      description: 'Search the tools this run may use. Returns stable names and one-line summaries; call tool_load to make matching tools available.',
-      argsSchema: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 20 } }, required: ['query'] },
+      description: 'Search the tools this run may use using BM25 over names, descriptions, and parameter schemas. Pass load: true to activate matched tools in one step, or call tool_load separately.',
+      argsSchema: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 20 }, load: { type: 'boolean' } }, required: ['query'] },
       async execute(args) {
         const query = typeof args.query === 'string' ? args.query : '';
         const limit = typeof args.limit === 'number' ? args.limit : undefined;
         const matches = discovery.search(query, limit);
-        return { success: true, output: JSON.stringify({ query, matches, generation: discovery.generation,
+        const loadResult = args.load === true && matches.length > 0
+          ? discovery.load(matches.map(match => match.name))
+          : undefined;
+        return { success: true, output: JSON.stringify({ query, matches,
+          ...(loadResult ? { loaded: loadResult.loaded, rejected: loadResult.rejected } : {}),
+          generation: discovery.generation,
           ...(matches.length === 0 ? { note: 'No visible tool matches. Try a broader name or a capability word from the tool description.' } : {}) }) };
       },
     },

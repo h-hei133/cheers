@@ -232,6 +232,7 @@ export function parseCliArgs(
     rawArgs.includes("--print") || rawArgs.includes("-p") || rawArgs.includes("--json"),
   );
   assignOption(options, "jsonEvents", rawArgs.includes("--json"));
+  assignOption(options, "rpcMode", rawArgs.includes("--rpc"));
   assignOption(options, "noContextFiles", rawArgs.includes("--no-context-files"));
   assignOption(options, "noSkills", rawArgs.includes("--no-skills") || rawArgs.includes("-ns"));
   assignOption(options, "offline", rawArgs.includes("--offline"));

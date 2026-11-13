@@ -37,7 +37,8 @@ afterEach(() => resetSessionUsage(sessionId));
 it.each([true, false])('retains bounded source in a native request when tools are allowed=%s', async allowTools => {
   expect(bounded).toContain(fact);
   expect(bounded).not.toBe(raw);
-  expect(JSON.stringify(outgoingProjection(history, false).messages)).not.toContain(fact);
+  expect(JSON.stringify(outgoingProjection(history, false).messages)).toContain(fact);
+  expect(JSON.stringify(outgoingProjection(history, false, true).messages)).not.toContain(fact);
   let sent = '';
   const step = createStepFunction({ provider, sessionId, workspaceRoot: '/fixture', systemPrompt: 'Implement.',
     tools, catalog: catalog(), pruneToolText: false, maxOutputTokens: 1024, reserveTokens: 8000,

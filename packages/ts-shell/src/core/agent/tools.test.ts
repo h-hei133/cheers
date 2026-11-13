@@ -169,7 +169,7 @@ describe("prepareToolCall", () => {
 describe("executeToolBatch", () => {
   it.each(["parallel", "sequential"] as const)("retains explicit page notices within the model cap in %s mode", async mode => {
     const notice = "[Page saved to artifact://123; 50 matches are outside this page]";
-    const output = "path\n".repeat(4000) + notice;
+    const output = "path\n".repeat(12_000) + notice;
     const tool = makeTool({ execute: async () => ({ output, isError: false, metadata: { outputNotice: notice } }) });
     const batch = await executeToolBatch([tool], assistantMessage(), [makeCall()], undefined, mode, undefined, collect().emit);
     expect(batch.messages[0].content).toContain("artifact://123");
@@ -181,8 +181,8 @@ describe("executeToolBatch", () => {
   });
 
   it("bounds oversized explicit notices and ignores non-string notice metadata", async () => {
-    const notice = "artifact://123 " + "n".repeat(20000) + " hook failure";
-    const output = "x".repeat(20000);
+    const notice = "artifact://123 " + "n".repeat(60_000) + " hook failure";
+    const output = "x".repeat(60_000);
     const tool = makeTool({ execute: async () => ({ output, isError: false, metadata: { outputNotice: notice } }) });
     const batch = await executeToolBatch([tool], assistantMessage(), [makeCall()], undefined, "parallel", undefined, collect().emit);
     expect((batch.messages[0].content as string).length).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT);
@@ -195,13 +195,13 @@ describe("executeToolBatch", () => {
 
   it.each(["feedback", "throw", "replace"])("preserves hook %s facts when long tool output is bounded", async mode => {
     const notice = "[Page saved to artifact://123]";
-    const output = "x".repeat(20000) + notice;
+    const output = "x".repeat(60_000) + notice;
     const tool = makeTool({ execute: async () => ({ output, isError: false, metadata: { outputNotice: notice, status: "partial" } }) });
     const { emit, events } = collect();
     const batch = await executeToolBatch([tool], assistantMessage(), [makeCall()], {
       afterToolCall: async () => {
         if (mode === "throw") throw new Error("verification unavailable");
-        return { output: mode === "replace" ? "redacted ".repeat(2000) : output + "\n[Verification feedback]\ncheck failed", isError: true };
+        return { output: mode === "replace" ? "redacted ".repeat(7000) : output + "\n[Verification feedback]\ncheck failed", isError: true };
       },
     }, "sequential", undefined, emit);
     expect(batch.messages[0].metadata?.status).toBe("partial");
@@ -354,7 +354,7 @@ describe("executeToolBatch", () => {
   it("bounds oversized tool output at the pairing point", async () => {
     const tools = [
       makeTool({
-        execute: async () => ({ output: "x".repeat(10_500), isError: false }),
+        execute: async () => ({ output: "x".repeat(TOOL_OUTPUT_LIMIT + 500), isError: false }),
       }),
     ];
     const { emit } = collect();
@@ -370,8 +370,8 @@ describe("executeToolBatch", () => {
     );
 
     expect(batch.messages).toHaveLength(1);
-    expect(batch.messages[0].content.startsWith("x".repeat(10_000))).toBe(true);
-    expect(batch.messages[0].content).toContain("[... output truncated to 10000 chars]");
+    expect(batch.messages[0].content.startsWith("x".repeat(TOOL_OUTPUT_LIMIT))).toBe(true);
+    expect(batch.messages[0].content).toContain(`[... output truncated to ${TOOL_OUTPUT_LIMIT} chars]`);
   });
 
   it("synthesizes aborted results for every call left unpaired", async () => {

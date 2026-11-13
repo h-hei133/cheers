@@ -99,6 +99,8 @@ export interface ResolvedRequestShape {
   readonly thinkingBudgetTokens?: number;
   /** Use the largest legal numeric budget inside the selected output ceiling. */
   readonly thinkingBudgetMaximum?: boolean;
+  /** Whether OpenAI-style `prompt_cache_key` may be sent when a session id is available. */
+  readonly promptCacheKey?: boolean;
 }
 
 /**
@@ -188,6 +190,7 @@ export function resolveRequestShape(
     assistantAfterToolResult: compat.assistantAfterToolResult === true,
     allowEmptySignature: compat.allowEmptySignature === true,
     supportsTemperature: compat.supportsTemperature !== false,
+    ...(compat.promptCacheKey !== undefined ? { promptCacheKey: compat.promptCacheKey } : {}),
     vision: entry.vision === true,
     ...(reasoningEffort && level ? { thinkingLevelName: levelNameFor(entry, level) } : {}),
     ...(reasoningEffort && level === 'max' ? { thinkingBudgetMaximum: true } : {}),

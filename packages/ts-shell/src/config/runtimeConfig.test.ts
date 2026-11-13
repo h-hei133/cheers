@@ -47,7 +47,7 @@ describe("runtime config", () => {
     expect(config.disabledTools).toEqual([]);
     expect(config.hiddenToolPrefixes).toEqual([]);
     expect(config.enableMcpTools).toBe(true);
-    expect(config.pruneToolText).toBe(true);
+    expect(config.pruneToolText).toBe(false);
     expect(config.activeProviderConnectionId).toBeUndefined();
     expect(config.providerConnections).toEqual([]);
     expect(config.providerCredentials).toEqual({});
@@ -73,27 +73,27 @@ describe("runtime config", () => {
 
   it('loads tool-text retention from trusted project, user and operation overrides', () => {
     const projectPath = path.join(fakeRoot, '.cheers.json');
-    fs.writeFileSync(projectPath, JSON.stringify({ pruneToolText: false }));
-    expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(true);
+    fs.writeFileSync(projectPath, JSON.stringify({ pruneToolText: true }));
+    expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(false);
     expect(getRuntimeConfig(fakeRoot).configProvenance.pruneToolText.rejected)
       .toEqual([{ source: 'project', reason: 'trust-not-established' }]);
     projectTrust.setProjectTrust(fakeRoot, 'session-only');
-    expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(false);
-    const userPath = getUserRuntimeConfigPath();
-    writeUserRuntimeConfigFile({ pruneToolText: true }, readRuntimeConfigEditAt(userPath));
     expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(true);
-    expect(getRuntimeConfig(fakeRoot, { pruneToolText: false }).pruneToolText).toBe(false);
+    const userPath = getUserRuntimeConfigPath();
     writeUserRuntimeConfigFile({ pruneToolText: false }, readRuntimeConfigEditAt(userPath));
-    expect(readUserRuntimeConfigFile().pruneToolText).toBe(false);
     expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(false);
+    expect(getRuntimeConfig(fakeRoot, { pruneToolText: true }).pruneToolText).toBe(true);
+    writeUserRuntimeConfigFile({ pruneToolText: true }, readRuntimeConfigEditAt(userPath));
+    expect(readUserRuntimeConfigFile().pruneToolText).toBe(true);
+    expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(true);
   });
 
   it('rejects malformed tool-text retention without treating it as a disabled policy', () => {
     const file = getUserRuntimeConfigPath();
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ pruneToolText: 'false' }));
+    fs.writeFileSync(file, JSON.stringify({ pruneToolText: 'true' }));
     const config = getRuntimeConfig(fakeRoot);
-    expect(config.pruneToolText).toBe(true);
+    expect(config.pruneToolText).toBe(false);
     expect(config.configValidation.valid).toBe(false);
     expect(config.configProvenance.pruneToolText.rejected)
       .toEqual([{ source: 'user', reason: 'invalid-value' }]);

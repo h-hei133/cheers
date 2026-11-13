@@ -19,9 +19,12 @@ import { nativeOpenAIResponses } from './protocol.js';
  */
 
 export type ProviderAuth = "api-key" | "oauth" | "none";
+export type ModelType = "chat" | "image" | "classifier";
 
 export interface CatalogModel {
   readonly id: string;
+  /** Model modality/role (`chat`, `image`, or `classifier`); absent defaults to `chat`. */
+  readonly modelType?: ModelType;
   /** Published text vocabulary; false disables an inherited declaration. Unknown models keep an estimate. */
   readonly tokenizer?: 'cl100k_base' | 'o200k_base' | false;
   /** Context window in tokens, when the provider publishes one. */
@@ -164,6 +167,8 @@ export interface ModelRequestShape {
    * sending it anyway fails the whole request rather than being ignored.
    */
   readonly supportsTemperature?: boolean;
+  /** Whether OpenAI-style `prompt_cache_key` routing is supported on this endpoint. */
+  readonly promptCacheKey?: boolean;
 }
 
 /**

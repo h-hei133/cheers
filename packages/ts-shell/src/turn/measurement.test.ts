@@ -77,9 +77,9 @@ it('subtracts only new measured-prefix rewrites from an already compacted provid
   const old = [...turn(0), ...turn(1), ...turn(2), ...turn(3), ...turn(4)];
   const usage = anchor(old);
   const current = [...old, ...turn(5), ...turn(6)];
-  const projection = outgoingProjection(current, false);
-  const prefixIdentity = measuredProjectionPrefix(current, projection, usage, false)!;
-  const oldWire = outgoingProjection(old, false).messages;
+  const projection = outgoingProjection(current, false, true);
+  const prefixIdentity = measuredProjectionPrefix(current, projection, usage, false, true)!;
+  const oldWire = outgoingProjection(old, false, true).messages;
   const removed = oldWire.reduce((sum, message, index) => sum + (message.content as string).length
     - (projection.messages[index]!.content as string).length, 0);
   expect(prefixIdentity.rewriteTokensRemoved).toBe(Math.floor(removed / 3.5));
@@ -93,15 +93,15 @@ it('subtracts only new measured-prefix rewrites from an already compacted provid
     tokens: 20_000 - Math.floor(removed / 3.5) + estimateTokens(projected.tailMessages) });
   expect(estimatePrompt(current, overhead, result.identity, usage, projected).tokens).toBe(result.tokens);
   expect(usage.lastPromptTokens).toBe(20_000);
-  expect(measuredProjectionPrefix(old, outgoingProjection(old, false), usage, false)?.rewriteTokensRemoved).toBe(0);
+  expect(measuredProjectionPrefix(old, outgoingProjection(old, false, true), usage, false, true)?.rewriteTokensRemoved).toBe(0);
 });
 
 it('does not subtract newly pruned unmeasured outputs from the provider prefix', () => {
   const old = turn(0);
   const current = [...old, ...turn(1), ...turn(2), ...turn(3), ...turn(4), ...turn(5)];
   const usage = anchor(old);
-  const projected = outgoingProjection(current, false);
-  const proof = measuredProjectionPrefix(current, projected, usage, false)!;
+  const projected = outgoingProjection(current, false, true);
+  const proof = measuredProjectionPrefix(current, projected, usage, false, true)!;
   expect(proof.rewriteTokensRemoved).toBeLessThan(Math.floor(projected.savedChars / 3.5));
 });
 
@@ -110,38 +110,38 @@ it.each([
 ] as const)('rejects a measured-prefix rewrite whose removal %s its provider anchor', (_relation, excess) => {
   const old = turn(0);
   const current = [...old, ...turn(1), ...turn(2), ...turn(3), ...turn(4)];
-  const projection = outgoingProjection(current, false);
+  const projection = outgoingProjection(current, false, true);
   const removedTokens = Math.floor(((old[2]!.content as string).length
     - (projection.messages[2]!.content as string).length) / 3.5);
   expect(removedTokens).toBeGreaterThan(1);
   // A positive remainder is valid even when a character estimate would suggest
   // a larger retained prefix. Only an exhausted anchor invalidates the proof.
-  expect(measuredProjectionPrefix(current, projection, anchor(old, removedTokens + 1), false))
+  expect(measuredProjectionPrefix(current, projection, anchor(old, removedTokens + 1), false, true))
     .toMatchObject({ rewriteTokensRemoved: removedTokens });
-  expect(measuredProjectionPrefix(current, projection, anchor(old, removedTokens - excess), false)).toBeUndefined();
+  expect(measuredProjectionPrefix(current, projection, anchor(old, removedTokens - excess), false, true)).toBeUndefined();
 });
 
 it.each([undefined, -1, 0, 0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
   'rejects an absent or invalid provider anchor before proving a rewrite (%s)', lastPromptTokens => {
     const old = turn(0);
     const usage = { ...anchor(old), lastPromptTokens };
-    expect(measuredProjectionPrefix(old, outgoingProjection(old, false), usage, false)).toBeUndefined();
+    expect(measuredProjectionPrefix(old, outgoingProjection(old, false, true), usage, false, true)).toBeUndefined();
   });
 
 it('rejects changed source, baseline, wire, bridge, image, opaque and balanced conversion identities', () => {
   const old = turn(0), usage = anchor(old);
   const current = [...old, ...turn(1), ...turn(2), ...turn(3)];
   expect(measuredProjectionPrefix([{ ...current[0]!, content: 'replaced' }, ...current.slice(1)],
-    outgoingProjection(current, false), usage, false)).toBeUndefined();
+    outgoingProjection(current, false, true), usage, false, true)).toBeUndefined();
   for (const changed of [{ wireHistoryDigest: 'c'.repeat(64) }, { wireRewriteTokens: 99 }, { wireMessageCount: old.length + 1 }]) {
-    expect(measuredProjectionPrefix(current, outgoingProjection(current, false),
-      { ...usage, lastPromptIdentity: { ...usage.lastPromptIdentity, ...changed } }, false)).toBeUndefined();
+    expect(measuredProjectionPrefix(current, outgoingProjection(current, false, true),
+      { ...usage, lastPromptIdentity: { ...usage.lastPromptIdentity, ...changed } }, false, true)).toBeUndefined();
   }
-  expect(measuredProjectionPrefix(current, outgoingProjection(current, true), usage, true)).toBeUndefined();
+  expect(measuredProjectionPrefix(current, outgoingProjection(current, true, true), usage, true, true)).toBeUndefined();
   for (const extra of [{ role: 'user' as const, content: [{ type: 'image' as const, mimeType: 'image/png', data: 'AA==' }] },
     { role: 'assistant' as const, content: 'answer', reasoning: { text: 'secret', signature: 'opaque' } },
     { role: 'assistant' as const, content: 'answer', origin: { provider: 'other', model: 'm', replayBinding: 'different' } }]) {
-    expect(measuredProjectionPrefix([...old, extra], outgoingProjection([...old, extra], false), usage, false)).toBeUndefined();
+    expect(measuredProjectionPrefix([...old, extra], outgoingProjection([...old, extra], false, true), usage, false, true)).toBeUndefined();
   }
   const malformed: AgentMessage[] = [old[0]!, { role: 'tool', content: 'orphan', tool_call_id: 'missing' }, old[1]!];
   const repaired = outgoingProjection(malformed, false);
@@ -154,7 +154,7 @@ it('uses actual dispatch usage for rewritten request admission instead of a whol
   let sends = 0;
   const step = createStepFunction({ sessionId, workspaceRoot: process.cwd(), systemPrompt: overhead.systemPrompt,
     provider: { provider: 'openai', model: 'm', baseUrl: 'https://fixture.invalid/v1', apiKey: 'synthetic' },
-    tools: [], contextWindow: 14_000, reserveTokens: 0, maxOutputTokens: 1,
+    tools: [], contextWindow: 14_000, reserveTokens: 0, maxOutputTokens: 1, pruneToolText: true,
     fetchImpl: async () => { sends++; return new Response(JSON.stringify({
       choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }],
       usage: { prompt_tokens: 20_000, completion_tokens: 1 },

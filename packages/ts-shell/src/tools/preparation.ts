@@ -5,6 +5,7 @@ interface PreparedCall {
   readonly owner: object;
   readonly preparation: ToolPreparation;
   readonly writeCandidate?: PreparedWriteCandidate;
+  readonly writeCandidates?: readonly PreparedWriteCandidate[];
   readonly source?: string;
   hookCallId?: string;
   callId?: string;
@@ -17,18 +18,36 @@ const calls = new WeakMap<object, PreparedCall>();
 export function prepareToolCall(tool: ToolDefinition, args: Record<string, unknown>, context: ToolExecutionContext, owner: object,
   verify?: () => void): Record<string, unknown> | Promise<Record<string, unknown>> {
   const prepared = Object.freeze({ ...args });
-  const source = tool.name === 'edit' ? JSON.stringify(prepared) : undefined;
-  const publish = (preparation: ToolPreparation): Record<string, unknown> => {
+  const initialSource = tool.name === 'edit' || tool.name === 'apply_patch' ? JSON.stringify(prepared) : undefined;
+  const publish = (resolved: ToolPreparation, asyncResolved: boolean): Record<string, unknown> => {
     context.abortSignal?.throwIfAborted();
     verify?.();
-    if (preparation.writeCandidate && source !== undefined && source !== JSON.stringify(prepared)) throw new Error('Prepared edit arguments changed during capture.');
-    const writeCandidate = preparation.writeCandidate
-      ? Object.freeze({ ...preparation.writeCandidate, before: Object.freeze({ ...preparation.writeCandidate.before }) }) : undefined;
-    calls.set(prepared, { tool, owner, preparation, ...(writeCandidate ? { writeCandidate, source: source ?? JSON.stringify(prepared) } : {}) });
+    const currentSource = !asyncResolved && initialSource !== undefined
+      ? initialSource
+      : resolved.writeCandidate || resolved.writeCandidates?.length || initialSource !== undefined ? JSON.stringify(prepared) : undefined;
+    if ((resolved.writeCandidate || resolved.writeCandidates?.length) && initialSource !== undefined && initialSource !== currentSource) {
+      throw new Error('Prepared edit arguments changed during capture.');
+    }
+    const writeCandidate = resolved.writeCandidate
+      ? Object.freeze({ ...resolved.writeCandidate, before: Object.freeze({ ...resolved.writeCandidate.before }) }) : undefined;
+    const writeCandidates = resolved.writeCandidates?.length
+      ? Object.freeze(resolved.writeCandidates.map(candidate => Object.freeze({
+          ...candidate,
+          before: Object.freeze({ ...candidate.before }),
+        })))
+      : undefined;
+    calls.set(prepared, {
+      tool,
+      owner,
+      preparation: resolved,
+      ...(writeCandidate ? { writeCandidate } : {}),
+      ...(writeCandidates ? { writeCandidates } : {}),
+      ...(writeCandidate || writeCandidates ? { source: currentSource } : {}),
+    });
     return prepared;
   };
   const preparation = tool.prepare!(prepared, context);
-  return preparation instanceof Promise ? preparation.then(publish) : publish(preparation);
+  return preparation instanceof Promise ? preparation.then(resolved => publish(resolved, true)) : publish(preparation, false);
 }
 
 export function preparedToolCall(args: object, owner: object): ToolPreparation | undefined {
@@ -40,7 +59,7 @@ export function preparedToolCall(args: object, owner: object): ToolPreparation |
 /** Bind the original prepared argument identity after ordinary permission, before hooks. */
 export function bindPreparedToolCall(args: object, owner: object, toolName: string, callId: string): void {
   const call = calls.get(args);
-  if (!call?.writeCandidate) return;
+  if (!call?.writeCandidate && !call?.writeCandidates?.length) return;
   if (!callId || call.owner !== owner || call.tool.name !== toolName || call.hookCallId || call.callId) throw new Error('Prepared tool call hook identity does not match.');
   call.hookCallId = callId;
 }
@@ -53,11 +72,19 @@ export function preparedWriteCandidate(args: object, toolName: string, callId: s
   return call.writeCandidate;
 }
 
+/** Expose all host-bound file write candidates for multi-file patch inspection. */
+export function preparedWriteCandidates(args: object, toolName: string, callId: string): readonly PreparedWriteCandidate[] | undefined {
+  const call = calls.get(args);
+  if ((!call?.writeCandidates?.length && !call?.writeCandidate) || call.tool.name !== toolName || call.hookCallId !== callId) return undefined;
+  if (call.source !== JSON.stringify(args)) throw new Error('Prepared edit arguments changed after capture.');
+  return call.writeCandidates ?? (call.writeCandidate ? [call.writeCandidate] : undefined);
+}
+
 export function authorizeToolCall(args: object, owner: object, toolName: string, callId: string): void {
   const call = calls.get(args);
   if (!call) return;
   if (call.owner !== owner || call.tool.name !== toolName || call.callId) throw new Error('Prepared tool call approval does not match.');
-  if (call.writeCandidate && (call.hookCallId !== callId || call.source !== JSON.stringify(args))) throw new Error('Prepared edit approval changed after capture.');
+  if ((call.writeCandidate || call.writeCandidates?.length) && (call.hookCallId !== callId || call.source !== JSON.stringify(args))) throw new Error('Prepared edit approval changed after capture.');
   call.callId = callId;
 }
 
@@ -69,7 +96,7 @@ export function consumeToolCall(args: object, owner: object, tool: ToolDefinitio
     return undefined;
   }
   if (call.owner !== owner || call.tool !== tool || call.callId !== callId) throw new Error('Prepared tool call was not approved for this execution.');
-  if (call.writeCandidate && call.source !== JSON.stringify(args)) throw new Error('Prepared edit arguments changed after capture.');
+  if ((call.writeCandidate || call.writeCandidates?.length) && call.source !== JSON.stringify(args)) throw new Error('Prepared edit arguments changed after capture.');
   return call.preparation;
 }
 

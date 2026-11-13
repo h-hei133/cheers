@@ -447,7 +447,7 @@ export const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProven
   topP: 1.0,
   maxOutputTokens: 4096,
   reserveTokens: 8_000,
-  pruneToolText: true,
+  pruneToolText: false,
   modelTokenBudgets: {},
   instructionBudgetBytes: 32 * 1024,
   allowUntrustedHooks: false,

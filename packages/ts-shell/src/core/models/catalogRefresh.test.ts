@@ -382,4 +382,45 @@ describe("refreshing the catalogue", () => {
     expect(result.cachePath).toBeUndefined();
     expect(result.error).toBeTruthy();
   });
+
+  it("supports ETag if-none-match 304 revalidation and image/classifier model types", async () => {
+    const document = {
+      demo: {
+        name: "Demo",
+        models: {
+          img: { id: "img", type: "image", limit: { context: 4_000 } },
+          cls: { id: "cls", type: "classifier", limit: { context: 8_000 } },
+        },
+      },
+    };
+    let seenIfNoneMatch: string | undefined;
+    const server = http.createServer((req, res) => {
+      seenIfNoneMatch = typeof req.headers["if-none-match"] === "string" ? req.headers["if-none-match"] : undefined;
+      if (seenIfNoneMatch === '"v1"') {
+        res.statusCode = 304;
+        res.end();
+        return;
+      }
+      res.setHeader("content-type", "application/json");
+      res.setHeader("etag", '"v1"');
+      res.end(JSON.stringify(document));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as { port: number }).port;
+    try {
+      const first = await refreshCatalog(`http://127.0.0.1:${port}/api.json`);
+      expect(first.ok).toBe(true);
+      expect(first.etag).toBe('"v1"');
+      const cached = readCache(first.cachePath!).demo?.models ?? [];
+      expect(cached.find(m => m.id === "img")?.modelType).toBe("image");
+      expect(cached.find(m => m.id === "cls")?.modelType).toBe("classifier");
+
+      const second = await refreshCatalog(`http://127.0.0.1:${port}/api.json`);
+      expect(second.ok).toBe(true);
+      expect(second.notModified).toBe(true);
+      expect(seenIfNoneMatch).toBe('"v1"');
+    } finally {
+      server.close();
+    }
+  });
 });

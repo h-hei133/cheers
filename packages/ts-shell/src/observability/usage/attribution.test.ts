@@ -2,7 +2,7 @@ import { afterEach, expect, it } from 'vitest';
 import { costModel } from '../../core/commands/cost/model.js';
 import { costReport } from '../../core/commands/cost/report.js';
 import { reportText } from '../../core/commands/report/projection.js';
-import { findCacheWaste, summarizeCacheUsage } from '../cacheWaste.js';
+import { detectLatestCacheMiss, findCacheWaste, formatCacheMissNotice, summarizeCacheUsage } from '../cacheWaste.js';
 import { getSessionUsage, markContextUnknown, persistSessionUsage, recordSessionUsage, resetSessionUsage, restoreSessionUsage, totalTokens } from '../usageTelemetry.js';
 import { attributedBucketKey, cacheIdentity, captureUsageAttribution, legacyBucketKey, splitBucketKey, usageBucketKey } from './identity.js';
 import { decodeUsageSnapshot, mergeUsageDelta } from './snapshot.js';
@@ -210,4 +210,15 @@ it.each(['context-reset', 'usage-gap'] as const)('persists %s after attributed u
   persistSessionUsage(B, disk, next => { disk = next; });
   expect(totalTokens(getSessionUsage(B))).toBe(330);
   expect(findCacheWaste(disk!.recentRequests, () => rates).misses).toEqual([]);
+});
+
+it('detects and formats real-time turn-end cache miss warnings', () => {
+  resetSessionUsage(A);
+  const attr = capture('https://relay.invalid/v1', rates);
+  recordRequest(A, attr, 10_000);
+  expect(detectLatestCacheMiss(getSessionUsage(A).recentRequests, () => rates)).toBeUndefined();
+  recordRequest(A, attr, 12_000);
+  const miss = detectLatestCacheMiss(getSessionUsage(A).recentRequests, () => rates);
+  expect(miss).toBeDefined();
+  expect(formatCacheMissNotice(miss!)).toContain('Cache miss: 10,000 prompt tokens re-billed');
 });

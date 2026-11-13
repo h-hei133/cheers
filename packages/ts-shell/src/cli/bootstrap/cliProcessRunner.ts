@@ -12,6 +12,7 @@ import { runCollaborationServiceMode } from '../collaboration/service.js';
 import type { Interface as ReadlineInterface } from "node:readline";
 
 import { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
+import { flushRawStdout, restoreStdout } from "../../core/shell/outputGuard.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import {
   createComponentLogger,
@@ -193,6 +194,10 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
         closeCollaborationFor(runtimeContext), closeExtensionsFor(runtimeContext), closeTraceDashboard(), mcpGateway.close(),
         Promise.resolve().then(async () => { if (await runtimeContext.freshState?.clearCache?.() === 'unknown') throw new Error('Provider cache cleanup is unverified.'); }),
       ]);
+      if (options.jsonEvents) {
+        await flushRawStdout();
+        restoreStdout();
+      }
       const failure = results.find(result => result.status === 'rejected');
       if (failure?.status === 'rejected') throw failure.reason;
     }, process: input.process, exit: input.exit, writeError: input.writeError,

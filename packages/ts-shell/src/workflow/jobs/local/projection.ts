@@ -36,5 +36,5 @@ export function renderTask(task: BackgroundTask): string {
  * only other way to get it is a second tool call.
  */
 export function renderTaskNotice(task: Parameters<typeof renderTask>[0]): string {
-  return `A background command finished.\n\n${renderTask(task)}\n\nUse taskOutput to inspect retained task results.`;
+  return `A background command finished.\n\n${renderTask(task)}\n\nUse taskOutput (load via tool_load if unpinned) to inspect retained task results.`;
 }

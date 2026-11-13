@@ -153,7 +153,7 @@ describe('threshold compaction progress', () => {
       ...toolGroup(`projected-${index}`, 4_000),
     ]).flat();
     const overhead = { systemPrompt: 'main system', tools: [{ name: 'read', description: 's'.repeat(35_000) }] };
-    const projectMessages = (source: readonly AgentMessage[]) => outgoingProjection(source, false).messages
+    const projectMessages = (source: readonly AgentMessage[]) => outgoingProjection(source, false, true).messages
       .map(message => ({ ...message, content: message.content ?? '' }));
     const projectedPolicy = { ...policy, contextWindow: 12_000, overhead, projectMessages };
     const projected = projectMessages(messages);

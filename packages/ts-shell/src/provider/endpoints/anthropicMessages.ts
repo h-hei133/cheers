@@ -7,6 +7,7 @@ import {
 import type { ChatMessage } from "../../turn/prompt.js";
 import type { ToolSchema } from "../../turn/tools.js";
 import type { ProviderUsage, StreamFragment, StreamedCompletion, StreamedToolCall } from "../../turn/completion.js";
+import { declareToolChanges, insertThinkingLevelMessages } from "./anthropicCachePreservation.js";
 import { copilotRequestHeaders } from "./copilotHeaders.js";
 import { declareEndpoint } from "./kinds.js";
 import { IncompleteStreamError } from '../response/error.js';
@@ -106,6 +107,12 @@ export interface AnthropicRequestInput {
   readonly thinkingBudgetTokens?: number;
   /** Use the largest legal numeric budget inside the selected output ceiling. */
   readonly thinkingBudgetMaximum?: boolean;
+  /** Prompt cache retention preference (`short` | `long` | `none`). */
+  readonly cacheRetention?: "short" | "long" | "none";
+  /** Initial pinned tool schemas for mid-conversation `tool_addition`/`tool_removal` preservation. */
+  readonly initialTools?: readonly ToolSchema[];
+  readonly supportsMidConvoToolChanges?: boolean;
+  readonly supportsMidConvoEffort?: boolean;
 }
 
 /** The headers this endpoint authenticates with, given an API key. */
@@ -129,27 +136,42 @@ export function anthropicHeaders(apiKey?: string): Record<string, string> {
  * only place this API accepts them.
  */
 export function anthropicRequestBody(input: AnthropicRequestInput): Record<string, unknown> {
+  const cacheControl = cacheControlFor(input.cacheRetention);
+  const wireMessages = convertMessages(input.messages, input.vision, input.allowEmptySignature === true);
+  let finalMessages: Array<WireMessage | Record<string, unknown>> = cacheControl
+    ? markLastUserMessageForCaching(wireMessages, cacheControl)
+    : [...wireMessages];
   const body: Record<string, unknown> = {
     model: input.model,
-    // Required by the API. The caller's ceiling wins when it set one, because a
-    // value that fits one model truncates another.
     max_tokens: input.maxOutputTokens ?? DEFAULT_MAX_TOKENS,
     stream: input.stream ?? true,
-    messages: convertMessages(input.messages, input.vision, input.allowEmptySignature === true),
   };
 
-  // The instruction and the tool declarations are the stable front of every
-  // request, so they are the part worth caching. Marking them is what makes the
-  // provider keep them: this endpoint caches only what it is told to, unlike the
-  // default one, where a matching prefix is cached without being asked.
   if (input.systemPrompt.trim() !== "") {
-    body.system = [{ type: "text", text: input.systemPrompt, cache_control: { type: "ephemeral" } }];
+    body.system = [{ type: "text", text: input.systemPrompt, ...(cacheControl ? { cache_control: cacheControl } : {}) }];
   }
-  if (input.allowTools && input.tools.length > 0) {
-    const tools = convertTools(input.tools);
-    body.tools = markLastForCaching(tools);
+  if (input.supportsMidConvoEffort && input.thinkingLevelName !== undefined) {
+    body.thinking = {
+      type: "adaptive",
+      display: "summarized",
+      block_binding: { prefix_mismatch_behavior: "drop_block" },
+    };
+    body.output_config = { effort: "low" };
+    finalMessages = insertThinkingLevelMessages(finalMessages, input.thinkingLevelName);
   }
-  // Omitted where the model is known to reject it, and where thinking is on: a
+  if (input.allowTools && (input.tools.length > 0 || (input.supportsMidConvoToolChanges && input.initialTools !== undefined))) {
+    if (input.supportsMidConvoToolChanges && input.initialTools !== undefined) {
+      const declared = declareToolChanges(input.initialTools, input.tools, cacheControl);
+      body.tools = declared.topLevelTools;
+      if (declared.toolChangeMessage) {
+        finalMessages = [...finalMessages, declared.toolChangeMessage];
+      }
+    } else if (input.tools.length > 0) {
+      const tools = convertTools(input.tools);
+      body.tools = cacheControl ? markLastForCaching(tools, cacheControl) : tools;
+    }
+  }
+  body.messages = finalMessages;
   // reasoning mode and a sampling temperature are alternatives, not companions.
   if (input.temperature !== undefined && input.supportsTemperature !== false && !input.thinkingLevelName) {
     body.temperature = input.temperature;
@@ -158,7 +180,7 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
   // Only sent when the model declared a name for the level. An endpoint that
   // does not know the field rejects the whole request, so an unmapped level
   // stays unsent rather than being guessed at.
-  if (input.thinkingLevelName !== undefined) {
+  if (input.thinkingLevelName !== undefined && !input.supportsMidConvoEffort) {
     // The budget is required alongside `enabled`: the API rejects the field
     // without one, so asking for reasoning without saying how much is not a
     // request it accepts.
@@ -340,12 +362,35 @@ function parseArguments(raw: string): unknown {
  * entry would spend the marker budget on nothing extra, and marking none would
  * cache nothing at all.
  */
+function cacheControlFor(
+  retention: AnthropicRequestInput["cacheRetention"],
+): { readonly type: "ephemeral"; readonly ttl?: "1h" } | undefined {
+  if (retention === "none") return undefined;
+  return retention === "long" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
+}
+
 function markLastForCaching(
   entries: readonly Record<string, unknown>[],
+  cacheControl: { readonly type: "ephemeral"; readonly ttl?: "1h" },
 ): readonly Record<string, unknown>[] {
   return entries.map((entry, index) =>
-    index === entries.length - 1 ? { ...entry, cache_control: { type: "ephemeral" } } : entry,
+    index === entries.length - 1 ? { ...entry, cache_control: cacheControl } : entry,
   );
+}
+
+function markLastUserMessageForCaching(
+  messages: readonly WireMessage[],
+  cacheControl: { readonly type: "ephemeral"; readonly ttl?: "1h" },
+): WireMessage[] {
+  if (messages.length === 0) return [...messages];
+  const lastIndex = messages.length - 1;
+  const last = messages[lastIndex]!;
+  if (last.role !== "user" || last.content.length === 0) return [...messages];
+  const lastBlockIndex = last.content.length - 1;
+  const markedContent = last.content.map((block, index) =>
+    index === lastBlockIndex ? { ...block, cache_control: cacheControl } : block,
+  );
+  return [...messages.slice(0, lastIndex), { ...last, content: markedContent }];
 }
 
 /** The tool declarations this API expects. */
@@ -786,6 +831,7 @@ declareEndpoint("anthropic-messages", {
       ...(input.supportsTemperature !== undefined ? { supportsTemperature: input.supportsTemperature } : {}),
       ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
       ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
+      ...(input.cacheRetention !== undefined ? { cacheRetention: input.cacheRetention } : {}),
     }),
   /**
    * The full turn. The simpler `body` above sends a prompt and no tools; this
@@ -810,11 +856,18 @@ declareEndpoint("anthropic-messages", {
       ...(input.supportsTemperature !== undefined ? { supportsTemperature: input.supportsTemperature } : {}),
       ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
       ...(input.thinkingBudgetMaximum ? { thinkingBudgetMaximum: true } : {}),
+      ...(input.cacheRetention !== undefined ? { cacheRetention: input.cacheRetention } : {}),
+      ...(input.initialTools !== undefined ? { initialTools: input.initialTools } : {}),
+      ...(input.supportsMidConvoToolChanges !== undefined ? { supportsMidConvoToolChanges: input.supportsMidConvoToolChanges } : {}),
+      ...(input.supportsMidConvoEffort !== undefined ? { supportsMidConvoEffort: input.supportsMidConvoEffort } : {}),
     }),
   refreshBody: (body) => {
-    // A different budget changes the message cache key; retaining it defeats
+    // A different budget/thinking config changes the message cache key; retaining it defeats
     // the one-token cost bound. Only non-budgeted requests can be replayed.
-    if ((body.thinking as { type?: string } | undefined)?.type === "enabled") return undefined;
+    const thinkingType = typeof body.thinking === "object" && body.thinking !== null && "type" in body.thinking
+      ? body.thinking.type
+      : undefined;
+    if (thinkingType === "enabled" || thinkingType === "adaptive") return undefined;
     return { ...body, max_tokens: 1 };
   },
   readBody: (body) => readAnthropicBody(body),

@@ -341,12 +341,12 @@ describe("reading a file that has not changed", () => {
     // to disk: pointing the model at a part would let it take the part for the
     // file. This is the case a size limit produces — 1,600 short lines stay
     // under the byte ceiling and are cut by the line limit instead.
-    const manyLines = Array.from({ length: 1_600 }, (_, index) => `line ${index}`).join("\n");
+    const manyLines = Array.from({ length: 2_500 }, (_, index) => `line ${index}`).join("\n");
     await withFile(manyLines, async ({ dir, sessionId }) => {
       const first = await read(dir, sessionId);
-      expect(first.output).toContain("Showing lines 1-500 of an uncounted file");
-      expect(first.output).toContain("offset=501");
-      expect(first.metadata?.read).toMatchObject({ stopReason: "line-limit", nextOffset: 501 });
+      expect(first.output).toContain("Showing lines 1-2000 of an uncounted file");
+      expect(first.output).toContain("offset=2001");
+      expect(first.metadata?.read).toMatchObject({ stopReason: "line-limit", nextOffset: 2001 });
 
       const second = await read(dir, sessionId);
       expect(second.output).not.toContain("unchanged");

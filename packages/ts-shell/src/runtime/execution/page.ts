@@ -17,7 +17,7 @@ function positiveInteger(value: number | undefined, fallback: number): number {
 /** Bounded UTF-8 pages from the same verified object used by ordinary reads. */
 export async function readTextPage(request: TextPageReadRequest): Promise<TextPageReadResult> {
   const offset = positiveInteger(request.offset, 1)
-  const limit = Math.min(positiveInteger(request.limit, 500), 1000)
+  const limit = Math.min(positiveInteger(request.limit, 2000), 2000)
   const budgets = {
     scanBytes: Math.min(positiveInteger(request.limits?.scanBytes, MAX_SCAN_BYTES), MAX_SCAN_BYTES),
     outputBytes: Math.min(positiveInteger(request.limits?.outputBytes, MAX_OUTPUT_BYTES), MAX_OUTPUT_BYTES),

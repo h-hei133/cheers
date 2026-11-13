@@ -3,7 +3,7 @@ import type { AgentMessage } from '../core/agent/state.js';
 import { toChatMessages, type ChatMessage } from './prompt.js';
 
 /** Identical source projection for dispatch and local preview. */
-export function outgoingProjection(messages: readonly AgentMessage[], bridge: boolean, pruneToolText = true) {
+export function outgoingProjection(messages: readonly AgentMessage[], bridge: boolean, pruneToolText = false) {
   const converted = toChatMessages(messages);
   const { messages: compacted, prunedCount, savedChars } = microcompactMessages(converted,
     { keepRecentTurns: 3, maxOutputChars: 1000, pruneToolText });
@@ -30,7 +30,7 @@ export function outgoingProjection(messages: readonly AgentMessage[], bridge: bo
   };
 }
 
-export function outgoingMessages(messages: readonly AgentMessage[], bridge: boolean, pruneToolText = true): readonly ChatMessage[] {
+export function outgoingMessages(messages: readonly AgentMessage[], bridge: boolean, pruneToolText = false): readonly ChatMessage[] {
   return outgoingProjection(messages, bridge, pruneToolText).messages;
 }
 

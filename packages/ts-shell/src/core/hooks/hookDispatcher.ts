@@ -8,7 +8,7 @@ import type { StopDispatchOptions } from './stop/model.js';
 import type { StopPayload } from './types.js';
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
 import { checkWriteHookArtifact, writeHookCommand } from './artifact.js';
-import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInput, translateWriteResult } from './translation.js';
+import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInput, translateWriteInputs, translateWriteResult } from './translation.js';
 import type {
   HookEventPayload,
   HookDecision,
@@ -262,24 +262,25 @@ export class HookDispatcher {
         if (trust !== this.trust || commandHooks !== this.commandHooks || trust?.admission?.()) continue;
         if (sourceRevision !== undefined && trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') !== sourceRevision) continue;
         const timeoutMs = hook.timeoutMs ?? hookTimeoutMs(relevantEvent);
-        let jsonPayload: string;
+        let jsonPayloads: string[];
         if (translated) {
-          const input = translateWriteInput(payload as PreToolUsePayload, timeoutMs);
-          if ('decision' in input) {
-            logger.info('Write hook result', input.hookVerdict);
-            if (input.decision === 'block') return input;
-            accumulatedDecision = mergeWriteHookResult(accumulatedDecision, input);
+          const inputs = translateWriteInputs(payload as PreToolUsePayload, timeoutMs);
+          if ('decision' in inputs) {
+            logger.info('Write hook result', inputs.hookVerdict);
+            if (inputs.decision === 'block') return inputs;
+            accumulatedDecision = mergeWriteHookResult(accumulatedDecision, inputs);
             continue;
           }
-          if (!this.matches(hook.matcher, matchPayload)) continue;
+          const matchedInputs = inputs.filter(input => this.matches(hook.matcher, { ...payload, toolName: input.tool_name }));
+          if (matchedInputs.length === 0) continue;
           const invalidArtifact = checkWriteHookArtifact(hook.writeGate, payload.workspaceRoot);
           if (invalidArtifact) {
             logger.warn('Write hook failed', invalidArtifact.hookVerdict);
             return invalidArtifact;
           }
-          try { jsonPayload = JSON.stringify(input); }
+          try { jsonPayloads = matchedInputs.map(input => JSON.stringify(input)); }
           catch { return hookUnknown('invalid_input'); }
-        } else jsonPayload = JSON.stringify(payload);
+        } else jsonPayloads = [JSON.stringify(payload)];
         const command = translated ? writeHookCommand(hook.writeGate) : hook.command;
 
         // Run under the same isolation the bash tool uses. A hook is a shell
@@ -310,113 +311,101 @@ export class HookDispatcher {
         const program = sandbox.command ?? SHELL_BIN;
         const programArgs = sandbox.args ?? ["-c", command];
 
-        try {
-          const stdout = await new Promise<string>((resolve, reject) => {
-            const child = execFile(
-              program,
-              [...programArgs],
-              {
-                cwd: payload.workspaceRoot,
-                timeout: timeoutMs,
-                maxBuffer: 1024 * 1024,
-              },
-              (error, stdoutBuf, stderrBuf) => {
-                if (error) {
-                  reject(
-                    new CommandHookFailure(
-                      error instanceof Error ? error.message : String(error),
-                      typeof (error as { code?: unknown }).code === "number"
-                        ? (error as { code: number }).code
-                        : undefined,
-                      stderrBuf,
-                      error instanceof Error && (error as { killed?: boolean }).killed === true,
-                      stdoutBuf,
-                    ),
-                  );
-                } else {
-                  if (stderrBuf) lastStderr = stderrBuf;
-                  resolve(stdoutBuf);
-                }
-              },
-            );
-
-            if (child.stdin) {
-              // A hook that exits without reading its input closes the pipe, and
-              // writing to it then raises EPIPE. That is a hook declining the
-              // payload, not a failure — an unhandled error event here would take
-              // the whole process down over a hook that simply had nothing to
-              // read. The callback above still decides the outcome.
-              child.stdin.on("error", () => {});
-              child.stdin.end(jsonPayload);
-            }
-          });
-
-          if (translated) {
-            const result = applyWriteHookPolicy(translateWriteResult(stdout));
-            logger.info('Write hook result', result.hookVerdict ?? { status: result.decision });
-            if (result.decision === 'block' || result.decision === 'retry') return result;
-            accumulatedDecision = mergeWriteHookResult(accumulatedDecision, result);
-          } else if (stdout && stdout.trim()) {
-            // Parsed inside its own guard so unreadable output is reported as
-            // what it is: the hook produced something, and it could not be
-            // understood, which is not the same as the hook saying nothing.
-            let parsed: HookDecision;
-            try {
-              parsed = JSON.parse(stdout.trim()) as HookDecision;
-              if (relevantEvent === 'PreToolUse') parsed = normalizeHookVeto(parsed) ?? parsed;
-            } catch {
-              logger.error(
-                `Command hook returned output that is not valid JSON for event ${relevantEvent}`,
-                { event: relevantEvent, command: hook.command },
+        const batchDeadline = Date.now() + timeoutMs;
+        for (const jsonPayload of jsonPayloads) {
+          const remainingMs = Math.max(1, batchDeadline - Date.now());
+          if (Date.now() > batchDeadline) return hookUnknown('timeout');
+          try {
+            const stdout = await new Promise<string>((resolve, reject) => {
+              const child = execFile(
+                program,
+                [...programArgs],
+                {
+                  cwd: payload.workspaceRoot,
+                  timeout: remainingMs,
+                  maxBuffer: 1024 * 1024,
+                },
+                (error, stdoutBuf, stderrBuf) => {
+                  if (error) {
+                    reject(
+                      new CommandHookFailure(
+                        error instanceof Error ? error.message : String(error),
+                        typeof (error as { code?: unknown }).code === "number"
+                          ? (error as { code: number }).code
+                          : undefined,
+                        stderrBuf,
+                        error instanceof Error && (error as { killed?: boolean }).killed === true,
+                        stdoutBuf,
+                      ),
+                    );
+                  } else {
+                    if (stderrBuf) lastStderr = stderrBuf;
+                    resolve(stdoutBuf);
+                  }
+                },
               );
-              throw new Error("hook returned invalid JSON output");
-            }
-            if (parsed.decision === "block" || parsed.decision === "retry") {
-              return parsed;
-            }
-            if (parsed.feedback || parsed.hookSpecificOutput) {
-              accumulatedDecision = mergeWriteHookResult(accumulatedDecision, parsed);
-            }
-          }
-        } catch (err: unknown) {
-          // A hook that could not run has not answered, and "no answer" used to
-          // be read as "no objection" — so a safety hook that timed out allowed
-          // exactly what it existed to stop. A failure on a `PreToolUse` hook is
-          // now a refusal rather than a shrug; on the observing events it stays a
-          // logged failure, since there is nothing to refuse.
-          const failure = err instanceof CommandHookFailure ? err : undefined;
-          if (translated) {
-            const parsed = translateWriteResult(failure?.stdout ?? '');
-            const result = failure?.timedOut ? hookUnknown('timeout')
-              : (parsed.decision === 'block' || parsed.decision === 'retry') && parsed.hookVerdict?.source !== 'adapter'
-                ? parsed : hookUnknown('process_failed');
-            logger.warn('Write hook failed', result.hookVerdict ?? { status: result.decision });
-            return result;
-          }
-          const detail = err instanceof Error ? err.message : String(err);
-          logger.error(`Command hook failed for event ${relevantEvent}`, {
-            event: relevantEvent,
-            command: hook.command,
-            timeoutMs,
-            exitCode: failure?.exitCode,
-            timedOut: failure?.timedOut,
-            error: detail,
-          });
 
-          // Exit 2 with something on stderr is the documented way for a hook to
-          // refuse: it has an explanation to give. A non-zero exit without one is
-          // a hook that broke, which on a gate event reads the same way but says
-          // so differently.
-          if (failure?.exitCode === 2 && failure.stderr.trim() !== "") {
-            return { decision: "block", reason: failure.stderr.trim() };
-          }
-          if (relevantEvent === "PreToolUse") {
-            return {
-              decision: "block",
-              reason: `The PreToolUse hook '${hook.command}' could not run (${detail}), so the action was not allowed.`,
-            };
+              if (child.stdin) {
+                child.stdin.on("error", () => {});
+                child.stdin.end(jsonPayload);
+              }
+            });
+
+            if (translated) {
+              const result = applyWriteHookPolicy(translateWriteResult(stdout));
+              logger.info('Write hook result', result.hookVerdict ?? { status: result.decision });
+              if (result.decision === 'block' || result.decision === 'retry') return result;
+              accumulatedDecision = mergeWriteHookResult(accumulatedDecision, result);
+            } else if (stdout && stdout.trim()) {
+              let parsed: HookDecision;
+              try {
+                parsed = JSON.parse(stdout.trim()) as HookDecision;
+                if (relevantEvent === 'PreToolUse') parsed = normalizeHookVeto(parsed) ?? parsed;
+              } catch {
+                logger.error(
+                  `Command hook returned output that is not valid JSON for event ${relevantEvent}`,
+                  { event: relevantEvent, command: hook.command },
+                );
+                throw new Error("hook returned invalid JSON output");
+              }
+              if (parsed.decision === "block" || parsed.decision === "retry") {
+                return parsed;
+              }
+              if (parsed.feedback || parsed.hookSpecificOutput) {
+                accumulatedDecision = mergeWriteHookResult(accumulatedDecision, parsed);
+              }
+            }
+          } catch (err: unknown) {
+            const failure = err instanceof CommandHookFailure ? err : undefined;
+            if (translated) {
+              const parsed = translateWriteResult(failure?.stdout ?? '');
+              const result = failure?.timedOut ? hookUnknown('timeout')
+                : (parsed.decision === 'block' || parsed.decision === 'retry') && parsed.hookVerdict?.source !== 'adapter'
+                  ? parsed : hookUnknown('process_failed');
+              logger.warn('Write hook failed', result.hookVerdict ?? { status: result.decision });
+              return result;
+            }
+            const detail = err instanceof Error ? err.message : String(err);
+            logger.error(`Command hook failed for event ${relevantEvent}`, {
+              event: relevantEvent,
+              command: hook.command,
+              timeoutMs,
+              exitCode: failure?.exitCode,
+              timedOut: failure?.timedOut,
+              error: detail,
+            });
+            if (failure?.exitCode === 2 && failure.stderr.trim() !== "") {
+              return { decision: "block", reason: failure.stderr.trim() };
+            }
+            if (relevantEvent === "PreToolUse") {
+              return {
+                decision: "block",
+                reason: `The PreToolUse hook '${hook.command}' could not run (${detail}), so the action was not allowed.`,
+              };
+            }
           }
         }
+
       }
     }
     return accumulatedDecision ?? { decision: "allow" };

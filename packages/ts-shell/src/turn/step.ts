@@ -429,6 +429,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
         payload = endpointTurnBody(endpoint, {
           model: request.provider.model,
           provider: request.provider.provider,
+          sessionId: request.sessionId,
+          ...(request.provider.baseUrl ? { baseUrl: request.provider.baseUrl } : {}),
+          ...(shape.promptCacheKey !== undefined ? { supportsPromptCacheKey: shape.promptCacheKey } : {}),
           replayBinding,
           systemPrompt,
           messages: finalMessages,
