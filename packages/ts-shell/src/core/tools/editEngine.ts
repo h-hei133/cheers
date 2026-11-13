@@ -93,8 +93,9 @@ function levenshteinRatio(a: string, b: string, minRatio = 0): number {
   const short = a.length <= b.length ? a : b;
   const long = a.length <= b.length ? b : a;
   const maxLen = long.length;
-  if (minRatio > 0 && short.length / maxLen < minRatio) return 0.0;
-
+  if (minRatio > 0 && (short.length / maxLen < minRatio || 1.0 - (maxLen - short.length) / maxLen < minRatio)) {
+    return 0.0;
+  }
   const cols = short.length;
   let prev = new Int32Array(cols + 1);
   let curr = new Int32Array(cols + 1);
@@ -102,11 +103,15 @@ function levenshteinRatio(a: string, b: string, minRatio = 0): number {
 
   for (let i = 1; i <= maxLen; i++) {
     curr[0] = i;
+    let rowMin = i;
     const longChar = long.charCodeAt(i - 1);
     for (let j = 1; j <= cols; j++) {
       const cost = longChar === short.charCodeAt(j - 1) ? 0 : 1;
-      curr[j] = Math.min(prev[j]! + 1, curr[j - 1]! + 1, prev[j - 1]! + cost);
+      const val = Math.min(prev[j]! + 1, curr[j - 1]! + 1, prev[j - 1]! + cost);
+      curr[j] = val;
+      if (val < rowMin) rowMin = val;
     }
+    if (minRatio > 0 && 1.0 - rowMin / maxLen < minRatio) return 0.0;
     const tmp = prev;
     prev = curr;
     curr = tmp;

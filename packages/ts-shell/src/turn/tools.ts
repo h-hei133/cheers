@@ -1,6 +1,8 @@
 import path from 'node:path';
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import { boundText, TOOL_OUTPUT_LIMIT, type AgentTool, type AgentToolResult, type ToolHooks } from "../core/agent/tools.js";
+import { OutputAccumulator } from "../core/tools/outputAccumulator.js";
+import { DEFAULT_MAX_LINES } from "../core/tools/truncation.js";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { DoomLoopDetector } from "../core/query/doomLoopDetector.js";
 import { buildToolEscalationPrompt, evaluateToolPermissionScope, planModeBlock } from "../core/query/toolPolicy.js";
@@ -189,7 +191,15 @@ async function executeTool(
   onUpdate?: (partialResult: unknown) => void,
   executeNestedTool?: ToolExecutionContext['executeNestedTool'],
 ): Promise<AgentToolResult> {
-  let streamed = "";
+  let accumulator: OutputAccumulator | undefined;
+  let settled = false;
+  const snapshotStreamed = (): string | undefined => {
+    settled = true;
+    if (!accumulator) return undefined;
+    accumulator.finish();
+    const text = accumulator.snapshot().content;
+    return text.length > 0 ? text : undefined;
+  };
   const startedAt = Date.now();
   traceLogger.info("tool call started", { toolCallId, tool: tool.name, requestId: options.correlationId });
   try {
@@ -270,11 +280,12 @@ async function executeTool(
       ...(executeNestedTool ? { executeNestedTool } : {}),
       // unaffected, since the callback only fires if the tool calls it.
       onOutput: (chunk: string) => {
-        streamed = (streamed + chunk).slice(0, TOOL_OUTPUT_LIMIT + 1);
+        if (settled) return;
+        (accumulator ??= new OutputAccumulator({ maxLines: DEFAULT_MAX_LINES, maxBytes: TOOL_OUTPUT_LIMIT })).append(chunk);
         onUpdate?.(chunk);
       },
     });
-    const output = result.output ?? result.content ?? (streamed ? boundText(streamed) : undefined);
+    const output = result.output ?? result.content ?? snapshotStreamed();
     traceLogger.info("tool call completed", { toolCallId, tool: tool.name, requestId: options.correlationId, success: result.success, durationMs: Math.max(0, Date.now() - startedAt) });
     return {
       output: result.success ? output ?? "Success"
@@ -285,7 +296,10 @@ async function executeTool(
     };
   } catch (error) {
     traceLogger.warn("tool call failed", { toolCallId, tool: tool.name, requestId: options.correlationId, error: error instanceof Error ? error.message : String(error) });
-    return { output: [streamed ? boundText(streamed) : "", `Tool execution error: ${error instanceof Error ? error.message : String(error)}`].filter(Boolean).join("\n"), isError: true,
+    const errorLine = `Tool execution error: ${error instanceof Error ? error.message : String(error)}`;
+    const streamed = snapshotStreamed();
+    const prefix = streamed ? boundText(streamed, Math.max(0, TOOL_OUTPUT_LIMIT - errorLine.length - 2)) : "";
+    return { output: [prefix, errorLine].filter(Boolean).join("\n"), isError: true,
       ...(error instanceof EditOperationError ? { metadata: { operationId: error.operationId, status: error.status } } : {}) };
   } finally { discardToolCall(args); forgetFileAccess(args); }
 }

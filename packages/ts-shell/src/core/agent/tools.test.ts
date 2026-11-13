@@ -60,6 +60,16 @@ describe("boundText", () => {
   it("truncates long output to the limit", () => {
     expect(boundText("abcdef", 4)).toBe("abcd\n\n[... output truncated to 4 chars]");
   });
+
+  it("snaps multi-line truncation to newline boundaries without splitting surrogate pairs", () => {
+    const multiline = Array.from({ length: 20 }, (_, i) => `line-${String(i).padStart(2, "0")}: payload`).join("\n");
+    const bounded = boundText(multiline, 120);
+    const prefix = bounded.split("\n\n[... output truncated")[0]!;
+    expect(prefix.endsWith("payload")).toBe(true);
+    const emojiRun = "😀".repeat(40);
+    const emojiBounded = boundText(emojiRun, 5);
+    expect(emojiBounded.startsWith("😀😀\n")).toBe(true);
+  });
 });
 
 describe("createToolResultMessage", () => {

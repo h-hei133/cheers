@@ -297,4 +297,33 @@ describe('edit wire schema and argument normalization', () => {
     expect(single.messages[0]?.content).toContain('Updated note.txt');
     expect(fs.readFileSync(file, 'utf8')).toBe('ONE\nTWO\n');
   });
+
+  it('rejects empty edits arrays, mixed replacement modes, and extra fields without oneOf', async () => {
+    const file = path.join(root, 'note.txt');
+    fs.writeFileSync(file, 'ALPHA\n');
+    const hooks = new HookDispatcher();
+    const empty = await run({ path: 'note.txt', edits: [] }, hooks);
+    expect(empty.messages[0]?.content).toContain('Invalid tool arguments');
+    const mixed = await run({ path: 'note.txt', content: 'NEW\n', oldText: 'ALPHA', newText: 'BETA' }, hooks);
+    expect(mixed.messages[0]?.content).toContain('Invalid tool arguments');
+    const extra = await run({ path: 'note.txt', content: 'NEW\n', unknownField: 1 }, hooks);
+    expect(extra.messages[0]?.content).toContain('Invalid tool arguments');
+    expect(fs.readFileSync(file, 'utf8')).toBe('ALPHA\n');
+  });
+
+  it('rejects extra fields in edits mode and handles boundary fuzzy match ratio without float under-pruning', async () => {
+    const file = path.join(root, 'fuzzy.txt');
+    fs.writeFileSync(file, `START_ANCHOR\n${'a'.repeat(46)}${'b'.repeat(54)}\nEND_ANCHOR\n`);
+    const hooks = new HookDispatcher();
+    const decoy = await run({ path: 'fuzzy.txt', edits: [{ oldText: 'START_ANCHOR', newText: 'X' }], files: ['x'] }, hooks);
+    expect(decoy.messages[0]?.content).toContain('Invalid tool arguments');
+    const itemExtra = await run({ path: 'fuzzy.txt', edits: [{ oldText: 'START_ANCHOR', newText: 'X', extra: 1 }] }, hooks);
+    expect(itemExtra.messages[0]?.content).toContain('Invalid tool arguments');
+    const fuzzy = await run({
+      path: 'fuzzy.txt',
+      edits: [{ oldText: `START_ANCHOR\n${'a'.repeat(46)}${'X'.repeat(54)}\nEND_ANCHOR`, newText: 'START_ANCHOR\nREPLACED\nEND_ANCHOR' }],
+    }, hooks);
+    expect(fuzzy.messages[0]?.content).toContain('Updated fuzzy.txt');
+    expect(fs.readFileSync(file, 'utf8')).toBe('START_ANCHOR\nREPLACED\nEND_ANCHOR\n');
+  });
 });

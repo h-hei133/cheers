@@ -27,29 +27,14 @@ const wireSchema = {
           newText: { type: 'string', description: 'The text to put in its place.' },
         },
         required: ['oldText', 'newText'],
+        additionalProperties: false,
       },
     },
   },
   required: ['path', 'edits'],
+  additionalProperties: false,
 };
 
-const acceptedSchema = {
-  type: 'object',
-  properties: {
-    path: wireSchema.properties.path,
-    content: { type: 'string' },
-    edits: wireSchema.properties.edits,
-    oldText: { type: 'string' },
-    newText: { type: 'string' },
-    replaceAll: { type: 'boolean' },
-  },
-  required: ['path'],
-  oneOf: [
-    { required: ['content'], not: { anyOf: [{ required: ['edits'] }, { required: ['oldText'] }, { required: ['newText'] }, { required: ['replaceAll'] }] } },
-    { required: ['edits'], not: { anyOf: [{ required: ['content'] }, { required: ['oldText'] }, { required: ['newText'] }, { required: ['replaceAll'] }] } },
-    { required: ['oldText', 'newText'], not: { anyOf: [{ required: ['content'] }, { required: ['edits'] }] } },
-  ],
-};
 
 function isSingleEdit(value: unknown): value is { oldText: string; newText: string } {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value)
@@ -70,8 +55,42 @@ export function prepareEditArguments(args: Record<string, unknown>): Record<stri
   return args;
 }
 
+const CONTENT_MODE_KEYS = new Set(['path', 'content']);
+const LEGACY_REPLACE_KEYS = new Set(['path', 'oldText', 'newText', 'replaceAll']);
+
 function validateEditArguments(args: Record<string, unknown>): void {
-  validateToolArguments(acceptedSchema, prepareEditArguments(args));
+  const normalized = prepareEditArguments(args);
+  if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) {
+    throw new Error('Invalid tool arguments: expected an object.');
+  }
+  if (typeof normalized.path !== 'string' || normalized.path.length === 0) {
+    throw new Error('Invalid tool arguments: path must be a non-empty string.');
+  }
+  const hasContent = normalized.content !== undefined;
+  const hasEdits = normalized.edits !== undefined;
+  const hasLegacyReplace = normalized.oldText !== undefined || normalized.newText !== undefined || normalized.replaceAll !== undefined;
+  const modeCount = (hasContent ? 1 : 0) + (hasEdits ? 1 : 0) + (hasLegacyReplace ? 1 : 0);
+  if (modeCount !== 1) {
+    throw new Error('Invalid tool arguments for edit: provide path and edits: [{ oldText, newText }].');
+  }
+  if (hasEdits) {
+    validateToolArguments(wireSchema, normalized);
+    return;
+  }
+  if (hasContent) {
+    if (typeof normalized.content !== 'string' || Object.keys(normalized).some(key => !CONTENT_MODE_KEYS.has(key))) {
+      throw new Error('Invalid tool arguments for edit content replacement.');
+    }
+    return;
+  }
+  if (
+    typeof normalized.oldText !== 'string'
+    || typeof normalized.newText !== 'string'
+    || (normalized.replaceAll !== undefined && typeof normalized.replaceAll !== 'boolean')
+    || Object.keys(normalized).some(key => !LEGACY_REPLACE_KEYS.has(key))
+  ) {
+    throw new Error('Invalid tool arguments for edit replacement.');
+  }
 }
 
 export function createEditToolDefinition(service: ExecutionService): ToolDefinition<Promise<ToolPreparation>> {

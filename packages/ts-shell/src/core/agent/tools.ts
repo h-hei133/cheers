@@ -104,19 +104,39 @@ export function parseToolArgs(
   }
 }
 
+function safeSlicePrefix(text: string, end: number): string {
+  if (end <= 0) return "";
+  if (end >= text.length) return text;
+  const code = text.charCodeAt(end - 1);
+  const next = text.charCodeAt(end);
+  const safeEnd = code >= 0xd800 && code <= 0xdbff && next >= 0xdc00 && next <= 0xdfff ? end - 1 : end;
+  return text.slice(0, safeEnd);
+}
+
+function snapLinePrefix(text: string, limit: number): string {
+  const raw = safeSlicePrefix(text, limit);
+  if (limit < 64 || !text.includes("\n")) return raw;
+  const lastNewline = raw.lastIndexOf("\n");
+  if (lastNewline >= Math.floor(raw.length / 2)) {
+    return raw.slice(0, lastNewline);
+  }
+  return raw;
+}
+
 export function boundText(text: string, limit: number = TOOL_OUTPUT_LIMIT, notice?: unknown): string {
   if (text.length <= limit) {
     return text;
   }
   const marker = `\n\n[... output truncated to ${limit} chars]`;
   if (typeof notice !== "string" || notice.length === 0) {
-    return `${text.slice(0, limit)}${marker}`;
+    return `${snapLinePrefix(text, limit)}${marker}`;
   }
   // Producers identify the facts needed to recover an omitted page. Reserve
   // space for them, including the marker, without parsing the result's prose.
   const tail = boundedNotice(notice, Math.min(2000, Math.max(0, limit - marker.length - 2)));
   const suffix = `${marker}\n\n${tail}`;
-  return `${text.slice(0, Math.max(0, limit - suffix.length))}${suffix}`.slice(0, limit);
+  const headBudget = Math.max(0, limit - suffix.length);
+  return safeSlicePrefix(`${snapLinePrefix(text, headBudget)}${suffix}`, limit);
 }
 
 function boundedNotice(notice: string, limit: number): string {
