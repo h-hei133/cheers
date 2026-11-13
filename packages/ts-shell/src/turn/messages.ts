@@ -2,11 +2,29 @@ import { microcompactMessages } from '../core/query/microCompact.js';
 import type { AgentMessage } from '../core/agent/state.js';
 import { toChatMessages, type ChatMessage } from './prompt.js';
 
+export interface OutgoingProjectionOptions {
+  readonly pruneToolText?: boolean;
+  readonly keepRecentTurns?: number;
+  readonly maxOutputChars?: number;
+  readonly transformMessages?: (messages: readonly ChatMessage[]) => readonly ChatMessage[];
+}
+
 /** Identical source projection for dispatch and local preview. */
-export function outgoingProjection(messages: readonly AgentMessage[], bridge: boolean, pruneToolText = false) {
+export function outgoingProjection(
+  messages: readonly AgentMessage[],
+  bridge: boolean,
+  pruneOrOptions: boolean | OutgoingProjectionOptions = false,
+) {
+  const opts: OutgoingProjectionOptions = typeof pruneOrOptions === 'boolean'
+    ? { pruneToolText: pruneOrOptions }
+    : pruneOrOptions;
+  const pruneToolText = opts.pruneToolText ?? false;
   const converted = toChatMessages(messages);
-  const { messages: compacted, prunedCount, savedChars } = microcompactMessages(converted,
-    { keepRecentTurns: 3, maxOutputChars: 1000, pruneToolText });
+  const { messages: compacted, prunedCount, savedChars } = microcompactMessages(converted, {
+    pruneToolText,
+    ...(opts.keepRecentTurns !== undefined ? { keepRecentTurns: opts.keepRecentTurns } : {}),
+    ...(opts.maxOutputChars !== undefined ? { maxOutputChars: opts.maxOutputChars } : {}),
+  });
   let result: ChatMessage[] = compacted;
   if (bridge) {
     result = [];
@@ -17,21 +35,28 @@ export function outgoingProjection(messages: readonly AgentMessage[], bridge: bo
       result.push(message);
     }
   }
+  if (opts.transformMessages) {
+    result = [...opts.transformMessages(result)];
+  }
   return {
     messages: result,
     savedChars,
     // Count equality alone misses a removed orphan and an inserted result
     // cancelling each other. A source-indexed prefix needs every index intact.
-    indexAligned: converted.length === messages.length && result.length === compacted.length
+    indexAligned: !opts.transformMessages && converted.length === messages.length && result.length === compacted.length
       && converted.every((message, index) => message.role === messages[index]!.role
         && message.tool_call_id === messages[index]!.tool_call_id
         && message.content === messages[index]!.content),
-    sourceAligned: converted.length === messages.length && prunedCount === 0 && result.length === compacted.length,
+    sourceAligned: !opts.transformMessages && converted.length === messages.length && prunedCount === 0 && result.length === compacted.length,
   };
 }
 
-export function outgoingMessages(messages: readonly AgentMessage[], bridge: boolean, pruneToolText = false): readonly ChatMessage[] {
-  return outgoingProjection(messages, bridge, pruneToolText).messages;
+export function outgoingMessages(
+  messages: readonly AgentMessage[],
+  bridge: boolean,
+  pruneOrOptions: boolean | OutgoingProjectionOptions = false,
+): readonly ChatMessage[] {
+  return outgoingProjection(messages, bridge, pruneOrOptions).messages;
 }
 
 export const FINAL_STEP_MESSAGE =

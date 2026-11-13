@@ -8,6 +8,7 @@ import {
   resolveRetryPolicy,
   retryDelayMs,
   serverRequestedDelayMs,
+  shouldRetryResponse,
   waitBeforeRetry,
 } from "./retry.js";
 import { createStepFunction } from "../../turn/step.js";
@@ -308,4 +309,54 @@ describe("two layers retrying the same failure", () => {
 
 it.each(["refusal", "guardrail_intervened", "content_filter", "safety", "recitation"])("does not retry %s despite network wording", (reason) => {
   expect(isRetryableFailure("error", `Network error: ${reason}`)).toBe(false);
+});
+
+describe("x-should-retry header", () => {
+  it("overrides default HTTP status retryability in both directions across provider and turn layers", async () => {
+    expect(shouldRetryResponse("false", 503)).toBe(false);
+    expect(shouldRetryResponse("TRUE", 400)).toBe(true);
+    expect(shouldRetryResponse(null, 503)).toBe(true);
+
+    let falseCalls = 0;
+    const noRetryStep = createStepFunction({
+      provider: { apiKey: "k", baseUrl: "https://p.test/v1", model: "m" },
+      workspaceRoot: process.cwd(),
+      sessionId: "x-should-retry-false",
+      systemPrompt: "x",
+      tools: [],
+      fetchImpl: async () => {
+        falseCalls += 1;
+        return new Response("busy", { status: 503, headers: { "x-should-retry": "false" } });
+      },
+    });
+    await runAgentLoop(
+      [{ role: "user", content: "hi" }],
+      [],
+      { tools: [], streamStep: (ctx, sig) => noRetryStep(ctx, sig, {}, { allowTools: true }), retry: { enabled: true, maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 } },
+      () => {},
+      undefined,
+    );
+    expect(falseCalls).toBe(1);
+
+    let trueCalls = 0;
+    const forceRetryStep = createStepFunction({
+      provider: { apiKey: "k", baseUrl: "https://p.test/v1", model: "m" },
+      workspaceRoot: process.cwd(),
+      sessionId: "x-should-retry-true",
+      systemPrompt: "x",
+      tools: [],
+      fetchImpl: async () => {
+        trueCalls += 1;
+        return new Response("bad", { status: 400, headers: { "x-should-retry": "true" } });
+      },
+    });
+    await runAgentLoop(
+      [{ role: "user", content: "hi" }],
+      [],
+      { tools: [], streamStep: (ctx, sig) => forceRetryStep(ctx, sig, {}, { allowTools: true }), retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 } },
+      () => {},
+      undefined,
+    );
+    expect(trueCalls).toBe(2);
+  });
 });

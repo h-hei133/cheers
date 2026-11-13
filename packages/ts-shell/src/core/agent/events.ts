@@ -26,9 +26,8 @@ export type AgentLifecycleEvent =
   | { readonly type: "retry_attempt_start"; readonly attempt: number }
   | { readonly type: "message_start"; readonly message: AgentMessage }
   /**
-   * Streaming progress. Produced by the `streamStep` implementation pushing
-   * partial text straight to the sink; the loop itself only emits whole
-   * `message_start` / `message_end` pairs.
+   * Streaming progress. Emitted by the loop when `streamStep` reports partial
+   * updates via `onUpdate`, updating `AgentCore.state.streamingMessage` live.
    */
   | { readonly type: "message_update"; readonly message: AgentMessage; readonly delta?: string }
   | { readonly type: "message_end"; readonly message: AgentMessage }

@@ -32,6 +32,7 @@ import {
   finalStepMessages,
   hasToolHistory,
   TOOL_HISTORY_UNSUPPORTED_MESSAGE,
+  type OutgoingProjectionOptions,
 } from './messages.js';
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
 import { resolveRequestShape } from "../core/models/requestShape.js";
@@ -43,7 +44,7 @@ import { historyDigest } from '../context/request/identity.js';
 import { decodePromptMeasurement } from '../context/request/measurement.js';
 import {
   REFUSAL,
-  isRetryableStatus,
+  shouldRetryResponse,
   resolveRetryPolicy,
   exceedsRetryCeiling,
   retryDelayMs,
@@ -197,6 +198,7 @@ export interface StepRequest {
   readonly initialTools?: readonly ToolSchema[];
   readonly virtualModels?: VirtualModelRegistry;
   readonly historicalEfforts?: ReadonlyMap<number, string>;
+  readonly projection?: OutgoingProjectionOptions;
 }
 
 const OVERFLOW_MARKERS = ["context_length_exceeded", "context_overflow", "maximum context length", "prompt_too_long"];
@@ -355,7 +357,11 @@ export function createStepFunction(request: StepRequest): StepFunction {
       const modelEntry = catalogModel(request.catalog ?? [], activeProvider, activeModel, catalogAddress);
       const usageAttribution = captureUsageAttribution({ provider: activeProvider, model: activeModel,
         baseUrl: request.provider.baseUrl, rates: modelEntry?.cost });
-      const projection = outgoingProjection(messages, shape.assistantAfterToolResult, request.pruneToolText);
+      const projectionOptions = {
+        ...request.projection,
+        ...(request.pruneToolText !== undefined ? { pruneToolText: request.pruneToolText } : {}),
+      };
+      const projection = outgoingProjection(messages, shape.assistantAfterToolResult, projectionOptions);
       const finalMessages = finalStepMessages(
         projection.messages,
         allowTools,
@@ -380,14 +386,14 @@ export function createStepFunction(request: StepRequest): StepFunction {
         replayBinding,
       };
       const promptProjection = storedPromptProjection(messages, projection, options.promptSource,
-        shape.assistantAfterToolResult, promptIdentity.wireMessageCount, request.pruneToolText);
+        shape.assistantAfterToolResult, promptIdentity.wireMessageCount, projectionOptions);
       const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: activeProvider,
         model: activeModel, endpoint, schemaDigest, systemDigest,
         endpointId: usageAttribution.endpointId, historyDigest: messageDigest, wireHistoryDigest, replayBinding });
       const initial = promptTokensFor({ messages: budgetMessages, overhead, ...(measured ? { measured } : {}) });
       const usage = getSessionUsage(request.sessionId);
       const prefixIdentity = options.agentMode ? undefined
-        : measuredProjectionPrefix(messages, projection, usage, shape.assistantAfterToolResult, request.pruneToolText);
+        : measuredProjectionPrefix(messages, projection, usage, shape.assistantAfterToolResult, projectionOptions);
       const calibrated = prefixIdentity ? estimatePrompt(messages, overhead, promptIdentity, usage, {
         tokens: initial.tokens, method: 'characters/3.5', prefixIdentity,
         tailMessages: budgetMessages.slice(usage.lastPromptMessageCount),
@@ -555,6 +561,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         let requestedDelayMs: number | undefined;
         let transient = false;
         let retryableAtTurn = true;
+        let forceRetryAtTurn = false;
         let releaseNow = true;
         try {
           const body = JSON.stringify(payload);
@@ -617,7 +624,11 @@ export function createStepFunction(request: StepRequest): StepFunction {
             message: detail,
           });
           refusal = `Provider HTTP ${attemptResponse.status}: ${refusalClass}. Response details withheld.`;
-          transient = isRetryableStatus(attemptResponse.status);
+          const shouldRetryHeader = attemptResponse.headers.get("x-should-retry");
+          const normalizedRetryHeader = shouldRetryHeader?.trim().toLowerCase();
+          transient = shouldRetryResponse(shouldRetryHeader, attemptResponse.status);
+          if (normalizedRetryHeader === "false") retryableAtTurn = false;
+          else if (normalizedRetryHeader === "true") forceRetryAtTurn = true;
           if (transient) {
             requestedDelayMs = serverRequestedDelayMs(
               attemptResponse.headers.get("retry-after-ms"),
@@ -651,6 +662,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             ...(refusalClass
               ? failedStep(refusal, "", refusalClass, tried)
               : errorStep(refusal, tried)),
+            ...(forceRetryAtTurn ? { retryable: true } : {}),
             ...(requestedDelayMs !== undefined ? { requestedDelayMs } : {}),
           });
         }

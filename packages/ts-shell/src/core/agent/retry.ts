@@ -112,6 +112,20 @@ export function isRetryableStatus(status: number | undefined): boolean {
 }
 
 /**
+ * Determine whether an HTTP error response should be retried, honoring an
+ * explicit `x-should-retry` header before falling back to HTTP status rules.
+ */
+export function shouldRetryResponse(
+  shouldRetryHeader: string | null | undefined,
+  status: number | undefined,
+): boolean {
+  const normalized = shouldRetryHeader?.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return isRetryableStatus(status);
+}
+
+/**
  * The wait a server asked for, in milliseconds.
  *
  * Both spellings are accepted because providers use both: the numeric

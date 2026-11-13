@@ -66,3 +66,49 @@ it.each(['window', 'input'] as const)('refuses the full retained source at a kno
   expect(result.errorMessage).toContain(CONTEXT_OVERFLOW_PREFIX);
   expect(sends).toBe(0);
 });
+
+it('honors configurable keepRecentTurns, maxOutputChars, and transformMessages on outgoingProjection', () => {
+  const custom = outgoingProjection(history, false, {
+    pruneToolText: true,
+    keepRecentTurns: 6,
+    maxOutputChars: 100,
+    transformMessages: (msgs) => [...msgs, { role: 'user', content: 'transformed-tail' }],
+  });
+  expect(JSON.stringify(custom.messages)).toContain(fact);
+  expect(custom.messages.at(-1)).toEqual({ role: 'user', content: 'transformed-tail' });
+});
+
+it('threads projection options through storedPromptProjection and measuredProjectionPrefix', async () => {
+  const { storedPromptProjection, measuredProjectionPrefix } = await import('./measurement.js');
+  const { historyDigest } = await import('../context/request/identity.js');
+  const { getSessionUsage } = await import('../observability/usageTelemetry.js');
+  const opts = { pruneToolText: true, keepRecentTurns: 1, maxOutputChars: 120 };
+  const projection = outgoingProjection(history, false, opts);
+  const opening: AgentMessage = { role: 'user', content: 'env\n\nimplement' };
+  const stored: AgentMessage = { role: 'user', content: 'implement' };
+  const withSource = [opening, ...history.slice(1)];
+  const withSourceProj = outgoingProjection(withSource, false, opts);
+  const saved = storedPromptProjection(withSource, withSourceProj, { opening, stored }, false, withSource.length, opts);
+  expect(saved?.wireHistoryDigest).toBe(historyDigest(projection.messages));
+
+  const usage = {
+    ...getSessionUsage(sessionId),
+    lastPromptTokens: 1500,
+    lastPromptMessageCount: history.length,
+    lastPromptIdentity: {
+      provider: 'fixture',
+      model: 'model',
+      endpoint: 'openai-compatible',
+      endpointId: 'a'.repeat(64),
+      schemaDigest: 's',
+      systemDigest: 'sys',
+      historyDigest: historyDigest(history),
+      wireHistoryDigest: historyDigest(projection.messages),
+      wireMessageCount: history.length,
+      wireRewriteTokens: Math.ceil(projection.savedChars / 3.5),
+      replayBinding,
+    },
+  };
+  const prefix = measuredProjectionPrefix(history, projection, usage, false, opts);
+  expect(prefix?.wireHistoryDigest).toBe(historyDigest(projection.messages));
+});

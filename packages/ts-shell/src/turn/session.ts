@@ -120,6 +120,7 @@ export interface TurnOptions {
     readonly maxDelayMs?: number;
   };
   readonly prepareRequest?: AgentLoopConfig['prepareRequest'];
+  readonly finishTurn?: AgentLoopConfig['finishTurn'];
   /**
    * Keeping this run's prompt cached between requests.
    *
@@ -231,6 +232,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     // the request it predicts on the same question.
     toolsAllowedOnNextStep: () => projection.stepCount + 1 < options.maxSteps,
     prepareNextStep: compaction?.beforeStep,
+    ...(options.finishTurn ? { finishTurn: options.finishTurn } : {}),
     ...(options.prepareRequest ? { prepareRequest: options.prepareRequest } : {}),
   });
 

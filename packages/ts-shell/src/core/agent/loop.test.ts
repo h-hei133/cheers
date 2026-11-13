@@ -574,4 +574,85 @@ describe("step retry", () => {
     expect(reasons).toEqual(["user", "retry"]);
     expect(produced.at(-1)?.content).toBe("fallback");
   });
+
+  it("emits streaming message_start and message_update events before message_end and supports finishTurn continuation/end", async () => {
+    const events: Array<{ type: string; content?: unknown; delta?: string }> = [];
+    let stepCount = 0;
+    await runAgentLoop(
+      [userMessage("stream it")],
+      [],
+      {
+        finishTurn: () => (stepCount === 1 ? { action: "continue" } : { action: "end" }),
+        streamStep: async (_messages, _signal, request) => {
+          stepCount += 1;
+          if (stepCount === 1) {
+            request?.onUpdate?.({ text: "hel", delta: "hel" });
+            request?.onUpdate?.({ text: "hello", delta: "lo" });
+            return { text: "hello", toolCalls: [], stopReason: "stop" };
+          }
+          return { text: "continued", toolCalls: [], stopReason: "stop" };
+        },
+      },
+      (event) => {
+        if (event.type === "message_start" || event.type === "message_update" || event.type === "message_end") {
+          events.push({ type: event.type, content: event.message.content, delta: "delta" in event ? event.delta : undefined });
+        }
+      },
+      undefined,
+    );
+    expect(stepCount).toBe(2);
+    expect(events.filter((e) => e.type === "message_start")).toHaveLength(3);
+    expect(events.filter((e) => e.type === "message_update")).toEqual([
+      { type: "message_update", content: "hello", delta: "lo" },
+    ]);
+    expect(events.filter((e) => e.type === "message_end" && e.content === "hello")).toHaveLength(1);
+  });
+
+  it("does not retry or emit duplicate message_end after streaming onUpdate", async () => {
+    const events: string[] = [];
+    let attempts = 0;
+    await runAgentLoop(
+      [userMessage("stream fail")],
+      [],
+      {
+        retry: { enabled: true, maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 },
+        streamStep: async (_messages, _signal, request) => {
+          attempts += 1;
+          request?.onUpdate?.({ text: "partial", delta: "partial" });
+          return { text: "partial", toolCalls: [], stopReason: "error", errorMessage: "Provider HTTP 503: temporary" };
+        },
+      },
+      (event) => {
+        if (event.type === "message_start" || event.type === "message_end" || event.type === "retry_scheduled") {
+          events.push(`${event.type}:${"message" in event ? event.message.role : ""}`);
+        }
+      },
+      undefined,
+    );
+    expect(attempts).toBe(1);
+    expect(events).toEqual([
+      "message_start:user",
+      "message_end:user",
+      "message_start:assistant",
+      "message_end:assistant",
+    ]);
+  });
+
+  it("reports willContinue: false on turn_end when shouldStopAfterStep overrides finishTurn continue", async () => {
+    const turnEnds: Array<{ willContinue?: boolean }> = [];
+    await runAgentLoop(
+      [userMessage("stop override")],
+      [],
+      {
+        finishTurn: () => ({ action: "continue" }),
+        shouldStopAfterStep: () => true,
+        streamStep: async () => ({ text: "done", toolCalls: [], stopReason: "stop" }),
+      },
+      (event) => {
+        if (event.type === "turn_end") turnEnds.push({ willContinue: event.willContinue });
+      },
+      undefined,
+    );
+    expect(turnEnds).toEqual([{ willContinue: false }]);
+  });
 });

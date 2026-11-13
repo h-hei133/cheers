@@ -77,14 +77,39 @@ export function createTurnRequest(
     };
     let budgetSummary = false;
     const toolsAllowed = projection.stepCount < options.maxSteps;
+    let streamedText = "";
+    let streamedReasoning = "";
+    const emitStreamUpdate = (delta?: string) => {
+      request?.onUpdate?.({
+        text: streamedText,
+        ...(streamedReasoning ? { reasoning: streamedReasoning } : {}),
+        ...(delta !== undefined ? { delta } : {}),
+      });
+    };
     let step = await options.step(
       messages,
       signal,
       {
-        onText: (delta) => channel.push({ type: "message.delta", role: "coder", delta }),
-        onReasoning: (delta) => channel.push({ type: "reasoning.delta", role: "coder", delta }),
-        onReasoningReplace: (text) => channel.push({ type: "reasoning.replace", role: "coder", text }),
-        onReplace: (text) => channel.push({ type: "message.replace", role: "coder", text }),
+        onText: (delta) => {
+          streamedText += delta;
+          channel.push({ type: "message.delta", role: "coder", delta });
+          emitStreamUpdate(delta);
+        },
+        onReasoning: (delta) => {
+          streamedReasoning += delta;
+          channel.push({ type: "reasoning.delta", role: "coder", delta });
+          emitStreamUpdate();
+        },
+        onReasoningReplace: (text) => {
+          streamedReasoning = text;
+          channel.push({ type: "reasoning.replace", role: "coder", text });
+          emitStreamUpdate();
+        },
+        onReplace: (text) => {
+          streamedText = text;
+          channel.push({ type: "message.replace", role: "coder", text });
+          emitStreamUpdate();
+        },
       },
       {
         allowTools: toolsAllowed,

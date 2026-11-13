@@ -55,6 +55,8 @@ export interface AssistantStep {
   readonly retriesExhausted?: boolean;
   /** Server-requested wait, carried when this loop owns the remaining retries. */
   readonly requestedDelayMs?: number;
+  /** Explicit server override (`x-should-retry: true`) when HTTP status alone would not retry. */
+  readonly retryable?: boolean;
   /**
    * The working out this step came with, and the provider's signature over it.
    *
@@ -109,6 +111,10 @@ export interface NextStepSnapshot {
 export interface NextStepUpdate {
   readonly messages?: readonly AgentMessage[];
 }
+export interface FinishTurnDecision {
+  readonly action: "continue" | "end";
+}
+
 
 export interface AgentLoopConfig {
   /** A function resolves the pool again for each batch, after discovery loaded tools. */
@@ -145,6 +151,10 @@ export interface AgentLoopConfig {
    * own default fills the rest.
    */
   readonly retry?: Partial<RetryPolicy>;
+  readonly finishTurn?: (
+    snapshot: NextStepSnapshot,
+    signal?: AbortSignal,
+  ) => FinishTurnDecision | undefined | Promise<FinishTurnDecision | undefined>;
   readonly prepareRequest?: (
     input: {
       readonly reason: 'user' | 'continuation' | 'retry';
@@ -157,7 +167,14 @@ export interface AgentLoopConfig {
   readonly streamStep: (
     messages: readonly AgentMessage[],
     signal?: AbortSignal,
-    request?: { readonly requestId: string },
+    request?: {
+      readonly requestId: string;
+      readonly onUpdate?: (partial: {
+        readonly text?: string;
+        readonly reasoning?: string;
+        readonly delta?: string;
+      }) => void;
+    },
   ) => Promise<AssistantStep>;
 }
 
@@ -209,34 +226,59 @@ async function retryStep(
   context: readonly AgentMessage[],
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
-): Promise<AssistantStep> {
+): Promise<{ readonly step: AssistantStep; readonly emittedStart: boolean }> {
   const policy = resolveRetryPolicy("turn", config.retry ?? {});
-  const request = Object.freeze({ requestId: randomUUID() });
+  const baseRequestId = randomUUID();
   let attempt = 0;
   for (;;) {
     const reason = attempt > 0 ? 'retry' : context.at(-1)?.role === 'user' ? 'user' : 'continuation';
     const prepared = await config.prepareRequest?.({ reason, attempt, messages: context }, signal);
     const activeStep = prepared?.streamStep ?? config.streamStep;
     const activeMessages = prepared?.messages ?? context;
+    let emittedStart = false;
+    let emitChain: Promise<void> = Promise.resolve();
+    const request = Object.freeze({
+      requestId: baseRequestId,
+      onUpdate: (partial: { readonly text?: string; readonly reasoning?: string; readonly delta?: string }) => {
+        const partialMessage: AgentMessage = {
+          role: "assistant",
+          content: partial.text ?? "",
+          ...(partial.reasoning ? { reasoning: { text: partial.reasoning } } : {}),
+        };
+        const isFirst = !emittedStart;
+        emittedStart = true;
+        emitChain = emitChain.then(async () => {
+          if (isFirst) {
+            await emit({ type: "message_start", message: partialMessage });
+          } else {
+            await emit({
+              type: "message_update",
+              message: partialMessage,
+              ...(partial.delta !== undefined ? { delta: partial.delta } : {}),
+            });
+          }
+        });
+      },
+    });
     const step = await activeStep(activeMessages, signal, request);
-    // A step whose own layer already retried is not retried again here. The
-    // provider layer sees the status and the server's delay, so it is the one
-    // that knows whether asking again is worth anything; by the time it gives up
-    // the answer is no. Retrying anyway multiplies the two counts instead of
-    // choosing between them.
-    if (step.retriesExhausted) return step;
-    if (!isRetryableFailure(step.stopReason, step.errorMessage)) return step;
+    await emitChain;
+    // Once partial output has reached listeners, or the step's own layer
+    // already retried, do not start another attempt for the same step.
+    if (emittedStart || step.retriesExhausted) return { step, emittedStart };
+    if (step.retryable !== true && !isRetryableFailure(step.stopReason, step.errorMessage)) return { step, emittedStart };
     attempt += 1;
-    if (attempt > policy.maxRetries) return step;
+    if (attempt > policy.maxRetries) return { step, emittedStart };
     if (exceedsRetryCeiling(policy, step.requestedDelayMs)) {
       const seconds = Math.ceil(step.requestedDelayMs! / 1000);
-      return { ...step, errorMessage: `Provider asked for a ${seconds}s wait before retrying, which is longer than this run will wait. ${step.errorMessage ?? ""}`.trim() };
+      return {
+        step: { ...step, errorMessage: `Provider asked for a ${seconds}s wait before retrying, which is longer than this run will wait. ${step.errorMessage ?? ""}`.trim() },
+        emittedStart,
+      };
     }
-
     recordCount("provider.retries", 1);
     const delayMs = retryDelayMs(policy, attempt, step.requestedDelayMs);
     await emit({ type: "retry_scheduled", attempt, maxAttempts: policy.maxRetries, delayMs });
-    if (!(await waitBeforeRetry(delayMs, signal))) return step;
+    if (!(await waitBeforeRetry(delayMs, signal))) return { step, emittedStart };
     await emit({ type: "retry_attempt_start", attempt });
   }
 }
@@ -306,9 +348,11 @@ async function driveLoop(
     }
   }
 
+  let explicitContinuation = false;
   while (true) {
     let hasMoreToolCalls = true;
-    while (hasMoreToolCalls || pending.length > 0) {
+    while (hasMoreToolCalls || pending.length > 0 || explicitContinuation) {
+      explicitContinuation = false;
       if (completedStep) {
         const update = await config.prepareNextStep?.(completedStep, signal);
         if (update?.messages) {
@@ -329,7 +373,7 @@ async function driveLoop(
       }
       pending = [];
 
-      const step = await retryStep(config, context, signal, emit);
+      const { step, emittedStart } = await retryStep(config, context, signal, emit);
       const assistant: AgentMessage = {
         role: "assistant",
         content: step.text,
@@ -350,12 +394,15 @@ async function driveLoop(
         ...(step.origin ? { origin: step.origin } : {}),
         ...(step.promptMeasurement ? { promptMeasurement: step.promptMeasurement } : {}),
       };
-      await emit({ type: "message_start", message: assistant });
+      if (!emittedStart) {
+        await emit({ type: "message_start", message: assistant });
+      }
       await emit({ type: "message_end", message: assistant });
       context.push(assistant);
       produced.push(assistant);
 
       if (step.stopReason === "error" || step.stopReason === "aborted") {
+        await config.finishTurn?.({ message: assistant, toolResults: [], messages: [...context] }, signal);
         await emit({ type: "turn_end", message: assistant, toolResults: [] });
         await emit({ type: "agent_end", messages: [...produced] });
         return;
@@ -390,24 +437,34 @@ async function driveLoop(
         produced.push(result);
       }
       if (signal?.aborted) {
+        await config.finishTurn?.({ message: assistant, toolResults, messages: [...context] }, signal);
         await emit({ type: "turn_end", message: assistant, toolResults });
         await emit({ type: "agent_end", messages: [...produced] });
         return;
       }
 
-      await emit({ type: "turn_end", message: assistant, toolResults, willContinue: hasMoreToolCalls });
       const snapshot: NextStepSnapshot = { message: assistant, toolResults, messages: [...context] };
-      // A step that reached the run's limit is answered with a closing
-      // instruction instead of tools, so the next request carries one more
-      // message than the conversation does.
+      const turnDecision = await config.finishTurn?.(snapshot, signal);
       const stopping = await config.shouldStopAfterStep?.(snapshot);
-      const toolsAllowed = config.toolsAllowedOnNextStep?.();
-      completedStep = { ...snapshot, ...(toolsAllowed !== undefined ? { toolsAllowed } : {}) };
-      if (stopping) {
+      const endRequested = turnDecision?.action === "end" || Boolean(stopping);
+      const continueRequested = turnDecision?.action === "continue" && !endRequested;
+      await emit({
+        type: "turn_end",
+        message: assistant,
+        toolResults,
+        willContinue: endRequested ? false : (hasMoreToolCalls || continueRequested),
+      });
+      if (endRequested) {
         await emit({ type: "agent_end", messages: [...produced] });
         return;
       }
+      // A step that reached the run's limit is answered with a closing
+      // instruction instead of tools, so the next request carries one more
+      // message than the conversation does.
+      const toolsAllowed = config.toolsAllowedOnNextStep?.();
+      completedStep = { ...snapshot, ...(toolsAllowed !== undefined ? { toolsAllowed } : {}) };
       pending = await pollSteering(config);
+      explicitContinuation = continueRequested && !hasMoreToolCalls && pending.length === 0;
     }
 
     const followUp = await pollFollowUp(config);
@@ -417,7 +474,6 @@ async function driveLoop(
     }
     break;
   }
-
   await emit({ type: "agent_end", messages: [...produced] });
 }
 
