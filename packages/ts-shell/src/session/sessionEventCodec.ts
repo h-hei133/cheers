@@ -118,7 +118,16 @@ export type TranscriptEvent =
   | CompactionTranscriptEntry
   | { type: 'compaction-commit'; id: string; compactionId: string; digest: string; timestamp: string }
   | ReportTranscriptEntry
-  | BranchSummaryTranscriptEntry;
+  | BranchSummaryTranscriptEntry
+  | CodemodeStoreTranscriptEntry;
+
+export interface CodemodeStoreTranscriptEntry {
+  readonly type: "codemode-store";
+  readonly id?: string;
+  readonly sourceEntryId?: string;
+  readonly entries: Readonly<Record<string, string | null>>;
+  readonly timestamp: string;
+}
 
 /**
  * The transcript format this build writes.

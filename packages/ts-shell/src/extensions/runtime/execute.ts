@@ -10,13 +10,14 @@ import type { VersionRecord } from '../model.js';
 import type { ToolExecutionContext, ToolExecutionResult } from '../../tools/types.js';
 import type { DenyRule } from '../../core/shell/approval/deny.js';
 import { sourceFile } from '../registry/sources.js';
-import { executeInProcessScript, type InProcessExtensionInvoke } from './inProcessLoader.js';
+import { executeInProcessScript, type ExtensionHostBridge, type InProcessExtensionInvoke } from './inProcessLoader.js';
 export interface ExecutionHost {
   readonly file: string;
   readonly root: string;
   readonly check: () => void;
   readonly denyRules: () => readonly DenyRule[];
   readonly execution?: ExecutionService;
+  readonly extensionHost?: ExtensionHostBridge;
 }
 export function scriptArgs(value: unknown): string[] {
   if (value === undefined) return [];
@@ -41,6 +42,7 @@ export async function executeScript(host: ExecutionHost, record: VersionRecord, 
       denyRules: host.denyRules,
       context,
       ...(invoke ? { invoke } : {}),
+      ...(host.extensionHost ? { host: host.extensionHost } : {}),
     });
   }
   if (process.platform !== 'linux') throw new Error('Isolated extension script execution currently requires Linux bubblewrap.');

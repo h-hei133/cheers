@@ -5,6 +5,7 @@ import type { CommandDefinition } from '../commands/types.js';
 import type { Skill } from '../skills/skillLoader.js';
 import type { SkillDiscovery } from '../skills/discovery.js';
 import type { ToolDefinition } from '../../tools/types.js';
+import { registerExtensionEventProvider } from '../hooks/extensionBridge.js';
 
 /** Neutral session composition port. The feature owner retains lifecycle and authority. */
 export interface CatalogContribution {
@@ -13,6 +14,7 @@ export interface CatalogContribution {
   readonly commands: readonly CommandDefinition[];
   readonly tools: readonly ToolDefinition[];
   readonly skills: (signal?: AbortSignal, discovery?: SkillDiscovery) => readonly Skill[] | Promise<readonly Skill[]>;
+  readonly onEvent?: (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => Promise<unknown>;
 }
 const entries = new Set<CatalogContribution>();
 const changes = createStateChanges();
@@ -31,3 +33,7 @@ export function catalogContributions(root = process.cwd(), sessionId?: string): 
   return sessionId === undefined && new Set(selected.map(entry => entry.sessionId)).size > 1 ? [] : selected;
 }
 export function observeCatalogContributions(root: string | undefined, changed: () => void): () => void { return changes.subscribe(root === undefined ? '*' : path.resolve(root), changed); }
+
+registerExtensionEventProvider((root, sessionId) =>
+  catalogContributions(root, sessionId).flatMap(entry => (entry.onEvent ? [entry.onEvent] : [])),
+);

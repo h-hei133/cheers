@@ -20,6 +20,7 @@ export interface RegistrationHost {
   readonly current: (record: PackageRecord, grant: string) => void;
   readonly withheld: (name: string) => void;
   readonly tool: (record: PackageRecord, script: string, grant: string, name: string) => ToolDefinition;
+  readonly event?: (record: PackageRecord, script: string, event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => Promise<unknown>;
 }
 export function extensionToolName(packageName: string, tool: string): string { return `ext_${packageName.replace(/-/g, '_')}_${tool}`; }
 export function registerPackage(host: RegistrationHost, record: PackageRecord): () => void {
@@ -60,5 +61,17 @@ export function registerPackage(host: RegistrationHost, record: PackageRecord): 
       return cached;
     } catch (error) { reader.rethrow(error); host.withheld(record.name); return []; }
   };
-  return registerCatalogContribution({ root: host.root, sessionId: host.sessionId, commands, tools, skills });
+  const jsScripts = manifest.scripts.filter(script => /\.(?:js|mjs|ts)$/.test(script.path) && activation.grants.includes(`script:${script.name}`));
+  const onEvent = jsScripts.length && host.event
+    ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => {
+        let currentPayload = payload;
+        for (const script of jsScripts) {
+          host.current(record, `script:${script.name}`);
+          const next = await host.event!(record, script.name, event, currentPayload, aliases, signal);
+          if (next !== undefined) currentPayload = next;
+        }
+        return currentPayload;
+      }
+    : undefined;
+  return registerCatalogContribution({ root: host.root, sessionId: host.sessionId, commands, tools, skills, ...(onEvent ? { onEvent } : {}) });
 }

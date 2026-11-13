@@ -5,7 +5,7 @@ import { canonical } from './registry/validation.js';
 import { rootIdentity, rootSignature } from './lifecycle/grants.js';
 import { registerPackage } from './runtime/registration.js';
 import { executeScript, scriptArgs, type ExecutionHost } from './runtime/execute.js';
-import type { InProcessExtensionInvoke } from './runtime/inProcessLoader.js';
+import type { ExtensionHostBridge, InProcessExtensionInvoke } from './runtime/inProcessLoader.js';
 import { runPreparedTool } from '../turn/invoke.js';
 import type { ToolGateOptions } from '../turn/tools.js';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../tools/types.js';
@@ -25,6 +25,7 @@ export interface ExtensionServiceOptions {
   readonly offline: () => boolean;
   readonly denyRules: () => readonly DenyRule[];
   readonly execution?: ExecutionHost['execution'];
+  readonly extensionHost?: ExtensionHostBridge;
   readonly assertWorkspace: (write: boolean) => void;
   readonly assertSourceAccess?: (absolute: string) => void;
 }
@@ -71,7 +72,8 @@ export class ExtensionService implements LifecycleHost {
           if (activation?.enabled && (activation.workspaceIdentity !== rootSignature(this.root) || sourceIdentity(selectedSource(record.active.source)) !== record.active.sourceIdentity)) throw new Error('Extension activation identity changed.');
           this.registrations.push(registerPackage({ root: this.root, sessionId: this.sessionId, file: this.store.file, run: (tool, args) => this.runTool(tool, args),
           withheld: name => { const message = `${name}: prompt contribution withheld because its identity, grants, files or parsing are invalid.`; if (!this.errors.includes(message)) this.errors.push(message); },
-          current: (selected, grant) => this.current(selected, grant, epoch), tool: (selected, script, grant, name) => this.tool(selected, script, grant, name) }, record)); }
+          current: (selected, grant) => this.current(selected, grant, epoch), tool: (selected, script, grant, name) => this.tool(selected, script, grant, name),
+          event: (selected, script, eventName, payload, aliases, signal) => this.dispatchEvent(selected, script, eventName, payload, aliases, epoch, signal) }, record)); }
         catch { this.errors.push(`${record.name}: registration withheld because its identity, permissions, files or capability names are invalid.`); }
       }
     } catch { this.errors.push('Extension state unavailable; all capabilities withheld.'); }
@@ -135,7 +137,7 @@ export class ExtensionService implements LifecycleHost {
         : grant.startsWith('command:')
           ? { kind: 'command', name: grant.slice(8), args }
           : undefined;
-      const result = await executeScript({ file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution }, record.active, script, args, current, { ...context, abortSignal: signal }, invoke);
+      const result = await executeScript({ file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution, extensionHost: this.options.extensionHost }, record.active, script, args, current, { ...context, abortSignal: signal }, invoke);
       if (result.metadata?.cleanup === 'unknown') {
         this.drainUnknown = true; this.processCleanupUnknown = true; this.epoch++;
         this.registrations.splice(0).forEach(unregister => unregister());
@@ -177,5 +179,27 @@ export class ExtensionService implements LifecycleHost {
       const admission = () => { if (signal.aborted) return 'Extension execution cancelled.'; try { this.check(); return gate.admission?.(); } catch { return 'Extension execution authority changed.'; } };
       return (await runPreparedTool(tool, { args }, { ...gate, admission, permissionScope: 'ask' }, signal, undefined, 'Extension execution')).output;
     });
+  }
+  private async dispatchEvent(record: PackageRecord, script: string, event: string, payload: unknown, aliases: readonly string[] | undefined, epoch: number, signal?: AbortSignal): Promise<unknown> {
+    const current = () => {
+      this.current(record, `script:${script}`, epoch);
+      this.options.assertWorkspace(record.active.manifest.permissions.workspace === 'write');
+    };
+    current();
+    return this.calls.run(async runSignal => {
+      const result = await executeScript(
+        { file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution, extensionHost: this.options.extensionHost },
+        record.active,
+        script,
+        [],
+        current,
+        { taskId: 'extension-event', workspaceRoot: this.root, sessionId: this.sessionId, abortSignal: runSignal },
+        { kind: 'event', event, ...(aliases ? { aliases } : {}), payload },
+      );
+      current();
+      const raw = typeof result.metadata?.eventOutput === 'string' ? result.metadata.eventOutput : '';
+      if (!raw.trim()) return undefined;
+      try { return JSON.parse(raw); } catch { return undefined; }
+    }, signal);
   }
 }

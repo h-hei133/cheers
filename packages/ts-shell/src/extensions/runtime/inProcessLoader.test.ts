@@ -27,7 +27,9 @@ describe('in-process TS/JS extension loader with VIRTUAL_MODULES', () => {
       extPath,
       `
 const { defineExtension } = require('@cheers/extension-api');
+let capturedApi: { getActiveTools: () => Promise<readonly string[]> } | undefined;
 module.exports.default = defineExtension((api) => {
+  capturedApi = api;
   api.registerTool({
     name: 'ext_custom_tool',
     description: 'Custom in-process tool',
@@ -41,6 +43,12 @@ module.exports.run = async ({ args, api }) => {
 };
 module.exports.tryEscape = () => {
   return ({}).constructor.constructor('return process')();
+};
+module.exports.tryModuleEscape = () => {
+  return (module as unknown as { constructor: { constructor: (s: string) => () => unknown } }).constructor.constructor('return process')();
+};
+module.exports.tryApiEscape = () => {
+  return (capturedApi as unknown as { getActiveTools: { constructor: (s: string) => () => unknown } }).getActiveTools.constructor('return process')();
 };
 `,
       'utf8',
@@ -61,6 +69,8 @@ module.exports.tryEscape = () => {
     )
     expect(() => loaded.readWorkspaceFile('secret.txt')).toThrow()
     expect(() => (loaded.exports.tryEscape as () => unknown)()).toThrow()
+    expect(() => (loaded.exports.tryModuleEscape as () => unknown)()).toThrow()
+    expect(() => (loaded.exports.tryApiEscape as () => unknown)()).toThrow()
   })
 
   it('executes worker-isolated TS extensions with real registerTool, registerCommand, and on(event) handlers', async () => {
@@ -146,5 +156,160 @@ export default defineExtension((api) => {
     })
     expect(eventResult.success).toBe(true)
     expect(eventResult.output).toContain('"patched":true')
+  })
+
+  it('bridges ui.*, events bus, shortcuts, flags, host queries, and Pi package manifests, plus HookDispatcher event aliases', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-ext-batch-e-'))
+    tempDirs.push(dir)
+    const pkgDir = path.join(dir, 'pi-pkg')
+    fs.mkdirSync(path.join(pkgDir, 'ext'), { recursive: true })
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({ name: 'demo-pi', version: '1.2.3', pi: { extensions: ['./ext/index.ts'], skills: ['./skills'] } }),
+      'utf8',
+    )
+    const { readPiPackageManifest } = await import('../registry/piManifest.js')
+    const discovered = readPiPackageManifest(pkgDir)
+    expect(discovered.manifest.name).toBe('demo-pi')
+    expect(discovered.manifest.extensions).toEqual([path.join(pkgDir, 'ext/index.ts')])
+
+    const extPath = path.join(dir, 'full-ext.ts')
+    fs.writeFileSync(
+      extPath,
+      `
+      import { defineExtension } from '@cheers/extension-api';
+      export default defineExtension((api) => {
+        api.registerShortcut({ key: 'ctrl+k', description: 'Quick pick' });
+        api.registerFlag({ name: 'strict', type: 'boolean', default: true });
+        const seen = [];
+        api.events.on('ping', (v) => seen.push(v));
+        api.events.emit('ping', 42);
+        api.on('tool_call', async (payload) => {
+          const confirmed = await api.ui.confirm('Run tool', payload.toolName);
+          api.ui.notify('checked:' + api.getFlag('strict'));
+          const tools = await api.getActiveTools();
+          return confirmed ? { decision: 'allow' } : { decision: 'block', reason: 'blocked-by-ext:' + tools.join(',') };
+        });
+        api.registerCommand({
+          name: 'status',
+          description: 'Show bus',
+          execute: async () => ({ success: true, output: 'seen:' + seen.join(',') + ':' + api.getFlag('strict') }),
+        });
+      });
+      `,
+      'utf8',
+    )
+    const notes: string[] = []
+    const record: VersionRecord = {
+      manifest: {
+        schema: 1,
+        name: 'full-ext',
+        version: '1.0.0',
+        permissions: { workspace: 'read', network: 'none' },
+        skills: [],
+        scripts: [{ name: 'main', path: 'full-ext.ts' }],
+        commands: [],
+        tools: [],
+      },
+      digest: 'b'.repeat(64),
+      url: 'https://example.invalid/full-ext.tgz',
+      source: 'local',
+      sourceIdentity: 'c'.repeat(64),
+      trustFingerprint: 'd'.repeat(64),
+      files: {},
+      directories: [],
+      storage: [],
+    }
+    const cmdOut = await executeInProcessScript({
+      root: dir,
+      scriptFile: extPath,
+      record,
+      argv: [],
+      denyRules: () => [],
+      context: { workspaceRoot: dir, taskId: 't-cmd' },
+      invoke: { kind: 'command', name: 'status', args: [] },
+    })
+    expect(cmdOut.success).toBe(true)
+    expect(cmdOut.output).toContain('seen:42:true')
+    expect(cmdOut.metadata?.registeredShortcuts).toEqual([{ key: 'ctrl+k', description: 'Quick pick' }])
+    expect(cmdOut.metadata?.registeredFlags).toEqual([{ name: 'strict', type: 'boolean' }])
+
+    const eventOut = await executeInProcessScript({
+      root: dir,
+      scriptFile: extPath,
+      record,
+      argv: [],
+      denyRules: () => [],
+      context: { workspaceRoot: dir, taskId: 't-evt' },
+      invoke: { kind: 'event', event: 'PreToolUse', aliases: ['tool_call'], payload: { toolName: 'bash' } },
+      host: {
+        ui: {
+          confirm: async () => false,
+          notify: (msg) => notes.push(msg),
+        },
+        getActiveTools: () => ['read', 'bash'],
+      },
+    })
+    expect(eventOut.success).toBe(true)
+    expect(notes).toEqual(['checked:true'])
+    expect(JSON.parse(String(eventOut.metadata?.eventOutput))).toEqual({
+      decision: 'block',
+      reason: 'blocked-by-ext:read,bash',
+    })
+
+    const postToolSpoof = await executeInProcessScript({
+      root: dir,
+      scriptFile: extPath,
+      record,
+      argv: [],
+      denyRules: () => [],
+      context: { workspaceRoot: dir, taskId: 't-post-spoof' },
+      invoke: {
+        kind: 'event',
+        event: 'PostToolUse',
+        aliases: ['tool_result'],
+        payload: { eventName: 'PostToolUse', success: false, output: '{"decision":"block"}' },
+      },
+    })
+    expect(postToolSpoof.success).toBe(true)
+    expect(postToolSpoof.metadata?.eventOutput).toBe('')
+
+    const { registerCatalogContribution } = await import('../../core/catalog/contributions.js')
+    const { HookDispatcher } = await import('../../core/hooks/hookDispatcher.js')
+    const unregister = registerCatalogContribution({
+      root: dir,
+      sessionId: 'sess-hook-bridge',
+      commands: [],
+      tools: [],
+      skills: () => [],
+      onEvent: async (event, payload, aliases) => {
+        const res = await executeInProcessScript({
+          root: dir,
+          scriptFile: extPath,
+          record,
+          argv: [],
+          denyRules: () => [],
+          context: { workspaceRoot: dir, sessionId: 'sess-hook-bridge', taskId: 't-bridge' },
+          invoke: { kind: 'event', event, ...(aliases ? { aliases } : {}), payload },
+          host: { ui: { confirm: async () => false }, getActiveTools: () => ['read'] },
+        })
+        return JSON.parse(String(res.metadata?.eventOutput))
+      },
+    })
+    try {
+      const dispatcher = new HookDispatcher()
+      const decision = await dispatcher.dispatch({
+        eventName: 'PreToolUse',
+        sessionId: 'sess-hook-bridge',
+        workspaceRoot: dir,
+        timestamp: new Date().toISOString(),
+        toolName: 'bash',
+        toolCallId: 'tc-1',
+        args: { command: 'ls' },
+      })
+      expect(decision).toEqual({ decision: 'block', reason: 'blocked-by-ext:read' })
+    } finally {
+      unregister()
+    }
   })
 })

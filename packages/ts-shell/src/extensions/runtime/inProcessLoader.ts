@@ -11,19 +11,78 @@ import { redactUnsafeReportText } from '../../core/security/reportText.js'
 import type { DenyRule } from '../../core/shell/approval/deny.js'
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../../tools/types.js'
 import type { VersionRecord } from '../model.js'
+import { EXTENSION_WORKER_SOURCE } from './workerSource.js'
+
+export interface ExtensionUiDialogOptions {
+  readonly timeout?: number
+}
+
+export interface ExtensionUiHost {
+  readonly select?: (title: string, options: readonly string[], opts?: ExtensionUiDialogOptions) => Promise<string | undefined>
+  readonly confirm?: (title: string, message: string, opts?: ExtensionUiDialogOptions) => Promise<boolean>
+  readonly input?: (title: string, placeholder?: string, opts?: ExtensionUiDialogOptions) => Promise<string | undefined>
+  readonly editor?: (title: string, prefill?: string) => Promise<string | undefined>
+  readonly notify?: (message: string, notifyType?: 'info' | 'warning' | 'error') => void
+  readonly setStatus?: (statusKey: string, statusText: string | undefined) => void
+  readonly setWidget?: (widgetKey: string, widgetLines: readonly string[] | undefined, widgetPlacement?: 'aboveEditor' | 'belowEditor') => void
+  readonly setTitle?: (title: string) => void
+  readonly setEditorText?: (text: string) => void
+}
+
+export interface ExtensionHostBridge {
+  readonly ui?: ExtensionUiHost
+  readonly getActiveTools?: () => readonly string[]
+  readonly getAllTools?: () => readonly string[]
+  readonly getCommands?: () => readonly string[]
+  readonly sendMessage?: (message: unknown) => Promise<void> | void
+  readonly appendEntry?: (customType: string, data: unknown) => Promise<void> | void
+}
+
+export interface ExtensionShortcut {
+  readonly key: string
+  readonly description?: string
+  readonly run?: () => unknown | Promise<unknown>
+}
+
+export interface ExtensionFlag {
+  readonly name: string
+  readonly description?: string
+  readonly type?: 'string' | 'boolean'
+  readonly default?: string | boolean
+}
+
+export interface ExtensionEventBus {
+  on(channel: string, listener: (data: unknown) => unknown): () => void
+  once(channel: string, listener: (data: unknown) => unknown): () => void
+  off(channel: string, listener: (data: unknown) => unknown): void
+  emit(channel: string, data?: unknown): void
+}
 
 export interface ExtensionAPI {
   readonly workspaceRoot: string
+  readonly events: ExtensionEventBus
+  readonly ui: Required<ExtensionUiHost>
   registerTool(tool: ToolDefinition): void
   registerCommand(command: CommandDefinition): void
+  registerShortcut(shortcut: ExtensionShortcut): void
+  registerFlag(flag: ExtensionFlag): void
+  getFlag(name: string): string | boolean | undefined
   on(event: string, handler: (payload: unknown) => unknown | Promise<unknown>): void
-  readWorkspaceFile(relativePath: string): string
+  readWorkspaceFile(relativePath: string): string | Promise<string>
+  getActiveTools(): Promise<readonly string[]>
+  getAllTools(): Promise<readonly string[]>
+  getCommands(): Promise<readonly string[]>
+  sendMessage(message: unknown): Promise<void>
+  appendEntry(customType: string, data: unknown): Promise<void>
 }
 
 export interface LoadedInProcessExtension {
   readonly tools: readonly ToolDefinition[]
   readonly commands: readonly CommandDefinition[]
+  readonly shortcuts: readonly ExtensionShortcut[]
+  readonly flags: readonly ExtensionFlag[]
   readonly handlers: ReadonlyMap<string, readonly ((payload: unknown) => unknown | Promise<unknown>)[]>
+  readonly events: ExtensionEventBus
   readonly readWorkspaceFile: (relativePath: string) => string
   readonly exports: Readonly<Record<string, unknown>>
 }
@@ -31,274 +90,199 @@ export interface LoadedInProcessExtension {
 export type InProcessExtensionInvoke =
   | { readonly kind: 'tool'; readonly name: string; readonly args?: Record<string, unknown> }
   | { readonly kind: 'command'; readonly name: string; readonly args?: readonly string[] }
-  | { readonly kind: 'event'; readonly event: string; readonly payload?: unknown }
+  | { readonly kind: 'event'; readonly event: string; readonly aliases?: readonly string[]; readonly payload?: unknown }
 
-export const VIRTUAL_MODULES: Readonly<Record<string, Record<string, unknown>>> = Object.freeze({
-  '@cheers/extension-api': Object.freeze({
-    defineExtension: Object.setPrototypeOf((factory: (api: ExtensionAPI) => unknown) => factory, null),
+export const VIRTUAL_MODULES: Readonly<Record<string, Record<string, unknown>>> = Object.freeze(
+  Object.assign(Object.create(null) as Record<string, Record<string, unknown>>, {
+    '@cheers/extension-api': Object.freeze(
+      Object.assign(Object.create(null) as Record<string, unknown>, {
+        defineExtension: Object.setPrototypeOf((factory: (api: ExtensionAPI) => unknown) => factory, null),
+      }),
+    ),
   }),
-})
+)
 
-function readContainedWorkspaceFile(
-  workspaceRoot: string,
-  relativePath: string,
-  denyRules: () => readonly DenyRule[],
-): string {
+function readContainedWorkspaceFile(workspaceRoot: string, relativePath: string, denyRules: () => readonly DenyRule[]): string {
   const target = path.resolve(workspaceRoot, relativePath)
   const contained = verifyPathContainment(target, workspaceRoot)
-  if (!contained.allowed) {
-    throw new Error('Extension read target is outside the workspace.')
-  }
+  if (!contained.allowed) throw new Error('Extension read target is outside the workspace.')
   const decision = evaluateToolPermissionScope('read', { path: contained.resolvedPath }, 'ask', workspaceRoot, denyRules())
-  if (decision.denied) {
-    throw new Error(decision.reason)
-  }
+  if (decision.denied) throw new Error(decision.reason)
   return fs.readFileSync(contained.resolvedPath, 'utf8')
 }
 
-/**
- * Transpile `.ts` / `.mts` / `.mjs` / `.js` extension scripts to CommonJS so they
- * can execute safely across Linux, macOS, and Windows.
- */
-export function transpileExtensionSource(source: string, filePath: string): string {
-  const result = ts.transpileModule(source, {
-    fileName: filePath,
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2022,
-      esModuleInterop: true,
-      allowJs: true,
-    },
+function nullProtoFn<T extends (...args: never[]) => unknown>(fn: T): T {
+  return Object.setPrototypeOf(fn, null)
+}
+
+function createEventBus(): ExtensionEventBus {
+  const listeners = new Map<string, Set<(data: unknown) => unknown>>()
+  const bus: ExtensionEventBus = Object.assign(Object.create(null) as ExtensionEventBus, {
+    on: nullProtoFn((channel: string, listener: (data: unknown) => unknown) => {
+      const set = listeners.get(channel) ?? new Set()
+      set.add(listener)
+      listeners.set(channel, set)
+      return nullProtoFn(() => set.delete(listener))
+    }),
+    once: nullProtoFn((channel: string, listener: (data: unknown) => unknown) => {
+      const off = bus.on(channel, data => {
+        off()
+        return listener(data)
+      })
+      return off
+    }),
+    off: nullProtoFn((channel: string, listener: (data: unknown) => unknown) => {
+      listeners.get(channel)?.delete(listener)
+    }),
+    emit: nullProtoFn((channel: string, data?: unknown) => {
+      for (const fn of [...(listeners.get(channel) ?? [])]) fn(data)
+    }),
   })
-  return result.outputText
+  return Object.freeze(bus)
+}
+
+function resolveUiHost(ui?: ExtensionUiHost): Required<ExtensionUiHost> {
+  return Object.freeze(Object.assign(Object.create(null) as Required<ExtensionUiHost>, {
+    select: nullProtoFn((title: string, opts: readonly string[], dialogOpts?: ExtensionUiDialogOptions) =>
+      ui?.select ? ui.select(title, opts, dialogOpts) : Promise.resolve(undefined)),
+    confirm: nullProtoFn((title: string, message: string, dialogOpts?: ExtensionUiDialogOptions) =>
+      ui?.confirm ? ui.confirm(title, message, dialogOpts) : Promise.resolve(false)),
+    input: nullProtoFn((title: string, placeholder?: string, dialogOpts?: ExtensionUiDialogOptions) =>
+      ui?.input ? ui.input(title, placeholder, dialogOpts) : Promise.resolve(undefined)),
+    editor: nullProtoFn((title: string, prefill?: string) =>
+      ui?.editor ? ui.editor(title, prefill) : Promise.resolve(undefined)),
+    notify: nullProtoFn((message: string, notifyType?: 'info' | 'warning' | 'error') => ui?.notify?.(message, notifyType)),
+    setStatus: nullProtoFn((statusKey: string, statusText: string | undefined) => ui?.setStatus?.(statusKey, statusText)),
+    setWidget: nullProtoFn((widgetKey: string, widgetLines: readonly string[] | undefined, placement?: 'aboveEditor' | 'belowEditor') =>
+      ui?.setWidget?.(widgetKey, widgetLines, placement)),
+    setTitle: nullProtoFn((title: string) => ui?.setTitle?.(title)),
+    setEditorText: nullProtoFn((text: string) => ui?.setEditorText?.(text)),
+  }))
+}
+
+async function handleWorkerHostRpc(
+  op: string,
+  payload: Record<string, unknown>,
+  options: { readonly root: string; readonly denyRules: () => readonly DenyRule[]; readonly host?: ExtensionHostBridge },
+): Promise<unknown> {
+  const ui = resolveUiHost(options.host?.ui)
+  switch (op) {
+    case 'readWorkspaceFile':
+      return readContainedWorkspaceFile(options.root, String(payload.path ?? ''), options.denyRules)
+    case 'ui.select':
+      return ui.select(String(payload.title ?? ''), Array.isArray(payload.options) ? payload.options.map(String) : [], { timeout: typeof payload.timeout === 'number' ? payload.timeout : undefined })
+    case 'ui.confirm':
+      return ui.confirm(String(payload.title ?? ''), String(payload.message ?? ''), { timeout: typeof payload.timeout === 'number' ? payload.timeout : undefined })
+    case 'ui.input':
+      return ui.input(String(payload.title ?? ''), typeof payload.placeholder === 'string' ? payload.placeholder : undefined, { timeout: typeof payload.timeout === 'number' ? payload.timeout : undefined })
+    case 'ui.editor':
+      return ui.editor(String(payload.title ?? ''), typeof payload.prefill === 'string' ? payload.prefill : undefined)
+    case 'ui.notify':
+      ui.notify(String(payload.message ?? ''), payload.notifyType as 'info' | 'warning' | 'error' | undefined)
+      return undefined
+    case 'ui.setStatus':
+      ui.setStatus(String(payload.statusKey ?? ''), typeof payload.statusText === 'string' ? payload.statusText : undefined)
+      return undefined
+    case 'ui.setWidget':
+      ui.setWidget(String(payload.widgetKey ?? ''), Array.isArray(payload.widgetLines) ? payload.widgetLines.map(String) : undefined, payload.widgetPlacement as 'aboveEditor' | 'belowEditor' | undefined)
+      return undefined
+    case 'ui.setTitle':
+      ui.setTitle(String(payload.title ?? ''))
+      return undefined
+    case 'ui.setEditorText':
+      ui.setEditorText(String(payload.text ?? ''))
+      return undefined
+    case 'host.getActiveTools':
+      return options.host?.getActiveTools ? options.host.getActiveTools() : []
+    case 'host.getAllTools':
+      return options.host?.getAllTools ? options.host.getAllTools() : []
+    case 'host.getCommands':
+      return options.host?.getCommands ? options.host.getCommands() : []
+    case 'host.sendMessage':
+      await options.host?.sendMessage?.(payload.msg)
+      return undefined
+    case 'host.appendEntry':
+      await options.host?.appendEntry?.(String(payload.customType ?? ''), payload.data)
+      return undefined
+    default:
+      throw new Error(`Unsupported extension host op: ${op}`)
+  }
+}
+
+/** Transpile `.ts` / `.mts` / `.mjs` / `.js` extension scripts to CommonJS across all platforms. */
+export function transpileExtensionSource(source: string, filePath: string): string {
+  return ts.transpileModule(source, {
+    fileName: filePath,
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, allowJs: true },
+  }).outputText
 }
 
 export function loadInProcessExtension(options: {
   readonly filePath: string
   readonly workspaceRoot: string
   readonly denyRules?: () => readonly DenyRule[]
+  readonly host?: ExtensionHostBridge
 }): LoadedInProcessExtension {
   const rawSource = fs.readFileSync(options.filePath, 'utf8')
   const code = transpileExtensionSource(rawSource, options.filePath)
   const tools: ToolDefinition[] = []
   const commands: CommandDefinition[] = []
+  const shortcuts: ExtensionShortcut[] = []
+  const flags: ExtensionFlag[] = []
+  const flagValues = new Map<string, string | boolean | undefined>()
   const handlers = new Map<string, ((payload: unknown) => unknown | Promise<unknown>)[]>()
   const denyRules = options.denyRules ?? (() => [])
+  const safeRead = (relativePath: string) => readContainedWorkspaceFile(options.workspaceRoot, String(relativePath ?? ''), denyRules)
+  const events = createEventBus()
+  const ui = resolveUiHost(options.host?.ui)
 
-  const safeRead = (relativePath: string) =>
-    readContainedWorkspaceFile(options.workspaceRoot, String(relativePath ?? ''), denyRules)
-
-  const api: ExtensionAPI = Object.freeze({
+  const api: ExtensionAPI = Object.freeze(Object.assign(Object.create(null) as ExtensionAPI, {
     workspaceRoot: options.workspaceRoot,
-    registerTool: Object.setPrototypeOf((tool: ToolDefinition) => {
-      tools.push(tool)
-    }, null),
-    registerCommand: Object.setPrototypeOf((command: CommandDefinition) => {
-      commands.push(command)
-    }, null),
-    on: Object.setPrototypeOf((event: string, handler: (payload: unknown) => unknown | Promise<unknown>) => {
+    events,
+    ui,
+    registerTool: nullProtoFn((tool: ToolDefinition) => tools.push(tool)),
+    registerCommand: nullProtoFn((command: CommandDefinition) => commands.push(command)),
+    registerShortcut: nullProtoFn((shortcut: ExtensionShortcut) => shortcuts.push(shortcut)),
+    registerFlag: nullProtoFn((flag: ExtensionFlag) => {
+      flags.push(flag)
+      if (!flagValues.has(flag.name) && flag.default !== undefined) flagValues.set(flag.name, flag.default)
+    }),
+    getFlag: nullProtoFn((name: string) => flagValues.get(name)),
+    on: nullProtoFn((event: string, handler: (payload: unknown) => unknown | Promise<unknown>) => {
       const list = handlers.get(event) ?? []
       list.push(handler)
       handlers.set(event, list)
-    }, null),
-    readWorkspaceFile: Object.setPrototypeOf(safeRead, null),
-  })
+    }),
+    readWorkspaceFile: nullProtoFn(safeRead),
+    getActiveTools: nullProtoFn(async () => options.host?.getActiveTools?.() ?? []),
+    getAllTools: nullProtoFn(async () => options.host?.getAllTools?.() ?? []),
+    getCommands: nullProtoFn(async () => options.host?.getCommands?.() ?? []),
+    sendMessage: nullProtoFn(async (msg: unknown) => { await options.host?.sendMessage?.(msg) }),
+    appendEntry: nullProtoFn(async (customType: string, data: unknown) => { await options.host?.appendEntry?.(customType, data) }),
+  }))
 
-  const moduleExports: Record<string, unknown> = {}
-  const moduleObj = { exports: moduleExports }
-  const customRequire = Object.setPrototypeOf((specifier: string): unknown => {
-    if (specifier in VIRTUAL_MODULES) {
-      return VIRTUAL_MODULES[specifier]
-    }
+  const moduleExports: Record<string, unknown> = Object.create(null) as Record<string, unknown>
+  const moduleObj = Object.assign(Object.create(null) as { exports: Record<string, unknown> }, { exports: moduleExports })
+  const customRequire = nullProtoFn((specifier: string): unknown => {
+    if (Object.hasOwn(VIRTUAL_MODULES, specifier)) return VIRTUAL_MODULES[specifier]
     throw new Error(`Extension module import '${specifier}' is not in VIRTUAL_MODULES.`)
-  }, null)
-
+  })
   const sandbox = vm.createContext(
-    {
+    Object.assign(Object.create(null) as Record<string, unknown>, {
       module: moduleObj,
       exports: moduleExports,
       require: customRequire,
       api,
-    },
-    {
-      name: 'extension-in-process',
-      codeGeneration: { strings: false, wasm: false },
-    },
+    }),
+    { name: 'extension-in-process', codeGeneration: { strings: false, wasm: false } },
   )
-
-  const script = new vm.Script(code, { filename: options.filePath })
-  script.runInContext(sandbox, { timeout: 5_000 })
-
-  const exported = moduleObj.exports as Record<string, unknown>
+  new vm.Script(code, { filename: options.filePath }).runInContext(sandbox, { timeout: 5_000 })
+  const exported = moduleObj.exports
   const defaultExport = exported.default ?? exported.activate
-  if (typeof defaultExport === 'function') {
-    defaultExport(api)
-  }
+  if (typeof defaultExport === 'function') defaultExport(api)
 
-  return {
-    tools,
-    commands,
-    handlers,
-    readWorkspaceFile: safeRead,
-    exports: exported,
-  }
+  return { tools, commands, shortcuts, flags, handlers, events, readWorkspaceFile: safeRead, exports: exported }
 }
-
-const EXTENSION_WORKER_SOURCE = `
-const vm = require('node:vm');
-const { parentPort, workerData } = require('node:worker_threads');
-
-const vmCtx = vm.createContext(Object.create(null), {
-  name: 'extension-worker',
-  codeGeneration: { strings: false, wasm: false },
-});
-
-const sendBridge = Object.setPrototypeOf((kind, jsonPayload) => {
-  parentPort.postMessage({ kind: String(kind), json: String(jsonPayload ?? '') });
-}, null);
-
-let dispatchReply = null;
-const registerReceiver = Object.setPrototypeOf((fn) => {
-  dispatchReply = fn;
-}, null);
-
-Object.defineProperty(vmCtx, '__send', { value: sendBridge, enumerable: false });
-Object.defineProperty(vmCtx, '__onReply', { value: registerReceiver, enumerable: false });
-Object.defineProperty(vmCtx, '__ARGV', { value: JSON.stringify(workerData.argv), enumerable: false });
-Object.defineProperty(vmCtx, '__ROOT', { value: String(workerData.workspaceRoot), enumerable: false });
-Object.defineProperty(vmCtx, '__INVOKE', { value: workerData.invoke ? JSON.stringify(workerData.invoke) : '', enumerable: false });
-
-const bootstrap = new vm.Script(\`
-(() => {
-  const send = globalThis.__send;
-  const onReply = globalThis.__onReply;
-  delete globalThis.__send;
-  delete globalThis.__onReply;
-
-  let seq = 0;
-  const pending = new Map();
-  onReply((id, ok, json) => {
-    const entry = pending.get(id);
-    if (!entry) return;
-    pending.delete(id);
-    if (ok) entry.resolve(json === '' ? undefined : JSON.parse(json));
-    else entry.reject(new Error(json || 'Extension host call failed.'));
-  });
-
-  function rpc(op, payload) {
-    const id = ++seq;
-    return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
-      send('rpc', JSON.stringify({ id, op, payload }));
-    });
-  }
-
-  globalThis.exports = {};
-  globalThis.module = { exports: globalThis.exports };
-  globalThis.require = (specifier) => {
-    if (specifier === '@cheers/extension-api') {
-      return { defineExtension: (factory) => factory };
-    }
-    throw new Error("Extension module import '" + specifier + "' is not in VIRTUAL_MODULES.");
-  };
-  const registeredTools = new Map();
-  const registeredCommands = new Map();
-  const registeredHandlers = new Map();
-  globalThis.__registeredTools = registeredTools;
-  globalThis.__registeredCommands = registeredCommands;
-  globalThis.__registeredHandlers = registeredHandlers;
-
-  globalThis.api = {
-    workspaceRoot: globalThis.__ROOT,
-    registerTool: (tool) => {
-      if (!tool || typeof tool.name !== 'string' || !tool.name.trim() || typeof tool.execute !== 'function') {
-        throw new Error('Extension registerTool requires { name, execute }.');
-      }
-      registeredTools.set(tool.name, tool);
-      send('registerTool', JSON.stringify({
-        name: tool.name,
-        description: String(tool.description ?? ''),
-        argsSchema: tool.argsSchema ?? { type: 'object' },
-      }));
-    },
-    registerCommand: (cmd) => {
-      if (!cmd || typeof cmd.name !== 'string' || !cmd.name.trim() || typeof cmd.execute !== 'function') {
-        throw new Error('Extension registerCommand requires { name, execute }.');
-      }
-      registeredCommands.set(cmd.name, cmd);
-      send('registerCommand', JSON.stringify({
-        name: cmd.name,
-        description: String(cmd.description ?? ''),
-        aliases: Array.isArray(cmd.aliases) ? cmd.aliases.map(String) : [],
-      }));
-    },
-    on: (event, handler) => {
-      if (typeof event !== 'string' || !event.trim() || typeof handler !== 'function') {
-        throw new Error('Extension on(event, handler) requires an event name and function.');
-      }
-      const list = registeredHandlers.get(event) ?? [];
-      list.push(handler);
-      registeredHandlers.set(event, list);
-      send('registerEvent', JSON.stringify({ event }));
-    },
-    readWorkspaceFile: (rel) => rpc('readWorkspaceFile', { path: String(rel ?? '') }),
-  };
-})();
-\`, { filename: 'extension-bootstrap.js' });
-
-bootstrap.runInContext(vmCtx);
-
-parentPort.on('message', (msg) => {
-  if (msg && msg.kind === 'reply' && typeof dispatchReply === 'function') {
-    dispatchReply(msg.id, msg.ok, msg.json);
-  }
-});
-
-(async () => {
-  try {
-    const script = new vm.Script(workerData.code, { filename: workerData.filename });
-    script.runInContext(vmCtx, { timeout: 5000 });
-    const runner = new vm.Script(\`
-      (async () => {
-        const exp = module.exports || {};
-        if (typeof exp.default === 'function') await exp.default(api);
-        else if (typeof exp.activate === 'function') await exp.activate(api);
-        const invoke = globalThis.__INVOKE ? JSON.parse(globalThis.__INVOKE) : null;
-        if (invoke && invoke.kind === 'tool') {
-          const tool = globalThis.__registeredTools.get(invoke.name);
-          if (tool) return await tool.execute(invoke.args || {}, { workspaceRoot: globalThis.__ROOT });
-        } else if (invoke && invoke.kind === 'command') {
-          const cmd = globalThis.__registeredCommands.get(invoke.name);
-          if (cmd) return await cmd.execute(invoke.args || [], { workspaceRoot: globalThis.__ROOT });
-        } else if (invoke && invoke.kind === 'event') {
-          const list = globalThis.__registeredHandlers.get(invoke.event) || [];
-          let current = invoke.payload;
-          for (const handler of list) {
-            const next = await handler(current);
-            if (next !== undefined) current = next;
-          }
-          return current;
-        }
-        if (typeof exp.run === 'function') {
-          return await exp.run({ args: JSON.parse(globalThis.__ARGV), workspaceRoot: globalThis.__ROOT, api });
-        }
-        return 'Loaded extension successfully.';
-      })()
-    \`, { filename: 'extension-runner.js' });
-    const value = await Promise.resolve(runner.runInContext(vmCtx, { timeout: 5000 }));
-    if (value && typeof value === 'object' && typeof value.output === 'string' && typeof value.success === 'boolean') {
-      parentPort.postMessage({ kind: value.success ? 'done' : 'error', json: value.output });
-    } else {
-      parentPort.postMessage({
-        kind: 'done',
-        json: typeof value === 'string' ? value : JSON.stringify(value ?? ''),
-      });
-    }
-  } catch (err) {
-    parentPort.postMessage({ kind: 'error', json: err instanceof Error ? err.message : String(err) });
-  }
-})();
-`;
 
 export async function executeInProcessScript(options: {
   readonly root: string
@@ -308,6 +292,7 @@ export async function executeInProcessScript(options: {
   readonly denyRules: () => readonly DenyRule[]
   readonly context: ToolExecutionContext
   readonly invoke?: InProcessExtensionInvoke
+  readonly host?: ExtensionHostBridge
 }): Promise<ToolExecutionResult> {
   options.context.abortSignal?.throwIfAborted()
   const rawSource = fs.readFileSync(options.scriptFile, 'utf8')
@@ -315,6 +300,8 @@ export async function executeInProcessScript(options: {
   const timeoutMs = 30_000
   const registeredTools: Array<{ readonly name: string; readonly description: string }> = []
   const registeredCommands: Array<{ readonly name: string; readonly description: string; readonly aliases: readonly string[] }> = []
+  const registeredShortcuts: Array<{ readonly key: string; readonly description: string }> = []
+  const registeredFlags: Array<{ readonly name: string; readonly type: string }> = []
   const registeredEvents: string[] = []
 
   const worker = new Worker(EXTENSION_WORKER_SOURCE, {
@@ -342,51 +329,44 @@ export async function executeInProcessScript(options: {
       }
       const onAbort = () => {
         void worker.terminate()
+        worker.unref()
         finish({ ok: false, output: 'Extension execution aborted.' })
       }
       const timer = setTimeout(() => {
         void worker.terminate()
+        worker.unref()
         finish({ ok: false, output: `Extension execution timed out after ${timeoutMs}ms.` })
       }, timeoutMs)
       timer.unref?.()
       options.context.abortSignal?.addEventListener('abort', onAbort, { once: true })
 
       worker.on('message', (msg: { readonly kind: string; readonly json: string }) => {
-        if (msg.kind === 'done') {
-          finish({ ok: true, output: msg.json })
-        } else if (msg.kind === 'error') {
-          finish({ ok: false, output: msg.json })
-        } else if (msg.kind === 'registerTool') {
+        if (msg.kind === 'done') finish({ ok: true, output: msg.json })
+        else if (msg.kind === 'error') finish({ ok: false, output: msg.json })
+        else if (msg.kind === 'registerTool') {
           const info = JSON.parse(msg.json) as { name: string; description?: string }
           registeredTools.push({ name: info.name, description: String(info.description ?? '') })
         } else if (msg.kind === 'registerCommand') {
           const info = JSON.parse(msg.json) as { name: string; description?: string; aliases?: string[] }
-          registeredCommands.push({
-            name: info.name,
-            description: String(info.description ?? ''),
-            aliases: Array.isArray(info.aliases) ? info.aliases.map(String) : [],
-          })
+          registeredCommands.push({ name: info.name, description: String(info.description ?? ''), aliases: Array.isArray(info.aliases) ? info.aliases.map(String) : [] })
+        } else if (msg.kind === 'registerShortcut') {
+          const info = JSON.parse(msg.json) as { key: string; description?: string }
+          registeredShortcuts.push({ key: info.key, description: String(info.description ?? '') })
+        } else if (msg.kind === 'registerFlag') {
+          const info = JSON.parse(msg.json) as { name: string; type?: string }
+          registeredFlags.push({ name: info.name, type: String(info.type ?? 'string') })
         } else if (msg.kind === 'registerEvent') {
           const info = JSON.parse(msg.json) as { event: string }
           if (!registeredEvents.includes(info.event)) registeredEvents.push(info.event)
         } else if (msg.kind === 'rpc') {
-          const parsed = JSON.parse(msg.json) as { id: number; op: string; payload: { path?: string } }
-          try {
-            if (parsed.op !== 'readWorkspaceFile') {
-              throw new Error(`Unsupported extension host op: ${parsed.op}`)
-            }
-            const content = readContainedWorkspaceFile(options.root, String(parsed.payload.path ?? ''), options.denyRules)
-            if (!settled) worker.postMessage({ kind: 'reply', id: parsed.id, ok: true, json: JSON.stringify(content) })
-          } catch (err) {
-            if (!settled) {
-              worker.postMessage({
-                kind: 'reply',
-                id: parsed.id,
-                ok: false,
-                json: err instanceof Error ? err.message : String(err),
-              })
-            }
-          }
+          const parsed = JSON.parse(msg.json) as { id: number; op: string; payload?: Record<string, unknown> }
+          void handleWorkerHostRpc(parsed.op, parsed.payload ?? {}, { root: options.root, denyRules: options.denyRules, host: options.host })
+            .then(value => {
+              if (!settled) worker.postMessage({ kind: 'reply', id: parsed.id, ok: true, json: value === undefined ? '' : JSON.stringify(value) })
+            })
+            .catch(err => {
+              if (!settled) worker.postMessage({ kind: 'reply', id: parsed.id, ok: false, json: err instanceof Error ? err.message : String(err) })
+            })
         }
       })
       worker.on('error', err => finish({ ok: false, output: err instanceof Error ? err.message : String(err) }))
@@ -395,11 +375,7 @@ export async function executeInProcessScript(options: {
       })
     })
 
-    const detail = redactUnsafeReportText(
-      redactReportText(outcome.output, 16_000, { projectRoot: options.root }),
-      new Set(),
-      16_000,
-    )
+    const detail = redactUnsafeReportText(redactReportText(outcome.output, 16_000, { projectRoot: options.root }), new Set(), 16_000)
     return {
       success: outcome.ok,
       output: `${detail}\nExtension execution: ${outcome.ok ? 'completed' : 'failed'}; exit ${outcome.ok ? 0 : 1}; mode in-process; source ${options.record.source}; SHA256 ${options.record.digest}.`,
@@ -409,12 +385,16 @@ export async function executeInProcessScript(options: {
         version: options.record.manifest.version,
         digest: options.record.digest,
         cleanup: 'confirmed',
+        eventOutput: outcome.output,
         registeredTools,
         registeredCommands,
+        registeredShortcuts,
+        registeredFlags,
         registeredEvents,
       },
     }
   } finally {
-    await worker.terminate().catch(() => {})
+    void worker.terminate().catch(() => {})
+    worker.unref()
   }
 }

@@ -76,6 +76,9 @@ export function isReadableTranscriptEvent(value: unknown): boolean {
     case "branch_summary": return Number.isInteger(value.droppedTurns) && Number(value.droppedTurns) >= 0 &&
       optionalString(value.summary) && optionalString(value.toEntryId) &&
       (value.abandonedEntryIds === undefined || (Array.isArray(value.abandonedEntryIds) && value.abandonedEntryIds.every(id => typeof id === "string")));
+    case "codemode-store": return optionalString(value.sourceEntryId)
+      && record(value.entries)
+      && Object.values(value.entries).every(v => typeof v === "string" || v === null);
     default: return false;
   }
 }

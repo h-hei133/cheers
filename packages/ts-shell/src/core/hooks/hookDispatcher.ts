@@ -9,6 +9,7 @@ import type { StopPayload } from './types.js';
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
 import { checkWriteHookArtifact, writeHookCommand } from './artifact.js';
 import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInput, translateWriteInputs, translateWriteResult } from './translation.js';
+import { getExtensionEventRunners } from './extensionBridge.js';
 import type {
   HookEventPayload,
   HookDecision,
@@ -408,8 +409,55 @@ export class HookDispatcher {
 
       }
     }
+    const extensionDecision = !trust?.admission?.() && payload.workspaceRoot
+      ? await dispatchExtensionHooks(payload, accumulatedDecision)
+      : null;
+    if (extensionDecision) return extensionDecision;
     return accumulatedDecision ?? { decision: "allow" };
   }
+}
+
+const EXTENSION_EVENT_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  SessionStart: ['session_start'],
+  SessionEnd: ['session_shutdown'],
+  UserPromptSubmit: ['input'],
+  PreToolUse: ['tool_call'],
+  PostToolUse: ['tool_result'],
+  PostToolUseFailure: ['tool_result'],
+  PreCompact: ['session_before_compact'],
+  PostCompact: ['session_compact'],
+  PreModelSwitch: ['model_select'],
+  PostModelSwitch: ['model_select'],
+  StopFailure: ['agent_end'],
+};
+
+async function dispatchExtensionHooks(
+  payload: HookEventPayload,
+  accumulated: HookDecision | null,
+): Promise<HookDecision | null> {
+  const runners = getExtensionEventRunners(payload.workspaceRoot, payload.sessionId);
+  const aliases = EXTENSION_EVENT_ALIASES[payload.eventName];
+  let merged = accumulated;
+  let updated = false;
+  for (const runExtensionEvent of runners) {
+    try {
+      const returned = await runExtensionEvent(payload.eventName, payload, aliases);
+      if (!returned || typeof returned !== 'object') continue;
+      const decision = payload.eventName === 'PreToolUse'
+        ? normalizeHookVeto(returned) ?? (returned as HookDecision)
+        : (returned as HookDecision);
+      if (decision.decision === 'block' || decision.decision === 'retry') {
+        return decision;
+      }
+      if (decision.feedback || decision.hookSpecificOutput) {
+        merged = mergeWriteHookResult(merged, decision);
+        updated = true;
+      }
+    } catch (err: unknown) {
+      logger.error(`Error in extension event handler: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return updated ? merged : null;
 }
 
 export const defaultHookDispatcher = new HookDispatcher();

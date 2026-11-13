@@ -4,6 +4,9 @@ import type { ExtensionService } from '../service.js';
 import type { LocalCommandResult } from '../../core/commands/types.js';
 import { getInstalledPlugins } from '../../core/commands/plugin/store.js';
 import { marketplaceCommand } from './marketplace.js';
+import path from 'node:path';
+import { readPiPackageManifest } from '../registry/piManifest.js';
+import { verifyPathContainment } from '../../core/security/pathJail.js';
 
 export async function pluginCommand(args: string[], service: ExtensionService): Promise<LocalCommandResult> {
   try {
@@ -17,6 +20,15 @@ export async function pluginCommand(args: string[], service: ExtensionService): 
     if (action === 'cancel' && !target) { await service.cancel(); return { kind: 'local', output: service.errors.length ? service.errors.join('\n') : 'Extension calls cancelled and drained.' }; }
     if (action === 'run' && target && input) return { kind: 'local', output: await service.run(target, input, rest) };
     if (['search', 'find'].includes(action) && target && input) return marketplaceCommand(['search', target, input, ...rest], service);
+    if (action === 'local' && target && !input) {
+      const candidate = path.resolve(service.root, target);
+      const containment = verifyPathContainment(candidate, service.root);
+      if (!containment.allowed) throw new Error('Local extension inspection target must stay within the workspace.');
+      service.assertSourceAccess(containment.resolvedPath);
+      service.assertSourceAccess(path.join(containment.resolvedPath, 'package.json'));
+      const discovered = readPiPackageManifest(containment.resolvedPath);
+      return { kind: 'local', output: JSON.stringify(discovered, null, 2) };
+    }
     if (rest.length) throw new Error('Too many plugin arguments.');
     if (action === 'install' && target && !input) return { kind: 'local', output: await service.approve(await installOperation(service, target)) };
     if (action === 'add' && target && !input) return { kind: 'local', output: await service.approve(registrationOperation(service, target)) };
@@ -25,6 +37,6 @@ export async function pluginCommand(args: string[], service: ExtensionService): 
     if (['uninstall', 'remove', 'rm'].includes(action) && target && !input) return { kind: 'local', output: await service.approve(removeOperation(service, target)) };
     if (['enable', 'disable', 'grant', 'revoke'].includes(action) && target && (!input || ['grant', 'revoke'].includes(action))) return { kind: 'local', output: await service.approve(activationOperation(service, service.root, action as 'enable' | 'disable' | 'grant' | 'revoke', target, input), 'extension_grant') };
     if (action === 'migrate' && !target) return { kind: 'local', output: await service.approve(migrationOperation(service)) };
-    throw new Error('Usage: /plugin list | details <name> | install <source>:<name>@<exactVersion> | update <name> <source>:<name>@<exactVersion> | rollback <name> <version> | uninstall <name> | enable|disable <name> | grant|revoke <name> prompt|script:<id>|command:<id>|tool:<id> | run <name> <script> [args] | reload | migrate');
+    throw new Error('Usage: /plugin list | details <name> | local <dir> | install <source>:<name>@<exactVersion> | update <name> <source>:<name>@<exactVersion> | rollback <name> <version> | uninstall <name> | enable|disable <name> | grant|revoke <name> prompt|script:<id>|command:<id>|tool:<id> | run <name> <script> [args] | reload | migrate');
   } catch (error) { return { kind: 'local', output: `Extension refused: ${error instanceof Error ? error.message : 'operation could not be confirmed'}` }; }
 }
