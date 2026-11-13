@@ -68,7 +68,11 @@ export class InteractiveSurface implements InteractiveView {
       this.lastComposerGeometry = undefined;
       // A full-screen overlay owns every row, so there is no fixed block to
       // redraw separately.
-      return { rows: chrome.overlayRows.slice(0, height).map(row => truncateToWidth(row, width)), fullScreen: true,
+      const fullRows = chrome.overlayRows.slice(0, height).map(row => truncateToWidth(row, width));
+      const compositedFull = this.context.overlayStack?.hasVisible(width, height)
+        ? this.context.overlayStack.composite(fullRows, width, height)
+        : fullRows;
+      return { rows: compositedFull, fullScreen: true,
         pointerMotion: this.context.overlayPointerMotion?.() === true };
     }
     const capacity = Math.max(0, height - chrome.rows.length);
@@ -101,9 +105,19 @@ export class InteractiveSurface implements InteractiveView {
       } : {}),
     };
     if (transcriptRows.length > 0) this.pointerGeometry = { width, height, layout };
+    const baseRows = [...transcriptRows, ...chrome.rows];
+    let rows: readonly string[] = baseRows;
+    if (this.context.overlayStack?.hasVisible(width, height)) {
+      if (layout === "document" && baseRows.length > height) {
+        const split = baseRows.length - height;
+        rows = [...baseRows.slice(0, split), ...this.context.overlayStack.composite(baseRows.slice(split), width, height)];
+      } else {
+        rows = this.context.overlayStack.composite(baseRows, width, height);
+      }
+    }
     return {
       documentId: this.transcript.all(),
-      rows: [...transcriptRows, ...chrome.rows],
+      rows,
       sensitiveRows: this.pane.sensitiveRows,
       chromeRows: chrome.rows,
       pointerMotion: this.context.overlayPointerMotion?.() === true,

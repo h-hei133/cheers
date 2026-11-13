@@ -6,6 +6,7 @@ import type { AmbientContext } from "../chrome/hints.js";
 import type { StatusFacts, StatusItemId } from "../chrome/items.js";
 import { SuggestionList } from "../chrome/suggestions.js";
 import type { FrameLayout, TerminalFrameProvider } from "../render/frame.js";
+import type { OverlayStack } from "../render/overlayStack.js";
 import type { Block } from "../transcript/blocks.js";
 import { Transcript } from "../transcript/container.js";
 import type { TurnActivity } from "../transcript/live.js";
@@ -91,6 +92,8 @@ export interface ViewContext {
   thinkingShortcut?(): string | undefined;
   /** Style the matches in one rendered row of the transcript. */
   highlightSearchMatches?(row: string, contentRow: number): string;
+  /** Optional floating overlay stack composited onto rendered viewport frames. */
+  overlayStack?: OverlayStack;
 }
 
 /** What the host does in response to input. Routed by the keymap and the pointer. */

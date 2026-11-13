@@ -2,6 +2,10 @@ import { ESC, ESCAPE_INCOMPLETE, ESCAPE_OVERLONG, resolveEscapeEnd } from "./esc
 import { parseKeyEvent, type ParsedKeyEvent } from "./keys.js";
 import { isMouseSequence, parseMouseReport, type MouseReport } from "./mouse.js";
 import { AppearanceReports } from "./appearance.js";
+import { parseCellSizeResponse } from "./cellSize.js";
+import { isProgramStatusReply } from "./programStatus.js";
+import { parseOscColorResponse, type OscColorTarget } from "./terminalColors.js";
+import { setCellDimensions, type CellDimensions } from "../imageDimensions.js";
 import { firstClusterLength } from "../text/measure.js";
 
 /**
@@ -33,6 +37,9 @@ export type MouseListener = (report: MouseReport) => void;
 
 export interface StdinBufferOptions {
   readonly onAppearance?: (appearance: "dark" | "light") => void;
+  readonly onCellSize?: (dimensions: CellDimensions) => void;
+  readonly onColorReply?: (color: OscColorTarget) => void;
+  readonly onProgramStatusReply?: () => void;
   readonly partialHoldMs?: number;
   readonly clusterHoldMs?: number;
   readonly pasteHoldMs?: number;
@@ -57,6 +64,12 @@ export class StdinBuffer {
   private readonly pasteListeners = new Set<PasteListener>();
   private readonly mouseListeners = new Set<MouseListener>();
   private readonly appearanceListeners = new Set<(appearance: 'dark' | 'light') => void>();
+  private readonly cellSizeListeners = new Set<(dimensions: CellDimensions) => void>();
+  private readonly colorReplyListeners = new Set<(color: OscColorTarget) => void>();
+  private readonly programStatusListeners = new Set<() => void>();
+  private readonly onCellSizeOption?: (dimensions: CellDimensions) => void;
+  private readonly onColorReplyOption?: (color: OscColorTarget) => void;
+  private readonly onProgramStatusOption?: () => void;
   private latestAppearance?: 'dark' | 'light';
   private readonly partialHoldMs: number;
   private readonly clusterHoldMs: number;
@@ -71,6 +84,9 @@ export class StdinBuffer {
       options.onAppearance?.(appearance);
       for (const listener of this.appearanceListeners) listener(appearance);
     });
+    this.onCellSizeOption = options.onCellSize;
+    this.onColorReplyOption = options.onColorReply;
+    this.onProgramStatusOption = options.onProgramStatusReply;
     this.partialHoldMs = options.partialHoldMs ?? PARTIAL_HOLD_MS;
     this.clusterHoldMs = options.clusterHoldMs ?? CLUSTER_HOLD_MS;
     this.pasteHoldMs = options.pasteHoldMs ?? PASTE_HOLD_MS;
@@ -94,6 +110,20 @@ export class StdinBuffer {
     return () => this.mouseListeners.delete(listener);
   }
 
+  onCellSize(listener: (dimensions: CellDimensions) => void): () => void {
+    this.cellSizeListeners.add(listener);
+    return () => this.cellSizeListeners.delete(listener);
+  }
+
+  onColorReply(listener: (color: OscColorTarget) => void): () => void {
+    this.colorReplyListeners.add(listener);
+    return () => this.colorReplyListeners.delete(listener);
+  }
+
+  onProgramStatusReply(listener: () => void): () => void {
+    this.programStatusListeners.add(listener);
+    return () => this.programStatusListeners.delete(listener);
+  }
   /** A transferred parser retains both partial reports and the last accepted appearance. */
   onAppearance(listener: (appearance: 'dark' | 'light') => void): () => void {
     if (this.disposed) return () => {};
@@ -138,6 +168,9 @@ export class StdinBuffer {
     this.pasteListeners.clear();
     this.mouseListeners.clear();
     this.appearanceListeners.clear();
+    this.cellSizeListeners.clear();
+    this.colorReplyListeners.clear();
+    this.programStatusListeners.clear();
     this.latestAppearance = undefined;
   }
 
@@ -288,8 +321,26 @@ export class StdinBuffer {
   private take(length: number): void {
     const sequence = this.buffer.slice(0, length);
     this.buffer = this.buffer.slice(length);
+    const cellSize = parseCellSizeResponse(sequence);
+    if (cellSize) {
+      setCellDimensions(cellSize);
+      this.onCellSizeOption?.(cellSize);
+      for (const listener of this.cellSizeListeners) listener(cellSize);
+      return;
+    }
+    if (isProgramStatusReply(sequence)) {
+      this.onProgramStatusOption?.();
+      for (const listener of this.programStatusListeners) listener();
+      return;
+    }
+    const colorReply = parseOscColorResponse(sequence);
+    if (colorReply) {
+      this.onColorReplyOption?.(colorReply);
+      for (const listener of this.colorReplyListeners) listener(colorReply);
+      if (colorReply.kind === "background") this.appearance.consume(sequence);
+      return;
+    }
     if (this.appearance.consume(sequence)) return;
-    // A mouse report shares the CSI shape of a keystroke, so it has to be
     // recognised here or it reaches the editor as typed text.
     if (isMouseSequence(sequence)) {
       const report = parseMouseReport(sequence);

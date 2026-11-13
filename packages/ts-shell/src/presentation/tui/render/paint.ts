@@ -1,6 +1,7 @@
 import { visibleWidth } from "../text/measure.js";
 import { truncateToWidth } from "../text/layout.js";
 import { coalesceAdjacentSgr, LINE_TERMINATOR } from "../text/sgr.js";
+import { stripOsc133ZonePrefix } from "../input/cellSize.js";
 
 /**
  * Escape-sequence construction for one painted frame.
@@ -53,7 +54,8 @@ export function eraseFromRow(row: number, height: number): string {
  * the previous frame's tail behind.
  */
 export function prepareRow(raw: string, width: number): string {
-  const fitted = visibleWidth(raw) > width ? truncateToWidth(raw, width) : raw;
+  const stripped = raw.startsWith("\x1b]133;") ? stripOsc133ZonePrefix(raw) : raw;
+  const fitted = visibleWidth(stripped) > width ? truncateToWidth(stripped, width) : stripped;
   const coalesced = coalesceAdjacentSgr(fitted);
   return coalesced.length === 0 ? "" : `${coalesced}${LINE_TERMINATOR}`;
 }

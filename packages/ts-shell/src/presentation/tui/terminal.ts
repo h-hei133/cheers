@@ -1,8 +1,20 @@
 import fs from "node:fs";
 import { StringDecoder } from "node:string_decoder";
-import { drainInput } from "./input/drain.js";
+import { acquireRawMode, drainInput, releaseRawMode } from "./input/drain.js";
 import { QUERY_APPEARANCE, STOP_APPEARANCE } from "./input/appearance.js";
+import { CELL_SIZE_QUERY } from "./input/cellSize.js";
 import { KeyboardNegotiation, type KeyboardProtocol } from "./input/keyboardProtocol.js";
+import {
+  TerminalStatusController,
+  type ProgramStatus,
+} from "./input/programStatus.js";
+import {
+  PendingColorQuery,
+  TERMINAL_COLOR_QUERY,
+  TerminalProtocolReader,
+  type ColorQueryOptions,
+  type TerminalColors,
+} from "./input/terminalColors.js";
 import { detectTerminalCapabilities, type TerminalCapabilities } from "./terminalCapabilities.js";
 
 /**
@@ -74,6 +86,10 @@ export interface TerminalDevice {
   enableInput(): void;
   /** Consume late protocol reports before a graceful exit; crash cleanup stays synchronous. */
   drainInput?(): Promise<void>;
+  setProgress?(active: boolean): void;
+  setProgramStatus?(status: ProgramStatus): void;
+  queryTerminalColors?(options?: ColorQueryOptions): Promise<TerminalColors>;
+  queryCellSize?(): void;
 }
 
 export class Terminal implements TerminalDevice {
@@ -90,7 +106,9 @@ export class Terminal implements TerminalDevice {
   private deferredInput: string[] = [];
   private inputReady?: () => void;
   private decoder = new StringDecoder("utf8");
-
+  private readonly status = new TerminalStatusController();
+  private readonly protocolReader = new TerminalProtocolReader();
+  private colorQuery: PendingColorQuery | undefined;
   private onInput: InputHandler = () => {};
   private onResize: ResizeHandler = () => {};
   private onDisconnect: DisconnectHandler = () => {};
@@ -110,6 +128,14 @@ export class Terminal implements TerminalDevice {
       const step = this.keyboard.consume(text);
       if (step.write) this.write(step.write);
       text = step.forward;
+      if (text.length === 0) return;
+    }
+    if (this.colorQuery || this.status.isProbePending) {
+      text = this.protocolReader.process(
+        text,
+        this.colorQuery,
+        this.status.isProbePending ? () => this.status.confirmSupported((data) => this.write(data)) : undefined,
+      );
       if (text.length === 0) return;
     }
     if (!this.inputEnabled) {
@@ -180,7 +206,7 @@ export class Terminal implements TerminalDevice {
     process.stdout.on("resize", this.handleResize);
     if (!process.stdin.isTTY) return;
 
-    if (this.inputEnabled) this.takeRawMode();
+    if (this.inputEnabled) this.rawOwned = acquireRawMode(this.rawOwned);
     if (this.capabilities.supportsBracketedPaste) this.write(ENABLE_BRACKETED_PASTE);
     process.stdin.on("data", this.handleData);
     process.stdin.on("end", this.handleEnd);
@@ -194,7 +220,10 @@ export class Terminal implements TerminalDevice {
     // indistinguishable from the head of a sequence.
     if (this.capabilities.supportsBracketedPaste) {
       this.write(this.keyboard.query);
-      if (process.stdout.isTTY) this.write(QUERY_APPEARANCE);
+      if (process.stdout.isTTY) {
+        this.write(QUERY_APPEARANCE);
+        this.status.beginProbe((data) => this.write(data));
+      }
       this.keyboardTimer = setTimeout(() => this.expireKeyboardNegotiation(), KEYBOARD_REPLY_TIMEOUT_MS);
       this.keyboardTimer.unref?.();
     }
@@ -202,8 +231,9 @@ export class Terminal implements TerminalDevice {
 
   /** Stop inspecting input for replies that are evidently not coming. */
   private expireKeyboardNegotiation(): void {
-    const held = this.keyboard.expire();
-    if (held.length > 0) this.handleData(held);
+    this.status.expireProbe();
+    const flushed = `${this.keyboard.expire()}${this.protocolReader.flush()}`;
+    if (flushed.length > 0) this.handleData(flushed);
   }
 
   /** Which modifier-reporting protocol negotiation settled on. */
@@ -215,7 +245,7 @@ export class Terminal implements TerminalDevice {
   enableInput(): void {
     if (this.inputEnabled) return;
     this.inputEnabled = true;
-    this.takeRawMode();
+    this.rawOwned = acquireRawMode(this.rawOwned);
     if (this.started && process.stdin.isTTY) {
       const ready = this.inputReady; this.inputReady = undefined; ready?.();
     }
@@ -230,13 +260,15 @@ export class Terminal implements TerminalDevice {
     this.inputReady = undefined;
     if (this.keyboardTimer) clearTimeout(this.keyboardTimer);
     this.keyboardTimer = undefined;
+    this.colorQuery?.cancel();
+    this.colorQuery = undefined;
+    this.protocolReader.flush();
     process.off("exit", this.handleExit);
     process.stdout.off("resize", this.handleResize);
     process.stdin.off("data", this.handleData);
     process.stdin.off("end", this.handleEnd);
     process.stdin.off("close", this.handleEnd);
-    this.writeSync(`${this.keyboard.stop()}${RESTORE_MODES}`);
-    this.releaseRawMode();
+    this.restoreSync();
   }
 
   async drainInput(): Promise<void> {
@@ -252,8 +284,9 @@ export class Terminal implements TerminalDevice {
 
   /** Unbuffered restore for exit and crash handlers, where queued writes are lost. */
   restoreSync(): void {
-    this.writeSync(`${this.keyboard.stop()}${RESTORE_MODES}`);
-    this.releaseRawMode();
+    const clear = this.status.consumeClearSequence();
+    this.writeSync(`${this.keyboard.stop()}${clear}${RESTORE_MODES}`);
+    this.rawOwned = releaseRawMode(this.rawOwned);
   }
 
   write(data: string, onWritten?: () => void): void {
@@ -291,25 +324,26 @@ export class Terminal implements TerminalDevice {
     this.write("\x1b[?25h");
   }
 
-  private takeRawMode(): void {
-    if (typeof process.stdin.setRawMode !== "function") return;
-    if (!process.stdin.isRaw) {
-      process.stdin.setRawMode(true);
-      this.rawOwned = true;
-    }
+  setProgress(active: boolean): void {
+    this.status.setProgress(active, (data) => this.write(data));
   }
 
-  private releaseRawMode(): void {
-    try {
-      if (this.rawOwned && typeof process.stdin.setRawMode === "function") {
-        process.stdin.setRawMode(false);
-      }
-      this.rawOwned = false;
-      process.stdin.pause();
-    } catch {
-      // Best-effort: the stream may already be torn down.
-    }
+  setProgramStatus(status: ProgramStatus): void {
+    this.status.setProgramStatus(status, (data) => this.write(data));
   }
+
+  queryTerminalColors(options: ColorQueryOptions = {}): Promise<TerminalColors> {
+    this.colorQuery?.cancel();
+    return new Promise((resolve) => {
+      this.colorQuery = new PendingColorQuery(resolve, options);
+      this.write(TERMINAL_COLOR_QUERY);
+    });
+  }
+
+  queryCellSize(): void {
+    this.write(CELL_SIZE_QUERY);
+  }
+
 
   private fireDisconnect(): void {
     if (this.disconnected) return;

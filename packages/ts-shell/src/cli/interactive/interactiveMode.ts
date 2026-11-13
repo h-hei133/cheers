@@ -30,6 +30,7 @@ import { nextScope } from "../approval/permissionScope.js";
 import { Clipboard } from "./clipboard.js";
 import { Pointer } from "./pointer.js";
 import { TUI } from "../../presentation/tui/render/engine.js";
+import { OverlayStack, type OverlayComponent, type OverlayHandle, type OverlayOptions } from "../../presentation/tui/render/overlayStack.js";
 import { processTerminal, type TerminalDevice } from "../../presentation/tui/terminal.js";
 import { textBlock } from "../../presentation/tui/transcript/blocks.js";
 import { transcriptLineRenderer } from "../../presentation/tui/transcript/output.js";
@@ -234,6 +235,7 @@ export class InteractiveMode {
     },
   });
   private readonly overlay: OverlayHost;
+  private readonly overlayStack: OverlayStack;
   private readonly pager = new Pager();
   private readonly search = new TranscriptSearch();
   private readonly pointer: Pointer;
@@ -312,6 +314,7 @@ export class InteractiveMode {
       write: (data) => this.terminal.write(data),
     });
     this.overlay = new OverlayHost(() => this.tui.requestRender(), this.preferences.keybindings);
+    this.overlayStack = new OverlayStack(() => this.tui.requestRender());
     this.tui = options.startup?.tui ?? new TUI(this.terminal, options.scheduler);
     this.theme = followTheme({
       workspaceRoot: options.runtimeContext.projectRoot,
@@ -332,6 +335,7 @@ export class InteractiveMode {
       this.theme.refresh();
       this.tui.requestRender({ force: true });
     });
+    this.stdin.onCellSize?.(() => this.tui.requestRender({ force: true }));
     this.tui.setDisconnectHandler(() => { void this.shutdown(); });
     // Build the transcript before subscribing to the live job owner. A native
     // runner may settle during construction; completion notices must have a
@@ -434,6 +438,7 @@ export class InteractiveMode {
         // the environment probe that never has a different answer.
         imageProtocol: () => this.imageProtocol,
         thinkingShortcut: this.preferences.thinkingShortcut,
+        overlayStack: this.overlayStack,
       },
       this.state,
     );
@@ -491,6 +496,9 @@ export class InteractiveMode {
     this.state.editor.loadHistory(diskHistory);
   }
 
+  showOverlay(component: OverlayComponent, options?: OverlayOptions): OverlayHandle {
+    return this.overlayStack.push(component, options);
+  }
   start(): void {
     // The intro renders itself at the frame width so a resize re-elides the path
     // instead of keeping the elision it was born with.
@@ -530,6 +538,7 @@ export class InteractiveMode {
         this.options.onUserIntent?.();
         this.vimSelection = undefined;
       }
+      if (this.overlayStack.handlePointer(report)) return;
       if (this.alternateScreen || this.pager.active || this.overlay.fullScreen) {
         const offset = this.pointer.handle(report);
         if (offset !== undefined && this.state.editor.setCursorOffset(offset)) {
@@ -550,6 +559,8 @@ export class InteractiveMode {
         this.tui.requestRender();
         return;
       }
+      const pasteDims = this.terminal.getDimensions();
+      if (this.overlayStack.handlePaste(text, pasteDims.columns, pasteDims.rows)) return;
       if (this.pager.handlePaste(text)) { this.tui.requestRender(); return; }
       if (this.overlay.handlePaste(text) || this.pickerInputPending.has(this.overlay.revision)) return;
       resetVimState(this.state.editor);
@@ -685,9 +696,10 @@ export class InteractiveMode {
     }
     this.catalogs.cancel();
     this.completionStatus = undefined;
+    const keyDims = this.terminal.getDimensions();
+    if (this.overlayStack.handleKey(event, keyDims.columns, keyDims.rows)) return;
     // An open picker owns the keyboard: it needs the arrows, Enter, Escape, and
     // every printable character for its filter.
-    // The pager owns every key while it is up, including Escape.
     if (this.pager.handleKey(event.keyId, event.text, this.terminal.getDimensions().rows)) {
       this.tui.requestRender();
       return;
@@ -794,6 +806,7 @@ export class InteractiveMode {
   private onQuestion(question: string): void {
     this.pager.close();
     this.overlay.close();
+    this.terminal.setProgramStatus?.({ state: "blocked", kind: "question", app: "cheers" });
     this.state.transcript.append(textBlock("notice", question));
     this.state.editor.placeholder = "Answer above, then press Enter";
     this.tui.requestRender();
@@ -801,6 +814,7 @@ export class InteractiveMode {
 
   private onQuestionSettled(): void {
     this.state.editor.placeholder = DEFAULT_PLACEHOLDER;
+    this.terminal.setProgramStatus?.({ state: this.busy ? "working" : "idle", app: "cheers" });
     this.tui.requestRender();
   }
 
@@ -1102,7 +1116,8 @@ export class InteractiveMode {
     }
     this.promptContext.suspend();
     this.busy = true;
-    // When the turn began, so an idle signal can say how long the work took
+    this.terminal.setProgress?.(true);
+    this.terminal.setProgramStatus?.({ state: "working", app: "cheers" });
     // rather than firing on every turn however brief.
     const turnStartedAt = Date.now();
     const attentionEnabled = this.options.runtimeContext.runtimeConfig.attentionOnIdle === true;
@@ -1189,6 +1204,8 @@ export class InteractiveMode {
       if (this.closing || this.stopped) {
         this.sink.end();
         this.busy = false;
+        this.terminal.setProgress?.(false);
+        this.terminal.setProgramStatus?.({ state: "clear", app: "cheers" });
         return;
       }
       // Long command output gets a view of its own: it is read once, and reading it
@@ -1197,6 +1214,10 @@ export class InteractiveMode {
       if (output) pageLongOutput(this.pager, output.title, output.block, this.state.transcript);
       this.sink.end();
       this.busy = automatic || this.pickerPending;
+      if (!this.busy) {
+        this.terminal.setProgress?.(false);
+        this.terminal.setProgramStatus?.({ state: "idle", app: "cheers" });
+      }
       this.promptContext.resume();
       if (sessionManagement && !this.stopped) this.overlay.open(sessionManagementPicker(this.pickerHost(), sessionManagement));
       if (exiting) {

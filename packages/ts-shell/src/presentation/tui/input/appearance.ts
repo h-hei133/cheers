@@ -10,7 +10,7 @@ export class AppearanceReports {
 
   /** Once committed to a report, its timeout must never turn the tail into keys. */
   holds(sequence: string): boolean {
-    return sequence.length >= 3 && ["\x1b]11;", "\x1b[?997;"].some(
+    return sequence.length >= 3 && ["\x1b]10;", "\x1b]11;", "\x1b]4;", "\x1b]7501;", "\x1b[?997;"].some(
       (prefix) => prefix.startsWith(sequence) || sequence.startsWith(prefix),
     );
   }
@@ -26,11 +26,11 @@ export class AppearanceReports {
   /** Keep framing, not an oversized payload. The invalid marker prevents applying it. */
   bound(sequence: string): string {
     const osc = sequence[1] === "]";
+    const header = osc ? (/^\x1b\](?:10|11|4|7501);/.exec(sequence)?.[0] ?? "\x1b]11;") : "\x1b[?997;0;";
     // The resolver proved there was no end before its cap. Retain the last byte
     // at the cap in case it starts an ST split over the boundary.
-    return (osc ? "\x1b]11;\0" : "\x1b[?997;0;") + sequence.slice((osc ? MAX_STRING_BYTES : MAX_CSI_BYTES) - 1);
+    return (osc ? `${header}\0` : header) + sequence.slice((osc ? MAX_STRING_BYTES : MAX_CSI_BYTES) - 1);
   }
-
   consume(sequence: string): boolean {
     const scheme = /^\x1b\[\?997;(1|2)n$/.exec(sequence);
     if (scheme) {

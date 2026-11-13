@@ -9,6 +9,17 @@ export interface CellDimensions {
 }
 
 const DEFAULT_CELL_DIMENSIONS: CellDimensions = { widthPx: 9, heightPx: 18 };
+let currentCellDimensions: CellDimensions = DEFAULT_CELL_DIMENSIONS;
+
+export function getCellDimensions(): CellDimensions {
+  return currentCellDimensions;
+}
+
+export function setCellDimensions(dimensions: CellDimensions): void {
+  if (dimensions.widthPx > 0 && dimensions.heightPx > 0) {
+    currentCellDimensions = dimensions;
+  }
+}
 function headerPrefixBuffer(base64Data: string, maxChars = 128): Buffer {
   if (base64Data.length <= maxChars) return Buffer.from(base64Data, "base64");
   const aligned = maxChars - (maxChars % 4);
@@ -123,7 +134,7 @@ export function getImageDimensions(base64Data: string, mimeType?: string): Image
 export function calculateImageRows(
   dimensions: ImageDimensions,
   targetColumns: number,
-  cellSize: CellDimensions = DEFAULT_CELL_DIMENSIONS,
+  cellSize: CellDimensions = currentCellDimensions,
 ): number {
   if (dimensions.widthPx <= 0 || dimensions.heightPx <= 0 || targetColumns <= 0) return 1;
   const renderedHeightPx = (targetColumns * cellSize.widthPx * dimensions.heightPx) / dimensions.widthPx;

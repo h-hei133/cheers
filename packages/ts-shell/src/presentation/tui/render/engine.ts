@@ -1,5 +1,6 @@
 import { DISABLE_MOUSE, ENABLE_MOUSE, DISABLE_MOUSE_MOTION, ENABLE_MOUSE_MOTION } from "../input/mouse.js";
-import { kittyDeleteAllImages, kittyDeleteImage, swapTransmittedForPlacement, transmissionsIn } from "../image.js";
+import { detectImageProtocol, kittyDeleteAllImages, kittyDeleteImage, swapTransmittedForPlacement, transmissionsIn } from "../image.js";
+import { CELL_SIZE_QUERY } from "../input/cellSize.js";
 import type { TerminalDevice, TerminalStartOptions } from "../terminal.js";
 import { processTerminal } from "../terminal.js";
 import {
@@ -151,6 +152,10 @@ export class TUI {
     this.alternateScreen = options?.useAlternateScreen !== false;
     this.enterScreen();
     this.setMouseTracking(this.alternateScreen);
+    if (detectImageProtocol()) {
+      if (this.terminal.queryCellSize) this.terminal.queryCellSize();
+      else this.terminal.write(CELL_SIZE_QUERY);
+    }
     this.requestRender({ force: true });
   }
 

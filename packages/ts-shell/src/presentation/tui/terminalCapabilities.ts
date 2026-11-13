@@ -1,3 +1,5 @@
+import { detectHyperlinkSupport } from "./input/cellSize.js";
+
 /**
  * Static terminal capability detection.
  *
@@ -16,6 +18,8 @@ export interface TerminalCapabilities {
   readonly supportsBracketedPaste: boolean;
   /** Inside tmux or screen, where the pane owns its own scrollback and reflow. */
   readonly insideMultiplexer: boolean;
+  /** Whether the terminal supports OSC 8 hyperlinks (probed via tmux when multiplexed). */
+  readonly supportsHyperlinks?: boolean;
 }
 
 /** Terminals known to implement synchronized output. */
@@ -60,5 +64,6 @@ export function detectTerminalCapabilities(env: NodeJS.ProcessEnv = process.env)
     supportsKittyKeyboard: isKitty || program === "ghostty" || program === "WezTerm",
     supportsBracketedPaste: !term.includes("dumb") && term !== "",
     insideMultiplexer,
+    supportsHyperlinks: detectHyperlinkSupport(env, insideMultiplexer),
   };
 }

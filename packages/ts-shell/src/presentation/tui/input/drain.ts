@@ -25,3 +25,26 @@ export function drainInput(input: Readable, maxMs = 1000, idleMs = 50): Promise<
     input.resume();
   });
 }
+
+/** Enter raw mode when stdin is a TTY, returning whether this call took ownership. */
+export function acquireRawMode(rawOwned: boolean): boolean {
+  if (typeof process.stdin.setRawMode !== "function") return rawOwned;
+  if (!process.stdin.isRaw) {
+    process.stdin.setRawMode(true);
+    return true;
+  }
+  return rawOwned;
+}
+
+/** Release raw mode if owned and pause stdin, tolerating already-torn-down streams. */
+export function releaseRawMode(rawOwned: boolean): boolean {
+  try {
+    if (rawOwned && typeof process.stdin.setRawMode === "function") {
+      process.stdin.setRawMode(false);
+    }
+    process.stdin.pause();
+  } catch {
+    // Best-effort: the stream may already be torn down.
+  }
+  return false;
+}
