@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { visibleWidth } from "./text/measure.js";
-import { detectImageProtocol, inlineImageSequence, kittyPlacementFor, swapTransmittedForPlacement, windowTitle, idleNotification, bell } from "./image.js";
+import { calculateImageRows, detectImageProtocol, estimateDecodedImageBytes, getImageDimensions, inlineImageSequence, kittyPlacementFor, swapTransmittedForPlacement, transmissionsIn, windowTitle, idleNotification, bell } from "./image.js";
 
 /** The environment of a terminal that identifies itself, with nothing else. */
 function env(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
@@ -123,5 +123,46 @@ describe("transmit-once placement under redraw", () => {
   it("leaves iterm2 sequences alone: that protocol has no placement mode", () => {
     const first = inlineImageSequence("iterm2", "QUJD", { columns: 10 });
     expect(kittyPlacementFor(first)).toBeUndefined();
+  });
+});
+
+describe("image header dimensions and decoded pixel accounting", () => {
+  it("parses PNG, GIF, WebP (VP8X), and JPEG SOF0 dimensions and calculates terminal rows", () => {
+    // 320x160 PNG IHDR
+    const png = Buffer.alloc(24);
+    png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+    png.writeUInt32BE(320, 16);
+    png.writeUInt32BE(160, 20);
+    const pngB64 = png.toString("base64");
+    expect(getImageDimensions(pngB64, "image/png")).toEqual({ widthPx: 320, heightPx: 160 });
+    expect(getImageDimensions(pngB64)).toEqual({ widthPx: 320, heightPx: 160 });
+    expect(calculateImageRows({ widthPx: 320, heightPx: 160 }, 40)).toBe(10);
+    expect(estimateDecodedImageBytes(pngB64)).toBe(320 * 160 * 4);
+
+    // 640x480 GIF89a
+    const gif = Buffer.alloc(10);
+    gif.write("GIF89a", 0, "ascii");
+    gif.writeUInt16LE(640, 6);
+    gif.writeUInt16LE(480, 8);
+    expect(getImageDimensions(gif.toString("base64"))).toEqual({ widthPx: 640, heightPx: 480 });
+
+    // 800x600 WebP VP8X
+    const webp = Buffer.alloc(30);
+    webp.write("RIFF", 0, "ascii");
+    webp.write("WEBP", 8, "ascii");
+    webp.write("VP8X", 12, "ascii");
+    webp[24] = (799) & 0xff;
+    webp[25] = (799 >> 8) & 0xff;
+    webp[26] = (799 >> 16) & 0xff;
+    webp[27] = (599) & 0xff;
+    webp[28] = (599 >> 8) & 0xff;
+    webp[29] = (599 >> 16) & 0xff;
+    expect(getImageDimensions(webp.toString("base64"))).toEqual({ widthPx: 800, heightPx: 600 });
+
+    // 1024x768 JPEG SOF0
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x03, 0x00, 0x04, 0x00, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01, 0xff, 0xd9]);
+    expect(getImageDimensions(jpeg.toString("base64"))).toEqual({ widthPx: 1024, heightPx: 768 });
+    const kittyRow = inlineImageSequence("kitty", pngB64, { imageId: 42 });
+    expect(transmissionsIn(kittyRow)[0]?.decodedBytes).toBe(320 * 160 * 4);
   });
 });

@@ -2,7 +2,7 @@ import { ENABLE_MOUSE, DISABLE_MOUSE, ENABLE_MOUSE_MOTION, DISABLE_MOUSE_MOTION 
 import { describe, expect, it, vi } from "vitest";
 import { TUI } from "./engine.js";
 import { CURSOR_MARKER } from "./paint.js";
-import type { FrameLayout, TerminalFramePlan, TerminalFrameProvider, ViewportSize } from "./frame.js";
+import { BoundedTerminalWriter, MAX_RENDER_WRITE_CHARS, writeBoundedFrame } from "./boundedWriter.js";
 import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminalDouble.js";
 
 class StubProvider implements TerminalFrameProvider {
@@ -926,6 +926,62 @@ describe("kitty image rows under redraw", () => {
     // And the frame after that places it, since this one just transmitted it.
     tui.renderNow();
     expect(terminal.drain()).not.toContain("QUJD");
+  });
+
+  it("evicts offscreen kitty images when decoded pixel bytes exceed 64 MiB", () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    tui.start();
+    scheduler.flush();
+    // Tiny 32-byte PNG headers claiming 5000x4000 pixels (~76.3 MiB decoded RGBA each)
+    const makeHugePng = (id: number): string => {
+      const png = Buffer.alloc(24);
+      png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+      png.writeUInt32BE(5000, 16);
+      png.writeUInt32BE(4000, 20);
+      return `\x1b_Ga=T,f=100,q=2,i=${id};${png.toString("base64")}\x1b\\`;
+    };
+    provider.rows = [makeHugePng(501)];
+    tui.renderNow();
+    provider.rows = [makeHugePng(502)];
+    tui.renderNow();
+    scheduler.flush();
+    const out = terminal.drain();
+    // Even with only 1 offscreen image (well below 16 count / 32 MiB wire), 76.3 MiB > 64 MiB triggers eviction of 501.
+    expect(out).toContain("\x1b_Ga=d,d=i,i=501");
+  });
+});
+
+describe("BoundedTerminalWriter", () => {
+  it("splits oversized writes at 1 MiB boundaries without splitting surrogate pairs", () => {
+    const chunks: string[] = [];
+    const done = vi.fn();
+    const writer = new BoundedTerminalWriter({ write: (d, cb) => { chunks.push(d); cb?.(); } }, 10);
+    writer.append("012345678😀xyz");
+    writer.flush(done);
+    expect(chunks.join("")).toBe("012345678😀xyz");
+    expect(chunks[0]).toBe("012345678");
+    expect(chunks[1]).toBe("😀xyz");
+    expect(done).toHaveBeenCalledOnce();
+    expect(MAX_RENDER_WRITE_CHARS).toBe(1024 * 1024);
+  });
+
+  it("delivers onWritten on a non-empty final chunk even on exact maxChars multiples and handles maxChars <= 1", () => {
+    const writes: string[] = [];
+    const done = vi.fn();
+    writeBoundedFrame(
+      { write: (d, cb) => { if (d.length > 0) { writes.push(d); cb?.(); } } },
+      "abcdefghij",
+      done,
+      5,
+    );
+    expect(writes).toEqual(["abcde", "fghij"]);
+    expect(done).toHaveBeenCalledOnce();
+
+    const clamped: string[] = [];
+    const smallWriter = new BoundedTerminalWriter({ write: (d) => clamped.push(d) }, 1);
+    smallWriter.append("😀a");
+    smallWriter.flush();
+    expect(clamped).toEqual(["😀", "a"]);
   });
 });
 

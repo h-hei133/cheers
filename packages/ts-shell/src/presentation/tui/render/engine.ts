@@ -12,6 +12,7 @@ import {
 } from "./frame.js";
 import { MainScreenPainter } from "./mainScreen.js";
 import { FrameStartup } from './startup.js';
+import { writeBoundedFrame } from "./boundedWriter.js";
 import {
   cursorPaint,
   cursorTarget,
@@ -54,8 +55,9 @@ const BACKLOG_RETRY_MS = 10;
  * holds a handful of images at once, so a cap of 32 off screen is generous for
  * scrolling back and far below what an unbounded session accumulates.
  */
-const MAX_OFFSCREEN_IMAGES = 32;
+const MAX_OFFSCREEN_IMAGES = 16;
 const MAX_OFFSCREEN_IMAGE_BYTES = 32 * 1024 * 1024;
+const MAX_OFFSCREEN_IMAGE_DECODED_BYTES = 64 * 1024 * 1024;
 
 export class TUI {
   private readonly terminal: TerminalDevice;
@@ -68,7 +70,7 @@ export class TUI {
    * first. Session-scoped rather than per-frame: the terminal keeps an image
    * until it is deleted, and that outlives any one frame's viewport.
    */
-  private readonly transmitted = new Map<number, { readonly bytes: number }>();
+  private readonly transmitted = new Map<number, { readonly bytes: number; readonly decodedBytes: number }>();
   private lastWidth = 0;
   private lastHeight = 0;
   private painted = false;
@@ -430,15 +432,15 @@ export class TUI {
     // Register this frame's transmissions after the swap, so the first paint of
     // an image sends its payload rather than placing pixels the terminal has
     // never been given. Visible images move to the young end of the registry.
-    const visible = new Map<number, number>();
+    const visible = new Map<number, { readonly bytes: number; readonly decodedBytes: number }>();
     for (const row of rows) {
       for (const transmission of transmissionsIn(row)) {
-        visible.set(transmission.imageId, transmission.bytes);
+        visible.set(transmission.imageId, { bytes: transmission.bytes, decodedBytes: transmission.decodedBytes });
       }
     }
-    for (const [imageId, bytes] of visible) {
+    for (const [imageId, held] of visible) {
       this.transmitted.delete(imageId);
-      this.transmitted.set(imageId, { bytes });
+      this.transmitted.set(imageId, held);
     }
 
     let buffer = paintBegin(this.terminal.capabilities.supportsDec2026Sync);
@@ -448,8 +450,7 @@ export class TUI {
     buffer += this.evictOffscreenImages(visible);
     buffer += cursorPaint(cursorTarget(source, 0, height), 0);
     buffer += paintEnd(this.terminal.capabilities.supportsDec2026Sync);
-    this.terminal.write(buffer, onWritten);
-
+    writeBoundedFrame(this.terminal, buffer, onWritten);
     this.window = rows;
     this.lastWidth = width;
     this.lastHeight = height;
@@ -467,22 +468,31 @@ export class TUI {
    * the ones off screen, oldest first, which are the ones a scroll back to the
    * beginning would need to re-transmit if it ever gets there.
    */
-  private evictOffscreenImages(visible: ReadonlyMap<number, number>): string {
+  private evictOffscreenImages(visible: ReadonlyMap<number, { readonly bytes: number; readonly decodedBytes: number }>): string {
     let offscreen = 0;
     let offscreenBytes = 0;
+    let offscreenDecodedBytes = 0;
     for (const [imageId, held] of this.transmitted) {
       if (visible.has(imageId)) continue;
       offscreen += 1;
       offscreenBytes += held.bytes;
+      offscreenDecodedBytes += held.decodedBytes;
     }
     let deletions = "";
     for (const [imageId, held] of this.transmitted) {
-      if (offscreen <= MAX_OFFSCREEN_IMAGES && offscreenBytes <= MAX_OFFSCREEN_IMAGE_BYTES) break;
+      if (
+        offscreen <= MAX_OFFSCREEN_IMAGES &&
+        offscreenBytes <= MAX_OFFSCREEN_IMAGE_BYTES &&
+        offscreenDecodedBytes <= MAX_OFFSCREEN_IMAGE_DECODED_BYTES
+      ) {
+        break;
+      }
       if (visible.has(imageId)) continue;
       deletions += kittyDeleteImage(imageId);
       this.transmitted.delete(imageId);
       offscreen -= 1;
       offscreenBytes -= held.bytes;
+      offscreenDecodedBytes -= held.decodedBytes;
     }
     return deletions;
   }

@@ -13,6 +13,8 @@
  * to text — an image that renders once and then corrupts on scrollback is
  * worse than a placeholder that never lies.
  */
+import { estimateDecodedImageBytes } from "./imageDimensions.js";
+export { calculateImageRows, estimateDecodedImageBytes, getImageDimensions, type CellDimensions, type ImageDimensions } from "./imageDimensions.js";
 
 export type ImageProtocol = "kitty" | "iterm2";
 
@@ -113,23 +115,29 @@ export interface KittyTransmission {
   readonly imageId: number;
   /** Bytes the transmission occupies, payload included. */
   readonly bytes: number;
+  /** Estimated decoded RGBA framebuffer bytes on the terminal side. */
+  readonly decodedBytes: number;
 }
 
 /**
- * The kitty transmissions a row carries, with the bytes each one holds.
- *
- * A transmission is an initiator chunk carrying the controls plus any number of
- * continuation chunks; the run is one unit, so it is parsed as one. The byte
- * count is what an eviction budget accounts in: the payload size is the cost
- * the terminal paid to hold the image, and it is the only size this side can
- * know without decoding formats it deliberately does not decode.
+ * The kitty transmissions a row carries, with the wire bytes and decoded-pixel
+ * estimate each one holds.
  */
 export function transmissionsIn(line: string): readonly KittyTransmission[] {
+  if (!line.includes("\x1b_G")) return [];
   const found: KittyTransmission[] = [];
   for (const match of line.matchAll(kittyTransmissionPattern())) {
     const id = /i=(\d+)/.exec(match[0])?.[1];
     if (id === undefined) continue;
-    found.push({ imageId: Number(id), bytes: match[0].length });
+    const payload = match[0]
+      .split("\x1b\\")
+      .filter(Boolean)
+      .map((part) => {
+        const sep = part.indexOf(";");
+        return sep === -1 ? "" : part.slice(sep + 1);
+      })
+      .join("");
+    found.push({ imageId: Number(id), bytes: match[0].length, decodedBytes: estimateDecodedImageBytes(payload) });
   }
   return found;
 }

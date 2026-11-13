@@ -32,8 +32,13 @@ describe("cell width", () => {
     expect(visibleWidth("é")).toBe(1);
     expect(visibleWidth("👨‍👩‍👧")).toBe(2);
     expect(getClusterWidth("👨‍👩‍👧")).toBe(2);
+    expect(visibleWidth("🇺🇸")).toBe(2);
+    expect(visibleWidth("🇺")).toBe(2);
+    expect(visibleWidth("☝🏽")).toBe(2);
+    expect(visibleWidth("1️⃣")).toBe(2);
+    expect(visibleWidth("❤‍🔥")).toBe(2);
+    expect(visibleWidth("क\u093f")).toBe(2);
   });
-
   it("gives combining marks and control characters no width", () => {
     expect(getCodePointWidth(0x0301)).toBe(0);
     expect(getCodePointWidth(0x200d)).toBe(0);

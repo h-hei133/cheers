@@ -31,7 +31,7 @@ const WIDE_RANGES: readonly number[] = [
   0x18cff, 0x18d08, 0x1aff0, 0x1aff3, 0x1aff5, 0x1affb, 0x1affd, 0x1affe,
   0x1b000, 0x1b122, 0x1b132, 0x1b132, 0x1b150, 0x1b152, 0x1b155, 0x1b155,
   0x1b164, 0x1b167, 0x1b170, 0x1b2fb, 0x1f004, 0x1f004, 0x1f0cf, 0x1f0cf,
-  0x1f18e, 0x1f18e, 0x1f191, 0x1f19a, 0x1f200, 0x1f202, 0x1f210, 0x1f23b,
+  0x1f18e, 0x1f18e, 0x1f191, 0x1f19a, 0x1f1e6, 0x1f1ff, 0x1f200, 0x1f202, 0x1f210, 0x1f23b,
   0x1f240, 0x1f248, 0x1f250, 0x1f251, 0x1f260, 0x1f265, 0x1f300, 0x1f320,
   0x1f32d, 0x1f335, 0x1f337, 0x1f37c, 0x1f37e, 0x1f393, 0x1f3a0, 0x1f3ca,
   0x1f3cf, 0x1f3d3, 0x1f3e0, 0x1f3f0, 0x1f3f4, 0x1f3f4, 0x1f3f8, 0x1f43e,
@@ -85,20 +85,90 @@ function resolveCodePointWidth(code: number): number {
 }
 
 const EMOJI_PRESENTATION_SELECTOR = 0xfe0f;
+const RGI_EMOJI = new RegExp("^\\p{RGI_Emoji}$", "v");
+const SPACING_MARK = /^\p{Mc}$/u;
+const NON_BASE_MARK = /^\p{Mark}$/u;
+const NON_PRINTING_MARK = /^[\p{Default_Ignorable_Code_Point}\p{Control}\p{Format}\p{Mark}\p{Surrogate}]$/u;
+
+function isTerminalSpacingMark(code: number): boolean {
+  if (code === 0x1734 || code === 0x302e || code === 0x302f) return false;
+  if (
+    code === 0x065f ||
+    code === 0x0f7f ||
+    code === 0x102b ||
+    code === 0x102c ||
+    code === 0x1031 ||
+    (code >= 0x1033 && code <= 0x1035) ||
+    code === 0x1038 ||
+    (code >= 0x103a && code <= 0x103e)
+  ) {
+    return true;
+  }
+  return SPACING_MARK.test(String.fromCodePoint(code));
+}
+
+function couldBeRgiEmoji(cluster: string, firstCode: number): boolean {
+  return (
+    (firstCode >= 0x1f000 && firstCode <= 0x1fbff) ||
+    (firstCode >= 0x2300 && firstCode <= 0x23ff) ||
+    (firstCode >= 0x2600 && firstCode <= 0x27bf) ||
+    (firstCode >= 0x2b50 && firstCode <= 0x2b55) ||
+    cluster.includes("\uFE0F") ||
+    cluster.length > 2
+  );
+}
 
 /**
- * Terminal cells occupied by one grapheme cluster. The first code point with a
- * non-zero width sets the base; an emoji presentation selector anywhere in the
- * cluster promotes it to a full-width cell.
+ * Terminal cells occupied by one grapheme cluster. Handles regional indicators,
+ * RGI emoji (with or without U+FE0F), ZWJ sequences containing wide emoji,
+ * and terminal spacing marks while keeping narrow dingbats at width 1.
  */
 export function getClusterWidth(cluster: string): number {
+  if (cluster.length === 0) return 0;
+  const firstCode = cluster.codePointAt(0)!;
+  if (firstCode >= 0x1f1e6 && firstCode <= 0x1f1ff) return 2;
+  if (couldBeRgiEmoji(cluster, firstCode) && RGI_EMOJI.test(cluster)) return 2;
+
   let width = 0;
   let promoted = false;
+  let followsMark = false;
+  let hasZwj = false;
+  let hasWideMember = false;
+  let first = true;
+
   for (const char of cluster) {
     const code = char.codePointAt(0)!;
     if (code === EMOJI_PRESENTATION_SELECTOR) promoted = true;
-    if (width === 0) width = getCodePointWidth(code);
+    if (code === 0x200d) hasZwj = true;
+    const cpWidth = getCodePointWidth(code);
+    if (cpWidth === 2) hasWideMember = true;
+
+    if (first) {
+      first = false;
+      width = cpWidth;
+      continue;
+    }
+
+    if (width === 0) {
+      width = cpWidth;
+      continue;
+    }
+
+    if (isTerminalSpacingMark(code)) {
+      width += 1;
+      followsMark = false;
+    } else if (NON_BASE_MARK.test(char)) {
+      followsMark = true;
+    } else if (!NON_PRINTING_MARK.test(char)) {
+      if (followsMark || (code >= 0xff00 && code <= 0xffef)) {
+        width += cpWidth;
+      } else if (code === 0x0e33 || code === 0x0eb3) {
+        width += 1;
+      }
+      followsMark = false;
+    }
   }
-  if (promoted && width === 1) return 2;
+
+  if ((promoted || (hasZwj && hasWideMember)) && width === 1) return 2;
   return width;
 }

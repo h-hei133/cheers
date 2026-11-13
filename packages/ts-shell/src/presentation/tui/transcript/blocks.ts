@@ -5,7 +5,7 @@ import { formatCommandLine, formatToolDetail } from "../../theme/commandHighligh
 import { padToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import type { ImageContent } from "../../../model-adapters/multimodal.js";
-import { imageIdForData, inlineImageSequence, type ImageProtocol } from "../image.js";
+import { calculateImageRows, getImageDimensions, imageIdForData, inlineImageSequence, type ImageProtocol } from "../image.js";
 import { renderDiff } from "./diff.js";
 import { renderMarkdown, trimPartialFence } from "./markdown.js";
 
@@ -148,8 +148,11 @@ function renderUser(block: Block, width: number, options: BlockRenderOptions = {
   // without shifting a single column, and the wrap leaves the sequence whole.
   for (const image of block.images ?? []) {
     if (options.imageProtocol) {
+      const columns = Math.max(4, Math.min(bodyWidth, 48));
+      const dims = getImageDimensions(image.data, image.mimeType);
       const sequence = inlineImageSequence(options.imageProtocol, image.data, {
-        columns: Math.max(4, Math.min(bodyWidth, 48)),
+        columns,
+        ...(dims ? { rows: calculateImageRows(dims, columns) } : {}),
         imageId: imageIdForData(image.data),
       });
       const padded = padToWidth(" ", width);
@@ -298,8 +301,11 @@ function toolImageRows(block: Block, width: number, options: BlockRenderOptions)
   const rows: string[] = [];
   for (const image of block.images ?? []) {
     if (options.imageProtocol) {
+      const columns = Math.max(4, Math.min(width, 48));
+      const dims = getImageDimensions(image.data, image.mimeType);
       const sequence = inlineImageSequence(options.imageProtocol, image.data, {
-        columns: Math.max(4, Math.min(width, 48)),
+        columns,
+        ...(dims ? { rows: calculateImageRows(dims, columns) } : {}),
         imageId: imageIdForData(image.data),
       });
       rows.push(`${GUTTER}${sequence}`);
