@@ -7,6 +7,7 @@ import type { AgentMessage } from "../core/agent/state.js";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
+import type { AgentLoopConfig } from "../core/agent/loop.js";
 import {
   condenseContext,
 } from "../session/compaction.js";
@@ -118,6 +119,7 @@ export interface TurnOptions {
     readonly baseDelayMs?: number;
     readonly maxDelayMs?: number;
   };
+  readonly prepareRequest?: AgentLoopConfig['prepareRequest'];
   /**
    * Keeping this run's prompt cached between requests.
    *
@@ -229,6 +231,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     // the request it predicts on the same question.
     toolsAllowedOnNextStep: () => projection.stepCount + 1 < options.maxSteps,
     prepareNextStep: compaction?.beforeStep,
+    ...(options.prepareRequest ? { prepareRequest: options.prepareRequest } : {}),
   });
 
   const queues = core.pendingQueues;

@@ -7,7 +7,8 @@ import {
 import type { ChatMessage } from "../../turn/prompt.js";
 import type { ToolSchema } from "../../turn/tools.js";
 import type { ProviderUsage, StreamFragment, StreamedCompletion, StreamedToolCall } from "../../turn/completion.js";
-import { declareToolChanges, insertThinkingLevelMessages } from "./anthropicCachePreservation.js";
+import { anthropicBetaHeaders, declareToolChanges, insertThinkingLevelMessages } from "./anthropicCachePreservation.js";
+export { anthropicBetaHeaders };
 import { copilotRequestHeaders } from "./copilotHeaders.js";
 import { declareEndpoint } from "./kinds.js";
 import { IncompleteStreamError } from '../response/error.js';
@@ -113,6 +114,7 @@ export interface AnthropicRequestInput {
   readonly initialTools?: readonly ToolSchema[];
   readonly supportsMidConvoToolChanges?: boolean;
   readonly supportsMidConvoEffort?: boolean;
+  readonly historicalEfforts?: ReadonlyMap<number, string>;
 }
 
 /** The headers this endpoint authenticates with, given an API key. */
@@ -126,6 +128,7 @@ export function anthropicHeaders(apiKey?: string): Record<string, string> {
     "anthropic-version": API_VERSION,
   };
 }
+
 
 /**
  * The request body.
@@ -157,7 +160,7 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
       block_binding: { prefix_mismatch_behavior: "drop_block" },
     };
     body.output_config = { effort: "low" };
-    finalMessages = insertThinkingLevelMessages(finalMessages, input.thinkingLevelName);
+    finalMessages = insertThinkingLevelMessages(finalMessages, input.thinkingLevelName, input.historicalEfforts);
   }
   if (input.allowTools && (input.tools.length > 0 || (input.supportsMidConvoToolChanges && input.initialTools !== undefined))) {
     if (input.supportsMidConvoToolChanges && input.initialTools !== undefined) {
@@ -815,7 +818,10 @@ declareEndpoint("anthropic-messages", {
   headers: (apiKey) => anthropicHeaders(apiKey),
   // Copilot serves Claude models through this protocol, and its gateway wants
   // the same metadata on these turns as on chat-completions ones.
-  requestHeaders: copilotRequestHeaders,
+  requestHeaders: (input) => ({
+    ...copilotRequestHeaders(input),
+    ...anthropicBetaHeaders(input),
+  }),
   body: (input) =>
     anthropicRequestBody({
       model: input.model,
@@ -860,6 +866,7 @@ declareEndpoint("anthropic-messages", {
       ...(input.initialTools !== undefined ? { initialTools: input.initialTools } : {}),
       ...(input.supportsMidConvoToolChanges !== undefined ? { supportsMidConvoToolChanges: input.supportsMidConvoToolChanges } : {}),
       ...(input.supportsMidConvoEffort !== undefined ? { supportsMidConvoEffort: input.supportsMidConvoEffort } : {}),
+      ...(input.historicalEfforts !== undefined ? { historicalEfforts: input.historicalEfforts } : {}),
     }),
   refreshBody: (body) => {
     // A different budget/thinking config changes the message cache key; retaining it defeats

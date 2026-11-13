@@ -454,4 +454,31 @@ describe("AgentCore continue and reset", () => {
     // Both corrections arrive in one request, so the model answers once.
     expect(steps).toBe(1);
   });
+
+  it("forwards prepareRequest hooks to the underlying loop", async () => {
+    const reasons: string[] = [];
+    let attempt = 0;
+    const core = new AgentCore({
+      prepareRequest: ({ reason, messages }) => {
+        reasons.push(reason);
+        return { messages };
+      },
+      streamStep: async () => {
+        attempt += 1;
+        if (attempt === 1) {
+          return {
+            text: "",
+            toolCalls: [],
+            stopReason: "error",
+            errorMessage: "429 rate limited",
+          };
+        }
+        return answer("recovered");
+      },
+      retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 },
+    });
+
+    await core.prompt(userMessage("go"));
+    expect(reasons).toEqual(["user", "retry"]);
+  });
 });

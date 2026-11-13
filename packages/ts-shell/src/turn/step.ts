@@ -1,4 +1,5 @@
-import { catalogModel, catalogProvider } from "../core/models/catalog.js";
+import { catalogModel, catalogProvider, providerEndpoint } from "../core/models/catalog.js";
+import { inferRouteReason, type VirtualModelRegistry } from "../core/models/virtualModels.js";
 import { createHash, randomUUID } from 'node:crypto';
 import { createComponentLogger } from "../observability/structuredLogger.js";
 import { ModelAdmissionError, type ModelTransport, type RequestPolicy } from '../core/agent/request/model.js';
@@ -192,6 +193,10 @@ export interface StepRequest {
    * retries by default.
    */
   readonly retry?: Partial<RetryPolicy>;
+  readonly cacheRetention?: 'short' | 'long' | 'none';
+  readonly initialTools?: readonly ToolSchema[];
+  readonly virtualModels?: VirtualModelRegistry;
+  readonly historicalEfforts?: ReadonlyMap<number, string>;
 }
 
 const OVERFLOW_MARKERS = ["context_length_exceeded", "context_overflow", "maximum context length", "prompt_too_long"];
@@ -258,7 +263,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
   // after a switch. Built once here because every attempt of every step from
   // this function talks to the same target; the callers that switch models
   // build a new step function.
-  const origin =
+  const initialTools = request.initialTools ?? request.tools;
+  const baseOrigin =
     request.provider.model || request.provider.provider
       ? { ...(request.provider.provider ? { provider: request.provider.provider } : {}), model: request.provider.model }
       : undefined;
@@ -268,70 +274,76 @@ export function createStepFunction(request: StepRequest): StepFunction {
     let requestAcceptedAt: number | undefined;
     let acceptedResponse = false;
     const catalogAddress = request.provider.provider ? request.provider.baseUrl : undefined;
-    const toolCalling = resolveRequestShape(
-      request.catalog ?? [],
-      request.provider.provider ?? "",
-      request.provider.model,
-      undefined,
-      catalogAddress,
-    ).toolCalling;
-    const allowTools = options.allowTools && toolCalling;
-    const allowed = options.allowedTools && new Set(options.allowedTools);
-    const declared = request.toolSnapshot?.() ?? request.tools;
-    const tools = toolCalling
-      ? allowed
-        ? declared.filter((tool) => allowed.has(tool.function.name))
-        : declared
-      : [];
-    const regeneratedPrompt = request.systemPromptFor !== undefined
-      && (options.agentMode !== undefined || !toolCalling);
-    const systemPrompt = regeneratedPrompt
-      ? request.systemPromptFor!(options.agentMode, tools.map((tool) => tool.function.name), toolCalling)
-      : request.systemPrompt;
-    // The wire omits schemas when the closing step forbids tools. Hash what the
-    // endpoint actually sends so a no-tools measurement cannot authorize a
-    // later tool-enabled request with a stale prompt count.
-    const wireTools = allowTools ? tools : [];
-    const overhead = { systemPrompt, tools: wireTools };
-    const schemaDigest = createHash('sha256').update(JSON.stringify(wireTools)).digest('hex');
-    const systemDigest = createHash('sha256').update(systemPrompt).digest('hex');
     const messageDigest = historyDigest(messages);
-    // Steps this call returns all come from the same target, so the origin is
-    // stamped once on whatever leaves — an answer, a refusal, or an abort —
-    // rather than threaded through each builder's signature. A `return` in
-    // this body that forgets the stamp is invisible to the type, which is why
-    // every exit goes through it.
     let shownReasoning = '';
+    let activeOrigin = baseOrigin;
+    let currentAllowTools = options.allowTools;
     const stamp = (step: AssistantStep): AssistantStep => {
-      // Failed reads have no verified native output, but public text already
-      // displayed still belongs in history. It receives no replay authority.
       const recorded = !step.reasoning && shownReasoning && (step.stopReason === 'error' || step.stopReason === 'aborted')
         ? { ...step, reasoning: { text: shownReasoning } } : step;
-      return { ...recorded, toolsAllowed: allowTools, ...(origin ? { origin: recorded.origin ?? origin } : {}) };
+      return { ...recorded, toolsAllowed: currentAllowTools, ...(activeOrigin ? { origin: recorded.origin ?? activeOrigin } : {}) };
     };
-    // Older direct adapters supplied only a model and URL. Without the runtime
-    // provider identity, retain their unique-model catalogue lookup.
     let streamAttempts = 0;
     for (;;) {
-      const effort = effortAccepted ? captured.thinkingEffort ?? undefined : undefined;
-      if (catalogProvider(request.catalog ?? [], request.provider.provider ?? '', catalogAddress).ambiguous) {
+      const rawEffort = effortAccepted ? captured.thinkingEffort ?? undefined : undefined;
+      const route = request.virtualModels
+        ? await request.virtualModels.resolve({
+            provider: request.provider.provider ?? "",
+            modelId: request.provider.model,
+            thinkingLevel: rawEffort ?? "medium",
+            reason: inferRouteReason(messages, streamAttempts),
+            messages,
+            signal,
+          })
+        : undefined;
+      const activeProvider = route?.provider ?? (request.provider.provider ?? "");
+      const activeModel = route?.modelId ?? request.provider.model;
+      const effort = effortAccepted ? (route?.thinkingLevel ?? rawEffort) : undefined;
+      if (activeProvider || activeModel) {
+        activeOrigin = { ...(activeProvider ? { provider: activeProvider } : {}), model: activeModel };
+      }
+      const toolCalling = resolveRequestShape(
+        request.catalog ?? [],
+        activeProvider,
+        activeModel,
+        undefined,
+        catalogAddress,
+      ).toolCalling;
+      const allowTools = options.allowTools && toolCalling;
+      currentAllowTools = allowTools;
+      const allowed = options.allowedTools && new Set(options.allowedTools);
+      const declared = request.toolSnapshot?.() ?? request.tools;
+      const tools = toolCalling
+        ? allowed
+          ? declared.filter((tool) => allowed.has(tool.function.name))
+          : declared
+        : [];
+      const regeneratedPrompt = request.systemPromptFor !== undefined
+        && (options.agentMode !== undefined || !toolCalling);
+      const systemPrompt = regeneratedPrompt
+        ? request.systemPromptFor!(options.agentMode, tools.map((tool) => tool.function.name), toolCalling)
+        : request.systemPrompt;
+      const wireTools = allowTools ? tools : [];
+      const overhead = { systemPrompt, tools: wireTools };
+      const schemaDigest = createHash('sha256').update(JSON.stringify(wireTools)).digest('hex');
+      const systemDigest = createHash('sha256').update(systemPrompt).digest('hex');
+      if (catalogProvider(request.catalog ?? [], activeProvider, catalogAddress).ambiguous) {
         return stamp(errorStep('The model catalogue has multiple entries for this endpoint. Resolve them before sending.'));
       }
       if (effort && (explicitEffort || ['minimal', 'xhigh', 'max'].includes(effort))
-        && effortCapability(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, effort, catalogAddress) === 'unsupported') {
+        && effortCapability(request.catalog ?? [], activeProvider, activeModel, effort, catalogAddress) === 'unsupported') {
         return stamp(errorStep('The selected model does not support this reasoning effort. Select another level or use /thinking auto.'));
       }
       if (!toolCalling && hasToolHistory(messages)) {
         return stamp(errorStep(TOOL_HISTORY_UNSUPPORTED_MESSAGE));
       }
-      // Resolved per attempt rather than once, because the shape depends on the
-      // level, and a refused `reasoning_effort` is answered by rebuilding the
-      // request without it.
-      const endpoint = endpointFor(request);
+      const endpoint = route
+        ? (providerEndpoint(request.catalog ?? [], activeProvider, catalogAddress, activeModel) ?? endpointFor(request))
+        : endpointFor(request);
       const shape = resolveRequestShape(
         request.catalog ?? [],
-        request.provider.provider ?? "",
-        request.provider.model,
+        activeProvider,
+        activeModel,
         effortAccepted ? effort : undefined,
         catalogAddress,
         endpoint,
@@ -340,8 +352,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       try { protocol = endpointShape(endpoint); }
       catch (error) { return stamp(errorStep(error instanceof Error ? error.message : String(error))); }
       const output = protocol.outputControl === 'provider' ? undefined : request.maxOutputTokens ?? shape.maxOutputCeiling;
-      const modelEntry = catalogModel(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, catalogAddress);
-      const usageAttribution = captureUsageAttribution({ provider: request.provider.provider ?? '', model: request.provider.model,
+      const modelEntry = catalogModel(request.catalog ?? [], activeProvider, activeModel, catalogAddress);
+      const usageAttribution = captureUsageAttribution({ provider: activeProvider, model: activeModel,
         baseUrl: request.provider.baseUrl, rates: modelEntry?.cost });
       const projection = outgoingProjection(messages, shape.assistantAfterToolResult, request.pruneToolText);
       const finalMessages = finalStepMessages(
@@ -355,8 +367,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       }));
       const wireHistoryDigest = historyDigest(finalMessages);
       const promptIdentity = {
-        provider: request.provider.provider ?? '',
-        model: request.provider.model,
+        provider: activeProvider,
+        model: activeModel,
         endpoint,
         endpointId: usageAttribution.endpointId,
         schemaDigest,
@@ -369,8 +381,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       };
       const promptProjection = storedPromptProjection(messages, projection, options.promptSource,
         shape.assistantAfterToolResult, promptIdentity.wireMessageCount, request.pruneToolText);
-      const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
-        model: request.provider.model, endpoint, schemaDigest, systemDigest,
+      const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: activeProvider,
+        model: activeModel, endpoint, schemaDigest, systemDigest,
         endpointId: usageAttribution.endpointId, historyDigest: messageDigest, wireHistoryDigest, replayBinding });
       const initial = promptTokensFor({ messages: budgetMessages, overhead, ...(measured ? { measured } : {}) });
       const usage = getSessionUsage(request.sessionId);
@@ -412,23 +424,32 @@ export function createStepFunction(request: StepRequest): StepFunction {
         const budgetFailure = explicitEffort && effort ? effortOutputFailure(endpointShape(endpoint), request.maxOutputTokens ?? shape.maxOutputCeiling) : undefined;
         if (budgetFailure) return stamp(errorStep(budgetFailure));
         requestHeaders = endpointShape(endpoint).requestHeaders?.({
-          provider: request.provider.provider,
-          model: request.provider.model,
+          provider: activeProvider,
+          model: activeModel,
           systemPrompt,
           messages: projection.messages,
           tools,
           allowTools,
           vision: shape.vision,
           temperature: request.temperature ?? 0.7,
+          ...(shape.reasoningEffort && shape.thinkingLevelName
+            ? { thinkingLevelName: shape.thinkingLevelName }
+            : {}),
           systemRole: shape.systemRole,
           reasoningEffort: Boolean(shape.reasoningEffort),
           maxTokensField: shape.maxTokensField,
           assistantAfterToolResult: shape.assistantAfterToolResult,
           serviceTier: request.provider.serviceTier,
+          ...(request.cacheRetention !== undefined ? { cacheRetention: request.cacheRetention } : {}),
+          ...(shape.supportsMidConvoToolChanges ? {
+            supportsMidConvoToolChanges: true,
+            initialTools,
+          } : {}),
+          ...(shape.supportsMidConvoEffort ? { supportsMidConvoEffort: true } : {}),
         }) ?? {};
         payload = endpointTurnBody(endpoint, {
-          model: request.provider.model,
-          provider: request.provider.provider,
+          model: activeModel,
+          provider: activeProvider,
           sessionId: request.sessionId,
           ...(request.provider.baseUrl ? { baseUrl: request.provider.baseUrl } : {}),
           ...(shape.promptCacheKey !== undefined ? { supportsPromptCacheKey: shape.promptCacheKey } : {}),
@@ -459,6 +480,13 @@ export function createStepFunction(request: StepRequest): StepFunction {
           maxTokensField: shape.maxTokensField,
           assistantAfterToolResult: shape.assistantAfterToolResult,
           serviceTier: request.provider.serviceTier,
+          ...(request.cacheRetention !== undefined ? { cacheRetention: request.cacheRetention } : {}),
+          ...(shape.supportsMidConvoToolChanges ? {
+            supportsMidConvoToolChanges: true,
+            initialTools,
+          } : {}),
+          ...(shape.supportsMidConvoEffort ? { supportsMidConvoEffort: true } : {}),
+          ...(request.historicalEfforts ? { historicalEfforts: request.historicalEfforts } : {}),
         });
         // Public replay adds input outside the legacy answer/tool estimate.
         if (shape.reasoningReplayField) {
@@ -530,12 +558,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
         let releaseNow = true;
         try {
           const body = JSON.stringify(payload);
-          const modelAttempt = await prepareRequestAttempt({ body, provider: request.provider.provider ?? '', model: request.provider.model,
+          const modelAttempt = await prepareRequestAttempt({ body, provider: activeProvider, model: activeModel,
             endpoint, purpose: options.agentMode ? 'subagent' : 'turn', requestId, policy: request.requestPolicy,
             ...(request.provider.credentialId && request.provider.credentialGeneration
               ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
           const attemptResponse = await modelAttempt.send(
-            endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
+            endpointUrl(request.provider.baseUrl, endpoint, activeModel),
             {
               method: "POST",
               headers: { ...request.provider.headers, ...requestHeaders },
@@ -547,21 +575,21 @@ export function createStepFunction(request: StepRequest): StepFunction {
           if (attemptResponse.ok) {
             requestAcceptedAt = Date.now();
             acceptedResponse = true;
-            traceLogger.info("provider request accepted", { requestId, endpoint, provider: request.provider.provider, model: request.provider.model, attempt });
+            traceLogger.info("provider request accepted", { requestId, endpoint, provider: activeProvider, model: activeModel, attempt });
             if (!options.agentMode) clearContextUsage(request.sessionId);
             response = attemptResponse;
             responseAttempt = modelAttempt;
             options.onRequestSent?.({
               promptIdentity,
               context: requestContext({ body, endpoint, fields: endpointShape(endpoint).contextFields,
-                provider: request.provider.provider ?? '', model: request.provider.model,
+                provider: activeProvider, model: activeModel,
                 tokenizer: modelEntry?.tokenizer,
                 ...(!regeneratedPrompt && request.systemPromptSources
                   ? { systemSources: request.systemPromptSources } : {}) }),
               endpoint,
               maxTokensField: shape.maxTokensField,
               reasoning: modelEntry?.reasoning,
-              url: endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
+              url: endpointUrl(request.provider.baseUrl, endpoint, activeModel),
               headers: request.provider.headers,
               requestHeaders,
               body,
@@ -644,13 +672,14 @@ export function createStepFunction(request: StepRequest): StepFunction {
         // Rebuilding without the field is the retry: the request is otherwise
         // identical, and asking again with it would fail again.
         effortAccepted = false;
+        streamAttempts += 1;
         continue;
       }
       if (!response) return stamp(errorStep(refusal || "Provider returned no response."));
 
       try {
         const completion = await readCompletion(response, watched, endpoint);
-        traceLogger.info("provider request completed", { requestId, endpoint, provider: request.provider.provider, model: request.provider.model, attempt: streamAttempts, usage: Boolean(completion.usage), durationMs: requestAcceptedAt === undefined ? undefined : Math.max(0, Date.now() - requestAcceptedAt) });
+        traceLogger.info("provider request completed", { requestId, endpoint, provider: activeProvider, model: activeModel, attempt: streamAttempts, usage: Boolean(completion.usage), durationMs: requestAcceptedAt === undefined ? undefined : Math.max(0, Date.now() - requestAcceptedAt) });
         const usage = completion.usage;
         const choice = completion.choices?.[0];
         const stopReason = choice?.message ? stopReasonOf(choice.finish_reason) : 'error';
@@ -693,8 +722,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
         const ownsReplay = decoded.stopReason !== 'error' && decoded.stopReason !== 'aborted'
           && (completion.reasoningSignature && protocol.opaqueReplay
             || shape.reasoningReplayField && completion.reasoning && !completion.reasoningSignature && !completion.reasoningRedacted);
-        const completed = ownsReplay && origin
-          ? { ...decoded, origin: { ...origin, replayBinding } } : decoded;
+        const completed = ownsReplay && activeOrigin
+          ? { ...decoded, origin: { ...activeOrigin, replayBinding } } : decoded;
         return stamp({ ...completed, ...(promptMeasurement ? { promptMeasurement } : {}),
           ...(shownAnything && completed.stopReason === 'error' ? { retriesExhausted: true } : {}) });
       } catch (error) {

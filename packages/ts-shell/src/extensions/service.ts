@@ -5,6 +5,7 @@ import { canonical } from './registry/validation.js';
 import { rootIdentity, rootSignature } from './lifecycle/grants.js';
 import { registerPackage } from './runtime/registration.js';
 import { executeScript, scriptArgs, type ExecutionHost } from './runtime/execute.js';
+import type { InProcessExtensionInvoke } from './runtime/inProcessLoader.js';
 import { runPreparedTool } from '../turn/invoke.js';
 import type { ToolGateOptions } from '../turn/tools.js';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../tools/types.js';
@@ -129,7 +130,12 @@ export class ExtensionService implements LifecycleHost {
     const current = () => { this.current(record, grant, epoch); this.current(record, `script:${script}`, epoch); this.options.assertWorkspace(record.active.manifest.permissions.workspace === 'write'); const blocked = this.options.gate('bash').admission?.(); if (blocked) throw new Error(blocked); };
     current();
     return this.calls.run(async signal => {
-      const result = await executeScript({ file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution }, record.active, script, args, current, { ...context, abortSignal: signal });
+      const invoke: InProcessExtensionInvoke | undefined = grant.startsWith('tool:')
+        ? { kind: 'tool', name: grant.slice(5), args: { args } }
+        : grant.startsWith('command:')
+          ? { kind: 'command', name: grant.slice(8), args }
+          : undefined;
+      const result = await executeScript({ file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution }, record.active, script, args, current, { ...context, abortSignal: signal }, invoke);
       if (result.metadata?.cleanup === 'unknown') {
         this.drainUnknown = true; this.processCleanupUnknown = true; this.epoch++;
         this.registrations.splice(0).forEach(unregister => unregister());

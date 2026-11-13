@@ -1,4 +1,30 @@
 import type { ToolSchema } from "../../turn/tools.js";
+import type { TurnRequest } from "./kinds.js";
+
+const MID_CONVERSATION_OUTPUT_CONFIG_BETA = "mid-conversation-output-config-2026-07-01";
+const THINKING_BINDING_CONTROLS_BETA = "thinking-binding-controls-2026-08-01";
+const INLINE_TOOLS_BETA = "inline-tools-2026-09-15";
+
+export function anthropicBetaHeaders(
+  input: Pick<
+    TurnRequest,
+    "allowTools" | "tools" | "initialTools" | "supportsMidConvoToolChanges" | "supportsMidConvoEffort" | "thinkingLevelName"
+  >,
+): Record<string, string> {
+  const betas: string[] = [];
+  if (input.supportsMidConvoEffort && input.thinkingLevelName !== undefined) {
+    betas.push(MID_CONVERSATION_OUTPUT_CONFIG_BETA, THINKING_BINDING_CONTROLS_BETA);
+  }
+  if (
+    input.allowTools
+    && input.supportsMidConvoToolChanges
+    && input.initialTools !== undefined
+    && (input.tools.length > 0 || input.initialTools.length > 0)
+  ) {
+    betas.push(INLINE_TOOLS_BETA);
+  }
+  return betas.length > 0 ? { "anthropic-beta": betas.join(",") } : {};
+}
 
 export const DEFERRED_TOOL_PLACEHOLDER = {
   type: "tool_search_tool_bm25_20250305",

@@ -10,7 +10,7 @@ import type { VersionRecord } from '../model.js';
 import type { ToolExecutionContext, ToolExecutionResult } from '../../tools/types.js';
 import type { DenyRule } from '../../core/shell/approval/deny.js';
 import { sourceFile } from '../registry/sources.js';
-import { executeInProcessScript } from './inProcessLoader.js';
+import { executeInProcessScript, type InProcessExtensionInvoke } from './inProcessLoader.js';
 export interface ExecutionHost {
   readonly file: string;
   readonly root: string;
@@ -24,7 +24,7 @@ export function scriptArgs(value: unknown): string[] {
   return [...value] as string[];
 }
 export async function executeScript(host: ExecutionHost, record: VersionRecord, script: string, argv: readonly string[], current: () => void,
-  context: ToolExecutionContext): Promise<ToolExecutionResult> {
+  context: ToolExecutionContext, invoke?: InProcessExtensionInvoke): Promise<ToolExecutionResult> {
   current(); host.check();
   const owned = versionPath(record, host.file); assertInventory(owned, record);
   const entry = record.manifest.scripts.find(value => value.name === script); if (!entry) throw new Error('Unknown extension script.');
@@ -40,6 +40,7 @@ export async function executeScript(host: ExecutionHost, record: VersionRecord, 
       argv,
       denyRules: host.denyRules,
       context,
+      ...(invoke ? { invoke } : {}),
     });
   }
   if (process.platform !== 'linux') throw new Error('Isolated extension script execution currently requires Linux bubblewrap.');

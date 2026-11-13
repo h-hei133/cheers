@@ -15,6 +15,7 @@ import { buildSystemPrompt, toChatMessages } from './prompt.js';
 import { estimateRequestTokens } from '../session/context.js';
 import { FINAL_STEP_MESSAGE, outgoingProjection } from './messages.js';
 import { countRequestText } from '../context/request/tokenizer.js';
+import { VirtualModelRegistry } from '../core/models/virtualModels.js';
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -2051,4 +2052,70 @@ it.each(['google-generative-ai', 'google-vertex', 'bedrock-converse-stream'])('c
   const result = await step([], undefined, {}, { allowTools: false });
   expect(result.text).toBe('ok');
   expect(endpoint === 'bedrock-converse-stream' ? body.additionalModelRequestFields.thinking.budget_tokens : body.generationConfig.thinkingConfig.thinkingBudget).toBe(2048);
+});
+
+it('forwards mid-convo cache preservation flags, anthropic-beta headers, and resolves VirtualModelRegistry in createStepFunction', async () => {
+  const seen: Array<{ url: string; headers: HeadersInit | undefined; body: Record<string, unknown> }> = [];
+  const virtualModels = new VirtualModelRegistry();
+  virtualModels.register({
+    provider: 'virtual',
+    id: 'auto-router',
+    name: 'Auto Router',
+    route: () => ({ provider: 'anthropic', modelId: 'claude-sonnet-4-6', thinkingLevel: 'high' }),
+  });
+  const initialTools = [{ type: 'function' as const, function: { name: 'read', description: 'read file', parameters: { type: 'object' } } }];
+  let activeTools = initialTools;
+  const step = createStepFunction({
+    workspaceRoot: process.cwd(),
+    sessionId: 'step-cache-virtual',
+    systemPrompt: 'sys',
+    provider: { provider: 'virtual', model: 'auto-router', baseUrl: 'https://api.anthropic.com', headers: {} },
+    catalog: [{
+      id: 'anthropic',
+      endpoint: 'anthropic-messages',
+      baseUrl: 'https://api.anthropic.com',
+      models: [{
+        id: 'claude-sonnet-4-6',
+        reasoning: true,
+        toolCalling: true,
+        compat: { supportsMidConvoToolChanges: true, supportsMidConvoEffort: true },
+      }],
+    }],
+    tools: initialTools,
+    initialTools,
+    toolSnapshot: () => activeTools,
+    cacheRetention: 'long',
+    virtualModels,
+    fetchImpl: async (url, init) => {
+      seen.push({ url: String(url), headers: init?.headers, body: JSON.parse(String(init?.body)) });
+      return jsonResponse({
+        id: 'msg_1',
+        type: 'message',
+        role: 'assistant',
+        model: 'claude-sonnet-4-6',
+        content: [{ type: 'text', text: 'ok' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 10, output_tokens: 2 },
+      });
+    },
+  });
+  activeTools = [
+    ...initialTools,
+    { type: 'function', function: { name: 'web_search', description: 'search', parameters: { type: 'object' } } },
+  ];
+  const res = await step([{ role: 'user', content: 'hi' }], undefined, {}, { allowTools: true });
+  expect(res.text).toBe('ok');
+  expect(res.origin).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-6' });
+  expect(seen).toHaveLength(1);
+  const reqHeaders = seen[0]!.headers as Record<string, string>;
+  expect(reqHeaders['anthropic-beta']).toBe(
+    'mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01,inline-tools-2026-09-15',
+  );
+  expect(seen[0]!.body.system).toEqual([
+    { type: 'text', text: 'sys', cache_control: { type: 'ephemeral', ttl: '1h' } },
+  ]);
+  expect(seen[0]!.body.tools).toEqual([
+    { name: 'read', description: 'read file', input_schema: { type: 'object' }, cache_control: { type: 'ephemeral', ttl: '1h' } },
+    { type: 'tool_search_tool_bm25_20250305', name: 'tool_search' },
+  ]);
 });

@@ -28,6 +28,11 @@ export interface LoadedInProcessExtension {
   readonly exports: Readonly<Record<string, unknown>>
 }
 
+export type InProcessExtensionInvoke =
+  | { readonly kind: 'tool'; readonly name: string; readonly args?: Record<string, unknown> }
+  | { readonly kind: 'command'; readonly name: string; readonly args?: readonly string[] }
+  | { readonly kind: 'event'; readonly event: string; readonly payload?: unknown }
+
 export const VIRTUAL_MODULES: Readonly<Record<string, Record<string, unknown>>> = Object.freeze({
   '@cheers/extension-api': Object.freeze({
     defineExtension: Object.setPrototypeOf((factory: (api: ExtensionAPI) => unknown) => factory, null),
@@ -161,6 +166,7 @@ Object.defineProperty(vmCtx, '__send', { value: sendBridge, enumerable: false })
 Object.defineProperty(vmCtx, '__onReply', { value: registerReceiver, enumerable: false });
 Object.defineProperty(vmCtx, '__ARGV', { value: JSON.stringify(workerData.argv), enumerable: false });
 Object.defineProperty(vmCtx, '__ROOT', { value: String(workerData.workspaceRoot), enumerable: false });
+Object.defineProperty(vmCtx, '__INVOKE', { value: workerData.invoke ? JSON.stringify(workerData.invoke) : '', enumerable: false });
 
 const bootstrap = new vm.Script(\`
 (() => {
@@ -195,11 +201,46 @@ const bootstrap = new vm.Script(\`
     }
     throw new Error("Extension module import '" + specifier + "' is not in VIRTUAL_MODULES.");
   };
+  const registeredTools = new Map();
+  const registeredCommands = new Map();
+  const registeredHandlers = new Map();
+  globalThis.__registeredTools = registeredTools;
+  globalThis.__registeredCommands = registeredCommands;
+  globalThis.__registeredHandlers = registeredHandlers;
+
   globalThis.api = {
     workspaceRoot: globalThis.__ROOT,
-    registerTool: () => {},
-    registerCommand: () => {},
-    on: () => {},
+    registerTool: (tool) => {
+      if (!tool || typeof tool.name !== 'string' || !tool.name.trim() || typeof tool.execute !== 'function') {
+        throw new Error('Extension registerTool requires { name, execute }.');
+      }
+      registeredTools.set(tool.name, tool);
+      send('registerTool', JSON.stringify({
+        name: tool.name,
+        description: String(tool.description ?? ''),
+        argsSchema: tool.argsSchema ?? { type: 'object' },
+      }));
+    },
+    registerCommand: (cmd) => {
+      if (!cmd || typeof cmd.name !== 'string' || !cmd.name.trim() || typeof cmd.execute !== 'function') {
+        throw new Error('Extension registerCommand requires { name, execute }.');
+      }
+      registeredCommands.set(cmd.name, cmd);
+      send('registerCommand', JSON.stringify({
+        name: cmd.name,
+        description: String(cmd.description ?? ''),
+        aliases: Array.isArray(cmd.aliases) ? cmd.aliases.map(String) : [],
+      }));
+    },
+    on: (event, handler) => {
+      if (typeof event !== 'string' || !event.trim() || typeof handler !== 'function') {
+        throw new Error('Extension on(event, handler) requires an event name and function.');
+      }
+      const list = registeredHandlers.get(event) ?? [];
+      list.push(handler);
+      registeredHandlers.set(event, list);
+      send('registerEvent', JSON.stringify({ event }));
+    },
     readWorkspaceFile: (rel) => rpc('readWorkspaceFile', { path: String(rel ?? '') }),
   };
 })();
@@ -220,8 +261,24 @@ parentPort.on('message', (msg) => {
     const runner = new vm.Script(\`
       (async () => {
         const exp = module.exports || {};
-        if (typeof exp.default === 'function') exp.default(api);
-        else if (typeof exp.activate === 'function') exp.activate(api);
+        if (typeof exp.default === 'function') await exp.default(api);
+        else if (typeof exp.activate === 'function') await exp.activate(api);
+        const invoke = globalThis.__INVOKE ? JSON.parse(globalThis.__INVOKE) : null;
+        if (invoke && invoke.kind === 'tool') {
+          const tool = globalThis.__registeredTools.get(invoke.name);
+          if (tool) return await tool.execute(invoke.args || {}, { workspaceRoot: globalThis.__ROOT });
+        } else if (invoke && invoke.kind === 'command') {
+          const cmd = globalThis.__registeredCommands.get(invoke.name);
+          if (cmd) return await cmd.execute(invoke.args || [], { workspaceRoot: globalThis.__ROOT });
+        } else if (invoke && invoke.kind === 'event') {
+          const list = globalThis.__registeredHandlers.get(invoke.event) || [];
+          let current = invoke.payload;
+          for (const handler of list) {
+            const next = await handler(current);
+            if (next !== undefined) current = next;
+          }
+          return current;
+        }
         if (typeof exp.run === 'function') {
           return await exp.run({ args: JSON.parse(globalThis.__ARGV), workspaceRoot: globalThis.__ROOT, api });
         }
@@ -229,10 +286,14 @@ parentPort.on('message', (msg) => {
       })()
     \`, { filename: 'extension-runner.js' });
     const value = await Promise.resolve(runner.runInContext(vmCtx, { timeout: 5000 }));
-    parentPort.postMessage({
-      kind: 'done',
-      json: typeof value === 'string' ? value : JSON.stringify(value ?? ''),
-    });
+    if (value && typeof value === 'object' && typeof value.output === 'string' && typeof value.success === 'boolean') {
+      parentPort.postMessage({ kind: value.success ? 'done' : 'error', json: value.output });
+    } else {
+      parentPort.postMessage({
+        kind: 'done',
+        json: typeof value === 'string' ? value : JSON.stringify(value ?? ''),
+      });
+    }
   } catch (err) {
     parentPort.postMessage({ kind: 'error', json: err instanceof Error ? err.message : String(err) });
   }
@@ -246,11 +307,15 @@ export async function executeInProcessScript(options: {
   readonly argv: readonly string[]
   readonly denyRules: () => readonly DenyRule[]
   readonly context: ToolExecutionContext
+  readonly invoke?: InProcessExtensionInvoke
 }): Promise<ToolExecutionResult> {
   options.context.abortSignal?.throwIfAborted()
   const rawSource = fs.readFileSync(options.scriptFile, 'utf8')
   const code = transpileExtensionSource(rawSource, options.scriptFile)
   const timeoutMs = 30_000
+  const registeredTools: Array<{ readonly name: string; readonly description: string }> = []
+  const registeredCommands: Array<{ readonly name: string; readonly description: string; readonly aliases: readonly string[] }> = []
+  const registeredEvents: string[] = []
 
   const worker = new Worker(EXTENSION_WORKER_SOURCE, {
     eval: true,
@@ -261,6 +326,7 @@ export async function executeInProcessScript(options: {
       filename: options.scriptFile,
       argv: [...options.argv],
       workspaceRoot: options.root,
+      ...(options.invoke ? { invoke: options.invoke } : {}),
     },
   })
 
@@ -290,6 +356,19 @@ export async function executeInProcessScript(options: {
           finish({ ok: true, output: msg.json })
         } else if (msg.kind === 'error') {
           finish({ ok: false, output: msg.json })
+        } else if (msg.kind === 'registerTool') {
+          const info = JSON.parse(msg.json) as { name: string; description?: string }
+          registeredTools.push({ name: info.name, description: String(info.description ?? '') })
+        } else if (msg.kind === 'registerCommand') {
+          const info = JSON.parse(msg.json) as { name: string; description?: string; aliases?: string[] }
+          registeredCommands.push({
+            name: info.name,
+            description: String(info.description ?? ''),
+            aliases: Array.isArray(info.aliases) ? info.aliases.map(String) : [],
+          })
+        } else if (msg.kind === 'registerEvent') {
+          const info = JSON.parse(msg.json) as { event: string }
+          if (!registeredEvents.includes(info.event)) registeredEvents.push(info.event)
         } else if (msg.kind === 'rpc') {
           const parsed = JSON.parse(msg.json) as { id: number; op: string; payload: { path?: string } }
           try {
@@ -330,6 +409,9 @@ export async function executeInProcessScript(options: {
         version: options.record.manifest.version,
         digest: options.record.digest,
         cleanup: 'confirmed',
+        registeredTools,
+        registeredCommands,
+        registeredEvents,
       },
     }
   } finally {

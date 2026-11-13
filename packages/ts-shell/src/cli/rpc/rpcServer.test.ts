@@ -13,11 +13,16 @@ describe("RPC JSONL protocol server", () => {
       id: "2",
       type: "get_state",
     });
+    expect(tryParseRpcCommand('{"id":"3","type":"abort"}')).toEqual({
+      id: "3",
+      type: "abort",
+    });
   });
 
   it("executes prompt, state, queue, and message RPC commands and emits JSON responses", async () => {
     const prompts: string[] = [];
     const responses: RpcResponse[] = [];
+    let aborted = 0;
     const host = {
       sessionId: "sess_rpc",
       workspaceRoot: "/workspace",
@@ -25,6 +30,7 @@ describe("RPC JSONL protocol server", () => {
       getMessages: () => [{ role: "user" as const, content: "hi" }],
       enqueuePrompt: (p: string) => prompts.push(p),
       clearQueue: () => 2,
+      abort: () => { aborted += 1; },
       emitResponse: (res: RpcResponse) => responses.push(res),
     };
 
@@ -32,7 +38,9 @@ describe("RPC JSONL protocol server", () => {
     await handleRpcCommand({ id: "req-2", type: "get_state" }, host);
     await handleRpcCommand({ id: "req-3", type: "get_messages" }, host);
     await handleRpcCommand({ id: "req-4", type: "clear_queue" }, host);
+    await handleRpcCommand({ id: "req-5", type: "abort" }, host);
 
+    expect(aborted).toBe(1);
     expect(prompts).toEqual(["fix bug"]);
     expect(responses).toEqual([
       { id: "req-1", type: "response", command: "prompt", success: true },
@@ -56,6 +64,12 @@ describe("RPC JSONL protocol server", () => {
         command: "clear_queue",
         success: true,
         data: { cleared: 2 },
+      },
+      {
+        id: "req-5",
+        type: "response",
+        command: "abort",
+        success: true,
       },
     ]);
   });

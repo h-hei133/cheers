@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  anthropicBetaHeaders,
   anthropicHeaders,
   anthropicRequestBody,
   readAnthropicBody,
@@ -878,5 +879,36 @@ describe("conversation history cache breakpoints", () => {
         },
       ],
     });
+  });
+
+  it("emits anthropic-beta headers and replays historicalEfforts markers", () => {
+    const headers = anthropicBetaHeaders({
+      allowTools: true,
+      tools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
+      initialTools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
+      supportsMidConvoToolChanges: true,
+      supportsMidConvoEffort: true,
+      thinkingLevelName: "high",
+    });
+    expect(headers["anthropic-beta"]).toBe(
+      "mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01,inline-tools-2026-09-15",
+    );
+    const body = anthropicRequestBody({
+      model: "claude-opus-4-6",
+      systemPrompt: "sys",
+      messages: [
+        { role: "user", content: "first" },
+        { role: "assistant", content: "ok" },
+        { role: "user", content: "second" },
+      ],
+      tools: [],
+      allowTools: false,
+      supportsMidConvoEffort: true,
+      thinkingLevelName: "high",
+      historicalEfforts: new Map([[0, "low"]]),
+    });
+    const wire = body.messages as Array<Record<string, unknown>>;
+    expect(wire[0]).toEqual({ role: "system", content: [], output_config: { effort: "low" } });
+    expect(wire.at(-1)).toEqual({ role: "system", content: [], output_config: { effort: "high" } });
   });
 });

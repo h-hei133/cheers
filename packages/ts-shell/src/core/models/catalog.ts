@@ -169,6 +169,10 @@ export interface ModelRequestShape {
   readonly supportsTemperature?: boolean;
   /** Whether OpenAI-style `prompt_cache_key` routing is supported on this endpoint. */
   readonly promptCacheKey?: boolean;
+  /** Whether this endpoint/model preserves prompt caches across mid-conversation system/tool/effort markers. */
+  readonly supportsMidConvoSystemMessages?: boolean;
+  readonly supportsMidConvoToolChanges?: boolean;
+  readonly supportsMidConvoEffort?: boolean;
 }
 
 /**

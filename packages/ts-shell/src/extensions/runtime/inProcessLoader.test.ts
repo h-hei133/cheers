@@ -2,7 +2,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { loadInProcessExtension } from './inProcessLoader.js'
+import { executeInProcessScript, loadInProcessExtension } from './inProcessLoader.js'
+import type { VersionRecord } from '../model.js'
 
 const tempDirs: string[] = []
 afterEach(() => {
@@ -60,5 +61,90 @@ module.exports.tryEscape = () => {
     )
     expect(() => loaded.readWorkspaceFile('secret.txt')).toThrow()
     expect(() => (loaded.exports.tryEscape as () => unknown)()).toThrow()
+  })
+
+  it('executes worker-isolated TS extensions with real registerTool, registerCommand, and on(event) handlers', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-ext-worker-'))
+    tempDirs.push(dir)
+    fs.writeFileSync(path.join(dir, 'note.txt'), 'worker-note', 'utf8')
+    const extPath = path.join(dir, 'worker-ext.ts')
+    fs.writeFileSync(
+      extPath,
+      `
+const { defineExtension } = require('@cheers/extension-api');
+export default defineExtension((api) => {
+  api.registerTool({
+    name: 'greet',
+    description: 'Greet with workspace note',
+    argsSchema: { type: 'object' },
+    execute: async (args) => ({ success: true, output: String(args.who ?? '') + ':' + await api.readWorkspaceFile('note.txt') }),
+  });
+  api.registerCommand({
+    name: 'hello',
+    description: 'Hello cmd',
+    execute: async (args) => 'cmd:' + args.join(','),
+  });
+  api.on('before_provider_request', (payload) => ({ ...(payload as Record<string, unknown>), patched: true }));
+});
+`,
+      'utf8',
+    )
+    const record: VersionRecord = {
+      source: 'fixture',
+      digest: 'deadbeef',
+      path: 'ext',
+      manifest: {
+        schema: 1,
+        name: 'worker-ext',
+        version: '1.0.0',
+        description: 'Worker ext',
+        permissions: { workspace: 'read', network: 'none' },
+        skills: [],
+        scripts: [{ name: 'main', path: 'worker-ext.ts' }],
+        commands: [],
+        tools: [],
+      },
+      sourceIdentity: 'id',
+    }
+    const ctx = { workspaceRoot: dir, taskId: 't1' }
+
+    const toolResult = await executeInProcessScript({
+      root: dir,
+      scriptFile: extPath,
+      record,
+      argv: [],
+      denyRules: () => [],
+      context: ctx,
+      invoke: { kind: 'tool', name: 'greet', args: { who: 'pi' } },
+    })
+    expect(toolResult.success).toBe(true)
+    expect(toolResult.output).toContain('pi:worker-note')
+    expect(toolResult.metadata?.registeredTools).toEqual([{ name: 'greet', description: 'Greet with workspace note' }])
+    expect(toolResult.metadata?.registeredCommands).toEqual([{ name: 'hello', description: 'Hello cmd', aliases: [] }])
+    expect(toolResult.metadata?.registeredEvents).toEqual(['before_provider_request'])
+
+    const cmdResult = await executeInProcessScript({
+      root: dir,
+      scriptFile: extPath,
+      record,
+      argv: [],
+      denyRules: () => [],
+      context: ctx,
+      invoke: { kind: 'command', name: 'hello', args: ['a', 'b'] },
+    })
+    expect(cmdResult.success).toBe(true)
+    expect(cmdResult.output).toContain('cmd:a,b')
+
+    const eventResult = await executeInProcessScript({
+      root: dir,
+      scriptFile: extPath,
+      record,
+      argv: [],
+      denyRules: () => [],
+      context: ctx,
+      invoke: { kind: 'event', event: 'before_provider_request', payload: { model: 'm' } },
+    })
+    expect(eventResult.success).toBe(true)
+    expect(eventResult.output).toContain('"patched":true')
   })
 })

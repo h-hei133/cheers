@@ -28,6 +28,7 @@ import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../cor
 import { configuredOutputLimit } from '../../provider/request/output.js';
 import { providerRequestTarget } from './requestTarget.js';
 import { configuredContextWindow } from '../../core/models/window.js';
+import type { VirtualModelRegistry } from '../../core/models/virtualModels.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -43,6 +44,8 @@ export interface ProviderStepHost {
   readonly thinkingEffortExplicit?: boolean;
   readonly serviceTier?: string;
   readonly onCredentialPersisted?: (rotation?: AccountRotation) => boolean | void;
+  readonly cacheRetention?: 'short' | 'long' | 'none';
+  readonly virtualModels?: VirtualModelRegistry;
 }
 
 /** The same captured catalogue address and model used by the request adapter. */
@@ -126,6 +129,9 @@ export function createProviderStep(
     thinkingEffortExplicit: request.thinkingEffortExplicit,
     tools: toolSchemas(tools),
     ...(discovery ? { toolSnapshot: () => toolSchemas(discovery.snapshot()) } : {}),
+    initialTools: toolSchemas(tools),
+    ...(request.cacheRetention !== undefined ? { cacheRetention: request.cacheRetention } : {}),
+    ...(request.virtualModels ? { virtualModels: request.virtualModels } : {}),
     catalog,
     // Sampling settings travel with the request, not with the provider: a
     // provider that ignores them still receives a well-formed request, and a

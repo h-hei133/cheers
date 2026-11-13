@@ -223,6 +223,7 @@ export interface TurnRequest {
   readonly initialTools?: readonly ToolSchema[];
   readonly supportsMidConvoToolChanges?: boolean;
   readonly supportsMidConvoEffort?: boolean;
+  readonly historicalEfforts?: ReadonlyMap<number, string>;
 }
 
 /**

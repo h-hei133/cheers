@@ -101,6 +101,10 @@ export interface ResolvedRequestShape {
   readonly thinkingBudgetMaximum?: boolean;
   /** Whether OpenAI-style `prompt_cache_key` may be sent when a session id is available. */
   readonly promptCacheKey?: boolean;
+  /** Whether this model preserves prompt cache across mid-conversation tool changes (`tool_addition`/`tool_removal`). */
+  readonly supportsMidConvoToolChanges?: boolean;
+  /** Whether this model preserves prompt cache across mid-conversation effort markers. */
+  readonly supportsMidConvoEffort?: boolean;
 }
 
 /**
@@ -191,6 +195,8 @@ export function resolveRequestShape(
     allowEmptySignature: compat.allowEmptySignature === true,
     supportsTemperature: compat.supportsTemperature !== false,
     ...(compat.promptCacheKey !== undefined ? { promptCacheKey: compat.promptCacheKey } : {}),
+    ...(compat.supportsMidConvoToolChanges === true && compat.supportsMidConvoSystemMessages !== false ? { supportsMidConvoToolChanges: true } : {}),
+    ...(compat.supportsMidConvoEffort === true && compat.supportsMidConvoSystemMessages !== false ? { supportsMidConvoEffort: true } : {}),
     vision: entry.vision === true,
     ...(reasoningEffort && level ? { thinkingLevelName: levelNameFor(entry, level) } : {}),
     ...(reasoningEffort && level === 'max' ? { thinkingBudgetMaximum: true } : {}),

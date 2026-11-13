@@ -166,6 +166,11 @@ export async function handleRpcCommand(command: RpcCommand, host: RpcHost): Prom
         response = buildResponse(command.id, command.type, true);
         break;
       }
+      case "abort": {
+        host.abort?.();
+        response = buildResponse(command.id, command.type, true);
+        break;
+      }
       case "clear_queue": {
         const cleared = host.clearQueue ? host.clearQueue() : 0;
         response = buildResponse(command.id, command.type, true, { data: { cleared } });
