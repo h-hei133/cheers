@@ -17,6 +17,8 @@ import "./googleGenAI.js";
 import "./googleAccount.js";
 import "./copilot.js";
 import "./googleVertex.js";
+import "./azureResponses.js";
+import "./mistral.js";
 import "./responses/index.js";
 import "./responses/account.js";
 

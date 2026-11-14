@@ -1,6 +1,6 @@
 import { STATUS_CODES } from 'node:http';
 import { request, type Dispatcher } from 'undici/index.js';
-import { decodedBody, discardBody } from './body.js';
+import { decodedBody, discardBody, supportsZstd } from './body.js';
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 
@@ -24,7 +24,7 @@ export async function requestFetch(input: RequestInfo | URL, init: RequestInit |
   let method = selected.method;
   let url = new URL(selected.url);
   const headers = new Headers(selected.headers);
-  if (!headers.has('accept-encoding')) headers.set('accept-encoding', 'gzip, deflate, br');
+  if (!headers.has('accept-encoding')) headers.set('accept-encoding', supportsZstd() ? 'gzip, deflate, br, zstd' : 'gzip, deflate, br');
   for (let redirects = 0; ; redirects++) {
     signal.throwIfAborted();
     const response = await request(url, {

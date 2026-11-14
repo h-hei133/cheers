@@ -1,5 +1,5 @@
+import { pollDeviceFlow, type DeviceFlowOptions } from "./deviceCode.js";
 import type { OAuthProviderConfig } from "./flow.js";
-
 /**
  * What each provider needs, and nothing else.
  *
@@ -133,4 +133,113 @@ interface OAuthProviderDeclaration {
 export function oauthConfigFor(provider: string, clientId?: string, clientSecret?: string, quotaProject?: string): OAuthProviderConfig | undefined {
   const config = signInProviders.find((candidate) => candidate.id === provider)?.make(clientId);
   return config && provider === 'google' ? { ...config, ...(clientSecret ? { clientSecret } : {}), ...(quotaProject ? { quotaProject } : {}) } : config;
+}
+
+export interface OpenAIDeviceCodeStart {
+  readonly deviceAuthId: string;
+  readonly userCode: string;
+  readonly verificationUri: string;
+  readonly intervalSeconds: number;
+}
+
+/** Start headless OpenAI Codex device-code authorization. */
+export async function startOpenAIDeviceAuth(
+  options: typeof fetch | { readonly fetchImpl?: typeof fetch; readonly signal?: AbortSignal } = {},
+): Promise<OpenAIDeviceCodeStart> {
+  const fetchImpl = typeof options === "function" ? options : (options.fetchImpl ?? fetch);
+  const signal = typeof options === "function" ? undefined : options.signal;
+  const config = openAIOAuthConfig();
+  const response = await fetchImpl("https://auth.openai.com/api/accounts/deviceauth/usercode", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ client_id: config.clientId }),
+    signal,
+    redirect: "error",
+  });
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error(`OpenAI device authorization request failed with HTTP ${response.status}`);
+  }
+  const raw: unknown = await response.json();
+  const data = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : undefined;
+  if (!data || typeof data.device_auth_id !== "string" || !data.device_auth_id || typeof data.user_code !== "string" || !data.user_code) {
+    throw new Error("OpenAI device authorization returned an incomplete payload.");
+  }
+  const parsedInterval = Number(data.interval ?? 5);
+  const intervalSeconds = Number.isFinite(parsedInterval) && parsedInterval > 0
+    ? Math.min(300, parsedInterval)
+    : 5;
+  return {
+    deviceAuthId: data.device_auth_id,
+    userCode: data.user_code,
+    verificationUri: "https://auth.openai.com/codex/device",
+    intervalSeconds,
+  };
+}
+
+/** Poll OpenAI device authorization endpoint until an authorization code + verifier are issued. */
+export async function pollOpenAIDeviceAuth(
+  start: OpenAIDeviceCodeStart,
+  options: Pick<DeviceFlowOptions<unknown>, "signal"> & { readonly fetchImpl?: typeof fetch } = {},
+): Promise<{ readonly authorizationCode: string; readonly codeVerifier: string }> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const config = openAIOAuthConfig();
+  return pollDeviceFlow<{ readonly authorizationCode: string; readonly codeVerifier: string }>({
+    intervalSeconds: start.intervalSeconds,
+    expiresInSeconds: 15 * 60,
+    signal: options.signal,
+    poll: async () => {
+      let res: Response;
+      try {
+        res = await fetchImpl("https://auth.openai.com/api/accounts/deviceauth/token", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ device_auth_id: start.deviceAuthId, user_code: start.userCode, client_id: config.clientId }),
+          signal: options.signal,
+          redirect: "error",
+        });
+      } catch (err) {
+        if (options.signal?.aborted) {
+          return { status: "failed", message: err instanceof Error ? err.message : "Aborted" };
+        }
+        return { status: "pending" };
+      }
+      if (res.status === 403 || res.status === 404) {
+        await res.body?.cancel().catch(() => {});
+        return { status: "pending" };
+      }
+      if (res.status === 429) {
+        await res.body?.cancel().catch(() => {});
+        return { status: "slow_down" };
+      }
+      if (res.status >= 500) {
+        await res.body?.cancel().catch(() => {});
+        return { status: "pending" };
+      }
+      let raw: unknown;
+      try {
+        raw = await res.json();
+      } catch {
+        await res.body?.cancel().catch(() => {});
+        return res.ok ? { status: "pending" } : { status: "failed", message: `HTTP ${res.status}` };
+      }
+      const body = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : undefined;
+      const oauthError = typeof body?.error === "string" ? body.error : undefined;
+      if (oauthError === "authorization_pending") return { status: "pending" };
+      if (oauthError === "slow_down") return { status: "slow_down" };
+      if (oauthError === "access_denied" || oauthError === "expired_token") {
+        return { status: "failed", message: oauthError };
+      }
+      if (!res.ok) {
+        return { status: "failed", message: oauthError ?? `HTTP ${res.status}` };
+      }
+      if (typeof body?.authorization_code !== "string" || !body.authorization_code || typeof body.code_verifier !== "string" || !body.code_verifier) {
+        return { status: "pending" };
+      }
+      return {
+        status: "complete",
+        value: { authorizationCode: body.authorization_code, codeVerifier: body.code_verifier },
+      };
+    },
+  });
 }

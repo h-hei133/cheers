@@ -1,5 +1,30 @@
-import { PassThrough, type Readable, pipeline } from 'node:stream';
-import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib';
+import { PassThrough, type Readable, pipeline, type Transform } from 'node:stream';
+import * as zlib from 'node:zlib';
+
+type ZlibWithZstd = typeof zlib & {
+  createZstdDecompress?: () => Transform;
+  zstdCompressSync?: (buf: string | Uint8Array, options?: { params?: Record<number, number> }) => Uint8Array;
+  constants?: typeof zlib.constants & { ZSTD_c_compressionLevel?: number };
+};
+
+const zstdLib = zlib as ZlibWithZstd;
+const REQUEST_COMPRESSION_ZSTD_LEVEL = 3;
+
+export function supportsZstd(): boolean {
+  return typeof zstdLib.createZstdDecompress === 'function';
+}
+
+export function compressZstdSync(body: string | Uint8Array): Uint8Array | undefined {
+  if (typeof zstdLib.zstdCompressSync !== 'function') return undefined;
+  const levelKey = zstdLib.constants?.ZSTD_c_compressionLevel;
+  try {
+    return levelKey !== undefined
+      ? zstdLib.zstdCompressSync(body, { params: { [levelKey]: REQUEST_COMPRESSION_ZSTD_LEVEL } })
+      : zstdLib.zstdCompressSync(body);
+  } catch {
+    return undefined;
+  }
+}
 
 /** Fetch decodes response bytes, including error responses, while retaining wire headers. */
 export function decodedBody(body: Readable, headers: Headers, signal: AbortSignal): ReadableStream<Uint8Array> {
@@ -8,10 +33,16 @@ export function decodedBody(body: Readable, headers: Headers, signal: AbortSigna
     discardBody(body);
     throw new TypeError('Too many response content encodings');
   }
-  const supported = encodings.every(encoding => ['gzip', 'x-gzip', 'deflate', 'br'].includes(encoding));
+  const supported = encodings.every(encoding =>
+    ['gzip', 'x-gzip', 'deflate', 'br'].includes(encoding) || (encoding === 'zstd' && typeof zstdLib.createZstdDecompress === 'function'),
+  );
   if (!supported || encodings.length === 0) return webBody(body, signal);
-  const decoders = encodings.reverse().map(encoding => encoding === 'br' ? createBrotliDecompress()
-    : encoding === 'deflate' ? createInflate() : createGunzip());
+  const decoders = encodings.reverse().map(encoding =>
+    encoding === 'zstd' ? zstdLib.createZstdDecompress!()
+      : encoding === 'br' ? zlib.createBrotliDecompress()
+      : encoding === 'deflate' ? zlib.createInflate()
+      : zlib.createGunzip(),
+  );
   const output = new PassThrough();
   const result = webBody(output, signal);
   // pipeline owns propagation and destruction in both directions, including reader cancellation.

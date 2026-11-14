@@ -432,6 +432,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         requestHeaders = endpointShape(endpoint).requestHeaders?.({
           provider: activeProvider,
           model: activeModel,
+          sessionId: request.sessionId,
           systemPrompt,
           messages: projection.messages,
           tools,

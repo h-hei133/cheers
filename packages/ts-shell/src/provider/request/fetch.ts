@@ -1,8 +1,8 @@
 import { admittedFetch, type Admission } from "../../core/network/admission.js";
 import { type Agent, type ProxyAgent, fetch as undiciFetch } from "undici/index.js";
+import { tryCodexWebSocketFetch } from "../endpoints/responses/codexWs.js";
 import { requestFetch, requestUrl } from './client.js';
 import { providerDispatchers } from './connection.js';
-
 export interface ProviderFetchEnvironment {
   readonly CHEERS_PROVIDER_PROXY?: string;
   readonly CHEERS_PROVIDER_NO_PROXY?: string;
@@ -274,8 +274,13 @@ export function providerFetchForEndpoint(
   const base = admittedFetch((input, init) => {
     init?.signal?.throwIfAborted();
     beforeDispatch?.(init);
-    return configured(input, (endpoint === 'openai-account-responses' || endpoint === 'google-account-generative-ai'
-      || endpoint === 'copilot-chat-completions' || endpoint === 'copilot-messages') ? { ...init, redirect: 'error' } : init);
+    const sseInit = (endpoint === 'openai-account-responses' || endpoint === 'google-account-generative-ai'
+      || endpoint === 'copilot-chat-completions' || endpoint === 'copilot-messages') ? { ...init, redirect: 'error' as const } : init;
+    const transport = process.env.CHEERS_CODEX_TRANSPORT?.trim().toLowerCase();
+    if (endpoint === 'openai-account-responses' && (transport === 'websocket' || transport === 'auto')) {
+      return tryCodexWebSocketFetch(input, sseInit, configured, transport === 'auto');
+    }
+    return configured(input, sseInit);
   }, admission);
   if (!signer) return base;
 
