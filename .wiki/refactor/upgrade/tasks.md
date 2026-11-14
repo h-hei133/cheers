@@ -14,10 +14,10 @@
 
 ## A: 工具与请求边界（P0）
 
-- [ ] **A.1** 单一 edit Schema、宽容参数归一化与有界匹配：已有待验收。实际模型 schema、原生 edit、安全拒绝和长度剪枝反转。
-- [ ] **A.2** 去重复准备期序列化：已有待验收。不能移除参数／内容变更检测；原生 prepare→hook→authorize→execute 反例。
+- [x] **A.1** 单一 edit Schema、宽容参数归一化与有界匹配：本地验收完成。原生edit的平面Schema、参数归一化与拒绝场景、raw字节保持通过；ambiguous计数原1,109,013次比较的反例经0.45长度剪枝降至50,000门槛内，26项匹配测试通过。不宣称真实模型质量或速度收益。
+- [x] **A.2** 去重复准备期序列化：本地验收完成。保留深快照身份、异步准备变更检测及单次消费；实际prepare→普通批准→hook→authorize→execute与15项准备测试通过，无删除内容/参数变更保护。
 - [ ] **A.3** read 2,000 行／50 KiB 与统一行字节预算：已有待验收。成功／失败／事件／后续上下文一致、归档提示不丢；沿用前台有界 capture。
-- [ ] **A.4** patch 写前判定：部分。已转译完整候选，但混合修改＋删除会漏掉未支持删除范围；子集选择、rename/delete、内容变化、unknown／unsupported 优先级需覆盖，不能把删除伪装为空写入。
+- [x] **A.4** patch 写前判定：本地验收完成。绑定普通批准的确切选择与revision，完整effects包含write/delete/rename；支持写入和unsupported删除缺口共存，unknown/block优先。9项真实patch反例及原生hook消费者通过，独立只读复审CLEAR；unsupported仍是证据缺口，不代表删除规则已实现。
 
 ## B / B2: 终端（P0／P1）
 
@@ -108,3 +108,5 @@
 2026-11-14 T1：六静态门通过（docs保留119条既有advisory）、完整scripts210/210；测试批次重叠不累加为唯一总数。Node24定向11/83、Node20.3定向5/65通过。隔离安装2,166项、2,465,935字节压缩包，只含一代；本地安装的TypeScript严格解析全部15入口，不依赖仓库ambient types；主题4项、TS扩展、SDK prompt、codemode worker通过。Linux Node20.3和单文件exe原生prompt通过，exe有host version回执。独立T1只读复审CLEAR，限制见design；记录 `.omx/artifacts/upgrade-toolchain-2026-11-14/`。首次npm12 JSON形状和缺失临时HOME属夹具失败，均修复重验。无真实服务/Windows/commit/push/CI；总目标仍active。
 
 2026-11-14 T1提交前：单独导出暂存树，在独立依赖路径以六静态门、生产build `fa4c37d23706`及55项相关脚本验证该提交不依赖其余未暂存修复。新lint同时要求删除已有测试中的不可达yield，随该批提交。初次夹具仅复制根node_modules、遗漏workspace-local Undici，修正夹具后build通过。以上新增证据仅覆盖首批暂存内容，无推送或CI声明。
+
+2026-11-14 A提交前：独立暂存树9套件255项通过（edit32、matching26、patch9、translation45/native25、preparation15、batch45、turn54/approval4），五静态门和生产build `b217b2736927`通过。此前patch9项中6失败/3通过，修复后全通过，独立review CLEAR。匹配反例修复前1,109,013次比较失败。T1本地提交为`a8ffe683`；A证据不等于A.3输出或整条路线图已完成。一次独立命令误用workspace-local Vitest路径，修正root依赖入口后重验，不是产品失败。

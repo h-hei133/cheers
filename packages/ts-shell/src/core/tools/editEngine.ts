@@ -355,7 +355,7 @@ function countStrategyMatches(
       for (let j = minEnd; j <= maxEnd; j++) {
         if (lines[j]!.trim() !== lastAnchor) continue;
         const interior = lines.slice(i + 1, j).map((line) => line.trim()).join("\n");
-        if (levenshteinRatio(interior, interiorSearch) >= 0.45) matches += 1;
+        if (levenshteinRatio(interior, interiorSearch, 0.45) >= 0.45) matches += 1;
       }
     }
     return matches;

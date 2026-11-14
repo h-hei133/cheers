@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { authorizeToolCall, bindPreparedToolCall, consumeToolCall, discardToolCall, preparedWriteCandidate, prepareToolCall } from './preparation.js';
+import { authorizeToolCall, bindPreparedToolCall, consumeToolCall, discardToolCall, preparedSelection, preparedWriteCandidate,
+  preparedWriteInspection, prepareToolCall, setPreparedSelection } from './preparation.js';
 import type { ToolDefinition } from './types.js';
 import { translateWriteInput } from '../core/hooks/translation.js';
 
@@ -87,5 +88,71 @@ describe('prepared candidate identity', () => {
     bindPreparedToolCall(args, owner, 'edit', 'call'); authorizeToolCall(args, owner, 'edit', 'call');
     edits[0]!.newText = 'changed after approval';
     expect(() => consumeToolCall(args, owner, tool, 'call')).toThrow('arguments changed after capture');
+  });
+
+  it('captures exhaustive patch effects independently of mutable preparation objects', async () => {
+    const target = { path: '/workspace/note.txt', operation: 'delete' as const };
+    const patchTool: ToolDefinition = { ...tool, name: 'apply_patch', prepare: () => ({
+      targets: [target], preview: 'delete', execute: async () => ({ success: true }),
+    }) };
+    const owner = {}, args = await prepareToolCall(patchTool, { input: 'delete' }, context, owner);
+    expect(preparedWriteInspection(args, 'apply_patch', 'call')).toBeUndefined();
+    target.path = '/workspace/foreign.txt';
+    bindPreparedToolCall(args, owner, 'apply_patch', 'call');
+    const inspection = preparedWriteInspection(args, 'apply_patch', 'call')!;
+    expect(inspection.targets).toEqual([{ path: '/workspace/note.txt', operation: 'delete' }]);
+    expect(inspection.writeCandidates).toEqual([]);
+    expect(Object.isFrozen(inspection)).toBe(true);
+    expect(Object.isFrozen(inspection.targets[0])).toBe(true);
+    expect(preparedWriteInspection({ ...args }, 'apply_patch', 'call')).toBeUndefined();
+    expect(preparedWriteInspection(args, 'apply_patch', 'other')).toBeUndefined();
+    discardToolCall(args);
+    expect(preparedWriteInspection(args, 'apply_patch', 'call')).toBeUndefined();
+  });
+
+  it('keeps the recorded selection after a refused second set, including after approval', async () => {
+    const target = { path: '/workspace/note.txt', operation: 'write' as const };
+    const patchTool: ToolDefinition = { ...tool, name: 'apply_patch', prepare: () => ({
+      targets: [target], preview: 'patch', selections: [{ id: 'one', label: 'one' }, { id: 'two', label: 'two' }],
+      selectionInspection: () => ({ targets: [target], writeCandidates: [candidate], revision: 'selected' }),
+      execute: async () => ({ success: true }),
+    }) };
+    const owner = {}, args = await prepareToolCall(patchTool, { input: 'patch' }, context, owner);
+    setPreparedSelection(args, ['one'], 'selected');
+    expect(() => setPreparedSelection(args, ['two'], 'other')).toThrow('cannot be replaced');
+    bindPreparedToolCall(args, owner, 'apply_patch', 'call');
+    expect(() => setPreparedSelection(args, ['one', 'two'], 'full')).toThrow('cannot be replaced');
+    expect(preparedSelection(args)).toEqual(['one']);
+    authorizeToolCall(args, owner, 'apply_patch', 'call');
+    expect(() => setPreparedSelection(args, ['two'], 'other')).toThrow('cannot be replaced');
+    expect(preparedSelection(args)).toEqual(['one']);
+    consumeToolCall(args, owner, patchTool, 'call');
+  });
+
+  it('protects delete-only arguments while asynchronous preparation yields', async () => {
+    const expectedHashes = { '/workspace/note.txt': 'a'.repeat(64) };
+    const patchTool: ToolDefinition = { ...tool, name: 'apply_patch', prepare: async () => {
+      await Promise.resolve(); expectedHashes['/workspace/note.txt'] = 'b'.repeat(64);
+      return { targets: [{ path: '/workspace/note.txt', operation: 'delete' as const }], preview: 'delete',
+        execute: async () => ({ success: true }) };
+    } };
+    await expect(prepareToolCall(patchTool, { input: 'delete', expectedHashes }, context, {}))
+      .rejects.toThrow('arguments changed during capture');
+  });
+
+  it('rejects delete-only mutations both after binding and after approval', async () => {
+    const patchTool: ToolDefinition = { ...tool, name: 'apply_patch', prepare: () => ({
+      targets: [{ path: '/workspace/note.txt', operation: 'delete' }], preview: 'delete',
+      execute: async () => ({ success: true }),
+    }) };
+    const expectedHashes = { '/workspace/note.txt': 'a'.repeat(64) };
+    const owner = {}, args = await prepareToolCall(patchTool, { input: 'delete', expectedHashes }, context, owner);
+    bindPreparedToolCall(args, owner, 'apply_patch', 'call');
+    expectedHashes['/workspace/note.txt'] = 'b'.repeat(64);
+    expect(() => authorizeToolCall(args, owner, 'apply_patch', 'call')).toThrow('approval changed after capture');
+    expectedHashes['/workspace/note.txt'] = 'a'.repeat(64);
+    authorizeToolCall(args, owner, 'apply_patch', 'call');
+    expectedHashes['/workspace/note.txt'] = 'b'.repeat(64);
+    expect(() => consumeToolCall(args, owner, patchTool, 'call')).toThrow('arguments changed after capture');
   });
 });

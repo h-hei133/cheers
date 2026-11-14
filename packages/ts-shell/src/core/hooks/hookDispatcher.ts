@@ -8,7 +8,7 @@ import type { StopDispatchOptions } from './stop/model.js';
 import type { StopPayload } from './types.js';
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
 import { checkWriteHookArtifact, writeHookCommand } from './artifact.js';
-import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInput, translateWriteInputs, translateWriteResult } from './translation.js';
+import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInputs, translateWriteResult } from './translation.js';
 import { getExtensionEventRunners } from './extensionBridge.js';
 import type {
   HookEventPayload,
@@ -272,7 +272,11 @@ export class HookDispatcher {
             accumulatedDecision = mergeWriteHookResult(accumulatedDecision, inputs);
             continue;
           }
-          const matchedInputs = inputs.filter(input => this.matches(hook.matcher, { ...payload, toolName: input.tool_name }));
+          for (const gap of inputs.gaps) {
+            logger.info('Write hook result', gap.hookVerdict);
+            accumulatedDecision = mergeWriteHookResult(accumulatedDecision, gap);
+          }
+          const matchedInputs = inputs.inputs.filter(input => this.matches(hook.matcher, { ...payload, toolName: input.tool_name }));
           if (matchedInputs.length === 0) continue;
           const invalidArtifact = checkWriteHookArtifact(hook.writeGate, payload.workspaceRoot);
           if (invalidArtifact) {
@@ -410,7 +414,7 @@ export class HookDispatcher {
       }
     }
     const extensionDecision = !trust?.admission?.() && payload.workspaceRoot
-      ? await dispatchExtensionHooks(payload, accumulatedDecision)
+      ? await dispatchExtensionHooks(payload, accumulatedDecision, stopOptions.signal)
       : null;
     if (extensionDecision) return extensionDecision;
     return accumulatedDecision ?? { decision: "allow" };
@@ -434,6 +438,7 @@ const EXTENSION_EVENT_ALIASES: Readonly<Record<string, readonly string[]>> = {
 async function dispatchExtensionHooks(
   payload: HookEventPayload,
   accumulated: HookDecision | null,
+  signal?: AbortSignal,
 ): Promise<HookDecision | null> {
   const runners = getExtensionEventRunners(payload.workspaceRoot, payload.sessionId);
   const aliases = EXTENSION_EVENT_ALIASES[payload.eventName];
@@ -441,7 +446,9 @@ async function dispatchExtensionHooks(
   let updated = false;
   for (const runExtensionEvent of runners) {
     try {
-      const returned = await runExtensionEvent(payload.eventName, payload, aliases);
+      if (signal?.aborted) return { decision: 'block', reason: 'Extension event cancelled.' };
+      const returned = await runExtensionEvent(payload.eventName, payload, aliases, signal);
+      if (signal?.aborted) return { decision: 'block', reason: 'Extension event cancelled.' };
       if (!returned || typeof returned !== 'object') continue;
       const decision = payload.eventName === 'PreToolUse'
         ? normalizeHookVeto(returned) ?? (returned as HookDecision)
@@ -454,7 +461,8 @@ async function dispatchExtensionHooks(
         updated = true;
       }
     } catch (err: unknown) {
-      logger.error(`Error in extension event handler: ${err instanceof Error ? err.message : String(err)}`);
+      logger.error('Extension event handler failed.');
+      if (payload.eventName === 'PreToolUse') return { decision: 'block', reason: 'Extension event handler failed; tool execution was refused.' };
     }
   }
   return updated ? merged : null;

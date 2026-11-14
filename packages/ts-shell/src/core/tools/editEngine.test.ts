@@ -294,3 +294,27 @@ it("applies disjoint cascading replacements against the original ranges", () => 
   ]);
   expect(result).toMatchObject({ success: true, content: "beta\ndelta\n" });
 });
+
+it("bounds matching work for unrelated long blocks while checking ambiguity", () => {
+  const search = `begin\n${"a".repeat(128)}\nend`;
+  const match = `begin\n${"a".repeat(127)}b\nend`;
+  const unrelated = `begin\n${"z".repeat(4096)}\nend`;
+  const original = `${match}\nseparator\n${unrelated}`;
+  const charCodeAt = String.prototype.charCodeAt;
+  let comparisons = 0;
+  String.prototype.charCodeAt = function(index: number): number {
+    comparisons++;
+    return charCodeAt.call(this, index);
+  };
+  let result;
+  try {
+    result = replaceInContent(original, search, "replacement");
+  } finally {
+    String.prototype.charCodeAt = charCodeAt;
+  }
+  expect(result).toMatchObject({ success: true, strategy: "block-anchor-levenshtein",
+    content: `replacement\nseparator\n${unrelated}` });
+  expect(comparisons).toBeLessThan(50_000);
+  const ambiguous = `${match}\nseparator\n${match}`;
+  expect(replaceInContent(ambiguous, search, "replacement")).toMatchObject({ success: false, content: ambiguous });
+});

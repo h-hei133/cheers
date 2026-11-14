@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyWriteHookPolicy, CANONICAL_WRITE_MATCHER, canonicalToolName, hookUnknown, mergeWriteHookResult,
   normalizeHookVeto, translateWriteInput, translateWriteInputs, translateWriteResult } from './translation.js';
 import { bindPreparedToolCall, discardToolCall, prepareToolCall } from '../../tools/preparation.js';
+import type { PreparedWriteCandidate, ToolDefinition, ToolPreparation } from '../../tools/types.js';
 import type { PreToolUsePayload } from './types.js';
 import fixtures from './fixtures/write-gate-results.json';
 
@@ -95,11 +96,44 @@ describe('canonical write translation', () => {
     bindPreparedToolCall(args, owner, 'apply_patch', 'call-multi');
     try {
       const translated = translateWriteInputs({ ...payload, toolName: 'apply_patch', toolCallId: 'call-multi', args }, 15000);
-      expect(Array.isArray(translated)).toBe(true);
-      expect(translated).toHaveLength(2);
+      expect('inputs' in translated && translated.inputs).toHaveLength(2);
+      expect('gaps' in translated && translated.gaps).toEqual([]);
     } finally {
       discardToolCall(args);
     }
+  });
+
+  it.each(['missing', 'foreign', 'duplicate'] as const)('keeps %s candidate coverage unknown', async defect => {
+    const first: PreparedWriteCandidate = { path: '/workspace/a.ts', content: 'a', before: { state: 'absent' } };
+    const second: PreparedWriteCandidate = { path: '/workspace/b.ts', content: 'b', before: { state: 'absent' } };
+    const candidates = defect === 'missing' ? [first] : defect === 'foreign' ? [first, { ...second, path: '/workspace/foreign.ts' }] : [first, first];
+    const tool: ToolDefinition = { name: 'apply_patch', description: 'fixture', argsSchema: {},
+      prepare: () => ({ targets: [{ path: first.path, operation: 'write' }, { path: second.path, operation: 'write' }],
+        preview: 'diff', writeCandidates: candidates, execute: async () => ({ success: true }) }),
+      execute: async () => ({ success: true }),
+    };
+    const owner = {}, args = await prepareToolCall(tool, { input: 'fixture' }, { workspaceRoot: '/workspace', taskId: 'call' }, owner);
+    bindPreparedToolCall(args, owner, 'apply_patch', 'call');
+    try {
+      expect(translateWriteInputs({ ...payload, toolName: 'apply_patch', args }, 15000))
+        .toMatchObject({ decision: 'block', hookVerdict: { status: 'unknown', reasonCode: 'input_incomplete' } });
+    } finally { discardToolCall(args); }
+  });
+
+  it.each(['delete', 'noop'] as const)('retains %s coverage without a fake replacement input', async effect => {
+    const targets: ToolPreparation['targets'] = effect === 'delete' ? [{ path: '/workspace/a.ts', operation: 'delete' }] : [];
+    const tool: ToolDefinition = { name: 'apply_patch', description: 'fixture', argsSchema: {},
+      prepare: () => ({ targets, preview: 'diff', execute: async () => ({ success: true }) }),
+      execute: async () => ({ success: true }),
+    };
+    const owner = {}, args = await prepareToolCall(tool, { input: 'fixture' }, { workspaceRoot: '/workspace', taskId: 'call' }, owner);
+    bindPreparedToolCall(args, owner, 'apply_patch', 'call');
+    try {
+      const translated = translateWriteInputs({ ...payload, toolName: 'apply_patch', args }, 15000);
+      expect(translated).toMatchObject({ inputs: [], gaps: [{ decision: 'unsupported', hookVerdict: {
+        status: 'unsupported', reasonCode: effect === 'delete' ? 'delete_effects' : 'not_a_judged_write',
+      } }] });
+    } finally { discardToolCall(args); }
   });
 });
 

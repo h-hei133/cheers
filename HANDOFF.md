@@ -2222,3 +2222,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A broad grep glob returns `.git/info/exclude` even though directory traversal prunes `.git`.
 - **Root Cause:** Native ignore handling materializes selected Git metadata, and ripgrep gives the later caller inclusion glob precedence over earlier fixed exclusions. A sentinel that is never materialized cannot expose the bug.
 - **Rule:** Put fixed directory exclusions after caller globs. Exercise actual Git metadata plus an ordinary positive match through native search; preserve metadata reads needed for ignore semantics and verified content handles. Keep the original failing control and distinguish tool-path repair from any experiment readiness or task-success claim.
+
+
+### Patch Approval Must Bind Exhaustive Selected Effects
+- **Symptom:** A write hook judges unapproved hunks, deletion gaps disappear behind an allow result, or a hook replaces the selected patch groups.
+- **Root Cause:** Prepared content candidates were treated as all effects, while the selection and preview revision were not sealed at the ordinary approval boundary.
+- **Rule:** Replan only the approved groups, verify the exact revision, and bind exhaustive write/delete effects before hooks. Refuse a second selection before changing state, protect delete-only and no-op argument identity, and preserve unknown and unsupported coverage alongside supported writes.

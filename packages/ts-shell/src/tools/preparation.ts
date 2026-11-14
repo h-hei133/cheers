@@ -1,4 +1,4 @@
-import type { PreparedWriteCandidate, ToolDefinition, ToolExecutionContext, ToolPreparation } from './types.js';
+import type { PreparedWriteCandidate, PreparedWriteInspection, ToolDefinition, ToolExecutionContext, ToolPreparation } from './types.js';
 
 interface PreparedCall {
   readonly tool: ToolDefinition;
@@ -6,7 +6,10 @@ interface PreparedCall {
   readonly preparation: ToolPreparation;
   readonly writeCandidate?: PreparedWriteCandidate;
   readonly writeCandidates?: readonly PreparedWriteCandidate[];
+  readonly selectionInspection?: ToolPreparation['selectionInspection'];
+  readonly selectionIds?: ReadonlySet<string>;
   readonly snapshot?: unknown;
+  writeInspection?: PreparedWriteInspection;
   hookCallId?: string;
   callId?: string;
   selection?: readonly string[];
@@ -14,6 +17,16 @@ interface PreparedCall {
 }
 
 const calls = new WeakMap<object, PreparedCall>();
+
+function captureInspection(value: PreparedWriteInspection): PreparedWriteInspection {
+  return Object.freeze({
+    targets: Object.freeze(value.targets.map(target => Object.freeze({ ...target }))),
+    writeCandidates: Object.freeze(value.writeCandidates.map(candidate => Object.freeze({
+      ...candidate, before: Object.freeze({ ...candidate.before }),
+    }))),
+    ...(value.revision === undefined ? {} : { revision: value.revision }),
+  });
+}
 
 function cloneSnapshotValue(value: unknown, seen = new WeakMap<object, unknown>()): unknown {
   if (value === null || typeof value !== 'object') return value;
@@ -87,11 +100,12 @@ export function prepareToolCall(tool: ToolDefinition, args: Record<string, unkno
   const publish = (resolved: ToolPreparation, asyncResolved: boolean): Record<string, unknown> => {
     context.abortSignal?.throwIfAborted();
     verify?.();
-    const hasCandidate = Boolean(resolved.writeCandidate || resolved.writeCandidates?.length);
-    if (asyncResolved && hasCandidate && initialSnapshot !== undefined && !deepSnapshotEqual(initialSnapshot, prepared)) {
+    const protectedCall = Boolean(resolved.writeCandidate || resolved.writeCandidates?.length
+      || resolved.selectionInspection || tool.name === 'apply_patch');
+    if (asyncResolved && protectedCall && initialSnapshot !== undefined && !deepSnapshotEqual(initialSnapshot, prepared)) {
       throw new Error('Prepared edit arguments changed during capture.');
     }
-    const snapshot = hasCandidate ? (initialSnapshot ?? cloneSnapshotValue(prepared)) : undefined;
+    const snapshot = protectedCall ? (initialSnapshot ?? cloneSnapshotValue(prepared)) : undefined;
     const writeCandidate = resolved.writeCandidate
       ? Object.freeze({ ...resolved.writeCandidate, before: Object.freeze({ ...resolved.writeCandidate.before }) }) : undefined;
     const writeCandidates = resolved.writeCandidates?.length
@@ -106,6 +120,12 @@ export function prepareToolCall(tool: ToolDefinition, args: Record<string, unkno
       preparation: resolved,
       ...(writeCandidate ? { writeCandidate } : {}),
       ...(writeCandidates ? { writeCandidates } : {}),
+      ...(tool.name === 'apply_patch' || resolved.selectionInspection ? {
+        writeInspection: captureInspection({ targets: resolved.targets,
+          writeCandidates: writeCandidates ?? (writeCandidate ? [writeCandidate] : []), revision: resolved.selectionRevision }),
+      } : {}),
+      ...(resolved.selectionInspection ? { selectionInspection: resolved.selectionInspection } : {}),
+      ...(resolved.selections ? { selectionIds: new Set(resolved.selections.map(group => group.id)) } : {}),
       ...(snapshot !== undefined ? { snapshot } : {}),
     });
     return prepared;
@@ -123,14 +143,30 @@ export function preparedToolCall(args: object, owner: object): ToolPreparation |
 /** Bind the original prepared argument identity after ordinary permission, before hooks. */
 export function bindPreparedToolCall(args: object, owner: object, toolName: string, callId: string): void {
   const call = calls.get(args);
-  if (!call?.writeCandidate && !call?.writeCandidates?.length) return;
+  if (!call || call.snapshot === undefined) return;
   if (!callId || call.owner !== owner || call.tool.name !== toolName || call.hookCallId || call.callId) throw new Error('Prepared tool call hook identity does not match.');
+  if (!deepSnapshotEqual(call.snapshot, args)) throw new Error('Prepared edit arguments changed after capture.');
+  if (call.selectionInspection) {
+    if (!call.selection?.length || !call.selectionRevision) throw new Error('The approved patch selection is missing its exact preview revision. Nothing was written.');
+    let inspection: PreparedWriteInspection;
+    try { inspection = captureInspection(call.selectionInspection(call.selection)); }
+    catch (error) {
+      throw new Error(`Patch changed after approval or its selection is stale. Nothing was written. ${error instanceof Error ? error.message : ''}`.trim());
+    }
+    if (inspection.revision !== call.selectionRevision) throw new Error('Patch selection revision changed after approval. Nothing was written.');
+    if (!deepSnapshotEqual(call.snapshot, args)) throw new Error('Prepared edit arguments changed after capture.');
+    call.writeInspection = inspection;
+  }
   call.hookCallId = callId;
 }
 
 /** Only the live host-bound call can expose its candidate; raw model fields are ignored. */
 export function preparedWriteCandidate(args: object, toolName: string, callId: string): PreparedWriteCandidate | undefined {
   const call = calls.get(args);
+  if (call?.writeInspection) {
+    const inspection = preparedWriteInspection(args, toolName, callId);
+    return inspection?.targets.length === 1 && inspection.writeCandidates.length === 1 ? inspection.writeCandidates[0] : undefined;
+  }
   if (!call?.writeCandidate || call.tool.name !== toolName || call.hookCallId !== callId) return undefined;
   if (call.snapshot !== undefined && !deepSnapshotEqual(call.snapshot, args)) throw new Error('Prepared edit arguments changed after capture.');
   return call.writeCandidate;
@@ -139,16 +175,25 @@ export function preparedWriteCandidate(args: object, toolName: string, callId: s
 /** Expose all host-bound file write candidates for multi-file patch inspection. */
 export function preparedWriteCandidates(args: object, toolName: string, callId: string): readonly PreparedWriteCandidate[] | undefined {
   const call = calls.get(args);
+  if (call?.writeInspection) return preparedWriteInspection(args, toolName, callId)?.writeCandidates;
   if ((!call?.writeCandidates?.length && !call?.writeCandidate) || call.tool.name !== toolName || call.hookCallId !== callId) return undefined;
   if (call.snapshot !== undefined && !deepSnapshotEqual(call.snapshot, args)) throw new Error('Prepared edit arguments changed after capture.');
   return call.writeCandidates ?? (call.writeCandidate ? [call.writeCandidate] : undefined);
+}
+
+/** The selected exhaustive effects belong only to the original host-bound call. */
+export function preparedWriteInspection(args: object, toolName: string, callId: string): PreparedWriteInspection | undefined {
+  const call = calls.get(args);
+  if (!call?.writeInspection || call.tool.name !== toolName || call.hookCallId !== callId) return undefined;
+  if (call.snapshot !== undefined && !deepSnapshotEqual(call.snapshot, args)) throw new Error('Prepared edit arguments changed after capture.');
+  return call.writeInspection;
 }
 
 export function authorizeToolCall(args: object, owner: object, toolName: string, callId: string): void {
   const call = calls.get(args);
   if (!call) return;
   if (call.owner !== owner || call.tool.name !== toolName || call.callId) throw new Error('Prepared tool call approval does not match.');
-  if ((call.writeCandidate || call.writeCandidates?.length) && (call.hookCallId !== callId || (call.snapshot !== undefined && !deepSnapshotEqual(call.snapshot, args)))) throw new Error('Prepared edit approval changed after capture.');
+  if (call.snapshot !== undefined && (call.hookCallId !== callId || !deepSnapshotEqual(call.snapshot, args))) throw new Error('Prepared edit approval changed after capture.');
   call.callId = callId;
 }
 
@@ -160,7 +205,7 @@ export function consumeToolCall(args: object, owner: object, tool: ToolDefinitio
     return undefined;
   }
   if (call.owner !== owner || call.tool !== tool || call.callId !== callId) throw new Error('Prepared tool call was not approved for this execution.');
-  if ((call.writeCandidate || call.writeCandidates?.length) && call.snapshot !== undefined && !deepSnapshotEqual(call.snapshot, args)) throw new Error('Prepared edit arguments changed after capture.');
+  if (call.snapshot !== undefined && !deepSnapshotEqual(call.snapshot, args)) throw new Error('Prepared edit arguments changed after capture.');
   return call.preparation;
 }
 
@@ -172,6 +217,12 @@ export function setPreparedSelection(
 ): void {
   const call = calls.get(args);
   if (call) {
+    if (call.selection || call.hookCallId || call.callId) throw new Error('The approved tool selection cannot be replaced.');
+    if (!Array.isArray(selection) || selection.length === 0 || new Set(selection).size !== selection.length
+      || selection.some(id => typeof id !== 'string' || !id.trim() || !call.selectionIds?.has(id))) {
+      throw new Error('The approved tool selection contains unknown or duplicate groups.');
+    }
+    if (call.selectionInspection && (typeof revision !== 'string' || !revision.trim())) throw new Error('The approved patch selection is missing its exact preview revision.');
     call.selection = Object.freeze([...selection]);
     if (revision !== undefined) call.selectionRevision = revision;
   }

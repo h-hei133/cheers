@@ -108,6 +108,8 @@ export interface ToolPreparation {
     readonly preview: string;
     readonly revision: string;
   }
+  /** Rebuild only the approved effects before binding the call to its pre-use hooks. */
+  readonly selectionInspection?: (selection: readonly string[]) => PreparedWriteInspection
   readonly execute: (
     context: ToolExecutionContext,
     selection?: readonly string[],
@@ -120,4 +122,11 @@ export interface PreparedWriteCandidate {
   readonly content: string
   /** Report-safe identity of the original bytes used to compute the candidate. */
   readonly before: { readonly state: 'absent' } | { readonly state: 'exists'; readonly sha256: string }
+}
+
+export interface PreparedWriteInspection {
+  /** Exhaustive effects, including deletions which have no replacement content. */
+  readonly targets: ToolPreparation['targets']
+  readonly writeCandidates: readonly PreparedWriteCandidate[]
+  readonly revision?: string
 }

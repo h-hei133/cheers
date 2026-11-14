@@ -1,6 +1,7 @@
 import { isRecord } from '../values/record.js';
 import type { HookDecision, PreToolUsePayload } from './types.js';
-import { preparedWriteCandidate, preparedWriteCandidates } from '../../tools/preparation.js';
+import { preparedWriteCandidate, preparedWriteInspection } from '../../tools/preparation.js';
+import type { PreparedWriteCandidate } from '../../tools/types.js';
 
 export const CANONICAL_WRITE_MATCHER = '^(?:Write|Edit|MultiEdit|NotebookEdit)$';
 /** C3b's opt-in experiment policy: block uncertainty, observe unsupported coverage. */
@@ -33,6 +34,11 @@ export interface CanonicalHookInput {
   readonly tool_input: { readonly file_path: string; readonly content: string };
 }
 
+export interface TranslatedWriteInputs {
+  readonly inputs: readonly CanonicalHookInput[];
+  readonly gaps: readonly HookDecision[];
+}
+
 export function canonicalToolName(name: string): string { return TOOLS[name] ?? name; }
 
 export function hookUnknown(reasonCode: string): HookDecision {
@@ -44,6 +50,19 @@ function unsupported(reasonCode: string, reason: string): HookDecision {
   return { decision: 'unsupported', reasonCode, reason, hookVerdict: { status: 'unsupported', source: 'adapter', reasonCode, policy: 'observe-only' } };
 }
 
+function canonicalWriteInput(payload: PreToolUsePayload, timeoutMs: number, candidate: PreparedWriteCandidate): CanonicalHookInput {
+  return {
+    version: 1, event: 'PreToolUse', workspaceRoot: payload.workspaceRoot, sessionId: payload.sessionId,
+    toolName: payload.toolName, toolCallId: payload.toolCallId, args: { ...payload.args }, timeoutMs,
+    reentry: { supported: false, active: false }, timestamp: payload.timestamp,
+    ...(payload.agentId === undefined ? {} : { agentId: payload.agentId }),
+    ...(payload.agentType === undefined ? {} : { agentType: payload.agentType }),
+    hook_event_name: 'PreToolUse', cwd: payload.workspaceRoot,
+    tool_name: candidate.before.state === 'absent' ? 'Write' : 'Edit',
+    tool_input: { file_path: candidate.path, content: candidate.content },
+  };
+}
+
 /** Consume the native prepared candidate, or an explicit full-file replacement; never reconstruct edits. */
 export function translateWriteInput(payload: PreToolUsePayload, timeoutMs: number): CanonicalHookInput | HookDecision {
   if (payload.eventName !== 'PreToolUse' || typeof payload.workspaceRoot !== 'string' || !payload.workspaceRoot
@@ -52,22 +71,11 @@ export function translateWriteInput(payload: PreToolUsePayload, timeoutMs: numbe
     || !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return hookUnknown('invalid_input');
   const tool = canonicalToolName(payload.toolName);
   if (tool === 'apply_patch') {
-    let candidate;
-    try { candidate = preparedWriteCandidate(payload.args, payload.toolName, payload.toolCallId); }
-    catch { return hookUnknown('prepared_input_changed'); }
-    if (!candidate) {
-      return unsupported('patch_targets',
-        'A patch may contain multiple targets, while content rules apply per file; patch normalization is not implemented.');
-    }
-    return {
-      version: 1, event: 'PreToolUse', workspaceRoot: payload.workspaceRoot, sessionId: payload.sessionId,
-      toolName: payload.toolName, toolCallId: payload.toolCallId, args: { ...payload.args }, timeoutMs,
-      reentry: { supported: false, active: false }, timestamp: payload.timestamp,
-      ...(payload.agentId === undefined ? {} : { agentId: payload.agentId }),
-      ...(payload.agentType === undefined ? {} : { agentType: payload.agentType }),
-      hook_event_name: 'PreToolUse', cwd: payload.workspaceRoot, tool_name: 'Edit',
-      tool_input: { file_path: candidate.path, content: candidate.content },
-    };
+    const translated = translateWriteInputs(payload, timeoutMs);
+    if ('decision' in translated) return translated;
+    if (translated.gaps.length) return translated.gaps[0]!;
+    return translated.inputs.length === 1 ? translated.inputs[0]! : unsupported('patch_targets',
+      'This patch requires per-file inspection of every selected target rather than one replacement input.');
   }
   if (tool === 'MultiEdit') return unsupported('multiple_edits', 'Multiple edits have no verified single-file replacement projection.');
   if (tool === 'NotebookEdit') return unsupported('notebook_cells', 'Notebook cell operations are not full file replacement content.');
@@ -99,31 +107,35 @@ export function translateWriteInput(payload: PreToolUsePayload, timeoutMs: numbe
 }
 
 /** Translate single-file or multi-file prepared write operations into canonical PreToolUse hook inputs. */
-export function translateWriteInputs(payload: PreToolUsePayload, timeoutMs: number): readonly CanonicalHookInput[] | HookDecision {
+export function translateWriteInputs(payload: PreToolUsePayload, timeoutMs: number): TranslatedWriteInputs | HookDecision {
   if (payload.eventName !== 'PreToolUse' || typeof payload.workspaceRoot !== 'string' || !payload.workspaceRoot
     || typeof payload.sessionId !== 'string' || typeof payload.toolCallId !== 'string'
     || typeof payload.toolName !== 'string' || !isRecord(payload.args)
     || !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return hookUnknown('invalid_input');
   const tool = canonicalToolName(payload.toolName);
   if (tool === 'apply_patch') {
-    let candidates;
-    try { candidates = preparedWriteCandidates(payload.args, payload.toolName, payload.toolCallId); }
+    let inspection;
+    try { inspection = preparedWriteInspection(payload.args, payload.toolName, payload.toolCallId); }
     catch { return hookUnknown('prepared_input_changed'); }
-    if (candidates && candidates.length > 0) {
-      return candidates.map(candidate => ({
-        version: 1 as const, event: 'PreToolUse' as const, workspaceRoot: payload.workspaceRoot, sessionId: payload.sessionId,
-        toolName: payload.toolName, toolCallId: payload.toolCallId, args: { ...payload.args }, timeoutMs,
-        reentry: { supported: false as const, active: false as const }, timestamp: payload.timestamp,
-        ...(payload.agentId === undefined ? {} : { agentId: payload.agentId }),
-        ...(payload.agentType === undefined ? {} : { agentType: payload.agentType }),
-        hook_event_name: 'PreToolUse' as const, cwd: payload.workspaceRoot,
-        tool_name: candidate.before.state === 'absent' ? 'Write' : 'Edit',
-        tool_input: { file_path: candidate.path, content: candidate.content },
-      }));
+    if (!inspection) return unsupported('patch_targets',
+      'A patch needs its original host-bound selected effects before per-file content can be inspected.');
+    const paths = new Set(inspection.targets.map(target => target.path));
+    const writes = inspection.targets.filter(target => target.operation === 'write');
+    const candidates = inspection.writeCandidates;
+    if (paths.size !== inspection.targets.length || candidates.length !== writes.length
+      || new Set(candidates.map(candidate => candidate.path)).size !== candidates.length
+      || candidates.some(candidate => !writes.some(target => target.path === candidate.path))) {
+      return hookUnknown('input_incomplete');
     }
+    const gaps: HookDecision[] = [];
+    if (inspection.targets.some(target => target.operation === 'delete')) gaps.push(unsupported('delete_effects',
+      'Selected deletions have no replacement content and remain outside the per-file content judgment.'));
+    if (inspection.targets.length === 0) gaps.push(unsupported('not_a_judged_write',
+      'The selected patch has no changed file content to judge.'));
+    return { inputs: candidates.map(candidate => canonicalWriteInput(payload, timeoutMs, candidate)), gaps };
   }
   const single = translateWriteInput(payload, timeoutMs);
-  return 'decision' in single ? single : [single];
+  return 'decision' in single ? single : { inputs: [single], gaps: [] };
 }
 
 /** Native flat vetoes retain their full payload; nested vetoes enter the same consumer. */

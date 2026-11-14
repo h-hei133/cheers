@@ -9,6 +9,7 @@ import { applyPatchPlan } from './batch.js';
 import { planPatch, planPatchSelection, type PatchPlan } from './plan.js';
 import { patchLimits } from './parse.js';
 import { hashContent } from '../authority/content.js';
+import { inspectPatchPlan } from './inspection.js';
 
 export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
   return {
@@ -30,7 +31,8 @@ export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
           return typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest) || file.before.state !== 'exists' || hashContent(file.before.content) !== digest;
         })) throw new Error('FILE_CONTENT_CHANGED: Patch source snapshots no longer match the proposal.');
       }
-      const targets = Object.freeze(plan.files.map(file => Object.freeze({ path: path.join(file.workspaceRoot, file.relativePath), operation: file.content === undefined ? 'delete' as const : 'write' as const })));
+      const inspection = inspectPatchPlan(plan);
+      const targets = inspection.targets;
       const selections = Object.freeze(plan.groups.map(group => Object.freeze({ id: group.id, label: group.label, files: group.files })));
       const renderPreview = (value: PatchPlan): string => ['Patch plan', `Revision: ${value.revision}`, ...value.files.map(file => {
         const before = file.before.state === 'exists' ? file.before.content : '';
@@ -38,32 +40,16 @@ export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
       }), 'Files commit separately. A later failure may require guarded compensation.'].join('\n\n');
       const preview = renderPreview(plan);
       if (Buffer.byteLength(preview) > patchLimits.previewBytes) throw new Error('Patch preview is too large; split the operation before requesting approval.');
-      const singleFile = plan.files.length === 1 ? plan.files[0]! : undefined;
-      const writeCandidate = singleFile && singleFile.content !== undefined && !singleFile.rename
-        ? Object.freeze({
-            path: path.join(singleFile.workspaceRoot, singleFile.relativePath),
-            content: singleFile.content,
-            before: singleFile.before.state === 'exists'
-              ? Object.freeze({ state: 'exists' as const, sha256: hashContent(singleFile.before.content) })
-              : Object.freeze({ state: 'absent' as const }),
-          })
-        : undefined;
-      const writtenFiles = plan.files.filter(file => file.content !== undefined);
-      const writeCandidates = writtenFiles.length > 0
-        ? Object.freeze(writtenFiles.map(file => Object.freeze({
-            path: path.join(file.workspaceRoot, file.rename?.target ?? file.relativePath),
-            content: file.content!,
-            before: file.before.state === 'exists'
-              ? Object.freeze({ state: 'exists' as const, sha256: hashContent(file.before.content) })
-              : Object.freeze({ state: 'absent' as const }),
-          })))
-        : undefined;
+      const writeCandidate = targets.length === 1 ? inspection.writeCandidates[0] : undefined;
+      const writeCandidates = inspection.writeCandidates;
       return Object.freeze({ targets, preview, ...(writeCandidate ? { writeCandidate } : {}), ...(writeCandidates ? { writeCandidates } : {}), selections, selectionRevision: plan.revision, selectionPreview: (chosen: readonly string[]) => {
         const selectedPlan = planPatchSelection(args.input as string, { ...context, sessionId: context.sessionId!, workspaceRoot: root }, chosen, plan);
         const selectedPreview = renderPreview(selectedPlan);
         if (Buffer.byteLength(selectedPreview) > patchLimits.previewBytes) throw new Error('Selected patch preview is too large; split the operation before requesting approval.');
         return { preview: selectedPreview, revision: selectedPlan.revision };
-      }, execute: async (actual: ToolExecutionContext, selection?: readonly string[], approval?: { readonly revision?: string }) => {
+      }, selectionInspection: (chosen: readonly string[]) => inspectPatchPlan(planPatchSelection(args.input as string,
+        { ...context, sessionId: context.sessionId!, workspaceRoot: root }, chosen, plan)),
+      execute: async (actual: ToolExecutionContext, selection?: readonly string[], approval?: { readonly revision?: string }) => {
         const chosen = selection;
         if (!Array.isArray(chosen) || chosen.length === 0) {
           throw new Error('The approval must explicitly select at least one patch group. Nothing was written.');
