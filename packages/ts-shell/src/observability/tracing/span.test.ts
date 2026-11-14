@@ -17,6 +17,53 @@ afterEach(async () => {
 });
 
 describe("OTel Span, InMemoryTraceStore, and JsonlTraceStore", () => {
+  it("keeps identities distinct between independent recorders and propagates the exact remote parent", async () => {
+    const sender = new InMemoryTraceStore();
+    const receiver = new InMemoryTraceStore();
+
+    await sender.startSpan({ name: "sender.root" }, async (root) => {
+      await receiver.extract(sender.inject(root)).startSpan({ name: "receiver.child" }, () => {});
+    });
+    await receiver.startSpan({ name: "receiver.root" }, () => {});
+
+    const sent = sender.snapshot()[0]!;
+    const received = receiver.snapshot();
+    const child = received.find((span) => span.name === "receiver.child")!;
+    const independent = received.find((span) => span.name === "receiver.root")!;
+    expect(child.traceId).toBe(sent.traceId);
+    expect(child.parentId).toBe(sent.id);
+    expect(independent.traceId).not.toBe(sent.traceId);
+    expect(new Set([sent.id, child.id, independent.id]).size).toBe(3);
+    for (const span of [sent, child, independent]) {
+      expect(span.traceId).toMatch(/^[0-9a-f]{32}$/);
+      expect(span.id).toMatch(/^[0-9a-f]{16}$/);
+      expect(span.traceId).not.toMatch(/^0+$/);
+      expect(span.id).not.toMatch(/^0+$/);
+    }
+  });
+
+  it("keeps root traces separate when a JSONL recorder is recreated and continues writing", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-trace-"));
+    tempDirs.push(dir);
+    const filePath = path.join(dir, "traces.jsonl");
+    const first = new JsonlTraceStore({ filePath });
+    await first.startSpan({ name: "before.restart" }, () => {});
+
+    const restarted = new JsonlTraceStore({ filePath });
+    await restarted.startSpan({ name: "after.restart" }, () => {});
+
+    const traces = (await restarted.findTraces()).traces;
+    expect(traces).toHaveLength(2);
+    expect(traces.map((trace) => trace.spans.map((span) => span.name))).toEqual(
+      expect.arrayContaining([["before.restart"], ["after.restart"]]),
+    );
+    expect(new Set(traces.map((trace) => trace.traceId)).size).toBe(2);
+    expect(new Set(traces.flatMap((trace) => trace.spans.map((span) => span.id))).size).toBe(2);
+    for (const trace of traces) {
+      expect((await restarted.getTrace(trace.traceId))?.spans).toHaveLength(1);
+    }
+  });
+
   it("records nested spans, enforces post-settlement inertness, and captures uncaught errors", async () => {
     const store = new InMemoryTraceStore();
     let leakedSpan: TelemetrySpan | undefined;

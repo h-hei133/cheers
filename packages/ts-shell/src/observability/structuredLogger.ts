@@ -5,6 +5,7 @@ import {
 } from './traceContext.js'
 import { getGlobalRotatingFileSink } from './rotatingFileSink.js'
 import type { StructuredLogEntry } from './types.js'
+import { currentTrace } from './tracing/context.js'
 
 export type { StructuredLogEntry } from './types.js'
 const secretPatterns = [
@@ -107,12 +108,13 @@ export class StructuredLogger {
     message: string,
     fields: Record<string, unknown>,
   ): void {
+    const active = currentTrace()
     const entry: StructuredLogEntry = {
       timestamp: new Date().toISOString(),
       level,
-      traceId: this.traceContext.traceId,
-      spanId: this.traceContext.spanId,
-      parentSpanId: this.traceContext.parentSpanId,
+      traceId: active ? active.traceId : this.traceContext.traceId,
+      spanId: active ? active.spanId : this.traceContext.spanId,
+      parentSpanId: active ? active.parentSpanId : this.traceContext.parentSpanId,
       component: this.component,
       message: redactSecrets(message),
       fields: redactSecretsFromObject(fields) as Record<string, unknown>,
@@ -128,7 +130,8 @@ export class StructuredLogger {
 
     if (enableFilePersistence && !process.env.VITEST && process.env.NODE_ENV !== 'test') {
       try {
-        getGlobalRotatingFileSink().write(entry)
+        const sink = active ? active.scope.sink : getGlobalRotatingFileSink()
+        sink?.write(entry)
       } catch {
         // Non-blocking
       }

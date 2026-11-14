@@ -73,7 +73,7 @@
 - [ ] **F2.2** 远程目录 ETag 增量更新：已有待验收，缓存身份、304、无效内容、配置变更。
 - [ ] **F2.3** 无 eval Schema 校验：缺口。当前 AJV 运行时 compile；替换原校验 owner，覆盖 dialect／ref／format、无 coercion、unknown 拒绝及安全错误。
 - [ ] **F2.4** 阶梯计价：缺口。当前只有平费率；按单次请求含缓存输入的严格阈值选择完整费率并持久化，不用会话累计重新选档。
-- [ ] **F2.5** Span／Event／Link／检索／作用域：已有待验收，记录器失败不夺取产品完成权。
+- [ ] **F2.5** Span／Event／Link／检索／作用域：部分验收。真实runTurn/session/request/tool及普通日志接通，11个新增反例先红后修，独立暂存树9套件70项、五静态门、build `2c8cce9867b8`通过。独立Linux进程验证异步observer/span拒绝不崩溃、custom recorder捕获sink；缺ID持久读保留并标missing。dashboard的profile/session检索来源一致性仍待核实，未勾选；F2.6另列。
 - [ ] **F2.6** 有界直方图及跨进程传播：缺口。进程全局 metrics 与无产品 extract 消费者需接入真实运行边界，保留调用身份和失败隔离。
 
 ## T4: 领域包与配置脚本收敛（P2，功能批次稳定后独立实施）
@@ -134,3 +134,5 @@
 2026-11-14 图片输入修复提交前：终端提交`b607fd6`；初次暂存树7/232与补充wire/capture/sent/compaction4/94通过，独立复审另发现既有image/jpg别名被新准入拒绝。simple/turn两反例均红后统一MIME投影，保留原history；最终独立暂存树11套件315项、五静态门及build `6d1d1be8347f`通过，含Linux实际inline缩放与PDF/read消费者。限定复核CLEAR；目录classifier/生成模型类别和B.3完整终端预算验收仍未完成，不勾选F2.1或B.3。
 
 2026-11-14 连接生命周期修复提交前：图片提交`260e549`。独立复审发现SSE fallback未继承owner取消；真实loopback进程两格handshake/cached均因owner不能取消打开的body而失败。绑定caller/owner同一signal后，独立暂存树五静态门、6套件75项及build `b4e5995ee59a`通过，含实际TLS/CONNECT/超时和SSE socket关闭。独立限定复核CLEAR；F1.2真实配置提供方兼容证据仍开项。
+
+2026-11-14 tracing修复提交前：连接提交`df99ff0`。6个carrier/真实turn红、2个native observer/sink红、2个async-method/missing-ID红、1个持久读缺ID丢记录红均已修复。首次8/64通过后build暴露日志类型仍必填，补真实reader反例而非断言绕过；最终独立暂存树9/70、五静态门、build `2c8cce9867b8`通过。异步side-channel拒绝均被观察且不等待，未知身份不借旧logger；日志保留仍partial。初次误列不存在tools.batch.test未当已运行证据，最终用实际tools.test 32项。dashboard来源剩余核实保持F2.5开项。

@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { redactReportText } from '../core/security/redaction.js';
 import { readStructuredLogs, traceRows, type TraceRow } from './diagnostics.js';
-import type { TelemetryStore } from './tracing/span.js';
+import type { TelemetryStore } from './tracing/types.js';
 export interface TraceDashboard {
   readonly url: string;
   readonly port: number;
@@ -29,17 +29,19 @@ export async function openTraceDashboard(
             timestamp: Number.isFinite(span.startedMs) ? new Date(span.startedMs).toISOString() : '[invalid timestamp]',
             traceId: safeText(span.traceId),
             spanId: safeText(span.id),
+            requestId: typeof span.attributes.requestId === 'string' ? safeText(span.attributes.requestId) : undefined,
+            toolId: typeof span.attributes.toolCallId === 'string' ? safeText(span.attributes.toolCallId) : undefined,
             durationMs: Number.isFinite(span.endedMs) && Number.isFinite(span.startedMs)
               ? Math.max(0, Math.round(span.endedMs - span.startedMs))
               : undefined,
             component: safeText(span.name),
-            message: safeText(span.status.status === 'error' ? (span.status.error?.message ?? 'error') : 'ok'),
+            message: safeText(span.status.status === 'error' ? (span.status.error?.message ?? 'error') : String(span.attributes.outcome ?? 'settled')),
           })),
         );
         const rows = [...spanRows, ...logRows];
         if (request.url === '/data') {
           response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-          response.end(JSON.stringify({ status: logs.status, rows }));
+          response.end(JSON.stringify({ status: logs.status, coverage: traceStore?.coverage, rows }));
           return;
         }
         response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });

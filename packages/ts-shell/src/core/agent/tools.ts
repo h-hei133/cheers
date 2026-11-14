@@ -3,6 +3,7 @@ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateHead, truncateTail, trunc
 import { boundToolMedia, createToolMediaBudget } from './media.js';
 import type { AgentEventSink } from "./events.js";
 import { recordCount, recordTiming } from "../../observability/metrics.js";
+import { toolRequest, traceOperation } from '../../observability/tracing/context.js';
 import type { AgentMessage } from "./state.js";
 
 export interface AgentToolCall {
@@ -310,33 +311,45 @@ async function executePreparedCall(
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
 ): Promise<AgentToolResult> {
-  // Timed here because this is the one place every tool call passes through,
-  // whether it ran sequentially or in a batch. The measurement is buffered, so
-  // it costs a map update rather than a disk write on the hot path.
-  const started = Date.now();
-  try {
-    const result = await tool.execute(call.id, args, signal, (partialResult) => {
-      void emit({
-        type: "tool_execution_update",
-        toolCallId: call.id,
-        toolName: call.name,
-        args: call.args,
-        partialResult,
+  const sourceRequest = toolRequest(call.id);
+  return traceOperation({ name: 'tool.execute', attributes: { tool: call.name, toolCallId: call.id,
+    ...(sourceRequest ? { requestId: sourceRequest.requestId } : {}),
+  } }, async span => {
+    if (sourceRequest) span?.addLink({ context: sourceRequest.span });
+    // Timed here because this is the one place every tool call passes through,
+    // whether it ran sequentially or in a batch. The measurement is buffered, so
+    // it costs a map update rather than a disk write on the hot path.
+    const started = Date.now();
+    try {
+      const result = await tool.execute(call.id, args, signal, (partialResult) => {
+        void emit({
+          type: "tool_execution_update",
+          toolCallId: call.id,
+          toolName: call.name,
+          args: call.args,
+          partialResult,
+        });
       });
-    });
-    recordCount("tool.calls", 1, { tool: call.name, outcome: result.isError ? "error" : "ok" });
-    recordTiming("tool.duration", Date.now() - started, { tool: call.name });
-    return result;
-  } catch (error) {
-    // A throw is a tool outcome too, and leaving it uncounted would make the
-    // error rate look lower than it is.
-    recordCount("tool.calls", 1, { tool: call.name, outcome: "error" });
-    recordTiming("tool.duration", Date.now() - started, { tool: call.name });
-    return {
-      output: `Tool execution error: ${error instanceof Error ? error.message : String(error)}`,
-      isError: true,
-    };
-  }
+      recordCount("tool.calls", 1, { tool: call.name, outcome: result.isError ? "error" : "ok" });
+      recordTiming("tool.duration", Date.now() - started, { tool: call.name });
+      span?.setAttributes({ outcome: signal?.aborted ? 'aborted' : result.isError ? 'error' : 'settled' });
+      if (signal?.aborted || result.isError) span?.setStatus({ status: 'error', error: {
+        name: signal?.aborted ? 'AbortError' : 'ToolError', message: signal?.aborted ? 'Tool execution aborted.' : 'Tool returned an error.',
+      } });
+      return result;
+    } catch (error) {
+      // A throw is a tool outcome too, and leaving it uncounted would make the
+      // error rate look lower than it is.
+      recordCount("tool.calls", 1, { tool: call.name, outcome: "error" });
+      recordTiming("tool.duration", Date.now() - started, { tool: call.name });
+      span?.setAttributes({ outcome: signal?.aborted ? 'aborted' : 'error' });
+      span?.setStatus({ status: 'error', error: { name: signal?.aborted ? 'AbortError' : 'ToolError', message: signal?.aborted ? 'Tool execution aborted.' : 'Tool execution failed.' } });
+      return {
+        output: `Tool execution error: ${error instanceof Error ? error.message : String(error)}`,
+        isError: true,
+      };
+    }
+  });
 }
 
 async function finalizeExecutedCall(

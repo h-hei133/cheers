@@ -2314,3 +2314,21 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A socket owner is retired after fallback response headers, but the HTTP stream keeps reading.
 - **Root Cause:** Fallback checks the owner only before dispatch and passes the original caller signal to the replacement transport.
 - **Rule:** Bind the caller and connection lifetime once, and pass their combined signal through every transport branch through body settlement. Exercise both fresh handshake fallback and a cached fallback using an actual open response; cancellation must reject the read and close the server connection without another request.
+
+
+### Telemetry Must Preserve The Invocation Outcome And Captured Owner
+- **Symptom:** A persistence callback replaces a successful result or original error, or late logs adopt a replacement session/profile.
+- **Root Cause:** Instrumentation settlement was allowed to throw, and long-lived loggers resolved mutable global identity instead of the active invocation.
+- **Rule:** Capture one immutable run scope and sink, carry operation identity through async context, invoke the product once, and preserve its exact value/error across recorder failure. Store bounded detached records in the ordinary rotating log family; retained tails remain partial capture.
+
+
+### A Telemetry Recorder Cannot Own Product Settlement
+- **Symptom:** A completed operation stays pending behind a hung recorder, or a throwing propagation getter prevents its callback from running.
+- **Root Cause:** The instrumentation awaited recorder settlement and read optional capability properties outside its error boundary.
+- **Rule:** Keep an exactly-once product promise as the completion owner, guard recorder property access, observe late rejection without awaiting it indefinitely, and fall back after bounded admission. Late recorder callbacks reuse the original outcome and label capture unavailable; ordinary synchronous-admission recorders must still persist before an immediate post-return query.
+
+
+### Optional Telemetry Failures Must Stay Outside Product Outcomes
+- **Symptom:** A recorder carrier getter skips a model step, an asynchronous void observer crashes the process, or missing IDs silently borrow an earlier logger identity.
+- **Root Cause:** Only the recorder call was guarded; returned properties and independently rejected observer promises escaped, while log schemas assumed every trace ID existed.
+- **Rule:** Guard the consumed carrier fields, observe side-channel promises without awaiting them, and capture storage even with a custom recorder. Preserve missing propagation in the schema and persisted reader, label it in display, and never resolve a replacement sink or identity for a running invocation.

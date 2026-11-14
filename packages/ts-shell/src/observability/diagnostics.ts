@@ -59,7 +59,9 @@ function parseEntry(line: string): StructuredLogEntry | undefined {
     const value = JSON.parse(line) as Partial<StructuredLogEntry>;
     if (typeof value.timestamp !== 'string' || typeof value.level !== 'string' || typeof value.component !== 'string' || typeof value.message !== 'string') return undefined;
     if (!['debug', 'info', 'warn', 'error'].includes(value.level)) return undefined;
-    if (typeof value.traceId !== 'string' || typeof value.spanId !== 'string' || !value.fields || typeof value.fields !== 'object') return undefined;
+    if (value.traceId !== undefined && typeof value.traceId !== 'string'
+      || value.spanId !== undefined && typeof value.spanId !== 'string'
+      || !value.fields || typeof value.fields !== 'object') return undefined;
     return value as StructuredLogEntry;
   } catch { return undefined; }
 }
@@ -71,7 +73,8 @@ export function traceRows(logs: readonly StructuredLogEntry[], projectRoot = pro
     const requestId = stringField(fields, 'requestId') ?? stringField(fields, 'request_id');
     const toolId = stringField(fields, 'toolCallId') ?? stringField(fields, 'tool_call_id') ?? stringField(fields, 'taskId');
     const durationMs = typeof fields.durationMs === 'number' && Number.isFinite(fields.durationMs) ? fields.durationMs : undefined;
-    return { timestamp: text(entry.timestamp), traceId: text(entry.traceId), spanId: text(entry.spanId),
+    return { timestamp: text(entry.timestamp), traceId: entry.traceId ? text(entry.traceId) : '[missing trace id]',
+      spanId: entry.spanId ? text(entry.spanId) : '[missing span id]',
       requestId: requestId === undefined ? undefined : text(requestId), toolId: toolId === undefined ? undefined : text(toolId),
       durationMs, component: text(entry.component), message: text(entry.message) };
   });

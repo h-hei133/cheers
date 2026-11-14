@@ -27,6 +27,9 @@ import type { CacheWarmingRunner } from "./cacheWarm.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 import { StopLifecycle } from './stop.js';
+import { runSessionTrace } from '../observability/tracing/runtime.js';
+import { currentTrace } from '../observability/tracing/context.js';
+import type { TelemetryContext } from '../observability/tracing/types.js';
 
 /**
  * One user turn, driven through the kernel.
@@ -40,6 +43,8 @@ import { StopLifecycle } from './stop.js';
  */
 
 export interface TurnOptions {
+  /** Optional recorder; CLI and SDK runs otherwise use their captured log owner. */
+  readonly telemetry?: TelemetryContext;
   readonly configScope?: ToolGateOptions['configScope'];
   /** Observes kernel facts after the ordinary transcript writer and projection have accepted them. */
   readonly observe?: import('../core/agent/events.js').AgentEventListener;
@@ -377,6 +382,8 @@ export function runTurn(options: TurnOptions): TurnRun {
     const outcome = concludeRun(core.state.messages, options.prompt, options.sessionId, projection.stepCount,
       projection.stepCount >= options.maxSteps && Boolean(core.state.messages.filter(message => message.role === 'assistant').at(-1)?.tool_calls?.length));
     if (outcome.kind === "failed") {
+      currentTrace()?.span.setAttributes({ outcome: 'error' });
+      currentTrace()?.span.setStatus({ status: 'error', error: { name: 'ModelError', message: 'Model step failed.' } });
       stop.finish('stopped', 'model_failed', false);
       await options.hooks.dispatch({
         eventName: "StopFailure",
@@ -422,8 +429,11 @@ export function runTurn(options: TurnOptions): TurnRun {
     return false;
   };
 
-  void drive()
+  void runSessionTrace({ sessionId: options.sessionId, workspaceRoot: options.workspaceRoot }, async span => {
+    await drive()
     .catch((error: unknown) => {
+      span.setAttributes({ outcome: options.signal.aborted ? 'aborted' : 'error' });
+      span.setStatus({ status: 'error', error: { name: 'RunError', message: options.signal.aborted ? 'Session run aborted.' : 'Session run failed.' } });
       if (options.signal.aborted) { stop.finish('stopped', 'cancelled', false); return; }
       stop.finish('stopped', 'runtime_failed', false);
       channel.push({ type: "query.failed", error: error instanceof Error ? error.message : String(error),
@@ -442,8 +452,13 @@ export function runTurn(options: TurnOptions): TurnRun {
           turnsExecuted: projection.stepCount,
         })
         .catch(() => undefined);
-      channel.close();
     });
+    if (options.signal.aborted) {
+      span.setAttributes({ outcome: 'aborted' });
+      span.setStatus({ status: 'error', error: { name: 'AbortError', message: 'Session run aborted.' } });
+    }
+    span.setAttributes({ steps: projection.stepCount });
+  }, options.telemetry).catch(() => undefined).finally(() => channel.close());
 
   return {
     events: channel,

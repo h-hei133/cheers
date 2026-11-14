@@ -9,6 +9,22 @@ import { readMetrics } from './metrics/reader.js';
 afterEach(() => vi.restoreAllMocks());
 
 describe('diagnostic trace projection', () => {
+  it('retains records whose propagation identity is unavailable and labels the missing fields', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-diag-'));
+    try {
+      const file = path.join(directory, 'missing.log');
+      const record = { timestamp: '2026-11-14T00:00:00.000Z', level: 'info', component: 'operation',
+        message: 'product completed', fields: { outcome: 'settled' } };
+      fs.writeFileSync(file, JSON.stringify(record) + '\n');
+      const read = readStructuredLogs(directory, file);
+      expect(read.entries).toHaveLength(1);
+      expect(read.entries[0]?.traceId).toBeUndefined();
+      expect(read.entries[0]?.spanId).toBeUndefined();
+      expect(traceRows(read.entries)[0]).toMatchObject({ traceId: '[missing trace id]', spanId: '[missing span id]',
+        message: 'product completed' });
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+
   it('preserves recorded request and tool IDs and labels missing IDs', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-diag-'));
     const sink = new RotatingFileSink({ logDir: directory, filePrefix: 'trace', pid: 1234 });

@@ -1,4 +1,4 @@
-import type { SpanStatus, StoredSpan, StoredTrace, TraceQuery } from "./span.js";
+import type { SpanStatus, StoredSpan, StoredTrace, TraceQuery } from "./types.js";
 
 const CONTROL_CHAR_RE = /[\u0000-\u001f\u007f-\u009f]/g;
 

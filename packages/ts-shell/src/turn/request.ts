@@ -1,13 +1,54 @@
 import type { AgentCoreOptions } from '../core/agent/agent.js';
 import type { QueryEvent } from '../core/query/runtime/events.js';
 import type { SessionMessage } from '../session/schema/sessionMessage.js';
-import { usageFromProvider } from '../provider/response/usage.js';
+import { hasUsage, usageFromProvider } from '../provider/response/usage.js';
 import type { SentRequest } from '../provider/request/sentRequest.js';
 import { getSessionUsage, recordRequestContext } from '../observability/usageTelemetry.js';
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 import type { CacheWarmingRunner } from './cacheWarm.js';
 import type { StepFunction, StepOptions } from './step.js';
 import type { EventChannel } from './stream.js';
+import { rememberToolRequests, traceOperation } from '../observability/tracing/context.js';
+import { randomUUID } from 'node:crypto';
+
+/** One logical request, including its native retries, with no retained prompt/body. */
+function tracedStep(step: StepFunction): StepFunction {
+  return (messages, signal, listener, options) => {
+    const requestId = options.requestId ?? randomUUID();
+    return traceOperation({ name: 'provider.request', attributes: {
+      requestId, purpose: options.requestPurpose ?? 'turn', usage: 'unknown',
+    } }, async span => {
+      let sent = false;
+      const result = await step(messages, signal, listener, { ...options, requestId,
+        onRequestSent: request => {
+          sent = true;
+          span?.setAttributes({ endpoint: request.endpoint ?? 'unknown', prepared: true });
+          options.onRequestSent?.(request);
+        },
+        onRequestUsage: usage => {
+          if (hasUsage(usage)) {
+            const counted = usageFromProvider(usage);
+            const inputReported = [usage.prompt_tokens, usage.cache_read_input_tokens, usage.cache_creation_input_tokens]
+              .some(value => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+            const outputReported = typeof usage.completion_tokens === 'number' && Number.isFinite(usage.completion_tokens) && usage.completion_tokens >= 0;
+            span?.setAttributes({ usage: inputReported && outputReported ? 'reported' : 'partial',
+              ...(inputReported ? { inputCount: counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens } : {}),
+              ...(outputReported ? { outputCount: counted.completionTokens } : {}) });
+          }
+          options.onRequestUsage?.(usage);
+        },
+      });
+      const outcome = signal?.aborted || result.stopReason === 'aborted' ? 'aborted'
+        : result.stopReason === 'error' ? 'error' : 'settled';
+      if (outcome === 'settled') rememberToolRequests(requestId, result.toolCalls.map(call => call.id));
+      span?.setAttributes({ outcome, prepared: sent, stopReason: result.stopReason ?? 'unknown' });
+      if (outcome !== 'settled') span?.setStatus({ status: 'error', error: {
+        name: outcome === 'aborted' ? 'AbortError' : 'RequestError', message: outcome === 'aborted' ? 'Provider request aborted.' : 'Provider request failed.',
+      } });
+      return result;
+    });
+  };
+}
 
 interface RequestOptions {
   readonly claimBudgetSummary?: () => boolean;
@@ -54,6 +95,7 @@ export function createTurnRequest(
 ): AgentCoreOptions['streamStep'] {
   // Captured wire identity belongs to this request, never rebuilt from history.
   let lastSentRequest: SentRequest | undefined;
+  const stepRequest = tracedStep(options.step);
   return async (messages, signal, request) => {
     channel.push({ type: "message.started", role: "coder" });
     // A new request replaces the old prefix even if it fails or reports no usage.
@@ -86,7 +128,7 @@ export function createTurnRequest(
         ...(delta !== undefined ? { delta } : {}),
       });
     };
-    let step = await options.step(
+    let step = await stepRequest(
       messages,
       signal,
       {
@@ -127,7 +169,7 @@ export function createTurnRequest(
       budgetSummary = true;
       // This instruction is request-local: it has no user-message lifecycle,
       // persistence or display event. The ordinary step still enforces the cap.
-      const closing = await options.step([...messages, { role: 'user', content:
+      const closing = await stepRequest([...messages, { role: 'user', content:
         'The goal budget cannot admit the next working step. Summarize progress and remaining blockers, then stop. Do not call tools or claim completion without evidence.' }],
       signal, {
         onText: delta => channel.push({ type: 'message.delta', role: 'coder', delta }),
