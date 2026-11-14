@@ -2363,3 +2363,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Markdown emits OSC 8 on a terminal whose capability is false, or the full reader bypasses a transcript-only repair.
 - **Root Cause:** Capability detection had no rendering consumer; reader and transcript layouts cached output independently, and storing caller-owned option objects could relabel old rows after mutation.
 - **Rule:** Capture terminal support once at the host, pass it through transcript, source projection and reader rendering, and include a captured value in each layout cache identity. Unsupported output retains readable labels and sanitized URLs. Never rerun the synchronous tmux probe per row or frame.
+
+
+### RPC EOF Must Retire Dialogs Before Draining Commands
+- **Symptom:** Closing stdin leaves an extension command waiting forever for a dialog response, or a disposed bridge emits more UI requests.
+- **Root Cause:** UI disposal happened after the command drain that awaited the unresolved dialog; disposal cancelled existing requests without retiring future calls.
+- **Rule:** Release the extension UI binding and dispose its RPC bridge on input close before draining turn/control chains, and repeat cleanup in finally. Disposed bridges stay silent, editor dialogs honor cancellation/timeouts, selections accept only the captured options, and failed emission releases pending listeners and timers. Replaced bindings cannot use late responses or old release callbacks to settle the new host's dialogs.
+
+
+### RPC Surface Renewal Must Follow Successful Configuration And Session Changes
+- **Symptom:** A successful settings or session command cancels old dialogs but permanently disables future extension UI on an open input stream.
+- **Root Cause:** Configuration publication retires the original surface lease, while the input consumer binds its bridge only at startup.
+- **Rule:** After a successful command actually changes the lease, refresh the existing extension owner before binding the current surface. Guard both sides with the input consumer identity and EOF/exit state; ordinary commands must not cancel pending dialogs, and retired consumers must never reclaim a successor's UI.

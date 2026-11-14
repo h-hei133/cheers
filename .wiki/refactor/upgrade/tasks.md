@@ -44,7 +44,7 @@
 
 - [ ] **D.1** 会话／模型／树命令：已有待验收，真实 JSONL 与错误分类。
 - [x] **D.2** 队列清空和 steering／follow-up 模式实时更改：本地验收完成。清空实际两条活跃输入与submission，模式跨readiness传递并保存后更新捕获队列；配置或运行替换拒绝修改后继。真实runTurn和JSONL消费者通过，宿主按input/session/settings拆分且函数上限通过。
-- [ ] **D.3** UI 请求／响应和事件：已有待验收，取消、撤权、EOF、迟到响应。
+- [x] **D.3** UI 请求／响应和事件：本地验收完成。加载扩展通过真实JSONL的选择／确认／输入／编辑、取消、EOF前撤权和迟到响应隔离；配置／会话转换新增四项红例后修复，在成功且lease改变时先刷新owner再绑定，后继consumer与EOF不能复活。独立暂存树6套件47项、六静态门、build `16aec298a055`及Linux编译CLI三次选择／改配置／新会话／未答编辑EOF退出通过，限定复审CLEAR。实际M，额外依赖1（转换后的surface lease），结构复用原host；无真实服务或跨平台声明。
 - [ ] **D.4** HTML 高亮、GFM／CJK、Thinking、Diff、灯箱：已有待验收，真实离线导出与转义安全。
 - [x] **D.5** 导出 token／费用：本地验收完成。只读捕获并验证真实session state/账单身份，累计用量与请求覆盖率分开；不从message metadata或prompt measurement推造用量，不用当前目录价格回填旧记录。四套件66项和离线Linux Chromium实际HTML通过，未知output/price保持unavailable。实际M，额外依赖1（历史workspace消失后仍须读取保存state）；真实供应商账单比对未发生。
 

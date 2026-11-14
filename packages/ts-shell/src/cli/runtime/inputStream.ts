@@ -13,7 +13,7 @@ import { attachInputQueue, isQueueControl } from './inputQueue.js';
 import { isGoalControl } from './goal.js';
 import { isSecurityControl } from './security.js';
 import { isAgentsControl } from './agents.js';
-import { isExtensionControl } from './extensions.js';
+import { bindExtensionUiFor, isExtensionControl, refreshExtensionsFor } from './extensions.js';
 import { isMcpRequest, isMcpConfiguration, isMcpControl, mcpControl } from '../mcp/content.js';
 import { cancelMcpFor } from './mcp.js';
 import { sshControl } from '../ssh/control.js';
@@ -30,6 +30,8 @@ import { attachGoalSubmission, schedulerForRuntime } from './goalScheduling.js';
 import { handleRpcCommand, tryParseRpcCommand, tryParseRpcUiResponse } from '../rpc/rpcServer.js';
 import { createRpcUiBridge, type RpcUiBridge } from '../rpc/uiBridge.js';
 import { createRuntimeRpcHost } from '../rpc/runtimeHost.js';
+
+const rpcInputOwners = new WeakMap<ShellRuntimeContext, object>();
 
 export async function runPromptInputStream(options: {
   readonly stdin?: NodeJS.ReadableStream;
@@ -83,6 +85,22 @@ export async function runPromptInputStream(options: {
   } | null = null;
 
   let closed = false; let busy = false;
+  let rpcUiBridge: RpcUiBridge | undefined;
+  let rpcInputOwner: object | undefined;
+  let releaseUi: (() => void) | undefined;
+  const closeRpcUi = (): void => {
+    if (rpcInputOwner && rpcInputOwners.get(options.runtimeContext) === rpcInputOwner) {
+      rpcInputOwners.delete(options.runtimeContext);
+    }
+    const release = releaseUi; releaseUi = undefined;
+    try { release?.(); } finally { rpcUiBridge?.dispose(); }
+  };
+  const stdinClosed = new Promise<void>((resolve, reject) => {
+    stdinReader.once('close', () => {
+      closed = true;
+      try { closeRpcUi(); resolve(); } catch (error) { reject(error); }
+    });
+  });
   let roundBarrier = Promise.resolve(); let releaseRound: (() => void) | undefined;
   const queue = new SubmissionQueue(() => options.runtimeContext.session, () => {
     options.renderer.renderLine('Queued input was not executed because the session changed. Queue it again explicitly.');
@@ -170,123 +188,142 @@ export async function runPromptInputStream(options: {
     settled: () => { busy = false; releaseRound?.(); releaseRound = undefined; },
   });
 
-  const rpcUiBridge = options.rpcMode
-    ? createRpcUiBridge(request => writeRawStdout(`${JSON.stringify(request)}\n`))
-    : undefined;
-  if (rpcUiBridge) options.onRpcUiBridge?.(rpcUiBridge);
-  const rpcHost = options.rpcMode
-    ? createRuntimeRpcHost({
-        runtimeContext: options.runtimeContext,
-        sessionRuntime: options.sessionRuntime,
-        sessionManager: options.sessionManager,
-        queue,
-        isStreaming: () => busy,
-        enqueuePrompt,
-        switchSession: options.switchSession,
-        ui: rpcUiBridge,
-      })
-    : undefined;
-
-  const flushPendingPrompt = () => {
-    if (!pendingPrompt) {
-      return;
+  try {
+    rpcUiBridge = options.rpcMode
+      ? createRpcUiBridge(request => writeRawStdout(`${JSON.stringify(request)}\n`))
+      : undefined;
+    if (rpcUiBridge) {
+      rpcInputOwner = {};
+      rpcInputOwners.set(options.runtimeContext, rpcInputOwner);
+      releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
+      if (closed) closeRpcUi();
+      options.onRpcUiBridge?.(rpcUiBridge);
     }
-    const prompt = pendingPrompt.lines.join("\n").trim();
-    pendingPrompt = null;
-    if (prompt.length > 0) {
-      enqueuePrompt(prompt);
-    }
-  };
+    const rpcHost = options.rpcMode
+      ? createRuntimeRpcHost({
+          runtimeContext: options.runtimeContext,
+          sessionRuntime: options.sessionRuntime,
+          sessionManager: options.sessionManager,
+          queue,
+          isStreaming: () => busy,
+          enqueuePrompt,
+          switchSession: options.switchSession,
+          ui: rpcUiBridge,
+        })
+      : undefined;
 
-  stdinReader.on("line", (line) => {
-    options.onUserIntent?.();
-    if (exitRequested) return;
-    const normalizedLine = line.replace(/^\uFEFF/, "");
-    if (pendingPrompt) {
-      if (
-        pendingPrompt.multilineLiteral &&
-        !pendingPrompt.inFence &&
-        normalizedLine.trim().length === 0
-      ) {
-        flushPendingPrompt();
+    const flushPendingPrompt = () => {
+      if (!pendingPrompt) {
         return;
       }
-      pendingPrompt.lines.push(normalizedLine);
-      pendingPrompt.inFence = updateFenceState(
-        pendingPrompt.inFence,
-        normalizedLine,
+      const prompt = pendingPrompt.lines.join("\n").trim();
+      pendingPrompt = null;
+      if (prompt.length > 0) {
+        enqueuePrompt(prompt);
+      }
+    };
+
+    stdinReader.on("line", (line) => {
+      options.onUserIntent?.();
+      if (exitRequested) return;
+      const normalizedLine = line.replace(/^\uFEFF/, "");
+      if (pendingPrompt) {
+        if (
+          pendingPrompt.multilineLiteral &&
+          !pendingPrompt.inFence &&
+          normalizedLine.trim().length === 0
+        ) {
+          flushPendingPrompt();
+          return;
+        }
+        pendingPrompt.lines.push(normalizedLine);
+        pendingPrompt.inFence = updateFenceState(
+          pendingPrompt.inFence,
+          normalizedLine,
+        );
+        if (!pendingPrompt.inFence && pendingPrompt.lines.some(isFenceLine)) {
+          flushPendingPrompt();
+        }
+        return;
+      }
+
+      if (normalizedLine.trim().length === 0) {
+        return;
+      }
+
+      const uiResponse = rpcUiBridge ? tryParseRpcUiResponse(normalizedLine) : undefined;
+      if (uiResponse && rpcUiBridge) {
+        rpcUiBridge.handleUiResponse(uiResponse);
+        return;
+      }
+
+      const rpcCommand = options.rpcMode ? tryParseRpcCommand(normalizedLine) : undefined;
+      if (rpcCommand && rpcHost) {
+        pendingControls++;
+        localControlChain = localControlChain
+          .then(async () => {
+            const background = options.runtimeContext.configuration.backgroundSignal;
+            const response = await handleRpcCommand(rpcCommand, rpcHost);
+            if (!response.success || background === options.runtimeContext.configuration.backgroundSignal) return;
+            if (closed || exitRequested || !rpcUiBridge || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
+            // A successful transition retires its old surface. Refresh the
+            // existing extension owner before binding the current input again.
+            refreshExtensionsFor(options.runtimeContext);
+            if (closed || exitRequested || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
+            releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
+          })
+          .finally(() => {
+            pendingControls--;
+          });
+        return;
+      }
+
+      const startsFence = isFenceLine(normalizedLine);
+      if (startsFence || opensMultilineLiteralPrompt(normalizedLine)) {
+        pendingPrompt = {
+          lines: [normalizedLine],
+          inFence: updateFenceState(false, normalizedLine),
+          multilineLiteral: opensMultilineLiteralPrompt(normalizedLine),
+        };
+        if (!pendingPrompt.inFence && startsFence) {
+          flushPendingPrompt();
+        }
+        return;
+      }
+
+      for (const prompt of parseTransportPrompts(normalizedLine, {
+        allowComments: false,
+      })) {
+        enqueuePrompt(prompt);
+      }
+    });
+
+    await stdinClosed;
+    flushPendingPrompt();
+    for (;;) {
+      const localControls = localControlChain;
+      await localControls;
+      const controls = controlChain;
+      await controls;
+      const turns = turnChain;
+      await turns;
+      if (localControls === localControlChain && controls === controlChain && turns === turnChain) break;
+    }
+    await schedulerForRuntime(options.sessionRuntime)?.stop('cancelled');
+    if (!options.rpcMode) {
+      options.renderer.renderLine(
+        `\nStdin stream closed. Processed ${processedCount} prompt(s).\n`,
       );
-      if (!pendingPrompt.inFence && pendingPrompt.lines.some(isFenceLine)) {
-        flushPendingPrompt();
-      }
-      return;
     }
-
-    if (normalizedLine.trim().length === 0) {
-      return;
+    options.logger.info("CLI non-TTY stdin stream mode closed", {
+      sessionId: options.runtimeContext.session.id,
+      processedCount,
+    });
+  } finally {
+    try { closeRpcUi(); } finally {
+      stdinReader.close();
+      releaseGoal?.();
+      releaseQueue();
     }
-
-    const uiResponse = rpcUiBridge ? tryParseRpcUiResponse(normalizedLine) : undefined;
-    if (uiResponse && rpcUiBridge) {
-      rpcUiBridge.handleUiResponse(uiResponse);
-      return;
-    }
-
-    const rpcCommand = options.rpcMode ? tryParseRpcCommand(normalizedLine) : undefined;
-    if (rpcCommand && rpcHost) {
-      pendingControls++;
-      localControlChain = localControlChain
-        .then(() => handleRpcCommand(rpcCommand, rpcHost).then(() => undefined))
-        .finally(() => {
-          pendingControls--;
-        });
-      return;
-    }
-
-    const startsFence = isFenceLine(normalizedLine);
-    if (startsFence || opensMultilineLiteralPrompt(normalizedLine)) {
-      pendingPrompt = {
-        lines: [normalizedLine],
-        inFence: updateFenceState(false, normalizedLine),
-        multilineLiteral: opensMultilineLiteralPrompt(normalizedLine),
-      };
-      if (!pendingPrompt.inFence && startsFence) {
-        flushPendingPrompt();
-      }
-      return;
-    }
-
-    for (const prompt of parseTransportPrompts(normalizedLine, {
-      allowComments: false,
-    })) {
-      enqueuePrompt(prompt);
-    }
-  });
-
-  await new Promise<void>((resolve) => {
-    stdinReader.once("close", () => { closed = true; resolve(); });
-  });
-  flushPendingPrompt();
-  for (;;) {
-    const localControls = localControlChain;
-    await localControls;
-    const controls = controlChain;
-    await controls;
-    const turns = turnChain;
-    await turns;
-    if (localControls === localControlChain && controls === controlChain && turns === turnChain) break;
   }
-  await schedulerForRuntime(options.sessionRuntime)?.stop('cancelled');
-  rpcUiBridge?.dispose();
-  releaseGoal?.();
-  releaseQueue();
-  if (!options.rpcMode) {
-    options.renderer.renderLine(
-      `\nStdin stream closed. Processed ${processedCount} prompt(s).\n`,
-    );
-  }
-  options.logger.info("CLI non-TTY stdin stream mode closed", {
-    sessionId: options.runtimeContext.session.id,
-    processedCount,
-  });
 }

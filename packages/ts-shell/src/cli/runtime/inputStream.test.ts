@@ -1,5 +1,7 @@
 import { PassThrough } from 'node:stream';
 import { expect, it } from 'vitest';
+import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { initialConfiguration } from '../../core/shell/configuration.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
@@ -191,12 +193,11 @@ it('routes RPC commands, attachments, queue clears, and extension_ui_response in
   const firstStarted = new Promise<void>(resolve => { started = resolve; });
   const held = new Promise<void>(resolve => { release = resolve; });
   let uiBridgeRef: import('../rpc/uiBridge.js').RpcUiBridge | undefined;
-  const context = {
-    session: { id: 'rpc-sess', createdAt: '2026-10-01T00:00:00Z', projectRoot: '/workspace', turns: [] },
-    projectRoot: '/workspace',
-    cwd: '/workspace',
-    runtimeConfig: { provider: 'openai', compactionEnabled: true, retryEnabled: true },
-  } as unknown as ShellRuntimeContext;
+  const seed = {
+    session: { id: 'rpc-sess', createdAt: '2026-10-01T00:00:00Z', projectRoot: process.cwd(), turns: [] },
+    projectRoot: process.cwd(), cwd: process.cwd(), runtimeConfig: getRuntimeConfig(process.cwd()),
+  };
+  const context = { ...seed, configuration: initialConfiguration(seed) } as unknown as ShellRuntimeContext;
   const run = runPromptInputStream({
     stdin,
     runtimeContext: context,

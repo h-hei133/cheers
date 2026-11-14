@@ -12,7 +12,7 @@ export interface RpcUiBridge {
   readonly select: (title: string, options: readonly string[], opts?: RpcUiDialogOptions) => Promise<string | undefined>;
   readonly confirm: (title: string, message: string, opts?: RpcUiDialogOptions) => Promise<boolean>;
   readonly input: (title: string, placeholder?: string, opts?: RpcUiDialogOptions) => Promise<string | undefined>;
-  readonly editor: (title: string, prefill?: string) => Promise<string | undefined>;
+  readonly editor: (title: string, prefill?: string, opts?: RpcUiDialogOptions) => Promise<string | undefined>;
   readonly notify: (message: string, notifyType?: "info" | "warning" | "error") => void;
   readonly setStatus: (statusKey: string, statusText: string | undefined) => void;
   readonly setWidget: (widgetKey: string, widgetLines: readonly string[] | undefined, widgetPlacement?: "aboveEditor" | "belowEditor") => void;
@@ -102,7 +102,7 @@ export type RpcExtensionUiRequest =
   | { readonly type: "extension_ui_request"; readonly id: string; readonly method: "select"; readonly title: string; readonly options: readonly string[]; readonly timeout?: number }
   | { readonly type: "extension_ui_request"; readonly id: string; readonly method: "confirm"; readonly title: string; readonly message: string; readonly timeout?: number }
   | { readonly type: "extension_ui_request"; readonly id: string; readonly method: "input"; readonly title: string; readonly placeholder?: string; readonly timeout?: number }
-  | { readonly type: "extension_ui_request"; readonly id: string; readonly method: "editor"; readonly title: string; readonly prefill?: string }
+  | { readonly type: "extension_ui_request"; readonly id: string; readonly method: "editor"; readonly title: string; readonly prefill?: string; readonly timeout?: number }
   | { readonly type: "extension_ui_request"; readonly id: string; readonly method: "notify"; readonly message: string; readonly notifyType?: "info" | "warning" | "error" }
   | { readonly type: "extension_ui_request"; readonly id: string; readonly method: "setStatus"; readonly statusKey: string; readonly statusText: string | undefined }
   | { readonly type: "extension_ui_request"; readonly id: string; readonly method: "setWidget"; readonly widgetKey: string; readonly widgetLines: readonly string[] | undefined; readonly widgetPlacement?: "aboveEditor" | "belowEditor" }

@@ -105,7 +105,7 @@ describe("RPC JSONL protocol server", () => {
     };
 
     await handleRpcCommand(parsedImgPrompt!, host);
-    await handleRpcCommand({ id: "s1", type: "set_session_name", name: "Batch D" }, host);
+    await handleRpcCommand({ id: "s1", type: "set_session_name", name: "Named session" }, host);
     await handleRpcCommand({ id: "s2", type: "get_last_assistant_text" }, host);
     await handleRpcCommand({ id: "s3", type: "get_session_stats" }, host);
     await handleRpcCommand(parsedModel!, host);
@@ -115,7 +115,7 @@ describe("RPC JSONL protocol server", () => {
     await handleRpcCommand({ id: "b1", type: "bash", command: "ls" }, host);
 
     expect(seenImages).toEqual([[{ type: "image", data: "AAAA", mimeType: "image/png" }]]);
-    expect(responses.find(r => r.id === "s1")).toMatchObject({ success: true, data: { name: "Batch D" } });
+    expect(responses.find(r => r.id === "s1")).toMatchObject({ success: true, data: { name: "Named session" } });
     expect(responses.find(r => r.id === "s2")).toMatchObject({ success: true, data: { text: "final answer" } });
     expect(responses.find(r => r.id === "m1")).toMatchObject({ success: true, data: { provider: "openai", modelId: "gpt-5" } });
     expect(responses.find(r => r.id === "t1")).toMatchObject({ success: true, data: { level: "high" } });

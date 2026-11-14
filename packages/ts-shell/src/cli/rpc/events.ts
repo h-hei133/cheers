@@ -2,7 +2,7 @@ import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import { writeRawStdout } from "../../core/shell/outputGuard.js";
 
-/** Translate an internal `QueryEvent` into a Pi-compatible RPC JSONL event frame when relevant. */
+/** Translate an internal `QueryEvent` into an RPC JSONL event frame when relevant. */
 export function toRpcEvent(event: QueryEvent): Record<string, unknown> | undefined {
   switch (event.type) {
     case "query.started":

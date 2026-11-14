@@ -9,12 +9,13 @@ import type {
 export type { RpcUiBridge, RpcUiDialogOptions };
 interface PendingUiRequest {
   readonly resolve: (response: RpcExtensionUiResponse | undefined) => void;
-  readonly cleanup: () => void;
 }
 
 /** Create a bidirectional RPC UI bridge tracking pending dialog prompts over JSONL. */
 export function createRpcUiBridge(emit: (request: RpcExtensionUiRequest) => void): RpcUiBridge {
   const pending = new Map<string, PendingUiRequest>();
+  let disposed = false;
+  const send = (request: RpcExtensionUiRequest): void => { if (!disposed) emit(request); };
 
   const requestDialog = <T>(
     build: (id: string) => RpcExtensionUiRequest,
@@ -22,10 +23,11 @@ export function createRpcUiBridge(emit: (request: RpcExtensionUiRequest) => void
     extract: (response: RpcExtensionUiResponse) => T,
     opts?: RpcUiDialogOptions,
   ): Promise<T> => {
-    if (opts?.signal?.aborted) return Promise.resolve(defaultValue);
+    if (disposed || opts?.signal?.aborted) return Promise.resolve(defaultValue);
     const id = randomUUID();
-    return new Promise<T>(resolve => {
+    return new Promise<T>((resolve, reject) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
+      let settled = false;
       const onAbort = () => settle(undefined);
       const cleanup = () => {
         if (timer !== undefined) clearTimeout(timer);
@@ -33,6 +35,8 @@ export function createRpcUiBridge(emit: (request: RpcExtensionUiRequest) => void
         pending.delete(id);
       };
       const settle = (response: RpcExtensionUiResponse | undefined) => {
+        if (settled) return;
+        settled = true;
         cleanup();
         if (!response || ("cancelled" in response && response.cancelled)) {
           resolve(defaultValue);
@@ -40,22 +44,30 @@ export function createRpcUiBridge(emit: (request: RpcExtensionUiRequest) => void
         }
         resolve(extract(response));
       };
-      pending.set(id, { resolve: settle, cleanup });
+      pending.set(id, { resolve: settle });
       opts?.signal?.addEventListener("abort", onAbort, { once: true });
       if (opts?.timeout !== undefined && opts.timeout > 0) {
         timer = setTimeout(() => settle(undefined), opts.timeout);
       }
-      emit(build(id));
+      if (opts?.signal?.aborted) { settle(undefined); return; }
+      try { send(build(id)); } catch (error) {
+        settled = true;
+        cleanup();
+        reject(error);
+      }
     });
   };
 
   return {
-    select: (title, options, opts) => requestDialog(
-      id => ({ type: "extension_ui_request", id, method: "select", title, options, ...(opts?.timeout !== undefined ? { timeout: opts.timeout } : {}) }),
-      undefined,
-      res => ("value" in res ? res.value : undefined),
-      opts,
-    ),
+    select: (title, options, opts) => {
+      const choices = Object.freeze([...options]);
+      return requestDialog(
+        id => ({ type: "extension_ui_request", id, method: "select", title, options: choices, ...(opts?.timeout !== undefined ? { timeout: opts.timeout } : {}) }),
+        undefined,
+        res => ("value" in res && choices.includes(res.value) ? res.value : undefined),
+        opts,
+      );
+    },
     confirm: (title, message, opts) => requestDialog(
       id => ({ type: "extension_ui_request", id, method: "confirm", title, message, ...(opts?.timeout !== undefined ? { timeout: opts.timeout } : {}) }),
       false,
@@ -68,16 +80,17 @@ export function createRpcUiBridge(emit: (request: RpcExtensionUiRequest) => void
       res => ("value" in res ? res.value : undefined),
       opts,
     ),
-    editor: (title, prefill) => requestDialog(
-      id => ({ type: "extension_ui_request", id, method: "editor", title, ...(prefill !== undefined ? { prefill } : {}) }),
+    editor: (title, prefill, opts) => requestDialog(
+      id => ({ type: "extension_ui_request", id, method: "editor", title, ...(prefill !== undefined ? { prefill } : {}), ...(opts?.timeout !== undefined ? { timeout: opts.timeout } : {}) }),
       undefined,
       res => ("value" in res ? res.value : undefined),
+      opts,
     ),
-    notify: (message, notifyType) => emit({ type: "extension_ui_request", id: randomUUID(), method: "notify", message, ...(notifyType ? { notifyType } : {}) }),
-    setStatus: (statusKey, statusText) => emit({ type: "extension_ui_request", id: randomUUID(), method: "setStatus", statusKey, statusText }),
-    setWidget: (widgetKey, widgetLines, widgetPlacement) => emit({ type: "extension_ui_request", id: randomUUID(), method: "setWidget", widgetKey, widgetLines, ...(widgetPlacement ? { widgetPlacement } : {}) }),
-    setTitle: (title) => emit({ type: "extension_ui_request", id: randomUUID(), method: "setTitle", title }),
-    setEditorText: (text) => emit({ type: "extension_ui_request", id: randomUUID(), method: "set_editor_text", text }),
+    notify: (message, notifyType) => send({ type: "extension_ui_request", id: randomUUID(), method: "notify", message, ...(notifyType ? { notifyType } : {}) }),
+    setStatus: (statusKey, statusText) => send({ type: "extension_ui_request", id: randomUUID(), method: "setStatus", statusKey, statusText }),
+    setWidget: (widgetKey, widgetLines, widgetPlacement) => send({ type: "extension_ui_request", id: randomUUID(), method: "setWidget", widgetKey, widgetLines, ...(widgetPlacement ? { widgetPlacement } : {}) }),
+    setTitle: (title) => send({ type: "extension_ui_request", id: randomUUID(), method: "setTitle", title }),
+    setEditorText: (text) => send({ type: "extension_ui_request", id: randomUUID(), method: "set_editor_text", text }),
     handleUiResponse: (response) => {
       const entry = pending.get(response.id);
       if (!entry) return false;
@@ -86,6 +99,7 @@ export function createRpcUiBridge(emit: (request: RpcExtensionUiRequest) => void
     },
     pendingCount: () => pending.size,
     dispose: () => {
+      disposed = true;
       for (const entry of [...pending.values()]) entry.resolve(undefined);
     },
   };
