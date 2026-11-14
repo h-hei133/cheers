@@ -2441,3 +2441,10 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A standard message nested getter executes during compaction capture, or metadata changes do not retire a summary source.
 - **Root Cause:** The ingress capture detaches custom entries only; structuredClone and digest still execute standard accessors, while a provider-field comparison omits application facts.
 - **Rule:** Apply the existing bounded inert snapshot to every caller/source message before cloning, comparison or asynchronous preparation. Compare all application fields except explicitly accepted storage identity/timestamp differences; restrict the opening exception to its environment content prefix.
+
+
+### Request Preparation And Usage Must Share Captured Attribution
+
+- **Symptom:** An admitted request retains an obsolete overflow refusal after exact wire recounting, or response callbacks move its usage into a successor purpose/mode/provider.
+- **Root Cause:** Refusal is not derived from the final budget; response accounting reads caller-owned options after dispatch.
+- **Rule:** Derive token refusal from the final effective budget, preserve independent input limits, and carry the captured purpose/mode/provider and auxiliary recorder into response accounting. Recheck freshness at the original attempt handoff and release refused unsent reservations through its existing owner.

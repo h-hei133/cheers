@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.2/B2.2/B2.3、D.2/D.3/D.5、E.2已完成所述本地验收；继续终端与运行时。
-**Active batch**: C.3摘要捕获已提交`57ca53eb`；完整caller/source与候选policy准备本批独立验收完成并立即提交，接着提交请求capture提取，再接通实际主请求threshold／候选发布。C.6历史声明另批处理。
+**Active batch**: C.3摘要捕获已提交`57ca53eb`；完整caller/source与候选policy准备已提交`72be40f8`；请求capture提取本批验证完立即提交，再接通实际主请求threshold／候选发布。C.6历史声明另批处理。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -74,3 +74,5 @@
 | 2026-11-15 | 摘要转换：manual/automatic/prefix/merge/branch复用有界converter、complete body preflight与获准capture。7个集成红例及byte/changed-identity unknown/nav取消红例修复，18套件326项、六静态门、函数上限、build `5e1c8ee4afbb`通过；限定复审CLEAR。Linux当前编译SDK实际配置模型3次摘要（manual两段、branch一次）及verified manual publication/取消零派发通过。首次native夹具假定单段导致计数失败，实际消费者全通过，修正计数后重验并保留失败日志。旧含秘密target identity不复算；无法映射的legacy unknown/无材料墓碑保守拒绝新capture，旧记录不迁移不删除。实际增加legacy兼容和navigation signal两个必要依赖，owner复用/单ledger成立；C.3 threshold/候选缩小仍开，16项不变。 |
 
 | 2026-11-15 | C.3压缩policy：完整caller/source在prepare前惰性捕获、raw source切点、重建完整candidate后一次prepare与缩小比较、candidate/authority双准入和当前policy进度。独立HEAD新增反例15失败/3通过；独立批次8套件160项、六静态门、build `c0a48b5abd86`通过，限定只读复核CLEAR。标准metadata/origin等应用字段比较补齐，仅忽略storage id/timestamp。最初build夹具node_modules符号链接触发既有保护，改实际目录后通过。主请求调用方尚未接通，16项验收数不变。 |
+
+| 2026-11-15 | C.3请求准备层：提取完整route/system/tools/images/closing/budget/body capture，initial loop projection复用，candidate raw先route再转换，accepted body直接send；动态声明单次refresh，发送前漂移原attempt确认未发送。独立复审新增旧overflow refusal与发送后用途/模式/计费owner修改两BLOCK已修复；5套件199项、六静态门、build `0a240477cfd4`通过，限定复核CLEAR。只交付准备接口，主请求threshold/live publication尚未接通，16项验收数不变。 |

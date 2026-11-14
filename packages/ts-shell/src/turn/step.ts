@@ -1,49 +1,26 @@
-import { catalogModel, catalogProvider, providerEndpoint } from "../core/models/catalog.js";
-import { inferRouteReason, type VirtualModelRegistry } from "../core/models/virtualModels.js";
-import { createHash, randomUUID } from 'node:crypto';
+import type { PreparedTurnContext, StepOptions, StepRequest } from './context/contract.js';
+export type { PreparedTurnContext, ProviderTarget, StepOptions, StepRequest } from './context/contract.js';
+import { createTurnContextPreparer, TurnPreparationError } from './context/prepare.js';
+import type { MessageProjection } from '../core/agent/messages.js';
+import { randomUUID } from 'node:crypto';
 import { createComponentLogger } from "../observability/structuredLogger.js";
-import { ModelAdmissionError, type ModelTransport, type RequestPolicy } from '../core/agent/request/model.js';
+import { ModelAdmissionError } from '../core/agent/request/model.js';
 import { prepareRequestAttempt, type RequestAttempt } from '../provider/request/attempt.js';
-import { InputLimitError, normalizeRequestImages, requestInputLimits } from '../provider/request/input.js';
+import { InputLimitError } from '../provider/request/input.js';
 import { hasUsage, usageFromProvider } from "../provider/response/usage.js";
 import { parseToolArgs, type AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
-import { clearContextUsage, getSessionUsage, markContextUnknown, measuredPromptContext, recordSessionUsage, type SessionUsageRecord } from "../observability/usageTelemetry.js";
-import { captureUsageAttribution } from '../observability/usage/identity.js';
-import { promptTokensFor, requestBudget } from '../context/request/budget.js';
-import { estimatePrompt } from '../context/request/estimate.js';
-import { measuredProjectionPrefix, storedPromptProjection } from './measurement.js';
-import { CHARS_PER_TOKEN } from '../session/context.js';
+import { clearContextUsage, markContextUnknown, recordSessionUsage, type SessionUsageRecord } from "../observability/usageTelemetry.js";
 import { captureThinkingPreference } from '../core/models/preference.js';
-import { effortOutputFailure } from '../provider/endpoints/effort.js';
-import { effortCapability } from '../core/models/capability.js';
-import { outputLimitFailure } from '../core/models/limits.js';
-import type { ThinkingPreference } from '../core/models/effort.js';
 import { isEventStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
-import { DEFAULT_ENDPOINT_KIND, endpointKind, endpointShape, endpointTurnBody, endpointUrl, type EndpointKind } from "../provider/endpoints/index.js";
+import { endpointShape, type EndpointKind } from "../provider/endpoints/index.js";
 import { requestReplayBinding } from '../provider/request/replay.js';
-import type { SentRequest } from "../provider/request/sentRequest.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../provider/registry/provider.js";
 import { IncompleteStreamError, ProviderResponseError } from '../provider/response/error.js';
 import { providerRequestError } from '../provider/request/error.js';
-import { type ChatMessage } from "./prompt.js";
-import {
-  outgoingProjection,
-  providerSystemPrompt,
-  finalStepMessages,
-  hasToolHistory,
-  TOOL_HISTORY_UNSUPPORTED_MESSAGE,
-  type OutgoingProjectionOptions,
-} from './messages.js';
-import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
-import { resolveRequestShape } from "../core/models/requestShape.js";
-import type { ModelInputLimits } from '../core/models/modalities.js';
-import type { CatalogProvider } from "../core/models/catalog.js";
-import type { PromptSource } from '../context/request/model.js';
+import { PARSE_ERROR_KEY } from "./tools.js";
 import { requestContext } from '../context/request/projection.js';
-import { estimateWirePrompt, WirePromptUnavailableError } from '../context/request/wire.js';
-import { historyDigest } from '../context/request/identity.js';
 import { decodePromptMeasurement } from '../context/request/measurement.js';
 import {
   REFUSAL,
@@ -53,7 +30,6 @@ import {
   retryDelayMs,
   serverRequestedDelayMs,
   waitBeforeRetry,
-  type RetryPolicy,
 } from "../core/agent/retry.js";
 
 /**
@@ -66,46 +42,6 @@ import {
  * arrived whole.
  */
 
-export interface ProviderTarget {
-  /**
-   * The headers this request authenticates with.
-   *
-   * Built once from the resolved credential, so both ways of earning an
-   * `Authorization` header — an API key and an account login — arrive here in the
-   * same shape. It was a bare `apiKey` before, which is why an account credential
-   * had nowhere to land: the header was formatted at the call site from a field
-   * that credential did not have.
-   */
-  readonly headers: Readonly<Record<string, string>>;
-  readonly baseUrl: string;
-  readonly model: string;
-  /**
-   * Which provider this is, so the catalog can be asked how it wants requests.
-   *
-   * Absent means the question cannot be answered, and the defaults an
-   * OpenAI-compatible endpoint expects are used — which is what every request
-   * looked like before the catalog could answer at all.
-   */
-  readonly provider?: string;
-  /** Which stored credential this target uses; non-secret and rotation-sensitive. */
-  readonly credentialId?: string;
-  readonly credentialGeneration?: string;
-  readonly replayOwner?: string;
-  /**
-   * Which endpoint kind this target speaks.
-   *
-   * Absent means the OpenAI-compatible shape, which is what every request looked
-   * like before a second kind existed. Named rather than inferred from the
-   * provider id, because a provider is who answers and an endpoint is how they
-   * want to be asked — one provider can offer both.
-   */
-  readonly endpoint?: EndpointKind;
-  /** Provider service tier selected by the session. */
-  readonly serviceTier?: string;
-  /** Captured non-secret replay identity for the exact provider target. */
-  readonly replayBinding?: string;
-}
-
 /** What a step reports while it runs, before the assembled message exists. */
 export interface StepListener {
   readonly onText?: (delta: string) => void;
@@ -116,35 +52,6 @@ export interface StepListener {
   readonly onReplace?: (text: string) => void;
 }
 
-export interface StepOptions {
-  /** Detached source retains agent history identity across application projection. */
-  readonly sourceMessages?: readonly AgentMessage[];
-  readonly providerMessages?: readonly ChatMessage[];
-  /** Exact opening object and the accepted user content retained by the prompt barrier. */
-  readonly promptSource?: { readonly opening: AgentMessage; readonly stored: AgentMessage };
-  readonly requestId?: string;
-  /** Whether the model may call tools on this step; the last step may not. */
-  readonly allowTools: boolean;
-  /** Restrict the bound tool schemas for this call; an empty list withdraws all tools. */
-  readonly allowedTools?: readonly string[];
-  /** Why this request is being sent, when the caller can prove it from context. */
-  readonly requestPurpose?: string;
-  /** Effective mode of a delegated run, established by its tool gate. */
-  readonly agentMode?: "plan" | "build";
-  /**
-   * Told the request that was sent, as it was sent.
-   *
-   * Reported rather than rebuilt by a later reader: the system instruction, the
-   * microcompaction of old turns and the bridging of tool results are all
-   * applied on the way out, so the bytes cannot be reconstructed from the
-   * session's history. Anything that needs to send this request again — keeping
-   * the prompt cached — has to be handed the request itself.
-   */
-  readonly onRequestSent?: (sent: SentRequest) => void;
-  /** Usage reported by this response, independent of any previous context gauge. */
-  readonly onRequestUsage?: (usage: ProviderUsage) => void;
-}
-
 /** The model side of the kernel: the next assistant step for a context. */
 export type StepFunction = (
   messages: readonly AgentMessage[],
@@ -152,60 +59,6 @@ export type StepFunction = (
   listener: StepListener,
   options: StepOptions,
 ) => Promise<AssistantStep>;
-
-export interface StepRequest {
-  readonly recordAuxiliaryUsage?: (usage: SessionUsageRecord) => void;
-  readonly requestPolicy?: RequestPolicy;
-  readonly modelTransport?: ModelTransport;
-  readonly thinkingEffort?: ThinkingPreference;
-  readonly thinkingEffortExplicit?: boolean;
-  readonly provider: ProviderTarget;
-  readonly workspaceRoot: string;
-  readonly sessionId: string;
-  readonly systemPrompt: string;
-  readonly systemPromptSources?: readonly PromptSource[];
-  /** Reuse the session's approved instructions with a delegated mode and tool set. */
-  readonly systemPromptFor?: (
-    agentMode: "plan" | "build" | undefined,
-    toolNames: readonly string[],
-    toolsAvailable?: boolean,
-  ) => string;
-  readonly tools: readonly ToolSchema[];
-  /** Read again for each step so tools loaded mid-run are declared next time. */
-  readonly toolSnapshot?: () => readonly ToolSchema[];
-  readonly temperature?: number;
-  readonly topP?: number;
-  readonly maxOutputTokens?: number;
-  /** Resolved window override; absent uses the catalogue entry. */
-  readonly contextWindow?: number;
-  /** Headroom held back from the shared window. */
-  readonly reserveTokens?: number;
-  /** Retain bounded tool text when false; media and request limits still apply. */
-  readonly pruneToolText?: boolean;
-  readonly fetchImpl?: typeof fetch;
-  /**
-   * The catalog to ask how this model wants requests shaped.
-   *
-   * Passed in rather than loaded here so a run reads it once, and so a test can
-   * state a model's shape without writing a catalog file.
-   */
-  readonly catalog?: readonly CatalogProvider[];
-  /**
-   * How many times a request that failed for a transient reason is sent again.
-   *
-   * A partial policy rather than a resolved one: the caller states what the user
-   * asked for and the provider layer's own default fills the rest, so the
-   * default lives here beside the layer it belongs to. Absent means no retries,
-   * which is this layer's default — the turn layer above is the one that
-   * retries by default.
-   */
-  readonly retry?: Partial<RetryPolicy>;
-  readonly cacheRetention?: 'short' | 'long' | 'none';
-  readonly initialTools?: readonly ToolSchema[];
-  readonly virtualModels?: VirtualModelRegistry;
-  readonly historicalEfforts?: ReadonlyMap<number, string>;
-  readonly projection?: OutgoingProjectionOptions;
-}
 
 const OVERFLOW_MARKERS = ["context_length_exceeded", "context_overflow", "maximum context length", "prompt_too_long"];
 
@@ -246,18 +99,6 @@ interface CompletionShape {
  * again would fail again. An overflow answer comes back as a failed step with
  * its own prefix so the session can compact and retry rather than report it.
  */
-/**
- * The endpoint kind this request speaks.
- *
- * One field decides, and it decides here rather than at each difference: an
- * endpoint that disagrees about the system field, the tool schema and the stream
- * events disagrees about all of them, and expressing that as per-model flags
- * would spread one decision across four places that could then disagree.
- */
-function endpointFor(request: StepRequest): EndpointKind {
-  return endpointKind(request.provider.endpoint) ?? DEFAULT_ENDPOINT_KIND;
-}
-
 /** One captured target and reasoning preference, with per-step tool admission. */
 export function createStepFunction(request: StepRequest): StepFunction {
   const traceLogger = createComponentLogger("provider-request");
@@ -271,22 +112,21 @@ export function createStepFunction(request: StepRequest): StepFunction {
   // after a switch. Built once here because every attempt of every step from
   // this function talks to the same target; the callers that switch models
   // build a new step function.
-  const initialTools = request.initialTools ?? request.tools;
   const baseOrigin =
     request.provider.model || request.provider.provider
       ? { ...(request.provider.provider ? { provider: request.provider.provider } : {}), model: request.provider.model }
       : undefined;
   const replayBinding = request.provider.replayBinding ?? requestReplayBinding(request.provider);
   return async (messages, signal, listener, options): Promise<AssistantStep> => {
-    const sourceMessages = options.sourceMessages ?? messages;
-    const projectedMessages: readonly AgentMessage[] = options.providerMessages
-      ? options.providerMessages.filter(message => message.role !== 'system').map(message => ({ ...message, content: message.content ?? '' })) : messages;
-    const converted = options.providerMessages !== undefined;
+    let sourceMessages = options.sourceMessages ?? messages;
+    const recordAuxiliaryUsage = request.recordAuxiliaryUsage;
+    let messageProjection: MessageProjection | undefined = options.providerMessages !== undefined
+      ? { messages: options.providerMessages.map(message => ({ ...message, content: message.content ?? '' })),
+          sourceMessages, providerMessages: options.providerMessages }
+      : undefined;
     const requestId = options.requestId ?? randomUUID();
     let requestAcceptedAt: number | undefined;
     let acceptedResponse = false;
-    const catalogAddress = request.provider.provider ? request.provider.baseUrl : undefined;
-    const messageDigest = historyDigest(sourceMessages);
     let shownReasoning = '';
     let activeOrigin = baseOrigin;
     let currentAllowTools = options.allowTools;
@@ -296,245 +136,43 @@ export function createStepFunction(request: StepRequest): StepFunction {
       return { ...recorded, toolsAllowed: currentAllowTools, ...(activeOrigin ? { origin: recorded.origin ?? activeOrigin } : {}) };
     };
     let streamAttempts = 0;
+    let preparationOffered = false;
+    let identityPreparations = 0;
+    const prepare = createTurnContextPreparer(request, options, { thinkingEffort: captured.thinkingEffort,
+      explicitEffort, effortAccepted: () => effortAccepted, streamAttempts: () => streamAttempts, replayBinding });
     for (;;) {
-      const rawEffort = effortAccepted ? captured.thinkingEffort ?? undefined : undefined;
-      const route = request.virtualModels
-        ? await request.virtualModels.resolve({
-            provider: request.provider.provider ?? "",
-            modelId: request.provider.model,
-            thinkingLevel: rawEffort ?? "medium",
-            reason: inferRouteReason(sourceMessages, streamAttempts),
-            messages: sourceMessages,
-            signal,
-          })
-        : undefined;
-      const activeProvider = route?.provider ?? (request.provider.provider ?? "");
-      const activeModel = route?.modelId ?? request.provider.model;
-      const effort = effortAccepted ? (route?.thinkingLevel ?? rawEffort) : undefined;
-      if (activeProvider || activeModel) {
-        activeOrigin = { ...(activeProvider ? { provider: activeProvider } : {}), model: activeModel };
-      }
-      const toolCalling = resolveRequestShape(
-        request.catalog ?? [],
-        activeProvider,
-        activeModel,
-        undefined,
-        catalogAddress,
-      ).toolCalling;
-      const allowTools = options.allowTools && toolCalling;
-      currentAllowTools = allowTools;
-      const allowed = options.allowedTools && new Set(options.allowedTools);
-      const declared = request.toolSnapshot?.() ?? request.tools;
-      const tools = toolCalling
-        ? allowed
-          ? declared.filter((tool) => allowed.has(tool.function.name))
-          : declared
-        : [];
-      const regeneratedPrompt = request.systemPromptFor !== undefined
-        && (options.agentMode !== undefined || !toolCalling);
-      const baseSystemPrompt = regeneratedPrompt
-        ? request.systemPromptFor!(options.agentMode, tools.map((tool) => tool.function.name), toolCalling)
-        : request.systemPrompt;
-      let systemPrompt: string;
-      try { systemPrompt = converted ? providerSystemPrompt(baseSystemPrompt, options.providerMessages!) : baseSystemPrompt; }
-      catch { return stamp(errorStep('System message content must contain text only.')); }
-      const wireTools = allowTools ? tools : [];
-      const overhead = { systemPrompt, tools: wireTools };
-      const schemaDigest = createHash('sha256').update(JSON.stringify(wireTools)).digest('hex');
-      const systemDigest = createHash('sha256').update(systemPrompt).digest('hex');
-      if (catalogProvider(request.catalog ?? [], activeProvider, catalogAddress).ambiguous) {
-        return stamp(errorStep('The model catalogue has multiple entries for this endpoint. Resolve them before sending.'));
-      }
-      if (effort && (explicitEffort || ['minimal', 'xhigh', 'max'].includes(effort))
-        && effortCapability(request.catalog ?? [], activeProvider, activeModel, effort, catalogAddress) === 'unsupported') {
-        return stamp(errorStep('The selected model does not support this reasoning effort. Select another level or use /thinking auto.'));
-      }
-      if (!toolCalling && hasToolHistory(projectedMessages)) {
-        return stamp(errorStep(TOOL_HISTORY_UNSUPPORTED_MESSAGE));
-      }
-      const endpoint = route
-        ? (providerEndpoint(request.catalog ?? [], activeProvider, catalogAddress, activeModel) ?? endpointFor(request))
-        : endpointFor(request);
-      const shape = resolveRequestShape(
-        request.catalog ?? [],
-        activeProvider,
-        activeModel,
-        effortAccepted ? effort : undefined,
-        catalogAddress,
-        endpoint,
-      );
-      let protocol;
-      try { protocol = endpointShape(endpoint); }
-      catch (error) { return stamp(errorStep(error instanceof Error ? error.message : String(error))); }
-      const output = protocol.outputControl === 'provider' ? undefined : request.maxOutputTokens ?? shape.maxOutputCeiling;
-      const modelEntry = catalogModel(request.catalog ?? [], activeProvider, activeModel, catalogAddress);
-      const usageAttribution = captureUsageAttribution({ provider: activeProvider, model: activeModel,
-        baseUrl: request.provider.baseUrl, rates: modelEntry?.cost });
-      const projectionOptions = {
-        ...request.projection,
-        ...(request.pruneToolText !== undefined ? { pruneToolText: request.pruneToolText } : {}),
-      };
-      const outgoing = outgoingProjection(projectedMessages, shape.assistantAfterToolResult, projectionOptions);
-      if (converted) { outgoing.indexAligned = false; outgoing.sourceAligned = false; }
-      let projection = outgoing;
-      let inputLimits: ModelInputLimits | undefined;
-      let finalMessages: readonly ChatMessage[];
+      let prepared: PreparedTurnContext;
       try {
-        inputLimits = requestInputLimits(shape.inputLimits);
-        const normalized = await normalizeRequestImages(outgoing.messages,
-          shape.vision, inputLimits, request.workspaceRoot, signal);
-        if (normalized !== outgoing.messages) projection = { ...outgoing, messages: [...normalized], indexAligned: false, sourceAligned: false };
-        finalMessages = finalStepMessages(projection.messages, allowTools, tools.length > 0);
+        prepared = await prepare(sourceMessages, signal, messageProjection);
+        if (!prepared.isCurrent()) {
+          if (identityPreparations++ >= 1) return stamp(errorStep('Request preparation changed repeatedly. No request was sent.', true));
+          prepared = await prepared.refresh(signal);
+        }
+        if (!preparationOffered && options.prepareContext) {
+          preparationOffered = true;
+          const replacement = await options.prepareContext(prepared, signal);
+          signal?.throwIfAborted();
+          if (replacement) prepared = replacement;
+        }
+        if (!prepared.isCurrent()) {
+          if (identityPreparations++ >= 1) return stamp(errorStep('Request preparation changed repeatedly. No request was sent.', true));
+          prepared = await prepared.refresh(signal);
+        }
+        if (!prepared.isCurrent()) return stamp(errorStep('Request preparation changed repeatedly. No request was sent.', true));
+        currentAllowTools = prepared.allowTools;
+        activeOrigin = prepared.activeProvider || prepared.activeModel
+          ? { ...(prepared.activeProvider ? { provider: prepared.activeProvider } : {}), model: prepared.activeModel } : undefined;
+        if (prepared.refusal) return stamp(errorStep(prepared.refusal.detail, prepared.refusal.inputLimit ?? false));
+        if (!prepared.budget.ok && prepared.budget.reason !== 'unknown') return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${prepared.budget.detail}`));
       } catch (error) {
         if (signal?.aborted) return stamp(abortedStep(''));
-        return stamp(errorStep(error instanceof InputLimitError ? error.message : 'Image input preparation failed.', true));
+        return stamp(errorStep(error instanceof TurnPreparationError ? error.message : 'Request context preparation failed. No request was sent.',
+          error instanceof TurnPreparationError && error.inputLimit));
       }
-      const budgetMessages: readonly AgentMessage[] = finalMessages.map(message => ({
-        ...message,
-        content: message.content ?? '',
-      }));
-      const wireHistoryDigest = historyDigest(finalMessages);
-      const promptIdentity = {
-        provider: activeProvider,
-        model: activeModel,
-        endpoint,
-        endpointId: usageAttribution.endpointId,
-        schemaDigest,
-        systemDigest,
-        historyDigest: messageDigest,
-        wireHistoryDigest,
-        wireMessageCount: finalMessages.length,
-        wireRewriteTokens: Math.ceil(projection.savedChars / CHARS_PER_TOKEN),
-        replayBinding,
-      };
-      const promptProjection = converted ? undefined : storedPromptProjection(sourceMessages, projection, options.promptSource,
-        shape.assistantAfterToolResult, promptIdentity.wireMessageCount, projectionOptions);
-      const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: activeProvider,
-        model: activeModel, endpoint, schemaDigest, systemDigest,
-        endpointId: usageAttribution.endpointId, historyDigest: messageDigest, wireHistoryDigest, replayBinding });
-      const initial = promptTokensFor({ messages: budgetMessages, overhead, ...(measured ? { measured } : {}) });
-      const usage = getSessionUsage(request.sessionId);
-      const prefixIdentity = options.agentMode || converted ? undefined
-        : measuredProjectionPrefix(sourceMessages, projection, usage, shape.assistantAfterToolResult, projectionOptions);
-      const calibrated = prefixIdentity ? estimatePrompt(sourceMessages, overhead, promptIdentity, usage, {
-        tokens: initial.tokens, method: 'characters/3.5', prefixIdentity,
-        tailMessages: budgetMessages.slice(usage.lastPromptMessageCount),
-        tailContext: { endpoint, provider: promptIdentity.provider, model: promptIdentity.model, replayBinding,
-          reasoningReplayField: shape.reasoningReplayField, allowEmptySignature: shape.allowEmptySignature },
-      }) : undefined;
-      const prompt = calibrated?.source === 'calibrated'
-        ? { tokens: calibrated.tokens, measured: true } : initial;
-      const budget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
-        inputLimit: modelEntry?.inputLimit,
-        promptTokens: prompt.tokens, outputTokens: output ?? shape.maxOutputCeiling,
-        reserveTokens: request.reserveTokens, measured: prompt.measured });
-      // A request that cannot fit is not sent: the same bounded overflow rescue
-      // that answers a provider refusal handles this before any bytes leave.
-      if (!budget.ok && budget.reason !== 'unknown') return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${budget.detail}`));
-      // The wire body comes from the protocol's own declaration, so a third
-      // protocol is a module rather than a branch here. Everything the two
-      // protocols disagree about is either in the table or resolved from the
-      // model; the caller's own preprocessing — the compaction above and the
-      // bridging of tool results — happens once, before this, because it is the
-      // same for every protocol.
-      //
-      // A kind nobody declared is answered here rather than left to throw. The
-      // name came from a file the user edited, so the one thing worth saying is
-      // which name and which kinds exist — and an error the loop can report is
-      // where that is visible. Left as a throw it would leave the turn through
-      // the loop's retry wrapper, which does not catch it, and reach the user as
-      // an uncaught crash with no mention of the file.
-      let payload: Record<string, unknown>;
-      let requestHeaders: Readonly<Record<string, string>> = {};
-      try {
-        const outputFailure = outputLimitFailure(output, shape.maxOutputCeiling);
-        if (outputFailure) return stamp(errorStep(outputFailure));
-        const budgetFailure = explicitEffort && effort ? effortOutputFailure(endpointShape(endpoint), request.maxOutputTokens ?? shape.maxOutputCeiling) : undefined;
-        if (budgetFailure) return stamp(errorStep(budgetFailure));
-        requestHeaders = endpointShape(endpoint).requestHeaders?.({
-          provider: activeProvider,
-          model: activeModel,
-          sessionId: request.sessionId,
-          systemPrompt,
-          messages: finalMessages,
-          tools,
-          allowTools,
-          vision: shape.vision,
-          temperature: request.temperature ?? 0.7,
-          ...(shape.reasoningEffort && shape.thinkingLevelName
-            ? { thinkingLevelName: shape.thinkingLevelName }
-            : {}),
-          systemRole: shape.systemRole,
-          reasoningEffort: Boolean(shape.reasoningEffort),
-          maxTokensField: shape.maxTokensField,
-          assistantAfterToolResult: shape.assistantAfterToolResult,
-          serviceTier: request.provider.serviceTier,
-          ...(request.cacheRetention !== undefined ? { cacheRetention: request.cacheRetention } : {}),
-          ...(shape.supportsMidConvoToolChanges ? {
-            supportsMidConvoToolChanges: true,
-            initialTools,
-          } : {}),
-          ...(shape.supportsMidConvoEffort ? { supportsMidConvoEffort: true } : {}),
-        }) ?? {};
-        payload = endpointTurnBody(endpoint, {
-          model: activeModel,
-          provider: activeProvider,
-          sessionId: request.sessionId,
-          ...(request.provider.baseUrl ? { baseUrl: request.provider.baseUrl } : {}),
-          ...(shape.promptCacheKey !== undefined ? { supportsPromptCacheKey: shape.promptCacheKey } : {}),
-          replayBinding,
-          systemPrompt,
-          messages: finalMessages,
-          tools,
-          allowTools,
-          vision: shape.vision,
-          temperature: request.temperature ?? 0.7,
-          ...(request.topP != null ? { topP: request.topP } : {}),
-          ...((request.maxOutputTokens ?? output) != null
-            ? { maxOutputTokens: request.maxOutputTokens ?? output }
-            : {}),
-          ...(shape.reasoningEffort && shape.thinkingLevelName
-            ? { thinkingLevelName: shape.thinkingLevelName }
-            : {}),
-          ...(shape.allowEmptySignature ? { allowEmptySignature: true } : {}),
-          supportsTemperature: shape.supportsTemperature,
-          ...(shape.thinkingBudgetMaximum ? { thinkingBudgetMaximum: true } : {}),
-          ...(shape.thinkingBudgetTokens !== undefined
-            ? { thinkingBudgetTokens: shape.thinkingBudgetTokens }
-            : {}),
-          systemRole: shape.systemRole,
-          reasoningEffort: shape.reasoningEffort,
-          reasoningSummary: shape.reasoningSummary,
-          reasoningReplayField: shape.reasoningReplayField,
-          maxTokensField: shape.maxTokensField,
-          assistantAfterToolResult: shape.assistantAfterToolResult,
-          serviceTier: request.provider.serviceTier,
-          ...(request.cacheRetention !== undefined ? { cacheRetention: request.cacheRetention } : {}),
-          ...(shape.supportsMidConvoToolChanges ? {
-            supportsMidConvoToolChanges: true,
-            initialTools,
-          } : {}),
-          ...(shape.supportsMidConvoEffort ? { supportsMidConvoEffort: true } : {}),
-          ...(request.historicalEfforts ? { historicalEfforts: request.historicalEfforts } : {}),
-        });
-        // Public replay and image conversion use the protocol's actual input projection.
-        if (shape.reasoningReplayField || inputLimits?.images) {
-          try {
-            const replayBudget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
-              inputLimit: modelEntry?.inputLimit, promptTokens: estimateWirePrompt(payload, protocol.contextFields, modelEntry?.tokenizer),
-              outputTokens: output ?? shape.maxOutputCeiling, reserveTokens: request.reserveTokens, measured: false });
-            if (!replayBudget.ok && replayBudget.reason !== 'unknown') return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${replayBudget.detail}`));
-          } catch (error) {
-            // Signed replay has no local token proof; byte/count admission still sees its complete serialized body.
-            if (shape.reasoningReplayField || !(error instanceof WirePromptUnavailableError)) throw error;
-          }
-        }
-      } catch (error) {
-        // The only throw from this call is an undeclared kind, and it names both
-        // the kind and the ones that exist. Reported as the reason the step
-        // failed, which is what puts it in front of the user.
-        return stamp(errorStep(error instanceof Error ? error.message : String(error)));
-      }
+      sourceMessages = prepared.sourceMessages;
+      messageProjection = prepared.messageProjection;
+      const { activeProvider, activeModel, effort, endpoint, shape, protocol, modelEntry,
+        usageAttribution, inputLimits, promptIdentity, promptProjection, requestHeaders, body } = prepared;
       // What has been shown so far, so an interrupted answer keeps the part
       // the user already read instead of vanishing from the conversation. Both
       // channels count: reasoning the user has watched is as impossible to take
@@ -592,41 +230,52 @@ export function createStepFunction(request: StepRequest): StepFunction {
         let forceRetryAtTurn = false;
         let releaseNow = true;
         try {
-          const body = JSON.stringify(payload);
+          if (!prepared.isCurrent()) return stamp(errorStep('Request preparation changed before dispatch. No request was sent.', true));
           const modelAttempt = await prepareRequestAttempt({ body, provider: activeProvider, model: activeModel,
-            endpoint, purpose: options.agentMode ? 'subagent' : 'turn', requestId, policy: request.requestPolicy, inputLimits,
+            endpoint, purpose: prepared.agentMode ? 'subagent' : 'turn', requestId, policy: request.requestPolicy, inputLimits,
             ...(request.provider.credentialId && request.provider.credentialGeneration
               ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
           const attemptResponse = await modelAttempt.send(
-            endpointUrl(request.provider.baseUrl, endpoint, activeModel),
+            prepared.url,
             {
               method: "POST",
-              headers: { ...request.provider.headers, ...requestHeaders },
+              headers: { ...prepared.headers, ...requestHeaders },
               body,
               signal: requestSignal,
             },
-            fetchImpl, request.modelTransport,
+            fetchImpl, (input, init, beforeDispatch) => {
+              const admittedDispatch = () => {
+                if (!prepared.isCurrent()) throw new TurnPreparationError('Request preparation changed before dispatch. No request was sent.', true);
+                beforeDispatch();
+              };
+              if (request.modelTransport) {
+                if (!prepared.isCurrent()) throw new TurnPreparationError('Request preparation changed before dispatch. No request was sent.', true);
+                return request.modelTransport(input, init, admittedDispatch);
+              }
+              admittedDispatch();
+              return fetchImpl(input, init);
+            },
           );
           if (attemptResponse.ok) {
             requestAcceptedAt = Date.now();
             acceptedResponse = true;
             traceLogger.info("provider request accepted", { requestId, endpoint, provider: activeProvider, model: activeModel, attempt });
-            if (!options.agentMode) clearContextUsage(request.sessionId);
+            if (!prepared.agentMode) clearContextUsage(request.sessionId);
             response = attemptResponse;
             responseAttempt = modelAttempt;
             options.onRequestSent?.({
               promptIdentity,
-              context: requestContext({ body, endpoint, fields: endpointShape(endpoint).contextFields,
+              context: requestContext({ body, endpoint, fields: protocol.contextFields,
                 provider: activeProvider, model: activeModel,
                 tokenizer: modelEntry?.tokenizer,
-                ...(!regeneratedPrompt && request.systemPromptSources
+                ...(!prepared.regeneratedPrompt && request.systemPromptSources
                   ? { systemSources: request.systemPromptSources } : {}) }),
               endpoint,
               maxTokensField: shape.maxTokensField,
               reasoning: modelEntry?.reasoning,
               inputLimits,
-              url: endpointUrl(request.provider.baseUrl, endpoint, activeModel),
-              headers: request.provider.headers,
+              url: prepared.url,
+              headers: prepared.headers,
               requestHeaders,
               body,
             });
@@ -665,6 +314,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             );
           }
         } catch (error) {
+          if (error instanceof TurnPreparationError) return stamp(errorStep(error.message, error.inputLimit));
           if (error instanceof InputLimitError) return stamp(errorStep(error.message, true));
           if (error instanceof ModelAdmissionError) return stamp({ ...errorStep(error.message, true), admissionFailure: error.code });
           if (signal?.aborted) return stamp(abortedStep(""));
@@ -729,7 +379,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         // Both live reuse and persistence depend on this exact validated count.
         // Classify before accounting without invoking display callbacks: their
         // failure must not discard usage the provider has already reported.
-        const promptMeasurement = !options.agentMode && counted && typeof usage?.prompt_tokens === 'number'
+        const promptMeasurement = !prepared.agentMode && counted && typeof usage?.prompt_tokens === 'number'
           && Number.isSafeInteger(usage.prompt_tokens) && usage.prompt_tokens >= 0
           && stopReason !== 'error' && stopReason !== 'aborted'
           ? decodePromptMeasurement({ tokens: counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens,
@@ -739,10 +389,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
           const record: SessionUsageRecord = {
             ...counted,
             attribution: usageAttribution,
-            model: request.provider.model,
+            model: activeModel,
             // Recorded with the bucket, not looked up later: a provider switch must
             // not reprice tokens that were already spent at the old provider's rate.
-            provider: request.provider.provider,
+            provider: activeProvider,
             // The raw selected count preserves context-status calibration. The
             // projection digest and its own count below bind budgets to the
             // exact compacted, bridged and closing-step wire history.
@@ -752,13 +402,13 @@ export function createStepFunction(request: StepRequest): StepFunction {
             // actually sent, and a measurement from the wrong request is stale.
             promptIdentity,
             promptProjection,
-            purpose: options.requestPurpose ?? (options.agentMode ? 'subagent' : 'turn'),
+            purpose: prepared.requestPurpose,
           };
-          if (options.agentMode && request.recordAuxiliaryUsage) request.recordAuxiliaryUsage(record);
-          else recordSessionUsage(request.sessionId, record, { affectsContext: !options.agentMode,
+          if (prepared.agentMode && recordAuxiliaryUsage) recordAuxiliaryUsage(record);
+          else recordSessionUsage(request.sessionId, record, { affectsContext: !prepared.agentMode,
             promptMeasured: Boolean(promptMeasurement) });
           options.onRequestUsage?.(usage);
-        } else if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
+        } else if (!prepared.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         responseAttempt?.settle(usage);
         const decoded = toStep(completion, watched, stopReason);
         const ownsReplay = decoded.stopReason !== 'error' && decoded.stopReason !== 'aborted'
@@ -769,7 +419,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         return stamp({ ...completed, ...(promptMeasurement ? { promptMeasurement } : {}),
           ...(shownAnything && completed.stopReason === 'error' ? { retriesExhausted: true } : {}) });
       } catch (error) {
-        if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
+        if (!prepared.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         if (error instanceof ModelAdmissionError) return stamp({ ...failedStep(error.message, shown, undefined, true), admissionFailure: error.code });
         if (signal?.aborted) return stamp(abortedStep(shown));
         if (error instanceof ProviderResponseError || error instanceof IncompleteStreamError) {
