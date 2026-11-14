@@ -159,6 +159,7 @@ export interface InteractiveModeOptions {
   readonly exit?: (code?: number) => void;
   /** Theme paths this run was started with, so `/theme` can still select them. */
   readonly themePaths?: readonly string[];
+  readonly resumeOnStart?: boolean;
   /** Output device; defaults to the process terminal. */
   readonly terminal?: TerminalDevice;
   /** Frame scheduler; defaults to real timers. */
@@ -640,6 +641,9 @@ export class InteractiveMode {
     // recolouring something not yet on screen.
     this.theme.refresh();
     this.promptContext.start();
+    if (this.options.resumeOnStart) {
+      this.openPicker("/resume");
+    }
   }
 
 

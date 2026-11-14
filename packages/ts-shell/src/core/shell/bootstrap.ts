@@ -15,6 +15,7 @@ import {
 } from "./runtimeContext.js";
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
 import path from "node:path";
+import { validateSessionId } from "../../session/store/sessionFileLayout.js";
 import { replayTodosFromMessages } from "../commands/todoCommandRuntime.js";
 import { hasUnfinishedSessionWork } from '../../session/recovery/work.js';
 
@@ -112,10 +113,10 @@ export function bootstrapShellRuntime(input: {
   requestedSessionId?: string;
   /** A validated new-process profile handoff always starts a fresh native identity. */
   freshSessionId?: string;
+  forkSource?: string;
   allowSessionRootMigration?: boolean;
   emitLifecycleMessages?: boolean;
   /**
-   * Step into the stored current-session pointer instead of starting a new
    * session. True for one-shot `--print` runs, which continue what the user was
    * last doing; false for an interactive launch, which is a new sitting.
    */
@@ -141,8 +142,13 @@ export function bootstrapShellRuntime(input: {
         targetPathBase: requestedProjectRoot, gitRoot: input.gitContext.root ?? null,
       });
     }
+    if (input.forkSource) {
+      const sourceId = resolveForkSourceId(input.sessionManager, input.forkSource, requestedProjectRoot);
+      const forked = input.sessionManager.fork(sourceId, requestedProjectRoot, { activate: true });
+      emitLifecycleMessage(`Forked session ${sourceId} into ${forked.id}`);
+      return forked;
+    }
     if (!input.requestedSessionId) {
-      // Two kinds of run, two answers.
       //
       // A one-shot `--print` invocation is a continuation of whatever the user was
       // last doing — that is what makes `/continue` and `/resume current` mean
@@ -349,6 +355,63 @@ export function bootstrapShellRuntime(input: {
  * Active metadata is also used by idle sessions. Only their actual recovery
  * evidence distinguishes interrupted work from an ordinary previous sitting.
  */
+const FORK_ARTIFACT_FILES = new Set(["metadata", "state", "transcript"]);
+
+function resolveForkSourceId(
+  sessionManager: SessionManager,
+  rawSource: string,
+  projectRoot: string,
+): string {
+  const source = rawSource.trim();
+  if (source === "current") {
+    const current = sessionManager.resolveCurrentSessionForProject(projectRoot);
+    if (!current.ok) {
+      throw new SessionBootstrapError({
+        code: "session-not-found",
+        message: `No current session found to fork for ${projectRoot}.`,
+        recoveryHint: `Start a session first or pass an existing session id to --fork.`,
+      });
+    }
+    return current.session.id;
+  }
+  const isPath = source.includes("/") || source.includes("\\") || /\.(?:jsonl|json)$/i.test(source);
+  let candidate = source;
+  if (isPath) {
+    const cleaned = source.replace(/[\\/]+$/, "");
+    const base = path.basename(cleaned, path.extname(cleaned));
+    candidate = FORK_ARTIFACT_FILES.has(base) ? (path.basename(path.dirname(cleaned)) || base) : base;
+  }
+  let validCandidate: string;
+  try {
+    validCandidate = validateSessionId(candidate);
+    if (validCandidate === "." || validCandidate === ".." || validCandidate.includes("..")) {
+      throw new Error("Invalid session id");
+    }
+  } catch (err) {
+    throw new SessionBootstrapError({
+      code: "session-not-found",
+      message: err instanceof Error ? err.message : `Invalid --fork session '${rawSource}'.`,
+      recoveryHint: "Pass a valid session id or session file path to --fork.",
+    });
+  }
+  if (sessionManager.sessionExists(validCandidate)) return validCandidate;
+  if (!isPath) {
+    const prefixMatches = sessionManager.listSessions().filter((entry) => entry.projectRoot === projectRoot && entry.id.startsWith(validCandidate));
+    if (prefixMatches.length === 1) return prefixMatches[0]!.id;
+    if (prefixMatches.length > 1) {
+      throw new SessionBootstrapError({
+        code: "session-not-found",
+        message: `Ambiguous --fork session prefix '${source}'.`,
+        recoveryHint: "Pass a longer session id prefix to --fork.",
+      });
+    }
+  }
+  throw new SessionBootstrapError({
+    code: "session-not-found",
+    message: `Session '${rawSource}' not found for --fork.`,
+    recoveryHint: "Check available sessions with /resume and pass a valid id to --fork.",
+  });
+}
 function hasUnfinishedBusiness(
   sessionManager: SessionManager,
   session: Session,

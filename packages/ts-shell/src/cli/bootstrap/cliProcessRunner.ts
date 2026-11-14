@@ -20,6 +20,8 @@ import {
   setGlobalTraceContext,
 } from "../../observability/index.js";
 import { parseCliArgs } from "../../entrypoints/cliArgs.js";
+import { formatCliModelList } from "../../entrypoints/cliListModels.js";
+import { runCliExport } from "../../entrypoints/cliExportCommand.js";
 import { selectTheme, selectedTheme } from "../../presentation/theme/selection.js";
 import { readDiagramMode } from "../interactive/tuiSettings.js";
 import { setDiagramMode } from "../../presentation/tui/transcript/mermaid.js";
@@ -81,8 +83,13 @@ export async function runCliProcess(
   // Explicit service mode has its own authenticated state owner and protocol.
   if (input.args[0] === 'serve') { await runCliCycle(input); return; }
   const parsed = parseCliArgs(input.args, { cwd: input.launchCwd });
-  if (!parsed.ok) { input.writeError(parsed.error.message); input.exit(parsed.error.exitCode); }
+  if (parsed.ok === false) { input.writeError(parsed.error.message); input.exit(parsed.error.exitCode); return; }
   if (parsed.args.versionRequested) { input.writeOutput(versionLabel()); return; }
+  if (parsed.args.options.listModels !== undefined) {
+    const pattern = typeof parsed.args.options.listModels === "string" ? parsed.args.options.listModels : undefined;
+    input.writeOutput(formatCliModelList(pattern));
+    return;
+  }
   const handoff = input.process.env?.CHEERS_PROFILE_HANDOFF;
   const profile = createProfileContext({ name: parsed.args.options.profile, ...(handoff !== undefined ? { mode: 'existing' } : {}) });
   const child = claimSwitchChild(profile, input.args, handoff);
@@ -90,6 +97,16 @@ export async function runCliProcess(
   const switchDepth = child?.plan.depth ?? 0;
   input.profileSelected?.(profile);
   return withProfile(profile, async () => {
+    if (parsed.args.options.exportTarget !== undefined) {
+      try {
+        const message = await runCliExport(parsed.args.options.exportTarget, parsed.args.options.promptArg, input.launchCwd);
+        input.writeOutput(message);
+      } catch (error) {
+        input.writeError(error instanceof Error ? error.message : String(error));
+        input.exit(1);
+      }
+      return;
+    }
     const configInputs = parsed.args.options.configPaths?.length
       ? createConfigInputs(parsed.args.options.configPaths.map(file => ({ path: file, source: 'user' })), input.launchCwd) : undefined;
     let recovery: RestartRequest | undefined;
@@ -357,6 +374,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
         interactiveApprovalPrompt = handler;
       },
       ...(options.themePaths ? { themePaths: options.themePaths } : {}),
+      ...(options.resumeSession ? { resumeOnStart: true } : {}),
       exit: shutdown.exit,
       stopSignal: stopSurface.signal,
     });

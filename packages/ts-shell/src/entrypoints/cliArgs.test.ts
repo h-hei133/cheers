@@ -501,3 +501,43 @@ describe('--config ordered inputs', () => {
     expect(parsed.options.printMode).toBe(false); expect(parsed.options.noSkills).toBe(false);
   });
 });
+
+describe("Track 2 CLI flags", () => {
+  it("parses --model, --models, --thinking, --no-tools, -e, -c, -r, --export, --list-models", () => {
+    const parsed = expectParsed([
+      "--model", "anthropic/claude-opus-4-6:high",
+      "--models", "gpt-5.4, claude-sonnet-4-5",
+      "--thinking", "medium",
+      "--no-tools",
+      "-e", "./ext-a.ts",
+      "--extension", "./ext-b.js",
+      "-c",
+      "-r",
+      "--list-models", "opus",
+      "hello world",
+    ]);
+    expect(parsed.options.model).toBe("anthropic/claude-opus-4-6:high");
+    expect(parsed.options.scopedModels).toEqual(["gpt-5.4", "claude-sonnet-4-5"]);
+    expect(parsed.options.thinking).toBe("medium");
+    expect(parsed.options.noTools).toBe(true);
+    expect(parsed.options.extensionPaths).toEqual(["./ext-a.ts", "./ext-b.js"]);
+    expect(parsed.options.continueSession).toBe(true);
+    expect(parsed.options.resumeSession).toBe(true);
+    expect(parsed.options.listModels).toBe("opus");
+    expect(parsed.options.promptArg).toBe("hello world");
+    expect(isContinueRequested(parsed)).toBe(true);
+  });
+
+  it("parses --list-models without pattern, --export, and --fork validation", () => {
+    expect(expectParsed(["--list-models"]).options.listModels).toBe(true);
+    expect(expectParsed(["--list-models", "--print"]).options.listModels).toBe(true);
+    expect(expectParsed(["--export", "sess-1", "out.html"]).options.exportTarget).toBe("sess-1");
+    expect(expectParsed(["--export", "sess-1", "out.html"]).options.promptArg).toBe("out.html");
+    expect(expectParsed(["--fork", "sess-1"]).options.forkSource).toBe("sess-1");
+    expect(expectParseError(["--fork", "sess-1", "-c"]).message).toContain("--fork");
+    expect(expectParseError(["--fork", "sess-1", "-r"]).message).toContain("--fork");
+    expect(expectParseError(["--fork", "sess-1", "--session-id", "x"]).message).toContain("--fork");
+    expect(expectParseError(["--thinking", "invalid"]).message).toContain("--thinking");
+    expect(expectParseError(["--models", " , "]).message).toContain("--models");
+  });
+});

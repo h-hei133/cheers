@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { registerCatalogContribution } from '../../core/catalog/contributions.js';
+import { loadInProcessExtension } from '../../extensions/runtime/inProcessLoader.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import type { ToolGateOptions } from '../../turn/tools.js';
@@ -16,9 +20,11 @@ const runtimes = new WeakMap<ShellRuntimeContext, ExtensionRuntime>();
 export function installExtensionRuntime(context: ShellRuntimeContext, runtime: ShellSessionRuntime, gate: (tool?: string) => ToolGateOptions): void {
   let service: ExtensionService | undefined; let identity: string | undefined;
   let closed = false; let retiredUnknown = false;
+  const cliCleanups: Array<() => void> = [];
   const retiring = new Set<Promise<void>>();
   runtimes.set(context, { run: operation => runtime.commands.run(operation), cancel: async () => { await service?.cancel(); }, close: async () => {
     closed = true;
+    cliCleanups.splice(0).forEach(unregister => unregister());
     const results = await Promise.allSettled([...retiring, ...(service ? [service.close()] : [])]);
     if (retiredUnknown || results.some(result => result.status === 'rejected')) throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
   }, service: () => {
@@ -35,10 +41,82 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
         check, offline: () => context.runtimeConfig.offline === true, denyRules: () => context.runtimeConfig.denyRules,
         assertSourceAccess: absolute => { check(); assertSourceAccess(absolute, context.projectRoot ?? root, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules); },
         assertWorkspace: write => { check(); const primary = context.projectRoot ?? root; assertSourceAccess(root, primary, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules); if (write) selectWorkspaceRoot(primary, context.session.workspaceRoots ?? [], root, 'write'); } });
+      cliCleanups.splice(0).forEach(unregister => unregister());
+      registerCliExtensions(context, root, session, cliCleanups, (absolute) => {
+        check();
+        assertSourceAccess(absolute, context.projectRoot ?? root, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules);
+      }, gate);
     }
     return service;
   } });
   runtimes.get(context)!.service();
+}
+
+function resolveExtensionEntryFile(candidate: string): string {
+  const resolved = path.resolve(candidate);
+  if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+    for (const entry of ['index.ts', 'index.mts', 'index.mjs', 'index.js']) {
+      const indexFile = path.join(resolved, entry);
+      if (fs.existsSync(indexFile)) return indexFile;
+    }
+  }
+  return resolved;
+}
+
+function registerCliExtensions(
+  context: ShellRuntimeContext,
+  root: string,
+  sessionId: string,
+  cleanups: Array<() => void>,
+  assertEntryAccess: (absolute: string) => void,
+  gate: (tool?: string) => ToolGateOptions,
+): void {
+  const paths = context.cliExtensionPaths;
+  if (!paths?.length) return;
+  const baseDir = context.originalCwd || root;
+  try {
+    for (const rawPath of paths) {
+      const filePath = resolveExtensionEntryFile(path.isAbsolute(rawPath) ? rawPath : path.join(baseDir, rawPath));
+      assertEntryAccess(filePath);
+      const loaded = loadInProcessExtension({
+        filePath,
+        workspaceRoot: root,
+        denyRules: () => context.runtimeConfig.denyRules,
+      });
+      const guardedTools = loaded.tools.map((tool) => ({
+        ...tool,
+        execute: async (args: Record<string, unknown>, toolContext: Parameters<typeof tool.execute>[1]) => {
+          const g = gate(tool.name);
+          const blocked = g.admission?.();
+          if (blocked) throw new Error(blocked);
+          return tool.execute(args, { ...toolContext, admission: g.admission ?? toolContext.admission });
+        },
+      }));
+      const onEvent = loaded.handlers.size > 0
+        ? async (event: string, payload: unknown, aliases?: readonly string[]) => {
+            let current = payload;
+            for (const name of [event, ...(aliases ?? [])]) {
+              for (const handler of loaded.handlers.get(name) ?? []) {
+                const next = await handler(current);
+                if (next !== undefined) current = next;
+              }
+            }
+            return current;
+          }
+        : undefined;
+      cleanups.push(registerCatalogContribution({
+        root,
+        sessionId,
+        commands: loaded.commands,
+        tools: guardedTools,
+        skills: () => [],
+        ...(onEvent ? { onEvent } : {}),
+      }));
+    }
+  } catch (error) {
+    cleanups.splice(0).forEach(unregister => unregister());
+    throw error;
+  }
 }
 export function extensionCommandFor(context: ShellRuntimeContext): NonNullable<CommandContext['extensionCommand']> {
   return async (kind, args, commandContext) => {

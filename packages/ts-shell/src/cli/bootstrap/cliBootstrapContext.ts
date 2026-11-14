@@ -142,9 +142,10 @@ export function createCliBootstrapRuntimeContext(
         freshSessionId: input.freshSessionId,
         allowSessionRootMigration: input.options.migrateSessionRoot === true,
         emitLifecycleMessages: false,
-        // A one-shot run continues where the user left off; an interactive launch
-        // is a new sitting and starts its own session.
-        adoptCurrentSession: input.options.printMode === true,
+        // A one-shot run or explicit `-c`/`--continue` continues where the user left off;
+        // an ordinary interactive launch starts its own fresh session.
+        adoptCurrentSession: input.options.printMode === true || input.options.continueSession === true,
+        ...(input.options.forkSource ? { forkSource: input.options.forkSource } : {}),
       });
     } catch (error) {
       handleCliBootstrapError({
@@ -156,6 +157,8 @@ export function createCliBootstrapRuntimeContext(
     }
   })();
   const runtimeContext = bootstrap.context;
+  if (input.options.scopedModels?.length) runtimeContext.scopedModels = input.options.scopedModels;
+  if (input.options.extensionPaths?.length) runtimeContext.cliExtensionPaths = input.options.extensionPaths;
   runtimeContext.workspaceAdmission = () => sessionWorkspaceAdmission(sessionManager, runtimeContext.session);
   const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext));
 
@@ -197,8 +200,8 @@ function configOverrides(options: CliOptions): RuntimeConfigOverrides {
     // The flag wins over the file, and only when it was given: `undefined`
     // leaves the configured value in place.
     offline: options.offline === true ? true : undefined,
-    // Passed through only when the flag named something: an empty array here
-    // would mean "offer no tools at all", which is not what an absent flag says.
-    allowedTools: options.allowedTools,
+    // `--no-tools` explicitly passes an empty array to disable all built-in tools;
+    // an absent flag keeps `undefined` so the default tool pool stays intact.
+    allowedTools: options.noTools ? [] : options.allowedTools,
   };
 }

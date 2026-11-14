@@ -51,6 +51,7 @@ export interface InteractiveLoopInput {
   ) => void;
   /** Theme paths this run was started with, so `/theme` can still select them. */
   readonly themePaths?: readonly string[];
+  readonly resumeOnStart?: boolean;
   /** Owns resource cleanup and its total budget before terminating the process. */
   readonly exit?: (code?: number) => void;
   readonly stopSignal?: AbortSignal;
@@ -120,6 +121,7 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
         scheduler: input.scheduler,
         setReadline: input.setReadline,
         setInteractiveApprovalPrompt: input.setInteractiveApprovalPrompt,
+        ...(input.resumeOnStart ? { resumeOnStart: true } : {}),
         exit: code => { release(); exit(code); resolve(); },
       });
     } catch (error) { startup?.dispose(); reject(error); return; }

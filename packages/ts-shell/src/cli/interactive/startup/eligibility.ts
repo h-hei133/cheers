@@ -1,8 +1,8 @@
 /** Only unambiguously interactive launches may take stdin before full parsing. */
 export function startupEligible(args: readonly string[], tty: boolean): boolean {
   if (!tty) return false;
-  const values = new Set(['--profile', '--config', '--project', '--attach', '--provider', '--api-key', '--tools', '--skill', '--theme', '--use-theme']);
-  const flags = new Set(['--no-context-files', '--no-skills', '-ns', '--offline', '--dangerously-bypass-hook-trust']);
+  const values = new Set(['--profile', '--config', '--project', '--attach', '--provider', '--model', '--models', '--thinking', '--api-key', '--tools', '--skill', '--theme', '--use-theme', '--extension', '-e', '--fork', '--session-id']);
+  const flags = new Set(['--no-context-files', '--no-skills', '-ns', '--offline', '--dangerously-bypass-hook-trust', '--continue', '-c', '--resume', '-r', '--no-tools', '-nt']);
   for (let index = 0; index < args.length; index++) {
     const arg = args[index]!;
     if (flags.has(arg)) continue;

@@ -87,6 +87,8 @@ export interface ShellRuntimeContext {
    * `--theme` named it.
    */
   themePaths?: readonly string[]
+  scopedModels?: readonly string[]
+  cliExtensionPaths?: readonly string[]
   gitContext: WorkflowGitContext
   session: Session
   activeSession: ActiveSessionIdentity

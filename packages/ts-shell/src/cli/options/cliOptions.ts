@@ -10,10 +10,18 @@ export interface CliOptions {
   /** Ordered, personal, read-only JSONC inputs resolved against launch cwd. */
   readonly configPaths?: readonly string[];
   readonly sessionId?: string;
+  readonly continueSession?: boolean;
+  readonly resumeSession?: boolean;
+  readonly forkSource?: string;
   readonly provider?: RuntimeProvider;
+  readonly model?: string;
+  readonly scopedModels?: readonly string[];
+  readonly thinking?: string;
   readonly apiKey?: string;
   readonly projectPath?: string;
   readonly replayFile?: string;
+  readonly exportTarget?: string;
+  readonly listModels?: string | true;
   readonly printMode?: boolean;
   /** Emit the run's events as JSON lines on stdout instead of prose. */
   readonly jsonEvents?: boolean;
@@ -36,6 +44,7 @@ export interface CliOptions {
    * trying a skill out before installing it, or pointing a run at one file.
    */
   readonly skillPaths?: readonly string[];
+  readonly extensionPaths?: readonly string[];
   /**
    * Skip discovered skills for this run.
    *
@@ -77,6 +86,7 @@ export interface CliOptions {
    * where naming what may not fails open as the tool set grows.
    */
   readonly allowedTools?: readonly string[];
+  readonly noTools?: boolean;
   /**
    * Run a project's declared hook commands without approving each one.
    *

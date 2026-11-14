@@ -1,4 +1,4 @@
-import { preferredEffort } from '../models/effort.js';
+import { preferredEffort, type ThinkingPreference } from '../models/effort.js';
 import { accountAuthKey, providerFacts } from "../providers/facts.js";
 import { vertexBaseUrl, vertexTarget } from "../../provider/endpoints/googleVertex.js";
 import type {
@@ -24,8 +24,8 @@ export interface ProviderCredentialResolutionInput {
   readonly cliApiKey?: string;
   readonly cliBaseUrl?: string;
   readonly cliModel?: string;
+  readonly cliThinkingEffort?: ThinkingPreference;
   readonly env?: NodeJS.ProcessEnv;
-  /** When the configuration declares a pool, selection stays inside it. */
   readonly pool?: { readonly sessionId?: string };
 }
 
@@ -146,7 +146,11 @@ function resolveCredential(
     input.cliModel ?? activeConnectionProfile?.model ?? configProfile?.model,
   );
 
-  const thinkingEffort = preferredEffort(activeConnectionProfile, configProfile);
+  const thinkingEffort = preferredEffort(
+    input.cliThinkingEffort !== undefined ? { thinkingEffort: input.cliThinkingEffort } : undefined,
+    activeConnectionProfile,
+    configProfile,
+  );
   const preference = { ...(thinkingEffort !== undefined ? { thinkingEffort } : {}),
     selection: { ...(input.cliProvider !== undefined ? { provider: input.cliProvider } : {}),
       ...(providerBinding ? { credentialScope: 'provider' as const } : {}),

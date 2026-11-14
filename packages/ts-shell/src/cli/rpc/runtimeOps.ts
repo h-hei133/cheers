@@ -91,12 +91,23 @@ export function readLastAssistantText(runtimeContext: ShellRuntimeContext): stri
 
 export async function cycleRpcModel(runtimeContext: ShellRuntimeContext): Promise<Record<string, unknown> | null> {
   const catalog = await readModelCatalog(false, runtimeContext.session.id, runtimeContext.runtimeConfig);
-  if (catalog.models.length === 0) return null;
+  const scoped = runtimeContext.scopedModels;
+  const candidates = scoped?.length
+    ? catalog.models.filter((id) =>
+        scoped.some((pattern) => {
+          const p = pattern.trim().toLowerCase();
+          const bare = p.includes("/") ? p.split("/", 2)[1]! : p;
+          return id.toLowerCase() === bare || id.toLowerCase().includes(bare);
+        }),
+      )
+    : catalog.models;
+  const pool = candidates.length > 0 ? candidates : catalog.models;
+  if (pool.length === 0) return null;
   const ctx = buildRpcCommandContext(runtimeContext);
   const active = modelRequest(ctx, runtimeContext.runtimeConfig);
   const current = catalog.active ?? active.model;
-  const idx = catalog.models.indexOf(current ?? "");
-  const nextModel = catalog.models[(idx + 1) % catalog.models.length]!;
+  const idx = pool.indexOf(current ?? "");
+  const nextModel = pool[(idx + 1) % pool.length]!;
   const note = assertModelApplied(await setModel([`${catalog.provider}/${nextModel}`], ctx, false));
   return { model: { provider: catalog.provider, id: nextModel }, note };
 }
