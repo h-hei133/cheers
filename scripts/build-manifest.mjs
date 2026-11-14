@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   chmodSync,
   closeSync,
@@ -14,7 +14,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { chmod, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   assertNoSymlinkPath,
@@ -29,6 +29,8 @@ import {
   snapshotDirectory,
   snapshotFile,
 } from "./build-identity.mjs";
+import { PUBLIC_ENTRY, PUBLIC_RECORD, publicFiles, publicManifest, readPublicRecord } from "./build/exports.mjs";
+import { capturePublicFiles, prunePublicFiles, replacePublicFile, restorePublicFiles } from "./build/transaction.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 export const PUBLISH_JOURNAL = ".publish-journal.json";
@@ -97,10 +99,6 @@ export function acquireBuildLock(root, dist) {
   }
 }
 
-function digest(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
 async function writeAtomic(root, file, content, mode = 0o644) {
   assertNoSymlinkPath(root, file);
   const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`;
@@ -147,18 +145,6 @@ function restoreFile(change) {
     return;
   }
   writeAtomicSync(change.root, change.file, change.previous, change.mode);
-}
-
-function packageMainContent(buildId) {
-  return `export * from "./builds/${buildId}/${REQUIRED_BUILD_INDEX}";\n`;
-}
-
-async function pruneStableMirror(dist) {
-  const keep = new Set(["builds", "build-manifest.json", "index.js", BUILD_LOCK, PUBLISH_JOURNAL, PACKAGE_MAIN_BACKUP]);
-  for (const entry of await readdir(dist, { withFileTypes: true })) {
-    if (keep.has(entry.name) || entry.name.startsWith(".staging-")) continue;
-    await rm(path.join(dist, entry.name), { recursive: true, force: true });
-  }
 }
 
 export function inspectBuildLock(root, dist) {
@@ -234,7 +220,12 @@ function recoverLockedTransaction(root, dist) {
   } catch {
     manifestBuildId = undefined;
   }
-  if (manifestBuildId !== journal.targetBuildId) {
+  if (journal.schemaVersion !== undefined && journal.schemaVersion !== 2) {
+    throw new Error("Publish journal has an unsupported version.");
+  }
+  if (manifestBuildId !== journal.targetBuildId && journal.schemaVersion === 2) {
+    restorePublicFiles(root, dist, journal.files);
+  } else if (manifestBuildId !== journal.targetBuildId) {
     const mainFile = path.join(root, REQUIRED_PACKAGE_MAIN);
     if (journal.hadPrevious) {
       const backupFile = path.join(dist, PACKAGE_MAIN_BACKUP);
@@ -250,14 +241,12 @@ function recoverLockedTransaction(root, dist) {
   return true;
 }
 
-function beginBuildTransaction(root, dist, mainState, targetBuildId) {
-  const backupFile = path.join(dist, PACKAGE_MAIN_BACKUP);
+function beginBuildTransaction(root, dist, files, targetBuildId) {
   const journalFile = path.join(dist, PUBLISH_JOURNAL);
-  if (mainState.previous !== null) writeAtomicSync(root, backupFile, mainState.previous, 0o600);
   writeAtomicSync(root, journalFile, `${JSON.stringify({
+    schemaVersion: 2,
     targetBuildId,
-    hadPrevious: mainState.previous !== null,
-    previousMode: mainState.mode,
+    files,
   })}\n`, 0o600);
 }
 
@@ -299,7 +288,7 @@ async function attachExecutableLocked(options) {
   assertNoSymlinkPath(rootPath, manifestFile);
   const manifestState = readFileState(rootPath, manifestFile);
   const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
-  if (manifest?.schemaVersion !== 2 || manifest.buildId !== options.expectedBuildId
+  if (manifest?.schemaVersion !== 3 || manifest.buildId !== options.expectedBuildId
     || manifest.inputsDigest !== options.expectedInputsDigest
     || (options.expectedArtifactDigest !== undefined && manifest.artifactDigest !== options.expectedArtifactDigest)
     || !Array.isArray(manifest.compilerInputs)) {
@@ -417,7 +406,7 @@ async function publishBuildLocked({
   const buildId = buildIdFor({ version, inputsDigest, node, mode });
   const buildRoot = path.join(distPath, "builds", buildId);
   const staged = snapshotDirectory(stagingPath);
-  for (const required of [REQUIRED_BUILD_ENTRY, REQUIRED_BUILD_INDEX, ...REQUIRED_BUILD_ASSETS]) {
+  for (const required of [REQUIRED_BUILD_ENTRY, REQUIRED_BUILD_INDEX, PUBLIC_ENTRY, PUBLIC_RECORD, ...REQUIRED_BUILD_ASSETS]) {
     if (!staged.artifacts.some(artifact => artifact.path === required)) throw new Error(`Build output is missing ${required}.`);
   }
   assertNoSymlinkPath(rootPath, path.join(rootPath, REQUIRED_BUILD_LAUNCHER));
@@ -425,15 +414,14 @@ async function publishBuildLocked({
     path: REQUIRED_BUILD_LAUNCHER,
     ...snapshotFile(path.join(rootPath, REQUIRED_BUILD_LAUNCHER), REQUIRED_BUILD_LAUNCHER),
   };
-  const mainContent = packageMainContent(buildId);
-  const packageMain = {
-    path: REQUIRED_PACKAGE_MAIN,
-    size: Buffer.byteLength(mainContent),
-    sha256: digest(mainContent),
-  };
+  const record = readPublicRecord(rootPath, stagingPath);
+  const publicApi = publicManifest(distRelative, buildId, record.entries);
+  const files = publicFiles(buildId, record.entries);
+  const packageMain = publicApi.files.find(file => file.path === REQUIRED_PACKAGE_MAIN);
+  if (!packageMain) throw new Error("The public package root is missing from this build.");
   const artifacts = staged.artifacts.map(artifact => ({ ...artifact, path: `builds/${buildId}/${artifact.path}` }));
   const manifest = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name,
     version,
     mode,
@@ -446,6 +434,7 @@ async function publishBuildLocked({
     entry: `builds/${buildId}/${REQUIRED_BUILD_ENTRY}`,
     launcher,
     packageMain,
+    publicApi,
     artifacts,
   };
   await mkdir(path.dirname(buildRoot), { recursive: true });
@@ -457,27 +446,32 @@ async function publishBuildLocked({
     if (existing.digest !== staged.digest) throw new Error(`Immutable build ${buildId.slice(0, 12)} already exists with different bytes.`);
     await rm(stagingPath, { recursive: true, force: true });
   }
-  const mainFile = path.join(rootPath, REQUIRED_PACKAGE_MAIN);
-  const mainState = readFileState(rootPath, mainFile);
-  beginBuildTransaction(rootPath, distPath, mainState, buildId);
+  let previous;
   try {
-    writeAtomicSync(rootPath, mainFile, mainContent, 0o644);
+    previous = JSON.parse(readFileSync(path.join(distPath, "build-manifest.json"), "utf8"));
+  } catch {
+    // A first build or an unreadable old manifest has no trusted cleanup inventory.
+  }
+  const priorFiles = capturePublicFiles(rootPath, distPath, files);
+  beginBuildTransaction(rootPath, distPath, priorFiles, buildId);
+  try {
+    for (const file of files) replacePublicFile(rootPath, path.join(distPath, file.path), file.content);
     if (buildInputDigest(rootPath, compilerInputs).digest !== inputsDigest) {
       throw new Error("Build inputs changed before manifest publication; the previous build was kept.");
     }
     await writeAtomic(rootPath, path.join(distPath, "build-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   } catch (error) {
     try {
-      restoreFile(mainState);
+      restorePublicFiles(rootPath, distPath, priorFiles);
       rmSync(path.join(distPath, PUBLISH_JOURNAL), { force: true });
       rmSync(path.join(distPath, PACKAGE_MAIN_BACKUP), { force: true });
     } catch (restoreError) {
-      throw new Error(`Build manifest publication failed and package-main rollback also failed: ${restoreError instanceof Error ? restoreError.message : String(restoreError)}`);
+      throw new Error(`Build manifest publication failed and public-entry rollback also failed: ${restoreError instanceof Error ? restoreError.message : String(restoreError)}`);
     }
     throw error;
   }
   try {
-    await pruneStableMirror(distPath);
+    prunePublicFiles(rootPath, distPath, previous, publicApi.files, snapshotFile);
   } catch {
     /* Stale files are harmless; the immutable build and pointer are already valid. */
   }

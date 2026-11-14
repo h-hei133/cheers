@@ -13,6 +13,7 @@ import {
   snapshotDirectory,
   snapshotFile,
 } from "./build-identity.mjs";
+import { PUBLIC_ENTRY, PUBLIC_RECORD, verifyPublicFiles } from "./build/exports.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 
@@ -87,13 +88,15 @@ function readManifest(dist) {
   if (!existsSync(file)) return { state: "missing" };
   try {
     const parsed = JSON.parse(readFileSync(file, "utf8"));
-    if (!parsed || typeof parsed !== "object" || parsed.schemaVersion !== 2
+    if (!parsed || typeof parsed !== "object" || parsed.schemaVersion !== 3
       || typeof parsed.name !== "string" || !parsed.name
       || typeof parsed.version !== "string" || typeof parsed.mode !== "string" || !parsed.mode
       || typeof parsed.builtAt !== "string" || typeof parsed.node !== "string"
       || !SHA256.test(parsed.buildId) || !SHA256.test(parsed.inputsDigest) || !SHA256.test(parsed.artifactDigest)
       || !safeRelativePath(parsed.entry) || !validLauncher(parsed.launcher)
       || !validPackageMain(parsed.packageMain)
+      || parsed.publicApi?.schemaVersion !== 1 || !Array.isArray(parsed.publicApi.entries)
+      || !Array.isArray(parsed.publicApi.files)
       || (parsed.executable !== undefined && !validExecutable(parsed.executable))
       || (parsed.executable?.verification?.kind === "host" && parsed.executable.verification.version !== parsed.version)
       || !Array.isArray(parsed.compilerInputs) || parsed.compilerInputs.some(file => !validCompilerInput(file))
@@ -106,6 +109,7 @@ function readManifest(dist) {
       paths.add(artifact.path);
     }
     if (!paths.has(parsed.entry) || !paths.has(`${prefix}${REQUIRED_BUILD_INDEX}`)
+      || !paths.has(`${prefix}${PUBLIC_ENTRY}`) || !paths.has(`${prefix}${PUBLIC_RECORD}`)
       || REQUIRED_BUILD_ASSETS.some(asset => !paths.has(`${prefix}${asset}`))) return { state: "truncated" };
     const expectedBuildId = buildIdFor({
       version: parsed.version,
@@ -190,14 +194,10 @@ export function checkBuild({ root, dist, version, executablePolicy = "optional" 
   } catch (error) {
     return artifactError("launcher-mismatch", `The CLI launcher cannot be verified: ${error instanceof Error ? error.message : String(error)}`);
   }
-  const expectedMain = `export * from "./builds/${built.buildId}/${REQUIRED_BUILD_INDEX}";\n`;
   let packageMain;
   try {
     assertNoSymlinkPath(root, path.join(root, built.packageMain.path));
     packageMain = snapshotFile(path.join(root, built.packageMain.path), built.packageMain.path);
-    if (readFileSync(path.join(root, built.packageMain.path), "utf8") !== expectedMain) {
-      return artifactError("package-main-mismatch", "The package main pointer does not match the verified build. Rebuild with npm run build:ts.");
-    }
   } catch (error) {
     return artifactError("package-main-mismatch", `The package main pointer cannot be verified: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -218,6 +218,15 @@ export function checkBuild({ root, dist, version, executablePolicy = "optional" 
   }
   if (packageMain.size !== built.packageMain.size || packageMain.sha256 !== built.packageMain.sha256) {
     return artifactError("package-main-mismatch", "The package main pointer bytes do not match the manifest. Rebuild with npm run build:ts.");
+  }
+  try {
+    const publicApi = verifyPublicFiles(root, dist, built);
+    const expectedMain = publicApi.files.find(file => file.path === REQUIRED_PACKAGE_MAIN);
+    if (JSON.stringify(expectedMain) !== JSON.stringify(built.packageMain)) {
+      return artifactError("package-main-mismatch", "The package root does not match the verified public entrypoints.");
+    }
+  } catch (error) {
+    return artifactError("package-exports-mismatch", `The public entrypoints cannot be verified: ${error instanceof Error ? error.message : String(error)}`);
   }
   if (built.executable === undefined && executablePolicy === "required") {
     return artifactError("missing-executable", "The published build has no verified single-file executable. Run npm run build:exe.");

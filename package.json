@@ -22,7 +22,7 @@
     "build:exe": "node scripts/build-cli-executable.mjs",
     "test": "npm run test:gate:golden-main-path && node scripts/test-all-stacks.mjs",
     "test:ts": "npm run test -w packages/ts-shell",
-    "test:scripts": "node --test scripts/*.test.mjs",
+    "test:scripts": "node --test --test-concurrency=1 scripts/*.test.mjs",
     "test:gate:golden-main-path": "npm run test:gate:golden-main-path -w packages/ts-shell",
     "test:all": "npm run test:gate:golden-main-path && node scripts/test-all-stacks.mjs",
     "dev": "npm run dev -w packages/ts-shell --",
@@ -51,6 +51,8 @@
     "check:config-consumers": "node scripts/check-config-consumers.mjs",
     "check:declarations": "node scripts/check-declarations.mjs",
     "check:node-floor": "node scripts/check-node-floor.mjs",
+    "check:lint": "biome lint --error-on-warnings --max-diagnostics=30",
+    "format": "biome format --write",
     "check:call-reachability": "node scripts/check-call-reachability.mjs",
     "verify:mcp-routing": "node scripts/verify-mcp-routing.mjs",
     "verify:mcp:local-execution": "node scripts/verify-mcp-local-execution.mjs",
@@ -128,5 +130,9 @@
   },
   "engines": {
     "node": ">=20.3.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.5",
+    "esbuild": "0.28.2"
   }
 }

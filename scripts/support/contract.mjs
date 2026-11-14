@@ -139,7 +139,8 @@ function terminateRunner(child) {
 export function runTests(vitestPath, reportPath, env, suites, tsShellRoot, timeoutMs = 240000) {
   return new Promise(resolve => {
     const child = spawn(process.execPath, [vitestPath, 'run', ...suites,
-      '--threads', 'false', '--reporter=json', '--outputFile', reportPath], {
+      '--pool=forks', '--minWorkers=1', '--maxWorkers=1', '--no-file-parallelism',
+      '--reporter=json', '--outputFile', reportPath], {
       cwd: tsShellRoot, env, stdio: ['ignore', 'pipe', 'pipe'], shell: false,
       detached: process.platform !== 'win32', windowsHide: true,
     })

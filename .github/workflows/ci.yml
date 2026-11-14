@@ -51,6 +51,9 @@ jobs:
       - name: Check nothing needs a newer Node than the declared floor
         run: npm run check:node-floor
 
+      - name: Check JavaScript and TypeScript correctness
+        run: npm run check:lint
+
       # The gate's own test, so a gate that stops detecting what it was written
       # for fails here rather than passing quietly. Covers every scripts/*.test.mjs.
       - name: Check the gates still detect

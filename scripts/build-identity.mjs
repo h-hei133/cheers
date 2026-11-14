@@ -17,11 +17,16 @@ export const REQUIRED_BUILD_INPUTS = [
   "node_modules/typescript/lib/_tsc.js",
   "node_modules/typescript/lib/lib.es2024.d.ts",
   "node_modules/@types/node/index.d.ts",
+  "node_modules/esbuild/package.json",
+  "node_modules/esbuild/lib/main.js",
   "scripts/build-cli.mjs",
   "scripts/build-cli-executable.mjs",
   "scripts/build-cli-bin.mjs",
   "scripts/build-identity.mjs",
   "scripts/build-manifest.mjs",
+  "scripts/build/bundle.mjs",
+  "scripts/build/exports.mjs",
+  "scripts/build/transaction.mjs",
   "scripts/start-lib.mjs",
   "scripts/start.mjs",
 ];
@@ -94,15 +99,20 @@ export function listCompilerFiles(root) {
 }
 
 export function buildInputDigest(root, compilerInputs = []) {
+  if (process.env.ESBUILD_BINARY_PATH) throw new Error("A custom esbuild binary cannot be used for a verified build.");
   const rootPath = path.resolve(root);
   const sourceRoot = path.join(root, "packages/ts-shell/src");
   const typeScriptLib = path.join(root, "node_modules/typescript/lib");
   const typesRoot = path.join(root, "node_modules/@types");
-  for (const directory of [sourceRoot, typeScriptLib, typesRoot]) assertNoSymlinkPath(rootPath, directory);
+  const bundlerRoot = path.join(root, "node_modules/@esbuild");
+  const bundlerLib = path.join(root, "node_modules/esbuild/lib");
+  for (const directory of [sourceRoot, typeScriptLib, typesRoot, bundlerRoot, bundlerLib]) assertNoSymlinkPath(rootPath, directory);
   const sources = filesUnder(sourceRoot, file => SOURCE_EXTENSIONS.has(path.extname(file)));
   const compilerFiles = [
     ...filesUnder(typeScriptLib, file => file.endsWith(".d.ts")),
     ...filesUnder(typesRoot),
+    ...filesUnder(bundlerRoot),
+    ...filesUnder(bundlerLib),
   ];
   const inputs = REQUIRED_BUILD_INPUTS.map(file => path.join(root, file));
   for (const file of inputs) {

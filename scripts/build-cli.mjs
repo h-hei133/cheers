@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertNoSymlinkPath, buildInputDigest, listCompilerFiles } from "./build-identity.mjs";
+import { assertNoSymlinkPath, buildInputDigest, listCompilerFiles, REQUIRED_BUILD_ASSETS } from "./build-identity.mjs";
 import { restoreCliLauncher, writeCliLauncher } from "./build-cli-bin.mjs";
 import { acquireBuildLock, publishBuild } from "./build-manifest.mjs";
+import { packageEntries, PUBLIC_RECORD } from "./build/exports.mjs";
 
 const SCRIPT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD_MODE = "production";
@@ -22,10 +23,24 @@ export function compileTypeScript({ root, staging }) {
   const result = spawnSync(process.execPath, [
     path.join(root, "node_modules/typescript/bin/tsc"),
     "-p", path.join(root, "packages/ts-shell/tsconfig.build.json"),
-    "--outDir", staging,
+    "--outDir", path.join(staging, "types"),
+    "--declaration", "--emitDeclarationOnly",
   ], { cwd: root, stdio: "inherit" });
   if (result.error) throw new BuildError(result.error.message, 1);
   if (result.status !== 0) throw new BuildError(`TypeScript build failed with exit ${result.status ?? "unknown"}.`, result.status || 1);
+}
+
+async function compileModules(options) {
+  const entries = packageEntries(options.root);
+  compileTypeScript(options);
+  const { bundleModules } = await import("./build/bundle.mjs");
+  const record = await bundleModules({ ...options, entries });
+  for (const asset of REQUIRED_BUILD_ASSETS) {
+    const target = path.join(options.staging, "types", asset);
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(path.join(options.staging, asset), target);
+  }
+  writeFileSync(path.join(options.staging, PUBLIC_RECORD), `${JSON.stringify({ schemaVersion: 1, ...record })}\n`);
 }
 
 export async function buildCli({
@@ -36,7 +51,7 @@ export async function buildCli({
   mode = BUILD_MODE,
   inputsDigest = buildInputDigest,
   listInputs = listCompilerFiles,
-  compile = compileTypeScript,
+  compile = compileModules,
   replaceLauncher = writeCliLauncher,
   restoreLauncher = restoreCliLauncher,
   publish = publishBuild,
@@ -60,7 +75,7 @@ export async function buildCli({
     const beforeCompilerInputs = listInputs(root);
     const before = inputsDigest(root, beforeCompilerInputs);
     mkdirSync(staging, { recursive: true });
-    await compile({ root, staging });
+    await compile({ root, staging, version: buildVersion, name: buildName });
     const afterCompilerInputs = listInputs(root);
     if (JSON.stringify(afterCompilerInputs) !== JSON.stringify(beforeCompilerInputs)) {
       throw new BuildError("Compiler inputs changed during compilation; the previous build was kept.");

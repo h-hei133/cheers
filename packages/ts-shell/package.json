@@ -5,25 +5,84 @@
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./core/agent": "./dist/core/agent/loop.js",
-    "./core/models": "./dist/core/models/catalog.js",
-    "./core/models/virtual": "./dist/core/models/virtualModels.js",
-    "./core/tools": "./dist/core/tools/registry.js",
-    "./core/tools/codemode": "./dist/core/tools/codemode/tool.js",
-    "./provider/endpoints": "./dist/provider/endpoints/index.js",
-    "./rpc": "./dist/cli/rpc/rpcServer.js",
-    "./extensions": "./dist/extensions/service.js",
-    "./session/export": "./dist/session/export/html.js",
-    "./browser": "./dist/browser/playwrightRuntime.js",
-    "./desktop": "./dist/desktop/tool.js",
-    "./media": "./dist/runtime/execution/media/index.js",
-    "./collaboration": "./dist/cli/collaboration/control.js",
-    "./planning": "./dist/cli/runtime/planning.js"
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./core/agent": {
+      "types": "./dist/types/core/agent/loop.d.ts",
+      "import": "./dist/core/agent/loop.js",
+      "default": "./dist/core/agent/loop.js"
+    },
+    "./core/models": {
+      "types": "./dist/types/core/models/catalog.d.ts",
+      "import": "./dist/core/models/catalog.js",
+      "default": "./dist/core/models/catalog.js"
+    },
+    "./core/models/virtual": {
+      "types": "./dist/types/core/models/virtualModels.d.ts",
+      "import": "./dist/core/models/virtualModels.js",
+      "default": "./dist/core/models/virtualModels.js"
+    },
+    "./core/tools": {
+      "types": "./dist/types/core/tools/registry.d.ts",
+      "import": "./dist/core/tools/registry.js",
+      "default": "./dist/core/tools/registry.js"
+    },
+    "./core/tools/codemode": {
+      "types": "./dist/types/core/tools/codemode/tool.d.ts",
+      "import": "./dist/core/tools/codemode/tool.js",
+      "default": "./dist/core/tools/codemode/tool.js"
+    },
+    "./provider/endpoints": {
+      "types": "./dist/types/provider/endpoints/index.d.ts",
+      "import": "./dist/provider/endpoints/index.js",
+      "default": "./dist/provider/endpoints/index.js"
+    },
+    "./rpc": {
+      "types": "./dist/types/cli/rpc/rpcServer.d.ts",
+      "import": "./dist/cli/rpc/rpcServer.js",
+      "default": "./dist/cli/rpc/rpcServer.js"
+    },
+    "./extensions": {
+      "types": "./dist/types/extensions/service.d.ts",
+      "import": "./dist/extensions/service.js",
+      "default": "./dist/extensions/service.js"
+    },
+    "./session/export": {
+      "types": "./dist/types/session/export/html.d.ts",
+      "import": "./dist/session/export/html.js",
+      "default": "./dist/session/export/html.js"
+    },
+    "./browser": {
+      "types": "./dist/types/browser/playwrightRuntime.d.ts",
+      "import": "./dist/browser/playwrightRuntime.js",
+      "default": "./dist/browser/playwrightRuntime.js"
+    },
+    "./desktop": {
+      "types": "./dist/types/desktop/tool.d.ts",
+      "import": "./dist/desktop/tool.js",
+      "default": "./dist/desktop/tool.js"
+    },
+    "./media": {
+      "types": "./dist/types/runtime/execution/media/index.d.ts",
+      "import": "./dist/runtime/execution/media/index.js",
+      "default": "./dist/runtime/execution/media/index.js"
+    },
+    "./collaboration": {
+      "types": "./dist/types/cli/collaboration/control.d.ts",
+      "import": "./dist/cli/collaboration/control.js",
+      "default": "./dist/cli/collaboration/control.js"
+    },
+    "./planning": {
+      "types": "./dist/types/cli/runtime/planning.d.ts",
+      "import": "./dist/cli/runtime/planning.js",
+      "default": "./dist/cli/runtime/planning.js"
+    }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "scripts": {
     "build": "node ../../scripts/build-cli.mjs",
@@ -35,6 +94,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.31.0",
+    "@types/node": "20.19.43",
+    "@types/ws": "8.18.1",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "gpt-tokenizer": "4.1.0",
@@ -47,15 +108,16 @@
     "saxes": "6.0.0",
     "tar": "7.5.14",
     "typescript": "^5.2.0",
-    "undici": "^7.18.2",
+    "undici": "6.29.1",
     "which": "4.0.0",
     "ws": "8.22.0"
   },
   "devDependencies": {
     "@types/picomatch": "^4.0.3",
     "@types/which": "3.0.4",
-    "@types/ws": "8.18.1",
     "tsx": "^4.0.0",
-    "vitest": "^0.34.0"
-  }
+    "vite": "6.4.6",
+    "vitest": "3.2.7"
+  },
+  "types": "./dist/types/index.d.ts"
 }

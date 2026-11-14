@@ -16,7 +16,9 @@ import {
 import { compilerTemporaryPath, isHostTarget, resolveExecutableOutput } from "./build-cli-executable.mjs";
 import { buildCli, compileTypeScript } from "./build-cli.mjs";
 import { LAUNCHER_CONTENT, writeCliLauncher } from "./build-cli-bin.mjs";
-import { buildInputDigest, listCompilerFiles, REQUIRED_BUILD_ASSETS, REQUIRED_PACKAGE_MAIN } from "./build-identity.mjs";
+import { buildInputDigest, listCompilerFiles, REQUIRED_BUILD_ASSETS, REQUIRED_BUILD_INPUTS, REQUIRED_PACKAGE_MAIN } from "./build-identity.mjs";
+import { bindingName, publicFiles } from "./build/exports.mjs";
+import { capturePublicFiles } from "./build/transaction.mjs";
 import { checkBuild, launchArgs } from "./start-lib.mjs";
 
 function write(file, value) {
@@ -26,6 +28,10 @@ function write(file, value) {
 
 function writeStaging(staging, entry = "// built\n") {
   write(path.join(staging, "index.js"), "export const value = 1;\n");
+  write(path.join(staging, "types/index.d.ts"), "export declare const value: number;\n");
+  write(path.join(staging, "public.js"), `export { value as ${bindingName(".", "value")} } from "./index.js";\n`);
+  write(path.join(staging, "public.json"), JSON.stringify({ schemaVersion: 1,
+    entries: [{ specifier: ".", path: "index.js", types: "types/index.d.ts", names: ["value"] }] }));
   write(path.join(staging, "entrypoints/cli.js"), entry);
   for (const asset of ["dark", "dark-contrast", "light", "light-contrast", "schema"]) {
     write(path.join(staging, `presentation/themes/${asset}.json`), "{}\n");
@@ -81,27 +87,11 @@ function fixture(version = "1.0.0") {
   const root = mkdtempSync(path.join(os.tmpdir(), "cheers-start-"));
   const dist = path.join(root, "packages/ts-shell/dist");
   const staging = path.join(dist, ".staging");
-  const inputs = [
-    "package.json",
-    "package-lock.json",
-    "packages/ts-shell/package.json",
-    "packages/ts-shell/tsconfig.json",
-    "packages/ts-shell/tsconfig.build.json",
-    "node_modules/typescript/package.json",
-    "node_modules/typescript/bin/tsc",
-    "node_modules/typescript/lib/tsc.js",
-    "node_modules/typescript/lib/_tsc.js",
-    "node_modules/typescript/lib/lib.es2024.d.ts",
-    "node_modules/@types/node/index.d.ts",
-    "scripts/build-cli.mjs",
-    "scripts/build-cli-executable.mjs",
-    "scripts/build-cli-bin.mjs",
-    "scripts/build-identity.mjs",
-    "scripts/build-manifest.mjs",
-    "scripts/start-lib.mjs",
-    "scripts/start.mjs",
-  ];
-  for (const file of inputs) write(path.join(root, file), `fixture ${file}\n`);
+  for (const file of REQUIRED_BUILD_INPUTS) write(path.join(root, file), `fixture ${file}\n`);
+  write(path.join(root, "package.json"), '{"type":"module"}\n');
+  write(path.join(root, "packages/ts-shell/package.json"), JSON.stringify({ name: "@cheers/build-fixture", type: "module", version,
+    main: "./dist/index.js", types: "./dist/types/index.d.ts", files: ["dist"],
+    exports: { ".": { types: "./dist/types/index.d.ts", import: "./dist/index.js", default: "./dist/index.js" } } }));
   write(path.join(root, "packages/ts-shell/src/index.ts"), "export const value = 1;\n");
   write(path.join(root, "dist/cli.js"), "// launcher\n");
   write(path.join(dist, "stale.js"), "stale\n");
@@ -123,7 +113,7 @@ test("accepts a complete immutable build and returns its contained entry", async
   assert.equal(result.state, "fresh");
   assert.equal(result.ok, true);
   assert.match(result.entry, new RegExp(`builds/${value.manifest.buildId}/entrypoints/cli\\.js$`));
-  assert.equal(existsSync(path.join(value.dist, "stale.js")), false);
+  assert.equal(readFileSync(path.join(value.dist, "stale.js"), "utf8"), "stale\n");
   rmSync(value.root, { recursive: true, force: true });
 });
 
@@ -603,6 +593,117 @@ test("does not recover a transaction while its build lock is active", async () =
   assert.equal(existsSync(path.join(value.dist, PUBLISH_JOURNAL)), true);
   assert.equal(existsSync(path.join(value.dist, PACKAGE_MAIN_BACKUP)), true);
   rmSync(value.root, { recursive: true, force: true });
+});
+
+test("publishes native subpath imports with shared identity, default and live bindings", async () => {
+  const value = fixture();
+  try {
+    const pkgFile = path.join(value.root, "packages/ts-shell/package.json");
+    const pkg = JSON.parse(readFileSync(pkgFile, "utf8"));
+    pkg.exports["./state"] = { types: "./dist/types/core/state.d.ts", import: "./dist/core/state.js", default: "./dist/core/state.js" };
+    write(pkgFile, JSON.stringify(pkg));
+    const entries = [
+      { specifier: ".", path: "index.js", types: "types/index.d.ts", names: ["increment", "owner", "value"] },
+      { specifier: "./state", path: "core/state.js", types: "types/core/state.d.ts", names: ["default", "increment", "owner", "value"] },
+    ];
+    write(path.join(value.staging, "chunks/state.js"), "export const owner = {}; export let value = 0; export function increment() { value++; }\n");
+    write(path.join(value.staging, "index.js"), 'export { owner, value, increment } from "./chunks/state.js";\n');
+    write(path.join(value.staging, "core/state.js"), 'export { owner as default, owner, value, increment } from "../chunks/state.js";\n');
+    write(path.join(value.staging, "types/core/state.d.ts"), "export declare const owner: object; export default owner;\n");
+    write(path.join(value.staging, "public.json"), JSON.stringify({ schemaVersion: 1, entries }));
+    write(path.join(value.staging, "public.js"), entries.map(entry =>
+      `export { ${entry.names.map(name => `${JSON.stringify(name)} as ${bindingName(entry.specifier, name)}`).join(", ")} } from ${JSON.stringify(`./${entry.path}`)};\n`).join(""));
+    const manifest = await publishBuild({ ...value, inputsDigest: buildInputDigest(value.root).digest, mode: "production" });
+    const probe = path.join(value.root, "packages/ts-shell/probe.mjs");
+    write(probe, `import assert from 'node:assert/strict';
+import * as root from '@cheers/build-fixture';
+import defaultOwner, * as state from '@cheers/build-fixture/state';
+assert.deepEqual(Object.keys(root), ['increment','owner','value']);
+assert.equal(root.owner, state.owner);
+assert.equal(defaultOwner, root.owner);
+state.increment();
+assert.equal(root.value, 1);
+root.increment();
+assert.equal(state.value, 2);
+`);
+    const result = spawnSync(process.execPath, [probe], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(checkBuild({ ...value }).state, "fresh");
+    write(path.join(value.dist, "core/state.js"), "export const owner = {};\n");
+    assert.equal(checkBuild({ ...value }).state, "package-exports-mismatch");
+    for (const file of publicFiles(manifest.buildId, entries)) write(path.join(value.dist, file.path), file.content);
+    write(path.join(value.dist, "current.js"), 'export * from "./missing.js";\n');
+    assert.equal(checkBuild({ ...value }).state, "package-exports-mismatch");
+  } finally {
+    rmSync(value.root, { recursive: true, force: true });
+  }
+});
+
+test("recovers every public file, original mode and prior absence from the journal", async () => {
+  const value = await buildFixture();
+  try {
+    const files = publicFiles(value.manifest.buildId, value.manifest.publicApi.entries);
+    files.push({ path: "future/index.js", content: "export {};\n" });
+    chmodSync(path.join(value.dist, "current.js"), 0o640);
+    const previous = capturePublicFiles(value.root, value.dist, files);
+    write(path.join(value.dist, PUBLISH_JOURNAL), JSON.stringify({ schemaVersion: 2, targetBuildId: "f".repeat(64), files: previous }));
+    for (const file of files) write(path.join(value.dist, file.path), "changed\n");
+    assert.equal(recoverBuildTransaction(value.root, value.dist), true);
+    assert.equal(checkBuild({ ...value }).state, "fresh");
+    assert.equal(statSync(path.join(value.dist, "current.js")).mode & 0o777, 0o640);
+    assert.equal(existsSync(path.join(value.dist, "future/index.js")), false);
+  } finally {
+    rmSync(value.root, { recursive: true, force: true });
+  }
+});
+
+test("rejects a forged recovery path before changing any public file", async () => {
+  const value = await buildFixture();
+  try {
+    const file = path.join(value.dist, "current.js");
+    const before = readFileSync(file, "utf8");
+    write(path.join(value.dist, PUBLISH_JOURNAL), JSON.stringify({ schemaVersion: 2, targetBuildId: "f".repeat(64), files: [
+      { path: "current.js", previous: Buffer.from("replaced").toString("base64"), mode: 0o644 },
+      { path: "../outside.js", previous: null, mode: 0o644 },
+    ] }));
+    assert.throws(() => recoverBuildTransaction(value.root, value.dist), /Invalid public-entry journal/);
+    assert.equal(readFileSync(file, "utf8"), before);
+    assert.equal(existsSync(path.join(value.dist, PUBLISH_JOURNAL)), true);
+  } finally {
+    rmSync(value.root, { recursive: true, force: true });
+  }
+});
+
+test("packing includes only the selected generation and declared public files", async () => {
+  const value = await buildFixture();
+  try {
+    const older = "f".repeat(64);
+    write(path.join(value.dist, "builds", older, "obsolete.js"), "export const old = true;\n");
+    write(path.join(value.dist, ".staging-unfinished", "private.js"), "throw new Error('not published');\n");
+    write(path.join(value.dist, "types/private.d.ts"), "export declare const old: true;\n");
+    const destination = path.join(value.root, "pack");
+    mkdirSync(destination);
+    const result = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm",
+      ["pack", "--json", "--ignore-scripts", "--pack-destination", destination], {
+        cwd: path.join(value.root, "packages/ts-shell"), encoding: "utf8", timeout: 20_000,
+      });
+    assert.equal(result.status, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    const [packed] = Array.isArray(parsed) ? parsed : Object.values(parsed);
+    const files = new Set(packed.files.map(file => file.path));
+    assert.equal(files.has("dist/index.js"), true);
+    assert.equal(files.has("dist/current.js"), true);
+    assert.equal(files.has("dist/types/index.d.ts"), true);
+    assert.equal(files.has(`dist/builds/${value.manifest.buildId}/public.js`), true);
+    assert.equal(files.has(`dist/builds/${value.manifest.buildId}/types/index.d.ts`), true);
+    assert.equal(files.has(`dist/builds/${older}/obsolete.js`), false);
+    assert.equal(files.has("dist/.staging-unfinished/private.js"), false);
+    assert.equal(files.has("dist/stale.js"), false);
+    assert.equal(files.has("dist/types/private.d.ts"), false);
+    assert.equal(files.has("src/index.ts"), false);
+  } finally {
+    rmSync(value.root, { recursive: true, force: true });
+  }
 });
 
 test("fails closed on a stale build lock without changing the transaction", async () => {

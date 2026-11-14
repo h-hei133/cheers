@@ -162,7 +162,6 @@ describe("shell session runtime idle barrier", () => {
       renderer: silentRenderer(),
       runPrompt: async function* () {
         throw new Error("provider down");
-        yield completedEvent("sess_fail", "hi");
       },
     });
 

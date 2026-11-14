@@ -5,7 +5,8 @@
     "outDir": "./dist",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "declaration": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
     "sourceMap": false,
     "strict": true
   },

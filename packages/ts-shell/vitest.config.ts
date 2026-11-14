@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    pool: 'forks',
+    minWorkers: 1,
+    maxWorkers: 1,
+    fileParallelism: false,
     // Browser and CLI scenario suites spawn real child processes and take 8-16s
     // on their own; the 5s default turns them into load-dependent flakes when the
     // suite runs concurrently. A hang still fails, just later.

@@ -5,9 +5,33 @@ import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { runTests } from './support/contract.mjs'
+import { runTests, verifyContractReport } from './support/contract.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+test('the installed runner executes isolated assertions serially and emits the admitted JSON report', { timeout: 30000 }, async () => {
+  const base = path.join(repoRoot, '.tmp')
+  fs.mkdirSync(base, { recursive: true })
+  const root = fs.mkdtempSync(path.join(base, 'contract-runner-'))
+  const home = path.join(root, 'home'), tmp = path.join(root, 'tmp')
+  fs.mkdirSync(home); fs.mkdirSync(tmp)
+  const file = path.join(root, 'runner.test.ts')
+  const report = path.join(root, 'report.json')
+  fs.writeFileSync(file, `import { it, expect } from 'vitest';
+it('executes the real runner', () => { expect(2 + 3).toBe(5); });\n`)
+  fs.writeFileSync(path.join(root, 'vitest.config.mjs'), 'export default { test: { environment: "node" } };\n')
+  try {
+    const result = await runTests(path.join(repoRoot, 'node_modules/vitest/vitest.mjs'), report,
+      { PATH: process.env.PATH, HOME: home, USERPROFILE: home, TMPDIR: tmp, CHEERS_TEST_ROOT: root,
+        CHEERS_PROVIDER_MODE: 'synthetic', GIT_CEILING_DIRECTORIES: root }, [file], root, 20000)
+    assert.equal(result.code, 0, result.output.toString())
+    assert.equal(result.timedOut, false)
+    assert.equal(result.cleanupUnconfirmed, false)
+    const parsed = JSON.parse(fs.readFileSync(report, 'utf8'))
+    verifyContractReport(parsed, [file], [{ file, title: 'executes the real runner', count: 1 }])
+    assert.equal(parsed.numPassedTests, 1)
+  } finally { fs.rmSync(root, { recursive: true, force: true }) }
+})
 
 async function stopped(pid) {
   for (let attempt = 0; attempt < 40; attempt++) {
