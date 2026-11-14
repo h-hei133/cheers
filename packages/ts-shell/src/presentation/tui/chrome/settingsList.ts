@@ -8,7 +8,7 @@ import { defaultTheme } from "../../theme/theme.js";
 import { SingleLineInput } from "./overlayWidgets.js";
 
 /**
- * Composable SettingsList OverlayComponent (adopted from Pi `settings-list.ts`).
+ * Composable settings overlay.
  *
  * Supports inline Enter/Space value cycling, live fuzzy search, and nested
  * submenu navigation with cursor restoration.

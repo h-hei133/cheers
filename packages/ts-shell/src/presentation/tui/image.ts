@@ -40,7 +40,6 @@ export function detectImageProtocol(env: NodeJS.ProcessEnv = process.env): Image
   const term = (env.TERM ?? "").toLowerCase();
   const program = (env.TERM_PROGRAM ?? "").toLowerCase();
   // A multiplexer redraws its own screen and strips graphics it did not emit;
-  // pi reaches the same verdict and we keep it.
   if (env.TMUX !== undefined || term.startsWith("tmux") || term.startsWith("screen")) {
     return undefined;
   }

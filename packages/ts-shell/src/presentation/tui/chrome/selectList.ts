@@ -7,7 +7,7 @@ import { fuzzyFilter } from "../text/search.js";
 import { defaultTheme } from "../../theme/theme.js";
 
 /**
- * Reusable themed SelectList OverlayComponent (adopted from Pi `select-list.ts`).
+ * Reusable themed selection overlay.
  */
 
 export interface SelectListItem {

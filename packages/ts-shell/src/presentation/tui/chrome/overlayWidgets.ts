@@ -5,7 +5,7 @@ import { graphemeBoundaries, sliceWithWidth, visibleWidth } from "../text/measur
 import { defaultTheme } from "../../theme/theme.js";
 
 /**
- * Lightweight Pi-style OverlayComponents: SingleLineInput, CancellableLoader,
+ * Composable terminal overlays: SingleLineInput, CancellableLoader,
  * and bordered overlay frame helpers.
  */
 

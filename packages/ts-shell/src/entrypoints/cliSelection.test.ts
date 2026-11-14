@@ -31,7 +31,7 @@ afterEach(() => {
   }
 });
 
-describe("Track 2 runtime wiring", () => {
+describe("CLI model and session selection", () => {
   it("lists and fuzzy-filters catalog models for --list-models", () => {
     const table = formatCliModelList("gpt");
     expect(table).toContain("provider");
@@ -40,7 +40,7 @@ describe("Track 2 runtime wiring", () => {
   });
 
   it("resolves provider/model:thinking shorthand and --thinking override", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-t2-model-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-selection-model-"));
     tempRoots.push(root);
     const config = getRuntimeConfig(root);
     const resolved = resolveCliCredential(
@@ -61,8 +61,8 @@ describe("Track 2 runtime wiring", () => {
   });
 
   it("forks an existing session on bootstrap (--fork) and exports HTML (--export)", async () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-t2-home-"));
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-t2-work-"));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-selection-home-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-selection-work-"));
     tempRoots.push(home, root);
     process.env.HOME = home;
     process.env.USERPROFILE = home;
@@ -134,7 +134,7 @@ describe("Track 2 runtime wiring", () => {
       }),
     ).toThrow();
   });
-  it("treats interactive Track 2 flags as startup-eligible and excludes --list-models/--export", () => {
+  it("treats interactive selection flags as startup-eligible and excludes --list-models/--export", () => {
     expect(startupEligible(["-c", "--model", "gpt-5.4", "--no-tools"], true)).toBe(true);
     expect(startupEligible(["--list-models"], true)).toBe(false);
     expect(startupEligible(["--export", "s1"], true)).toBe(false);

@@ -11,7 +11,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("Pi fuzzyMatch and fuzzyFilter", () => {
+describe("Terminal fuzzy matching", () => {
   it("supports multi-token queries, contiguous preference, and alphanumeric swaps", () => {
     expect(fuzzyMatch("4o", "gpt-o4-mini").matches).toBe(true);
     expect(fuzzyMatch("o4", "gpt-4o").matches).toBe(true);

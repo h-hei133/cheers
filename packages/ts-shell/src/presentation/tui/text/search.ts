@@ -1,5 +1,5 @@
 /**
- * Multi-token alphanumeric fuzzy matching (adopted from Pi `packages/tui/src/fuzzy.ts`)
+ * Multi-token alphanumeric fuzzy matching
  * alongside literal-priority ranking for command/option completion.
  *
  * Lower `FuzzyMatch.score` = better match; higher `matchRank` = better match.

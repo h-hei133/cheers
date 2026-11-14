@@ -502,7 +502,7 @@ describe('--config ordered inputs', () => {
   });
 });
 
-describe("Track 2 CLI flags", () => {
+describe("model, session, extension, and output flags", () => {
   it("parses --model, --models, --thinking, --no-tools, -e, -c, -r, --export, --list-models", () => {
     const parsed = expectParsed([
       "--model", "anthropic/claude-opus-4-6:high",
