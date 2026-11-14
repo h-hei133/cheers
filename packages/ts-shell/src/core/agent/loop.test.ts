@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AgentLifecycleEvent } from "./events.js";
 import type { AssistantStep } from "./loop.js";
 import { runAgentLoop, runAgentLoopContinue } from "./loop.js";
-import type { AgentMessage } from "./state.js";
+import type { AgentMessage, StandardAgentMessage } from "./state.js";
 import type { AgentTool, AgentToolCall } from "./tools.js";
 
 function collect() {
@@ -54,6 +54,27 @@ function readTool(): AgentTool {
     }),
   };
 }
+
+const requestMarker: StandardAgentMessage = { id: 'declaration', role: 'system', content: '', requestDeclaration: { version: 1,
+  target: { provider: 'fixture', model: 'model', endpoint: 'anthropic', replayBinding: 'a'.repeat(64) }, tools: [] } };
+
+it('refuses continuation from an assistant followed only by request declarations', async () => {
+  const { emit } = collect();
+  await expect(runAgentLoopContinue([{ role: 'assistant', content: 'done' }, requestMarker],
+    { streamStep: async () => textStep('unused') }, emit, undefined)).rejects.toThrow('Cannot continue from message role: assistant');
+  await expect(runAgentLoopContinue([requestMarker], { streamStep: async () => textStep('unused') },
+    emit, undefined)).rejects.toThrow('Cannot continue: no messages in context');
+});
+
+it('keeps declaration entries while finding a continued request reason', async () => {
+  const reasons: string[] = [];
+  const { emit } = collect();
+  await runAgentLoopContinue([userMessage('Continue'), requestMarker], {
+    prepareRequest: input => { reasons.push(input.reason); return undefined; },
+    streamStep: async messages => { expect(messages.at(-1)?.id).toBe(requestMarker.id); return textStep('done'); },
+  }, emit, undefined);
+  expect(reasons).toEqual(['user']);
+});
 
 describe("runAgentLoop", () => {
   it("runs a text-only turn through the full lifecycle", async () => {

@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { AgentCore } from "./agent.js";
 import type { AgentLifecycleEvent } from "./events.js";
 import type { AssistantStep } from "./loop.js";
-import type { AgentMessage } from "./state.js";
+import type { AgentMessage, StandardAgentMessage } from "./state.js";
+
+const requestMarker: StandardAgentMessage = { id: 'declaration', role: 'system', content: '', requestDeclaration: { version: 1,
+  target: { provider: 'fixture', model: 'model', endpoint: 'anthropic', replayBinding: 'a'.repeat(64) }, tools: [] } };
 
 function collect() {
   const events: AgentLifecycleEvent[] = [];
@@ -27,6 +30,21 @@ async function settle(): Promise<void> {
 }
 
 describe("AgentCore prompt", () => {
+  it('uses the last dialogue message for continuation behind a declaration tail', async () => {
+    const core = new AgentCore({ initialState: { messages: [{ role: 'assistant', content: 'done' }, requestMarker] },
+      streamStep: async () => answer('resumed') });
+    await expect(core.continue()).rejects.toThrow('Cannot continue from message role: assistant');
+    core.followUp(userMessage('Next task'));
+    await core.continue();
+    expect(core.state.messages.at(-1)?.content).toBe('resumed');
+    expect(core.state.messages.filter(message => message.requestDeclaration)).toEqual([requestMarker]);
+  });
+
+  it('refuses a declaration-only context as having no actionable messages', async () => {
+    const core = new AgentCore({ initialState: { messages: [requestMarker] }, streamStep: async () => answer('unused') });
+    await expect(core.continue()).rejects.toThrow('Cannot continue: no messages in context');
+  });
+
   it("runs the full lifecycle and settles the state", async () => {
     const { events, listener } = collect();
     const core = new AgentCore({

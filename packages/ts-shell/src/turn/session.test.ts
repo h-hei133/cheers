@@ -362,6 +362,11 @@ describe("runTurn", () => {
     ];
     expect(requestPurposeFor(search)).toBe("discovery-search");
     expect(requestPurposeFor(load)).toBe("discovery-load");
+    const marker: SessionMessage = { id: 'declaration', role: 'system', content: '', requestDeclaration: { version: 1,
+      target: { provider: 'fixture', model: 'model', endpoint: 'anthropic', replayBinding: 'a'.repeat(64) }, tools: [] } };
+    expect(requestPurposeFor([...search, marker])).toBe('discovery-search');
+    expect(requestPurposeFor([load[0]!, marker, load[1]!, marker])).toBe('discovery-load');
+    expect(requestPurposeFor([...load, { role: 'system', content: 'Ordinary repair instruction' }, marker])).toBe('turn');
     expect(requestPurposeFor([{ role: "user", content: "loaded" }])).toBe("turn");
   });
 

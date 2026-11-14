@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.2/B2.2/B2.3、D.2/D.3/D.5、E.2已完成所述本地验收；继续终端与运行时。
-**Active batch**: 普通请求完整准备已提交`58e3e5b`，C.6数据／持久化已提交`078d28f`。协议／转换边界批通过六静态门、13套件337项、build `2a1feaebbaa4`、函数上限和限定独立复核。按用户要求先提交该批，再接发送前发布及独立压缩保留批，保持各owner可验收和小工作区。C.3、C.6均保留部分，等待完整联合验收。
+**Active batch**: 普通请求完整准备已提交`58e3e5b`，C.6数据／持久化已提交`078d28f`，协议／转换边界已提交`9f1aa023`。发送前发布批已通过六静态门、18套件346项、build `c29d540a73fa`和函数上限；独立复审发现的published reframe遗漏字段保留问题已修复并通过对照断言。按用户要求先本地提交本批，再接独立压缩保留批。C.3、C.6均保留部分，等待稳定压缩声明及完整Linux联合验收。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -81,3 +81,4 @@
 | 2026-11-15 | 普通请求完整capture：不再用选择模型的早期policy压缩实际路由请求；实际小窗口完整system开销、candidate raw归属及goal closing/provider分离通过。独立复审的大→小effort fallback和refresh通知两反例先红后修；每次有效准备通知bare capture，原live fence继续约束重试/发送。六静态门、16套件356项、build `c7e760063e80`通过，限定复核CLEAR。当前编译SDK配置模型6次bodySent、普通自动压缩持久commit及重开通过。首次原生过小window、55s多段摘要截止和不存在的内部字段为探针失败，保留回执；最终只调fixture历史/窗口/时限，未修改生产边界。工具发现两夹具在独立HEAD同样失败，显式full模式单独提交`dae1b97`。实际M，额外依赖1（latest capture通知），单一owner/无新循环；16项验收数不变，C.6继续开项。 |
 | 2026-11-15 | C.6数据／持久化首批：完整版本化工具／target／mapped effort和空文本system载体，strict inert JSON及append-first，双向codec保留字段／ID／顺序。公开write边界三红例已修复；六静态门、5套件93项、build `cd08cabeb2bf`通过，限定独立复核CLEAR。初次两夹具失败为旧createNew对象，调整当前loaded观察后仍保留独立reopen／fork；错误npm筛选启动不计红。实际L，额外依赖1（公开append入口）；C.6协议／发送／压缩保留待下一批，16项不变。 |
 | 2026-11-15 | C.6协议／转换边界：native相邻schema/effort增量固定在原marker，首个同target epoch为baseline、返回target重新开段；转换保留显式marker身份／顺序，无法保留则拒绝。真实outgoing的empty assistant/工具配对及capture前undefined两缺口补反例修复。7/8协议红例与9/15 carrier红例、复核2failed/1passed已保留；最终六静态门、13套件337项、build `2a1feaebbaa4`、函数上限通过，限定独立复核CLEAR。首轮未知Google endpoint名和OpenAI额外system字段是夹具错误，改实际端点及与无marker原body对比，不更改协议。实际L，额外依赖2（复用capture和真实配对）；发送／压缩保留仍未实现，16项不变。 |
+| 2026-11-15 | C.6发送前发布：committed source与prospective marker分离，raw路由后生成完整runtime tools／mapped effort再转换；候选和refresh不写历史。原dispatch边界同步onMessage成功后窄append live，取消或漂移零派发，原attempt confirmUnsent；HTTP retry复用同capture，effort fallback记录实际新声明。closing撤权不写runtime removal，goal summary排除未发布marker；promote通知bare capture供overflow recovery。原两红例修复，新增7项真实边界及owner/wrapper集成通过；六静态门、18套件346项、build `c29d540a73fa`和函数上限0超限。首轮空cache误判／prototype复用差异、build类型收窄和复审published reframe差异已修复，失败回执保留。实际L，额外依赖2（窄append与native wrapper转换复用）；压缩spine及真实provider联合验收仍开，16项不变。 |

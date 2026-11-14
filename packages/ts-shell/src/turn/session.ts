@@ -8,7 +8,7 @@ import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import type { AgentLoopConfig } from "../core/agent/loop.js";
-import { captureContext, sameContext, type RequestContextOwner } from '../core/agent/context.js';
+import { captureContext, lastContextMessageIndex, sameContext, type RequestContextOwner } from '../core/agent/context.js';
 import type { PreparedTurnContext } from './context/contract.js';
 import {
   condenseContext,
@@ -346,7 +346,8 @@ export function runTurn(options: TurnOptions): TurnRun {
    */
   const recoverOverflow = async (): Promise<boolean> => {
     const messages = core.state.messages;
-    const last = messages[messages.length - 1];
+    const lastIndex = lastContextMessageIndex(messages);
+    const last = messages[lastIndex];
     if (!last || last.role !== "assistant" || !isOverflowFailure(last) || !options.compaction
       || options.compaction.policy.enabled === false) return false;
     if (overflowRecovered) return false;
@@ -355,7 +356,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     // somewhere the scheduled path would not have. It runs without the
     // threshold check standing in the way: the provider already refused the
     // request, so the context is over budget by definition, not by estimate.
-    const kept = messages.slice(0, -1);
+    const kept = [...messages.slice(0, lastIndex), ...messages.slice(lastIndex + 1)];
     if (preparedRequest || options.convertToLlm || kept.some(message => message.role === 'custom')) {
       const prior = preparedRequest;
       if (!prior?.context.eligible || !compaction || !sameContext(kept, prior.prepared.sourceMessages)) return false;

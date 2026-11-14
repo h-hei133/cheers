@@ -70,6 +70,8 @@ export interface StepOptions {
   readonly prepareContext?: (prepared: PreparedTurnContext, signal?: AbortSignal) => Promise<PreparedTurnContext | undefined>;
   /** Observe each effective capture, including declaration refresh and native retry preparation. */
   readonly onPreparedContext?: (prepared: PreparedTurnContext) => void;
+  /** Persist and admit a declaration synchronously at the existing dispatch boundary. */
+  readonly onDeclaration?: (message: StandardAgentMessage, projection: MessageProjection) => void;
   /** Detached source retains agent history identity across application projection. */
   readonly sourceMessages?: readonly AgentMessage[];
   readonly providerMessages?: readonly ChatMessage[];
@@ -157,6 +159,10 @@ export interface PreparedTurnContext {
   readonly requestPurpose: string;
   readonly agentMode?: 'plan' | 'build';
   readonly sourceMessages: readonly AgentMessage[];
+  /** The complete raw input that conversion and request budgeting have seen. */
+  readonly prospectiveMessages: readonly AgentMessage[];
+  /** Preparation keeps this out of committed history until dispatch admission. */
+  readonly pendingDeclaration?: StandardAgentMessage;
   readonly messageProjection: MessageProjection;
   readonly finalMessages: readonly ChatMessage[];
   readonly budgetMessages: readonly StandardAgentMessage[];
@@ -199,6 +205,8 @@ export interface PreparedTurnContext {
   reframe(options: Pick<StepOptions, 'allowTools' | 'allowedTools' | 'agentMode' | 'requestPurpose'>, signal?: AbortSignal): Promise<PreparedTurnContext>;
   /** Routes raw candidate history, converts it once, then captures its complete wire request. */
   prepare(messages: readonly AgentMessage[], signal?: AbortSignal): Promise<PreparedTurnContext>;
+  /** Promote an already persisted declaration without rebuilding its admitted wire body. */
+  published(): PreparedTurnContext;
 }
 
 /** Internal protocol body inputs already resolved by the preparation owner. */

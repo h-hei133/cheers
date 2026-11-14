@@ -145,6 +145,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       explicitEffort, effortAccepted: () => effortAccepted, streamAttempts: () => streamAttempts, replayBinding });
     for (;;) {
       let prepared: PreparedTurnContext;
+      let barePrepared: PreparedTurnContext;
       try {
         if (streamAttempts === 0 && !messageProjection && options.providerMessages !== undefined) {
           const providerMessages = captureMessageHistory(options.providerMessages);
@@ -173,6 +174,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           prepared = await prepared.refresh(signal);
           options.onPreparedContext?.(prepared);
         }
+        barePrepared = prepared;
         if (contextOwner) prepared = bindTurnContext(prepared, contextOwner);
         if (!prepared.isCurrent()) return stamp(errorStep('Request preparation changed repeatedly. No request was sent.', true));
         currentAllowTools = prepared.allowTools;
@@ -261,6 +263,25 @@ export function createStepFunction(request: StepRequest): StepFunction {
             },
             fetchImpl, (input, init, beforeDispatch) => {
               const admittedDispatch = () => {
+                if (!prepared.isCurrent()) throw new TurnPreparationError('Request preparation changed before dispatch. No request was sent.', true);
+                if (barePrepared.pendingDeclaration) {
+                  try {
+                    if (!options.onDeclaration) throw new Error('unavailable');
+                    options.onDeclaration(barePrepared.pendingDeclaration, {
+                      ...barePrepared.messageProjection, sourceMessages: barePrepared.prospectiveMessages,
+                    });
+                  } catch {
+                    throw new TurnPreparationError('Request declaration persistence failed. No request was sent.', true);
+                  }
+                  barePrepared = barePrepared.published();
+                  sourceMessages = barePrepared.sourceMessages;
+                  messageProjection = barePrepared.messageProjection;
+                  // Recovery must retain the new bare capture, independently of
+                  // this request's live fence after its assistant is appended.
+                  options.onPreparedContext?.(barePrepared);
+                  prepared = contextOwner ? bindTurnContext(barePrepared, contextOwner) : barePrepared;
+                }
+                requestSignal.throwIfAborted();
                 if (!prepared.isCurrent()) throw new TurnPreparationError('Request preparation changed before dispatch. No request was sent.', true);
                 beforeDispatch();
               };

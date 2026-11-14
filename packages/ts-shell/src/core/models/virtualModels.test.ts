@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { CatalogModel } from './catalog.js'
-import { getModelType, modelsOfType, VirtualModelRegistry } from './virtualModels.js'
+import { getModelType, inferRouteReason, modelsOfType, VirtualModelRegistry } from './virtualModels.js'
 
 describe('virtual models and multimodal catalog types', () => {
+  it('infers the dialogue reason through declarations while retaining ordinary system messages', () => {
+    const marker = { id: 'declaration', role: 'system' as const, content: '', requestDeclaration: { version: 1 as const,
+      target: { provider: 'fixture', model: 'model', endpoint: 'anthropic', replayBinding: 'a'.repeat(64) }, tools: [] } }
+    const user = { role: 'user' as const, content: 'Continue' }
+    expect(inferRouteReason([user, marker], 0)).toBe('user')
+    expect(inferRouteReason([user, marker], 1)).toBe('retry')
+    expect(inferRouteReason([user, { role: 'system', content: 'Repair instruction' }, marker], 0)).toBe('continuation')
+  })
+
   it('filters catalog models by chat, image, and classifier types', () => {
     const models: CatalogModel[] = [
       { id: 'chat-default' },

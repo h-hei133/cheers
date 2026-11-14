@@ -5,7 +5,7 @@ import type { AgentEventListener } from "./events.js";
 import type { AgentTool, AgentToolExecutionMode, ToolHooks } from "./tools.js";
 import type { RetryPolicy } from "./retry.js";
 import { captureCustomMessage, captureMessageHistory } from './custom.js';
-import { sameContext } from './context.js';
+import { lastContextMessageIndex, sameContext } from './context.js';
 
 export interface AgentCoreOptions {
   readonly initialState?: InitialAgentState;
@@ -79,7 +79,7 @@ export class AgentCore {
       throw new Error("Agent is already processing.");
     }
     const transcript = this.internalState.messages;
-    const last = transcript[transcript.length - 1];
+    const last = transcript[lastContextMessageIndex(transcript)];
     if (!last && !this.hasQueuedMessages()) {
       throw new Error("Cannot continue: no messages in context");
     }

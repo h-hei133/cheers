@@ -5,7 +5,7 @@ import { flushMetrics, recordCount, recordTiming } from "../../observability/met
 import type { AgentMessage, AgentStopReason } from "./state.js";
 import { convertMessages, type MessageConverter, type MessageProjection } from './messages.js';
 import type { ProviderMessage } from '../../model-adapters/message.js';
-import { captureContext, sameContext, type RequestContextOwner } from './context.js';
+import { captureContext, captureDeclarationAppend, lastContextMessageIndex, sameContext, type RequestContextOwner } from './context.js';
 import {
   exceedsRetryCeiling,
   isRetryableFailure,
@@ -170,7 +170,7 @@ export interface AgentLoopConfig {
     signal?: AbortSignal,
   ) => { readonly messages?: readonly AgentMessage[]; readonly streamStep?: AgentLoopConfig['streamStep'] } | undefined
     | Promise<{ readonly messages?: readonly AgentMessage[]; readonly streamStep?: AgentLoopConfig['streamStep'] } | undefined>;
-  readonly streamStep: (
+  readonly streamStep: ((
     messages: readonly AgentMessage[],
     signal?: AbortSignal,
     request?: {
@@ -184,7 +184,7 @@ export interface AgentLoopConfig {
         readonly delta?: string;
       }) => void;
     },
-  ) => Promise<AssistantStep>;
+  ) => Promise<AssistantStep>) & { readonly preparesContext?: boolean };
 }
 
 export async function runAgentLoop(
@@ -239,40 +239,69 @@ async function retryStep(
   const policy = resolveRetryPolicy("turn", config.retry ?? {});
   let requestId = randomUUID();
   let projection: MessageProjection | undefined;
+  let priorSource: readonly AgentMessage[] | undefined;
   let priorStep: AgentLoopConfig['streamStep'] | undefined;
   let attempt = 0;
   for (;;) {
     let capturedContext = captureContext(context);
-    const reason = attempt > 0 ? 'retry' : context.at(-1)?.role === 'user' ? 'user' : 'continuation';
+    const reason = attempt > 0 ? 'retry' : context[lastContextMessageIndex(context)]?.role === 'user' ? 'user' : 'continuation';
     const prepared = await config.prepareRequest?.({ reason, attempt, messages: context }, signal);
     const activeStep = prepared?.streamStep ?? config.streamStep;
     const activeMessages = prepared?.messages ?? context;
-    const converted = await convertMessages(activeMessages, config.convertToLlm, signal, projection);
-    if (attempt > 0 && ((converted.sourceMessages && converted !== projection) || activeStep !== priorStep)) requestId = randomUUID();
-    projection = converted;
+    // Native preparation routes raw history before adding declarations and converting it.
+    const deferredSource = activeStep.preparesContext === true ? captureContext(activeMessages) : undefined;
+    const converted = deferredSource ? undefined : await convertMessages(activeMessages, config.convertToLlm, signal, projection);
+    if (attempt > 0 && (activeStep !== priorStep || (deferredSource
+      ? !priorSource || !sameContext(deferredSource, priorSource)
+      : converted!.sourceMessages && converted !== projection))) requestId = randomUUID();
+    if (converted) projection = converted;
+    else if (!projection?.sourceMessages || !sameContext(deferredSource!, projection.sourceMessages)) projection = undefined;
+    priorSource = deferredSource ?? converted?.sourceMessages;
     priorStep = activeStep;
     let contextAccepted = false;
+    let declarationPublishing = false;
+    const ownsHistory = () => activeStep === config.streamStep
+      && (contextAccepted || sameContext(activeMessages, capturedContext)) && sameContext(context, capturedContext)
+      && (config.isContextCurrent?.(capturedContext) ?? true);
     const requestContext: RequestContextOwner = {
       eligible: activeStep === config.streamStep && sameContext(activeMessages, capturedContext),
-      isCurrent: () => !signal?.aborted && activeStep === config.streamStep
-        && (contextAccepted || sameContext(activeMessages, capturedContext)) && sameContext(context, capturedContext)
-        && (config.isContextCurrent?.(capturedContext) ?? true),
+      isCurrent: () => !signal?.aborted && ownsHistory(),
       accept: candidate => {
-        if (contextAccepted || !candidate.sourceMessages || !requestContext.isCurrent()) return false;
+        if (contextAccepted || declarationPublishing || !candidate.sourceMessages || !requestContext.isCurrent()) return false;
         const next = captureContext(candidate.sourceMessages);
         config.onContextReplaced?.(next);
         replaceContext(context, next);
         capturedContext = next;
+        priorSource = capturedContext;
         projection = candidate;
         contextAccepted = true;
         return true;
+      },
+      appendDeclaration: (message, candidate, persist) => {
+        if (declarationPublishing || !requestContext.isCurrent()) return false;
+        const append = captureDeclarationAppend(capturedContext, message, candidate);
+        if (!append) return false;
+        declarationPublishing = true;
+        try {
+          persist(append.message);
+          // Cancellation after a successful write cannot erase the committed fact.
+          if (!ownsHistory()) return false;
+          config.onContextReplaced?.(append.sourceMessages);
+          replaceContext(context, append.sourceMessages);
+          capturedContext = append.sourceMessages;
+          priorSource = capturedContext;
+          projection = append.projection;
+          contextAccepted = true;
+          return true;
+        } finally { declarationPublishing = false; }
       },
     };
     let emittedStart = false;
     let emitChain: Promise<void> = Promise.resolve();
     const request = Object.freeze({
       requestId,
-      ...(converted.sourceMessages ? { sourceMessages: converted.sourceMessages, providerMessages: converted.providerMessages } : {}),
+      ...(deferredSource ? { sourceMessages: deferredSource }
+        : converted!.sourceMessages ? { sourceMessages: converted!.sourceMessages, providerMessages: converted!.providerMessages } : {}),
       context: requestContext,
       onUpdate: (partial: { readonly text?: string; readonly reasoning?: string; readonly delta?: string }) => {
         const partialMessage: AgentMessage = {
@@ -296,7 +325,7 @@ async function retryStep(
       },
     });
     signal?.throwIfAborted();
-    const step = await activeStep(converted.messages, signal, request);
+    const step = await activeStep(deferredSource ? activeMessages : converted!.messages, signal, request);
     await emitChain;
     // Once partial output has reached listeners, or the step's own layer
     // already retried, do not start another attempt for the same step.
@@ -325,10 +354,11 @@ export async function runAgentLoopContinue(
   emit: AgentEventSink,
   signal: AbortSignal | undefined,
 ): Promise<AgentMessage[]> {
-  if (seed.length === 0) {
+  const lastIndex = lastContextMessageIndex(seed);
+  if (lastIndex < 0) {
     throw new Error("Cannot continue: no messages in context");
   }
-  if (seed[seed.length - 1].role === "assistant") {
+  if (seed[lastIndex]!.role === "assistant") {
     throw new Error("Cannot continue from message role: assistant");
   }
   const produced: AgentMessage[] = [];

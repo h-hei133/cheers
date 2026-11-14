@@ -14,12 +14,33 @@ import { sameContext } from '../core/agent/context.js';
 import type { EventChannel } from './stream.js';
 import { rememberToolRequests, traceOperation } from '../observability/tracing/context.js';
 import { randomUUID } from 'node:crypto';
+import { types } from 'node:util';
+import { TurnPreparationError } from './context/prepare.js';
+import type { StandardAgentMessage } from '../core/agent/state.js';
 
 const BUDGET_SUMMARY_MESSAGE = 'The goal budget cannot admit the next working step. Summarize progress and remaining blockers, then stop. Do not call tools or claim completion without evidence.';
+const PROMISE_THEN = Promise.prototype.then;
+const PROMISE_SPECIES = Object.getOwnPropertyDescriptor(Promise, Symbol.species)?.get;
+
+/** A synchronous dispatch barrier cannot wait for application persistence. */
+function persistDeclaration(persist: (message: SessionMessage) => void, message: StandardAgentMessage): void {
+  const result: unknown = persist(message);
+  if (result === null || typeof result !== 'object' && typeof result !== 'function') return;
+  // Observe only a plain native promise without invoking application accessors.
+  if (!types.isProxy(result) && types.isPromise(result) && Object.getPrototypeOf(result) === Promise.prototype
+    && !Object.getOwnPropertyDescriptor(result, 'constructor') && !Object.getOwnPropertyDescriptor(result, 'then')
+    && Object.getOwnPropertyDescriptor(Promise.prototype, 'constructor')?.value === Promise
+    && Object.getOwnPropertyDescriptor(Promise.prototype, 'then')?.value === PROMISE_THEN
+    && Object.getOwnPropertyDescriptor(Promise, Symbol.species)?.get === PROMISE_SPECIES
+    && Object.getOwnPropertyDescriptor(Promise, Symbol.species)?.set === undefined) {
+    PROMISE_THEN.call(result, () => {}, () => {});
+  }
+  throw new TurnPreparationError('Request declaration persistence must complete synchronously. No request was sent.', true);
+}
 
 /** One logical request, including its native retries, with no retained prompt/body. */
 function tracedStep(step: StepFunction): StepFunction {
-  return (messages, signal, listener, options) => {
+  const traced: StepFunction = (messages, signal, listener, options) => {
     const requestId = options.requestId ?? randomUUID();
     return traceOperation({ name: 'provider.request', attributes: {
       requestId, purpose: options.requestPurpose ?? 'turn', usage: 'unknown',
@@ -54,6 +75,7 @@ function tracedStep(step: StepFunction): StepFunction {
       return result;
     });
   };
+  return Object.assign(traced, { preparesContext: step.preparesContext === true });
 }
 
 interface RequestOptions {
@@ -63,6 +85,7 @@ interface RequestOptions {
   readonly consumePreparedContext?: (messages: readonly SessionMessage[]) => PreparedTurnContext | undefined;
   readonly claimBudgetSummary?: () => boolean;
   readonly step: StepFunction;
+  readonly onMessage?: (message: SessionMessage) => void;
   readonly sessionId: string;
   readonly maxSteps: number;
   readonly allowedTools?: readonly string[];
@@ -81,6 +104,7 @@ export function requestPurposeFor(
   const resultIds = new Set<string>();
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]!;
+    if (message.requestDeclaration) continue;
     if (message.role === "tool") {
       if (message.tool_call_id) resultIds.add(message.tool_call_id);
       continue;
@@ -105,17 +129,27 @@ export function createTurnRequest(
 ): AgentCoreOptions['streamStep'] {
   // Captured wire identity belongs to this request, never rebuilt from history.
   let lastSentRequest: SentRequest | undefined;
+  let lastConverted: { readonly projection: MessageProjection; readonly converter: MessageConverter | undefined } | undefined;
   const stepRequest = tracedStep(options.step);
-  return async (messages, signal, request) => {
+  const streamStep: AgentCoreOptions['streamStep'] = async (messages, signal, request) => {
     const toolsAllowed = projection.stepCount < options.maxSteps;
     const recovered = options.consumePreparedContext?.(request?.sourceMessages ?? messages);
     const recovery = recovered ? await recovered.reframe({ allowTools: toolsAllowed, allowedTools: options.allowedTools,
       requestPurpose: requestPurposeFor(recovered.sourceMessages) }, signal) : undefined;
+    const openingIndex = promptSource ? messages.indexOf(promptSource.opening) : -1;
+    const activePromptSource = promptSource && request?.sourceMessages && openingIndex >= 0
+      ? { opening: request.sourceMessages[openingIndex]!, stored: promptSource.stored } : promptSource;
     let activeMessages = recovery?.messageProjection.messages ?? messages;
     let activeProjection: MessageProjection = recovery?.messageProjection ?? {
       messages: messages as MessageProjection['messages'],
       ...(request?.sourceMessages ? { sourceMessages: request.sourceMessages, providerMessages: request.providerMessages } : {}),
     };
+    if (!recovery && stepRequest.preparesContext === true && request?.sourceMessages
+      && lastConverted && lastConverted.converter === options.convertToLlm && lastConverted.projection.sourceMessages
+      && lastConverted.projection.providerMessages && sameContext(request.sourceMessages, lastConverted.projection.sourceMessages)) {
+      activeProjection = { messages: request.sourceMessages as MessageProjection['messages'], sourceMessages: request.sourceMessages,
+        providerMessages: lastConverted.projection.providerMessages };
+    }
     channel.push({ type: "message.started", role: "coder" });
     // A new request replaces the old prefix even if it fails or reports no usage.
     if (lastSentRequest) options.cacheWarming?.noteRequest(0, lastSentRequest);
@@ -137,6 +171,7 @@ export function createTurnRequest(
       }
     };
     let budgetSummary = false;
+    let latestPrepared: PreparedTurnContext | undefined;
     let streamedText = "";
     let streamedReasoning = "";
     const emitStreamUpdate = (delta?: string) => {
@@ -174,7 +209,21 @@ export function createTurnRequest(
       {
         allowTools: toolsAllowed,
         ...(request?.context?.eligible ? { contextOwner: request.context } : {}),
-        ...(promptSource ? { promptSource } : {}),
+        ...(request?.context?.eligible && request.context.appendDeclaration && options.onMessage ? {
+          onDeclaration: (message: StandardAgentMessage, prospective: MessageProjection) => {
+            let appended: boolean;
+            try {
+              appended = request.context!.appendDeclaration!(message, prospective,
+                saved => persistDeclaration(options.onMessage!, saved));
+            } catch {
+              throw new TurnPreparationError('Request declaration persistence failed. No request was sent.', true);
+            }
+            if (!appended) throw new TurnPreparationError('Request history changed before declaration publication. No request was sent.', true);
+            activeProjection = prospective;
+            activeMessages = prospective.messages;
+          },
+        } : {}),
+        ...(activePromptSource ? { promptSource: activePromptSource } : {}),
         ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}),
         requestPurpose: requestPurposeFor(activeProjection.sourceMessages ?? activeMessages),
         ...(activeProjection.sourceMessages ? { sourceMessages: activeProjection.sourceMessages, providerMessages: activeProjection.providerMessages } : {}),
@@ -189,8 +238,11 @@ export function createTurnRequest(
           return captured;
         },
         onPreparedContext: prepared => {
+          latestPrepared = prepared;
           activeProjection = prepared.messageProjection;
           activeMessages = prepared.messageProjection.messages;
+          lastConverted = { projection: { ...prepared.messageProjection, sourceMessages: prepared.prospectiveMessages },
+            converter: options.convertToLlm };
           if (request?.context) options.onPreparedContext?.(prepared, request.context);
         },
         requestId: request?.requestId,
@@ -205,15 +257,18 @@ export function createTurnRequest(
       // This instruction is request-local: it has no user-message lifecycle,
       // persistence or display event. The ordinary step still enforces the cap.
       const instruction = { role: 'user' as const, content: BUDGET_SUMMARY_MESSAGE };
-      const closing = await stepRequest([...activeMessages, instruction],
+      const pendingSource = latestPrepared?.pendingDeclaration ? latestPrepared.sourceMessages : undefined;
+      const closingMessages = [...(pendingSource ?? activeMessages), instruction];
+      const closing = await stepRequest(closingMessages,
       signal, {
         onText: delta => channel.push({ type: 'message.delta', role: 'coder', delta }),
         onReasoning: delta => channel.push({ type: 'reasoning.delta', role: 'coder', delta }),
         onReasoningReplace: text => channel.push({ type: 'reasoning.replace', role: 'coder', text }),
         onReplace: text => channel.push({ type: 'message.replace', role: 'coder', text }),
-      }, { allowTools: false, ...(activeProjection.sourceMessages ? {
+      }, { allowTools: false, ...(pendingSource ? { sourceMessages: closingMessages, convertToLlm: options.convertToLlm }
+        : activeProjection.sourceMessages ? {
         sourceMessages: [...activeProjection.sourceMessages, instruction],
-      } : {}), ...(activeProjection.providerMessages ? { providerMessages: [...activeProjection.providerMessages, instruction] } : {}),
+      } : {}), ...(!pendingSource && activeProjection.providerMessages ? { providerMessages: [...activeProjection.providerMessages, instruction] } : {}),
         ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}), requestPurpose: 'goal-budget-summary',
         onRequestSent, onRequestUsage });
       // Its input includes an unpersisted instruction, so it cannot anchor the
@@ -229,4 +284,5 @@ export function createTurnRequest(
     }
     return { ...step, toolsAllowed: toolsAllowed && step.toolsAllowed !== false };
   };
+  return Object.assign(streamStep, { preparesContext: stepRequest.preparesContext === true });
 }

@@ -43,6 +43,8 @@ export type EndpointKind = string;
 
 /** What one endpoint needs to say about itself. */
 export interface EndpointShape {
+  /** This protocol can project durable request declarations at history boundaries. */
+  readonly historyDeclarations?: boolean;
   /** Auxiliary requests may require the same native stream as full turns. */
   readonly simpleResponse?: 'stream';
   /** The provider owns output length when no request ceiling is supported. */

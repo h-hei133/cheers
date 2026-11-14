@@ -1,4 +1,5 @@
 import type { AgentMessage } from '../agent/state.js'
+import { lastContextMessageIndex } from '../agent/context.js'
 import type { CatalogModel, ModelType, ThinkingLevel } from './catalog.js'
 
 export const VIRTUAL_MODEL_API = 'cheers-virtual'
@@ -42,7 +43,7 @@ export function modelsOfType(models: readonly CatalogModel[], type: ModelType): 
 
 export function inferRouteReason(messages: readonly AgentMessage[], attempt: number): ModelRouteReason {
   if (attempt > 0) return 'retry'
-  const last = messages.at(-1)
+  const last = messages[lastContextMessageIndex(messages)]
   return last?.role === 'user' ? 'user' : 'continuation'
 }
 
