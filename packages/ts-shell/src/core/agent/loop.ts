@@ -5,6 +5,7 @@ import { flushMetrics, recordCount, recordTiming } from "../../observability/met
 import type { AgentMessage, AgentStopReason } from "./state.js";
 import { convertMessages, type MessageConverter, type MessageProjection } from './messages.js';
 import type { ProviderMessage } from '../../model-adapters/message.js';
+import { captureContext, sameContext, type RequestContextOwner } from './context.js';
 import {
   exceedsRetryCeiling,
   isRetryableFailure,
@@ -140,6 +141,8 @@ export interface AgentLoopConfig {
     signal?: AbortSignal,
   ) => NextStepUpdate | undefined | Promise<NextStepUpdate | undefined>;
   readonly onContextReplaced?: (messages: readonly AgentMessage[]) => void;
+  /** A request must not replace successor state that changed while preparation awaited. */
+  readonly isContextCurrent?: (messages: readonly AgentMessage[]) => boolean;
   readonly getSteeringMessages?: () => Promise<AgentMessage[]>;
   readonly getFollowUpMessages?: () => Promise<AgentMessage[]>;
   /**
@@ -174,6 +177,7 @@ export interface AgentLoopConfig {
       readonly requestId: string;
       readonly sourceMessages?: readonly AgentMessage[];
       readonly providerMessages?: readonly ProviderMessage[];
+      readonly context?: RequestContextOwner;
       readonly onUpdate?: (partial: {
         readonly text?: string;
         readonly reasoning?: string;
@@ -228,7 +232,7 @@ export async function runAgentLoop(
  */
 async function retryStep(
   config: AgentLoopConfig,
-  context: readonly AgentMessage[],
+  context: AgentMessage[],
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
 ): Promise<{ readonly step: AssistantStep; readonly emittedStart: boolean }> {
@@ -238,6 +242,7 @@ async function retryStep(
   let priorStep: AgentLoopConfig['streamStep'] | undefined;
   let attempt = 0;
   for (;;) {
+    let capturedContext = captureContext(context);
     const reason = attempt > 0 ? 'retry' : context.at(-1)?.role === 'user' ? 'user' : 'continuation';
     const prepared = await config.prepareRequest?.({ reason, attempt, messages: context }, signal);
     const activeStep = prepared?.streamStep ?? config.streamStep;
@@ -246,11 +251,29 @@ async function retryStep(
     if (attempt > 0 && ((converted.sourceMessages && converted !== projection) || activeStep !== priorStep)) requestId = randomUUID();
     projection = converted;
     priorStep = activeStep;
+    let contextAccepted = false;
+    const requestContext: RequestContextOwner = {
+      eligible: activeStep === config.streamStep && sameContext(activeMessages, capturedContext),
+      isCurrent: () => !signal?.aborted && activeStep === config.streamStep
+        && (contextAccepted || sameContext(activeMessages, capturedContext)) && sameContext(context, capturedContext)
+        && (config.isContextCurrent?.(capturedContext) ?? true),
+      accept: candidate => {
+        if (contextAccepted || !candidate.sourceMessages || !requestContext.isCurrent()) return false;
+        const next = captureContext(candidate.sourceMessages);
+        config.onContextReplaced?.(next);
+        replaceContext(context, next);
+        capturedContext = next;
+        projection = candidate;
+        contextAccepted = true;
+        return true;
+      },
+    };
     let emittedStart = false;
     let emitChain: Promise<void> = Promise.resolve();
     const request = Object.freeze({
       requestId,
       ...(converted.sourceMessages ? { sourceMessages: converted.sourceMessages, providerMessages: converted.providerMessages } : {}),
+      context: requestContext,
       onUpdate: (partial: { readonly text?: string; readonly reasoning?: string; readonly delta?: string }) => {
         const partialMessage: AgentMessage = {
           role: "assistant",

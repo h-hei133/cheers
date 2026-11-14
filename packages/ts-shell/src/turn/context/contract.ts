@@ -1,4 +1,5 @@
 import type { AgentMessage, StandardAgentMessage } from '../../core/agent/state.js';
+import type { RequestContextOwner } from '../../core/agent/context.js';
 import type { MessageConverter, MessageProjection } from '../../core/agent/messages.js';
 import type { RetryPolicy } from '../../core/agent/retry.js';
 import type { ModelTransport, RequestPolicy } from '../../core/agent/request/model.js';
@@ -61,6 +62,10 @@ export interface ProviderTarget {
 }
 
 export interface StepOptions {
+  /** The original live history fence also applies to native provider retries. */
+  readonly contextOwner?: RequestContextOwner;
+  /** A previously admitted recovery retains its complete route and wire capture. */
+  readonly preparedContext?: PreparedTurnContext;
   readonly convertToLlm?: MessageConverter;
   readonly prepareContext?: (prepared: PreparedTurnContext, signal?: AbortSignal) => Promise<PreparedTurnContext | undefined>;
   /** Detached source retains agent history identity across application projection. */
@@ -167,6 +172,7 @@ export interface PreparedTurnContext {
   readonly activeModel: string;
   readonly effort?: Exclude<ThinkingPreference, null>;
   readonly allowTools: boolean;
+  readonly allowedTools?: readonly string[];
   readonly tools: readonly ToolSchema[];
   readonly systemPrompt: string;
   readonly regeneratedPrompt: boolean;
@@ -187,6 +193,8 @@ export interface PreparedTurnContext {
   isCurrent(): boolean;
   /** Refresh dynamic declarations against the same routed source and conversion. */
   refresh(signal?: AbortSignal): Promise<PreparedTurnContext>;
+  /** Rebuild the same routed source and conversion for an explicit next-call contract. */
+  reframe(options: Pick<StepOptions, 'allowTools' | 'allowedTools' | 'agentMode' | 'requestPurpose'>, signal?: AbortSignal): Promise<PreparedTurnContext>;
   /** Routes raw candidate history, converts it once, then captures its complete wire request. */
   prepare(messages: readonly AgentMessage[], signal?: AbortSignal): Promise<PreparedTurnContext>;
 }

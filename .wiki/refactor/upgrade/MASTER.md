@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.2/B2.2/B2.3、D.2/D.3/D.5、E.2已完成所述本地验收；继续终端与运行时。
-**Active batch**: C.3摘要捕获已提交`57ca53eb`；完整caller/source与候选policy准备已提交`72be40f8`；请求capture提取本批验证完立即提交，再接通实际主请求threshold／候选发布。C.6历史声明另批处理。
+**Active batch**: C.3摘要捕获`57ca53eb`、完整caller/source policy`72be40f8`及请求capture`c521d82d`已提交；转换主请求threshold／候选发布与overflow接线本批已验证，提交后补齐普通请求的完整准备路径。C.6历史声明另批处理。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -72,6 +72,7 @@
 | 2026-11-14 | custom持久化／显示：保存、重开、分叉、隐藏正文与data分离、版本化导出及失败live状态通过13套件280项，六静态门通过。独立复审补充role accessor、有限数预算、tree隐藏正文和contextSummary误排除四个实际红例，修复后限定CLEAR。联合构建首次发现泛型断言错误，纯类型修正后build `094220828813`通过；原失败保留。C.3转换／SDK仍未实现，不增加完成数。 |
 | 2026-11-15 | 前台转换／SDK：prepareRequest后捕获raw与provider，system文本进真实system字段，转换内容参与工具/图片/预算准入；相同raw重试复用capture、替换raw重新转换并换requestId。SDK idle追加覆盖完整settlement，普通native Promise取消后保留late rejection观察。复审新增数组/Promise钩子、system丢失、早取消和settlement等反例先红后修；Promise附属async context符号不被误拒。12套件391项、六静态门、函数上限、build `48bafd6fec4c`和Linux编译SDK实际配置模型三次wire通过，限定复审CLEAR。诊断夹具跨root配置失效、global fetch未观察Undici发送及错误私有符号均保留失败分类，最终用实际bodySent观察重验。C.3压缩/rewind一致性与C.6仍未完成，16项完成数不变。 |
 | 2026-11-15 | 摘要转换：manual/automatic/prefix/merge/branch复用有界converter、complete body preflight与获准capture。7个集成红例及byte/changed-identity unknown/nav取消红例修复，18套件326项、六静态门、函数上限、build `5e1c8ee4afbb`通过；限定复审CLEAR。Linux当前编译SDK实际配置模型3次摘要（manual两段、branch一次）及verified manual publication/取消零派发通过。首次native夹具假定单段导致计数失败，实际消费者全通过，修正计数后重验并保留失败日志。旧含秘密target identity不复算；无法映射的legacy unknown/无材料墓碑保守拒绝新capture，旧记录不迁移不删除。实际增加legacy兼容和navigation signal两个必要依赖，owner复用/单ledger成立；C.3 threshold/候选缩小仍开，16项不变。 |
+| 2026-11-15 | C.3转换主请求接线：复用已捕获完整request决定threshold；候选完成转换、预算／字节限制和live／durable准入后才发布；forced overflow按下一closing合同生成并直接消费capture。修复refresh丢live fence、native retries、transient diagnostics及重复checkpoint marker差异。17套件446项、六静态门、函数上限与build `fed3b0f8c0d2`通过；限定独立复审CLEAR。当前编译SDK配置模型7次bodySent覆盖automatic/manual/rewind/reopen/取消零派发，隐藏raw未送出。首次storage夹具错误给无参数SessionManager传目录且遗漏prompt barrier，修正隔离和实际barrier后重验；native首次转换规则误把历史自动prompt作为当前请求，限制观察阶段后通过，失败日志保留。普通无converter/custom请求仍走早期policy，C.3保持部分、总数16；下批接通后再做完整验收。 |
 
 | 2026-11-15 | C.3压缩policy：完整caller/source在prepare前惰性捕获、raw source切点、重建完整candidate后一次prepare与缩小比较、candidate/authority双准入和当前policy进度。独立HEAD新增反例15失败/3通过；独立批次8套件160项、六静态门、build `c0a48b5abd86`通过，限定只读复核CLEAR。标准metadata/origin等应用字段比较补齐，仅忽略storage id/timestamp。最初build夹具node_modules符号链接触发既有保护，改实际目录后通过。主请求调用方尚未接通，16项验收数不变。 |
 

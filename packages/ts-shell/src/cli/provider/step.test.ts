@@ -121,7 +121,7 @@ it('uses the host plan mode for a foreground model that cannot call tools', asyn
   const tools = new Map([['task', createTaskToolDefinition()]]);
   const prepared = await preparePromptRequest({ workspaceRoot: setup.root, sessionId: setup.session.id,
     agentMode: request.agentMode, toolsAvailable: providerToolsAvailable(request),
-    catalogContent: { skills: new Map(), tools: [] } }, () => tools);
+    catalogContent: { skills: new Map(), tools: [] }, runtimeConfig: { ...getRuntimeConfig(setup.root), toolDiscovery: 'full' } }, () => tools);
   const step = createProviderStep(request, prepared.tools, prepared.promptContext, prepared.discovery);
 
   const result = await step([{ role: 'user', content: 'Plan without tools' }], setup.signal, {}, { allowTools: true });

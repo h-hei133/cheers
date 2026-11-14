@@ -5,6 +5,7 @@ import type { AgentEventListener } from "./events.js";
 import type { AgentTool, AgentToolExecutionMode, ToolHooks } from "./tools.js";
 import type { RetryPolicy } from "./retry.js";
 import { captureCustomMessage, captureMessageHistory } from './custom.js';
+import { sameContext } from './context.js';
 
 export interface AgentCoreOptions {
   readonly initialState?: InitialAgentState;
@@ -186,6 +187,7 @@ export class AgentCore {
       onContextReplaced: (messages) => {
         this.internalState.messages = [...messages];
       },
+      isContextCurrent: messages => sameContext(this.internalState.messages, messages),
       streamStep: this.options.streamStep,
       getSteeringMessages: async () => this.steeringQueue.drain(),
       getFollowUpMessages: async () => this.followUpQueue.drain(),

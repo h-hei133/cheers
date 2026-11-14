@@ -8,6 +8,8 @@ import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import type { AgentLoopConfig } from "../core/agent/loop.js";
+import { captureContext, sameContext, type RequestContextOwner } from '../core/agent/context.js';
+import type { PreparedTurnContext } from './context/contract.js';
 import {
   condenseContext,
 } from "../session/compaction.js";
@@ -17,7 +19,7 @@ import { openingMessage } from './opening.js';
 import { buildCompactionLifecycle } from "../core/shell/compaction.js";
 import { concludeRun, TurnProjection } from "./projection.js";
 import { EventChannel } from "./stream.js";
-import { createTurnRequest } from "./request.js";
+import { createTurnRequest, requestPurposeFor } from "./request.js";
 import { isOverflowFailure, type StepFunction } from "./step.js";
 import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
@@ -220,7 +222,9 @@ export function runTurn(options: TurnOptions): TurnRun {
   const hooks = createToolHooks(gate, toolPool);
   const compaction = options.compaction ? turnCompaction({ setup: options.compaction,
     sessionId: options.sessionId, workspaceRoot: options.workspaceRoot, hooks: options.hooks,
-    maxSteps: options.maxSteps, hasTools: toolPool().size > 0 }) : undefined;
+    maxSteps: options.maxSteps, hasTools: toolPool().size > 0, converted: Boolean(options.convertToLlm) }) : undefined;
+  let preparedRequest: { readonly prepared: PreparedTurnContext; readonly context: RequestContextOwner } | undefined;
+  let recoveredContext: PreparedTurnContext | undefined;
   const core = new AgentCore({
     initialState: { messages: options.history as readonly AgentMessage[] },
     // Absent means the kernel's own default, which is the same value the config
@@ -234,7 +238,14 @@ export function runTurn(options: TurnOptions): TurnRun {
     ),
     beforeToolCall: hooks.beforeToolCall,
     afterToolCall: hooks.afterToolCall,
-    streamStep: createTurnRequest(options, projection, channel, options.storedPrompt ? { opening, stored: options.storedPrompt } : undefined),
+    streamStep: createTurnRequest({ ...options, prepareContext: compaction?.prepareContext,
+      onPreparedContext: (prepared, context) => { preparedRequest = { prepared, context }; },
+      consumePreparedContext: messages => {
+        const recovered = recoveredContext;
+        recoveredContext = undefined;
+        return recovered && recovered.isCurrent() && sameContext(messages, recovered.sourceMessages) ? recovered : undefined;
+      },
+    }, projection, channel, options.storedPrompt ? { opening, stored: options.storedPrompt } : undefined),
     shouldStopAfterStep: () => projection.stepCount >= options.maxSteps,
     // The request layer allows tools while the step counter is below the
     // budget, and that counter has already advanced when the request is built.
@@ -244,7 +255,12 @@ export function runTurn(options: TurnOptions): TurnRun {
     prepareNextStep: compaction?.beforeStep,
     ...(options.finishTurn ? { finishTurn: options.finishTurn } : {}),
     ...(options.prepareRequest ? { prepareRequest: options.prepareRequest } : {}),
-    ...(options.convertToLlm ? { convertToLlm: options.convertToLlm } : {}),
+    ...(options.convertToLlm ? { convertToLlm: (messages, signal) => {
+      if (recoveredContext?.isCurrent() && sameContext(messages, recoveredContext.sourceMessages)) {
+        return recoveredContext.messageProjection.providerMessages!;
+      }
+      return options.convertToLlm!(messages, signal);
+    } } : {}),
   });
 
   const queues = core.pendingQueues;
@@ -339,6 +355,26 @@ export function runTurn(options: TurnOptions): TurnRun {
     // threshold check standing in the way: the provider already refused the
     // request, so the context is over budget by definition, not by estimate.
     const kept = messages.slice(0, -1);
+    if (options.convertToLlm || kept.some(message => message.role === 'custom')) {
+      const prior = preparedRequest;
+      if (!prior?.context.eligible || !compaction || !sameContext(kept, prior.prepared.sourceMessages)) return false;
+      let expected = captureContext(messages);
+      const context: RequestContextOwner = {
+        eligible: true,
+        isCurrent: () => !options.signal.aborted && sameContext(core.state.messages, expected),
+        accept: candidate => {
+          if (!candidate.sourceMessages || !context.isCurrent()) return false;
+          expected = captureContext(candidate.sourceMessages);
+          core.state.messages = [...expected];
+          return true;
+        },
+      };
+      const next = await prior.prepared.reframe({ allowTools: projection.stepCount + 1 < options.maxSteps,
+        allowedTools: options.allowedTools, requestPurpose: requestPurposeFor(kept) }, options.signal);
+      if (!context.isCurrent()) return false;
+      recoveredContext = await compaction.recoverContext(next, options.signal, context);
+      return recoveredContext !== undefined;
+    }
     const source = options.compaction.authority?.capture(kept);
     const lifecycle = buildCompactionLifecycle({ hooks: options.hooks, sessionId: options.sessionId,
       workspaceRoot: options.workspaceRoot, reason: 'overflow' });
@@ -366,7 +402,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     if (source && options.compaction.authority) {
       const committed = options.compaction.authority.commit({ source, summary: condensed.summary,
         keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore, signal: options.signal,
-        admission: options.compaction.authority.admission });
+        admission: () => condensed.preparedPolicy?.admission?.() ?? options.compaction?.authority?.admission?.() });
       if (committed.status === 'unverified') throw new CompactionPublicationError();
       if (committed.status !== 'committed') return false;
     }

@@ -61,6 +61,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     }
     const sourceMessages = snapshotData(messages, CAPTURE_LIMITS) as unknown as readonly AgentMessage[];
     const optionIdentity = JSON.stringify([options.allowTools, options.allowedTools, options.agentMode]);
+    const allowedTools = options.allowedTools === undefined ? undefined : Object.freeze([...options.allowedTools]);
     const generationIdentity = JSON.stringify([request.provider, request.temperature, request.topP, request.maxOutputTokens,
       request.contextWindow, request.reserveTokens, request.cacheRetention, request.initialTools, request.historicalEfforts && [...request.historicalEfforts],
       request.pruneToolText, request.projection]);
@@ -72,10 +73,12 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       messages: sourceMessages, signal,
     }) : undefined;
     signal?.throwIfAborted();
-    const messageProjection = reuse?.providerMessages
+    const messageProjection = reuse
       ? Object.freeze({ sourceMessages,
           messages: snapshotData(reuse.messages, CAPTURE_LIMITS) as unknown as MessageProjection['messages'],
-          providerMessages: snapshotData(reuse.providerMessages, CAPTURE_LIMITS) as unknown as NonNullable<MessageProjection['providerMessages']> })
+          ...(reuse.providerMessages !== undefined ? {
+            providerMessages: snapshotData(reuse.providerMessages, CAPTURE_LIMITS) as unknown as NonNullable<MessageProjection['providerMessages']>,
+          } : {}) })
       : await convertMessages(sourceMessages, converter, signal);
     const openingIndex = options.promptSource ? messages.indexOf(options.promptSource.opening) : -1;
     const promptSource = options.promptSource && openingIndex >= 0
@@ -96,7 +99,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       catalogAddress,
     ).toolCalling;
     const allowTools = options.allowTools && toolCalling;
-    const allowed = options.allowedTools && new Set(options.allowedTools);
+    const allowed = allowedTools && new Set(allowedTools);
     const currentDeclarations = request.toolSnapshot?.() ?? request.tools;
     const declarationIdentity = JSON.stringify(currentDeclarations);
     const declared = snapshotData(currentDeclarations, CAPTURE_LIMITS) as unknown as typeof currentDeclarations;
@@ -281,13 +284,20 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       contextWindow: request.contextWindow ?? modelEntry?.contextWindow, inputLimit: modelEntry?.inputLimit,
       outputTokens: output ?? shape.maxOutputCeiling, reserveTokens: request.reserveTokens,
       promptIdentity: Object.freeze(promptIdentity), promptProjection: promptProjection && Object.freeze(promptProjection),
-      projection: freezeDeep(projection), activeProvider, activeModel, effort, allowTools, tools, systemPrompt,
+      projection: freezeDeep(projection), activeProvider, activeModel, effort, allowTools, allowedTools, tools, systemPrompt,
       regeneratedPrompt, endpoint, shape: Object.freeze(shape), protocol,
       modelEntry: modelEntry && structuredClone(modelEntry), usageAttribution, inputLimits,
       payload: freezeDeep(payload!), requestHeaders: Object.freeze({ ...requestHeaders }), body,
       url: endpointUrl(request.provider.baseUrl, endpoint, activeModel), headers: Object.freeze({ ...request.provider.headers }),
       replayBinding, ...(refusal ? { refusal: Object.freeze(refusal) } : {}), isCurrent,
       refresh: (refreshSignal?: AbortSignal) => prepare(sourceMessages, refreshSignal, messageProjection, { route }),
+      reframe: (callOptions: Pick<StepOptions, 'allowTools' | 'allowedTools' | 'agentMode' | 'requestPurpose'>, reframeSignal?: AbortSignal) => {
+        const nextOptions: StepOptions = { ...options, allowTools: callOptions.allowTools,
+          allowedTools: callOptions.allowedTools === undefined ? undefined : Object.freeze([...callOptions.allowedTools]),
+          agentMode: callOptions.agentMode, requestPurpose: callOptions.requestPurpose,
+          convertToLlm: converter, promptSource, preparedContext: undefined };
+        return createTurnContextPreparer(request, nextOptions, lifetime)(sourceMessages, reframeSignal, messageProjection, { route });
+      },
       prepare: (candidate: readonly AgentMessage[], candidateSignal?: AbortSignal) => prepare(candidate, candidateSignal),
     });
   };

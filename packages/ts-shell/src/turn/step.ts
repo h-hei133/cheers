@@ -1,6 +1,7 @@
 import type { PreparedTurnContext, StepOptions, StepRequest } from './context/contract.js';
 export type { PreparedTurnContext, ProviderTarget, StepOptions, StepRequest } from './context/contract.js';
 import { createTurnContextPreparer, TurnPreparationError } from './context/prepare.js';
+import { bindTurnContext } from './context/owner.js';
 import type { MessageProjection } from '../core/agent/messages.js';
 import { randomUUID } from 'node:crypto';
 import { createComponentLogger } from "../observability/structuredLogger.js";
@@ -138,22 +139,28 @@ export function createStepFunction(request: StepRequest): StepFunction {
     let streamAttempts = 0;
     let preparationOffered = false;
     let identityPreparations = 0;
+    const contextOwner = options.contextOwner;
     const prepare = createTurnContextPreparer(request, options, { thinkingEffort: captured.thinkingEffort,
       explicitEffort, effortAccepted: () => effortAccepted, streamAttempts: () => streamAttempts, replayBinding });
     for (;;) {
       let prepared: PreparedTurnContext;
       try {
-        prepared = await prepare(sourceMessages, signal, messageProjection);
+        if (contextOwner && !contextOwner.isCurrent()) throw new TurnPreparationError('Request history changed during preparation. No request was sent.', true);
+        prepared = streamAttempts === 0 && options.preparedContext
+          ? options.preparedContext : await prepare(sourceMessages, signal, messageProjection);
+        if (contextOwner && !contextOwner.isCurrent()) throw new TurnPreparationError('Request history changed during preparation. No request was sent.', true);
         if (!prepared.isCurrent()) {
           if (identityPreparations++ >= 1) return stamp(errorStep('Request preparation changed repeatedly. No request was sent.', true));
           prepared = await prepared.refresh(signal);
         }
+        if (contextOwner && !contextOwner.isCurrent()) throw new TurnPreparationError('Request history changed during preparation. No request was sent.', true);
         if (!preparationOffered && options.prepareContext) {
           preparationOffered = true;
           const replacement = await options.prepareContext(prepared, signal);
           signal?.throwIfAborted();
           if (replacement) prepared = replacement;
         }
+        if (contextOwner) prepared = bindTurnContext(prepared, contextOwner);
         if (!prepared.isCurrent()) {
           if (identityPreparations++ >= 1) return stamp(errorStep('Request preparation changed repeatedly. No request was sent.', true));
           prepared = await prepared.refresh(signal);

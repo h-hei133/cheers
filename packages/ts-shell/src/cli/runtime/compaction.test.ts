@@ -41,7 +41,8 @@ const fixture = vi.hoisted(() => ({
   resolution: {} as Record<string, unknown>,
   toolCalling: undefined as boolean | undefined,
   endpoint: "test-signed-summary",
-  config: { providerConnectTimeoutMs: 1000, providerHeadersTimeoutMs: 1000, providerBodyTimeoutMs: 1000, offline: true },
+  config: { providerConnectTimeoutMs: 1000, providerHeadersTimeoutMs: 1000, providerBodyTimeoutMs: 1000, offline: true,
+    disabledTools: [], hiddenToolPrefixes: [], toolDiscovery: 'full', skillful: false },
 }));
 vi.mock("../../config/runtimeConfig.js", async importOriginal => ({ ...await importOriginal<typeof import('../../config/runtimeConfig.js')>(), getRuntimeConfig: () => fixture.config }));
 // This transport composition has no goal; budget policy is covered by its owning suite.

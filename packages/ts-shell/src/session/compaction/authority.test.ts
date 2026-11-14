@@ -48,6 +48,19 @@ it('allows only opening content prefixes while preserving every other applicatio
   expect(() => authority.capture([{ role: 'user', content: caller.content }])).toThrow('no longer matches');
 });
 
+it('accepts live assistant completion diagnostics omitted by durable history while retaining its facts', () => {
+  const stored: AgentMessage = { id: 'assistant', timestamp: 'earlier', role: 'assistant', content: 'answer',
+    metadata: { application: 1 }, origin: { provider: 'fixture', model: 'model' } };
+  const source: CompactionSource = { sessionId: 'live-completion', identity: 'raw', history: [stored] };
+  const authority = sessionCompactionAuthority({ sessionId: source.sessionId, workspaceRoot: root, admission: () => undefined,
+    isCurrent: () => true, capture: () => source, commit: () => ({ status: 'committed' }) });
+  const live: AgentMessage = { role: 'assistant', content: 'answer', stopReason: 'stop', errorMessage: 'transient diagnostic',
+    metadata: { application: 1 }, origin: { provider: 'fixture', model: 'model' } };
+  expect(authority.capture([live])).toBe(source);
+  expect(() => authority.capture([{ ...live, metadata: { application: 2 } }])).toThrow('no longer matches');
+  expect(() => authority.capture([{ ...live, origin: { provider: 'fixture', model: 'changed' } }])).toThrow('no longer matches');
+});
+
 it('rejects custom accessors without invoking application code', () => {
   const source: CompactionSource = { sessionId: 'inert-test', identity: 'raw', history: [{ role: 'custom', customType: 'application', content: 'text', display: true }] };
   const authority = sessionCompactionAuthority({ sessionId: source.sessionId, workspaceRoot: root, admission: () => undefined,

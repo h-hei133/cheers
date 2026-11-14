@@ -710,12 +710,15 @@ export function applyCompaction(
   const checkpoint: AgentMessage = {
     role: "user",
     content: formatContextCheckpoint(summary),
+    metadata: { contextSummary: "compaction" },
   };
   const head = messages[0]?.role === "system" ? [messages[0]] : [];
   return [...head, checkpoint, ...messages.slice(plan.cut)];
 }
 
 export interface CompactionStepOptions {
+  /** A provider overflow bypasses the threshold, while candidate shrink and admission still apply. */
+  readonly force?: boolean;
   readonly summarize: SummarizeHistory;
   readonly authority?: CompactionAuthority;
   /** Enables durable step reuse across restarts; absent keeps the old in-memory behaviour. */
@@ -781,7 +784,8 @@ export function createCompactionStep(
       source = input.operation?.source ?? source;
       const preparedPolicy = await prepareCompactionPolicy(input.policy, input.messages, signal, snapshot.toolsAllowed);
       if (options.authority?.admission?.()) throw new Error('Compaction source ownership changed.');
-      const prepared = planCompaction(input.messages, preparedPolicy, snapshot.toolsAllowed);
+      const prepared = options.force ? planCompactionCut(input.messages, preparedPolicy)
+        : planCompaction(input.messages, preparedPolicy, snapshot.toolsAllowed);
       if (progress?.blocks(input.messages, prepared?.cut, snapshot.toolsAllowed, preparedPolicy)) return undefined;
       if (prepared?.tokensBefore === undefined) {
         const refusal = compactionRefusalReason(input.messages, preparedPolicy, snapshot.toolsAllowed);
@@ -792,7 +796,7 @@ export function createCompactionStep(
         return undefined;
       }
       // The preparation closure reuses this exact raw capture in condenseContext.
-      condensed = await condenseContext({ ...input, policy: preparedPolicy });
+      condensed = await condenseContext({ ...input, policy: preparedPolicy, force: options.force });
     } catch (error) {
       if (error instanceof ModelAdmissionError) throw error;
       if (signal?.aborted) {

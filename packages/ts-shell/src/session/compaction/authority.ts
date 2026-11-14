@@ -25,10 +25,12 @@ function matchesHistory(source: CompactionSource, messages: readonly AgentMessag
   if (actual.length !== storedHistory.length) return false;
   return actual.every((message, index) => {
     const stored = storedHistory[index]!;
-    // Storage identity is not an application fact. Every other captured field
-    // can influence conversion, including metadata and provider observations.
-    const { id: _callerId, timestamp: _callerTime, content: _callerContent, ...callerFacts } = message;
-    const { id: _storedId, timestamp: _storedTime, content: _storedContent, ...storedFacts } = stored;
+    // Persistence omits storage identity and transient completion diagnostics.
+    // Other captured facts, including metadata and provider origin, must match.
+    const { id: _callerId, timestamp: _callerTime, content: _callerContent,
+      stopReason: _callerStop, errorMessage: _callerError, ...callerFacts } = message;
+    const { id: _storedId, timestamp: _storedTime, content: _storedContent,
+      stopReason: _storedStop, errorMessage: _storedError, ...storedFacts } = stored;
     if (!sameValue(callerFacts, storedFacts)) return false;
     if (sameValue(message.content, stored.content)) return true;
     // The current opening includes the runtime environment before its persisted user text.

@@ -71,6 +71,10 @@ import { sourceReaderFor } from '../data/access.js';
 import { installUsageRuntime, usageResetApproval } from './usage.js';
 import { captureSummaryRole } from '../provider/summary.js';
 import { currentProviderConnections } from '../../provider/request/connection.js';
+import { preparePromptRequest } from '../../core/prompts/request.js';
+import { providerStepRequest, providerToolsAvailable } from '../provider/step.js';
+import { manualCompactionPolicy } from './compaction/context.js';
+import { captureThinkingPreference } from '../../core/models/preference.js';
 
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
@@ -130,7 +134,7 @@ export function createCliSessionRuntime(input: {
       const main = config.sessionModelRoles?.summary
         ? Promise.resolve({ provider: providers.provider(resolved, catalog) } as ProviderRenewal)
         : providers.renew(resolved, config, admission, catalog, false);
-      return main.then(({ provider, failure }) => {
+      return main.then(async ({ provider, failure }) => {
         if (!provider) {
           return {
             status: "failed" as const,
@@ -143,12 +147,26 @@ export function createCliSessionRuntime(input: {
           convertToLlm,
           onCredentialPersisted: providers.publication,
           requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager) });
+        const host = { workspaceRoot, sessionId, runtimeConfig: config, providerCatalog: catalog,
+          providerCredentialResolution: resolved, providerMode: 'real' as const, admission,
+          ...captureThinkingPreference(workspaceRoot, resolved.thinkingEffort),
+          agentMode: sessionRuntime.getAgentMode() };
+        const preparedPrompt = await preparePromptRequest({ ...host, signal, mcpGateway: input.mcpGateway,
+          toolsAvailable: providerToolsAvailable(host, catalog), featureTools: foregroundTools(input.runtimeContext),
+          ...(input.runtimeContext.skillOptions ? { skillOptions: input.runtimeContext.skillOptions } : {}),
+          ...(input.runtimeContext.systemPrompt !== undefined ? { systemPrompt: input.runtimeContext.systemPrompt } : {}),
+          ...(input.runtimeContext.appendSystemPrompt?.length ? { appendSystemPrompt: input.runtimeContext.appendSystemPrompt } : {}),
+          ...(input.runtimeContext.sdkSkills ? { sdkSkills: input.runtimeContext.sdkSkills } : {}),
+        });
+        const mainRequest = providerStepRequest(host, preparedPrompt.tools, preparedPrompt.promptContext, preparedPrompt.discovery);
+        const policy = manualCompactionPolicy(wiring.policy, { ...mainRequest, provider: { ...mainRequest.provider, ...provider, provider: provider.providerId } },
+          convertToLlm, admission);
         return compactSessionHistory({
           store: input.sessionManager,
           sessionId,
           authority: nativeCompactionAuthority({ sessionId, workspaceRoot, admission,
             publication: operation.publication, configuration: input.runtimeContext.configuration, store: input.sessionManager }),
-          policy: wiring.policy,
+          policy,
           summarize: wiring.summarize,
           summarizeTurnPrefix: wiring.summarizeTurnPrefix,
           signal,

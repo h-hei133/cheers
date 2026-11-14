@@ -32,7 +32,7 @@
 
 - [ ] **C.1** prepareNextTurn／prepareRequest／finishTurn 与虚拟路由：部分验收。follow-up优先于人工context-only续轮、steering仍优先，两项反转红例有效；独立暂存树4套件111项、六静态门、build `1e9c526087ec`通过，限定复核CLEAR。其他hook调用顺序与真实配置模型验收仍待完成。
 - [ ] **C.2** message_update 流式部分消息及 x-should-retry：已有待验收，部分响应不重放、内外重试一致。
-- [ ] **C.3** AgentMessage 与 provider Message 分离及 convertToLlm：部分。基础类型`91c3ec6`、custom持久化／显示`f5e4ee9`及前台SDK`c220e6f`已提交。前台12套件391项、六静态门、函数上限、build `48bafd6fec4c`及Linux配置模型三次wire/重开/取消后复用通过，实际通过回执在`conversion-native-wire.log`，历史`conversion-native.json`为失败诊断。摘要批接通manual/automatic/prefix/merge/branch转换、同一获准capture预算及send、完整UTF-8准入、原ledger的unknown和legacy拒绝、导航/connection取消；18套件326项、六静态门、build `5e1c8ee4afbb`与当前编译SDK真实模型三次摘要/手动持久化/branch/取消零派发通过，限定复审CLEAR。主请求threshold与候选发布前转换缩小验证仍未完成，不因子批次通过勾选。
+- [ ] **C.3** AgentMessage 与 provider Message 分离及 convertToLlm：部分。基础类型`91c3ec6`、custom持久化／显示`f5e4ee9`及前台SDK`c220e6f`已提交。前台12套件391项、六静态门、函数上限、build `48bafd6fec4c`及Linux配置模型三次wire/重开/取消后复用通过，实际通过回执在`conversion-native-wire.log`，历史`conversion-native.json`为失败诊断。摘要批接通manual/automatic/prefix/merge/branch转换、同一获准capture预算及send、完整UTF-8准入、原ledger的unknown和legacy拒绝、导航/connection取消；18套件326项、六静态门、build `5e1c8ee4afbb`与当前编译SDK真实模型三次摘要/手动持久化/branch/取消零派发通过。完整policy`72be40f8`和capture`c521d82d`之后，转换主请求threshold、候选缩小／完整limits／live owner准入、closing overflow复用和重复checkpoint已通过17套件446项、六静态门、build `fed3b0f8c0d2`及当前编译SDK配置模型7次bodySent（automatic/manual/rewind/reopen/取消零派发），限定复审CLEAR。普通无converter/custom完整请求阈值仍未接通，C.3保持部分。
 - [ ] **C.4** 默认历史工具文本保留与一致测量：已有待验收，真实多轮请求前缀与压缩预算。
 - [ ] **C.5** Anthropic 历史缓存标记、OpenAI／Responses affinity 与 TTL：已有待验收，真实最终 wire 和能力限制。
 - [ ] **C.6** 动态工具／思考档位在原始消息位置声明：部分。当前请求末尾临时追加增量，后续消息会移动旧块；需跨轮／续接后前缀稳定的实际 wire 证据。

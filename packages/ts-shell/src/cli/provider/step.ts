@@ -5,7 +5,7 @@ import type { RequestPolicy } from '../../core/agent/request/model.js';
 import type { ThinkingPreference } from '../../core/models/effort.js';
 import type { ToolDefinition } from '../../tools/types.js';
 import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } from '../../turn/prompt.js';
-import { createStepFunction, type StepFunction } from '../../turn/step.js';
+import { createStepFunction, type StepFunction, type StepRequest } from '../../turn/step.js';
 import { loadCatalog } from '../../core/models/catalogStore.js';
 import { catalogProvider } from '../../core/models/catalog.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
@@ -65,6 +65,16 @@ export function createProviderStep(
   promptContext: SystemPromptContext,
   discovery?: ToolDiscovery,
 ): StepFunction {
+  return createStepFunction(providerStepRequest(request, tools, promptContext, discovery));
+}
+
+/** Shared request assembly for foreground dispatch and pure context preparation. */
+export function providerStepRequest(
+  request: ProviderStepHost,
+  tools: ReadonlyMap<string, ToolDefinition>,
+  promptContext: SystemPromptContext,
+  discovery?: ToolDiscovery,
+): StepRequest {
   const resolution = request.providerCredentialResolution;
   assertScopedModel(request.runtimeConfig, resolution);
   if (resolution.blocked) throw new Error(credentialBlockMessage(resolution.blocked));
@@ -85,7 +95,7 @@ export function createProviderStep(
     baseUrl: baseUrl ?? "",
     ...(endpoint ? { endpoint } : {}),
   });
-  return createStepFunction({
+  return {
     recordAuxiliaryUsage: sessionUsageSink(request.sessionId),
     requestPolicy: request.requestPolicy,
     modelTransport: providerModelTransport(request.runtimeConfig, endpoint, request.admission),
@@ -148,7 +158,7 @@ export function createProviderStep(
       baseDelayMs: request.runtimeConfig?.retryBaseDelayMs,
       maxDelayMs: request.runtimeConfig?.retryMaxDelayMs,
     },
-  });
+  };
 }
 
 /** Each explicit delegated model is resolved once; unavailable targets never use the main step. */

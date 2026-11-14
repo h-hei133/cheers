@@ -234,11 +234,14 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
   }
   if (condensed.status === 'failed') return { status: 'failed', reason: SUMMARY_MISSING };
   if (input.signal?.aborted) return { status: 'failed', reason: 'Compaction was cancelled.' };
+  const admission = () => condensed.preparedPolicy?.admission?.() ?? input.authority?.admission?.();
+  const blocked = admission();
+  if (blocked) return { status: 'failed', reason: blocked };
   const commitInput: CompactionCommitInput = { source,
     summary: condensed.summary,
     keptMessages: condensed.plan.keptMessages,
     tokensBefore: condensed.plan.tokensBefore,
-    signal: input.signal, admission: input.authority?.admission };
+    signal: input.signal, admission };
   const committed = input.authority ? input.authority.commit(commitInput) : input.store.appendCompactionIfCurrent?.(commitInput);
   if (committed && committed.status !== 'committed') return { status: 'failed', reason: committed.reason };
   if (!committed) {

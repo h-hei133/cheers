@@ -2448,3 +2448,21 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** An admitted request retains an obsolete overflow refusal after exact wire recounting, or response callbacks move its usage into a successor purpose/mode/provider.
 - **Root Cause:** Refusal is not derived from the final budget; response accounting reads caller-owned options after dispatch.
 - **Rule:** Derive token refusal from the final effective budget, preserve independent input limits, and carry the captured purpose/mode/provider and auxiliary recorder into response accounting. Recheck freshness at the original attempt handoff and release refused unsent reservations through its existing owner.
+
+### Overflow Recovery Must Prepare The Next Call Contract
+
+- **Symptom:** A recovered request crosses into the closing step but still declares tools and omits the closing instruction.
+- **Root Cause:** Recovery reused the previous call's complete capture after the step counter advanced.
+- **Rule:** Reframe the captured route and conversion under the explicit next allowTools, allowedTools, mode and purpose before estimating or publishing a candidate. Verify the actual consuming call again without rerunning the converter for unchanged raw history.
+
+### Declaration Refresh Must Preserve The Live History Fence
+
+- **Symptom:** A retired request becomes current again after declarations refresh, or a native retry sends its old history after the preparation callback has run once.
+- **Root Cause:** A wrapper replaced isCurrent but inherited an unguarded refresh, while retry preparation did not retain the original live owner.
+- **Rule:** Bind the original history owner at the logical step and recheck it on every preparation and handoff. Guard refresh, reframe and candidate preparation both before and after awaits; declaration changes may refresh only while that history owner remains current.
+
+### Live Checkpoints Must Match Durable Projection Metadata
+
+- **Symptom:** A second compaction refuses unchanged context because live and reopened checkpoints carry different metadata.
+- **Root Cause:** The storage reader adds its contextSummary marker while applyCompaction omitted it; broad metadata equality then fails.
+- **Rule:** Emit the same canonical storage marker in the live checkpoint, retaining strict comparison of application metadata. Actual SessionManager integration fixtures must isolate HOME/USERPROFILE and use persistUserPromptBarrier when comparing transient environment framing to saved prompt text.

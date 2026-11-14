@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createStepFunction } from '../step.js';
 import type { PreparedTurnContext, StepOptions, StepRequest } from './contract.js';
+import { createTurnContextPreparer } from './prepare.js';
 import type { AgentMessage } from '../../core/agent/state.js';
 import type { MessageConverter } from '../../core/agent/messages.js';
 import { VirtualModelRegistry } from '../../core/models/virtualModels.js';
@@ -78,6 +79,53 @@ describe('prepared turn context', () => {
       prepareContext: prepared => prepared.prepare([{ role: 'user', content: 'x'.repeat(3000) }]) });
     expect(result).toMatchObject({ stopReason: 'error', retriesExhausted: true });
     expect(result.errorMessage).toContain('byte limit'); expect(send).not.toHaveBeenCalled();
+  });
+
+  it('reframes closing permissions without rerouting or reconverting and passes them to later candidates', async () => {
+    const routed = vi.fn(() => ({ provider: 'fixture', modelId: 'ordinary' }));
+    const registry = new VirtualModelRegistry(); registry.register({ provider: 'fixture', id: 'ordinary', name: 'Virtual', route: routed });
+    const converted = vi.fn((messages: readonly AgentMessage[]) => [{ role: 'user' as const, content: messages[0]?.content }]);
+    const sent: string[] = [];
+    const stepRequest = request({ virtualModels: registry, tools: [tool('read'), tool('write')],
+      provider: { headers: {}, baseUrl: 'https://prepare.test/v1', provider: 'fixture', model: 'ordinary', replayBinding: 'fixture-replay' },
+      fetchImpl: async (_url, init) => { sent.push(String(init?.body)); return new Response(JSON.stringify({ choices: [{
+        message: { content: 'ok' }, finish_reason: 'stop' }] }), { headers: { 'content-type': 'application/json' } }); },
+    });
+    const prepare = createTurnContextPreparer(stepRequest, {
+      allowTools: true, allowedTools: ['read'], agentMode: 'plan', requestPurpose: 'original', convertToLlm: converted,
+    }, { explicitEffort: false, effortAccepted: () => true, streamAttempts: () => 0, replayBinding: 'fixture-replay' });
+    const prepared = await prepare([{ role: 'user', content: 'Original source' }]);
+    expect(JSON.parse(prepared.body).tools.map((entry: ReturnType<typeof tool>) => entry.function.name)).toEqual(['read']);
+    expect(prepared.budgetMessages.at(-1)?.content).toBe('Original source');
+    const allowedTools = ['read'];
+    const closed = await prepared.reframe({ allowTools: false, allowedTools });
+    allowedTools.push('write');
+    expect(closed).toMatchObject({ allowTools: false, allowedTools: ['read'], requestPurpose: 'turn' });
+    expect(closed.agentMode).toBeUndefined(); expect(Object.isFrozen(closed.allowedTools)).toBe(true);
+    expect(closed.sourceMessages).toEqual(prepared.sourceMessages);
+    expect(closed.messageProjection).toEqual(prepared.messageProjection);
+    expect(closed.isCurrent()).toBe(true); expect(closed.overhead.tools).toEqual([]);
+    expect(closed.budgetMessages.at(-1)?.content).toBe(FINAL_STEP_MESSAGE);
+    expect(JSON.parse(closed.body).tools).toBeUndefined();
+    expect(routed).toHaveBeenCalledTimes(1); expect(converted).toHaveBeenCalledTimes(1);
+    let accepted = await closed.prepare([{ role: 'user', content: 'Candidate source' }]);
+    expect(accepted).toMatchObject({ allowTools: false, allowedTools: ['read'], requestPurpose: 'turn' });
+    expect(accepted.agentMode).toBeUndefined(); expect(accepted.budgetMessages.at(-1)?.content).toBe(FINAL_STEP_MESSAGE);
+    expect(JSON.parse(accepted.body).tools).toBeUndefined();
+    expect(routed).toHaveBeenCalledTimes(2); expect(converted).toHaveBeenCalledTimes(2);
+    const reopened = await accepted.reframe({ allowTools: true, allowedTools: ['write'], agentMode: 'build', requestPurpose: 'next-call' });
+    expect(reopened).toMatchObject({ allowTools: true, allowedTools: ['write'], agentMode: 'build', requestPurpose: 'next-call' });
+    expect(reopened.budgetMessages.at(-1)?.content).toBe('Candidate source');
+    expect(JSON.parse(reopened.body).tools.map((entry: ReturnType<typeof tool>) => entry.function.name)).toEqual(['write']);
+    accepted = await accepted.refresh();
+    expect(accepted.allowTools).toBe(false); expect(accepted.budgetMessages.at(-1)?.content).toBe(FINAL_STEP_MESSAGE);
+    expect(routed).toHaveBeenCalledTimes(2); expect(converted).toHaveBeenCalledTimes(2);
+    const result = await createStepFunction(stepRequest)(accepted.sourceMessages, undefined, {}, {
+      allowTools: false, allowedTools: ['read'], preparedContext: accepted, convertToLlm: converted,
+    });
+    expect(result).toMatchObject({ text: 'ok', stopReason: 'stop', toolsAllowed: false });
+    expect(sent).toEqual([accepted.body]);
+    expect(routed).toHaveBeenCalledTimes(2); expect(converted).toHaveBeenCalledTimes(2);
   });
 
   it('refreshes changed declarations once using the same route and conversion', async () => {

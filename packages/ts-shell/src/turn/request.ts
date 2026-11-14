@@ -7,6 +7,11 @@ import { getSessionUsage, recordRequestContext } from '../observability/usageTel
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 import type { CacheWarmingRunner } from './cacheWarm.js';
 import type { StepFunction, StepOptions } from './step.js';
+import type { PreparedTurnContext } from './context/contract.js';
+import type { RequestContextOwner } from '../core/agent/context.js';
+import type { MessageConverter, MessageProjection } from '../core/agent/messages.js';
+import { sameContext } from '../core/agent/context.js';
+import { bindTurnContext } from './context/owner.js';
 import type { EventChannel } from './stream.js';
 import { rememberToolRequests, traceOperation } from '../observability/tracing/context.js';
 import { randomUUID } from 'node:crypto';
@@ -53,6 +58,10 @@ function tracedStep(step: StepFunction): StepFunction {
 }
 
 interface RequestOptions {
+  readonly convertToLlm?: MessageConverter;
+  readonly prepareContext?: (prepared: PreparedTurnContext, signal: AbortSignal | undefined, context: RequestContextOwner) => Promise<PreparedTurnContext | undefined>;
+  readonly onPreparedContext?: (prepared: PreparedTurnContext, context: RequestContextOwner) => void;
+  readonly consumePreparedContext?: (messages: readonly SessionMessage[]) => PreparedTurnContext | undefined;
   readonly claimBudgetSummary?: () => boolean;
   readonly step: StepFunction;
   readonly sessionId: string;
@@ -99,6 +108,15 @@ export function createTurnRequest(
   let lastSentRequest: SentRequest | undefined;
   const stepRequest = tracedStep(options.step);
   return async (messages, signal, request) => {
+    const toolsAllowed = projection.stepCount < options.maxSteps;
+    const recovered = options.consumePreparedContext?.(request?.sourceMessages ?? messages);
+    const recovery = recovered ? await recovered.reframe({ allowTools: toolsAllowed, allowedTools: options.allowedTools,
+      requestPurpose: requestPurposeFor(recovered.sourceMessages) }, signal) : undefined;
+    let activeMessages = recovery?.messageProjection.messages ?? messages;
+    let activeProjection: MessageProjection = recovery?.messageProjection ?? {
+      messages: messages as MessageProjection['messages'],
+      ...(request?.sourceMessages ? { sourceMessages: request.sourceMessages, providerMessages: request.providerMessages } : {}),
+    };
     channel.push({ type: "message.started", role: "coder" });
     // A new request replaces the old prefix even if it fails or reports no usage.
     if (lastSentRequest) options.cacheWarming?.noteRequest(0, lastSentRequest);
@@ -120,7 +138,6 @@ export function createTurnRequest(
       }
     };
     let budgetSummary = false;
-    const toolsAllowed = projection.stepCount < options.maxSteps;
     let streamedText = "";
     let streamedReasoning = "";
     const emitStreamUpdate = (delta?: string) => {
@@ -131,7 +148,7 @@ export function createTurnRequest(
       });
     };
     let step = await stepRequest(
-      messages,
+      activeMessages,
       signal,
       {
         onText: (delta) => {
@@ -157,10 +174,25 @@ export function createTurnRequest(
       },
       {
         allowTools: toolsAllowed,
+        ...(request?.context?.eligible ? { contextOwner: request.context } : {}),
         ...(promptSource ? { promptSource } : {}),
         ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}),
-        requestPurpose: requestPurposeFor(request?.sourceMessages ?? messages),
-        ...(request?.sourceMessages ? { sourceMessages: request.sourceMessages, providerMessages: request.providerMessages } : {}),
+        requestPurpose: requestPurposeFor(activeProjection.sourceMessages ?? activeMessages),
+        ...(activeProjection.sourceMessages ? { sourceMessages: activeProjection.sourceMessages, providerMessages: activeProjection.providerMessages } : {}),
+        convertToLlm: options.convertToLlm,
+        ...(recovery ? { preparedContext: recovery } : {}),
+        prepareContext: async prepared => {
+          let captured = recovery && recovery.isCurrent() && sameContext(prepared.sourceMessages, recovery.sourceMessages) ? recovery : prepared;
+          if (request?.context) {
+            const replacement = !recovery && options.prepareContext ? await options.prepareContext(captured, signal, request.context) : undefined;
+            captured = replacement ?? captured;
+            options.onPreparedContext?.(captured, request.context);
+          }
+          activeProjection = captured.messageProjection;
+          activeMessages = captured.messageProjection.messages;
+          const accepted = captured;
+          return request?.context?.eligible ? bindTurnContext(accepted, request.context) : accepted;
+        },
         requestId: request?.requestId,
         // Kept so a refresh can replay it. Captured at the step, because that
         // is the only place the request exists in the shape it was sent.
@@ -173,15 +205,15 @@ export function createTurnRequest(
       // This instruction is request-local: it has no user-message lifecycle,
       // persistence or display event. The ordinary step still enforces the cap.
       const instruction = { role: 'user' as const, content: BUDGET_SUMMARY_MESSAGE };
-      const closing = await stepRequest([...messages, instruction],
+      const closing = await stepRequest([...activeMessages, instruction],
       signal, {
         onText: delta => channel.push({ type: 'message.delta', role: 'coder', delta }),
         onReasoning: delta => channel.push({ type: 'reasoning.delta', role: 'coder', delta }),
         onReasoningReplace: text => channel.push({ type: 'reasoning.replace', role: 'coder', text }),
         onReplace: text => channel.push({ type: 'message.replace', role: 'coder', text }),
-      }, { allowTools: false, ...(request?.sourceMessages ? {
-        sourceMessages: [...request.sourceMessages, instruction],
-        providerMessages: [...(request.providerMessages ?? []), instruction],
+      }, { allowTools: false, ...(activeProjection.sourceMessages ? {
+        sourceMessages: [...activeProjection.sourceMessages, instruction],
+        providerMessages: [...(activeProjection.providerMessages ?? []), instruction],
       } : {}), ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}), requestPurpose: 'goal-budget-summary',
         onRequestSent, onRequestUsage });
       // Its input includes an unpersisted instruction, so it cannot anchor the
