@@ -32,7 +32,7 @@
 
 - [ ] **C.1** prepareNextTurn／prepareRequest／finishTurn 与虚拟路由：部分验收。follow-up优先于人工context-only续轮、steering仍优先，两项反转红例有效；独立暂存树4套件111项、六静态门、build `1e9c526087ec`通过，限定复核CLEAR。其他hook调用顺序与真实配置模型验收仍待完成。
 - [ ] **C.2** message_update 流式部分消息及 x-should-retry：已有待验收，部分响应不重放、内外重试一致。
-- [ ] **C.3** AgentMessage 与 provider Message 分离及 convertToLlm：缺口。目前 AgentMessage extends SessionMessage；需实际自定义消息、投影／持久化／SDK 消费者，不能只新增类型。
+- [ ] **C.3** AgentMessage 与 provider Message 分离及 convertToLlm：部分。基础类型已拆层，provider不携带会话状态，测量合同归原request owner；六静态门、4套件85项和build通过，限定复审CLEAR。自定义消息、投影／持久化／SDK消费者仍待实现，不因类型拆分勾选完成。
 - [ ] **C.4** 默认历史工具文本保留与一致测量：已有待验收，真实多轮请求前缀与压缩预算。
 - [ ] **C.5** Anthropic 历史缓存标记、OpenAI／Responses affinity 与 TTL：已有待验收，真实最终 wire 和能力限制。
 - [ ] **C.6** 动态工具／思考档位在原始消息位置声明：部分。当前请求末尾临时追加增量，后续消息会移动旧块；需跨轮／续接后前缀稳定的实际 wire 证据。

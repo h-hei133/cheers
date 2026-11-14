@@ -1,4 +1,4 @@
-import type { MultimodalContentBlock } from "../model-adapters/multimodal.js";
+import type { ProviderMessage, ProviderToolCall } from '../model-adapters/message.js';
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { textSize } from '../context/request/measure.js';
@@ -12,33 +12,8 @@ import type { PromptSource } from '../context/request/model.js';
  * it; everything that changes per turn travels in the user message instead.
  */
 
-export interface ChatToolCall {
-  readonly id: string;
-  readonly type: "function";
-  readonly function: { readonly name: string; readonly arguments: string };
-}
-
-export interface ChatMessage {
-  readonly role: "system" | "user" | "assistant" | "tool";
-  /** Text, or text with images attached; see `SessionMessage.content`. */
-  readonly content?: string | readonly MultimodalContentBlock[] | null;
-  readonly tool_calls?: readonly ChatToolCall[];
-  readonly tool_call_id?: string;
-  readonly origin?: SessionMessage['origin'];
-  /**
-   * The working out an assistant turn came with, and the provider's signature
-   * over it; see `SessionMessage.reasoning`.
-   *
-   * Carried through to the endpoint that needs it back, and ignored by the ones
-   * that do not: a protocol with no place for it simply does not read it.
-   */
-  readonly reasoning?: {
-    readonly text: string;
-    readonly signature?: string;
-    /** See `SessionMessage.reasoning.redacted`. */
-    readonly redacted?: boolean;
-  };
-}
+export type ChatToolCall = ProviderToolCall;
+export type ChatMessage = ProviderMessage;
 
 export interface SystemPromptContext {
   /**
