@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { prepareCompactionMessages, requestCompactionSummary } from "./summarize.js";
+import { prepareCompactionMessages, prepareCompactionRequest, requestCompactionSummary, type CompactionRequest } from "./summarize.js";
 import { parseFileFootprintXml } from "./fileFootprint.js";
 import { DEFAULT_REQUEST_SHAPE } from '../../models/requestShape.js';
 import { ModelAdmissionError } from '../../agent/request/model.js';
@@ -247,5 +247,117 @@ describe("requestCompactionSummary", () => {
       maxOutputTokens: 10,
       provider: { inputLimit: 1, reserveTokens: 0 },
     })).toThrow(SummaryAdmissionError);
+  });
+
+  it('sends the captured body, target, headers and file footprint after caller mutation', async () => {
+    const sent: Array<{ url: string; body: string; authorization: string | null }> = [];
+    const shape = { ...DEFAULT_REQUEST_SHAPE, toolCalling: true };
+    const provider = { headers: { authorization: 'fixture-before' }, baseUrl: 'https://provider.test/v1', model: 'before', shape };
+    const messages = [{ role: 'assistant' as const, content: '', tool_calls: [{ id: 'read', type: 'function' as const,
+      function: { name: 'read', arguments: '{"path":"src/before.ts"}' } }] }];
+    const fetchImpl = vi.fn(async (url: unknown, init?: RequestInit) => {
+      sent.push({ url: String(url), body: String(init?.body), authorization: new Headers(init?.headers).get('authorization') });
+      return Response.json({ choices: [{ message: { content: 'summary' } }] });
+    });
+    const prepared = prepareCompactionRequest({ provider, messages, fetchImpl: fetchImpl as typeof fetch, prompt: 'captured instruction' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    provider.model = 'after'; provider.baseUrl = 'https://replacement.test'; provider.headers.authorization = 'fixture-after';
+    shape.toolCalling = false;
+    messages[0]!.tool_calls[0]!.function.arguments = '{"path":"src/after.ts"}';
+    const dispatch = vi.fn();
+    const summary = await prepared.send({ dispatch });
+    expect(dispatch).toHaveBeenCalledOnce();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ url: 'https://provider.test/v1/chat/completions', authorization: 'fixture-before' });
+    const body = JSON.parse(sent[0]!.body);
+    expect(body.model).toBe('before');
+    expect(body.messages.at(-1).content).toBe('captured instruction');
+    expect(body.messages[0].tool_calls[0].function.arguments).toBe('{"path":"src/before.ts"}');
+    expect(parseFileFootprintXml(summary).readFiles).toEqual(['src/before.ts']);
+    await expect(prepared.send()).rejects.toThrow('already been consumed');
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('checks complete serialized input bytes before admitting a summary handle', () => {
+    const reserve = vi.fn();
+    const fetchImpl = vi.fn();
+    expect(() => prepareCompactionRequest({
+      provider: { headers: {}, baseUrl: 'https://fixture.test', model: 'summary',
+        shape: { ...DEFAULT_REQUEST_SHAPE, inputLimits: { maxRequestBytes: 32 } } },
+      messages: [{ role: 'user', content: 'small' }], prompt: 'small instruction',
+      fetchImpl: fetchImpl as typeof fetch, requestPolicy: { reserve } as never,
+    })).toThrow(SummaryAdmissionError);
+    expect(reserve).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('merges converted system text into every auxiliary protocol system field', async () => {
+    for (const endpoint of ['openai-compatible', 'anthropic-messages', 'google-generative-ai']) {
+      const bodies: Array<Record<string, any>> = [];
+      const prepared = prepareCompactionRequest({
+        provider: { headers: {}, baseUrl: 'https://fixture.test', model: 'summary', endpoint }, prompt: 'summarize once',
+        messages: [{ role: 'system', content: 'first instruction' }, { role: 'user', content: 'history' },
+          { role: 'system', content: 'second instruction' }],
+        fetchImpl: (async (_url, init) => {
+          bodies.push(JSON.parse(String(init?.body)));
+          return Response.json({ choices: [{ message: { content: 'summary' } }] });
+        }) as typeof fetch,
+      });
+      await prepared.send();
+      expect(bodies).toHaveLength(1);
+      const body = bodies[0]!;
+      if (endpoint === 'openai-compatible') expect(body.messages[0]).toEqual({ role: 'system', content: 'first instruction\n\nsecond instruction' });
+      if (endpoint === 'anthropic-messages') {
+        expect(body.system[0].text).toBe('first instruction\n\nsecond instruction');
+        expect(body.messages.every((message: any) => message.role !== 'system')).toBe(true);
+      }
+      if (endpoint === 'google-generative-ai') expect(body.systemInstruction.parts[0].text).toBe('first instruction\n\nsecond instruction');
+    }
+  });
+
+  it('refuses non-text system content before preparing a body or dispatching', () => {
+    const fetchImpl = vi.fn();
+    const messages = [{ role: 'system', content: [{ type: 'image', data: 'fixture', mimeType: 'image/png' }] }];
+    expect(() => prepareCompactionRequest({ provider: { headers: {}, baseUrl: 'https://fixture.test', model: 'summary' },
+      messages: messages as unknown as CompactionRequest['messages'], fetchImpl })).toThrow(SummaryAdmissionError);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('binds identity to captured request bytes and target without authentication headers', () => {
+    const request: CompactionRequest = { provider: { headers: { authorization: 'fixture-one' }, baseUrl: 'https://fixture.test', model: 'summary' },
+      messages: [{ role: 'user', content: 'history' }], fetchImpl: vi.fn(), prompt: 'summarize' };
+    const first = prepareCompactionRequest(request);
+    const same = prepareCompactionRequest({ ...request, provider: { ...request.provider, headers: { authorization: 'fixture-two' } } });
+    expect(first.identity).toMatch(/^[a-f0-9]{64}$/);
+    expect(same.identity).toBe(first.identity);
+    expect(prepareCompactionRequest({ ...request, messages: [{ role: 'user', content: 'changed' }] }).identity).not.toBe(first.identity);
+    expect(prepareCompactionRequest({ ...request, provider: { ...request.provider, model: 'different' } }).identity).not.toBe(first.identity);
+    expect(prepareCompactionRequest({ ...request, purpose: 'branch-summary' }).identity).not.toBe(first.identity);
+    expect(prepareCompactionRequest({ ...request, previousSummary: 'previous' }).identity).not.toBe(first.identity);
+    expect(prepareCompactionRequest({ ...request, provider: { ...request.provider,
+      credentialId: 'account', credentialGeneration: 'next' } }).identity).not.toBe(first.identity);
+  });
+
+  it('estimates converted history separately while preflight still covers the complete request', () => {
+    const messages = [{ role: 'user' as const, content: 'history' }];
+    const request: CompactionRequest = { provider: { headers: {}, baseUrl: 'https://fixture.test', model: 'summary' }, messages, fetchImpl: vi.fn() };
+    const first = prepareCompactionRequest({ ...request, prompt: 'short' });
+    const longer = prepareCompactionRequest({ ...request, prompt: 'long instruction '.repeat(100), previousSummary: 'old work '.repeat(100) });
+    expect(first.tokens).toBe(promptTokensFor({ messages }).tokens);
+    expect(longer.tokens).toBe(first.tokens);
+    expect(() => prepareCompactionRequest({ ...request, provider: { ...request.provider, inputLimit: first.tokens + 1, reserveTokens: 0 },
+      prompt: 'long instruction '.repeat(100) })).toThrow(SummaryAdmissionError);
+  });
+
+  it('rejects a cancelled prepared request before transport admission and dispatch', async () => {
+    const controller = new AbortController();
+    const reserve = vi.fn();
+    const fetchImpl = vi.fn();
+    const dispatch = vi.fn();
+    const prepared = prepareCompactionRequest({ provider: { headers: {}, baseUrl: 'https://fixture.test', model: 'summary' },
+      messages: [{ role: 'user', content: 'history' }], signal: controller.signal, fetchImpl, requestPolicy: { reserve } });
+    controller.abort();
+    await expect(prepared.send({ dispatch })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(reserve).not.toHaveBeenCalled(); expect(fetchImpl).not.toHaveBeenCalled(); expect(dispatch).not.toHaveBeenCalled();
   });
 });

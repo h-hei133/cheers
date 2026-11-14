@@ -95,6 +95,7 @@ export interface SessionRuntimeDependencies {
    */
   readonly summarizeAbandonedTurns?: (
     messages: readonly SessionMessage[],
+    signal?: AbortSignal,
   ) => Promise<string | undefined>;
 }
 
@@ -492,9 +493,9 @@ export class ShellSessionRuntime {
    * rewind itself is the user's decision and must not depend on a summary
    * being available.
    */
-  async summarizeAbandonedTurns(messages: readonly SessionMessage[]): Promise<string | undefined> {
+  async summarizeAbandonedTurns(messages: readonly SessionMessage[], signal?: AbortSignal): Promise<string | undefined> {
     if (!this.deps.summarizeAbandonedTurns) return undefined;
-    return this.deps.summarizeAbandonedTurns(messages);
+    return this.deps.summarizeAbandonedTurns(messages, signal);
   }
 
   terminate(sessionId: string): void {

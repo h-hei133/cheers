@@ -25,8 +25,9 @@ export function compactionOperationKey(input: CompactionOperationInput): string 
     input.source?.replayIdentity ?? input.source?.identity ?? '', input.identity ?? '']);
 }
 export function compactionStepDigest(input: { readonly history: readonly unknown[]; readonly prefix?: readonly unknown[];
-  readonly previousSummary?: string; readonly instructions?: string; readonly stage?: string }): string {
-  return digest([input.history, input.prefix ?? [], input.previousSummary ?? '', input.instructions ?? '', input.stage ?? '']);
+  readonly previousSummary?: string; readonly instructions?: string; readonly stage?: string; readonly preparedIdentity?: string }): string {
+  const source = [input.history, input.prefix ?? [], input.previousSummary ?? '', input.instructions ?? '', input.stage ?? ''];
+  return digest(input.preparedIdentity === undefined ? source : [...source, input.preparedIdentity]);
 }
 function verifyOwner(claim: CompactionStepClaim): void {
   if (claim.profile) assertCurrentProfile(claim.profile);
@@ -47,7 +48,7 @@ function mutate<T>(claim: CompactionStepClaim, action: (operations: Record<strin
   }, { createParent: false });
 }
 /** Preparation never asserts a request has been sent. A restart still cannot replay an owned preparation. */
-export function claimCompactionStep(input: CompactionOperationInput & { readonly stepDigest: string }): CompactionStepClaim {
+export function claimCompactionStep(input: CompactionOperationInput & { readonly stepDigest: string; readonly preparedIdentity?: string }): CompactionStepClaim {
   const operation = compactionOperationKey(input);
   const step = input.stepDigest;
   const file = input.source?.directory ? path.join(input.source.directory, 'compaction-operations.json') : compactionOperationsPath(input.sessionId);
@@ -63,13 +64,25 @@ export function claimCompactionStep(input: CompactionOperationInput & { readonly
   const result = mutate(claim, (operations, now) => {
     const current = operations[operation] ?? { updatedAt: now, steps: {} };
     const existing = current.steps[step];
+    // A changed conversion or segment schedule cannot authorize replay of an
+    // uncertain request. Preserve legacy raw-key evidence in this same ledger.
+    const uncertain = input.preparedIdentity === undefined ? undefined
+      : Object.values(current.steps).find(record => record.status !== 'completed');
+    if (uncertain) return Object.freeze({ ...claim, acquired: false, claimId: uncertain.claimId, unknown: true });
     if (existing) return Object.freeze({ ...claim, acquired: false, claimId: existing.claimId,
       ...(existing.status === 'completed' && existing.summary !== undefined ? { summary: existing.summary } : { unknown: true }) });
+    // Old targets could hash credentials into policy identity. Their retained
+    // evidence cannot be safely assigned to the new non-secret operation key.
+    if (input.preparedIdentity !== undefined && Object.values(operations).some(record => Object.values(record.steps)
+      .some(value => value.preparedIdentity === undefined && (value.status !== 'completed' || value.summary === undefined)))) {
+      throw new CompactionOperationError('Legacy compaction replay evidence cannot be mapped to this request; inspect the saved session before requesting another summary.');
+    }
     // Capacity refuses new work; it never removes evidence to make room for a send.
     if (Object.values(operations).reduce((count, record) => count + Object.keys(record.steps).length, 0) >= 8192) {
       throw new CompactionOperationError('Compaction replay evidence is full; no new summary request was authorized.');
     }
-    current.steps[step] = { claimId: claim.claimId, status: 'prepared', updatedAt: now };
+    current.steps[step] = { claimId: claim.claimId, status: 'prepared', updatedAt: now,
+      ...(input.preparedIdentity !== undefined ? { preparedIdentity: input.preparedIdentity } : {}) };
     operations[operation] = { ...current, updatedAt: now };
     return claim;
   });

@@ -2429,3 +2429,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Converted system instructions vanish at dispatch, or SDK custom history is appended while prompt settlement remains pending.
 - **Root Cause:** Stored-history projection drops system messages and a cleared model controller does not mean the complete runtime promise has settled.
 - **Rule:** Project converted system text into the request system field before budgeting and identity capture, reject unsupported system media explicitly, and require the runtime run and command owners to be idle before SDK history appends. Observe the configured Undici transport when proving real wire content; replacing global fetch does not observe it.
+
+### Prepared Summary Identity Must Preserve Unknown Replay Evidence
+- **Symptom:** A changed converter output or upgraded target identity makes a previously uncertain summary send appear new.
+- **Root Cause:** Exact body identity changes the step/operation digest while the old ledger still retains an unknown handoff or an expired summary tombstone.
+- **Rule:** Preserve exact capture identity for completed reuse, block changed captures while the same operation is uncertain, and refuse unmappable legacy evidence without rehashing credentials or deleting records. Check complete serialized input limits before admitting a capture, and carry navigation/connection cancellation into pending branch conversion.

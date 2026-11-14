@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { CompactionSetup } from '../../turn/session.js';
 import { withProviderConnections, type ProviderConnectionLifetime } from '../../provider/request/connection.js';
+import type { PreparedSummaryStep } from '../../session/compaction/contract.js';
 
 /** One resource owner holds its controller; there is no process-wide owner registry. */
 export function createProviderConnections(context: ShellRuntimeContext) {
@@ -27,11 +28,20 @@ export function createProviderConnections(context: ShellRuntimeContext) {
   const compaction = (setup: CompactionSetup, scope: ProviderConnectionLifetime): CompactionSetup => {
     const summarize = setup.summarize;
     const prefix = setup.summarizeTurnPrefix;
+    const prepare = <T extends readonly unknown[]>(callback: (...args: T) => Promise<PreparedSummaryStep>) =>
+      (...args: T) => withProviderConnections(scope, async () => {
+        const captured = await callback(...args);
+        scope.signal.throwIfAborted();
+        return Object.freeze({ ...captured, send: (dispatch?: Parameters<PreparedSummaryStep['send']>[0]) =>
+          withProviderConnections(scope, () => captured.send(dispatch)) });
+      });
     return { ...setup,
       summarize: Object.assign((...args: Parameters<typeof summarize>) => withProviderConnections(scope, () => summarize(...args)),
-        { dispatchAware: summarize.dispatchAware, preflight: summarize.preflight }),
+        { dispatchAware: summarize.dispatchAware, preflight: summarize.preflight,
+          ...(summarize.prepare ? { prepare: prepare(summarize.prepare) } : {}) }),
       ...(prefix ? { summarizeTurnPrefix: Object.assign((...args: Parameters<typeof prefix>) => withProviderConnections(scope, () => prefix(...args)),
-        { dispatchAware: prefix.dispatchAware, preflight: prefix.preflight }) } : {}),
+        { dispatchAware: prefix.dispatchAware, preflight: prefix.preflight,
+          ...(prefix.prepare ? { prepare: prepare(prefix.prepare) } : {}) }) } : {}),
     };
   };
   return { reset, capture, run, compaction };

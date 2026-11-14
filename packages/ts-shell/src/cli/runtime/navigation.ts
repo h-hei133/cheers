@@ -116,7 +116,7 @@ export async function navigateSession(input: {
   let warning = 'A storage error was reported while navigating.';
   try {
     dropped = await manager.revertTo(sessionId, entryId,
-      abandoned => runtime.summarizeAbandonedTurns(abandoned),
+      abandoned => runtime.summarizeAbandonedTurns(abandoned, signal),
       () => {
         signal?.throwIfAborted();
         validate();

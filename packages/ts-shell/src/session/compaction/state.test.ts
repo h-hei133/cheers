@@ -54,6 +54,31 @@ it('records prepared and dispatched as separate read-back states', () => {
   expect(state()).toMatchObject({ status: 'dispatched', claimId: claim.claimId });
 });
 
+it('refuses a different capture while any legacy or new step in the operation is uncertain', () => {
+  const original = claimCompactionStep({ ...operation(), stepDigest: 'legacy-raw-digest' });
+  expect(claimCompactionStep({ ...operation(), stepDigest: 'new-output-digest', preparedIdentity: 'first-output' })).toMatchObject({ acquired: false, unknown: true });
+  releaseCompactionStep(original);
+  const accepted = claimCompactionStep({ ...operation(), stepDigest: 'new-output-digest', preparedIdentity: 'first-output' });
+  expect(accepted.acquired).toBe(true);
+  dispatchCompactionStep(accepted);
+  markCompactionStepUnknown(accepted, sessionId);
+  expect(claimCompactionStep({ ...operation(), stepDigest: 'changed-clamp-and-stage-digest', preparedIdentity: 'next-output' })).toMatchObject({ acquired: false, unknown: true });
+});
+
+it.each(['unknown', 'tombstone'] as const)('preserves unmappable legacy %s evidence when the summary target identity changes', kind => {
+  const original = claimCompactionStep({ ...operation(), stepDigest: 'legacy' });
+  dispatchCompactionStep(original);
+  if (kind === 'unknown') markCompactionStepUnknown(original, sessionId);
+  else {
+    completeCompactionStep(original, sessionId, 'material');
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 100 * 365 * 24 * 60 * 60_000);
+  }
+  expect(() => claimCompactionStep({ ...operation(), policyDigest: 'non-secret-target', stepDigest: 'new', preparedIdentity: 'capture' }))
+    .toThrow('Legacy compaction replay evidence cannot be mapped');
+  const retained = JSON.parse(fs.readFileSync(compactionOperationsPath(sessionId), 'utf8')).operations[original.operation].steps.legacy;
+  expect(retained.claimId).toBe(original.claimId);
+});
+
 it('never gives a follower mutation authority over the acquired attempt', () => {
   const leader = claimCompactionStep({ ...operation(), stepDigest: 'step' });
   const follower = claimCompactionStep({ ...operation(), stepDigest: 'step' });

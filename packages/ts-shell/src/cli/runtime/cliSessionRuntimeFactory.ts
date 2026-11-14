@@ -70,6 +70,7 @@ import { prepareContextInjection } from './context/injection.js';
 import { sourceReaderFor } from '../data/access.js';
 import { installUsageRuntime, usageResetApproval } from './usage.js';
 import { captureSummaryRole } from '../provider/summary.js';
+import { currentProviderConnections } from '../../provider/request/connection.js';
 
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
@@ -139,6 +140,7 @@ export function createCliSessionRuntime(input: {
         assertAdmission(admission);
         signal.throwIfAborted();
         const wiring = buildCompactionWiring({ provider, resolution: resolved, runtimeConfig: config, admission, sessionId, catalog, workspaceRoot,
+          convertToLlm,
           onCredentialPersisted: providers.publication,
           requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager) });
         return compactSessionHistory({
@@ -168,7 +170,9 @@ export function createCliSessionRuntime(input: {
         });
       });
     }),
-    summarizeAbandonedTurns: (messages) => providerResources.withConnections(() => {
+    summarizeAbandonedTurns: (messages, navigationSignal) => providerResources.withConnections(() => {
+      const connectionSignal = currentProviderConnections()?.signal;
+      const signal = navigationSignal && connectionSignal ? AbortSignal.any([navigationSignal, connectionSignal]) : navigationSignal ?? connectionSignal;
       const operation = configurationOperation(input.runtimeContext);
       const config = operation.config; const catalog = operation.publication.catalog;
       const usageFor = sessionUsageRecorder(input.runtimeContext.session.id);
@@ -178,10 +182,15 @@ export function createCliSessionRuntime(input: {
       const role = captureSummaryRole({ config, catalog, workspaceRoot: input.runtimeContext.projectRoot, admission,
         onCredentialPersisted: providers.publication });
       const selected = role ? role.resolve().then(provider => ({ provider })) : providers.renew(resolved, config, admission, catalog);
-      return selected.then(({ provider }) => {
+      return selected.then(async ({ provider }) => {
         assertAdmission(admission);
         if (!provider) return undefined;
+        let projected;
+        try { projected = await toCompactionMessages(messages, convertToLlm, signal); }
+        catch { return undefined; }
+        assertAdmission(admission);
         return requestCompactionSummary({
+          signal,
           requestPolicy, purpose: 'branch-summary', maxOutputTokens: configuredOutputLimit(config, provider.endpoint),
           onUsage: usageFor({ provider: provider.providerId ?? '', model: provider.model, baseUrl: provider.baseUrl,
             rates: catalogModel(catalog, provider.providerId ?? '', provider.model, provider.baseUrl)?.cost }),
@@ -191,7 +200,7 @@ export function createCliSessionRuntime(input: {
           // the global fetch, so a `/back` whose summary stalled waited forever with
           // no deadline and no abort signal. Same wiring as its two siblings.
           fetchImpl: providerFetchForEndpoint(config, provider.endpoint, endpointShape, admission),
-          messages: toCompactionMessages(messages),
+          messages: projected,
         });
       });
     }),

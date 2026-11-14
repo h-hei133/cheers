@@ -17,8 +17,11 @@ import type { ModelTransport, RequestPolicy } from '../../agent/request/model.js
 import type { ResolvedRequestShape } from '../../models/requestShape.js';
 import { promptTokensFor, requestBudget } from '../../../context/request/budget.js';
 import type { ProviderUsage } from '../../../turn/completion.js';
-import { SummaryAdmissionError, type CompactionDispatch } from '../../../session/compaction/contract.js';
+import { SummaryAdmissionError, type CompactionDispatch, type PreparedSummaryStep } from '../../../session/compaction/contract.js';
 import { readCompletion } from '../../../provider/response/read.js';
+import { createHash } from 'node:crypto';
+import { snapshotData } from '../../values/data.js';
+import { assertRequestInput, requestInputLimits } from '../../../provider/request/input.js';
 
 /**
  * One summarization request.
@@ -37,6 +40,7 @@ export interface CompactionProvider {
   readonly maxOutputTokens?: number;
   readonly reserveTokens?: number;
   readonly providerId?: string;
+  readonly replayBinding?: string;
   /** Which stored credential sends this summary; non-secret and rotation-sensitive. */
   readonly credentialId?: string;
   readonly credentialGeneration?: string;
@@ -156,8 +160,9 @@ export function prepareCompactionMessages(request: Pick<CompactionRequest, 'mess
   const prompt = request.instructions?.trim()
     ? `${base}\n\nThe user asked the summary to focus on: ${request.instructions.trim()}`
     : base;
+  const capturedHistory = summaryMessages(request.messages);
   const history = request.provider.shape?.toolCalling === false
-    ? proseToolHistory(request.messages) : request.messages;
+    ? proseToolHistory(capturedHistory) : capturedHistory;
   const messages = [
     ...(previousSummary ? [{ role: 'user' as const, content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }] : []),
     ...history, { role: 'user' as const, content: prompt },
@@ -170,6 +175,21 @@ export function prepareCompactionMessages(request: Pick<CompactionRequest, 'mess
     if (budget.ok === false && budget.reason !== 'unknown') throw new SummaryAdmissionError(`Summary request refused: ${budget.detail}`);
   }
   return messages;
+}
+
+/** Auxiliary endpoint codecs carry text system instructions outside conversation. */
+function summaryMessages(messages: readonly CompactionChatMessage[]): readonly CompactionChatMessage[] {
+  const system: string[] = [];
+  const history: CompactionChatMessage[] = [];
+  for (const message of messages) {
+    if (message.content !== undefined && message.content !== null && typeof message.content !== 'string') {
+      throw new SummaryAdmissionError('Summary request refused: only text messages can be summarized.');
+    }
+    if (message.role === 'system') {
+      if (message.content) system.push(message.content);
+    } else history.push(message);
+  }
+  return system.length ? [{ role: 'system', content: system.join('\n\n') }, ...history] : history;
 }
 
 /**
@@ -205,39 +225,88 @@ function proseToolHistory(messages: readonly CompactionChatMessage[]): Compactio
   return projected;
 }
 
-/** The checkpoint message replacing `messages`, or nothing when the provider could not produce one. */
-export async function requestCompactionSummary(request: CompactionRequest): Promise<string | undefined> {
-  const previousSummary = request.previousSummary?.trim();
-  const messages = prepareCompactionMessages(request);
-  const fetchImpl = request.fetchImpl;
+/** Capture and admit one exact summary request before any durable claim or send. */
+export function prepareCompactionRequest(request: CompactionRequest): PreparedSummaryStep {
+  request.signal?.throwIfAborted();
+  let data: { readonly provider: Omit<CompactionProvider, 'headers'>; readonly messages: readonly CompactionChatMessage[] };
+  try {
+    const provider: Omit<CompactionProvider, 'headers'> = {
+      baseUrl: request.provider.baseUrl, model: request.provider.model, providerId: request.provider.providerId,
+      endpoint: request.provider.endpoint, replayBinding: request.provider.replayBinding,
+      credentialId: request.provider.credentialId, credentialGeneration: request.provider.credentialGeneration,
+      shape: request.provider.shape, serviceTier: request.provider.serviceTier,
+      contextWindow: request.provider.contextWindow, inputLimit: request.provider.inputLimit,
+      maxOutputTokens: request.provider.maxOutputTokens, reserveTokens: request.provider.reserveTokens,
+      supportsTemperature: request.provider.supportsTemperature,
+    };
+    data = snapshotData({ provider, messages: request.messages },
+      { bytes: 64 * 1024 * 1024, nodes: 250_000, depth: 48 }) as unknown as typeof data;
+  } catch { throw new SummaryAdmissionError('Summary request refused: messages and request shape must be bounded inert data.'); }
   const headers = new Headers(request.provider.headers);
-  const kind = endpointKind(request.provider.endpoint);
+  const captured = Object.freeze({ ...request,
+    provider: Object.freeze({ ...data.provider, headers: Object.freeze(Object.fromEntries(headers)) }), messages: data.messages });
+  const messages = prepareCompactionMessages(captured);
+  const history = captured.provider.shape?.toolCalling === false ? proseToolHistory(summaryMessages(captured.messages))
+    : summaryMessages(captured.messages);
+  const tokens = promptTokensFor({ messages: history.map(message => ({ ...message, content: message.content ?? '' })) }).tokens;
+  const kind = endpointKind(captured.provider.endpoint) ?? 'openai-compatible';
   headers.set('accept', endpointShape(kind).simpleResponse === 'stream' ? 'text/event-stream' : 'application/json');
-  const maxOutputTokens = request.provider.maxOutputTokens ?? request.maxOutputTokens;
-  const body = JSON.stringify(
-    endpointBody(kind, {
-      ...request.provider.shape,
-      model: request.provider.model,
-      provider: request.provider.providerId,
-      serviceTier: request.provider.serviceTier,
-      ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
-      ...(request.provider.supportsTemperature !== undefined ? { supportsTemperature: request.provider.supportsTemperature } : {}),
-      ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-      messages,
-    }),
-  );
+  const maxOutputTokens = captured.provider.maxOutputTokens ?? captured.maxOutputTokens;
+  const body = JSON.stringify(endpointBody(kind, {
+    ...captured.provider.shape,
+    model: captured.provider.model,
+    provider: captured.provider.providerId,
+    replayBinding: captured.provider.replayBinding,
+    serviceTier: captured.provider.serviceTier,
+    ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+    ...(captured.provider.supportsTemperature !== undefined ? { supportsTemperature: captured.provider.supportsTemperature } : {}),
+    ...(captured.temperature !== undefined ? { temperature: captured.temperature } : {}),
+    systemPrompt: messages.filter(message => message.role === 'system').map(message => message.content ?? '').join('\n\n'),
+    messages: messages.filter(message => message.role !== 'system'),
+  }));
+  try { assertRequestInput(body, endpointShape(kind).contextFields, requestInputLimits(captured.provider.shape?.inputLimits)); }
+  catch { throw new SummaryAdmissionError('Summary request refused: the complete input exceeds the selected model limits.'); }
+  const url = endpointUrl(captured.provider.baseUrl, kind, captured.provider.model, false);
+  const identity = createHash('sha256').update(JSON.stringify([
+    'prepared-summary-v1', createHash('sha256').update(url).digest('hex'),
+    createHash('sha256').update(body).digest('hex'), captured.provider.providerId ?? '', captured.provider.model, kind,
+    captured.provider.replayBinding ?? '', captured.provider.credentialId ?? '', captured.provider.credentialGeneration ?? '',
+    captured.provider.shape, captured.provider.contextWindow, captured.provider.inputLimit,
+    captured.provider.reserveTokens, maxOutputTokens, captured.purpose ?? 'compaction',
+  ])).digest('hex');
+  captured.signal?.throwIfAborted();
+  let consumed = false;
+  return Object.freeze({ identity, tokens, send: async (dispatch?: CompactionDispatch) => {
+    if (consumed) throw new Error('The prepared summary request has already been consumed.');
+    captured.signal?.throwIfAborted();
+    consumed = true;
+    return sendCompactionRequest(captured, { body, headers, kind, url }, dispatch);
+  } });
+}
+
+/** The checkpoint replacing history, or nothing when the provider cannot summarize it. */
+export async function requestCompactionSummary(request: CompactionRequest): Promise<string | undefined> {
+  return prepareCompactionRequest(request).send(request.dispatch);
+}
+
+async function sendCompactionRequest(request: CompactionRequest,
+  capture: { readonly body: string; readonly headers: Headers; readonly kind: EndpointKind; readonly url: string },
+  dispatch?: CompactionDispatch): Promise<string | undefined> {
+  const previousSummary = request.previousSummary?.trim();
+  const fetchImpl = request.fetchImpl;
+  const { body, headers, kind, url } = capture;
   const attempt = await prepareRequestAttempt({ body, provider: request.provider.providerId ?? '', model: request.provider.model,
     endpoint: kind ?? 'openai-compatible', purpose: request.purpose ?? 'compaction', policy: request.requestPolicy,
     inputLimits: request.provider.shape?.inputLimits,
     ...(request.provider.credentialId && request.provider.credentialGeneration
       ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
-  const transport: ModelTransport | undefined = request.dispatch ? (input, init, beforeDispatch) => {
-    const handoff = (): void => { beforeDispatch(); request.dispatch!.dispatch(); };
+  const transport: ModelTransport | undefined = dispatch ? (input, init, beforeDispatch) => {
+    const handoff = (): void => { beforeDispatch(); dispatch.dispatch(); };
     if (request.modelTransport) return request.modelTransport(input, init, handoff);
     handoff();
     return fetchImpl(input, init);
   } : request.modelTransport;
-  const res = await attempt.send(endpointUrl(request.provider.baseUrl, kind, request.provider.model, false), {
+  const res = await attempt.send(url, {
     method: "POST",
     headers,
     body,

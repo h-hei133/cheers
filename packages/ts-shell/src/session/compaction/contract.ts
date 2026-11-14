@@ -52,9 +52,18 @@ export interface SummarizeRequest {
   readonly signal?: AbortSignal;
 }
 
+/** One admitted request capture, shared by scheduling, replay identity and send. */
+export interface PreparedSummaryStep {
+  readonly identity: string;
+  /** Converted history only; the complete request has separately passed preflight. */
+  readonly tokens: number;
+  readonly send: (dispatch?: CompactionDispatch) => Promise<string | undefined>;
+}
+
 export interface SummarizeHistory {
   readonly dispatchAware?: boolean;
   (request: SummarizeRequest): Promise<string | undefined>;
+  readonly prepare?: (request: SummarizeRequest) => Promise<PreparedSummaryStep>;
   /** Pure local validation, before durable request claims or any summary send. */
   readonly preflight?: (request: SummarizeRequest) => void;
 }
@@ -70,6 +79,7 @@ export interface SummarizeHistory {
 export interface SummarizeTurnPrefix {
   (messages: readonly AgentMessage[], signal?: AbortSignal, dispatch?: CompactionDispatch): Promise<string | undefined>;
   readonly dispatchAware?: boolean;
+  readonly prepare?: (messages: readonly AgentMessage[], signal?: AbortSignal) => Promise<PreparedSummaryStep>;
   /** Pure local validation, before durable request claims or any summary send. */
   readonly preflight?: (messages: readonly AgentMessage[], signal?: AbortSignal) => void;
 }
@@ -105,6 +115,8 @@ export class CompactionPublicationError extends Error {
 }
 export type CompactionStepStatus = 'prepared' | 'dispatched' | 'unknown' | 'completed';
 export interface StepRecord {
+  /** Present only for a captured request; legacy identities may be unmappable. */
+  readonly preparedIdentity?: string;
   readonly claimId: string;
   readonly status: CompactionStepStatus;
   readonly summary?: string;

@@ -25,3 +25,23 @@ it('captures workspace/profile identity and blocks late callbacks after reset', 
   expect(connections.reset()).toBe('reset');
   expect(next.signal.aborted).toBe(true);
 });
+
+it('retains asynchronous summary preparation and its later send under the same connection owner', async () => {
+  const context = { session: { id: 'prepared', createdAt: 'created' }, projectRoot: '/A', cwd: '/A' } as unknown as ShellRuntimeContext;
+  const connections = createProviderConnections(context);
+  const owner = connections.capture();
+  let sends = 0;
+  const summarize = Object.assign(async () => 'unused', { prepare: async () => {
+    expect(currentProviderConnections()!.id).toBe(owner.id);
+    await Promise.resolve();
+    return { identity: 'capture', tokens: 1, send: async () => { sends++; return currentProviderConnections()!.id; } };
+  } });
+  const setup = connections.compaction({ summarize, summarizeTurnPrefix: Object.assign(async () => 'unused',
+    { prepare: summarize.prepare }) } as unknown as CompactionSetup, owner);
+  const history = await setup.summarize.prepare!({ messages: [] });
+  const prefix = await setup.summarizeTurnPrefix!.prepare!([]);
+  expect(await history.send()).toBe(owner.id);
+  connections.reset();
+  expect(() => prefix.send()).toThrow();
+  expect(sends).toBe(1);
+});

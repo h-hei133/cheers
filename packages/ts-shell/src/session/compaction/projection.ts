@@ -46,11 +46,13 @@ function projectResults(messages: readonly AgentMessage[], fraction: number): re
 }
 
 /** Shrink only the summary projection, then recheck the complete request budget. */
-export function clampToolResults(
+export async function clampToolResults<T>(
   messages: readonly AgentMessage[],
   maxTokens: number,
-  fits: (messages: readonly AgentMessage[]) => boolean,
-): readonly AgentMessage[] | undefined {
+  admit: (messages: readonly AgentMessage[]) => T | undefined | Promise<T | undefined>,
+  signal?: AbortSignal,
+): Promise<T | undefined> {
+  signal?.throwIfAborted();
   let textChars = 0;
   for (const message of messages) {
     if (message.role !== 'tool') continue;
@@ -58,16 +60,21 @@ export function clampToolResults(
     else for (const block of message.content) if (block.type === 'text') textChars += block.text.length;
   }
   if (!textChars) return undefined;
-  let projected = projectResults(messages, 0);
+  const minimum = projectResults(messages, 0);
   // Even the minimal result projection must retain both ends and its loss marker.
-  if (!fits(projected)) return undefined;
+  let accepted = await admit(minimum);
+  signal?.throwIfAborted();
+  if (accepted === undefined) return undefined;
   let low = 0;
   let high = Math.min(textChars, Math.floor(maxTokens * CHARS_PER_TOKEN));
   while (low < high) {
     const middle = Math.ceil((low + high) / 2);
     const candidate = projectResults(messages, middle / textChars);
-    if (fits(candidate)) { projected = candidate; low = middle; }
+    const prepared = await admit(candidate);
+    signal?.throwIfAborted();
+    // A converter need not be monotone. Retain only a candidate actually admitted.
+    if (prepared !== undefined) { accepted = prepared; low = middle; }
     else high = middle - 1;
   }
-  return projected;
+  return accepted;
 }

@@ -24,6 +24,9 @@ export function readOperations(file: string): OperationFile {
         || !Number.isSafeInteger(record.updatedAt) || (record.summary !== undefined && typeof record.summary !== 'string')) {
         throw new CompactionOperationError('Compaction operation state contains an invalid step.');
       }
+      if (record.preparedIdentity !== undefined && (typeof record.preparedIdentity !== 'string' || !record.preparedIdentity)) {
+        throw new CompactionOperationError('Compaction operation state contains an invalid prepared identity.');
+      }
       steps[step] = record as unknown as StepRecord;
     }
     operations[key] = { updatedAt: value.updatedAt as number, steps };

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../SessionManager.js';
 import { condenseContext, type SummarizeHistory } from '../compaction.js';
-import { generateCompaction } from './generation.js';
+import { CompactionStepUnknown, generateCompaction } from './generation.js';
 import { compactionOperationsPath } from './state.js';
 import type { AgentMessage } from '../../core/agent/state.js';
 import { requestCompactionSummary } from '../../core/query/compaction/summarize.js';
@@ -13,6 +13,7 @@ import { summaryBudget } from '../../cli/provider/summary/budget.js';
 import { prepareCompactionMessages } from '../../core/query/compaction/summarize.js';
 import { estimateTokens } from '../context.js';
 import { legalUnits } from './schedule.js';
+import type { PreparedSummaryStep, SummarizeRequest, SummarizeTurnPrefix } from './contract.js';
 
 let home: string;
 let sessionId: string;
@@ -196,4 +197,115 @@ it('refuses repeated tool call identities before sending an incompletely paired 
     { role: 'tool', content: 'one result', tool_call_id: 'duplicate' },
   ], prefix: [], summarize })).rejects.toThrow('tool call IDs are missing or repeated');
   expect(summarize).not.toHaveBeenCalled();
+});
+
+it('sends accepted segment captures with the previous summary only on segment zero', async () => {
+  const sent: Array<{ request: SummarizeRequest; identity: string }> = [];
+  const captures: PreparedSummaryStep[] = [];
+  const messages: AgentMessage[] = [{ role: 'user', content: 'first' }, { role: 'assistant', content: 'second' }];
+  const fallback = vi.fn(async () => 'must not use fallback');
+  const summarize = Object.assign(fallback, { prepare: async (request: SummarizeRequest): Promise<PreparedSummaryStep> => {
+    await Promise.resolve();
+    const merged = request.messages[0]?.content === 'captured summary';
+    const identity = `${captures.length}:${request.previousSummary ?? ''}`;
+    const step = { identity, tokens: merged ? 1 : request.messages.length * 10,
+      send: async (dispatch: Parameters<PreparedSummaryStep['send']>[0]) => {
+        dispatch!.dispatch();
+        sent.push({ request, identity });
+        return 'captured summary';
+      } };
+    captures.push(step);
+    return step;
+  } });
+  expect(await generateCompaction({ history: messages, prefix: [], previousSummary: 'old checkpoint', maxTokens: 10, summarize }))
+    .toBe('captured summary');
+  expect(fallback).not.toHaveBeenCalled();
+  expect(sent.map(value => value.request.previousSummary)).toEqual(['old checkpoint', undefined, undefined]);
+  expect(sent.slice(0, 2).map(value => value.request.messages)).toEqual([[messages[0]], [messages[1]]]);
+  expect(sent.map(value => value.identity)).toEqual([captures[0]!.identity, captures[2]!.identity, captures[3]!.identity]);
+  expect(captures).toHaveLength(4);
+});
+
+it('binds durable reuse to the prepared output identity rather than source history alone', async () => {
+  const sent = vi.fn();
+  const fallback = vi.fn(async () => 'must not use fallback');
+  const summarizer = (identity: string) => Object.assign(fallback, {
+    prepare: async (): Promise<PreparedSummaryStep> => ({ identity, tokens: 1,
+      send: async dispatch => { dispatch!.dispatch(); sent(identity); return `summary ${identity}`; } }),
+  });
+  const input = { history: [{ role: 'user' as const, content: 'same raw history' }], prefix: [],
+    operation: { sessionId, policyDigest: 'captured-output-policy' } };
+  expect(await generateCompaction({ ...input, summarize: summarizer('first') })).toBe('summary first');
+  expect(await generateCompaction({ ...input, summarize: summarizer('first') })).toBe('summary first');
+  expect(await generateCompaction({ ...input, summarize: summarizer('changed') })).toBe('summary changed');
+  expect(sent.mock.calls).toEqual([['first'], ['changed']]);
+  expect(fallback).not.toHaveBeenCalled();
+});
+
+it('retains an unknown logical step when a later conversion changes its output identity', async () => {
+  let preparations = 0;
+  const send = vi.fn(async dispatch => { dispatch!.dispatch(); throw new Error('uncertain provider handoff'); });
+  const summarize = Object.assign(vi.fn(async () => 'unused'), { prepare: async () => ({
+    identity: `conversion-${++preparations}`, tokens: 1, send,
+  }) });
+  const input = { history: [{ role: 'user' as const, content: 'same raw source' }], prefix: [], summarize,
+    operation: { sessionId, policyDigest: 'non-deterministic-unknown' } };
+  await expect(generateCompaction(input)).rejects.toThrow('uncertain provider handoff');
+  await expect(generateCompaction(input)).rejects.toThrow(CompactionStepUnknown);
+  expect(send).toHaveBeenCalledOnce();
+});
+
+it('preserves prepared prefix captures and independently prepares its merge request', async () => {
+  const sent: string[] = [];
+  const prefixFallback = vi.fn(async () => 'must not use fallback');
+  let prefixPreparations = 0;
+  const prefix = Object.assign(prefixFallback, { prepare: async (messages: readonly AgentMessage[]): Promise<PreparedSummaryStep> => {
+    const identity = `prefix-${++prefixPreparations}`;
+    return { identity, tokens: messages.length * 10, send: async dispatch => {
+      dispatch!.dispatch(); sent.push(identity); return 'prefix summary';
+    } };
+  } }) satisfies SummarizeTurnPrefix;
+  const summarize = Object.assign(vi.fn(async () => 'must not use fallback'), {
+    prepare: async (): Promise<PreparedSummaryStep> => ({ identity: 'history-merge', tokens: 1,
+      send: async dispatch => { dispatch!.dispatch(); sent.push('history-merge'); return 'merged prefix'; } }),
+  });
+  expect(await generateCompaction({ history: [], prefix: [{ role: 'user', content: 'opening' }, { role: 'assistant', content: 'continuation' }],
+    maxTokens: 10, summarize, summarizeTurnPrefix: prefix })).toBe('merged prefix');
+  expect(sent).toEqual(['prefix-1', 'prefix-3', 'history-merge']);
+  expect(prefixPreparations).toBe(3);
+  expect(prefixFallback).not.toHaveBeenCalled();
+  expect(summarize).not.toHaveBeenCalled();
+});
+
+it('cancels preparation before any durable claim or summary dispatch', async () => {
+  const controller = new AbortController();
+  const send = vi.fn(async () => 'must not send');
+  const summarize = Object.assign(vi.fn(async () => 'must not use fallback'), {
+    prepare: async (): Promise<PreparedSummaryStep> => {
+      await Promise.resolve(); controller.abort();
+      return { identity: 'late', tokens: 1, send };
+    },
+  });
+  await expect(generateCompaction({ history: [{ role: 'user', content: 'history' }], prefix: [], signal: controller.signal,
+    operation: { sessionId, policyDigest: 'cancelled-preparation' }, summarize })).rejects.toMatchObject({ name: 'AbortError' });
+  expect(send).not.toHaveBeenCalled();
+  expect(fs.existsSync(compactionOperationsPath(sessionId))).toBe(false);
+});
+
+it('releases a prepared unsent failure and retains an uncertain prepared dispatch', async () => {
+  const input = { history: [{ role: 'user' as const, content: 'history' }], prefix: [],
+    operation: { sessionId, policyDigest: 'prepared-dispatch' } };
+  const summarize = Object.assign(vi.fn(async () => 'must not use fallback'), {
+    prepare: async (): Promise<PreparedSummaryStep> => ({ identity: 'same', tokens: 1,
+      send: async () => { throw new Error('known unsent'); } }),
+  });
+  await expect(generateCompaction({ ...input, summarize })).rejects.toThrow('known unsent');
+  summarize.prepare = async () => ({ identity: 'same', tokens: 1, send: async dispatch => {
+    dispatch!.dispatch(); throw new Error('unknown after dispatch');
+  } });
+  await expect(generateCompaction({ ...input, summarize })).rejects.toThrow('unknown after dispatch');
+  const retry = vi.fn(async () => 'must not send');
+  summarize.prepare = async () => ({ identity: 'same', tokens: 1, send: retry });
+  await expect(generateCompaction({ ...input, summarize })).rejects.toThrow();
+  expect(retry).not.toHaveBeenCalled();
 });

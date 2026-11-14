@@ -1,6 +1,6 @@
 import type { AgentMessage } from '../../core/agent/state.js';
 import { estimateTokens } from '../context.js';
-import { SummaryAdmissionError } from './contract.js';
+import { SummaryAdmissionError, type PreparedSummaryStep } from './contract.js';
 import { clampToolResults } from './projection.js';
 
 export const MAX_SEGMENTS = 64;
@@ -30,35 +30,64 @@ export function legalUnits(messages: readonly AgentMessage[]): readonly (readonl
   return units;
 }
 
-/** Pure checks precede claims; oversized tool prose is projected within its legal group. */
-export function scheduleSegments(input: {
+export interface ScheduledSegment {
+  readonly messages: readonly AgentMessage[];
+  readonly prepared?: PreparedSummaryStep;
+}
+
+/** Preparation precedes claims; accepted captures stay attached to their legal group. */
+export async function scheduleSegments(input: {
   readonly messages: readonly AgentMessage[];
   readonly maxTokens?: number;
-  readonly validate?: (messages: readonly AgentMessage[]) => void;
-}): readonly (readonly AgentMessage[])[] {
+  readonly signal?: AbortSignal;
+  /** Summary merge material must fit as one complete request. */
+  readonly indivisible?: boolean;
+  readonly validate?: (messages: readonly AgentMessage[], index: number) => void | Promise<void>;
+  readonly prepare?: (messages: readonly AgentMessage[], index: number) => Promise<PreparedSummaryStep>;
+}): Promise<readonly ScheduledSegment[]> {
+  input.signal?.throwIfAborted();
   const maxTokens = input.maxTokens ?? DEFAULT_SEGMENT_TOKENS;
   if (!Number.isSafeInteger(maxTokens) || maxTokens <= 0) throw new Error('Summary segment budget is invalid.');
-  const fits = (messages: readonly AgentMessage[]): boolean => {
-    if (messages.length > MAX_SEGMENT_MESSAGES || estimateTokens(messages) > maxTokens) return false;
-    try { input.validate?.(messages); return true; }
+  const admit = async (messages: readonly AgentMessage[], index: number): Promise<ScheduledSegment | undefined> => {
+    input.signal?.throwIfAborted();
+    if (messages.length > MAX_SEGMENT_MESSAGES || (!input.prepare && estimateTokens(messages) > maxTokens)) return undefined;
+    try {
+      const prepared = await input.prepare?.(messages, index);
+      input.signal?.throwIfAborted();
+      if (input.prepare && (!prepared || typeof prepared.identity !== 'string' || !prepared.identity
+        || !Number.isSafeInteger(prepared.tokens) || prepared.tokens < 0 || typeof prepared.send !== 'function')) {
+        throw new Error('Summary preparation returned an invalid request identity or token count.');
+      }
+      if (prepared && prepared.tokens > maxTokens) return undefined;
+      await input.validate?.(messages, index);
+      input.signal?.throwIfAborted();
+      return { messages, ...(prepared ? { prepared } : {}) };
+    }
     catch (error) {
-      if (error instanceof SummaryAdmissionError) return false;
+      input.signal?.throwIfAborted();
+      if (error instanceof SummaryAdmissionError) return undefined;
       throw error;
     }
   };
-  const segments: AgentMessage[][] = [];
-  let current: AgentMessage[] = [];
-  for (const unit of legalUnits(input.messages)) {
-    const candidate = [...current, ...unit];
-    if (fits(candidate)) { current = candidate; continue; }
-    const projected = fits(unit) ? unit : clampToolResults(unit, maxTokens, fits);
-    if (!projected) throw new SummaryAdmissionError('Summary request refused: a legal message group exceeds its segment budget.');
-    if (current.length) {
+  const segments: ScheduledSegment[] = [];
+  let current: ScheduledSegment | undefined;
+  const legal = legalUnits(input.messages);
+  const units = input.indivisible && input.messages.length ? [input.messages] : legal;
+  for (const unit of units) {
+    const candidate = current ? [...current.messages, ...unit] : unit;
+    const accepted = await admit(candidate, segments.length);
+    if (accepted) { current = accepted; continue; }
+    let projected: ScheduledSegment | undefined;
+    if (current) {
       segments.push(current);
       if (segments.length >= MAX_SEGMENTS) throw new SummaryAdmissionError('Summary request refused: the bounded segment schedule is full.');
+      projected = await admit(unit, segments.length);
     }
-    current = [...projected];
+    projected ??= await clampToolResults(unit, maxTokens, messages => admit(messages, segments.length), input.signal);
+    if (!projected) throw new SummaryAdmissionError('Summary request refused: a legal message group exceeds its segment budget.');
+    current = projected;
   }
-  if (current.length) segments.push(current);
+  if (current) segments.push(current);
+  input.signal?.throwIfAborted();
   return segments;
 }

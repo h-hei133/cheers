@@ -25,11 +25,13 @@ import { createStepFunction } from '../../turn/step.js';
 import type { PromptIdentitySnapshot } from '../../observability/usage/model.js';
 import { estimateRequestTokens, estimateTokens } from '../../session/context.js';
 import { planCompaction, planCompactionCut } from '../../session/compaction.js';
+import { generateCompaction } from '../../session/compaction/generation.js';
 import { requestReplayBinding } from '../../provider/request/replay.js';
 import { outgoingProjection } from '../../turn/messages.js';
 import * as measurement from '../../turn/measurement.js';
 import { estimatePrompt } from '../../context/request/estimate.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
+import type { MessageConverter } from '../../core/agent/messages.js';
 
 const fixture = vi.hoisted(() => ({
   deps: undefined as SessionRuntimeDependencies | undefined,
@@ -115,7 +117,7 @@ afterEach(async () => {
   vi.unstubAllEnvs(); fs.rmSync(scratch, { recursive: true, force: true });
 });
 
-function runtime(withKey: boolean) {
+function runtime(withKey: boolean, convertToLlm?: MessageConverter) {
   fixture.resolution = { provider: "fixture", model: "fixture-model", baseUrl,
     ...(withKey ? { credential: { apiKey: "synthetic", model: "fixture-model", baseUrl } } : {}),
   };
@@ -126,7 +128,7 @@ function runtime(withKey: boolean) {
   const configuration = new ConfigState(context.runtimeConfig as never, configurationBinding(context), loadCatalog());
   fixture.configuration = configuration;
   createCliSessionRuntime({
-    runtimeContext: { ...context, configuration },
+    runtimeContext: { ...context, configuration, convertToLlm },
     providerRuntimeBridge: { resolveCredentialSnapshot: () => fixture.resolution },
     sessionManager: manager,
     renderer: { renderLine: vi.fn(), emit: vi.fn() }, options: {}, approvalTrustPolicy: {}, getReadline: () => null,
@@ -170,6 +172,105 @@ it.each([true, false])("signs automatic history and prefix summaries (apiKey=%s)
   await fixture.compaction!.summarizeTurnPrefix!([], new AbortController().signal);
   expect(signed).toHaveLength(2);
   expect(received.map(request => request.signature)).toEqual(["signed-1", "signed-2"]);
+});
+
+it.each(['manual', 'automatic', 'branch'] as const)('converts the captured %s summary before the actual request', async mode => {
+  let conversions = 0;
+  const converter: MessageConverter = async messages => {
+    conversions++;
+    expect(Object.isFrozen(messages)).toBe(true);
+    return [{ role: 'system', content: 'APPLICATION_SYSTEM' },
+      { role: 'user', content: `APPLICATION_HISTORY_${conversions}` }];
+  };
+  const deps = runtime(true, converter);
+  if (mode === 'manual') await deps.compactHistory!('signed-summary', new AbortController().signal);
+  else if (mode === 'automatic') {
+    deps.runPrompt('hello', new AbortController().signal);
+    await fixture.compaction!.summarize({ messages: [] });
+    await fixture.compaction!.summarizeTurnPrefix!([]);
+  } else await deps.summarizeAbandonedTurns!([{ role: 'custom', customType: 'application',
+    content: 'RAW_PRIVATE_CONTEXT', data: { value: 'RAW_PRIVATE_DATA' }, display: false }]);
+  expect(conversions).toBe(mode === 'branch' ? 1 : 2);
+  expect(received).toHaveLength(conversions);
+  received.forEach((request, index) => {
+    const body = JSON.stringify(request.body);
+    expect(body).toContain('APPLICATION_SYSTEM');
+    expect(body).toContain(`APPLICATION_HISTORY_${index + 1}`);
+    expect(body).not.toContain('RAW_PRIVATE');
+  });
+});
+
+it('captures one asynchronous converted summary for both complete admission and send', async () => {
+  const converter = vi.fn(async () => [{ role: 'user' as const, content: 'WIRE_SMALL' }]);
+  const wiring = buildCompactionWiring({ provider: { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: fixture.endpoint },
+    runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog: loadCatalog(), convertToLlm: converter });
+  const messages = [{ role: 'user' as const, content: 'RAW_LARGE'.repeat(12_000) }];
+  const prepared = await wiring.summarize.prepare!({ messages });
+  expect(prepared.tokens).toBeLessThan(100);
+  expect(received).toEqual([]);
+  messages[0]!.content = 'replacement';
+  await prepared.send();
+  expect(converter).toHaveBeenCalledOnce();
+  expect(JSON.stringify(received[0]!.body)).toContain('WIRE_SMALL');
+  expect(JSON.stringify(received[0]!.body)).not.toContain('replacement');
+  await expect(prepared.send()).rejects.toThrow('already been consumed');
+});
+
+it('refuses converted summary growth before claiming or dispatching a request', async () => {
+  const converter = vi.fn(async () => [{ role: 'user' as const, content: 'WIRE_LARGE'.repeat(12_000) }]);
+  const reserve = vi.fn();
+  const wiring = buildCompactionWiring({ provider: { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture', endpoint: fixture.endpoint },
+    runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog: loadCatalog(), convertToLlm: converter,
+    requestPolicy: { reserve } as never });
+  await expect(wiring.summarize.prepare!({ messages: [{ role: 'user', content: 'small' }] })).rejects.toThrow('Summary request refused');
+  expect(converter).toHaveBeenCalledOnce();
+  expect(reserve).not.toHaveBeenCalled();
+  expect(received).toEqual([]);
+});
+
+it('clips only the summary tool projection when complete UTF-8 bytes exceed the model limit', async () => {
+  const raw = [{ role: 'assistant' as const, content: '', tool_calls: [{ id: 'source', type: 'function' as const,
+    function: { name: 'read', arguments: '{}' } }] },
+  { role: 'tool' as const, tool_call_id: 'source', content: 'HEAD' + '界'.repeat(8_000) + 'TAIL' }];
+  const before = JSON.stringify(raw);
+  const converter = vi.fn(async messages => messages);
+  const wiring = buildCompactionWiring({ provider: { headers: {}, baseUrl, model: 'fixture-model', providerId: 'fixture',
+    endpoint: fixture.endpoint, shape: { ...resolveRequestShape(loadCatalog(), 'fixture', 'fixture-model', undefined, baseUrl, fixture.endpoint),
+      inputLimits: { maxRequestBytes: 8_000 } } },
+    runtimeConfig: fixture.config as never, sessionId: 'signed-summary', catalog: loadCatalog(), convertToLlm: converter });
+  expect(await generateCompaction({ history: raw, prefix: [], summarize: wiring.summarize, maxTokens: 9_000 })).toContain('SUMMARY_ANSWER');
+  expect(received).toHaveLength(1);
+  expect(Buffer.byteLength(JSON.stringify(received[0]!.body), 'utf8')).toBeLessThanOrEqual(8_000);
+  expect(JSON.stringify(received[0]!.body)).toContain('truncated for summary');
+  expect(JSON.stringify(raw)).toBe(before);
+  expect(converter.mock.calls.length).toBeGreaterThan(1);
+});
+
+it('keeps rewind available when application conversion refuses a branch summary', async () => {
+  const deps = runtime(true, () => { throw new Error('PRIVATE_CONVERTER_FAILURE'); });
+  expect(await deps.summarizeAbandonedTurns!([{ role: 'user', content: 'abandoned work' }])).toBeUndefined();
+  expect(received).toEqual([]);
+});
+
+it('releases a pending branch converter when navigation is cancelled without dispatch', async () => {
+  let entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  let fail!: (error: Error) => void;
+  const pending = new Promise<readonly import('../../model-adapters/message.js').ProviderMessage[]>((_resolve, reject) => { fail = reject; });
+  const deps = runtime(true, () => { entered(); return pending; });
+  const controller = new AbortController();
+  let settled = false;
+  const run = deps.summarizeAbandonedTurns!([{ role: 'user', content: 'abandoned work' }], controller.signal)
+    .then(value => { settled = true; return value; });
+  await started;
+  controller.abort();
+  await new Promise(resolve => setImmediate(resolve));
+  const releasedByCancellation = settled;
+  // Release the source even on a broken product path so the failure cannot hang this suite.
+  fail(new Error('late private converter failure'));
+  expect(await run).toBeUndefined();
+  expect(releasedByCancellation).toBe(true);
+  expect(received).toEqual([]);
 });
 
 it("writes the fallback summary's tool history as prose for a model that takes none", async () => {

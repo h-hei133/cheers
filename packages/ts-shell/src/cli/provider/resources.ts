@@ -154,6 +154,7 @@ export function createProviderResources(input: {
       const setup: CompactionSetup | undefined = activeProvider
         ? {
             ...buildCompactionWiring({ provider: activeProvider, resolution: resolved, runtimeConfig: config, admission, sessionId, catalog, requestPolicy,
+              convertToLlm: input.runtimeContext.convertToLlm,
               workspaceRoot: input.runtimeContext.projectRoot, onCredentialPersisted: providers.publication }),
             authority: nativeCompactionAuthority({ sessionId, workspaceRoot: input.runtimeContext.projectRoot,
               admission, publication, configuration: input.runtimeContext.configuration, store: input.sessionManager }),
