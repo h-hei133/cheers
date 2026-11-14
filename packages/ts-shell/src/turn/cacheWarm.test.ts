@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createCacheWarmingRunner } from "./cacheWarm.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
+import { InputLimitError } from '../provider/request/input.js';
 
 /**
  * What actually happens to a prompt between requests.
@@ -24,6 +25,19 @@ const priced = {
 };
 
 describe("the cache warming runner", () => {
+  it('retires a captured prefix that no longer passes input limits without another refresh', async () => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => { throw new InputLimitError('The request exceeds the selected model byte limit.'); });
+      const onDecision = vi.fn();
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh, onDecision });
+      runner.noteRequest(500_000, sent); await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).toHaveBeenCalledOnce(); expect(runner.status().stopReason).toContain('byte limit');
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      expect(onDecision).toHaveBeenLastCalledWith(expect.anything(), expect.stringContaining('byte limit'));
+      await vi.advanceTimersByTimeAsync(600_000); expect(refresh).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
+  });
   it('stops and exposes admission refusal without rescheduling', async () => {
     vi.useFakeTimers();
     try {

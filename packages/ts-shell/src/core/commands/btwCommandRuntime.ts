@@ -16,6 +16,7 @@ import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { endpointShape } from "../../provider/endpoints/index.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../../provider/registry/provider.js";
 import { ModelAdmissionError } from '../agent/request/model.js';
+import { InputLimitError } from '../../provider/request/input.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { createReport, span } from './report/projection.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
@@ -123,7 +124,7 @@ export async function runBtwCommand(
           onFailure: (classification) => { failure = classification; },
         })) ?? "";
     } catch (error) {
-      if (error instanceof ModelAdmissionError) return { kind: 'local', output: error.message };
+      if (error instanceof ModelAdmissionError || error instanceof InputLimitError) return { kind: 'local', output: error.message };
       failure ??= classifyProviderFailure({
         errorName: error instanceof Error ? error.name : undefined,
         message: error instanceof Error ? error.message : String(error),

@@ -36,6 +36,7 @@ declareEndpoint("google-generative-ai", {
       model: input.model,
       provider: input.provider,
       replayBinding: input.replayBinding,
+      vision: input.vision,
       systemPrompt: input.systemPrompt ?? "",
       messages: input.messages as never,
       tools: [],

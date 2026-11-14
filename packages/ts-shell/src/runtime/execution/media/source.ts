@@ -15,6 +15,49 @@ export interface MediaSource {
   readonly verify: () => Promise<void>
 }
 
+/** Inline images share the same bounded, private descriptor consumed by native decoders. */
+export async function withInlineMediaSource<T>(data: string, signal: AbortSignal | undefined,
+  consume: (source: MediaSource) => Promise<T>): Promise<T> {
+  signal?.throwIfAborted()
+  if (process.platform !== 'linux') throw new MediaReadError('unavailable')
+  if (data.length > Math.ceil(16 * 1024 * 1024 / 3) * 4) throw new MediaReadError('bytes')
+  if (!data || data.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) throw new MediaReadError('format')
+  const bytes = Buffer.from(data, 'base64')
+  if (bytes.length > 16 * 1024 * 1024) throw new MediaReadError('bytes')
+  if (bytes.toString('base64') !== data) throw new MediaReadError('format')
+  const deadline = performance.now() + 15_000
+  const verify = async (): Promise<void> => {
+    signal?.throwIfAborted()
+    if (performance.now() >= deadline) throw new MediaReadError('deadline')
+  }
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-media-'))
+  let writer: FileHandle | undefined, reader: FileHandle | undefined
+  let failure: unknown
+  try {
+    const temporary = path.join(directory, 'source')
+    writer = await fs.open(temporary, 'wx', 0o600)
+    await writer.writeFile(bytes)
+    reader = await fs.open(temporary, constants.O_RDONLY | constants.O_NOFOLLOW)
+    await fs.unlink(temporary)
+    await closeReadHandle(writer); writer = undefined
+    await verify()
+    const result = await consume({ fd: reader.fd, bytes: bytes.length,
+      hash: createHash('sha256').update(bytes).digest('hex'), signature: bytes.subarray(0, 16), deadline, verify })
+    await verify()
+    return result
+  } catch (error) { failure = error; throw error }
+  finally {
+    const closed = await Promise.allSettled([...(reader ? [closeReadHandle(reader)] : []), ...(writer ? [closeReadHandle(writer)] : [])])
+    let removed = true
+    try { await fs.rm(directory, { recursive: true, force: true }) } catch { removed = false }
+    if (!removed || closed.some(result => result.status === 'rejected')) {
+      const cleanup = new MediaReadError('cleanup')
+      if (failure) throw new AggregateError([failure, cleanup], 'Media extraction failed: input-handle cleanup could not be verified.')
+      throw cleanup
+    }
+  }
+}
+
 /** Decode a private bounded copy, so native reads cannot follow source growth. */
 export async function withMediaSource<T>(request: MediaReadRequest, consume: (source: MediaSource) => Promise<T>): Promise<T> {
   request.abortSignal?.throwIfAborted()

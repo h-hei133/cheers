@@ -326,7 +326,7 @@ function simpleAsTurn(input: SimpleRequest): TurnRequest {
     messages: input.messages,
     tools: [],
     allowTools: false,
-    vision: false,
+    vision: input.vision ?? false,
     temperature: input.temperature ?? 0,
     ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
     ...(input.supportsTemperature !== undefined ? { supportsTemperature: input.supportsTemperature } : {}),

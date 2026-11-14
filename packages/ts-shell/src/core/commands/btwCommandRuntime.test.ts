@@ -28,6 +28,16 @@ beforeEach(() => {
 });
 afterEach(() => { cleanupAdvisorHarnesses(); vi.clearAllMocks(); vi.useRealTimers(); });
 
+it('reports local byte admission refusal without inventing a provider failure or dispatching', async () => {
+  vi.mocked(loadCatalog).mockReturnValue([{ id: 'fixture', label: 'Fixture', runtime: 'openai-compatible', auth: 'api-key',
+    models: [{ id: 'm', inputLimits: { maxRequestBytes: 1 } }] }]);
+  const fetchImpl = vi.fn(async () => Response.json({ choices: [{ message: { content: 'should not send' } }] })) as unknown as typeof fetch;
+  vi.mocked(providerFetchForEndpoint).mockReturnValue(fetchImpl);
+  const result = await runBtwCommand(['question'], { cwd: '/synthetic' });
+  expect(result.output).toContain('byte limit'); expect(result.output).not.toContain('Failure:');
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
+
 it.each(['blocked', 'catalogue'] as const)('refuses a %s endpoint override before side-question HTTP', async source => {
   vi.mocked(resolveProviderCredential).mockReturnValue(source === 'blocked'
     ? { provider: 'openai', baseUrl: 'https://foreign.invalid/v1', expectedEnvVarName: 'OPENAI_API_KEY', blocked: 'connection-overridden' }

@@ -9,6 +9,7 @@ import type { ProviderUsage } from '../../turn/completion.js';
 import { requestReplayBinding } from './replay.js';
 import { readCompletion } from '../response/read.js';
 import { copilotRequestHeaders } from '../endpoints/copilotHeaders.js';
+import { normalizeRequestImages, requestInputLimits } from './input.js';
 
 /**
  * One out-of-band model call.
@@ -69,6 +70,8 @@ export interface SimpleCompletionRequest {
   readonly signal?: AbortSignal;
   /** Report a classification without exposing provider response bodies. */
   readonly onFailure?: (failure: ProviderFailureClass) => void;
+  /** Native inline processing owns temporary state; no source files are read from this directory. */
+  readonly workspaceRoot?: string;
 }
 
 /**
@@ -93,7 +96,9 @@ export async function requestSimpleCompletion(
     .filter((message) => message.role === "system")
     .map((message) => message.content)
     .join("\n\n");
-  const messages = request.messages.filter((message) => message.role !== "system");
+  const inputLimits = requestInputLimits(request.shape?.inputLimits);
+  const messages = await normalizeRequestImages(request.messages.filter((message) => message.role !== "system"),
+    request.shape?.vision === true, inputLimits, request.workspaceRoot ?? process.cwd(), request.signal);
   const headers = new Headers(request.provider.headers);
   if (kind === 'copilot-chat-completions' || kind === 'copilot-messages') {
     for (const [name, value] of Object.entries(copilotRequestHeaders({ provider: request.provider.providerId, messages }))) headers.set(name, value);
@@ -110,7 +115,7 @@ export async function requestSimpleCompletion(
     }),
   );
   const attempt = await prepareRequestAttempt({ body: serialized, provider: request.provider.providerId ?? '', model: request.provider.model,
-    endpoint: kind ?? 'openai-compatible', purpose: 'side-question', policy: request.requestPolicy,
+    endpoint: kind ?? 'openai-compatible', purpose: 'side-question', policy: request.requestPolicy, inputLimits,
     ...(request.provider.credentialId && request.provider.credentialGeneration
       ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
   const res = await attempt.send(endpointUrl(request.provider.baseUrl, kind, request.provider.model, false), {

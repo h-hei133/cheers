@@ -65,7 +65,7 @@ declareEndpoint("openai-compatible", {
     model: input.model,
     messages: [
       ...(input.systemPrompt ? [{ role: input.systemRole ?? 'system', content: input.systemPrompt }] : []),
-      ...input.messages.map(message => wireMessage(message, input)),
+      ...wireMessages(input.messages, input.vision === true, false, input),
     ],
     // Gated the same way the full request gates it. A caller that declares the
     // model rejects a temperature gets a request without one, whether or not the

@@ -128,3 +128,7 @@
 2026-11-14 账户归一化清理提交前：D.5提交`46b80eec`。删除无人消费的凭据codec，保留现有canonical normalizer；真实持久配置先拒绝prototype键，安全归一化后的extras经普通credential resolution读取。独立暂存树五静态门、19项account测试和build `3a18c732b2d1`通过；不等于F1.4所有OAuth提供方已实现。
 
 2026-11-14 设备登录修复提交前：账户清理提交`1d5ee319`。显式device选择贯通instruction/poll/私有exchange/proof/pending owner及refresh enrollment；首次独立暂存树6/190与build通过，独立复审发现exchange仅body限时。默认15分钟login下30秒headers未超时的反例确实失败；改为fetch前创建共享30秒scope，修复后独立暂存树6套件191项、五静态门、build `810b9a19a4c4`通过，包含晚response取消/无proof。F1.4其他提供方、真人同意和实际续期仍缺证据，未勾选。
+
+2026-11-14 B2.2提交前：设备登录提交`d81e4f86`；实际宿主及共享输入边界11套件166项、五静态门、build `64e760e74bd1`通过。两条Linux PTY路径16色/拆分DA1/晚到更新/粘贴保持通过；探针首次期待旧kitty状态而非公开enhanced值，修正后通过，产品未改。独立复审限定CLEAR。提交前仅去除新增文件尾空行，build证据对应行为相同的暂存树。
+
+2026-11-14 图片输入修复提交前：终端提交`b607fd6`；初次暂存树7/232与补充wire/capture/sent/compaction4/94通过，独立复审另发现既有image/jpg别名被新准入拒绝。simple/turn两反例均红后统一MIME投影，保留原history；最终独立暂存树11套件315项、五静态门及build `6d1d1be8347f`通过，含Linux实际inline缩放与PDF/read消费者。限定复核CLEAR；目录classifier/生成模型类别和B.3完整终端预算验收仍未完成，不勾选F2.1或B.3。

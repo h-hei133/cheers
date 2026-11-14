@@ -6,6 +6,8 @@ import type { ModelTransport, RequestPolicy } from '../../core/agent/request/mod
 import { ModelAdmissionError } from '../../core/agent/request/model.js';
 import type { PromptIdentitySnapshot } from '../../observability/usage/model.js';
 import { prepareRequestAttempt } from './attempt.js';
+import type { ModelInputLimits } from '../../core/models/modalities.js';
+import { InputLimitError } from './input.js';
 
 /** A prepared request captured before transport signing, with its exact prompt prefix. */
 export interface SentRequest {
@@ -22,6 +24,8 @@ export interface SentRequest {
   readonly endpoint?: string;
   readonly reasoning?: boolean;
   readonly maxTokensField?: TurnRequest["maxTokensField"];
+  /** Captured exact-model limits remain bound to the prefix when a timer refreshes it. */
+  readonly inputLimits?: ModelInputLimits;
 }
 
 /** The endpoint owns replay compatibility and the location of its output ceiling. */
@@ -55,7 +59,7 @@ export async function sendSentRequest(
   try {
     const serialized = JSON.stringify(body);
     const attempt = await prepareRequestAttempt({ body: serialized, provider: metering?.provider ?? '', model: metering?.model ?? String(body.model ?? ''),
-      endpoint: sent.endpoint ?? 'openai-compatible', purpose: 'cache-refresh', policy: metering?.policy,
+      endpoint: sent.endpoint ?? 'openai-compatible', purpose: 'cache-refresh', policy: metering?.policy, inputLimits: sent.inputLimits,
       ...(metering?.credential ? { credential: metering.credential } : {}) });
     const headers = new Headers(sent.headers);
     for (const [name, value] of Object.entries(sent.requestHeaders ?? {})) headers.set(name, value);
@@ -86,7 +90,7 @@ export async function sendSentRequest(
     if (!hasMessage || signal?.aborted || (finishReason != null && !["stop", "length", "tool_calls"].includes(finishReason))) return undefined;
     return usage;
   } catch (error) {
-    if (error instanceof ModelAdmissionError) throw error;
+    if (error instanceof ModelAdmissionError || error instanceof InputLimitError) throw error;
     // Background refresh failure never becomes an answer or a usage estimate.
     return undefined;
   } finally {

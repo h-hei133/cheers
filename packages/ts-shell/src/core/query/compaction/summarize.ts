@@ -228,6 +228,7 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   );
   const attempt = await prepareRequestAttempt({ body, provider: request.provider.providerId ?? '', model: request.provider.model,
     endpoint: kind ?? 'openai-compatible', purpose: request.purpose ?? 'compaction', policy: request.requestPolicy,
+    inputLimits: request.provider.shape?.inputLimits,
     ...(request.provider.credentialId && request.provider.credentialGeneration
       ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
   const transport: ModelTransport | undefined = request.dispatch ? (input, init, beforeDispatch) => {

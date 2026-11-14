@@ -9,6 +9,7 @@ import {
 import type { ModelCostRates } from "../core/models/catalog.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
+import { InputLimitError } from '../provider/request/input.js';
 
 /**
  * Keeping a prompt cached between requests.
@@ -190,7 +191,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
       if (options.isCurrent?.() === false) { clear(); return; }
       if (usage) options.onUsage?.(usage);
     } catch (error) {
-      if (error instanceof ModelAdmissionError) {
+      if (error instanceof ModelAdmissionError || error instanceof InputLimitError) {
         stopReason = error.message; stopped = true; clear();
         options.onDecision?.(decision, stopReason);
         return;

@@ -5,6 +5,8 @@ import { modelUsage } from '../response/metering.js';
 import type { ProviderUsage } from '../../turn/completion.js';
 import { credentialBackoffRemaining, noteCredentialRateLimit, responseBackoffMs,
   type CredentialKey } from './backoff.js';
+import type { ModelInputLimits } from '../../core/models/modalities.js';
+import { assertRequestInput, requestInputLimits } from './input.js';
 
 export interface RequestAttempt {
   readonly id?: string;
@@ -17,8 +19,11 @@ export async function prepareRequestAttempt(request: {
   readonly body: string; readonly provider: string; readonly model: string; readonly endpoint: string;
   readonly purpose: string; readonly requestId?: string; readonly policy?: RequestPolicy;
   readonly credential?: CredentialKey;
+  readonly inputLimits?: ModelInputLimits;
 }): Promise<RequestAttempt> {
-  request = Object.freeze({ ...request, ...(request.credential ? { credential: Object.freeze({ ...request.credential }) } : {}) });
+  request = Object.freeze({ ...request, inputLimits: requestInputLimits(request.inputLimits),
+    ...(request.credential ? { credential: Object.freeze({ ...request.credential }) } : {}) });
+  if (request.inputLimits) assertRequestInput(request.body, endpointShape(request.endpoint).contextFields, request.inputLimits);
   // A credential that a provider just rate-limited is not asked again until its
   // own deadline. Another credential of the same provider is unaffected.
   const assertCredentialReady = (): void => {

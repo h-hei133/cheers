@@ -1,6 +1,5 @@
 /**
- * Model input/output modalities and image input limits, aligned with Pi's
- * `model-schema.ts` and `applyImageResizeDefaults`.
+ * Model input/output modalities and optional image input constraints.
  */
 
 export const MODEL_INPUT_MODALITIES = ["text", "image"] as const;
@@ -30,6 +29,38 @@ export const DEFAULT_IMAGE_RESIZE: Readonly<Required<ModelImageResizeOptions>> =
   maxBytes: Math.floor(4.5 * 1024 * 1024),
   jpegQuality: 80,
 };
+
+/** Capture validated limits before asynchronous normalization or request admission. */
+export function captureInputLimits(limits: ModelInputLimits | undefined): ModelInputLimits | undefined {
+  if (limits === undefined) return undefined;
+  if (limits === null || typeof limits !== 'object' || Array.isArray(limits)
+    || limits.images !== undefined && (limits.images === null || typeof limits.images !== 'object' || Array.isArray(limits.images))
+    || limits.images?.resize !== undefined && (limits.images.resize === null || typeof limits.images.resize !== 'object' || Array.isArray(limits.images.resize))) {
+    throw new Error('Model input limits must be objects.');
+  }
+  const positive = (value: number | undefined): number | undefined => {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value <= 0)) throw new Error('Model input limits must be positive safe integers.');
+    return value;
+  };
+  const count = (value: number | undefined): number | undefined => {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) throw new Error('Model image counts must be non-negative safe integers.');
+    return value;
+  };
+  const resize = limits.images?.resize;
+  if (resize?.jpegQuality !== undefined && (!Number.isSafeInteger(resize.jpegQuality) || resize.jpegQuality < 1 || resize.jpegQuality > 100)) {
+    throw new Error('Model JPEG quality must be an integer from 1 to 100.');
+  }
+  return Object.freeze({
+    maxRequestBytes: positive(limits.maxRequestBytes),
+    ...(limits.images ? { images: Object.freeze({
+      maxPerMessage: count(limits.images.maxPerMessage), maxPerRequest: count(limits.images.maxPerRequest),
+      ...(resize ? { resize: Object.freeze({
+        maxWidth: positive(resize.maxWidth), maxHeight: positive(resize.maxHeight), maxBytes: positive(resize.maxBytes),
+        jpegQuality: resize.jpegQuality,
+      }) } : {}),
+    }) } : {}),
+  });
+}
 
 const VALID_MODALITY_SET = new Set<string>(MODEL_INPUT_MODALITIES);
 

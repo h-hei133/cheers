@@ -30,7 +30,7 @@ export function responseBody(input: SimpleRequest | TurnRequest, stream: boolean
     ...(cacheKey ? { prompt_cache_key: cacheKey } : {}),
     ...(cacheKey && input.cacheRetention === 'long' ? { prompt_cache_retention: '24h' } : {}),
     ...(input.systemPrompt ? { instructions: input.systemPrompt } : {}),
-    input: responseMessages(input.messages, turn?.vision ?? false, input.provider, input.model, input.replayBinding),
+    input: responseMessages(input.messages, input.vision ?? false, input.provider, input.model, input.replayBinding),
     include: ['reasoning.encrypted_content'],
     ...(turn?.allowTools && turn.tools.length ? { tools: turn.tools.map(tool => ({
       type: 'function', name: tool.function.name, description: tool.function.description,

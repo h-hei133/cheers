@@ -830,6 +830,7 @@ declareEndpoint("anthropic-messages", {
       tools: [],
       allowTools: false,
       stream: false,
+      vision: input.vision,
       ...(input.reasoningEffort && input.thinkingLevelName ? { thinkingLevelName: input.thinkingLevelName } : {}),
       ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
       ...(input.thinkingBudgetMaximum ? { thinkingBudgetMaximum: true } : {}),

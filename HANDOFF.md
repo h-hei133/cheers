@@ -2296,3 +2296,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Protocol-looking paste text disappears, a keyboard reply settles the color query, or a timeout releases an unrelated partial paste marker.
 - **Root Cause:** Raw pre-scanning bypasses the actual paste owner, and multiple queries share an unowned DA1 sentinel or partial-buffer deadline.
 - **Rule:** Use the existing input parser for complete non-paste reports, retain each query fence through settlement or its own bounded expiry, and retire only the matching prefix. Transfer the same parser across startup adoption; keep cached colors subordinate to the captured theme and appearance owners.
+
+
+### Input Admission Must Preserve Existing Image Aliases
+- **Symptom:** A valid JPEG accepted by an endpoint is refused before dispatch after adding image limits.
+- **Root Cause:** A new signature check requires the canonical MIME string but the existing contract accepts the JPEG alias.
+- **Rule:** Normalize only supported aliases in the shared image owner, then use the same value for signature, dimensions, request projection and native decoding. Keep raw history unchanged and verify both main and simple requests through final byte/count admission.

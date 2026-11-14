@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createComponentLogger } from "../observability/structuredLogger.js";
 import { ModelAdmissionError, type ModelTransport, type RequestPolicy } from '../core/agent/request/model.js';
 import { prepareRequestAttempt, type RequestAttempt } from '../provider/request/attempt.js';
+import { InputLimitError, normalizeRequestImages, requestInputLimits } from '../provider/request/input.js';
 import { hasUsage, usageFromProvider } from "../provider/response/usage.js";
 import { parseToolArgs, type AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
@@ -36,10 +37,11 @@ import {
 } from './messages.js';
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
 import { resolveRequestShape } from "../core/models/requestShape.js";
+import type { ModelInputLimits } from '../core/models/modalities.js';
 import type { CatalogProvider } from "../core/models/catalog.js";
 import type { PromptSource } from '../context/request/model.js';
 import { requestContext } from '../context/request/projection.js';
-import { estimateWirePrompt } from '../context/request/wire.js';
+import { estimateWirePrompt, WirePromptUnavailableError } from '../context/request/wire.js';
 import { historyDigest } from '../context/request/identity.js';
 import { decodePromptMeasurement } from '../context/request/measurement.js';
 import {
@@ -361,12 +363,20 @@ export function createStepFunction(request: StepRequest): StepFunction {
         ...request.projection,
         ...(request.pruneToolText !== undefined ? { pruneToolText: request.pruneToolText } : {}),
       };
-      const projection = outgoingProjection(messages, shape.assistantAfterToolResult, projectionOptions);
-      const finalMessages = finalStepMessages(
-        projection.messages,
-        allowTools,
-        tools.length > 0,
-      );
+      const outgoing = outgoingProjection(messages, shape.assistantAfterToolResult, projectionOptions);
+      let projection = outgoing;
+      let inputLimits: ModelInputLimits | undefined;
+      let finalMessages: readonly ChatMessage[];
+      try {
+        inputLimits = requestInputLimits(shape.inputLimits);
+        const normalized = await normalizeRequestImages(outgoing.messages,
+          shape.vision, inputLimits, request.workspaceRoot, signal);
+        if (normalized !== outgoing.messages) projection = { ...outgoing, messages: [...normalized], indexAligned: false, sourceAligned: false };
+        finalMessages = finalStepMessages(projection.messages, allowTools, tools.length > 0);
+      } catch (error) {
+        if (signal?.aborted) return stamp(abortedStep(''));
+        return stamp(errorStep(error instanceof InputLimitError ? error.message : 'Image input preparation failed.', true));
+      }
       const budgetMessages: readonly AgentMessage[] = finalMessages.map(message => ({
         ...message,
         content: message.content ?? '',
@@ -434,7 +444,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           model: activeModel,
           sessionId: request.sessionId,
           systemPrompt,
-          messages: projection.messages,
+          messages: finalMessages,
           tools,
           allowTools,
           vision: shape.vision,
@@ -495,12 +505,17 @@ export function createStepFunction(request: StepRequest): StepFunction {
           ...(shape.supportsMidConvoEffort ? { supportsMidConvoEffort: true } : {}),
           ...(request.historicalEfforts ? { historicalEfforts: request.historicalEfforts } : {}),
         });
-        // Public replay adds input outside the legacy answer/tool estimate.
-        if (shape.reasoningReplayField) {
-          const replayBudget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
-            inputLimit: modelEntry?.inputLimit, promptTokens: estimateWirePrompt(payload, protocol.contextFields),
-            outputTokens: output ?? shape.maxOutputCeiling, reserveTokens: request.reserveTokens, measured: false });
-          if (!replayBudget.ok && replayBudget.reason !== 'unknown') return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${replayBudget.detail}`));
+        // Public replay and image conversion use the protocol's actual input projection.
+        if (shape.reasoningReplayField || inputLimits?.images) {
+          try {
+            const replayBudget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
+              inputLimit: modelEntry?.inputLimit, promptTokens: estimateWirePrompt(payload, protocol.contextFields, modelEntry?.tokenizer),
+              outputTokens: output ?? shape.maxOutputCeiling, reserveTokens: request.reserveTokens, measured: false });
+            if (!replayBudget.ok && replayBudget.reason !== 'unknown') return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${replayBudget.detail}`));
+          } catch (error) {
+            // Signed replay has no local token proof; byte/count admission still sees its complete serialized body.
+            if (shape.reasoningReplayField || !(error instanceof WirePromptUnavailableError)) throw error;
+          }
         }
       } catch (error) {
         // The only throw from this call is an undeclared kind, and it names both
@@ -567,7 +582,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         try {
           const body = JSON.stringify(payload);
           const modelAttempt = await prepareRequestAttempt({ body, provider: activeProvider, model: activeModel,
-            endpoint, purpose: options.agentMode ? 'subagent' : 'turn', requestId, policy: request.requestPolicy,
+            endpoint, purpose: options.agentMode ? 'subagent' : 'turn', requestId, policy: request.requestPolicy, inputLimits,
             ...(request.provider.credentialId && request.provider.credentialGeneration
               ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
           const attemptResponse = await modelAttempt.send(
@@ -597,6 +612,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
               endpoint,
               maxTokensField: shape.maxTokensField,
               reasoning: modelEntry?.reasoning,
+              inputLimits,
               url: endpointUrl(request.provider.baseUrl, endpoint, activeModel),
               headers: request.provider.headers,
               requestHeaders,
@@ -637,6 +653,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             );
           }
         } catch (error) {
+          if (error instanceof InputLimitError) return stamp(errorStep(error.message, true));
           if (error instanceof ModelAdmissionError) return stamp({ ...errorStep(error.message, true), admissionFailure: error.code });
           if (signal?.aborted) return stamp(abortedStep(""));
           // No response was observed. This does not establish whether the
