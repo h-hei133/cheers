@@ -2471,3 +2471,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Automatic effort fallback routes to a smaller model, but recovery prices the first model and refuses a legal cut; storing a fenced capture also prevents recovery after the failed assistant message is appended.
 - **Root Cause:** A once-only compaction callback also delivered capture notifications, and the notification retained the previous logical request's live wrapper.
 - **Rule:** Keep once-only compaction preparation separate from notifications for every native preparation and declaration refresh. Store the bare effective capture for recovery, then bind the original history owner inside the active step before refusal or dispatch. Reframe recovery under its new owner and closing contract. Raw source ownership alone never implies provider conversion or disables aligned measurement.
+
+### Transcript Declarations Need Every Encoding Entry To Capture First
+- **Symptom:** A message factory validates a declaration, but direct encode or append drops undefined fields, invokes schema hooks, or persists data that the reader rejects.
+- **Root Cause:** Public append paths serialize caller events without the factory's inert capture; creating a header before validation also changes disk on refusal.
+- **Rule:** Capture message events before encoding at the shared codec, check the event type through its own data descriptor, and encode once before header creation or file opening. Preserve append-first live publication and the existing unknown disk outcome after a real write. SessionManager reloads current projections per write; tests must observe the current loaded record instead of an old createNew object.

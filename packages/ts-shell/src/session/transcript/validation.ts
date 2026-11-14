@@ -2,6 +2,7 @@ import { isRecord as record } from "../../core/values/record.js";
 import { readableOutput, readableQueryResult, readableToolEvent } from "./output.js";
 import { readableLifecycleRecord } from './lifecycle.js';
 import { isCustomMessage } from '../../core/agent/custom.js';
+import { captureRequestDeclaration } from '../../core/agent/declarations/codec.js';
 
 const ROLES: ReadonlySet<unknown> = new Set(["system", "user", "assistant", "tool"]);
 const AGENT_ROLES: ReadonlySet<unknown> = new Set(["planner", "coder", "reviewer"]);
@@ -25,6 +26,8 @@ function toolCalls(value: unknown): boolean {
 }
 
 function message(value: Record<string, unknown>): boolean {
+  try { value = captureRequestDeclaration(value as Record<string, unknown> & { role: string }); }
+  catch { return false; }
   if (value.role === 'custom') return isCustomMessage(value);
   const origin = value.origin;
   const reasoning = value.reasoning;

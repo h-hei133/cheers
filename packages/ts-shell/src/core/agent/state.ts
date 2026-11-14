@@ -2,6 +2,7 @@ import type { MessageContent, ProviderMessage } from '../../model-adapters/messa
 import type { PromptMeasurement } from './request/measurement.js';
 import type { CustomAgentMessage } from './custom.js';
 import { captureMessageHistory } from './custom.js';
+import type { RequestDeclaration } from './declarations/model.js';
 export type { CustomAgentMessage, CustomMessageInput } from './custom.js';
 
 export type AgentStopReason = "stop" | "length" | "error" | "aborted";
@@ -22,6 +23,8 @@ export interface StandardAgentMessage extends MutableProviderMessage {
   readonly admissionFailure?: import('./request/model.js').ModelAdmissionError['code'];
   readonly stopReason?: AgentStopReason | string;
   readonly errorMessage?: string;
+  /** Runtime declarations retain their original system-message history position. */
+  readonly requestDeclaration?: RequestDeclaration;
 }
 
 export type AgentMessage = StandardAgentMessage | CustomAgentMessage;

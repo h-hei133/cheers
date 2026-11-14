@@ -139,17 +139,18 @@ export function appendTranscriptEvent(
   header?: { readonly sessionId: string; readonly timestamp: string; readonly cwd: string },
   options?: TranscriptAppendOptions,
 ): void {
+  const record = Buffer.from(`${encodeTranscriptEvent(event)}\n`, 'utf8');
   if (options?.requireExisting) {
-    appendExistingEvent(transcriptPath, event, options);
+    appendExistingEvent(transcriptPath, record, options);
     return;
   }
   if (options?.expectedIdentity !== undefined || options?.durable || options?.expectedPrefix) throw new TranscriptAppendError('unchanged');
   ensureTranscriptHeader(transcriptPath, header);
-  fs.appendFileSync(transcriptPath, `${encodeTranscriptEvent(event)}\n`, "utf8");
+  fs.appendFileSync(transcriptPath, record);
 }
 
 /** Preserve an interrupted tail and verify the appended record through the same file handle. */
-function appendExistingEvent(transcriptPath: string, event: TranscriptEvent, options?: TranscriptAppendOptions): void {
+function appendExistingEvent(transcriptPath: string, record: Buffer, options?: TranscriptAppendOptions): void {
   let persistence: 'unchanged' | 'unknown' = 'unchanged';
   const bound = options?.expectedIdentity !== undefined || options?.durable === true || options?.expectedPrefix !== undefined;
   try {
@@ -163,7 +164,6 @@ function appendExistingEvent(transcriptPath: string, event: TranscriptEvent, opt
         throw new TranscriptAppendError('unchanged');
       }
       if (before.size) fs.readSync(fd, last, 0, 1, before.size - 1);
-      const record = Buffer.from(`${encodeTranscriptEvent(event)}\n`, 'utf8');
       const separator = before.size && last[0] !== 10 ? Buffer.from('\n') : Buffer.alloc(0);
       persistence = 'unknown';
       fs.appendFileSync(fd, separator.length ? Buffer.concat([separator, record]) : record);
@@ -350,10 +350,10 @@ export function appendSessionTurn(input: {
     // which is what lets a branch be resolved into the messages it contains.
     id: message.id ?? createTranscriptEntryId("turn"),
   };
-  // A failed custom append must not remain available to the next model turn.
+  // A failed custom or declaration append must not reach the next model turn.
   // An append that landed before a later state error stays an uncertain disk
   // outcome; readers reload through the existing transcript/state authority.
-  if (message.role === 'custom') {
+  if (message.role === 'custom' || Object.hasOwn(message, 'requestDeclaration') && message.requestDeclaration !== undefined) {
     input.append(createMessageTranscriptEvent(nextMessage));
     const next = { ...input.session, turns: [...input.session.turns, nextMessage], updatedAt: input.timestamp };
     input.writeMetadata(next);

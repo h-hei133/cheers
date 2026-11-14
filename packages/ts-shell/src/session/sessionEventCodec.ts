@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { types } from 'node:util';
 import { decodePromptMeasurement } from '../context/request/measurement.js';
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
 import { isReadableTranscriptEvent } from "./transcript/validation.js";
 import type { ReportTranscriptEntry } from './reports/model.js';
+import { captureCustomMessage } from '../core/agent/custom.js';
 export type TranscriptLifecycleEventName =
   | "run-started"
   | "run-interrupted"
@@ -168,6 +170,7 @@ export function legacyTranscriptEntryId(lineNumber: number): string {
 export function createMessageTranscriptEvent(
   message: SessionMessage & { timestamp: string },
 ): Extract<TranscriptEvent, { type: "message" }> {
+  message = captureCustomMessage(message);
   if (message.role === 'custom') return {
     type: 'message', id: message.id ?? createTranscriptEntryId('msg'), role: 'custom',
     customType: message.customType, display: message.display, content: message.content, timestamp: message.timestamp,
@@ -190,6 +193,7 @@ export function createMessageTranscriptEvent(
     ...(message.origin ? { origin: message.origin } : {}),
     ...(message.reasoning ? { reasoning: message.reasoning } : {}),
     ...(message.failureClass ? { failureClass: message.failureClass } : {}),
+    ...(Object.hasOwn(message, 'requestDeclaration') && message.requestDeclaration ? { requestDeclaration: message.requestDeclaration } : {}),
     timestamp: message.timestamp,
   };
 }
@@ -239,6 +243,11 @@ function durableQueryEvent(event: QueryEvent): QueryEvent {
 }
 
 export function encodeTranscriptEvent(event: TranscriptEvent): string {
+  if (!event || typeof event !== 'object' || types.isProxy(event)) throw new Error('Transcript event requires inert data.');
+  const type = Object.getOwnPropertyDescriptor(event, 'type');
+  if (!type || !('value' in type)) throw new Error('Transcript event type must be an own data property.');
+  if (type.value === 'message') event = captureCustomMessage(event as Extract<TranscriptEvent, { type: 'message' }>);
+  else if (Object.getOwnPropertyDescriptor(event, 'requestDeclaration')) throw new Error('Request declaration requires a message event.');
   // Older readers reject this new wire type instead of applying an unverified summary.
   return JSON.stringify(event.type === 'compaction' && event.publication === 'prepared'
     ? { ...event, type: 'compaction-prepared' } : event);
@@ -320,6 +329,7 @@ export function transcriptEventToSessionMessage(
   if (event.type !== "message") {
     return undefined;
   }
+  event = captureCustomMessage(event);
   if (event.role === 'custom') return {
     ...(event.id ? { id: event.id } : {}), role: 'custom', customType: event.customType!, display: event.display!,
     content: event.content, timestamp: event.timestamp,
@@ -343,6 +353,7 @@ export function transcriptEventToSessionMessage(
     // the working out back unsigned, and the request would be refused.
     ...(event.reasoning ? { reasoning: event.reasoning } : {}),
     ...(event.failureClass ? { failureClass: event.failureClass } : {}),
+    ...(Object.hasOwn(event, 'requestDeclaration') && event.requestDeclaration ? { requestDeclaration: event.requestDeclaration } : {}),
     timestamp: event.timestamp,
   };
 }

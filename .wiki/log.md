@@ -11760,3 +11760,7 @@ CI 43158106512 在 7c7153c1 上实际失败：3文件5项失败，1100文件1452
 类型拆分、custom持久化／显示、前台转换、摘要capture、完整policy及转换主请求接线已经分别提交。普通请求本批补齐实际路由的完整system/tools/body阈值，并修复最新effort fallback capture恢复和goal closing历史误丢；新增两反例先红后修，六静态门、16套件356项及build `c7e760063e80`通过，限定独立复核CLEAR。
 
 Linux当前编译SDK已配置模型6次actual bodySent、普通automatic verified commit和重开通过。过小window、过短探针截止及错误内部字段的失败回执保留；工具发现两fixture在上一提交同样失败，显式full模式单独提交`dae1b97`。规划本地验收数仍16，C.3联合验收及C.6稳定声明继续开项；无push或远端CI声明。任务与证据以[运行时开发清单](refactor/upgrade/MASTER.md)为准。
+
+### 2026-11-15：声明合同和会话存储独立批次
+
+C.6首批补齐完整工具／实际目标／effort的版本化空文本system声明，双向transcript保留顺序／ID，append-first防止失败声明进入内存。复核发现公开encode和直接append会绕过捕获，三项入口反例先红后修；六静态门、5套件93项及build `cd08cabeb2bf`通过，限定独立复核CLEAR。当前仍未接实际发送和协议历史投影，C.6保留部分、本地验收数仍16；按批本地提交，无push／CI声明。

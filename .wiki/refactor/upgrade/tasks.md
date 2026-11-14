@@ -35,7 +35,7 @@
 - [ ] **C.3** AgentMessage 与 provider Message 分离及 convertToLlm：部分。基础类型`91c3ec6`、custom持久化／显示`f5e4ee9`及前台SDK`c220e6f`已提交。前台12套件391项、六静态门、函数上限、build `48bafd6fec4c`及Linux配置模型三次wire/重开/取消后复用通过，实际通过回执在`conversion-native-wire.log`，历史`conversion-native.json`为失败诊断。摘要批接通manual/automatic/prefix/merge/branch转换、同一获准capture预算及send、完整UTF-8准入、原ledger的unknown和legacy拒绝、导航/connection取消；18套件326项、六静态门、build `5e1c8ee4afbb`与当前编译SDK真实模型三次摘要/手动持久化/branch/取消零派发通过。完整policy`72be40f8`和capture`c521d82d`之后，转换主请求threshold、候选缩小／完整limits／live owner准入、closing overflow复用和重复checkpoint已通过17套件446项、六静态门、build `fed3b0f8c0d2`及当前编译SDK配置模型7次bodySent（automatic/manual/rewind/reopen/取消零派发），限定复审CLEAR。普通请求完整阈值已接通：实际route/window/system/tools、candidate raw归属、goal closing与最新effort fallback capture均使用同一准备owner。两补充反例先红后修，16套件356项、六静态门、build `c7e760063e80`及Linux编译SDK配置模型6次bodySent（automatic verified commit/reopen）通过，限定复核CLEAR；工具发现full夹具单独提交`dae1b97`。C.3保留部分，等待稳定历史声明及完整联合验收。
 - [ ] **C.4** 默认历史工具文本保留与一致测量：已有待验收，真实多轮请求前缀与压缩预算。
 - [ ] **C.5** Anthropic 历史缓存标记、OpenAI／Responses affinity 与 TTL：已有待验收，真实最终 wire 和能力限制。
-- [ ] **C.6** 动态工具／思考档位在原始消息位置声明：部分。当前请求末尾临时追加增量，后续消息会移动旧块；需跨轮／续接后前缀稳定的实际 wire 证据。
+- [ ] **C.6** 动态工具／思考档位在原始消息位置声明：部分。首批实现版本化完整工具／实际目标／effort声明合同，空文本system载体、descriptor-first有界JSON捕获，双向transcript保留字段／ID／顺序；声明append-first，失败不发布live history，uncertain磁盘事实保留。公开encode与两种append绕过捕获的三项反例先红后修；六静态门、5套件93项及build `cd08cabeb2bf`通过，限定独立复核CLEAR。实际准备／发送尚未发布声明，协议投影和压缩保留仍待实施；需跨轮／续接后前缀稳定的实际wire证据。
 - [ ] **C.7** 逐轮缓存未命中与成本归因：已有待验收，真实 usage 缺失保持未知，不能据假定缓存率宣称节省。
 - [ ] **C.8** 六个核心工具、动态 prompt、BM25／词干／Schema 索引和单步激活：已有待验收，生产 search→execute 与失效代际。
 - [ ] **C.9** stdout 保护：部分。JSON／RPC 已接入，普通 print 尚缺；外部日志不污染结果与有界重试队列。
