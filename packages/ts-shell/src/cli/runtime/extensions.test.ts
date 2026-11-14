@@ -4,21 +4,25 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
-import { initialConfiguration } from '../../core/shell/configuration.js';
+import { configurationAdmission, initialConfiguration } from '../../core/shell/configuration.js';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import { ShellCommandRuntime } from '../../core/shell/command.js';
-import { closeExtensionsFor, extensionManagerFor, installExtensionRuntime, isExtensionControl } from './extensions.js';
+import { closeExtensionsFor, extensionManagerFor, installExtensionRuntime, isExtensionControl, waitForExtensionsFor } from './extensions.js';
 import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
+import { catalogContributions } from '../../core/catalog/contributions.js';
+import { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
+import { createProfileContext, withProfile } from '../../core/paths/profile/context.js';
 
 let directory: string; let context: ShellRuntimeContext;
 beforeEach(() => {
-  directory = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-view-'));
+  const temporary = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(temporary, { recursive: true });
+  directory = fs.mkdtempSync(path.join(temporary, 'extension-view-'));
   vi.stubEnv('HOME', path.join(directory, 'home')); vi.stubEnv('USERPROFILE', path.join(directory, 'home'));
   vi.stubEnv('CHEERS_MARKETPLACES_FILE', path.join(directory, 'sources.json'));
   vi.stubEnv('CHEERS_EXTENSIONS_FILE', path.join(directory, 'registry.json'));
-  context = { cwd: directory, projectRoot: directory, session: { id: 'view', createdAt: '2026-10-21', projectRoot: directory },
-    runtimeConfig: getRuntimeConfig(directory) } as ShellRuntimeContext;
-  context.configuration = initialConfiguration(context);
+  const seed = { cwd: directory, projectRoot: directory, session: { id: 'view', createdAt: '2026-10-21', projectRoot: directory },
+    runtimeConfig: getRuntimeConfig(directory) };
+  context = { ...seed, configuration: initialConfiguration(seed) } as ShellRuntimeContext;
 });
 afterEach(async () => { await closeExtensionsFor(context); vi.unstubAllEnvs(); fs.rmSync(directory, { recursive: true, force: true }); });
 
@@ -29,6 +33,30 @@ function install() {
     hooks: new HookDispatcher(), emit: () => {}, permissionScope: 'ask' }));
   return commands;
 }
+
+it('awaits async file factories before publishing complete CLI contributions', async () => {
+  const file = path.join(directory, 'extension.ts');
+  fs.writeFileSync(file, `export default async api => {
+    await Promise.resolve();
+    api.registerTool({ name: 'initialized_tool', description: 'Ready', argsSchema: { type: 'object' }, execute: async () => ({ success: true, output: 'ok' }) });
+  };`);
+  context.cliExtensionPaths = [file];
+  install();
+  expect(catalogContributions(directory, 'view').flatMap(entry => entry.tools)).toEqual([]);
+  await waitForExtensionsFor(context);
+  expect(catalogContributions(directory, 'view').flatMap(entry => entry.tools).map(tool => tool.name)).toEqual(['initialized_tool']);
+});
+
+it('withholds every CLI contribution when a later async factory rejects', async () => {
+  const first = path.join(directory, 'first.ts');
+  const second = path.join(directory, 'second.ts');
+  fs.writeFileSync(first, `export default api => api.registerTool({ name: 'partial_tool' });`);
+  fs.writeFileSync(second, `export default async () => { await Promise.resolve(); throw new Error('factory failed'); };`);
+  context.cliExtensionPaths = [first, second];
+  install();
+  await expect(waitForExtensionsFor(context)).rejects.toThrow('factory failed');
+  expect(catalogContributions(directory, 'view').flatMap(entry => entry.tools)).toEqual([]);
+});
 
 it('exposes only the installed runtime and shares aliases without legacy fallback', () => {
   expect(extensionManagerFor(context)).toBeUndefined();
@@ -63,4 +91,29 @@ it('keeps corrupt installation state unavailable and captures command cancellati
   commands.current!.controller.abort();
   await expect(pending).rejects.toThrow();
   expect(fs.existsSync(path.join(directory, 'registry.json'))).toBe(false);
+});
+
+it.each(['unchanged', 'replaced'] as const)('settles a pending custom-host answer with its profile owner %s', async owner => {
+  const profile = createProfileContext({ homeDir: directory, name: 'dialog', env: {} });
+  withProfile(profile, () => {
+    const seed = { ...context, profile, runtimeConfig: getRuntimeConfig(directory) };
+    context = { ...seed, configuration: initialConfiguration(seed) };
+    install();
+    expect(configurationAdmission(context)()).toBeUndefined();
+  });
+  let answer!: (value: boolean) => void;
+  let signal: AbortSignal | undefined;
+  withProfile(profile, () => bindExtensionUiFor(context, { confirm: (_title, _message, options) => {
+    signal = options?.signal;
+    return new Promise(resolve => { answer = resolve; });
+  } }));
+  const pending = withProfile(profile, () => extensionHostFor(context)!.ui!.confirm!('Continue', 'Use this session?'));
+  await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+  if (owner === 'replaced') {
+    fs.renameSync(profile.root, `${profile.root}-old`);
+    fs.mkdirSync(profile.root);
+  }
+  expect(signal?.aborted).toBe(false);
+  answer(true);
+  expect(await pending).toBe(owner === 'unchanged');
 });

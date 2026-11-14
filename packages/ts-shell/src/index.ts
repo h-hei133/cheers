@@ -53,7 +53,7 @@ export {
   type TaskVerdictStatus,
 } from "./result/task/verdict.js";
 
-// Embedded Session SDK (Track 3)
+// Embedded session SDK
 export {
   AgentSession,
   createAgentSession,
@@ -68,9 +68,11 @@ export {
   type ResourceDiagnostic,
   type ResourceLoader,
 } from "./sdk/resourceLoader.js";
+export type { ExtensionUiHost, ExtensionUiDialogOptions } from './extensions/runtime/ui.js';
 export {
   runExtensionFactory,
   loadInProcessExtension,
+  loadInProcessExtensionAsync,
   type ExtensionAPI,
   type ExtensionFactory,
   type ExtensionHostBridge,

@@ -5,21 +5,32 @@ import type { DenyRule } from "../core/shell/approval/deny.js";
 import { resolveSkillCatalog } from "../core/skills/skillCatalog.js";
 import type { Skill } from "../core/skills/skillLoader.js";
 import {
-  loadInProcessExtension,
+  loadInProcessExtensionAsync,
   runExtensionFactory,
   type ExtensionFactory,
   type ExtensionHostBridge,
   type LoadedInProcessExtension,
 } from "../extensions/runtime/inProcessLoader.js";
 import { listThemes, loadTheme, type ThemeConfig } from "../presentation/themes/index.js";
+import { redactReportText } from "../core/security/redaction.js";
+import { types as nodeTypes } from "node:util";
 
 /**
- * DefaultResourceLoader & ResourceLoader (adopted from Pi `core/resource-loader.ts`),
- * composing Cheers' skill catalog, theme discovery, system prompt overrides, and
- * in-process/inline extension loading.
+ * Compose skill and theme discovery, system prompt overrides, and extension loading.
  */
 
 const MAX_PROMPT_FILE_BYTES = 1024 * 1024;
+
+/** Error messages cross VM realms; read only native own data, never extension getters. */
+function extensionLoadDiagnostic(error: unknown): string {
+  let detail = "Extension initialization failed.";
+  if (typeof error === "string") detail = error;
+  else if (nodeTypes.isNativeError(error)) {
+    const message = Object.getOwnPropertyDescriptor(error, "message");
+    if (message && "value" in message && typeof message.value === "string") detail = message.value;
+  }
+  return redactReportText(detail, 512);
+}
 
 export interface ResourceDiagnostic {
   readonly kind: "warning" | "error";
@@ -117,6 +128,7 @@ export class DefaultResourceLoader implements ResourceLoader {
   private appendSystemPrompt: readonly string[] = [];
   private dynamicHost: ExtensionHostBridge | undefined;
   private dynamicDenyRules: (() => readonly DenyRule[]) | undefined;
+  private generation: { readonly controller: AbortController; host: ExtensionHostBridge | undefined } | undefined;
 
   constructor(private readonly options: DefaultResourceLoaderOptions = {}) {
     this.cwd = path.resolve(options.cwd ?? process.cwd());
@@ -125,6 +137,14 @@ export class DefaultResourceLoader implements ResourceLoader {
   }
 
   setHost(host: ExtensionHostBridge): void {
+    const bound = this.generation?.host ?? this.dynamicHost;
+    if (bound !== undefined && bound !== host) {
+      throw new Error("Resource loader is already bound to another host. Call reload(host) or create a new loader before binding another session.");
+    }
+    if (this.generation) {
+      this.generation.controller.signal.throwIfAborted();
+      this.generation.host = host;
+    }
     this.dynamicHost = host;
   }
 
@@ -133,101 +153,137 @@ export class DefaultResourceLoader implements ResourceLoader {
   }
 
   async reload(hostOverride?: ExtensionHostBridge): Promise<void> {
-    if (hostOverride) this.dynamicHost = hostOverride;
-    const hostProxy: ExtensionHostBridge = {
-      get ui() { return hostLoader.dynamicHost?.ui; },
-      getActiveTools: () => hostLoader.dynamicHost?.getActiveTools?.() ?? [],
-      getAllTools: () => hostLoader.dynamicHost?.getAllTools?.() ?? [],
-      getCommands: () => hostLoader.dynamicHost?.getCommands?.() ?? [],
-      sendMessage: (msg) => hostLoader.dynamicHost?.sendMessage?.(msg),
-      appendEntry: (type, data) => hostLoader.dynamicHost?.appendEntry?.(type, data),
+    this.generation?.controller.abort(new Error("Resource reload was superseded."));
+    const generation = { controller: new AbortController(), host: hostOverride ?? this.dynamicHost };
+    this.generation = generation;
+    this.dynamicHost = generation.host;
+    this.extensionsResult = { extensions: [], errors: [] };
+    this.skills = []; this.skillDiagnostics = [];
+    this.themes = []; this.themeDiagnostics = [];
+    this.systemPrompt = undefined; this.appendSystemPrompt = [];
+    const signal = generation.controller.signal;
+    const hostForGeneration = (): ExtensionHostBridge | undefined => {
+      signal.throwIfAborted();
+      return generation.host;
     };
-    const hostLoader = this;
+    const hostProxy: ExtensionHostBridge = {
+      get ui() { return hostForGeneration()?.ui; },
+      getActiveTools: () => hostForGeneration()?.getActiveTools?.() ?? [],
+      getAllTools: () => hostForGeneration()?.getAllTools?.() ?? [],
+      getCommands: () => hostForGeneration()?.getCommands?.() ?? [],
+      sendMessage: (msg) => {
+        const host = hostForGeneration();
+        if (!host?.sendMessage) throw new Error("Extension message host is unavailable.");
+        return host.sendMessage(msg);
+      },
+      appendEntry: (type, data) => {
+        const host = hostForGeneration();
+        if (!host?.appendEntry) throw new Error("Extension entry storage is unavailable.");
+        return host.appendEntry(type, data);
+      },
+    };
     const denyRulesFn = () => this.dynamicDenyRules?.() ?? [];
 
-    const loadedExtensions: LoadedSdkExtension[] = [];
-    const extensionErrors: Array<{ readonly path: string; readonly error: string }> = [];
+    try {
+      const loadedExtensions: LoadedSdkExtension[] = [];
+      const extensionErrors: Array<{ readonly path: string; readonly error: string }> = [];
 
-    if (!this.options.noExtensions) {
-      for (const rawPath of this.options.additionalExtensionPaths ?? []) {
-        const entry = resolveExtensionEntry(rawPath, this.cwd);
-        try {
-          if (this.options.assertSourceAccess) {
-            this.options.assertSourceAccess(entry);
-          } else {
-            const contained = verifyPathContainment(entry, this.cwd);
-            if (!contained.allowed) throw new Error(`Extension path '${rawPath}' is outside workspace.`);
+      if (!this.options.noExtensions) {
+        for (const rawPath of this.options.additionalExtensionPaths ?? []) {
+          const entry = resolveExtensionEntry(rawPath, this.cwd);
+          try {
+            if (this.options.assertSourceAccess) {
+              this.options.assertSourceAccess(entry);
+            } else {
+              const contained = verifyPathContainment(entry, this.cwd);
+              if (!contained.allowed) throw new Error(`Extension path '${rawPath}' is outside workspace.`);
+            }
+            const ext = await loadInProcessExtensionAsync({
+              filePath: entry,
+              workspaceRoot: this.cwd,
+              denyRules: denyRulesFn,
+              host: hostProxy,
+              signal,
+            });
+            signal.throwIfAborted();
+            loadedExtensions.push({ source: entry, extension: ext });
+          } catch (err) {
+            signal.throwIfAborted();
+            extensionErrors.push({ path: entry, error: extensionLoadDiagnostic(err) });
           }
-          const ext = loadInProcessExtension({
-            filePath: entry,
+        }
+      }
+
+      const factories = this.options.extensionFactories ?? [];
+      for (let i = 0; i < factories.length; i++) {
+        const source = `<inline:${i + 1}>`;
+        try {
+          const ext = await runExtensionFactory({
+            factory: factories[i]!,
             workspaceRoot: this.cwd,
             denyRules: denyRulesFn,
             host: hostProxy,
+            signal,
           });
-          loadedExtensions.push({ source: entry, extension: ext });
+          signal.throwIfAborted();
+          loadedExtensions.push({ source, extension: ext });
         } catch (err) {
-          extensionErrors.push({ path: entry, error: err instanceof Error ? err.message : String(err) });
+          signal.throwIfAborted();
+          extensionErrors.push({ path: source, error: extensionLoadDiagnostic(err) });
         }
       }
-    }
 
-    const factories = this.options.extensionFactories ?? [];
-    for (let i = 0; i < factories.length; i++) {
-      const source = `<inline:${i + 1}>`;
-      try {
-        const ext = await runExtensionFactory({
-          factory: factories[i]!,
-          workspaceRoot: this.cwd,
-          denyRules: denyRulesFn,
-          host: hostProxy,
-        });
-        loadedExtensions.push({ source, extension: ext });
-      } catch (err) {
-        extensionErrors.push({ path: source, error: err instanceof Error ? err.message : String(err) });
+      const baseExt: LoadExtensionsResult = { extensions: loadedExtensions, errors: extensionErrors };
+      const extensionsResult = this.options.extensionsOverride ? this.options.extensionsOverride(baseExt) : baseExt;
+
+      const skillCatalog = await resolveSkillCatalog({
+        workspaceRoot: this.cwd,
+        abortSignal: signal,
+        ...(this.options.additionalSkillPaths?.length ? { skillPaths: this.options.additionalSkillPaths } : {}),
+        ...(this.options.noSkills ? { noSkills: true } : {}),
+      });
+      signal.throwIfAborted();
+      const baseSkills = {
+        skills: [...skillCatalog.skills.values()],
+        diagnostics: [
+          ...skillCatalog.diagnostics.map((d) => ({ kind: "warning" as const, path: d.filePath, message: d.message })),
+          ...skillCatalog.failures.map((f) => ({ kind: "error" as const, path: f.filePath, message: f.message })),
+        ],
+      };
+      const resolvedSkills = this.options.skillsOverride ? this.options.skillsOverride(baseSkills) : baseSkills;
+
+      const loadedThemes: ThemeConfig[] = [];
+      const themeDiags: ResourceDiagnostic[] = [];
+      if (!this.options.noThemes) {
+        const themePaths = this.options.additionalThemePaths ?? [];
+        for (const name of listThemes(this.cwd, themePaths)) {
+          const cfg = loadTheme(name, this.cwd, themePaths);
+          if (cfg) loadedThemes.push(cfg);
+          else themeDiags.push({ kind: "warning", message: `Failed to load theme '${name}'.` });
+        }
       }
+
+      const baseSystem = resolvePromptInput(this.options.systemPrompt, this.cwd);
+      const systemPrompt = this.options.systemPromptOverride ? this.options.systemPromptOverride(baseSystem) : baseSystem;
+
+      const baseAppend = (this.options.appendSystemPrompt ?? [])
+        .map((entry) => resolvePromptInput(entry, this.cwd))
+        .filter((entry): entry is string => entry !== undefined && entry.length > 0);
+      const appendSystemPrompt = this.options.appendSystemPromptOverride
+        ? this.options.appendSystemPromptOverride(baseAppend)
+        : baseAppend;
+      signal.throwIfAborted();
+      this.extensionsResult = extensionsResult;
+      this.skills = resolvedSkills.skills;
+      this.skillDiagnostics = resolvedSkills.diagnostics;
+      this.themes = loadedThemes;
+      this.themeDiagnostics = themeDiags;
+      this.systemPrompt = systemPrompt;
+      this.appendSystemPrompt = appendSystemPrompt;
+    } catch (error) {
+      generation.controller.abort();
+      throw error;
     }
-
-    const baseExt: LoadExtensionsResult = { extensions: loadedExtensions, errors: extensionErrors };
-    this.extensionsResult = this.options.extensionsOverride ? this.options.extensionsOverride(baseExt) : baseExt;
-
-    const skillCatalog = await resolveSkillCatalog({
-      workspaceRoot: this.cwd,
-      ...(this.options.additionalSkillPaths?.length ? { skillPaths: this.options.additionalSkillPaths } : {}),
-      ...(this.options.noSkills ? { noSkills: true } : {}),
-    });
-    const baseSkills = {
-      skills: [...skillCatalog.skills.values()],
-      diagnostics: [
-        ...skillCatalog.diagnostics.map((d) => ({ kind: "warning" as const, path: d.filePath, message: d.message })),
-        ...skillCatalog.failures.map((f) => ({ kind: "error" as const, path: f.filePath, message: f.message })),
-      ],
-    };
-    const resolvedSkills = this.options.skillsOverride ? this.options.skillsOverride(baseSkills) : baseSkills;
-    this.skills = resolvedSkills.skills;
-    this.skillDiagnostics = resolvedSkills.diagnostics;
-
-    const loadedThemes: ThemeConfig[] = [];
-    const themeDiags: ResourceDiagnostic[] = [];
-    if (!this.options.noThemes) {
-      const themePaths = this.options.additionalThemePaths ?? [];
-      for (const name of listThemes(this.cwd, themePaths)) {
-        const cfg = loadTheme(name, this.cwd, themePaths);
-        if (cfg) loadedThemes.push(cfg);
-        else themeDiags.push({ kind: "warning", message: `Failed to load theme '${name}'.` });
-      }
-    }
-    this.themes = loadedThemes;
-    this.themeDiagnostics = themeDiags;
-
-    const baseSystem = resolvePromptInput(this.options.systemPrompt, this.cwd);
-    this.systemPrompt = this.options.systemPromptOverride ? this.options.systemPromptOverride(baseSystem) : baseSystem;
-
-    const baseAppend = (this.options.appendSystemPrompt ?? [])
-      .map((entry) => resolvePromptInput(entry, this.cwd))
-      .filter((entry): entry is string => entry !== undefined && entry.length > 0);
-    this.appendSystemPrompt = this.options.appendSystemPromptOverride
-      ? this.options.appendSystemPromptOverride(baseAppend)
-      : baseAppend;
   }
 
   getExtensions(): LoadExtensionsResult {

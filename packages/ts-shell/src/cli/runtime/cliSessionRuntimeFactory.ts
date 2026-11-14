@@ -45,7 +45,7 @@ import { collaborationAdmissionFor } from '../collaboration/policy.js';
 import { installSecurityRuntime, cancelSecurityFor } from './security.js';
 import { installAgentsRuntime } from './agents.js';
 import { installMcpRuntime, cancelMcpFor } from './mcp.js';
-import { installExtensionRuntime, cancelExtensionsFor, refreshExtensionsFor } from './extensions.js';
+import { installExtensionRuntime, cancelExtensionsFor, refreshExtensionsFor, waitForExtensionsFor } from './extensions.js';
 import { gitRequestMode } from '../../workflow/git/operation/policy.js';
 import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
 import { installGoalScheduler } from './goalScheduling.js';
@@ -307,6 +307,7 @@ export function createCliSessionRuntime(input: {
           sourceEntryId = id;
         },
         prepareProviderResources,
+        prepareExtensions: () => waitForExtensionsFor(input.runtimeContext),
         admission,
         onCredentialPersisted: providers.publication,
         providerCredentialResolution: resolvedCredential,
@@ -344,6 +345,6 @@ export function createCliSessionRuntime(input: {
   installUsageRuntime(input.runtimeContext, nativeGate,
     usageResetApproval(input.runtimeContext, input.sessionManager, input.getPromptInteractiveApproval ?? (() => undefined)));
   if (input.mcpGateway) installMcpRuntime(input.runtimeContext, input.mcpGateway, nativeGate, url => input.renderer.renderLine(`Open this MCP sign-in URL in your browser:\n${url}`));
-  installExtensionRuntime(input.runtimeContext, sessionRuntime, nativeGate);
+  installExtensionRuntime(input.runtimeContext, sessionRuntime, nativeGate, input.sessionManager, input.mcpGateway);
   return sessionRuntime;
 }

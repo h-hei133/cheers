@@ -46,7 +46,7 @@ vi.mock("../runtime/media.js", () => ({
 }));
 vi.mock("../runtime/jobs.js", () => ({ closeJobsFor: vi.fn() }));
 vi.mock("../runtime/director.js", () => ({ closeDirectorFor: vi.fn() }));
-vi.mock("../runtime/extensions.js", () => ({ closeExtensionsFor: vi.fn() }));
+vi.mock("../runtime/extensions.js", () => ({ closeExtensionsFor: vi.fn(), waitForExtensionsFor: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("../../observability/traceDashboard.js", () => ({
   closeTraceDashboard: vi.fn(),
 }));
@@ -111,7 +111,7 @@ it.each(['idle', 'busy', 'pending', 'unknown', 'unreadable', 'save-failed'] as c
       recordDisplay: vi.fn(),
     },
     startupArgs: [],
-  } as never;
+  };
   const sessionManager = {
     getRecoveryHintAsync: vi.fn(async () => ({
       candidate: { id: "sess_saved" },
@@ -200,8 +200,8 @@ it.each(['idle', 'busy', 'pending', 'unknown', 'unreadable', 'save-failed'] as c
     env: {},
     execPath: process.execPath,
     argv: [process.execPath, "cli"],
-  }) as NodeJS.Process;
-  const stdin = Object.assign(new PassThrough(), { isTTY: true }) as NodeJS.ReadStream;
+  }) as unknown as NodeJS.Process;
+  const stdin = Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.ReadStream;
   const stdoutWrite = vi.spyOn(process.stdout, "write");
 
   try {
@@ -255,7 +255,7 @@ it("waits for the line-loop first-frame callback before starting the recovery hi
       recordDisplay: vi.fn(),
     },
     startupArgs: [],
-  } as never;
+  };
   const getRecoveryHintAsync = vi.fn(async () => ({
     candidate: { id: "sess_saved" },
     summary: { resumeDisposition: "fully-resumable" },
@@ -330,8 +330,8 @@ it("waits for the line-loop first-frame callback before starting the recovery hi
     env: {},
     execPath: process.execPath,
     argv: [process.execPath, "cli"],
-  }) as NodeJS.Process;
-  const stdin = Object.assign(new PassThrough(), { isTTY: false }) as NodeJS.ReadStream;
+  }) as unknown as NodeJS.Process;
+  const stdin = Object.assign(new PassThrough(), { isTTY: false }) as unknown as NodeJS.ReadStream;
   const stdoutWrite = vi.spyOn(process.stdout, "write");
 
   try {

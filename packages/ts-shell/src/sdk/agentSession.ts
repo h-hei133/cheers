@@ -4,14 +4,14 @@ import type { CliOptions } from "../cli/options/cliOptions.js";
 import { resolveCliCredential } from "../cli/provider/cliProviderRuntimeBridge.js";
 import { closeCollaborationFor } from "../cli/runtime/collaboration.js";
 import { closeDirectorFor } from "../cli/runtime/director.js";
-import { closeExtensionsFor } from "../cli/runtime/extensions.js";
+import { bindExtensionUiFor, closeExtensionsFor, extensionHostFor, waitForExtensionsFor } from "../cli/runtime/extensions.js";
+import { cancelExtensionUiFor, closeExtensionHost } from "../cli/runtime/extensions/host.js";
 import { closeJobsFor } from "../cli/runtime/jobs.js";
 import { closeMediaFor } from "../cli/runtime/media.js";
 import { closeSshFor } from "../cli/runtime/ssh.js";
 import { createCliSessionRuntime } from "../cli/runtime/cliSessionRuntimeFactory.js";
 import { getRuntimeConfig, type RuntimeConfig, type RuntimeConfigOverrides, type RuntimeProvider } from "../config/runtimeConfig.js";
 import { registerCatalogContribution } from "../core/catalog/contributions.js";
-import { createCommandRegistry } from "../core/commands/registry.js";
 import type { CoreMcpGateway } from "../core/mcp/gateway.js";
 import type { QueryEventObserver } from "../core/shell/sessionRuntime.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
@@ -19,10 +19,9 @@ import { bootstrapShellRuntime } from "../core/shell/bootstrap.js";
 import type { CompactionOutcome } from "../core/shell/compaction.js";
 import type { ShellRuntimeContext } from "../core/shell/runtimeContext.js";
 import type { PromptAttachments, ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
-import { filterVisibleToolNames } from "../core/tools/prefilter.js";
-import { createCoreToolRegistry } from "../core/tools/registry.js";
 import { createCliMcpGateway } from "../entrypoints/cliMcpModule.js";
-import type { ExtensionHostBridge } from "../extensions/runtime/inProcessLoader.js";
+import type { ExtensionUiHost } from "../extensions/runtime/ui.js";
+import { runExtensionInvocation } from "../extensions/runtime/context.js";
 import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { Session } from "../session/schema/sessionRecord.js";
 import { SessionManager } from "../session/SessionManager.js";
@@ -31,9 +30,7 @@ import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import { DefaultResourceLoader, type LoadExtensionsResult, type ResourceLoader } from "./resourceLoader.js";
 
 /**
- * Embedded Session SDK (`createAgentSession` + `AgentSession`), adopted from
- * Pi `core/sdk.ts` and composed directly over Cheers' runtime, session, and
- * security primitives.
+ * Compose an embedded session from the existing runtime, session, and security owners.
  */
 
 export interface CreateAgentSessionOptions {
@@ -63,6 +60,7 @@ export interface CreateAgentSessionOptions {
   readonly nonInteractiveApproval?: "deny" | "allow-once" | "allow-always";
   readonly renderer?: StreamingRenderer;
   readonly mcpGateway?: CoreMcpGateway;
+  readonly ui?: ExtensionUiHost;
 }
 
 export interface CreateAgentSessionResult {
@@ -105,6 +103,7 @@ function registerSdkContributions(
   sessionId: string,
   extensionsResult: LoadExtensionsResult,
   customTools: readonly ToolDefinition[] | undefined,
+  ui: () => ExtensionUiHost | undefined,
 ): Array<() => void> {
   const cleanups: Array<() => void> = [];
   try {
@@ -122,7 +121,7 @@ function registerSdkContributions(
     for (const loaded of extensionsResult.extensions) {
       const ext = loaded.extension;
       const onEvent = ext.handlers.size > 0
-        ? async (event: string, payload: unknown, aliases?: readonly string[]) => {
+        ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => runExtensionInvocation(ui(), signal, async () => {
             let current = payload;
             let matched = false;
             for (const name of [event, ...(aliases ?? [])]) {
@@ -133,7 +132,7 @@ function registerSdkContributions(
               }
             }
             return matched ? current : undefined;
-          }
+          })
         : undefined;
       cleanups.push(
         registerCatalogContribution({
@@ -165,6 +164,11 @@ export class AgentSession {
     private readonly ownsMcpGateway: boolean,
     private readonly contributionCleanups: readonly (() => void)[],
   ) {}
+
+  bindUi(host: ExtensionUiHost): () => void {
+    if (this.disposed) throw new Error('Agent session is disposed.');
+    return bindExtensionUiFor(this.runtimeContext, host);
+  }
 
   get sessionId(): string {
     return this.runtimeContext.session.id;
@@ -208,6 +212,7 @@ export class AgentSession {
   }
 
   async abort(): Promise<void> {
+    cancelExtensionUiFor(this.runtimeContext);
     await this.sessionRuntime.cancelAndWait();
   }
 
@@ -234,6 +239,7 @@ export class AgentSession {
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
+    closeExtensionHost(this.runtimeContext);
     await this.sessionRuntime.cancelAndWait();
     for (const unregister of this.contributionCleanups) unregister();
     await Promise.allSettled([
@@ -258,7 +264,6 @@ export async function createAgentSession(
   const renderer = options.renderer ?? createSilentRenderer();
   const resourceLoader = options.resourceLoader ?? new DefaultResourceLoader({ cwd });
 
-  let sessionRuntimeRef: ShellSessionRuntime | undefined;
   let runtimeContextRef: ShellRuntimeContext | undefined;
 
   if (!options.resourceLoader) {
@@ -289,40 +294,7 @@ export async function createAgentSession(
     ? { ...baseConfig, disabledTools: [...new Set([...baseConfig.disabledTools, ...toolPolicy.disabledTools])] }
     : baseConfig;
 
-  const extraToolNames = [
-    ...(options.customTools ?? []).map((t) => t.name),
-    ...extensionsResult.extensions.flatMap((entry) => entry.extension.tools.map((t) => t.name)),
-  ];
-  const hostBridge: ExtensionHostBridge = {
-    getActiveTools: () => {
-      const cfg = runtimeContextRef?.runtimeConfig ?? runtimeConfig;
-      const names = [...new Set([...createCoreToolRegistry().keys(), ...extraToolNames])];
-      return filterVisibleToolNames(names, cfg);
-    },
-    getAllTools: () => [...new Set([...createCoreToolRegistry().keys(), ...extraToolNames])],
-    getCommands: () => [...createCommandRegistry(cwd, runtimeContextRef?.runtimeConfig ?? runtimeConfig).keys()],
-    sendMessage: async (msg) => {
-      if (typeof msg !== "string" || !sessionRuntimeRef || !runtimeContextRef) return;
-      const liveInput = sessionRuntimeRef.input();
-      if (liveInput) {
-        liveInput.followUp(msg, "extension");
-      } else {
-        await sessionRuntimeRef.executePrompt(runtimeContextRef.session.id, msg, { outputMode: "print" });
-      }
-    },
-    appendEntry: async (customType, data) => {
-      if (!runtimeContextRef) return;
-      const text = typeof data === "string" ? data : JSON.stringify(data);
-      sessionManager.captureReportWriter(runtimeContextRef.session.id)({
-        version: 1,
-        title: `extension:${customType}`,
-        lines: [{ kind: "text", spans: [{ text, role: "text" }] }],
-        facts: { customType },
-      });
-    },
-  };
   resourceLoader.setDenyRules?.(() => runtimeContextRef?.runtimeConfig.denyRules ?? runtimeConfig.denyRules);
-  resourceLoader.setHost?.(hostBridge);
 
   const cliOptions: CliOptions = {
     provider: options.provider,
@@ -380,6 +352,7 @@ export async function createAgentSession(
     runtimeContext.session.id,
     extensionsResult,
     options.customTools,
+    () => extensionHostFor(runtimeContext)?.ui,
   );
 
   let sessionRuntime: ShellSessionRuntime;
@@ -401,12 +374,16 @@ export async function createAgentSession(
       getReadline: () => null,
       isStdinTty: () => false,
     });
+    await waitForExtensionsFor(runtimeContext);
+    const host = extensionHostFor(runtimeContext);
+    if (host) resourceLoader.setHost?.(host);
+    if (options.ui) bindExtensionUiFor(runtimeContext, options.ui);
   } catch (error) {
+    await closeExtensionsFor(runtimeContext).catch(() => {});
     cleanups.splice(0).forEach((unregister) => unregister());
     if (ownsMcpGateway) await mcpGateway.close().catch(() => {});
     throw error;
   }
-  sessionRuntimeRef = sessionRuntime;
 
   if (options.permissionScope) {
     sessionRuntime.setPermissionScope(options.permissionScope);

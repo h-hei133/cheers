@@ -341,7 +341,7 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
         toolName: call.name,
         toolCallId: call.id,
         args,
-      });
+      }, { signal });
       const afterHook = options.admission?.();
       if (afterHook) { approvals.delete(call.id); return { block: true, reason: afterHook }; }
       toolScopePolicy(call.name, args, options, preparedToolCall(args, options));

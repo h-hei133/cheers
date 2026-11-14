@@ -2332,3 +2332,28 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A recorder carrier getter skips a model step, an asynchronous void observer crashes the process, or missing IDs silently borrow an earlier logger identity.
 - **Root Cause:** Only the recorder call was guarded; returned properties and independently rejected observer promises escaped, while log schemas assumed every trace ID existed.
 - **Rule:** Guard the consumed carrier fields, observe side-channel promises without awaiting them, and capture storage even with a custom recorder. Preserve missing propagation in the schema and persisted reader, label it in display, and never resolve a replacement sink or identity for a running invocation.
+
+
+### SDK Reloads Must Own Their Extension Host Generation
+- **Symptom:** An extension API from an earlier resource reload sends messages or entries through a later session's host, or an older asynchronous reload overwrites current resources.
+- **Root Cause:** Host proxies dereferenced the loader's mutable host, and reload publication had no revocable generation identity.
+- **Rule:** Capture one host binding and cancellation controller for each reload; permit its first late host binding, reject replacing an already bound host without explicit reload, and pass the generation signal into file/inline initialization and discovery. Revoke the old generation before loading the new one, and publish resources only after the current generation finishes. Missing message/storage hosts throw fixed unavailable errors; diagnostic projection must not invoke arbitrary getters or string conversion.
+
+
+### Async Extension Initialization Needs An Atomic Registration Boundary
+- **Symptom:** Async factories publish incomplete registrations or reject after their loader has returned.
+- **Root Cause:** Factory invocation happened outside bounded VM evaluation and its returned promise was ignored.
+- **Rule:** Start file factories inside the bounded VM entry, await initialization before publishing frozen registrations, and retire host capabilities after rejection, timeout or cancellation. Observe late failures. A cooperative await deadline does not terminate CPU loops resumed after await; that requires process/worker isolation. Project cross-realm native errors from own data descriptors and redact them without executing arbitrary getters or string conversions.
+
+
+### Pending Dialog Answers Need Captured Admission At Settlement
+
+- **Symptom:** A custom UI returns a successful confirmation after another process replaces its profile storage, without an abort event.
+- **Root Cause:** Admission was checked only when acquiring the host; asynchronous settlement trusted the old successful answer. Re-reading a mutable host getter would also adopt a successor surface.
+- **Rule:** Carry the existing admission callback with the captured host and recheck it before accepting success, returning the ordinary cancellation fallback on refusal. Test both unchanged and replaced profile ownership, construct configuration inside the same profile, and keep the source acquisition count at one.
+
+
+### Extension Generation Retirement Must Cancel Already Running Dialogs
+- **Symptom:** Reload revokes old APIs, but a tool already awaiting confirmation can accept a late success from the old host.
+- **Root Cause:** Invocation scope replaced the initialization signal instead of retaining both the generation and the caller lifetime.
+- **Rule:** Combine generation and invocation cancellation for tool preparation, execution, commands, handlers and their captured UI source. Verify an active confirmation through the real resource loader, require host cancellation and the ordinary false fallback, and reject the late answer without reacquiring another host.

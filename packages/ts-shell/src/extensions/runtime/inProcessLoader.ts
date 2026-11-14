@@ -12,22 +12,10 @@ import type { DenyRule } from '../../core/shell/approval/deny.js'
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../../tools/types.js'
 import type { VersionRecord } from '../model.js'
 import { EXTENSION_WORKER_SOURCE } from './workerSource.js'
-
-export interface ExtensionUiDialogOptions {
-  readonly timeout?: number
-}
-
-export interface ExtensionUiHost {
-  readonly select?: (title: string, options: readonly string[], opts?: ExtensionUiDialogOptions) => Promise<string | undefined>
-  readonly confirm?: (title: string, message: string, opts?: ExtensionUiDialogOptions) => Promise<boolean>
-  readonly input?: (title: string, placeholder?: string, opts?: ExtensionUiDialogOptions) => Promise<string | undefined>
-  readonly editor?: (title: string, prefill?: string) => Promise<string | undefined>
-  readonly notify?: (message: string, notifyType?: 'info' | 'warning' | 'error') => void
-  readonly setStatus?: (statusKey: string, statusText: string | undefined) => void
-  readonly setWidget?: (widgetKey: string, widgetLines: readonly string[] | undefined, widgetPlacement?: 'aboveEditor' | 'belowEditor') => void
-  readonly setTitle?: (title: string) => void
-  readonly setEditorText?: (text: string) => void
-}
+import { ExtensionInitialization, type ExtensionInitializationOptions } from './initialization.js'
+import { resolveUiHost, type ExtensionUiHost } from './ui.js'
+import { currentExtensionInvocation, runExtensionInvocation } from './context.js'
+export type { ExtensionUiHost, ExtensionUiDialogOptions } from './ui.js'
 
 export interface ExtensionHostBridge {
   readonly ui?: ExtensionUiHost
@@ -112,11 +100,15 @@ function readContainedWorkspaceFile(workspaceRoot: string, relativePath: string,
   return fs.readFileSync(contained.resolvedPath, 'utf8')
 }
 
-function nullProtoFn<T extends (...args: never[]) => unknown>(fn: T): T {
-  return Object.setPrototypeOf(fn, null)
+function nullProtoFn<T extends (...args: never[]) => unknown>(fn: T, admission?: () => void): T {
+  const guarded = admission ? (...args: Parameters<T>): ReturnType<T> => {
+    admission()
+    return fn(...args) as ReturnType<T>
+  } : fn
+  return Object.setPrototypeOf(guarded, null) as T
 }
 
-function createEventBus(): ExtensionEventBus {
+function createEventBus(admission?: () => void): ExtensionEventBus {
   const listeners = new Map<string, Set<(data: unknown) => unknown>>()
   const bus: ExtensionEventBus = Object.assign(Object.create(null) as ExtensionEventBus, {
     on: nullProtoFn((channel: string, listener: (data: unknown) => unknown) => {
@@ -124,49 +116,31 @@ function createEventBus(): ExtensionEventBus {
       set.add(listener)
       listeners.set(channel, set)
       return nullProtoFn(() => set.delete(listener))
-    }),
+    }, admission),
     once: nullProtoFn((channel: string, listener: (data: unknown) => unknown) => {
       const off = bus.on(channel, data => {
         off()
         return listener(data)
       })
       return off
-    }),
+    }, admission),
     off: nullProtoFn((channel: string, listener: (data: unknown) => unknown) => {
       listeners.get(channel)?.delete(listener)
-    }),
+    }, admission),
     emit: nullProtoFn((channel: string, data?: unknown) => {
       for (const fn of [...(listeners.get(channel) ?? [])]) fn(data)
-    }),
+    }, admission),
   })
   return Object.freeze(bus)
-}
-
-function resolveUiHost(ui?: ExtensionUiHost): Required<ExtensionUiHost> {
-  return Object.freeze(Object.assign(Object.create(null) as Required<ExtensionUiHost>, {
-    select: nullProtoFn((title: string, opts: readonly string[], dialogOpts?: ExtensionUiDialogOptions) =>
-      ui?.select ? ui.select(title, opts, dialogOpts) : Promise.resolve(undefined)),
-    confirm: nullProtoFn((title: string, message: string, dialogOpts?: ExtensionUiDialogOptions) =>
-      ui?.confirm ? ui.confirm(title, message, dialogOpts) : Promise.resolve(false)),
-    input: nullProtoFn((title: string, placeholder?: string, dialogOpts?: ExtensionUiDialogOptions) =>
-      ui?.input ? ui.input(title, placeholder, dialogOpts) : Promise.resolve(undefined)),
-    editor: nullProtoFn((title: string, prefill?: string) =>
-      ui?.editor ? ui.editor(title, prefill) : Promise.resolve(undefined)),
-    notify: nullProtoFn((message: string, notifyType?: 'info' | 'warning' | 'error') => ui?.notify?.(message, notifyType)),
-    setStatus: nullProtoFn((statusKey: string, statusText: string | undefined) => ui?.setStatus?.(statusKey, statusText)),
-    setWidget: nullProtoFn((widgetKey: string, widgetLines: readonly string[] | undefined, placement?: 'aboveEditor' | 'belowEditor') =>
-      ui?.setWidget?.(widgetKey, widgetLines, placement)),
-    setTitle: nullProtoFn((title: string) => ui?.setTitle?.(title)),
-    setEditorText: nullProtoFn((text: string) => ui?.setEditorText?.(text)),
-  }))
 }
 
 async function handleWorkerHostRpc(
   op: string,
   payload: Record<string, unknown>,
-  options: { readonly root: string; readonly denyRules: () => readonly DenyRule[]; readonly host?: ExtensionHostBridge },
+  options: { readonly root: string; readonly denyRules: () => readonly DenyRule[]; readonly host?: ExtensionHostBridge; readonly signal: AbortSignal },
 ): Promise<unknown> {
-  const ui = resolveUiHost(options.host?.ui)
+  options.signal.throwIfAborted()
+  const ui = resolveUiHost(() => ({ host: options.host?.ui, signal: options.signal }))
   switch (op) {
     case 'readWorkspaceFile':
       return readContainedWorkspaceFile(options.root, String(payload.path ?? ''), options.denyRules)
@@ -177,7 +151,7 @@ async function handleWorkerHostRpc(
     case 'ui.input':
       return ui.input(String(payload.title ?? ''), typeof payload.placeholder === 'string' ? payload.placeholder : undefined, { timeout: typeof payload.timeout === 'number' ? payload.timeout : undefined })
     case 'ui.editor':
-      return ui.editor(String(payload.title ?? ''), typeof payload.prefill === 'string' ? payload.prefill : undefined)
+      return ui.editor(String(payload.title ?? ''), typeof payload.prefill === 'string' ? payload.prefill : undefined, { timeout: typeof payload.timeout === 'number' ? payload.timeout : undefined })
     case 'ui.notify':
       ui.notify(String(payload.message ?? ''), payload.notifyType as 'info' | 'warning' | 'error' | undefined)
       return undefined
@@ -222,7 +196,13 @@ function createExtensionApiCollector(options: {
   readonly workspaceRoot: string
   readonly denyRules?: () => readonly DenyRule[]
   readonly host?: ExtensionHostBridge
+  readonly initialization?: ExtensionInitialization
 }) {
+  const initialization = options.initialization ?? new ExtensionInitialization()
+  const active = () => initialization.assertActive()
+  const collecting = () => initialization.assertCollecting()
+  const invocationSignal = (signal?: AbortSignal) => signal
+    ? AbortSignal.any([initialization.signal, signal]) : initialization.signal
   const tools: ToolDefinition[] = []
   const commands: CommandDefinition[] = []
   const shortcuts: ExtensionShortcut[] = []
@@ -230,43 +210,57 @@ function createExtensionApiCollector(options: {
   const flagValues = new Map<string, string | boolean | undefined>()
   const handlers = new Map<string, ((payload: unknown) => unknown | Promise<unknown>)[]>()
   const denyRules = options.denyRules ?? (() => [])
-  const safeRead = (relativePath: string) => readContainedWorkspaceFile(options.workspaceRoot, String(relativePath ?? ''), denyRules)
-  const events = createEventBus()
-  const ui = resolveUiHost(options.host?.ui)
+  const safeRead = (relativePath: string) => {
+    active()
+    return readContainedWorkspaceFile(options.workspaceRoot, String(relativePath ?? ''), denyRules)
+  }
+  const events = createEventBus(active)
+  const ui = resolveUiHost(() => {
+    const invocation = currentExtensionInvocation()
+    return invocation ? { host: invocation.ui, signal: invocationSignal(invocation.signal) } : { host: options.host?.ui, signal: initialization.signal }
+  }, active)
 
   const api: ExtensionAPI = Object.freeze(Object.assign(Object.create(null) as ExtensionAPI, {
     workspaceRoot: options.workspaceRoot,
     events,
     ui,
-    registerTool: nullProtoFn((tool: ToolDefinition) => tools.push(tool)),
-    registerCommand: nullProtoFn((command: CommandDefinition) => commands.push(command)),
-    registerShortcut: nullProtoFn((shortcut: ExtensionShortcut) => shortcuts.push(shortcut)),
+    registerTool: nullProtoFn((tool: ToolDefinition) => tools.push({ ...tool,
+      execute: (args, context) => runExtensionInvocation(options.host?.ui, invocationSignal(context.abortSignal), () => { active(); return tool.execute(args, context) }),
+      ...(tool.prepare ? { prepare: (args: Record<string, unknown>, context: ToolExecutionContext) => runExtensionInvocation(options.host?.ui, invocationSignal(context.abortSignal), () => { active(); return tool.prepare!(args, context) }) } : {}),
+    }), collecting),
+    registerCommand: nullProtoFn((command: CommandDefinition) => commands.push({ ...command,
+      execute: (args, context) => runExtensionInvocation(options.host?.ui, invocationSignal(context.signal), () => { active(); return command.execute(args, context) }),
+    }), collecting),
+    registerShortcut: nullProtoFn((shortcut: ExtensionShortcut) => shortcuts.push(shortcut), collecting),
     registerFlag: nullProtoFn((flag: ExtensionFlag) => {
       flags.push(flag)
       if (!flagValues.has(flag.name) && flag.default !== undefined) flagValues.set(flag.name, flag.default)
-    }),
-    getFlag: nullProtoFn((name: string) => flagValues.get(name)),
+    }, collecting),
+    getFlag: nullProtoFn((name: string) => flagValues.get(name), active),
     on: nullProtoFn((event: string, handler: (payload: unknown) => unknown | Promise<unknown>) => {
       const list = handlers.get(event) ?? []
-      list.push(handler)
+      list.push(payload => {
+        const inherited = currentExtensionInvocation()
+        return runExtensionInvocation(inherited ? inherited.ui : options.host?.ui, invocationSignal(inherited?.signal), () => { active(); return handler(payload) })
+      })
       handlers.set(event, list)
-    }),
+    }, collecting),
     readWorkspaceFile: nullProtoFn(safeRead),
-    getActiveTools: nullProtoFn(async () => options.host?.getActiveTools?.() ?? []),
-    getAllTools: nullProtoFn(async () => options.host?.getAllTools?.() ?? []),
-    getCommands: nullProtoFn(async () => options.host?.getCommands?.() ?? []),
-    sendMessage: nullProtoFn(async (msg: unknown) => { await options.host?.sendMessage?.(msg) }),
-    appendEntry: nullProtoFn(async (customType: string, data: unknown) => { await options.host?.appendEntry?.(customType, data) }),
+    getActiveTools: nullProtoFn(async () => options.host?.getActiveTools?.() ?? [], active),
+    getAllTools: nullProtoFn(async () => options.host?.getAllTools?.() ?? [], active),
+    getCommands: nullProtoFn(async () => options.host?.getCommands?.() ?? [], active),
+    sendMessage: nullProtoFn(async (msg: unknown) => { currentExtensionInvocation()?.signal.throwIfAborted(); if (!options.host?.sendMessage) throw new Error('Extension message host is unavailable.'); await options.host.sendMessage(msg) }, active),
+    appendEntry: nullProtoFn(async (customType: string, data: unknown) => { currentExtensionInvocation()?.signal.throwIfAborted(); if (!options.host?.appendEntry) throw new Error('Extension entry storage is unavailable.'); await options.host.appendEntry(customType, data) }, active),
   }))
 
   return {
     api,
     result: (exports: Readonly<Record<string, unknown>> = {}): LoadedInProcessExtension => ({
-      tools,
-      commands,
-      shortcuts,
-      flags,
-      handlers,
+      tools: Object.freeze([...tools]),
+      commands: Object.freeze([...commands]),
+      shortcuts: Object.freeze([...shortcuts]),
+      flags: Object.freeze([...flags]),
+      handlers: new Map([...handlers].map(([event, callbacks]) => [event, Object.freeze([...callbacks])])),
       events,
       readWorkspaceFile: safeRead,
       exports,
@@ -275,47 +269,86 @@ function createExtensionApiCollector(options: {
 }
 
 /** Execute an inline ExtensionFactory directly against the shared ExtensionAPI surface. */
-export async function runExtensionFactory(options: {
+export async function runExtensionFactory(options: ExtensionInitializationOptions & {
   readonly factory: ExtensionFactory
   readonly workspaceRoot: string
   readonly denyRules?: () => readonly DenyRule[]
   readonly host?: ExtensionHostBridge
 }): Promise<LoadedInProcessExtension> {
-  const collector = createExtensionApiCollector(options)
-  await options.factory(collector.api)
-  return collector.result()
+  const initialization = new ExtensionInitialization(options)
+  const collector = createExtensionApiCollector({ ...options, initialization })
+  try {
+    initialization.assertActive()
+    // Inline factories are caller-owned code; awaiting them does not provide process isolation.
+    await initialization.wait(options.factory(collector.api))
+    return collector.result()
+  } catch (error) {
+    initialization.retire()
+    throw error
+  }
 }
 
-export function loadInProcessExtension(options: {
+function beginExtensionLoad(options: ExtensionLoadOptions) {
+  const initialization = new ExtensionInitialization(options)
+  const collector = createExtensionApiCollector({ ...options, initialization })
+  try {
+    initialization.assertActive()
+    const rawSource = fs.readFileSync(options.filePath, 'utf8')
+    const code = transpileExtensionSource(rawSource, options.filePath)
+    const moduleExports: Record<string, unknown> = Object.create(null) as Record<string, unknown>
+    const moduleObj = Object.assign(Object.create(null) as { exports: Record<string, unknown> }, { exports: moduleExports })
+    const customRequire = nullProtoFn((specifier: string): unknown => {
+      if (Object.hasOwn(VIRTUAL_MODULES, specifier)) return VIRTUAL_MODULES[specifier]
+      throw new Error(`Extension module import '${specifier}' is not in VIRTUAL_MODULES.`)
+    })
+    const sandbox = vm.createContext(
+      Object.assign(Object.create(null) as Record<string, unknown>, {
+        module: moduleObj, exports: moduleExports, require: customRequire, api: collector.api,
+      }),
+      { name: 'extension-in-process', codeGeneration: { strings: false, wasm: false } },
+    )
+    // Start the exported factory inside the same bounded VM evaluation as its module.
+    const startFactory = '\n; ((factory) => typeof factory === "function" ? factory(api) : undefined)' +
+      '(module.exports.default ?? module.exports.activate);'
+    const pending = new vm.Script(code + startFactory, { filename: options.filePath })
+      .runInContext(sandbox, { timeout: initialization.timeoutMs }) as unknown
+    return { initialization, pending, result: () => collector.result(moduleObj.exports) }
+  } catch (error) {
+    initialization.retire()
+    throw error
+  }
+}
+
+export interface ExtensionLoadOptions extends ExtensionInitializationOptions {
   readonly filePath: string
   readonly workspaceRoot: string
   readonly denyRules?: () => readonly DenyRule[]
   readonly host?: ExtensionHostBridge
-}): LoadedInProcessExtension {
-  const rawSource = fs.readFileSync(options.filePath, 'utf8')
-  const code = transpileExtensionSource(rawSource, options.filePath)
-  const collector = createExtensionApiCollector(options)
-  const moduleExports: Record<string, unknown> = Object.create(null) as Record<string, unknown>
-  const moduleObj = Object.assign(Object.create(null) as { exports: Record<string, unknown> }, { exports: moduleExports })
-  const customRequire = nullProtoFn((specifier: string): unknown => {
-    if (Object.hasOwn(VIRTUAL_MODULES, specifier)) return VIRTUAL_MODULES[specifier]
-    throw new Error(`Extension module import '${specifier}' is not in VIRTUAL_MODULES.`)
-  })
-  const sandbox = vm.createContext(
-    Object.assign(Object.create(null) as Record<string, unknown>, {
-      module: moduleObj,
-      exports: moduleExports,
-      require: customRequire,
-      api: collector.api,
-    }),
-    { name: 'extension-in-process', codeGeneration: { strings: false, wasm: false } },
-  )
-  new vm.Script(code, { filename: options.filePath }).runInContext(sandbox, { timeout: 5_000 })
-  const exported = moduleObj.exports
-  const defaultExport = exported.default ?? exported.activate
-  if (typeof defaultExport === 'function') defaultExport(collector.api)
+}
 
-  return collector.result(exported)
+/** Compatibility entry for synchronous factories. Async factories must use the awaited loader. */
+export function loadInProcessExtension(options: ExtensionLoadOptions): LoadedInProcessExtension {
+  const load = beginExtensionLoad(options)
+  try {
+    if (load.pending && (typeof load.pending === 'object' || typeof load.pending === 'function') &&
+      typeof (load.pending as { then?: unknown }).then === 'function') {
+      load.initialization.retire()
+      void Promise.resolve(load.pending).catch(() => {})
+      throw new Error('Async extension factories require loadInProcessExtensionAsync.')
+    }
+    load.initialization.commit()
+    return load.result()
+  } catch (error) {
+    load.initialization.retire()
+    throw error
+  }
+}
+
+/** Publish a complete registration snapshot only after the exported factory succeeds. */
+export async function loadInProcessExtensionAsync(options: ExtensionLoadOptions): Promise<LoadedInProcessExtension> {
+  const load = beginExtensionLoad(options)
+  await load.initialization.wait(load.pending)
+  return load.result()
 }
 
 export async function executeInProcessScript(options: {
@@ -337,6 +370,9 @@ export async function executeInProcessScript(options: {
   const registeredShortcuts: Array<{ readonly key: string; readonly description: string }> = []
   const registeredFlags: Array<{ readonly name: string; readonly type: string }> = []
   const registeredEvents: string[] = []
+  const hostCalls = new AbortController()
+  const invocationUi = options.host?.ui
+  const host: ExtensionHostBridge | undefined = options.host ? { ...options.host, ui: invocationUi } : undefined
 
   const worker = new Worker(EXTENSION_WORKER_SOURCE, {
     eval: true,
@@ -357,6 +393,7 @@ export async function executeInProcessScript(options: {
       const finish = (res: { readonly ok: boolean; readonly output: string }) => {
         if (settled) return
         settled = true
+        hostCalls.abort()
         clearTimeout(timer)
         options.context.abortSignal?.removeEventListener('abort', onAbort)
         resolve(res)
@@ -394,7 +431,7 @@ export async function executeInProcessScript(options: {
           if (!registeredEvents.includes(info.event)) registeredEvents.push(info.event)
         } else if (msg.kind === 'rpc') {
           const parsed = JSON.parse(msg.json) as { id: number; op: string; payload?: Record<string, unknown> }
-          void handleWorkerHostRpc(parsed.op, parsed.payload ?? {}, { root: options.root, denyRules: options.denyRules, host: options.host })
+          void handleWorkerHostRpc(parsed.op, parsed.payload ?? {}, { root: options.root, denyRules: options.denyRules, host, signal: hostCalls.signal })
             .then(value => {
               if (!settled) worker.postMessage({ kind: 'reply', id: parsed.id, ok: true, json: value === undefined ? '' : JSON.stringify(value) })
             })
@@ -428,6 +465,7 @@ export async function executeInProcessScript(options: {
       },
     }
   } finally {
+    hostCalls.abort()
     void worker.terminate().catch(() => {})
     worker.unref()
   }

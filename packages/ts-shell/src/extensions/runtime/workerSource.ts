@@ -97,7 +97,7 @@ const bootstrap = new vm.Script(\`
     select: (title, options, opts) => rpc('ui.select', { title: String(title ?? ''), options: Array.isArray(options) ? options.map(String) : [], timeout: opts && opts.timeout }),
     confirm: (title, message, opts) => rpc('ui.confirm', { title: String(title ?? ''), message: String(message ?? ''), timeout: opts && opts.timeout }),
     input: (title, placeholder, opts) => rpc('ui.input', { title: String(title ?? ''), placeholder: placeholder === undefined ? undefined : String(placeholder), timeout: opts && opts.timeout }),
-    editor: (title, prefill) => rpc('ui.editor', { title: String(title ?? ''), prefill: prefill === undefined ? undefined : String(prefill) }),
+    editor: (title, prefill, opts) => rpc('ui.editor', { title: String(title ?? ''), prefill: prefill === undefined ? undefined : String(prefill), timeout: opts && opts.timeout }),
     notify: (message, notifyType) => rpc('ui.notify', { message: String(message ?? ''), notifyType }),
     setStatus: (statusKey, statusText) => rpc('ui.setStatus', { statusKey: String(statusKey ?? ''), statusText }),
     setWidget: (widgetKey, widgetLines, widgetPlacement) => rpc('ui.setWidget', { widgetKey: String(widgetKey ?? ''), widgetLines, widgetPlacement }),

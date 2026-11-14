@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { registerCatalogContribution } from '../../core/catalog/contributions.js';
-import { loadInProcessExtension } from '../../extensions/runtime/inProcessLoader.js';
+import { registerCatalogContribution, type CatalogContribution } from '../../core/catalog/contributions.js';
+import { loadInProcessExtensionAsync, type ExtensionHostBridge } from '../../extensions/runtime/inProcessLoader.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import type { ToolGateOptions } from '../../turn/tools.js';
@@ -14,38 +14,60 @@ import { marketplaceCommand } from '../../extensions/command/marketplace.js';
 import { pluginCommand } from '../../extensions/command/plugin.js';
 import { extensionManager, type ExtensionRun } from '../../extensions/view/manager.js';
 import type { ExtensionManager } from '../../extensions/view/model.js';
+import type { SessionManager } from '../../session/SessionManager.js';
+import { cancelExtensionUiFor, closeExtensionHost, installExtensionHost } from './extensions/host.js';
+import { runExtensionInvocation } from '../../extensions/runtime/context.js';
+import type { CoreMcpGateway } from '../../core/mcp/gateway.js';
+export { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
 
-interface ExtensionRuntime { readonly service: () => ExtensionService; readonly close: () => Promise<void>; readonly cancel: () => Promise<void>; readonly run: ExtensionRun }
+interface ExtensionRuntime { readonly service: () => ExtensionService; readonly ready: () => Promise<void>; readonly close: () => Promise<void>; readonly cancel: () => Promise<void>; readonly run: ExtensionRun }
 const runtimes = new WeakMap<ShellRuntimeContext, ExtensionRuntime>();
-export function installExtensionRuntime(context: ShellRuntimeContext, runtime: ShellSessionRuntime, gate: (tool?: string) => ToolGateOptions): void {
+export function installExtensionRuntime(context: ShellRuntimeContext, runtime: ShellSessionRuntime, gate: (tool?: string) => ToolGateOptions, store?: SessionManager,
+  gateway?: Pick<CoreMcpGateway, 'peekSnapshot'>): void {
   let service: ExtensionService | undefined; let identity: string | undefined;
   let closed = false; let retiredUnknown = false;
   const cliCleanups: Array<() => void> = [];
   const retiring = new Set<Promise<void>>();
-  runtimes.set(context, { run: operation => runtime.commands.run(operation), cancel: async () => { await service?.cancel(); }, close: async () => {
+  let initialization: AbortController | undefined;
+  let initializing = false;
+  let ready: Promise<void> = Promise.resolve();
+  runtimes.set(context, { run: operation => runtime.commands.run(operation), ready: () => ready, cancel: async () => { if (initializing) initialization?.abort(); await service?.cancel(); }, close: async () => {
     closed = true;
+    closeExtensionHost(context);
+    initialization?.abort();
     cliCleanups.splice(0).forEach(unregister => unregister());
     const results = await Promise.allSettled([...retiring, ...(service ? [service.close()] : [])]);
+    await ready.catch(() => {});
     if (retiredUnknown || results.some(result => result.status === 'rejected')) throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
   }, service: () => {
     if (closed || retiredUnknown) throw new Error('Extension runtime is closed or prior cleanup is unknown.');
-    const key = `${context.session.id}:${context.cwd}`;
+    const key = JSON.stringify([context.session.id, context.session.createdAt, context.cwd, context.configuration.substrateRevision, context.workspaceRevision]);
     if (!service || identity !== key) {
+      initialization?.abort();
       if (service) {
         const retirement = service.close().catch(() => { retiredUnknown = true; }).finally(() => retiring.delete(retirement));
         retiring.add(retirement);
       }
       identity = key; const session = context.session.id; const root = context.cwd;
+      const extensionHost = installExtensionHost(context, runtime, store, gateway);
       const check = () => { const refused = configurationAdmission(context)() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session or workspace changed.' : undefined); if (refused) throw new Error(refused); };
       service = new ExtensionService({ root, gate: tool => ({ ...gate(tool), admission: () => gate(tool).admission?.() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session changed.' : undefined) }),
-        check, offline: () => context.runtimeConfig.offline === true, denyRules: () => context.runtimeConfig.denyRules,
+        check, extensionHost, offline: () => context.runtimeConfig.offline === true, denyRules: () => context.runtimeConfig.denyRules,
         assertSourceAccess: absolute => { check(); assertSourceAccess(absolute, context.projectRoot ?? root, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules); },
         assertWorkspace: write => { check(); const primary = context.projectRoot ?? root; assertSourceAccess(root, primary, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules); if (write) selectWorkspaceRoot(primary, context.session.workspaceRoots ?? [], root, 'write'); } });
       cliCleanups.splice(0).forEach(unregister => unregister());
-      registerCliExtensions(context, root, session, cliCleanups, (absolute) => {
+      initialization = new AbortController();
+      initializing = true;
+      const signal = initialization.signal;
+      ready = registerCliExtensions(context, root, session, cliCleanups, (absolute) => {
+        signal.throwIfAborted();
         check();
         assertSourceAccess(absolute, context.projectRoot ?? root, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules);
-      }, gate);
+      }, gate, signal, extensionHost);
+      // Consumers await the same initialization; observe failures during startup as well.
+      void ready.then(() => { if (initialization?.signal === signal) initializing = false; }, () => {
+        if (initialization?.signal === signal) { initializing = false; initialization.abort(); }
+      });
     }
     return service;
   } });
@@ -63,26 +85,33 @@ function resolveExtensionEntryFile(candidate: string): string {
   return resolved;
 }
 
-function registerCliExtensions(
+async function registerCliExtensions(
   context: ShellRuntimeContext,
   root: string,
   sessionId: string,
   cleanups: Array<() => void>,
   assertEntryAccess: (absolute: string) => void,
   gate: (tool?: string) => ToolGateOptions,
-): void {
+  signal: AbortSignal,
+  host: ExtensionHostBridge,
+): Promise<void> {
   const paths = context.cliExtensionPaths;
   if (!paths?.length) return;
   const baseDir = context.originalCwd || root;
+  const pendingCleanups: Array<() => void> = [];
+  const contributions: CatalogContribution[] = [];
   try {
     for (const rawPath of paths) {
       const filePath = resolveExtensionEntryFile(path.isAbsolute(rawPath) ? rawPath : path.join(baseDir, rawPath));
       assertEntryAccess(filePath);
-      const loaded = loadInProcessExtension({
+      const loaded = await loadInProcessExtensionAsync({
         filePath,
         workspaceRoot: root,
         denyRules: () => context.runtimeConfig.denyRules,
+        signal,
+        host,
       });
+      assertEntryAccess(filePath);
       const guardedTools = loaded.tools.map((tool) => ({
         ...tool,
         execute: async (args: Record<string, unknown>, toolContext: Parameters<typeof tool.execute>[1]) => {
@@ -93,7 +122,7 @@ function registerCliExtensions(
         },
       }));
       const onEvent = loaded.handlers.size > 0
-        ? async (event: string, payload: unknown, aliases?: readonly string[]) => {
+        ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => runExtensionInvocation(host.ui, signal, async () => {
             let current = payload;
             for (const name of [event, ...(aliases ?? [])]) {
               for (const handler of loaded.handlers.get(name) ?? []) {
@@ -102,19 +131,22 @@ function registerCliExtensions(
               }
             }
             return current;
-          }
+          })
         : undefined;
-      cleanups.push(registerCatalogContribution({
+      contributions.push({
         root,
         sessionId,
         commands: loaded.commands,
         tools: guardedTools,
         skills: () => [],
         ...(onEvent ? { onEvent } : {}),
-      }));
+      });
     }
+    signal.throwIfAborted();
+    for (const contribution of contributions) pendingCleanups.push(registerCatalogContribution(contribution));
+    cleanups.push(...pendingCleanups);
   } catch (error) {
-    cleanups.splice(0).forEach(unregister => unregister());
+    pendingCleanups.splice(0).forEach(unregister => unregister());
     throw error;
   }
 }
@@ -125,9 +157,14 @@ export function extensionCommandFor(context: ShellRuntimeContext): NonNullable<C
     return service ? kind === 'marketplace' ? marketplaceCommand(args, service) : pluginCommand(args, service) : { kind: 'local', output: 'Extensions require a bound session runtime.' };
   };
 }
-export function cancelExtensionsFor(context: ShellRuntimeContext): void { void runtimes.get(context)?.cancel(); }
+export function cancelExtensionsFor(context: ShellRuntimeContext): void { cancelExtensionUiFor(context); void runtimes.get(context)?.cancel(); }
 export async function closeExtensionsFor(context: ShellRuntimeContext): Promise<void> { await runtimes.get(context)?.close(); }
 export function refreshExtensionsFor(context: ShellRuntimeContext): void { runtimes.get(context)?.service(); }
+export async function waitForExtensionsFor(context: ShellRuntimeContext): Promise<void> {
+  const runtime = runtimes.get(context);
+  runtime?.service();
+  await runtime?.ready();
+}
 export function extensionManagerFor(context: ShellRuntimeContext): ExtensionManager | undefined {
   const runtime = runtimes.get(context);
   if (!runtime) return undefined;

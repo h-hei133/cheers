@@ -54,7 +54,7 @@
 - [x] **E.2** codemode 分支持久化：本地验收完成。删除失败后全局Map退路，真实会话捕获scope/原始前缀/分支，锁内重读与写键CAS/当前预算，同FD校验、fsync和回读后报告persisted；疑似已落盘失败为unknown。损坏持久分支先拒绝再catch-up，多级fork根映射；Linux编译产物独立进程重启读取/分叉通过。E.4确定性重放仍未实现。
 - [ ] **E.3** TS 声明／namespace／image／models API：已有待验收，真实脚本调用与输出预算。
 - [ ] **E.4** 确定性重放：待核实。已有 worker 不等于声明中的可恢复确定性执行；先明确记录和副作用边界再实现。
-- [ ] **E.5** TS 文件／异步工厂及共享宿主：已有待验收，延迟初始化／reload／取消、安装产物。
+- [ ] **E.5** TS 文件／异步工厂及共享宿主：部分验收。异步原子发布、旧代际撤权、SDK/shared host和在途reload确认取消通过独立暂存树8/46及turn4/114、五静态门/build；安装产物最终验收、SDK配置发布后的UI重绑定WATCH仍待核实。
 - [ ] **E.6** 扩展完整生命周期事件：部分，逐事件找 dispatch 和结果消费者；声明未消费者不得算完成。
 - [ ] **E.7** registerProvider／virtual model／MCP／renderer 与运行时 setters：缺口；通过已有目录、路由、权限和渲染 owner 注册、撤销及失效，避免第二运行时。
 - [ ] **E.8** shortcuts／flags：部分。目前收集但 CLI／SDK 未消费；冲突、默认值、实际参数与按键生命周期。
@@ -138,3 +138,5 @@
 2026-11-14 tracing修复提交前：连接提交`df99ff0`。6个carrier/真实turn红、2个native observer/sink红、2个async-method/missing-ID红、1个持久读缺ID丢记录红均已修复。首次8/64通过后build暴露日志类型仍必填，补真实reader反例而非断言绕过；最终独立暂存树9/70、五静态门、build `2c8cce9867b8`通过。异步side-channel拒绝均被观察且不等待，未知身份不借旧logger；日志保留仍partial。初次误列不存在tools.batch.test未当已运行证据，最终用实际tools.test 32项。dashboard来源剩余核实保持F2.5开项。
 
 2026-11-14 包元数据命名提交前：tracing提交`783c2836`。资源清单统一使用cheers字段和本地manifest owner，旧项目标签未继续作为新配置入口；独立暂存树五静态门、loader3项及build `55f4520a8ef4`通过。仅此来源字段/命名修正，不代表E.9 npm/git/local安装adapter完成。
+
+2026-11-14 扩展基础修复提交前：包元数据提交`16baff4`。复审新增真实loader active-tool确认反例先红（reload后host signal未abort），合并generation/caller信号后绿；最终独立暂存树8套件46项、turn/session/approval/pending4套件114项、五静态门、build `63c53a330913`通过。限定复审CLEAR。首次附加路径tools.approval.test不存在，未当运行证据，实际approval/tools消费者在后续4套件验证。SDK配置发布UI重绑定留WATCH；T3真实配置模型和扩展其余任务不因此勾选。

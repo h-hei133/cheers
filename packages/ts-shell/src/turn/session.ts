@@ -144,7 +144,9 @@ export interface TurnOptions {
 
 /** Input the user can hand a running turn. */
 export interface TurnInput {
-  /** Change delivery on the queues owned by this live run. */
+  /** Exact tool names currently offered by this running turn. */
+  readonly activeTools?: () => readonly string[];
+  /** Change the delivery mode on the queues owned by this live run. */
   readonly setQueueMode?: (lane: 'steering' | 'followUp', mode: 'one-at-a-time' | 'all') => void;
   /** Deliver before the model's next step, inside the current work. */
   steer(text: string, id?: string): void;
@@ -279,7 +281,7 @@ export function runTurn(options: TurnOptions): TurnRun {
       workspaceRoot: options.workspaceRoot,
       timestamp: new Date().toISOString(),
       resumed: options.history.length > 0,
-    });
+    }, { signal: options.signal });
     if (started.decision === "block" || started.decision === "retry") {
       throw new Error(`SessionStart hook ${started.decision}: ${started.reason || started.feedback || "Prompt admission refused."}`);
     }
@@ -290,7 +292,7 @@ export function runTurn(options: TurnOptions): TurnRun {
       workspaceRoot: options.workspaceRoot,
       timestamp: new Date().toISOString(),
       prompt: options.prompt,
-    });
+    }, { signal: options.signal });
     if (submitted.decision === "block" || submitted.decision === "retry") {
       throw new Error(`UserPromptSubmit hook ${submitted.decision}: ${submitted.reason || submitted.feedback || "Prompt admission refused."}`);
     }
@@ -462,6 +464,7 @@ export function runTurn(options: TurnOptions): TurnRun {
 
   return {
     events: channel,
+    activeTools: () => [...toolPool().keys()],
     setQueueMode: (lane, mode) => core.setQueueMode(lane, mode),
     queue,
     steer: (text, id) => {

@@ -29,6 +29,7 @@ export function streamCliRuntimePrompt(input: {
   readonly admission?: CliRuntimeInvocationInput['admission'];
   readonly onCredentialPersisted?: CliRuntimeInvocationInput['onCredentialPersisted'];
   readonly prepareProviderResources?: CliRuntimeInvocationInput['prepareProviderResources'];
+  readonly prepareExtensions?: () => Promise<void>;
   readonly prompt: string;
   readonly onPromptIdentity?: CliRuntimeInvocationInput['onPromptIdentity'];
   readonly readPromptIdentity?: CliRuntimeInvocationInput['readPromptIdentity'];
@@ -72,7 +73,7 @@ export function streamCliRuntimePrompt(input: {
   // an event iterator should not have to know that. The events the caller
   // reads start after the snapshot either way, so the promise is folded in
   // here rather than pushed into every caller's signature.
-  const started = runCliRuntimeInvocation({
+  const start = () => runCliRuntimeInvocation({
     stepControl: input.stepControl,
     onCommandSettled: input.onCommandSettled,
     background: input.background,
@@ -118,6 +119,10 @@ export function streamCliRuntimePrompt(input: {
     ...(input.sdkSkills ? { sdkSkills: input.sdkSkills } : {}),
     ...(input.cacheWarming ? { cacheWarming: input.cacheWarming } : {}),
   });
+  const started = input.prepareExtensions ? input.prepareExtensions().then(() => {
+    input.signal.throwIfAborted();
+    return start();
+  }) : start();
   const events = (async function* (): AsyncIterable<QueryEvent> {
     yield* (await started).events;
   })();

@@ -32,7 +32,38 @@ function makeEnv(): { home: string; work: string } {
   return { home, work };
 }
 
-describe("Track 3 DefaultResourceLoader", () => {
+describe("DefaultResourceLoader", () => {
+  it("awaits file factories and reports rejected initialization without partial extensions", async () => {
+    const { work } = makeEnv();
+    const ready = path.join(work, "ready.ts");
+    const rejected = path.join(work, "rejected.ts");
+    fs.writeFileSync(ready, `export default async api => {
+      await Promise.resolve();
+      api.registerTool({ name: 'file_ready', description: 'Ready', argsSchema: { type: 'object' }, execute: async () => ({ success: true, output: 'ready' }) });
+    };`);
+    fs.writeFileSync(rejected, `export default async api => {
+      api.registerFlag({ name: 'partial' });
+      await Promise.resolve();
+      throw new Error('initialization failed');
+    };`);
+    const loader = new DefaultResourceLoader({ cwd: work, additionalExtensionPaths: [ready, rejected] });
+    await loader.reload();
+    expect(loader.getExtensions().extensions.flatMap(entry => entry.extension.tools).map(tool => tool.name)).toEqual(["file_ready"]);
+    expect(loader.getExtensions().errors).toEqual([{ path: rejected, error: "initialization failed" }]);
+  });
+  it("redacts VM error data and never invokes thrown message getters", async () => {
+    const { work } = makeEnv();
+    const secret = path.join(work, "secret.ts");
+    const getter = path.join(work, "getter.ts");
+    fs.writeFileSync(secret, `export default async () => { throw new Error('token=private-value initialization failed'); };`);
+    fs.writeFileSync(getter, `export default async () => { throw { get message() { while (true) {} } }; };`);
+    const loader = new DefaultResourceLoader({ cwd: work, additionalExtensionPaths: [secret, getter] });
+    await loader.reload();
+    const errors = loader.getExtensions().errors;
+    expect(errors).toHaveLength(2);
+    expect(errors[0]!.error).not.toContain("private-value");
+    expect(errors[1]!.error).toBe("Extension initialization failed.");
+  });
   it("loads inline extensionFactories, skills, themes, and systemPrompt/appendSystemPrompt", async () => {
     const { work } = makeEnv();
     const promptFile = path.join(work, "SYSTEM.md");
@@ -76,7 +107,7 @@ describe("Track 3 DefaultResourceLoader", () => {
   });
 });
 
-describe("Track 3 createAgentSession & AgentSession", () => {
+describe("createAgentSession & AgentSession", () => {
   it("binds hostBridge even for pre-reloaded DefaultResourceLoader and disposes cleanly", async () => {
     const { work } = makeEnv();
     let capturedApi: ExtensionAPI | undefined;

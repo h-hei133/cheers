@@ -102,7 +102,11 @@ export default defineExtension((api) => {
     const record: VersionRecord = {
       source: 'fixture',
       digest: 'deadbeef',
-      path: 'ext',
+      url: 'https://example.invalid/worker-ext.tgz',
+      trustFingerprint: 'fixture-trust',
+      files: {},
+      directories: [],
+      storage: [],
       manifest: {
         schema: 1,
         name: 'worker-ext',
@@ -125,10 +129,10 @@ export default defineExtension((api) => {
       argv: [],
       denyRules: () => [],
       context: ctx,
-      invoke: { kind: 'tool', name: 'greet', args: { who: 'pi' } },
+      invoke: { kind: 'tool', name: 'greet', args: { who: 'user' } },
     })
     expect(toolResult.success).toBe(true)
-    expect(toolResult.output).toContain('pi:worker-note')
+    expect(toolResult.output).toContain('user:worker-note')
     expect(toolResult.metadata?.registeredTools).toEqual([{ name: 'greet', description: 'Greet with workspace note' }])
     expect(toolResult.metadata?.registeredCommands).toEqual([{ name: 'hello', description: 'Hello cmd', aliases: [] }])
     expect(toolResult.metadata?.registeredEvents).toEqual(['before_provider_request'])
@@ -291,7 +295,7 @@ export default defineExtension((api) => {
           denyRules: () => [],
           context: { workspaceRoot: dir, sessionId: 'sess-hook-bridge', taskId: 't-bridge' },
           invoke: { kind: 'event', event, ...(aliases ? { aliases } : {}), payload },
-          host: { ui: { confirm: async () => false }, getActiveTools: () => ['read'] },
+          host: { ui: { confirm: async () => false, notify: message => notes.push(message) }, getActiveTools: () => ['read'] },
         })
         return JSON.parse(String(res.metadata?.eventOutput))
       },

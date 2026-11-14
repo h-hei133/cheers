@@ -43,6 +43,7 @@ export function pendingTurnInput(): PendingTurnInput {
   ]);
 
   const input: TurnInput = {
+    activeTools: () => live?.activeTools?.() ?? [],
     setQueueMode: (lane, mode) => {
       modes[lane] = mode;
       live?.setQueueMode?.(lane, mode);

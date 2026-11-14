@@ -6,7 +6,7 @@ import { closeSshFor } from '../runtime/ssh.js';
 import { installMediaSurface, closeMediaFor } from '../runtime/media.js';
 import { closeJobsFor } from '../runtime/jobs.js';
 import { closeDirectorFor } from '../runtime/director.js';
-import { closeExtensionsFor } from '../runtime/extensions.js';
+import { closeExtensionsFor, waitForExtensionsFor } from '../runtime/extensions.js';
 import { closeTraceDashboard } from '../../observability/traceDashboard.js';
 import { runCollaborationServiceMode } from '../collaboration/service.js';
 import type { Interface as ReadlineInterface } from "node:readline";
@@ -317,6 +317,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       // is built.
       getPromptInteractiveApproval: () => interactiveApprovalPrompt,
     });
+    await waitForExtensionsFor(runtimeContext);
     time("runtime ready");
     cancelRun = () => cancelGoalRunForShutdown(sessionRuntime);
     isBusy = () => sessionRuntime.getCurrentRunController() !== null;
