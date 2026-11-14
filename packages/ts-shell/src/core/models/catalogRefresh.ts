@@ -1,6 +1,7 @@
 import { THINKING_LEVELS, type CatalogProvider, type CatalogModel, type ModelCostRates } from "./catalog.js";
 import { readCatalogCacheEtag, updateCatalogCacheEtag, writeCatalogCache } from "./catalogStore.js";
 import { positiveTokenLimit } from "./limits.js";
+import { normalizeModalities, withDefaultImageLimits } from "./modalities.js";
 
 /**
  * Refreshing the catalogue from a public index.
@@ -135,9 +136,13 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
       const inputLimit = positiveTokenLimit(model?.limit?.input);
       const maxTokens = positiveTokenLimit(model?.limit?.output);
       const cost = projectCost(model?.cost);
-      const vision = Array.isArray(model?.modalities?.input)
-        ? model.modalities.input.includes("image")
-        : undefined;
+      const inputModalities = normalizeModalities(model?.modalities?.input);
+      const outputModalities = normalizeModalities(model?.modalities?.output);
+      const vision = inputModalities
+        ? inputModalities.includes("image")
+        : Array.isArray(model?.modalities?.input)
+          ? model.modalities.input.includes("image")
+          : undefined;
       const thinkingLevelMap = projectThinkingLevelMap(model?.reasoning_options);
       const compat = typeof model?.temperature === "boolean"
         ? { supportsTemperature: model.temperature }
@@ -145,7 +150,7 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
       const modelType = model?.type === "image" || model?.type === "classifier" || model?.type === "chat"
         ? model.type
         : undefined;
-      models.push({
+      models.push(withDefaultImageLimits({
         id: resolved,
         ...(modelType ? { modelType } : {}),
         ...(context !== undefined ? { contextWindow: context } : {}),
@@ -155,9 +160,11 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
         ...(typeof model?.tool_call === "boolean" ? { toolCalling: model.tool_call } : {}),
         ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
         ...(vision !== undefined ? { vision } : {}),
+        ...(inputModalities ? { input: inputModalities } : {}),
+        ...(outputModalities ? { output: outputModalities } : {}),
         ...(compat ? { compat } : {}),
         ...(cost ? { cost } : {}),
-      });
+      }));
     }
     if (models.length === 0) continue;
     providers.push({

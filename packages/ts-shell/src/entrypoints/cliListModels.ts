@@ -1,10 +1,10 @@
 import { loadCatalog } from "../core/models/catalogStore.js";
+import { modelSupportsVision } from "../core/models/modalities.js";
 import { fuzzyFilter } from "../presentation/tui/text/search.js";
 
 /**
- * Formats available models for `--list-models [pattern]` (adopted from Pi `list-models.ts`).
+ * Formats available models for `--list-models [pattern]`.
  */
-
 function formatTokenCount(count: number | undefined): string {
   if (!count || count <= 0) return "-";
   if (count >= 1_000_000) {
@@ -26,7 +26,7 @@ export function formatCliModelList(pattern?: string): string {
       contextWindow: model.contextWindow,
       maxTokens: model.maxTokens,
       reasoning: model.reasoning === false ? "no" : "yes",
-      images: model.vision === true ? "yes" : "no",
+      images: modelSupportsVision(model) ? "yes" : "no",
     })),
   );
 

@@ -5,8 +5,12 @@ import { nonsecretUrl } from './config.js';
 import { THINKING_LEVELS } from '../../../core/models/effort.js';
 
 const number = { type: 'number', minimum: 0 };
+const modalityList = listSchema(enumSchema(['text', 'image']));
+const imageResize = objectSchema({ maxWidth: positiveSchema, maxHeight: positiveSchema, maxBytes: positiveSchema, jpegQuality: { type: 'integer', minimum: 1, maximum: 100 } });
+const inputLimits = objectSchema({ maxRequestBytes: positiveSchema, images: objectSchema({ resize: imageResize, maxPerMessage: positiveSchema, maxPerRequest: positiveSchema }) });
 const model = objectSchema({
-  id: nameSchema, contextWindow: positiveSchema, inputLimit: positiveSchema, maxTokens: positiveSchema, reasoning: booleanSchema, vision: booleanSchema,
+  id: nameSchema, modelType: enumSchema(['chat', 'image', 'classifier']), contextWindow: positiveSchema, inputLimit: positiveSchema, maxTokens: positiveSchema, reasoning: booleanSchema, vision: booleanSchema,
+  input: modalityList, output: modalityList, inputLimits,
   serviceTiers: listSchema(nameSchema),
   tokenizer: { enum: ['cl100k_base', 'o200k_base', false] },
   cost: objectSchema({ promptPerMTok: number, completionPerMTok: number, cacheReadPerMTok: number, cacheWritePerMTok: number }, ['promptPerMTok', 'completionPerMTok']),

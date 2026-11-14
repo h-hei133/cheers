@@ -1,6 +1,7 @@
 import http from 'node:http';
+import { redactReportText } from '../core/security/redaction.js';
 import { readStructuredLogs, traceRows, type TraceRow } from './diagnostics.js';
-
+import type { TelemetryStore } from './tracing/span.js';
 export interface TraceDashboard {
   readonly url: string;
   readonly port: number;
@@ -10,18 +11,46 @@ export interface TraceDashboard {
 let active: TraceDashboard | undefined;
 
 /** Start a report-safe, loopback-only trace viewer. The caller owns explicit close. */
-export async function openTraceDashboard(directory: string, currentPath: string): Promise<TraceDashboard> {
+export async function openTraceDashboard(
+  directory: string,
+  currentPath: string,
+  traceStore?: TelemetryStore,
+): Promise<TraceDashboard> {
   if (active) return active;
   const server = http.createServer((request, response) => {
-    const logs = readStructuredLogs(directory, currentPath);
-    const rows = traceRows(logs.entries);
-    if (request.url === '/data') {
-      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      response.end(JSON.stringify({ status: logs.status, rows }));
-      return;
-    }
-    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-    response.end(render(rows));
+    void (async () => {
+      try {
+        const logs = readStructuredLogs(directory, currentPath);
+        const logRows = traceRows(logs.entries);
+        const safeText = (value: string): string => redactReportText(value, 240, { projectRoot: process.cwd() });
+        const stored = traceStore ? await traceStore.findTraces({ limit: 50 }) : undefined;
+        const spanRows: TraceRow[] = (stored?.traces ?? []).flatMap((trace) =>
+          trace.spans.map((span) => ({
+            timestamp: Number.isFinite(span.startedMs) ? new Date(span.startedMs).toISOString() : '[invalid timestamp]',
+            traceId: safeText(span.traceId),
+            spanId: safeText(span.id),
+            durationMs: Number.isFinite(span.endedMs) && Number.isFinite(span.startedMs)
+              ? Math.max(0, Math.round(span.endedMs - span.startedMs))
+              : undefined,
+            component: safeText(span.name),
+            message: safeText(span.status.status === 'error' ? (span.status.error?.message ?? 'error') : 'ok'),
+          })),
+        );
+        const rows = [...spanRows, ...logRows];
+        if (request.url === '/data') {
+          response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+          response.end(JSON.stringify({ status: logs.status, rows }));
+          return;
+        }
+        response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+        response.end(render(rows));
+      } catch {
+        if (!response.headersSent) {
+          response.writeHead(500, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+        }
+        response.end('Internal error');
+      }
+    })();
   });
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);

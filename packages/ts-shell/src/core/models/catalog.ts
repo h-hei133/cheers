@@ -1,8 +1,8 @@
 import type { RuntimeProvider } from "../../config/runtimeConfig.js";
 import type { EndpointKind } from "../../provider/endpoints/kinds.js";
 import { sanitizeModelLimits } from "./limits.js";
+import { mergeInputLimits, type ModelInputLimits, type ModelInputModality } from "./modalities.js";
 import { nativeOpenAIResponses } from './protocol.js';
-
 /**
  * Provider and model catalogue.
  *
@@ -108,6 +108,12 @@ export interface CatalogModel {
    * still reaches the model.
    */
   readonly vision?: boolean;
+  /** Supported input modalities (`text`, `image`); absent falls back to `vision`. */
+  readonly input?: readonly ModelInputModality[];
+  /** Supported output modalities when published (e.g. image generation models). */
+  readonly output?: readonly ModelInputModality[];
+  /** Optional request byte and image count/resize ceilings. */
+  readonly inputLimits?: ModelInputLimits;
   /** Provider service tiers this model accepts, for example `priority` or `flex`. */
   readonly serviceTiers?: readonly string[];
 }
@@ -729,16 +735,21 @@ function mergeModelEntry(
       : {}),
     ...(preserveExplicitCapabilities
       ? {
+          ...(existing.modelType !== undefined ? { modelType: existing.modelType } : {}),
           ...(existing.reasoning !== undefined ? { reasoning: existing.reasoning } : {}),
           ...(existing.toolCalling !== undefined ? { toolCalling: existing.toolCalling } : {}),
           ...(existing.vision !== undefined ? { vision: existing.vision } : {}),
+          ...(existing.input !== undefined ? { input: existing.input } : {}),
+          ...(existing.output !== undefined ? { output: existing.output } : {}),
           ...(existing.maxTokens !== undefined ? { maxTokens: existing.maxTokens } : {}),
           ...(existing.serviceTiers !== undefined ? { serviceTiers: existing.serviceTiers } : {}),
         }
       : {}),
+    ...(existing.inputLimits || patch.inputLimits
+      ? { inputLimits: mergeInputLimits(existing.inputLimits, patch.inputLimits, preserveExplicitCapabilities) }
+      : {}),
   };
 }
-
 function mergeModelEntries(models: readonly CatalogModel[], preserveExplicitCapabilities: boolean): CatalogModel[] {
   const byId = new Map<string, CatalogModel>();
   for (const model of models) {

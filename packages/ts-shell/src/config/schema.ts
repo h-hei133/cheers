@@ -24,6 +24,7 @@ export function enumSchema(values: readonly string[]): AnySchemaObject {
 
 const authFields = {
   accessToken: referenceSchema, refreshToken: referenceSchema, expiresAt: positiveSchema,
+  extras: { type: 'object', additionalProperties: true },
 };
 const authRequired = ['type', 'accessToken', 'refreshToken', 'expiresAt'];
 const accountAuth = objectSchema({

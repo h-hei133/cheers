@@ -22,6 +22,7 @@
 
 import type { CatalogModel, CatalogProvider, ModelRequestShape, ThinkingLevel } from "./catalog.js";
 import { THINKING_LEVELS, catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint } from "./catalog.js";
+import { modelInputModalities, modelSupportsVision, type ModelInputLimits, type ModelInputModality } from "./modalities.js";
 import { summaryProtocol } from './protocol.js';
 
 /** What a request needs to know, with every choice already decided. */
@@ -62,6 +63,10 @@ export interface ResolvedRequestShape {
    * reach the model when the image is described instead.
    */
   readonly vision: boolean;
+  /** Resolved supported input modalities (`text`, `image`). */
+  readonly inputModalities?: readonly ModelInputModality[];
+  /** Optional request/image limits declared by the model. */
+  readonly inputLimits?: ModelInputLimits;
   /**
    * The provider's own name for a level, or nothing when it has none.
    *
@@ -197,7 +202,9 @@ export function resolveRequestShape(
     ...(compat.promptCacheKey !== undefined ? { promptCacheKey: compat.promptCacheKey } : {}),
     ...(compat.supportsMidConvoToolChanges === true && compat.supportsMidConvoSystemMessages !== false ? { supportsMidConvoToolChanges: true } : {}),
     ...(compat.supportsMidConvoEffort === true && compat.supportsMidConvoSystemMessages !== false ? { supportsMidConvoEffort: true } : {}),
-    vision: entry.vision === true,
+    vision: modelSupportsVision(entry),
+    inputModalities: modelInputModalities(entry),
+    ...(entry.inputLimits ? { inputLimits: entry.inputLimits } : {}),
     ...(reasoningEffort && level ? { thinkingLevelName: levelNameFor(entry, level) } : {}),
     ...(reasoningEffort && level === 'max' ? { thinkingBudgetMaximum: true } : {}),
     ...(reasoningEffort && level ? { thinkingBudgetTokens: THINKING_BUDGET_TOKENS[level] } : {}),

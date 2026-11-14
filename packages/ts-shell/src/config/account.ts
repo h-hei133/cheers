@@ -8,8 +8,8 @@ export interface OpenAIAccountAuthConfig {
   readonly accountId?: string;
   /** New independent login identity; preserved only by verified renewal. */
   readonly loginId?: string;
+  readonly extras?: Readonly<Record<string, unknown>>;
 }
-
 export interface GoogleAccountAuthConfig {
   readonly type: "google-gemini-account";
   readonly accessToken: string;
@@ -23,8 +23,8 @@ export interface GoogleAccountAuthConfig {
   readonly scopes?: readonly string[];
   /** Billing project captured at login, never borrowed from another request. */
   readonly quotaProject?: string;
+  readonly extras?: Readonly<Record<string, unknown>>;
 }
-
 /**
  * A credential from a subscription rather than from a registered API client.
  *
@@ -42,8 +42,8 @@ export interface SubscriptionAccountAuthConfig {
   readonly expiresAt: number;
   /** The API base the subscription is routed to, when the issuer states one. */
   readonly baseUrl?: string;
+  readonly extras?: Readonly<Record<string, unknown>>;
 }
-
 /**
  * Any credential an account sign-in can produce.
  *
@@ -63,7 +63,37 @@ export interface ProviderAccountAuthConfig {
   readonly subscription?: SubscriptionAccountAuthConfig;
 }
 
+const UNSAFE_EXTRA_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
+function sanitizeNestedExtra(value: unknown, depth = 0): unknown {
+  if (depth > 8) return undefined;
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (Array.isArray(value)) {
+    const list: unknown[] = [];
+    for (const item of value) {
+      const next = sanitizeNestedExtra(item, depth + 1);
+      if (next !== undefined) list.push(next);
+    }
+    return list;
+  }
+  if (typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      if (UNSAFE_EXTRA_KEYS.has(key)) continue;
+      const next = sanitizeNestedExtra(entry, depth + 1);
+      if (next !== undefined) out[key] = next;
+    }
+    return out;
+  }
+  return undefined;
+}
+
+function cleanAuthExtras(extras: Readonly<Record<string, unknown>> | undefined): Record<string, unknown> | undefined {
+  if (!extras || typeof extras !== 'object' || Array.isArray(extras)) return undefined;
+  const cleaned = sanitizeNestedExtra(extras) as Record<string, unknown> | undefined;
+  return cleaned && Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
 
 export function normalizeProviderAccountAuth(
   provider: string,
@@ -93,6 +123,7 @@ export function normalizeProviderAccountAuth(
       return undefined;
     }
 
+    const extras = cleanAuthExtras(openai.extras);
     return {
       openai: {
         type: "openai-chatgpt-account",
@@ -101,6 +132,7 @@ export function normalizeProviderAccountAuth(
         expiresAt,
         ...(accountId ? { accountId } : {}),
         ...(loginId ? { loginId } : {}),
+        ...(extras ? { extras } : {}),
       },
     };
   }
@@ -130,6 +162,7 @@ export function normalizeProviderAccountAuth(
       return undefined;
     }
 
+    const extras = cleanAuthExtras(google.extras);
     return {
       google: {
         type: "google-gemini-account",
@@ -141,6 +174,7 @@ export function normalizeProviderAccountAuth(
         ...(clientSecret ? { clientSecret } : {}),
         ...(quotaProject ? { quotaProject } : {}),
         ...(scopes ? { scopes } : {}),
+        ...(extras ? { extras } : {}),
       },
     };
   }
@@ -153,9 +187,11 @@ export function normalizeProviderAccountAuth(
     const expiresAt = Number(subscription.expiresAt);
     if (!accessToken || !refreshToken || !Number.isFinite(expiresAt) || expiresAt <= 0) return undefined;
     const baseUrl = normalizeBaseUrl(subscription.baseUrl);
+    const extras = cleanAuthExtras(subscription.extras);
     return { subscription: { type: "subscription", accessToken, refreshToken, expiresAt,
       ...(subscription.provider ? { provider: subscription.provider } : {}),
-      ...(baseUrl ? { baseUrl } : {}) } };
+      ...(baseUrl ? { baseUrl } : {}),
+      ...(extras ? { extras } : {}) } };
   }
 
   return undefined;
