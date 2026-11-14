@@ -155,9 +155,9 @@ export class Transcript {
   }
 
   /** Rows the whole transcript occupies at `width`. */
-  rowCount(width: number): number {
+  rowCount(width: number, options?: BlockRenderOptions): number {
     let total = 0;
-    for (let index = 0; index < this.blocks.length; index++) total += this.cache.rowsFor(this.blocks[index]!, index, width).length;
+    for (let index = 0; index < this.blocks.length; index++) total += this.cache.rowsFor(this.blocks[index]!, index, width, options).length;
     return total;
   }
 

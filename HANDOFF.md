@@ -2357,3 +2357,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Reload revokes old APIs, but a tool already awaiting confirmation can accept a late success from the old host.
 - **Root Cause:** Invocation scope replaced the initialization signal instead of retaining both the generation and the caller lifetime.
 - **Rule:** Combine generation and invocation cancellation for tool preparation, execution, commands, handlers and their captured UI source. Verify an active confirmation through the real resource loader, require host cancellation and the ordinary false fallback, and reject the late answer without reacquiring another host.
+
+
+### Hyperlink Rendering Must Consume The Captured Terminal Capability
+- **Symptom:** Markdown emits OSC 8 on a terminal whose capability is false, or the full reader bypasses a transcript-only repair.
+- **Root Cause:** Capability detection had no rendering consumer; reader and transcript layouts cached output independently, and storing caller-owned option objects could relabel old rows after mutation.
+- **Rule:** Capture terminal support once at the host, pass it through transcript, source projection and reader rendering, and include a captured value in each layout cache identity. Unsupported output retains readable labels and sanitized URLs. Never rerun the synchronous tmux probe per row or frame.

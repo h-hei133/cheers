@@ -17,6 +17,7 @@ it("wraps safe labels in OSC8 and leaves refused targets inert", () => {
     "\x1b]8;;https://example.test\x07docs\x1b]8;;\x07",
   );
   expect(terminalHyperlink("docs", "javascript:alert(1)")).toBe("docs");
+  expect(terminalHyperlink("docs", "https://example.test", false)).toBe("docs");
 });
 
 it("closes only a hyperlink left open by slicing, including ST-terminated rows", () => {

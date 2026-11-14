@@ -82,7 +82,8 @@ export class InteractiveSurface implements InteractiveView {
       capacity,
       this.context.selection(),
       this.context.highlightSearchMatches,
-      { imageProtocol: this.context.imageProtocol?.(), thinkingShortcut: this.context.thinkingShortcut?.() },
+      { imageProtocol: this.context.imageProtocol?.(), thinkingShortcut: this.context.thinkingShortcut?.(),
+        supportsHyperlinks: this.context.supportsHyperlinks?.() },
       layout,
     );
     this.lastComposerGeometry = layout === "document" || chrome.composerRows.length === 0 ? undefined : {

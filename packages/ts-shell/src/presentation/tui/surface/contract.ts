@@ -88,6 +88,8 @@ export interface ViewContext {
   searchBar?(): { readonly query: string; readonly matchCount: number; readonly currentNumber: number } | undefined;
   /** Inline-image protocol the terminal speaks, or nothing when it does not. */
   imageProtocol?(): ImageProtocol | undefined;
+  /** Captured OSC 8 support for the terminal that owns this surface. */
+  supportsHyperlinks?(): boolean;
   /** A key that currently dispatches the thinking expansion action. */
   thinkingShortcut?(): string | undefined;
   /** Style the matches in one rendered row of the transcript. */

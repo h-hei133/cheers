@@ -44,6 +44,11 @@ export interface MarkdownRender {
   readonly sources: readonly (MarkdownSourceLine | undefined)[];
 }
 
+export interface MarkdownRenderOptions {
+  /** Captured terminal support; omitted calls retain the standalone renderer default. */
+  readonly supportsHyperlinks?: boolean;
+}
+
 /** Drop a trailing partial code fence so a streaming block does not flicker. */
 export function trimPartialFence(text: string): string {
   const lines = text.split("\n");
@@ -56,11 +61,11 @@ export function trimPartialFence(text: string): string {
 }
 
 /** Inline emphasis, code spans, and link labels for one line. */
-export function renderInline(text: string): string {
-  return renderInlineAt(text);
+export function renderInline(text: string, options?: MarkdownRenderOptions): string {
+  return renderInlineAt(text, undefined, options);
 }
 
-function renderInlineAt(text: string, context?: InlineContext): string {
+function renderInlineAt(text: string, context?: InlineContext, options?: MarkdownRenderOptions): string {
   if (!inlineWithinBudget(text, context)) return text;
   return transformInline(text, {
     renderCode: (code) => {
@@ -71,9 +76,9 @@ function renderInlineAt(text: string, context?: InlineContext): string {
     },
     renderText: renderPlainInline,
     renderLink: (label, href, next) => {
-      const renderedLabel = defaultTheme.fg("mdLink", renderInlineAt(label, next));
+      const renderedLabel = defaultTheme.fg("mdLink", renderInlineAt(label, next, options));
       const visibleTarget = displayLinkUrl(href);
-      return `${terminalHyperlink(renderedLabel, href)}${visibleTarget ? defaultTheme.fg("mdLinkUrl", ` (${visibleTarget})`) : ""}`;
+      return `${terminalHyperlink(renderedLabel, href, options?.supportsHyperlinks)}${visibleTarget ? defaultTheme.fg("mdLinkUrl", ` (${visibleTarget})`) : ""}`;
     },
     findMath: createMathFinder(text),
   }, context);
@@ -92,8 +97,8 @@ function renderPlainInline(text: string): string {
  * looks. The exported page uses the same scan and a different renderer, which is
  * what keeps one answer reading the same in both.
  */
-export function renderMarkdown(text: string, width: number): string[] {
-  return [...renderMarkdownWithSources(text, width).rows];
+export function renderMarkdown(text: string, width: number, options?: MarkdownRenderOptions): string[] {
+  return [...renderMarkdownWithSources(text, width, options).rows];
 }
 
 /**
@@ -103,7 +108,7 @@ export function renderMarkdown(text: string, width: number): string[] {
  * one source line. Every such row points at the same source node; selection
  * requires complete node coverage before it returns that source.
  */
-export function renderMarkdownWithSources(text: string, width: number): MarkdownRender {
+export function renderMarkdownWithSources(text: string, width: number, options?: MarkdownRenderOptions): MarkdownRender {
   const cells = Math.max(8, width);
   const rows: string[] = [];
   const sources: (MarkdownSourceLine | undefined)[] = [];
@@ -129,7 +134,7 @@ export function renderMarkdownWithSources(text: string, width: number): Markdown
   for (const block of scanBlocks(text)) {
     switch (block.kind) {
       case "table":
-        append(renderTableWithSources(block, cells, lines));
+        append(renderTableWithSources(block, cells, lines, options));
         break;
       case "math": {
         const projected = latexToDisplayText(block.body) ?? block.raw;
@@ -143,7 +148,7 @@ export function renderMarkdownWithSources(text: string, width: number): Markdown
         break;
       case "heading":
         pushNode(wrapWithIndent(
-          defaultTheme.bold(defaultTheme.fg("mdHeading", renderInline(block.text))), "", cells,
+          defaultTheme.bold(defaultTheme.fg("mdHeading", renderInline(block.text, options))), "", cells,
         ), lines[block.sourceStart], block.sourceStart);
         break;
       case "rule":
@@ -152,18 +157,18 @@ export function renderMarkdownWithSources(text: string, width: number): Markdown
       case "list": {
         const glyph = /^\d+$/.test(block.marker.replace(/\.$/, "")) ? `${block.marker}` : "•";
         pushNode(wrapWithIndent(
-          renderInline(block.text), `${block.indent}${defaultTheme.fg("mdListBullet", glyph)} `, cells,
+          renderInline(block.text, options), `${block.indent}${defaultTheme.fg("mdListBullet", glyph)} `, cells,
         ), lines[block.sourceStart], block.sourceStart);
         break;
       }
       case "quote":
         pushNode(wrapWithIndent(
-          defaultTheme.fg("mdQuoteText", renderInline(block.text)), `${defaultTheme.fg("mdQuoteBorder", "▏")} `, cells,
+          defaultTheme.fg("mdQuoteText", renderInline(block.text, options)), `${defaultTheme.fg("mdQuoteBorder", "▏")} `, cells,
         ), lines[block.sourceStart], block.sourceStart);
         break;
       default:
         pushNode(wrapWithIndent(
-          block.line.trim() === "" ? "" : renderInline(block.line), "", cells,
+          block.line.trim() === "" ? "" : renderInline(block.line, options), "", cells,
         ), lines[block.sourceStart], block.sourceStart);
         break;
     }
@@ -180,7 +185,7 @@ export function renderMarkdownWithSources(text: string, width: number): Markdown
  * table that overflows is worse than one with a truncated cell.
  */
 function renderTableWithSources(block: Extract<import("./markdownScan.js").MarkdownBlock, { kind: "table" }>,
-  cells: number, lines: readonly string[]): MarkdownRender {
+  cells: number, lines: readonly string[], options?: MarkdownRenderOptions): MarkdownRender {
   const head = splitTableRow(block.header);
   const rowsOfCells = block.rows.map(splitTableRow);
   const columns = Math.max(head.length, ...rowsOfCells.map(row => row.length));
@@ -195,8 +200,8 @@ function renderTableWithSources(block: Extract<import("./markdownScan.js").Markd
   if (rows.some(row => row.some(cell => Buffer.byteLength(cell, "utf8") > MAX_CELL_BYTES))) {
     return rawTableWithSources(block, cells, lines);
   }
-  const widths = columnWidths(rows, cells);
-  const wrapped = tableCellsFit(rows, widths);
+  const widths = columnWidths(rows, cells, options);
+  const wrapped = tableCellsFit(rows, widths, options);
   if (!wrapped) return rawTableWithSources(block, cells, lines);
   const line = defaultTheme.fg("border", widths.map((width) => "─".repeat(width)).join("─┼─"));
   const rendered: string[] = [];
@@ -217,14 +222,14 @@ function renderTableWithSources(block: Extract<import("./markdownScan.js").Markd
   return { rows: rendered, sources };
 }
 
-function tableCellsFit(rows: readonly string[][], widths: readonly number[]): string[][][] | undefined {
+function tableCellsFit(rows: readonly string[][], widths: readonly number[], options?: MarkdownRenderOptions): string[][][] | undefined {
   const wrappedRows: string[][][] = [];
   for (const row of rows) {
     const wrappedRow: string[][] = [];
     for (let column = 0; column < widths.length; column++) {
       const lines: string[] = [];
       for (const segment of (row[column] ?? "").split(/<br\s*\/?>/i)) {
-        lines.push(...wrapToWidth(renderInline(segment), widths[column]!));
+        lines.push(...wrapToWidth(renderInline(segment, options), widths[column]!));
       }
       const cell = lines.length ? lines : [""];
       if (cell.length > MAX_CELL_LINES) return undefined;
@@ -302,12 +307,12 @@ function truncateUtf8(text: string, maxBytes: number): string {
 }
 
 /** Column widths sized to content, then scaled down to fit the frame. */
-function columnWidths(rows: readonly string[][], cells: number): number[] {
+function columnWidths(rows: readonly string[][], cells: number, options?: MarkdownRenderOptions): number[] {
   const count = Math.max(...rows.map((row) => row.length));
   const widths = new Array<number>(count).fill(0);
   for (const row of rows) {
     for (let column = 0; column < count; column++) {
-      const rendered = (row[column] ?? "").split(/<br\s*\/?>/i).map(segment => renderInline(segment));
+      const rendered = (row[column] ?? "").split(/<br\s*\/?>/i).map(segment => renderInline(segment, options));
       widths[column] = Math.max(widths[column]!, ...rendered.map(segment => visibleWidth(segment)));
     }
   }

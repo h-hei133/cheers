@@ -5,7 +5,7 @@ import { layoutReport } from '../report/renderer.js';
 import { stripAnsi } from '../text/ansi.js';
 import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth } from "../text/layout.js";
-import { renderMarkdown } from "../transcript/markdown.js";
+import { renderMarkdown, type MarkdownRenderOptions } from "../transcript/markdown.js";
 import { layoutDiff } from "../transcript/diff.js";
 import {
   countDiffLines,
@@ -93,6 +93,7 @@ export class Pager {
   private top = 0;
   private width = 0;
   private revision = -1;
+  private supportsHyperlinks: boolean | undefined;
   private report: CommandReport | undefined;
   private filter = "";
   private pageRows = 1;
@@ -209,21 +210,22 @@ export class Pager {
   }
 
   /** Choose the form from the same body and actual chrome capacity being drawn. */
-  render(width: number, height: number, inlineCapacity = 0): string[] {
+  render(width: number, height: number, inlineCapacity = 0, options?: MarkdownRenderOptions): string[] {
     if (!this.active || width <= 0 || height <= 0) return [];
     const padding = Math.min(2, Math.floor((width - 1) / 2));
     const inset = ' '.repeat(padding);
     const inner = Math.max(1, width - padding * 2);
     const reflow = this.width !== inner;
-    if (reflow || this.revision !== defaultTheme.colorRevision) {
+    if (reflow || this.revision !== defaultTheme.colorRevision || this.supportsHyperlinks !== options?.supportsHyperlinks) {
       const anchor = this.visible()[this.top]?.source;
       if (this.diff) {
         this.rows = this.diffRows(inner);
       } else if (this.report) {
         const layout = layoutReport(this.report, inner);
         this.rows = layout.rows.map((text, index) => ({ text, source: layout.sources[index]! }));
-      } else this.rows = renderMarkdown(this.source, inner).map((text, index) => ({ text, source: index }));
+      } else this.rows = renderMarkdown(this.source, inner, options).map((text, index) => ({ text, source: index }));
       this.revision = defaultTheme.colorRevision;
+      this.supportsHyperlinks = options?.supportsHyperlinks;
       this.width = inner;
       if (this.report && reflow && anchor !== undefined) this.top = Math.max(0, this.visible().findIndex(row => row.source === anchor));
     }

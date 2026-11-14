@@ -7,7 +7,7 @@ import { visibleWidth } from "../text/measure.js";
 import type { ImageContent } from "../../../model-adapters/multimodal.js";
 import { calculateImageRows, getImageDimensions, imageIdForData, inlineImageSequence, type ImageProtocol } from "../image.js";
 import { renderDiff } from "./diff.js";
-import { renderMarkdown, trimPartialFence } from "./markdown.js";
+import { renderMarkdown, trimPartialFence, type MarkdownRenderOptions } from "./markdown.js";
 
 /**
  * Transcript block model.
@@ -72,7 +72,7 @@ export interface Block {
  * caller (and every test) can state what the terminal said once, and a change
  * of terminal mid-session re-renders rather than half-remembers.
  */
-export interface BlockRenderOptions {
+export interface BlockRenderOptions extends MarkdownRenderOptions {
   /** Inline-image protocol the terminal speaks, or nothing. */
   readonly imageProtocol?: ImageProtocol;
   /** Effective admitted key label; absent when no keyboard action is bound. */
@@ -107,16 +107,16 @@ export function renderBlock(
     case "tool":
       return renderTool(block, width, options);
     case "command":
-      return renderLabelled(block, defaultTheme.fg("accent", "⌘"), width);
+      return renderLabelled(block, defaultTheme.fg("accent", "⌘"), width, options);
     case "error":
-      return renderLabelled(block, defaultTheme.fg("error", "!"), width);
+      return renderLabelled(block, defaultTheme.fg("error", "!"), width, options);
     case "notice":
       // Indented like every other block, and indented by the renderer rather than
       // by whoever wrote the text — a caller that prefixes its own spaces loses
       // them the moment the line wraps.
       return [...prose(block.text, width, GUTTER), ""];
     default:
-      return [...renderAssistant(block, width), ""];
+      return [...renderAssistant(block, width, options), ""];
   }
 }
 
@@ -338,12 +338,12 @@ function elide(text: string, limit: number): string {
  * difference between a wall of text with literal `##` in it and something a
  * reader can scan.
  */
-function renderLabelled(block: Block, glyph: string, width: number): readonly string[] {
+function renderLabelled(block: Block, glyph: string, width: number, options: BlockRenderOptions): readonly string[] {
   const rows = [`${GUTTER}${glyph} ${defaultTheme.bold(block.title ?? "")}`];
   const bodyWidth = Math.max(8, width - visibleWidth(BODY_INDENT));
   const body = block.report
     ? block.collapsed ? [defaultTheme.dim('Report shown in reader · click to expand')] : renderReport(block.report, Math.max(1, width))
-    : renderMarkdown(block.text.replace(/\s+$/, ""), bodyWidth);
+    : renderMarkdown(block.text.replace(/\s+$/, ""), bodyWidth, options);
   for (const row of body) {
     rows.push(`${BODY_INDENT}${row}`);
   }
@@ -359,11 +359,11 @@ function renderLabelled(block: Block, glyph: string, width: number): readonly st
  * trailing partial fence dropped, so a fence marker arriving one character at a
  * time does not make the block flicker between styled and unstyled.
  */
-function renderAssistant(block: Block, width: number): readonly string[] {
+function renderAssistant(block: Block, width: number, options: BlockRenderOptions): readonly string[] {
   const source = block.finalized ? block.text : trimPartialFence(block.text);
   if (!source.trim()) return [];
   const bodyWidth = Math.max(8, width - visibleWidth(GUTTER));
-  return renderMarkdown(source.replace(/\s+$/, ""), bodyWidth).map((row) => `${GUTTER}${row}`);
+  return renderMarkdown(source.replace(/\s+$/, ""), bodyWidth, options).map((row) => `${GUTTER}${row}`);
 }
 
 /** Body text wrapped to the remaining width behind `indent`. */

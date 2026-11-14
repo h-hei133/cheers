@@ -46,6 +46,7 @@ export class TranscriptPane {
   private lastTranscriptRevision = -1;
   private lastSelectionWidth = -1;
   private layout: FrameLayout | undefined;
+  private renderOptions?: BlockRenderOptions;
   private pageAvailable = false;
   /** Painted indexes stay valid until the next frame by accounting for this prepend. */
   private pendingPage: { readonly added: number; restore: boolean } | undefined;
@@ -72,12 +73,13 @@ export class TranscriptPane {
       this.pendingPage = undefined;
     }
     this.layout = layout;
+    this.renderOptions = options ? { ...options } : undefined;
     const safeWidth = Math.max(1, Math.floor(width));
     this.pageAvailable = layout === 'viewport' && width > 0 && capacity > 0;
     const selectionLayoutChanged = documentChanged || safeWidth !== this.lastSelectionWidth
       || this.transcript.revision !== this.lastTranscriptRevision;
     const hasScrollbar = layout === "viewport" && needsScrollbar(
-      this.transcript.rowCount(safeWidth),
+      this.transcript.rowCount(safeWidth, options),
       Math.max(1, capacity),
       safeWidth,
     );
@@ -226,7 +228,7 @@ export class TranscriptPane {
   /** Rendered rows of the full transcript at the last width, for selection copying. */
   contentRows(): readonly string[] {
     if (this.window.layout.rows.length > 0) return this.window.layout.rows;
-    return this.transcript.render(this.geometry ? Math.max(1, this.width - 1) : this.width).rows;
+    return this.transcript.render(this.geometry ? Math.max(1, this.width - 1) : this.width, this.renderOptions).rows;
   }
 
   /** Changes whenever source coordinates or their underlying transcript change. */

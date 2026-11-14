@@ -301,6 +301,7 @@ export class InteractiveMode {
   constructor(private readonly options: InteractiveModeOptions) {
     this.alternateScreen = options.runtimeContext.runtimeConfig.tuiMode !== "regular";
     this.terminal = options.startup?.terminal ?? options.terminal ?? processTerminal;
+    const supportsHyperlinks = this.terminal.capabilities.supportsHyperlinks === true;
     this.composerPreference = new ComposerPreference(
       () => this.options.runtimeContext.runtimeConfig,
       () => {
@@ -425,7 +426,7 @@ export class InteractiveMode {
         overlayInputActive: () => !this.pager.active && this.overlay.inputActive,
         overlayPointerMotion: () => this.overlay.active && !this.pager.active,
         overlayRows: (width, height, availableRows) =>
-          this.pager.active ? this.pager.render(width, height, availableRows) : this.overlay.render(width, height, availableRows),
+          this.pager.active ? this.pager.render(width, height, availableRows, { supportsHyperlinks }) : this.overlay.render(width, height, availableRows),
         selection: () => this.pointer.selection,
         composerSelection: () => this.pointer.composerSelection ?? this.vimSelection,
         hintStatus: () => ({ toast: this.toast, completion: this.completionStatus }),
@@ -444,6 +445,7 @@ export class InteractiveMode {
         // the renderer asks on every frame — a function per frame would re-run
         // the environment probe that never has a different answer.
         imageProtocol: () => this.imageProtocol,
+        supportsHyperlinks: () => supportsHyperlinks,
         thinkingShortcut: this.preferences.thinkingShortcut,
         overlayStack: this.overlayStack,
       },

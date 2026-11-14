@@ -1,6 +1,6 @@
 import { wrapToWidth } from "../text/layout.js";
 import { stripAnsi } from "../text/ansi.js";
-import type { Block } from "./blocks.js";
+import type { Block, BlockRenderOptions } from "./blocks.js";
 import { layoutDiff } from "./diff.js";
 import { renderMarkdownWithSources } from "./markdown.js";
 
@@ -89,9 +89,10 @@ export function sourceLinesFor(
   blockIndex: number,
   width: number,
   rows: readonly string[],
+  options?: BlockRenderOptions,
 ): readonly (SourceLine | undefined)[] {
   if (block.kind === "assistant" && block.finalized) {
-    const projected = renderMarkdownWithSources(block.text.replace(/\s+$/, ""), Math.max(8, width));
+    const projected = renderMarkdownWithSources(block.text.replace(/\s+$/, ""), Math.max(8, width), options);
     const separator = rows.length > 0 && rows[rows.length - 1] === "" ? 1 : 0;
     if (rows.length - separator === projected.rows.length
       && projected.rows.every((row, index) => stripAnsi(row) === stripAnsi(rows[index] ?? ""))) {
@@ -104,7 +105,7 @@ export function sourceLinesFor(
     }
   }
   if ((block.kind === "command" || block.kind === "error") && !block.report && !block.diff) {
-    const projected = renderMarkdownWithSources(block.text.replace(/\s+$/, ""), Math.max(8, width));
+    const projected = renderMarkdownWithSources(block.text.replace(/\s+$/, ""), Math.max(8, width), options);
     const separator = rows.length > 0 && rows[rows.length - 1] === "" ? 1 : 0;
     const bodyRows = rows.slice(1, 1 + projected.rows.length);
     if (rows.length - separator === projected.rows.length + 1

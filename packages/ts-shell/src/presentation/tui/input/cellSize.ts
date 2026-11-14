@@ -50,7 +50,7 @@ export function detectHyperlinkSupport(
   env: NodeJS.ProcessEnv = process.env,
   insideMultiplexer = env.TMUX !== undefined || (env.TERM ?? "").startsWith("tmux") || (env.TERM ?? "").startsWith("screen"),
 ): boolean {
-  const override = readBooleanEnv(env.TSSHELL_TUI_HYPERLINKS ?? env.PI_HYPERLINKS);
+  const override = readBooleanEnv(env.TSSHELL_TUI_HYPERLINKS);
   if (override !== undefined) return override;
   const term = (env.TERM ?? "").toLowerCase();
   if (!term || term === "dumb") return false;

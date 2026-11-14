@@ -239,7 +239,7 @@ describe("the document a main-screen frame reports", () => {
 
   it("decorates a single document layout at the requested width", () => {
     const highlight = vi.fn((row: string, index: number) => `${row}\x1b[4m${index}\x1b[24m`);
-    const { view, live } = surface({ highlightSearchMatches: highlight, imageProtocol: () => "kitty" });
+    const { view, live } = surface({ highlightSearchMatches: highlight, imageProtocol: () => "kitty", supportsHyperlinks: () => true });
     view.transcript.append({ kind: "user", text: "hello", finalized: true });
     view.transcript.append({ kind: "user", text: "picture", finalized: true, images: [{ type: "image", mimeType: "image/png", data: "QUJD" }] });
     live.selection = { from: { row: 0, column: 0 }, to: { row: 0, column: 10 } };
@@ -248,7 +248,7 @@ describe("the document a main-screen frame reports", () => {
     const content = plan.rows.slice(0, -plan.chromeRows!.length);
 
     expect(render).toHaveBeenCalledOnce();
-    expect(render).toHaveBeenCalledWith(30, { imageProtocol: "kitty" });
+    expect(render).toHaveBeenCalledWith(30, { imageProtocol: "kitty", thinkingShortcut: undefined, supportsHyperlinks: true });
     expect(content[0]).toContain("\x1b[7m");
     expect(content[0]).toContain("\x1b[4m0\x1b[24m");
     expect(content.join("\n")).toContain("QUJD");

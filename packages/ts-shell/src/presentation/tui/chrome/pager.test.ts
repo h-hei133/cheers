@@ -67,6 +67,17 @@ describe("paging long output", () => {
 });
 
 describe("reading in the pager", () => {
+  it("refreshes cached markdown when captured hyperlink support changes", () => {
+    const pager = new Pager();
+    pager.open("Links", "[docs](https://example.test)");
+    const enabled = pager.render(WIDTH, HEIGHT, 0, { supportsHyperlinks: true });
+    expect(enabled.join("\n")).toContain("\x1b]8;;https://example.test\x07");
+    const disabled = pager.render(WIDTH, HEIGHT, 0, { supportsHyperlinks: false });
+    expect(disabled.join("\n")).not.toContain("\x1b]8;");
+    expect(plain(disabled).join("\n")).toContain("docs (https://example.test)");
+    expect(pager.render(WIDTH, HEIGHT, 0, { supportsHyperlinks: true })).toEqual(enabled);
+  });
+
   function open(): Pager {
     const pager = new Pager();
     pager.open("/log", LONG);

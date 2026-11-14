@@ -18,8 +18,9 @@ export function safeLinkUrl(value: string): string | undefined {
   return /^(https?|mailto)$/i.test(scheme[1]!) ? trimmed : undefined;
 }
 
-/** Wrap visible terminal text in OSC8, unless the URL policy refuses its target. */
-export function terminalHyperlink(label: string, href: string): string {
+/** Wrap visible text in OSC8 when supported and the URL policy admits its target. */
+export function terminalHyperlink(label: string, href: string, supportsHyperlinks = true): string {
+  if (!supportsHyperlinks) return label;
   const url = safeLinkUrl(href);
   return url === undefined ? label : `${HYPERLINK_OPEN}${url}\x07${label}${HYPERLINK_CLOSE}`;
 }

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { setDiagramMode } from "./mermaid.js";
-import { renderInline, renderMarkdown, trimPartialFence } from "./markdown.js";
+import { renderInline, renderMarkdown, renderMarkdownWithSources, trimPartialFence } from "./markdown.js";
 import { scanBlocks } from "./markdownScan.js";
 import { visibleWidth } from "../text/measure.js";
 import { stripAnsi } from "../text/ansi.js";
@@ -120,6 +120,38 @@ describe("inline styling", () => {
 });
 
 describe("block structure", () => {
+  it.each([
+    "[**`docs`**](https://example.test)",
+    "# [docs](https://example.test)",
+    "- [docs](https://example.test)",
+    "> [docs](https://example.test)",
+    "| Link |\n| --- |\n| [docs](https://example.test) |",
+  ])("honors captured hyperlink support throughout markdown: %s", source => {
+    const enabled = renderMarkdownWithSources(source, 80, { supportsHyperlinks: true });
+    const disabled = renderMarkdownWithSources(source, 80, { supportsHyperlinks: false });
+    expect(enabled.rows.join("\n")).toContain("\x1b]8;;https://example.test\x07");
+    expect(disabled.rows.join("\n")).not.toContain("\x1b]8;");
+    expect(plain(disabled.rows)).toContain("docs (https://example.test)");
+    expect(plain(disabled.rows)).toBe(plain(enabled.rows));
+    expect(disabled.sources).toEqual(enabled.sources);
+  });
+
+  it.each([true, false])("preserves URL and control-byte safety with hyperlinks %s", supportsHyperlinks => {
+    const rows = renderMarkdown(
+      "[unsafe](javascript:alert(1))\n[docs](https://example.test/\0\x1b]8;;injected\x07\u009dpath)",
+      160,
+      { supportsHyperlinks },
+    );
+    const rendered = rows.join("\n");
+    expect(rendered).not.toContain("\x1b]8;;javascript:");
+    expect(rendered).not.toContain("\x1b]8;;injected");
+    expect(rendered).not.toContain("\0");
+    expect(rendered).not.toContain("\u009d");
+    expect(plain(rows)).toContain("unsafe (javascript:alert(1))");
+    expect(plain(rows)).toContain("docs (https://example.test/]8;;injectedpath)");
+    if (!supportsHyperlinks) expect(rendered).not.toContain("\x1b]8;");
+  });
+
   it("renders headings without their hashes", () => {
     expect(plain(renderMarkdown("## Results", WIDTH))).toBe("Results");
   });

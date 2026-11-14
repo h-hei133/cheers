@@ -4,6 +4,7 @@ import { defaultTheme } from "../../theme/theme.js";
 import { Transcript } from "./container.js";
 import { textBlock, type Block } from "./blocks.js";
 import { getDefaultTheme } from "../../themes/index.js";
+import { stripAnsi } from "../text/ansi.js";
 
 // Color assertions run under an explicit capability, independent of NO_COLOR.
 const originalColorMode = defaultTheme.colorMode;
@@ -59,6 +60,27 @@ describe("finding the block behind a row", () => {
 });
 
 describe("re-rendering", () => {
+  it.each(["assistant", "command", "error"] as const)("refreshes cached %s links when captured support changes", kind => {
+    const transcript = new Transcript();
+    const source = "[docs](https://example.test)";
+    transcript.append({ kind, title: "Fixture", text: source, finalized: true });
+    const options = { supportsHyperlinks: true };
+    const enabled = transcript.render(80, options);
+    expect(enabled.rows.join("\n")).toContain("\x1b]8;;https://example.test\x07");
+    options.supportsHyperlinks = false;
+    const disabled = transcript.render(80, options);
+    expect(disabled.rows.join("\n")).not.toContain("\x1b]8;");
+    expect(disabled.rows.map(stripAnsi).join("\n")).toContain("docs (https://example.test)");
+    expect(disabled.sources.some(line => line?.text === source)).toBe(true);
+    const repeated = transcript.render(80, options);
+    expect(repeated.sources).toEqual(disabled.sources);
+    expect(repeated.sources[kind === "assistant" ? 0 : 1]).toBe(disabled.sources[kind === "assistant" ? 0 : 1]);
+    options.supportsHyperlinks = true;
+    const restored = transcript.render(80, options);
+    expect(restored.rows).toEqual(enabled.rows);
+    expect(restored.sources[kind === "assistant" ? 0 : 1]).toBe(enabled.sources[kind === "assistant" ? 0 : 1]);
+  });
+
   it("reflows to a new width", () => {
     const transcript = withBlocks("a sentence long enough to wrap at a narrow width");
 

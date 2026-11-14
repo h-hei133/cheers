@@ -193,7 +193,7 @@ describe("CSI 16t cell size, OSC 133 stripping, and hyperlink probing", () => {
 
   it("respects hyperlink env overrides without spawning tmux", () => {
     expect(detectHyperlinkSupport({ TERM: "xterm-256color", TSSHELL_TUI_HYPERLINKS: "0" }, false)).toBe(false);
-    expect(detectHyperlinkSupport({ TERM: "xterm-256color", PI_HYPERLINKS: "1", TMUX: "/tmp/tmux" }, true)).toBe(true);
+    expect(detectHyperlinkSupport({ TERM: "xterm-256color", TSSHELL_TUI_HYPERLINKS: "1", TMUX: "/tmp/tmux" }, true)).toBe(true);
     expect(detectHyperlinkSupport({ TERM: "dumb" }, false)).toBe(false);
   });
 

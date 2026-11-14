@@ -31,6 +31,7 @@ export class TranscriptCache {
       entry.width === width &&
       entry.revision === revision &&
       entry.options?.imageProtocol === options?.imageProtocol &&
+      entry.options?.supportsHyperlinks === options?.supportsHyperlinks &&
       entry.options?.thinkingShortcut === options?.thinkingShortcut);
     if (hit) {
       if (hit.blockIndex !== index) {
@@ -41,7 +42,7 @@ export class TranscriptCache {
     }
     const rows = renderBlock(block, width, options);
     const kept = (entries ?? []).filter(entry => entry.revision === revision);
-    kept.unshift({ width, revision, rows, options, blockIndex: index });
+    kept.unshift({ width, revision, rows, options: options ? { ...options } : undefined, blockIndex: index });
     this.entries.set(block, kept.slice(0, MAX_CACHED_WIDTHS));
     return rows;
   }
@@ -53,13 +54,14 @@ export class TranscriptCache {
     rows: readonly string[],
     options?: BlockRenderOptions,
   ): readonly (SourceLine | undefined)[] {
-    if (!block.finalized) return sourceLinesFor(block, index, width, rows);
+    if (!block.finalized) return sourceLinesFor(block, index, width, rows, options);
     const entry = this.entries.get(block)?.find(candidate => candidate.width === width
       && candidate.revision === defaultTheme.colorRevision
       && candidate.options?.imageProtocol === options?.imageProtocol
+      && candidate.options?.supportsHyperlinks === options?.supportsHyperlinks
       && candidate.options?.thinkingShortcut === options?.thinkingShortcut);
     if (entry?.sources) return entry.sources;
-    const sources = sourceLinesFor(block, index, width, rows);
+    const sources = sourceLinesFor(block, index, width, rows, options);
     if (entry) entry.sources = sources;
     return sources;
   }

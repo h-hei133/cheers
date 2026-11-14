@@ -80,6 +80,43 @@ import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import type { Keybindings } from './keybindings.js';
 import { buildToolEscalationPrompt } from '../../core/query/toolPolicy.js';
 import { AgentRegistryScanner } from '../../core/messaging/agentRegistryScanner.js';
+import { detectTerminalCapabilities } from '../../presentation/tui/terminalCapabilities.js';
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  [true, false].map(supportsHyperlinks => ({ kind, supportsHyperlinks }))))(
+  'renders markdown using one captured terminal capability in the actual $kind host with hyperlinks $supportsHyperlinks',
+  ({ kind, supportsHyperlinks }) => {
+    const terminal = new RecordingTerminal();
+    const detected = detectTerminalCapabilities({
+      TERM: 'xterm-256color', TSSHELL_TUI_HYPERLINKS: supportsHyperlinks ? '1' : '0',
+    });
+    Object.assign(terminal.capabilities, detected);
+    const capability = vi.fn(() => detected.supportsHyperlinks);
+    Object.defineProperty(terminal.capabilities, 'supportsHyperlinks', { get: capability });
+    const { mode } = build({ tuiMode: kind, terminal });
+    const host = mode as unknown as { view: InteractiveView; pager: Pager };
+    expect(capability).toHaveBeenCalledOnce();
+    capability.mockReturnValue(!supportsHyperlinks);
+    mode.start();
+    try {
+      host.view.transcript.append({ kind: 'assistant', text: '[docs](https://example.test)', finalized: true });
+      for (let frame = 0; frame < 3; frame++) {
+        const rendered = host.view.renderFrame({ columns: 100, rows: 24 }).rows.join('\n');
+        expect(stripAnsi(rendered)).toContain('docs (https://example.test)');
+        expect(rendered.includes('\x1b]8;;https://example.test\x07')).toBe(supportsHyperlinks);
+        if (!supportsHyperlinks) expect(rendered).not.toContain('\x1b]8;');
+      }
+      host.pager.open('Reader links', '[docs](https://example.test)');
+      const reader = host.view.renderFrame({ columns: 100, rows: 24 });
+      expect(reader.fullScreen).toBe(true);
+      expect(stripAnsi(reader.rows.join('\n'))).toContain('docs (https://example.test)');
+      expect(reader.rows.join('\n').includes('\x1b]8;;https://example.test\x07')).toBe(supportsHyperlinks);
+      if (!supportsHyperlinks) expect(reader.rows.join('\n')).not.toContain('\x1b]8;');
+      host.pager.close();
+      expect(capability).toHaveBeenCalledOnce();
+    } finally { mode.stop(); }
+  },
+);
 
 it.each(['regular', 'fullscreen'] as const)('suspends peer scans in the actual %s host while a picker or reader covers chrome', kind => {
   const scheduler = new ManualScheduler(), { mode } = build({ tuiMode: kind, scheduler });
@@ -499,6 +536,7 @@ function build(overrides: {
   startup?: StartupSurface;
   onFirstFrame?: () => void;
   tuiMode?: 'regular' | 'fullscreen';
+  terminal?: RecordingTerminal;
 } = {}): {
   mode: InteractiveMode;
   renderer: StreamingRenderer;
@@ -508,7 +546,7 @@ function build(overrides: {
 } {
   const renderer = new StreamingRenderer();
   const readline: { current: unknown } = { current: null };
-  const terminal = new RecordingTerminal();
+  const terminal = overrides.terminal ?? new RecordingTerminal();
   const approval: { current: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined } = { current: undefined };
   const mode = new InteractiveMode({
     runtimeContext: withConfiguration({
