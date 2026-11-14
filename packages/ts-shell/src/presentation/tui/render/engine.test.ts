@@ -577,6 +577,24 @@ describe("steady-state repaint", () => {
 });
 
 describe("the cursor", () => {
+  it.each([false, true])("paints and places the unqualified emoji cursor consistently in alternate=%s", (useAlternateScreen) => {
+    const { tui, terminal, provider } = boot();
+    terminal.columns = 3;
+    provider.rows = ["history"];
+    provider.chrome = ["placeholder", "hint"];
+    tui.start({ useAlternateScreen });
+    for (const cluster of ["1\u20e3", "#\u20e3", "👁‍🗨", "🇨", "🇨🇳"]) {
+      provider.chrome = [`${cluster}${CURSOR_MARKER}xy`, "hint"];
+      tui.renderNow();
+      const written = terminal.drain();
+      expect(written).toContain(`${cluster}…`);
+      expect(written).not.toContain(CURSOR_MARKER);
+      if (useAlternateScreen) expect(written).toMatch(/\x1b\[\d+;3H\x1b\[\?25h/);
+      else expect(written).toContain("\x1b[2C\x1b[?25h");
+    }
+    tui.stop();
+  });
+
   it("consumes markers across the regular screen, borrowed overlay, and restored editor", () => {
     const { tui, terminal, provider } = boot();
     const chrome = [`prompt${CURSOR_MARKER}more`, 'hint'];

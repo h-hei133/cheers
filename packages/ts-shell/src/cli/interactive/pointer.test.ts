@@ -459,6 +459,11 @@ describe("pointer composer caret clicks", () => {
     ["中x", 0, 0], ["中x", 1, 0], ["中x", 2, 1],
     ["e\u0301x", 1, 2], ["😀x", 1, 0], ["😀x", 2, 2],
     ["👩‍💻x", 1, 0], ["👩‍💻x", 2, 5],
+    ["1\u20e3x", 1, 0], ["1\u20e3x", 2, 2],
+    ["#\u20e3x", 1, 0], ["#\u20e3x", 2, 2],
+    ["👁‍🗨x", 1, 0], ["👁‍🗨x", 2, 5],
+    ["🇨x", 1, 0], ["🇨x", 2, 2],
+    ["🇨🇳x", 1, 0], ["🇨🇳x", 2, 4],
   ] as const)("maps %j cell %s to source offset %s", (text, cell, offset) => {
     const geometry = composerGeometry(text);
     const row = geometry.layout.rows.find(row => row.kind === "content")!;

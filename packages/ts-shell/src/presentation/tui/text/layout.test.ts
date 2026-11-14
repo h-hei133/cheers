@@ -24,6 +24,16 @@ describe("truncation", () => {
     expect(visibleWidth(truncateToWidth("你好世界", 5))).toBeLessThanOrEqual(5);
   });
 
+  it.each(["1\u20e3", "#\u20e3", "👁‍🗨", "🇨", "🇨🇳"])(
+    "truncates unqualified emoji %j as an indivisible two-cell cluster", (cluster) => {
+      expect(truncateToWidth(`${cluster}xy`, 3)).toBe(`${cluster}…`);
+      expect(truncateToWidth(`${cluster}xy`, 2)).toBe("…");
+      expect(wrapToWidth(`${cluster}x${cluster}`, 2)).toEqual([cluster, "x", cluster]);
+      expect(wrapToWidth(`      - ${cluster}`, 9)).toEqual(["      - ", cluster]);
+      expect(padToWidth(cluster, 3)).toBe(`${cluster} `);
+    },
+  );
+
   it("places the ellipsis at the requested end", () => {
     expect(truncateToWidthWithMode("abcdefgh", 5, "start")).toBe("…efgh");
     expect(truncateToWidthWithMode("abcdefgh", 5, "middle")).toBe("ab…gh");

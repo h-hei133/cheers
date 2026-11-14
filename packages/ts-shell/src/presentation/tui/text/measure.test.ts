@@ -39,6 +39,34 @@ describe("cell width", () => {
     expect(visibleWidth("❤‍🔥")).toBe(2);
     expect(visibleWidth("क\u093f")).toBe(2);
   });
+
+  it.each(["1\u20e3", "#\u20e3", "*\u20e3", "👁‍🗨", "👁️‍🗨", "👁‍🗨️"])(
+    "keeps unqualified emoji %j as two original display cells", (cluster) => {
+      expect(getClusterWidth(cluster)).toBe(2);
+      expect(visibleWidth(`${cluster}x`)).toBe(3);
+      expect([...lineCells(`${cluster}x`)].map(({ cluster, width }) => [cluster, width])).toEqual([[cluster, 2], ["x", 1]]);
+      expect(graphemeBoundaries(`${cluster}x`)).toEqual([0, cluster.length, cluster.length + 1]);
+      expect(sliceWithWidth(`${cluster}x`, 0, 1)).toEqual({ text: "", width: 0 });
+      expect(sliceWithWidth(`${cluster}x`, 1, 2)).toEqual({ text: "x", width: 1 });
+      expect(sliceWithWidth(`${cluster}x`, 0, 2)).toEqual({ text: cluster, width: 2 });
+    },
+  );
+
+  it("keeps partial regional indicators stable when a streamed flag completes", () => {
+    for (let code = 0x1f1e6; code <= 0x1f1ff; code++) {
+      expect(visibleWidth(String.fromCodePoint(code))).toBe(2);
+    }
+    for (const flag of ["🇨🇳", "🇯🇵", "🇬🇧", "🇺🇸", "🇩🇪"]) {
+      expect(visibleWidth(flag.slice(0, 2))).toBe(2);
+      expect(visibleWidth(flag)).toBe(2);
+    }
+  });
+
+  it.each([["❤", 1], ["✔", 1], ["✗", 1], ["1\ufe0e\u20e3", 1], ["👁︎‍🗨︎", 2], ["❤‍✔", 1]] as const)(
+    "preserves %j text width %s without promoting arbitrary ZWJ clusters", (cluster, width) => {
+      expect(getClusterWidth(cluster)).toBe(width);
+    },
+  );
   it("gives combining marks and control characters no width", () => {
     expect(getCodePointWidth(0x0301)).toBe(0);
     expect(getCodePointWidth(0x200d)).toBe(0);

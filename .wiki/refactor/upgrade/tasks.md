@@ -21,7 +21,7 @@
 
 ## B / B2: 终端（P0／P1）
 
-- [ ] **B.1** 国旗、ZWJ、无 FE0F 等显示宽度：已有待验收，真实渲染／截断／命中一致。
+- [x] **B.1** 国旗、ZWJ、无 FE0F 等显示宽度：本地验收完成。无selector keycap与双窄成员眼睛气泡ZWJ的真实反例先红后修；仅改共享width owner，资格化计算影子由RGI约束、不改source和显式selector，保留原dingbat／宽成员fallback。六静态门、7套件306项、函数上限及build `12c748aff97c`通过，限定只读复核CLEAR；Linux当前编译CLI两模式PTY共10格通过，regular按grapheme移动、fullscreen点击第二cell和精确原文编辑验证。keycap／ZWJ两反转确实红、生产逐字节恢复后7/306再绿。实际M，额外依赖0；证据不等于物理字体或其他平台显示普遍兼容。
 - [x] **B.2** 1 MiB 分块 writer 与背压：本地验收完成。UTF-8字节预算、跨fragment surrogate保持；regular/fullscreen逐行进入同一writer，原pending-byte与shutdown owner保留。独立暂存树4套件107项及build通过；Linux实际受阻管道4MB文本摘要一致、全部写块<=1MiB，PTY约5.7MB输出完成；关闭输出exit1、SIGTERM exit143均完成清理且不报告写完。实际M，额外依赖0；不宣称物理终端或整进程总内存上限。
 - [ ] **B.3** 图片头、cell size、缓存数量／传输／64 MiB 解码预算：已有待验收，真实 Linux 图片和未知格式拒绝。
 - [ ] **B2.1** OSC 9;4／7501／133／16t／tmux 超链接：部分验收。捕获超链接能力贯通实际regular/fullscreen宿主、transcript/source与reader，缓存复制并区分能力；独立暂存树8套件601项、六静态门、build `6a9bc408aeed`通过，限定复审CLEAR。全协议生命周期、输入隔离及真实tmux仍待验收。
@@ -145,3 +145,6 @@
 
 
 2026-11-15 C.3联合验收：六静态门通过，实际30套件502项全部通过，明确删除主联合命令中5个不存在的测试路径并补入实际history／summary／schedule／state消费者。账户刷新首次失败归类harness/setup drift：默认4096超过main100而在renewal前拒绝；fixture合法化后原全部断言通过。限定只读复核CLEAR。`context-joint-native-evidence.json`绑定同一`e4d27485`和build `c7857153d401`、两源脚本SHA256及每组7次actual请求；C.3本地验收数增至17，C.6因Anthropic原生协议无真实证据保持部分。仅测试／文档变更，沿用未改的生产构建，不重跑build。
+
+
+2026-11-15 B.1：初21项失败中3项是窄frame仍保留3cells和旧text-ZWJ宽度的夹具错误，原日志保留；几何确认后使用真实borderless2cells，不改生产frame。最终7/306、六静态门、函数上限0monoliths和build `12c748aff97c`通过，独立复核CLEAR。Linux当前编译CLI regular/fullscreen各5种source原文、硬件cursor字节和按键/鼠标编辑结果通过；第一次native未计入cue margin的观察错误保留。keycap与ZWJ反转为3红／1红，逐字节恢复后7/306再绿。本地验收数18，继续B.3；无physical glyph/provider/push/CI声明。

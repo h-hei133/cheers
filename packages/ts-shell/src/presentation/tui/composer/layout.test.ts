@@ -67,6 +67,24 @@ describe("composer source layout", () => {
     expect(copied(layout, { row: row.screenRow, column: last.columnEnd - 1 }, { row: row.screenRow, column: first.columnStart + 1 })).toBe(source);
   });
 
+  it.each(["1\u20e3", "#\u20e3", "👁‍🗨", "🇨", "🇨🇳"])(
+    "maps both unqualified emoji %j cells to the exact source before and after wrapping", (cluster) => {
+      const editor = draft(`${cluster}xy`);
+      const wide = layoutComposer(editor, { busy: false, shape: "band" }, 20);
+      const first = contentRows(wide)[0]!;
+      expect(first.cells[0]).toMatchObject({ columnStart: 4, columnEnd: 6, sourceStart: 0, sourceEnd: cluster.length });
+      expect(first.cells[1]).toMatchObject({ columnStart: 6, sourceStart: cluster.length });
+      for (const column of [4, 5]) expect(copied(wide, { row: first.screenRow, column }, { row: first.screenRow, column })).toBe(cluster);
+      const narrow = layoutComposer(editor, { busy: false, shape: "borderless" }, 2);
+      const rows = contentRows(narrow);
+      expect(rows).toHaveLength(2);
+      expect(rows[0]!.cells[0]).toMatchObject({ sourceStart: 0, sourceEnd: cluster.length });
+      expect(rows[1]!.sourceStart).toBe(cluster.length);
+      expect(copied(narrow, { row: rows[0]!.screenRow, column: rows[0]!.cells[0]!.columnEnd - 1 },
+        { row: rows[1]!.screenRow, column: 100 })).toBe(`${cluster}xy`);
+    },
+  );
+
   it("adds no newline at a soft break but retains logical and empty-line breaks", () => {
     const layout = layoutComposer(draft("abcdefghij\n\n  last  "), { busy: false, shape: "band" }, 12);
     const rows = contentRows(layout);

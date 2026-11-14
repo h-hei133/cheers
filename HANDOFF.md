@@ -2508,3 +2508,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A read-only process inventory exposes another service's sensitive startup parameters.
 - **Root Cause:** The process listing includes full arguments for unrelated services.
 - **Rule:** Use only PID, parent, state, resource usage and executable name for routine process checks. Narrow diagnostic reads to owned processes and report safe derived facts; never print an unrestricted command-line inventory.
+
+
+### Optional Emoji Selectors Need One Shared Width Decision
+- **Symptom:** A keycap or narrow-member ZWJ is painted across two cells but truncation, cursor placement and pointer selection treat it as one.
+- **Root Cause:** Fully qualified RGI matching excludes optional-selector forms; testing only wide-member emoji hides the mismatch. Tiny composer frames can also drop decoration and retain more content cells than a fixture expects.
+- **Rule:** Recognize exact keycaps and probe ZWJ qualification on a shadow string bounded by the existing RGI set; preserve original text and explicit selectors. Test measurement, truncation, mapped source selection, both painter cursor bytes and native input edits. Confirm actual composerTextWidth and cue margins before asserting small-frame wrapping.

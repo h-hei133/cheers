@@ -4,8 +4,8 @@
  * Width is resolved per grapheme cluster, not per code unit: a cluster is one
  * cursor stop, so an emoji ZWJ sequence or a base letter plus combining marks
  * advances the cursor exactly once. Cluster width comes from the first
- * non-zero-width code point, promoted to 2 when an emoji presentation selector
- * (U+FE0F) is present.
+ * non-zero-width code point, with two cells for emoji presentation, keycaps
+ * and recognized emoji ZWJ sequences even when optional selectors are absent.
  *
  * East Asian Wide/Fullwidth ranges are tabulated here because ECMAScript
  * exposes no `East_Asian_Width` property escape. Zero-width code points are
@@ -86,6 +86,9 @@ function resolveCodePointWidth(code: number): number {
 
 const EMOJI_PRESENTATION_SELECTOR = 0xfe0f;
 const RGI_EMOJI = new RegExp("^\\p{RGI_Emoji}$", "v");
+const KEYCAP = /^[#*0-9]\uFE0F?\u20E3$/u;
+const UNSPECIFIED_PICTOGRAPH = /\p{Extended_Pictographic}(?![\uFE0E\uFE0F\p{Emoji_Modifier}])/gu;
+const EMOJI_PRESENTATION = /^\p{Emoji_Presentation}$/u;
 const SPACING_MARK = /^\p{Mc}$/u;
 const NON_BASE_MARK = /^\p{Mark}$/u;
 const NON_PRINTING_MARK = /^[\p{Default_Ignorable_Code_Point}\p{Control}\p{Format}\p{Mark}\p{Surrogate}]$/u;
@@ -118,6 +121,13 @@ function couldBeRgiEmoji(cluster: string, firstCode: number): boolean {
   );
 }
 
+/** Qualification is only a width probe; source bytes and explicit text selectors stay intact. */
+function isUnqualifiedEmojiZwj(cluster: string): boolean {
+  if (!cluster.includes("\u200d")) return false;
+  const qualified = cluster.replace(UNSPECIFIED_PICTOGRAPH, char => EMOJI_PRESENTATION.test(char) ? char : `${char}\uFE0F`);
+  return qualified !== cluster && RGI_EMOJI.test(qualified);
+}
+
 /**
  * Terminal cells occupied by one grapheme cluster. Handles regional indicators,
  * RGI emoji (with or without U+FE0F), ZWJ sequences containing wide emoji,
@@ -127,7 +137,9 @@ export function getClusterWidth(cluster: string): number {
   if (cluster.length === 0) return 0;
   const firstCode = cluster.codePointAt(0)!;
   if (firstCode >= 0x1f1e6 && firstCode <= 0x1f1ff) return 2;
+  if (KEYCAP.test(cluster)) return 2;
   if (couldBeRgiEmoji(cluster, firstCode) && RGI_EMOJI.test(cluster)) return 2;
+  if (isUnqualifiedEmojiZwj(cluster)) return 2;
 
   let width = 0;
   let promoted = false;
