@@ -13,7 +13,7 @@
  * to text — an image that renders once and then corrupts on scrollback is
  * worse than a placeholder that never lies.
  */
-import { estimateDecodedImageBytes, imageCellSize } from "./imageDimensions.js";
+import { estimateDecodedImageBytes, getImageDimensions, imageCellSize } from "./imageDimensions.js";
 import { canonicalImageMime, inspectImage } from '../../model-adapters/image/input.js';
 import type { ImageContent } from '../../model-adapters/multimodal.js';
 import type { ImageDimensions } from './imageDimensions.js';
@@ -62,7 +62,45 @@ export function inlineImageRows(image: ImageContent, protocol: ImageProtocol, wi
  * would make a parse depend on whether some earlier parse had finished.
  */
 function kittyTransmissionPattern(): RegExp {
-  return /\x1b_G([^;]*);[^\x1b]*\x1b\\(?:\x1b_G(?:[^;]*,)?m=1;[^\x1b]*\x1b\\)*(?:\x1b_G(?:[^;]*,)?m=0;[^\x1b]*\x1b\\)?/g;
+  return /\x1b_G([^;\x1b]*)(?:;[^\x1b]*)?\x1b\\(?:\x1b_G(?:[^;]*,)?m=1;[^\x1b]*\x1b\\)*(?:\x1b_G(?:[^;]*,)?m=0;[^\x1b]*\x1b\\)?/g;
+}
+
+export interface ImageSequence {
+  readonly protocol: ImageProtocol;
+  readonly sequence: string;
+  readonly start: number;
+  readonly end: number;
+  readonly rows: number;
+  /** The control may be emitted from the last reserved row, above its cursor. */
+  readonly rowOffset: number;
+  readonly heightPx?: number;
+}
+
+/** Whole graphics controls and their row extent, including iTerm cursor protection. */
+export function imageSequencesIn(row: string): readonly ImageSequence[] {
+  const found: ImageSequence[] = [];
+  if (row.includes('\x1b_G')) {
+    for (const match of row.matchAll(kittyTransmissionPattern())) {
+      const controls = match[1]!.split(',');
+      if (controls.includes('a=d') || controls.includes('a=t') || !controls.some(control => control.startsWith('i='))) continue;
+      const rows = Number(controls.find(control => control.startsWith('r='))?.slice(2) ?? 1);
+      const separator = match[0].indexOf(';');
+      const prefix = separator < 0 ? '' : match[0].slice(separator + 1, separator + 129);
+      found.push({ protocol: 'kitty', sequence: match[0], start: match.index!, end: match.index! + match[0].length,
+        rows: Number.isSafeInteger(rows) && rows > 0 ? rows : 1, rowOffset: 0,
+        heightPx: getImageDimensions(prefix, 'image/png')?.heightPx });
+    }
+  }
+  if (row.includes('\x1b]1337;File=')) {
+    const pattern = /(?:\x1b7(?:\x1b\[\d+A)?)?\x1b\]1337;File=([^:]*):[^\x07\x1b]*(?:\x07|\x1b\\)(?:\x1b8)?/g;
+    for (const match of row.matchAll(pattern)) {
+      const rows = Number(match[1]!.split(';').find(control => control.startsWith('height='))?.slice(7) ?? 1);
+      const rowOffset = Number(/^\x1b7\x1b\[(\d+)A/.exec(match[0])?.[1] ?? 0);
+      found.push({ protocol: 'iterm2', sequence: match[0], start: match.index!, end: match.index! + match[0].length,
+        rows: Number.isSafeInteger(rows) && rows > 0 ? rows : 1, rowOffset });
+    }
+  }
+  return found.sort((a, b) => a.start - b.start);
 }
 
 /** Which inline-image protocol the terminal speaks, or nothing. */
@@ -156,6 +194,7 @@ export function transmissionsIn(line: string): readonly KittyTransmission[] {
   if (!line.includes("\x1b_G")) return [];
   const found: KittyTransmission[] = [];
   for (const match of line.matchAll(kittyTransmissionPattern())) {
+    if (match[1]!.split(',').some(control => control === 'a=p' || control === 'a=d')) continue;
     const id = /i=(\d+)/.exec(match[0])?.[1];
     if (id === undefined) continue;
     const payload = match[0]

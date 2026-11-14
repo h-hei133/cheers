@@ -15,6 +15,7 @@ import {
 } from "../transcript/viewport.js";
 import { ScrollModel } from "./scroll.js";
 import { getCellDimensions, type CellDimensions } from '../imageDimensions.js';
+import { clipImageRows } from '../image/viewport.js';
 
 /**
  * The scrolling transcript area.
@@ -114,7 +115,9 @@ export class TranscriptPane {
       this.lastTranscriptRevision = this.transcript.revision;
       this.lastImageCellSize = imageCellSize;
     }
-    const visible = rows.slice(top, top + safeCapacity);
+    const visible = layout === 'viewport'
+      ? clipImageRows(rows, top, safeCapacity, contentWidth)
+      : rows.slice(top, top + safeCapacity);
     const filler = Math.max(0, safeCapacity - visible.length);
     this.window = new TranscriptWindow({ top, filler, visible: visible.length, rows, owners });
     this.sources = [

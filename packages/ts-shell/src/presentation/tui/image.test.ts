@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { visibleWidth } from "./text/measure.js";
-import { calculateImageRows, detectImageProtocol, estimateDecodedImageBytes, getImageDimensions, inlineImageSequence, kittyPlacementFor, swapTransmittedForPlacement, transmissionsIn, windowTitle, idleNotification, bell } from "./image.js";
+import { calculateImageRows, detectImageProtocol, estimateDecodedImageBytes, getImageDimensions, imageSequencesIn, inlineImageRows, inlineImageSequence, kittyPlacementFor, swapTransmittedForPlacement, transmissionsIn, windowTitle, idleNotification, bell } from "./image.js";
+import { pngImage } from '../../test-utils/image.js';
 import { getCellDimensions, setCellDimensions } from './imageDimensions.js';
 
 /** The environment of a terminal that identifies itself, with nothing else. */
@@ -103,6 +104,20 @@ describe("terminal attention sequences", () => {
 });
 
 describe("transmit-once placement under redraw", () => {
+  it('recognizes a complete chunked graphics run and a placement without claiming another transmission', () => {
+    const image = pngImage(320, 161, 'large'.repeat(1500));
+    const sequence = inlineImageRows(image, 'kitty', 40)![0]!;
+    const [parsed] = imageSequencesIn(`before ${sequence} after`);
+    expect(parsed).toMatchObject({ protocol: 'kitty', sequence, rows: 11, rowOffset: 0, heightPx: 161 });
+    expect(parsed?.start).toBe(7);
+    expect(parsed?.end).toBe(7 + sequence.length);
+    expect(imageSequencesIn(sequence)).toHaveLength(1);
+    const placed = kittyPlacementFor(sequence)!;
+    expect(imageSequencesIn(placed)).toHaveLength(1);
+    expect(imageSequencesIn(placed)[0]?.rows).toBe(11);
+    expect(transmissionsIn(placed)).toEqual([]);
+  });
+
   it("places a transmitted kitty image instead of resending its bytes", () => {
     // First appearance: full transmission, carrying an image id.
     const first = inlineImageSequence("kitty", "QUJD", { columns: 10, imageId: 7 });

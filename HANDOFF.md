@@ -2526,3 +2526,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A cell-size reply correctly reflows finalized images, but an old mouse selection remains actionable and can copy another row.
 - **Root Cause:** The render cache observes cell geometry while the selection generation observes only document, width and transcript revision. Image payload rows may also erase their own pixels when padding is printed afterward.
 - **Rule:** Capture cell dimensions as immutable values and include their identity in both image layout caching and selection coordinates. Draw background text before image controls; preserve renderer cursor accounting. A keyboard enhancement reply does not release its separate DA1 fence before the original deadline.
+
+### Image Suppression Must Remove Its Attached Cursor Move
+- **Symptom:** A clipped or overlay-covered image becomes text, but its scrollbar moves to the first column and a later erase-to-end removes the overlay.
+- **Root Cause:** Removing graphics and its decoder cursor wrapper leaves the background's attached carriage return or horizontal reanchor. The row still measures as full width while the terminal cursor has moved left.
+- **Rule:** Remove the attached CR/CSI-C when removing a generated image control, preserving the background and trailing scrollbar. Exercise actual user rows with scrollbar and a visible iTerm last-row anchor, not just a bare graphics sequence. Freeze all build inputs, including tests, before native compiled-CLI probes; RTK pipe proxies must not hide a native child's PTY.

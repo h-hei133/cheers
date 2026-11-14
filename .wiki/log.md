@@ -11803,3 +11803,10 @@ Linux当前compiled CLI regular/fullscreen×Kitty/iTerm2四格完整PNG、native
 准入`20a37ae`后复用原image/geometry/cache/pane owner补N行reservation、48×48界限、窄宽fits、C=1与iTerm保存恢复。复审背景后padding和cell重排旧Pointer copy两类反例修复；按冻结cell identity重建finalized图片cache并推进选择代际，普通text/source memo保持。
 
 六门、8/313、0monoliths与buildf3c7f85fd552通过，限定复核CLEAR；Linux当前compiled CLI四格split回复10→20行重排／后继文本／cursor通过，两反转紅且逐字节恢复再绿。旧颜色fixture的DA1 deadline冲突在HEAD同失败，只修fixture等待；B.3crop／最后绘制／精确预算留后续，本地18项不变，按批提交。
+
+
+### 2026-11-15：图片可视区裁剪和浮层覆盖独立子批
+
+布局`ef052794`后复用原完整graphics识别与局部image/viewport owner，Kitty按源像素y/h/r裁剪并重锚，iTerm部分图回退文字；浮层触及任一reserved行即抑制图片。真实scrollbar＋CR及iTerm末行两红例修复，背景/source/owners保留。
+
+六门、8/243、0monoliths、build `2443a54998eb`通过，限定复核CLEAR；Linux当前compiled CLI fullscreen Kitty/iTerm小屏、PageUp、扩屏恢复均exit0，两反转红且逐字节恢复后再绿。初native探针非TTY、陈旧build与小屏intro观察错误保留；物理pixels不测。B.3最后绘制、placement、regular scrollback及预算仍待完成，本地18项不变，按批提交。

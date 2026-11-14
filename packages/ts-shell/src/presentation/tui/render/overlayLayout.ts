@@ -1,5 +1,6 @@
 import { closeTerminalHyperlink } from "../text/link.js";
 import { lineCells, sliceWithWidth } from "../text/measure.js";
+import { suppressOccludedImages } from '../image/viewport.js';
 
 /**
  * Pure layout math, ANSI/OSC-8-safe line compositing, wide-char boundary
@@ -286,10 +287,5 @@ export function compositeTuiLine(
 
 /** Suppress inline terminal image rows occluded by a floating overlay's vertical span. */
 export function clearOccludedImageLines(lines: string[], startRow: number, rowCount: number): void {
-  const endRow = Math.min(lines.length, startRow + rowCount);
-  for (let row = Math.max(0, startRow); row < endRow; row++) {
-    if (isImageLine(lines[row]!)) {
-      lines[row] = "";
-    }
-  }
+  suppressOccludedImages(lines, startRow, rowCount);
 }

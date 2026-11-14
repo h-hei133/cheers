@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.1/B.2/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
-**Active batch**: B.3准入首批已提交`20a37ae`。占行／cell-size子批8/313、六门、函数上限和build `f3c7f85fd552`通过，限定独立复核CLEAR；Linux当前编译CLI两模式×两协议split回复10→20行重排passed，cache／Pointer反转红且逐字节恢复。记录后按批提交，再接crop／图片最后绘制及精确离屏预算。B.3部分、整体本地验收18项；C.6原生历史协议缺口继续保留。
+**Active batch**: B.3准入`20a37ae`、占行／cell-size `ef052794`已提交。viewport裁剪／浮层覆盖子批8/243、六门、函数上限和build `2443a54998eb`通过，限定独立复核CLEAR；Linux当前编译CLI fullscreen×两协议小屏／PageUp／扩屏恢复passed，两反转红且逐字节恢复。按批提交后接图片最后绘制、placement清退、regular scrollback和精确离屏预算。B.3部分、整体本地验收18项；C.6原生历史协议缺口继续保留。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -92,3 +92,5 @@
 | 2026-11-15 | B.3首批拒绝unknown／格式伪装／损坏头／单图超限，复审MIME terminal-control两红例修复；Kitty PNG-only／非PNG fallback与iTerm实际read JPEG/alias通过。六门、6/124、0monoliths、build `320e22d14438`和Linux当前编译CLI两模式×两协议四格passed；两反转红／逐字节恢复后再绿。实际M／额外依赖1，B.3保持部分、18项不变，下一批占行与cell-size。 |
 
 | 2026-11-15 | B.3布局／cell-size：48×48与窄宽fits、N行reservation、C=1、iTerm保存恢复、finalized局部cache及Pointer generation接线通过。复审背景次序／旧drag copy红修复；旧颜色夹具HEAD也失败，按原键盘deadline等待后8/313和六门／0monoliths／build `f3c7f85fd552`通过，限定CLEAR。Linux当前编译CLI四格late split10→20行passed；两反转红／逐字节恢复，实际L／额外依赖2，B.3与18项计数不变。 |
+
+| 2026-11-15 | B.3裁剪子批8/243、六门、函数上限、build `2443a54998eb`、Linux fullscreen两协议crop/fallback/扩屏恢复通过，限定复核CLEAR；两反转红且逐字节恢复。仅记录本批完成，B.3仍部分、本地18项不变，按批提交后继续painter和预算。 |

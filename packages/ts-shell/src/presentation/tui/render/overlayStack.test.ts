@@ -3,6 +3,11 @@ import { parseKeyEvent } from "../input/keys.js";
 import type { MouseReport } from "../input/mouse.js";
 import { visibleWidth } from "../text/measure.js";
 import { compositeTuiLine, OverlayStack, resolveOverlayLayout, type OverlayComponent } from "./overlayStack.js";
+import { inlineImageRows, type ImageProtocol } from '../image.js';
+import { pngImage } from '../../../test-utils/image.js';
+import { setCellDimensions } from '../imageDimensions.js';
+import { renderBlock } from '../transcript/blocks.js';
+import { highlightSelection } from '../transcript/selection.js';
 
 function makeOverlay(lines: readonly string[], label = "ov"): OverlayComponent & {
   keys: string[];
@@ -146,5 +151,47 @@ describe("OverlayStack", () => {
     // Click outside all overlays returns false so host/transcript can handle it
     const miss: MouseReport = { kind: "press", button: 0, row: 3, column: 0, shift: false, alt: false, ctrl: false };
     expect(stack.handlePointer(miss)).toBe(false);
+  });
+
+  it.each<ImageProtocol>(['kitty', 'iterm2'])('suppresses a %s image when an overlay covers a reserved row away from its anchor', protocol => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const rows = [...inlineImageRows(pngImage(320, 161), protocol, 40)!, 'following text'];
+    const original = [...rows];
+    const stack = new OverlayStack();
+    stack.push(makeOverlay(['covered'], 'overlay'), { width: 12, row: 2, col: 2 });
+    const composited = stack.composite(rows, 40, rows.length);
+    expect(composited.join('')).not.toContain('\x1b_G');
+    expect(composited.join('')).not.toContain('\x1b]1337;File=');
+    expect(composited.join('')).not.toContain('\x1b7');
+    expect(composited.join('')).not.toContain('\x1b8');
+    expect(composited[2]).toContain('overlay:');
+    expect(composited.at(-1)).toBe('following text');
+    expect(rows).toEqual(original);
+  });
+
+  it('removes the user image carriage return before compositing an overlay on its anchor row', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const rows = [...renderBlock({ kind: 'user', text: '', finalized: true, images: [pngImage(320, 161)] }, 40, { imageProtocol: 'kitty' })].map(row => `${row}|`);
+    const stack = new OverlayStack();
+    stack.push(makeOverlay(['covered'], 'overlay'), { width: 12, row: 0, col: 2 });
+    const composited = stack.composite(rows, 41, rows.length);
+    expect(composited[0]).toContain('overlay:');
+    expect(composited[0]).not.toContain('\x1b_G');
+    expect(composited[0]).not.toContain('\r');
+    expect(visibleWidth(composited[0]!)).toBe(41);
+    expect(composited[0]).toMatch(/\|$/);
+  });
+
+  it('preserves overlay and scrollbar on selected user image rows', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const rows = [...renderBlock({ kind: 'user', text: '', finalized: true, images: [pngImage(320, 161)] }, 40, { imageProtocol: 'kitty' })];
+    const shaded = highlightSelection(rows, { from: { row: 0, column: 0 }, to: { row: 0, column: 38 } }).map(row => `${row}|`);
+    const stack = new OverlayStack();
+    stack.push(makeOverlay(['covered'], 'overlay'), { width: 12, row: 0, col: 2 });
+    const composited = stack.composite(shaded, 41, rows.length);
+    expect(composited[0]).not.toContain('\x1b_G');
+    expect(composited[0]).not.toContain('\r');
+    expect(visibleWidth(composited[0]!)).toBe(41);
+    expect(composited[0]).toMatch(/\|$/);
   });
 });
