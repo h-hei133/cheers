@@ -2497,3 +2497,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Removing a duplicate checkpoint from a split prefix makes overflow recovery return the unchanged old summary without a model attempt.
 - **Root Cause:** Empty dialogue schedules no segments even when previousSummary contains the material that needs revision.
 - **Rule:** Keep the prior checkpoint out of dialogue/prefix, but schedule its empty-history request through the same complete prepare, segment limits, cancellation, claim, dispatch and unknown-outcome ledger. Verify both approved revision and over-budget zero-dispatch refusal.
+
+
+### Summary Renewal Fixtures Need A Valid Foreground Request
+- **Symptom:** A renewal/publication test returns a generic retained-history failure with no renewal or provider request.
+- **Root Cause:** Removing the global output override restores the default output budget, while the fixture's foreground catalogue retains a much smaller ceiling. Complete request preparation correctly refuses before renewal.
+- **Rule:** Verify the foreground request is a legal prerequisite for summary renewal tests. Keep the independent summary target unchanged, preserve refresh/request/publication assertions, and detach the history baseline so in-place mutation cannot pass equality. Classify the actual early failure before changing a reason assertion.
+
+### Process Inventory Must Exclude Raw Command Arguments
+- **Symptom:** A read-only process inventory exposes another service's sensitive startup parameters.
+- **Root Cause:** The process listing includes full arguments for unrelated services.
+- **Rule:** Use only PID, parent, state, resource usage and executable name for routine process checks. Narrow diagnostic reads to owned processes and report safe derived facts; never print an unrestricted command-line inventory.

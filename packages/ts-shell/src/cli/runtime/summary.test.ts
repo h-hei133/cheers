@@ -429,13 +429,17 @@ it('renews the summary account once and refuses append across the resulting conf
   const setup = await fixture('gpt-5.4'); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   const old = { type: 'openai-chatgpt-account' as const, accessToken: 'synthetic-old', refreshToken: 'synthetic-refresh', expiresAt: 1, accountId: 'b' };
   const fresh = { ...old, accessToken: accountToken('synthetic-fresh', 'b'), refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
-  writeUserRuntimeConfigFile({ ...edit.values, maxOutputTokens: undefined, providerConnections: edit.values.providerConnections!.map(connection => connection.id === 'b'
+  // Removing the global output override restores 4096 for the foreground model.
+  // Its complete request must be valid before summary credential renewal starts.
+  writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model =>
+    model.id === 'main' ? { ...model, contextWindow: 16000, maxTokens: 8192 } : model) })));
+  writeUserRuntimeConfigFile({ ...edit.values, contextWindow: 16000, maxOutputTokens: undefined, providerConnections: edit.values.providerConnections!.map(connection => connection.id === 'b'
     ? { ...connection, baseUrl: 'https://chatgpt.com/backend-api', authType: 'account-auth', apiKey: undefined, accountAuth: { openai: old } } : connection) }, edit);
   const address = new URL(edit.values.providerConnections!.find(connection => connection.id === 'b')!.baseUrl!);
   accountWire(address.origin, '/b/v1/codex/responses');
   const renewal = observeOAuthRenewal(fresh);
   const { deps } = runtime(setup);
-  const history = setup.manager.getSession(setup.session.id)!.turns;
+  const history = structuredClone(setup.manager.getSession(setup.session.id)!.turns);
   expect(await deps.compactHistory!(setup.session.id, setup.signal)).toMatchObject({ status: 'failed', reason: expect.stringContaining('Configuration changed') });
   expect(setup.manager.getSession(setup.session.id)!.turns).toEqual(history);
   expect(renewal).toHaveBeenCalledOnce();

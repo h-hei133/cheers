@@ -21,8 +21,8 @@
 
 ## Current status
 
-**Active phase**: T1、A四项、B.2/B2.2/B2.3、D.2/D.3/D.5、E.2已完成所述本地验收；继续终端与运行时。
-**Active batch**: 发送前声明发布已提交`f43648cd`。压缩声明保留批完成六静态门、13套件231项、函数上限与build `c7857153d401`；四项反转断言失败、三生产文件逐字节恢复后3套件32项通过。限定只读复审CLEAR。按用户要求本地提交本批后继续C.3/C.6跨轮／重开／压缩的Linux配置模型实际请求联合验收；两项仍部分，不增加16项本地验收数。
+**Active phase**: T1、A四项、B.2/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
+**Active batch**: C.3联合验收完成；声明压缩保留已提交`e4d27485`。实际30套件502项及六静态门通过，账户刷新fixture修正限定复核CLEAR；Linux当前build `c7857153d401`两组各7次真实配置模型请求通过。C.3勾选，本地验收数17；C.6因缺Anthropic原生历史协议真实服务证据继续部分。提交此测试／验收批后处理B.1精确Unicode宽度及渲染／截断／命中联合证据。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -38,7 +38,7 @@
 
 ## Adaptive control
 
-当前本地验收任务数为16，包含T1五项、A四项、B.2/B2.2/B2.3、D.2/D.3/D.5和E.2；核实不计实现完成。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
+当前本地验收任务数为17，包含T1五项、A四项、B.2/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3；核实不计实现完成。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 
 ## Session log
 
@@ -84,3 +84,5 @@
 | 2026-11-15 | C.6发送前发布：committed source与prospective marker分离，raw路由后生成完整runtime tools／mapped effort再转换；候选和refresh不写历史。原dispatch边界同步onMessage成功后窄append live，取消或漂移零派发，原attempt confirmUnsent；HTTP retry复用同capture，effort fallback记录实际新声明。closing撤权不写runtime removal，goal summary排除未发布marker；promote通知bare capture供overflow recovery。原两红例修复，新增7项真实边界及owner/wrapper集成通过；六静态门、18套件346项、build `c29d540a73fa`和函数上限0超限。首轮空cache误判／prototype复用差异、build类型收窄和复审published reframe差异已修复，失败回执保留。实际L，额外依赖2（窄append与native wrapper转换复用）；压缩spine及真实provider联合验收仍开，16项不变。 |
 
 | 2026-11-15 | 声明压缩保留按原ID／顺序移到checkpoint前，kept tail保持原始位置；transcript通过一次登记与区间移动避免每次重扫声明。新增取消、计数、stored system与split checkpoint反例先红后修；去重后的checkpoint-only调度曾导致progress三项回归，恢复同一完整准入链后13/231及六门/build通过。四反转均红、逐字节恢复后3/32再绿，限定复审CLEAR；本地批次提交，实际L／额外依赖2（局部取消和空history摘要准入）。无真实provider、push／CI或C.3/C.6完成声明，下一批联合验收。 |
+
+| 2026-11-15 | C.3补实际owner联合30套件502项及六静态门通过，限定只读复核CLEAR。账户刷新早拒绝是fixture main100与默认4096冲突；只修fixture并保留全部行为断言。当前编译SDK两组14次actual请求证据通过，C.3本地验收数17；Anthropic native未被当前目标消费，C.6继续部分。此批只有测试／文档，生产build未改变；按批提交后继续B.1。 |

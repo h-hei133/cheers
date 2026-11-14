@@ -11775,3 +11775,10 @@ C.6首批补齐完整工具／实际目标／effort的版本化空文本system�
 发送前发布`f43648cd`后，压缩按raw cut保留被丢弃声明的原ID／顺序，kept声明仍在原tail；live／reopen和branch／fork隔离保持。transcript首次声明只迁移一次，之后登记arena和移动区间，避免每次receipt复制完整spine；取消丢弃中保持局部计数一致。复审新增ordinary system错误准入、重复checkpoint计数及empty摘要准入反例先红后修，progress三项恢复回归真实修复。
 
 六静态门、13套件231项、函数上限0超限及build `c7857153d401`通过；四有效反转红，三文件逐字节恢复后3套件32项通过，限定只读复审CLEAR。证据在`.omx/artifacts/upgrade-messages-2026-11-14/declarations-compaction-*.log`；错误期望／dispatch夹具诊断保留。当前本地提交批不等于真实provider／跨轮续接联合验收，C.3/C.6和整份规划仍active、本地验收16项；不声明push或远端CI。
+
+
+### 2026-11-15：消息联合验收完成，保留原生协议缺口
+
+C.3实际30套件502项与六静态门通过；账户刷新用例最初因fixture移除输出override后默认4096超过前台main100而在更新前拒绝。只修fixture前台预算并保留原拒绝、一次刷新、两次新凭据、持久化与detached历史断言，限定只读复核CLEAR。
+
+当前编译SDK两组共14次实际配置模型请求覆盖自动／手动压缩、rewind／重开、system转换、工具／档位跨轮及取消零派发后复用。C.3勾选，本地验收17项；当前目标不消费Anthropic原生历史control，C.6和总规划保持未完成。此测试／文档批按用户要求本地提交，未改生产构建；继续B.1宽度／渲染／命中联合，不声明push或CI。
