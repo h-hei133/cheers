@@ -11,7 +11,6 @@ import type { PreparedTurnContext } from './context/contract.js';
 import type { RequestContextOwner } from '../core/agent/context.js';
 import type { MessageConverter, MessageProjection } from '../core/agent/messages.js';
 import { sameContext } from '../core/agent/context.js';
-import { bindTurnContext } from './context/owner.js';
 import type { EventChannel } from './stream.js';
 import { rememberToolRequests, traceOperation } from '../observability/tracing/context.js';
 import { randomUUID } from 'node:crypto';
@@ -186,12 +185,13 @@ export function createTurnRequest(
           if (request?.context) {
             const replacement = !recovery && options.prepareContext ? await options.prepareContext(captured, signal, request.context) : undefined;
             captured = replacement ?? captured;
-            options.onPreparedContext?.(captured, request.context);
           }
-          activeProjection = captured.messageProjection;
-          activeMessages = captured.messageProjection.messages;
-          const accepted = captured;
-          return request?.context?.eligible ? bindTurnContext(accepted, request.context) : accepted;
+          return captured;
+        },
+        onPreparedContext: prepared => {
+          activeProjection = prepared.messageProjection;
+          activeMessages = prepared.messageProjection.messages;
+          if (request?.context) options.onPreparedContext?.(prepared, request.context);
         },
         requestId: request?.requestId,
         // Kept so a refresh can replay it. Captured at the step, because that
@@ -213,8 +213,8 @@ export function createTurnRequest(
         onReplace: text => channel.push({ type: 'message.replace', role: 'coder', text }),
       }, { allowTools: false, ...(activeProjection.sourceMessages ? {
         sourceMessages: [...activeProjection.sourceMessages, instruction],
-        providerMessages: [...(activeProjection.providerMessages ?? []), instruction],
-      } : {}), ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}), requestPurpose: 'goal-budget-summary',
+      } : {}), ...(activeProjection.providerMessages ? { providerMessages: [...activeProjection.providerMessages, instruction] } : {}),
+        ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}), requestPurpose: 'goal-budget-summary',
         onRequestSent, onRequestUsage });
       // Its input includes an unpersisted instruction, so it cannot anchor the
       // stored conversation. The step has already recorded the real usage.

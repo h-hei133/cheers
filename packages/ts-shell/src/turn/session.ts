@@ -222,7 +222,8 @@ export function runTurn(options: TurnOptions): TurnRun {
   const hooks = createToolHooks(gate, toolPool);
   const compaction = options.compaction ? turnCompaction({ setup: options.compaction,
     sessionId: options.sessionId, workspaceRoot: options.workspaceRoot, hooks: options.hooks,
-    maxSteps: options.maxSteps, hasTools: toolPool().size > 0, converted: Boolean(options.convertToLlm) }) : undefined;
+    maxSteps: options.maxSteps, hasTools: toolPool().size > 0,
+    prepared: options.step.preparesContext === true, converted: Boolean(options.convertToLlm) }) : undefined;
   let preparedRequest: { readonly prepared: PreparedTurnContext; readonly context: RequestContextOwner } | undefined;
   let recoveredContext: PreparedTurnContext | undefined;
   const core = new AgentCore({
@@ -355,7 +356,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     // threshold check standing in the way: the provider already refused the
     // request, so the context is over budget by definition, not by estimate.
     const kept = messages.slice(0, -1);
-    if (options.convertToLlm || kept.some(message => message.role === 'custom')) {
+    if (preparedRequest || options.convertToLlm || kept.some(message => message.role === 'custom')) {
       const prior = preparedRequest;
       if (!prior?.context.eligible || !compaction || !sameContext(kept, prior.prepared.sourceMessages)) return false;
       let expected = captureContext(messages);

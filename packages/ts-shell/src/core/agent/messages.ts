@@ -15,7 +15,7 @@ export type MessageConverter = (messages: readonly AgentMessage[], signal?: Abor
 
 export interface MessageProjection {
   readonly messages: readonly StandardAgentMessage[];
-  /** Present when source indexes cannot prove the converted request's identity. */
+  /** Captured raw history for ownership checks, independently of provider conversion. */
   readonly sourceMessages?: readonly AgentMessage[];
   readonly providerMessages?: readonly ProviderMessage[];
 }

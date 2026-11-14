@@ -42,6 +42,7 @@ export function turnCompaction(input: {
    * short as the conversation.
    */
   readonly hasTools: boolean;
+  readonly prepared?: boolean;
   readonly converted?: boolean;
 }): {
   readonly beforePrompt: (history: readonly AgentMessage[], opening: AgentMessage, signal: AbortSignal) => Promise<readonly AgentMessage[]>;
@@ -79,7 +80,6 @@ export function turnCompaction(input: {
   const prepareRequest = async (prepared: PreparedTurnContext, signal: AbortSignal | undefined,
     context: RequestContextOwner, force = false): Promise<PreparedTurnContext | undefined> => {
     if (!context.eligible || setup.policy.enabled === false) return undefined;
-    if (!input.converted && prepared.messageProjection.sourceMessages === undefined) return undefined;
     if (!context.isCurrent()) throw new Error('Request history changed before compaction preparation.');
     if (!force) { requestContext = context; attempted = false; }
     else if (!requestContext || attempted) return undefined;
@@ -93,14 +93,15 @@ export function turnCompaction(input: {
     attempted ||= candidate !== undefined;
     if (!context.isCurrent()) throw new Error('Request history changed during compaction preparation.');
     if (!update?.messages) return undefined;
-    if (!candidate || !sameContext(update.messages, candidate.sourceMessages) || !context.accept(candidate.messageProjection)) {
+    if (!candidate || !sameContext(update.messages, candidate.sourceMessages) || !context.accept({ ...candidate.messageProjection,
+      sourceMessages: candidate.sourceMessages })) {
       throw new Error('Published compaction could not be accepted by its live request.');
     }
     return candidate;
   };
   return {
     beforePrompt: async (history, opening, signal) => {
-      if (input.converted || history.some(message => message.role === 'custom')) return history;
+      if (input.prepared || input.converted || history.some(message => message.role === 'custom')) return history;
       // The first step carries tools unless the run is limited to that one
       // step, in which case it is already the closing step.
       const update = await check('prompt', { messages: [...history, opening], toolResults: [],
@@ -114,7 +115,7 @@ export function turnCompaction(input: {
       }
       return update.messages.slice(0, -1);
     },
-    beforeStep: (snapshot, signal) => input.converted || snapshot.messages.some(message => message.role === 'custom')
+    beforeStep: (snapshot, signal) => input.prepared || input.converted || snapshot.messages.some(message => message.role === 'custom')
       ? undefined : check(snapshot.message ? 'step' : 'continuation', snapshot, signal),
     prepareContext: (prepared, signal, context) => prepareRequest(prepared, signal, context),
     recoverContext: (prepared, signal, context) => prepareRequest(prepared, signal, context, true),

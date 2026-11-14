@@ -89,6 +89,17 @@ it.each(['bedrock', 'vertex'] as const)('arms and cancels a handoff on the captu
   expect(new HandoffStore(manager, context.session).read().cycles[0]!.phase).toBe('cancelled');
   expect(armedHandoffs.has(context)).toBe(false); expect(context.runtimeConfig).toBe(original); expect(requests).toEqual([]);
 });
+
+it.each([false, true])('only promises complete context preparation when the handoff target supports it (target=%s)', async targetPrepared => {
+  await command('arm executor');
+  const resolution = context.resolveConfigTarget!(context.configuration.current.config);
+  const handoff = handoffRunFor(context, manager, runtime, resolution, new AbortController().signal, () => undefined, () => {});
+  const base = Object.assign(async () => ({ text: 'done', toolCalls: [], stopReason: 'stop' as const }), { preparesContext: true });
+  const target = Object.assign(async () => ({ text: 'done', toolCalls: [], stopReason: 'stop' as const }), { preparesContext: targetPrepared });
+  const control = handoff!.control({ step: base, forModel: () => target, hooks,
+    tools: new Map([['todo', { name: 'todo', description: 'Checklist', parameters: { type: 'object' }, execute: async () => ({ success: true, output: 'done' }) }]]) });
+  expect(control.step.preparesContext).toBe(targetPrepared);
+});
 async function drive(signal = new AbortController().signal, extra: { readonly beforeApproval?: () => void; readonly failPersistence?: boolean } = {}) {
   const publication = context.configuration.current; const resolution = context.resolveConfigTarget!(publication.config);
   const handoff = handoffRunFor(context, manager, runtime, resolution, signal, () => undefined, () => {});

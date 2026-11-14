@@ -2466,3 +2466,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A second compaction refuses unchanged context because live and reopened checkpoints carry different metadata.
 - **Root Cause:** The storage reader adds its contextSummary marker while applyCompaction omitted it; broad metadata equality then fails.
 - **Rule:** Emit the same canonical storage marker in the live checkpoint, retaining strict comparison of application metadata. Actual SessionManager integration fixtures must isolate HOME/USERPROFILE and use persistUserPromptBarrier when comparing transient environment framing to saved prompt text.
+
+### Overflow Recovery Needs The Latest Bare Request Capture
+- **Symptom:** Automatic effort fallback routes to a smaller model, but recovery prices the first model and refuses a legal cut; storing a fenced capture also prevents recovery after the failed assistant message is appended.
+- **Root Cause:** A once-only compaction callback also delivered capture notifications, and the notification retained the previous logical request's live wrapper.
+- **Rule:** Keep once-only compaction preparation separate from notifications for every native preparation and declaration refresh. Store the bare effective capture for recovery, then bind the original history owner inside the active step before refusal or dispatch. Reframe recovery under its new owner and closing contract. Raw source ownership alone never implies provider conversion or disables aligned measurement.

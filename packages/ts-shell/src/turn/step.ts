@@ -54,12 +54,15 @@ export interface StepListener {
 }
 
 /** The model side of the kernel: the next assistant step for a context. */
-export type StepFunction = (
+export type StepFunction = ((
   messages: readonly AgentMessage[],
   signal: AbortSignal | undefined,
   listener: StepListener,
   options: StepOptions,
-) => Promise<AssistantStep>;
+) => Promise<AssistantStep>) & {
+  /** This step supplies complete request preparation before its dispatch boundary. */
+  readonly preparesContext?: boolean;
+};
 
 const OVERFLOW_MARKERS = ["context_length_exceeded", "context_overflow", "maximum context length", "prompt_too_long"];
 
@@ -118,7 +121,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       ? { ...(request.provider.provider ? { provider: request.provider.provider } : {}), model: request.provider.model }
       : undefined;
   const replayBinding = request.provider.replayBinding ?? requestReplayBinding(request.provider);
-  return async (messages, signal, listener, options): Promise<AssistantStep> => {
+  const step: StepFunction = async (messages, signal, listener, options): Promise<AssistantStep> => {
     let sourceMessages = options.sourceMessages ?? messages;
     const recordAuxiliaryUsage = request.recordAuxiliaryUsage;
     let messageProjection: MessageProjection | undefined = options.providerMessages !== undefined
@@ -160,11 +163,14 @@ export function createStepFunction(request: StepRequest): StepFunction {
           signal?.throwIfAborted();
           if (replacement) prepared = replacement;
         }
-        if (contextOwner) prepared = bindTurnContext(prepared, contextOwner);
+        options.onPreparedContext?.(prepared);
+        if (contextOwner && !contextOwner.isCurrent()) throw new TurnPreparationError('Request history changed during preparation. No request was sent.', true);
         if (!prepared.isCurrent()) {
           if (identityPreparations++ >= 1) return stamp(errorStep('Request preparation changed repeatedly. No request was sent.', true));
           prepared = await prepared.refresh(signal);
+          options.onPreparedContext?.(prepared);
         }
+        if (contextOwner) prepared = bindTurnContext(prepared, contextOwner);
         if (!prepared.isCurrent()) return stamp(errorStep('Request preparation changed repeatedly. No request was sent.', true));
         currentAllowTools = prepared.allowTools;
         activeOrigin = prepared.activeProvider || prepared.activeModel
@@ -459,6 +465,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       }
     }
   };
+  return Object.assign(step, { preparesContext: true as const });
 }
 
 async function readCompletion(

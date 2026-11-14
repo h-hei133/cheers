@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.2/B2.2/B2.3、D.2/D.3/D.5、E.2已完成所述本地验收；继续终端与运行时。
-**Active batch**: C.3摘要捕获`57ca53eb`、完整caller/source policy`72be40f8`及请求capture`c521d82d`已提交；转换主请求threshold／候选发布与overflow接线本批已验证，提交后补齐普通请求的完整准备路径。C.6历史声明另批处理。
+**Active batch**: C.3转换主请求接线`43c72e5d`之后，普通请求也通过完整route/system/tools/body capture决定压缩；大→小effort fallback恢复与goal收尾已修复验收。工具发现夹具单独提交`dae1b97`；当前普通请求批提交后继续C.6历史声明。C.3保留部分，等待稳定声明与完整联合验收。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -77,3 +77,5 @@
 | 2026-11-15 | C.3压缩policy：完整caller/source在prepare前惰性捕获、raw source切点、重建完整candidate后一次prepare与缩小比较、candidate/authority双准入和当前policy进度。独立HEAD新增反例15失败/3通过；独立批次8套件160项、六静态门、build `c0a48b5abd86`通过，限定只读复核CLEAR。标准metadata/origin等应用字段比较补齐，仅忽略storage id/timestamp。最初build夹具node_modules符号链接触发既有保护，改实际目录后通过。主请求调用方尚未接通，16项验收数不变。 |
 
 | 2026-11-15 | C.3请求准备层：提取完整route/system/tools/images/closing/budget/body capture，initial loop projection复用，candidate raw先route再转换，accepted body直接send；动态声明单次refresh，发送前漂移原attempt确认未发送。独立复审新增旧overflow refusal与发送后用途/模式/计费owner修改两BLOCK已修复；5套件199项、六静态门、build `0a240477cfd4`通过，限定复核CLEAR。只交付准备接口，主请求threshold/live publication尚未接通，16项验收数不变。 |
+
+| 2026-11-15 | 普通请求完整capture：不再用选择模型的早期policy压缩实际路由请求；实际小窗口完整system开销、candidate raw归属及goal closing/provider分离通过。独立复审的大→小effort fallback和refresh通知两反例先红后修；每次有效准备通知bare capture，原live fence继续约束重试/发送。六静态门、16套件356项、build `c7e760063e80`通过，限定复核CLEAR。当前编译SDK配置模型6次bodySent、普通自动压缩持久commit及重开通过。首次原生过小window、55s多段摘要截止和不存在的内部字段为探针失败，保留回执；最终只调fixture历史/窗口/时限，未修改生产边界。工具发现两夹具在独立HEAD同样失败，显式full模式单独提交`dae1b97`。实际M，额外依赖1（latest capture通知），单一owner/无新循环；16项验收数不变，C.6继续开项。 |

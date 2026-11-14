@@ -6,6 +6,7 @@ import { createTurnRequest } from '../request.js';
 import { EventChannel } from '../stream.js';
 import { resetSessionUsage } from '../../observability/usageTelemetry.js';
 import { bindTurnContext } from './owner.js';
+import { ModelAdmissionError } from '../../core/agent/request/model.js';
 
 const sessionId = 'context-owner-regression';
 afterEach(() => resetSessionUsage(sessionId));
@@ -39,13 +40,16 @@ it.each(['ordinary', 'candidate'] as const)('refuses %s history retirement inste
 
 it('refreshes changed declarations while retaining the same current history fence', async () => {
   let tools = [tool('read')]; const send = vi.fn(async (_url: unknown, _init?: RequestInit) => response());
+  const captures: PreparedTurnContext[] = [];
   const stream = createTurnRequest({ step: createStepFunction(request({ toolSnapshot: () => tools, fetchImpl: send })),
-    sessionId, maxSteps: 3, onPreparedContext: () => { tools = [tool('write')]; },
+    sessionId, maxSteps: 3, onPreparedContext: prepared => { captures.push(prepared); tools = [tool('write')]; },
   }, { stepCount: 1 }, new EventChannel());
   const result = await stream([{ role: 'user', content: 'captured history' }], undefined,
     { requestId: 'owner-current', context: owner(() => true) });
   expect(result.stopReason).toBe('stop'); expect(send).toHaveBeenCalledOnce();
   expect(JSON.parse(String(send.mock.calls[0]![1]?.body)).tools[0].function.name).toBe('write');
+  expect(captures).toHaveLength(2); expect(captures[0]!.tools).toEqual([tool('read')]);
+  expect(captures[1]!.body).toBe(String(send.mock.calls[0]![1]?.body));
 });
 
 it('keeps the live fence on a native retry after its preparation callback has already run', async () => {
@@ -87,4 +91,22 @@ it('does not return a current context when its live owner retires while refreshi
   const bound = bindTurnContext({ ...prepared, refresh }, owner(() => current));
   await expect(bound.refresh()).rejects.toThrow('Request history changed');
   expect(refresh).toHaveBeenCalledOnce(); expect(bound.isCurrent()).toBe(false);
+});
+
+it('retains ordinary source history in a goal closing request without inventing provider conversion', async () => {
+  const bodies: string[] = [];
+  let reservations = 0;
+  const step = createStepFunction(request({ fetchImpl: async (_url, init) => { bodies.push(String(init?.body)); return response(); },
+    requestPolicy: { reserve: () => {
+      if (++reservations === 1) throw new ModelAdmissionError('exhausted');
+      return { id: 'closing', dispatch: () => {}, confirmUnsent: () => {}, settle: () => {} };
+    } } }));
+  const history = [{ role: 'user' as const, content: 'Retained goal facts.' }];
+  const stream = createTurnRequest({ step, sessionId, maxSteps: 3, claimBudgetSummary: () => true,
+    prepareContext: async prepared => ({ ...prepared, messageProjection: { ...prepared.messageProjection, sourceMessages: prepared.sourceMessages } }),
+  }, { stepCount: 1 }, new EventChannel());
+  const result = await stream(history, undefined, { requestId: 'goal-source', context: owner(() => true) });
+  expect(reservations).toBe(2);
+  expect(result).toMatchObject({ stopReason: 'error', admissionFailure: 'exhausted' }); expect(bodies).toHaveLength(1);
+  expect(bodies[0]).toContain('Retained goal facts.'); expect(bodies[0]).toContain('The goal budget cannot admit');
 });

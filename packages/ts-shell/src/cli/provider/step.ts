@@ -194,7 +194,9 @@ export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<str
         credential = fresh.credential?.accountAuth;
       }
     };
-    const step: StepFunction = async (...args) => { args[1]?.throwIfAborted(); await prepare(); args[1]?.throwIfAborted(); return active(...args); };
+    const step: StepFunction = Object.assign(async (...args: Parameters<StepFunction>) => {
+      args[1]?.throwIfAborted(); await prepare(); args[1]?.throwIfAborted(); return active(...args);
+    }, { preparesContext: true as const });
     // The same catalogue address the step itself resolves, so a delegated
     // instruction cannot claim tools the target model is declared not to take.
     const acceptsTools = providerToolsAvailable(selected, catalog);

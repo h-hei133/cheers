@@ -81,10 +81,10 @@ export class HandoffRun {
     if (!host.tools.has('todo')) throw new Error('Model handoff requires the session checklist tool.');
     let active: StepFunction = host.step;
     const target = host.forModel(this.row.target.model, this.admission, this.row.target.thinkingEffort, 'current');
-    return { step: async (...args) => {
+    return { step: Object.assign(async (...args: Parameters<StepFunction>) => {
       this.assert(); if (!this.row.runId) throw new Error('The handoff turn has not been accepted.');
       return active(...args);
-    }, observe: async (event, signal) => {
+    }, { preparesContext: host.step.preparesContext === true && target.preparesContext === true }), observe: async (event, signal) => {
       this.observe(event);
       if (event.type !== 'turn_end' || signal.aborted
         || event.message.stopReason === 'error' || event.message.stopReason === 'aborted') return;

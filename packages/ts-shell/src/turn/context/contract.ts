@@ -68,6 +68,8 @@ export interface StepOptions {
   readonly preparedContext?: PreparedTurnContext;
   readonly convertToLlm?: MessageConverter;
   readonly prepareContext?: (prepared: PreparedTurnContext, signal?: AbortSignal) => Promise<PreparedTurnContext | undefined>;
+  /** Observe each effective capture, including declaration refresh and native retry preparation. */
+  readonly onPreparedContext?: (prepared: PreparedTurnContext) => void;
   /** Detached source retains agent history identity across application projection. */
   readonly sourceMessages?: readonly AgentMessage[];
   readonly providerMessages?: readonly ChatMessage[];
