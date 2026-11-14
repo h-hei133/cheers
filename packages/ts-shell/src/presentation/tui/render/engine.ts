@@ -1,5 +1,5 @@
 import { DISABLE_MOUSE, ENABLE_MOUSE, DISABLE_MOUSE_MOTION, ENABLE_MOUSE_MOTION } from "../input/mouse.js";
-import { detectImageProtocol, kittyDeleteAllImages, kittyDeleteImage, swapTransmittedForPlacement, transmissionsIn } from "../image.js";
+import { detectImageProtocol, kittyDeleteAllImages, kittyDeleteImage, kittyDeletePlacements, swapTransmittedForPlacement, transmissionsIn } from "../image.js";
 import { CELL_SIZE_QUERY } from "../input/cellSize.js";
 import type { TerminalDevice, TerminalStartOptions } from "../terminal.js";
 import { processTerminal } from "../terminal.js";
@@ -14,6 +14,7 @@ import {
 import { MainScreenPainter } from "./mainScreen.js";
 import { FrameStartup } from './startup.js';
 import { BoundedTerminalWriter } from "./boundedWriter.js";
+import { imagePaintPosition, imageRowsChanged, imageTextFragments, separateImageRows } from './images.js';
 import {
   cursorPaint,
   cursorTarget,
@@ -50,11 +51,9 @@ const BACKLOG_RETRY_MS = 10;
  * How much terminal-side image memory a session may hold off screen.
  *
  * An image the terminal keeps costs it the decoded pixels, which are far larger
- * than the base64 this side sends, but the transmission bytes are the only size
- * known here without decoding formats this layer deliberately does not decode.
- * They are a proportional stand-in, and the count is the hard bound: a screen
- * holds a handful of images at once, so a cap of 32 off screen is generous for
- * scrolling back and far below what an unbounded session accumulates.
+ * than the base64 this side sends. Keep separate limits for upload bytes and
+ * estimated RGBA pixels, plus at most 16 offscreen images. Visible placements
+ * are excluded from these cache limits; admission bounds individual images.
  */
 const MAX_OFFSCREEN_IMAGES = 16;
 const MAX_OFFSCREEN_IMAGE_BYTES = 32 * 1024 * 1024;
@@ -72,6 +71,8 @@ export class TUI {
    * until it is deleted, and that outlives any one frame's viewport.
    */
   private readonly transmitted = new Map<number, { readonly bytes: number; readonly decodedBytes: number }>();
+  /** A failed write can leave uploads present without a trustworthy registry. */
+  private unknownImageUploads = false;
   private lastWidth = 0;
   private lastHeight = 0;
   private painted = false;
@@ -430,7 +431,7 @@ export class TUI {
     // an image whose row scrolls out of view and back is still held by the
     // terminal, and rebuilding the set from the visible rows alone resent the
     // whole payload every time it returned.
-    const placed = new Set(this.transmitted.keys());
+    const placed = new Set(this.unknownImageUploads ? [] : this.transmitted.keys());
     const swapRows = (frame: readonly string[]): readonly string[] =>
       frame.map((row) => swapTransmittedForPlacement(row, placed));
 
@@ -443,25 +444,63 @@ export class TUI {
         visible.set(transmission.imageId, { bytes: transmission.bytes, decodedBytes: transmission.decodedBytes });
       }
     }
+    const previousUploads = new Map(this.transmitted);
+    const unknownCleanup = this.unknownImageUploads
+      ? [...previousUploads.keys()].map(imageId => kittyDeleteImage(imageId)).join('') : '';
     for (const [imageId, held] of visible) {
       this.transmitted.delete(imageId);
       this.transmitted.set(imageId, held);
     }
 
-    const writer = new BoundedTerminalWriter(this.terminal);
-    writer.append(paintBegin(this.terminal.capabilities.supportsDec2026Sync));
-    const fragments = stable && !force
-      ? diffFragments(swapRows(this.window), swapRows(rows), 0, height)
-      : fullFragments(swapRows(rows), height);
-    for (const fragment of fragments) writer.append(fragment);
-    writer.append(this.evictOffscreenImages(visible));
-    writer.append(cursorPaint(cursorTarget(source, 0, height), 0));
-    writer.append(paintEnd(this.terminal.capabilities.supportsDec2026Sync));
-    writer.flush(onWritten);
-    this.window = rows;
-    this.lastWidth = width;
-    this.lastHeight = height;
-    this.painted = true;
+    try {
+      const writer = new BoundedTerminalWriter(this.terminal);
+      writer.append(paintBegin(this.terminal.capabilities.supportsDec2026Sync));
+      writer.append(unknownCleanup);
+      if (this.unknownImageUploads) {
+        for (const imageId of previousUploads.keys()) if (!visible.has(imageId)) this.transmitted.delete(imageId);
+      }
+      const previousRows = swapRows(this.window);
+      const nextRows = swapRows(rows);
+      const previousGraphics = separateImageRows(previousRows);
+      const nextGraphics = separateImageRows(nextRows);
+      const redrawImages = !stable || force
+        || imageRowsChanged(previousRows, nextRows, [...previousGraphics.images, ...nextGraphics.images]);
+      if (redrawImages && (previousGraphics.images.length > 0 || nextGraphics.images.length > 0)) {
+        if ([...previousGraphics.images, ...nextGraphics.images].some(image => image.protocol === 'kitty')) {
+          writer.append(kittyDeletePlacements());
+        }
+        for (const fragment of imageTextFragments(nextGraphics.text, height)) writer.append(fragment);
+        for (const image of nextGraphics.images) {
+          writer.append(imagePaintPosition(image));
+          writer.append(swapTransmittedForPlacement(image.sequence, placed));
+          for (const transmission of transmissionsIn(image.sequence)) placed.add(transmission.imageId);
+        }
+      } else {
+        const fragments = stable && !force
+          ? diffFragments(previousRows, nextRows, 0, height)
+          : this.transmitted.size > 0 ? imageTextFragments(nextRows, height) : fullFragments(nextRows, height);
+        for (const fragment of fragments) writer.append(fragment);
+      }
+      writer.append(this.evictOffscreenImages(visible));
+      writer.append(cursorPaint(cursorTarget(source, 0, height), 0));
+      writer.append(paintEnd(this.terminal.capabilities.supportsDec2026Sync));
+      writer.flush(onWritten);
+      this.unknownImageUploads = false;
+      this.window = rows;
+      this.lastWidth = width;
+      this.lastHeight = height;
+      this.painted = true;
+    } catch (error) {
+      // A partial or failed write cannot prove which uploads the terminal holds.
+      // Force a fresh image transmission and repaint on the next attempt.
+      this.unknownImageUploads ||= this.transmitted.size > 0 || previousUploads.size > 0;
+      for (const [imageId, held] of previousUploads) {
+        if (!this.transmitted.has(imageId)) this.transmitted.set(imageId, held);
+      }
+      this.painted = false;
+      this.forceNextFrame = true;
+      throw error;
+    }
   }
 
   /**
@@ -515,9 +554,11 @@ export class TUI {
    * keeps to scroll back through.
    */
   private forgetTransmittedImages(options: { readonly free: boolean }): string {
-    const remembered = this.transmitted.size > 0;
+    const remembered = this.transmitted.size > 0 || this.unknownImageUploads;
+    const deletions = options.free ? [...this.transmitted.keys()].map(imageId => kittyDeleteImage(imageId)).join('') : '';
     this.transmitted.clear();
+    this.unknownImageUploads = false;
     if (!options.free || !remembered) return "";
-    return kittyDeleteAllImages();
+    return deletions + kittyDeleteAllImages();
   }
 }

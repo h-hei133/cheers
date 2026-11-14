@@ -4,6 +4,9 @@ import { TUI } from "./engine.js";
 import { CURSOR_MARKER } from "./paint.js";
 import { BoundedTerminalWriter, MAX_RENDER_WRITE_BYTES, writeBoundedFrame } from "./boundedWriter.js";
 import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminalDouble.js";
+import { pngImage } from '../../../test-utils/image.js';
+import { inlineImageRows } from '../image.js';
+import { setCellDimensions } from '../imageDimensions.js';
 
 class StubProvider implements TerminalFrameProvider {
   rows: string[] = ["row"];
@@ -838,6 +841,153 @@ describe("handing the terminal to a child process", () => {
 });
 
 describe("kitty image rows under redraw", () => {
+  it.each(['kitty', 'iterm2'] as const)('writes text and all clears before the %s graphics controls', protocol => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const { tui, terminal, scheduler, provider } = boot();
+    provider.rows = [...inlineImageRows(pngImage(320, 161), protocol, 16)!, 'following text'];
+    tui.start(); scheduler.flush();
+    const bytes = terminal.drain();
+    const graphic = protocol === 'kitty' ? bytes.indexOf('\x1b_Ga=T') : bytes.indexOf('\x1b]1337;File=');
+    expect(graphic).toBeGreaterThan(bytes.indexOf('following text'));
+    expect(graphic).toBeGreaterThan(bytes.lastIndexOf('\x1b[K'));
+    expect(graphic).toBeGreaterThan(bytes.lastIndexOf('\x1b[2K'));
+  });
+
+  it('redraws retained pixels after a covered row changes while the anchor is unchanged', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const { tui, terminal, scheduler, provider } = boot();
+    const image = pngImage(320, 161);
+    provider.rows = [...inlineImageRows(image, 'kitty', 16)!, 'outside extent'];
+    tui.start(); scheduler.flush(); terminal.drain();
+    provider.rows[1] = 'changed covered cells';
+    tui.renderNow();
+    const bytes = terminal.drain();
+    expect(bytes).toContain('\x1b_Ga=d,d=a,q=2\x1b\\');
+    expect(bytes).toContain('\x1b_Ga=p');
+    expect(bytes).not.toContain(image.data);
+    expect(bytes.indexOf('\x1b_Ga=p')).toBeGreaterThan(bytes.indexOf('changed covered cells'));
+    expect(bytes.indexOf('\x1b_Ga=p')).toBeGreaterThan(bytes.lastIndexOf('\x1b[K'));
+    provider.rows[provider.rows.length - 1] = 'changed outside';
+    tui.renderNow();
+    expect(terminal.drain()).not.toContain('\x1b_G');
+  });
+
+  it('removes old placements on movement and disappearance while retaining uploaded pixels', () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    const image = pngImage(80, 80);
+    const rows = [...inlineImageRows(image, 'kitty', 4)!];
+    provider.rows = rows; tui.start(); scheduler.flush(); terminal.drain();
+    provider.rows = ['', ...rows]; tui.renderNow();
+    let bytes = terminal.drain();
+    expect(bytes).toContain('\x1b_Ga=d,d=a,q=2\x1b\\');
+    expect(bytes.indexOf('a=d,d=a')).toBeLessThan(bytes.indexOf('a=p'));
+    expect(bytes).not.toContain('a=d,d=I');
+    provider.rows = ['only text']; tui.renderNow();
+    bytes = terminal.drain();
+    expect(bytes).toContain('\x1b_Ga=d,d=a,q=2\x1b\\');
+    expect(bytes).not.toContain('a=d,d=I');
+    provider.rows = rows; tui.renderNow();
+    bytes = terminal.drain();
+    expect(bytes).toContain('a=p');
+    expect(bytes).not.toContain(image.data);
+  });
+
+  it('preserves cached uploads during a forced full paint without an erase-display command', () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    const image = pngImage(80, 80);
+    provider.rows = [...inlineImageRows(image, 'kitty', 4)!];
+    tui.start(); scheduler.flush(); terminal.drain();
+    tui.requestRender({ force: true }); scheduler.flush();
+    const bytes = terminal.drain();
+    expect(bytes).toContain('a=d,d=a');
+    expect(bytes).toContain('a=p');
+    expect(bytes).not.toContain(image.data);
+    expect(bytes).not.toMatch(/\x1b\[(?:0|2)?J/);
+  });
+
+  it('paints two independent placements of the same uploaded image', () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    const image = pngImage(80, 80);
+    const rows = inlineImageRows(image, 'kitty', 4)!;
+    provider.rows = [...rows, 'between', ...rows];
+    tui.start(); scheduler.flush();
+    const initial = terminal.drain();
+    expect(initial.match(/\x1b_Ga=T/g)).toHaveLength(1);
+    expect(initial.match(/\x1b_Ga=p/g)).toHaveLength(1);
+    provider.rows[1] = 'changed covered cells';
+    tui.renderNow();
+    const bytes = terminal.drain();
+    expect(bytes.match(/\x1b_Ga=p/g)).toHaveLength(2);
+    expect(bytes).toContain('\x1b[1;1H\x1b_Ga=p');
+    expect(bytes).toContain(`\x1b[${rows.length + 2};1H\x1b_Ga=p`);
+    expect(bytes).not.toContain(image.data);
+  });
+
+  it('does not reuse an upload that failed before reaching the terminal', () => {
+    const { tui, terminal, provider } = boot();
+    const image = pngImage(80, 80);
+    tui.start(); tui.renderNow(); terminal.drain();
+    provider.rows = [...inlineImageRows(image, 'kitty', 4)!];
+    const originalWrite = terminal.write.bind(terminal);
+    let refuse = true;
+    terminal.write = (bytes, done) => {
+      if (refuse && bytes.includes(image.data)) { refuse = false; throw new Error('graphics write failed'); }
+      originalWrite(bytes, done);
+    };
+    expect(() => tui.renderNow()).toThrow('graphics write failed');
+    terminal.drain();
+    tui.renderNow();
+    expect(terminal.drain()).toContain(image.data);
+  });
+
+  it.each(['text retry', 'stop'] as const)('retires previously uploaded pixels after a failed frame followed by %s', action => {
+    const { tui, terminal, provider } = boot();
+    const first = pngImage(80, 80, 'first');
+    const next = pngImage(80, 80, 'next');
+    provider.rows = [...inlineImageRows(first, 'kitty', 4)!];
+    tui.start(); tui.renderNow(); terminal.drain();
+    provider.rows = ['hide the first image']; tui.renderNow(); terminal.drain();
+    const originalWrite = terminal.write.bind(terminal);
+    terminal.write = (bytes, done) => {
+      if (bytes.includes(next.data)) throw new Error('graphics write failed');
+      originalWrite(bytes, done);
+    };
+    provider.rows = [...inlineImageRows(next, 'kitty', 4)!];
+    expect(() => tui.renderNow()).toThrow('graphics write failed');
+    terminal.drain();
+    if (action === 'stop') tui.stop();
+    else { provider.rows = ['text only']; tui.renderNow(); }
+    const bytes = terminal.drain();
+    for (const image of [first, next]) {
+      const id = /i=(\d+)/.exec(inlineImageRows(image, 'kitty', 4)![0]!)![1];
+      expect(bytes).toContain(`\x1b_Ga=d,d=I,i=${id},q=2\x1b\\`);
+    }
+  });
+
+  it('keeps unknown upload identities when the cleanup write also fails', () => {
+    const { tui, terminal, provider } = boot();
+    const first = pngImage(80, 80, 'first');
+    const next = pngImage(80, 80, 'next');
+    provider.rows = [...inlineImageRows(first, 'kitty', 4)!]; tui.start(); tui.renderNow(); terminal.drain();
+    provider.rows = ['hide image']; tui.renderNow(); terminal.drain();
+    const originalWrite = terminal.write.bind(terminal);
+    let failures = 2;
+    terminal.write = (bytes, done) => {
+      if (failures > 0) { failures--; throw new Error('graphics write failed'); }
+      originalWrite(bytes, done);
+    };
+    provider.rows = [...inlineImageRows(next, 'kitty', 4)!];
+    expect(() => tui.renderNow()).toThrow('graphics write failed');
+    provider.rows = ['text only'];
+    expect(() => tui.renderNow()).toThrow('graphics write failed');
+    tui.renderNow();
+    const bytes = terminal.drain();
+    for (const image of [first, next]) {
+      const id = /i=(\d+)/.exec(inlineImageRows(image, 'kitty', 4)![0]!)![1];
+      expect(bytes).toContain(`a=d,d=I,i=${id}`);
+    }
+  });
+
   it("sends the payload once and places it on every later paint", () => {
     const { tui, terminal, scheduler, provider } = boot();
     const transmitted =
@@ -903,10 +1053,71 @@ describe("kitty image rows under redraw", () => {
     scheduler.flush();
 
     const bytes = terminal.drain();
-    const deletions = bytes.match(/\x1b_Ga=d,d=i,i=\d+/g) ?? [];
-    // 60 images, a budget of 32 offscreen plus the one on screen: the rest go.
-    expect(deletions.length).toBeGreaterThan(0);
-    expect(deletions.length).toBeLessThan(60);
+    const deletions = bytes.match(/\x1b_Ga=d,d=I,i=\d+/g) ?? [];
+    // 60 images, exactly 16 offscreen plus the one on screen remain held.
+    expect(deletions).toHaveLength(43);
+    expect(deletions[0]).toContain('i=2000');
+    expect(deletions.at(-1)).toContain('i=2042');
+  });
+
+  it('keeps exactly 16 offscreen complete images and releases the seventeenth oldest upload', () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    const pictures = Array.from({ length: 18 }, (_, i) => pngImage(1, 1, `count-${i}`));
+    tui.start(); scheduler.flush(); terminal.drain();
+    for (const image of pictures.slice(0, 17)) {
+      provider.rows = [...inlineImageRows(image, 'kitty', 1)!]; tui.renderNow();
+      expect(terminal.drain()).not.toContain('a=d,d=I');
+    }
+    provider.rows = [...inlineImageRows(pictures[17]!, 'kitty', 1)!]; tui.renderNow();
+    let bytes = terminal.drain();
+    const firstId = /i=(\d+)/.exec(inlineImageRows(pictures[0]!, 'kitty', 1)![0]!)![1];
+    expect(bytes.match(/a=d,d=I/g)).toHaveLength(1);
+    expect(bytes).toContain(`a=d,d=I,i=${firstId}`);
+    provider.rows = [...inlineImageRows(pictures[0]!, 'kitty', 1)!]; tui.renderNow();
+    bytes = terminal.drain();
+    expect(bytes).toContain(pictures[0]!.data);
+  });
+
+  it('applies the 32 MiB wire budget independently of image count and decoded size', () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    // Four valid ~9 MiB uploads, each only one decoded pixel. Three fit under
+    // 32 MiB, while the fourth crosses it without reaching the count cap.
+    const large = pngImage(1, 1, 'wire'.repeat(1_769_472));
+    const images = Array.from({ length: 5 }, (_, i) => {
+      const rows = [...inlineImageRows(large, 'kitty', 1)!];
+      return rows.map(row => row.replace(/i=\d+/, `i=${100 + i}`));
+    });
+    const wireBytes = images[0]!.join('').length;
+    expect(3 * wireBytes).toBeLessThanOrEqual(32 * 1024 * 1024);
+    expect(4 * wireBytes).toBeGreaterThan(32 * 1024 * 1024);
+    tui.start(); scheduler.flush(); terminal.drain();
+    for (const rows of images.slice(0, 4)) {
+      provider.rows = rows; tui.renderNow();
+      expect(terminal.drain()).not.toContain('a=d,d=I');
+    }
+    provider.rows = images[4]!; tui.renderNow();
+    const bytes = terminal.drain();
+    expect(bytes.match(/a=d,d=I/g)).toHaveLength(1);
+    expect(bytes).toContain('a=d,d=I,i=100');
+    expect(bytes).not.toContain('a=d,d=I,i=104');
+  });
+
+  it('retains exactly 64 MiB of decoded offscreen pixels and evicts on the next pixel', () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    const large = pngImage(2048, 4096);
+    const tiny = pngImage(1, 1);
+    const rowsFor = (image: typeof tiny, id: number) => [...inlineImageRows(image, 'kitty', 1)!].map(row => row.replace(/i=\d+/, `i=${id}`));
+    tui.start(); scheduler.flush(); terminal.drain();
+    for (const rows of [rowsFor(large, 601), rowsFor(large, 602), rowsFor(tiny, 603)]) {
+      provider.rows = rows; tui.renderNow();
+      expect(terminal.drain()).not.toContain('a=d,d=I');
+    }
+    provider.rows = rowsFor(tiny, 604); tui.renderNow();
+    const bytes = terminal.drain();
+    expect(bytes.match(/a=d,d=I/g)).toHaveLength(1);
+    expect(bytes).toContain('a=d,d=I,i=601');
+    expect(bytes).not.toContain('a=d,d=I,i=602');
+    expect(bytes).not.toContain('a=d,d=I,i=604');
   });
 
   it("frees the terminal's images when the session gives the screen back", () => {
@@ -966,7 +1177,7 @@ describe("kitty image rows under redraw", () => {
     scheduler.flush();
     const out = terminal.drain();
     // Even with only 1 offscreen image (well below 16 count / 32 MiB wire), 76.3 MiB > 64 MiB triggers eviction of 501.
-    expect(out).toContain("\x1b_Ga=d,d=i,i=501");
+    expect(out).toContain("\x1b_Ga=d,d=I,i=501");
   });
 });
 

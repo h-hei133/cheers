@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.1/B.2/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
-**Active batch**: B.3准入`20a37ae`、占行／cell-size `ef052794`已提交。viewport裁剪／浮层覆盖子批8/243、六门、函数上限和build `2443a54998eb`通过，限定独立复核CLEAR；Linux当前编译CLI fullscreen×两协议小屏／PageUp／扩屏恢复passed，两反转红且逐字节恢复。按批提交后接图片最后绘制、placement清退、regular scrollback和精确离屏预算。B.3部分、整体本地验收18项；C.6原生历史协议缺口继续保留。
+**Active batch**: B.3裁剪已提交`cf3b504`；fullscreen图片最后绘制／placement清退和精确预算子批已通过六门、9/261、0monoliths、build `e240273b687f`及Linux编译CLI两协议同图双placement／重排／按ID释放，限定独立复核CLEAR。两反转红且逐字节恢复。按批提交后继续regular scrollback与document-tail；B.3部分、整体本地验收18项，C.6原生协议缺口保留。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -94,3 +94,5 @@
 | 2026-11-15 | B.3布局／cell-size：48×48与窄宽fits、N行reservation、C=1、iTerm保存恢复、finalized局部cache及Pointer generation接线通过。复审背景次序／旧drag copy红修复；旧颜色夹具HEAD也失败，按原键盘deadline等待后8/313和六门／0monoliths／build `f3c7f85fd552`通过，限定CLEAR。Linux当前编译CLI四格late split10→20行passed；两反转红／逐字节恢复，实际L／额外依赖2，B.3与18项计数不变。 |
 
 | 2026-11-15 | B.3裁剪子批8/243、六门、函数上限、build `2443a54998eb`、Linux fullscreen两协议crop/fallback/扩屏恢复通过，限定复核CLEAR；两反转红且逐字节恢复。仅记录本批完成，B.3仍部分、本地18项不变，按批提交后继续painter和预算。 |
+
+| 2026-11-15 | B.3fullscreen绘图／精确预算9/261、六门、0monoliths、build `e240273b687f`和Linux编译CLI两协议双placement／重排／exit通过；复审duplicate首帧和failed upload/cleanup身份反例修复，限定CLEAR，两反转红且逐字节恢复。regular仍开项，18项不变，按批提交。 |

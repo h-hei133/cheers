@@ -215,11 +215,16 @@ export function transmissionsIn(line: string): readonly KittyTransmission[] {
  *
  * An image stays in the terminal's memory until it is deleted or the emulator
  * exits, and nothing else in the protocol expires it: a session that pastes
- * screenshots for an afternoon would hold every one of them. `d=i` frees the
+ * screenshots for an afternoon would hold every one of them. `d=I` frees the
  * image and every placement of it, which is what an eviction needs.
  */
 export function kittyDeleteImage(imageId: number): string {
-  return `\x1b_Ga=d,d=i,i=${imageId},q=2\x1b\\`;
+  return `\x1b_Ga=d,d=I,i=${imageId},q=2\x1b\\`;
+}
+
+/** Clear all placements while keeping uploaded pixels available for reuse. */
+export function kittyDeletePlacements(): string {
+  return '\x1b_Ga=d,d=a,q=2\x1b\\';
 }
 
 /** A deletion for every kitty image this session transmitted. */

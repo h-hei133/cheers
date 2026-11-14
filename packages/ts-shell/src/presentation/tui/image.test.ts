@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { visibleWidth } from "./text/measure.js";
-import { calculateImageRows, detectImageProtocol, estimateDecodedImageBytes, getImageDimensions, imageSequencesIn, inlineImageRows, inlineImageSequence, kittyPlacementFor, swapTransmittedForPlacement, transmissionsIn, windowTitle, idleNotification, bell } from "./image.js";
+import { calculateImageRows, detectImageProtocol, estimateDecodedImageBytes, getImageDimensions, imageSequencesIn, inlineImageRows, inlineImageSequence, kittyDeleteImage, kittyPlacementFor, swapTransmittedForPlacement, transmissionsIn, windowTitle, idleNotification, bell } from "./image.js";
 import { pngImage } from '../../test-utils/image.js';
 import { getCellDimensions, setCellDimensions } from './imageDimensions.js';
 
@@ -104,6 +104,9 @@ describe("terminal attention sequences", () => {
 });
 
 describe("transmit-once placement under redraw", () => {
+  it('frees uploaded image data as well as its placements during eviction', () => {
+    expect(kittyDeleteImage(17)).toBe('\x1b_Ga=d,d=I,i=17,q=2\x1b\\');
+  });
   it('recognizes a complete chunked graphics run and a placement without claiming another transmission', () => {
     const image = pngImage(320, 161, 'large'.repeat(1500));
     const sequence = inlineImageRows(image, 'kitty', 40)![0]!;

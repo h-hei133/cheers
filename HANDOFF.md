@@ -2531,3 +2531,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A clipped or overlay-covered image becomes text, but its scrollbar moves to the first column and a later erase-to-end removes the overlay.
 - **Root Cause:** Removing graphics and its decoder cursor wrapper leaves the background's attached carriage return or horizontal reanchor. The row still measures as full width while the terminal cursor has moved left.
 - **Rule:** Remove the attached CR/CSI-C when removing a generated image control, preserving the background and trailing scrollbar. Exercise actual user rows with scrollbar and a visible iTerm last-row anchor, not just a bare graphics sequence. Freeze all build inputs, including tests, before native compiled-CLI probes; RTK pipe proxies must not hide a native child's PTY.
+
+
+### Uploaded Pixels And Placements Have Different Lifetimes
+- **Symptom:** Eviction removes a picture but retains decoded pixels; duplicate same-data pictures lose the first placement; failed output followed by text leaves hidden uploads untracked.
+- **Root Cause:** Lowercase Kitty deletion clears placements, while uppercase deletion frees data. Re-uploading an existing ID removes its earlier placements; the visible-only all-delete does not cover unplaced cache entries. Pre-write registry mutation can also forget an eviction or unknown upload before the terminal receives cleanup.
+- **Rule:** Use per-ID d=I to retire uploads, d=a only to replace visible placements, and same-frame upload-once then placement for duplicate IDs. Preserve previous and proposed IDs across write failures and cleanup failures, force fresh upload on retry, and release all known IDs on owned-screen exit. Draw all clears/text before graphics and repaint after any covered-cell change.
