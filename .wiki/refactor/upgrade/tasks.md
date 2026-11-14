@@ -124,3 +124,5 @@
 2026-11-14 B.2提交前：端点路由提交`a410eab2`。writer原3项红及fullscreen追加反例均已修复；独立暂存树五静态门、4套件107项、build `85c4ef80b41d`通过。实际Node进程加载暂存源码：OS管道先积压4,000,000字节后延迟150ms读取，全文SHA256一致；regular画面累计5,695,129字节，最大write1,048,576字节，回调时pending0。Linux PTY5,697,415字节完成；实际断管与SIGTERM通过原CLI shutdown分别exit1/143，closed=true、completed=false。记录`.omx/artifacts/upgrade-writer-2026-11-14/`；原生探针使用暂存源码tsx，不冒称公开编译导出。
 
 2026-11-14 D.5提交前：B.2提交`6e1e3eb4`。独立暂存树五静态门、4套件66项、build `9ad07e84b0db`通过。Linux真实存储owner写入130tokens与1项部分未知派发，gatherExport只读state，编译公开HTML入口生成文件；离线Chromium显示100in/30out、记录估价、12in/unknown out，0网络请求/0页面错误。D.4完整Markdown功能未借此勾选。B2新增11项边界中10红/1通过，正修复键盘/paste/截止和换代语义。
+
+2026-11-14 账户归一化清理提交前：D.5提交`46b80eec`。删除无人消费的凭据codec，保留现有canonical normalizer；真实持久配置先拒绝prototype键，安全归一化后的extras经普通credential resolution读取。独立暂存树五静态门、19项account测试和build `3a18c732b2d1`通过；不等于F1.4所有OAuth提供方已实现。

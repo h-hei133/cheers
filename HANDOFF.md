@@ -2272,3 +2272,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** HTML export reports complete usage and cost from fabricated message metadata or turns a prompt-only measurement into input usage with output zero.
 - **Root Cause:** The export assumed accounting lived on transcript messages, while cumulative billing and dispatched-request coverage are persisted separately in session state. Their cache categories and scopes differ, so adding them double-counts usage.
 - **Rule:** Read the state once with its session identity, project recorded billing using captured prices, and show request-ledger gaps separately. Missing usage or prices remain unavailable; a prompt measurement never proves output or aggregate cost. Captured conversation exports cannot borrow live state, and historical accounting must stay readable after the former workspace disappears.
+
+
+### Persisted Configuration Admission Precedes Account Normalization
+- **Symptom:** A valid-looking account fixture resolves no credential, even though the account normalizer preserves its safe extension fields.
+- **Root Cause:** Persisted JSON refuses prototype-related keys before normalization; account eligibility also requires provider-specific scope and billing fields. Calling the normalizer directly does not prove either boundary.
+- **Rule:** Test unsafe persisted documents as refusals with unchanged bytes. Test in-memory sanitization separately, then persist the admitted account and assert both valid configuration and unblocked credential resolution with the required provider fields.

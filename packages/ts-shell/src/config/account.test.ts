@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getRuntimeConfig, getUserRuntimeConfigPath } from './runtimeConfig.js';
 import { resolveProviderCredential } from '../core/shell/providerCredentials.js';
 import { providerAuthorization } from '../provider/request/authorization.js';
+import { normalizeProviderAccountAuth, type AccountAuthConfig, type ProviderAccountAuthConfig } from './account.js';
 
 describe('persisted subscription credentials', () => {
   const environment = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE,
@@ -116,6 +117,54 @@ describe('persisted subscription credentials', () => {
       sessionConnection: { id: 'owner', provider: 'github-copilot' } }, env: {} });
     expect(resolution.blocked).toBeUndefined();
     expect(resolution.credential).toMatchObject({ source: 'connection', connectionId: 'owner', accountAuth: subscription });
+  });
+
+  it.each(['openai', 'google', 'github-copilot'] as const)('preserves safe %s extras through the real persisted normalizer', provider => {
+    const extras = JSON.parse('{"enterpriseUrl":"https://ghe.example.com","availableModelIds":["gpt-4.1"],"deep":{"ok":true,"constructor":{"unsafe":1}},"__proto__":{"polluted":true},"type":"spoof","accessToken":"spoof","expiresAt":1}');
+    const tokens = {
+      accessToken: provider === 'github-copilot' ? 'tid=synthetic;proxy-ep=proxy.individual.githubcopilot.com' : 'synthetic-access',
+      refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 3600000, extras,
+    };
+    const source: ProviderAccountAuthConfig = provider === 'openai'
+      ? { openai: { ...tokens, type: 'openai-chatgpt-account', accountId: 'account' } }
+      : provider === 'google' ? { google: { ...tokens, type: 'google-gemini-account', clientId: 'synthetic-client',
+          scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' } }
+        : { subscription: { ...tokens, type: 'subscription', provider: 'github-copilot', baseUrl: 'https://api.individual.githubcopilot.com' } };
+    const accountOf = (value: ProviderAccountAuthConfig | undefined): AccountAuthConfig | undefined =>
+      value?.openai ?? value?.google ?? value?.subscription;
+    const auth = accountOf(source)!;
+    const unsafe = JSON.stringify({ provider, providerCredentials: { [provider]: { accountAuth: source } } });
+    fs.writeFileSync(getUserRuntimeConfigPath(), unsafe);
+    const refused = getRuntimeConfig(workspace);
+    expect(refused.configValidation.valid).toBe(false);
+    expect(resolveProviderCredential({ runtimeConfig: refused, env: {} }).credential).toBeUndefined();
+    expect(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8')).toBe(unsafe);
+    const normalized = normalizeProviderAccountAuth(provider, source);
+    const admitted = accountOf(normalized)!;
+    expect(Object.hasOwn(admitted.extras!, '__proto__')).toBe(false);
+    expect(Object.hasOwn((admitted.extras!.deep as Record<string, unknown>), 'constructor')).toBe(false);
+    const raw = JSON.stringify({ provider, providerCredentials: { [provider]: { accountAuth: normalized } } });
+    fs.writeFileSync(getUserRuntimeConfigPath(), raw);
+    const config = getRuntimeConfig(workspace), resolution = resolveProviderCredential({ runtimeConfig: config, env: {} }), account = resolution.credential?.accountAuth;
+    expect(config.configValidation.valid).toBe(true);
+    expect(resolution.blocked).toBeUndefined();
+    expect(account).toMatchObject({ type: auth.type, accessToken: auth.accessToken, refreshToken: 'synthetic-refresh', expiresAt: auth.expiresAt,
+      extras: { enterpriseUrl: 'https://ghe.example.com', availableModelIds: ['gpt-4.1'], deep: { ok: true }, type: 'spoof', accessToken: 'spoof', expiresAt: 1 } });
+    expect(Object.hasOwn(account!.extras!, '__proto__')).toBe(false);
+    expect(Object.hasOwn((account!.extras!.deep as Record<string, unknown>), 'constructor')).toBe(false);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8')).toBe(raw);
+  });
+
+  it('sanitizes unsupported and deeply nested extras without changing canonical account fields', () => {
+    let deep: unknown = { retained: true };
+    for (let index = 0; index < 10; index++) deep = { next: deep };
+    const normalized = normalizeProviderAccountAuth('openai', { openai: { type: 'openai-chatgpt-account', accessToken: ' real-access ',
+      refreshToken: ' real-refresh ', expiresAt: 123456, accountId: 'acct_1', extras: { deep, nan: NaN, infinite: Infinity,
+        function: () => 'omit', values: ['ok', NaN, true], prototype: 'omit', accountId: 'spoof' } } });
+    expect(normalized?.openai).toMatchObject({ accessToken: 'real-access', refreshToken: 'real-refresh', expiresAt: 123456, accountId: 'acct_1',
+      extras: { values: ['ok', true], accountId: 'spoof' } });
+    expect(JSON.stringify(normalized?.openai?.extras)).not.toMatch(/retained|nan|infinite|function|prototype/);
   });
 
   it.each(['openai', 'google', 'openai-compatible'] as const)('does not admit subscription material for %s', provider => {
