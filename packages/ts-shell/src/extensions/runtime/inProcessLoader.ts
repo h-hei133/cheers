@@ -87,11 +87,12 @@ export interface LoadedInProcessExtension {
   readonly exports: Readonly<Record<string, unknown>>
 }
 
+export type ExtensionFactory = (api: ExtensionAPI) => void | Promise<void>
+
 export type InProcessExtensionInvoke =
   | { readonly kind: 'tool'; readonly name: string; readonly args?: Record<string, unknown> }
   | { readonly kind: 'command'; readonly name: string; readonly args?: readonly string[] }
   | { readonly kind: 'event'; readonly event: string; readonly aliases?: readonly string[]; readonly payload?: unknown }
-
 export const VIRTUAL_MODULES: Readonly<Record<string, Record<string, unknown>>> = Object.freeze(
   Object.assign(Object.create(null) as Record<string, Record<string, unknown>>, {
     '@cheers/extension-api': Object.freeze(
@@ -217,14 +218,11 @@ export function transpileExtensionSource(source: string, filePath: string): stri
   }).outputText
 }
 
-export function loadInProcessExtension(options: {
-  readonly filePath: string
+function createExtensionApiCollector(options: {
   readonly workspaceRoot: string
   readonly denyRules?: () => readonly DenyRule[]
   readonly host?: ExtensionHostBridge
-}): LoadedInProcessExtension {
-  const rawSource = fs.readFileSync(options.filePath, 'utf8')
-  const code = transpileExtensionSource(rawSource, options.filePath)
+}) {
   const tools: ToolDefinition[] = []
   const commands: CommandDefinition[] = []
   const shortcuts: ExtensionShortcut[] = []
@@ -261,6 +259,42 @@ export function loadInProcessExtension(options: {
     appendEntry: nullProtoFn(async (customType: string, data: unknown) => { await options.host?.appendEntry?.(customType, data) }),
   }))
 
+  return {
+    api,
+    result: (exports: Readonly<Record<string, unknown>> = {}): LoadedInProcessExtension => ({
+      tools,
+      commands,
+      shortcuts,
+      flags,
+      handlers,
+      events,
+      readWorkspaceFile: safeRead,
+      exports,
+    }),
+  }
+}
+
+/** Execute an inline ExtensionFactory directly against the shared ExtensionAPI surface. */
+export async function runExtensionFactory(options: {
+  readonly factory: ExtensionFactory
+  readonly workspaceRoot: string
+  readonly denyRules?: () => readonly DenyRule[]
+  readonly host?: ExtensionHostBridge
+}): Promise<LoadedInProcessExtension> {
+  const collector = createExtensionApiCollector(options)
+  await options.factory(collector.api)
+  return collector.result()
+}
+
+export function loadInProcessExtension(options: {
+  readonly filePath: string
+  readonly workspaceRoot: string
+  readonly denyRules?: () => readonly DenyRule[]
+  readonly host?: ExtensionHostBridge
+}): LoadedInProcessExtension {
+  const rawSource = fs.readFileSync(options.filePath, 'utf8')
+  const code = transpileExtensionSource(rawSource, options.filePath)
+  const collector = createExtensionApiCollector(options)
   const moduleExports: Record<string, unknown> = Object.create(null) as Record<string, unknown>
   const moduleObj = Object.assign(Object.create(null) as { exports: Record<string, unknown> }, { exports: moduleExports })
   const customRequire = nullProtoFn((specifier: string): unknown => {
@@ -272,16 +306,16 @@ export function loadInProcessExtension(options: {
       module: moduleObj,
       exports: moduleExports,
       require: customRequire,
-      api,
+      api: collector.api,
     }),
     { name: 'extension-in-process', codeGeneration: { strings: false, wasm: false } },
   )
   new vm.Script(code, { filename: options.filePath }).runInContext(sandbox, { timeout: 5_000 })
   const exported = moduleObj.exports
   const defaultExport = exported.default ?? exported.activate
-  if (typeof defaultExport === 'function') defaultExport(api)
+  if (typeof defaultExport === 'function') defaultExport(collector.api)
 
-  return { tools, commands, shortcuts, flags, handlers, events, readWorkspaceFile: safeRead, exports: exported }
+  return collector.result(exported)
 }
 
 export async function executeInProcessScript(options: {

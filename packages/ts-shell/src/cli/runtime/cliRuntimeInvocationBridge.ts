@@ -63,6 +63,9 @@ export function streamCliRuntimePrompt(input: {
     readonly noSkills?: boolean;
   };
   readonly forcedTool?: CliRuntimeInvocationInput['forcedTool'];
+  readonly systemPrompt?: string;
+  readonly appendSystemPrompt?: readonly string[];
+  readonly sdkSkills?: CliRuntimeInvocationInput['sdkSkills'];
 }): CliRuntimeInvocationResult {
   // The turn below is async since MCP tools joined the pool — their snapshot
   // has to be awaited before the first event, and a caller that can only take
@@ -110,6 +113,9 @@ export function streamCliRuntimePrompt(input: {
     ...(input.providerCatalog ? { providerCatalog: input.providerCatalog } : {}),
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.forcedTool ? { forcedTool: input.forcedTool } : {}),
+    ...(input.systemPrompt !== undefined ? { systemPrompt: input.systemPrompt } : {}),
+    ...(input.appendSystemPrompt?.length ? { appendSystemPrompt: input.appendSystemPrompt } : {}),
+    ...(input.sdkSkills ? { sdkSkills: input.sdkSkills } : {}),
     ...(input.cacheWarming ? { cacheWarming: input.cacheWarming } : {}),
   });
   const events = (async function* (): AsyncIterable<QueryEvent> {

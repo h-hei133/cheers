@@ -89,6 +89,9 @@ export interface ShellRuntimeContext {
   themePaths?: readonly string[]
   scopedModels?: readonly string[]
   cliExtensionPaths?: readonly string[]
+  systemPrompt?: string
+  appendSystemPrompt?: readonly string[]
+  sdkSkills?: ReadonlyMap<string, import('../skills/skillLoader.js').Skill>
   gitContext: WorkflowGitContext
   session: Session
   activeSession: ActiveSessionIdentity

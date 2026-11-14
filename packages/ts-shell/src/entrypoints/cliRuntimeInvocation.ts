@@ -123,6 +123,9 @@ export interface CliRuntimeInvocationInput {
   };
   /** A validated one-use tool selection for this request only. */
   readonly forcedTool?: string;
+  readonly systemPrompt?: string;
+  readonly appendSystemPrompt?: readonly string[];
+  readonly sdkSkills?: ReadonlyMap<string, import('../core/skills/skillLoader.js').Skill>;
 }
 
 export interface CliRuntimeInvocationRequest extends Omit<CliRuntimeInvocationInput, "providerModeEnv"> {

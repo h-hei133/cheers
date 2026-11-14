@@ -12,6 +12,8 @@ export interface PromptRequestInput extends ToolCatalogInput {
   readonly toolsAvailable?: boolean;
   readonly forcedTool?: string;
   readonly allowedTools?: readonly string[];
+  readonly systemPrompt?: string;
+  readonly appendSystemPrompt?: readonly string[];
   readonly onSource?: (target: string, content?: Buffer) => void;
 }
 
@@ -28,7 +30,10 @@ export async function preparePromptRequest(input: PromptRequestInput, override?:
   const allowed = input.allowedTools ? new Set(input.allowedTools) : undefined;
   const filter = (pool: ReadonlyMap<string, ToolDefinition>) => allowed ? new Map([...pool].filter(([name]) => allowed.has(name))) : pool;
   const promptContext = buildSystemPromptContext({ workspaceRoot: input.workspaceRoot, sessionId: input.sessionId,
-    runtimeConfig: input.runtimeConfig, skills, toolNames: [...filter(tools).keys()], onSource: input.onSource });
+    runtimeConfig: input.runtimeConfig, skills, toolNames: [...filter(tools).keys()],
+    ...(input.systemPrompt !== undefined ? { systemPrompt: input.systemPrompt } : {}),
+    ...(input.appendSystemPrompt?.length ? { appendSystemPrompt: input.appendSystemPrompt } : {}),
+    onSource: input.onSource });
   const toolsAvailable = input.toolsAvailable !== false;
   const system = systemPromptSnapshot(input.agentMode, promptContext, toolsAvailable);
   // Discovery updates schemas between steps; the assembled system text stays fixed.

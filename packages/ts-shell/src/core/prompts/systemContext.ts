@@ -19,13 +19,15 @@ export interface SystemPromptContextInput {
   readonly runtimeConfig?: RuntimeConfig;
   readonly skills: ReadonlyMap<string, Skill>;
   readonly toolNames: readonly string[];
+  readonly systemPrompt?: string;
+  readonly appendSystemPrompt?: readonly string[];
   readonly onSource?: (target: string, content?: Buffer) => void;
 }
 
 /** Assemble the exact system-prompt inputs used by a model request. */
 export function buildSystemPromptContext(input: SystemPromptContextInput): SystemPromptContext {
   const untrusted = projectTrust.isProjectUntrusted(input.workspaceRoot);
-  const instructions = untrusted
+  const instructions = input.systemPrompt !== undefined || untrusted
     ? { files: [], truncated: false }
     : loadInstructionFiles({
         cwd: input.workspaceRoot,
@@ -52,9 +54,14 @@ export function buildSystemPromptContext(input: SystemPromptContextInput): Syste
     );
   }
 
+  const baseInstructions = input.systemPrompt !== undefined ? input.systemPrompt : renderInstructionFiles(instructions.files);
+  const extraAppended = input.appendSystemPrompt?.filter(Boolean).join('\n\n') ?? '';
+  const baseAppended = renderAppendedInstructions(appended.files);
+  const appendedInstructions = [baseAppended, extraAppended].filter(Boolean).join('\n\n');
+
   return {
-    instructions: renderInstructionFiles(instructions.files),
-    appendedInstructions: renderAppendedInstructions(appended.files),
+    instructions: baseInstructions,
+    appendedInstructions,
     skills: skillPrompt(input.skills, readSessionModel(input.sessionId)?.skillful),
     toolNames: input.toolNames,
   };

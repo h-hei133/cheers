@@ -25,6 +25,7 @@ export interface ToolCatalogInput {
   readonly workspaceRoot: string;
   readonly sessionId?: string;
   readonly skillOptions?: { readonly skillPaths?: readonly string[]; readonly noSkills?: boolean };
+  readonly sdkSkills?: ReadonlyMap<string, Skill>;
   readonly runtimeConfig?: RuntimeConfig;
   /** Model runs start small; command inspection keeps the full pool. */
   readonly discover?: boolean;
@@ -95,6 +96,7 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
  * see `resolveSkillCatalog`.
  */
 async function discoverSkills(request: ToolCatalogInput): Promise<ReadonlyMap<string, Skill>> {
+  if (request.sdkSkills) return request.sdkSkills;
   const { skills, collisions, diagnostics, failures } = await resolveSkillCatalog({
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
