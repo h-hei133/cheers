@@ -58,3 +58,57 @@ export function withLineEnding(text: string, ending: LineEnding): string {
   const unix = toUnixLines(text);
   return ending === "\r\n" ? unix.replace(/\n/g, "\r\n") : unix;
 }
+
+export interface UnixReplacementSpan {
+  readonly start: number;
+  readonly end: number;
+  readonly newText: string;
+}
+
+function buildUnixOffsetMap(rawText: string): readonly number[] {
+  const map: number[] = [];
+  let index = 0;
+  while (index < rawText.length) {
+    map.push(index);
+    if (rawText[index] === "\r" && rawText[index + 1] === "\n") {
+      index += 2;
+    } else {
+      index += 1;
+    }
+  }
+  map.push(rawText.length);
+  return map;
+}
+
+function localLineEndingAt(rawText: string, offset: number, fallback: LineEnding): LineEnding {
+  const lineEnd = rawText.indexOf("\n", offset);
+  if (lineEnd > 0 && rawText[lineEnd - 1] === "\r") return "\r\n";
+  if (lineEnd >= 0) return "\n";
+  const prevLineEnd = rawText.lastIndexOf("\n", Math.max(0, offset - 1));
+  if (prevLineEnd > 0 && rawText[prevLineEnd - 1] === "\r") return "\r\n";
+  if (prevLineEnd >= 0) return "\n";
+  return fallback;
+}
+
+/**
+ * Apply Unix-offset replacements directly onto `rawText`, preserving any mixed
+ * line endings on untouched regions (Pi `applyReplacementsToOriginal` semantics).
+ */
+export function applyUnixReplacementsToOriginal(
+  rawText: string,
+  edits: readonly UnixReplacementSpan[],
+): string {
+  if (edits.length === 0) return rawText;
+  const map = buildUnixOffsetMap(rawText);
+  const fallback = detectLineEnding(rawText);
+  const sorted = [...edits].sort((a, b) => b.start - a.start);
+  let result = rawText;
+  for (const edit of sorted) {
+    const origStart = map[edit.start] ?? rawText.length;
+    const origEnd = map[edit.end] ?? rawText.length;
+    const ending = localLineEndingAt(rawText, origStart, fallback);
+    const formatted = withLineEnding(edit.newText, ending);
+    result = result.slice(0, origStart) + formatted + result.slice(origEnd);
+  }
+  return result;
+}

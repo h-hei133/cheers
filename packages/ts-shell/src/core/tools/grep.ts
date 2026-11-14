@@ -52,6 +52,14 @@ export function createGrepToolDefinition(
           type: "boolean",
           description: "Perform case-insensitive matching (default: false).",
         },
+        literal: {
+          type: "boolean",
+          description: "Treat pattern as a literal string rather than a regular expression (default: false).",
+        },
+        context: {
+          type: "number",
+          description: "Number of context lines to show before and after each match (default: 0).",
+        },
         limit: {
           type: "number",
           description:
@@ -87,24 +95,21 @@ export function createGrepToolDefinition(
       }
       const globFilter = typeof args.glob === "string" ? args.glob.trim() : "";
       const ignoreCase = Boolean(args.ignoreCase);
+      const literal = Boolean(args.literal);
+      const contextLines = typeof args.context === "number" && args.context > 0 ? Math.min(20, Math.floor(args.context)) : 0;
       const limit =
         typeof args.limit === "number" && args.limit > 0
           ? Math.min(args.limit, 500)
           : DEFAULT_GREP_LIMIT;
 
-      // ripgrep first, when it is installed. It is what the implementations we
-      // compared against run, and the reason is measurable: the in-process walk
-      // below reads every file in the workspace one at a time, which is 1.3
-      // seconds on this repository for a pattern that occurs twice, against 30
-      // milliseconds for `rg`. The walk stays as the fallback rather than being
-      // deleted, so a machine without ripgrep still searches — the same
-      // degradation the compared implementations use for native dependencies.
       const viaRipgrep = await searchWithRipgrep({
         assertFileAccess: context.assertFileAccess,
         pattern: rawPattern,
         searchPath: searchSubPath,
         ...(globFilter ? { glob: globFilter } : {}),
         ignoreCase,
+        literal,
+        ...(contextLines > 0 ? { context: contextLines } : {}),
         limit,
         workspaceRoot: searchRoot,
         abortSignal: context.abortSignal,
@@ -139,13 +144,11 @@ export function createGrepToolDefinition(
       }
 
       let regex: RegExp;
+      const escaped = rawPattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       try {
-        regex = new RegExp(rawPattern, ignoreCase ? "iu" : "u");
+        regex = new RegExp(literal ? escaped : rawPattern, ignoreCase ? "iu" : "u");
       } catch {
-        regex = new RegExp(
-          rawPattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-          ignoreCase ? "iu" : "u",
-        );
+        regex = new RegExp(escaped, ignoreCase ? "iu" : "u");
       }
 
       const allFiles = await executionService.listFilesRecursive({
@@ -193,21 +196,24 @@ export function createGrepToolDefinition(
             maxBytes: MAX_SEARCHED_FILE_BYTES,
           });
           const lines = content.split("\n");
+          const displayFile = reportPath(relPath, searchRoot, context.workspaceRoot);
+          const emittedLines = new Set<number>();
 
           for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            if (regex.test(line)) {
-              const safeLine = truncateLineWidth(line, 500);
-              // Same rule as glob: a path relative to an attached root would be
-              // resolved against the primary root by every later tool. An entry
-              // that is already absolute must not be joined onto the root again,
-              // which would fabricate a different path inside it.
-              results.push(`${reportPath(relPath, searchRoot, context.workspaceRoot)}:${i + 1}: ${safeLine}`);
-              totalMatches++;
-              if (totalMatches >= limit) {
-                break;
-              }
+            const line = lines[i]!;
+            if (!regex.test(line)) continue;
+            const startCtx = Math.max(0, i - contextLines);
+            const endCtx = Math.min(lines.length - 1, i + contextLines);
+            for (let c = startCtx; c <= endCtx; c++) {
+              if (emittedLines.has(c)) continue;
+              emittedLines.add(c);
+              const isMatchLine = c === i;
+              const safeLine = truncateLineWidth(lines[c]!, 500);
+              const sep = isMatchLine ? ":" : "-";
+              results.push(`${displayFile}${sep}${c + 1}${sep} ${safeLine}`);
             }
+            totalMatches++;
+            if (totalMatches >= limit) break;
           }
         } catch (error) {
           if (error instanceof ReadCleanupError) throw error;

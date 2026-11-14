@@ -7,7 +7,7 @@ import { verifyPathContainment } from '../core/security/pathJail.js';
 import { assertWorkspaceRoot, captureWorkspaceRoot, resolveWorkspaceRoot } from '../core/workspace/roots.js';
 import { workspaceRelativePath } from '../core/workspace/files.js';
 import { withFileLock } from '../runtime/execution/fileLock.js';
-import { detectLineEnding, splitByteOrderMark, toUnixLines, withLineEnding } from '../runtime/execution/fileText.js';
+import { applyUnixReplacementsToOriginal, detectLineEnding, splitByteOrderMark, toUnixLines, withLineEnding } from '../runtime/execution/fileText.js';
 import type { ExecutionService } from '../runtime/execution/service.js';
 import type { ToolDefinition, ToolExecutionContext, ToolPreparation } from '../tools/types.js';
 import { createUnifiedDiff } from '../presentation/tui/transcript/diff.js';
@@ -143,6 +143,7 @@ async function prepareEdit(service: ExecutionService, args: Record<string, unkno
       : { state: 'exists' as const, sha256: createHash('sha256').update(raw).digest('hex') };
     const writeCandidate = Object.freeze({ path: target, content, before: Object.freeze(before) });
     const diff = raw && raw !== content ? createUnifiedDiff(relative, raw, content) : '';
+    const firstChangedLine = raw && raw !== content ? computeFirstChangedLine(raw, content) : undefined;
     const output = diff ? `Updated ${relative}\n\n\`\`\`diff\n${diff}\n\`\`\``
       : raw === undefined ? `Updated ${relative} (original unreadable, no diff)` : `Updated ${relative}`;
     return Object.freeze({ targets: Object.freeze([Object.freeze({ path: target, operation: 'write' as const })]),
@@ -158,9 +159,20 @@ async function prepareEdit(service: ExecutionService, args: Record<string, unkno
           assertFileAccess: absolute => { verifyWorkspace(); actual.assertFileAccess?.(absolute); }, abortSignal: actual.abortSignal,
           authority: { mode: 'approved-for-write', source: 'tool-runtime-approval', reason: 'The original prepared edit was approved.' },
           caller: 'core-tool:edit', reason: 'Commit the approved prepared replacement.', reportSafeTarget: containment.resolvedPath });
-        return approvedResult(output, written ? { ...written } : { status: 'unverified' });
+        const meta = written ? { ...written } : { status: 'unverified' };
+        return approvedResult(output, firstChangedLine !== undefined ? { ...meta, firstChangedLine } : meta);
       } });
   });
+}
+
+function computeFirstChangedLine(before: string, after: string): number | undefined {
+  const beforeLines = before.split('\n');
+  const afterLines = after.split('\n');
+  const limit = Math.max(beforeLines.length, afterLines.length);
+  for (let i = 0; i < limit; i++) {
+    if (beforeLines[i] !== afterLines[i]) return i + 1;
+  }
+  return undefined;
 }
 
 function replacementContent(raw: string | undefined, args: Record<string, unknown>): string {
@@ -172,5 +184,8 @@ function replacementContent(raw: string | undefined, args: Record<string, unknow
   const result = segments ? replaceManyInContent(normalized, segments.map(segment => ({ oldText: clean(segment.oldText), newText: clean(segment.newText) })))
     : replaceInContent(normalized, clean(args.oldText as string), clean(args.newText as string), { replaceAll: Boolean(args.replaceAll) });
   if (!result.success) throw new Error(result.error ?? 'Failed to apply replacements.');
+  if (result.locatedEdits) {
+    return bom + applyUnixReplacementsToOriginal(text, result.locatedEdits);
+  }
   return bom + withLineEnding(result.content, detectLineEnding(text));
 }

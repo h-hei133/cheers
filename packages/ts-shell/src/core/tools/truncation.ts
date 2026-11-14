@@ -22,6 +22,7 @@ export interface TruncationResult {
   readonly direction: "head" | "tail" | "none";
   readonly firstLineExceedsLimit?: boolean;
   readonly firstLineBytes?: number;
+  readonly lastLinePartial?: boolean;
 }
 
 export const DEFAULT_MAX_LINES = 2000;
@@ -113,11 +114,18 @@ export function truncateTail(
 
   const resultLines: string[] = [];
   let currentBytes = 0;
+  let lastLinePartial = false;
 
   for (let i = lines.length - 1; i >= 0 && resultLines.length < maxLines; i--) {
-    const line = lines[i];
+    const line = lines[i]!;
     const lineBytes = Buffer.byteLength(line, "utf8") + (resultLines.length > 0 ? 1 : 0);
-    if (currentBytes + lineBytes > maxBytes && resultLines.length > 0) {
+    if (currentBytes + lineBytes > maxBytes) {
+      if (resultLines.length === 0) {
+        const partial = truncateStringToBytesFromEnd(line, maxBytes);
+        resultLines.unshift(partial);
+        currentBytes = Buffer.byteLength(partial, "utf8");
+        lastLinePartial = true;
+      }
       break;
     }
     resultLines.unshift(line);
@@ -133,10 +141,31 @@ export function truncateTail(
     shownLines: resultLines.length,
     shownBytes: Buffer.byteLength(truncatedContent, "utf8"),
     direction: "tail",
+    ...(lastLinePartial ? { lastLinePartial: true } : {}),
   };
+}
+
+function truncateStringToBytesFromEnd(str: string, maxBytes: number): string {
+  const buf = Buffer.from(str, "utf8");
+  if (buf.length <= maxBytes) return str;
+  let start = Math.max(0, buf.length - maxBytes);
+  while (start < buf.length && (buf[start]! & 0xc0) === 0x80) {
+    start++;
+  }
+  let sliced = buf.subarray(start).toString("utf8");
+  if (sliced.length > 0) {
+    const first = sliced.charCodeAt(0);
+    if (first >= 0xdc00 && first <= 0xdfff) sliced = sliced.slice(1);
+  }
+  return sliced;
 }
 
 export function truncateLineWidth(line: string, maxChars: number = 500): string {
   if (line.length <= maxChars) return line;
-  return line.slice(0, maxChars) + " … [truncated]";
+  let end = Math.max(0, maxChars);
+  if (end > 0) {
+    const code = line.charCodeAt(end - 1);
+    if (code >= 0xd800 && code <= 0xdbff) end -= 1;
+  }
+  return line.slice(0, end) + " … [truncated]";
 }

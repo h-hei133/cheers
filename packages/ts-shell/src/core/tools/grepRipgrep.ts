@@ -42,6 +42,7 @@ export interface RipgrepMatch {
   readonly path: string;
   readonly lineNumber: number;
   readonly line: string;
+  readonly isContext?: boolean;
 }
 
 /** Why a ripgrep search did not produce an answer. */
@@ -74,6 +75,8 @@ export interface RipgrepSearchInput {
   readonly searchPath: string;
   readonly glob?: string;
   readonly ignoreCase?: boolean;
+  readonly literal?: boolean;
+  readonly context?: number;
   readonly limit: number;
   /** Workspace root, used as the working directory so paths come back relative. */
   readonly workspaceRoot: string;
@@ -123,6 +126,8 @@ export function forgetRipgrepBinary(): void {
 function searchOptions(input: RipgrepSearchInput): string[] {
   const args = ["--no-config", "--color=never", "--hidden"];
   if (input.ignoreCase) args.push("--ignore-case");
+  if (input.literal) args.push("--fixed-strings");
+  if (input.context && input.context > 0) args.push("--context", `${Math.floor(input.context)}`);
   if (input.glob && input.glob.trim() !== "") {
     args.push("--glob", input.glob.trim());
     // The in-process walk compiles its glob with `nocase`, so `*.ts` finds
@@ -168,28 +173,30 @@ interface RipgrepRecord {
  */
 export function parseRipgrepJson(output: string, limit: number): readonly RipgrepMatch[] {
   const matches: RipgrepMatch[] = [];
+  let matchCount = 0;
   for (const line of output.split("\n")) {
-    if (line === "" || matches.length >= limit) continue;
+    if (line === "") continue;
     let record: RipgrepRecord;
     try {
       record = JSON.parse(line) as RipgrepRecord;
     } catch {
-      // A truncated final line, or something ripgrep did not write. Skipping it
-      // is right: one unreadable record is not a reason to lose the rest.
       continue;
     }
-    if (!record || typeof record !== "object" || record.type !== "match") continue;
-    const path = record.data?.path?.text;
+    if (!record || typeof record !== "object") continue;
+    if (record.type !== "match" && record.type !== "context") continue;
+    if (record.type === "match" && matchCount >= limit) continue;
+    const filePath = record.data?.path?.text;
     const text = record.data?.lines?.text;
     const lineNumber = record.data?.line_number;
-    if (typeof path !== "string" || typeof text !== "string" || typeof lineNumber !== "number") {
+    if (typeof filePath !== "string" || typeof text !== "string" || typeof lineNumber !== "number") {
       continue;
     }
+    if (record.type === "match") matchCount += 1;
     matches.push({
-      path,
+      path: filePath,
       lineNumber,
-      // The record carries the line with its terminator; the tool reports lines.
       line: text.replace(/\r?\n$/, ""),
+      ...(record.type === "context" ? { isContext: true } : {}),
     });
   }
   return matches;
@@ -202,7 +209,8 @@ export function parseRipgrepJson(output: string, limit: number): readonly Ripgre
  * reads the same whichever search answered.
  */
 export function formatRipgrepMatch(match: RipgrepMatch, maxLineWidth: number): string {
-  return `${match.path}:${match.lineNumber}: ${truncateLineWidth(match.line, maxLineWidth)}`;
+  const sep = match.isContext ? "-" : ":";
+  return `${match.path}${sep}${match.lineNumber}${sep} ${truncateLineWidth(match.line, maxLineWidth)}`;
 }
 
 /**
@@ -241,16 +249,18 @@ export async function searchWithRipgrep(input: RipgrepSearchInput): Promise<Ripg
   });
   if (!listed.ok) return listed;
   const matches: RipgrepMatch[] = [];
+  let matchCount = 0;
   for (const batch of searchFileBatches(listed.files)) {
     if (input.abortSignal?.aborted) return { ok: false, reason: 'cancelled' };
     const allowed = batch.filter((file) => permittedSearchFile(input.workspaceRoot, file, assertFileAccess) === file);
     if (!allowed.length) continue;
     const remaining = deadline - Date.now();
     if (remaining <= 0) return { ok: false, reason: 'timeout' };
-    const result = await streamSearch(binary, { ...input, timeoutMs: remaining, limit: input.limit - matches.length }, allowed);
+    const result = await streamSearch(binary, { ...input, timeoutMs: remaining, limit: input.limit - matchCount }, allowed);
     if (!result.ok) return result;
     matches.push(...result.matches);
-    if (matches.length >= input.limit) break;
+    matchCount += result.matches.filter((m) => !m.isContext).length;
+    if (matchCount >= input.limit) break;
   }
   return { ok: true, matches: matches.filter((match) => permittedSearchFile(input.workspaceRoot, match.path, assertFileAccess) !== undefined) };
 }
@@ -293,6 +303,8 @@ async function streamOutput(binary: string, input: RipgrepSearchInput, files?: r
   if (input.abortSignal?.aborted) controller.abort();
   const decoder = new StringDecoder("utf8");
   const matches: RipgrepMatch[] = [];
+  let matchCount = 0;
+  let limitMatchPath: string | undefined;
   let pending = "";
   let limitReached = false;
   let oversized = false;
@@ -315,9 +327,33 @@ async function streamOutput(binary: string, input: RipgrepSearchInput, files?: r
           const allowed = permittedSearchFile(input.workspaceRoot, match.path, input.assertFileAccess);
           if (allowed === undefined || !files?.includes(allowed)) continue;
         }
+        if (limitMatchPath !== undefined) {
+          if (!match.isContext || match.path !== limitMatchPath) {
+            limitReached = true;
+            controller.abort();
+            break;
+          }
+          matches.push({ ...match, line: truncateLineWidth(match.line, 500) });
+          continue;
+        }
+        if (!match.isContext) matchCount += 1;
         matches.push({ ...match, line: truncateLineWidth(match.line, 500) });
+        if (matchCount >= input.limit) {
+          if (input.context && input.context > 0) {
+            limitMatchPath = match.path;
+          } else {
+            limitReached = true;
+            controller.abort();
+            break;
+          }
+        }
       }
-      if (matches.length >= input.limit) { limitReached = true; controller.abort(); break; }
+      if (controller.signal.aborted) break;
+      if (limitMatchPath !== undefined && line.includes('"type":"end"')) {
+        limitReached = true;
+        controller.abort();
+        break;
+      }
     }
     if (pending.length > recordLimit) { oversized = true; controller.abort(); }
     if (controller.signal.aborted) pending = "";

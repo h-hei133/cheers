@@ -1,3 +1,4 @@
+import { fuzzyFilter } from "../text/search.js";
 import { scrollWindow, type ListWindow } from "./window.js";
 import { isFocusable } from './option.js';
 export { isFocusable } from './option.js';
@@ -155,8 +156,11 @@ export class OptionModel {
     const focused = this.current()?.id;
     const previous = this.matches;
     const needle = this.query.trim().toLowerCase();
+    const isMultiToken = needle.includes(" ") || needle.includes("/");
     this.matches = this.filterOptions ? this.filterOptions(needle, this.all) : needle
-      ? this.all.filter((option) => cachedHaystack(this.haystacks, option).includes(needle))
+      ? (isMultiToken
+        ? fuzzyFilter(this.all, needle, (option) => cachedHaystack(this.haystacks, option))
+        : this.all.filter((option) => cachedHaystack(this.haystacks, option).includes(needle)))
       : this.all;
     const preferred = !this.selectionTouched ? this.defaultSelection?.(this.matches) : undefined;
     const retained = this.matches.findIndex(option => option.id === (preferred ?? focused) && isFocusable(option));

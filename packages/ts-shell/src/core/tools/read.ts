@@ -6,7 +6,7 @@ import { isImageFilePath } from '../../model-adapters/multimodal.js'
 import { ArtifactManager } from '../session/artifactManager.js'
 import { parsePathSelector } from './selectorParser.js'
 import { formatDirectoryListing } from './directoryListing.js'
-import { resolveToolTarget } from './permissionContext.js'
+import { resolveReadablePathVariant, resolveToolTarget } from './permissionContext.js'
 import { approvedResult } from './toolResultLifecycle.js'
 import type { ToolDefinition } from '../../tools/types.js'
 import type { ExecutionService, TextPageReadRequest, TextPageReadResult } from '../../runtime/execution/types.js'
@@ -73,16 +73,17 @@ export function createReadToolDefinition(executionService: ExecutionService): To
         if (!containment.allowed) {
           throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
         }
+        const readPath = resolveReadablePathVariant(containment.resolvedPath, root)
         // A directory is a legitimate thing to read. Handing the model a raw
         // EISDIR instead of the names it asked for makes "what is in here"
         // unanswerable without shelling out, so the listing is answered here,
         // through the same ignore policy every other tool walks with.
-        const stats = await fs.stat(containment.resolvedPath).catch(() => undefined)
+        const stats = await fs.stat(readPath).catch(() => undefined)
         if (stats?.isDirectory()) {
           const listing = await formatDirectoryListing({
             assertFileAccess: context.assertFileAccess,
             abortSignal: context.abortSignal,
-            absolutePath: containment.resolvedPath,
+            absolutePath: readPath,
             workspaceRoot: root,
             artifactRoot: context.artifactRoot,
             displayPath: selector.cleanPath,
@@ -99,12 +100,12 @@ export function createReadToolDefinition(executionService: ExecutionService): To
           operationKind: 'file.read',
           assertFileAccess: context.assertFileAccess,
           abortSignal: context.abortSignal,
-          absolutePath: containment.resolvedPath,
+          absolutePath: readPath,
           workspaceRoot: root,
           authority: AUTHORITY,
           caller: 'core-tool:read',
           reason: 'Read an approved workspace file target.',
-          reportSafeTarget: containment.resolvedPath,
+          reportSafeTarget: readPath,
         }
       }
 

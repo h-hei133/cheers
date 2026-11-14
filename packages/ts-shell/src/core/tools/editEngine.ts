@@ -23,6 +23,7 @@ export interface ReplaceResult {
   readonly content: string;
   readonly strategy?: string;
   readonly error?: string;
+  readonly locatedEdits?: readonly { readonly start: number; readonly end: number; readonly newText: string }[];
 }
 
 /** Where a match was found, and how much of the original it covers. */
@@ -248,10 +249,19 @@ export function replaceInContent(
         error: "replaceAll needs an exact match; the text was not found verbatim.",
       };
     }
+    const locatedEdits: Array<{ start: number; end: number; newText: string }> = [];
+    let from = 0;
+    for (;;) {
+      const at = originalContent.indexOf(oldText, from);
+      if (at === -1) break;
+      locatedEdits.push({ start: at, end: at + oldText.length, newText });
+      from = at + oldText.length;
+    }
     return {
       success: true,
       content: originalContent.split(oldText).join(newText),
       strategy: "exact-all",
+      locatedEdits,
     };
   }
 
@@ -285,7 +295,12 @@ export function replaceInContent(
     };
   }
 
-  return { success: true, content: applyEdit(originalContent, located, newText), strategy: located.strategy };
+  return {
+    success: true,
+    content: applyEdit(originalContent, located, newText),
+    strategy: located.strategy,
+    locatedEdits: [{ start: located.start, end: located.end, newText }],
+  };
 }
 
 /**
@@ -378,6 +393,7 @@ export interface SegmentReplaceResult {
   readonly success: boolean;
   readonly content: string;
   readonly error?: string;
+  readonly locatedEdits?: readonly { readonly start: number; readonly end: number; readonly newText: string }[];
 }
 
 /**
@@ -454,5 +470,9 @@ export function replaceManyInContent(
   for (const entry of [...ordered].reverse()) {
     content = applyEdit(content, entry.edit, entry.newText);
   }
-  return { success: true, content };
+  return {
+    success: true,
+    content,
+    locatedEdits: ordered.map(entry => ({ start: entry.edit.start, end: entry.edit.end, newText: entry.newText })),
+  };
 }
