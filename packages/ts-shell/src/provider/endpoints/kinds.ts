@@ -226,6 +226,8 @@ export interface TurnRequest {
   readonly supportsMidConvoToolChanges?: boolean;
   readonly supportsMidConvoEffort?: boolean;
   readonly historicalEfforts?: ReadonlyMap<number, string>;
+  /** The actual routed non-secret target for retained declaration markers. */
+  readonly declarationTarget?: import('../../core/agent/declarations/model.js').RequestDeclaration['target'];
 }
 
 /**

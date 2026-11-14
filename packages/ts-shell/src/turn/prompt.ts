@@ -156,7 +156,16 @@ export function toChatMessages(history: readonly SessionMessage[] = []): ChatMes
   };
 
   for (const message of history) {
-    if (message.role === "system") continue;
+    if (message.role === "system") {
+      if (message.requestDeclaration) result.push({ role: 'system', content: '',
+        ...(message.id ? { id: message.id } : {}), requestDeclaration: message.requestDeclaration });
+      continue;
+    }
+    const silentAssistant = message.role === 'assistant'
+      && (typeof message.content === 'string' ? !message.content : !message.content
+        || message.content.every(block => block.type === 'text' && !block.text))
+      && !message.reasoning?.text && !message.tool_calls?.length;
+    if (pendingCalls?.length && silentAssistant) continue;
     if (message.role !== "tool" && pendingCalls && pendingCalls.length > 0) closePending();
 
     if (message.role === "user" || message.role === 'custom') {

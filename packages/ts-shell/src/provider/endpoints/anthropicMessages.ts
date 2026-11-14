@@ -5,9 +5,11 @@ import {
   type AnthropicImageBlock,
 } from "../../model-adapters/multimodal.js";
 import type { ChatMessage } from "../../turn/prompt.js";
+import type { RequestDeclaration } from '../../core/agent/declarations/model.js';
 import type { ToolSchema } from "../../turn/tools.js";
 import type { ProviderUsage, StreamFragment, StreamedCompletion, StreamedToolCall } from "../../turn/completion.js";
 import { anthropicBetaHeaders, declareToolChanges, insertThinkingLevelMessages } from "./anthropicCachePreservation.js";
+import { anthropicToolDefinition, projectRequestDeclarations, type DeclarationProjection, type NativeSystemMessage } from './anthropic/declarations.js';
 export { anthropicBetaHeaders };
 import { copilotRequestHeaders } from "./copilotHeaders.js";
 import { declareEndpoint } from "./kinds.js";
@@ -115,6 +117,7 @@ export interface AnthropicRequestInput {
   readonly supportsMidConvoToolChanges?: boolean;
   readonly supportsMidConvoEffort?: boolean;
   readonly historicalEfforts?: ReadonlyMap<number, string>;
+  readonly declarationTarget?: RequestDeclaration['target'];
 }
 
 /** The headers this endpoint authenticates with, given an API key. */
@@ -133,14 +136,14 @@ export function anthropicHeaders(apiKey?: string): Record<string, string> {
 /**
  * The request body.
  *
- * System instructions are lifted out of the conversation rather than converted:
- * a `system` message has no equivalent inside `messages`, so leaving one there
- * would fail the request. Tool results are folded into user turns, which is the
- * only place this API accepts them.
+ * Ordinary system instructions are lifted out of the conversation; request
+ * declarations become supported native controls at legal assistant boundaries.
+ * Tool results are folded into user turns, where this API accepts them.
  */
 export function anthropicRequestBody(input: AnthropicRequestInput): Record<string, unknown> {
   const cacheControl = cacheControlFor(input.cacheRetention);
-  const wireMessages = convertMessages(input.messages, input.vision, input.allowEmptySignature === true);
+  const declarations = projectRequestDeclarations(input, cacheControl);
+  const wireMessages = convertMessages(input.messages, input.vision, input.allowEmptySignature === true, declarations);
   let finalMessages: Array<WireMessage | Record<string, unknown>> = cacheControl
     ? markLastUserMessageForCaching(wireMessages, cacheControl)
     : [...wireMessages];
@@ -153,19 +156,22 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
   if (input.systemPrompt.trim() !== "") {
     body.system = [{ type: "text", text: input.systemPrompt, ...(cacheControl ? { cache_control: cacheControl } : {}) }];
   }
-  if (input.supportsMidConvoEffort && input.thinkingLevelName !== undefined) {
+  const nativeEffort = declarations ? declarations.nativeEffort : input.supportsMidConvoEffort && input.thinkingLevelName !== undefined;
+  if (nativeEffort) {
     body.thinking = {
       type: "adaptive",
       display: "summarized",
       block_binding: { prefix_mismatch_behavior: "drop_block" },
     };
     body.output_config = { effort: "low" };
-    finalMessages = insertThinkingLevelMessages(finalMessages, input.thinkingLevelName, input.historicalEfforts);
+    if (!declarations) finalMessages = insertThinkingLevelMessages(finalMessages, input.thinkingLevelName!, input.historicalEfforts);
   }
-  if (input.allowTools && (input.tools.length > 0 || (input.supportsMidConvoToolChanges && input.initialTools !== undefined))) {
+  if (declarations?.nativeTools) {
+    if (declarations.topLevelTools!.length > 0) body.tools = declarations.topLevelTools;
+  } else if (input.allowTools && (input.tools.length > 0 || (input.supportsMidConvoToolChanges && input.initialTools !== undefined))) {
     if (input.supportsMidConvoToolChanges && input.initialTools !== undefined) {
       const declared = declareToolChanges(input.initialTools, input.tools, cacheControl);
-      body.tools = declared.topLevelTools;
+      if (declared.topLevelTools.length > 0) body.tools = declared.topLevelTools;
       if (declared.toolChangeMessage) {
         finalMessages = [...finalMessages, declared.toolChangeMessage];
       }
@@ -183,7 +189,7 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
   // Only sent when the model declared a name for the level. An endpoint that
   // does not know the field rejects the whole request, so an unmapped level
   // stays unsent rather than being guessed at.
-  if (input.thinkingLevelName !== undefined && !input.supportsMidConvoEffort) {
+  if (input.thinkingLevelName !== undefined && (!input.supportsMidConvoEffort || declarations?.numericEffortFallback)) {
     // The budget is required alongside `enabled`: the API rejects the field
     // without one, so asking for reasoning without saying how much is not a
     // request it accepts.
@@ -220,18 +226,19 @@ type ContentBlock =
   | { readonly type: "tool_use"; readonly id: string; readonly name: string; readonly input: unknown }
   | { readonly type: "tool_result"; readonly tool_use_id: string; readonly content: string | readonly (AnthropicImageBlock | { readonly type: "text"; readonly text: string })[] };
 
-interface WireMessage {
+interface ConversationMessage {
   readonly role: "user" | "assistant";
   readonly content: readonly ContentBlock[];
 }
+type WireMessage = ConversationMessage | NativeSystemMessage;
 
 /**
  * The conversation in this API's shape.
  *
  * Three conversions happen here, and each is required rather than stylistic:
  *
- *   - `system` messages are dropped. The system instruction travels in its own
- *     field, and a `system` role inside `messages` is rejected.
+ *   - Ordinary `system` messages are dropped. Applicable request declarations
+ *     become native controls immediately before the next nonempty assistant.
  *   - An assistant turn's tool calls become `tool_use` blocks, because that is
  *     how this API names them.
  *   - A `tool` message becomes a `user` turn carrying a `tool_result` block: the
@@ -241,11 +248,17 @@ function convertMessages(
   messages: readonly ChatMessage[],
   vision: boolean | undefined,
   allowEmptySignature: boolean,
+  declarations?: DeclarationProjection,
 ): WireMessage[] {
   const wire: WireMessage[] = [];
+  const pending: NativeSystemMessage[] = [];
 
   for (const message of messages) {
-    if (message.role === "system") continue;
+    if (message.role === "system") {
+      const update = declarations?.markers.get(message);
+      if (update) pending.push(update);
+      continue;
+    }
 
     if (message.role === "tool") {
       const block: ContentBlock = {
@@ -300,7 +313,7 @@ function convertMessages(
     } else if (Array.isArray(message.content)) {
       for (const block of message.content) {
         if (block.type === "text") {
-          blocks.push({ type: "text", text: block.text });
+          if (block.text || !declarations) blocks.push({ type: "text", text: block.text });
           continue;
         }
         // A model that cannot read a picture is given the words for one instead:
@@ -329,13 +342,16 @@ function convertMessages(
     // content array is rejected, and the conversation loses nothing by omitting
     // a turn that said nothing.
     if (blocks.length === 0) continue;
+    if (message.role === "assistant") wire.push(...pending.splice(0));
     wire.push({ role: message.role === "assistant" ? "assistant" : "user", content: blocks });
   }
 
+  wire.push(...pending);
+  if (declarations?.tail) wire.push(declarations.tail);
   return wire;
 }
 
-function isOnlyToolResults(message: WireMessage): boolean {
+function isOnlyToolResults(message: ConversationMessage): boolean {
   return message.content.every((block) => block.type === "tool_result");
 }
 
@@ -386,23 +402,21 @@ function markLastUserMessageForCaching(
   cacheControl: { readonly type: "ephemeral"; readonly ttl?: "1h" },
 ): WireMessage[] {
   if (messages.length === 0) return [...messages];
-  const lastIndex = messages.length - 1;
+  let lastIndex = messages.length - 1;
+  while (lastIndex >= 0 && messages[lastIndex]!.role === 'system') lastIndex--;
+  if (lastIndex < 0) return [...messages];
   const last = messages[lastIndex]!;
   if (last.role !== "user" || last.content.length === 0) return [...messages];
   const lastBlockIndex = last.content.length - 1;
   const markedContent = last.content.map((block, index) =>
     index === lastBlockIndex ? { ...block, cache_control: cacheControl } : block,
   );
-  return [...messages.slice(0, lastIndex), { ...last, content: markedContent }];
+  return [...messages.slice(0, lastIndex), { ...last, content: markedContent }, ...messages.slice(lastIndex + 1)];
 }
 
 /** The tool declarations this API expects. */
 function convertTools(tools: readonly ToolSchema[]): readonly Record<string, unknown>[] {
-  return tools.map((tool) => ({
-    name: tool.function.name,
-    description: tool.function.description,
-    input_schema: tool.function.parameters ?? { type: "object", properties: {} },
-  }));
+  return tools.map(anthropicToolDefinition);
 }
 
 /**
@@ -868,6 +882,7 @@ declareEndpoint("anthropic-messages", {
       ...(input.supportsMidConvoToolChanges !== undefined ? { supportsMidConvoToolChanges: input.supportsMidConvoToolChanges } : {}),
       ...(input.supportsMidConvoEffort !== undefined ? { supportsMidConvoEffort: input.supportsMidConvoEffort } : {}),
       ...(input.historicalEfforts !== undefined ? { historicalEfforts: input.historicalEfforts } : {}),
+      ...(input.declarationTarget !== undefined ? { declarationTarget: input.declarationTarget } : {}),
     }),
   refreshBody: (body) => {
     // A different budget/thinking config changes the message cache key; retaining it defeats

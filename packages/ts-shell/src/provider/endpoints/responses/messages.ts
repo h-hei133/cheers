@@ -37,6 +37,7 @@ function userContent(message: ChatMessage, vision: boolean): readonly Record<str
 export function responseMessages(messages: readonly ChatMessage[], vision: boolean, provider: string | undefined, model: string, binding?: string): readonly OutputItem[] {
   const result: OutputItem[] = [];
   for (const message of messages) {
+    if (message.requestDeclaration) continue;
     if (message.role === 'assistant') {
       const native = replay(message, provider, model, binding);
       if (native) { result.push(...native); continue; }

@@ -31,6 +31,7 @@ export function prepareTurnBody(context: TurnBodyContext) {
       initialTools,
     } : {}),
     ...(shape.supportsMidConvoEffort ? { supportsMidConvoEffort: true } : {}),
+    declarationTarget: { provider: activeProvider, model: activeModel, endpoint, replayBinding },
   }) ?? {};
   payload = endpointTurnBody(endpoint, {
     model: activeModel,
@@ -72,6 +73,7 @@ export function prepareTurnBody(context: TurnBodyContext) {
     } : {}),
     ...(shape.supportsMidConvoEffort ? { supportsMidConvoEffort: true } : {}),
     ...(request.historicalEfforts ? { historicalEfforts: request.historicalEfforts } : {}),
+    declarationTarget: { provider: activeProvider, model: activeModel, endpoint, replayBinding },
   });
   return { requestHeaders, payload };
 }

@@ -7,7 +7,7 @@ import type { ProviderMessage } from '../model-adapters/message.js';
 export function providerSystemPrompt(base: string, messages: readonly ProviderMessage[]): string {
   const parts = base ? [base] : [];
   for (const message of messages) {
-    if (message.role !== 'system' || message.content == null) continue;
+    if (message.role !== 'system' || message.requestDeclaration || message.content == null) continue;
     if (typeof message.content === 'string') parts.push(message.content);
     else {
       if (message.content.some(block => block.type !== 'text')) throw new Error('System message content must contain text only.');

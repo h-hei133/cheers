@@ -2476,3 +2476,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A message factory validates a declaration, but direct encode or append drops undefined fields, invokes schema hooks, or persists data that the reader rejects.
 - **Root Cause:** Public append paths serialize caller events without the factory's inert capture; creating a header before validation also changes disk on refusal.
 - **Rule:** Capture message events before encoding at the shared codec, check the event type through its own data descriptor, and encode once before header creation or file opening. Preserve append-first live publication and the existing unknown disk outcome after a real write. SessionManager reloads current projections per write; tests must observe the current loaded record instead of an old createNew object.
+
+### Request Markers Must Survive Capture And Conversion Before Protocol Ordering
+- **Symptom:** A reused provider carrier invokes a getter, a schema's undefined field disappears before validation, or a silent assistant closes still-pending tool results before native projection.
+- **Root Cause:** Generic snapshot or spread precedes the strict declaration boundary, and raw indexes are mistaken for converted message positions.
+- **Rule:** Capture raw/reused/converted declaration data before generic normalization and keep ingress refusal inside preparation error handling. Require converters to preserve explicit marker identities, payloads and order; choose legal native positions during protocol conversion. Skip silent assistants only while results remain pending, and verify the actual outgoing chain. Auto effort has no proven native reset; use the existing current/default behavior instead of carrying an old explicit level.

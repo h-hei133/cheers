@@ -3,6 +3,7 @@ import type { AgentMessage, StandardAgentMessage } from './state.js';
 import { captureMessageHistory } from './custom.js';
 import { snapshotData } from '../values/data.js';
 import { isProviderMessage, type ProviderMessage } from '../../model-adapters/message.js';
+import { assertDeclarationHistory } from './declarations/history.js';
 
 /**
  * Convert application history for one request without rewriting durable source.
@@ -33,7 +34,8 @@ export async function convertMessages(messages: readonly AgentMessage[], convert
   try {
     const admitted = captureMessageHistory(messages);
     if (!converter && admitted.every((message): message is StandardAgentMessage => message.role !== 'custom')) {
-      return { messages: messages as readonly StandardAgentMessage[] };
+      assertDeclarationHistory(admitted, admitted);
+      return { messages: admitted.some(message => message.requestDeclaration) ? admitted : messages as readonly StandardAgentMessage[] };
     }
     captured = snapshotData(admitted, LIMITS) as unknown as readonly AgentMessage[];
   } catch { throw new Error('Message conversion requires bounded inert history.'); }
@@ -45,6 +47,7 @@ export async function convertMessages(messages: readonly AgentMessage[], convert
   signal?.throwIfAborted();
   try {
     const providerMessages = captureProviderMessages(converted);
+    assertDeclarationHistory(captured, providerMessages);
     const projected = providerMessages.map(message => Object.freeze({ ...message, content: message.content ?? '' }));
     return Object.freeze({ messages: Object.freeze(projected), sourceMessages: captured, providerMessages });
   } catch { throw new Error('Message conversion returned invalid provider messages.'); }
@@ -92,7 +95,8 @@ function canObservePromise(value: unknown): value is Promise<unknown> {
 }
 
 function captureProviderMessages(value: unknown): readonly ProviderMessage[] {
-  const saved = snapshotData(value, LIMITS);
+  if (!Array.isArray(value)) throw new Error('invalid');
+  const saved = snapshotData(captureMessageHistory(value), LIMITS);
   if (!Array.isArray(saved) || !saved.every(isProviderMessage)) throw new Error('invalid');
   return saved;
 }

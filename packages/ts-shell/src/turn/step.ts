@@ -3,6 +3,7 @@ export type { PreparedTurnContext, ProviderTarget, StepOptions, StepRequest } fr
 import { createTurnContextPreparer, TurnPreparationError } from './context/prepare.js';
 import { bindTurnContext } from './context/owner.js';
 import type { MessageProjection } from '../core/agent/messages.js';
+import { captureMessageHistory } from '../core/agent/custom.js';
 import { randomUUID } from 'node:crypto';
 import { createComponentLogger } from "../observability/structuredLogger.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
@@ -124,10 +125,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
   const step: StepFunction = async (messages, signal, listener, options): Promise<AssistantStep> => {
     let sourceMessages = options.sourceMessages ?? messages;
     const recordAuxiliaryUsage = request.recordAuxiliaryUsage;
-    let messageProjection: MessageProjection | undefined = options.providerMessages !== undefined
-      ? { messages: options.providerMessages.map(message => ({ ...message, content: message.content ?? '' })),
-          sourceMessages, providerMessages: options.providerMessages }
-      : undefined;
+    let messageProjection: MessageProjection | undefined;
     const requestId = options.requestId ?? randomUUID();
     let requestAcceptedAt: number | undefined;
     let acceptedResponse = false;
@@ -148,6 +146,11 @@ export function createStepFunction(request: StepRequest): StepFunction {
     for (;;) {
       let prepared: PreparedTurnContext;
       try {
+        if (streamAttempts === 0 && !messageProjection && options.providerMessages !== undefined) {
+          const providerMessages = captureMessageHistory(options.providerMessages);
+          messageProjection = { messages: providerMessages.map(message => ({ ...message, content: message.content ?? '' })),
+            sourceMessages, providerMessages };
+        }
         if (contextOwner && !contextOwner.isCurrent()) throw new TurnPreparationError('Request history changed during preparation. No request was sent.', true);
         prepared = streamAttempts === 0 && options.preparedContext
           ? options.preparedContext : await prepare(sourceMessages, signal, messageProjection);

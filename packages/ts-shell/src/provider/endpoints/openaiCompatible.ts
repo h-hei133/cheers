@@ -144,6 +144,7 @@ function wireMessages(messages: readonly ChatMessage[], vision: boolean, bridge:
     pending = [];
   };
   for (const message of messages) {
+    if (message.requestDeclaration) continue;
     if (message.role !== "tool") flush();
     if (message.role === "tool" && Array.isArray(message.content)) {
       const images = message.content.filter(block => block.type === "image");

@@ -1,5 +1,7 @@
 import type { MultimodalContentBlock } from './multimodal.js';
 import { isRecord } from '../core/values/record.js';
+import type { RequestDeclaration } from '../core/agent/declarations/model.js';
+import { captureRequestDeclaration } from '../core/agent/declarations/codec.js';
 
 export type MessageContent = string | readonly MultimodalContentBlock[];
 
@@ -37,6 +39,9 @@ export interface MessageReasoning {
 
 /** Standard messages accepted by provider projection, without session or agent state. */
 export interface ProviderMessage {
+  /** Declaration markers retain their captured identity until protocol projection. */
+  readonly id?: string;
+  readonly requestDeclaration?: RequestDeclaration;
   readonly role: 'system' | 'user' | 'assistant' | 'tool';
   /** Text or text with images; protocols may omit content for tool calls. */
   readonly content?: MessageContent | null;
@@ -52,6 +57,8 @@ export interface ProviderMessage {
 export function isProviderMessage(value: unknown): value is ProviderMessage {
   if (!isRecord(value) || typeof value.role !== 'string' || !['system', 'user', 'assistant', 'tool'].includes(value.role)
     || (value.content !== undefined && value.content !== null && !isMessageContent(value.content))) return false;
+  try { captureRequestDeclaration(value as Record<string, unknown> & { role: string }); }
+  catch { return false; }
   const calls = value.tool_calls, origin = value.origin, reasoning = value.reasoning;
   return (calls === undefined || (value.role === 'assistant' && Array.isArray(calls) && calls.every(call =>
     isRecord(call) && typeof call.id === 'string' && call.id.length > 0 && call.type === 'function'

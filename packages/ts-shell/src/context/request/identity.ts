@@ -8,6 +8,7 @@ interface DigestMessage {
   readonly tool_calls?: unknown;
   readonly tool_call_id?: string;
   readonly origin?: unknown;
+  readonly requestDeclaration?: unknown;
 }
 
 /** Hash content at its owning boundary; retain no prompt text in telemetry. */
@@ -23,6 +24,7 @@ export function historyDigest(messages: readonly DigestMessage[]): string {
   const digest = createHash('sha256');
   for (const message of messages) digest.update(JSON.stringify([
     message.role, message.content, message.reasoning, message.tool_calls, message.tool_call_id, message.origin,
+    ...(message.requestDeclaration ? [message.requestDeclaration] : []),
   ]) + '\n');
   return digest.digest('hex');
 }

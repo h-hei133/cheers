@@ -17,6 +17,8 @@ import { promptTokensFor, requestBudget } from '../../context/request/budget.js'
 import { estimatePrompt } from '../../context/request/estimate.js';
 import { estimateWirePrompt, WirePromptUnavailableError } from '../../context/request/wire.js';
 import { historyDigest } from '../../context/request/identity.js';
+import { assertDeclarationHistory } from '../../core/agent/declarations/history.js';
+import { captureMessageHistory } from '../../core/agent/custom.js';
 import { CHARS_PER_TOKEN } from '../../session/context.js';
 import { outgoingProjection, providerSystemPrompt, finalStepMessages, hasToolHistory, TOOL_HISTORY_UNSUPPORTED_MESSAGE } from '../messages.js';
 import { measuredProjectionPrefix, storedPromptProjection } from '../measurement.js';
@@ -59,7 +61,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     if (options.convertToLlm !== converter) {
       throw new TurnPreparationError('Message converter changed during preparation. No request was sent.', true);
     }
-    const sourceMessages = snapshotData(messages, CAPTURE_LIMITS) as unknown as readonly AgentMessage[];
+    const sourceMessages = snapshotData(captureMessageHistory(messages), CAPTURE_LIMITS) as unknown as readonly AgentMessage[];
     const optionIdentity = JSON.stringify([options.allowTools, options.allowedTools, options.agentMode]);
     const allowedTools = options.allowedTools === undefined ? undefined : Object.freeze([...options.allowedTools]);
     const generationIdentity = JSON.stringify([request.provider, request.temperature, request.topP, request.maxOutputTokens,
@@ -75,16 +77,17 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     signal?.throwIfAborted();
     const messageProjection = reuse
       ? Object.freeze({ sourceMessages,
-          messages: snapshotData(reuse.messages, CAPTURE_LIMITS) as unknown as MessageProjection['messages'],
+          messages: snapshotData(captureMessageHistory(reuse.messages), CAPTURE_LIMITS) as unknown as MessageProjection['messages'],
           ...(reuse.providerMessages !== undefined ? {
-            providerMessages: snapshotData(reuse.providerMessages, CAPTURE_LIMITS) as unknown as NonNullable<MessageProjection['providerMessages']>,
+            providerMessages: snapshotData(captureMessageHistory(reuse.providerMessages), CAPTURE_LIMITS) as unknown as NonNullable<MessageProjection['providerMessages']>,
           } : {}) })
       : await convertMessages(sourceMessages, converter, signal);
+    assertDeclarationHistory(sourceMessages, messageProjection.messages);
     const openingIndex = options.promptSource ? messages.indexOf(options.promptSource.opening) : -1;
     const promptSource = options.promptSource && openingIndex >= 0
       ? { opening: sourceMessages[openingIndex]!, stored: options.promptSource.stored } : undefined;
     const projectedMessages = messageProjection.providerMessages
-      ? messageProjection.messages.filter(message => message.role !== 'system') : messageProjection.messages;
+      ? messageProjection.messages.filter(message => message.role !== 'system' || message.requestDeclaration) : messageProjection.messages;
     const converted = messageProjection.providerMessages !== undefined;
     const activeProvider = route?.provider ?? (request.provider.provider ?? '');
     const activeModel = route?.modelId ?? request.provider.model;
@@ -233,7 +236,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       ({ requestHeaders, payload } = prepareTurnBody({ request, options, activeProvider, activeModel,
         endpoint, protocol, systemPrompt, finalMessages, tools, allowTools, shape, initialTools, replayBinding, output }));
       // Public replay and image conversion use the protocol's actual input projection.
-      if (shape.reasoningReplayField || inputLimits?.images) {
+      if (shape.reasoningReplayField || inputLimits?.images || finalMessages.some(message => message.requestDeclaration)) {
         try {
           const wireTokens = estimateWirePrompt(payload, protocol.contextFields, modelEntry?.tokenizer);
           if (!prompt.measured || wireTokens > prompt.tokens) {

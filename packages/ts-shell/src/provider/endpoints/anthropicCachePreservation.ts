@@ -1,5 +1,7 @@
 import type { ToolSchema } from "../../turn/tools.js";
 import type { TurnRequest } from "./kinds.js";
+import { projectRequestDeclarations, toolChangeBlocks, topLevelTools, type DeclarationInput, type NativeSystemMessage } from './anthropic/declarations.js';
+export { DEFERRED_TOOL_PLACEHOLDER } from './anthropic/declarations.js';
 
 const MID_CONVERSATION_OUTPUT_CONFIG_BETA = "mid-conversation-output-config-2026-07-01";
 const THINKING_BINDING_CONTROLS_BETA = "thinking-binding-controls-2026-08-01";
@@ -9,43 +11,20 @@ export function anthropicBetaHeaders(
   input: Pick<
     TurnRequest,
     "allowTools" | "tools" | "initialTools" | "supportsMidConvoToolChanges" | "supportsMidConvoEffort" | "thinkingLevelName"
-  >,
+  > & Pick<DeclarationInput, 'messages' | 'declarationTarget'>,
 ): Record<string, string> {
+  const declarations = projectRequestDeclarations(input);
   const betas: string[] = [];
-  if (input.supportsMidConvoEffort && input.thinkingLevelName !== undefined) {
+  if (declarations ? declarations.nativeEffort : input.supportsMidConvoEffort && input.thinkingLevelName !== undefined) {
     betas.push(MID_CONVERSATION_OUTPUT_CONFIG_BETA, THINKING_BINDING_CONTROLS_BETA);
   }
-  if (
-    input.allowTools
-    && input.supportsMidConvoToolChanges
-    && input.initialTools !== undefined
-    && (input.tools.length > 0 || input.initialTools.length > 0)
-  ) {
+  const inlineTools = declarations ? declarations.requiresInlineTools : input.allowTools
+    && input.supportsMidConvoToolChanges && input.initialTools !== undefined
+    && (input.tools.length > 0 || input.initialTools.length > 0);
+  if (inlineTools) {
     betas.push(INLINE_TOOLS_BETA);
   }
   return betas.length > 0 ? { "anthropic-beta": betas.join(",") } : {};
-}
-
-export const DEFERRED_TOOL_PLACEHOLDER = {
-  type: "tool_search_tool_bm25_20250305",
-  name: "tool_search",
-} as const;
-
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (typeof value === "object" && value !== null) {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record).sort().map(k => `${JSON.stringify(k)}:${canonicalJson(record[k])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function convertSingleTool(tool: ToolSchema): Record<string, unknown> {
-  return {
-    name: tool.function.name,
-    description: tool.function.description,
-    input_schema: tool.function.parameters ?? { type: "object", properties: {} },
-  };
 }
 
 /**
@@ -59,51 +38,11 @@ export function declareToolChanges(
   cacheControl?: { readonly type: "ephemeral"; readonly ttl?: "1h" },
 ): {
   readonly topLevelTools: readonly Record<string, unknown>[];
-  readonly toolChangeMessage?: { readonly role: "system"; readonly content: readonly Record<string, unknown>[] };
+  readonly toolChangeMessage?: NativeSystemMessage;
 } {
-  const initialConverted = initialTools.map(convertSingleTool);
-  const markedInitial = cacheControl && initialConverted.length > 0
-    ? initialConverted.map((entry, idx) =>
-        idx === initialConverted.length - 1 ? { ...entry, cache_control: cacheControl } : entry)
-    : initialConverted;
-  const topLevelTools = [...markedInitial, DEFERRED_TOOL_PLACEHOLDER];
-
-  const initialByName = new Map(initialTools.map(t => [t.function.name, canonicalJson(convertSingleTool(t))]));
-  const currentByName = new Map(currentTools.map(t => [t.function.name, t]));
-
-  const added: ToolSchema[] = [];
-  const modified: string[] = [];
-  for (const tool of currentTools) {
-    const prev = initialByName.get(tool.function.name);
-    const curr = canonicalJson(convertSingleTool(tool));
-    if (prev !== curr) {
-      if (prev !== undefined) modified.push(tool.function.name);
-      added.push(tool);
-    }
-  }
-  const removed: string[] = [...modified];
-  for (const tool of initialTools) {
-    if (!currentByName.has(tool.function.name)) {
-      removed.push(tool.function.name);
-    }
-  }
-
-  const blocks: Record<string, unknown>[] = [];
-  for (const name of removed) {
-    blocks.push({
-      type: "tool_removal",
-      tool: { type: "tool_reference", name },
-    });
-  }
-  for (const tool of added) {
-    blocks.push({
-      type: "tool_addition",
-      tool: { type: "tool_definition", definition: convertSingleTool(tool) },
-    });
-  }
-
+  const blocks = toolChangeBlocks(initialTools, currentTools);
   return {
-    topLevelTools,
+    topLevelTools: topLevelTools(initialTools, cacheControl),
     ...(blocks.length > 0 ? { toolChangeMessage: { role: "system" as const, content: blocks } } : {}),
   };
 }

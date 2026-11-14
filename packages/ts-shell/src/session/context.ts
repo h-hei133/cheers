@@ -24,6 +24,7 @@ export const DEFAULT_RESERVE_TOKENS = 8000;
  */
 export function messageCharCount(message: AgentMessage): number {
   let chars = messageToText(message.content).length;
+  if (message.requestDeclaration) chars += JSON.stringify(message.requestDeclaration).length;
   if (Array.isArray(message.content)) {
     chars += message.content.filter(block => block.type === "image").length
       * IMAGE_ESTIMATE_TOKENS * CHARS_PER_TOKEN;

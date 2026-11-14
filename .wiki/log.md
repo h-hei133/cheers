@@ -11764,3 +11764,7 @@ Linux当前编译SDK已配置模型6次actual bodySent、普通automatic verifie
 ### 2026-11-15：声明合同和会话存储独立批次
 
 C.6首批补齐完整工具／实际目标／effort的版本化空文本system声明，双向transcript保留顺序／ID，append-first防止失败声明进入内存。复核发现公开encode和直接append会绕过捕获，三项入口反例先红后修；六静态门、5套件93项及build `cd08cabeb2bf`通过，限定独立复核CLEAR。当前仍未接实际发送和协议历史投影，C.6保留部分、本地验收数仍16；按批本地提交，无push／CI声明。
+
+### 2026-11-15：原始声明的协议与转换边界
+
+数据批`078d28f`之后，协议按同target段的首个完整tools快照固定baseline，后续相邻schema／删除／恢复和effort保持原marker；native更新延到实际assistant，不切开tool结果。转换保留声明身份和顺序，raw/reuse/output在通用snapshot前capture，计量包含完整controls。7项协议红例、9项carrier红例及两复核红例修复后，六静态门、13套件337项、build `2a1feaebbaa4`和函数上限通过，限定独立复核CLEAR。auto安全回退不承诺前缀稳定；实际发布和压缩spine仍待实施，本地验收数16、目标active，无push／CI声明。
