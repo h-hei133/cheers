@@ -2,6 +2,55 @@ import type { AgentMessage } from '../../core/agent/state.js';
 import { requestBudget, requestBudgetThreshold } from '../../context/request/budget.js';
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens, messageCharCount, overheadCharCount, type RequestOverhead } from '../context.js';
 import { FINAL_STEP_MESSAGE } from '../../turn/messages.js';
+import type { CompactionPolicy, CondenseInput } from '../compaction.js';
+import { captureMessageHistory } from '../../core/agent/custom.js';
+import { snapshotData } from '../../core/values/data.js';
+
+const CAPTURE_LIMITS = { bytes: 64 * 1024 * 1024, nodes: 250_000, depth: 48 } as const;
+
+/** Admit every standard or custom value before any content reader or serializer. */
+export function captureCompactionHistory(messages: readonly AgentMessage[]): readonly AgentMessage[] {
+  return snapshotData(captureMessageHistory(messages), CAPTURE_LIMITS) as unknown as readonly AgentMessage[];
+}
+
+/** Detach both history authorities before application preparation can yield. */
+export function captureCompactionInput(input: CondenseInput): CondenseInput {
+  const messages = captureCompactionHistory(input.messages);
+  const operation = input.operation ? snapshotData(input.operation, CAPTURE_LIMITS) as unknown as NonNullable<CondenseInput['operation']> : undefined;
+  if (operation?.source) captureMessageHistory(operation.source.history);
+  return { ...input, messages, policy: Object.freeze({ ...input.policy }), ...(operation ? { operation } : {}) };
+}
+
+/** Generation reads stored raw history; lifecycle facts describe the complete caller. */
+export function capturedGenerationInput(input: CondenseInput, policy: CompactionPolicy, tokensBefore: number): CondenseInput {
+  return { ...input, messages: input.operation?.source?.history ?? input.messages, force: true, policy,
+    ...(input.lifecycle?.before ? { lifecycle: { ...input.lifecycle, before: event => input.lifecycle!.before!({
+      ...event, tokensBefore, messageCount: input.messages.length,
+    }) } } : {}) };
+}
+
+/** Preparation carries the captured lifetime; an async result cannot adopt a successor. */
+export async function prepareCompactionPolicy(policy: CompactionPolicy, messages: readonly AgentMessage[],
+  signal?: AbortSignal, toolsAllowed?: boolean): Promise<CompactionPolicy> {
+  signal?.throwIfAborted();
+  if (policy.admission?.()) throw new Error('Compaction request ownership changed.');
+  const prepared = policy.prepare ? await policy.prepare(messages, signal, toolsAllowed) : policy;
+  signal?.throwIfAborted();
+  if (policy.admission?.() || prepared.admission?.()) throw new Error('Compaction request ownership changed.');
+  return Object.freeze({ ...policy, ...prepared });
+}
+
+/** Complete captured request estimate; provider measurements are a separate contract. */
+export function estimateCompactionContext(messages: readonly AgentMessage[], policy: {
+  readonly overhead?: RequestOverhead;
+  readonly projectMessages?: (messages: readonly AgentMessage[]) => readonly AgentMessage[];
+  readonly estimateContextTokens?: (messages: readonly AgentMessage[], toolsAllowed?: boolean) => number;
+}, toolsAllowed?: boolean): number {
+  const tokens = policy.estimateContextTokens?.(messages, toolsAllowed)
+    ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed, policy.overhead), policy.projectMessages);
+  if (!Number.isSafeInteger(tokens) || tokens < 0) throw new Error('Compaction request estimate is invalid.');
+  return tokens;
+}
 
 interface BudgetPolicy {
   readonly contextWindow: number;
@@ -46,7 +95,16 @@ export function formatBudgetBreakdown(messages: readonly AgentMessage[], policy:
   readonly outputTokens?: number;
   readonly reserveTokens?: number;
   readonly projectMessages?: (messages: readonly AgentMessage[]) => readonly AgentMessage[];
-}, closingChars = 0): string {
+  readonly estimateContextTokens?: (messages: readonly AgentMessage[], toolsAllowed?: boolean) => number;
+}, closingChars = 0, toolsAllowed?: boolean): string {
+  if (policy.estimateContextTokens) {
+    const prompt = estimateCompactionContext(messages, policy, toolsAllowed);
+    const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
+    const captured = `Estimated budget: captured request ${prompt.toLocaleString('en-US')} + `;
+    return policy.outputTokens === undefined
+      ? `${captured}reserve ${reserve.toLocaleString('en-US')} = ${(prompt + reserve).toLocaleString('en-US')} known tokens; output is provider-selected and unknown.`
+      : `${captured}output ${policy.outputTokens.toLocaleString('en-US')} + reserve ${reserve.toLocaleString('en-US')} = ${(prompt + policy.outputTokens + reserve).toLocaleString('en-US')} tokens.`;
+  }
   // One rounding over the whole request, exactly as the headline does it.
   // Rounding the instruction separately and adding the results is not the same
   // number, and the message states both.

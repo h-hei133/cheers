@@ -57,6 +57,16 @@ afterEach(() => {
 });
 
 describe('threshold compaction progress', () => {
+  it('uses each current and accepted prepared policy without a stale projection closure', () => {
+    const messages = history();
+    const onDeadEnd = vi.fn();
+    const progress = createCompactionProgress({ ...policy, estimateContextTokens: () => 1 }, onDeadEnd);
+    progress.accepted(messages, 2, undefined, { ...policy, estimateContextTokens: () => 2_000 });
+    expect(onDeadEnd).toHaveBeenCalledOnce();
+    expect(progress.blocks(messages, messages.length - 2, undefined, { ...policy, estimateContextTokens: () => 2_000 })).toBe(true);
+    expect(progress.blocks(messages, messages.length - 2, undefined, { ...policy, estimateContextTokens: () => 1 })).toBe(false);
+  });
+
   it('keeps ordinary compaction available after it creates headroom', async () => {
     const summarize = vi.fn(async () => 'older work');
     const onDeadEnd = vi.fn();

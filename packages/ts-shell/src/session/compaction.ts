@@ -3,7 +3,8 @@ import { ModelAdmissionError } from '../core/agent/request/model.js';
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import { CHARS_PER_TOKEN, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
-import { availableTailTokens, closingCharsFor, estimateWithClosing, formatBudgetBreakdown, reachedBudgetThreshold } from './compaction/budget.js';
+import { availableTailTokens, captureCompactionInput, capturedGenerationInput, closingCharsFor, estimateCompactionContext, formatBudgetBreakdown,
+  prepareCompactionPolicy, reachedBudgetThreshold } from './compaction/budget.js';
 import { digest } from './compaction/state.js';
 import { formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
 import { generateCompaction, CompactionStepUnknown } from './compaction/generation.js';
@@ -11,10 +12,9 @@ import type { CompactionAuthority, CompactionOperationInput, CompactionSource, S
 import { CompactionPublicationError } from './compaction/contract.js';
 import { COMPACTION_DECLINE_MESSAGES, CompactionSummaryError } from './compaction/failure.js';
 import { createCompactionProgress } from './compaction/progress.js';
-import { freezeDeep } from '../core/values/freeze.js';
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 
-export type { SummarizeHistory, SummarizeRequest, SummarizeTurnPrefix } from './compaction/contract.js';
+export type { PreparedSummaryStep, SummarizeHistory, SummarizeRequest, SummarizeTurnPrefix } from './compaction/contract.js';
 export { CONTEXT_CHECKPOINT_MARKER, formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
 export { shouldCompact } from './compaction/budget.js';
 
@@ -48,11 +48,6 @@ const measuredTokensCache = new WeakMap<CompactionPolicy, {
   readonly tokens: number | undefined;
 }>();
 
-/** Drop the cached answer for a policy, before re-measuring across an await. */
-function forgetMeasurement(policy: CompactionPolicy): void {
-  measuredTokensCache.delete(policy);
-}
-
 function measureContextOnce(policy: CompactionPolicy, messages: readonly AgentMessage[],
   toolsAllowed: boolean | undefined): number | undefined {
   const cached = measuredTokensCache.get(policy);
@@ -65,6 +60,11 @@ function measureContextOnce(policy: CompactionPolicy, messages: readonly AgentMe
 export const KEEP_RECENT_TOKENS = 20_000;
 
 export interface CompactionPolicy {
+  readonly prepare?: (messages: readonly AgentMessage[], signal?: AbortSignal, toolsAllowed?: boolean) => Promise<CompactionPolicy>;
+  readonly preparedIdentity?: string;
+  readonly admission?: () => string | undefined;
+  /** Captured complete request estimate, independently of provider usage. */
+  readonly estimateContextTokens?: (messages: readonly AgentMessage[], toolsAllowed?: boolean) => number;
   /** Digest of the captured summary target, effort and model capabilities; never credentials. */
   readonly summaryIdentity?: string;
   /** Maximum history/prefix input tokens, leaving room for a carried summary. */
@@ -360,9 +360,9 @@ export function compactionRefusalReason(
   if (isBelowThreshold(messages, policy, toolsAllowed)) return undefined;
   const reason = explainNoCut(messages, policy);
   const measured = measureContextOnce(policy, messages, toolsAllowed);
-  const tokens = measured ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed, policy.overhead), policy.projectMessages);
+  const tokens = measured ?? estimateCompactionContext(messages, policy, toolsAllowed);
   const state = `the prompt uses about ${Math.round(tokens).toLocaleString('en-US')} ${measured === undefined ? 'estimated' : 'provider-measured'} tokens for a ${policy.contextWindow.toLocaleString('en-US')}-token window`;
-  const breakdown = formatBudgetBreakdown(messages, policy, closingCharsFor(toolsAllowed, policy.overhead));
+  const breakdown = formatBudgetBreakdown(messages, policy, closingCharsFor(toolsAllowed, policy.overhead), toolsAllowed);
   return reason === "no-legal-cut"
     ? { key: reason, message: `Context ${state}, but every point it could be split at would separate a tool call from its result. Finish the turn, then compact. ${breakdown}` }
     : { key: reason, message: `Context ${state}, but the conversation still fits the recent tail compaction keeps, so there is nothing to condense. Lower keepRecentTokens to condense it now. ${breakdown}` };
@@ -431,7 +431,7 @@ export function planCompaction(
   // The provider's own count wins when it exists: it measured the prompt that
   // was actually sent, while the estimate only measures the text we kept.
   const measuredTokens = measureContextOnce(policy, messages, toolsAllowed);
-  const tokensBefore = measuredTokens ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed, policy.overhead), policy.projectMessages);
+  const tokensBefore = measuredTokens ?? estimateCompactionContext(messages, policy, toolsAllowed);
   const measured = measuredTokens !== undefined;
   if (!reachedBudgetThreshold(tokensBefore, policy, measured)) {
     return undefined;
@@ -453,7 +453,7 @@ function isBelowThreshold(
   toolsAllowed?: boolean,
 ): boolean {
   const measuredTokens = measureContextOnce(policy, messages, toolsAllowed);
-  const tokensBefore = measuredTokens ?? estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed, policy.overhead), policy.projectMessages);
+  const tokensBefore = measuredTokens ?? estimateCompactionContext(messages, policy, toolsAllowed);
   const measured = measuredTokens !== undefined;
   return !reachedBudgetThreshold(tokensBefore, policy, measured);
 }
@@ -466,6 +466,7 @@ export interface CondensedContext {
   readonly summarized: number;
   /** What the context is estimated to cost after the checkpoint replaces the head. */
   readonly tokensAfter: number;
+  readonly preparedPolicy?: CompactionPolicy;
 }
 
 /**
@@ -576,17 +577,27 @@ const pendingCompactions = new Map<string, Promise<CondenseOutcome>>();
 
 /** Identical work in this process joins one generation; other processes consult durable claims. */
 export async function condenseContext(input: CondenseInput): Promise<CondenseOutcome> {
-  const original = freezeDeep(structuredClone(input.messages));
+  input = captureCompactionInput(input);
+  const original = input.messages;
   const source = input.operation?.source;
+  let preparedPolicy: CompactionPolicy;
+  try { preparedPolicy = await prepareCompactionPolicy(input.policy, original, input.signal, input.toolsAllowed); }
+  catch (error) {
+    if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
+    throw error;
+  }
+  const estimatedBefore = estimateCompactionContext(original, preparedPolicy, input.toolsAllowed);
+  const tokensBefore = input.force ? estimatedBefore
+    : measureContextOnce(preparedPolicy, original, input.toolsAllowed) ?? estimatedBefore;
   // Triggering uses the caller's complete request; generation uses the same
   // captured stored conversation for manual, automatic and overflow callers.
-  if (source && !input.force && isBelowThreshold(original, input.policy, input.toolsAllowed)) {
+  if (!input.force && isBelowThreshold(original, preparedPolicy, input.toolsAllowed)) {
     return { status: 'declined', reason: 'below-threshold' };
   }
-  const captured = { ...input, messages: source ? freezeDeep(structuredClone(source.history)) : original,
-    ...(source ? { force: true } : {}),
-    policy: Object.freeze({ ...input.policy }), operation: input.operation && freezeDeep({ ...input.operation }) };
-  const key = captured.operation ? digest([{ ...captured.operation,
+  const offset = source ? original.length - source.history.length : 0;
+  const captured = capturedGenerationInput(input, preparedPolicy, tokensBefore);
+  const key = captured.operation && !input.policy.prepare && !input.policy.estimateContextTokens
+    && !preparedPolicy.prepare && !preparedPolicy.estimateContextTokens ? digest([{ ...captured.operation,
     source: captured.operation.source && { sessionId: captured.operation.source.sessionId,
       identity: captured.operation.source.replayIdentity ?? captured.operation.source.identity } },
     captured.messages, captured.instructions, captured.policy.summaryIdentity,
@@ -599,20 +610,24 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
   try {
     const result = await pending;
     if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
-    if (result.status !== 'condensed' || !source) return result;
+    if (result.status !== 'condensed') return result;
     // Shared generation never shares a caller's runtime system prefix or opening
     // envelope. Rebuild its checkpoint and exact kept tail from that caller.
-    // The await above may have let a request record new usage, so the answer
-    // cached before it no longer describes the same measurement.
-    forgetMeasurement(input.policy);
-    const offset = original.length - captured.messages.length;
     const plan = { ...result.plan, cut: result.plan.cut + offset,
       turnStart: result.plan.turnStart < 0 ? -1 : result.plan.turnStart + offset,
-      tokensBefore: input.force ? estimateTokens(original)
-        : measureContextOnce(input.policy, original, input.toolsAllowed)
-          ?? estimateWithClosing(original, input.policy.overhead, closingCharsFor(input.toolsAllowed, input.policy.overhead), input.policy.projectMessages) };
+      tokensBefore };
     const messages = applyCompaction(original, plan, result.summary);
-    return { ...result, plan, messages, tokensAfter: estimateTokens(messages) };
+    let candidatePolicy: CompactionPolicy;
+    try { candidatePolicy = await prepareCompactionPolicy(preparedPolicy, messages, input.signal, input.toolsAllowed); }
+    catch (error) {
+      if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
+      throw error;
+    }
+    const tokensAfter = estimateCompactionContext(messages, candidatePolicy, input.toolsAllowed);
+    // Compare the two complete caller requests, never the source-only material
+    // or a provider measurement against an estimate of the rebuilt candidate.
+    if (tokensAfter >= estimatedBefore) return { status: 'declined', reason: 'would-not-shrink' };
+    return { ...result, plan, messages, tokensAfter, preparedPolicy: candidatePolicy };
   } finally {
     if (key && !joined && pendingCompactions.get(key) === pending) pendingCompactions.delete(key);
   }
@@ -655,6 +670,8 @@ async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
   if (proceed === false) {
     return { status: "declined", reason: "blocked-by-hook" };
   }
+  if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
+  if (input.policy.admission?.()) throw new Error('Compaction request ownership changed.');
 
   const history = input.messages.slice(historyStart, historyEnd);
   const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, head), plan.cut) : [];
@@ -678,17 +695,7 @@ async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
     return { status: "failed", reason: "unsummarized" };
   }
   const messages = applyCompaction(input.messages, plan, summary);
-  // A compaction earns its cost by leaving the context smaller than it found
-  // it. Both sides are measured the same way — an estimate against an estimate
-  // — because the comparison is between two contexts and the provider has
-  // measured neither. A summary can be larger than what it replaces when the
-  // history it condenses was mostly short messages, which is how a context
-  // grows on every pass instead of shrinking.
-  const before = estimateTokens(input.messages);
   const after = estimateTokens(messages);
-  if (after >= before) {
-    return { status: "declined", reason: "would-not-shrink" };
-  }
   // The head the checkpoint replaces spans from the first message it discards
   // to the cut, which includes any earlier checkpoint it was merged with.
   const summarized = plan.cut - head;
@@ -743,45 +750,24 @@ export interface CompactionStepOptions {
 export function createCompactionStep(
   policy: CompactionPolicy,
   options: CompactionStepOptions,
-): (snapshot: NextStepSnapshot, signal?: AbortSignal) => Promise<NextStepUpdate | undefined> {
+): (snapshot: NextStepSnapshot, signal?: AbortSignal, currentPolicy?: CompactionPolicy) => Promise<NextStepUpdate | undefined> {
   const reason = options.reason ?? "threshold";
   const progress = reason === 'threshold' ? createCompactionProgress(policy, options.onDeadEnd) : undefined;
   // A refusal is reported once per run of identical context, not once per step.
   // The step runs before every model call in a tool loop, so a context that
   // cannot be condensed would otherwise repeat the same sentence on each one.
   let reportedRefusal: string | undefined;
-  const step = async (snapshot: NextStepSnapshot, signal?: AbortSignal): Promise<NextStepUpdate | undefined> => {
+  const step = async (snapshot: NextStepSnapshot, signal?: AbortSignal, currentPolicy?: CompactionPolicy): Promise<NextStepUpdate | undefined> => {
     if (signal?.aborted) {
       return undefined;
     }
-    // A compaction whose size is known before the summary is requested can be
-    // refused by the caller without paying for a summary that gets thrown away.
-    const prepared = planCompaction(snapshot.messages, policy, snapshot.toolsAllowed);
-    if (progress?.blocks(snapshot.messages, prepared?.cut, snapshot.toolsAllowed)) return undefined;
-    const tokensBefore = prepared?.tokensBefore;
-    if (tokensBefore === undefined) {
-      // Declining silently is right when the context still fits: there is
-      // nothing to do and nothing to say. It is wrong when the budget is
-      // already spent and no cut can be made, because the request then goes out
-      // and the provider refuses it with no explanation of why nothing was
-      // condensed. That case is reported so the user can act before the failure.
-      const refusal = compactionRefusalReason(snapshot.messages, policy, snapshot.toolsAllowed);
-      if (refusal && refusal.key !== reportedRefusal) {
-        reportedRefusal = refusal.key;
-        options.onDeclined?.(refusal.message);
-      }
-      return undefined;
-    }
-    // The lifecycle travels into `condenseContext` rather than being invoked
-    // here: one place dispatches the hooks, so the manual and automatic paths
-    // cannot report different payloads for the same event.
     let condensed: CondenseOutcome;
     let source: CompactionSource | undefined;
     try {
       source = options.authority?.capture(snapshot.messages);
-      condensed = await condenseContext({
+      const input = captureCompactionInput({
         messages: snapshot.messages,
-        policy,
+        policy: currentPolicy ?? policy,
         summarize: options.summarize,
         summarizeTurnPrefix: options.summarizeTurnPrefix,
         signal,
@@ -792,6 +778,21 @@ export function createCompactionStep(
           ...(source ? { source } : {}), ...(options.authority?.identity ? { identity: options.authority.identity } : {}),
           ...(options.provider ? { provider: options.provider } : {}), ...(options.model ? { model: options.model } : {}) } } : {}),
       });
+      source = input.operation?.source ?? source;
+      const preparedPolicy = await prepareCompactionPolicy(input.policy, input.messages, signal, snapshot.toolsAllowed);
+      if (options.authority?.admission?.()) throw new Error('Compaction source ownership changed.');
+      const prepared = planCompaction(input.messages, preparedPolicy, snapshot.toolsAllowed);
+      if (progress?.blocks(input.messages, prepared?.cut, snapshot.toolsAllowed, preparedPolicy)) return undefined;
+      if (prepared?.tokensBefore === undefined) {
+        const refusal = compactionRefusalReason(input.messages, preparedPolicy, snapshot.toolsAllowed);
+        if (refusal && refusal.key !== reportedRefusal) {
+          reportedRefusal = refusal.key;
+          options.onDeclined?.(refusal.message);
+        }
+        return undefined;
+      }
+      // The preparation closure reuses this exact raw capture in condenseContext.
+      condensed = await condenseContext({ ...input, policy: preparedPolicy });
     } catch (error) {
       if (error instanceof ModelAdmissionError) throw error;
       if (signal?.aborted) {
@@ -817,9 +818,16 @@ export function createCompactionStep(
     }
     reportedRefusal = undefined;
     const { plan, summary } = condensed;
+    const candidatePolicy = condensed.preparedPolicy ?? currentPolicy ?? policy;
+    const admission = (): string | undefined => candidatePolicy.admission?.() ?? options.authority?.admission?.();
+    const blocked = admission();
+    if (blocked) {
+      options.onDeclined?.(`Automatic compaction was not published: ${blocked}`);
+      return undefined;
+    }
     if (source && options.authority) {
       const committed = options.authority.commit({ source, summary, keptMessages: plan.keptMessages,
-        tokensBefore: plan.tokensBefore, signal, admission: options.authority.admission });
+        tokensBefore: plan.tokensBefore, signal, admission });
       if (committed.status === 'unverified') throw new CompactionPublicationError();
       if (committed.status !== 'committed') {
         options.onDeclined?.(`Automatic compaction was not published: ${committed.reason}`);
@@ -829,7 +837,7 @@ export function createCompactionStep(
     if (options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore }) === false) return undefined;
     await options.lifecycle?.after?.({ reason, summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
     if (signal?.aborted) return undefined;
-    progress?.accepted(condensed.messages, plan.keptMessages, snapshot.toolsAllowed);
+    progress?.accepted(condensed.messages, plan.keptMessages, snapshot.toolsAllowed, candidatePolicy);
     return { messages: condensed.messages };
   };
   return step;

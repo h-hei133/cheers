@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import type { AgentMessage } from '../../core/agent/state.js';
 import { compactionRefusalReason } from '../compaction.js';
 import { estimateRequestTokens } from '../context.js';
-import { closingCharsFor, estimateWithClosing, formatBudgetBreakdown } from './budget.js';
+import { closingCharsFor, estimateCompactionContext, estimateWithClosing, formatBudgetBreakdown } from './budget.js';
 
 const messages: AgentMessage[] = [{ role: 'user', content: 'xxxxxxx' }, { role: 'assistant', content: 'yyyyyyy' }];
 const overhead = { tools: [{ name: 'read' }], systemPrompt: 's'.repeat(350) };
@@ -77,4 +77,21 @@ it('uses projected history for the refusal headline and additive breakdown', () 
   expect(refusal?.message).toContain('about 200 estimated tokens');
   expect(refusal?.message).toContain('history 100 + fixed overhead 100');
   expect(refusal?.message).toContain('= 220 tokens.');
+});
+
+it('uses the captured complete request estimate before the raw projection fallback', () => {
+  const policy = { estimateContextTokens: (_messages: readonly AgentMessage[], toolsAllowed?: boolean) => toolsAllowed === false ? 777 : 555,
+    projectMessages: () => { throw new Error('raw projection cannot describe the capture'); }, overhead };
+  expect(estimateCompactionContext(messages, policy)).toBe(555);
+  expect(estimateCompactionContext(messages, policy, false)).toBe(777);
+  expect(() => estimateCompactionContext(messages, { estimateContextTokens: () => Number.NaN })).toThrow('estimate is invalid');
+});
+
+it('reports the exact captured estimate without inventing an additive component split', () => {
+  const policy = { contextWindow: 100, reserveTokens: 10, outputTokens: 20, keepRecentTokens: 10,
+    estimateContextTokens: (_messages: readonly AgentMessage[], toolsAllowed?: boolean) => toolsAllowed === false ? 777 : 555,
+    projectMessages: () => { throw new Error('projection is not a captured request'); } };
+  const refusal = compactionRefusalReason(messages, policy, false);
+  expect(refusal?.message).toContain('about 777 estimated tokens');
+  expect(refusal?.message).toContain('captured request 777 + output 20 + reserve 10 = 807 tokens');
 });

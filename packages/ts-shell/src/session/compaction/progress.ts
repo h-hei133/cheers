@@ -2,7 +2,7 @@ import type { AgentMessage } from '../../core/agent/state.js';
 import { historyDigest } from '../../context/request/identity.js';
 import { messageToText } from '../../model-adapters/multimodal.js';
 import { estimateTokens, type RequestOverhead } from '../context.js';
-import { availableTailTokens, closingCharsFor, estimateWithClosing } from './budget.js';
+import { availableTailTokens, estimateCompactionContext } from './budget.js';
 import { readContextCheckpoint } from './checkpoint.js';
 
 interface ProgressPolicy {
@@ -12,6 +12,7 @@ interface ProgressPolicy {
   readonly outputTokens?: number;
   readonly overhead?: RequestOverhead;
   readonly projectMessages?: (messages: readonly AgentMessage[]) => readonly AgentMessage[];
+  readonly estimateContextTokens?: (messages: readonly AgentMessage[], toolsAllowed?: boolean) => number;
 }
 
 const DEAD_END_NOTICE = 'Compaction freed too little context to make progress — pausing automatic compaction on this history. '
@@ -25,7 +26,7 @@ function hasHeadroom(messages: readonly AgentMessage[], policy: ProgressPolicy,
     ? estimateTokens([checkpoint]) : 0;
   // A closing request carries an instruction the conversation does not, so the
   // residual must be measured against the request that will actually be sent.
-  const prompt = estimateWithClosing(messages, policy.overhead, closingCharsFor(toolsAllowed, policy.overhead), policy.projectMessages);
+  const prompt = estimateCompactionContext(messages, policy, toolsAllowed);
   return prompt <= availableTailTokens(policy) + checkpointTokens;
 }
 
@@ -38,10 +39,10 @@ function cutIdentity(message: AgentMessage): string {
 export function createCompactionProgress(policy: ProgressPolicy, onDeadEnd?: (message: string) => void) {
   let deadEnd: string | undefined;
   return {
-    blocks(messages: readonly AgentMessage[], cut: number | undefined, toolsAllowed?: boolean): boolean {
+    blocks(messages: readonly AgentMessage[], cut: number | undefined, toolsAllowed?: boolean, currentPolicy = policy): boolean {
       if (deadEnd === undefined) return false;
       const firstKept = cut === undefined ? undefined : messages[cut];
-      if (hasHeadroom(messages, policy, toolsAllowed) || firstKept && cutIdentity(firstKept) !== deadEnd) {
+      if (hasHeadroom(messages, currentPolicy, toolsAllowed) || firstKept && cutIdentity(firstKept) !== deadEnd) {
         deadEnd = undefined;
         return false;
       }
@@ -49,9 +50,9 @@ export function createCompactionProgress(policy: ProgressPolicy, onDeadEnd?: (me
       // even when the checkpoint has moved the old boundary to index one.
       return true;
     },
-    accepted(messages: readonly AgentMessage[], keptMessages: number, toolsAllowed?: boolean): void {
+    accepted(messages: readonly AgentMessage[], keptMessages: number, toolsAllowed?: boolean, currentPolicy = policy): void {
       const firstKept = messages[messages.length - keptMessages];
-      if (!firstKept || hasHeadroom(messages, policy, toolsAllowed)) {
+      if (!firstKept || hasHeadroom(messages, currentPolicy, toolsAllowed)) {
         deadEnd = undefined;
         return;
       }

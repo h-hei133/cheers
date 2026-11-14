@@ -2434,3 +2434,10 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A changed converter output or upgraded target identity makes a previously uncertain summary send appear new.
 - **Root Cause:** Exact body identity changes the step/operation digest while the old ledger still retains an unknown handoff or an expired summary tombstone.
 - **Rule:** Preserve exact capture identity for completed reuse, block changed captures while the same operation is uncertain, and refuse unmappable legacy evidence without rehashing credentials or deleting records. Check complete serialized input limits before admitting a capture, and carry navigation/connection cancellation into pending branch conversion.
+
+
+### Standard History Must Be Captured Before Cloning Or Comparing
+
+- **Symptom:** A standard message nested getter executes during compaction capture, or metadata changes do not retire a summary source.
+- **Root Cause:** The ingress capture detaches custom entries only; structuredClone and digest still execute standard accessors, while a provider-field comparison omits application facts.
+- **Rule:** Apply the existing bounded inert snapshot to every caller/source message before cloning, comparison or asynchronous preparation. Compare all application fields except explicitly accepted storage identity/timestamp differences; restrict the opening exception to its environment content prefix.

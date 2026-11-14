@@ -4,6 +4,8 @@ import { messageToText } from '../../model-adapters/multimodal.js';
 import type { AgentMessage } from '../../core/agent/state.js';
 import type { CompactionAuthority, CompactionCommitInput, CompactionCommit, CompactionSource } from './contract.js';
 import { digest } from './state.js';
+import { captureCompactionHistory } from './budget.js';
+import { sameValue } from '../../config/values.js';
 
 function instructionIdentity(cwd: string, includeFreshness = true): string {
   const loaded = [loadInstructionFiles({ cwd }), loadAppendedInstructionFiles({ cwd })];
@@ -15,18 +17,25 @@ function instructionIdentity(cwd: string, includeFreshness = true): string {
 }
 
 function matchesHistory(source: CompactionSource, messages: readonly AgentMessage[]): boolean {
-  const actual = messages[0]?.role === 'system' ? messages.slice(1) : messages;
-  if (actual.length !== source.history.length) return false;
+  let captured: readonly AgentMessage[];
+  let storedHistory: readonly AgentMessage[];
+  try { captured = captureCompactionHistory(messages); storedHistory = captureCompactionHistory(source.history); }
+  catch { return false; }
+  const actual = captured[0]?.role === 'system' ? captured.slice(1) : captured;
+  if (actual.length !== storedHistory.length) return false;
   return actual.every((message, index) => {
-    const stored = source.history[index]!;
-    if (message.role !== stored.role || digest(message.tool_calls) !== digest(stored.tool_calls)
-      || message.tool_call_id !== stored.tool_call_id || digest(message.reasoning) !== digest(stored.reasoning)) return false;
-    if (digest(message.content) === digest(stored.content)) return true;
+    const stored = storedHistory[index]!;
+    // Storage identity is not an application fact. Every other captured field
+    // can influence conversion, including metadata and provider observations.
+    const { id: _callerId, timestamp: _callerTime, content: _callerContent, ...callerFacts } = message;
+    const { id: _storedId, timestamp: _storedTime, content: _storedContent, ...storedFacts } = stored;
+    if (!sameValue(callerFacts, storedFacts)) return false;
+    if (sameValue(message.content, stored.content)) return true;
     // The current opening includes the runtime environment before its persisted user text.
     const text = messageToText(stored.content);
     const images = (content: AgentMessage['content']) => typeof content === 'string' ? [] : content.filter(block => block.type !== 'text');
     return stored.id === source.promptEntryId && text.length > 0 && message.role === 'user' && !('id' in message)
-      && digest(images(message.content)) === digest(images(stored.content))
+      && sameValue(images(message.content), images(stored.content))
       && messageToText(message.content).endsWith(`\n\n${text}`);
   });
 }
