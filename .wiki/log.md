@@ -11731,3 +11731,26 @@ CI 43158106512 在 7c7153c1 上实际失败：3文件5项失败，1100文件1452
 
 - 修通 `380dcc58` 遗留的 4 处断链并通过 `verify:import-cycles`、`check:config-consumers`、`check:declarations`、`check:node-floor`、`analyze:module-facades`（0 monoliths）、`npm run build`、`test:scripts`（201/201）及 9 个 Vitest 套件（333/333）验证。
 - 新增编译路线图 `.wiki/wiki/references/pi-parity-prioritized-roadmap-2026-11.md`，将剩余 Pi 差距划分为 P0–P3、合并执行批次（Batch A–F）与必须隔离推进的独立轨道（Track 1–6）。
+
+
+### 2026-11-14：运行时升级生产消费者复核
+
+对近期 `3366a43c..acb617cb` 的运行时改动逐项核对生产入口、消费者与验证边界，修复扩展 UI／异步加载代际、RPC EOF／SDK abort、超链接能力、连接资源、设备授权兑换、图片外发限额、导出计量和 tracing 失败隔离。删除无消费者的凭据 codec、流式参数修复／预览支线和空的溢出 callback，保留原始工具参数严格准入与现有 owner。
+
+前台大输出另以原生命令反例确认完整内存捕获未被限长控制，随后复用既有输出 sink、执行器与 artifact 发布：spawn 前捕获，固定缓冲写入和校验，按原 PID 移交后台。真实测试发现 Node 退出 flush 强制恢复管道，现由原输出消费者有界接纳和排空；失败清理保留原描述符和可重试 owner，不把未知改写成完成。
+
+独立复审另发现进程外替换 profile 存储时定制对话框仍接受旧答案，已由实际反例确认并在接收答案时复用捕获式准入修复；最终定向 9 文件58项通过。代码复审对该修复为 APPROVE，架构复审对输出捕获至清理范围为 CLEAR，均不代表全工作区穷尽批准。最终生产构建 `fd5bd5060f3e`，隔离环境实际 RPC／SDK、两种 Linux PTY 和 8 MiB 原生命令输出探针通过；归档提示明确为完整文本，非任意原始二进制。
+
+验证批次、首次失败分类、独立审阅与未验证范围集中记录于 [运行时升级复核](wiki/references/runtime-upgrade-review-2026-11.md)。各批测试重叠，不累加为唯一数量；本地 Linux／synthetic 证据不证明真实服务、性能账单、多平台或整条路线图完成。当前是未提交工作区修复，提交、推送与远端 CI 单独记实际回执。
+
+### 2026-11-14：规划执行首批工具链与公开包交付
+
+已按三份研究输入核实全量任务并在[运行时开发清单](refactor/upgrade/MASTER.md)维持总目标active。T1升级Vitest/Biome并修正Undici声明下限，保留实际AST/扩展消费者需要的TypeScript依赖；共享esbuild图、单一generation pointer、manifest/journal全入口恢复、声明和当前代打包完成本地验收。此前14子路径导入失败已由Node20.3实际15入口全部成功反证。
+
+六静态门、210脚本、Node20.3定向5文件65项、隔离安装严格类型/4主题/TS扩展/SDK/worker通过；生产build b57986b62aa3与Linux单文件exe/Node20.3原生prompt通过。T1独立只读复审CLEAR，静态聚合和导出形状转场限制保留。任务5项本地验收不等于整条规划完成；继续A及其余缺口，无真实服务/Windows/commit/push/CI声明。详细证据见清单及本地.omx/artifacts/upgrade-toolchain-2026-11-14/。
+
+### 2026-11-14：按批提交与新增生命周期缺陷修复
+
+按用户要求把验收完成的批次逐一提交，最近为扩展基础`a66e16de`、超链接`2f186ae`、RPC UI`9dd3d65`、终端UI`bd1f2f9`、续轮优先级`7ad89c3`和命名整理`1aa588b`。独立暂存树验证确保每批不依赖未暂存修复；本地验收16项，整条规划仍active。
+
+新增RPC配置／会话转换四项红例和终端录制两模式红例均已修复，限定复审CLEAR；RPC当前编译CLI JSONL和终端当前编译CLI两种Linux PTY通过。各批定向测试、构建身份和未知范围见当前清单，不累加重叠测试，不宣称真实服务、推送或远端CI。接续C.3消息投影与持久化、C.6稳定历史声明，不把旧修复提交替代规划实现。

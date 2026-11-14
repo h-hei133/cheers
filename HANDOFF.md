@@ -2393,3 +2393,21 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A `finishTurn` continuation repeatedly sends context-only requests while a follow-up remains queued.
 - **Root Cause:** Artificial continuation kept execution inside the inner tool/steering loop, outside the follow-up drain.
 - **Rule:** Preserve steering priority, then drain follow-ups before issuing artificial continuation. Give regression fixtures a finite final step; restoring the old inner-loop condition must fail both queue and request-reason assertions.
+
+
+### Upgrade Connections Must Carry The Captured Transport Policy
+- **Symptom:** WebSocket requests bypass configured proxies or retain different deadlines from HTTP requests; revoked configuration can still reach fallback dispatch.
+- **Root Cause:** The upgrade path created its own connection without the request owner's resolved policy and treated one admission check as sufficient for later network effects.
+- **Rule:** Capture one proxy/NO_PROXY/deadline policy, tunnel through the connection owner, and include it in socket identity. Recheck admission after asynchronous acquisition, before send and before fallback. Verify target TLS through CONNECT with a trusted fixture, reject mismatched and untrusted certificates, and never replay after response acceptance. Terminate failed/cancelled sockets and close both ends of proxy fixtures.
+
+
+### Persistent Trace Identity Must Survive Recorder Replacement
+- **Symptom:** A new recorder appends identifiers already used by a prior instance, merging unrelated runs during query.
+- **Root Cause:** Trace/span identity came from counters that reset with every recorder.
+- **Rule:** Generate unique trace/span identifiers, preserve explicit parent propagation, and test recorder replacement followed by another write. Put shared trace contracts in an independent type owner so runtime query imports cannot form a reverse type dependency.
+
+
+### Public Package Entries Must Share One Verified Build
+- **Symptom:** Root imports work while advertised subpaths are missing, or packed libraries carry every historical build and incomplete declarations.
+- **Root Cause:** The publisher retained only one root forwarder and broadly removed sibling paths; declaration and package consumers were absent from artifact validation.
+- **Rule:** Build public entries in one shared graph, use one generation pointer and collision-free stable binding names, bind every wrapper/type/pack policy to the manifest, and journal exact prior states. Package only the selected immutable generation without deleting disk generations needed by running processes. Validate an isolated installed consumer on the declared Node floor, with its own dependencies and strict declaration checking.

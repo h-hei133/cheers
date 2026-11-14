@@ -2,7 +2,7 @@
 
 > Compiled knowledge base for the three-layer autonomous coding agent architecture, proof grounding, and reference models.
 
-Last updated: 2026-11-13
+Last updated: 2026-11-14
 
 ## Statistics
 
@@ -15,11 +15,12 @@ Last updated: 2026-11-13
 - Inventory records: 0 tracked items
 - Datasets: 0 manifests
 - Outputs: 0 generated artifacts
-- Last compiled: 2026-11-13
+- Last compiled: 2026-11-14
 - Last lint: 2026-08-28
 
 ## Quick Navigation
 
+- [Current runtime development tasks and acceptance](refactor/upgrade/MASTER.md)
 - [Keyboard shortcuts and rebinding](guides/keybindings.md)
 - [Themes and automatic appearance](guides/themes.md)
 - [Settings and command discovery](guides/settings.md)
@@ -53,6 +54,7 @@ Last updated: 2026-11-13
 - [Concepts](wiki/concepts/_index.md)
 - [Topics](wiki/topics/_index.md)
 - [References](wiki/references/_index.md)
+- [运行时升级复核与修复证据](wiki/references/runtime-upgrade-review-2026-11.md)
 - [Theses](wiki/theses/_index.md)
 - [Outputs](output/_index.md)
 
