@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type { ProviderFailureClass } from "../../provider/registry/provider.js";
 import { flushMetrics, recordCount, recordTiming } from "../../observability/metrics.js";
 import type { AgentMessage, AgentStopReason } from "./state.js";
+import { convertMessages, type MessageConverter, type MessageProjection } from './messages.js';
+import type { ProviderMessage } from '../../model-adapters/message.js';
 import {
   exceedsRetryCeiling,
   isRetryableFailure,
@@ -117,6 +119,7 @@ export interface FinishTurnDecision {
 
 
 export interface AgentLoopConfig {
+  readonly convertToLlm?: MessageConverter;
   /** A function resolves the pool again for each batch, after discovery loaded tools. */
   readonly tools?: readonly AgentTool[] | (() => readonly AgentTool[]);
   readonly toolExecution?: AgentToolExecutionMode;
@@ -169,6 +172,8 @@ export interface AgentLoopConfig {
     signal?: AbortSignal,
     request?: {
       readonly requestId: string;
+      readonly sourceMessages?: readonly AgentMessage[];
+      readonly providerMessages?: readonly ProviderMessage[];
       readonly onUpdate?: (partial: {
         readonly text?: string;
         readonly reasoning?: string;
@@ -228,17 +233,24 @@ async function retryStep(
   emit: AgentEventSink,
 ): Promise<{ readonly step: AssistantStep; readonly emittedStart: boolean }> {
   const policy = resolveRetryPolicy("turn", config.retry ?? {});
-  const baseRequestId = randomUUID();
+  let requestId = randomUUID();
+  let projection: MessageProjection | undefined;
+  let priorStep: AgentLoopConfig['streamStep'] | undefined;
   let attempt = 0;
   for (;;) {
     const reason = attempt > 0 ? 'retry' : context.at(-1)?.role === 'user' ? 'user' : 'continuation';
     const prepared = await config.prepareRequest?.({ reason, attempt, messages: context }, signal);
     const activeStep = prepared?.streamStep ?? config.streamStep;
     const activeMessages = prepared?.messages ?? context;
+    const converted = await convertMessages(activeMessages, config.convertToLlm, signal, projection);
+    if (attempt > 0 && ((converted.sourceMessages && converted !== projection) || activeStep !== priorStep)) requestId = randomUUID();
+    projection = converted;
+    priorStep = activeStep;
     let emittedStart = false;
     let emitChain: Promise<void> = Promise.resolve();
     const request = Object.freeze({
-      requestId: baseRequestId,
+      requestId,
+      ...(converted.sourceMessages ? { sourceMessages: converted.sourceMessages, providerMessages: converted.providerMessages } : {}),
       onUpdate: (partial: { readonly text?: string; readonly reasoning?: string; readonly delta?: string }) => {
         const partialMessage: AgentMessage = {
           role: "assistant",
@@ -260,7 +272,8 @@ async function retryStep(
         });
       },
     });
-    const step = await activeStep(activeMessages, signal, request);
+    signal?.throwIfAborted();
+    const step = await activeStep(converted.messages, signal, request);
     await emitChain;
     // Once partial output has reached listeners, or the step's own layer
     // already retried, do not start another attempt for the same step.

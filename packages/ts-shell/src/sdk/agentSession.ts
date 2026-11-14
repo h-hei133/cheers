@@ -28,12 +28,15 @@ import { SessionManager } from "../session/SessionManager.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import { DefaultResourceLoader, type LoadExtensionsResult, type ResourceLoader } from "./resourceLoader.js";
+import { snapshotCustomMessage } from '../core/agent/custom.js';
+import { snapshotData } from '../core/values/data.js';
 
 /**
  * Compose an embedded session from the existing runtime, session, and security owners.
  */
 
 export interface CreateAgentSessionOptions {
+  readonly convertToLlm?: import('../core/agent/messages.js').MessageConverter;
   readonly cwd?: string;
   readonly launchCwd?: string;
   readonly runtimeConfig?: RuntimeConfig;
@@ -178,6 +181,17 @@ export class AgentSession {
     return this.runtimeContext.projectRoot;
   }
 
+  /** Append application context while idle, using the existing durable history owner. */
+  appendCustomMessage(payload: import('../core/agent/custom.js').CustomMessageInput): void {
+    if (this.disposed) throw new Error('Agent session is disposed.');
+    if (this.sessionRuntime.isRunning()) throw new Error('Wait for the active turn before appending custom history.');
+    const saved = snapshotData(payload, { bytes: 32 * 1024 * 1024, nodes: 100_000, depth: 32 });
+    const message = snapshotCustomMessage({ ...(saved as object), role: 'custom' });
+    this.sessionManager.addTurn(this.sessionId, message);
+    const session = this.sessionManager.getSession(this.sessionId);
+    if (session) this.runtimeContext.session = session;
+  }
+
   async prompt(
     text: string,
     options?: {
@@ -259,6 +273,7 @@ export class AgentSession {
 export async function createAgentSession(
   options: CreateAgentSessionOptions = {},
 ): Promise<CreateAgentSessionResult> {
+  const convertToLlm = options.convertToLlm;
   const cwd = path.resolve(options.cwd ?? process.cwd());
   const sessionManager = options.sessionManager ?? new SessionManager();
   const renderer = options.renderer ?? createSilentRenderer();
@@ -334,6 +349,7 @@ export async function createAgentSession(
   });
 
   const runtimeContext = bootstrap.context;
+  if (convertToLlm) Object.defineProperty(runtimeContext, 'convertToLlm', { value: convertToLlm, enumerable: true });
   runtimeContextRef = runtimeContext;
   if (options.scopedModels?.length) runtimeContext.scopedModels = options.scopedModels;
   const sysPrompt = resourceLoader.getSystemPrompt();

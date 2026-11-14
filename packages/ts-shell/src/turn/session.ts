@@ -125,6 +125,7 @@ export interface TurnOptions {
     readonly maxDelayMs?: number;
   };
   readonly prepareRequest?: AgentLoopConfig['prepareRequest'];
+  readonly convertToLlm?: AgentLoopConfig['convertToLlm'];
   readonly finishTurn?: AgentLoopConfig['finishTurn'];
   /**
    * Keeping this run's prompt cached between requests.
@@ -243,6 +244,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     prepareNextStep: compaction?.beforeStep,
     ...(options.finishTurn ? { finishTurn: options.finishTurn } : {}),
     ...(options.prepareRequest ? { prepareRequest: options.prepareRequest } : {}),
+    ...(options.convertToLlm ? { convertToLlm: options.convertToLlm } : {}),
   });
 
   const queues = core.pendingQueues;
@@ -442,6 +444,7 @@ export function runTurn(options: TurnOptions): TurnRun {
         ...(error instanceof ModelAdmissionError ? { admissionFailure: error.code } : {}) });
     })
     .finally(async () => {
+      if (options.signal.aborted) stop.finish('stopped', 'cancelled', false);
       // The run is over, so the session is waiting on a person rather than on a
       // model. What that means for refreshing is the runner's decision.
       options.cacheWarming?.noteSettled();

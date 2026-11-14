@@ -83,3 +83,6 @@ export { getRuntimeConfig, type RuntimeConfig, type RuntimeConfigOverrides, type
 export type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from "./tools/types.js";
 export type { QueryEvent } from "./core/query/runtime/events.js";
 export type { QueryEventObserver } from "./core/shell/sessionRuntime.js";
+export type { AgentMessage, CustomAgentMessage, CustomMessageInput } from './core/agent/state.js';
+export type { MessageConverter } from './core/agent/messages.js';
+export type { ProviderMessage } from './model-adapters/message.js';

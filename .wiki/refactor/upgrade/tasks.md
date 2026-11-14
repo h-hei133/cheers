@@ -32,7 +32,7 @@
 
 - [ ] **C.1** prepareNextTurn／prepareRequest／finishTurn 与虚拟路由：部分验收。follow-up优先于人工context-only续轮、steering仍优先，两项反转红例有效；独立暂存树4套件111项、六静态门、build `1e9c526087ec`通过，限定复核CLEAR。其他hook调用顺序与真实配置模型验收仍待完成。
 - [ ] **C.2** message_update 流式部分消息及 x-should-retry：已有待验收，部分响应不重放、内外重试一致。
-- [ ] **C.3** AgentMessage 与 provider Message 分离及 convertToLlm：部分。基础类型`91c3ec6`，custom保存／重开／分叉／显示与导出消费者已实现；隐藏正文不进tree/search/HTML，data留原历史，默认content→user。四个独立复审红例修复，13套件280项、六静态门与build `094220828813`通过，限定复审CLEAR。SDK与convertToLlm生产接线、取消／预算／压缩一致性仍待完成，不因子批次通过勾选。
+- [ ] **C.3** AgentMessage 与 provider Message 分离及 convertToLlm：部分。基础类型`91c3ec6`、custom持久化／显示`f5e4ee9`已提交。SDK与前台转换已接通，捕获raw与wire分离、转换后system/工具/图片/预算准入、重试capture和完整idle settlement通过12套件391项、六静态门、函数上限与build `48bafd6fec4c`；Linux编译SDK实际配置模型三次发送、重开和取消后复用通过，限定复审CLEAR。自动/手动压缩、summary与rewind转换一致性仍待完成，不因子批次通过勾选。
 - [ ] **C.4** 默认历史工具文本保留与一致测量：已有待验收，真实多轮请求前缀与压缩预算。
 - [ ] **C.5** Anthropic 历史缓存标记、OpenAI／Responses affinity 与 TTL：已有待验收，真实最终 wire 和能力限制。
 - [ ] **C.6** 动态工具／思考档位在原始消息位置声明：部分。当前请求末尾临时追加增量，后续消息会移动旧块；需跨轮／续接后前缀稳定的实际 wire 证据。

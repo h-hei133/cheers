@@ -321,12 +321,11 @@ describe("runAgentLoop", () => {
     expect(seenSnapshots[0]).toEqual({ hasMessage: false, roles: ["user"] });
   });
 
-  it("keeps tool results pairable when the signal is already aborted", async () => {
+  it("keeps accepted tool calls pairable when the request is cancelled", async () => {
     const call: AgentToolCall = { id: "call-1", name: "read", args: { path: "a.txt" } };
     const { streamStep } = scriptedStream([toolStep([call]), textStep("done")]);
     const { emit } = collect();
     const controller = new AbortController();
-    controller.abort();
     let executed = 0;
     const tools: AgentTool[] = [
       {
@@ -341,7 +340,7 @@ describe("runAgentLoop", () => {
     const messages = await runAgentLoop(
       [userMessage("go")],
       [],
-      { streamStep, tools },
+      { streamStep: async (...args) => { const step = await streamStep(...args); controller.abort(); return step; }, tools },
       emit,
       controller.signal,
     );

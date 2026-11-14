@@ -32,6 +32,8 @@ export interface SessionResumeProvenance {
 }
 
 export interface ShellRuntimeContext {
+  /** Application converter captured at session construction. */
+  readonly convertToLlm?: import('../agent/messages.js').MessageConverter;
   readonly profile?: import('../paths/profile/context.js').ProfileContext;
   /** Identity of the request shape most recently prepared by this runtime. */
   promptIdentity?: PromptIdentitySnapshot;

@@ -48,6 +48,24 @@ export function snapshotCustomMessage(value: unknown): CustomAgentMessage {
   return saved as unknown as CustomAgentMessage;
 }
 
+/** Read array entries only after rejecting proxy traps, accessors and sparse input. */
+export function captureMessageHistory<T extends { readonly role: string }>(value: readonly T[]): T[] {
+  if (types.isProxy(value) || !Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error('Message history must be an inert array.');
+  }
+  const length = Object.getOwnPropertyDescriptor(value, 'length')?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > 250_000) throw new Error('Message history exceeds its structural limit.');
+  const keys = Reflect.ownKeys(value);
+  if (keys.length !== length + 1) throw new Error('Message history must contain only complete array entries.');
+  const messages: T[] = [];
+  for (let index = 0; index < length; index++) {
+    const entry = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!entry || !('value' in entry)) throw new Error('Message history cannot contain accessors or missing entries.');
+    messages.push(captureCustomMessage(entry.value));
+  }
+  return messages;
+}
+
 export function isCustomMessage(value: unknown): value is CustomAgentMessage {
   try { snapshotCustomMessage(value); return true; } catch { return false; }
 }

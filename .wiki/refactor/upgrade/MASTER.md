@@ -2,7 +2,7 @@
 
 > **Task**: 核实研究规划，实施仍然成立的任务，并按实际生产路径验收。
 > **Started**: 2026-11-14
-> **Last Updated**: 2026-11-14
+> **Last Updated**: 2026-11-15
 > **Mode**: LOCAL_ONLY
 
 ## Scope and authority
@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.2/B2.2/B2.3、D.2/D.3/D.5、E.2已完成所述本地验收；继续终端与运行时。
-**Active batch**: 消息基础类型已提交`91c3ec6`；C.3持久化／显示完成所述验收，按批提交后继续SDK与convertToLlm生产接线。C.6历史声明另批处理。
+**Active batch**: 消息基础类型`91c3ec6`与持久化／显示`f5e4ee9`已提交；SDK与前台convertToLlm完成本批本地和Linux真实模型验收，及时提交后进入压缩转换一致性。C.6历史声明另批处理。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -70,3 +70,4 @@
 | 2026-11-14 | loop提交`7ad89c3`；命名整理独立暂存树六静态门和3套件71项通过，行为未改，提交`1aa588b`。保留第一轮审计为有日期的证据快照并链接当前清单；HANDOFF保留已提交顺序，仅追加遗漏的三条既有护栏，不提交历史重排。 |
 | 2026-11-14 | 消息基础类型拆层：provider叶合同、agent身份及durable兼容类型分离。六静态门、4套件85项和build通过。独立复审指出新增core→context类型依赖，实际测量合同移回core/agent/request后，循环／lint／build重验通过、限定复审CLEAR。此批不含custom行为，不增加16项完成数。 |
 | 2026-11-14 | custom持久化／显示：保存、重开、分叉、隐藏正文与data分离、版本化导出及失败live状态通过13套件280项，六静态门通过。独立复审补充role accessor、有限数预算、tree隐藏正文和contextSummary误排除四个实际红例，修复后限定CLEAR。联合构建首次发现泛型断言错误，纯类型修正后build `094220828813`通过；原失败保留。C.3转换／SDK仍未实现，不增加完成数。 |
+| 2026-11-15 | 前台转换／SDK：prepareRequest后捕获raw与provider，system文本进真实system字段，转换内容参与工具/图片/预算准入；相同raw重试复用capture、替换raw重新转换并换requestId。SDK idle追加覆盖完整settlement，普通native Promise取消后保留late rejection观察。复审新增数组/Promise钩子、system丢失、早取消和settlement等反例先红后修；Promise附属async context符号不被误拒。12套件391项、六静态门、函数上限、build `48bafd6fec4c`和Linux编译SDK实际配置模型三次wire通过，限定复审CLEAR。诊断夹具跨root配置失效、global fetch未观察Undici发送及错误私有符号均保留失败分类，最终用实际bodySent观察重验。C.3压缩/rewind一致性与C.6仍未完成，16项完成数不变。 |

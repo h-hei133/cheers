@@ -1,6 +1,21 @@
 import { microcompactMessages } from '../core/query/microCompact.js';
 import type { AgentMessage } from '../core/agent/state.js';
 import { toChatMessages, type ChatMessage } from './prompt.js';
+import type { ProviderMessage } from '../model-adapters/message.js';
+
+/** Every endpoint accepts system text through the request's system field. */
+export function providerSystemPrompt(base: string, messages: readonly ProviderMessage[]): string {
+  const parts = base ? [base] : [];
+  for (const message of messages) {
+    if (message.role !== 'system' || message.content == null) continue;
+    if (typeof message.content === 'string') parts.push(message.content);
+    else {
+      if (message.content.some(block => block.type !== 'text')) throw new Error('System message content must contain text only.');
+      parts.push(message.content.map(block => block.type === 'text' ? block.text : '').join('\n'));
+    }
+  }
+  return parts.join('\n\n');
+}
 
 export interface OutgoingProjectionOptions {
   readonly pruneToolText?: boolean;

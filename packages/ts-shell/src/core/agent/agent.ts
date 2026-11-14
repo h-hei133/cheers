@@ -4,9 +4,11 @@ import { createAgentState, type AgentMessage, type AgentState, type InitialAgent
 import type { AgentEventListener } from "./events.js";
 import type { AgentTool, AgentToolExecutionMode, ToolHooks } from "./tools.js";
 import type { RetryPolicy } from "./retry.js";
+import { captureCustomMessage, captureMessageHistory } from './custom.js';
 
 export interface AgentCoreOptions {
   readonly initialState?: InitialAgentState;
+  readonly convertToLlm?: AgentLoopConfig['convertToLlm'];
   /** A function resolves the pool again for each batch, after discovery loaded tools. */
   readonly tools?: readonly AgentTool[] | (() => readonly AgentTool[]);
   readonly toolExecution?: AgentToolExecutionMode;
@@ -47,7 +49,7 @@ export class AgentCore {
   private lastRun?: Promise<void>;
 
   constructor(options: AgentCoreOptions) {
-    this.options = options;
+    this.options = { ...options };
     this.internalState = createAgentState(options.initialState);
     this.steeringQueue = new PendingQueue<AgentMessage>(options.steeringMode ?? "one-at-a-time");
     this.followUpQueue = new PendingQueue<AgentMessage>(options.followUpMode ?? "one-at-a-time");
@@ -67,7 +69,7 @@ export class AgentCore {
 
   /** A session may prepare this prompt before entry; queued restarts still prepare normally. */
   public async prompt(input: AgentMessage | readonly AgentMessage[], options: { readonly skipInitialPreparation?: boolean } = {}): Promise<void> {
-    const messages = Array.isArray(input) ? [...input] : [input];
+    const messages = captureMessageHistory(Array.isArray(input) ? input : [input]);
     await this.runPromptMessages(messages, options);
   }
 
@@ -127,11 +129,11 @@ export class AgentCore {
   }
 
   public steer(message: AgentMessage, id?: string): void {
-    this.steeringQueue.enqueue(message, id);
+    this.steeringQueue.enqueue(captureCustomMessage(message), id);
   }
 
   public followUp(message: AgentMessage, id?: string): void {
-    this.followUpQueue.enqueue(message, id);
+    this.followUpQueue.enqueue(captureCustomMessage(message), id);
   }
 
   public clearAllQueues(): void {
@@ -177,6 +179,7 @@ export class AgentCore {
       shouldStopAfterStep: this.options.shouldStopAfterStep,
       toolsAllowedOnNextStep: this.options.toolsAllowedOnNextStep,
       prepareNextStep: this.options.prepareNextStep,
+      ...(this.options.convertToLlm ? { convertToLlm: this.options.convertToLlm } : {}),
       ...(this.options.prepareRequest ? { prepareRequest: this.options.prepareRequest } : {}),
       ...(this.options.finishTurn ? { finishTurn: this.options.finishTurn } : {}),
       ...(this.options.retry ? { retry: this.options.retry } : {}),

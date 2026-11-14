@@ -11,6 +11,8 @@ import type { EventChannel } from './stream.js';
 import { rememberToolRequests, traceOperation } from '../observability/tracing/context.js';
 import { randomUUID } from 'node:crypto';
 
+const BUDGET_SUMMARY_MESSAGE = 'The goal budget cannot admit the next working step. Summarize progress and remaining blockers, then stop. Do not call tools or claim completion without evidence.';
+
 /** One logical request, including its native retries, with no retained prompt/body. */
 function tracedStep(step: StepFunction): StepFunction {
   return (messages, signal, listener, options) => {
@@ -157,7 +159,8 @@ export function createTurnRequest(
         allowTools: toolsAllowed,
         ...(promptSource ? { promptSource } : {}),
         ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}),
-        requestPurpose: requestPurposeFor(messages),
+        requestPurpose: requestPurposeFor(request?.sourceMessages ?? messages),
+        ...(request?.sourceMessages ? { sourceMessages: request.sourceMessages, providerMessages: request.providerMessages } : {}),
         requestId: request?.requestId,
         // Kept so a refresh can replay it. Captured at the step, because that
         // is the only place the request exists in the shape it was sent.
@@ -169,14 +172,17 @@ export function createTurnRequest(
       budgetSummary = true;
       // This instruction is request-local: it has no user-message lifecycle,
       // persistence or display event. The ordinary step still enforces the cap.
-      const closing = await stepRequest([...messages, { role: 'user', content:
-        'The goal budget cannot admit the next working step. Summarize progress and remaining blockers, then stop. Do not call tools or claim completion without evidence.' }],
+      const instruction = { role: 'user' as const, content: BUDGET_SUMMARY_MESSAGE };
+      const closing = await stepRequest([...messages, instruction],
       signal, {
         onText: delta => channel.push({ type: 'message.delta', role: 'coder', delta }),
         onReasoning: delta => channel.push({ type: 'reasoning.delta', role: 'coder', delta }),
         onReasoningReplace: text => channel.push({ type: 'reasoning.replace', role: 'coder', text }),
         onReplace: text => channel.push({ type: 'message.replace', role: 'coder', text }),
-      }, { allowTools: false, ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}), requestPurpose: 'goal-budget-summary',
+      }, { allowTools: false, ...(request?.sourceMessages ? {
+        sourceMessages: [...request.sourceMessages, instruction],
+        providerMessages: [...(request.providerMessages ?? []), instruction],
+      } : {}), ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}), requestPurpose: 'goal-budget-summary',
         onRequestSent, onRequestUsage });
       // Its input includes an unpersisted instruction, so it cannot anchor the
       // stored conversation. The step has already recorded the real usage.

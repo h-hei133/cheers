@@ -30,6 +30,7 @@ import { providerRequestError } from '../provider/request/error.js';
 import { type ChatMessage } from "./prompt.js";
 import {
   outgoingProjection,
+  providerSystemPrompt,
   finalStepMessages,
   hasToolHistory,
   TOOL_HISTORY_UNSUPPORTED_MESSAGE,
@@ -116,6 +117,9 @@ export interface StepListener {
 }
 
 export interface StepOptions {
+  /** Detached source retains agent history identity across application projection. */
+  readonly sourceMessages?: readonly AgentMessage[];
+  readonly providerMessages?: readonly ChatMessage[];
   /** Exact opening object and the accepted user content retained by the prompt barrier. */
   readonly promptSource?: { readonly opening: AgentMessage; readonly stored: AgentMessage };
   readonly requestId?: string;
@@ -274,11 +278,15 @@ export function createStepFunction(request: StepRequest): StepFunction {
       : undefined;
   const replayBinding = request.provider.replayBinding ?? requestReplayBinding(request.provider);
   return async (messages, signal, listener, options): Promise<AssistantStep> => {
+    const sourceMessages = options.sourceMessages ?? messages;
+    const projectedMessages: readonly AgentMessage[] = options.providerMessages
+      ? options.providerMessages.filter(message => message.role !== 'system').map(message => ({ ...message, content: message.content ?? '' })) : messages;
+    const converted = options.providerMessages !== undefined;
     const requestId = options.requestId ?? randomUUID();
     let requestAcceptedAt: number | undefined;
     let acceptedResponse = false;
     const catalogAddress = request.provider.provider ? request.provider.baseUrl : undefined;
-    const messageDigest = historyDigest(messages);
+    const messageDigest = historyDigest(sourceMessages);
     let shownReasoning = '';
     let activeOrigin = baseOrigin;
     let currentAllowTools = options.allowTools;
@@ -295,8 +303,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
             provider: request.provider.provider ?? "",
             modelId: request.provider.model,
             thinkingLevel: rawEffort ?? "medium",
-            reason: inferRouteReason(messages, streamAttempts),
-            messages,
+            reason: inferRouteReason(sourceMessages, streamAttempts),
+            messages: sourceMessages,
             signal,
           })
         : undefined;
@@ -324,9 +332,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
         : [];
       const regeneratedPrompt = request.systemPromptFor !== undefined
         && (options.agentMode !== undefined || !toolCalling);
-      const systemPrompt = regeneratedPrompt
+      const baseSystemPrompt = regeneratedPrompt
         ? request.systemPromptFor!(options.agentMode, tools.map((tool) => tool.function.name), toolCalling)
         : request.systemPrompt;
+      let systemPrompt: string;
+      try { systemPrompt = converted ? providerSystemPrompt(baseSystemPrompt, options.providerMessages!) : baseSystemPrompt; }
+      catch { return stamp(errorStep('System message content must contain text only.')); }
       const wireTools = allowTools ? tools : [];
       const overhead = { systemPrompt, tools: wireTools };
       const schemaDigest = createHash('sha256').update(JSON.stringify(wireTools)).digest('hex');
@@ -338,7 +349,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         && effortCapability(request.catalog ?? [], activeProvider, activeModel, effort, catalogAddress) === 'unsupported') {
         return stamp(errorStep('The selected model does not support this reasoning effort. Select another level or use /thinking auto.'));
       }
-      if (!toolCalling && hasToolHistory(messages)) {
+      if (!toolCalling && hasToolHistory(projectedMessages)) {
         return stamp(errorStep(TOOL_HISTORY_UNSUPPORTED_MESSAGE));
       }
       const endpoint = route
@@ -363,7 +374,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
         ...request.projection,
         ...(request.pruneToolText !== undefined ? { pruneToolText: request.pruneToolText } : {}),
       };
-      const outgoing = outgoingProjection(messages, shape.assistantAfterToolResult, projectionOptions);
+      const outgoing = outgoingProjection(projectedMessages, shape.assistantAfterToolResult, projectionOptions);
+      if (converted) { outgoing.indexAligned = false; outgoing.sourceAligned = false; }
       let projection = outgoing;
       let inputLimits: ModelInputLimits | undefined;
       let finalMessages: readonly ChatMessage[];
@@ -395,16 +407,16 @@ export function createStepFunction(request: StepRequest): StepFunction {
         wireRewriteTokens: Math.ceil(projection.savedChars / CHARS_PER_TOKEN),
         replayBinding,
       };
-      const promptProjection = storedPromptProjection(messages, projection, options.promptSource,
+      const promptProjection = converted ? undefined : storedPromptProjection(sourceMessages, projection, options.promptSource,
         shape.assistantAfterToolResult, promptIdentity.wireMessageCount, projectionOptions);
       const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: activeProvider,
         model: activeModel, endpoint, schemaDigest, systemDigest,
         endpointId: usageAttribution.endpointId, historyDigest: messageDigest, wireHistoryDigest, replayBinding });
       const initial = promptTokensFor({ messages: budgetMessages, overhead, ...(measured ? { measured } : {}) });
       const usage = getSessionUsage(request.sessionId);
-      const prefixIdentity = options.agentMode ? undefined
-        : measuredProjectionPrefix(messages, projection, usage, shape.assistantAfterToolResult, projectionOptions);
-      const calibrated = prefixIdentity ? estimatePrompt(messages, overhead, promptIdentity, usage, {
+      const prefixIdentity = options.agentMode || converted ? undefined
+        : measuredProjectionPrefix(sourceMessages, projection, usage, shape.assistantAfterToolResult, projectionOptions);
+      const calibrated = prefixIdentity ? estimatePrompt(sourceMessages, overhead, promptIdentity, usage, {
         tokens: initial.tokens, method: 'characters/3.5', prefixIdentity,
         tailMessages: budgetMessages.slice(usage.lastPromptMessageCount),
         tailContext: { endpoint, provider: promptIdentity.provider, model: promptIdentity.model, replayBinding,
@@ -721,7 +733,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           && Number.isSafeInteger(usage.prompt_tokens) && usage.prompt_tokens >= 0
           && stopReason !== 'error' && stopReason !== 'aborted'
           ? decodePromptMeasurement({ tokens: counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens,
-            messageCount: messages.length, identity: promptIdentity,
+            messageCount: sourceMessages.length, identity: promptIdentity,
             projection: promptProjection }) : undefined;
         if (usage && counted) {
           const record: SessionUsageRecord = {
@@ -734,7 +746,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             // The raw selected count preserves context-status calibration. The
             // projection digest and its own count below bind budgets to the
             // exact compacted, bridged and closing-step wire history.
-            promptMessageCount: messages.length,
+            promptMessageCount: sourceMessages.length,
             // Use the effective schemas and system prompt, not the unfiltered
             // declarations: allowed tools and agent mode can change what was
             // actually sent, and a measurement from the wrong request is stale.

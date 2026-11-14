@@ -91,6 +91,7 @@ export function createCliSessionRuntime(input: {
     | undefined
   );
 }): ShellSessionRuntime {
+  const convertToLlm = input.runtimeContext.convertToLlm;
   prepareGoalSession(input.runtimeContext, input.sessionManager);
   const isStdinTty = input.isStdinTty ?? (() => Boolean(process.stdin.isTTY));
   const providers = createCompactionProviders(input);
@@ -300,6 +301,7 @@ export function createCliSessionRuntime(input: {
         interactiveAsk: (questions, askSignal) =>
           promptInteractiveQuestions(input.getReadline(), questions, askSignal),
         historyMessages,
+        ...(convertToLlm ? { convertToLlm } : {}),
         ...(historyMessages.length < allTurns.length ? { storedPrompt: allTurns.at(-1) } : {}),
         onTurnMessage: (message) => {
           const id = message.id ?? createTranscriptEntryId("turn");

@@ -47,3 +47,22 @@ export interface ProviderMessage {
   /** Endpoints that require signed reasoning return this unchanged. */
   readonly reasoning?: MessageReasoning;
 }
+
+/** The provider boundary accepts only the standard roles and captured protocol fields. */
+export function isProviderMessage(value: unknown): value is ProviderMessage {
+  if (!isRecord(value) || typeof value.role !== 'string' || !['system', 'user', 'assistant', 'tool'].includes(value.role)
+    || (value.content !== undefined && value.content !== null && !isMessageContent(value.content))) return false;
+  const calls = value.tool_calls, origin = value.origin, reasoning = value.reasoning;
+  return (calls === undefined || (value.role === 'assistant' && Array.isArray(calls) && calls.every(call =>
+    isRecord(call) && typeof call.id === 'string' && call.id.length > 0 && call.type === 'function'
+    && isRecord(call.function) && typeof call.function.name === 'string' && call.function.name.length > 0
+    && typeof call.function.arguments === 'string')))
+    && (value.tool_call_id === undefined || (value.role === 'tool' && typeof value.tool_call_id === 'string' && value.tool_call_id.length > 0))
+    && (value.role !== 'tool' || typeof value.tool_call_id === 'string' && value.tool_call_id.length > 0)
+    && (origin === undefined || (isRecord(origin) && typeof origin.model === 'string'
+      && (origin.provider === undefined || typeof origin.provider === 'string')
+      && (origin.replayBinding === undefined || typeof origin.replayBinding === 'string' && /^[a-f0-9]{64}$/.test(origin.replayBinding))))
+    && (reasoning === undefined || (value.role === 'assistant' && isRecord(reasoning) && typeof reasoning.text === 'string'
+      && (reasoning.signature === undefined || typeof reasoning.signature === 'string')
+      && (reasoning.redacted === undefined || typeof reasoning.redacted === 'boolean')));
+}

@@ -139,6 +139,11 @@ export class ShellSessionRuntime {
     return this.currentRunController ?? this.commands.current?.controller ?? null;
   }
 
+  /** Includes durable and observer settlement after provider dispatch has ended. */
+  isRunning(): boolean {
+    return this.currentRun !== null || this.getCurrentRunController() !== null;
+  }
+
   /** Where input typed during the active run goes; nothing when no run takes input. */
   input(): TurnInput | undefined {
     return this.currentInput;
@@ -496,7 +501,7 @@ export class ShellSessionRuntime {
     this.stateMachine.terminate();
     // The host closes before its bounded resource join cancels active work.
     // Keep its prompt and uncertain outcomes until their owner settles them.
-    if (this.currentRun || this.getCurrentRunController()
+    if (this.isRunning()
       || hasUnfinishedSessionWork(this.deps.sessionManager.getRecoverySnapshot(sessionId))) return;
     this.deps.sessionManager.saveTerminated(sessionId);
   }

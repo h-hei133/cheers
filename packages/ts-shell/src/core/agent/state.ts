@@ -1,6 +1,7 @@
 import type { MessageContent, ProviderMessage } from '../../model-adapters/message.js';
 import type { PromptMeasurement } from './request/measurement.js';
 import type { CustomAgentMessage } from './custom.js';
+import { captureMessageHistory } from './custom.js';
 export type { CustomAgentMessage, CustomMessageInput } from './custom.js';
 
 export type AgentStopReason = "stop" | "length" | "error" | "aborted";
@@ -42,7 +43,7 @@ export interface InitialAgentState {
 export function createAgentState(initial?: InitialAgentState): AgentState {
   return {
     systemPrompt: initial?.systemPrompt ?? "",
-    messages: initial?.messages ? [...initial.messages] : [],
+    messages: initial?.messages ? captureMessageHistory(initial.messages) : [],
     isStreaming: false,
     streamingMessage: undefined,
     pendingToolCalls: new Set<string>(),

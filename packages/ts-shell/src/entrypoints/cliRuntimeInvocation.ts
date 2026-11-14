@@ -65,6 +65,7 @@ import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly convertToLlm?: TurnOptions['convertToLlm'];
   readonly stepControl?: import('../turn/control.js').StepControlFactory;
   readonly catalogContent?: CatalogContent;
   readonly onCommandSettled?: ToolCatalogInput['onCommandSettled'];
@@ -371,6 +372,7 @@ async function startTurn(
   const step = control?.step ?? baseStep;
 
   const run = runTurn({
+    ...(request.convertToLlm ? { convertToLlm: request.convertToLlm } : {}),
     configScope: toolScopeBinding(request.runtimeConfig),
     ...(discovery ? { toolSnapshot: () => discovery.snapshot() } : {}),
     observe: control?.observe,

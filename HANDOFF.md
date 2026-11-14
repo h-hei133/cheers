@@ -2417,3 +2417,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Custom messages disappear after reopening, hidden text leaks through tree search, or a rejected append remains in live history.
 - **Root Cause:** Standard-role readers, internal summary metadata and display consumers treated application history as an ordinary provider message; admission read the role before rejecting accessors, and numeric JSON values escaped byte accounting.
 - **Rule:** Inspect the own role descriptor before reading source properties, detach bounded inert JSON and count serialized scalar bytes. Keep custom entries in the original thread regardless of application metadata; apply display policy to every presentation projection while preserving model context. Publish live history only after the existing persistence callbacks return, retaining uncertain disk outcomes on later failure.
+
+
+### Message Conversion Must Capture Before Promise Assimilation
+- **Symptom:** A synchronous converter output executes a `then` getter or a prepared array invokes an index getter before rejection; native Promise observation invokes constructor/species hooks.
+- **Root Cause:** Array mapping and Promise resolution inspect application values before the inert-data boundary, while a native Promise brand alone does not prove observation is inert.
+- **Rule:** Check outer array descriptors before reading entries, capture synchronous output inside a non-thenable wrapper, and observe only supported native Promises after constructor/then/prototype/species checks. Allow Node async-context metadata symbols. Keep cancellation handlers attached for supported late rejections; the caller owns refused Promise shapes.
+
+
+### Converted System Text And SDK Idle Need Their Actual Owners
+- **Symptom:** Converted system instructions vanish at dispatch, or SDK custom history is appended while prompt settlement remains pending.
+- **Root Cause:** Stored-history projection drops system messages and a cleared model controller does not mean the complete runtime promise has settled.
+- **Rule:** Project converted system text into the request system field before budgeting and identity capture, reject unsupported system media explicitly, and require the runtime run and command owners to be idle before SDK history appends. Observe the configured Undici transport when proving real wire content; replacing global fetch does not observe it.
