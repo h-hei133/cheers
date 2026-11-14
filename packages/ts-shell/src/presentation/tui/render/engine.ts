@@ -13,13 +13,13 @@ import {
 } from "./frame.js";
 import { MainScreenPainter } from "./mainScreen.js";
 import { FrameStartup } from './startup.js';
-import { writeBoundedFrame } from "./boundedWriter.js";
+import { BoundedTerminalWriter } from "./boundedWriter.js";
 import {
   cursorPaint,
   cursorTarget,
-  diffPaint,
+  diffFragments,
   ENTER_ALT_SCREEN,
-  fullPaint,
+  fullFragments,
   EXIT_ALT_SCREEN,
   leaveScreen,
   padToHeight,
@@ -448,14 +448,16 @@ export class TUI {
       this.transmitted.set(imageId, held);
     }
 
-    let buffer = paintBegin(this.terminal.capabilities.supportsDec2026Sync);
-    buffer += stable && !force
-      ? diffPaint(swapRows(this.window), swapRows(rows), 0, height)
-      : fullPaint(swapRows(rows), height);
-    buffer += this.evictOffscreenImages(visible);
-    buffer += cursorPaint(cursorTarget(source, 0, height), 0);
-    buffer += paintEnd(this.terminal.capabilities.supportsDec2026Sync);
-    writeBoundedFrame(this.terminal, buffer, onWritten);
+    const writer = new BoundedTerminalWriter(this.terminal);
+    writer.append(paintBegin(this.terminal.capabilities.supportsDec2026Sync));
+    const fragments = stable && !force
+      ? diffFragments(swapRows(this.window), swapRows(rows), 0, height)
+      : fullFragments(swapRows(rows), height);
+    for (const fragment of fragments) writer.append(fragment);
+    writer.append(this.evictOffscreenImages(visible));
+    writer.append(cursorPaint(cursorTarget(source, 0, height), 0));
+    writer.append(paintEnd(this.terminal.capabilities.supportsDec2026Sync));
+    writer.flush(onWritten);
     this.window = rows;
     this.lastWidth = width;
     this.lastHeight = height;

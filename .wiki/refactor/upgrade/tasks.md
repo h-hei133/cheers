@@ -22,7 +22,7 @@
 ## B / B2: 终端（P0／P1）
 
 - [ ] **B.1** 国旗、ZWJ、无 FE0F 等显示宽度：已有待验收，真实渲染／截断／命中一致。
-- [ ] **B.2** 1 MiB 分块 writer 与背压：已有待验收，受阻管道、关闭与取消不丢终态。
+- [x] **B.2** 1 MiB 分块 writer 与背压：本地验收完成。UTF-8字节预算、跨fragment surrogate保持；regular/fullscreen逐行进入同一writer，原pending-byte与shutdown owner保留。独立暂存树4套件107项及build通过；Linux实际受阻管道4MB文本摘要一致、全部写块<=1MiB，PTY约5.7MB输出完成；关闭输出exit1、SIGTERM exit143均完成清理且不报告写完。实际M，额外依赖0；不宣称物理终端或整进程总内存上限。
 - [ ] **B.3** 图片头、cell size、缓存数量／传输／64 MiB 解码预算：已有待验收，真实 Linux 图片和未知格式拒绝。
 - [ ] **B2.1** OSC 9;4／7501／133／16t／tmux 超链接：已有待验收，实际生命周期和输入隔离。
 - [ ] **B2.2** OSC 10／11／4 查询与完整调色板应用：部分。查询 API 尚未由产品生命周期调用；接入现有主题选择／预览，不让迟到响应改变后继宿主或覆盖显式选择。
@@ -120,3 +120,5 @@
 2026-11-14 流式参数修复提交前：A.3提交`28ffb9e7`。删除没有预览消费者的修补解析器，SSE原始参数片段保持原字节并只在最终完整对象准入；多个工具中任意参数损坏则全部拒绝执行。独立暂存树五静态门、completion/step两套件172项及build `cc6f429b3e71`通过；确认被删除源码未残留于导出树。F1.1真实增量预览仍未实现，不勾选。首次从workspace子目录调用根门禁脚本失败，改根目录执行后通过，属命令位置错误。
 
 2026-11-14 端点路由修复提交前：流式参数提交`24a23997`。内建Mistral目录选择专用chat端点，兼容旧配置名；清除非协议字段并规范call ID/affinity。Azure由端点统一解析完整base URL、资源和api-version，保留relay前缀和query。独立暂存树五静态门、2套件26项、build `3a0b1baf2323`通过。F1.2完整WebSocket及真实服务验收仍开项；没有把fixture应答称为真实提供方证据。
+
+2026-11-14 B.2提交前：端点路由提交`a410eab2`。writer原3项红及fullscreen追加反例均已修复；独立暂存树五静态门、4套件107项、build `85c4ef80b41d`通过。实际Node进程加载暂存源码：OS管道先积压4,000,000字节后延迟150ms读取，全文SHA256一致；regular画面累计5,695,129字节，最大write1,048,576字节，回调时pending0。Linux PTY5,697,415字节完成；实际断管与SIGTERM通过原CLI shutdown分别exit1/143，closed=true、completed=false。记录`.omx/artifacts/upgrade-writer-2026-11-14/`；原生探针使用暂存源码tsx，不冒称公开编译导出。

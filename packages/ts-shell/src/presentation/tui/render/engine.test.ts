@@ -2,7 +2,7 @@ import { ENABLE_MOUSE, DISABLE_MOUSE, ENABLE_MOUSE_MOTION, DISABLE_MOUSE_MOTION 
 import { describe, expect, it, vi } from "vitest";
 import { TUI } from "./engine.js";
 import { CURSOR_MARKER } from "./paint.js";
-import { BoundedTerminalWriter, MAX_RENDER_WRITE_CHARS, writeBoundedFrame } from "./boundedWriter.js";
+import { BoundedTerminalWriter, MAX_RENDER_WRITE_BYTES, writeBoundedFrame } from "./boundedWriter.js";
 import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminalDouble.js";
 
 class StubProvider implements TerminalFrameProvider {
@@ -962,10 +962,10 @@ describe("BoundedTerminalWriter", () => {
     expect(chunks[0]).toBe("012345678");
     expect(chunks[1]).toBe("😀xyz");
     expect(done).toHaveBeenCalledOnce();
-    expect(MAX_RENDER_WRITE_CHARS).toBe(1024 * 1024);
+    expect(MAX_RENDER_WRITE_BYTES).toBe(1024 * 1024);
   });
 
-  it("delivers onWritten on a non-empty final chunk even on exact maxChars multiples and handles maxChars <= 1", () => {
+  it("delivers onWritten on a non-empty final chunk even on exact byte multiples and handles limits <= 1", () => {
     const writes: string[] = [];
     const done = vi.fn();
     writeBoundedFrame(

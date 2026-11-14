@@ -104,28 +104,39 @@ export function padToHeight(rows: readonly string[], height: number): string[] {
 }
 
 /** Absolute rewrites for the rows that differ between two prepared frames. */
-export function diffPaint(previous: readonly string[], next: readonly string[], top: number, height: number): string {
-  let buffer = "";
+export function* diffFragments(previous: readonly string[], next: readonly string[], top: number, height: number): IterableIterator<string> {
   for (let index = 0; index < next.length; index++) {
     if (previous[index] === next[index]) continue;
-    buffer += `${moveTo(top + index, 0)}${next[index] ?? ""}${ERASE_TO_END_OF_LINE}`;
+    yield moveTo(top + index, 0);
+    yield next[index] ?? "";
+    yield ERASE_TO_END_OF_LINE;
   }
   if (previous.length > next.length && top + next.length < height) {
-    buffer += eraseFromRow(top + next.length, height);
+    yield eraseFromRow(top + next.length, height);
   }
-  return buffer;
+}
+
+/** Materialized diff for consumers that need an in-memory frame. */
+export function diffPaint(previous: readonly string[], next: readonly string[], top: number, height: number): string {
+  return [...diffFragments(previous, next, top, height)].join("");
 }
 
 export const ENTER_ALT_SCREEN = "\x1b[?1049h";
 export const EXIT_ALT_SCREEN = "\x1b[?1049l";
 
 /** Every row rewritten from the top, for a frame with no previous state to diff. */
-export function fullPaint(rows: readonly string[], height: number): string {
-  let buffer = `${moveTo(0, 0)}${ERASE_TO_END_OF_SCREEN}`;
+export function* fullFragments(rows: readonly string[], height: number): IterableIterator<string> {
+  yield `${moveTo(0, 0)}${ERASE_TO_END_OF_SCREEN}`;
   for (let index = 0; index < Math.min(rows.length, height); index++) {
-    buffer += `${moveTo(index, 0)}${rows[index] ?? ""}${ERASE_TO_END_OF_LINE}`;
+    yield moveTo(index, 0);
+    yield rows[index] ?? "";
+    yield ERASE_TO_END_OF_LINE;
   }
-  return buffer;
+}
+
+/** Materialized full paint for consumers that need an in-memory frame. */
+export function fullPaint(rows: readonly string[], height: number): string {
+  return [...fullFragments(rows, height)].join("");
 }
 
 /**

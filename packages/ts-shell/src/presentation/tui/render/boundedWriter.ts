@@ -1,65 +1,81 @@
-export const MAX_RENDER_WRITE_CHARS = 1024 * 1024;
+export const MAX_RENDER_WRITE_BYTES = 1024 * 1024;
 
 export interface TerminalWriteSink {
   write(data: string, onWritten?: () => void): void;
 }
 
-function safeChunkEnd(value: string, offset: number, capacity: number): number {
-  let end = Math.min(value.length, offset + capacity);
-  if (
-    end < value.length &&
-    end > offset &&
-    value.charCodeAt(end - 1) >= 0xd800 &&
-    value.charCodeAt(end - 1) <= 0xdbff &&
-    value.charCodeAt(end) >= 0xdc00 &&
-    value.charCodeAt(end) <= 0xdfff
-  ) {
-    end--;
+function chunkBoundary(value: string, offset: number, capacity: number): { end: number; bytes: number } {
+  let end = offset;
+  let bytes = 0;
+  while (end < value.length) {
+    const point = value.codePointAt(end)!;
+    const width = point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4;
+    if (bytes + width > capacity) break;
+    bytes += width;
+    end += point > 0xffff ? 2 : 1;
   }
-  return end;
+  return { end, bytes };
 }
 
 /**
- * Streams terminal output in <= 1 MiB UTF-16-safe chunks so oversized frames
- * never exceed V8 string limits or split surrogate pairs across writes.
+ * Buffers at most 1 MiB of UTF-8 output. Callers append rows instead of first
+ * constructing a complete frame; adjacent fragments may split a surrogate pair.
  */
 export class BoundedTerminalWriter {
   private buffer = "";
+  private bufferBytes = 0;
+  private heldSurrogate = "";
   private writtenChars = 0;
-  private readonly maxChars: number;
+  private readonly maxBytes: number;
 
   constructor(
     private readonly sink: TerminalWriteSink,
-    maxChars: number = MAX_RENDER_WRITE_CHARS,
+    maxBytes: number = MAX_RENDER_WRITE_BYTES,
   ) {
-    this.maxChars = Number.isFinite(maxChars) ? Math.max(2, Math.floor(maxChars)) : MAX_RENDER_WRITE_CHARS;
+    this.maxBytes = Number.isFinite(maxBytes) ? Math.max(4, Math.floor(maxBytes)) : MAX_RENDER_WRITE_BYTES;
   }
 
   append(value: string): void {
+    if (!value) return;
+    value = this.heldSurrogate + value;
+    this.heldSurrogate = "";
+    const last = value.charCodeAt(value.length - 1);
+    if (last >= 0xd800 && last <= 0xdbff) {
+      this.heldSurrogate = value.slice(-1);
+      value = value.slice(0, -1);
+    }
     let offset = 0;
     while (offset < value.length) {
-      const capacity = this.maxChars - this.buffer.length;
+      const capacity = this.maxBytes - this.bufferBytes;
       if (capacity <= 0) {
-        this.flush();
+        this.drain();
         continue;
       }
-      let end = safeChunkEnd(value, offset, capacity);
+      const { end, bytes } = chunkBoundary(value, offset, capacity);
       if (end === offset) {
-        if (this.buffer.length > 0) {
-          this.flush();
-          continue;
-        }
-        end = Math.min(value.length, offset + 2);
+        this.drain();
+        continue;
       }
       this.buffer += value.slice(offset, end);
+      this.bufferBytes += bytes;
       offset = end;
-      if (this.buffer.length >= this.maxChars && offset < value.length) {
-        this.flush();
+      if (this.bufferBytes >= this.maxBytes && offset < value.length) {
+        this.drain();
       }
     }
   }
 
   flush(onWritten?: () => void): void {
+    if (this.heldSurrogate) {
+      if (this.bufferBytes + 3 > this.maxBytes) this.drain();
+      this.buffer += this.heldSurrogate;
+      this.bufferBytes += 3;
+      this.heldSurrogate = "";
+    }
+    this.drain(onWritten);
+  }
+
+  private drain(onWritten?: () => void): void {
     if (!this.buffer) {
       if (onWritten) this.sink.write("", onWritten);
       return;
@@ -67,10 +83,11 @@ export class BoundedTerminalWriter {
     this.sink.write(this.buffer, onWritten);
     this.writtenChars += this.buffer.length;
     this.buffer = "";
+    this.bufferBytes = 0;
   }
 
   get length(): number {
-    return this.writtenChars + this.buffer.length;
+    return this.writtenChars + this.buffer.length + this.heldSurrogate.length;
   }
 }
 
@@ -79,10 +96,10 @@ export function writeBoundedFrame(
   sink: TerminalWriteSink,
   data: string,
   onWritten?: () => void,
-  maxChars: number = MAX_RENDER_WRITE_CHARS,
+  maxBytes: number = MAX_RENDER_WRITE_BYTES,
 ): void {
-  const limit = Number.isFinite(maxChars) ? Math.max(2, Math.floor(maxChars)) : MAX_RENDER_WRITE_CHARS;
-  if (data.length <= limit) {
+  const limit = Number.isFinite(maxBytes) ? Math.max(4, Math.floor(maxBytes)) : MAX_RENDER_WRITE_BYTES;
+  if (Buffer.byteLength(data) <= limit) {
     sink.write(data, onWritten);
     return;
   }

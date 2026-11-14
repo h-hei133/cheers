@@ -2260,3 +2260,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Direct adapter tests pass while the built-in provider still uses a generic endpoint, or an endpoint appends a second API prefix.
 - **Root Cause:** Tests selected the new adapter explicitly and mirrored its URL construction instead of exercising catalogue selection and accepted base URLs.
 - **Rule:** Verify built-in, exact-base and user-override routing. Let the endpoint own URL normalization, preserve relay prefixes and query parameters, and keep the generic URL dispatcher a thin delegate.
+
+
+### Terminal Chunk Limits Must Count Bytes Across Fragments
+- **Symptom:** A nominal one-megabyte write grows with CJK or emoji, a surrogate split across rows becomes replacement text, or a painter still assembles the complete frame before slicing it.
+- **Root Cause:** Character counts are not UTF-8 byte counts; independently encoding adjacent fragments loses their shared character boundary. Result-time slicing cannot bound frame construction.
+- **Rule:** Stream rows through the existing writer, carry a trailing high surrogate into the next fragment, and attach completion only to the final write. Keep the terminal's pending-byte and shutdown owners; exercise a real blocked pipe, closed output and signal so partial delivery never reports completion.

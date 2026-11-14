@@ -34,7 +34,7 @@
  */
 
 import { cursorTarget, paintBegin, paintEnd, prepareRows } from "./paint.js";
-import { writeBoundedFrame } from "./boundedWriter.js";
+import { BoundedTerminalWriter } from "./boundedWriter.js";
 
 /** Everything this needs from the terminal, so a double can stand in for one. */
 export interface MainScreenDevice {
@@ -168,20 +168,22 @@ export class MainScreenPainter {
       return delta > 0 ? `\x1b[${delta}B\r` : `\x1b[${-delta}A\r`;
     };
 
-    let buffer = paintBegin(this.device.capabilities.supportsDec2026Sync) + replacement;
+    const output = new BoundedTerminalWriter(this.device);
+    output.append(paintBegin(this.device.capabilities.supportsDec2026Sync));
+    output.append(replacement);
     if (appendRows.length > 0) {
       // Appending happens at the bottom of the content, which means stepping
       // over the fixed block to reach it. `writtenTotal` is that bottom, and it
       // is the cursor's own account rather than the fixed block's last row,
       // because the two differ and the append has to land on the row that is
       // actually free.
-      buffer += move(writtenTotal);
+      output.append(move(writtenTotal));
       for (const row of appendRows) {
         // The newline after each row is what feeds the scrollback: a row written
         // on the screen's last line stays there until a newline pushes it up,
         // and without that push the transcript would stop growing at one screen
         // and the bottom line would be overwritten forever.
-        buffer += `${ERASE_LINE}${row}\r\n`;
+        output.append(`${ERASE_LINE}${row}\r\n`);
       }
       // Each appended row ended with a newline, so the cursor is one row past
       // the last of them. That is also the row the fixed block starts on when
@@ -199,13 +201,13 @@ export class MainScreenPainter {
       onScreenContent.slice(0, sharedContent),
     );
     if (changedFrom < sharedContent) {
-      buffer += move(newScrolled + changedFrom);
+      output.append(move(newScrolled + changedFrom));
       for (let index = changedFrom; index < sharedContent; index++) {
-        buffer += `${ERASE_LINE}${onScreenContent[index] ?? ""}`;
+        output.append(`${ERASE_LINE}${onScreenContent[index] ?? ""}`);
         // A newline between rows moves the cursor down; a trailing one would
         // step past the last row and leave the account one ahead of the
         // terminal for every move that follows.
-        if (index < sharedContent - 1) buffer += "\r\n";
+        if (index < sharedContent - 1) output.append("\r\n");
       }
       // The rewrite left the cursor on the last row it wrote, which is the
       // row the accounting names.
@@ -222,27 +224,27 @@ export class MainScreenPainter {
     // says it changed.
     if (appendRows.length === 0 && previousOnScreen.length > onScreenContent.length) {
       const blockTop = newScrolled + onScreenContent.length;
-      buffer += move(blockTop);
+      output.append(move(blockTop));
       if (onScreenContent.length > 0) {
         // A newline rather than a bare down-move: at the screen's last row a
         // down-move does nothing and the erase would start on the row the
         // content still keeps, while a newline scrolls the kept rows into the
         // scrollback and hands back the blank row the erase wants.
-        buffer += "\r\n";
+        output.append("\r\n");
         cursor += 1;
       }
-      buffer += ERASE_TO_END_OF_SCREEN;
+      output.append(ERASE_TO_END_OF_SCREEN);
       this.fixedRows = [];
     }
 
     // The fixed block, redrawn under the content wherever it changed.
     if (fixed.length > 0 || this.fixedRows.length > 0) {
-      buffer += move(newScrolled + onScreenContent.length);
+      output.append(move(newScrolled + onScreenContent.length));
       for (let index = 0; index < fixed.length; index++) {
-        buffer += `${ERASE_LINE}${fixed[index] ?? ""}`;
-        if (index < fixed.length - 1) buffer += "\r\n";
+        output.append(`${ERASE_LINE}${fixed[index] ?? ""}`);
+        if (index < fixed.length - 1) output.append("\r\n");
       }
-      if (this.fixedRows.length > fixed.length) buffer += ERASE_TO_END_OF_SCREEN;
+      if (this.fixedRows.length > fixed.length) output.append(ERASE_TO_END_OF_SCREEN);
       if (fixed.length > 0) cursor = newScrolled + onScreenContent.length + fixed.length - 1;
     }
 
@@ -250,13 +252,13 @@ export class MainScreenPainter {
     // essential: the next append, redraw or suspension starts from this row.
     const caret = cursorTarget([...rawContent.slice(newScrolled), ...rawFixed], 0, height);
     if (caret) {
-      buffer += move(newScrolled + caret.row);
+      output.append(move(newScrolled + caret.row));
       const column = Math.min(width - 1, caret.column);
-      if (column > 0) buffer += `\x1b[${column}C`;
-      buffer += SHOW_CURSOR;
+      if (column > 0) output.append(`\x1b[${column}C`);
+      output.append(SHOW_CURSOR);
     }
-    buffer += paintEnd(this.device.capabilities.supportsDec2026Sync);
-    writeBoundedFrame(this.device, buffer, onWritten);
+    output.append(paintEnd(this.device.capabilities.supportsDec2026Sync));
+    output.flush(onWritten);
 
     this.visibleContent = onScreenContent;
     this.scrolled = newScrolled;
