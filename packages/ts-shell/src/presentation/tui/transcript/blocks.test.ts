@@ -4,6 +4,7 @@ import { visibleWidth } from "../text/measure.js";
 import { stripAnsi } from "../text/ansi.js";
 import { defaultTheme } from "../../theme/theme.js";
 import { getDefaultTheme } from "../../themes/index.js";
+import { pngImage } from '../../../test-utils/image.js';
 
 // Color assertions run under an explicit capability, independent of NO_COLOR.
 const originalColorMode = defaultTheme.colorMode;
@@ -124,7 +125,7 @@ describe("width discipline", () => {
 });
 
 describe("image attachments in the prompt echo", () => {
-  const IMG = { type: "image" as const, data: "QUJD", mimeType: "image/png" };
+  const IMG = pngImage();
 
   it("renders the inline sequence on a protocol terminal, unwrapped", () => {
     // The sequence is carried through wrapping intact — escape sequences hold
@@ -138,7 +139,7 @@ describe("image attachments in the prompt echo", () => {
     const imageRows = rows.filter((row) => row.includes("\x1b_G"));
     expect(imageRows.length).toBe(1);
     expect(imageRows[0]).toContain("a=T,f=100,q=2");
-    expect(imageRows[0]).toContain("QUJD");
+    expect(imageRows[0]).toContain(IMG.data);
     // The sequence carries an image id, without which a redraw in alt-screen
     // cannot place the image and resends the whole payload every frame.
     expect(imageRows[0]).toMatch(/\x1b_G(?:[^;]*,)?i=\d+/);
@@ -166,7 +167,7 @@ describe("image attachments in the prompt echo", () => {
 });
 
 describe("pictures a tool returned", () => {
-  const IMG = { type: "image" as const, data: "QUJD", mimeType: "image/png" };
+  const IMG = pngImage();
 
   it("draws a screenshot result even while the card is folded", () => {
     // The picture is the result; folding the card's prose away must not hide it.
@@ -186,5 +187,51 @@ describe("pictures a tool returned", () => {
     );
     expect(rows.some((row) => row.includes("\x1b_G"))).toBe(false);
     expect(rows.some((row) => row.includes("image result: image/png"))).toBe(true);
+  });
+});
+
+describe('terminal image admission', () => {
+  const png = pngImage();
+  const gif = { type: 'image' as const, mimeType: 'image/gif', data: 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' };
+  const cases = [
+    { name: 'unknown format', image: { ...png, mimeType: 'image/svg+xml' } },
+    { name: 'invalid base64', image: { ...png, data: 'QUJD' } },
+    { name: 'base64 escape injection', image: { ...png, data: `${png.data}\x1b[2J` } },
+    { name: 'mismatched MIME', image: { ...png, mimeType: 'image/jpeg' } },
+    { name: 'truncated PNG header', image: { ...png, data: Buffer.from(png.data, 'base64').subarray(0, 24).toString('base64') } },
+    { name: 'oversized decoded image', image: (() => {
+      const bytes = Buffer.from(png.data, 'base64');
+      bytes.writeUInt32BE(5000, 16); bytes.writeUInt32BE(4000, 20);
+      return { ...png, data: bytes.toString('base64') };
+    })() },
+  ];
+
+  it.each(['user', 'tool'] as const)('refuses unknown or invalid graphics at the actual %s block boundary', kind => {
+    for (const protocol of ['kitty', 'iterm2'] as const) {
+      for (const { name, image } of cases) {
+        const rows = renderBlock({ ...textBlock(kind, ''), title: 'read', images: [image] }, WIDTH, { imageProtocol: protocol });
+        expect(rows.join('\n'), `${protocol}: ${name}`).not.toMatch(/\x1b_G|\x1b\]1337;/);
+        expect(rows.map(stripAnsi).join('\n')).toContain(kind === 'user' ? 'image attachment:' : 'image result:');
+      }
+    }
+  });
+
+  it.each(['user', 'tool'] as const)('uses a text fallback for a non-PNG %s image on Kitty and preserves iTerm2 support', kind => {
+    const block = { ...textBlock(kind, ''), title: 'read', images: [gif] };
+    expect(renderBlock(block, WIDTH, { imageProtocol: 'kitty' }).join('\n')).not.toContain('\x1b_G');
+    const iterm = renderBlock(block, WIDTH, { imageProtocol: 'iterm2' }).join('\n');
+    expect(iterm).toContain('\x1b]1337;');
+    expect(iterm).toContain(gif.data);
+    expect(block.images[0]).toBe(gif);
+  });
+
+  it.each(['user', 'tool'] as const)('does not emit terminal controls from a refused %s image MIME label', kind => {
+    const control = '\x1b[2J';
+    const block = { ...textBlock(kind, ''), title: 'read', images: [{ ...png, mimeType: `image/svg+xml${control}` }] };
+    for (const imageProtocol of [undefined, 'kitty', 'iterm2'] as const) {
+      const rows = renderBlock(block, WIDTH, { imageProtocol }).join('\n');
+      expect(rows).not.toContain(control);
+      expect(rows).not.toMatch(/\x1b_G|\x1b\]1337;/);
+    }
   });
 });

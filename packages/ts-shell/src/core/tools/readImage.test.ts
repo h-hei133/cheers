@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { safeRemoveDir } from '../../test-utils/cleanup.js'
 import { createCoreToolRegistry } from './registry.js'
 import which from 'which'
+import { renderBlock } from '../../presentation/tui/transcript/blocks.js'
 
 /**
  * A binary file read as text is mojibake, and mojibake is worse than a refusal:
@@ -47,6 +48,17 @@ describe('read tool on an image', () => {
     expect(result.metadata?.media).toMatchObject({ width: 1, height: 1 })
     // The PNG signature must not survive into the model's context as characters.
     expect(result.output).not.toContain('\uFFFD')
+    for (const mimeType of ['image/jpeg', 'image/jpg']) {
+      const image = { ...result.images![0]!, mimeType }
+      const block = { kind: 'tool' as const, title: 'read', text: result.output, finalized: true, collapsed: true, images: [image] }
+      const kitty = renderBlock(block, 40, { imageProtocol: 'kitty' }).join('\n')
+      expect(kitty).not.toContain('\x1b_G')
+      expect(kitty).toContain(`image result: ${mimeType}`)
+      const iterm = renderBlock(block, 40, { imageProtocol: 'iterm2' }).join('\n')
+      expect(iterm).toContain('\x1b]1337;File=')
+      expect(iterm).toContain(image.data)
+      expect(block.images[0]).toBe(image)
+    }
   })
 
   it('still reads a text file beside it normally', async () => {

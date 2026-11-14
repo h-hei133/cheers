@@ -2514,3 +2514,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A keycap or narrow-member ZWJ is painted across two cells but truncation, cursor placement and pointer selection treat it as one.
 - **Root Cause:** Fully qualified RGI matching excludes optional-selector forms; testing only wide-member emoji hides the mismatch. Tiny composer frames can also drop decoration and retain more content cells than a fixture expects.
 - **Rule:** Recognize exact keycaps and probe ZWJ qualification on a shadow string bounded by the existing RGI set; preserve original text and explicit selectors. Test measurement, truncation, mapped source selection, both painter cursor bytes and native input edits. Confirm actual composerTextWidth and cue margins before asserting small-frame wrapping.
+
+
+### Refused Image Metadata Still Reaches The Terminal
+- **Symptom:** Rejecting an unknown image still emits the MIME field's clear-screen escape through its text fallback.
+- **Root Cause:** Header/protocol refusal and display safety are separate boundaries; theme styling preserves ANSI in rejected metadata.
+- **Rule:** Apply the existing display neutralization to fallback metadata and assert raw terminal bytes at both user and tool consumers. Complete header admission does not prove pixel integrity; Kitty PNG controls must never carry a JPEG/GIF/WebP source.

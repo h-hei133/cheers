@@ -11,8 +11,8 @@ function headerPrefixBuffer(base64Data: string, maxChars = 128): Buffer {
 
 function getPngDimensions(base64Data: string): ImageDimensions | undefined {
   const buffer = headerPrefixBuffer(base64Data, 64);
-  if (buffer.length < 24) return undefined;
-  if (buffer[0] !== 0x89 || buffer[1] !== 0x50 || buffer[2] !== 0x4e || buffer[3] !== 0x47) return undefined;
+  if (buffer.length < 33 || !buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    || buffer.readUInt32BE(8) !== 13 || buffer.subarray(12, 16).toString('ascii') !== 'IHDR') return undefined;
   const widthPx = buffer.readUInt32BE(16);
   const heightPx = buffer.readUInt32BE(20);
   return widthPx > 0 && heightPx > 0 ? { widthPx, heightPx } : undefined;
@@ -36,13 +36,13 @@ function getWebpDimensions(base64Data: string): ImageDimensions | undefined {
   }
   const chunk = buffer.subarray(12, 16).toString("ascii");
   if (chunk === "VP8 ") {
-    if (buffer.length < 30) return undefined;
+    if (buffer.length < 30 || buffer[23] !== 0x9d || buffer[24] !== 0x01 || buffer[25] !== 0x2a) return undefined;
     const widthPx = buffer.readUInt16LE(26) & 0x3fff;
     const heightPx = buffer.readUInt16LE(28) & 0x3fff;
     return widthPx > 0 && heightPx > 0 ? { widthPx, heightPx } : undefined;
   }
   if (chunk === "VP8L") {
-    if (buffer.length < 25) return undefined;
+    if (buffer.length < 25 || buffer[20] !== 0x2f) return undefined;
     const bits = buffer.readUInt32LE(21);
     const widthPx = (bits & 0x3fff) + 1;
     const heightPx = ((bits >> 14) & 0x3fff) + 1;
@@ -101,9 +101,10 @@ export function getImageDimensions(base64Data: string, mimeType?: string): Image
   try {
     if (!base64Data) return undefined;
     if (mimeType === "image/png") return getPngDimensions(base64Data);
-    if (mimeType === "image/jpeg") return getJpegDimensions(base64Data);
+    if (mimeType === "image/jpeg" || mimeType === "image/jpg") return getJpegDimensions(base64Data);
     if (mimeType === "image/gif") return getGifDimensions(base64Data);
     if (mimeType === "image/webp") return getWebpDimensions(base64Data);
+    if (mimeType !== undefined) return undefined;
     return (
       getPngDimensions(base64Data) ??
       getGifDimensions(base64Data) ??

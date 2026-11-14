@@ -4,8 +4,9 @@ import { defaultTheme } from "../../theme/theme.js";
 import { formatCommandLine, formatToolDetail } from "../../theme/commandHighlight.js";
 import { padToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
+import { neutraliseForDisplay } from '../../../core/text/safety.js';
 import type { ImageContent } from "../../../model-adapters/multimodal.js";
-import { calculateImageRows, getImageDimensions, imageIdForData, inlineImageSequence, type ImageProtocol } from "../image.js";
+import { calculateImageRows, inlineImageDimensions, imageIdForData, inlineImageSequence, type ImageProtocol } from "../image.js";
 import { renderDiff } from "./diff.js";
 import { renderMarkdown, trimPartialFence, type MarkdownRenderOptions } from "./markdown.js";
 
@@ -147,18 +148,18 @@ function renderUser(block: Block, width: number, options: BlockRenderOptions = {
   // sequence occupies zero cells, so the bubble's styling wraps around it
   // without shifting a single column, and the wrap leaves the sequence whole.
   for (const image of block.images ?? []) {
-    if (options.imageProtocol) {
+    const dims = options.imageProtocol && inlineImageDimensions(image, options.imageProtocol);
+    if (options.imageProtocol && dims) {
       const columns = Math.max(4, Math.min(bodyWidth, 48));
-      const dims = getImageDimensions(image.data, image.mimeType);
       const sequence = inlineImageSequence(options.imageProtocol, image.data, {
         columns,
-        ...(dims ? { rows: calculateImageRows(dims, columns) } : {}),
+        rows: calculateImageRows(dims, columns),
         imageId: imageIdForData(image.data),
       });
       const padded = padToWidth(" ", width);
       rows.push(`${defaultTheme.bg("userMessageBg", padded + sequence)}\x1b[0m`);
     } else {
-      const label = `${image.mimeType}, ${Math.round((image.data.length * 3) / 4 / 1024)} KB`;
+      const label = `${neutraliseForDisplay(image.mimeType)}, ${Math.round((image.data.length * 3) / 4 / 1024)} KB`;
       const padded = padToWidth(defaultTheme.fg("userMessageText", `image attachment: ${label}`), width);
       rows.push(`${defaultTheme.bg("userMessageBg", padded)}\x1b[0m`);
     }
@@ -300,17 +301,17 @@ function renderTool(block: Block, width: number, options: BlockRenderOptions = {
 function toolImageRows(block: Block, width: number, options: BlockRenderOptions): readonly string[] {
   const rows: string[] = [];
   for (const image of block.images ?? []) {
-    if (options.imageProtocol) {
+    const dims = options.imageProtocol && inlineImageDimensions(image, options.imageProtocol);
+    if (options.imageProtocol && dims) {
       const columns = Math.max(4, Math.min(width, 48));
-      const dims = getImageDimensions(image.data, image.mimeType);
       const sequence = inlineImageSequence(options.imageProtocol, image.data, {
         columns,
-        ...(dims ? { rows: calculateImageRows(dims, columns) } : {}),
+        rows: calculateImageRows(dims, columns),
         imageId: imageIdForData(image.data),
       });
       rows.push(`${GUTTER}${sequence}`);
     } else {
-      const label = `${image.mimeType}, ${Math.round((image.data.length * 3) / 4 / 1024)} KB`;
+      const label = `${neutraliseForDisplay(image.mimeType)}, ${Math.round((image.data.length * 3) / 4 / 1024)} KB`;
       rows.push(`${GUTTER}${defaultTheme.dim(`image result: ${label}`)}`);
     }
   }

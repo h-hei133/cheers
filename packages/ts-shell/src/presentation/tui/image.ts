@@ -14,9 +14,23 @@
  * worse than a placeholder that never lies.
  */
 import { estimateDecodedImageBytes } from "./imageDimensions.js";
+import { canonicalImageMime, inspectImage } from '../../model-adapters/image/input.js';
+import type { ImageContent } from '../../model-adapters/multimodal.js';
+import type { ImageDimensions } from './imageDimensions.js';
 export { calculateImageRows, estimateDecodedImageBytes, getImageDimensions, type CellDimensions, type ImageDimensions } from "./imageDimensions.js";
 
 export type ImageProtocol = "kitty" | "iterm2";
+
+/** Refuse unsupported wire formats and excessive terminal-side pixel allocation. */
+export function inlineImageDimensions(image: ImageContent, protocol: ImageProtocol): ImageDimensions | undefined {
+  try {
+    if (protocol === 'kitty' && canonicalImageMime(image.mimeType) !== 'image/png') return undefined;
+    const dimensions = inspectImage(image);
+    return dimensions.widthPx * dimensions.heightPx * 4 <= 64 * 1024 * 1024 ? dimensions : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * One kitty transmission: an initiator chunk carrying the controls, then any

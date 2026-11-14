@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.1/B.2/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
-**Active batch**: C.3联合验收已提交`b8c09e1f`。B.1共享宽度修复完成7套件306项、六静态门、函数上限与build `12c748aff97c`；两反转红且逐字节恢复后再绿，Linux当前编译CLI两模式PTY共10格原文／cursor／键鼠编辑结果通过，限定只读复核CLEAR。本地验收18项；提交此批后核实B.3图片头、cell-size和预算。C.6仍缺Anthropic原生历史协议真实服务证据，保持部分。
+**Active batch**: B.1已提交`30335353`。B.3终端格式准入首批完成六门、6/124、函数上限及build `320e22d14438`，限定只读复核CLEAR；Linux编译CLI四格完整PNG／native JPEG和未知MIME安全fallback通过，两反转红且逐字节恢复。记录后按批提交，再接图片占行／cell-size缓存和离屏预算。整体本地验收18项；C.6原生历史协议证据缺口继续保留。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -88,3 +88,5 @@
 | 2026-11-15 | C.3补实际owner联合30套件502项及六静态门通过，限定只读复核CLEAR。账户刷新早拒绝是fixture main100与默认4096冲突；只修fixture并保留全部行为断言。当前编译SDK两组14次actual请求证据通过，C.3本地验收数17；Anthropic native未被当前目标消费，C.6继续部分。此批只有测试／文档，生产build未改变；按批提交后继续B.1。 |
 
 | 2026-11-15 | B.1原文资格化宽度修复7套件306项、六静态门、函数上限和build `12c748aff97c`通过，限定只读复核CLEAR。两反转红／逐字节恢复再绿，Linux编译CLI两模式各五样本cursor／键盘／第二cell点击原文编辑通过，physical glyph未测。初几何与cue预算探针错误保留，只改fixture。本地验收18项；按批提交后接B.3。 |
+
+| 2026-11-15 | B.3首批拒绝unknown／格式伪装／损坏头／单图超限，复审MIME terminal-control两红例修复；Kitty PNG-only／非PNG fallback与iTerm实际read JPEG/alias通过。六门、6/124、0monoliths、build `320e22d14438`和Linux当前编译CLI两模式×两协议四格passed；两反转红／逐字节恢复后再绿。实际M／额外依赖1，B.3保持部分、18项不变，下一批占行与cell-size。 |

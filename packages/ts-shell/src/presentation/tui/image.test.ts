@@ -129,8 +129,9 @@ describe("transmit-once placement under redraw", () => {
 describe("image header dimensions and decoded pixel accounting", () => {
   it("parses PNG, GIF, WebP (VP8X), and JPEG SOF0 dimensions and calculates terminal rows", () => {
     // 320x160 PNG IHDR
-    const png = Buffer.alloc(24);
+    const png = Buffer.alloc(33);
     png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+    png.writeUInt32BE(13, 8); png.write('IHDR', 12, 'ascii');
     png.writeUInt32BE(320, 16);
     png.writeUInt32BE(160, 20);
     const pngB64 = png.toString("base64");

@@ -950,10 +950,11 @@ describe("kitty image rows under redraw", () => {
     const { tui, terminal, scheduler, provider } = boot();
     tui.start();
     scheduler.flush();
-    // Tiny 32-byte PNG headers claiming 5000x4000 pixels (~76.3 MiB decoded RGBA each)
+    // Tiny complete IHDR headers claiming 5000x4000 pixels (~76.3 MiB decoded RGBA each)
     const makeHugePng = (id: number): string => {
-      const png = Buffer.alloc(24);
+      const png = Buffer.alloc(33);
       png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+      png.writeUInt32BE(13, 8); png.write('IHDR', 12, 'ascii');
       png.writeUInt32BE(5000, 16);
       png.writeUInt32BE(4000, 20);
       return `\x1b_Ga=T,f=100,q=2,i=${id};${png.toString("base64")}\x1b\\`;

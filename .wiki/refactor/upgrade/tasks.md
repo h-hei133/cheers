@@ -23,7 +23,7 @@
 
 - [x] **B.1** 国旗、ZWJ、无 FE0F 等显示宽度：本地验收完成。无selector keycap与双窄成员眼睛气泡ZWJ的真实反例先红后修；仅改共享width owner，资格化计算影子由RGI约束、不改source和显式selector，保留原dingbat／宽成员fallback。六静态门、7套件306项、函数上限及build `12c748aff97c`通过，限定只读复核CLEAR；Linux当前编译CLI两模式PTY共10格通过，regular按grapheme移动、fullscreen点击第二cell和精确原文编辑验证。keycap／ZWJ两反转确实红、生产逐字节恢复后7/306再绿。实际M，额外依赖0；证据不等于物理字体或其他平台显示普遍兼容。
 - [x] **B.2** 1 MiB 分块 writer 与背压：本地验收完成。UTF-8字节预算、跨fragment surrogate保持；regular/fullscreen逐行进入同一writer，原pending-byte与shutdown owner保留。独立暂存树4套件107项及build通过；Linux实际受阻管道4MB文本摘要一致、全部写块<=1MiB，PTY约5.7MB输出完成；关闭输出exit1、SIGTERM exit143均完成清理且不报告写完。实际M，额外依赖0；不宣称物理终端或整进程总内存上限。
-- [ ] **B.3** 图片头、cell size、缓存数量／传输／64 MiB 解码预算：已有待验收，真实 Linux 图片和未知格式拒绝。
+- [ ] **B.3** 图片头、cell size、缓存数量／传输／64 MiB 解码预算：部分。第一批终端准入复用严格inspectImage，完整PNG／WebP bitstream头和显式MIME身份、单图64MiB RGBA估算限制；Kitty非PNG明确文字fallback，iTerm保留实际read JPEG／image-jpg。初8反例及复审MIME控制注入两红例先红后修；六静态门、6套件124项、函数上限和build `320e22d14438`通过，限定独立复核CLEAR。Linux编译CLI两模式×Kitty／iTerm2实际完整PNG与native read JPEG传输／拒绝通过；两反转红、逐字节恢复。头准入不证明像素完整性，图片占行／finalized cell-size缓存及精确离屏预算继续待下一批。
 - [ ] **B2.1** OSC 9;4／7501／133／16t／tmux 超链接：部分验收。捕获超链接能力贯通实际regular/fullscreen宿主、transcript/source与reader，缓存复制并区分能力；独立暂存树8套件601项、六静态门、build `6a9bc408aeed`通过，限定复审CLEAR。全协议生命周期、输入隔离及真实tmux仍待验收。
 - [x] **B2.2** OSC 10／11／4 查询与完整调色板应用：本地验收完成。实际regular/fullscreen启动及adoption接入100ms查询、16色稀疏合并和晚到更新；显式主题、预览、DEC997与后继宿主优先级保持。同一StdinBuffer保护粘贴，键盘DA1 fence保留到250ms自身截止。独立暂存树11套件166项、五静态门、build `64e760e74bd1`通过；Linux实际PTY绑定及fallback两路径16色/拆分DA1/晚到更新/原始粘贴通过，独立复审限定CLEAR。实际L，额外依赖2（共享framing与query fence）；不宣称物理终端普遍兼容。
 - [x] **B2.3** 可组合浮层与非捕获交互：本地验收完成。实际宿主选择／确认／单行／多行输入、叠层焦点和鼠标、短屏选择／光标、退出／撤权与composer恢复；widget/status复用chrome并限制总量。扩展对话录制遗漏两模式先红后修，真实cast排除输入、关闭后普通输出保留。独立暂存树6套件497项、六静态门、build `22b63f350222`及Linux编译CLI两种PTY选择／编辑取消／exit0通过，限定复审CLEAR。实际L，额外依赖1（recording消费者）；没有物理终端或其他平台证据。
@@ -148,3 +148,5 @@
 
 
 2026-11-15 B.1：初21项失败中3项是窄frame仍保留3cells和旧text-ZWJ宽度的夹具错误，原日志保留；几何确认后使用真实borderless2cells，不改生产frame。最终7/306、六静态门、函数上限0monoliths和build `12c748aff97c`通过，独立复核CLEAR。Linux当前编译CLI regular/fullscreen各5种source原文、硬件cursor字节和按键/鼠标编辑结果通过；第一次native未计入cue margin的观察错误保留。keycap与ZWJ反转为3红／1红，逐字节恢复后7/306再绿。本地验收数18，继续B.3；无physical glyph/provider/push/CI声明。
+
+2026-11-15 B.3准入首批：admission-red.log初8failed／19passed；admission-review-counterexample.log为两个实际MIME原字节反例，先前npm12 -t解析拒绝只算setup失败。六门和6/124绿；native首次seed误从root导入core tools及fullscreen清屏观察错误均保留，最终仅改probe导入／观察后四格passed。实际M，额外依赖1（拒绝MIME显示安全）；相同metadata／wire owner复用，无新增循环或解码器。本地18项计数不变，B.3仍部分。

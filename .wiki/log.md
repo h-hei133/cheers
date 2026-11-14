@@ -11789,3 +11789,10 @@ C.3实际30套件502项与六静态门通过；账户刷新用例最初因fixtur
 B.1无FE0F keycap／双窄成员ZWJ的measure、截断、点击及两模式绘制反例先红后修；仅改共享width owner，source字节和旧dingbat合同保留。六静态门、7套件306项、函数上限与build12c748aff97c通过，限定只读复核CLEAR；两项反转确实失败且逐字节恢复后再绿。
 
 Linux当前编译CLI regular/fullscreen各五种字符cursor、键盘移动／第二格点击和精确原文编辑通过，未测物理字体。C.3验收已提交b8c09e1f；B.1勾选后本地验收18项，继续B.3，不关闭总目标或宣称push/CI。
+
+
+### 2026-11-15：终端图片准入独立批次
+
+B.3首先修复实际user/tool图片unknown／MIME伪装／损坏头与Kitty非PNG误传，复用严格input和metadata owner，单图64MiB RGBA估算拒绝。独立复审补出拒绝MIME控制字节注入，两项原字节反例先红后复用显示安全函数修复；六静态门、6套件124项、函数上限和build320e22d14438通过，限定复核CLEAR。
+
+Linux当前compiled CLI regular/fullscreen×Kitty/iTerm2四格完整PNG、native read JPEG及unknown安全fallback通过，两反转红且逐字节恢复再绿。不宣称pixel解码、物理显示或终端总内存上限；图片多行布局、finalized cell-size缓存与离屏预算精确验收留后续，B.3保持部分、本地18项不变。按用户要求提交完成子批，不推送或声明CI。
