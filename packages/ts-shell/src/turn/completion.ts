@@ -1,4 +1,3 @@
-import { ToolCallArgumentsStream } from '../model-adapters/toolCallArgsStream.js';
 import { streamTracer } from '../observability/logs/stream.js';
 import { IncompleteStreamError, providerResponseError } from '../provider/response/error.js';
 /**
@@ -144,7 +143,8 @@ interface PendingCall {
   index: number | undefined;
   id: string;
   name: string;
-  args: ToolCallArgumentsStream;
+  /** Raw wire text; final execution admission parses the complete object once. */
+  args: string;
   /** Set instead of `args` by hosts that stream arguments as an object. */
   object: Record<string, unknown> | undefined;
 }
@@ -397,7 +397,7 @@ function pickCall(state: StreamState, delta: ToolCallDelta, offset: number, batc
     const positional = batch > 1 ? state.slots[offset] : state.calls[state.calls.length - 1];
     if (positional) return positional;
   }
-  const created: PendingCall = { index, id: id ?? "", name: "", args: new ToolCallArgumentsStream(), object: undefined };
+  const created: PendingCall = { index, id: id ?? "", name: "", args: "", object: undefined };
   state.calls.push(created);
   if (index !== undefined) state.byIndex.set(index, created);
   if (batch > 1) state.slots[offset] = created;
@@ -418,7 +418,7 @@ function applyCall(call: PendingCall, delta: ToolCallDelta): void {
   if (typeof name === "string" && name.length > 0) call.name = name;
   const args = delta.function?.arguments;
   if (typeof args === "string") {
-    call.args.append(args);
+    call.args += args;
     return;
   }
   if (args && typeof args === "object" && !Array.isArray(args)) {
@@ -504,7 +504,7 @@ function assemble(state: StreamState): StreamedCompletion {
     type: "function" as const,
     function: {
       name: call.name,
-      arguments: call.object ? JSON.stringify(call.object) : call.args.text,
+      arguments: call.object ? JSON.stringify(call.object) : call.args,
     },
   }));
 

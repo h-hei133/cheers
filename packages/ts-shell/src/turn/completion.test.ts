@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ProviderResponseError } from '../provider/response/error.js';
+import { toStep } from './step.js';
 import {
   isEventStream,
   readCompletionStream,
@@ -83,6 +84,35 @@ describe("reading a streamed completion", () => {
     expect(result.message.tool_calls).toEqual([
       { id: "call_1", type: "function", function: { name: "read", arguments: '{"path":"a.ts"}' } },
     ]);
+  });
+
+  it('preserves fragmented JSON literals exactly for strict final admission', async () => {
+    const args = { path: 'literal.txt', content: 'quote " slash \\ literal \\n Unicode Ω', nested: { values: [1, null, true] } };
+    const raw = JSON.stringify(args);
+    const chunks = Array.from(raw, argument => chunk({ tool_calls: [{ index: 0, function: { arguments: argument } }] }));
+    const { result } = await collect(streamOf(
+      chunk({ tool_calls: [{ index: 0, id: 'exact', function: { name: 'write', arguments: '' } }] }),
+      ...chunks, chunk({}, { finish_reason: 'tool_calls' }), 'data: [DONE]\n\n',
+    ));
+    expect(result.message.tool_calls?.[0]?.function.arguments).toBe(raw);
+    const admitted = toStep({ choices: [{ message: result.message, finish_reason: result.finishReason }] }, {});
+    expect(admitted.toolCalls).toEqual([{ id: 'exact', name: 'write', args }]);
+  });
+
+  it.each(['{"path":"incomplete.txt","content":"partial', '{"path":"incomplete.txt","content":"partial"',
+    '{"path":"incomplete.txt","content":"raw\ncontrol"}'])('preserves malformed SSE arguments for whole-response final refusal: %j', async malformed => {
+    const { result } = await collect(streamOf(
+      chunk({ content: 'Preparing changes.', tool_calls: [
+        { index: 0, id: 'complete', function: { name: 'write', arguments: '{"path":"complete.txt","content":"complete"}' } },
+        { index: 1, id: 'malformed', function: { name: 'write', arguments: malformed.slice(0, 8) } },
+      ] }),
+      chunk({ tool_calls: [{ index: 1, function: { arguments: malformed.slice(8) } }] }, { finish_reason: 'tool_calls' }),
+      'data: [DONE]\n\n',
+    ));
+    expect(result.message.tool_calls?.[1]?.function.arguments).toBe(malformed);
+    const refused = toStep({ choices: [{ message: result.message, finish_reason: result.finishReason }] }, {});
+    expect(refused).toMatchObject({ text: 'Preparing changes.', stopReason: 'error', toolCalls: [],
+      errorMessage: 'Provider returned malformed tool arguments. No tool calls were executed.' });
   });
 
   it("keeps two concurrent tool calls apart", async () => {
