@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileIdentity } from '../../core/workspace/files.js';
 
 export interface TranscriptReadLimits {
@@ -8,6 +9,20 @@ export interface TranscriptReadLimits {
 
 const CHUNK_BYTES = 64 * 1024;
 const YIELD_LINES = 1024;
+
+/** Bind an append to exact original bytes without retaining the full transcript. */
+export function readTranscriptPrefixDigest(fd: number, length: number): string {
+  if (!Number.isSafeInteger(length) || length < 0 || fs.fstatSync(fd).size < length) throw new Error('The saved transcript prefix is unavailable.');
+  const digest = createHash('sha256');
+  const bytes = Buffer.alloc(Math.min(CHUNK_BYTES, length));
+  let offset = 0;
+  while (offset < length) {
+    const count = fs.readSync(fd, bytes, 0, Math.min(bytes.length, length - offset), offset);
+    if (!count) throw new Error('The saved transcript prefix is unavailable.');
+    digest.update(bytes.subarray(0, count)); offset += count;
+  }
+  return digest.digest('hex');
+}
 
 /** Consume complete prefix lines without retaining or allocating the entire source text. */
 export async function readTranscriptPrefixAsync(

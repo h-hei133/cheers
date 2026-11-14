@@ -11,6 +11,8 @@ import {
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { Session } from "../schema/sessionRecord.js";
 import { publishedCompactionEvents } from '../compaction/publication.js';
+import { descriptorPath, fileIdentity } from '../../core/workspace/files.js';
+import { readTranscriptPrefixDigest } from './source.js';
 
 export {
   parseTranscript,
@@ -104,6 +106,19 @@ export function projectBranchMessages(
   );
 }
 
+export class TranscriptAppendError extends Error {
+  constructor(readonly persistence: 'unchanged' | 'unknown') {
+    super(`Transcript append failed; persistence ${persistence}.`); this.name = 'TranscriptAppendError';
+  }
+}
+
+interface TranscriptAppendOptions {
+  readonly requireExisting?: boolean;
+  readonly expectedIdentity?: string;
+  readonly durable?: boolean;
+  readonly expectedPrefix?: { readonly bytes: number; readonly sha256: string };
+}
+
 /**
  * Add one entry to a transcript.
  *
@@ -121,37 +136,53 @@ export function appendTranscriptEvent(
   transcriptPath: string,
   event: TranscriptEvent,
   header?: { readonly sessionId: string; readonly timestamp: string; readonly cwd: string },
-  options?: { readonly requireExisting?: boolean },
+  options?: TranscriptAppendOptions,
 ): void {
   if (options?.requireExisting) {
-    appendExistingEvent(transcriptPath, event);
+    appendExistingEvent(transcriptPath, event, options);
     return;
   }
+  if (options?.expectedIdentity !== undefined || options?.durable || options?.expectedPrefix) throw new TranscriptAppendError('unchanged');
   ensureTranscriptHeader(transcriptPath, header);
   fs.appendFileSync(transcriptPath, `${encodeTranscriptEvent(event)}\n`, "utf8");
 }
 
 /** Preserve an interrupted tail and verify the appended record through the same file handle. */
-function appendExistingEvent(transcriptPath: string, event: TranscriptEvent): void {
-  const fd = fs.openSync(transcriptPath, fs.constants.O_RDWR | fs.constants.O_APPEND);
+function appendExistingEvent(transcriptPath: string, event: TranscriptEvent, options?: TranscriptAppendOptions): void {
+  let persistence: 'unchanged' | 'unknown' = 'unchanged';
+  const bound = options?.expectedIdentity !== undefined || options?.durable === true || options?.expectedPrefix !== undefined;
   try {
-    const before = fs.fstatSync(fd); const last = Buffer.alloc(1);
-    if (before.size) fs.readSync(fd, last, 0, 1, before.size - 1);
-    const record = Buffer.from(`${encodeTranscriptEvent(event)}\n`, 'utf8');
-    const separator = before.size && last[0] !== 10 ? Buffer.from('\n') : Buffer.alloc(0);
-    fs.appendFileSync(fd, separator.length ? Buffer.concat([separator, record]) : record);
-    const end = fs.fstatSync(fd).size; const actual = Buffer.alloc(record.length);
-    let offset = 0;
-    while (offset < actual.length) {
-      const read = fs.readSync(fd, actual, offset, actual.length - offset, end - actual.length + offset);
-      if (!read) throw new Error('Transcript append could not be verified.');
-      offset += read;
-    }
-    const current = fs.statSync(transcriptPath);
-    if (!actual.equals(record) || current.ino !== before.ino || current.dev !== before.dev) {
-      throw new Error('Transcript append could not be verified.');
-    }
-  } finally { fs.closeSync(fd); }
+    const fd = fs.openSync(transcriptPath, fs.constants.O_RDWR | fs.constants.O_APPEND
+      | (bound ? (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0) : 0));
+    try {
+      const before = fs.fstatSync(fd); const last = Buffer.alloc(1);
+      if (bound && (!before.isFile() || options?.expectedIdentity !== undefined && fileIdentity(before) !== options.expectedIdentity
+        || descriptorPath(fd, transcriptPath) !== transcriptPath)) throw new TranscriptAppendError('unchanged');
+      if (options?.expectedPrefix && readTranscriptPrefixDigest(fd, options.expectedPrefix.bytes) !== options.expectedPrefix.sha256) {
+        throw new TranscriptAppendError('unchanged');
+      }
+      if (before.size) fs.readSync(fd, last, 0, 1, before.size - 1);
+      const record = Buffer.from(`${encodeTranscriptEvent(event)}\n`, 'utf8');
+      const separator = before.size && last[0] !== 10 ? Buffer.from('\n') : Buffer.alloc(0);
+      persistence = 'unknown';
+      fs.appendFileSync(fd, separator.length ? Buffer.concat([separator, record]) : record);
+      if (options?.durable) fs.fsyncSync(fd);
+      const end = fs.fstatSync(fd).size; const actual = Buffer.alloc(record.length);
+      let offset = 0;
+      while (offset < actual.length) {
+        const read = fs.readSync(fd, actual, offset, actual.length - offset, end - actual.length + offset);
+        if (!read) throw new Error('Transcript append could not be verified.');
+        offset += read;
+      }
+      const current = fs.statSync(transcriptPath);
+      if (!actual.equals(record) || current.ino !== before.ino || current.dev !== before.dev) {
+        throw new Error('Transcript append could not be verified.');
+      }
+    } finally { fs.closeSync(fd); }
+  } catch (error) {
+    if (bound) throw new TranscriptAppendError(persistence);
+    throw error;
+  }
 }
 
 /**

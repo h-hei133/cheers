@@ -1,7 +1,30 @@
-import { describe, expect, it } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolDefinition } from '../../../tools/types.js'
+import { SessionManager } from '../../../session/SessionManager.js'
 import { createCodemodeToolDefinition } from './tool.js'
 import { NESTED_CALL_LIMITS, NestedCallRecorder } from './nestedCalls.js'
+
+let temporary: string
+let workspace: string
+beforeEach(() => {
+  const parent = path.join(os.tmpdir(), 'cheers-test')
+  fs.mkdirSync(parent, { recursive: true })
+  temporary = fs.mkdtempSync(path.join(parent, 'codemode-tool-'))
+  workspace = path.join(temporary, 'workspace')
+  const home = path.join(temporary, 'home')
+  fs.mkdirSync(workspace); fs.mkdirSync(home)
+  vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home)
+  vi.stubEnv('CHEERS_TEST_ROOT', temporary); vi.stubEnv('GIT_CEILING_DIRECTORIES', temporary)
+  const manager = new SessionManager()
+  for (const id of ['sess-codemode', 'sess-iso', 'sess-e', 'sess-img']) manager.createNewWithId(id, workspace)
+})
+afterEach(() => {
+  vi.restoreAllMocks(); vi.unstubAllEnvs()
+  fs.rmSync(temporary, { recursive: true, force: true })
+})
 
 describe('codemode and NestedToolCallRunner', () => {
   function fixtureRegistry(): Map<string, ToolDefinition> {
@@ -46,7 +69,7 @@ describe('codemode and NestedToolCallRunner', () => {
   it('batches nested tool calls, filters output, persists store/load, and records nested call telemetry', async () => {
     const registry = fixtureRegistry()
     const codemode = registry.get('codemode')!
-    const context = { workspaceRoot: '/workspace', sessionId: 'sess-codemode', taskId: 'cm-1' }
+    const context = { workspaceRoot: workspace, sessionId: 'sess-codemode', taskId: 'cm-1' }
 
     const first = await codemode.execute(
       {
@@ -98,20 +121,20 @@ describe('codemode and NestedToolCallRunner', () => {
     const codemode = registry.get('codemode')!
     const failed = await codemode.execute(
       { code: 'return typeof process !== "undefined" ? process.env : "isolated";' },
-      { workspaceRoot: '/workspace', sessionId: 'sess-iso', taskId: 'cm-2' },
+      { workspaceRoot: workspace, sessionId: 'sess-iso', taskId: 'cm-2' },
     )
     expect(failed.success).toBe(true)
     expect(failed.output).toContain('isolated')
     const escapeAttempt = await codemode.execute(
       { code: 'return (() => { try { return ({}).constructor.constructor("return process")(); } catch (e) { return "blocked:" + e.name; } })();' },
-      { workspaceRoot: '/workspace', sessionId: 'sess-iso', taskId: 'cm-2' },
+      { workspaceRoot: workspace, sessionId: 'sess-iso', taskId: 'cm-2' },
     )
     expect(escapeAttempt.success).toBe(true)
     expect(escapeAttempt.output).toContain('blocked:EvalError')
 
     const asyncLoop = await codemode.execute(
       { code: '// @options: {"timeout_ms": 150}\nawait Promise.resolve(); while (true) {}' },
-      { workspaceRoot: '/workspace', sessionId: 'sess-iso', taskId: 'cm-3' },
+      { workspaceRoot: workspace, sessionId: 'sess-iso', taskId: 'cm-3' },
     )
     expect(asyncLoop.success).toBe(false)
     expect(asyncLoop.error ?? asyncLoop.output).toContain('timed out')
@@ -142,7 +165,7 @@ describe('codemode and NestedToolCallRunner', () => {
 
     const registry = fixtureRegistry()
     const codemode = registry.get('codemode')!
-    const ctx = { workspaceRoot: '/workspace', sessionId: 'sess-e', taskId: 'cm-e1' }
+    const ctx = { workspaceRoot: workspace, sessionId: 'sess-e', taskId: 'cm-e1' }
 
     const described = await codemode.execute(
       { code: 'const sig = await describeTool("read"); const ns = await describeNamespace("mcp_github"); return { sig, ns, hasModels: Array.isArray(models.list()) };' },
@@ -172,7 +195,7 @@ describe('codemode and NestedToolCallRunner', () => {
     const pngB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
     const registry = fixtureRegistry()
     const codemode = registry.get('codemode')!
-    const ctx = { workspaceRoot: '/workspace', sessionId: 'sess-img', taskId: 'cm-img' }
+    const ctx = { workspaceRoot: workspace, sessionId: 'sess-img', taskId: 'cm-img' }
 
     const okImg = await codemode.execute(
       { code: `await image("data:image/png;base64,${pngB64}"); store("k", "committed"); return "ok";` },

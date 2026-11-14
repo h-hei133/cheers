@@ -9,9 +9,9 @@ import { renderToolSample, toolNamespace } from './declarations.js'
 import { validateCodemodeImage } from './image.js'
 import { parseCodemodeScript } from './options.js'
 import { CODEMODE_WORKER_SOURCE } from './prelude.js'
-import { clearCodemodeStore, loadCodemodeStore, MAX_STORE_TOTAL_CHARS, MAX_STORE_VALUE_CHARS } from './store.js'
+import { loadCodemodeStore, MAX_STORE_TOTAL_CHARS, MAX_STORE_VALUE_CHARS } from './store.js'
+import { CodemodeStoreError, type CodemodeStoreStatus } from './state.js'
 
-export { clearCodemodeStore }
 export const CODEMODE_TOOL_NAME = 'codemode'
 const MAX_CONCURRENT_WORKERS = 4
 let activeWorkers = 0
@@ -168,6 +168,9 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
         worker.once('exit', releaseSlot)
       } catch (err) {
         releaseSlot()
+        if (err instanceof CodemodeStoreError) return deniedResult(`Script failed\n\n${err.message}`, {
+          codemodeStore: { status: err.status, reason: err.reason },
+        })
         throw err
       }
 
@@ -275,11 +278,23 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
           })
         })
 
-        if (result.ok && result.writes) {
-          storeHandle.commit(result.writes)
-        }
         const nestedCalls = runner.recorder.snapshot()
-        const metadata = nestedCalls ? { nestedCalls } : undefined
+        let storeStatus: CodemodeStoreStatus = 'unchanged'
+        if (result.ok && result.writes) {
+          try {
+            storeStatus = storeHandle.commit(result.writes, () => {
+              context.abortSignal?.throwIfAborted()
+              if (context.admission?.()) throw new CodemodeStoreError('conflict')
+            })
+          } catch (error) {
+            const failure = error instanceof CodemodeStoreError ? error : new CodemodeStoreError('unavailable', 'unknown')
+            return deniedResult(formatCodemodeOutput('Script failed', textItems, consoleLines, parsedScript.maxOutputChars,
+              failure.message + (nestedCalls?.calls.some(call => call.status === 'ok') ? ' Completed nested tool effects were not rolled back.' : '')), {
+              ...(nestedCalls ? { nestedCalls } : {}), codemodeStore: { status: failure.status, reason: failure.reason },
+            })
+          }
+        }
+        const metadata = { ...(nestedCalls ? { nestedCalls } : {}), codemodeStore: { status: storeStatus } }
         return result.ok
           ? {
               ...approvedResult(formatCodemodeOutput('Script completed', textItems, consoleLines, parsedScript.maxOutputChars), metadata),

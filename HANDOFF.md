@@ -2228,3 +2228,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A write hook judges unapproved hunks, deletion gaps disappear behind an allow result, or a hook replaces the selected patch groups.
 - **Root Cause:** Prepared content candidates were treated as all effects, while the selection and preview revision were not sealed at the ordinary approval boundary.
 - **Rule:** Replan only the approved groups, verify the exact revision, and bind exhaustive write/delete effects before hooks. Refuse a second selection before changing state, protect delete-only and no-op argument identity, and preserve unknown and unsupported coverage alongside supported writes.
+
+
+### Saved Script State Needs Branch And Raw Prefix Admission
+- **Symptom:** A broken branch becomes an empty successful store after catch-up, or an unchanged inode hides deleted history before a pending script commits.
+- **Root Cause:** Compatibility catch-up ran before validating saved ancestry, and path identity plus per-key comparisons did not prove append-only history.
+- **Rule:** Reject invalid saved ancestry before catch-up, bind the original raw byte prefix, and recheck it on the actual append descriptor under the existing state lock. Require fsync and readback before reporting persisted; preserve unknown after a possibly landed append and keep completed nested effects visible. Only legacy sessions without a thread may use the linear fallback.
