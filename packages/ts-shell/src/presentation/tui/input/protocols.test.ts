@@ -147,6 +147,8 @@ describe("terminal color queries (OSC 10/11/4)", () => {
     try {
       terminal.start((chunk) => stdin.feed(chunk), () => {}, () => {});
       input.push("\x1b[?1u");
+      // DA1 belongs to keyboard negotiation through its own deadline, even after the enhanced reply.
+      await vi.advanceTimersByTimeAsync(250);
       const pending = terminal.queryTerminalColors({ timeoutMs: 5000 });
       input.push("\x1b]10;#1122");
       input.push("33\x1b\\\x1b[?62c");

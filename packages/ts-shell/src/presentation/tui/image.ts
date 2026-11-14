@@ -13,7 +13,7 @@
  * to text — an image that renders once and then corrupts on scrollback is
  * worse than a placeholder that never lies.
  */
-import { estimateDecodedImageBytes } from "./imageDimensions.js";
+import { estimateDecodedImageBytes, imageCellSize } from "./imageDimensions.js";
 import { canonicalImageMime, inspectImage } from '../../model-adapters/image/input.js';
 import type { ImageContent } from '../../model-adapters/multimodal.js';
 import type { ImageDimensions } from './imageDimensions.js';
@@ -30,6 +30,22 @@ export function inlineImageDimensions(image: ImageContent, protocol: ImageProtoc
   } catch {
     return undefined;
   }
+}
+
+/** Image bytes and their reserved extent share one geometry decision. */
+export function inlineImageRows(image: ImageContent, protocol: ImageProtocol, width: number): readonly string[] | undefined {
+  const dimensions = inlineImageDimensions(image, protocol);
+  if (!dimensions) return undefined;
+  const size = imageCellSize(dimensions, width);
+  const sequence = inlineImageSequence(protocol, image.data, { ...size, imageId: imageIdForData(image.data) });
+  const rows = Array<string>(size.rows).fill('');
+  if (protocol === 'kitty') rows[0] = sequence;
+  else {
+    // Clear the reserved rows first. Restore the cursor after iTerm's decoder moves it.
+    const up = size.rows > 1 ? `\x1b[${size.rows - 1}A` : '';
+    rows[size.rows - 1] = `\x1b7${up}${sequence}\x1b8`;
+  }
+  return rows;
 }
 
 /**
@@ -249,7 +265,7 @@ function encodeKitty(
   options: { readonly columns?: number; readonly rows?: number; readonly imageId?: number },
 ): string {
   const CHUNK = 4096;
-  const params = ["a=T", "f=100", "q=2"];
+  const params = ["a=T", "f=100", "q=2", "C=1"];
   if (options.columns !== undefined) params.push(`c=${options.columns}`);
   if (options.rows !== undefined) params.push(`r=${options.rows}`);
   if (options.imageId !== undefined) params.push(`i=${options.imageId}`);

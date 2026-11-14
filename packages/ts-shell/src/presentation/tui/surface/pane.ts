@@ -14,6 +14,7 @@ import {
   type ScrollbarGeometry,
 } from "../transcript/viewport.js";
 import { ScrollModel } from "./scroll.js";
+import { getCellDimensions, type CellDimensions } from '../imageDimensions.js';
 
 /**
  * The scrolling transcript area.
@@ -45,6 +46,7 @@ export class TranscriptPane {
   private selectionRevisionValue = 0;
   private lastTranscriptRevision = -1;
   private lastSelectionWidth = -1;
+  private lastImageCellSize?: CellDimensions;
   private layout: FrameLayout | undefined;
   private renderOptions?: BlockRenderOptions;
   private pageAvailable = false;
@@ -75,9 +77,10 @@ export class TranscriptPane {
     this.layout = layout;
     this.renderOptions = options ? { ...options } : undefined;
     const safeWidth = Math.max(1, Math.floor(width));
+    const imageCellSize = options?.imageProtocol && document.some(block => block.images?.length) ? getCellDimensions() : undefined;
     this.pageAvailable = layout === 'viewport' && width > 0 && capacity > 0;
     const selectionLayoutChanged = documentChanged || safeWidth !== this.lastSelectionWidth
-      || this.transcript.revision !== this.lastTranscriptRevision;
+      || this.transcript.revision !== this.lastTranscriptRevision || imageCellSize !== this.lastImageCellSize;
     const hasScrollbar = layout === "viewport" && needsScrollbar(
       this.transcript.rowCount(safeWidth, options),
       Math.max(1, capacity),
@@ -109,6 +112,7 @@ export class TranscriptPane {
       this.selectionRevisionValue++;
       this.lastSelectionWidth = safeWidth;
       this.lastTranscriptRevision = this.transcript.revision;
+      this.lastImageCellSize = imageCellSize;
     }
     const visible = rows.slice(top, top + safeCapacity);
     const filler = Math.max(0, safeCapacity - visible.length);

@@ -2520,3 +2520,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Rejecting an unknown image still emits the MIME field's clear-screen escape through its text fallback.
 - **Root Cause:** Header/protocol refusal and display safety are separate boundaries; theme styling preserves ANSI in rejected metadata.
 - **Rule:** Apply the existing display neutralization to fallback metadata and assert raw terminal bytes at both user and tool consumers. Complete header admission does not prove pixel integrity; Kitty PNG controls must never carry a JPEG/GIF/WebP source.
+
+
+### Image Reflow Must Retire Input Coordinates
+- **Symptom:** A cell-size reply correctly reflows finalized images, but an old mouse selection remains actionable and can copy another row.
+- **Root Cause:** The render cache observes cell geometry while the selection generation observes only document, width and transcript revision. Image payload rows may also erase their own pixels when padding is printed afterward.
+- **Rule:** Capture cell dimensions as immutable values and include their identity in both image layout caching and selection coordinates. Draw background text before image controls; preserve renderer cursor accounting. A keyboard enhancement reply does not release its separate DA1 fence before the original deadline.

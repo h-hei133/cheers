@@ -8,6 +8,9 @@ import { SuggestionList } from "../../presentation/tui/chrome/suggestions.js";
 import { createViewState, type ViewContext } from '../../presentation/tui/surface/contract.js';
 import { InteractiveSurface } from '../../presentation/tui/surface/view.js';
 import type { Block } from '../../presentation/tui/transcript/blocks.js';
+import { pngImage } from '../../test-utils/image.js';
+import { setCellDimensions } from '../../presentation/tui/imageDimensions.js';
+import { StdinBuffer } from '../../presentation/tui/input/stdinBuffer.js';
 
 function composerGeometry(text: string, top = 10, width = 40) {
   const editor = new Editor(); editor.setText(text);
@@ -64,6 +67,33 @@ function blockSurface(block: Block) {
 }
 
 describe('pointer block clicks', () => {
+  it('refuses an old text drag after a cell-size reply moves rows in the same transcript viewport', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const selected: Block = { kind: 'notice', text: 'selected text\nnext text', finalized: true };
+    const { view, pointer, copied } = blockSurface(selected);
+    view.transcript.clear();
+    view.transcript.append({ kind: 'user', text: '', finalized: true, images: [pngImage(320, 160)] });
+    view.transcript.append(selected);
+    // The actual image protocol is a view fact, not a global terminal override.
+    const context = (view as unknown as { context: ViewContext }).context;
+    Object.assign(context, { imageProtocol: () => 'kitty' });
+    const input = new StdinBuffer();
+    try {
+      view.renderFrame({ columns: 40, rows: 60 });
+      const row = Array.from({ length: 60 }, (_, i) => i).find(i => view.blockAtScreenRow(i) === selected)!;
+      const start = { button: 0, shift: false, alt: false, ctrl: false, row, column: 0 };
+      pointer.handle({ ...start, kind: 'press' });
+      pointer.handle({ ...start, kind: 'drag', column: 7 });
+      expect(pointer.selection).toBeDefined();
+      const top = view.selectionTop(); const revision = view.transcript.revision;
+      input.feed('\x1b[6;18;18t');
+      view.renderFrame({ columns: 40, rows: 60 });
+      expect(view.selectionTop()).toBe(top); expect(view.transcript.revision).toBe(revision);
+      expect(pointer.copySelection()).toBe(false);
+      expect(copied).toEqual([]); expect(pointer.selection).toBeUndefined();
+    } finally { input.dispose(); setCellDimensions({ widthPx: 9, heightPx: 18 }); pointer.clearSelection(); }
+  });
+
   it.each([false, true])('opens a live collapsed thinking prefix across a delta (repaint=%s)', repaint => {
     const block: Block = { kind: 'thinking', text: 'initial reasoning', elapsedMs: 1000, collapsed: true, finalized: false };
     const { view, pointer, copied, event } = blockSurface(block);

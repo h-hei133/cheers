@@ -6,7 +6,7 @@ import { padToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { neutraliseForDisplay } from '../../../core/text/safety.js';
 import type { ImageContent } from "../../../model-adapters/multimodal.js";
-import { calculateImageRows, inlineImageDimensions, imageIdForData, inlineImageSequence, type ImageProtocol } from "../image.js";
+import { inlineImageRows, type ImageProtocol } from "../image.js";
 import { renderDiff } from "./diff.js";
 import { renderMarkdown, trimPartialFence, type MarkdownRenderOptions } from "./markdown.js";
 
@@ -148,16 +148,12 @@ function renderUser(block: Block, width: number, options: BlockRenderOptions = {
   // sequence occupies zero cells, so the bubble's styling wraps around it
   // without shifting a single column, and the wrap leaves the sequence whole.
   for (const image of block.images ?? []) {
-    const dims = options.imageProtocol && inlineImageDimensions(image, options.imageProtocol);
-    if (options.imageProtocol && dims) {
-      const columns = Math.max(4, Math.min(bodyWidth, 48));
-      const sequence = inlineImageSequence(options.imageProtocol, image.data, {
-        columns,
-        rows: calculateImageRows(dims, columns),
-        imageId: imageIdForData(image.data),
-      });
-      const padded = padToWidth(" ", width);
-      rows.push(`${defaultTheme.bg("userMessageBg", padded + sequence)}\x1b[0m`);
+    const inline = options.imageProtocol && inlineImageRows(image, options.imageProtocol, bodyWidth);
+    if (inline) {
+      for (const row of inline) {
+        const background = padToWidth('', width);
+        rows.push(`${defaultTheme.bg('userMessageBg', row ? `${background}\r${row}` : background)}\x1b[0m`);
+      }
     } else {
       const label = `${neutraliseForDisplay(image.mimeType)}, ${Math.round((image.data.length * 3) / 4 / 1024)} KB`;
       const padded = padToWidth(defaultTheme.fg("userMessageText", `image attachment: ${label}`), width);
@@ -301,15 +297,9 @@ function renderTool(block: Block, width: number, options: BlockRenderOptions = {
 function toolImageRows(block: Block, width: number, options: BlockRenderOptions): readonly string[] {
   const rows: string[] = [];
   for (const image of block.images ?? []) {
-    const dims = options.imageProtocol && inlineImageDimensions(image, options.imageProtocol);
-    if (options.imageProtocol && dims) {
-      const columns = Math.max(4, Math.min(width, 48));
-      const sequence = inlineImageSequence(options.imageProtocol, image.data, {
-        columns,
-        rows: calculateImageRows(dims, columns),
-        imageId: imageIdForData(image.data),
-      });
-      rows.push(`${GUTTER}${sequence}`);
+    const inline = options.imageProtocol && inlineImageRows(image, options.imageProtocol, width);
+    if (inline) {
+      for (const row of inline) rows.push(`${GUTTER}${row}`);
     } else {
       const label = `${neutraliseForDisplay(image.mimeType)}, ${Math.round((image.data.length * 3) / 4 / 1024)} KB`;
       rows.push(`${GUTTER}${defaultTheme.dim(`image result: ${label}`)}`);

@@ -5,11 +5,12 @@ import { stripAnsi } from "../text/ansi.js";
 import { defaultTheme } from "../../theme/theme.js";
 import { getDefaultTheme } from "../../themes/index.js";
 import { pngImage } from '../../../test-utils/image.js';
+import { setCellDimensions } from '../imageDimensions.js';
 
 // Color assertions run under an explicit capability, independent of NO_COLOR.
 const originalColorMode = defaultTheme.colorMode;
 beforeEach(() => defaultTheme.apply(getDefaultTheme(), "256"));
-afterEach(() => defaultTheme.apply(getDefaultTheme(), originalColorMode));
+afterEach(() => { defaultTheme.apply(getDefaultTheme(), originalColorMode); setCellDimensions({ widthPx: 9, heightPx: 18 }); });
 
 const WIDTH = 40;
 
@@ -233,5 +234,41 @@ describe('terminal image admission', () => {
       expect(rows).not.toContain(control);
       expect(rows).not.toMatch(/\x1b_G|\x1b\]1337;/);
     }
+  });
+});
+
+describe('terminal image row extent', () => {
+  it.each(['user', 'tool'] as const)('reserves every cell row for a %s image on both protocols', kind => {
+    const image = pngImage(320, 160);
+    for (const imageProtocol of ['kitty', 'iterm2'] as const) {
+      const block = { ...textBlock(kind, ''), title: 'read', images: [image], collapsed: true };
+      const rows = renderBlock(block, 40, { imageProtocol });
+      const prefix = kind === 'user' ? 0 : 1;
+      expect(rows).toHaveLength(prefix + 10 + 1);
+      const inline = rows.find(row => row.includes(imageProtocol === 'kitty' ? '\x1b_G' : '\x1b]1337;'))!;
+      if (imageProtocol === 'kitty') expect(inline).toMatch(/(?:^|,)r=10(?:,|;)/);
+      else expect(inline).toContain('height=10:');
+      expect(rows.filter(row => row.includes(image.data))).toHaveLength(1);
+    }
+  });
+
+  it('keeps tall images bounded and fits graphics inside a frame narrower than four columns', () => {
+    for (const image of [pngImage(1, 5000), pngImage(320, 160)]) {
+      const rows = renderBlock({ ...textBlock('user', ''), images: [image] }, 1, { imageProtocol: 'kitty' });
+      const controls = /\x1b_G([^;]*);/.exec(rows.join(''))![1]!;
+      expect(controls).toMatch(/(?:^|,)c=1(?:,|$)/);
+      expect(rows.length).toBeLessThanOrEqual(49);
+      expect(rows.every(row => visibleWidth(row) <= 1)).toBe(true);
+    }
+  });
+
+  it.each(['kitty', 'iterm2'] as const)('paints the user background before %s graphics and anchors at the first column', imageProtocol => {
+    const image = pngImage(320, 160);
+    const rows = renderBlock({ ...textBlock('user', ''), images: [image] }, 40, { imageProtocol });
+    const row = rows.find(row => row.includes(image.data))!;
+    const end = row.indexOf(image.data) + image.data.length + (imageProtocol === 'kitty' ? 2 : 1);
+    expect(stripAnsi(row.slice(end))).toBe('');
+    expect(row.indexOf(' '.repeat(40))).toBeLessThan(row.indexOf(image.data));
+    expect(row).toContain('\r' + (imageProtocol === 'kitty' ? '\x1b_G' : '\x1b7'));
   });
 });

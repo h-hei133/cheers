@@ -11796,3 +11796,10 @@ Linux当前编译CLI regular/fullscreen各五种字符cursor、键盘移动／�
 B.3首先修复实际user/tool图片unknown／MIME伪装／损坏头与Kitty非PNG误传，复用严格input和metadata owner，单图64MiB RGBA估算拒绝。独立复审补出拒绝MIME控制字节注入，两项原字节反例先红后复用显示安全函数修复；六静态门、6套件124项、函数上限和build320e22d14438通过，限定复核CLEAR。
 
 Linux当前compiled CLI regular/fullscreen×Kitty/iTerm2四格完整PNG、native read JPEG及unknown安全fallback通过，两反转红且逐字节恢复再绿。不宣称pixel解码、物理显示或终端总内存上限；图片多行布局、finalized cell-size缓存与离屏预算精确验收留后续，B.3保持部分、本地18项不变。按用户要求提交完成子批，不推送或声明CI。
+
+
+### 2026-11-15：图片占行和晚到cell-size独立子批
+
+准入`20a37ae`后复用原image/geometry/cache/pane owner补N行reservation、48×48界限、窄宽fits、C=1与iTerm保存恢复。复审背景后padding和cell重排旧Pointer copy两类反例修复；按冻结cell identity重建finalized图片cache并推进选择代际，普通text/source memo保持。
+
+六门、8/313、0monoliths与buildf3c7f85fd552通过，限定复核CLEAR；Linux当前compiled CLI四格split回复10→20行重排／后继文本／cursor通过，两反转紅且逐字节恢复再绿。旧颜色fixture的DA1 deadline冲突在HEAD同失败，只修fixture等待；B.3crop／最后绘制／精确预算留后续，本地18项不变，按批提交。

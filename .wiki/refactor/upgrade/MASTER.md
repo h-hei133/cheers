@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.1/B.2/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
-**Active batch**: B.1已提交`30335353`。B.3终端格式准入首批完成六门、6/124、函数上限及build `320e22d14438`，限定只读复核CLEAR；Linux编译CLI四格完整PNG／native JPEG和未知MIME安全fallback通过，两反转红且逐字节恢复。记录后按批提交，再接图片占行／cell-size缓存和离屏预算。整体本地验收18项；C.6原生历史协议证据缺口继续保留。
+**Active batch**: B.3准入首批已提交`20a37ae`。占行／cell-size子批8/313、六门、函数上限和build `f3c7f85fd552`通过，限定独立复核CLEAR；Linux当前编译CLI两模式×两协议split回复10→20行重排passed，cache／Pointer反转红且逐字节恢复。记录后按批提交，再接crop／图片最后绘制及精确离屏预算。B.3部分、整体本地验收18项；C.6原生历史协议缺口继续保留。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -90,3 +90,5 @@
 | 2026-11-15 | B.1原文资格化宽度修复7套件306项、六静态门、函数上限和build `12c748aff97c`通过，限定只读复核CLEAR。两反转红／逐字节恢复再绿，Linux编译CLI两模式各五样本cursor／键盘／第二cell点击原文编辑通过，physical glyph未测。初几何与cue预算探针错误保留，只改fixture。本地验收18项；按批提交后接B.3。 |
 
 | 2026-11-15 | B.3首批拒绝unknown／格式伪装／损坏头／单图超限，复审MIME terminal-control两红例修复；Kitty PNG-only／非PNG fallback与iTerm实际read JPEG/alias通过。六门、6/124、0monoliths、build `320e22d14438`和Linux当前编译CLI两模式×两协议四格passed；两反转红／逐字节恢复后再绿。实际M／额外依赖1，B.3保持部分、18项不变，下一批占行与cell-size。 |
+
+| 2026-11-15 | B.3布局／cell-size：48×48与窄宽fits、N行reservation、C=1、iTerm保存恢复、finalized局部cache及Pointer generation接线通过。复审背景次序／旧drag copy红修复；旧颜色夹具HEAD也失败，按原键盘deadline等待后8/313和六门／0monoliths／build `f3c7f85fd552`通过，限定CLEAR。Linux当前编译CLI四格late split10→20行passed；两反转红／逐字节恢复，实际L／额外依赖2，B.3与18项计数不变。 |

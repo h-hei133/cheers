@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { visibleWidth } from "./text/measure.js";
 import { calculateImageRows, detectImageProtocol, estimateDecodedImageBytes, getImageDimensions, inlineImageSequence, kittyPlacementFor, swapTransmittedForPlacement, transmissionsIn, windowTitle, idleNotification, bell } from "./image.js";
+import { getCellDimensions, setCellDimensions } from './imageDimensions.js';
 
 /** The environment of a terminal that identifies itself, with nothing else. */
 function env(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
@@ -42,7 +43,7 @@ describe("inline image sequences", () => {
 
   it("encodes a small kitty image in one control sequence", () => {
     const sequence = inlineImageSequence("kitty", small, { columns: 8, rows: 4 });
-    expect(sequence.startsWith("\x1b_Ga=T,f=100,q=2,c=8,r=4;")).toBe(true);
+    expect(sequence.startsWith("\x1b_Ga=T,f=100,q=2,C=1,c=8,r=4;")).toBe(true);
     expect(sequence.endsWith("\x1b\\")).toBe(true);
     expect(sequence).toContain(small);
   });
@@ -61,6 +62,29 @@ describe("inline image sequences", () => {
     const sequence = inlineImageSequence("iterm2", small, { columns: 10, rows: 5, name: "shot.png" });
     expect(sequence.startsWith("\x1b]1337;File=inline=1;size=4;width=10;height=5;name=")).toBe(true);
     expect(sequence.endsWith(`:${small}\x07`)).toBe(true);
+  });
+
+  it('prevents Kitty cursor movement on both transmission and later placement', () => {
+    const sequence = inlineImageSequence('kitty', small, { columns: 8, rows: 4, imageId: 5 });
+    expect(sequence).toMatch(/(?:^|,)C=1(?:,|;)/);
+    expect(kittyPlacementFor(sequence)).toMatch(/(?:^|,)C=1(?:,|\x1b)/);
+  });
+});
+
+describe('cell dimension value identity', () => {
+  it('captures a valid cell size without letting callers mutate current geometry', () => {
+    const original = getCellDimensions();
+    try {
+      const provided = { widthPx: 12, heightPx: 24 }; setCellDimensions(provided);
+      provided.widthPx = 99;
+      expect(getCellDimensions()).toEqual({ widthPx: 12, heightPx: 24 });
+      expect(Object.isFrozen(getCellDimensions())).toBe(true);
+      for (const widthPx of [Infinity, NaN, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+        setCellDimensions({ widthPx, heightPx: 24 });
+        expect(getCellDimensions()).toEqual({ widthPx: 12, heightPx: 24 });
+      }
+      expect(calculateImageRows({ widthPx: 320, heightPx: 161 }, 40, { widthPx: 9, heightPx: 18 })).toBe(11);
+    } finally { setCellDimensions(original); }
   });
 });
 

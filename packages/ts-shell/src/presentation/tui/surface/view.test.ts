@@ -14,6 +14,8 @@ import type { ComposerShapeId } from "../composer/contract.js";
 import { Pointer } from "../../../cli/interactive/pointer.js";
 import { OverlayHost } from "../../../cli/interactive/overlay.js";
 import { parseKeyEvent } from '../input/keys.js';
+import { pngImage } from '../../../test-utils/image.js';
+import { setCellDimensions } from '../imageDimensions.js';
 
 /** Facts a test can change between frames; the surface reads them at paint time. */
 interface Facts {
@@ -69,6 +71,25 @@ function surface(overrides: Partial<ViewContext> = {}): { view: InteractiveSurfa
 const SIZE = { columns: 60, rows: 16 };
 
 describe('painted pointer geometry', () => {
+  it('retires text selection coordinates when image cell geometry changes with unchanged width and transcript', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const { view } = surface({ imageProtocol: () => 'kitty' });
+    view.transcript.append({ kind: 'user', text: '', finalized: true, images: [pngImage(320, 160)] });
+    view.transcript.append({ kind: 'notice', text: 'selected text\nafter selection', finalized: true });
+    try {
+      view.renderFrame({ columns: 40, rows: 60 });
+      const revision = view.selectionRevision(); const top = view.selectionTop(); const content = view.transcript.revision;
+      setCellDimensions({ widthPx: 18, heightPx: 18 });
+      view.renderFrame({ columns: 40, rows: 60 });
+      expect(view.selectionTop()).toBe(top);
+      expect(view.transcript.revision).toBe(content);
+      expect(view.selectionRevision()).toBeGreaterThan(revision);
+      const changed = view.selectionRevision();
+      view.renderFrame({ columns: 40, rows: 60 });
+      expect(view.selectionRevision()).toBe(changed);
+    } finally { setCellDimensions({ widthPx: 9, heightPx: 18 }); }
+  });
+
   it('stays stable across hidden thinking deltas and records width-only resize and layout changes', () => {
     const { view } = surface();
     const thinking = view.transcript.append({ kind: 'thinking', text: 'initial', collapsed: true, finalized: false });
@@ -240,8 +261,9 @@ describe("the document a main-screen frame reports", () => {
   it("decorates a single document layout at the requested width", () => {
     const highlight = vi.fn((row: string, index: number) => `${row}\x1b[4m${index}\x1b[24m`);
     const { view, live } = surface({ highlightSearchMatches: highlight, imageProtocol: () => "kitty", supportsHyperlinks: () => true });
+    const image = pngImage(320, 160);
     view.transcript.append({ kind: "user", text: "hello", finalized: true });
-    view.transcript.append({ kind: "user", text: "picture", finalized: true, images: [{ type: "image", mimeType: "image/png", data: "QUJD" }] });
+    view.transcript.append({ kind: "user", text: "picture", finalized: true, images: [image] });
     live.selection = { from: { row: 0, column: 0 }, to: { row: 0, column: 10 } };
     const render = vi.spyOn(view.transcript, "render");
     const plan = view.renderFrame({ columns: 30, rows: 5 }, "document");
@@ -251,7 +273,7 @@ describe("the document a main-screen frame reports", () => {
     expect(render).toHaveBeenCalledWith(30, { imageProtocol: "kitty", thinkingShortcut: undefined, supportsHyperlinks: true });
     expect(content[0]).toContain("\x1b[7m");
     expect(content[0]).toContain("\x1b[4m0\x1b[24m");
-    expect(content.join("\n")).toContain("QUJD");
+    expect(content.join("\n")).toContain(image.data);
     expect(highlight).toHaveBeenCalledTimes(content.length);
     expect(view.scrollbarGeometry()).toBeUndefined();
   });

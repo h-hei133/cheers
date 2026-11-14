@@ -5,11 +5,14 @@ import { Transcript } from "./container.js";
 import { textBlock, type Block } from "./blocks.js";
 import { getDefaultTheme } from "../../themes/index.js";
 import { stripAnsi } from "../text/ansi.js";
+import { setCellDimensions } from '../imageDimensions.js';
+import { StdinBuffer } from '../input/stdinBuffer.js';
+import { pngImage } from '../../../test-utils/image.js';
 
 // Color assertions run under an explicit capability, independent of NO_COLOR.
 const originalColorMode = defaultTheme.colorMode;
 beforeEach(() => defaultTheme.apply(getDefaultTheme(), "256"));
-afterEach(() => defaultTheme.apply(getDefaultTheme(), originalColorMode));
+afterEach(() => { defaultTheme.apply(getDefaultTheme(), originalColorMode); setCellDimensions({ widthPx: 9, heightPx: 18 }); });
 
 const WIDTH = 40;
 
@@ -60,6 +63,27 @@ describe("finding the block behind a row", () => {
 });
 
 describe("re-rendering", () => {
+  it.each(['kitty', 'iterm2'] as const)('reflows finalized %s images after a late split cell-size reply without invalidating ordinary text', imageProtocol => {
+    const transcript = new Transcript();
+    transcript.append({ ...textBlock('user', ''), images: [pngImage(320, 160)] });
+    transcript.append(textBlock('notice', 'after image'));
+    const before = transcript.render(WIDTH, { imageProtocol });
+    const source = before.sources.find(line => line?.text === 'after image');
+    const input = new StdinBuffer(); const keys: unknown[] = []; input.onKey(key => keys.push(key));
+    try {
+      input.feed('\x1b[6;18;'); input.feed('18t');
+      const after = transcript.render(WIDTH, { imageProtocol });
+      const image = after.rows.find(row => row.includes(imageProtocol === 'kitty' ? '\x1b_G' : '\x1b]1337;'))!;
+      expect(image).toContain(imageProtocol === 'kitty' ? 'r=20' : 'height=20');
+      expect(after.rows).toHaveLength(before.rows.length + 10);
+      expect(after.sources.find(line => line?.text === 'after image')).toBe(source);
+      expect(keys).toEqual([]);
+      const repeated = transcript.render(WIDTH, { imageProtocol });
+      expect(repeated.rows).toEqual(after.rows);
+      expect(transcript.rowCount(WIDTH, { imageProtocol })).toBe(after.rows.length);
+      expect(after.owners.slice(0, 20)).toEqual(Array(20).fill(0));
+    } finally { input.dispose(); }
+  });
   it.each(["assistant", "command", "error"] as const)("refreshes cached %s links when captured support changes", kind => {
     const transcript = new Transcript();
     const source = "[docs](https://example.test)";
