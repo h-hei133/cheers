@@ -3,7 +3,7 @@ import path from 'node:path'
 import { isRecord } from '../../core/values/record.js'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
 
-export interface PiPackageManifest {
+export interface PackageManifest {
   readonly name: string
   readonly version?: string
   readonly extensions: readonly string[]
@@ -13,22 +13,22 @@ export interface PiPackageManifest {
   readonly changelogPath?: string
 }
 
-export interface DiscoveredLocalPiPackage {
+export interface DiscoveredLocalPackage {
   readonly root: string
-  readonly manifest: PiPackageManifest
+  readonly manifest: PackageManifest
   readonly diagnostics: readonly string[]
 }
 
 function stringList(value: unknown, label: string, diagnostics: string[]): string[] {
   if (value === undefined) return []
   if (!Array.isArray(value)) {
-    diagnostics.push(`Invalid pi.${label}: expected string array.`)
+    diagnostics.push(`Invalid cheers.${label}: expected string array.`)
     return []
   }
   const out: string[] = []
   for (const item of value) {
     if (typeof item === 'string' && item.trim()) out.push(item.trim())
-    else diagnostics.push(`Ignored non-string entry in pi.${label}.`)
+    else diagnostics.push(`Ignored non-string entry in cheers.${label}.`)
   }
   return out
 }
@@ -41,7 +41,7 @@ function resolveContainedPaths(root: string, entries: readonly string[], label: 
     const target = path.resolve(root, clean)
     const containment = verifyPathContainment(target, root)
     if (!containment.allowed) {
-      diagnostics.push(`Refused pi.${label} entry escaping package root: ${rel}`)
+      diagnostics.push(`Refused cheers.${label} entry escaping package root: ${rel}`)
       continue
     }
     resolved.push(containment.resolvedPath)
@@ -49,8 +49,8 @@ function resolveContainedPaths(root: string, entries: readonly string[], label: 
   return resolved
 }
 
-/** Read and validate a Pi-format `"pi"` manifest from `<packageDir>/package.json` without executing any code. */
-export function readPiPackageManifest(packageDir: string): DiscoveredLocalPiPackage {
+/** Inspect package resource metadata without executing extension code. */
+export function readPackageManifest(packageDir: string): DiscoveredLocalPackage {
   const resolvedRoot = path.resolve(packageDir)
   const pkgPath = path.join(resolvedRoot, 'package.json')
   const containedPkg = verifyPathContainment(pkgPath, resolvedRoot)
@@ -69,21 +69,21 @@ export function readPiPackageManifest(packageDir: string): DiscoveredLocalPiPack
     throw new Error('Malformed package.json object.')
   }
   const diagnostics: string[] = []
-  const pi = isRecord(parsed.pi) ? parsed.pi : {}
-  if (parsed.pi !== undefined && !isRecord(parsed.pi)) {
-    diagnostics.push('Ignored non-object "pi" field in package.json.')
+  const metadata = isRecord(parsed.cheers) ? parsed.cheers : {}
+  if (parsed.cheers !== undefined && !isRecord(parsed.cheers)) {
+    diagnostics.push('Ignored non-object "cheers" field in package.json.')
   }
 
-  const extensions = resolveContainedPaths(resolvedRoot, stringList(pi.extensions, 'extensions', diagnostics), 'extensions', diagnostics)
-  const skills = resolveContainedPaths(resolvedRoot, stringList(pi.skills, 'skills', diagnostics), 'skills', diagnostics)
-  const prompts = resolveContainedPaths(resolvedRoot, stringList(pi.prompts, 'prompts', diagnostics), 'prompts', diagnostics)
-  const themes = resolveContainedPaths(resolvedRoot, stringList(pi.themes, 'themes', diagnostics), 'themes', diagnostics)
+  const extensions = resolveContainedPaths(resolvedRoot, stringList(metadata.extensions, 'extensions', diagnostics), 'extensions', diagnostics)
+  const skills = resolveContainedPaths(resolvedRoot, stringList(metadata.skills, 'skills', diagnostics), 'skills', diagnostics)
+  const prompts = resolveContainedPaths(resolvedRoot, stringList(metadata.prompts, 'prompts', diagnostics), 'prompts', diagnostics)
+  const themes = resolveContainedPaths(resolvedRoot, stringList(metadata.themes, 'themes', diagnostics), 'themes', diagnostics)
 
   let changelogPath: string | undefined
-  if (typeof pi.changelogPath === 'string' && pi.changelogPath.trim()) {
-    const containment = verifyPathContainment(path.resolve(resolvedRoot, pi.changelogPath.trim()), resolvedRoot)
+  if (typeof metadata.changelogPath === 'string' && metadata.changelogPath.trim()) {
+    const containment = verifyPathContainment(path.resolve(resolvedRoot, metadata.changelogPath.trim()), resolvedRoot)
     if (containment.allowed) changelogPath = containment.resolvedPath
-    else diagnostics.push('Refused pi.changelogPath escaping package root.')
+    else diagnostics.push('Refused cheers.changelogPath escaping package root.')
   }
 
   return {

@@ -5,7 +5,7 @@ import type { LocalCommandResult } from '../../core/commands/types.js';
 import { getInstalledPlugins } from '../../core/commands/plugin/store.js';
 import { marketplaceCommand } from './marketplace.js';
 import path from 'node:path';
-import { readPiPackageManifest } from '../registry/piManifest.js';
+import { readPackageManifest } from '../registry/manifest.js';
 import { verifyPathContainment } from '../../core/security/pathJail.js';
 
 export async function pluginCommand(args: string[], service: ExtensionService): Promise<LocalCommandResult> {
@@ -26,7 +26,7 @@ export async function pluginCommand(args: string[], service: ExtensionService): 
       if (!containment.allowed) throw new Error('Local extension inspection target must stay within the workspace.');
       service.assertSourceAccess(containment.resolvedPath);
       service.assertSourceAccess(path.join(containment.resolvedPath, 'package.json'));
-      const discovered = readPiPackageManifest(containment.resolvedPath);
+      const discovered = readPackageManifest(containment.resolvedPath);
       return { kind: 'local', output: JSON.stringify(discovered, null, 2) };
     }
     if (rest.length) throw new Error('Too many plugin arguments.');

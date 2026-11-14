@@ -136,3 +136,5 @@
 2026-11-14 连接生命周期修复提交前：图片提交`260e549`。独立复审发现SSE fallback未继承owner取消；真实loopback进程两格handshake/cached均因owner不能取消打开的body而失败。绑定caller/owner同一signal后，独立暂存树五静态门、6套件75项及build `b4e5995ee59a`通过，含实际TLS/CONNECT/超时和SSE socket关闭。独立限定复核CLEAR；F1.2真实配置提供方兼容证据仍开项。
 
 2026-11-14 tracing修复提交前：连接提交`df99ff0`。6个carrier/真实turn红、2个native observer/sink红、2个async-method/missing-ID红、1个持久读缺ID丢记录红均已修复。首次8/64通过后build暴露日志类型仍必填，补真实reader反例而非断言绕过；最终独立暂存树9/70、五静态门、build `2c8cce9867b8`通过。异步side-channel拒绝均被观察且不等待，未知身份不借旧logger；日志保留仍partial。初次误列不存在tools.batch.test未当已运行证据，最终用实际tools.test 32项。dashboard来源剩余核实保持F2.5开项。
+
+2026-11-14 包元数据命名提交前：tracing提交`783c2836`。资源清单统一使用cheers字段和本地manifest owner，旧项目标签未继续作为新配置入口；独立暂存树五静态门、loader3项及build `55f4520a8ef4`通过。仅此来源字段/命名修正，不代表E.9 npm/git/local安装adapter完成。

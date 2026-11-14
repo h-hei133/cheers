@@ -158,19 +158,19 @@ export default defineExtension((api) => {
     expect(eventResult.output).toContain('"patched":true')
   })
 
-  it('bridges ui.*, events bus, shortcuts, flags, host queries, and Pi package manifests, plus HookDispatcher event aliases', async () => {
+  it('bridges ui.*, events bus, shortcuts, flags, host queries, package metadata, and HookDispatcher event aliases', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-ext-batch-e-'))
     tempDirs.push(dir)
-    const pkgDir = path.join(dir, 'pi-pkg')
+    const pkgDir = path.join(dir, 'package')
     fs.mkdirSync(path.join(pkgDir, 'ext'), { recursive: true })
     fs.writeFileSync(
       path.join(pkgDir, 'package.json'),
-      JSON.stringify({ name: 'demo-pi', version: '1.2.3', pi: { extensions: ['./ext/index.ts'], skills: ['./skills'] } }),
+      JSON.stringify({ name: 'test-extension', version: '1.2.3', cheers: { extensions: ['./ext/index.ts'], skills: ['./skills'] } }),
       'utf8',
     )
-    const { readPiPackageManifest } = await import('../registry/piManifest.js')
-    const discovered = readPiPackageManifest(pkgDir)
-    expect(discovered.manifest.name).toBe('demo-pi')
+    const { readPackageManifest } = await import('../registry/manifest.js')
+    const discovered = readPackageManifest(pkgDir)
+    expect(discovered.manifest.name).toBe('test-extension')
     expect(discovered.manifest.extensions).toEqual([path.join(pkgDir, 'ext/index.ts')])
 
     const extPath = path.join(dir, 'full-ext.ts')
