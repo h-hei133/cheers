@@ -2302,3 +2302,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A valid JPEG accepted by an endpoint is refused before dispatch after adding image limits.
 - **Root Cause:** A new signature check requires the canonical MIME string but the existing contract accepts the JPEG alias.
 - **Rule:** Normalize only supported aliases in the shared image owner, then use the same value for signature, dimensions, request projection and native decoding. Keep raw history unchanged and verify both main and simple requests through final byte/count admission.
+
+
+### Cached Provider Sockets Need An Invocation Owner And A Real Idle Deadline
+- **Symptom:** Idle WebSockets survive until another request, or one SDK session reset closes another session using the same wire session/credential.
+- **Root Cause:** Expiry was checked only during acquisition, and cache identity lacked the captured runtime/profile/session owner.
+- **Rule:** Carry one resource-owned lifetime through async provider work, scope socket and fallback identity to it, and retire pending/active/idle sockets only through that owner. Schedule unref idle timers, cancel them while leased, recheck owner after connection setup, and retain compaction callback dispatch/preflight properties when wrapping.
+
+
+### Transport Fallback Retains The Original Cancellation Owner
+- **Symptom:** A socket owner is retired after fallback response headers, but the HTTP stream keeps reading.
+- **Root Cause:** Fallback checks the owner only before dispatch and passes the original caller signal to the replacement transport.
+- **Rule:** Bind the caller and connection lifetime once, and pass their combined signal through every transport branch through body settlement. Exercise both fresh handshake fallback and a cached fallback using an actual open response; cancellation must reject the read and close the server connection without another request.

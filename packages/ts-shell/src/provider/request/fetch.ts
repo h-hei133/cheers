@@ -2,7 +2,9 @@ import { admittedFetch, type Admission } from "../../core/network/admission.js";
 import { type Agent, type ProxyAgent, fetch as undiciFetch } from "undici/index.js";
 import { tryCodexWebSocketFetch } from "../endpoints/responses/codexWs.js";
 import { requestFetch, requestUrl } from './client.js';
-import { providerDispatchers } from './connection.js';
+import { currentProviderConnections, providerDispatchers } from './connection.js';
+import { withRequestSigner, type RequestSigner } from './signing.js';
+export { withRequestSigner, type RequestSigner, type SignableRequest } from './signing.js';
 export interface ProviderFetchEnvironment {
   readonly CHEERS_PROVIDER_PROXY?: string;
   readonly CHEERS_PROVIDER_NO_PROXY?: string;
@@ -31,34 +33,6 @@ interface ProviderFetchOptions {
    */
   readonly timeouts?: ProviderTimeoutOverrides;
 }
-
-/**
- * What a request looks like to something that has to sign it.
- *
- * Every field is what the transport already holds at the moment before dispatch,
- * which is the point: a signature covers the method, the URL, the headers and the
- * body, and this is the only place all four exist together. Signing anywhere
- * earlier means signing something that has not been built yet.
- */
-export interface SignableRequest {
-  readonly url: string;
-  readonly method: string;
-  readonly headers: Readonly<Record<string, string>>;
-  /** The serialized body, or nothing for a request that carries none. */
-  readonly body?: string;
-}
-
-/**
- * Adds whatever a protocol needs to authenticate a request.
- *
- * Returns the headers to send, given the request they will travel with. A
- * credential that is a constant does not need this and does not use it — this is
- * for the ones whose value depends on the request, which is what a signature is.
- * Async because signing is: deriving a key and hashing a body are both.
- */
-export type RequestSigner = (
-  request: SignableRequest,
-) => Promise<Readonly<Record<string, string | undefined>>>;
 
 /** The three deadlines a request runs against, as configuration states them. */
 export interface ProviderTimeoutOverrides {
@@ -113,55 +87,6 @@ export function createProviderFetchFromEnv(
 }
 
 /**
- * A transport that signs each request before it is sent.
- *
- * The signer runs here because this is where a request exists in full: the
- * method, the final URL, the headers and the serialized body are all in hand one
- * line before dispatch, and a signature covers all four. A credential resolved
- * when the session is built cannot see the body, and the body is most of what is
- * being signed.
- *
- * The signed headers are merged over the caller's, so a signer can add to the
- * request without having to reproduce what the caller already decided.
- */
-export function withRequestSigner(base: typeof fetch, signer: RequestSigner): typeof fetch {
-  return (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const method = (init?.method ?? "GET").toUpperCase();
-    const url = String(requestUrl(input));
-    const headers = headerRecord(init?.headers);
-    const body = typeof init?.body === "string" ? init.body : undefined;
-    const signed = await signer({
-      url,
-      method,
-      headers,
-      ...(body !== undefined ? { body } : {}),
-    });
-    // An absent entry is not a header: a signer with nothing to add for an
-    // optional field says so by leaving it out, and sending the name with no
-    // value would be a header the service reads as empty.
-    const merged: Record<string, string> = { ...headers };
-    for (const [name, value] of Object.entries(signed)) {
-      if (value !== undefined) merged[name] = value;
-    }
-    return await base(input, { ...(init ?? {}), headers: merged });
-  }) as typeof fetch;
-}
-
-/** The request headers as a plain record, whichever of the three shapes they arrive in. */
-function headerRecord(headers: HeadersInit | undefined): Record<string, string> {
-  if (!headers) return {};
-  if (Array.isArray(headers)) return Object.fromEntries(headers);
-  if (headers instanceof Headers) {
-    const record: Record<string, string> = {};
-    headers.forEach((value, name) => {
-      record[name] = value;
-    });
-    return record;
-  }
-  return { ...(headers as Record<string, string>) };
-}
-
-/**
  * The fetch every provider request goes through, reused across calls.
  *
  * Reused rather than rebuilt because the wrapper holds an undici dispatcher: a
@@ -184,7 +109,7 @@ export function providerFetchFromTimeouts(
   // string `"6000"` was dropped by the guard and then keyed identically to the
   // number `6000`, so a reload served the old wrapper with the old deadline. That
   // is the one thing the comment above promises cannot happen.
-  const key = JSON.stringify([resolved.connectTimeoutMs, resolved.headersTimeoutMs, resolved.bodyTimeoutMs]);
+  const key = JSON.stringify(resolveProviderTransportConfig(process.env, resolved));
   if (cachedProviderFetch?.key === key) return cachedProviderFetch.fetch;
   const fetchImpl = createProviderFetchFromEnv({ timeouts: resolved });
   cachedProviderFetch = { key, fetch: fetchImpl };
@@ -270,15 +195,20 @@ export function providerFetchForEndpoint(
   beforeDispatch?: (init?: RequestInit) => void,
 ): typeof fetch {
   const signer = shapeFor(endpoint).signer;
+  const socketConfig = resolveProviderTransportConfig(process.env, providerTimeoutsFrom(config));
+  const transport = process.env.CHEERS_CODEX_TRANSPORT?.trim().toLowerCase();
   const configured = providerFetchFor(config);
   const base = admittedFetch((input, init) => {
     init?.signal?.throwIfAborted();
     beforeDispatch?.(init);
     const sseInit = (endpoint === 'openai-account-responses' || endpoint === 'google-account-generative-ai'
       || endpoint === 'copilot-chat-completions' || endpoint === 'copilot-messages') ? { ...init, redirect: 'error' as const } : init;
-    const transport = process.env.CHEERS_CODEX_TRANSPORT?.trim().toLowerCase();
     if (endpoint === 'openai-account-responses' && (transport === 'websocket' || transport === 'auto')) {
-      return tryCodexWebSocketFetch(input, sseInit, configured, transport === 'auto');
+      const decision = resolveTransportDecision(requestUrl(input).hostname, socketConfig);
+      return tryCodexWebSocketFetch(input, sseInit, configured, transport === 'auto', {
+        ...socketConfig, proxyUrl: decision.mode === 'proxy' ? socketConfig.proxyUrl : undefined, admission,
+        lifetime: currentProviderConnections(),
+      });
     }
     return configured(input, sseInit);
   }, admission);

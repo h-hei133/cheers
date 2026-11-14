@@ -5,6 +5,8 @@ import {
   isWebSocketSseFallbackActive,
   markWebSocketSseFallback,
 } from "./codexWsCache.js";
+import type { ProviderSocketOptions } from '../../request/connection.js';
+import { assertAdmission } from '../../../core/network/admission.js';
 
 /**
  * Codex Responses WebSocket transport with session-scoped connection caching
@@ -86,7 +88,10 @@ export async function streamCodexWebSocket(input: {
   readonly extraHeaders?: Readonly<Record<string, string>>;
   readonly body: Record<string, unknown>;
   readonly signal?: AbortSignal;
+  readonly transport?: ProviderSocketOptions;
 }): Promise<ReadableStream<Uint8Array>> {
+  if (input.transport?.lifetime) input = { ...input, signal: input.signal
+    ? AbortSignal.any([input.signal, input.transport.lifetime.signal]) : input.transport.lifetime.signal };
   const url = buildCodexWebSocketUrl(input.baseUrl, input.path);
   const headers = buildCodexWebSocketHeaders({
     token: input.token,
@@ -95,22 +100,28 @@ export async function streamCodexWebSocket(input: {
     extraHeaders: input.extraHeaders,
   });
   const scopedCacheKey = input.cacheKey
-    ? buildSocketCacheKey(input.cacheKey, url, input.token, input.accountId)
+    ? buildSocketCacheKey(input.cacheKey, url, input.token, input.accountId, input.transport)
     : undefined;
 
-  const { socket, release } = await acquireCodexWebSocket(scopedCacheKey, url, headers, input.signal);
+  const { socket, release } = await acquireCodexWebSocket(scopedCacheKey, url, headers, input.signal, input.transport);
   const encoder = new TextEncoder();
   let finishStream: ((broken: boolean) => void) | undefined;
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
       let finished = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
       const cleanup = (broken = false) => {
+        clearTimeout(timer);
         socket.off("message", onMessage);
         socket.off("error", onError);
         socket.off("close", onClose);
         input.signal?.removeEventListener("abort", onAbort);
         release(broken);
+      };
+      const deadline = (milliseconds: number, code: string) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => onError(Object.assign(new Error('Provider WebSocket response timed out.'), { code })), milliseconds);
       };
       finishStream = (broken: boolean) => {
         if (finished) return;
@@ -119,6 +130,7 @@ export async function streamCodexWebSocket(input: {
       };
       const onMessage = (raw: unknown) => {
         if (finished) return;
+        deadline(input.transport?.bodyTimeoutMs ?? 120_000, 'UND_ERR_BODY_TIMEOUT');
         const text = typeof raw === "string" ? raw : Buffer.isBuffer(raw) ? raw.toString("utf8") : String(raw);
         controller.enqueue(encoder.encode(encodeSseFrame(text)));
         try {
@@ -161,6 +173,10 @@ export async function streamCodexWebSocket(input: {
       socket.on("error", onError);
       socket.on("close", onClose);
       input.signal?.addEventListener("abort", onAbort, { once: true });
+      if (input.signal?.aborted) { onAbort(); return; }
+      try { assertAdmission(input.transport?.admission); }
+      catch (error) { onError(error); return; }
+      deadline(input.transport?.headersTimeoutMs ?? 120_000, 'UND_ERR_HEADERS_TIMEOUT');
 
       const frame = JSON.stringify({ type: "response.create", ...input.body });
       socket.send(frame, (err) => {
@@ -186,21 +202,37 @@ export async function tryCodexWebSocketFetch(
   init: RequestInit | undefined,
   sseFallback: (url: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
   allowSseFallback = true,
+  transport?: ProviderSocketOptions,
 ): Promise<Response> {
   const urlString = input instanceof Request ? input.url : String(input);
   const headers = new Headers(input instanceof Request ? input.headers : undefined);
   if (init?.headers) {
     new Headers(init.headers).forEach((value, key) => headers.set(key, value));
   }
-  const sessionKey = headers.get("session-id") ?? headers.get("x-client-request-id") ?? undefined;
-  if (allowSseFallback && isWebSocketSseFallbackActive(sessionKey)) {
+  const requestSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+  const ownerSignal = transport?.lifetime?.signal;
+  const signal = ownerSignal
+    ? requestSignal ? AbortSignal.any([requestSignal, ownerSignal]) : ownerSignal
+    : requestSignal;
+  if (ownerSignal) init = { ...init, signal };
+  const fallback = () => {
+    transport?.lifetime?.signal.throwIfAborted();
+    signal?.throwIfAborted();
+    assertAdmission(transport?.admission);
     return sseFallback(input, init);
+  };
+  signal?.throwIfAborted();
+  assertAdmission(transport?.admission);
+  const sessionKey = headers.get("session-id") ?? headers.get("x-client-request-id") ?? undefined;
+  if (allowSseFallback && isWebSocketSseFallbackActive(sessionKey, transport?.lifetime)) {
+    return fallback();
   }
   const auth = headers.get("authorization") ?? "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
   const bodyText = typeof init?.body === "string" ? init.body : undefined;
   if (!token || !bodyText) {
-    return sseFallback(input, init);
+    if (!allowSseFallback) throw new Error('Provider WebSocket requires a bearer credential and serialized body.');
+    return fallback();
   }
   const extraHeaders: Record<string, string> = {};
   headers.forEach((value, key) => {
@@ -209,7 +241,6 @@ export async function tryCodexWebSocketFetch(
       extraHeaders[key] = value;
     }
   });
-  const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
 
   try {
     const parsedBody = JSON.parse(bodyText) as Record<string, unknown>;
@@ -224,16 +255,17 @@ export async function tryCodexWebSocketFetch(
       extraHeaders,
       body: parsedBody,
       signal: signal ?? undefined,
+      transport,
     });
     return new Response(stream, {
       status: 200,
       headers: { "content-type": "text/event-stream" },
     });
   } catch (err) {
-    if (signal?.aborted || isAbortError(err) || !allowSseFallback) {
+    if (signal?.aborted || transport?.lifetime?.signal.aborted || isAbortError(err) || !allowSseFallback) {
       throw err;
     }
-    if (sessionKey) markWebSocketSseFallback(sessionKey);
-    return sseFallback(input, init);
+    if (sessionKey) markWebSocketSseFallback(sessionKey, transport?.lifetime);
+    return fallback();
   }
 }

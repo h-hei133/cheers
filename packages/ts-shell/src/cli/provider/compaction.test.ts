@@ -17,6 +17,9 @@ import { outgoingProjection } from '../../turn/messages.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import { planCompaction } from '../../session/compaction.js';
 import { estimateTokens } from '../../session/context.js';
+import { currentProviderConnections } from '../../provider/request/connection.js';
+import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
+import type { AgentMessage } from '../../core/agent/state.js';
 
 vi.mock('../../turn/cacheWarm.js', () => ({ createCacheWarmingRunner: () => ({ stop: vi.fn() }) }));
 
@@ -28,7 +31,7 @@ const main: ProviderCredentialResolution = { provider: 'openai', model: 'fixture
   baseUrl: 'https://provider.invalid/v1', expectedEnvVarName: 'OPENAI_API_KEY',
   credential: { provider: 'openai', authMode: 'api-key', apiKey: 'synthetic-compaction-only',
     model: 'fixture', baseUrl: 'https://provider.invalid/v1', source: 'config', envVarName: 'OPENAI_API_KEY' } };
-const catalog: readonly CatalogProvider[] = [{ id: 'openai', endpoint: 'openai-compatible',
+const catalog: readonly CatalogProvider[] = [{ id: 'openai', label: 'OpenAI', runtime: 'openai', auth: 'api-key', endpoint: 'openai-compatible',
   baseUrl: main.baseUrl, models: [{ id: 'fixture' }] }];
 
 function fixture() {
@@ -40,6 +43,33 @@ function fixture() {
   return { config, binding, configuration, runtimeContext, renderer,
     providers: createCompactionProviders({ runtimeContext, renderer }) };
 }
+
+it('keeps connection owners isolated and resets only the captured session lifetime', async () => {
+  const first = fixture();
+  const second = fixture();
+  const resources = createProviderResources({ ...first, sessionManager: setup.manager,
+    providerRuntimeBridge: { resolveCredentialSnapshot: () => main } }, first.providers);
+  const other = createProviderResources({ ...second, sessionManager: setup.manager,
+    providerRuntimeBridge: { resolveCredentialSnapshot: () => main } }, second.providers);
+  const runtime = { getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
+  resources.installFreshState(runtime);
+  other.installFreshState(runtime);
+  const ownerA = resources.withConnections(() => currentProviderConnections()!);
+  const ownerB = other.withConnections(() => currentProviderConnections()!);
+  expect(ownerA.id).not.toBe(ownerB.id);
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const late = resources.withConnections(async () => { await pending; return currentProviderConnections()!; });
+  expect(await first.runtimeContext.freshState!.clearCache!()).toBe('reset');
+  expect(ownerA.signal.aborted).toBe(true);
+  expect(ownerB.signal.aborted).toBe(false);
+  const replacement = resources.withConnections(() => currentProviderConnections()!);
+  expect(replacement.id).not.toBe(ownerA.id);
+  release();
+  expect(await late).toBe(ownerA);
+  expect(await first.runtimeContext.freshState!.clearCache!()).toBe('reset');
+  expect(await second.runtimeContext.freshState!.clearCache!()).toBe('reset');
+});
 
 it.each(['connection-overridden', 'connection-unavailable', 'connection-pending', 'pool-empty', 'pool-unavailable', 'pool-required'] as const)(
   'keeps %s visible while refusing a compaction provider', blocked => {
@@ -64,7 +94,7 @@ it('distinguishes missing credentials, endpoints and models', () => {
 
 it('reports ambiguous catalogue aliases without selecting either provider', () => {
   const { providers } = fixture();
-  const ambiguous = ['a', 'b'].map(id => ({ id, runtime: 'openai' as const, baseUrl: main.baseUrl, models: [{ id: 'fixture' }] }));
+  const ambiguous: readonly CatalogProvider[] = ['a', 'b'].map(id => ({ id, label: id, auth: 'api-key', runtime: 'openai', baseUrl: main.baseUrl, models: [{ id: 'fixture' }] }));
   expect(providers.availability(main, ambiguous)).toMatchObject({ available: false,
     reason: expect.stringContaining('More than one model catalogue') });
   expect(providers.provider(main, ambiguous)).toBeUndefined();
@@ -128,7 +158,7 @@ it('publishes current unavailability before the first turn and updates it across
   resolution = main;
   expect(input.runtimeContext.compactionUnavailable?.()).toBeUndefined();
   const ticket = input.configuration.begin(input.binding);
-  const ambiguous = ['a', 'b'].map(id => ({ id, runtime: 'openai' as const, baseUrl: main.baseUrl, models: [{ id: 'fixture' }] }));
+  const ambiguous: readonly CatalogProvider[] = ['a', 'b'].map(id => ({ id, label: id, auth: 'api-key', runtime: 'openai', baseUrl: main.baseUrl, models: [{ id: 'fixture' }] }));
   expect(input.configuration.publish(ticket, input.config, input.binding, undefined, ambiguous).status).toBe('applied');
   expect(input.runtimeContext.compactionUnavailable?.()).toContain('More than one model catalogue');
   input.configuration.transition(input.binding);
@@ -176,7 +206,7 @@ it('calibrates the actual microcompaction evaluator without altering provider us
     backgroundSignal: new AbortController().signal, sessionId: setup.session.id,
     admission: () => undefined, getSourceEntryId: () => undefined });
   const compaction = prepare(main).compaction!;
-  const messages = [{ role: 'user' as const, content: 'read' }, { role: 'assistant' as const, content: '', tool_calls: [
+  const messages: readonly AgentMessage[] = [{ role: 'user', content: 'read' }, { role: 'assistant', content: '', tool_calls: [
     { id: 'read-1', type: 'function' as const, function: { name: 'read', arguments: '{}' } },
   ] }, { role: 'tool' as const, tool_call_id: 'read-1', content: 'result '.repeat(1000) }];
   const provider = input.providers.provider(main, catalog)!;
@@ -187,7 +217,7 @@ it('calibrates the actual microcompaction evaluator without altering provider us
   // Seed a plausible synthetic count for the measured wire. The old constant
   // was smaller than the later rewrite deduction and correctly failed admission.
   // Keep provider accounting distinct from the local fallback estimate.
-  const promptTokens = estimateTokens(outgoingProjection(messages, false, true).messages) + 100;
+  const promptTokens = estimateTokens(outgoingProjection(messages, false, true).messages.map(message => ({ ...message, content: message.content ?? '' }))) + 100;
   recordSessionUsage(setup.session.id, { promptTokens, promptMessageCount: messages.length, promptIdentity: identity,
     attribution: captureUsageAttribution({ provider: main.provider, model: main.model!, baseUrl: main.baseUrl! }) });
   expect(input.runtimeContext.compactionMeasurement?.()).toBeUndefined();
@@ -199,7 +229,7 @@ it('calibrates the actual microcompaction evaluator without altering provider us
   expect(corrected).toBeDefined();
   expect(corrected).toBeLessThan(promptTokens);
   const grown = [...messages, ...tail];
-  expect(corrected).toBeGreaterThan(estimateTokens(outgoingProjection(grown, false, true).messages));
+  expect(corrected).toBeGreaterThan(estimateTokens(outgoingProjection(grown, false, true).messages.map(message => ({ ...message, content: message.content ?? '' }))));
   // The raw estimate overstates the rewritten prompt. Threshold decisions
   // must use the calibrated value on both sides of the soft boundary.
   const calibratedPolicy = { ...compaction.policy, contextWindow: 600, reserveTokens: 0,

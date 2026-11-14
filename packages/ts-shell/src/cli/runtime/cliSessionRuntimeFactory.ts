@@ -118,7 +118,7 @@ export function createCliSessionRuntime(input: {
     // sits one level below the subagent memories, which name a directory after
     // each agent: the two must not share a path, and they do not.
     projectMemoryStore,
-    compactHistory: (sessionId, signal, instructions) => {
+    compactHistory: (sessionId, signal, instructions) => providerResources.withConnections(() => {
       signal.throwIfAborted();
       const operation = configurationOperation(input.runtimeContext);
       const config = operation.config; const catalog = operation.publication.catalog;
@@ -166,8 +166,8 @@ export function createCliSessionRuntime(input: {
           },
         });
       });
-    },
-    summarizeAbandonedTurns: (messages) => {
+    }),
+    summarizeAbandonedTurns: (messages) => providerResources.withConnections(() => {
       const operation = configurationOperation(input.runtimeContext);
       const config = operation.config; const catalog = operation.publication.catalog;
       const usageFor = sessionUsageRecorder(input.runtimeContext.session.id);
@@ -193,8 +193,8 @@ export function createCliSessionRuntime(input: {
           messages: toCompactionMessages(messages),
         });
       });
-    },
-    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext, onPromptAccepted): PromptRun => {
+    }),
+    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext, onPromptAccepted): PromptRun => providerResources.withConnections(() => {
       const operation = configurationOperation(input.runtimeContext);
       const publication = operation.publication;
       const config = operation.config;
@@ -324,7 +324,7 @@ export function createCliSessionRuntime(input: {
       });
       return { ...run, sourceEntryId: getSourceEntryId,
         settled: planningSettlement(input.sessionManager, sessionId, promptEntryId, sessionRuntime, config, input.renderer) };
-    },
+    }),
   });
   providerResources.installFreshState(sessionRuntime);
   installRuleControlRuntime({ runtimeContext: input.runtimeContext, sessionManager: input.sessionManager, mcpGateway: input.mcpGateway,

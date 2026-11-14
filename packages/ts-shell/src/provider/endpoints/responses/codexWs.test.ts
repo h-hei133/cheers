@@ -1,5 +1,8 @@
 import * as http from "node:http";
-import { afterEach, describe, expect, it } from "vitest";
+import net from 'node:net';
+import type { AddressInfo } from 'node:net';
+import type { Duplex } from 'node:stream';
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocketServer } from "ws";
 import { endpointShape } from "../index.js";
 import {
@@ -9,10 +12,43 @@ import {
   tryCodexWebSocketFetch,
 } from "./codexWs.js";
 import { readResponseStream } from "./stream.js";
+import { providerFetchForEndpoint } from '../../request/fetch.js';
+import { providerRequestError } from '../../request/error.js';
+import { withProviderConnections } from '../../request/connection.js';
 
 const servers: Array<() => Promise<void>> = [];
 
+async function startProxy(): Promise<{ url: string; requests: string[] }> {
+  const requests: string[] = [];
+  const connections = new Set<Duplex>();
+  const proxy = http.createServer();
+  proxy.on('connect', (request, client, head) => {
+    requests.push(request.url!);
+    connections.add(client);
+    client.on('close', () => connections.delete(client));
+    const port = Number(request.url!.split(':').at(-1));
+    const target = net.connect(port, '127.0.0.1', () => {
+      client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+      if (head.length) target.write(head);
+      client.pipe(target); target.pipe(client);
+    });
+    connections.add(target);
+    target.on('close', () => { connections.delete(target); client.destroy(); });
+    target.on('error', () => client.destroy());
+    client.on('error', () => target.destroy());
+    client.on('close', () => target.destroy());
+  });
+  await new Promise<void>(resolve => proxy.listen(0, '127.0.0.1', resolve));
+  servers.push(async () => {
+    for (const socket of connections) socket.destroy();
+    proxy.closeAllConnections();
+    await new Promise<void>(resolve => proxy.close(() => resolve()));
+  });
+  return { url: `http://127.0.0.1:${(proxy.address() as AddressInfo).port}`, requests };
+}
+
 afterEach(async () => {
+  vi.unstubAllEnvs();
   clearCodexWebSocketCache();
   while (servers.length > 0) {
     await servers.pop()!();
@@ -92,6 +128,128 @@ async function startWsServer(): Promise<{
 }
 
 describe("Codex WebSocket transport and SSE fallback", () => {
+  it('keeps same-session sockets isolated across runtime owners and lets one owner close without retiring the other', async () => {
+    const server = await startWsServer();
+    vi.stubEnv('CHEERS_CODEX_TRANSPORT', 'websocket');
+    const fetchImpl = providerFetchForEndpoint({}, 'openai-account-responses', endpointShape);
+    const first = new AbortController();
+    const second = new AbortController();
+    const init = { method: 'POST', headers: { authorization: 'Bearer synthetic-same-credential', 'session-id': 'same-session' }, body: '{}' };
+    const complete = async () => {
+      const response = await fetchImpl(server.url, init);
+      await response.text();
+    };
+    try {
+      await withProviderConnections({ id: 'owner-A', signal: first.signal }, complete);
+      await withProviderConnections({ id: 'owner-B', signal: second.signal }, complete);
+      expect(server.connections()).toBe(2);
+      first.abort();
+      await withProviderConnections({ id: 'owner-B', signal: second.signal }, complete);
+      expect(server.connections()).toBe(2);
+      expect(server.received).toHaveLength(3);
+    } finally { first.abort(); second.abort(); }
+  });
+  it('uses production proxy policy and keeps captured NO_PROXY independent of later environment changes', async () => {
+    const server = await startWsServer();
+    const proxy = await startProxy();
+    vi.stubEnv('CHEERS_CODEX_TRANSPORT', 'websocket');
+    vi.stubEnv('CHEERS_PROVIDER_PROXY', proxy.url);
+    vi.stubEnv('CHEERS_PROVIDER_NO_PROXY', '127.0.0.1');
+    const direct = providerFetchForEndpoint({}, 'openai-account-responses', () => ({}));
+    vi.stubEnv('CHEERS_PROVIDER_NO_PROXY', '');
+    const proxied = providerFetchForEndpoint({}, 'openai-account-responses', () => ({}));
+    const init: RequestInit = { method: 'POST', headers: { authorization: 'Bearer fixture', 'session-id': 'policy' }, body: '{}' };
+    expect(await (await direct(server.url, init)).text()).toContain('ws-hello');
+    expect(proxy.requests).toHaveLength(0);
+    expect(await (await proxied(server.url, init)).text()).toContain('ws-hello');
+    expect(proxy.requests).toHaveLength(1);
+    expect(server.connections()).toBe(2);
+  });
+
+  it('classifies a stalled upgrade as a provider timeout without dispatching a response request', async () => {
+    const sockets = new Set<net.Socket>();
+    const server = http.createServer();
+    server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
+    server.on('upgrade', () => {});
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    servers.push(async () => { for (const socket of sockets) socket.destroy(); await new Promise<void>(resolve => server.close(() => resolve())); });
+    const failure = await tryCodexWebSocketFetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/responses`, {
+      method: 'POST', headers: { authorization: 'Bearer fixture' }, body: '{}',
+    }, async () => { throw new Error('Unexpected fallback'); }, false, {
+      connectTimeoutMs: 500, headersTimeoutMs: 60, bodyTimeoutMs: 500,
+    }).then(() => undefined, error => error);
+    expect(failure).toMatchObject({ code: 'UND_ERR_HEADERS_TIMEOUT' });
+    expect(providerRequestError(failure).failureClass).toBe('provider_timeout');
+  });
+
+  it.each(['abort', 'cancel'] as const)('retires a connection after a partial response and %s', async kind => {
+    const server = http.createServer();
+    const wss = new WebSocketServer({ server });
+    let connections = 0;
+    wss.on('connection', socket => { connections++; socket.on('message', () => socket.send('{"type":"response.output_text.delta","delta":"partial"}')); });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    servers.push(() => new Promise<void>(resolve => wss.close(() => server.close(() => resolve()))));
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/responses`;
+    let fallbackCalls = 0;
+    const fallback = async () => { fallbackCalls++; return new Response('fallback'); };
+    const controller = new AbortController();
+    const init: RequestInit = { method: 'POST', headers: { authorization: 'Bearer fixture', 'session-id': 'cancelled' }, body: '{}', signal: controller.signal };
+    const reader = (await tryCodexWebSocketFetch(url, init, fallback)).body!.getReader();
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain('partial');
+    if (kind === 'abort') {
+      controller.abort();
+      await expect(reader.read()).rejects.toMatchObject({ name: 'AbortError' });
+    } else await reader.cancel();
+    const next = (await tryCodexWebSocketFetch(url, { ...init, signal: undefined }, fallback)).body!.getReader();
+    await next.read(); await next.cancel();
+    expect(connections).toBe(2);
+    expect(fallbackCalls).toBe(0);
+  });
+  it('uses a configured CONNECT proxy for an otherwise unresolvable provider host', async () => {
+    const server = await startWsServer();
+    const proxy = await startProxy();
+    const target = new URL(server.url); target.hostname = 'provider.invalid';
+    const response = await tryCodexWebSocketFetch(target, {
+      method: 'POST', headers: { authorization: 'Bearer fixture', 'session-id': 'proxy-session' },
+      body: '{"model":"gpt-5"}',
+    }, async () => { throw new Error('Unexpected fallback'); }, false, {
+      proxyUrl: proxy.url, connectTimeoutMs: 500, headersTimeoutMs: 500, bodyTimeoutMs: 500,
+    });
+    expect(await response.text()).toContain('ws-hello');
+    expect(proxy.requests).toEqual([target.host]);
+  });
+
+  it.each([false, true])('bounds an accepted stream before and after its first frame (partial=%s)', async partial => {
+    const server = http.createServer();
+    const wss = new WebSocketServer({ server });
+    wss.on('connection', socket => socket.on('message', () => {
+      if (partial) socket.send('{"type":"response.output_text.delta","delta":"partial"}');
+    }));
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    servers.push(() => new Promise<void>(resolve => wss.close(() => server.close(() => resolve()))));
+    let fallbackCalls = 0;
+    const response = await tryCodexWebSocketFetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/responses`, {
+      method: 'POST', headers: { authorization: 'Bearer fixture' }, body: '{}',
+    }, async () => { fallbackCalls++; return new Response('fallback'); }, true, {
+      connectTimeoutMs: 500, headersTimeoutMs: 60, bodyTimeoutMs: 60,
+    });
+    await expect(response.text()).rejects.toMatchObject({ code: partial ? 'UND_ERR_BODY_TIMEOUT' : 'UND_ERR_HEADERS_TIMEOUT' });
+    expect(fallbackCalls).toBe(0);
+  });
+
+  it('rechecks authority after socket acquisition and before an SSE fallback', async () => {
+    const server = await startWsServer();
+    let checks = 0; let fallbackCalls = 0;
+    const result = tryCodexWebSocketFetch(server.url, {
+      method: 'POST', headers: { authorization: 'Bearer fixture' }, body: '{}',
+    }, async () => { fallbackCalls++; return new Response('fallback'); }, true, {
+      connectTimeoutMs: 500, headersTimeoutMs: 500, bodyTimeoutMs: 500,
+      admission: () => ++checks >= 4 ? 'configuration revoked' : undefined,
+    });
+    await expect(result).rejects.toThrow('configuration revoked');
+    expect(server.received).toHaveLength(0);
+    expect(fallbackCalls).toBe(0);
+  });
   it("emits session-id and x-client-request-id headers clamped to 64 chars unless cacheRetention is none", () => {
     const shape = endpointShape("openai-account-responses");
     const longId = "a".repeat(80);
@@ -107,8 +265,8 @@ describe("Codex WebSocket transport and SSE fallback", () => {
       systemRole: "system",
       maxTokensField: "max_tokens",
       supportsTemperature: true,
-      temperature: undefined,
-      reasoningEffort: undefined,
+      temperature: 0.7,
+      reasoningEffort: false,
       sessionId: longId,
     });
     expect(headers).toEqual({
@@ -127,8 +285,8 @@ describe("Codex WebSocket transport and SSE fallback", () => {
       assistantAfterToolResult: false,
       systemRole: "system",
       maxTokensField: "max_tokens",
-      temperature: undefined,
-      reasoningEffort: undefined,
+      temperature: 0.7,
+      reasoningEffort: false,
       sessionId: "sess-1",
       cacheRetention: "none",
     });
@@ -177,7 +335,7 @@ describe("Codex WebSocket transport and SSE fallback", () => {
     servers.push(() => new Promise<void>((resolve) => httpOnly.close(() => resolve())));
 
     let sseCalls = 0;
-    const sseFallback = async (u: string | URL, i?: RequestInit) => {
+    const sseFallback = async (u: RequestInfo | URL, i?: RequestInit) => {
       sseCalls++;
       return fetch(u, i);
     };

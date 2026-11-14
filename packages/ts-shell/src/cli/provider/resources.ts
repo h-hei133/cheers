@@ -19,6 +19,8 @@ import { cacheRefreshFor } from '../runtime/cache.js';
 import { buildCompactionWiring, nativeCompactionAuthority, type CompactionProvider } from '../runtime/compaction.js';
 import type { createCompactionProviders } from './compaction.js';
 import { createCompactionMeasurement } from './measurement.js';
+import { withProviderConnections } from '../../provider/request/connection.js';
+import { createProviderConnections } from './connections.js';
 
 interface Resources {
   readonly compaction?: CompactionSetup;
@@ -35,6 +37,7 @@ export function createProviderResources(input: {
   let previousCacheWarming: CacheWarmingRunner | undefined;
   let releaseCacheListener: (() => void) | undefined;
   let cacheWarmingSessionId: string | undefined;
+  const connections = createProviderConnections(input.runtimeContext);
   const measurement = createCompactionMeasurement(() => {
     const usage = getSessionUsage(input.runtimeContext.session.id);
     return [usage.lastPromptIdentity, usage.lastPromptTokens, usage.lastPromptMessageCount,
@@ -80,15 +83,17 @@ export function createProviderResources(input: {
   const installFreshState = (sessionRuntime: ShellSessionRuntime) => {
     input.runtimeContext.freshState = {
       admission: () => sessionRuntime.getCurrentRunController() !== null ? 'Wait for the current provider turn before resetting local state.' : undefined,
+      resetConnection: connections.reset,
       clearCache: async () => {
+        const connectionResult = connections.reset();
         const sessionId = input.runtimeContext.session.id;
         const owner = previousCacheWarming;
-        if (!owner || cacheWarmingSessionId !== sessionId) return 'unchanged';
+        if (!owner || cacheWarmingSessionId !== sessionId) return connectionResult;
         const result = await owner.reset();
         if (input.runtimeContext.session.id !== sessionId || owner !== previousCacheWarming) return 'unknown';
         previousCacheWarming = undefined; cacheWarmingSessionId = undefined;
         releaseCacheListener?.(); releaseCacheListener = undefined;
-        return result;
+        return result === 'unchanged' ? connectionResult : result;
       },
     };
   };
@@ -105,6 +110,7 @@ export function createProviderResources(input: {
     readonly resources?: (resources: Resources) => Resources;
   }) => {
     const { config, catalog, publication, backgroundSignal, sessionId, admission, requestPolicy } = run;
+    const connectionScope = connections.capture();
     measurementScope = undefined;
     // Retire the previous run before building another runner for the same prefix.
     releaseCacheListener?.();
@@ -145,7 +151,7 @@ export function createProviderResources(input: {
       releaseCacheListener = () => backgroundSignal.removeEventListener('abort', stopBackground);
       if (backgroundSignal.aborted) cacheWarming.stop();
 
-      const compaction: CompactionSetup | undefined = activeProvider
+      const setup: CompactionSetup | undefined = activeProvider
         ? {
             ...buildCompactionWiring({ provider: activeProvider, resolution: resolved, runtimeConfig: config, admission, sessionId, catalog, requestPolicy,
               workspaceRoot: input.runtimeContext.projectRoot, onCredentialPersisted: providers.publication }),
@@ -162,6 +168,7 @@ export function createProviderResources(input: {
             onDeadEnd: message => { input.renderer.renderLine(message); },
           }
         : undefined;
+      const compaction = setup ? connections.compaction(setup, connectionScope) : undefined;
       const resources = { compaction, cacheWarming };
       const prepared = run.resources ? run.resources(resources) : resources;
       if (prepared.compaction && activeProvider) {
@@ -172,7 +179,7 @@ export function createProviderResources(input: {
       }
       return prepared;
     };
-    return prepareProviderResources;
+    return (resolved: ProviderCredentialResolution) => withProviderConnections(connectionScope, () => prepareProviderResources(resolved));
   };
-  return { installFreshState, startRun };
+  return { installFreshState, startRun, withConnections: connections.run };
 }

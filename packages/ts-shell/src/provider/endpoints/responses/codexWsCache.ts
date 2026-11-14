@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
 import { WebSocket } from "ws";
+import type { ProviderConnectionLifetime, ProviderSocketOptions } from '../../request/connection.js';
+import { assertAdmission } from '../../../core/network/admission.js';
+import { connectWebSocket } from './socket.js';
 
 const SESSION_WEBSOCKET_CACHE_TTL_MS = 5 * 60_000;
 const SESSION_WEBSOCKET_MAX_AGE_MS = 55 * 60_000;
@@ -12,17 +15,56 @@ interface CachedWebSocketConnection {
   readonly createdAt: number;
   lastUsedAt: number;
   busy: boolean;
+  retired: boolean;
+  idleTimer?: ReturnType<typeof setTimeout>;
+  readonly lifetime?: ProviderConnectionLifetime;
+  readonly onOwnerAbort: () => void;
+  readonly onClose: () => void;
 }
 
 const sessionWebSockets = new Map<string, CachedWebSocketConnection>();
-const websocketSseFallbackSessions = new Set<string>();
+const websocketSseFallbackSessions = new Map<string, { readonly lifetime?: ProviderConnectionLifetime; readonly onAbort: () => void }>();
 
 function evictCachedSocket(cacheKey: string, entry: CachedWebSocketConnection): void {
+  if (entry.retired) return;
+  entry.retired = true;
+  clearTimeout(entry.idleTimer);
+  entry.lifetime?.signal.removeEventListener('abort', entry.onOwnerAbort);
   if (sessionWebSockets.get(cacheKey) === entry) {
     sessionWebSockets.delete(cacheKey);
   }
   entry.socket.off("error", entry.idleErrorHandler);
-  try { entry.socket.close(); } catch { /* ignore */ }
+  entry.socket.off('close', entry.onClose);
+  entry.socket.once('error', () => {});
+  entry.socket.terminate();
+}
+
+function idleSocket(cacheKey: string, entry: CachedWebSocketConnection): void {
+  if (entry.retired || entry.lifetime?.signal.aborted || entry.socket.readyState !== WebSocket.OPEN) {
+    evictCachedSocket(cacheKey, entry);
+    return;
+  }
+  entry.socket.on('error', entry.idleErrorHandler);
+  const remaining = Math.min(SESSION_WEBSOCKET_CACHE_TTL_MS,
+    Math.max(0, entry.createdAt + SESSION_WEBSOCKET_MAX_AGE_MS - Date.now()));
+  entry.idleTimer = setTimeout(() => evictCachedSocket(cacheKey, entry), remaining);
+  entry.idleTimer.unref();
+}
+
+function cachedLease(cacheKey: string, entry: CachedWebSocketConnection) {
+  clearTimeout(entry.idleTimer);
+  entry.idleTimer = undefined;
+  entry.socket.off('error', entry.idleErrorHandler);
+  entry.busy = true;
+  let released = false;
+  return { socket: entry.socket, release: (broken = false) => {
+    if (released || entry.retired) return;
+    released = true;
+    entry.busy = false;
+    entry.lastUsedAt = Date.now();
+    if (broken) evictCachedSocket(cacheKey, entry);
+    else idleSocket(cacheKey, entry);
+  } };
 }
 
 function pruneWebSocketCache(now: number): void {
@@ -34,90 +76,78 @@ function pruneWebSocketCache(now: number): void {
     }
   }
   while (sessionWebSockets.size >= MAX_CACHED_WEBSOCKETS) {
-    const oldest = sessionWebSockets.entries().next().value;
-    if (!oldest || oldest[1].busy) break;
+    const oldest = [...sessionWebSockets].filter(([, entry]) => !entry.busy)
+      .sort((a, b) => a[1].lastUsedAt - b[1].lastUsedAt)[0];
+    if (!oldest) break;
     evictCachedSocket(oldest[0], oldest[1]);
   }
 }
 
-export function buildSocketCacheKey(sessionKey: string, url: string, token: string, accountId?: string): string {
+export function buildSocketCacheKey(sessionKey: string, url: string, token: string, accountId?: string,
+  transport?: ProviderSocketOptions): string {
   const credentialDigest = createHash("sha256")
     .update(`${url}\0${token}\0${accountId ?? ""}`)
+    .update(JSON.stringify(transport ? [transport.proxyUrl, transport.connectTimeoutMs,
+      transport.headersTimeoutMs, transport.bodyTimeoutMs, transport.lifetime?.id] : []))
     .digest("hex")
     .slice(0, 24);
   return `${credentialDigest}:${sessionKey}`;
 }
 
-export function markWebSocketSseFallback(sessionKey: string): void {
-  websocketSseFallbackSessions.add(sessionKey);
+function fallbackKey(sessionKey: string, lifetime?: ProviderConnectionLifetime): string {
+  return JSON.stringify([lifetime?.id, sessionKey]);
+}
+
+function removeFallback(key: string): void {
+  const entry = websocketSseFallbackSessions.get(key);
+  entry?.lifetime?.signal.removeEventListener('abort', entry.onAbort);
+  websocketSseFallbackSessions.delete(key);
+}
+
+export function markWebSocketSseFallback(sessionKey: string, lifetime?: ProviderConnectionLifetime): void {
+  if (lifetime?.signal.aborted) return;
+  const key = fallbackKey(sessionKey, lifetime);
+  removeFallback(key);
+  const onAbort = () => removeFallback(key);
+  websocketSseFallbackSessions.set(key, { lifetime, onAbort });
+  lifetime?.signal.addEventListener('abort', onAbort, { once: true });
+  if (websocketSseFallbackSessions.size > MAX_CACHED_WEBSOCKETS) {
+    removeFallback(websocketSseFallbackSessions.keys().next().value!);
+  }
   const suffix = `:${sessionKey}`;
   for (const [key, entry] of sessionWebSockets) {
-    if (key === sessionKey || key.endsWith(suffix)) {
+    if ((key === sessionKey || key.endsWith(suffix)) && entry.lifetime?.id === lifetime?.id) {
       evictCachedSocket(key, entry);
     }
   }
 }
 
-export function isWebSocketSseFallbackActive(sessionKey: string | undefined): boolean {
-  return sessionKey ? websocketSseFallbackSessions.has(sessionKey) : false;
+export function isWebSocketSseFallbackActive(sessionKey: string | undefined, lifetime?: ProviderConnectionLifetime): boolean {
+  return sessionKey ? websocketSseFallbackSessions.has(fallbackKey(sessionKey, lifetime)) : false;
 }
 
 export function clearCodexWebSocketCache(): void {
   for (const [key, entry] of sessionWebSockets) {
     evictCachedSocket(key, entry);
   }
-  websocketSseFallbackSessions.clear();
+  for (const key of websocketSseFallbackSessions.keys()) removeFallback(key);
 }
 
-function connectWebSocket(url: string, headers: Record<string, string>, signal?: AbortSignal): Promise<WebSocket> {
-  return new Promise((resolve, reject) => {
-    signal?.throwIfAborted();
-    const socket = new WebSocket(url, { headers, handshakeTimeout: WEBSOCKET_CONNECT_TIMEOUT_MS });
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      try { socket.terminate(); } catch { /* ignore */ }
-      reject(new Error(`WebSocket connection timed out after ${WEBSOCKET_CONNECT_TIMEOUT_MS}ms`));
-    }, WEBSOCKET_CONNECT_TIMEOUT_MS);
-    const cleanup = () => {
-      clearTimeout(timer);
-      socket.off("open", onOpen);
-      socket.off("error", onError);
-      signal?.removeEventListener("abort", onAbort);
-    };
-    const onOpen = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(socket);
-    };
-    const onError = (err: unknown) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(err instanceof Error ? err : new Error(String(err)));
-    };
-    const onAbort = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      try { socket.terminate(); } catch { /* ignore */ }
-      reject(signal?.reason instanceof Error ? signal.reason : new DOMException("Aborted", "AbortError"));
-    };
-    socket.on("open", onOpen);
-    socket.on("error", onError);
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-}
 
 export async function acquireCodexWebSocket(
   cacheKey: string | undefined,
   url: string,
   headers: Record<string, string>,
   signal?: AbortSignal,
+  options: ProviderSocketOptions = { connectTimeoutMs: WEBSOCKET_CONNECT_TIMEOUT_MS,
+    headersTimeoutMs: WEBSOCKET_CONNECT_TIMEOUT_MS, bodyTimeoutMs: 120_000 },
 ): Promise<{ readonly socket: WebSocket; readonly release: (broken?: boolean) => void }> {
+  const lifetime = options.lifetime;
+  if (lifetime && cacheKey) cacheKey = `${lifetime.id}:${cacheKey}`;
+  lifetime?.signal.throwIfAborted();
+  if (lifetime) signal = signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal;
+  signal?.throwIfAborted();
+  assertAdmission(options.admission);
   const now = Date.now();
   pruneWebSocketCache(now);
 
@@ -128,52 +158,45 @@ export async function acquireCodexWebSocket(
       if (expired || existing.socket.readyState !== WebSocket.OPEN) {
         evictCachedSocket(cacheKey, existing);
       } else {
-        existing.busy = true;
         existing.lastUsedAt = now;
-        existing.socket.off("error", existing.idleErrorHandler);
-        return {
-          socket: existing.socket,
-          release: (broken = false) => {
-            existing.busy = false;
-            existing.lastUsedAt = Date.now();
-            if (broken || existing.socket.readyState !== WebSocket.OPEN) {
-              evictCachedSocket(cacheKey, existing);
-            } else {
-              existing.socket.on("error", existing.idleErrorHandler);
-            }
-          },
-        };
+        return cachedLease(cacheKey, existing);
       }
     }
   }
 
-  const socket = await connectWebSocket(url, headers, signal);
-  if (cacheKey && !sessionWebSockets.has(cacheKey)) {
+  const socket = await connectWebSocket(url, headers, signal, options);
+  try { signal?.throwIfAborted(); assertAdmission(options.admission); }
+  catch (error) { socket.once('error', () => {}); socket.terminate(); throw error; }
+  if (cacheKey && !sessionWebSockets.has(cacheKey) && sessionWebSockets.size < MAX_CACHED_WEBSOCKETS) {
+    const key = cacheKey;
     const entry: CachedWebSocketConnection = {
       socket,
-      idleErrorHandler: () => evictCachedSocket(cacheKey, entry),
+      idleErrorHandler: () => evictCachedSocket(key, entry),
       createdAt: now,
       lastUsedAt: now,
       busy: true,
+      retired: false,
+      lifetime,
+      onOwnerAbort: () => evictCachedSocket(key, entry),
+      onClose: () => evictCachedSocket(key, entry),
     };
-    sessionWebSockets.set(cacheKey, entry);
-    return {
-      socket,
-      release: (broken = false) => {
-        entry.busy = false;
-        entry.lastUsedAt = Date.now();
-        if (broken || socket.readyState !== WebSocket.OPEN) {
-          evictCachedSocket(cacheKey, entry);
-        } else {
-          socket.on("error", entry.idleErrorHandler);
-        }
-      },
-    };
+    sessionWebSockets.set(key, entry);
+    lifetime?.signal.addEventListener('abort', entry.onOwnerAbort, { once: true });
+    socket.once('close', entry.onClose);
+    return cachedLease(key, entry);
   }
+  const terminate = () => { socket.once('error', () => {}); socket.terminate(); };
+  const detach = () => lifetime?.signal.removeEventListener('abort', terminate);
+  lifetime?.signal.addEventListener('abort', terminate, { once: true });
+  socket.once('close', detach);
+  let released = false;
   return {
     socket,
     release: () => {
-      try { socket.close(); } catch { /* ignore */ }
+      if (released) return;
+      released = true;
+      detach();
+      terminate();
     },
   };
 }
