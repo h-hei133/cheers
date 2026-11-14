@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { declareEndpoint, endpointShape } from "./kinds.js";
+import { declareEndpoint, endpointShape, type EndpointShape, type SimpleRequest } from "./kinds.js";
 
 /**
- * Mistral Conversations / Chat endpoint (`mistral-conversations`).
+ * Mistral Chat Completions endpoint.
  *
  * Normalizes tool-call IDs to Mistral's 9-character `[a-zA-Z0-9]` requirement
  * deterministically without prefix collisions, and forwards `x-affinity` when
@@ -31,8 +31,13 @@ function sanitizeAffinity(sessionId: string | undefined): string | undefined {
   return chars.length <= AFFINITY_MAX_LENGTH ? cleaned : chars.slice(0, AFFINITY_MAX_LENGTH).join("");
 }
 
-function normalizeMistralPayload(body: Record<string, unknown>): Record<string, unknown> {
-  if (!Array.isArray(body.messages)) return body;
+function normalizeMistralPayload(body: Record<string, unknown>, input: Pick<SimpleRequest, "sessionId" | "cacheRetention">): Record<string, unknown> {
+  // Usage is part of native Mistral frames; OpenAI's stream options and retention
+  // field are not fields of this request protocol.
+  const { stream_options: _streamOptions, prompt_cache_retention: _retention, prompt_cache_key: _cacheKey, ...payload } = body;
+  const affinity = input.cacheRetention === "none" ? undefined : sanitizeAffinity(input.sessionId);
+  if (affinity) payload.prompt_cache_key = affinity;
+  if (!Array.isArray(body.messages)) return payload;
   const messages = body.messages.map((msg) => {
     if (!msg || typeof msg !== "object") return msg;
     const rec = msg as Record<string, unknown>;
@@ -50,12 +55,12 @@ function normalizeMistralPayload(body: Record<string, unknown>): Record<string, 
       ...(toolCalls !== undefined ? { tool_calls: toolCalls } : {}),
     };
   });
-  return { ...body, messages };
+  return { ...payload, messages };
 }
 
 const baseShape = (): ReturnType<typeof endpointShape> => endpointShape("openai-compatible");
 
-declareEndpoint("mistral-conversations", {
+const chatShape: EndpointShape = {
   contextFields: { conversation: "messages", tools: "tools", firstMessageIsSystem: true },
   path: () => "/chat/completions",
   modelsPath: "/models",
@@ -65,8 +70,13 @@ declareEndpoint("mistral-conversations", {
     const affinity = sanitizeAffinity(input.sessionId);
     return affinity ? { "x-affinity": affinity } : {};
   },
-  body: (input) => normalizeMistralPayload(baseShape().body(input)),
-  turnBody: (input) => normalizeMistralPayload(baseShape().turnBody(input)),
+  body: (input) => normalizeMistralPayload(baseShape().body(input), input),
+  turnBody: (input) => normalizeMistralPayload(baseShape().turnBody(input), input),
+  refreshBody: (body, model) => baseShape().refreshBody?.(body, model),
   readBody: (body) => baseShape().readBody(body),
   readStream: (body) => baseShape().readStream(body),
-});
+};
+
+declareEndpoint("mistral-chat-completions", chatShape);
+// Retain configurations using the earlier endpoint name.
+declareEndpoint("mistral-conversations", chatShape);

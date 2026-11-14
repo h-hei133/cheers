@@ -417,6 +417,7 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     id: "mistral",
     label: "Mistral",
     runtime: OPENAI_COMPATIBLE,
+    endpoint: "mistral-chat-completions",
     auth: "api-key",
     baseUrl: "https://api.mistral.ai/v1",
     envVar: "MISTRAL_API_KEY",

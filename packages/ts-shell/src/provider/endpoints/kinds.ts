@@ -69,6 +69,8 @@ export interface EndpointShape {
    * separate resources; omitted means streaming, as in a main turn.
    */
   readonly path: (model: string, stream?: boolean) => string;
+  /** Resolve protocols whose configured base may already include their resource path. */
+  readonly url?: (baseUrl: string, model: string, stream?: boolean) => string;
   /**
    * The credential headers this endpoint authenticates with.
    *
@@ -299,7 +301,8 @@ export function endpointKind(configured: string | undefined): EndpointKind | und
  * knows how a base URL and a resource join.
  */
 export function endpointUrl(baseUrl: string, kind: EndpointKind | undefined, model: string, stream = true): string {
-  return `${baseUrl.replace(/\/+$/, "")}${endpointShape(kind).path(model, stream)}`;
+  const shape = endpointShape(kind);
+  return shape.url?.(baseUrl, model, stream) ?? `${baseUrl.replace(/\/+$/, "")}${shape.path(model, stream)}`;
 }
 
 /** The body a request with no tools sends. */

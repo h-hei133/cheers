@@ -2254,3 +2254,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A failed stream may leave a live descriptor or cause cleanup to delete externally changed staging after a later stat succeeds.
 - **Root Cause:** A pathname or refreshed size is not ownership of the original bytes. A one-shot cleanup attempt also loses the only capability able to safely release renamed storage.
 - **Rule:** Preserve the original descriptor and digest of confirmed writes; verify bounded content before cleanup, leave foreign replacements intact, and retain unknown cleanup at the artifact owner for bounded retry. An already removed owned path settles cleanup; acquisition, staging and final publication must share the same captured storage identity.
+
+
+### Protocol Tests Must Reach The Shipped Catalogue Route
+- **Symptom:** Direct adapter tests pass while the built-in provider still uses a generic endpoint, or an endpoint appends a second API prefix.
+- **Root Cause:** Tests selected the new adapter explicitly and mirrored its URL construction instead of exercising catalogue selection and accepted base URLs.
+- **Rule:** Verify built-in, exact-base and user-override routing. Let the endpoint own URL normalization, preserve relay prefixes and query parameters, and keep the generic URL dispatcher a thin delegate.
