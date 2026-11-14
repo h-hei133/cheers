@@ -351,7 +351,7 @@ async function driveLoop(
   let explicitContinuation = false;
   while (true) {
     let hasMoreToolCalls = true;
-    while (hasMoreToolCalls || pending.length > 0 || explicitContinuation) {
+    while (hasMoreToolCalls || pending.length > 0) {
       explicitContinuation = false;
       if (completedStep) {
         const update = await config.prepareNextStep?.(completedStep, signal);
@@ -469,7 +469,13 @@ async function driveLoop(
 
     const followUp = await pollFollowUp(config);
     if (followUp.length > 0) {
+      explicitContinuation = false;
       pending = followUp;
+      continue;
+    }
+    // Queued user work takes priority over another context-only request.
+    if (explicitContinuation) {
+      explicitContinuation = false;
       continue;
     }
     break;

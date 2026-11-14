@@ -2387,3 +2387,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** An extension input or editor writes typed text into an approved recording while the normal composer is empty.
 - **Root Cause:** The recording exclusion predicate covered the legacy overlay but not the extension overlay stack; its full-screen frame had no composer-sensitive rows.
 - **Rule:** Exclude output while extension dialogs are active or the host is closing. Verify actual terminal painting through the recording owner and stored cast, then verify safe output is recorded after the dialog closes.
+
+
+### Artificial Continuation Must Yield To Queued Follow-Ups
+- **Symptom:** A `finishTurn` continuation repeatedly sends context-only requests while a follow-up remains queued.
+- **Root Cause:** Artificial continuation kept execution inside the inner tool/steering loop, outside the follow-up drain.
+- **Rule:** Preserve steering priority, then drain follow-ups before issuing artificial continuation. Give regression fixtures a finite final step; restoring the old inner-loop condition must fail both queue and request-reason assertions.

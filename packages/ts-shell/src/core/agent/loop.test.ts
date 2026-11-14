@@ -638,6 +638,70 @@ describe("step retry", () => {
     ]);
   });
 
+  it("uses a queued follow-up before a context-only finishTurn continuation", async () => {
+    const seen: AgentMessage[][] = [];
+    const reasons: string[] = [];
+    const { events, emit } = collect();
+    let followUpPolls = 0;
+    await runAgentLoop(
+      [userMessage("first request")],
+      [],
+      {
+        prepareRequest: ({ reason }) => { reasons.push(reason); return undefined; },
+        finishTurn: () => ({ action: seen.length === 1 ? "continue" : "end" }),
+        getFollowUpMessages: async () => {
+          followUpPolls += 1;
+          return followUpPolls === 1 ? [userMessage("queued request")] : [];
+        },
+        streamStep: async (messages) => {
+          seen.push([...messages]);
+          return textStep(seen.length === 1 ? "first answer" : "queued answer");
+        },
+      },
+      emit,
+      undefined,
+    );
+
+    expect(seen).toHaveLength(2);
+    expect(followUpPolls).toBe(1);
+    expect(seen[1].at(-1)?.content).toBe("queued request");
+    expect(reasons).toEqual(["user", "user"]);
+    expect(events.filter(event => event.type === "message_end" && event.message.content === "queued request")).toHaveLength(1);
+    expect(eventTypes(events).filter(type => type === "agent_end")).toHaveLength(1);
+  });
+
+  it("keeps steering ahead of follow-ups and consumes a follow-up when continuation would be artificial", async () => {
+    const seen: AgentMessage[][] = [];
+    let steeringPolls = 0;
+    let followUpPolls = 0;
+    await runAgentLoop(
+      [userMessage("go")],
+      [],
+      {
+        finishTurn: () => ({ action: seen.length < 3 ? "continue" : "end" }),
+        getSteeringMessages: async () => {
+          steeringPolls += 1;
+          return steeringPolls === 2 ? [userMessage("steering request")] : [];
+        },
+        getFollowUpMessages: async () => {
+          followUpPolls += 1;
+          return [userMessage("follow-up request")];
+        },
+        streamStep: async (messages) => {
+          seen.push([...messages]);
+          return textStep(`answer ${seen.length}`);
+        },
+      },
+      () => {},
+      undefined,
+    );
+
+    expect(seen).toHaveLength(3);
+    expect(seen[1].at(-1)?.content).toBe("steering request");
+    expect(seen[2].at(-1)?.content).toBe("follow-up request");
+    expect(followUpPolls).toBe(1);
+  });
+
   it("reports willContinue: false on turn_end when shouldStopAfterStep overrides finishTurn continue", async () => {
     const turnEnds: Array<{ willContinue?: boolean }> = [];
     await runAgentLoop(

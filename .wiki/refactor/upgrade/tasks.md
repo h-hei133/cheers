@@ -30,7 +30,7 @@
 
 ## C: 循环、消息与缓存（P1，并包含深度审计 P0）
 
-- [ ] **C.1** prepareNextTurn／prepareRequest／finishTurn 与虚拟路由：已有待验收，调用顺序、follow-up 优先级与真实配置模型。
+- [ ] **C.1** prepareNextTurn／prepareRequest／finishTurn 与虚拟路由：部分验收。follow-up优先于人工context-only续轮、steering仍优先，两项反转红例有效；独立暂存树4套件111项、六静态门、build `1e9c526087ec`通过，限定复核CLEAR。其他hook调用顺序与真实配置模型验收仍待完成。
 - [ ] **C.2** message_update 流式部分消息及 x-should-retry：已有待验收，部分响应不重放、内外重试一致。
 - [ ] **C.3** AgentMessage 与 provider Message 分离及 convertToLlm：缺口。目前 AgentMessage extends SessionMessage；需实际自定义消息、投影／持久化／SDK 消费者，不能只新增类型。
 - [ ] **C.4** 默认历史工具文本保留与一致测量：已有待验收，真实多轮请求前缀与压缩预算。
