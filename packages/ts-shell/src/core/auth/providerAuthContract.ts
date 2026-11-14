@@ -21,6 +21,8 @@ export interface ProviderAuthMethod {
   readonly label: string;
 }
 
+export type ProviderAccountAuthMethod = 'account-auth' | 'device-code';
+
 export interface ProviderAccountAuthResult {
   readonly provider?: RuntimeProvider;
   readonly baseUrl?: string;
@@ -42,6 +44,7 @@ export interface ProviderAuthContract {
   readonly provider: RuntimeProvider;
   readonly methods: readonly ProviderAuthMethod[];
   loginAccountAuth(options?: {
+    readonly accountMethod?: ProviderAccountAuthMethod;
     readonly signal?: AbortSignal;
     readonly timeoutMs?: number;
     /**

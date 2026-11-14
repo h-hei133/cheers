@@ -1,6 +1,7 @@
 import type { CommandAction, CommandSyntax } from "../syntax/model.js";
 import { parseSyntax } from "../syntax/parse.js";
 import { syntaxCompletions } from "../syntax/projection.js";
+import { scanCommandArgs } from '../arguments.js';
 import { CONNECT_PRESETS, resolveProviderTarget } from "./preset.js";
 
 const provider = { name: "provider", kind: "text", required: true } as const;
@@ -14,6 +15,7 @@ export const connectSyntax: CommandSyntax = {
     { name: "login", summary: "create a provider connection", parameters: [provider], flags: [
       { name: "api-key", aliases: ["key"], kind: "text", summary: "use an API key", conflicts: ["account", "browser"] },
       { name: "account", kind: "boolean", summary: "start supported account authentication", conflicts: ["api-key", "browser", "base-url", "model"] },
+      { name: "device-code", kind: "boolean", summary: "use OpenAI device sign-in with --account", conflicts: ["api-key", "browser", "base-url", "model"] },
       { name: "browser", kind: "boolean", summary: "capture a key with a local browser", conflicts: ["api-key", "account", "base-url", "model"] },
       { name: "base-url", kind: "text", summary: "set the API endpoint", conflicts: ["account", "browser"] },
       { name: "model", kind: "text", summary: "set the connection model", conflicts: ["account", "browser"] },
@@ -44,14 +46,24 @@ export const logoutShortcutSyntax: CommandSyntax = {
 
 export function parseConnectArgs(args: readonly string[]) {
   const parsed = parseSyntax(connectSyntax, args);
+  if (parsed.ok && parsed.flags.get('device-code') === true && (parsed.flags.get('account') !== true
+    || resolveProviderTarget(parsed.args[0])?.provider !== 'openai')) {
+    return { ok: false as const, reason: '--device-code requires OpenAI --account authentication.' };
+  }
   if (parsed.ok && (parsed.action.name === "login" || parsed.action.name === "set") && !resolveProviderTarget(parsed.args[0])) return { ok: false as const, reason: "Unknown provider or preset." };
   return parsed;
 }
 
 export function connectCompletions(prefix: string) {
   const values = [...CONNECT_PRESETS.map(preset => preset.id), "openai-compatible", "gemini"];
+  const tokens = scanCommandArgs(prefix, true);
+  const before = /\s$/.test(prefix) ? tokens : tokens.slice(0, -1);
+  const selected = parseSyntax(connectSyntax, before.map(token => token.value));
+  const device = selected.ok && selected.action.name === 'login' && selected.flags.get('account') === true
+    && resolveProviderTarget(selected.args[0])?.provider === 'openai';
   return syntaxCompletions({ ...connectSyntax, actions: connectSyntax.actions.map(action => action.name === "login" || action.name === "set"
-    ? { ...action, parameters: action.parameters?.map(parameter => parameter.name === "provider" ? { ...parameter, values } : parameter) } : action) }, prefix);
+    ? { ...action, flags: action.flags?.map(flag => flag.name === 'device-code' ? { ...flag, suggest: device } : flag),
+      parameters: action.parameters?.map(parameter => parameter.name === "provider" ? { ...parameter, values } : parameter) } : action) }, prefix);
 }
 
 export function loginShortcutCompletions(prefix: string) {

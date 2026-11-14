@@ -38,6 +38,7 @@ export function renderPresetCatalog(): string {
   lines.push("Auth contracts:");
   lines.push("- api-key connection: /connect login <provider> --api-key <key>");
   lines.push("- account-auth connection: /connect login openai --account");
+  lines.push("- OpenAI device sign-in: /connect login openai --account --device-code");
   lines.push("- browser-assisted local capture: /connect login <provider> --browser");
   return lines.join("\n");
 }
@@ -189,6 +190,7 @@ export function getConnectHelpText(): string {
     "/connect login <provider|preset> --api-key <key> [--base-url <url>] [--model <model>] [--label <name>]",
     "/connect set <provider|preset> <api-key> [base-url] [model]       (legacy /auth set compatibility)",
     "/connect login openai --account [--label <name>]                 (real ChatGPT account login)",
+    "/connect login openai --account --device-code [--label <name>]   (headless OpenAI sign-in)",
     "/connect login google --account [--label <name>]                 (Google OAuth; requires GOOGLE_OAUTH_CLIENT_ID)",
     "/connect login <provider|preset> --browser [--label <name>]      (browser-assisted local key capture)",
     "/connect use <connection-id|provider>",
@@ -201,6 +203,7 @@ export function getConnectHelpText(): string {
     "- /connect login google --account   (requires GOOGLE_OAUTH_CLIENT_ID env)",
     "- /connect login antigravity --api-key <key> --base-url <url> --model <model>",
     "- /connect login openai --account",
+    "- /connect login openai --account --device-code",
     "- /connect login openai --api-key sk-xxxx --model gpt-4.1-mini",
     "- /connect status",
   ].join("\n");

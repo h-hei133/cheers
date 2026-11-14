@@ -2278,3 +2278,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A valid-looking account fixture resolves no credential, even though the account normalizer preserves its safe extension fields.
 - **Root Cause:** Persisted JSON refuses prototype-related keys before normalization; account eligibility also requires provider-specific scope and billing fields. Calling the normalizer directly does not prove either boundary.
 - **Rule:** Test unsafe persisted documents as refusals with unchanged bytes. Test in-memory sanitization separately, then persist the admitted account and assert both valid configuration and unblocked credential resolution with the required provider fields.
+
+
+### Device Authorization Is Not Yet A Credential Or Renewal Grant
+- **Symptom:** Device authorization appears successful but the saved account cannot issue requests or has no trustworthy automatic renewal grant.
+- **Root Cause:** The device poll returns an authorization code and verifier, not final credentials. Treating helper output as native login proof bypasses the existing exchange and captured enrollment owner.
+- **Rule:** Select device login explicitly, show instructions before polling, and redeem the code with the device callback through the ordinary private exchange. Bound the whole login and each request, preserve pending-connection identity, and let only the native owner mint renewal proof.
+
+
+### Request Deadlines Must Start Before Response Headers
+- **Symptom:** A device login has a thirty-second request limit but a stalled token exchange waits for the fifteen-minute login limit.
+- **Root Cause:** The request scope was created after awaiting response headers; a test with the same whole-login timeout could not distinguish the two boundaries.
+- **Rule:** Create one request scope before dispatch and retain it through headers, body and final admission. Test with a longer enclosing lifetime, cancel late ignored-signal responses, and keep timeout versus caller cancellation separate before any credential proof is issued.

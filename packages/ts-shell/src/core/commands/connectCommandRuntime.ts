@@ -11,6 +11,7 @@ import {
 } from "../../config/runtimeConfig.js";
 import { maskApiKey } from "../shell/providerCredentials.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import type { ProviderAccountAuthMethod } from '../auth/providerAuthContract.js';
 import { captureApiKeyViaBrowser } from "./browserAuthOnboarding.js";
 import {
   __setOpenAIProviderAuthLoginForTest,
@@ -121,13 +122,14 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
     return [
       "Invalid /connect login usage.",
       "API key: /connect login <openai|anthropic|openai-compatible|siliconflow|google|antigravity|claudecode> --api-key <key> [--base-url <url>] [--model <model>] [--label <name>]",
-      "Account auth: /connect login openai --account [--label <name>]",
+      "Account auth: /connect login openai --account [--device-code] [--label <name>]",
       "Browser-assisted local key capture: /connect login <provider> --browser [--label <name>]",
     ].join("\n");
   }
 
   if (parsed.flags.account === true) {
-    return await runAccountAuthConnection(target, parsed.flags.label, onPersisted, workspaceRoot, options);
+    return await runAccountAuthConnection(target, parsed.flags.label, onPersisted, workspaceRoot,
+      { ...options, ...(parsed.flags['device-code'] === true ? { accountMethod: 'device-code' as const } : {}) });
   }
 
   if (parsed.flags.browser === true) {
@@ -454,7 +456,7 @@ export async function runAccountAuthConnection(
   labelFlag?: string | boolean,
   onPersisted?: () => void,
   workspaceRoot?: string,
-  options?: { readonly activate?: boolean; readonly signal?: AbortSignal; readonly onProgress?: CommandContext['signInProgress'] },
+  options?: { readonly activate?: boolean; readonly signal?: AbortSignal; readonly onProgress?: CommandContext['signInProgress']; readonly accountMethod?: ProviderAccountAuthMethod },
 ): Promise<string> {
   return runProviderAccountAuthLogin({
     provider: target.provider,

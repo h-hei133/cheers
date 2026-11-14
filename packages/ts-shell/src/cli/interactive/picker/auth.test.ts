@@ -179,7 +179,7 @@ describe('authentication chooser boundaries', () => {
     const run = vi.fn(async () => undefined), before = bytes();
     const picker = authPicker(context(), 'login', run);
     const methods = await select(picker, 'openai');
-    expect((await methods.load()).map(row => row.id)).toEqual(['key', 'account']);
+    expect((await methods.load()).map(row => row.id)).toEqual(['key', 'account', 'device']);
     const confirmation = (await methods.apply(['account']))!.next!;
     expect(confirmation.initialSelection).toBe('cancel');
     expect(await confirmation.apply(['start'])).toBeUndefined();
@@ -193,6 +193,17 @@ describe('authentication chooser boundaries', () => {
     const unsupported = await select(authPicker(context(), 'login', run), 'anthropic');
     expect((await unsupported.load()).map(row => row.id)).toEqual(['key']);
     expect(await unsupported.apply(['account'])).toBeUndefined();
+  });
+
+  it('offers explicit OpenAI device sign-in through the existing confirmed command host', async () => {
+    const run = vi.fn(async () => undefined), before = bytes();
+    const methods = await select(authPicker(context(), 'login', run), 'openai');
+    const confirmation = await select(methods, 'device');
+    await confirmation.load(); expect(run).not.toHaveBeenCalled(); expect(bytes()).toBe(before);
+    await confirmation.apply(['start']);
+    expect(run).toHaveBeenCalledWith(['login', 'openai', '--account', '--device-code']);
+    const google = await select(authPicker(context(), 'login', run), 'google');
+    expect((await google.load()).map(row => row.id)).not.toContain('device');
   });
 
   it('prepares the exact API key command without collecting or saving a secret', async () => {

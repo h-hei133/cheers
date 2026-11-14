@@ -58,6 +58,7 @@ describe("connect command runtime", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     if (originalHome === undefined) delete process.env.USERPROFILE;
     else process.env.USERPROFILE = originalHome;
     if (originalUnixHome === undefined) delete process.env.HOME;
@@ -90,6 +91,80 @@ describe("connect command runtime", () => {
     expect(stored.providerConnections?.[0]?.accountAuth).toBeUndefined(); expect(stored.providerCredentials?.openai).toBeUndefined();
     const callback = new URL(progress[0]!).searchParams.get('redirect_uri')!;
     await expect(fetch(callback)).rejects.toThrow();
+  });
+
+  it('runs explicit OpenAI device login through native exchange, captured persistence and refresh enrollment', async () => {
+    const verifier = 'v'.repeat(43), progress: unknown[] = [], requests: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (address: string | URL | Request) => {
+      const url = String(address); requests.push(url);
+      if (url.endsWith('/usercode')) return Response.json({ device_auth_id: 'synthetic-device', user_code: 'ABCD-EFGH', interval: 1 });
+      if (url.endsWith('/deviceauth/token')) {
+        expect(progress).toEqual([{ authorizeUrl: 'https://auth.openai.com/codex/device', userCode: 'ABCD-EFGH' }]);
+        expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections?.[0]?.status).toBe('pending');
+        return Response.json({ authorization_code: 'synthetic-code', code_verifier: verifier });
+      }
+      return Response.json({ access_token: accountToken('device-access', 'device-account'), refresh_token: 'device-refresh', expires_in: 3600 });
+    }));
+    const result = await runConnectCommand(['login', 'openai', '--account', '--device-code'], { cwd: workspaceRoot, signInProgress: value => progress.push(value) });
+    expect(result.output).toContain('connected via device code login');
+    expect(result.output).not.toContain('Automatic renewal remains unverified');
+    expect(requests).toEqual(['https://auth.openai.com/api/accounts/deviceauth/usercode', 'https://auth.openai.com/api/accounts/deviceauth/token', 'https://auth.openai.com/oauth/token']);
+    const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+    expect(stored.providerConnections?.[0]).toMatchObject({ status: 'connected', accountAuth: { openai: { accountId: 'device-account', refreshToken: 'device-refresh' } } });
+    const ledger = fs.readFileSync(refreshLeasesPath(), 'utf8');
+    expect(Object.values(JSON.parse(ledger).leases).map((row: any) => row.grant?.origin)).toEqual(['login']);
+    expect(ledger).not.toMatch(/device-access|device-refresh|ABCD-EFGH|synthetic-code/);
+    expect(fs.readFileSync(getUserAuthPath(), 'utf8')).not.toMatch(/ABCD-EFGH|synthetic-device|synthetic-code|production/);
+    expect(result.output).not.toMatch(/ABCD-EFGH|synthetic-device|synthetic-code|device-access|device-refresh/);
+  });
+
+  it('refuses a device login result when its captured pending connection changes', async () => {
+    let exchanges = 0;
+    vi.stubGlobal('fetch', vi.fn(async (address: string | URL | Request) => {
+      const url = String(address);
+      if (url.endsWith('/usercode')) return Response.json({ device_auth_id: 'synthetic-device', user_code: 'ABCD-EFGH' });
+      if (url.endsWith('/deviceauth/token')) return Response.json({ authorization_code: 'synthetic-code', code_verifier: 'v'.repeat(43) });
+      exchanges++;
+      return Response.json({ access_token: accountToken('device-access', 'device-account'), refresh_token: 'device-refresh', expires_in: 3600 });
+    }));
+    await expect(runConnectCommand(['login', 'openai', '--account', '--device-code'], { cwd: workspaceRoot, signInProgress: () => {
+      const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+      writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections?.map(connection => ({ ...connection, label: 'replacement' })) }, edit);
+    } })).rejects.toBeInstanceOf(ConfigWriteError);
+    expect(exchanges).toBe(1);
+    expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections?.[0]).toMatchObject({ label: 'replacement', status: 'pending' });
+    expect(fs.readFileSync(getUserAuthPath(), 'utf8')).not.toMatch(/device-access|device-refresh|accountAuth/);
+    expect(fs.existsSync(refreshLeasesPath())).toBe(false);
+  });
+
+  it('cancels the actual device poll through the command host and keeps late credentials out of storage', async () => {
+    const controller = new AbortController(); let release!: (response: Response) => void, dispatched!: () => void;
+    const polling = new Promise<void>(resolve => { dispatched = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (address: string | URL | Request) => {
+      if (String(address).endsWith('/usercode')) return Response.json({ device_auth_id: 'synthetic-device', user_code: 'ABCD-EFGH' });
+      dispatched(); return new Promise<Response>(resolve => { release = resolve; });
+    }));
+    const operation = runConnectCommand(['login', 'openai', '--account', '--device-code'], { cwd: workspaceRoot,
+      runCancellable: work => work(controller.signal), signInProgress: vi.fn() });
+    await polling; controller.abort('PRIVATE_REASON'); const result = await operation;
+    expect(result.output).toContain('sign-in cancelled'); expect(result.output).toContain('pending -> error');
+    expect(result.output).toContain('--account --device-code'); expect(result.output).not.toMatch(/PRIVATE_REASON|pending -> connected|ABCD-EFGH/);
+    release(Response.json({ authorization_code: 'synthetic-code', code_verifier: 'v'.repeat(43) }));
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections?.[0]).toMatchObject({ status: 'error' });
+    expect(fs.readFileSync(getUserAuthPath(), 'utf8')).not.toMatch(/accountAuth|ABCD-EFGH|synthetic-code/);
+    expect(fs.existsSync(refreshLeasesPath())).toBe(false);
+  });
+
+  it('does not grant device enrollment to a raw credential override', async () => {
+    __setOpenAIProviderAuthLoginForTest(async options => {
+      expect(options?.accountMethod).toBe('device-code');
+      return { accessToken: 'raw-device-access', refreshToken: 'raw-device-refresh', expiresAt: Date.now() + 3600000,
+        accountId: 'raw-account', authorizeUrl: 'https://auth.openai.com/codex/device', callbackUrl: 'https://auth.openai.com/deviceauth/callback', production: {} };
+    });
+    const result = await runConnectCommand(['login', 'openai', '--account', '--device-code'], { cwd: workspaceRoot, signInProgress: vi.fn() });
+    expect(result.output).toContain('Automatic renewal remains unverified');
+    expect(Object.values(JSON.parse(fs.readFileSync(refreshLeasesPath(), 'utf8')).leases).map((row: any) => row.grant)).toEqual([undefined]);
   });
 
   it("creates a siliconflow connection and sets it as active runtime provider", async () => {

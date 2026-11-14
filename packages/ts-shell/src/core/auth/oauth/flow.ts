@@ -4,6 +4,9 @@ import { createPkcePair, createState } from "./pkce.js";
 import { startCallbackServer } from "./callback.js";
 import { loginLifetime, waitForLogin } from './lifetime.js';
 import type { SignInProgress } from '../providerAuthContract.js';
+import { requestScope, withinRequest } from '../../network/request.js';
+import { parseResponseJson, readResponseText } from '../../network/response.js';
+import { NetworkError } from '../../network/error.js';
 
 /**
  * One authorization-code-with-PKCE flow, for every provider that uses it.
@@ -101,6 +104,35 @@ export interface OAuthLoginOptions {
   readonly onAuthorizeUrl?: (url: string) => void;
   /** Override the token exchange transport; tests pass a stub. */
   readonly fetchImpl?: typeof fetch;
+}
+
+export interface OAuthCodeAuthorization {
+  readonly code: string;
+  readonly verifier: string;
+  readonly authorizeUrl: string;
+  readonly redirectUri: string;
+}
+
+/** Device authorization shares the native exchange and its enrollment capability. */
+export async function runOAuthDeviceLogin(config: OAuthProviderConfig,
+  authorize: (signal: AbortSignal) => Promise<OAuthCodeAuthorization>,
+  options: Pick<OAuthLoginOptions, 'timeoutMs' | 'signal' | 'fetchImpl'> = {}): Promise<OAuthLoginResult> {
+  if (options.timeoutMs !== undefined && (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0 || options.timeoutMs > 2_147_483_647)) {
+    throw new Error('Sign-in timeout must be a positive finite duration within the timer limit.');
+  }
+  const lifetime = loginLifetime(Math.max(30_000, options.timeoutMs ?? 15 * 60_000), options.signal);
+  try {
+    lifetime.signal.throwIfAborted();
+    const authorization = await waitForLogin(authorize(lifetime.signal), lifetime.signal);
+    lifetime.signal.throwIfAborted();
+    const tokens = await exchangeCode(config, { code: authorization.code, verifier: authorization.verifier,
+      redirectUri: authorization.redirectUri, fetchImpl: options.fetchImpl ?? fetch, signal: lifetime.signal, maxResponseBytes: 128 * 1024 });
+    lifetime.signal.throwIfAborted();
+    return { ...tokens, authorizeUrl: authorization.authorizeUrl, callbackUrl: authorization.redirectUri, clientId: config.clientId };
+  } catch (error) {
+    if (lifetime.signal.aborted) throw new OAuthExchangeError(lifetime.signal.reason?.name === 'TimeoutError' ? 'timeout' : 'cancelled', config.label, 'sign-in');
+    throw error;
+  } finally { lifetime.close(); }
 }
 
 /** How long to wait for the browser round trip before giving up. */
@@ -242,6 +274,7 @@ async function exchangeCode(
     readonly redirectUri: string;
     readonly fetchImpl: typeof fetch;
     readonly signal?: AbortSignal;
+    readonly maxResponseBytes?: number;
   },
 ): Promise<OAuthTokens> {
   const body = new URLSearchParams({
@@ -252,7 +285,7 @@ async function exchangeCode(
     code_verifier: input.verifier,
     ...(config.clientSecret ? { client_secret: config.clientSecret } : {}),
   });
-  const payload = await post(config, body, input.fetchImpl, "token exchange", input.signal);
+  const payload = await post(config, body, input.fetchImpl, "token exchange", input.signal, input.maxResponseBytes);
   const tokens: OAuthTokens = {
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token ?? "",
@@ -279,39 +312,61 @@ async function post(
   fetchImpl: typeof fetch,
   step: string,
   signal?: AbortSignal,
+  maxResponseBytes?: number,
 ): Promise<TokenPayload> {
-  let response: Response;
+  const scope = maxResponseBytes === undefined ? undefined : requestScope(30_000, signal);
+  const requestSignal = scope?.signal ?? signal;
+  let response: Response | undefined;
   try {
-    signal?.throwIfAborted();
-    const pending = fetchImpl(config.tokenUrl, {
-      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: body.toString(), redirect: 'error',
-      ...(signal ? { signal } : {}),
-    });
-    if (signal) void pending.then(late => { if (signal.aborted) void late.body?.cancel().catch(() => undefined); }, () => undefined);
-    response = await waitForLogin(pending, signal);
+    try {
+      scope?.check();
+      requestSignal?.throwIfAborted();
+      const pending = fetchImpl(config.tokenUrl, {
+        method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: body.toString(), redirect: 'error',
+        ...(requestSignal ? { signal: requestSignal } : {}),
+      });
+      if (requestSignal) void pending.then(late => {
+        response = late;
+        if (requestSignal.aborted) void late.body?.cancel().catch(() => undefined);
+      }, () => undefined);
+      response = scope ? await withinRequest(pending, scope) : await waitForLogin(pending, signal);
+    } catch (error) {
+      const kind = error instanceof Error && error.name === 'AbortError' ? 'cancelled' : 'transport';
+      throw new OAuthExchangeError(kind, config.label, step);
+    }
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined);
+      throw new OAuthExchangeError('http', config.label, step, response.status);
+    }
+    let decoded: unknown;
+    try {
+      decoded = scope && maxResponseBytes !== undefined
+        ? parseResponseJson(await withinRequest(readResponseText(response, scope, maxResponseBytes), scope))
+        : await waitForLogin(response.json(), signal);
+      scope?.check();
+    }
+    catch { throw new OAuthExchangeError('decode', config.label, step); }
+    if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) throw new OAuthExchangeError('response', config.label, step);
+    const payload = decoded as Partial<TokenPayload>;
+    if (typeof payload.access_token !== "string" || payload.access_token.length === 0) {
+      throw new OAuthExchangeError('access', config.label, step);
+    }
+    if ((payload.refresh_token !== undefined && typeof payload.refresh_token !== 'string')
+      || (payload.id_token !== undefined && typeof payload.id_token !== 'string')
+      || (payload.scope !== undefined && typeof payload.scope !== 'string')
+      || (payload.expires_in !== undefined && (typeof payload.expires_in !== 'number' || !Number.isFinite(payload.expires_in) || payload.expires_in < 0))) {
+      throw new OAuthExchangeError('metadata', config.label, step);
+    }
+    scope?.check();
+    return payload as TokenPayload;
   } catch (error) {
-    const kind = error instanceof Error && error.name === 'AbortError' ? 'cancelled' : 'transport';
-    throw new OAuthExchangeError(kind, config.label, step);
-  }
-  if (!response.ok) {
-    void response.body?.cancel().catch(() => undefined);
-    throw new OAuthExchangeError('http', config.label, step, response.status);
-  }
-  let decoded: unknown;
-  try { decoded = await waitForLogin(response.json(), signal); }
-  catch { throw new OAuthExchangeError('decode', config.label, step); }
-  if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) throw new OAuthExchangeError('response', config.label, step);
-  const payload = decoded as Partial<TokenPayload>;
-  if (typeof payload.access_token !== "string" || payload.access_token.length === 0) {
-    throw new OAuthExchangeError('access', config.label, step);
-  }
-  if ((payload.refresh_token !== undefined && typeof payload.refresh_token !== 'string')
-    || (payload.id_token !== undefined && typeof payload.id_token !== 'string')
-    || (payload.scope !== undefined && typeof payload.scope !== 'string')
-    || (payload.expires_in !== undefined && (typeof payload.expires_in !== 'number' || !Number.isFinite(payload.expires_in) || payload.expires_in < 0))) {
-    throw new OAuthExchangeError('metadata', config.label, step);
-  }
-  return payload as TokenPayload;
+    if (scope?.signal.aborted) {
+      if (response) void response.body?.cancel().catch(() => undefined);
+      const kind = scope.signal.reason instanceof NetworkError && scope.signal.reason.code === 'timeout' ? 'timeout' : 'cancelled';
+      throw new OAuthExchangeError(kind, config.label, step);
+    }
+    throw error;
+  } finally { scope?.dispose(); }
 }
 
 /** OAuth omission means the requested scope; an explicit reduced grant stays reduced. */

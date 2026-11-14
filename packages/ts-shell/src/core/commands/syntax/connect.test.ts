@@ -21,6 +21,10 @@ it.each([
   ["login", "openai", "--browser", "--account"],
   ["login", "openai", "--browser", "--model", "ignored"],
   ["login", "openai", "--account=false"],
+  ["login", "openai", "--device-code"],
+  ["login", "google", "--account", "--device-code"],
+  ["login", "openai", "--api-key", "fixture-secret", "--device-code"],
+  ["login", "openai", "--account", "--device-code", "--model", "ignored"],
   ["login", "openai", "--api-key", "fixture-secret", "--key", "duplicate"],
   ["login", "openai", "--unknown", "fixture-secret"],
   ["login", "openai", "--label"],
@@ -56,5 +60,8 @@ it("suggests providers only at their legal position and excludes auth conflicts"
   expect(suggest("status ")).toEqual([]);
   expect(suggest("act")).toEqual(["activate"]);
   expect(suggest("login openai --account --b")).toEqual([]);
+  expect(suggest("login openai --account --d")).toEqual(['--device-code']);
+  expect(suggest("login google --account --d")).toEqual([]);
+  expect(suggest("login openai --d")).toEqual([]);
   expect(suggest("login openai --api-key ")).toEqual([]);
 });

@@ -50,7 +50,9 @@ export function authPicker(context: CommandContext, action: 'login' | 'logout', 
 
 function loginMethods(selection: ConnectionSelection, target: { readonly id: string; readonly label: string; readonly provider: Parameters<typeof resolveProviderAuthContract>[0] }, signIn?: SignInCommand): Picker {
   let offered = false;
-  const account = resolveProviderAuthContract(target.provider) !== undefined;
+  const contract = resolveProviderAuthContract(target.provider);
+  const account = contract !== undefined;
+  const device = target.provider === 'openai' && contract?.methods.some(method => method.kind === 'device-code');
   return {
     title: `Log in — ${target.label}`, form: 'panel', empty: '', filterable: false,
     footer: 'Account sign-in starts only after confirmation. API key selection prepares a command.',
@@ -58,23 +60,26 @@ function loginMethods(selection: ConnectionSelection, target: { readonly id: str
       offered = true;
       return [{ id: 'key', label: 'API key', detail: 'Prepare the existing login command; supply the key explicitly.' },
         ...(account ? [{ id: 'account', label: 'Account sign-in', detail: 'Use the native account flow with cancellable sign-in instructions.',
-          disabled: !signIn, note: signIn ? undefined : 'Interactive authentication host unavailable' }] : [])];
+          disabled: !signIn, note: signIn ? undefined : 'Interactive authentication host unavailable' }] : []),
+        ...(device ? [{ id: 'device', label: 'Device code sign-in', disabled: !signIn,
+          note: signIn ? undefined : 'Interactive authentication host unavailable' }] : [])];
     },
     async apply(ids) {
       if (!offered || ids.length !== 1) return undefined;
       const blocked = selection.admission();
       if (blocked) return { note: blocked };
       if (ids[0] === 'key') return { draft: `/login ${target.id} --api-key ` };
+      if (ids[0] === 'device' && device && signIn) return { next: loginConfirmation(selection, target, signIn, true) };
       return ids[0] === 'account' && account && signIn
         ? { next: loginConfirmation(selection, target, signIn) } : undefined;
     },
   };
 }
 
-function loginConfirmation(selection: ConnectionSelection, target: { readonly id: string; readonly label: string }, signIn: SignInCommand): Picker {
+function loginConfirmation(selection: ConnectionSelection, target: { readonly id: string; readonly label: string }, signIn: SignInCommand, device = false): Picker {
   let offered = false, used = false;
   return {
-    title: `Confirm sign-in — ${target.label}`, form: 'panel', empty: '', filterable: false,
+    title: `Confirm sign-in — ${target.label}${device ? ' device code' : ''}`, form: 'panel', empty: '', filterable: false,
     exclusive: true, holdInput: true, initialSelection: 'cancel',
     footer: 'Start opens native authentication and saves its pending/result state. Cancel leaves configuration unchanged.',
     async load() { offered = true; return [{ id: 'cancel', label: 'Cancel' }, { id: 'start', label: `Start ${target.label} account sign-in` }]; },
@@ -85,7 +90,7 @@ function loginConfirmation(selection: ConnectionSelection, target: { readonly id
       const blocked = selection.admission();
       if (blocked) return { note: blocked };
       used = true;
-      await signIn(['login', target.id, '--account']);
+      await signIn(['login', target.id, '--account', ...(device ? ['--device-code'] : [])]);
       return undefined;
     },
   };

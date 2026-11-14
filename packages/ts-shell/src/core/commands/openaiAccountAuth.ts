@@ -6,6 +6,7 @@ import {
   type OAuthTokens,
 } from "../auth/oauth/flow.js";
 import { openAIOAuthConfig } from "../auth/oauth/providers.js";
+import { runOpenAIDeviceLogin } from '../auth/oauth/openai/device.js';
 
 /**
  * Signing in with an OpenAI account.
@@ -41,6 +42,13 @@ export async function loginOpenAIAccountViaAuthorizationCodeFlow(
   };
 }
 
+export async function loginOpenAIAccountViaDeviceCodeFlow(options?: OAuthLoginOptions): Promise<OpenAIAccountAuthResult> {
+  const result = await runOpenAIDeviceLogin(openAIOAuthConfig(), options);
+  return { accessToken: result.accessToken, refreshToken: result.refreshToken, expiresAt: result.expiresAt,
+    ...(result.accountId ? { accountId: result.accountId } : {}), authorizeUrl: result.authorizeUrl,
+    callbackUrl: result.callbackUrl, production: result.production };
+}
+
 /** Trade a stored refresh token for a fresh access token. */
 export async function refreshOpenAIAccountTokens(refreshToken: string): Promise<OAuthTokens> {
   return refreshOAuthTokens(openAIOAuthConfig(), refreshToken);
@@ -50,8 +58,10 @@ export const openAIProviderAuthContract: ProviderAuthContract = {
   provider: "openai",
   methods: [
     { kind: "account-auth", label: "Sign in with an OpenAI account (browser)" },
+    { kind: "device-code", label: "Sign in with an OpenAI account (device code)" },
     { kind: "api-key", label: "Use an API key" },
     { kind: "browser-assisted-capture", label: "Capture a local credential from a browser" },
   ],
-  loginAccountAuth: async (options) => loginOpenAIAccountViaAuthorizationCodeFlow(options),
+  loginAccountAuth: async (options) => options?.accountMethod === 'device-code'
+    ? loginOpenAIAccountViaDeviceCodeFlow(options) : loginOpenAIAccountViaAuthorizationCodeFlow(options),
 };

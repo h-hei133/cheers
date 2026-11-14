@@ -9,6 +9,7 @@ import { accountBinding, captureAccountEdit } from './account/state.js';
 import { grantRefreshLogin, reserveRefreshLogin, refreshLeasesPath, captureLeaseStore, type RefreshStore } from './account/lease.js';
 import { accountGeneration, credentialDigest } from './account/lineage.js';
 import { nativeOAuthLogin, OAuthExchangeError } from './oauth/flow.js';
+import { OpenAIDeviceAuthError } from './oauth/openai/device.js';
 import { nativeCopilotLogin } from './oauth/copilot/flow.js';
 import { assertCopilotAccount } from './oauth/copilot/policy.js';
 import { oauthConfigFor } from './oauth/providers.js';
@@ -24,6 +25,7 @@ import {
   toSubscriptionAccountAuthConfig,
   type ProviderAccountAuthConnectionSummary,
   type ProviderAuthContract,
+  type ProviderAccountAuthMethod,
 } from "./providerAuthContract.js";
 import {
   gitHubCopilotProviderAuthContract,
@@ -75,6 +77,7 @@ export async function runProviderAccountAuthLogin(input: {
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: import('./providerAuthContract.js').SignInProgress) => void;
   readonly activate?: boolean;
+  readonly accountMethod?: ProviderAccountAuthMethod;
 }): Promise<string> {
   input.signal?.throwIfAborted();
   const contract = resolveProviderAuthContract(input.provider);
@@ -84,6 +87,9 @@ export async function runProviderAccountAuthLogin(input: {
       "Account-auth is currently unavailable for this provider in this build.",
       `Use --api-key or --browser for ${input.provider}.`,
     ].join("\n");
+  }
+  if (input.accountMethod && !contract.methods.some(method => method.kind === input.accountMethod)) {
+    return 'The requested account sign-in method is unavailable for this provider.';
   }
 
   const connectionId = buildConnectionId(input.provider);
@@ -111,7 +117,7 @@ export async function runProviderAccountAuthLogin(input: {
   input.onPersisted?.();
 
   try {
-    const authResult = await contract.loginAccountAuth({ signal: input.signal, onProgress: input.onProgress });
+    const authResult = await contract.loginAccountAuth({ signal: input.signal, onProgress: input.onProgress, accountMethod: input.accountMethod });
     input.signal?.throwIfAborted();
     const accountAuth = resolveAccountAuthConfig(input.provider, authResult);
     if (!accountAuth) {
@@ -135,7 +141,7 @@ export async function runProviderAccountAuthLogin(input: {
     input.onPersisted?.();
 
     return [
-      `${input.providerLabel} account-auth connected via ${input.provider === 'github-copilot' ? 'device code' : 'browser'} login.`,
+      `${input.providerLabel} account-auth connected via ${input.accountMethod === 'device-code' || input.provider === 'github-copilot' ? 'device code' : 'browser'} login.`,
       `Connection ID: ${summary.connectionId}`,
       "State transition: pending -> connected",
       "Connection type: account-auth",
@@ -158,9 +164,9 @@ export async function runProviderAccountAuthLogin(input: {
       `${input.providerLabel} account-auth login failed.`,
       `Connection ID: ${connectionId}`,
       "State transition: pending -> error",
-      `Reason: ${error instanceof OAuthExchangeError ? error.message : 'The authorization flow did not complete. Retry the login.'}`,
+      `Reason: ${error instanceof OAuthExchangeError || error instanceof OpenAIDeviceAuthError ? error.message : 'The authorization flow did not complete. Retry the login.'}`,
       `Stored at: ${configPath}`,
-      `Retry with: /connect login ${input.provider} --account`,
+      `Retry with: /connect login ${input.provider} --account${input.accountMethod === 'device-code' ? ' --device-code' : ''}`,
     ].join("\n");
   }
 }
