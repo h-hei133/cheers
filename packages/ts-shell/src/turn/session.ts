@@ -139,6 +139,8 @@ export interface TurnOptions {
 
 /** Input the user can hand a running turn. */
 export interface TurnInput {
+  /** Change delivery on the queues owned by this live run. */
+  readonly setQueueMode?: (lane: 'steering' | 'followUp', mode: 'one-at-a-time' | 'all') => void;
   /** Deliver before the model's next step, inside the current work. */
   steer(text: string, id?: string): void;
   /** Deliver once the current work has stopped. */
@@ -445,6 +447,7 @@ export function runTurn(options: TurnOptions): TurnRun {
 
   return {
     events: channel,
+    setQueueMode: (lane, mode) => core.setQueueMode(lane, mode),
     queue,
     steer: (text, id) => {
       if (!text.trim()) return;

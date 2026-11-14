@@ -94,7 +94,10 @@ export async function runNonTtyPromptStream(options: {
     onFirstFrame: options.onFirstFrame,
     onUserIntent: options.onUserIntent,
     rpcMode: options.rpcMode,
-    switchSession: session => switchRuntimeSessionProjectContext(options.runtimeContext, session),
+    switchSession: session => {
+      switchRuntimeSessionProjectContext(options.runtimeContext, session);
+      return true;
+    },
     runPrompt: (prompt, attachments) => runNonInteractivePrompt({ ...options, prompt, attachments, printMode: false, jsonEvents: options.rpcMode === true, awaitGoalScheduling: false }),
   });
 }

@@ -2234,3 +2234,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A broken branch becomes an empty successful store after catch-up, or an unchanged inode hides deleted history before a pending script commits.
 - **Root Cause:** Compatibility catch-up ran before validating saved ancestry, and path identity plus per-key comparisons did not prove append-only history.
 - **Rule:** Reject invalid saved ancestry before catch-up, bind the original raw byte prefix, and recheck it on the actual append descriptor under the existing state lock. Require fsync and readback before reporting persisted; preserve unknown after a possibly landed append and keep completed nested effects visible. Only legacy sessions without a thread may use the linear fallback.
+
+
+### RPC Settings And Session Selection Need Live Consumers
+- **Symptom:** Clear or delivery-mode commands only change pending submissions/configuration, while active input survives; a rejected session callback has already changed selection.
+- **Root Cause:** RPC handlers bypassed the live input owner and eagerly activated candidates; the native switch boolean described a project change, not transition acceptance.
+- **Rule:** Read and mutate the same captured live queue, carry modes through readiness, and recheck admission after asynchronous saves. Create inactive session candidates and select only after acceptance; adapt project-change results explicitly at the native callback boundary.

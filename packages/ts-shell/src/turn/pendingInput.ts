@@ -36,12 +36,17 @@ export function pendingTurnInput(): PendingTurnInput {
   // through it when it is set, so the queue reported and the queue drained are
   // the run's — the queue that actually holds the messages.
   let live: TurnInput | undefined;
+  const modes: Partial<Record<'steering' | 'followUp', 'one-at-a-time' | 'all'>> = {};
   const buffered = inputQueueControl([
     { lane: 'steering', queue: steering, text: text => text, replace: (_value, text) => text },
     { lane: 'followUp', queue: followUps, text: text => text, replace: (_value, text) => text },
   ]);
 
   const input: TurnInput = {
+    setQueueMode: (lane, mode) => {
+      modes[lane] = mode;
+      live?.setQueueMode?.(lane, mode);
+    },
     steer: (text, id) => {
       if (live) live.steer(text, id);
       else steering.enqueue(text, id);
@@ -67,6 +72,8 @@ export function pendingTurnInput(): PendingTurnInput {
     adopt: (run) => {
       if (!run?.input) return;
       live = run.input;
+      if (modes.steering) live.setQueueMode?.('steering', modes.steering);
+      if (modes.followUp) live.setQueueMode?.('followUp', modes.followUp);
       for (const entry of steering.entries()) live.steer(entry.value, entry.id);
       for (const entry of followUps.entries()) live.followUp(entry.value, entry.id);
       steering.clear(); followUps.clear();

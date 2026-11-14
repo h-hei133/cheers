@@ -1,6 +1,9 @@
 import path from "node:path";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
+import { switchActiveSession } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
+import type { TurnInput } from "../../turn/session.js";
+import type { SubmissionQueue } from "../interactive/inputQueue.js";
 import type { Session } from "../../session/schema/sessionRecord.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import { readModelCatalog } from "../../core/commands/modelCommandRuntime.js";
@@ -182,16 +185,37 @@ export function applyRpcSessionSwitch(
   runtimeContext: ShellRuntimeContext,
   nextSession: Session,
   switchSession?: (session: Session) => boolean,
-): void {
+): boolean {
   if (switchSession) {
-    switchSession(nextSession);
+    return switchSession(nextSession);
   } else {
-    runtimeContext.session = nextSession;
-    runtimeContext.activeSession = {
-      sessionId: nextSession.id,
-      sessionProjectDir: nextSession.projectRoot,
-    };
+    switchActiveSession(runtimeContext, nextSession, nextSession.projectRoot,
+      { cwd: nextSession.projectRoot, projectRoot: nextSession.projectRoot });
+    return true;
   }
+}
+
+/** Snapshot and remove input from the same two live lanes and the host's submission queue. */
+export function clearRpcQueue(input: TurnInput | undefined, queue: SubmissionQueue) {
+  const pending = input?.pending() ?? { steering: [], followUps: [] };
+  const activeRemoved = input?.clearQueue() ?? [];
+  const removed = queue.splice(0);
+  return { cleared: activeRemoved.length + removed.length, steering: pending.steering,
+    followUp: [...pending.followUps, ...removed] };
+}
+
+/** Persist once, then apply only to the captured turn if its admission still holds. */
+export async function setRpcQueueMode(runtimeContext: ShellRuntimeContext, sessionRuntime: ShellSessionRuntime,
+  lane: 'steering' | 'followUp', mode: 'one-at-a-time' | 'all'): Promise<void> {
+  const input = sessionRuntime.input?.();
+  const admitted = configurationAdmission(runtimeContext);
+  if (input && !input.setQueueMode) throw new Error('The active input queue cannot change its delivery mode.');
+  await saveRpcSetting(runtimeContext, lane === 'steering' ? 'steeringMode' : 'followUpMode', mode);
+  const refusal = admitted();
+  if (refusal || input !== sessionRuntime.input?.()) {
+    throw new Error(refusal ?? 'Queue mode was saved, but the active turn changed before it could be applied.');
+  }
+  input?.setQueueMode?.(lane, mode);
 }
 
 export function navigateRpcTree(

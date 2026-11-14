@@ -33,6 +33,31 @@ function recordingRun(): {
 }
 
 describe("input held before a run exists", () => {
+  it('carries queue mode changes through readiness adoption and updates the same live queue', () => {
+    const buffered = pendingTurnInput();
+    const setters = buffered.input as TurnInput & { setQueueMode?: (lane: 'steering' | 'followUp', mode: 'one-at-a-time' | 'all') => void };
+    setters.setQueueMode?.('steering', 'one-at-a-time');
+    setters.setQueueMode?.('followUp', 'all');
+    buffered.input.steer('S1'); buffered.input.steer('S2');
+    buffered.input.followUp('F1'); buffered.input.followUp('F2');
+    const steering = new PendingQueue<string>('all');
+    const followUps = new PendingQueue<string>('one-at-a-time');
+    const live = { steer: (text: string, id?: string) => { steering.enqueue(text, id); },
+      followUp: (text: string, id?: string) => { followUps.enqueue(text, id); },
+      setQueueMode: (lane: 'steering' | 'followUp', mode: 'one-at-a-time' | 'all') => {
+        (lane === 'steering' ? steering : followUps).mode = mode;
+      },
+      pending: () => ({ steering: steering.entries().map(entry => entry.value), followUps: followUps.entries().map(entry => entry.value) }),
+      clearQueue: () => { const all = [...steering.entries(), ...followUps.entries()].map(entry => entry.value);
+        steering.clear(); followUps.clear(); return all; } };
+    buffered.adopt({ input: live });
+    expect(steering.drain()).toEqual(['S1']);
+    expect(followUps.drain()).toEqual(['F1', 'F2']);
+    setters.setQueueMode?.('steering', 'all');
+    buffered.input.steer('S3');
+    expect(steering.drain()).toEqual(['S2', 'S3']);
+  });
+
   it('preserves pending IDs across adoption and edits the queue consumed by the live run', () => {
     const buffered = pendingTurnInput(); buffered.input.followUp('duplicate'); buffered.input.followUp('duplicate');
     const entries = buffered.input.queue!.entries();

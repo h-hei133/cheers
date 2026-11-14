@@ -20,6 +20,7 @@ import { validateSessionId } from "./store/sessionFileLayout.js";
 import {
   createSession,
   createSessionWithId,
+  type SessionCreationOptions,
 } from "./store/sessionCreation.js";
 import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
 import { readSessionMetadataRecord } from "./store/sessionStore.js";
@@ -140,10 +141,10 @@ export class SessionManager extends SessionReentrySurface {
 
   createNew(
     projectRoot: string = process.cwd(),
-    options?: ProjectBindingOptions,
+    options?: SessionCreationOptions & { readonly activate?: boolean },
   ): Session {
     return createSession({
-      callbacks: this.createSessionCreationCallbacks(),
+      callbacks: this.createSessionCreationCallbacks(options?.activate !== false),
       projectRoot,
       options,
     });

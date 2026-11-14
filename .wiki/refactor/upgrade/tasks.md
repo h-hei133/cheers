@@ -43,7 +43,7 @@
 ## D: RPC 与导出（P1）
 
 - [ ] **D.1** 会话／模型／树命令：已有待验收，真实 JSONL 与错误分类。
-- [ ] **D.2** 队列清空和 steering／follow-up 模式实时更改：部分。clearQueue 未清活跃输入队列；模式只写配置未改活跃队列，需实际进行中消费者。
+- [x] **D.2** 队列清空和 steering／follow-up 模式实时更改：本地验收完成。清空实际两条活跃输入与submission，模式跨readiness传递并保存后更新捕获队列；配置或运行替换拒绝修改后继。真实runTurn和JSONL消费者通过，宿主按input/session/settings拆分且函数上限通过。
 - [ ] **D.3** UI 请求／响应和事件：已有待验收，取消、撤权、EOF、迟到响应。
 - [ ] **D.4** HTML 高亮、GFM／CJK、Thinking、Diff、灯箱：已有待验收，真实离线导出与转义安全。
 - [ ] **D.5** 导出 token／费用：已有待验收，身份与覆盖率、缺失／部分计量不伪造。
@@ -112,3 +112,5 @@
 2026-11-14 A提交前：独立暂存树9套件255项通过（edit32、matching26、patch9、translation45/native25、preparation15、batch45、turn54/approval4），五静态门和生产build `b217b2736927`通过。此前patch9项中6失败/3通过，修复后全通过，独立review CLEAR。匹配反例修复前1,109,013次比较失败。T1本地提交为`a8ffe683`；A证据不等于A.3输出或整条路线图已完成。一次独立命令误用workspace-local Vitest路径，修正root依赖入口后重验，不是产品失败。
 
 2026-11-14 E.2提交前：最初11红/3通过，修复后75项通过；独立复审补充“坏leaf被新消息补齐掩盖”“同inode删旧前缀”两反例均红，修复后实际工作区与独立暂存树5套件80项通过。五静态门、生产build `d3279f86c0e7`、编译产物两次独立Linux进程验证持久写/重启读/两代fork独立值通过。独立复核CLEAR，只承诺现有锁和身份/前缀重验，不承诺任意不守锁外部改写原子性、所有未await嵌套调用结算或E.4重放。A本地提交`e58d8786`。
+
+2026-11-14 D.2提交前：12红/5通过反例后，独立暂存树6套件117项、五静态门、生产build `0d399d72cbe2`通过，含真实runTurn、JSONL及95项SessionManager。修正拒绝callback前已激活、新会话parentSession丢失、同项目projectChanged误作接受；新候选以activate:false创建，接受后再选择。宿主拆分后命名函数数runtimeHost3/runtimeOps20/input10/session13/settings11，独立复核CLEAR。E.2本地提交`43edd014`；D.1其他RPC验收与bash入口仍未完成。
