@@ -391,6 +391,7 @@ describe("CLI runtime invocation", () => {
       if (!address || typeof address === "string") throw new Error("No test HTTP port");
       const { createStep: _createStep, ...deps } = dependencies().deps;
       const run = await runCliRuntimeInvocation(baseInput({ permissionScope: "allow-all", providerModeEnv: "real",
+        runtimeConfig: { ...getRuntimeConfig(workspaceRoot), toolDiscovery: 'full' },
         providerCredentialResolution: { ...providerCredentialResolution, baseUrl: `http://127.0.0.1:${address.port}/v1`, model: "test" },
       }), { ...deps, tools: () => new Map([
         ["task", createTaskToolDefinition()],
@@ -476,6 +477,7 @@ describe("CLI runtime invocation", () => {
     const spy = vi.spyOn(turnSession, 'runTurn').mockImplementation(options => { captured = options; return original(options); });
     try {
       const run = await runCliRuntimeInvocation(baseInput({ providerModeEnv: 'real', providerCatalog: catalog,
+        runtimeConfig: { ...getRuntimeConfig(workspaceRoot), toolDiscovery: 'full' },
         providerCredentialResolution: { ...providerCredentialResolution, model: 'text-only', baseUrl: 'https://fixture.invalid/v1' },
         catalogContent: { skills: new Map(), tools: [] }, agentMode: 'plan',
         compaction: { policy: { contextWindow: 10_000 }, summarize: async () => undefined, onCompact: () => {} },
