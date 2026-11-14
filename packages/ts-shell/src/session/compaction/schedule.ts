@@ -42,6 +42,8 @@ export async function scheduleSegments(input: {
   readonly signal?: AbortSignal;
   /** Summary merge material must fit as one complete request. */
   readonly indivisible?: boolean;
+  /** An empty dialogue can still carry an earlier checkpoint to revise. */
+  readonly includeEmpty?: boolean;
   readonly validate?: (messages: readonly AgentMessage[], index: number) => void | Promise<void>;
   readonly prepare?: (messages: readonly AgentMessage[], index: number) => Promise<PreparedSummaryStep>;
 }): Promise<readonly ScheduledSegment[]> {
@@ -72,7 +74,7 @@ export async function scheduleSegments(input: {
   const segments: ScheduledSegment[] = [];
   let current: ScheduledSegment | undefined;
   const legal = legalUnits(input.messages);
-  const units = input.indivisible && input.messages.length ? [input.messages] : legal;
+  const units = (input.indivisible && input.messages.length) || (input.includeEmpty && !input.messages.length) ? [input.messages] : legal;
   for (const unit of units) {
     const candidate = current ? [...current.messages, ...unit] : unit;
     const accepted = await admit(candidate, segments.length);

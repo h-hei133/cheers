@@ -6,7 +6,7 @@ import { CHARS_PER_TOKEN, estimateTokens, messageCharCount, type RequestOverhead
 import { availableTailTokens, captureCompactionInput, capturedGenerationInput, closingCharsFor, estimateCompactionContext, formatBudgetBreakdown,
   prepareCompactionPolicy, reachedBudgetThreshold } from './compaction/budget.js';
 import { digest } from './compaction/state.js';
-import { formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
+import { contextCheckpointIndex, formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
 import { generateCompaction, CompactionStepUnknown } from './compaction/generation.js';
 import type { CompactionAuthority, CompactionOperationInput, CompactionSource, SummarizeHistory, SummarizeTurnPrefix } from './compaction/contract.js';
 import { CompactionPublicationError } from './compaction/contract.js';
@@ -196,7 +196,7 @@ export interface CompactionLifecycle {
  * stay in the tail, which keeps the pair together.
  */
 function canStartTail(message: AgentMessage): boolean {
-  return message.role !== "tool";
+  return message.role !== "tool" && !message.requestDeclaration;
 }
 
 /** Whether the message opens a turn, which is what the tail would rather start on. */
@@ -648,13 +648,13 @@ async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
   }
   // A leading system message is carried over verbatim by applyCompaction, so
   // summarizing it as well would pay to restate what is still there.
-  const head = input.messages[0]?.role === "system" ? 1 : 0;
+  const head = contextCheckpointIndex(input.messages);
   // A conversation that was compacted before opens with the checkpoint that
   // compaction left. That text is already a summary, so it travels back to the
   // summarizer as the summary to revise rather than as history to condense —
   // condensing a condensation sheds a little of it on every pass.
   const existing = input.messages[head];
-  const previousSummary = existing ? readContextCheckpoint(messageToText(existing.content)) : undefined;
+  const previousSummary = existing && head < plan.cut ? readContextCheckpoint(messageToText(existing.content)) : undefined;
   const historyStart = previousSummary === undefined ? head : head + 1;
   // When the cut sits inside a turn, that turn's opening message is neither kept
   // nor part of the older history, so the history stops where the turn begins
@@ -673,8 +673,8 @@ async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
   if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
   if (input.policy.admission?.()) throw new Error('Compaction request ownership changed.');
 
-  const history = input.messages.slice(historyStart, historyEnd);
-  const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, head), plan.cut) : [];
+  const history = input.messages.slice(historyStart, historyEnd).filter(message => !message.requestDeclaration);
+  const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, historyStart), plan.cut).filter(message => !message.requestDeclaration) : [];
   const operation = input.operation ? { ...input.operation,
     policyDigest: digest([input.policy.contextWindow, input.policy.reserveTokens, input.policy.outputTokens, input.policy.keepRecentTokens,
       input.policy.enabled, input.policy.summaryIdentity, input.policy.segmentTokens, input.policy.mergeTokens, input.instructions, plan,
@@ -696,9 +696,9 @@ async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
   }
   const messages = applyCompaction(input.messages, plan, summary);
   const after = estimateTokens(messages);
-  // The head the checkpoint replaces spans from the first message it discards
-  // to the cut, which includes any earlier checkpoint it was merged with.
-  const summarized = plan.cut - head;
+  // Declarations are retained verbatim; count only the dialogue and any
+  // earlier checkpoint that the new checkpoint replaces.
+  const summarized = history.length + prefix.length + Number(previousSummary !== undefined);
   return { status: "condensed", plan, summary, messages, summarized, tokensAfter: after };
 }
 
@@ -712,8 +712,9 @@ export function applyCompaction(
     content: formatContextCheckpoint(summary),
     metadata: { contextSummary: "compaction" },
   };
-  const head = messages[0]?.role === "system" ? [messages[0]] : [];
-  return [...head, checkpoint, ...messages.slice(plan.cut)];
+  const head = messages[0]?.role === "system" && !messages[0].requestDeclaration ? [messages[0]] : [];
+  const declarations = messages.slice(head.length, plan.cut).filter(message => message.requestDeclaration);
+  return [...head, ...declarations, checkpoint, ...messages.slice(plan.cut)];
 }
 
 export interface CompactionStepOptions {

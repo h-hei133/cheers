@@ -30,6 +30,26 @@ function history(): AgentMessage[] {
     { role: 'tool' as const, tool_call_id: String(index), content: 'y'.repeat(400) }]).flat();
 }
 
+it('revises a previous checkpoint through an admitted empty-history request', async () => {
+  const send = vi.fn(async ({ dispatch }: { dispatch(): void }) => { dispatch(); return 'brief'; });
+  const prepare = vi.fn(async (request: SummarizeRequest) => {
+    expect(request.messages).toEqual([]); expect(request.previousSummary).toBe('older work');
+    return { identity: 'checkpoint-only', tokens: 10, send };
+  });
+  const summarize = Object.assign(vi.fn(async () => 'unused'), { prepare });
+  expect(await generateCompaction({ history: [], prefix: [], previousSummary: 'older work', maxTokens: 100, summarize })).toBe('brief');
+  expect(prepare).toHaveBeenCalledOnce(); expect(send).toHaveBeenCalledOnce(); expect(summarize).not.toHaveBeenCalled();
+});
+
+it('refuses an oversized checkpoint-only request before dispatch', async () => {
+  const send = vi.fn(async () => 'must not send');
+  const summarize = Object.assign(vi.fn(async () => 'unused'), {
+    prepare: async () => ({ identity: 'large-checkpoint', tokens: 101, send }),
+  });
+  await expect(generateCompaction({ history: [], prefix: [], previousSummary: 'older work', maxTokens: 100, summarize })).rejects.toThrow('segment budget');
+  expect(send).not.toHaveBeenCalled(); expect(summarize).not.toHaveBeenCalled();
+});
+
 it('merges valid small-window summaries using the complete input allowance', async () => {
   const budget = summaryBudget({ contextWindow: 10_000, reserveTokens: 500, providerOwnedOutput: false });
   const summarize = Object.assign(vi.fn(async (request: Parameters<SummarizeHistory>[0]) =>

@@ -1,3 +1,5 @@
+import type { AgentMessage } from '../../core/agent/state.js';
+
 /** Opens the message a compaction leaves in place of the history it condensed. */
 export const CONTEXT_CHECKPOINT_MARKER = "[Context Checkpoint]";
 
@@ -15,4 +17,10 @@ export function readContextCheckpoint(content: string): string | undefined {
     return undefined;
   }
   return content.slice(CONTEXT_CHECKPOINT_MARKER.length).replace(/^\n/, "");
+}
+/** Declaration state is carried before a checkpoint, independently of dialogue. */
+export function contextCheckpointIndex(messages: readonly AgentMessage[]): number {
+  let index = messages[0]?.role === 'system' && !messages[0].requestDeclaration ? 1 : 0;
+  while (messages[index]?.requestDeclaration) index++;
+  return index;
 }

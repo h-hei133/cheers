@@ -11768,3 +11768,10 @@ C.6首批补齐完整工具／实际目标／effort的版本化空文本system�
 ### 2026-11-15：原始声明的协议与转换边界
 
 数据批`078d28f`之后，协议按同target段的首个完整tools快照固定baseline，后续相邻schema／删除／恢复和effort保持原marker；native更新延到实际assistant，不切开tool结果。转换保留声明身份和顺序，raw/reuse/output在通用snapshot前capture，计量包含完整controls。7项协议红例、9项carrier红例及两复核红例修复后，六静态门、13套件337项、build `2a1feaebbaa4`和函数上限通过，限定独立复核CLEAR。auto安全回退不承诺前缀稳定；实际发布和压缩spine仍待实施，本地验收数16、目标active，无push／CI声明。
+
+
+### 2026-11-15：压缩声明保留与重复投影成本
+
+发送前发布`f43648cd`后，压缩按raw cut保留被丢弃声明的原ID／顺序，kept声明仍在原tail；live／reopen和branch／fork隔离保持。transcript首次声明只迁移一次，之后登记arena和移动区间，避免每次receipt复制完整spine；取消丢弃中保持局部计数一致。复审新增ordinary system错误准入、重复checkpoint计数及empty摘要准入反例先红后修，progress三项恢复回归真实修复。
+
+六静态门、13套件231项、函数上限0超限及build `c7857153d401`通过；四有效反转红，三文件逐字节恢复后3套件32项通过，限定只读复审CLEAR。证据在`.omx/artifacts/upgrade-messages-2026-11-14/declarations-compaction-*.log`；错误期望／dispatch夹具诊断保留。当前本地提交批不等于真实provider／跨轮续接联合验收，C.3/C.6和整份规划仍active、本地验收16项；不声明push或远端CI。

@@ -21,10 +21,14 @@ function matchesHistory(source: CompactionSource, messages: readonly AgentMessag
   let storedHistory: readonly AgentMessage[];
   try { captured = captureCompactionHistory(messages); storedHistory = captureCompactionHistory(source.history); }
   catch { return false; }
-  const actual = captured[0]?.role === 'system' ? captured.slice(1) : captured;
+  // Only the caller's transient system frame is exempt from durable matching.
+  if (storedHistory[0]?.role === 'system' && !storedHistory[0].requestDeclaration) return false;
+  const actual = captured.length === storedHistory.length + 1 && captured[0]?.role === 'system'
+    && !captured[0].requestDeclaration ? captured.slice(1) : captured;
   if (actual.length !== storedHistory.length) return false;
   return actual.every((message, index) => {
     const stored = storedHistory[index]!;
+    if (message.requestDeclaration && message.id !== stored.id) return false;
     // Persistence omits storage identity and transient completion diagnostics.
     // Other captured facts, including metadata and provider origin, must match.
     const { id: _callerId, timestamp: _callerTime, content: _callerContent,

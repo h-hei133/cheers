@@ -2486,3 +2486,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Preparation writes a marker before admission, a failed persistence leaves live history changed, or overflow recovery cannot use the capture after a successful declaration append.
 - **Root Cause:** Prepared wire input, committed raw source and the current request fence are treated as one history; ordinary message events publish live before persistence.
 - **Rule:** Route committed raw, capture a prospective declaration before conversion, and keep compaction source committed. At the original synchronous dispatch barrier, prove a single append, persist, publish live, then recheck cancellation and freshness. Promote the bare capture without reconversion and notify recovery; keep request-local closing withdrawals out of durable loadouts. Published and pending reframe must clear the same omitted call fields.
+
+
+### Compaction Declarations Need A Retained Prefix And Exact Tail
+- **Symptom:** Compaction loses historical tool/effort state, reopening differs from live history, or many receipts repeatedly copy the declaration prefix.
+- **Root Cause:** Declaration carriers are treated as dialogue or as the caller's temporary system frame, and every receipt rebuilds the accumulated prefix.
+- **Rule:** Preserve discarded declarations in original ID/order before the checkpoint, keep retained declarations at their raw tail positions, and count only replaced dialogue. Register each declaration once and move ranges; check cancellation while discarding and keep counters synchronized with completed nodes. Do not admit stored ordinary system history through the transient caller exception.
+
+### A Checkpoint-Only Summary Still Needs Admission And Dispatch
+- **Symptom:** Removing a duplicate checkpoint from a split prefix makes overflow recovery return the unchanged old summary without a model attempt.
+- **Root Cause:** Empty dialogue schedules no segments even when previousSummary contains the material that needs revision.
+- **Rule:** Keep the prior checkpoint out of dialogue/prefix, but schedule its empty-history request through the same complete prepare, segment limits, cancellation, claim, dispatch and unknown-outcome ledger. Verify both approved revision and over-budget zero-dispatch refusal.

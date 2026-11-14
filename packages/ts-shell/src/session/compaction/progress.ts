@@ -3,7 +3,7 @@ import { historyDigest } from '../../context/request/identity.js';
 import { messageToText } from '../../model-adapters/multimodal.js';
 import { estimateTokens, type RequestOverhead } from '../context.js';
 import { availableTailTokens, estimateCompactionContext } from './budget.js';
-import { readContextCheckpoint } from './checkpoint.js';
+import { contextCheckpointIndex, readContextCheckpoint } from './checkpoint.js';
 
 interface ProgressPolicy {
   readonly contextWindow: number;
@@ -21,7 +21,7 @@ const DEAD_END_NOTICE = 'Compaction freed too little context to make progress â€
 /** The checkpoint gets its own allowance; system instructions and schemas do not. */
 function hasHeadroom(messages: readonly AgentMessage[], policy: ProgressPolicy,
   toolsAllowed?: boolean): boolean {
-  const checkpoint = messages[messages[0]?.role === 'system' ? 1 : 0];
+  const checkpoint = messages[contextCheckpointIndex(messages)];
   const checkpointTokens = checkpoint && readContextCheckpoint(messageToText(checkpoint.content)) !== undefined
     ? estimateTokens([checkpoint]) : 0;
   // A closing request carries an instruction the conversation does not, so the

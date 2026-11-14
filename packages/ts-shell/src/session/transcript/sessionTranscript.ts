@@ -14,6 +14,7 @@ import type { Session } from "../schema/sessionRecord.js";
 import { publishedCompactionEvents } from '../compaction/publication.js';
 import { descriptorPath, fileIdentity } from '../../core/workspace/files.js';
 import { readTranscriptPrefixDigest } from './source.js';
+import { TranscriptRetention } from './retention.js';
 
 export {
   parseTranscript,
@@ -231,11 +232,18 @@ export function projectTranscriptMessages(
   const messages: SessionMessage[] = [];
   const checkpoints: SessionMessage[] = [];
   let firstMessage = 0;
+  let retention: TranscriptRetention | undefined;
 
   let index = 0;
   for (const event of publishedCompactionEvents(events, signal)) {
     if ((index++ & (CONTROL_CHECK_INTERVAL - 1)) === 0) signal?.throwIfAborted();
     if (event.type === "compaction") {
+      const checkpoint: SessionMessage = { role: 'user', content: `[Context Checkpoint]\n${event.summary}`,
+        metadata: { contextSummary: 'compaction' }, timestamp: event.timestamp };
+      if (retention) {
+        retention.compact(checkpoint, event.keptMessages, signal);
+        continue;
+      }
       // Re-anchor context at the compaction checkpoint, keeping the most
       // recent messages verbatim behind it.
       // Checkpoints form a reversed prefix; ordinary messages form a forward
@@ -255,12 +263,7 @@ export function projectTranscriptMessages(
           firstMessage = 0;
         }
       } else checkpoints.length = Math.min(checkpoints.length, kept - tailLength);
-      checkpoints.push({
-        role: "user",
-        content: `[Context Checkpoint]\n${event.summary}`,
-        metadata: { contextSummary: "compaction" },
-        timestamp: event.timestamp,
-      });
+      checkpoints.push(checkpoint);
     } else if (event.type === "branch_summary") {
       // What the abandoned turns established, carried forward as a note. It is
       // not a turn the user took, so it reads as context rather than as speech.
@@ -268,22 +271,39 @@ export function projectTranscriptMessages(
       // carry, and inventing a placeholder would put a turn in the conversation
       // that nobody said.
       if (event.summary !== undefined) {
-        messages.push({
+        const message: SessionMessage = {
           role: "user",
           content: `[Earlier Path]\n${event.summary}`,
           metadata: { contextSummary: "branch" },
           timestamp: event.timestamp,
-        });
+        };
+        if (retention) retention.append(message);
+        else messages.push(message);
       }
     } else if (event.type === "message") {
       const msg = transcriptEventToSessionMessage(event);
       if (msg) {
-        messages.push(msg);
+        if (!retention && msg.requestDeclaration) {
+          retention = new TranscriptRetention();
+          for (let cursor = checkpoints.length - 1; cursor >= 0; cursor -= 1) {
+            if ((cursor & (CONTROL_CHECK_INTERVAL - 1)) === 0) signal?.throwIfAborted();
+            retention.append(checkpoints[cursor]!);
+          }
+          for (let cursor = firstMessage; cursor < messages.length; cursor += 1) {
+            if ((cursor & (CONTROL_CHECK_INTERVAL - 1)) === 0) signal?.throwIfAborted();
+            retention.append(messages[cursor]!);
+          }
+          messages.length = 0;
+          checkpoints.length = 0;
+          firstMessage = 0;
+        }
+        if (retention) retention.append(msg);
+        else messages.push(msg);
       }
     }
   }
 
-  return checkpoints.reverse().concat(messages.slice(firstMessage));
+  return retention ? retention.messages(signal) : checkpoints.reverse().concat(messages.slice(firstMessage));
 }
 
 export function appendCompactionEvent(

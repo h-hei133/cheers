@@ -82,6 +82,7 @@ export async function generateCompaction(input: {
       preflight: (value: SummarizeRequest) => input.summarizeTurnPrefix?.preflight?.(value.messages, value.signal) });
   const schedule = (messages: readonly AgentMessage[], summarize: SummarizeHistory,
     maxTokens: number | undefined, previousSummary?: string, indivisible = false) => scheduleSegments({ messages, maxTokens, signal: input.signal, indivisible,
+    includeEmpty: previousSummary !== undefined,
     ...(summarize.prepare ? { prepare: (candidate: readonly AgentMessage[], index: number) =>
       summarize.prepare!(request(candidate, index === 0 ? previousSummary : undefined)) }
       : { validate: (candidate: readonly AgentMessage[], index: number) =>
