@@ -57,8 +57,18 @@ describe("boundText", () => {
     expect(boundText("ok")).toBe("ok");
   });
 
+  it("enforces UTF-8 bytes and complete-line budgets including truncation notices", () => {
+    for (const text of ["界".repeat(20_000), "😀".repeat(20_000), "x\n".repeat(3000)]) {
+      const bounded = boundText(text);
+      expect(Buffer.byteLength(bounded, "utf8")).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT);
+      expect(bounded.split("\n").length).toBeLessThanOrEqual(2000);
+      expect(bounded).toContain("output truncated");
+      expect(bounded).not.toContain("\uFFFD");
+    }
+  });
+
   it("truncates long output to the limit", () => {
-    expect(boundText("abcdef", 4)).toBe("abcd\n\n[... output truncated to 4 chars]");
+    expect(boundText("abcdef", 4)).toBe("abcd");
   });
 
   it("snaps multi-line truncation to newline boundaries without splitting surrogate pairs", () => {
@@ -68,7 +78,7 @@ describe("boundText", () => {
     expect(prefix.endsWith("payload")).toBe(true);
     const emojiRun = "😀".repeat(40);
     const emojiBounded = boundText(emojiRun, 5);
-    expect(emojiBounded.startsWith("😀😀\n")).toBe(true);
+    expect(emojiBounded).toBe("😀");
   });
 });
 
@@ -177,6 +187,22 @@ describe("prepareToolCall", () => {
 });
 
 describe("executeToolBatch", () => {
+  it.each(["parallel", "sequential"] as const)("publishes the same bounded receipt consumed by context in %s mode", async mode => {
+    const notice = "artifact://receipt " + "界\n".repeat(3000) + "verification failed";
+    const metadata = { outputNotice: notice, status: "partial" };
+    const tool = makeTool({ execute: async () => ({ output: "😀\n".repeat(20_000), isError: true, metadata }) });
+    const { emit, events } = collect();
+    const batch = await executeToolBatch([tool], assistantMessage(), [makeCall()], undefined, mode, undefined, emit);
+    const message = batch.messages[0];
+    expect(Buffer.byteLength(message.content as string, "utf8")).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT);
+    expect((message.content as string).split("\n").length).toBeLessThanOrEqual(2000);
+    expect(message.content).toContain("artifact://receipt");
+    expect(message.content).toContain("verification failed");
+    expect(message.metadata).toEqual(metadata);
+    for (const event of events.filter(event => event.type === "message_start" || event.type === "message_end")) {
+      if (event.type === "message_start" || event.type === "message_end") expect(event.message).toBe(message);
+    }
+  });
   it.each(["parallel", "sequential"] as const)("retains explicit page notices within the model cap in %s mode", async mode => {
     const notice = "[Page saved to artifact://123; 50 matches are outside this page]";
     const output = "path\n".repeat(12_000) + notice;
@@ -380,8 +406,12 @@ describe("executeToolBatch", () => {
     );
 
     expect(batch.messages).toHaveLength(1);
-    expect(batch.messages[0].content.startsWith("x".repeat(TOOL_OUTPUT_LIMIT))).toBe(true);
-    expect(batch.messages[0].content).toContain(`[... output truncated to ${TOOL_OUTPUT_LIMIT} chars]`);
+    const content = batch.messages[0].content;
+    expect(typeof content).toBe('string');
+    if (typeof content !== 'string') throw new Error('Expected bounded text content.');
+    expect(content.startsWith("x".repeat(TOOL_OUTPUT_LIMIT - 100))).toBe(true);
+    expect(Buffer.byteLength(content, "utf8")).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT);
+    expect(content).toContain(`[... output truncated to ${TOOL_OUTPUT_LIMIT} bytes or 2000 lines]`);
   });
 
   it("synthesizes aborted results for every call left unpaired", async () => {

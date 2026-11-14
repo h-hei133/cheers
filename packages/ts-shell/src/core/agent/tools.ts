@@ -1,4 +1,5 @@
-import { messageToText, type ImageContent } from "../../model-adapters/multimodal.js";
+import type { ImageContent } from "../../model-adapters/multimodal.js";
+import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateHead, truncateTail, truncateTextBytes } from "../tools/truncation.js";
 import { boundToolMedia, createToolMediaBudget } from './media.js';
 import type { AgentEventSink } from "./events.js";
 import { recordCount, recordTiming } from "../../observability/metrics.js";
@@ -88,7 +89,7 @@ export interface ExecutedToolBatch {
   readonly terminate: boolean;
 }
 
-export const TOOL_OUTPUT_LIMIT = 50 * 1024;
+export const TOOL_OUTPUT_LIMIT = DEFAULT_MAX_BYTES;
 
 export function parseToolArgs(
   raw: string,
@@ -104,49 +105,33 @@ export function parseToolArgs(
   }
 }
 
-function safeSlicePrefix(text: string, end: number): string {
-  if (end <= 0) return "";
-  if (end >= text.length) return text;
-  const code = text.charCodeAt(end - 1);
-  const next = text.charCodeAt(end);
-  const safeEnd = code >= 0xd800 && code <= 0xdbff && next >= 0xdc00 && next <= 0xdfff ? end - 1 : end;
-  return text.slice(0, safeEnd);
-}
-
-function snapLinePrefix(text: string, limit: number): string {
-  const raw = safeSlicePrefix(text, limit);
-  if (limit < 64 || !text.includes("\n")) return raw;
-  const lastNewline = raw.lastIndexOf("\n");
-  if (lastNewline >= Math.floor(raw.length / 2)) {
-    return raw.slice(0, lastNewline);
-  }
-  return raw;
-}
-
 export function boundText(text: string, limit: number = TOOL_OUTPUT_LIMIT, notice?: unknown): string {
-  if (text.length <= limit) {
-    return text;
-  }
-  const marker = `\n\n[... output truncated to ${limit} chars]`;
-  if (typeof notice !== "string" || notice.length === 0) {
-    return `${snapLinePrefix(text, limit)}${marker}`;
-  }
+  const maxBytes = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : TOOL_OUTPUT_LIMIT;
+  if (!truncateHead(text, { maxBytes, maxLines: DEFAULT_MAX_LINES }).truncated) return text;
+  const marker = `[... output truncated to ${maxBytes} bytes or ${DEFAULT_MAX_LINES} lines]`;
+  const markerBytes = Buffer.byteLength(marker, "utf8");
+  if (markerBytes > maxBytes) return truncateTextBytes(text, maxBytes);
   // Producers identify the facts needed to recover an omitted page. Reserve
   // space for them, including the marker, without parsing the result's prose.
-  const tail = boundedNotice(notice, Math.min(2000, Math.max(0, limit - marker.length - 2)));
-  const suffix = `${marker}\n\n${tail}`;
-  const headBudget = Math.max(0, limit - suffix.length);
-  return safeSlicePrefix(`${snapLinePrefix(text, headBudget)}${suffix}`, limit);
+  const tail = typeof notice === "string" && notice.length > 0
+    ? boundedNotice(notice, Math.min(2000, Math.max(0, maxBytes - markerBytes - 4))) : "";
+  const suffix = `\n\n${marker}${tail ? `\n\n${tail}` : ""}`;
+  const headBudget = Math.max(0, maxBytes - Buffer.byteLength(suffix, "utf8"));
+  const head = truncateHead(text, { maxBytes: headBudget, maxLines: DEFAULT_MAX_LINES - suffix.split("\n").length + 1 });
+  const prefix = head.firstLineExceedsLimit ? truncateTextBytes(text.split("\n", 1)[0]!, headBudget) : head.content;
+  return prefix ? prefix + suffix : suffix.slice(2);
 }
 
 function boundedNotice(notice: string, limit: number): string {
-  if (notice.length <= limit) return notice;
+  if (!truncateHead(notice, { maxBytes: limit, maxLines: 200 }).truncated) return notice;
   const marker = "\n[... result notice shortened]\n";
-  if (limit <= marker.length) return marker.slice(0, limit);
-  const retained = limit - marker.length;
-  const head = Math.ceil(retained / 2);
-  const tail = retained - head;
-  return notice.slice(0, head) + marker + (tail ? notice.slice(-tail) : "");
+  const markerBytes = Buffer.byteLength(marker, "utf8");
+  if (limit <= markerBytes) return truncateTextBytes(notice, limit);
+  const retained = limit - markerBytes;
+  const headBytes = Math.ceil(retained / 2);
+  const head = truncateHead(notice, { maxBytes: headBytes, maxLines: 99 });
+  const prefix = head.firstLineExceedsLimit ? truncateTextBytes(notice.split("\n", 1)[0]!, headBytes) : head.content;
+  return prefix + marker + truncateTail(notice, { maxBytes: retained - headBytes, maxLines: 99 }).content;
 }
 
 export function createToolResultMessage(
@@ -157,10 +142,11 @@ export function createToolResultMessage(
 ): AgentMessage {
   const bounded = boundToolMedia({ output, images, metadata }, createToolMediaBudget());
   const retained = bounded.images ?? [];
+  const text = boundText(bounded.output, TOOL_OUTPUT_LIMIT, bounded.metadata?.outputNotice);
   return {
     role: "tool",
     tool_call_id: toolCallId,
-    content: retained.length ? [{ type: "text", text: bounded.output }, ...retained] : bounded.output,
+    content: retained.length ? [{ type: "text", text }, ...retained] : text,
     ...(bounded.metadata ? { metadata: bounded.metadata } : {}),
   };
 }
@@ -289,18 +275,12 @@ export async function executeToolBatch(
     requested === "sequential" || forcedSequential
       ? await runSequential(tools, assistantMessage, calls, hooks, signal, emit)
       : await runParallel(tools, assistantMessage, calls, hooks, signal, emit);
-  // Bound model text while preserving validated media as typed content blocks.
-  const bounded = batch.messages.map((message) => {
-    const text = boundText(messageToText(message.content), TOOL_OUTPUT_LIMIT, message.metadata?.outputNotice);
-    const images = Array.isArray(message.content) ? message.content.filter((block): block is ImageContent => block.type === "image") : [];
-    return { ...message, content: images.length ? [{ type: "text" as const, text }, ...images] : text };
-  });
   if (!signal?.aborted) {
-    return { messages: bounded, terminate: batch.terminate };
+    return batch;
   }
-  const pairedIds = new Set(bounded.map((message) => message.tool_call_id));
+  const pairedIds = new Set(batch.messages.map((message) => message.tool_call_id));
   // This array also receives aborted results for any calls not yet paired.
-  const messages: AgentMessage[] = [...bounded];
+  const messages: AgentMessage[] = [...batch.messages];
   for (const call of calls) {
     if (pairedIds.has(call.id)) {
       continue;

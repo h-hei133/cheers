@@ -3,8 +3,6 @@ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, type TruncationResult, truncateTa
 export interface OutputAccumulatorOptions {
   readonly maxLines?: number
   readonly maxBytes?: number
-  /** Optional streaming sink notified when total decoded output first overflows budget and for subsequent chunks. */
-  readonly onOverflowSpill?: (chunk: string) => void
 }
 
 export interface OutputAccumulatorSnapshot {
@@ -41,15 +39,11 @@ export class OutputAccumulator {
   private currentLineBytes = 0
   private hasOpenLine = false
   private finished = false
-  private spilled = false
-  private spillBuffer = ''
-  private readonly onOverflowSpill?: (chunk: string) => void
 
   constructor(options: OutputAccumulatorOptions = {}) {
     this.maxLines = options.maxLines ?? DEFAULT_MAX_LINES
     this.maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES
     this.maxRollingBytes = Math.max(this.maxBytes * 2, 1)
-    this.onOverflowSpill = options.onOverflowSpill
   }
 
   append(chunk: string | Buffer | Uint8Array): void {
@@ -111,19 +105,6 @@ export class OutputAccumulator {
     this.totalDecodedBytes += bytes
     this.tailText += text
     this.tailBytes += bytes
-    if (this.onOverflowSpill) {
-      if (this.spilled) {
-        this.onOverflowSpill(text)
-      } else {
-        this.spillBuffer += text
-        if (this.totalDecodedBytes > this.maxBytes) {
-          this.spilled = true
-          const initial = this.spillBuffer
-          this.spillBuffer = ''
-          this.onOverflowSpill(initial)
-        }
-      }
-    }
     if (this.tailBytes > this.maxRollingBytes * 2) {
       this.trimTail()
     }

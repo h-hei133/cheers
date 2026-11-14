@@ -92,7 +92,7 @@ function localLineEndingAt(rawText: string, offset: number, fallback: LineEnding
 
 /**
  * Apply Unix-offset replacements directly onto `rawText`, preserving any mixed
- * line endings on untouched regions (Pi `applyReplacementsToOriginal` semantics).
+ * line endings on untouched regions.
  */
 export function applyUnixReplacementsToOriginal(
   rawText: string,

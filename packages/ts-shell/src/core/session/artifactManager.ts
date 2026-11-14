@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ArtifactPublicationError, publishArtifact, publishTextArtifact } from './artifacts/publication.js';
+import { createTextStaging, type TextStaging } from './artifacts/staging.js';
+import type { ArtifactSource } from './artifacts/stream.js';
+import { ArtifactCleanup, waitArtifactPublication } from './artifacts/cleanup.js';
+import { retainTextStaging } from './artifacts/lifetime.js';
 import { verifyPathContainment } from '../security/pathJail.js';
 import { assertProfileStorage, currentProfile, type ProfileContext } from '../paths/profile/context.js';
 import { profileScope } from '../paths/profile/scope.js';
@@ -24,6 +28,7 @@ export class ArtifactManager {
   private readonly storageRoot: string;
   private readonly artifactsDir: string;
   private readonly profile: ProfileContext | undefined;
+  private readonly cleanup: ArtifactCleanup;
   private counter: number = 0;
 
   constructor(workspaceRoot: string = process.cwd(), sessionId: string = "default", owner = { profile: currentProfile() }) {
@@ -38,6 +43,7 @@ export class ArtifactManager {
       sessionId,
       "artifacts",
     );
+    this.cleanup = new ArtifactCleanup(this.artifactsDir);
     try {
       if (!fs.existsSync(this.artifactsDir)) return;
       this.verifyDirectory();
@@ -106,14 +112,36 @@ export class ArtifactManager {
   }
 
   async save(content: string, toolType: string = "output"): Promise<StoredArtifact> {
-    return this.publish(Buffer.from(content, 'utf8'), toolType, 'log', content.split('\n').length);
+    return this.publish(Buffer.from(content, 'utf8'), toolType, 'log');
+  }
+
+  /** The source owns its resources and must yield bounded chunks promptly. */
+  async saveStream(source: AsyncIterable<Uint8Array>, toolType = 'output', signal?: AbortSignal): Promise<StoredArtifact> {
+    return this.publish(source, toolType, 'log', signal);
+  }
+
+  /** Allocate only on overflow; close seals the source and dispose releases it. */
+  async createTextStaging(signal?: AbortSignal): Promise<TextStaging> {
+    await this.cleanup.admit();
+    assertProfileStorage(this.artifactsDir, this.profile);
+    const checked = verifyPathContainment(this.artifactsDir, this.storageRoot);
+    if (!checked.allowed || checked.resolvedPath !== this.artifactsDir) throw new ArtifactPublicationError('not-published', 'complete', this.artifactsDir);
+    const reservation = this.cleanup.reserve();
+    const stage = await this.cleanup.operation(reservation,
+      () => createTextStaging(this.storageRoot, this.artifactsDir, signal, () => assertProfileStorage(this.artifactsDir, this.profile)),
+      value => this.cleanup.bind(reservation, { close: () => value.dispose() }));
+    return retainTextStaging(this.cleanup, reservation, stage);
+  }
+
+  retryCleanup(): Promise<'complete' | 'unknown'> {
+    return this.cleanup.retry();
   }
 
   async saveBinary(content: Uint8Array, toolType = 'binary', format = 'bin', signal?: AbortSignal): Promise<StoredArtifact> {
     if (!['bin', 'png', 'jpg', 'jpeg', 'webp', 'pdf'].includes(format)) throw new Error('Unsupported binary artifact format.');
     if (content.byteLength > 8 * 1024 * 1024) throw new Error('Binary artifact exceeds the 8 MiB limit.');
     this.assertBinaryStorage();
-    return this.publish(Buffer.from(content), toolType, format, 0, signal);
+    return this.publish(Buffer.from(content), toolType, format, signal);
   }
 
   assertBinaryStorage(): void {
@@ -126,7 +154,8 @@ export class ArtifactManager {
     } catch { throw new ArtifactPublicationError('not-published', 'complete', this.artifactsDir); }
   }
 
-  private async publish(content: Buffer, toolType: string, format: string, lines: number, signal?: AbortSignal): Promise<StoredArtifact> {
+  private async publish(content: ArtifactSource, toolType: string, format: string, signal?: AbortSignal): Promise<StoredArtifact> {
+    await this.cleanup.admit();
     assertProfileStorage(this.artifactsDir, this.profile);
     const id = String(this.counter++);
     const tag = toolType.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64) || 'output';
@@ -134,8 +163,12 @@ export class ArtifactManager {
     const targetPath = path.join(this.artifactsDir, filename);
     const checked = verifyPathContainment(this.artifactsDir, this.storageRoot);
     if (!checked.allowed || checked.resolvedPath !== this.artifactsDir) throw new Error('Artifact directory resolves through a symbolic link.');
-    const sha256 = format === 'log' ? await publishTextArtifact(this.storageRoot, this.artifactsDir, filename, content)
-      : await publishArtifact(this.storageRoot, this.artifactsDir, filename, content, signal);
+    const admit = (): void => assertProfileStorage(this.artifactsDir, this.profile);
+    const reservation = this.cleanup.reserve();
+    const receipt = await this.cleanup.operation(reservation,
+      () => format === 'log' ? publishTextArtifact(this.storageRoot, this.artifactsDir, filename, content, signal, admit)
+        : publishArtifact(this.storageRoot, this.artifactsDir, filename, content, signal, admit),
+      () => this.cleanup.release(reservation), pending => waitArtifactPublication(pending, signal), 'unverified');
     assertProfileStorage(targetPath, this.profile);
 
     return {
@@ -143,10 +176,10 @@ export class ArtifactManager {
       uri: `artifact://${id}`,
       path: targetPath,
       toolType,
-      totalBytes: content.length,
-      totalLines: lines,
+      totalBytes: receipt.totalBytes,
+      totalLines: format === 'log' ? receipt.totalLines : 0,
       createdAt: new Date().toISOString(),
-      sha256, format, ...(process.platform === 'linux' ? { publication: 'verified' as const } : {}),
+      sha256: receipt.sha256, format, ...(process.platform === 'linux' ? { publication: 'verified' as const } : {}),
     };
   }
 

@@ -2240,3 +2240,17 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Clear or delivery-mode commands only change pending submissions/configuration, while active input survives; a rejected session callback has already changed selection.
 - **Root Cause:** RPC handlers bypassed the live input owner and eagerly activated candidates; the native switch boolean described a project change, not transition acceptance.
 - **Rule:** Read and mutate the same captured live queue, carry modes through readiness, and recheck admission after asynchronous saves. Create inactive session candidates and select only after acceptance; adapt project-change results explicitly at the native callback boundary.
+
+
+### Foreground Capture Must Follow Native Settlement
+
+- **Symptom:** Tool output is short in the transcript while a verbose command retains its complete streams in memory; promotion or cancellation can close its spill before the pipes drain.
+- **Root Cause:** Result-time truncation runs after native accumulation. A dispatched kill does not prove pipe closure, and Node's child exit flush forcibly resumes paused stdout/stderr during an outstanding write.
+- **Rule:** Attach the shared bounded capture before spawn, return write backpressure to the native owner, admit at most one forced late chunk per pipe, and drain before sealing. Promotion and refusal transfer the exact capture through native settlement; retain separate stream classification and never advertise interrupted output as complete.
+
+
+### Failed Artifact Writes Need Content-Bound Cleanup Ownership
+
+- **Symptom:** A failed stream may leave a live descriptor or cause cleanup to delete externally changed staging after a later stat succeeds.
+- **Root Cause:** A pathname or refreshed size is not ownership of the original bytes. A one-shot cleanup attempt also loses the only capability able to safely release renamed storage.
+- **Rule:** Preserve the original descriptor and digest of confirmed writes; verify bounded content before cleanup, leave foreign replacements intact, and retain unknown cleanup at the artifact owner for bounded retry. An already removed owned path settles cleanup; acquisition, staging and final publication must share the same captured storage identity.

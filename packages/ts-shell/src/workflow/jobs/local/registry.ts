@@ -4,13 +4,16 @@ import type { LocalExecutionHandle } from '../../../runtime/execution/types.js';
 import { createDefaultExecutionService } from '../../../runtime/execution/service.js';
 import type { CommandExecutionResult, ExecutionService } from '../../../runtime/execution/types.js';
 import { createOutputSink } from './output.js';
-import { appendAdoptedOutput, appendOutput, type OperationOutput } from './stream.js';
+import { appendAdoptedOutput, appendOutput, observeCapturedOutput, type OperationOutput } from './stream.js';
+import { capturedOutputSink } from './capture.js';
+import type { CommandOutputCapture } from '../../../runtime/execution/output/capture.js';
 import type { BackgroundInput, BackgroundRunner, BackgroundTask, LocalJournalPort } from './model.js';
 import { taskSnapshot } from './snapshot.js';
 import { closeOutput } from './settlement.js';
 
 interface Operation extends OperationOutput { readonly controller: AbortController;
-  settlement: Promise<void>; readonly handle?: LocalExecutionHandle; readonly input?: BackgroundInput; readonly adopted?: boolean; watch?: ReturnType<typeof setInterval>; }
+  settlement: Promise<void>; readonly handle?: LocalExecutionHandle; readonly input?: BackgroundInput; readonly adopted?: boolean;
+  captureDisposition?: 'background'; watch?: ReturnType<typeof setInterval>; }
 
 /** Live handles belong to this owner; restart never signals a numeric PID from a journal. */
 export class TaskRegistry implements BackgroundRunner {
@@ -43,7 +46,7 @@ export class TaskRegistry implements BackgroundRunner {
     const id = this.journal?.create(input) ?? `bg_${this.nextId++}`;
     return this.launch(id, input);
   }
-  adopt(handle: LocalExecutionHandle, input: BackgroundInput): BackgroundTask {
+  adopt(handle: LocalExecutionHandle, input: BackgroundInput, capture?: CommandOutputCapture): BackgroundTask {
     if (this.closing) throw new Error('Local job owner is closing.');
     const id = randomUUID();
     const task: BackgroundTask = { id, command: input.command, cwd: input.cwd, pid: handle.pid, startedAt: Date.now(), state: 'running', output: '' };
@@ -54,14 +57,21 @@ export class TaskRegistry implements BackgroundRunner {
       resolveSettlement = resolve;
       rejectSettlement = reject;
     });
-    const operation: Operation = { controller: new AbortController(), sink: createOutputSink({ limitBytes: 65536, label: id,
+    // Promotion releases the foreground waiter. Observe a later failure without
+    // replacing the rejecting promise returned to explicit stop/settlement callers.
+    void settlement.catch(() => {});
+    const operation: Operation = { controller: new AbortController(), sink: capture ? capturedOutputSink(capture) : createOutputSink({ limitBytes: 65536, label: id,
       ...(!this.journal && this.spillDirectory ? { spillDirectory: this.spillDirectory } : {}) }), stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8'),
-      pendingOutput: [], pendingBytes: 0, pendingTruncated: false, settlement, handle, input, adopted: true };
+      pendingOutput: [], pendingBytes: { stdout: 0, stderr: 0 }, pendingTruncated: { stdout: false, stderr: false },
+      ...(capture ? { capture } : {}), settlement, handle, input, adopted: true };
     this.operations.set(id, operation);
     let resolvePromotion!: (outcome: 'promoted' | 'settled' | 'refused') => void;
     const promotion = new Promise<'promoted' | 'settled' | 'refused'>(resolve => { resolvePromotion = resolve; });
     this.promotion.set(id, { promise: promotion, resolve: resolvePromotion });
-    const off = handle.onOutput(text => {
+    const off = capture ? capture.onChunk((stream, bytes) => {
+      const output = this.operations.get(id);
+      if (output) observeCapturedOutput(id, stream, bytes, output, this.tasks, this.journal, this.promoted.has(id));
+    }) : handle.onOutput(text => {
       const output = this.operations.get(id);
       if (output) appendAdoptedOutput(id, text, output, this.tasks, this.journal, this.promoted.has(id));
     });
@@ -75,11 +85,25 @@ export class TaskRegistry implements BackgroundRunner {
         await this.finish(id, result);
       } catch (error) {
         failure = error;
+        if (this.promoted.has(id)) {
+          try { this.journal?.unverified(id); } catch { /* Preserve the original durable fence. */ }
+        }
         this.tasks.set(id, {
           ...this.tasks.get(id)!,
           state: 'unknown',
           failure: 'Native cleanup or durable publication remains unverified.',
         });
+      } finally {
+        // Foreground settlement leaves source disposal with its caller. Once
+        // promoted, the job owns the same source even if sealing fails.
+        if (capture && operation.captureDisposition === 'background') {
+          try { await capture.dispose(); }
+          catch (error) {
+            failure ??= error;
+            try { this.journal?.unverified(id); } catch { /* Preserve the original durable fence. */ }
+            this.tasks.set(id, { ...this.tasks.get(id)!, state: 'unknown', failure: 'Command output cleanup remains unverified.' });
+          }
+        }
       }
       this.settlePromotion(id, 'settled');
       this.operations.delete(id);
@@ -107,13 +131,15 @@ export class TaskRegistry implements BackgroundRunner {
       try {
         this.journal.promote(id, operation.input, task.pid);
         // Output may arrive while the child is still a foreground wait. Publish
-        // that prefix before marking the task promoted so restart and notices
-        // see the same stream the live sink already showed.
-        for (const chunk of operation.pendingOutput) this.journal.output(id, 'stdout', chunk);
-        if (operation.pendingTruncated) this.journal.truncate(id, 'stdout');
+        // that bounded prefix before marking the task promoted. A previously
+        // truncated prefix stays partial; later chunks cannot restore it.
+        for (const chunk of operation.pendingOutput) this.journal.output(id, chunk.stream, chunk.bytes);
+        for (const stream of ['stdout', 'stderr'] as const) {
+          if (operation.pendingTruncated[stream]) this.journal.truncate(id, stream);
+          operation.pendingBytes[stream] = 0;
+          operation.pendingTruncated[stream] = false;
+        }
         operation.pendingOutput.length = 0;
-        operation.pendingBytes = 0;
-        operation.pendingTruncated = false;
         this.promoted.add(id);
         // A promoted foreground child is admitted exactly like a launched job:
         // revoking the grant kills the same PID, not a copy of it.
@@ -128,6 +154,7 @@ export class TaskRegistry implements BackgroundRunner {
         return 'refused';
       }
     })();
+    if (operation?.capture && (outcome === 'promoted' || outcome === 'refused')) operation.captureDisposition = 'background';
     this.settlePromotion(id, outcome);
     return outcome;
   }
@@ -161,7 +188,7 @@ export class TaskRegistry implements BackgroundRunner {
     this.tasks.set(id, task);
     const operation: Operation = { controller: new AbortController(), sink: createOutputSink({ limitBytes: 65536, label: id,
       ...(!this.journal && this.spillDirectory ? { spillDirectory: this.spillDirectory } : {}) }), stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8'),
-      pendingOutput: [], pendingBytes: 0, pendingTruncated: false, settlement: Promise.resolve() };
+      pendingOutput: [], pendingBytes: { stdout: 0, stderr: 0 }, pendingTruncated: { stdout: false, stderr: false }, settlement: Promise.resolve() };
     this.operations.set(id, operation);
     // The durable replay fence is established before calling the native execution owner.
     try { this.journal?.arm(id); }
@@ -205,9 +232,13 @@ export class TaskRegistry implements BackgroundRunner {
     // The journal already contains the original bytes. Decoder tails belong to
     // the live text sink only; writing them back would invent replacement bytes
     // when a command ends with an incomplete UTF-8 sequence.
-    const stdoutTail = operation.stdout.end();
-    const stderrTail = operation.stderr.end();
-    await closeOutput(operation.sink, stdoutTail + stderrTail);
+    if (operation.capture) {
+      await operation.capture.finish(result.outputFailed || result.status === 'cancelled' || result.status === 'timeout');
+    } else {
+      const stdoutTail = operation.stdout.end();
+      const stderrTail = operation.stderr.end();
+      await closeOutput(operation.sink, stdoutTail + stderrTail);
+    }
     let publicationFailed = false;
     // A foreground-adopted task is journaled only after promotion; an ordinary
     // launched task is journaled from the start.

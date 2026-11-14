@@ -1,6 +1,7 @@
 import type { StringDecoder } from 'node:string_decoder';
 import type { OutputSink } from './output.js';
 import type { BackgroundTask, LocalJournalPort } from './model.js';
+import type { CommandOutputCapture, CommandOutputStream } from '../../../runtime/execution/output/capture.js';
 
 const PENDING_OUTPUT_LIMIT = 65536;
 
@@ -9,9 +10,10 @@ export interface OperationOutput {
   readonly sink: OutputSink;
   readonly stdout: StringDecoder;
   readonly stderr: StringDecoder;
-  readonly pendingOutput: Buffer[];
-  pendingBytes: number;
-  pendingTruncated: boolean;
+  readonly pendingOutput: { readonly stream: CommandOutputStream; readonly bytes: Buffer }[];
+  readonly pendingBytes: Record<CommandOutputStream, number>;
+  readonly pendingTruncated: Record<CommandOutputStream, boolean>;
+  readonly capture?: CommandOutputCapture;
 }
 
 /** Retain a bounded original prefix until the existing child is promoted. */
@@ -24,23 +26,37 @@ export function appendAdoptedOutput(
   promoted: boolean,
 ): void {
   const bytes = Buffer.from(text);
-  if (promoted) journal?.output(id, 'stdout', bytes);
-  else {
-    const remaining = PENDING_OUTPUT_LIMIT - operation.pendingBytes;
-    if (remaining > 0) {
-      const prefix = utf8Prefix(bytes, remaining);
-      if (prefix.length > 0) {
-        operation.pendingOutput.push(prefix);
-        operation.pendingBytes += prefix.length;
-      }
-      if (prefix.length < bytes.length) operation.pendingTruncated = true;
-    } else {
-      operation.pendingTruncated = true;
-    }
-  }
+  retainAdoptedBytes(id, 'stdout', bytes, operation, journal, promoted);
   void operation.sink.append(text);
   tasks.set(id, { ...tasks.get(id)!, output: operation.sink.tail, outputTruncated: operation.sink.truncated,
     get outputPath() { return operation.sink.spillPath; } });
+}
+
+/** A shared pre-spawn capture already consumed these bytes; only journal and project them here. */
+export function observeCapturedOutput(id: string, stream: CommandOutputStream, bytes: Buffer, operation: OperationOutput,
+  tasks: Map<string, BackgroundTask>, journal: LocalJournalPort | undefined, promoted: boolean): void {
+  retainAdoptedBytes(id, stream, bytes, operation, journal, promoted);
+  tasks.set(id, { ...tasks.get(id)!, output: operation.sink.tail, outputTruncated: operation.sink.truncated });
+}
+
+function retainAdoptedBytes(id: string, stream: CommandOutputStream, bytes: Buffer, operation: OperationOutput,
+  journal: LocalJournalPort | undefined, promoted: boolean): void {
+  if (promoted) journal?.output(id, stream, bytes);
+  else {
+    const remaining = PENDING_OUTPUT_LIMIT - operation.pendingBytes[stream];
+    if (remaining > 0) {
+      // Typed streams retain original bytes, including an unfinished UTF-8 code
+      // point. Legacy decoded callbacks already arrive at a character boundary.
+      const prefix = operation.capture ? bytes.subarray(0, remaining) : utf8Prefix(bytes, remaining);
+      if (prefix.length > 0) {
+        operation.pendingOutput.push({ stream, bytes: Buffer.from(prefix) });
+        operation.pendingBytes[stream] += prefix.length;
+      }
+      if (prefix.length < bytes.length) operation.pendingTruncated[stream] = true;
+    } else {
+      operation.pendingTruncated[stream] = true;
+    }
+  }
 }
 
 /** Journal original bytes before decoding the live text projection. */

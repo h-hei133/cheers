@@ -28,6 +28,21 @@ export interface TruncationResult {
 export const DEFAULT_MAX_LINES = 2000;
 export const DEFAULT_MAX_BYTES = 50 * 1024; // 50KB
 
+/** Cut a string at a complete UTF-8 character boundary in either direction. */
+export function truncateTextBytes(text: string, maxBytes: number, direction: "head" | "tail" = "head"): string {
+  const limit = Number.isFinite(maxBytes) ? Math.max(0, Math.floor(maxBytes)) : DEFAULT_MAX_BYTES;
+  const bytes = Buffer.from(text, "utf8");
+  if (bytes.length <= limit) return text;
+  if (direction === "tail") {
+    let start = bytes.length - limit;
+    while (start < bytes.length && (bytes[start]! & 0xc0) === 0x80) start++;
+    return bytes.subarray(start).toString("utf8");
+  }
+  let end = limit;
+  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
+  return bytes.subarray(0, end).toString("utf8");
+}
+
 export function truncateHead(
   content: string,
   budget: TruncationBudget = {},
@@ -121,7 +136,7 @@ export function truncateTail(
     const lineBytes = Buffer.byteLength(line, "utf8") + (resultLines.length > 0 ? 1 : 0);
     if (currentBytes + lineBytes > maxBytes) {
       if (resultLines.length === 0) {
-        const partial = truncateStringToBytesFromEnd(line, maxBytes);
+        const partial = truncateTextBytes(line, maxBytes, "tail");
         resultLines.unshift(partial);
         currentBytes = Buffer.byteLength(partial, "utf8");
         lastLinePartial = true;
@@ -143,21 +158,6 @@ export function truncateTail(
     direction: "tail",
     ...(lastLinePartial ? { lastLinePartial: true } : {}),
   };
-}
-
-function truncateStringToBytesFromEnd(str: string, maxBytes: number): string {
-  const buf = Buffer.from(str, "utf8");
-  if (buf.length <= maxBytes) return str;
-  let start = Math.max(0, buf.length - maxBytes);
-  while (start < buf.length && (buf[start]! & 0xc0) === 0x80) {
-    start++;
-  }
-  let sliced = buf.subarray(start).toString("utf8");
-  if (sliced.length > 0) {
-    const first = sliced.charCodeAt(0);
-    if (first >= 0xdc00 && first <= 0xdfff) sliced = sliced.slice(1);
-  }
-  return sliced;
 }
 
 export function truncateLineWidth(line: string, maxChars: number = 500): string {

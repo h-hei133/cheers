@@ -97,6 +97,7 @@ export function startStreamed(options: StreamOptions): { handle: LocalExecutionH
       if (stderrTail) {
         if (options.captureOutput !== false) stderr += stderrTail
         options.onOutput(stderrTail)
+        for (const listener of listeners) listener(stderrTail)
       }
     }
     const finish = (): void => {
@@ -154,13 +155,13 @@ export function startStreamed(options: StreamOptions): { handle: LocalExecutionH
       const text = stdoutDecoder.write(chunk)
       if (options.captureOutput !== false) stdout += text
       consumers.consume([child.stdout, child.stderr], () => { options.onOutput(text); for (const listener of listeners) listener(text); return options.onStdout?.(chunk); },
-        () => { streamFailed = true; stop(true) })
+        () => { streamFailed = true; stop(true) }, child.stdout)
     })
     child.stderr?.on('data', (chunk: Buffer) => {
       const text = stderrDecoder.write(chunk)
       if (options.captureOutput !== false) stderr += text
-      consumers.consume([child.stdout, child.stderr], () => { options.onOutput(text); return options.onStderr?.(chunk); },
-        () => { streamFailed = true; stop(true) })
+      consumers.consume([child.stdout, child.stderr], () => { options.onOutput(text); for (const listener of listeners) listener(text); return options.onStderr?.(chunk); },
+        () => { streamFailed = true; stop(true) }, child.stderr)
     })
     child.on('error', (error: NodeJS.ErrnoException) => fail(error.message, {
       ...(typeof error.code === 'string' ? { spawnErrorCode: error.code } : {}),

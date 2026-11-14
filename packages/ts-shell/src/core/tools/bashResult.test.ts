@@ -4,6 +4,8 @@ import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createCoreToolRegistry } from './registry.js'
 import type { ExecutionService } from '../../runtime/execution/types.js'
+import { ArtifactManager } from '../session/artifactManager.js'
+import { createToolResultMessage } from '../agent/tools.js'
 
 let root: string
 beforeEach(async () => { root = await fs.mkdtemp(path.join(os.tmpdir(), 'bash-result-')) })
@@ -53,4 +55,21 @@ it('does not duplicate a failed command stream either, while keeping the failure
   expect(result.metadata).not.toHaveProperty('stdout')
   expect(result.metadata).not.toHaveProperty('stderr')
   expect(JSON.stringify(result.metadata)).not.toContain('PRIVATE_STDERR')
+})
+
+it.each(['completed', 'failed'])('retains a verified raw-output artifact through the %s tool receipt byte bound', async status => {
+  const stdout = `${'界'.repeat(160)}\n`.repeat(180)
+  const result = await run(serviceReturning(status === 'completed' ? completed(stdout) : failed(stdout, 'command failed')))
+  expect(result.success).toBe(status === 'completed')
+  const notice = result.metadata?.outputNotice
+  expect(typeof notice).toBe('string')
+  const locator = typeof notice === 'string' ? /artifact:\/\/\d+/.exec(notice)?.[0] : undefined
+  expect(locator).toBeDefined()
+  const artifactPath = ArtifactManager.getShared(root, 'result').resolve(locator!)
+  expect(artifactPath).not.toBeNull()
+  expect(await fs.readFile(artifactPath!, 'utf8')).toContain(stdout)
+  const message = createToolResultMessage('bash', result.success ? result.output! : result.error!, result.metadata)
+  expect(message.content).toContain(locator)
+  expect(Buffer.byteLength(message.content as string, 'utf8')).toBeLessThanOrEqual(50 * 1024)
+  expect(message.metadata).toMatchObject({ status, outputNotice: notice })
 })

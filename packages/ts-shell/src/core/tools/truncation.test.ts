@@ -3,9 +3,19 @@ import {
   truncateHead,
   truncateTail,
   truncateLineWidth,
+  truncateTextBytes,
 } from "./truncation.js";
 
 describe("Directional Dual-Budget Truncator", () => {
+  it("uses complete UTF-8 characters in head and tail byte slices", () => {
+    expect(truncateTextBytes("a😀界b", 5)).toBe("a😀");
+    expect(truncateTextBytes("a😀界b", 5, "tail")).toBe("界b");
+    expect(truncateTextBytes("😀", 3)).toBe("");
+    expect(truncateTextBytes("😀", 3, "tail")).toBe("");
+    expect(truncateTextBytes("😀", 0)).toBe("");
+    expect(truncateTextBytes("😀", 4)).toBe("😀");
+  });
+
   it("keeps content unchanged within line and byte limits", () => {
     const text = "line 1\nline 2\nline 3";
     const res = truncateHead(text, { maxLines: 10, maxBytes: 1024 });

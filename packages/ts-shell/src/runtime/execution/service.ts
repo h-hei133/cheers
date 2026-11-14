@@ -130,6 +130,10 @@ function withCommandExecutionProjection(
   executionPath: ExecutionPath,
   result: NormalizedExecutionResult & { readonly recoveryReason?: string },
 ): CommandExecutionResult {
+  if (request.outputSnapshot) {
+    const output = request.outputSnapshot();
+    result = { ...result, stdout: output.stdout || result.stdout, stderr: output.stderr || result.stderr };
+  }
   const classification = classifyCommandExecutionOutcome({
     status: result.status,
     exitCode: result.exitCode,

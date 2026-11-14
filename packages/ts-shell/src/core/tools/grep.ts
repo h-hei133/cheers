@@ -197,7 +197,7 @@ export function createGrepToolDefinition(
           });
           const lines = content.split("\n");
           const displayFile = reportPath(relPath, searchRoot, context.workspaceRoot);
-          const emittedLines = new Set<number>();
+          const emittedLines = new Map<number, number>();
 
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i]!;
@@ -205,12 +205,17 @@ export function createGrepToolDefinition(
             const startCtx = Math.max(0, i - contextLines);
             const endCtx = Math.min(lines.length - 1, i + contextLines);
             for (let c = startCtx; c <= endCtx; c++) {
-              if (emittedLines.has(c)) continue;
-              emittedLines.add(c);
               const isMatchLine = c === i;
               const safeLine = truncateLineWidth(lines[c]!, 500);
               const sep = isMatchLine ? ":" : "-";
-              results.push(`${displayFile}${sep}${c + 1}${sep} ${safeLine}`);
+              const row = `${displayFile}${sep}${c + 1}${sep} ${safeLine}`;
+              const existing = emittedLines.get(c);
+              if (existing !== undefined) {
+                if (isMatchLine) results[existing] = row;
+                continue;
+              }
+              emittedLines.set(c, results.length);
+              results.push(row);
             }
             totalMatches++;
             if (totalMatches >= limit) break;
@@ -264,12 +269,14 @@ async function reportGrepMatches(
   const rawResult = matches.join("\n");
   const truncated = truncateHead(rawResult, { maxLines: 500, maxBytes: 50 * 1024 });
   let outputText = truncated.content;
+  let outputNotice: string | undefined;
 
   if (truncated.truncated) {
     const artifactManager = ArtifactManager.getShared(workspaceRoot, sessionId);
     const artifact = await artifactManager.save(rawResult, "grep");
-    outputText += `\n\n[Showing ${truncated.shownLines} of ${matches.length} matches (${Math.round(truncated.shownBytes / 1024)}KB). Full grep output spilled to: ${artifact.uri}]`;
+    outputNotice = `[Showing ${truncated.shownLines} of ${matches.length} lines (${Math.round(truncated.shownBytes / 1024)}KB). Full grep output spilled to: ${artifact.uri}]`;
+    outputText += `\n\n${outputNotice}`;
   }
 
-  return approvedResult(outputText);
+  return approvedResult(outputText, outputNotice ? { outputNotice } : undefined);
 }

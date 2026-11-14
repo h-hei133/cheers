@@ -71,6 +71,33 @@ it('adopts a foreground child and promotes it without a second spawn', async () 
   expect(ended).toEqual([task.id]);
 });
 
+it('promotes one native process with its pre-spawn capture and separate original streams', async () => {
+  const local = journal();
+  const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
+  const { createCommandOutputCapture } = await import('../../../runtime/execution/output/capture.js');
+  const capture = createCommandOutputCapture();
+  const dispose = vi.spyOn(capture, 'dispose');
+  let observe!: () => void;
+  const received = new Promise<void>(resolve => { observe = resolve; });
+  capture.onChunk(stream => { if (stream === 'stderr') observe(); });
+  const { startStreamed } = await import('../../../runtime/execution/local.js');
+  const { handle } = startStreamed({ command: process.execPath,
+    args: ['-e', 'process.stdout.write("before-out\\n"); process.stderr.write("before-error\\n"); setTimeout(() => { process.stdout.write("after-out\\n"); process.stderr.write("after-error\\n"); process.exit(0) }, 250)'],
+    cwd: root, captureOutput: false, onOutput: () => {},
+    onStdout: bytes => capture.append('stdout', bytes), onStderr: bytes => capture.append('stderr', bytes) });
+  const task = owner.adopt(handle, { command: 'captured-command', cwd: root }, capture);
+  await received;
+  expect(local.list()).toEqual([]);
+  expect(owner.promote(task.id)).toBe('promoted');
+  await owner.settled(task.id);
+  expect(await handle.result).toEqual({ stdout: '', stderr: '' });
+  expect(task.pid).toBe(handle.pid);
+  expect(local.get(task.id)).toMatchObject({ status: 'completed', output: 'complete', truncated: false });
+  expect(Buffer.from(local.get(task.id).stdout, 'base64').toString('utf8')).toBe('before-out\nafter-out\n');
+  expect(Buffer.from(local.get(task.id).stderr, 'base64').toString('utf8')).toBe('before-error\nafter-error\n');
+  expect(dispose).toHaveBeenCalledTimes(1);
+});
+
 it('preserves a UTF-8 code point split across adopted output chunks', async () => {
   const local = journal();
   const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
@@ -260,6 +287,34 @@ it('does not claim cancellation until the native owner settles and preserves fai
   settle(result('failed', null, true)); expect(await pending).toBe(false);
   expect(local.get(task.id)).toMatchObject({ status: 'unknown', dispatchPossible: true, output: 'unknown' });
   expect(() => journal().adopt(task.id)).toThrow(/conflict/);
+});
+
+it('observes a promoted capture seal failure while retaining rejecting settlement and unknown journal state', async () => {
+  const local = journal();
+  const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
+  const { createCommandOutputCapture } = await import('../../../runtime/execution/output/capture.js');
+  const capture = createCommandOutputCapture();
+  const failure = new Error('synthetic capture seal failure');
+  vi.spyOn(capture, 'finish').mockRejectedValue(failure);
+  const dispose = vi.spyOn(capture, 'dispose');
+  let resolveResult!: () => void;
+  const result = new Promise<{ stdout: string; stderr: string }>(resolve => {
+    resolveResult = () => resolve({ stdout: '', stderr: '' });
+  });
+  const handle: LocalExecutionHandle = {
+    pid: 43210, onOutput: () => () => {}, detach() {}, kill: async () => {}, result,
+  };
+  const task = owner.adopt(handle, { command: 'capture seal failure', cwd: root }, capture);
+  expect(owner.promote(task.id)).toBe('promoted');
+  const settlement = owner.settled(task.id);
+  resolveResult();
+  // Let the job settle without an explicit waiter first. Vitest would report an
+  // unhandled rejection if the background owner did not observe this promise.
+  await until(() => !owner.hasLive(task.id));
+  await expect(settlement).rejects.toBe(failure);
+  expect(local.get(task.id)).toMatchObject({ status: 'unknown', output: 'unknown', dispatchPossible: true });
+  expect(owner.get(task.id)).toMatchObject({ state: 'unknown' });
+  expect(dispose).toHaveBeenCalledTimes(1);
 });
 
 it('keeps a durable task unknown when settlement publication fails', async () => {

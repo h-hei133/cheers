@@ -1,13 +1,14 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyUnixReplacementsToOriginal } from "../../runtime/execution/fileText.js";
 import { createDefaultExecutionService } from "../../runtime/execution/service.js";
+import { ArtifactManager } from "../session/artifactManager.js";
+import { createToolResultMessage } from "../agent/tools.js";
 import { createEditToolDefinition } from "../../edit/tool.js";
 import { createGrepToolDefinition } from "./grep.js";
 import { formatRipgrepMatch, forgetRipgrepBinary, parseRipgrepJson, ripgrepArgs } from "./grepRipgrep.js";
-import { OutputAccumulator } from "./outputAccumulator.js";
 import { normalizeToolPathInput, resolveReadablePathVariant, resolveToolTarget } from "./permissionContext.js";
 import { createReadToolDefinition } from "./read.js";
 import { truncateLineWidth, truncateTail } from "./truncation.js";
@@ -15,6 +16,8 @@ import { truncateLineWidth, truncateTail } from "./truncation.js";
 const tempDirs: string[] = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   forgetRipgrepBinary();
   for (const dir of tempDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -27,7 +30,7 @@ function makeWorkspace(): string {
   return dir;
 }
 
-describe("Pi path-utils parity", () => {
+describe("Tool paths", () => {
   it("strips @ prefix, normalizes Unicode spaces, expands ~, and decodes file:// URLs", () => {
     const root = makeWorkspace();
     expect(normalizeToolPathInput("@src/app.ts")).toBe("src/app.ts");
@@ -53,7 +56,7 @@ describe("Pi path-utils parity", () => {
   });
 });
 
-describe("Pi truncation parity", () => {
+describe("Tool output bounds", () => {
   it("slices an oversized single trailing line by byte budget without splitting UTF-16 surrogates", () => {
     const emojiLine = "😀".repeat(60); // 240 UTF-8 bytes
     const result = truncateTail(emojiLine, { maxLines: 10, maxBytes: 25 });
@@ -68,25 +71,7 @@ describe("Pi truncation parity", () => {
   });
 });
 
-describe("OutputAccumulator incremental spill", () => {
-  it("emits buffered content once maxBytes overflows and streams subsequent chunks", () => {
-    const spilled: string[] = [];
-    const acc = new OutputAccumulator({
-      maxBytes: 10,
-      maxLines: 100,
-      onOverflowSpill: (chunk) => spilled.push(chunk),
-    });
-    acc.append("12345");
-    expect(spilled).toEqual([]);
-    acc.append("67890A");
-    expect(spilled).toEqual(["1234567890A"]);
-    acc.append("BC");
-    expect(spilled).toEqual(["1234567890A", "BC"]);
-    acc.finish();
-  });
-});
-
-describe("Pi grep literal and context support", () => {
+describe("Search literal and context support", () => {
   it("passes --fixed-strings and --context to ripgrep and formats context lines with -", () => {
     const args = ripgrepArgs({
       pattern: "a+b(c)",
@@ -115,8 +100,11 @@ describe("Pi grep literal and context support", () => {
 
   it("supports literal and context in fallback search as well", async () => {
     const root = makeWorkspace();
+    vi.stubEnv("PATH", root);
     fs.writeFileSync(path.join(root, "sample.txt"), "line1\na+b(c)\nline3\n");
-    const grepTool = createGrepToolDefinition(createDefaultExecutionService());
+    const service = createDefaultExecutionService();
+    const list = vi.spyOn(service, "listFilesRecursive");
+    const grepTool = createGrepToolDefinition(service);
     const result = await grepTool.execute(
       { pattern: "a+b(c)", literal: true, context: 1 },
       { workspaceRoot: root, sessionId: "s1", taskId: "t1" },
@@ -124,6 +112,54 @@ describe("Pi grep literal and context support", () => {
     expect(result.output).toContain("sample.txt-1- line1");
     expect(result.output).toContain("sample.txt:2: a+b(c)");
     expect(result.output).toContain("sample.txt-3- line3");
+    expect(list).toHaveBeenCalled();
+  });
+
+  it.each(["native", "fallback"] as const)("retains overlapping context as distinct matching lines in %s search", async mode => {
+    const root = makeWorkspace();
+    if (mode === "fallback") vi.stubEnv("PATH", root);
+    fs.writeFileSync(path.join(root, "sample.txt"), "before\nTARGET one\nTARGET two\nafter\n");
+    const service = createDefaultExecutionService();
+    const list = vi.spyOn(service, "listFilesRecursive");
+    const result = await createGrepToolDefinition(service).execute(
+      { pattern: "TARGET", literal: true, context: 1, limit: 2 },
+      { workspaceRoot: root, sessionId: "matches", taskId: "matches" },
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.output?.split("\n")).toEqual([
+      "sample.txt-1- before",
+      "sample.txt:2: TARGET one",
+      "sample.txt:3: TARGET two",
+      "sample.txt-4- after",
+    ]);
+    if (mode === "native") expect(list).not.toHaveBeenCalled();
+    else expect(list).toHaveBeenCalled();
+  });
+
+  it("preserves the published search artifact locator through the shared tool receipt bound", async () => {
+    const root = makeWorkspace();
+    vi.stubEnv("PATH", root);
+    const source = Array.from({ length: 130 }, (_, index) => `TARGET-${index} ${"界".repeat(180)}`).join("\n");
+    fs.writeFileSync(path.join(root, "sample.txt"), source);
+    const result = await createGrepToolDefinition(createDefaultExecutionService()).execute(
+      { pattern: "TARGET", literal: true, limit: 130 },
+      { workspaceRoot: root, sessionId: "spill", taskId: "spill" },
+    );
+
+    expect(result.success).toBe(true);
+    const notice = result.metadata?.outputNotice;
+    expect(typeof notice).toBe("string");
+    const locator = typeof notice === "string" ? /artifact:\/\/\d+/.exec(notice)?.[0] : undefined;
+    expect(locator).toBeDefined();
+    const artifactPath = ArtifactManager.getShared(root, "spill").resolve(locator!);
+    expect(artifactPath).not.toBeNull();
+    const saved = fs.readFileSync(artifactPath!, "utf8");
+    expect(saved).toContain("sample.txt:130: TARGET-129");
+    const message = createToolResultMessage("search", result.output!, result.metadata);
+    expect(message.content).toContain(locator);
+    expect(message.metadata?.outputNotice).toBe(notice);
+    expect(Buffer.byteLength(message.content as string, "utf8")).toBeLessThanOrEqual(50 * 1024);
   });
 
   it("keeps searching past context-heavy files until match limit is actually reached", async () => {
@@ -142,7 +178,7 @@ describe("Pi grep literal and context support", () => {
     expect(result.output).toContain("f69.txt:3: TARGET");
   });
 });
-describe("Pi edit line-ending preservation and firstChangedLine", () => {
+describe("Edit line endings and changed-line projection", () => {
   it("preserves untouched mixed line endings across replacements", async () => {
     const raw = "alpha\r\nbeta\ngamma\r\n";
     const edited = applyUnixReplacementsToOriginal(raw, [{ start: 6, end: 10, newText: "BETA" }]);

@@ -25,7 +25,8 @@ it('promotes a default-timeout foreground command without spawning again', async
   await vi.advanceTimersByTimeAsync(60_000);
   const result = await pending;
   expect(startCommand).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 300_000 }));
-  expect(adopt).toHaveBeenCalledWith(expect.objectContaining({ pid: 4321 }), expect.objectContaining({ command: 'echo hi' }));
+  expect(adopt).toHaveBeenCalledWith(expect.objectContaining({ pid: 4321 }), expect.objectContaining({ command: 'echo hi' }),
+    expect.objectContaining({ append: expect.any(Function), finish: expect.any(Function), dispose: expect.any(Function) }));
   expect(detach).toHaveBeenCalled();
   expect(promote).toHaveBeenCalledWith('task-1');
   expect(kill).not.toHaveBeenCalled();

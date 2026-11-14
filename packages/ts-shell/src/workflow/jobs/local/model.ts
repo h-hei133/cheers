@@ -31,7 +31,8 @@ export interface BackgroundRunner {
    * that can be promoted to a durable job before the wait gives up. Adopting a
    * command that finishes in the foreground leaves no journal entry.
    */
-  adopt?(handle: import('../../../runtime/execution/types.js').LocalExecutionHandle, input: BackgroundInput): BackgroundTask;
+  adopt?(handle: import('../../../runtime/execution/types.js').LocalExecutionHandle, input: BackgroundInput,
+    capture?: import('../../../runtime/execution/output/capture.js').CommandOutputCapture): BackgroundTask;
   /**
    * Promote a provisional task to a durable job.
    *

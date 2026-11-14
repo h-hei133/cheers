@@ -2,12 +2,8 @@ import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
 import { resolveWorkspaceRoot } from '../workspace/roots.js'
 import { startBackgroundCommand, createTaskOutputToolDefinition, createTaskStopToolDefinition, createTaskWaitToolDefinition } from './shell/background.js';
-import { planCommandLaunch } from './shell/launch.js';
-import { TOOL_APPROVED_COMMAND_AUTHORITY } from './shell/authority.js';
 import { withFileLock } from '../../runtime/execution/fileLock.js'
 import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
-import { OutputAccumulator } from './outputAccumulator.js'
-import { ArtifactManager } from '../session/artifactManager.js'
 import {
   createDefaultExecutionService,
   type ExecutionAuthority,
@@ -34,14 +30,12 @@ import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { resolveToolTarget } from './permissionContext.js'
 import { validateToolArguments } from './arguments.js'
 import { approvedResult, deniedResult, runtimeErrorResult } from './toolResultLifecycle.js'
-import { networkNotice, readSandboxRules } from '../../sandbox/osSandbox.js'
-import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
+import { DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
 import { createPatchToolDefinition } from '../../edit/patch/tool.js'
 import { createEditToolDefinition } from '../../edit/tool.js'
-import { startCommandProof } from '../../runtime/execution/proof.js'
 import { createCodemodeToolDefinition } from './codemode/tool.js'
+import { runCommandTool } from './shell/foreground.js'
 
-type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
   mode: 'read-only',
   source: 'tool-runtime-approval',
@@ -67,174 +61,6 @@ function outsideWorkspaceMessage(reason: string | undefined, target: string, wor
   const why = reason ?? `Target '${target}' is outside the workspace.`
   return `${why} Writes are limited to the workspace (${workspaceRoot}) and the roots the user attaches. `
     + `To allow this path, the user can run /workspace add <path> --write, then retry.`
-}
-
-function inferFailureKind(result: {
-  status: 'completed' | 'failed' | 'timeout' | 'cancelled'
-  failureKind?: ExecutionFailureKind
-}): ExecutionFailureKind | undefined {
-  if (result.failureKind) {
-    return result.failureKind
-  }
-
-  switch (result.status) {
-    case 'timeout':
-      return 'timeout'
-    case 'cancelled':
-      return 'cancelled'
-    case 'failed':
-      return 'execution_failure'
-    default:
-      return undefined
-  }
-}
-
-async function runCommandTool(
-  executionService: ExecutionService,
-  command: string,
-  context: ToolExecutionContext,
-  requestedTimeoutSeconds?: unknown,
-) {
-  if (!command || !command.trim()) {
-    return deniedResult('Error: No command provided to execute.', {
-      status: 'failed',
-      exitCode: 1,
-    })
-  }
-  // Refused rather than clamped: a value past the ceiling would otherwise be
-  // silently replaced by something the caller did not ask for.
-  const timeout = resolveCommandTimeout(requestedTimeoutSeconds)
-  if (!timeout.ok) {
-    return deniedResult(`Error: ${timeout.reason}`, { status: 'failed', exitCode: 1 })
-  }
-  const { shellBin, shellArgs, sandbox } = planCommandLaunch(command, context)
-  // A refusal is not a command to run: the sandbox answered "I could not isolate
-  // this and you asked me not to proceed without it". Running it anyway would be
-  // the setting doing nothing, so it stops here.
-  if (sandbox.state === 'refused') {
-    return deniedResult(`Error: ${sandbox.notice ?? 'sandbox refused the command'}`, {
-      status: 'failed',
-      exitCode: 1,
-    })
-  }
-  const proof = startCommandProof(command, context)
-  context.commandProof?.started(proof, context.assertSourceAccess)
-  // A default-timeout foreground command is spawned once and adopted by the
-  // job owner. Keep the bounded background deadline on the native handle too;
-  // the foreground race only releases the turn and must not remove the limit.
-  const promotable = requestedTimeoutSeconds === undefined && context.background?.adopt && context.background.promote
-    && context.onOutput && executionService.startCommand
-  const request = {
-    operationKind: 'command.run' as const,
-    command: sandbox.command ?? shellBin,
-    args: sandbox.args ?? shellArgs,
-    cwd: context.workspaceRoot,
-    workspaceRoot: context.workspaceRoot,
-    authority: TOOL_APPROVED_COMMAND_AUTHORITY,
-    caller: 'core-tool:bash',
-    reason: 'Run an approved workspace command.',
-    reportSafeCommand: command,
-    abortSignal: context.abortSignal,
-    ...(context.commandEnv ? { env: context.commandEnv } : {}),
-    ...(context.onOutput ? { onOutput: context.onOutput } : {}),
-    ...(promotable ? { timeoutMs: 300_000 } : {}),
-  }
-  // An interactive default-timeout command is spawned once and adopted by the
-  // job owner. If it outlives the foreground window it is promoted in place,
-  // keeping the same PID; an explicit timeout keeps the ordinary path.
-  let result: Awaited<ReturnType<ExecutionService['runCommand']>>
-  if (promotable) {
-    const started = executionService.startCommand!(request)
-    const task = context.background!.adopt!(started.handle, { command, cwd: context.workspaceRoot, timeoutMs: 300_000,
-      authority: TOOL_APPROVED_COMMAND_AUTHORITY, ...(context.commandEnv ? { env: context.commandEnv } : {}) })
-    const deadline = new Promise<'timeout'>(resolve => {
-      const timer = setTimeout(() => resolve('timeout'), DEFAULT_COMMAND_TIMEOUT_MS)
-      timer.unref?.()
-    })
-    const promotionRace = context.background!.whenPromoted
-      ? context.background!.whenPromoted(task.id).then(outcome => ({ kind: 'promotion' as const, outcome }))
-      : undefined
-    const raced = await Promise.race([
-      started.result.then(value => ({ kind: 'result' as const, value })),
-      deadline.then(() => ({ kind: 'timeout' as const })),
-      ...(promotionRace ? [promotionRace] : []),
-    ])
-    if (raced.kind === 'promotion') {
-      if (raced.outcome === 'promoted') {
-        started.handle.detach()
-        return approvedResult(`Moved to the background as ${task.id}. It keeps the same process; read it with taskOutput and stop it with taskStop.`)
-      }
-      if (raced.outcome === 'refused') {
-        await started.handle.kill()
-        return deniedResult('Error: the command could not be moved to the background and was stopped. Nothing is still running.', { status: 'failed', exitCode: 1 })
-      }
-      result = await started.result
-    } else if (raced.kind === 'timeout') {
-      started.handle.detach()
-      const promotion = context.background!.promote!(task.id)
-      if (promotion === 'refused') {
-        await started.handle.kill()
-        return deniedResult('Error: the command could not be moved to the background and was stopped. Nothing is still running.', { status: 'failed', exitCode: 1 })
-      }
-      if (promotion === 'promoted')
-        return approvedResult(`Moved to the background as ${task.id} after ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds. It keeps the same process; read it with taskOutput and stop it with taskStop.`)
-      // It finished between the deadline and the promotion; report the result.
-      result = await started.result
-    } else result = raced.value
-  } else {
-    result = await executionService.runCommand({ ...request, timeoutMs: timeout.timeoutMs })
-  }
-  context.commandProof?.settled({ ...proof, settledAt: new Date().toISOString(), status: result.status, exitCode: result.exitCode }, context.assertSourceAccess)
-  const artifactManager = ArtifactManager.getShared(context.workspaceRoot, context.sessionId)
-  const isOk = result.status === 'completed' && result.exitCode === 0
-  const rawOutput = isOk
-    ? (result.stdout || 'Command completed with no output')
-    : ([result.stderr, result.stdout].filter(Boolean).join('\n') || result.recoveryReason || `Command failed with exit code ${result.exitCode}`)
-
-  const accumulator = new OutputAccumulator({ maxLines: 2000, maxBytes: 50 * 1024 })
-  accumulator.append(rawOutput)
-  accumulator.finish()
-  const truncated = accumulator.snapshot().truncation
-  let finalOutput = truncated.content
-  const sandboxNotices = [sandbox.notice, sandbox.state === 'isolated' ? networkNotice(readSandboxRules(context.workspaceRoot)) : undefined].filter(Boolean)
-  if (sandboxNotices.length > 0) {
-    finalOutput = `${sandboxNotices.map(notice => `[sandbox] ${notice}`).join('\n')}\n${finalOutput}`
-  }
-
-  if (truncated.truncated) {
-    const artifact = await artifactManager.save(rawOutput, 'bash')
-    finalOutput += `\n\n[Showing last ${truncated.shownLines} of ${truncated.originalLines} lines (${Math.round(truncated.shownBytes / 1024)}KB of ${Math.round(truncated.originalBytes / 1024)}KB). Full raw output saved: ${artifact.uri}]\n[To read full or earlier sections: read(path="${artifact.uri}:1-500")]`
-  }
-
-  // How the result was classified and which executor answered are decided by the
-  // execution service; dropping them here would make the tool result unable to
-  // say what kind of failure this was.
-  //
-  // The raw streams are deliberately absent. `finalOutput` already carries what
-  // the model reads, and a second copy under `metadata` would be written into
-  // the transcript beside every command result — doubling its size, without a
-  // consumer: no reader of a tool result's metadata looks at `stdout`/`stderr`.
-  // A reader that needs the full bytes is pointed at the artifact instead.
-  const executionProvenance = {
-    executionPath: result.executionPath,
-    errorClass: result.errorClass,
-  }
-
-  if (isOk) {
-    return approvedResult(finalOutput, {
-      ...executionProvenance,
-      status: result.status,
-      exitCode: result.exitCode,
-    })
-  }
-
-  return deniedResult(finalOutput, {
-    ...executionProvenance,
-    status: result.status,
-    exitCode: result.exitCode,
-    failureKind: inferFailureKind(result),
-    recoveryReason: result.recoveryReason,
-  })
 }
 
 export function createCoreToolRegistry(options?: {

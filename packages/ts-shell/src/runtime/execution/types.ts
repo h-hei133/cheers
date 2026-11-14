@@ -161,6 +161,8 @@ export interface CommandExecutionRequest {
   readonly onStdout?: (chunk: Buffer) => void | Promise<void>
   readonly onStderr?: (chunk: Buffer) => void | Promise<void>
   readonly captureOutput?: boolean
+  /** A bounded capture owner supplies the same streams for classification and receipts. */
+  readonly outputSnapshot?: () => { readonly stdout: string; readonly stderr: string }
   /** Controlled CLI handoffs share the restored terminal through this spawn owner. */
   readonly inheritTerminal?: boolean
   /** Long-lived duplex services must clean their group even after a normal leader exit. */
