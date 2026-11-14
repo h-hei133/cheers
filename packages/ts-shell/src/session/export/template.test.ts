@@ -187,10 +187,14 @@ describe("exported page branch traversal", () => {
       ],
       tree: [node("u"), node("a", "u"), node("t", "a")],
       leafId: "t",
-      stats: { userMessages: 1, assistantMessages: 1, toolCalls: 1, models: ["openai/gpt-5"], tokens: { input: 10, output: 5 }, costUsd: 0.001 },
+      stats: { userMessages: 1, assistantMessages: 1, toolCalls: 1, models: ["openai/gpt-5"],
+        accounting: { scope: "session", status: "partial", usageStatus: "recorded", tokens: { input: 10, output: 5, total: 15 },
+          estimatedCostUsd: 0.001, requestCoverage: { status: "unavailable" } } },
     });
     expect(elements.get("stats")!.textContent).toContain("openai/gpt-5");
     expect(elements.get("stats")!.textContent).toContain("10 in / 5 out");
+    expect(elements.get("stats")!.textContent).toContain("Recorded session tokens");
+    expect(elements.get("stats")!.textContent).toContain("Estimated recorded cost: $0.0010");
     const conv = elements.get("conversation")!;
     expect(conv.textContent).toContain("step 1");
     expect(conv.textContent).toContain("-old");
@@ -200,5 +204,29 @@ describe("exported page branch traversal", () => {
     expect(elements.get("modal-image")!.attributes.get("src")).toBe("data:image/png;base64,AAAA");
     elements.get("image-modal")!.listeners.get("click")?.();
     expect(elements.get("image-modal")!.className).not.toContain("open");
+  });
+
+  it("shows unknown categories and dispatched usage gaps without substituting zero", () => {
+    const elements = runPage({ entries: [], tree: [], stats: { userMessages: 0, assistantMessages: 0, toolCalls: 0,
+      accounting: { scope: "session", status: "partial", usageStatus: "partial", tokens: { total: 15 },
+        requestCoverage: { status: "partial", dispatchedUnknown: 2, historyUnknown: true, breach: true,
+          knownPartialTokens: { input: 10 } } } } });
+    const stats = elements.get("stats")!.textContent;
+    expect(stats).toContain("15 total; allocation unknown");
+    expect(stats).toContain("Estimated recorded cost: unavailable");
+    expect(stats).toContain("Requests with unknown usage: 2");
+    expect(stats).toContain("Earlier request usage: unknown");
+    expect(stats).toContain("Request bounds: breached");
+    expect(stats).toContain("Partial request tokens: 10 in / unknown out");
+    expect(stats).not.toContain("0 out");
+    expect(stats).not.toContain("$0.0000");
+  });
+
+  it("renders absent accounting as unavailable", () => {
+    const elements = runPage({ entries: [], tree: [], stats: { userMessages: 0, assistantMessages: 0, toolCalls: 0,
+      accounting: { scope: "session", status: "unavailable", usageStatus: "unavailable",
+        requestCoverage: { status: "unavailable" } } } });
+    expect(elements.get("stats")!.textContent).toContain("Session usage: unavailable");
+    expect(elements.get("stats")!.textContent).toContain("Request coverage: unavailable");
   });
 });

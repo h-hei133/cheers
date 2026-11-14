@@ -4,14 +4,6 @@ export interface ExportImage {
   readonly data: string;
 }
 
-export interface ExportEntryUsage {
-  readonly inputTokens: number;
-  readonly outputTokens: number;
-  readonly cacheReadTokens?: number;
-  readonly cacheWriteTokens?: number;
-  readonly costUsd?: number;
-}
-
 export interface ExportEntry {
   readonly id: string;
   readonly role: string;
@@ -23,7 +15,6 @@ export interface ExportEntry {
   readonly toolCallId?: string;
   readonly toolDiff?: string;
   readonly isError?: boolean;
-  readonly usage?: ExportEntryUsage;
   readonly origin?: { readonly provider?: string; readonly model: string };
   readonly timestamp?: string;
   readonly sourceEntryId?: string;
@@ -48,14 +39,32 @@ export interface ExportSessionStats {
   readonly compactions: number;
   readonly branchSummaries: number;
   readonly models: readonly string[];
+  readonly accounting: ExportAccounting;
+}
+
+/** Session cumulative accounting includes retired branches and auxiliary requests. */
+export interface ExportAccounting {
+  readonly scope: 'session';
+  readonly status: 'recorded' | 'partial' | 'unavailable';
+  readonly usageStatus: 'recorded' | 'partial' | 'unavailable';
+  readonly recordedRequests?: number;
   readonly tokens?: {
-    readonly input: number;
-    readonly output: number;
-    readonly cacheRead: number;
-    readonly cacheWrite: number;
+    readonly input?: number;
+    readonly output?: number;
+    readonly cacheRead?: number;
+    readonly cacheWrite?: number;
     readonly total: number;
   };
-  readonly costUsd?: number;
+  readonly estimatedCostUsd?: number;
+  readonly requestCoverage: {
+    readonly status: 'tracked' | 'partial' | 'unavailable';
+    readonly scopeCount?: number;
+    readonly pending?: number;
+    readonly dispatchedUnknown?: number;
+    readonly historyUnknown?: boolean;
+    readonly breach?: boolean;
+    readonly knownPartialTokens?: { readonly input?: number; readonly output?: number };
+  };
 }
 
 export interface ExportPayload {

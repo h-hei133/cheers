@@ -367,11 +367,27 @@ export const PAGE_SCRIPT = String.raw`
       ['Tool calls', String(s.toolCalls || 0)],
     ];
     if (s.models && s.models.length) items.push(['Models', s.models.join(', ')]);
-    if (s.tokens) {
-      items.push(['Tokens', (s.tokens.input || 0) + ' in / ' + (s.tokens.output || 0) + ' out']);
-    }
-    if (typeof s.costUsd === 'number') {
-      items.push(['Cost', '$' + s.costUsd.toFixed(4)]);
+    var accounting = s.accounting;
+    if (accounting) {
+      var tokens = accounting.tokens;
+      if (tokens) {
+        var categories = typeof tokens.input === 'number' && typeof tokens.output === 'number'
+          ? tokens.input + ' in / ' + tokens.output + ' out' : tokens.total + ' total; allocation unknown';
+        items.push(['Recorded session tokens', categories]);
+      } else items.push(['Session usage', 'unavailable']);
+      items.push(['Estimated recorded cost', typeof accounting.estimatedCostUsd === 'number'
+        ? '$' + accounting.estimatedCostUsd.toFixed(4) : 'unavailable']);
+      var coverage = accounting.requestCoverage;
+      items.push(['Request coverage', coverage.status === 'tracked' ? 'tracked scopes' : coverage.status]);
+      if (coverage.dispatchedUnknown) items.push(['Requests with unknown usage', String(coverage.dispatchedUnknown)]);
+      if (coverage.historyUnknown) items.push(['Earlier request usage', 'unknown']);
+      if (coverage.breach) items.push(['Request bounds', 'breached']);
+      if (coverage.knownPartialTokens) {
+        var partial = coverage.knownPartialTokens;
+        items.push(['Partial request tokens',
+          (typeof partial.input === 'number' ? partial.input : 'unknown') + ' in / ' +
+          (typeof partial.output === 'number' ? partial.output : 'unknown') + ' out']);
+      }
     }
     items.forEach(function (pair) {
       var span = el('span', 'stat');

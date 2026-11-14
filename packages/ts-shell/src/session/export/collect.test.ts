@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createSessionStoreLayout, projectSessionFileLayout } from "../store/sessionFileLayout.js";
 import { writeSessionMetadataRecord, writeSessionRecord } from "../store/sessionStore.js";
 import { writeSessionState } from "../store/sessionStateStore.js";
-import { appendSessionTurn, appendTranscriptEvent } from "../transcript/sessionTranscript.js";
+import { appendSessionTurn, appendTranscriptEvent, parseTranscript } from "../transcript/sessionTranscript.js";
+import { sessionUsageRecorder } from "../store/usage.js";
+import { sessionRequestStore } from "../store/requests.js";
+import { createRequestPolicy } from "../../core/agent/request/policy.js";
+import { resetSessionUsage } from "../../observability/usageTelemetry.js";
 import { gatherExport } from "./collect.js";
 import { renderExportHtml } from "./html.js";
 import type { Session } from "../schema/sessionRecord.js";
@@ -26,13 +30,17 @@ describe("gathering a session for export", () => {
   const originalHome = process.env.HOME;
   const originalUserProfile = process.env.USERPROFILE;
   beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), "export-home-"));
-    workspace = fs.mkdtempSync(path.join(os.tmpdir(), "export-work-"));
+    const temporaryRoot = path.join(os.tmpdir(), "cheers-test");
+    fs.mkdirSync(temporaryRoot, { recursive: true });
+    home = fs.mkdtempSync(path.join(temporaryRoot, "export-home-"));
+    workspace = fs.mkdtempSync(path.join(temporaryRoot, "export-work-"));
     process.env.HOME = home;
     process.env.USERPROFILE = home;
+    resetSessionUsage(sessionId);
   });
 
   afterEach(() => {
+    resetSessionUsage(sessionId);
     if (originalUserProfile === undefined) delete process.env.USERPROFILE;
     else process.env.USERPROFILE = originalUserProfile;
     if (originalHome === undefined) delete process.env.HOME;
@@ -42,7 +50,7 @@ describe("gathering a session for export", () => {
   });
 
   /** A session written the way the product writes one, so the tree exists. */
-  function writeSession(turns: readonly { role: "user" | "assistant"; content: string }[]): void {
+  function writeSession(turns: readonly { role: "user" | "assistant"; content: string }[]): Session {
     const storeLayout = createSessionStoreLayout(home);
     const layout = projectSessionFileLayout({ sessionsDir: storeLayout.sessionsDir, sessionId });
     const base: Session = {
@@ -68,6 +76,7 @@ describe("gathering a session for export", () => {
         writeState: (session) => writeSessionState({ session, layout }),
       });
     }
+    return recorded;
   }
 
   it("joins the tree to the messages by entry id", () => {
@@ -273,7 +282,6 @@ describe("gathering a session for export", () => {
         origin: { provider: "openai", model: "gpt-5" },
         reasoning: { text: "check secret sk-1234567890abcdef12345678" },
         tool_calls: [{ id: "call-edit", type: "function", function: { name: "edit", arguments: "{}" } }],
-        metadata: { usage: { inputTokens: 120, outputTokens: 40, costUsd: 0.0025 } },
       },
       timestamp: "2026-09-25T00:00:02.000Z",
       append: (event) => appendTranscriptEvent(layout.transcriptPath, event),
@@ -294,6 +302,11 @@ describe("gathering a session for export", () => {
       writeState: (session) => writeSessionState({ session, layout }),
     });
 
+    sessionUsageRecorder(sessionId)({ provider: "openai", model: "gpt-5", baseUrl: "https://provider.invalid",
+      rates: { promptPerMTok: 3, completionPerMTok: 6, cacheReadPerMTok: 1 } })({
+      prompt_tokens: 120, completion_tokens: 40, total_tokens: 160, prompt_tokens_details: { cached_tokens: 80 },
+    });
+
     const result = gatherExport({ sessionId, workspace });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -306,11 +319,118 @@ describe("gathering a session for export", () => {
       toolResults: 1,
       toolCalls: 1,
       models: ["openai/gpt-5"],
-      tokens: { input: 120, output: 40, total: 160 },
-      costUsd: 0.0025,
+      accounting: { scope: "session", status: "partial", usageStatus: "recorded", recordedRequests: 1,
+        tokens: { input: 120, output: 40, cacheRead: 80, cacheWrite: 0, total: 160 },
+        requestCoverage: { status: "unavailable" } },
     });
+    expect(result.payload.stats?.accounting.estimatedCostUsd).toBeCloseTo(0.00044);
+    expect(result.payload.entries.every(entry => !("usage" in entry))).toBe(true);
     const html = renderExportHtml(result.payload);
     expect(html).toContain("image-modal");
     expect(html).toContain("toggle-thinking");
+  });
+
+  it("exports durable billing beside an unknown dispatched request without adding ledger tokens again", () => {
+    const session = writeSession([{ role: "user", content: "question" }, { role: "assistant", content: "answer" }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    const scope = { id: "workspace-scope", workspacePath: workspace, workspaceIdentity: "workspace-identity" };
+    const store = sessionRequestStore({ getSessionDirPath: () => layout.sessionDir }, session, scope, () => ({}));
+    const policy = createRequestPolicy(store, scope.id);
+    const prepared = { requestId: "PRIVATE_REQUEST_ID", bodyDigest: "a".repeat(64), provider: "relay", model: "recorded",
+      endpoint: "https://provider.invalid/PRIVATE_ENDPOINT", purpose: "answer", credentialId: "PRIVATE_CREDENTIAL_ID" };
+    const complete = policy.reserve(prepared);
+    complete.dispatch();
+    complete.settle({ version: 1, inputTokens: 100, outputTokens: 30, cacheReadTokens: 60, complete: true });
+    sessionUsageRecorder(sessionId)({ provider: "relay", model: "recorded", baseUrl: "https://provider.invalid",
+      rates: { promptPerMTok: 3, completionPerMTok: 6, cacheReadPerMTok: 1 } })({
+      prompt_tokens: 100, completion_tokens: 30, total_tokens: 130, prompt_tokens_details: { cached_tokens: 60 },
+    });
+    const partial = policy.reserve({ ...prepared, requestId: "PRIVATE_PARTIAL_REQUEST_ID" });
+    partial.dispatch();
+    partial.settle({ version: 1, inputTokens: 12, complete: false });
+
+    const before = fs.readFileSync(layout.statePath, "utf8");
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.stats?.accounting).toMatchObject({ scope: "session", status: "partial", usageStatus: "recorded",
+      recordedRequests: 1, tokens: { input: 100, output: 30, cacheRead: 60, cacheWrite: 0, total: 130 },
+      requestCoverage: { status: "partial", scopeCount: 1, pending: 1, dispatchedUnknown: 1, historyUnknown: true,
+        knownPartialTokens: { input: 12 } } });
+    expect(result.payload.stats?.accounting.estimatedCostUsd).toBeCloseTo(0.00036);
+    expect(result.payload.stats?.accounting.requestCoverage.knownPartialTokens).not.toHaveProperty("output");
+    expect(result.payload.entries.every(entry => !("usage" in entry))).toBe(true);
+    expect(JSON.stringify(result.payload)).not.toContain("PRIVATE_");
+    expect(fs.readFileSync(layout.statePath, "utf8")).toBe(before);
+  });
+
+  it.each(["absent", "metadata", "prompt-measurement"])("keeps %s accounting unavailable instead of fabricating output zero", kind => {
+    writeSession([{ role: "user", content: "question" }, { role: "assistant", content: "answer" }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    const events = fs.readFileSync(layout.transcriptPath, "utf8").trimEnd().split("\n").map(line => JSON.parse(line));
+    const assistant = events.find(event => event.type === "message" && event.role === "assistant");
+    if (kind === "metadata") assistant.metadata = { usage: { inputTokens: 123, outputTokens: 456, costUsd: 7 } };
+    if (kind === "prompt-measurement") assistant.promptMeasurement = {
+      tokens: 123, messageCount: 1, identity: { provider: "fixture", model: "fixture" },
+    };
+    fs.writeFileSync(layout.transcriptPath, events.map(event => JSON.stringify(event)).join("\n") + "\n");
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.stats?.accounting).toEqual({ scope: "session", status: "unavailable", usageStatus: "unavailable",
+      requestCoverage: { status: "unavailable" } });
+    expect(result.payload.entries.every(entry => !("usage" in entry))).toBe(true);
+  });
+
+  it("does not read live accounting when exporting captured conversation bytes", () => {
+    writeSession([{ role: "user", content: "captured conversation" }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    const captured = { transcript: parseTranscript(fs.readFileSync(layout.transcriptPath, "utf8")) };
+    sessionUsageRecorder(sessionId)({ provider: "fixture", model: "fixture", baseUrl: "https://provider.invalid",
+      rates: { promptPerMTok: 1, completionPerMTok: 2 } })({ prompt_tokens: 99, completion_tokens: 1 });
+    expect(gatherExport({ sessionId, workspace })).toMatchObject({ ok: true,
+      payload: { stats: { accounting: { tokens: { total: 100 } } } } });
+    const result = gatherExport({ sessionId, workspace, captured });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.stats?.accounting).toEqual({ scope: "session", status: "unavailable", usageStatus: "unavailable",
+      requestCoverage: { status: "unavailable" } });
+  });
+
+  it("retains recorded historical accounting after the workspace directory was removed", () => {
+    writeSession([{ role: "user", content: "historical conversation" }]);
+    sessionUsageRecorder(sessionId)({ provider: "fixture", model: "fixture", baseUrl: "https://provider.invalid" })({
+      prompt_tokens: 10, completion_tokens: 2,
+    });
+    fs.rmSync(workspace, { recursive: true });
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.stats?.accounting.tokens?.total).toBe(12);
+    expect(result.payload.stats?.accounting).not.toHaveProperty("estimatedCostUsd");
+  });
+
+  it.each(["missing", "corrupt", "different-root", "different-session"])("keeps accounting unavailable for %s state provenance", kind => {
+    writeSession([{ role: "user", content: "readable conversation" }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    sessionUsageRecorder(sessionId)({ provider: "fixture", model: "fixture", baseUrl: "https://provider.invalid" })({
+      prompt_tokens: 10, completion_tokens: 2,
+    });
+    if (kind === "missing") fs.rmSync(layout.statePath);
+    if (kind === "corrupt") fs.writeFileSync(layout.statePath, "broken");
+    if (kind === "different-root") {
+      const state = JSON.parse(fs.readFileSync(layout.statePath, "utf8"));
+      fs.writeFileSync(layout.statePath, JSON.stringify({ ...state, projectRoot: home }));
+    }
+    if (kind === "different-session") {
+      const metadata = JSON.parse(fs.readFileSync(layout.metadataPath, "utf8"));
+      fs.writeFileSync(layout.metadataPath, JSON.stringify({ ...metadata, id: "sess_replacement" }));
+    }
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.entries[0]?.content).toBe("readable conversation");
+    expect(result.payload.stats?.accounting.usageStatus).toBe("unavailable");
+    expect(result.payload.stats?.accounting).not.toHaveProperty("tokens");
   });
 });

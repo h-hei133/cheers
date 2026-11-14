@@ -1,22 +1,16 @@
-import type { ExportEntry, ExportSessionStats, ExportTreeNode } from "./model.js";
+import type { ExportAccounting, ExportEntry, ExportSessionStats, ExportTreeNode } from "./model.js";
 
 /** Compute aggregate message, tool, model, token, and cost statistics for an export payload. */
 export function computeExportStats(
   entries: readonly ExportEntry[],
   tree: readonly ExportTreeNode[],
+  accounting: ExportAccounting,
 ): ExportSessionStats {
   let userMessages = 0;
   let assistantMessages = 0;
   let toolResults = 0;
   let commandOutputs = 0;
   let toolCalls = 0;
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let cacheReadTokens = 0;
-  let cacheWriteTokens = 0;
-  let costUsd = 0;
-  let hasCost = false;
-  let hasUsage = false;
   const models = new Set<string>();
 
   for (const entry of entries) {
@@ -28,17 +22,6 @@ export function computeExportStats(
     if (entry.toolCalls) toolCalls += entry.toolCalls.length;
     if (entry.origin?.model) {
       models.add(entry.origin.provider ? `${entry.origin.provider}/${entry.origin.model}` : entry.origin.model);
-    }
-    if (entry.usage) {
-      hasUsage = true;
-      inputTokens += entry.usage.inputTokens;
-      outputTokens += entry.usage.outputTokens;
-      cacheReadTokens += entry.usage.cacheReadTokens ?? 0;
-      cacheWriteTokens += entry.usage.cacheWriteTokens ?? 0;
-      if (entry.usage.costUsd !== undefined) {
-        hasCost = true;
-        costUsd += entry.usage.costUsd;
-      }
     }
   }
 
@@ -58,17 +41,6 @@ export function computeExportStats(
     compactions,
     branchSummaries,
     models: [...models],
-    ...(hasUsage
-      ? {
-          tokens: {
-            input: inputTokens,
-            output: outputTokens,
-            cacheRead: cacheReadTokens,
-            cacheWrite: cacheWriteTokens,
-            total: inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens,
-          },
-        }
-      : {}),
-    ...(hasCost ? { costUsd } : {}),
+    accounting,
   };
 }

@@ -1,4 +1,3 @@
-import { readStateSnapshotRequired } from "../store/sessionStateStore.js";
 import type { SessionThreadSnapshot } from "../schema/sessionThread.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 import { redactExportText } from "../../core/security/redaction.js";
@@ -6,9 +5,10 @@ import { messageToText } from "../../model-adapters/multimodal.js";
 import { renderMarkdownHtml } from "./htmlRender.js";
 import { projectExportTree } from "./graph.js";
 import { sanitizeExport } from "./sanitize.js";
-import { readExportSource, readExportThread } from "./source.js";
-import type { ExportEntry, ExportEntryUsage, ExportImage, ExportPayload } from "./model.js";
+import { readExportSource, readExportState } from "./source.js";
+import type { ExportEntry, ExportImage, ExportPayload } from "./model.js";
 import { computeExportStats } from "./stats.js";
+import { projectExportAccounting } from './accounting.js';
 import { restoreReport } from '../reports/projection.js';
 import type { ReportTranscriptEntry } from '../reports/model.js';
 import type { SessionStoreLayout } from '../store/sessionFileLayout.js';
@@ -31,7 +31,7 @@ export function gatherExport(input: {
   const source = input.captured ? { ok: true as const, transcript: input.captured.transcript, statePath: undefined }
     : readExportSource(input.sessionId, input.maxSourceBytes, input.layout);
   if (!source.ok) return source;
-  const { transcript, statePath } = source;
+  const { transcript } = source;
   const messages = transcript.events.filter((event): event is Extract<TranscriptEvent, { type: "message" }> => event.type === "message");
   const reports = transcript.events.filter((event): event is ReportTranscriptEntry => event.type === 'command-output')
     .flatMap(event => {
@@ -50,13 +50,8 @@ export function gatherExport(input: {
   if (new Set(entries.map(entry => entry.id)).size !== entries.length) {
     return { ok: false, reason: "The transcript has duplicate message identities; branch associations are ambiguous." };
   }
-  let snapshot = input.captured?.thread;
-  try {
-    if (statePath !== undefined) snapshot = input.maxSourceBytes === undefined ? readStateSnapshotRequired(statePath).thread
-      : readExportThread(statePath, input.maxSourceBytes);
-  } catch {
-    // A chronological view remains useful, but must identify its lost branch history.
-  }
+  const capturedState = 'metadataPath' in source ? readExportState(source, input.sessionId, input.maxSourceBytes) : undefined;
+  const snapshot = input.captured?.thread ?? capturedState?.state.thread;
   const tree = projectExportTree(snapshot, entries);
   const warnings = [...tree.warnings, ...transcript.warnings];
   const sanitized = sanitizeExport({
@@ -67,7 +62,7 @@ export function gatherExport(input: {
     ok: true,
     payload: {
       ...sanitized,
-      stats: computeExportStats(sanitized.entries, sanitized.tree),
+      stats: computeExportStats(sanitized.entries, sanitized.tree, projectExportAccounting(capturedState?.state, capturedState?.binding)),
     },
   };
 }
@@ -97,25 +92,6 @@ function extractToolDiff(event: Extract<TranscriptEvent, { type: "message" }>, c
   return fenced?.[1]?.trim() ? redactExportText(fenced[1].replace(/\r?\n$/, "")) : undefined;
 }
 
-function extractUsage(event: Extract<TranscriptEvent, { type: "message" }>): ExportEntryUsage | undefined {
-  const raw = event.metadata?.usage;
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    const rec = raw as Record<string, unknown>;
-    const inputTokens = typeof rec.inputTokens === "number" ? rec.inputTokens : typeof rec.promptTokens === "number" ? rec.promptTokens : 0;
-    const outputTokens = typeof rec.outputTokens === "number" ? rec.outputTokens : typeof rec.completionTokens === "number" ? rec.completionTokens : 0;
-    const cacheReadTokens = typeof rec.cacheReadTokens === "number" ? rec.cacheReadTokens : undefined;
-    const cacheWriteTokens = typeof rec.cacheWriteTokens === "number" ? rec.cacheWriteTokens : undefined;
-    const costUsd = typeof rec.costUsd === "number" ? rec.costUsd : typeof rec.cost === "number" ? rec.cost : undefined;
-    if (inputTokens > 0 || outputTokens > 0 || (cacheReadTokens ?? 0) > 0 || (cacheWriteTokens ?? 0) > 0 || costUsd !== undefined) {
-      return { inputTokens, outputTokens, ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}), ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}), ...(costUsd !== undefined ? { costUsd } : {}) };
-    }
-  }
-  if (event.promptMeasurement && event.promptMeasurement.tokens > 0) {
-    return { inputTokens: event.promptMeasurement.tokens, outputTokens: 0 };
-  }
-  return undefined;
-}
-
 function toExportEntry(event: Extract<TranscriptEvent, { type: "message" }>): ExportEntry {
   const toolCalls = event.tool_calls?.map(call => ({
     id: call.id, name: call.function.name, arguments: redactExportText(call.function.arguments),
@@ -123,7 +99,6 @@ function toExportEntry(event: Extract<TranscriptEvent, { type: "message" }>): Ex
   const content = redactExportText(messageToText(event.content, { placeholderForImages: true }));
   const images = extractImages(event.content);
   const toolDiff = extractToolDiff(event, content);
-  const usage = extractUsage(event);
   const isError = event.metadata?.isError === true || event.failureClass !== undefined;
   const reasoning = event.reasoning?.text || event.reasoning?.redacted
     ? { text: redactExportText(event.reasoning.text ?? ""), ...(event.reasoning.redacted ? { redacted: true } : {}) }
@@ -136,7 +111,6 @@ function toExportEntry(event: Extract<TranscriptEvent, { type: "message" }>): Ex
     ...(event.tool_call_id !== undefined ? { toolCallId: event.tool_call_id } : {}),
     ...(toolDiff !== undefined ? { toolDiff } : {}),
     ...(isError ? { isError: true } : {}),
-    ...(usage !== undefined ? { usage } : {}),
     ...(event.origin !== undefined ? { origin: event.origin } : {}),
     timestamp: event.timestamp,
   };

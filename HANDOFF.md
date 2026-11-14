@@ -2266,3 +2266,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A nominal one-megabyte write grows with CJK or emoji, a surrogate split across rows becomes replacement text, or a painter still assembles the complete frame before slicing it.
 - **Root Cause:** Character counts are not UTF-8 byte counts; independently encoding adjacent fragments loses their shared character boundary. Result-time slicing cannot bound frame construction.
 - **Rule:** Stream rows through the existing writer, carry a trailing high surrogate into the next fragment, and attach completion only to the final write. Keep the terminal's pending-byte and shutdown owners; exercise a real blocked pipe, closed output and signal so partial delivery never reports completion.
+
+
+### Exported Accounting Must Follow Durable Owners
+- **Symptom:** HTML export reports complete usage and cost from fabricated message metadata or turns a prompt-only measurement into input usage with output zero.
+- **Root Cause:** The export assumed accounting lived on transcript messages, while cumulative billing and dispatched-request coverage are persisted separately in session state. Their cache categories and scopes differ, so adding them double-counts usage.
+- **Rule:** Read the state once with its session identity, project recorded billing using captured prices, and show request-ledger gaps separately. Missing usage or prices remain unavailable; a prompt measurement never proves output or aggregate cost. Captured conversation exports cannot borrow live state, and historical accounting must stay readable after the former workspace disappears.

@@ -46,7 +46,7 @@
 - [x] **D.2** 队列清空和 steering／follow-up 模式实时更改：本地验收完成。清空实际两条活跃输入与submission，模式跨readiness传递并保存后更新捕获队列；配置或运行替换拒绝修改后继。真实runTurn和JSONL消费者通过，宿主按input/session/settings拆分且函数上限通过。
 - [ ] **D.3** UI 请求／响应和事件：已有待验收，取消、撤权、EOF、迟到响应。
 - [ ] **D.4** HTML 高亮、GFM／CJK、Thinking、Diff、灯箱：已有待验收，真实离线导出与转义安全。
-- [ ] **D.5** 导出 token／费用：已有待验收，身份与覆盖率、缺失／部分计量不伪造。
+- [x] **D.5** 导出 token／费用：本地验收完成。只读捕获并验证真实session state/账单身份，累计用量与请求覆盖率分开；不从message metadata或prompt measurement推造用量，不用当前目录价格回填旧记录。四套件66项和离线Linux Chromium实际HTML通过，未知output/price保持unavailable。实际M，额外依赖1（历史workspace消失后仍须读取保存state）；真实供应商账单比对未发生。
 
 ## E / T2 / T3: 编程与扩展（P1／P2）
 
@@ -122,3 +122,5 @@
 2026-11-14 端点路由修复提交前：流式参数提交`24a23997`。内建Mistral目录选择专用chat端点，兼容旧配置名；清除非协议字段并规范call ID/affinity。Azure由端点统一解析完整base URL、资源和api-version，保留relay前缀和query。独立暂存树五静态门、2套件26项、build `3a0b1baf2323`通过。F1.2完整WebSocket及真实服务验收仍开项；没有把fixture应答称为真实提供方证据。
 
 2026-11-14 B.2提交前：端点路由提交`a410eab2`。writer原3项红及fullscreen追加反例均已修复；独立暂存树五静态门、4套件107项、build `85c4ef80b41d`通过。实际Node进程加载暂存源码：OS管道先积压4,000,000字节后延迟150ms读取，全文SHA256一致；regular画面累计5,695,129字节，最大write1,048,576字节，回调时pending0。Linux PTY5,697,415字节完成；实际断管与SIGTERM通过原CLI shutdown分别exit1/143，closed=true、completed=false。记录`.omx/artifacts/upgrade-writer-2026-11-14/`；原生探针使用暂存源码tsx，不冒称公开编译导出。
+
+2026-11-14 D.5提交前：B.2提交`6e1e3eb4`。独立暂存树五静态门、4套件66项、build `9ad07e84b0db`通过。Linux真实存储owner写入130tokens与1项部分未知派发，gatherExport只读state，编译公开HTML入口生成文件；离线Chromium显示100in/30out、记录估价、12in/unknown out，0网络请求/0页面错误。D.4完整Markdown功能未借此勾选。B2新增11项边界中10红/1通过，正修复键盘/paste/截止和换代语义。
