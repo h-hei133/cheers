@@ -49,6 +49,13 @@ export function renderChrome(
   // and yields to everything else, because it is a reminder rather than content.
   const pendingRows = renderPendingInput(context.pendingInput?.() ?? [], width).slice(0, Math.max(0, remaining));
   remaining -= pendingRows.length;
+  const extension = context.extensionChrome?.();
+  const extensionStatus = extension?.status.length ? [extension.status.join(' · ')] : [];
+  // Reserve widgets before optional hints, but always leave the composer intact.
+  const aboveEditor = (extension?.aboveEditor ?? []).slice(0, Math.max(0, remaining - inputRows));
+  remaining -= aboveEditor.length;
+  const belowEditor = [...(extension?.belowEditor ?? []), ...extensionStatus].slice(0, Math.max(0, remaining - inputRows));
+  remaining -= belowEditor.length;
   const hintStatus = context.hintStatus?.();
   const completionStatus = hintStatus?.completion;
   const suggestionRows = view.suggestionsOpen ? view.suggestions.render(width, Math.max(0, remaining - inputRows - Number(!!completionStatus))) : [];
@@ -85,9 +92,9 @@ export function renderChrome(
   // offset counts them: geometry answered for the composer must be the rows the
   // pointer will actually find it on.
   return {
-    rows: [...visibleStatus, ...pendingRows, ...composerRows, ...suggestionRows, ...hints].map(row => truncateToWidth(row, width)),
+    rows: [...visibleStatus, ...pendingRows, ...aboveEditor, ...composerRows, ...suggestionRows, ...belowEditor, ...hints].map(row => truncateToWidth(row, width)),
     pendingRows: pendingRows.length,
-    composerOffset: visibleStatus.length + pendingRows.length, composerRows, composerLayout,
+    composerOffset: visibleStatus.length + pendingRows.length + aboveEditor.length, composerRows, composerLayout,
     overlayOffset: activityRows.length - droppedStatus, overlayHeight: overlayRows.length, overlayRows, suggestionRows: suggestionRows.length,
   };
 }

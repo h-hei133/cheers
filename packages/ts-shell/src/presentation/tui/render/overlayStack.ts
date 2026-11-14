@@ -28,7 +28,7 @@ export {
 
 export interface OverlayComponent {
   focused?: boolean;
-  render(width: number): readonly string[];
+  render(width: number, maxRows?: number): readonly string[];
   handleKey?(event: ParsedKeyEvent): boolean | void;
   handlePointer?(report: MouseReport, bounds: OverlayBounds): boolean | void;
   handlePaste?(text: string): boolean | void;
@@ -132,7 +132,7 @@ export class OverlayStack {
 
     for (const entry of visibleEntries) {
       const initialLayout = resolveOverlayLayout(entry.options, 0, termWidth, termHeight);
-      let rendered = entry.component.render(initialLayout.width);
+      let rendered = entry.component.render(initialLayout.width, initialLayout.maxHeight ?? termHeight);
       const layout = resolveOverlayLayout(entry.options, rendered.length, termWidth, termHeight);
       const maxViewportRows = Math.max(0, termHeight - layout.row);
       const maxAllowedRows = layout.maxHeight !== undefined

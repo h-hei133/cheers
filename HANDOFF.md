@@ -2375,3 +2375,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A successful settings or session command cancels old dialogs but permanently disables future extension UI on an open input stream.
 - **Root Cause:** Configuration publication retires the original surface lease, while the input consumer binds its bridge only at startup.
 - **Rule:** After a successful command actually changes the lease, refresh the existing extension owner before binding the current surface. Guard both sides with the input consumer identity and EOF/exit state; ordinary commands must not cancel pending dialogs, and retired consumers must never reclaim a successor's UI.
+
+
+### Extension Dialogs Need A Rendered And Revocable Input Owner
+- **Symptom:** A floating extension dialog receives keys without appearing in regular terminal mode, clipped messages hide choices or the caret, and waiting for shutdown drainage leaves its promise pending.
+- **Root Cause:** The regular painter treats chrome separately from viewport overlays; input and render budgets were independent, while UI was tied to initialization instead of the active terminal lifetime.
+- **Rule:** Bind after input readiness, paint dialog overlays through a full-screen frame with the actual row budget, and preserve the composer separately. Revoke and cancel UI before awaiting input drainage; recheck captured session/root/config admission at acceptance and explicitly recapture after host transitions. Actual terminal fixtures must emit input readiness before testing UI availability.
+
+
+### Extension Dialog Frames Must Be Excluded From Recordings
+- **Symptom:** An extension input or editor writes typed text into an approved recording while the normal composer is empty.
+- **Root Cause:** The recording exclusion predicate covered the legacy overlay but not the extension overlay stack; its full-screen frame had no composer-sensitive rows.
+- **Rule:** Exclude output while extension dialogs are active or the host is closing. Verify actual terminal painting through the recording owner and stored cast, then verify safe output is recorded after the dialog closes.

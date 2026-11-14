@@ -82,6 +82,12 @@ export interface ViewContext {
   toast?(): string | undefined;
   /** Loading/partial status belongs to the completion list, independent of transient toasts. */
   hintStatus?(): { readonly toast?: string; readonly completion?: string };
+  /** Extension content is measured in the same layout as the composer. */
+  extensionChrome?(): {
+    readonly status: readonly string[];
+    readonly aboveEditor: readonly string[];
+    readonly belowEditor: readonly string[];
+  };
   /** Active mouse selection within the composer / input box. */
   composerSelection?(): SourceSelection | undefined;
   /** What an open search should show in the bar, or nothing when none is open. */

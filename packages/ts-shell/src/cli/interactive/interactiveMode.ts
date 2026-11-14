@@ -60,6 +60,8 @@ import { isAgentsControl, agentsCommandFor, agentDefinitionsFor, agentDiscoveryF
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
 import { sshControl, runSshControl } from '../ssh/control.js';
 import { isExtensionControl, extensionCommandFor, extensionManagerFor } from '../runtime/extensions.js';
+import { createExtensionUiAdapter } from './extensions.js';
+import { ExtensionUiBinding } from './extensions/binding.js';
 import { isMcpRequest, isMcpConfiguration, mcpControl } from '../mcp/content.js';
 import { runMcpConfigurationControl } from '../mcp/control.js';
 import { cancelMcpFor, mcpDefinitionFor } from '../runtime/mcp.js';
@@ -284,6 +286,8 @@ export class InteractiveMode {
   private releaseEvents: (() => void) | undefined;
   private releaseGoalSubmission?: () => void;
   private releaseInputQueue?: () => void;
+  private readonly extensionBinding: ExtensionUiBinding;
+  private readonly extensionUi: ReturnType<typeof createExtensionUiAdapter>;
   /**
    * The theme file being followed, when the theme in use came from one.
    *
@@ -299,6 +303,7 @@ export class InteractiveMode {
 
 
   constructor(private readonly options: InteractiveModeOptions) {
+    this.extensionBinding = new ExtensionUiBinding(options.runtimeContext, () => this.extensionUi?.clear());
     this.alternateScreen = options.runtimeContext.runtimeConfig.tuiMode !== "regular";
     this.terminal = options.startup?.terminal ?? options.terminal ?? processTerminal;
     const supportsHyperlinks = this.terminal.capabilities.supportsHyperlinks === true;
@@ -350,7 +355,8 @@ export class InteractiveMode {
     // valid storage target even in that narrow window.
     this.state = options.startup?.state ?? createViewState();
     this.stash = new DraftStash(this.state.pastes);
-    excludeRecordingInput(options.runtimeContext, () => this.stopped || Boolean(this.state.editor.getText() || this.questions.question() || this.overlay.active || this.pager.active || this.search.active));
+    excludeRecordingInput(options.runtimeContext, () => this.stopped || this.closing || Boolean(this.state.editor.getText()
+      || this.questions.question() || this.overlay.active || this.extensionUi?.active || this.pager.active || this.search.active));
     // Completion is a scoped local notice. Output does not become new user intent
     // or silently dispatch a model request; taskOutput exposes the retained facts.
     const backgroundFollowUp = createBackgroundFollowUp({
@@ -422,7 +428,7 @@ export class InteractiveMode {
         cancelArmed: () =>
           this.gesture.lastCancelAt !== undefined &&
           Date.now() - this.gesture.lastCancelAt < CANCEL_ARMED_MS,
-        overlayFullScreen: () => this.pager.fullScreen || this.overlay.fullScreen,
+        overlayFullScreen: () => this.extensionUi?.active === true || this.pager.fullScreen || this.overlay.fullScreen,
         overlayInputActive: () => !this.pager.active && this.overlay.inputActive,
         overlayPointerMotion: () => this.overlay.active && !this.pager.active,
         overlayRows: (width, height, availableRows) =>
@@ -430,6 +436,7 @@ export class InteractiveMode {
         selection: () => this.pointer.selection,
         composerSelection: () => this.pointer.composerSelection ?? this.vimSelection,
         hintStatus: () => ({ toast: this.toast, completion: this.completionStatus }),
+        extensionChrome: () => this.extensionUi?.chrome() ?? { status: [], aboveEditor: [], belowEditor: [] },
         searchBar: () => {
           // Built before asking: the count and the position only exist once the
           // query has been matched against the rows that are on screen.
@@ -487,11 +494,43 @@ export class InteractiveMode {
       ask: (question) => this.onQuestion(question),
       settle: () => this.onQuestionSettled(),
     });
+    this.extensionUi = createExtensionUiAdapter({
+      overlays: this.overlayStack,
+      admitted: () => !this.stopped && !this.closing && this.extensionBinding.admitted(),
+      available: () => !this.pager.active && !this.overlay.active && !this.overlayStack.getTopmostCapturing()
+        && !this.pickerPending && !this.questions.question(),
+      changed: () => {
+        this.view.invalidateLayout();
+        if (this.stopped || this.closing) return;
+        this.tui.requestRender();
+      },
+      settled: () => queueMicrotask(() => {
+        if (!this.stopped && !this.closing && !this.extensionUi.active && !this.busy && !this.pickerPending && !this.overlay.active && !this.questions.question()) {
+          const next = this.queue.shift();
+          if (next !== undefined) this.runQueued(next, this.queue.takeAttachments());
+        }
+      }),
+      notify: (message, type) => {
+        this.state.transcript.append(textBlock(type === 'error' ? 'error' : 'notice', message));
+        this.view.scrollToEnd();
+        this.tui.requestRender();
+      },
+      setTitle: title => this.terminal.write(windowTitle(title)),
+      setEditorText: text => {
+        this.replaceExternalDraft(text);
+        this.pointer.clearSelection();
+        this.syncSuggestions(false);
+        this.tui.requestRender();
+      },
+    });
     this.readline = this.questions.asReadline(() => { void this.shutdown(); });
     this.options.setReadline?.(this.readline);
-    this.options.setInteractiveApprovalPrompt?.((prompt) => promptApproval(prompt,
-      { pager: this.pager, overlay: this.overlay, render: () => this.tui.requestRender() },
-      this.options.sessionRuntime.getCurrentRunController()?.signal));
+    this.options.setInteractiveApprovalPrompt?.((prompt) => {
+      this.extensionUi.cancelDialogs();
+      return promptApproval(prompt,
+        { pager: this.pager, overlay: this.overlay, render: () => this.tui.requestRender() },
+        this.options.sessionRuntime.getCurrentRunController()?.signal);
+    });
     this.tui.setFrameProvider(recordingFrameProvider(options.runtimeContext, this.view));
     this.state.editor.placeholder = DEFAULT_PLACEHOLDER;
     // A chip token deletes whole: the caret sits at its end, and one Backspace
@@ -603,15 +642,15 @@ export class InteractiveMode {
     this.tui.onInput((data) => this.stdin.feed(data));
     this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
     this.releaseInputQueue = attachSubmissionQueue(this.options.sessionRuntime, this.queue, text => this.runQueued(text, this.queue.takeAttachments()),
-      () => !(this.busy || this.pickerPending || this.overlay.active || this.stopped || this.questions.question()));
+      () => !(this.busy || this.pickerPending || this.overlay.active || this.extensionUi.active || this.stopped || this.questions.question()));
     this.releaseGoalSubmission = attachGoalSubmission(this.options.sessionRuntime, {
       ready: () => !this.stopped && !this.closing && !this.busy && !this.pickerPending && !this.overlay.active
-        && !this.questions.question() && this.queue.length === 0 && !this.state.editor.getText().trim()
+        && !this.questions.question() && !this.extensionUi.active && this.queue.length === 0 && !this.state.editor.getText().trim()
         && !this.state.pastes.hasImages(this.state.editor.getText()),
       submit: (prompt, metadata) => this.run(prompt, undefined, metadata),
       settled: () => {
         this.busy = this.pickerPending;
-        const next = this.pickerPending || this.overlay.active || this.stopped ? undefined : this.queue.shift();
+        const next = this.pickerPending || this.overlay.active || this.extensionUi.active || this.stopped ? undefined : this.queue.shift();
         if (next !== undefined) this.runQueued(next, this.queue.takeAttachments());
         this.tui.requestRender();
       },
@@ -633,6 +672,7 @@ export class InteractiveMode {
         time('runtime frame write completed');
         this.options.onFirstFrame?.();
       });
+      this.extensionBinding.refresh(this.extensionUi.host);
       time('runtime input adopted');
       this.releaseTerminalPalette = requestTerminalPalette(this.terminal, colors => {
         if (this.stopped || this.closing || !terminalTheme.update(colors)) return;
@@ -645,6 +685,7 @@ export class InteractiveMode {
       onInputReady: () => {
         observers.onInputReady?.();
         time('runtime input adopted');
+        this.extensionBinding.refresh(this.extensionUi.host);
         this.releaseTerminalPalette?.();
         this.releaseTerminalPalette = requestTerminalPalette(this.terminal, colors => {
           if (this.stopped || this.closing || !terminalTheme.update(colors)) return;
@@ -678,6 +719,8 @@ export class InteractiveMode {
     for (const cleanup of [
       () => { this.releaseTerminalPalette?.(); this.releaseTerminalPalette = undefined; this.terminalTheme?.dispose(); this.terminalTheme = undefined; },
       () => { this.releaseTerminalProtocol?.(); this.releaseTerminalProtocol = undefined; },
+      () => this.extensionBinding.dispose(),
+      () => this.extensionUi.dispose(),
       () => this.promptContext.stop(),
       () => this.pickerLifecycles.abortAll(),
       () => this.options.setStartupNotice?.(undefined),
@@ -712,6 +755,12 @@ export class InteractiveMode {
   private onKey(event: Parameters<typeof routeKey>[0]): void {
     if (this.closing || this.stopped) return;
     this.options.onUserIntent?.();
+    // Dialog cancellation and acceptance belong to the child before app exits.
+    if (this.extensionUi.active) {
+      const dimensions = this.terminal.getDimensions();
+      this.overlayStack.handleKey(event, dimensions.columns, dimensions.rows);
+      return;
+    }
     if (this.preferences.keybindings.actionFor(event.keyId) === 'app.exit'
       && this.state.editor.getText().length === 0) {
       void this.shutdown();
@@ -831,6 +880,7 @@ export class InteractiveMode {
 
   /** Publish a runtime question as a transcript block and retarget the prompt. */
   private onQuestion(question: string): void {
+    this.extensionUi.cancelDialogs();
     this.pager.close();
     this.overlay.close();
     this.terminal.setProgramStatus?.({ state: "blocked", kind: "question", app: "cheers" });
@@ -1254,12 +1304,14 @@ export class InteractiveMode {
       if (clearing) {
         try {
           startFreshSession(this.historyTarget());
+          this.extensionBinding.refresh(this.extensionUi.host);
           this.sink.end(true);
         } catch (error) {
           this.state.transcript.append(textBlock('error', error instanceof Error ? error.message : String(error), 'error'));
         }
         this.tui.requestRender({ force: true });
       } else if (opened || navigation?.changed) {
+        this.extensionBinding.refresh(this.extensionUi.host);
         showConversation(this.historyTarget(), navigation?.changed ? this.options.runtimeContext.session : undefined);
         this.tui.requestRender({ force: true });
       }
@@ -1267,8 +1319,9 @@ export class InteractiveMode {
         this.state.transcript.append(textBlock("command", navigation.output, "/tree"));
         if (navigation.draft !== undefined) this.replaceExternalDraft(navigation.draft);
       }
+      if (!this.stopped && !this.closing && configurationRevision !== this.options.runtimeContext.configuration.current.revision && this.extensionBinding.needsRefresh()) this.extensionBinding.refresh(this.extensionUi.host);
       this.tui.requestRender();
-      const next = automatic || this.pickerPending || sessionManagement ? undefined : retrying ?? this.queue.shift();
+      const next = automatic || this.pickerPending || sessionManagement || this.extensionUi.active ? undefined : retrying ?? this.queue.shift();
       // The attention pair, when the user asked for it and the turn was long
       // enough that they may have looked away. A queued follow-up keeps the
       // conversation running, so the signal waits for the turn that ends it.
@@ -1380,8 +1433,9 @@ export class InteractiveMode {
           this.pickerPending = false;
           this.busy = false;
         }
+        if (!this.stopped && !this.closing && this.extensionBinding.needsRefresh()) this.extensionBinding.refresh(this.extensionUi.host);
         this.tui.requestRender();
-        const next = picker.exclusive && !this.stopped && !this.overlay.active ? this.queue.shift() : undefined;
+        const next = picker.exclusive && !this.stopped && !this.overlay.active && !this.extensionUi.active ? this.queue.shift() : undefined;
         if (next !== undefined) this.runQueued(next, this.queue.takeAttachments());
       });
   }
@@ -1414,7 +1468,11 @@ export class InteractiveMode {
         getToolPool: toolPoolFor(this.options.runtimeContext, this.options.initialMcpGateway),
         contextEstimate: contextEstimateFor(this.options.runtimeContext, this.options.sessionManager,
           this.options.initialMcpGateway, this.options.sessionRuntime),
-        refreshRuntimeConfig: scope => refreshShellRuntimeConfig(this.options.runtimeContext, scope),
+        refreshRuntimeConfig: scope => {
+          const result = refreshShellRuntimeConfig(this.options.runtimeContext, scope);
+          if (!this.stopped && !this.closing && this.extensionBinding.needsRefresh()) this.extensionBinding.refresh(this.extensionUi.host);
+          return result;
+        },
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,
         interactive: true,
@@ -1479,6 +1537,7 @@ export class InteractiveMode {
       rewind: async (point) => {
         const result = await navigateSession(this.options, point.entryId, point.version, selectionAdmission);
         if (result.changed) {
+          this.extensionBinding.refresh(this.extensionUi.host);
           showConversation(this.historyTarget(), this.options.runtimeContext.session);
           this.tui.requestRender({ force: true });
         }
@@ -1588,7 +1647,11 @@ export class InteractiveMode {
     // A single stdin chunk can contain the exit key and further complete keys,
     // paste or mouse events. Detach dispatch before yielding to the drain.
     let failure: { cause: unknown } | undefined;
-    try { this.stdin.dispose(); } catch (cause) { failure = { cause }; }
+    try {
+      this.extensionBinding.dispose();
+    } catch (cause) { failure = { cause }; }
+    try { this.extensionUi.dispose(); } catch (cause) { failure ??= { cause }; }
+    try { this.stdin.dispose(); } catch (cause) { failure ??= { cause }; }
     try {
       if (this.terminal.drainInput) await this.terminal.drainInput();
     } catch {
