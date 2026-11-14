@@ -2411,3 +2411,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Root imports work while advertised subpaths are missing, or packed libraries carry every historical build and incomplete declarations.
 - **Root Cause:** The publisher retained only one root forwarder and broadly removed sibling paths; declaration and package consumers were absent from artifact validation.
 - **Rule:** Build public entries in one shared graph, use one generation pointer and collision-free stable binding names, bind every wrapper/type/pack policy to the manifest, and journal exact prior states. Package only the selected immutable generation without deleting disk generations needed by running processes. Validate an isolated installed consumer on the declared Node floor, with its own dependencies and strict declaration checking.
+
+
+### Custom History Needs Inert Ingress And Independent Display Policy
+- **Symptom:** Custom messages disappear after reopening, hidden text leaks through tree search, or a rejected append remains in live history.
+- **Root Cause:** Standard-role readers, internal summary metadata and display consumers treated application history as an ordinary provider message; admission read the role before rejecting accessors, and numeric JSON values escaped byte accounting.
+- **Rule:** Inspect the own role descriptor before reading source properties, detach bounded inert JSON and count serialized scalar bytes. Keep custom entries in the original thread regardless of application metadata; apply display policy to every presentation projection while preserving model context. Publish live history only after the existing persistence callbacks return, retaining uncertain disk outcomes on later failure.

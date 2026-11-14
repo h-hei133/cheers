@@ -9,6 +9,7 @@ import {
   type TranscriptEvent,
 } from "../sessionEventCodec.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
+import { captureCustomMessage } from '../../core/agent/custom.js';
 import type { Session } from "../schema/sessionRecord.js";
 import { publishedCompactionEvents } from '../compaction/publication.js';
 import { descriptorPath, fileIdentity } from '../../core/workspace/files.js';
@@ -340,14 +341,27 @@ export function appendSessionTurn(input: {
   readonly writeMetadata: (session: Session) => void;
   readonly writeState: (session: Session) => void;
 }): void {
+  const message = captureCustomMessage(input.message);
   const nextMessage: SessionMessage & { timestamp: string } = {
-    ...input.message,
+    ...message,
     timestamp: input.timestamp,
     // Named at the moment it is recorded, so the thread can point back at it.
     // The transcript and the turn list then agree on which message is which,
     // which is what lets a branch be resolved into the messages it contains.
-    id: input.message.id ?? createTranscriptEntryId("turn"),
+    id: message.id ?? createTranscriptEntryId("turn"),
   };
+  // A failed custom append must not remain available to the next model turn.
+  // An append that landed before a later state error stays an uncertain disk
+  // outcome; readers reload through the existing transcript/state authority.
+  if (message.role === 'custom') {
+    input.append(createMessageTranscriptEvent(nextMessage));
+    const next = { ...input.session, turns: [...input.session.turns, nextMessage], updatedAt: input.timestamp };
+    input.writeMetadata(next);
+    input.writeState(next);
+    input.session.turns.push(nextMessage);
+    input.session.updatedAt = input.timestamp;
+    return;
+  }
   input.session.turns.push(nextMessage);
   input.session.updatedAt = input.timestamp;
   input.append(createMessageTranscriptEvent(nextMessage));

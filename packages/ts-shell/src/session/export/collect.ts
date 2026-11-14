@@ -3,7 +3,7 @@ import type { TranscriptEvent } from "../sessionEventCodec.js";
 import { redactExportText } from "../../core/security/redaction.js";
 import { messageToText } from "../../model-adapters/multimodal.js";
 import { renderMarkdownHtml } from "./htmlRender.js";
-import { projectExportTree } from "./graph.js";
+import { projectExportTree, visibleExportTree } from "./graph.js";
 import { sanitizeExport } from "./sanitize.js";
 import { readExportSource, readExportState } from "./source.js";
 import type { ExportEntry, ExportImage, ExportPayload } from "./model.js";
@@ -52,11 +52,12 @@ export function gatherExport(input: {
   }
   const capturedState = 'metadataPath' in source ? readExportState(source, input.sessionId, input.maxSourceBytes) : undefined;
   const snapshot = input.captured?.thread ?? capturedState?.state.thread;
-  const tree = projectExportTree(snapshot, entries);
+  const hidden = new Set(messages.filter(message => message.role === 'custom' && !message.display).map(message => message.id));
+  const tree = visibleExportTree(projectExportTree(snapshot, entries), hidden);
   const warnings = [...tree.warnings, ...transcript.warnings];
   const sanitized = sanitizeExport({
     header: { sessionId: input.sessionId, exportedAt: (input.now ?? (() => new Date()))().toISOString(), workspace: input.workspace },
-    tree: tree.nodes, entries, leafId: tree.leafId, warnings,
+    tree: tree.nodes, entries: entries.filter(entry => !hidden.has(entry.id)), leafId: tree.leafId, warnings,
   });
   return {
     ok: true,
@@ -93,6 +94,7 @@ function extractToolDiff(event: Extract<TranscriptEvent, { type: "message" }>, c
 }
 
 function toExportEntry(event: Extract<TranscriptEvent, { type: "message" }>): ExportEntry {
+  if (event.role === 'custom' && !event.display) return { id: event.id ?? '', role: 'custom', content: '', html: '', timestamp: event.timestamp };
   const toolCalls = event.tool_calls?.map(call => ({
     id: call.id, name: call.function.name, arguments: redactExportText(call.function.arguments),
   }));

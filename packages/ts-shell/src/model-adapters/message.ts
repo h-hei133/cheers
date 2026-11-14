@@ -1,6 +1,15 @@
 import type { MultimodalContentBlock } from './multimodal.js';
+import { isRecord } from '../core/values/record.js';
 
 export type MessageContent = string | readonly MultimodalContentBlock[];
+
+/** Validate inert, already captured content before a consumer dereferences it. */
+export function isMessageContent(value: unknown): value is MessageContent {
+  return typeof value === 'string' || (Array.isArray(value) && value.every(block => isRecord(block) && (
+    (block.type === 'text' && typeof block.text === 'string') ||
+    (block.type === 'image' && typeof block.data === 'string' && typeof block.mimeType === 'string')
+  )));
+}
 
 export interface ProviderToolCall {
   readonly id: string;

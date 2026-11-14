@@ -40,7 +40,12 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
   const toolBlocksById = new Map<string, Block>();
   const respondedToolIds = new Set<string>();
   for (const turn of turns) {
-    if (turn.role === "user") {
+    if (turn.role === 'custom') {
+      if (turn.display) {
+        const images = imagesOf(turn.content);
+        blocks.push({ ...textBlock('notice', messageToText(turn.content)), ...(images.length ? { images } : {}) });
+      }
+    } else if (turn.role === "user") {
       if (turn.metadata?.source === 'goal-continuation') {
         blocks.push(textBlock('notice', `Goal continuation (round ${String(turn.metadata.round)}).`));
         continue;

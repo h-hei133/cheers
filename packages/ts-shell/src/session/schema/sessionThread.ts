@@ -1,6 +1,6 @@
 import { freezeDeep } from "../../core/values/freeze.js";
 import type { Session } from "./sessionRecord.js";
-import { isSessionContextMessage } from "./sessionMessage.js";
+import { isSessionContextMessage, type SessionMessage } from "./sessionMessage.js";
 
 export type SessionThreadEntryKind = "session-root" | "turn-message";
 
@@ -8,7 +8,7 @@ export interface SessionThreadEntry {
   readonly id: string;
   readonly parentId?: string;
   readonly kind: SessionThreadEntryKind;
-  readonly role?: "system" | "user" | "assistant" | "tool";
+  readonly role?: SessionMessage['role'];
   readonly order: number;
   readonly timestamp?: string;
 }
@@ -111,7 +111,7 @@ export function buildLinearSessionThreadSnapshot(
 export function appendSessionThreadChild(input: {
   readonly snapshot: SessionThreadSnapshot | undefined;
   readonly session: Session;
-  readonly messageRole: "system" | "user" | "assistant" | "tool";
+  readonly messageRole: SessionMessage['role'];
   readonly timestamp: string;
   readonly entryId?: string;
   readonly parentEntryId?: string;

@@ -40,7 +40,7 @@ export function exportHistory(sessionId: string, workspace: string, title = 'Imp
   const document: HistoryDocument = { kind: 'session-history', version: 1, sourceId: sessionId,
     title: redactExportText(title).replace(/[\x00-\x1f\x7f-\x9f]/g, ' ').slice(0, 512), leafId: payload.leafId,
     nodes: payload.tree.map(node => ({ id: node.id, ...(node.parentId ? { parentId: node.parentId } : {}), kind: node.kind as HistoryNode['kind'] })),
-    entries: payload.entries.map(entry => ({ id: entry.id, role: entry.role as HistoryEntry['role'], content: entry.content,
+    entries: payload.entries.map(entry => ({ id: entry.id, role: entry.role === 'custom' ? 'system' : entry.role as HistoryEntry['role'], content: entry.content,
       timestamp: entry.timestamp ?? payload.header.exportedAt, ...(entry.toolCalls ? { toolCalls: entry.toolCalls } : {}),
       ...(entry.toolCallId !== undefined ? { toolCallId: entry.toolCallId } : {}) })),
   };

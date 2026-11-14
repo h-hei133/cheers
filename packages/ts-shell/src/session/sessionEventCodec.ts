@@ -1,8 +1,7 @@
-import type { MultimodalContentBlock } from "../model-adapters/multimodal.js";
 import { randomUUID } from "node:crypto";
 import { decodePromptMeasurement } from '../context/request/measurement.js';
 import type { QueryEvent } from "../core/query/runtime/events.js";
-import type { SessionMessage, SessionToolCall } from "./schema/sessionMessage.js";
+import type { SessionMessage } from "./schema/sessionMessage.js";
 import { isReadableTranscriptEvent } from "./transcript/validation.js";
 import type { ReportTranscriptEntry } from './reports/model.js';
 export type TranscriptLifecycleEventName =
@@ -59,53 +58,7 @@ export interface BranchSummaryTranscriptEntry {
 }
 
 export type TranscriptEvent =
-  | {
-      type: "message";
-      id?: string;
-      role: SessionMessage["role"];
-      promptMeasurement?: SessionMessage['promptMeasurement'];
-      /** Text, or text with images; see `SessionMessage.content`. */
-      content: string | readonly MultimodalContentBlock[];
-      tool_calls?: readonly SessionToolCall[];
-      tool_call_id?: string;
-      /**
-       * Structured facts recorded beside a tool's prose; see
-       * `SessionMessage.metadata`. Written as given: this layer has no budget,
-       * so a producer that would put large content here has to bound it (or,
-       * better, keep the content in `content` and record only what a later
-       * reader needs to replay).
-       */
-      metadata?: Record<string, unknown>;
-      /**
-       * The model an assistant answer came from. Absent on every line written
-       * before the field existed, and on every role that has no model behind
-       * it. Readers treat absence as the current model, so old transcripts
-       * keep behaving as they did when they were written.
-       */
-      origin?: {
-        readonly provider?: string;
-        readonly model: string;
-        readonly replayBinding?: string;
-      };
-      /**
-       * The working out an assistant answer came with, and the provider's
-       * signature over it. See `SessionMessage.reasoning` for why it is kept.
-       */
-      reasoning?: {
-        readonly text: string;
-        readonly signature?: string;
-        readonly redacted?: boolean;
-      };
-      /**
-       * Why an assistant answer failed, when it did.
-       *
-       * The provider's own wording is kept in `errorMessage`; this is the
-       * category it belongs to, so a reader can tell a rate limit from a bad
-       * request without matching on prose that varies by provider.
-       */
-      failureClass?: string;
-      timestamp: string;
-    }
+  | (SessionMessage & { type: "message"; timestamp: string })
   | {
       type: "lifecycle";
       id?: string;
@@ -215,6 +168,12 @@ export function legacyTranscriptEntryId(lineNumber: number): string {
 export function createMessageTranscriptEvent(
   message: SessionMessage & { timestamp: string },
 ): Extract<TranscriptEvent, { type: "message" }> {
+  if (message.role === 'custom') return {
+    type: 'message', id: message.id ?? createTranscriptEntryId('msg'), role: 'custom',
+    customType: message.customType, display: message.display, content: message.content, timestamp: message.timestamp,
+    ...(message.data !== undefined ? { data: message.data } : {}),
+    ...(message.metadata ? { metadata: message.metadata } : {}),
+  };
   const promptMeasurement = message.role === 'assistant' ? decodePromptMeasurement(message.promptMeasurement) : undefined;
   return {
     type: "message",
@@ -361,6 +320,12 @@ export function transcriptEventToSessionMessage(
   if (event.type !== "message") {
     return undefined;
   }
+  if (event.role === 'custom') return {
+    ...(event.id ? { id: event.id } : {}), role: 'custom', customType: event.customType!, display: event.display!,
+    content: event.content, timestamp: event.timestamp,
+    ...(event.data !== undefined ? { data: event.data } : {}),
+    ...(event.metadata ? { metadata: event.metadata } : {}),
+  };
   const promptMeasurement = event.role === 'assistant' ? decodePromptMeasurement(event.promptMeasurement) : undefined;
   return {
     ...(event.id ? { id: event.id } : {}),

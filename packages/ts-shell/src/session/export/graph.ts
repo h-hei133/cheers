@@ -20,6 +20,29 @@ export function projectExportTree(value: unknown, entries: readonly ExportEntry[
   return { ...tree, nodes, warnings: [...warnings] };
 }
 
+/** Omit display-hidden entries while retaining every visible descendant's ancestry. */
+export function visibleExportTree(tree: ReturnType<typeof projectExportTree>, hidden: ReadonlySet<string | undefined>): ReturnType<typeof projectExportTree> {
+  if (!hidden.size) return tree;
+  const byId = new Map(tree.nodes.map(node => [node.id, node]));
+  const parent = (id: string | undefined): string | undefined => {
+    const seen = new Set<string>();
+    while (id && hidden.has(id)) {
+      if (seen.has(id)) return undefined;
+      seen.add(id); id = byId.get(id)?.parentId;
+    }
+    return id;
+  };
+  const depths = new Map<string, number>();
+  const nodes: ExportTreeNode[] = [];
+  for (const node of tree.nodes) {
+    if (hidden.has(node.id)) continue;
+    const parentId = parent(node.parentId);
+    const depth = parentId ? (depths.get(parentId) ?? -1) + 1 : 0;
+    nodes.push({ ...node, parentId, depth }); depths.set(node.id, depth);
+  }
+  return { ...tree, nodes, leafId: parent(tree.leafId ?? undefined) ?? null };
+}
+
 function buildTree(value: unknown, entries: readonly ExportEntry[]): {
   readonly nodes: readonly ExportTreeNode[];
   readonly leafId: string | null;
@@ -78,7 +101,7 @@ function readableThread(value: unknown): value is Pick<SessionThreadSnapshot, "e
       (entry.kind !== "turn-message" && entry.kind !== "session-root") ||
       !Number.isFinite(entry.order) ||
       (entry.timestamp !== undefined && typeof entry.timestamp !== "string") ||
-      (entry.role !== undefined && !["user", "assistant", "system", "tool"].includes(entry.role))) return false;
+      (entry.role !== undefined && !["user", "assistant", "system", "tool", 'custom'].includes(entry.role))) return false;
     ids.add(entry.id);
     return true;
   });

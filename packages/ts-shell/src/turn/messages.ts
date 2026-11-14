@@ -69,7 +69,7 @@ export function finalStepMessages(messages: readonly ChatMessage[], allowTools: 
 }
 
 /** Whether a request history requires the selected model to understand tools. */
-export function hasToolHistory(messages: readonly Pick<ChatMessage, 'role' | 'tool_calls'>[]): boolean {
+export function hasToolHistory(messages: readonly { readonly role: string; readonly tool_calls?: ChatMessage['tool_calls'] }[]): boolean {
   return messages.some(message =>
     message.role === 'tool' || (message.role === 'assistant' && (message.tool_calls?.length ?? 0) > 0),
   );

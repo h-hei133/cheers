@@ -105,6 +105,7 @@ function omitContext(message: SessionMessage, modes: readonly ContextSelectionMo
     else if (typeof content === 'string' && message.role !== 'system') content = content.replace(/```[^\n]*\n[\s\S]*?\n```/g,
       block => block.length > 2048 ? `[Large block omitted from context; original retained at ${message.id}.]` : block);
   }
+  if (message.role === 'custom') return { ...message, content };
   const { reasoning, ...rest } = message;
   return { ...rest, content, ...(reasoning && !modes.includes('thinking') ? { reasoning } : {}) };
 }

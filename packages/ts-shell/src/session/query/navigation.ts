@@ -286,7 +286,7 @@ function navigationPoint(
 ): SessionNavigationPoint {
   const { node, depth, parentId, valid } = candidate;
   const message = byId.get(node.entry.id);
-  const text = message ? messageToText(message.content) : "";
+  const text = message && (message.role !== 'custom' || message.display) ? messageToText(message.content) : "";
   const unavailable = !valid ? "broken ancestry"
     : node.entry.kind === "turn-message" && !message ? "message unavailable" : undefined;
   return {

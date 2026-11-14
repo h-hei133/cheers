@@ -1,4 +1,4 @@
-import type { AgentMessage } from '../../core/agent/state.js';
+import type { AgentMessage, StandardAgentMessage } from '../../core/agent/state.js';
 import { CHARS_PER_TOKEN, estimateTokens } from '../../session/context.js';
 import { endpointBody, endpointShape, type EndpointKind, type SimpleRequest } from '../../provider/endpoints/index.js';
 
@@ -14,6 +14,7 @@ export interface PromptTailContext {
 
 /** Add only public reasoning that the selected protocol actually sends. */
 export function estimatePromptTail(messages: readonly AgentMessage[], context?: PromptTailContext): number | undefined {
+  if (!messages.every((message): message is StandardAgentMessage => message.role !== 'custom')) return undefined;
   if (messages.some(message => message.reasoning?.signature !== undefined || message.reasoning?.redacted)) return undefined;
   const ordinary = estimateTokens(messages);
   if (!messages.some(message => message.reasoning?.text)) return ordinary;

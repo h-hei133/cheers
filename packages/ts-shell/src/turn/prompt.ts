@@ -159,7 +159,7 @@ export function toChatMessages(history: readonly SessionMessage[] = []): ChatMes
     if (message.role === "system") continue;
     if (message.role !== "tool" && pendingCalls && pendingCalls.length > 0) closePending();
 
-    if (message.role === "user") {
+    if (message.role === "user" || message.role === 'custom') {
       // Preserve the submitted text, including significant whitespace, and
       // pass image blocks through without flattening them.
       const content = message.content;

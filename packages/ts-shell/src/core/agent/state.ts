@@ -1,5 +1,7 @@
 import type { MessageContent, ProviderMessage } from '../../model-adapters/message.js';
 import type { PromptMeasurement } from './request/measurement.js';
+import type { CustomAgentMessage } from './custom.js';
+export type { CustomAgentMessage, CustomMessageInput } from './custom.js';
 
 export type AgentStopReason = "stop" | "length" | "error" | "aborted";
 
@@ -21,7 +23,7 @@ export interface StandardAgentMessage extends MutableProviderMessage {
   readonly errorMessage?: string;
 }
 
-export type AgentMessage = StandardAgentMessage;
+export type AgentMessage = StandardAgentMessage | CustomAgentMessage;
 
 export interface AgentState {
   systemPrompt: string;
