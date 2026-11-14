@@ -4,7 +4,7 @@ import { isMouseSequence, parseMouseReport, type MouseReport } from "./mouse.js"
 import { AppearanceReports } from "./appearance.js";
 import { parseCellSizeResponse } from "./cellSize.js";
 import { isProgramStatusReply } from "./programStatus.js";
-import { parseOscColorResponse, type OscColorTarget } from "./terminalColors.js";
+import { parseOscColorResponse, type OscColorTarget } from "./color.js";
 import { setCellDimensions, type CellDimensions } from "../imageDimensions.js";
 import { firstClusterLength } from "../text/measure.js";
 
@@ -36,6 +36,10 @@ export type PasteListener = (text: string, issue?: "too-large") => void;
 export type MouseListener = (report: MouseReport) => void;
 
 export interface StdinBufferOptions {
+  /** Observe framing without treating protocol-looking pasted text as reports. */
+  readonly onSequence?: (sequence: string, pasted: boolean) => void;
+  readonly onPartialHold?: (prefix: string) => boolean;
+  readonly framingOnly?: boolean;
   readonly onAppearance?: (appearance: "dark" | "light") => void;
   readonly onCellSize?: (dimensions: CellDimensions) => void;
   readonly onColorReply?: (color: OscColorTarget) => void;
@@ -67,6 +71,8 @@ export class StdinBuffer {
   private readonly cellSizeListeners = new Set<(dimensions: CellDimensions) => void>();
   private readonly colorReplyListeners = new Set<(color: OscColorTarget) => void>();
   private readonly programStatusListeners = new Set<() => void>();
+  private readonly sequenceListeners = new Set<(sequence: string, pasted: boolean) => boolean | void>();
+  private readonly partialHoldListeners = new Set<(prefix: string) => boolean>();
   private readonly onCellSizeOption?: (dimensions: CellDimensions) => void;
   private readonly onColorReplyOption?: (color: OscColorTarget) => void;
   private readonly onProgramStatusOption?: () => void;
@@ -77,8 +83,14 @@ export class StdinBuffer {
   private readonly maxPasteBytes: number;
   private readonly setTimer: (callback: () => void, delayMs: number) => unknown;
   private readonly clearTimer: (handle: unknown) => void;
+  private readonly onSequenceOption?: (sequence: string, pasted: boolean) => void;
+  private readonly onPartialHoldOption?: (prefix: string) => boolean;
+  private readonly framingOnly: boolean;
 
   constructor(options: StdinBufferOptions = {}) {
+    this.onSequenceOption = options.onSequence;
+    this.onPartialHoldOption = options.onPartialHold;
+    this.framingOnly = options.framingOnly === true;
     this.appearance = new AppearanceReports(appearance => {
       this.latestAppearance = appearance;
       options.onAppearance?.(appearance);
@@ -124,6 +136,15 @@ export class StdinBuffer {
     this.programStatusListeners.add(listener);
     return () => this.programStatusListeners.delete(listener);
   }
+  onSequence(listener: (sequence: string, pasted: boolean) => boolean | void): () => void {
+    this.sequenceListeners.add(listener);
+    return () => this.sequenceListeners.delete(listener);
+  }
+  /** A protocol owner can retain a bounded prefix until its own reply deadline. */
+  onPartialHold(listener: (prefix: string) => boolean): () => void {
+    this.partialHoldListeners.add(listener);
+    return () => this.partialHoldListeners.delete(listener);
+  }
   /** A transferred parser retains both partial reports and the last accepted appearance. */
   onAppearance(listener: (appearance: 'dark' | 'light') => void): () => void {
     if (this.disposed) return () => {};
@@ -154,6 +175,16 @@ export class StdinBuffer {
     this.releasePartial();
   }
 
+  /** Retire only a protocol owner's residual frame, leaving paste and other reports intact. */
+  flushPartial(matches: (prefix: string) => boolean, discard = false): void {
+    if (this.pasting || !matches(this.buffer)) return;
+    this.clearTimer(this.partialTimer);
+    this.partialTimer = undefined;
+    this.holdingCluster = false;
+    if (discard) this.buffer = "";
+    else this.take(this.buffer.length);
+  }
+
   dispose(): void {
     this.disposed = true;
     this.buffer = "";
@@ -171,6 +202,8 @@ export class StdinBuffer {
     this.cellSizeListeners.clear();
     this.colorReplyListeners.clear();
     this.programStatusListeners.clear();
+    this.sequenceListeners.clear();
+    this.partialHoldListeners.clear();
     this.latestAppearance = undefined;
   }
 
@@ -183,6 +216,8 @@ export class StdinBuffer {
         continue;
       }
       if (this.buffer.startsWith(BRACKETED_PASTE_START)) {
+        this.onSequenceOption?.(BRACKETED_PASTE_START, true);
+        for (const listener of this.sequenceListeners) listener(BRACKETED_PASTE_START, true);
         this.buffer = this.buffer.slice(BRACKETED_PASTE_START.length);
         this.pasting = true;
         this.pasteBuffer = "";
@@ -194,6 +229,11 @@ export class StdinBuffer {
       }
       if (BRACKETED_PASTE_START.startsWith(this.buffer)) return;
       if (this.buffer.charCodeAt(0) !== 0x1b) {
+        if (this.framingOnly) {
+          const escape = this.buffer.indexOf(ESC);
+          this.take(escape < 0 ? this.buffer.length : escape);
+          continue;
+        }
         // A terminal that still translates Enter to CRLF would otherwise submit
         // and then insert a newline into the next draft.
         if (this.buffer.startsWith("\r\n")) {
@@ -214,6 +254,11 @@ export class StdinBuffer {
         continue;
       }
       const end = resolveEscapeEnd(this.buffer, 0);
+      const interrupted = this.buffer.indexOf(ESC, 1);
+      if (interrupted > 0 && this.holdsPartial(this.buffer.slice(0, interrupted))) {
+        this.buffer = this.buffer.slice(interrupted);
+        continue;
+      }
       const restart = this.appearance.restartAt(this.buffer);
       if (restart > 0 && (end < 0 || restart < end)) {
         this.buffer = this.buffer.slice(restart);
@@ -238,6 +283,10 @@ export class StdinBuffer {
     if (end < 0) {
       const safe = Math.max(0, this.buffer.length - BRACKETED_PASTE_END.length + 1);
       const content = this.buffer.slice(0, safe);
+      if (content) {
+        this.onSequenceOption?.(content, true);
+        for (const listener of this.sequenceListeners) listener(content, true);
+      }
       if (!this.pasteRejected) {
         const bytes = Buffer.byteLength(content, "utf8");
         if (this.pasteBytes + bytes > this.maxPasteBytes) {
@@ -252,6 +301,8 @@ export class StdinBuffer {
       return false;
     }
     const content = this.buffer.slice(0, end);
+    this.onSequenceOption?.(content + BRACKETED_PASTE_END, true);
+    for (const listener of this.sequenceListeners) listener(content + BRACKETED_PASTE_END, true);
     if (!this.pasteRejected) {
       const bytes = Buffer.byteLength(content, "utf8");
       if (this.pasteBytes + bytes > this.maxPasteBytes) this.pasteRejected = true;
@@ -285,6 +336,10 @@ export class StdinBuffer {
     // Whatever is still buffered was withheld only in case the terminator was
     // split across chunks; with the paste abandoned it is content.
     const text = this.pasteRejected ? "" : this.pasteBuffer + this.buffer;
+    if (this.buffer) {
+      this.onSequenceOption?.(this.buffer, true);
+      for (const listener of this.sequenceListeners) listener(this.buffer, true);
+    }
     const issue = this.pasteRejected ? "too-large" as const : undefined;
     this.pasteBuffer = "";
     this.buffer = "";
@@ -306,6 +361,7 @@ export class StdinBuffer {
     // No timer or unbounded payload remains, and late fragments still belong
     // to this report. In particular, OSC's terminating BEL is never ctrl+g.
     if (this.appearance.holds(this.buffer)) return;
+    if (this.holdsPartial(this.buffer)) return;
     while (this.buffer.length > 0) {
       const before = this.buffer.length;
       if (this.buffer.charCodeAt(0) === 0x1b) {
@@ -321,6 +377,11 @@ export class StdinBuffer {
   private take(length: number): void {
     const sequence = this.buffer.slice(0, length);
     this.buffer = this.buffer.slice(length);
+    this.onSequenceOption?.(sequence, false);
+    let consumed = false;
+    for (const listener of this.sequenceListeners) consumed = listener(sequence, false) === true || consumed;
+    if (consumed) return;
+    if (this.framingOnly) return;
     const cellSize = parseCellSizeResponse(sequence);
     if (cellSize) {
       setCellDimensions(cellSize);
@@ -350,6 +411,12 @@ export class StdinBuffer {
     const event = parseKeyEvent(sequence);
     if (!event.keyId) return;
     for (const listener of this.keyListeners) listener(event);
+  }
+
+  private holdsPartial(prefix: string): boolean {
+    let held = this.onPartialHoldOption?.(prefix) === true;
+    for (const listener of this.partialHoldListeners) held = listener(prefix) || held;
+    return held;
   }
 }
 

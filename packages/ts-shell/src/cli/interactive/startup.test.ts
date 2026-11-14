@@ -25,9 +25,9 @@ async function queuedInput(terminal: RecordingTerminal, text: string) {
   } };
 }
 
-it.each([[], ['--project', '/fixture', '--no-skills'], ['--profile=test', '--offline']].map(args => [args]))(
+it.each([[], ['--project', '/fixture', '--no-skills'], ['--profile=test', '--offline'], ['--session-id', 'old']].map(args => [args]))(
   'permits an explicit interactive prepaint: %j', args => { expect(startupEligible(args, true)).toBe(true); });
-it.each([['--print'], ['--json'], ['--session-id', 'old'], ['--replay-file', 'file'], ['--doctor'], ['serve'],
+it.each([['--print'], ['--json'], ['--session-id', 'old', '--print'], ['--session-id'], ['--replay-file', 'file'], ['--doctor'], ['serve'],
   ['prompt text'], ['--project'], ['--profile='], ['--', 'text'], ['--help'], ['--version']].map(args => [args]))(
   'keeps other launches out of the early terminal owner: %j', args => { expect(startupEligible(args, true)).toBe(false); });
 it('never prepaints a pipe', () => { expect(startupEligible([], false)).toBe(false); });

@@ -3,7 +3,8 @@ import { StringDecoder } from "node:string_decoder";
 import { acquireRawMode, drainInput, releaseRawMode } from "./input/drain.js";
 import { QUERY_APPEARANCE, STOP_APPEARANCE } from "./input/appearance.js";
 import { CELL_SIZE_QUERY } from "./input/cellSize.js";
-import { KeyboardNegotiation, type KeyboardProtocol } from "./input/keyboardProtocol.js";
+import type { KeyboardProtocol } from "./input/keyboardProtocol.js";
+import { TerminalInputProtocol } from './input/protocol.js';
 import {
   TerminalStatusController,
   type ProgramStatus,
@@ -11,10 +12,10 @@ import {
 import {
   PendingColorQuery,
   TERMINAL_COLOR_QUERY,
-  TerminalProtocolReader,
   type ColorQueryOptions,
   type TerminalColors,
 } from "./input/terminalColors.js";
+import type { StdinBuffer } from './input/stdinBuffer.js';
 import { detectTerminalCapabilities, type TerminalCapabilities } from "./terminalCapabilities.js";
 
 /**
@@ -90,12 +91,13 @@ export interface TerminalDevice {
   setProgramStatus?(status: ProgramStatus): void;
   queryTerminalColors?(options?: ColorQueryOptions): Promise<TerminalColors>;
   queryCellSize?(): void;
+  /** Use the host's existing paste-aware framing for terminal report collection. */
+  bindProtocolInput?(input: StdinBuffer): () => void;
 }
 
 export class Terminal implements TerminalDevice {
   readonly capabilities: TerminalCapabilities;
 
-  private keyboard = new KeyboardNegotiation();
   private draining = false;
   private started = false;
   private disconnected = false;
@@ -107,7 +109,15 @@ export class Terminal implements TerminalDevice {
   private inputReady?: () => void;
   private decoder = new StringDecoder("utf8");
   private readonly status = new TerminalStatusController();
-  private readonly protocolReader = new TerminalProtocolReader();
+  private readonly protocol = new TerminalInputProtocol({
+    write: data => this.write(data),
+    forward: data => {
+      if (!this.inputEnabled) this.deferredInput.push(data);
+      else this.onInput(data);
+    },
+    colorQuery: () => this.colorQuery,
+    programStatusReply: () => this.status.isProbePending ? () => this.status.confirmSupported(data => this.write(data)) : undefined,
+  });
   private colorQuery: PendingColorQuery | undefined;
   private onInput: InputHandler = () => {};
   private onResize: ResizeHandler = () => {};
@@ -124,20 +134,8 @@ export class Terminal implements TerminalDevice {
       text = this.decoder.write(chunk);
     }
     if (text.length === 0) return;
-    if (this.keyboard.pending) {
-      const step = this.keyboard.consume(text);
-      if (step.write) this.write(step.write);
-      text = step.forward;
-      if (text.length === 0) return;
-    }
-    if (this.colorQuery || this.status.isProbePending) {
-      text = this.protocolReader.process(
-        text,
-        this.colorQuery,
-        this.status.isProbePending ? () => this.status.confirmSupported((data) => this.write(data)) : undefined,
-      );
-      if (text.length === 0) return;
-    }
+    text = this.protocol.process(text);
+    if (text.length === 0) return;
     if (!this.inputEnabled) {
       this.deferredInput.push(text);
       return;
@@ -162,10 +160,6 @@ export class Terminal implements TerminalDevice {
   }
 
   /** Whether there is no terminal attached, so nothing should be painted. */
-  get headless(): boolean {
-    return !process.stdout.isTTY;
-  }
-
   get columns(): number {
     return process.stdout.columns || 80;
   }
@@ -191,7 +185,7 @@ export class Terminal implements TerminalDevice {
     if (this.started) return;
     this.started = true;
     this.draining = false;
-    this.keyboard = new KeyboardNegotiation();
+    this.protocol.start();
     this.decoder = new StringDecoder("utf8");
     // However the process leaves — clean exit, crash, or a signal — the terminal
     // must not be left in raw mode with the cursor hidden and autowrap off.
@@ -212,14 +206,11 @@ export class Terminal implements TerminalDevice {
     process.stdin.on("end", this.handleEnd);
     process.stdin.on("close", this.handleEnd);
     process.stdin.resume();
-    if (this.inputEnabled) {
-      const ready = this.inputReady; this.inputReady = undefined; ready?.();
-    }
     // Ask for modifier reporting before the first keystroke: without it the
     // terminal cannot express Shift+Enter at all, and a bare Escape is
     // indistinguishable from the head of a sequence.
     if (this.capabilities.supportsBracketedPaste) {
-      this.write(this.keyboard.query);
+      this.write(this.protocol.begin());
       if (process.stdout.isTTY) {
         this.write(QUERY_APPEARANCE);
         this.status.beginProbe((data) => this.write(data));
@@ -227,18 +218,20 @@ export class Terminal implements TerminalDevice {
       this.keyboardTimer = setTimeout(() => this.expireKeyboardNegotiation(), KEYBOARD_REPLY_TIMEOUT_MS);
       this.keyboardTimer.unref?.();
     }
+    if (this.inputEnabled) {
+      const ready = this.inputReady; this.inputReady = undefined; ready?.();
+    }
   }
 
   /** Stop inspecting input for replies that are evidently not coming. */
   private expireKeyboardNegotiation(): void {
     this.status.expireProbe();
-    const flushed = `${this.keyboard.expire()}${this.protocolReader.flush()}`;
-    if (flushed.length > 0) this.handleData(flushed);
+    this.protocol.expire();
   }
 
   /** Which modifier-reporting protocol negotiation settled on. */
   get keyboardProtocol(): KeyboardProtocol {
-    return this.keyboard.active;
+    return this.protocol.keyboardProtocol;
   }
 
   /** Take over stdin after a deferred start and replay anything typed meanwhile. */
@@ -262,7 +255,7 @@ export class Terminal implements TerminalDevice {
     this.keyboardTimer = undefined;
     this.colorQuery?.cancel();
     this.colorQuery = undefined;
-    this.protocolReader.flush();
+    this.protocol.retire();
     process.off("exit", this.handleExit);
     process.stdout.off("resize", this.handleResize);
     process.stdin.off("data", this.handleData);
@@ -278,14 +271,14 @@ export class Terminal implements TerminalDevice {
     this.keyboardTimer = undefined;
     this.deferredInput = [];
     // Stop generating reports before waiting for those already in flight.
-    this.writeSync(this.keyboard.stop() + STOP_APPEARANCE);
+    this.writeSync(this.protocol.drain() + STOP_APPEARANCE);
     await drainInput(process.stdin);
   }
 
   /** Unbuffered restore for exit and crash handlers, where queued writes are lost. */
   restoreSync(): void {
     const clear = this.status.consumeClearSequence();
-    this.writeSync(`${this.keyboard.stop()}${clear}${RESTORE_MODES}`);
+    this.writeSync(`${this.protocol.restore()}${clear}${RESTORE_MODES}`);
     this.rawOwned = releaseRawMode(this.rawOwned);
   }
 
@@ -316,14 +309,6 @@ export class Terminal implements TerminalDevice {
     }
   }
 
-  hideCursor(): void {
-    this.write("\x1b[?25l");
-  }
-
-  showCursor(): void {
-    this.write("\x1b[?25h");
-  }
-
   setProgress(active: boolean): void {
     this.status.setProgress(active, (data) => this.write(data));
   }
@@ -342,6 +327,10 @@ export class Terminal implements TerminalDevice {
 
   queryCellSize(): void {
     this.write(CELL_SIZE_QUERY);
+  }
+
+  bindProtocolInput(input: StdinBuffer): () => void {
+    return this.protocol.bind(input);
   }
 
 

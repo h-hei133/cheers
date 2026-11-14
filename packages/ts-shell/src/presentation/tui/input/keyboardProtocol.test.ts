@@ -45,6 +45,35 @@ describe("negotiation", () => {
     expect(negotiation.pending).toBe(false);
     expect(negotiation.consume("\x1b[?0u").forward).toBe("\x1b[?0u");
   });
+
+  it("owns its DA1 fence after enhanced negotiation until the actual sentinel arrives", () => {
+    const negotiation = new KeyboardNegotiation(false);
+    negotiation.begin();
+    expect(negotiation.consumeSequence("\x1b[?1u").write).toBe("\x1b[>5u");
+    expect(negotiation.consumeSequence("\x1b[?62c").forward).toBe("");
+    expect(negotiation.consumeSequence("\x1b[?62c").forward).toBe("\x1b[?62c");
+  });
+
+  it("keeps framed negotiation prefixes bounded and never owns an incomplete frame", () => {
+    const negotiation = new KeyboardNegotiation(false);
+    expect(negotiation.holdsSequence(`\x1b[?${"1".repeat(29)}`)).toBe(true);
+    expect(negotiation.holdsSequence(`\x1b[?${"1".repeat(30)}`)).toBe(false);
+    expect(negotiation.consumeSequence("\x1b[?").forward).toBe("\x1b[?");
+    expect(negotiation.consumeSequence("1u").forward).toBe("1u");
+    expect(negotiation.active).toBe("legacy");
+    expect(negotiation.consumeSequence("\x1b[?1u").write).toBe("\x1b[>5u");
+  });
+
+  it("expires the remaining bounded DA1 owner without undoing the enhanced protocol", () => {
+    const negotiation = new KeyboardNegotiation(false);
+    negotiation.begin(); negotiation.consumeSequence("\x1b[?1u");
+    expect(negotiation.holdsSequence("\x1b[?62;")).toBe(true);
+    expect(negotiation.holdsSequence(`\x1b[?${"1".repeat(30)}`)).toBe(false);
+    expect(negotiation.expire()).toBe("");
+    expect(negotiation.holdsSequence("\x1b[?62;")).toBe(false);
+    expect(negotiation.consumeSequence("\x1b[?62c").forward).toBe("\x1b[?62c");
+    expect(negotiation.active).toBe("enhanced");
+  });
 });
 
 describe("input passthrough during negotiation", () => {

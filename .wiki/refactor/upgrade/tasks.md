@@ -25,7 +25,7 @@
 - [x] **B.2** 1 MiB 分块 writer 与背压：本地验收完成。UTF-8字节预算、跨fragment surrogate保持；regular/fullscreen逐行进入同一writer，原pending-byte与shutdown owner保留。独立暂存树4套件107项及build通过；Linux实际受阻管道4MB文本摘要一致、全部写块<=1MiB，PTY约5.7MB输出完成；关闭输出exit1、SIGTERM exit143均完成清理且不报告写完。实际M，额外依赖0；不宣称物理终端或整进程总内存上限。
 - [ ] **B.3** 图片头、cell size、缓存数量／传输／64 MiB 解码预算：已有待验收，真实 Linux 图片和未知格式拒绝。
 - [ ] **B2.1** OSC 9;4／7501／133／16t／tmux 超链接：已有待验收，实际生命周期和输入隔离。
-- [ ] **B2.2** OSC 10／11／4 查询与完整调色板应用：部分。查询 API 尚未由产品生命周期调用；接入现有主题选择／预览，不让迟到响应改变后继宿主或覆盖显式选择。
+- [x] **B2.2** OSC 10／11／4 查询与完整调色板应用：本地验收完成。实际regular/fullscreen启动及adoption接入100ms查询、16色稀疏合并和晚到更新；显式主题、预览、DEC997与后继宿主优先级保持。同一StdinBuffer保护粘贴，键盘DA1 fence保留到250ms自身截止。独立暂存树11套件166项、五静态门、build `64e760e74bd1`通过；Linux实际PTY绑定及fallback两路径16色/拆分DA1/晚到更新/原始粘贴通过，独立复审限定CLEAR。实际L，额外依赖2（共享framing与query fence）；不宣称物理终端普遍兼容。
 - [ ] **B2.3** 可组合浮层与非捕获交互：已有待验收，叠层焦点、短屏、关闭／恢复、真实 PTY。
 
 ## C: 循环、消息与缓存（P1，并包含深度审计 P0）

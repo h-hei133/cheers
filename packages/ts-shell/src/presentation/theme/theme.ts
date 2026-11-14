@@ -9,6 +9,8 @@
 
 import { scopedColor, detectColorMode, type ColorMode } from "./color.js";
 import { loadTheme, getDefaultTheme, type ThemeConfig } from "../themes/index.js";
+import { projectTerminalTheme } from './terminal.js';
+import type { TerminalColors } from '../tui/input/terminalColors.js';
 
 import type { ThemeColorToken } from "./tokens.js";
 export { THEME_COLOR_TOKENS, type ThemeColorToken } from "./tokens.js";
@@ -226,8 +228,8 @@ export function applyDefaultTheme(appearance: "dark" | "light"): void {
   prepareDefaultTheme(appearance)();
 }
 
-export function prepareDefaultTheme(appearance: "dark" | "light"): () => void {
-  return defaultTheme.prepare(getDefaultTheme(appearance), detectColorMode());
+export function prepareDefaultTheme(appearance: "dark" | "light", terminal: TerminalColors = {}): () => void {
+  return defaultTheme.prepare(projectTerminalTheme(getDefaultTheme(appearance), terminal), detectColorMode());
 }
 
 export const defaultTheme = new Theme(getDefaultTheme(), detectColorMode());

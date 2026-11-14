@@ -105,7 +105,8 @@ import { catalogContributions } from '../../core/catalog/contributions.js';
 import { TurnSink } from "./turnSink.js";
 import { reportWriter, reportSaveNotice } from '../output/reports.js';
 import { undoPickerHost } from '../runtime/undo.js';
-import { updateAppearance } from "../../presentation/theme/selection.js";
+import { bindTerminalTheme } from "../../presentation/theme/selection.js";
+import { requestTerminalPalette } from '../../presentation/theme/terminal.js';
 import { followTheme, type ThemeFollower } from "../../presentation/themes/watch.js";
 import { themePreferences } from "../../presentation/theme/preview.js";
 import { createContextController } from './context/controller.js';
@@ -291,6 +292,10 @@ export class InteractiveMode {
    * theme nobody is looking at.
    */
   private readonly theme: ThemeFollower;
+  private terminalTheme?: ReturnType<typeof bindTerminalTheme>;
+  private terminalAppearance?: 'dark' | 'light';
+  private releaseTerminalPalette?: () => void;
+  private releaseTerminalProtocol?: () => void;
 
 
   constructor(private readonly options: InteractiveModeOptions) {
@@ -332,7 +337,8 @@ export class InteractiveMode {
       } : {}),
     });
     this.stdin.onAppearance(appearance => {
-      if (!updateAppearance(appearance)) return;
+      this.terminalAppearance = appearance;
+      if (this.stopped || this.closing || !this.terminalTheme?.appearance(appearance)) return;
       this.theme.refresh();
       this.tui.requestRender({ force: true });
     });
@@ -501,6 +507,10 @@ export class InteractiveMode {
     return this.overlayStack.push(component, options);
   }
   start(): void {
+    this.releaseTerminalPalette?.(); this.releaseTerminalPalette = undefined;
+    const terminalTheme = this.terminalTheme = bindTerminalTheme();
+    this.releaseTerminalProtocol?.(); this.releaseTerminalProtocol = this.terminal.bindProtocolInput?.(this.stdin);
+    if (this.terminalAppearance) terminalTheme.appearance(this.terminalAppearance);
     // The intro renders itself at the frame width so a resize re-elides the path
     // instead of keeping the elision it was born with.
     this.state.transcript.append({
@@ -622,6 +632,10 @@ export class InteractiveMode {
         this.options.onFirstFrame?.();
       });
       time('runtime input adopted');
+      this.releaseTerminalPalette = requestTerminalPalette(this.terminal, colors => {
+        if (this.stopped || this.closing || !terminalTheme.update(colors)) return;
+        this.theme.refresh(); this.tui.requestRender({ force: true });
+      });
       this.tui.renderNow();
     } else this.tui.start({
       useAlternateScreen: this.alternateScreen,
@@ -629,6 +643,11 @@ export class InteractiveMode {
       onInputReady: () => {
         observers.onInputReady?.();
         time('runtime input adopted');
+        this.releaseTerminalPalette?.();
+        this.releaseTerminalPalette = requestTerminalPalette(this.terminal, colors => {
+          if (this.stopped || this.closing || !terminalTheme.update(colors)) return;
+          this.theme.refresh(); this.tui.requestRender({ force: true });
+        });
       },
       onFirstWrite: () => {
         onFirstWrite?.();
@@ -655,6 +674,8 @@ export class InteractiveMode {
     // Keep the first failure for the caller; releasing resources is not proof
     // that every subscription or the terminal was restored.
     for (const cleanup of [
+      () => { this.releaseTerminalPalette?.(); this.releaseTerminalPalette = undefined; this.terminalTheme?.dispose(); this.terminalTheme = undefined; },
+      () => { this.releaseTerminalProtocol?.(); this.releaseTerminalProtocol = undefined; },
       () => this.promptContext.stop(),
       () => this.pickerLifecycles.abortAll(),
       () => this.options.setStartupNotice?.(undefined),

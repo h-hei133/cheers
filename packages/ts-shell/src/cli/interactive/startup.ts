@@ -16,6 +16,7 @@ export class StartupSurface {
   private readonly releaseInput: () => void;
   private readonly releaseKey: () => void;
   private readonly releasePaste: () => void;
+  private readonly releaseProtocol?: () => void;
   private transferred = false;
   private stopped = false;
   private notice = 'Loading runtime · Enter adds a line · Esc exits';
@@ -23,6 +24,7 @@ export class StartupSurface {
   constructor(readonly terminal: TerminalDevice = processTerminal, scheduler?: RenderScheduler,
     private readonly exit: (code: number) => void = code => process.exit(code)) {
     this.firstPaint = new Promise(resolve => { this.finishPaint = resolve; });
+    this.releaseProtocol = terminal.bindProtocolInput?.(this.input);
     this.tui = new TUI(terminal, scheduler);
     const view = new InteractiveSurface({ facts: () => ({ model: '', provider: '', directory: process.cwd() }), statusItems: () => ['directory'],
       activity: () => undefined, busy: () => false, queuedCount: () => 0, now: Date.now,
@@ -82,7 +84,7 @@ export class StartupSurface {
 
   dispose = (): void => {
     if (this.stopped || this.transferred) return;
-    this.stopped = true; this.releaseInput(); this.releaseKey(); this.releasePaste(); this.input.dispose(); this.tui.stop();
+    this.stopped = true; this.releaseInput(); this.releaseKey(); this.releasePaste(); this.releaseProtocol?.(); this.input.dispose(); this.tui.stop();
     this.finishPaint();
     process.removeListener('exit', this.dispose);
   };

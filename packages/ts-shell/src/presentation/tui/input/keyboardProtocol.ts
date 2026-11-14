@@ -55,6 +55,7 @@ export interface ProtocolStep {
 export class KeyboardNegotiation {
   private held = "";
   private settled = false;
+  private attributesPending = false;
   private protocol: KeyboardProtocol = "legacy";
   private readonly minimal: boolean;
 
@@ -68,6 +69,12 @@ export class KeyboardNegotiation {
     return `${QUERY_ENHANCED}${QUERY_DEVICE_ATTRIBUTES}`;
   }
 
+  /** Capture ownership of the DA1 sentinel when its query is actually sent. */
+  begin(): string {
+    this.attributesPending = true;
+    return this.query;
+  }
+
   /** The protocol in force once negotiation settled. */
   get active(): KeyboardProtocol {
     return this.protocol;
@@ -75,7 +82,7 @@ export class KeyboardNegotiation {
 
   /** Whether replies are still expected, so input must be inspected. */
   get pending(): boolean {
-    return !this.settled;
+    return !this.settled || this.attributesPending;
   }
 
   /** Sequences that restore the device; write these on shutdown. */
@@ -90,8 +97,34 @@ export class KeyboardNegotiation {
     const restore = this.restore;
     this.protocol = "legacy";
     this.settled = true;
+    this.attributesPending = false;
     this.held = "";
     return restore;
+  }
+
+  /** Consume a complete non-paste frame supplied by the stdin owner. */
+  consumeSequence(sequence: string): ProtocolStep {
+    const attributes = DEVICE_ATTRIBUTES_REPLY.exec(sequence);
+    if ((this.attributesPending || !this.settled) && attributes?.[0] === sequence) {
+      this.attributesPending = false;
+      return { forward: "", write: this.settle("modify-other-keys") };
+    }
+    if (this.settled) return { forward: sequence, write: "" };
+    const enhanced = ENHANCED_REPLY.exec(sequence);
+    if (enhanced?.[0] === sequence) {
+      return { forward: "", write: this.settle("enhanced") };
+    }
+    return { forward: sequence, write: "" };
+  }
+
+  /** Let the stdin owner retain only bounded negotiation prefixes until expiry. */
+  holdsSequence(prefix: string): boolean {
+    return this.pending && this.couldBecomeReply(prefix);
+  }
+
+  /** Classify a residual frame even after this negotiation has retired. */
+  isReplyPrefix(prefix: string): boolean {
+    return this.couldBecomeReply(prefix);
   }
 
   /**
@@ -120,6 +153,7 @@ export class KeyboardNegotiation {
       }
       const attributes = DEVICE_ATTRIBUTES_REPLY.exec(tail);
       if (attributes) {
+        this.attributesPending = false;
         write += this.settle("modify-other-keys");
         index += attributes[0].length;
         continue;
@@ -149,6 +183,7 @@ export class KeyboardNegotiation {
    * still coming costs work and risks holding a key that will never be claimed.
    */
   expire(): string {
+    this.attributesPending = false;
     if (this.settled) return "";
     this.settled = true;
     this.protocol = "legacy";

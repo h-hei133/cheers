@@ -2290,3 +2290,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A device login has a thirty-second request limit but a stalled token exchange waits for the fifteen-minute login limit.
 - **Root Cause:** The request scope was created after awaiting response headers; a test with the same whole-login timeout could not distinguish the two boundaries.
 - **Rule:** Create one request scope before dispatch and retain it through headers, body and final admission. Test with a longer enclosing lifetime, cancel late ignored-signal responses, and keep timeout versus caller cancellation separate before any credential proof is issued.
+
+
+### Terminal Queries Must Share Paste Framing And Own Their Fences
+- **Symptom:** Protocol-looking paste text disappears, a keyboard reply settles the color query, or a timeout releases an unrelated partial paste marker.
+- **Root Cause:** Raw pre-scanning bypasses the actual paste owner, and multiple queries share an unowned DA1 sentinel or partial-buffer deadline.
+- **Rule:** Use the existing input parser for complete non-paste reports, retain each query fence through settlement or its own bounded expiry, and retire only the matching prefix. Transfer the same parser across startup adoption; keep cached colors subordinate to the captured theme and appearance owners.
