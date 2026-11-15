@@ -105,14 +105,16 @@ it('finishes host cleanup while reporting a resource retirement failure to every
   expect(terminate).toHaveBeenCalledTimes(1);
 });
 
-it('rejects a stale resource snapshot if its loader is reloaded during session creation', async () => {
+it.each([false, true])('rejects a stale resource snapshot while preserving loader ownership if options mutate: %s', async mutate => {
   fs.writeFileSync(path.join(root, 'note.txt'), 'Workspace text');
   const apis: ExtensionAPI[] = [];
   const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true,
     extensionFactories: [api => { apis.push(api); }] });
   await loader.reload();
-  const creating = createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all' });
+  const options = { cwd: root, resourceLoader: loader as DefaultResourceLoader | undefined, noTools: 'all' as const };
+  const creating = createAgentSession(options);
   const observed = creating.then(value => ({ value }), error => ({ error }));
+  if (mutate) options.resourceLoader = undefined;
   await loader.reload();
   const result = await observed;
   if ('value' in result) await result.value.session.dispose();

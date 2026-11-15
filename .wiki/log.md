@@ -11906,3 +11906,7 @@ Linux同代内部compiled三场景实际两loopback通过，每格route/compact�
 摘要目标已提交`9bf68f9`。提升原codemode存储为session/branch/store，薄适配保留wire/worker ABI，内部namespace独立事件；revision/tombstone拒绝ABA，原历史lease与empty/read-key复验、内部预算及unknown/persisted语义保持。八基线断言红后实现，复核同handle准入重入补2红后修。最终六门8/247、0monoliths、build `7bcb4574ea2a`及五反转exact恢复通过，限定复核CLEAR。
 
 Linux同代三独立Node进程验证重开／分叉独立持久化、actual worker namespace隔离和过期结果拒绝。原错误二进制／不存在writer测试路径均记录为setup/范围问题，最终实际create消费者包含在八套件。证据`.omx/artifacts/upgrade-branch-store-2026-11-15/`；无新增provider调用，生产router接入仍待下一批，C.1/E.7未勾选、21/62保持。按批本地提交，不push。
+
+### 2026-11-15：会话虚拟模型注册与代际撤权
+
+分支store已提交774c898。本子批新增扩展registerVirtualModel，CLI／SDK复用原catalog contribution，公开callback-free logical metadata；边界捕获、原signal／options、duplicate/physical collision和reload旧回调拒绝已修。六门18/178、0monoliths、build 047e196c6597、六反转exact恢复及限定复核CLEAR；同代2214文件npm安装strict类型、Linux SDK／CLI native通过，未新增provider请求。完整证据归档 .omx/artifacts/upgrade-virtual-registration-2026-11-15/，按批本地提交不push；E.7转部分，21/62保持，继续逻辑选择与生产路由。

@@ -2,8 +2,20 @@ import { types } from 'node:util';
 
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 
+function dataPrototype(prototype: object | null, array: boolean, allowCrossRealm: boolean): boolean {
+  if (array ? prototype === Array.prototype : prototype === null || prototype === Object.prototype) return true;
+  if (!allowCrossRealm || prototype === null || types.isProxy(prototype)) return false;
+  const parent = Object.getPrototypeOf(prototype);
+  return array ? Array.isArray(prototype) && parent !== null && !types.isProxy(parent) && Object.getPrototypeOf(parent) === null
+    : parent === null;
+}
+
 /** Capture bounded JSON data without invoking source accessors or serialization hooks. */
-export function snapshotData(value: unknown, limits: { readonly bytes: number; readonly nodes: number; readonly depth: number }): JsonValue {
+export function snapshotData(value: unknown, limits: {
+  readonly bytes: number; readonly nodes: number; readonly depth: number;
+  /** Explicit VM boundary; the result still contains only host-owned inert JSON data. */
+  readonly allowCrossRealm?: boolean;
+}): JsonValue {
   let bytes = 0, nodes = 0;
   const ancestors = new Set<object>();
   const count = (text: string): void => {
@@ -26,7 +38,7 @@ export function snapshotData(value: unknown, limits: { readonly bytes: number; r
     }
     if (typeof item !== 'object' || types.isProxy(item)) throw new Error('Message data must contain inert JSON values.');
     const array = Array.isArray(item), prototype = Object.getPrototypeOf(item);
-    if ((array ? prototype !== Array.prototype : prototype !== null && prototype !== Object.prototype) || ancestors.has(item)) {
+    if (!dataPrototype(prototype, array, limits.allowCrossRealm === true) || ancestors.has(item)) {
       throw new Error('Message data must contain acyclic JSON values.');
     }
     ancestors.add(item);

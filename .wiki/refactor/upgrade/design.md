@@ -334,3 +334,9 @@ native.json绑定最终build／六生产owner／probe哈希。探针从同代com
 原八断言反例（ABA、empty、mixed重开/fork）已修；限定复审指出callback递归同handle后吞inner lock失败，outer仍写。补2真实红例后添加transacting及每个owner/per-call callback之后的retired复验，避免再进同步锁或继续退休写。最终六门8/247、0monoliths、build `7bcb4574ea2a`、五有效反转exact恢复通过，限定复核CLEAR。首次错误Vitest二进制为setup failure，首联合实际7/240没有writer消费者；后补真实create并最终单进程8/247。旧build `03a9bbdbae07`属重入修复前历史。
 
 native.json记录三fresh Node进程和九生产owner哈希，同代chunk复制件仅暴露private store binding，所有依赖仍指原generation。public SessionManager与codemode worker真实执行：seed两个namespace、reopen读取／worker只见codemode、ABA/tombstone/empty拒绝、fork继承并独立写、第三进程恢复parent/fork各值。没有替代存储实现、provider请求或生产router消费者。证据`.omx/artifacts/upgrade-branch-store-2026-11-15/delivery.json`；实际L、额外依赖2、复用10/10，C.1/E.7和21/62保持。
+
+## Session virtual registration (2026-11-15)
+
+注册只扩展既有session catalog composition：loader异步初始化完整结束后发布，generation signal／cleanup退出；SDK getModelCatalog返回physical与callback-free virtual两份目录，不虚构credential/runtime。捕获definition与route结果，拒绝访问器／Proxy／重复与超量；state复用snapshotData的显式cross-realm选项，其他消费者默认策略不变。回调原signal和原loader ownership在await之前固定，退休result不污染后继；worker仍明确不支持。
+
+独立复核发现caller map、contribution getter重入、signal方法替换、返回state getter与可变options归属，先复现后修。六门18/178、0monoliths、build 047e196c6597、六断言反转及exact恢复通过。2214文件安装包strict公开类型和Linux安装SDK／同代CLI异步注册、reload pending拒绝、旧dispose保留后继、collision exit1通过；初始native取消cause与slash-path夹具失败保留。当前逻辑选择与生产router仍无消费者，不以注册证明派发或真实provider；C.1/E.7保持开项。下一步把原分支store CAS接入准备期，并审视VM request/messages/signal输入边界。

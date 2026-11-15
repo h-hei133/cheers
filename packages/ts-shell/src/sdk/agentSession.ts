@@ -30,6 +30,8 @@ import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import { DefaultResourceLoader, type LoadExtensionsResult, type ResourceLoader } from "./resourceLoader.js";
 import { snapshotCustomMessage } from '../core/agent/custom.js';
 import { snapshotData } from '../core/values/data.js';
+import type { CatalogProvider } from '../core/models/catalog.js';
+import { sessionModelCatalog } from '../core/catalog/models.js';
 
 /**
  * Compose an embedded session from the existing runtime, session, and security owners.
@@ -107,6 +109,7 @@ function registerSdkContributions(
   extensionsResult: LoadExtensionsResult,
   customTools: readonly ToolDefinition[] | undefined,
   ui: () => ExtensionUiHost | undefined,
+  catalog: readonly CatalogProvider[],
 ): Array<() => void> {
   const cleanups: Array<() => void> = [];
   try {
@@ -143,9 +146,11 @@ function registerSdkContributions(
           sessionId,
           commands: ext.commands,
           tools: ext.tools,
+          virtualModels: ext.virtualModels,
+          signal: ext.signal,
           skills: () => [],
           ...(onEvent ? { onEvent } : {}),
-        }),
+        }, catalog),
       );
     }
     return cleanups;
@@ -181,6 +186,12 @@ export class AgentSession {
 
   get workspaceRoot(): string {
     return this.runtimeContext.projectRoot;
+  }
+
+  /** Logical models have no credentials; their physical destination is resolved per request. */
+  getModelCatalog(): ReturnType<typeof sessionModelCatalog> {
+    if (this.disposed) throw new Error('Agent session is disposed.');
+    return sessionModelCatalog(this.runtimeContext.cwd, this.sessionId, this.runtimeContext.configuration.current.catalog);
   }
 
   /** Append application context while idle, using the existing durable history owner. */
@@ -292,16 +303,19 @@ export async function createAgentSession(
   const cwd = path.resolve(options.cwd ?? process.cwd());
   const sessionManager = options.sessionManager ?? new SessionManager();
   const renderer = options.renderer ?? createSilentRenderer();
-  const resourceLoader = options.resourceLoader ?? new DefaultResourceLoader({ cwd });
+  const suppliedLoader = options.resourceLoader;
+  const ownsResources = suppliedLoader === undefined;
+  const resourceLoader = suppliedLoader ?? new DefaultResourceLoader({ cwd });
 
   let runtimeContextRef: ShellRuntimeContext | undefined;
 
-  if (!options.resourceLoader) {
+  if (ownsResources) {
     await resourceLoader.reload();
   }
 
   const extensionsResult = resourceLoader.getExtensions();
   const bindResources = resourceLoader.captureBinding?.();
+  const retireUnboundResources = ownsResources ? resourceLoader.captureRetirement?.() : undefined;
   const toolPolicy = resolveSdkToolPolicy(options, extensionsResult);
   const overrides: RuntimeConfigOverrides = {
     ...options.runtimeConfigOverrides,
@@ -362,7 +376,7 @@ export async function createAgentSession(
     adoptCurrentSession: options.continueSession === true,
     emitLifecycleMessages: false,
   }); } catch (error) {
-    if (!options.resourceLoader) { try { resourceLoader.captureRetirement?.()(); } catch { /* Keep the bootstrap failure. */ } }
+    try { retireUnboundResources?.(); } catch { /* Keep the bootstrap failure. */ }
     throw error;
   }
 
@@ -375,19 +389,13 @@ export async function createAgentSession(
   const appendPrompts = resourceLoader.getAppendSystemPrompt();
   if (appendPrompts.length > 0) runtimeContext.appendSystemPrompt = appendPrompts;
   const loadedSkills = resourceLoader.getSkills().skills;
-  if (loadedSkills.length > 0 || options.resourceLoader) {
+  if (loadedSkills.length > 0 || !ownsResources) {
     runtimeContext.sdkSkills = new Map(loadedSkills.map((s) => [s.name, s]));
   }
 
   const ownsMcpGateway = options.mcpGateway === undefined;
   const mcpGateway = options.mcpGateway ?? createCliMcpGateway(() => runtimeContext.cwd);
-  const cleanups = registerSdkContributions(
-    runtimeContext.cwd,
-    runtimeContext.session.id,
-    extensionsResult,
-    options.customTools,
-    () => extensionHostFor(runtimeContext)?.ui,
-  );
+  const cleanups: Array<() => void> = [];
 
   let sessionRuntime: ShellSessionRuntime;
   let retireResources: (() => void) | undefined;
@@ -398,6 +406,8 @@ export async function createAgentSession(
     realProviderSmokeOptIn: () => process.env.CHEERS_REAL_PROVIDER_SMOKE?.trim() === "1",
   };
   try {
+    cleanups.push(...registerSdkContributions(runtimeContext.cwd, runtimeContext.session.id, extensionsResult,
+      options.customTools, () => extensionHostFor(runtimeContext)?.ui, runtimeContext.configuration.current.catalog));
     sessionRuntime = createCliSessionRuntime({
       sessionManager,
       mcpGateway,
@@ -419,6 +429,9 @@ export async function createAgentSession(
     if (options.ui) bindExtensionUiFor(runtimeContext, options.ui);
   } catch (error) {
     try { retireResources?.(); } catch { /* Keep the initialization failure. */ }
+    if (!retireResources) {
+      try { retireUnboundResources?.(); } catch { /* Keep the initialization failure. */ }
+    }
     await closeExtensionsFor(runtimeContext).catch(() => {});
     cleanups.splice(0).forEach((unregister) => unregister());
     if (ownsMcpGateway) await mcpGateway.close().catch(() => {});

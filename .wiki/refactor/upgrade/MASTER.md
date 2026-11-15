@@ -22,9 +22,9 @@
 
 ## Current status
 
-**Current phase**: active；T3.1已提交`d683a3d`，C.1物理目标`e61a340`、摘要目标`9bf68f9`已提交，session branch-store前置子批本地验证完成；继续会话注册和生产路由接入。合计21/62项完成。
-**Last completed batch**: 既有codemode存储提升为session/branch/store，旧wire与worker ABI由薄适配保持；内部namespace使用独立事件。捕获原历史lease，revision/tombstone识别ABA，空结果和读键同样复验，内部键数量／大小有界；准入回调重入退休后不继续写。六门、8套件247项、0monoliths及build `7bcb4574ea2a`通过，五有效反转红且exact恢复，限定独立复核CLEAR。Linux同代三个独立进程验证seed/reopen/fork、实际worker隔离、ABA与空结果拒绝。该前置能力尚未接入生产router；C.1/E.7保持部分，没有新增真实provider调用或push／CI。
-**Goal**: active；41项未完成，其中13部分、12已有待验收、14确认缺口、2待核实。保留完整规划，不关闭总目标。
+**Current phase**: active；T3.1已提交`d683a3d`，C.1物理目标`e61a340`、摘要目标`9bf68f9`和session branch-store `774c898`已提交；会话虚拟模型注册子批本地验证完成，继续逻辑选择与生产路由。合计21/62项完成。
+**Last completed batch**: session extension新增registerVirtualModel，SDK和CLI复用原catalog contribution发布与撤权；公开目录分离physical和callback-free virtual metadata，不构造虚拟凭据。重复／物理冲突、有界VM data捕获、loader重载／注销／取消和原始options ownership已验证。六门、18套件178项、0monoliths及build `047e196c6597`通过，六有效反转红且exact恢复，限定独立复核CLEAR；2214文件安装包严格公开类型及Linux安装SDK／同代CLI注册、重载在途拒绝、旧dispose保留后继、冲突exit1通过。本批没有生产逻辑模型派发或真实provider调用；worker注册明确不支持，C.1/E.7不勾选。
+**Goal**: active；41项未完成，其中14部分、12已有待验收、13确认缺口、2待核实。保留完整规划，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -48,6 +48,8 @@
 摘要目标子批遥测：实际L，复用检查10/10，新增未预见依赖2（显式角色renewal的消费者准入、成功rotation共享结果归属）。复用原压缩进度、预算、凭据renewal及connection owner，不修改auth core。下一批提升既有codemode分支store为session owner，使用隔离namespace和原捕获lease，避免建立平行持久化路径；注册和正式路由须在这些前置合同成立后启用。
 
 分支store子批遥测：实际L，复用检查10/10，新增未预见依赖2（无输出的read-key验证、准入同步重入）。单coder负责既有owner提升，主线程捕反例／串行验证，限定独立审查发现重入后两红修复。正式router应将同一个状态键加入写CAS；分开的assertCurrent与commit不能被宣称为原子读写事务。下一注册批复用catalog contribution与扩展代际，virtual元数据不伪造physical auth。
+
+虚拟注册子批遥测：实际L，复用检查10/10，新增未预见依赖2（VM data跨realm显式捕获、调用方可变signal／options身份）。复用原loader generation、contribution和snapshotData，默认JSON准入不变。初9断言红、复核6红及observer补1红后修；首轮reload占位host、AbortError文案、native reload cause和CLI slash路径夹具错误分别记录。E.7由缺口转部分，完成总数保持21/62。
 
 ## Session log
 

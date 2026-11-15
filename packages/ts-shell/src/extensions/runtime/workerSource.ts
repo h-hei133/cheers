@@ -109,6 +109,7 @@ const bootstrap = new vm.Script(\`
     workspaceRoot: globalThis.__ROOT,
     events: eventsBus,
     ui,
+    registerVirtualModel: () => { throw new Error('Virtual model registration is unavailable in worker extensions. Use a session extension.'); },
     registerTool: (tool) => {
       if (!tool || typeof tool.name !== 'string' || !tool.name.trim() || typeof tool.execute !== 'function') {
         throw new Error('Extension registerTool requires { name, execute }.');

@@ -1,37 +1,11 @@
 import type { AgentMessage } from '../agent/state.js'
 import { lastContextMessageIndex } from '../agent/context.js'
-import type { CatalogModel, ModelType, ThinkingLevel } from './catalog.js'
+import type { CatalogModel, ModelType } from './catalog.js'
+import { captureVirtualDefinition, MAX_VIRTUAL_MODELS } from './virtual/capture.js'
+import type { ModelRoute, ModelRouteReason, ModelRouteRequest, VirtualModelDefinition } from './virtual/contract.js'
+export type { ModelRoute, ModelRouteReason, ModelRouteRequest, VirtualModelDefinition, VirtualModelMetadata } from './virtual/contract.js'
 
 export const VIRTUAL_MODEL_API = 'cheers-virtual'
-
-export type ModelRouteReason = 'user' | 'continuation' | 'retry' | 'direct'
-
-export interface ModelRouteRequest<TState = unknown> {
-  readonly provider: string
-  readonly modelId: string
-  readonly thinkingLevel: ThinkingLevel
-  readonly reason: ModelRouteReason
-  readonly state?: TState
-  readonly messages: readonly AgentMessage[]
-  readonly signal?: AbortSignal
-}
-
-export interface ModelRoute<TState = unknown> {
-  readonly provider: string
-  readonly modelId: string
-  readonly thinkingLevel?: ThinkingLevel
-  readonly state?: TState
-}
-
-export interface VirtualModelDefinition<TState = unknown> {
-  readonly provider: string
-  readonly id: string
-  readonly name: string
-  readonly thinkingLevels?: readonly ThinkingLevel[]
-  readonly contextWindow?: number
-  readonly maxTokens?: number
-  readonly route: (request: ModelRouteRequest<TState>) => ModelRoute<TState> | Promise<ModelRoute<TState>>
-}
 
 export function getModelType(model: Pick<CatalogModel, 'modelType'>): ModelType {
   return model.modelType ?? 'chat'
@@ -55,8 +29,21 @@ export class VirtualModelRegistry {
     return `${provider}\0${id}`
   }
 
-  register(definition: VirtualModelDefinition): void {
-    this.definitions.set(this.key(definition.provider, definition.id), definition)
+  register(definition: VirtualModelDefinition): () => void {
+    if (this.definitions.size >= MAX_VIRTUAL_MODELS) throw new Error('Virtual model registration limit exceeded.')
+    const captured = captureVirtualDefinition(definition)
+    const key = this.key(captured.provider, captured.id)
+    if (this.definitions.has(key)) throw new Error('Virtual model registration collision.')
+    let active = true
+    const owned = captureVirtualDefinition(captured, () => {
+      if (!active || this.definitions.get(key) !== owned) throw new Error('Virtual model registration is retired.')
+    })
+    this.definitions.set(key, owned)
+    return () => {
+      active = false
+      if (this.definitions.get(key) !== owned) return
+      this.definitions.delete(key); this.states.delete(key)
+    }
   }
 
   get(provider: string, id: string): VirtualModelDefinition | undefined {
@@ -68,12 +55,15 @@ export class VirtualModelRegistry {
   }
 
   async resolve(request: Omit<ModelRouteRequest, 'state'>): Promise<ModelRoute | undefined> {
-    const def = this.get(request.provider, request.modelId)
+    const { provider, modelId, reason, signal } = request
+    const def = this.get(provider, modelId)
     if (!def) return undefined
-    const k = this.key(request.provider, request.modelId)
-    const state = request.reason === 'direct' ? undefined : this.states.get(k)
+    const k = this.key(provider, modelId)
+    const state = reason === 'direct' ? undefined : this.states.get(k)
     const routed = await def.route({ ...request, state })
-    if (request.reason !== 'direct' && routed.state !== undefined) {
+    if (signal) AbortSignal.prototype.throwIfAborted.call(signal)
+    if (this.definitions.get(k) !== def) throw new Error('Virtual model registration is retired.')
+    if (reason !== 'direct' && routed.state !== undefined) {
       this.states.set(k, routed.state)
     }
     return routed

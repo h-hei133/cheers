@@ -138,12 +138,14 @@ async function registerCliExtensions(
         sessionId,
         commands: loaded.commands,
         tools: guardedTools,
+        virtualModels: loaded.virtualModels,
+        signal: loaded.signal,
         skills: () => [],
         ...(onEvent ? { onEvent } : {}),
       });
     }
     signal.throwIfAborted();
-    for (const contribution of contributions) pendingCleanups.push(registerCatalogContribution(contribution));
+    for (const contribution of contributions) pendingCleanups.push(registerCatalogContribution(contribution, context.configuration.current.catalog));
     cleanups.push(...pendingCleanups);
   } catch (error) {
     pendingCleanups.splice(0).forEach(unregister => unregister());

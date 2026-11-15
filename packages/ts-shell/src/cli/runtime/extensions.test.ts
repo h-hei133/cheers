@@ -12,6 +12,7 @@ import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { catalogContributions } from '../../core/catalog/contributions.js';
 import { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
 import { createProfileContext, withProfile } from '../../core/paths/profile/context.js';
+import { sessionModelCatalog, sessionVirtualModels } from '../../core/catalog/models.js';
 
 let directory: string; let context: ShellRuntimeContext;
 beforeEach(() => {
@@ -56,6 +57,67 @@ it('withholds every CLI contribution when a later async factory rejects', async 
   install();
   await expect(waitForExtensionsFor(context)).rejects.toThrow('factory failed');
   expect(catalogContributions(directory, 'view').flatMap(entry => entry.tools)).toEqual([]);
+});
+
+it('publishes complete async file virtual metadata and retires its captured callback on close', async () => {
+  const file = path.join(directory, 'virtual.ts');
+  fs.writeFileSync(file, `export default async api => {
+    api.registerVirtualModel({ provider: 'adaptive', id: 'first', name: 'First', thinkingLevels: ['low', 'high'],
+      route: request => ({ provider: 'openai', modelId: 'physical', state: { count: (request.state?.count ?? 0) + 1 } }) });
+    await Promise.resolve();
+    api.registerVirtualModel({ provider: 'adaptive', id: 'second', name: 'Second', route: () => ({ provider: 'openai', modelId: 'physical' }) });
+  };`);
+  context.cliExtensionPaths = [file]; install();
+  expect(sessionVirtualModels(directory, 'view')).toEqual([]);
+  await waitForExtensionsFor(context);
+  const models = sessionVirtualModels(directory, 'view'); const physical = context.configuration.current.catalog;
+  expect(models.map(model => model.id)).toEqual(['first', 'second']);
+  const catalog = sessionModelCatalog(directory, 'view', physical);
+  expect(catalog.physical).toBe(physical);
+  expect(catalog.virtual).toEqual([{ provider: 'adaptive', id: 'first', name: 'First', thinkingLevels: ['low', 'high'] },
+    { provider: 'adaptive', id: 'second', name: 'Second' }]);
+  expect(catalog.virtual.every(model => !Object.hasOwn(model, 'route'))).toBe(true);
+  await expect(models[0]!.route({ provider: 'adaptive', modelId: 'first', thinkingLevel: 'high', reason: 'direct',
+    messages: [], state: { count: 3 } })).resolves.toMatchObject({ state: { count: 4 } });
+  await closeExtensionsFor(context); expect(sessionVirtualModels(directory, 'view')).toEqual([]);
+  await expect(models[0]!.route({ provider: 'adaptive', modelId: 'first', thinkingLevel: 'high', reason: 'direct', messages: [] }))
+    .rejects.toThrow(/retired/);
+});
+
+it('withholds staged virtual models and tools when a later async file factory rejects', async () => {
+  const first = path.join(directory, 'virtual-first.ts'); const second = path.join(directory, 'virtual-second.ts');
+  fs.writeFileSync(first, `export default async api => {
+    await Promise.resolve();
+    api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic', route: () => ({ provider: 'openai', modelId: 'physical' }) });
+    api.registerTool({ name: 'staged_virtual_tool' });
+  };`);
+  fs.writeFileSync(second, `export default async api => {
+    api.registerVirtualModel({ provider: 'adaptive', id: 'late', name: 'Late', route: () => ({ provider: 'openai', modelId: 'physical' }) });
+    await Promise.resolve(); throw new Error('later virtual factory failed');
+  };`);
+  context.cliExtensionPaths = [first, second]; install();
+  await expect(waitForExtensionsFor(context)).rejects.toThrow('later virtual factory failed');
+  expect(catalogContributions(directory, 'view')).toEqual([]); expect(sessionVirtualModels(directory, 'view')).toEqual([]);
+});
+
+it('cleans earlier CLI registrations when a later virtual model collides with the physical catalog', async () => {
+  const physical = context.configuration.current.catalog.flatMap(provider => provider.models.map(model => ({ provider: provider.id, model: model.id })))[0]!;
+  expect(physical).toBeDefined();
+  const first = path.join(directory, 'before-collision.ts'); const second = path.join(directory, 'physical-collision.ts');
+  fs.writeFileSync(first, `export default async api => {
+    await Promise.resolve();
+    api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic', route: () => ({ provider: 'openai', modelId: 'physical' }) });
+    api.registerTool({ name: 'before_collision' });
+  };`);
+  fs.writeFileSync(second, `export default async api => {
+    await Promise.resolve();
+    api.registerVirtualModel({ provider: ${JSON.stringify(physical.provider)}, id: ${JSON.stringify(physical.model)}, name: 'Collision',
+      route: () => ({ provider: 'openai', modelId: 'physical' }) });
+  };`);
+  context.cliExtensionPaths = [first, second]; install();
+  await expect(waitForExtensionsFor(context)).rejects.toThrow(/physical/);
+  expect(catalogContributions(directory, 'view')).toEqual([]);
+  expect(sessionModelCatalog(directory, 'view', context.configuration.current.catalog).virtual).toEqual([]);
 });
 
 it('exposes only the installed runtime and shares aliases without legacy fallback', () => {

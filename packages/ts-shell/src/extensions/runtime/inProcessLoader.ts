@@ -15,6 +15,8 @@ import { EXTENSION_WORKER_SOURCE } from './workerSource.js'
 import { ExtensionInitialization, type ExtensionInitializationOptions } from './initialization.js'
 import { resolveUiHost, type ExtensionUiHost } from './ui.js'
 import { currentExtensionInvocation, runExtensionInvocation } from './context.js'
+import { captureVirtualDefinition, MAX_VIRTUAL_MODELS } from '../../core/models/virtual/capture.js'
+import type { ModelRouteRequest, VirtualModelDefinition } from '../../core/models/virtual/contract.js'
 export type { ExtensionUiHost, ExtensionUiDialogOptions } from './ui.js'
 
 export interface ExtensionHostBridge {
@@ -52,6 +54,7 @@ export interface ExtensionAPI {
   readonly ui: Required<ExtensionUiHost>
   registerTool(tool: ToolDefinition): void
   registerCommand(command: CommandDefinition): void
+  registerVirtualModel<TState = unknown>(model: VirtualModelDefinition<TState>): void
   registerShortcut(shortcut: ExtensionShortcut): void
   registerFlag(flag: ExtensionFlag): void
   getFlag(name: string): string | boolean | undefined
@@ -67,6 +70,8 @@ export interface ExtensionAPI {
 export interface LoadedInProcessExtension {
   readonly tools: readonly ToolDefinition[]
   readonly commands: readonly CommandDefinition[]
+  readonly virtualModels?: readonly VirtualModelDefinition[]
+  readonly signal?: AbortSignal
   readonly shortcuts: readonly ExtensionShortcut[]
   readonly flags: readonly ExtensionFlag[]
   readonly handlers: ReadonlyMap<string, readonly ((payload: unknown) => unknown | Promise<unknown>)[]>
@@ -205,6 +210,7 @@ function createExtensionApiCollector(options: {
     ? AbortSignal.any([initialization.signal, signal]) : initialization.signal
   const tools: ToolDefinition[] = []
   const commands: CommandDefinition[] = []
+  const virtualModels: VirtualModelDefinition[] = []
   const shortcuts: ExtensionShortcut[] = []
   const flags: ExtensionFlag[] = []
   const flagValues = new Map<string, string | boolean | undefined>()
@@ -231,6 +237,19 @@ function createExtensionApiCollector(options: {
     registerCommand: nullProtoFn((command: CommandDefinition) => commands.push({ ...command,
       execute: (args, context) => runExtensionInvocation(options.host?.ui, invocationSignal(context.signal), () => { active(); return command.execute(args, context) }),
     }), collecting),
+    registerVirtualModel: nullProtoFn((model: VirtualModelDefinition) => {
+      if (virtualModels.length >= MAX_VIRTUAL_MODELS) throw new Error('Virtual model registration limit exceeded.')
+      const definition = captureVirtualDefinition(model, active)
+      if (virtualModels.some(value => value.provider === definition.provider && value.id === definition.id)) throw new Error('Virtual model registration collision.')
+      virtualModels.push(Object.freeze({ ...definition, route: async (request: ModelRouteRequest) => {
+        const signal = invocationSignal(request.signal)
+        return runExtensionInvocation(options.host?.ui, signal, async () => {
+          active(); signal.throwIfAborted()
+          const result = await definition.route({ ...request, signal })
+          active(); signal.throwIfAborted(); return result
+        })
+      } }))
+    }, collecting),
     registerShortcut: nullProtoFn((shortcut: ExtensionShortcut) => shortcuts.push(shortcut), collecting),
     registerFlag: nullProtoFn((flag: ExtensionFlag) => {
       flags.push(flag)
@@ -258,6 +277,8 @@ function createExtensionApiCollector(options: {
     result: (exports: Readonly<Record<string, unknown>> = {}): LoadedInProcessExtension => ({
       tools: Object.freeze([...tools]),
       commands: Object.freeze([...commands]),
+      virtualModels: Object.freeze([...virtualModels]),
+      signal: initialization.signal,
       shortcuts: Object.freeze([...shortcuts]),
       flags: Object.freeze([...flags]),
       handlers: new Map([...handlers].map(([event, callbacks]) => [event, Object.freeze([...callbacks])])),

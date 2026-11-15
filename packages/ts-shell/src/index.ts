@@ -69,6 +69,7 @@ export {
   type ResourceLoader,
 } from "./sdk/resourceLoader.js";
 export type { ExtensionUiHost, ExtensionUiDialogOptions } from './extensions/runtime/ui.js';
+export type { ModelRoute, ModelRouteRequest, ModelRouteReason, VirtualModelDefinition, VirtualModelMetadata } from './core/models/virtual/contract.js';
 export {
   runExtensionFactory,
   loadInProcessExtension,
