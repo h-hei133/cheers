@@ -1,0 +1,10 @@
+{
+  "reviewer": "/root/routing_delivery_review",
+  "initial": "REQUEST CHANGES",
+  "status": "APPROVE",
+  "scope": "Four changed files; follow-up three-file consumer-admission repair",
+  "finding": "Nested microtask selection replacement after helper resolved before caller resumed.",
+  "counterexamples": "review-red.log",
+  "resolution": "Captured assertCurrent checked by both consumers; original projectRoot/version used for fork. Draft only after accepted selection.",
+  "independentExecution": false
+}

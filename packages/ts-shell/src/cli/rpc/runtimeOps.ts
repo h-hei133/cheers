@@ -15,7 +15,6 @@ import { costModel } from "../../core/commands/cost/model.js";
 import { loadCatalog } from "../../core/models/catalogStore.js";
 import { listVisibleCommands } from "../../core/commands/registry.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
-import { readSessionNavigationAsync } from "../../session/query/navigation.js";
 import { readSessionEntries, readSessionTree } from "../../session/query/sessionEntries.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../../session/store/sessionFileLayout.js";
 import { readTranscriptEvents } from "../../session/transcript/sessionTranscript.js";
@@ -162,11 +161,6 @@ export async function readRpcTree(runtimeContext: ShellRuntimeContext): Promise<
   const tree = readSessionTree(snapshot.entries);
   if (tree === "unknown-cursor") throw new Error("Session tree unavailable.");
   return { tree, leafId: snapshot.activeLeafId };
-}
-
-export async function readRpcForkMessages(runtimeContext: ShellRuntimeContext): Promise<readonly { readonly entryId: string; readonly text: string }[]> {
-  const nav = await readSessionNavigationAsync(runtimeContext.session.id, runtimeContext.cwd);
-  return nav.points.map(point => ({ entryId: point.entryId, text: point.prompt ?? "" }));
 }
 
 export function listRpcModels(runtimeContext?: ShellRuntimeContext): readonly Record<string, unknown>[] {

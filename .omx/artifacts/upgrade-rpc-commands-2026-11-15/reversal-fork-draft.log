@@ -1,0 +1,71 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/runtimeHost.test.ts (31 tests | 1 failed | 30 skipped) 75ms
+   ↓ clears both live input lanes and pending submissions without cancelling the active turn
+   ↓ changes the running steering delivery mode before the next actual model step
+   ↓ changes the running followUp delivery mode before the next actual model step
+   ↓ reports a refused new_session without changing the current selection
+   ↓ reports a refused switch_session without changing the current selection
+   ↓ reports a refused fork without changing the current selection
+   ↓ reports a refused clone without changing the current selection
+   ↓ persists new-session ancestry while starting with an empty conversation
+   ↓ accepts a same-project session callback and selects only after acceptance
+   ↓ reads persisted conversation updates through get_messages after the host was created
+   ↓ reads persisted conversation updates through get_state after the host was created
+   ↓ reads persisted conversation updates through get_session_stats after the host was created
+   ↓ reads persisted conversation updates through get_last_assistant_text after the host was created
+   ↓ reads the accepted new session on the next call through the existing host
+   ↓ refuses get_messages when the selected stored session is unavailable
+   ↓ refuses get_state when the selected stored session is unavailable
+   ↓ refuses get_session_stats when the selected stored session is unavailable
+   ↓ refuses get_last_assistant_text when the selected stored session is unavailable
+   ↓ rejects a changed identity during a current-session read
+   ↓ rejects a changed selection during a current-session read
+   ↓ reports the resolved physical provider together with its model for a CLI override
+   ↓ offers only saved user questions for a fork and returns their exact editable text
+   × returns a saved question as a fork draft after the branch was accepted 74ms
+     → expected { type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(3 matching properties omitted from actual)
+   ↓ refuses get_fork_messages when its session changes during acquisition
+   ↓ refuses fork when its session changes during acquisition
+   ↓ binds a fork draft to the acquired history version before creating a session
+   ↓ keeps a refused fork switch separate from an accepted editable draft
+   ↓ refuses a fork when the host becomes busy while acquiring its draft
+   ↓ omits unavailable saved questions from fork candidates
+   ↓ refuses get_fork_messages when selection changes after the nested read resolves
+   ↓ refuses fork when selection changes after the nested read resolves
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 30 skipped (31)
+   Start at  18:59:09
+   Duration  8.97s (transform 5.42s, setup 0ms, collect 8.64s, tests 75ms, environment 0ms, prepare 56ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > returns a saved question as a fork draft after the branch was accepted
+AssertionError: expected { type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "data": {
+      "cancelled": false,
+-     "text": "Selected draft",
+    },
+    "success": true,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:237:20
+    235|   const entryId = manager.getSession(context.session.id)!.turns[0]!.id…
+    236|   const response = await handleRpcCommand({ type: 'fork', entryId }, h…
+    237|   expect(response).toMatchObject({ success: true, data: { cancelled: f…
+       |                    ^
+    238| });
+    239| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

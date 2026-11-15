@@ -1,0 +1,8 @@
+{
+  "reviewer": "/root/routing_architecture",
+  "initial": "BLOCK",
+  "status": "CLEAR",
+  "scope": "Bounded fork repair and async consumer lifetime",
+  "resolution": "Original lease reaches list and fork consumers immediately before publication/write.",
+  "independentExecution": false
+}

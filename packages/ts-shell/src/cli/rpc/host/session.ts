@@ -6,13 +6,12 @@ import {
   navigateRpcTree,
   readLastAssistantText,
   readRpcEntries,
-  readRpcForkMessages,
   readRpcSessionStats,
   readRpcTree,
   resolveSessionTargetId,
 } from "../runtimeOps.js";
 import type { RuntimeRpcHostOptions } from "./contract.js";
-import { readRpcSession } from './read.js';
+import { readRpcForkMessages, readRpcNavigation, readRpcSession } from './read.js';
 
 type SessionHost = Pick<RpcHost, "newSession" | "switchSession" | "setSessionName" | "getSessionStats"
   | "getLastAssistantText" | "fork" | "cloneSession" | "getForkMessages" | "getEntries" | "getTree" | "navigateTree">;
@@ -48,8 +47,14 @@ export function sessionHost(options: RuntimeRpcHostOptions, manager: SessionMana
     getLastAssistantText: () => readLastAssistantText(readRpcSession(runtimeContext, manager)),
     fork: async (entryId) => {
       if (options.isStreaming()) return { cancelled: true };
-      const forked = manager.fork(runtimeContext.session.id, runtimeContext.projectRoot, { activate: false, entryId });
-      return selectSession(forked);
+      const snapshot = await readRpcNavigation(runtimeContext);
+      if (options.isStreaming()) return { cancelled: true };
+      const point = snapshot.points.find(candidate => candidate.entryId === entryId && candidate.prompt !== undefined && !candidate.unavailable);
+      if (!point) throw new Error('Cannot fork: select a saved user-message entry with complete ancestry.');
+      snapshot.assertCurrent();
+      const forked = manager.fork(snapshot.session.id, snapshot.projectRoot, { activate: false, entryId, expectedVersion: snapshot.version });
+      const selected = selectSession(forked);
+      return selected.cancelled ? selected : { ...selected, text: point.prompt };
     },
     cloneSession: async () => {
       if (options.isStreaming()) return { cancelled: true };

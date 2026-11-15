@@ -12,6 +12,7 @@ import type { Session } from '../../session/schema/sessionRecord.js';
 import { runTurn, type TurnInput } from '../../turn/session.js';
 import type { StepFunction } from '../../turn/step.js';
 import { resolveCliCredential } from '../provider/cliProviderRuntimeBridge.js';
+import * as navigation from '../../session/query/navigation.js';
 import { SubmissionQueue } from '../interactive/inputQueue.js';
 import type { RpcCommand } from './protocol.js';
 import { handleRpcCommand } from './rpcServer.js';
@@ -42,7 +43,8 @@ afterEach(() => {
 });
 
 function host(input?: TurnInput, switchSession?: (session: Session) => boolean) {
-  const runtime = { input: () => input, cancelCurrentRun: () => {} } as unknown as ShellSessionRuntime;
+  const runtime = { input: () => input, cancelCurrentRun: () => {}, getState: () => input ? 'running' : 'idle',
+    summarizeAbandonedTurns: async () => undefined } as unknown as ShellSessionRuntime;
   return { ...createRuntimeRpcHost({ runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
     queue, isStreaming: () => Boolean(input), enqueuePrompt: text => { queue.push(text); }, switchSession }), emitResponse: () => {} };
 }
@@ -208,4 +210,115 @@ it('reports the resolved physical provider together with its model for a CLI ove
   expect(actual).toMatchObject({ provider: 'anthropic', model: 'physical' });
   const response = await handleRpcCommand({ type: 'get_state' }, host());
   expect(response).toMatchObject({ success: true, data: { model: { provider: 'anthropic', id: 'physical' }, thinkingLevel: 'low' } });
+});
+
+it('offers only saved user questions for a fork and returns their exact editable text', async () => {
+  manager.addTurn(context.session.id, { role: 'user', content: 'First question\n  keep spacing' });
+  manager.addTurn(context.session.id, { role: 'assistant', content: 'First answer' });
+  manager.addTurn(context.session.id, { role: 'user', content: 'Second question' });
+  const source = manager.getSession(context.session.id)!;
+  const rpc = host();
+  const offered = await handleRpcCommand({ type: 'get_fork_messages' }, rpc);
+  expect(offered).toMatchObject({ success: true, data: { messages: [
+    { entryId: source.turns[0]!.id, text: 'First question\n  keep spacing' },
+    { entryId: source.turns[2]!.id, text: 'Second question' },
+  ] } });
+  const result = await handleRpcCommand({ type: 'fork', entryId: source.turns[0]!.id! }, rpc);
+  expect(result).toMatchObject({ success: true, data: { cancelled: false, text: 'First question\n  keep spacing' } });
+  expect(context.session.id).not.toBe(source.id);
+  expect(context.session.turns).toEqual([]);
+  expect(manager.getSession(source.id)!.turns).toEqual(source.turns);
+});
+
+it('returns a saved question as a fork draft after the branch was accepted', async () => {
+  manager.addTurn(context.session.id, { role: 'user', content: 'Selected draft' });
+  const entryId = manager.getSession(context.session.id)!.turns[0]!.id!;
+  const response = await handleRpcCommand({ type: 'fork', entryId }, host());
+  expect(response).toMatchObject({ success: true, data: { cancelled: false, text: 'Selected draft' } });
+});
+
+it.each(['get_fork_messages', 'fork'] as const)('refuses %s when its session changes during acquisition', async type => {
+  manager.addTurn(context.session.id, { role: 'user', content: 'Old question' });
+  const entryId = manager.getSession(context.session.id)!.turns[0]!.id!;
+  const successor = manager.createNew(directory, { activate: false });
+  const original = navigation.readSessionNavigationAsync;
+  vi.spyOn(navigation, 'readSessionNavigationAsync').mockImplementationOnce(async (...args) => {
+    const result = await original(...args);
+    context.session = successor;
+    return result;
+  });
+  const fork = vi.spyOn(manager, 'fork');
+  const response = await handleRpcCommand(type === 'fork' ? { type, entryId } : { type }, host());
+  expect(response).toMatchObject({ success: false });
+  expect(response.data).toBeUndefined();
+  expect(fork).not.toHaveBeenCalled();
+  expect(context.session).toBe(successor);
+});
+
+it('binds a fork draft to the acquired history version before creating a session', async () => {
+  manager.addTurn(context.session.id, { role: 'user', content: 'Captured question' });
+  const entryId = manager.getSession(context.session.id)!.turns[0]!.id!;
+  const original = navigation.readSessionNavigationAsync;
+  vi.spyOn(navigation, 'readSessionNavigationAsync').mockImplementationOnce(async (...args) => {
+    const result = await original(...args);
+    manager.addTurn(context.session.id, { role: 'assistant', content: 'New history after capture' });
+    return result;
+  });
+  const count = fs.readdirSync(path.dirname(manager.getSessionDirPath(context.session.id))).length;
+  const response = await handleRpcCommand({ type: 'fork', entryId }, host());
+  expect(response).toMatchObject({ success: false });
+  expect(fs.readdirSync(path.dirname(manager.getSessionDirPath(context.session.id)))).toHaveLength(count);
+});
+
+it('keeps a refused fork switch separate from an accepted editable draft', async () => {
+  manager.addTurn(context.session.id, { role: 'user', content: 'Unaccepted draft' });
+  const entryId = manager.getSession(context.session.id)!.turns[0]!.id!;
+  const response = await handleRpcCommand({ type: 'fork', entryId }, host(undefined, () => false));
+  expect(response).toMatchObject({ success: true, data: { cancelled: true } });
+  expect(response.data?.text).toBeUndefined();
+});
+
+it('refuses a fork when the host becomes busy while acquiring its draft', async () => {
+  manager.addTurn(context.session.id, { role: 'user', content: 'Pending draft' });
+  const entryId = manager.getSession(context.session.id)!.turns[0]!.id!;
+  let busy = false;
+  const original = navigation.readSessionNavigationAsync;
+  vi.spyOn(navigation, 'readSessionNavigationAsync').mockImplementationOnce(async (...args) => {
+    const snapshot = await original(...args); busy = true; return snapshot;
+  });
+  const fork = vi.spyOn(manager, 'fork');
+  const rpc = createRuntimeRpcHost({ runtimeContext: context, sessionRuntime: {} as ShellSessionRuntime,
+    sessionManager: manager, queue, isStreaming: () => busy, enqueuePrompt: () => {} });
+  const response = await handleRpcCommand({ type: 'fork', entryId }, { ...rpc, emitResponse: () => {} });
+  expect(response).toMatchObject({ success: true, data: { cancelled: true } });
+  expect(fork).not.toHaveBeenCalled();
+});
+
+it('omits unavailable saved questions from fork candidates', async () => {
+  manager.addTurn(context.session.id, { role: 'user', content: 'Incomplete question' });
+  const original = navigation.readSessionNavigationAsync;
+  vi.spyOn(navigation, 'readSessionNavigationAsync').mockImplementationOnce(async (...args) => {
+    const snapshot = await original(...args);
+    return { ...snapshot, actionSafe: false, quality: 'partial', points: snapshot.points.map(point => ({ ...point, unavailable: 'partial transcript' })) };
+  });
+  const response = await handleRpcCommand({ type: 'get_fork_messages' }, host());
+  expect(response).toMatchObject({ success: true, data: { messages: [] } });
+});
+
+it.each(['get_fork_messages', 'fork'] as const)('refuses %s when selection changes after the nested read resolves', async type => {
+  manager.addTurn(context.session.id, { role: 'user', content: 'Retired draft' });
+  const entryId = manager.getSession(context.session.id)!.turns[0]!.id!;
+  const successor = manager.createNew(directory, { activate: false });
+  const original = navigation.readSessionNavigationAsync;
+  vi.spyOn(navigation, 'readSessionNavigationAsync').mockImplementationOnce(async (...args) => {
+    const snapshot = await original(...args);
+    queueMicrotask(() => queueMicrotask(() => { context.session = successor; }));
+    return snapshot;
+  });
+  const fork = vi.spyOn(manager, 'fork');
+  const response = await handleRpcCommand(type === 'fork' ? { type, entryId } : { type }, host());
+  expect(response).toMatchObject({ success: false });
+  expect(response.data).toBeUndefined();
+  expect(fork).not.toHaveBeenCalled();
+  expect(context.session).toBe(successor);
 });

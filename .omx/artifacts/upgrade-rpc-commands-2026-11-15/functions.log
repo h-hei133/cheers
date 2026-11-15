@@ -1,0 +1,3 @@
+module-facade-check ceiling=20 modules=2635 reported=0 thresholds=delegationRatio>=0.9,branching<=0,ownStateWrites<=0
+  verdict         names lines  delegation  branching  lines/name  module
+module-facade-summary monoliths=0 thin_facades=0

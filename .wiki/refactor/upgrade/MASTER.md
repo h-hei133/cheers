@@ -22,8 +22,8 @@
 
 ## Current status
 
-**Current phase**: active；C.1已本地提交`d8189ac`。D.1当前会话读取子批本地验证完成，待本地提交；下一联合验收session／model／tree命令及错误分类。当前22/62项完成。
-**Last completed batch**: D.1当前读取子批修复startup旧messages／count／stats／last-text以及physical provider/model错误配对，复用现有SessionManager且不回写runtime binding。十一读反例与一resolver反例先红；六门4/33、三反转exact恢复、恢复1/21、2635模块0monoliths、build `545e59e9f16a`通过；Linux当前编译CLI两进程logical／physical各一POST，当前读／新会话／切回／删除后拒绝／EOF exit0通过，独立代码APPROVE、架构CLEAR。D.1其余命令未验收，仍部分。
+**Current phase**: active；C.1已提交`d8189ac`、RPC当前读取已提交`5ded288`。D.1 fork／session／tree矩阵子批本地验证完成待提交；下一核实并接入bash／abort_bash现有执行owner。当前22/62项完成。
+**Last completed batch**: D.1 fork候选／draft／captured source版本与consumer准入修复。五初红、两复审嵌套microtask红后修；六门6/65、五反转exact恢复、2635模块0monoliths、build `8f67e032b1c9`通过，限定独立代码APPROVE／架构CLEAR。Linux编译CLI实际JSONL会话／模型／tree／clone／fork／navigate往返／busy／abort／missing读取矩阵三loopback POST、EOF exit0通过。bash／abort_bash仍缺生产宿主，D.1继续部分。
 **Goal**: active；40项未完成，其中14部分、11已有待验收、13确认缺口、2待核实。保留完整规划，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -55,10 +55,13 @@
 
 RPC读取子批遥测：实际M，结构复用10/10，新增未预见依赖1（真实CLI override的provider/model配对）；复用现有存储reader和RPC宿主，新增本域read owner，不建立缓存或并行持久化。原工具输出／usage汇总语义不改；D.1由确认缺口转部分，22/62保持。
 
+RPC fork子批遥测：实际M，复用10/10，新增未预见依赖1（helper resolve至consumer之间的microtask准入）。保持原branch/fork与history version CAS，read owner传递原lease，无新增存储或执行平面。完整D.1命令审计新增确认bash／abort_bash宿主未接入，单独后续实现，22/62保持。
+
 ## Session log
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-15 | RPC read已提交5ded288；fork／commands子批七反例红、六门6/65、五反转、0monoliths、build `8f67e032b1c9`和Linux三POST session/model/tree/busy矩阵passed，限定复审APPROVE/CLEAR。D.1 bash／abort_bash待接入，22/62保持，按批本地提交。 |
 | 2026-11-15 | C.1已提交d8189ac；D.1当前读取子批十二反例先红，六门4/33、三反转、0monoliths、build `545e59e9f16a`、Linuxlogical／physical两进程真实JSONL及两POST通过，限定独立双lane复核通过。本地22/62保持，待提交后继续session／tree／error联合验收。 |
 | 2026-11-15 | C.1逻辑选择／生产路由完成当前六门39/840、十反转、0monoliths、build `083b3d78d8bf`与Linux公开SDK／CLI／摘要／重试／RPC限定矩阵及4次配置模型POST；证据归档upgrade-virtual-routing-2026-11-15。架构CLEAR、限定独立代码复审APPROVE，本批待本地提交，C.1完成22/62；D.1 get_messages旧快照已由普通physical对照证实，下一单独修复。 |
 | 2026-11-15 | 分支store前置：基线8断言红，重入补2红后修；最终六门8/247、0monoliths、build `7bcb4574ea2a`，五反转exact恢复，限定复审CLEAR。Linux同代三进程重开/分叉/实际worker namespace隔离和冲突拒绝passed。证据`.omx/artifacts/upgrade-branch-store-2026-11-15/delivery.json`；无新增provider调用，21/62保持，继续注册／路由consumer。 |

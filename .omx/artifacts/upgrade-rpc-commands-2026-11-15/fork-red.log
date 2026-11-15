@@ -1,0 +1,180 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/runtimeHost.test.ts (27 tests | 5 failed) 889ms
+   ✓ clears both live input lanes and pending submissions without cancelling the active turn 34ms
+   ✓ changes the running steering delivery mode before the next actual model step 32ms
+   ✓ changes the running followUp delivery mode before the next actual model step 29ms
+   ✓ reports a refused new_session without changing the current selection 42ms
+   ✓ reports a refused switch_session without changing the current selection 41ms
+   ✓ reports a refused fork without changing the current selection 40ms
+   ✓ reports a refused clone without changing the current selection 43ms
+   ✓ persists new-session ancestry while starting with an empty conversation 27ms
+   ✓ accepts a same-project session callback and selects only after acceptance 29ms
+   ✓ reads persisted conversation updates through get_messages after the host was created 31ms
+   ✓ reads persisted conversation updates through get_state after the host was created 29ms
+   ✓ reads persisted conversation updates through get_session_stats after the host was created 28ms
+   ✓ reads persisted conversation updates through get_last_assistant_text after the host was created 29ms
+   ✓ reads the accepted new session on the next call through the existing host 48ms
+   ✓ refuses get_messages when the selected stored session is unavailable 23ms
+   ✓ refuses get_state when the selected stored session is unavailable 22ms
+   ✓ refuses get_session_stats when the selected stored session is unavailable 20ms
+   ✓ refuses get_last_assistant_text when the selected stored session is unavailable 21ms
+   ✓ rejects a changed identity during a current-session read 28ms
+   ✓ rejects a changed selection during a current-session read 29ms
+   ✓ reports the resolved physical provider together with its model for a CLI override 17ms
+   × offers only saved user questions for a fork and returns their exact editable text 52ms
+     → expected { type: 'response', …(3) } to match object { success: true, data: { …(1) } }
+(2 matching properties omitted from actual)
+   × returns a saved question as a fork draft after the branch was accepted 38ms
+     → expected { type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(3 matching properties omitted from actual)
+   × refuses get_fork_messages when its session changes during acquisition 34ms
+     → expected { type: 'response', …(3) } to match object { success: false }
+(4 matching properties omitted from actual)
+   × refuses fork when its session changes during acquisition 45ms
+     → expected { type: 'response', …(3) } to match object { success: false }
+(5 matching properties omitted from actual)
+   × binds a fork draft to the acquired history version before creating a session 41ms
+     → expected { type: 'response', …(3) } to match object { success: false }
+(5 matching properties omitted from actual)
+   ✓ keeps a refused fork switch separate from an accepted editable draft 33ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > offers only saved user questions for a fork and returns their exact editable text
+AssertionError: expected { type: 'response', …(3) } to match object { success: true, data: { …(1) } }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+@@ -1,12 +1,20 @@
+  {
+    "data": {
+      "messages": [
+        {
++         "entryId": "sess_ae72166cd4b7d828_1794739983517:root",
++         "text": "",
++       },
++       {
+          "entryId": "turn_5d33669f",
+          "text": "First question
+    keep spacing",
++       },
++       {
++         "entryId": "turn_ade848c3",
++         "text": "",
+        },
+        {
+          "entryId": "turn_538d8c75",
+          "text": "Second question",
+        },
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:222:19
+    220|   const rpc = host();
+    221|   const offered = await handleRpcCommand({ type: 'get_fork_messages' }…
+    222|   expect(offered).toMatchObject({ success: true, data: { messages: [
+       |                   ^
+    223|     { entryId: source.turns[0]!.id, text: 'First question\n  keep spac…
+    224|     { entryId: source.turns[2]!.id, text: 'Second question' },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > returns a saved question as a fork draft after the branch was accepted
+AssertionError: expected { type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "data": {
+      "cancelled": false,
+-     "text": "Selected draft",
+    },
+    "success": true,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:237:20
+    235|   const entryId = manager.getSession(context.session.id)!.turns[0]!.id…
+    236|   const response = await handleRpcCommand({ type: 'fork', entryId }, h…
+    237|   expect(response).toMatchObject({ success: true, data: { cancelled: f…
+       |                    ^
+    238| });
+    239| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_fork_messages when its session changes during acquisition
+AssertionError: expected { type: 'response', …(3) } to match object { success: false }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "success": false,
++   "success": true,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:252:20
+    250|   const fork = vi.spyOn(manager, 'fork');
+    251|   const response = await handleRpcCommand(type === 'fork' ? { type, en…
+    252|   expect(response).toMatchObject({ success: false });
+       |                    ^
+    253|   expect(response.data).toBeUndefined();
+    254|   expect(fork).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses fork when its session changes during acquisition
+AssertionError: expected { type: 'response', …(3) } to match object { success: false }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "success": false,
++   "success": true,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:252:20
+    250|   const fork = vi.spyOn(manager, 'fork');
+    251|   const response = await handleRpcCommand(type === 'fork' ? { type, en…
+    252|   expect(response).toMatchObject({ success: false });
+       |                    ^
+    253|   expect(response.data).toBeUndefined();
+    254|   expect(fork).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > binds a fork draft to the acquired history version before creating a session
+AssertionError: expected { type: 'response', …(3) } to match object { success: false }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "success": false,
++   "success": true,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:269:20
+    267|   const count = fs.readdirSync(path.dirname(manager.getSessionDirPath(…
+    268|   const response = await handleRpcCommand({ type: 'fork', entryId }, h…
+    269|   expect(response).toMatchObject({ success: false });
+       |                    ^
+    270|   expect(fs.readdirSync(path.dirname(manager.getSessionDirPath(context…
+    271| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 22 passed (27)
+   Start at  18:52:53
+   Duration  10.26s (transform 5.64s, setup 0ms, collect 9.10s, tests 889ms, environment 0ms, prepare 50ms)
+

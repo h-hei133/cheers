@@ -373,3 +373,12 @@ RPC get_messages成功prompt后仍返回startup session.turns，普通physical�
 初六门3/30、两反转、build d3ab676d5081下logical native通过；physical原生对照发现另一个旧状态错误：CLI credential实际解析anthropic/physical，但get_state用了默认runtime provider与actual model。新增实际resolveCliCredential测试单红后将physical provider改为active.provider，logical仍优先。第三反转真实AssertionError且exact恢复，最终六门4/33、恢复1/21和build 545e59e9f16ab3d6a6ca13c15fea683db7ba83531dec8b5046633f5dd0583d55通过，2635模块0monoliths。限定独立代码APPROVE／架构CLEAR包含该后续修复，无reviewer重跑tests。
 
 当前Linux compiled CLI原生两fresh进程分别logical与physical，各一loopback POST，四类read显示当前消息、配对、count与last-text；new_session空消息、切回恢复，删除目录后四read明确success=false而非旧成功，EOF exit0。原逻辑成功回执、两physical失败及driver源保留；final receipt和源码hash绑定当前构建，旧d3ab676d5081仅历史。证据.omx/artifacts/upgrade-rpc-read-2026-11-15/。实际M、额外依赖1、复用10/10；无配置真实provider新调用、其他平台、push／CI，full D.1 session／tree／busy等仍待联合验收，22/62保持。
+
+
+## RPC fork drafts and command consumers (2026-11-15)
+
+当前编译CLI session/model/tree矩阵先发现get_fork_messages把root和assistant投为text空串，成功fork结束在问题之前却未返回原问题draft；原协议声明text可选、分支owner已完整复制source并结束在user父节点，缺口在RPC消费者。五实际红例后host/read复用现有有界异步navigation owner、过滤prompt已知且非unavailable，host/session向原manager.fork传snapshot.version，accepted switch后才返回原文draft；cancelled switch不返回draft。原reference只选user问题并返selectedText的决定保留，本项目额外用既有version CAS约束读取到写入。
+
+独立双lane复核指出helper验证后返回Promise、caller再await有第二microtask边界。两个nested queueMicrotask反例实际AssertionError，原代码会fork旧source并替换后继或返回旧候选。修复让snapshot携原assertCurrent和projectRoot，consumer在await后、busy callback和候选选择后、实际fork之前重验；list在projection前重验。busy during acquisition及unavailable候选追加覆盖。六门6套件65项、五有效反转全部AssertionError并exact恢复、2635模块0monoliths、build 8f67e032b1c91129dd330922b13da08fdc46d7a410de80160f6783437ad8c5cc通过；代码APPROVE／架构CLEAR，限定四个修改文件及消费者，不替代full D.1。
+
+Linux当前compiled CLI真实JSONL一次矩阵、三loopback POST（前台、实际branch summary、挂起后abort）：logical模型set/cycle/thinking和metadata、prompt/current读、rename与空名拒绝、entries cursor排他／unknown拒绝、tree current／invalid／stale、clone／fork exact draft与source不变、navigate前后往返且entries保留旧回答、新session／switch、busy时四session命令cancelled和navigation拒绝、abort结算、删除后四read拒绝、EOF exit0。失败原native 545e59e9f16a回执与源码保留；最终driver/hash/build绑定。源码审计同时确认bash／abort_bash有protocol/handler但host无runBash／abortBash，仍须接现有execution/permission owner；不通过删任务缩小D.1。证据.omx/artifacts/upgrade-rpc-commands-2026-11-15/，实际M、额外依赖1、复用10/10，22/62保持，无新配置provider／其他平台／push／CI声明。

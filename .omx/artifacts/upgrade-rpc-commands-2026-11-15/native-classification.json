@@ -1,0 +1,10 @@
+{
+  "failure": "pre-existing-product-fork-contract",
+  "originalBuild": "545e59e9f16ab3d6a6ca13c15fea683db7ba83531dec8b5046633f5dd0583d55",
+  "result": "Native fork list included root/assistant rows; successful fork omitted selected question text. Five baseline assertions and two independent-review nested-microtask assertions reproduced defects before repair.",
+  "files": [
+    "native-first.json",
+    "fork-red.log",
+    "review-red.log"
+  ]
+}

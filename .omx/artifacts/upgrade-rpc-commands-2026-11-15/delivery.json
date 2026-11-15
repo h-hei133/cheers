@@ -1,0 +1,165 @@
+{
+  "date": "2026-11-15",
+  "scope": "D.1 fork and session/model/tree command matrix",
+  "status": "locally-validated-sub-batch",
+  "parentCommit": "5ded288a08d443973f11a66623d287f9765e8030",
+  "buildId": "8f67e032b1c91129dd330922b13da08fdc46d7a410de80160f6783437ad8c5cc",
+  "completeTasks": 22,
+  "totalTasks": 62,
+  "overallGoal": "active",
+  "sourceSnapshots": {
+    "packages/ts-shell/src/cli/rpc/host/read.ts": {
+      "snapshot": "source/cli/rpc/host/read.ts.txt",
+      "sha256": "16b2490a0ed6b5119e4532a5c73b0cf4a5a1c9204bb26cea19cd310630ab4c86"
+    },
+    "packages/ts-shell/src/cli/rpc/host/session.ts": {
+      "snapshot": "source/cli/rpc/host/session.ts.txt",
+      "sha256": "2b46857687ea72f7c07f09ef89d364232824e7430edd1495b3210069484cf923"
+    },
+    "packages/ts-shell/src/cli/rpc/runtimeHost.test.ts": {
+      "snapshot": "source/cli/rpc/runtimeHost.test.ts.txt",
+      "sha256": "24d50400d9c5134be60e26998b95b765bafbe6c1306ee7a36929f7d05ee180f0"
+    },
+    "packages/ts-shell/src/cli/rpc/runtimeOps.ts": {
+      "snapshot": "source/cli/rpc/runtimeOps.ts.txt",
+      "sha256": "cb2376804deac8f242980585e8315a45f8fb17971515144e4ad3219952660174"
+    }
+  },
+  "documents": {
+    ".wiki/log.md": {
+      "snapshot": "docs/.wiki/log.md.txt",
+      "sha256": "d5f8d633e0c07a542c35cb622c2ebbebdab7fdaa23e90596a576c6cbcf865a4e"
+    },
+    ".wiki/refactor/upgrade/MASTER.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/MASTER.md.txt",
+      "sha256": "6eac7922eecde575d167cf1ea863d01247079eb95e5ac5d4e166aec30025f4b7"
+    },
+    ".wiki/refactor/upgrade/design.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/design.md.txt",
+      "sha256": "08560a34bf54127c5721916516c311b4054db6ca04f4983dd1cc2aa8cd41cd0d"
+    },
+    ".wiki/refactor/upgrade/tasks.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/tasks.md.txt",
+      "sha256": "2c0f513cef9fe2c867b2a7880c777d727b9ca4a5b5a21729668a91b13e5cb569"
+    },
+    "HANDOFF.md": {
+      "snapshot": "docs/HANDOFF.md.txt",
+      "sha256": "10508a63f19db38e43ba8f200a21dd67145d52544ba15ad5adb07d5c66164285"
+    }
+  },
+  "evidence": {
+    "build.log": "8e599676fc8f645c5ac8e216f0afc47012eff376fc34ec20ca7197f8bfac2247",
+    "docs.log": "b343ccc12290561bb865a2691e96199dd78ed3f156ca83960e19e35fd2e1eb3d",
+    "final-gates.log": "1ccb4ae830b3d64a186067a57ff442855406257a6795bb16944fc92a75b37822",
+    "final-tests.log": "87547a736cee6ef5ae24ac283b72a342f2640aa534ef517510b13e95f857cdb9",
+    "fork-red.log": "296a40bffed8ef7cdb8acf06d081fec6544e5eae0407a538226b5da1ce126c18",
+    "functions.log": "2ce048f734d7711004752efe719c6b2c08fd65845232628c8e1b38710b61c4ac",
+    "gates.log": "1ccb4ae830b3d64a186067a57ff442855406257a6795bb16944fc92a75b37822",
+    "native-classification.json": "d3f82f6f972b3b3b4d40ba4fe4be0fccd7004027deb013949978474eb70bdc60",
+    "native-first.json": "7ff692bfd8f2fe0bcde759b967450ac05679a0f2821bf04ad2b728571da034d2",
+    "native-first.log": "73c417423a19a45b4c1def66b49497035e1c843c9779c5775ae5a0b8428257f1",
+    "native-first.mjs.txt": "b93f407b70ea6bf7af04bad5c6f7dca31dfd1eb9ce9676e76f484a39c814fbf4",
+    "native.json": "0a6083b2e170e53ee1a8b8951b11ef34c64467e0d33006548ae4c08eebcfb4b6",
+    "native.log": "35fb3eb3167961dcccaf2325f4e9a41e7f7db55fdb90c9efc8d197d69b156533",
+    "native.mjs.txt": "852afe4cc36968a98acbe926e593b5b53881451007ab6ef9bf77bbce75249f05",
+    "reversal-fork-consumer-admission.log": "3d242d2b75e3733ede0499722412872378029225ba028718539f770a9d4498cf",
+    "reversal-fork-draft.log": "dbd896f28b2cb1551c543eba6fe35ed47bcedc71b4e7f7b8f0f02f0c605a21cd",
+    "reversal-list-consumer-admission.log": "2e0a361fbb43ce24f4ebc77c152e7e0f195fe833628c924b6130bc3a238c6f92",
+    "reversal-source-version.log": "e943a6de9a470c3e8b4a421d62605bb839732c8086a775be6056c1b54b8669bb",
+    "reversal-user-rows.log": "fb1948874f4b3b15f0b1abf96a4f571e28b29e97d81e62974187250868fedc7d",
+    "reversal.mjs.txt": "266b1fb534fd28d94453cc13baabc160065515b7ef10db805a7114b556002a4e",
+    "reversals.json": "fd45007f39f062393d100592128557a53b54ff6d3d8afed2c98db41a1842dcd5",
+    "reversals.log": "0e2018e07eb850be965960e63c6315bee2cf27217064f4b7737ba882c817c92e",
+    "review-architecture.json": "64d473087df9c432fbef8c37392a59097b678fb656e28a7ee233b41f3b02572d",
+    "review-code.json": "c40d4b448dd740ab2dfb4f497030d3d0b0505546c445f89999d105f1b9d521b2",
+    "review-red.log": "6546d4a54ab54d184d579a432e1a747491d3bdc8dddac7cd004e8ec31d59b799",
+    "review-tests.log": "5cb13c72bbc1d4f17b9a0dba8c84430791c53fcc9b013d69b3aa5efd0abf474a",
+    "tests.log": "bff1e200c4d3d00d7bf3dfa94f6e0e64712c7273f3406b3ecd3bb431f837cca2",
+    "build-manifest.json": "0164151d59c48546049211d1b12fda7adbcc7f1ffbf41993c29c88b489e3a8ae",
+    "docs/.wiki/log.md.txt": "d5f8d633e0c07a542c35cb622c2ebbebdab7fdaa23e90596a576c6cbcf865a4e",
+    "docs/.wiki/refactor/upgrade/MASTER.md.txt": "6eac7922eecde575d167cf1ea863d01247079eb95e5ac5d4e166aec30025f4b7",
+    "docs/.wiki/refactor/upgrade/design.md.txt": "08560a34bf54127c5721916516c311b4054db6ca04f4983dd1cc2aa8cd41cd0d",
+    "docs/.wiki/refactor/upgrade/tasks.md.txt": "2c0f513cef9fe2c867b2a7880c777d727b9ca4a5b5a21729668a91b13e5cb569",
+    "docs/HANDOFF.md.txt": "10508a63f19db38e43ba8f200a21dd67145d52544ba15ad5adb07d5c66164285",
+    "source/cli/rpc/host/read.ts.txt": "16b2490a0ed6b5119e4532a5c73b0cf4a5a1c9204bb26cea19cd310630ab4c86",
+    "source/cli/rpc/host/session.ts.txt": "2b46857687ea72f7c07f09ef89d364232824e7430edd1495b3210069484cf923",
+    "source/cli/rpc/runtimeHost.test.ts.txt": "24d50400d9c5134be60e26998b95b765bafbe6c1306ee7a36929f7d05ee180f0",
+    "source/cli/rpc/runtimeOps.ts.txt": "cb2376804deac8f242980585e8315a45f8fb17971515144e4ad3219952660174"
+  },
+  "validation": {
+    "initialCounterexamples": 5,
+    "reviewCounterexamples": 2,
+    "tests": {
+      "status": "passed",
+      "suites": 6,
+      "tests": 65,
+      "log": "final-tests.log"
+    },
+    "gates": {
+      "status": "passed",
+      "count": 6,
+      "log": "final-gates.log"
+    },
+    "reversals": {
+      "status": "passed",
+      "count": 5,
+      "receipt": "reversals.json",
+      "exactRestoration": true
+    },
+    "responsibility": {
+      "modules": 2635,
+      "monoliths": 0,
+      "log": "functions.log"
+    },
+    "build": {
+      "status": "passed",
+      "log": "build.log"
+    },
+    "native": {
+      "status": "passed",
+      "receipt": "native.json",
+      "loopbackPosts": 3,
+      "platform": "linux",
+      "compiledCli": true,
+      "realProvider": false,
+      "stages": [
+        "selection",
+        "prompt",
+        "reads",
+        "inspection",
+        "branching",
+        "switch",
+        "busy",
+        "missing"
+      ]
+    },
+    "review": {
+      "code": "APPROVE",
+      "architecture": "CLEAR",
+      "receipts": [
+        "review-code.json",
+        "review-architecture.json"
+      ],
+      "scope": "Four changed files plus immediate existing navigation/fork context"
+    },
+    "docs": {
+      "status": "passed",
+      "log": "docs.log"
+    }
+  },
+  "failures": [
+    "Original compiled RPC fork list included root/assistant rows and omitted accepted draft text.",
+    "Independent review nested microtask race reproduced before captured consumer admission repair."
+  ],
+  "limits": {
+    "fullD1": false,
+    "remainingD1": [
+      "bash/abort_bash production host consumer",
+      "remaining settings/execution full protocol acceptance"
+    ],
+    "configuredProviderCalls": false,
+    "otherPlatforms": false,
+    "push": false,
+    "ci": false
+  }
+}

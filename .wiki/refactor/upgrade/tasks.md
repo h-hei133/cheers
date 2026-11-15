@@ -42,7 +42,7 @@
 
 ## D: RPC 与导出（P1）
 
-- [ ] **D.1** 会话／模型／树命令：部分。旧startup session.turns造成messages／count／stats／last-text过期已修：共用host/read读取当前stored session、复验selection／active binding／id／createdAt／root，缺失明确拒绝，不回写runtime binding；get_state的physical provider/model现来自同一resolved target。十一读反例与CLI resolver单红先复现，当前六门4/33、恢复1/21、三有效反转exact恢复、2635模块0monoliths、build `545e59e9f16a`和限定双lane复核通过。Linux同代CLI两进程logical／physical各一POST后消息／计数／统计／last-text、新会话／切回、删除后四读取拒绝及EOF exit0通过。完整tree／fork／clone、busy／错误分类及其他命令仍需联合验收，不勾选。历史失败见virtual-routing的rpc-classification与本批native-classification；证据`.omx/artifacts/upgrade-rpc-read-2026-11-15/delivery.json`。
+- [ ] **D.1** 会话／模型／树命令：部分。旧startup session.turns造成messages／count／stats／last-text过期已修：共用host/read读取当前stored session、复验selection／active binding／id／createdAt／root，缺失明确拒绝，不回写runtime binding；get_state的physical provider/model现来自同一resolved target。十一读反例与CLI resolver单红先复现，当前六门4/33、恢复1/21、三有效反转exact恢复、2635模块0monoliths、build `545e59e9f16a`和限定双lane复核通过。Linux同代CLI两进程logical／physical各一POST后消息／计数／统计／last-text、新会话／切回、删除后四读取拒绝及EOF exit0通过。后续fork子批已修仅返回可用user候选、accepted switch后返原文draft、原source version绑定及每个await后selection准入；五初红＋两复审微任务红后修，六门6/65、五有效反转exact恢复、build `8f67e032b1c9`与限定代码APPROVE／架构CLEAR通过。Linux实际JSONL矩阵已验rename／entries exclusive cursor／invalid cursor／tree current-invalid-stale／clone／fork／navigate往返保留history／switch／四busy拒绝／abort及missing读取，三loopback POST、EOF exit0。bash／abort_bash仍只有声明和handler，production host未接入；整项继续部分，不勾选。历史失败见virtual-routing的rpc-classification与本批native-classification；证据`.omx/artifacts/upgrade-rpc-read-2026-11-15/delivery.json`。
 - [x] **D.2** 队列清空和 steering／follow-up 模式实时更改：本地验收完成。清空实际两条活跃输入与submission，模式跨readiness传递并保存后更新捕获队列；配置或运行替换拒绝修改后继。真实runTurn和JSONL消费者通过，宿主按input/session/settings拆分且函数上限通过。
 - [x] **D.3** UI 请求／响应和事件：本地验收完成。加载扩展通过真实JSONL的选择／确认／输入／编辑、取消、EOF前撤权和迟到响应隔离；配置／会话转换新增四项红例后修复，在成功且lease改变时先刷新owner再绑定，后继consumer与EOF不能复活。独立暂存树6套件47项、六静态门、build `16aec298a055`及Linux编译CLI三次选择／改配置／新会话／未答编辑EOF退出通过，限定复审CLEAR。实际M，额外依赖1（转换后的surface lease），结构复用原host；无真实服务或跨平台声明。
 - [ ] **D.4** HTML 高亮、GFM／CJK、Thinking、Diff、灯箱：已有待验收，真实离线导出与转义安全。
@@ -102,6 +102,8 @@
 - **P3-DESKTOP** 独立 Web／桌面产品矩阵：原文暂缓；不把 Linux 桌面自动化工具称作桌面产品。
 
 ## Validation ledger
+
+2026-11-15 D.1 fork／命令矩阵子批：当前六门6/65、五反转exact恢复、2635模块0monoliths、build `8f67e032b1c9`和Linux编译CLI三loopback POST矩阵passed。原native发现root／assistant错误候选和fork漏draft，五反例红；双lane指出helper resolve后的微任务窗口，两精确反例红后传原assertCurrent到consumer。最终限定代码APPROVE／架构CLEAR，bash／abort_bash宿主缺口仍在，D.1部分／22/62保持。read子批已提交`5ded288`；本批证据`.omx/artifacts/upgrade-rpc-commands-2026-11-15/delivery.json`，未push。
 
 2026-11-15 D.1当前会话读取子批：十一实际读反例先红；初native logical通过，但physical发现get_state错误provider/model配对，真实CLI resolver反例再红后修。最终六门4/33、三反转exact恢复、恢复1/21、0monoliths及build `545e59e9f16a`通过；Linux两进程各一loopback POST，当前read／switch／missing拒绝／EOF全部passed，限定代码APPROVE／架构CLEAR。旧build `d3ab676d5081`失败原回执保留；D.1转部分，22/62保持，继续完整tree／session／error消费者验收。C.1已提交`d8189ac`，未push。
 

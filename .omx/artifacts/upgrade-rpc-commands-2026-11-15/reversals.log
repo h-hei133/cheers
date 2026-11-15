@@ -1,0 +1,5 @@
+{"name":"user-rows","file":"packages/ts-shell/src/cli/rpc/host/read.ts","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true,"sourceSha256":"16b2490a0ed6b5119e4532a5c73b0cf4a5a1c9204bb26cea19cd310630ab4c86"}
+{"name":"fork-draft","file":"packages/ts-shell/src/cli/rpc/host/session.ts","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true,"sourceSha256":"2b46857687ea72f7c07f09ef89d364232824e7430edd1495b3210069484cf923"}
+{"name":"source-version","file":"packages/ts-shell/src/cli/rpc/host/session.ts","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true,"sourceSha256":"2b46857687ea72f7c07f09ef89d364232824e7430edd1495b3210069484cf923"}
+{"name":"fork-consumer-admission","file":"packages/ts-shell/src/cli/rpc/host/session.ts","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true,"sourceSha256":"2b46857687ea72f7c07f09ef89d364232824e7430edd1495b3210069484cf923"}
+{"name":"list-consumer-admission","file":"packages/ts-shell/src/cli/rpc/host/read.ts","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true,"sourceSha256":"16b2490a0ed6b5119e4532a5c73b0cf4a5a1c9204bb26cea19cd310630ab4c86"}

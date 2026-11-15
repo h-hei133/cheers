@@ -1,0 +1,16 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+{"type":"response","command":"fork","success":true,"data":{"cancelled":true}}
+ ✓ src/cli/rpc/runtimeHost.test.ts (31 tests) 985ms
+ ✓ src/session/branch/create.test.ts (6 tests) 232ms
+ ✓ src/cli/rpc/uiBridge.test.ts (7 tests) 30ms
+ ✓ src/session/query/sessionEntries.test.ts (16 tests) 6ms
+ ✓ src/cli/rpc/rpcServer.test.ts (3 tests) 5ms
+ ✓ src/session/query/navigation.test.ts (2 tests) 4ms
+
+ Test Files  6 passed (6)
+      Tests  65 passed (65)
+   Start at  18:57:36
+   Duration  11.71s (transform 5.60s, setup 0ms, collect 9.36s, tests 1.26s, environment 1ms, prepare 287ms)
+

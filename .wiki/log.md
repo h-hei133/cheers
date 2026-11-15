@@ -11918,3 +11918,7 @@ Linux同代三独立Node进程验证重开／分叉独立持久化、actual work
 ### 2026-11-15：RPC读取当前会话与一致模型配对
 
 C.1已本地提交d8189ac。本子批修复四RPC读取旧启动对象，以及physical CLI模型override下错误provider/model配对；十二实际反例先红，最终六门4/33、三有效反转exact恢复、恢复1/21、0monoliths、build 545e59e9f16a通过，限定代码APPROVE／架构CLEAR。Linuxlogical／physical两fresh CLI进程各一loopback POST、当前读／会话切换／删除后拒绝／EOF exit0通过。失败回执与最终source哈希归档.omx/artifacts/upgrade-rpc-read-2026-11-15/；D.1部分、22/62保持，按批本地提交，不push。
+
+### 2026-11-15：RPC分叉草稿和会话命令矩阵
+
+read修复已提交5ded288。fork候选仅可用user问题、成功选择后返回exact draft，原source version CAS与await后consumer准入接通；五初红＋两复审微任务红后修。六门6/65、五反转exact恢复、0monoliths、build 8f67e032b1c9和Linux实际JSONL三POST会话／模型／树／fork／clone／busy／abort矩阵通过，限定代码APPROVE／架构CLEAR。证据.omx/artifacts/upgrade-rpc-commands-2026-11-15/；bash／abort_bash宿主缺口仍在，D.1部分／22/62保持，按批本地提交不push。

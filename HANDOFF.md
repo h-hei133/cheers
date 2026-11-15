@@ -2653,3 +2653,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A successful prompt leaves get_messages empty, counts and last text stale, or get_state pairs a default provider with an overridden model.
 - **Root Cause:** Persistence returns fresh records instead of updating the startup session object, while the state projection combines runtime defaults with resolved request fields.
 - **Rule:** Read the currently selected session through the existing store for each RPC projection, validate its original selection and identity, and do not rebind runtime context from a read. Refuse unavailable data instead of falling back to an old snapshot. Project provider and model from the same logical selection or resolved physical target, and test a real CLI override as well as ordinary persisted updates.
+
+### Async Read Admission Must Reach Its Final Consumer
+- **Symptom:** A helper validates its captured session, yet its caller forks old history and replaces a newly selected session; a candidate list can similarly return retired rows.
+- **Root Cause:** Resolving the helper's promise adds a microtask boundary before the consumer resumes. Source-version CAS protects the stored history, not the runtime's current selection.
+- **Rule:** Return the original admission closure with the acquired snapshot and invoke it after the consumer's await and any caller callbacks, immediately before publication or write. Keep the captured project root and source version. Use nested microtasks in the regression to replace selection between helper validation and consumer resumption; return fork draft text only after an accepted switch.
