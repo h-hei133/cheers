@@ -52,6 +52,13 @@ export interface ProtocolStep {
   readonly write: string;
 }
 
+/** Classify a complete negotiation report without applying it to a generation. */
+export function keyboardReplyKind(sequence: string): 'attributes' | 'enhanced' | undefined {
+  if (DEVICE_ATTRIBUTES_REPLY.exec(sequence)?.[0] === sequence) return 'attributes';
+  if (ENHANCED_REPLY.exec(sequence)?.[0] === sequence) return 'enhanced';
+  return undefined;
+}
+
 export class KeyboardNegotiation {
   private held = "";
   private settled = false;
@@ -70,9 +77,9 @@ export class KeyboardNegotiation {
   }
 
   /** Capture ownership of the DA1 sentinel when its query is actually sent. */
-  begin(): string {
+  begin(queriesBeforeSentinel = ''): string {
     this.attributesPending = true;
-    return this.query;
+    return `${QUERY_ENHANCED}${queriesBeforeSentinel}${QUERY_DEVICE_ATTRIBUTES}`;
   }
 
   /** The protocol in force once negotiation settled. */

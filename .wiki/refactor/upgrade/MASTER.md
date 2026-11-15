@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.1/B.2/B.3/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
-**Active batch**: document-tail已提交`63c0aba`；B.3最终资格补完整WebP消费者并恢复错位原生回执，3套件56项与六门通过，按批本地提交。整体本地验收19/62项；接续B2.1状态探测／停止生命周期与提示区导航，C.6原生协议缺口保留。
+**Active batch**: B.3已提交`8bf4d22`；B2.1状态子批六门、8/210、build `744017336148`和Linux已加载CLI四格通过，按批提交。真实bootstrap回复约966ms延迟／250ms协商失败仍保留；下一小批修startup，再补提示区导航与tmux。整体19/62项本地验收，C.6原生服务缺口保留。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -102,3 +102,5 @@
 | 2026-11-15 | document浮层复用已有1049借屏，用原文档有界tail裁剪后composite，原native history/placement不改；进出screenRevision使旧选择失效，背景pointer/composer/choice坐标退休，浮层保留自身bounds。fullscreen清ID在真实terminal.stop恢复主屏之前，继续尝试全部cleanup并保留首错。六静态门、8套件244项、0monoliths、build `f78d9a11fe0d`通过；实际Screen证明partial主图层/cursor/scrollback关闭后精确恢复及同ID跨屏清退隔离，限定独立复核CLEAR。Linux当前编译CLI两协议通过临时input hook触发实际OverlayStack借屏／抑图／还屏且exit0，两反转红且逐字节恢复。 独立owner probe错误导入非公开dist路径导致ERR_MODULE_NOT_FOUND，改用当前CLI已编译owner的临时触发钩子，未新增产品入口；初fixture超长label截断及完全visible高度已更正，失败日志保留。实际M／额外依赖1（选择退休），18项不变，物理像素与native history重排不计完成。 |
 
 | 2026-11-15 | B.3最终资格：完整WebP经实际user/tool block的占行／iTerm传输／Kitty回退和损坏／decoded拒绝通过，六门与3套件56项通过；无生产改动。错位paint/lifecycle receipt从原日志恢复且源码hash验证，失败probe另存保留，修正诊断driver目的文件避免再覆盖。原native history不可重排、无physical pixels／其他平台边界不升级；19/62项本地完成，整体active。下一批B2.1先重现7501 DA1顺序与stop后setter复活，再补提示区消费者及真实Linux tmux。 |
+
+| 2026-11-15 | B2.1状态生命周期：共享7501尾随DA1、32个有deadline的全部query owner、停止／排空撤权及write/cancel重入护栏；原9红、复审3红和两个单红修复。六门8/210、0monoliths、build `744017336148`、Linux loaded两模式×支持/不支持四格通过，两反转红且逐字节恢复5/93。native初查询输入约966ms才处理使bootstrap协商失效，保留真实缺口；paste回显被slash tokenizer处理反斜杠，改观察实际StdinBuffer原始paste并继续原命令，未更改产品契约。调用native过早遇构建未结束是主线程序列错误，保留失败并完成串行新代验证。整体19/62不变，下一批startup／133／tmux。 |

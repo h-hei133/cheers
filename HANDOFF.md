@@ -2560,3 +2560,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A successful overlay probe overwrites the graphics-paint receipt, while its own canonical receipt still reports an earlier failed probe.
 - **Root Cause:** A copied diagnostic driver retained the previous batch's JSON destination; exit status and console logs passed without checking receipt ownership.
 - **Rule:** Before publishing evidence pointers, verify the receipt's batch, build and source hashes against the original command output. Keep failed receipts separately; restore misplaced success receipts from their original logs with before/after hashes, and do not claim a new execution from restoration.
+
+
+### Terminal Query Fences Share One Ordered Owner
+- **Symptom:** A cancelled color query's late DA1 ends a newly restarted status probe, or a synchronous output callback stops the device before a new timer is recorded.
+- **Root Cause:** Counting startup queries alone omits other DA1 producers; post-write mutations outlive stop, and clearing a cancelled query without identity checks erases a callback's successor.
+- **Rule:** Register every DA1 with its actual query owner before dispatch, retain cancelled owners through their own deadline, and decline new queries when the fixed queue is full. Establish cancellable timers before external writes and revalidate the startup generation after each callback boundary. Preserve successor query identity after cancel. Untagged reports past the deadline cannot be proven to belong to an old query.

@@ -82,11 +82,11 @@ export class TerminalStatusController {
   private statusActive = false;
   private pendingStatus: ProgramStatus | undefined;
 
-  beginProbe(write: (data: string) => void): void {
+  beginProbe(): string {
     this.queryPending = true;
     this.supported = false;
     this.pendingStatus = undefined;
-    write(PROGRAM_STATUS_QUERY);
+    return PROGRAM_STATUS_QUERY;
   }
 
   expireProbe(): void {
@@ -95,6 +95,7 @@ export class TerminalStatusController {
   }
 
   confirmSupported(write: (data: string) => void): void {
+    if (!this.queryPending) return;
     this.supported = true;
     this.queryPending = false;
     const queued = this.pendingStatus;
@@ -113,9 +114,9 @@ export class TerminalStatusController {
     }
     if (active) {
       this.progressActive = true;
-      write(TERMINAL_PROGRESS_ACTIVE);
       this.progressTimer = setInterval(() => write(TERMINAL_PROGRESS_ACTIVE), TERMINAL_PROGRESS_KEEPALIVE_MS);
       this.progressTimer.unref?.();
+      write(TERMINAL_PROGRESS_ACTIVE);
       return;
     }
     if (this.progressActive) {
@@ -144,6 +145,8 @@ export class TerminalStatusController {
     this.progressActive = false;
     const clearStatus = this.statusActive ? formatProgramStatus({ state: "clear", app: "cheers" }) : "";
     this.statusActive = false;
+    this.supported = false;
+    this.expireProbe();
     return `${clearProgress}${clearStatus}`;
   }
 }

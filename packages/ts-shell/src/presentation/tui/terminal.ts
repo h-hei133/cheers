@@ -100,6 +100,7 @@ export class Terminal implements TerminalDevice {
 
   private draining = false;
   private started = false;
+  private generation = 0;
   private disconnected = false;
   private rawOwned = false;
   private inputEnabled = false;
@@ -117,6 +118,7 @@ export class Terminal implements TerminalDevice {
     },
     colorQuery: () => this.colorQuery,
     programStatusReply: () => this.status.isProbePending ? () => this.status.confirmSupported(data => this.write(data)) : undefined,
+    programStatusProbeEnded: () => this.status.expireProbe(),
   });
   private colorQuery: PendingColorQuery | undefined;
   private onInput: InputHandler = () => {};
@@ -183,6 +185,7 @@ export class Terminal implements TerminalDevice {
     options?: TerminalStartOptions,
   ): void {
     if (this.started) return;
+    const generation = ++this.generation;
     this.started = true;
     this.draining = false;
     this.protocol.start();
@@ -202,18 +205,22 @@ export class Terminal implements TerminalDevice {
 
     if (this.inputEnabled) this.rawOwned = acquireRawMode(this.rawOwned);
     if (this.capabilities.supportsBracketedPaste) this.write(ENABLE_BRACKETED_PASTE);
+    if (!this.started || this.draining || this.disconnected || this.generation !== generation) return;
     process.stdin.on("data", this.handleData);
     process.stdin.on("end", this.handleEnd);
     process.stdin.on("close", this.handleEnd);
     process.stdin.resume();
+    if (!this.started || this.draining || this.disconnected || this.generation !== generation) return;
     // Ask for modifier reporting before the first keystroke: without it the
     // terminal cannot express Shift+Enter at all, and a bare Escape is
     // indistinguishable from the head of a sequence.
     if (this.capabilities.supportsBracketedPaste) {
-      this.write(this.protocol.begin());
+      const statusQuery = process.stdout.isTTY ? this.status.beginProbe() : '';
+      this.write(this.protocol.begin(statusQuery, KEYBOARD_REPLY_TIMEOUT_MS));
+      if (!this.started || this.draining || this.disconnected || this.generation !== generation) return;
       if (process.stdout.isTTY) {
         this.write(QUERY_APPEARANCE);
-        this.status.beginProbe((data) => this.write(data));
+        if (!this.started || this.draining || this.disconnected || this.generation !== generation) return;
       }
       this.keyboardTimer = setTimeout(() => this.expireKeyboardNegotiation(), KEYBOARD_REPLY_TIMEOUT_MS);
       this.keyboardTimer.unref?.();
@@ -271,12 +278,14 @@ export class Terminal implements TerminalDevice {
     this.keyboardTimer = undefined;
     this.deferredInput = [];
     // Stop generating reports before waiting for those already in flight.
-    this.writeSync(this.protocol.drain() + STOP_APPEARANCE);
+    this.writeSync(this.protocol.drain() + this.status.consumeClearSequence() + STOP_APPEARANCE);
     await drainInput(process.stdin);
   }
 
   /** Unbuffered restore for exit and crash handlers, where queued writes are lost. */
   restoreSync(): void {
+    this.draining = true;
+    this.protocol.retire();
     const clear = this.status.consumeClearSequence();
     this.writeSync(`${this.protocol.restore()}${clear}${RESTORE_MODES}`);
     this.rawOwned = releaseRawMode(this.rawOwned);
@@ -310,17 +319,25 @@ export class Terminal implements TerminalDevice {
   }
 
   setProgress(active: boolean): void {
+    if (!this.started || this.draining || this.disconnected || !process.stdout.isTTY) return;
     this.status.setProgress(active, (data) => this.write(data));
   }
 
   setProgramStatus(status: ProgramStatus): void {
+    if (!this.started || this.draining || this.disconnected || !process.stdout.isTTY) return;
     this.status.setProgramStatus(status, (data) => this.write(data));
   }
 
   queryTerminalColors(options: ColorQueryOptions = {}): Promise<TerminalColors> {
     this.colorQuery?.cancel();
     return new Promise((resolve) => {
-      this.colorQuery = new PendingColorQuery(resolve, options);
+      const query = new PendingColorQuery(resolve, options);
+      this.colorQuery = query;
+      if (!this.protocol.expectColors(query, options.timeoutMs)) {
+        query.cancel();
+        if (this.colorQuery === query) this.colorQuery = undefined;
+        return;
+      }
       this.write(TERMINAL_COLOR_QUERY);
     });
   }

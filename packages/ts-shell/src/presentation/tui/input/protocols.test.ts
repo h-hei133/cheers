@@ -54,7 +54,7 @@ describe("program status (OSC 7501) and progress (OSC 9;4)", () => {
     const forwarded = vi.fn();
     try {
       terminal.start(forwarded, () => {}, () => {});
-      expect(write).toHaveBeenCalledWith(PROGRAM_STATUS_QUERY);
+      expect(write).toHaveBeenCalledWith(`\x1b[?u${PROGRAM_STATUS_QUERY}\x1b[c`);
 
       terminal.setProgramStatus({ state: "working", app: "cheers" });
       expect(write.mock.calls.some(([s]) => s.includes("7501;state=working"))).toBe(false);

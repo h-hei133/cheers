@@ -11836,3 +11836,8 @@ document浮层复用已有1049借屏，用原文档有界tail裁剪后composite�
 ### 2026-11-15：图片预算任务最终本地验收
 
 B.3最后两项资格缺口已补：完整WebP走实际user/tool渲染边界，占行／iTerm传输／Kitty回退及坏头／decoded预算拒绝；六门、3套件56项通过，无生产改动。paint/lifecycle回执目的文件错位从原日志恢复，源码hash核对、失败JSON和修复摘要保留，不声称重新跑native。原history重排／物理像素／其他平台边界保持。B.3本地完成，总体19/62项，继续B2.1并按批提交。
+
+
+### 2026-11-15：终端状态生命周期独立子批
+
+7501改共享尾随DA1，全部query fence在原protocol owner有32项上限；old color／startup隔离、停止／排空撤权及write/cancel重入反例修复。六门、8/210、0monoliths、build `744017336148`和Linux loaded CLI四格通过，两反转红且exact恢复。bootstrap输入约966ms处理超过250ms，真实协商仍缺口；B2.1部分、19/62不变，后续startup／133／tmux另批。
