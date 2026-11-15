@@ -1,0 +1,244 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/runtimeHost.test.ts (20 tests | 11 failed) 658ms
+   ✓ clears both live input lanes and pending submissions without cancelling the active turn 35ms
+   ✓ changes the running steering delivery mode before the next actual model step 35ms
+   ✓ changes the running followUp delivery mode before the next actual model step 31ms
+   ✓ reports a refused new_session without changing the current selection 45ms
+   ✓ reports a refused switch_session without changing the current selection 33ms
+   ✓ reports a refused fork without changing the current selection 44ms
+   ✓ reports a refused clone without changing the current selection 39ms
+   ✓ persists new-session ancestry while starting with an empty conversation 29ms
+   ✓ accepts a same-project session callback and selects only after acceptance 32ms
+   × reads persisted conversation updates through get_messages after the host was created 43ms
+     → expected { messages: [] } to match object { messages: [ …(2) ] }
+   × reads persisted conversation updates through get_state after the host was created 31ms
+     → expected { …(11) } to match object { messageCount: 2 }
+(12 matching properties omitted from actual)
+   × reads persisted conversation updates through get_session_stats after the host was created 31ms
+     → expected { …(11) } to match object { userMessages: 1, …(2) }
+(15 matching properties omitted from actual)
+   × reads persisted conversation updates through get_last_assistant_text after the host was created 30ms
+     → expected { text: null } to match object { text: 'new answer' }
+   × reads the accepted new session on the next call through the existing host 57ms
+     → expected { text: 'selected answer' } to deeply equal { text: 'latest answer' }
+   × refuses get_messages when the selected stored session is unavailable 25ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+   × refuses get_state when the selected stored session is unavailable 26ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(14 matching properties omitted from actual)
+   × refuses get_session_stats when the selected stored session is unavailable 19ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(14 matching properties omitted from actual)
+   × refuses get_last_assistant_text when the selected stored session is unavailable 19ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+   × rejects a changed identity during a current-session read 27ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+   × rejects a changed selection during a current-session read 27ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads persisted conversation updates through get_messages after the host was created
+AssertionError: expected { messages: [] } to match object { messages: [ …(2) ] }
+
+- Expected
++ Received
+
+  {
+-   "messages": [
+-     ObjectContaining {
+-       "content": "new question",
+-       "role": "user",
+-     },
+-     ObjectContaining {
+-       "content": "new answer",
+-       "role": "assistant",
+-     },
+-   ],
++   "messages": [],
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:156:27
+    154|       : type === 'get_session_stats' ? { userMessages: 1, assistantMes…
+    155|         : { text: 'new answer' };
+    156|     expect(response.data).toMatchObject(expected);
+       |                           ^
+    157|     expect(context.session).toBe(startup);
+    158|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads persisted conversation updates through get_state after the host was created
+AssertionError: expected { …(11) } to match object { messageCount: 2 }
+(12 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "messageCount": 2,
++   "messageCount": 0,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:156:27
+    154|       : type === 'get_session_stats' ? { userMessages: 1, assistantMes…
+    155|         : { text: 'new answer' };
+    156|     expect(response.data).toMatchObject(expected);
+       |                           ^
+    157|     expect(context.session).toBe(startup);
+    158|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads persisted conversation updates through get_session_stats after the host was created
+AssertionError: expected { …(11) } to match object { userMessages: 1, …(2) }
+(15 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "assistantMessages": 1,
+-   "totalMessages": 2,
+-   "userMessages": 1,
++   "assistantMessages": 0,
++   "totalMessages": 0,
++   "userMessages": 0,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:156:27
+    154|       : type === 'get_session_stats' ? { userMessages: 1, assistantMes…
+    155|         : { text: 'new answer' };
+    156|     expect(response.data).toMatchObject(expected);
+       |                           ^
+    157|     expect(context.session).toBe(startup);
+    158|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads persisted conversation updates through get_last_assistant_text after the host was created
+AssertionError: expected { text: null } to match object { text: 'new answer' }
+
+- Expected
++ Received
+
+  {
+-   "text": "new answer",
++   "text": null,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:156:27
+    154|       : type === 'get_session_stats' ? { userMessages: 1, assistantMes…
+    155|         : { text: 'new answer' };
+    156|     expect(response.data).toMatchObject(expected);
+       |                           ^
+    157|     expect(context.session).toBe(startup);
+    158|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads the accepted new session on the next call through the existing host
+AssertionError: expected { text: 'selected answer' } to deeply equal { text: 'latest answer' }
+
+- Expected
++ Received
+
+  {
+-   "text": "latest answer",
++   "text": "selected answer",
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:168:83
+    166|   expect((await handleRpcCommand({ type: 'switch_session', sessionPath…
+    167|   manager.addTurn(target.id, { role: 'assistant', content: 'latest ans…
+    168|   expect((await handleRpcCommand({ type: 'get_last_assistant_text' }, …
+       |                                                                                   ^
+    169|   expect((await handleRpcCommand({ type: 'get_state' }, rpc)).data).to…
+    170| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_messages when the selected stored session is unavailable
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_last_assistant_text when the selected stored session is unavailable
+AssertionError: expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "error": "The selected session is unavailable.",
+-   "success": false,
++   "success": true,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:179:22
+    177|     fs.rmSync(manager.getSessionDirPath(context.session.id), { recursi…
+    178|     const response = await handleRpcCommand({ type }, rpc);
+    179|     expect(response).toMatchObject({ success: false, error: 'The selec…
+       |                      ^
+    180|     expect(response.data).toBeUndefined();
+    181|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_state when the selected stored session is unavailable
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_session_stats when the selected stored session is unavailable
+AssertionError: expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(14 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "error": "The selected session is unavailable.",
+-   "success": false,
++   "success": true,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:179:22
+    177|     fs.rmSync(manager.getSessionDirPath(context.session.id), { recursi…
+    178|     const response = await handleRpcCommand({ type }, rpc);
+    179|     expect(response).toMatchObject({ success: false, error: 'The selec…
+       |                      ^
+    180|     expect(response.data).toBeUndefined();
+    181|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/11]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > rejects a changed identity during a current-session read
+ FAIL  src/cli/rpc/runtimeHost.test.ts > rejects a changed selection during a current-session read
+AssertionError: expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "error": "The selected session changed during the read.",
+-   "success": false,
++   "success": true,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:196:20
+    194|   });
+    195|   const response = await handleRpcCommand({ type: 'get_messages' }, rp…
+    196|   expect(response).toMatchObject({ success: false, error: 'The selecte…
+       |                    ^
+    197|   expect(response.data).toBeUndefined();
+    198|   expect(context.session.id).toBe(kind === 'selection' ? successor.id …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/11]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  11 failed | 9 passed (20)
+   Start at  18:37:02
+   Duration  11.37s (transform 5.20s, setup 0ms, collect 10.45s, tests 658ms, environment 0ms, prepare 54ms)
+

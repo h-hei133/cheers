@@ -1,0 +1,34 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+const repo = process.cwd(), directory = path.join(repo, '.tmp/rpc-read');
+const file = path.join(repo, 'packages/ts-shell/src/cli/rpc/host/read.ts');
+const original = fs.readFileSync(file), source = original.toString();
+const cases = [
+  { name: 'fresh-record', before: '  return current;', after: '  return selected;', filter: 'reads persisted conversation updates' },
+  { name: 'read-identity', before: '  if (context.session !== selected || context.activeSession !== active',
+    after: '  if (false && (context.session !== selected || context.activeSession !== active',
+    close: ['    || current.projectRoot !== selected.projectRoot) {', '    || current.projectRoot !== selected.projectRoot)) {'], filter: 'rejects a changed' },
+];
+const receipt = [];
+for (const item of cases) {
+  assert.equal(source.split(item.before).length, 2);
+  let next = source.replace(item.before, item.after);
+  if (item.close) next = next.replace(...item.close);
+  let result;
+  try {
+    fs.writeFileSync(file, next);
+    result = spawnSync('rtk', ['env', 'VITEST_MAX_THREADS=2', 'VITEST_MIN_THREADS=2', 'node_modules/.bin/vitest',
+      'run', '--root', 'packages/ts-shell', 'src/cli/rpc/runtimeHost.test.ts', '--maxWorkers=1', '--no-file-parallelism', '-t', item.filter],
+      { cwd: repo, encoding: 'utf8', timeout: 55_000, maxBuffer: 1024 * 1024 });
+  } finally { fs.writeFileSync(file, original); }
+  const log = (result.stdout ?? '') + (result.stderr ?? '');
+  fs.writeFileSync(path.join(directory, 'reversal-' + item.name + '.log'), log);
+  const entry = { name: item.name, exitCode: result.status, signal: result.signal,
+    assertionFailure: result.status === 1 && /AssertionError/.test(log), restoredExact: fs.readFileSync(file).equals(original),
+    sourceSha256: createHash('sha256').update(original).digest('hex') };
+  receipt.push(entry); fs.writeFileSync(path.join(directory, 'reversals.json'), JSON.stringify(receipt, null, 2) + '\n');
+  assert.ok(entry.assertionFailure); assert.ok(entry.restoredExact); console.log(JSON.stringify(entry));
+}

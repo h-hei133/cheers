@@ -1,0 +1,138 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/runtimeHost.test.ts (20 tests | 4 failed | 16 skipped) 120ms
+   ↓ clears both live input lanes and pending submissions without cancelling the active turn
+   ↓ changes the running steering delivery mode before the next actual model step
+   ↓ changes the running followUp delivery mode before the next actual model step
+   ↓ reports a refused new_session without changing the current selection
+   ↓ reports a refused switch_session without changing the current selection
+   ↓ reports a refused fork without changing the current selection
+   ↓ reports a refused clone without changing the current selection
+   ↓ persists new-session ancestry while starting with an empty conversation
+   ↓ accepts a same-project session callback and selects only after acceptance
+   × reads persisted conversation updates through get_messages after the host was created 42ms
+     → expected { messages: [] } to match object { messages: [ …(2) ] }
+   × reads persisted conversation updates through get_state after the host was created 26ms
+     → expected { …(11) } to match object { messageCount: 2 }
+(12 matching properties omitted from actual)
+   × reads persisted conversation updates through get_session_stats after the host was created 25ms
+     → expected { …(11) } to match object { userMessages: 1, …(2) }
+(15 matching properties omitted from actual)
+   × reads persisted conversation updates through get_last_assistant_text after the host was created 26ms
+     → expected { text: null } to match object { text: 'new answer' }
+   ↓ reads the accepted new session on the next call through the existing host
+   ↓ refuses get_messages when the selected stored session is unavailable
+   ↓ refuses get_state when the selected stored session is unavailable
+   ↓ refuses get_session_stats when the selected stored session is unavailable
+   ↓ refuses get_last_assistant_text when the selected stored session is unavailable
+   ↓ rejects a changed identity during a current-session read
+   ↓ rejects a changed selection during a current-session read
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 16 skipped (20)
+   Start at  18:40:24
+   Duration  7.98s (transform 4.62s, setup 0ms, collect 7.63s, tests 120ms, environment 0ms, prepare 48ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads persisted conversation updates through get_messages after the host was created
+AssertionError: expected { messages: [] } to match object { messages: [ …(2) ] }
+
+- Expected
++ Received
+
+  {
+-   "messages": [
+-     ObjectContaining {
+-       "content": "new question",
+-       "role": "user",
+-     },
+-     ObjectContaining {
+-       "content": "new answer",
+-       "role": "assistant",
+-     },
+-   ],
++   "messages": [],
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:156:27
+    154|       : type === 'get_session_stats' ? { userMessages: 1, assistantMes…
+    155|         : { text: 'new answer' };
+    156|     expect(response.data).toMatchObject(expected);
+       |                           ^
+    157|     expect(context.session).toBe(startup);
+    158|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads persisted conversation updates through get_state after the host was created
+AssertionError: expected { …(11) } to match object { messageCount: 2 }
+(12 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "messageCount": 2,
++   "messageCount": 0,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:156:27
+    154|       : type === 'get_session_stats' ? { userMessages: 1, assistantMes…
+    155|         : { text: 'new answer' };
+    156|     expect(response.data).toMatchObject(expected);
+       |                           ^
+    157|     expect(context.session).toBe(startup);
+    158|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads persisted conversation updates through get_session_stats after the host was created
+AssertionError: expected { …(11) } to match object { userMessages: 1, …(2) }
+(15 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "assistantMessages": 1,
+-   "totalMessages": 2,
+-   "userMessages": 1,
++   "assistantMessages": 0,
++   "totalMessages": 0,
++   "userMessages": 0,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:156:27
+    154|       : type === 'get_session_stats' ? { userMessages: 1, assistantMes…
+    155|         : { text: 'new answer' };
+    156|     expect(response.data).toMatchObject(expected);
+       |                           ^
+    157|     expect(context.session).toBe(startup);
+    158|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads persisted conversation updates through get_last_assistant_text after the host was created
+AssertionError: expected { text: null } to match object { text: 'new answer' }
+
+- Expected
++ Received
+
+  {
+-   "text": "new answer",
++   "text": null,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:156:27
+    154|       : type === 'get_session_stats' ? { userMessages: 1, assistantMes…
+    155|         : { text: 'new answer' };
+    156|     expect(response.data).toMatchObject(expected);
+       |                           ^
+    157|     expect(context.session).toBe(startup);
+    158|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+

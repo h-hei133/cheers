@@ -1,0 +1,61 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/runtimeHost.test.ts (20 tests | 2 failed | 18 skipped) 74ms
+   ↓ clears both live input lanes and pending submissions without cancelling the active turn
+   ↓ changes the running steering delivery mode before the next actual model step
+   ↓ changes the running followUp delivery mode before the next actual model step
+   ↓ reports a refused new_session without changing the current selection
+   ↓ reports a refused switch_session without changing the current selection
+   ↓ reports a refused fork without changing the current selection
+   ↓ reports a refused clone without changing the current selection
+   ↓ persists new-session ancestry while starting with an empty conversation
+   ↓ accepts a same-project session callback and selects only after acceptance
+   ↓ reads persisted conversation updates through get_messages after the host was created
+   ↓ reads persisted conversation updates through get_state after the host was created
+   ↓ reads persisted conversation updates through get_session_stats after the host was created
+   ↓ reads persisted conversation updates through get_last_assistant_text after the host was created
+   ↓ reads the accepted new session on the next call through the existing host
+   ↓ refuses get_messages when the selected stored session is unavailable
+   ↓ refuses get_state when the selected stored session is unavailable
+   ↓ refuses get_session_stats when the selected stored session is unavailable
+   ↓ refuses get_last_assistant_text when the selected stored session is unavailable
+   × rejects a changed identity during a current-session read 47ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+   × rejects a changed selection during a current-session read 27ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 18 skipped (20)
+   Start at  18:40:32
+   Duration  8.01s (transform 4.63s, setup 0ms, collect 7.69s, tests 74ms, environment 0ms, prepare 50ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > rejects a changed identity during a current-session read
+ FAIL  src/cli/rpc/runtimeHost.test.ts > rejects a changed selection during a current-session read
+AssertionError: expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "error": "The selected session changed during the read.",
+-   "success": false,
++   "success": true,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:197:20
+    195|   });
+    196|   const response = await handleRpcCommand({ type: 'get_messages' }, rp…
+    197|   expect(response).toMatchObject({ success: false, error: 'The selecte…
+       |                    ^
+    198|   expect(response.data).toBeUndefined();
+    199|   expect(context.session.id).toBe(kind === 'selection' ? successor.id …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+

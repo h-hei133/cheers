@@ -1,0 +1,65 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/runtimeHost.test.ts (21 tests | 1 failed | 20 skipped) 37ms
+   ↓ clears both live input lanes and pending submissions without cancelling the active turn
+   ↓ changes the running steering delivery mode before the next actual model step
+   ↓ changes the running followUp delivery mode before the next actual model step
+   ↓ reports a refused new_session without changing the current selection
+   ↓ reports a refused switch_session without changing the current selection
+   ↓ reports a refused fork without changing the current selection
+   ↓ reports a refused clone without changing the current selection
+   ↓ persists new-session ancestry while starting with an empty conversation
+   ↓ accepts a same-project session callback and selects only after acceptance
+   ↓ reads persisted conversation updates through get_messages after the host was created
+   ↓ reads persisted conversation updates through get_state after the host was created
+   ↓ reads persisted conversation updates through get_session_stats after the host was created
+   ↓ reads persisted conversation updates through get_last_assistant_text after the host was created
+   ↓ reads the accepted new session on the next call through the existing host
+   ↓ refuses get_messages when the selected stored session is unavailable
+   ↓ refuses get_state when the selected stored session is unavailable
+   ↓ refuses get_session_stats when the selected stored session is unavailable
+   ↓ refuses get_last_assistant_text when the selected stored session is unavailable
+   ↓ rejects a changed identity during a current-session read
+   ↓ rejects a changed selection during a current-session read
+   × reports the resolved physical provider together with its model for a CLI override 35ms
+     → expected { type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(11 matching properties omitted from actual)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reports the resolved physical provider together with its model for a CLI override
+AssertionError: expected { type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(11 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "data": {
+      "model": {
+        "id": "physical",
+-       "provider": "anthropic",
++       "provider": "openai",
+      },
+      "thinkingLevel": "low",
+    },
+    "success": true,
+  }
+
+ ❯ src/cli/rpc/runtimeHost.test.ts:210:20
+    208|   expect(actual).toMatchObject({ provider: 'anthropic', model: 'physic…
+    209|   const response = await handleRpcCommand({ type: 'get_state' }, host(…
+    210|   expect(response).toMatchObject({ success: true, data: { model: { pro…
+       |                    ^
+    211| });
+    212| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  18:43:53
+   Duration  9.44s (transform 5.61s, setup 0ms, collect 9.14s, tests 37ms, environment 0ms, prepare 61ms)
+

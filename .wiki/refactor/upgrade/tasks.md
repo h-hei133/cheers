@@ -42,7 +42,7 @@
 
 ## D: RPC 与导出（P1）
 
-- [ ] **D.1** 会话／模型／树命令：缺口。当前Linux编译CLI真实JSONL已覆盖logical get_state／available_models／set_model／cycle_model／thinking及physical派发／durable origin／EOF exit0；get_messages在成功prompt后仍读startup session.turns，普通physical选择对照同样复现。需改为当前会话读取并核实stats／last-assistant等同源消费者，以及会话／树和错误分类；`.omx/artifacts/upgrade-virtual-routing-2026-11-15/rpc-classification.json`保留失败与对照，不把限定RPC通过当整项验收。
+- [ ] **D.1** 会话／模型／树命令：部分。旧startup session.turns造成messages／count／stats／last-text过期已修：共用host/read读取当前stored session、复验selection／active binding／id／createdAt／root，缺失明确拒绝，不回写runtime binding；get_state的physical provider/model现来自同一resolved target。十一读反例与CLI resolver单红先复现，当前六门4/33、恢复1/21、三有效反转exact恢复、2635模块0monoliths、build `545e59e9f16a`和限定双lane复核通过。Linux同代CLI两进程logical／physical各一POST后消息／计数／统计／last-text、新会话／切回、删除后四读取拒绝及EOF exit0通过。完整tree／fork／clone、busy／错误分类及其他命令仍需联合验收，不勾选。历史失败见virtual-routing的rpc-classification与本批native-classification；证据`.omx/artifacts/upgrade-rpc-read-2026-11-15/delivery.json`。
 - [x] **D.2** 队列清空和 steering／follow-up 模式实时更改：本地验收完成。清空实际两条活跃输入与submission，模式跨readiness传递并保存后更新捕获队列；配置或运行替换拒绝修改后继。真实runTurn和JSONL消费者通过，宿主按input/session/settings拆分且函数上限通过。
 - [x] **D.3** UI 请求／响应和事件：本地验收完成。加载扩展通过真实JSONL的选择／确认／输入／编辑、取消、EOF前撤权和迟到响应隔离；配置／会话转换新增四项红例后修复，在成功且lease改变时先刷新owner再绑定，后继consumer与EOF不能复活。独立暂存树6套件47项、六静态门、build `16aec298a055`及Linux编译CLI三次选择／改配置／新会话／未答编辑EOF退出通过，限定复审CLEAR。实际M，额外依赖1（转换后的surface lease），结构复用原host；无真实服务或跨平台声明。
 - [ ] **D.4** HTML 高亮、GFM／CJK、Thinking、Diff、灯箱：已有待验收，真实离线导出与转义安全。
@@ -102,6 +102,8 @@
 - **P3-DESKTOP** 独立 Web／桌面产品矩阵：原文暂缓；不把 Linux 桌面自动化工具称作桌面产品。
 
 ## Validation ledger
+
+2026-11-15 D.1当前会话读取子批：十一实际读反例先红；初native logical通过，但physical发现get_state错误provider/model配对，真实CLI resolver反例再红后修。最终六门4/33、三反转exact恢复、恢复1/21、0monoliths及build `545e59e9f16a`通过；Linux两进程各一loopback POST，当前read／switch／missing拒绝／EOF全部passed，限定代码APPROVE／架构CLEAR。旧build `d3ab676d5081`失败原回执保留；D.1转部分，22/62保持，继续完整tree／session／error消费者验收。C.1已提交`d8189ac`，未push。
 
 2026-11-15 C.1逻辑选择／生产路由：当前build `083b3d78d8bf`绑定39/840、六门、0monoliths、十有效反转和同代Linux原生矩阵，限定独立代码复审8个核心owner为APPROVE、架构CLEAR；C.1本地完成，22/62。首次missing lint script、UI reversal TypeError、abort fixture死锁、test-input旧build拒绝、retry fixture配置和错误RPC transcript假设均保留分类。原用户catalog JSON损坏，配置连接／凭据未改，隔离最小model entry后4次真实POST通过；另两次connection refusal零POST、一个auth failure一POST仍是失败。限定RPC逻辑选择通过但普通physical对照复现get_messages旧快照，D.1由已有待验收转确认缺口。完整回执与source hashes见`.omx/artifacts/upgrade-virtual-routing-2026-11-15/delivery.json`；未push／CI。
 

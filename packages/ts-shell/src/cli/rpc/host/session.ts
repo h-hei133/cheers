@@ -12,6 +12,7 @@ import {
   resolveSessionTargetId,
 } from "../runtimeOps.js";
 import type { RuntimeRpcHostOptions } from "./contract.js";
+import { readRpcSession } from './read.js';
 
 type SessionHost = Pick<RpcHost, "newSession" | "switchSession" | "setSessionName" | "getSessionStats"
   | "getLastAssistantText" | "fork" | "cloneSession" | "getForkMessages" | "getEntries" | "getTree" | "navigateTree">;
@@ -43,8 +44,8 @@ export function sessionHost(options: RuntimeRpcHostOptions, manager: SessionMana
       runtimeContext.session = updated;
       return { sessionId: updated.id, name: updated.title ?? "" };
     },
-    getSessionStats: () => readRpcSessionStats(runtimeContext),
-    getLastAssistantText: () => readLastAssistantText(runtimeContext),
+    getSessionStats: () => readRpcSessionStats(readRpcSession(runtimeContext, manager)),
+    getLastAssistantText: () => readLastAssistantText(readRpcSession(runtimeContext, manager)),
     fork: async (entryId) => {
       if (options.isStreaming()) return { cancelled: true };
       const forked = manager.fork(runtimeContext.session.id, runtimeContext.projectRoot, { activate: false, entryId });

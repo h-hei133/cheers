@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/rpc/runtimeHost.test.ts (21 tests) 640ms
+
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  18:46:09
+   Duration  9.94s (transform 5.61s, setup 0ms, collect 9.05s, tests 640ms, environment 0ms, prepare 52ms)
+

@@ -11914,3 +11914,7 @@ Linux同代三独立Node进程验证重开／分叉独立持久化、actual work
 ### 2026-11-15：逻辑模型选择与生产路由验证
 
 注册子批356b996b后接通CLI／SDK／RPC／picker逻辑选择、原branch-store routing CAS、retry／direct／摘要和VM callback数据边界。当前六门39/840、十有效反转exact恢复、0monoliths、build 083b3d78d8bf及2224文件安装strict类型通过；Linux公开入口33次loopback POST与原配置模型4次真实POST通过，原catalog损坏的隔离最小entry边界保留。架构CLEAR、限定独立代码复审APPROVE，C.1本地完成22/62，本批待本地提交；D.1 get_messages旧快照由physical对照确认。证据 .omx/artifacts/upgrade-virtual-routing-2026-11-15/；按批本地提交后修RPC消费者，不push。
+
+### 2026-11-15：RPC读取当前会话与一致模型配对
+
+C.1已本地提交d8189ac。本子批修复四RPC读取旧启动对象，以及physical CLI模型override下错误provider/model配对；十二实际反例先红，最终六门4/33、三有效反转exact恢复、恢复1/21、0monoliths、build 545e59e9f16a通过，限定代码APPROVE／架构CLEAR。Linuxlogical／physical两fresh CLI进程各一loopback POST、当前读／会话切换／删除后拒绝／EOF exit0通过。失败回执与最终source哈希归档.omx/artifacts/upgrade-rpc-read-2026-11-15/；D.1部分、22/62保持，按批本地提交，不push。

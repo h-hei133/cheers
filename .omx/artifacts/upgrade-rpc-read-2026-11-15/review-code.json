@@ -1,0 +1,10 @@
+{
+  "reviewer": "/root/routing_delivery_review",
+  "status": "APPROVE",
+  "fileCount": 6,
+  "findings": 0,
+  "readOnly": true,
+  "testsRun": false,
+  "scope": "Current session read repair, plus later physical provider/model projection fix and real CLI resolver test.",
+  "limits": "No full D.1 acceptance or historical stats aggregation change."
+}

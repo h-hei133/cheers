@@ -11,6 +11,7 @@ import { SessionManager } from '../../session/SessionManager.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
 import { runTurn, type TurnInput } from '../../turn/session.js';
 import type { StepFunction } from '../../turn/step.js';
+import { resolveCliCredential } from '../provider/cliProviderRuntimeBridge.js';
 import { SubmissionQueue } from '../interactive/inputQueue.js';
 import type { RpcCommand } from './protocol.js';
 import { handleRpcCommand } from './rpcServer.js';
@@ -136,4 +137,75 @@ it('accepts a same-project session callback and selects only after acceptance', 
   expect(response).toMatchObject({ success: true, data: { cancelled: false, sessionId: target.id } });
   expect(context.session.id).toBe(target.id);
   expect(manager.getCurrentSessionForProject(directory)?.id).toBe(target.id);
+});
+
+it.each(['get_messages', 'get_state', 'get_session_stats', 'get_last_assistant_text'] as const)(
+  'reads persisted conversation updates through %s after the host was created', async type => {
+    const startup = context.session;
+    const rpc = host();
+    manager.addTurn(startup.id, { role: 'user', content: 'new question' });
+    manager.addTurn(startup.id, { role: 'assistant', content: 'new answer' });
+    expect(startup.turns).toEqual([]);
+    const response = await handleRpcCommand({ type }, rpc);
+    expect(response.success).toBe(true);
+    const expected = type === 'get_messages' ? { messages: [
+      expect.objectContaining({ role: 'user', content: 'new question' }),
+      expect.objectContaining({ role: 'assistant', content: 'new answer' }),
+    ] } : type === 'get_state' ? { messageCount: 2 }
+      : type === 'get_session_stats' ? { userMessages: 1, assistantMessages: 1, totalMessages: 2 }
+        : { text: 'new answer' };
+    expect(response.data).toMatchObject(expected);
+    expect(context.session).toBe(startup);
+  },
+);
+
+it('reads the accepted new session on the next call through the existing host', async () => {
+  const rpc = host();
+  manager.addTurn(context.session.id, { role: 'assistant', content: 'old answer' });
+  const target = manager.createNew(directory, { activate: false });
+  manager.addTurn(target.id, { role: 'assistant', content: 'selected answer' });
+  expect((await handleRpcCommand({ type: 'switch_session', sessionPath: target.id }, rpc)).success).toBe(true);
+  manager.addTurn(target.id, { role: 'assistant', content: 'latest answer' });
+  expect((await handleRpcCommand({ type: 'get_last_assistant_text' }, rpc)).data).toEqual({ text: 'latest answer' });
+  expect((await handleRpcCommand({ type: 'get_state' }, rpc)).data).toMatchObject({ sessionId: target.id, messageCount: 2 });
+});
+
+it.each(['get_messages', 'get_state', 'get_session_stats', 'get_last_assistant_text'] as const)(
+  'refuses %s when the selected stored session is unavailable', async type => {
+    const rpc = host();
+    manager.addTurn(context.session.id, { role: 'assistant', content: 'removed answer' });
+    context.session = manager.getSession(context.session.id)!;
+    fs.rmSync(manager.getSessionDirPath(context.session.id), { recursive: true });
+    const response = await handleRpcCommand({ type }, rpc);
+    expect(response).toMatchObject({ success: false, error: 'The selected session is unavailable.' });
+    expect(response.data).toBeUndefined();
+  },
+);
+
+it.each(['identity', 'selection'] as const)('rejects a changed %s during a current-session read', async kind => {
+  const rpc = host();
+  const originalId = context.session.id;
+  manager.addTurn(context.session.id, { role: 'assistant', content: 'original answer' });
+  const original = manager.getSession.bind(manager);
+  const successor = manager.createNew(directory, { activate: false });
+  vi.spyOn(manager, 'getSession').mockImplementation(id => {
+    const current = original(id)!;
+    if (kind === 'identity') return { ...current, createdAt: '2000-01-01T00:00:00.000Z' };
+    context.session = successor;
+    return current;
+  });
+  const response = await handleRpcCommand({ type: 'get_messages' }, rpc);
+  expect(response).toMatchObject({ success: false, error: 'The selected session changed during the read.' });
+  expect(response.data).toBeUndefined();
+  expect(context.session.id).toBe(kind === 'selection' ? successor.id : originalId);
+});
+
+it('reports the resolved physical provider together with its model for a CLI override', async () => {
+  const options = { model: 'anthropic/physical:low' };
+  context.resolveConfigTarget = (config, sessionId) => resolveCliCredential(config, options, {}, sessionId);
+  expect(context.runtimeConfig.provider).toBe('openai');
+  const actual = context.resolveConfigTarget(context.runtimeConfig, context.session.id);
+  expect(actual).toMatchObject({ provider: 'anthropic', model: 'physical' });
+  const response = await handleRpcCommand({ type: 'get_state' }, host());
+  expect(response).toMatchObject({ success: true, data: { model: { provider: 'anthropic', id: 'physical' }, thinkingLevel: 'low' } });
 });

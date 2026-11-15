@@ -1,0 +1,20 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "status": "failed",
+  "realProvider": false,
+  "stages": {},
+  "buildId": "d3ab676d508174470f4275681fafac50ccf7ab825d6c5ba6fd5e7526368a37d4",
+  "probeSha256": "307df3b1eb332497ab8733008369b4dd6744d58c870bb5d46d8de2b45392ab2e",
+  "initialModel": {
+    "provider": "openai",
+    "id": "physical"
+  },
+  "initialEffort": "low",
+  "failedStage": "state",
+  "errorName": "AssertionError",
+  "line": "81",
+  "assertion": {
+    "operator": "deepStrictEqual"
+  }
+}

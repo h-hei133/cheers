@@ -1,0 +1,8 @@
+{
+  "reviewer": "/root/routing_architecture",
+  "status": "CLEAR",
+  "fileCount": 6,
+  "readOnly": true,
+  "testsRun": false,
+  "scope": "Original selected/active identity, fresh existing store read, no runtime rebinding, shared consumers and paired resolved physical target."
+}

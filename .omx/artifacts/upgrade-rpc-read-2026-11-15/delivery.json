@@ -1,0 +1,179 @@
+{
+  "date": "2026-11-15",
+  "scope": "D.1 current-session read repair and resolved physical model projection",
+  "status": "locally-validated",
+  "parentCommit": "d8189ac0893569ddd1f2de76732dd1b0a5bd1d20",
+  "buildId": "545e59e9f16ab3d6a6ca13c15fea683db7ba83531dec8b5046633f5dd0583d55",
+  "completeTasks": 22,
+  "totalTasks": 62,
+  "overallGoal": "active",
+  "sourceSnapshots": {
+    "packages/ts-shell/src/cli/rpc/host/input.ts": {
+      "snapshot": "source/cli/rpc/host/input.ts.txt",
+      "sha256": "a2c27c59ee69daa5ac640b148a215becbb3f8ac963494a780286131f5dc4fc77"
+    },
+    "packages/ts-shell/src/cli/rpc/host/session.ts": {
+      "snapshot": "source/cli/rpc/host/session.ts.txt",
+      "sha256": "40052b3c4345c6dc6614e88d22a8aeb91734283cb253a826be69393f1600ba96"
+    },
+    "packages/ts-shell/src/cli/rpc/runtimeHost.test.ts": {
+      "snapshot": "source/cli/rpc/runtimeHost.test.ts.txt",
+      "sha256": "f362277e659da3ba620482de0c200223ca56044bc268fb6fea5362c4bb674520"
+    },
+    "packages/ts-shell/src/cli/rpc/runtimeHost.ts": {
+      "snapshot": "source/cli/rpc/runtimeHost.ts.txt",
+      "sha256": "f2fa2bef11800e825fe05658fa37e6cbb666d86b2554d2c621b1f96194dad142"
+    },
+    "packages/ts-shell/src/cli/rpc/runtimeOps.ts": {
+      "snapshot": "source/cli/rpc/runtimeOps.ts.txt",
+      "sha256": "11f23d82fa436b485a7ebcd5fa2f98a1a638d5de5650c7653dad58e4651afa5c"
+    },
+    "packages/ts-shell/src/cli/rpc/host/read.ts": {
+      "snapshot": "source/cli/rpc/host/read.ts.txt",
+      "sha256": "f4a4ccd16b5aca75fb6d3eb287e4a5b71b81ff053d5804c3f30240fe0537b648"
+    }
+  },
+  "documents": {
+    ".wiki/log.md": {
+      "snapshot": "docs/.wiki/log.md.txt",
+      "sha256": "84799785b57469710feb4d6f36966a2334746a1bdf923f30a0f2ea9b070bfafa"
+    },
+    ".wiki/refactor/upgrade/MASTER.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/MASTER.md.txt",
+      "sha256": "2ea85b757c72e9a3e4d575b159a5015dd50478483800ec392a190d05be3a6c15"
+    },
+    ".wiki/refactor/upgrade/design.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/design.md.txt",
+      "sha256": "78365ad70c656f69ee0b1c0c42a00e69e2d060634d013b027e822a0444072371"
+    },
+    ".wiki/refactor/upgrade/tasks.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/tasks.md.txt",
+      "sha256": "fe26158f2282da0d8ec2165232af94c5a2225746e36be40c0f4673af761e900c"
+    },
+    "HANDOFF.md": {
+      "snapshot": "docs/HANDOFF.md.txt",
+      "sha256": "4906ef82faf94b08d6688b65ba54b457dc3d49378493d2dd651f352df4b5b64e"
+    }
+  },
+  "evidence": {
+    "build.log": "8f36cebb98f1aea14502fb70f663d0940cae960cb63c435b02de4b2dfe86874d",
+    "counterexamples.log": "8c415d0e10d1b0314b1ab656a89aff85da9a82b508d6790e0d09a13b9138827c",
+    "docs.log": "b343ccc12290561bb865a2691e96199dd78ed3f156ca83960e19e35fd2e1eb3d",
+    "final-build.log": "2205bf3aa4981cff8c0b5af5220c4087a11d836a306ddf9d2383b4263591e964",
+    "final-gates.log": "0be14a4a2bcab8258c5d6b64a5620413dbc7693df0fe961cf691fcba8caf1014",
+    "final-restored-tests.log": "28892621966b3e6e97f1d06cb170fdefbb7f0c32f4678ee559449964cdd54a12",
+    "final-tests.log": "1192468c6b8065f7f93e7f60f19f8362c5a3705cea78454e0fafaa554e2d3383",
+    "functions.log": "2ce048f734d7711004752efe719c6b2c08fd65845232628c8e1b38710b61c4ac",
+    "gates.log": "35bd59fc9e5715abaaec1d3c7c55325da861620f99473f6672270056b16b98e5",
+    "native-classification.json": "9db48df1570dc5257d8e3639050e913f3af61fb370eb6aae360d87cb6756ba65",
+    "native-first.mjs.txt": "ef4ac3fb40fd299244d50183c1a55431e98def511d195941a38c58319b01fc9e",
+    "native-physical-first.json": "5753184e8adf7a9e10e146d44a364896a8ecb82e890e741a066c6272783812d3",
+    "native-physical-first.log": "a21daf6fec33045d3934030a9cbfdac5b1ff0995969edf9cc6cc7d9fe018d6fd",
+    "native-physical-second.json": "6c336fd7ff649835d3998c9b461278709d6db4f19f5c4b9cb14639a357e2ecf6",
+    "native-physical-second.log": "ffe322b396f1bd3902f82ee6097082adae7831c7a0e615b9b2f5481451900a10",
+    "native-physical.json": "2d4defa03211437359ae7986112ab9785697de98e3a6cd41139f2f053b197596",
+    "native-physical.log": "93222f7e01e0b7339920ce2cf810f35e958862dc896b7d1f2fdc13ccfb917a0f",
+    "native-second.mjs.txt": "307df3b1eb332497ab8733008369b4dd6744d58c870bb5d46d8de2b45392ab2e",
+    "native-virtual-first.json": "f7c6254b20212a069709e4d263c70fb0f9dc021a54315ede3bbf08d9d95aac8a",
+    "native-virtual-first.log": "b966f34e65c32d56345cd4eb96a8d41a781f554075574cb670febe4bf922c54f",
+    "native-virtual.json": "8f81352e38d3889896ee1badc5e3c58418e69ed92c15c2b5787676130773d380",
+    "native-virtual.log": "2c34b5176eb886f0a261b52bd4f4a1d4e3564748390f89d0b0a4d3371651da23",
+    "native.mjs.txt": "307df3b1eb332497ab8733008369b4dd6744d58c870bb5d46d8de2b45392ab2e",
+    "physical-state-red.log": "0a4e0be29970dfa24f8c89807a0186740d305e9127d2b96dacaec4d662f07cb3",
+    "restored-tests.log": "bab551df39b4d0d05226112a9f6942b06b8ca3bb28043aef7676902b8c7aeb04",
+    "reversal-fresh-record.log": "95fb1dcf2b2285a350159ec865b0eb92566cbdcf01c55e235a482eed23ac6c5f",
+    "reversal-physical-provider.log": "e8fbdc007f4f197aa8212d6a99835258e743a7cb7f58571808eec6a4d0628a60",
+    "reversal-read-identity.log": "7ee688dd20999ccc701729f4b506a903e79e47000f2607a58c23766928414f89",
+    "reversal.log": "104ae604392816732481bb0a6110d083ee996f61f21c13af3330dc1239ec1525",
+    "reversal.mjs.txt": "6b5af957a32e4efca7a111471779da3f5c980801ed636746f555b0404e4be659",
+    "reversals.json": "c6d3a2f36b90caeb3cc78b3dc57119c449ba0050fb4c04bff80605c8665d130b",
+    "review-architecture.json": "c83f269780b7eb5d9c5584128475116acf9e182dccc09e262a9ff9cecdd4bcd0",
+    "review-code.json": "5eca212bda8567a7ed576a49a73a91f63de774c9a06fb20750fba80612284430",
+    "tests.log": "03d17214db832ad8d260b9564b11264b3673fd7b4a567a5c3e5373ba8d3446b2",
+    "build-manifest.json": "86baec8d3bef9180cc31dafdbe8ac2e20a7b15b5d93fcec5a9c112c9f15f152d",
+    "docs/.wiki/log.md.txt": "84799785b57469710feb4d6f36966a2334746a1bdf923f30a0f2ea9b070bfafa",
+    "docs/.wiki/refactor/upgrade/MASTER.md.txt": "2ea85b757c72e9a3e4d575b159a5015dd50478483800ec392a190d05be3a6c15",
+    "docs/.wiki/refactor/upgrade/design.md.txt": "78365ad70c656f69ee0b1c0c42a00e69e2d060634d013b027e822a0444072371",
+    "docs/.wiki/refactor/upgrade/tasks.md.txt": "fe26158f2282da0d8ec2165232af94c5a2225746e36be40c0f4673af761e900c",
+    "docs/HANDOFF.md.txt": "4906ef82faf94b08d6688b65ba54b457dc3d49378493d2dd651f352df4b5b64e",
+    "source/cli/rpc/host/input.ts.txt": "a2c27c59ee69daa5ac640b148a215becbb3f8ac963494a780286131f5dc4fc77",
+    "source/cli/rpc/host/session.ts.txt": "40052b3c4345c6dc6614e88d22a8aeb91734283cb253a826be69393f1600ba96",
+    "source/cli/rpc/runtimeHost.test.ts.txt": "f362277e659da3ba620482de0c200223ca56044bc268fb6fea5362c4bb674520",
+    "source/cli/rpc/runtimeHost.ts.txt": "f2fa2bef11800e825fe05658fa37e6cbb666d86b2554d2c621b1f96194dad142",
+    "source/cli/rpc/runtimeOps.ts.txt": "11f23d82fa436b485a7ebcd5fa2f98a1a638d5de5650c7653dad58e4651afa5c",
+    "source/cli/rpc/host/read.ts.txt": "f4a4ccd16b5aca75fb6d3eb287e4a5b71b81ff053d5804c3f30240fe0537b648"
+  },
+  "validation": {
+    "counterexamples": {
+      "initial": 11,
+      "additionalPhysicalProjection": 1,
+      "logs": [
+        "counterexamples.log",
+        "physical-state-red.log"
+      ]
+    },
+    "gates": {
+      "status": "passed",
+      "count": 6,
+      "log": "final-gates.log"
+    },
+    "tests": {
+      "status": "passed",
+      "suites": 4,
+      "tests": 33,
+      "log": "final-tests.log"
+    },
+    "reversals": {
+      "status": "passed",
+      "count": 3,
+      "receipt": "reversals.json",
+      "restoredSuite": "final-restored-tests.log",
+      "restoredTests": 21
+    },
+    "functions": {
+      "status": "passed",
+      "modules": 2635,
+      "monoliths": 0,
+      "log": "functions.log"
+    },
+    "build": {
+      "status": "passed",
+      "log": "final-build.log"
+    },
+    "native": {
+      "status": "passed",
+      "platform": "linux",
+      "freshCompiledCliProcesses": 2,
+      "loopbackPosts": 2,
+      "receipts": [
+        "native-virtual.json",
+        "native-physical.json"
+      ],
+      "covers": [
+        "fresh messages/count/stats/last assistant",
+        "correct physical and logical provider/model",
+        "new session and switch back",
+        "deleted selected session refuses four reads",
+        "EOF exit 0"
+      ]
+    },
+    "review": {
+      "code": "APPROVE",
+      "architecture": "CLEAR",
+      "codeReceipt": "review-code.json",
+      "architectureReceipt": "review-architecture.json",
+      "scope": "Six changed owner/test files and physical projection follow-up"
+    }
+  },
+  "initialFailures": [
+    "Original build d3ab676d5081 virtual reads passed; physical get_state paired default provider with resolved model. Two failed physical receipts and driver snapshots retained. Actual CLI resolver test reproduced before repair."
+  ],
+  "limits": {
+    "fullD1": false,
+    "historicalStatsAggregation": "unchanged",
+    "realConfiguredProvider": false,
+    "otherPlatforms": false,
+    "push": false,
+    "ci": false
+  }
+}

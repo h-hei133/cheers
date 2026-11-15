@@ -1,0 +1,11 @@
+{
+  "failure": "pre-existing-product-read-gap",
+  "task": "D.1",
+  "attempts": [
+    "native-physical-first.json",
+    "native-physical-second.json"
+  ],
+  "reason": "Physical --model resolved anthropic/physical while get_state paired runtimeConfig.provider=openai with physical id. A production resolveCliCredential counterexample reproduced the wrong pair; readRpcState now uses active.provider.",
+  "firstVirtualReceipt": "native-virtual-first.json",
+  "firstBuild": "d3ab676d508174470f4275681fafac50ccf7ab825d6c5ba6fd5e7526368a37d4"
+}

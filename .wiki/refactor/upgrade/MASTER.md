@@ -22,9 +22,9 @@
 
 ## Current status
 
-**Current phase**: active；会话注册已提交`356b996b`。C.1逻辑选择／生产路由本地验收完成，独立代码APPROVE、架构CLEAR；本批待本地提交。下一修复D.1当前会话读取。当前22/62项完成。
-**Last completed batch**: C.1逻辑选择／生产路由。durable logical selection、分支state同键CAS先于compaction、完整physical authority、retry／continuation／direct、手动／分支摘要、VM输入及CLI／SDK／RPC选择消费者已接通。六门39/840、十有效反转、恢复5/79、补4/34与1/12、0monoliths、build `083b3d78d8bf`通过；同代安装包2224文件strict类型、Linux loopback 33 POST与原配置模型4次真实POST通过。原catalog损坏的隔离fixture边界和RPC旧messages缺口保留；限定独立代码复审8个核心owner为APPROVE、架构CLEAR。
-**Goal**: active；40项未完成，其中13部分、11已有待验收、14确认缺口、2待核实。保留完整规划，不关闭总目标。
+**Current phase**: active；C.1已本地提交`d8189ac`。D.1当前会话读取子批本地验证完成，待本地提交；下一联合验收session／model／tree命令及错误分类。当前22/62项完成。
+**Last completed batch**: D.1当前读取子批修复startup旧messages／count／stats／last-text以及physical provider/model错误配对，复用现有SessionManager且不回写runtime binding。十一读反例与一resolver反例先红；六门4/33、三反转exact恢复、恢复1/21、2635模块0monoliths、build `545e59e9f16a`通过；Linux当前编译CLI两进程logical／physical各一POST，当前读／新会话／切回／删除后拒绝／EOF exit0通过，独立代码APPROVE、架构CLEAR。D.1其余命令未验收，仍部分。
+**Goal**: active；40项未完成，其中14部分、11已有待验收、13确认缺口、2待核实。保留完整规划，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -53,10 +53,13 @@
 
 逻辑路由子批遥测：实际L；结构复用检查10/10，复用原session model／branch store／provider／compaction／loader owner，不新增运行时或依赖。新增未预见依赖3（显式delegation的logical隔离、内部retry实际dispatch身份、file callback的realm／UI结算边界）；D.1旧messages另立后续批次。测试／原生证据及限定独立审查通过，C.1勾选为本地完成，22/62。先前无返回的代码lane仍记录unavailable，不作为批准来源；当前代码APPROVE来自新独立8-owner复核。未补造统一历史drift基线。
 
+RPC读取子批遥测：实际M，结构复用10/10，新增未预见依赖1（真实CLI override的provider/model配对）；复用现有存储reader和RPC宿主，新增本域read owner，不建立缓存或并行持久化。原工具输出／usage汇总语义不改；D.1由确认缺口转部分，22/62保持。
+
 ## Session log
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-15 | C.1已提交d8189ac；D.1当前读取子批十二反例先红，六门4/33、三反转、0monoliths、build `545e59e9f16a`、Linuxlogical／physical两进程真实JSONL及两POST通过，限定独立双lane复核通过。本地22/62保持，待提交后继续session／tree／error联合验收。 |
 | 2026-11-15 | C.1逻辑选择／生产路由完成当前六门39/840、十反转、0monoliths、build `083b3d78d8bf`与Linux公开SDK／CLI／摘要／重试／RPC限定矩阵及4次配置模型POST；证据归档upgrade-virtual-routing-2026-11-15。架构CLEAR、限定独立代码复审APPROVE，本批待本地提交，C.1完成22/62；D.1 get_messages旧快照已由普通physical对照证实，下一单独修复。 |
 | 2026-11-15 | 分支store前置：基线8断言红，重入补2红后修；最终六门8/247、0monoliths、build `7bcb4574ea2a`，五反转exact恢复，限定复审CLEAR。Linux同代三进程重开/分叉/实际worker namespace隔离和冲突拒绝passed。证据`.omx/artifacts/upgrade-branch-store-2026-11-15/delivery.json`；无新增provider调用，21/62保持，继续注册／路由consumer。 |
 | 2026-11-15 | C.1摘要目标子批六门、15/246、0monoliths、build `9e91decd500a`与五断言反转通过；限定复核CLEAR。同代Linux内部自动／overflow／role均route一次，公开SDK配置模型两次bodySent完成prompt／compact。原生前两次夹具先触发threshold而非overflow，失败receipt/source保留；最终只扩大overflow物理窗口并核对首POST拒绝。证据`.omx/artifacts/upgrade-summary-target-2026-11-15/delivery.json`，C.1/E.7开项、21/62保持。 |

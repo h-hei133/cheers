@@ -73,12 +73,12 @@ export async function saveRpcSetting(runtimeContext: ShellRuntimeContext, key: s
   if (!result.applied) throw new Error(result.note);
 }
 
-export function readRpcSessionStats(runtimeContext: ShellRuntimeContext): Record<string, unknown> {
-  const usage = getSessionUsage(runtimeContext.session.id);
+export function readRpcSessionStats(session: Session): Record<string, unknown> {
+  const usage = getSessionUsage(session.id);
   const model = costModel(usage, loadCatalog());
-  const turns = runtimeContext.session.turns;
+  const turns = session.turns;
   return {
-    sessionId: runtimeContext.session.id,
+    sessionId: session.id,
     userMessages: turns.filter(t => t.role === "user").length,
     assistantMessages: turns.filter(t => t.role === "assistant").length,
     toolResults: turns.filter(t => t.role === "tool").length,
@@ -87,9 +87,9 @@ export function readRpcSessionStats(runtimeContext: ShellRuntimeContext): Record
   };
 }
 
-export function readLastAssistantText(runtimeContext: ShellRuntimeContext): string | null {
-  for (let i = runtimeContext.session.turns.length - 1; i >= 0; i -= 1) {
-    const turn = runtimeContext.session.turns[i];
+export function readLastAssistantText(session: Session): string | null {
+  for (let i = session.turns.length - 1; i >= 0; i -= 1) {
+    const turn = session.turns[i];
     if (turn?.role === "assistant") return messageToText(turn.content);
   }
   return null;
@@ -241,22 +241,22 @@ export function navigateRpcTree(
   );
 }
 
-export function readRpcState(runtimeContext: ShellRuntimeContext, queueLength: number, isStreaming: boolean) {
+export function readRpcState(runtimeContext: ShellRuntimeContext, queueLength: number, isStreaming: boolean, session: Session) {
   const ctx = buildRpcCommandContext(runtimeContext);
   const active = modelRequest(ctx, runtimeContext.runtimeConfig);
   const thinking = captureThinkingPreference(runtimeContext.projectRoot, active.thinkingEffort);
-  const logical = readLogicalModel(runtimeContext.session.id);
+  const logical = readLogicalModel(session.id);
   return {
-    sessionId: runtimeContext.session.id,
+    sessionId: session.id,
     workspaceRoot: runtimeContext.projectRoot,
     isStreaming,
-    messageCount: runtimeContext.session.turns.length,
+    messageCount: session.turns.length,
     pendingMessageCount: queueLength,
-    model: { provider: logical?.provider ?? runtimeContext.runtimeConfig.provider, id: logical?.model ?? active.model },
+    model: { provider: logical?.provider ?? active.provider, id: logical?.model ?? active.model },
     thinkingLevel: (logical ? logical.thinkingEffort : thinking.thinkingEffort) ?? "auto",
     steeringMode: runtimeContext.runtimeConfig.steeringMode ?? "one-at-a-time",
     followUpMode: runtimeContext.runtimeConfig.followUpMode ?? "one-at-a-time",
-    ...(runtimeContext.session.title ? { sessionName: runtimeContext.session.title } : {}),
+    ...(session.title ? { sessionName: session.title } : {}),
     autoCompactionEnabled: runtimeContext.runtimeConfig.compactionEnabled !== false,
     autoRetryEnabled: runtimeContext.runtimeConfig.retryEnabled !== false,
   };

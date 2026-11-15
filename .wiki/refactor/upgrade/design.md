@@ -364,3 +364,12 @@ native.json记录三fresh Node进程和九生产owner哈希，同代chunk复制�
 原用户models.json有语法错误，常规loader无法接纳其active physical entry。最初零请求失败，两个使用既存有效对象的尝试connection refused零POST，另一个既存配置目标一POST后auth失败，均保留原receipt并分类。最终只在隔离目录提取原active connection完整有效scalar字段、原地址／endpoint／凭据，并为原active model加最小{id}条目，不补造capability。原用户文件未改，凭据仅写0600临时文件并已清除。四次真实POST证明该隔离配置连接的生产路径，不证明原损坏catalog成功加载。原SDK abort夹具先等abort再释放阻塞callback造成死锁；retry三次fixture依次缺隐式effort、retryEnabled、普通tool批准；所有失败和驱动保留，未修改产品以迎合夹具。
 
 RPC get_messages成功prompt后仍返回startup session.turns，普通physical对照同样失败；SessionStoreAccess.load返回新record而输入host读旧对象。这是D.1既有消费者缺口，当前限定RPC只验选择及durable transcript origin；另次误读transcript格式的fixture失败也保留。C.1独立架构复审CLEAR，最终独立代码lane实际检查8个核心owner并给APPROVE、无发现；先前无最终结果的lane记录unavailable，不充当批准。结合全批root验证与逐项合同核对，C.1本地完成，22/62。证据与82个当前source snapshots在.omx/artifacts/upgrade-virtual-routing-2026-11-15/，lane旧字节单独归档不再回拷。实际L、额外依赖3；E.7仍缺provider／MCP／renderer／setters且worker注册明确unsupported；无Windows、physical terminal、push或CI验收。
+
+
+## RPC current conversation reads (2026-11-15)
+
+原输入host与runtimeOps的四个read消费者使用启动时session对象，SessionManager的load/addTurn并不保持该对象与durable消息同步；真实CLI logical和ordinary physical都已复现。十一新增反例涵盖四读取最新记录、switch后继续同host、四读取删除拒绝及createdAt／同步selection replacement；全部真实AssertionError后复用SessionManager.getSession，在host/read固定原selected／active binding并复核stored id／createdAt／projectRoot，返回fresh Session给projection，不回写runtimeContext.session、不建立第二缓存。current active branch消息与已有usage成本汇总保持原语义；参考agent.current messages的所有权决定由本项目既有persisted owner实现，不直接复制其in-memory agent结构。
+
+初六门3/30、两反转、build d3ab676d5081下logical native通过；physical原生对照发现另一个旧状态错误：CLI credential实际解析anthropic/physical，但get_state用了默认runtime provider与actual model。新增实际resolveCliCredential测试单红后将physical provider改为active.provider，logical仍优先。第三反转真实AssertionError且exact恢复，最终六门4/33、恢复1/21和build 545e59e9f16ab3d6a6ca13c15fea683db7ba83531dec8b5046633f5dd0583d55通过，2635模块0monoliths。限定独立代码APPROVE／架构CLEAR包含该后续修复，无reviewer重跑tests。
+
+当前Linux compiled CLI原生两fresh进程分别logical与physical，各一loopback POST，四类read显示当前消息、配对、count与last-text；new_session空消息、切回恢复，删除目录后四read明确success=false而非旧成功，EOF exit0。原逻辑成功回执、两physical失败及driver源保留；final receipt和源码hash绑定当前构建，旧d3ab676d5081仅历史。证据.omx/artifacts/upgrade-rpc-read-2026-11-15/。实际M、额外依赖1、复用10/10；无配置真实provider新调用、其他平台、push／CI，full D.1 session／tree／busy等仍待联合验收，22/62保持。

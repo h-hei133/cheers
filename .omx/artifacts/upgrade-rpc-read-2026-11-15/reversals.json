@@ -1,0 +1,27 @@
+[
+  {
+    "name": "fresh-record",
+    "exitCode": 1,
+    "signal": null,
+    "assertionFailure": true,
+    "restoredExact": true,
+    "sourceSha256": "f4a4ccd16b5aca75fb6d3eb287e4a5b71b81ff053d5804c3f30240fe0537b648"
+  },
+  {
+    "name": "read-identity",
+    "exitCode": 1,
+    "signal": null,
+    "assertionFailure": true,
+    "restoredExact": true,
+    "sourceSha256": "f4a4ccd16b5aca75fb6d3eb287e4a5b71b81ff053d5804c3f30240fe0537b648"
+  },
+  {
+    "name": "physical-provider",
+    "exitCode": 1,
+    "signal": null,
+    "assertionFailure": true,
+    "restoredExact": true,
+    "file": "packages/ts-shell/src/cli/rpc/runtimeOps.ts",
+    "sourceSha256": "11f23d82fa436b485a7ebcd5fa2f98a1a638d5de5650c7653dad58e4651afa5c"
+  }
+]

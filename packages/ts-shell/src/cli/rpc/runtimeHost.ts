@@ -15,7 +15,7 @@ export function createRuntimeRpcHost(options: RuntimeRpcHostOptions): RpcHost {
     get sessionId() { return runtimeContext.session.id; },
     get workspaceRoot() { return runtimeContext.projectRoot; },
     ...(options.ui ? { ui: options.ui } : {}),
-    ...inputHost(options),
+    ...inputHost(options, manager),
     ...sessionHost(options, manager),
     ...settingsHost(options),
   };

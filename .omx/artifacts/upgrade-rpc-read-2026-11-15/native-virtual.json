@@ -1,0 +1,78 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "status": "passed",
+  "realProvider": false,
+  "stages": {
+    "selection": {
+      "passed": true,
+      "logicalState": true,
+      "virtualMetadata": true,
+      "setAndCycle": true,
+      "effort": true,
+      "noModelPost": true
+    },
+    "prompt": {
+      "passed": true,
+      "physicalDispatch": true,
+      "durablePhysicalOrigin": true
+    },
+    "reads": {
+      "passed": true,
+      "currentMessages": true,
+      "currentCount": true,
+      "currentStats": true,
+      "currentLastText": true
+    },
+    "switch": {
+      "passed": true,
+      "emptySuccessor": true,
+      "originalRestored": true
+    },
+    "missing": {
+      "passed": true,
+      "readsRefused": 4
+    }
+  },
+  "buildId": "545e59e9f16ab3d6a6ca13c15fea683db7ba83531dec8b5046633f5dd0583d55",
+  "probeSha256": "307df3b1eb332497ab8733008369b4dd6744d58c870bb5d46d8de2b45392ab2e",
+  "initialModel": {
+    "provider": "adaptive",
+    "id": "one"
+  },
+  "initialEffort": "high",
+  "selection": "virtual",
+  "messageFacts": [
+    {
+      "role": "user",
+      "isText": true,
+      "matches": false,
+      "contains": true,
+      "hasOrigin": false,
+      "physical": false,
+      "keys": [
+        "id",
+        "role",
+        "content",
+        "timestamp"
+      ]
+    },
+    {
+      "role": "assistant",
+      "isText": true,
+      "matches": true,
+      "contains": true,
+      "hasOrigin": true,
+      "physical": true,
+      "keys": [
+        "id",
+        "role",
+        "content",
+        "origin",
+        "timestamp"
+      ]
+    }
+  ],
+  "gaps": [],
+  "loopbackPosts": 1
+}

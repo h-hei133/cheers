@@ -2648,3 +2648,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Manual or branch summaries lose implicit reasoning effort, or dispatch an explicit effort with too little output budget for the endpoint.
 - **Root Cause:** The direct path reads only router overrides and bypasses the existing preference fallback or output-minimum check.
 - **Rule:** Capture the original effective effort, resolve the complete physical target before summary budgeting, then apply the existing endpoint constraints. Explicit summary roles retain precedence. Preserve ordinary configuration admission and the manual compaction owner's durable publication fence.
+
+### RPC Reads Must Follow The Stored Session And Resolved Target
+- **Symptom:** A successful prompt leaves get_messages empty, counts and last text stale, or get_state pairs a default provider with an overridden model.
+- **Root Cause:** Persistence returns fresh records instead of updating the startup session object, while the state projection combines runtime defaults with resolved request fields.
+- **Rule:** Read the currently selected session through the existing store for each RPC projection, validate its original selection and identity, and do not rebind runtime context from a read. Refuse unavailable data instead of falling back to an old snapshot. Project provider and model from the same logical selection or resolved physical target, and test a real CLI override as well as ordinary persisted updates.
