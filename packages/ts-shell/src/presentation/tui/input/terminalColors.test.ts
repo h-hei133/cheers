@@ -87,11 +87,11 @@ it('keeps a same-chunk late palette reply newer than the resolved device query s
   const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode: vi.fn(), fd: 0 as const });
   vi.spyOn(process, 'stdin', 'get').mockReturnValue(input as unknown as NodeJS.ReadStream & { fd: 0 });
   vi.spyOn(process, 'stdout', 'get').mockReturnValue(Object.assign(new PassThrough(), { isTTY: true, fd: 1 as const }) as unknown as NodeJS.WriteStream & { fd: 1 });
-  const terminal = new Terminal(), reports: TerminalColors[] = [];
+  const terminal = new Terminal(negotiationCapabilities), reports: TerminalColors[] = [];
   vi.spyOn(terminal, 'write').mockImplementation(() => {}); vi.spyOn(terminal, 'writeSync').mockImplementation(() => {});
   terminal.start(() => {}, () => {}, () => {}); const release = requestTerminalPalette(terminal, colors => reports.push(colors));
   try {
-    input.push('\x1b[?1u'); input.push('\x1b]4;2;#010203\x07\x1b[?62c\x1b]4;2;#040506\x07');
+    input.push('\x1b[?1u'); input.push('\x1b[?62c\x1b]4;2;#010203\x07\x1b[?62c\x1b]4;2;#040506\x07');
     await Promise.resolve();
     expect(reports.at(-1)?.palette?.[2]).toEqual({ r: 4, g: 5, b: 6 });
   } finally { release(); terminal.stop(); input.destroy(); }
