@@ -85,6 +85,39 @@ describe('durable goal scheduling', () => {
     expect(goal().scheduling).toBeUndefined();
   });
 
+  it('waits for a manual prompt settlement before submitting an automatic round', async () => {
+    vi.useFakeTimers();
+    let release!: () => void; let entered!: () => void;
+    const tail = new Promise<void>(resolve => { release = resolve; });
+    const settling = new Promise<void>(resolve => { entered = resolve; });
+    const runtime = new ShellSessionRuntime({ sessionManager: manager,
+      renderer: { renderLine() {}, renderChunk() {} } as never,
+      runPrompt: async function* () { yield completed(); },
+      promptSettled: async metadata => {
+        if (metadata?.source !== 'goal-continuation') { entered(); await tail; }
+      } });
+    const scheduler = installGoalScheduler({ session } as never, manager, runtime, () => {});
+    schedulers.push(scheduler);
+    const manual = runtime.executePrompt(session.id, 'Finish the human request.');
+    try {
+      await settling;
+      expect(runtime.getCurrentRunController()).toBeNull();
+      expect(runtime.isRunning()).toBe(true);
+      const submit = vi.spyOn(runtime, 'executePrompt');
+      expect(scheduler.start()).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(160);
+      expect(submit).not.toHaveBeenCalled();
+      expect(goal().phase).toBe('active');
+      release(); await manual;
+      await vi.advanceTimersByTimeAsync(81);
+      expect(submit).toHaveBeenCalledOnce();
+      expect(goal().scheduling).toMatchObject({ phase: 'ready', round: 1, lastOutcome: 'answer', pendingRound: false });
+    } finally {
+      release(); await manual; await scheduler.stop('user');
+      vi.clearAllTimers(); vi.useRealTimers();
+    }
+  });
+
   it('bounds actual CLI cleanup after an automatic runtime ignores cancellation without clearing its owner', async () => {
     vi.useFakeTimers();
     let scheduler!: GoalScheduler;

@@ -11881,3 +11881,10 @@ C.1初始／续轮准备的取消、后继历史及结束hook退出六红例先�
 loader／dispose子批已提交`c8d14775`：原代际claim、失败绑定保留caller资源／deny rules、消费资源撤权和后继reload保留，并发dispose共享等待与原首错，失败后继续cleanup／terminate。两WATCH补实际setHost排序和pending cache拒绝，六门、6套件34项、0monoliths、build `1787d90736d1`通过；两反转为真实断言红且源码逐字节恢复，最终限定只读复核CLEAR。
 
 Linux当前编译SDK inline／TS文件扩展撤权、abort复用和后继资源保留passed，synthetic provider；临时driver归档后清理。T3.1 compact／当前安装包／真实模型联合仍未完成，整体20完成／42未完成。用户要求完成在手子批后暂停，记录[暂停总结](refactor/upgrade/summary.md)和逐项缺口；不启动后续任务，不宣称push／CI或总目标完成。
+
+
+### 2026-11-15：SDK压缩与当前安装包联合验收
+
+恢复后compact使用原command settlement，prompt互斥先于注册，取消回调异常仍取消并等待原操作，保留回调后继；dispose开始即撤销compact。goal scheduler的controller空闲误判由真实尾部反例修复为isRunning。六门、16套件236项、0monoliths及build `d9acacbc4260`通过，限定独立复核CLEAR，四有效反转红／逐字节恢复。
+
+同代隔离npm安装15公开入口／严格类型（不跳过库检查），Linux配置模型四次actual请求覆盖prompt／compact／复用／同ID重开；取消零派发／零commit、迟到失败、inline／TS扩展撤权及后继保留通过。旧构建和setup失败分开保留，临时状态归档清理，按批本地提交；T3.1本地完成，21/62，继续C.1和E.7依赖，无push／CI或整体完成声明。

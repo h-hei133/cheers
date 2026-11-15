@@ -59,6 +59,20 @@ create前捕获加载generation及其binding claim，在异步初始化后核对
 
 本子批新增依赖仅原代际binding claim，未增加第二资源owner；不关闭T3.1。compact未纳入idle／取消等待及controller覆盖仍需反例和修复，当前安装包严格类型／真实模型／取消复用／dispose联合验收未运行。用户要求当前子批后暂停，因此这些后续工作保留为未完成。
 
+## SDK compaction settlement (2026-11-15, resumed)
+
+当前源码确认compact只占用controller而没有登记Promise，waitForIdle／cancelAndWait无法等待；状态机在压缩与prompt最后的持久化结算阶段均不能判定真实忙闲，重入可覆盖controller。用户已恢复执行，先建立反例再修复。
+
+参考会话的决定：手动压缩有独立取消身份、isIdle包含压缩、abort后等待idle；压缩结束才退休身份，不接续中断的旧轮。本项目采用完整等待与同owner取消；保留原CompactionOutcome.busy而不自动中断正在执行的prompt，原因是三个现有SDK／CLI／RPC消费者共享明确的忙时拒绝契约。复用ShellCommandRuntime已有同步登记、取消controller与settled Promise，不新增并行运行时。prompt在进入drive前检查原活动操作，拒绝的请求不得替换currentRun或lastRun。SDK dispose后的compact与prompt保持相同撤权边界。
+
+取消hook可同步抛错或创建后继：先捕获原controller和idle Promise，再在finally取消并等待；不得取消或等待回调创建的后继。实际默认goal scheduler仅看controller时在promptSettled尾部误提交，主线程真实反例红后改为isRunning；与prompt admission共用完整settlement，不添加新任务owner。
+
+最终六门、16套件236项、0monoliths、build `d9acacbc4260`通过，限定独立只读复核CLEAR；四有效反转（settlement／prompt admission／cancel hook／scheduler）各真实AssertionError，逐字节恢复后完整16/236通过。初9红、hook1红、scheduler1红保留；错误Vitest路径与npm12 pack名称对象被误作数组的报告脚本失败不计行为证据。
+
+当前同代npm包2203文件／2513226bytes，隔离安装15入口、严格TypeScript skipLibCheck=false通过；Linux Node24.15已配置模型实际四请求分别prompt／compact／reuse／reopen，原生SDK持久compact、重叠拒绝、取消零派发和零commit、迟到converter rejection、同ID重开、inline和TS扩展撤权以及后继loader代际保留通过。receipt核验五源文件和探针SHA256，旧两构建保留历史证据而不替代最新代码。T3.1本地完成，21/62；实际L、额外依赖2，原owner复用，未push或取得CI。
+
+下一C.1只读核实确认生产没有virtual注册消费者，属于E.7前置依赖。模型metadata可复用session catalog contributions；可执行回调属于core/models和extension generation，不写ConfigState克隆目录。物理target必须先用现有凭据／account／scope owner重绑定完整URL、headers、credential identity、fetch和modelTransport；不能从turn/context直接import CLI step组装器而形成环。按这一依赖拆批，完整注册／分支状态／实际路由联合验收前不勾选C.1或E.7。
+
 ## Toolchain publication contract (2026-11-14)
 
 公开入口与CLI由一次shared graph构建，元数据产生静态public.js，stable wrappers经唯一current.js共享运行时。别名由specifier和export name编码，新增入口不会重用旧别名；默认和live binding保留。manifest v3把全部wrapper、声明转发和pack规则绑定到输入与产物；journal v2记录旧字节/模式/不存在状态，兼容旧日志恢复。仅清理旧manifest记录且未被用户改动的managed files，不宽泛清目录。旧build保留在磁盘，dist/.npmignore仅打包当前代，防止安装包携带989代历史。声明目录复制原JSON资源，公开类型的Node依赖随包安装。

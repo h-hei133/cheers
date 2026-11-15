@@ -60,7 +60,7 @@
 - [ ] **E.8** shortcuts／flags：部分。目前收集但 CLI／SDK 未消费；冲突、默认值、实际参数与按键生命周期。
 - [ ] **E.9** 包安装来源和 CLI 入口：部分。已有签名 marketplace 安装，npm／git／local adapter 和顶层安装入口尚缺；保留显式批准、完整性、精确版本与写入边界。
 - [ ] **T2.1** CLI 参数集合、单遍解析与早期启动判断：部分，主循环已存在；测试完整启动矩阵并处理早期多遍语义。
-- [ ] **T3.1** createAgentSession／DefaultResourceLoader：部分。loader／dispose子批已提交`c8d14775`：初始化前捕获资源代际、绑定前复验、构造退休闭包后才提交host，成功claim后更新deny rules；dispose撤销消费代际且保留后继reload，所有并发调用等待同一cleanup并收到原首错，其他cleanup与terminate继续执行。六静态门、6套件34项、0monoliths与build `1787d90736d1`通过，最终限定只读复核CLEAR；两项收尾反转为真实断言失败，源码逐字节恢复。Linux当前编译SDK实际inline／TS文件扩展撤权与后继保留通过，使用synthetic provider。compact仍未纳入idle／取消等待且可覆盖controller；同一当前安装包严格类型、真实配置模型调用、取消复用与dispose联合验收仍待完成，T1/C.3旧证据不替代。本子批后按用户要求暂停，20/62项不变。
+- [x] **T3.1** createAgentSession／DefaultResourceLoader：本地验收完成。loader／dispose子批`c8d14775`保留原代际claim、失败绑定回退、消费代际撤权和并发dispose同等待／首错。compact复用原command settlement，prompt／command／compaction互斥；取消回调失败仍取消并等待原操作，回调创建的后继不受影响，dispose开始即拒绝compact。goal scheduler以完整isRunning等待prompt结算。六静态门、16套件236项、0monoliths和build `d9acacbc4260`通过，限定独立复核CLEAR；四项实际断言反转红且逐字节恢复。当前同代隔离npm安装2203入口文件／15公开子路径导入和严格类型（skipLibCheck=false）通过；Linux Node24.15配置模型四次actual请求覆盖prompt／compact／复用／同ID重开，取消零派发和零compact commit、迟到失败处理、inline／TS扩展撤权及后继资源保留均通过。实际L，额外依赖2；仅本地Linux证据，无push／CI或全平台声明。证据在`.omx/artifacts/upgrade-sdk-2026-11-15/compaction-delivery.json`。
 
 ## F1 / F2: 协议、目录和遥测（P2）
 
@@ -166,3 +166,6 @@
 2026-11-15 B.3最终资格：document-tail已提交`63c0aba`；独立只读审计确认原roadmap:23/full-audit:58要求已由各actual owner覆盖，剩余完整WebP消费者证据补于blocks.test。测试3套件56项、六静态门通过，无生产代码变更，不重做此前已通过的build/native。原paint成功回执被lifecycle driver写入同目的文件；从paint-native-first.log和lifecycle-native-cli.log精确恢复两个canonical receipt，保留失败probe于lifecycle-native-probe-failed.json及receipt-repair.json哈希，全部归档source hashes验证通过。实际S，结构复用原owner，无新增生产依赖；本地验收由18增为19/62。Linux字节／生命周期和模型／平台边界保留，整体goal继续active。
 
 2026-11-15 B2.1状态子批：初测试9failed/4passed为实际顺序／stop／reentry反例；初未显式capability和key字段错误另存分类。独立复审old-color/startup sentinel与start重入三红、capacity单红、cancel后继单红均修复。六门、8/210、0monoliths、build `744017336148`通过，Linux当前CLI loaded四格shared DA／fallback／keepalive／原始paste／suspend再probe／stop后迟到调用通过；startup确认均false，明确bootstrap输入饥饿仍未修，两反转红且exact恢复5/93。实际L／额外依赖2（所有query fence及start/cancel重入），原owner复用、无新循环，19/62项不变。B2.1仍部分，不扩大本批为整个终端完成。
+
+
+2026-11-15 恢复后SDK联合收尾：原9红例、取消hook异常1红及goal scheduler实际入口1红先复现后修。最终六门16/236、0monoliths、build `d9acacbc4260`，四有效反转red/exact恢复及同代安装严格类型／15入口／四真实请求passed，限定独立复核CLEAR。旧`92cfbc5c5b63`、`57574fd63403`回执保留原代际，不当最新源码验证；初Vitest错误路径和npm12 pack对象读取错误仅setup记录。T3.1勾选，总21/62；C.1缺实际目标完整重绑定和会话注册／状态，继续实施。

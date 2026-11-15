@@ -18,7 +18,7 @@ export function installGoalScheduler(context: ShellRuntimeContext, store: Sessio
         session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules))) report('Goal completed from approved criteria and verified runtime evidence.'); }
       catch { /* Unknown acceptance does not publish completion. */ }
     },
-    host: { ready: () => runtime.getCurrentRunController() === null,
+    host: { ready: () => !runtime.isRunning(),
       submit: async (prompt, promptMetadata) => { await runtime.executePrompt(context.session.id, prompt, { promptMetadata, outputMode: 'print' }); } } });
   runtime.observeEvents(event => scheduler.observe(event), { renders: false });
   contexts.set(context, scheduler); runtimes.set(runtime, scheduler);

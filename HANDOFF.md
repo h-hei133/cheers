@@ -2603,3 +2603,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A second dispose caller finishes before cleanup, or a rejected asynchronous cleanup is reported as successful disposal.
 - **Root Cause:** A boolean guards cleanup without sharing its promise, and allSettled results are discarded.
 - **Rule:** Publish one disposal promise before invoking retirement hooks. Continue independent cleanup after synchronous or asynchronous failures, finish termination, and return the original first failure to every caller. Test a pending cleanup rejection and a failed binding followed by a successful new claim.
+
+### Compaction Needs A Settlement Owner Before Cancellation
+- **Symptom:** SDK abort or dispose returns while a summary is still settling, and a second operation replaces its cancellation controller.
+- **Root Cause:** Manual compaction registered only a controller; idle waited only for prompt and local-command promises. A cancellation hook could also throw before either cancellation or the join.
+- **Rule:** Register compaction with the existing command settlement owner. Reject overlap before registering a prompt; state-machine idle and cleared provider controllers do not prove settlement. Scheduling readiness must use that same full settlement boundary. Capture cancellation controllers and the idle promise before invoking callbacks, cancel in finally and still join after callback failure. Do not cancel or wait on a successor created by that callback.

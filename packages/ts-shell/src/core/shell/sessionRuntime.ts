@@ -162,8 +162,9 @@ export class ShellSessionRuntime {
 
   /** Abort the active run and wait until it has settled. */
   async cancelAndWait(): Promise<void> {
-    this.cancelCurrentRun();
-    await this.waitForIdle().catch(() => undefined);
+    const settled = this.waitForIdle().catch(() => undefined);
+    try { this.cancelCurrentRun(); }
+    finally { await settled; }
   }
 
 
@@ -210,6 +211,7 @@ export class ShellSessionRuntime {
       promptMetadata?: Record<string, unknown>;
     },
   ): Promise<string> {
+    if (this.isRunning()) throw new Error('A session operation is still running.');
     const run = this.trackRun(this.drivePrompt(sessionId, prompt, options));
     return run;
   }
@@ -461,10 +463,16 @@ export class ShellSessionRuntime {
   }
 
   cancelCurrentRun(): void {
-    this.deps.onCancelRequested?.();
-    this.commands.current?.controller.abort();
-    this.currentRunController?.abort();
-    this.stateMachine.interruptRun();
+    const command = this.commands.current?.controller;
+    const run = this.currentRunController;
+    try { this.deps.onCancelRequested?.(); }
+    finally {
+      command?.abort();
+      run?.abort();
+      if (this.currentRunController === run && this.commands.current?.controller === command) {
+        this.stateMachine.interruptRun();
+      }
+    }
   }
 
   /**
@@ -476,14 +484,8 @@ export class ShellSessionRuntime {
     if (!this.deps.compactHistory) {
       return { status: "failed", reason: "No provider is available to summarize the conversation." };
     }
-    if (this.stateMachine.getState() === "running") return { status: "busy" };
-    const controller = new AbortController();
-    this.currentRunController = controller;
-    try {
-      return await this.deps.compactHistory(sessionId, controller.signal, instructions);
-    } finally {
-      if (this.currentRunController === controller) this.currentRunController = null;
-    }
+    if (this.isRunning()) return { status: "busy" };
+    return this.commands.run(signal => this.deps.compactHistory!(sessionId, signal, instructions));
   }
 
   /**

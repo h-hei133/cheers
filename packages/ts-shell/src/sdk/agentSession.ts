@@ -237,6 +237,7 @@ export class AgentSession {
   }
 
   async compact(instructions?: string): Promise<CompactionOutcome> {
+    if (this.disposed) throw new Error('AgentSession has been disposed.');
     return this.sessionRuntime.compactHistory(this.sessionId, instructions);
   }
 

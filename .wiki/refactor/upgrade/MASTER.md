@@ -18,13 +18,13 @@
 - [Task inventory](tasks.md)：唯一任务与验收清单。
 - [Design and evidence](design.md)：结构事实、参考决策、复用与实施顺序。
 - [Earlier repair evidence](../../wiki/references/runtime-upgrade-review-2026-11.md)：上一轮证据，不能替代本轮任务验收。
-- [Pause summary](summary.md)：截至2026-11-15的已完成20项、实际测试和剩余42项；本子批后按用户要求暂停。
+- [Pause summary](summary.md)：2026-11-15此前暂停时的历史快照；当前状态以本页和任务清单为准。
 
 ## Current status
 
-**Current phase**: paused；用户要求完成在手子批后暂停后续任务并总结。T1、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收，合计20/62。
-**Last completed batch**: T3.1 loader／dispose子批已提交`c8d14775`，六门、6套件34项、0monoliths及build `1787d90736d1`通过，限定只读复核CLEAR；两项实际断言反转红／逐字节恢复，Linux当前编译SDK inline／TS文件能力撤权与后继代际保留通过，synthetic provider。T3.1整体未勾选，compact idle／cancel和当前安装包／真实模型联合验收仍缺。此前C.1准备子批`2141b70b`完成，但完整虚拟路由target／scope／状态尚未完成。
-**Goal**: paused at user request；42项未完成，其中14部分、12已有待验收、14确认缺口、2待核实。总目标没有完成，不关闭。
+**Current phase**: active；T3.1完整SDK本地验收完成，继续C.1虚拟路由及其E.7注册依赖。合计21/62项完成。
+**Last completed batch**: T3.1 compact复用command settlement，prompt拒绝覆盖在途owner，取消回调失败仍取消并等待原操作，goal scheduler等待prompt结算。六门、16套件236项、0monoliths及build `d9acacbc4260`通过，限定独立复核CLEAR；四项有效反转红且逐字节恢复。同代隔离安装15入口、严格类型检查和Linux四次配置模型actual请求通过，取消零派发／复用／重开／扩展撤权及后继保留均通过。按批本地提交；没有push或远端CI。
+**Goal**: active；41项未完成，其中13部分、12已有待验收、14确认缺口、2待核实。保留完整规划，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -39,14 +39,17 @@
 
 ## Adaptive control
 
-当前本地验收任务数为20/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3；核实不计实现完成。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
+当前本地验收任务数为21/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.2/D.3/D.5、E.2、C.3和T3.1；核实不计实现完成。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 
-当前在用户要求的暂停边界，不启动下一批。恢复时从T3.1 compact的idle／取消等待及controller归属反例开始，再完成当前安装包联合验收和C.1路由缺口；已有证据不扩展为后续构建的重新验收。
+恢复时已核对干净工作区与`560c0cc4`。T3.1 compact仅持有controller、不登记settlement，且只凭状态机拒绝重入；该缺口经源码核实仍成立。复用原commands owner登记完整压缩操作、保持忙时拒绝，覆盖prompt／command互斥和SDK dispose等待；不建立第二任务管理器。C.1完整路由由独立只读核实线检查，后续独立实施；已有证据不扩展为新构建的重新验收。
+
+本批遥测：实际L；结构复审10/10，复用SDK／command／runtime／scheduler原owner，没有新运行时或依赖库；新增未预见依赖2（取消回调失败边界、goal scheduler空闲判断）。此前未记录统一估算／数值基线，不补造历史delta或累计drift；后续C.1按已核实的完整目标重绑定和会话注册依赖拆批，先完成物理目标捕获，再实施session-owned注册和持久状态。
 
 ## Session log
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-15 | 恢复后T3.1本地完成。compact和取消／idle完整等待，goal scheduler尾部反例修复；六门16/236、0monoliths、build `d9acacbc4260`及同代隔离安装15入口／严格类型／四次配置模型请求passed。四反转red且exact恢复，限定独立复核CLEAR；21完成／41未完成，继续C.1，按批本地提交。 |
 | 2026-11-15 | 用户要求在手子批完成后暂停。SDK loader／dispose已提交`c8d14775`，6/34、六门、0monoliths、当前编译原生能力撤权／后继保留通过，build `1787d90736d1`；两个实际反转红且exact恢复，限定复核CLEAR。记录20完成／42未完成，提交暂停总结；不进入compact／虚拟路由后续任务，不宣称push／CI或整体完成。 |
 | 2026-11-14 | 四条只读核实线完成初步盘点；研究中的部分“缺失”已过期。14 个公开子路径实际导入全部 ERR_MODULE_NOT_FOUND；确认构建交付缺口。T1 开始实施；其余任务保持待实施／待验证。 |
 | 2026-11-14 | T1五项本地验收完成，生产build `b57986b62aa3`；210脚本、Node20.3 65定向项、隔离安装15入口/严格类型/SDK/资源/worker与Linux原生prompt通过。独立复审只覆盖T1；继续A，不关闭总目标。 |
