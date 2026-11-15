@@ -2571,3 +2571,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** The early terminal sends its keyboard/status queries, but a real immediate reply is processed after the 250ms deadline while loaded-runtime probes pass.
 - **Root Cause:** The first frame's write callback permits synchronous heavy imports before stdin has a poll opportunity; a query write can also disconnect before its timer is installed.
 - **Rule:** Await the original protocol owner's sentinel/deadline alongside the first write before heavy initialization. Settle that wait on retirement, drainage and disconnect without adding another timer. Keep keyboard and color DA1 owners separate in fixtures, and preserve dynamic device write callbacks when splitting input/output owners.
+
+
+### Prompt Navigation Must Reach Retained History Through Notices
+- **Symptom:** Previous-prompt navigation stops at the oldest prompt when a restored-history notice precedes it, or key release jumps a second time.
+- **Root Cause:** Semantic boundaries alone cannot reach the existing top-row page loader, and arrow release reports retain the same key binding as key press.
+- **Rule:** With no preceding prompt, reach top zero, paint, then reuse the original retained-page loader and anchor contract. Refuse navigation from pending/stale coordinates; use the shared key-release predicate before dispatch. Paging may update its notice, so compare exact authored copy sources while separately asserting the current notice.

@@ -45,6 +45,7 @@ function build(busy = false, interruptible = false, vimMode = false,
     retry: vi.fn(),
     syncSuggestions: vi.fn(),
     scroll: vi.fn(),
+    scrollPrompt: vi.fn(),
     scrollPage: vi.fn(),
     scrollToEnd: vi.fn(),
     copySelection: vi.fn().mockReturnValue(false),
@@ -75,6 +76,39 @@ function build(busy = false, interruptible = false, vimMode = false,
   };
 }
 describe("scrolling", () => {
+  it.each(['\x1b[1;5:3A', '\x1b[1;6:3A', '\x1b[1;5:3B', '\x1b[57419;5:3u'])(
+    'ignores a prompt-navigation release %j', raw => {
+      const { press, surface, actions } = build(); surface.editor.setText('Unsubmitted draft');
+      press(raw);
+      expect(actions.scrollPrompt).not.toHaveBeenCalled();
+      expect(surface.editor.getText()).toBe('Unsubmitted draft');
+    });
+  it.each(['\x1b[1;5A', '\x1b[1;6A', '\x1b[57419;5u', '\x1b[57419;6u'])(
+    'routes previous prompt %j without changing the draft', raw => {
+      const { press, surface, actions } = build(); surface.editor.setText('Unsubmitted draft');
+      press(raw);
+      expect(actions.scrollPrompt).toHaveBeenCalledWith(-1);
+      expect(actions.scroll).not.toHaveBeenCalled();
+      expect(actions.submit).not.toHaveBeenCalled();
+      expect(surface.editor.getText()).toBe('Unsubmitted draft');
+    });
+
+  it.each(['\x1b[1;5B', '\x1b[1;6B', '\x1b[57420;5u', '\x1b[57420;6u'])(
+    'routes next prompt %j without entering prompt recall', raw => {
+      const { press, surface, actions } = build();
+      surface.editor.pushHistory('Saved prompt'); surface.editor.setText('Current draft');
+      press(raw);
+      expect(actions.scrollPrompt).toHaveBeenCalledWith(1);
+      expect(surface.editor.getText()).toBe('Current draft');
+    });
+
+  it('uses the existing binding configuration for prompt navigation', () => {
+    const bindings = new Keybindings({ 'tui.altScreen.previousPrompt': 'f6', 'tui.altScreen.nextPrompt': [] });
+    const { press, actions } = build(false, false, false, bindings);
+    press('\x1b[1;5A'); press('\x1b[1;5B'); expect(actions.scrollPrompt).not.toHaveBeenCalled();
+    press('\x1b[17~'); expect(actions.scrollPrompt).toHaveBeenCalledOnce();
+    expect(actions.scrollPrompt).toHaveBeenCalledWith(-1);
+  });
   it("scrolls faster with shift+up and shift+down", () => {
     const { press, actions } = build();
     press("\x1b[1;2A");

@@ -161,6 +161,7 @@ function renderUser(block: Block, width: number, options: BlockRenderOptions = {
     }
   }
   rows.push("");
+  if (rows.length > 1) rows[0] = `\x1b]133;A\x07${rows[0]}`;
   return rows;
 }
 

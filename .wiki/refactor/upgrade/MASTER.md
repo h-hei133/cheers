@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.1/B.2/B.3/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
-**Active batch**: B2.1状态子批已提交`39667225`。startup等待原DA1／250ms边界，六门、9/231、build `220cdd055d01`和Linux编译CLI四格首次协商全部通过；两个反转红且逐字节恢复后3/77通过，限定只读复核CLEAR。本启动小批提交后，继续提示区导航与真实tmux。整体19/62项本地验收，B2.1与C.6原生服务缺口保留。
+**Active batch**: B2.1 startup已提交`ff07807a`；用户提示导航小批完成六门、9/280、恢复后3/131、0monoliths和build `3154882609b3`，Linux编译CLI regular/fullscreen及65提示保留历史三格通过，限定只读复核CLEAR。按批提交后继续助手消息边界与真实tmux；B2.1仍部分，整体19/62项本地验收，C.6原生服务缺口保留。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -106,3 +106,5 @@
 | 2026-11-15 | B2.1状态生命周期：共享7501尾随DA1、32个有deadline的全部query owner、停止／排空撤权及write/cancel重入护栏；原9红、复审3红和两个单红修复。六门8/210、0monoliths、build `744017336148`、Linux loaded两模式×支持/不支持四格通过，两反转红且逐字节恢复5/93。native初查询输入约966ms才处理使bootstrap协商失效，保留真实缺口；paste回显被slash tokenizer处理反斜杠，改观察实际StdinBuffer原始paste并继续原命令，未更改产品契约。调用native过早遇构建未结束是主线程序列错误，保留失败并完成串行新代验证。整体19/62不变，下一批startup／133／tmux。 |
 
 | 2026-11-15 | B2.1启动子批：首帧write及原协议owner readiness一起等待，DA1／250ms／stop／drain／disconnect结束，未新增timer或query。terminal拆input/output保留现有消费入口并满足20函数上限；复核发现构造bind绕过动态write，现有7项反例红后修。联合颜色fixture在HEAD同样失败，补齐独立keyboard/color哨兵并显式能力，原较晚颜色断言保持。六门、9/231、0monoliths、build `220cdd055d01`通过；Linux编译CLI四格bootstrapKeyboardConfirmed全部true、精确paste与暂停／stop清理通过。两个有效反转红、逐字节恢复后3/77通过，限定只读复核CLEAR；实际M／额外依赖1（断连等待清退），19/62不变，继续133／tmux。 |
+
+| 2026-11-15 | B2.1用户提示导航：前导notice通向保留页及按键释放两红例修复，原owner与copy保持。六门、9/280、恢复3/131、0monoliths、build `3154882609b3`和Linux编译CLI三格通过；两有效反转红／exact恢复，限定复核CLEAR。按批提交，19/62不变，继续助手边界与真实tmux。 |

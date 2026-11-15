@@ -11847,3 +11847,10 @@ B.3最后两项资格缺口已补：完整WebP走实际user/tool渲染边界，�
 状态已提交39667225后，heavy imports等待首帧write与原input/protocol DA1／250ms边界；断连／停止结束等待。terminal拆input/output保留原消费合同并满足20函数上限。复核dynamic write七红修复；颜色fixture在HEAD同样缺独立keyboard哨兵，仅补实际两查询身份，不改生产颜色协议。
 
 六门、9套件231项、0monoliths和build 220cdd055d01通过，限定复核CLEAR；Linux当前编译CLI四格首次协商全部确认，paste／suspend／stop及exit0通过。两个反转红且逐字节恢复后3/77通过，失败分类保留。小批本地提交、无push／CI声明；B2.1的133导航与真实tmux继续，整体19/62项不变。
+
+
+### 2026-11-15：用户提示导航独立子批
+
+复用原block/pane/scroll/keymap/host接通内部133用户边界，render前剥离，复制与draft保持。复审两红例为前导notice阻挡保留页和释放报告重复跳；修复后六门、9/280、恢复3/131、0monoliths及build `3154882609b3`通过，限定只读复核CLEAR。两有效反转red且逐字节恢复，错误反转与Editor API/原生观察夹具失败保留分类。
+
+Linux当前编译CLI regular/fullscreen及65提示旧页三格全exit0；普通模式提示、前后跳、release不动作、authored copy保持和内部133不输出全部通过。原history notice按分页正常更新不误判为源改写。助手边界与真实tmux待下一批，19/62和目标active保持；按批本地提交，不推送或宣称CI。

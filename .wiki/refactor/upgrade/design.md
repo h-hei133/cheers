@@ -238,3 +238,14 @@ status-native.json为当前冻结CLI Linux regular/fullscreen×支持/不支持�
 复核发现构造期bind固化write，后来spy／recording不能观察协议输出，现有7项消费者反例先红再恢复动态call。首次联合9/231仅same-chunk颜色fixture失败；原HEAD同样失败且两个生产文件逐字节恢复，原因是缺keyboard的独立DA1。fixture显式能力并补两个哨兵，仍要求较晚颜色优先，生产颜色合同未放宽。初startup四红、disconnect红、write七红与baseline失败原日志保留。
 
 startup-delivery-gates六门、startup-accepted-tests9/231、0monoliths及build 220cdd055d01通过；两有效反转分别移除启动等待和断连清退，均实际失败且字节完全恢复，startup-restored-tests3/77通过。限定只读复核CLEAR。startup-native.json绑定该build及两source SHA256，Linux当前CLI regular/fullscreen×支持/不支持四格全部bootstrapKeyboardConfirmed=true，shared query、原始paste、keepalive、suspend再probe、停止迟到setter清退和exit0通过。hook只触发现有生命周期入口；physicalTerminal=false、realProvider=false。实际M／额外依赖1（断连清退），本地19/62不变，133导航／真实tmux与整体目标继续开项。
+
+
+## User prompt navigation (2026-11-15)
+
+复用原block渲染、pane/scroll、keymap与宿主。用户块首行带内部133A；navigation必须同时满足原user owner首行，拒绝assistant／user续行中的伪marker。按最后paint的document/revision/viewport和pendingPage准入，resize沿原block/offset恢复；无前驱先到top0，下次paint后复用原revealEarlier保留锚点，再跳到新页prompt，不追加第二分页缓存。原binding提供Ctrl+Up/Down和Ctrl+Shift+Up/Down及重绑；复用isKeyRelease防止CSI箭头release重复跳转，CSI-u release由原parser过滤。实际overlay/search/Vim先消费，regular保持原生history且给明确fullscreen提示；prepareRows剥离marker避免133结束7501程序状态。
+
+只读参考的提示标记／paint前剥离／从scrollTop按方向找边界决策已比较，未复制另一运行时。参考还包含没有tool调用的assistant边界，当前小批仅用户prompt，保留后续差距而不声称完整semantic parity。
+
+navigation-delivery-gates六门、navigation-delivery-tests9套件280项、navigation-restored-build恢复后3/131及0monoliths/build `3154882609b3`全部通过；navigation-reversals.json两有效反转red且生产文件逐字节恢复，限定只读复核CLEAR。第一反转只删top fallback却保留新scrollPage路径仍绿，不作为反证；按原top===0合同恢复后的反转确实红。两次夹具调用不存在的remember/submit API，改原pushHistory后通过；加载页后立即跳旧提示断言与原锚点契约冲突，修为保留notice再按一次跳转，仍验证到达旧prompt。
+
+navigation-native.json绑定当前build及seed/hook/driver哈希；Linux真实PTY当前编译CLI三格regular3、fullscreen3、fullscreen65全部exit0，前后跳／release／65条旧页／draft与原始user/assistant copy数据保持、内部133不外发。hook只观察实际Surface，不替代parser、按键、render或pane。第一次把recordingFrameProvider当Surface而没有report，第二次误以最晚prompt一定在viewport之外，第三次把分页notice更新当copy改变；失败原JSON/source/log全部保留，最终以原Surface和authored source核验。notice按原contract更新为All earlier messages are shown，未修改生产分页行为。实际M，额外依赖1（保留页消费者）；B2.1与总目标仍未完成，19/62保持，无真实provider／物理终端／push／CI声明。

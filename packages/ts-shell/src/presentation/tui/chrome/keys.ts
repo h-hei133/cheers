@@ -52,6 +52,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   },
   { keys: ["pageup", "pagedown"], does: "scroll the conversation by a screen", group: "moving" },
   { keys: ["shift+up", "shift+down"], does: "scroll the conversation by a few rows", group: "moving" },
+  { keys: ['ctrl+up', 'ctrl+down', 'ctrl+shift+up', 'ctrl+shift+down'], does: 'jump between prompts in fullscreen mode', group: 'moving' },
 
   { keys: ["backspace"], does: "delete the character before the caret", group: "editing" },
   { keys: ["delete"], does: "delete the character under the caret", group: "editing" },

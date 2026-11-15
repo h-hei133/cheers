@@ -5,6 +5,7 @@ import { graphemeBoundaries } from "../../presentation/tui/text/measure.js";
 import { KEY_ACTIONS, type Keybindings } from "./keybindings.js";
 import { getSlashInvocation, type SlashCatalogScope } from "../../entrypoints/slashCommandRegistry.js";
 import { feedVim, initialVimState, type VimEffect, type VimKey, type VimState } from "../../presentation/tui/editor/modal/state.js";
+import { isKeyRelease } from '../../presentation/tui/input/keys.js';
 
 /**
  * Key routing for the interactive view.
@@ -177,6 +178,12 @@ function runAction(action: string, event: ParsedKeyEvent, context: KeymapContext
     case "tui.editor.pageDown":
       actions.scrollPage(1);
       return "redrawn";
+    case 'tui.altScreen.previousPrompt':
+      if (!isKeyRelease(event.raw)) actions.scrollPrompt?.(-1);
+      return 'redrawn';
+    case 'tui.altScreen.nextPrompt':
+      if (!isKeyRelease(event.raw)) actions.scrollPrompt?.(1);
+      return 'redrawn';
     case "app.scroll.fastUp":
       actions.scroll(-FAST_SCROLL_ROWS);
       return "redrawn";

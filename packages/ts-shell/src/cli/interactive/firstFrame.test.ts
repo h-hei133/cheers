@@ -71,6 +71,50 @@ function boot(
 }
 
 describe("transcript search ownership", () => {
+  it('ignores prompt key releases and reveals retained history through the actual fullscreen host', () => {
+    const turns = Array.from({ length: 65 }, (_, index) => ({ id: `prompt-${index}`, role: 'user',
+      content: `Retained navigation prompt ${index}`, timestamp: '2026-11-15T00:00:00Z' }));
+    const { mode, terminal, scheduler, runtimeContext } = boot({}, 'fullscreen');
+    Object.assign(runtimeContext.session, { turns, reports: [] });
+    mode.start(); scheduler.flush(); terminal.drain();
+    const host = mode as unknown as { view: { selectionTop(): number; blockAtScreenRow(row: number): { text: string } | undefined;
+      transcript: { all(): readonly unknown[] } }; state: { editor: { getText(): string } } };
+    try {
+      terminal.input('Unsubmitted retained draft'); scheduler.flush(); terminal.drain();
+      terminal.input('\x1b[1;5A'); scheduler.flush(); terminal.drain();
+      const top = host.view.selectionTop();
+      terminal.input('\x1b[1;5:3A'); scheduler.flush();
+      expect(host.view.selectionTop()).toBe(top);
+      terminal.input('\x1b[57419;5:3u'); scheduler.flush();
+      expect(host.view.selectionTop()).toBe(top);
+      for (let count = 0; count < 70 && host.view.blockAtScreenRow(0)?.text !== 'Retained navigation prompt 0'; count++) {
+        terminal.input('\x1b[1;5A'); scheduler.flush(); terminal.drain();
+      }
+      expect(host.view.blockAtScreenRow(0)?.text).toBe('Retained navigation prompt 0');
+      expect(host.state.editor.getText()).toBe('Unsubmitted retained draft');
+      expect(runtimeContext.session.turns).toEqual(turns);
+    } finally { mode.stop(); }
+  });
+  it.each(['regular', 'fullscreen'] as const)('routes semantic prompt navigation in the actual %s host', screen => {
+    const turns = Array.from({ length: 3 }, (_, index) => [
+      { id: `user-${index}`, role: 'user', content: `Navigation prompt ${index}`, timestamp: '2026-11-15T00:00:00Z' },
+      { id: `assistant-${index}`, role: 'assistant', content: `Navigation reply ${index}\n${'body\n'.repeat(10)}`, timestamp: '2026-11-15T00:00:00Z' },
+    ]).flat();
+    const { mode, terminal, scheduler, runtimeContext } = boot({}, screen);
+    Object.assign(runtimeContext.session, { turns, reports: [] });
+    mode.start(); scheduler.flush(); terminal.drain();
+    try {
+      terminal.input('Unsubmitted navigation draft'); scheduler.flush(); terminal.drain();
+      terminal.input('\x1b[1;5A'); scheduler.flush();
+      const output = terminal.drain();
+      if (screen === 'fullscreen') expect(stripAnsi(output)).toContain('Navigation prompt 2');
+      else expect(stripAnsi(output)).toContain('Prompt navigation requires fullscreen mode');
+      expect(output).not.toContain('\x1b]133;A');
+      const editor = (mode as unknown as { state: { editor: { getText(): string } } }).state.editor;
+      expect(editor.getText()).toBe('Unsubmitted navigation draft');
+      expect(runtimeContext.session.turns).toEqual(turns);
+    } finally { mode.stop(); }
+  });
   it.each(["regular", "fullscreen"] as const)("retains the actual %s screen after config reload", (screen) => {
     const { mode, terminal, scheduler, runtimeContext } = boot({}, screen);
     mode.start();

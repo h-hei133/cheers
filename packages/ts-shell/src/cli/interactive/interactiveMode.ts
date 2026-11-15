@@ -832,6 +832,12 @@ export class InteractiveMode {
           this.view.scrollPage(direction);
           this.tui.requestRender();
         },
+        scrollPrompt: direction => {
+          if (this.overlay.active || this.extensionUi.active || this.questions.question()) return;
+          if (this.alternateScreen) this.view.scroll(direction === -1 ? 'previous-prompt' : 'next-prompt');
+          else this.toast = 'Prompt navigation requires fullscreen mode; use terminal navigation here.';
+          this.tui.requestRender();
+        },
         openSearch: () => {
           if (!this.alternateScreen) {
             this.toast = "Transcript search requires fullscreen mode; use terminal search here.";

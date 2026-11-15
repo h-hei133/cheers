@@ -3,7 +3,7 @@ import type { FrameLayout, TerminalFramePlan, ViewportSize } from "../render/fra
 import type { Block } from "../transcript/blocks.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
-import { createViewState, type ChoiceRegions, type ComposerGeometry, type InteractiveView, type PointerGeometry, type ViewContext, type ViewState } from "./contract.js";
+import { createViewState, type ChoiceRegions, type ComposerGeometry, type InteractiveView, type PointerGeometry, type ScrollTarget, type ViewContext, type ViewState } from "./contract.js";
 import { TranscriptPane } from "./pane.js";
 import { renderChrome } from "./chrome.js";
 import { clipImageRows } from '../image/viewport.js';
@@ -158,7 +158,7 @@ export class InteractiveSurface implements InteractiveView {
     return this.pane.scrolledBack;
   }
 
-  scroll(rows: number): boolean {
+  scroll(rows: ScrollTarget): boolean {
     return this.pane.scroll(rows);
   }
 

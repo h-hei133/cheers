@@ -16,6 +16,8 @@ import {
 import { ScrollModel } from "./scroll.js";
 import { getCellDimensions, type CellDimensions } from '../imageDimensions.js';
 import { clipImageRows } from '../image/viewport.js';
+import { OSC133_PROMPT_START } from '../input/cellSize.js';
+import type { ScrollTarget } from './contract.js';
 
 /**
  * The scrolling transcript area.
@@ -176,7 +178,26 @@ export class TranscriptPane {
   }
 
   /** Move the window by `rows` (negative scrolls back). Returns whether it moved. */
-  scroll(rows: number): boolean {
+  scroll(rows: ScrollTarget): boolean {
+    if (typeof rows !== 'number') {
+      if (!this.pageAvailable || this.document !== this.transcript.all() || this.pendingPage
+        || this.lastTranscriptRevision !== this.transcript.revision) return false;
+      const direction = rows === 'previous-prompt' ? -1 : 1;
+      const top = this.scroller.scrollTop;
+      const content = this.window.layout.rows;
+      for (let row = top + direction; row >= 0 && row < content.length; row += direction) {
+        const owner = this.owners[row];
+        if (owner === undefined || this.owners[row - 1] === owner || this.document[owner]?.kind !== 'user'
+          || !OSC133_PROMPT_START.test(content[row] ?? '')) continue;
+        const target = Math.min(row, Math.max(0, this.total - this.capacity));
+        if (target === top) continue;
+        this.scroller.scrollTo(target);
+        return true;
+      }
+      if (direction !== -1) return false;
+      if (top > 0) { this.scroller.scrollTo(0); return true; }
+      return this.scrollPage(-1);
+    }
     // Bounded by what the last frame could actually reveal, so a key that had
     // nowhere to go says so instead of reporting a move that renders identically.
     return this.scroller.scrollBy(rows) !== rows;

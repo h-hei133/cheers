@@ -6,6 +6,7 @@ import { defaultTheme } from "../../theme/theme.js";
 import { getDefaultTheme } from "../../themes/index.js";
 import { pngImage } from '../../../test-utils/image.js';
 import { setCellDimensions } from '../imageDimensions.js';
+import { prepareRow } from '../render/paint.js';
 
 // Color assertions run under an explicit capability, independent of NO_COLOR.
 const originalColorMode = defaultTheme.colorMode;
@@ -33,6 +34,15 @@ describe('thinking expansion hints', () => {
 });
 
 describe("prompt echo", () => {
+  it('carries one semantic prompt boundary while painted output and source text stay unchanged', () => {
+    const block = textBlock('user', 'first line\nsecond line');
+    const rows = renderBlock(block, WIDTH);
+    expect(rows[0]).toMatch(/^\x1b\]133;A\x07/);
+    expect(rows.filter(row => /^\x1b\]133;A\x07/.test(row))).toHaveLength(1);
+    expect(rows.map(row => prepareRow(row, WIDTH)).join('')).not.toContain('\x1b]133;');
+    expect(block.text).toBe('first line\nsecond line');
+    expect(rows.map(stripAnsi).slice(0, 2).map(row => row.trimEnd())).toEqual(['first line', 'second line']);
+  });
   it("paints the prompt as a full-width bubble", () => {
     // A shade that stops at the last character reads as a highlight, not as a
     // turn boundary; padding it to the frame width makes the prompt a board.

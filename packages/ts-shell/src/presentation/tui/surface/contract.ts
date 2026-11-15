@@ -36,6 +36,8 @@ export interface ViewState {
   readonly suggestions: SuggestionList;
 }
 
+export type ScrollTarget = number | 'previous-prompt' | 'next-prompt';
+
 export function createViewState(): ViewState {
   return {
     transcript: new Transcript(),
@@ -145,6 +147,8 @@ export interface ViewActions {
   scroll(rows: number): void;
   /** Move the transcript window by whole screens. */
   scrollPage(direction: -1 | 1): void;
+  /** Move to an original user prompt in the fullscreen transcript. */
+  scrollPrompt?(direction: -1 | 1): void;
   /** Jump to the newest rows. */
   scrollToEnd(): void;
   retry(): void;
@@ -221,7 +225,7 @@ export interface InteractiveView extends TerminalFrameProvider {
   /** How far back the window is, in rows; 0 means it is following the newest. */
   readonly scrolledBack: number;
   /** Move the window by `rows` (negative scrolls back). Returns whether it moved. */
-  scroll(rows: number): boolean;
+  scroll(rows: ScrollTarget): boolean;
   /** Scroll by whole screens, for PageUp and PageDown. */
   scrollPage(direction: -1 | 1): boolean;
   /** Jump to the newest rows, which is also what any new output implies. */
