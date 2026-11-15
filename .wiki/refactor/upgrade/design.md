@@ -382,3 +382,18 @@ RPC get_messages成功prompt后仍返回startup session.turns，普通physical�
 独立双lane复核指出helper验证后返回Promise、caller再await有第二microtask边界。两个nested queueMicrotask反例实际AssertionError，原代码会fork旧source并替换后继或返回旧候选。修复让snapshot携原assertCurrent和projectRoot，consumer在await后、busy callback和候选选择后、实际fork之前重验；list在projection前重验。busy during acquisition及unavailable候选追加覆盖。六门6套件65项、五有效反转全部AssertionError并exact恢复、2635模块0monoliths、build 8f67e032b1c91129dd330922b13da08fdc46d7a410de80160f6783437ad8c5cc通过；代码APPROVE／架构CLEAR，限定四个修改文件及消费者，不替代full D.1。
 
 Linux当前compiled CLI真实JSONL一次矩阵、三loopback POST（前台、实际branch summary、挂起后abort）：logical模型set/cycle/thinking和metadata、prompt/current读、rename与空名拒绝、entries cursor排他／unknown拒绝、tree current／invalid／stale、clone／fork exact draft与source不变、navigate前后往返且entries保留旧回答、新session／switch、busy时四session命令cancelled和navigation拒绝、abort结算、删除后四read拒绝、EOF exit0。失败原native 545e59e9f16a回执与源码保留；最终driver/hash/build绑定。源码审计同时确认bash／abort_bash有protocol/handler但host无runBash／abortBash，仍须接现有execution/permission owner；不通过删任务缩小D.1。证据.omx/artifacts/upgrade-rpc-commands-2026-11-15/，实际M、额外依赖1、复用10/10，22/62保持，无新配置provider／其他平台／push／CI声明。
+
+
+## RPC shell execution and history (2026-11-15)
+
+D.1 fork子批已提交`b1d46c3`。目标实现原先只有bash／abort_bash协议和handler，production host无消费者。定向只读参考比较确认组合stdout/stderr、完整取消身份、可排除shell结果等语义；本项目选择复用原工具定义／native gate／ShellCommandRuntime／ExecutionService，RPC不接background adoption，长命令不暗中变job。registry提取为shell/tool的原定义，默认成功stdout／失败stderr+stdout语义保持；RPC选择同一capture的可选combined sink，独立UTF-8 decoder、背压／seal／spill／dispose同owner，结构化truncated及outputArtifact直接来自producer。
+
+runPreparedTool执行原permission／scope／hooks，工具实际status与exitCode独立于after-hook失败保存；部分started事件写入失败补失败result且不执行native，result事件写失败保留已观测native证据。command controller在同步接纳时登记并覆盖执行、hooks、持久化和响应构造，abort_bash仅取消原shell controller。JSONL local control链只分離bash的响应等待，原session command仍是执行owner；EOF收齐响应后继续prompt链，read／abort可在shell运行时到达。session new/switch/fork/clone/tree导航使用完整busy边界。
+
+上下文内结果是已有display custom shell message；excludeFromContext使用已有command-output report，重开、分叉和导出保留而普通／摘要模型请求不含报告。captureShellHistory固定session／sourceEntry／configuration signal；原branch-store lease在执行准入和保存前复验，旧hook修改branch不能派发native。新增可选SessionReadLimits在同一store捕获冻结并传入初读、两次事务重读、verification与catch-up条目上限；shell复用现有navigation limits，超限拒绝而不salvage。只承诺此lease读取上限；旧appendQueryEvent/addTurn/report writer同步读取仍未整体有界，不宣称整个管道的heap／取消延迟已证明。branch断言后普通同步addTurn不等于跨进程事务。保存严格返回saved／not-saved／unverified，外层失败仍保留data中的native结果。
+
+真实反例和分类：禁用测试错把disabledTools放到不支持的override源，改隔离project配置并断言生效；build提取漏async由TS2322发现，恢复原Promise合同。审查找到pre-hook换branch仍执行、tree漏busy、started事件部分落盘三个真实断言红，另8个read-limit红和catch-up 1红后修。误用biome check引入的全树格式报告未应用，正式check:lint通过。原生夹具先后遇到近期历史太短／合法cut位置未满足、base64 payload与session-data selector／.log归档观察错误；失败原回执和driver均保留，产品未为夹具假设改动。
+
+验证：联合13套件227项，catch-up修复3/59、逐字节反转恢复后5/68通过；六静态门、2641模块0monoliths、五有效AssertionError反转、当前build `90499a5f654ca7bb9c8cb6f0da8b45803d2ba1e6f055574f13f2012a9a51f2d3`通过。Linux当前CLI实际JSONL最终两loopback POST检查prompt和summary最终body，included命令进入两者、excluded报告均不出现；输出归档196637字节与预期逐字节一致，重开／fork报告保留，native进程原PID身份取消后不再运行，busy／reuse／EOF全部passed。当前CLI已配置模型1次actual bodySent，模型返回上下文中included marker、排除报告保留导出，exit0；该real observer不能读取Undici body对象，所以精确wire排除证据来自loopback，未以真实模型的缺失文本替代wire断言。沿用原连接与凭据，损坏model目录仅在隔离home构造最小有效entry，用户配置不改。
+
+独立代码最终APPROVE、架构CLEAR，范围为本子批和有界follow-up。证据`.omx/artifacts/upgrade-rpc-shell-2026-11-15/delivery.json`。D.1其余settings／execution完整命令矩阵仍未验收，22/62保持、goal active；实际L、额外依赖3。无其他平台、push或CI声明。

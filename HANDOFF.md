@@ -2658,3 +2658,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A helper validates its captured session, yet its caller forks old history and replaces a newly selected session; a candidate list can similarly return retired rows.
 - **Root Cause:** Resolving the helper's promise adds a microtask boundary before the consumer resumes. Source-version CAS protects the stored history, not the runtime's current selection.
 - **Rule:** Return the original admission closure with the acquired snapshot and invoke it after the consumer's await and any caller callbacks, immediately before publication or write. Keep the captured project root and source version. Use nested microtasks in the regression to replace selection between helper validation and consumer resumption; return fork draft text only after an accepted switch.
+
+
+### Native Command Admission Must Keep The Original Branch Live
+- **Symptom:** A pre-call hook changes the saved branch, but an approved native command still runs; only its later history write is refused. A partially recorded started event can also remain pending after command admission fails.
+- **Root Cause:** Runtime object identity does not detect persisted branch navigation, and append-then-state event writes can throw after the started record already exists.
+- **Rule:** Revalidate the captured branch lease before native effects and history publication; use the existing full command settlement owner for busy and cancellation. Attempt a report-safe failed result after a started-event write was attempted, preserve observed native output independently of hooks and persistence, and do not infer cross-process atomicity from a separate branch check plus ordinary message append. Captured read limits must cover compatibility catch-up as well as saved records.

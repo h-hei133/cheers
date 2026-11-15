@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/turn/invoke.test.ts (2 tests) 18ms
+ ✓ src/turn/approval.test.ts (4 tests) 37ms
+
+ Test Files  2 passed (2)
+      Tests  6 passed (6)
+   Start at  19:40:02
+   Duration  2.04s (transform 782ms, setup 0ms, collect 1.59s, tests 54ms, environment 0ms, prepare 100ms)
+

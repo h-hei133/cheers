@@ -1,0 +1,63 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/branch/store/index.test.ts (37 tests | 1 failed | 36 skipped) 39ms
+   ↓ session branch storage compatibility boundary > keeps internal namespace records out of the legacy codemode event discriminator
+   ↓ session branch storage compatibility boundary > reopens a mixed transcript and starts a worker with codemode values only
+   ↓ session branch storage compatibility boundary > remaps internal root anchors in the existing fork event owner
+   ↓ session branch storage compatibility boundary > retains internal records in a real fork without exposing their values to the fork worker
+   ↓ host-owned branch storage leases > refuses a captured history that exceeds its metadataBytes limit
+   ↓ host-owned branch storage leases > refuses a captured history that exceeds its stateBytes limit
+   ↓ host-owned branch storage leases > refuses a captured history that exceeds its transcriptBytes limit
+   ↓ host-owned branch storage leases > refuses a captured history that exceeds its transcriptLines limit
+   ↓ host-owned branch storage leases > refuses a captured history that exceeds its entries limit
+   ↓ host-owned branch storage leases > retains original read limits for assertCurrent after source growth
+   ↓ host-owned branch storage leases > retains original read limits for commit after source growth
+   ↓ host-owned branch storage leases > reports unknown when an appended store write exceeds its captured verification limit
+   × host-owned branch storage leases > applies the captured entry limit while catching up a lagging stored tree 37ms
+     → expected function to throw an error, but it didn't
+   ↓ host-owned branch storage leases > isolates same-named keys and writes across host namespaces and codemode
+   ↓ host-owned branch storage leases > keeps special string keys local to their namespace
+   ↓ host-owned branch storage leases > reopens internal values and tombstones and inherits them independently in real forks
+   ↓ host-owned branch storage leases > replays internal records only on their captured ancestry
+   ↓ host-owned branch storage leases > rejects a state-free read-key result after an ABA change without appending
+   ↓ host-owned branch storage leases > validates only selected read keys while permitting unrelated writes
+   ↓ host-owned branch storage leases > captures read keys before admission can change them and never invokes accessor/proxy traps
+   ↓ host-owned branch storage leases > rejects write accessors and proxies before publishing or invoking their traps
+   ↓ host-owned branch storage leases > bounds internal write/read sets and deletion keys before publishing
+   ↓ host-owned branch storage leases > counts durable tombstones against the internal revision budget before a later write
+   ↓ host-owned branch storage leases > bounds internal tombstone key characters and rejects oversized replayed revision state
+   ↓ host-owned branch storage leases > preserves the existing internal live value and total character limits
+   ↓ host-owned branch storage leases > retains absent-key deletion revisions and never revives a retired lease
+   ↓ host-owned branch storage leases > validates empty commits and state-free history checks against the original branch
+   ↓ host-owned branch storage leases > rejects a navigation round trip captured before await
+   ↓ host-owned branch storage leases > captures owner admission before await and does not revive it after an empty refusal
+   ↓ host-owned branch storage leases > rechecks history after the final admission callback before append
+   ↓ host-owned branch storage leases > refuses an outer write after admission 1 swallows a same-handle reentry failure
+   ↓ host-owned branch storage leases > refuses an outer write after admission 2 swallows a same-handle reentry failure
+   ↓ host-owned branch storage leases > preserves unknown internal persistence after append fails
+   ↓ host-owned branch storage leases > preserves unknown internal persistence after fsync fails
+   ↓ host-owned branch storage leases > preserves unknown internal persistence after readback fails
+   ↓ host-owned branch storage leases > retains confirmed persistence when releasing the existing session lock fails
+   ↓ host-owned branch storage leases > refuses malformed internal envelopes and keeps the reserved codemode wire distinct
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/branch/store/index.test.ts > host-owned branch storage leases > applies the captured entry limit while catching up a lagging stored tree
+AssertionError: expected function to throw an error, but it didn't
+ ❯ src/session/branch/store/index.test.ts:127:97
+    125|     const limits = { metadataBytes: 1024 * 1024, stateBytes: 1024 * 10…
+    126|       transcriptBytes: 1024 * 1024, transcriptLines: 1000, entries: 2 …
+    127|     expect(() => captureBranchStore({ sessionId, cwd: workspace, names…
+       |                                                                                                 ^
+    128|   });
+    129| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 36 skipped (37)
+   Start at  20:07:07
+   Duration  2.28s (transform 1.32s, setup 0ms, collect 1.97s, tests 39ms, environment 0ms, prepare 58ms)
+

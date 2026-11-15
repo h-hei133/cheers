@@ -1,0 +1,64 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/core/tools/shell/output.test.ts (5 tests) 3179ms
+   ✓ preserves command failure classification and its receipt with bounded capture  508ms
+   ✓ keeps a completed command observable when its full output cannot be saved  453ms
+   ✓ cancels the same native command and labels the output incomplete  429ms
+   ✓ bounds native capture and preserves the full selected streams for exit 0  1013ms
+   ✓ bounds native capture and preserves the full selected streams for exit 7  775ms
+ ❯ src/cli/rpc/shell.test.ts (13 tests | 1 failed) 5673ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  656ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  447ms
+   ✓ refuses shell deny before native side effects 114ms
+   × refuses shell disabled before native side effects 566ms
+     → expected true to be false // Object.is equality
+   ✓ refuses shell plan before native side effects 47ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  697ms
+   ✓ keeps actual exit evidence when after-call hooks fail  506ms
+   ✓ reports unverified message persistence without losing the completed native outcome  404ms
+   ✓ does not publish a completed shell result into a changed session  559ms
+   ✓ does not publish a completed shell result into a changed branch  418ms
+   ✓ redacts credential-shaped command output in the response and durable records  595ms
+   ✓ leaves an unrelated local command running when abort_bash has no owned shell 32ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  631ms
+ ✓ src/runtime/execution/output/capture.test.ts (7 tests) 9ms
+ ✓ src/cli/runtime/inputStream.extensions.test.ts (16 tests) 2241ms
+   ✓ admits a fresh loaded-extension dialog after successful JSONL set_auto_retry and isolates the cancelled request  335ms
+ ✓ src/core/tools/shell/promotion.test.ts (4 tests) 1340ms
+   ✓ promotes a default-timeout foreground command without spawning again  345ms
+   ✓ reports the result when the command settles before promotion  327ms
+   ✓ returns as soon as a new message promotes the command  331ms
+   ✓ stops the child when promotion is refused at capacity  336ms
+ ✓ src/cli/rpc/runtimeHost.test.ts (31 tests) 1025ms
+ ✓ src/cli/runtime/inputStream.rpc.test.ts (2 tests) 220ms
+ ✓ src/turn/approval.test.ts (4 tests) 32ms
+ ✓ src/turn/invoke.test.ts (2 tests) 16ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > refuses shell disabled before native side effects
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/cli/rpc/shell.test.ts:93:28
+     91|   if (reason === 'plan') test.runtime.setAgentMode('plan');
+     92|   const response = await handleRpcCommand({ type: 'bash', command: 'pr…
+     93|   expect(response.success).toBe(false);
+       |                            ^
+     94|   expect(response.data).toMatchObject({ isError: true, status: reason …
+     95|   expect(fs.existsSync(path.join(test.root, 'blocked.txt'))).toBe(fals…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 8 passed (9)
+      Tests  1 failed | 83 passed (84)
+   Start at  19:45:11
+   Duration  42.57s (transform 8.36s, setup 0ms, collect 24.66s, tests 13.74s, environment 1ms, prepare 408ms)
+

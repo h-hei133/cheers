@@ -1,0 +1,116 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/shell/output.test.ts (5 tests | 2 failed) 2631ms
+   ✓ preserves command failure classification and its receipt with bounded capture  460ms
+   ✓ keeps a completed command observable when its full output cannot be saved  440ms
+   ✓ cancels the same native command and labels the output incomplete  431ms
+   × bounds native capture and preserves the full selected streams for exit 0 668ms
+     → expected { executionPath: 'ts-local', …(4) } to match object { truncated: true, …(1) }
+(5 matching properties omitted from actual)
+   × bounds native capture and preserves the full selected streams for exit 7 631ms
+     → expected { executionPath: 'ts-local', …(6) } to match object { truncated: true, …(1) }
+(7 matching properties omitted from actual)
+ ❯ src/runtime/execution/output/capture.test.ts (7 tests | 2 failed) 17ms
+   ✓ shares one bounded tail per stream and preserves the complete prefix through lazy spill 4ms
+   ✓ decodes each stream independently and observes original bytes for the promotion journal 5ms
+   ✓ waits for the one pending spill write before sealing, without admitting an unbounded queue 1ms
+   ✓ retains a bounded tail without advertising full output when spill is unavailable 1ms
+   ✓ keeps cancellation incomplete even after already captured bytes seal successfully 0ms
+   × preserves decoded stdout and stderr order in the optional combined view 3ms
+     → Cannot read properties of undefined (reading 'sink')
+   × spills one complete combined view and retains a bounded tail across both streams 1ms
+     → Cannot read properties of undefined (reading 'sink')
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/shell/output.test.ts > bounds native capture and preserves the full selected streams for exit 0
+AssertionError: expected { executionPath: 'ts-local', …(4) } to match object { truncated: true, …(1) }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "outputArtifact": "artifact://0",
+-   "truncated": true,
++   "errorClass": "success",
++   "executionPath": "ts-local",
++   "exitCode": 0,
++   "outputNotice": "[Showing last 143 of 1283 lines (50KB of 451KB). Full text output saved: artifact://0]
++ [To read full or earlier sections: read(path=\"artifact://0:1-500\")]",
++   "status": "completed",
+  }
+
+ ❯ src/core/tools/shell/output.test.ts:108:27
+    106|   const uri = /artifact:\/\/\d+/.exec(notice)?.[0];
+    107|   expect(uri).toBeDefined();
+    108|   expect(result.metadata).toMatchObject({ truncated: true, outputArtif…
+       |                           ^
+    109|   const artifact = ArtifactManager.getShared(root, 'output').resolve(u…
+    110|   expect(artifact).not.toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/core/tools/shell/output.test.ts > bounds native capture and preserves the full selected streams for exit 7
+AssertionError: expected { executionPath: 'ts-local', …(6) } to match object { truncated: true, …(1) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "outputArtifact": "artifact://0",
+-   "truncated": true,
++   "errorClass": "command_failed",
++   "executionPath": "ts-local",
++   "exitCode": 7,
++   "failureKind": "execution_failure",
++   "outputNotice": "[Showing last 143 of 2566 lines (50KB of 753KB). Full text output saved: artifact://0]
++ [To read full or earlier sections: read(path=\"artifact://0:1-500\")]",
++   "recoveryReason": undefined,
++   "status": "failed",
+  }
+
+ ❯ src/core/tools/shell/output.test.ts:108:27
+    106|   const uri = /artifact:\/\/\d+/.exec(notice)?.[0];
+    107|   expect(uri).toBeDefined();
+    108|   expect(result.metadata).toMatchObject({ truncated: true, outputArtif…
+       |                           ^
+    109|   const artifact = ArtifactManager.getShared(root, 'output').resolve(u…
+    110|   expect(artifact).not.toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/runtime/execution/output/capture.test.ts > preserves decoded stdout and stderr order in the optional combined view
+TypeError: Cannot read properties of undefined (reading 'sink')
+ ❯ Object.snapshot src/runtime/execution/output/capture.ts:57:73
+     55|       return finishing;
+     56|     },
+     57|     snapshot(stream) { const state = streams[stream]; return { ...stat…
+       |                                                                         ^
+     58|     async *source(stream) {
+     59|       if (!finished || incomplete) throw new Error('Complete command o…
+ ❯ src/runtime/execution/output/capture.test.ts:108:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/runtime/execution/output/capture.test.ts > spills one complete combined view and retains a bounded tail across both streams
+TypeError: Cannot read properties of undefined (reading 'sink')
+ ❯ Object.snapshot src/runtime/execution/output/capture.ts:57:73
+     55|       return finishing;
+     56|     },
+     57|     snapshot(stream) { const state = streams[stream]; return { ...stat…
+       |                                                                         ^
+     58|     async *source(stream) {
+     59|       if (!finished || incomplete) throw new Error('Complete command o…
+ ❯ src/runtime/execution/output/capture.test.ts:124:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 8 passed (12)
+   Start at  19:43:16
+   Duration  7.10s (transform 1.76s, setup 0ms, collect 3.04s, tests 2.65s, environment 0ms, prepare 101ms)
+

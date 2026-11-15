@@ -1,0 +1,26 @@
+{
+  "lane": "routing_delivery_review",
+  "status": "APPROVE",
+  "mode": "read-only",
+  "validationRun": false,
+  "scope": "18 product files and adjacent tests, then independent follow-up reviews of branch admission, navigation, lifecycle event repair and captured read limits",
+  "initial": "APPROVE before architecture counterexamples",
+  "followUps": [
+    {
+      "status": "APPROVE",
+      "scope": "original branch lease admission, navigation busy guard, failed started-event settlement"
+    },
+    {
+      "status": "REQUEST CHANGES",
+      "finding": "catchUpSessionThread omitted captured entry limit"
+    },
+    {
+      "status": "APPROVE",
+      "scope": "limits.entries propagation and lagging stored tree regression"
+    }
+  ],
+  "limitations": [
+    "Not full D.1 acceptance",
+    "Root owns execution evidence"
+  ]
+}

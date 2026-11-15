@@ -1,0 +1,40 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+const base = 'packages/ts-shell/src/';
+const cases = [
+  { name: 'combined-output', file: 'cli/runtime/shell/index.ts',
+    before: '{ combinedOutput: true }', after: '{ combinedOutput: false }',
+    suite: 'cli/rpc/shell.test.ts', filter: 'runs the production shell RPC' },
+  { name: 'branch-admission', file: 'cli/runtime/shell/history.ts',
+    before: 'try { branch.assertCurrent([]); return undefined; }', after: 'try { return admission(); }',
+    suite: 'cli/rpc/shell.test.ts', filter: 'refuses native effects when a pre-call hook' },
+  { name: 'excluded-history', file: 'cli/runtime/shell/history.ts',
+    before: 'if (result.excludeFromContext) {', after: 'if (false) {',
+    suite: 'cli/rpc/shell.test.ts', filter: 'retains excluded output as a branch report' },
+  { name: 'started-settlement', file: 'turn/invoke.ts',
+    before: 'if (startedEventAttempted && !resultEventAttempted) {', after: 'if (observed && !resultEventAttempted) {',
+    suite: 'turn/invoke.test.ts', filter: 'settles a started event whose recording throws' },
+  { name: 'captured-limits', file: 'session/branch/store/index.ts',
+    before: 'captured.transcriptPrefix, limits', after: 'captured.transcriptPrefix, undefined', count: 3,
+    suite: 'session/branch/store/index.test.ts', filter: 'retains original read limits' },
+];
+const receipts = [];
+for (const item of cases) {
+  const file = base + item.file, original = fs.readFileSync(file), source = original.toString();
+  assert.equal(source.split(item.before).length, (item.count ?? 1) + 1);
+  let result;
+  try {
+    fs.writeFileSync(file, source.replaceAll(item.before, item.after));
+    result = spawnSync('rtk', ['env', 'VITEST_MAX_THREADS=1', 'VITEST_MIN_THREADS=1', 'node', '../../node_modules/vitest/vitest.mjs',
+      'run', 'src/' + item.suite, '-t', item.filter], { cwd: 'packages/ts-shell', encoding: 'utf8', timeout: 55_000, maxBuffer: 1024 * 1024 });
+  } finally { fs.writeFileSync(file, original); }
+  const output = (result.stdout ?? '') + (result.stderr ?? '');
+  fs.writeFileSync('.tmp/rpc-shell/reversal-' + item.name + '.log', output);
+  const receipt = { name: item.name, file, exitCode: result.status, signal: result.signal,
+    assertionFailure: result.status === 1 && output.includes('AssertionError'), restoredExact: fs.readFileSync(file).equals(original),
+    sourceSha256: createHash('sha256').update(original).digest('hex') };
+  receipts.push(receipt); fs.writeFileSync('.tmp/rpc-shell/reversals.json', JSON.stringify(receipts, null, 2) + '\n');
+  assert.ok(receipt.assertionFailure); assert.ok(receipt.restoredExact); console.log(JSON.stringify(receipt));
+}

@@ -1,0 +1,4 @@
+packages/ts-shell/src/core/tools/shell/tool.ts(26,5): error TS2322: Type '(args: Record<string, unknown>, context: ToolExecutionContext) => ToolExecutionResult | Promise<ToolExecutionResult>' is not assignable to type '(args: Record<string, unknown>, context: ToolExecutionContext) => Promise<ToolExecutionResult>'.
+  Type 'ToolExecutionResult | Promise<ToolExecutionResult>' is not assignable to type 'Promise<ToolExecutionResult>'.
+    Type 'ToolExecutionResult' is missing the following properties from type 'Promise<ToolExecutionResult>': then, catch, finally, [Symbol.toStringTag]
+Build failed: TypeScript build failed with exit 1.

@@ -15,6 +15,8 @@ export async function runPreparedTool(tool: ToolDefinition, input: Record<string
   const pool = new Map([[tool.name, tool]]); const adapted = adaptTools(pool, options)[0]!; const hooks = createToolHooks(options, pool);
   const assistantMessage: AgentMessage = { role: 'assistant', content: [], timestamp: new Date().toISOString() };
   let observed: AgentToolResult | undefined;
+  let startedEventAttempted = false;
+  let resultEventAttempted = false;
   try {
     signal?.throwIfAborted();
     const args = await adapted.prepareArguments!(input, signal); const call = { id, name: tool.name, args };
@@ -22,6 +24,7 @@ export async function runPreparedTool(tool: ToolDefinition, input: Record<string
     const denied = await hooks.beforeToolCall!({ call, args, assistantMessage }, signal);
     if (denied?.block) return publication ? { isError: true, output: publicationOutput(`${label} refused: ${denied.reason}`), metadata: { status: 'unchanged' } }
       : { isError: true, output: `${label} refused by its ordinary permission or hook gate.` };
+    startedEventAttempted = true;
     options.emit({ type: 'tool.started', toolName: tool.name, taskId: id, args: { [publication?.eventKey ?? 'operationId']: id } });
     const result = await adapted.execute(id, args, signal); observed = result;
     const update = await hooks.afterToolCall!({ call, args, assistantMessage, result, isError: result.isError }, signal);
@@ -29,6 +32,7 @@ export async function runPreparedTool(tool: ToolDefinition, input: Record<string
       ...(update?.isError && result.metadata?.status !== 'unchanged' ? { publication: result.metadata?.status, status: 'unverified' } : {}) } }
       : update?.metadata ? { metadata: { ...result.metadata, ...update.metadata } } : {}) };
     if (publication) settled.output = publicationOutput(settled.output);
+    resultEventAttempted = true;
     options.emit({ type: 'tool.result', toolName: tool.name, taskId: id, success: !settled.isError, output: settled.output });
     return settled;
   } catch (error) {
@@ -39,7 +43,13 @@ export async function runPreparedTool(tool: ToolDefinition, input: Record<string
       if (observed) options.emit({ type: 'tool.result', toolName: tool.name, taskId: id, success: false, output: result.output });
       return result;
     }
-    return observed ? { ...observed, isError: true, output: `${observed.output}\n${label} after-call hooks or publication failed; actual effect evidence remains visible.` }
+    const result = observed
+      ? { ...observed, isError: true, output: `${observed.output}\n${label} after-call hooks or publication failed; actual effect evidence remains visible.` }
       : { isError: true, output: `${label} was blocked or its result could not be confirmed.` };
+    if (startedEventAttempted && !resultEventAttempted) {
+      try { options.emit({ type: 'tool.result', toolName: tool.name, taskId: id, success: false, output: result.output }); }
+      catch { /* The failed publication stays visible in the returned effect evidence. */ }
+    }
+    return result;
   }
 }

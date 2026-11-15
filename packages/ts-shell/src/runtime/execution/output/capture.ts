@@ -2,13 +2,14 @@ import { StringDecoder } from 'node:string_decoder';
 import { createOutputSink, type OutputSinkSnapshot, type OutputSpill } from './sink.js';
 
 export type CommandOutputStream = 'stdout' | 'stderr';
+export type CommandOutputView = CommandOutputStream | 'combined';
 export interface CommandOutputSnapshot extends OutputSinkSnapshot { readonly totalRawBytes: number }
 export interface CommandOutputCapture {
   append(stream: CommandOutputStream, bytes: Buffer): void | Promise<void>;
   onChunk(listener: (stream: CommandOutputStream, bytes: Buffer) => void): () => void;
   finish(incomplete?: boolean): Promise<void>;
-  snapshot(stream: CommandOutputStream): CommandOutputSnapshot;
-  source(stream: CommandOutputStream): AsyncIterable<Uint8Array>;
+  snapshot(stream: CommandOutputView): CommandOutputSnapshot;
+  source(stream: CommandOutputView): AsyncIterable<Uint8Array>;
   dispose(): Promise<void>;
   readonly complete: boolean;
 }
@@ -17,11 +18,19 @@ export interface CommandOutputCapture {
 export function createCommandOutputCapture(options: {
   readonly limitBytes?: number;
   readonly openSpill?: () => Promise<OutputSpill>;
+  readonly combinedOutput?: boolean;
 } = {}): CommandOutputCapture {
   const make = () => ({ decoder: new StringDecoder('utf8'), totalRawBytes: 0,
     sink: createOutputSink({ capture: true, limitBytes: options.limitBytes ?? 100 * 1024, label: 'command',
       ...(options.openSpill ? { openSpill: options.openSpill } : {}) }) });
   const streams = { stdout: make(), stderr: make() };
+  const combined = options.combinedOutput ? make() : undefined;
+  const states = [...Object.values(streams), ...(combined ? [combined] : [])];
+  const selected = (view: CommandOutputView) => {
+    const state = view === 'combined' ? combined : streams[view];
+    if (!state) throw new Error('Combined command output was not captured.');
+    return state;
+  };
   const listeners = new Set<(stream: CommandOutputStream, bytes: Buffer) => void>();
   let finished = false;
   let sealed = false;
@@ -33,9 +42,12 @@ export function createCommandOutputCapture(options: {
       if (finished) throw new Error('Cannot append to finished command output.');
       const state = streams[stream];
       state.totalRawBytes += bytes.length;
-      const pending = state.sink.append(state.decoder.write(bytes));
+      const text = state.decoder.write(bytes);
+      const pending = state.sink.append(text);
+      if (combined) combined.totalRawBytes += bytes.length;
+      const merged = combined?.sink.append(text);
       for (const listener of listeners) listener(stream, bytes);
-      return pending;
+      return pending || merged ? Promise.all([pending, merged]).then(() => {}) : undefined;
     },
     onChunk(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     finish(outputIncomplete = false) {
@@ -43,25 +55,27 @@ export function createCommandOutputCapture(options: {
       if (finishing) return finishing;
       finished = true;
       listeners.clear();
-      finishing = settleCapture(Object.values(streams).map(async state => {
-        const tail = state.decoder.end();
-        if (tail) await state.sink.append(tail);
-        await state.sink.close();
-      })).then(() => { sealed = true; }).catch(error => {
+      finishing = settleCapture([(async () => {
+        for (const state of Object.values(streams)) {
+          const tail = state.decoder.end();
+          if (tail) { await state.sink.append(tail); await combined?.sink.append(tail); }
+        }
+        await Promise.all(states.map(state => state.sink.close()));
+      })()]).then(() => { sealed = true; }).catch(error => {
         incomplete = true;
-        for (const state of Object.values(streams)) state.sink.abort?.();
+        for (const state of states) state.sink.abort?.();
         throw error;
       });
       return finishing;
     },
-    snapshot(stream) { const state = streams[stream]; return { ...state.sink.snapshot(), totalRawBytes: state.totalRawBytes }; },
+    snapshot(stream) { const state = selected(stream); return { ...state.sink.snapshot(), totalRawBytes: state.totalRawBytes }; },
     async *source(stream) {
       if (!finished || incomplete) throw new Error('Complete command output is unavailable.');
       await finishing;
-      yield* streams[stream].sink.source();
+      yield* selected(stream).sink.source();
     },
-    dispose() { return settleCapture(Object.values(streams).map(state => state.sink.dispose())); },
-    get complete() { return sealed && !incomplete && streams.stdout.sink.complete && streams.stderr.sink.complete; },
+    dispose() { return settleCapture(states.map(state => state.sink.dispose())); },
+    get complete() { return sealed && !incomplete && states.every(state => state.sink.complete); },
   };
 }
 

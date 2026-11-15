@@ -1,0 +1,107 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/session/branch/store/index.test.ts (36 tests | 8 failed | 27 skipped) 396ms
+   ↓ session branch storage compatibility boundary > keeps internal namespace records out of the legacy codemode event discriminator
+   ↓ session branch storage compatibility boundary > reopens a mixed transcript and starts a worker with codemode values only
+   ↓ session branch storage compatibility boundary > remaps internal root anchors in the existing fork event owner
+   ↓ session branch storage compatibility boundary > retains internal records in a real fork without exposing their values to the fork worker
+   × host-owned branch storage leases > refuses a captured history that exceeds its metadataBytes limit 60ms
+     → expected function to throw an error, but it didn't
+   × host-owned branch storage leases > refuses a captured history that exceeds its stateBytes limit 44ms
+     → expected function to throw an error, but it didn't
+   × host-owned branch storage leases > refuses a captured history that exceeds its transcriptBytes limit 44ms
+     → expected function to throw an error, but it didn't
+   × host-owned branch storage leases > refuses a captured history that exceeds its transcriptLines limit 23ms
+     → expected function to throw an error, but it didn't
+   × host-owned branch storage leases > refuses a captured history that exceeds its entries limit 40ms
+     → expected function to throw an error, but it didn't
+   × host-owned branch storage leases > retains original read limits for assertCurrent after source growth 48ms
+     → expected function to throw an error, but it didn't
+   × host-owned branch storage leases > retains original read limits for commit after source growth 42ms
+     → expected function to throw an error, but it didn't
+   × host-owned branch storage leases > reports unknown when an appended store write exceeds its captured verification limit 40ms
+     → expected undefined to match object { status: 'unknown' }
+   ↓ host-owned branch storage leases > isolates same-named keys and writes across host namespaces and codemode
+   ↓ host-owned branch storage leases > keeps special string keys local to their namespace
+   ↓ host-owned branch storage leases > reopens internal values and tombstones and inherits them independently in real forks
+   ↓ host-owned branch storage leases > replays internal records only on their captured ancestry
+   ↓ host-owned branch storage leases > rejects a state-free read-key result after an ABA change without appending
+   ↓ host-owned branch storage leases > validates only selected read keys while permitting unrelated writes
+   ↓ host-owned branch storage leases > captures read keys before admission can change them and never invokes accessor/proxy traps
+   ↓ host-owned branch storage leases > rejects write accessors and proxies before publishing or invoking their traps
+   ↓ host-owned branch storage leases > bounds internal write/read sets and deletion keys before publishing
+   ↓ host-owned branch storage leases > counts durable tombstones against the internal revision budget before a later write
+   ↓ host-owned branch storage leases > bounds internal tombstone key characters and rejects oversized replayed revision state
+   ✓ host-owned branch storage leases > preserves the existing internal live value and total character limits 54ms
+   ↓ host-owned branch storage leases > retains absent-key deletion revisions and never revives a retired lease
+   ↓ host-owned branch storage leases > validates empty commits and state-free history checks against the original branch
+   ↓ host-owned branch storage leases > rejects a navigation round trip captured before await
+   ↓ host-owned branch storage leases > captures owner admission before await and does not revive it after an empty refusal
+   ↓ host-owned branch storage leases > rechecks history after the final admission callback before append
+   ↓ host-owned branch storage leases > refuses an outer write after admission 1 swallows a same-handle reentry failure
+   ↓ host-owned branch storage leases > refuses an outer write after admission 2 swallows a same-handle reentry failure
+   ↓ host-owned branch storage leases > preserves unknown internal persistence after append fails
+   ↓ host-owned branch storage leases > preserves unknown internal persistence after fsync fails
+   ↓ host-owned branch storage leases > preserves unknown internal persistence after readback fails
+   ↓ host-owned branch storage leases > retains confirmed persistence when releasing the existing session lock fails
+   ↓ host-owned branch storage leases > refuses malformed internal envelopes and keeps the reserved codemode wire distinct
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/branch/store/index.test.ts > host-owned branch storage leases > refuses a captured history that exceeds its metadataBytes limit
+ FAIL  src/session/branch/store/index.test.ts > host-owned branch storage leases > refuses a captured history that exceeds its stateBytes limit
+ FAIL  src/session/branch/store/index.test.ts > host-owned branch storage leases > refuses a captured history that exceeds its transcriptBytes limit
+ FAIL  src/session/branch/store/index.test.ts > host-owned branch storage leases > refuses a captured history that exceeds its transcriptLines limit
+ FAIL  src/session/branch/store/index.test.ts > host-owned branch storage leases > refuses a captured history that exceeds its entries limit
+AssertionError: expected function to throw an error, but it didn't
+ ❯ src/session/branch/store/index.test.ts:99:99
+     97|       const limits = { metadataBytes: 1024 * 1024, stateBytes: 1024 * …
+     98|         transcriptLines: 1000, entries: 1000, [field]: 0 };
+     99|       expect(() => captureBranchStore({ sessionId, cwd: workspace, nam…
+       |                                                                                                   ^
+    100|     });
+    101| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/session/branch/store/index.test.ts > host-owned branch storage leases > retains original read limits for assertCurrent after source growth
+ FAIL  src/session/branch/store/index.test.ts > host-owned branch storage leases > retains original read limits for commit after source growth
+AssertionError: expected function to throw an error, but it didn't
+ ❯ src/session/branch/store/index.test.ts:108:110
+    106|     limits.transcriptBytes += 1024 * 1024;
+    107|     appendTranscriptEvent(transcriptPath(), internalEvent(), undefined…
+    108|     expect(() => operation === 'assertCurrent' ? lease.assertCurrent([…
+       |                                                                                                              ^
+    109|     expect(readTranscriptEvents(transcriptPath()).some(event => event.…
+    110|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/session/branch/store/index.test.ts > host-owned branch storage leases > reports unknown when an appended store write exceeds its captured verification limit
+AssertionError: expected undefined to match object { status: 'unknown' }
+
+- Expected: 
+{
+  "status": "unknown",
+}
+
++ Received: 
+undefined
+
+ ❯ src/session/branch/store/index.test.ts:118:21
+    116|     let failure: unknown;
+    117|     try { lease.commit({ key: '"value"' }); } catch (error) { failure …
+    118|     expect(failure).toMatchObject({ status: 'unknown' });
+       |                     ^
+    119|     expect(readTranscriptEvents(transcriptPath()).some(event => event.…
+    120|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 1 passed | 27 skipped (36)
+   Start at  20:01:42
+   Duration  2.36s (transform 1.15s, setup 0ms, collect 1.74s, tests 396ms, environment 0ms, prepare 55ms)
+

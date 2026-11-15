@@ -1,0 +1,35 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/rpc/shell.test.ts (19 tests) 5615ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  506ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  476ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  444ms
+   ✓ keeps actual exit evidence when after-call hooks fail  426ms
+   ✓ reports unverified message persistence without losing the completed native outcome  427ms
+   ✓ retains completed effects without saving history after configuration retirement  418ms
+   ✓ retains completed effects without saving history after deletion retirement  399ms
+   ✓ preserves an unverified excluded report write in the RPC outcome  415ms
+   ✓ does not publish a completed shell result into a changed session  402ms
+   ✓ does not publish a completed shell result into a changed branch  394ms
+   ✓ redacts credential-shaped command output in the response and durable records  379ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  538ms
+ ✓ src/session/branch/store/index.test.ts (37 tests) 1053ms
+ ✓ src/turn/invoke.test.ts (3 tests) 16ms
+ ✓ src/core/tools/shell/output.test.ts (5 tests) 2187ms
+   ✓ preserves command failure classification and its receipt with bounded capture  368ms
+   ✓ keeps a completed command observable when its full output cannot be saved  347ms
+   ✓ cancels the same native command and labels the output incomplete  362ms
+   ✓ bounds native capture and preserves the full selected streams for exit 0  544ms
+   ✓ bounds native capture and preserves the full selected streams for exit 7  565ms
+ ✓ src/core/tools/shell/promotion.test.ts (4 tests) 1242ms
+   ✓ promotes a default-timeout foreground command without spawning again  321ms
+   ✓ reports the result when the command settles before promotion  302ms
+   ✓ returns as soon as a new message promotes the command  314ms
+   ✓ stops the child when promotion is refused at capacity  304ms
+
+ Test Files  5 passed (5)
+      Tests  68 passed (68)
+   Start at  20:12:23
+   Duration  26.74s (transform 7.48s, setup 0ms, collect 13.63s, tests 10.11s, environment 1ms, prepare 241ms)
+

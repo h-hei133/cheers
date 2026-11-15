@@ -1,3 +1,5 @@
+import type { SessionReadLimits } from '../../store/sessionStore.js';
+
 export const MAX_STORE_VALUE_CHARS = 256 * 1024;
 export const MAX_STORE_TOTAL_CHARS = 1024 * 1024;
 export const CODEMODE_STORE_NAMESPACE = 'codemode';
@@ -34,6 +36,8 @@ export interface BranchStoreInput {
   /** Selected by the host; never supplied by a worker write. */
   readonly namespace: string;
   readonly admission?: () => void;
+  /** Captured per owner; overflow refuses acquisition or revalidation. */
+  readonly limits?: SessionReadLimits;
 }
 
 /** Capture before asynchronous work. No operation reacquires a newer history lease. */

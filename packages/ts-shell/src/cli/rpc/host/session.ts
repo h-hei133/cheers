@@ -19,6 +19,7 @@ type SessionHost = Pick<RpcHost, "newSession" | "switchSession" | "setSessionNam
 /** Session candidates remain inactive until the owning runtime accepts their identity. */
 export function sessionHost(options: RuntimeRpcHostOptions, manager: SessionManager): SessionHost {
   const { runtimeContext, sessionRuntime } = options;
+  const busy = () => options.isStreaming() || sessionRuntime.isRunning?.() === true;
   const selectSession = (session: Session) => {
     if (!applyRpcSessionSwitch(runtimeContext, session, options.switchSession)) return { cancelled: true };
     manager.setCurrentSessionForProject(session.projectRoot, session.id);
@@ -26,13 +27,13 @@ export function sessionHost(options: RuntimeRpcHostOptions, manager: SessionMana
   };
   return {
     newSession: async (parentSession) => {
-      if (options.isStreaming()) return { cancelled: true };
+      if (busy()) return { cancelled: true };
       const created = manager.createNew(runtimeContext.projectRoot, { activate: false,
         ...(parentSession ? { parentSession } : {}) });
       return selectSession(created);
     },
     switchSession: async (sessionPath) => {
-      if (options.isStreaming()) return { cancelled: true };
+      if (busy()) return { cancelled: true };
       const targetId = resolveSessionTargetId(sessionPath);
       const resumed = manager.getSession(targetId);
       if (!resumed) throw new Error('The selected session is unavailable.');
@@ -46,9 +47,9 @@ export function sessionHost(options: RuntimeRpcHostOptions, manager: SessionMana
     getSessionStats: () => readRpcSessionStats(readRpcSession(runtimeContext, manager)),
     getLastAssistantText: () => readLastAssistantText(readRpcSession(runtimeContext, manager)),
     fork: async (entryId) => {
-      if (options.isStreaming()) return { cancelled: true };
+      if (busy()) return { cancelled: true };
       const snapshot = await readRpcNavigation(runtimeContext);
-      if (options.isStreaming()) return { cancelled: true };
+      if (busy()) return { cancelled: true };
       const point = snapshot.points.find(candidate => candidate.entryId === entryId && candidate.prompt !== undefined && !candidate.unavailable);
       if (!point) throw new Error('Cannot fork: select a saved user-message entry with complete ancestry.');
       snapshot.assertCurrent();
@@ -57,13 +58,16 @@ export function sessionHost(options: RuntimeRpcHostOptions, manager: SessionMana
       return selected.cancelled ? selected : { ...selected, text: point.prompt };
     },
     cloneSession: async () => {
-      if (options.isStreaming()) return { cancelled: true };
+      if (busy()) return { cancelled: true };
       const cloned = manager.fork(runtimeContext.session.id, runtimeContext.projectRoot, { activate: false });
       return selectSession(cloned);
     },
     getForkMessages: () => readRpcForkMessages(runtimeContext),
     getEntries: (since) => readRpcEntries(runtimeContext, since),
     getTree: () => readRpcTree(runtimeContext),
-    navigateTree: (entryId, expectedVersion) => navigateRpcTree(runtimeContext, manager, sessionRuntime, entryId, expectedVersion),
+    navigateTree: (entryId, expectedVersion) => {
+      if (busy()) throw new Error('A session operation is still running.');
+      return navigateRpcTree(runtimeContext, manager, sessionRuntime, entryId, expectedVersion);
+    },
   };
 }

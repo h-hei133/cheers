@@ -1,0 +1,197 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+const directory = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(directory, '../..');
+const receipt = { platform: process.platform, compiledCliRpc: true, status: 'not_run', realProvider: false,
+  buildId: JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'))).buildId,
+  probeSha256: createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex'), stages: {} };
+const root = fs.mkdtempSync(path.join(directory, 'native-state-'));
+let stage = 'setup', child, server, current, number = 0, bodyCount = 0;
+const clients = new Set(), requestBodies = [], requests = [];
+const watchdog = setTimeout(() => { for (const client of clients) client.process.kill('SIGTERM'); }, 180_000);
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function until(predicate, label, timeout = 20_000) {
+  const end = Date.now() + timeout;
+  for (;;) { if (predicate()) return; if (Date.now() > end) throw new Error(`Deadline: ${label}`); await delay(25); }
+}
+function setup(name, settings = {}) {
+  const state = path.join(root, name), home = path.join(state, 'home'), workspace = path.join(state, 'work');
+  fs.mkdirSync(workspace, { recursive: true }); fs.mkdirSync(home);
+  const storage = path.join(home, '.cheers'); fs.mkdirSync(storage);
+  fs.writeFileSync(path.join(storage, 'config.json'), JSON.stringify({ agentMode: 'build', maxOutputTokens: 128,
+    reserveTokens: 0, compactionEnabled: false, retryEnabled: false, cacheWarming: 'off', ...settings }));
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: 'openai', providerCredentials: {
+    openai: { model: 'rpc-shell', baseUrl, apiKey: 'synthetic-shell' } } }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: { openai: {
+    runtime: 'openai', endpoint: 'openai-compatible', auth: 'api-key', baseUrl,
+    models: [{ id: 'rpc-shell', contextWindow: 64_000, maxTokens: 2048 }] } } }));
+  return { state, home, workspace, storage };
+}
+function start(fixture, approval = 'allow-once', sessionId) {
+  const responses = [], frames = [], waiters = new Set(); let lines = '', invalidLines = 0;
+  const env = { ...process.env, HOME: fixture.home, USERPROFILE: fixture.home, CHEERS_TEST_ROOT: fixture.home,
+    GIT_CEILING_DIRECTORIES: root, CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '', OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '',
+    CHEERS_MARKETPLACES_FILE: path.join(fixture.home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(fixture.home, 'extensions.json') };
+  const spawned = spawn('rtk', ['node', path.join(repo, 'scripts/start.mjs'), '--rpc', '--project', fixture.workspace,
+    '--no-context-files', '--no-skills', '--tools', 'bash,read', '--model', 'openai/rpc-shell',
+    '--non-interactive-approval', approval, ...(sessionId ? ['--session-id', sessionId] : [])],
+    { cwd: fixture.workspace, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  const closed = new Promise(resolve => spawned.on('close', (code, signal) => resolve({ code, signal })));
+  spawned.stderr.on('data', () => {});
+  spawned.stdout.on('data', chunk => {
+    lines += chunk.toString();
+    for (;;) {
+      const newline = lines.indexOf('\n'); if (newline < 0) break;
+      const line = lines.slice(0, newline); lines = lines.slice(newline + 1);
+      if (!line.trim()) continue;
+      let value; try { value = JSON.parse(line); } catch { invalidLines++; continue; }
+      frames.push(value); if (value.type === 'response') responses.push(value);
+      for (const waiter of [...waiters]) if (waiter.predicate(value)) waiter.resolve(value);
+    }
+  });
+  function waitFor(predicate, from = frames.length) {
+    const found = frames.slice(from).find(predicate); if (found) return Promise.resolve(found);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { waiters.delete(waiter); reject(new Error('RPC response deadline.')); }, 30_000);
+      const waiter = { predicate, resolve: value => { clearTimeout(timer); waiters.delete(waiter); resolve(value); } };
+      waiters.add(waiter);
+    });
+  }
+  function command(type, values = {}) {
+    const id = String(++number), response = waitFor(value => value.type === 'response' && value.id === id);
+    spawned.stdin.write(JSON.stringify({ id, type, ...values }) + '\n'); return response;
+  }
+  const client = { ...fixture, process: spawned, closed, frames, command, waitFor, get invalidLines() { return invalidLines; },
+    async finish() {
+      spawned.stdin.end(); const result = await closed; clients.delete(client);
+      assert.deepEqual(result, { code: 0, signal: null }); assert.equal(invalidLines, 0); assert.equal(lines.trim(), '');
+      return result;
+    } };
+  clients.add(client); return client;
+}
+function transcript(client, id) {
+  return fs.readFileSync(path.join(client.storage, 'sessions', id, 'transcript.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+}
+function filesBelow(root) {
+  return fs.readdirSync(root, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? filesBelow(path.join(root, entry.name)) : [path.join(root, entry.name)]);
+}
+let baseUrl;
+try {
+  assert.equal(process.platform, 'linux');
+  server = http.createServer(async (request, response) => {
+    const chunks = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    if (request.method !== 'POST') { response.writeHead(200, { 'content-type': 'application/json' }); response.end('{"data":[]}'); return; }
+    const body = JSON.parse(Buffer.concat(chunks).toString()); requestBodies.push(body); bodyCount++;
+    requests.push({ model: body.model, authenticated: request.headers.authorization === 'Bearer synthetic-shell' });
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'RPC_MODEL_ACK' }, finish_reason: 'stop' }] }));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
+  stage = 'denied'; current = start(setup('denied'), 'deny');
+  const denied = await current.command('bash', { command: 'printf forbidden > forbidden.txt' });
+  assert.equal(denied.success, false); assert.equal(denied.data.status, 'denied'); assert.equal(denied.data.exitCode, null);
+  assert.equal(fs.existsSync(path.join(current.workspace, 'forbidden.txt')), false);
+  await current.finish(); receipt.stages.denied = { passed: true, zeroNativeWrite: true, eofExit0: true };
+  stage = 'disabled'; current = start(setup('disabled', { disabledTools: ['bash'] }));
+  const disabled = await current.command('bash', { command: 'printf forbidden > forbidden.txt' });
+  assert.equal(disabled.success, false); assert.equal(disabled.data.status, 'blocked');
+  assert.equal(fs.existsSync(path.join(current.workspace, 'forbidden.txt')), false);
+  await current.finish(); receipt.stages.disabled = { passed: true, zeroNativeWrite: true, eofExit0: true };
+  stage = 'included'; const fixture = setup('accepted'); current = start(fixture);
+  const initial = await current.command('get_state'); assert.equal(initial.success, true); const sessionId = initial.data.sessionId;
+  const success = await current.command('bash', { command: "printf 'RPC_INCLUDED_OUT'; printf 'RPC_INCLUDED_ERR' >&2" });
+  assert.equal(success.success, true); assert.equal(success.data.status, 'completed'); assert.equal(success.data.exitCode, 0);
+  assert.equal(success.data.truncated, false); assert.equal(success.data.historySaved, 'saved');
+  assert.ok(success.data.output.includes('RPC_INCLUDED_OUT')); assert.ok(success.data.output.includes('RPC_INCLUDED_ERR'));
+  const failure = await current.command('bash', { command: 'printf RPC_PARTIAL; printf RPC_FAILED >&2; exit 7' });
+  assert.equal(failure.success, false); assert.equal(failure.data.status, 'failed'); assert.equal(failure.data.exitCode, 7);
+  assert.ok(failure.data.output.includes('RPC_PARTIAL')); assert.ok(failure.data.output.includes('RPC_FAILED'));
+  receipt.stages.execution = { passed: true, nativeSuccess: true, bothStreams: true, nonzeroExit: 7, saved: true };
+  stage = 'excluded';
+  const excluded = await current.command('bash', { command: 'printf RPC_EXCLUDED_MARKER', excludeFromContext: true });
+  assert.equal(excluded.success, true); assert.equal(excluded.data.historySaved, 'saved');
+  let events = transcript(current, sessionId);
+  assert.ok(events.some(event => event.type === 'command-output' && event.text.includes('RPC_EXCLUDED_MARKER')));
+  const messages = await current.command('get_messages'); assert.equal(messages.success, true);
+  assert.ok(messages.data.messages.some(message => message.role === 'custom' && message.content.includes('RPC_INCLUDED_ERR')));
+  assert.equal(JSON.stringify(messages.data.messages).includes('RPC_EXCLUDED_MARKER'), false);
+  stage = 'request'; const end = current.waitFor(value => value.type === 'agent_end');
+  assert.equal((await current.command('prompt', { message: 'Return RPC_MODEL_ACK.' })).success, true);
+  assert.equal((await end).status, 'completed'); assert.equal(bodyCount, 1);
+  assert.ok(JSON.stringify(requestBodies[0].messages).includes('RPC_INCLUDED_ERR'));
+  assert.equal(JSON.stringify(requestBodies[0].messages).includes('RPC_EXCLUDED_MARKER'), false);
+  stage = 'summary';
+  const compact = await current.command('compact', { customInstructions: 'Preserve the shell result in a concise summary.' });
+  assert.equal(compact.success, true); assert.ok(bodyCount > 1);
+  assert.ok(JSON.stringify(requestBodies.slice(1)).includes('RPC_INCLUDED_ERR'));
+  assert.equal(JSON.stringify(requestBodies.slice(1)).includes('RPC_EXCLUDED_MARKER'), false);
+  const exportResult = await current.command('export_html'); assert.equal(exportResult.success, true);
+  assert.ok(exportResult.data.html.includes('RPC_EXCLUDED_MARKER'));
+  receipt.stages.context = { passed: true, actualPromptBody: true, actualSummaryBody: true, reportVisibleInExport: true, excludedAbsent: true };
+  stage = 'large-output';
+  const expected = 'RPC_LARGE_OUT\n' + 'x'.repeat(192 * 1024) + '\nRPC_LARGE_ERR\n';
+  fs.writeFileSync(path.join(current.workspace, 'large.cjs'), "process.stdout.write('RPC_LARGE_OUT\\n' + 'x'.repeat(192 * 1024) + '\\n', () => { setTimeout(() => process.stderr.write('RPC_LARGE_ERR\\n'), 30); });");
+  const large = await current.command('bash', { command: `${JSON.stringify(process.execPath)} large.cjs`, excludeFromContext: true });
+  assert.equal(large.success, true); assert.equal(large.data.truncated, true); assert.match(large.data.outputArtifact, /^artifact:\/\/\d+$/);
+  assert.ok(Buffer.byteLength(large.data.output) <= 55 * 1024); assert.ok(large.data.output.includes('RPC_LARGE_ERR'));
+  const artifactId = large.data.outputArtifact.slice('artifact://'.length);
+  const artifact = filesBelow(root).find(file => file.includes(`${path.sep}${sessionId}${path.sep}artifacts${path.sep}`)
+    && path.basename(file).startsWith(`${artifactId}.`) && file.endsWith('.txt'));
+  assert.ok(artifact); const captured = fs.readFileSync(artifact, 'utf8'); assert.equal(captured, expected);
+  receipt.stages.output = { passed: true, combinedArtifact: true, artifactBytes: Buffer.byteLength(captured),
+    artifactSha256: createHash('sha256').update(captured).digest('hex'), boundedResponse: true };
+  stage = 'reopen'; await current.finish(); current = start(fixture, 'allow-once', sessionId);
+  assert.equal((await current.command('get_state')).data.sessionId, sessionId);
+  const exported = await current.command('export_html'); assert.equal(exported.success, true); assert.ok(exported.data.html.includes('RPC_EXCLUDED_MARKER'));
+  assert.equal(JSON.stringify((await current.command('get_messages')).data.messages).includes('RPC_EXCLUDED_MARKER'), false);
+  const cloned = await current.command('clone'); assert.equal(cloned.success, true); assert.equal(cloned.data.cancelled, false);
+  assert.notEqual(cloned.data.sessionId, sessionId);
+  const forkExport = await current.command('export_html'); assert.equal(forkExport.success, true); assert.ok(forkExport.data.html.includes('RPC_EXCLUDED_MARKER'));
+  assert.equal(JSON.stringify((await current.command('get_messages')).data.messages).includes('RPC_EXCLUDED_MARKER'), false);
+  assert.equal((await current.command('switch_session', { sessionPath: sessionId })).data.cancelled, false);
+  receipt.stages.persistence = { passed: true, reopen: true, forkReport: true, excludedAbsent: true };
+  stage = 'abort';
+  fs.writeFileSync(path.join(current.workspace, 'hold.cjs'), "require('node:fs').writeFileSync('running.json', JSON.stringify({pid:process.pid})); process.stdout.write('RPC_RUNNING'); setInterval(() => {}, 1000);");
+  const pending = current.command('bash', { command: `${JSON.stringify(process.execPath)} hold.cjs` });
+  await until(() => fs.existsSync(path.join(current.workspace, 'running.json')), 'native shell started');
+  const pid = JSON.parse(fs.readFileSync(path.join(current.workspace, 'running.json'))).pid;
+  const identity = fs.readFileSync(`/proc/${pid}/stat`, 'utf8').split(' ').at(21);
+  assert.equal((await current.command('get_state')).data.isBashRunning, true);
+  for (const type of ['new_session', 'clone']) assert.equal((await current.command(type)).data.cancelled, true);
+  assert.equal((await current.command('navigate_tree', { entryId: `${sessionId}:root` })).success, false);
+  assert.equal((await current.command('bash', { command: 'printf forbidden > overlap.txt' })).success, false);
+  assert.equal(fs.existsSync(path.join(current.workspace, 'overlap.txt')), false);
+  assert.equal((await current.command('abort_bash')).success, true);
+  const cancelled = await pending;
+  assert.equal(cancelled.success, false); assert.equal(cancelled.data.cancelled, true); assert.equal(cancelled.data.status, 'cancelled');
+  assert.ok(cancelled.data.output.includes('RPC_RUNNING'));
+  await until(() => {
+    try { const fields = fs.readFileSync(`/proc/${pid}/stat`, 'utf8').split(' '); return fields.at(21) !== identity || fields[2] === 'Z'; }
+    catch (error) { if (error.code === 'ENOENT') return true; throw error; }
+  }, 'original native process termination');
+  assert.equal((await current.command('get_state')).data.isBashRunning, false);
+  assert.equal((await current.command('bash', { command: 'printf RPC_REUSED', excludeFromContext: true })).success, true);
+  receipt.stages.cancellation = { passed: true, nativeStopped: true, concurrentReads: true, overlapRefused: true, navigationRefused: true, reusable: true };
+  stage = 'eof';
+  const final = current.command('bash', { command: 'printf RPC_EOF' });
+  current.process.stdin.end(); const eof = await final; assert.equal(eof.success, true); assert.equal(eof.data.historySaved, 'saved');
+  assert.deepEqual(await current.closed, { code: 0, signal: null }); clients.delete(current); assert.equal(current.invalidLines, 0);
+  receipt.stages.eof = { passed: true, drainsShellResponse: true, exit0: true, validJsonLines: true };
+  assert.ok(requests.every(request => request.authenticated && request.model === 'rpc-shell'));
+  receipt.posts = bodyCount; receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage; receipt.failure = { name: error?.name,
+    code: error?.code, message: error?.code === 'ERR_ASSERTION' ? 'Assertion failed; see stage.' : 'Native probe failed; details withheld.' };
+  process.exitCode = 1;
+} finally {
+  clearTimeout(watchdog);
+  for (const client of clients) { client.process.kill('SIGTERM'); await Promise.race([client.closed, delay(5000)]); }
+  server?.closeAllConnections?.(); if (server) await new Promise(resolve => server.close(resolve));
+  fs.writeFileSync(path.join(directory, 'native.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt)); fs.rmSync(root, { recursive: true, force: true });
+}

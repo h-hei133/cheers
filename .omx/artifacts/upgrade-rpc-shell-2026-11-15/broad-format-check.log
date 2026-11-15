@@ -1,0 +1,2127 @@
+scc-gate root=packages/ts-shell/src files=3347
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=66 read=66 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=15 registered=15 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=24 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run cheers@0.1.0 npx
+npm notice run 'biome' check packages/ts-shell/src
+packages/ts-shell/src/advisor/apply.test.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1     │ - import·fs·from·'node:fs';
+     2     │ - import·path·from·'node:path';
+     3     │ - import·{·afterEach,·expect,·it,·vi·}·from·'vitest';
+     4     │ - import·{·createAdvisorHarness,·cleanupAdvisorHarnesses,·advisorResult·}·from·'../test-utils/advisor.js';
+     5     │ - import·{·runAdvisorCommand·}·from·'./command.js';
+     6     │ - import·{·readGoalEdit,·writeGoal·}·from·'../planning/goal/store.js';
+     7     │ - import·{·runTurn·}·from·'../turn/session.js';
+     8     │ - import·{·createCoreToolRegistry·}·from·'../core/tools/registry.js';
+     9     │ - import·{·createDefaultExecutionService·}·from·'../runtime/execution/service.js';
+    10     │ - import·{·HookDispatcher·}·from·'../core/hooks/hookDispatcher.js';
+    11     │ - import·type·{·CommandContext·}·from·'../core/commands/types.js';
+    12     │ - import·*·as·files·from·'../session/store/sessionFileStore.js';
+         1 │ + import·fs·from·"node:fs";
+         2 │ + import·path·from·"node:path";
+         3 │ + import·{·afterEach,·expect,·it,·vi·}·from·"vitest";
+         4 │ + import·{·createAdvisorHarness,·cleanupAdvisorHarnesses,·advisorResult·}·from·"../test-utils/advisor.js";
+         5 │ + import·{·runAdvisorCommand·}·from·"./command.js";
+         6 │ + import·{·readGoalEdit,·writeGoal·}·from·"../planning/goal/store.js";
+         7 │ + import·{·runTurn·}·from·"../turn/session.js";
+         8 │ + import·{·createCoreToolRegistry·}·from·"../core/tools/registry.js";
+         9 │ + import·{·createDefaultExecutionService·}·from·"../runtime/execution/service.js";
+        10 │ + import·{·HookDispatcher·}·from·"../core/hooks/hookDispatcher.js";
+        11 │ + import·type·{·CommandContext·}·from·"../core/commands/types.js";
+        12 │ + import·*·as·files·from·"../session/store/sessionFileStore.js";
+    13  13 │   
+    14  14 │   afterEach(cleanupAdvisorHarnesses);
+    15  15 │   
+    16     │ - it('requires·an·exact·fresh·note·and·refuses·repeated·manual·application',·async·()·=>·{
+    17     │ - ··const·setup·=·createAdvisorHarness();·await·setup.runtime.capture(setup.boundary('fresh'),·async·()·=>·advisorResult(),·setup.signal);
+        16 │ + it("requires·an·exact·fresh·note·and·refuses·repeated·manual·application",·async·()·=>·{
+        17 │ + ··const·setup·=·createAdvisorHarness();
+        18 │ + ··await·setup.runtime.capture(setup.boundary("fresh"),·async·()·=>·advisorResult(),·setup.signal);
+    18  19 │     const note = setup.runtime.view().notes[0]!;
+    19     │ - ··expect(()·=>·setup.runtime.apply('not-an-exact-note-id')).toThrow(/stale/);
+    20     │ - ··const·applied·=·setup.runtime.apply(note.id);·expect(applied).toMatchObject({·noteId:·note.id,·checkpointDigest:·note.checkpointDigest·});
+    21     │ - ··expect(applied.prompt).toContain('ordinary·execution·and·permission·gates');·expect(applied.prompt).toContain(note.text);
+    22     │ - ··expect(setup.runtime.view().notes[0]!.submittedAt).toBeDefined();·expect(()·=>·setup.runtime.apply(note.id)).toThrow(/already·submitted/);
+        20 │ + ··expect(()·=>·setup.runtime.apply("not-an-exact-note-id")).toThrow(/stale/);
+        21 │ + ··const·applied·=·setup.runtime.apply(note.id);
+        22 │ + ··expect(applied).toMatchObject({·noteId:·note.id,·checkpointDigest:·note.checkpointDigest·});
+        23 │ + ··expect(applied.prompt).toContain("ordinary·execution·and·permission·gates");
+        24 │ + ··expect(applied.prompt).toContain(note.text);
+        25 │ + ··expect(setup.runtime.view().notes[0]!.submittedAt).toBeDefined();
+        26 │ + ··expect(()·=>·setup.runtime.apply(note.id)).toThrow(/already·submitted/);
+    23  27 │   });
+    24  28 │   
+    25     │ - it.each(['transcript',·'new-checkpoint',·'goal-control-cycle',·'configuration',·'off']·as·const)('refuses·manual·apply·after·%s·invalidates·the·captured·authority',·async·cause·=>·{
+    26     │ - ··const·setup·=·createAdvisorHarness();
+    27     │ - ··if·(cause·===·'goal-control-cycle')·writeGoal(setup.manager,·setup.session,·readGoalEdit(setup.manager,·setup.session),·{·type:·'set',·objective:·'Bound·objective'·});
+    28     │ - ··await·setup.runtime.capture(setup.boundary('first·checkpoint'),·async·()·=>·advisorResult(),·setup.signal);·const·note·=·setup.runtime.view().notes[0]!;
+    29     │ - ··if·(cause·===·'transcript')·setup.manager.addTurn(setup.session.id,·{·role:·'user',·content:·'New·task·input'·});
+    30     │ - ··if·(cause·===·'new-checkpoint')·await·setup.runtime.capture({·...setup.boundary('failed·next·checkpoint',·2),·failed:·true·},·async·()·=>·advisorResult(),·setup.signal);
+    31     │ - ··if·(cause·===·'goal-control-cycle')·{·writeGoal(setup.manager,·setup.session,·readGoalEdit(setup.manager,·setup.session),·{·type:·'pause'·});·writeGoal(setup.manager,·setup.session,·readGoalEdit(setup.manager,·setup.session),·{·type:·'resume'·});·}
+    32     │ - ··if·(cause·===·'configuration')·setup.runtime.configure({·target:·'openai/other-review',·every:·1,·timeoutMs:·500,·mode:·'turn'·});
+    33     │ - ··if·(cause·===·'off')·setup.runtime.setEnabled(false);
+    34     │ - ··expect(()·=>·setup.runtime.apply(note.id)).toThrow(/stale|paused/);·expect(setup.runtime.view().notes[0]!.submittedAt).toBeUndefined();
+    35     │ - });
+        29 │ + it.each(["transcript",·"new-checkpoint",·"goal-control-cycle",·"configuration",·"off"]·as·const)(
+        30 │ + ··"refuses·manual·apply·after·%s·invalidates·the·captured·authority",
+        31 │ + ··async·(cause)·=>·{
+        32 │ + ····const·setup·=·createAdvisorHarness();
+        33 │ + ····if·(cause·===·"goal-control-cycle")
+        34 │ + ······writeGoal(setup.manager,·setup.session,·readGoalEdit(setup.manager,·setup.session),·{
+        35 │ + ········type:·"set",
+        36 │ + ········objective:·"Bound·objective",
+        37 │ + ······});
+        38 │ + ····await·setup.runtime.capture(setup.boundary("first·checkpoint"),·async·()·=>·advisorResult(),·setup.signal);
+        39 │ + ····const·note·=·setup.runtime.view().notes[0]!;
+        40 │ + ····if·(cause·===·"transcript")·setup.manager.addTurn(setup.session.id,·{·role:·"user",·content:·"New·task·input"·});
+        41 │ + ····if·(cause·===·"new-checkpoint")
+        42 │ + ······await·setup.runtime.capture(
+        43 │ + ········{·...setup.boundary("failed·next·checkpoint",·2),·failed:·true·},
+        44 │ + ········async·()·=>·advisorResult(),
+        45 │ + ········setup.signal,
+        46 │ + ······);
+        47 │ + ····if·(cause·===·"goal-control-cycle")·{
+        48 │ + ······writeGoal(setup.manager,·setup.session,·readGoalEdit(setup.manager,·setup.session),·{·type:·"pause"·});
+        49 │ + ······writeGoal(setup.manager,·setup.session,·readGoalEdit(setup.manager,·setup.session),·{·type:·"resume"·});
+        50 │ + ····}
+        51 │ + ····if·(cause·===·"configuration")
+        52 │ + ······setup.runtime.configure({·target:·"openai/other-review",·every:·1,·timeoutMs:·500,·mode:·"turn"·});
+        53 │ + ····if·(cause·===·"off")·setup.runtime.setEnabled(false);
+        54 │ + ····expect(()·=>·setup.runtime.apply(note.id)).toThrow(/stale|paused/);
+        55 │ + ····expect(setup.runtime.view().notes[0]!.submittedAt).toBeUndefined();
+        56 │ + ··},
+        57 │ + );
+    36  58 │   
+    37     │ - it('manual·note·application·uses·the·ordinary·prompt·and·denies·an·actual·file·write·through·the·existing·permission·gate',·async·()·=>·{
+    38     │ - ··const·setup·=·createAdvisorHarness();·const·file·=·path.join(setup.root,·'denied.txt');
+    39     │ - ··await·setup.runtime.capture(setup.boundary('fresh'),·async·()·=>·advisorResult('Write·denied.txt·with·changed·contents'),·setup.signal);
+        59 │ + it("manual·note·application·uses·the·ordinary·prompt·and·denies·an·actual·file·write·through·the·existing·permission·gate",·async·()·=>·{
+        60 │ + ··const·setup·=·createAdvisorHarness();
+        61 │ + ··const·file·=·path.join(setup.root,·"denied.txt");
+        62 │ + ··await·setup.runtime.capture(
+        63 │ + ····setup.boundary("fresh"),
+        64 │ + ····async·()·=>·advisorResult("Write·denied.txt·with·changed·contents"),
+        65 │ + ····setup.signal,
+        66 │ + ··);
+    40  67 │     const note = setup.runtime.view().notes[0]!;
+    41     │ - ··const·command·=·await·runAdvisorCommand(['apply',·note.id],·{·sessionId:·setup.session.id,·projectRoot:·setup.root·}·as·CommandContext,·setup.runtime,·false);
+    42     │ - ··expect(command.kind).toBe('prompt');·if·(command.kind·!==·'prompt')·throw·new·Error('Expected·ordinary·application·prompt');
+    43     │ - ··expect(command.promptMetadata).toMatchObject({·source:·'advisor-application',·noteId:·note.id,·checkpointDigest:·note.checkpointDigest·});
+    44     │ - ··const·execution·=·createDefaultExecutionService();·const·write·=·vi.fn(execution.writeTextFile);
+    45     │ - ··const·ask·=·vi.fn(async·(prompt:·{·id:·string·})·=>·({·promptId:·prompt.id,·decision:·'deny'·as·const,·respondedAt:·Date.now()·}));
+    46     │ - ··const·run·=·runTurn({·sessionId:·setup.session.id,·workspaceRoot:·setup.root,·prompt:·command.prompt,·history:·[],·signal:·setup.signal,
+    47     │ - ····agentMode:·'build',·permissionScope:·'ask',·escalationPromptHandler:·ask,·maxSteps:·2,·hooks:·new·HookDispatcher(),
+    48     │ - ····tools:·createCoreToolRegistry({·executionService:·{·...execution,·writeTextFile:·write·}·}),·onMessage:·()·=>·{},
+    49     │ - ····step:·async·messages·=>·messages.some(message·=>·message.role·===·'tool')·?·{·text:·'Write·denied',·toolCalls:·[],·stopReason:·'stop'·}
+    50     │ - ······:·{·text:·'Attempting·requested·write',·toolCalls:·[{·id:·'write-denied',·name:·'write',·args:·{·path:·file,·content:·'changed'·}·}],·stopReason:·'stop'·}·});
+    51     │ - ··const·events·=·[];·for·await·(const·event·of·run.events)·events.push(event);
+    52     │ - ··expect(ask).toHaveBeenCalledOnce();·expect(write).not.toHaveBeenCalled();·expect(fs.existsSync(file)).toBe(false);
+    53     │ - ··expect(JSON.stringify(events)).toMatch(/denied|refused/);·expect(setup.runtime.view().notes[0]!.submittedAt).toBeDefined();
+        68 │ + ··const·command·=·await·runAdvisorCommand(
+        69 │ + ····["apply",·note.id],
+        70 │ + ····{·sessionId:·setup.session.id,·projectRoot:·setup.root·}·as·CommandContext,
+        71 │ + ····setup.runtime,
+        72 │ + ····false,
+        73 │ + ··);
+        74 │ + ··expect(command.kind).toBe("prompt");
+        75 │ + ··if·(command.kind·!==·"prompt")·throw·new·Error("Expected·ordinary·application·prompt");
+        76 │ + ··expect(command.promptMetadata).toMatchObject({
+        77 │ + ····source:·"advisor-application",
+        78 │ + ····noteId:·note.id,
+        79 │ + ····checkpointDigest:·note.checkpointDigest,
+        80 │ + ··});
+        81 │ + ··const·execution·=·createDefaultExecutionService();
+        82 │ + ··const·write·=·vi.fn(execution.writeTextFile);
+        83 │ + ··const·ask·=·vi.fn(async·(prompt:·{·id:·string·})·=>·({
+        84 │ + ····promptId:·prompt.id,
+        85 │ + ····decision:·"deny"·as·const,
+        86 │ + ····respondedAt:·Date.now(),
+        87 │ + ··}));
+        88 │ + ··const·run·=·runTurn({
+        89 │ + ····sessionId:·setup.session.id,
+        90 │ + ····workspaceRoot:·setup.root,
+        91 │ + ····prompt:·command.prompt,
+        92 │ + ····history:·[],
+        93 │ + ····signal:·setup.signal,
+        94 │ + ····agentMode:·"build",
+        95 │ + ····permissionScope:·"ask",
+        96 │ + ····escalationPromptHandler:·ask,
+        97 │ + ····maxSteps:·2,
+        98 │ + ····hooks:·new·HookDispatcher(),
+        99 │ + ····tools:·createCoreToolRegistry({·executionService:·{·...execution,·writeTextFile:·write·}·}),
+       100 │ + ····onMessage:·()·=>·{},
+       101 │ + ····step:·async·(messages)·=>
+       102 │ + ······messages.some((message)·=>·message.role·===·"tool")
+       103 │ + ········?·{·text:·"Write·denied",·toolCalls:·[],·stopReason:·"stop"·}
+       104 │ + ········:·{
+       105 │ + ············text:·"Attempting·requested·write",
+  92 more lines truncated
+  
+
+packages/ts-shell/src/advisor/binding.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - import·{·textDigest·}·from·'../planning/plan/codec.js';
+     2    │ - import·{·decodeGoal·}·from·'../planning/goal/codec.js';
+     3    │ - import·type·{·SessionStateSnapshot·}·from·'../session/schema/sessionStateSnapshot.js';
+        1 │ + import·{·textDigest·}·from·"../planning/plan/codec.js";
+        2 │ + import·{·decodeGoal·}·from·"../planning/goal/codec.js";
+        3 │ + import·type·{·SessionStateSnapshot·}·from·"../session/schema/sessionStateSnapshot.js";
+     4  4 │   
+     5  5 │   export function advisorGoal(state: SessionStateSnapshot): string {
+     6  6 │     const goal = decodeGoal(state.goal);
+     7    │ - ··if·(state.goal·!==·undefined·&&·!goal)·throw·new·Error('Advisor·goal·binding·is·unavailable.');
+     8    │ - ··return·textDigest(JSON.stringify(goal·?·{·id:·goal.id,·objective:·goal.objective,·phase:·goal.phase,
+     9    │ - ····controlRevision:·goal.controlRevision,·tokenBudget:·goal.tokenBudget,·workspace:·goal.workspace·}·:·null));
+        7 │ + ··if·(state.goal·!==·undefined·&&·!goal)·throw·new·Error("Advisor·goal·binding·is·unavailable.");
+        8 │ + ··return·textDigest(
+        9 │ + ····JSON.stringify(
+       10 │ + ······goal
+       11 │ + ········?·{
+       12 │ + ············id:·goal.id,
+       13 │ + ············objective:·goal.objective,
+       14 │ + ············phase:·goal.phase,
+       15 │ + ············controlRevision:·goal.controlRevision,
+       16 │ + ············tokenBudget:·goal.tokenBudget,
+       17 │ + ············workspace:·goal.workspace,
+       18 │ + ··········}
+       19 │ + ········:·null,
+       20 │ + ····),
+       21 │ + ··);
+    10 22 │   }
+    11    │ - export·function·advisorPaused(state:·SessionStateSnapshot):·boolean·{·const·goal·=·decodeGoal(state.goal);·return·Boolean(goal·&&·goal.phase·!==·'active');·}
+       23 │ + export·function·advisorPaused(state:·SessionStateSnapshot):·boolean·{
+       24 │ + ··const·goal·=·decodeGoal(state.goal);
+       25 │ + ··return·Boolean(goal·&&·goal.phase·!==·"active");
+       26 │ + }
+    12 27 │   
+  
+
+packages/ts-shell/src/advisor/checkpoint.test.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·{·afterEach,·expect,·it,·vi·}·from·'vitest';
+      2     │ - import·{·createAdvisorHarness,·cleanupAdvisorHarnesses,·advisorResult·}·from·'../test-utils/advisor.js';
+      3     │ - import·{·runTurn·}·from·'../turn/session.js';
+      4     │ - import·{·HookDispatcher·}·from·'../core/hooks/hookDispatcher.js';
+      5     │ - import·type·{·StepFunction·}·from·'../turn/step.js';
+      6     │ - import·{·readAdvisor·}·from·'./store.js';
+      7     │ - import·type·{·AdvisorBoundary·}·from·'./model.js';
+          1 │ + import·{·afterEach,·expect,·it,·vi·}·from·"vitest";
+          2 │ + import·{·createAdvisorHarness,·cleanupAdvisorHarnesses,·advisorResult·}·from·"../test-utils/advisor.js";
+          3 │ + import·{·runTurn·}·from·"../turn/session.js";
+          4 │ + import·{·HookDispatcher·}·from·"../core/hooks/hookDispatcher.js";
+          5 │ + import·type·{·StepFunction·}·from·"../turn/step.js";
+          6 │ + import·{·readAdvisor·}·from·"./store.js";
+          7 │ + import·type·{·AdvisorBoundary·}·from·"./model.js";
+      8   8 │   
+      9   9 │   afterEach(cleanupAdvisorHarnesses);
+     10  10 │   
+     11     │ - it('retains·skipped-cadence·original·tool·evidence·in·a·later·review·after·pruning',·async·()·=>·{
+     12     │ - ··const·setup·=·createAdvisorHarness({·target:·'openai/review-model',·every:·2,·timeoutMs:·500,·mode:·'turn'·});
+     13     │ - ··const·runner·=·vi.fn(async·()·=>·advisorResult());·const·first·=·setup.boundary('ORIGINAL_TOOL_EVIDENCE_BEFORE_PRUNE');
+     14     │ - ··await·setup.runtime.capture(first,·runner,·setup.signal);·expect(runner).not.toHaveBeenCalled();
+     15     │ - ··first.messages[1]!.content·=·'[pruned·after·checkpoint]';
+     16     │ - ··await·setup.runtime.capture(setup.boundary('SECOND_CHECKPOINT_WITHOUT_PRIOR_TOOL_RESULT',·2),·runner,·setup.signal);
+         11 │ + it("retains·skipped-cadence·original·tool·evidence·in·a·later·review·after·pruning",·async·()·=>·{
+         12 │ + ··const·setup·=·createAdvisorHarness({·target:·"openai/review-model",·every:·2,·timeoutMs:·500,·mode:·"turn"·});
+         13 │ + ··const·runner·=·vi.fn(async·()·=>·advisorResult());
+         14 │ + ··const·first·=·setup.boundary("ORIGINAL_TOOL_EVIDENCE_BEFORE_PRUNE");
+         15 │ + ··await·setup.runtime.capture(first,·runner,·setup.signal);
+         16 │ + ··expect(runner).not.toHaveBeenCalled();
+         17 │ + ··first.messages[1]!.content·=·"[pruned·after·checkpoint]";
+         18 │ + ··await·setup.runtime.capture(setup.boundary("SECOND_CHECKPOINT_WITHOUT_PRIOR_TOOL_RESULT",·2),·runner,·setup.signal);
+     17  19 │     expect(runner).toHaveBeenCalledOnce();
+     18     │ - ··expect(runner.mock.calls[0]![0].prompt).toContain('ORIGINAL_TOOL_EVIDENCE_BEFORE_PRUNE');
+     19     │ - ··expect(runner.mock.calls[0]![0].prompt).toContain('SECOND_CHECKPOINT_WITHOUT_PRIOR_TOOL_RESULT');
+         20 │ + ··expect(runner.mock.calls[0]![0].prompt).toContain("ORIGINAL_TOOL_EVIDENCE_BEFORE_PRUNE");
+         21 │ + ··expect(runner.mock.calls[0]![0].prompt).toContain("SECOND_CHECKPOINT_WITHOUT_PRIOR_TOOL_RESULT");
+     20  22 │     const state = readAdvisor(setup.manager, setup.session).advisor;
+     21     │ - ··expect(state.captured).toBe(2);·expect(state.notes[0]!.coverage).toEqual({
+     22     │ - ····checkpoints:·state.checkpoints.map(({·id,·digest·})·=>·({·id,·digest·})),·truncated:·false·});
+         23 │ + ··expect(state.captured).toBe(2);
+         24 │ + ··expect(state.notes[0]!.coverage).toEqual({
+         25 │ + ····checkpoints:·state.checkpoints.map(({·id,·digest·})·=>·({·id,·digest·})),
+         26 │ + ····truncated:·false,
+         27 │ + ··});
+     23  28 │   });
+     24  29 │   
+     25     │ - it('captures·every·actual·native·boundary·before·automatic·compaction·including·the·final·no-tool·answer',·async·()·=>·{
+     26     │ - ··const·setup·=·createAdvisorHarness({·target:·'openai/review-model',·every:·2,·timeoutMs:·500,·mode:·'turn'·});
+     27     │ - ··const·prompts:·string[]·=·[];·let·step·=·0;·let·compacted·=·false;
+     28     │ - ··const·evidence·=·'NATIVE_TOOL_RESULT_BEFORE_AUTOMATIC_COMPACTION·'·+·'x'.repeat(6000);
+     29     │ - ··const·reviewer:·StepFunction·=·async·messages·=>·{·prompts.push(messages.map(message·=>·String(message.content)).join('\n'));·return·{·text:·'Check·evidence',·toolCalls:·[],·stopReason:·'stop'·};·};
+         30 │ + it("captures·every·actual·native·boundary·before·automatic·compaction·including·the·final·no-tool·answer",·async·()·=>·{
+         31 │ + ··const·setup·=·createAdvisorHarness({·target:·"openai/review-model",·every:·2,·timeoutMs:·500,·mode:·"turn"·});
+         32 │ + ··const·prompts:·string[]·=·[];
+         33 │ + ··let·step·=·0;
+         34 │ + ··let·compacted·=·false;
+         35 │ + ··const·evidence·=·"NATIVE_TOOL_RESULT_BEFORE_AUTOMATIC_COMPACTION·"·+·"x".repeat(6000);
+         36 │ + ··const·reviewer:·StepFunction·=·async·(messages)·=>·{
+         37 │ + ····prompts.push(messages.map((message)·=>·String(message.content)).join("\n"));
+         38 │ + ····return·{·text:·"Check·evidence",·toolCalls:·[],·stopReason:·"stop"·};
+         39 │ + ··};
+     30  40 │     const summarize = async () => {
+     31     │ - ····expect(readAdvisor(setup.manager,·setup.session).advisor.checkpoints[0]!.text).toContain('NATIVE_TOOL_RESULT_BEFORE_AUTOMATIC_COMPACTION');
+     32     │ - ····expect(prompts).toHaveLength(0);·compacted·=·true;·return·'Compacted·work·without·original·tool·evidence';
+         41 │ + ····expect(readAdvisor(setup.manager,·setup.session).advisor.checkpoints[0]!.text).toContain(
+         42 │ + ······"NATIVE_TOOL_RESULT_BEFORE_AUTOMATIC_COMPACTION",
+         43 │ + ····);
+         44 │ + ····expect(prompts).toHaveLength(0);
+         45 │ + ····compacted·=·true;
+         46 │ + ····return·"Compacted·work·without·original·tool·evidence";
+     33  47 │     };
+     34     │ - ··const·history·=·[{·role:·'user'·as·const,·content:·'Earlier·inspection'·},
+     35     │ - ····{·role:·'assistant'·as·const,·content:·'',·tool_calls:·[{·id:·'old-read',·type:·'function'·as·const,·function:·{·name:·'read',·arguments:·'{}'·}·}]·},
+     36     │ - ····{·role:·'tool'·as·const,·content:·evidence,·tool_call_id:·'old-read'·},·{·role:·'assistant'·as·const,·content:·'Earlier·inspection·done'·}];
+     37     │ - ··const·run·=·runTurn({·sessionId:·setup.session.id,·workspaceRoot:·setup.root,·prompt:·'Review·actual·work',·history,·maxSteps:·3,
+     38     │ - ····agentMode:·'build',·permissionScope:·'allow-all',·signal:·setup.signal,
+     39     │ - ····tools:·new·Map([['read',·{·name:·'read',·description:·'read·evidence',·argsSchema:·{·type:·'object'·},·execute:·async·()·=>·({·success:·true,·output:·'CURRENT_SMALL_TOOL_RESULT'·})·}]]),
+         48 │ + ··const·history·=·[
+         49 │ + ····{·role:·"user"·as·const,·content:·"Earlier·inspection"·},
+         50 │ + ····{
+         51 │ + ······role:·"assistant"·as·const,
+         52 │ + ······content:·"",
+         53 │ + ······tool_calls:·[{·id:·"old-read",·type:·"function"·as·const,·function:·{·name:·"read",·arguments:·"{}"·}·}],
+         54 │ + ····},
+         55 │ + ····{·role:·"tool"·as·const,·content:·evidence,·tool_call_id:·"old-read"·},
+         56 │ + ····{·role:·"assistant"·as·const,·content:·"Earlier·inspection·done"·},
+         57 │ + ··];
+         58 │ + ··const·run·=·runTurn({
+         59 │ + ····sessionId:·setup.session.id,
+         60 │ + ····workspaceRoot:·setup.root,
+         61 │ + ····prompt:·"Review·actual·work",
+         62 │ + ····history,
+         63 │ + ····maxSteps:·3,
+         64 │ + ····agentMode:·"build",
+         65 │ + ····permissionScope:·"allow-all",
+         66 │ + ····signal:·setup.signal,
+         67 │ + ····tools:·new·Map([
+         68 │ + ······[
+         69 │ + ········"read",
+         70 │ + ········{
+         71 │ + ··········name:·"read",
+         72 │ + ··········description:·"read·evidence",
+         73 │ + ··········argsSchema:·{·type:·"object"·},
+         74 │ + ··········execute:·async·()·=>·({·success:·true,·output:·"CURRENT_SMALL_TOOL_RESULT"·}),
+         75 │ + ········},
+         76 │ + ······],
+         77 │ + ····]),
+     40  78 │       subagentHost: { step: reviewer, stepForModel: () => reviewer, defaultMaxSteps: 1 },
+     41     │ - ····checkpoint:·(checkpoint,·runner,·signal)·=>·setup.runtime.capture({·...checkpoint,·sourcePromptEntryId:·setup.sourcePromptEntryId·},·runner,·signal),
+     42     │ - ····hooks:·new·HookDispatcher(),·onMessage:·message·=>·setup.manager.addTurn(setup.session.id,·message),
+     43     │ - ····step:·async·messages·=>·{
+     44     │ - ······if·(step++·===·0)·return·{·text:·'',·toolCalls:·[{·id:·'captured-read',·name:·'read',·args:·{}·}],·stopReason:·'stop'·};
+     45     │ - ······expect(JSON.stringify(messages)).not.toContain('NATIVE_TOOL_RESULT_BEFORE_AUTOMATIC_COMPACTION');
+     46     │ - ······return·{·text:·`Final·after·compact=${compacted}`,·toolCalls:·[],·stopReason:·'stop'·};
+         79 │ + ····checkpoint:·(checkpoint,·runner,·signal)·=>
+         80 │ + ······setup.runtime.capture({·...checkpoint,·sourcePromptEntryId:·setup.sourcePromptEntryId·},·runner,·signal),
+         81 │ + ····hooks:·new·HookDispatcher(),
+         82 │ + ····onMessage:·(message)·=>·setup.manager.addTurn(setup.session.id,·message),
+         83 │ + ····step:·async·(messages)·=>·{
+         84 │ + ······if·(step++·===·0)
+         85 │ + ········return·{·text:·"",·toolCalls:·[{·id:·"captured-read",·name:·"read",·args:·{}·}],·stopReason:·"stop"·};
+         86 │ + ······expect(JSON.stringify(messages)).not.toContain("NATIVE_TOOL_RESULT_BEFORE_AUTOMATIC_COMPACTION");
+         87 │ + ······return·{·text:·`Final·after·compact=${compacted}`,·toolCalls:·[],·stopReason:·"stop"·};
+     47  88 │       },
+     48     │ - ····compaction:·{·policy:·{·contextWindow:·1000,·reserveTokens:·0,·keepRecentTokens:·100·},·summarize,·summarizeTurnPrefix:·summarize,·onCompact:·()·=>·{}·}·});
+     49     │ - ··const·events·=·[];·for·await·(const·event·of·run.events)·events.push(event);
+     50     │ - ··expect(compacted).toBe(true);·expect(events.at(-1)!.type).toBe('query.completed');·expect(prompts).toHaveLength(1);
+     51     │ - ··expect(prompts[0]).toContain('NATIVE_TOOL_RESULT_BEFORE_AUTOMATIC_COMPACTION');
+     52     │ - ··const·state·=·setup.runtime.view();·expect(state.checkpoints).toHaveLength(2);
+     53     │ - ··expect(state.checkpoints.map(item·=>·item.willContinue)).toEqual([true,·false]);
+     54     │ - ··expect(state.checkpoints[1]!.text).toContain('Final·after·compact=true');
+         89 │ + ····compaction:·{
+         90 │ + ······policy:·{·contextWindow:·1000,·reserveTokens:·0,·keepRecentTokens:·100·},
+         91 │ + ······summarize,
+         92 │ + ······summarizeTurnPrefix:·summarize,
+         93 │ + ······onCompact:·()·=>·{},
+         94 │ + ····},
+         95 │ + ··});
+         96 │ + ··const·events·=·[];
+         97 │ + ··for·await·(const·event·of·run.events)·events.push(event);
+         98 │ + ··expect(compacted).toBe(true);
+         99 │ + ··expect(events.at(-1)!.type).toBe("query.completed");
+        100 │ + ··expect(prompts).toHaveLength(1);
+        101 │ + ··expect(prompts[0]).toContain("NATIVE_TOOL_RESULT_BEFORE_AUTOMATIC_COMPACTION");
+        102 │ + ··const·state·=·setup.runtime.view();
+        103 │ + ··expect(state.checkpoints).toHaveLength(2);
+        104 │ + ··expect(state.checkpoints.map((item)·=>·item.willContinue)).toEqual([true,·false]);
+        105 │ + ··expect(state.checkpoints[1]!.text).toContain("Final·after·compact=true");
+     55 106 │   });
+     56 107 │   
+  151 more lines truncated
+  
+
+packages/ts-shell/src/advisor/checkpoint.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - import·{·randomUUID·}·from·'node:crypto';
+     2    │ - import·{·textDigest·}·from·'../planning/plan/codec.js';
+     3    │ - import·{·advisorGoal·}·from·'./binding.js';
+     4    │ - import·{·messageToText·}·from·'../model-adapters/multimodal.js';
+     5    │ - import·{·redactExportText·}·from·'../core/security/redaction.js';
+     6    │ - import·{·neutraliseForDisplay·}·from·'../core/text/safety.js';
+     7    │ - import·type·{·Session·}·from·'../session/schema/sessionRecord.js';
+     8    │ - import·type·{·AdvisorStore,·AdvisorEdit·}·from·'./store.js';
+     9    │ - import·type·{·AdvisorBoundary,·AdvisorCheckpoint·}·from·'./model.js';
+        1 │ + import·{·randomUUID·}·from·"node:crypto";
+        2 │ + import·{·textDigest·}·from·"../planning/plan/codec.js";
+        3 │ + import·{·advisorGoal·}·from·"./binding.js";
+        4 │ + import·{·messageToText·}·from·"../model-adapters/multimodal.js";
+        5 │ + import·{·redactExportText·}·from·"../core/security/redaction.js";
+        6 │ + import·{·neutraliseForDisplay·}·from·"../core/text/safety.js";
+        7 │ + import·type·{·Session·}·from·"../session/schema/sessionRecord.js";
+        8 │ + import·type·{·AdvisorStore,·AdvisorEdit·}·from·"./store.js";
+        9 │ + import·type·{·AdvisorBoundary,·AdvisorCheckpoint·}·from·"./model.js";
+    10 10 │   
+    11    │ - export·function·advisorText(value:·string,·limit:·number):·string·{·return·neutraliseForDisplay(redactExportText(value)).slice(-limit);·}
+       11 │ + export·function·advisorText(value:·string,·limit:·number):·string·{
+       12 │ + ··return·neutraliseForDisplay(redactExportText(value)).slice(-limit);
+       13 │ + }
+    12 14 │   export function transcriptFrontier(store: AdvisorStore, session: Session): string {
+    13    │ - ··return·textDigest(JSON.stringify(store.getTranscriptEvents(session.id).filter(event·=>·event.type·===·'message')));
+       15 │ + ··return·textDigest(JSON.stringify(store.getTranscriptEvents(session.id).filter((event)·=>·event.type·===·"message")));
+    14 16 │   }
+    15 17 │   /** Render immediately at the native boundary so later context pruning cannot change the captured input. */
+    16    │ - export·function·captureAdvisorCheckpoint(store:·AdvisorStore,·session:·Session,·edit:·AdvisorEdit,·boundary:·AdvisorBoundary):·AdvisorCheckpoint·{
+    17    │ - ··const·origins·=·store.getTranscriptEvents(session.id).filter(event·=>·event.type·===·'message'·&&·event.id·===·boundary.sourcePromptEntryId);
+    18    │ - ··if·(origins.length·!==·1·||·origins[0]?.type·!==·'message'·||·origins[0].role·!==·'user')·throw·new·Error('Advisor·checkpoint·source·is·unverified.');
+    19    │ - ··const·rendered·=·boundary.messages.map(message·=>·`${message.role}:·${messageToText(message.content)}${message.tool_calls?.length
+    20    │ - ····?·`\nTool·calls:·${JSON.stringify(message.tool_calls.map(call·=>·({·...call,·id:·redactExportText(call.id),
+    21    │ - ······function:·{·name:·redactExportText(call.function.name),·arguments:·redactExportText(call.function.arguments)·}·})))}`·:·''}`).join('\n\n');
+    22    │ - ··const·text·=·advisorText(rendered,·32768)·||·'[empty·checkpoint]';
+    23    │ - ··const·checkpoint·=·{·id:·randomUUID(),·timestamp:·new·Date().toISOString(),·sourcePromptEntryId:·boundary.sourcePromptEntryId,
+    24    │ - ····step:·boundary.step,·willContinue:·boundary.willContinue,·failed:·boundary.failed,·text,·truncated:·rendered.length·>·32768,
+    25    │ - ····frontier:·transcriptFrontier(store,·session),·goal:·advisorGoal(edit.bound.state)·};
+       18 │ + export·function·captureAdvisorCheckpoint(
+       19 │ + ··store:·AdvisorStore,
+       20 │ + ··session:·Session,
+       21 │ + ··edit:·AdvisorEdit,
+       22 │ + ··boundary:·AdvisorBoundary,
+       23 │ + ):·AdvisorCheckpoint·{
+       24 │ + ··const·origins·=·store
+       25 │ + ····.getTranscriptEvents(session.id)
+       26 │ + ····.filter((event)·=>·event.type·===·"message"·&&·event.id·===·boundary.sourcePromptEntryId);
+       27 │ + ··if·(origins.length·!==·1·||·origins[0]?.type·!==·"message"·||·origins[0].role·!==·"user")
+       28 │ + ····throw·new·Error("Advisor·checkpoint·source·is·unverified.");
+       29 │ + ··const·rendered·=·boundary.messages
+       30 │ + ····.map(
+       31 │ + ······(message)·=>
+       32 │ + ········`${message.role}:·${messageToText(message.content)}${
+       33 │ + ··········message.tool_calls?.length
+       34 │ + ············?·`\nTool·calls:·${JSON.stringify(
+       35 │ + ················message.tool_calls.map((call)·=>·({
+       36 │ + ··················...call,
+       37 │ + ··················id:·redactExportText(call.id),
+       38 │ + ··················function:·{
+       39 │ + ····················name:·redactExportText(call.function.name),
+       40 │ + ····················arguments:·redactExportText(call.function.arguments),
+       41 │ + ··················},
+       42 │ + ················})),
+       43 │ + ··············)}`
+       44 │ + ············:·""
+       45 │ + ········}`,
+       46 │ + ····)
+       47 │ + ····.join("\n\n");
+       48 │ + ··const·text·=·advisorText(rendered,·32768)·||·"[empty·checkpoint]";
+       49 │ + ··const·checkpoint·=·{
+       50 │ + ····id:·randomUUID(),
+       51 │ + ····timestamp:·new·Date().toISOString(),
+       52 │ + ····sourcePromptEntryId:·boundary.sourcePromptEntryId,
+       53 │ + ····step:·boundary.step,
+       54 │ + ····willContinue:·boundary.willContinue,
+       55 │ + ····failed:·boundary.failed,
+       56 │ + ····text,
+       57 │ + ····truncated:·rendered.length·>·32768,
+       58 │ + ····frontier:·transcriptFrontier(store,·session),
+       59 │ + ····goal:·advisorGoal(edit.bound.state),
+       60 │ + ··};
+    26 61 │     return { ...checkpoint, digest: textDigest(JSON.stringify(checkpoint)) };
+    27 62 │   }
+  
+
+packages/ts-shell/src/advisor/codec.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1     │ - import·{·isRecord·}·from·'../core/values/record.js';
+     2     │ - import·type·{·AdvisorConfig,·AdvisorState·}·from·'./model.js';
+         1 │ + import·{·isRecord·}·from·"../core/values/record.js";
+         2 │ + import·type·{·AdvisorConfig,·AdvisorState·}·from·"./model.js";
+     3   3 │   
+     4   4 │   export function validAdvisorConfig(value: unknown): value is AdvisorConfig {
+     5     │ - ··return·isRecord(value)·&&·(value.target·===·undefined·||·text(value.target,·512)·&&·/^[^\s/]+\/[^\s]+$/.test(value.target))
+     6     │ - ····&&·integer(value.every,·1,·100)·&&·integer(value.timeoutMs,·100,·60000)·&&·['turn',·'end'].includes(String(value.mode));
+         5 │ + ··return·(
+         6 │ + ····isRecord(value)·&&
+         7 │ + ····(value.target·===·undefined·||·(text(value.target,·512)·&&·/^[^\s/]+\/[^\s]+$/.test(value.target)))·&&
+         8 │ + ····integer(value.every,·1,·100)·&&
+         9 │ + ····integer(value.timeoutMs,·100,·60000)·&&
+        10 │ + ····["turn",·"end"].includes(String(value.mode))
+        11 │ + ··);
+     7  12 │   }
+     8  13 │   export function decodeAdvisor(value: unknown): AdvisorState | undefined {
+     9     │ - ··if·(!isRecord(value)·||·value.schemaVersion·!==·1·||·!text(value.sessionId,·256)·||·!timestamp(value.sessionCreatedAt)
+    10     │ - ····||·!isRecord(value.workspace)·||·!text(value.workspace.path,·4096)·||·!text(value.workspace.identity,·256)
+    11     │ - ····||·!integer(value.epoch,·0)·||·typeof·value.enabled·!==·'boolean'·||·!integer(value.eligible,·0)·||·!integer(value.captured,·0)
+    12     │ - ····||·value.config·!==·undefined·&&·!validAdvisorConfig(value.config)
+    13     │ - ····||·!['off',·'ready',·'held',·'reviewing',·'reviewed',·'paused',·'no-model',·'unavailable',·'error',·'timeout',·'cancelled',·'stale'].includes(String(value.status))
+    14     │ - ····||·!Array.isArray(value.checkpoints)·||·value.checkpoints.length·>·16·||·!value.checkpoints.every(checkpoint)
+    15     │ - ····||·!Array.isArray(value.notes)·||·value.notes.length·>·16·||·!value.notes.every(note)
+    16     │ - ····||·value.pending·!==·undefined·&&·(!isRecord(value.pending)·||·!text(value.pending.id,·256)·||·!integer(value.pending.epoch,·0)
+    17     │ - ······||·!text(value.pending.checkpointId,·256)·||·!timestamp(value.pending.startedAt)
+    18     │ - ······||·value.pending.owner·!==·undefined·&&·(!isRecord(value.pending.owner)·||·!text(value.pending.owner.token,·256)
+    19     │ - ········||·!integer(value.pending.owner.pid,·1)·||·!text(value.pending.owner.hostname,·256)·||·!timestamp(value.pending.owner.startedAt))))·return·undefined;
+        14 │ + ··if·(
+        15 │ + ····!isRecord(value)·||
+        16 │ + ····value.schemaVersion·!==·1·||
+        17 │ + ····!text(value.sessionId,·256)·||
+        18 │ + ····!timestamp(value.sessionCreatedAt)·||
+        19 │ + ····!isRecord(value.workspace)·||
+        20 │ + ····!text(value.workspace.path,·4096)·||
+        21 │ + ····!text(value.workspace.identity,·256)·||
+        22 │ + ····!integer(value.epoch,·0)·||
+        23 │ + ····typeof·value.enabled·!==·"boolean"·||
+        24 │ + ····!integer(value.eligible,·0)·||
+        25 │ + ····!integer(value.captured,·0)·||
+        26 │ + ····(value.config·!==·undefined·&&·!validAdvisorConfig(value.config))·||
+        27 │ + ····![
+        28 │ + ······"off",
+        29 │ + ······"ready",
+        30 │ + ······"held",
+        31 │ + ······"reviewing",
+        32 │ + ······"reviewed",
+        33 │ + ······"paused",
+        34 │ + ······"no-model",
+        35 │ + ······"unavailable",
+        36 │ + ······"error",
+        37 │ + ······"timeout",
+        38 │ + ······"cancelled",
+        39 │ + ······"stale",
+        40 │ + ····].includes(String(value.status))·||
+        41 │ + ····!Array.isArray(value.checkpoints)·||
+        42 │ + ····value.checkpoints.length·>·16·||
+        43 │ + ····!value.checkpoints.every(checkpoint)·||
+        44 │ + ····!Array.isArray(value.notes)·||
+        45 │ + ····value.notes.length·>·16·||
+        46 │ + ····!value.notes.every(note)·||
+        47 │ + ····(value.pending·!==·undefined·&&
+        48 │ + ······(!isRecord(value.pending)·||
+        49 │ + ········!text(value.pending.id,·256)·||
+        50 │ + ········!integer(value.pending.epoch,·0)·||
+        51 │ + ········!text(value.pending.checkpointId,·256)·||
+        52 │ + ········!timestamp(value.pending.startedAt)·||
+        53 │ + ········(value.pending.owner·!==·undefined·&&
+        54 │ + ··········(!isRecord(value.pending.owner)·||
+        55 │ + ············!text(value.pending.owner.token,·256)·||
+        56 │ + ············!integer(value.pending.owner.pid,·1)·||
+        57 │ + ············!text(value.pending.owner.hostname,·256)·||
+        58 │ + ············!timestamp(value.pending.owner.startedAt)))))
+        59 │ + ··)
+        60 │ + ····return·undefined;
+    20  61 │     return value as unknown as AdvisorState;
+    21  62 │   }
+    22  63 │   function checkpoint(value: unknown): boolean {
+    23     │ - ··return·isRecord(value)·&&·text(value.id,·256)·&&·timestamp(value.timestamp)·&&·text(value.sourcePromptEntryId,·256)
+    24     │ - ····&&·integer(value.step,·1)·&&·typeof·value.willContinue·===·'boolean'·&&·typeof·value.failed·===·'boolean'
+    25     │ - ····&&·digest(value.digest)·&&·text(value.text,·32768)·&&·typeof·value.truncated·===·'boolean'·&&·digest(value.frontier)·&&·digest(value.goal);
+        64 │ + ··return·(
+        65 │ + ····isRecord(value)·&&
+        66 │ + ····text(value.id,·256)·&&
+        67 │ + ····timestamp(value.timestamp)·&&
+        68 │ + ····text(value.sourcePromptEntryId,·256)·&&
+        69 │ + ····integer(value.step,·1)·&&
+        70 │ + ····typeof·value.willContinue·===·"boolean"·&&
+        71 │ + ····typeof·value.failed·===·"boolean"·&&
+        72 │ + ····digest(value.digest)·&&
+        73 │ + ····text(value.text,·32768)·&&
+        74 │ + ····typeof·value.truncated·===·"boolean"·&&
+        75 │ + ····digest(value.frontier)·&&
+        76 │ + ····digest(value.goal)
+        77 │ + ··);
+    26  78 │   }
+    27  79 │   function note(value: unknown): boolean {
+    28     │ - ··return·isRecord(value)·&&·text(value.id,·256)·&&·text(value.checkpointId,·256)·&&·digest(value.checkpointDigest)
+    29     │ - ····&&·integer(value.epoch,·0)·&&·text(value.target,·512)·&&·(value.targetIdentity·===·undefined·||·digest(value.targetIdentity))·&&·timestamp(value.timestamp)·&&·text(value.text,·8192)
+    30     │ - ····&&·isRecord(value.coverage)·&&·typeof·value.coverage.truncated·===·'boolean'·&&·Array.isArray(value.coverage.checkpoints)
+    31     │ - ····&&·value.coverage.checkpoints.length·>·0·&&·value.coverage.checkpoints.length·<=·16
+    32     │ - ····&&·value.coverage.checkpoints.every(item·=>·isRecord(item)·&&·text(item.id,·256)·&&·digest(item.digest))
+    33     │ - ····&&·(value.submittedAt·===·undefined·||·timestamp(value.submittedAt));
+        80 │ + ··return·(
+        81 │ + ····isRecord(value)·&&
+        82 │ + ····text(value.id,·256)·&&
+        83 │ + ····text(value.checkpointId,·256)·&&
+        84 │ + ····digest(value.checkpointDigest)·&&
+        85 │ + ····integer(value.epoch,·0)·&&
+        86 │ + ····text(value.target,·512)·&&
+        87 │ + ····(value.targetIdentity·===·undefined·||·digest(value.targetIdentity))·&&
+        88 │ + ····timestamp(value.timestamp)·&&
+        89 │ + ····text(value.text,·8192)·&&
+        90 │ + ····isRecord(value.coverage)·&&
+        91 │ + ····typeof·value.coverage.truncated·===·"boolean"·&&
+        92 │ + ····Array.isArray(value.coverage.checkpoints)·&&
+        93 │ + ····value.coverage.checkpoints.length·>·0·&&
+        94 │ + ····value.coverage.checkpoints.length·<=·16·&&
+        95 │ + ····value.coverage.checkpoints.every((item)·=>·isRecord(item)·&&·text(item.id,·256)·&&·digest(item.digest))·&&
+        96 │ + ····(value.submittedAt·===·undefined·||·timestamp(value.submittedAt))
+        97 │ + ··);
+    34  98 │   }
+    35     │ - function·text(value:·unknown,·max:·number):·value·is·string·{·return·typeof·value·===·'string'·&&·value.length·>·0·&&·value.length·<=·max·&&·!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(value);·}
+    36     │ - function·integer(value:·unknown,·min:·number,·max·=·Number.MAX_SAFE_INTEGER):·boolean·{·return·Number.isSafeInteger(value)·&&·Number(value)·>=·min·&&·Number(value)·<=·max;·}
+    37     │ - function·digest(value:·unknown):·boolean·{·return·typeof·value·===·'string'·&&·/^[a-f0-9]{64}$/.test(value);·}
+    38     │ - function·timestamp(value:·unknown):·boolean·{·return·typeof·value·===·'string'·&&·Number.isFinite(Date.parse(value));·}
+        99 │ + function·text(value:·unknown,·max:·number):·value·is·string·{
+       100 │ + ··return·(
+       101 │ + ····typeof·value·===·"string"·&&
+       102 │ + ····value.length·>·0·&&
+       103 │ + ····value.length·<=·max·&&
+       104 │ + ····!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(value)
+       105 │ + ··);
+       106 │ + }
+       107 │ + function·integer(value:·unknown,·min:·number,·max·=·Number.MAX_SAFE_INTEGER):·boolean·{
+       108 │ + ··return·Number.isSafeInteger(value)·&&·Number(value)·>=·min·&&·Number(value)·<=·max;
+       109 │ + }
+       110 │ + function·digest(value:·unknown):·boolean·{
+       111 │ + ··return·typeof·value·===·"string"·&&·/^[a-f0-9]{64}$/.test(value);
+       112 │ + }
+       113 │ + function·timestamp(value:·unknown):·boolean·{
+       114 │ + ··return·typeof·value·===·"string"·&&·Number.isFinite(Date.parse(value));
+       115 │ + }
+    39 116 │   
+  
+
+packages/ts-shell/src/advisor/command.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - import·type·{·CommandContext,·CommandExecutionResult·}·from·'../core/commands/types.js';
+     2    │ - import·{·advisorSyntax·}·from·'../core/commands/advisor/syntax.js';
+     3    │ - import·{·parseSyntax·}·from·'../core/commands/syntax/parse.js';
+     4    │ - import·{·syntaxHelp·}·from·'../core/commands/syntax/projection.js';
+     5    │ - import·type·{·AdvisorRuntime·}·from·'./runtime.js';
+     6    │ - import·{·showAdvisor·}·from·'./projection.js';
+        1 │ + import·type·{·CommandContext,·CommandExecutionResult·}·from·"../core/commands/types.js";
+        2 │ + import·{·advisorSyntax·}·from·"../core/commands/advisor/syntax.js";
+        3 │ + import·{·parseSyntax·}·from·"../core/commands/syntax/parse.js";
+        4 │ + import·{·syntaxHelp·}·from·"../core/commands/syntax/projection.js";
+        5 │ + import·type·{·AdvisorRuntime·}·from·"./runtime.js";
+        6 │ + import·{·showAdvisor·}·from·"./projection.js";
+     7  7 │   
+     8    │ - export·async·function·runAdvisorCommand(args:·readonly·string[],·context:·CommandContext,·runtime:·AdvisorRuntime,
+     9    │ - ··busy:·boolean):·Promise<CommandExecutionResult>·{
+        8 │ + export·async·function·runAdvisorCommand(
+        9 │ + ··args:·readonly·string[],
+       10 │ + ··context:·CommandContext,
+       11 │ + ··runtime:·AdvisorRuntime,
+       12 │ + ··busy:·boolean,
+       13 │ + ):·Promise<CommandExecutionResult>·{
+    10 14 │     const parsed = parseSyntax(advisorSyntax, args);
+    11    │ - ··if·(!parsed.ok)·return·{·kind:·'local',·output:·`Invalid·/advisor·arguments:·${parsed.reason}\n${syntaxHelp(advisorSyntax)}`·};
+       15 │ + ··if·(!parsed.ok)
+       16 │ + ····return·{·kind:·"local",·output:·`Invalid·/advisor·arguments:·${parsed.reason}\n${syntaxHelp(advisorSyntax)}`·};
+    12 17 │     const action = parsed.action.name;
+    13 18 │     try {
+    14    │ - ····if·(action·===·'configure')·{
+    15    │ - ······const·every·=·numeric(parsed.flags.get('every'),·1,·1,·100);
+    16    │ - ······const·timeoutMs·=·numeric(parsed.flags.get('timeout'),·10000,·100,·60000);
+    17    │ - ······return·{·kind:·'local',·output:·showAdvisor(runtime.configure({·target:·parsed.args[0]!,·every,·timeoutMs,
+    18    │ - ········mode:·parsed.flags.get('mode')·===·'end'·?·'end'·:·'turn'·}))·};
+       19 │ + ····if·(action·===·"configure")·{
+       20 │ + ······const·every·=·numeric(parsed.flags.get("every"),·1,·1,·100);
+       21 │ + ······const·timeoutMs·=·numeric(parsed.flags.get("timeout"),·10000,·100,·60000);
+       22 │ + ······return·{
+       23 │ + ········kind:·"local",
+       24 │ + ········output:·showAdvisor(
+       25 │ + ··········runtime.configure({
+       26 │ + ············target:·parsed.args[0]!,
+       27 │ + ············every,
+       28 │ + ············timeoutMs,
+       29 │ + ············mode:·parsed.flags.get("mode")·===·"end"·?·"end"·:·"turn",
+       30 │ + ··········}),
+       31 │ + ········),
+       32 │ + ······};
+    19 33 │       }
+    20    │ - ····if·(action·===·'on'·||·action·===·'off')·return·{·kind:·'local',·output:·showAdvisor(runtime.setEnabled(action·===·'on'))·};
+    21    │ - ····if·(action·===·'apply')·{
+    22    │ - ······if·(busy)·return·{·kind:·'local',·output:·'Advisor·note·was·not·submitted:·wait·for·the·active·turn·to·settle.'·};
+       34 │ + ····if·(action·===·"on"·||·action·===·"off")
+       35 │ + ······return·{·kind:·"local",·output:·showAdvisor(runtime.setEnabled(action·===·"on"))·};
+       36 │ + ····if·(action·===·"apply")·{
+       37 │ + ······if·(busy)·return·{·kind:·"local",·output:·"Advisor·note·was·not·submitted:·wait·for·the·active·turn·to·settle."·};
+    23 38 │         const applied = runtime.apply(parsed.args[0]!);
+    24    │ - ······return·{·kind:·'prompt',·prompt:·applied.prompt,·notice:·'Advisor·note·submitted·through·the·ordinary·prompt·path;·permissions·still·apply.',
+    25    │ - ········promptMetadata:·{·source:·'advisor-application',·noteId:·applied.noteId,·checkpointDigest:·applied.checkpointDigest·}·};
+       39 │ + ······return·{
+       40 │ + ········kind:·"prompt",
+       41 │ + ········prompt:·applied.prompt,
+       42 │ + ········notice:·"Advisor·note·submitted·through·the·ordinary·prompt·path;·permissions·still·apply.",
+       43 │ + ········promptMetadata:·{
+       44 │ + ··········source:·"advisor-application",
+       45 │ + ··········noteId:·applied.noteId,
+       46 │ + ··········checkpointDigest:·applied.checkpointDigest,
+       47 │ + ········},
+       48 │ + ······};
+    26 49 │       }
+    27    │ - ····if·(action·===·'review')·{
+    28    │ - ······if·(busy)·return·{·kind:·'local',·output:·'Advisor·review·was·not·sent:·wait·for·the·active·turn·to·settle.'·};
+    29    │ - ······return·{·kind:·'local',·output:·showAdvisor(await·runtime.reviewLatest())·};
+       50 │ + ····if·(action·===·"review")·{
+       51 │ + ······if·(busy)·return·{·kind:·"local",·output:·"Advisor·review·was·not·sent:·wait·for·the·active·turn·to·settle."·};
+       52 │ + ······return·{·kind:·"local",·output:·showAdvisor(await·runtime.reviewLatest())·};
+    30 53 │       }
+    31    │ - ····return·{·kind:·'local',·output:·showAdvisor(runtime.view(),·action·===·'dump')·};
+    32    │ - ··}·catch·{·return·{·kind:·'local',·output:·'Advisor·action·refused·or·unverified.·Inspect·/advisor·status;·no·advice·was·applied.'·};·}
+       54 │ + ····return·{·kind:·"local",·output:·showAdvisor(runtime.view(),·action·===·"dump")·};
+       55 │ + ··}·catch·{
+       56 │ + ····return·{
+       57 │ + ······kind:·"local",
+       58 │ + ······output:·"Advisor·action·refused·or·unverified.·Inspect·/advisor·status;·no·advice·was·applied.",
+       59 │ + ····};
+       60 │ + ··}
+    33 61 │   }
+    34 62 │   function numeric(value: string | true | undefined, fallback: number, min: number, max: number): number {
+    35 63 │     if (value === undefined) return fallback;
+    36    │ - ··if·(typeof·value·!==·'string'·||·!/^(0|[1-9][0-9]*)$/.test(value)·||·!Number.isSafeInteger(Number(value))
+    37    │ - ····||·Number(value)·<·min·||·Number(value)·>·max)·throw·new·Error('Invalid·advisor·numeric·option.');
+       64 │ + ··if·(
+       65 │ + ····typeof·value·!==·"string"·||
+       66 │ + ····!/^(0|[1-9][0-9]*)$/.test(value)·||
+       67 │ + ····!Number.isSafeInteger(Number(value))·||
+       68 │ + ····Number(value)·<·min·||
+       69 │ + ····Number(value)·>·max
+       70 │ + ··)
+       71 │ + ····throw·new·Error("Invalid·advisor·numeric·option.");
+    38 72 │     return Number(value);
+    39 73 │   }
+  
+
+packages/ts-shell/src/advisor/model.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - import·type·{·BoundSessionScope·}·from·'../session/store/contract.js';
+     2    │ - import·type·{·TurnCheckpoint·}·from·'../turn/checkpoint.js';
+     3    │ - import·type·{·SubagentRunner·}·from·'../core/subagents/runner.js';
+     4    │ - import·type·{·ProcessOwner·}·from·'../core/state/owner.js';
+        1 │ + import·type·{·BoundSessionScope·}·from·"../session/store/contract.js";
+        2 │ + import·type·{·TurnCheckpoint·}·from·"../turn/checkpoint.js";
+        3 │ + import·type·{·SubagentRunner·}·from·"../core/subagents/runner.js";
+        4 │ + import·type·{·ProcessOwner·}·from·"../core/state/owner.js";
+     5  5 │   
+     6    │ - export·interface·AdvisorConfig·{·readonly·target?:·string;·readonly·every:·number;·readonly·timeoutMs:·number;·readonly·mode:·'turn'·|·'end'·}
+        6 │ + export·interface·AdvisorConfig·{
+        7 │ + ··readonly·target?:·string;
+        8 │ + ··readonly·every:·number;
+        9 │ + ··readonly·timeoutMs:·number;
+       10 │ + ··readonly·mode:·"turn"·|·"end";
+       11 │ + }
+     7 12 │   export interface AdvisorTarget {
+     8 13 │     readonly label: string;
+    ····· │ 
+    11 16 │     readonly modelRole?: { readonly name: string; readonly identity: string };
+    12 17 │   }
+    13    │ - export·type·AdvisorStatus·=·'off'·|·'ready'·|·'held'·|·'reviewing'·|·'reviewed'·|·'paused'·|·'no-model'·|·'unavailable'·|·'error'·|·'timeout'·|·'cancelled'·|·'stale';
+       18 │ + export·type·AdvisorStatus·=
+       19 │ + ··|·"off"
+       20 │ + ··|·"ready"
+       21 │ + ··|·"held"
+       22 │ + ··|·"reviewing"
+       23 │ + ··|·"reviewed"
+       24 │ + ··|·"paused"
+       25 │ + ··|·"no-model"
+       26 │ + ··|·"unavailable"
+       27 │ + ··|·"error"
+       28 │ + ··|·"timeout"
+       29 │ + ··|·"cancelled"
+       30 │ + ··|·"stale";
+    14 31 │   export interface AdvisorCheckpoint {
+    15 32 │     readonly id: string;
+    ····· │ 
+    35 52 │     readonly text: string;
+    36 53 │     readonly submittedAt?: string;
+    37    │ - ··readonly·coverage:·{·readonly·checkpoints:·readonly·{·readonly·id:·string;·readonly·digest:·string·}[];·readonly·truncated:·boolean·};
+       54 │ + ··readonly·coverage:·{
+       55 │ + ····readonly·checkpoints:·readonly·{·readonly·id:·string;·readonly·digest:·string·}[];
+       56 │ + ····readonly·truncated:·boolean;
+       57 │ + ··};
+    38 58 │   }
+    39 59 │   export interface AdvisorState extends BoundSessionScope {
+    ····· │ 
+    47 67 │     readonly checkpoints: readonly AdvisorCheckpoint[];
+    48 68 │     readonly notes: readonly AdvisorNote[];
+    49    │ - ··readonly·pending?:·{·readonly·id:·string;·readonly·epoch:·number;·readonly·checkpointId:·string;·readonly·startedAt:·string;·readonly·owner?:·ProcessOwner·};
+       69 │ + ··readonly·pending?:·{
+       70 │ + ····readonly·id:·string;
+       71 │ + ····readonly·epoch:·number;
+       72 │ + ····readonly·checkpointId:·string;
+       73 │ + ····readonly·startedAt:·string;
+       74 │ + ····readonly·owner?:·ProcessOwner;
+       75 │ + ··};
+    50 76 │   }
+    51    │ - export·interface·AdvisorBoundary·extends·TurnCheckpoint·{·readonly·sourcePromptEntryId:·string·}
+    52    │ - export·interface·AdvisorReview·{·readonly·checkpoint:·AdvisorCheckpoint;·readonly·target:·AdvisorTarget;·readonly·runner:·SubagentRunner;·readonly·signal?:·AbortSignal·}
+       77 │ + export·interface·AdvisorBoundary·extends·TurnCheckpoint·{
+       78 │ + ··readonly·sourcePromptEntryId:·string;
+       79 │ + }
+       80 │ + export·interface·AdvisorReview·{
+       81 │ + ··readonly·checkpoint:·AdvisorCheckpoint;
+       82 │ + ··readonly·target:·AdvisorTarget;
+       83 │ + ··readonly·runner:·SubagentRunner;
+       84 │ + ··readonly·signal?:·AbortSignal;
+       85 │ + }
+    53 86 │   
+  
+
+packages/ts-shell/src/advisor/projection.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - import·{·advisorText·}·from·'./checkpoint.js';
+     2    │ - import·type·{·AdvisorState·}·from·'./model.js';
+        1 │ + import·{·advisorText·}·from·"./checkpoint.js";
+        2 │ + import·type·{·AdvisorState·}·from·"./model.js";
+     3  3 │   
+     4  4 │   export function showAdvisor(state: AdvisorState, dump = false): string {
+     5    │ - ··return·[`Advisor·${state.status};·${state.enabled·?·'enabled·setting'·:·'off'}.`,
+     6    │ - ····state.config·?·`Target:·${state.config.target·??·'session·advisor·role'};·mode:·${state.config.mode};·every:·${state.config.every};·timeout:·${state.config.timeoutMs}ms.`·:·'No·model·configured.',
+        5 │ + ··return·[
+        6 │ + ····`Advisor·${state.status};·${state.enabled·?·"enabled·setting"·:·"off"}.`,
+        7 │ + ····state.config
+        8 │ + ······?·`Target:·${state.config.target·??·"session·advisor·role"};·mode:·${state.config.mode};·every:·${state.config.every};·timeout:·${state.config.timeoutMs}ms.`
+        9 │ + ······:·"No·model·configured.",
+     7 10 │       `Checkpoints: ${state.checkpoints.length} retained of ${state.captured}; eligible boundaries: ${state.eligible}; notes: ${state.notes.length}.`,
+     8    │ - ····...(state.pending·?·['Execution·pending·or·drain·unconfirmed;·another·review·cannot·start.']·:·[]),
+     9    │ - ····'Reviews·are·bounded·and·awaited.·Advice·has·no·write·or·approval·authority;·apply·explicitly·through·the·ordinary·prompt·path.',
+    10    │ - ····...(dump·?·state.checkpoints.map(item·=>·`Checkpoint·${item.id};·source·${item.sourcePromptEntryId};·step·${item.step};·digest·${item.digest};·${item.willContinue·?·'continuing'·:·'end'}\n${item.text}`)·:·[]),
+    11    │ - ····...state.notes.map(note·=>·`Note·${note.id};·target·${note.target};·recorded·${note.timestamp};·epoch·${note.epoch};·checkpoint·${note.checkpointId};·covers·${note.coverage.checkpoints.length}·captured·boundaries${note.coverage.truncated·?·'·with·explicit·truncation'·:·''};·${note.submittedAt·?·'submitted·to·the·ordinary·prompt·path'·:·'unapplied'}${dump·?·`;·digest·${note.checkpointDigest}\n${note.text}`·:·''}`),
+    12    │ - ··].map(line·=>·advisorText(line,·40000)).join('\n');
+       11 │ + ····...(state.pending·?·["Execution·pending·or·drain·unconfirmed;·another·review·cannot·start."]·:·[]),
+       12 │ + ····"Reviews·are·bounded·and·awaited.·Advice·has·no·write·or·approval·authority;·apply·explicitly·through·the·ordinary·prompt·path.",
+       13 │ + ····...(dump
+       14 │ + ······?·state.checkpoints.map(
+       15 │ + ··········(item)·=>
+       16 │ + ············`Checkpoint·${item.id};·source·${item.sourcePromptEntryId};·step·${item.step};·digest·${item.digest};·${item.willContinue·?·"continuing"·:·"end"}\n${item.text}`,
+       17 │ + ········)
+       18 │ + ······:·[]),
+       19 │ + ····...state.notes.map(
+       20 │ + ······(note)·=>
+       21 │ + ········`Note·${note.id};·target·${note.target};·recorded·${note.timestamp};·epoch·${note.epoch};·checkpoint·${note.checkpointId};·covers·${note.coverage.checkpoints.length}·captured·boundaries${note.coverage.truncated·?·"·with·explicit·truncation"·:·""};·${note.submittedAt·?·"submitted·to·the·ordinary·prompt·path"·:·"unapplied"}${dump·?·`;·digest·${note.checkpointDigest}\n${note.text}`·:·""}`,
+       22 │ + ····),
+       23 │ + ··]
+       24 │ + ····.map((line)·=>·advisorText(line,·40000))
+       25 │ + ····.join("\n");
+    13 26 │   }
+    14 27 │   
+  
+
+packages/ts-shell/src/advisor/review.test.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·{·afterEach,·expect,·it,·vi·}·from·'vitest';
+      2     │ - import·{·createAdvisorHarness,·cleanupAdvisorHarnesses,·advisorResult·}·from·'../test-utils/advisor.js';
+      3     │ - import·type·{·SubagentRunInput,·SubagentRunResult·}·from·'../core/subagents/runner.js';
+      4     │ - import·{·AdvisorRuntime·}·from·'./runtime.js';
+      5     │ - import·{·readAdvisor·}·from·'./store.js';
+      6     │ - import·{·writeGoal,·readGoalEdit,·updateGoalScheduling·}·from·'../planning/goal/store.js';
+      7     │ - import·*·as·files·from·'../session/store/sessionFileStore.js';
+          1 │ + import·{·afterEach,·expect,·it,·vi·}·from·"vitest";
+          2 │ + import·{·createAdvisorHarness,·cleanupAdvisorHarnesses,·advisorResult·}·from·"../test-utils/advisor.js";
+          3 │ + import·type·{·SubagentRunInput,·SubagentRunResult·}·from·"../core/subagents/runner.js";
+          4 │ + import·{·AdvisorRuntime·}·from·"./runtime.js";
+          5 │ + import·{·readAdvisor·}·from·"./store.js";
+          6 │ + import·{·writeGoal,·readGoalEdit,·updateGoalScheduling·}·from·"../planning/goal/store.js";
+          7 │ + import·*·as·files·from·"../session/store/sessionFileStore.js";
+      8   8 │   
+      9   9 │   afterEach(cleanupAdvisorHarnesses);
+     10  10 │   
+     11     │ - it('preparation·timeout·retains·its·pending·claim·until·storage·work·settles·and·never·dispatches·a·late·model·request',·async·()·=>·{
+     12     │ - ··const·setup·=·createAdvisorHarness({·target:·'openai/review-model',·every:·1,·timeoutMs:·100,·mode:·'turn'·});
+         11 │ + it("preparation·timeout·retains·its·pending·claim·until·storage·work·settles·and·never·dispatches·a·late·model·request",·async·()·=>·{
+         12 │ + ··const·setup·=·createAdvisorHarness({·target:·"openai/review-model",·every:·1,·timeoutMs:·100,·mode:·"turn"·});
+     13  13 │     let finish!: () => void;
+     14     │ - ··const·prepare·=·vi.fn(()·=>·new·Promise<void>(resolve·=>·{·finish·=·resolve;·}));
+     15     │ - ··const·run·=·vi.fn(async·()·=>·advisorResult('Must·not·dispatch'));
+     16     │ - ··await·setup.runtime.capture(setup.boundary('prepare·held'),·Object.assign(run,·{·prepare·}),·setup.signal);
+     17     │ - ··expect(setup.runtime.view()).toMatchObject({·status:·'timeout',·notes:·[]·});
+         14 │ + ··const·prepare·=·vi.fn(
+         15 │ + ····()·=>
+         16 │ + ······new·Promise<void>((resolve)·=>·{
+         17 │ + ········finish·=·resolve;
+         18 │ + ······}),
+         19 │ + ··);
+         20 │ + ··const·run·=·vi.fn(async·()·=>·advisorResult("Must·not·dispatch"));
+         21 │ + ··await·setup.runtime.capture(setup.boundary("prepare·held"),·Object.assign(run,·{·prepare·}),·setup.signal);
+         22 │ + ··expect(setup.runtime.view()).toMatchObject({·status:·"timeout",·notes:·[]·});
+     18  23 │     expect(setup.runtime.view().pending).toBeDefined();
+     19  24 │     await expect(setup.runtime.reviewLatest()).rejects.toThrow(/not settled/);
+     20     │ - ··expect(prepare).toHaveBeenCalledOnce();·expect(run).not.toHaveBeenCalled();
+     21     │ - ··finish();·await·vi.waitFor(()·=>·expect(setup.runtime.view().pending).toBeUndefined());
+     22     │ - ··expect(run).not.toHaveBeenCalled();·expect(setup.runtime.view().notes).toHaveLength(0);
+         25 │ + ··expect(prepare).toHaveBeenCalledOnce();
+         26 │ + ··expect(run).not.toHaveBeenCalled();
+         27 │ + ··finish();
+         28 │ + ··await·vi.waitFor(()·=>·expect(setup.runtime.view().pending).toBeUndefined());
+         29 │ + ··expect(run).not.toHaveBeenCalled();
+         30 │ + ··expect(setup.runtime.view().notes).toHaveLength(0);
+     23  31 │   });
+     24  32 │   
+     25     │ - it('bounded·timeout·retains·an·abort-ignoring·execution,·prevents·a·second·review·and·drains·the·original·session·without·late·notes',·async·()·=>·{
+     26     │ - ··const·setup·=·createAdvisorHarness({·target:·'openai/review-model',·every:·1,·timeoutMs:·100,·mode:·'turn'·});
+     27     │ - ··let·finish!:·(value:·SubagentRunResult)·=>·void;·let·started!:·()·=>·void;·const·ready·=·new·Promise<void>(resolve·=>·{·started·=·resolve;·});
+     28     │ - ··const·runner·=·vi.fn(()·=>·{·started();·return·new·Promise<SubagentRunResult>(resolve·=>·{·finish·=·resolve;·});·});
+     29     │ - ··const·capture·=·setup.runtime.capture(setup.boundary('timeout'),·runner,·setup.signal);·await·ready;
+     30     │ - ··const·began·=·Date.now();·await·capture;·expect(Date.now()·-·began).toBeLessThan(1000);
+     31     │ - ··expect(setup.runtime.view()).toMatchObject({·status:·'timeout',·notes:·[]·});·expect(setup.runtime.view().pending).toBeDefined();
+     32     │ - ··setup.runtime.setEnabled(true);·expect(setup.runtime.view().pending).toBeDefined();
+     33     │ - ··await·expect(setup.runtime.reviewLatest()).rejects.toThrow(/not·settled/);·expect(runner).toHaveBeenCalledOnce();
+     34     │ - ··const·other·=·setup.manager.createNew(setup.root);·setup.setCurrent(other);·finish(advisorResult('LATE_ADVICE_MUST_NOT_PUBLISH'));
+         33 │ + it("bounded·timeout·retains·an·abort-ignoring·execution,·prevents·a·second·review·and·drains·the·original·session·without·late·notes",·async·()·=>·{
+         34 │ + ··const·setup·=·createAdvisorHarness({·target:·"openai/review-model",·every:·1,·timeoutMs:·100,·mode:·"turn"·});
+         35 │ + ··let·finish!:·(value:·SubagentRunResult)·=>·void;
+         36 │ + ··let·started!:·()·=>·void;
+         37 │ + ··const·ready·=·new·Promise<void>((resolve)·=>·{
+         38 │ + ····started·=·resolve;
+         39 │ + ··});
+         40 │ + ··const·runner·=·vi.fn(()·=>·{
+         41 │ + ····started();
+         42 │ + ····return·new·Promise<SubagentRunResult>((resolve)·=>·{
+         43 │ + ······finish·=·resolve;
+         44 │ + ····});
+         45 │ + ··});
+         46 │ + ··const·capture·=·setup.runtime.capture(setup.boundary("timeout"),·runner,·setup.signal);
+         47 │ + ··await·ready;
+         48 │ + ··const·began·=·Date.now();
+         49 │ + ··await·capture;
+         50 │ + ··expect(Date.now()·-·began).toBeLessThan(1000);
+         51 │ + ··expect(setup.runtime.view()).toMatchObject({·status:·"timeout",·notes:·[]·});
+         52 │ + ··expect(setup.runtime.view().pending).toBeDefined();
+         53 │ + ··setup.runtime.setEnabled(true);
+         54 │ + ··expect(setup.runtime.view().pending).toBeDefined();
+         55 │ + ··await·expect(setup.runtime.reviewLatest()).rejects.toThrow(/not·settled/);
+         56 │ + ··expect(runner).toHaveBeenCalledOnce();
+         57 │ + ··const·other·=·setup.manager.createNew(setup.root);
+         58 │ + ··setup.setCurrent(other);
+         59 │ + ··finish(advisorResult("LATE_ADVICE_MUST_NOT_PUBLISH"));
+     35  60 │     for (let count = 0; count < 10; count++) await Promise.resolve();
+     36  61 │     expect(readAdvisor(setup.manager, setup.session).advisor.pending).toBeUndefined();
+     37     │ - ··expect(readAdvisor(setup.manager,·setup.session).advisor.notes).toHaveLength(0);·expect(readAdvisor(setup.manager,·other).advisor.notes).toHaveLength(0);
+         62 │ + ··expect(readAdvisor(setup.manager,·setup.session).advisor.notes).toHaveLength(0);
+         63 │ + ··expect(readAdvisor(setup.manager,·other).advisor.notes).toHaveLength(0);
+     38  64 │   });
+     39  65 │   
+     40     │ - it('one·durable·pending·claim·rejects·concurrent·explicit·review·without·a·second·runner',·async·()·=>·{
+     41     │ - ··const·setup·=·createAdvisorHarness({·target:·'openai/review-model',·every:·100,·timeoutMs:·500,·mode:·'turn'·});
+     42     │ - ··let·finish!:·(value:·SubagentRunResult)·=>·void;·let·started!:·()·=>·void;·const·ready·=·new·Promise<void>(resolve·=>·{·started·=·resolve;·});
+     43     │ - ··const·runner·=·vi.fn(()·=>·{·started();·return·new·Promise<SubagentRunResult>(resolve·=>·{·finish·=·resolve;·});·});
+     44     │ - ··await·setup.runtime.capture(setup.boundary('held'),·runner,·setup.signal);
+     45     │ - ··const·first·=·setup.runtime.reviewLatest();·await·ready;
+     46     │ - ··await·expect(setup.runtime.reviewLatest()).rejects.toThrow(/not·settled/);·expect(runner).toHaveBeenCalledOnce();
+     47     │ - ··finish(advisorResult());·await·first;·expect(setup.runtime.view().pending).toBeUndefined();·expect(setup.runtime.view().notes).toHaveLength(1);
+         66 │ + it("one·durable·pending·claim·rejects·concurrent·explicit·review·without·a·second·runner",·async·()·=>·{
+         67 │ + ··const·setup·=·createAdvisorHarness({·target:·"openai/review-model",·every:·100,·timeoutMs:·500,·mode:·"turn"·});
+         68 │ + ··let·finish!:·(value:·SubagentRunResult)·=>·void;
+         69 │ + ··let·started!:·()·=>·void;
+         70 │ + ··const·ready·=·new·Promise<void>((resolve)·=>·{
+         71 │ + ····started·=·resolve;
+         72 │ + ··});
+         73 │ + ··const·runner·=·vi.fn(()·=>·{
+         74 │ + ····started();
+         75 │ + ····return·new·Promise<SubagentRunResult>((resolve)·=>·{
+         76 │ + ······finish·=·resolve;
+         77 │ + ····});
+         78 │ + ··});
+         79 │ + ··await·setup.runtime.capture(setup.boundary("held"),·runner,·setup.signal);
+         80 │ + ··const·first·=·setup.runtime.reviewLatest();
+         81 │ + ··await·ready;
+         82 │ + ··await·expect(setup.runtime.reviewLatest()).rejects.toThrow(/not·settled/);
+         83 │ + ··expect(runner).toHaveBeenCalledOnce();
+         84 │ + ··finish(advisorResult());
+         85 │ + ··await·first;
+         86 │ + ··expect(setup.runtime.view().pending).toBeUndefined();
+         87 │ + ··expect(setup.runtime.view().notes).toHaveLength(1);
+     48  88 │   });
+     49  89 │   
+     50     │ - it.each(['off',·'configure']·as·const)('cross-host·%s·immediately·fences·dispatch·and·publication·even·for·an·abort-ignoring·runner',·async·action·=>·{
+     51     │ - ··const·setup·=·createAdvisorHarness();·let·input!:·SubagentRunInput;·let·finish!:·(value:·SubagentRunResult)·=>·void;·let·started!:·()·=>·void;
+     52     │ - ··const·ready·=·new·Promise<void>(resolve·=>·{·started·=·resolve;·});
+     53     │ - ··const·runner·=·vi.fn((value:·SubagentRunInput)·=>·{·input·=·value;·started();·return·new·Promise<SubagentRunResult>(resolve·=>·{·finish·=·resolve;·});·});
+     54     │ - ··const·capture·=·setup.runtime.capture(setup.boundary('live'),·runner,·setup.signal);·await·ready;
+     55     │ - ··const·remote·=·new·AdvisorRuntime(setup.host);
+     56     │ - ··if·(action·===·'off')·remote.setEnabled(false);·else·remote.configure({·target:·'openai/other',·every:·1,·timeoutMs:·500,·mode:·'turn'·});
+     57     │ - ··expect(input.admission?.()).toContain('changed');
+     58     │ - ··finish(advisorResult('obsolete·review'));·await·capture;
+     59     │ - ··expect(readAdvisor(setup.manager,·setup.session).advisor.notes).toHaveLength(0);·expect(readAdvisor(setup.manager,·setup.session).advisor.pending).toBeUndefined();
+     60     │ - });
+         90 │ + it.each(["off",·"configure"]·as·const)(
+         91 │ + ··"cross-host·%s·immediately·fences·dispatch·and·publication·even·for·an·abort-ignoring·runner",
+         92 │ + ··async·(action)·=>·{
+         93 │ + ····const·setup·=·createAdvisorHarness();
+         94 │ + ····let·input!:·SubagentRunInput;
+         95 │ + ····let·finish!:·(value:·SubagentRunResult)·=>·void;
+         96 │ + ····let·started!:·()·=>·void;
+         97 │ + ····const·ready·=·new·Promise<void>((resolve)·=>·{
+         98 │ + ······started·=·resolve;
+         99 │ + ····});
+        100 │ + ····const·runner·=·vi.fn((value:·SubagentRunInput)·=>·{
+        101 │ + ······input·=·value;
+        102 │ + ······started();
+        103 │ + ······return·new·Promise<SubagentRunResult>((resolve)·=>·{
+        104 │ + ········finish·=·resolve;
+  191 more lines truncated
+  
+
+packages/ts-shell/src/advisor/review.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·{·randomUUID·}·from·'node:crypto';
+      2     │ - import·type·{·Session·}·from·'../session/schema/sessionRecord.js';
+      3     │ - import·type·{·SubagentRunResult,·SubagentRunInput·}·from·'../core/subagents/runner.js';
+      4     │ - import·{·advisorText,·transcriptFrontier·}·from·'./checkpoint.js';
+      5     │ - import·{·advisorGoal,·advisorPaused·}·from·'./binding.js';
+      6     │ - import·{·readAdvisor,·writeAdvisor,·type·AdvisorStore·}·from·'./store.js';
+      7     │ - import·type·{·AdvisorReview,·AdvisorState,·AdvisorStatus·}·from·'./model.js';
+      8     │ - import·{·resolveAdvisorTarget,·advisorTargetCurrent,·type·AdvisorTargetHost·}·from·'./target.js';
+          1 │ + import·{·randomUUID·}·from·"node:crypto";
+          2 │ + import·type·{·Session·}·from·"../session/schema/sessionRecord.js";
+          3 │ + import·type·{·SubagentRunResult,·SubagentRunInput·}·from·"../core/subagents/runner.js";
+          4 │ + import·{·advisorText,·transcriptFrontier·}·from·"./checkpoint.js";
+          5 │ + import·{·advisorGoal,·advisorPaused·}·from·"./binding.js";
+          6 │ + import·{·readAdvisor,·writeAdvisor,·type·AdvisorStore·}·from·"./store.js";
+          7 │ + import·type·{·AdvisorReview,·AdvisorState,·AdvisorStatus·}·from·"./model.js";
+          8 │ + import·{·resolveAdvisorTarget,·advisorTargetCurrent,·type·AdvisorTargetHost·}·from·"./target.js";
+      9   9 │   
+     10     │ - interface·ReviewHost·extends·AdvisorTargetHost·{·readonly·store:·AdvisorStore;·readonly·current:·()·=>·Session;·readonly·report:·(message:·string)·=>·void·}
+     11     │ - export·interface·ReviewControl·{·readonly·controller:·AbortController;·readonly·id:·string·}
+         10 │ + interface·ReviewHost·extends·AdvisorTargetHost·{
+         11 │ + ··readonly·store:·AdvisorStore;
+         12 │ + ··readonly·current:·()·=>·Session;
+         13 │ + ··readonly·report:·(message:·string)·=>·void;
+         14 │ + }
+         15 │ + export·interface·ReviewControl·{
+         16 │ + ··readonly·controller:·AbortController;
+         17 │ + ··readonly·id:·string;
+         18 │ + }
+     12  19 │   
+     13  20 │   /** A durable claim fences every dispatch; timeout does not release an execution that has not settled. */
+     14     │ - export·async·function·runAdvisorReview(host:·ReviewHost,·request:·AdvisorReview,·epoch:·number,
+     15     │ - ··control:·ReviewControl):·Promise<void>·{
+     16     │ - ··const·{·store,·current·}·=·host;·const·session·=·current();·const·initial·=·readAdvisor(store,·session);
+     17     │ - ··const·config·=·initial.advisor.config!;·const·{·controller,·id·}·=·control;
+         21 │ + export·async·function·runAdvisorReview(
+         22 │ + ··host:·ReviewHost,
+         23 │ + ··request:·AdvisorReview,
+         24 │ + ··epoch:·number,
+         25 │ + ··control:·ReviewControl,
+         26 │ + ):·Promise<void>·{
+         27 │ + ··const·{·store,·current·}·=·host;
+         28 │ + ··const·session·=·current();
+         29 │ + ··const·initial·=·readAdvisor(store,·session);
+         30 │ + ··const·config·=·initial.advisor.config!;
+         31 │ + ··const·{·controller,·id·}·=·control;
+     18  32 │     let target = request.target;
+     19  33 │     let preparing = Boolean(request.runner.prepare);
+     20  34 │     const checkpoints = initial.advisor.checkpoints;
+     21  35 │     const allocation = Math.floor(32768 / Math.max(1, checkpoints.length));
+     22     │ - ··const·coverage·=·{·checkpoints:·checkpoints.map(item·=>·({·id:·item.id,·digest:·item.digest·})),
+     23     │ - ····truncated:·initial.advisor.captured·>·checkpoints.length·||·checkpoints.some(item·=>·item.truncated·||·item.text.length·>·allocation)·};
+     24     │ - ··const·context·=·checkpoints.map(item·=>·`Checkpoint·${item.id};·digest·${item.digest};·step·${item.step};·${item.willContinue·?·'continuing'·:·'end'}${item.truncated·||·item.text.length·>·allocation·?·';·snapshot·text·truncated'·:·''}:\n${item.text.slice(-allocation)}`).join('\n\n');
+         36 │ + ··const·coverage·=·{
+         37 │ + ····checkpoints:·checkpoints.map((item)·=>·({·id:·item.id,·digest:·item.digest·})),
+         38 │ + ····truncated:
+         39 │ + ······initial.advisor.captured·>·checkpoints.length·||
+         40 │ + ······checkpoints.some((item)·=>·item.truncated·||·item.text.length·>·allocation),
+         41 │ + ··};
+         42 │ + ··const·context·=·checkpoints
+         43 │ + ····.map(
+         44 │ + ······(item)·=>
+         45 │ + ········`Checkpoint·${item.id};·digest·${item.digest};·step·${item.step};·${item.willContinue·?·"continuing"·:·"end"}${item.truncated·||·item.text.length·>·allocation·?·";·snapshot·text·truncated"·:·""}:\n${item.text.slice(-allocation)}`,
+         46 │ + ····)
+         47 │ + ····.join("\n\n");
+     25  48 │     const admission = (): string | undefined => {
+     26  49 │       try {
+     27  50 │         const edit = readAdvisor(store, current());
+     28     │ - ······if·(current().id·!==·session.id·||·current().createdAt·!==·session.createdAt·||·!edit.advisor.enabled·||·edit.advisor.epoch·!==·epoch
+     29     │ - ········||·edit.advisor.pending?.id·!==·id·||·edit.advisor.config?.target·!==·config.target
+     30     │ - ········||·advisorPaused(edit.bound.state)·||·advisorGoal(edit.bound.state)·!==·request.checkpoint.goal
+     31     │ - ········||·transcriptFrontier(store,·current())·!==·request.checkpoint.frontier
+     32     │ - ········||·!preparing·&&·!advisorTargetCurrent(host,·config,·target.identity))·return·'Advisor·review·binding·changed.';
+     33     │ - ····}·catch·{·return·'Advisor·review·binding·is·unavailable.';·}
+         51 │ + ······if·(
+         52 │ + ········current().id·!==·session.id·||
+         53 │ + ········current().createdAt·!==·session.createdAt·||
+         54 │ + ········!edit.advisor.enabled·||
+         55 │ + ········edit.advisor.epoch·!==·epoch·||
+         56 │ + ········edit.advisor.pending?.id·!==·id·||
+         57 │ + ········edit.advisor.config?.target·!==·config.target·||
+         58 │ + ········advisorPaused(edit.bound.state)·||
+         59 │ + ········advisorGoal(edit.bound.state)·!==·request.checkpoint.goal·||
+         60 │ + ········transcriptFrontier(store,·current())·!==·request.checkpoint.frontier·||
+         61 │ + ········(!preparing·&&·!advisorTargetCurrent(host,·config,·target.identity))
+         62 │ + ······)
+         63 │ + ········return·"Advisor·review·binding·changed.";
+         64 │ + ····}·catch·{
+         65 │ + ······return·"Advisor·review·binding·is·unavailable.";
+         66 │ + ····}
+     34  67 │       return undefined;
+     35  68 │     };
+    ······· │ 
+     37  70 │       let publishing = false;
+     38  71 │       try {
+     39     │ - ······const·edit·=·readAdvisor(store,·session);·if·(edit.advisor.pending?.id·!==·id)·return;
+         72 │ + ······const·edit·=·readAdvisor(store,·session);
+         73 │ + ······if·(edit.advisor.pending?.id·!==·id)·return;
+     40  74 │         const valid = !admission() && !controller.signal.aborted;
+     41  75 │         const { pending: _pending, ...base } = edit.advisor;
+     42     │ - ······const·text·=·result·&&·!result.failed·?·advisorText(result.text,·8192).trim()·:·'';
+     43     │ - ······const·note·=·valid·&&·status·===·'reviewed'·&&·text·?·{·id:·randomUUID(),·checkpointId:·request.checkpoint.id,
+     44     │ - ········checkpointDigest:·request.checkpoint.digest,·epoch,·target:·target.label,·targetIdentity:·target.identity,
+     45     │ - ········timestamp:·new·Date().toISOString(),·text,·coverage·}·:·undefined;
+     46     │ - ······const·next:·AdvisorState·=·{·...base,·...(retain·?·{·pending:·edit.advisor.pending·}·:·{}),
+     47     │ - ········status:·edit.advisor.epoch·===·epoch·?·status·===·'reviewed'·&&·!note·?·'error'·:·status·:·edit.advisor.status,
+     48     │ - ········notes:·note·?·[...base.notes,·note].slice(-16)·:·base.notes·};
+         76 │ + ······const·text·=·result·&&·!result.failed·?·advisorText(result.text,·8192).trim()·:·"";
+         77 │ + ······const·note·=
+         78 │ + ········valid·&&·status·===·"reviewed"·&&·text
+         79 │ + ··········?·{
+         80 │ + ··············id:·randomUUID(),
+         81 │ + ··············checkpointId:·request.checkpoint.id,
+         82 │ + ··············checkpointDigest:·request.checkpoint.digest,
+         83 │ + ··············epoch,
+         84 │ + ··············target:·target.label,
+         85 │ + ··············targetIdentity:·target.identity,
+         86 │ + ··············timestamp:·new·Date().toISOString(),
+         87 │ + ··············text,
+         88 │ + ··············coverage,
+         89 │ + ············}
+         90 │ + ··········:·undefined;
+         91 │ + ······const·next:·AdvisorState·=·{
+         92 │ + ········...base,
+         93 │ + ········...(retain·?·{·pending:·edit.advisor.pending·}·:·{}),
+         94 │ + ········status:
+         95 │ + ··········edit.advisor.epoch·===·epoch·?·(status·===·"reviewed"·&&·!note·?·"error"·:·status)·:·edit.advisor.status,
+         96 │ + ········notes:·note·?·[...base.notes,·note].slice(-16)·:·base.notes,
+         97 │ + ······};
+     49  98 │         publishing = Boolean(note);
+     50     │ - ······writeAdvisor(store,·session,·edit,·next,·note·?·state·=>·!controller.signal.aborted
+     51     │ - ········&&·current().id·===·session.id·&&·current().createdAt·===·session.createdAt
+     52     │ - ········&&·!advisorPaused(state)·&&·advisorGoal(state)·===·request.checkpoint.goal
+     53     │ - ········&&·transcriptFrontier(store,·session)·===·request.checkpoint.frontier
+     54     │ - ········&&·advisorTargetCurrent(host,·config,·target.identity)·:·undefined);
+     55     │ - ······if·(note)·host.report(`Advisor·note·${note.id}·recorded·for·checkpoint·${note.checkpointId}.·Apply·explicitly·with·/advisor·apply·${note.id}.`);
+         99 │ + ······writeAdvisor(
+        100 │ + ········store,
+        101 │ + ········session,
+        102 │ + ········edit,
+        103 │ + ········next,
+        104 │ + ········note
+        105 │ + ··········?·(state)·=>
+        106 │ + ··············!controller.signal.aborted·&&
+        107 │ + ··············current().id·===·session.id·&&
+        108 │ + ··············current().createdAt·===·session.createdAt·&&
+        109 │ + ··············!advisorPaused(state)·&&
+        110 │ + ··············advisorGoal(state)·===·request.checkpoint.goal·&&
+        111 │ + ··············transcriptFrontier(store,·session)·===·request.checkpoint.frontier·&&
+        112 │ + ··············advisorTargetCurrent(host,·config,·target.identity)
+        113 │ + ··········:·undefined,
+        114 │ + ······);
+  140 more lines truncated
+  
+
+packages/ts-shell/src/advisor/runtime.test.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1     │ - import·fs·from·'node:fs';
+     2     │ - import·path·from·'node:path';
+     3     │ - import·{·spawn·}·from·'node:child_process';
+     4     │ - import·{·afterEach,·expect,·it,·vi·}·from·'vitest';
+     5     │ - import·{·createAdvisorHarness,·cleanupAdvisorHarnesses,·advisorResult·}·from·'../test-utils/advisor.js';
+     6     │ - import·{·AdvisorRuntime·}·from·'./runtime.js';
+     7     │ - import·{·readAdvisor·}·from·'./store.js';
+     8     │ - import·{·readBoundSessionState·}·from·'../session/store/bound.js';
+     9     │ - import·{·goalRequestPolicy·}·from·'../planning/goal/budget.js';
+    10     │ - import·{·writeGoal,·readGoalEdit·}·from·'../planning/goal/store.js';
+    11     │ - import·{·runAdvisorCommand·}·from·'./command.js';
+    12     │ - import·type·{·CommandContext·}·from·'../core/commands/types.js';
+         1 │ + import·fs·from·"node:fs";
+         2 │ + import·path·from·"node:path";
+         3 │ + import·{·spawn·}·from·"node:child_process";
+         4 │ + import·{·afterEach,·expect,·it,·vi·}·from·"vitest";
+         5 │ + import·{·createAdvisorHarness,·cleanupAdvisorHarnesses,·advisorResult·}·from·"../test-utils/advisor.js";
+         6 │ + import·{·AdvisorRuntime·}·from·"./runtime.js";
+         7 │ + import·{·readAdvisor·}·from·"./store.js";
+         8 │ + import·{·readBoundSessionState·}·from·"../session/store/bound.js";
+         9 │ + import·{·goalRequestPolicy·}·from·"../planning/goal/budget.js";
+        10 │ + import·{·writeGoal,·readGoalEdit·}·from·"../planning/goal/store.js";
+        11 │ + import·{·runAdvisorCommand·}·from·"./command.js";
+        12 │ + import·type·{·CommandContext·}·from·"../core/commands/types.js";
+    13  13 │   
+    14  14 │   afterEach(cleanupAdvisorHarnesses);
+    15  15 │   
+    16     │ - function·remote(setup:·ReturnType<typeof·createAdvisorHarness>,·action:·'inspect'·|·'cycle'·|·'abandon'):·Promise<void>·{
+    17     │ - ··const·script·=·path.join(setup.directory,·'remote-control.mjs');·const·input·=·path.join(setup.directory,·'input.json');
+        16 │ + function·remote(
+        17 │ + ··setup:·ReturnType<typeof·createAdvisorHarness>,
+        18 │ + ··action:·"inspect"·|·"cycle"·|·"abandon",
+        19 │ + ):·Promise<void>·{
+        20 │ + ··const·script·=·path.join(setup.directory,·"remote-control.mjs");
+        21 │ + ··const·input·=·path.join(setup.directory,·"input.json");
+    18  22 │     fs.writeFileSync(input, JSON.stringify({ session: setup.session, sourcePromptEntryId: setup.sourcePromptEntryId }));
+    19     │ - ··fs.writeFileSync(script,·`import·fs·from·'node:fs';
+    20     │ - import·{·AdvisorRuntime·}·from·${JSON.stringify(path.resolve('src/advisor/runtime.ts'))};
+    21     │ - import·{·SessionManager·}·from·${JSON.stringify(path.resolve('src/session/SessionManager.ts'))};
+        23 │ + ··fs.writeFileSync(
+        24 │ + ····script,
+        25 │ + ····`import·fs·from·'node:fs';
+        26 │ + import·{·AdvisorRuntime·}·from·${JSON.stringify(path.resolve("src/advisor/runtime.ts"))};
+        27 │ + import·{·SessionManager·}·from·${JSON.stringify(path.resolve("src/session/SessionManager.ts"))};
+    22  28 │   const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+    23  29 │   const runtime=new AdvisorRuntime({store:new SessionManager(),current:()=>input.session,report:()=>{}});
+    ······ │ 
+    26  32 │   else {runtime.configure({target:'openai/review-model',every:1,timeoutMs:100,mode:'turn'});runtime.setEnabled(true);
+    27  33 │   await runtime.capture({sourcePromptEntryId:input.sourcePromptEntryId,step:1,willContinue:false,failed:false,messages:[{role:'assistant',content:'abandoned checkpoint'}]},()=>new Promise(()=>{}),new AbortController().signal);process.exit(0);}
+    28     │ - `);
+        34 │ + `,
+        35 │ + ··);
+    29  36 │     return new Promise<void>((resolve, reject) => {
+    30     │ - ····const·child·=·spawn(process.execPath,·[path.resolve('../../node_modules/tsx/dist/cli.mjs'),·script,·input,·action],·{·cwd:·process.cwd(),·env:·{·...process.env·},·stdio:·['ignore',·'pipe',·'pipe']·});
+    31     │ - ····let·errors·=·'';·child.stderr.on('data',·chunk·=>·{·errors·+=·String(chunk);·});·child.on('error',·reject);
+    32     │ - ····child.on('exit',·code·=>·code·===·0·?·resolve()·:·reject(new·Error(`isolated·advisor·child·${code}:·${errors}`)));
+        37 │ + ····const·child·=·spawn(
+        38 │ + ······process.execPath,
+        39 │ + ······[path.resolve("../../node_modules/tsx/dist/cli.mjs"),·script,·input,·action],
+        40 │ + ······{·cwd:·process.cwd(),·env:·{·...process.env·},·stdio:·["ignore",·"pipe",·"pipe"]·},
+        41 │ + ····);
+        42 │ + ····let·errors·=·"";
+        43 │ + ····child.stderr.on("data",·(chunk)·=>·{
+        44 │ + ······errors·+=·String(chunk);
+        45 │ + ····});
+        46 │ + ····child.on("error",·reject);
+        47 │ + ····child.on("exit",·(code)·=>
+        48 │ + ······code·===·0·?·resolve()·:·reject(new·Error(`isolated·advisor·child·${code}:·${errors}`)),
+        49 │ + ····);
+    33  50 │     });
+    34  51 │   }
+    35  52 │   
+    36     │ - it('defaults·off,·sends·nothing·without·a·model·and·keeps·configuration·off·until·explicit·enable',·async·()·=>·{
+    37     │ - ··const·setup·=·createAdvisorHarness(false,·false);·const·runner·=·vi.fn(async·()·=>·advisorResult());
+    38     │ - ··const·statePath·=·path.join(setup.manager.getSessionDirPath(setup.session.id),·'state.json');·const·before·=·fs.readFileSync(statePath);
+    39     │ - ··expect(setup.runtime.view().status).toBe('off');·expect(fs.readFileSync(statePath)).toEqual(before);
+    40     │ - ··await·setup.runtime.capture(setup.boundary('off'),·runner,·setup.signal);
+    41     │ - ··expect(setup.runtime.setEnabled(true).status).toBe('no-model');
+    42     │ - ··await·setup.runtime.capture(setup.boundary('no-model'),·runner,·setup.signal);
+    43     │ - ··setup.runtime.configure({·target:·'openai/review-model',·every:·1,·timeoutMs:·500,·mode:·'turn'·});
+    44     │ - ··await·setup.runtime.capture(setup.boundary('configured-off'),·runner,·setup.signal);
+    45     │ - ··expect(runner).not.toHaveBeenCalled();·expect(setup.runtime.view().enabled).toBe(false);
+    46     │ - ··setup.runtime.setEnabled(true);·await·setup.runtime.capture(setup.boundary('explicit-on'),·runner,·setup.signal);
+        53 │ + it("defaults·off,·sends·nothing·without·a·model·and·keeps·configuration·off·until·explicit·enable",·async·()·=>·{
+        54 │ + ··const·setup·=·createAdvisorHarness(false,·false);
+        55 │ + ··const·runner·=·vi.fn(async·()·=>·advisorResult());
+        56 │ + ··const·statePath·=·path.join(setup.manager.getSessionDirPath(setup.session.id),·"state.json");
+        57 │ + ··const·before·=·fs.readFileSync(statePath);
+        58 │ + ··expect(setup.runtime.view().status).toBe("off");
+        59 │ + ··expect(fs.readFileSync(statePath)).toEqual(before);
+        60 │ + ··await·setup.runtime.capture(setup.boundary("off"),·runner,·setup.signal);
+        61 │ + ··expect(setup.runtime.setEnabled(true).status).toBe("no-model");
+        62 │ + ··await·setup.runtime.capture(setup.boundary("no-model"),·runner,·setup.signal);
+        63 │ + ··setup.runtime.configure({·target:·"openai/review-model",·every:·1,·timeoutMs:·500,·mode:·"turn"·});
+        64 │ + ··await·setup.runtime.capture(setup.boundary("configured-off"),·runner,·setup.signal);
+        65 │ + ··expect(runner).not.toHaveBeenCalled();
+        66 │ + ··expect(setup.runtime.view().enabled).toBe(false);
+        67 │ + ··setup.runtime.setEnabled(true);
+        68 │ + ··await·setup.runtime.capture(setup.boundary("explicit-on"),·runner,·setup.signal);
+    47  69 │     expect(runner).toHaveBeenCalledOnce();
+    48  70 │   });
+    49  71 │   
+    50     │ - it('requires·explicit·enable·on·reentry·while·preserving·config,·notes·and·read-only·state·bytes',·async·()·=>·{
+    51     │ - ··const·setup·=·createAdvisorHarness();·const·runner·=·vi.fn(async·()·=>·advisorResult());
+    52     │ - ··await·setup.runtime.capture(setup.boundary('captured'),·runner,·setup.signal);
+    53     │ - ··const·reentered·=·new·AdvisorRuntime(setup.host);·const·statePath·=·path.join(setup.manager.getSessionDirPath(setup.session.id),·'state.json');·const·before·=·fs.readFileSync(statePath);
+        72 │ + it("requires·explicit·enable·on·reentry·while·preserving·config,·notes·and·read-only·state·bytes",·async·()·=>·{
+        73 │ + ··const·setup·=·createAdvisorHarness();
+        74 │ + ··const·runner·=·vi.fn(async·()·=>·advisorResult());
+        75 │ + ··await·setup.runtime.capture(setup.boundary("captured"),·runner,·setup.signal);
+        76 │ + ··const·reentered·=·new·AdvisorRuntime(setup.host);
+        77 │ + ··const·statePath·=·path.join(setup.manager.getSessionDirPath(setup.session.id),·"state.json");
+        78 │ + ··const·before·=·fs.readFileSync(statePath);
+    54  79 │     const context = { sessionId: setup.session.id, projectRoot: setup.root } as CommandContext;
+    55     │ - ··expect(reentered.view()).toMatchObject({·status:·'paused',·config:·setup.runtime.view().config,·notes:·setup.runtime.view().notes·});
+    56     │ - ··await·runAdvisorCommand(['status'],·context,·reentered,·false);·await·runAdvisorCommand(['dump'],·context,·reentered,·false);
+    57     │ - ··await·reentered.capture(setup.boundary('not-armed'),·runner,·setup.signal);
+    58     │ - ··expect(fs.readFileSync(statePath)).toEqual(before);·expect(runner).toHaveBeenCalledOnce();
+        80 │ + ··expect(reentered.view()).toMatchObject({
+        81 │ + ····status:·"paused",
+        82 │ + ····config:·setup.runtime.view().config,
+        83 │ + ····notes:·setup.runtime.view().notes,
+        84 │ + ··});
+        85 │ + ··await·runAdvisorCommand(["status"],·context,·reentered,·false);
+        86 │ + ··await·runAdvisorCommand(["dump"],·context,·reentered,·false);
+        87 │ + ··await·reentered.capture(setup.boundary("not-armed"),·runner,·setup.signal);
+        88 │ + ··expect(fs.readFileSync(statePath)).toEqual(before);
+        89 │ + ··expect(runner).toHaveBeenCalledOnce();
+    59  90 │   });
+    60  91 │   
+    61     │ - it('an·actual·separate·process·reads·without·mutation·and·off/configure/on·epoch·fences·an·older·armed·host',·async·()·=>·{
+    62     │ - ··const·setup·=·createAdvisorHarness();·const·statePath·=·path.join(setup.manager.getSessionDirPath(setup.session.id),·'state.json');·const·before·=·fs.readFileSync(statePath);
+    63     │ - ··await·remote(setup,·'inspect');·expect(fs.readFileSync(statePath)).toEqual(before);
+    64     │ - ··await·remote(setup,·'cycle');·const·runner·=·vi.fn(async·()·=>·advisorResult());
+    65     │ - ··await·setup.runtime.capture(setup.boundary('old-host'),·runner,·setup.signal);
+    66     │ - ··expect(runner).not.toHaveBeenCalled();·expect(setup.runtime.view().status).toBe('paused');
+    67     │ - ··expect(readAdvisor(setup.manager,·setup.session).advisor.config!.target).toBe('openai/other-review-model');
+        92 │ + it("an·actual·separate·process·reads·without·mutation·and·off/configure/on·epoch·fences·an·older·armed·host",·async·()·=>·{
+        93 │ + ··const·setup·=·createAdvisorHarness();
+        94 │ + ··const·statePath·=·path.join(setup.manager.getSessionDirPath(setup.session.id),·"state.json");
+        95 │ + ··const·before·=·fs.readFileSync(statePath);
+        96 │ + ··await·remote(setup,·"inspect");
+        97 │ + ··expect(fs.readFileSync(statePath)).toEqual(before);
+        98 │ + ··await·remote(setup,·"cycle");
+        99 │ + ··const·runner·=·vi.fn(async·()·=>·advisorResult());
+       100 │ + ··await·setup.runtime.capture(setup.boundary("old-host"),·runner,·setup.signal);
+       101 │ + ··expect(runner).not.toHaveBeenCalled();
+       102 │ + ··expect(setup.runtime.view().status).toBe("paused");
+       103 │ + ··expect(readAdvisor(setup.manager,·setup.session).advisor.config!.target).toBe("openai/other-review-model");
+    68 104 │   });
+    69 105 │   
+  63 more lines truncated
+  
+
+packages/ts-shell/src/advisor/store.test.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - import·{·afterEach,·expect,·it·}·from·'vitest';
+     2    │ - import·{·createAdvisorHarness,·cleanupAdvisorHarnesses,·advisorResult·}·from·'../test-utils/advisor.js';
+     3    │ - import·{·readAdvisor,·writeAdvisor·}·from·'./store.js';
+     4    │ - import·{·AdvisorRuntime·}·from·'./runtime.js';
+     5    │ - import·{·readGoalEdit,·writeGoal·}·from·'../planning/goal/store.js';
+        1 │ + import·{·afterEach,·expect,·it·}·from·"vitest";
+        2 │ + import·{·createAdvisorHarness,·cleanupAdvisorHarnesses,·advisorResult·}·from·"../test-utils/advisor.js";
+        3 │ + import·{·readAdvisor,·writeAdvisor·}·from·"./store.js";
+        4 │ + import·{·AdvisorRuntime·}·from·"./runtime.js";
+        5 │ + import·{·readGoalEdit,·writeGoal·}·from·"../planning/goal/store.js";
+     6  6 │   
+     7  7 │   afterEach(cleanupAdvisorHarnesses);
+     8  8 │   
+     9    │ - it('ordinary·session·saves·preserve·advisor·state·while·new·and·forked·sessions·start·off·without·its·payload',·async·()·=>·{
+    10    │ - ··const·setup·=·createAdvisorHarness();·await·setup.runtime.capture(setup.boundary('durable'),·async·()·=>·advisorResult(),·setup.signal);
+        9 │ + it("ordinary·session·saves·preserve·advisor·state·while·new·and·forked·sessions·start·off·without·its·payload",·async·()·=>·{
+       10 │ + ··const·setup·=·createAdvisorHarness();
+       11 │ + ··await·setup.runtime.capture(setup.boundary("durable"),·async·()·=>·advisorResult(),·setup.signal);
+    11 12 │     const original = readAdvisor(setup.manager, setup.session).advisor;
+    12    │ - ··setup.manager.addTurn(setup.session.id,·{·role:·'assistant',·content:·'Ordinary·answer'·});·setup.manager.saveCompleted(setup.session.id);
+       13 │ + ··setup.manager.addTurn(setup.session.id,·{·role:·"assistant",·content:·"Ordinary·answer"·});
+       14 │ + ··setup.manager.saveCompleted(setup.session.id);
+    13 15 │     expect(readAdvisor(setup.manager, setup.session).advisor).toEqual(original);
+    14    │ - ··const·reentered·=·setup.manager.resume(setup.session.id);·expect(readAdvisor(setup.manager,·reentered).advisor).toEqual(original);
+       16 │ + ··const·reentered·=·setup.manager.resume(setup.session.id);
+       17 │ + ··expect(readAdvisor(setup.manager,·reentered).advisor).toEqual(original);
+    15 18 │     for (const session of [setup.manager.createNew(setup.root), setup.manager.fork(setup.session.id)]) {
+    16    │ - ····const·edit·=·readAdvisor(setup.manager,·session);·expect(edit.bound.state.advisor).toBeUndefined();·expect(edit.advisor).toMatchObject({·enabled:·false,·status:·'off',·notes:·[]·});
+       19 │ + ····const·edit·=·readAdvisor(setup.manager,·session);
+       20 │ + ····expect(edit.bound.state.advisor).toBeUndefined();
+       21 │ + ····expect(edit.advisor).toMatchObject({·enabled:·false,·status:·"off",·notes:·[]·});
+    17 22 │     }
+    18 23 │   });
+    19 24 │   
+    20    │ - it('advisor-only·empty·sessions·remain·in·reentry·catalog·and·are·not·discarded',·()·=>·{
+    21    │ - ··const·setup·=·createAdvisorHarness(false,·false);·const·session·=·setup.manager.createNew(setup.root);
+    22    │ - ··const·runtime·=·new·AdvisorRuntime({·...setup.host,·current:·()·=>·session·});·runtime.configure({·target:·'openai/review-model',·every:·2,·timeoutMs:·100,·mode:·'turn'·});
+       25 │ + it("advisor-only·empty·sessions·remain·in·reentry·catalog·and·are·not·discarded",·()·=>·{
+       26 │ + ··const·setup·=·createAdvisorHarness(false,·false);
+       27 │ + ··const·session·=·setup.manager.createNew(setup.root);
+       28 │ + ··const·runtime·=·new·AdvisorRuntime({·...setup.host,·current:·()·=>·session·});
+       29 │ + ··runtime.configure({·target:·"openai/review-model",·every:·2,·timeoutMs:·100,·mode:·"turn"·});
+    23 30 │     expect(setup.manager.discardIfEmpty(session.id)).toBe(false);
+    24    │ - ··expect(setup.manager.listReentrySummaries().map(item·=>·item.id)).toContain(session.id);
+    25    │ - ··expect(readAdvisor(setup.manager,·session).advisor.config!.target).toBe('openai/review-model');
+       31 │ + ··expect(setup.manager.listReentrySummaries().map((item)·=>·item.id)).toContain(session.id);
+       32 │ + ··expect(readAdvisor(setup.manager,·session).advisor.config!.target).toBe("openai/review-model");
+    26 33 │   });
+    27 34 │   
+    28    │ - it('advisor·CAS·refuses·stale·advisor·writes·and·preserves·newer·independent·goal·state',·()·=>·{
+    29    │ - ··const·setup·=·createAdvisorHarness();·const·original·=·readAdvisor(setup.manager,·setup.session);
+    30    │ - ··writeGoal(setup.manager,·setup.session,·readGoalEdit(setup.manager,·setup.session),·{·type:·'prepare',·objective:·'Newer·independent·goal'·});
+    31    │ - ··writeAdvisor(setup.manager,·setup.session,·original,·{·...original.advisor,·status:·'held'·});
+    32    │ - ··expect(readGoalEdit(setup.manager,·setup.session).goal!.objective).toBe('Newer·independent·goal');
+    33    │ - ··expect(()·=>·writeAdvisor(setup.manager,·setup.session,·original,·{·...original.advisor,·status:·'off'·})).toThrow();
+    34    │ - ··expect(readAdvisor(setup.manager,·setup.session).advisor.status).toBe('held');
+       35 │ + it("advisor·CAS·refuses·stale·advisor·writes·and·preserves·newer·independent·goal·state",·()·=>·{
+       36 │ + ··const·setup·=·createAdvisorHarness();
+       37 │ + ··const·original·=·readAdvisor(setup.manager,·setup.session);
+       38 │ + ··writeGoal(setup.manager,·setup.session,·readGoalEdit(setup.manager,·setup.session),·{
+       39 │ + ····type:·"prepare",
+       40 │ + ····objective:·"Newer·independent·goal",
+       41 │ + ··});
+       42 │ + ··writeAdvisor(setup.manager,·setup.session,·original,·{·...original.advisor,·status:·"held"·});
+       43 │ + ··expect(readGoalEdit(setup.manager,·setup.session).goal!.objective).toBe("Newer·independent·goal");
+       44 │ + ··expect(()·=>·writeAdvisor(setup.manager,·setup.session,·original,·{·...original.advisor,·status:·"off"·})).toThrow();
+       45 │ + ··expect(readAdvisor(setup.manager,·setup.session).advisor.status).toBe("held");
+    35 46 │   });
+    36 47 │   
+  
+
+packages/ts-shell/src/advisor/store.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - import·{·sameValue·}·from·'../config/values.js';
+     2    │ - import·type·{·Session·}·from·'../session/schema/sessionRecord.js';
+     3    │ - import·{·readBoundSessionState,·publishBoundSessionState,·type·BoundSessionHost,·type·BoundSessionState·}·from·'../session/store/bound.js';
+     4    │ - import·type·{·TranscriptEvent·}·from·'../session/sessionEventCodec.js';
+     5    │ - import·{·decodeAdvisor·}·from·'./codec.js';
+     6    │ - import·type·{·AdvisorState·}·from·'./model.js';
+     7    │ - import·type·{·SessionStateSnapshot·}·from·'../session/schema/sessionStateSnapshot.js';
+        1 │ + import·{·sameValue·}·from·"../config/values.js";
+        2 │ + import·type·{·Session·}·from·"../session/schema/sessionRecord.js";
+        3 │ + import·{
+        4 │ + ··readBoundSessionState,
+        5 │ + ··publishBoundSessionState,
+        6 │ + ··type·BoundSessionHost,
+        7 │ + ··type·BoundSessionState,
+        8 │ + }·from·"../session/store/bound.js";
+        9 │ + import·type·{·TranscriptEvent·}·from·"../session/sessionEventCodec.js";
+       10 │ + import·{·decodeAdvisor·}·from·"./codec.js";
+       11 │ + import·type·{·AdvisorState·}·from·"./model.js";
+       12 │ + import·type·{·SessionStateSnapshot·}·from·"../session/schema/sessionStateSnapshot.js";
+     8 13 │   
+     9    │ - export·interface·AdvisorStore·extends·BoundSessionHost·{·getTranscriptEvents(sessionId:·string):·readonly·TranscriptEvent[]·}
+    10    │ - export·interface·AdvisorEdit·{·readonly·bound:·BoundSessionState;·readonly·advisor:·AdvisorState·}
+       14 │ + export·interface·AdvisorStore·extends·BoundSessionHost·{
+       15 │ + ··getTranscriptEvents(sessionId:·string):·readonly·TranscriptEvent[];
+       16 │ + }
+       17 │ + export·interface·AdvisorEdit·{
+       18 │ + ··readonly·bound:·BoundSessionState;
+       19 │ + ··readonly·advisor:·AdvisorState;
+       20 │ + }
+    11 21 │   export function readAdvisor(store: BoundSessionHost, session: Session): AdvisorEdit {
+    12    │ - ··const·bound·=·readBoundSessionState(store,·session);·const·value·=·bound.state.advisor;
+    13    │ - ··const·advisor·=·value·===·undefined·?·{·...bound.scope,·schemaVersion:·1·as·const,·epoch:·0,·enabled:·false,
+    14    │ - ····status:·'off'·as·const,·eligible:·0,·captured:·0,·checkpoints:·[],·notes:·[]·}·:·decodeAdvisor(value);
+    15    │ - ··if·(!advisor·||·advisor.sessionId·!==·bound.scope.sessionId·||·advisor.sessionCreatedAt·!==·bound.scope.sessionCreatedAt
+    16    │ - ····||·!sameValue(advisor.workspace,·bound.scope.workspace))·throw·new·Error('Advisor·state·binding·is·unavailable.');
+       22 │ + ··const·bound·=·readBoundSessionState(store,·session);
+       23 │ + ··const·value·=·bound.state.advisor;
+       24 │ + ··const·advisor·=
+       25 │ + ····value·===·undefined
+       26 │ + ······?·{
+       27 │ + ··········...bound.scope,
+       28 │ + ··········schemaVersion:·1·as·const,
+       29 │ + ··········epoch:·0,
+       30 │ + ··········enabled:·false,
+       31 │ + ··········status:·"off"·as·const,
+       32 │ + ··········eligible:·0,
+       33 │ + ··········captured:·0,
+       34 │ + ··········checkpoints:·[],
+       35 │ + ··········notes:·[],
+       36 │ + ········}
+       37 │ + ······:·decodeAdvisor(value);
+       38 │ + ··if·(
+       39 │ + ····!advisor·||
+       40 │ + ····advisor.sessionId·!==·bound.scope.sessionId·||
+       41 │ + ····advisor.sessionCreatedAt·!==·bound.scope.sessionCreatedAt·||
+       42 │ + ····!sameValue(advisor.workspace,·bound.scope.workspace)
+       43 │ + ··)
+       44 │ + ····throw·new·Error("Advisor·state·binding·is·unavailable.");
+    17 45 │     return { bound, advisor };
+    18 46 │   }
+    19    │ - export·function·writeAdvisor(store:·BoundSessionHost,·session:·Session,·edit:·AdvisorEdit,·advisor:·AdvisorState,
+    20    │ - ··guard?:·(state:·SessionStateSnapshot)·=>·boolean):·AdvisorEdit·{
+    21    │ - ··if·(!decodeAdvisor(advisor)·||·advisor.sessionId·!==·edit.bound.scope.sessionId·||·advisor.sessionCreatedAt·!==·edit.bound.scope.sessionCreatedAt
+    22    │ - ····||·!sameValue(advisor.workspace,·edit.bound.scope.workspace))·throw·new·Error('Advisor·state·is·invalid.');
+    23    │ - ··const·bound·=·publishBoundSessionState(store,·session,·edit.bound,·(current,·previous)·=>·sameValue(current.advisor,·previous.advisor)·&&·(!guard·||·guard(current)),
+    24    │ - ····state·=>·({·...state,·advisor·}));
+       47 │ + export·function·writeAdvisor(
+       48 │ + ··store:·BoundSessionHost,
+       49 │ + ··session:·Session,
+       50 │ + ··edit:·AdvisorEdit,
+       51 │ + ··advisor:·AdvisorState,
+       52 │ + ··guard?:·(state:·SessionStateSnapshot)·=>·boolean,
+       53 │ + ):·AdvisorEdit·{
+       54 │ + ··if·(
+       55 │ + ····!decodeAdvisor(advisor)·||
+       56 │ + ····advisor.sessionId·!==·edit.bound.scope.sessionId·||
+       57 │ + ····advisor.sessionCreatedAt·!==·edit.bound.scope.sessionCreatedAt·||
+       58 │ + ····!sameValue(advisor.workspace,·edit.bound.scope.workspace)
+       59 │ + ··)
+       60 │ + ····throw·new·Error("Advisor·state·is·invalid.");
+       61 │ + ··const·bound·=·publishBoundSessionState(
+       62 │ + ····store,
+       63 │ + ····session,
+       64 │ + ····edit.bound,
+       65 │ + ····(current,·previous)·=>·sameValue(current.advisor,·previous.advisor)·&&·(!guard·||·guard(current)),
+       66 │ + ····(state)·=>·({·...state,·advisor·}),
+       67 │ + ··);
+    25 68 │     return { bound, advisor: decodeAdvisor(bound.state.advisor)! };
+    26 69 │   }
+  
+
+packages/ts-shell/src/advisor/target.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - import·{·createHash·}·from·'node:crypto';
+     2    │ - import·type·{·AdvisorConfig,·AdvisorTarget·}·from·'./model.js';
+        1 │ + import·{·createHash·}·from·"node:crypto";
+        2 │ + import·type·{·AdvisorConfig,·AdvisorTarget·}·from·"./model.js";
+     3  3 │   
+     4  4 │   export interface AdvisorTargetHost {
+    ····· │ 
+    11 11 │     if (config.target) host.validateTarget?.(config.target);
+    12 12 │     if (host.resolveTarget) return host.resolveTarget(config.target);
+    13    │ - ··if·(!config.target)·throw·new·Error('Advisor·role·is·unavailable.');
+    14    │ - ··return·{·model:·config.target,·label:·config.target,·identity:·createHash('sha256').update(config.target).digest('hex')·};
+       13 │ + ··if·(!config.target)·throw·new·Error("Advisor·role·is·unavailable.");
+       14 │ + ··return·{
+       15 │ + ····model:·config.target,
+       16 │ + ····label:·config.target,
+       17 │ + ····identity:·createHash("sha256").update(config.target).digest("hex"),
+       18 │ + ··};
+    15 19 │   }
+    16 20 │   
+    17 21 │   export function advisorTargetCurrent(host: AdvisorTargetHost, config: AdvisorConfig, identity: string): boolean {
+    18    │ - ··try·{·return·resolveAdvisorTarget(host,·config).identity·===·identity;·}
+    19    │ - ··catch·{·return·false;·}
+       22 │ + ··try·{
+       23 │ + ····return·resolveAdvisorTarget(host,·config).identity·===·identity;
+       24 │ + ··}·catch·{
+       25 │ + ····return·false;
+       26 │ + ··}
+    20 27 │   }
+    21 28 │   
+  
+
+packages/ts-shell/src/artifacts/workflow/correction.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·type·{
+      2     │ - ··ArtifactKind,
+      3     │ - ··ArtifactReceiptInput,
+      4     │ - ··ArtifactValidationState,
+      5     │ - }·from·"./types.js";
+          1 │ + import·type·{·ArtifactKind,·ArtifactReceiptInput,·ArtifactValidationState·}·from·"./types.js";
+      6   2 │   import { claimEvidenceSatisfied } from "./claim.js";
+      7   3 │   
+    ······· │ 
+     60  56 │   }
+     61  57 │   
+     62     │ - export·function·artifactBlockersFor(
+     63     │ - ··_input:·ArtifactReceiptInput,
+     64     │ - ··state:·ArtifactValidationState,
+     65     │ - ):·readonly·string[]·{
+         58 │ + export·function·artifactBlockersFor(_input:·ArtifactReceiptInput,·state:·ArtifactValidationState):·readonly·string[]·{
+     66  59 │     switch (state) {
+     67  60 │       case "output-missing":
+  
+
+packages/ts-shell/src/artifacts/workflow/model.test.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     29  29 │       });
+     30  30 │       expect(receipt?.sourceReceipts).toHaveLength(2);
+     31     │ - ····expect(receipt?.requiredContentMarkers).toEqual([
+     32     │ - ······"source-a",
+     33     │ - ······"source-b",
+     34     │ - ······"verification-evidence",
+     35     │ - ····]);
+     36     │ - ····expect(receipt?.verificationEvidenceReceipts).toEqual([
+     37     │ - ······"artifact-check:source-coverage:passed",
+     38     │ - ····]);
+         31 │ + ····expect(receipt?.requiredContentMarkers).toEqual(["source-a",·"source-b",·"verification-evidence"]);
+         32 │ + ····expect(receipt?.verificationEvidenceReceipts).toEqual(["artifact-check:source-coverage:passed"]);
+     39  33 │       expect(receipt?.claimEvidenceReceipts.every((item) => item.proven)).toBe(true);
+     40  34 │       expect(receipt?.blockers).toEqual([]);
+    ······· │ 
+     42  36 │   
+     43  37 │     it("blocks missing source, unsafe paths, invalid artifacts, and failed validation", () => {
+     44     │ - ····expect(createArtifactReceipt({
+     45     │ - ······taskKind:·"docs-report",
+     46     │ - ······outputKind:·"artifact",
+     47     │ - ······requiredPaths:·[],
+     48     │ - ······workspacePaths:·["notes/source.md"],
+     49     │ - ······verificationState:·"selected-passed",
+     50     │ - ······failureCategories:·[],
+     51     │ - ····})).toMatchObject({
+         38 │ + ····expect(
+         39 │ + ······createArtifactReceipt({
+         40 │ + ········taskKind:·"docs-report",
+         41 │ + ········outputKind:·"artifact",
+         42 │ + ········requiredPaths:·[],
+         43 │ + ········workspacePaths:·["notes/source.md"],
+         44 │ + ········verificationState:·"selected-passed",
+         45 │ + ········failureCategories:·[],
+         46 │ + ······}),
+         47 │ + ····).toMatchObject({
+     52  48 │         validationState: "output-missing",
+     53  49 │         blockers: ["artifact output path missing"],
+    ······· │ 
+     55  51 │       });
+     56  52 │   
+     57     │ - ····expect(createArtifactReceipt({
+     58     │ - ······taskKind:·"docs-report",
+     59     │ - ······outputKind:·"artifact",
+     60     │ - ······requiredPaths:·["reports/summary.md"],
+     61     │ - ······workspacePaths:·["reports/summary.md"],
+     62     │ - ······verificationState:·"selected-passed",
+     63     │ - ······failureCategories:·[],
+     64     │ - ····})?.validationState).toBe("source-missing");
+         53 │ + ····expect(
+         54 │ + ······createArtifactReceipt({
+         55 │ + ········taskKind:·"docs-report",
+         56 │ + ········outputKind:·"artifact",
+         57 │ + ········requiredPaths:·["reports/summary.md"],
+         58 │ + ········workspacePaths:·["reports/summary.md"],
+         59 │ + ········verificationState:·"selected-passed",
+         60 │ + ········failureCategories:·[],
+         61 │ + ······})?.validationState,
+         62 │ + ····).toBe("source-missing");
+     65  63 │   
+     66     │ - ····expect(createArtifactReceipt({
+     67     │ - ······taskKind:·"docs-report",
+     68     │ - ······outputKind:·"artifact",
+     69     │ - ······requiredPaths:·["../summary.md"],
+     70     │ - ······workspacePaths:·["notes/source.md",·"../summary.md"],
+     71     │ - ······verificationState:·"selected-passed",
+     72     │ - ······failureCategories:·[],
+     73     │ - ····})?.validationState).toBe("unsafe-path");
+         64 │ + ····expect(
+         65 │ + ······createArtifactReceipt({
+         66 │ + ········taskKind:·"docs-report",
+         67 │ + ········outputKind:·"artifact",
+         68 │ + ········requiredPaths:·["../summary.md"],
+         69 │ + ········workspacePaths:·["notes/source.md",·"../summary.md"],
+         70 │ + ········verificationState:·"selected-passed",
+         71 │ + ········failureCategories:·[],
+         72 │ + ······})?.validationState,
+         73 │ + ····).toBe("unsafe-path");
+     74  74 │   
+     75     │ - ····expect(createArtifactReceipt({
+     76     │ - ······taskKind:·"data-artifact",
+     77     │ - ······outputKind:·"artifact",
+     78     │ - ······requiredPaths:·["artifacts/totals.json"],
+     79     │ - ······workspacePaths:·["data/input.csv",·"artifacts/totals.json"],
+     80     │ - ······verificationState:·"selected-failed",
+     81     │ - ······failureCategories:·["artifact·invalid"],
+     82     │ - ····})?.validationState).toBe("validation-failed");
+         75 │ + ····expect(
+         76 │ + ······createArtifactReceipt({
+         77 │ + ········taskKind:·"data-artifact",
+         78 │ + ········outputKind:·"artifact",
+         79 │ + ········requiredPaths:·["artifacts/totals.json"],
+         80 │ + ········workspacePaths:·["data/input.csv",·"artifacts/totals.json"],
+         81 │ + ········verificationState:·"selected-failed",
+         82 │ + ········failureCategories:·["artifact·invalid"],
+         83 │ + ······})?.validationState,
+         84 │ + ····).toBe("validation-failed");
+     83  85 │   
+     84     │ - ····expect(createArtifactReceipt({
+     85     │ - ······taskKind:·"docs-report",
+     86     │ - ······outputKind:·"artifact",
+     87     │ - ······requiredPaths:·["reports/summary.md"],
+     88     │ - ······workspacePaths:·["notes/source.md",·"reports/summary.md"],
+     89     │ - ······verificationState:·"selected-not-run",
+     90     │ - ······failureCategories:·[],
+     91     │ - ····})?.validationState).toBe("not-proven");
+         86 │ + ····expect(
+         87 │ + ······createArtifactReceipt({
+         88 │ + ········taskKind:·"docs-report",
+         89 │ + ········outputKind:·"artifact",
+         90 │ + ········requiredPaths:·["reports/summary.md"],
+         91 │ + ········workspacePaths:·["notes/source.md",·"reports/summary.md"],
+         92 │ + ········verificationState:·"selected-not-run",
+         93 │ + ········failureCategories:·[],
+         94 │ + ······})?.validationState,
+         95 │ + ····).toBe("not-proven");
+     92  96 │   
+     93     │ - ····expect(createArtifactReceipt({
+     94     │ - ······taskKind:·"docs-report",
+     95     │ - ······outputKind:·"artifact",
+     96     │ - ······requiredPaths:·["reports/summary.md"],
+     97     │ - ······workspacePaths:·["notes/source.md",·"reports/summary.md"],
+     98     │ - ······verificationState:·"selected-passed",
+     99     │ - ······failureCategories:·[],
+    100     │ - ······requiredContentMarkers:·["source-receipt",·"verification-evidence"],
+    101     │ - ······observedContentMarkers:·["source-receipt"],
+    102     │ - ······verificationEvidence:·["artifact-check:source-coverage:failed"],
+    103     │ - ····})?.validationState).toBe("invalid");
+         97 │ + ····expect(
+         98 │ + ······createArtifactReceipt({
+         99 │ + ········taskKind:·"docs-report",
+        100 │ + ········outputKind:·"artifact",
+        101 │ + ········requiredPaths:·["reports/summary.md"],
+        102 │ + ········workspacePaths:·["notes/source.md",·"reports/summary.md"],
+        103 │ + ········verificationState:·"selected-passed",
+        104 │ + ········failureCategories:·[],
+        105 │ + ········requiredContentMarkers:·["source-receipt",·"verification-evidence"],
+        106 │ + ········observedContentMarkers:·["source-receipt"],
+        107 │ + ········verificationEvidence:·["artifact-check:source-coverage:failed"],
+        108 │ + ······})?.validationState,
+        109 │ + ····).toBe("invalid");
+    104 110 │   
+    105     │ - ····expect(createArtifactReceipt({
+    106     │ - ······taskKind:·"docs-report",
+    107     │ - ······outputKind:·"artifact",
+    108     │ - ······requiredPaths:·["reports/summary.md"],
+    109     │ - ······workspacePaths:·["notes/source.md",·"reports/summary.md"],
+    110     │ - ······verificationState:·"selected-passed",
+    111     │ - ······failureCategories:·[],
+    112     │ - ······requiredContentMarkers:·["source-receipt"],
+    113     │ - ······observedContentMarkers:·["source-receipt"],
+    114     │ - ······verificationEvidence:·[],
+    115     │ - ····})?.validationState).toBe("not-proven");
+  82 more lines truncated
+  
+
+packages/ts-shell/src/artifacts/workflow/model.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     5  5 │     ArtifactReceiptInput,
+     6  6 │   } from "./types.js";
+     7    │ - import·{
+     8    │ - ··claimEvidenceReceiptsFor,
+     9    │ - ··safeEvidence,
+    10    │ - ··uniqueEvidence,
+    11    │ - }·from·"./claim.js";
+        7 │ + import·{·claimEvidenceReceiptsFor,·safeEvidence,·uniqueEvidence·}·from·"./claim.js";
+    12  8 │   import {
+    13  9 │     artifactBlockersFor,
+    ····· │ 
+    63 59 │       });
+    64 60 │     }
+    65    │ - ··const·targetFiles·=·Object.freeze(uniqueEvidence([
+    66    │ - ····...input.changedFiles,
+    67    │ - ····...input.verifiedFiles,
+    68    │ - ····...input.evidenceFiles,
+    69    │ - ··]));
+       61 │ + ··const·targetFiles·=·Object.freeze(
+       62 │ + ····uniqueEvidence([...input.changedFiles,·...input.verifiedFiles,·...input.evidenceFiles]),
+       63 │ + ··);
+    70 64 │     return Object.freeze({
+    71 65 │       written: input.changedFiles.length > 0,
+  
+
+packages/ts-shell/src/workflow/jobs/validation.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - import·{·isRecord·}·from·'../../core/values/record.js';
+     2    │ - import·type·{·BoundSessionScope·}·from·'../../session/store/contract.js';
+     3    │ - import·{·JobStateError,·type·JobOrigin·}·from·'./model.js';
+        1 │ + import·{·isRecord·}·from·"../../core/values/record.js";
+        2 │ + import·type·{·BoundSessionScope·}·from·"../../session/store/contract.js";
+        3 │ + import·{·JobStateError,·type·JobOrigin·}·from·"./model.js";
+     4  4 │   
+     5  5 │   export function valid(value: unknown): asserts value {
+     6    │ - ··if·(!value)·throw·new·JobStateError('invalid');
+        6 │ + ··if·(!value)·throw·new·JobStateError("invalid");
+     7  7 │   }
+     8  8 │   export function text(value: unknown, max: number): value is string {
+     9    │ - ··return·typeof·value·===·'string'·&&·value.length·>·0·&&·value.length·<=·max·&&·!/[\x00-\x1f\x7f-\x9f]/.test(value);
+        9 │ + ··return·typeof·value·===·"string"·&&·value.length·>·0·&&·value.length·<=·max·&&·!/[\x00-\x1f\x7f-\x9f]/.test(value);
+    10 10 │   }
+    11 11 │   export function validateOrigin(value: unknown): asserts value is JobOrigin {
+    12    │ - ··valid(isRecord(value)·&&·Object.keys(value).every(key·=>·['kind',·'principal',·'acceptanceId',·'parentId',·'goalId',·'roomId',·'serviceEpoch',·'hostGeneration',·'sourceEntryId'].includes(key)));
+    13    │ - ··valid(['local',·'collaboration',·'goal',·'advisor'].includes(String(value.kind)));
+    14    │ - ··for·(const·key·of·['principal',·'acceptanceId',·'parentId',·'goalId',·'roomId',·'serviceEpoch',·'sourceEntryId'])·valid(value[key]·===·undefined·||·text(value[key],·256));
+    15    │ - ··const·collab·=·value.kind·===·'collaboration'·||·['principal',·'acceptanceId',·'roomId',·'serviceEpoch',·'hostGeneration'].some(key·=>·value[key]·!==·undefined);
+    16    │ - ··valid(!collab·||·(text(value.principal,·256)·&&·text(value.acceptanceId,·256)·&&·text(value.roomId,·256)
+    17    │ - ····&&·text(value.serviceEpoch,·256)·&&·Number.isSafeInteger(value.hostGeneration)·&&·Number(value.hostGeneration)·>=·1));
+    18    │ - ··valid(value.kind·!==·'goal'·||·text(value.goalId,·256));·valid(value.kind·!==·'advisor'·||·text(value.parentId,·256));
+       12 │ + ··valid(
+       13 │ + ····isRecord(value)·&&
+       14 │ + ······Object.keys(value).every((key)·=>
+       15 │ + ········[
+       16 │ + ··········"kind",
+       17 │ + ··········"principal",
+       18 │ + ··········"acceptanceId",
+       19 │ + ··········"parentId",
+       20 │ + ··········"goalId",
+       21 │ + ··········"roomId",
+       22 │ + ··········"serviceEpoch",
+       23 │ + ··········"hostGeneration",
+       24 │ + ··········"sourceEntryId",
+       25 │ + ········].includes(key),
+       26 │ + ······),
+       27 │ + ··);
+       28 │ + ··valid(["local",·"collaboration",·"goal",·"advisor"].includes(String(value.kind)));
+       29 │ + ··for·(const·key·of·["principal",·"acceptanceId",·"parentId",·"goalId",·"roomId",·"serviceEpoch",·"sourceEntryId"])
+       30 │ + ····valid(value[key]·===·undefined·||·text(value[key],·256));
+       31 │ + ··const·collab·=
+       32 │ + ····value.kind·===·"collaboration"·||
+       33 │ + ····["principal",·"acceptanceId",·"roomId",·"serviceEpoch",·"hostGeneration"].some((key)·=>·value[key]·!==·undefined);
+       34 │ + ··valid(
+       35 │ + ····!collab·||
+       36 │ + ······(text(value.principal,·256)·&&
+       37 │ + ········text(value.acceptanceId,·256)·&&
+       38 │ + ········text(value.roomId,·256)·&&
+       39 │ + ········text(value.serviceEpoch,·256)·&&
+       40 │ + ········Number.isSafeInteger(value.hostGeneration)·&&
+       41 │ + ········Number(value.hostGeneration)·>=·1),
+       42 │ + ··);
+       43 │ + ··valid(value.kind·!==·"goal"·||·text(value.goalId,·256));
+       44 │ + ··valid(value.kind·!==·"advisor"·||·text(value.parentId,·256));
+    19 45 │   }
+    20 46 │   export function validateScope(value: unknown, session: BoundSessionScope): asserts value is BoundSessionScope {
+    21    │ - ··valid(isRecord(value)·&&·Object.keys(value).every(key·=>·['sessionId',·'sessionCreatedAt',·'workspace'].includes(key))
+    22    │ - ····&&·value.sessionId·===·session.sessionId·&&·value.sessionCreatedAt·===·session.sessionCreatedAt·&&·isRecord(value.workspace)
+    23    │ - ····&&·Object.keys(value.workspace).every(key·=>·['path',·'identity'].includes(key))·&&·text(value.workspace.path,·4096)·&&·text(value.workspace.identity,·256));
+       47 │ + ··valid(
+       48 │ + ····isRecord(value)·&&
+       49 │ + ······Object.keys(value).every((key)·=>·["sessionId",·"sessionCreatedAt",·"workspace"].includes(key))·&&
+       50 │ + ······value.sessionId·===·session.sessionId·&&
+       51 │ + ······value.sessionCreatedAt·===·session.sessionCreatedAt·&&
+       52 │ + ······isRecord(value.workspace)·&&
+       53 │ + ······Object.keys(value.workspace).every((key)·=>·["path",·"identity"].includes(key))·&&
+       54 │ + ······text(value.workspace.path,·4096)·&&
+       55 │ + ······text(value.workspace.identity,·256),
+       56 │ + ··);
+    24 57 │   }
+    25 58 │   
+  
+
+packages/ts-shell/src/workflow/rules/proposal.test.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - import·fs·from·'node:fs';
+     2    │ - import·os·from·'node:os';
+     3    │ - import·path·from·'node:path';
+     4    │ - import·{·afterEach,·describe,·expect,·it·}·from·'vitest';
+     5    │ - import·{·prepareRuleProposal,·proposeRules·}·from·'./proposal.js';
+        1 │ + import·fs·from·"node:fs";
+        2 │ + import·os·from·"node:os";
+        3 │ + import·path·from·"node:path";
+        4 │ + import·{·afterEach,·describe,·expect,·it·}·from·"vitest";
+        5 │ + import·{·prepareRuleProposal,·proposeRules·}·from·"./proposal.js";
+     6  6 │   
+     7  7 │   const roots: string[] = [];
+     8    │ - afterEach(()·=>·{·for·(const·root·of·roots.splice(0))·fs.rmSync(root,·{·recursive:·true,·force:·true·});·});
+        8 │ + afterEach(()·=>·{
+        9 │ + ··for·(const·root·of·roots.splice(0))·fs.rmSync(root,·{·recursive:·true,·force:·true·});
+       10 │ + });
+     9 11 │   
+    10    │ - describe('rule·proposals',·()·=>·{
+    11    │ - ··it('refuses·a·symlink,·bounded·metadata·failure·and·read·denial·without·treating·them·as·absence',·()·=>·{
+    12    │ - ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·'cheers-rule-'));·roots.push(root);
+    13    │ - ····const·outside·=·fs.mkdtempSync(path.join(os.tmpdir(),·'cheers-rule-outside-'));·roots.push(outside);
+    14    │ - ····fs.writeFileSync(path.join(outside,·'private'),·'external·fixture');
+    15    │ - ····fs.symlinkSync(path.join(outside,·'private'),·path.join(root,·'AGENTS.md'));
+    16    │ - ····expect(()·=>·proposeRules(root,·'init')).toThrow('outside·the·selected·workspace');
+    17    │ - ····fs.unlinkSync(path.join(root,·'AGENTS.md'));
+    18    │ - ····fs.writeFileSync(path.join(root,·'package.json'),·'·'.repeat(128·*·1024·+·1));
+    19    │ - ····expect(()·=>·proposeRules(root,·'init')).toThrow('size·limit');
+    20    │ - ····expect(()·=>·proposeRules(root,·'feedback',·'test',·()·=>·{·throw·new·Error('source·denied');·})).toThrow('source·denied');
+       12 │ + describe("rule·proposals",·()·=>·{
+       13 │ + ··it("refuses·a·symlink,·bounded·metadata·failure·and·read·denial·without·treating·them·as·absence",·()·=>·{
+       14 │ + ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·"cheers-rule-"));
+       15 │ + ····roots.push(root);
+       16 │ + ····const·outside·=·fs.mkdtempSync(path.join(os.tmpdir(),·"cheers-rule-outside-"));
+       17 │ + ····roots.push(outside);
+       18 │ + ····fs.writeFileSync(path.join(outside,·"private"),·"external·fixture");
+       19 │ + ····fs.symlinkSync(path.join(outside,·"private"),·path.join(root,·"AGENTS.md"));
+       20 │ + ····expect(()·=>·proposeRules(root,·"init")).toThrow("outside·the·selected·workspace");
+       21 │ + ····fs.unlinkSync(path.join(root,·"AGENTS.md"));
+       22 │ + ····fs.writeFileSync(path.join(root,·"package.json"),·"·".repeat(128·*·1024·+·1));
+       23 │ + ····expect(()·=>·proposeRules(root,·"init")).toThrow("size·limit");
+       24 │ + ····expect(()·=>
+       25 │ + ······proposeRules(root,·"feedback",·"test",·()·=>·{
+       26 │ + ········throw·new·Error("source·denied");
+       27 │ + ······}),
+       28 │ + ····).toThrow("source·denied");
+    21 29 │     });
+    22    │ - ··it('preserves·existing·rule·content·and·does·not·invent·unknown·commands',·()·=>·{
+    23    │ - ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·'cheers-rule-'));·roots.push(root);
+    24    │ - ····fs.writeFileSync(path.join(root,·'AGENTS.md'),·'Keep·source·files·small.\n',·'utf8');
+    25    │ - ····const·proposal·=·proposeRules(root,·'init');
+    26    │ - ····expect(proposal.before).toBe('Keep·source·files·small.\n');
+    27    │ - ····expect(proposal.after).toContain('Keep·source·files·small.');
+    28    │ - ····expect(proposal.after).toContain('No·recognized·project·manifest');
+    29    │ - ····expect(proposal.after).not.toContain('npm·test');
+    30    │ - ····expect(proposal.write).toBe('append');
+       30 │ + ··it("preserves·existing·rule·content·and·does·not·invent·unknown·commands",·()·=>·{
+       31 │ + ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·"cheers-rule-"));
+       32 │ + ····roots.push(root);
+       33 │ + ····fs.writeFileSync(path.join(root,·"AGENTS.md"),·"Keep·source·files·small.\n",·"utf8");
+       34 │ + ····const·proposal·=·proposeRules(root,·"init");
+       35 │ + ····expect(proposal.before).toBe("Keep·source·files·small.\n");
+       36 │ + ····expect(proposal.after).toContain("Keep·source·files·small.");
+       37 │ + ····expect(proposal.after).toContain("No·recognized·project·manifest");
+       38 │ + ····expect(proposal.after).not.toContain("npm·test");
+       39 │ + ····expect(proposal.write).toBe("append");
+    31 40 │     });
+    32 41 │   
+    33    │ - ··it('turns·explicit·feedback·into·a·preview·without·durable·authority',·()·=>·{
+    34    │ - ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·'cheers-rule-'));·roots.push(root);
+    35    │ - ····const·proposal·=·proposeRules(root,·'feedback',·'Use·strict·checks');
+    36    │ - ····expect(proposal.preview).toContain('Use·strict·checks');
+    37    │ - ····expect(proposal.preview).toContain('AGENTS.md');
+    38    │ - ····expect(fs.existsSync(path.join(root,·'AGENTS.md'))).toBe(false);
+       42 │ + ··it("turns·explicit·feedback·into·a·preview·without·durable·authority",·()·=>·{
+       43 │ + ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·"cheers-rule-"));
+       44 │ + ····roots.push(root);
+       45 │ + ····const·proposal·=·proposeRules(root,·"feedback",·"Use·strict·checks");
+       46 │ + ····expect(proposal.preview).toContain("Use·strict·checks");
+       47 │ + ····expect(proposal.preview).toContain("AGENTS.md");
+       48 │ + ····expect(fs.existsSync(path.join(root,·"AGENTS.md"))).toBe(false);
+    39 49 │     });
+    40 50 │   
+    41    │ - ··it('retains·distinct·consecutive·feedback·while·keeping·an·exact·repeated·proposal·unchanged',·()·=>·{
+    42    │ - ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·'cheers-rule-'));·roots.push(root);
+    43    │ - ····const·file·=·path.join(root,·'AGENTS.md');
+    44    │ - ····const·first·=·proposeRules(root,·'feedback',·'Keep·source·files·small');
+       51 │ + ··it("retains·distinct·consecutive·feedback·while·keeping·an·exact·repeated·proposal·unchanged",·()·=>·{
+       52 │ + ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·"cheers-rule-"));
+       53 │ + ····roots.push(root);
+       54 │ + ····const·file·=·path.join(root,·"AGENTS.md");
+       55 │ + ····const·first·=·proposeRules(root,·"feedback",·"Keep·source·files·small");
+    45 56 │       fs.writeFileSync(file, first.after);
+    46    │ - ····const·second·=·proposeRules(root,·'feedback',·'Keep·tests·focused');
+    47    │ - ····expect(second.write).toBe('append');
+    48    │ - ····expect(second.after).toContain('Keep·source·files·small');
+    49    │ - ····expect(second.preview).toContain('Keep·tests·focused');
+       57 │ + ····const·second·=·proposeRules(root,·"feedback",·"Keep·tests·focused");
+       58 │ + ····expect(second.write).toBe("append");
+       59 │ + ····expect(second.after).toContain("Keep·source·files·small");
+       60 │ + ····expect(second.preview).toContain("Keep·tests·focused");
+    50 61 │       fs.writeFileSync(file, second.after);
+    51    │ - ····expect(proposeRules(root,·'feedback',·'Keep·tests·focused').write).toBe('unchanged');
+       62 │ + ····expect(proposeRules(root,·"feedback",·"Keep·tests·focused").write).toBe("unchanged");
+    52 63 │     });
+    53 64 │   
+    54    │ - ··it('prepares·an·existing·file·through·the·ordinary·patch·owner·with·the·expected·digest',·()·=>·{
+    55    │ - ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·'cheers-rule-'));·roots.push(root);
+    56    │ - ····fs.writeFileSync(path.join(root,·'AGENTS.md'),·'Keep·source·files·small.\n',·'utf8');
+    57    │ - ····const·proposal·=·proposeRules(root,·'init');
+    58    │ - ····const·prepared·=·prepareRuleProposal(proposal,·{·workspaceRoot:·root,·artifactRoot:·root,·sessionId:·'s1',·assertFileAccess:·()·=>·{}·}·as·never);
+    59    │ - ····expect(prepared.preparation.preview).toContain('AGENTS.md');
+       65 │ + ··it("prepares·an·existing·file·through·the·ordinary·patch·owner·with·the·expected·digest",·()·=>·{
+       66 │ + ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·"cheers-rule-"));
+       67 │ + ····roots.push(root);
+       68 │ + ····fs.writeFileSync(path.join(root,·"AGENTS.md"),·"Keep·source·files·small.\n",·"utf8");
+       69 │ + ····const·proposal·=·proposeRules(root,·"init");
+       70 │ + ····const·prepared·=·prepareRuleProposal(proposal,·{
+       71 │ + ······workspaceRoot:·root,
+       72 │ + ······artifactRoot:·root,
+       73 │ + ······sessionId:·"s1",
+       74 │ + ······assertFileAccess:·()·=>·{},
+       75 │ + ····}·as·never);
+       76 │ + ····expect(prepared.preparation.preview).toContain("AGENTS.md");
+    60 77 │     });
+    61 78 │   
+    62    │ - ··it('rejects·a·stale·rule·file·before·preparing·the·write',·()·=>·{
+    63    │ - ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·'cheers-rule-'));·roots.push(root);
+    64    │ - ····fs.writeFileSync(path.join(root,·'AGENTS.md'),·'Keep·source·files·small.\nKeep·tests·focused.\n',·'utf8');
+    65    │ - ····const·proposal·=·proposeRules(root,·'init');
+    66    │ - ····fs.appendFileSync(path.join(root,·'AGENTS.md'),·'Changed·while·preview·was·open.\n',·'utf8');
+    67    │ - ····expect(()·=>·prepareRuleProposal(proposal,·{·workspaceRoot:·root,·artifactRoot:·root,·sessionId:·'s1',·assertFileAccess:·()·=>·{}·}·as·never)).toThrow(/FILE_CONTENT_CHANGED|Patch·source·snapshots/);
+       79 │ + ··it("rejects·a·stale·rule·file·before·preparing·the·write",·()·=>·{
+       80 │ + ····const·root·=·fs.mkdtempSync(path.join(os.tmpdir(),·"cheers-rule-"));
+       81 │ + ····roots.push(root);
+       82 │ + ····fs.writeFileSync(path.join(root,·"AGENTS.md"),·"Keep·source·files·small.\nKeep·tests·focused.\n",·"utf8");
+       83 │ + ····const·proposal·=·proposeRules(root,·"init");
+       84 │ + ····fs.appendFileSync(path.join(root,·"AGENTS.md"),·"Changed·while·preview·was·open.\n",·"utf8");
+       85 │ + ····expect(()·=>
+       86 │ + ······prepareRuleProposal(proposal,·{
+       87 │ + ········workspaceRoot:·root,
+       88 │ + ········artifactRoot:·root,
+       89 │ + ········sessionId:·"s1",
+       90 │ + ········assertFileAccess:·()·=>·{},
+       91 │ + ······}·as·never),
+       92 │ + ····).toThrow(/FILE_CONTENT_CHANGED|Patch·source·snapshots/);
+    68 93 │     });
+    69 94 │   });
+  
+
+packages/ts-shell/src/workflow/rules/proposal.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·path·from·'node:path';
+      2     │ - import·{·editDiff·}·from·'../../edit/result/diff.js';
+      3     │ - import·{·hashContent·}·from·'../../edit/authority/content.js';
+      4     │ - import·{·createPatchToolDefinition·}·from·'../../edit/patch/tool.js';
+      5     │ - import·type·{·ToolExecutionContext,·ToolPreparation·}·from·'../../tools/types.js';
+      6     │ - import·{·inspectWorkspaceFile,·type·FileState·}·from·'../../core/workspace/files.js';
+      7     │ - import·{·detectLineEnding,·splitByteOrderMark·}·from·'../../runtime/execution/fileText.js';
+          1 │ + import·path·from·"node:path";
+          2 │ + import·{·editDiff·}·from·"../../edit/result/diff.js";
+          3 │ + import·{·hashContent·}·from·"../../edit/authority/content.js";
+          4 │ + import·{·createPatchToolDefinition·}·from·"../../edit/patch/tool.js";
+          5 │ + import·type·{·ToolExecutionContext,·ToolPreparation·}·from·"../../tools/types.js";
+          6 │ + import·{·inspectWorkspaceFile,·type·FileState·}·from·"../../core/workspace/files.js";
+          7 │ + import·{·detectLineEnding,·splitByteOrderMark·}·from·"../../runtime/execution/fileText.js";
+      8   8 │   
+      9     │ - export·type·RuleProposalKind·=·'init'·|·'feedback';
+          9 │ + export·type·RuleProposalKind·=·"init"·|·"feedback";
+     10  10 │   
+     11  11 │   export interface RuleProposal {
+    ······· │ 
+     17  17 │     readonly sourceDigest: string;
+     18  18 │     readonly preview: string;
+     19     │ - ··readonly·write:·'new'·|·'append'·|·'unchanged';
+     20     │ - ··readonly·sourceState:·'exists'·|·'absent';
+         19 │ + ··readonly·write:·"new"·|·"append"·|·"unchanged";
+         20 │ + ··readonly·sourceState:·"exists"·|·"absent";
+     21  21 │   }
+     22  22 │   
+    ······· │ 
+     26  26 │   }
+     27  27 │   
+     28     │ - const·MARKER·=·'##·Project·initialization·guidance';
+     29     │ - const·FEEDBACK_MARKER·=·'##·Feedback-derived·rule·proposal';
+         28 │ + const·MARKER·=·"##·Project·initialization·guidance";
+         29 │ + const·FEEDBACK_MARKER·=·"##·Feedback-derived·rule·proposal";
+     30  30 │   const MAX_FEEDBACK = 4_000;
+     31  31 │   
+     32  32 │   /** Inspect only bounded, local project metadata. No command is executed here. */
+     33     │ - export·function·proposeRules(root:·string,·kind:·RuleProposalKind,·feedback?:·string,·read?:·(target:·string,·maxBytes:·number)·=>·FileState):·RuleProposal·{
+         33 │ + export·function·proposeRules(
+         34 │ + ··root:·string,
+         35 │ + ··kind:·RuleProposalKind,
+         36 │ + ··feedback?:·string,
+         37 │ + ··read?:·(target:·string,·maxBytes:·number)·=>·FileState,
+         38 │ + ):·RuleProposal·{
+     34  39 │     const projectRoot = path.resolve(root);
+     35     │ - ··const·source·=·read·??·((target,·maxBytes)·=>·inspectWorkspaceFile(projectRoot,·path.relative(projectRoot,·target),·undefined,·maxBytes));
+         40 │ + ··const·source·=
+         41 │ + ····read·??
+         42 │ + ····((target,·maxBytes)·=>·inspectWorkspaceFile(projectRoot,·path.relative(projectRoot,·target),·undefined,·maxBytes));
+     36  43 │     const { target, file } = ruleTarget(projectRoot, source);
+     37     │ - ··const·before·=·file.state·===·'exists'·?·file.content·:·'';
+     38     │ - ··const·section·=·kind·===·'init'·?·initializationSection(projectRoot,·source)·:·feedbackSection(feedback);
+     39     │ - ··const·marker·=·kind·===·'init'·?·MARKER·:·FEEDBACK_MARKER;
+     40     │ - ··const·alreadyPresent·=·kind·===·'init'·?·before.includes(marker)·:·before.replace(/\r\n/g,·'\n').includes(section);
+         44 │ + ··const·before·=·file.state·===·"exists"·?·file.content·:·"";
+         45 │ + ··const·section·=·kind·===·"init"·?·initializationSection(projectRoot,·source)·:·feedbackSection(feedback);
+         46 │ + ··const·marker·=·kind·===·"init"·?·MARKER·:·FEEDBACK_MARKER;
+         47 │ + ··const·alreadyPresent·=·kind·===·"init"·?·before.includes(marker)·:·before.replace(/\r\n/g,·"\n").includes(section);
+     41  48 │     const after = alreadyPresent ? before : joinRuleText(before, section);
+     42  49 │     return Object.freeze({
+    ······· │ 
+     48  55 │       sourceDigest: hashContent(before),
+     49  56 │       preview: editDiff(path.relative(projectRoot, target) || path.basename(target), before, after),
+     50     │ - ····write:·after·===·before·?·'unchanged'·:·file.state·===·'exists'·?·'append'·:·'new',
+         57 │ + ····write:·after·===·before·?·"unchanged"·:·file.state·===·"exists"·?·"append"·:·"new",
+     51  58 │       sourceState: file.state,
+     52  59 │     });
+    ······· │ 
+     55  62 │   /** Prepare the proposal for the ordinary apply_patch approval and stale check. */
+     56  63 │   export function prepareRuleProposal(proposal: RuleProposal, context: ToolExecutionContext): PreparedRuleProposal {
+     57     │ - ··if·(!context.sessionId)·throw·new·Error('A·saved·session·is·required·before·preparing·a·rule·write.');
+         64 │ + ··if·(!context.sessionId)·throw·new·Error("A·saved·session·is·required·before·preparing·a·rule·write.");
+     58  65 │     const relative = path.relative(context.artifactRoot ?? context.workspaceRoot, proposal.target);
+     59     │ - ··if·(!relative·||·relative.startsWith('..')·||·path.isAbsolute(relative))·throw·new·Error('Rule·target·is·outside·the·workspace.');
+         66 │ + ··if·(!relative·||·relative.startsWith("..")·||·path.isAbsolute(relative))
+         67 │ + ····throw·new·Error("Rule·target·is·outside·the·workspace.");
+     60  68 │     const args = rulePatchArguments(proposal, relative);
+     61  69 │     const input = args.input;
+    ······· │ 
+     65  73 │   }
+     66  74 │   
+     67     │ - export·function·rulePatchArguments(proposal:·RuleProposal,·relative:·string):·{·input:·string;·expectedHashes:·Record<string,·string>·}·{
+     68     │ - ··const·input·=·proposal.sourceState·===·'absent'
+     69     │ - ····?·`***·Begin·Patch\n***·Add·File:·${relative}\n${proposal.after.split('\n').filter((line,·index,·all)·=>·index·<·all.length·-·1·||·line).map(line·=>·`+${line}`).join('\n')}\n***·End·Patch`
+     70     │ - ····:·updatePatch(relative,·proposal.before,·proposal.after);
+     71     │ - ··return·{·input,·expectedHashes:·proposal.sourceState·===·'absent'·?·{}·:·{·[proposal.target]:·proposal.sourceDigest·}·};
+         75 │ + export·function·rulePatchArguments(
+         76 │ + ··proposal:·RuleProposal,
+         77 │ + ··relative:·string,
+         78 │ + ):·{·input:·string;·expectedHashes:·Record<string,·string>·}·{
+         79 │ + ··const·input·=
+         80 │ + ····proposal.sourceState·===·"absent"
+         81 │ + ······?·`***·Begin·Patch\n***·Add·File:·${relative}\n${proposal.after
+         82 │ + ··········.split("\n")
+         83 │ + ··········.filter((line,·index,·all)·=>·index·<·all.length·-·1·||·line)
+         84 │ + ··········.map((line)·=>·`+${line}`)
+         85 │ + ··········.join("\n")}\n***·End·Patch`
+         86 │ + ······:·updatePatch(relative,·proposal.before,·proposal.after);
+         87 │ + ··return·{
+         88 │ + ····input,
+         89 │ + ····expectedHashes:·proposal.sourceState·===·"absent"·?·{}·:·{·[proposal.target]:·proposal.sourceDigest·},
+         90 │ + ··};
+     72  91 │   }
+     73  92 │   
+    ······· │ 
+     75  94 │     const oldLines = patchLines(before);
+     76  95 │     const newLines = patchLines(after);
+     77     │ - ··const·hunk·=·['@@',·...oldLines.map(line·=>·`-${line}`),·...newLines.map(line·=>·`+${line}`)].join('\n');
+         96 │ + ··const·hunk·=·["@@",·...oldLines.map((line)·=>·`-${line}`),·...newLines.map((line)·=>·`+${line}`)].join("\n");
+     78  97 │     return `*** Begin Patch\n*** Update File: ${relative}\n${hunk}\n*** End Patch`;
+     79  98 │   }
+     80  99 │   
+     81 100 │   function patchLines(value: string): string[] {
+     82     │ - ··const·normalized·=·splitByteOrderMark(value).text.replace(/\r\n/g,·'\n');
+        101 │ + ··const·normalized·=·splitByteOrderMark(value).text.replace(/\r\n/g,·"\n");
+     83 102 │     if (!normalized) return [];
+     84     │ - ··return·(normalized.endsWith('\n')·?·normalized.slice(0,·-1)·:·normalized).split('\n');
+        103 │ + ··return·(normalized.endsWith("\n")·?·normalized.slice(0,·-1)·:·normalized).split("\n");
+     85 104 │   }
+     86 105 │   
+     87     │ - function·ruleTarget(root:·string,·read:·(target:·string,·maxBytes:·number)·=>·FileState):·{·target:·string;·file:·FileState·}·{
+     88     │ - ··for·(const·candidate·of·['AGENTS.md',·'AGENTS.MD',·'CLAUDE.md',·'CLAUDE.MD'])·{
+        106 │ + function·ruleTarget(
+        107 │ + ··root:·string,
+        108 │ + ··read:·(target:·string,·maxBytes:·number)·=>·FileState,
+        109 │ + ):·{·target:·string;·file:·FileState·}·{
+        110 │ + ··for·(const·candidate·of·["AGENTS.md",·"AGENTS.MD",·"CLAUDE.md",·"CLAUDE.MD"])·{
+     89 111 │       const target = path.join(root, candidate);
+     90 112 │       const file = read(target, 128 * 1024);
+     91     │ - ····if·(file.state·===·'exists')·return·{·target,·file·};
+        113 │ + ····if·(file.state·===·"exists")·return·{·target,·file·};
+     92 114 │     }
+     93     │ - ··return·{·target:·path.join(root,·'AGENTS.md'),·file:·{·state:·'absent'·}·};
+        115 │ + ··return·{·target:·path.join(root,·"AGENTS.md"),·file:·{·state:·"absent"·}·};
+     94 116 │   }
+     95 117 │   
+    ······· │ 
+     98 120 │     const ending = detectLineEnding(before);
+     99 121 │     const text = splitByteOrderMark(before).text;
+    100     │ - ··return·before·+·(text·?·(text.endsWith('\n')·?·ending·:·ending·+·ending)·:·'')·+·section.replace(/\n/g,·ending)
+    101     │ - ····+·(!text·||·text.endsWith('\n')·?·ending·:·'');
+        122 │ + ··return·(
+        123 │ + ····before·+
+        124 │ + ····(text·?·(text.endsWith("\n")·?·ending·:·ending·+·ending)·:·"")·+
+        125 │ + ····section.replace(/\n/g,·ending)·+
+        126 │ + ····(!text·||·text.endsWith("\n")·?·ending·:·"")
+        127 │ + ··);
+    102 128 │   }
+    103 129 │   
+    ······· │ 
+    106 132 │     const manifests: string[] = [];
+    107 133 │     const metadata = new Map<string, FileState>();
+    108     │ - ··const·exists·=·(name:·string)·=>·{·if·(!metadata.has(name))·metadata.set(name,·read(path.join(root,·name),·128·*·1024));·return·metadata.get(name)!.state·===·'exists';·};
+    109     │ - ··const·add·=·(name:·string,·label:·string)·=>·{·if·(exists(name))·{·manifests.push(name);·facts.push(`-·${label}:·${name}`);·}·};
+    110     │ - ··add('package.json',·'JavaScript/TypeScript·manifest');
+    111     │ - ··add('tsconfig.json',·'TypeScript·configuration');
+    112     │ - ··add('Cargo.toml',·'Rust·manifest');
+  79 more lines truncated
+  
+
+The number of diagnostics exceeds the limit allowed. Use --max-diagnostics to increase it.
+Diagnostics not shown: 3087.
+Checked 3347 files in 1197ms. No fixes applied.
+Found 3107 errors.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+

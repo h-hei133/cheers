@@ -1,0 +1,47 @@
+[
+  {
+    "name": "combined-output",
+    "file": "packages/ts-shell/src/cli/runtime/shell/index.ts",
+    "exitCode": 1,
+    "signal": null,
+    "assertionFailure": true,
+    "restoredExact": true,
+    "sourceSha256": "7d5b8fef68a84cb657a7dadc69a8274b5e9aa6e9e27eda6f7948721a9b14e6bb"
+  },
+  {
+    "name": "branch-admission",
+    "file": "packages/ts-shell/src/cli/runtime/shell/history.ts",
+    "exitCode": 1,
+    "signal": null,
+    "assertionFailure": true,
+    "restoredExact": true,
+    "sourceSha256": "4454644b59665eac44983c14e68f395aa1dddb48b5bf964520f5e04315a437d1"
+  },
+  {
+    "name": "excluded-history",
+    "file": "packages/ts-shell/src/cli/runtime/shell/history.ts",
+    "exitCode": 1,
+    "signal": null,
+    "assertionFailure": true,
+    "restoredExact": true,
+    "sourceSha256": "4454644b59665eac44983c14e68f395aa1dddb48b5bf964520f5e04315a437d1"
+  },
+  {
+    "name": "started-settlement",
+    "file": "packages/ts-shell/src/turn/invoke.ts",
+    "exitCode": 1,
+    "signal": null,
+    "assertionFailure": true,
+    "restoredExact": true,
+    "sourceSha256": "1ab4c6d49bdf6c6e31f3528c32246f060e6b3d6c9aa54e8add4e96097bc8f4bc"
+  },
+  {
+    "name": "captured-limits",
+    "file": "packages/ts-shell/src/session/branch/store/index.ts",
+    "exitCode": 1,
+    "signal": null,
+    "assertionFailure": true,
+    "restoredExact": true,
+    "sourceSha256": "efc2bcedf4992cd60ebf824adddbc055dbca7bd57e5f3ec788d8ad382b17bf3f"
+  }
+]

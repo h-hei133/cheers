@@ -1,0 +1,45 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/rpc/shell.test.ts (19 tests) 9557ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  604ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  512ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  495ms
+   ✓ keeps actual exit evidence when after-call hooks fail  460ms
+   ✓ reports unverified message persistence without losing the completed native outcome  460ms
+   ✓ retains completed effects without saving history after configuration retirement  552ms
+   ✓ retains completed effects without saving history after deletion retirement  457ms
+   ✓ preserves an unverified excluded report write in the RPC outcome  444ms
+   ✓ does not publish a completed shell result into a changed session  534ms
+   ✓ does not publish a completed shell result into a changed branch  515ms
+   ✓ redacts credential-shaped command output in the response and durable records  472ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  3402ms
+ ✓ src/cli/runtime/navigation.test.ts (41 tests) 32752ms
+   ✓ session tree navigation > keeps every admitted deep entry in bounded tree and history terminal output without changing saved files  29259ms
+ ✓ src/session/branch/store/index.test.ts (36 tests) 1258ms
+ ✓ src/core/tools/shell/output.test.ts (5 tests) 2433ms
+   ✓ preserves command failure classification and its receipt with bounded capture  400ms
+   ✓ keeps a completed command observable when its full output cannot be saved  390ms
+   ✓ cancels the same native command and labels the output incomplete  408ms
+   ✓ bounds native capture and preserves the full selected streams for exit 0  619ms
+   ✓ bounds native capture and preserves the full selected streams for exit 7  615ms
+ ✓ src/cli/runtime/inputStream.extensions.test.ts (16 tests) 2090ms
+ ✓ src/core/tools/shell/promotion.test.ts (4 tests) 1376ms
+   ✓ promotes a default-timeout foreground command without spawning again  359ms
+   ✓ reports the result when the command settles before promotion  335ms
+   ✓ returns as soon as a new message promotes the command  342ms
+   ✓ stops the child when promotion is refused at capacity  339ms
+ ✓ src/cli/rpc/runtimeHost.test.ts (31 tests) 1129ms
+ ✓ src/session/reports/persistence.test.ts (5 tests) 197ms
+ ✓ src/turn/tools.test.ts (54 tests) 417ms
+   ✓ createToolHooks > shows the same plan eligibility that the execution gate enforces for every built-in  341ms
+ ✓ src/cli/runtime/inputStream.rpc.test.ts (2 tests) 231ms
+ ✓ src/turn/approval.test.ts (4 tests) 35ms
+ ✓ src/turn/invoke.test.ts (3 tests) 17ms
+ ✓ src/runtime/execution/output/capture.test.ts (7 tests) 9ms
+
+ Test Files  13 passed (13)
+      Tests  227 passed (227)
+   Start at  20:05:20
+   Duration  82.34s (transform 8.55s, setup 0ms, collect 25.78s, tests 51.50s, environment 2ms, prepare 663ms)
+

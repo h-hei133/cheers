@@ -34,6 +34,7 @@ import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { researchRunFor } from './research.js';
 import { cancelGitFor } from './git.js';
 import { installGitCliRuntime } from './gitGate.js';
+import { installShellRuntime } from './shell/index.js';
 import { installDataTransfer } from '../data/transfer.js';
 import { selectModelContext } from '../../session/context/selection.js';
 import { installCollaborationRuntime } from './collaboration.js';
@@ -389,6 +390,7 @@ export function createCliSessionRuntime(input: {
     busy: () => sessionRuntime.getCurrentRunController() !== null });
   goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));
   const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
+  installShellRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installDataTransfer(input.runtimeContext, nativeGate);
   installCollaborationRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installSshRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate, message => input.renderer.renderLine(message));

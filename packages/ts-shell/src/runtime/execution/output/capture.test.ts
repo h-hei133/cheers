@@ -96,3 +96,34 @@ it('keeps cancellation incomplete even after already captured bytes seal success
   await expect(sourceText(capture.source('stdout'))).rejects.toThrow(/unavailable/);
   await capture.dispose();
 });
+
+it('preserves decoded stdout and stderr order in the optional combined view', async () => {
+  const capture = createCommandOutputCapture({ combinedOutput: true });
+  await capture.append('stdout', Buffer.from('first:'));
+  await capture.append('stdout', Buffer.from([0xe4]));
+  await capture.append('stderr', Buffer.from('error:'));
+  await capture.append('stdout', Buffer.from([0xb8, 0x96]));
+  await capture.append('stderr', Buffer.from('last'));
+  await capture.finish();
+  expect(capture.snapshot('combined').tail).toBe('first:error:世last');
+  expect(await sourceText(capture.source('combined'))).toBe('first:error:世last');
+  expect(await sourceText(capture.source('stdout'))).toBe('first:世');
+  expect(await sourceText(capture.source('stderr'))).toBe('error:last');
+  await capture.dispose();
+});
+
+it('spills one complete combined view and retains a bounded tail across both streams', async () => {
+  const spills: OutputSpill[] = [];
+  const capture = createCommandOutputCapture({ limitBytes: 8, combinedOutput: true,
+    openSpill: async () => { const value = staging(); spills.push(value); return value; },
+  });
+  await capture.append('stdout', Buffer.from('first\n'));
+  await capture.append('stderr', Buffer.from('error\n'));
+  await capture.append('stdout', Buffer.from('last\n'));
+  await capture.finish();
+  expect(capture.snapshot('combined')).toMatchObject({ truncated: true, totalRawBytes: 17 });
+  expect(Buffer.byteLength(capture.snapshot('combined').tail)).toBeLessThanOrEqual(8);
+  expect(await sourceText(capture.source('combined'))).toBe('first\nerror\nlast\n');
+  await capture.dispose();
+  expect(spills.every(spill => vi.mocked(spill.dispose).mock.calls.length === 1)).toBe(true);
+});

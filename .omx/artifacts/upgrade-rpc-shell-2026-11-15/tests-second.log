@@ -1,0 +1,32 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/rpc/shell.test.ts (13 tests) 4362ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  392ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  357ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  342ms
+   ✓ keeps actual exit evidence when after-call hooks fail  340ms
+   ✓ reports unverified message persistence without losing the completed native outcome  333ms
+   ✓ does not publish a completed shell result into a changed session  348ms
+   ✓ does not publish a completed shell result into a changed branch  358ms
+   ✓ redacts credential-shaped command output in the response and durable records  366ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  1158ms
+ ✓ src/core/tools/shell/output.test.ts (5 tests) 2175ms
+   ✓ preserves command failure classification and its receipt with bounded capture  357ms
+   ✓ keeps a completed command observable when its full output cannot be saved  365ms
+   ✓ cancels the same native command and labels the output incomplete  367ms
+   ✓ bounds native capture and preserves the full selected streams for exit 0  549ms
+   ✓ bounds native capture and preserves the full selected streams for exit 7  536ms
+ ✓ src/cli/runtime/inputStream.extensions.test.ts (16 tests) 2040ms
+ ✓ src/core/tools/shell/promotion.test.ts (4 tests) 1088ms
+ ✓ src/cli/rpc/runtimeHost.test.ts (31 tests) 915ms
+ ✓ src/cli/runtime/inputStream.rpc.test.ts (2 tests) 218ms
+ ✓ src/turn/approval.test.ts (4 tests) 33ms
+ ✓ src/turn/invoke.test.ts (2 tests) 15ms
+ ✓ src/runtime/execution/output/capture.test.ts (7 tests) 8ms
+
+ Test Files  9 passed (9)
+      Tests  84 passed (84)
+   Start at  19:48:32
+   Duration  33.50s (transform 8.22s, setup 0ms, collect 18.92s, tests 10.85s, environment 1ms, prepare 399ms)
+

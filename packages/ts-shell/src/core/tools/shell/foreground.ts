@@ -12,7 +12,7 @@ import { commandOutputResult } from './output.js';
 
 /** One execution and capture owner survive the foreground-to-job handoff. */
 export async function runCommandTool(executionService: ExecutionService, command: string,
-  context: ToolExecutionContext, requestedTimeoutSeconds?: unknown) {
+  context: ToolExecutionContext, requestedTimeoutSeconds?: unknown, options: { readonly combinedOutput?: boolean } = {}) {
   if (!command.trim()) return deniedResult('Error: No command provided to execute.', { status: 'failed', exitCode: 1 });
   const timeout = resolveCommandTimeout(requestedTimeoutSeconds);
   if (!timeout.ok) return deniedResult(`Error: ${timeout.reason}`, { status: 'failed', exitCode: 1 });
@@ -20,7 +20,7 @@ export async function runCommandTool(executionService: ExecutionService, command
   if (sandbox.state === 'refused') return deniedResult(`Error: ${sandbox.notice ?? 'sandbox refused the command'}`, { status: 'failed', exitCode: 1 });
 
   const manager = ArtifactManager.getShared(context.artifactRoot ?? context.workspaceRoot, context.sessionId);
-  const capture = createCommandOutputCapture({ openSpill: () => manager.createTextStaging() });
+  const capture = createCommandOutputCapture({ openSpill: () => manager.createTextStaging(), combinedOutput: options.combinedOutput });
   const proof = startCommandProof(command, context);
   context.commandProof?.started(proof, context.assertSourceAccess);
   const promotable = requestedTimeoutSeconds === undefined && context.background?.adopt && context.background.promote
@@ -89,7 +89,7 @@ export async function runCommandTool(executionService: ExecutionService, command
     catch { /* The bounded result reports incomplete output below. */ }
     const notices = [sandbox.notice, sandbox.state === 'isolated' ? networkNotice(readSandboxRules(context.workspaceRoot)) : undefined]
       .filter((notice): notice is string => !!notice);
-    const output = await commandOutputResult(result, capture, manager, notices);
+    const output = await commandOutputResult(result, capture, manager, notices, options);
     projected = true;
     return output;
   } finally {

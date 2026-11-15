@@ -4,7 +4,7 @@ import { captureWorkspaceRoot } from '../../../core/workspace/roots.js';
 import { sameValue } from '../../../config/values.js';
 import { readBoundSessionState, type BoundSessionState } from '../../store/bound.js';
 import { assertSessionStoreProfile, locateExistingSessionLayout, type SessionStoreLayout } from '../../store/sessionFileLayout.js';
-import { readSessionRecordSnapshot } from '../../store/sessionStore.js';
+import { readSessionRecordSnapshot, type SessionReadLimits } from '../../store/sessionStore.js';
 import { readSessionFileVersion } from '../../store/version.js';
 import { buildLinearSessionThreadSnapshot, catchUpSessionThread, sessionRootEntryId, sessionThreadPath, type SessionThreadSnapshot } from '../../schema/sessionThread.js';
 import type { TranscriptEvent } from '../../sessionEventCodec.js';
@@ -50,18 +50,18 @@ function capturePrefix(target: string, identity: string, prefix?: BranchStoreSta
 
 /** Acquire one actual saved branch; failures never establish an empty ephemeral store. */
 export function readBranchStoreState(store: SessionStoreLayout, sessionId: string, cwd?: string,
-  prefix?: BranchStoreState['transcriptPrefix']): BranchStoreState {
+  prefix?: BranchStoreState['transcriptPrefix'], limits?: SessionReadLimits): BranchStoreState {
   try {
     assertSessionStoreProfile(store);
     const layout = locateExistingSessionLayout(store, sessionId);
     const sourcePathIdentity = pathIdentity(layout.transcriptPath);
     const version = readSessionFileVersion(layout);
     const transcriptIdentity = fileIdentity(fs.lstatSync(layout.transcriptPath));
-    const snapshot = readSessionRecordSnapshot({ sessionId, layout, cwd: cwd ?? process.cwd() });
+    const snapshot = readSessionRecordSnapshot({ sessionId, layout, cwd: cwd ?? process.cwd(), limits });
     if (snapshot.warnings.length || snapshot.transcriptTruncated) throw new BranchStoreError('unavailable');
-    const bound = readBoundSessionState({ getSessionDirPath: () => layout.sessionDir }, snapshot.session);
+    const bound = readBoundSessionState({ getSessionDirPath: () => layout.sessionDir }, snapshot.session, limits);
     if (snapshot.state.thread !== undefined) assertThread(snapshot.state.thread, sessionId);
-    const thread = catchUpSessionThread(snapshot.state.thread ?? buildLinearSessionThreadSnapshot(snapshot.session), snapshot.session);
+    const thread = catchUpSessionThread(snapshot.state.thread ?? buildLinearSessionThreadSnapshot(snapshot.session), snapshot.session, limits?.entries);
     assertThread(thread, sessionId);
     const branch = sessionThreadPath(thread);
     if (cwd !== undefined) {

@@ -150,7 +150,8 @@ export async function handleRpcCommand(command: RpcCommand, host: RpcHost): Prom
         if (!extended.handled) {
           response = buildResponse(undefined, "unknown", false, { error: "Unsupported RPC command." });
         } else if ("error" in extended) {
-          response = buildResponse(command.id, command.type, false, { error: extended.error });
+          response = buildResponse(command.id, command.type, false, { error: extended.error,
+            ...(extended.data ? { data: extended.data } : {}) });
         } else {
           response = buildResponse(command.id, command.type, true, extended.data ? { data: extended.data } : undefined);
         }

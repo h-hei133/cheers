@@ -1,0 +1,76 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/shell.test.ts (14 tests | 1 failed) 6314ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  547ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  533ms
+   ✓ refuses shell deny before native side effects 87ms
+   ✓ refuses shell disabled before native side effects 80ms
+   ✓ refuses shell plan before native side effects 123ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  476ms
+   ✓ keeps actual exit evidence when after-call hooks fail  464ms
+   ✓ reports unverified message persistence without losing the completed native outcome  416ms
+   × refuses native effects when a pre-call hook retires the captured branch 468ms
+     → expected true to be false // Object.is equality
+   ✓ does not publish a completed shell result into a changed session  1327ms
+   ✓ does not publish a completed shell result into a changed branch  648ms
+   ✓ redacts credential-shaped command output in the response and durable records  466ms
+   ✓ leaves an unrelated local command running when abort_bash has no owned shell 65ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  614ms
+ ❯ src/turn/invoke.test.ts (3 tests | 1 failed) 24ms
+   ✓ settles a direct native tool failure after post hooks reject without losing effect evidence 16ms
+   ✓ keeps the observed native result when recording the result event fails 1ms
+   × settles a started event whose recording throws before native execution 7ms
+     → expected [] to deeply equal [ ObjectContaining{…} ]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/invoke.test.ts > settles a started event whose recording throws before native execution
+AssertionError: expected [] to deeply equal [ ObjectContaining{…} ]
+
+- Expected
++ Received
+
+- [
+-   ObjectContaining {
+-     "output": "Native operation was blocked or its result could not be confirmed.",
+-     "success": false,
+-   },
+- ]
++ []
+
+ ❯ src/turn/invoke.test.ts:43:64
+     41|   expect(execute).not.toHaveBeenCalled();
+     42|   expect(result.isError).toBe(true);
+     43|   expect(events.filter(event => event.type === 'tool.result')).toEqual…
+       |                                                                ^
+     44|     expect.objectContaining({ success: false, output: result.output }),
+     45|   ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > refuses native effects when a pre-call hook retires the captured branch
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/cli/rpc/shell.test.ts:148:60
+    146|   });
+    147|   const response = await handleRpcCommand({ type: 'bash', command: 'pr…
+    148|   expect(fs.existsSync(path.join(test.root, 'stale.txt'))).toBe(false);
+       |                                                            ^
+    149|   expect(response).toMatchObject({ success: false, data: { status: 'bl…
+    150|   expect(test.manager.getTranscriptEvents(sessionId).some(event => eve…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 15 passed (17)
+   Start at  19:54:07
+   Duration  20.69s (transform 7.65s, setup 0ms, collect 12.88s, tests 6.34s, environment 0ms, prepare 105ms)
+

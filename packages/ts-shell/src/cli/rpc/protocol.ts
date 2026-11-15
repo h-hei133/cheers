@@ -85,6 +85,7 @@ export interface RpcSessionState {
   readonly sessionId: string;
   readonly workspaceRoot: string;
   readonly isStreaming: boolean;
+  readonly isBashRunning?: boolean;
   readonly messageCount: number;
   readonly isCompacting?: boolean;
   readonly pendingMessageCount?: number;

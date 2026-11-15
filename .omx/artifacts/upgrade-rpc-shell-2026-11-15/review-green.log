@@ -1,0 +1,24 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/rpc/shell.test.ts (19 tests) 7376ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  649ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  551ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  540ms
+   ✓ keeps actual exit evidence when after-call hooks fail  533ms
+   ✓ reports unverified message persistence without losing the completed native outcome  575ms
+   ✓ retains completed effects without saving history after configuration retirement  478ms
+   ✓ retains completed effects without saving history after deletion retirement  509ms
+   ✓ preserves an unverified excluded report write in the RPC outcome  499ms
+   ✓ does not publish a completed shell result into a changed session  530ms
+   ✓ does not publish a completed shell result into a changed branch  564ms
+   ✓ redacts credential-shaped command output in the response and durable records  559ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  642ms
+ ✓ src/session/reports/persistence.test.ts (5 tests) 459ms
+ ✓ src/turn/invoke.test.ts (3 tests) 20ms
+
+ Test Files  3 passed (3)
+      Tests  27 passed (27)
+   Start at  19:57:35
+   Duration  23.05s (transform 7.67s, setup 0ms, collect 13.55s, tests 7.85s, environment 0ms, prepare 157ms)
+

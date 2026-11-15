@@ -22,8 +22,8 @@
 
 ## Current status
 
-**Current phase**: active；C.1已提交`d8189ac`、RPC当前读取已提交`5ded288`。D.1 fork／session／tree矩阵子批本地验证完成待提交；下一核实并接入bash／abort_bash现有执行owner。当前22/62项完成。
-**Last completed batch**: D.1 fork候选／draft／captured source版本与consumer准入修复。五初红、两复审嵌套microtask红后修；六门6/65、五反转exact恢复、2635模块0monoliths、build `8f67e032b1c9`通过，限定独立代码APPROVE／架构CLEAR。Linux编译CLI实际JSONL会话／模型／tree／clone／fork／navigate往返／busy／abort／missing读取矩阵三loopback POST、EOF exit0通过。bash／abort_bash仍缺生产宿主，D.1继续部分。
+**Current phase**: active；D.1 fork／session／tree子批已提交`b1d46c3`。bash／abort_bash生产宿主子批完成本地验收，随本记录提交；下一核实其余settings／execution命令并完成D.1联合验收。当前22/62项完成。
+**Last completed batch**: RPC shell复用原tool gate、command settlement和唯一execution路径；组合输出、captured branch准入、可排除报告、取消／busy／EOF结算接通。联合13/227、最终局部3/59与恢复5/68、六门、2641模块0monoliths、build `90499a5f654c`及五反转exact恢复通过；限定代码APPROVE／架构CLEAR。Linux当前CLI两loopback POST验证普通／摘要wire排除、196637字节归档、重开／fork／取消与EOF；配置模型1次actual bodySent和标记回读通过。D.1整项仍部分。
 **Goal**: active；40项未完成，其中14部分、11已有待验收、13确认缺口、2待核实。保留完整规划，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -57,10 +57,13 @@ RPC读取子批遥测：实际M，结构复用10/10，新增未预见依赖1（�
 
 RPC fork子批遥测：实际M，复用10/10，新增未预见依赖1（helper resolve至consumer之间的microtask准入）。保持原branch/fork与history version CAS，read owner传递原lease，无新增存储或执行平面。完整D.1命令审计新增确认bash／abort_bash宿主未接入，单独后续实现，22/62保持。
 
+RPC shell子批遥测：实际L；复用检查通过原gate／commands／capture／report／branch store六个owner，不新增依赖、执行平面或转换消息类型。额外依赖3（部分started事件写入结算、branch校验的有界读取、navigate_tree全操作busy）；独立审查发现均有真实反例并修复。只承诺新lease读取上限，旧event／message writer同步读取未整体有界；branch check加普通addTurn不提供跨进程原子性。D.1其余命令待联合资格审计，22/62保持。
+
 ## Session log
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-15 | RPC fork已提交b1d46c3；shell／abort接通原owner，六门13/227、最终3/59／恢复5/68、五反转exact恢复、0monoliths、build `90499a5f654c`通过，限定复核APPROVE/CLEAR。Linux当前CLI两loopback POST与配置模型一次actual请求、组合归档／排除／重开／fork／取消／EOF全passed；证据upgrade-rpc-shell-2026-11-15。D.1仍部分，22/62，按批本地提交不push。 |
 | 2026-11-15 | RPC read已提交5ded288；fork／commands子批七反例红、六门6/65、五反转、0monoliths、build `8f67e032b1c9`和Linux三POST session/model/tree/busy矩阵passed，限定复审APPROVE/CLEAR。D.1 bash／abort_bash待接入，22/62保持，按批本地提交。 |
 | 2026-11-15 | C.1已提交d8189ac；D.1当前读取子批十二反例先红，六门4/33、三反转、0monoliths、build `545e59e9f16a`、Linuxlogical／physical两进程真实JSONL及两POST通过，限定独立双lane复核通过。本地22/62保持，待提交后继续session／tree／error联合验收。 |
 | 2026-11-15 | C.1逻辑选择／生产路由完成当前六门39/840、十反转、0monoliths、build `083b3d78d8bf`与Linux公开SDK／CLI／摘要／重试／RPC限定矩阵及4次配置模型POST；证据归档upgrade-virtual-routing-2026-11-15。架构CLEAR、限定独立代码复审APPROVE，本批待本地提交，C.1完成22/62；D.1 get_messages旧快照已由普通physical对照证实，下一单独修复。 |

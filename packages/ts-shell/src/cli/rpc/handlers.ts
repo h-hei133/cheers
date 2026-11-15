@@ -2,7 +2,7 @@ import type { RpcCommand, RpcHost } from "./protocol.js";
 
 export type RpcHandlerOutcome =
   | { readonly handled: true; readonly data?: Record<string, unknown> }
-  | { readonly handled: true; readonly error: string }
+  | { readonly handled: true; readonly error: string; readonly data?: Record<string, unknown> }
   | { readonly handled: false };
 
 function unavailable(name: string): RpcHandlerOutcome {
@@ -102,8 +102,16 @@ async function handleTreeAndExecution(command: RpcCommand, host: RpcHost): Promi
       const nav = await host.navigateTree(command.entryId, command.expectedVersion);
       return { handled: true, data: { ...nav } };
     }
-    case "bash":
-      return host.runBash ? { handled: true, data: await host.runBash(command.command, command.excludeFromContext) } : unavailable(command.type);
+    case "bash": {
+      if (!host.runBash) return unavailable(command.type);
+      const data = await host.runBash(command.command, command.excludeFromContext);
+      if (data.isError === true || data.historySaved !== undefined && data.historySaved !== 'saved') {
+        return { handled: true, data, error: data.historySaved !== undefined && data.historySaved !== 'saved'
+          ? 'Shell result history could not be confirmed; execution evidence is retained in data.'
+          : 'Shell command did not complete successfully; execution evidence is retained in data.' };
+      }
+      return { handled: true, data };
+    }
     case "abort_bash":
       if (!host.abortBash) return unavailable(command.type);
       host.abortBash();
@@ -115,6 +123,9 @@ async function handleTreeAndExecution(command: RpcCommand, host: RpcHost): Promi
 
 /** Dispatch extended session, model, thinking, compaction, tree, and bash RPC commands. */
 export async function handleExtendedRpcCommand(command: RpcCommand, host: RpcHost): Promise<RpcHandlerOutcome> {
+  // Register shell ownership during admission, before the transport admits a
+  // following abort or session command. Its response may settle much later.
+  if (command.type === 'bash' || command.type === 'abort_bash') return handleTreeAndExecution(command, host);
   const sessionOutcome = await handleSessionAndStats(command, host);
   if (sessionOutcome.handled) return sessionOutcome;
   const modelOutcome = await handleModelAndThinking(command, host);

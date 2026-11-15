@@ -1,0 +1,26 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/session/branch/store/index.test.ts (36 tests) 2768ms
+   ✓ session branch storage compatibility boundary > reopens a mixed transcript and starts a worker with codemode values only  489ms
+   ✓ host-owned branch storage leases > counts durable tombstones against the internal revision budget before a later write  323ms
+ ✓ src/cli/rpc/shell.test.ts (19 tests) 13412ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  6366ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  989ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  484ms
+   ✓ keeps actual exit evidence when after-call hooks fail  522ms
+   ✓ reports unverified message persistence without losing the completed native outcome  483ms
+   ✓ retains completed effects without saving history after configuration retirement  451ms
+   ✓ retains completed effects without saving history after deletion retirement  444ms
+   ✓ preserves an unverified excluded report write in the RPC outcome  467ms
+   ✓ does not publish a completed shell result into a changed session  588ms
+   ✓ does not publish a completed shell result into a changed branch  585ms
+   ✓ redacts credential-shaped command output in the response and durable records  508ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  633ms
+ ✓ src/turn/invoke.test.ts (3 tests) 19ms
+
+ Test Files  3 passed (3)
+      Tests  58 passed (58)
+   Start at  20:02:41
+   Duration  30.60s (transform 7.52s, setup 0ms, collect 12.75s, tests 16.20s, environment 0ms, prepare 150ms)
+

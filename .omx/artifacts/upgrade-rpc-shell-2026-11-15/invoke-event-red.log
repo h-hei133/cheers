@@ -1,0 +1,30 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/turn/invoke.test.ts (2 tests | 1 failed) 19ms
+   ✓ settles a direct native tool failure after post hooks reject without losing effect evidence 14ms
+   × keeps the observed native result when recording the result event fails 4ms
+     → private event store failure
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/invoke.test.ts > keeps the observed native result when recording the result event fails
+Error: private event store failure
+ ❯ Object.emit src/turn/invoke.test.ts:28:62
+     26|     execute: async () => ({ success: true, output: 'native output befo…
+     27|   {}, { workspaceRoot: process.cwd(), sessionId: 'native', permissionS…
+     28|     emit: event => { if (event.type === 'tool.result') throw new Error…
+       |                                                              ^
+     29|   expect(result).toMatchObject({ isError: true, output: expect.stringC…
+     30|     metadata: { status: 'completed', exitCode: 0 } });
+ ❯ runPreparedTool src/turn/invoke.ts:44:13
+ ❯ src/turn/invoke.test.ts:25:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  19:37:30
+   Duration  1.38s (transform 675ms, setup 0ms, collect 1.14s, tests 19ms, environment 0ms, prepare 57ms)
+

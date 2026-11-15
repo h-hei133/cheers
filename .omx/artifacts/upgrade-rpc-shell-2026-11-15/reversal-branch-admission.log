@@ -1,0 +1,52 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/shell.test.ts (19 tests | 1 failed | 18 skipped) 411ms
+   ↓ runs the production shell RPC through the native gate and persists its result for the next request
+   ↓ retains excluded output as a branch report without adding it to model history, including after reopen and fork
+   ↓ refuses shell deny before native side effects
+   ↓ refuses shell disabled before native side effects
+   ↓ refuses shell plan before native side effects
+   ↓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message
+   ↓ keeps actual exit evidence when after-call hooks fail
+   ↓ reports unverified message persistence without losing the completed native outcome
+   × refuses native effects when a pre-call hook retires the captured branch 409ms
+     → expected true to be false // Object.is equality
+   ↓ retains completed effects without saving history after configuration retirement
+   ↓ retains completed effects without saving history after deletion retirement
+   ↓ preserves an unverified excluded report write in the RPC outcome
+   ↓ accepts immediate abort before the shell operation enters its first microtask
+   ↓ does not publish a completed shell result into a changed session
+   ↓ does not publish a completed shell result into a changed branch
+   ↓ redacts credential-shaped command output in the response and durable records
+   ↓ leaves an unrelated local command running when abort_bash has no owned shell
+   ↓ refuses tree navigation while the shell command owner is running
+   ↓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  20:11:16
+   Duration  12.76s (transform 6.99s, setup 0ms, collect 11.09s, tests 411ms, environment 0ms, prepare 51ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > refuses native effects when a pre-call hook retires the captured branch
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/cli/rpc/shell.test.ts:148:60
+    146|   });
+    147|   const response = await handleRpcCommand({ type: 'bash', command: 'pr…
+    148|   expect(fs.existsSync(path.join(test.root, 'stale.txt'))).toBe(false);
+       |                                                            ^
+    149|   expect(response).toMatchObject({ success: false, data: { status: 'bl…
+    150|   expect(test.manager.getTranscriptEvents(sessionId).some(event => eve…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

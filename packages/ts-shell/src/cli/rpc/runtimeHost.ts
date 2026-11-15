@@ -4,6 +4,7 @@ import type { RuntimeRpcHostOptions } from "./host/contract.js";
 import { inputHost } from "./host/input.js";
 import { sessionHost } from "./host/session.js";
 import { settingsHost } from "./host/settings.js";
+import { shellHost } from './host/shell.js';
 
 export type { RuntimeRpcHostOptions } from "./host/contract.js";
 
@@ -18,5 +19,6 @@ export function createRuntimeRpcHost(options: RuntimeRpcHostOptions): RpcHost {
     ...inputHost(options, manager),
     ...sessionHost(options, manager),
     ...settingsHost(options),
+    ...shellHost(options),
   };
 }

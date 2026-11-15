@@ -1,0 +1,226 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/shell.test.ts (10 tests | 10 failed) 2530ms
+   × runs the production shell RPC through the native gate and persists its result for the next request 108ms
+     → expected { type: 'response', …(3) } to match object { success: true, data: { …(6) } }
+(3 matching properties omitted from actual)
+   × retains excluded output as a branch report without adding it to model history, including after reopen and fork 45ms
+     → expected { type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(3 matching properties omitted from actual)
+   × refuses shell deny before native side effects 55ms
+     → expected undefined to match object { isError: true, status: 'blocked' }
+   × refuses shell disabled before native side effects 44ms
+     → expected undefined to match object { isError: true, status: 'blocked' }
+   × refuses shell plan before native side effects 41ms
+     → expected undefined to match object { isError: true, status: 'blocked' }
+   × keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message 44ms
+     → expected { type: 'response', …(3) } to match object { success: false, data: { …(5) } }
+(3 matching properties omitted from actual)
+   × keeps actual exit evidence when after-call hooks fail 47ms
+     → ENOENT: no such file or directory, open '/tmp/cheers-test/rpc-shell-yWQR34/work/effect.txt'
+   × reports unverified message persistence without losing the completed native outcome 43ms
+     → expected { type: 'response', …(3) } to match object { success: false, data: { …(4) } }
+(3 matching properties omitted from actual)
+   × leaves an unrelated local command running when abort_bash has no owned shell 46ms
+     → expected { type: 'response', …(3) } to match object { success: true }
+(3 matching properties omitted from actual)
+   × lets JSONL reads, busy refusals and abort reach a native shell before its response settles 2053ms
+     → expected false to be true // Object.is equality
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > runs the production shell RPC through the native gate and persists its result for the next request
+AssertionError: expected { type: 'response', …(3) } to match object { success: true, data: { …(6) } }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "data": {
+-     "cancelled": false,
+-     "exitCode": 0,
+-     "historySaved": "saved",
+-     "isError": false,
+-     "status": "completed",
+-     "truncated": false,
+-   },
+-   "success": true,
++   "success": false,
+  }
+
+ ❯ src/cli/rpc/shell.test.ts:61:18
+     59|   const test = fixture();
+     60|   const result = await handleRpcCommand({ type: 'bash', command: "prin…
+     61|   expect(result).toMatchObject({ success: true, data: { status: 'compl…
+       |                  ^
+     62|     cancelled: false, truncated: false, isError: false, historySaved: …
+     63|   expect(result.data?.output).toContain('RPC_STDOUT'); expect(result.d…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > retains excluded output as a branch report without adding it to model history, including after reopen and fork
+AssertionError: expected { type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "data": {
+-     "historySaved": "saved",
+-     "output": "RPC_EXCLUDED",
+-   },
+-   "success": true,
++   "success": false,
+  }
+
+ ❯ src/cli/rpc/shell.test.ts:79:18
+     77|   const test = fixture();
+     78|   const result = await handleRpcCommand({ type: 'bash', command: 'prin…
+     79|   expect(result).toMatchObject({ success: true, data: { output: 'RPC_E…
+       |                  ^
+     80|   const loaded = new SessionManager().getSession(test.context.session.…
+     81|   expect(loaded.turns).toEqual([]); expect(loaded.reports).toHaveLengt…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > refuses shell deny before native side effects
+ FAIL  src/cli/rpc/shell.test.ts > refuses shell disabled before native side effects
+ FAIL  src/cli/rpc/shell.test.ts > refuses shell plan before native side effects
+AssertionError: expected undefined to match object { isError: true, status: 'blocked' }
+
+- Expected: 
+{
+  "isError": true,
+  "status": "blocked",
+}
+
++ Received: 
+undefined
+
+ ❯ src/cli/rpc/shell.test.ts:94:25
+     92|   const response = await handleRpcCommand({ type: 'bash', command: 'pr…
+     93|   expect(response.success).toBe(false);
+     94|   expect(response.data).toMatchObject({ isError: true, status: 'blocke…
+       |                         ^
+     95|   expect(fs.existsSync(path.join(test.root, 'blocked.txt'))).toBe(fals…
+     96| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message
+AssertionError: expected { type: 'response', …(3) } to match object { success: false, data: { …(5) } }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "data": {
+-     "cancelled": false,
+-     "exitCode": 7,
+-     "historySaved": "saved",
+-     "isError": true,
+-     "status": "failed",
+-   },
+    "success": false,
+  }
+
+ ❯ src/cli/rpc/shell.test.ts:101:20
+     99|   const test = fixture();
+    100|   const response = await handleRpcCommand({ type: 'bash', command: "pr…
+    101|   expect(response).toMatchObject({ success: false, data: { status: 'fa…
+       |                    ^
+    102|     isError: true, cancelled: false, historySaved: 'saved' } });
+    103|   expect(response.data?.output).toContain('RPC_PARTIAL'); expect(respo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > keeps actual exit evidence when after-call hooks fail
+Error: ENOENT: no such file or directory, open '/tmp/cheers-test/rpc-shell-yWQR34/work/effect.txt'
+ ❯ src/cli/rpc/shell.test.ts:115:13
+    113|   });
+    114|   const response = await handleRpcCommand({ type: 'bash', command: 'pr…
+    115|   expect(fs.readFileSync(path.join(test.root, 'effect.txt'), 'utf8')).…
+       |             ^
+    116|   expect(response).toMatchObject({ success: false, data: { status: 'co…
+    117|   expect(response.data?.output).toContain('RPC_EFFECT'); expect(respon…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > reports unverified message persistence without losing the completed native outcome
+AssertionError: expected { type: 'response', …(3) } to match object { success: false, data: { …(4) } }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "data": {
+-     "exitCode": 0,
+-     "historySaved": "unverified",
+-     "output": StringContaining "RPC_UNSAVED",
+-     "status": "completed",
+-   },
+    "success": false,
+  }
+
+ ❯ src/cli/rpc/shell.test.ts:125:20
+    123|   vi.spyOn(test.manager, 'addTurn').mockImplementation(() => { throw n…
+    124|   const response = await handleRpcCommand({ type: 'bash', command: 'pr…
+    125|   expect(response).toMatchObject({ success: false, data: { status: 'co…
+       |                    ^
+    126|     historySaved: 'unverified', output: expect.stringContaining('RPC_U…
+    127|   expect(JSON.stringify(response)).not.toContain('private persistence …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > leaves an unrelated local command running when abort_bash has no owned shell
+AssertionError: expected { type: 'response', …(3) } to match object { success: true }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "success": true,
++   "success": false,
+  }
+
+ ❯ src/cli/rpc/shell.test.ts:135:71
+    133|   await Promise.resolve();
+    134|   try {
+    135|     expect(await handleRpcCommand({ type: 'abort_bash' }, test.host)).…
+       |                                                                       ^
+    136|     const response = await handleRpcCommand({ type: 'bash', command: '…
+    137|     expect(response.success).toBe(false); expect(response.error).toMat…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  src/cli/rpc/shell.test.ts > lets JSONL reads, busy refusals and abort reach a native shell before its response settles
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ vi.waitFor.timeout src/cli/rpc/shell.test.ts:151:85
+    149|   try {
+    150|     stdin.write(JSON.stringify({ id: 'shell', type: 'bash', command: `…
+    151|     await vi.waitFor(() => expect(fs.existsSync(path.join(test.root, '…
+       |                                                                                     ^
+    152|     stdin.write('{"id":"state","type":"get_state"}\n{"id":"new","type"…
+    153|       + '{"id":"overlap","type":"bash","command":"printf forbidden > o…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  10 failed (10)
+   Start at  19:27:55
+   Duration  16.62s (transform 7.68s, setup 0ms, collect 13.72s, tests 2.53s, environment 0ms, prepare 99ms)
+

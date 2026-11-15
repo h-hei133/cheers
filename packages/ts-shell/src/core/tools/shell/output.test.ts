@@ -105,6 +105,7 @@ it.each([0, 7])('bounds native capture and preserves the full selected streams f
   const notice = String(result.metadata?.outputNotice ?? '');
   const uri = /artifact:\/\/\d+/.exec(notice)?.[0];
   expect(uri).toBeDefined();
+  expect(result.metadata).toMatchObject({ truncated: true, outputArtifact: uri });
   const artifact = ArtifactManager.getShared(root, 'output').resolve(uri!);
   expect(artifact).not.toBeNull();
   expect(await fs.readFile(artifact!, 'utf8')).toBe(exitCode === 0 ? stdout : `${stderr}\n${stdout}`);

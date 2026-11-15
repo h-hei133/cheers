@@ -11922,3 +11922,10 @@ C.1已本地提交d8189ac。本子批修复四RPC读取旧启动对象，以及p
 ### 2026-11-15：RPC分叉草稿和会话命令矩阵
 
 read修复已提交5ded288。fork候选仅可用user问题、成功选择后返回exact draft，原source version CAS与await后consumer准入接通；五初红＋两复审微任务红后修。六门6/65、五反转exact恢复、0monoliths、build 8f67e032b1c9和Linux实际JSONL三POST会话／模型／树／fork／clone／busy／abort矩阵通过，限定代码APPROVE／架构CLEAR。证据.omx/artifacts/upgrade-rpc-commands-2026-11-15/；bash／abort_bash宿主缺口仍在，D.1部分／22/62保持，按批本地提交不push。
+
+
+### 2026-11-15：RPC shell生产入口与完整结算
+
+fork批已提交b1d46c3。bash／abort_bash复用原gate、commands和唯一ExecutionService，included custom／excluded report、组合输出／artifact结构元数据接通；pre-hook旧branch拒绝、完整busy和partial started失败结算经反例修复。可选read limits传入原branch owner并覆盖catch-up，旧writer未整体有界、普通message追加不声称跨进程原子。
+
+六门13/227、最终3/59／恢复5/68、五反转exact恢复、2641模块0monoliths、build `90499a5f654c`和限定代码APPROVE／架构CLEAR通过。Linux同代CLI两loopback POST普通／summary排除、196637字节归档、重开／fork／native取消／EOF passed；配置模型一次actual请求正确回读shell标记，隔离最小目录／原凭据边界保持。setup／observer错误均保留分类，归档upgrade-rpc-shell-2026-11-15，按批本地提交；D.1仍部分／22/62，不push或宣称CI。

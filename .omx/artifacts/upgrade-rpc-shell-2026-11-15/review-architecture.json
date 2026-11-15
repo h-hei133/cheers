@@ -1,0 +1,18 @@
+{
+  "lane": "routing_architecture",
+  "status": "CLEAR",
+  "mode": "read-only",
+  "validationRun": false,
+  "scope": "D.1 RPC shell and existing command/tool/storage/output owners",
+  "findingsRepaired": [
+    "pre-hook branch retirement did not refuse execution",
+    "navigate_tree omitted full command busy guard",
+    "partially stored started event lacked failed result",
+    "captured history limits and catch-up entry ceiling"
+  ],
+  "limitations": [
+    "Existing event/message writers retain older unbounded reads",
+    "No cross-process atomicity between branch check and addTurn",
+    "Not full D.1 acceptance"
+  ]
+}

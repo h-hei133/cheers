@@ -92,6 +92,41 @@ describe('session branch storage compatibility boundary', () => {
 describe('host-owned branch storage leases', () => {
   const capture = (namespace = 'model-routing', id = sessionId) => captureBranchStore({ sessionId: id, cwd: workspace, namespace });
 
+  it.each(['metadataBytes', 'stateBytes', 'transcriptBytes', 'transcriptLines', 'entries'] as const)(
+    'refuses a captured history that exceeds its %s limit', field => {
+      const limits = { metadataBytes: 1024 * 1024, stateBytes: 1024 * 1024, transcriptBytes: 1024 * 1024,
+        transcriptLines: 1000, entries: 1000, [field]: 0 };
+      expect(() => captureBranchStore({ sessionId, cwd: workspace, namespace: 'shell', limits })).toThrow(BranchStoreError);
+    });
+
+  it.each(['assertCurrent', 'commit'] as const)('retains original read limits for %s after source growth', operation => {
+    const limits = { metadataBytes: 1024 * 1024, stateBytes: 1024 * 1024,
+      transcriptBytes: fs.statSync(transcriptPath()).size, transcriptLines: 1000, entries: 1000 };
+    const lease = captureBranchStore({ sessionId, cwd: workspace, namespace: 'shell', limits });
+    limits.transcriptBytes += 1024 * 1024;
+    appendTranscriptEvent(transcriptPath(), internalEvent(), undefined, { requireExisting: true });
+    expect(() => operation === 'assertCurrent' ? lease.assertCurrent([]) : lease.commit({ key: '"value"' })).toThrow(BranchStoreError);
+    expect(readTranscriptEvents(transcriptPath()).some(event => event.type === 'branch-store' && event.namespace === 'shell')).toBe(false);
+  });
+
+  it('reports unknown when an appended store write exceeds its captured verification limit', () => {
+    const limits = { metadataBytes: 1024 * 1024, stateBytes: 1024 * 1024,
+      transcriptBytes: fs.statSync(transcriptPath()).size, transcriptLines: 1000, entries: 1000 };
+    const lease = captureBranchStore({ sessionId, cwd: workspace, namespace: 'shell', limits });
+    let failure: unknown;
+    try { lease.commit({ key: '"value"' }); } catch (error) { failure = error; }
+    expect(failure).toMatchObject({ status: 'unknown' });
+    expect(readTranscriptEvents(transcriptPath()).some(event => event.type === 'branch-store' && event.namespace === 'shell')).toBe(true);
+  });
+
+  it('applies the captured entry limit while catching up a lagging stored tree', () => {
+    for (const id of ['first', 'second']) appendTranscriptEvent(transcriptPath(),
+      { type: 'message', id, role: 'user', content: id, timestamp: '2026-11-15T00:00:00.000Z' }, undefined, { requireExisting: true });
+    const limits = { metadataBytes: 1024 * 1024, stateBytes: 1024 * 1024,
+      transcriptBytes: 1024 * 1024, transcriptLines: 1000, entries: 2 };
+    expect(() => captureBranchStore({ sessionId, cwd: workspace, namespace: 'shell', limits })).toThrow(BranchStoreError);
+  });
+
   it('isolates same-named keys and writes across host namespaces and codemode', () => {
     const routing = capture(); const other = capture('another-owner'); const codemode = loadCodemodeStore(sessionId, workspace);
     expect(routing.commit({ private: '"routing"' })).toBe('persisted');

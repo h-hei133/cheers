@@ -75,6 +75,8 @@ export async function runPromptInputStream(options: {
   let turnChain = Promise.resolve();
   let controlChain = Promise.resolve();
   let localControlChain = Promise.resolve();
+  const rpcResponses = new Set<Promise<void>>();
+  let rpcResponseFailure: unknown;
   let contentCancellation = Promise.resolve();
   let mcpCancellationGeneration = 0;
   let pendingControls = 0;
@@ -261,19 +263,24 @@ export async function runPromptInputStream(options: {
       if (rpcCommand && rpcHost) {
         pendingControls++;
         localControlChain = localControlChain
-          .then(async () => {
+          .then(() => {
             const background = options.runtimeContext.configuration.backgroundSignal;
-            const response = await handleRpcCommand(rpcCommand, rpcHost);
-            if (!response.success || background === options.runtimeContext.configuration.backgroundSignal) return;
-            if (closed || exitRequested || !rpcUiBridge || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
-            // A successful transition retires its old surface. Refresh the
-            // existing extension owner before binding the current input again.
-            refreshExtensionsFor(options.runtimeContext);
-            if (closed || exitRequested || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
-            releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
-          })
-          .finally(() => {
-            pendingControls--;
+            const pending = handleRpcCommand(rpcCommand, rpcHost).then(response => {
+              if (!response.success || background === options.runtimeContext.configuration.backgroundSignal) return;
+              if (closed || exitRequested || !rpcUiBridge || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
+              // A successful transition retires its old surface. Refresh the
+              // existing extension owner before binding the current input again.
+              refreshExtensionsFor(options.runtimeContext);
+              if (closed || exitRequested || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
+              releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
+            }).finally(() => { pendingControls--; });
+            if (rpcCommand.type !== 'bash') return pending;
+            // The session's command owner joins execution. This set only joins
+            // response writes at EOF while later controls can reach cancellation.
+            rpcResponses.add(pending);
+            pending.then(() => rpcResponses.delete(pending), error => {
+              rpcResponses.delete(pending); rpcResponseFailure ??= error;
+            });
           });
         return;
       }
@@ -305,6 +312,8 @@ export async function runPromptInputStream(options: {
       await localControls;
       const controls = controlChain;
       await controls;
+      await Promise.allSettled([...rpcResponses]);
+      if (rpcResponseFailure !== undefined) throw rpcResponseFailure;
       const turns = turnChain;
       await turns;
       if (localControls === localControlChain && controls === controlChain && turns === turnChain) break;

@@ -1,11 +1,11 @@
 import type { CommandExecutionResult } from '../../../runtime/execution/types.js';
-import type { CommandOutputCapture, CommandOutputStream } from '../../../runtime/execution/output/capture.js';
+import type { CommandOutputCapture, CommandOutputView } from '../../../runtime/execution/output/capture.js';
 import { ArtifactManager } from '../../session/artifactManager.js';
 import { OutputAccumulator } from '../outputAccumulator.js';
 import { approvedResult, deniedResult } from '../toolResultLifecycle.js';
 
 interface OutputPart {
-  readonly stream?: CommandOutputStream;
+  readonly stream?: CommandOutputView;
   readonly tail: string;
   readonly bytes: number;
   readonly newlines: number;
@@ -13,15 +13,15 @@ interface OutputPart {
   readonly boundary: boolean;
 }
 
-function selectOutput(result: CommandExecutionResult, capture: CommandOutputCapture): OutputPart[] {
-  const part = (stream: CommandOutputStream): OutputPart => {
+function selectOutput(result: CommandExecutionResult, capture: CommandOutputCapture, combinedOutput = false): OutputPart[] {
+  const part = (stream: CommandOutputView): OutputPart => {
     const snapshot = capture.snapshot(stream);
     if (snapshot.totalRawBytes > 0) return { stream, tail: snapshot.tail, bytes: snapshot.totalBytes,
       newlines: snapshot.totalNewlines, truncated: snapshot.truncated, boundary: snapshot.tailStartsAtLineBoundary };
-    return textPart(result[stream]);
+    return textPart(stream === 'combined' ? [result.stdout, result.stderr].filter(Boolean).join('\n') : result[stream]);
   };
   const successful = result.status === 'completed' && result.exitCode === 0;
-  const selected = (successful ? [part('stdout')] : [part('stderr'), part('stdout')]).filter(value => value.bytes > 0);
+  const selected = (combinedOutput ? [part('combined')] : successful ? [part('stdout')] : [part('stderr'), part('stdout')]).filter(value => value.bytes > 0);
   return selected.length ? selected : [textPart(successful ? 'Command completed with no output'
     : result.recoveryReason || `Command failed with exit code ${result.exitCode}`)];
 }
@@ -43,8 +43,8 @@ async function* fullOutput(parts: readonly OutputPart[], capture: CommandOutputC
 
 /** The result owns only a bounded text projection; the artifact owns the full streams. */
 export async function commandOutputResult(result: CommandExecutionResult, capture: CommandOutputCapture,
-  manager: ArtifactManager, notices: readonly string[] = []) {
-  const parts = selectOutput(result, capture);
+  manager: ArtifactManager, notices: readonly string[] = [], options: { readonly combinedOutput?: boolean } = {}) {
+  const parts = selectOutput(result, capture, options.combinedOutput);
   // Once a later stream has overflowed, its retained tail already exceeds the
   // display budget. Joining an earlier tail would invent a continuous prefix.
   let first = 0;
@@ -63,12 +63,14 @@ export async function commandOutputResult(result: CommandExecutionResult, captur
   const truncated = preview.truncated || parts.some(part => part.truncated);
   const outputNotices = notices.map(notice => `[sandbox] ${notice}`);
   let cleanupUnknown = false;
+  let outputArtifact: string | undefined;
   if (truncated && capture.complete) {
     const controller = new AbortController();
     const deadline = setTimeout(() => controller.abort(), 30_000);
     deadline.unref?.();
     try {
       const artifact = await manager.saveStream(fullOutput(parts, capture), 'bash', controller.signal);
+      outputArtifact = artifact.uri;
       outputNotices.push(`[Showing last ${preview.shownLines} of ${originalLines} lines (${Math.round(preview.shownBytes / 1024)}KB of ${Math.round(originalBytes / 1024)}KB). Full text output saved: ${artifact.uri}]\n[To read full or earlier sections: read(path="${artifact.uri}:1-500")]`);
     } catch {
       outputNotices.push('[Output truncated; complete output could not be saved.]');
@@ -80,7 +82,7 @@ export async function commandOutputResult(result: CommandExecutionResult, captur
   const outputNotice = outputNotices.join('\n');
   const output = [preview.content, outputNotice].filter(Boolean).join('\n\n');
   const metadata = { executionPath: result.executionPath, errorClass: result.errorClass,
-    status: result.status, exitCode: result.exitCode, ...(outputNotice ? { outputNotice } : {}),
+    status: result.status, exitCode: result.exitCode, truncated, ...(outputArtifact ? { outputArtifact } : {}), ...(outputNotice ? { outputNotice } : {}),
     ...(!capture.complete ? { outputComplete: false } : {}), ...(cleanupUnknown ? { outputCleanup: 'unknown' } : {}) };
   if (result.status === 'completed' && result.exitCode === 0) return approvedResult(output, metadata);
   return deniedResult(output, { ...metadata, failureKind: result.failureKind

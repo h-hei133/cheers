@@ -1,0 +1,58 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "status": "failed",
+  "realProvider": false,
+  "buildId": "90499a5f654ca7bb9c8cb6f0da8b45803d2ba1e6f055574f13f2012a9a51f2d3",
+  "probeSha256": "af50a5245143428f9e7e5fd43c0e3f3b9babf4d3f505f29eae3fe813f227bf2d",
+  "stages": {
+    "denied": {
+      "passed": true,
+      "zeroNativeWrite": true,
+      "eofExit0": true
+    },
+    "disabled": {
+      "passed": true,
+      "zeroNativeWrite": true,
+      "eofExit0": true
+    },
+    "execution": {
+      "passed": true,
+      "nativeSuccess": true,
+      "bothStreams": true,
+      "nonzeroExit": 7,
+      "saved": true
+    },
+    "context": {
+      "passed": true,
+      "actualPromptBody": true,
+      "actualSummaryBody": true,
+      "reportVisibleInExport": true,
+      "excludedAbsent": true
+    }
+  },
+  "summaryObservation": {
+    "success": true,
+    "data": {
+      "status": "compacted",
+      "summarized": 2,
+      "kept": 2,
+      "tokensBefore": 4024,
+      "tokensAfter": 1690
+    },
+    "bodyCount": 2,
+    "includes": true,
+    "excludes": true
+  },
+  "exportObservation": {
+    "success": true,
+    "included": true,
+    "excluded": true
+  },
+  "failedStage": "large-output",
+  "failure": {
+    "name": "AssertionError",
+    "code": "ERR_ASSERTION",
+    "message": "Assertion failed; see stage."
+  }
+}

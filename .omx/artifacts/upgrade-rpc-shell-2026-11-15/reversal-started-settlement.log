@@ -1,0 +1,41 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/turn/invoke.test.ts (3 tests | 1 failed | 2 skipped) 18ms
+   ↓ settles a direct native tool failure after post hooks reject without losing effect evidence
+   ↓ keeps the observed native result when recording the result event fails
+   × settles a started event whose recording throws before native execution 18ms
+     → expected [] to deeply equal [ ObjectContaining{…} ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 skipped (3)
+   Start at  20:11:46
+   Duration  1.25s (transform 621ms, setup 0ms, collect 1.03s, tests 18ms, environment 0ms, prepare 49ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/invoke.test.ts > settles a started event whose recording throws before native execution
+AssertionError: expected [] to deeply equal [ ObjectContaining{…} ]
+
+- Expected
++ Received
+
+- [
+-   ObjectContaining {
+-     "output": "Native operation was blocked or its result could not be confirmed.",
+-     "success": false,
+-   },
+- ]
++ []
+
+ ❯ src/turn/invoke.test.ts:43:64
+     41|   expect(execute).not.toHaveBeenCalled();
+     42|   expect(result.isError).toBe(true);
+     43|   expect(events.filter(event => event.type === 'tool.result')).toEqual…
+       |                                                                ^
+     44|     expect.objectContaining({ success: false, output: result.output }),
+     45|   ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

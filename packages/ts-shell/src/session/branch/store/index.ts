@@ -15,13 +15,19 @@ export type { BranchStoreHandle, BranchStoreInput, BranchStoreReason, BranchStor
 /** One host-owned namespace and immutable before-await branch lease, backed by the session transcript. */
 export function captureBranchStore(input: BranchStoreInput): BranchStoreHandle {
   const { sessionId, cwd, namespace, admission: ownerAdmission } = input;
+  const requestedLimits = input.limits;
+  const limits = requestedLimits === undefined ? undefined : Object.freeze({
+    metadataBytes: requestedLimits.metadataBytes, stateBytes: requestedLimits.stateBytes,
+    transcriptBytes: requestedLimits.transcriptBytes, transcriptLines: requestedLimits.transcriptLines, entries: requestedLimits.entries,
+  });
+  if (limits && Object.values(limits).some(limit => !Number.isSafeInteger(limit) || limit < 0)) throw new BranchStoreError('invalid');
   if (namespace !== CODEMODE_STORE_NAMESPACE && !isBranchStoreNamespace(namespace)) throw new BranchStoreError('invalid');
   let store: ReturnType<typeof createSessionStoreLayout>;
   let captured: ReturnType<typeof readBranchStoreState>;
   try {
     if (validateSessionId(sessionId) !== sessionId || sessionId === '.' || sessionId === '..') throw new BranchStoreError('invalid');
     ownerAdmission?.();
-    store = createSessionStoreLayout(); captured = readBranchStoreState(store, sessionId, cwd);
+    store = createSessionStoreLayout(); captured = readBranchStoreState(store, sessionId, cwd, undefined, limits);
     ownerAdmission?.();
   } catch (error) { throw error instanceof BranchStoreError ? error : new BranchStoreError('unavailable'); }
   const replayed = replayBranchStore(captured.events, namespace, captured.activeEntryIds);
@@ -42,7 +48,7 @@ export function captureBranchStore(input: BranchStoreInput): BranchStoreHandle {
     try {
       withFileLock(captured.bound.layout.stateLockPath, () => {
         ownerAdmission?.(); assertLive(); admission?.(); assertLive(); reason = 'unavailable';
-        const current = readBranchStoreState(store, sessionId, cwd, captured.transcriptPrefix);
+        const current = readBranchStoreState(store, sessionId, cwd, captured.transcriptPrefix, limits);
         assertBranchStoreState(current, captured);
         const latest = replayBranchStore(current.events, namespace, current.activeEntryIds);
         assertStoreRevisions(latest, replayed, comparedKeys);
@@ -51,7 +57,7 @@ export function captureBranchStore(input: BranchStoreInput): BranchStoreHandle {
           if (namespace !== CODEMODE_STORE_NAMESPACE) assertRevisionBudget(latest.revisions, accepted);
         }
         ownerAdmission?.(); assertLive(); admission?.(); assertLive();
-        const beforeWrite = readBranchStoreState(store, sessionId, cwd, captured.transcriptPrefix);
+        const beforeWrite = readBranchStoreState(store, sessionId, cwd, captured.transcriptPrefix, limits);
         assertBranchStoreState(beforeWrite, captured);
         if (beforeWrite.version !== current.version) throw new BranchStoreError('conflict');
         if (!accepted || !keys.length) return;
@@ -64,7 +70,7 @@ export function captureBranchStore(input: BranchStoreInput): BranchStoreHandle {
         appendTranscriptEvent(captured.bound.layout.transcriptPath, entry, undefined,
           { requireExisting: true, expectedIdentity: captured.transcriptIdentity, expectedPrefix: captured.transcriptPrefix, durable: true });
         reason = 'verification-failed';
-        const confirmed = readBranchStoreState(store, sessionId, cwd, captured.transcriptPrefix);
+        const confirmed = readBranchStoreState(store, sessionId, cwd, captured.transcriptPrefix, limits);
         assertBranchStoreState(confirmed, captured);
         if (!sameValue(confirmed.events.find(event => event.id === entry.id), entry)) throw new BranchStoreError('verification-failed', 'unknown');
         status = 'persisted'; reason = 'lock-failed';

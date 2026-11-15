@@ -1,0 +1,46 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "status": "failed",
+  "realProvider": false,
+  "buildId": "90499a5f654ca7bb9c8cb6f0da8b45803d2ba1e6f055574f13f2012a9a51f2d3",
+  "probeSha256": "ac4f5e3f0839c5ab799040008cd7294955eea1b566f8ed288b6112e10486581e",
+  "stages": {
+    "denied": {
+      "passed": true,
+      "zeroNativeWrite": true,
+      "eofExit0": true
+    },
+    "disabled": {
+      "passed": true,
+      "zeroNativeWrite": true,
+      "eofExit0": true
+    },
+    "execution": {
+      "passed": true,
+      "nativeSuccess": true,
+      "bothStreams": true,
+      "nonzeroExit": 7,
+      "saved": true
+    }
+  },
+  "summaryObservation": {
+    "success": true,
+    "data": {
+      "status": "compacted",
+      "summarized": 2,
+      "kept": 2,
+      "tokensBefore": 4024,
+      "tokensAfter": 1690
+    },
+    "bodyCount": 2,
+    "includes": true,
+    "excludes": true
+  },
+  "failedStage": "export",
+  "failure": {
+    "name": "AssertionError",
+    "code": "ERR_ASSERTION",
+    "message": "Assertion failed; see stage."
+  }
+}
