@@ -1,0 +1,9 @@
+packages/ts-shell/src/extensions/runtime/inProcessLoader.ts(251,79): error TS2345: Argument of type '((request: ModelRouteRequest<unknown>) => ModelRoute<unknown> | Promise<ModelRoute<unknown>>) | ((request: ModelRouteInput<unknown>) => ModelRoute<...> | Promise<...>)' is not assignable to parameter of type '(request: ModelRouteRequest<unknown>) => ModelRoute<unknown> | Promise<ModelRoute<unknown>>'.
+  Type '(request: ModelRouteInput<unknown>) => ModelRoute<unknown> | Promise<ModelRoute<unknown>>' is not assignable to type '(request: ModelRouteRequest<unknown>) => ModelRoute<unknown> | Promise<ModelRoute<unknown>>'.
+    Types of parameters 'request' and 'request' are incompatible.
+      Type 'ModelRouteRequest<unknown>' is not assignable to type 'ModelRouteInput<unknown>'.
+        Type 'ModelRouteRequest<unknown>' is not assignable to type '{ readonly signal?: AbortSignal | undefined; }'.
+          Types of property 'signal' are incompatible.
+            Type 'ModelRouteSignal | undefined' is not assignable to type 'AbortSignal | undefined'.
+              Property 'dispatchEvent' is missing in type 'ModelRouteSignal' but required in type 'AbortSignal'.
+Build failed: TypeScript build failed with exit 1.

@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/extensions/runtime/virtual.test.ts (24 tests) 703ms
+ ✓ src/sdk/agentSession.test.ts (7 tests) 601ms
+ ✓ src/core/commands/model/virtual.test.ts (14 tests) 399ms
+ ✓ src/cli/interactive/picker/model/virtual.test.ts (5 tests) 138ms
+ ✓ src/core/models/virtual/capture.test.ts (11 tests) 7ms
+
+ Test Files  5 passed (5)
+      Tests  61 passed (61)
+   Start at  17:01:06
+   Duration  17.59s (transform 7.62s, setup 0ms, collect 14.74s, tests 1.85s, environment 1ms, prepare 257ms)
+

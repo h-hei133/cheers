@@ -5,6 +5,7 @@ import type { RetryPolicy } from '../../core/agent/retry.js';
 import type { ModelTransport, RequestPolicy } from '../../core/agent/request/model.js';
 import type { CatalogProvider, CatalogModel } from '../../core/models/catalog.js';
 import type { ModelRoute, VirtualModelRegistry } from '../../core/models/virtualModels.js';
+import type { ModelRouteFailure, ModelRouteReason } from '../../core/models/virtual/contract.js';
 import type { ResolvedRequestShape } from '../../core/models/requestShape.js';
 import type { ModelInputLimits } from '../../core/models/modalities.js';
 import type { ThinkingPreference } from '../../core/models/effort.js';
@@ -62,6 +63,9 @@ export interface ProviderTarget {
 }
 
 export interface StepOptions {
+  /** The outer loop owns retries; direct requests never consume branch routing state. */
+  readonly routeReason?: ModelRouteReason;
+  readonly failedRoute?: ModelRouteFailure;
   /** The original live history fence also applies to native provider retries. */
   readonly contextOwner?: RequestContextOwner;
   /** A previously admitted recovery retains its complete route and wire capture. */
@@ -156,6 +160,11 @@ export interface StepRequest extends StepTarget {
   readonly cacheRetention?: 'short' | 'long' | 'none';
   readonly initialTools?: readonly ToolSchema[];
   readonly virtualModels?: VirtualModelRegistry;
+  readonly virtualModel?: { readonly provider: string; readonly modelId: string };
+  readonly captureRouteState?: (provider: string, modelId: string, admission: () => void) => {
+    readonly state: unknown;
+    readonly accept: (state: unknown, admission: () => void) => void;
+  };
   readonly resolveTarget?: (route: ModelRoute, signal?: AbortSignal) => StepTarget | Promise<StepTarget>;
   readonly historicalEfforts?: ReadonlyMap<number, string>;
   readonly projection?: OutgoingProjectionOptions;
@@ -163,6 +172,8 @@ export interface StepRequest extends StepTarget {
 
 /** One complete local request capture; publication and dispatch remain with their existing owners. */
 export interface PreparedTurnContext {
+  /** Accept routing state before compaction or declaration publication changes branch ancestry. */
+  readonly acceptRoute?: () => void;
   readonly target: StepTarget;
   readonly requestPurpose: string;
   readonly agentMode?: 'plan' | 'build';

@@ -1,0 +1,1062 @@
+diff --git a/packages/ts-shell/src/cli/interactive/completion/catalog.ts b/packages/ts-shell/src/cli/interactive/completion/catalog.ts
+index 9750a7a3..d23693f5 100644
+--- a/packages/ts-shell/src/cli/interactive/completion/catalog.ts
++++ b/packages/ts-shell/src/cli/interactive/completion/catalog.ts
+@@ -12,6 +12,7 @@ import { listThemes } from "../../../presentation/themes/index.js";
+ import { createSkillCatalog } from "./skills.js";
+ import { createCatalogObservation } from "./observation.js";
+ import { observeCatalogContributions } from '../../../core/catalog/contributions.js';
++import { sessionModelCatalog } from '../../../core/catalog/models.js';
+ import { toolPoolFor } from "../../runtime/tools.js";
+ import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
+ import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
+@@ -46,7 +47,10 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
+   signal?: AbortSignal): Promise<readonly Suggestion[]> {
+   if (kind === "mcp") return serverCatalog(context.cwd);
+   if (kind === "connection") return connectionCatalog();
+-  if (kind === "model" || kind === "provider") return modelCatalog(kind, context.configuration.current.catalog);
++  if (kind === "model" || kind === "provider") {
++    const catalog = sessionModelCatalog(context.cwd, context.session.id, context.configuration.current.catalog);
++    return modelCatalog(kind, catalog.physical, catalog.virtual);
++  }
+   if (kind === "workflow") return workflowCatalog(context.cwd);
+   if (kind === "record" || kind === "invalidatable" || kind === "candidate" || kind === "approvable" || kind === "approved") return memoryCatalog(kind, context);
+   if (kind === "grant") {
+@@ -131,6 +135,7 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
+       if (kind === "candidate" || kind === "approvable" || kind === "approved") return observeMemoryCatalog(current.session.id, changed);
+       const targets = catalogSources(kind, { cwd: current.cwd, projectRoot: current.projectRoot, themePaths, grantPath: policy?.sourcePath }, query);
+       const close = targets.map(target => observeDirectory(target, changed));
++      if (kind === 'model' || kind === 'provider') close.push(observeCatalogContributions(current.cwd, () => { pending = undefined; changed(); }));
+       if (kind === "tools") {
+         close.push(observeCatalogContributions(current.cwd, changed));
+         const unsubscribe = gateway.subscribe?.(changed);
+diff --git a/packages/ts-shell/src/cli/interactive/completion/models.ts b/packages/ts-shell/src/cli/interactive/completion/models.ts
+index 39f446d2..0301b937 100644
+--- a/packages/ts-shell/src/cli/interactive/completion/models.ts
++++ b/packages/ts-shell/src/cli/interactive/completion/models.ts
+@@ -3,6 +3,7 @@ import { loadCatalog } from "../../../core/models/catalogStore.js";
+ import { modelSyntax, parseModelArgs } from "../../../core/commands/model/syntax.js";
+ import { firstParameter } from "./position.js";
+ import type { Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
++import type { VirtualModelMetadata } from '../../../core/models/virtual/contract.js';
+ 
+ export function modelKind(before: readonly string[], current: string, after: readonly string[]): "model" | "provider" | undefined {
+   if (!before.length && modelSyntax.actions.some(action => action.name && (action.name === current.toLowerCase() || action.aliases?.includes(current.toLowerCase())))) return undefined;
+@@ -11,10 +12,10 @@ export function modelKind(before: readonly string[], current: string, after: rea
+   return parsed.action.name === "use" ? "model" : parsed.action.name === "list" ? "provider" : undefined;
+ }
+ 
+-export function modelCatalog(kind: "model" | "provider", catalog: readonly CatalogProvider[] = loadCatalog()): readonly Suggestion[] {
+-  if (kind === "provider") return catalog
+-    .map(provider => ({ value: provider.id, label: provider.id }));
+-  return catalog.flatMap(provider => provider.models.map(model => ({
++export function modelCatalog(kind: "model" | "provider", catalog: readonly CatalogProvider[] = loadCatalog(), virtual: readonly VirtualModelMetadata[] = []): readonly Suggestion[] {
++  if (kind === "provider") return [...new Set([...catalog.map(provider => provider.id), ...virtual.map(model => model.provider)])]
++    .map(value => ({ value, label: value }));
++  return [...catalog.flatMap(provider => provider.models.map(model => ({
+     value: `${provider.id}/${model.id}`, label: `${provider.id}/${model.id}`,
+-  })));
++  }))), ...virtual.map(model => ({ value: `${model.provider}/${model.id}`, label: `${model.provider}/${model.id}` }))];
+ }
+diff --git a/packages/ts-shell/src/cli/interactive/picker/model.ts b/packages/ts-shell/src/cli/interactive/picker/model.ts
+index 1487172b..d05a634f 100644
+--- a/packages/ts-shell/src/cli/interactive/picker/model.ts
++++ b/packages/ts-shell/src/cli/interactive/picker/model.ts
+@@ -36,6 +36,10 @@ import { listedModelMetadata, modelMetadataDetails } from './model/metadata.js';
+ import { ModelFocus } from './model/focus.js';
+ import { ModelActionOwner, modelActionAdmission, modelBrowserOwned } from './model/owner.js';
+ import { providerBindingAvailable, providerScopeSelected } from '../../../core/auth/binding.js';
++import { sessionVirtualModels, sessionModelCatalog } from '../../../core/catalog/models.js';
++import { setVirtualModel } from '../../../core/commands/model/virtual.js';
++import { readLogicalModel } from '../../../session/model/logical.js';
++import { virtualModelEffortPicker } from './model/virtual.js';
+ 
+ interface RoleSelection {
+   readonly role: AutomaticModelRole;
+@@ -94,7 +98,10 @@ export function modelPicker(context: CommandContext, focus?: string, navigation
+       details.clear(); detailRecords.clear(); actions.clear(); inspections.clear(); assignments.clear();
+       refreshModelCatalog(context);
+       let choice: ReturnType<typeof captureModelChoice> | undefined;
++      let virtualChoice: ReturnType<typeof captureModelChoice> | undefined;
+       try { choice = captureModelChoice(context); } catch { /* Read-only discovery still works without a saved session. */ }
++      try { virtualChoice = context.logicalModelAdmission ? captureModelChoice({ ...context, admission: context.logicalModelAdmission }) : choice; }
++      catch { /* Logical discovery remains read-only when session capture fails. */ }
+       const admitInspection = () => {
+         if (context.signal?.aborted) return 'Model inspection cancelled. Reopen the model picker.';
+         const refusal = choice?.admission() ?? context.admission?.();
+@@ -106,6 +113,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation
+       const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+       const local = choice || publication ? undefined : loadCatalogSnapshot();
+       const catalog = choice?.catalog ?? publication?.catalog ?? local!.providers;
++      const logical = readLogicalModel(context.sessionId);
+       catalogDiagnostics = choice?.catalogDiagnostics ?? publication?.catalogDiagnostics ?? local?.diagnostics ?? [];
+       const active = context.resolveConfigTarget?.(config, context.sessionId)
+         ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
+@@ -167,7 +175,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation
+             const alias = provider.id === provider.runtime ? catalog.find(candidate => candidate.runtime === provider.runtime
+               && candidate.id !== provider.runtime && candidate.baseUrl !== undefined && modelAddress !== undefined
+               && candidate.baseUrl.replace(/\/+$/, '') === modelAddress.replace(/\/+$/, '')) : undefined;
+-            const selected = Boolean(exact && !ambiguous && !alias && activeReady
++            const selected = Boolean(!logical && exact && !ambiguous && !alias && activeReady
+               && connection?.connectionId === active.credential?.connectionId && provider.runtime === active.provider && model.id === active.model
+               && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
+             const reason = namedConnectionRequired ? 'named connection required'
+@@ -256,7 +264,45 @@ export function modelPicker(context: CommandContext, focus?: string, navigation
+       // A protocol's credential cannot make a different relay category usable.
+       // Derive category readiness from its exact, admitted model rows.
+       const readyCategories = new Set(rows.filter(row => !row.disabled).map(row => groups.get(row.id)?.category));
+-      const categories = orderModelCatalog(catalog, rows, groups, readyCategories);
++      const categories = [...orderModelCatalog(catalog, rows, groups, readyCategories)];
++      if (!assigning && context.sessionId) {
++        const virtualCatalog = sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual;
++        const definitions = sessionVirtualModels(context.cwd, context.sessionId);
++        for (const model of virtualCatalog) {
++          const id = `virtual:${JSON.stringify([model.provider, model.id])}`;
++          const definition = definitions.find(value => value.provider === model.provider && value.id === model.id)!;
++          const selected = logical?.provider === model.provider && logical.model === model.id;
++          groups.set(id, { category: model.provider });
++          rows.push({ id, label: model.id, detail: model.name, note: selected ? 'active' : 'virtual',
++            ...(!virtualChoice?.baseline ? { disabled: true, focusable: true } : {}) });
++          details.set(id, [`Model: ${model.provider}/${model.id}`, `Name: ${model.name}`, 'Physical destination is resolved per request.']);
++          if (!categories.some(category => category.id === model.provider)) categories.push({ id: model.provider, label: model.provider });
++          if (virtualChoice?.baseline) {
++            const captured = virtualChoice;
++            const target = { provider: model.provider, model: model.id,
++              ...(selected && logical.thinkingEffort !== undefined ? { thinkingEffort: logical.thinkingEffort } : {}) };
++            actions.set(id, async stillOwned => {
++              const admission = () => modelActionAdmission(captured.admission, stillOwned)
++                ?? (sessionVirtualModels(context.cwd, context.sessionId!).includes(definition) ? undefined : 'Virtual model registration changed. Reopen the picker.');
++              return admission() ?? setVirtualModel(target, { ...context, admission, logicalModelAdmission: admission }, { baseline: captured.baseline, definition });
++            });
++            inspections.set(id, () => virtualModelEffortPicker(model, target.thinkingEffort ?? null,
++              (thinkingEffort, stillOwned) => {
++                const admission = () => modelActionAdmission(captured.admission, stillOwned)
++                  ?? (sessionVirtualModels(context.cwd, context.sessionId!).includes(definition) ? undefined : 'Virtual model registration changed. Reopen the picker.');
++                return setVirtualModel({ ...target, thinkingEffort }, { ...context, admission, logicalModelAdmission: admission }, { baseline: captured.baseline, definition });
++              }, note => modelPicker(context, id, navigation, undefined, note, signIn, parent),
++              captured.admission, () => modelBrowserOwned({ ...context, admission: context.logicalModelAdmission ?? context.admission })));
++          }
++        }
++        if (logical && !virtualCatalog.some(model => model.provider === logical.provider && model.id === logical.model)) {
++          const id = `virtual:${JSON.stringify([logical.provider, logical.model])}`;
++          groups.set(id, { category: logical.provider });
++          rows.unshift({ id, label: logical.model, detail: `${logical.provider}/${logical.model}`, note: 'active · unavailable', disabled: true, focusable: true });
++          details.set(id, ['The selected virtual model is unavailable. Reload its extension or choose another model.']);
++          if (!categories.some(category => category.id === logical.provider)) categories.push({ id: logical.provider, label: logical.provider });
++        }
++      }
+       // Overrides and legacy credentials can supply a current request without a
+       // matching named connection. Keep that fact visible without inventing one.
+       const savedTarget = choice?.baseline?.selection;
+@@ -265,7 +311,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation
+       const currentConnection = active.credential && !active.blocked ? active.credential.connectionId
+         : active.selection?.connectionId ?? (active.selection?.credentialScope !== 'provider'
+           ? config.sessionConnection?.id ?? config.activeProviderConnectionId : undefined);
+-      if (currentModel && !rows.some(row => row.note === 'active')) {
++      if (!logical && currentModel && !rows.some(row => row.note === 'active')) {
+         const id = 'model:current';
+         groups.set(id, { category: currentProvider });
+         const reportAddress = activeReady ? activeAddress : active.baseUrl;
+@@ -302,7 +348,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation
+         try {
+           const selection = readSessionModel(context.sessionId);
+           for (const role of ['default', 'subagent', 'summary', 'advisor'] as const) {
+-            const target = role === 'default' ? { provider: active.provider, model: active.model, connectionId: active.credential?.connectionId, thinkingEffort }
++            const target = role === 'default' ? logical ? { ...logical, connectionId: undefined } : { provider: active.provider, model: active.model, connectionId: active.credential?.connectionId, thinkingEffort }
+               : (selection?.roles ?? config.sessionModelRoles)?.[role];
+             const id = `role:${role}`;
+             rows.push({ id, label: role === 'default' ? 'Default' : role[0].toUpperCase() + role.slice(1),
+@@ -362,7 +408,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation
+           rows.push({ id: "preset:unavailable", label: "Model presets unavailable", detail: "The preset library could not be read.", disabled: true });
+         }
+       }
+-      activeFocus = focus ?? rows.find(row => row.note === 'active')?.id;
++      activeFocus = focus ?? (logical ? `virtual:${JSON.stringify([logical.provider, logical.model])}` : rows.find(row => row.note === 'active')?.id);
+       const projected = navigation.project('');
+       const previousRows = focusFallback?.rows ?? projected;
+       const crossCategory = focusFallback?.crossCategory === true;
+@@ -394,7 +440,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation
+     }),
+     async inspect(id) {
+       if (refreshFailed) return navigation.all.some(row => row.id === id) ? { note: refreshFailure } : undefined;
+-      const refusal = inspectionAdmission?.();
++      const refusal = id.startsWith('virtual:') ? context.logicalModelAdmission?.() ?? (context.logicalModelAdmission ? undefined : inspectionAdmission?.()) : inspectionAdmission?.();
+       if (refusal) return { note: refusal };
+       const next = inspections.get(id)?.(); return next ? { next } : undefined;
+     },
+diff --git a/packages/ts-shell/src/cli/interactive/picker/model/watch.ts b/packages/ts-shell/src/cli/interactive/picker/model/watch.ts
+index 9181bbfe..ae0c3901 100644
+--- a/packages/ts-shell/src/cli/interactive/picker/model/watch.ts
++++ b/packages/ts-shell/src/cli/interactive/picker/model/watch.ts
+@@ -1,28 +1,32 @@
+ import type { CommandContext } from '../../../../core/commands/types.js';
++import { observeCatalogContributions } from '../../../../core/catalog/contributions.js';
+ 
+ /** Refresh changed publications and revalidate an open owner after a failed read. */
+ export function watchModels<T>(context: CommandContext, load: () => Promise<T>, publish: (value: T) => void,
+   observedRevision?: number, onFailure?: () => void): () => void {
+-  if (!context.readConfiguration) return () => {};
+-  let revision = observedRevision ?? context.readConfiguration().revision;
++  let revision = observedRevision ?? context.readConfiguration?.().revision;
++  let generation = 0, acceptedGeneration = 0;
+   let active = true, pending = false, retry = false;
++  const closeContributions = context.cwd ? observeCatalogContributions(context.cwd, () => { generation++; }) : () => {};
+   const timer = setInterval(() => {
+     if (!active || pending) return;
+     let current: number | undefined;
+-    try { current = context.readConfiguration!().revision; }
++    try { current = context.readConfiguration?.().revision; }
+     catch { retry = true; onFailure?.(); return; }
+-    if (current === revision && !retry) return;
++    if (current === revision && generation === acceptedGeneration && !retry) return;
++    const capturedGeneration = generation;
+     pending = true;
+     void load().then(rows => {
+       if (!active) return;
+-      const latest = context.readConfiguration!().revision;
+-      if (!active || latest !== current) return;
++      const latest = context.readConfiguration?.().revision;
++      if (!active || latest !== current || capturedGeneration !== generation) return;
+       revision = current;
++      acceptedGeneration = capturedGeneration;
+       retry = false;
+       publish(rows);
+     }).catch(() => { if (active) onFailure?.(); })
+       .finally(() => { pending = false; });
+   }, 500);
+   timer.unref?.();
+-  return () => { active = false; clearInterval(timer); };
++  return () => { active = false; clearInterval(timer); closeContributions(); };
+ }
+diff --git a/packages/ts-shell/src/cli/interactive/sessionFacts.ts b/packages/ts-shell/src/cli/interactive/sessionFacts.ts
+index 6423beb9..5a55a2a9 100644
+--- a/packages/ts-shell/src/cli/interactive/sessionFacts.ts
++++ b/packages/ts-shell/src/cli/interactive/sessionFacts.ts
+@@ -10,6 +10,7 @@ import type { StatusFacts } from "../../presentation/tui/chrome/items.js";
+ import type { WelcomeState } from "../../presentation/tui/chrome/welcome.js";
+ import { estimateSessionCost, getSessionUsage, measuredPromptContext, totalTokens } from "../../observability/usageTelemetry.js";
+ import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
++import { readLogicalModel } from '../../session/model/logical.js';
+ 
+ /**
+  * Session facts for the status band.
+@@ -29,6 +30,8 @@ export function shortenPath(target: string): string {
+ 
+ /** Model identifier selected for requests by this host. */
+ export function activeModelName(context: ShellRuntimeContext): string {
++  const logical = readLogicalModel(context.session.id);
++  if (logical) return `${logical.provider}/${logical.model}`;
+   const config = context.configuration.current.config;
+   const active = context.resolveConfigTarget?.(config, context.session.id)
+     ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
+@@ -56,6 +59,7 @@ export function readStatusFacts(
+   live: LiveStatusFacts = {},
+ ): StatusFacts {
+   const { config, catalog } = context.configuration.current;
++  const logical = readLogicalModel(context.session.id);
+   const active = context.resolveConfigTarget?.(config, context.session.id)
+     ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
+   let activeBaseUrl = active.baseUrl;
+@@ -90,8 +94,8 @@ export function readStatusFacts(
+     : measured ? { contextUsed: measured.tokens, contextSource: 'measured' as const }
+       : preview ? { contextSource: preview.source } : {};
+   return {
+-    model: active.model ?? active.provider,
+-    provider: active.provider,
++    model: logical ? `${logical.provider}/${logical.model}` : active.model ?? active.provider,
++    provider: logical?.provider ?? active.provider,
+     branch: context.gitContext.branch ?? undefined,
+     directory: shortenPath(context.projectRoot || path.resolve(".")),
+     sessionId: context.session.id,
+@@ -103,10 +107,8 @@ export function readStatusFacts(
+     openTodos: getSessionTodos(context.session.id).filter((todo) => todo.status !== "done" && todo.status !== "dropped").length,
+     // The denominator is the same resolution compaction uses, even when its
+     // numerator is unknown after startup, restoration, or context replacement.
+-    contextWindow: window.window,
+-    contextWindowSource: window.source,
+-    contextWarning: window.warning,
+-    ...contextFact,
++    ...(logical ? {} : { contextWindow: window.window, contextWindowSource: window.source, contextWarning: window.warning }),
++    ...(logical && !preview ? {} : contextFact),
+     ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
+     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
+     ...(usage.usageHealth ? { usageIncomplete: true } : {}),
+diff --git a/packages/ts-shell/src/cli/rpc/host/settings.ts b/packages/ts-shell/src/cli/rpc/host/settings.ts
+index 6d617f13..77aa25f3 100644
+--- a/packages/ts-shell/src/cli/rpc/host/settings.ts
++++ b/packages/ts-shell/src/cli/rpc/host/settings.ts
+@@ -26,7 +26,7 @@ export function settingsHost(options: RuntimeRpcHostOptions): SettingsHost {
+       return { provider, modelId, note };
+     },
+     cycleModel: () => cycleRpcModel(runtimeContext),
+-    getAvailableModels: listRpcModels,
++    getAvailableModels: () => listRpcModels(runtimeContext),
+     setThinkingLevel: (level) => setRpcThinking(runtimeContext, level),
+     cycleThinkingLevel: () => cycleRpcThinking(runtimeContext),
+     getAvailableThinkingLevels: () => THINKING_LEVELS,
+diff --git a/packages/ts-shell/src/cli/rpc/runtimeOps.ts b/packages/ts-shell/src/cli/rpc/runtimeOps.ts
+index 5789cbd9..37d645f5 100644
+--- a/packages/ts-shell/src/cli/rpc/runtimeOps.ts
++++ b/packages/ts-shell/src/cli/rpc/runtimeOps.ts
+@@ -25,6 +25,8 @@ import { messageToText } from "../../model-adapters/multimodal.js";
+ import { configurationAdmission } from "../../core/shell/configuration.js";
+ import { openSettings } from "../interactive/settings.js";
+ import { navigateSession } from "../runtime/navigation.js";
++import { readLogicalModel } from '../../session/model/logical.js';
++import { sessionModelCatalog } from '../../core/catalog/models.js';
+ 
+ export const THINKING_LEVELS = thinkingSyntax.actions
+   .map(action => action.name)
+@@ -49,6 +51,7 @@ export function buildRpcCommandContext(runtimeContext: ShellRuntimeContext) {
+     sessionId: runtimeContext.session.id,
+     runtimeConfig: runtimeContext.runtimeConfig,
+     admission: configurationAdmission(runtimeContext),
++    logicalModelAdmission: configurationAdmission(runtimeContext, { deferredModel: true }),
+     resolveConfigTarget: runtimeContext.resolveConfigTarget,
+     readConfiguration: () => ({
+       config: runtimeContext.configuration.current.config,
+@@ -93,26 +96,27 @@ export function readLastAssistantText(runtimeContext: ShellRuntimeContext): stri
+ }
+ 
+ export async function cycleRpcModel(runtimeContext: ShellRuntimeContext): Promise<Record<string, unknown> | null> {
+-  const catalog = await readModelCatalog(false, runtimeContext.session.id, runtimeContext.runtimeConfig);
++  const ctx = buildRpcCommandContext(runtimeContext);
++  const catalog = await readModelCatalog(false, runtimeContext.session.id, runtimeContext.runtimeConfig, ctx);
++  const addressed = [...catalog.models.map(id => ({ provider: catalog.provider as string, id })),
++    ...(catalog.virtual ?? []).map(model => ({ provider: model.provider, id: model.id }))];
+   const scoped = runtimeContext.scopedModels;
+   const candidates = scoped?.length
+-    ? catalog.models.filter((id) =>
++    ? addressed.filter(({ provider, id }) =>
+         scoped.some((pattern) => {
+           const p = pattern.trim().toLowerCase();
+-          const bare = p.includes("/") ? p.split("/", 2)[1]! : p;
+-          return id.toLowerCase() === bare || id.toLowerCase().includes(bare);
++          return p.includes('/') ? `${provider}/${id}`.toLowerCase() === p : id.toLowerCase().includes(p);
+         }),
+       )
+-    : catalog.models;
+-  const pool = candidates.length > 0 ? candidates : catalog.models;
++    : addressed;
++  const pool = candidates.length > 0 ? candidates : addressed;
+   if (pool.length === 0) return null;
+-  const ctx = buildRpcCommandContext(runtimeContext);
+   const active = modelRequest(ctx, runtimeContext.runtimeConfig);
+-  const current = catalog.active ?? active.model;
+-  const idx = pool.indexOf(current ?? "");
++  const current = catalog.logical ? `${catalog.logical.provider}/${catalog.logical.model}` : `${catalog.provider}/${catalog.active ?? active.model}`;
++  const idx = pool.findIndex(model => `${model.provider}/${model.id}` === current);
+   const nextModel = pool[(idx + 1) % pool.length]!;
+-  const note = assertModelApplied(await setModel([`${catalog.provider}/${nextModel}`], ctx, false));
+-  return { model: { provider: catalog.provider, id: nextModel }, note };
++  const note = assertModelApplied(await setModel([`${nextModel.provider}/${nextModel.id}`], ctx, false));
++  return { model: nextModel, note };
+ }
+ 
+ export async function setRpcThinking(runtimeContext: ShellRuntimeContext, level: string): Promise<{ readonly level: string }> {
+@@ -125,7 +129,8 @@ export async function setRpcThinking(runtimeContext: ShellRuntimeContext, level:
+ export async function cycleRpcThinking(runtimeContext: ShellRuntimeContext): Promise<{ readonly level: string } | null> {
+   const ctx = buildRpcCommandContext(runtimeContext);
+   const active = modelRequest(ctx, runtimeContext.runtimeConfig);
+-  const current = captureThinkingPreference(runtimeContext.projectRoot, active.thinkingEffort).thinkingEffort ?? "off";
++  const logical = readLogicalModel(runtimeContext.session.id);
++  const current = (logical ? logical.thinkingEffort : captureThinkingPreference(runtimeContext.projectRoot, active.thinkingEffort).thinkingEffort) ?? "off";
+   const idx = THINKING_LEVELS.indexOf(current);
+   const nextName = THINKING_LEVELS[(idx + 1) % THINKING_LEVELS.length]!;
+   const action = thinkingSyntax.actions.find(item => item.name === nextName);
+@@ -164,13 +169,16 @@ export async function readRpcForkMessages(runtimeContext: ShellRuntimeContext):
+   return nav.points.map(point => ({ entryId: point.entryId, text: point.prompt ?? "" }));
+ }
+ 
+-export function listRpcModels(): readonly Record<string, unknown>[] {
+-  return loadCatalog().flatMap(provider => provider.models.map(model => ({
++export function listRpcModels(runtimeContext?: ShellRuntimeContext): readonly Record<string, unknown>[] {
++  const catalog = runtimeContext ? sessionModelCatalog(runtimeContext.cwd, runtimeContext.session.id, runtimeContext.configuration.current.catalog)
++    : { physical: loadCatalog(), virtual: [] };
++  return [...catalog.physical.flatMap(provider => provider.models.map(model => ({
+     provider: provider.id,
+     id: model.id,
+     contextWindow: model.contextWindow,
+     maxTokens: model.maxTokens,
+-  })));
++  }))), ...catalog.virtual.map(model => ({ provider: model.provider, id: model.id, virtual: true,
++    contextWindow: model.contextWindow, maxTokens: model.maxTokens }))];
+ }
+ 
+ export function listRpcCommands(runtimeContext: ShellRuntimeContext): readonly Record<string, unknown>[] {
+@@ -237,14 +245,15 @@ export function readRpcState(runtimeContext: ShellRuntimeContext, queueLength: n
+   const ctx = buildRpcCommandContext(runtimeContext);
+   const active = modelRequest(ctx, runtimeContext.runtimeConfig);
+   const thinking = captureThinkingPreference(runtimeContext.projectRoot, active.thinkingEffort);
++  const logical = readLogicalModel(runtimeContext.session.id);
+   return {
+     sessionId: runtimeContext.session.id,
+     workspaceRoot: runtimeContext.projectRoot,
+     isStreaming,
+     messageCount: runtimeContext.session.turns.length,
+     pendingMessageCount: queueLength,
+-    model: { provider: runtimeContext.runtimeConfig.provider, id: active.model },
+-    thinkingLevel: thinking.thinkingEffort ?? "auto",
++    model: { provider: logical?.provider ?? runtimeContext.runtimeConfig.provider, id: logical?.model ?? active.model },
++    thinkingLevel: (logical ? logical.thinkingEffort : thinking.thinkingEffort) ?? "auto",
+     steeringMode: runtimeContext.runtimeConfig.steeringMode ?? "one-at-a-time",
+     followUpMode: runtimeContext.runtimeConfig.followUpMode ?? "one-at-a-time",
+     ...(runtimeContext.session.title ? { sessionName: runtimeContext.session.title } : {}),
+diff --git a/packages/ts-shell/src/core/commands/model/context.ts b/packages/ts-shell/src/core/commands/model/context.ts
+index 7ed0deb6..faa5fb83 100644
+--- a/packages/ts-shell/src/core/commands/model/context.ts
++++ b/packages/ts-shell/src/core/commands/model/context.ts
+@@ -18,6 +18,11 @@ export async function runExtendedContextCommand(args: string[], context: Command
+   if (!parsed.ok) return { kind: 'local', output: `Invalid /extended-context arguments: ${parsed.reason}\n${syntaxHelp(extendedContextSyntax)}` };
+   const selection = context.sessionId ? readSessionModel(context.sessionId) : undefined;
+   const action = parsed.action.name;
++  if (selection?.virtualModel && (action === 'on' || action === 'enable')) {
++    return { kind: 'local', output: 'Extended context requires a physical model; routed capacity is resolved per request.' };
++  }
++  if (selection?.virtualModel && (!action || action === 'status')) return { kind: 'local', output: selection.contextWindow
++    ? `Extended context: saved (${selection.contextWindow} tokens); inactive while a virtual model is selected.` : 'Extended context: off.' };
+   if (!action || action === 'status') {
+     if (!selection?.contextWindow) return { kind: 'local', output: 'Extended context: off.' };
+     const publication = context.readConfiguration?.();
+diff --git a/packages/ts-shell/src/core/commands/model/preferences.ts b/packages/ts-shell/src/core/commands/model/preferences.ts
+index c2578b09..6a2acd0d 100644
+--- a/packages/ts-shell/src/core/commands/model/preferences.ts
++++ b/packages/ts-shell/src/core/commands/model/preferences.ts
+@@ -12,6 +12,7 @@ import { configurationApplicationNotice, readFreshConfiguration } from '../confi
+ import { selectedModelMatches, selectionRequest } from './target.js';
+ import { providerCredentialBaseUrl } from '../../auth/account/target.js';
+ import { providerBindingAvailable } from '../../auth/binding.js';
++import { sessionVirtualModels } from '../../catalog/models.js';
+ 
+ /** Publish a small session preference through the same active identity and CAS fences. */
+ export function publishModelPreference(context: CommandContext, update: (selection: SessionModelSelection, catalog: readonly CatalogProvider[], baseUrl?: string) => SessionModelSelection): string | undefined {
+@@ -23,6 +24,20 @@ export function publishModelPreference(context: CommandContext, update: (selecti
+     const publication = context.readConfiguration?.();
+     const config = publication?.config ?? context.runtimeConfig ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
+     const catalog = publication?.catalog ?? loadCatalog();
++    if (selection?.virtualModel) {
++      if (!baseline.projectRoot || path.resolve(baseline.projectRoot) !== path.resolve(root) || context.admission?.()) {
++        return 'Session, workspace or model identity changed. Reopen the model settings.';
++      }
++      const definition = sessionVirtualModels(context.cwd, context.sessionId).find(model => model.provider === selection.virtualModel!.provider && model.id === selection.virtualModel!.model);
++      const next = update(selection, catalog);
++      const independent = { ...selection, skillful: next.skillful };
++      if (next.contextWindow === undefined) delete independent.contextWindow;
++      if (!sameValue(independent, next)) return 'This preference requires a physical model. Select one before changing it.';
++      writeSessionModel(context.sessionId, next, baseline, () => !context.admission?.() && !context.signal?.aborted
++        && (!definition || sessionVirtualModels(context.cwd, context.sessionId!).includes(definition)));
++      if (!sameValue(readSessionModel(context.sessionId), next)) return 'Preference publication is unverified; inspect the session before retrying.';
++      return configurationApplicationNotice(context);
++    }
+     if (!selection || !baseline.projectRoot || path.resolve(baseline.projectRoot) !== path.resolve(root)
+       || !selectedModelMatches(config, selection) || context.admission?.()) {
+       return 'Session, workspace or active model identity changed. Select the current connection and model again.';
+diff --git a/packages/ts-shell/src/core/commands/model/role.ts b/packages/ts-shell/src/core/commands/model/role.ts
+index 22beb99a..8833e785 100644
+--- a/packages/ts-shell/src/core/commands/model/role.ts
++++ b/packages/ts-shell/src/core/commands/model/role.ts
+@@ -16,6 +16,7 @@ import { isThinkingPreference, THINKING_LEVELS, type ThinkingPreference } from '
+ import { providerCredentialBaseUrl } from '../../auth/account/target.js';
+ import { providerBindingAvailable, providerScopeSelected } from '../../auth/binding.js';
+ import { loadCatalog } from '../../models/catalogStore.js';
++import { sessionVirtualModels } from '../../catalog/models.js';
+ 
+ export type AutomaticModelRole = keyof SessionModelPolicy;
+ export interface RoleResult { readonly output: string; readonly saved: boolean }
+@@ -29,6 +30,8 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
+     return context.signal?.aborted ? 'Role editing cancelled. Reopen the model picker.' : refusal;
+   };
+   const baseline = choice.baseline;
++  const virtualDefinition = baseline?.selection?.virtualModel && context.sessionId ? sessionVirtualModels(context.cwd, context.sessionId)
++    .find(model => model.provider === baseline.selection!.virtualModel!.provider && model.id === baseline.selection!.virtualModel!.model) : undefined;
+   const active = context.resolveConfigTarget?.(choice.config, context.sessionId)
+     ?? resolveProviderCredential({ runtimeConfig: choice.config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
+   const ready = !baseline?.selection && !active.blocked && (active.credential
+@@ -41,6 +44,8 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
+     : undefined);
+   const defaultRequestCurrent = (): boolean => {
+     try {
++      if (baseline?.selection?.virtualModel) return !virtualDefinition || Boolean(context.sessionId
++        && sessionVirtualModels(context.cwd, context.sessionId).includes(virtualDefinition));
+       const current = context.readConfiguration?.().config ?? context.runtimeConfig
+         ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
+       if (baseline?.selection) return selectedModelMatches(current, baseline.selection)
+diff --git a/packages/ts-shell/src/core/commands/model/selection.ts b/packages/ts-shell/src/core/commands/model/selection.ts
+index 52c026cc..d901c103 100644
+--- a/packages/ts-shell/src/core/commands/model/selection.ts
++++ b/packages/ts-shell/src/core/commands/model/selection.ts
+@@ -25,6 +25,10 @@ import { invalidatePromptMeasurement } from '../../../observability/usageTelemet
+ import { captureThinkingPreference } from '../../models/preference.js';
+ import { exactTargetMatches, modelRequest, targetRequest, targetResolutionIdentity } from './target.js';
+ import { providerBindingAvailable, providerScopeSelected } from '../../auth/binding.js';
++import { readLogicalModel } from '../../../session/model/logical.js';
++import { sessionVirtualModels } from '../../catalog/models.js';
++import { parseModelSelection } from '../../models/virtual/selection.js';
++import { setVirtualModel } from './virtual.js';
+ 
+ interface ExactSelection { readonly target: SessionModelTarget; readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy;
+   readonly resolution?: string }
+@@ -59,8 +63,20 @@ function validResolution(value: unknown): value is string {
+ }
+ 
+ export async function setModel(args: string[], context: CommandContext, global: boolean, requestedEffort?: ThinkingPreference): Promise<string> {
+-  try { return await selectModel(args, context, global, requestedEffort); }
+-  catch { return 'Model selection outcome is unverified. Inspect saved session and global preferences before retrying.'; }
++  try {
++    const selected = readLogicalModel(context.sessionId);
++    const parsed = args[0] ? parseModelSelection(args[0], context.sessionId ? sessionVirtualModels(context.cwd, context.sessionId) : []) : undefined;
++    const repeatsSaved = selected && args[0]?.trim() === `${selected.provider}/${selected.model}`;
++    const logical = parsed?.kind === 'virtual' ? parsed.virtualModel : (repeatsSaved || !args[0] && requestedEffort !== undefined) ? selected : undefined;
++    if (logical) {
++      if (global) return 'Global model save refused: virtual models belong to the current session extension generation.';
++      return await setVirtualModel({ ...logical, ...(requestedEffort !== undefined ? { thinkingEffort: requestedEffort } : {}) }, context,
++        parsed?.kind === 'virtual' ? { definition: parsed.definition } : {});
++    }
++    return await selectModel(args, context, global, requestedEffort);
++  }
++  catch (error) { return error instanceof SessionModelWriteError ? sessionFailure(error)
++    : 'Model selection outcome is unverified. Inspect saved session and global preferences before retrying.'; }
+ }
+ 
+ async function selectModel(args: string[], context: CommandContext, global: boolean, requestedEffort?: ThinkingPreference, exact?: ExactSelection): Promise<string> {
+diff --git a/packages/ts-shell/src/core/commands/model/serviceTier.ts b/packages/ts-shell/src/core/commands/model/serviceTier.ts
+index 143249b8..15c58b19 100644
+--- a/packages/ts-shell/src/core/commands/model/serviceTier.ts
++++ b/packages/ts-shell/src/core/commands/model/serviceTier.ts
+@@ -14,8 +14,10 @@ import path from 'node:path';
+ import { connectionIdentity } from './identity.js';
+ import { catalogProvider } from '../../models/catalog.js';
+ import { modelRequest, selectedModelMatches, selectionRequest } from './target.js';
++import { readLogicalModel } from '../../../session/model/logical.js';
+ 
+ export function effectiveServiceTier(context: CommandContext): string | undefined {
++  if (readLogicalModel(context.sessionId)) return undefined;
+   const config = context.readConfiguration?.().config ?? context.runtimeConfig
+     ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
+   const request = modelRequest(context, config);
+@@ -38,6 +40,7 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
+   catch { return 'Service tier blocked: the saved model selection is unavailable.'; }
+   const selection = baseline.selection;
+   if (!selection) return 'Service tier requires a selected model in this session.';
++  if (selection.virtualModel) return 'Service tier requires a physical model; routed service tier is resolved per request.';
+   const root = context.projectRoot ?? context.cwd;
+   const config = context.readConfiguration?.().config ?? context.runtimeConfig ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
+   const catalog = context.readConfiguration?.().catalog ?? loadCatalog();
+@@ -77,6 +80,7 @@ export async function runSlowCommand(args: string[], context: CommandContext): P
+   const parsed = parseSyntax(slowSyntax, args);
+   if (!parsed.ok) return { kind: 'local', output: `Invalid /slow arguments: ${parsed.reason}\n${syntaxHelp(slowSyntax)}` };
+   const action = parsed.action.name;
++  if (readLogicalModel(context.sessionId)) return { kind: 'local', output: 'Slow mode: unavailable while a virtual model is selected; service tier is resolved per request.' };
+   const tier = effectiveServiceTier(context);
+   if (!action || action === 'status') return { kind: 'local', output: `Slow mode: ${tier === 'flex' ? 'on (flex)' : `off (${tier ?? 'provider/project default; unverified'})`}.` };
+   if (action === 'on' || action === 'enable') return { kind: 'local', output: setSessionServiceTier(context, 'flex') };
+diff --git a/packages/ts-shell/src/core/commands/modelCommandRuntime.ts b/packages/ts-shell/src/core/commands/modelCommandRuntime.ts
+index 9ad0c75e..ae10e616 100644
+--- a/packages/ts-shell/src/core/commands/modelCommandRuntime.ts
++++ b/packages/ts-shell/src/core/commands/modelCommandRuntime.ts
+@@ -23,6 +23,9 @@ import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
+ import { runModelPresetCommand } from './model/presetCommand.js';
+ import { providerCredentialBaseUrl } from '../auth/account/target.js';
+ import { modelDefaultSource, modelDefaultSourceLine, sessionOwnsModel } from './model/defaultSource.js';
++import { sessionModelCatalog } from '../catalog/models.js';
++import { readLogicalModel } from '../../session/model/logical.js';
++import type { VirtualModelMetadata } from '../models/virtual/contract.js';
+ 
+ 
+ /**
+@@ -107,8 +110,10 @@ function modelConfiguration(context: CommandContext) {
+ 
+ function renderCatalogView(context: CommandContext): string {
+   const { config, catalog, active, catalogDiagnostics } = modelConfiguration(context);
+-  return renderCatalog({ providers: catalog, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
++  const physical = renderCatalog({ providers: catalog, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
+     availability: modelCatalogAvailability(context, { config, catalog, active }) });
++  const virtual = context.sessionId ? sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual : [];
++  return virtual.length ? `${physical}\n\nVirtual models\n${virtual.map(model => `- ${model.provider}/${model.id} (${model.name})`).join('\n')}` : physical;
+ }
+ 
+ function modelCatalogAvailability(context: CommandContext, input: Pick<ReturnType<typeof modelConfiguration>, 'config' | 'catalog' | 'active'>) {
+@@ -121,6 +126,16 @@ function modelCatalogAvailability(context: CommandContext, input: Pick<ReturnTyp
+ 
+ function renderModelStatus(context: CommandContext): string {
+   const { config, catalog, active: request, catalogDiagnostics } = modelConfiguration(context);
++  const logical = readLogicalModel(context.sessionId);
++  if (logical) {
++    const available = Boolean(context.sessionId && sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual
++      .some(model => model.provider === logical.provider && model.id === logical.model));
++    return ['Model selection status', ...catalogDiagnostics, `Model: ${logical.provider}/${logical.model}`,
++      `Thinking effort: ${logical.thinkingEffort ?? 'auto'}`, `Virtual model: ${available ? 'registered' : 'unavailable'}`,
++      'Physical destination and request authentication are resolved per request.',
++      `Saved physical provider: ${config.provider}`, `Saved physical model: ${request.model ?? 'unset'}`,
++      'Use /model use <provider>/<model> to select a model.'].join('\n');
++  }
+   const connections = normalizeConnections(config);
+   const activeId = config.activeProviderConnectionId?.trim();
+   const activeConnection = connections.find((item) => item.id === activeId);
+@@ -265,6 +280,8 @@ export interface ModelCatalog {
+   readonly active?: string;
+   /** The list is read locally; network refresh is always an explicit separate action. */
+   readonly offline: boolean;
++  readonly virtual?: readonly VirtualModelMetadata[];
++  readonly logical?: { readonly provider: string; readonly model: string };
+ }
+ 
+ /**
+@@ -272,14 +289,16 @@ export interface ModelCatalog {
+  * text. Shares the local catalogue and explicit refresh owner with `/model list` so
+  * the two can never offer different models.
+  */
+-export async function readModelCatalog(refresh = false, sessionId?: string, runtimeConfig?: RuntimeConfig): Promise<ModelCatalog> {
+-  const context = { cwd: process.cwd(), sessionId, runtimeConfig };
++export async function readModelCatalog(refresh = false, sessionId?: string, runtimeConfig?: RuntimeConfig, suppliedContext?: CommandContext): Promise<ModelCatalog> {
++  const context = suppliedContext ?? { cwd: process.cwd(), sessionId, runtimeConfig };
+   if (refresh) await refreshModels(context);
+   const { catalog, active } = modelConfiguration(context);
+   const allowed = active.credential?.authMode === 'account-auth' ? providerFacts(active.provider).accountAuthAllowedModels : undefined;
+   const binding = catalogProvider(catalog, active.provider, providerCredentialBaseUrl(catalog, active));
+   return { provider: active.provider, models: binding.ambiguous ? [] : allowed ?? binding.entry?.models.map(model => model.id) ?? [],
+-    active: active.model, offline: true };
++    active: active.model, offline: true,
++    ...(context.sessionId ? { virtual: sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual,
++      logical: readLogicalModel(context.sessionId) } : {}) };
+ }
+ 
+ async function refreshModels(context: CommandContext): Promise<string> {
+@@ -299,6 +318,16 @@ async function listModels(args: string[], refresh: boolean, context: CommandCont
+   let snapshot = modelConfiguration(context);
+   const hint = args[0]?.trim();
+   const requested = hint ? (snapshot.catalog.some(entry => entry.id === hint) ? hint : normalizeProvider(hint) ?? hint) : undefined;
++  const virtual = context.sessionId ? sessionModelCatalog(context.cwd, context.sessionId, snapshot.catalog).virtual : [];
++  const logical = readLogicalModel(context.sessionId);
++  const virtualProvider = requested ?? logical?.provider;
++  const virtualRows = virtual.filter(model => model.provider === virtualProvider);
++  if (virtualRows.length || virtualProvider === logical?.provider) return [
++    `Virtual models for provider=${virtualProvider}`,
++    'Source: current session extensions',
++    ...virtualRows.map(model => `${logical?.provider === model.provider && logical.model === model.id ? '*' : '-'} ${model.id} (${model.name})`),
++    ...(!virtualRows.length ? ['The selected virtual model is unavailable.'] : []),
++  ].join('\n');
+   if (requested && !snapshot.catalog.some(entry => entry.id === requested) && !RUNTIME_PROVIDERS.some(id => id === requested)) {
+     return [...snapshot.catalogDiagnostics, 'Unknown provider. Use /model to inspect the catalogue.'].join('\n');
+   }
+diff --git a/packages/ts-shell/src/core/commands/thinkingCommandRuntime.ts b/packages/ts-shell/src/core/commands/thinkingCommandRuntime.ts
+index b9559005..88833c37 100644
+--- a/packages/ts-shell/src/core/commands/thinkingCommandRuntime.ts
++++ b/packages/ts-shell/src/core/commands/thinkingCommandRuntime.ts
+@@ -7,12 +7,19 @@ import { captureThinkingPreference } from '../models/preference.js';
+ import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+ import { projectSessionModel } from '../../session/model/projection.js';
+ import type { CommandContext, LocalCommandResult } from './types.js';
++import { readLogicalModel } from '../../session/model/logical.js';
+ 
+ export async function runThinkingCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
+   const parsed = parseSyntax(thinkingSyntax, args);
+   if (!parsed.ok) return { kind: 'local', output: `Invalid /thinking arguments: ${parsed.reason}\n${syntaxHelp(thinkingSyntax)}` };
+   if (parsed.action.effort !== undefined) return { kind: 'local', output: await setModel([], context, parsed.flags.has('global'), parsed.action.effort) };
+   if (parsed.flags.has('global')) return { kind: 'local', output: 'Choose an effort before --global.' };
++  const logical = readLogicalModel(context.sessionId);
++  if (logical) return { kind: 'local', output: [
++    `Thinking effort: ${logical.thinkingEffort ?? 'auto (router decides)'}.`,
++    `Model: ${logical.provider}/${logical.model}.`,
++    'Using the saved virtual model preference.', syntaxHelp(thinkingSyntax),
++  ].join('\n') };
+   const effective = context.readConfiguration?.().config ?? context.runtimeConfig
+     ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+   const request = modelRequest(context, effective);
+diff --git a/packages/ts-shell/src/sdk/agentSession.test.ts b/packages/ts-shell/src/sdk/agentSession.test.ts
+index b9073f30..66b24d91 100644
+--- a/packages/ts-shell/src/sdk/agentSession.test.ts
++++ b/packages/ts-shell/src/sdk/agentSession.test.ts
+@@ -4,6 +4,7 @@ import path from "node:path";
+ import { afterEach, describe, expect, it, vi } from "vitest";
+ import { CoreMcpGateway } from "../core/mcp/gateway.js";
+ import { createAgentSession, DefaultResourceLoader, getRuntimeConfig, type ExtensionAPI, type QueryEvent } from "../index.js";
++import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../session/model/state.js';
+ 
+ const tempDirs: string[] = [];
+ const originalHome = process.env.HOME;
+@@ -108,6 +109,43 @@ describe("DefaultResourceLoader", () => {
+ });
+ 
+ describe("createAgentSession & AgentSession", () => {
++  it('selects a staged virtual startup option without inventing a physical model or replacing provider authority', async () => {
++    const { work } = makeEnv();
++    const route = vi.fn(() => ({ provider: 'openai', modelId: 'physical' }));
++    const resourceLoader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
++      api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Adaptive', route });
++    }] });
++    await resourceLoader.reload();
++    const { session } = await createAgentSession({ cwd: work, resourceLoader, provider: 'google', model: 'adaptive/auto' });
++    try {
++      expect(readSessionModel(session.sessionId)).toEqual(expect.objectContaining({ provider: 'google', connectionScope: 'provider',
++        virtualModel: { provider: 'adaptive', model: 'auto' } }));
++      expect(readSessionModel(session.sessionId)?.model).toBeUndefined();
++      expect(session.runtimeContext.resolveConfigTarget!(session.runtimeContext.runtimeConfig, session.sessionId).provider).toBe('google');
++      expect(session.runtimeContext.runtimeConfig.provider).not.toBe('adaptive');
++      expect(route).not.toHaveBeenCalled();
++    } finally { await session.dispose(); }
++  });
++  it('edits only virtual effort when SDK resumes a saved logical model with a thinking option', async () => {
++    const { work } = makeEnv();
++    const resourceLoader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
++      api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Adaptive', thinkingLevels: ['high', 'max'],
++        route: () => ({ provider: 'openai', modelId: 'physical' }) });
++    }] });
++    await resourceLoader.reload();
++    const first = await createAgentSession({ cwd: work, resourceLoader, model: 'adaptive/auto' });
++    const sessionId = first.session.sessionId;
++    const selected = { ...readSessionModel(sessionId)!, thinkingEffort: 'low' as const,
++      virtualModel: { provider: 'adaptive', model: 'auto', thinkingEffort: 'high' as const } };
++    writeSessionModel(sessionId, selected, readSessionModelEdit(sessionId));
++    await first.session.dispose();
++    await resourceLoader.reload();
++    const second = await createAgentSession({ cwd: work, resourceLoader, sessionId, thinkingLevel: 'max' });
++    try {
++      expect(readSessionModel(sessionId)).toEqual({ ...selected, virtualModel: { ...selected.virtualModel, thinkingEffort: 'max' } });
++      expect(second.session.runtimeContext.resolveConfigTarget!(second.session.runtimeContext.runtimeConfig, sessionId).thinkingEffort).toBe('low');
++    } finally { await second.session.dispose(); }
++  });
+   it("binds hostBridge even for pre-reloaded DefaultResourceLoader and disposes cleanly", async () => {
+     const { work } = makeEnv();
+     let capturedApi: ExtensionAPI | undefined;
+diff --git a/packages/ts-shell/src/sdk/agentSession.ts b/packages/ts-shell/src/sdk/agentSession.ts
+index 9159209e..d0a9ffe6 100644
+--- a/packages/ts-shell/src/sdk/agentSession.ts
++++ b/packages/ts-shell/src/sdk/agentSession.ts
+@@ -31,7 +31,13 @@ import { DefaultResourceLoader, type LoadExtensionsResult, type ResourceLoader }
+ import { snapshotCustomMessage } from '../core/agent/custom.js';
+ import { snapshotData } from '../core/values/data.js';
+ import type { CatalogProvider } from '../core/models/catalog.js';
+-import { sessionModelCatalog } from '../core/catalog/models.js';
++import { sessionModelCatalog, sessionVirtualModels } from '../core/catalog/models.js';
++import { parseModelSelection } from '../core/models/virtual/selection.js';
++import { setVirtualModel } from '../core/commands/model/virtual.js';
++import { readLogicalModel } from '../session/model/logical.js';
++import { thinkingSyntax } from '../core/commands/thinking/syntax.js';
++import { configurationAdmission } from '../core/shell/configuration.js';
++import { setModel } from '../core/commands/model/selection.js';
+ 
+ /**
+  * Compose an embedded session from the existing runtime, session, and security owners.
+@@ -314,6 +320,10 @@ export async function createAgentSession(
+   }
+ 
+   const extensionsResult = resourceLoader.getExtensions();
++  const startupModel = parseModelSelection(options.model, extensionsResult.extensions.flatMap(entry => entry.extension.virtualModels), options.provider);
++  let pendingLogical = startupModel.kind === 'virtual';
++  const startupThinking = thinkingSyntax.actions.find(action => action.name === options.thinkingLevel
++    || action.aliases?.includes(options.thinkingLevel ?? ''))?.effort;
+   const bindResources = resourceLoader.captureBinding?.();
+   const retireUnboundResources = ownsResources ? resourceLoader.captureRetirement?.() : undefined;
+   const toolPolicy = resolveSdkToolPolicy(options, extensionsResult);
+@@ -341,9 +351,9 @@ export async function createAgentSession(
+ 
+   const cliOptions: CliOptions = {
+     provider: options.provider,
+-    model: options.model,
++    model: startupModel.kind === 'virtual' ? undefined : options.model,
+     scopedModels: options.scopedModels,
+-    thinking: options.thinkingLevel,
++    thinking: startupModel.kind === 'virtual' ? undefined : options.thinkingLevel,
+     apiKey: options.apiKey,
+     noContextFiles: resourceLoader.getNoContextFiles(),
+     skillPaths: resourceLoader.getSkillPaths(),
+@@ -355,6 +365,8 @@ export async function createAgentSession(
+     nonInteractiveApproval: options.nonInteractiveApproval ?? "deny",
+     dangerouslyBypassHookTrust: options.allowUntrustedHooks,
+   };
++  const resolveSdkCredential = (config: RuntimeConfig, sessionId?: string) => resolveCliCredential(config,
++    !options.model && readLogicalModel(sessionId) ? { ...cliOptions, thinking: undefined } : cliOptions, process.env, sessionId);
+ 
+   let bootstrap: ReturnType<typeof bootstrapShellRuntime>;
+   try { bootstrap = bootstrapShellRuntime({
+@@ -362,7 +374,8 @@ export async function createAgentSession(
+     launchCwd: options.launchCwd ?? cwd,
+     runtimeConfig,
+     runtimeConfigOverrides: overrides,
+-    resolveConfigTarget: (cfg, sid) => resolveCliCredential(cfg, cliOptions, process.env, sid),
++    deferredModel: () => pendingLogical,
++    resolveConfigTarget: resolveSdkCredential,
+     skillOptions: {
+       ...(resourceLoader.getSkillPaths().length ? { skillPaths: resourceLoader.getSkillPaths() } : {}),
+       ...(resourceLoader.getNoSkills() ? { noSkills: true } : {}),
+@@ -401,13 +414,15 @@ export async function createAgentSession(
+   let retireResources: (() => void) | undefined;
+   const approvalTrustPolicy = options.approvalTrustPolicy ?? new ApprovalTrustPolicy();
+   const providerRuntimeBridge = {
+-    resolveCredentialSnapshot: () => resolveCliCredential(runtimeContext.runtimeConfig, cliOptions, process.env, runtimeContext.session.id),
++    resolveCredentialSnapshot: () => resolveSdkCredential(runtimeContext.runtimeConfig, runtimeContext.session.id),
+     providerModeEnv: () => process.env.CHEERS_PROVIDER_MODE,
+     realProviderSmokeOptIn: () => process.env.CHEERS_REAL_PROVIDER_SMOKE?.trim() === "1",
+   };
+   try {
+     cleanups.push(...registerSdkContributions(runtimeContext.cwd, runtimeContext.session.id, extensionsResult,
+       options.customTools, () => extensionHostFor(runtimeContext)?.ui, runtimeContext.configuration.current.catalog));
++    const startupDefinition = startupModel.kind === 'virtual' ? sessionVirtualModels(runtimeContext.cwd, runtimeContext.session.id)
++      .find(model => model.provider === startupModel.virtualModel.provider && model.id === startupModel.virtualModel.model) : undefined;
+     sessionRuntime = createCliSessionRuntime({
+       sessionManager,
+       mcpGateway,
+@@ -427,6 +442,35 @@ export async function createAgentSession(
+     }
+     resourceLoader.setDenyRules?.(() => runtimeContextRef?.runtimeConfig.denyRules ?? runtimeConfig.denyRules);
+     if (options.ui) bindExtensionUiFor(runtimeContext, options.ui);
++    if (startupModel.kind === 'virtual') {
++      if (!startupDefinition || !sessionVirtualModels(runtimeContext.cwd, runtimeContext.session.id).includes(startupDefinition)) {
++        throw new Error('Virtual startup model registration changed during initialization.');
++      }
++      const selected = { ...startupModel.virtualModel, ...(startupThinking !== undefined ? { thinkingEffort: startupThinking } : {}) };
++      const output = await setVirtualModel(selected, { cwd: runtimeContext.cwd, projectRoot: runtimeContext.projectRoot,
++        sessionId: runtimeContext.session.id, runtimeConfig: runtimeContext.runtimeConfig,
++        readConfiguration: () => runtimeContext.configuration.current, resolveConfigTarget: runtimeContext.resolveConfigTarget,
++        admission: configurationAdmission(runtimeContext), logicalModelAdmission: configurationAdmission(runtimeContext, { deferredModel: true }) }, { definition: startupDefinition });
++      if (!output.startsWith('Model switched to ') && !output.startsWith('Model preference saved for ')) throw new Error(output);
++      pendingLogical = false;
++    } else if (options.model && readLogicalModel(runtimeContext.session.id)) {
++      const output = await setModel([startupModel.model ?? options.model], { cwd: runtimeContext.cwd, projectRoot: runtimeContext.projectRoot,
++        sessionId: runtimeContext.session.id, runtimeConfig: runtimeContext.runtimeConfig,
++        readConfiguration: () => runtimeContext.configuration.current, resolveConfigTarget: runtimeContext.resolveConfigTarget,
++        admission: configurationAdmission(runtimeContext), logicalModelAdmission: configurationAdmission(runtimeContext, { deferredModel: true }) }, false, startupThinking ?? startupModel.thinkingEffort);
++      if (!output.startsWith('Model switched to ') && !output.startsWith('Model preference saved for ')) throw new Error(output);
++    } else if (!options.model && startupThinking !== undefined) {
++      const logical = readLogicalModel(runtimeContext.session.id);
++      if (logical) {
++        const output = await setVirtualModel({ ...logical, thinkingEffort: startupThinking }, {
++          cwd: runtimeContext.cwd, projectRoot: runtimeContext.projectRoot, sessionId: runtimeContext.session.id,
++          runtimeConfig: runtimeContext.runtimeConfig, readConfiguration: () => runtimeContext.configuration.current,
++          resolveConfigTarget: runtimeContext.resolveConfigTarget, admission: configurationAdmission(runtimeContext),
++          logicalModelAdmission: configurationAdmission(runtimeContext, { deferredModel: true }),
++        });
++        if (!output.startsWith('Model switched to ') && !output.startsWith('Model preference saved for ')) throw new Error(output);
++      }
++    }
+   } catch (error) {
+     try { retireResources?.(); } catch { /* Keep the initialization failure. */ }
+     if (!retireResources) {
+@@ -443,7 +487,7 @@ export async function createAgentSession(
+   }
+ 
+   const credential = providerRuntimeBridge.resolveCredentialSnapshot();
+-  const modelFallbackMessage = credential.blocked
++  const modelFallbackMessage = !readLogicalModel(runtimeContext.session.id) && credential.blocked
+     ? `Provider credential status: ${credential.blocked}${credential.provider ? ` (${credential.provider})` : ""}`
+     : undefined;
+ 
+diff --git a/packages/ts-shell/src/session/branch/create.test.ts b/packages/ts-shell/src/session/branch/create.test.ts
+index b8f0d58d..82cdf207 100644
+--- a/packages/ts-shell/src/session/branch/create.test.ts
++++ b/packages/ts-shell/src/session/branch/create.test.ts
+@@ -7,6 +7,7 @@ import { SessionStoreAccess } from '../store/sessionStoreAccess.js';
+ import { readSessionNavigation } from '../query/navigation.js';
+ import { SessionForkError } from './create.js';
+ import { hasUnfinishedSessionWork } from '../recovery/work.js';
++import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../model/state.js';
+ 
+ let root: string;
+ beforeEach(() => {
+@@ -15,6 +16,18 @@ beforeEach(() => {
+ });
+ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
+ 
++it('preserves model selection in a fork under a fresh session revision', () => {
++  const manager = new SessionManager(); const source = manager.createNew(root);
++  const selected = { connectionScope: 'provider' as const, provider: 'openai', model: 'physical', thinkingEffort: null,
++    skillful: false, virtualModel: { provider: 'adaptive', model: 'auto', thinkingEffort: 'high' as const } };
++  writeSessionModel(source.id, selected, readSessionModelEdit(source.id));
++  const revision = readSessionModelEdit(source.id).revision;
++  const forked = manager.fork(source.id, root, { activate: false });
++  expect(readSessionModel(forked.id)).toEqual(selected);
++  expect(readSessionModelEdit(forked.id).revision).not.toBe(revision);
++  expect(readSessionModel(source.id)).toEqual(selected);
++});
++
+ it('forks a historic user entry with all branches retained and no inherited pending authority', async () => {
+   const manager = new SessionManager(); const source = manager.createNew(root);
+   manager.addTurn(source.id, { role: 'user', content: 'first question' });
+diff --git a/packages/ts-shell/src/session/branch/create.ts b/packages/ts-shell/src/session/branch/create.ts
+index ac95283c..2f5116ef 100644
+--- a/packages/ts-shell/src/session/branch/create.ts
++++ b/packages/ts-shell/src/session/branch/create.ts
+@@ -5,6 +5,7 @@ import { readSessionFileVersion } from '../store/version.js';
+ import type { SessionStoreAccess } from '../store/sessionStoreAccess.js';
+ import { sameValue } from '../../config/values.js';
+ import { forkThread, forkTranscriptEvents } from './fork.js';
++import { decodeSessionModel, readSessionModelEdit, writeSessionModel } from '../model/state.js';
+ 
+ export interface SessionForkOptions {
+   readonly activate?: boolean;
+@@ -36,7 +37,10 @@ export function forkSession(input: {
+     throw new Error('Cannot fork: source history changed after selection. Reopen its tree.');
+   }
+   const source = store.load(sourceId);
+-  const thread = store.readStateSnapshotRequired(store.statePath(sourceId)).thread ?? buildLinearSessionThreadSnapshot(source);
++  const sourceState = store.readStateSnapshotRequired(store.statePath(sourceId));
++  const selection = decodeSessionModel(sourceState.modelSelection);
++  if (sourceState.modelSelection !== undefined && !selection) throw new Error('Cannot fork: source model selection is unavailable.');
++  const thread = sourceState.thread ?? buildLinearSessionThreadSnapshot(source);
+   const events = readTranscriptEvents(store.transcriptPath(sourceId));
+   if (readSessionFileVersion(layout) !== version) throw new Error('Cannot fork: source history changed. Reopen its tree.');
+   if (!sessionThreadPath(thread).resolved) throw new Error('Cannot fork: session ancestry is unavailable.');
+@@ -65,9 +69,11 @@ export function forkSession(input: {
+     }
+     const copied = forkThread({ ...thread, activeLeafId: forkLeaf }, source.id, forked.id);
+     store.writeSessionState(forked, { thread: copied });
++    if (selection) writeSessionModel(forked.id, selection, readSessionModelEdit(forked.id));
+     const saved = store.load(forked.id);
+     const state = store.readStateSnapshotRequired(store.statePath(forked.id));
+-    if (!sameValue(state.thread, copied) || !sessionThreadPath(copied).resolved || saved.parentSession !== source.id) throw new Error('Fork readback failed.');
++    if (!sameValue(state.thread, copied) || !sameValue(state.modelSelection, selection)
++      || !sessionThreadPath(copied).resolved || saved.parentSession !== source.id) throw new Error('Fork readback failed.');
+     if (options?.activate !== false) callbacks.setCurrentSessionForProject(saved.projectRoot, saved.id);
+     return saved;
+   } catch { throw new SessionForkError(forked.id); }
+diff --git a/packages/ts-shell/src/session/model/contract.ts b/packages/ts-shell/src/session/model/contract.ts
+index ffe5bb15..aa0775bd 100644
+--- a/packages/ts-shell/src/session/model/contract.ts
++++ b/packages/ts-shell/src/session/model/contract.ts
+@@ -29,10 +29,22 @@ export interface ProviderModelTarget {
+ 
+ export type SessionModelTarget = SessionModelRole | ProviderModelTarget;
+ 
+-/** Preferences contain no credential; legacy named selections keep their original scope. */
+-export type SessionModelSelection = (ProviderModelTarget | (SessionModelRole & {
++export interface SessionVirtualModelSelection {
++  readonly provider: string;
++  readonly model: string;
++  readonly thinkingEffort?: ThinkingPreference;
++}
++
++/** Physical authority remains present even when a logical choice has no physical default. */
++type SessionModelAuthority = Omit<ProviderModelTarget, 'model'> | (Omit<SessionModelRole, 'model'> & {
+   readonly connectionScope?: 'session';
+-})) & {
++});
++
++/** Preferences contain no credential; legacy named selections keep their original scope. */
++export type SessionModelSelection = SessionModelAuthority & (
++  { readonly model: string; readonly virtualModel?: undefined }
++  | { readonly model?: string; readonly virtualModel: SessionVirtualModelSelection }
++) & {
+   /** Provider service tier for this session, when the active model advertises it. */
+   readonly serviceTier?: string;
+   readonly presets?: Readonly<Record<string, SessionModelPreset>>;
+diff --git a/packages/ts-shell/src/session/model/projection.ts b/packages/ts-shell/src/session/model/projection.ts
+index 291d7490..342910a6 100644
+--- a/packages/ts-shell/src/session/model/projection.ts
++++ b/packages/ts-shell/src/session/model/projection.ts
+@@ -1,5 +1,5 @@
+ import { isRuntimeProvider, type RuntimeConfig } from "../../config/runtimeConfig.js";
+-import { readSessionModel } from "./state.js";
++import { readSessionModelStrict } from "./state.js";
+ import { sessionModelOrigins } from '../../config/provenance/projection.js';
+ import type { SessionModelSelection } from './contract.js';
+ 
+@@ -7,12 +7,15 @@ type ModelConfig = Partial<Pick<RuntimeConfig, "provider" | "activeProviderConne
+ 
+ /** Overlay a session preference without mutating shared defaults or credentials. */
+ export function projectSessionModel<T extends ModelConfig>(config: T, sessionId?: string): T {
+-  return projectModelSelection(config, readSessionModel(sessionId));
++  return projectModelSelection(config, readSessionModelStrict(sessionId));
+ }
+ 
+ /** Also used to validate the exact next request target before saving it. */
+ export function projectModelSelection<T extends ModelConfig>(config: T, selection?: SessionModelSelection): T {
+-  if (!selection || (selection.connectionScope === undefined && config.activeProviderConnectionId !== selection.connectionId)) return config;
++  if (!selection) return config;
++  // Independent roles survive a dormant or unavailable default binding.
++  if (selection.virtualModel && selection.roles) config = { ...config, sessionModelRoles: selection.roles };
++  if (selection.connectionScope === undefined && config.activeProviderConnectionId !== selection.connectionId) return config;
+   const providerSlot = selection.connectionScope === 'provider';
+   const connection = config.providerConnections?.find(item => item.id === selection.connectionId);
+   const binding = providerSlot
+@@ -21,18 +24,18 @@ export function projectModelSelection<T extends ModelConfig>(config: T, selectio
+     ? { activeProviderConnectionId: selection.connectionId, sessionConnection: { id: selection.connectionId, provider: selection.provider } } : {};
+   if (!providerSlot && (!connection || connection.provider !== selection.provider)) return selection.connectionScope === 'session' ? { ...config, ...binding } : config;
+   if (!isRuntimeProvider(selection.provider)) return { ...config, ...binding };
+-  const preference = { model: selection.model, ...(selection.thinkingEffort !== undefined ? { thinkingEffort: selection.thinkingEffort } : {}) };
++  const preference = { ...(selection.model !== undefined ? { model: selection.model } : {}), ...(selection.thinkingEffort !== undefined ? { thinkingEffort: selection.thinkingEffort } : {}) };
+   return {
+     ...config,
+     ...binding,
+-    sessionServiceTier: selection.serviceTier === undefined ? undefined : {
++    sessionServiceTier: selection.virtualModel || selection.serviceTier === undefined || selection.model === undefined ? undefined : {
+       provider: selection.provider, model: selection.model, value: selection.serviceTier,
+       ...(selection.connectionId !== undefined ? { connectionId: selection.connectionId } : {}),
+       ...(selection.connectionScope !== undefined ? { connectionScope: selection.connectionScope } : {}),
+     },
+     ...(selection.roles ? { sessionModelRoles: selection.roles } : {}),
+     ...(selection.connectionScope ? { provider: selection.provider } : {}),
+-    sessionContextWindow: selection.contextWindow === undefined ? undefined : {
++    sessionContextWindow: selection.virtualModel || selection.contextWindow === undefined || selection.model === undefined ? undefined : {
+       provider: selection.provider, model: selection.model, value: selection.contextWindow,
+       ...(selection.connectionId !== undefined ? { connectionId: selection.connectionId } : {}),
+       ...(selection.connectionScope !== undefined ? { connectionScope: selection.connectionScope } : {}),
+diff --git a/packages/ts-shell/src/session/model/state.ts b/packages/ts-shell/src/session/model/state.ts
+index f6e6266e..c7fc127d 100644
+--- a/packages/ts-shell/src/session/model/state.ts
++++ b/packages/ts-shell/src/session/model/state.ts
+@@ -2,17 +2,21 @@ import { createSessionStoreLayout, locateExistingSessionLayout, validateSessionI
+ import { readStateSnapshotRequired, readStateSnapshotSafely } from "../store/sessionStateStore.js";
+ import { withFileLock, writeJsonFileAtomic } from "../store/sessionFileStore.js";
+ import { randomUUID } from 'node:crypto';
++import { existsSync } from 'node:fs';
+ import { freezeDeep } from '../../core/values/freeze.js';
+ import { sameValue } from '../../config/values.js';
+ import { SessionModelWriteError, type ModelWriteState } from './outcome.js';
+ 
+ import { isThinkingPreference, type ThinkingPreference } from '../../core/models/effort.js';
+-import type { SessionModelPolicy, SessionModelPreset, SessionModelRole, SessionModelSelection } from "./contract.js";
++import type { SessionModelPolicy, SessionModelPreset, SessionModelRole, SessionModelSelection, SessionVirtualModelSelection } from "./contract.js";
+ 
+ export function decodeSessionModel(value: unknown): SessionModelSelection | undefined {
+   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+   const candidate = value as Record<string, unknown>;
+-  if (![candidate.provider, candidate.model].every(item => typeof item === "string" && item.trim().length > 0)) return undefined;
++  const virtualModel = decodeVirtualModel(candidate.virtualModel);
++  if (Object.hasOwn(candidate, 'virtualModel') && !virtualModel) return undefined;
++  if (typeof candidate.provider !== 'string' || !candidate.provider.trim()) return undefined;
++  if (candidate.model === undefined ? !virtualModel : typeof candidate.model !== 'string' || !candidate.model.trim()) return undefined;
+   if (candidate.connectionScope === 'provider'
+     ? candidate.connectionId !== undefined
+     : typeof candidate.connectionId !== 'string' || !candidate.connectionId.trim()) return undefined;
+@@ -29,7 +33,19 @@ export function decodeSessionModel(value: unknown): SessionModelSelection | unde
+   if (contextWindow !== undefined && (!Number.isSafeInteger(contextWindow) || (contextWindow as number) < 1)) return undefined;
+   const address = candidate.connectionScope === 'provider' ? { connectionScope: 'provider' as const }
+     : { connectionId: (candidate.connectionId as string).trim(), ...(candidate.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}) };
+-  return { ...address, ...(roles ? { roles } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
++  return { ...address, ...(roles ? { roles } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), provider: candidate.provider.trim(), ...(candidate.model !== undefined ? { model: (candidate.model as string).trim() } : {}), ...(virtualModel ? { virtualModel } : {}) } as SessionModelSelection;
++}
++
++export function decodeVirtualModel(value: unknown): SessionVirtualModelSelection | undefined {
++  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
++  const candidate = value as Record<string, unknown>;
++  if (Object.keys(candidate).some(key => !['provider', 'model', 'thinkingEffort'].includes(key))) return undefined;
++  const validText = (item: unknown, limit: number): item is string => typeof item === 'string' && item.length > 0
++    && item.length <= limit && item === item.trim() && !/[\u0000-\u001f\u007f-\u009f]/.test(item);
++  if (!validText(candidate.provider, 128) || candidate.provider.includes('/') || !validText(candidate.model, 512)
++    || (Object.hasOwn(candidate, 'thinkingEffort') && !isThinkingPreference(candidate.thinkingEffort))) return undefined;
++  return { provider: candidate.provider, model: candidate.model,
++    ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}) };
+ }
+ 
+ function decodeRole(value: unknown): SessionModelRole | undefined {
+@@ -87,6 +103,19 @@ export function readSessionModel(sessionId?: string): SessionModelSelection | un
+   return decodeSessionModel(readStateSnapshotSafely(layoutFor(sessionId).statePath)?.modelSelection);
+ }
+ 
++/** Request and logical-selection readers must not turn malformed durable state into a default. */
++export function readSessionModelStrict(sessionId?: string): SessionModelSelection | undefined {
++  if (!sessionId) return undefined;
++  try {
++    const path = layoutFor(sessionId).statePath;
++    if (!existsSync(path)) return undefined;
++    return decodeSessionModel(requiredState(path).modelSelection);
++  } catch (error) {
++    if (error instanceof SessionModelWriteError) throw error;
++    throw new SessionModelWriteError('read-failed', 'unchanged');
++  }
++}
++
+ class ModelEdit {
+   constructor(readonly sessionId: string, readonly statePath: string, readonly projectRoot: string | undefined,
+     readonly selection: SessionModelSelection | undefined, readonly revision: string | undefined) { freezeDeep(this); }

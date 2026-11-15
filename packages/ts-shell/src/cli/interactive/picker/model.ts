@@ -36,6 +36,10 @@ import { listedModelMetadata, modelMetadataDetails } from './model/metadata.js';
 import { ModelFocus } from './model/focus.js';
 import { ModelActionOwner, modelActionAdmission, modelBrowserOwned } from './model/owner.js';
 import { providerBindingAvailable, providerScopeSelected } from '../../../core/auth/binding.js';
+import { sessionVirtualModels, sessionModelCatalog } from '../../../core/catalog/models.js';
+import { setVirtualModel } from '../../../core/commands/model/virtual.js';
+import { readLogicalModel } from '../../../session/model/logical.js';
+import { virtualModelEffortPicker } from './model/virtual.js';
 
 interface RoleSelection {
   readonly role: AutomaticModelRole;
@@ -94,7 +98,10 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       details.clear(); detailRecords.clear(); actions.clear(); inspections.clear(); assignments.clear();
       refreshModelCatalog(context);
       let choice: ReturnType<typeof captureModelChoice> | undefined;
+      let virtualChoice: ReturnType<typeof captureModelChoice> | undefined;
       try { choice = captureModelChoice(context); } catch { /* Read-only discovery still works without a saved session. */ }
+      try { virtualChoice = context.logicalModelAdmission ? captureModelChoice({ ...context, admission: context.logicalModelAdmission }) : choice; }
+      catch { /* Logical discovery remains read-only when session capture fails. */ }
       const admitInspection = () => {
         if (context.signal?.aborted) return 'Model inspection cancelled. Reopen the model picker.';
         const refusal = choice?.admission() ?? context.admission?.();
@@ -106,6 +113,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
       const local = choice || publication ? undefined : loadCatalogSnapshot();
       const catalog = choice?.catalog ?? publication?.catalog ?? local!.providers;
+      const logical = readLogicalModel(context.sessionId);
       catalogDiagnostics = choice?.catalogDiagnostics ?? publication?.catalogDiagnostics ?? local?.diagnostics ?? [];
       const active = context.resolveConfigTarget?.(config, context.sessionId)
         ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
@@ -167,7 +175,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
             const alias = provider.id === provider.runtime ? catalog.find(candidate => candidate.runtime === provider.runtime
               && candidate.id !== provider.runtime && candidate.baseUrl !== undefined && modelAddress !== undefined
               && candidate.baseUrl.replace(/\/+$/, '') === modelAddress.replace(/\/+$/, '')) : undefined;
-            const selected = Boolean(exact && !ambiguous && !alias && activeReady
+            const selected = Boolean(!logical && exact && !ambiguous && !alias && activeReady
               && connection?.connectionId === active.credential?.connectionId && provider.runtime === active.provider && model.id === active.model
               && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
             const reason = namedConnectionRequired ? 'named connection required'
@@ -256,7 +264,45 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       // A protocol's credential cannot make a different relay category usable.
       // Derive category readiness from its exact, admitted model rows.
       const readyCategories = new Set(rows.filter(row => !row.disabled).map(row => groups.get(row.id)?.category));
-      const categories = orderModelCatalog(catalog, rows, groups, readyCategories);
+      const categories = [...orderModelCatalog(catalog, rows, groups, readyCategories)];
+      if (!assigning && context.sessionId) {
+        const virtualCatalog = sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual;
+        const definitions = sessionVirtualModels(context.cwd, context.sessionId);
+        for (const model of virtualCatalog) {
+          const id = `virtual:${JSON.stringify([model.provider, model.id])}`;
+          const definition = definitions.find(value => value.provider === model.provider && value.id === model.id)!;
+          const selected = logical?.provider === model.provider && logical.model === model.id;
+          groups.set(id, { category: model.provider });
+          rows.push({ id, label: model.id, detail: model.name, note: selected ? 'active' : 'virtual',
+            ...(!virtualChoice?.baseline ? { disabled: true, focusable: true } : {}) });
+          details.set(id, [`Model: ${model.provider}/${model.id}`, `Name: ${model.name}`, 'Physical destination is resolved per request.']);
+          if (!categories.some(category => category.id === model.provider)) categories.push({ id: model.provider, label: model.provider });
+          if (virtualChoice?.baseline) {
+            const captured = virtualChoice;
+            const target = { provider: model.provider, model: model.id,
+              ...(selected && logical.thinkingEffort !== undefined ? { thinkingEffort: logical.thinkingEffort } : {}) };
+            actions.set(id, async stillOwned => {
+              const admission = () => modelActionAdmission(captured.admission, stillOwned)
+                ?? (sessionVirtualModels(context.cwd, context.sessionId!).includes(definition) ? undefined : 'Virtual model registration changed. Reopen the picker.');
+              return admission() ?? setVirtualModel(target, { ...context, admission, logicalModelAdmission: admission }, { baseline: captured.baseline, definition });
+            });
+            inspections.set(id, () => virtualModelEffortPicker(model, target.thinkingEffort ?? null,
+              (thinkingEffort, stillOwned) => {
+                const admission = () => modelActionAdmission(captured.admission, stillOwned)
+                  ?? (sessionVirtualModels(context.cwd, context.sessionId!).includes(definition) ? undefined : 'Virtual model registration changed. Reopen the picker.');
+                return setVirtualModel({ ...target, thinkingEffort }, { ...context, admission, logicalModelAdmission: admission }, { baseline: captured.baseline, definition });
+              }, note => modelPicker(context, id, navigation, undefined, note, signIn, parent),
+              captured.admission, () => modelBrowserOwned({ ...context, admission: context.logicalModelAdmission ?? context.admission })));
+          }
+        }
+        if (logical && !virtualCatalog.some(model => model.provider === logical.provider && model.id === logical.model)) {
+          const id = `virtual:${JSON.stringify([logical.provider, logical.model])}`;
+          groups.set(id, { category: logical.provider });
+          rows.unshift({ id, label: logical.model, detail: `${logical.provider}/${logical.model}`, note: 'active · unavailable', disabled: true, focusable: true });
+          details.set(id, ['The selected virtual model is unavailable. Reload its extension or choose another model.']);
+          if (!categories.some(category => category.id === logical.provider)) categories.push({ id: logical.provider, label: logical.provider });
+        }
+      }
       // Overrides and legacy credentials can supply a current request without a
       // matching named connection. Keep that fact visible without inventing one.
       const savedTarget = choice?.baseline?.selection;
@@ -265,7 +311,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const currentConnection = active.credential && !active.blocked ? active.credential.connectionId
         : active.selection?.connectionId ?? (active.selection?.credentialScope !== 'provider'
           ? config.sessionConnection?.id ?? config.activeProviderConnectionId : undefined);
-      if (currentModel && !rows.some(row => row.note === 'active')) {
+      if (!logical && currentModel && !rows.some(row => row.note === 'active')) {
         const id = 'model:current';
         groups.set(id, { category: currentProvider });
         const reportAddress = activeReady ? activeAddress : active.baseUrl;
@@ -302,7 +348,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
         try {
           const selection = readSessionModel(context.sessionId);
           for (const role of ['default', 'subagent', 'summary', 'advisor'] as const) {
-            const target = role === 'default' ? { provider: active.provider, model: active.model, connectionId: active.credential?.connectionId, thinkingEffort }
+            const target = role === 'default' ? logical ? { ...logical, connectionId: undefined } : { provider: active.provider, model: active.model, connectionId: active.credential?.connectionId, thinkingEffort }
               : (selection?.roles ?? config.sessionModelRoles)?.[role];
             const id = `role:${role}`;
             rows.push({ id, label: role === 'default' ? 'Default' : role[0].toUpperCase() + role.slice(1),
@@ -362,7 +408,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
           rows.push({ id: "preset:unavailable", label: "Model presets unavailable", detail: "The preset library could not be read.", disabled: true });
         }
       }
-      activeFocus = focus ?? rows.find(row => row.note === 'active')?.id;
+      activeFocus = focus ?? (logical ? `virtual:${JSON.stringify([logical.provider, logical.model])}` : rows.find(row => row.note === 'active')?.id);
       const projected = navigation.project('');
       const previousRows = focusFallback?.rows ?? projected;
       const crossCategory = focusFallback?.crossCategory === true;
@@ -393,8 +439,9 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       publish(navigation.all);
     }),
     async inspect(id) {
+      if (typeof id !== 'string') return undefined;
       if (refreshFailed) return navigation.all.some(row => row.id === id) ? { note: refreshFailure } : undefined;
-      const refusal = inspectionAdmission?.();
+      const refusal = id.startsWith('virtual:') ? context.logicalModelAdmission?.() ?? (context.logicalModelAdmission ? undefined : inspectionAdmission?.()) : inspectionAdmission?.();
       if (refusal) return { note: refusal };
       const next = inspections.get(id)?.(); return next ? { next } : undefined;
     },

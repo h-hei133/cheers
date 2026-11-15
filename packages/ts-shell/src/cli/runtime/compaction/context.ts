@@ -7,12 +7,16 @@ import type { StepRequest } from '../../../turn/step.js';
 import { createTurnContextPreparer } from '../../../turn/context/prepare.js';
 import { capturedCompactionPolicy } from '../../../turn/compaction/policy.js';
 import { requestReplayBinding } from '../../../provider/request/replay.js';
+import type { PreparedTurnContext } from '../../../turn/context/contract.js';
+import type { buildCompactionWiring } from '../compaction.js';
+import type { CompactionBinding } from '../../../turn/compaction.js';
 
 /** Manual history uses the foreground request owner without acquiring a provider attempt. */
 export function manualCompactionPolicy(policy: CompactionPolicy, request: StepRequest,
-  converter: MessageConverter | undefined, admission?: () => string | undefined): CompactionPolicy {
+  converter: MessageConverter | undefined, admission?: () => string | undefined,
+  bind?: (prepared: PreparedTurnContext) => CompactionPolicy): CompactionPolicy {
   const thinking = captureThinkingPreference(request.workspaceRoot, request.thinkingEffort);
-  const options = { allowTools: true, convertToLlm: converter, requestPurpose: 'turn' } as const;
+  const options = { allowTools: true, convertToLlm: converter, requestPurpose: 'turn', routeReason: 'direct' } as const;
   const prepareRequest = createTurnContextPreparer(request, options, {
     thinkingEffort: thinking.thinkingEffort,
     explicitEffort: request.thinkingEffortExplicit ?? thinking.thinkingEffortExplicit,
@@ -24,6 +28,24 @@ export function manualCompactionPolicy(policy: CompactionPolicy, request: StepRe
     const blocked = admission?.(); if (blocked) throw new Error(blocked);
     const prepared = await prepareRequest(captured, signal);
     if (!sameContext(messages, captured)) throw new Error('Manual compaction history changed during preparation.');
-    return capturedCompactionPolicy(policy, prepared, { admission, onPrepared: () => {} });
+    prepared.acceptRoute?.();
+    return capturedCompactionPolicy(bind?.(prepared) ?? policy, prepared, { admission, onPrepared: () => {} });
   } };
+}
+
+/** Bind before planning the cut; every summary segment reuses that same physical target. */
+export function manualCompactionWiring(wiring: ReturnType<typeof buildCompactionWiring>, request: StepRequest,
+  converter: MessageConverter | undefined, admission: () => string | undefined): CompactionBinding {
+  let bound: CompactionBinding | undefined;
+  const current = () => {
+    if (!bound) throw new Error('Manual compaction has no prepared request.');
+    return bound;
+  };
+  return { policy: manualCompactionPolicy(wiring.policy, request, converter, admission, prepared => {
+    bound = wiring.forRequest(prepared, admission); return bound.policy;
+  }),
+  summarize: Object.assign((...args: Parameters<typeof wiring.summarize>) => current().summarize(...args),
+    { dispatchAware: true, prepare: (...args: Parameters<typeof wiring.summarize>) => current().summarize.prepare!(...args) }),
+  summarizeTurnPrefix: Object.assign((...args: Parameters<typeof wiring.summarizeTurnPrefix>) => current().summarizeTurnPrefix!(...args),
+    { dispatchAware: true, prepare: (...args: Parameters<NonNullable<typeof wiring.summarizeTurnPrefix.prepare>>) => current().summarizeTurnPrefix!.prepare!(...args) }) };
 }

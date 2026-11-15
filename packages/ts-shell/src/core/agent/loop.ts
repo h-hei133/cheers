@@ -5,6 +5,8 @@ import { flushMetrics, recordCount, recordTiming } from "../../observability/met
 import type { AgentMessage, AgentStopReason } from "./state.js";
 import { convertMessages, type MessageConverter, type MessageProjection } from './messages.js';
 import type { ProviderMessage } from '../../model-adapters/message.js';
+import type { ModelRouteFailure } from '../models/virtual/contract.js';
+import { inferRouteReason } from '../models/virtualModels.js';
 import { assertContextCurrent, captureContext, captureDeclarationAppend, lastContextMessageIndex, sameContext, type RequestContextOwner } from './context.js';
 import {
   exceedsRetryCeiling,
@@ -25,6 +27,8 @@ import {
 } from "./tools.js";
 
 export interface AssistantStep {
+  /** Physical handoff evidence for retry routing, absent for local preparation failures. */
+  readonly routeAttempt?: ModelRouteFailure;
   /** Whether the request that produced this step admitted tool calls. */
   readonly toolsAllowed?: boolean;
   /** Measurement belongs to this completed request, not the session's last response. */
@@ -80,11 +84,7 @@ export interface AssistantStep {
    * absent origin as matching, which keeps unattributed steps behaving as
    * they did before the field existed.
    */
-  readonly origin?: {
-    readonly provider?: string;
-    readonly model: string;
-    readonly replayBinding?: string;
-  };
+  readonly origin?: ProviderMessage['origin'];
 }
 export interface NextStepSnapshot {
   /**
@@ -178,6 +178,9 @@ export interface AgentLoopConfig {
     signal?: AbortSignal,
     request?: {
       readonly requestId: string;
+      readonly reason?: 'user' | 'continuation' | 'retry';
+      readonly attempt?: number;
+      readonly failedRoute?: ModelRouteFailure;
       readonly sourceMessages?: readonly AgentMessage[];
       readonly providerMessages?: readonly ProviderMessage[];
       readonly context?: RequestContextOwner;
@@ -245,10 +248,11 @@ async function retryStep(
   let priorSource: readonly AgentMessage[] | undefined;
   let priorStep: AgentLoopConfig['streamStep'] | undefined;
   let attempt = 0;
+  let failedRoute: ModelRouteFailure | undefined;
   for (;;) {
     let capturedContext = captureContext(context);
     signal?.throwIfAborted();
-    const reason = attempt > 0 ? 'retry' : context[lastContextMessageIndex(context)]?.role === 'user' ? 'user' : 'continuation';
+    const reason = inferRouteReason(context, attempt) as 'user' | 'continuation' | 'retry';
     const prepared = config.prepareRequest ? await config.prepareRequest({ reason, attempt, messages: context }, signal) : undefined;
     if (config.prepareRequest) assertContextCurrent(context, capturedContext, config.isContextCurrent, signal);
     const activeStep = prepared?.streamStep ?? config.streamStep;
@@ -305,6 +309,7 @@ async function retryStep(
     let emitChain: Promise<void> = Promise.resolve();
     const request = Object.freeze({
       requestId,
+      reason, attempt, ...(failedRoute ? { failedRoute } : {}),
       ...(deferredSource ? { sourceMessages: deferredSource }
         : converted!.sourceMessages ? { sourceMessages: converted!.sourceMessages, providerMessages: converted!.providerMessages } : {}),
       context: requestContext,
@@ -331,6 +336,7 @@ async function retryStep(
     });
     assertContextCurrent(context, capturedContext, config.isContextCurrent, signal);
     const step = await activeStep(deferredSource ? activeMessages : converted!.messages, signal, request);
+    failedRoute = step.routeAttempt;
     await emitChain;
     // Once partial output has reached listeners, or the step's own layer
     // already retried, do not start another attempt for the same step.

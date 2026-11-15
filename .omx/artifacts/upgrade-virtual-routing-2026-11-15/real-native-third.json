@@ -1,0 +1,39 @@
+{
+  "platform": "linux",
+  "node": "v24.15.0",
+  "status": "failed",
+  "publicInstalledSdk": true,
+  "configuredProvider": true,
+  "buildId": "083b3d78d8bf8dc44d04fc2ec6c43c595bb7d6e0d68257a983c3491a2854887c",
+  "requests": 0,
+  "stages": {},
+  "probeSha256": "5ac1c6f0f4fe1a4ecc6e6c92f64c3841ee2184b1b43d0a77d09588759eacdd9a",
+  "catalogueSetup": {
+    "isolatedValidObjects": true,
+    "originalActiveSelected": false,
+    "existingConfiguredTarget": true,
+    "originalConfigUnchanged": true
+  },
+  "configuredPhysicalTargetResolved": true,
+  "failedStage": "prompt",
+  "errorName": "Error",
+  "failure": "provider-network",
+  "failureFacts": {
+    "connectionUnavailable": false,
+    "noBinding": false,
+    "noCredential": false,
+    "endpointOwnership": false,
+    "configuredLimits": false,
+    "authorityChanged": false,
+    "configurationChanged": false,
+    "sourceUnavailable": false,
+    "fetchFailed": false,
+    "refused": true,
+    "timeout": false,
+    "thinking": false,
+    "history": false,
+    "modelAdmission": false
+  },
+  "errorCodes": [],
+  "isolatedStateRemoved": true
+}

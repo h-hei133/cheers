@@ -1,0 +1,59 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/session/model/provider.test.ts src/session/model/selection.test.ts src/session/model/effort.test.ts src/session/model/state.test.ts src/session/branch/create.test.ts src/cli/provider/step.test.ts src/cli/provider/route.test.ts src/cli/provider/compaction.test.ts src/cli/provider/connections.test.ts src/cli/provider/cliProviderRuntimeBridge.test.ts src/core/shell/bootstrap.test.ts src/core/shell/configurationRefusal.test.ts src/core/commands/model/presetCommand.test.ts src/core/commands/model/serviceTier.test.ts src/core/commands/model/virtual.test.ts src/cli/bootstrap/cliProcessRunner.test.ts src/cli/interactive/picker/model/publication.test.ts src/cli/interactive/picker/model/watch.test.ts src/cli/interactive/picker/model/virtual.test.ts src/sdk/lifecycle.test.ts src/sdk/virtual.test.ts src/sdk/agentSession.test.ts src/extensions/runtime/ui.test.ts src/extensions/runtime/inProcessLoader.test.ts src/extensions/runtime/virtual.test.ts src/core/catalog/models.test.ts src/core/models/virtualModels.test.ts src/core/models/virtual/selection.test.ts src/core/models/virtual/capture.test.ts src/core/agent/loop.test.ts src/turn/context/prepare.test.ts src/turn/context/target.test.ts src/turn/request.test.ts src/turn/step.test.ts src/turn/declarations.test.ts src/turn/compaction/context.test.ts src/cli/runtime/compaction/virtual.test.ts src/cli/runtime/renewal.test.ts src/config/constraints.test.ts --maxWorkers=1 --no-file-parallelism
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/turn/step.test.ts (117 tests) 505ms
+ ✓ src/session/model/provider.test.ts (200 tests) 14268ms
+ ✓ src/session/model/selection.test.ts (69 tests) 3968ms
+ ✓ src/cli/runtime/compaction/virtual.test.ts (15 tests) 1785ms
+   ✓ routes manual summaries once without reading or writing branch routing state  304ms
+ ✓ src/cli/runtime/renewal.test.ts (12 tests) 1163ms
+ ✓ src/cli/interactive/picker/model/publication.test.ts (19 tests) 1684ms
+ ✓ src/session/model/effort.test.ts (26 tests) 1476ms
+Warning: Config project maxTurns: trust-not-established; value ignored.
+Resumed session sess_d73b478296aeb657_1794734921853
+Resumed session sess_4c659161e6329b09_1794734921909 with migrated project root /tmp/cheers-bootstrap-xO0f5D/session-root-rebind-nsnZGW -> /tmp/cheers-bootstrap-xO0f5D/session-root-rebind-nsnZGW/nested/entry
+Resumed session sess_185fb6e3c393ecbe_1794734922003 with migrated project root /tmp/cheers-bootstrap-DDAt8O/project-a-migrate-nnLIHm -> /tmp/cheers-bootstrap-DDAt8O/project-b-migrate-vMyC7A
+Resumed session sess_06ecb531200c3ef2_1794734922515
+Current session pointer sess_64ac607379e7d865_1794734922850 could not be resumed for /tmp/cheers-bootstrap-324Pta/project-stale-current-DR9q1E; starting a fresh session.
+Resumed session sess_5a8d439e5917e598_1794734922988
+ ✓ src/core/shell/bootstrap.test.ts (28 tests) 1660ms
+ ✓ src/sdk/lifecycle.test.ts (10 tests) 2833ms
+   ✓ retires the loaded extension capabilities when their consuming session is disposed  2066ms
+ ✓ src/core/commands/model/presetCommand.test.ts (11 tests) 1079ms
+ ✓ src/cli/provider/step.test.ts (15 tests) 940ms
+ ✓ src/config/constraints.test.ts (36 tests) 836ms
+ ✓ src/extensions/runtime/virtual.test.ts (24 tests) 685ms
+ ✓ src/cli/provider/route.test.ts (14 tests) 658ms
+ ✓ src/sdk/agentSession.test.ts (7 tests) 564ms
+ ✓ src/cli/provider/compaction.test.ts (23 tests) 546ms
+ ✓ src/session/model/state.test.ts (26 tests) 538ms
+ ✓ src/core/commands/model/virtual.test.ts (14 tests) 361ms
+ ✓ src/cli/bootstrap/cliProcessRunner.test.ts (7 tests) 386ms
+ ✓ src/extensions/runtime/inProcessLoader.test.ts (3 tests) 330ms
+ ✓ src/extensions/runtime/ui.test.ts (8 tests) 343ms
+ ✓ src/sdk/virtual.test.ts (4 tests) 336ms
+ ✓ src/session/branch/create.test.ts (6 tests) 320ms
+ ✓ src/turn/declarations.test.ts (9 tests) 263ms
+ ✓ src/cli/interactive/picker/model/virtual.test.ts (6 tests) 142ms
+ ✓ src/turn/context/prepare.test.ts (13 tests) 148ms
+ ✓ src/turn/compaction/context.test.ts (6 tests) 89ms
+ ✓ src/core/commands/model/serviceTier.test.ts (9 tests) 82ms
+ ✓ src/turn/request.test.ts (12 tests) 43ms
+ ✓ src/turn/context/target.test.ts (11 tests) 34ms
+ ✓ src/core/agent/loop.test.ts (30 tests) 31ms
+ ✓ src/cli/interactive/picker/model/watch.test.ts (7 tests) 15ms
+ ✓ src/core/catalog/models.test.ts (16 tests) 14ms
+ ✓ src/core/models/virtual/capture.test.ts (11 tests) 8ms
+ ✓ src/core/shell/configurationRefusal.test.ts (6 tests) 4ms
+ ✓ src/cli/provider/connections.test.ts (3 tests) 4ms
+ ✓ src/core/models/virtualModels.test.ts (3 tests) 4ms
+ ✓ src/core/models/virtual/selection.test.ts (2 tests) 2ms
+ ✓ src/cli/provider/cliProviderRuntimeBridge.test.ts (2 tests) 2ms
+
+ Test Files  39 passed (39)
+      Tests  840 passed (840)
+   Start at  17:27:56
+   Duration  83.04s (transform 8.81s, setup 0ms, collect 37.47s, tests 38.15s, environment 5ms, prepare 1.82s)
+

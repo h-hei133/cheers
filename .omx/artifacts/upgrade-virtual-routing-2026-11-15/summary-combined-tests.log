@@ -1,0 +1,24 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/runtime/compaction/virtual.test.ts (6 tests) 1180ms
+   ✓ routes manual summaries once without reading or writing branch routing state  304ms
+   ✓ keeps an explicit summary role for manual with dormant credentials unavailable  498ms
+ ✓ src/cli/runtime/summary.test.ts (50 tests) 13332ms
+   ✓ sends the admitted tier for 'manual' summaries on 'main'  834ms
+   ✓ sends the admitted tier for 'manual' summaries on 'different-model'  1642ms
+   ✓ sends the admitted tier for 'manual' summaries on 'sibling'  326ms
+   ✓ sends the admitted tier for 'manual' summaries on 'inherited'  302ms
+   ✓ does not reuse a completed summary after the role effort changes  387ms
+   ✓ renews the summary account once and refuses append across the resulting configuration publication  338ms
+ ✓ src/cli/runtime/renewal.test.ts (12 tests) 1025ms
+ ✓ src/sdk/compaction.test.ts (11 tests) 952ms
+ ✓ src/cli/runtime/compaction.test.ts (51 tests) 781ms
+ ✓ src/cli/runtime/compaction/target.test.ts (11 tests) 635ms
+ ✓ src/cli/runtime/compaction/context.test.ts (3 tests) 21ms
+
+ Test Files  7 passed (7)
+      Tests  144 passed (144)
+   Start at  16:52:34
+   Duration  40.58s (transform 7.91s, setup 0ms, collect 20.99s, tests 17.93s, environment 1ms, prepare 336ms)
+

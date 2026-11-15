@@ -2,17 +2,21 @@ import { createSessionStoreLayout, locateExistingSessionLayout, validateSessionI
 import { readStateSnapshotRequired, readStateSnapshotSafely } from "../store/sessionStateStore.js";
 import { withFileLock, writeJsonFileAtomic } from "../store/sessionFileStore.js";
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { freezeDeep } from '../../core/values/freeze.js';
 import { sameValue } from '../../config/values.js';
 import { SessionModelWriteError, type ModelWriteState } from './outcome.js';
 
 import { isThinkingPreference, type ThinkingPreference } from '../../core/models/effort.js';
-import type { SessionModelPolicy, SessionModelPreset, SessionModelRole, SessionModelSelection } from "./contract.js";
+import type { SessionModelPolicy, SessionModelPreset, SessionModelRole, SessionModelSelection, SessionVirtualModelSelection } from "./contract.js";
 
 export function decodeSessionModel(value: unknown): SessionModelSelection | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const candidate = value as Record<string, unknown>;
-  if (![candidate.provider, candidate.model].every(item => typeof item === "string" && item.trim().length > 0)) return undefined;
+  const virtualModel = decodeVirtualModel(candidate.virtualModel);
+  if (Object.hasOwn(candidate, 'virtualModel') && !virtualModel) return undefined;
+  if (typeof candidate.provider !== 'string' || !candidate.provider.trim()) return undefined;
+  if (candidate.model === undefined ? !virtualModel : typeof candidate.model !== 'string' || !candidate.model.trim()) return undefined;
   if (candidate.connectionScope === 'provider'
     ? candidate.connectionId !== undefined
     : typeof candidate.connectionId !== 'string' || !candidate.connectionId.trim()) return undefined;
@@ -29,7 +33,19 @@ export function decodeSessionModel(value: unknown): SessionModelSelection | unde
   if (contextWindow !== undefined && (!Number.isSafeInteger(contextWindow) || (contextWindow as number) < 1)) return undefined;
   const address = candidate.connectionScope === 'provider' ? { connectionScope: 'provider' as const }
     : { connectionId: (candidate.connectionId as string).trim(), ...(candidate.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}) };
-  return { ...address, ...(roles ? { roles } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
+  return { ...address, ...(roles ? { roles } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), provider: candidate.provider.trim(), ...(candidate.model !== undefined ? { model: (candidate.model as string).trim() } : {}), ...(virtualModel ? { virtualModel } : {}) } as SessionModelSelection;
+}
+
+export function decodeVirtualModel(value: unknown): SessionVirtualModelSelection | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const candidate = value as Record<string, unknown>;
+  if (Object.keys(candidate).some(key => !['provider', 'model', 'thinkingEffort'].includes(key))) return undefined;
+  const validText = (item: unknown, limit: number): item is string => typeof item === 'string' && item.length > 0
+    && item.length <= limit && item === item.trim() && !/[\u0000-\u001f\u007f-\u009f]/.test(item);
+  if (!validText(candidate.provider, 128) || candidate.provider.includes('/') || !validText(candidate.model, 512)
+    || (Object.hasOwn(candidate, 'thinkingEffort') && !isThinkingPreference(candidate.thinkingEffort))) return undefined;
+  return { provider: candidate.provider, model: candidate.model,
+    ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}) };
 }
 
 function decodeRole(value: unknown): SessionModelRole | undefined {
@@ -85,6 +101,19 @@ function layoutFor(sessionId: string) {
 export function readSessionModel(sessionId?: string): SessionModelSelection | undefined {
   if (!sessionId) return undefined;
   return decodeSessionModel(readStateSnapshotSafely(layoutFor(sessionId).statePath)?.modelSelection);
+}
+
+/** Request and logical-selection readers must not turn malformed durable state into a default. */
+export function readSessionModelStrict(sessionId?: string): SessionModelSelection | undefined {
+  if (!sessionId) return undefined;
+  try {
+    const path = layoutFor(sessionId).statePath;
+    if (!existsSync(path)) return undefined;
+    return decodeSessionModel(requiredState(path).modelSelection);
+  } catch (error) {
+    if (error instanceof SessionModelWriteError) throw error;
+    throw new SessionModelWriteError('read-failed', 'unchanged');
+  }
 }
 
 class ModelEdit {

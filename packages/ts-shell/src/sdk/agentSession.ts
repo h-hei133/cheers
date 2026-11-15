@@ -31,7 +31,13 @@ import { DefaultResourceLoader, type LoadExtensionsResult, type ResourceLoader }
 import { snapshotCustomMessage } from '../core/agent/custom.js';
 import { snapshotData } from '../core/values/data.js';
 import type { CatalogProvider } from '../core/models/catalog.js';
-import { sessionModelCatalog } from '../core/catalog/models.js';
+import { sessionModelCatalog, sessionVirtualModels } from '../core/catalog/models.js';
+import { parseModelSelection } from '../core/models/virtual/selection.js';
+import { setVirtualModel } from '../core/commands/model/virtual.js';
+import { readLogicalModel } from '../session/model/logical.js';
+import { thinkingSyntax } from '../core/commands/thinking/syntax.js';
+import { configurationAdmission } from '../core/shell/configuration.js';
+import { setModel } from '../core/commands/model/selection.js';
 
 /**
  * Compose an embedded session from the existing runtime, session, and security owners.
@@ -314,6 +320,10 @@ export async function createAgentSession(
   }
 
   const extensionsResult = resourceLoader.getExtensions();
+  const startupModel = parseModelSelection(options.model, extensionsResult.extensions.flatMap(entry => entry.extension.virtualModels ?? []), options.provider);
+  let pendingLogical = startupModel.kind === 'virtual';
+  const startupThinking = thinkingSyntax.actions.find(action => action.name === options.thinkingLevel
+    || action.aliases?.includes(options.thinkingLevel ?? ''))?.effort;
   const bindResources = resourceLoader.captureBinding?.();
   const retireUnboundResources = ownsResources ? resourceLoader.captureRetirement?.() : undefined;
   const toolPolicy = resolveSdkToolPolicy(options, extensionsResult);
@@ -341,9 +351,9 @@ export async function createAgentSession(
 
   const cliOptions: CliOptions = {
     provider: options.provider,
-    model: options.model,
+    model: startupModel.kind === 'virtual' ? undefined : options.model,
     scopedModels: options.scopedModels,
-    thinking: options.thinkingLevel,
+    thinking: startupModel.kind === 'virtual' ? undefined : options.thinkingLevel,
     apiKey: options.apiKey,
     noContextFiles: resourceLoader.getNoContextFiles(),
     skillPaths: resourceLoader.getSkillPaths(),
@@ -355,6 +365,8 @@ export async function createAgentSession(
     nonInteractiveApproval: options.nonInteractiveApproval ?? "deny",
     dangerouslyBypassHookTrust: options.allowUntrustedHooks,
   };
+  const resolveSdkCredential = (config: RuntimeConfig, sessionId?: string) => resolveCliCredential(config,
+    !options.model && readLogicalModel(sessionId) ? { ...cliOptions, thinking: undefined } : cliOptions, process.env, sessionId);
 
   let bootstrap: ReturnType<typeof bootstrapShellRuntime>;
   try { bootstrap = bootstrapShellRuntime({
@@ -362,7 +374,8 @@ export async function createAgentSession(
     launchCwd: options.launchCwd ?? cwd,
     runtimeConfig,
     runtimeConfigOverrides: overrides,
-    resolveConfigTarget: (cfg, sid) => resolveCliCredential(cfg, cliOptions, process.env, sid),
+    deferredModel: () => pendingLogical,
+    resolveConfigTarget: resolveSdkCredential,
     skillOptions: {
       ...(resourceLoader.getSkillPaths().length ? { skillPaths: resourceLoader.getSkillPaths() } : {}),
       ...(resourceLoader.getNoSkills() ? { noSkills: true } : {}),
@@ -401,13 +414,15 @@ export async function createAgentSession(
   let retireResources: (() => void) | undefined;
   const approvalTrustPolicy = options.approvalTrustPolicy ?? new ApprovalTrustPolicy();
   const providerRuntimeBridge = {
-    resolveCredentialSnapshot: () => resolveCliCredential(runtimeContext.runtimeConfig, cliOptions, process.env, runtimeContext.session.id),
+    resolveCredentialSnapshot: () => resolveSdkCredential(runtimeContext.runtimeConfig, runtimeContext.session.id),
     providerModeEnv: () => process.env.CHEERS_PROVIDER_MODE,
     realProviderSmokeOptIn: () => process.env.CHEERS_REAL_PROVIDER_SMOKE?.trim() === "1",
   };
   try {
     cleanups.push(...registerSdkContributions(runtimeContext.cwd, runtimeContext.session.id, extensionsResult,
       options.customTools, () => extensionHostFor(runtimeContext)?.ui, runtimeContext.configuration.current.catalog));
+    const startupDefinition = startupModel.kind === 'virtual' ? sessionVirtualModels(runtimeContext.cwd, runtimeContext.session.id)
+      .find(model => model.provider === startupModel.virtualModel.provider && model.id === startupModel.virtualModel.model) : undefined;
     sessionRuntime = createCliSessionRuntime({
       sessionManager,
       mcpGateway,
@@ -427,6 +442,35 @@ export async function createAgentSession(
     }
     resourceLoader.setDenyRules?.(() => runtimeContextRef?.runtimeConfig.denyRules ?? runtimeConfig.denyRules);
     if (options.ui) bindExtensionUiFor(runtimeContext, options.ui);
+    if (startupModel.kind === 'virtual') {
+      if (!startupDefinition || !sessionVirtualModels(runtimeContext.cwd, runtimeContext.session.id).includes(startupDefinition)) {
+        throw new Error('Virtual startup model registration changed during initialization.');
+      }
+      const selected = { ...startupModel.virtualModel, ...(startupThinking !== undefined ? { thinkingEffort: startupThinking } : {}) };
+      const output = await setVirtualModel(selected, { cwd: runtimeContext.cwd, projectRoot: runtimeContext.projectRoot,
+        sessionId: runtimeContext.session.id, runtimeConfig: runtimeContext.runtimeConfig,
+        readConfiguration: () => runtimeContext.configuration.current, resolveConfigTarget: runtimeContext.resolveConfigTarget,
+        admission: configurationAdmission(runtimeContext), logicalModelAdmission: configurationAdmission(runtimeContext, { deferredModel: true }) }, { definition: startupDefinition });
+      if (!output.startsWith('Model switched to ') && !output.startsWith('Model preference saved for ')) throw new Error(output);
+      pendingLogical = false;
+    } else if (options.model && readLogicalModel(runtimeContext.session.id)) {
+      const output = await setModel([startupModel.model ?? options.model], { cwd: runtimeContext.cwd, projectRoot: runtimeContext.projectRoot,
+        sessionId: runtimeContext.session.id, runtimeConfig: runtimeContext.runtimeConfig,
+        readConfiguration: () => runtimeContext.configuration.current, resolveConfigTarget: runtimeContext.resolveConfigTarget,
+        admission: configurationAdmission(runtimeContext), logicalModelAdmission: configurationAdmission(runtimeContext, { deferredModel: true }) }, false, startupThinking ?? startupModel.thinkingEffort);
+      if (!output.startsWith('Model switched to ') && !output.startsWith('Model preference saved for ')) throw new Error(output);
+    } else if (!options.model && startupThinking !== undefined) {
+      const logical = readLogicalModel(runtimeContext.session.id);
+      if (logical) {
+        const output = await setVirtualModel({ ...logical, thinkingEffort: startupThinking }, {
+          cwd: runtimeContext.cwd, projectRoot: runtimeContext.projectRoot, sessionId: runtimeContext.session.id,
+          runtimeConfig: runtimeContext.runtimeConfig, readConfiguration: () => runtimeContext.configuration.current,
+          resolveConfigTarget: runtimeContext.resolveConfigTarget, admission: configurationAdmission(runtimeContext),
+          logicalModelAdmission: configurationAdmission(runtimeContext, { deferredModel: true }),
+        });
+        if (!output.startsWith('Model switched to ') && !output.startsWith('Model preference saved for ')) throw new Error(output);
+      }
+    }
   } catch (error) {
     try { retireResources?.(); } catch { /* Keep the initialization failure. */ }
     if (!retireResources) {
@@ -443,7 +487,7 @@ export async function createAgentSession(
   }
 
   const credential = providerRuntimeBridge.resolveCredentialSnapshot();
-  const modelFallbackMessage = credential.blocked
+  const modelFallbackMessage = !readLogicalModel(runtimeContext.session.id) && credential.blocked
     ? `Provider credential status: ${credential.blocked}${credential.provider ? ` (${credential.provider})` : ""}`
     : undefined;
 

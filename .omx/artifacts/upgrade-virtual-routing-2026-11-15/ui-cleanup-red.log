@@ -1,0 +1,69 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/extensions/runtime/virtual.test.ts (23 tests | 2 failed | 21 skipped) 361ms
+   ↓ session extension virtual registration > keeps the file route request in the VM realm
+   ↓ session extension virtual registration > keeps the file route messages in the VM realm
+   ↓ session extension virtual registration > keeps the file route message in the VM realm
+   ↓ session extension virtual registration > keeps the file route state in the VM realm
+   ↓ session extension virtual registration > keeps the file route signal in the VM realm
+   ↓ session extension virtual registration > does not expose a host UI promise to a file route
+   ↓ session extension virtual registration > does not expose a host UI error to a file route
+   ↓ session extension virtual registration > keeps cancellation events and thrown cancellation errors in the file VM realm
+   ↓ session extension virtual registration > copies and freezes nested file inputs and retains primitive failure and previous-target data
+   ↓ session extension virtual registration > cancels file UI with its VM signal while retaining generation reuse
+   ↓ session extension virtual registration > keeps abort-listener UI effects under the retired original file invocation
+   ↓ session extension virtual registration > preserves file route UI ownership through await and rejects result accessors before reading them
+   × session extension virtual registration > settles a file UI reply even when its caller signal cleanup throws 348ms
+     → .toMatch() expects to receive a string, but got undefined
+   × session extension virtual registration > drops a file UI setup that throws before host dispatch and leaves its stale cancellation inert 12ms
+     → expected undefined to be true // Object.is equality
+   ↓ session extension virtual registration > waits for the complete async file registration and captures VM thinking-level arrays and generic state
+   ↓ session extension virtual registration > does not publish a staged virtual definition when later async file initialization fails
+   ↓ session extension virtual registration > closes virtual registration after initialization without changing the accepted snapshot
+   ↓ session extension virtual registration > keeps the generic state registration API typed for inline extension consumers
+   ↓ session extension virtual registration > cancels async file initialization without publishing its staged virtual definition
+   ↓ session extension virtual registration > discards an in-flight route after its request signal aborts
+   ↓ session extension virtual registration > discards an in-flight route after its generation signal aborts
+   ↓ session extension virtual registration > retains the callback UI invocation owner through await and refuses the retired invocation later
+   ↓ session extension virtual registration > reports virtual registration as explicitly unsupported through the actual worker execution adapter
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > settles a file UI reply even when its caller signal cleanup throws
+TypeError: .toMatch() expects to receive a string, but got undefined
+ ❯ vi.waitFor.timeout src/extensions/runtime/virtual.test.ts:195:61
+    193|     const observed = pending.then(value => ({ value }), error => ({ er…
+    194|     try {
+    195|       await vi.waitFor(() => expect(loaded.exports.settled).toMatch(/r…
+       |                                                             ^
+    196|     } finally { invocation.abort(); await observed; }
+    197|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > drops a file UI setup that throws before host dispatch and leaves its stale cancellation inert
+AssertionError: expected undefined to be true // Object.is equality
+
+- Expected: 
+true
+
++ Received: 
+undefined
+
+ ❯ src/extensions/runtime/virtual.test.ts:214:36
+    212|     await loaded.virtualModels![0]!.route(request());
+    213|     expect(input).not.toHaveBeenCalled();
+    214|     expect(loaded.exports.removed).toBe(true);
+       |                                    ^
+    215|     expect(() => (loaded.exports.cancel as () => void)()).not.toThrow(…
+    216|     expect(loaded.exports.cancelled).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 21 skipped (23)
+   Start at  16:57:32
+   Duration  1.10s (transform 172ms, setup 0ms, collect 522ms, tests 361ms, environment 0ms, prepare 64ms)
+

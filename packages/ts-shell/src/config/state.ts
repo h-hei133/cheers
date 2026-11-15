@@ -26,6 +26,8 @@ export interface ConfigPublication {
   readonly requested: RuntimeConfig;
   readonly binding: ConfigBinding;
   readonly admissionBlocked: boolean;
+  /** Only the initial selected-model constraints may be repaired through a logical selection. */
+  readonly modelConstraintsOnly?: boolean;
   readonly diagnostics: readonly string[];
 }
 
@@ -58,7 +60,9 @@ export class ConfigState {
   constructor(config: RuntimeConfig, binding: ConfigBinding, catalog: readonly CatalogProvider[] = [], catalogDiagnostics: readonly string[] = []) {
     this.publication = freezeDeep({ revision: 0, config, requested: config, catalog: structuredClone(catalog), binding: structuredClone(binding),
       catalogDiagnostics: [...catalogDiagnostics],
-      admissionBlocked: config.configValidation.securityBlocked || config.configValidation.constraintsBlocked === true, diagnostics: config.configDiagnostics });
+      admissionBlocked: config.configValidation.securityBlocked || config.configValidation.constraintsBlocked === true,
+      modelConstraintsOnly: !config.configValidation.securityBlocked && config.configValidation.modelConstraintsBlocked === true,
+      diagnostics: config.configDiagnostics });
   }
 
   get current(): ConfigPublication { return this.publication; }
@@ -84,7 +88,7 @@ export class ConfigState {
     this.generation++;
     this.substrateGeneration++;
     this.publication = freezeDeep({ ...this.publication, revision: this.publication.revision + 1, binding: structuredClone(binding),
-      admissionBlocked: true, diagnostics: ['Configuration must be validated for the new session binding.'] });
+      admissionBlocked: true, modelConstraintsOnly: false, diagnostics: ['Configuration must be validated for the new session binding.'] });
   }
 
   publish(ticket: ConfigTicket, candidate: RuntimeConfig, actual: ConfigBinding, applyPrepared?: () => void,
@@ -134,7 +138,7 @@ export class ConfigState {
 
   private reject(diagnostics: readonly string[], block: boolean): void {
     this.publication = freezeDeep({ ...this.publication, revision: this.publication.revision + 1,
-      admissionBlocked: this.publication.admissionBlocked || block, diagnostics: [...diagnostics] });
+      admissionBlocked: this.publication.admissionBlocked || block, modelConstraintsOnly: false, diagnostics: [...diagnostics] });
   }
 
   private result(status: ConfigReloadResult['status'], before: RuntimeConfig): ConfigReloadResult {

@@ -1,10 +1,12 @@
 import { createCompactionProviders, type ProviderRenewal } from '../provider/compaction.js';
+import { readLogicalModel } from '../../session/model/logical.js';
+import { sessionVirtualRegistry } from '../../core/catalog/models.js';
 import { createProviderResources } from '../provider/resources.js';
-import { assertAdmission } from '../../core/network/admission.js';
+import { assertAdmission, type Admission } from '../../core/network/admission.js';
 import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
 import { catalogModel } from '../../core/models/catalog.js';
 import { endpointShape } from '../../provider/endpoints/index.js';
-import { buildCompactionWiring, nativeCompactionAuthority, toCompactionMessages } from './compaction.js';
+import { buildCompactionWiring, routedCompactionWiring, nativeCompactionAuthority, toCompactionMessages } from './compaction.js';
 import { profileScope } from '../../core/paths/profile/scope.js';
 import { configurationOperation } from '../../core/shell/scope.js';
 import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
@@ -73,7 +75,10 @@ import { captureSummaryRole } from '../provider/summary.js';
 import { currentProviderConnections } from '../../provider/request/connection.js';
 import { preparePromptRequest } from '../../core/prompts/request.js';
 import { providerStepRequest, providerToolsAvailable } from '../provider/step.js';
-import { manualCompactionPolicy } from './compaction/context.js';
+import { manualCompactionPolicy, manualCompactionWiring } from './compaction/context.js';
+import { directCompactionTarget } from './compaction/direct.js';
+import { summaryTransport } from './compaction/target.js';
+import type { StepTarget } from '../../turn/context/contract.js';
 import { captureThinkingPreference } from '../../core/models/preference.js';
 
 export function createCliSessionRuntime(input: {
@@ -131,11 +136,13 @@ export function createCliSessionRuntime(input: {
       const workspaceRoot = input.runtimeContext.projectRoot;
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = operation.admission;
-      const main = config.sessionModelRoles?.summary
+      const virtualModel = readLogicalModel(sessionId);
+      const virtualModels = virtualModel ? sessionVirtualRegistry(input.runtimeContext.cwd, sessionId) : undefined;
+      const main = virtualModel ? Promise.resolve({} as ProviderRenewal) : config.sessionModelRoles?.summary
         ? Promise.resolve({ provider: providers.provider(resolved, catalog) } as ProviderRenewal)
         : providers.renew(resolved, config, admission, catalog, false);
       return main.then(async ({ provider, failure }) => {
-        if (!provider) {
+        if (!provider && !virtualModel) {
           return {
             status: "failed" as const,
             reason: failure ?? `No credential for provider ${resolved.provider}; set ${resolved.expectedEnvVarName} or configure a connection.`,
@@ -143,12 +150,15 @@ export function createCliSessionRuntime(input: {
         }
         assertAdmission(admission);
         signal.throwIfAborted();
-        const wiring = buildCompactionWiring({ provider, resolution: resolved, runtimeConfig: config, admission, sessionId, catalog, workspaceRoot,
+        const wiringInput = { runtimeConfig: config, admission, sessionId, catalog, workspaceRoot,
           convertToLlm,
           onCredentialPersisted: providers.publication,
-          requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager) });
+          requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager) };
+        const wiring = virtualModel ? routedCompactionWiring(wiringInput)
+          : buildCompactionWiring({ ...wiringInput, provider: provider!, resolution: resolved });
         const host = { workspaceRoot, sessionId, runtimeConfig: config, providerCatalog: catalog,
           providerCredentialResolution: resolved, providerMode: 'real' as const, admission,
+          virtualModel, virtualModels,
           ...captureThinkingPreference(workspaceRoot, resolved.thinkingEffort),
           agentMode: sessionRuntime.getAgentMode() };
         const preparedPrompt = await preparePromptRequest({ ...host, signal, mcpGateway: input.mcpGateway,
@@ -159,16 +169,17 @@ export function createCliSessionRuntime(input: {
           ...(input.runtimeContext.sdkSkills ? { sdkSkills: input.runtimeContext.sdkSkills } : {}),
         });
         const mainRequest = providerStepRequest(host, preparedPrompt.tools, preparedPrompt.promptContext, preparedPrompt.discovery);
-        const policy = manualCompactionPolicy(wiring.policy, { ...mainRequest, provider: { ...mainRequest.provider, ...provider, provider: provider.providerId } },
-          convertToLlm, admission);
+        const bound = virtualModel ? manualCompactionWiring(wiring, mainRequest, convertToLlm, admission)
+          : { ...wiring, policy: manualCompactionPolicy(wiring.policy,
+            { ...mainRequest, provider: { ...mainRequest.provider, ...provider, provider: provider!.providerId } }, convertToLlm, admission) };
         return compactSessionHistory({
           store: input.sessionManager,
           sessionId,
           authority: nativeCompactionAuthority({ sessionId, workspaceRoot, admission,
             publication: operation.publication, configuration: input.runtimeContext.configuration, store: input.sessionManager }),
-          policy,
-          summarize: wiring.summarize,
-          summarizeTurnPrefix: wiring.summarizeTurnPrefix,
+          policy: bound.policy,
+          summarize: bound.summarize,
+          summarizeTurnPrefix: bound.summarizeTurnPrefix,
           signal,
           instructions,
           // A user typed this one, which is the distinction the hook payload
@@ -197,27 +208,41 @@ export function createCliSessionRuntime(input: {
       const requestPolicy = goalPolicyFor(input.runtimeContext, input.sessionManager);
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = operation.admission;
+      const virtualModel = readLogicalModel(input.runtimeContext.session.id);
       const role = captureSummaryRole({ config, catalog, workspaceRoot: input.runtimeContext.projectRoot, admission,
         onCredentialPersisted: providers.publication });
-      const selected = role ? role.resolve().then(provider => ({ provider })) : providers.renew(resolved, config, admission, catalog);
-      return selected.then(async ({ provider }) => {
-        assertAdmission(admission);
+      const selected: Promise<{ readonly provider?: import('./compaction.js').CompactionProvider;
+        readonly target?: StepTarget; readonly admission?: Admission }> = role
+        ? role.resolve().then(provider => ({ provider: { ...provider, providerId: provider.providerId ?? '' } })) : virtualModel
+        ? directCompactionTarget(providerStepRequest({ workspaceRoot: input.runtimeContext.projectRoot,
+          sessionId: input.runtimeContext.session.id, runtimeConfig: config, providerCatalog: catalog,
+          providerCredentialResolution: resolved, providerMode: 'real', admission,
+          virtualModel, virtualModels: sessionVirtualRegistry(input.runtimeContext.cwd, input.runtimeContext.session.id),
+          agentMode: sessionRuntime.getAgentMode(), onCredentialPersisted: providers.publication,
+        }, new Map(), {}), messages, signal, admission)
+        : providers.renew(resolved, config, admission, catalog);
+      return selected.then(async selected => {
+        const { provider } = selected;
+        const admit = selected.admission ?? admission;
+        assertAdmission(admit);
         if (!provider) return undefined;
         let projected;
         try { projected = await toCompactionMessages(messages, convertToLlm, signal); }
         catch { return undefined; }
-        assertAdmission(admission);
+        assertAdmission(admit);
         return requestCompactionSummary({
           signal,
-          requestPolicy, purpose: 'branch-summary', maxOutputTokens: configuredOutputLimit(config, provider.endpoint),
+          requestPolicy, purpose: 'branch-summary', maxOutputTokens: virtualModel ? provider.maxOutputTokens : configuredOutputLimit(config, provider.endpoint),
           onUsage: usageFor({ provider: provider.providerId ?? '', model: provider.model, baseUrl: provider.baseUrl,
             rates: catalogModel(catalog, provider.providerId ?? '', provider.model, provider.baseUrl)?.cost }),
-          modelTransport: providerModelTransport(config, provider.endpoint, admission),
           provider,
           // The third of the three summarisers, and the one that was missed: it kept
           // the global fetch, so a `/back` whose summary stalled waited forever with
           // no deadline and no abort signal. Same wiring as its two siblings.
-          fetchImpl: providerFetchForEndpoint(config, provider.endpoint, endpointShape, admission),
+          ...(selected.target ? summaryTransport(selected.target, admit) : {
+            modelTransport: providerModelTransport(config, provider.endpoint, admit),
+            fetchImpl: providerFetchForEndpoint(config, provider.endpoint, endpointShape, admit),
+          }),
           messages: projected,
         });
       });
@@ -232,6 +257,7 @@ export function createCliSessionRuntime(input: {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
+      const virtualModel = readLogicalModel(sessionId);
       const director = directorRunFor(input.runtimeContext, input.sessionManager, parentAdmission);
       const handoff = handoffRunFor(input.runtimeContext, input.sessionManager, sessionRuntime, resolvedCredential, signal,
         parentAdmission, input.renderer.renderLine.bind(input.renderer));
@@ -243,7 +269,7 @@ export function createCliSessionRuntime(input: {
       const requestPolicy = director ? director.policy(research.requestPolicy) : handoff ? handoff.policy(research.requestPolicy) : research.requestPolicy;
       const getSourceEntryId = () => sourceEntryId;
       const prepareProviderResources = providerResources.startRun({
-        config, catalog, publication, backgroundSignal, sessionId, admission, requestPolicy,
+        config, catalog, publication, backgroundSignal, sessionId, admission, requestPolicy, virtualModel,
         getSourceEntryId,
         ...(handoff ? { resources: handoff.resources.bind(handoff) } : {}),
       });
@@ -289,6 +315,8 @@ export function createCliSessionRuntime(input: {
       const forcedTool = takeForcedTool(input.runtimeContext);
       const promptWithAttachments = promptWithContext(prompt, attachedContext);
       const run = streamCliRuntimePrompt({
+        virtualModel,
+        ...(virtualModel ? { virtualModels: sessionVirtualRegistry(input.runtimeContext.cwd, sessionId) } : {}),
         stepControl: handoff?.control,
         onCommandSettled: handoff?.commandSettled.bind(handoff),
         background: jobsRunnerFor(input.runtimeContext),

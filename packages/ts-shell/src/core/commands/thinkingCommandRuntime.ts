@@ -7,12 +7,19 @@ import { captureThinkingPreference } from '../models/preference.js';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import { projectSessionModel } from '../../session/model/projection.js';
 import type { CommandContext, LocalCommandResult } from './types.js';
+import { readLogicalModel } from '../../session/model/logical.js';
 
 export async function runThinkingCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
   const parsed = parseSyntax(thinkingSyntax, args);
   if (!parsed.ok) return { kind: 'local', output: `Invalid /thinking arguments: ${parsed.reason}\n${syntaxHelp(thinkingSyntax)}` };
   if (parsed.action.effort !== undefined) return { kind: 'local', output: await setModel([], context, parsed.flags.has('global'), parsed.action.effort) };
   if (parsed.flags.has('global')) return { kind: 'local', output: 'Choose an effort before --global.' };
+  const logical = readLogicalModel(context.sessionId);
+  if (logical) return { kind: 'local', output: [
+    `Thinking effort: ${logical.thinkingEffort ?? 'auto (router decides)'}.`,
+    `Model: ${logical.provider}/${logical.model}.`,
+    'Using the saved virtual model preference.', syntaxHelp(thinkingSyntax),
+  ].join('\n') };
   const effective = context.readConfiguration?.().config ?? context.runtimeConfig
     ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
   const request = modelRequest(context, effective);

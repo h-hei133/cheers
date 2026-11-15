@@ -1,0 +1,44 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/provider/route.test.ts (14 tests | 1 failed | 13 skipped) 68ms
+   ↓ routes the actual provider step to the physical URL and credential without sending to the original provider
+   ↓ keeps an explicit delegated model independent of the foreground logical selection
+   ↓ keeps an explicit delegated role independent of the foreground logical selection
+   ↓ keeps inherited logical delegation while applying its own explicit effort
+   ↓ refuses a physical model outside allowedModels before reservation or HTTP dispatch
+   ↓ refuses a missing physical catalogue provider before reservation or HTTP dispatch
+   ↓ refuses a missing physical catalogue model before reservation or HTTP dispatch
+   ↓ rechecks host admission after delayed routing before reservation or HTTP dispatch
+   ↓ rejects a same-provider connection whose credential changed during routing
+   ↓ rejects a physical profile credential withdrawn during message conversion
+   ↓ routes a logical selection before checking dormant physical scope and credentials
+   × persists accepted route state before compaction and restores it in a new step and fork 67ms
+     → expected 'error' to be 'stop' // Object.is equality
+   ↓ refuses a router state race even when the callback returns no replacement state
+   ↓ does not persist router state when conversion cancels before route acceptance
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  17:35:44
+   Duration  3.90s (transform 2.31s, setup 0ms, collect 3.61s, tests 68ms, environment 0ms, prepare 52ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/provider/route.test.ts > persists accepted route state before compaction and restores it in a new step and fork
+AssertionError: expected 'error' to be 'stop' // Object.is equality
+
+Expected: "stop"
+Received: "error"
+
+ ❯ src/cli/provider/route.test.ts:235:28
+    233|   const first = await createProviderStep(host, new Map(), {})(messages…
+    234|     prepareContext: async prepared => { expect(read()[key]).toBe('1');…
+    235|   expect(first.stopReason).toBe('stop'); expect(test.route).toHaveBeen…
+       |                            ^
+    236|   const fork = test.setup.manager.fork(test.setup.session.id, test.set…
+    237|   expect(read(fork.id)[key]).toBe('1');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

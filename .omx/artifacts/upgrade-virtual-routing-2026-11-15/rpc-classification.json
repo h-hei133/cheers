@@ -1,0 +1,7 @@
+{
+  "failure": "pre-existing-consumer-gap",
+  "task": "D.1",
+  "virtualProbe": "rpc-native-second.json",
+  "physicalControl": "rpc-baseline.json",
+  "result": "Both the virtual route and ordinary physical selection completed one model POST but get_messages returned an empty stale runtimeContext.session.turns snapshot. SessionStoreAccess.load returns new records; RPC getMessages reads the startup object. This is not caused by branch routing state. The existing D.1 task stays open; virtual-selection acceptance checks durable physical response independently."
+}

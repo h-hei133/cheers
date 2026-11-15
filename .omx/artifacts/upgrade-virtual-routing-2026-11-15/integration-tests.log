@@ -1,0 +1,221 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/session/model/provider.test.ts (200 tests) 15813ms
+   ✓ keeps a saved credentialless provider window unverified for a unknown-endpoint endpoint  568ms
+   ✓ refuses a signer 'skill' preference after a 'blocked' replacement inside the writer lock  473ms
+ ✓ src/session/model/selection.test.ts (69 tests) 4336ms
+   ✓ retains a model-only session at exit without retaining ordinary empty sessions  301ms
+ ✓ src/cli/provider/step.test.ts (15 tests) 906ms
+Warning: Config project maxTurns: trust-not-established; value ignored.
+Resumed session sess_eff7ec42334fa411_1794733570283
+Resumed session sess_9bb011bbeca641b0_1794733570337 with migrated project root /tmp/cheers-bootstrap-5nP4sh/session-root-rebind-01Sbrn -> /tmp/cheers-bootstrap-5nP4sh/session-root-rebind-01Sbrn/nested/entry
+Resumed session sess_f3ba424a1399db4f_1794733570421 with migrated project root /tmp/cheers-bootstrap-Wm9ilc/project-a-migrate-Nqmfse -> /tmp/cheers-bootstrap-Wm9ilc/project-b-migrate-2dsjeo
+Resumed session sess_6aaded1b8afb09b4_1794733570881
+Current session pointer sess_1251a396bfc7b8c7_1794733571174 could not be resumed for /tmp/cheers-bootstrap-pNOkLM/project-stale-current-2feqQa; starting a fresh session.
+Resumed session sess_3bbcd8aaef7f60a9_1794733571303
+ ✓ src/core/shell/bootstrap.test.ts (28 tests) 1533ms
+ ✓ src/sdk/lifecycle.test.ts (10 tests) 1346ms
+   ✓ retires the loaded extension capabilities when their consuming session is disposed  663ms
+ ✓ src/cli/provider/compaction.test.ts (23 tests) 540ms
+ ✓ src/cli/interactive/picker/model/publication.test.ts (19 tests) 1686ms
+ ✓ src/cli/provider/route.test.ts (11 tests) 479ms
+ ✓ src/session/model/effort.test.ts (26 tests) 1540ms
+ ❯ src/cli/bootstrap/cliProcessRunner.test.ts (7 tests | 7 failed) 29ms
+   × routes startup notices and preserves signal lifecycle for idle work 18ms
+     → Cannot read properties of undefined (reading 'configScopes')
+   × routes startup notices and preserves signal lifecycle for busy work 3ms
+     → Cannot read properties of undefined (reading 'configScopes')
+   × routes startup notices and preserves signal lifecycle for pending work 2ms
+     → Cannot read properties of undefined (reading 'configScopes')
+   × routes startup notices and preserves signal lifecycle for unknown work 1ms
+     → Cannot read properties of undefined (reading 'configScopes')
+   × routes startup notices and preserves signal lifecycle for unreadable work 1ms
+     → Cannot read properties of undefined (reading 'configScopes')
+   × routes startup notices and preserves signal lifecycle for save-failed work 1ms
+     → Cannot read properties of undefined (reading 'configScopes')
+   × waits for the line-loop first-frame callback before starting the recovery hint 1ms
+     → Cannot read properties of undefined (reading 'configScopes')
+ ✓ src/core/commands/model/presetCommand.test.ts (11 tests) 962ms
+ ✓ src/cli/interactive/picker/model/watch.test.ts (7 tests) 15ms
+ ✓ src/extensions/runtime/ui.test.ts (8 tests) 346ms
+ ✓ src/extensions/runtime/inProcessLoader.test.ts (3 tests) 347ms
+ ✓ src/sdk/virtual.test.ts (4 tests) 314ms
+ ✓ src/session/branch/create.test.ts (6 tests) 234ms
+ ✓ src/turn/context/prepare.test.ts (13 tests) 159ms
+ ✓ src/cli/interactive/picker/model/virtual.test.ts (5 tests) 140ms
+ ✓ src/core/agent/loop.test.ts (30 tests) 32ms
+ ✓ src/turn/context/target.test.ts (11 tests) 41ms
+ ✓ src/turn/request.test.ts (9 tests) 38ms
+ ❯ src/core/catalog/models.test.ts (16 tests | 2 failed) 19ms
+   ✓ isolates virtual definitions by session and rejects duplicate logical identities 3ms
+   ✓ refuses a virtual definition that shadows an accepted physical catalogue entry 0ms
+   ✓ retires captured callbacks and discards a result after unregister without deleting a successor 1ms
+   ✓ withdraws contributions when the resource generation retires 1ms
+   ✓ does not invoke a caller signal accessor during collision admission 1ms
+   ✓ keeps registration and retirement independent of replaced signal observer methods 0ms
+   ✓ captures virtual metadata and callback identity before caller mutation 1ms
+   ✓ registry cleanup only retires the generation that owns it 0ms
+   ✓ rejects oversized registration before reading model slots 1ms
+   ✓ does not let an array method bypass definition capture 0ms
+   ✓ checks collisions after contribution property capture can register another owner 0ms
+   ✓ retains the original request cancellation after a router replaces its signal 0ms
+   ✓ rejects result accessors without publishing state into a later registration 1ms
+   × captures route state without retaining caller data or a then accessor 6ms
+     → expected [ undefined, undefined ] to deeply equal [ undefined, { count: 1 } ]
+   × does not let the router change the captured publication reason or cancellation method 2ms
+     → expected last "spy" call to have been called with [ ObjectContaining {"state": 1} ]
+   ✓ presents callback-free logical metadata beside the physical catalogue 0ms
+ ✓ src/session/model/state.test.ts (26 tests) 537ms
+ ✓ src/turn/compaction/context.test.ts (6 tests) 94ms
+ ✓ src/core/commands/model/serviceTier.test.ts (9 tests) 87ms
+ ✓ src/core/shell/configurationRefusal.test.ts (6 tests) 6ms
+ ✓ src/cli/provider/connections.test.ts (3 tests) 5ms
+ ✓ src/core/models/virtualModels.test.ts (3 tests) 4ms
+ ✓ src/core/models/virtual/selection.test.ts (2 tests) 3ms
+ ✓ src/cli/provider/cliProviderRuntimeBridge.test.ts (2 tests) 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for idle work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for busy work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for pending work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for unknown work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for unreadable work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for save-failed work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > waits for the line-loop first-frame callback before starting the recovery hint
+TypeError: Cannot read properties of undefined (reading 'configScopes')
+ ❯ configurationAdmission src/core/shell/configuration.ts:122:70
+    120|   const substrate = context.configuration.substrateRevision;
+    121|   const workspaceRevision = context.workspaceRevision;
+    122|   const scoped = scopeAdmission(context.configuration.current.config.c…
+       |                                                                      ^
+    123|   return () => {
+    124|     if (context.profile) {
+ ❯ applyStartupModel src/cli/bootstrap/model.ts:25:80
+ ❯ runCliCycle src/cli/bootstrap/cliProcessRunner.ts:323:11
+ ❯ src/cli/bootstrap/cliProcessRunner.ts:116:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  src/core/catalog/models.test.ts > captures route state without retaining caller data or a then accessor
+AssertionError: expected [ undefined, undefined ] to deeply equal [ undefined, { count: 1 } ]
+
+- Expected
++ Received
+
+  [
+    undefined,
+-   {
+-     "count": 1,
+-   },
++   undefined,
+  ]
+
+ ❯ src/core/catalog/models.test.ts:170:16
+    168|   await registry.resolve(request);
+    169|   expect(first?.state).toEqual({ count: 1 });
+    170|   expect(seen).toEqual([undefined, { count: 1 }]);
+       |                ^
+    171| 
+    172|   let reads = 0;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  src/core/catalog/models.test.ts > does not let the router change the captured publication reason or cancellation method
+AssertionError: expected last "spy" call to have been called with [ ObjectContaining {"state": 1} ]
+
+- Expected
++ Received
+
+  [
+-   ObjectContaining {
+-     "state": 1,
++   {
++     "messages": [],
++     "modelId": "auto",
++     "provider": "adaptive",
++     "reason": "user",
++     "signal": AbortSignal {
++       Symbol(kEvents): Map {},
++       Symbol(events.maxEventTargetListeners): 0,
++       Symbol(events.maxEventTargetListenersWarned): false,
++       Symbol(kHandlers): Map {},
++       Symbol(kAborted): false,
++       Symbol(kReason): undefined,
++       Symbol(kComposite): false,
++     },
++     "state": undefined,
++     "thinkingLevel": "medium",
+    },
+  ]
+
+ ❯ src/core/catalog/models.test.ts:191:17
+    189|   request.reason = 'user';
+    190|   await registry.resolve(request);
+    191|   expect(route).toHaveBeenLastCalledWith(expect.objectContaining({ sta…
+       |                 ^
+    192|   route.mockImplementation(() => {
+    193|     controller.signal.throwIfAborted = () => {};
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 2 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: id.startsWith is not a function
+ ❯ Object.inspect src/cli/interactive/picker/model.ts:443:26
+    441|     async inspect(id) {
+    442|       if (refreshFailed) return navigation.all.some(row => row.id === …
+    443|       const refusal = id.startsWith('virtual:') ? context.logicalModel…
+       |                          ^
+    444|       if (refusal) return { note: refusal };
+    445|       const next = inspections.get(id)?.(); return next ? { next } : u…
+ ❯ inspectCustom ../../node_modules/chai/index.js:752:18
+ ❯ inspect ../../node_modules/chai/index.js:774:20
+ ❯ inspectList ../../node_modules/chai/index.js:332:28
+ ❯ Object.inspectArray [as Array] ../../node_modules/chai/index.js:381:24
+ ❯ inspect ../../node_modules/chai/index.js:771:31
+ ❯ inspect ../../node_modules/chai/index.js:918:10
+ ❯ objDisplay ../../node_modules/chai/index.js:924:13
+ ❯ ../../node_modules/chai/index.js:957:12
+
+This error originated in "src/cli/interactive/picker/model/publication.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "makes cached models read-only after a load refresh failure and restores them after revalidation". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: id.startsWith is not a function
+ ❯ Object.inspect src/cli/interactive/picker/model.ts:443:26
+    441|     async inspect(id) {
+    442|       if (refreshFailed) return navigation.all.some(row => row.id === …
+    443|       const refusal = id.startsWith('virtual:') ? context.logicalModel…
+       |                          ^
+    444|       if (refusal) return { note: refusal };
+    445|       const next = inspections.get(id)?.(); return next ? { next } : u…
+ ❯ inspectCustom ../../node_modules/chai/index.js:752:18
+ ❯ inspect ../../node_modules/chai/index.js:774:20
+ ❯ inspectList ../../node_modules/chai/index.js:332:28
+ ❯ Object.inspectArray [as Array] ../../node_modules/chai/index.js:381:24
+ ❯ inspect ../../node_modules/chai/index.js:771:31
+ ❯ inspect ../../node_modules/chai/index.js:918:10
+ ❯ objDisplay ../../node_modules/chai/index.js:924:13
+ ❯ ../../node_modules/chai/index.js:957:12
+
+This error originated in "src/cli/interactive/picker/model/publication.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "routes Enter on a cached model through inspection refusal without executing its old selection action". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  2 failed | 28 passed (30)
+      Tests  9 failed | 579 passed (588)
+     Errors  2 errors
+   Start at  17:05:33
+   Duration  68.94s (transform 9.73s, setup 0ms, collect 30.80s, tests 31.59s, environment 4ms, prepare 2.28s)
+

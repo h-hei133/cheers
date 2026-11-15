@@ -129,20 +129,32 @@ export function createStepFunction(request: StepRequest): StepFunction {
     let requestAcceptedAt: number | undefined;
     let acceptedResponse = false;
     let shownReasoning = '';
-    let activeOrigin = baseOrigin;
+    let activeOrigin: AssistantStep['origin'] = baseOrigin;
+    let dispatchedOrigin: AssistantStep['origin'];
     let currentAllowTools = options.allowTools;
     const stamp = (step: AssistantStep): AssistantStep => {
       const recorded = !step.reasoning && shownReasoning && (step.stopReason === 'error' || step.stopReason === 'aborted')
         ? { ...step, reasoning: { text: shownReasoning } } : step;
-      return { ...recorded, toolsAllowed: currentAllowTools, ...(activeOrigin ? { origin: recorded.origin ?? activeOrigin } : {}) };
+      return { ...recorded, toolsAllowed: currentAllowTools, ...(activeOrigin ? { origin: recorded.origin ?? activeOrigin } : {}),
+        ...(dispatchedOrigin?.provider && (recorded.stopReason === 'error' || recorded.stopReason === 'aborted') ? {
+          routeAttempt: { provider: dispatchedOrigin.provider, modelId: dispatchedOrigin.model,
+            ...(dispatchedOrigin.thinkingLevel ? { thinkingLevel: dispatchedOrigin.thinkingLevel } : {}),
+            stopReason: recorded.stopReason,
+            ...(recorded.errorMessage ? { errorMessage: recorded.errorMessage.slice(0, 8192) } : {}),
+            ...(recorded.failureClass ? { failureClass: recorded.failureClass } : {}),
+          },
+        } : {}) };
     };
     let streamAttempts = 0;
+    let failedRoute = options.failedRoute;
     let preparationOffered = false;
     let identityPreparations = 0;
     const contextOwner = options.contextOwner;
     const prepare = createTurnContextPreparer(request, options, { thinkingEffort: captured.thinkingEffort,
-      explicitEffort, effortAccepted: () => effortAccepted, streamAttempts: () => streamAttempts, replayBinding });
+      explicitEffort, effortAccepted: () => effortAccepted, streamAttempts: () => streamAttempts,
+      failedRoute: () => failedRoute, replayBinding });
     for (;;) {
+      dispatchedOrigin = undefined;
       let prepared: PreparedTurnContext;
       let barePrepared: PreparedTurnContext;
       try {
@@ -160,6 +172,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           prepared = await prepared.refresh(signal);
         }
         if (contextOwner && !contextOwner.isCurrent()) throw new TurnPreparationError('Request history changed during preparation. No request was sent.', true);
+        prepared.acceptRoute?.();
         if (!preparationOffered && options.prepareContext) {
           preparationOffered = true;
           const replacement = await options.prepareContext(prepared, signal);
@@ -178,7 +191,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
         if (!prepared.isCurrent()) return stamp(errorStep('Request preparation changed repeatedly. No request was sent.', true));
         currentAllowTools = prepared.allowTools;
         activeOrigin = prepared.activeProvider || prepared.activeModel
-          ? { ...(prepared.activeProvider ? { provider: prepared.activeProvider } : {}), model: prepared.activeModel } : undefined;
+          ? { ...(prepared.activeProvider ? { provider: prepared.activeProvider } : {}), model: prepared.activeModel,
+            ...(prepared.effort ? { thinkingLevel: prepared.effort } : {}) } : undefined;
         if (prepared.refusal) return stamp(errorStep(prepared.refusal.detail, prepared.refusal.inputLimit ?? false));
         if (!prepared.budget.ok && prepared.budget.reason !== 'unknown') return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${prepared.budget.detail}`));
       } catch (error) {
@@ -284,6 +298,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
                 requestSignal.throwIfAborted();
                 if (!prepared.isCurrent()) throw new TurnPreparationError('Request preparation changed before dispatch. No request was sent.', true);
                 beforeDispatch();
+                dispatchedOrigin = activeOrigin;
               };
               if (target.modelTransport) {
                 if (!prepared.isCurrent()) throw new TurnPreparationError('Request preparation changed before dispatch. No request was sent.', true);
@@ -400,6 +415,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       if (dropEffort) {
         // Rebuilding without the field is the retry: the request is otherwise
         // identical, and asking again with it would fail again.
+        failedRoute = stamp(errorStep('Provider rejected the implicit reasoning effort.')).routeAttempt;
         effortAccepted = false;
         streamAttempts += 1;
         continue;
@@ -465,6 +481,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
         }
         const detail = error instanceof Error ? error.message : String(error);
         if (!acceptedResponse && !shownAnything && !REFUSAL.test(detail) && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {
+          const failure = providerRequestError(error);
+          failedRoute = stamp(failedStep(failure.message, '', failure.failureClass)).routeAttempt;
           streamAttempts += 1;
           releaseAfterRead?.abort();
           const waited = await waitBeforeRetry(retryDelayMs(retry, streamAttempts, undefined), signal);

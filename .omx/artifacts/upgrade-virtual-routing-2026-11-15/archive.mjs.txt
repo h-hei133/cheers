@@ -1,0 +1,133 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+
+const scratch = path.dirname(fileURLToPath(import.meta.url));
+const repo = path.resolve(scratch, '../..');
+const archive = path.join(repo, '.omx/artifacts/upgrade-virtual-routing-2026-11-15');
+const hash = value => createHash('sha256').update(value).digest('hex');
+const git = (args, cwd = repo) => {
+  const result = spawnSync('rtk', ['proxy', 'git', ...args], { cwd, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+  assert.equal(result.status, 0, 'Git evidence read failed');
+  return result.stdout;
+};
+const list = args => git(args).split('\0').filter(Boolean);
+fs.mkdirSync(archive, { recursive: true });
+
+const build = JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json')));
+const receipts = ['native', 'cli-native', 'summary-native', 'retry-native', 'real-native', 'rpc-native'];
+for (const name of receipts) {
+  const receipt = JSON.parse(fs.readFileSync(path.join(scratch, name + '.json')));
+  assert.equal(receipt.status, 'passed', name);
+  assert.equal(receipt.buildId, build.buildId, name);
+  assert.equal(receipt.probeSha256, hash(fs.readFileSync(path.join(scratch, name + '.mjs'))), name);
+}
+const reversals = JSON.parse(fs.readFileSync(path.join(scratch, 'reversals.json')));
+assert.equal(reversals.length, 10);
+for (const reversal of reversals) {
+  assert.equal(reversal.assertionFailure, true);
+  assert.equal(reversal.restoredExact, true);
+  assert.equal(reversal.sha256, hash(fs.readFileSync(path.join(repo, 'packages/ts-shell/src', reversal.file))));
+}
+
+const productFiles = [...new Set([
+  ...list(['diff', '--name-only', '-z', '--', 'packages/ts-shell/src']),
+  ...list(['ls-files', '--others', '--exclude-standard', '-z', '--', 'packages/ts-shell/src']),
+])].sort();
+const sources = {};
+for (const file of productFiles) {
+  const bytes = fs.readFileSync(path.join(repo, file));
+  const snapshot = 'source/' + file.replace('packages/ts-shell/src/', '') + '.txt';
+  const target = path.join(archive, snapshot);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, bytes);
+  sources[file] = { snapshot, sha256: hash(bytes) };
+}
+
+for (const entry of fs.readdirSync(scratch, { withFileTypes: true })) {
+  if (!entry.isFile() || !/\.(?:json|log|mjs|mts|txt)$/.test(entry.name)) continue;
+  const bytes = fs.readFileSync(path.join(scratch, entry.name));
+  const text = bytes.toString('utf8');
+  assert.ok(!/\b(?:sk|rk|ghp|github_pat)-[A-Za-z0-9_-]{24,}\b|Bearer [A-Za-z0-9_.-]{24,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:]+:[^\s/@]+@/.test(text), 'Credential pattern found in ' + entry.name);
+  const name = /\.(?:mjs|mts)$/.test(entry.name) ? entry.name + '.txt' : entry.name;
+  fs.writeFileSync(path.join(archive, name), bytes);
+}
+
+const lanes = {};
+for (const name of ['virtual-input', 'virtual-selection']) {
+  const cwd = path.join(repo, '.tmp', name);
+  if (!fs.existsSync(cwd)) continue;
+  const changed = git(['diff', '--binary', '--', 'packages/ts-shell/src'], cwd);
+  fs.writeFileSync(path.join(archive, name + '-lane.patch.txt'), changed);
+  const untracked = git(['ls-files', '--others', '--exclude-standard', '-z', '--', 'packages/ts-shell/src'], cwd).split('\0').filter(Boolean);
+  const laneSources = {};
+  for (const file of untracked) {
+    const bytes = fs.readFileSync(path.join(cwd, file));
+    const snapshot = 'lanes/' + name + '/' + file.replace('packages/ts-shell/src/', '') + '.txt';
+    fs.mkdirSync(path.dirname(path.join(archive, snapshot)), { recursive: true });
+    fs.writeFileSync(path.join(archive, snapshot), bytes);
+    laneSources[file] = { snapshot, sha256: hash(bytes) };
+  }
+  lanes[name] = { patch: name + '-lane.patch.txt', sourceSnapshots: laneSources, integrated: true,
+    note: 'Historical lane bytes; integrated current source snapshots are authoritative. Do not recopy.' };
+}
+fs.writeFileSync(path.join(archive, 'build-manifest.json'), JSON.stringify(build, null, 2) + '\n');
+const pack = JSON.parse(fs.readFileSync(path.join(scratch, 'pack.json')))['@cheers/ts-shell'];
+const evidence = {};
+function collect(directory, relative = '') {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const name = path.join(relative, entry.name);
+    if (entry.isDirectory()) collect(path.join(directory, entry.name), name);
+    else if (entry.name !== 'delivery.json') evidence[name] = hash(fs.readFileSync(path.join(directory, entry.name)));
+  }
+}
+collect(archive);
+const delivery = {
+  date: '2026-11-15', scope: 'C.1 logical selection and production virtual routing; E.7 virtual consumer',
+  status: 'locally-validated', parentCommit: git(['rev-parse', 'HEAD']).trim(),
+  buildId: build.buildId, completeTasks: 22, totalTasks: 62, overallGoal: 'active',
+  sourceSnapshots: sources, laneEvidence: lanes, evidence,
+  validation: {
+    staticGates: { status: 'passed', count: 6, logs: ['accepted-gates.log', 'accepted-lint.log'],
+      setupFailure: 'accepted-gates.log ends with missing npm lint script; actual check:lint passed separately.' },
+    focusedTests: { status: 'passed', suites: 39, tests: 840, log: 'accepted-tests.log' },
+    reversals: { status: 'passed', count: 10, exactRestoration: true, receipt: 'reversals.json',
+      restoredTests: { suites: 5, tests: 79, log: 'reversal-restored-tests.log' } },
+    additionalSurfaces: { status: 'passed', suites: 4, tests: 34, log: 'surface-tests.log',
+      absentFilter: 'src/config/state.test.ts was not a test file and was not executed.' },
+    publication: { status: 'passed', suites: 1, tests: 12, log: 'publication-tests.log' },
+    responsibility: { status: 'passed', modules: 2634, monoliths: 0, log: 'accepted-functions.log' },
+    build: { status: 'passed', log: 'accepted-build-current.log' },
+    package: { status: 'passed', name: pack.name, files: pack.files.length, bytes: pack.size, unpackedBytes: pack.unpackedSize,
+      tarballSha256: hash(fs.readFileSync(path.join(scratch, pack.filename))), strictTypes: true, skipLibCheck: false,
+      installLog: 'install-current.log', typesLog: 'installed-types-current.log' },
+    native: { status: 'passed-with-recorded-boundaries', platform: 'linux', node: 'v24.15.0',
+      installedSdkPosts: 10, compiledCliPosts: 2, automaticSummaryPosts: 12, retryAndContinuationPosts: 8,
+      compiledRpcPosts: 1, configuredRealPosts: 4, receipts: receipts.map(name => name + '.json'),
+      rpcScope: 'Logical selection and durable physical dispatch only; get_messages gap remains D.1.',
+      realCatalog: 'Original configured active connection and credentials; isolated minimal model entry because original catalog JSON is malformed. Original files unchanged; isolated state removed.' },
+    independentReview: { code: 'APPROVE', codeReviewer: '/root/routing_delivery_review', codeFiles: 8,
+      architecture: 'CLEAR', architectureReviewer: '/root/routing_architecture',
+      scope: 'Eight named routing/state/delegation/retry/VM owner files; root validates the full batch.',
+      reports: ['review-code.json', 'review-architecture.json', 'review-availability.json'] },
+    docs: { status: 'passed', log: 'delivery-docs.log', docsSourceAdvisory: 119 },
+  },
+  initialFailures: [
+    'Original counterexample and integration failures remain in their own logs; successful receipts do not overwrite them.',
+    'Initial VM UI reversal failed with TypeError and is not counted; strengthened assertion produced the final genuine AssertionError.',
+    'Initial SDK probe waited for abort before releasing its held route callback; terminated as a harness deadlock.',
+    'CLI launcher refused the old build after a test-only input change; rebuilt, repacked, reinstalled and reran the current probes.',
+    'Retry probe setups omitted implicit effort, retryEnabled and the harmless tool approval in successive attempts; each failure is classified separately.',
+    'Configured catalog was malformed; two connection-refused attempts sent no POST, another configured target sent one POST with auth failure. Final original active connection sent four successful POSTs with isolated minimal model metadata.',
+    'RPC get_messages returned empty after a successful virtual prompt; ordinary physical control reproduced the pre-existing D.1 gap. Another attempt guessed the transcript wire shape incorrectly.',
+  ],
+  limits: { workerVirtualRegistration: 'explicitly-unsupported', e7: 'partial', d1: 'confirmed-gap',
+    cacheSavings: 'not-measured', generalVmSandbox: false, originalMalformedCatalogValidated: false,
+    physicalTerminal: false, otherPlatforms: false, push: false, ci: false },
+};
+fs.writeFileSync(path.join(archive, 'delivery.json'), JSON.stringify(delivery, null, 2) + '\n');
+console.log(JSON.stringify({ archive: path.relative(repo, archive), buildId: build.buildId,
+  sourceCount: productFiles.length, evidenceCount: Object.keys(evidence).length, status: delivery.status }));

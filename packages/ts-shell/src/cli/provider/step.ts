@@ -30,6 +30,8 @@ import { providerRequestTarget } from './requestTarget.js';
 import { configuredContextWindow } from '../../core/models/window.js';
 import type { VirtualModelRegistry } from '../../core/models/virtualModels.js';
 import { providerRouteResolver } from './route.js';
+import type { SessionVirtualModelSelection } from '../../session/model/contract.js';
+import { captureRoutingState } from '../../session/model/routing.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -47,11 +49,13 @@ export interface ProviderStepHost {
   readonly onCredentialPersisted?: (rotation?: AccountRotation) => boolean | void;
   readonly cacheRetention?: 'short' | 'long' | 'none';
   readonly virtualModels?: VirtualModelRegistry;
+  readonly virtualModel?: SessionVirtualModelSelection;
 }
 
 /** The same captured catalogue address and model used by the request adapter. */
 export function providerToolsAvailable(request: Pick<ProviderStepHost,
-  'providerMode' | 'providerCredentialResolution' | 'providerCatalog'>, catalog?: readonly CatalogProvider[]): boolean {
+  'providerMode' | 'providerCredentialResolution' | 'providerCatalog' | 'virtualModel'>, catalog?: readonly CatalogProvider[]): boolean {
+  if (request.virtualModel) return true;
   if (request.providerMode === 'synthetic') return true;
   const accepted = catalog ?? request.providerCatalog ?? loadCatalog();
   const resolution = request.providerCredentialResolution;
@@ -77,19 +81,22 @@ export function providerStepRequest(
   discovery?: ToolDiscovery,
 ): StepRequest {
   const resolution = request.providerCredentialResolution;
-  assertScopedModel(request.runtimeConfig, resolution);
-  if (resolution.blocked) throw new Error(credentialBlockMessage(resolution.blocked));
+  const logical = request.virtualModel;
+  if (!logical) {
+    assertScopedModel(request.runtimeConfig, resolution);
+    if (resolution.blocked) throw new Error(credentialBlockMessage(resolution.blocked));
+  }
   // Read once for the whole step function, not once per use: loading the
   // catalogue touches the filesystem, and a run that reloaded it mid-turn could
   // change request shape between two steps of the same answer.
   const catalog = request.providerCatalog ?? loadCatalog();
-  const baseUrl = providerCredentialBaseUrl(catalog, resolution);
-  if (catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before sending.');
-  const endpoint = providerCredentialEndpoint(catalog, resolution, baseUrl);
-  const configuredTier = requestServiceTier(request.runtimeConfig, resolution, catalog, baseUrl, endpoint, request.serviceTier);
-  const contextWindow = configuredContextWindow(request.runtimeConfig, resolution);
+  const baseUrl = logical ? undefined : providerCredentialBaseUrl(catalog, resolution);
+  if (!logical && catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before sending.');
+  const endpoint = logical ? undefined : providerCredentialEndpoint(catalog, resolution, baseUrl);
+  const configuredTier = logical ? undefined : requestServiceTier(request.runtimeConfig, resolution, catalog, baseUrl, endpoint, request.serviceTier);
+  const contextWindow = logical ? undefined : configuredContextWindow(request.runtimeConfig, resolution);
   const system = systemPromptSnapshot(request.agentMode, promptContext, providerToolsAvailable(request, catalog));
-  const targetIdentity = providerRequestTarget({
+  const targetIdentity = logical ? undefined : providerRequestTarget({
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
     resolution,
@@ -99,15 +106,15 @@ export function providerStepRequest(
   return {
     recordAuxiliaryUsage: sessionUsageSink(request.sessionId),
     requestPolicy: request.requestPolicy,
-    modelTransport: providerModelTransport(request.runtimeConfig, endpoint, request.admission),
+    modelTransport: logical ? undefined : providerModelTransport(request.runtimeConfig, endpoint, request.admission),
     provider: {
       // Built from the whole credential, not from its key alone. An account login
       // yields a token instead of a key, and formatting the header here from a
       // field it does not have is what sent an empty bearer.
-      headers: targetIdentity.headers,
+      headers: targetIdentity?.headers ?? {},
       baseUrl: baseUrl ?? "",
-      ...(targetIdentity.replayOwner ? { replayOwner: targetIdentity.replayOwner } : {}),
-      replayBinding: targetIdentity.replayBinding,
+      ...(targetIdentity?.replayOwner ? { replayOwner: targetIdentity.replayOwner } : {}),
+      replayBinding: targetIdentity?.replayBinding,
       model: resolution.model ?? resolution.credential?.model ?? "",
       // The catalog is keyed by provider id, so the request shape cannot be
       // resolved without it.
@@ -117,7 +124,7 @@ export function providerStepRequest(
       // answers, and an endpoint is how they want to be asked.
       ...(endpoint ? { endpoint } : {}),
       ...(configuredTier ? { serviceTier: configuredTier } : {}),
-      ...(targetIdentity.credentialId && targetIdentity.credentialGeneration
+      ...(targetIdentity?.credentialId && targetIdentity.credentialGeneration
         ? { credentialId: targetIdentity.credentialId, credentialGeneration: targetIdentity.credentialGeneration }
         : {}),
     },
@@ -129,23 +136,28 @@ export function providerStepRequest(
     // them that is not a constant header: one signs, one carries a token that
     // expires. Both are applied by the transport, which is the only place a
     // request exists whole.
-    fetchImpl: providerFetchForEndpoint(request.runtimeConfig, endpoint, endpointShape, request.admission),
+    fetchImpl: logical ? undefined : providerFetchForEndpoint(request.runtimeConfig, endpoint, endpointShape, request.admission),
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
     systemPrompt: system.text,
     systemPromptSources: system.sources,
     systemPromptFor: (agentMode, toolNames, toolsAvailable = true) =>
       buildSystemPrompt(agentMode ?? request.agentMode, { ...promptContext, toolNames }, toolsAvailable),
-    thinkingEffort: request.thinkingEffort,
-    thinkingEffortExplicit: request.thinkingEffortExplicit,
+    thinkingEffort: logical ? logical.thinkingEffort : request.thinkingEffort,
+    thinkingEffortExplicit: logical ? logical.thinkingEffort !== undefined : request.thinkingEffortExplicit,
     tools: toolSchemas(tools),
     ...(discovery ? { toolSnapshot: () => toolSchemas(discovery.snapshot()) } : {}),
     initialTools: toolSchemas(tools),
     ...(request.cacheRetention !== undefined ? { cacheRetention: request.cacheRetention } : {}),
+    ...(logical ? { virtualModel: { provider: logical.provider, modelId: logical.model },
+      captureRouteState: (provider: string, modelId: string, admission: () => void) => captureRoutingState({
+        sessionId: request.sessionId, cwd: request.workspaceRoot, provider, modelId,
+        admission: () => { assertAdmission(request.admission); admission(); } }),
+    } : {}),
     ...(request.virtualModels ? { virtualModels: request.virtualModels,
       resolveTarget: providerRouteResolver({ ...request, providerCatalog: catalog, virtualModels: request.virtualModels },
         (target, admission) => providerStepRequest({ ...request, providerCatalog: catalog,
-          providerCredentialResolution: target, admission, virtualModels: undefined }, tools, promptContext, discovery)),
+          providerCredentialResolution: target, admission, virtualModels: undefined, virtualModel: undefined }, tools, promptContext, discovery)),
     } : {}),
     catalog,
     // Sampling settings travel with the request, not with the provider: a
@@ -153,7 +165,7 @@ export function providerStepRequest(
     // run that sets none keeps the step's own defaults.
     temperature: request.runtimeConfig?.temperature,
     topP: request.runtimeConfig?.topP,
-    maxOutputTokens: configuredOutputLimit(request.runtimeConfig, endpoint),
+    maxOutputTokens: logical ? undefined : configuredOutputLimit(request.runtimeConfig, endpoint),
     ...(contextWindow !== undefined ? { contextWindow } : {}),
     ...(request.runtimeConfig?.reserveTokens !== undefined ? { reserveTokens: request.runtimeConfig.reserveTokens } : {}),
     pruneToolText: request.runtimeConfig?.pruneToolText,
@@ -187,12 +199,16 @@ export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<str
     const admit = () => request.admission?.() ?? admission?.() ?? scopedAdmission();
     assertAdmission(admit);
     const requestPolicy = request.requestPolicy?.withAdmission?.(() => { const refusal = admit(); if (refusal) throw new Error(refusal); }) ?? request.requestPolicy;
+    const virtualModel = model ? undefined : request.virtualModel && { ...request.virtualModel,
+      ...(effort !== undefined ? { thinkingEffort: effort } : {}) };
     const selected = { ...request, providerCatalog: catalog, runtimeConfig, workspaceRoot: workspace, providerCredentialResolution: resolution,
+      virtualModel, virtualModels: model ? undefined : request.virtualModels,
       requestPolicy, admission: admit, ...(effort !== undefined ? { thinkingEffort: effort, thinkingEffortExplicit: true } : {}) };
     // Validate the captured request before any refresh side effect. Building a step does not send.
     let active = createProviderStep(selected, tools, context, discovery);
     let credential = resolution.credential?.accountAuth;
     const prepare = async (publication?: AccountPublication) => {
+      if (virtualModel) { assertAdmission(admit); return; }
       const fresh = await renew(resolution, admit, publication);
       if (fresh.credential?.accountAuth !== credential) {
         active = createProviderStep({ ...selected, providerCredentialResolution: fresh }, tools, context, discovery);

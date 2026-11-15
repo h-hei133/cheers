@@ -209,6 +209,7 @@ export async function routeInteractiveCommand(
     ...(input.runtimeContext.promptIdentity ? { promptIdentity: input.runtimeContext.promptIdentity } : {}),
     readConfiguration: () => input.runtimeContext.configuration.current,
     admission: configurationAdmission(input.runtimeContext),
+    logicalModelAdmission: configurationAdmission(input.runtimeContext, { deferredModel: true }),
     applyDisplayConfig: applied => input.runtimeContext.configuration.recordDisplay(applied),
     refreshRuntimeConfig: scope => {
       const result = refreshShellRuntimeConfig(input.runtimeContext, scope);

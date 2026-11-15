@@ -16,6 +16,7 @@ import { isThinkingPreference, THINKING_LEVELS, type ThinkingPreference } from '
 import { providerCredentialBaseUrl } from '../../auth/account/target.js';
 import { providerBindingAvailable, providerScopeSelected } from '../../auth/binding.js';
 import { loadCatalog } from '../../models/catalogStore.js';
+import { sessionVirtualModels } from '../../catalog/models.js';
 
 export type AutomaticModelRole = keyof SessionModelPolicy;
 export interface RoleResult { readonly output: string; readonly saved: boolean }
@@ -29,6 +30,8 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
     return context.signal?.aborted ? 'Role editing cancelled. Reopen the model picker.' : refusal;
   };
   const baseline = choice.baseline;
+  const virtualDefinition = baseline?.selection?.virtualModel && context.sessionId ? sessionVirtualModels(context.cwd, context.sessionId)
+    .find(model => model.provider === baseline.selection!.virtualModel!.provider && model.id === baseline.selection!.virtualModel!.model) : undefined;
   const active = context.resolveConfigTarget?.(choice.config, context.sessionId)
     ?? resolveProviderCredential({ runtimeConfig: choice.config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
   const ready = !baseline?.selection && !active.blocked && (active.credential
@@ -41,6 +44,8 @@ export function prepareModelRole(context: CommandContext, role: AutomaticModelRo
     : undefined);
   const defaultRequestCurrent = (): boolean => {
     try {
+      if (baseline?.selection?.virtualModel) return !virtualDefinition || Boolean(context.sessionId
+        && sessionVirtualModels(context.cwd, context.sessionId).includes(virtualDefinition));
       const current = context.readConfiguration?.().config ?? context.runtimeConfig
         ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
       if (baseline?.selection) return selectedModelMatches(current, baseline.selection)

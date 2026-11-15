@@ -1,0 +1,145 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { channel } from 'node:diagnostics_channel';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const repo = path.resolve(directory, '../..');
+const installed = path.join(directory, 'install/node_modules/@cheers/ts-shell');
+const { createAgentSession, DefaultResourceLoader, getRuntimeConfig } = await import(pathToFileURL(path.join(installed, 'dist/index.js')).href);
+const { catalogProvider } = await import(pathToFileURL(path.join(installed, 'dist/core/models/catalog.js')).href);
+// Capture configured credentials before creating the isolated runtime home.
+const configured = getRuntimeConfig(repo);
+const catalogs = new Map();
+for (const name of ['models.json', 'models-cache.json']) {
+  const file = path.join(os.homedir(), '.cheers', name);
+  if (fs.existsSync(file)) catalogs.set(name, fs.readFileSync(file));
+}
+const manifest = JSON.parse(fs.readFileSync(path.join(installed, 'dist/build-manifest.json')));
+const receipt = { platform: process.platform, node: process.version, status: 'not_run', publicInstalledSdk: true,
+  configuredProvider: true, buildId: manifest.buildId, requests: 0, stages: {},
+  probeSha256: createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex') };
+const previous = new Map(), sessions = new Set(), loaders = new Set();
+const root = fs.mkdtempSync(path.join(directory, 'real-state-'));
+const home = path.join(root, 'home'), workspace = path.join(root, 'work');
+fs.mkdirSync(home, { mode: 0o700 }); fs.mkdirSync(workspace);
+const storage = path.join(home, '.cheers'); fs.mkdirSync(storage, { mode: 0o700 });
+let stage = 'setup', session, timer, lastFailure;
+let target;
+const seen = [];
+const sent = channel('undici:request:bodySent');
+const onSent = ({ request }) => {
+  if (request.method !== 'POST') return;
+  receipt.requests++;
+  receipt.stages[stage] = { ...receipt.stages[stage], posts: (receipt.stages[stage]?.posts ?? 0) + 1 };
+  console.log(JSON.stringify({ stage, bodySent: true, request: receipt.requests }));
+};
+function events(current) {
+  return current.sessionManager.getTranscriptEvents(current.sessionId).filter(event => event.type === 'branch-store' && event.namespace === 'model-routing');
+}
+function state(current) {
+  const key = JSON.stringify(['adaptive', 'configured']);
+  const rows = events(current);
+  for (let index = rows.length - 1; index >= 0; index--) {
+    if (Object.hasOwn(rows[index].entries, key)) return JSON.parse(rows[index].entries[key]);
+  }
+}
+try {
+  assert.equal(process.platform, 'linux');
+  assert.equal(manifest.buildId, JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'))).buildId);
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home,
+    GIT_CEILING_DIRECTORIES: root, CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '1',
+    CHEERS_MARKETPLACES_FILE: path.join(home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(home, 'extensions.json') })) {
+    previous.set(key, process.env[key]); process.env[key] = value;
+  }
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: configured.provider,
+    providerCredentials: configured.providerCredentials, providerConnections: configured.providerConnections,
+    activeProviderConnectionId: configured.activeProviderConnectionId, accountPool: configured.accountPool }), { mode: 0o600 });
+  for (const [name, contents] of catalogs) fs.writeFileSync(path.join(storage, name), contents, { mode: 0o600 });
+  const config = { ...getRuntimeConfig(workspace), contextWindow: 32_000, keepRecentTokens: 400, reserveTokens: 0,
+    maxOutputTokens: 1024, compactionEnabled: false, cacheWarmIntervalSeconds: 0, retryEnabled: false,
+    retryMaxRetries: 0, providerRetryMaxRetries: 0,
+    providerConnectTimeoutMs: 10_000, providerHeadersTimeoutMs: 45_000, providerBodyTimeoutMs: 45_000 };
+  const marker = 'ROUTING_SESSION_ACK_63852';
+  const makeLoader = () => {
+    const loader = new DefaultResourceLoader({ cwd: workspace, noContextFiles: true, noSkills: true, noThemes: true,
+      systemPrompt: `Return only ${marker}. When summarizing, preserve that marker and use fewer than 60 words.`,
+      extensionFactories: [api => api.registerVirtualModel({ provider: 'adaptive', id: 'configured', name: 'Configured', route: request => {
+        assert.ok(target);
+        seen.push({ reason: request.reason, count: request.state?.count, previousMatches: request.previous?.modelId === target.modelId });
+        return { ...target, state: { count: (request.state?.count ?? 0) + 1 } };
+      } })] });
+    loaders.add(loader); return loader;
+  };
+  const create = async extra => {
+    const loader = makeLoader(); await loader.reload(); assert.equal(loader.getExtensions().errors.length, 0);
+    const result = await createAgentSession({ cwd: workspace, runtimeConfig: config, resourceLoader: loader, noTools: 'all', ...extra });
+    sessions.add(result.session);
+    result.session.subscribe(event => { if (event.type === 'query.failed') lastFailure = String(event.error); });
+    return result.session;
+  };
+  session = await create({ model: 'adaptive/configured' });
+  const resolution = session.runtimeContext.resolveConfigTarget(session.runtimeContext.runtimeConfig, session.sessionId);
+  assert.equal(resolution.blocked, undefined); assert.ok(resolution.credential); assert.ok(resolution.model);
+  const owner = catalogProvider(session.getModelCatalog().physical, resolution.provider, resolution.baseUrl ?? resolution.credential.baseUrl);
+  assert.equal(owner.ambiguous, false); assert.ok(owner.entry?.models.some(model => model.id === resolution.model));
+  target = { provider: owner.entry.id, modelId: resolution.model };
+  receipt.configuredPhysicalTargetResolved = true;
+  sent.subscribe(onSent);
+  timer = setTimeout(() => { receipt.deadline = true; void session?.abort().catch(() => {}); }, 190_000);
+  stage = 'prompt';
+  assert.equal((await session.prompt(`Return only ${marker}.`)).trim(), marker);
+  assert.equal(state(session)?.count, 1);
+  assert.ok(session.getState().turns.some(message => message.role === 'assistant' && message.origin?.provider === resolution.provider && message.origin?.model === target.modelId));
+  receipt.stages.prompt = { ...receipt.stages.prompt, passed: true, physicalOrigin: true, stateAccepted: true };
+  stage = 'manual-summary';
+  for (let index = 0; index < 5; index++) {
+    session.sessionManager.persistUserPromptBarrier(session.sessionId, `Recorded work ${index}: ${'verified bounded facts '.repeat(100)}`);
+    session.sessionManager.addTurn(session.sessionId, { role: 'assistant', content: 'Saved decision '.repeat(60) });
+  }
+  const before = events(session).length;
+  assert.equal((await session.compact(`Keep ${marker}; use fewer than 60 words.`)).status, 'compacted');
+  assert.equal(seen.at(-1).reason, 'direct'); assert.equal(seen.at(-1).count, undefined);
+  assert.equal(events(session).length, before); assert.equal(state(session)?.count, 1);
+  receipt.stages[stage] = { ...receipt.stages[stage], passed: true, directStateless: true };
+  stage = 'branch-summary';
+  const summary = await session.sessionRuntime.summarizeAbandonedTurns([
+    { role: 'user', content: `${marker}: ${'abandoned verified decisions '.repeat(70)}` },
+    { role: 'assistant', content: 'Retain the result '.repeat(60) },
+  ], new AbortController().signal);
+  assert.ok(summary.includes('<compacted-summary>')); assert.ok(summary.includes(marker));
+  assert.equal(seen.at(-1).reason, 'direct'); assert.equal(seen.at(-1).count, undefined);
+  assert.equal(events(session).length, before); assert.equal(state(session)?.count, 1);
+  receipt.stages[stage] = { ...receipt.stages[stage], passed: true, directStateless: true, surface: 'session.sessionRuntime' };
+  stage = 'reopen';
+  const id = session.sessionId; await session.dispose(); sessions.delete(session);
+  session = await create({ sessionId: id });
+  assert.equal((await session.prompt(`Return only ${marker}.`)).trim(), marker);
+  assert.equal(seen.at(-1).count, 1); assert.equal(state(session)?.count, 2);
+  receipt.stages[stage] = { ...receipt.stages[stage], passed: true, stateReused: true };
+  assert.equal(receipt.requests, 4);
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage; receipt.errorName = error?.name;
+  receipt.line = String(error?.stack).match(/real-native\.mjs:(\d+)/)?.[1];
+  const detail = `${String(error?.message ?? '')} ${lastFailure ?? ''}`;
+  receipt.failure = /quota|429/i.test(detail) ? 'provider-quota' : /auth|credential|401|403/i.test(detail) ? 'provider-auth'
+    : /network|fetch|timeout|connect/i.test(detail) ? 'provider-network' : /catalog|target/i.test(detail) ? 'target-admission' : 'product-or-contract';
+  if (error?.name === 'AssertionError') receipt.assertion = { operator: error.operator,
+    actual: typeof error.actual === 'number' || typeof error.actual === 'boolean' ? error.actual : undefined,
+    expected: typeof error.expected === 'number' || typeof error.expected === 'boolean' ? error.expected : undefined };
+  process.exitCode = 1;
+} finally {
+  clearTimeout(timer);
+  for (const current of sessions) await current.dispose().catch(() => {});
+  for (const loader of loaders) { try { loader.captureRetirement()(); } catch {} }
+  sent.unsubscribe(onSent);
+  for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  fs.rmSync(root, { recursive: true, force: true });
+  receipt.isolatedStateRemoved = !fs.existsSync(root);
+  fs.writeFileSync(path.join(directory, 'real-native.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt));
+}

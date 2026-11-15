@@ -26,7 +26,7 @@ export function settingsHost(options: RuntimeRpcHostOptions): SettingsHost {
       return { provider, modelId, note };
     },
     cycleModel: () => cycleRpcModel(runtimeContext),
-    getAvailableModels: listRpcModels,
+    getAvailableModels: () => listRpcModels(runtimeContext),
     setThinkingLevel: (level) => setRpcThinking(runtimeContext, level),
     cycleThinkingLevel: () => cycleRpcThinking(runtimeContext),
     getAvailableThinkingLevels: () => THINKING_LEVELS,

@@ -1,0 +1,69 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/config/constraints.test.ts (36 tests | 1 failed) 1287ms
+   × defers dormant model limits while retaining configuration invariants before a virtual route 19ms
+     → expected undefined to deeply equal []
+   ✓ checks inactive model budgets against their own capacity instead of the main session window 8ms
+   ✓ reports the resolved 'explicit' endpoint in 'legacy' storage without exposing values or deleting independent defaults 45ms
+   ✓ reports the resolved 'fallback' endpoint in 'legacy' storage without exposing values or deleting independent defaults 8ms
+   ✓ reports the resolved 'pool' endpoint in 'legacy' storage without exposing values or deleting independent defaults 7ms
+   ✓ reports the resolved 'override' endpoint in 'legacy' storage without exposing values or deleting independent defaults 6ms
+   ✓ reports the resolved 'explicit' endpoint in 'split' storage without exposing values or deleting independent defaults 29ms
+   ✓ reports the resolved 'fallback' endpoint in 'split' storage without exposing values or deleting independent defaults 61ms
+   ✓ reports the resolved 'pool' endpoint in 'split' storage without exposing values or deleting independent defaults 51ms
+   ✓ reports the resolved 'override' endpoint in 'split' storage without exposing values or deleting independent defaults 50ms
+   ✓ does not claim an endpoint override for a equal target 10ms
+   ✓ does not claim an endpoint override for a absent target 31ms
+   ✓ does not claim an endpoint override for a blocked target 29ms
+   ✓ does not claim an endpoint override for a profile target 29ms
+   ✓ refreshes endpoint notices from the accepted request and clears them when the sources agree 66ms
+   ✓ uses the account issuer endpoint in legacy storage instead of an unrelated stored API endpoint 28ms
+   ✓ uses the account issuer endpoint in auth-only storage instead of an unrelated stored API endpoint 27ms
+   ✓ uses native account protocol and provider-owned output across startup, reload, preset and model selection 150ms
+   ✓ rejects incompatible configuration while preserving an operational last-good snapshot: {"maxOutputTokens":64001} 118ms
+   ✓ rejects incompatible configuration while preserving an operational last-good snapshot: {"contextWindow":4096,"reserveTokens":0} 34ms
+   ✓ rejects incompatible configuration while preserving an operational last-good snapshot: {"reserveTokens":128000} 31ms
+   ✓ rejects incompatible configuration while preserving an operational last-good snapshot: {"retryBaseDelayMs":60001} 47ms
+   ✓ rejects incompatible configuration while preserving an operational last-good snapshot: {"modelTokenBudgets":{"private-invalid-key":{"reserveTokens":1}}} 38ms
+   ✓ rejects incompatible configuration while preserving an operational last-good snapshot: {"modelTokenBudgets":{"openai/small":{"reserveTokens":16000}}} 31ms
+   ✓ keeps zero reservation, large output limits and capped recent history distinct 15ms
+   ✓ resolves per-model reservation before checking the available context 15ms
+   ✓ preserves explicit window overrides and marks unknown capacity without leaking model identifiers 24ms
+   ✓ validates the explicit provider selection on startup and reload 29ms
+   ✓ rejects an oversized model selection before either store changes and validates the session model on reload 37ms
+   ✓ does not commit a selection after a hook changes its context budget 25ms
+   ✓ rechecks every budgeted model after a hook before writing the selection 17ms
+   ✓ retains last-good when the roomy model cannot fit its endpoint reasoning minimum 31ms
+   ✓ retains last-good when the unknown model cannot fit its endpoint reasoning minimum 34ms
+   ✓ uses actual CLI and environment credential precedence when that determines the model 43ms
+   ✓ publishes and retains the immutable catalogue together with its checked configuration 34ms
+   ✓ reports unsupported sampling and rejects unsupported stored effort through the same catalogue 25ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/config/constraints.test.ts > defers dormant model limits while retaining configuration invariants before a virtual route
+AssertionError: expected undefined to deeply equal []
+
+- Expected: 
+[]
+
++ Received: 
+undefined
+
+ ❯ src/config/constraints.test.ts:14:28
+     12|   let deferred;
+     13|   try { deferred = inspectConfigConstraints(config, undefined, []); } …
+     14|   expect(deferred?.errors).toEqual([]);
+       |                            ^
+     15|   let invalid;
+     16|   try { invalid = inspectConfigConstraints({ ...config, retryBaseDelay…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 35 passed (36)
+   Start at  16:16:33
+   Duration  4.56s (transform 1.77s, setup 0ms, collect 2.92s, tests 1.29s, environment 0ms, prepare 104ms)
+

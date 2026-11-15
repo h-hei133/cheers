@@ -1,0 +1,16 @@
+{
+  "code": "APPROVE",
+  "unavailableLanes": [
+    "/root/sdk_review",
+    "/root/route_audit/selection_review",
+    "/root/routing_code_acceptance",
+    "/root/routing_final_code"
+  ],
+  "authorReportsNotIndependent": [
+    "/root/route_audit",
+    "/root/sdk_final_review"
+  ],
+  "pendingLanes": [],
+  "reason": "Older code lanes produced no completed final review and were interrupted. Author reports are not independent approval.",
+  "acceptedLane": "/root/routing_delivery_review"
+}

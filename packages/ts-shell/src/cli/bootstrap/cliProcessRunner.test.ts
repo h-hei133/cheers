@@ -28,6 +28,10 @@ vi.mock("./cliBootstrapContext.js", () => ({
   createCliBootstrapRuntimeContext: vi.fn(),
   logCliBootstrapSessionInitialized: vi.fn(),
 }));
+vi.mock("../../core/shell/runtimeContext.js", async () => ({
+  ...await vi.importActual<typeof import("../../core/shell/runtimeContext.js")>("../../core/shell/runtimeContext.js"),
+  refreshShellRuntimeConfig: vi.fn(() => ({ status: 'applied' })),
+}));
 vi.mock("./cliStartupSurface.js", () => ({
   projectAndRenderCliStartupSurface: vi.fn(),
 }));
@@ -107,7 +111,7 @@ it.each(['idle', 'busy', 'pending', 'unknown', 'unreadable', 'save-failed'] as c
       configDiagnostics: [],
     },
     configuration: {
-      current: { revision: 1 },
+      current: { revision: 1, config: {} },
       recordDisplay: vi.fn(),
     },
     startupArgs: [],
@@ -146,6 +150,7 @@ it.each(['idle', 'busy', 'pending', 'unknown', 'unreadable', 'save-failed'] as c
     recoveryCandidateSummary: null,
     runtimeContext,
     bootstrap: { lifecycleNotices: ['Resumed session sess_current'] },
+    settleModel: vi.fn(),
     mcpGateway,
   } as never);
   vi.mocked(projectAndRenderCliStartupSurface).mockResolvedValue({
@@ -251,7 +256,7 @@ it("waits for the line-loop first-frame callback before starting the recovery hi
       configDiagnostics: [],
     },
     configuration: {
-      current: { revision: 1 },
+      current: { revision: 1, config: {} },
       recordDisplay: vi.fn(),
     },
     startupArgs: [],
@@ -282,6 +287,7 @@ it("waits for the line-loop first-frame callback before starting the recovery hi
     recoveryCandidateSummary: null,
     runtimeContext,
     bootstrap: { lifecycleNotices: [] },
+    settleModel: vi.fn(),
     mcpGateway,
   } as never);
   vi.mocked(projectAndRenderCliStartupSurface).mockResolvedValue({

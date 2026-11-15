@@ -1,0 +1,79 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+const directory = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(directory, '../..');
+const receipt = { platform: process.platform, buildId: JSON.parse(fs.readFileSync(path.join(repo,'packages/ts-shell/dist/build-manifest.json'))).buildId,
+  status: 'not-run', compiledCli: true, stages: {}, loopbackPosts: 0, realProvider: false, probeSha256: createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex') };
+const root = fs.mkdtempSync(path.join(directory,'cli-state-')), home=path.join(root,'home'), workspace=path.join(root,'work');
+fs.mkdirSync(home); fs.mkdirSync(workspace); fs.mkdirSync(path.join(home,'.cheers'));
+const requests=[], servers=[];
+let stage='setup';
+async function wire(label) {
+  const server=http.createServer(async(req,res)=>{
+    const chunks=[]; for await(const chunk of req) chunks.push(Buffer.from(chunk));
+    if(req.method !== 'POST'){res.writeHead(200,{'content-type':'application/json'});res.end('{"data":[]}');return;}
+    const body=JSON.parse(Buffer.concat(chunks).toString());
+    requests.push({stage, label, body, authenticated:req.headers.authorization === 'Bearer synthetic-'+label, path:req.url});
+    res.writeHead(200,{'content-type':'application/json'});
+    res.end(JSON.stringify({choices:[{message:{role:'assistant',content:'CLI_ROUTE_ACK'},finish_reason:'stop'}],usage:{prompt_tokens:10,completion_tokens:2,total_tokens:12}}));
+  });servers.push(server);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  return 'http://127.0.0.1:'+server.address().port+'/v1';
+}
+const env={...process.env,HOME:home,USERPROFILE:home,CHEERS_TEST_ROOT:home,GIT_CEILING_DIRECTORIES:root,CHEERS_PROVIDER_MODE:'real',
+  CHEERS_REAL_PROVIDER_SMOKE:'',OPENAI_API_KEY:'',ANTHROPIC_API_KEY:'',CHEERS_MARKETPLACES_FILE:path.join(home,'sources.json'),CHEERS_EXTENSIONS_FILE:path.join(home,'extensions.json')};
+const settings=path.join(home,'.cheers','config.json'),auth=path.join(home,'.cheers','auth.json');
+function run(args,prompt){
+  return new Promise((resolve,reject)=>{
+    const child=spawn('rtk',['node',path.join(repo,'scripts/start.mjs'),'--project',workspace,'--no-context-files','--no-skills','--no-tools',...args,'--print',prompt],
+      {cwd:workspace,env,stdio:['ignore','pipe','pipe']});
+    let text=''; const add=chunk=>{text+=chunk; if(text.length>512*1024)child.kill('SIGTERM');};child.stdout.on('data',add);child.stderr.on('data',add);
+    const timer=setTimeout(()=>child.kill('SIGTERM'),35_000); child.on('error',reject);
+    child.on('close',(code,signal)=>{clearTimeout(timer);resolve({code,signal,text});});
+  });
+}
+function sessionFiles(){
+  const base=path.join(home,'.cheers','sessions');return fs.readdirSync(base).filter(id=>id.startsWith('sess_')).map(id=>({id,
+    state:JSON.parse(fs.readFileSync(path.join(base,id,'state.json'),'utf8')),
+    events:fs.readFileSync(path.join(base,id,'transcript.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line))}));
+}
+try {
+  assert.equal(process.platform,'linux');
+  const dormant=await wire('dormant'), physical=await wire('physical');
+  fs.writeFileSync(settings,JSON.stringify({maxOutputTokens:64,reserveTokens:0,compactionEnabled:false,retryEnabled:false,cacheWarming:'off',
+    providerConnectTimeoutMs:3000,providerHeadersTimeoutMs:3000,providerBodyTimeoutMs:3000}));
+  fs.writeFileSync(auth,JSON.stringify({provider:'openai',providerCredentials:{openai:{model:'dormant',baseUrl:dormant},anthropic:{apiKey:'synthetic-physical',model:'physical',baseUrl:physical}}}),{mode:0o600});
+  fs.writeFileSync(path.join(home,'.cheers','models.json'),JSON.stringify({providers:{
+    openai:{runtime:'openai',endpoint:'openai-compatible',auth:'api-key',baseUrl:dormant,models:[{id:'dormant',contextWindow:64_000,maxTokens:512}]},
+    anthropic:{runtime:'anthropic',endpoint:'openai-compatible',auth:'api-key',baseUrl:physical,models:[{id:'physical',contextWindow:64_000,maxTokens:512,reasoning:true}]}}}));
+  const extension=path.join(workspace,'models.ts');
+  fs.writeFileSync(extension,"export default async api => { await Promise.resolve(); api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic', thinkingLevels: ['low','high'], route: request => ({ provider: 'anthropic', modelId: 'physical', state: { count: (request.state?.count ?? 0) + 1 } }) }); };");
+  stage='startup';const first=await run(['--extension',extension,'--model','adaptive/auto:high'],'Return CLI_ROUTE_ACK.');
+  assert.equal(first.code,0);assert.ok(first.text.includes('CLI_ROUTE_ACK'));
+  let stored=sessionFiles().find(item=>item.state.modelSelection?.virtualModel?.model==='auto');assert.ok(stored);
+  const id=stored.id;assert.equal(stored.state.modelSelection.virtualModel.thinkingEffort,'high');
+  const stateCount=item=>item.events.filter(event=>event.type==='branch-store'&&event.namespace==='model-routing').map(event=>event.entries[JSON.stringify(['adaptive','auto'])]).filter(Boolean).map(value=>JSON.parse(value).count);
+  assert.deepEqual(stateCount(stored),[1]);
+  assert.equal(requests.length,1);assert.ok(requests[0].authenticated);assert.equal(requests[0].label,'physical');assert.equal(requests[0].body.reasoning_effort,'high');
+  receipt.stages.startup={passed:true,dormantCredentialAbsent:true,logicalSaved:true,physicalDispatch:true,effort:true};
+  stage='resume';const resumed=await run(['--extension',extension,'--session-id',id],'Continue.');
+  assert.equal(resumed.code,0);assert.ok(resumed.text.includes('CLI_ROUTE_ACK'));
+  stored=sessionFiles().find(item=>item.id===id);assert.deepEqual(stateCount(stored),[1,2]);
+  receipt.stages.resume={passed:true,stateReused:true};
+  stage='thinking';const edited=await run(['--extension',extension,'--session-id',id],'/thinking low');
+  assert.equal(edited.code,0);assert.equal(sessionFiles().find(item=>item.id===id).state.modelSelection.virtualModel.thinkingEffort,'low');
+  assert.equal(requests.length,2);receipt.stages.thinking={passed:true,noProviderCall:true};
+  stage='missing';const before=requests.length;const missing=await run(['--session-id',id],'Cannot route without the registration.');
+  assert.equal(requests.length,before);assert.ok(/virtual model.*unavailable|selected virtual model|context preparation failed/i.test(missing.text));
+  assert.equal(sessionFiles().find(item=>item.id===id).state.modelSelection.virtualModel.model,'auto');
+  receipt.stages.missing={passed:true,noFallback:true,exitCode:missing.code};
+  assert.ok(requests.every(item=>item.label==='physical'&&item.authenticated&&item.body.model==='physical'&&item.path==='/v1/chat/completions'));
+  receipt.loopbackPosts=requests.length;receipt.status='passed';
+} catch(error){receipt.status='failed';receipt.failedStage=stage;receipt.errorName=error?.name;receipt.line=String(error?.stack).match(/cli-native\.mjs:(\d+)/)?.[1];
+  if(error?.name==='AssertionError')receipt.assertion={operator:error.operator,actual:typeof error.actual==='number'||typeof error.actual==='boolean'?error.actual:undefined,expected:typeof error.expected==='number'||typeof error.expected==='boolean'?error.expected:undefined};process.exitCode=1;
+} finally {for(const server of servers){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}fs.rmSync(root,{recursive:true,force:true});
+  fs.writeFileSync(path.join(directory,'cli-native.json'),JSON.stringify(receipt,null,2)+'\n');console.log(JSON.stringify(receipt));}
+

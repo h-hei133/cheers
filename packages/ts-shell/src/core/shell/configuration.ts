@@ -5,7 +5,7 @@ import { prepareThemeSelection } from '../../presentation/theme/selection.js';
 import { projectTrust } from '../security/projectTrust.js';
 import { identifyProject } from '../security/trust/identity.js';
 import { configTrustMatches } from '../../config/trust.js';
-import { constrainRuntimeConfig, type ConfigModelTarget } from '../../config/constraints.js';
+import { constrainRuntimeConfig, inspectConfigConstraints, type ConfigModelTarget } from '../../config/constraints.js';
 import { loadCatalogSnapshot } from '../models/catalogStore.js';
 import type { CatalogProvider } from '../models/catalog.js';
 import { resolveProviderCredential } from './providerCredentials.js';
@@ -13,6 +13,7 @@ import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import { assertCurrentProfile, type ProfileContext } from '../paths/profile/context.js';
 import { ConfigInputError } from '../../config/inputs/model.js';
 import { scopeAdmission } from '../../config/scope/admission.js';
+import { readLogicalModel } from '../../session/model/logical.js';
 
 interface ConfigurationContext {
   readonly profile?: ProfileContext;
@@ -26,6 +27,7 @@ interface ConfigurationContext {
   readonly session: { readonly id: string };
   readonly runtimeConfigOverrides?: RuntimeConfigOverrides;
   readonly resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ConfigModelTarget;
+  readonly deferredModel?: () => boolean;
   readonly themePaths?: readonly string[];
 }
 
@@ -47,11 +49,11 @@ export function initialConfiguration(context: Omit<ConfigurationContext, 'config
   return new ConfigState(validateCandidate(candidate, context, catalog.providers), binding, catalog.providers, catalog.diagnostics);
 }
 
-function validateCandidate(config: RuntimeConfig, context: Pick<ConfigurationContext, 'session' | 'resolveConfigTarget'>, catalog: readonly CatalogProvider[]): RuntimeConfig {
+function validateCandidate(config: RuntimeConfig, context: Pick<ConfigurationContext, 'session' | 'resolveConfigTarget' | 'deferredModel'>, catalog: readonly CatalogProvider[]): RuntimeConfig {
   const candidate = projectSessionModel(config, context.session.id);
   const target = context.resolveConfigTarget?.(candidate, context.session.id)
     ?? resolveProviderCredential({ runtimeConfig: candidate, pool: { sessionId: context.session.id } });
-  return constrainRuntimeConfig(candidate, target, catalog);
+  return constrainRuntimeConfig(candidate, context.deferredModel?.() || readLogicalModel(context.session.id) ? undefined : target, catalog);
 }
 
 /**
@@ -111,7 +113,7 @@ export function configurationRefusal(publication: ConfigPublication): string {
 }
 
 /** Ordinary settings stay pinned; safety revocation and substrate changes do not. */
-export function configurationAdmission(context: ConfigurationContext): () => string | undefined {
+export function configurationAdmission(context: ConfigurationContext, options: { readonly deferredModel?: boolean } = {}): () => string | undefined {
   try { if (context.profile) assertCurrentProfile(context.profile); }
   catch { return () => 'Profile storage or identity changed; restart in the owning profile before starting new actions.'; }
   const binding = configurationBinding(context);
@@ -129,7 +131,13 @@ export function configurationAdmission(context: ConfigurationContext): () => str
     if (workspaceRevision !== context.workspaceRevision) return 'Workspace roots changed; start a new operation.';
     const workspaceBlocked = context.workspaceAdmission?.();
     if (workspaceBlocked) return workspaceBlocked;
-    if (context.configuration.current.admissionBlocked) return configurationRefusal(context.configuration.current);
+    const publication = context.configuration.current;
+    if (publication.admissionBlocked) {
+      const canDefer = options.deferredModel && publication.modelConstraintsOnly === true && !publication.config.configValidation.securityBlocked
+        && publication.config.configValidation.constraintsBlocked === true
+        && inspectConfigConstraints(publication.config, undefined, publication.catalog).errors.length === 0;
+      if (!canDefer) return configurationRefusal(publication);
+    }
     const actual = configurationBinding(context);
     if (context.configuration.current.binding.trustRevision !== actual.trustRevision || context.configuration.current.binding.workspaceRoot !== actual.workspaceRoot) {
       return 'Project trust changed; reload configuration before starting new actions.';
@@ -153,7 +161,7 @@ export function refreshConfiguration(context: ConfigurationContext, scope?: 'cat
     const accepted = state.current.requested;
     const target = context.resolveConfigTarget?.(accepted, context.session.id)
       ?? resolveProviderCredential({ runtimeConfig: accepted, pool: { sessionId: context.session.id } });
-    return state.publish(ticket, constrainRuntimeConfig(accepted, target, catalog), configurationBinding(context), undefined, catalog, snapshot.diagnostics);
+    return state.publish(ticket, constrainRuntimeConfig(accepted, context.deferredModel?.() || readLogicalModel(context.session.id) ? undefined : target, catalog), configurationBinding(context), undefined, catalog, snapshot.diagnostics);
   }
   let candidate: RuntimeConfig;
   try { candidate = validateCandidate(getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides, ticket.binding.inputs), context, catalog); }

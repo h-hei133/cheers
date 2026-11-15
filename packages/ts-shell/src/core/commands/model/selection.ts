@@ -25,6 +25,10 @@ import { invalidatePromptMeasurement } from '../../../observability/usageTelemet
 import { captureThinkingPreference } from '../../models/preference.js';
 import { exactTargetMatches, modelRequest, targetRequest, targetResolutionIdentity } from './target.js';
 import { providerBindingAvailable, providerScopeSelected } from '../../auth/binding.js';
+import { readLogicalModel } from '../../../session/model/logical.js';
+import { sessionVirtualModels } from '../../catalog/models.js';
+import { parseModelSelection } from '../../models/virtual/selection.js';
+import { setVirtualModel } from './virtual.js';
 
 interface ExactSelection { readonly target: SessionModelTarget; readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy;
   readonly resolution?: string }
@@ -59,8 +63,20 @@ function validResolution(value: unknown): value is string {
 }
 
 export async function setModel(args: string[], context: CommandContext, global: boolean, requestedEffort?: ThinkingPreference): Promise<string> {
-  try { return await selectModel(args, context, global, requestedEffort); }
-  catch { return 'Model selection outcome is unverified. Inspect saved session and global preferences before retrying.'; }
+  try {
+    const selected = readLogicalModel(context.sessionId);
+    const parsed = args[0] ? parseModelSelection(args[0], context.sessionId ? sessionVirtualModels(context.cwd, context.sessionId) : []) : undefined;
+    const repeatsSaved = selected && args[0]?.trim() === `${selected.provider}/${selected.model}`;
+    const logical = parsed?.kind === 'virtual' ? parsed.virtualModel : (repeatsSaved || !args[0] && requestedEffort !== undefined) ? selected : undefined;
+    if (logical) {
+      if (global) return 'Global model save refused: virtual models belong to the current session extension generation.';
+      return await setVirtualModel({ ...logical, ...(requestedEffort !== undefined ? { thinkingEffort: requestedEffort } : {}) }, context,
+        parsed?.kind === 'virtual' ? { definition: parsed.definition } : {});
+    }
+    return await selectModel(args, context, global, requestedEffort);
+  }
+  catch (error) { return error instanceof SessionModelWriteError ? sessionFailure(error)
+    : 'Model selection outcome is unverified. Inspect saved session and global preferences before retrying.'; }
 }
 
 async function selectModel(args: string[], context: CommandContext, global: boolean, requestedEffort?: ThinkingPreference, exact?: ExactSelection): Promise<string> {

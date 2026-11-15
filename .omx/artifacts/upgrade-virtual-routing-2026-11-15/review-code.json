@@ -1,0 +1,25 @@
+{
+  "reviewer": "/root/routing_delivery_review",
+  "status": "APPROVE",
+  "files": [
+    "packages/ts-shell/src/turn/context/route.ts",
+    "packages/ts-shell/src/session/model/routing.ts",
+    "packages/ts-shell/src/turn/step.ts",
+    "packages/ts-shell/src/turn/context/prepare.ts",
+    "packages/ts-shell/src/cli/provider/step.ts",
+    "packages/ts-shell/src/core/commands/model/virtual.ts",
+    "packages/ts-shell/src/extensions/runtime/virtual.ts",
+    "packages/ts-shell/src/extensions/runtime/virtualSource.ts"
+  ],
+  "fileCount": 8,
+  "findings": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "conclusion": "No concrete correctness or security regressions found in the reviewed routing, state acceptance, delegation, retry, and VM bridge paths.",
+  "readOnly": true,
+  "independentExecution": false,
+  "limits": "Only the eight named owner files; deferred RPC D.1 excluded."
+}

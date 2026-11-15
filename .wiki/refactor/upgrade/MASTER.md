@@ -22,9 +22,9 @@
 
 ## Current status
 
-**Current phase**: active；T3.1已提交`d683a3d`，C.1物理目标`e61a340`、摘要目标`9bf68f9`和session branch-store `774c898`已提交；会话虚拟模型注册子批本地验证完成，继续逻辑选择与生产路由。合计21/62项完成。
-**Last completed batch**: session extension新增registerVirtualModel，SDK和CLI复用原catalog contribution发布与撤权；公开目录分离physical和callback-free virtual metadata，不构造虚拟凭据。重复／物理冲突、有界VM data捕获、loader重载／注销／取消和原始options ownership已验证。六门、18套件178项、0monoliths及build `047e196c6597`通过，六有效反转红且exact恢复，限定独立复核CLEAR；2214文件安装包严格公开类型及Linux安装SDK／同代CLI注册、重载在途拒绝、旧dispose保留后继、冲突exit1通过。本批没有生产逻辑模型派发或真实provider调用；worker注册明确不支持，C.1/E.7不勾选。
-**Goal**: active；41项未完成，其中14部分、12已有待验收、13确认缺口、2待核实。保留完整规划，不关闭总目标。
+**Current phase**: active；会话注册已提交`356b996b`。C.1逻辑选择／生产路由本地验收完成，独立代码APPROVE、架构CLEAR；本批待本地提交。下一修复D.1当前会话读取。当前22/62项完成。
+**Last completed batch**: C.1逻辑选择／生产路由。durable logical selection、分支state同键CAS先于compaction、完整physical authority、retry／continuation／direct、手动／分支摘要、VM输入及CLI／SDK／RPC选择消费者已接通。六门39/840、十有效反转、恢复5/79、补4/34与1/12、0monoliths、build `083b3d78d8bf`通过；同代安装包2224文件strict类型、Linux loopback 33 POST与原配置模型4次真实POST通过。原catalog损坏的隔离fixture边界和RPC旧messages缺口保留；限定独立代码复审8个核心owner为APPROVE、架构CLEAR。
+**Goal**: active；40项未完成，其中13部分、11已有待验收、14确认缺口、2待核实。保留完整规划，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -39,7 +39,7 @@
 
 ## Adaptive control
 
-当前本地验收任务数为21/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.2/D.3/D.5、E.2、C.3和T3.1；核实不计实现完成。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
+当前本地验收任务数为22/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.2/D.3/D.5、E.2、C.1、C.3和T3.1；核实不计实现完成。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 
 恢复时已核对干净工作区与`560c0cc4`。T3.1 compact仅持有controller、不登记settlement，且只凭状态机拒绝重入；该缺口经源码核实仍成立。复用原commands owner登记完整压缩操作、保持忙时拒绝，覆盖prompt／command互斥和SDK dispose等待；不建立第二任务管理器。C.1完整路由由独立只读核实线检查，后续独立实施；已有证据不扩展为新构建的重新验收。
 
@@ -51,10 +51,13 @@
 
 虚拟注册子批遥测：实际L，复用检查10/10，新增未预见依赖2（VM data跨realm显式捕获、调用方可变signal／options身份）。复用原loader generation、contribution和snapshotData，默认JSON准入不变。初9断言红、复核6红及observer补1红后修；首轮reload占位host、AbortError文案、native reload cause和CLI slash路径夹具错误分别记录。E.7由缺口转部分，完成总数保持21/62。
 
+逻辑路由子批遥测：实际L；结构复用检查10/10，复用原session model／branch store／provider／compaction／loader owner，不新增运行时或依赖。新增未预见依赖3（显式delegation的logical隔离、内部retry实际dispatch身份、file callback的realm／UI结算边界）；D.1旧messages另立后续批次。测试／原生证据及限定独立审查通过，C.1勾选为本地完成，22/62。先前无返回的代码lane仍记录unavailable，不作为批准来源；当前代码APPROVE来自新独立8-owner复核。未补造统一历史drift基线。
+
 ## Session log
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-15 | C.1逻辑选择／生产路由完成当前六门39/840、十反转、0monoliths、build `083b3d78d8bf`与Linux公开SDK／CLI／摘要／重试／RPC限定矩阵及4次配置模型POST；证据归档upgrade-virtual-routing-2026-11-15。架构CLEAR、限定独立代码复审APPROVE，本批待本地提交，C.1完成22/62；D.1 get_messages旧快照已由普通physical对照证实，下一单独修复。 |
 | 2026-11-15 | 分支store前置：基线8断言红，重入补2红后修；最终六门8/247、0monoliths、build `7bcb4574ea2a`，五反转exact恢复，限定复审CLEAR。Linux同代三进程重开/分叉/实际worker namespace隔离和冲突拒绝passed。证据`.omx/artifacts/upgrade-branch-store-2026-11-15/delivery.json`；无新增provider调用，21/62保持，继续注册／路由consumer。 |
 | 2026-11-15 | C.1摘要目标子批六门、15/246、0monoliths、build `9e91decd500a`与五断言反转通过；限定复核CLEAR。同代Linux内部自动／overflow／role均route一次，公开SDK配置模型两次bodySent完成prompt／compact。原生前两次夹具先触发threshold而非overflow，失败receipt/source保留；最终只扩大overflow物理窗口并核对首POST拒绝。证据`.omx/artifacts/upgrade-summary-target-2026-11-15/delivery.json`，C.1/E.7开项、21/62保持。 |
 | 2026-11-15 | C.1物理目标子批六门、15/297、0monoliths、build `3ff7e7c3ad7b`和同代Linux内部compiled route／公开SDK配置模型一次请求通过；六反转实际断言红且exact恢复，限定复核CLEAR。最初candidate反转触发普通拒绝而未到断言，收紧成功断言后重跑六项；初日志保留。当前21/62，继续摘要fallback／session注册／分支状态；T3.1已提交`d683a3d`。 |

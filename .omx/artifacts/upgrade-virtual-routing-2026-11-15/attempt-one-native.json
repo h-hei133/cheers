@@ -1,0 +1,16 @@
+{
+  "status": "terminated",
+  "stage": "cancel",
+  "classification": "harness-deadlock",
+  "reason": "The driver awaited session.abort(), which waits for route settlement, before releasing its deliberately held inline callback.",
+  "processSignal": "SIGTERM",
+  "observed": {
+    "strictInstalledTypesExit": 0,
+    "twoSessionTranscripts": true,
+    "parentBranchStoreEntries": 3,
+    "forkBranchStoreEntries": 4,
+    "parentCompactionCommits": 1,
+    "cancelPromptPersisted": true
+  },
+  "nativeAcceptance": false
+}

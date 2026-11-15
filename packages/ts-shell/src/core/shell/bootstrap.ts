@@ -99,6 +99,7 @@ export function bootstrapShellRuntime(input: {
   runtimeConfig: RuntimeConfig;
   runtimeConfigOverrides?: RuntimeConfigOverrides;
   resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution;
+  deferredModel?: () => boolean;
   /** How this run was asked to load skills; carried into the runtime context. */
   skillOptions?: {
     readonly skillPaths?: readonly string[];
@@ -334,6 +335,7 @@ export function bootstrapShellRuntime(input: {
       runtimeConfig: input.runtimeConfig,
       runtimeConfigOverrides: input.runtimeConfigOverrides,
       resolveConfigTarget: input.resolveConfigTarget,
+      deferredModel: input.deferredModel,
       ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
       ...(input.themePaths ? { themePaths: input.themePaths } : {}),
       gitContext: boundGitContext,

@@ -1,0 +1,89 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/virtual-selection/packages/ts-shell
+
+ ❯ src/sdk/agentSession.test.ts (6 tests | 1 failed) 433ms
+   ✓ DefaultResourceLoader > awaits file factories and reports rejected initialization without partial extensions 61ms
+   ✓ DefaultResourceLoader > redacts VM error data and never invokes thrown message getters 23ms
+   ✓ DefaultResourceLoader > loads inline extensionFactories, skills, themes, and systemPrompt/appendSystemPrompt 18ms
+   × createAgentSession & AgentSession > selects a staged virtual startup option without inventing a physical model or replacing provider authority 82ms
+     → expected undefined to deeply equal ObjectContaining{…}
+   ✓ createAgentSession & AgentSession > binds hostBridge even for pre-reloaded DefaultResourceLoader and disposes cleanly 151ms
+   ✓ createAgentSession & AgentSession > supports noTools: 'all', excludeTools via disabledTools, explicit runtimeConfig overrides, and caller-owned mcpGateway 96ms
+ ❯ src/cli/interactive/picker/model/virtual.test.ts (3 tests | 3 failed) 67ms
+   × offers virtual picker rows without dormant auth and rejects an action captured before retirement 35ms
+     → expected undefined to be defined
+   × completes registered identities and refreshes model completion after contribution retirement 17ms
+     → expected [] to include 'adaptive/auto'
+   × refreshes the model observer when virtual registrations change without a configuration revision 14ms
+     → expected "spy" to be called once, but got 0 times
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/sdk/agentSession.test.ts > createAgentSession & AgentSession > selects a staged virtual startup option without inventing a physical model or replacing provider authority
+AssertionError: expected undefined to deeply equal ObjectContaining{…}
+
+- Expected: 
+ObjectContaining {
+  "connectionScope": "provider",
+  "provider": "google",
+  "virtualModel": {
+    "model": "auto",
+    "provider": "adaptive",
+  },
+}
+
++ Received: 
+undefined
+
+ ❯ src/sdk/agentSession.test.ts:121:51
+    119|     const { session } = await createAgentSession({ cwd: work, resource…
+    120|     try {
+    121|       expect(readSessionModel(session.sessionId)).toEqual(expect.objec…
+       |                                                   ^
+    122|         virtualModel: { provider: 'adaptive', model: 'auto' } }));
+    123|       expect(readSessionModel(session.sessionId)?.model).toBeUndefined…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/cli/interactive/picker/model/virtual.test.ts > offers virtual picker rows without dormant auth and rejects an action captured before retirement
+AssertionError: expected undefined to be defined
+ ❯ src/cli/interactive/picker/model/virtual.test.ts:34:19
+     32|   const rows = await picker.load();
+     33|   const virtual = rows.find(row => row.label === 'auto' && row.detail?…
+     34|   expect(virtual).toBeDefined(); expect(virtual?.disabled).not.toBe(tr…
+       |                   ^
+     35|   close();
+     36|   expect((await picker.apply([virtual!.id]))?.note).not.toContain('Mod…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/cli/interactive/picker/model/virtual.test.ts > completes registered identities and refreshes model completion after contribution retirement
+AssertionError: expected [] to include 'adaptive/auto'
+ ❯ src/cli/interactive/picker/model/virtual.test.ts:46:76
+     44|   const loader = createCatalogLoader(() => context, {} as CliMcpGatewa…
+     45|   const controller = new AbortController();
+     46|   expect((await loader('model', controller.signal)).map(row => row.val…
+       |                                                                            ^
+     47|   expect((await loader('provider', controller.signal)).map(row => row.…
+     48|   const changed = vi.fn(); const stop = loader.observe('model', undefi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/cli/interactive/picker/model/virtual.test.ts > refreshes the model observer when virtual registrations change without a configuration revision
+AssertionError: expected "spy" to be called once, but got 0 times
+ ❯ src/cli/interactive/picker/model/virtual.test.ts:61:18
+     59|   const stop = watchModels(context as never, load, publish, 1);
+     60|   try { register(); await vi.advanceTimersByTimeAsync(500);
+     61|     expect(load).toHaveBeenCalledOnce(); expect(publish).toHaveBeenCal…
+       |                  ^
+     62|   } finally { stop(); }
+     63| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 5 passed (9)
+   Start at  15:55:39
+   Duration  15.30s (transform 7.78s, setup 0ms, collect 14.28s, tests 501ms, environment 0ms, prepare 103ms)
+

@@ -1,0 +1,2122 @@
+import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { createStepFunction, emptyAnswerExplanation, CONTEXT_OVERFLOW_PREFIX, isContextOverflow } from "./step.js";
+import { getSessionUsage, resetSessionUsage, recordSessionUsage, totalTokens } from "../observability/usageTelemetry.js";
+import { writeProjectState } from "../core/state/projectState.js";
+import { declareEndpoint, endpointTurnBody } from "../provider/endpoints/index.js";
+import { crc32 } from "../provider/aws/eventStream.js";
+import { runAgentLoop } from "../core/agent/loop.js";
+import { sendSentRequest, type SentRequest } from "../provider/request/sentRequest.js";
+import { historyDigest, requestIdentity } from '../context/request/identity.js';
+import { BUILTIN_PROVIDERS } from '../core/models/catalog.js';
+import { buildSystemPrompt, toChatMessages } from './prompt.js';
+import { estimateRequestTokens } from '../session/context.js';
+import { FINAL_STEP_MESSAGE, outgoingProjection } from './messages.js';
+import { countRequestText } from '../context/request/tokenizer.js';
+import { VirtualModelRegistry } from '../core/models/virtualModels.js';
+
+/**
+ * The step is the only place a provider is spoken to. What matters here is
+ * what the kernel is told afterwards: an interruption is not a network
+ * failure, an overflow is its own kind of failure, and a host that refuses a
+ * request field costs one retry rather than the turn.
+ */
+
+const request = {
+  provider: { apiKey: "k", baseUrl: "https://provider.test/v1", model: "m" },
+  workspaceRoot: process.cwd(),
+  sessionId: "sess_step",
+  systemPrompt: "be brief",
+  tools: [],
+};
+
+function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}): Response {
+  return {
+    ok: init.ok ?? true,
+    status: init.status ?? 200,
+    headers: new Headers({ "content-type": "application/json" }),
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  } as unknown as Response;
+}
+
+describe("createStepFunction", () => {
+  it.each([false, 'cl100k_base', 'o200k_base'] as const)('retains the accepted native tool JSON estimate with tokenizer %s', async tokenizer => {
+    const sessionId = `native-tool-json-${tokenizer}`; resetSessionUsage(sessionId);
+    let captured: SentRequest | undefined; let serialized = ''; let sends = 0;
+    const literal = 'ORDINARY_DOCUMENT_DATA Ω 😀 '.repeat(120);
+    const arguments_ = JSON.stringify({ document: { signature: literal, inlineData: { data: literal },
+      nested: [{ type: 'redacted_thinking', data: literal }, { type: 'image', source: { data: literal } }] } });
+    const messages = [{ role: 'user' as const, content: 'inspect this document' },
+      { role: 'assistant' as const, content: '', tool_calls: [{ id: 'call_one', type: 'function' as const,
+        function: { name: 'read', arguments: arguments_ } }] },
+      { role: 'tool' as const, tool_call_id: 'call_one', content: 'document inspected' }];
+    const step = createStepFunction({ ...request, sessionId, contextWindow: 65536, maxOutputTokens: 128,
+      provider: { ...request.provider, provider: 'fixture', endpoint: 'anthropic-messages' },
+      catalog: [{ id: 'fixture', models: [{ id: 'm', tokenizer, toolCalling: true, contextWindow: 65536, maxTokens: 128 }] }],
+      tools: [{ type: 'function', function: { name: 'read', parameters: { type: 'object' } } }],
+      fetchImpl: async (_url, init) => {
+        sends++; serialized = String(init?.body);
+        return jsonResponse({ content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn',
+          usage: { input_tokens: 123, output_tokens: 1 } });
+      },
+    });
+    try {
+      const result = await step(messages, undefined, {}, { allowTools: true, onRequestSent: sent => { captured = sent; } });
+      expect(result).toMatchObject({ stopReason: 'stop', text: 'ok' }); expect(sends).toBe(1);
+      const body = JSON.parse(serialized);
+      expect(body.messages[1].content[0].input).toEqual(JSON.parse(arguments_));
+      const counted = countRequestText([JSON.stringify(body.messages), JSON.stringify({ ...body, messages: undefined })], tokenizer);
+      expect(captured?.context?.localEstimate).toEqual({ ...counted, scope: 'assembled-request' });
+      expect(JSON.stringify(captured?.context)).not.toContain('ORDINARY_DOCUMENT_DATA');
+      expect(getSessionUsage(sessionId).lastPromptTokens).toBe(123);
+    } finally { resetSessionUsage(sessionId); }
+  });
+
+  it('binds accepted request and provider measurement to the same selected history digest', async () => {
+    const id = 'history-step'; resetSessionUsage(id);
+    const messages = [{ role: 'user' as const, content: 'selected content' }];
+    let captured: SentRequest | undefined;
+    try {
+      const step = createStepFunction({ ...request, sessionId: id, fetchImpl: async () => jsonResponse({
+        choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 1 },
+      }) });
+      await step(messages, undefined, {}, { allowTools: false, onRequestSent: sent => { captured = sent; } });
+      expect(captured?.promptIdentity?.historyDigest).toBe(historyDigest(messages));
+      expect(getSessionUsage(id).lastPromptIdentity?.historyDigest).toBe(historyDigest(messages));
+    } finally { resetSessionUsage(id); }
+  });
+  it("reports the prompt identity from the wire request, including a no-tools step", async () => {
+    const identities: Array<{ schemaDigest: string; systemDigest: string }> = [];
+    const step = createStepFunction({ ...request, tools: [{
+      type: "function",
+      function: { name: "read", description: "read a file", parameters: { type: "object", properties: {} } },
+    }], fetchImpl: async () => jsonResponse({ choices: [{ message: { content: "ok" } }] }) });
+    await step([], undefined, {}, { allowTools: true, onRequestSent: sent => {
+      if (sent.promptIdentity) identities.push(sent.promptIdentity);
+    } });
+    await step([], undefined, {}, { allowTools: false, onRequestSent: sent => {
+      if (sent.promptIdentity) identities.push(sent.promptIdentity);
+    } });
+    expect(identities).toHaveLength(2);
+    expect(identities[0]!.systemDigest).toBe(identities[1]!.systemDigest);
+    expect(identities[0]!.schemaDigest).not.toBe(identities[1]!.schemaDigest);
+  });
+
+  it("omits tool declarations and refuses tool history for a model that cannot call tools", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    let sent: SentRequest | undefined;
+    const step = createStepFunction({
+      ...request,
+      provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{ id: "m", toolCalling: false }] }],
+      tools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
+      systemPromptSources: [{ kind: "base", bytes: 8, codeUnits: 8 }],
+      systemPromptFor: (agentMode, toolNames, toolsAvailable = true) =>
+        buildSystemPrompt(agentMode, { toolNames }, toolsAvailable),
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] });
+      },
+    });
+
+    expect(await step([{ role: "user", content: "hello" }], undefined, {}, {
+      allowTools: true,
+      onRequestSent: request => { sent = request; },
+    }))
+      .toMatchObject({ stopReason: "stop", text: "answer" });
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).not.toHaveProperty("tools");
+    expect(bodies[0]).not.toHaveProperty("tool_choice");
+    expect(bodies[0]?.messages).toEqual([{ role: "system", content: buildSystemPrompt(undefined, { toolNames: [] }, false) },
+      { role: "user", content: "hello" }]);
+    expect(JSON.stringify(bodies[0]?.messages)).not.toContain("You have reached the limit of steps");
+    expect(sent?.promptIdentity?.schemaDigest).toBe(requestIdentity({ tools: [] }).schemaDigest);
+    expect(sent?.context?.systemSources).toBeUndefined();
+
+    const history = [
+      { role: "user" as const, content: "read the file" },
+      { role: "assistant" as const, content: "", tool_calls: [{ id: "call-1", type: "function" as const,
+        function: { name: "read", arguments: "{}" } }] },
+      { role: "tool" as const, tool_call_id: "call-1", content: "contents" },
+    ];
+    const result = await step(history, undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toContain("does not support tool history");
+    expect(bodies).toHaveLength(1);
+  });
+
+  it.each([undefined, true])("keeps the tool prompt for a model with tool calling %s", async (toolCalling) => {
+    let body: Record<string, unknown> | undefined;
+    let promptCalls = 0;
+    const step = createStepFunction({
+      ...request,
+      provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{
+        id: "m",
+        ...(toolCalling === undefined ? {} : { toolCalling }),
+      }] }],
+      systemPrompt: "stable tools prompt",
+      systemPromptFor: () => {
+        promptCalls += 1;
+        return "replacement prompt";
+      },
+      tools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "hello" }], undefined, {}, { allowTools: true });
+
+    expect(body?.tools).toHaveLength(1);
+    expect(body?.tool_choice).toBe("auto");
+    expect(body?.messages).toEqual([{ role: "system", content: "stable tools prompt" },
+      { role: "user", content: "hello" }]);
+    expect(promptCalls).toBe(0);
+  });
+
+  it('observes the exact accepted serialization and drops static source claims for delegated prompts', async () => {
+    let body = ''; let captured: SentRequest | undefined;
+    const step = createStepFunction({ ...request, systemPrompt: '规则🔒\n"quoted"',
+      systemPromptSources: [{ kind: 'base', bytes: 10, codeUnits: 5 }],
+      systemPromptFor: () => 'delegated',
+      fetchImpl: async (_url, init) => { body = String(init?.body); return jsonResponse({ choices: [{ message: { content: 'ok' } }] }); },
+    });
+    await step([{ role: 'user', content: '问\\路径' }], undefined, {}, { allowTools: true, onRequestSent: sent => { captured = sent; } });
+    expect(captured!.body).toBe(body);
+    expect(captured!.context?.body).toEqual({ bytes: Buffer.byteLength(body), codeUnits: body.length });
+    expect(captured!.context?.systemSources).toEqual([{ kind: 'base', bytes: 10, codeUnits: 5 }]);
+    expect(JSON.stringify(captured!.context)).not.toContain('规则');
+    expect(JSON.stringify(captured!.context)).not.toContain('provider.test');
+    await step([], undefined, {}, { agentMode: 'plan', allowTools: false, onRequestSent: sent => { captured = sent; } });
+    expect(captured!.context?.systemSources).toBeUndefined();
+  });
+  it.each([
+    { usage: undefined, expected: undefined },
+    { usage: null, expected: undefined },
+    { usage: {}, expected: undefined },
+    { usage: { completion_tokens: 3 }, expected: undefined },
+    { usage: { prompt_tokens: 0, completion_tokens: 3 }, expected: 0 },
+  ])('replaces the previous context measurement with the current usage presence: $expected', async ({ usage, expected }) => {
+    const id = 'status-step'; resetSessionUsage(id);
+    const identity = { provider: 'openai', model: 'm', endpoint: 'openai-compatible', ...requestIdentity(request) };
+    recordSessionUsage(id, { promptTokens: 1000, completionTokens: 10, model: 'm', promptIdentity: identity });
+    expect(getSessionUsage(id).lastPromptTokens).toBe(1000);
+    const step = createStepFunction({ ...request, sessionId: id, fetchImpl: async () =>
+      jsonResponse({ choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }], usage }),
+    });
+    expect(await step([{ role: 'user', content: 'next' }], undefined, {}, { allowTools: false })).toMatchObject({ stopReason: 'stop', text: 'ok' });
+    const telemetry = getSessionUsage(id);
+    expect(telemetry.lastPromptTokens).toBe(expected);
+    expect(totalTokens(telemetry)).toBe(usage?.completion_tokens ? 1013 : 1010);
+    expect(telemetry.turnsCount).toBe(usage?.completion_tokens ? 2 : 1);
+    expect(telemetry.recentRequests.filter(entry => entry.kind === 'context-reset')).toHaveLength(0);
+    expect(telemetry.recentRequests.at(-1)?.kind).toBe(expected === undefined ? 'usage-gap' : 'request');
+    resetSessionUsage(id);
+  });
+
+  it('rejects output above the model ceiling before sending and preserves an admissible explicit cap', async () => {
+    const sent: Record<string, unknown>[] = [];
+    const create = (maxOutputTokens: number) => createStepFunction({ ...request, maxOutputTokens,
+      provider: { ...request.provider, provider: 'fixture' },
+      catalog: [{ id: 'fixture', models: [{ id: 'm', maxTokens: 2048 }] }],
+      fetchImpl: async (_url, init) => {
+        sent.push(JSON.parse(String(init?.body)));
+        return jsonResponse({ choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }] });
+      },
+    });
+    expect(await create(2049)([], undefined, {}, { allowTools: false })).toMatchObject({ stopReason: 'error', errorMessage: expect.stringContaining('model output limit') });
+    expect(sent).toEqual([]);
+    expect(await create(2048)([], undefined, {}, { allowTools: false })).toMatchObject({ stopReason: 'stop' });
+    expect(sent).toHaveLength(1); expect(sent[0]?.max_tokens).toBe(2048);
+  });
+
+  it("refuses an over-window request before the provider is called", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] }));
+    const step = createStepFunction({
+      ...request,
+      contextWindow: 10,
+      maxOutputTokens: 1,
+      fetchImpl,
+    });
+
+    const result = await step([{ role: "user", content: "x".repeat(1_000) }], undefined, {}, { allowTools: false });
+
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toMatch(/^Context overflow:/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("budgets the closing request with withheld schemas and its synthetic instruction", async () => {
+    const id = "step-closing-budget";
+    resetSessionUsage(id);
+    const messages = [{ role: "user" as const, content: "hello" }];
+    const closingTokens = estimateRequestTokens(
+      [...messages, { role: "user", content: FINAL_STEP_MESSAGE }],
+      { systemPrompt: request.systemPrompt, tools: [] },
+    );
+    const fetchImpl = vi.fn(async () => jsonResponse({
+      choices: [{ message: { content: "answer" }, finish_reason: "stop" }],
+    }));
+    const create = (contextWindow: number) => createStepFunction({
+      ...request,
+      sessionId: id,
+      contextWindow,
+      maxOutputTokens: 1,
+      provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{ id: "m" }] }],
+      tools: [{
+        type: "function",
+        function: {
+          name: "read",
+          description: "x".repeat(40_000),
+          parameters: { type: "object" },
+        },
+      }],
+      fetchImpl,
+    });
+
+    try {
+      expect(await create(closingTokens + 1)(messages, undefined, {}, { allowTools: false }))
+        .toMatchObject({ stopReason: "stop", text: "answer" });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+      const blocked = await create(closingTokens)(messages, undefined, {}, { allowTools: false });
+      expect(blocked.stopReason).toBe("error");
+      expect(blocked.errorMessage).toMatch(/^Context overflow:/);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    } finally {
+      resetSessionUsage(id);
+    }
+  });
+
+  it("budgets the closing request from its microcompacted wire history", async () => {
+    const id = "step-wire-budget";
+    resetSessionUsage(id);
+    const messages = [
+      { role: "user" as const, content: "first" },
+      { role: "assistant" as const, content: "", tool_calls: [{ id: "call-1", type: "function" as const,
+        function: { name: "read", arguments: "{}" } }] },
+      { role: "tool" as const, tool_call_id: "call-1", content: "x".repeat(5_000) },
+      { role: "user" as const, content: "second" },
+      { role: "assistant" as const, content: "done" },
+      { role: "user" as const, content: "third" },
+      { role: "assistant" as const, content: "done" },
+      { role: "user" as const, content: "fourth" },
+      { role: "assistant" as const, content: "done" },
+      { role: "user" as const, content: "current" },
+    ];
+    const projection = outgoingProjection(messages, false, true);
+    expect(projection.sourceAligned).toBe(false);
+    expect(JSON.stringify(projection.messages)).toContain("Omitted");
+    const overhead = { systemPrompt: request.systemPrompt, tools: [] };
+    const wireMessages = [...projection.messages, { role: "user", content: FINAL_STEP_MESSAGE }]
+      .map(message => ({ ...message, content: message.content ?? "" }));
+    const wireTokens = estimateRequestTokens(wireMessages, overhead);
+    const rawTokens = estimateRequestTokens(
+      [...messages, { role: "user", content: FINAL_STEP_MESSAGE }],
+      overhead,
+    );
+    expect(rawTokens).toBeGreaterThan(wireTokens);
+    const bodies: Record<string, unknown>[] = [];
+    const step = createStepFunction({
+      ...request,
+      sessionId: id,
+      pruneToolText: true,
+      contextWindow: wireTokens + 1,
+      maxOutputTokens: 1,
+      provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{ id: "m" }] }],
+      tools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return jsonResponse({
+          choices: [{ message: { content: "answer" }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 1, completion_tokens: 1 },
+        });
+      },
+    });
+
+    try {
+      expect(await step(messages, undefined, {}, { allowTools: false }))
+        .toMatchObject({ stopReason: "stop", text: "answer" });
+      expect(bodies).toHaveLength(1);
+      expect(JSON.stringify(bodies[0]?.messages)).toContain("Omitted");
+      const telemetry = getSessionUsage(id);
+      expect(telemetry.lastPromptMessageCount).toBe(messages.length);
+      expect(telemetry.lastPromptIdentity?.wireMessageCount).toBe(messages.length + 1);
+      expect(telemetry.lastPromptIdentity?.wireHistoryDigest).toMatch(/^[a-f0-9]{64}$/);
+      expect(telemetry.lastPromptIdentity?.replayBinding).toMatch(/^[a-f0-9]{64}$/);
+    } finally {
+      resetSessionUsage(id);
+    }
+  });
+
+  it("refuses a prompt over the model's independent input limit before sending", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] }));
+    const step = createStepFunction({
+      ...request,
+      provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{ id: "m", contextWindow: 10_000, inputLimit: 50, maxTokens: 1 }] }],
+      fetchImpl,
+    });
+    const result = await step([{ role: "user", content: "x".repeat(1_000) }], undefined, {}, { allowTools: false });
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toMatch(/^Context overflow: .*input limit/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("records the exact message array sent so later measurements include new tool arguments", async () => {
+    const id = "step-prompt-message-count";
+    resetSessionUsage(id);
+    const bodies: Array<{ messages: Array<{ role: string; content?: string; tool_calls?: unknown[] }> }> = [];
+    const step = createStepFunction({
+      ...request,
+      sessionId: id,
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)) as typeof bodies[number]);
+        return jsonResponse({
+          choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 100, completion_tokens: 1 },
+        });
+      },
+    });
+
+    try {
+      await step([{ role: "user", content: "first" }], undefined, {}, { allowTools: true });
+      expect(getSessionUsage(id).lastPromptMessageCount).toBe(1);
+
+      const withTool = [
+        { role: "user" as const, content: "first" },
+        { role: "assistant" as const, content: "", tool_calls: [{ id: "call-1", type: "function" as const,
+          function: { name: "read", arguments: '{"path":"src/a.ts"}' } }] },
+        { role: "tool" as const, tool_call_id: "call-1", content: "file" },
+      ];
+      await step(withTool, undefined, {}, { allowTools: true });
+      expect(getSessionUsage(id).lastPromptMessageCount).toBe(3);
+      expect(bodies[1]?.messages).toEqual(expect.arrayContaining([
+        expect.objectContaining({ role: "assistant", tool_calls: [expect.objectContaining({
+          function: expect.objectContaining({ arguments: '{"path":"src/a.ts"}' }),
+        })] }),
+      ]));
+    } finally {
+      resetSessionUsage(id);
+    }
+  });
+
+  it("distinguishes a no-tools measurement from the tool-enabled wire schema", async () => {
+    const id = "step-prompt-schema-gate";
+    resetSessionUsage(id);
+    const step = createStepFunction({
+      ...request,
+      sessionId: id,
+      tools: [{ type: "function", function: { name: "read", parameters: { type: "object" } } }],
+      fetchImpl: async () => jsonResponse({
+        choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 100, completion_tokens: 1 },
+      }),
+    });
+    try {
+      await step([{ role: "user", content: "first" }], undefined, {}, { allowTools: false });
+      const withoutTools = getSessionUsage(id).lastPromptIdentity?.schemaDigest;
+      await step([{ role: "user", content: "second" }], undefined, {}, { allowTools: true });
+      const withTools = getSessionUsage(id).lastPromptIdentity?.schemaDigest;
+      expect(withoutTools).toBeTruthy();
+      expect(withTools).toBeTruthy();
+      expect(withoutTools).not.toBe(withTools);
+    } finally {
+      resetSessionUsage(id);
+    }
+  });
+
+  it.each(["max_tokens", "max_completion_tokens"] as const)("retains the catalog's %s field when the original ceiling is absent", async maxTokensField => {
+    let captured: SentRequest | undefined;
+    const step = createStepFunction({ ...request, provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{ id: "m", compat: { maxTokensField } }] }],
+      fetchImpl: async () => jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] }),
+    });
+    await step([], undefined, {}, { allowTools: false, onRequestSent: sent => { captured = sent; } });
+    expect(captured).toBeDefined();
+    const original = JSON.parse(captured!.body);
+    expect(original.max_tokens).toBeUndefined();
+    expect(original.max_completion_tokens).toBeUndefined();
+    let replay: Record<string, unknown> = {};
+    await sendSentRequest(captured!, undefined, async (_url, init) => {
+      replay = JSON.parse(String(init?.body));
+      return jsonResponse({});
+    });
+    expect(replay).toEqual({ ...original, [maxTokensField]: 1 });
+  });
+
+  it.each([{ allowedTools: [] }, { allowedTools: ["unknown"] }])("does not advertise tools or a spent budget for an empty intersection: $allowedTools", async ({ allowedTools }) => {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({ ...request,
+      tools: [{ type: "function", function: { name: "read", parameters: {} } }],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body));
+        return jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] });
+      },
+    });
+    await step([{ role: "user", content: "inspect" }], undefined, {}, { allowTools: false, allowedTools });
+    expect(body.tools).toBeUndefined();
+    expect(JSON.stringify(body.messages)).not.toContain("cannot call any more tools");
+    await step([{ role: "user", content: "inspect" }], undefined, {}, { allowTools: true, allowedTools });
+    expect(body.tools).toBeUndefined();
+  });
+
+  it("uses the same restricted schemas for endpoint headers and request bodies", async () => {
+    const endpoint = "test-restricted-schemas";
+    const seen: string[][] = [];
+    declareEndpoint(endpoint, {
+      resource: () => "test",
+      requestHeaders: (input) => { seen.push(input.tools.map((tool) => tool.function.name)); return {}; },
+      turnBody: (input) => { seen.push(input.tools.map((tool) => tool.function.name)); return {}; },
+      simpleBody: () => ({}), readBody: () => ({ choices: [{ message: { content: "answer" } }] }),
+      readStream: () => { throw new Error("no stream"); },
+    });
+    const step = createStepFunction({ ...request, provider: { ...request.provider, endpoint },
+      tools: ["read", "write"].map((name) => ({ type: "function", function: { name, parameters: {} } })),
+      fetchImpl: async () => jsonResponse({}),
+    });
+    await step([], undefined, {}, { allowTools: true, allowedTools: ["read", "unknown"] });
+    expect(seen).toEqual([["read"], ["read"]]);
+  });
+
+  it.each([
+    ["content", "error"], ["reasoning_content", "error"],
+    ["content", "eof"], ["reasoning_content", "eof"],
+  ])("does not retry partial %s after %s at the outer loop", async (channel, ending) => {
+    let requests = 0;
+    const shown: string[] = [];
+    const step = createStepFunction({ ...request, fetchImpl: async () => {
+      requests++;
+      return new Response(new ReadableStream<Uint8Array>({ start(controller) {
+        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { [channel]: "already seen" } }] })}\n\n`));
+        setTimeout(() => ending === "eof" ? controller.close() : controller.error(new Error("connection lost")), 5);
+      } }), { headers: { "content-type": "text/event-stream" } });
+    } });
+    const produced = await runAgentLoop([{ role: "user", content: "hello" }], [], {
+      retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+      streamStep: (messages, signal) => step(messages, signal, {
+        onText: (text) => shown.push(text), onReasoning: (text) => shown.push(text),
+      }, { allowTools: true }),
+    }, () => {}, undefined);
+    expect(requests).toBe(1);
+    expect(shown).toEqual(["already seen"]);
+    expect(produced.at(-1)?.stopReason).toBe("error");
+    expect(produced.at(-1)?.reasoning).toEqual(channel === 'reasoning_content' ? { text: 'already seen' } : undefined);
+    expect(produced.at(-1)?.origin?.replayBinding).toBeUndefined();
+  });
+
+  it('keeps public reasoning on cancellation and does not carry it into the next request', async () => {
+    const controller = new AbortController();
+    let calls = 0;
+    const step = createStepFunction({ ...request, fetchImpl: async (_url, init) => {
+      if (calls++ > 0) return jsonResponse({ choices: [{ message: { content: 'Next answer' }, finish_reason: 'stop' }] });
+      return new Response(new ReadableStream<Uint8Array>({ start(stream) {
+        stream.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: 'Visible before cancel' } }] })}\n\n`));
+        init?.signal?.addEventListener('abort', () => stream.error(new Error('request aborted')), { once: true });
+      } }), { headers: { 'content-type': 'text/event-stream' } });
+    } });
+    const result = await step([], controller.signal, { onReasoning: () => controller.abort() }, { allowTools: false });
+    expect(result).toMatchObject({ text: '', stopReason: 'aborted', reasoning: { text: 'Visible before cancel' } });
+    expect(result.reasoning?.signature).toBeUndefined();
+    expect(result.origin?.replayBinding).toBeUndefined();
+    const next = await step([], undefined, {}, { allowTools: false });
+    expect(next).toMatchObject({ text: 'Next answer', stopReason: 'stop' });
+    expect(next.reasoning).toBeUndefined();
+    expect(calls).toBe(2);
+  });
+
+  it("does not replay an accepted response whose body ends before any event", async () => {
+    let requests = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+      fetchImpl: async () => {
+        requests += 1;
+        return new Response(new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.error(new Error("socket hang up"));
+          },
+        }), { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    const produced = await runAgentLoop([{ role: "user", content: "hello" }], [], {
+      retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+      streamStep: (messages, signal) => step(messages, signal, {}, { allowTools: true }),
+    }, () => {}, undefined);
+    expect(requests).toBe(1);
+    expect(produced.at(-1)).toMatchObject({ stopReason: "error" });
+  });
+
+  it.each([
+    [false, 'upstream_error', 'provider_endpoint'],
+    [true, 'upstream_error', 'provider_endpoint'],
+    [false, 'rate_limit_error', 'provider_rate_limited'],
+    [true, 'rate_limit_error', 'provider_rate_limited'],
+  ] as const)('keeps an SSE API failure report-safe with partial text %s and type %s', async (partialText, errorType, failureClass) => {
+    const sessionId = 'sse-provider-error-' + partialText + '-' + errorType;
+    resetSessionUsage(sessionId);
+    const canary = 'SSE_PRIVATE_CANARY';
+    const text = partialText ? 'Partial answer.' : '';
+    let requests = 0, admitted = 0, executed = 0;
+    const shown: string[] = [];
+    const events: string[] = [];
+    const step = createStepFunction({
+      ...request,
+      sessionId,
+      tools: [{ type: 'function', function: { name: 'write', parameters: { type: 'object' } } }],
+      retry: { enabled: true, maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+      fetchImpl: async () => {
+        requests++;
+        // A reversed retry guard terminates with an observable second request.
+        if (requests > 1) return jsonResponse({ choices: [{ message: { content: 'Must not retry' }, finish_reason: 'stop' }] });
+        const frames = [
+          { choices: [{ delta: { ...(partialText ? { content: text } : {}), tool_calls: [{
+            index: 0, id: 'untrusted-write', type: 'function',
+            function: { name: 'write', arguments: JSON.stringify({ path: 'refused.txt', content: 'must not dispatch' }) },
+          }] } }] },
+          { error: { type: errorType, message: canary + ' capacity unavailable; socket hang up; HTTP 401' } },
+        ];
+        return new Response(frames.map(frame => 'data: ' + JSON.stringify(frame) + '\n\n').join('') + 'data: [DONE]\n\n',
+          { headers: { 'content-type': 'text/event-stream' } });
+      },
+    });
+    let observed: Awaited<ReturnType<typeof step>> | undefined;
+    try {
+      const produced = await runAgentLoop([{ role: 'user', content: 'Update the file' }], [], {
+        retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+        streamStep: async (messages, signal) => {
+          observed = await step(messages, signal, { onText: value => { shown.push(value); } }, { allowTools: true });
+          return observed;
+        },
+        beforeToolCall: async () => { admitted++; return undefined; },
+        tools: [{ name: 'write', execute: async () => {
+          executed++;
+          return { output: 'unexpected dispatch', isError: false };
+        } }],
+      }, event => { events.push(event.type); }, undefined);
+
+      expect(requests).toBe(1);
+      expect(shown).toEqual(partialText ? [text] : []);
+      expect(observed).toMatchObject({
+        text, toolCalls: [], stopReason: 'error', failureClass, retriesExhausted: true,
+        errorMessage: 'Provider reported an error: ' + failureClass + '. Response details withheld.',
+      });
+      expect(produced.at(-1)).toMatchObject({
+        content: text, stopReason: 'error', failureClass,
+        errorMessage: 'Provider reported an error: ' + failureClass + '. Response details withheld.',
+      });
+      expect(produced.at(-1)?.tool_calls).toBeUndefined();
+      expect(admitted).toBe(0);
+      expect(executed).toBe(0);
+      expect(events).not.toContain('tool_execution_start');
+      expect(events).not.toContain('retry_scheduled');
+      expect(events).not.toContain('retry_attempt_start');
+      expect(JSON.stringify(observed)).not.toContain(canary);
+      expect(JSON.stringify(produced)).not.toContain(canary);
+      expect(observed?.errorMessage).not.toContain('Network error');
+      expect(observed?.errorMessage).not.toContain('HTTP');
+    } finally { resetSessionUsage(sessionId); }
+  });
+
+  it("marks returned error completions after visible output as non-retryable", async () => {
+    const step = createStepFunction({ ...request, fetchImpl: async () => jsonResponse({
+      choices: [{ message: { content: "partial answer" }, finish_reason: "error" }],
+    }) });
+    const result = await step([], undefined, {}, { allowTools: true });
+    expect(result).toMatchObject({ text: "partial answer", stopReason: "error", retriesExhausted: true });
+  });
+
+  it.each([
+    ["openai-compatible", { choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "read", arguments: '{"path":"a"}' } }] } }] }],
+    ["anthropic-messages", { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "c1", name: "read", input: { path: "a" } } }],
+    ["google-generative-ai", { candidates: [{ content: { parts: [{ functionCall: { name: "read", args: { path: "a" }, id: "c1" } }] } }] }],
+  ] as const)("does not admit tools from an incomplete %s stream", async (endpoint, payload) => {
+    const step = createStepFunction({ ...request, provider: { ...request.provider, endpoint },
+      fetchImpl: async () => new Response(`data: ${JSON.stringify(payload)}\n\n`, { headers: { "content-type": "text/event-stream" } }),
+    });
+    const result = await step([], undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toMatch(/stream ended/i);
+    expect(result.failureClass).toBe('provider_stream_protocol_error');
+    expect(result.toolCalls).toEqual([]);
+  });
+
+  it("reports a cancelled request as an aborted step, not a network failure", async () => {
+    const controller = new AbortController();
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () => {
+        controller.abort();
+        const error = new Error("This operation was aborted");
+        error.name = "AbortError";
+        throw error;
+      },
+    });
+    const result = await step([{ role: "user", content: "hi" }], controller.signal, {}, { allowTools: true });
+    expect(result.stopReason).toBe("aborted");
+    expect(result.errorMessage).toBe("Operation aborted");
+  });
+
+  it("reports the request it sent, as it sent it", async () => {
+    // This is what a cache refresh replays. It has to be the bytes that went
+    // out, because a cache is keyed on the request's own prefix: anything
+    // rebuilt from the session's history — without the system instruction,
+    // without the microcompaction of old turns — would arrive as a miss and be
+    // charged at the full write price.
+    const sent: Array<{ url: string; body: string }> = [];
+    let receivedUrl = "";
+    let receivedBody = "";
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async (url: string | URL, init?: RequestInit) => {
+        receivedUrl = String(url);
+        receivedBody = String(init?.body ?? "");
+        return jsonResponse({ choices: [{ message: { content: "ok" } }] });
+      },
+    });
+
+    await step(
+      [{ role: "user", content: "hi" }],
+      undefined,
+      {},
+      { allowTools: true, onRequestSent: (captured) => sent.push(captured) },
+    );
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].url).toBe(receivedUrl);
+    expect(sent[0].body).toBe(receivedBody);
+    // The system instruction is part of the cached prefix, so it must be in
+    // what was captured.
+    expect(JSON.parse(sent[0].body).messages[0]).toEqual({ role: "system", content: "be brief" });
+  });
+
+  it("marks a context overflow so the session can compact and retry", async () => {
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () => jsonResponse({ error: { code: "context_length_exceeded", message: 'SYNTHETIC_PRIVATE_RESPONSE' } }, { ok: false, status: 400 }),
+    });
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage?.startsWith(CONTEXT_OVERFLOW_PREFIX)).toBe(true);
+    expect(result.errorMessage).not.toContain('SYNTHETIC_PRIVATE_RESPONSE');
+  });
+
+  it("names the model every kind of step came from", async () => {
+    // Every exit — an answer, a refusal the retries gave up on, an overflow —
+    // must say which model produced it. A step that forgets leaves a failure
+    // the next run cannot attribute, and attribution is the fact the origin
+    // field exists to carry.
+    const answered = createStepFunction({
+      ...request,
+      thinkingEffort: 'low', thinkingEffortExplicit: false,
+      fetchImpl: async () => jsonResponse({ choices: [{ message: { content: "hi" }, finish_reason: "stop" }] }),
+    });
+    const answer = await answered([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
+    expect(answer.origin).toEqual({ model: "m", thinkingLevel: 'low' });
+
+    const refused = createStepFunction({
+      ...request,
+      thinkingEffort: 'low', thinkingEffortExplicit: false,
+      fetchImpl: async () => jsonResponse({ error: "no" }, { ok: false, status: 400 }),
+    });
+    const refusal = await refused([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
+    expect(refusal.stopReason).toBe("error");
+    expect(refusal.origin).toEqual({ model: "m", thinkingLevel: 'low' });
+
+    const overflowed = createStepFunction({
+      ...request,
+      thinkingEffort: 'low', thinkingEffortExplicit: false,
+      fetchImpl: async () => jsonResponse({ error: { code: "context_length_exceeded" } }, { ok: false, status: 400 }),
+    });
+    const overflow = await overflowed([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
+    expect(overflow.origin).toEqual({ model: "m", thinkingLevel: 'low' });
+  });
+
+  it("delivers a whole-body answer as one delta and parses its tool calls", async () => {
+    const deltas: string[] = [];
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: "Reading.",
+                tool_calls: [{ id: "c1", type: "function", function: { name: "read", arguments: "{\"path\":\"a\"}" } }],
+              },
+              finish_reason: "tool_calls",
+            },
+          ],
+        }),
+    });
+    const result = await step([{ role: "user", content: "hi" }], undefined, { onText: (delta) => deltas.push(delta) }, { allowTools: true });
+    expect(deltas).toEqual(["Reading."]);
+    expect(result.toolCalls).toEqual([{ id: "c1", name: "read", args: { path: "a" } }]);
+    expect(result.stopReason).toBe("stop");
+  });
+
+  it("flags a truncated response so the kernel refuses its tool calls", async () => {
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: { content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "write", arguments: "{\"pa" } }] },
+              finish_reason: "length",
+            },
+          ],
+        }),
+    });
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe("length");
+    expect(result.toolCalls).toHaveLength(1);
+  });
+
+  it.each([
+    ['json', 'stop'], ['json', 'tool_calls'],
+    ['stream', 'stop'], ['stream', 'tool_calls'],
+  ] as const)('refuses every call when final %s arguments are malformed (%s)', async (transport, finishReason) => {
+    for (const malformed of [
+      '{"path":"second.txt","content":"INCOMPLETE_ARGUMENT_DATA"',
+      '{"path":"second.txt","content":"INCOMPLETE_ARGUMENT_DATA',
+      '{"path":"second.txt","content":"raw\ncontrol"}',
+      '[]', 'null', '',
+    ]) {
+      const root = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(root, { recursive: true });
+      const workspace = fs.mkdtempSync(path.join(root, 'final-arguments-'));
+      const first = path.join(workspace, 'first.txt'); fs.writeFileSync(first, 'unchanged');
+      let requests = 0, admitted = 0, executed = 0;
+      const sessionId = `final-arguments-${transport}-${finishReason}`; resetSessionUsage(sessionId);
+      const calls = [
+        { id: 'complete', type: 'function' as const, function: { name: 'write', arguments: JSON.stringify({ path: 'first.txt', content: 'complete replacement' }) } },
+        { id: 'incomplete', type: 'function' as const, function: { name: 'write', arguments: malformed } },
+      ];
+      const step = createStepFunction({ ...request, sessionId, workspaceRoot: workspace, retry: { maxRetries: 0 },
+        fetchImpl: async () => {
+          requests++;
+          if (requests > 1) return jsonResponse({ choices: [{ message: { content: 'Must not retry' }, finish_reason: 'stop' }] });
+          const usage = { prompt_tokens: 8, completion_tokens: 12, total_tokens: 20 };
+          if (transport === 'json') return jsonResponse({ choices: [{ message: { content: 'Preparing changes.', tool_calls: calls }, finish_reason: finishReason }], usage });
+          const fragments = [
+            { choices: [{ delta: { content: 'Preparing changes.', tool_calls: calls.map((call, index) => ({ ...call, index,
+              function: { ...call.function, arguments: call.function.arguments.slice(0, 10) } })) } }] },
+            { choices: [{ delta: { tool_calls: calls.map((call, index) => ({ index,
+              function: { arguments: call.function.arguments.slice(10) } })) }, finish_reason: finishReason }], usage },
+          ];
+          return new Response(fragments.map(fragment => `data: ${JSON.stringify(fragment)}\n\n`).join('') + 'data: [DONE]\n\n',
+            { headers: { 'content-type': 'text/event-stream' } });
+        },
+      });
+      try {
+        const events: string[] = [];
+        const produced = await runAgentLoop([{ role: 'user', content: 'Update both files' }], [], {
+          streamStep: (messages, signal) => step(messages, signal, {}, { allowTools: true }),
+          retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+          beforeToolCall: async () => { admitted++; return undefined; },
+          tools: [{ name: 'write', execute: async (_id, args) => {
+            executed++; fs.writeFileSync(path.join(workspace, String(args.path)), String(args.content));
+            return { output: 'written', isError: false };
+          } }],
+        }, event => { events.push(event.type); }, undefined);
+        expect(requests).toBe(1);
+        expect(admitted).toBe(0);
+        expect(executed).toBe(0);
+        expect(fs.readFileSync(first, 'utf8')).toBe('unchanged');
+        expect(fs.existsSync(path.join(workspace, 'second.txt'))).toBe(false);
+        expect(events).not.toContain('tool_execution_start');
+        expect(produced.at(-1)).toMatchObject({ content: 'Preparing changes.', stopReason: 'error',
+          errorMessage: 'Provider returned malformed tool arguments. No tool calls were executed.' });
+        expect(produced.at(-1)?.tool_calls).toBeUndefined();
+        expect(JSON.stringify(produced)).not.toContain('INCOMPLETE_ARGUMENT_DATA');
+        expect(totalTokens(getSessionUsage(sessionId))).toBe(20);
+      } finally { fs.rmSync(workspace, { recursive: true, force: true }); }
+    }
+  });
+
+  it('preserves complete tool JSON objects without repairing their literal values', async () => {
+    const args = { path: 'complete.txt', content: 'literal \\n, quote " and Unicode Ω', nested: { values: [1, null, true] } };
+    const step = createStepFunction({ ...request, fetchImpl: async () => jsonResponse({ choices: [{
+      message: { content: '', tool_calls: [{ id: 'complete', type: 'function', function: { name: 'write', arguments: JSON.stringify(args) } }] },
+      finish_reason: 'tool_calls',
+    }] }) });
+    const result = await step([], undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe('stop');
+    expect(result.toolCalls).toEqual([{ id: 'complete', name: 'write', args }]);
+  });
+
+  it('keeps length refusal for a complete call beside incomplete final arguments', async () => {
+    let sends = 0, executed = 0;
+    const step = createStepFunction({ ...request, fetchImpl: async () => {
+      if (sends++ > 0) return jsonResponse({ choices: [{ message: { content: 'Request smaller changes' }, finish_reason: 'stop' }] });
+      return jsonResponse({ choices: [{ message: { content: '', tool_calls: [
+        { id: 'complete', type: 'function', function: { name: 'write', arguments: '{"path":"first.txt","content":"complete"}' } },
+        { id: 'incomplete', type: 'function', function: { name: 'write', arguments: '{"path":"second.txt","content":"partial' } },
+      ] }, finish_reason: 'length' }] });
+    } });
+    const produced = await runAgentLoop([{ role: 'user', content: 'Update both files' }], [], {
+      streamStep: (messages, signal) => step(messages, signal, {}, { allowTools: true }),
+      tools: [{ name: 'write', execute: async () => { executed++; return { output: 'must not run', isError: false }; } }],
+    }, () => {}, undefined);
+    expect(executed).toBe(0);
+    expect(produced.find(message => message.role === 'assistant')?.stopReason).toBe('length');
+    expect(produced.filter(message => message.role === 'tool')).toHaveLength(2);
+    expect(produced.at(-1)?.content).toBe('Request smaller changes');
+  });
+
+  it('does not grant replay authority to reasoning beside malformed final calls', async () => {
+    const target = { provider: 'fixture', model: 'm', baseUrl: 'https://fixture.invalid/v1', headers: {} };
+    const step = createStepFunction({ ...request, provider: target,
+      catalog: [{ id: target.provider, baseUrl: target.baseUrl, models: [{ id: target.model,
+        compat: { reasoningReplayField: 'reasoning_content' } }] }],
+      fetchImpl: async () => jsonResponse({ choices: [{ message: { content: 'Preparing changes.', reasoning_content: 'Synthetic public reasoning',
+        tool_calls: [{ id: 'incomplete', type: 'function', function: { name: 'write', arguments: '{"path":"a","content":"partial' } }] },
+      finish_reason: 'stop' }] }),
+    });
+    const result = await step([], undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe('error');
+    expect(result.reasoning).toEqual({ text: 'Synthetic public reasoning' });
+    expect(result.origin?.replayBinding).toBeUndefined();
+    expect(result.toolCalls).toEqual([]);
+  });
+
+  it.each(['json', 'stream'] as const)('refuses every %s tool envelope with a missing or empty name', async transport => {
+    for (const name of [undefined, '', ' ', null, 1]) {
+      for (const completeArgs of [true, false]) {
+        let requests = 0, admitted = 0, dispatched = 0;
+        const usage = { prompt_tokens: 8, completion_tokens: 12, total_tokens: 20 };
+        const sessionId = `unnamed-envelope-${transport}`; resetSessionUsage(sessionId);
+        const calls = [
+          { id: 'complete', type: 'function', function: { name: 'write', arguments: '{"path":"first","content":"complete"}' } },
+          { id: 'unnamed', type: 'function', function: { ...(name === undefined ? {} : { name }),
+            arguments: completeArgs ? '{"path":"second","content":"complete"}' : '{"path":"second","content":"partial' } },
+        ];
+        const step = createStepFunction({ ...request, sessionId, fetchImpl: async () => {
+          requests++;
+          // A reversed decoder may dispatch and continue. Settle that trajectory
+          // so the admission assertions fail instead of spinning the test loop.
+          if (requests > 1) return jsonResponse({ choices: [{ message: { content: 'Counterexample settled.' }, finish_reason: 'stop' }], usage });
+          if (transport === 'json') return jsonResponse({ choices: [{ message: { content: 'Preparing changes.', tool_calls: calls }, finish_reason: 'tool_calls' }], usage });
+          return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Preparing changes.',
+            tool_calls: calls.map((call, index) => ({ ...call, index })) }, finish_reason: 'tool_calls' }], usage })}\n\ndata: [DONE]\n\n`,
+          { headers: { 'content-type': 'text/event-stream' } });
+        } });
+        const events: string[] = [];
+        const produced = await runAgentLoop([{ role: 'user', content: 'Update both files' }], [], {
+          streamStep: (messages, signal) => step(messages, signal, {}, { allowTools: true }),
+          beforeToolCall: async () => { admitted++; return undefined; },
+          tools: [{ name: 'write', execute: async () => { dispatched++; return { output: 'must not run', isError: false }; } }],
+        }, event => { events.push(event.type); }, undefined);
+        expect(requests).toBe(1); expect(admitted).toBe(0); expect(dispatched).toBe(0);
+        expect(events).not.toContain('tool_execution_start');
+        expect(produced.at(-1)).toMatchObject({ stopReason: 'error', errorMessage: 'Provider returned malformed tool calls. No tool calls were executed.' });
+        expect(produced.at(-1)?.tool_calls).toBeUndefined();
+        expect(totalTokens(getSessionUsage(sessionId))).toBe(20);
+      }
+    }
+  });
+
+  it.each(['anthropic-signed', 'anthropic-redacted', 'bedrock-signed'] as const)(
+    'does not replay signed or opaque reasoning after malformed calls (%s)', async variant => {
+      const endpoint = variant === 'bedrock-signed' ? 'bedrock-converse-stream' : 'anthropic-messages';
+      const sessionId = `malformed-signed-${variant}`; resetSessionUsage(sessionId);
+      const publicText = 'Synthetic public reasoning';
+      const authority = 'SYNTHETIC_FAILED_REPLAY_AUTHORITY';
+      const malformedArgs = '{"path":"second","content":"partial';
+      const encoder = new TextEncoder();
+      const frame = (name: string, payload: unknown): Uint8Array => {
+        const headers: number[] = [];
+        for (const [key, value] of [[":message-type", "event"], [":event-type", name]]) {
+          const k = encoder.encode(key), v = encoder.encode(value);
+          headers.push(k.length, ...k, 7, v.length >> 8, v.length & 255, ...v);
+        }
+        const data = encoder.encode(JSON.stringify(payload));
+        const bytes = new Uint8Array(16 + headers.length + data.length), view = new DataView(bytes.buffer);
+        view.setUint32(0, bytes.length); view.setUint32(4, headers.length); view.setUint32(8, crc32(bytes.subarray(0, 8)));
+        bytes.set(headers, 12); bytes.set(data, 12 + headers.length);
+        view.setUint32(bytes.length - 4, crc32(bytes.subarray(0, bytes.length - 4)));
+        return bytes;
+      };
+      const events = variant === 'bedrock-signed' ? [] : [
+        { type: 'message_start', message: { usage: { input_tokens: 8, output_tokens: 0 } } },
+        { type: 'content_block_start', index: 0, content_block: variant === 'anthropic-redacted'
+          ? { type: 'redacted_thinking', data: authority } : { type: 'thinking', thinking: '' } },
+        ...(variant === 'anthropic-signed' ? [
+          { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: publicText } },
+          { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: authority } },
+        ] : []),
+        { type: 'content_block_stop', index: 0 },
+        { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'complete', name: 'write', input: {} } },
+        { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{"path":"first","content":"complete"}' } },
+        { type: 'content_block_stop', index: 1 },
+        { type: 'content_block_start', index: 2, content_block: { type: 'tool_use', id: 'incomplete', name: 'write', input: {} } },
+        { type: 'content_block_delta', index: 2, delta: { type: 'input_json_delta', partial_json: malformedArgs } },
+        { type: 'content_block_stop', index: 2 },
+        { type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 12 } },
+        { type: 'message_stop' },
+      ];
+      const step = createStepFunction({ ...request, sessionId, provider: { ...request.provider, provider: 'fixture', endpoint },
+        fetchImpl: async () => variant !== 'bedrock-signed'
+          ? new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''), { headers: { 'content-type': 'text/event-stream' } })
+          : new Response(new ReadableStream<Uint8Array>({ start(controller) {
+            controller.enqueue(frame('contentBlockDelta', { contentBlockIndex: 0, delta: { reasoningContent: { text: publicText } } }));
+            controller.enqueue(frame('contentBlockDelta', { contentBlockIndex: 0, delta: { reasoningContent: { signature: authority } } }));
+            for (const [index, args] of ['{"path":"first","content":"complete"}', malformedArgs].entries()) {
+              controller.enqueue(frame('contentBlockStart', { contentBlockIndex: index + 1, start: { toolUse: { toolUseId: `call-${index}`, name: 'write' } } }));
+              controller.enqueue(frame('contentBlockDelta', { contentBlockIndex: index + 1, delta: { toolUse: { input: args } } }));
+            }
+            controller.enqueue(frame('messageStop', { stopReason: 'tool_use' }));
+            controller.enqueue(frame('metadata', { usage: { inputTokens: 8, outputTokens: 12, totalTokens: 20 } }));
+            controller.close();
+          } }), { headers: { 'content-type': 'application/vnd.amazon.eventstream' } }),
+      });
+      let hooks = 0, dispatched = 0;
+      const produced = await runAgentLoop([{ role: 'user', content: 'Update both files' }], [], {
+        streamStep: (messages, signal) => step(messages, signal, {}, { allowTools: true }),
+        beforeToolCall: async () => { hooks++; return undefined; },
+        tools: [{ name: 'write', execute: async () => { dispatched++; return { output: 'must not run', isError: false }; } }],
+      }, () => {}, undefined);
+      const failed = produced.at(-1)!;
+      expect(failed.stopReason).toBe('error'); expect(failed.tool_calls).toBeUndefined();
+      expect(hooks).toBe(0); expect(dispatched).toBe(0);
+      expect(failed.reasoning?.signature).toBeUndefined(); expect(failed.origin?.replayBinding).toBeUndefined();
+      expect(JSON.stringify(produced)).not.toContain(authority);
+      if (variant === 'anthropic-redacted') expect(failed.reasoning).toEqual({ text: '[reasoning withheld by the provider]' });
+      else expect(failed.reasoning).toEqual({ text: publicText });
+      expect(totalTokens(getSessionUsage(sessionId))).toBe(20);
+      const history = toChatMessages([{ role: 'user', content: 'Update both files' }, ...produced,
+        { role: 'user', content: 'Report the failure' }]);
+      const next = endpointTurnBody(endpoint, { model: 'm', provider: 'fixture', systemPrompt: 'brief', messages: history,
+        tools: [], allowTools: false, vision: false, temperature: 0.7, systemRole: 'system', reasoningEffort: false,
+        maxTokensField: 'max_tokens', maxOutputTokens: 2048, assistantAfterToolResult: false });
+      expect(JSON.stringify(next)).not.toMatch(/SYNTHETIC_FAILED_REPLAY_AUTHORITY|"type":"thinking"|redacted_thinking|reasoningContent/);
+    },
+  );
+
+  it("forbids tools on the closing step by not sending them", async () => {
+    // Omitted rather than sent with `tool_choice: "none"`. Both stop the call,
+    // but sending the schemas spends tokens on declarations the model may not
+    // use — and the other protocol omitted them, so the two disagreed about what
+    // a model can even see.
+    let body: { tool_choice?: string; tools?: unknown } = {};
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as { tool_choice?: string; tools?: unknown };
+        return jsonResponse({ choices: [{ message: { content: "final" }, finish_reason: "stop" }] });
+      },
+    });
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: false });
+    expect(body.tool_choice).toBeUndefined();
+    expect(body.tools).toBeUndefined();
+  });
+
+  it("maps a refusal to an error stop reason rather than a finished one", async () => {
+    // A content filter is the provider refusing, not the model finishing. The
+    // refusal has to reach the kernel as an error so the turn stops instead of
+    // treating a refusal as a completed answer.
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () =>
+        jsonResponse({
+          choices: [{ message: { content: "" }, finish_reason: "content_filter" }],
+        }),
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(result.stopReason).toBe("error");
+  });
+
+  it("explains an empty answer instead of inventing one", async () => {
+    // An answer with no content and no refusal reason is the provider saying
+    // nothing, not the provider refusing: the refusal is `content_filter`, which
+    // is an error, while an empty finish is a step to explain rather than a
+    // stop to report as clean.
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () => jsonResponse({ choices: [{ message: { content: "" }, finish_reason: "stop" }] }),
+    });
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+    expect(result.text).toBe("");
+    expect(result.errorMessage).toContain("returned nothing at all");
+    expect(result.stopReason).toBe("stop");
+  });
+
+  it("sends the sampling settings the caller configured", async () => {
+    let body: { temperature?: number; top_p?: number; max_tokens?: number } = {};
+    const step = createStepFunction({
+      ...request,
+      thinkingEffort: null,
+      temperature: 0.2,
+      topP: 0.9,
+      maxOutputTokens: 777,
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as typeof body;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+    expect(body.temperature).toBe(0.2);
+    expect(body.top_p).toBe(0.9);
+    expect(body.max_tokens).toBe(777);
+  });
+
+  it("omits temperature for a shipped reasoning model at automatic effort", async () => {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      provider: { ...request.provider, provider: "openai", model: "gpt-5.3" },
+      catalog: BUILTIN_PROVIDERS,
+      thinkingEffort: null,
+      temperature: 0.2,
+      maxOutputTokens: 777,
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+    expect(body).not.toHaveProperty("temperature");
+    expect(body.max_completion_tokens).toBe(777);
+  });
+
+  it("recognizes overflow markers regardless of provider casing", () => {
+    expect(isContextOverflow("Maximum Context Length exceeded for model m")).toBe(true);
+    expect(isContextOverflow("PROMPT_TOO_LONG: reduce input")).toBe(true);
+    expect(isContextOverflow("context_length_exceeded")).toBe(true);
+    expect(isContextOverflow("rate limited, try again later")).toBe(false);
+  });
+
+  it("reads cache traffic from the OpenAI-compatible shape", async () => {
+    resetSessionUsage("sess_cache_openai");
+    const step = createStepFunction({
+      ...request,
+      sessionId: "sess_cache_openai",
+      fetchImpl: async () =>
+        jsonResponse({
+          choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+          usage: {
+            prompt_tokens: 1_000,
+            completion_tokens: 10,
+            prompt_tokens_details: { cached_tokens: 768 },
+          },
+        }),
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    // Nested under `prompt_tokens_details` on this family of providers. Cache
+    // traffic is per model, so it is read from the bucket for the model that
+    // answered rather than from a session-level field.
+    expect(Object.values(getSessionUsage("sess_cache_openai").byModel)).toMatchObject([{
+      attribution: { provider: '', model: 'm', origin: 'https://provider.test', rates: null },
+      cacheReadTokens: 768, promptTokens: 232,
+    }]);
+    expect(getSessionUsage("sess_cache_openai").lastPromptTokens).toBe(1000);
+    resetSessionUsage("sess_cache_openai");
+  });
+
+  it("reads cache traffic from the Anthropic-shaped fields", async () => {
+    resetSessionUsage("sess_cache_anthropic");
+    const step = createStepFunction({
+      ...request,
+      sessionId: "sess_cache_anthropic",
+      fetchImpl: async () =>
+        jsonResponse({
+          choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+          usage: {
+            prompt_tokens: 1_000,
+            completion_tokens: 10,
+            cache_read_input_tokens: 512,
+            cache_creation_input_tokens: 256,
+          },
+        }),
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    const usage = getSessionUsage("sess_cache_anthropic");
+    expect(Object.values(usage.byModel)).toMatchObject([{
+      attribution: { provider: '', model: 'm', origin: 'https://provider.test', rates: null },
+      cacheReadTokens: 512, cacheWriteTokens: 256, promptTokens: 1000, totalTokens: 1778,
+    }]);
+    expect(usage.lastPromptTokens).toBe(1768);
+    resetSessionUsage("sess_cache_anthropic");
+  });
+
+  it("records no cache traffic when the provider reports none", async () => {
+    resetSessionUsage("sess_cache_none");
+    const step = createStepFunction({
+      ...request,
+      sessionId: "sess_cache_none",
+      fetchImpl: async () =>
+        jsonResponse({
+          choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 1_000, completion_tokens: 10 },
+        }),
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    const usage = getSessionUsage("sess_cache_none");
+    expect(Object.values(usage.byModel)).toMatchObject([{
+      attribution: { provider: '', model: 'm', origin: 'https://provider.test', rates: null },
+      cacheReadTokens: 0, cacheWriteTokens: 0,
+    }]);
+    resetSessionUsage("sess_cache_none");
+  });
+
+  it("asks again after a transient refusal and keeps the successful answer", async () => {
+    let calls = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            ok: false,
+            status: 503,
+            headers: new Headers(),
+            text: async () => "service unavailable",
+          } as unknown as Response;
+        }
+        return jsonResponse({ choices: [{ message: { content: "recovered" }, finish_reason: "stop" }] });
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(calls).toBe(2);
+    expect(result.stopReason).toBe("stop");
+    expect(result.text).toBe("recovered");
+  });
+
+  it("stops at the configured count instead of asking forever", async () => {
+    let calls = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        calls += 1;
+        return {
+          ok: false,
+          status: 500,
+          headers: new Headers(),
+          text: async () => "server error",
+        } as unknown as Response;
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    // The first attempt plus two retries.
+    expect(calls).toBe(3);
+    expect(result.stopReason).toBe("error");
+  });
+
+  it("does not ask again when the request itself was rejected", async () => {
+    let calls = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        calls += 1;
+        return {
+          ok: false,
+          status: 400,
+          headers: new Headers(),
+          text: async () => "bad request",
+        } as unknown as Response;
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(calls).toBe(1);
+    expect(result.errorMessage).toContain("400");
+  });
+
+  it("records what kind of failure a rejected request was", async () => {
+    // The message alone is prose every provider words differently, so nothing
+    // downstream can act on it without matching text. The class is the part
+    // that distinguishes an expired credential from an exhausted quota.
+    const cases: Array<[number, string, string]> = [
+      [401, "unauthorized", "provider_auth"],
+      [403, "forbidden", "provider_auth"],
+      [429, "slow down", "provider_rate_limited"],
+      [500, "server error", "provider_endpoint"],
+    ];
+
+    for (const [status, body, expected] of cases) {
+      const step = createStepFunction({
+        ...request,
+        fetchImpl: async () =>
+          ({
+            ok: false,
+            status,
+            headers: new Headers(),
+            text: async () => body,
+          }) as unknown as Response,
+      });
+
+      const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+      expect(result.failureClass, `status ${status}`).toBe(expected);
+      expect(result.errorMessage).toContain(`Provider HTTP ${status}: ${expected}`);
+      expect(result.errorMessage).not.toContain(body);
+    }
+  });
+
+  it("records a safety block as its own class rather than a status", async () => {
+    // A content filter arrives with whatever status the provider chose, so the
+    // class cannot be derived from the status alone.
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () =>
+        ({
+          ok: false,
+          status: 400,
+          headers: new Headers(),
+          text: async () => '{"error":{"type":"content_filter","message":"blocked"}}',
+        }) as unknown as Response,
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(result.failureClass).toBe("provider_safety_block");
+  });
+
+  it("withholds private transport detail when no structured cause is known", async () => {
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () => {
+        throw new Error("socket hang up");
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(result.failureClass).toBeUndefined();
+    expect(result.errorMessage).toBe("Network error: request failed. Details withheld.");
+  });
+
+  it("waits the delay the server asked for", async () => {
+    const started = Date.now();
+    let calls = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 1, baseDelayMs: 10_000, maxDelayMs: 10_000 },
+      fetchImpl: async () => {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            ok: false,
+            status: 429,
+            headers: new Headers({ "retry-after": "0.05" }),
+            text: async () => "rate limited",
+          } as unknown as Response;
+        }
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    const elapsed = Date.now() - started;
+    // The server said 50ms; the local backoff would have been ten seconds.
+    expect(elapsed).toBeGreaterThanOrEqual(40);
+    expect(elapsed).toBeLessThan(5_000);
+  });
+
+  it("does not retry an overflow, which is answered by condensing", async () => {
+    let calls = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        calls += 1;
+        return {
+          ok: false,
+          status: 400,
+          headers: new Headers(),
+          text: async () => JSON.stringify({ error: { code: "context_length_exceeded" } }),
+        } as unknown as Response;
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(calls).toBe(1);
+    expect(result.errorMessage?.startsWith(CONTEXT_OVERFLOW_PREFIX)).toBe(true);
+  });
+
+  it("shapes the request the way the catalog says this model wants it", async () => {
+    // The catalog could describe a model's window and price but not how to talk
+    // to it, so an endpoint that refuses `developer` or only accepts
+    // `max_completion_tokens` failed on an otherwise correct request.
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "step-shape-"));
+    try {
+      fs.mkdirSync(path.join(workspace, ".agents"));
+      writeProjectState(workspace, { thinkingEffort: "high" });
+      let body: Record<string, unknown> = {};
+      const step = createStepFunction({
+        ...request,
+        workspaceRoot: workspace,
+        maxOutputTokens: 4096,
+        catalog: [
+          {
+            id: "vendor",
+            label: "Vendor",
+            runtime: "openai-compatible",
+            auth: "api-key",
+            models: [
+              {
+                id: "m",
+                contextWindow: 128_000,
+                thinkingLevelMap: { high: "xhigh" },
+                compat: {
+                  systemRole: "developer",
+                  maxTokensField: "max_completion_tokens",
+                  assistantAfterToolResult: true,
+                },
+              },
+            ],
+          },
+        ],
+        fetchImpl: async (_url, init) => {
+          body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+          return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+        },
+      });
+
+      await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+      const messages = body.messages as Array<{ role: string }>;
+      expect(messages[0]?.role).toBe("developer");
+      expect(body.max_completion_tokens).toBe(4096);
+      expect(body.max_tokens).toBeUndefined();
+      // The model's own name for the level, not the level's name.
+      expect(body.reasoning_effort).toBe("xhigh");
+    } finally {
+      fs.rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it("sends the model's own ceiling when the run set none", async () => {
+    // The ceiling is a property of the model: a value that fits one is truncated
+    // by another. The run-wide setting wins when it is set; when it is not, the
+    // catalog's value is what the request falls back to.
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      maxOutputTokens: undefined,
+      catalog: [
+        {
+          id: "vendor",
+          label: "Vendor",
+          runtime: "openai-compatible",
+          auth: "api-key",
+          models: [{ id: "m", contextWindow: 128_000, maxTokens: 16_384 }],
+        },
+      ],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(body.max_tokens).toBe(16_384);
+  });
+
+  it("lets the run's ceiling win over the model's", async () => {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      maxOutputTokens: 777,
+      catalog: [
+        {
+          id: "vendor",
+          label: "Vendor",
+          runtime: "openai-compatible",
+          auth: "api-key",
+          models: [{ id: "m", contextWindow: 128_000, maxTokens: 16_384 }],
+        },
+      ],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(body.max_tokens).toBe(777);
+  });
+
+  it("bridges tool results when the model requires an assistant turn between them", async () => {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      catalog: [
+        {
+          id: "vendor",
+          label: "Vendor",
+          runtime: "openai-compatible",
+          auth: "api-key",
+          models: [{ id: "m", contextWindow: 1_000, compat: { assistantAfterToolResult: true } }],
+        },
+      ],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step(
+      [
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [{ id: "c1", type: "function", function: { name: "read", arguments: "{}" } }],
+        },
+        { role: "tool", tool_call_id: "c1", content: "file!" },
+        { role: "user", content: "and now?" },
+      ] as never,
+      undefined,
+      {},
+      { allowTools: true },
+    );
+
+    const roles = (body.messages as Array<{ role: string }>).map((message) => message.role);
+    const toolIndex = roles.indexOf("tool");
+    expect(roles[toolIndex + 1]).toBe("assistant");
+    expect(roles[toolIndex + 2]).toBe("user");
+  });
+
+  it("keeps the request unchanged for a model the catalog does not describe", async () => {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      maxOutputTokens: 2048,
+      catalog: [],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    const messages = body.messages as Array<{ role: string }>;
+    expect(messages[0]?.role).toBe("system");
+    expect(body.max_tokens).toBe(2048);
+    expect(body.max_completion_tokens).toBeUndefined();
+  });
+
+  it("still drops reasoning_effort when the host refuses it", async () => {
+    // The refusal is not a transient failure, so it must not be retried with the
+    // same field; the request is rebuilt without it instead. The level has to be
+    // set for the field to be sent at all, so this runs in its own workspace.
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "step-effort-"));
+    try {
+      fs.mkdirSync(path.join(workspace, ".agents"));
+      writeProjectState(workspace, { thinkingEffort: "high" });
+      const bodies: string[] = [];
+      const step = createStepFunction({
+        ...request,
+        workspaceRoot: workspace,
+        retry: { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+        fetchImpl: async (_url, init) => {
+          bodies.push(String(init?.body ?? ""));
+          if (bodies.length === 1) {
+            return {
+              ok: false,
+              status: 400,
+              headers: new Headers(),
+              text: async () => "unsupported parameter: reasoning_effort",
+            } as unknown as Response;
+          }
+          return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+        },
+      });
+
+      const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0]).toContain("reasoning_effort");
+      expect(bodies[1]).not.toContain("reasoning_effort");
+      expect(result.stopReason).toBe("stop");
+    } finally {
+      fs.rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Bedrock catalog capability routing", () => {
+  it.each([true, false])("routes binary event streams and requires completion %s", async (complete) => {
+    const frame = (name: string, payload: unknown): Uint8Array => {
+      const encoder = new TextEncoder();
+      const headers: number[] = [];
+      for (const [key, value] of [[":message-type", "event"], [":event-type", name]]) {
+        const k = encoder.encode(key); const v = encoder.encode(value);
+        headers.push(k.length, ...k, 7, v.length >> 8, v.length & 255, ...v);
+      }
+      const data = encoder.encode(JSON.stringify(payload));
+      const bytes = new Uint8Array(16 + headers.length + data.length);
+      const view = new DataView(bytes.buffer);
+      view.setUint32(0, bytes.length); view.setUint32(4, headers.length);
+      view.setUint32(8, crc32(bytes.subarray(0, 8)));
+      bytes.set(headers, 12); bytes.set(data, 12 + headers.length);
+      view.setUint32(bytes.length - 4, crc32(bytes.subarray(0, bytes.length - 4)));
+      return bytes;
+    };
+    let calls = 0;
+    const fragments: string[] = [];
+    const step = createStepFunction({
+      ...request,
+      provider: { ...request.provider, endpoint: "bedrock-converse-stream" },
+      retry: { enabled: true, maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        calls++;
+        return new Response(new ReadableStream({ start(controller) {
+          controller.enqueue(frame("contentBlockDelta", { contentBlockIndex: 0, delta: { text: "visible" } }));
+          if (complete) controller.enqueue(frame("messageStop", { stopReason: "end_turn" }));
+          controller.close();
+        } }), { headers: { "content-type": "application/vnd.amazon.eventstream" } });
+      },
+    });
+    const result = await step([{ role: "user", content: "hi" }], undefined, { onText: (text) => fragments.push(text) }, { allowTools: false });
+    expect(calls).toBe(1);
+    expect(fragments).toEqual(["visible"]);
+    expect(result.stopReason).toBe(complete ? "stop" : "error");
+    if (!complete) expect(result.errorMessage).toContain("stream ended");
+  });
+
+  it.each([false, true])("honors catalog vision %s and the selected output ceiling", async (vision) => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "step-bedrock-"));
+    try {
+      fs.mkdirSync(path.join(workspace, ".agents"));
+      writeProjectState(workspace, { thinkingEffort: "high" });
+      let body: Record<string, unknown> = {};
+      const step = createStepFunction({
+        ...request,
+        workspaceRoot: workspace,
+        provider: { ...request.provider, provider: "bedrock", endpoint: "bedrock-converse-stream" },
+        maxOutputTokens: 4096,
+        catalog: [{
+          id: "bedrock", label: "Bedrock", runtime: "openai-compatible", auth: "api-key",
+          models: [{ id: "m", contextWindow: 128000, maxTokens: 8192, vision, reasoning: true }],
+        }],
+        fetchImpl: async (_url, init) => {
+          body = JSON.parse(String(init?.body));
+          return jsonResponse({ output: { message: { content: [{ text: "ok" }] } } });
+        },
+      });
+      const result = await step([{ role: "user", content: [
+        { type: "text", text: "look at this" },
+        { type: "image", mimeType: "image/png", data: "aW1hZ2U=" },
+      ] }], undefined, {}, { allowTools: false });
+      expect(result.stopReason).toBe("stop");
+      expect(body.inferenceConfig).toEqual({ maxTokens: 4096 });
+      expect(body.additionalModelRequestFields).toEqual({ thinking: { type: "enabled", budget_tokens: 3072 } });
+      expect(body.messages).toEqual([{ role: "user", content: [
+        { text: "look at this" },
+        vision ? { image: { format: "png", source: { bytes: "aW1hZ2U=" } } }
+          : { text: "[Image: image/png (0KB) - non-vision fallback]" },
+      ] }]);
+    } finally {
+      fs.rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("speaking a second endpoint", () => {
+  /** An answer in the second endpoint's own event format. */
+  function anthropicSse(text: string): Response {
+    const frames = [
+      `event: message_start\ndata: ${JSON.stringify({ type: "message_start", message: { usage: { input_tokens: 9 } } })}\n\n`,
+      `event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } })}\n\n`,
+      `event: message_delta\ndata: ${JSON.stringify({ type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 4 } })}\n\n`,
+      `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`,
+    ].join("");
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(frames));
+        controller.close();
+      },
+    });
+    return {
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body,
+      text: async () => "",
+      json: async () => ({}),
+    } as unknown as Response;
+  }
+
+  it("posts to the endpoint's own path with its own body", async () => {
+    // The whole reason a second endpoint exists: the default path and body are
+    // rejected by this host, so a request built in the default shape cannot
+    // succeed however correct the rest of it is.
+    let seenUrl = "";
+    let seenBody: Record<string, unknown> = {};
+    let seenHeaders: Record<string, string> = {};
+    const step = createStepFunction({
+      ...request,
+      provider: {
+        headers: { "x-api-key": "k", "anthropic-version": "2023-06-01" },
+        baseUrl: "https://api.anthropic.test/v1",
+        model: "claude-sonnet-4-5",
+        provider: "anthropic",
+        endpoint: "anthropic-messages",
+      },
+      fetchImpl: async (url, init) => {
+        seenUrl = String(url);
+        seenBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        seenHeaders = (init?.headers ?? {}) as Record<string, string>;
+        return anthropicSse("hello");
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(seenUrl).toBe("https://api.anthropic.test/v1/messages");
+    // The instruction is its own field here, not a message.
+    expect(seenBody.system).toEqual([
+      { type: "text", text: "be brief", cache_control: { type: "ephemeral" } },
+    ]);
+    expect(Array.isArray(seenBody.messages)).toBe(true);
+    expect((seenBody.messages as readonly { role: string }[]).every((m) => m.role !== "system")).toBe(true);
+    expect(typeof seenBody.max_tokens).toBe("number");
+    expect(seenHeaders["x-api-key"]).toBe("k");
+    expect(result.text).toBe("hello");
+  });
+
+  it("reads usage from both halves of that endpoint's stream", async () => {
+    // The input side arrives on the first event and the output side later, so a
+    // reader that took one of them would report a prompt size of zero.
+    resetSessionUsage("sess_step_anthropic");
+    const step = createStepFunction({
+      ...request,
+      sessionId: "sess_step_anthropic",
+      provider: {
+        headers: { "x-api-key": "k" },
+        baseUrl: "https://api.anthropic.test/v1",
+        model: "claude-sonnet-4-5",
+        provider: "anthropic",
+        endpoint: "anthropic-messages",
+      },
+      fetchImpl: async () => anthropicSse("ok"),
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    const usage = getSessionUsage("sess_step_anthropic");
+    const bucket = Object.values(usage.byModel)[0];
+    expect(bucket?.promptTokens).toBe(9);
+    expect(bucket?.completionTokens).toBe(4);
+  });
+
+  it("still uses the default path when no endpoint is declared", async () => {
+    // The default has to stay exactly as it was: every provider that worked
+    // before declares no endpoint, so the branch must not change their request.
+    let seenUrl = "";
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async (url) => {
+        seenUrl = String(url);
+        return jsonResponse({ choices: [{ message: { content: "hi" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
+
+    expect(seenUrl).toBe("https://provider.test/v1/chat/completions");
+  });
+  /**
+   * The claim the protocol registry exists to make, measured where it counts.
+   *
+   * A protocol declared from this file — not shipped, not named anywhere in
+   * `src/` — is driven through the real step function by naming it in the
+   * catalog. Nothing in the turn loop was edited to allow that: `step.ts` asks
+   * the registry for the body and the registry has never heard of this kind
+   * except from this file's own declaration. If the payload were still built from
+   * a branch on the kind, this request would go out as the default shape and the
+   * assertion below would fail on the body it received.
+   */
+  it("sends a protocol it has never heard of through the same path", async () => {
+    const STUB = "test-turn-protocol";
+    declareEndpoint(STUB, {
+      path: () => "/stub-turn",
+      headers: () => ({ "x-stub": "1" }),
+      body: () => ({}),
+      turnBody: (input) => ({ stub_turn: input.model, stub_tools: input.tools.length }),
+      readBody: () => ({ choices: [{ message: { content: "from the stub" } }] }),
+      readStream: () => {
+        throw new Error("the stub does not stream");
+      },
+    });
+
+    let url = "";
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      provider: { apiKey: "k", baseUrl: "https://provider.test/v1", model: "m", endpoint: STUB },
+      catalog: [
+        { id: "stub-vendor", label: "Stub", runtime: "openai-compatible", auth: "api-key", models: [{ id: "m" }] },
+      ],
+      fetchImpl: async (sentUrl, init) => {
+        url = String(sentUrl);
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    // The resource is the stub's, so the registry answered the URL question too.
+    expect(url).toBe("https://provider.test/v1/stub-turn");
+    expect(body).toEqual({ stub_turn: "m", stub_tools: 0 });
+    expect(result.stopReason).toBe("stop");
+  });
+
+  /**
+   * A name the build does not speak comes from a file a person edited, so the
+   * step has to say which name and which kinds exist. An uncaught throw here
+   * would leave the turn through the loop's retry wrapper — which does not catch
+   * it — and reach the user as a crash that never mentions the file.
+   */
+  it("reports an endpoint kind nobody declared instead of crashing", async () => {
+    const step = createStepFunction({
+      ...request,
+      provider: { apiKey: "k", baseUrl: "https://provider.test/v1", model: "m", endpoint: "not-a-kind" },
+      catalog: [
+        { id: "v", label: "V", runtime: "openai-compatible", auth: "api-key", models: [{ id: "m" }] },
+      ],
+      fetchImpl: async () => {
+        throw new Error("no request should have been sent");
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toContain("not-a-kind");
+    // And it names the kinds that do exist, which is the part that makes the
+    // message actionable rather than merely accurate.
+    expect(result.errorMessage).toContain("openai-compatible");
+  });
+
+});
+
+describe("the last step a run may act on", () => {
+  /** A tool the model may call, so the notice has something to withdraw. */
+  const TOOL_FOR_THE_NOTICE = [{
+    type: "function" as const,
+    function: { name: "read", description: "read a file", parameters: { type: "object", properties: {} } },
+  }];
+
+  async function bodyFor(allowTools: boolean, tools = request.tools): Promise<Record<string, unknown>> {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      tools,
+      fetchImpl: async (_url: string | URL, init?: RequestInit) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" } }] });
+      },
+    });
+    await step([{ role: "user", content: "do the thing" }], undefined, {}, { allowTools });
+    return body;
+  }
+
+  it("says so when the tools have been withdrawn", async () => {
+    // Withdrawing the tools is not self-explanatory. A model that sees its tool
+    // list and cannot call from it reads the harness as broken rather than the
+    // budget as reached, and the useful move — answer with what you have — is
+    // one it has to be told to make.
+    const body = await bodyFor(false, TOOL_FOR_THE_NOTICE);
+    const messages = body.messages as Array<{ role: string; content: string }>;
+
+    expect(messages[messages.length - 1]!.content).toMatch(/reached the limit/i);
+    expect(messages[messages.length - 1]!.content).toMatch(/cannot call any more tools/i);
+  });
+
+  it("says nothing of the kind on a run that never had tools", async () => {
+    // A run configured with no tools did not reach a limit; there was no budget
+    // to spend. Telling its model about a withdrawn tool list it never had is a
+    // false statement the model cannot check, and on the protocol that requires
+    // turns to alternate it also appends a second user turn in a row.
+    const body = await bodyFor(false, []);
+    const messages = body.messages as Array<{ role: string; content: string }>;
+
+    expect(JSON.stringify(messages)).not.toMatch(/reached the limit/i);
+  });
+
+  it("says nothing of the kind while tools are still available", async () => {
+    const body = await bodyFor(true, TOOL_FOR_THE_NOTICE);
+    const messages = body.messages as Array<{ role: string; content: string }>;
+
+    expect(JSON.stringify(messages)).not.toMatch(/reached the limit/i);
+  });
+
+  it("sends no tool list on that step either", async () => {
+    // The notice and the withdrawal travel together: a notice about tools the
+    // request still carries would contradict the request.
+    const body = await bodyFor(false);
+
+    expect(body).not.toHaveProperty("tools");
+  });
+});
+  it("does not retry a stream after the provider accepted the request", async () => {
+    let attempts = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        attempts += 1;
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.error(new Error("socket hang up"));
+          },
+        });
+        return new Response(body, { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+    expect(attempts).toBe(1);
+    expect(result.stopReason).toBe("error");
+    expect(result.retriesExhausted).toBe(true);
+  });
+
+  it("does not retry a stream that already showed reasoning, only one that showed nothing", async () => {
+    // A thinking model streams its reasoning before any text. Once the user has
+    // read reasoning, a retry would re-emit it — the same argument as retrying
+    // after text, and it is guarded for the same reason.
+    let attempts = 0;
+    const seen: string[] = [];
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        attempts += 1;
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            const encode = (text: string) => new TextEncoder().encode(text);
+            controller.enqueue(
+              encode(`data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: "thinking hard" } }] })}\n\n`),
+            );
+            setTimeout(() => controller.error(new Error("socket hang up")), 5);
+          },
+        });
+        return new Response(body, { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    const result = await step(
+      [{ role: "user", content: "hi" }],
+      undefined,
+      {
+        onText: (delta) => seen.push(delta),
+        onReasoning: (delta) => seen.push(delta),
+      },
+      { allowTools: true },
+    );
+    expect(attempts).toBe(1);
+    expect(result.stopReason).toBe("error");
+    expect(seen).toEqual(["thinking hard"]);
+  });
+
+
+it.each(["refusal", "guardrail_intervened", "content_filter", "safety", "recitation"])("explains %s as a refusal", (reason) => {
+  expect(emptyAnswerExplanation(reason, 0)).toContain("withheld");
+  expect(emptyAnswerExplanation(reason, 20)).not.toContain("/connect");
+});
+
+
+it.each(["SAFETY", "RECITATION", "PROHIBITED_CONTENT"])("keeps Google %s refusal guidance through JSON and SSE", async (finishReason) => {
+  for (const stream of [false, true]) {
+    const body = { candidates: [{ content: { parts: [] }, finishReason }] };
+    const step = createStepFunction({ ...request, provider: { ...request.provider, endpoint: "google-generative-ai" }, fetchImpl: async () =>
+      stream ? new Response(`data: ${JSON.stringify(body)}\n\n`, { headers: { "content-type": "text/event-stream" } }) : jsonResponse(body),
+    });
+    const result = await step([], undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toContain("withheld");
+    expect(result.errorMessage).not.toContain("/connect");
+  }
+});
+
+
+it("never retries a streamed safety rejection even when its detail mentions a network", async () => {
+  let requests = 0;
+  const step = createStepFunction({ ...request,
+    provider: { ...request.provider, endpoint: "google-generative-ai" },
+    retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+    fetchImpl: async () => {
+      requests++;
+      return new Response(`data: ${JSON.stringify({ promptFeedback: { blockReason: "SAFETY", blockReasonMessage: "Network access blocked by safety rules" } })}\n\n`, { headers: { "content-type": "text/event-stream" } });
+    },
+  });
+  const result = await step([], undefined, {}, { allowTools: true });
+  expect(result.stopReason).toBe("error");
+  expect(requests).toBe(1);
+});
+
+
+it('keeps a captured legacy effort across project edits, retries and later steps', async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'effort-capture-'));
+  fs.mkdirSync(path.join(workspace, '.agents'));
+  try {
+    writeProjectState(workspace, { thinkingEffort: 'low' });
+    const bodies: Record<string, unknown>[] = [];
+    const step = createStepFunction({ ...request, workspaceRoot: workspace,
+      retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        writeProjectState(workspace, { thinkingEffort: 'high' });
+        return bodies.length === 1 ? jsonResponse({}, { ok: false, status: 503 }) : jsonResponse({ choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] });
+      },
+    });
+    await step([], undefined, {}, { allowTools: false });
+    await step([], undefined, {}, { allowTools: false });
+    expect(bodies.map(body => body.reasoning_effort)).toEqual(['low', 'low', 'low']);
+  } finally { fs.rmSync(workspace, { recursive: true, force: true }); }
+});
+
+it('does not silently drop an explicit effort or disclose a rejecting response body', async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const step = createStepFunction({ ...request, thinkingEffort: 'high', fetchImpl: async (_url, init) => {
+    bodies.push(JSON.parse(String(init?.body)));
+    return jsonResponse({ error: 'reasoning_effort unsupported SENSITIVE_SERVER_DETAIL' }, { ok: false, status: 400 });
+  } });
+  const result = await step([], undefined, {}, { allowTools: false });
+  expect(JSON.stringify(result)).toContain('Provider rejected the selected reasoning effort');
+  expect(JSON.stringify(result)).not.toContain('SENSITIVE_SERVER_DETAIL');
+  expect(bodies).toHaveLength(1); expect(bodies[0].reasoning_effort).toBe('high');
+});
+
+it.each([{ reasoning: false }, { compat: { reasoningEffort: false } }, { thinkingLevelMap: { high: null } }])('rejects explicit unsupported effort before HTTP: %j', facts => {
+  let calls = 0;
+  const step = createStepFunction({ ...request, thinkingEffort: 'high', catalog: [{ id: 'vendor', models: [{ id: 'm', ...facts }] }], fetchImpl: async () => { calls++; return jsonResponse({}); } });
+  return step([], undefined, {}, { allowTools: false }).then(result => {
+    expect(JSON.stringify(result)).toContain('does not support'); expect(calls).toBe(0);
+  });
+});
+
+it('sends the mapped explicit level and treats null as provider decides despite legacy fallback', async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'effort-null-'));
+  fs.mkdirSync(path.join(workspace, '.agents'));
+  try {
+    writeProjectState(workspace, { thinkingEffort: 'low' });
+    const bodies: Record<string, unknown>[] = [];
+    for (const thinkingEffort of ['high', null] as const) {
+      const step = createStepFunction({ ...request, workspaceRoot: workspace, thinkingEffort,
+        catalog: [{ id: 'vendor', models: [{ id: 'm', thinkingLevelMap: { high: 'xhigh' } }] }],
+        fetchImpl: async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return jsonResponse({ choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] }); },
+      });
+      await step([], undefined, {}, { allowTools: false });
+    }
+    expect(bodies.map(body => body.reasoning_effort)).toEqual(['xhigh', undefined]);
+  } finally { fs.rmSync(workspace, { recursive: true, force: true }); }
+});
+
+
+it.each(['anthropic-messages', 'bedrock-converse-stream'])('rejects explicit effort with a small %s output cap before HTTP', async endpoint => {
+  let calls = 0;
+  const step = createStepFunction({ ...request, provider: { ...request.provider, endpoint }, thinkingEffort: 'high', maxOutputTokens: 1500,
+    catalog: [{ id: 'vendor', models: [{ id: 'm', reasoning: true }] }], fetchImpl: async () => { calls++; return jsonResponse({}); },
+  });
+  const result = await step([], undefined, {}, { allowTools: false });
+  expect(result.errorMessage).toContain('output limit must be at least 2048'); expect(calls).toBe(0);
+});
+
+it.each(['google-generative-ai', 'google-vertex', 'bedrock-converse-stream'])('carries explicit budget for an unknown custom model over %s', async endpoint => {
+  let body: any;
+  const step = createStepFunction({ ...request, provider: { ...request.provider, endpoint, model: 'custom-unlisted' }, thinkingEffort: 'low', maxOutputTokens: 4096,
+    catalog: [], fetchImpl: async (_url, init) => {
+      body = JSON.parse(String(init?.body));
+      return jsonResponse(endpoint === 'bedrock-converse-stream' ? { output: { message: { role: 'assistant', content: [{ text: 'ok' }] } }, stopReason: 'end_turn' }
+        : { candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }] });
+    },
+  });
+  const result = await step([], undefined, {}, { allowTools: false });
+  expect(result.text).toBe('ok');
+  expect(endpoint === 'bedrock-converse-stream' ? body.additionalModelRequestFields.thinking.budget_tokens : body.generationConfig.thinkingConfig.thinkingBudget).toBe(2048);
+});
+
+it('forwards mid-convo cache preservation flags, anthropic-beta headers, and resolves VirtualModelRegistry in createStepFunction', async () => {
+  const seen: Array<{ url: string; headers: HeadersInit | undefined; body: Record<string, unknown> }> = [];
+  const virtualModels = new VirtualModelRegistry();
+  virtualModels.register({
+    provider: 'virtual',
+    id: 'auto-router',
+    name: 'Auto Router',
+    route: () => ({ provider: 'anthropic', modelId: 'claude-sonnet-4-6', thinkingLevel: 'high' }),
+  });
+  const initialTools = [{ type: 'function' as const, function: { name: 'read', description: 'read file', parameters: { type: 'object' } } }];
+  let activeTools = initialTools;
+  const step = createStepFunction({
+    workspaceRoot: process.cwd(),
+    sessionId: 'step-cache-virtual',
+    systemPrompt: 'sys',
+    provider: { provider: 'virtual', model: 'auto-router', baseUrl: 'https://unused.invalid', headers: {} },
+    resolveTarget: () => ({
+      provider: { provider: 'anthropic', model: 'claude-sonnet-4-6', baseUrl: 'https://api.anthropic.com',
+        endpoint: 'anthropic-messages', headers: {} },
+      fetchImpl: async (url, init) => {
+        seen.push({ url: String(url), headers: init?.headers, body: JSON.parse(String(init?.body)) });
+        return jsonResponse({ id: 'msg_1', type: 'message', role: 'assistant', model: 'claude-sonnet-4-6',
+          content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 2 } });
+      },
+    }),
+    catalog: [{
+      id: 'anthropic',
+      endpoint: 'anthropic-messages',
+      baseUrl: 'https://api.anthropic.com',
+      models: [{
+        id: 'claude-sonnet-4-6',
+        reasoning: true,
+        toolCalling: true,
+        compat: { supportsMidConvoToolChanges: true, supportsMidConvoEffort: true },
+      }],
+    }],
+    tools: initialTools,
+    initialTools,
+    toolSnapshot: () => activeTools,
+    cacheRetention: 'long',
+    virtualModels,
+    fetchImpl: async () => { throw new Error('The original virtual target must not dispatch.'); },
+  });
+  activeTools = [
+    ...initialTools,
+    { type: 'function', function: { name: 'web_search', description: 'search', parameters: { type: 'object' } } },
+  ];
+  const res = await step([{ role: 'user', content: 'hi' }], undefined, {}, { allowTools: true });
+  expect(res.text).toBe('ok');
+  expect(res.origin).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-6', thinkingLevel: 'high' });
+  expect(seen).toHaveLength(1);
+  const reqHeaders = seen[0]!.headers as Record<string, string>;
+  expect(reqHeaders['anthropic-beta']).toBe(
+    'mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01,inline-tools-2026-09-15',
+  );
+  expect(seen[0]!.body.system).toEqual([
+    { type: 'text', text: 'sys', cache_control: { type: 'ephemeral', ttl: '1h' } },
+  ]);
+  expect(seen[0]!.body.tools).toEqual([
+    { name: 'read', description: 'read file', input_schema: { type: 'object' }, cache_control: { type: 'ephemeral', ttl: '1h' } },
+    { type: 'tool_search_tool_bm25_20250305', name: 'tool_search' },
+  ]);
+});

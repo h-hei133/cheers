@@ -1,0 +1,17 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/cli/provider/route.test.ts src/cli/runtime/compaction/virtual.test.ts src/turn/request.test.ts src/core/commands/model/virtual.test.ts src/extensions/runtime/virtual.test.ts --maxWorkers=1 --no-file-parallelism
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/extensions/runtime/virtual.test.ts (24 tests) 741ms
+ ✓ src/cli/provider/route.test.ts (14 tests) 775ms
+ ✓ src/cli/runtime/compaction/virtual.test.ts (15 tests) 1969ms
+   ✓ routes manual summaries once without reading or writing branch routing state  443ms
+ ✓ src/core/commands/model/virtual.test.ts (14 tests) 375ms
+ ✓ src/turn/request.test.ts (12 tests) 48ms
+
+ Test Files  5 passed (5)
+      Tests  79 passed (79)
+   Start at  17:39:09
+   Duration  19.74s (transform 8.15s, setup 0ms, collect 14.79s, tests 3.91s, environment 1ms, prepare 244ms)
+

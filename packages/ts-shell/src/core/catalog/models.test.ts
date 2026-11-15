@@ -165,9 +165,11 @@ it('captures route state without retaining caller data or a then accessor', asyn
   const request = { provider: 'adaptive', modelId: 'auto', thinkingLevel: 'medium' as const, reason: 'user' as const, messages: [] };
   const first = await registry.resolve(request);
   state.count = 8;
-  await registry.resolve(request);
+  await registry.resolve({ ...request, state: first?.state });
   expect(first?.state).toEqual({ count: 1 });
   expect(seen).toEqual([undefined, { count: 1 }]);
+  await registry.resolve(request);
+  expect(seen[2]).toBeUndefined();
 
   let reads = 0;
   const remove = registry.register({ ...definition(), id: 'then', route: () => ({ provider: 'openai', modelId: 'physical',
@@ -178,17 +180,18 @@ it('captures route state without retaining caller data or a then accessor', asyn
   remove();
 });
 
-it('does not let the router change the captured publication reason or cancellation method', async () => {
+it('captures the caller state and reason before routing and retains original cancellation', async () => {
   const registry = new VirtualModelRegistry();
   const controller = new AbortController();
   const request = { provider: 'adaptive', modelId: 'auto', thinkingLevel: 'medium' as const,
     reason: 'user' as 'user' | 'direct', messages: [], signal: controller.signal };
   const route = vi.fn(() => { request.reason = 'direct'; return { provider: 'openai', modelId: 'physical', state: 1 }; });
   registry.register(definition(route));
-  await registry.resolve(request);
+  const first = await registry.resolve(request);
+  expect(route).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'user', state: undefined }));
   request.reason = 'user';
-  await registry.resolve(request);
-  expect(route).toHaveBeenLastCalledWith(expect.objectContaining({ state: 1 }));
+  await registry.resolve({ ...request, state: first?.state });
+  expect(route).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'user', state: 1 }));
   route.mockImplementation(() => {
     controller.signal.throwIfAborted = () => {};
     controller.abort();

@@ -23,6 +23,9 @@ import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
 import { runModelPresetCommand } from './model/presetCommand.js';
 import { providerCredentialBaseUrl } from '../auth/account/target.js';
 import { modelDefaultSource, modelDefaultSourceLine, sessionOwnsModel } from './model/defaultSource.js';
+import { sessionModelCatalog } from '../catalog/models.js';
+import { readLogicalModel } from '../../session/model/logical.js';
+import type { VirtualModelMetadata } from '../models/virtual/contract.js';
 
 
 /**
@@ -107,8 +110,10 @@ function modelConfiguration(context: CommandContext) {
 
 function renderCatalogView(context: CommandContext): string {
   const { config, catalog, active, catalogDiagnostics } = modelConfiguration(context);
-  return renderCatalog({ providers: catalog, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
+  const physical = renderCatalog({ providers: catalog, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
     availability: modelCatalogAvailability(context, { config, catalog, active }) });
+  const virtual = context.sessionId ? sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual : [];
+  return virtual.length ? `${physical}\n\nVirtual models\n${virtual.map(model => `- ${model.provider}/${model.id} (${model.name})`).join('\n')}` : physical;
 }
 
 function modelCatalogAvailability(context: CommandContext, input: Pick<ReturnType<typeof modelConfiguration>, 'config' | 'catalog' | 'active'>) {
@@ -121,6 +126,16 @@ function modelCatalogAvailability(context: CommandContext, input: Pick<ReturnTyp
 
 function renderModelStatus(context: CommandContext): string {
   const { config, catalog, active: request, catalogDiagnostics } = modelConfiguration(context);
+  const logical = readLogicalModel(context.sessionId);
+  if (logical) {
+    const available = Boolean(context.sessionId && sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual
+      .some(model => model.provider === logical.provider && model.id === logical.model));
+    return ['Model selection status', ...catalogDiagnostics, `Model: ${logical.provider}/${logical.model}`,
+      `Thinking effort: ${logical.thinkingEffort ?? 'auto'}`, `Virtual model: ${available ? 'registered' : 'unavailable'}`,
+      'Physical destination and request authentication are resolved per request.',
+      `Saved physical provider: ${config.provider}`, `Saved physical model: ${request.model ?? 'unset'}`,
+      'Use /model use <provider>/<model> to select a model.'].join('\n');
+  }
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -265,6 +280,8 @@ export interface ModelCatalog {
   readonly active?: string;
   /** The list is read locally; network refresh is always an explicit separate action. */
   readonly offline: boolean;
+  readonly virtual?: readonly VirtualModelMetadata[];
+  readonly logical?: { readonly provider: string; readonly model: string };
 }
 
 /**
@@ -272,14 +289,16 @@ export interface ModelCatalog {
  * text. Shares the local catalogue and explicit refresh owner with `/model list` so
  * the two can never offer different models.
  */
-export async function readModelCatalog(refresh = false, sessionId?: string, runtimeConfig?: RuntimeConfig): Promise<ModelCatalog> {
-  const context = { cwd: process.cwd(), sessionId, runtimeConfig };
+export async function readModelCatalog(refresh = false, sessionId?: string, runtimeConfig?: RuntimeConfig, suppliedContext?: CommandContext): Promise<ModelCatalog> {
+  const context = suppliedContext ?? { cwd: process.cwd(), sessionId, runtimeConfig };
   if (refresh) await refreshModels(context);
   const { catalog, active } = modelConfiguration(context);
   const allowed = active.credential?.authMode === 'account-auth' ? providerFacts(active.provider).accountAuthAllowedModels : undefined;
   const binding = catalogProvider(catalog, active.provider, providerCredentialBaseUrl(catalog, active));
   return { provider: active.provider, models: binding.ambiguous ? [] : allowed ?? binding.entry?.models.map(model => model.id) ?? [],
-    active: active.model, offline: true };
+    active: active.model, offline: true,
+    ...(context.sessionId ? { virtual: sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual,
+      logical: readLogicalModel(context.sessionId) } : {}) };
 }
 
 async function refreshModels(context: CommandContext): Promise<string> {
@@ -299,6 +318,16 @@ async function listModels(args: string[], refresh: boolean, context: CommandCont
   let snapshot = modelConfiguration(context);
   const hint = args[0]?.trim();
   const requested = hint ? (snapshot.catalog.some(entry => entry.id === hint) ? hint : normalizeProvider(hint) ?? hint) : undefined;
+  const virtual = context.sessionId ? sessionModelCatalog(context.cwd, context.sessionId, snapshot.catalog).virtual : [];
+  const logical = readLogicalModel(context.sessionId);
+  const virtualProvider = requested ?? logical?.provider;
+  const virtualRows = virtual.filter(model => model.provider === virtualProvider);
+  if (virtualRows.length || virtualProvider === logical?.provider) return [
+    `Virtual models for provider=${virtualProvider}`,
+    'Source: current session extensions',
+    ...virtualRows.map(model => `${logical?.provider === model.provider && logical.model === model.id ? '*' : '-'} ${model.id} (${model.name})`),
+    ...(!virtualRows.length ? ['The selected virtual model is unavailable.'] : []),
+  ].join('\n');
   if (requested && !snapshot.catalog.some(entry => entry.id === requested) && !RUNTIME_PROVIDERS.some(id => id === requested)) {
     return [...snapshot.catalogDiagnostics, 'Unknown provider. Use /model to inspect the catalogue.'].join('\n');
   }

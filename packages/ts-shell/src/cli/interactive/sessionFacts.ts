@@ -10,6 +10,7 @@ import type { StatusFacts } from "../../presentation/tui/chrome/items.js";
 import type { WelcomeState } from "../../presentation/tui/chrome/welcome.js";
 import { estimateSessionCost, getSessionUsage, measuredPromptContext, totalTokens } from "../../observability/usageTelemetry.js";
 import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
+import { readLogicalModel } from '../../session/model/logical.js';
 
 /**
  * Session facts for the status band.
@@ -29,6 +30,8 @@ export function shortenPath(target: string): string {
 
 /** Model identifier selected for requests by this host. */
 export function activeModelName(context: ShellRuntimeContext): string {
+  const logical = readLogicalModel(context.session.id);
+  if (logical) return `${logical.provider}/${logical.model}`;
   const config = context.configuration.current.config;
   const active = context.resolveConfigTarget?.(config, context.session.id)
     ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
@@ -56,6 +59,7 @@ export function readStatusFacts(
   live: LiveStatusFacts = {},
 ): StatusFacts {
   const { config, catalog } = context.configuration.current;
+  const logical = readLogicalModel(context.session.id);
   const active = context.resolveConfigTarget?.(config, context.session.id)
     ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
   let activeBaseUrl = active.baseUrl;
@@ -90,8 +94,8 @@ export function readStatusFacts(
     : measured ? { contextUsed: measured.tokens, contextSource: 'measured' as const }
       : preview ? { contextSource: preview.source } : {};
   return {
-    model: active.model ?? active.provider,
-    provider: active.provider,
+    model: logical ? `${logical.provider}/${logical.model}` : active.model ?? active.provider,
+    provider: logical?.provider ?? active.provider,
     branch: context.gitContext.branch ?? undefined,
     directory: shortenPath(context.projectRoot || path.resolve(".")),
     sessionId: context.session.id,
@@ -103,10 +107,8 @@ export function readStatusFacts(
     openTodos: getSessionTodos(context.session.id).filter((todo) => todo.status !== "done" && todo.status !== "dropped").length,
     // The denominator is the same resolution compaction uses, even when its
     // numerator is unknown after startup, restoration, or context replacement.
-    contextWindow: window.window,
-    contextWindowSource: window.source,
-    contextWarning: window.warning,
-    ...contextFact,
+    ...(logical ? {} : { contextWindow: window.window, contextWindowSource: window.source, contextWarning: window.warning }),
+    ...(logical && !preview ? {} : contextFact),
     ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
     ...(usage.usageHealth ? { usageIncomplete: true } : {}),

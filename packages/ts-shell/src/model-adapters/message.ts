@@ -2,6 +2,7 @@ import type { MultimodalContentBlock } from './multimodal.js';
 import { isRecord } from '../core/values/record.js';
 import type { RequestDeclaration } from '../core/agent/declarations/model.js';
 import { captureRequestDeclaration } from '../core/agent/declarations/codec.js';
+import { THINKING_LEVELS, type ThinkingLevel } from '../core/models/effort.js';
 
 export type MessageContent = string | readonly MultimodalContentBlock[];
 
@@ -27,6 +28,7 @@ export interface MessageOrigin {
   readonly provider?: string;
   readonly model: string;
   readonly replayBinding?: string;
+  readonly thinkingLevel?: ThinkingLevel;
 }
 
 /** Reasoning stays separate from the answer and retains the provider's opaque signature. */
@@ -68,7 +70,8 @@ export function isProviderMessage(value: unknown): value is ProviderMessage {
     && (value.role !== 'tool' || typeof value.tool_call_id === 'string' && value.tool_call_id.length > 0)
     && (origin === undefined || (isRecord(origin) && typeof origin.model === 'string'
       && (origin.provider === undefined || typeof origin.provider === 'string')
-      && (origin.replayBinding === undefined || typeof origin.replayBinding === 'string' && /^[a-f0-9]{64}$/.test(origin.replayBinding))))
+      && (origin.replayBinding === undefined || typeof origin.replayBinding === 'string' && /^[a-f0-9]{64}$/.test(origin.replayBinding))
+      && (origin.thinkingLevel === undefined || THINKING_LEVELS.includes(origin.thinkingLevel as ThinkingLevel))))
     && (reasoning === undefined || (value.role === 'assistant' && isRecord(reasoning) && typeof reasoning.text === 'string'
       && (reasoning.signature === undefined || typeof reasoning.signature === 'string')
       && (reasoning.redacted === undefined || typeof reasoning.redacted === 'boolean')));

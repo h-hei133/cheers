@@ -1,0 +1,15 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/config/constraints.test.ts (36 tests) 780ms
+ ✓ src/cli/provider/route.test.ts (11 tests) 432ms
+ ✓ src/turn/request.test.ts (9 tests) 30ms
+ ✓ src/core/commands/model/virtual.test.ts (13 tests) 299ms
+ ✓ src/core/models/virtualModels.test.ts (3 tests) 3ms
+ ✓ src/sdk/agentSession.test.ts (7 tests) 680ms
+
+ Test Files  6 passed (6)
+      Tests  79 passed (79)
+   Start at  16:24:28
+   Duration  16.15s (transform 6.30s, setup 0ms, collect 12.81s, tests 2.22s, environment 1ms, prepare 251ms)
+

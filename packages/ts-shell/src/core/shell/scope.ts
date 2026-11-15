@@ -3,6 +3,7 @@ import { configurationAdmission, ConfigurationRefusalError, configurationRefusal
 import { scopedRuntimeConfig } from '../../config/scope/projection.js';
 import { constrainRuntimeConfig } from '../../config/constraints.js';
 import { resolveProviderCredential } from './providerCredentials.js';
+import { readLogicalModel } from '../../session/model/logical.js';
 
 /** One explicit operation value; inspecting another path never changes the installation. */
 export function configurationOperation(context: Pick<ShellRuntimeContext, 'configuration' | 'projectRoot' | 'cwd' | 'session'> &
@@ -19,7 +20,7 @@ export function configurationOperation(context: Pick<ShellRuntimeContext, 'confi
   if (config !== publication.config) {
     const target = context.resolveConfigTarget?.(config, context.session.id)
       ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
-    config = constrainRuntimeConfig(config, target, publication.catalog);
+    config = constrainRuntimeConfig(config, readLogicalModel(context.session.id) ? undefined : target, publication.catalog);
     if (!config.configValidation.valid) throw new ConfigurationRefusalError(configurationRefusalCauses({ ...publication, diagnostics: config.configDiagnostics }));
   }
   return { publication, config, admission, identity: Object.freeze({

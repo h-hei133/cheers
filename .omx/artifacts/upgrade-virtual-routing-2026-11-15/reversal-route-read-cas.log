@@ -1,0 +1,44 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/provider/route.test.ts (14 tests | 1 failed | 13 skipped) 119ms
+   ↓ routes the actual provider step to the physical URL and credential without sending to the original provider
+   ↓ keeps an explicit delegated model independent of the foreground logical selection
+   ↓ keeps an explicit delegated role independent of the foreground logical selection
+   ↓ keeps inherited logical delegation while applying its own explicit effort
+   ↓ refuses a physical model outside allowedModels before reservation or HTTP dispatch
+   ↓ refuses a missing physical catalogue provider before reservation or HTTP dispatch
+   ↓ refuses a missing physical catalogue model before reservation or HTTP dispatch
+   ↓ rechecks host admission after delayed routing before reservation or HTTP dispatch
+   ↓ rejects a same-provider connection whose credential changed during routing
+   ↓ rejects a physical profile credential withdrawn during message conversion
+   ↓ routes a logical selection before checking dormant physical scope and credentials
+   ↓ persists accepted route state before compaction and restores it in a new step and fork
+   × refuses a router state race even when the callback returns no replacement state 118ms
+     → expected 'stop' to be 'error' // Object.is equality
+   ↓ does not persist router state when conversion cancels before route acceptance
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  17:35:48
+   Duration  3.86s (transform 2.25s, setup 0ms, collect 3.51s, tests 119ms, environment 0ms, prepare 54ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/provider/route.test.ts > refuses a router state race even when the callback returns no replacement state
+AssertionError: expected 'stop' to be 'error' // Object.is equality
+
+Expected: "error"
+Received: "stop"
+
+ ❯ src/cli/provider/route.test.ts:251:29
+    249|   const result = await createProviderStep(logicalHost(test), new Map()…
+    250|     test.setup.signal, {}, { allowTools: false });
+    251|   expect(result.stopReason).toBe('error'); expect(test.route).toHaveBe…
+       |                             ^
+    252|   expect(read().initial[key]).toBe('2'); expect(test.original.requests…
+    253| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

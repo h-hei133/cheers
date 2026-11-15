@@ -7,6 +7,7 @@ import type { SessionMessage } from '../session/schema/sessionMessage.js';
 import { createStepFunction, type PreparedTurnContext, type StepFunction } from './step.js';
 import { createTurnRequest } from './request.js';
 import { EventChannel } from './stream.js';
+import { VirtualModelRegistry, type ModelRouteRequest } from '../core/models/virtualModels.js';
 
 const marker: StandardAgentMessage = { id: 'declaration', role: 'system', content: '', requestDeclaration: { version: 1,
   target: { provider: 'fixture', model: 'model', endpoint: 'anthropic', replayBinding: 'a'.repeat(64) }, tools: [] } };
@@ -150,4 +151,70 @@ it('prepares a goal closing request from committed history when a declaration re
   expect(converter).toHaveBeenCalledTimes(2);
   expect(persist).not.toHaveBeenCalled();
   expect(core.state.messages.some(message => message.requestDeclaration)).toBe(false);
+});
+
+it('routes outer retries with the actual failed physical target and latest successful response', async () => {
+  const seen: ModelRouteRequest[] = []; let sends = 0;
+  const virtualModels = new VirtualModelRegistry();
+  virtualModels.register({ provider: 'fixture', id: 'automatic', name: 'Automatic', route: request => {
+    seen.push(request); return { provider: 'fixture', modelId: request.reason === 'retry' ? 'recovery' : 'physical' };
+  } });
+  const step = createStepFunction({ provider: { provider: 'fixture', model: 'automatic', headers: {}, baseUrl: 'https://route.invalid/v1' },
+    virtualModels, catalog: [{ id: 'fixture', models: [{ id: 'physical' }, { id: 'recovery' }] }], tools: [], systemPrompt: '',
+    sessionId: 'route-retry', workspaceRoot: process.cwd(), fetchImpl: async () => ++sends === 1
+      ? new Response('private body must not reach routing context', { status: 503 })
+      : new Response(JSON.stringify({ choices: [{ message: { content: 'Recovered' }, finish_reason: 'stop' }] }),
+        { headers: { 'content-type': 'application/json' } }) });
+  const core = new AgentCore({ streamStep: createTurnRequest({ step, sessionId: 'route-retry', maxSteps: 3 },
+    { stepCount: 0 }, new EventChannel<QueryEvent>()), retry: { enabled: true, maxRetries: 1, baseDelayMs: 0 },
+    initialState: { messages: [{ role: 'assistant', content: 'Previous success', stopReason: 'stop', origin: { provider: 'fixture', model: 'physical' } }] } });
+  await core.prompt([{ role: 'user', content: 'Retry if needed' }, { role: 'system', content: 'Trailing instruction' }]);
+  expect(core.state.messages.at(-1)?.content).toBe('Recovered'); expect(sends).toBe(2);
+  expect(seen.map(request => request.reason)).toEqual(['user', 'retry']);
+  expect(seen[0]).toMatchObject({ previous: { provider: 'fixture', modelId: 'physical' } });
+  expect(seen[1]).toMatchObject({ failed: { provider: 'fixture', modelId: 'physical', stopReason: 'error' } });
+  expect(JSON.stringify(seen[1])).not.toContain('private body must not reach routing context');
+});
+
+it.each([false, true])('routes an implicit-effort retry with its latest dispatched failure over outer context %s', async olderFailure => {
+  const seen: ModelRouteRequest[] = [], sent: Record<string, unknown>[] = [];
+  const virtualModels = new VirtualModelRegistry();
+  virtualModels.register({ provider: 'fixture', id: 'automatic', name: 'Automatic', route: request => {
+    seen.push(request);
+    return { provider: 'fixture', modelId: request.reason === 'retry' && request.failed?.modelId === 'physical' ? 'recovery' : 'physical' };
+  } });
+  const step = createStepFunction({ provider: { provider: 'fixture', model: 'automatic', headers: {}, baseUrl: 'https://route.invalid/v1' },
+    virtualModels, catalog: [{ id: 'fixture', models: [{ id: 'physical' }, { id: 'recovery' }, { id: 'older' }] }], tools: [], systemPrompt: '',
+    thinkingEffort: 'low', thinkingEffortExplicit: false, sessionId: 'route-effort-retry', workspaceRoot: process.cwd(),
+    fetchImpl: async (_input, init) => {
+      sent.push(JSON.parse(String(init?.body)));
+      return sent.length === 1 ? new Response('reasoning_effort PRIVATE_RESPONSE_BODY', { status: 400 })
+        : new Response(JSON.stringify({ choices: [{ message: { content: 'Recovered' }, finish_reason: 'stop' }] }),
+          { headers: { 'content-type': 'application/json' } });
+    } });
+  const result = await step([{ role: 'user', content: 'Recover from unsupported implicit effort.' }], undefined, {}, {
+    allowTools: false,
+    ...(olderFailure ? { routeReason: 'retry', failedRoute: { provider: 'fixture', modelId: 'older', stopReason: 'error' } } : {}),
+  });
+  expect(seen).toHaveLength(2);
+  expect(seen[1]).toMatchObject({ reason: 'retry', failed: { provider: 'fixture', modelId: 'physical', thinkingLevel: 'low', stopReason: 'error' } });
+  expect(JSON.stringify(seen)).not.toContain('PRIVATE_RESPONSE_BODY');
+  expect(sent.map(body => body.model)).toEqual(['physical', 'recovery']);
+  expect(sent[1]?.reasoning_effort).toBeUndefined();
+  expect(result).toMatchObject({ stopReason: 'stop', origin: { provider: 'fixture', model: 'recovery' } });
+});
+
+it('does not reuse the previous dispatch marker when routing the effort retry itself fails', async () => {
+  let sends = 0;
+  const virtualModels = new VirtualModelRegistry();
+  virtualModels.register({ provider: 'fixture', id: 'automatic', name: 'Automatic', route: request => {
+    if (request.reason === 'retry') throw new Error('The route is unavailable.');
+    return { provider: 'fixture', modelId: 'physical' };
+  } });
+  const step = createStepFunction({ provider: { provider: 'fixture', model: 'automatic', headers: {}, baseUrl: 'https://route.invalid/v1' },
+    virtualModels, catalog: [{ id: 'fixture', models: [{ id: 'physical' }] }], tools: [], systemPrompt: '',
+    thinkingEffort: 'low', thinkingEffortExplicit: false, sessionId: 'route-effort-refusal', workspaceRoot: process.cwd(),
+    fetchImpl: async () => { sends++; return new Response('reasoning_effort unsupported', { status: 400 }); } });
+  const result = await step([{ role: 'user', content: 'The retry route will fail.' }], undefined, {}, { allowTools: false });
+  expect(sends).toBe(1); expect(result.stopReason).toBe('error'); expect(result.routeAttempt).toBeUndefined();
 });

@@ -1,0 +1,4 @@
+{
+  "failure": "build-input-generation",
+  "reason": "The launcher correctly refused a build after the VM UI test assertion changed. No CLI provider dispatch occurred. Production bytes were unchanged; a current build is required for launcher evidence."
+}

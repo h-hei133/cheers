@@ -12,6 +12,7 @@ import { configurationApplicationNotice, readFreshConfiguration } from '../confi
 import { selectedModelMatches, selectionRequest } from './target.js';
 import { providerCredentialBaseUrl } from '../../auth/account/target.js';
 import { providerBindingAvailable } from '../../auth/binding.js';
+import { sessionVirtualModels } from '../../catalog/models.js';
 
 /** Publish a small session preference through the same active identity and CAS fences. */
 export function publishModelPreference(context: CommandContext, update: (selection: SessionModelSelection, catalog: readonly CatalogProvider[], baseUrl?: string) => SessionModelSelection): string | undefined {
@@ -23,6 +24,20 @@ export function publishModelPreference(context: CommandContext, update: (selecti
     const publication = context.readConfiguration?.();
     const config = publication?.config ?? context.runtimeConfig ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
     const catalog = publication?.catalog ?? loadCatalog();
+    if (selection?.virtualModel) {
+      if (!baseline.projectRoot || path.resolve(baseline.projectRoot) !== path.resolve(root) || context.admission?.()) {
+        return 'Session, workspace or model identity changed. Reopen the model settings.';
+      }
+      const definition = sessionVirtualModels(context.cwd, context.sessionId).find(model => model.provider === selection.virtualModel!.provider && model.id === selection.virtualModel!.model);
+      const next = update(selection, catalog);
+      const independent = { ...selection, skillful: next.skillful };
+      if (next.contextWindow === undefined) delete independent.contextWindow;
+      if (!sameValue(independent, next)) return 'This preference requires a physical model. Select one before changing it.';
+      writeSessionModel(context.sessionId, next, baseline, () => !context.admission?.() && !context.signal?.aborted
+        && (!definition || sessionVirtualModels(context.cwd, context.sessionId!).includes(definition)));
+      if (!sameValue(readSessionModel(context.sessionId), next)) return 'Preference publication is unverified; inspect the session before retrying.';
+      return configurationApplicationNotice(context);
+    }
     if (!selection || !baseline.projectRoot || path.resolve(baseline.projectRoot) !== path.resolve(root)
       || !selectedModelMatches(config, selection) || context.admission?.()) {
       return 'Session, workspace or active model identity changed. Select the current connection and model again.';

@@ -29,10 +29,22 @@ export interface ProviderModelTarget {
 
 export type SessionModelTarget = SessionModelRole | ProviderModelTarget;
 
-/** Preferences contain no credential; legacy named selections keep their original scope. */
-export type SessionModelSelection = (ProviderModelTarget | (SessionModelRole & {
+export interface SessionVirtualModelSelection {
+  readonly provider: string;
+  readonly model: string;
+  readonly thinkingEffort?: ThinkingPreference;
+}
+
+/** Physical authority remains present even when a logical choice has no physical default. */
+type SessionModelAuthority = Omit<ProviderModelTarget, 'model'> | (Omit<SessionModelRole, 'model'> & {
   readonly connectionScope?: 'session';
-})) & {
+});
+
+/** Preferences contain no credential; legacy named selections keep their original scope. */
+export type SessionModelSelection = SessionModelAuthority & (
+  { readonly model: string; readonly virtualModel?: undefined }
+  | { readonly model?: string; readonly virtualModel: SessionVirtualModelSelection }
+) & {
   /** Provider service tier for this session, when the active model advertises it. */
   readonly serviceTier?: string;
   readonly presets?: Readonly<Record<string, SessionModelPreset>>;

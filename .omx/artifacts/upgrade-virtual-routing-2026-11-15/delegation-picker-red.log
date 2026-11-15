@@ -1,0 +1,187 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/cli/provider/route.test.ts src/cli/interactive/picker/model/virtual.test.ts -t explicit delegated|inherited logical delegation|non-string inspection --maxWorkers=1 --no-file-parallelism
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/provider/route.test.ts (14 tests | 3 failed | 11 skipped) 214ms
+   ↓ routes the actual provider step to the physical URL and credential without sending to the original provider
+   × keeps an explicit delegated model independent of the foreground logical selection 121ms
+     → expected { Object (text, toolCalls, ...) } to match object { Object (stopReason, origin) }
+(7 matching properties omitted from actual)
+   × keeps an explicit delegated role independent of the foreground logical selection 28ms
+     → Delegated role connection is unavailable.
+   × keeps inherited logical delegation while applying its own explicit effort 64ms
+     → expected "spy" to be called with arguments: [ ObjectContaining{…} ]
+
+Received: 
+
+  1st spy call:
+
+  [
+-   ObjectContaining {
+-     "thinkingLevel": "high",
++   {
++     "messages": [
++       {
++         "content": "Inherit the logical model at the child effort.",
++         "role": "user",
++       },
++     ],
++     "modelId": "auto",
++     "provider": "adaptive",
++     "reason": "user",
++     "signal": AbortSignal {
++       Symbol(kEvents): Map {},
++       Symbol(events.maxEventTargetListeners): 0,
++       Symbol(events.maxEventTargetListenersWarned): false,
++       Symbol(kHandlers): Map {},
++       Symbol(kAborted): false,
++       Symbol(kReason): undefined,
++       Symbol(kComposite): false,
++       Symbol(kDependantSignals): Set {
++         SafeWeakRef {},
++       },
++     },
++     "state": undefined,
++     "thinkingLevel": "low",
+    },
+  ]
+
+
+Number of calls: 1
+
+   ↓ refuses a physical model outside allowedModels before reservation or HTTP dispatch
+   ↓ refuses a missing physical catalogue provider before reservation or HTTP dispatch
+   ↓ refuses a missing physical catalogue model before reservation or HTTP dispatch
+   ↓ rechecks host admission after delayed routing before reservation or HTTP dispatch
+   ↓ rejects a same-provider connection whose credential changed during routing
+   ↓ rejects a physical profile credential withdrawn during message conversion
+   ↓ routes a logical selection before checking dormant physical scope and credentials
+   ↓ persists accepted route state before compaction and restores it in a new step and fork
+   ↓ refuses a router state race even when the callback returns no replacement state
+   ↓ does not persist router state when conversion cancels before route acceptance
+ ❯ src/cli/interactive/picker/model/virtual.test.ts (6 tests | 1 failed | 5 skipped) 27ms
+   × ignores non-string inspection arguments used by object diagnostics 26ms
+     → promise rejected "TypeError: id.startsWith is not a function" instead of resolving
+   ↓ offers virtual picker rows without dormant auth and rejects an action captured before retirement
+   ↓ completes registered identities and refreshes model completion after contribution retirement
+   ↓ refreshes the model observer when virtual registrations change without a configuration revision
+   ↓ retains unavailable saved virtual effort as read-only focus until an explicit supported choice
+   ↓ keeps unavailable saved virtual identity focused when its registration is gone
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/provider/route.test.ts > keeps an explicit delegated model independent of the foreground logical selection
+AssertionError: expected { Object (text, toolCalls, ...) } to match object { Object (stopReason, origin) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "origin": {
+-     "model": "automatic",
+-     "provider": "openai",
++     "model": "physical",
++     "provider": "anthropic",
+    },
+    "stopReason": "stop",
+  }
+
+ ❯ src/cli/provider/route.test.ts:111:18
+    109|   const result = await delegatedSteps(host, new Map(), {})(target)(
+    110|     [{ role: 'user', content: 'Use the explicit delegated target.' }],…
+    111|   expect(result).toMatchObject({ stopReason: 'stop', origin: { provide…
+       |                  ^
+    112|   expect(test.route).not.toHaveBeenCalled();
+    113|   expect(test.original.requests).toHaveLength(1); expect(test.physical…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/cli/provider/route.test.ts > keeps an explicit delegated role independent of the foreground logical selection
+Error: Delegated role connection is unavailable.
+ ❯ delegatedTarget src/cli/provider/target.ts:19:101
+     17|   if (matches.length > 1) throw new Error('Delegated connection is amb…
+     18|   const connection = matches[0];
+     19|   if (typeof target !== 'string' && (!connection || connection.provide…
+       |                                                                                                     ^
+     20|   if (config?.accountPool?.[main.provider] && (connection?.provider ??…
+     21|     throw new Error('Delegated provider is unavailable outside the par…
+ ❯ select src/cli/provider/step.ts:197:9
+ ❯ src/cli/provider/step.ts:222:78
+ ❯ src/cli/provider/route.test.ts:109:58
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/cli/provider/route.test.ts > keeps inherited logical delegation while applying its own explicit effort
+AssertionError: expected "spy" to be called with arguments: [ ObjectContaining{…} ]
+
+Received: 
+
+  1st spy call:
+
+  [
+-   ObjectContaining {
+-     "thinkingLevel": "high",
++   {
++     "messages": [
++       {
++         "content": "Inherit the logical model at the child effort.",
++         "role": "user",
++       },
++     ],
++     "modelId": "auto",
++     "provider": "adaptive",
++     "reason": "user",
++     "signal": AbortSignal {
++       Symbol(kEvents): Map {},
++       Symbol(events.maxEventTargetListeners): 0,
++       Symbol(events.maxEventTargetListenersWarned): false,
++       Symbol(kHandlers): Map {},
++       Symbol(kAborted): false,
++       Symbol(kReason): undefined,
++       Symbol(kComposite): false,
++       Symbol(kDependantSignals): Set {
++         SafeWeakRef {},
++       },
++     },
++     "state": undefined,
++     "thinkingLevel": "low",
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/cli/provider/route.test.ts:127:22
+    125|     [{ role: 'user', content: 'Inherit the logical model at the child …
+    126|   expect(result).toMatchObject({ stopReason: 'stop', origin: { provide…
+    127|   expect(test.route).toHaveBeenCalledWith(expect.objectContaining({ th…
+       |                      ^
+    128|   expect(test.original.requests).toEqual([]);
+    129|   expect(test.physical.requests[0]?.body).toMatchObject({ model: 'phys…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/cli/interactive/picker/model/virtual.test.ts > ignores non-string inspection arguments used by object diagnostics
+AssertionError: promise rejected "TypeError: id.startsWith is not a function" instead of resolving
+ ❯ src/cli/interactive/picker/model/virtual.test.ts:32:55
+     30| it('ignores non-string inspection arguments used by object diagnostics…
+     31|   const picker = modelPicker({ cwd: root, projectRoot: root, sessionId…
+     32|   await expect(picker.inspect!(2 as unknown as string)).resolves.toBeU…
+       |                                                       ^
+     33| });
+     34| 
+
+Caused by: TypeError: id.startsWith is not a function
+ ❯ Object.inspect src/cli/interactive/picker/model.ts:443:26
+ ❯ src/cli/interactive/picker/model/virtual.test.ts:32:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 16 skipped (20)
+   Start at  17:14:50
+   Duration  15.63s (transform 7.14s, setup 0ms, collect 14.87s, tests 241ms, environment 0ms, prepare 107ms)
+

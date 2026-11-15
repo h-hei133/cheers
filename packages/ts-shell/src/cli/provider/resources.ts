@@ -16,11 +16,14 @@ import type { SessionManager } from '../../session/SessionManager.js';
 import { createCacheWarmingRunner, type CacheWarmingRunner } from '../../turn/cacheWarm.js';
 import type { CompactionSetup } from '../../turn/session.js';
 import { cacheRefreshFor } from '../runtime/cache.js';
-import { buildCompactionWiring, nativeCompactionAuthority, type CompactionProvider } from '../runtime/compaction.js';
+import { buildCompactionWiring, routedCompactionWiring, nativeCompactionAuthority, type CompactionProvider } from '../runtime/compaction.js';
 import type { createCompactionProviders } from './compaction.js';
 import { createCompactionMeasurement } from './measurement.js';
 import { withProviderConnections } from '../../provider/request/connection.js';
 import { createProviderConnections } from './connections.js';
+import { readLogicalModel } from '../../session/model/logical.js';
+import { sessionVirtualModels } from '../../core/catalog/models.js';
+import type { SessionVirtualModelSelection } from '../../session/model/contract.js';
 
 interface Resources {
   readonly compaction?: CompactionSetup;
@@ -72,6 +75,10 @@ export function createProviderResources(input: {
     const publication = input.runtimeContext.configuration.current;
     if (publication.admissionBlocked) return 'Configuration must be admitted before provider requests can be sent.';
     try {
+      const logical = readLogicalModel(input.runtimeContext.session.id);
+      if (logical) return sessionVirtualModels(input.runtimeContext.cwd, input.runtimeContext.session.id)
+        .some(model => model.provider === logical.provider && model.id === logical.model)
+        ? undefined : 'The selected virtual model is unavailable. Reload its extension or choose another model.';
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const availability = providers.availability(resolved, publication.catalog, publication.config);
       return availability.available ? undefined : availability.reason;
@@ -106,6 +113,7 @@ export function createProviderResources(input: {
     readonly sessionId: string;
     readonly admission: Admission;
     readonly requestPolicy?: RequestPolicy;
+    readonly virtualModel?: SessionVirtualModelSelection;
     readonly getSourceEntryId: () => string | undefined;
     readonly resources?: (resources: Resources) => Resources;
   }) => {
@@ -118,6 +126,20 @@ export function createProviderResources(input: {
     previousCacheWarming = undefined;
 
     const prepareProviderResources = (resolved: ProviderCredentialResolution) => {
+      if (run.virtualModel) {
+        const setup: CompactionSetup = {
+          ...routedCompactionWiring({ runtimeConfig: config, admission, sessionId, catalog, requestPolicy,
+            convertToLlm: input.runtimeContext.convertToLlm, workspaceRoot: input.runtimeContext.projectRoot,
+            onCredentialPersisted: providers.publication }),
+          authority: nativeCompactionAuthority({ sessionId, workspaceRoot: input.runtimeContext.projectRoot,
+            admission, publication, configuration: input.runtimeContext.configuration, store: input.sessionManager }),
+          onCompact: () => { markContextUnknown(sessionId); recordCount('compaction.runs', 1, {}); },
+          onDeclined: message => input.renderer.renderLine(message),
+          onDeadEnd: message => input.renderer.renderLine(message),
+        };
+        const resources = { compaction: connections.compaction(setup, connectionScope) };
+        return run.resources ? run.resources(resources) : resources;
+      }
       const activeProvider = providers.provider(resolved, catalog);
       measurementScope = undefined;
       if (activeProvider) {

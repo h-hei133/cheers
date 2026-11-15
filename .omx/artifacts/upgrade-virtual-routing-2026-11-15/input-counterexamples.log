@@ -1,0 +1,102 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/virtual-input/packages/ts-shell
+
+ ❯ src/extensions/runtime/virtual.test.ts (18 tests | 8 failed) 511ms
+   × session extension virtual registration > keeps the file route request in the VM realm 47ms
+     → expected { escaped: true } to deeply equal { escaped: false }
+   × session extension virtual registration > keeps the file route messages in the VM realm 10ms
+     → expected { escaped: true } to deeply equal { escaped: false }
+   × session extension virtual registration > keeps the file route message in the VM realm 9ms
+     → expected { escaped: true } to deeply equal { escaped: false }
+   × session extension virtual registration > keeps the file route state in the VM realm 11ms
+     → expected { escaped: true } to deeply equal { escaped: false }
+   × session extension virtual registration > keeps the file route signal in the VM realm 10ms
+     → expected { escaped: true } to deeply equal { escaped: false }
+   × session extension virtual registration > does not expose a host UI promise to a file route 8ms
+     → expected { escaped: true } to deeply equal { escaped: false }
+   × session extension virtual registration > does not expose a host UI error to a file route 8ms
+     → expected { escaped: true } to deeply equal { escaped: false }
+   × session extension virtual registration > keeps cancellation events and thrown cancellation errors in the file VM realm 13ms
+     → expected 'Error' to be 'AbortError' // Object.is equality
+   ✓ session extension virtual registration > preserves file route UI ownership through await and rejects result accessors before reading them 60ms
+   ✓ session extension virtual registration > waits for the complete async file registration and captures VM thinking-level arrays and generic state 61ms
+   ✓ session extension virtual registration > does not publish a staged virtual definition when later async file initialization fails 57ms
+   ✓ session extension virtual registration > closes virtual registration after initialization without changing the accepted snapshot 6ms
+   ✓ session extension virtual registration > keeps the generic state registration API typed for inline extension consumers 1ms
+   ✓ session extension virtual registration > cancels async file initialization without publishing its staged virtual definition 57ms
+   ✓ session extension virtual registration > discards an in-flight route after its request signal aborts 1ms
+   ✓ session extension virtual registration > discards an in-flight route after its generation signal aborts 1ms
+   ✓ session extension virtual registration > retains the callback UI invocation owner through await and refuses the retired invocation later 52ms
+   ✓ session extension virtual registration > reports virtual registration as explicitly unsupported through the actual worker execution adapter 99ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > keeps the file route request in the VM realm
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > keeps the file route messages in the VM realm
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > keeps the file route message in the VM realm
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > keeps the file route state in the VM realm
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > keeps the file route signal in the VM realm
+AssertionError: expected { escaped: true } to deeply equal { escaped: false }
+
+- Expected
++ Received
+
+  {
+-   "escaped": false,
++   "escaped": true,
+  }
+
+ ❯ src/extensions/runtime/virtual.test.ts:43:26
+     41|     const result = await loaded.virtualModels![0]!.route({ ...request(…
+     42|       messages: [{ role: 'user', content: 'Authored message' }], state…
+     43|     expect(result.state).toEqual({ escaped: false });
+       |                          ^
+     44|   });
+     45| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > does not expose a host UI promise to a file route
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > does not expose a host UI error to a file route
+AssertionError: expected { escaped: true } to deeply equal { escaped: false }
+
+- Expected
++ Received
+
+  {
+-   "escaped": false,
++   "escaped": true,
+  }
+
+ ❯ src/extensions/runtime/virtual.test.ts:58:70
+     56|       input: async () => { if (target === 'error') throw new Error('Ho…
+     57|     } } });
+     58|     expect((await loaded.virtualModels![0]!.route(request())).state).t…
+       |                                                                      ^
+     59|   });
+     60| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > keeps cancellation events and thrown cancellation errors in the file VM realm
+AssertionError: expected 'Error' to be 'AbortError' // Object.is equality
+
+Expected: "AbortError"
+Received: "Error"
+
+ ❯ src/extensions/runtime/virtual.test.ts:85:39
+     83|     await rejected;
+     84|     expect(loaded.exports.cancelType).toBe('abort');
+     85|     expect(loaded.exports.cancelName).toBe('AbortError');
+       |                                       ^
+     86|     expect(loaded.exports.cancelEscaped).toBe(false);
+     87|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 10 passed (18)
+   Start at  16:29:03
+   Duration  1.30s (transform 172ms, setup 0ms, collect 532ms, tests 511ms, environment 0ms, prepare 60ms)
+

@@ -18,13 +18,18 @@ export async function runExtendedContextCommand(args: string[], context: Command
   if (!parsed.ok) return { kind: 'local', output: `Invalid /extended-context arguments: ${parsed.reason}\n${syntaxHelp(extendedContextSyntax)}` };
   const selection = context.sessionId ? readSessionModel(context.sessionId) : undefined;
   const action = parsed.action.name;
+  if (selection?.virtualModel && (action === 'on' || action === 'enable')) {
+    return { kind: 'local', output: 'Extended context requires a physical model; routed capacity is resolved per request.' };
+  }
+  if (selection?.virtualModel && (!action || action === 'status')) return { kind: 'local', output: selection.contextWindow
+    ? `Extended context: saved (${selection.contextWindow} tokens); inactive while a virtual model is selected.` : 'Extended context: off.' };
   if (!action || action === 'status') {
-    if (!selection?.contextWindow) return { kind: 'local', output: 'Extended context: off.' };
+    if (!selection?.contextWindow || !selection.model) return { kind: 'local', output: 'Extended context: off.' };
     const publication = context.readConfiguration?.();
     const config = publication?.config ?? context.runtimeConfig
       ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
     const request = modelRequest(context, config);
-    const matches = sessionPreferenceMatches(config, selection, request)
+    const matches = sessionPreferenceMatches(config, { ...selection, model: selection.model }, request)
       && sessionPreferenceMatches(config, config.sessionContextWindow, request)
       && config.sessionContextWindow?.value === selection.contextWindow;
     let active = false;

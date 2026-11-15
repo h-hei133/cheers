@@ -1,0 +1,84 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/turn/request.test.ts (12 tests | 2 failed | 10 skipped) 25ms
+   ↓ retains native preparation through both wrappers and publishes before live state
+   ↓ preserves the exact opening identity against a detached source for preparation accounting
+   ↓ refuses throws declaration persistence without dispatch or application getters
+   ↓ refuses promise declaration persistence without dispatch or application getters
+   ↓ refuses getter declaration persistence without dispatch or application getters
+   ↓ does not grant declaration publication to an alternate prepared step
+   ↓ reuses captured conversion for an outer retry of an unchanged native request
+   ↓ prepares a goal closing request from committed history when a declaration remains pending
+   ↓ routes outer retries with the actual failed physical target and latest successful response
+   × routes an implicit-effort retry with its latest dispatched failure over outer context false 20ms
+     → expected { provider: 'fixture', …(6) } to match object { reason: 'retry', failed: { …(4) } }
+(6 matching properties omitted from actual)
+   × routes an implicit-effort retry with its latest dispatched failure over outer context true 4ms
+     → expected { provider: 'fixture', …(7) } to match object { reason: 'retry', failed: { …(4) } }
+(6 matching properties omitted from actual)
+   ↓ does not reuse the previous dispatch marker when routing the effort retry itself fails
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 10 skipped (12)
+   Start at  17:36:10
+   Duration  2.19s (transform 1.22s, setup 0ms, collect 1.94s, tests 25ms, environment 0ms, prepare 54ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/request.test.ts > routes an implicit-effort retry with its latest dispatched failure over outer context false
+AssertionError: expected { provider: 'fixture', …(6) } to match object { reason: 'retry', failed: { …(4) } }
+(6 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "failed": {
+-     "modelId": "physical",
+-     "provider": "fixture",
+-     "stopReason": "error",
+-     "thinkingLevel": "low",
+-   },
+    "reason": "retry",
+  }
+
+ ❯ src/turn/request.test.ts:200:19
+    198|   });
+    199|   expect(seen).toHaveLength(2);
+    200|   expect(seen[1]).toMatchObject({ reason: 'retry', failed: { provider:…
+       |                   ^
+    201|   expect(JSON.stringify(seen)).not.toContain('PRIVATE_RESPONSE_BODY');
+    202|   expect(sent.map(body => body.model)).toEqual(['physical', 'recovery'…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/turn/request.test.ts > routes an implicit-effort retry with its latest dispatched failure over outer context true
+AssertionError: expected { provider: 'fixture', …(7) } to match object { reason: 'retry', failed: { …(4) } }
+(6 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "failed": {
+-     "modelId": "physical",
++     "modelId": "older",
+      "provider": "fixture",
+      "stopReason": "error",
+-     "thinkingLevel": "low",
+    },
+    "reason": "retry",
+  }
+
+ ❯ src/turn/request.test.ts:200:19
+    198|   });
+    199|   expect(seen).toHaveLength(2);
+    200|   expect(seen[1]).toMatchObject({ reason: 'retry', failed: { provider:…
+       |                   ^
+    201|   expect(JSON.stringify(seen)).not.toContain('PRIVATE_RESPONSE_BODY');
+    202|   expect(sent.map(body => body.model)).toEqual(['physical', 'recovery'…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

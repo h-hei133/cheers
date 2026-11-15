@@ -37,6 +37,7 @@ export interface CliRootContext {
 }
 
 export interface CliBootstrapRuntimeContext extends CliRootContext {
+  readonly settleModel: () => void;
   readonly sessionManager: SessionManager;
   readonly renderer: StreamingRenderer;
   readonly writeJsonEvent?: ReturnType<typeof createJsonEventWriter>;
@@ -117,6 +118,7 @@ export function createCliBootstrapRuntimeContext(
   const recoveryCandidate = null;
   const recoveryCandidateSummary = null;
   const recoveryBlockedNotice = null;
+  let pendingModel = Boolean(input.options.model);
   const bootstrap = (() => {
     try {
       return bootstrapShellRuntime({
@@ -125,6 +127,7 @@ export function createCliBootstrapRuntimeContext(
         runtimeConfig: input.rootContext.runtimeConfig,
         runtimeConfigOverrides: configOverrides(input.options),
         resolveConfigTarget: (config, sessionId) => resolveCliCredential(config, input.options, process.env, sessionId),
+        deferredModel: () => pendingModel,
         ...(input.options.skillPaths || input.options.noSkills
           ? {
               skillOptions: {
@@ -173,6 +176,7 @@ export function createCliBootstrapRuntimeContext(
     bootstrap,
     runtimeContext,
     mcpGateway,
+    settleModel: () => { pendingModel = false; },
   };
 }
 

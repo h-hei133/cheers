@@ -11,6 +11,7 @@ import { credentialDigest } from '../../core/auth/account/lineage.js';
 import type { StepTarget } from '../../turn/context/contract.js';
 import { delegatedTarget } from './target.js';
 import { delegatedRenewal, type AccountRotation } from './renewal.js';
+import { inspectConfigConstraints } from '../../config/constraints.js';
 
 interface RouteHost {
   readonly workspaceRoot: string;
@@ -55,6 +56,9 @@ function physicalTarget(route: ModelRoute, host: RouteHost): ProviderCredentialR
     throw new Error('The routed catalogue does not own the physical endpoint.');
   }
   assertScopedModel(config, resolved);
+  if (config && inspectConfigConstraints(config, resolved, host.providerCatalog).errors.length) {
+    throw new Error('The routed physical model does not satisfy the configured request limits.');
+  }
   return resolved;
 }
 

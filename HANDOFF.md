@@ -2628,3 +2628,23 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A failed registration remains visible, a caller's custom array method bypasses capture, or old callback results reach a later registration after reload.
 - **Root Cause:** Caller-owned getters, methods, signals and returned thenables still execute after the collision or lifetime check; cleanup can also reread mutable options and claim a successor resource generation.
 - **Rule:** Capture contribution fields first, use bounded data slots for definition arrays, and check logical collisions after caller access. Capture original cancellation and resource ownership; native signal intrinsics keep replaced observer methods out of publication. Reconstruct bounded inert results before returning across another promise boundary and revalidate the exact registration before state publication. VM data support must be explicit and must not relax other JSON consumers.
+
+### Explicit Physical Delegation Must Clear Inherited Logical Selection
+- **Symptom:** A child with an explicit model or role still invokes the foreground virtual router and dispatches to its target.
+- **Root Cause:** Delegation replaces physical provider fields while retaining the parent's logical selection and registry.
+- **Rule:** Explicit physical delegation clears inherited logical routing. An inherited logical selection keeps its own nested effort, including a child's explicit effort override. Verify the actual endpoint, credential and callback count for both paths.
+
+### Routing State Must Be Accepted Before Compaction Changes Its Branch
+- **Symptom:** Compaction retires the captured branch before a valid route can publish, or an unchanged route result accepts a stale state read.
+- **Root Cause:** Publication is delayed until after compaction, or absent replacement state takes an empty-write shortcut that omits the read key's CAS.
+- **Rule:** Capture state before the callback and accept the same key under the original branch lease before compaction. Preserve CAS for absent and unchanged results, including tombstones. Candidate and refresh preparation reuse the accepted route; direct summaries neither capture nor publish routing state.
+
+### Retry Context Belongs To The Latest Physical Dispatch
+- **Symptom:** An effort retry reports an older outer failure, or a local preparation failure is attributed to a previously dispatched model.
+- **Root Cause:** Retry preparation closes over the initial failure context and the dispatch marker survives into the next attempt.
+- **Rule:** Feed the latest actually dispatched physical target and report-safe failure into the next route. Clear the dispatch marker before preparation so failures before dispatch cannot inherit it. Transport retries reuse their accepted route and do not publish additional routing state.
+
+### Direct Summary Routing Must Preserve Effort And Endpoint Budgets
+- **Symptom:** Manual or branch summaries lose implicit reasoning effort, or dispatch an explicit effort with too little output budget for the endpoint.
+- **Root Cause:** The direct path reads only router overrides and bypasses the existing preference fallback or output-minimum check.
+- **Rule:** Capture the original effective effort, resolve the complete physical target before summary budgeting, then apply the existing endpoint constraints. Explicit summary roles retain precedence. Preserve ordinary configuration admission and the manual compaction owner's durable publication fence.

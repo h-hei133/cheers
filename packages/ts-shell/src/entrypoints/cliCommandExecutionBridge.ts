@@ -47,6 +47,7 @@ export type CliCommandExecution =
     };
 
 export interface BuildCliCommandExecutionInput {
+  readonly logicalModelAdmission?: CommandContext['logicalModelAdmission'];
   readonly runCancellable?: CommandContext['runCancellable'];
   readonly signal?: CommandContext['signal'];
   readonly freshState?: CommandContext['freshState'];
@@ -232,6 +233,7 @@ export async function buildCliCommandExecution(
     readConfiguration: input.readConfiguration,
     recordAuxiliaryUsage: input.recordAuxiliaryUsage,
     admission: input.admission,
+    logicalModelAdmission: input.logicalModelAdmission,
     applyDisplayConfig: input.applyDisplayConfig,
     workspaceRoots: input.workspaceRoots,
     getToolPool: input.getToolPool,

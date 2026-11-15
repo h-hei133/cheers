@@ -1,0 +1,174 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/provider/route.test.ts (11 tests | 4 failed) 395ms
+   ✓ routes the actual provider step to the physical URL and credential without sending to the original provider 89ms
+   ✓ refuses a physical model outside allowedModels before reservation or HTTP dispatch 27ms
+   ✓ refuses a missing physical catalogue provider before reservation or HTTP dispatch 27ms
+   ✓ refuses a missing physical catalogue model before reservation or HTTP dispatch 28ms
+   ✓ rechecks host admission after delayed routing before reservation or HTTP dispatch 29ms
+   ✓ rejects a same-provider connection whose credential changed during routing 25ms
+   ✓ rejects a physical profile credential withdrawn during message conversion 30ms
+   × routes a logical selection before checking dormant physical scope and credentials 33ms
+     → expected undefined to match object { Object (text, stopReason) }
+   × persists accepted route state before compaction and restores it in a new step and fork 31ms
+     → expected 'error' to be 'stop' // Object.is equality
+   × refuses a router state race even when the callback returns no replacement state 52ms
+     → expected 'stop' to be 'error' // Object.is equality
+   × does not persist router state when conversion cancels before route acceptance 24ms
+     → expected "spy" to be called once, but got 0 times
+ ❯ src/turn/request.test.ts (9 tests | 1 failed) 37ms
+   ✓ retains native preparation through both wrappers and publishes before live state 7ms
+   ✓ preserves the exact opening identity against a detached source for preparation accounting 0ms
+   ✓ refuses throws declaration persistence without dispatch or application getters 1ms
+   ✓ refuses promise declaration persistence without dispatch or application getters 1ms
+   ✓ refuses getter declaration persistence without dispatch or application getters 1ms
+   ✓ does not grant declaration publication to an alternate prepared step 0ms
+   ✓ reuses captured conversion for an outer retry of an unchanged native request 11ms
+   ✓ prepares a goal closing request from committed history when a declaration remains pending 2ms
+   × routes outer retries with the actual failed physical target and latest successful response 12ms
+     → expected [ 'continuation', 'continuation' ] to deeply equal [ 'user', 'retry' ]
+ ❯ src/core/models/virtualModels.test.ts (3 tests | 2 failed) 9ms
+   × virtual models and multimodal catalog types > infers a user turn through later system and extension messages after the last assistant 5ms
+     → expected 'continuation' to be 'user' // Object.is equality
+   ✓ virtual models and multimodal catalog types > filters catalog models by chat, image, and classifier types 0ms
+   × virtual models and multimodal catalog types > routes using only caller-owned state without leaking another branch state 2ms
+     → expected { provider: 'openai', …(3) } to deeply equal { provider: 'openai', …(3) }
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/request.test.ts > routes outer retries with the actual failed physical target and latest successful response
+AssertionError: expected [ 'continuation', 'continuation' ] to deeply equal [ 'user', 'retry' ]
+
+- Expected
++ Received
+
+  [
+-   "user",
+-   "retry",
++   "continuation",
++   "continuation",
+  ]
+
+ ❯ src/turn/request.test.ts:173:47
+    171|   await core.prompt([{ role: 'user', content: 'Retry if needed' }, { r…
+    172|   expect(core.state.messages.at(-1)?.content).toBe('Recovered'); expec…
+    173|   expect(seen.map(request => request.reason)).toEqual(['user', 'retry'…
+       |                                               ^
+    174|   expect(seen[0]).toMatchObject({ previous: { provider: 'fixture', mod…
+    175|   expect(seen[1]).toMatchObject({ failed: { provider: 'fixture', model…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  src/cli/provider/route.test.ts > routes a logical selection before checking dormant physical scope and credentials
+AssertionError: expected undefined to match object { Object (text, stopReason) }
+
+- Expected: 
+{
+  "stopReason": "stop",
+  "text": "Physical route answer.",
+}
+
++ Received: 
+undefined
+
+ ❯ src/cli/provider/route.test.ts:188:18
+    186|   try { result = await createProviderStep(host, new Map(), {})([{ role…
+    187|     test.setup.signal, {}, { allowTools: false }); } catch { result = …
+    188|   expect(result).toMatchObject({ text: 'Physical route answer.', stopR…
+       |                  ^
+    189|   expect(test.route).toHaveBeenCalledOnce();
+    190|   expect(test.original.requests).toEqual([]); expect(test.physical.req…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  src/cli/provider/route.test.ts > persists accepted route state before compaction and restores it in a new step and fork
+AssertionError: expected 'error' to be 'stop' // Object.is equality
+
+Expected: "stop"
+Received: "error"
+
+ ❯ src/cli/provider/route.test.ts:201:28
+    199|   const first = await createProviderStep(host, new Map(), {})(messages…
+    200|     prepareContext: async prepared => { expect(read()[key]).toBe('1');…
+    201|   expect(first.stopReason).toBe('stop'); expect(test.route).toHaveBeen…
+       |                            ^
+    202|   const fork = test.setup.manager.fork(test.setup.session.id, test.set…
+    203|   expect(read(fork.id)[key]).toBe('1');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  src/cli/provider/route.test.ts > refuses a router state race even when the callback returns no replacement state
+AssertionError: expected 'stop' to be 'error' // Object.is equality
+
+Expected: "error"
+Received: "stop"
+
+ ❯ src/cli/provider/route.test.ts:217:29
+    215|   const result = await createProviderStep(logicalHost(test), new Map()…
+    216|     test.setup.signal, {}, { allowTools: false });
+    217|   expect(result.stopReason).toBe('error'); expect(test.route).toHaveBe…
+       |                             ^
+    218|   expect(read().initial[key]).toBe('2'); expect(test.original.requests…
+    219| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  src/cli/provider/route.test.ts > does not persist router state when conversion cancels before route acceptance
+AssertionError: expected "spy" to be called once, but got 0 times
+ ❯ src/cli/provider/route.test.ts:226:22
+    224|   const result = await createProviderStep(logicalHost(test), new Map()…
+    225|     controller.signal, {}, { allowTools: false, convertToLlm: messages…
+    226|   expect(test.route).toHaveBeenCalledOnce(); expect(result.stopReason)…
+       |                      ^
+    227|   expect(captureBranchStore({ sessionId: test.setup.session.id, cwd: t…
+    228|   expect(test.physical.requests).toEqual([]); expect(test.original.req…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  src/core/models/virtualModels.test.ts > virtual models and multimodal catalog types > infers a user turn through later system and extension messages after the last assistant
+AssertionError: expected 'continuation' to be 'user' // Object.is equality
+
+Expected: "user"
+Received: "continuation"
+
+ ❯ src/core/models/virtualModels.test.ts:12:100
+     10|     expect(inferRouteReason([user, marker], 0)).toBe('user')
+     11|     expect(inferRouteReason([user, marker], 1)).toBe('retry')
+     12|     expect(inferRouteReason([user, { role: 'system', content: 'Repair …
+       |                                                                                                    ^
+     13|     expect(inferRouteReason([user, { role: 'assistant', content: 'Work…
+     14|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  src/core/models/virtualModels.test.ts > virtual models and multimodal catalog types > routes using only caller-owned state without leaking another branch state
+AssertionError: expected { provider: 'openai', …(3) } to deeply equal { provider: 'openai', …(3) }
+
+- Expected
++ Received
+
+  {
+    "modelId": "gpt-5-strong",
+    "provider": "openai",
+-   "state": 8,
++   "state": 2,
+    "thinkingLevel": "high",
+  }
+
+ ❯ src/core/models/virtualModels.test.ts:59:21
+     57|       messages: [{ role: 'user', content: 'hi' }],
+     58|     })
+     59|     expect(retried).toEqual({ provider: 'openai', modelId: 'gpt-5-stro…
+       |                     ^
+     60|     expect(await registry.resolve({ provider: 'openai', modelId: 'auto…
+     61|       reason: 'user', messages: [] })).toMatchObject({ state: 1 })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  7 failed | 16 passed (23)
+   Start at  16:09:55
+   Duration  4.59s (transform 2.11s, setup 0ms, collect 3.62s, tests 441ms, environment 0ms, prepare 134ms)
+

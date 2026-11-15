@@ -1,0 +1,66 @@
+packages/ts-shell/src/cli/bootstrap/model.ts(29,13): error TS2540: Cannot assign to 'model' because it is a read-only property.
+packages/ts-shell/src/cli/bootstrap/model.ts(29,40): error TS2540: Cannot assign to 'thinking' because it is a read-only property.
+packages/ts-shell/src/cli/bootstrap/model.ts(36,13): error TS2540: Cannot assign to 'thinking' because it is a read-only property.
+packages/ts-shell/src/cli/interactive/interactiveCommandRouter.ts(212,5): error TS2353: Object literal may only specify known properties, and 'logicalModelAdmission' does not exist in type 'BuildCliCommandExecutionInput'.
+packages/ts-shell/src/cli/interactive/picker/model/virtual.ts(17,3): error TS2741: Property 'empty' is missing in type '{ title: string; form: "panel"; filterable: false; acceptsOwnership: true; initialSelection: string; back: (notice?: string | undefined) => Picker; previewEnd: () => void; detail: () => string[]; footer: string; load(): Promise<...>; apply(ids: readonly string[], host?: () => boolean): Promise<...>; }' but required in type 'Picker'.
+packages/ts-shell/src/cli/provider/step.ts(116,26): error TS2339: Property 'replayOwner' does not exist on type 'ProviderRequestTarget | { headers: {}; }'.
+  Property 'replayOwner' does not exist on type '{ headers: {}; }'.
+packages/ts-shell/src/cli/provider/step.ts(116,70): error TS2339: Property 'replayOwner' does not exist on type 'ProviderRequestTarget | { headers: {}; }'.
+  Property 'replayOwner' does not exist on type '{ headers: {}; }'.
+packages/ts-shell/src/cli/provider/step.ts(117,37): error TS2339: Property 'replayBinding' does not exist on type 'ProviderRequestTarget | { headers: {}; }'.
+  Property 'replayBinding' does not exist on type '{ headers: {}; }'.
+packages/ts-shell/src/cli/provider/step.ts(127,26): error TS2339: Property 'credentialId' does not exist on type 'ProviderRequestTarget | { headers: {}; }'.
+  Property 'credentialId' does not exist on type '{ headers: {}; }'.
+packages/ts-shell/src/cli/provider/step.ts(127,57): error TS2339: Property 'credentialGeneration' does not exist on type 'ProviderRequestTarget | { headers: {}; }'.
+  Property 'credentialGeneration' does not exist on type '{ headers: {}; }'.
+packages/ts-shell/src/cli/provider/step.ts(128,42): error TS2339: Property 'credentialId' does not exist on type 'ProviderRequestTarget | { headers: {}; }'.
+  Property 'credentialId' does not exist on type '{ headers: {}; }'.
+packages/ts-shell/src/cli/provider/step.ts(128,93): error TS2339: Property 'credentialGeneration' does not exist on type 'ProviderRequestTarget | { headers: {}; }'.
+  Property 'credentialGeneration' does not exist on type '{ headers: {}; }'.
+packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts(224,25): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'Admission | undefined'.
+packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts(229,25): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'Admission | undefined'.
+packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts(239,55): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'Pick<StepTarget, "fetchImpl" | "modelTransport">'.
+packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts(240,79): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'Admission | undefined'.
+packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts(241,91): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'Admission | undefined'.
+packages/ts-shell/src/cli/runtime/compaction/context.ts(31,5): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+packages/ts-shell/src/core/commands/model/context.ts(32,54): error TS2345: Argument of type 'SessionModelSelection' is not assignable to parameter of type 'ModelPreferenceBinding | undefined'.
+  Type 'Omit<ProviderModelTarget, "model"> & { readonly model?: string | undefined; readonly virtualModel: SessionVirtualModelSelection; } & { ...; }' is not assignable to type 'ModelPreferenceBinding | undefined'.
+    Type 'Omit<ProviderModelTarget, "model"> & { readonly model?: string | undefined; readonly virtualModel: SessionVirtualModelSelection; } & { ...; }' is not assignable to type 'ModelPreferenceBinding'.
+      Types of property 'model' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+packages/ts-shell/src/core/commands/model/context.ts(33,43): error TS2345: Argument of type '(Pick<SessionModelSelection, "provider" | "model" | "connectionScope" | "connectionId"> & { readonly value: number; }) | undefined' is not assignable to parameter of type 'ModelPreferenceBinding | undefined'.
+  Type 'Pick<SessionModelSelection, "provider" | "model" | "connectionScope" | "connectionId"> & { readonly value: number; }' is not assignable to type 'ModelPreferenceBinding | undefined'.
+    Type 'Pick<SessionModelSelection, "provider" | "model" | "connectionScope" | "connectionId"> & { readonly value: number; }' is not assignable to type 'ModelPreferenceBinding'.
+      Types of property 'model' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+packages/ts-shell/src/core/commands/model/presetCommand.ts(52,45): error TS2345: Argument of type 'SessionModelSelection | undefined' is not assignable to parameter of type 'SessionModelTarget | undefined'.
+  Type 'Omit<ProviderModelTarget, "model"> & { readonly model?: string | undefined; readonly virtualModel: SessionVirtualModelSelection; } & { ...; }' is not assignable to type 'SessionModelTarget | undefined'.
+    Type 'Omit<ProviderModelTarget, "model"> & { readonly model?: string | undefined; readonly virtualModel: SessionVirtualModelSelection; } & { ...; }' is not assignable to type 'ProviderModelTarget'.
+      Types of property 'model' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+packages/ts-shell/src/core/commands/model/virtual.ts(31,82): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+packages/ts-shell/src/core/commands/model/virtual.ts(35,59): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+packages/ts-shell/src/core/commands/model/virtual.ts(55,86): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+packages/ts-shell/src/core/commands/model/virtual.ts(59,23): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+packages/ts-shell/src/core/commands/model/virtual.ts(61,33): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+packages/ts-shell/src/core/commands/model/virtual.ts(65,76): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+packages/ts-shell/src/core/models/window.ts(33,43): error TS2345: Argument of type '(Pick<SessionModelSelection, "provider" | "model" | "connectionScope" | "connectionId"> & { readonly value: number; }) | undefined' is not assignable to parameter of type 'ModelPreferenceBinding | undefined'.
+  Type 'Pick<SessionModelSelection, "provider" | "model" | "connectionScope" | "connectionId"> & { readonly value: number; }' is not assignable to type 'ModelPreferenceBinding | undefined'.
+    Type 'Pick<SessionModelSelection, "provider" | "model" | "connectionScope" | "connectionId"> & { readonly value: number; }' is not assignable to type 'ModelPreferenceBinding'.
+      Types of property 'model' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+packages/ts-shell/src/sdk/agentSession.ts(323,59): error TS2345: Argument of type '(VirtualModelDefinition<unknown> | undefined)[]' is not assignable to parameter of type 'readonly VirtualModelMetadata[]'.
+  Type 'VirtualModelDefinition<unknown> | undefined' is not assignable to type 'VirtualModelMetadata'.
+    Type 'undefined' is not assignable to type 'VirtualModelMetadata'.
+packages/ts-shell/src/turn/context/route.ts(39,61): error TS7006: Parameter 'admission' implicitly has an 'any' type.
+Build failed: TypeScript build failed with exit 1.

@@ -1,0 +1,48 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts (15 tests | 1 failed | 14 skipped) 156ms
+   ↓ routes manual summaries once without reading or writing branch routing state
+   ↓ routes branch summaries once without reading or writing branch routing state
+   ↓ keeps an explicit summary role for manual with dormant credentials unavailable
+   ↓ keeps an explicit summary role for branch with dormant credentials unavailable
+   ↓ defers automatic compaction to the routed physical target and does not create a virtual cache warmer
+   ↓ rejects a retired direct route before summary dispatch
+   ↓ refuses a direct summary when its output budget cannot carry explicit thinking
+   ↓ retains its captured settings across a same-binding publication during direct summary route
+   ↓ retains its captured settings across a same-binding publication during direct summary converter
+   ↓ preserves selected effort when a manual summary route omits its override
+   × preserves selected effort when a branch summary route omits its override 155ms
+     → expected false to be true // Object.is equality
+   ↓ uses an explicit route effort override for a branch summary
+   ↓ refuses an unsupported direct summary effort before dispatch: {"effort":"high","physical":{"reasoning":false}}
+   ↓ refuses an unsupported direct summary effort before dispatch: {"effort":"high","physical":{"thinkingLevelMap":{"high":null}}}
+   ↓ refuses an unsupported direct summary effort before dispatch: {"physical":{"reasoning":true},"routeEffort":"max"}
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+   Start at  17:36:15
+   Duration  11.96s (transform 7.26s, setup 0ms, collect 11.53s, tests 156ms, environment 0ms, prepare 54ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > preserves selected effort when a branch summary route omits its override
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts:177:86
+    175|   expect(test.route.mock.calls[0]![0].thinkingLevel).toBe('high');
+    176|   expect(test.requests.length).toBeGreaterThan(0);
+    177|   expect(test.requests.every(request => request.body.reasoning_effort …
+       |                                                                                      ^
+    178|   expect(test.store().initial[test.key]).toBe('7');
+    179| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

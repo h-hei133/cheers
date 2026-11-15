@@ -7,6 +7,8 @@ import { installMediaSurface, closeMediaFor } from '../runtime/media.js';
 import { closeJobsFor } from '../runtime/jobs.js';
 import { closeDirectorFor } from '../runtime/director.js';
 import { closeExtensionsFor, waitForExtensionsFor } from '../runtime/extensions.js';
+import { applyStartupModel, type StartupModelOptions } from './model.js';
+import { refreshShellRuntimeConfig } from '../../core/shell/runtimeContext.js';
 import { closeTraceDashboard } from '../../observability/traceDashboard.js';
 import { runCollaborationServiceMode } from '../collaboration/service.js';
 import type { Interface as ReadlineInterface } from "node:readline";
@@ -136,9 +138,9 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
     return;
   }
 
-  const options: CliOptions = recovery ? { ...parsedCliArgs.args.options, sessionId: recovery.sessionId,
+  const options: StartupModelOptions = recovery ? { ...parsedCliArgs.args.options, sessionId: recovery.sessionId,
     projectPath: recovery.workspaceRoot, promptArg: undefined, replayFile: undefined, migrateSessionRoot: false }
-    : parsedCliArgs.args.options;
+    : { ...parsedCliArgs.args.options };
   const rootContext = createCliRootContext({
     configInputs,
     launchCwd: input.launchCwd,
@@ -318,6 +320,12 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
       getPromptInteractiveApproval: () => interactiveApprovalPrompt,
     });
     await waitForExtensionsFor(runtimeContext);
+    await applyStartupModel(runtimeContext, options);
+    bootstrapRuntime.settleModel();
+    const modelConfiguration = refreshShellRuntimeConfig(runtimeContext);
+    if (modelConfiguration.status !== 'applied' && runtimeContext.configuration.current.admissionBlocked) {
+      throw new ConfigurationRefusalError(runtimeContext.configuration.current.diagnostics);
+    }
     time("runtime ready");
     cancelRun = () => cancelGoalRunForShutdown(sessionRuntime);
     isBusy = () => sessionRuntime.getCurrentRunController() !== null;

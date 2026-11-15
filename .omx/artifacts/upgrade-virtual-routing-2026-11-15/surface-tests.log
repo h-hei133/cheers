@@ -1,0 +1,10 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ✓ src/cli/rpc/runtimeHost.test.ts (9 tests) 349ms
+ ✓ src/cli/rpc/rpcServer.test.ts (3 tests) 5ms
+ ✓ src/cli/interactive/completion/models.test.ts (19 tests) 132ms
+ ✓ src/cli/interactive/completion/catalog.test.ts (3 tests) 2469ms
+   ✓ runtime catalog source > honors disabled skills and current tool visibility, reusing a pending catalog without connecting  2030ms
+ Test Files  4 passed (4)
+      Tests  34 passed (34)
+   Start at  18:07:56
+   Duration  17.88s (transform 6.93s, setup 0ms, collect 13.99s, tests 2.95s, environment 1ms, prepare 246ms)

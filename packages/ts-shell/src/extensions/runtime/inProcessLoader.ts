@@ -13,11 +13,12 @@ import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '
 import type { VersionRecord } from '../model.js'
 import { EXTENSION_WORKER_SOURCE } from './workerSource.js'
 import { ExtensionInitialization, type ExtensionInitializationOptions } from './initialization.js'
-import { resolveUiHost, type ExtensionUiHost } from './ui.js'
+import { resolveUiHost, type ExtensionUiHost, type ExtensionUiApi } from './ui.js'
 import { currentExtensionInvocation, runExtensionInvocation } from './context.js'
 import { captureVirtualDefinition, MAX_VIRTUAL_MODELS } from '../../core/models/virtual/capture.js'
-import type { ModelRouteRequest, VirtualModelDefinition } from '../../core/models/virtual/contract.js'
-export type { ExtensionUiHost, ExtensionUiDialogOptions } from './ui.js'
+import type { ModelRouteInput, CapturedVirtualModelDefinition, VirtualModelDefinition } from '../../core/models/virtual/contract.js'
+import { createVirtualBridge } from './virtual.js'
+export type { ExtensionUiHost, ExtensionUiDialogOptions, ExtensionUiApi, ExtensionUiRequestOptions } from './ui.js'
 
 export interface ExtensionHostBridge {
   readonly ui?: ExtensionUiHost
@@ -51,7 +52,7 @@ export interface ExtensionEventBus {
 export interface ExtensionAPI {
   readonly workspaceRoot: string
   readonly events: ExtensionEventBus
-  readonly ui: Required<ExtensionUiHost>
+  readonly ui: Required<ExtensionUiApi>
   registerTool(tool: ToolDefinition): void
   registerCommand(command: CommandDefinition): void
   registerVirtualModel<TState = unknown>(model: VirtualModelDefinition<TState>): void
@@ -70,7 +71,7 @@ export interface ExtensionAPI {
 export interface LoadedInProcessExtension {
   readonly tools: readonly ToolDefinition[]
   readonly commands: readonly CommandDefinition[]
-  readonly virtualModels?: readonly VirtualModelDefinition[]
+  readonly virtualModels?: readonly CapturedVirtualModelDefinition[]
   readonly signal?: AbortSignal
   readonly shortcuts: readonly ExtensionShortcut[]
   readonly flags: readonly ExtensionFlag[]
@@ -202,6 +203,7 @@ function createExtensionApiCollector(options: {
   readonly denyRules?: () => readonly DenyRule[]
   readonly host?: ExtensionHostBridge
   readonly initialization?: ExtensionInitialization
+  readonly invokeVirtual?: (callback: VirtualModelDefinition['route'], request: ModelRouteInput) => ReturnType<VirtualModelDefinition['route']>
 }) {
   const initialization = options.initialization ?? new ExtensionInitialization()
   const active = () => initialization.assertActive()
@@ -210,7 +212,7 @@ function createExtensionApiCollector(options: {
     ? AbortSignal.any([initialization.signal, signal]) : initialization.signal
   const tools: ToolDefinition[] = []
   const commands: CommandDefinition[] = []
-  const virtualModels: VirtualModelDefinition[] = []
+  const virtualModels: CapturedVirtualModelDefinition[] = []
   const shortcuts: ExtensionShortcut[] = []
   const flags: ExtensionFlag[] = []
   const flagValues = new Map<string, string | boolean | undefined>()
@@ -240,12 +242,13 @@ function createExtensionApiCollector(options: {
     registerVirtualModel: nullProtoFn((model: VirtualModelDefinition) => {
       if (virtualModels.length >= MAX_VIRTUAL_MODELS) throw new Error('Virtual model registration limit exceeded.')
       const definition = captureVirtualDefinition(model, active)
+      const callback = Object.getOwnPropertyDescriptor(model, 'route')!.value as VirtualModelDefinition['route']
       if (virtualModels.some(value => value.provider === definition.provider && value.id === definition.id)) throw new Error('Virtual model registration collision.')
-      virtualModels.push(Object.freeze({ ...definition, route: async (request: ModelRouteRequest) => {
+      virtualModels.push(Object.freeze({ ...definition, route: async (request: ModelRouteInput) => {
         const signal = invocationSignal(request.signal)
         return runExtensionInvocation(options.host?.ui, signal, async () => {
           active(); signal.throwIfAborted()
-          const result = await definition.route({ ...request, signal })
+          const result = await (options.invokeVirtual ? options.invokeVirtual(callback, { ...request, signal }) : definition.route({ ...request, signal }))
           active(); signal.throwIfAborted(); return result
         })
       } }))
@@ -274,6 +277,7 @@ function createExtensionApiCollector(options: {
 
   return {
     api,
+    ui,
     result: (exports: Readonly<Record<string, unknown>> = {}): LoadedInProcessExtension => ({
       tools: Object.freeze([...tools]),
       commands: Object.freeze([...commands]),
@@ -311,7 +315,10 @@ export async function runExtensionFactory(options: ExtensionInitializationOption
 
 function beginExtensionLoad(options: ExtensionLoadOptions) {
   const initialization = new ExtensionInitialization(options)
-  const collector = createExtensionApiCollector({ ...options, initialization })
+  let virtualBridge: ReturnType<typeof createVirtualBridge>
+  const collector = createExtensionApiCollector({ ...options, initialization,
+    invokeVirtual: (callback, request) => virtualBridge.invoke(callback, request),
+  })
   try {
     initialization.assertActive()
     const rawSource = fs.readFileSync(options.filePath, 'utf8')
@@ -328,6 +335,8 @@ function beginExtensionLoad(options: ExtensionLoadOptions) {
       }),
       { name: 'extension-in-process', codeGeneration: { strings: false, wasm: false } },
     )
+    virtualBridge = createVirtualBridge(sandbox, collector.ui)
+    sandbox.api = Object.freeze(Object.assign(Object.create(null) as ExtensionAPI, collector.api, { ui: virtualBridge.ui }))
     // Start the exported factory inside the same bounded VM evaluation as its module.
     const startFactory = '\n; ((factory) => typeof factory === "function" ? factory(api) : undefined)' +
       '(module.exports.default ?? module.exports.activate);'

@@ -1,0 +1,31 @@
+{"name":"route-acceptance-order","file":"turn/step.ts","sha256":"94b22574cfa67a41972308cd8714481ba6ab6c0ef6792e3b41ef210c952a7037","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true}
+{"name":"route-read-cas","file":"session/model/routing.ts","sha256":"e276bd6b3ab7b8f8c441c3e4870e1c920a61c2d60e322dd3681778cc1c9ab7bd","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true}
+{"name":"direct-stateless","file":"turn/context/route.ts","sha256":"d9d2331c98f9d11bda6d44010912c3fb9d281c8f9dcb83f42c6395dcfa3a7f67","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true}
+{"name":"delegated-selection","file":"cli/provider/step.ts","sha256":"9e09008340ccef1efab357650fa3563b22753b8ac08c702bade3618e36b08dae","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true}
+{"name":"retry-context","file":"turn/step.ts","sha256":"94b22574cfa67a41972308cd8714481ba6ab6c0ef6792e3b41ef210c952a7037","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true}
+{"name":"retry-dispatch-identity","file":"turn/step.ts","sha256":"94b22574cfa67a41972308cd8714481ba6ab6c0ef6792e3b41ef210c952a7037","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true}
+{"name":"summary-effort","file":"cli/runtime/compaction/direct.ts","sha256":"faa2ae81060fe1cdeb817569ecb79a8bcf9894fe53ce62d3472f8848bee92e20","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true}
+{"name":"summary-output","file":"cli/runtime/compaction/direct.ts","sha256":"faa2ae81060fe1cdeb817569ecb79a8bcf9894fe53ce62d3472f8848bee92e20","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true}
+{"name":"selection-capture","file":"core/commands/model/virtual.ts","sha256":"8faa8269bb9fea798842915ea177942efe0e8aee7d975178a741674e7271894d","exitCode":1,"signal":null,"assertionFailure":true,"restoredExact":true}
+{"name":"ui-settlement","file":"extensions/runtime/virtualSource.ts","sha256":"8256528e454bbcadbc54fb00dffffcd3723e18ffa4780e98be43e2239775376e","exitCode":1,"signal":null,"assertionFailure":false,"restoredExact":true}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(receipt.assertionFailure)
+
+    at file:///home/wang/projects/cheers/.tmp/virtual-routing/reversal.mjs:65:48
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.15.0

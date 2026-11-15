@@ -1,0 +1,42 @@
+import { createAgentSession, DefaultResourceLoader, type ExtensionAPI, type VirtualModelDefinition,
+  type CapturedVirtualModelDefinition, type ModelRouteInput, type ModelRouteRequest, type ModelRoute,
+  type ModelRouteSignal, type VirtualModelMetadata, type ExtensionUiApi, type ExtensionUiHost,
+  type ExtensionUiRequestOptions, type ExtensionUiDialogOptions } from '@cheers/ts-shell';
+
+type State = { count: number };
+const callback = (request: ModelRouteRequest<State>): ModelRoute<State> => ({ provider: 'anthropic', modelId: 'physical',
+  state: { count: (request.state?.count ?? 0) + 1 } });
+const model: VirtualModelDefinition<State> = { provider: 'adaptive', id: 'inline', name: 'Inline', route: callback };
+const native = new AbortController().signal;
+const observed: ModelRouteSignal = native;
+const input: ModelRouteInput<State> = { provider: 'adaptive', modelId: 'inline', reason: 'user', thinkingLevel: 'low',
+  messages: [], state: { count: 1 }, signal: native,
+  previous: { provider: 'anthropic', modelId: 'physical', thinkingLevel: 'low' },
+  failed: { provider: 'anthropic', modelId: 'physical', stopReason: 'error', failureClass: 'provider_network' } };
+const request: ModelRouteRequest<State> = input;
+const uiOptions: ExtensionUiRequestOptions = { signal: observed };
+const hostOptions: ExtensionUiDialogOptions = { signal: native };
+
+if (false) {
+  const captured = {} as CapturedVirtualModelDefinition<State>;
+  const ui = {} as Required<ExtensionUiApi>;
+  const host = {} as Required<ExtensionUiHost>;
+  const api = {} as ExtensionAPI;
+  api.registerVirtualModel<State>(model);
+  await captured.route(input);
+  await ui.input('Destination', undefined, uiOptions);
+  await host.input('Destination', undefined, hostOptions);
+  // @ts-expect-error Observations do not promise native AbortSignal branding.
+  const invalidInput: ModelRouteInput<State> = request;
+  // @ts-expect-error Host invocation cannot consume a callback-only observation signal.
+  await captured.route(request);
+  // @ts-expect-error Host UI requires native signal options.
+  await host.input('Destination', undefined, uiOptions);
+  void invalidInput;
+}
+
+const loader = new DefaultResourceLoader({ cwd: '.', noSkills: true, noThemes: true,
+  extensionFactories: [(api: ExtensionAPI) => api.registerVirtualModel<State>(model)] });
+void createAgentSession; void loader;
+const catalog: readonly VirtualModelMetadata[] = [];
+void catalog;

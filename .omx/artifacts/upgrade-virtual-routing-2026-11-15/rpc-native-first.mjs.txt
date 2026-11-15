@@ -1,0 +1,101 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+const directory = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(directory, '../..');
+const receipt = { platform: process.platform, compiledCliRpc: true, status: 'not_run', realProvider: false, stages: {},
+  buildId: JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'))).buildId,
+  probeSha256: createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex') };
+const root = fs.mkdtempSync(path.join(directory, 'rpc-state-')), home = path.join(root, 'home'), workspace = path.join(root, 'work');
+fs.mkdirSync(home); fs.mkdirSync(workspace); const storage = path.join(home, '.cheers'); fs.mkdirSync(storage);
+let stage = 'setup', child, server, timer, lines = '', number = 0, closed;
+const responses = [], requests = [], waiters = new Set();
+const env = { ...process.env, HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home, GIT_CEILING_DIRECTORIES: root,
+  CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '', OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '',
+  CHEERS_MARKETPLACES_FILE: path.join(home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(home, 'extensions.json') };
+function waitFor(predicate) {
+  const found = responses.find(predicate); if (found) return Promise.resolve(found);
+  return new Promise((resolve, reject) => {
+    const entry = { predicate, resolve: value => { clearTimeout(deadline); waiters.delete(entry); resolve(value); } };
+    const deadline = setTimeout(() => { waiters.delete(entry); reject(new Error('RPC probe response deadline.')); }, 25_000);
+    waiters.add(entry);
+  });
+}
+function command(type, values = {}) {
+  const id = String(++number); const pending = waitFor(value => value.type === 'response' && value.id === id);
+  child.stdin.write(JSON.stringify({ id, type, ...values }) + '\n'); return pending;
+}
+function accept(chunk) {
+  lines += chunk.toString();
+  for (;;) {
+    const newline = lines.indexOf('\n'); if (newline < 0) break;
+    const line = lines.slice(0, newline); lines = lines.slice(newline + 1);
+    let value; try { value = JSON.parse(line); } catch { continue; }
+    responses.push(value); for (const entry of [...waiters]) if (entry.predicate(value)) entry.resolve(value);
+  }
+}
+try {
+  assert.equal(process.platform, 'linux');
+  server = http.createServer(async (request, response) => {
+    const chunks = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    if (request.method !== 'POST') { response.writeHead(200, { 'content-type': 'application/json' }); response.end('{"data":[]}'); return; }
+    const body = JSON.parse(Buffer.concat(chunks).toString());
+    requests.push({ model: body.model, effort: body.reasoning_effort, authenticated: request.headers.authorization === 'Bearer synthetic-physical' });
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'RPC_ACK' }, finish_reason: 'stop' }] }));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
+  fs.writeFileSync(path.join(storage, 'config.json'), JSON.stringify({ maxOutputTokens: 64, reserveTokens: 0,
+    compactionEnabled: false, retryEnabled: false, cacheWarming: 'off' }));
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: 'openai', providerCredentials: {
+    openai: { model: 'dormant', baseUrl }, anthropic: { apiKey: 'synthetic-physical', model: 'physical', baseUrl } } }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: {
+    openai: { runtime: 'openai', endpoint: 'openai-compatible', auth: 'api-key', baseUrl, models: [{ id: 'dormant', contextWindow: 64_000, maxTokens: 512 }] },
+    anthropic: { runtime: 'anthropic', endpoint: 'openai-compatible', auth: 'api-key', baseUrl, models: [{ id: 'physical', contextWindow: 64_000, maxTokens: 512 }] },
+  } }));
+  const extension = path.join(workspace, 'models.ts');
+  fs.writeFileSync(extension, "export default api => { api.registerVirtualModel({ provider: 'adaptive', id: 'one', name: 'One', thinkingLevels: ['low','high'], route: request => ({ provider: 'anthropic', modelId: 'physical', state: { count: (request.state?.count ?? 0) + 1 } }) }); api.registerVirtualModel({ provider: 'adaptive', id: 'two', name: 'Two', thinkingLevels: ['low','high'], route: () => ({ provider: 'anthropic', modelId: 'physical' }) }); };");
+  child = spawn('rtk', ['node', path.join(repo, 'scripts/start.mjs'), '--rpc', '--project', workspace, '--no-context-files', '--no-skills', '--no-tools',
+    '--extension', extension, '--model', 'adaptive/one:high', '--models', 'adaptive/one,adaptive/two'], { cwd: workspace, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  child.stdout.on('data', accept); child.stderr.on('data', () => {});
+  closed = new Promise(resolve => child.on('close', (code, signal) => resolve({ code, signal })));
+  timer = setTimeout(() => child.kill('SIGTERM'), 100_000);
+  stage = 'state';
+  const initial = await command('get_state'); assert.equal(initial.success, true);
+  assert.deepEqual(initial.data.model, { provider: 'adaptive', id: 'one' }); assert.equal(initial.data.thinkingLevel, 'high');
+  stage = 'catalog'; const catalog = await command('get_available_models'); assert.equal(catalog.success, true);
+  assert.deepEqual(catalog.data.models.filter(model => model.virtual).map(model => model.id), ['one', 'two']);
+  assert.ok(catalog.data.models.filter(model => model.virtual).every(model => !('route' in model) && !('auth' in model)));
+  stage = 'select'; const selected = await command('set_model', { provider: 'adaptive', modelId: 'two' }); assert.equal(selected.success, true);
+  const after = await command('get_state'); assert.deepEqual(after.data.model, { provider: 'adaptive', id: 'two' });
+  const cycle = await command('cycle_model'); assert.equal(cycle.success, true); assert.deepEqual(cycle.data.model, { provider: 'adaptive', id: 'one' });
+  stage = 'thinking'; assert.equal((await command('set_thinking_level', { level: 'low' })).success, true);
+  assert.equal((await command('get_state')).data.thinkingLevel, 'low'); assert.equal(requests.length, 0);
+  receipt.stages.selection = { passed: true, logicalState: true, virtualMetadata: true, setAndCycle: true, effort: true, noModelPost: true };
+  stage = 'prompt'; const completed = waitFor(value => value.type === 'agent_end');
+  assert.equal((await command('prompt', { message: 'Return RPC_ACK.' })).success, true);
+  assert.equal((await completed).status, 'completed');
+  assert.deepEqual(requests, [{ model: 'physical', effort: 'low', authenticated: true }]);
+  const messages = await command('get_messages'); assert.equal(messages.success, true);
+  assert.ok(messages.data.messages.some(message => message.role === 'assistant' && message.content === 'RPC_ACK' && message.origin?.model === 'physical'));
+  receipt.stages.prompt = { passed: true, physicalDispatch: true, physicalOrigin: true };
+  stage = 'close'; child.stdin.end(); const exit = await closed; assert.equal(exit.code, 0);
+  receipt.loopbackPosts = requests.length; receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage; receipt.errorName = error?.name;
+  receipt.line = String(error?.stack).match(/rpc-native\.mjs:(\d+)/)?.[1];
+  if (error?.name === 'AssertionError') receipt.assertion = { operator: error.operator,
+    actual: typeof error.actual === 'number' || typeof error.actual === 'boolean' ? error.actual : undefined,
+    expected: typeof error.expected === 'number' || typeof error.expected === 'boolean' ? error.expected : undefined };
+  process.exitCode = 1;
+} finally {
+  clearTimeout(timer); child?.kill('SIGTERM'); if (closed) await closed;
+  if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.writeFileSync(path.join(directory, 'rpc-native.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt));
+}

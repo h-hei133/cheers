@@ -1,0 +1,47 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/commands/model/virtual.test.ts (14 tests | 1 failed | 13 skipped) 56ms
+   ↓ selects a registered logical model while dormant physical auth is unavailable, preserving authority without routing
+   ↓ permits an absent physical model only with a valid logical marker
+   ↓ refuses a logical choice retired during its switch hook
+   ↓ edits virtual effort through /thinking without changing dormant physical fields
+   ↓ reports selected logical identity in command status and the native model label
+   ↓ clears virtual selection when explicitly selecting a physical model
+   ↓ refuses malformed persisted logical selection instead of projecting a physical fallback
+   ↓ keeps an unavailable saved virtual choice selected and refuses effort or same-address fallback
+   ↓ edits independent session preferences with dormant auth unavailable
+   ↓ does not claim the dormant physical service tier applies to a virtual selection
+   ↓ uses logical admission only to defer dormant model constraints
+   ↓ uses logical admission only to defer dormant independent constraints
+   ↓ uses logical admission only to defer dormant security constraints
+   × rejects caller-owned effort accessors before capability validation or hooks 55ms
+     → expected 4 to be +0 // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/commands/model/virtual.test.ts > rejects caller-owned effort accessors before capability validation or hooks
+AssertionError: expected 4 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 4
+
+ ❯ src/core/commands/model/virtual.test.ts:193:54
+    191|   expect(output).not.toContain('Model switched to');
+    192|   expect(readSessionModel(session.id)).toEqual(before);
+    193|   expect(hook).not.toHaveBeenCalled(); expect(reads).toBe(0);
+       |                                                      ^
+    194| });
+    195| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  16:30:05
+   Duration  3.36s (transform 1.97s, setup 0ms, collect 3.06s, tests 56ms, environment 0ms, prepare 55ms)
+

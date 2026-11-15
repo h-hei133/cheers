@@ -126,6 +126,21 @@ export function buildCompactionWiring(input: CompactionInput): CompactionWiring 
   return compactionWiring(input, summaryRole);
 }
 
+/** Logical selections have no physical budget or summarizer until a request is routed. */
+export function routedCompactionWiring(input: Omit<CompactionInput, 'provider' | 'resolution'>): CompactionWiring {
+  const summaryRole = captureSummaryRole({ config: input.runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
+    admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
+  const unavailable = async (): Promise<never> => { throw new Error('Compaction requires a captured physical request.'); };
+  return { policy: { enabled: input.runtimeConfig.compactionEnabled, contextWindow: 0 },
+    summarize: unavailable, summarizeTurnPrefix: unavailable,
+    forRequest: (request, admission) => {
+      const admit = () => input.admission?.() ?? admission() ?? (!request.isCurrent() ? 'The captured request target changed.' : undefined);
+      assertAdmission(admit);
+      return compactionWiring({ ...input, provider: summaryTarget(request), admission: admit,
+        resolution: { provider: request.activeProvider, model: request.activeModel } }, summaryRole, request);
+    } };
+}
+
 function compactionWiring(input: CompactionInput, summaryRole: ReturnType<typeof captureSummaryRole>,
   prepared?: PreparedTurnContext): CompactionWiring {
   const provider = input.provider;

@@ -4,6 +4,18 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile, type RuntimeConfigFile, type RuntimeProvider } from './runtimeConfig.js';
 import { constrainRuntimeConfig, inspectConfigConstraints } from './constraints.js';
+
+it('defers dormant model limits while retaining configuration invariants before a virtual route', () => {
+  const config = { ...getRuntimeConfig(process.cwd()), contextWindow: 8, maxOutputTokens: 64, reserveTokens: 64 };
+  const target = { provider: 'openai', model: 'dormant' };
+  expect(inspectConfigConstraints(config, target, []).errors.length).toBeGreaterThan(0);
+  let deferred;
+  try { deferred = inspectConfigConstraints(config, undefined, []); } catch { deferred = undefined; }
+  expect(deferred?.errors).toEqual([]);
+  let invalid;
+  try { invalid = inspectConfigConstraints({ ...config, retryBaseDelayMs: 5, retryMaxDelayMs: 1 }, undefined, []); } catch { invalid = undefined; }
+  expect(invalid?.errors).toContain('retryBaseDelayMs must not exceed retryMaxDelayMs.');
+});
 import { resolveProviderCredential } from '../core/shell/providerCredentials.js';
 import { loadCatalog, userCatalogPath } from '../core/models/catalogStore.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../core/shell/runtimeContext.js';

@@ -49,7 +49,11 @@ export async function runModelPresetCommand(args: string[], context: CommandCont
     return { kind: 'local', output: failure ? failure : `Model preset '${name}' from the ${resolved.source} owner is valid for the current catalogue.` };
   }
   if (action === 'save') {
-    const roles = parsePresetRoles(context, selection, parsed.args.slice(1));
+    const physical = selection?.model ? selection.connectionScope === 'provider'
+      ? { connectionScope: 'provider' as const, provider: selection.provider, model: selection.model, thinkingEffort: selection.thinkingEffort }
+      : { connectionId: selection.connectionId, provider: selection.provider, model: selection.model, thinkingEffort: selection.thinkingEffort }
+      : undefined;
+    const roles = parsePresetRoles(context, physical, parsed.args.slice(1));
     if (!roles.ok) return { kind: 'local', output: roles.reason };
     if (!parsed.flags.has('profile') && !sessionId) return { kind: 'local', output: 'Saving a session preset requires an active selected model.' };
     return { kind: 'local', output: parsed.flags.has('profile')

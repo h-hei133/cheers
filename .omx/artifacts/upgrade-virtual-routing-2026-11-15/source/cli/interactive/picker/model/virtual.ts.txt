@@ -1,0 +1,45 @@
+import type { Picker } from '../../overlay.js';
+import type { VirtualModelMetadata } from '../../../../core/models/virtual/contract.js';
+import { THINKING_LEVELS, type ThinkingPreference } from '../../../../core/models/effort.js';
+
+/** Logical effort choices come from registration metadata, before any physical route exists. */
+export function virtualModelEffortPicker(model: VirtualModelMetadata, current: ThinkingPreference,
+  save: (effort: ThinkingPreference, owned: () => boolean) => Promise<string>, back: (notice?: string) => Picker,
+  admission: () => string | undefined, canReturn: () => boolean): Picker {
+  let offered = false, retired = false, pending = false;
+  const supported: readonly ThinkingPreference[] = [null, ...(model.thinkingLevels ?? THINKING_LEVELS)];
+  const choices = supported.includes(current) ? supported : [...supported, current];
+  const owns = (host: () => boolean): boolean => {
+    if (!offered || retired) return false;
+    if (!host()) retired = true;
+    return !retired;
+  };
+  return {
+    title: `Use ${model.provider}/${model.id}`, form: 'panel', filterable: false, acceptsOwnership: true, empty: 'No reasoning settings are available.',
+    initialSelection: current ?? 'auto', back, previewEnd: () => { offered = false; retired = true; },
+    detail: () => [`Model: ${model.provider}/${model.id}`, 'Physical destination is resolved per request.'],
+    footer: 'Enter saves model and effort · Esc returns',
+    async load() {
+      if (retired) return [];
+      offered = true;
+      return choices.map(effort => ({ id: effort ?? 'auto', label: effort ?? 'auto (router decides)',
+        ...(effort === current ? { note: supported.includes(effort) ? 'current preference' : 'current · unavailable' } : {}),
+        ...(!supported.includes(effort) ? { disabled: true, focusable: true } : {}) }));
+    },
+    async apply(ids, host = () => true) {
+      if (pending || ids.length !== 1 || !owns(host)) return undefined;
+      const effort = supported.find(value => (value ?? 'auto') === ids[0]);
+      if (effort === undefined) return undefined;
+      const refusal = admission();
+      if (!owns(host)) return undefined;
+      if (refusal) { retired = true; return { note: refusal, ...(canReturn() && host() ? { next: back(refusal) } : {}) }; }
+      pending = true;
+      try {
+        const note = await save(effort, () => owns(host));
+        const returning = owns(host) && canReturn() && owns(host);
+        retired = true;
+        return { note, ...(returning ? { next: back(note) } : {}) };
+      } finally { pending = false; retired = true; }
+    },
+  };
+}

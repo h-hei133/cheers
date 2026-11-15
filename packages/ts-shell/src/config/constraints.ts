@@ -41,9 +41,7 @@ function undeclaredEndpointFailure(error: unknown): string | undefined {
 const UNDECLARED_ENDPOINT = 'The model catalogue names an endpoint kind this build does not declare';
 
 /** Final relations use the same target, precedence and window as the consumers. */
-export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigModelTarget, catalog: readonly CatalogProvider[]) {
-  const errors: string[] = [];
-  const notices: string[] = [];
+function inspectTargetConstraints(config: RuntimeConfig, target: ConfigModelTarget, catalog: readonly CatalogProvider[], errors: string[], notices: string[]) {
   const resolution = target;
   let endpoint: string | undefined;
   let output: number | undefined;
@@ -67,9 +65,6 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
     // Compare the resolved request, including fallback, pool and CLI selection.
     // Endpoints can contain userinfo or secret query/path values; report only the relation.
     notices.push(ENDPOINT_NOTICE);
-  }
-  if ((config.retryBaseDelayMs ?? DEFAULT_CONFIG.retryBaseDelayMs!) > (config.retryMaxDelayMs ?? DEFAULT_CONFIG.retryMaxDelayMs!)) {
-    errors.push('retryBaseDelayMs must not exceed retryMaxDelayMs.');
   }
   if (catalogProvider(catalog, target.provider, target.baseUrl).ambiguous) errors.push('Multiple model catalogue entries claim the selected endpoint. Resolve the duplicate entries before sending.');
   const entry = catalogModel(catalog, target.provider, target.model, target.baseUrl);
@@ -96,6 +91,18 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
   if (entry?.compat?.supportsTemperature === false && config.configProvenance.temperature?.sources.some(source => source !== 'default')) {
     notices.push('temperature is not sent because the selected model does not support it.');
   }
+  return target;
+}
+
+/** Target-independent relations remain checked while a logical model awaits physical routing. */
+export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigModelTarget | undefined, catalog: readonly CatalogProvider[]) {
+  const errors: string[] = [];
+  const notices: string[] = [];
+  const resolution = target;
+  if (target) target = inspectTargetConstraints(config, target, catalog, errors, notices);
+  if ((config.retryBaseDelayMs ?? DEFAULT_CONFIG.retryBaseDelayMs!) > (config.retryMaxDelayMs ?? DEFAULT_CONFIG.retryMaxDelayMs!)) {
+    errors.push('retryBaseDelayMs must not exceed retryMaxDelayMs.');
+  }
   for (const [key, budget] of Object.entries(config.modelTokenBudgets ?? {})) {
     const separator = key.indexOf('/');
     if (separator <= 0 || separator === key.length - 1) {
@@ -105,11 +112,11 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
     const provider = key.slice(0, separator);
     const model = key.slice(separator + 1);
     const resolved = resolveContextWindow({ catalog, provider, model,
-      ...(provider === target.provider ? { baseUrl: target.baseUrl } : {}),
+      ...(target && provider === target.provider ? { baseUrl: target.baseUrl } : {}),
       configured: configuredContextWindow(config, { ...resolution, provider, model }) });
     // Unknown inactive models have no capacity to verify. Their active use is
     // checked above against the actual runtime fallback or explicit window.
-    if (resolved.source === 'default' && (provider !== target.provider || model !== target.model)) {
+    if (resolved.source === 'default' && (provider !== target?.provider || model !== target?.model)) {
       notices.push('modelTokenBudgets contains a model whose context capacity is unverified.');
       continue;
     }
@@ -122,12 +129,13 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
   return { errors: [...new Set(errors)], notices: [...new Set(notices)] };
 }
 
-export function constrainRuntimeConfig(config: RuntimeConfig, target: ConfigModelTarget, catalog: readonly CatalogProvider[]): RuntimeConfig {
+export function constrainRuntimeConfig(config: RuntimeConfig, target: ConfigModelTarget | undefined, catalog: readonly CatalogProvider[]): RuntimeConfig {
   const { errors, notices } = inspectConfigConstraints(config, target, catalog);
   const diagnostics = config.configDiagnostics.filter(message => message !== ENDPOINT_NOTICE);
   if (!errors.length && !notices.length && diagnostics.length === config.configDiagnostics.length) return config;
   return { ...config,
-    configValidation: { ...config.configValidation, ...(errors.length ? { valid: false, constraintsBlocked: true } : {}) },
+    configValidation: { ...config.configValidation, ...(errors.length ? { valid: false, constraintsBlocked: true,
+      modelConstraintsBlocked: Boolean(target) && inspectConfigConstraints(config, undefined, catalog).errors.length === 0 } : {}) },
     configDiagnostics: [...diagnostics, ...errors.map(error => `Config constraint: ${error}`), ...notices],
   };
 }

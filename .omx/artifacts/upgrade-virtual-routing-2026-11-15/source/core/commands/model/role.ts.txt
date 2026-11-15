@@ -1,0 +1,107 @@
+import path from 'node:path';
+import type { CommandContext } from '../types.js';
+import { configurationApplicationNotice, readFreshConfiguration } from '../configuration.js';
+import { captureModelChoice } from './choice.js';
+import { validateModelPreset } from './preset.js';
+import { resolveProviderCredential } from '../../shell/providerCredentials.js';
+import { readSessionModel, writeSessionModel } from '../../../session/model/state.js';
+import type { SessionModelPolicy, SessionModelRole, SessionModelSelection } from '../../../session/model/contract.js';
+import { sameValue } from '../../../config/values.js';
+import { SessionModelWriteError } from '../../../session/model/outcome.js';
+import { modelRequest, selectedModelMatches, selectionRequest } from './target.js';
+import { projectModelSelection, projectSessionModel } from '../../../session/model/projection.js';
+import { catalogModel } from '../../models/catalog.js';
+import { effortCapability } from '../../models/capability.js';
+import { isThinkingPreference, THINKING_LEVELS, type ThinkingPreference } from '../../models/effort.js';
+import { providerCredentialBaseUrl } from '../../auth/account/target.js';
+import { providerBindingAvailable, providerScopeSelected } from '../../auth/binding.js';
+import { loadCatalog } from '../../models/catalogStore.js';
+import { sessionVirtualModels } from '../../catalog/models.js';
+
+export type AutomaticModelRole = keyof SessionModelPolicy;
+export interface RoleResult { readonly output: string; readonly saved: boolean }
+
+/** Change one automatic consumer through the existing session selection transaction. */
+export function prepareModelRole(context: CommandContext, role: AutomaticModelRole) {
+  const choice = captureModelChoice(context);
+  const admission = (): string | undefined => {
+    if (context.signal?.aborted) return 'Role editing cancelled. Reopen the model picker.';
+    const refusal = choice.admission();
+    return context.signal?.aborted ? 'Role editing cancelled. Reopen the model picker.' : refusal;
+  };
+  const baseline = choice.baseline;
+  const virtualDefinition = baseline?.selection?.virtualModel && context.sessionId ? sessionVirtualModels(context.cwd, context.sessionId)
+    .find(model => model.provider === baseline.selection!.virtualModel!.provider && model.id === baseline.selection!.virtualModel!.model) : undefined;
+  const active = context.resolveConfigTarget?.(choice.config, context.sessionId)
+    ?? resolveProviderCredential({ runtimeConfig: choice.config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
+  const ready = !baseline?.selection && !active.blocked && (active.credential
+    || (providerScopeSelected(choice.config, active) && providerBindingAvailable(choice.catalog, active)));
+  const selection: SessionModelSelection | undefined = baseline?.selection ?? (active.model && ready
+    ? { ...(active.credential?.connectionId ? { connectionScope: 'session' as const, connectionId: active.credential.connectionId }
+      : { connectionScope: 'provider' as const }), provider: active.provider, model: active.model,
+      ...(active.thinkingEffort !== undefined ? { thinkingEffort: active.thinkingEffort } : {}),
+      roles: choice.config.sessionModelRoles ?? {} }
+    : undefined);
+  const defaultRequestCurrent = (): boolean => {
+    try {
+      if (baseline?.selection?.virtualModel) return !virtualDefinition || Boolean(context.sessionId
+        && sessionVirtualModels(context.cwd, context.sessionId).includes(virtualDefinition));
+      const current = context.readConfiguration?.().config ?? context.runtimeConfig
+        ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
+      if (baseline?.selection) return selectedModelMatches(current, baseline.selection)
+        && sameValue(selectionRequest(context, current, baseline.selection), active);
+      const request = modelRequest(context, current);
+      return (Boolean(active.credential) || providerScopeSelected(current, request)) && sameValue(request, active)
+        && providerBindingAvailable(loadCatalog(), request);
+    } catch { return false; }
+  };
+  const commit = (target: SessionModelRole | undefined): RoleResult => {
+    if (!['subagent', 'summary', 'advisor'].includes(role) || !context.sessionId || !baseline?.projectRoot || !selection
+      || path.resolve(baseline.projectRoot) !== path.resolve(context.projectRoot ?? context.cwd)) {
+      return { saved: false, output: 'Role assignment requires a current session and a concrete default model.' };
+    }
+    const refusal = admission();
+    if (refusal) return { saved: false, output: refusal };
+    if (!defaultRequestCurrent()) return { saved: false, output: baseline.selection
+      ? 'The saved default differs from the current request. Select the current model before editing roles.'
+      : 'The current default request changed. Reopen the model picker before editing roles.' };
+    const failure = target ? validateModelPreset({ [role]: target }, choice.config, choice.catalog) : undefined;
+    if (failure) return { saved: false, output: failure };
+    const roles = { ...(selection.roles ?? choice.config.sessionModelRoles) };
+    if (target) roles[role] = target;
+    else delete roles[role];
+    const next = { ...selection, roles };
+    try {
+      writeSessionModel(context.sessionId, next, baseline, () => !admission() && defaultRequestCurrent()
+        && (!target || !validateModelPreset({ [role]: target }, choice.config, choice.catalog)));
+      if (!sameValue(readSessionModel(context.sessionId), next)) {
+        return { saved: false, output: 'Role assignment write outcome is unverified. Reopen the model panel.' };
+      }
+      const notice = configurationApplicationNotice(context);
+      return { saved: true, output: notice
+        ? `Role assignment saved for this session.\n${notice}`
+        : `${role} ${target ? `uses ${target.provider}/${target.model} on connection ${target.connectionId}; reasoning effort: ${target.thinkingEffort ?? 'provider decides'}`
+          : 'follows the default model'} for this session.` };
+    } catch (error) {
+      return { saved: false, output: error instanceof SessionModelWriteError ? error.message
+        : 'Role assignment outcome is unverified. Inspect the saved session before retrying.' };
+    }
+  };
+  const current = (selection?.roles ?? choice.config.sessionModelRoles)?.[role];
+  const resolution = current ? resolveProviderCredential({ runtimeConfig: projectModelSelection(choice.config,
+    { ...current, connectionScope: 'session' }), env: {} }) : undefined;
+  const available = current && resolution && !resolution.blocked && resolution.credential
+    && resolution.provider === current.provider && resolution.model === current.model
+    && resolution.credential.connectionId === current.connectionId;
+  const baseUrl = available ? providerCredentialBaseUrl(choice.catalog, resolution) : undefined;
+  const model = available ? catalogModel(choice.catalog, current.provider, current.model, baseUrl) : undefined;
+  const levels = available && model?.reasoning !== false ? THINKING_LEVELS.filter(level =>
+    effortCapability(choice.catalog, current.provider, current.model, level, baseUrl) === 'supported') : [];
+  const efforts: readonly ThinkingPreference[] = levels.length ? [null, ...levels] : [];
+  return { assign: commit, current, efforts, admission, setEffort: (effort: ThinkingPreference): RoleResult => {
+    if (!current || !isThinkingPreference(effort) || !efforts.includes(effort)) {
+      return { saved: false, output: 'This role has no available setting for that reasoning effort.' };
+    }
+    return commit({ ...current, thinkingEffort: effort });
+  } };
+}

@@ -340,3 +340,27 @@ native.json记录三fresh Node进程和九生产owner哈希，同代chunk复制�
 注册只扩展既有session catalog composition：loader异步初始化完整结束后发布，generation signal／cleanup退出；SDK getModelCatalog返回physical与callback-free virtual两份目录，不虚构credential/runtime。捕获definition与route结果，拒绝访问器／Proxy／重复与超量；state复用snapshotData的显式cross-realm选项，其他消费者默认策略不变。回调原signal和原loader ownership在await之前固定，退休result不污染后继；worker仍明确不支持。
 
 独立复核发现caller map、contribution getter重入、signal方法替换、返回state getter与可变options归属，先复现后修。六门18/178、0monoliths、build 047e196c6597、六断言反转及exact恢复通过。2214文件安装包strict公开类型和Linux安装SDK／同代CLI异步注册、reload pending拒绝、旧dispose保留后继、collision exit1通过；初始native取消cause与slash-path夹具失败保留。当前逻辑选择与生产router仍无消费者，不以注册证明派发或真实provider；C.1/E.7保持开项。下一步把原分支store CAS接入准备期，并审视VM request/messages/signal输入边界。
+
+
+## Logical selection and production routing (2026-11-15)
+
+逻辑选择以virtualModel {provider, model, thinkingEffort?}保存在原session model owner，物理provider／model／tier／context偏好保持独立。先匹配完整注册identity，再解析slash和effort；缺失、退休或损坏选择明确拒绝，不以沉睡的physical配置继续。CLI启动／resume、SDK options／command、picker／completion／status、RPC和fork复用同一投影；物理显式delegation清除继承logical，继承式delegation只更新其自身effort。actual响应origin记录physical replay identity。
+
+参考的direct无状态、previous成功与failed实际目标、route先于budget以及state先于compaction决定已进入生产消费者。registry只持有定义，不持有会话state；原session branch store使用model-routing namespace与JSON.stringify([provider, modelId])键，callback前捕获并在压缩前同键CAS接受，undefined／unchanged同样验证读键。candidate／refresh／reframe沿用accepted physical target，不重取router。outer和implicit-effort retry得到最近实际失败目标，准备前清旧dispatch marker；HTTP transport retry保留原route与body。失败上下文只含report-safe文本。
+
+手动和分支summary用direct路由，完全不capture／publish foreground state；完整physical endpoint／auth／transport先于summary预算，保留隐式effort fallback与显式endpoint output minimum，显式summary role优先。普通configurationAdmission允许其已捕获设置继续，manual durable compaction仍由原owner作精确publication fence。virtual选择不创建cache warmer；没有声称缓存收益。VM file callback只收到有界复制冻结JSON、realm-local signal／UI／error，host保存原invocation lifetime与AsyncResource owner，cancel和UI settlement不被用户可变observer方法阻断；不构成通用VM sandbox承诺。
+
+当前验证为六门（五门见accepted-gates，check:lint单独见accepted-lint）、39套件840项、十个真实AssertionError反转及exact恢复，恢复后5/79通过；另4/34覆盖RPC／completion、1/12覆盖实际config publication owner。surface命令里的不存在state.test.ts未执行，不计入。2634模块／0monoliths，build 083b3d78d8bf8dc44d04fc2ec6c43c595bb7d6e0d68257a983c3491a2854887c；2224文件／2542711bytes压缩包隔离安装、strict skipLibCheck=false NodeNext消费者通过。先前build 606aa5d3abd6只因VM UI测试断言变更被launcher正确拒绝；已重建、重打包并重跑当前SDK／CLI探针。未重复宣称前一构建证据属于新构建。
+
+| 当前Linux入口 | 实际POST | 验证行为 |
+| --- | --- | --- |
+| 安装公开SDK | 10 loopback | inline／file选择，physical origin，state复用／重开／fork，manual／branch direct，cancel／reload零迟到派发和后继保留 |
+| 编译CLI | 2 loopback | --model effort、session-id续接、无沉睡凭据、thinking只改nested选择、缺注册exit1且零fallback |
+| 安装SDK自动摘要 | 12 loopback | threshold／overflow／显式role各route一次、state一次、compaction一次；所有摘要前state已接受 |
+| 安装SDK重试／续轮 | 8 loopback | outer与effort失败context、HTTP相同body重试不重路由、实际custom tool后continuation |
+| 编译CLI RPC | 1 loopback | logical state／catalog／set／cycle／thinking无POST，physical派发和durable origin，EOF exit0；messages缺口未关闭 |
+| 安装SDK原配置模型 | 4 real | prompt／manual direct／branch direct／same-ID reopen，origin及state保持 |
+
+原用户models.json有语法错误，常规loader无法接纳其active physical entry。最初零请求失败，两个使用既存有效对象的尝试connection refused零POST，另一个既存配置目标一POST后auth失败，均保留原receipt并分类。最终只在隔离目录提取原active connection完整有效scalar字段、原地址／endpoint／凭据，并为原active model加最小{id}条目，不补造capability。原用户文件未改，凭据仅写0600临时文件并已清除。四次真实POST证明该隔离配置连接的生产路径，不证明原损坏catalog成功加载。原SDK abort夹具先等abort再释放阻塞callback造成死锁；retry三次fixture依次缺隐式effort、retryEnabled、普通tool批准；所有失败和驱动保留，未修改产品以迎合夹具。
+
+RPC get_messages成功prompt后仍返回startup session.turns，普通physical对照同样失败；SessionStoreAccess.load返回新record而输入host读旧对象。这是D.1既有消费者缺口，当前限定RPC只验选择及durable transcript origin；另次误读transcript格式的fixture失败也保留。C.1独立架构复审CLEAR，最终独立代码lane实际检查8个核心owner并给APPROVE、无发现；先前无最终结果的lane记录unavailable，不充当批准。结合全批root验证与逐项合同核对，C.1本地完成，22/62。证据与82个当前source snapshots在.omx/artifacts/upgrade-virtual-routing-2026-11-15/，lane旧字节单独归档不再回拷。实际L、额外依赖3；E.7仍缺provider／MCP／renderer／setters且worker注册明确unsupported；无Windows、physical terminal、push或CI验收。

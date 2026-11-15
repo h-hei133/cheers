@@ -1,6 +1,7 @@
 import type { CatalogProvider } from '../models/catalog.js';
 import { virtualModelMetadata } from '../models/virtual/capture.js';
 import { catalogContributions } from './contributions.js';
+import { VirtualModelRegistry } from '../models/virtualModels.js';
 
 /** Executable registrations stay outside the accepted physical configuration publication. */
 export function sessionVirtualModels(root: string, sessionId: string) {
@@ -14,4 +15,9 @@ export function sessionModelCatalog(root: string, sessionId: string, physical: r
     throw new Error('Virtual model registration collides with a physical model.');
   }
   return Object.freeze({ physical, virtual: Object.freeze(virtual.map(virtualModelMetadata)) });
+}
+
+/** Keep executable lookups on the current contribution generation, without another registration owner. */
+export function sessionVirtualRegistry(root: string, sessionId: string) {
+  return new VirtualModelRegistry(() => sessionVirtualModels(root, sessionId));
 }

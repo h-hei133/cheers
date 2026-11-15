@@ -1,0 +1,209 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const repo = path.resolve(directory, '../..');
+const packageDirectory = path.resolve(process.env.CHEERS_VIRTUAL_PACKAGE_DIR ?? path.join(directory, 'install/node_modules/@cheers/ts-shell'));
+const receipt = { status: 'not_run', platform: process.platform, node: process.version, packageName: undefined,
+  buildId: undefined, publicSdk: true, actualLoopbackHttp: true, realProvider: false, stages: {}, gaps: [],
+  probeSha256: createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex') };
+const previous = new Map();
+const sessions = new Set(), loaders = new Set(), servers = new Set();
+const stateRoot = path.join(directory, 'native-state');
+let stage = 'setup';
+let deadline;
+let ownsState = false;
+const tick = () => new Promise(resolve => setImmediate(resolve));
+const bounded = (pending, label, milliseconds = 15_000) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error(`Probe deadline: ${label}`)), milliseconds);
+  Promise.resolve(pending).then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+});
+function isolate(name) {
+  const root = path.join(stateRoot, name), home = path.join(root, 'home'), workspace = path.join(root, 'work');
+  fs.mkdirSync(home, { recursive: true }); fs.mkdirSync(workspace, { recursive: true });
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home,
+    GIT_CEILING_DIRECTORIES: root, CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '',
+    OPENAI_API_KEY: 'synthetic-dormant', ANTHROPIC_API_KEY: 'synthetic-physical',
+    CHEERS_MARKETPLACES_FILE: path.join(home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(home, 'extensions.json') })) {
+    if (!previous.has(key)) previous.set(key, process.env[key]); process.env[key] = value;
+  }
+  return { root, home, workspace };
+}
+async function wire(label) {
+  const requests = [];
+  const server = http.createServer(async (request, response) => {
+    try {
+      let bytes = 0; const chunks = [];
+      for await (const chunk of request) { bytes += chunk.length; if (bytes > 8 * 1024 * 1024) throw new Error('Fixture request exceeds limit.'); chunks.push(Buffer.from(chunk)); }
+      if (request.method !== 'POST') {
+        response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify({ data: [{ id: label }] })); return;
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      requests.push({ path: request.url, keyMatches: request.headers.authorization === `Bearer synthetic-${label}`, body });
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'PHYSICAL_ACK' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 } }));
+    } catch { response.writeHead(400); response.end('Invalid fixture request.'); }
+  });
+  servers.add(server); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  return { requests, baseUrl: `http://127.0.0.1:${server.address().port}/v1` };
+}
+function catalog(home, dormant, physical) {
+  const storage = path.join(home, '.cheers'); fs.mkdirSync(storage, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: {
+    openai: { runtime: 'openai', endpoint: 'openai-compatible', auth: 'api-key', baseUrl: dormant.baseUrl,
+      models: [{ id: 'dormant', contextWindow: 64_000, maxTokens: 512 }] },
+    anthropic: { runtime: 'anthropic', endpoint: 'openai-compatible', auth: 'api-key', baseUrl: physical.baseUrl,
+      models: [{ id: 'physical', contextWindow: 64_000, maxTokens: 512 }] },
+  } }));
+}
+function routingEvents(session) {
+  return session.sessionManager.getTranscriptEvents(session.sessionId).filter(event => event.type === 'branch-store' && event.namespace === 'model-routing');
+}
+function routeState(session, modelId) {
+  const key = JSON.stringify(['adaptive', modelId]);
+  const events = routingEvents(session);
+  for (let index = events.length - 1; index >= 0; index--) {
+    if (Object.hasOwn(events[index].entries, key)) {
+      const encoded = events[index].entries[key]; return encoded === null ? undefined : JSON.parse(encoded);
+    }
+  }
+  return undefined;
+}
+async function close(session) { await session.dispose(); sessions.delete(session); }
+
+try {
+  assert.equal(process.platform, 'linux');
+  assert.equal(fs.existsSync(stateRoot), false, 'Refuse existing probe state.');
+  fs.mkdirSync(stateRoot); ownsState = true;
+  const pkg = JSON.parse(fs.readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
+  assert.equal(pkg.name, '@cheers/ts-shell'); receipt.packageName = pkg.name;
+  const installed = JSON.parse(fs.readFileSync(path.join(packageDirectory, 'dist/build-manifest.json'), 'utf8'));
+  const current = JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'), 'utf8'));
+  assert.equal(installed.buildId, current.buildId); receipt.buildId = installed.buildId;
+  const { createAgentSession, DefaultResourceLoader, getRuntimeConfig } = await import(pathToFileURL(path.join(packageDirectory, 'dist/index.js')).href);
+  deadline = setTimeout(() => { receipt.deadline = true; for (const session of sessions) void session.abort(); }, 150_000);
+  const dormant = await wire('dormant'), physical = await wire('physical');
+  const isolated = isolate('public'); catalog(isolated.home, dormant, physical);
+  const config = { ...getRuntimeConfig(isolated.workspace), provider: 'openai', providerConnections: [], activeProviderConnectionId: undefined,
+    sessionConnection: undefined, accountPool: undefined, configScopes: undefined, allowedModels: undefined, sessionModelRoles: undefined,
+    maxOutputTokens: 64, contextWindow: 64_000, reserveTokens: 0, keepRecentTokens: 100,
+    compactionEnabled: false, cacheWarmIntervalSeconds: 0, retryEnabled: false, retryMaxRetries: 0, providerRetryMaxRetries: 0,
+    providerConnectTimeoutMs: 3000, providerHeadersTimeoutMs: 3000, providerBodyTimeoutMs: 3000,
+    providerCredentials: { openai: { apiKey: 'synthetic-dormant', model: 'dormant', baseUrl: dormant.baseUrl },
+      anthropic: { apiKey: 'synthetic-physical', model: 'physical', baseUrl: physical.baseUrl } } };
+  const seen = []; let hold = false, entered, finish;
+  const file = path.join(isolated.workspace, 'models.ts');
+  fs.writeFileSync(file, `export default async api => {
+    await Promise.resolve();
+    api.registerVirtualModel({ provider: 'adaptive', id: 'file', name: 'File', route: request => ({ provider: 'anthropic', modelId: 'physical',
+      state: { count: (request.state?.count ?? 0) + 1 } }) });
+  };`);
+  const makeLoader = () => {
+    const loader = new DefaultResourceLoader({ cwd: isolated.workspace, noContextFiles: true, noSkills: true, noThemes: true,
+      additionalExtensionPaths: [file], extensionFactories: [api => api.registerVirtualModel({ provider: 'adaptive', id: 'inline', name: 'Inline', route: request => {
+        seen.push({ reason: request.reason, count: request.state?.count, previous: request.previous?.modelId, failed: request.failed?.modelId });
+        if (hold) { entered?.(); return new Promise(resolve => { finish = resolve; }); }
+        return { provider: 'anthropic', modelId: 'physical', state: { count: (request.state?.count ?? 0) + 1 } };
+      } })] });
+    loaders.add(loader); return loader;
+  };
+  const create = async (loader, extra = {}) => {
+    await loader.reload(); assert.deepEqual(loader.getExtensions().errors, []);
+    const result = await createAgentSession({ cwd: isolated.workspace, runtimeConfig: config, resourceLoader: loader, noTools: 'all', ...extra });
+    sessions.add(result.session); return result.session;
+  };
+  stage = 'inline-prompt';
+  let loader = makeLoader(); let session = await create(loader, { model: 'adaptive/inline' });
+  assert.equal(session.getModelCatalog().virtual.length, 2);
+  assert.ok(session.getModelCatalog().virtual.every(model => !('route' in model) && !('runtime' in model) && !('auth' in model)));
+  assert.equal((await bounded(session.prompt('Return PHYSICAL_ACK.'), stage)).trim(), 'PHYSICAL_ACK');
+  assert.equal(dormant.requests.length, 0); assert.equal(physical.requests.length, 1);
+  assert.ok(physical.requests.every(item => item.path === '/v1/chat/completions' && item.keyMatches && item.body.model === 'physical'));
+  assert.ok(session.getState().turns.some(message => message.role === 'assistant' && message.origin?.provider === 'anthropic' && message.origin?.model === 'physical'));
+  assert.deepEqual(seen.map(value => value.count), [undefined]);
+  assert.equal(routeState(session, 'inline')?.count, 1);
+  stage = 'inline-state'; await bounded(session.prompt('Continue.'), stage);
+  assert.equal(seen.at(-1).count, 1); assert.equal(seen.at(-1).previous, 'physical');
+  assert.equal(routeState(session, 'inline')?.count, 2);
+  const originalId = session.sessionId; await close(session);
+  stage = 'reopen'; loader = makeLoader(); session = await create(loader, { sessionId: originalId });
+  await bounded(session.prompt('Resume.'), stage); assert.equal(seen.at(-1).count, 2); assert.equal(routeState(session, 'inline')?.count, 3);
+  stage = 'fork'; const forkLoader = makeLoader(); const fork = await create(forkLoader, { forkSource: originalId });
+  assert.notEqual(fork.sessionId, originalId); await bounded(fork.prompt('Fork continuation.'), stage);
+  assert.equal(seen.at(-1).count, 3); assert.equal(routeState(fork, 'inline')?.count, 4); assert.equal(routeState(session, 'inline')?.count, 3);
+  await close(fork);
+  receipt.stages.inline = { passed: true, actualOrigin: true, stateReuse: true, reopened: true, independentFork: true };
+
+  stage = 'direct-summary';
+  for (let index = 0; index < 6; index++) {
+    session.sessionManager.persistUserPromptBarrier(session.sessionId, `Recorded ${index}: ${'bounded verified history '.repeat(60)}`);
+    session.sessionManager.addTurn(session.sessionId, { role: 'assistant', content: 'Retained decision '.repeat(40) });
+  }
+  const beforeDirect = routingEvents(session).length, beforeState = routeState(session, 'inline');
+  const compacted = await bounded(session.compact('Keep a concise summary.'), stage);
+  assert.equal(compacted.status, 'compacted');
+  assert.ok(seen.some(value => value.reason === 'direct')); assert.equal(seen.at(-1).reason, 'direct'); assert.equal(seen.at(-1).count, undefined);
+  assert.equal(routingEvents(session).length, beforeDirect); assert.deepEqual(routeState(session, 'inline'), beforeState);
+  stage = 'branch-summary';
+  assert.equal(typeof session.sessionRuntime.summarizeAbandonedTurns, 'function');
+  const summary = await bounded(session.sessionRuntime.summarizeAbandonedTurns([
+    { role: 'user', content: 'Abandoned context '.repeat(100) }, { role: 'assistant', content: 'Decision '.repeat(70) },
+  ], new AbortController().signal), stage);
+  assert.ok(summary.includes('<compacted-summary>\nPHYSICAL_ACK\n</compacted-summary>')); assert.equal(seen.at(-1).reason, 'direct'); assert.equal(seen.at(-1).count, undefined);
+  assert.equal(routingEvents(session).length, beforeDirect); assert.deepEqual(routeState(session, 'inline'), beforeState);
+  receipt.stages.direct = { passed: true, manualStateless: true, branchStateless: true, branchSurface: 'session.sessionRuntime' };
+
+  stage = 'cancel'; hold = true;
+  const cancelledStarted = new Promise(resolve => { entered = resolve; });
+  const postsBeforeCancel = physical.requests.length, routingBeforeCancel = routingEvents(session).length;
+  const cancelling = session.prompt('Cancel before dispatch.'); const observedCancel = cancelling.then(() => true, () => false);
+  await bounded(cancelledStarted, 'cancel-router-entered'); const aborted = session.abort();
+  finish({ provider: 'anthropic', modelId: 'physical', state: { count: 999 } });
+  await bounded(Promise.all([aborted, observedCancel]), 'cancel-settlement'); await tick();
+  assert.equal(physical.requests.length, postsBeforeCancel); assert.equal(routingEvents(session).length, routingBeforeCancel);
+  hold = false; await bounded(session.prompt('Reuse after cancellation.'), 'cancel-reuse');
+  receipt.stages.cancel = { passed: true, zeroLatePosts: true, zeroRouteStateWrites: true, reused: true };
+
+  stage = 'reload'; hold = true;
+  const reloadingStarted = new Promise(resolve => { entered = resolve; });
+  const postsBeforeReload = physical.requests.length, routingBeforeReload = routingEvents(session).length;
+  const reloading = session.prompt('Reload before dispatch.'); const observedReload = reloading.then(() => true, () => false);
+  await bounded(reloadingStarted, 'reload-router-entered'); await loader.reload({});
+  finish({ provider: 'anthropic', modelId: 'physical', state: { count: 1000 } });
+  await bounded(observedReload, 'reload-settlement'); await tick(); assert.equal(physical.requests.length, postsBeforeReload);
+  assert.equal(routingEvents(session).length, routingBeforeReload);
+  hold = false; await close(session);
+  const successor = loader.getExtensions().extensions.find(item => item.source.includes('<inline:')).extension.virtualModels[0];
+  assert.equal((await successor.route({ provider: 'adaptive', modelId: 'inline', thinkingLevel: 'low', reason: 'direct', messages: [] })).modelId, 'physical');
+  receipt.stages.reload = { passed: true, zeroLatePosts: true, zeroRouteStateWrites: true, successorPreserved: true };
+
+  stage = 'file-prompt'; const fileLoader = makeLoader(); session = await create(fileLoader, { model: 'adaptive/file' });
+  const beforeFile = physical.requests.length;
+  await bounded(session.prompt('File route.'), stage); await bounded(session.prompt('File route again.'), 'file-state');
+  assert.equal(physical.requests.length, beforeFile + 2); assert.equal(routeState(session, 'file')?.count, 2);
+  assert.ok(session.getState().turns.some(message => message.role === 'assistant' && message.origin?.model === 'physical'));
+  receipt.stages.file = { passed: true, publicSelection: true, actualOrigin: true, stateReuse: true };
+  assert.equal(dormant.requests.length, 0); receipt.posts = physical.requests.length;
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage; receipt.errorName = error?.name;
+  receipt.line = String(error?.stack).match(/native\.mjs:(\d+)/)?.[1];
+  if (error?.name === 'AssertionError') receipt.assertion = { operator: error.operator,
+    actual: typeof error.actual === 'number' || typeof error.actual === 'boolean' ? error.actual : undefined,
+    expected: typeof error.expected === 'number' || typeof error.expected === 'boolean' ? error.expected : undefined };
+  process.exitCode = 1;
+} finally {
+  clearTimeout(deadline);
+  for (const session of sessions) await session.dispose().catch(() => {});
+  for (const loader of loaders) { try { loader.captureRetirement()(); } catch {} }
+  for (const server of servers) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  if (ownsState) fs.rmSync(stateRoot, { recursive: true, force: true });
+  fs.writeFileSync(path.join(directory, 'native.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt));
+}

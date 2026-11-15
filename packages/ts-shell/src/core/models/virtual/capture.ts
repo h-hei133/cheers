@@ -1,7 +1,7 @@
 import { types } from 'node:util';
 import { THINKING_LEVELS, type ThinkingLevel } from '../effort.js';
 import { snapshotData } from '../../values/data.js';
-import type { ModelRoute, ModelRouteRequest, VirtualModelDefinition, VirtualModelMetadata } from './contract.js';
+import type { ModelRoute, ModelRouteInput, CapturedVirtualModelDefinition, VirtualModelDefinition, VirtualModelMetadata } from './contract.js';
 
 export const MAX_VIRTUAL_MODELS = 256;
 
@@ -45,9 +45,9 @@ function levels(value: unknown): readonly ThinkingLevel[] | undefined {
 }
 
 /** Capture VM and inline definitions without invoking accessors or retaining mutable metadata. */
-export function captureVirtualDefinition<TState = unknown>(value: VirtualModelDefinition<TState>, admission?: () => void): VirtualModelDefinition<TState> {
+export function captureVirtualDefinition<TState = unknown>(value: VirtualModelDefinition<TState> | CapturedVirtualModelDefinition<TState>, admission?: () => void): CapturedVirtualModelDefinition<TState> {
   const captured = fields(value, ['provider', 'id', 'name', 'thinkingLevels', 'contextWindow', 'maxTokens', 'route']);
-  const route = captured.route?.value as VirtualModelDefinition<TState>['route'];
+  const route = captured.route?.value as CapturedVirtualModelDefinition<TState>['route'];
   if (typeof route !== 'function') throw new Error('Virtual model registration requires a route callback.');
   const provider = label(captured.provider?.value, 128);
   if (provider.includes('/')) throw new Error('Virtual model provider identifiers cannot contain slashes.');
@@ -56,7 +56,7 @@ export function captureVirtualDefinition<TState = unknown>(value: VirtualModelDe
   const metadata: VirtualModelMetadata = Object.freeze({ provider, id: label(captured.id?.value, 512), name: label(captured.name?.value, 256),
     ...(thinkingLevels !== undefined ? { thinkingLevels } : {}), ...(contextWindow !== undefined ? { contextWindow } : {}),
     ...(maxTokens !== undefined ? { maxTokens } : {}) });
-  return Object.freeze({ ...metadata, route: async (request: ModelRouteRequest<TState>) => {
+  return Object.freeze({ ...metadata, route: async (request: ModelRouteInput<TState>) => {
     const signal = request.signal;
     const assertSignal = signal && AbortSignal.prototype.throwIfAborted.bind(signal);
     admission?.(); assertSignal?.();
@@ -81,11 +81,11 @@ export function captureModelRoute<TState>(value: ModelRoute<TState>): ModelRoute
 }
 
 /** Native data slots only: a custom map, sparse array or accessor cannot bypass capture. */
-export function captureVirtualDefinitions(value: readonly VirtualModelDefinition[], admission?: () => void): readonly VirtualModelDefinition[] {
+export function captureVirtualDefinitions(value: readonly (VirtualModelDefinition | CapturedVirtualModelDefinition)[], admission?: () => void): readonly CapturedVirtualModelDefinition[] {
   if (!Array.isArray(value) || types.isProxy(value)) throw new Error('Virtual model registrations require an array.');
   if (value.length > MAX_VIRTUAL_MODELS) throw new Error('Virtual model registration limit exceeded.');
   if (Reflect.ownKeys(value).length !== value.length + 1) throw new Error('Virtual model registration array contains unsupported fields.');
-  const result: VirtualModelDefinition[] = [];
+  const result: CapturedVirtualModelDefinition[] = [];
   for (let index = 0; index < value.length; index++) {
     const descriptor = Object.getOwnPropertyDescriptor(value, index);
     if (!descriptor || !('value' in descriptor)) throw new Error('Virtual model registration array requires data slots.');
@@ -95,7 +95,7 @@ export function captureVirtualDefinitions(value: readonly VirtualModelDefinition
 }
 
 /** Callback-free metadata can be composed beside the accepted physical catalogue. */
-export function virtualModelMetadata(definition: VirtualModelDefinition): VirtualModelMetadata {
+export function virtualModelMetadata(definition: VirtualModelDefinition | CapturedVirtualModelDefinition): VirtualModelMetadata {
   const { route: _route, ...metadata } = definition;
   return Object.freeze(metadata);
 }

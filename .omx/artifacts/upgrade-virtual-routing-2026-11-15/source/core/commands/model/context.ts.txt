@@ -1,0 +1,55 @@
+import type { CommandContext, LocalCommandResult } from '../types.js';
+import { catalogBaseUrl, catalogModel } from '../../models/catalog.js';
+import { readSessionModel } from '../../../session/model/state.js';
+import { parseSyntax } from '../syntax/parse.js';
+import { syntaxHelp } from '../syntax/projection.js';
+import { extendedContextSyntax } from '../extended-context/syntax.js';
+import { publishModelPreference, PreferenceCapabilityError } from './preferences.js';
+import { projectSessionModel } from '../../../session/model/projection.js';
+import { readFreshConfiguration } from '../configuration.js';
+import { modelRequest } from './target.js';
+import { sessionPreferenceMatches } from '../../models/preference.js';
+import { providerBindingAvailable } from '../../auth/binding.js';
+import { loadCatalog } from '../../models/catalogStore.js';
+
+/** `/extended-context` exposes only the catalog's exact model window. */
+export async function runExtendedContextCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
+  const parsed = parseSyntax(extendedContextSyntax, args);
+  if (!parsed.ok) return { kind: 'local', output: `Invalid /extended-context arguments: ${parsed.reason}\n${syntaxHelp(extendedContextSyntax)}` };
+  const selection = context.sessionId ? readSessionModel(context.sessionId) : undefined;
+  const action = parsed.action.name;
+  if (selection?.virtualModel && (action === 'on' || action === 'enable')) {
+    return { kind: 'local', output: 'Extended context requires a physical model; routed capacity is resolved per request.' };
+  }
+  if (selection?.virtualModel && (!action || action === 'status')) return { kind: 'local', output: selection.contextWindow
+    ? `Extended context: saved (${selection.contextWindow} tokens); inactive while a virtual model is selected.` : 'Extended context: off.' };
+  if (!action || action === 'status') {
+    if (!selection?.contextWindow || !selection.model) return { kind: 'local', output: 'Extended context: off.' };
+    const publication = context.readConfiguration?.();
+    const config = publication?.config ?? context.runtimeConfig
+      ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
+    const request = modelRequest(context, config);
+    const matches = sessionPreferenceMatches(config, { ...selection, model: selection.model }, request)
+      && sessionPreferenceMatches(config, config.sessionContextWindow, request)
+      && config.sessionContextWindow?.value === selection.contextWindow;
+    let active = false;
+    try { active = matches && Boolean(request.credential || providerBindingAvailable(publication?.catalog ?? loadCatalog(), request)); }
+    catch { /* An unavailable endpoint keeps this saved preference unverified. */ }
+    return { kind: 'local', output: active ? `Extended context: on (${selection.contextWindow} tokens).`
+      : `Extended context: saved (${selection.contextWindow} tokens); inactive or unverified for the current request.` };
+  }
+  if (!selection || !context.sessionId) return { kind: 'local', output: 'Extended context requires an active selected model; no setting was changed.' };
+  if (action === 'off' || action === 'disable') {
+    const refusal = publishModelPreference(context, selected => { const next = { ...selected }; delete next.contextWindow; return next; });
+    return { kind: 'local', output: refusal ?? 'Extended context disabled for this session.' };
+  }
+  if (action !== 'on' && action !== 'enable') return { kind: 'local', output: 'Usage: /extended-context [on|off|status]' };
+  let window: number | undefined;
+  const refusal = publishModelPreference(context, (selected, catalog, baseUrl) => {
+    const supported = catalogModel(catalog, selected.provider, selected.model, catalogBaseUrl(catalog, selected.provider, baseUrl))?.contextWindow;
+    if (!supported) throw new PreferenceCapabilityError('Extended context refused: this exact model has no published window.');
+    window = supported;
+    return { ...selected, contextWindow: supported };
+  });
+  return { kind: 'local', output: refusal ?? `Extended context enabled at the catalog window (${window} tokens) for this session.` };
+}

@@ -1,0 +1,59 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/cli/bootstrap/cliProcessRunner.test.ts src/core/catalog/models.test.ts src/cli/interactive/picker/model/virtual.test.ts src/cli/interactive/picker/model/publication.test.ts src/cli/provider/route.test.ts src/cli/provider/step.test.ts src/cli/runtime/compaction/virtual.test.ts src/cli/runtime/renewal.test.ts --maxWorkers=1 --no-file-parallelism
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/runtime/compaction/virtual.test.ts (15 tests) 2412ms
+   ✓ keeps an explicit summary role for manual with dormant credentials unavailable  871ms
+ ✓ src/cli/provider/route.test.ts (14 tests) 644ms
+ ❯ src/cli/bootstrap/cliProcessRunner.test.ts (7 tests | 7 failed) 24ms
+   × routes startup notices and preserves signal lifecycle for idle work 10ms
+     → state.begin is not a function
+   × routes startup notices and preserves signal lifecycle for busy work 3ms
+     → state.begin is not a function
+   × routes startup notices and preserves signal lifecycle for pending work 2ms
+     → state.begin is not a function
+   × routes startup notices and preserves signal lifecycle for unknown work 2ms
+     → state.begin is not a function
+   × routes startup notices and preserves signal lifecycle for unreadable work 2ms
+     → state.begin is not a function
+   × routes startup notices and preserves signal lifecycle for save-failed work 2ms
+     → state.begin is not a function
+   × waits for the line-loop first-frame callback before starting the recovery hint 2ms
+     → state.begin is not a function
+ ✓ src/cli/interactive/picker/model/virtual.test.ts (6 tests) 146ms
+ ✓ src/core/catalog/models.test.ts (16 tests) 12ms
+ ✓ src/cli/interactive/picker/model/publication.test.ts (19 tests) 1733ms
+ ✓ src/cli/runtime/renewal.test.ts (12 tests) 2249ms
+   ✓ reports 'persisted' storage and blocks 'manual' dispatch/publication after verification fails  1169ms
+ ✓ src/cli/provider/step.test.ts (15 tests) 945ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for idle work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for busy work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for pending work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for unknown work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for unreadable work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > routes startup notices and preserves signal lifecycle for save-failed work
+ FAIL  src/cli/bootstrap/cliProcessRunner.test.ts > waits for the line-loop first-frame callback before starting the recovery hint
+TypeError: state.begin is not a function
+ ❯ refreshConfiguration src/core/shell/configuration.ts:155:24
+    153| export function refreshConfiguration(context: ConfigurationContext, sc…
+    154|   const state = context.configuration;
+    155|   const ticket = state.begin(configurationBinding(context));
+       |                        ^
+    156|   const snapshot = loadCatalogSnapshot();
+    157|   const catalog = snapshot.providers;
+ ❯ refreshShellRuntimeConfig src/core/shell/runtimeContext.ts:205:18
+ ❯ runCliCycle src/cli/bootstrap/cliProcessRunner.ts:325:32
+ ❯ src/cli/bootstrap/cliProcessRunner.ts:116:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+
+ Test Files  1 failed | 7 passed (8)
+      Tests  7 failed | 97 passed (104)
+   Start at  17:18:04
+   Duration  30.78s (transform 8.91s, setup 0ms, collect 20.90s, tests 8.16s, environment 1ms, prepare 378ms)
+

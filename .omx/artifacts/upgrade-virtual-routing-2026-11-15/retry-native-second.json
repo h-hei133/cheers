@@ -1,0 +1,75 @@
+{
+  "platform": "linux",
+  "publicInstalledSdk": true,
+  "status": "failed",
+  "realProvider": false,
+  "stages": {
+    "outer": {
+      "routes": [
+        {
+          "stage": "outer",
+          "reason": "user",
+          "previous": "physical",
+          "safe": true
+        },
+        {
+          "stage": "outer",
+          "reason": "retry",
+          "count": 1,
+          "previous": "physical",
+          "failed": "physical",
+          "stopReason": "error",
+          "safe": true
+        }
+      ],
+      "models": [
+        "physical",
+        "recovery"
+      ],
+      "routeStateEntries": 2,
+      "posts": 2,
+      "resultMatches": true,
+      "passed": true
+    },
+    "effort": {
+      "routes": [
+        {
+          "stage": "effort",
+          "reason": "user",
+          "previous": "physical",
+          "safe": true
+        },
+        {
+          "stage": "effort",
+          "reason": "retry",
+          "count": 1,
+          "previous": "physical",
+          "failed": "physical",
+          "stopReason": "error",
+          "safe": true
+        }
+      ],
+      "models": [
+        "physical",
+        "recovery"
+      ],
+      "routeStateEntries": 2,
+      "posts": 2,
+      "resultMatches": true,
+      "passed": true
+    }
+  },
+  "buildId": "083b3d78d8bf8dc44d04fc2ec6c43c595bb7d6e0d68257a983c3491a2854887c",
+  "probeSha256": "9dccaeba75c455a48de4f49279e6b6669b65cb7e873afec424112badc9450bbf",
+  "failedStage": "transport",
+  "errorName": "Error",
+  "failedStagePosts": [
+    {
+      "model": "physical"
+    }
+  ],
+  "failureFacts": {
+    "unsupportedEffort": false,
+    "admission": false
+  }
+}

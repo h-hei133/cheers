@@ -1449,6 +1449,7 @@ export class InteractiveMode {
   /** Everything the pickers need from the session, resolved lazily. */
   private pickerHost(signal?: AbortSignal): PickerHost {
     const admission = configurationAdmission(this.options.runtimeContext);
+    const logicalAdmission = configurationAdmission(this.options.runtimeContext, { deferredModel: true });
     const selectionRevision = this.selectionRevision;
     const selectionAdmission = (): string | undefined => {
       if (this.stopped || this.closing || this.selectionRevision !== selectionRevision
@@ -1461,6 +1462,11 @@ export class InteractiveMode {
       commandContext: {
         runCancellable: operation => this.options.sessionRuntime.commands.run(operation),
         admission: selectionAdmission,
+        logicalModelAdmission: () => {
+          if (this.stopped || this.closing || this.selectionRevision !== selectionRevision
+            || this.options.sessionRuntime.getCurrentRunController()?.signal.aborted) return 'The session selection was cancelled or its surface closed. Reopen the picker.';
+          return logicalAdmission();
+        },
         ...(signal ? { signal } : {}),
         projectRoot: this.options.runtimeContext.projectRoot,
         runtimeConfig: this.options.runtimeContext.runtimeConfig,

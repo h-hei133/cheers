@@ -1,0 +1,47 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts (15 tests | 2 failed | 13 skipped) 413ms
+   × routes manual summaries once without reading or writing branch routing state 305ms
+     → expected '999' to be '7' // Object.is equality
+   × routes branch summaries once without reading or writing branch routing state 107ms
+     → expected '999' to be '7' // Object.is equality
+   ↓ keeps an explicit summary role for manual with dormant credentials unavailable
+   ↓ keeps an explicit summary role for branch with dormant credentials unavailable
+   ↓ defers automatic compaction to the routed physical target and does not create a virtual cache warmer
+   ↓ rejects a retired direct route before summary dispatch
+   ↓ refuses a direct summary when its output budget cannot carry explicit thinking
+   ↓ retains its captured settings across a same-binding publication during direct summary route
+   ↓ retains its captured settings across a same-binding publication during direct summary converter
+   ↓ preserves selected effort when a manual summary route omits its override
+   ↓ preserves selected effort when a branch summary route omits its override
+   ↓ uses an explicit route effort override for a branch summary
+   ↓ refuses an unsupported direct summary effort before dispatch: {"effort":"high","physical":{"reasoning":false}}
+   ↓ refuses an unsupported direct summary effort before dispatch: {"effort":"high","physical":{"thinkingLevelMap":{"high":null}}}
+   ↓ refuses an unsupported direct summary effort before dispatch: {"physical":{"reasoning":true},"routeEffort":"max"}
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 13 skipped (15)
+   Start at  17:35:53
+   Duration  12.23s (transform 7.24s, setup 0ms, collect 11.55s, tests 413ms, environment 0ms, prepare 54ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > routes manual summaries once without reading or writing branch routing state
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > routes branch summaries once without reading or writing branch routing state
+AssertionError: expected '999' to be '7' // Object.is equality
+
+Expected: "7"
+Received: "999"
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts:108:42
+    106|   expect(test.route.mock.calls[0]![0]).toMatchObject({ provider: 'adap…
+    107|   expect(test.route.mock.calls[0]![0].state).toBeUndefined();
+    108|   expect(test.store().initial[test.key]).toBe('7');
+       |                                          ^
+    109|   expect(test.requests.length).toBeGreaterThan(0);
+    110|   expect(test.requests.every(request => request.body.model === 'physic…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+

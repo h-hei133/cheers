@@ -20,7 +20,7 @@ import type { ComposerShapeId } from '../presentation/tui/composer/contract.js';
 import type { ConfigInputs } from './inputs/model.js';
 import type { ConfigScopes } from './scope/model.js';
 import type { PathRule } from './scope/contract.js';
-import type { SessionModelPolicy, SessionModelSelection } from '../session/model/contract.js';
+import type { SessionModelPolicy, SessionModelTarget } from '../session/model/contract.js';
 import { captureConfigScopes, scopeSettings } from './scope/capture.js';
 import type { ModelPreferences } from './preferences/contract.js';
 
@@ -117,7 +117,7 @@ export interface RuntimeConfig {
   /** Absent means no model restriction; [] permits no model requests. */
   readonly allowedModels?: readonly string[];
   /** Structured acceptance facts; diagnostic wording never decides publication. */
-  readonly configValidation: { readonly valid: boolean; readonly securityBlocked: boolean; readonly constraintsBlocked?: boolean };
+  readonly configValidation: { readonly valid: boolean; readonly securityBlocked: boolean; readonly constraintsBlocked?: boolean; readonly modelConstraintsBlocked?: boolean };
   readonly provider: RuntimeProvider;
   readonly maxTurns: number;
   /**
@@ -157,7 +157,8 @@ export interface RuntimeConfig {
     readonly value: string;
   };
   /** Bound session catalogue window; never a stored setting or a shared budget. */
-  readonly sessionContextWindow?: Pick<SessionModelSelection, 'provider' | 'model' | 'connectionId' | 'connectionScope'> & {
+  readonly sessionContextWindow?: Pick<SessionModelTarget, 'provider' | 'model' | 'connectionId'> & {
+    readonly connectionScope?: 'session' | 'provider';
     readonly value: number;
   };
   readonly providerConnections: readonly ProviderConnectionConfig[];

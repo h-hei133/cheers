@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/extensions/runtime/virtual.test.ts (21 tests) 1138ms
+ ✓ src/core/commands/model/virtual.test.ts (14 tests) 527ms
+ ✓ src/core/models/virtualModels.test.ts (3 tests) 4ms
+
+ Test Files  3 passed (3)
+      Tests  38 passed (38)
+   Start at  16:42:41
+   Duration  9.33s (transform 2.69s, setup 0ms, collect 5.95s, tests 1.67s, environment 1ms, prepare 490ms)
+

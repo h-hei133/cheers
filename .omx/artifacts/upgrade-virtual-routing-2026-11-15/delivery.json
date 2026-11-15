@@ -1,0 +1,772 @@
+{
+  "date": "2026-11-15",
+  "scope": "C.1 logical selection and production virtual routing; E.7 virtual consumer",
+  "status": "locally-validated",
+  "parentCommit": "356b996b8afaf02460bea48fc91352e05d5c49c2",
+  "buildId": "083b3d78d8bf8dc44d04fc2ec6c43c595bb7d6e0d68257a983c3491a2854887c",
+  "completeTasks": 22,
+  "totalTasks": 62,
+  "overallGoal": "active",
+  "sourceSnapshots": {
+    "packages/ts-shell/src/cli/bootstrap/cliBootstrapContext.ts": {
+      "snapshot": "source/cli/bootstrap/cliBootstrapContext.ts.txt",
+      "sha256": "0d19d77d83ee1e043a455aa6025c9ab1f214b20904cc0fdce81ee77ef4c2e024"
+    },
+    "packages/ts-shell/src/cli/bootstrap/cliProcessRunner.test.ts": {
+      "snapshot": "source/cli/bootstrap/cliProcessRunner.test.ts.txt",
+      "sha256": "2a5e58ff71141a7f14a3e5f0aac41ade7324c9cea62723b4ca4bfaa77639189c"
+    },
+    "packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts": {
+      "snapshot": "source/cli/bootstrap/cliProcessRunner.ts.txt",
+      "sha256": "e5edf056a3802439eb26ecef577cd734a99f33a2bd56dc48be2858123997b432"
+    },
+    "packages/ts-shell/src/cli/bootstrap/model.ts": {
+      "snapshot": "source/cli/bootstrap/model.ts.txt",
+      "sha256": "4292fa2b32054caef16bb37a0f84c05d2e41e2fa81a87e1989e3a541518a3959"
+    },
+    "packages/ts-shell/src/cli/interactive/completion/catalog.ts": {
+      "snapshot": "source/cli/interactive/completion/catalog.ts.txt",
+      "sha256": "272bd773a11e7bdfda815128868694981a9c85bd466241b28ba69546b957b3d2"
+    },
+    "packages/ts-shell/src/cli/interactive/completion/models.ts": {
+      "snapshot": "source/cli/interactive/completion/models.ts.txt",
+      "sha256": "c2eb5963b3b81465cb67c20d97e94070a3d08dff81e029f4f9ee06b8583d3355"
+    },
+    "packages/ts-shell/src/cli/interactive/interactiveCommandRouter.ts": {
+      "snapshot": "source/cli/interactive/interactiveCommandRouter.ts.txt",
+      "sha256": "5f8c1875c3f59deced7ea2d6dd3bd5542efbe67f7290c00763f9bb9073bbd499"
+    },
+    "packages/ts-shell/src/cli/interactive/interactiveMode.ts": {
+      "snapshot": "source/cli/interactive/interactiveMode.ts.txt",
+      "sha256": "7ff25d3ff35766da318b55c17e070fcb4633bcd5d719658212fb79f8153e9906"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/model.ts": {
+      "snapshot": "source/cli/interactive/picker/model.ts.txt",
+      "sha256": "40f877638ae689823cc0ba498cede5a979035ce58a347c56d6091e77d2ede162"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/model/virtual.test.ts": {
+      "snapshot": "source/cli/interactive/picker/model/virtual.test.ts.txt",
+      "sha256": "0867943f4810ada66fc07c2ad60cc9e72ced28f4ac8d5282deb228cc1dc07534"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/model/virtual.ts": {
+      "snapshot": "source/cli/interactive/picker/model/virtual.ts.txt",
+      "sha256": "aa7062da579f2cc6e2b2586a665b9c9ce339cac61be9e230cfbd0847c6d9f0fd"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/model/watch.ts": {
+      "snapshot": "source/cli/interactive/picker/model/watch.ts.txt",
+      "sha256": "78d043e8296b8a408d623d64e2d152e897c4f47a9db9b03b65bdcdc936cde68c"
+    },
+    "packages/ts-shell/src/cli/interactive/sessionFacts.ts": {
+      "snapshot": "source/cli/interactive/sessionFacts.ts.txt",
+      "sha256": "026df084fa7ccc37f004e9b9260d06a52a6065fe08fac24d508250ba5b6e930f"
+    },
+    "packages/ts-shell/src/cli/provider/cliProviderRuntimeBridge.ts": {
+      "snapshot": "source/cli/provider/cliProviderRuntimeBridge.ts.txt",
+      "sha256": "57a4ee5ffc6ca41f1e179a2e34879fafdadc742a445221f9349e4d095701e3d0"
+    },
+    "packages/ts-shell/src/cli/provider/resources.ts": {
+      "snapshot": "source/cli/provider/resources.ts.txt",
+      "sha256": "1ae9163524aa3d0a9cb44ef00cd71e51b3c984408de58f4aa23d6c6d20b9b29a"
+    },
+    "packages/ts-shell/src/cli/provider/route.test.ts": {
+      "snapshot": "source/cli/provider/route.test.ts.txt",
+      "sha256": "d33b606cc650da451fab59c0865b5c941747e5dde5a323d27b300fc7f41e8f2f"
+    },
+    "packages/ts-shell/src/cli/provider/route.ts": {
+      "snapshot": "source/cli/provider/route.ts.txt",
+      "sha256": "868f5317773a642cd3feee53cdb26afa7bb316e0bdf33ba3fcbed5b3624fa447"
+    },
+    "packages/ts-shell/src/cli/provider/step.ts": {
+      "snapshot": "source/cli/provider/step.ts.txt",
+      "sha256": "9e09008340ccef1efab357650fa3563b22753b8ac08c702bade3618e36b08dae"
+    },
+    "packages/ts-shell/src/cli/rpc/host/settings.ts": {
+      "snapshot": "source/cli/rpc/host/settings.ts.txt",
+      "sha256": "80bb34f8b385b8ea49ab6b23e8cc49ea6f473378e605f4e3ae13d8d28c364d83"
+    },
+    "packages/ts-shell/src/cli/rpc/runtimeOps.ts": {
+      "snapshot": "source/cli/rpc/runtimeOps.ts.txt",
+      "sha256": "67e985cc7de0d6f1935c9d18f5edf9e066c3cbb938c30a7a70c2cc2562e9b73a"
+    },
+    "packages/ts-shell/src/cli/runtime/cliRuntimeInvocationBridge.ts": {
+      "snapshot": "source/cli/runtime/cliRuntimeInvocationBridge.ts.txt",
+      "sha256": "3f5a26887ee7ee4110a975bcace309cd140122fe028ac23984a0da701c3add03"
+    },
+    "packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts": {
+      "snapshot": "source/cli/runtime/cliSessionRuntimeFactory.ts.txt",
+      "sha256": "9ea8ea8c4a7acddd8e76a5fa78c827b05f6199d29994091e1587e4a9b35ed118"
+    },
+    "packages/ts-shell/src/cli/runtime/compaction.ts": {
+      "snapshot": "source/cli/runtime/compaction.ts.txt",
+      "sha256": "62c991e9eaa6fb2165dcdf6f6529ef1c1d0d63587b8301904345827b96561f53"
+    },
+    "packages/ts-shell/src/cli/runtime/compaction/context.ts": {
+      "snapshot": "source/cli/runtime/compaction/context.ts.txt",
+      "sha256": "78063a34130e32eae6e2d4aa11332c30305079c16f57b685de94eb78a59d7773"
+    },
+    "packages/ts-shell/src/cli/runtime/compaction/direct.ts": {
+      "snapshot": "source/cli/runtime/compaction/direct.ts.txt",
+      "sha256": "faa2ae81060fe1cdeb817569ecb79a8bcf9894fe53ce62d3472f8848bee92e20"
+    },
+    "packages/ts-shell/src/cli/runtime/compaction/target.ts": {
+      "snapshot": "source/cli/runtime/compaction/target.ts.txt",
+      "sha256": "c6354bce7ccb7f146fb6e7f483ddef07183862b9e10e05b69bee132d5b8f72fa"
+    },
+    "packages/ts-shell/src/cli/runtime/compaction/virtual.test.ts": {
+      "snapshot": "source/cli/runtime/compaction/virtual.test.ts.txt",
+      "sha256": "91c8879f3c26948128c24a1016298ab67703bcfcb5360b64df0dfdda852f6a74"
+    },
+    "packages/ts-shell/src/config/constraints.test.ts": {
+      "snapshot": "source/config/constraints.test.ts.txt",
+      "sha256": "f826eb14fa1d70f3ebbe61cc5d787e09700f9bc7a7eeec5bd0b167767df28dc8"
+    },
+    "packages/ts-shell/src/config/constraints.ts": {
+      "snapshot": "source/config/constraints.ts.txt",
+      "sha256": "2a5b552a573b12c78e2f462f7cca7879bb2262a752fb5e2443a1b931201245c0"
+    },
+    "packages/ts-shell/src/config/runtimeConfig.ts": {
+      "snapshot": "source/config/runtimeConfig.ts.txt",
+      "sha256": "89e53def9d63ccfae698c1bf6729a3768fb82e4574a0bace85de5b0fdf718eb4"
+    },
+    "packages/ts-shell/src/config/state.ts": {
+      "snapshot": "source/config/state.ts.txt",
+      "sha256": "8758a0daff6a4e2b01313a547fc05e5f1c87b4c6103fc97d8423e06d20a35cdb"
+    },
+    "packages/ts-shell/src/core/agent/loop.ts": {
+      "snapshot": "source/core/agent/loop.ts.txt",
+      "sha256": "cec2c02580533e7cbc57456f164771d59a3c0dd61221750ccc8543785cc9aeec"
+    },
+    "packages/ts-shell/src/core/catalog/contributions.ts": {
+      "snapshot": "source/core/catalog/contributions.ts.txt",
+      "sha256": "4998125cf7e43d75c6a08462c80d55e5345abc7462459438c68e57230e153cbf"
+    },
+    "packages/ts-shell/src/core/catalog/models.test.ts": {
+      "snapshot": "source/core/catalog/models.test.ts.txt",
+      "sha256": "433dde98a0e4d10b7d465e884914935d5c6a700def0073bf46bf1f649e204859"
+    },
+    "packages/ts-shell/src/core/catalog/models.ts": {
+      "snapshot": "source/core/catalog/models.ts.txt",
+      "sha256": "ad81a43d1c62cd5ad90ee26e2687e2b7e2d14975f702931de174ec8431dea378"
+    },
+    "packages/ts-shell/src/core/commands/model/context.ts": {
+      "snapshot": "source/core/commands/model/context.ts.txt",
+      "sha256": "e4b5592b0f5df370bb3f27a96413944bc892304785c55dd97b4649414d5dcfa9"
+    },
+    "packages/ts-shell/src/core/commands/model/preferences.ts": {
+      "snapshot": "source/core/commands/model/preferences.ts.txt",
+      "sha256": "b1199ea97343a8c086d821b11b4563101ad4596d8c055d6187c210d81ff61027"
+    },
+    "packages/ts-shell/src/core/commands/model/presetCommand.ts": {
+      "snapshot": "source/core/commands/model/presetCommand.ts.txt",
+      "sha256": "ba11c9bdb809b92885d2881f5113fa5b88a7545cc31f7fffb36484af2176e3b5"
+    },
+    "packages/ts-shell/src/core/commands/model/role.ts": {
+      "snapshot": "source/core/commands/model/role.ts.txt",
+      "sha256": "90a27ce66bd49b21593a638db67b245f9c8f1cb41af758e2b32aaa03d70ba23d"
+    },
+    "packages/ts-shell/src/core/commands/model/selection.ts": {
+      "snapshot": "source/core/commands/model/selection.ts.txt",
+      "sha256": "a5517381ee829d31fd12a9d6166799052b82f78415f08d617f9ae3269eda8be3"
+    },
+    "packages/ts-shell/src/core/commands/model/serviceTier.ts": {
+      "snapshot": "source/core/commands/model/serviceTier.ts.txt",
+      "sha256": "b92e54a5102ee33ae8a07a70a7cefc5e9785c31b3becaf1415db0173e86bb249"
+    },
+    "packages/ts-shell/src/core/commands/model/virtual.test.ts": {
+      "snapshot": "source/core/commands/model/virtual.test.ts.txt",
+      "sha256": "c061389fdd5325fdf3a0ede07883db04972af7988f9e4595401697bdc280e592"
+    },
+    "packages/ts-shell/src/core/commands/model/virtual.ts": {
+      "snapshot": "source/core/commands/model/virtual.ts.txt",
+      "sha256": "8faa8269bb9fea798842915ea177942efe0e8aee7d975178a741674e7271894d"
+    },
+    "packages/ts-shell/src/core/commands/modelCommandRuntime.ts": {
+      "snapshot": "source/core/commands/modelCommandRuntime.ts.txt",
+      "sha256": "250f69dc8fc9cc44e03a35484d7efe734decc313856b072ca7ed60fad0e85644"
+    },
+    "packages/ts-shell/src/core/commands/thinkingCommandRuntime.ts": {
+      "snapshot": "source/core/commands/thinkingCommandRuntime.ts.txt",
+      "sha256": "05ba2ab927c87ad64582e1cf9d886dbf07733a0aba9cf51759e349c16a4d9a34"
+    },
+    "packages/ts-shell/src/core/commands/types.ts": {
+      "snapshot": "source/core/commands/types.ts.txt",
+      "sha256": "95b7194cae83fa9b550cf3211417553faf670279eb4f870fe0687d36824fb9ea"
+    },
+    "packages/ts-shell/src/core/models/virtual/capture.ts": {
+      "snapshot": "source/core/models/virtual/capture.ts.txt",
+      "sha256": "6cd841c531547b3a06955e7e779d65a519010b0234bbb3be878b0f648423e4bf"
+    },
+    "packages/ts-shell/src/core/models/virtual/context.ts": {
+      "snapshot": "source/core/models/virtual/context.ts.txt",
+      "sha256": "28248f5a5090aae49913508f5408fc869b7b417794c00c7979558ce4760f10d3"
+    },
+    "packages/ts-shell/src/core/models/virtual/contract.ts": {
+      "snapshot": "source/core/models/virtual/contract.ts.txt",
+      "sha256": "f2b2454def408251329aec712770090fa794e198204a0c6c0d7e50701aca34ef"
+    },
+    "packages/ts-shell/src/core/models/virtual/selection.test.ts": {
+      "snapshot": "source/core/models/virtual/selection.test.ts.txt",
+      "sha256": "4204ee22a11eaff1ff75fd09006f8a348ad00815c001a3bb6fc8f8b53fb9e4eb"
+    },
+    "packages/ts-shell/src/core/models/virtual/selection.ts": {
+      "snapshot": "source/core/models/virtual/selection.ts.txt",
+      "sha256": "126304560f7a9125b06419b77afcb73fafc471945727574b9ba9af3a98ca5f22"
+    },
+    "packages/ts-shell/src/core/models/virtualModels.test.ts": {
+      "snapshot": "source/core/models/virtualModels.test.ts.txt",
+      "sha256": "276466acd1f3a509ac8e486080d09c54ba79821ac61aac86a4b7095737665142"
+    },
+    "packages/ts-shell/src/core/models/virtualModels.ts": {
+      "snapshot": "source/core/models/virtualModels.ts.txt",
+      "sha256": "a8381a80743f5aea0eb5dca2fe73bb8c56d3c24d88929152bba0cd19c7069cbb"
+    },
+    "packages/ts-shell/src/core/shell/bootstrap.ts": {
+      "snapshot": "source/core/shell/bootstrap.ts.txt",
+      "sha256": "cf1277636b5851f02e94b8d6c06680bd678d17c7157b29a66250e86d1096d3de"
+    },
+    "packages/ts-shell/src/core/shell/configuration.ts": {
+      "snapshot": "source/core/shell/configuration.ts.txt",
+      "sha256": "6566c418716e7bbbadcb839a385e76a802b1ce71267074538ccc331f1f75e175"
+    },
+    "packages/ts-shell/src/core/shell/runtimeContext.ts": {
+      "snapshot": "source/core/shell/runtimeContext.ts.txt",
+      "sha256": "f729f451c34f21d7b772639addf66c6c1c6647e1d5bcf678c9268468ebf67311"
+    },
+    "packages/ts-shell/src/core/shell/scope.ts": {
+      "snapshot": "source/core/shell/scope.ts.txt",
+      "sha256": "11ca93ff41d0c5ef0b56a6748d0dcec6abd74b16d44b78ca8c2a83a2e385e8ae"
+    },
+    "packages/ts-shell/src/entrypoints/cliCommandExecutionBridge.ts": {
+      "snapshot": "source/entrypoints/cliCommandExecutionBridge.ts.txt",
+      "sha256": "8e0f7dfba49fd1e66bcfbd914b49fd89867182b8294367acac1cd4b3c94bf357"
+    },
+    "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts": {
+      "snapshot": "source/entrypoints/cliRuntimeInvocation.ts.txt",
+      "sha256": "ed5914a273e20f9e7bd3fa0a1b055f676dc4231fb4751c7a87efeddd13311ffd"
+    },
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": {
+      "snapshot": "source/extensions/runtime/inProcessLoader.ts.txt",
+      "sha256": "e6ba89ec1c80300924e9c959f19b68a8229d8cde7bf1acc7da68e05558ee1806"
+    },
+    "packages/ts-shell/src/extensions/runtime/ui.ts": {
+      "snapshot": "source/extensions/runtime/ui.ts.txt",
+      "sha256": "14a60aad1f4f60221c7ebe59a92b1747396120d5b5f636d64362044394594cc6"
+    },
+    "packages/ts-shell/src/extensions/runtime/virtual.test.ts": {
+      "snapshot": "source/extensions/runtime/virtual.test.ts.txt",
+      "sha256": "77cbbf42129de5ba56b777a7d8555dacdade67d57c7fd690820ad2cd12521bc7"
+    },
+    "packages/ts-shell/src/extensions/runtime/virtual.ts": {
+      "snapshot": "source/extensions/runtime/virtual.ts.txt",
+      "sha256": "8731e22f56b2dae4838e4a9480c8be53fb9a2c80cd7f32109be86c1d0c4d53f9"
+    },
+    "packages/ts-shell/src/extensions/runtime/virtualSource.ts": {
+      "snapshot": "source/extensions/runtime/virtualSource.ts.txt",
+      "sha256": "8256528e454bbcadbc54fb00dffffcd3723e18ffa4780e98be43e2239775376e"
+    },
+    "packages/ts-shell/src/index.ts": {
+      "snapshot": "source/index.ts.txt",
+      "sha256": "a6ef28d898c9bc48717b08ca682e146a073b5d3923bf83550b061e48e0daffb1"
+    },
+    "packages/ts-shell/src/model-adapters/message.ts": {
+      "snapshot": "source/model-adapters/message.ts.txt",
+      "sha256": "7892864399b48065836ff7f84eb8ecf271ef3a5990227709d8f1451464e437bd"
+    },
+    "packages/ts-shell/src/sdk/agentSession.test.ts": {
+      "snapshot": "source/sdk/agentSession.test.ts.txt",
+      "sha256": "cec209418c702ed460458f7b3fed1cbf0f4ad24d1d26187cecf9d8fc376b1942"
+    },
+    "packages/ts-shell/src/sdk/agentSession.ts": {
+      "snapshot": "source/sdk/agentSession.ts.txt",
+      "sha256": "da1c7c13b5f14c1f18897968b3f53ee9a28f6a269f5cd9577cd5fe17795032e0"
+    },
+    "packages/ts-shell/src/session/branch/create.test.ts": {
+      "snapshot": "source/session/branch/create.test.ts.txt",
+      "sha256": "3b060bdc8e47cde5e97376c40983fc80f9be256cdfdb007e31bdbe6ae3e429ea"
+    },
+    "packages/ts-shell/src/session/branch/create.ts": {
+      "snapshot": "source/session/branch/create.ts.txt",
+      "sha256": "8772a3868f5f2b27a679eed5472ace8f4587087892cbb6650af474b07f01b38f"
+    },
+    "packages/ts-shell/src/session/model/contract.ts": {
+      "snapshot": "source/session/model/contract.ts.txt",
+      "sha256": "825e693ab03a0fedfbbb1b9207c9550802565cdf547a2748c5f412013c45744f"
+    },
+    "packages/ts-shell/src/session/model/logical.ts": {
+      "snapshot": "source/session/model/logical.ts.txt",
+      "sha256": "caab482389b30476c57e9f5a709303212e2075ce6b4c2377cdbb908a0527b6d4"
+    },
+    "packages/ts-shell/src/session/model/projection.ts": {
+      "snapshot": "source/session/model/projection.ts.txt",
+      "sha256": "2ada277ed666bcf97cc445d20919700cee25cba2a0a5a383b66048c08d3b240e"
+    },
+    "packages/ts-shell/src/session/model/routing.ts": {
+      "snapshot": "source/session/model/routing.ts.txt",
+      "sha256": "e276bd6b3ab7b8f8c441c3e4870e1c920a61c2d60e322dd3681778cc1c9ab7bd"
+    },
+    "packages/ts-shell/src/session/model/state.ts": {
+      "snapshot": "source/session/model/state.ts.txt",
+      "sha256": "e01803dd65883e03a6aa317e050dae369188f87206d88213fa44333531b5daa8"
+    },
+    "packages/ts-shell/src/turn/context/contract.ts": {
+      "snapshot": "source/turn/context/contract.ts.txt",
+      "sha256": "326346040d1e7b32982f513df0e0a9359e36e9ebea7808d79b93b708c388e27c"
+    },
+    "packages/ts-shell/src/turn/context/prepare.ts": {
+      "snapshot": "source/turn/context/prepare.ts.txt",
+      "sha256": "22cb1d276d37278ee418743e6f36c6810656e191d4110e522fb09b9e07d8786c"
+    },
+    "packages/ts-shell/src/turn/context/route.ts": {
+      "snapshot": "source/turn/context/route.ts.txt",
+      "sha256": "d9d2331c98f9d11bda6d44010912c3fb9d281c8f9dcb83f42c6395dcfa3a7f67"
+    },
+    "packages/ts-shell/src/turn/request.test.ts": {
+      "snapshot": "source/turn/request.test.ts.txt",
+      "sha256": "798b4fe3468f8bcd4b9641159e024e0f1f5019d0e930d72d289b3d2a0e37a2bf"
+    },
+    "packages/ts-shell/src/turn/request.ts": {
+      "snapshot": "source/turn/request.ts.txt",
+      "sha256": "44700916917ccb83d3e12ad008f658de1824b672500330c4f1a289073def3917"
+    },
+    "packages/ts-shell/src/turn/step.test.ts": {
+      "snapshot": "source/turn/step.test.ts.txt",
+      "sha256": "30302fbadd837644af564729febbb23ef8e48821dce11eb824f56153df7ac357"
+    },
+    "packages/ts-shell/src/turn/step.ts": {
+      "snapshot": "source/turn/step.ts.txt",
+      "sha256": "94b22574cfa67a41972308cd8714481ba6ab6c0ef6792e3b41ef210c952a7037"
+    }
+  },
+  "laneEvidence": {
+    "virtual-input": {
+      "patch": "virtual-input-lane.patch.txt",
+      "sourceSnapshots": {
+        "packages/ts-shell/src/extensions/runtime/virtual.ts": {
+          "snapshot": "lanes/virtual-input/extensions/runtime/virtual.ts.txt",
+          "sha256": "f7b5e7f2f224a2604b89a9097092dc3a1e3a2b04b0f000abcdb19e36160dceef"
+        },
+        "packages/ts-shell/src/extensions/runtime/virtualSource.ts": {
+          "snapshot": "lanes/virtual-input/extensions/runtime/virtualSource.ts.txt",
+          "sha256": "2f165799a7c38cdb4f3a41ebe836993bf8cd038a77d01dd0cd9493c4bd57e664"
+        }
+      },
+      "integrated": true,
+      "note": "Historical lane bytes; integrated current source snapshots are authoritative. Do not recopy."
+    },
+    "virtual-selection": {
+      "patch": "virtual-selection-lane.patch.txt",
+      "sourceSnapshots": {
+        "packages/ts-shell/src/cli/interactive/picker/model/virtual.test.ts": {
+          "snapshot": "lanes/virtual-selection/cli/interactive/picker/model/virtual.test.ts.txt",
+          "sha256": "6a628d6320bde6ffb533c7aab9c65e484badbbe93e24029b9e2136dd0c4ea0d9"
+        },
+        "packages/ts-shell/src/cli/interactive/picker/model/virtual.ts": {
+          "snapshot": "lanes/virtual-selection/cli/interactive/picker/model/virtual.ts.txt",
+          "sha256": "850bfd93e12197240d6e8e24dbbd21789c9e53fd1723e2b791836d6c2e7e8ff3"
+        },
+        "packages/ts-shell/src/core/commands/model/virtual.test.ts": {
+          "snapshot": "lanes/virtual-selection/core/commands/model/virtual.test.ts.txt",
+          "sha256": "c061389fdd5325fdf3a0ede07883db04972af7988f9e4595401697bdc280e592"
+        },
+        "packages/ts-shell/src/core/commands/model/virtual.ts": {
+          "snapshot": "lanes/virtual-selection/core/commands/model/virtual.ts.txt",
+          "sha256": "9154286152bec19c188ad7106fe93b5f33891c10da3c4e8e8f27e85e9cbdfb77"
+        },
+        "packages/ts-shell/src/core/models/virtual/selection.test.ts": {
+          "snapshot": "lanes/virtual-selection/core/models/virtual/selection.test.ts.txt",
+          "sha256": "4204ee22a11eaff1ff75fd09006f8a348ad00815c001a3bb6fc8f8b53fb9e4eb"
+        },
+        "packages/ts-shell/src/core/models/virtual/selection.ts": {
+          "snapshot": "lanes/virtual-selection/core/models/virtual/selection.ts.txt",
+          "sha256": "126304560f7a9125b06419b77afcb73fafc471945727574b9ba9af3a98ca5f22"
+        },
+        "packages/ts-shell/src/session/model/logical.ts": {
+          "snapshot": "lanes/virtual-selection/session/model/logical.ts.txt",
+          "sha256": "caab482389b30476c57e9f5a709303212e2075ce6b4c2377cdbb908a0527b6d4"
+        }
+      },
+      "integrated": true,
+      "note": "Historical lane bytes; integrated current source snapshots are authoritative. Do not recopy."
+    }
+  },
+  "evidence": {
+    "accepted-build-current.log": "b86aa8dcc205ae52ede6ad1013de1e457920a48b74ce17f1939fde89354596aa",
+    "accepted-build-first.log": "87901c5cea06bca858fb142df8aff366fcb1ab837975e663dc4a2a0fefb53adb",
+    "accepted-build.log": "87901c5cea06bca858fb142df8aff366fcb1ab837975e663dc4a2a0fefb53adb",
+    "accepted-functions.log": "dc0e9021c5ac9e9145c40f295c0e1fbaee82e31a722e613b017f6a9cfd488717",
+    "accepted-gates.log": "1b8a3abb4d2b7a8ca2ecea463d34f4f8cc862fe4c214e472daed8b179b88fc15",
+    "accepted-lint.log": "5c9173ecff56274e16ad7f15cfb50087d84ad40376a59365e711ff8051b4f84a",
+    "accepted-tests.log": "c8734a2798db2cc79fa08322df6133cb44b094dc48fdbb7c2a736558fe01f027",
+    "archive.mjs.txt": "67ec40efc41d44af60ab8f47ec9c7b638a2956e3f448093db15fcf5f2126a661",
+    "attempt-one-native.json": "26ee780d68babfca616059b1e50d3fcda35f35cfb0b423771e15780630cc438b",
+    "attempt-one-native.log": "a926b26cd841265f6ae6727c540a750b8fb283c6994868dcf86789f9136fb4b3",
+    "attempt-one-native.mjs.txt": "e16187aa4dd8edb8a6a2d00e2b8e0e978197486e4d6e2ecb6ae0f1433723af0d",
+    "bridge-first-tests.log": "ad482f969a9d5f73c37aaa42ac02d6d891b201dc13ed97612d214ccd49578d3f",
+    "build-first.log": "31a0d379ed5cbc418127cebcd18ce9cf05e49f366523c26630f715d10b11b79b",
+    "build-manifest.json": "90b91bd88d62efdc9008c64291c0495e7ecfa23340fc81ad0508c7f056f185fc",
+    "build-second.log": "21b8d5efc9de908c14a1cff10a168ef3a7ad6ced571b64f02947455ff9fd4488",
+    "build-third.log": "912ba1e0ab19c2cc4102a8a37c95c14912be900d174c0d9a6935586e49118dbe",
+    "cli-native-first-classification.json": "8fed9e64b6d6c6f8e9c2e859f74ca02bcd93a13ad6d12fe70635accc0225fd9c",
+    "cli-native-first.json": "c1e2a2894738261a757566fb5b51d00b2cdf832eea308f16e1b87fb93ba9d62f",
+    "cli-native-first.log": "26c81a3638c97becf061d12572aaf27d880edff995e87d08300bf7a779761774",
+    "cli-native-first.mjs.txt": "9546a50319175fcae3d594f5e1b6c48272c1a3e0ad3eee3a8c49d52aa8b5304f",
+    "cli-native.json": "7df18e710411964cafbe3dd13f57dd94ef7e2b7d13e2a1f4977060e77bc92734",
+    "cli-native.log": "d7e5c3fa562ea730345b378580fd3a3ab719a36a460da7ce5ef5c05833728e0e",
+    "cli-native.mjs.txt": "9546a50319175fcae3d594f5e1b6c48272c1a3e0ad3eee3a8c49d52aa8b5304f",
+    "constraints-red.log": "dbbde9468b4baa1fbc1dafb1f41ee3cd3341133e32d08bd56f6c101051175254",
+    "consumer.mts.txt": "ba1564e3e57b0390f861e0c39724c7e236d0ef3aadb48e1da62efdb92b1ff7d8",
+    "contracts-second-tests.log": "2eb856dfb42b9675ac4b7cbf3ee31b16dc08a265f12c3852aa8edda41a79b436",
+    "delegation-picker-red-corrected.log": "97b51191c8637b380f6294e5a823e4e6e097bffe32314124b6b8fcf1134644b1",
+    "delegation-picker-red.log": "506dabf42d8eb0cc2eac5cd9a3f8b873825c617795170a47c04921d4f16d47a9",
+    "delivery-docs.log": "b343ccc12290561bb865a2691e96199dd78ed3f156ca83960e19e35fd2e1eb3d",
+    "functions.log": "dc0e9021c5ac9e9145c40f295c0e1fbaee82e31a722e613b017f6a9cfd488717",
+    "input-counterexamples.log": "c42b0d19f685f5ab6140885a92cbc8a8ea2ad17577f43f83c62cb5e9a0490682",
+    "install-current.log": "52cd426213f8fec4b56ad66ce620586775c5cc452be20e5e0fe8bbce7ad8f14c",
+    "install.log": "88f3b8c085198befc4f1dcd4a2e08fb0fef913cb9f66b953e80e4e57d1ffc46a",
+    "installed-types-current.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "installed-types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "integrated-cycles.log": "3f5e408fb0b133d7b8fd2149e5298602e6b7ffc4988ed99ba4f663b0be2ec117",
+    "integrated-first-tests.log": "620f1fa888e70c005568ddcd89e2d6071e7d6161b131a69e90c999428fc69981",
+    "integration-tests.log": "9a88688cfb3445b8b001bb5f35a54a553b85c63dd155a06b46c8d5df82f5570c",
+    "lanes/virtual-input/extensions/runtime/virtual.ts.txt": "f7b5e7f2f224a2604b89a9097092dc3a1e3a2b04b0f000abcdb19e36160dceef",
+    "lanes/virtual-input/extensions/runtime/virtualSource.ts.txt": "2f165799a7c38cdb4f3a41ebe836993bf8cd038a77d01dd0cd9493c4bd57e664",
+    "lanes/virtual-selection/cli/interactive/picker/model/virtual.test.ts.txt": "6a628d6320bde6ffb533c7aab9c65e484badbbe93e24029b9e2136dd0c4ea0d9",
+    "lanes/virtual-selection/cli/interactive/picker/model/virtual.ts.txt": "850bfd93e12197240d6e8e24dbbd21789c9e53fd1723e2b791836d6c2e7e8ff3",
+    "lanes/virtual-selection/core/commands/model/virtual.test.ts.txt": "c061389fdd5325fdf3a0ede07883db04972af7988f9e4595401697bdc280e592",
+    "lanes/virtual-selection/core/commands/model/virtual.ts.txt": "9154286152bec19c188ad7106fe93b5f33891c10da3c4e8e8f27e85e9cbdfb77",
+    "lanes/virtual-selection/core/models/virtual/selection.test.ts.txt": "4204ee22a11eaff1ff75fd09006f8a348ad00815c001a3bb6fc8f8b53fb9e4eb",
+    "lanes/virtual-selection/core/models/virtual/selection.ts.txt": "126304560f7a9125b06419b77afcb73fafc471945727574b9ba9af3a98ca5f22",
+    "lanes/virtual-selection/session/model/logical.ts.txt": "caab482389b30476c57e9f5a709303212e2075ce6b4c2377cdbb908a0527b6d4",
+    "lint-first.log": "68895e81dc1427f0b7683560d64fd3e93c2fe83bc545de615f9ba986b8418c9d",
+    "native-first-build.json": "683a7e9e5f71b9eebccf6774503bc5312bbc7a64e38e9715000f43444a9f8ce4",
+    "native-first-build.log": "6e6c96205f49df8ba0f9995eb320f186584b148e67f976516f850d5db6ed231b",
+    "native.json": "0443f7f86880627f6c519f77e9f3c464c073034f8c0a9234d71a8d8e43abb81a",
+    "native.log": "086fd248524f043aa443402014801a0133f8d8713ab769cec3381864a8a9c6c5",
+    "native.mjs.txt": "a36c3b106b3736cc8d093fe46b8f88ab11879b0699c292b8d8a3ea975b1570b6",
+    "pack-errors.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "pack-first.json": "d0fc65a2bd8cb99989e3ca9be0876bbab5a57bf346c8eae0affee12f0aba338c",
+    "pack.json": "c8901743718257b3c99a4415b89bf1677fb0553c40bb670259a53d366b34d5c1",
+    "publication-tests.log": "3cb22c5ad12442edb8810893f46a859b3464850a1ad8484a86baedeaa2263441",
+    "real-native-first-classification.json": "b93549c41c8a3e36f16f53b1a815129f28b1a1c0b2c7881e999d167e2cb44504",
+    "real-native-first.json": "0981b5bc174b69a85d3de84d4a283f7b1a06f1528e6c82ea2b0ace0fe0e7bb62",
+    "real-native-first.log": "b8c9f4ee0009eff99926ae16b11c35f25fe299616b99d5762d8289833d68611a",
+    "real-native-first.mjs.txt": "7820a41990c7aad5cacfd224f75b7bcf20b5781d14678c40784340d31865781d",
+    "real-native-fourth.json": "4f8b69dd77010b4d604e9d0296e6dcb55958394b19414235a1b4beaba0d30ada",
+    "real-native-fourth.log": "13511e82ea295f03f100efd8c9c1fa1eeaf116bc2b7e7d3e74997a96877a3ee5",
+    "real-native-fourth.mjs.txt": "fde1c39f08857e0382595a1544fe34671def64a12662f0350fc1f24152709e87",
+    "real-native-second-classification.json": "62e9d70c89857ad9ad409ffd356be4c089d02a90d853a0591bf8ce89856316c9",
+    "real-native-second.json": "af5e267b2968c183ce74c3131c7e468f805879b0605d41f8c70592d07e6c7eeb",
+    "real-native-second.log": "bfbcfa23bcafa543dee10a1d1d909038bfe8be47cb2d2db2363bc74d5da22d35",
+    "real-native-second.mjs.txt": "d5b77993dbf1c46e3e7bc90d491208c83e04af9db4b7a3f98b82c0f2bfae28cc",
+    "real-native-third.json": "39d0127e19b657bcf3b1ae526783b50a37ddc0cfbb277ab51ce8c6e2c55512f2",
+    "real-native-third.log": "c9a59062295eef23d03a996c2efee11a227b678ebc579a33587c61bcb356cf66",
+    "real-native-third.mjs.txt": "5ac1c6f0f4fe1a4ecc6e6c92f64c3841ee2184b1b43d0a77d09588759eacdd9a",
+    "real-native.json": "387124e011f0ad4be1a5a5c57bc7d01d8d6357e55f510613f164083871519e45",
+    "real-native.log": "82cc0414f69269825b9fc036e7b669e764319aa1b165fb86f5a4a5f1da8663e7",
+    "real-native.mjs.txt": "07cb181e00564f16f789486ba5a95012759e37bf4855d154a3dd8fe51694b2c4",
+    "retry-effort-red.log": "2b514fcb7ae7d87d7bea242b7ce0950e3af91df1e54edbc7bd6aa49d02be3c33",
+    "retry-native-classifications.json": "a779f846aee5b1f8ecf04a79206e74585b7b23bf0d4e4983c1cd90a1d3760598",
+    "retry-native-first.json": "3fc4e202c8722cf9f1678beec8c71218f42d2d9b2fba3937b06a2471f4b3c13d",
+    "retry-native-first.log": "ad04760fd9f402154f53d8f134e50347b5c64695462cca9c779b794246ec53b5",
+    "retry-native-first.mjs.txt": "eec8ccfb72eaed048652e5e40930e39dee172d0a9f464e390d8de108093905ea",
+    "retry-native-second.json": "6e9f7f79aebc87f89eec99bab144d825ac4b4fecd78268c262987d0a6f63594c",
+    "retry-native-second.log": "1a21d401393fffebab1d40a7fab3307b4858f7a9f283d73dc874ebcd1c36cc94",
+    "retry-native-second.mjs.txt": "9dccaeba75c455a48de4f49279e6b6669b65cb7e873afec424112badc9450bbf",
+    "retry-native-third.json": "f0e267695cfb2aa8b41d22e12a7c82bc714bfff1e99d73e175ed47cc9129beae",
+    "retry-native-third.log": "2af3a19b04b013014ffb5f91efabdeb65a7c302c325cba5e3d7556478e575eb8",
+    "retry-native-third.mjs.txt": "0ed5228936a6c858dc6d2281558fc111bf65cd09d2d05fbb4246575ca9a864f8",
+    "retry-native.json": "06df60ee2f0b697cd5705bb5441057ba69ea950268d1b6a37d413cdfae22a306",
+    "retry-native.log": "49b645a1f48c335bf1f3ac8f35ca404f902397d43a0896366db8aa2a1cf5ca50",
+    "retry-native.mjs.txt": "091163f5bf04bb65e78d72dd7a15e9e1d4cca31f800e629595f409d8079c0d4f",
+    "retry-router-red.log": "06fd7bf9cf3f37e39978e710e4cf9e85de312e04ad937852a5ed1ab5e1b3c989",
+    "retry-startup-tests.log": "4583154b338cb8fc2bc214c452727b955886f5682bbcdd0d8eb3c136b20c355d",
+    "reversal-delegated-selection.log": "6de597a49b0cbc2e16e92de517ce0b7477f54981d678c48127c2c9e65b535cf8",
+    "reversal-direct-stateless.log": "bcced7269ff69046760c11bcbb0287430157eb1a902514b7c38116ab90fbf511",
+    "reversal-restored-tests.log": "856d59cdde5cb5cc4d4fe9e784910959bb0c5609c0797b1ca26b504be771d4df",
+    "reversal-retry-context.log": "0f637769ac68bf021160c5ef1041c727763efbde47a33cc6ff9670b0ffc72473",
+    "reversal-retry-dispatch-identity.log": "4b3572ee9c4825193e40771a44f73e65c39c8c01b5ac3a5d51ad2a962b1c5580",
+    "reversal-route-acceptance-order.log": "92986ec06ac676fb53eba8dce17ad9af5dd52171c96882c662dbad1f841ba406",
+    "reversal-route-read-cas.log": "f4d79e5d7db7fe638ab82d653f50afa9ba78d4e8dc813fa56f480674d6f6af40",
+    "reversal-run.log": "3e52d1b4f4201da6dd80a6242c37351b853815399ac09d8e2b2b07978bb0ceb1",
+    "reversal-selection-capture.log": "eb72998f9fbbfab50bcfa827cdc61ceed070c4eff43ddb3de49c80f54dd9c715",
+    "reversal-summary-effort.log": "d04f05ddab9be29c7bd079c376beffccb36cc47552f7e365a113fc95aca6feca",
+    "reversal-summary-output.log": "b743d8d0e5a0e410420582f64e353a18ff6ca9045ea01bcb57a5723e7619bd7b",
+    "reversal-ui-final.log": "682b5296d6f5f59d3fe302d4507e2d4f0d18b55628af2f791618e8bd8a9b4780",
+    "reversal-ui-settlement-first.log": "02f8b68222f56670dae1c9a2bf82973f87643f303cfe1568a0425ffdb54d187e",
+    "reversal-ui-settlement.log": "c5b68b2e366e6de81450cfa8c4a02f78f5e00218fc2b789e910d1142fd97cb93",
+    "reversal.mjs.txt": "9087db1714498fb02f8e251df3abb16969e4bc452df2a41539fb1bb6f53eab09",
+    "reversals-first.json": "661cc7128c4bcce129245d731346111869e1af09c0a364e919fee89459ee7600",
+    "reversals.json": "e758b42cefe90a8e3711b3c05516bb4541e68620da54f47cd82a6b19b753c0de",
+    "review-architecture.json": "09eec294e6fe098f6ebd43887f68e5c9d4d219ea80c8da719a55f402d23ffaef",
+    "review-availability.json": "bf4d60878cbccce28afb3425c0e961bf52dc0909d23659c744f5d51ccc89224b",
+    "review-code.json": "ee430bca88869c7cd31cc4a816c46f050628d0d19f29cafc5586e9da9b14a909",
+    "review-fixes-tests.log": "2e842fc13b161deead7c409174784e428ad9a1165078b041cb90a9b4403753ab",
+    "routing-counterexamples.log": "af37d11ab88f38ef582de5ac5df25c681fa5ba10e285bbd73aa319bc3929367f",
+    "rpc-baseline.json": "f7905363e8689b1a780f1b6b45933e4675c9a11430485b14624ceaa464eb64cd",
+    "rpc-baseline.log": "741f716918c75aba773e38974b7cf6424e99343c0447295f25bd5730212a5dde",
+    "rpc-baseline.mjs.txt": "349731f5522a035cdefd273ba3b42dc9e0f8141f575b304dcdf53d420787f389",
+    "rpc-classification.json": "030313986f71ed7b2adfe1663495cfbcb446211525111c8b01a0f545949f5843",
+    "rpc-native-first.json": "d51c1aef03a2c2c3ae572956e823e480d8cbe4ed861847463d65f7733deeed36",
+    "rpc-native-first.log": "d513b42ca52a0fc71c849a9d4d75aafb51deb5e1b69dccbde7c20bc4d1f7f9b3",
+    "rpc-native-first.mjs.txt": "ba1a7cff1b94d1cd7475c3c5e95aa17fa3aac335e55369ab95d9296ddb94756d",
+    "rpc-native-second.json": "cc1fb16ec20405ee77cb4923e9ad7823bd958af652cb77abc9a64a9f63d286d7",
+    "rpc-native-second.log": "7523bd47cd9bc1a0afef1cb72384e8816e403380daf10751a4c1e91f290ea2cd",
+    "rpc-native-second.mjs.txt": "8646d6361f239eb22f46e919bf1b3732018e23216294a9936b4b805e68041aa1",
+    "rpc-native-third.json": "c6f5393f180ad1bd0fd7f1181cd6b35a93cb39657e260b17b2228213fb104b8a",
+    "rpc-native-third.log": "fb4e1cebb818204f3f48ab8f9625d4625affddb06850d9fcbba16feb0b145dbb",
+    "rpc-native-third.mjs.txt": "25f7eba4ecc094aed12129e3106ea14c4d61a4fc9997320fc13848ae6d20c154",
+    "rpc-native.json": "1f5c99759ca72d75370fba5d30a7fb04a55f79b6dcbb645fed4fa7f8b0853216",
+    "rpc-native.log": "f48c242a4e0e723d38f5b2e1480e585a7ac22c9850c7e31a97fa0e88bab6a550",
+    "rpc-native.mjs.txt": "2df6110fc60bd73399746467a6c9f5a95a45a429be8b7244a6d9baa9ea285bcc",
+    "selection-accessor-red.log": "c290b5d929c162d732040cccac962d1ab7b35b61dbdf51c40b9cc631f2629b0c",
+    "selection-counterexamples.log": "97d3e3f1b4503892e3fcec17b5d23d3fda42f53e4226506c7ed16b40abbb04c7",
+    "selection-first-tests.log": "1a10d25ccbb3e0dff252721361f467eff1b9a0492cde09a57ee25e558bfc1656",
+    "selection-integrated.json": "04238c8578b6323862c22e081bcba3d546dcf981418d0179381d2d3989133474",
+    "selection-red.log": "c3ca48ad38e75c3c492b67394042fdfafa502f742d7221367f2c608ecebcebc9",
+    "selection-surface-red.log": "d5b2c073bc8dd8c721f11b9a3aa1a9d9654357cd9d72ed6873c49d506e562ac5",
+    "selection-ui-sdk-red.log": "5ff43a886931251283c2d189964a8cee9ea9122a39a876bdc0c281e9db50e8be",
+    "source/cli/bootstrap/cliBootstrapContext.ts.txt": "0d19d77d83ee1e043a455aa6025c9ab1f214b20904cc0fdce81ee77ef4c2e024",
+    "source/cli/bootstrap/cliProcessRunner.test.ts.txt": "2a5e58ff71141a7f14a3e5f0aac41ade7324c9cea62723b4ca4bfaa77639189c",
+    "source/cli/bootstrap/cliProcessRunner.ts.txt": "e5edf056a3802439eb26ecef577cd734a99f33a2bd56dc48be2858123997b432",
+    "source/cli/bootstrap/model.ts.txt": "4292fa2b32054caef16bb37a0f84c05d2e41e2fa81a87e1989e3a541518a3959",
+    "source/cli/interactive/completion/catalog.ts.txt": "272bd773a11e7bdfda815128868694981a9c85bd466241b28ba69546b957b3d2",
+    "source/cli/interactive/completion/models.ts.txt": "c2eb5963b3b81465cb67c20d97e94070a3d08dff81e029f4f9ee06b8583d3355",
+    "source/cli/interactive/interactiveCommandRouter.ts.txt": "5f8c1875c3f59deced7ea2d6dd3bd5542efbe67f7290c00763f9bb9073bbd499",
+    "source/cli/interactive/interactiveMode.ts.txt": "7ff25d3ff35766da318b55c17e070fcb4633bcd5d719658212fb79f8153e9906",
+    "source/cli/interactive/picker/model/virtual.test.ts.txt": "0867943f4810ada66fc07c2ad60cc9e72ced28f4ac8d5282deb228cc1dc07534",
+    "source/cli/interactive/picker/model/virtual.ts.txt": "aa7062da579f2cc6e2b2586a665b9c9ce339cac61be9e230cfbd0847c6d9f0fd",
+    "source/cli/interactive/picker/model/watch.ts.txt": "78d043e8296b8a408d623d64e2d152e897c4f47a9db9b03b65bdcdc936cde68c",
+    "source/cli/interactive/picker/model.ts.txt": "40f877638ae689823cc0ba498cede5a979035ce58a347c56d6091e77d2ede162",
+    "source/cli/interactive/sessionFacts.ts.txt": "026df084fa7ccc37f004e9b9260d06a52a6065fe08fac24d508250ba5b6e930f",
+    "source/cli/provider/cliProviderRuntimeBridge.ts.txt": "57a4ee5ffc6ca41f1e179a2e34879fafdadc742a445221f9349e4d095701e3d0",
+    "source/cli/provider/resources.ts.txt": "1ae9163524aa3d0a9cb44ef00cd71e51b3c984408de58f4aa23d6c6d20b9b29a",
+    "source/cli/provider/route.test.ts.txt": "d33b606cc650da451fab59c0865b5c941747e5dde5a323d27b300fc7f41e8f2f",
+    "source/cli/provider/route.ts.txt": "868f5317773a642cd3feee53cdb26afa7bb316e0bdf33ba3fcbed5b3624fa447",
+    "source/cli/provider/step.ts.txt": "9e09008340ccef1efab357650fa3563b22753b8ac08c702bade3618e36b08dae",
+    "source/cli/rpc/host/settings.ts.txt": "80bb34f8b385b8ea49ab6b23e8cc49ea6f473378e605f4e3ae13d8d28c364d83",
+    "source/cli/rpc/runtimeOps.ts.txt": "67e985cc7de0d6f1935c9d18f5edf9e066c3cbb938c30a7a70c2cc2562e9b73a",
+    "source/cli/runtime/cliRuntimeInvocationBridge.ts.txt": "3f5a26887ee7ee4110a975bcace309cd140122fe028ac23984a0da701c3add03",
+    "source/cli/runtime/cliSessionRuntimeFactory.ts.txt": "9ea8ea8c4a7acddd8e76a5fa78c827b05f6199d29994091e1587e4a9b35ed118",
+    "source/cli/runtime/compaction/context.ts.txt": "78063a34130e32eae6e2d4aa11332c30305079c16f57b685de94eb78a59d7773",
+    "source/cli/runtime/compaction/direct.ts.txt": "faa2ae81060fe1cdeb817569ecb79a8bcf9894fe53ce62d3472f8848bee92e20",
+    "source/cli/runtime/compaction/target.ts.txt": "c6354bce7ccb7f146fb6e7f483ddef07183862b9e10e05b69bee132d5b8f72fa",
+    "source/cli/runtime/compaction/virtual.test.ts.txt": "91c8879f3c26948128c24a1016298ab67703bcfcb5360b64df0dfdda852f6a74",
+    "source/cli/runtime/compaction.ts.txt": "62c991e9eaa6fb2165dcdf6f6529ef1c1d0d63587b8301904345827b96561f53",
+    "source/config/constraints.test.ts.txt": "f826eb14fa1d70f3ebbe61cc5d787e09700f9bc7a7eeec5bd0b167767df28dc8",
+    "source/config/constraints.ts.txt": "2a5b552a573b12c78e2f462f7cca7879bb2262a752fb5e2443a1b931201245c0",
+    "source/config/runtimeConfig.ts.txt": "89e53def9d63ccfae698c1bf6729a3768fb82e4574a0bace85de5b0fdf718eb4",
+    "source/config/state.ts.txt": "8758a0daff6a4e2b01313a547fc05e5f1c87b4c6103fc97d8423e06d20a35cdb",
+    "source/core/agent/loop.ts.txt": "cec2c02580533e7cbc57456f164771d59a3c0dd61221750ccc8543785cc9aeec",
+    "source/core/catalog/contributions.ts.txt": "4998125cf7e43d75c6a08462c80d55e5345abc7462459438c68e57230e153cbf",
+    "source/core/catalog/models.test.ts.txt": "433dde98a0e4d10b7d465e884914935d5c6a700def0073bf46bf1f649e204859",
+    "source/core/catalog/models.ts.txt": "ad81a43d1c62cd5ad90ee26e2687e2b7e2d14975f702931de174ec8431dea378",
+    "source/core/commands/model/context.ts.txt": "e4b5592b0f5df370bb3f27a96413944bc892304785c55dd97b4649414d5dcfa9",
+    "source/core/commands/model/preferences.ts.txt": "b1199ea97343a8c086d821b11b4563101ad4596d8c055d6187c210d81ff61027",
+    "source/core/commands/model/presetCommand.ts.txt": "ba11c9bdb809b92885d2881f5113fa5b88a7545cc31f7fffb36484af2176e3b5",
+    "source/core/commands/model/role.ts.txt": "90a27ce66bd49b21593a638db67b245f9c8f1cb41af758e2b32aaa03d70ba23d",
+    "source/core/commands/model/selection.ts.txt": "a5517381ee829d31fd12a9d6166799052b82f78415f08d617f9ae3269eda8be3",
+    "source/core/commands/model/serviceTier.ts.txt": "b92e54a5102ee33ae8a07a70a7cefc5e9785c31b3becaf1415db0173e86bb249",
+    "source/core/commands/model/virtual.test.ts.txt": "c061389fdd5325fdf3a0ede07883db04972af7988f9e4595401697bdc280e592",
+    "source/core/commands/model/virtual.ts.txt": "8faa8269bb9fea798842915ea177942efe0e8aee7d975178a741674e7271894d",
+    "source/core/commands/modelCommandRuntime.ts.txt": "250f69dc8fc9cc44e03a35484d7efe734decc313856b072ca7ed60fad0e85644",
+    "source/core/commands/thinkingCommandRuntime.ts.txt": "05ba2ab927c87ad64582e1cf9d886dbf07733a0aba9cf51759e349c16a4d9a34",
+    "source/core/commands/types.ts.txt": "95b7194cae83fa9b550cf3211417553faf670279eb4f870fe0687d36824fb9ea",
+    "source/core/models/virtual/capture.ts.txt": "6cd841c531547b3a06955e7e779d65a519010b0234bbb3be878b0f648423e4bf",
+    "source/core/models/virtual/context.ts.txt": "28248f5a5090aae49913508f5408fc869b7b417794c00c7979558ce4760f10d3",
+    "source/core/models/virtual/contract.ts.txt": "f2b2454def408251329aec712770090fa794e198204a0c6c0d7e50701aca34ef",
+    "source/core/models/virtual/selection.test.ts.txt": "4204ee22a11eaff1ff75fd09006f8a348ad00815c001a3bb6fc8f8b53fb9e4eb",
+    "source/core/models/virtual/selection.ts.txt": "126304560f7a9125b06419b77afcb73fafc471945727574b9ba9af3a98ca5f22",
+    "source/core/models/virtualModels.test.ts.txt": "276466acd1f3a509ac8e486080d09c54ba79821ac61aac86a4b7095737665142",
+    "source/core/models/virtualModels.ts.txt": "a8381a80743f5aea0eb5dca2fe73bb8c56d3c24d88929152bba0cd19c7069cbb",
+    "source/core/shell/bootstrap.ts.txt": "cf1277636b5851f02e94b8d6c06680bd678d17c7157b29a66250e86d1096d3de",
+    "source/core/shell/configuration.ts.txt": "6566c418716e7bbbadcb839a385e76a802b1ce71267074538ccc331f1f75e175",
+    "source/core/shell/runtimeContext.ts.txt": "f729f451c34f21d7b772639addf66c6c1c6647e1d5bcf678c9268468ebf67311",
+    "source/core/shell/scope.ts.txt": "11ca93ff41d0c5ef0b56a6748d0dcec6abd74b16d44b78ca8c2a83a2e385e8ae",
+    "source/entrypoints/cliCommandExecutionBridge.ts.txt": "8e0f7dfba49fd1e66bcfbd914b49fd89867182b8294367acac1cd4b3c94bf357",
+    "source/entrypoints/cliRuntimeInvocation.ts.txt": "ed5914a273e20f9e7bd3fa0a1b055f676dc4231fb4751c7a87efeddd13311ffd",
+    "source/extensions/runtime/inProcessLoader.ts.txt": "e6ba89ec1c80300924e9c959f19b68a8229d8cde7bf1acc7da68e05558ee1806",
+    "source/extensions/runtime/ui.ts.txt": "14a60aad1f4f60221c7ebe59a92b1747396120d5b5f636d64362044394594cc6",
+    "source/extensions/runtime/virtual.test.ts.txt": "77cbbf42129de5ba56b777a7d8555dacdade67d57c7fd690820ad2cd12521bc7",
+    "source/extensions/runtime/virtual.ts.txt": "8731e22f56b2dae4838e4a9480c8be53fb9a2c80cd7f32109be86c1d0c4d53f9",
+    "source/extensions/runtime/virtualSource.ts.txt": "8256528e454bbcadbc54fb00dffffcd3723e18ffa4780e98be43e2239775376e",
+    "source/index.ts.txt": "a6ef28d898c9bc48717b08ca682e146a073b5d3923bf83550b061e48e0daffb1",
+    "source/model-adapters/message.ts.txt": "7892864399b48065836ff7f84eb8ecf271ef3a5990227709d8f1451464e437bd",
+    "source/sdk/agentSession.test.ts.txt": "cec209418c702ed460458f7b3fed1cbf0f4ad24d1d26187cecf9d8fc376b1942",
+    "source/sdk/agentSession.ts.txt": "da1c7c13b5f14c1f18897968b3f53ee9a28f6a269f5cd9577cd5fe17795032e0",
+    "source/session/branch/create.test.ts.txt": "3b060bdc8e47cde5e97376c40983fc80f9be256cdfdb007e31bdbe6ae3e429ea",
+    "source/session/branch/create.ts.txt": "8772a3868f5f2b27a679eed5472ace8f4587087892cbb6650af474b07f01b38f",
+    "source/session/model/contract.ts.txt": "825e693ab03a0fedfbbb1b9207c9550802565cdf547a2748c5f412013c45744f",
+    "source/session/model/logical.ts.txt": "caab482389b30476c57e9f5a709303212e2075ce6b4c2377cdbb908a0527b6d4",
+    "source/session/model/projection.ts.txt": "2ada277ed666bcf97cc445d20919700cee25cba2a0a5a383b66048c08d3b240e",
+    "source/session/model/routing.ts.txt": "e276bd6b3ab7b8f8c441c3e4870e1c920a61c2d60e322dd3681778cc1c9ab7bd",
+    "source/session/model/state.ts.txt": "e01803dd65883e03a6aa317e050dae369188f87206d88213fa44333531b5daa8",
+    "source/turn/context/contract.ts.txt": "326346040d1e7b32982f513df0e0a9359e36e9ebea7808d79b93b708c388e27c",
+    "source/turn/context/prepare.ts.txt": "22cb1d276d37278ee418743e6f36c6810656e191d4110e522fb09b9e07d8786c",
+    "source/turn/context/route.ts.txt": "d9d2331c98f9d11bda6d44010912c3fb9d281c8f9dcb83f42c6395dcfa3a7f67",
+    "source/turn/request.test.ts.txt": "798b4fe3468f8bcd4b9641159e024e0f1f5019d0e930d72d289b3d2a0e37a2bf",
+    "source/turn/request.ts.txt": "44700916917ccb83d3e12ad008f658de1824b672500330c4f1a289073def3917",
+    "source/turn/step.test.ts.txt": "30302fbadd837644af564729febbb23ef8e48821dce11eb824f56153df7ac357",
+    "source/turn/step.ts.txt": "94b22574cfa67a41972308cd8714481ba6ab6c0ef6792e3b41ef210c952a7037",
+    "summary-combined-tests.log": "d0f9f4f373ddeb16f83f68a8db0d07bd7cce5a144a28295de1c50f787ea71498",
+    "summary-first-tests.log": "2ef1216b8188047fd4cb24319f40c5e08a904c944f716b4b2a561ab09982ec2b",
+    "summary-native.json": "02206aaee8958fbb56ab7fa87f2f082f2f512fde000b011bd4ffa354eb97a686",
+    "summary-native.log": "fdfeff53723565c73cf3e21dae6d33d3e4e95ce42c82068ff14b936c0d73570e",
+    "summary-native.mjs.txt": "142871257193b66aebfbdeff1e2f8e90bb131b3c1899b23a051275df14ca5ba5",
+    "summary-red-corrected.log": "aaeb5d8334b6bd4701ae47d1dd1a2b9759ac6695d2cd781e48f2eadc25140c68",
+    "summary-red.log": "726cb30d84d5313e4b5b90eb92710601567acd33340fd88d164dc9e051bb2d43",
+    "surface-tests.log": "0c5677f4c5c9f7a1a69b74e3a12bde30aa648dfbc75580b9e8992f00da7e4f7f",
+    "ui-cleanup-red.log": "d568510a3ee22997a1fdae7a222416400a6028e0f15b9d9b37e29877b84bb370",
+    "virtual-input-lane.patch.txt": "caff305feee18357b065bdb044294fa299f80d4179a0083863533452a29afa13",
+    "virtual-selection-lane.patch.txt": "ce8f92ca24bfcdbcc17a93d6e23b0fb5122dfc9d33fdee7ae4e61eef3fe973fd",
+    "docs/MASTER.md.txt": "b6a27400ba0aa777d470a17a0d9924ee34e26676a0ff86e046b5dd68e836c772",
+    "docs/tasks.md.txt": "09da9e32e46ac3648b72dc5ecf10f3e694a7340b03333d6d06c8fcaa7389b4b8",
+    "docs/design.md.txt": "02162e9327e4c18b8c10bec1772b4173235cb9f89515c3ec6d676e747a6a2ad9",
+    "docs/log.md.txt": "68aceb30476bbe58a1d72fc8fd1d508d39382f34eb8236176d1c0e6740b971fd",
+    "docs/HANDOFF.md.txt": "f816f3b94fed00ce8583caab61bfb031708cb29b27a27c19fdf3c5d201f8f74a"
+  },
+  "validation": {
+    "staticGates": {
+      "status": "passed",
+      "count": 6,
+      "logs": [
+        "accepted-gates.log",
+        "accepted-lint.log"
+      ],
+      "setupFailure": "accepted-gates.log ends with missing npm lint script; actual check:lint passed separately."
+    },
+    "focusedTests": {
+      "status": "passed",
+      "suites": 39,
+      "tests": 840,
+      "log": "accepted-tests.log"
+    },
+    "reversals": {
+      "status": "passed",
+      "count": 10,
+      "exactRestoration": true,
+      "receipt": "reversals.json",
+      "restoredTests": {
+        "suites": 5,
+        "tests": 79,
+        "log": "reversal-restored-tests.log"
+      }
+    },
+    "additionalSurfaces": {
+      "status": "passed",
+      "suites": 4,
+      "tests": 34,
+      "log": "surface-tests.log",
+      "absentFilter": "src/config/state.test.ts was not a test file and was not executed."
+    },
+    "publication": {
+      "status": "passed",
+      "suites": 1,
+      "tests": 12,
+      "log": "publication-tests.log"
+    },
+    "responsibility": {
+      "status": "passed",
+      "modules": 2634,
+      "monoliths": 0,
+      "log": "accepted-functions.log"
+    },
+    "build": {
+      "status": "passed",
+      "log": "accepted-build-current.log"
+    },
+    "package": {
+      "status": "passed",
+      "name": "@cheers/ts-shell",
+      "files": 2224,
+      "bytes": 2542711,
+      "unpackedBytes": 10871795,
+      "tarballSha256": "2e5472aa92ed58088438be466af177f9524dda310e69bdf1bf9c5eb4326d9952",
+      "strictTypes": true,
+      "skipLibCheck": false,
+      "installLog": "install-current.log",
+      "typesLog": "installed-types-current.log"
+    },
+    "native": {
+      "status": "passed-with-recorded-boundaries",
+      "platform": "linux",
+      "node": "v24.15.0",
+      "installedSdkPosts": 10,
+      "compiledCliPosts": 2,
+      "automaticSummaryPosts": 12,
+      "retryAndContinuationPosts": 8,
+      "compiledRpcPosts": 1,
+      "configuredRealPosts": 4,
+      "receipts": [
+        "native.json",
+        "cli-native.json",
+        "summary-native.json",
+        "retry-native.json",
+        "real-native.json",
+        "rpc-native.json"
+      ],
+      "rpcScope": "Logical selection and durable physical dispatch only; get_messages gap remains D.1.",
+      "realCatalog": "Original configured active connection and credentials; isolated minimal model entry because original catalog JSON is malformed. Original files unchanged; isolated state removed."
+    },
+    "independentReview": {
+      "code": "APPROVE",
+      "codeReviewer": "/root/routing_delivery_review",
+      "codeFiles": 8,
+      "architecture": "CLEAR",
+      "architectureReviewer": "/root/routing_architecture",
+      "scope": "Eight named routing/state/delegation/retry/VM owner files; root validates the full batch.",
+      "reports": [
+        "review-code.json",
+        "review-architecture.json",
+        "review-availability.json"
+      ]
+    },
+    "docs": {
+      "status": "passed",
+      "log": "delivery-docs.log",
+      "docsSourceAdvisory": 119
+    }
+  },
+  "initialFailures": [
+    "Original counterexample and integration failures remain in their own logs; successful receipts do not overwrite them.",
+    "Initial VM UI reversal failed with TypeError and is not counted; strengthened assertion produced the final genuine AssertionError.",
+    "Initial SDK probe waited for abort before releasing its held route callback; terminated as a harness deadlock.",
+    "CLI launcher refused the old build after a test-only input change; rebuilt, repacked, reinstalled and reran the current probes.",
+    "Retry probe setups omitted implicit effort, retryEnabled and the harmless tool approval in successive attempts; each failure is classified separately.",
+    "Configured catalog was malformed; two connection-refused attempts sent no POST, another configured target sent one POST with auth failure. Final original active connection sent four successful POSTs with isolated minimal model metadata.",
+    "RPC get_messages returned empty after a successful virtual prompt; ordinary physical control reproduced the pre-existing D.1 gap. Another attempt guessed the transcript wire shape incorrectly."
+  ],
+  "limits": {
+    "workerVirtualRegistration": "explicitly-unsupported",
+    "e7": "partial",
+    "d1": "confirmed-gap",
+    "cacheSavings": "not-measured",
+    "generalVmSandbox": false,
+    "originalMalformedCatalogValidated": false,
+    "physicalTerminal": false,
+    "otherPlatforms": false,
+    "push": false,
+    "ci": false
+  },
+  "documents": {
+    ".wiki/refactor/upgrade/MASTER.md": {
+      "snapshot": "docs/MASTER.md.txt",
+      "sha256": "b6a27400ba0aa777d470a17a0d9924ee34e26676a0ff86e046b5dd68e836c772"
+    },
+    ".wiki/refactor/upgrade/tasks.md": {
+      "snapshot": "docs/tasks.md.txt",
+      "sha256": "09da9e32e46ac3648b72dc5ecf10f3e694a7340b03333d6d06c8fcaa7389b4b8"
+    },
+    ".wiki/refactor/upgrade/design.md": {
+      "snapshot": "docs/design.md.txt",
+      "sha256": "02162e9327e4c18b8c10bec1772b4173235cb9f89515c3ec6d676e747a6a2ad9"
+    },
+    ".wiki/log.md": {
+      "snapshot": "docs/log.md.txt",
+      "sha256": "68aceb30476bbe58a1d72fc8fd1d508d39382f34eb8236176d1c0e6740b971fd"
+    },
+    "HANDOFF.md": {
+      "snapshot": "docs/HANDOFF.md.txt",
+      "sha256": "f816f3b94fed00ce8583caab61bfb031708cb29b27a27c19fdf3c5d201f8f74a"
+    }
+  }
+}

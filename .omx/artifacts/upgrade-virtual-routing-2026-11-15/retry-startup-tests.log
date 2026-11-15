@@ -1,0 +1,182 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/turn/request.test.ts src/turn/step.test.ts src/turn/declarations.test.ts src/turn/context/prepare.test.ts src/turn/context/target.test.ts src/cli/bootstrap/cliProcessRunner.test.ts --maxWorkers=1 --no-file-parallelism
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/bootstrap/cliProcessRunner.test.ts (7 tests) 381ms
+ ✓ src/turn/request.test.ts (12 tests) 42ms
+ ❯ src/turn/step.test.ts (117 tests | 2 failed) 515ms
+   ✓ createStepFunction > retains the accepted native tool JSON estimate with tokenizer false 11ms
+   ✓ createStepFunction > retains the accepted native tool JSON estimate with tokenizer cl100k_base 71ms
+   ✓ createStepFunction > retains the accepted native tool JSON estimate with tokenizer o200k_base 115ms
+   ✓ createStepFunction > binds accepted request and provider measurement to the same selected history digest 2ms
+   ✓ createStepFunction > reports the prompt identity from the wire request, including a no-tools step 2ms
+   ✓ createStepFunction > omits tool declarations and refuses tool history for a model that cannot call tools 2ms
+   ✓ createStepFunction > keeps the tool prompt for a model with tool calling undefined 1ms
+   ✓ createStepFunction > keeps the tool prompt for a model with tool calling true 1ms
+   ✓ createStepFunction > observes the exact accepted serialization and drops static source claims for delegated prompts 1ms
+   ✓ createStepFunction > replaces the previous context measurement with the current usage presence: undefined 1ms
+   ✓ createStepFunction > replaces the previous context measurement with the current usage presence: undefined 1ms
+   ✓ createStepFunction > replaces the previous context measurement with the current usage presence: undefined 1ms
+   ✓ createStepFunction > replaces the previous context measurement with the current usage presence: undefined 1ms
+   ✓ createStepFunction > replaces the previous context measurement with the current usage presence: +0 1ms
+   ✓ createStepFunction > rejects output above the model ceiling before sending and preserves an admissible explicit cap 1ms
+   ✓ createStepFunction > refuses an over-window request before the provider is called 1ms
+   ✓ createStepFunction > budgets the closing request with withheld schemas and its synthetic instruction 4ms
+   ✓ createStepFunction > budgets the closing request from its microcompacted wire history 3ms
+   ✓ createStepFunction > refuses a prompt over the model's independent input limit before sending 1ms
+   ✓ createStepFunction > records the exact message array sent so later measurements include new tool arguments 2ms
+   ✓ createStepFunction > distinguishes a no-tools measurement from the tool-enabled wire schema 1ms
+   ✓ createStepFunction > retains the catalog's max_tokens field when the original ceiling is absent 1ms
+   ✓ createStepFunction > retains the catalog's max_completion_tokens field when the original ceiling is absent 1ms
+   ✓ createStepFunction > does not advertise tools or a spent budget for an empty intersection: [] 1ms
+   ✓ createStepFunction > does not advertise tools or a spent budget for an empty intersection: [ 'unknown' ] 1ms
+   ✓ createStepFunction > uses the same restricted schemas for endpoint headers and request bodies 1ms
+   ✓ createStepFunction > does not retry partial content after error at the outer loop 20ms
+   ✓ createStepFunction > does not retry partial reasoning_content after error at the outer loop 14ms
+   ✓ createStepFunction > does not retry partial content after eof at the outer loop 6ms
+   ✓ createStepFunction > does not retry partial reasoning_content after eof at the outer loop 7ms
+   ✓ createStepFunction > keeps public reasoning on cancellation and does not carry it into the next request 2ms
+   ✓ createStepFunction > does not replay an accepted response whose body ends before any event 1ms
+   ✓ createStepFunction > keeps an SSE API failure report-safe with partial text false and type upstream_error 3ms
+   ✓ createStepFunction > keeps an SSE API failure report-safe with partial text true and type upstream_error 1ms
+   ✓ createStepFunction > keeps an SSE API failure report-safe with partial text false and type rate_limit_error 1ms
+   ✓ createStepFunction > keeps an SSE API failure report-safe with partial text true and type rate_limit_error 1ms
+   ✓ createStepFunction > marks returned error completions after visible output as non-retryable 1ms
+   ✓ createStepFunction > does not admit tools from an incomplete openai-compatible stream 1ms
+   ✓ createStepFunction > does not admit tools from an incomplete anthropic-messages stream 1ms
+   ✓ createStepFunction > does not admit tools from an incomplete google-generative-ai stream 2ms
+   ✓ createStepFunction > reports a cancelled request as an aborted step, not a network failure 1ms
+   ✓ createStepFunction > reports the request it sent, as it sent it 1ms
+   ✓ createStepFunction > marks a context overflow so the session can compact and retry 1ms
+   × createStepFunction > names the model every kind of step came from 3ms
+     → expected { model: 'm', thinkingLevel: 'high' } to deeply equal { model: 'm' }
+   ✓ createStepFunction > delivers a whole-body answer as one delta and parses its tool calls 1ms
+   ✓ createStepFunction > flags a truncated response so the kernel refuses its tool calls 1ms
+   ✓ createStepFunction > refuses every call when final json arguments are malformed (stop) 20ms
+   ✓ createStepFunction > refuses every call when final json arguments are malformed (tool_calls) 14ms
+   ✓ createStepFunction > refuses every call when final stream arguments are malformed (stop) 13ms
+   ✓ createStepFunction > refuses every call when final stream arguments are malformed (tool_calls) 10ms
+   ✓ createStepFunction > preserves complete tool JSON objects without repairing their literal values 1ms
+   ✓ createStepFunction > keeps length refusal for a complete call beside incomplete final arguments 2ms
+   ✓ createStepFunction > does not grant replay authority to reasoning beside malformed final calls 1ms
+   ✓ createStepFunction > refuses every json tool envelope with a missing or empty name 9ms
+   ✓ createStepFunction > refuses every stream tool envelope with a missing or empty name 8ms
+   ✓ createStepFunction > does not replay signed or opaque reasoning after malformed calls (anthropic-signed) 2ms
+   ✓ createStepFunction > does not replay signed or opaque reasoning after malformed calls (anthropic-redacted) 1ms
+   ✓ createStepFunction > does not replay signed or opaque reasoning after malformed calls (bedrock-signed) 4ms
+   ✓ createStepFunction > forbids tools on the closing step by not sending them 1ms
+   ✓ createStepFunction > maps a refusal to an error stop reason rather than a finished one 1ms
+   ✓ createStepFunction > explains an empty answer instead of inventing one 1ms
+   ✓ createStepFunction > sends the sampling settings the caller configured 1ms
+   ✓ createStepFunction > omits temperature for a shipped reasoning model at automatic effort 1ms
+   ✓ createStepFunction > recognizes overflow markers regardless of provider casing 0ms
+   ✓ createStepFunction > reads cache traffic from the OpenAI-compatible shape 1ms
+   ✓ createStepFunction > reads cache traffic from the Anthropic-shaped fields 1ms
+   ✓ createStepFunction > records no cache traffic when the provider reports none 1ms
+   ✓ createStepFunction > asks again after a transient refusal and keeps the successful answer 3ms
+   ✓ createStepFunction > stops at the configured count instead of asking forever 4ms
+   ✓ createStepFunction > does not ask again when the request itself was rejected 1ms
+   ✓ createStepFunction > records what kind of failure a rejected request was 2ms
+   ✓ createStepFunction > records a safety block as its own class rather than a status 1ms
+   ✓ createStepFunction > withholds private transport detail when no structured cause is known 1ms
+   ✓ createStepFunction > waits the delay the server asked for 52ms
+   ✓ createStepFunction > does not retry an overflow, which is answered by condensing 1ms
+   ✓ createStepFunction > shapes the request the way the catalog says this model wants it 5ms
+   ✓ createStepFunction > sends the model's own ceiling when the run set none 1ms
+   ✓ createStepFunction > lets the run's ceiling win over the model's 1ms
+   ✓ createStepFunction > bridges tool results when the model requires an assistant turn between them 1ms
+   ✓ createStepFunction > keeps the request unchanged for a model the catalog does not describe 1ms
+   ✓ createStepFunction > still drops reasoning_effort when the host refuses it 4ms
+   ✓ Bedrock catalog capability routing > routes binary event streams and requires completion true 1ms
+   ✓ Bedrock catalog capability routing > routes binary event streams and requires completion false 1ms
+   ✓ Bedrock catalog capability routing > honors catalog vision false and the selected output ceiling 3ms
+   ✓ Bedrock catalog capability routing > honors catalog vision true and the selected output ceiling 3ms
+   ✓ speaking a second endpoint > posts to the endpoint's own path with its own body 1ms
+   ✓ speaking a second endpoint > reads usage from both halves of that endpoint's stream 1ms
+   ✓ speaking a second endpoint > still uses the default path when no endpoint is declared 1ms
+   ✓ speaking a second endpoint > sends a protocol it has never heard of through the same path 1ms
+   ✓ speaking a second endpoint > reports an endpoint kind nobody declared instead of crashing 0ms
+   ✓ the last step a run may act on > says so when the tools have been withdrawn 1ms
+   ✓ the last step a run may act on > says nothing of the kind on a run that never had tools 1ms
+   ✓ the last step a run may act on > says nothing of the kind while tools are still available 1ms
+   ✓ the last step a run may act on > sends no tool list on that step either 1ms
+   ✓ does not retry a stream after the provider accepted the request 1ms
+   ✓ does not retry a stream that already showed reasoning, only one that showed nothing 6ms
+   ✓ explains refusal as a refusal 0ms
+   ✓ explains guardrail_intervened as a refusal 0ms
+   ✓ explains content_filter as a refusal 0ms
+   ✓ explains safety as a refusal 0ms
+   ✓ explains recitation as a refusal 0ms
+   ✓ keeps Google SAFETY refusal guidance through JSON and SSE 2ms
+   ✓ keeps Google RECITATION refusal guidance through JSON and SSE 1ms
+   ✓ keeps Google PROHIBITED_CONTENT refusal guidance through JSON and SSE 1ms
+   ✓ never retries a streamed safety rejection even when its detail mentions a network 1ms
+   ✓ keeps a captured legacy effort across project edits, retries and later steps 6ms
+   ✓ does not silently drop an explicit effort or disclose a rejecting response body 1ms
+   ✓ rejects explicit unsupported effort before HTTP: {"reasoning":false} 0ms
+   ✓ rejects explicit unsupported effort before HTTP: {"compat":{"reasoningEffort":false}} 0ms
+   ✓ rejects explicit unsupported effort before HTTP: {"thinkingLevelMap":{"high":null}} 0ms
+   ✓ sends the mapped explicit level and treats null as provider decides despite legacy fallback 5ms
+   ✓ rejects explicit effort with a small anthropic-messages output cap before HTTP 0ms
+   ✓ rejects explicit effort with a small bedrock-converse-stream output cap before HTTP 0ms
+   ✓ carries explicit budget for an unknown custom model over google-generative-ai 1ms
+   ✓ carries explicit budget for an unknown custom model over google-vertex 1ms
+   ✓ carries explicit budget for an unknown custom model over bedrock-converse-stream 0ms
+   × forwards mid-convo cache preservation flags, anthropic-beta headers, and resolves VirtualModelRegistry in createStepFunction 3ms
+     → expected { provider: 'anthropic', …(2) } to deeply equal { provider: 'anthropic', …(1) }
+ ✓ src/turn/declarations.test.ts (9 tests) 227ms
+ ✓ src/turn/context/prepare.test.ts (13 tests) 142ms
+ ✓ src/turn/context/target.test.ts (11 tests) 35ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/step.test.ts > createStepFunction > names the model every kind of step came from
+AssertionError: expected { model: 'm', thinkingLevel: 'high' } to deeply equal { model: 'm' }
+
+- Expected
++ Received
+
+  {
+    "model": "m",
++   "thinkingLevel": "high",
+  }
+
+ ❯ src/turn/step.test.ts:721:27
+    719|     });
+    720|     const answer = await answered([{ role: "user", content: "q" }], un…
+    721|     expect(answer.origin).toEqual({ model: "m" });
+       |                           ^
+    722| 
+    723|     const refused = createStepFunction({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/turn/step.test.ts > forwards mid-convo cache preservation flags, anthropic-beta headers, and resolves VirtualModelRegistry in createStepFunction
+AssertionError: expected { provider: 'anthropic', …(2) } to deeply equal { provider: 'anthropic', …(1) }
+
+- Expected
++ Received
+
+  {
+    "model": "claude-sonnet-4-6",
+    "provider": "anthropic",
++   "thinkingLevel": "high",
+  }
+
+ ❯ src/turn/step.test.ts:2106:22
+    2104|   const res = await step([{ role: 'user', content: 'hi' }], undefined,…
+    2105|   expect(res.text).toBe('ok');
+    2106|   expect(res.origin).toEqual({ provider: 'anthropic', model: 'claude-s…
+       |                      ^
+    2107|   expect(seen).toHaveLength(1);
+    2108|   const reqHeaders = seen[0]!.headers as Record<string, string>;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  2 failed | 167 passed (169)
+   Start at  17:23:20
+   Duration  13.66s (transform 5.81s, setup 0ms, collect 11.19s, tests 1.34s, environment 1ms, prepare 274ms)
+

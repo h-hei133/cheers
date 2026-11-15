@@ -1,0 +1,44 @@
+{
+  "platform": "linux",
+  "node": "v24.15.0",
+  "status": "passed",
+  "publicInstalledSdk": true,
+  "configuredProvider": true,
+  "buildId": "083b3d78d8bf8dc44d04fc2ec6c43c595bb7d6e0d68257a983c3491a2854887c",
+  "requests": 4,
+  "stages": {
+    "prompt": {
+      "posts": 1,
+      "passed": true,
+      "physicalOrigin": true,
+      "stateAccepted": true
+    },
+    "manual-summary": {
+      "posts": 1,
+      "passed": true,
+      "directStateless": true
+    },
+    "branch-summary": {
+      "posts": 1,
+      "passed": true,
+      "directStateless": true,
+      "surface": "session.sessionRuntime"
+    },
+    "reopen": {
+      "posts": 1,
+      "passed": true,
+      "stateReused": true
+    }
+  },
+  "probeSha256": "07cb181e00564f16f789486ba5a95012759e37bf4855d154a3dd8fe51694b2c4",
+  "catalogueSetup": {
+    "isolatedValidObjects": true,
+    "originalActiveSelected": true,
+    "existingConfiguredTarget": true,
+    "originalConfigUnchanged": true,
+    "candidateIndex": 0,
+    "minimalConfiguredModelEntry": true
+  },
+  "configuredPhysicalTargetResolved": true,
+  "isolatedStateRemoved": true
+}

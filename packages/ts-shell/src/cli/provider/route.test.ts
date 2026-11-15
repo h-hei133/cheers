@@ -9,7 +9,8 @@ import type { PreparedRequest, RequestPolicy } from '../../core/agent/request/mo
 import { writeGoal, readGoalEdit } from '../../planning/goal/store.js';
 import { goalRequestPolicy } from '../../planning/goal/budget.js';
 import { readBoundSessionState } from '../../session/store/bound.js';
-import { createProviderStep, type ProviderStepHost } from './step.js';
+import { createProviderStep, delegatedSteps, type ProviderStepHost } from './step.js';
+import { captureBranchStore } from '../../session/branch/store/index.js';
 
 const servers: http.Server[] = [];
 afterEach(async () => {
@@ -98,6 +99,40 @@ it('routes the actual provider step to the physical URL and credential without s
   expect(test.reserved).toEqual([expect.objectContaining({ provider: 'anthropic', model: 'physical' })]);
 });
 
+it.each(['model', 'role'] as const)('keeps an explicit delegated %s independent of the foreground logical selection', async kind => {
+  const test = await fixture();
+  const registry = new VirtualModelRegistry();
+  registry.register({ provider: 'adaptive', id: 'auto', name: 'Adaptive', route: test.route });
+  const connection = { id: 'delegated', provider: 'openai' as const, authType: 'api-key' as const,
+    apiKey: 'synthetic-delegated-route-only', baseUrl: test.original.baseUrl, model: 'automatic',
+    status: 'connected' as const, createdAt: '2026-11-15', updatedAt: '2026-11-15' };
+  const host = { ...test.host, runtimeConfig: { ...test.host.runtimeConfig!, providerConnections: [connection] },
+    virtualModels: registry, virtualModel: { provider: 'adaptive', model: 'auto' } };
+  const target = kind === 'model' ? 'openai/automatic' : { connectionId: connection.id, provider: 'openai' as const, model: 'automatic' };
+  const before = captureBranchStore({ sessionId: test.setup.session.id, cwd: test.setup.root, namespace: 'model-routing' }).initial;
+  const result = await delegatedSteps(host, new Map(), {})(target)(
+    [{ role: 'user', content: 'Use the explicit delegated target.' }], test.setup.signal, {}, { allowTools: false });
+  expect(result).toMatchObject({ stopReason: 'stop', origin: { provider: 'openai', model: 'automatic' } });
+  expect(test.route).not.toHaveBeenCalled();
+  expect(test.original.requests).toHaveLength(1); expect(test.physical.requests).toEqual([]);
+  expect(captureBranchStore({ sessionId: test.setup.session.id, cwd: test.setup.root, namespace: 'model-routing' }).initial).toEqual(before);
+});
+
+it('keeps inherited logical delegation while applying its own explicit effort', async () => {
+  const test = await fixture();
+  const registry = new VirtualModelRegistry();
+  registry.register({ provider: 'adaptive', id: 'auto', name: 'Adaptive', route: test.route });
+  const host = { ...test.host, providerCatalog: test.host.providerCatalog!.map(provider => ({ ...provider,
+    models: provider.models.map(model => ({ ...model, reasoning: true })) })),
+    virtualModels: registry, virtualModel: { provider: 'adaptive', model: 'auto', thinkingEffort: 'low' as const } };
+  const result = await delegatedSteps(host, new Map(), {})('', undefined, 'high')(
+    [{ role: 'user', content: 'Inherit the logical model at the child effort.' }], test.setup.signal, {}, { allowTools: false });
+  expect(result).toMatchObject({ stopReason: 'stop', origin: { provider: 'anthropic', model: 'physical' } });
+  expect(test.route).toHaveBeenCalledWith(expect.objectContaining({ thinkingLevel: 'high' }));
+  expect(test.original.requests).toEqual([]);
+  expect(test.physical.requests[0]?.body).toMatchObject({ model: 'physical', reasoning_effort: 'high' });
+});
+
 it('refuses a physical model outside allowedModels before reservation or HTTP dispatch', async () => {
   const test = await fixture();
   const host = { ...test.host, runtimeConfig: { ...test.host.runtimeConfig!, allowedModels: ['openai/automatic'] } };
@@ -169,4 +204,60 @@ it('rejects a physical profile credential withdrawn during message conversion', 
     } });
   expect(result.stopReason).toBe('error');
   expect(test.original.requests).toEqual([]); expect(test.physical.requests).toEqual([]); expect(test.reserved).toEqual([]);
+});
+
+function logicalHost(test: Awaited<ReturnType<typeof fixture>>): ProviderStepHost {
+  const virtualModels = new VirtualModelRegistry();
+  virtualModels.register({ provider: 'adaptive', id: 'automatic', name: 'Adaptive', route: test.route });
+  return { ...test.host, virtualModels, virtualModel: { provider: 'adaptive', model: 'automatic' } } as ProviderStepHost;
+}
+
+it('routes a logical selection before checking dormant physical scope and credentials', async () => {
+  const test = await fixture();
+  const host = { ...logicalHost(test), runtimeConfig: { ...test.host.runtimeConfig!, allowedModels: ['anthropic/physical'] },
+    providerCredentialResolution: { ...test.host.providerCredentialResolution, blocked: 'missing-connection' as const, model: undefined, credential: undefined } };
+  let result;
+  try { result = await createProviderStep(host, new Map(), {})([{ role: 'user', content: 'Use the valid route.' }],
+    test.setup.signal, {}, { allowTools: false }); } catch { result = undefined; }
+  expect(result).toMatchObject({ text: 'Physical route answer.', stopReason: 'stop' });
+  expect(test.route).toHaveBeenCalledOnce();
+  expect(test.original.requests).toEqual([]); expect(test.physical.requests).toHaveLength(1);
+});
+
+it('persists accepted route state before compaction and restores it in a new step and fork', async () => {
+  const test = await fixture(); const host = logicalHost(test);
+  test.route.mockImplementation(async request => ({ provider: 'anthropic', modelId: 'physical', state: Number(request.state ?? 0) + 1 }));
+  const read = (sessionId = test.setup.session.id) => captureBranchStore({ sessionId, cwd: test.setup.root, namespace: 'model-routing' }).initial;
+  const key = JSON.stringify(['adaptive', 'automatic']);
+  const messages = [{ role: 'user' as const, content: 'Route on this branch.' }];
+  const first = await createProviderStep(host, new Map(), {})(messages, test.setup.signal, {}, { allowTools: false,
+    prepareContext: async prepared => { expect(read()[key]).toBe('1'); return prepared.prepare(messages); } });
+  expect(first.stopReason).toBe('stop'); expect(test.route).toHaveBeenCalledOnce();
+  const fork = test.setup.manager.fork(test.setup.session.id, test.setup.root, { activate: false });
+  expect(read(fork.id)[key]).toBe('1');
+  const second = await createProviderStep({ ...host, sessionId: fork.id, requestPolicy: undefined }, new Map(), {})(messages,
+    test.setup.signal, {}, { allowTools: false });
+  expect(second.stopReason).toBe('stop'); expect(read(fork.id)[key]).toBe('2'); expect(read()[key]).toBe('1');
+  expect(test.route.mock.calls.map(([request]) => request.state)).toEqual([undefined, 1]);
+});
+
+it('refuses a router state race even when the callback returns no replacement state', async () => {
+  const test = await fixture(); const key = JSON.stringify(['adaptive', 'automatic']);
+  const read = () => captureBranchStore({ sessionId: test.setup.session.id, cwd: test.setup.root, namespace: 'model-routing' });
+  read().commit({ [key]: '1' });
+  test.route.mockImplementation(async () => { read().commit({ [key]: '2' }); return { provider: 'anthropic', modelId: 'physical' }; });
+  const result = await createProviderStep(logicalHost(test), new Map(), {})([{ role: 'user', content: 'Do not accept a stale read.' }],
+    test.setup.signal, {}, { allowTools: false });
+  expect(result.stopReason).toBe('error'); expect(test.route).toHaveBeenCalledOnce();
+  expect(read().initial[key]).toBe('2'); expect(test.original.requests).toEqual([]); expect(test.physical.requests).toEqual([]);
+});
+
+it('does not persist router state when conversion cancels before route acceptance', async () => {
+  const test = await fixture(); const controller = new AbortController();
+  test.route.mockImplementation(async () => ({ provider: 'anthropic', modelId: 'physical', state: 1 }));
+  const result = await createProviderStep(logicalHost(test), new Map(), {})([{ role: 'user', content: 'Cancel before accepting state.' }],
+    controller.signal, {}, { allowTools: false, convertToLlm: messages => { controller.abort(); return messages; } });
+  expect(test.route).toHaveBeenCalledOnce(); expect(result.stopReason).toBe('aborted');
+  expect(captureBranchStore({ sessionId: test.setup.session.id, cwd: test.setup.root, namespace: 'model-routing' }).initial).toEqual({});
+  expect(test.physical.requests).toEqual([]); expect(test.original.requests).toEqual([]);
 });

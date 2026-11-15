@@ -4,7 +4,7 @@ import { admittedFetch, assertAdmission, type Admission } from '../../../core/ne
 import type { ModelTransport } from '../../../core/agent/request/model.js';
 
 /** Project the accepted physical identity without resolving credentials a second time. */
-export function summaryTarget(prepared: PreparedTurnContext): CompactionProvider & { readonly providerId: string } {
+export function summaryTarget(prepared: Pick<PreparedTurnContext, 'target' | 'activeProvider' | 'activeModel' | 'endpoint' | 'replayBinding' | 'shape'>): CompactionProvider & { readonly providerId: string } {
   const { provider } = prepared.target;
   return { providerId: prepared.activeProvider, model: prepared.activeModel,
     baseUrl: provider.baseUrl, endpoint: prepared.endpoint, headers: provider.headers,

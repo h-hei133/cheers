@@ -1,0 +1,17 @@
+[
+  {
+    "attempt": "first",
+    "failure": "harness-setup",
+    "reason": "The effort scenario had no implicit effort, so its synthetic rejection was not eligible for fallback. A legacy project low preference was seeded in isolated state."
+  },
+  {
+    "attempt": "second",
+    "failure": "harness-setup",
+    "reason": "The transport scenario set providerRetryMaxRetries but disabled retryEnabled. Both documented inputs are now provided."
+  },
+  {
+    "attempt": "third",
+    "failure": "harness-setup",
+    "reason": "The custom read-only probe defaulted to noninteractive denial. The final fixture explicitly allows that one call, preserving ordinary approval."
+  }
+]

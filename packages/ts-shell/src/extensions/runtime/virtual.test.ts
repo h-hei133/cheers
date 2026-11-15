@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { executeInProcessScript, loadInProcessExtensionAsync, runExtensionFactory, type ExtensionAPI,
   type ExtensionHostBridge, type LoadedInProcessExtension } from './inProcessLoader.js';
 import { runExtensionInvocation } from './context.js';
-import type { ExtensionUiHost } from './ui.js';
-import type { ModelRoute, ModelRouteRequest } from '../../core/models/virtual/contract.js';
+import type { ExtensionUiHost, ExtensionUiApi } from './ui.js';
+import type { ModelRoute, ModelRouteRequest, ModelRouteInput } from '../../core/models/virtual/contract.js';
 import type { VersionRecord } from '../model.js';
 
 const roots: string[] = [];
@@ -24,11 +24,214 @@ function extension(source: string) {
   return { workspaceRoot: root, filePath };
 }
 function controller() { const value = new AbortController(); controllers.push(value); return value; }
-function request(signal?: AbortSignal): ModelRouteRequest {
+function request(signal?: AbortSignal): ModelRouteInput {
   return { provider: 'adaptive', modelId: 'auto', thinkingLevel: 'high', reason: 'user', messages: [], signal };
 }
 
 describe('session extension virtual registration', () => {
+  it('types host route inputs separately from callback and UI cancellation observations', async () => {
+    if (false) {
+      const observed = {} as ModelRouteRequest;
+      const hosted = {} as ModelRouteInput;
+      const callbackUi = {} as Required<ExtensionUiApi>;
+      const hostUi = {} as Required<ExtensionUiHost>;
+      await callbackUi.input('Destination', undefined, { signal: observed.signal });
+      await hostUi.input('Destination', undefined, { signal: hosted.signal });
+      // @ts-expect-error Callback observations do not promise native AbortSignal branding.
+      const input: ModelRouteInput = observed;
+      // @ts-expect-error Physical UI hosts only consume native AbortSignal inputs.
+      await hostUi.input('Destination', undefined, { signal: observed.signal });
+      void input;
+    }
+    expect(true).toBe(true);
+  });
+  it.each(['request', 'messages', 'message', 'state', 'signal'] as const)('keeps the file route %s in the VM realm', async field => {
+    const file = extension(`export default api => api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic',
+      route: request => {
+        const values = { request, messages: request.messages, message: request.messages[0], state: request.state, signal: request.signal };
+        let escaped = false;
+        try { escaped = values[${JSON.stringify(field)}].constructor.constructor('return typeof process')() === 'object'; } catch {}
+        return { provider: 'openai', modelId: 'physical', state: { escaped } };
+      } });`);
+    const loaded = await loadInProcessExtensionAsync({ ...file, signal: controller().signal });
+    const result = await loaded.virtualModels![0]!.route({ ...request(controller().signal),
+      messages: [{ role: 'user', content: 'Authored message' }], state: { count: 1 } });
+    expect(result.state).toEqual({ escaped: false });
+  });
+
+  it.each(['promise', 'error'] as const)('does not expose a host UI %s to a file route', async target => {
+    const file = extension(`export default api => api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic',
+      route: async () => {
+        const escapes = value => { try { return value.constructor.constructor('return typeof process')() === 'object'; } catch { return false; } };
+        const pending = api.ui.input('Destination');
+        let escaped = ${target === 'promise' ? 'escapes(pending)' : 'false'};
+        try { await pending; } catch (error) { ${target === 'error' ? 'escaped = escapes(error);' : ''} }
+        return { provider: 'openai', modelId: 'physical', state: { escaped } };
+      } });`);
+    const loaded = await loadInProcessExtensionAsync({ ...file, signal: controller().signal, host: { ui: {
+      input: async () => { if (target === 'error') throw new Error('Host dialog failed.'); return 'destination'; },
+    } } });
+    expect((await loaded.virtualModels![0]!.route(request())).state).toEqual({ escaped: false });
+  });
+
+  it('keeps cancellation events and thrown cancellation errors in the file VM realm', async () => {
+    const file = extension(`export default api => api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic',
+      route: async request => {
+        module.exports.started = true;
+        await new Promise(resolve => request.signal.addEventListener('abort', event => {
+          module.exports.cancelType = event.type;
+          let escaped = false;
+          try { request.signal.throwIfAborted(); } catch (error) {
+            module.exports.cancelName = error.name;
+            try { escaped = error.constructor.constructor('return typeof process')() === 'object'; } catch {}
+          }
+          module.exports.cancelEscaped = escaped;
+          resolve();
+        }, { once: true }));
+        return { provider: 'openai', modelId: 'late' };
+      } });`);
+    const generation = controller(), invocation = controller();
+    const loaded = await loadInProcessExtensionAsync({ ...file, signal: generation.signal });
+    const pending = loaded.virtualModels![0]!.route(request(invocation.signal));
+    const rejected = expect(pending).rejects.toThrow();
+    await vi.waitFor(() => expect(loaded.exports.started).toBe(true));
+    invocation.abort(new Error('Host cancellation.'));
+    await rejected;
+    expect(loaded.exports.cancelType).toBe('abort');
+    expect(loaded.exports.cancelName).toBe('AbortError');
+    expect(loaded.exports.cancelEscaped).toBe(false);
+  });
+
+  it('copies and freezes nested file inputs and retains primitive failure and previous-target data', async () => {
+    const file = extension(`export default api => api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic',
+      route: request => {
+        module.exports.held = request;
+        return { provider: 'openai', modelId: 'physical', state: {
+          frozen: [request, request.messages, request.messages[0], request.state, request.state.values, request.previous, request.failed].every(Object.isFrozen),
+          previous: request.previous, failed: request.failed,
+        } };
+      } });`);
+    const loaded = await loadInProcessExtensionAsync({ ...file, signal: controller().signal });
+    const message = { role: 'user' as const, content: 'Original' }, state = { values: [1] };
+    const previous = { provider: 'openai', modelId: 'first', thinkingLevel: 'low' };
+    const failed = { provider: 'openai', modelId: 'second', stopReason: 'error', errorMessage: 'Bounded failure', failureClass: 'provider_network' };
+    const result = await loaded.virtualModels![0]!.route({ ...request(), messages: [message], state, previous, failed } as ModelRouteInput);
+    message.content = 'Changed'; state.values[0] = 9;
+    expect(result.state).toEqual({ frozen: true, previous, failed });
+    expect((loaded.exports.held as ModelRouteRequest).messages[0]!.content).toBe('Original');
+    expect((loaded.exports.held as ModelRouteRequest).state).toEqual({ values: [1] });
+  });
+
+  it('cancels file UI with its VM signal while retaining generation reuse', async () => {
+    const file = extension(`export default api => api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic',
+      route: async request => {
+        const answer = await api.ui.input('Destination', undefined, { signal: request.signal });
+        api.ui.setEditorText(answer ?? 'cancelled');
+        return { provider: 'openai', modelId: answer ?? 'cancelled' };
+      } });`);
+    const generation = controller(), invocation = controller();
+    let uiSignal: AbortSignal | undefined;
+    const edit = vi.fn();
+    const loaded = await loadInProcessExtensionAsync({ ...file, signal: generation.signal, host: { ui: {
+      input: (_title, placeholder, options) => {
+        expect(placeholder).toBeUndefined(); uiSignal = options?.signal;
+        return new Promise(() => {});
+      }, setEditorText: edit,
+    } } });
+    const pending = loaded.virtualModels![0]!.route(request(invocation.signal));
+    const rejected = expect(pending).rejects.toThrow();
+    await vi.waitFor(() => expect(uiSignal).toBeDefined()); invocation.abort(); await rejected;
+    expect(uiSignal!.aborted).toBe(true);
+    expect(edit).not.toHaveBeenCalled();
+    expect(generation.signal.aborted).toBe(false);
+  });
+
+  it('keeps abort-listener UI effects under the retired original file invocation', async () => {
+    const file = extension(`export default api => api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic',
+      route: request => new Promise(resolve => {
+        module.exports.started = true;
+        request.signal.addEventListener('abort', () => {
+          api.ui.setEditorText('cancelled');
+          resolve({ provider: 'openai', modelId: 'late' });
+        }, { once: true });
+      }) });`);
+    const generation = controller(), invocation = controller();
+    const original = vi.fn(), replacement = vi.fn();
+    let ui: ExtensionUiHost = { setEditorText: original };
+    const loaded = await loadInProcessExtensionAsync({ ...file, signal: generation.signal, host: { get ui() { return ui; } } });
+    const pending = loaded.virtualModels![0]!.route(request(invocation.signal));
+    const rejected = expect(pending).rejects.toThrow();
+    await vi.waitFor(() => expect(loaded.exports.started).toBe(true));
+    ui = { setEditorText: replacement }; invocation.abort(); await rejected;
+    expect(original).not.toHaveBeenCalled(); expect(replacement).not.toHaveBeenCalled();
+  });
+
+  it('preserves file route UI ownership through await and rejects result accessors before reading them', async () => {
+    const file = extension(`export default api => api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic',
+      route: async () => {
+        const answer = await api.ui.input('Destination');
+        api.ui.setEditorText(answer);
+        return { provider: 'openai', modelId: 'physical', get state() { module.exports.read = true; return {}; } };
+      } });`);
+    let currentUi: ExtensionUiHost | undefined;
+    let answer!: (value: string) => void;
+    const originalEdit = vi.fn(), replacementEdit = vi.fn();
+    currentUi = { input: () => new Promise(resolve => { answer = resolve; }), setEditorText: originalEdit };
+    const loaded = await loadInProcessExtensionAsync({ ...file, signal: controller().signal, host: { get ui() { return currentUi; } } });
+    const pending = loaded.virtualModels![0]!.route(request());
+    const rejected = expect(pending).rejects.toThrow(/accessor|inert/i);
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    currentUi = { input: async () => 'replacement', setEditorText: replacementEdit };
+    answer('original');
+    await rejected;
+    expect(originalEdit).toHaveBeenCalledWith('original');
+    expect(replacementEdit).not.toHaveBeenCalled();
+    expect(loaded.exports.read).toBeUndefined();
+  });
+
+  it('settles a file UI reply even when its caller signal cleanup throws', async () => {
+    const file = extension(`export default api => api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic',
+      route: async () => {
+        const signal = { aborted: false, reason: undefined, onabort: null, throwIfAborted() {}, addEventListener() {},
+          removeEventListener() { throw new Error('VM cleanup failed.'); } };
+        try {
+          const answer = await api.ui.input('Destination', undefined, { signal });
+          module.exports.settled = 'resolved';
+          return { provider: 'openai', modelId: answer };
+        } catch (error) {
+          module.exports.settled = 'rejected';
+          return { provider: 'openai', modelId: 'refused' };
+        }
+      } });`);
+    const invocation = controller();
+    const loaded = await loadInProcessExtensionAsync({ ...file, signal: controller().signal, host: { ui: { input: async () => 'physical' } } });
+    const pending = loaded.virtualModels![0]!.route(request(invocation.signal));
+    const observed = pending.then(value => ({ value }), error => ({ error }));
+    try {
+      await vi.waitFor(() => expect(loaded.exports.settled).toBe('resolved'), { timeout: 300 });
+    } finally { invocation.abort(); await observed; }
+  });
+
+  it('drops a file UI setup that throws before host dispatch and leaves its stale cancellation inert', async () => {
+    const file = extension(`export default api => api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Automatic',
+      route: async () => {
+        let cancel;
+        const signal = { aborted: false, reason: undefined, onabort: null, throwIfAborted() {},
+          addEventListener(_type, callback) { cancel = callback; throw new Error('VM setup failed.'); },
+          removeEventListener() { module.exports.removed = true; } };
+        try { await api.ui.input('Destination', undefined, { signal }); } catch {}
+        module.exports.cancel = () => { cancel(); module.exports.cancelled = true; };
+        return { provider: 'openai', modelId: 'physical' };
+      } });`);
+    const input = vi.fn(async () => 'physical');
+    const loaded = await loadInProcessExtensionAsync({ ...file, signal: controller().signal, host: { ui: { input } } });
+    await loaded.virtualModels![0]!.route(request());
+    expect(input).not.toHaveBeenCalled();
+    expect(loaded.exports.removed).toBe(true);
+    expect(() => (loaded.exports.cancel as () => void)()).not.toThrow();
+    expect(loaded.exports.cancelled).toBe(true);
+  });
+
   it('waits for the complete async file registration and captures VM thinking-level arrays and generic state', async () => {
     const file = extension(`
       export default async api => {

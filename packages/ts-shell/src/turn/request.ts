@@ -208,6 +208,8 @@ export function createTurnRequest(
       },
       {
         allowTools: toolsAllowed,
+        routeReason: request?.reason,
+        failedRoute: request?.failedRoute,
         ...(request?.context?.eligible ? { contextOwner: request.context } : {}),
         ...(request?.context?.eligible && request.context.appendDeclaration && options.onMessage ? {
           onDeclaration: (message: StandardAgentMessage, prospective: MessageProjection) => {
@@ -265,7 +267,7 @@ export function createTurnRequest(
         onReasoning: delta => channel.push({ type: 'reasoning.delta', role: 'coder', delta }),
         onReasoningReplace: text => channel.push({ type: 'reasoning.replace', role: 'coder', text }),
         onReplace: text => channel.push({ type: 'message.replace', role: 'coder', text }),
-      }, { allowTools: false, ...(pendingSource ? { sourceMessages: closingMessages, convertToLlm: options.convertToLlm }
+      }, { allowTools: false, routeReason: 'direct', ...(pendingSource ? { sourceMessages: closingMessages, convertToLlm: options.convertToLlm }
         : activeProjection.sourceMessages ? {
         sourceMessages: [...activeProjection.sourceMessages, instruction],
       } : {}), ...(!pendingSource && activeProjection.providerMessages ? { providerMessages: [...activeProjection.providerMessages, instruction] } : {}),

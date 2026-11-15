@@ -1,0 +1,5 @@
+{
+  "failure": "provider-network",
+  "requests": 0,
+  "reason": "Configured connected target and its existing complete catalogue object resolved; connection refused before any POST. A safe diagnostic rerun confirmed refusal; no secret or response body was logged."
+}

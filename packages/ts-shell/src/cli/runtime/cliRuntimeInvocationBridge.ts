@@ -15,6 +15,8 @@ import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import type { CatalogProvider } from "../../core/models/catalog.js";
 
 export function streamCliRuntimePrompt(input: {
+  readonly virtualModel?: CliRuntimeInvocationInput['virtualModel'];
+  readonly virtualModels?: CliRuntimeInvocationInput['virtualModels'];
   readonly convertToLlm?: CliRuntimeInvocationInput['convertToLlm'];
   readonly stepControl?: CliRuntimeInvocationInput['stepControl'];
   readonly onCommandSettled?: CliRuntimeInvocationInput['onCommandSettled'];
@@ -75,6 +77,8 @@ export function streamCliRuntimePrompt(input: {
   // reads start after the snapshot either way, so the promise is folded in
   // here rather than pushed into every caller's signature.
   const start = () => runCliRuntimeInvocation({
+    virtualModel: input.virtualModel,
+    virtualModels: input.virtualModels,
     ...(input.convertToLlm ? { convertToLlm: input.convertToLlm } : {}),
     stepControl: input.stepControl,
     onCommandSettled: input.onCommandSettled,

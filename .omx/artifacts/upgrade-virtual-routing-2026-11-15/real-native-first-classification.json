@@ -1,0 +1,5 @@
+{
+  "failure": "provider-config",
+  "requests": 0,
+  "reason": "Configured model catalogue cannot be parsed, so the active physical target has no admitted catalogue metadata. Credentials resolve; no provider request was made. An existing connected configured target with an independently valid catalogue object will be selected in the isolated probe only."
+}

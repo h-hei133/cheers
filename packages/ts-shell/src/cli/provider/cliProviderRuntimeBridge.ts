@@ -8,6 +8,9 @@ import {
   type ProviderCredentialResolution,
 } from "../../core/shell/providerCredentials.js";
 import type { CliOptions } from "../options/cliOptions.js";
+import { parseModelSelection } from '../../core/models/virtual/selection.js';
+import { sessionVirtualModels } from '../../core/catalog/models.js';
+import { readLogicalModel } from '../../session/model/logical.js';
 
 export interface CliProviderRuntimeBridge {
   readonly resolveCredentialSnapshot: () => ProviderCredentialResolution;
@@ -58,8 +61,10 @@ export function resolveCliCredential(
   env: NodeJS.ProcessEnv = process.env,
   sessionId?: string,
 ): ProviderCredentialResolution {
-  const parsedModel = parseCliModelOption(options.model, options.provider);
-  const cliThinkingEffort = parseThinkingOption(options.thinking ?? parsedModel.thinking);
+  const selection = sessionId ? parseModelSelection(options.model, sessionVirtualModels(process.cwd(), sessionId), options.provider) : undefined;
+  const logical = selection?.kind === 'virtual' || !options.model && sessionId && readLogicalModel(sessionId);
+  const parsedModel = parseCliModelOption(logical ? undefined : options.model, options.provider);
+  const cliThinkingEffort = logical ? undefined : parseThinkingOption(options.thinking ?? parsedModel.thinking);
   return resolveProviderCredential({
     runtimeConfig,
     cliProvider: parsedModel.provider,

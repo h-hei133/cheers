@@ -183,6 +183,8 @@ export interface CommandContext {
   /** Read the configuration and catalogue from one accepted publication. */
   readonly readConfiguration?: () => { readonly config: RuntimeConfig; readonly catalog: readonly CatalogProvider[]; readonly catalogDiagnostics?: readonly string[]; readonly revision?: number; readonly binding?: import('../../config/state.js').ConfigBinding }
   readonly admission?: () => string | undefined
+  /** Model selection may defer only target-specific checks while preserving configuration safety. */
+  readonly logicalModelAdmission?: () => string | undefined
   /** Catalogue-only refresh retains ordinary accepted settings and rechecks model constraints. */
   readonly refreshRuntimeConfig?: (scope?: 'catalog') => import('../../config/application.js').ConfigReloadResult
   /** Apply a display-only setting after its owning writer has persisted it. */

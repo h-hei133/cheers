@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
 import { createAgentSession, DefaultResourceLoader, getRuntimeConfig, type ExtensionAPI, type QueryEvent } from "../index.js";
+import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../session/model/state.js';
 
 const tempDirs: string[] = [];
 const originalHome = process.env.HOME;
@@ -108,6 +109,43 @@ describe("DefaultResourceLoader", () => {
 });
 
 describe("createAgentSession & AgentSession", () => {
+  it('selects a staged virtual startup option without inventing a physical model or replacing provider authority', async () => {
+    const { work } = makeEnv();
+    const route = vi.fn(() => ({ provider: 'openai', modelId: 'physical' }));
+    const resourceLoader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
+      api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Adaptive', route });
+    }] });
+    await resourceLoader.reload();
+    const { session } = await createAgentSession({ cwd: work, resourceLoader, provider: 'google', model: 'adaptive/auto' });
+    try {
+      expect(readSessionModel(session.sessionId)).toEqual(expect.objectContaining({ provider: 'google', connectionScope: 'provider',
+        virtualModel: { provider: 'adaptive', model: 'auto' } }));
+      expect(readSessionModel(session.sessionId)?.model).toBeUndefined();
+      expect(session.runtimeContext.resolveConfigTarget!(session.runtimeContext.runtimeConfig, session.sessionId).provider).toBe('google');
+      expect(session.runtimeContext.runtimeConfig.provider).not.toBe('adaptive');
+      expect(route).not.toHaveBeenCalled();
+    } finally { await session.dispose(); }
+  });
+  it('edits only virtual effort when SDK resumes a saved logical model with a thinking option', async () => {
+    const { work } = makeEnv();
+    const resourceLoader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
+      api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Adaptive', thinkingLevels: ['high', 'max'],
+        route: () => ({ provider: 'openai', modelId: 'physical' }) });
+    }] });
+    await resourceLoader.reload();
+    const first = await createAgentSession({ cwd: work, resourceLoader, model: 'adaptive/auto' });
+    const sessionId = first.session.sessionId;
+    const selected = { ...readSessionModel(sessionId)!, thinkingEffort: 'low' as const,
+      virtualModel: { provider: 'adaptive', model: 'auto', thinkingEffort: 'high' as const } };
+    writeSessionModel(sessionId, selected, readSessionModelEdit(sessionId));
+    await first.session.dispose();
+    await resourceLoader.reload();
+    const second = await createAgentSession({ cwd: work, resourceLoader, sessionId, thinkingLevel: 'max' });
+    try {
+      expect(readSessionModel(sessionId)).toEqual({ ...selected, virtualModel: { ...selected.virtualModel, thinkingEffort: 'max' } });
+      expect(second.session.runtimeContext.resolveConfigTarget!(second.session.runtimeContext.runtimeConfig, sessionId).thinkingEffort).toBe('low');
+    } finally { await second.session.dispose(); }
+  });
   it("binds hostBridge even for pre-reloaded DefaultResourceLoader and disposes cleanly", async () => {
     const { work } = makeEnv();
     let capturedApi: ExtensionAPI | undefined;

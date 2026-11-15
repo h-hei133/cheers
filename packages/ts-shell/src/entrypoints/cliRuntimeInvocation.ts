@@ -61,10 +61,14 @@ import { credentialBlockMessage } from '../core/shell/providerCredentials.js';
 import { scopeAdmission } from '../config/scope/admission.js';
 import { toolScopeBinding } from '../config/scope/tools.js';
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
+import type { SessionVirtualModelSelection } from '../session/model/contract.js';
+import type { VirtualModelRegistry } from '../core/models/virtualModels.js';
 
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly virtualModel?: SessionVirtualModelSelection;
+  readonly virtualModels?: VirtualModelRegistry;
   readonly convertToLlm?: TurnOptions['convertToLlm'];
   readonly stepControl?: import('../turn/control.js').StepControlFactory;
   readonly catalogContent?: CatalogContent;
@@ -184,8 +188,8 @@ export async function runCliRuntimeInvocation(
   const gateway = input.mcpGateway ?? new CoreMcpGateway(input.workspaceRoot);
   const request = buildCliRuntimeInvocation({ ...input, mcpGateway: gateway });
   try {
-    assertScopedModel(request.runtimeConfig, request.providerCredentialResolution);
-    const run = request.providerMode === "real"
+    if (!request.virtualModel) assertScopedModel(request.runtimeConfig, request.providerCredentialResolution);
+    const run = request.providerMode === "real" && !request.virtualModel
       ? await deferUntilReady(request, dependencies)
       : await startTurn(request, dependencies);
     if (input.mcpGateway) return run;
@@ -331,7 +335,8 @@ async function startTurn(
   dependencies: CliRuntimeInvocationDependencies,
 ): Promise<CliRuntimeInvocationResult> {
   assertAdmission(request.admission);
-  request = { ...request, ...request.prepareProviderResources?.(request.providerCredentialResolution) };
+  request = { ...request, ...request.prepareProviderResources?.(request.providerCredentialResolution),
+    ...(request.virtualModel ? { cacheWarming: undefined } : {}) };
   const hooks = dependencies.hooks ?? defaultHookDispatcher;
   setupBuiltinVerificationHooks(hooks);
   // Declared hooks are registered here so the user can be asked about them; the

@@ -7,7 +7,7 @@ import type { SkillDiscovery } from '../skills/discovery.js';
 import type { ToolDefinition } from '../../tools/types.js';
 import { registerExtensionEventProvider } from '../hooks/extensionBridge.js';
 import type { CatalogProvider } from '../models/catalog.js';
-import type { VirtualModelDefinition } from '../models/virtual/contract.js';
+import type { CapturedVirtualModelDefinition } from '../models/virtual/contract.js';
 import { captureVirtualDefinitions, MAX_VIRTUAL_MODELS } from '../models/virtual/capture.js';
 
 /** Neutral session composition port. The feature owner retains lifecycle and authority. */
@@ -18,7 +18,7 @@ export interface CatalogContribution {
   readonly tools: readonly ToolDefinition[];
   readonly skills: (signal?: AbortSignal, discovery?: SkillDiscovery) => readonly Skill[] | Promise<readonly Skill[]>;
   readonly onEvent?: (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => Promise<unknown>;
-  readonly virtualModels?: readonly VirtualModelDefinition[];
+  readonly virtualModels?: readonly CapturedVirtualModelDefinition[];
   /** The generation that owns these callbacks, independent of an individual request. */
   readonly signal?: AbortSignal;
 }

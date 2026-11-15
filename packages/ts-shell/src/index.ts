@@ -68,8 +68,8 @@ export {
   type ResourceDiagnostic,
   type ResourceLoader,
 } from "./sdk/resourceLoader.js";
-export type { ExtensionUiHost, ExtensionUiDialogOptions } from './extensions/runtime/ui.js';
-export type { ModelRoute, ModelRouteRequest, ModelRouteReason, VirtualModelDefinition, VirtualModelMetadata } from './core/models/virtual/contract.js';
+export type { ExtensionUiHost, ExtensionUiDialogOptions, ExtensionUiApi, ExtensionUiRequestOptions } from './extensions/runtime/ui.js';
+export type { ModelRoute, ModelRouteInput, ModelRouteRequest, ModelRouteReason, ModelRouteSignal, ModelRouteTarget, ModelRouteFailure, CapturedVirtualModelDefinition, VirtualModelDefinition, VirtualModelMetadata } from './core/models/virtual/contract.js';
 export {
   runExtensionFactory,
   loadInProcessExtension,

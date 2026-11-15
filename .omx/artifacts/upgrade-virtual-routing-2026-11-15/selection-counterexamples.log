@@ -1,0 +1,210 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/virtual-selection/packages/ts-shell
+
+ ❯ src/session/branch/create.test.ts (6 tests | 1 failed) 247ms
+   × preserves model selection in a fork under a fresh session revision 38ms
+     → expected undefined to deeply equal { connectionScope: 'provider', …(4) }
+   ✓ forks a historic user entry with all branches retained and no inherited pending authority 61ms
+   ✓ rejects a non-user entry before creation and leaves a failed copy inactive with an explicit identity 27ms
+   ✓ rejects an obsolete fork source version before creating any session 28ms
+   ✓ does not hand a fork the tool call its source never finished 48ms
+   ✓ does not hand a fork an approval whose tool never started 43ms
+ ❯ src/core/commands/model/virtual.test.ts (7 tests | 6 failed) 177ms
+   × selects a registered logical model while dormant physical auth is unavailable, preserving authority without routing 53ms
+     → expected { connectionScope: 'provider', …(4) } to deeply equal { connectionScope: 'provider', …(7) }
+   × permits an absent physical model only with a valid logical marker 12ms
+     → Session model invalid: this attempt did not write.
+   × refuses a logical choice retired during its switch hook 27ms
+     → expected 'Model switched to adaptive/auto.\nRea…' not to contain 'Model switched to'
+   × edits virtual effort through /thinking without changing dormant physical fields 21ms
+     → expected 'Model switch blocked: this model does…' to match /Model (switched to|preference sav…/auto
+   × reports selected logical identity in command status and the native model label 20ms
+     → expected 'Model selection status\nProvider: ope…' to contain 'adaptive/auto'
+   ✓ clears virtual selection when explicitly selecting a physical model 24ms
+   × refuses malformed persisted logical selection instead of projecting a physical fallback 18ms
+     → expected [Function] to throw an error
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/sdk/agentSession.test.ts [ src/sdk/agentSession.test.ts ]
+ FAIL  src/cli/interactive/picker/model/virtual.test.ts [ src/cli/interactive/picker/model/virtual.test.ts ]
+Error: Cannot find package 'undici/index.js' imported from '/home/wang/projects/cheers/.tmp/virtual-selection/packages/ts-shell/src/provider/request/fetch.ts'
+ ❯ src/provider/request/fetch.ts:2:1
+      1| import { admittedFetch, type Admission } from "../../core/network/admi…
+      2| import { type Agent, type ProxyAgent, fetch as undiciFetch } from "und…
+       | ^
+      3| import { tryCodexWebSocketFetch } from "../endpoints/responses/codexWs…
+      4| import { requestFetch, requestUrl } from './client.js';
+
+Caused by: Error: Failed to load url undici/index.js (resolved id: undici/index.js) in /home/wang/projects/cheers/.tmp/virtual-selection/packages/ts-shell/src/provider/request/fetch.ts. Does the file exist?
+ ❯ loadAndTransform ../../../../node_modules/vite/dist/node/chunks/config.js:22907:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/branch/create.test.ts > preserves model selection in a fork under a fresh session revision
+AssertionError: expected undefined to deeply equal { connectionScope: 'provider', …(4) }
+
+- Expected: 
+{
+  "connectionScope": "provider",
+  "model": "physical",
+  "provider": "openai",
+  "skillful": false,
+  "thinkingEffort": null,
+}
+
++ Received: 
+undefined
+
+ ❯ src/session/branch/create.test.ts:26:39
+     24|   const revision = readSessionModelEdit(source.id).revision;
+     25|   const forked = manager.fork(source.id, root, { activate: false });
+     26|   expect(readSessionModel(forked.id)).toEqual(selected);
+       |                                       ^
+     27|   expect(readSessionModelEdit(forked.id).revision).not.toBe(revision);
+     28|   expect(readSessionModel(source.id)).toEqual(selected);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  src/core/commands/model/virtual.test.ts > selects a registered logical model while dormant physical auth is unavailable, preserving authority without routing
+AssertionError: expected { connectionScope: 'provider', …(4) } to deeply equal { connectionScope: 'provider', …(7) }
+
+- Expected
++ Received
+
+  {
+    "connectionScope": "provider",
+-   "contextWindow": 128000,
+-   "model": "physical",
++   "model": "adaptive/auto",
+    "provider": "openai",
+-   "serviceTier": "flex",
+    "skillful": false,
+-   "thinkingEffort": null,
+-   "virtualModel": {
+-     "model": "auto",
+-     "provider": "adaptive",
+    "thinkingEffort": "high",
+-   },
+  }
+
+ ❯ src/core/commands/model/virtual.test.ts:60:40
+     58|   const output = await runModelCommand(['use', 'adaptive/auto', '--eff…
+     59|   expect(output.output).toContain('Model switched to adaptive/auto.');
+     60|   expect(readSessionModel(session.id)).toEqual({ ...physical, virtualM…
+       |                                        ^
+     61|   expect(route).not.toHaveBeenCalled();
+     62| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  src/core/commands/model/virtual.test.ts > permits an absent physical model only with a valid logical marker
+SessionModelWriteError: Session model invalid: this attempt did not write.
+ ❯ writeSessionModel src/session/model/state.ts:128:23
+    126| export function writeSessionModel(sessionId: string, selection: Sessio…
+    127|   const decoded = decodeSessionModel(selection);
+    128|   if (!decoded) throw new SessionModelWriteError('invalid', 'unchanged…
+       |                       ^
+    129|   return commitModel(sessionId, decoded, baseline, beforeCommit);
+    130| }
+ ❯ src/core/commands/model/virtual.test.ts:67:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  src/core/commands/model/virtual.test.ts > refuses a logical choice retired during its switch hook
+AssertionError: expected 'Model switched to adaptive/auto.\nRea…' not to contain 'Model switched to'
+
+- Expected
++ Received
+
+- Model switched to
++ Model switched to adaptive/auto.
++ Reasoning effort: auto (provider decides).
++ Model catalogue entry is unavailable; capability is unverified. Use /model refresh or /model config. Remote availability is not verified.
++ Provider: openai
++ Credential source: env
++ Scope: current session (saved for resume).
+
+ ❯ src/core/commands/model/virtual.test.ts:81:29
+     79|   const output = await runModelCommand(['use', 'adaptive/auto'], conte…
+     80|   expect(hook).toHaveBeenCalledWith(expect.objectContaining({ eventNam…
+     81|   expect(output.output).not.toContain('Model switched to');
+       |                             ^
+     82|   expect(readSessionModel(session.id)).toEqual(physical);
+     83|   expect(route).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  src/core/commands/model/virtual.test.ts > edits virtual effort through /thinking without changing dormant physical fields
+AssertionError: expected 'Model switch blocked: this model does…' to match /Model (switched to|preference sav…/auto
+
+- Expected: 
+/Model (switched to|preference saved for) adaptive\/auto/
+
++ Received: 
+"Model switch blocked: this model does not support the selected reasoning effort. Choose another level or --effort auto."
+
+ ❯ src/core/commands/model/virtual.test.ts:90:25
+     88|   seedVirtual(session.id, physical);
+     89|   const output = await runThinkingCommand(['max'], context);
+     90|   expect(output.output).toMatch(/Model (switched to|preference saved f…
+       |                         ^
+     91|   expect(readSessionModel(session.id)).toEqual({ ...physical, virtualM…
+     92|   await runThinkingCommand(['auto'], context);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  src/core/commands/model/virtual.test.ts > reports selected logical identity in command status and the native model label
+AssertionError: expected 'Model selection status\nProvider: ope…' to contain 'adaptive/auto'
+
+- Expected
++ Received
+
+- adaptive/auto
++ Model selection status
++ Provider: openai
++ Auth type: api-key
++ Active connection: none
++ Model: physical
++ Model source: provider (session selection).
++ Request provider: openai
++ Request model: physical
++
++ Provider readiness
++ - Config status: no active connection selected.
++ - Next: run /connect status, then /connect login or /connect use.
++
++ Use /model list to inspect available models.
++ Use /model use <model-id> to switch active model.
+
+ ❯ src/core/commands/model/virtual.test.ts:100:63
+     98|   const { session, physical, context } = fixture();
+     99|   seedVirtual(session.id, physical);
+    100|   expect((await runModelCommand(['status'], context)).output).toContai…
+       |                                                               ^
+    101|   const config = projectSessionModel(getRuntimeConfig(root), session.i…
+    102|   const runtime = { cwd: root, projectRoot: root, session, configurati…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  src/core/commands/model/virtual.test.ts > refuses malformed persisted logical selection instead of projecting a physical fallback
+AssertionError: expected [Function] to throw an error
+ ❯ src/core/commands/model/virtual.test.ts:122:73
+    120|   fs.writeFileSync(layout.statePath, JSON.stringify({ ...state, modelS…
+    121|     virtualModel: { provider: 'adaptive', model: '' } } }));
+    122|   expect(() => projectSessionModel(getRuntimeConfig(root), session.id)…
+       |                                                                         ^
+    123| });
+    124| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+
+ Test Files  4 failed (4)
+      Tests  7 failed | 6 passed (13)
+   Start at  15:53:03
+   Duration  12.45s (transform 5.99s, setup 0ms, collect 2.94s, tests 424ms, environment 0ms, prepare 197ms)
+

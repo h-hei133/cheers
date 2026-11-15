@@ -1,0 +1,53 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/turn/request.test.ts -t previous dispatch marker --maxWorkers=1 --no-file-parallelism
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/turn/request.test.ts (12 tests | 1 failed | 11 skipped) 17ms
+   ↓ retains native preparation through both wrappers and publishes before live state
+   ↓ preserves the exact opening identity against a detached source for preparation accounting
+   ↓ refuses throws declaration persistence without dispatch or application getters
+   ↓ refuses promise declaration persistence without dispatch or application getters
+   ↓ refuses getter declaration persistence without dispatch or application getters
+   ↓ does not grant declaration publication to an alternate prepared step
+   ↓ reuses captured conversion for an outer retry of an unchanged native request
+   ↓ prepares a goal closing request from committed history when a declaration remains pending
+   ↓ routes outer retries with the actual failed physical target and latest successful response
+   ↓ routes an implicit-effort retry with its latest dispatched failure over outer context false
+   ↓ routes an implicit-effort retry with its latest dispatched failure over outer context true
+   × does not reuse the previous dispatch marker when routing the effort retry itself fails 16ms
+     → expected { provider: 'fixture', …(4) } to be undefined
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/request.test.ts > does not reuse the previous dispatch marker when routing the effort retry itself fails
+AssertionError: expected { provider: 'fixture', …(4) } to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+{
+  "errorMessage": "Request context preparation failed. No request was sent.",
+  "modelId": "physical",
+  "provider": "fixture",
+  "stopReason": "error",
+  "thinkingLevel": "low",
+}
+
+ ❯ src/turn/request.test.ts:219:95
+    217|     fetchImpl: async () => { sends++; return new Response('reasoning_e…
+    218|   const result = await step([{ role: 'user', content: 'The retry route…
+    219|   expect(sends).toBe(1); expect(result.stopReason).toBe('error'); expe…
+       |                                                                                               ^
+    220| });
+    221| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 skipped (12)
+   Start at  17:22:35
+   Duration  2.20s (transform 1.22s, setup 0ms, collect 1.95s, tests 17ms, environment 0ms, prepare 59ms)
+

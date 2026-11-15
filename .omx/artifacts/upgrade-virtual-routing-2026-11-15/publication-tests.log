@@ -1,0 +1,6 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ✓ src/config/publication.test.ts (12 tests) 113ms
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  18:10:28
+   Duration  949ms (transform 321ms, setup 0ms, collect 608ms, tests 113ms, environment 0ms, prepare 57ms)

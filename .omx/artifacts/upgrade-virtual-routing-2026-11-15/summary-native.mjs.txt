@@ -1,0 +1,113 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const directory = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(directory, '../..');
+const installed = path.join(directory, 'install/node_modules/@cheers/ts-shell');
+const { createAgentSession, DefaultResourceLoader, getRuntimeConfig } = await import(pathToFileURL(path.join(installed, 'dist/index.js')).href);
+const receipt = { platform: process.platform, publicInstalledSdk: true, status: 'not_run', realProvider: false, stages: {},
+  buildId: JSON.parse(fs.readFileSync(path.join(installed, 'dist/build-manifest.json'))).buildId,
+  probeSha256: createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex') };
+const root = fs.mkdtempSync(path.join(directory, 'summary-state-')), home = path.join(root, 'home'), workspace = path.join(root, 'work');
+fs.mkdirSync(home); fs.mkdirSync(workspace); const storage = path.join(home, '.cheers'); fs.mkdirSync(storage);
+const previous = new Map(), servers = new Set(), sessions = new Set(), loaders = new Set(), requests = [];
+let stage = 'setup', session, overflow = false, timer;
+const routeEvents = current => current.sessionManager.getTranscriptEvents(current.sessionId)
+  .filter(event => event.type === 'branch-store' && event.namespace === 'model-routing');
+async function wire(label) {
+  const server = http.createServer(async (request, response) => {
+    const chunks = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    if (request.method !== 'POST') { response.writeHead(200, { 'content-type': 'application/json' }); response.end('{"data":[]}'); return; }
+    const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    requests.push({ stage, label, model: body.model, output: body.max_tokens,
+      authenticated: request.headers.authorization === `Bearer synthetic-${label}`,
+      checkpoint: JSON.stringify(body).includes('[Context Checkpoint]'), acceptedState: routeEvents(session).length });
+    if (overflow && body.max_tokens === 32) { overflow = false; response.writeHead(400); response.end('maximum context length exceeded'); return; }
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: body.max_tokens === 32 ? 'DONE' : 'Saved work.' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 12, completion_tokens: 3, total_tokens: 15 } }));
+  });
+  servers.add(server); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  return `http://127.0.0.1:${server.address().port}/v1`;
+}
+try {
+  assert.equal(process.platform, 'linux');
+  assert.equal(receipt.buildId, JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'))).buildId);
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home,
+    GIT_CEILING_DIRECTORIES: root, CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '',
+    OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', CHEERS_MARKETPLACES_FILE: path.join(home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(home, 'extensions.json') })) {
+    previous.set(key, process.env[key]); process.env[key] = value;
+  }
+  const dormant = await wire('dormant'), physical = await wire('physical'), summary = await wire('summary');
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: {
+    openai: { runtime: 'openai', endpoint: 'openai-compatible', auth: 'api-key', baseUrl: dormant,
+      models: [{ id: 'dormant', contextWindow: 64_000, maxTokens: 512 }, { id: 'summary', contextWindow: 8000, maxTokens: 256 }] },
+    anthropic: { runtime: 'anthropic', endpoint: 'openai-compatible', auth: 'api-key', baseUrl: physical,
+      models: [{ id: 'physical', contextWindow: 5000, maxTokens: 512 }, { id: 'physical-large', contextWindow: 50_000, maxTokens: 512 }] },
+  } }));
+  const baseline = { ...getRuntimeConfig(workspace), provider: 'openai', activeProviderConnectionId: undefined,
+    sessionConnection: undefined, accountPool: undefined, configScopes: undefined, allowedModels: undefined,
+    providerConnections: [{ id: 'summary', provider: 'openai', status: 'connected', authType: 'api-key', apiKey: 'synthetic-summary',
+      model: 'summary', baseUrl: summary, createdAt: '2026-11-15', updatedAt: '2026-11-15' }],
+    providerCredentials: { openai: { model: 'dormant', baseUrl: dormant }, anthropic: { apiKey: 'synthetic-physical', model: 'physical', baseUrl: physical } },
+    maxOutputTokens: 32, reserveTokens: 0, keepRecentTokens: 10, contextWindow: undefined, compactionEnabled: true,
+    retryEnabled: false, retryMaxRetries: 0, providerRetryMaxRetries: 0, cacheWarmIntervalSeconds: 0,
+    providerConnectTimeoutMs: 3000, providerHeadersTimeoutMs: 3000, providerBodyTimeoutMs: 3000 };
+  timer = setTimeout(() => { receipt.deadline = true; void session?.abort().catch(() => {}); }, 90_000);
+  for (const name of ['automatic', 'overflow', 'role']) {
+    stage = name; overflow = name === 'overflow'; let routes = 0;
+    const model = name === 'overflow' ? 'physical-large' : 'physical';
+    const loader = new DefaultResourceLoader({ cwd: workspace, noContextFiles: true, noSkills: true, noThemes: true,
+      systemPrompt: name === 'overflow' ? 'Answer briefly.' : 'System '.repeat(1200),
+      extensionFactories: [api => api.registerVirtualModel({ provider: 'adaptive', id: name, name, route: request => {
+        routes++; return { provider: 'anthropic', modelId: model, state: { count: (request.state?.count ?? 0) + 1 } };
+      } })] });
+    loaders.add(loader); await loader.reload(); assert.equal(loader.getExtensions().errors.length, 0);
+    session = (await createAgentSession({ cwd: workspace, resourceLoader: loader, noTools: 'all', model: `adaptive/${name}`,
+      runtimeConfig: { ...baseline, sessionModelRoles: name === 'role' ? { summary: { provider: 'openai', model: 'summary', connectionId: 'summary' } } : undefined } })).session;
+    sessions.add(session);
+    for (let index = 0; index < 5; index++) {
+      session.sessionManager.persistUserPromptBarrier(session.sessionId, `Question ${index}: ${'x'.repeat(1200)}`);
+      session.sessionManager.addTurn(session.sessionId, { role: 'assistant', content: `Answer ${index}: ${'y'.repeat(1200)}` });
+    }
+    const result = await session.prompt('Continue.');
+    const current = requests.filter(request => request.stage === name);
+    const commits = session.sessionManager.getTranscriptEvents(session.sessionId).filter(event => event.type === 'compaction-commit');
+    receipt.stages[name] = { routes, requests: current, compactionCommits: commits.length, routeStateEntries: routeEvents(session).length, resultMatches: result.trim() === 'DONE' };
+    assert.equal(result.trim(), 'DONE'); assert.equal(routes, 1); assert.equal(commits.length, 1);
+    assert.ok(current.length >= 2); assert.ok(current.every(request => request.acceptedState === 1 && request.authenticated));
+    assert.ok(current.at(-1).checkpoint); assert.equal(current.at(-1).model, model); assert.equal(current.at(-1).output, 32);
+    assert.equal(routeEvents(session).length, 1);
+    if (name === 'role') {
+      assert.ok(current.some(request => request.label === 'summary' && request.model === 'summary' && request.output === 256));
+      assert.ok(current.every(request => request.label === 'summary' || request.output === 32));
+    } else {
+      assert.ok(current.every(request => request.label === 'physical' && request.model === model));
+      assert.ok(current.some(request => request.output === 512));
+    }
+    if (name === 'overflow') { assert.equal(current[0].output, 32); assert.equal(overflow, false); }
+    receipt.stages[name].passed = true;
+    await session.dispose(); sessions.delete(session); session = undefined;
+  }
+  assert.ok(requests.every(request => request.label !== 'dormant'));
+  receipt.loopbackPosts = requests.length; receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage; receipt.errorName = error?.name;
+  receipt.line = String(error?.stack).match(/summary-native\.mjs:(\d+)/)?.[1];
+  if (error?.name === 'AssertionError') receipt.assertion = { operator: error.operator,
+    actual: typeof error.actual === 'number' || typeof error.actual === 'boolean' ? error.actual : undefined,
+    expected: typeof error.expected === 'number' || typeof error.expected === 'boolean' ? error.expected : undefined };
+  process.exitCode = 1;
+} finally {
+  clearTimeout(timer);
+  for (const current of sessions) await current.dispose().catch(() => {});
+  for (const loader of loaders) { try { loader.captureRetirement()(); } catch {} }
+  for (const server of servers) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.writeFileSync(path.join(directory, 'summary-native.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt));
+}

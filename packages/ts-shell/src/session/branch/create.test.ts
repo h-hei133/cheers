@@ -7,6 +7,7 @@ import { SessionStoreAccess } from '../store/sessionStoreAccess.js';
 import { readSessionNavigation } from '../query/navigation.js';
 import { SessionForkError } from './create.js';
 import { hasUnfinishedSessionWork } from '../recovery/work.js';
+import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../model/state.js';
 
 let root: string;
 beforeEach(() => {
@@ -14,6 +15,18 @@ beforeEach(() => {
   vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
+
+it('preserves model selection in a fork under a fresh session revision', () => {
+  const manager = new SessionManager(); const source = manager.createNew(root);
+  const selected = { connectionScope: 'provider' as const, provider: 'openai', model: 'physical', thinkingEffort: null,
+    skillful: false, virtualModel: { provider: 'adaptive', model: 'auto', thinkingEffort: 'high' as const } };
+  writeSessionModel(source.id, selected, readSessionModelEdit(source.id));
+  const revision = readSessionModelEdit(source.id).revision;
+  const forked = manager.fork(source.id, root, { activate: false });
+  expect(readSessionModel(forked.id)).toEqual(selected);
+  expect(readSessionModelEdit(forked.id).revision).not.toBe(revision);
+  expect(readSessionModel(source.id)).toEqual(selected);
+});
 
 it('forks a historic user entry with all branches retained and no inherited pending authority', async () => {
   const manager = new SessionManager(); const source = manager.createNew(root);

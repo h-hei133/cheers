@@ -1,0 +1,50 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts (15 tests | 1 failed | 14 skipped) 155ms
+   ↓ routes manual summaries once without reading or writing branch routing state
+   ↓ routes branch summaries once without reading or writing branch routing state
+   ↓ keeps an explicit summary role for manual with dormant credentials unavailable
+   ↓ keeps an explicit summary role for branch with dormant credentials unavailable
+   ↓ defers automatic compaction to the routed physical target and does not create a virtual cache warmer
+   ↓ rejects a retired direct route before summary dispatch
+   × refuses a direct summary when its output budget cannot carry explicit thinking 154ms
+     → promise resolved "undefined" instead of rejecting
+   ↓ retains its captured settings across a same-binding publication during direct summary route
+   ↓ retains its captured settings across a same-binding publication during direct summary converter
+   ↓ preserves selected effort when a manual summary route omits its override
+   ↓ preserves selected effort when a branch summary route omits its override
+   ↓ uses an explicit route effort override for a branch summary
+   ↓ refuses an unsupported direct summary effort before dispatch: {"effort":"high","physical":{"reasoning":false}}
+   ↓ refuses an unsupported direct summary effort before dispatch: {"effort":"high","physical":{"thinkingLevelMap":{"high":null}}}
+   ↓ refuses an unsupported direct summary effort before dispatch: {"physical":{"reasoning":true},"routeEffort":"max"}
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+   Start at  17:36:27
+   Duration  11.93s (transform 7.31s, setup 0ms, collect 11.50s, tests 155ms, environment 0ms, prepare 55ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > refuses a direct summary when its output budget cannot carry explicit thinking
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected: 
+Error {
+  "message": "rejected promise",
+}
+
++ Received: 
+undefined
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts:140:112
+    138| it('refuses a direct summary when its output budget cannot carry expli…
+    139|   const test = await fixture(false, true, { effort: 'high', endpoint: …
+    140|   await expect(test.deps.summarizeAbandonedTurns!(test.manager.getSess…
+       |                                                                                                                ^
+    141|     .rejects.toThrow('output limit must be at least 2048');
+    142|   expect(test.route).toHaveBeenCalledOnce(); expect(test.requests).toE…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

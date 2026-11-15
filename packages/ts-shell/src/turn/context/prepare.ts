@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { catalogModel, catalogProvider } from '../../core/models/catalog.js';
-import { inferRouteReason, type ModelRoute } from '../../core/models/virtualModels.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
 import { effortCapability } from '../../core/models/capability.js';
 import { outputLimitFailure } from '../../core/models/limits.js';
@@ -30,6 +29,7 @@ import type { ModelInputLimits } from '../../core/models/modalities.js';
 import type { ThinkingPreference } from '../../core/models/effort.js';
 import { prepareTurnBody } from './body.js';
 import { captureStepTarget, resolveStepTarget } from './target.js';
+import { prepareModelRoute, type PreparedRoute } from './route.js';
 import { requestReplayBinding } from '../../provider/request/replay.js';
 import type { PreparedTurnContext, StepOptions, StepRequest, StepTarget } from './contract.js';
 
@@ -46,6 +46,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
   readonly explicitEffort: boolean;
   readonly effortAccepted: () => boolean;
   readonly streamAttempts: () => number;
+  readonly failedRoute?: () => StepOptions['failedRoute'];
   readonly replayBinding: string;
 }) {
   const initialTools = request.initialTools ?? request.tools;
@@ -56,7 +57,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
   const requestPurpose = options.requestPurpose;
   const agentMode = options.agentMode;
   const prepare = async (messages: readonly AgentMessage[], signal?: AbortSignal, reuse?: MessageProjection,
-    fixedRoute?: { readonly route?: ModelRoute; readonly target: StepTarget }, seed?: StandardAgentMessage): Promise<PreparedTurnContext> => {
+    fixedRoute?: { readonly routing: PreparedRoute; readonly target: StepTarget }, seed?: StandardAgentMessage): Promise<PreparedTurnContext> => {
     signal?.throwIfAborted();
     if (options.requestPurpose !== requestPurpose) {
       throw new TurnPreparationError('Request purpose changed during preparation. No request was sent.', true);
@@ -75,11 +76,10 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       request.pruneToolText, request.projection]);
     const projectionTransform = request.projection?.transformMessages;
     const rawEffort = lifetime.effortAccepted() ? lifetime.thinkingEffort ?? undefined : undefined;
-    const route = fixedRoute ? fixedRoute.route : request.virtualModels ? await request.virtualModels.resolve({
-      provider: request.provider.provider ?? '', modelId: request.provider.model,
-      thinkingLevel: rawEffort ?? 'medium', reason: inferRouteReason(sourceMessages, lifetime.streamAttempts()),
-      messages: sourceMessages, signal,
-    }) : undefined;
+    const routing = fixedRoute?.routing ?? await prepareModelRoute(request,
+      { ...options, failedRoute: lifetime.failedRoute ? lifetime.failedRoute() : options.failedRoute }, sourceMessages,
+      rawEffort ?? 'medium', lifetime.streamAttempts(), signal);
+    const route = routing.route;
     signal?.throwIfAborted();
     const target = fixedRoute?.target ?? await resolveStepTarget(request, sourceTarget, route, signal);
     signal?.throwIfAborted();
@@ -291,7 +291,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     const capturedSystem = baseSystemPrompt;
     const isCurrent = (): boolean => {
       try {
-        if (target.isCurrent?.() === false || request.resolveTarget !== resolveTarget
+        if (!routing.isCurrent() || target.isCurrent?.() === false || request.resolveTarget !== resolveTarget
           || options.requestPurpose !== requestPurpose || options.agentMode !== agentMode || options.convertToLlm !== converter
           || generationIdentity !== JSON.stringify([request.provider, request.temperature, request.topP, request.maxOutputTokens,
           request.contextWindow, request.reserveTokens, request.cacheRetention, request.initialTools, request.historicalEfforts && [...request.historicalEfforts],
@@ -308,6 +308,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       } catch { return false; }
     };
     const captured: PreparedTurnContext = Object.freeze({ target, requestPurpose: requestPurpose ?? (agentMode ? 'subagent' : 'turn'), agentMode,
+      acceptRoute: () => routing.accept(() => { if (!isCurrent()) throw new TurnPreparationError('The captured route changed before acceptance. No request was sent.', true); }),
       sourceMessages, prospectiveMessages, ...(pendingDeclaration ? { pendingDeclaration } : {}),
       messageProjection, finalMessages, budgetMessages: freezeDeep(budgetMessages),
       overhead: freezeDeep(overhead), prompt: Object.freeze(prompt), budget: Object.freeze(budget),
@@ -321,28 +322,28 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       url: endpointUrl(target.provider.baseUrl, endpoint, activeModel), headers: Object.freeze({ ...target.provider.headers }),
       replayBinding, ...(refusal ? { refusal: Object.freeze(refusal) } : {}), isCurrent,
       refresh: (refreshSignal?: AbortSignal) => prepare(sourceMessages, refreshSignal,
-        { ...messageProjection, sourceMessages: prospectiveMessages }, { route, target }, pendingDeclaration),
+        { ...messageProjection, sourceMessages: prospectiveMessages }, { routing, target }, pendingDeclaration),
       reframe: (callOptions: Pick<StepOptions, 'allowTools' | 'allowedTools' | 'agentMode' | 'requestPurpose'>, reframeSignal?: AbortSignal) => {
         const nextOptions: StepOptions = { ...options, allowTools: callOptions.allowTools,
           allowedTools: callOptions.allowedTools === undefined ? undefined : Object.freeze([...callOptions.allowedTools]),
           agentMode: callOptions.agentMode, requestPurpose: callOptions.requestPurpose,
           convertToLlm: converter, promptSource, preparedContext: undefined };
         return createTurnContextPreparer(request, nextOptions, lifetime)(sourceMessages, reframeSignal,
-          { ...messageProjection, sourceMessages: prospectiveMessages }, { route, target }, pendingDeclaration);
+          { ...messageProjection, sourceMessages: prospectiveMessages }, { routing, target }, pendingDeclaration);
       },
-      prepare: (candidate: readonly AgentMessage[], candidateSignal?: AbortSignal) => prepare(candidate, candidateSignal, undefined, { route, target }),
+      prepare: (candidate: readonly AgentMessage[], candidateSignal?: AbortSignal) => prepare(candidate, candidateSignal, undefined, { routing, target }),
       published: () => {
         if (!pendingDeclaration) return captured;
         const { pendingDeclaration: _pending, ...published } = captured;
         const projection = Object.freeze({ ...messageProjection, sourceMessages: prospectiveMessages });
         const promoted: PreparedTurnContext = Object.freeze({ ...published, sourceMessages: prospectiveMessages, messageProjection: projection,
-          refresh: (refreshSignal?: AbortSignal) => prepare(prospectiveMessages, refreshSignal, projection, { route, target }),
+          refresh: (refreshSignal?: AbortSignal) => prepare(prospectiveMessages, refreshSignal, projection, { routing, target }),
           reframe: (callOptions: Pick<StepOptions, 'allowTools' | 'allowedTools' | 'agentMode' | 'requestPurpose'>, reframeSignal?: AbortSignal) =>
             createTurnContextPreparer(request, { ...options, allowTools: callOptions.allowTools,
               allowedTools: callOptions.allowedTools === undefined ? undefined : Object.freeze([...callOptions.allowedTools]),
               agentMode: callOptions.agentMode, requestPurpose: callOptions.requestPurpose,
               convertToLlm: converter, promptSource, preparedContext: undefined }, lifetime)(
-              prospectiveMessages, reframeSignal, projection, { route, target }),
+              prospectiveMessages, reframeSignal, projection, { routing, target }),
           published: () => promoted,
         });
         return promoted;

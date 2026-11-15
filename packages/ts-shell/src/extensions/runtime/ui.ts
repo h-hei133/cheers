@@ -1,6 +1,21 @@
+import type { ModelRouteSignal } from '../../core/models/virtual/contract.js';
+
 export interface ExtensionUiDialogOptions {
   readonly timeout?: number;
   readonly signal?: AbortSignal;
+}
+
+/** Callback-side cancellation is observable data; host dialog options retain native signals. */
+export interface ExtensionUiRequestOptions {
+  readonly timeout?: number;
+  readonly signal?: ModelRouteSignal;
+}
+
+export interface ExtensionUiApi extends Omit<ExtensionUiHost, 'select' | 'confirm' | 'input' | 'editor'> {
+  readonly select?: (title: string, options: readonly string[], opts?: ExtensionUiRequestOptions) => Promise<string | undefined>;
+  readonly confirm?: (title: string, message: string, opts?: ExtensionUiRequestOptions) => Promise<boolean>;
+  readonly input?: (title: string, placeholder?: string, opts?: ExtensionUiRequestOptions) => Promise<string | undefined>;
+  readonly editor?: (title: string, prefill?: string, opts?: ExtensionUiRequestOptions) => Promise<string | undefined>;
 }
 
 export interface ExtensionUiHost {

@@ -30,7 +30,7 @@
 
 ## C: 循环、消息与缓存（P1，并包含深度审计 P0）
 
-- [ ] **C.1** prepareNextTurn／prepareRequest／finishTurn 与虚拟路由：部分验收。准备边界已补初始／续轮／逐请求的取消和历史复验、结束hook取消退出、turn_start后继拒绝；原队列peek保留steering／follow-up优先级与撤回，8套件161项、六门及Linux编译loop配置模型两次发送和准备取消零派发通过。完整物理target/auth/transport捕获与scope复验已提交`e61a340`：route前冻结authority，candidate／refresh／reframe复用，reasoning归属实际replay；15/297及六反转、Linux两个实际loopback通过。自动／overflow摘要现绑定同一physical target与预算，显式summary角色保持优先；消费者撤权不污染成功共享renewal。最终六门15/246、五断言反转、build `9e91decd500a`及Linux内部三场景route一次／公开SDK配置模型两次bodySent通过，限定复核CLEAR。会话注册前置已通过当前18/178及Linux安装SDK／CLI验收；仍缺生产逻辑选择、router分支状态持久化／退休、完整retry/direct与previous/failed上下文、手动／分支摘要direct路由和虚拟选择缓存归属。内部registry注入不算公共注册验收，C.1不勾选，当前21/62；细节见验证账。
+- [x] **C.1** prepareNextTurn／prepareRequest／finishTurn 与虚拟路由：Linux本地验收完成。既有准备／结束／队列边界保留；当前逻辑选择独立保存，缺失注册拒绝fallback，实际physical target完整绑定auth／endpoint／transport／scope／budget／replay。原branch store按model-routing namespace同键CAS，含absent／unchanged结果，先接受再压缩；candidate／refresh复用同route。outer／effort重试使用最新实际failed目标，transport retry不重复路由；direct摘要不读写state，显式summary role优先，virtual选择不建cache warmer。CLI／SDK／命令／picker／completion／RPC／fork及VM callback数据边界接通。当前六门、39/840、十有效反转exact恢复、恢复5/79、补4/34与publication1/12、0monoliths、build `083b3d78d8bf`通过；同代2224文件安装strict类型，Linux公开SDK10／CLI2／自动摘要12／重试续轮8／限定RPC1个loopback POST及配置模型4个真实POST通过。配置模型用了隔离最小有效目录，原损坏目录未验收；D.1旧messages读取缺口单列。限定独立代码复审8个核心owner为APPROVE，架构CLEAR；证据`.omx/artifacts/upgrade-virtual-routing-2026-11-15/delivery.json`。
 - [ ] **C.2** message_update 流式部分消息及 x-should-retry：已有待验收，部分响应不重放、内外重试一致。
 - [x] **C.3** AgentMessage 与 provider Message 分离及 convertToLlm：本地验收完成。独立基础类型、custom持久化／显示、前台SDK、摘要和普通请求完整capture均已提交；同一raw路由／转换／system／工具／图片／budget／最终body经过统一准备owner，自动／手动／prefix／merge／branch／overflow／rewind／重开保持一致，取消后可复用。当前`e4d27485`联合30套件502项、六静态门通过，限定只读复核CLEAR；Linux编译build `c7857153d401`两组配置模型各7次actual bodySent通过，隐藏raw未送出，取消零派发及声明ID／顺序保持。账户刷新fixture因移除override后默认4096超过main旧100 ceiling而早拒绝，定向复现零renewal／零dispatch；仅修正fixture前台预算，原拒绝／一次刷新／两次新凭据／持久化和历史断言均通过。详细范围与首次失败见design及`context-joint-final.log`；不表示C.6原生协议、缓存收益、其他平台或远端CI完成。
 - [ ] **C.4** 默认历史工具文本保留与一致测量：已有待验收，真实多轮请求前缀与压缩预算。
@@ -42,7 +42,7 @@
 
 ## D: RPC 与导出（P1）
 
-- [ ] **D.1** 会话／模型／树命令：已有待验收，真实 JSONL 与错误分类。
+- [ ] **D.1** 会话／模型／树命令：缺口。当前Linux编译CLI真实JSONL已覆盖logical get_state／available_models／set_model／cycle_model／thinking及physical派发／durable origin／EOF exit0；get_messages在成功prompt后仍读startup session.turns，普通physical选择对照同样复现。需改为当前会话读取并核实stats／last-assistant等同源消费者，以及会话／树和错误分类；`.omx/artifacts/upgrade-virtual-routing-2026-11-15/rpc-classification.json`保留失败与对照，不把限定RPC通过当整项验收。
 - [x] **D.2** 队列清空和 steering／follow-up 模式实时更改：本地验收完成。清空实际两条活跃输入与submission，模式跨readiness传递并保存后更新捕获队列；配置或运行替换拒绝修改后继。真实runTurn和JSONL消费者通过，宿主按input/session/settings拆分且函数上限通过。
 - [x] **D.3** UI 请求／响应和事件：本地验收完成。加载扩展通过真实JSONL的选择／确认／输入／编辑、取消、EOF前撤权和迟到响应隔离；配置／会话转换新增四项红例后修复，在成功且lease改变时先刷新owner再绑定，后继consumer与EOF不能复活。独立暂存树6套件47项、六静态门、build `16aec298a055`及Linux编译CLI三次选择／改配置／新会话／未答编辑EOF退出通过，限定复审CLEAR。实际M，额外依赖1（转换后的surface lease），结构复用原host；无真实服务或跨平台声明。
 - [ ] **D.4** HTML 高亮、GFM／CJK、Thinking、Diff、灯箱：已有待验收，真实离线导出与转义安全。
@@ -56,7 +56,7 @@
 - [ ] **E.4** 确定性重放：待核实。已有 worker 不等于声明中的可恢复确定性执行；先明确记录和副作用边界再实现。
 - [ ] **E.5** TS 文件／异步工厂及共享宿主：部分验收。异步原子发布、旧代际撤权、SDK/shared host和在途reload确认取消通过独立暂存树8/46及turn4/114、五静态门/build；安装产物最终验收、SDK配置发布后的UI重绑定WATCH仍待核实。
 - [ ] **E.6** 扩展完整生命周期事件：部分，逐事件找 dispatch 和结果消费者；声明未消费者不得算完成。
-- [ ] **E.7** registerProvider／virtual model／MCP／renderer 与运行时 setters：部分。会话virtual注册复用既有loader／catalog owner，SDK getModelCatalog仅公开独立元数据；重复与physical冲突拒绝、有界VM数据捕获、generation／request取消、reload与cleanup保留后继通过。六门18/178、0monoliths、build `047e196c6597`及六有效反转通过；当前2214文件npm包严格公开类型、Linux安装SDK和同代CLI注册／撤权／冲突exit1通过，独立复核限定CLEAR。生产逻辑选择／路由尚未接入，worker注册明确不支持；provider／MCP／renderer和其余setters仍缺。
+- [ ] **E.7** registerProvider／virtual model／MCP／renderer 与运行时 setters：部分。注册`356b996b`后，当前CLI／SDK生产逻辑选择与router已接通，callback-free目录、nested effort、独立分支状态、重开／fork、取消／reload后继保留和direct摘要经公开入口验证。VM callback收到有界复制冻结JSON与realm-local signal／UI／error，保留原调用lifetime；不宣称通用VM安全沙箱。当前六门39/840、十反转、build `083b3d78d8bf`与2224文件安装strict类型通过，Linux公开SDK／CLI／配置模型证据见C.1。worker virtual注册明确不支持，provider／MCP／renderer和其余setters仍缺；限定独立代码复审APPROVE、架构CLEAR；E.7其余范围继续开项。
 - [ ] **E.8** shortcuts／flags：部分。目前收集但 CLI／SDK 未消费；冲突、默认值、实际参数与按键生命周期。
 - [ ] **E.9** 包安装来源和 CLI 入口：部分。已有签名 marketplace 安装，npm／git／local adapter 和顶层安装入口尚缺；保留显式批准、完整性、精确版本与写入边界。
 - [ ] **T2.1** CLI 参数集合、单遍解析与早期启动判断：部分，主循环已存在；测试完整启动矩阵并处理早期多遍语义。
@@ -102,6 +102,8 @@
 - **P3-DESKTOP** 独立 Web／桌面产品矩阵：原文暂缓；不把 Linux 桌面自动化工具称作桌面产品。
 
 ## Validation ledger
+
+2026-11-15 C.1逻辑选择／生产路由：当前build `083b3d78d8bf`绑定39/840、六门、0monoliths、十有效反转和同代Linux原生矩阵，限定独立代码复审8个核心owner为APPROVE、架构CLEAR；C.1本地完成，22/62。首次missing lint script、UI reversal TypeError、abort fixture死锁、test-input旧build拒绝、retry fixture配置和错误RPC transcript假设均保留分类。原用户catalog JSON损坏，配置连接／凭据未改，隔离最小model entry后4次真实POST通过；另两次connection refusal零POST、一个auth failure一POST仍是失败。限定RPC逻辑选择通过但普通physical对照复现get_messages旧快照，D.1由已有待验收转确认缺口。完整回执与source hashes见`.omx/artifacts/upgrade-virtual-routing-2026-11-15/delivery.json`；未push／CI。
 
 2026-11-15 C.1/E.7会话虚拟注册前置：inline／async file扩展registerVirtualModel经原contribution发布，SDK目录分离physical/virtual并剥离callback；不向配置合成runtime/auth。元数据与返回state捕获、collision/cap、原signal／options身份及generation撤权已补。原9红、复核6红、observer1红；最终六门18套件178项、0monoliths、build `047e196c6597`和六断言反转exact恢复通过，独立复核CLEAR。同代2214文件／2524053bytes npm安装及strict skipLibCheck=false类型通过；Linux安装SDK inline/file目录、VM state、reload pending拒绝、旧dispose保留后继以及CLI异步注册／重复exit1通过，provider调用0。最初测试占位host和取消cause预期错误、首build两处隐式any、旧consumer测试路径未匹配（随后改真实context/codec纳入18套件）、npm pack返回object而非array、原生slash被识别为project路径均分类保留。证据`.omx/artifacts/upgrade-virtual-registration-2026-11-15/delivery.json`。C.1仍缺逻辑选择、caller-owned branch CAS、retry/direct/previous/failed、摘要direct和缓存归属；输入VM隔离仍需在生产派发前审视，E.7部分，合计21/62不变。
 

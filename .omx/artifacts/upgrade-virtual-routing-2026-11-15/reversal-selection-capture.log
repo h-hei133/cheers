@@ -1,0 +1,49 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/commands/model/virtual.test.ts (14 tests | 1 failed | 13 skipped) 63ms
+   ↓ selects a registered logical model while dormant physical auth is unavailable, preserving authority without routing
+   ↓ permits an absent physical model only with a valid logical marker
+   ↓ refuses a logical choice retired during its switch hook
+   ↓ edits virtual effort through /thinking without changing dormant physical fields
+   ↓ reports selected logical identity in command status and the native model label
+   ↓ clears virtual selection when explicitly selecting a physical model
+   ↓ refuses malformed persisted logical selection instead of projecting a physical fallback
+   ↓ keeps an unavailable saved virtual choice selected and refuses effort or same-address fallback
+   ↓ edits independent session preferences with dormant auth unavailable
+   ↓ does not claim the dormant physical service tier applies to a virtual selection
+   ↓ uses logical admission only to defer dormant model constraints
+   ↓ uses logical admission only to defer dormant independent constraints
+   ↓ uses logical admission only to defer dormant security constraints
+   × rejects caller-owned effort accessors before capability validation or hooks 62ms
+     → expected 'Model switched to adaptive/auto.\nRea…' not to contain 'Model switched to'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  17:36:40
+   Duration  3.16s (transform 1.85s, setup 0ms, collect 2.86s, tests 63ms, environment 0ms, prepare 52ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/commands/model/virtual.test.ts > rejects caller-owned effort accessors before capability validation or hooks
+AssertionError: expected 'Model switched to adaptive/auto.\nRea…' not to contain 'Model switched to'
+
+- Expected
++ Received
+
+- Model switched to
++ Model switched to adaptive/auto.
++ Reasoning effort: high.
++ Scope: current session (saved for resume).
+
+ ❯ src/core/commands/model/virtual.test.ts:191:22
+    189|   const hook = vi.spyOn(defaultHookDispatcher, 'dispatch');
+    190|   const output = await setVirtualModel(target, context);
+    191|   expect(output).not.toContain('Model switched to');
+       |                      ^
+    192|   expect(readSessionModel(session.id)).toEqual(before);
+    193|   expect(hook).not.toHaveBeenCalled(); expect(reads).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -1,0 +1,28 @@
+{
+  "reviewer": "/root/routing_architecture",
+  "status": "CLEAR",
+  "readOnly": true,
+  "independentExecution": false,
+  "findings": [
+    {
+      "status": "resolved",
+      "finding": "Explicit delegated physical selections clear foreground logical routing.",
+      "file": "packages/ts-shell/src/cli/provider/step.ts"
+    },
+    {
+      "status": "resolved",
+      "finding": "step.ts captures the actual failed physical target with safe text; prepare.ts passes it to the next route, replacing older failure context.",
+      "files": [
+        "packages/ts-shell/src/turn/step.ts:418",
+        "packages/ts-shell/src/turn/context/prepare.ts:79"
+      ]
+    },
+    {
+      "status": "resolved",
+      "finding": "Dispatch identity is cleared before preparation, preventing local failures from claiming a stale dispatched target.",
+      "file": "packages/ts-shell/src/turn/step.ts:157"
+    }
+  ],
+  "conclusion": "Candidate and refresh preparation reuse their captured route and target. No additional architectural blocker found.",
+  "scope": "Reviewed routing contracts only; root owns validation."
+}

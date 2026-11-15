@@ -1,0 +1,113 @@
+/** File route inputs and UI replies stay in the extension realm; this is not a security sandbox. */
+export const VIRTUAL_SOURCE = `(() => {
+  const sendUi = globalThis.__virtualUi;
+  const settle = globalThis.__virtualSettle;
+  const capture = globalThis.__virtualCapture;
+  const diagnostic = globalThis.__virtualDiagnostic;
+  delete globalThis.__virtualUi;
+  delete globalThis.__virtualSettle;
+  delete globalThis.__virtualCapture;
+  delete globalThis.__virtualDiagnostic;
+  let sequence = 0;
+  const pending = new Map();
+  const cancellations = new Map();
+  const error = text => new Error(text || 'Virtual model callback failed.');
+  const freeze = value => {
+    if (value && typeof value === 'object') {
+      for (const key of Object.keys(value)) freeze(value[key]);
+      Object.freeze(value);
+    }
+    return value;
+  };
+  const reply = (id, ok, json) => {
+    const entry = pending.get(id);
+    if (!entry) return;
+    pending.delete(id);
+    entry.signal?.removeEventListener('abort', entry.cancel);
+    if (ok) entry.resolve(json === '' ? undefined : JSON.parse(json));
+    else entry.reject(error(json));
+  };
+  const dialog = (method, args, options, fallback) => new Promise((resolve, reject) => {
+    const id = ++sequence;
+    const signal = options?.signal;
+    if (signal?.aborted) { resolve(fallback); return; }
+    const cancel = () => { sendUi(id, 'cancel', ''); reply(id, true, fallback === undefined ? '' : JSON.stringify(fallback)); };
+    pending.set(id, { resolve, reject, signal, cancel });
+    signal?.addEventListener('abort', cancel, { once: true });
+    const failure = sendUi(id, method, JSON.stringify([...args, { timeout: options?.timeout }]));
+    if (failure) reply(id, false, failure);
+  });
+  const effect = (method, args) => {
+    const failure = sendUi(++sequence, method, JSON.stringify(args));
+    if (failure) throw error(failure);
+  };
+  const ui = Object.freeze({
+    select: (title, choices, options) => dialog('select', [title, choices], options, undefined),
+    confirm: (title, message, options) => dialog('confirm', [title, message], options, false),
+    input: (title, placeholder, options) => dialog('input', [title, placeholder], options, undefined),
+    editor: (title, prefill, options) => dialog('editor', [title, prefill], options, undefined),
+    notify: (message, kind) => effect('notify', [message, kind]),
+    setStatus: (key, value) => effect('setStatus', [key, value]),
+    setWidget: (key, value, placement) => effect('setWidget', [key, value, placement]),
+    setTitle: title => effect('setTitle', [title]),
+    setEditorText: text => effect('setEditorText', [text]),
+  });
+  const cancellation = id => {
+    let aborted = false, reason, onabort = null;
+    const listeners = [];
+    const signal = Object.freeze({
+      get aborted() { return aborted; },
+      get reason() { return reason; },
+      get onabort() { return onabort; },
+      set onabort(value) { onabort = typeof value === 'function' ? value : null; },
+      throwIfAborted() { if (aborted) throw reason; },
+      addEventListener(type, callback, options) {
+        if (type !== 'abort' || callback == null) return;
+        const capture = typeof options === 'boolean' ? options : Boolean(options?.capture);
+        if (!listeners.some(entry => entry.callback === callback && entry.capture === capture)) {
+          listeners.push({ callback, capture, once: typeof options === 'object' && Boolean(options?.once) });
+        }
+      },
+      removeEventListener(type, callback, options) {
+        if (type !== 'abort') return;
+        const capture = typeof options === 'boolean' ? options : Boolean(options?.capture);
+        const index = listeners.findIndex(entry => entry.callback === callback && entry.capture === capture);
+        if (index >= 0) listeners.splice(index, 1);
+      },
+    });
+    cancellations.set(id, () => {
+      if (aborted) return;
+      aborted = true;
+      reason = error('Virtual model request was cancelled.'); reason.name = 'AbortError';
+      let stopped = false;
+      const event = Object.freeze({ type: 'abort', target: signal, currentTarget: signal, defaultPrevented: false,
+        preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() { stopped = true; } });
+      for (const entry of [...listeners]) {
+        if (!listeners.includes(entry)) continue;
+        if (entry.once) listeners.splice(listeners.indexOf(entry), 1);
+        try {
+          if (typeof entry.callback === 'function') entry.callback.call(signal, event);
+          else entry.callback.handleEvent(event);
+        } catch {}
+        if (stopped) break;
+      }
+      if (!stopped && onabort) { try { onabort.call(signal, event); } catch {} }
+      cancellations.delete(id);
+    });
+    return signal;
+  };
+  const invoke = (callback, id, json) => {
+    const input = freeze(JSON.parse(json));
+    const signal = cancellation(id);
+    const request = Object.freeze({ ...input, signal });
+    Promise.resolve().then(() => { signal.throwIfAborted(); return callback(request); }).then(value => {
+      const encoded = capture(value);
+      cancellations.delete(id);
+      settle(id, true, encoded);
+    }, failure => {
+      cancellations.delete(id);
+      settle(id, false, diagnostic(failure));
+    });
+  };
+  return Object.freeze({ ui, reply, invoke, cancel: id => cancellations.get(id)?.() });
+})()`;

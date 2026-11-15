@@ -1,0 +1,38 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts (6 tests | 1 failed) 1046ms
+   ✓ routes manual summaries once without reading or writing branch routing state  414ms
+   × routes branch summaries once without reading or writing branch routing state 114ms
+     → Summary request refused: Request needs 3646 input + 512 output + 0 reserved tokens, which does not fit a 4000-token window.
+   ✓ keeps an explicit summary role for manual with dormant credentials unavailable 259ms
+   ✓ keeps an explicit summary role for branch with dormant credentials unavailable 89ms
+   ✓ defers automatic compaction to the routed physical target and does not create a virtual cache warmer 88ms
+   ✓ rejects a retired direct route before summary dispatch 81ms
+ ✓ src/cli/provider/route.test.ts (11 tests) 474ms
+ ✓ src/cli/runtime/compaction/context.test.ts (3 tests) 33ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > routes branch summaries once without reading or writing branch routing state
+Error: Summary request refused: Request needs 3646 input + 512 output + 0 reserved tokens, which does not fit a 4000-token window.
+ ❯ prepareCompactionMessages src/core/query/compaction/summarize.ts:175:67
+    173|       outputTokens: maxOutputTokens,
+    174|       reserveTokens: request.provider.reserveTokens, promptTokens: pro…
+    175|     if (budget.ok === false && budget.reason !== 'unknown') throw new …
+       |                                                                   ^
+    176|   }
+    177|   return messages;
+ ❯ prepareCompactionRequest src/core/query/compaction/summarize.ts:248:20
+ ❯ requestCompactionSummary src/core/query/compaction/summarize.ts:289:10
+ ❯ src/cli/runtime/cliSessionRuntimeFactory.ts:230:16
+ ❯ src/cli/runtime/compaction/virtual.test.ts:93:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 19 passed (20)
+   Start at  16:50:56
+   Duration  13.96s (transform 6.78s, setup 0ms, collect 11.77s, tests 1.55s, environment 0ms, prepare 147ms)
+

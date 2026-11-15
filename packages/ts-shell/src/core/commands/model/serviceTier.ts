@@ -14,8 +14,10 @@ import path from 'node:path';
 import { connectionIdentity } from './identity.js';
 import { catalogProvider } from '../../models/catalog.js';
 import { modelRequest, selectedModelMatches, selectionRequest } from './target.js';
+import { readLogicalModel } from '../../../session/model/logical.js';
 
 export function effectiveServiceTier(context: CommandContext): string | undefined {
+  if (readLogicalModel(context.sessionId)) return undefined;
   const config = context.readConfiguration?.().config ?? context.runtimeConfig
     ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
   const request = modelRequest(context, config);
@@ -38,6 +40,7 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
   catch { return 'Service tier blocked: the saved model selection is unavailable.'; }
   const selection = baseline.selection;
   if (!selection) return 'Service tier requires a selected model in this session.';
+  if (selection.virtualModel) return 'Service tier requires a physical model; routed service tier is resolved per request.';
   const root = context.projectRoot ?? context.cwd;
   const config = context.readConfiguration?.().config ?? context.runtimeConfig ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
   const catalog = context.readConfiguration?.().catalog ?? loadCatalog();
@@ -77,6 +80,7 @@ export async function runSlowCommand(args: string[], context: CommandContext): P
   const parsed = parseSyntax(slowSyntax, args);
   if (!parsed.ok) return { kind: 'local', output: `Invalid /slow arguments: ${parsed.reason}\n${syntaxHelp(slowSyntax)}` };
   const action = parsed.action.name;
+  if (readLogicalModel(context.sessionId)) return { kind: 'local', output: 'Slow mode: unavailable while a virtual model is selected; service tier is resolved per request.' };
   const tier = effectiveServiceTier(context);
   if (!action || action === 'status') return { kind: 'local', output: `Slow mode: ${tier === 'flex' ? 'on (flex)' : `off (${tier ?? 'provider/project default; unverified'})`}.` };
   if (action === 'on' || action === 'enable') return { kind: 'local', output: setSessionServiceTier(context, 'flex') };

@@ -1,0 +1,96 @@
+import fs from 'node:fs';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { SessionManager } from '../../../../session/SessionManager.js';
+import { getRuntimeConfig } from '../../../../config/runtimeConfig.js';
+import { registerCatalogContribution } from '../../../../core/catalog/contributions.js';
+import { modelPicker } from '../model.js';
+import { readSessionModel } from '../../../../session/model/state.js';
+import { createCatalogLoader } from '../../completion/catalog.js';
+import { watchModels } from './watch.js';
+import { writeSessionModel, readSessionModelEdit } from '../../../../session/model/state.js';
+import type { ShellRuntimeContext } from '../../../../core/shell/runtimeContext.js';
+import type { CliMcpGateway } from '../../../../entrypoints/cliMcpModule.js';
+
+let root: string, sessionId: string;
+const cleanups: Array<() => void> = [];
+beforeEach(() => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  root = fs.mkdtempSync('/tmp/cheers-test/virtual-surface-');
+  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+  sessionId = new SessionManager().createNew(root).id;
+});
+afterEach(() => { cleanups.splice(0).forEach(close => close()); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
+function register() {
+  const route = vi.fn(() => ({ provider: 'openai', modelId: 'physical' }));
+  const close = registerCatalogContribution({ root, sessionId, commands: [], tools: [], skills: () => [],
+    virtualModels: [{ provider: 'adaptive', id: 'auto', name: 'Adaptive', route }] });
+  cleanups.push(close); return { route, close };
+}
+
+it('offers virtual picker rows without dormant auth and rejects an action captured before retirement', async () => {
+  const { route, close } = register();
+  const picker = modelPicker({ cwd: root, projectRoot: root, sessionId });
+  const rows = await picker.load();
+  const virtual = rows.find(row => row.label === 'auto' && row.detail?.includes('Adaptive'));
+  expect(virtual).toBeDefined(); expect(virtual?.disabled).not.toBe(true);
+  close();
+  expect((await picker.apply([virtual!.id]))?.note).not.toContain('Model switched to');
+  expect(readSessionModel(sessionId)).toBeUndefined(); expect(route).not.toHaveBeenCalled();
+});
+
+it('completes registered identities and refreshes model completion after contribution retirement', async () => {
+  const { route, close } = register();
+  const context = { cwd: root, projectRoot: root, session: { id: sessionId }, runtimeConfig: getRuntimeConfig(root),
+    configuration: { current: { revision: 1, catalog: [] } }, skillOptions: {} } as unknown as ShellRuntimeContext;
+  const loader = createCatalogLoader(() => context, {} as CliMcpGateway, []);
+  const controller = new AbortController();
+  expect((await loader('model', controller.signal)).map(row => row.value)).toContain('adaptive/auto');
+  expect((await loader('provider', controller.signal)).map(row => row.value)).toContain('adaptive');
+  const changed = vi.fn(); const stop = loader.observe('model', undefined, changed);
+  try { close(); await Promise.resolve(); expect(changed).toHaveBeenCalledOnce();
+    expect((await loader('model', controller.signal)).map(row => row.value)).not.toContain('adaptive/auto');
+    expect(route).not.toHaveBeenCalled();
+  } finally { stop?.(); }
+});
+
+it('refreshes the model observer when virtual registrations change without a configuration revision', async () => {
+  vi.useFakeTimers();
+  const context = { cwd: root, projectRoot: root, sessionId, readConfiguration: () => ({ revision: 1 }) };
+  const publish = vi.fn(), load = vi.fn(async () => ['logical']);
+  const stop = watchModels(context as never, load, publish, 1);
+  try { register(); await vi.advanceTimersByTimeAsync(500);
+    expect(load).toHaveBeenCalledOnce(); expect(publish).toHaveBeenCalledWith(['logical']);
+  } finally { stop(); }
+});
+
+it('retains unavailable saved virtual effort as read-only focus until an explicit supported choice', async () => {
+  const route = vi.fn(() => ({ provider: 'openai', modelId: 'physical' }));
+  cleanups.push(registerCatalogContribution({ root, sessionId, commands: [], tools: [], skills: () => [],
+    virtualModels: [{ provider: 'adaptive', id: 'auto', name: 'Adaptive', thinkingLevels: ['high'], route }] }));
+  const selected = { connectionScope: 'provider' as const, provider: 'openai',
+    virtualModel: { provider: 'adaptive', model: 'auto', thinkingEffort: 'max' as const } };
+  writeSessionModel(sessionId, selected, readSessionModelEdit(sessionId));
+  const picker = modelPicker({ cwd: root, projectRoot: root, sessionId });
+  const row = (await picker.load()).find(value => value.label === 'auto' && value.note === 'active')!;
+  const effort = (await picker.inspect!(row.id))!.next!;
+  expect(effort.initialSelection).toBe('max');
+  expect((await effort.load()).find(value => value.id === 'max')).toMatchObject({ disabled: true, focusable: true });
+  expect(await effort.apply(['max'])).toBeUndefined();
+  expect(readSessionModel(sessionId)).toEqual(selected);
+  expect((await effort.apply(['high']))?.note).toContain('Model switched to adaptive/auto');
+  expect(readSessionModel(sessionId)).toEqual({ ...selected, virtualModel: { ...selected.virtualModel, thinkingEffort: 'high' } });
+  expect(route).not.toHaveBeenCalled();
+});
+
+it('keeps unavailable saved virtual identity focused when its registration is gone', async () => {
+  const selected = { connectionScope: 'provider' as const, provider: 'openai',
+    virtualModel: { provider: 'adaptive', model: 'auto' } };
+  writeSessionModel(sessionId, selected, readSessionModelEdit(sessionId));
+  const picker = modelPicker({ cwd: root, projectRoot: root, sessionId });
+  const rows = await picker.load();
+  const row = rows.find(value => value.label === 'auto' && value.note === 'active · unavailable')!;
+  expect(row).toMatchObject({ disabled: true, focusable: true });
+  expect(picker.initialSelection).toBe(row.id);
+  expect((await picker.apply([row.id]))?.note).not.toContain('Model switched to');
+  expect(readSessionModel(sessionId)).toEqual(selected);
+});

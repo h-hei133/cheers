@@ -1,0 +1,127 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/virtual-selection/packages/ts-shell
+
+ ✓ src/session/model/provider.test.ts (200 tests) 12843ms
+ ❯ src/session/model/selection.test.ts (69 tests | 1 failed) 4033ms
+   ✓ persists and resumes credentialless bedrock model and thinking changes without shared writes 142ms
+   ✓ persists and resumes credentialless vertex model and thinking changes without shared writes  547ms
+   ✓ keeps static provider-slot model changes across model-specific endpoints available 72ms
+   ✓ does not borrow the 'bedrock' signer for a credentialless active named 'model' change 60ms
+   ✓ does not borrow the 'bedrock' signer for a credentialless active named 'thinking' change 87ms
+   ✓ does not borrow the 'vertex' signer for a credentialless active named 'model' change 62ms
+   ✓ does not borrow the 'vertex' signer for a credentialless active named 'thinking' change 76ms
+   ✓ saves only 'bedrock' provider model defaults globally with session=false and no static credential 75ms
+   ✓ saves only 'bedrock' provider model defaults globally with session=true and no static credential 77ms
+   ✓ saves only 'vertex' provider model defaults globally with session=false and no static credential 51ms
+   ✓ saves only 'vertex' provider model defaults globally with session=true and no static credential 97ms
+   ✓ revalidates a credentialless signer 'address' change at the 'hook' before either store writes 68ms
+   ✓ revalidates a credentialless signer 'provider' change at the 'hook' before either store writes 59ms
+   ✓ revalidates a credentialless signer 'blocked' change at the 'hook' before either store writes 49ms
+   ✓ revalidates a credentialless signer 'pool' change at the 'hook' before either store writes 48ms
+   ✓ revalidates a credentialless signer 'address' change at the 'lock' before either store writes 59ms
+   ✓ revalidates a credentialless signer 'provider' change at the 'lock' before either store writes 46ms
+   ✓ revalidates a credentialless signer 'blocked' change at the 'lock' before either store writes 38ms
+   ✓ revalidates a credentialless signer 'pool' change at the 'lock' before either store writes 47ms
+   ✓ refuses a credentialless current request with 'openai' before model hooks or writes 52ms
+   ✓ refuses a credentialless current request with 'nonsigner' before model hooks or writes 50ms
+   ✓ refuses a credentialless current request with 'missing-address' before model hooks or writes 40ms
+   ✓ refuses a credentialless current request with 'blocked' before model hooks or writes 39ms
+   ✓ rejects a different request provider before hooks or writes through the command bridge: /model new 59ms
+   ✓ rejects a different request provider before hooks or writes through the command bridge: /model openai/new --global 45ms
+   ✓ rejects a different request provider before hooks or writes through the command bridge: /model google/new 38ms
+   ✓ rejects a different request provider before hooks or writes through the command bridge: /thinking high --global 41ms
+   ✓ allows an explicit request provider after selecting its matching saved connection 60ms
+   ✓ rejects a request provider change during the model hook before committing either store 38ms
+   ✓ persists a session-only selection through lifecycle writes, restart and session switching 106ms
+   ✓ changes defaults only explicitly while other session overrides remain independent 73ms
+   ✓ keeps independent provider preferences and origins intact under a named session selection 24ms
+   ✓ does not transfer a selection to a different connection or provider 31ms
+   ✓ rejects invalid syntax before file or network effects: "status" 19ms
+   ✓ rejects invalid syntax before file or network effects: "refresh" 20ms
+   ✓ rejects invalid syntax before file or network effects: "config" 18ms
+   ✓ rejects invalid syntax before file or network effects: "use" 26ms
+   ✓ rejects invalid syntax before file or network effects: "use" 17ms
+   ✓ rejects invalid syntax before file or network effects: "use" 16ms
+   ✓ rejects invalid syntax before file or network effects: "use" 16ms
+   ✓ rejects invalid syntax before file or network effects: "list" 19ms
+   ✓ rejects invalid syntax before file or network effects: "list" 18ms
+   ✓ rejects invalid syntax before file or network effects: "m" 24ms
+   ✓ blocks a missing session without changing global defaults 74ms
+   ✓ retains a model-only session at exit without retaining ordinary empty sessions 53ms
+   ✓ reports a partial result when the session save succeeds and the global save fails 40ms
+   × rejects damaged session state without replacing it or writing global defaults 24ms
+     → expected 'Model selection outcome is unverified…' to contain 'Model switch failed: session preferen…'
+   ✓ rejects a delayed older selection after another command has saved a newer model 41ms
+   ✓ refuses a connection whose credential was replaced while the selection hook ran 34ms
+   ✓ checks current admission after the asynchronous hook before either write 34ms
+   ✓ does not apply or write global defaults when the session writer returns without saving 27ms
+   ✓ does not redirect a selection from the accepted connection to a newly selected disk connection 43ms
+   ✓ rejects same-ID apiKey replacement before dispatching a model hook 36ms
+   ✓ rejects same-ID baseUrl replacement before dispatching a model hook 43ms
+   ✓ rejects same-ID authType replacement before dispatching a model hook 42ms
+   ✓ rejects same-ID credential replacement before dispatching a model hook 40ms
+   ✓ rejects a saved workspace that was rebound before the command captured its baseline 25ms
+   ✓ rechecks credentials after acquiring the session lock 40ms
+   ✓ allows sequential selections and a no-op after a model-only session overlay is published 75ms
+   ✓ binds a session model change to the resolved fallback connection without changing shared defaults 122ms
+   ✓ binds a session model change to the resolved pool connection without changing shared defaults 138ms
+   ✓ updates only the resolved 'fallback' model default on an explicit global save with session=false 41ms
+   ✓ updates only the resolved 'fallback' model default on an explicit global save with session=true 61ms
+   ✓ updates only the resolved 'pool' model default on an explicit global save with session=false 42ms
+   ✓ updates only the resolved 'pool' model default on an explicit global save with session=true 72ms
+   ✓ refuses a changed fallback selection after the model hook without saving to either connection 57ms
+   ✓ refuses a changed pool selection after the model hook without saving to either connection 67ms
+   ✓ rechecks the resolved fallback choice inside the session lock before saving 54ms
+   ✓ rechecks the resolved pool choice inside the session lock before saving 52ms
+ ✓ src/cli/interactive/sessionFacts.test.ts (29 tests) 138ms
+ ✓ src/session/model/effort.test.ts (26 tests) 1387ms
+ ✓ src/session/model/state.test.ts (26 tests) 503ms
+ ✓ src/sdk/agentSession.test.ts (6 tests) 400ms
+ ✓ src/session/branch/create.test.ts (6 tests) 216ms
+ ✓ src/core/commands/model/virtual.test.ts (9 tests) 238ms
+ ✓ src/cli/interactive/picker/model/watch.test.ts (7 tests) 15ms
+ ❯ src/cli/interactive/picker/model/virtual.test.ts (4 tests | 1 failed) 107ms
+   ✓ offers virtual picker rows without dormant auth and rejects an action captured before retirement 34ms
+   × completes registered identities and refreshes model completion after contribution retirement 16ms
+     → expected "spy" to be called at least once
+   ✓ refreshes the model observer when virtual registrations change without a configuration revision 19ms
+   ✓ retains unavailable saved virtual effort as read-only focus until an explicit supported choice 37ms
+ ✓ src/cli/interactive/completion/models.test.ts (19 tests) 85ms
+ ✓ src/core/models/virtual/selection.test.ts (2 tests) 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/session/model/selection.test.ts > rejects damaged session state without replacing it or writing global defaults
+AssertionError: expected 'Model selection outcome is unverified…' to contain 'Model switch failed: session preferen…'
+
+Expected: "Model switch failed: session preference"
+Received: "Model selection outcome is unverified. Inspect saved session and global preferences before retrying."
+
+ ❯ src/session/model/selection.test.ts:348:25
+    346|   const original = configBytes();
+    347|   const result = await runModelCommand(["use", "new", "--global"], { c…
+    348|   expect(result.output).toContain("Model switch failed: session prefer…
+       |                         ^
+    349|   expect(fs.readFileSync(layout.statePath, "utf8")).toBe("{broken");
+    350|   expect(configBytes()).toEqual(original);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/cli/interactive/picker/model/virtual.test.ts > completes registered identities and refreshes model completion after contribution retirement
+AssertionError: expected "spy" to be called at least once
+ ❯ src/cli/interactive/picker/model/virtual.test.ts:50:34
+     48|   expect((await loader('provider', controller.signal)).map(row => row.…
+     49|   const changed = vi.fn(); const stop = loader.observe('model', undefi…
+     50|   try { close(); expect(changed).toHaveBeenCalled();
+       |                                  ^
+     51|     expect((await loader('model', controller.signal)).map(row => row.v…
+     52|     expect(route).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 10 passed (12)
+      Tests  2 failed | 401 passed (403)
+   Start at  16:05:51
+   Duration  40.81s (transform 7.42s, setup 0ms, collect 18.64s, tests 19.97s, environment 1ms, prepare 518ms)
+

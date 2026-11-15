@@ -1,0 +1,50 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/extensions/runtime/virtual.test.ts (24 tests | 1 failed | 23 skipped) 353ms
+   ↓ session extension virtual registration > types host route inputs separately from callback and UI cancellation observations
+   ↓ session extension virtual registration > keeps the file route request in the VM realm
+   ↓ session extension virtual registration > keeps the file route messages in the VM realm
+   ↓ session extension virtual registration > keeps the file route message in the VM realm
+   ↓ session extension virtual registration > keeps the file route state in the VM realm
+   ↓ session extension virtual registration > keeps the file route signal in the VM realm
+   ↓ session extension virtual registration > does not expose a host UI promise to a file route
+   ↓ session extension virtual registration > does not expose a host UI error to a file route
+   ↓ session extension virtual registration > keeps cancellation events and thrown cancellation errors in the file VM realm
+   ↓ session extension virtual registration > copies and freezes nested file inputs and retains primitive failure and previous-target data
+   ↓ session extension virtual registration > cancels file UI with its VM signal while retaining generation reuse
+   ↓ session extension virtual registration > keeps abort-listener UI effects under the retired original file invocation
+   ↓ session extension virtual registration > preserves file route UI ownership through await and rejects result accessors before reading them
+   × session extension virtual registration > settles a file UI reply even when its caller signal cleanup throws 352ms
+     → .toMatch() expects to receive a string, but got undefined
+   ↓ session extension virtual registration > drops a file UI setup that throws before host dispatch and leaves its stale cancellation inert
+   ↓ session extension virtual registration > waits for the complete async file registration and captures VM thinking-level arrays and generic state
+   ↓ session extension virtual registration > does not publish a staged virtual definition when later async file initialization fails
+   ↓ session extension virtual registration > closes virtual registration after initialization without changing the accepted snapshot
+   ↓ session extension virtual registration > keeps the generic state registration API typed for inline extension consumers
+   ↓ session extension virtual registration > cancels async file initialization without publishing its staged virtual definition
+   ↓ session extension virtual registration > discards an in-flight route after its request signal aborts
+   ↓ session extension virtual registration > discards an in-flight route after its generation signal aborts
+   ↓ session extension virtual registration > retains the callback UI invocation owner through await and refuses the retired invocation later
+   ↓ session extension virtual registration > reports virtual registration as explicitly unsupported through the actual worker execution adapter
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 23 skipped (24)
+   Start at  17:36:43
+   Duration  1.03s (transform 165ms, setup 0ms, collect 466ms, tests 353ms, environment 0ms, prepare 55ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/extensions/runtime/virtual.test.ts > session extension virtual registration > settles a file UI reply even when its caller signal cleanup throws
+TypeError: .toMatch() expects to receive a string, but got undefined
+ ❯ vi.waitFor.timeout src/extensions/runtime/virtual.test.ts:211:61
+    209|     const observed = pending.then(value => ({ value }), error => ({ er…
+    210|     try {
+    211|       await vi.waitFor(() => expect(loaded.exports.settled).toMatch(/r…
+       |                                                             ^
+    212|     } finally { invocation.abort(); await observed; }
+    213|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

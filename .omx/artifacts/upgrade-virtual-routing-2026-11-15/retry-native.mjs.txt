@@ -1,0 +1,119 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const directory = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(directory, '../..');
+const installed = path.join(directory, 'install/node_modules/@cheers/ts-shell');
+const { createAgentSession, DefaultResourceLoader, getRuntimeConfig } = await import(pathToFileURL(path.join(installed, 'dist/index.js')).href);
+const receipt = { platform: process.platform, publicInstalledSdk: true, status: 'not_run', realProvider: false, stages: {},
+  buildId: JSON.parse(fs.readFileSync(path.join(installed, 'dist/build-manifest.json'))).buildId,
+  probeSha256: createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex') };
+const root = fs.mkdtempSync(path.join(directory, 'retry-state-')), home = path.join(root, 'home'), workspace = path.join(root, 'work');
+fs.mkdirSync(home); fs.mkdirSync(workspace); fs.mkdirSync(path.join(workspace, '.agents'));
+const storage = path.join(home, '.cheers'); fs.mkdirSync(storage);
+const projectState = path.join(storage, 'projects', `work-${createHash('sha256').update(workspace).digest('hex').slice(0, 8)}`, 'state.json');
+fs.mkdirSync(path.dirname(projectState), { recursive: true });
+const previous = new Map(), sessions = new Set(), loaders = new Set(), requests = [];
+let stage = 'setup', session, server, timer, failureSent = false, toolRuns = 0;
+const routeEvents = current => current.sessionManager.getTranscriptEvents(current.sessionId)
+  .filter(event => event.type === 'branch-store' && event.namespace === 'model-routing');
+const seen = [];
+try {
+  assert.equal(process.platform, 'linux');
+  assert.equal(receipt.buildId, JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'))).buildId);
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home,
+    GIT_CEILING_DIRECTORIES: root, CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '',
+    OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', CHEERS_MARKETPLACES_FILE: path.join(home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(home, 'extensions.json') })) {
+    previous.set(key, process.env[key]); process.env[key] = value;
+  }
+  server = http.createServer(async (request, response) => {
+    const chunks = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    if (request.method !== 'POST') { response.writeHead(200, { 'content-type': 'application/json' }); response.end('{"data":[]}'); return; }
+    const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    requests.push({ stage, model: body.model, body, authenticated: request.headers.authorization === 'Bearer synthetic-physical' });
+    if (!failureSent && ['outer', 'effort', 'transport'].includes(stage)) {
+      failureSent = true; response.writeHead(stage === 'effort' ? 400 : 503);
+      response.end(stage === 'effort' ? 'reasoning_effort PRIVATE_RESPONSE_BODY' : 'PRIVATE_RESPONSE_BODY'); return;
+    }
+    const toolRequest = stage === 'continuation' && requests.filter(item => item.stage === stage).length === 1;
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: toolRequest ? 'Preparing.' : 'DONE',
+      ...(toolRequest ? { tool_calls: [{ id: 'call_probe', type: 'function', function: { name: 'probe', arguments: '{}' } }] } : {}) },
+      finish_reason: toolRequest ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 3, total_tokens: 15 } }));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: {
+    openai: { runtime: 'openai', endpoint: 'openai-compatible', auth: 'api-key', baseUrl,
+      models: [{ id: 'dormant', contextWindow: 64_000, maxTokens: 512 }] },
+    anthropic: { runtime: 'anthropic', endpoint: 'openai-compatible', auth: 'api-key', baseUrl,
+      models: [{ id: 'physical', contextWindow: 64_000, maxTokens: 512 }, { id: 'recovery', contextWindow: 64_000, maxTokens: 512 }] },
+  } }));
+  const baseline = { ...getRuntimeConfig(workspace), provider: 'openai', activeProviderConnectionId: undefined,
+    sessionConnection: undefined, accountPool: undefined, configScopes: undefined, allowedModels: undefined, providerConnections: [],
+    providerCredentials: { openai: { model: 'dormant', baseUrl }, anthropic: { apiKey: 'synthetic-physical', model: 'physical', baseUrl } },
+    maxOutputTokens: 64, reserveTokens: 0, contextWindow: 64_000, compactionEnabled: false, cacheWarmIntervalSeconds: 0,
+    retryEnabled: false, retryMaxRetries: 0, providerRetryMaxRetries: 0, retryBaseDelayMs: 1, retryMaxDelayMs: 1,
+    providerConnectTimeoutMs: 3000, providerHeadersTimeoutMs: 3000, providerBodyTimeoutMs: 3000 };
+  timer = setTimeout(() => { receipt.deadline = true; void session?.abort().catch(() => {}); }, 90_000);
+  for (const name of ['outer', 'effort', 'transport', 'continuation']) {
+    stage = name; failureSent = false;
+    fs.writeFileSync(projectState, JSON.stringify({ version: 1, thinkingEffort: name === 'effort' ? 'low' : null }));
+    const loader = new DefaultResourceLoader({ cwd: workspace, noContextFiles: true, noSkills: true, noThemes: true,
+      systemPrompt: 'Answer briefly.', extensionFactories: [api => api.registerVirtualModel({ provider: 'adaptive', id: name, name,
+        route: request => {
+          seen.push({ stage, reason: request.reason, count: request.state?.count, previous: request.previous?.modelId,
+            failed: request.failed?.modelId, stopReason: request.failed?.stopReason, safe: !(JSON.stringify(request.failed) ?? '').includes('PRIVATE_RESPONSE_BODY') });
+          return { provider: 'anthropic', modelId: request.reason === 'retry' ? 'recovery' : 'physical', state: { count: (request.state?.count ?? 0) + 1 } };
+        } })] });
+    loaders.add(loader); await loader.reload(); assert.equal(loader.getExtensions().errors.length, 0);
+    session = (await createAgentSession({ cwd: workspace, resourceLoader: loader, noTools: name === 'continuation' ? 'builtin' : 'all',
+      nonInteractiveApproval: name === 'continuation' ? 'allow-once' : 'deny',
+      customTools: name === 'continuation' ? [{ name: 'probe', description: 'Return the stored fact.', argsSchema: { type: 'object', properties: {} },
+        execute: async () => { toolRuns++; return { success: true, output: 'Stored fact.' }; } }] : undefined,
+      model: `adaptive/${name}`, runtimeConfig: { ...baseline,
+        retryEnabled: name === 'outer' || name === 'transport', retryMaxRetries: name === 'outer' ? 1 : 0, providerRetryMaxRetries: name === 'transport' ? 1 : 0 } })).session;
+    sessions.add(session);
+    session.sessionManager.persistUserPromptBarrier(session.sessionId, 'Earlier question.');
+    session.sessionManager.addTurn(session.sessionId, { role: 'assistant', content: 'Previous success.', stopReason: 'stop', origin: { provider: 'anthropic', model: 'physical' } });
+    const result = await session.prompt('Continue with the next step.');
+    const routes = seen.filter(item => item.stage === name), actual = requests.filter(item => item.stage === name);
+    receipt.stages[name] = { routes, models: actual.map(item => item.model), routeStateEntries: routeEvents(session).length,
+      posts: actual.length, resultMatches: result.trim() === 'DONE' };
+    assert.equal(result.trim(), 'DONE'); assert.ok(actual.every(item => item.authenticated)); assert.equal(actual.length, 2);
+    assert.ok(routes.every(item => item.safe)); assert.equal(routes[0].previous, 'physical');
+    if (name === 'transport') {
+      assert.equal(routes.length, 1); assert.deepEqual(actual.map(item => item.model), ['physical', 'physical']);
+      assert.deepEqual(actual[0].body, actual[1].body); assert.equal(routeEvents(session).length, 1);
+    } else {
+      assert.equal(routes.length, 2); assert.equal(routes[1].count, 1); assert.equal(routeEvents(session).length, 2);
+      if (name === 'continuation') { assert.equal(routes[1].reason, 'continuation'); assert.equal(routes[1].previous, 'physical'); assert.equal(toolRuns, 1); }
+      else { assert.equal(routes[1].reason, 'retry'); assert.equal(routes[1].failed, 'physical'); assert.equal(routes[1].stopReason, 'error');
+        assert.deepEqual(actual.map(item => item.model), ['physical', 'recovery']); }
+    }
+    receipt.stages[name].passed = true;
+    await session.dispose(); sessions.delete(session); session = undefined;
+  }
+  receipt.loopbackPosts = requests.length; receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage; receipt.errorName = error?.name;
+  receipt.line = String(error?.stack).match(/retry-native\.mjs:(\d+)/)?.[1];
+  receipt.failedStagePosts = requests.filter(item => item.stage === stage).map(item => ({ model: item.model, effort: item.body.reasoning_effort }));
+  receipt.failureFacts = { unsupportedEffort: /reasoning|thinking|effort/i.test(String(error?.message)), admission: /admission|permission/i.test(String(error?.message)) };
+  if (error?.name === 'AssertionError') receipt.assertion = { operator: error.operator,
+    actual: typeof error.actual === 'number' || typeof error.actual === 'boolean' ? error.actual : undefined,
+    expected: typeof error.expected === 'number' || typeof error.expected === 'boolean' ? error.expected : undefined };
+  process.exitCode = 1;
+} finally {
+  clearTimeout(timer);
+  for (const current of sessions) await current.dispose().catch(() => {});
+  for (const loader of loaders) { try { loader.captureRetirement()(); } catch {} }
+  if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.writeFileSync(path.join(directory, 'retry-native.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt));
+}

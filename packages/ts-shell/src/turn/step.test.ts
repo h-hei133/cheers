@@ -715,25 +715,28 @@ describe("createStepFunction", () => {
     // field exists to carry.
     const answered = createStepFunction({
       ...request,
+      thinkingEffort: 'low', thinkingEffortExplicit: false,
       fetchImpl: async () => jsonResponse({ choices: [{ message: { content: "hi" }, finish_reason: "stop" }] }),
     });
     const answer = await answered([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
-    expect(answer.origin).toEqual({ model: "m" });
+    expect(answer.origin).toEqual({ model: "m", thinkingLevel: 'low' });
 
     const refused = createStepFunction({
       ...request,
+      thinkingEffort: 'low', thinkingEffortExplicit: false,
       fetchImpl: async () => jsonResponse({ error: "no" }, { ok: false, status: 400 }),
     });
     const refusal = await refused([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
     expect(refusal.stopReason).toBe("error");
-    expect(refusal.origin).toEqual({ model: "m" });
+    expect(refusal.origin).toEqual({ model: "m", thinkingLevel: 'low' });
 
     const overflowed = createStepFunction({
       ...request,
+      thinkingEffort: 'low', thinkingEffortExplicit: false,
       fetchImpl: async () => jsonResponse({ error: { code: "context_length_exceeded" } }, { ok: false, status: 400 }),
     });
     const overflow = await overflowed([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
-    expect(overflow.origin).toEqual({ model: "m" });
+    expect(overflow.origin).toEqual({ model: "m", thinkingLevel: 'low' });
   });
 
   it("delivers a whole-body answer as one delta and parses its tool calls", async () => {
@@ -2103,7 +2106,7 @@ it('forwards mid-convo cache preservation flags, anthropic-beta headers, and res
   ];
   const res = await step([{ role: 'user', content: 'hi' }], undefined, {}, { allowTools: true });
   expect(res.text).toBe('ok');
-  expect(res.origin).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-6' });
+  expect(res.origin).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-6', thinkingLevel: 'high' });
   expect(seen).toHaveLength(1);
   const reqHeaders = seen[0]!.headers as Record<string, string>;
   expect(reqHeaders['anthropic-beta']).toBe(

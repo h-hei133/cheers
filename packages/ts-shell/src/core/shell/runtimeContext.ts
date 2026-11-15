@@ -68,6 +68,8 @@ export interface ShellRuntimeContext {
   /** Explicit launch flags must survive settings reloads and session switches. */
   readonly runtimeConfigOverrides?: RuntimeConfigOverrides
   readonly resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution
+  /** Startup waits for extension registrations before resolving an explicit logical choice. */
+  readonly deferredModel?: () => boolean
   /**
    * How this run was asked to load skills.
    *
@@ -143,6 +145,7 @@ export function createShellRuntimeContext(input: {
   runtimeConfig: RuntimeConfig
   runtimeConfigOverrides?: RuntimeConfigOverrides
   resolveConfigTarget?: (config: RuntimeConfig, sessionId?: string) => ProviderCredentialResolution
+  deferredModel?: () => boolean
   skillOptions?: {
     readonly skillPaths?: readonly string[]
     readonly noSkills?: boolean
@@ -180,6 +183,7 @@ export function createShellRuntimeContext(input: {
     configuration,
     runtimeConfigOverrides: configuration.current.binding.overrides,
     resolveConfigTarget: input.resolveConfigTarget,
+    deferredModel: input.deferredModel,
     get runtimeConfig() { return configuration.current.config; },
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.themePaths ? { themePaths: input.themePaths } : {}),

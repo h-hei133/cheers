@@ -1,0 +1,138 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts (6 tests | 6 failed) 593ms
+   × routes manual summaries once without reading or writing branch routing state 138ms
+     → expected { status: 'failed', …(1) } to match object { status: 'compacted' }
+(1 matching property omitted from actual)
+   × routes branch summaries once without reading or writing branch routing state 97ms
+     → the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+   × keeps an explicit summary role for manual with dormant credentials unavailable 86ms
+     → expected { status: 'failed', …(1) } to match object { status: 'compacted' }
+(1 matching property omitted from actual)
+   × keeps an explicit summary role for branch with dormant credentials unavailable 87ms
+     → Delegated role connection is unavailable.
+   × defers automatic compaction to the routed physical target and does not create a virtual cache warmer 96ms
+     → expected { …(5) } to be undefined
+   × rejects a retired direct route before summary dispatch 89ms
+     → expected "spy" to be called once, but got 0 times
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > routes manual summaries once without reading or writing branch routing state
+AssertionError: expected { status: 'failed', …(1) } to match object { status: 'compacted' }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "status": "compacted",
++   "status": "failed",
+  }
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts:89:96
+     87| it.each(['manual', 'branch'] as const)('routes %s summaries once witho…
+     88|   const test = await fixture();
+     89|   if (kind === 'manual') expect(await test.deps.compactHistory!(test.s…
+       |                                                                                                ^
+     90|   else expect(await test.deps.summarizeAbandonedTurns!(test.manager.ge…
+     91|   expect(test.route).toHaveBeenCalledOnce();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > routes branch summaries once without reading or writing branch routing state
+AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+ ❯ src/cli/runtime/compaction/virtual.test.ts:90:119
+     88|   const test = await fixture();
+     89|   if (kind === 'manual') expect(await test.deps.compactHistory!(test.s…
+     90|   else expect(await test.deps.summarizeAbandonedTurns!(test.manager.ge…
+       |                                                                                                                       ^
+     91|   expect(test.route).toHaveBeenCalledOnce();
+     92|   expect(test.route.mock.calls[0]![0]).toMatchObject({ provider: 'adap…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > keeps an explicit summary role for manual with dormant credentials unavailable
+AssertionError: expected { status: 'failed', …(1) } to match object { status: 'compacted' }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "status": "compacted",
++   "status": "failed",
+  }
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts:102:96
+    100| it.each(['manual', 'branch'] as const)('keeps an explicit summary role…
+    101|   const test = await fixture(true);
+    102|   if (kind === 'manual') expect(await test.deps.compactHistory!(test.s…
+       |                                                                                                ^
+    103|   else expect(await test.deps.summarizeAbandonedTurns!(test.manager.ge…
+    104|   expect(test.requests.length).toBeGreaterThan(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > keeps an explicit summary role for branch with dormant credentials unavailable
+Error: Delegated role connection is unavailable.
+ ❯ delegatedTarget src/cli/provider/target.ts:19:101
+     17|   if (matches.length > 1) throw new Error('Delegated connection is amb…
+     18|   const connection = matches[0];
+     19|   if (typeof target !== 'string' && (!connection || connection.provide…
+       |                                                                                                     ^
+     20|   if (config?.accountPool?.[main.provider] && (connection?.provider ??…
+     21|     throw new Error('Delegated provider is unavailable outside the par…
+ ❯ captureSummaryRole src/cli/provider/summary.ts:36:20
+ ❯ src/cli/runtime/cliSessionRuntimeFactory.ts:202:20
+ ❯ withProviderConnections src/provider/request/connection.ts:20:30
+ ❯ Object.run [as withConnections] src/cli/provider/connections.ts:28:45
+ ❯ Object.summarizeAbandonedTurns src/cli/runtime/cliSessionRuntimeFactory.ts:193:80
+ ❯ src/cli/runtime/compaction/virtual.test.ts:103:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > defers automatic compaction to the routed physical target and does not create a virtual cache warmer
+AssertionError: expected { …(5) } to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+{
+  "noteRequest": [Function noteRequest],
+  "noteSettled": [Function noteSettled],
+  "reset": [Function reset],
+  "status": [Function status],
+  "stop": [Function stop],
+}
+
+ ❯ src/cli/runtime/compaction/virtual.test.ts:112:44
+    110|   const test = await fixture(false, false);
+    111|   test.deps.runPrompt('Continue', test.signal);
+    112|   expect(observed.resources?.cacheWarming).toBeUndefined();
+       |                                            ^
+    113|   expect(observed.resources?.compaction?.forRequest).toBeTypeOf('funct…
+    114|   expect(test.route).not.toHaveBeenCalled(); expect(test.requests).toE…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  src/cli/runtime/compaction/virtual.test.ts > rejects a retired direct route before summary dispatch
+AssertionError: expected "spy" to be called once, but got 0 times
+ ❯ src/cli/runtime/compaction/virtual.test.ts:121:22
+    119|   test.route.mockImplementation(() => { test.close(); return { provide…
+    120|   await test.deps.summarizeAbandonedTurns!(test.manager.getSession(tes…
+    121|   expect(test.route).toHaveBeenCalledOnce(); expect(test.requests).toE…
+       |                      ^
+    122| });
+    123| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed (6)
+   Start at  16:46:33
+   Duration  16.22s (transform 8.28s, setup 0ms, collect 15.31s, tests 593ms, environment 0ms, prepare 54ms)
+

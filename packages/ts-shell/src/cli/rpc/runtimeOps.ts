@@ -25,6 +25,8 @@ import { messageToText } from "../../model-adapters/multimodal.js";
 import { configurationAdmission } from "../../core/shell/configuration.js";
 import { openSettings } from "../interactive/settings.js";
 import { navigateSession } from "../runtime/navigation.js";
+import { readLogicalModel } from '../../session/model/logical.js';
+import { sessionModelCatalog } from '../../core/catalog/models.js';
 
 export const THINKING_LEVELS = thinkingSyntax.actions
   .map(action => action.name)
@@ -49,6 +51,7 @@ export function buildRpcCommandContext(runtimeContext: ShellRuntimeContext) {
     sessionId: runtimeContext.session.id,
     runtimeConfig: runtimeContext.runtimeConfig,
     admission: configurationAdmission(runtimeContext),
+    logicalModelAdmission: configurationAdmission(runtimeContext, { deferredModel: true }),
     resolveConfigTarget: runtimeContext.resolveConfigTarget,
     readConfiguration: () => ({
       config: runtimeContext.configuration.current.config,
@@ -93,26 +96,27 @@ export function readLastAssistantText(runtimeContext: ShellRuntimeContext): stri
 }
 
 export async function cycleRpcModel(runtimeContext: ShellRuntimeContext): Promise<Record<string, unknown> | null> {
-  const catalog = await readModelCatalog(false, runtimeContext.session.id, runtimeContext.runtimeConfig);
+  const ctx = buildRpcCommandContext(runtimeContext);
+  const catalog = await readModelCatalog(false, runtimeContext.session.id, runtimeContext.runtimeConfig, ctx);
+  const addressed = [...catalog.models.map(id => ({ provider: catalog.provider as string, id })),
+    ...(catalog.virtual ?? []).map(model => ({ provider: model.provider, id: model.id }))];
   const scoped = runtimeContext.scopedModels;
   const candidates = scoped?.length
-    ? catalog.models.filter((id) =>
+    ? addressed.filter(({ provider, id }) =>
         scoped.some((pattern) => {
           const p = pattern.trim().toLowerCase();
-          const bare = p.includes("/") ? p.split("/", 2)[1]! : p;
-          return id.toLowerCase() === bare || id.toLowerCase().includes(bare);
+          return p.includes('/') ? `${provider}/${id}`.toLowerCase() === p : id.toLowerCase().includes(p);
         }),
       )
-    : catalog.models;
-  const pool = candidates.length > 0 ? candidates : catalog.models;
+    : addressed;
+  const pool = candidates.length > 0 ? candidates : addressed;
   if (pool.length === 0) return null;
-  const ctx = buildRpcCommandContext(runtimeContext);
   const active = modelRequest(ctx, runtimeContext.runtimeConfig);
-  const current = catalog.active ?? active.model;
-  const idx = pool.indexOf(current ?? "");
+  const current = catalog.logical ? `${catalog.logical.provider}/${catalog.logical.model}` : `${catalog.provider}/${catalog.active ?? active.model}`;
+  const idx = pool.findIndex(model => `${model.provider}/${model.id}` === current);
   const nextModel = pool[(idx + 1) % pool.length]!;
-  const note = assertModelApplied(await setModel([`${catalog.provider}/${nextModel}`], ctx, false));
-  return { model: { provider: catalog.provider, id: nextModel }, note };
+  const note = assertModelApplied(await setModel([`${nextModel.provider}/${nextModel.id}`], ctx, false));
+  return { model: nextModel, note };
 }
 
 export async function setRpcThinking(runtimeContext: ShellRuntimeContext, level: string): Promise<{ readonly level: string }> {
@@ -125,7 +129,8 @@ export async function setRpcThinking(runtimeContext: ShellRuntimeContext, level:
 export async function cycleRpcThinking(runtimeContext: ShellRuntimeContext): Promise<{ readonly level: string } | null> {
   const ctx = buildRpcCommandContext(runtimeContext);
   const active = modelRequest(ctx, runtimeContext.runtimeConfig);
-  const current = captureThinkingPreference(runtimeContext.projectRoot, active.thinkingEffort).thinkingEffort ?? "off";
+  const logical = readLogicalModel(runtimeContext.session.id);
+  const current = (logical ? logical.thinkingEffort : captureThinkingPreference(runtimeContext.projectRoot, active.thinkingEffort).thinkingEffort) ?? "off";
   const idx = THINKING_LEVELS.indexOf(current);
   const nextName = THINKING_LEVELS[(idx + 1) % THINKING_LEVELS.length]!;
   const action = thinkingSyntax.actions.find(item => item.name === nextName);
@@ -164,13 +169,16 @@ export async function readRpcForkMessages(runtimeContext: ShellRuntimeContext): 
   return nav.points.map(point => ({ entryId: point.entryId, text: point.prompt ?? "" }));
 }
 
-export function listRpcModels(): readonly Record<string, unknown>[] {
-  return loadCatalog().flatMap(provider => provider.models.map(model => ({
+export function listRpcModels(runtimeContext?: ShellRuntimeContext): readonly Record<string, unknown>[] {
+  const catalog = runtimeContext ? sessionModelCatalog(runtimeContext.cwd, runtimeContext.session.id, runtimeContext.configuration.current.catalog)
+    : { physical: loadCatalog(), virtual: [] };
+  return [...catalog.physical.flatMap(provider => provider.models.map(model => ({
     provider: provider.id,
     id: model.id,
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,
-  })));
+  }))), ...catalog.virtual.map(model => ({ provider: model.provider, id: model.id, virtual: true,
+    contextWindow: model.contextWindow, maxTokens: model.maxTokens }))];
 }
 
 export function listRpcCommands(runtimeContext: ShellRuntimeContext): readonly Record<string, unknown>[] {
@@ -237,14 +245,15 @@ export function readRpcState(runtimeContext: ShellRuntimeContext, queueLength: n
   const ctx = buildRpcCommandContext(runtimeContext);
   const active = modelRequest(ctx, runtimeContext.runtimeConfig);
   const thinking = captureThinkingPreference(runtimeContext.projectRoot, active.thinkingEffort);
+  const logical = readLogicalModel(runtimeContext.session.id);
   return {
     sessionId: runtimeContext.session.id,
     workspaceRoot: runtimeContext.projectRoot,
     isStreaming,
     messageCount: runtimeContext.session.turns.length,
     pendingMessageCount: queueLength,
-    model: { provider: runtimeContext.runtimeConfig.provider, id: active.model },
-    thinkingLevel: thinking.thinkingEffort ?? "auto",
+    model: { provider: logical?.provider ?? runtimeContext.runtimeConfig.provider, id: logical?.model ?? active.model },
+    thinkingLevel: (logical ? logical.thinkingEffort : thinking.thinkingEffort) ?? "auto",
     steeringMode: runtimeContext.runtimeConfig.steeringMode ?? "one-at-a-time",
     followUpMode: runtimeContext.runtimeConfig.followUpMode ?? "one-at-a-time",
     ...(runtimeContext.session.title ? { sessionName: runtimeContext.session.title } : {}),

@@ -1,0 +1,20 @@
+{
+  "platform": "linux",
+  "node": "v24.15.0",
+  "status": "failed",
+  "publicInstalledSdk": true,
+  "configuredProvider": true,
+  "buildId": "083b3d78d8bf8dc44d04fc2ec6c43c595bb7d6e0d68257a983c3491a2854887c",
+  "requests": 0,
+  "stages": {},
+  "probeSha256": "7820a41990c7aad5cacfd224f75b7bcf20b5781d14678c40784340d31865781d",
+  "failedStage": "setup",
+  "errorName": "AssertionError",
+  "line": "88",
+  "failure": "product-or-contract",
+  "assertion": {
+    "operator": "==",
+    "expected": true
+  },
+  "isolatedStateRemoved": true
+}

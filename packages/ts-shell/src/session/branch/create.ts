@@ -5,6 +5,7 @@ import { readSessionFileVersion } from '../store/version.js';
 import type { SessionStoreAccess } from '../store/sessionStoreAccess.js';
 import { sameValue } from '../../config/values.js';
 import { forkThread, forkTranscriptEvents } from './fork.js';
+import { decodeSessionModel, readSessionModelEdit, writeSessionModel } from '../model/state.js';
 
 export interface SessionForkOptions {
   readonly activate?: boolean;
@@ -36,7 +37,10 @@ export function forkSession(input: {
     throw new Error('Cannot fork: source history changed after selection. Reopen its tree.');
   }
   const source = store.load(sourceId);
-  const thread = store.readStateSnapshotRequired(store.statePath(sourceId)).thread ?? buildLinearSessionThreadSnapshot(source);
+  const sourceState = store.readStateSnapshotRequired(store.statePath(sourceId));
+  const selection = decodeSessionModel(sourceState.modelSelection);
+  if (sourceState.modelSelection !== undefined && !selection) throw new Error('Cannot fork: source model selection is unavailable.');
+  const thread = sourceState.thread ?? buildLinearSessionThreadSnapshot(source);
   const events = readTranscriptEvents(store.transcriptPath(sourceId));
   if (readSessionFileVersion(layout) !== version) throw new Error('Cannot fork: source history changed. Reopen its tree.');
   if (!sessionThreadPath(thread).resolved) throw new Error('Cannot fork: session ancestry is unavailable.');
@@ -65,9 +69,11 @@ export function forkSession(input: {
     }
     const copied = forkThread({ ...thread, activeLeafId: forkLeaf }, source.id, forked.id);
     store.writeSessionState(forked, { thread: copied });
+    if (selection) writeSessionModel(forked.id, selection, readSessionModelEdit(forked.id));
     const saved = store.load(forked.id);
     const state = store.readStateSnapshotRequired(store.statePath(forked.id));
-    if (!sameValue(state.thread, copied) || !sessionThreadPath(copied).resolved || saved.parentSession !== source.id) throw new Error('Fork readback failed.');
+    if (!sameValue(state.thread, copied) || !sameValue(state.modelSelection, selection)
+      || !sessionThreadPath(copied).resolved || saved.parentSession !== source.id) throw new Error('Fork readback failed.');
     if (options?.activate !== false) callbacks.setCurrentSessionForProject(saved.projectRoot, saved.id);
     return saved;
   } catch { throw new SessionForkError(forked.id); }

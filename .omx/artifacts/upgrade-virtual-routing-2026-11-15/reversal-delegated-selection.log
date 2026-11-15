@@ -1,0 +1,59 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/provider/route.test.ts (14 tests | 2 failed | 12 skipped) 174ms
+   ↓ routes the actual provider step to the physical URL and credential without sending to the original provider
+   × keeps an explicit delegated model independent of the foreground logical selection 113ms
+     → expected { Object (text, toolCalls, ...) } to match object { Object (stopReason, origin) }
+(7 matching properties omitted from actual)
+   × keeps an explicit delegated role independent of the foreground logical selection 60ms
+     → expected { Object (text, toolCalls, ...) } to match object { Object (stopReason, origin) }
+(7 matching properties omitted from actual)
+   ↓ keeps inherited logical delegation while applying its own explicit effort
+   ↓ refuses a physical model outside allowedModels before reservation or HTTP dispatch
+   ↓ refuses a missing physical catalogue provider before reservation or HTTP dispatch
+   ↓ refuses a missing physical catalogue model before reservation or HTTP dispatch
+   ↓ rechecks host admission after delayed routing before reservation or HTTP dispatch
+   ↓ rejects a same-provider connection whose credential changed during routing
+   ↓ rejects a physical profile credential withdrawn during message conversion
+   ↓ routes a logical selection before checking dormant physical scope and credentials
+   ↓ persists accepted route state before compaction and restores it in a new step and fork
+   ↓ refuses a router state race even when the callback returns no replacement state
+   ↓ does not persist router state when conversion cancels before route acceptance
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 12 skipped (14)
+   Start at  17:36:05
+   Duration  4.00s (transform 2.31s, setup 0ms, collect 3.59s, tests 174ms, environment 0ms, prepare 55ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/provider/route.test.ts > keeps an explicit delegated model independent of the foreground logical selection
+ FAIL  src/cli/provider/route.test.ts > keeps an explicit delegated role independent of the foreground logical selection
+AssertionError: expected { Object (text, toolCalls, ...) } to match object { Object (stopReason, origin) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "origin": {
+-     "model": "automatic",
+-     "provider": "openai",
++     "model": "physical",
++     "provider": "anthropic",
+    },
+    "stopReason": "stop",
+  }
+
+ ❯ src/cli/provider/route.test.ts:115:18
+    113|   const result = await delegatedSteps(host, new Map(), {})(target)(
+    114|     [{ role: 'user', content: 'Use the explicit delegated target.' }],…
+    115|   expect(result).toMatchObject({ stopReason: 'stop', origin: { provide…
+       |                  ^
+    116|   expect(test.route).not.toHaveBeenCalled();
+    117|   expect(test.original.requests).toHaveLength(1); expect(test.physical…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+

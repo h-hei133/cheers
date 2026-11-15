@@ -11910,3 +11910,7 @@ Linux同代三独立Node进程验证重开／分叉独立持久化、actual work
 ### 2026-11-15：会话虚拟模型注册与代际撤权
 
 分支store已提交774c898。本子批新增扩展registerVirtualModel，CLI／SDK复用原catalog contribution，公开callback-free logical metadata；边界捕获、原signal／options、duplicate/physical collision和reload旧回调拒绝已修。六门18/178、0monoliths、build 047e196c6597、六反转exact恢复及限定复核CLEAR；同代2214文件npm安装strict类型、Linux SDK／CLI native通过，未新增provider请求。完整证据归档 .omx/artifacts/upgrade-virtual-registration-2026-11-15/，按批本地提交不push；E.7转部分，21/62保持，继续逻辑选择与生产路由。
+
+### 2026-11-15：逻辑模型选择与生产路由验证
+
+注册子批356b996b后接通CLI／SDK／RPC／picker逻辑选择、原branch-store routing CAS、retry／direct／摘要和VM callback数据边界。当前六门39/840、十有效反转exact恢复、0monoliths、build 083b3d78d8bf及2224文件安装strict类型通过；Linux公开入口33次loopback POST与原配置模型4次真实POST通过，原catalog损坏的隔离最小entry边界保留。架构CLEAR、限定独立代码复审APPROVE，C.1本地完成22/62，本批待本地提交；D.1 get_messages旧快照由physical对照确认。证据 .omx/artifacts/upgrade-virtual-routing-2026-11-15/；按批本地提交后修RPC消费者，不push。
