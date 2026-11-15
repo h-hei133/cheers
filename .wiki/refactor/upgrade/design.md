@@ -258,3 +258,12 @@ navigation-native.json绑定当前build及seed/hook/driver哈希；Linux真实PT
 对比参考assistant不含toolCalls时标记的决定，选择live unknown更保守的确认规则，复用既有渲染/复制/准备输出。来源拆分后source.ts按stripAnsi比对，不改变authored source或source映射；prepareRows照旧剥离内部133，避免外部状态干扰。新增真实projection→sink→render、history、实际host双模式、end/failure/next-message/tool partial最终化以及普通和中间工具消息导航反例。boundaries-red为3红／6绿，boundaries-delivery六门及9/233通过；三反转分别放宽unknown、删除toolcall事实、删除assistant导航均红，三个生产文件exact恢复。boundaries-restored-build为3/81、0monoliths及build `fbb35f5b6199`通过，限定只读复核CLEAR。
 
 boundaries-native.json当前build和seed/hook/driver哈希绑定，Linux当前编译CLI regular/fullscreen/65旧页三格全部exit0。真实Ctrl箭头在prompt与结束reply间前后跳，release不重复，draft/authored copy与旧页保持、内部133不外发。初次fixture起点恰是最后reply首行，因此previous正确跳当前prompt；另一fixture把Ctrl+Down误当细粒度scroll，实际它已绑定next边界。失败JSON和driver原文保留，最终只用实际起点并检查上一reply→prompt→reply，未改生产clamp。实际M，额外依赖1（message结束的调用事实）；本地19/62保持，B2.1仍需真实tmux及协议联合审计。无物理终端／真实provider／push／CI声明。
+
+
+## Terminal protocol local acceptance (2026-11-15)
+
+用户导航`d644ccf7`与助手边界`2d9c8c0a`均按批提交；本验收没有新增生产修改。当前编译build `fbb35f5b6199`的joint-acceptance六门及15套件430项通过，不累加之前重叠测试。joint-status-native四格确认真实bootstrap/sharedDA/7501支持或fallback/9;4 keepalive/原始paste/suspend再probe/stop迟到setter清退；joint-cell-native同build Kitty四格确认原TUI实际16t query、split6;40;20t经原StdinBuffer得20x40、同状态生命周期与exit0。原B.3各protocol实际图片late-cell重排证据保留原build，不误称重跑pixel。
+
+tmux-native.json为Linux真实tmux3.4独立server/socket及附着client，actual client_termfeatures支持和不支持hyperlinks各两模式。compiled detectTerminalCapabilities在真实pane读取当前client而非fake executable；actual Surface捕获支持位，pipe-pane观察本CLI实际OSC8，supported时有、unsupported时无、internal133无外发、全exit0。hook只观察原Surface与current compiled chunks；第一次误捕startup无能力Surface的JSON缺字段，失败回执与原source保留，改仅在实际host bool能力有值时记录后通过，没有修改产品。外层物理终端点击不在本地验收中。
+
+joint-source-evidence核验四canonical passed receipt同build、归档探针source SHA256一致，记录八个生产owner身份；限定独立审计实际读取回执和联合日志给CLEAR。原10/11/4完整palette查询/parse/lease/theme/render消费者和相关当前测试也存在，B2.2保持已完成不重复计数。所有本次临时驱动与状态均隔离并逐次清理；归档文本/JSON保留，不把探针放入产品。实际S、额外生产依赖0，B2.1按原研究范围Linux本地完成，总20/62；继续循环hook/SDK与其他规划任务。physicalTerminal/realProvider=false，其他平台、deadline后无标记回复严格归属、push和CI无证据，总目标active。

@@ -11861,3 +11861,10 @@ Linux当前编译CLI regular/fullscreen及65提示旧页三格全exit0；普通�
 用户导航`d644ccf7`后补实际message_end工具调用事实；未知partial不获marker，中间toolcall文本排除，live／restore一致，原RPC和失败状态保持。六门、9/233、恢复3/81、0monoliths、build `fbb35f5b6199`及Linux编译CLI三格通过，三有效反转red/exact恢复，限定复核CLEAR。
 
 原生首次起点已在最后reply首行及Ctrl+Down细粒度滚动假设错误按fixture分类保留；最终实际前后prompt/reply跳转、release、65旧页、draft/copy源和内部marker不外发通过。确认结束包括失败attempt，不冒充成功。本地19/62保持，继续真实tmux／B2.1联合并按批提交，无push／CI声明。
+
+
+### 2026-11-15：终端协议任务最终本地验收
+
+B2.1当前build `fbb35f5b6199`联合六門、15/430及导航3/状态4/cell-size4/真实tmux两client×两宿主均passed，receipt/source身份核验，限定独立审计CLEAR。支持位实际来自tmux客户端feature，actual CLI OSC8支持时输出否则回退，原16t query/split回复/paste与停止状态保持，全exit0。
+
+B2.1勾选后整体20/62项，本验收批仅文档按用户要求提交；物理终端、其他平台、真实provider、deadline后无tag严格归属、push和CI不宣称。完整研究任务保留，总目标active，继续C.1循环hook/T3.1 SDK。
