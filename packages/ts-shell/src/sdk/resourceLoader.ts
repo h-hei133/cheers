@@ -50,8 +50,12 @@ export interface LoadExtensionsResult {
 
 export interface ResourceLoader {
   reload(host?: ExtensionHostBridge): Promise<void>;
-  setHost?(host: ExtensionHostBridge): void;
+  setHost?(host: ExtensionHostBridge): void | (() => void);
   setDenyRules?(denyRules: () => readonly DenyRule[]): void;
+  /** Retire only the loaded generation consumed by this session, preserving later reloads. */
+  captureRetirement?(): () => void;
+  /** Bind the exact resource snapshot captured before session initialization awaits. */
+  captureBinding?(): (host: ExtensionHostBridge) => () => void;
   getExtensions(): LoadExtensionsResult;
   getSkills(): { readonly skills: readonly Skill[]; readonly diagnostics: readonly ResourceDiagnostic[] };
   getThemes(): { readonly themes: readonly ThemeConfig[]; readonly diagnostics: readonly ResourceDiagnostic[] };
@@ -136,20 +140,50 @@ export class DefaultResourceLoader implements ResourceLoader {
     this.dynamicDenyRules = options.denyRules;
   }
 
-  setHost(host: ExtensionHostBridge): void {
-    const bound = this.generation?.host ?? this.dynamicHost;
+  setHost(host: ExtensionHostBridge): void | (() => void) {
+    const generation = this.generation;
+    const bound = generation?.host ?? this.dynamicHost;
     if (bound !== undefined && bound !== host) {
       throw new Error("Resource loader is already bound to another host. Call reload(host) or create a new loader before binding another session.");
     }
-    if (this.generation) {
-      this.generation.controller.signal.throwIfAborted();
-      this.generation.host = host;
+    generation?.controller.signal.throwIfAborted();
+    const retire = this.captureRetirement();
+    if (this.generation !== generation || (generation?.host ?? this.dynamicHost) !== bound) {
+      throw new Error('Resource generation changed during host binding.');
     }
+    generation?.controller.signal.throwIfAborted();
+    if (generation) generation.host = host;
     this.dynamicHost = host;
+    return retire;
   }
 
   setDenyRules(denyRules: () => readonly DenyRule[]): void {
     this.dynamicDenyRules = denyRules;
+  }
+
+  captureRetirement(): () => void {
+    const generation = this.generation;
+    return () => {
+      if (!generation) return;
+      if (this.generation === generation) {
+        this.generation = undefined;
+        this.dynamicHost = undefined;
+      }
+      generation.host = undefined;
+      generation.controller.abort(new Error('Resource consumer is retired.'));
+    };
+  }
+
+  captureBinding(): (host: ExtensionHostBridge) => () => void {
+    const generation = this.generation;
+    const retire = this.captureRetirement();
+    return host => {
+      if (!generation || this.generation !== generation || generation.controller.signal.aborted) {
+        throw new Error('Resource generation changed during session initialization.');
+      }
+      const release = this.setHost(host);
+      return typeof release === 'function' ? release : retire;
+    };
   }
 
   async reload(hostOverride?: ExtensionHostBridge): Promise<void> {

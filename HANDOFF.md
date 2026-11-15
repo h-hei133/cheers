@@ -2593,3 +2593,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Restoration testing starts while a mutation probe is still running, or a command-option rejection is counted as a red test.
 - **Root Cause:** A yielded session_id is mistaken for completion and npm option parsing is mistaken for an executed test; broad mutation tests may lose their terminating fixture condition.
 - **Rule:** Join the live execution until exit before another heavy command or mutation. Use direct Vitest with a bounded scenario when forwarding selection through npm is uncertain, require an actual assertion failure, and restore exact bytes in finally before a separate green check. Keep interrupted and setup-failed receipts separate from validation evidence.
+
+### Resource Binding Must Claim The Captured Generation
+- **Symptom:** Session creation binds resources reloaded during initialization, or a failed second consumer changes the first consumer's host or deny rules.
+- **Root Cause:** Binding reads the latest loader state after an await, and publishes the host before constructing its retirement callback.
+- **Rule:** Capture the resource generation before initialization awaits and revalidate it at binding. Acquire retirement before publishing the host, then publish deny rules only after a successful claim. Retirement releases only the consumed generation and preserves a later reload; ordinary turn cancellation keeps reusable resources live.
+
+### Concurrent Disposal Must Share Cleanup And Failure
+- **Symptom:** A second dispose caller finishes before cleanup, or a rejected asynchronous cleanup is reported as successful disposal.
+- **Root Cause:** A boolean guards cleanup without sharing its promise, and allSettled results are discarded.
+- **Rule:** Publish one disposal promise before invoking retirement hooks. Continue independent cleanup after synchronous or asynchronous failures, finish termination, and return the original first failure to every caller. Test a pending cleanup rejection and a failed binding followed by a successful new claim.

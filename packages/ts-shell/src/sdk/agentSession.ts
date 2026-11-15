@@ -157,6 +157,7 @@ function registerSdkContributions(
 
 export class AgentSession {
   private disposed = false;
+  private disposal: Promise<void> | undefined;
 
   constructor(
     readonly runtimeContext: ShellRuntimeContext,
@@ -166,6 +167,7 @@ export class AgentSession {
     private readonly mcpGateway: CoreMcpGateway | undefined,
     private readonly ownsMcpGateway: boolean,
     private readonly contributionCleanups: readonly (() => void)[],
+    private readonly retireResources?: () => void,
   ) {}
 
   bindUi(host: ExtensionUiHost): () => void {
@@ -250,23 +252,35 @@ export class AgentSession {
     return this.sessionManager.getSession(this.sessionId) ?? this.runtimeContext.session;
   }
 
-  async dispose(): Promise<void> {
-    if (this.disposed) return;
+  dispose(): Promise<void> {
+    if (this.disposal) return this.disposal;
+    let settled!: { readonly resolve: () => void; readonly reject: (error: unknown) => void };
+    this.disposal = new Promise<void>((resolve, reject) => { settled = { resolve, reject }; });
+    void this.disposal.catch(() => {});
     this.disposed = true;
-    closeExtensionHost(this.runtimeContext);
-    await this.sessionRuntime.cancelAndWait();
-    for (const unregister of this.contributionCleanups) unregister();
-    await Promise.allSettled([
-      closeMediaFor(this.runtimeContext),
-      closeDirectorFor(this.runtimeContext),
-      closeJobsFor(this.runtimeContext, false),
-      closeSshFor(this.runtimeContext),
-      closeCollaborationFor(this.runtimeContext),
-      closeExtensionsFor(this.runtimeContext),
-      Promise.resolve().then(() => this.runtimeContext.freshState?.clearCache?.()),
-      ...(this.ownsMcpGateway ? [Promise.resolve().then(() => this.mcpGateway?.close())] : []),
-    ]);
-    this.sessionRuntime.terminate(this.sessionId);
+    void (async () => {
+      const errors: unknown[] = [];
+      try { this.retireResources?.(); } catch (error) { errors.push(error); }
+      try { closeExtensionHost(this.runtimeContext); } catch (error) { errors.push(error); }
+      try { await this.sessionRuntime.cancelAndWait(); } catch (error) { errors.push(error); }
+      for (const unregister of this.contributionCleanups) {
+        try { unregister(); } catch (error) { errors.push(error); }
+      }
+      const cleanupResults = await Promise.allSettled([
+        Promise.resolve().then(() => closeMediaFor(this.runtimeContext)),
+        Promise.resolve().then(() => closeDirectorFor(this.runtimeContext)),
+        Promise.resolve().then(() => closeJobsFor(this.runtimeContext, false)),
+        Promise.resolve().then(() => closeSshFor(this.runtimeContext)),
+        Promise.resolve().then(() => closeCollaborationFor(this.runtimeContext)),
+        Promise.resolve().then(() => closeExtensionsFor(this.runtimeContext)),
+        Promise.resolve().then(() => this.runtimeContext.freshState?.clearCache?.()),
+        ...(this.ownsMcpGateway ? [Promise.resolve().then(() => this.mcpGateway?.close())] : []),
+      ]);
+      for (const result of cleanupResults) if (result.status === 'rejected') errors.push(result.reason);
+      try { this.sessionRuntime.terminate(this.sessionId); } catch (error) { errors.push(error); }
+      if (errors.length > 0) throw errors[0];
+    })().then(settled.resolve, settled.reject);
+    return this.disposal;
   }
 }
 
@@ -286,6 +300,7 @@ export async function createAgentSession(
   }
 
   const extensionsResult = resourceLoader.getExtensions();
+  const bindResources = resourceLoader.captureBinding?.();
   const toolPolicy = resolveSdkToolPolicy(options, extensionsResult);
   const overrides: RuntimeConfigOverrides = {
     ...options.runtimeConfigOverrides,
@@ -309,8 +324,6 @@ export async function createAgentSession(
     ? { ...baseConfig, disabledTools: [...new Set([...baseConfig.disabledTools, ...toolPolicy.disabledTools])] }
     : baseConfig;
 
-  resourceLoader.setDenyRules?.(() => runtimeContextRef?.runtimeConfig.denyRules ?? runtimeConfig.denyRules);
-
   const cliOptions: CliOptions = {
     provider: options.provider,
     model: options.model,
@@ -328,7 +341,8 @@ export async function createAgentSession(
     dangerouslyBypassHookTrust: options.allowUntrustedHooks,
   };
 
-  const bootstrap = bootstrapShellRuntime({
+  let bootstrap: ReturnType<typeof bootstrapShellRuntime>;
+  try { bootstrap = bootstrapShellRuntime({
     cwd,
     launchCwd: options.launchCwd ?? cwd,
     runtimeConfig,
@@ -346,7 +360,10 @@ export async function createAgentSession(
     ...(options.forkSource ? { forkSource: options.forkSource } : {}),
     adoptCurrentSession: options.continueSession === true,
     emitLifecycleMessages: false,
-  });
+  }); } catch (error) {
+    if (!options.resourceLoader) { try { resourceLoader.captureRetirement?.()(); } catch { /* Keep the bootstrap failure. */ } }
+    throw error;
+  }
 
   const runtimeContext = bootstrap.context;
   if (convertToLlm) Object.defineProperty(runtimeContext, 'convertToLlm', { value: convertToLlm, enumerable: true });
@@ -372,6 +389,7 @@ export async function createAgentSession(
   );
 
   let sessionRuntime: ShellSessionRuntime;
+  let retireResources: (() => void) | undefined;
   const approvalTrustPolicy = options.approvalTrustPolicy ?? new ApprovalTrustPolicy();
   const providerRuntimeBridge = {
     resolveCredentialSnapshot: () => resolveCliCredential(runtimeContext.runtimeConfig, cliOptions, process.env, runtimeContext.session.id),
@@ -392,9 +410,14 @@ export async function createAgentSession(
     });
     await waitForExtensionsFor(runtimeContext);
     const host = extensionHostFor(runtimeContext);
-    if (host) resourceLoader.setHost?.(host);
+    if (host) {
+      const release = bindResources ? bindResources(host) : resourceLoader.setHost?.(host);
+      retireResources = typeof release === 'function' ? release : resourceLoader.captureRetirement?.();
+    }
+    resourceLoader.setDenyRules?.(() => runtimeContextRef?.runtimeConfig.denyRules ?? runtimeConfig.denyRules);
     if (options.ui) bindExtensionUiFor(runtimeContext, options.ui);
   } catch (error) {
+    try { retireResources?.(); } catch { /* Keep the initialization failure. */ }
     await closeExtensionsFor(runtimeContext).catch(() => {});
     cleanups.splice(0).forEach((unregister) => unregister());
     if (ownsMcpGateway) await mcpGateway.close().catch(() => {});
@@ -418,6 +441,7 @@ export async function createAgentSession(
     mcpGateway,
     ownsMcpGateway,
     cleanups,
+    retireResources,
   );
 
   return {
