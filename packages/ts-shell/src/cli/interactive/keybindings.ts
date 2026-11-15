@@ -85,8 +85,8 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
   "tui.overlay.previousGroup": { defaultKeys: ["shift+tab"], description: "Previous picker group", scope: 'overlay' },
   "tui.altScreen.top": { defaultKeys: ["ctrl+home"], description: "Go to the oldest rows, or the start of the draft" },
   "tui.altScreen.bottom": { defaultKeys: ["ctrl+end"], description: "Go to the newest rows, or the end of the draft" },
-  "tui.altScreen.previousPrompt": { defaultKeys: ["ctrl+up", "ctrl+shift+up"], description: "Jump to the previous prompt in fullscreen mode" },
-  "tui.altScreen.nextPrompt": { defaultKeys: ["ctrl+down", "ctrl+shift+down"], description: "Jump to the next prompt in fullscreen mode" },
+  "tui.altScreen.previousPrompt": { defaultKeys: ["ctrl+up", "ctrl+shift+up"], description: "Jump to the previous prompt or answer in fullscreen mode" },
+  "tui.altScreen.nextPrompt": { defaultKeys: ["ctrl+down", "ctrl+shift+down"], description: "Jump to the next prompt or answer in fullscreen mode" },
   // Not ctrl+f: that is the emacs-style cursor-right the editor already binds, and
   // the reference implementation avoids it for the same reason on every platform
   // that has the cursor binding.

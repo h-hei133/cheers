@@ -107,7 +107,11 @@ describe("transcript search ownership", () => {
       terminal.input('Unsubmitted navigation draft'); scheduler.flush(); terminal.drain();
       terminal.input('\x1b[1;5A'); scheduler.flush();
       const output = terminal.drain();
-      if (screen === 'fullscreen') expect(stripAnsi(output)).toContain('Navigation prompt 2');
+      if (screen === 'fullscreen') {
+        expect(stripAnsi(output)).toContain('Navigation reply 2');
+        terminal.input('\x1b[1;5A'); scheduler.flush();
+        expect(stripAnsi(terminal.drain())).toContain('Navigation prompt 2');
+      }
       else expect(stripAnsi(output)).toContain('Prompt navigation requires fullscreen mode');
       expect(output).not.toContain('\x1b]133;A');
       const editor = (mode as unknown as { state: { editor: { getText(): string } } }).state.editor;

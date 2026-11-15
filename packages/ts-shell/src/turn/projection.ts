@@ -83,7 +83,8 @@ export class TurnProjection {
       }
       case "message_end": {
         const message = event.message;
-        if (message.role === "assistant") return [{ type: "message.finished", role: "coder" }];
+        if (message.role === "assistant") return [{ type: "message.finished", role: "coder",
+          ...(message.tool_calls?.length ? { hasToolCalls: true as const } : {}) }];
         // Input the user handed a running turn. The kernel emits this at the
         // moment it is injected into the conversation, which is the only
         // reliable statement that it was delivered: submitting a steer is a

@@ -187,7 +187,9 @@ export class TranscriptPane {
       const content = this.window.layout.rows;
       for (let row = top + direction; row >= 0 && row < content.length; row += direction) {
         const owner = this.owners[row];
-        if (owner === undefined || this.owners[row - 1] === owner || this.document[owner]?.kind !== 'user'
+        const block = owner === undefined ? undefined : this.document[owner];
+        if (owner === undefined || this.owners[row - 1] === owner
+          || (block?.kind !== 'user' && (block?.kind !== 'assistant' || block.hasToolCalls !== false))
           || !OSC133_PROMPT_START.test(content[row] ?? '')) continue;
         const target = Math.min(row, Math.max(0, this.total - this.capacity));
         if (target === top) continue;

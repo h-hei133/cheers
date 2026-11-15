@@ -147,7 +147,7 @@ export interface ViewActions {
   scroll(rows: number): void;
   /** Move the transcript window by whole screens. */
   scrollPage(direction: -1 | 1): void;
-  /** Move to an original user prompt in the fullscreen transcript. */
+  /** Move to an original prompt or confirmed answer in the fullscreen transcript. */
   scrollPrompt?(direction: -1 | 1): void;
   /** Jump to the newest rows. */
   scrollToEnd(): void;

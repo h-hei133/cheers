@@ -19,6 +19,18 @@ function build(): { sink: TurnSink; transcript: Transcript; rows: () => string }
 }
 
 describe("streaming assistant text", () => {
+  it.each(['end', 'failure', 'next-message', 'tool'] as const)('keeps %s-finalized partial output outside confirmed message boundaries', action => {
+    const { sink, transcript } = build();
+    sink.begin('turn', 'partial'); sink.chunk('Unknown partial output');
+    const block = transcript.last()!;
+    if (action === 'end') sink.end();
+    else if (action === 'failure') sink.handleEvent({ type: 'query.failed', error: 'Provider unavailable' });
+    else if (action === 'next-message') sink.handleEvent({ type: 'message.started', role: 'coder' });
+    else sink.handleEvent({ type: 'tool.started', toolName: 'read', taskId: 'partial-read', args: { path: 'a' } });
+    expect(block.finalized).toBe(true);
+    expect(block.hasToolCalls).toBeUndefined();
+    expect(transcript.render(WIDTH).rows.join('')).not.toContain('\x1b]133;A');
+  });
   it('reads the current collapse preference only when a new thinking block opens', () => {
     const transcript = new Transcript();
     let collapsed = false;

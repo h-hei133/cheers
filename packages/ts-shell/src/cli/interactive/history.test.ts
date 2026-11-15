@@ -5,6 +5,7 @@ import { forgetSessionTodos, getSessionTodos, setSessionTodos } from "../../core
 import { Transcript } from "../../presentation/tui/transcript/container.js";
 import { appendConversation, restoreConversation, showConversation, startFreshSession } from "./history.js";
 import { copyPicker } from './picker/copy.js';
+import { renderBlock } from '../../presentation/tui/transcript/blocks.js';
 import { rewindPoints, rewindPicker } from "./picker/rewind.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 
@@ -35,6 +36,16 @@ const CONVERSATION = [
 ];
 
 describe("restoring a conversation", () => {
+  it('restores answer boundaries while a tool-calling assistant retains its excluded identity', () => {
+    const withTools = { ...turn('assistant', 'Inspecting.'), tool_calls: [{ id: 'boundary-read', type: 'function' as const,
+      function: { name: 'read', arguments: '{"path":"source.ts"}' } }] };
+    const messages = [turn('user', 'Inspect source'), withTools, { ...turn('tool', 'Source text'), tool_call_id: 'boundary-read' }, turn('assistant', 'Answer after inspection.')];
+    const original = structuredClone(messages);
+    const blocks = restoreConversation(messages).blocks;
+    expect(blocks[1]).toMatchObject({ kind: 'assistant', text: 'Inspecting.', hasToolCalls: true });
+    expect(blocks.map(block => renderBlock(block, 60).filter(row => /^\x1b\]133;A\x07/.test(row)).length)).toEqual([1, 0, 0, 1]);
+    expect(messages).toEqual(original);
+  });
   it('uses the current display preference for restored thinking blocks', () => {
     const message = { ...turn('assistant', 'answer'), reasoning: { text: 'reasoning' } };
     expect(restoreConversation([message]).blocks[0]?.collapsed).toBe(true);

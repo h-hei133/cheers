@@ -212,7 +212,7 @@ export class TurnSink implements RendererSink {
         this.onChange();
         return;
       case "message.finished":
-        this.finalizeAssistant();
+        this.finalizeAssistant(event.hasToolCalls === true);
         this.onChange();
         return;
       case "message.started":
@@ -319,11 +319,14 @@ export class TurnSink implements RendererSink {
     return this.assistant;
   }
 
-  private finalizeAssistant(): void {
+  private finalizeAssistant(hasToolCalls?: boolean): void {
     // Whatever the model was working through is settled once it starts answering.
     this.thinking.settle();
     if (!this.assistant) return;
-    this.transcript.update(this.assistant, block => { block.finalized = true; });
+    this.transcript.update(this.assistant, block => {
+      if (hasToolCalls !== undefined) block.hasToolCalls = hasToolCalls;
+      block.finalized = true;
+    });
     // `/copy` with no argument copies the last answer; without this it had
     // nothing recorded to copy.
     recordLastAssistantResponse(this.assistant.text);

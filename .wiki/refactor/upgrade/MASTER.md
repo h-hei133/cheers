@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.1/B.2/B.3/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
-**Active batch**: B2.1 startup已提交`ff07807a`；用户提示导航小批完成六门、9/280、恢复后3/131、0monoliths和build `3154882609b3`，Linux编译CLI regular/fullscreen及65提示保留历史三格通过，限定只读复核CLEAR。按批提交后继续助手消息边界与真实tmux；B2.1仍部分，整体19/62项本地验收，C.6原生服务缺口保留。
+**Active batch**: 用户提示导航已提交`d644ccf7`；助手消息边界补齐实际message.finished工具调用事实，未知partial不获边界。六门、9/233、恢复3/81、0monoliths、build `fbb35f5b6199`及Linux编译CLI三格通过，限定复核CLEAR，三反转红／exact恢复。按批提交后继续真实tmux与B2.1联合验收；整体19/62项，C.6原生服务缺口保留。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -108,3 +108,5 @@
 | 2026-11-15 | B2.1启动子批：首帧write及原协议owner readiness一起等待，DA1／250ms／stop／drain／disconnect结束，未新增timer或query。terminal拆input/output保留现有消费入口并满足20函数上限；复核发现构造bind绕过动态write，现有7项反例红后修。联合颜色fixture在HEAD同样失败，补齐独立keyboard/color哨兵并显式能力，原较晚颜色断言保持。六门、9/231、0monoliths、build `220cdd055d01`通过；Linux编译CLI四格bootstrapKeyboardConfirmed全部true、精确paste与暂停／stop清理通过。两个有效反转红、逐字节恢复后3/77通过，限定只读复核CLEAR；实际M／额外依赖1（断连等待清退），19/62不变，继续133／tmux。 |
 
 | 2026-11-15 | B2.1用户提示导航：前导notice通向保留页及按键释放两红例修复，原owner与copy保持。六门、9/280、恢复3/131、0monoliths、build `3154882609b3`和Linux编译CLI三格通过；两有效反转红／exact恢复，限定复核CLEAR。按批提交，19/62不变，继续助手边界与真实tmux。 |
+
+| 2026-11-15 | 助手消息边界：实际message_end工具调用事实同步进入原block，结束无工具消息可导航、未知partial保守拒绝。六门、9/233、恢复3/81、0monoliths、build `fbb35f5b6199`及Linux编译CLI三格通过，限定复核CLEAR；三反转red/exact恢复。原生viewport已在最后回答首行时previous正确跳prompt，错误起点预期保留；按批提交后继续tmux，19/62保持。 |

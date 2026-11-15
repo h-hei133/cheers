@@ -2577,3 +2577,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Previous-prompt navigation stops at the oldest prompt when a restored-history notice precedes it, or key release jumps a second time.
 - **Root Cause:** Semantic boundaries alone cannot reach the existing top-row page loader, and arrow release reports retain the same key binding as key press.
 - **Rule:** With no preceding prompt, reach top zero, paint, then reuse the original retained-page loader and anchor contract. Refuse navigation from pending/stale coordinates; use the shared key-release predicate before dispatch. Paging may update its notice, so compare exact authored copy sources while separately asserting the current notice.
+
+
+### Assistant Boundary Facts Must Arrive Before Tool Execution
+- **Symptom:** A tool-calling preamble becomes a navigable answer, or a stopped partial block acquires a message boundary without a completed-message fact.
+- **Root Cause:** message_end precedes tool_execution_start; finalization also runs on cancellation, failure and message replacement, so neither the next tool nor finalized alone states whether a message contains tools.
+- **Rule:** Project the actual completed-message tool-call state at message_end, write it before finalization in one transcript update, and keep unknown partial state distinct from confirmed false. Restore the same fact from durable tool_calls; navigation and rendering require explicit eligibility, without upgrading failed message completion to success.

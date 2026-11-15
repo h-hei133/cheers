@@ -45,6 +45,8 @@ export interface Block {
   previewTruncated?: boolean;
   /** False while the block may still change, which blocks retirement. */
   finalized: boolean;
+  /** Assistant tool-call state confirmed by message completion; absent before confirmation. */
+  hasToolCalls?: boolean;
   /**
    * Collapsed blocks show one summary row instead of their body. Reasoning is
    * collapsed by default: it is how the answer was reached, not the answer.
@@ -355,7 +357,9 @@ function renderAssistant(block: Block, width: number, options: BlockRenderOption
   const source = block.finalized ? block.text : trimPartialFence(block.text);
   if (!source.trim()) return [];
   const bodyWidth = Math.max(8, width - visibleWidth(GUTTER));
-  return renderMarkdown(source.replace(/\s+$/, ""), bodyWidth, options).map((row) => `${GUTTER}${row}`);
+  const rows = renderMarkdown(source.replace(/\s+$/, ""), bodyWidth, options).map((row) => `${GUTTER}${row}`);
+  if (rows.length > 0 && block.finalized && block.hasToolCalls === false) rows[0] = `\x1b]133;A\x07${rows[0]}`;
+  return rows;
 }
 
 /** Body text wrapped to the remaining width behind `indent`. */

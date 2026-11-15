@@ -70,7 +70,7 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
       }
       const content = messageToText(turn.content).trim();
       if (content) {
-        blocks.push(textBlock("assistant", content));
+        blocks.push({ ...textBlock("assistant", content), hasToolCalls: Boolean(turn.tool_calls?.length) });
       }
       if (turn.tool_calls && turn.tool_calls.length > 0) {
         for (const call of turn.tool_calls) {

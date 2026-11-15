@@ -119,7 +119,7 @@ export type QueryEvent =
    */
   | { readonly type: 'message.delivered'; readonly role: 'user'; readonly text: string }
   /** The model message stopped producing output, including failed attempts. */
-  | { readonly type: 'message.finished'; readonly role: AgentRole }
+  | { readonly type: 'message.finished'; readonly role: AgentRole; readonly hasToolCalls?: true }
   /**
    * What the model said while working the answer out. A separate channel because
    * it is not the answer: a reasoning model's working can run longer than its

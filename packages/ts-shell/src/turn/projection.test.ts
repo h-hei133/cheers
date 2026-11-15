@@ -1,5 +1,7 @@
 import { expect, it } from "vitest";
 import { concludeRun, TurnProjection } from "./projection.js";
+import { Transcript } from '../presentation/tui/transcript/container.js';
+import { TurnSink } from '../cli/interactive/turnSink.js';
 
 it.each(['stop', 'error', 'aborted'] as const)('closes assistant display on message_end without claiming %s success', stopReason => {
   const projection = new TurnProjection();
@@ -72,4 +74,25 @@ it("carries a tool result's pictures to its card, and only when there are some",
     content: "done" } });
   expect(withoutPicture).toMatchObject({ type: "tool.result", output: "done" });
   expect((withoutPicture as { images?: unknown }).images).toBeUndefined();
+});
+
+it('keeps a tool-calling assistant out of semantic navigation before its tool starts', () => {
+  const projection = new TurnProjection();
+  const transcript = new Transcript();
+  const sink = new TurnSink(transcript, () => {});
+  sink.begin('turn', 'inspect');
+  sink.chunk('Inspecting the file.');
+  const toolCalls = [{ id: 'read-source', type: 'function' as const, function: { name: 'read', arguments: '{"path":"source.ts"}' } }];
+  const finished = projection.project({ type: 'message_end', message: { role: 'assistant', content: 'Inspecting the file.', tool_calls: toolCalls } });
+  expect(finished).toEqual([{ type: 'message.finished', role: 'coder', hasToolCalls: true }]);
+  for (const event of finished) sink.handleEvent(event);
+  const block = transcript.last()!;
+  expect(block).toMatchObject({ finalized: true, hasToolCalls: true });
+  expect(transcript.render(60).rows.join('')).not.toContain('\x1b]133;A');
+  for (const event of projection.project({ type: 'tool_execution_start', toolCallId: 'read-source', toolName: 'read', args: { path: 'source.ts' } })) sink.handleEvent(event);
+  sink.handleEvent({ type: 'message.started', role: 'coder' });
+  sink.chunk('Completed answer.');
+  for (const event of projection.project({ type: 'message_end', message: { role: 'assistant', content: 'Completed answer.' } })) sink.handleEvent(event);
+  expect(transcript.render(60).rows.filter(row => /^\x1b\]133;A\x07/.test(row))).toHaveLength(1);
+  expect(block.text).toBe('Inspecting the file.');
 });

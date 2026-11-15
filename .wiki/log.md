@@ -11854,3 +11854,10 @@ B.3最后两项资格缺口已补：完整WebP走实际user/tool渲染边界，�
 复用原block/pane/scroll/keymap/host接通内部133用户边界，render前剥离，复制与draft保持。复审两红例为前导notice阻挡保留页和释放报告重复跳；修复后六门、9/280、恢复3/131、0monoliths及build `3154882609b3`通过，限定只读复核CLEAR。两有效反转red且逐字节恢复，错误反转与Editor API/原生观察夹具失败保留分类。
 
 Linux当前编译CLI regular/fullscreen及65提示旧页三格全exit0；普通模式提示、前后跳、release不动作、authored copy保持和内部133不输出全部通过。原history notice按分页正常更新不误判为源改写。助手边界与真实tmux待下一批，19/62和目标active保持；按批本地提交，不推送或宣称CI。
+
+
+### 2026-11-15：助手消息边界独立子批
+
+用户导航`d644ccf7`后补实际message_end工具调用事实；未知partial不获marker，中间toolcall文本排除，live／restore一致，原RPC和失败状态保持。六门、9/233、恢复3/81、0monoliths、build `fbb35f5b6199`及Linux编译CLI三格通过，三有效反转red/exact恢复，限定复核CLEAR。
+
+原生首次起点已在最后reply首行及Ctrl+Down细粒度滚动假设错误按fixture分类保留；最终实际前后prompt/reply跳转、release、65旧页、draft/copy源和内部marker不外发通过。确认结束包括失败attempt，不冒充成功。本地19/62保持，继续真实tmux／B2.1联合并按批提交，无push／CI声明。

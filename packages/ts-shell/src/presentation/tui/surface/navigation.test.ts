@@ -24,6 +24,26 @@ function conversation() {
 }
 
 describe('prompt navigation', () => {
+  it('moves between prompts and confirmed answers while excluding tool-calling and unconfirmed output', () => {
+    const transcript = new Transcript();
+    const prompt = transcript.append(textBlock('user', 'Original prompt'));
+    transcript.append({ ...textBlock('assistant', 'Reading the file.\n' + 'preamble\n'.repeat(5)), hasToolCalls: true });
+    transcript.append({ ...textBlock('tool', 'File content'), title: 'read', status: 'ok' });
+    const answer = transcript.append({ ...textBlock('assistant', 'Confirmed answer\n' + 'body\n'.repeat(8)), hasToolCalls: false });
+    transcript.append(textBlock('assistant', 'Unknown partial output\n' + 'tail\n'.repeat(10)));
+    const pane = new TranscriptPane(transcript);
+    const render = () => pane.render(width, capacity, undefined);
+    render();
+    const sources = [...transcript.copySources()];
+    expect(pane.scroll('previous-prompt')).toBe(true); render();
+    expect(pane.blockAtScreenRow(0)).toBe(answer);
+    expect(pane.scroll('previous-prompt')).toBe(true); render();
+    expect(pane.blockAtScreenRow(0)).toBe(prompt);
+    expect(pane.scroll('next-prompt')).toBe(true); render();
+    expect(pane.blockAtScreenRow(0)).toBe(answer);
+    expect(pane.scroll('next-prompt')).toBe(false);
+    expect([...transcript.copySources()]).toEqual(sources);
+  });
   it('jumps between original prompt boundaries without visiting wrapped continuation rows', () => {
     const { pane, render, starts, transcript } = conversation();
     const sources = [...transcript.copySources()];

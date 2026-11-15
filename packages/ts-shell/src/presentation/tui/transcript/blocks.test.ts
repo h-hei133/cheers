@@ -82,6 +82,29 @@ describe("prompt echo", () => {
   });
 });
 
+describe('assistant message boundaries', () => {
+  it('marks a completed answer once without changing painted text or its copy source', () => {
+    const block = { ...textBlock('assistant', 'First answer line\n\nSecond answer line'), hasToolCalls: false };
+    const rows = renderBlock(block, WIDTH);
+    expect(rows[0]).toMatch(/^\x1b\]133;A\x07/);
+    expect(rows.filter(row => /^\x1b\]133;A\x07/.test(row))).toHaveLength(1);
+    expect(rows.map(row => prepareRow(row, WIDTH)).join('')).not.toContain('\x1b]133;');
+    expect(block.text).toBe('First answer line\n\nSecond answer line');
+  });
+
+  it.each([
+    { kind: 'assistant' as const, text: 'Still producing output', finalized: false },
+    textBlock('assistant', 'Finalized without a confirmed message end'),
+    { ...textBlock('assistant', 'Inspecting the file.'), hasToolCalls: true },
+    textBlock('assistant', ' \n\t'),
+    textBlock('notice', 'A local notice'),
+    textBlock('thinking', 'Private reasoning'),
+    { ...textBlock('tool', 'Tool body'), title: 'read', status: 'ok' as const },
+  ])('does not create a message boundary for $kind: $text', block => {
+    expect(renderBlock(block, WIDTH).join('')).not.toContain('\x1b]133;A');
+  });
+});
+
 describe("tool invocation", () => {
   it("marks a running tool differently from a finished one", () => {
     const running = renderBlock({ kind: "tool", title: "read", text: "", status: "running", finalized: false }, WIDTH);

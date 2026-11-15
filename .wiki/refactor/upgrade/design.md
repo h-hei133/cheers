@@ -249,3 +249,12 @@ startup-delivery-gates六门、startup-accepted-tests9/231、0monoliths及build 
 navigation-delivery-gates六门、navigation-delivery-tests9套件280项、navigation-restored-build恢复后3/131及0monoliths/build `3154882609b3`全部通过；navigation-reversals.json两有效反转red且生产文件逐字节恢复，限定只读复核CLEAR。第一反转只删top fallback却保留新scrollPage路径仍绿，不作为反证；按原top===0合同恢复后的反转确实红。两次夹具调用不存在的remember/submit API，改原pushHistory后通过；加载页后立即跳旧提示断言与原锚点契约冲突，修为保留notice再按一次跳转，仍验证到达旧prompt。
 
 navigation-native.json绑定当前build及seed/hook/driver哈希；Linux真实PTY当前编译CLI三格regular3、fullscreen3、fullscreen65全部exit0，前后跳／release／65条旧页／draft与原始user/assistant copy数据保持、内部133不外发。hook只观察实际Surface，不替代parser、按键、render或pane。第一次把recordingFrameProvider当Surface而没有report，第二次误以最晚prompt一定在viewport之外，第三次把分页notice更新当copy改变；失败原JSON/source/log全部保留，最终以原Surface和authored source核验。notice按原contract更新为All earlier messages are shown，未修改生产分页行为。实际M，额外依赖1（保留页消费者）；B2.1与总目标仍未完成，19/62保持，无真实provider／物理终端／push／CI声明。
+
+
+## Completed assistant message navigation (2026-11-15)
+
+在用户导航已提交`d644ccf7`之后，复用Block.hasToolCalls记录message.finished已知的true/false；live开始及非finished最终化保留undefined，不把停止更新当无工具调用事实。TurnProjection读取实际assistant.tool_calls，只有true追加到原事件，普通事件和RPC显式role JSONL保持。kernel先构造完整assistant并message_end，才执行tool batch；TurnSink在同一次transcript.update写工具事实再finalize。恢复从durable tool_calls取Boolean，raw／provider／session存储不新增字段。已确认结束且无调用的非空assistant首行加内部133A，pane再联查原owner首行与false资格，伪raw marker不能获额外边界。失败attempt的完整结束消息也可导航，不改其失败分类，不等于成功回答。
+
+对比参考assistant不含toolCalls时标记的决定，选择live unknown更保守的确认规则，复用既有渲染/复制/准备输出。来源拆分后source.ts按stripAnsi比对，不改变authored source或source映射；prepareRows照旧剥离内部133，避免外部状态干扰。新增真实projection→sink→render、history、实际host双模式、end/failure/next-message/tool partial最终化以及普通和中间工具消息导航反例。boundaries-red为3红／6绿，boundaries-delivery六门及9/233通过；三反转分别放宽unknown、删除toolcall事实、删除assistant导航均红，三个生产文件exact恢复。boundaries-restored-build为3/81、0monoliths及build `fbb35f5b6199`通过，限定只读复核CLEAR。
+
+boundaries-native.json当前build和seed/hook/driver哈希绑定，Linux当前编译CLI regular/fullscreen/65旧页三格全部exit0。真实Ctrl箭头在prompt与结束reply间前后跳，release不重复，draft/authored copy与旧页保持、内部133不外发。初次fixture起点恰是最后reply首行，因此previous正确跳当前prompt；另一fixture把Ctrl+Down误当细粒度scroll，实际它已绑定next边界。失败JSON和driver原文保留，最终只用实际起点并检查上一reply→prompt→reply，未改生产clamp。实际M，额外依赖1（message结束的调用事实）；本地19/62保持，B2.1仍需真实tmux及协议联合审计。无物理终端／真实provider／push／CI声明。
