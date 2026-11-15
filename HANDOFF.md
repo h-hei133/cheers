@@ -2608,3 +2608,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** SDK abort or dispose returns while a summary is still settling, and a second operation replaces its cancellation controller.
 - **Root Cause:** Manual compaction registered only a controller; idle waited only for prompt and local-command promises. A cancellation hook could also throw before either cancellation or the join.
 - **Rule:** Register compaction with the existing command settlement owner. Reject overlap before registering a prompt; state-machine idle and cleared provider controllers do not prove settlement. Scheduling readiness must use that same full settlement boundary. Capture cancellation controllers and the idle promise before invoking callbacks, cancel in finally and still join after callback failure. Do not cancel or wait on a successor created by that callback.
+
+### Physical Routing Must Capture Authority Before Calling A Router
+- **Symptom:** A virtual choice reaches a different model with the original endpoint, transport or credential; refresh can also adopt a replacement installed by the router itself.
+- **Root Cause:** Only model labels were routed, executable handles were captured after the callback, and returned reasoning retained the original replay namespace.
+- **Rule:** Capture original data and executable identities before routing. Resolve a complete physical target under the existing catalogue, scope and credential authority, retain it through candidate compaction and refresh, and revalidate at transport handoff. Bind response origin to that target's replay identity. A later callback must not renew the authority of the original request.

@@ -29,6 +29,7 @@ import { configuredOutputLimit } from '../../provider/request/output.js';
 import { providerRequestTarget } from './requestTarget.js';
 import { configuredContextWindow } from '../../core/models/window.js';
 import type { VirtualModelRegistry } from '../../core/models/virtualModels.js';
+import { providerRouteResolver } from './route.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -141,7 +142,11 @@ export function providerStepRequest(
     ...(discovery ? { toolSnapshot: () => toolSchemas(discovery.snapshot()) } : {}),
     initialTools: toolSchemas(tools),
     ...(request.cacheRetention !== undefined ? { cacheRetention: request.cacheRetention } : {}),
-    ...(request.virtualModels ? { virtualModels: request.virtualModels } : {}),
+    ...(request.virtualModels ? { virtualModels: request.virtualModels,
+      resolveTarget: providerRouteResolver({ ...request, providerCatalog: catalog, virtualModels: request.virtualModels },
+        (target, admission) => providerStepRequest({ ...request, providerCatalog: catalog,
+          providerCredentialResolution: target, admission, virtualModels: undefined }, tools, promptContext, discovery)),
+    } : {}),
     catalog,
     // Sampling settings travel with the request, not with the provider: a
     // provider that ignores them still receives a well-formed request, and a

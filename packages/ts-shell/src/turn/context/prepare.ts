@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { catalogModel, catalogProvider, providerEndpoint } from '../../core/models/catalog.js';
+import { catalogModel, catalogProvider } from '../../core/models/catalog.js';
 import { inferRouteReason, type ModelRoute } from '../../core/models/virtualModels.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
 import { effortCapability } from '../../core/models/capability.js';
@@ -29,7 +29,9 @@ import type { ChatMessage } from '../prompt.js';
 import type { ModelInputLimits } from '../../core/models/modalities.js';
 import type { ThinkingPreference } from '../../core/models/effort.js';
 import { prepareTurnBody } from './body.js';
-import type { PreparedTurnContext, StepOptions, StepRequest } from './contract.js';
+import { captureStepTarget, resolveStepTarget } from './target.js';
+import { requestReplayBinding } from '../../provider/request/replay.js';
+import type { PreparedTurnContext, StepOptions, StepRequest, StepTarget } from './contract.js';
 
 const CAPTURE_LIMITS = { bytes: 64 * 1024 * 1024, nodes: 250_000, depth: 48 } as const;
 
@@ -46,15 +48,15 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
   readonly streamAttempts: () => number;
   readonly replayBinding: string;
 }) {
-  const catalogAddress = request.provider.provider ? request.provider.baseUrl : undefined;
   const initialTools = request.initialTools ?? request.tools;
   const explicitEffort = lifetime.explicitEffort;
-  const replayBinding = lifetime.replayBinding;
+  const resolveTarget = request.resolveTarget;
+  const sourceTarget = captureStepTarget(request);
   const converter = options.convertToLlm;
   const requestPurpose = options.requestPurpose;
   const agentMode = options.agentMode;
   const prepare = async (messages: readonly AgentMessage[], signal?: AbortSignal, reuse?: MessageProjection,
-    fixedRoute?: { readonly route?: ModelRoute }, seed?: StandardAgentMessage): Promise<PreparedTurnContext> => {
+    fixedRoute?: { readonly route?: ModelRoute; readonly target: StepTarget }, seed?: StandardAgentMessage): Promise<PreparedTurnContext> => {
     signal?.throwIfAborted();
     if (options.requestPurpose !== requestPurpose) {
       throw new TurnPreparationError('Request purpose changed during preparation. No request was sent.', true);
@@ -79,11 +81,18 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       messages: sourceMessages, signal,
     }) : undefined;
     signal?.throwIfAborted();
+    const target = fixedRoute?.target ?? await resolveStepTarget(request, sourceTarget, route, signal);
+    signal?.throwIfAborted();
+    if (target.isCurrent?.() === false) throw new TurnPreparationError('The captured provider target changed. No request was sent.', true);
+    const activeRequest: StepRequest = { ...request, ...target, maxOutputTokens: target.maxOutputTokens,
+      contextWindow: target.contextWindow, reserveTokens: target.reserveTokens };
+    const catalogAddress = target.provider.provider ? target.provider.baseUrl : undefined;
+    const replayBinding = route ? target.provider.replayBinding ?? requestReplayBinding(target.provider) : lifetime.replayBinding;
     const openingIndex = options.promptSource ? messages.indexOf(options.promptSource.opening) : -1;
     const promptSource = options.promptSource && openingIndex >= 0
       ? { opening: sourceMessages[openingIndex]!, stored: options.promptSource.stored } : undefined;
-    const activeProvider = route?.provider ?? (request.provider.provider ?? '');
-    const activeModel = route?.modelId ?? request.provider.model;
+    const activeProvider = target.provider.provider ?? '';
+    const activeModel = target.provider.model;
     const effortAccepted = lifetime.effortAccepted();
     const effort = effortAccepted ? route?.thinkingLevel ?? rawEffort : undefined;
     const toolCalling = resolveRequestShape(
@@ -115,9 +124,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       && effortCapability(request.catalog ?? [], activeProvider, activeModel, effort, catalogAddress) === 'unsupported') {
       throw new TurnPreparationError('The selected model does not support this reasoning effort. Select another level or use /thinking auto.');
     }
-    const endpoint = route
-      ? (providerEndpoint(request.catalog ?? [], activeProvider, catalogAddress, activeModel) ?? (endpointKind(request.provider.endpoint) ?? DEFAULT_ENDPOINT_KIND))
-      : (endpointKind(request.provider.endpoint) ?? DEFAULT_ENDPOINT_KIND);
+    const endpoint = endpointKind(target.provider.endpoint) ?? DEFAULT_ENDPOINT_KIND;
     const shape = resolveRequestShape(
       request.catalog ?? [],
       activeProvider,
@@ -162,10 +169,10 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     const schemaDigest = createHash('sha256').update(JSON.stringify(wireTools)).digest('hex');
     const systemDigest = createHash('sha256').update(systemPrompt).digest('hex');
     const messageDigest = historyDigest(prospectiveMessages);
-    const output = protocol.outputControl === 'provider' ? undefined : request.maxOutputTokens ?? shape.maxOutputCeiling;
+    const output = protocol.outputControl === 'provider' ? undefined : target.maxOutputTokens ?? shape.maxOutputCeiling;
     const modelEntry = catalogModel(request.catalog ?? [], activeProvider, activeModel, catalogAddress);
     const usageAttribution = captureUsageAttribution({ provider: activeProvider, model: activeModel,
-      baseUrl: request.provider.baseUrl, rates: modelEntry?.cost });
+      baseUrl: target.provider.baseUrl, rates: modelEntry?.cost });
     const projectionOptions = {
       ...request.projection,
       ...(request.pruneToolText !== undefined ? { pruneToolText: request.pruneToolText } : {}),
@@ -220,10 +227,10 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     }) : undefined;
     let prompt = calibrated?.source === 'calibrated'
       ? { tokens: calibrated.tokens, measured: true } : initialPrompt;
-    let budget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
+    let budget = requestBudget({ window: target.contextWindow ?? modelEntry?.contextWindow,
       inputLimit: modelEntry?.inputLimit,
       promptTokens: prompt.tokens, outputTokens: output ?? shape.maxOutputCeiling,
-      reserveTokens: request.reserveTokens, measured: prompt.measured });
+      reserveTokens: target.reserveTokens, measured: prompt.measured });
     // A request that cannot fit is not sent: the same bounded overflow rescue
     // that answers a provider refusal handles this before any bytes leave.
     let refusal: PreparedTurnContext['refusal'] = !budget.ok && budget.reason !== 'unknown'
@@ -246,9 +253,9 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     try {
       const outputFailure = outputLimitFailure(output, shape.maxOutputCeiling);
       if (outputFailure) throw new TurnPreparationError(outputFailure);
-      const budgetFailure = explicitEffort && effort ? effortOutputFailure(protocol, request.maxOutputTokens ?? shape.maxOutputCeiling) : undefined;
+      const budgetFailure = explicitEffort && effort ? effortOutputFailure(protocol, target.maxOutputTokens ?? shape.maxOutputCeiling) : undefined;
       if (budgetFailure) throw new TurnPreparationError(budgetFailure);
-      ({ requestHeaders, payload } = prepareTurnBody({ request, options, activeProvider, activeModel,
+      ({ requestHeaders, payload } = prepareTurnBody({ request: activeRequest, options, activeProvider, activeModel,
         endpoint, protocol, systemPrompt, finalMessages, tools, allowTools, shape, initialTools, replayBinding, output }));
       // Public replay and image conversion use the protocol's actual input projection.
       if (shape.reasoningReplayField || inputLimits?.images || finalMessages.some(message => message.requestDeclaration)) {
@@ -256,9 +263,9 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
           const wireTokens = estimateWirePrompt(payload, protocol.contextFields, modelEntry?.tokenizer);
           if (!prompt.measured || wireTokens > prompt.tokens) {
             prompt = { tokens: wireTokens, measured: false };
-            budget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
+            budget = requestBudget({ window: target.contextWindow ?? modelEntry?.contextWindow,
               inputLimit: modelEntry?.inputLimit, promptTokens: wireTokens,
-              outputTokens: output ?? shape.maxOutputCeiling, reserveTokens: request.reserveTokens, measured: false });
+              outputTokens: output ?? shape.maxOutputCeiling, reserveTokens: target.reserveTokens, measured: false });
           }
         } catch (error) {
           // Signed replay has no local token proof; byte/count admission still sees its complete serialized body.
@@ -284,7 +291,8 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     const capturedSystem = baseSystemPrompt;
     const isCurrent = (): boolean => {
       try {
-        if (options.requestPurpose !== requestPurpose || options.agentMode !== agentMode || options.convertToLlm !== converter
+        if (target.isCurrent?.() === false || request.resolveTarget !== resolveTarget
+          || options.requestPurpose !== requestPurpose || options.agentMode !== agentMode || options.convertToLlm !== converter
           || generationIdentity !== JSON.stringify([request.provider, request.temperature, request.topP, request.maxOutputTokens,
           request.contextWindow, request.reserveTokens, request.cacheRetention, request.initialTools, request.historicalEfforts && [...request.historicalEfforts],
           request.pruneToolText, request.projection]) || projectionTransform !== request.projection?.transformMessages
@@ -299,42 +307,42 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
         return currentSystem === capturedSystem;
       } catch { return false; }
     };
-    const captured: PreparedTurnContext = Object.freeze({ requestPurpose: requestPurpose ?? (agentMode ? 'subagent' : 'turn'), agentMode,
+    const captured: PreparedTurnContext = Object.freeze({ target, requestPurpose: requestPurpose ?? (agentMode ? 'subagent' : 'turn'), agentMode,
       sourceMessages, prospectiveMessages, ...(pendingDeclaration ? { pendingDeclaration } : {}),
       messageProjection, finalMessages, budgetMessages: freezeDeep(budgetMessages),
       overhead: freezeDeep(overhead), prompt: Object.freeze(prompt), budget: Object.freeze(budget),
-      contextWindow: request.contextWindow ?? modelEntry?.contextWindow, inputLimit: modelEntry?.inputLimit,
-      outputTokens: output ?? shape.maxOutputCeiling, reserveTokens: request.reserveTokens,
+      contextWindow: target.contextWindow ?? modelEntry?.contextWindow, inputLimit: modelEntry?.inputLimit,
+      outputTokens: output ?? shape.maxOutputCeiling, reserveTokens: target.reserveTokens,
       promptIdentity: Object.freeze(promptIdentity), promptProjection: promptProjection && Object.freeze(promptProjection),
       projection: freezeDeep(projection), activeProvider, activeModel, effort, allowTools, allowedTools, tools, systemPrompt,
       regeneratedPrompt, endpoint, shape: Object.freeze(shape), protocol,
       modelEntry: modelEntry && structuredClone(modelEntry), usageAttribution, inputLimits,
       payload: freezeDeep(payload!), requestHeaders: Object.freeze({ ...requestHeaders }), body,
-      url: endpointUrl(request.provider.baseUrl, endpoint, activeModel), headers: Object.freeze({ ...request.provider.headers }),
+      url: endpointUrl(target.provider.baseUrl, endpoint, activeModel), headers: Object.freeze({ ...target.provider.headers }),
       replayBinding, ...(refusal ? { refusal: Object.freeze(refusal) } : {}), isCurrent,
       refresh: (refreshSignal?: AbortSignal) => prepare(sourceMessages, refreshSignal,
-        { ...messageProjection, sourceMessages: prospectiveMessages }, { route }, pendingDeclaration),
+        { ...messageProjection, sourceMessages: prospectiveMessages }, { route, target }, pendingDeclaration),
       reframe: (callOptions: Pick<StepOptions, 'allowTools' | 'allowedTools' | 'agentMode' | 'requestPurpose'>, reframeSignal?: AbortSignal) => {
         const nextOptions: StepOptions = { ...options, allowTools: callOptions.allowTools,
           allowedTools: callOptions.allowedTools === undefined ? undefined : Object.freeze([...callOptions.allowedTools]),
           agentMode: callOptions.agentMode, requestPurpose: callOptions.requestPurpose,
           convertToLlm: converter, promptSource, preparedContext: undefined };
         return createTurnContextPreparer(request, nextOptions, lifetime)(sourceMessages, reframeSignal,
-          { ...messageProjection, sourceMessages: prospectiveMessages }, { route }, pendingDeclaration);
+          { ...messageProjection, sourceMessages: prospectiveMessages }, { route, target }, pendingDeclaration);
       },
-      prepare: (candidate: readonly AgentMessage[], candidateSignal?: AbortSignal) => prepare(candidate, candidateSignal),
+      prepare: (candidate: readonly AgentMessage[], candidateSignal?: AbortSignal) => prepare(candidate, candidateSignal, undefined, { route, target }),
       published: () => {
         if (!pendingDeclaration) return captured;
         const { pendingDeclaration: _pending, ...published } = captured;
         const projection = Object.freeze({ ...messageProjection, sourceMessages: prospectiveMessages });
         const promoted: PreparedTurnContext = Object.freeze({ ...published, sourceMessages: prospectiveMessages, messageProjection: projection,
-          refresh: (refreshSignal?: AbortSignal) => prepare(prospectiveMessages, refreshSignal, projection, { route }),
+          refresh: (refreshSignal?: AbortSignal) => prepare(prospectiveMessages, refreshSignal, projection, { route, target }),
           reframe: (callOptions: Pick<StepOptions, 'allowTools' | 'allowedTools' | 'agentMode' | 'requestPurpose'>, reframeSignal?: AbortSignal) =>
             createTurnContextPreparer(request, { ...options, allowTools: callOptions.allowTools,
               allowedTools: callOptions.allowedTools === undefined ? undefined : Object.freeze([...callOptions.allowedTools]),
               agentMode: callOptions.agentMode, requestPurpose: callOptions.requestPurpose,
               convertToLlm: converter, promptSource, preparedContext: undefined }, lifetime)(
-              prospectiveMessages, reframeSignal, projection, { route }),
+              prospectiveMessages, reframeSignal, projection, { route, target }),
           published: () => promoted,
         });
         return promoted;

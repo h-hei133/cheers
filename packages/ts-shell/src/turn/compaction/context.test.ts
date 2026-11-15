@@ -69,7 +69,7 @@ it('uses the complete ordinary request overhead and routed window before publish
   const result = await run({ rawSize: 250, policyWindow: 20_000, systemPrompt: 'System '.repeat(420), virtualModels: registry });
   expect(result.summarize).toHaveBeenCalledOnce(); expect(result.publications).toHaveBeenCalledOnce();
   expect(result.bodies).toHaveLength(1); expect(result.bodies[0]).toContain('[Context Checkpoint]');
-  expect(JSON.parse(result.bodies[0]!).model).toBe('small'); expect(route).toHaveBeenCalledTimes(2);
+  expect(JSON.parse(result.bodies[0]!).model).toBe('small'); expect(route).toHaveBeenCalledTimes(1);
 });
 
 it('recovers an ordinary provider overflow with the next closing contract and its captured route', async () => {
@@ -82,7 +82,7 @@ it('recovers an ordinary provider overflow with the next closing contract and it
   expect(result.summarize).toHaveBeenCalledOnce(); expect(result.publications).toHaveBeenCalledOnce();
   expect(result.bodies).toHaveLength(2); const body = JSON.parse(result.bodies[1]!);
   expect(body.tools).toBeUndefined(); expect(body.messages.at(-1)?.content).toContain('You have reached the limit of steps');
-  expect(body.model).toBe('large'); expect(route).toHaveBeenCalledTimes(2);
+  expect(body.model).toBe('large'); expect(route).toHaveBeenCalledTimes(1);
 });
 
 it('keeps temporary prepared history ineligible for ordinary durable compaction', async () => {
@@ -111,7 +111,7 @@ it('recovers the actual small route after automatic effort fallback refuses its 
   expect(recovered.model).toBe('small'); expect(recovered.reasoning_effort).toBeUndefined();
   expect(recovered.tools).toBeUndefined(); expect(result.bodies[1]).toContain('[Context Checkpoint]');
   expect(recovered.messages.at(-1)?.content).toContain('You have reached the limit of steps');
-  expect(route).toHaveBeenCalledTimes(3);
+  expect(route).toHaveBeenCalledTimes(2);
 });
 
 it('keeps ordinary candidate measurement aligned when raw ownership is attached without provider conversion', async () => {

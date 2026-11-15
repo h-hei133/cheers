@@ -2069,7 +2069,16 @@ it('forwards mid-convo cache preservation flags, anthropic-beta headers, and res
     workspaceRoot: process.cwd(),
     sessionId: 'step-cache-virtual',
     systemPrompt: 'sys',
-    provider: { provider: 'virtual', model: 'auto-router', baseUrl: 'https://api.anthropic.com', headers: {} },
+    provider: { provider: 'virtual', model: 'auto-router', baseUrl: 'https://unused.invalid', headers: {} },
+    resolveTarget: () => ({
+      provider: { provider: 'anthropic', model: 'claude-sonnet-4-6', baseUrl: 'https://api.anthropic.com',
+        endpoint: 'anthropic-messages', headers: {} },
+      fetchImpl: async (url, init) => {
+        seen.push({ url: String(url), headers: init?.headers, body: JSON.parse(String(init?.body)) });
+        return jsonResponse({ id: 'msg_1', type: 'message', role: 'assistant', model: 'claude-sonnet-4-6',
+          content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 2 } });
+      },
+    }),
     catalog: [{
       id: 'anthropic',
       endpoint: 'anthropic-messages',
@@ -2086,18 +2095,7 @@ it('forwards mid-convo cache preservation flags, anthropic-beta headers, and res
     toolSnapshot: () => activeTools,
     cacheRetention: 'long',
     virtualModels,
-    fetchImpl: async (url, init) => {
-      seen.push({ url: String(url), headers: init?.headers, body: JSON.parse(String(init?.body)) });
-      return jsonResponse({
-        id: 'msg_1',
-        type: 'message',
-        role: 'assistant',
-        model: 'claude-sonnet-4-6',
-        content: [{ type: 'text', text: 'ok' }],
-        stop_reason: 'end_turn',
-        usage: { input_tokens: 10, output_tokens: 2 },
-      });
-    },
+    fetchImpl: async () => { throw new Error('The original virtual target must not dispatch.'); },
   });
   activeTools = [
     ...initialTools,

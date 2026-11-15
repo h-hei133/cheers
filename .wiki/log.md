@@ -11888,3 +11888,9 @@ Linux当前编译SDK inline／TS文件扩展撤权、abort复用和后继资源�
 恢复后compact使用原command settlement，prompt互斥先于注册，取消回调异常仍取消并等待原操作，保留回调后继；dispose开始即撤销compact。goal scheduler的controller空闲误判由真实尾部反例修复为isRunning。六门、16套件236项、0monoliths及build `d9acacbc4260`通过，限定独立复核CLEAR，四有效反转红／逐字节恢复。
 
 同代隔离npm安装15公开入口／严格类型（不跳过库检查），Linux配置模型四次actual请求覆盖prompt／compact／复用／同ID重开；取消零派发／零commit、迟到失败、inline／TS扩展撤权及后继保留通过。旧构建和setup失败分开保留，临时状态归档清理，按批本地提交；T3.1本地完成，21/62，继续C.1和E.7依赖，无push／CI或整体完成声明。
+
+### 2026-11-15：物理路由目标捕获子批
+
+T3.1已提交`d683a3d`。C.1现在解析完整physical endpoint／auth／transport／limits，route前捕获原authority，candidate／refresh保持目标，reasoning归属实际replay。六门、15/297、0monoliths及build `3ff7e7c3ad7b`通过，限定只读复核CLEAR，六有效反转红且exact恢复。首个candidate反转普通拒绝不算断言反证，补精确成功断言后重跑；原失败与旧build证据保留。
+
+Linux同代compiled内部invocation实际两loopback验证正确派发、scope及凭据撤销零POST；公开SDK配置模型一次真实bodySent通过。公共virtual注册／session状态／retry/direct／summary fallback仍待完成，C.1和E.7不勾选，21/62保持。继续目标，按批本地提交，无push／CI声明。

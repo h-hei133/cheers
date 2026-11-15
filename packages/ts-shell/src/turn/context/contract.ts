@@ -4,7 +4,7 @@ import type { MessageConverter, MessageProjection } from '../../core/agent/messa
 import type { RetryPolicy } from '../../core/agent/retry.js';
 import type { ModelTransport, RequestPolicy } from '../../core/agent/request/model.js';
 import type { CatalogProvider, CatalogModel } from '../../core/models/catalog.js';
-import type { VirtualModelRegistry } from '../../core/models/virtualModels.js';
+import type { ModelRoute, VirtualModelRegistry } from '../../core/models/virtualModels.js';
 import type { ResolvedRequestShape } from '../../core/models/requestShape.js';
 import type { ModelInputLimits } from '../../core/models/modalities.js';
 import type { ThinkingPreference } from '../../core/models/effort.js';
@@ -100,13 +100,25 @@ export interface StepOptions {
   readonly onRequestUsage?: (usage: ProviderUsage) => void;
 }
 
-export interface StepRequest {
+/** Physical identity and transport are resolved and retained together. */
+export interface StepTarget {
+  readonly provider: ProviderTarget;
+  readonly fetchImpl?: typeof fetch;
+  readonly modelTransport?: ModelTransport;
+  /** Explicit output control; absent uses the physical catalogue entry. */
+  readonly maxOutputTokens?: number;
+  /** Resolved window override; absent uses the physical catalogue entry. */
+  readonly contextWindow?: number;
+  /** Headroom held back from the shared window. */
+  readonly reserveTokens?: number;
+  readonly isCurrent?: () => boolean;
+}
+
+export interface StepRequest extends StepTarget {
   readonly recordAuxiliaryUsage?: (usage: SessionUsageRecord) => void;
   readonly requestPolicy?: RequestPolicy;
-  readonly modelTransport?: ModelTransport;
   readonly thinkingEffort?: ThinkingPreference;
   readonly thinkingEffortExplicit?: boolean;
-  readonly provider: ProviderTarget;
   readonly workspaceRoot: string;
   readonly sessionId: string;
   readonly systemPrompt: string;
@@ -122,14 +134,8 @@ export interface StepRequest {
   readonly toolSnapshot?: () => readonly ToolSchema[];
   readonly temperature?: number;
   readonly topP?: number;
-  readonly maxOutputTokens?: number;
-  /** Resolved window override; absent uses the catalogue entry. */
-  readonly contextWindow?: number;
-  /** Headroom held back from the shared window. */
-  readonly reserveTokens?: number;
   /** Retain bounded tool text when false; media and request limits still apply. */
   readonly pruneToolText?: boolean;
-  readonly fetchImpl?: typeof fetch;
   /**
    * The catalog to ask how this model wants requests shaped.
    *
@@ -150,12 +156,14 @@ export interface StepRequest {
   readonly cacheRetention?: 'short' | 'long' | 'none';
   readonly initialTools?: readonly ToolSchema[];
   readonly virtualModels?: VirtualModelRegistry;
+  readonly resolveTarget?: (route: ModelRoute, signal?: AbortSignal) => StepTarget | Promise<StepTarget>;
   readonly historicalEfforts?: ReadonlyMap<number, string>;
   readonly projection?: OutgoingProjectionOptions;
 }
 
 /** One complete local request capture; publication and dispatch remain with their existing owners. */
 export interface PreparedTurnContext {
+  readonly target: StepTarget;
   readonly requestPurpose: string;
   readonly agentMode?: 'plan' | 'build';
   readonly sourceMessages: readonly AgentMessage[];

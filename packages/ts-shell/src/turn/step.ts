@@ -110,7 +110,6 @@ export function createStepFunction(request: StepRequest): StepFunction {
   let effortAccepted = true;
   const captured = captureThinkingPreference(request.workspaceRoot, request.thinkingEffort);
   const explicitEffort = request.thinkingEffortExplicit ?? captured.thinkingEffortExplicit;
-  const fetchImpl = request.fetchImpl ?? fetch;
   const retry = resolveRetryPolicy("provider", request.retry ?? {});
   // The model identity travels with every step this function returns, so a
   // failure recorded by one model can be recognized as not the current model's
@@ -190,7 +189,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       sourceMessages = prepared.sourceMessages;
       messageProjection = prepared.messageProjection;
       const { activeProvider, activeModel, effort, endpoint, shape, protocol, modelEntry,
-        usageAttribution, inputLimits, promptIdentity, promptProjection, requestHeaders, body } = prepared;
+        usageAttribution, inputLimits, promptIdentity, promptProjection, requestHeaders, body, target } = prepared;
+      const fetchImpl = target.fetchImpl ?? fetch;
       // What has been shown so far, so an interrupted answer keeps the part
       // the user already read instead of vanishing from the conversation. Both
       // channels count: reasoning the user has watched is as impossible to take
@@ -251,8 +251,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
           if (!prepared.isCurrent()) return stamp(errorStep('Request preparation changed before dispatch. No request was sent.', true));
           const modelAttempt = await prepareRequestAttempt({ body, provider: activeProvider, model: activeModel,
             endpoint, purpose: prepared.agentMode ? 'subagent' : 'turn', requestId, policy: request.requestPolicy, inputLimits,
-            ...(request.provider.credentialId && request.provider.credentialGeneration
-              ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
+            ...(target.provider.credentialId && target.provider.credentialGeneration
+              ? { credential: { credentialId: target.provider.credentialId, generation: target.provider.credentialGeneration } } : {}) });
           const attemptResponse = await modelAttempt.send(
             prepared.url,
             {
@@ -285,9 +285,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
                 if (!prepared.isCurrent()) throw new TurnPreparationError('Request preparation changed before dispatch. No request was sent.', true);
                 beforeDispatch();
               };
-              if (request.modelTransport) {
+              if (target.modelTransport) {
                 if (!prepared.isCurrent()) throw new TurnPreparationError('Request preparation changed before dispatch. No request was sent.', true);
-                return request.modelTransport(input, init, admittedDispatch);
+                return target.modelTransport(input, init, admittedDispatch);
               }
               admittedDispatch();
               return fetchImpl(input, init);
@@ -452,7 +452,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           && (completion.reasoningSignature && protocol.opaqueReplay
             || shape.reasoningReplayField && completion.reasoning && !completion.reasoningSignature && !completion.reasoningRedacted);
         const completed = ownsReplay && activeOrigin
-          ? { ...decoded, origin: { ...activeOrigin, replayBinding } } : decoded;
+          ? { ...decoded, origin: { ...activeOrigin, replayBinding: prepared.replayBinding } } : decoded;
         return stamp({ ...completed, ...(promptMeasurement ? { promptMeasurement } : {}),
           ...(shownAnything && completed.stopReason === 'error' ? { retriesExhausted: true } : {}) });
       } catch (error) {

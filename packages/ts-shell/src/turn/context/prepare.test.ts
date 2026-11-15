@@ -48,8 +48,8 @@ describe('prepared turn context', () => {
       fetchImpl: async (_url, init) => { sent.push(String(init?.body)); return new Response(JSON.stringify({
         choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] }), { headers: { 'content-type': 'application/json' } }); } }));
     const result = await step(raw, undefined, {}, { allowTools: false, convertToLlm, prepareContext });
-    expect(result).toMatchObject({ text: 'ok', stopReason: 'stop', origin: { model: 'small' } });
-    expect(order).toEqual(['route:original', 'convert:original', 'route:candidate', 'convert:candidate']);
+    expect(result).toMatchObject({ text: 'ok', stopReason: 'stop', origin: { model: 'large' } });
+    expect(order).toEqual(['route:original', 'convert:original', 'convert:candidate']);
     expect(prepareContext).toHaveBeenCalledTimes(1); expect(convertToLlm).toHaveBeenCalledTimes(2);
     expect(sent).toEqual([accepted.body]);
     expect(JSON.parse(sent[0]!).messages).toEqual([{ role: 'system', content: accepted.systemPrompt }, { role: 'user', content: 'Candidate wire' }]);
@@ -112,20 +112,20 @@ describe('prepared turn context', () => {
     expect(accepted).toMatchObject({ allowTools: false, allowedTools: ['read'], requestPurpose: 'turn' });
     expect(accepted.agentMode).toBeUndefined(); expect(accepted.budgetMessages.at(-1)?.content).toBe(FINAL_STEP_MESSAGE);
     expect(JSON.parse(accepted.body).tools).toBeUndefined();
-    expect(routed).toHaveBeenCalledTimes(2); expect(converted).toHaveBeenCalledTimes(2);
+    expect(routed).toHaveBeenCalledTimes(1); expect(converted).toHaveBeenCalledTimes(2);
     const reopened = await accepted.reframe({ allowTools: true, allowedTools: ['write'], agentMode: 'build', requestPurpose: 'next-call' });
     expect(reopened).toMatchObject({ allowTools: true, allowedTools: ['write'], agentMode: 'build', requestPurpose: 'next-call' });
     expect(reopened.budgetMessages.at(-1)?.content).toBe('Candidate source');
     expect(JSON.parse(reopened.body).tools.map((entry: ReturnType<typeof tool>) => entry.function.name)).toEqual(['write']);
     accepted = await accepted.refresh();
     expect(accepted.allowTools).toBe(false); expect(accepted.budgetMessages.at(-1)?.content).toBe(FINAL_STEP_MESSAGE);
-    expect(routed).toHaveBeenCalledTimes(2); expect(converted).toHaveBeenCalledTimes(2);
+    expect(routed).toHaveBeenCalledTimes(1); expect(converted).toHaveBeenCalledTimes(2);
     const result = await createStepFunction(stepRequest)(accepted.sourceMessages, undefined, {}, {
       allowTools: false, allowedTools: ['read'], preparedContext: accepted, convertToLlm: converted,
     });
     expect(result).toMatchObject({ text: 'ok', stopReason: 'stop', toolsAllowed: false });
     expect(sent).toEqual([accepted.body]);
-    expect(routed).toHaveBeenCalledTimes(2); expect(converted).toHaveBeenCalledTimes(2);
+    expect(routed).toHaveBeenCalledTimes(1); expect(converted).toHaveBeenCalledTimes(2);
   });
 
   it('refreshes changed declarations once using the same route and conversion', async () => {

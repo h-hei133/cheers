@@ -22,8 +22,8 @@
 
 ## Current status
 
-**Current phase**: active；T3.1完整SDK本地验收完成，继续C.1虚拟路由及其E.7注册依赖。合计21/62项完成。
-**Last completed batch**: T3.1 compact复用command settlement，prompt拒绝覆盖在途owner，取消回调失败仍取消并等待原操作，goal scheduler等待prompt结算。六门、16套件236项、0monoliths及build `d9acacbc4260`通过，限定独立复核CLEAR；四项有效反转红且逐字节恢复。同代隔离安装15入口、严格类型检查和Linux四次配置模型actual请求通过，取消零派发／复用／重开／扩展撤权及后继保留均通过。按批本地提交；没有push或远端CI。
+**Current phase**: active；T3.1已提交`d683a3d`，C.1完整物理目标捕获子批本地验证完成；继续摘要目标、会话注册及分支状态。合计21/62项完成。
+**Last completed batch**: C.1物理目标捕获复用CLI凭据／scope／renewal owner，route前冻结原transport与authority，candidate／refresh／reframe保持同一目标，reasoning使用实际replay身份。六门、15套件297项、0monoliths及build `3ff7e7c3ad7b`通过，限定独立复核CLEAR；六项有效反转红且逐字节恢复。Linux同代内部编译invocation两loopback验证实际URL／凭据／origin及拒绝零派发，公开SDK配置模型一次actual请求通过。公开virtual注册仍未接入，C.1和E.7保持部分；按批本地提交，没有push或远端CI。
 **Goal**: active；41项未完成，其中13部分、12已有待验收、14确认缺口、2待核实。保留完整规划，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -49,6 +49,7 @@
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-15 | C.1物理目标子批六门、15/297、0monoliths、build `3ff7e7c3ad7b`和同代Linux内部compiled route／公开SDK配置模型一次请求通过；六反转实际断言红且exact恢复，限定复核CLEAR。最初candidate反转触发普通拒绝而未到断言，收紧成功断言后重跑六项；初日志保留。当前21/62，继续摘要fallback／session注册／分支状态；T3.1已提交`d683a3d`。 |
 | 2026-11-15 | 恢复后T3.1本地完成。compact和取消／idle完整等待，goal scheduler尾部反例修复；六门16/236、0monoliths、build `d9acacbc4260`及同代隔离安装15入口／严格类型／四次配置模型请求passed。四反转red且exact恢复，限定独立复核CLEAR；21完成／41未完成，继续C.1，按批本地提交。 |
 | 2026-11-15 | 用户要求在手子批完成后暂停。SDK loader／dispose已提交`c8d14775`，6/34、六门、0monoliths、当前编译原生能力撤权／后继保留通过，build `1787d90736d1`；两个实际反转红且exact恢复，限定复核CLEAR。记录20完成／42未完成，提交暂停总结；不进入compact／虚拟路由后续任务，不宣称push／CI或整体完成。 |
 | 2026-11-14 | 四条只读核实线完成初步盘点；研究中的部分“缺失”已过期。14 个公开子路径实际导入全部 ERR_MODULE_NOT_FOUND；确认构建交付缺口。T1 开始实施；其余任务保持待实施／待验证。 |

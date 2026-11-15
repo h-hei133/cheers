@@ -103,6 +103,8 @@
 
 ## Validation ledger
 
+2026-11-15 C.1物理目标捕获子批：原target/resolver/transport/replay与CLI authority反例已修复，跨provider只能解析完整物理绑定；实际目标不存在、非chat、scope拒绝或route/converter撤销凭据均不能派发。candidate压缩、声明refresh和closing reframe沿用同一路由；最终六门、15套件297项、0monoliths、build `3ff7e7c3ad7b`通过，限定只读复核CLEAR。六反转实际AssertionError红、生产文件逐字节恢复；首个candidate普通拒绝日志另留，不当有效断言反证。Linux当前compiled内部invocation实际两loopback覆盖URL／auth／origin及拒绝零POST，公开SDK用配置模型一次bodySent通过；该内部注入不表示公共virtual注册已有。证据见`.omx/artifacts/upgrade-routing-2026-11-15/delivery.json`。实际L、复用检查10/10、额外依赖2（reasoning replay归属、router前authority捕获）；仍缺summary fallback实际目标、session/branch状态、retry/direct与生产注册，C.1/E.7保持开项、21/62不变。
+
 2026-11-15 暂停收尾：T3.1 loader／dispose子批`c8d14775`完成，证据在`.omx/artifacts/upgrade-sdk-2026-11-15/lifecycle-closing-delivery.json`。实际六门、6套件34项、函数上限0超限、build `1787d90736d1`及Linux当前编译SDK inline／TS文件消费撤权与后继保留通过；使用synthetic provider，没有新增真实服务调用。`lifecycle-closing-reversals.json`两项实际AssertionError失败且逐字节恢复，最终只读复核限定CLEAR。补齐半绑定排序和异步cleanup拒绝两WATCH；早期重复匹配的mutation脚本拒绝、一次相对config/root启动失败和未写resolves断言的反转诊断不计有效验证。用户要求完成在手子批后暂停，未开始compact或虚拟路由后续修改；整体20完成／42未完成，详见[暂停总结](summary.md)。
 
 2026-11-14 初次核实：真实 Node import 中14个非根入口全部 ERR_MODULE_NOT_FOUND，作为 T1 的修复前反例。
