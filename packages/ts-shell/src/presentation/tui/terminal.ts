@@ -1,14 +1,10 @@
-import fs from "node:fs";
-import { StringDecoder } from "node:string_decoder";
 import { acquireRawMode, drainInput, releaseRawMode } from "./input/drain.js";
 import { QUERY_APPEARANCE, STOP_APPEARANCE } from "./input/appearance.js";
 import { CELL_SIZE_QUERY } from "./input/cellSize.js";
 import type { KeyboardProtocol } from "./input/keyboardProtocol.js";
-import { TerminalInputProtocol } from './input/protocol.js';
-import {
-  TerminalStatusController,
-  type ProgramStatus,
-} from "./input/programStatus.js";
+import type { ProgramStatus } from './input/programStatus.js';
+import { TerminalInput } from './terminal/input.js';
+import { TerminalOutput } from './terminal/output.js';
 import {
   PendingColorQuery,
   TERMINAL_COLOR_QUERY,
@@ -27,9 +23,6 @@ import { detectTerminalCapabilities, type TerminalCapabilities } from "./termina
  * accounted so the renderer can back off instead of queueing frames a slow link
  * will never drain.
  */
-
-/** Queued bytes past which the link is treated as gone rather than slow. */
-const MAX_BACKLOG_BYTES = 64 * 1024 * 1024;
 
 /** How long to wait for a keyboard-protocol reply before assuming there is none. */
 const KEYBOARD_REPLY_TIMEOUT_MS = 250;
@@ -93,6 +86,8 @@ export interface TerminalDevice {
   queryCellSize?(): void;
   /** Use the host's existing paste-aware framing for terminal report collection. */
   bindProtocolInput?(input: StdinBuffer): () => void;
+  /** Settle the initial keyboard/status query before synchronous initialization. */
+  waitForProtocol?(): Promise<void>;
 }
 
 export class Terminal implements TerminalDevice {
@@ -103,59 +98,18 @@ export class Terminal implements TerminalDevice {
   private generation = 0;
   private disconnected = false;
   private rawOwned = false;
-  private inputEnabled = false;
-  private pendingBytes = 0;
   private keyboardTimer: NodeJS.Timeout | undefined;
-  private deferredInput: string[] = [];
   private inputReady?: () => void;
-  private decoder = new StringDecoder("utf8");
-  private readonly status = new TerminalStatusController();
-  private readonly protocol = new TerminalInputProtocol({
-    write: data => this.write(data),
-    forward: data => {
-      if (!this.inputEnabled) this.deferredInput.push(data);
-      else this.onInput(data);
-    },
-    colorQuery: () => this.colorQuery,
-    programStatusReply: () => this.status.isProbePending ? () => this.status.confirmSupported(data => this.write(data)) : undefined,
-    programStatusProbeEnded: () => this.status.expireProbe(),
-  });
+  private readonly input = new TerminalInput({ write: data => this.write(data), colors: () => this.colorQuery });
+  private readonly output = new TerminalOutput(() => this.disconnected, () => this.fireDisconnect());
+  private readonly status = this.input.status;
+  private readonly protocol = this.input.protocol;
   private colorQuery: PendingColorQuery | undefined;
-  private onInput: InputHandler = () => {};
-  private onResize: ResizeHandler = () => {};
-  private onDisconnect: DisconnectHandler = () => {};
-
-  private readonly handleData = (chunk: Buffer | string): void => {
-    if (this.draining) return;
-    let text: string;
-    if (typeof chunk === "string") {
-      const tail = this.decoder.end();
-      this.decoder = new StringDecoder("utf8");
-      text = tail + chunk;
-    } else {
-      text = this.decoder.write(chunk);
-    }
-    if (text.length === 0) return;
-    text = this.protocol.process(text);
-    if (text.length === 0) return;
-    if (!this.inputEnabled) {
-      this.deferredInput.push(text);
-      return;
-    }
-    this.onInput(text);
-  };
-
-  private readonly handleResize = (): void => {
-    this.onResize();
-  };
-
-  private readonly handleEnd = (): void => {
-    this.fireDisconnect();
-  };
-
-  private readonly handleExit = (): void => {
-    this.restoreSync();
-  };
+  private onResize?: ResizeHandler;
+  private onDisconnect?: DisconnectHandler;
+  private readonly handleData = this.input.receive.bind(this.input);
+  private readonly handleEnd = this.fireDisconnect.bind(this);
+  private readonly handleExit = this.restoreSync.bind(this);
 
   constructor(capabilities: TerminalCapabilities = detectTerminalCapabilities()) {
     this.capabilities = capabilities;
@@ -175,7 +129,7 @@ export class Terminal implements TerminalDevice {
   }
 
   getPendingOutputBytes(): number {
-    return this.pendingBytes;
+    return this.output.pendingBytes;
   }
 
   start(
@@ -188,22 +142,19 @@ export class Terminal implements TerminalDevice {
     const generation = ++this.generation;
     this.started = true;
     this.draining = false;
-    this.protocol.start();
-    this.decoder = new StringDecoder("utf8");
+    this.input.start(onInput, options?.deferInput !== true);
     // However the process leaves — clean exit, crash, or a signal — the terminal
     // must not be left in raw mode with the cursor hidden and autowrap off.
     process.once("exit", this.handleExit);
     this.disconnected = false;
-    this.onInput = onInput;
     this.onResize = onResize;
     this.onDisconnect = onDisconnect;
-    this.inputEnabled = options?.deferInput !== true;
     this.inputReady = options?.onInputReady;
 
-    process.stdout.on("resize", this.handleResize);
+    process.stdout.on("resize", onResize);
     if (!process.stdin.isTTY) return;
 
-    if (this.inputEnabled) this.rawOwned = acquireRawMode(this.rawOwned);
+    if (this.input.enabled) this.rawOwned = acquireRawMode(this.rawOwned);
     if (this.capabilities.supportsBracketedPaste) this.write(ENABLE_BRACKETED_PASTE);
     if (!this.started || this.draining || this.disconnected || this.generation !== generation) return;
     process.stdin.on("data", this.handleData);
@@ -222,19 +173,15 @@ export class Terminal implements TerminalDevice {
         this.write(QUERY_APPEARANCE);
         if (!this.started || this.draining || this.disconnected || this.generation !== generation) return;
       }
-      this.keyboardTimer = setTimeout(() => this.expireKeyboardNegotiation(), KEYBOARD_REPLY_TIMEOUT_MS);
+      this.keyboardTimer = setTimeout(() => { this.status.expireProbe(); this.protocol.expire(); }, KEYBOARD_REPLY_TIMEOUT_MS);
       this.keyboardTimer.unref?.();
     }
-    if (this.inputEnabled) {
+    if (this.input.enabled) {
       const ready = this.inputReady; this.inputReady = undefined; ready?.();
     }
   }
 
-  /** Stop inspecting input for replies that are evidently not coming. */
-  private expireKeyboardNegotiation(): void {
-    this.status.expireProbe();
-    this.protocol.expire();
-  }
+  waitForProtocol(): Promise<void> { return this.protocol.waitForReply(); }
 
   /** Which modifier-reporting protocol negotiation settled on. */
   get keyboardProtocol(): KeyboardProtocol {
@@ -243,15 +190,13 @@ export class Terminal implements TerminalDevice {
 
   /** Take over stdin after a deferred start and replay anything typed meanwhile. */
   enableInput(): void {
-    if (this.inputEnabled) return;
-    this.inputEnabled = true;
+    if (this.input.enabled) return;
+    this.input.enabled = true;
     this.rawOwned = acquireRawMode(this.rawOwned);
     if (this.started && process.stdin.isTTY) {
       const ready = this.inputReady; this.inputReady = undefined; ready?.();
     }
-    const buffered = this.deferredInput;
-    this.deferredInput = [];
-    for (const chunk of buffered) this.onInput(chunk);
+    this.input.flushDeferred();
   }
 
   stop(): void {
@@ -262,9 +207,9 @@ export class Terminal implements TerminalDevice {
     this.keyboardTimer = undefined;
     this.colorQuery?.cancel();
     this.colorQuery = undefined;
-    this.protocol.retire();
+    this.input.retire();
     process.off("exit", this.handleExit);
-    process.stdout.off("resize", this.handleResize);
+    if (this.onResize) process.stdout.off("resize", this.onResize);
     process.stdin.off("data", this.handleData);
     process.stdin.off("end", this.handleEnd);
     process.stdin.off("close", this.handleEnd);
@@ -276,46 +221,26 @@ export class Terminal implements TerminalDevice {
     this.draining = true;
     if (this.keyboardTimer) clearTimeout(this.keyboardTimer);
     this.keyboardTimer = undefined;
-    this.deferredInput = [];
     // Stop generating reports before waiting for those already in flight.
-    this.writeSync(this.protocol.drain() + this.status.consumeClearSequence() + STOP_APPEARANCE);
+    this.writeSync(this.input.drain() + this.status.consumeClearSequence() + STOP_APPEARANCE);
     await drainInput(process.stdin);
   }
 
   /** Unbuffered restore for exit and crash handlers, where queued writes are lost. */
   restoreSync(): void {
     this.draining = true;
-    this.protocol.retire();
+    this.input.retire();
     const clear = this.status.consumeClearSequence();
     this.writeSync(`${this.protocol.restore()}${clear}${RESTORE_MODES}`);
     this.rawOwned = releaseRawMode(this.rawOwned);
   }
 
   write(data: string, onWritten?: () => void): void {
-    if (this.disconnected || data.length === 0) return;
-    const bytes = Buffer.byteLength(data, "utf8");
-    if (this.pendingBytes + bytes > MAX_BACKLOG_BYTES) {
-      this.fireDisconnect();
-      return;
-    }
-    this.pendingBytes += bytes;
-    process.stdout.write(data, (error) => {
-      this.pendingBytes = Math.max(0, this.pendingBytes - bytes);
-      if (!error) onWritten?.();
-    });
+    this.output.write(data, onWritten);
   }
 
   writeSync(data: string): void {
-    if (!process.stdout.isTTY) return;
-    try {
-      fs.writeSync(1, data);
-    } catch {
-      try {
-        process.stdout.write(data);
-      } catch {
-        // The device is gone; nothing further can be restored.
-      }
-    }
+    this.output.writeSync(data);
   }
 
   setProgress(active: boolean): void {
@@ -354,7 +279,9 @@ export class Terminal implements TerminalDevice {
   private fireDisconnect(): void {
     if (this.disconnected) return;
     this.disconnected = true;
-    this.onDisconnect();
+    this.input.retire();
+    this.status.consumeClearSequence();
+    this.onDisconnect?.();
   }
 }
 

@@ -94,7 +94,7 @@ let pending: StartupSurface | undefined;
 export function beginStartupSurface(): Promise<void> {
   if (pending) throw new Error('A startup surface already owns the terminal.');
   pending = new StartupSurface();
-  return pending.firstPaint;
+  return Promise.all([pending.firstPaint, pending.terminal.waitForProtocol?.()]).then(() => {});
 }
 export function settleStartupInput(): Promise<void> | undefined {
   return pending?.settleInput();

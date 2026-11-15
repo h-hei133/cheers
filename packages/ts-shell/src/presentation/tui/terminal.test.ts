@@ -142,3 +142,41 @@ it("queries appearance on each start and disables reports on stop and crash rest
     expect(sync.mock.lastCall?.[0]).toContain(STOP_APPEARANCE);
   } finally { terminal.stop(); input.destroy(); }
 });
+
+it.each(['sentinel', 'timeout', 'stop'] as const)('settles startup protocol readiness at its owned %s boundary', async boundary => {
+  vi.useFakeTimers();
+  const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode: vi.fn() });
+  vi.spyOn(process, 'stdin', 'get').mockReturnValue(input as unknown as NodeJS.ReadStream);
+  vi.spyOn(process, 'stdout', 'get').mockReturnValue(Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.WriteStream);
+  const terminal = new Terminal({ hasTrueColor: true, has256Color: true, supportsDec2026Sync: true,
+    supportsKittyKeyboard: true, supportsBracketedPaste: true, insideMultiplexer: false });
+  vi.spyOn(terminal, 'write').mockImplementation(() => {}); vi.spyOn(terminal, 'writeSync').mockImplementation(() => {});
+  const ready = vi.fn();
+  try {
+    terminal.start(() => {}, () => {}, () => {});
+    const waiting = terminal.waitForProtocol().then(ready);
+    input.push('\x1b[?1u'); await Promise.resolve(); expect(ready).not.toHaveBeenCalled();
+    if (boundary === 'sentinel') input.push('\x1b[?62c');
+    else if (boundary === 'stop') terminal.stop();
+    else { await vi.advanceTimersByTimeAsync(249); expect(ready).not.toHaveBeenCalled(); await vi.advanceTimersByTimeAsync(1); }
+    await waiting; expect(ready).toHaveBeenCalledOnce();
+  } finally { terminal.stop(); input.destroy(); }
+});
+
+it('settles protocol readiness when the query write disconnects before a deadline is installed', async () => {
+  vi.useFakeTimers();
+  const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode: vi.fn() });
+  vi.spyOn(process, 'stdin', 'get').mockReturnValue(input as unknown as NodeJS.ReadStream);
+  vi.spyOn(process, 'stdout', 'get').mockReturnValue(Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.WriteStream);
+  const terminal = new Terminal({ hasTrueColor: true, has256Color: true, supportsDec2026Sync: true,
+    supportsKittyKeyboard: true, supportsBracketedPaste: true, insideMultiplexer: false });
+  vi.spyOn(terminal, 'write').mockImplementation(data => { if (data.startsWith('\x1b[?u')) input.emit('close'); });
+  vi.spyOn(terminal, 'writeSync').mockImplementation(() => {});
+  const ready = vi.fn(), disconnected = vi.fn();
+  try {
+    terminal.start(() => {}, () => {}, disconnected);
+    void terminal.waitForProtocol().then(ready); await Promise.resolve();
+    expect(disconnected).toHaveBeenCalledOnce(); expect(ready).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { terminal.stop(); input.destroy(); }
+});

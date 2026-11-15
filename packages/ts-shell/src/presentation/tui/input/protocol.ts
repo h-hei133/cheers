@@ -29,12 +29,16 @@ export class TerminalInputProtocol {
   // Every sent DA1 has an owner. Retain old owners across a direct restart
   // until their own deadline so cancelled color queries cannot settle startup.
   private attributes: AttributesFence[] = [];
+  private ready?: () => void;
+  private waiting: Promise<void> = Promise.resolve();
 
   constructor(private readonly host: ProtocolHost) {
     this.reader = this.createReader();
   }
 
   start(): void {
+    this.finish();
+    this.waiting = Promise.resolve();
     this.started = true;
     this.draining = false;
     this.keyboard = new KeyboardNegotiation();
@@ -49,6 +53,7 @@ export class TerminalInputProtocol {
       this.keyboard.expire();
       return '';
     }
+    this.waiting = new Promise(resolve => { this.ready = resolve; });
     this.attributes.push({ keyboard: this.keyboard, expiresAt: Date.now() + timeoutMs });
     return this.keyboard.begin(queriesBeforeSentinel);
   }
@@ -62,11 +67,14 @@ export class TerminalInputProtocol {
 
   get keyboardProtocol(): KeyboardProtocol { return this.keyboard.active; }
 
+  waitForReply(): Promise<void> { return this.waiting; }
+
   process(chunk: string): string {
     return this.releaseInput ? chunk : this.reader.process(chunk, this.host.colorQuery());
   }
 
   expire(): void {
+    this.finish();
     this.expireAttributes();
     const owner = this.keyboard;
     const pending = owner.pending;
@@ -78,6 +86,7 @@ export class TerminalInputProtocol {
 
   retire(): void {
     this.started = false;
+    this.finish();
     this.input?.flushPartial(prefix => this.keyboard.isReplyPrefix(prefix) && !prefix.startsWith('\x1b[?997;'), true);
     this.reader.flush();
     this.reader.dispose();
@@ -85,6 +94,7 @@ export class TerminalInputProtocol {
 
   drain(): string {
     this.draining = true;
+    this.finish();
     this.attributes = [];
     this.reader.flushPartial(() => true, true);
     this.input?.flushPartial(() => true, true);
@@ -135,6 +145,7 @@ export class TerminalInputProtocol {
         return true;
       }
       this.host.programStatusProbeEnded();
+      this.finish();
     }
     const step = this.keyboard.consumeSequence(sequence);
     if (step.write) this.host.write(step.write);
@@ -145,6 +156,8 @@ export class TerminalInputProtocol {
     const now = Date.now();
     this.attributes = this.attributes.filter(owner => owner.expiresAt > now);
   }
+
+  private finish(): void { this.ready?.(); this.ready = undefined; }
 
   private holdsSequence(prefix: string): boolean {
     return this.started && !this.draining && this.keyboard.holdsSequence(prefix);

@@ -1,7 +1,8 @@
 import { expect, it, vi } from 'vitest';
 import { once } from 'node:events';
 import { createConnection, createServer, type AddressInfo } from 'node:net';
-import { StartupSurface } from './startup.js';
+import { beginStartupSurface, stopStartupSurface, StartupSurface } from './startup.js';
+import { processTerminal } from '../../presentation/tui/terminal.js';
 import { startupEligible } from './startup/eligibility.js';
 import { RecordingTerminal, ManualScheduler } from '../../test-utils/terminalDouble.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
@@ -31,6 +32,22 @@ it.each([['--print'], ['--json'], ['--session-id', 'old', '--print'], ['--sessio
   ['prompt text'], ['--project'], ['--profile='], ['--', 'text'], ['--help'], ['--version']].map(args => [args]))(
   'keeps other launches out of the early terminal owner: %j', args => { expect(startupEligible(args, true)).toBe(false); });
 it('never prepaints a pipe', () => { expect(startupEligible([], false)).toBe(false); });
+
+it('holds heavy initialization until the early terminal has settled its startup queries', async () => {
+  let settle: () => void = () => {};
+  const queries = new Promise<void>(resolve => { settle = resolve; });
+  vi.spyOn(processTerminal, 'start').mockImplementation(() => {});
+  vi.spyOn(processTerminal, 'stop').mockImplementation(() => {});
+  vi.spyOn(processTerminal, 'write').mockImplementation((_data, written) => written?.());
+  vi.spyOn(processTerminal, 'waitForProtocol').mockReturnValue(queries);
+  const initialized = vi.fn();
+  try {
+    const starting = beginStartupSurface().then(initialized);
+    await Promise.resolve(); await Promise.resolve();
+    expect(initialized).not.toHaveBeenCalled();
+    settle(); await starting; expect(initialized).toHaveBeenCalledOnce();
+  } finally { stopStartupSurface(); vi.restoreAllMocks(); }
+});
 
 it('paints and edits one draft without dispatching Enter before readiness', async () => {
   const terminal = new RecordingTerminal(), scheduler = new ManualScheduler(), exit = vi.fn();

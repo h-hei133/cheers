@@ -2566,3 +2566,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A cancelled color query's late DA1 ends a newly restarted status probe, or a synchronous output callback stops the device before a new timer is recorded.
 - **Root Cause:** Counting startup queries alone omits other DA1 producers; post-write mutations outlive stop, and clearing a cancelled query without identity checks erases a callback's successor.
 - **Rule:** Register every DA1 with its actual query owner before dispatch, retain cancelled owners through their own deadline, and decline new queries when the fixed queue is full. Establish cancellable timers before external writes and revalidate the startup generation after each callback boundary. Preserve successor query identity after cancel. Untagged reports past the deadline cannot be proven to belong to an old query.
+
+### Synchronous Initialization Can Starve A Startup Protocol Window
+- **Symptom:** The early terminal sends its keyboard/status queries, but a real immediate reply is processed after the 250ms deadline while loaded-runtime probes pass.
+- **Root Cause:** The first frame's write callback permits synchronous heavy imports before stdin has a poll opportunity; a query write can also disconnect before its timer is installed.
+- **Rule:** Await the original protocol owner's sentinel/deadline alongside the first write before heavy initialization. Settle that wait on retirement, drainage and disconnect without adding another timer. Keep keyboard and color DA1 owners separate in fixtures, and preserve dynamic device write callbacks when splitting input/output owners.
