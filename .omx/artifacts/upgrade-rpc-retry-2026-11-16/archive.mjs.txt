@@ -1,0 +1,79 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+const repo = process.cwd(), scratch = path.join(repo, '.tmp/rpc-retry');
+const directory = path.join(repo, '.omx/artifacts/upgrade-rpc-retry-2026-11-16');
+const hash = value => createHash('sha256').update(value).digest('hex');
+for (const entry of fs.readdirSync(scratch, { withFileTypes: true })) {
+  assert.equal(entry.isFile(), true, 'Temporary runtime state must already be removed.');
+  const name = entry.name.endsWith('.mjs') ? entry.name + '.txt' : entry.name;
+  fs.copyFileSync(path.join(scratch, entry.name), path.join(directory, name));
+}
+const sourceHashes = JSON.parse(fs.readFileSync(path.join(scratch, 'source-hashes.json')));
+const source = {};
+for (const [file, sha256] of Object.entries(sourceHashes)) {
+  const bytes = fs.readFileSync(path.join(repo, file)); assert.equal(hash(bytes), sha256);
+  const snapshot = 'source/' + file.replace('packages/ts-shell/src/', '') + '.txt';
+  fs.mkdirSync(path.dirname(path.join(directory, snapshot)), { recursive: true });
+  fs.writeFileSync(path.join(directory, snapshot), bytes); source[file] = { snapshot, sha256 };
+}
+const documents = {};
+for (const file of ['.wiki/log.md', '.wiki/refactor/upgrade/MASTER.md', '.wiki/refactor/upgrade/tasks.md',
+  '.wiki/refactor/upgrade/design.md', '.wiki/refactor/upgrade/summary.md', 'HANDOFF.md']) {
+  const bytes = fs.readFileSync(path.join(repo, file)), snapshot = 'docs/' + file + '.txt';
+  fs.mkdirSync(path.dirname(path.join(directory, snapshot)), { recursive: true });
+  fs.writeFileSync(path.join(directory, snapshot), bytes); documents[file] = { snapshot, sha256: hash(bytes) };
+}
+const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json')));
+fs.copyFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'), path.join(directory, 'build-manifest.json'));
+const native = JSON.parse(fs.readFileSync(path.join(directory, 'retry-native.json')));
+const real = JSON.parse(fs.readFileSync(path.join(directory, 'retry-real.json')));
+assert.equal(native.status, 'passed'); assert.equal(real.status, 'passed');
+assert.equal(native.buildId, manifest.buildId); assert.equal(real.buildId, manifest.buildId);
+const cases = [...JSON.parse(fs.readFileSync(path.join(directory, 'retry-reversals.json'))).cases,
+  JSON.parse(fs.readFileSync(path.join(directory, 'readiness-reversal.json')))];
+assert.equal(cases.length, 5);
+assert.ok(cases.every(item => item.assertionFailed && item.restoredExactly && (item.exitCode ?? item.status) === 1));
+const code = JSON.parse(fs.readFileSync(path.join(directory, 'review-code.json')));
+const architecture = JSON.parse(fs.readFileSync(path.join(directory, 'review-architecture.json')));
+assert.equal(code.recommendation, 'APPROVE'); assert.equal(architecture.status, 'CLEAR');
+const receipts = {};
+function visit(folder) {
+  for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
+    const file = path.join(folder, entry.name);
+    if (entry.isDirectory()) visit(file);
+    else if (entry.name !== 'delivery.json') receipts[path.relative(directory, file)] = hash(fs.readFileSync(file));
+  }
+}
+visit(directory);
+const delivery = {
+  schemaVersion: 1, date: '2026-11-16', task: 'D.1', batch: 'RPC retry cancellation and readiness forwarding',
+  status: 'locally-validated-sub-batch', delivery: 'Local commit containing this receipt; not pushed',
+  baseCommit: execFileSync('rtk', ['proxy', 'git', 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  buildId: manifest.buildId, source, documents,
+  validation: {
+    tests: { status: 'passed', suites: 14, tests: 412, log: 'retry-final.log' },
+    restored: { status: 'passed', suites: 4, tests: 67, log: 'readiness-restored.log' },
+    gates: { status: 'passed', count: 6, log: 'retry-final.log', docsSourceAdvisories: 119 },
+    docs: { status: 'passed', log: 'retry-docs.log' },
+    responsibility: { modules: 2648, monoliths: 0, log: 'retry-final.log' },
+    build: { status: 'passed', log: 'retry-final.log' },
+    reversals: { count: 5, actualAssertionsFailed: true, restoredExactly: true, receipts: ['retry-reversals.json', 'readiness-reversal.json'] },
+    native: { status: 'passed', receipt: 'retry-native.json', loopbackPosts: 6, platform: 'linux', compiledCli: true },
+    configuredProvider: { status: 'passed', receipt: 'retry-real.json', posts: 2, platform: 'linux', compiledCli: true,
+      originalActiveTarget: true, originalConfigUnchanged: true, minimalIsolatedCatalogue: true,
+      bodyInspectable: false, actualRetryFailureInduced: false },
+    review: { code: 'APPROVE', architecture: 'CLEAR', filesPerLane: 10,
+      rootExecutedValidation: true, reviewersExecutedValidation: false, receipts: ['review-code.json', 'review-architecture.json'] },
+  },
+  limits: { fullD1: false, remaining: ['Final D.1 joint command acceptance', 'Other roadmap tasks'],
+    tasksComplete: 22, tasksTotal: 62, pending: { total: 40, partial: 14, existingAwaitingAcceptance: 11, gaps: 13, needsVerification: 2 },
+    goal: 'paused by user after this sub-batch', otherPlatforms: false, push: false, ci: false,
+    fullRepositorySuite: false, deterministicRealProviderFailure: false, providerBodyInspection: false },
+  failureClassification: 'classification.md', evidence: receipts,
+};
+fs.writeFileSync(path.join(directory, 'delivery.json'), JSON.stringify(delivery, null, 2) + '\n');
+console.log(JSON.stringify({ status: delivery.status, buildId: manifest.buildId, sourceSnapshots: Object.keys(source).length,
+  documents: Object.keys(documents).length, evidenceFiles: Object.keys(receipts).length, review: delivery.validation.review }));

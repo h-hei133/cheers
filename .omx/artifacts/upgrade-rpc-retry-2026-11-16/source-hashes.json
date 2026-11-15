@@ -1,0 +1,12 @@
+{
+  "packages/ts-shell/src/cli/rpc/host/settings.ts": "eb8f3c0450fcc7ca23bd295c7ef6dfccb00c754d4c2ef4192c848e1db9c34846",
+  "packages/ts-shell/src/core/agent/agent.ts": "358ec13731a38ba48c0b55dec0ff918085ffdc576fb532d0cf3c63d2ecea7ee8",
+  "packages/ts-shell/src/core/agent/loop.ts": "8225c1cd6193b13b9505e105254a08ca817ed02c3f4d00ad013865d45cbb9a11",
+  "packages/ts-shell/src/core/agent/retry.test.ts": "084f858aec5a5ceaadf9da3f11cdbe549598026a3be4f0b4134d660604eec859",
+  "packages/ts-shell/src/core/agent/retry.ts": "0d3e057d71eb1b0e7524dd4086a8e86bc9b57cdfc508e84799f0b7876648546f",
+  "packages/ts-shell/src/turn/pendingInput.test.ts": "f1ae7966bdf1d713ab0348ab8681e41e8010b6707e89f50c66aa8513fd0ee8a6",
+  "packages/ts-shell/src/turn/pendingInput.ts": "554f79406bff9b83bc54ef50b68b51c438f8cf7edc0298de8f37a174ef525540",
+  "packages/ts-shell/src/turn/session.ts": "0b4202b724b12d7bee850cc22a6abe19aaf9bac670b1f6c2eed17fcf3dcb24ff",
+  "packages/ts-shell/src/turn/step.ts": "84da6e7b187acd8afb045b921724e276f1453c2bd8a5d975b284cf7ebd16b82c",
+  "packages/ts-shell/src/cli/rpc/retry.test.ts": "acf9073a40367963e42ed1bdd797cb45c018549fa1f0562cb77f8fbc6604bf31"
+}

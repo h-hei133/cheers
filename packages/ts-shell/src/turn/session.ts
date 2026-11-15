@@ -147,6 +147,8 @@ export interface TurnOptions {
 
 /** Input the user can hand a running turn. */
 export interface TurnInput {
+  /** Cancel a current retry wait without aborting the run or clearing its queues. */
+  readonly abortRetry?: () => void;
   /** Exact tool names currently offered by this running turn. */
   readonly activeTools?: () => readonly string[];
   /** Change the delivery mode on the queues owned by this live run. */
@@ -508,6 +510,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     activeTools: () => [...toolPool().keys()],
     setQueueMode: (lane, mode) => core.setQueueMode(lane, mode),
     queue,
+    abortRetry: () => core.abortRetry(),
     steer: (text, id) => {
       if (!text.trim()) return;
       core.steer({ role: "user", content: text }, id);

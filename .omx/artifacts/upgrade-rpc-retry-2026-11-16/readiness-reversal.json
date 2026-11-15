@@ -1,0 +1,7 @@
+{
+  "name": "readiness-forwarding",
+  "sourceSha256": "554f79406bff9b83bc54ef50b68b51c438f8cf7edc0298de8f37a174ef525540",
+  "assertionFailed": true,
+  "exitCode": 1,
+  "restoredExactly": true
+}

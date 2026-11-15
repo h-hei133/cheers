@@ -1,0 +1,42 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/retry.test.ts src/core/agent/retry.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/retry.test.ts (6 tests | 1 failed) 372ms
+   ✓ leaves an ordinary in-flight model request and its cancellation services untouched 87ms
+   ✓ does not cancel an unrelated command while no retry wait exists 15ms
+   ✓ cancels from the retry scheduling observer before another request without aborting its parent 61ms
+   ✓ keeps an explicit queued successor independent from the cancelled retry 65ms
+   ✓ cancels the existing provider response backoff while leaving the session signal live 69ms
+   × cancels the existing provider stream backoff while leaving the session signal live 75ms
+     → expected 0 to be greater than 0
+ ✓ src/core/agent/retry.test.ts (43 tests) 51ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/retry.test.ts > cancels the existing provider stream backoff while leaving the session signal live
+AssertionError: expected 0 to be greater than 0
+ ❯ src/cli/rpc/retry.test.ts:130:32
+    128|   try {
+    129|     await vi.advanceTimersByTimeAsync(1); expect(calls).toBe(1);
+    130|     expect(vi.getTimerCount()).toBeGreaterThan(0);
+       |                                ^
+    131|     expect(await handleRpcCommand({ type: 'abort_retry' }, test.host))…
+    132|     await vi.runAllTimersAsync(); await running;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 48 passed (49)
+   Start at  22:06:04
+   Duration  10.47s (transform 5.73s, setup 0ms, collect 9.61s, tests 423ms, environment 0ms, prepare 106ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/retry.test.ts src/core/agent/retry.test.ts

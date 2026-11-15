@@ -2681,3 +2681,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A compact request blocks the abort intended to stop it, or an immediate abort observes no active controller and the compaction starts afterward.
 - **Root Cause:** Sequential RPC handler awaits precede the existing command owner's synchronous registration, and the transport serializes the full response instead of admission.
 - **Rule:** Reach command admission before yielding, then let the existing response join own EOF while later controls proceed. Keep operation settlement in the session owner so busy refusals and queued prompts retain their ordering. Preserve the producer's structured unsuccessful outcome; native persistence probes must inspect the actual commit record and supply history with a legal cut.
+
+
+### Retry Cancellation Must Reach The Adopted Input Without Aborting Its Run
+- **Symptom:** abort_retry cancels ordinary requests and native commands, or direct turn tests pass while the real CLI continues retrying. An aborted step with retained text can also be mistaken for a completed answer.
+- **Root Cause:** Generic cancellation owns more than a retry wait, the readiness input proxy omits a new control, and wait registration happens after a scheduling observer can issue cancellation.
+- **Rule:** Keep retry control in the existing wait owner, keyed by the exact kernel run signal; register before scheduling publication, join the original callback and clean only that wait. Forward through the adopted input without buffering an early cancellation for a later run. Report cancelled retries as failed while preserving explicit queued input. Test both direct owners and the current compiled CLI. A failed body after accepted headers remains non-replayable; construct pre-response failures when testing backoff.
+
+### Process Checks Must Not Print Command Arguments
+- **Symptom:** A broad process inventory prints a service token carried in its command line.
+- **Root Cause:** Full argv is treated as harmless diagnostic metadata even though unrelated services may pass credentials there.
+- **Rule:** Inspect process IDs, parent IDs, state and executable names only. Do not print or archive full command arguments when checking for test/build residue; report the process state needed for the serial-validation decision.

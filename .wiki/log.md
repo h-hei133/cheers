@@ -11941,3 +11941,10 @@ shell已提交c10c5291。thinking按实际endpoint capability／budget或virtual
 ### 2026-11-15：RPC压缩控制与结构化结果
 
 设置／发现已提交0caf82c。compact在首个await前登记原command owner，响应复用EOF join，后续读取／busy／abort可达；nothing／busy／failed保留结构化data。四实际反例红后4/43与六门绿，三个反转exact恢复、1/5恢复测试、2647模块0monoliths及build `1a9b082e419d`通过；限定APPROVE／CLEAR。Linux三loopback POST挂起摘要取消／无commit／复用成功commit和EOF、配置模型两次actual请求通过。四次native夹具／观察器失败保留，归档upgrade-rpc-compaction-2026-11-15；D.1部分22/62，下一retry取消，不push。
+
+
+### 2026-11-16：RPC重试取消收尾与暂停
+
+compact已提交bf01f8f。abort_retry复用原wait owner，只取消已登记retry而不abort kernel run／native command／generic services；登记先于scheduled，callback失败仍被观察，取消明确failed。真实CLI发现readiness输入代理缺转发，先红后补原代理，早期取消不缓存。最终六门14/412、五反转exact恢复、恢复4/67、2648模块0monoliths和build `754fdcb217b0`通过；Linux同代六loopback POST验两层取消／普通stream与native命令保留／后继复用／accepted body不重放，配置模型两次bodySent完成在途控制与再用，原配置hash不变。首次真实产品接线失败和SSE夹具错误保留分类，本子批独立代码APPROVE／架构CLEAR，未借用历史批准。
+
+按用户要求当前子批本地提交后暂停后续任务；22/62项完成，40项未完成（14部分、11已有待验收、13确认缺口、2待核实），D.1整项联合验收尚未发生。完整已完成范围、真实测试和未完成清单见refactor/upgrade/summary.md，未push、未取得本轮远端CI。

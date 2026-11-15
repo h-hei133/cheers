@@ -1,0 +1,22 @@
+{
+  "reviewer": "/root/routing_delivery_review",
+  "recommendation": "APPROVE",
+  "base": "bf01f8f",
+  "filesReviewed": 10,
+  "paths": [
+    "core/agent/retry.ts",
+    "core/agent/retry.test.ts",
+    "core/agent/loop.ts",
+    "core/agent/agent.ts",
+    "turn/session.ts",
+    "turn/step.ts",
+    "turn/pendingInput.ts",
+    "turn/pendingInput.test.ts",
+    "cli/rpc/retry.test.ts",
+    "cli/rpc/host/settings.ts"
+  ],
+  "findings": [],
+  "evidence": "Existing wait owner uses the exact run signal, callback settlement and cleanup remain observed, cancelled waits report failed, and the readiness proxy delegates only to its adopted input without buffering cancellation.",
+  "validationRunByReviewer": false,
+  "limits": "Only current retry cancellation delta; native/provider receipts belong to root validation and full D.1 acceptance remains pending."
+}

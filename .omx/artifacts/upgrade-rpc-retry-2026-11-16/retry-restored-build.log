@@ -1,0 +1,12 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ✓ src/cli/rpc/retry.test.ts (7 tests) 431ms
+ ✓ src/core/agent/retry.test.ts (43 tests) 51ms
+ ✓ src/turn/retry.test.ts (9 tests) 53ms
+ Test Files  3 passed (3)
+      Tests  59 passed (59)
+   Start at  00:31:33
+   Duration  11.57s (transform 5.94s, setup 0ms, collect 10.41s, tests 536ms, environment 0ms, prepare 146ms)
+module-facade-check ceiling=20 modules=2648 reported=0 thresholds=delegationRatio>=0.9,branching<=0,ownStateWrites<=0
+  verdict         names lines  delegation  branching  lines/name  module
+module-facade-summary monoliths=0 thin_facades=0
+Wrote build manifest 29105ad640c0 for @cheers/ts-shell@0.1.0

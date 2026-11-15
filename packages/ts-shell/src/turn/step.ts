@@ -409,7 +409,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           );
         }
         const waited = await waitBeforeRetry(retryDelayMs(retry, attempt, requestedDelayMs), signal);
-        if (!waited) return stamp(abortedStep(""));
+        if (!waited) return stamp(signal?.aborted ? abortedStep('') : failedStep('Retry was cancelled.', '', refusalClass, true));
       }
 
       if (dropEffort) {
@@ -486,7 +486,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           streamAttempts += 1;
           releaseAfterRead?.abort();
           const waited = await waitBeforeRetry(retryDelayMs(retry, streamAttempts, undefined), signal);
-          if (!waited) return stamp(abortedStep(""));
+          if (!waited) return stamp(signal?.aborted ? abortedStep('') : failedStep('Retry was cancelled.', '', failure.failureClass, true));
           continue;
         }
         // The text already streamed is kept and the step is still marked failed.

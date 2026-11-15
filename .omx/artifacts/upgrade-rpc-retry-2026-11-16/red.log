@@ -1,0 +1,127 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/retry.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/retry.test.ts (5 tests | 5 failed) 250ms
+   × leaves an ordinary in-flight model request and its cancellation services untouched 77ms
+     → expected true to be false // Object.is equality
+   × does not cancel an unrelated command while no retry wait exists 13ms
+     → expected true to be false // Object.is equality
+   × cancels from the retry scheduling observer before another request without aborting its parent 49ms
+     → expected true to be false // Object.is equality
+   × keeps an explicit queued successor independent from the cancelled retry 53ms
+     → expected [ Array(1) ] to have a length of 2 but got 1
+   × cancels the existing provider backoff while leaving the session signal live 57ms
+     → expected true to be false // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/retry.test.ts > leaves an ordinary in-flight model request and its cancellation services untouched
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/cli/rpc/retry.test.ts:66:36
+     64|   try {
+     65|     expect(await handleRpcCommand({ type: 'abort_retry' }, test.host))…
+     66|     expect(requestSignal?.aborted).toBe(false); expect(test.signals[0]…
+       |                                    ^
+     67|     expect(test.genericCancel).not.toHaveBeenCalled();
+     68|   } finally { release(); await running.catch(() => {}); }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/cli/rpc/retry.test.ts > does not cancel an unrelated command while no retry wait exists
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/cli/rpc/retry.test.ts:80:70
+     78|   try {
+     79|     expect(await handleRpcCommand({ type: 'abort_retry' }, test.host))…
+     80|     expect(test.runtime.commands.current?.controller.signal.aborted).t…
+       |                                                                      ^
+     81|     expect(test.genericCancel).not.toHaveBeenCalled();
+     82|   } finally { release(); }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/cli/rpc/retry.test.ts > cancels from the retry scheduling observer before another request without aborting its parent
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/cli/rpc/retry.test.ts:92:73
+     90|   await test.runtime.executePrompt(test.context.session.id, 'retry').c…
+     91|   await Promise.all(test.cancels);
+     92|   expect(step).toHaveBeenCalledOnce(); expect(test.signals[0]!.aborted…
+       |                                                                         ^
+     93|   expect(test.genericCancel).not.toHaveBeenCalled();
+     94|   expect(test.events).toContainEqual(expect.objectContaining({ type: '…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/cli/rpc/retry.test.ts > keeps an explicit queued successor independent from the cancelled retry
+AssertionError: expected [ Array(1) ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ src/cli/rpc/retry.test.ts:110:19
+    108|   const test = fixture(step, true, true);
+    109|   await test.runtime.executePrompt(test.context.session.id, 'initial')…
+    110|   expect(prompts).toHaveLength(2); expect(prompts[1]).toBe('EXPLICIT_S…
+       |                   ^
+    111|   expect(test.signals[0]!.aborted).toBe(false); expect(test.genericCan…
+    112|   expect(test.events.some(event => event.type === 'query.completed')).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/cli/rpc/retry.test.ts > cancels the existing provider backoff while leaving the session signal live
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/cli/rpc/retry.test.ts:128:61
+    126|     expect(await handleRpcCommand({ type: 'abort_retry' }, test.host))…
+    127|     await vi.runAllTimersAsync(); await running;
+    128|     expect(calls).toBe(1); expect(test.signals[0]!.aborted).toBe(false…
+       |                                                             ^
+    129|     expect(test.genericCancel).not.toHaveBeenCalled();
+    130|     expect(test.events).toContainEqual(expect.objectContaining({ type:…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed (5)
+   Start at  22:02:54
+   Duration  8.80s (transform 5.04s, setup 0ms, collect 8.31s, tests 250ms, environment 0ms, prepare 55ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/retry.test.ts

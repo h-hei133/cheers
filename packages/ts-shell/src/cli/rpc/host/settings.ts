@@ -31,7 +31,7 @@ export function settingsHost(options: RuntimeRpcHostOptions): SettingsHost {
     compact: (customInstructions) => sessionRuntime.compactHistory(runtimeContext.session.id, customInstructions),
     setAutoCompaction: (enabled) => saveRpcSetting(runtimeContext, "compactionEnabled", enabled),
     setAutoRetry: (enabled) => saveRpcSetting(runtimeContext, "retryEnabled", enabled),
-    abortRetry: () => sessionRuntime.cancelCurrentRun(),
+    abortRetry: () => sessionRuntime.input?.()?.abortRetry?.(),
     getCommands: (signal) => listRpcCommands(runtimeContext, signal),
   };
 }

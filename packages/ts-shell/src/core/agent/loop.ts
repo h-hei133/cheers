@@ -353,8 +353,10 @@ async function retryStep(
     }
     recordCount("provider.retries", 1);
     const delayMs = retryDelayMs(policy, attempt, step.requestedDelayMs);
-    await emit({ type: "retry_scheduled", attempt, maxAttempts: policy.maxRetries, delayMs });
-    if (!(await waitBeforeRetry(delayMs, signal))) return { step, emittedStart };
+    const waited = await waitBeforeRetry(delayMs, signal,
+      () => emit({ type: "retry_scheduled", attempt, maxAttempts: policy.maxRetries, delayMs }));
+    if (!waited) return { step: signal?.aborted ? step : { ...step, stopReason: 'error', retryable: false,
+      retriesExhausted: true, errorMessage: 'Retry was cancelled.' }, emittedStart };
     await emit({ type: "retry_attempt_start", attempt });
   }
 }

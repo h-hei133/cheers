@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { pendingTurnInput } from "./pendingInput.js";
 import type { TurnInput } from "./session.js";
 import { inputQueueControl, PendingQueue } from '../core/agent/queue.js';
@@ -33,6 +33,20 @@ function recordingRun(): {
 }
 
 describe("input held before a run exists", () => {
+  it('forwards retry cancellation to the adopted run without buffering it for a future run', () => {
+    const buffered = pendingTurnInput(), first = recordingRun(), second = recordingRun();
+    const firstCancel = vi.fn(), secondCancel = vi.fn();
+    buffered.input.followUp('preserved input');
+    buffered.input.abortRetry?.();
+    buffered.adopt({ input: { ...first.input, abortRetry: firstCancel } });
+    expect(firstCancel).not.toHaveBeenCalled(); expect(first.followUps).toEqual(['preserved input']);
+    buffered.input.abortRetry?.(); expect(firstCancel).toHaveBeenCalledOnce();
+    buffered.adopt({ input: { ...second.input, abortRetry: secondCancel } });
+    expect(secondCancel).not.toHaveBeenCalled();
+    buffered.input.abortRetry?.(); expect(secondCancel).toHaveBeenCalledOnce();
+    expect(firstCancel).toHaveBeenCalledOnce();
+  });
+
   it('carries queue mode changes through readiness adoption and updates the same live queue', () => {
     const buffered = pendingTurnInput();
     const setters = buffered.input as TurnInput & { setQueueMode?: (lane: 'steering' | 'followUp', mode: 'one-at-a-time' | 'all') => void };

@@ -1,0 +1,43 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+const repo = process.cwd(), directory = path.join(repo, '.tmp/rpc-retry');
+const cases = [
+  { name: 'control-scope', file: 'packages/ts-shell/src/cli/rpc/host/settings.ts',
+    before: 'abortRetry: () => sessionRuntime.input?.()?.abortRetry?.(),',
+    after: 'abortRetry: () => sessionRuntime.cancelCurrentRun(),',
+    test: 'src/cli/rpc/retry.test.ts', title: 'ordinary in-flight model request' },
+  { name: 'schedule-ownership', file: 'packages/ts-shell/src/core/agent/loop.ts',
+    before: 'const waited = await waitBeforeRetry(delayMs, signal,\n      () => emit({ type: "retry_scheduled", attempt, maxAttempts: policy.maxRetries, delayMs }));',
+    after: 'await emit({ type: "retry_scheduled", attempt, maxAttempts: policy.maxRetries, delayMs });\n    const waited = await waitBeforeRetry(delayMs, signal);',
+    test: 'src/cli/rpc/retry.test.ts', title: 'cancels from the retry scheduling observer' },
+  { name: 'provider-outcome', file: 'packages/ts-shell/src/turn/step.ts',
+    before: "signal?.aborted ? abortedStep('') : failedStep('Retry was cancelled.', '', refusalClass, true)",
+    after: "abortedStep('')",
+    test: 'src/cli/rpc/retry.test.ts', title: 'existing provider response backoff' },
+  { name: 'zero-delay-ownership', file: 'packages/ts-shell/src/core/agent/retry.ts',
+    before: 'if (signal && waits) { waits.add(onAbort); retryWaits.set(signal, waits); }',
+    after: 'if (signal && waits && delayMs > 0) { waits.add(onAbort); retryWaits.set(signal, waits); }',
+    test: 'src/core/agent/retry.test.ts', title: 'owns a 0ms retry' },
+];
+const receipts = [];
+for (const item of cases) {
+  const file = path.join(repo, item.file), original = fs.readFileSync(file), source = original.toString();
+  assert.equal(source.split(item.before).length, 2);
+  try {
+    fs.writeFileSync(file, source.replace(item.before, item.after));
+    const logFile = path.join(directory, `reversal-${item.name}.log`), log = fs.openSync(logFile, 'w');
+    const result = spawnSync('rtk', ['env', 'VITEST_MAX_THREADS=1', 'VITEST_MIN_THREADS=1', 'npm', 'run', 'test', '-w', 'packages/ts-shell', '--', item.test, '-t', item.title],
+      { cwd: repo, stdio: ['ignore', log, log], timeout: 60_000 });
+    fs.closeSync(log);
+    const output = fs.readFileSync(logFile, 'utf8');
+    assert.equal(result.status, 1); assert.match(output, /AssertionError/); assert.match(output, /1 failed/);
+    receipts.push({ name: item.name, assertionFailed: true, exitCode: result.status,
+      sourceSha256: createHash('sha256').update(original).digest('hex') });
+  } finally { fs.writeFileSync(file, original); assert.deepEqual(fs.readFileSync(file), original); }
+  receipts.at(-1).restoredExactly = true;
+  console.log(JSON.stringify(receipts.at(-1)));
+}
+fs.writeFileSync(path.join(directory, 'retry-reversals.json'), JSON.stringify({ cases: receipts }, null, 2) + '\n');

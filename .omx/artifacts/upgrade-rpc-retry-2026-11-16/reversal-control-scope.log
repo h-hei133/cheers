@@ -1,0 +1,49 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/retry.test.ts -t ordinary in-flight model request
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/retry.test.ts (7 tests | 1 failed | 6 skipped) 95ms
+   × leaves an ordinary in-flight model request and its cancellation services untouched 94ms
+     → expected true to be false // Object.is equality
+   ↓ does not cancel an unrelated command while no retry wait exists
+   ↓ cancels from the retry scheduling observer before another request without aborting its parent
+   ↓ keeps an explicit queued successor independent from the cancelled retry
+   ↓ cancels the existing provider response backoff while leaving the session signal live
+   ↓ cancels the existing provider network backoff while leaving the session signal live
+   ↓ leaves an accepted provider stream live and never replays its failed body
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/retry.test.ts > leaves an ordinary in-flight model request and its cancellation services untouched
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/cli/rpc/retry.test.ts:66:36
+     64|   try {
+     65|     expect(await handleRpcCommand({ type: 'abort_retry' }, test.host))…
+     66|     expect(requestSignal?.aborted).toBe(false); expect(test.signals[0]…
+       |                                    ^
+     67|     expect(test.genericCancel).not.toHaveBeenCalled();
+     68|   } finally { release(); await running.catch(() => {}); }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  00:30:35
+   Duration  10.04s (transform 5.83s, setup 0ms, collect 9.64s, tests 95ms, environment 0ms, prepare 59ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/retry.test.ts -t 'ordinary in-flight model request'

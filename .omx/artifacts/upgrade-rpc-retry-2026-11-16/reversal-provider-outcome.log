@@ -1,0 +1,135 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/retry.test.ts -t existing provider response backoff
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/retry.test.ts (7 tests | 1 failed | 6 skipped) 105ms
+   ↓ leaves an ordinary in-flight model request and its cancellation services untouched
+   ↓ does not cancel an unrelated command while no retry wait exists
+   ↓ cancels from the retry scheduling observer before another request without aborting its parent
+   ↓ keeps an explicit queued successor independent from the cancelled retry
+   × cancels the existing provider response backoff while leaving the session signal live 104ms
+     → expected [ …(8) ] to deep equally contain ObjectContaining{…}
+   ↓ cancels the existing provider network backoff while leaving the session signal live
+   ↓ leaves an accepted provider stream live and never replays its failed body
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/retry.test.ts > cancels the existing provider response backoff while leaving the session signal live
+AssertionError: expected [ …(8) ] to deep equally contain ObjectContaining{…}
+
+- Expected: 
+ObjectContaining {
+  "error": StringContaining "Retry was cancelled",
+  "type": "query.failed",
+}
+
++ Received: 
+[
+  {
+    "prompt": "provider retry",
+    "sessionId": "sess_57a8d5503c1a0029_1794760268150",
+    "type": "query.started",
+  },
+  {
+    "role": "coder",
+    "type": "message.started",
+  },
+  {
+    "role": "coder",
+    "type": "message.finished",
+  },
+  {
+    "attemptId": "e7cffac5-2015-4871-a793-262ecff28567",
+    "kind": "model_answer",
+    "messageIdentity": "d5674ea9fc2bf5660f6664febd1b904a725118e5205eb505932f4ff6334ceccc",
+    "progressFingerprint": {
+      "checks": [],
+      "version": 1,
+    },
+    "reentryCount": 0,
+    "sequence": 1,
+    "status": "failed",
+    "step": 1,
+    "stop_hook_active": false,
+    "type": "lifecycle.record",
+  },
+  {
+    "delta": "Operation aborted",
+    "role": "coder",
+    "type": "message.delta",
+  },
+  {
+    "attemptId": "e7cffac5-2015-4871-a793-262ecff28567",
+    "kind": "stop_state",
+    "progressFingerprint": {
+      "checks": [],
+      "version": 1,
+    },
+    "reasonCode": "candidate_answer",
+    "reentryCount": 0,
+    "sequence": 2,
+    "state": "checking",
+    "stop_hook_active": false,
+    "terminal": false,
+    "type": "lifecycle.record",
+  },
+  {
+    "attemptId": "e7cffac5-2015-4871-a793-262ecff28567",
+    "kind": "stop_state",
+    "progressFingerprint": {
+      "checks": [],
+      "version": 1,
+    },
+    "reasonCode": "explicit_allow",
+    "reentryCount": 0,
+    "sequence": 3,
+    "state": "accepted",
+    "stop_hook_active": false,
+    "terminal": true,
+    "type": "lifecycle.record",
+  },
+  {
+    "result": {
+      "finalOutput": "Operation aborted",
+      "sharedContext": {
+        "handoffs": [],
+        "initialPrompt": "provider retry",
+        "notes": [
+          "steps: 1",
+        ],
+        "sessionId": "sess_57a8d5503c1a0029_1794760268150",
+      },
+      "status": "stopped_error",
+      "stopReason": "Operation aborted",
+      "terminalClassification": "stopped",
+      "terminalReason": "stopped_error",
+      "transcript": [],
+    },
+    "type": "query.completed",
+  },
+]
+
+ ❯ src/cli/rpc/retry.test.ts:134:25
+    132|     expect(calls).toBe(1); expect(test.signals[0]!.aborted).toBe(false…
+    133|     expect(test.genericCancel).not.toHaveBeenCalled();
+    134|     expect(test.events).toContainEqual(expect.objectContaining({ type:…
+       |                         ^
+    135|     expect(test.events.some(event => event.type === 'query.completed')…
+    136|   } finally { test.runtime.cancelCurrentRun(); await vi.runAllTimersAs…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  00:30:58
+   Duration  9.81s (transform 5.76s, setup 0ms, collect 9.44s, tests 105ms, environment 0ms, prepare 60ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/retry.test.ts -t 'existing provider response backoff'

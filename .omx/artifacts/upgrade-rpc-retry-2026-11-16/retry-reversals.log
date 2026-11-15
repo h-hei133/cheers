@@ -1,0 +1,4 @@
+{"name":"control-scope","assertionFailed":true,"exitCode":1,"sourceSha256":"eb8f3c0450fcc7ca23bd295c7ef6dfccb00c754d4c2ef4192c848e1db9c34846","restoredExactly":true}
+{"name":"schedule-ownership","assertionFailed":true,"exitCode":1,"sourceSha256":"8225c1cd6193b13b9505e105254a08ca817ed02c3f4d00ad013865d45cbb9a11","restoredExactly":true}
+{"name":"provider-outcome","assertionFailed":true,"exitCode":1,"sourceSha256":"84da6e7b187acd8afb045b921724e276f1453c2bd8a5d975b284cf7ebd16b82c","restoredExactly":true}
+{"name":"zero-delay-ownership","assertionFailed":true,"exitCode":1,"sourceSha256":"0d3e057d71eb1b0e7524dd4086a8e86bc9b57cdfc508e84799f0b7876648546f","restoredExactly":true}

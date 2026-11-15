@@ -3,7 +3,7 @@ import { PendingQueue } from "./queue.js";
 import { createAgentState, type AgentMessage, type AgentState, type InitialAgentState } from "./state.js";
 import type { AgentEventListener } from "./events.js";
 import type { AgentTool, AgentToolExecutionMode, ToolHooks } from "./tools.js";
-import type { RetryPolicy } from "./retry.js";
+import { cancelRetryWait, type RetryPolicy } from "./retry.js";
 import { captureCustomMessage, captureMessageHistory } from './custom.js';
 import { lastContextMessageIndex, sameContext } from './context.js';
 
@@ -152,6 +152,11 @@ export class AgentCore {
    */
   public abort(): void {
     this.activeRun?.abortController.abort();
+  }
+
+  /** Cancel only an existing retry wait; ordinary requests and queued input remain owned by the run. */
+  public abortRetry(): void {
+    cancelRetryWait(this.activeRun?.abortController.signal);
   }
 
   public waitForIdle(): Promise<void> {

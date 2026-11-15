@@ -48,6 +48,14 @@ export const DEFAULT_PROVIDER_RETRIES = 0;
  */
 const JITTER_FRACTION = 0.25;
 
+/** The existing run signal identifies its waits without giving retry control authority over the run. */
+const retryWaits = new WeakMap<AbortSignal, Set<() => void>>();
+
+export function cancelRetryWait(signal: AbortSignal | undefined): void {
+  if (!signal) return;
+  for (const cancel of [...(retryWaits.get(signal) ?? [])]) cancel();
+}
+
 /**
  * Failures worth trying again, matched against the provider's own wording.
  *
@@ -197,40 +205,41 @@ export function exceedsRetryCeiling(policy: RetryPolicy, requestedMs: number | u
  * Resolves `false` when the wait was cut short, so the caller returns instead of
  * retrying a request nobody is waiting for any more.
  */
-export function waitBeforeRetry(delayMs: number, signal: AbortSignal | undefined): Promise<boolean> {
-  if (signal?.aborted) return Promise.resolve(false);
-  if (delayMs <= 0) return Promise.resolve(true);
-  // Built by hand rather than with `Promise.withResolvers`, which needs Node 22.
-  // The declared floor is 20.3 for `AbortSignal.any`, and a helper that only exists
-  // on a newer runtime than the package claims turns the first retry into a
-  // `TypeError` on every machine inside the declared range. This went unnoticed
-  // until CI was checked: it runs Node 20, and every local run was Node 24.
-  let resolve!: (value: boolean) => void;
-  const promise = new Promise<boolean>((settle) => {
-    resolve = settle;
-  });
-  let remaining = delayMs;
-  let timer: ReturnType<typeof setTimeout>;
-  const schedule = (): void => {
-    // Node turns a delay above the signed 32-bit timer range into 1ms. An
-    // uncapped server wait must stay a wait, and remain cancellable between chunks.
-    const chunk = Math.min(remaining, 2 ** 31 - 1);
-    timer = setTimeout(() => {
-      remaining -= chunk;
-      if (remaining > 0) { schedule(); return; }
-      signal?.removeEventListener("abort", onAbort);
-      resolve(true);
-    }, chunk);
-  };
-  // Not `once` alone: the listener has to come off when the timer wins too, or
-  // every retry leaves one behind for the life of the process.
-  const onAbort = (): void => {
-    clearTimeout(timer);
-    resolve(false);
-  };
-  signal?.addEventListener("abort", onAbort, { once: true });
-  schedule();
-  return promise;
+export async function waitBeforeRetry(delayMs: number, signal: AbortSignal | undefined,
+  onScheduled?: () => void | Promise<void>): Promise<boolean> {
+  if (signal?.aborted) return false;
+  let cancelled = false, timer: ReturnType<typeof setTimeout> | undefined;
+  let resolveWait: ((value: boolean) => void) | undefined;
+  const onAbort = (): void => { cancelled = true; clearTimeout(timer); resolveWait?.(false); };
+  const waits = signal ? retryWaits.get(signal) ?? new Set<() => void>() : undefined;
+  if (signal && waits) { waits.add(onAbort); retryWaits.set(signal, waits); }
+  signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    // Register before publication, including zero-delay retries. Cancellation
+    // cannot overtake the original observer's settlement or swallow its error.
+    await onScheduled?.();
+    if (cancelled || signal?.aborted) return false;
+    if (delayMs <= 0) return true;
+    const waited = await new Promise<boolean>(resolve => {
+      resolveWait = resolve;
+      let remaining = delayMs;
+      const schedule = (): void => {
+        // Node treats larger timers as 1ms; keep uncapped waits cancellable.
+        const chunk = Math.min(remaining, 2 ** 31 - 1);
+        timer = setTimeout(() => {
+          remaining -= chunk;
+          if (remaining > 0) schedule();
+          else resolve(true);
+        }, chunk);
+      };
+      schedule();
+    });
+    return waited && !cancelled;
+  } finally {
+    clearTimeout(timer); signal?.removeEventListener('abort', onAbort);
+    waits?.delete(onAbort);
+    if (signal && waits?.size === 0 && retryWaits.get(signal) === waits) retryWaits.delete(signal);
+  }
 }
 
 /**

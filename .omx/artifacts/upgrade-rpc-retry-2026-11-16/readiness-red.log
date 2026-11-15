@@ -1,0 +1,33 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/cli/rpc/retry.test.ts (8 tests | 1 failed | 7 skipped) 1927ms
+   ↓ leaves an ordinary in-flight model request and its cancellation services untouched
+   ↓ does not cancel an unrelated command while no retry wait exists
+   ↓ cancels from the retry scheduling observer before another request without aborting its parent
+   ↓ keeps an explicit queued successor independent from the cancelled retry
+   × cancels retry through the same readiness input used by the CLI 1926ms
+     → expected "spy" to be called once, but got 3 times
+   ↓ cancels the existing provider response backoff while leaving the session signal live
+   ↓ cancels the existing provider network backoff while leaving the session signal live
+   ↓ leaves an accepted provider stream live and never replays its failed body
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  00:35:57
+   Duration  11.53s (transform 5.65s, setup 0ms, collect 9.34s, tests 1.93s, environment 0ms, prepare 58ms)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/cli/rpc/retry.test.ts > cancels retry through the same readiness input used by the CLI
+AssertionError: expected "spy" to be called once, but got 3 times
+ ❯ src/cli/rpc/retry.test.ts:124:16
+    122|   await test.runtime.executePrompt(test.context.session.id, 'readiness…
+    123|   await Promise.all(test.cancels);
+    124|   expect(step).toHaveBeenCalledOnce();
+       |                ^
+    125|   expect(test.signals[0]!.aborted).toBe(false); expect(test.genericCan…
+    126|   expect(test.events).toContainEqual(expect.objectContaining({ type: '…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/retry.test.ts -t 'same readiness input'

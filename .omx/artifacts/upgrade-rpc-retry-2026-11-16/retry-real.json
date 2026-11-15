@@ -1,0 +1,38 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "realProvider": true,
+  "status": "passed",
+  "buildId": "754fdcb217b0356b4a8666b773938d68bf6b22c898f631fcfdd8c060484e1a5a",
+  "probeSha256": "0194f390a3e1bd662873a31af994f2b1a1f90b0c454c23ae170be6a896eb20a0",
+  "stages": {
+    "ordinary": {
+      "passed": true,
+      "actualBodySent": true,
+      "inFlightControl": true,
+      "completed": true,
+      "singlePost": true
+    },
+    "reuse": {
+      "passed": true,
+      "idleControlNotBuffered": true,
+      "explicitSuccessorCompleted": true,
+      "singleAdditionalPost": true
+    },
+    "eof": {
+      "passed": true,
+      "exit0": true,
+      "validJsonLines": true
+    }
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "existingConfiguredTarget": true,
+    "minimalConfiguredModelEntry": true,
+    "isolatedValidObjects": true
+  },
+  "originalConfigUnchanged": true,
+  "requests": 2,
+  "bodyInspectable": false,
+  "actualRetryFailureInduced": false
+}

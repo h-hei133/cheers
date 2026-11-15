@@ -1,0 +1,22 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+const repo = process.cwd(), directory = path.join(repo, '.tmp/rpc-retry');
+const file = path.join(repo, 'packages/ts-shell/src/turn/pendingInput.ts');
+const original = fs.readFileSync(file), needle = '    abortRetry: () => live?.abortRetry?.(),\n';
+assert.equal(original.toString().split(needle).length, 2);
+const receipt = { name: 'readiness-forwarding', sourceSha256: createHash('sha256').update(original).digest('hex') };
+try {
+  fs.writeFileSync(file, original.toString().replace(needle, ''));
+  const logFile = path.join(directory, 'reversal-readiness-forwarding.log'), log = fs.openSync(logFile, 'w');
+  const result = spawnSync('rtk', ['npm', 'run', 'test', '-w', 'packages/ts-shell', '--', 'src/cli/rpc/retry.test.ts', '-t', 'same readiness input'],
+    { cwd: repo, stdio: ['ignore', log, log], timeout: 60_000 });
+  fs.closeSync(log); const output = fs.readFileSync(logFile, 'utf8');
+  assert.equal(result.status, 1); assert.match(output, /AssertionError/); assert.match(output, /1 failed/);
+  receipt.assertionFailed = true; receipt.exitCode = result.status;
+} finally { fs.writeFileSync(file, original); assert.deepEqual(fs.readFileSync(file), original); }
+receipt.restoredExactly = true;
+fs.writeFileSync(path.join(directory, 'readiness-reversal.json'), JSON.stringify(receipt, null, 2) + '\n');
+console.log(JSON.stringify(receipt));

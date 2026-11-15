@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_PROVIDER_RETRIES,
   DEFAULT_TURN_RETRIES,
+  cancelRetryWait,
   exceedsRetryCeiling,
   isRetryableFailure,
   isRetryableStatus,
@@ -188,6 +189,57 @@ describe("resolveRetryPolicy", () => {
 });
 
 describe("waitBeforeRetry", () => {
+  it.each([0, 5000])('owns a %dms retry before scheduling publication and waits for that callback to settle', async delay => {
+    const parent = new AbortController(); let release!: () => void, settled = false;
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const pending = waitBeforeRetry(delay, parent.signal, async () => {
+      cancelRetryWait(parent.signal); await hold;
+    }).then(value => { settled = true; return value; });
+    await Promise.resolve(); expect(settled).toBe(false); expect(parent.signal.aborted).toBe(false);
+    release(); await expect(pending).resolves.toBe(false);
+    await expect(waitBeforeRetry(0, parent.signal)).resolves.toBe(true);
+  });
+
+  it('cleans a rejected scheduling callback without retiring another wait on the same run', async () => {
+    const parent = new AbortController(), failure = new Error('publication failed'); let successor!: Promise<boolean>;
+    await expect(waitBeforeRetry(5000, parent.signal, () => {
+      successor = waitBeforeRetry(5000, parent.signal); throw failure;
+    })).rejects.toBe(failure);
+    cancelRetryWait(parent.signal);
+    await expect(successor).resolves.toBe(false);
+    expect(parent.signal.aborted).toBe(false);
+    await expect(waitBeforeRetry(0, parent.signal)).resolves.toBe(true);
+  });
+
+  it('cancels only captured waits and leaves a separately owned run ready to retry', async () => {
+    const first = new AbortController(), other = new AbortController();
+    const pending = waitBeforeRetry(5000, first.signal), independent = waitBeforeRetry(1, other.signal);
+    cancelRetryWait(first.signal); cancelRetryWait(first.signal); cancelRetryWait(undefined);
+    await expect(pending).resolves.toBe(false); await expect(independent).resolves.toBe(true);
+    expect(first.signal.aborted).toBe(false); expect(other.signal.aborted).toBe(false);
+    await expect(waitBeforeRetry(0, first.signal)).resolves.toBe(true);
+  });
+
+  it('removes the chunked timer and abort listener after retry-only cancellation', async () => {
+    vi.useFakeTimers();
+    const parent = new AbortController(), remove = vi.spyOn(parent.signal, 'removeEventListener');
+    try {
+      const pending = waitBeforeRetry(2 ** 31 + 5000, parent.signal);
+      await vi.advanceTimersByTimeAsync(2 ** 31 - 1);
+      expect(vi.getTimerCount()).toBe(1); cancelRetryWait(parent.signal);
+      await expect(pending).resolves.toBe(false);
+      expect(vi.getTimerCount()).toBe(0); expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+      expect(parent.signal.aborted).toBe(false);
+    } finally { cancelRetryWait(parent.signal); remove.mockRestore(); vi.useRealTimers(); }
+  });
+
+  it('does not turn a scheduling callback rejection into successful cancellation', async () => {
+    const parent = new AbortController(), failure = new Error('observer rejected');
+    const pending = waitBeforeRetry(5000, parent.signal, async () => { cancelRetryWait(parent.signal); throw failure; });
+    await expect(pending).rejects.toBe(failure);
+    await expect(waitBeforeRetry(0, parent.signal)).resolves.toBe(true);
+  });
+
   it("waits the delay when nothing interrupts it", async () => {
     await expect(waitBeforeRetry(5, undefined)).resolves.toBe(true);
   });

@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-16",
+  "task": "D.1",
+  "batch": "RPC retry cancellation and readiness forwarding",
+  "status": "locally-validated-sub-batch",
+  "delivery": "Local commit containing this receipt; not pushed",
+  "baseCommit": "bf01f8f1ceb9ff5d27cecf74cdd1300641dd0637",
+  "buildId": "754fdcb217b0356b4a8666b773938d68bf6b22c898f631fcfdd8c060484e1a5a",
+  "source": {
+    "packages/ts-shell/src/cli/rpc/host/settings.ts": {
+      "snapshot": "source/cli/rpc/host/settings.ts.txt",
+      "sha256": "eb8f3c0450fcc7ca23bd295c7ef6dfccb00c754d4c2ef4192c848e1db9c34846"
+    },
+    "packages/ts-shell/src/core/agent/agent.ts": {
+      "snapshot": "source/core/agent/agent.ts.txt",
+      "sha256": "358ec13731a38ba48c0b55dec0ff918085ffdc576fb532d0cf3c63d2ecea7ee8"
+    },
+    "packages/ts-shell/src/core/agent/loop.ts": {
+      "snapshot": "source/core/agent/loop.ts.txt",
+      "sha256": "8225c1cd6193b13b9505e105254a08ca817ed02c3f4d00ad013865d45cbb9a11"
+    },
+    "packages/ts-shell/src/core/agent/retry.test.ts": {
+      "snapshot": "source/core/agent/retry.test.ts.txt",
+      "sha256": "084f858aec5a5ceaadf9da3f11cdbe549598026a3be4f0b4134d660604eec859"
+    },
+    "packages/ts-shell/src/core/agent/retry.ts": {
+      "snapshot": "source/core/agent/retry.ts.txt",
+      "sha256": "0d3e057d71eb1b0e7524dd4086a8e86bc9b57cdfc508e84799f0b7876648546f"
+    },
+    "packages/ts-shell/src/turn/pendingInput.test.ts": {
+      "snapshot": "source/turn/pendingInput.test.ts.txt",
+      "sha256": "f1ae7966bdf1d713ab0348ab8681e41e8010b6707e89f50c66aa8513fd0ee8a6"
+    },
+    "packages/ts-shell/src/turn/pendingInput.ts": {
+      "snapshot": "source/turn/pendingInput.ts.txt",
+      "sha256": "554f79406bff9b83bc54ef50b68b51c438f8cf7edc0298de8f37a174ef525540"
+    },
+    "packages/ts-shell/src/turn/session.ts": {
+      "snapshot": "source/turn/session.ts.txt",
+      "sha256": "0b4202b724b12d7bee850cc22a6abe19aaf9bac670b1f6c2eed17fcf3dcb24ff"
+    },
+    "packages/ts-shell/src/turn/step.ts": {
+      "snapshot": "source/turn/step.ts.txt",
+      "sha256": "84da6e7b187acd8afb045b921724e276f1453c2bd8a5d975b284cf7ebd16b82c"
+    },
+    "packages/ts-shell/src/cli/rpc/retry.test.ts": {
+      "snapshot": "source/cli/rpc/retry.test.ts.txt",
+      "sha256": "acf9073a40367963e42ed1bdd797cb45c018549fa1f0562cb77f8fbc6604bf31"
+    }
+  },
+  "documents": {
+    ".wiki/log.md": {
+      "snapshot": "docs/.wiki/log.md.txt",
+      "sha256": "4a3e9d18b10fcba88b81008fbe40fa5099279c63c557843d2595254dde109fa2"
+    },
+    ".wiki/refactor/upgrade/MASTER.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/MASTER.md.txt",
+      "sha256": "a30f94a749bb70f3b286952337803af8d969a1e2c406a5db7d9590940ec14190"
+    },
+    ".wiki/refactor/upgrade/tasks.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/tasks.md.txt",
+      "sha256": "3c314585e04e6449aace4941348c70b1c928929a86a35948e49d8bc2192ba184"
+    },
+    ".wiki/refactor/upgrade/design.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/design.md.txt",
+      "sha256": "3cd20be2b94c090708175c1d425ef2fb30596dc8142affa5f64e27abb727666a"
+    },
+    ".wiki/refactor/upgrade/summary.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/summary.md.txt",
+      "sha256": "db0ff185a7116b9892a29513a68ebe06c9508effecfbfba45cb26d07efa31ce6"
+    },
+    "HANDOFF.md": {
+      "snapshot": "docs/HANDOFF.md.txt",
+      "sha256": "5d9b07964318aac4e9d6e3088ae1016b7c06d424f78a23029def76dae90ce376"
+    }
+  },
+  "validation": {
+    "tests": {
+      "status": "passed",
+      "suites": 14,
+      "tests": 412,
+      "log": "retry-final.log"
+    },
+    "restored": {
+      "status": "passed",
+      "suites": 4,
+      "tests": 67,
+      "log": "readiness-restored.log"
+    },
+    "gates": {
+      "status": "passed",
+      "count": 6,
+      "log": "retry-final.log",
+      "docsSourceAdvisories": 119
+    },
+    "docs": {
+      "status": "passed",
+      "log": "retry-docs.log",
+      "scope": "Strict docs gate and product/document diff check passed; raw evidence whitespace is preserved separately."
+    },
+    "responsibility": {
+      "modules": 2648,
+      "monoliths": 0,
+      "log": "retry-final.log"
+    },
+    "build": {
+      "status": "passed",
+      "log": "retry-final.log"
+    },
+    "reversals": {
+      "count": 5,
+      "actualAssertionsFailed": true,
+      "restoredExactly": true,
+      "receipts": [
+        "retry-reversals.json",
+        "readiness-reversal.json"
+      ]
+    },
+    "native": {
+      "status": "passed",
+      "receipt": "retry-native.json",
+      "loopbackPosts": 6,
+      "platform": "linux",
+      "compiledCli": true
+    },
+    "configuredProvider": {
+      "status": "passed",
+      "receipt": "retry-real.json",
+      "posts": 2,
+      "platform": "linux",
+      "compiledCli": true,
+      "originalActiveTarget": true,
+      "originalConfigUnchanged": true,
+      "minimalIsolatedCatalogue": true,
+      "bodyInspectable": false,
+      "actualRetryFailureInduced": false
+    },
+    "review": {
+      "code": "APPROVE",
+      "architecture": "CLEAR",
+      "filesPerLane": 10,
+      "rootExecutedValidation": true,
+      "reviewersExecutedValidation": false,
+      "receipts": [
+        "review-code.json",
+        "review-architecture.json"
+      ]
+    },
+    "rawEvidenceWhitespace": {
+      "unrestrictedCachedCheck": "reported-original-log-whitespace",
+      "productDocumentCachedCheck": "passed",
+      "rawBytesPreserved": true
+    }
+  },
+  "limits": {
+    "fullD1": false,
+    "remaining": [
+      "Final D.1 joint command acceptance",
+      "Other roadmap tasks"
+    ],
+    "tasksComplete": 22,
+    "tasksTotal": 62,
+    "pending": {
+      "total": 40,
+      "partial": 14,
+      "existingAwaitingAcceptance": 11,
+      "gaps": 13,
+      "needsVerification": 2
+    },
+    "goal": "paused by user after this sub-batch",
+    "otherPlatforms": false,
+    "push": false,
+    "ci": false,
+    "fullRepositorySuite": false,
+    "deterministicRealProviderFailure": false,
+    "providerBodyInspection": false
+  },
+  "failureClassification": "classification.md",
+  "evidence": {
+    "archive.mjs.txt": "8849f4bd717940125808538ca7f62599d993264bb5704c2be24dfebc68612715",
+    "build-manifest.json": "04cae4c01f39f211ae2f351303207be55aad35849c8f6f7caf9993110023b456",
+    "classification.md": "dd597cad05756c27a7ac444b78ef1b180af42407a5655374962e7242186e8f04",
+    "docs/.wiki/log.md.txt": "4a3e9d18b10fcba88b81008fbe40fa5099279c63c557843d2595254dde109fa2",
+    "docs/.wiki/refactor/upgrade/MASTER.md.txt": "a30f94a749bb70f3b286952337803af8d969a1e2c406a5db7d9590940ec14190",
+    "docs/.wiki/refactor/upgrade/design.md.txt": "3cd20be2b94c090708175c1d425ef2fb30596dc8142affa5f64e27abb727666a",
+    "docs/.wiki/refactor/upgrade/summary.md.txt": "db0ff185a7116b9892a29513a68ebe06c9508effecfbfba45cb26d07efa31ce6",
+    "docs/.wiki/refactor/upgrade/tasks.md.txt": "3c314585e04e6449aace4941348c70b1c928929a86a35948e49d8bc2192ba184",
+    "docs/HANDOFF.md.txt": "5d9b07964318aac4e9d6e3088ae1016b7c06d424f78a23029def76dae90ce376",
+    "green-first.log": "6bf7b621a7e5c42dc92c2eb9ba4d3138f99cd17a2264286b1ffd26dcec0098ef",
+    "readiness-red.log": "f7f49d03b2a07805ad26cd7ee6692225bd99a27e27e3c87d842b57e6f32920d1",
+    "readiness-restored.log": "7fb653bfbfcf2858b9692fc3122f1e3962bb482ee622f9e15bb6d919a81efb4b",
+    "readiness-reversal.json": "ead933fb9152bfa2ba8d319232478af1fe8ff83745865fefe4147109886075ea",
+    "readiness-reversal.mjs.txt": "a84d21b4123faa766009c59ca0becb7ceeb04d672ef95124ea23cde0db5a519e",
+    "red.log": "8ab2cd05915c751ca5be3d20b38123fe8d8a8023b26b6906ee7befae49c7b9d8",
+    "retry-accepted.log": "34b0977b87e25949173219d3d434dbf523b54ef5819e37c24daaa6059b2f4c8f",
+    "retry-docs.log": "b343ccc12290561bb865a2691e96199dd78ed3f156ca83960e19e35fd2e1eb3d",
+    "retry-final.log": "c5359e429956272a55b95e25659be5c3aeb96202f05edbf13ec2cfb38d6fbfde",
+    "retry-native-first.json": "5e9676714ba31ea6d7e3e6d6c057afa9fecb457ebc96f5b5bdaa2b969301ff91",
+    "retry-native-first.log": "06341ac2b0f4288f8360630dd41108cc043d3e701d0735b4a7cc7c3a52157120",
+    "retry-native-first.mjs.txt": "5e2d4d4ebdbab2f112d316b06141a43c4a0fdef99744d9788e017116c9aa1b48",
+    "retry-native.json": "e69ed75b296b4aa1b6642f9bdd754cf2d0d13365ce61b5f60c72f542491540ab",
+    "retry-native.log": "09a7f5fb9f5ec2860a2b0098fe9c5ec954b1a0ca1b8c53e1b0c0403455929963",
+    "retry-native.mjs.txt": "5e2d4d4ebdbab2f112d316b06141a43c4a0fdef99744d9788e017116c9aa1b48",
+    "retry-real.json": "88f116614178445c2fb133d77df20472894a5c8716d532ce219313ce84062e35",
+    "retry-real.log": "ad63ded10d281425e7518a9d62211bdd53904b38686fee3ba8ba65edc69ee4a8",
+    "retry-real.mjs.txt": "0194f390a3e1bd662873a31af994f2b1a1f90b0c454c23ae170be6a896eb20a0",
+    "retry-restored-build.log": "0a6d79089efe42847d8b8b738e9118b0c80d1ec20c10d0748af0c3f5d99cafc9",
+    "retry-reversals.json": "419de9ba5751f76b213c63db2c552bc0c34f22747f7110ca9fbf390f64c35080",
+    "retry-reversals.log": "6c60ee671624cd356373f14e720aebec0cd3d7f5de3f2c203feafc00bf2ea90a",
+    "retry-reversals.mjs.txt": "3515be4df3c81b1bbbe87bc173754dd6112339fc487defef3387f6c531a424d8",
+    "reversal-control-scope.log": "9b636cf8484403e7bc86a4fcc4e53bd3a97303d214d29d8a934d8b2fd58e3568",
+    "reversal-provider-outcome.log": "c9213ad13e515e1b6714005544f0991e910db210561c251c74ab2bc30f17ed12",
+    "reversal-readiness-forwarding.log": "0839dde773e61af4e3b55320c47ae9f524b40359bc57b20c7660c8db14d479c1",
+    "reversal-schedule-ownership.log": "16251ed80f9546dbc823c585e87488e8fac6c3fe2550cf7fa53b74fe6fb4e402",
+    "reversal-zero-delay-ownership.log": "109c26f8088dc2dac742169f037edbc7a7a2de6250e8cbe56e494272dfd09046",
+    "review-architecture.json": "0982bde009def86806bb092dd09088922b2184c9b77759235aa7c7c8c852953b",
+    "review-code.json": "fe736ade379e28cca1151acdc2edd7aac9e751ad8506d648c65a0b787f368f0a",
+    "source/cli/rpc/host/settings.ts.txt": "eb8f3c0450fcc7ca23bd295c7ef6dfccb00c754d4c2ef4192c848e1db9c34846",
+    "source/cli/rpc/retry.test.ts.txt": "acf9073a40367963e42ed1bdd797cb45c018549fa1f0562cb77f8fbc6604bf31",
+    "source/core/agent/agent.ts.txt": "358ec13731a38ba48c0b55dec0ff918085ffdc576fb532d0cf3c63d2ecea7ee8",
+    "source/core/agent/loop.ts.txt": "8225c1cd6193b13b9505e105254a08ca817ed02c3f4d00ad013865d45cbb9a11",
+    "source/core/agent/retry.test.ts.txt": "084f858aec5a5ceaadf9da3f11cdbe549598026a3be4f0b4134d660604eec859",
+    "source/core/agent/retry.ts.txt": "0d3e057d71eb1b0e7524dd4086a8e86bc9b57cdfc508e84799f0b7876648546f",
+    "source/turn/pendingInput.test.ts.txt": "f1ae7966bdf1d713ab0348ab8681e41e8010b6707e89f50c66aa8513fd0ee8a6",
+    "source/turn/pendingInput.ts.txt": "554f79406bff9b83bc54ef50b68b51c438f8cf7edc0298de8f37a174ef525540",
+    "source/turn/session.ts.txt": "0b4202b724b12d7bee850cc22a6abe19aaf9bac670b1f6c2eed17fcf3dcb24ff",
+    "source/turn/step.ts.txt": "84da6e7b187acd8afb045b921724e276f1453c2bd8a5d975b284cf7ebd16b82c",
+    "source-hashes.json": "93929efdfebd7a104f1a5fe99def4ba17d8061e08497db27beb6c5ac23800a4e",
+    "summary-2026-11-15.md": "4d914ccb6aa6d04912b5ca402efbf266c2dd06ad4137784b80bf1cbfdcf160a1",
+    "waits-green.log": "cbfe2a4d3bd17a73b6e7b1980802cbe0497efec66c3648abec4ba5c7ca81186f"
+  }
+}

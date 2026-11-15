@@ -423,3 +423,18 @@ Linux同代compiled CLI两loopback POST：high→max→auto→high循环及actua
 Linux当前compiled CLI三loopback POST实际覆盖：空历史nothing且零provider；summary已发未响应时get_state／new_session拒绝／compact busy／abort可达，取消socket关闭且无compaction-commit；另次指令允许新summary，成功缩小并写一条verified commit，EOF等响应后exit0。初两次fixture只有一条旧shell记录，无法形成现有合法cut，按现有policy补第二条旧记录；后两次observer查旧compaction事件名，实际生产记录为compaction-prepared／compaction-commit，修观察器而非产品。四失败receipt／driver完整保留。配置模型两次actual bodySent分别prompt和manual summary，当前RPC返回compacted、验证持久commit、JSONL／EOF通过；原连接与凭据不改，隔离最小有效catalog的限制及body不可检查继续明示。
 
 证据`.omx/artifacts/upgrade-rpc-compaction-2026-11-15/delivery.json`。实际M、复用10/10、无新生产依赖。D.1仍缺retry专属取消，22/62保持；不以本子批扩大为全压缩路径验收，无其他平台／push／CI。
+
+
+## RPC retry cancellation (2026-11-16)
+
+compact控制子批已提交`bf01f8f`。abort_retry原先调用cancelCurrentRun，取消普通provider请求、无关command和generic cancellation services，五个真实断言反例已先红。只读参考的retry-only控制／无retry时no-op决定采用，实施复用本项目现有waitBeforeRetry；WeakMap按kernel的原run signal保存当前wait closure，cancelRetryWait只调用当时捕获的wait，不abort parent或清空队列。AgentCore、TurnInput、RPC host逐层委派，不建立重试引擎或第二运行状态。
+
+wait登记先于retry_scheduled callback，包括零delay；callback的结算和拒绝仍await，取消不能隐藏其失败或提前宣称idle。timer／abort listener和同signal set仅清自身closure，旧wait不能退休后继wait；超过signed32 timer仍按原chunk策略。provider与outer层取消均报告明确failed、retry耗尽／不再派发，保留已观测内容和physical／failure facts，不走Stop或完成状态。显式follow-up仍属于原队列，可作为独立新问题执行。
+
+最后一项SSE夹具曾返回已接受HTTP200后故障并要求retry timer，违背现有acceptedResponse防重放合同，归类harness/setup drift；改为真正的pre-response网络失败backoff，同时新增挂起accepted stream中的retry取消no-op和body故障单次请求失败。初三套件51项绿不代表真实CLI接线完整；当前build `29105ad640c0`原生首轮实际继续重试，确认CLI／entrypoint的pendingTurnInput代理遗漏abortRetry。新增RPC通过同一代理的反例期望一步实际三步先红，再仅补原代理向当前adopted handle转发；adopt前的取消不缓存，也不转给后来run。该首次真实产品失败回执和原driver保留。
+
+最终六静态门、14套件412项、2648模块0monoliths及build `754fdcb217b0356b4a8666b773938d68bf6b22c898f631fcfdd8c060484e1a5a`通过。五个有效反转均实际AssertionError并逐字节恢复；最终恢复4套件67项通过。四个初反转对应control scope、scheduled所有权、provider failure outcome和zero-delay，后续readiness转发另有有效反转。历史初绿／错误夹具／旧build不取代最终证据。
+
+Linux同代compiled CLI六loopback POST覆盖：普通已接受响应不被abort_retry取消并正常完成；HTTP429的provider／outer两层等待各单POST取消为failed，无第二请求，之后显式新prompt正常；真实native bash运行中retry取消无动作且exit0；已接受stream后body故障只失败一次、不重放。所有独立进程JSONL有效、EOF exit0。已配置模型同代两次actual bodySent通过，在途abort_retry保留普通请求、idle取消不缓存、第二prompt成功；未主动制造真实provider限流／网络故障，无法检查Undici body，失败取消证明来自本地网络。沿用原active连接与凭据，损坏models目录仅在隔离home用同目标最小有效entry，原四配置文件hash不变，临时秘密清除。
+
+证据`.omx/artifacts/upgrade-rpc-retry-2026-11-16/delivery.json`。独立代码APPROVE／架构CLEAR，各自实读10文件且未执行验证；本子批报告另存，上一批批准不延伸；完整D.1审计lane未完成，不作approval。实际M，无新生产依赖，额外依赖2（scheduled发布前捕获、readiness代理转发）。本子批后按用户要求暂停；D.1整项仍部分，22/62保持，后续恢复时先做整项联合验收。没有push、远端CI或其他平台声明。

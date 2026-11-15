@@ -2,7 +2,7 @@
 
 > **Task**: 核实研究规划，实施仍然成立的任务，并按实际生产路径验收。
 > **Started**: 2026-11-14
-> **Last Updated**: 2026-11-15
+> **Last Updated**: 2026-11-16
 > **Mode**: LOCAL_ONLY
 
 ## Scope and authority
@@ -18,13 +18,13 @@
 - [Task inventory](tasks.md)：唯一任务与验收清单。
 - [Design and evidence](design.md)：结构事实、参考决策、复用与实施顺序。
 - [Earlier repair evidence](../../wiki/references/runtime-upgrade-review-2026-11.md)：上一轮证据，不能替代本轮任务验收。
-- [Pause summary](summary.md)：2026-11-15此前暂停时的历史快照；当前状态以本页和任务清单为准。
+- [Pause summary](summary.md)：2026-11-16当前暂停总结，列出已完成范围、实际测试及全部40项未完成任务。
 
 ## Current status
 
-**Current phase**: active；D.1设置／发现子批已提交`0caf82c`。compact控制与结果子批完成本地验收，随本记录提交；下一修复已确认的abort_retry误取消，再做D.1联合验收。当前22/62项完成。
-**Last completed batch**: compact在首个handler await前登记原command owner，响应复用rpcResponses在EOF结算，读取／busy／abort保持可达，非compacted结果保留结构化status。四实际断言红后修，六门4/43、恢复1/5、三个有效反转exact恢复、2647模块0monoliths及build `1a9b082e419d`通过；限定APPROVE／CLEAR。Linux当前CLI三loopback POST验证空历史、挂起摘要取消／无commit、复用成功／持久commit与EOF；配置模型两次actual bodySent完成prompt与compact。D.1整项仍部分。
-**Goal**: active；40项未完成，其中14部分、11已有待验收、13确认缺口、2待核实。保留完整规划，不关闭总目标。
+**Current phase**: paused（用户要求当前子批收尾后暂停后续任务）；compact子批已提交`bf01f8f`，retry专属取消子批随本记录本地提交。当前22/62项完成，D.1仍为部分，未进入整项联合验收。
+**Last completed batch**: abort_retry只取消当前kernel signal登记的retry waits，原run／command／generic cancellation不受影响；登记先于retry_scheduled，callback结算与失败继续被观察。取消报告明确failed且不再重试，显式后继队列独立；CLI就绪输入代理向已adopted handle转发，早期取消不缓存。六门、14套件412项、五个有效反转exact恢复、恢复4/67、2648模块0monoliths及build `754fdcb217b0`通过。Linux同代CLI六loopback POST验证两层取消、普通stream／native command保留、复用和不重放；配置模型两次bodySent验证普通在途取消无动作及后继请求。本子批独立代码APPROVE／架构CLEAR，限于10文件；原生回执由root执行。
+**Goal**: paused；40项未完成，其中14部分、11已有待验收、13确认缺口、2待核实。保留完整规划，恢复须由用户授权，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -62,6 +62,8 @@ RPC shell子批遥测：实际L；复用检查通过原gate／commands／capture
 RPC设置／发现子批遥测：实际L；复用检查10/10，沿用配置publication、effort capability／endpoint budget、command invocation、skill catalog和原JSONL response join，无新loader或执行平面。额外依赖3（保存后的完整publication、应用callback换代、异步发现到最终响应的准入与取消）。project默认覆盖显式user值的推断被反证，保留原优先级；实际launch／显式config输入差异如实报告。下一批只接原retry等待的取消归属与compact command admission，不重建重试或压缩引擎，22/62保持。
 
 RPC压缩控制子批遥测：实际M；复用10/10，原session commands／compaction／JSONL owner不变，无新增生产依赖。两处原生夹具错误分别为缺少合法旧prefix及旧compaction事件名，保留失败记录并修观察器，不修改压缩切点／持久化规则。retry所有权独立实施；22/62保持。
+
+RPC重试取消子批遥测：实际M；复用原retry wait、kernel run signal、TurnInput和CLI就绪代理，无新重试引擎／执行平面或生产依赖。额外依赖2（retry_scheduled发布前所有权、就绪输入转发）；真实CLI首先证明仅接runTurn不足，补代理后重建并重跑。已接收SSE不重放是既有合同，错误重试夹具修为pre-response网络失败并另验accepted stream。配置模型实际请求通过，但没有主动制造真实服务限流或读其body；失败取消证据来自本地HTTP及聚焦测试。按用户要求此批后暂停，D.1联合验收及其余40项保留。
 
 ## Session log
 

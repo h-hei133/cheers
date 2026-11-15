@@ -1,0 +1,36 @@
+scc-gate root=packages/ts-shell/src files=3354
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=66 read=66 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=15 registered=15 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=24 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+Checked 10 files in 12ms. No fixes applied.
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ✓ src/cli/rpc/retry.test.ts (8 tests) 520ms
+ ✓ src/cli/rpc/runtimeHost.test.ts (31 tests) 1078ms
+ ✓ src/entrypoints/cliRuntimeInvocation.test.ts (28 tests) 939ms
+ ✓ src/turn/step.test.ts (117 tests) 565ms
+ ✓ src/turn/session.test.ts (50 tests) 519ms
+ ✓ src/core/shell/sessionRuntime.test.ts (50 tests) 456ms
+ ✓ src/cli/rpc/compaction.test.ts (5 tests) 212ms
+ ✓ src/turn/retry.test.ts (9 tests) 59ms
+ ✓ src/core/agent/retry.test.ts (43 tests) 52ms
+ ✓ src/core/agent/agent.test.ts (27 tests) 33ms
+ ✓ src/core/agent/loop.test.ts (30 tests) 34ms
+ ✓ src/cli/rpc/rpcServer.test.ts (3 tests) 6ms
+ ✓ src/turn/pendingInput.test.ts (7 tests) 5ms
+ ✓ src/cli/runtime/cliRuntimeInvocationBridge.test.ts (4 tests) 130ms
+ Test Files  14 passed (14)
+      Tests  412 passed (412)
+   Start at  00:36:51
+   Duration  26.95s (transform 7.47s, setup 0ms, collect 19.56s, tests 4.61s, environment 2ms, prepare 696ms)
+module-facade-check ceiling=20 modules=2648 reported=0 thresholds=delegationRatio>=0.9,branching<=0,ownStateWrites<=0
+  verdict         names lines  delegation  branching  lines/name  module
+module-facade-summary monoliths=0 thin_facades=0
+Wrote build manifest 754fdcb217b0 for @cheers/ts-shell@0.1.0
