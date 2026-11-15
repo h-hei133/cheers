@@ -29,6 +29,8 @@ import { modelPicker } from '../interactive/picker/model.js';
 import { setSessionServiceTier } from '../../core/commands/model/serviceTier.js';
 import { captureSummaryRole } from '../provider/summary.js';
 import * as accountRenewal from '../../core/auth/account/renewal.js';
+import { buildCompactionWiring } from './compaction.js';
+import { createTurnContextPreparer } from '../../turn/context/prepare.js';
 
 const observed = vi.hoisted(() => ({ deps: undefined as SessionRuntimeDependencies | undefined, compaction: undefined as CompactionSetup | undefined }));
 // Exercise the production composition and real summary engine without starting UI/scheduling loops.
@@ -447,5 +449,35 @@ it('renews the summary account once and refuses append across the resulting conf
   const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
   expect(stored.providerConnections!.find(connection => connection.id === 'b')?.accountAuth?.openai).toMatchObject({ ...fresh, expiresAt: expect.any(Number) });
   expect(stored.providerConnections!.find(connection => connection.id === 'a')).toEqual(edit.values.providerConnections![0]);
+  expect(stored.activeProviderConnectionId).toBe('a');
+});
+
+it('preserves an already dispatched summary token rotation while rejecting a retired physical request', async () => {
+  const setup = await fixture('gpt-5.4'), edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const old = { type: 'openai-chatgpt-account' as const, accessToken: 'synthetic-old', refreshToken: 'synthetic-refresh', expiresAt: 1, accountId: 'b' };
+  const fresh = { ...old, accessToken: accountToken('retired-fresh', 'b'), refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
+  writeUserRuntimeConfigFile({ ...edit.values, maxOutputTokens: undefined,
+    providerConnections: edit.values.providerConnections!.map(connection => connection.id === 'b'
+      ? { ...connection, baseUrl: 'https://chatgpt.com/backend-api', authType: 'account-auth', apiKey: undefined, accountAuth: { openai: old } }
+      : connection) }, edit);
+  const address = edit.values.providerConnections!.find(connection => connection.id === 'a')!.baseUrl!;
+  const summaryAddress = new URL(edit.values.providerConnections!.find(connection => connection.id === 'b')!.baseUrl!);
+  accountWire(summaryAddress.origin, '/b/v1/codex/responses');
+  const config = projectSessionModel(getRuntimeConfig(setup.root), setup.session.id), catalog = loadCatalog();
+  let current = true;
+  const renewal = observeOAuthRenewal(fresh, () => { current = false; });
+  const target = { provider: { provider: 'openai', model: 'main', baseUrl: address, headers: {} },
+    tools: [], systemPrompt: '', catalog, sessionId: setup.session.id, workspaceRoot: setup.root, maxOutputTokens: 100,
+    isCurrent: () => current };
+  const prepared = await createTurnContextPreparer(target, { allowTools: false }, {
+    explicitEffort: false, effortAccepted: () => true, streamAttempts: () => 0, replayBinding: 'fixture',
+  })([{ role: 'user', content: 'Continue.' }]);
+  const bound = buildCompactionWiring({ provider: { ...target.provider, providerId: 'openai' }, runtimeConfig: config,
+    workspaceRoot: setup.root, sessionId: setup.session.id, catalog }).forRequest(prepared, () => undefined);
+  await expect(bound.summarize.prepare!({ messages: [{ role: 'user', content: 'Summarize.' }] })).rejects.toThrow();
+  expect(renewal).toHaveBeenCalledOnce(); expect(setup.requests).toEqual([]);
+  const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
+  expect(stored.providerConnections!.find(connection => connection.id === 'b')?.accountAuth?.openai)
+    .toMatchObject({ accessToken: fresh.accessToken, refreshToken: fresh.refreshToken });
   expect(stored.activeProviderConnectionId).toBe('a');
 });

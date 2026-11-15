@@ -12,11 +12,16 @@ import { createComponentLogger } from '../observability/structuredLogger.js';
 import { createCompactionStep, type CompactionPolicy, type CompactionReason,
   type SummarizeHistory, type SummarizeTurnPrefix } from '../session/compaction.js';
 
-export interface CompactionSetup {
-  readonly authority?: import('../session/compaction/contract.js').CompactionAuthority;
+export interface CompactionBinding {
   readonly policy: CompactionPolicy;
   readonly summarize: SummarizeHistory;
   readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
+}
+
+export interface CompactionSetup extends CompactionBinding {
+  readonly authority?: import('../session/compaction/contract.js').CompactionAuthority;
+  /** Bind summaries and their budgets to the request that actually needs compaction. */
+  readonly forRequest?: (prepared: PreparedTurnContext, admission: () => string | undefined) => CompactionBinding;
   /** Record the accepted checkpoint durably. */
   readonly onCompact: (input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }) => void;
   /** User-visible notice for a refusal or a safely projected automatic failure. */
@@ -83,13 +88,20 @@ export function turnCompaction(input: {
     if (!context.isCurrent()) throw new Error('Request history changed before compaction preparation.');
     if (!force) { requestContext = context; attempted = false; }
     else if (!requestContext || attempted) return undefined;
+    signal?.throwIfAborted();
+    const admission = () => !context.isCurrent() ? 'Live history changed during compaction.'
+      : !prepared.isCurrent() ? 'Request target changed during compaction.' : undefined;
+    const binding = setup.forRequest?.(prepared, admission) ?? setup;
+    signal?.throwIfAborted();
+    const refusal = admission();
+    if (refusal) throw new Error(refusal);
     let candidate: PreparedTurnContext | undefined;
-    const policy = capturedCompactionPolicy(setup.policy, prepared, {
-      force, admission: () => context.isCurrent() ? undefined : 'Live history changed during compaction.',
+    const policy = capturedCompactionPolicy(binding.policy, prepared, {
+      force, admission,
       onPrepared: captured => { candidate = captured; },
     });
     const update = await (force ? recover : prepare)({ messages: prepared.sourceMessages, toolResults: [],
-      toolsAllowed: prepared.allowTools }, signal, policy);
+      toolsAllowed: prepared.allowTools }, signal, policy, binding);
     attempted ||= candidate !== undefined;
     if (!context.isCurrent()) throw new Error('Request history changed during compaction preparation.');
     if (!update?.messages) return undefined;

@@ -11894,3 +11894,9 @@ Linux当前编译SDK inline／TS文件扩展撤权、abort复用和后继资源�
 T3.1已提交`d683a3d`。C.1现在解析完整physical endpoint／auth／transport／limits，route前捕获原authority，candidate／refresh保持目标，reasoning归属实际replay。六门、15/297、0monoliths及build `3ff7e7c3ad7b`通过，限定只读复核CLEAR，六有效反转红且exact恢复。首个candidate反转普通拒绝不算断言反证，补精确成功断言后重跑；原失败与旧build证据保留。
 
 Linux同代compiled内部invocation实际两loopback验证正确派发、scope及凭据撤销零POST；公开SDK配置模型一次真实bodySent通过。公共virtual注册／session状态／retry/direct／summary fallback仍待完成，C.1和E.7不勾选，21/62保持。继续目标，按批本地提交，无push／CI声明。
+
+### 2026-11-15：自动摘要绑定实际路由目标
+
+物理目标批已提交`e61a340`。自动／overflow压缩现绑定prepared physical target的transport／replay／shape／预算，显式summary角色优先；保留原进度与connection owner。显式角色renewal接收消费者准入，但已派发且验证的rotation仍按原owner保存，成功共享结果不被退休消费者污染。六门、15/246、0monoliths、build `9e91decd500a`通过，五断言反转红且exact恢复，限定独立复核CLEAR。
+
+Linux同代内部compiled三场景实际两loopback通过，每格route/compact一次；公开SDK配置模型prompt和compact共两次actual bodySent。前两原生夹具错误触发threshold而非overflow，失败回执/source保存；最终调整该场景物理窗口后验证首请求拒绝→摘要→原target重试，未修改产品。证据归档`.omx/artifacts/upgrade-summary-target-2026-11-15/`，临时状态清理。C.1/E.7、生产注册／分支状态／direct路由仍开，21/62保持，继续后续批次，无push／CI声明。

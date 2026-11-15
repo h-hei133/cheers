@@ -1,5 +1,5 @@
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
-import type { Admission } from '../../core/network/admission.js';
+import { assertAdmission, type Admission } from '../../core/network/admission.js';
 import type { RequestPolicy } from '../../core/agent/request/model.js';
 import type { AgentMessage } from '../../core/agent/state.js';
 import { convertMessages, type MessageConverter } from '../../core/agent/messages.js';
@@ -35,6 +35,9 @@ import { measuredProjectionPrefix } from '../../turn/measurement.js';
 import { estimatePromptTail } from '../../context/request/tail.js';
 import { summaryBudget } from '../provider/summary/budget.js';
 import { currentProviderConnections } from '../../provider/request/connection.js';
+import type { PreparedTurnContext } from '../../turn/context/contract.js';
+import type { CompactionBinding, CompactionSetup } from '../../turn/compaction.js';
+import { summaryTarget, summaryTransport } from './compaction/target.js';
 
 /** Bind the captured publication and native session owner at each compaction entry point. */
 export function nativeCompactionAuthority(input: {
@@ -75,22 +78,12 @@ export interface CompactionProvider extends SummaryProvider {
   readonly replayBinding?: string;
 }
 
-interface CompactionWiring {
-  readonly policy: CompactionPolicy;
-  readonly summarize: SummarizeHistory;
+interface CompactionWiring extends CompactionBinding {
   readonly summarizeTurnPrefix: SummarizeTurnPrefix;
+  readonly forRequest: NonNullable<CompactionSetup['forRequest']>;
 }
 
-/**
- * The engine wiring both compaction paths run on.
- *
- * The automatic step and the `/compact` command must condense the same history
- * the same way, so they are handed the same policy, the same summarizers, and
- * the same measured-usage callback. Building this twice is how the manual path
- * came to keep a fixed count of messages while the automatic path worked to a
- * token budget.
- */
-export function buildCompactionWiring(input: {
+interface CompactionInput {
   readonly convertToLlm?: MessageConverter;
   readonly workspaceRoot?: string;
   readonly onCredentialPersisted?: () => void;
@@ -108,6 +101,7 @@ export function buildCompactionWiring(input: {
     readonly credentialId?: string;
     readonly credentialGeneration?: string;
     readonly replayBinding?: string;
+    readonly serviceTier?: string;
   };
   readonly runtimeConfig: RuntimeConfig;
   /** Captured request identity, including its credential namespace. Never reselect here. */
@@ -123,20 +117,30 @@ export function buildCompactionWiring(input: {
    * happens mid-turn.
    */
   readonly catalog: readonly CatalogProvider[];
-}): CompactionWiring {
+}
+
+/** Manual and automatic summaries share policy construction and one explicit role renewal. */
+export function buildCompactionWiring(input: CompactionInput): CompactionWiring {
+  const summaryRole = captureSummaryRole({ config: input.runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
+    admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
+  return compactionWiring(input, summaryRole);
+}
+
+function compactionWiring(input: CompactionInput, summaryRole: ReturnType<typeof captureSummaryRole>,
+  prepared?: PreparedTurnContext): CompactionWiring {
   const provider = input.provider;
   const usageFor = sessionUsageRecorder(input.sessionId);
   if (catalogProvider(input.catalog, provider.providerId, provider.baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before compacting.');
   const runtimeConfig = input.runtimeConfig;
-  const summaryRole = captureSummaryRole({ config: runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
-    admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
-  const serviceTier = summaryRole ? undefined : requestServiceTier(runtimeConfig,
+  const serviceTier = summaryRole ? undefined : prepared ? provider.serviceTier : requestServiceTier(runtimeConfig,
     input.resolution ?? { provider: provider.providerId, model: provider.model }, input.catalog, provider.baseUrl, provider.endpoint);
   const prepare = async (request: Omit<CompactionRequest, 'provider' | 'fetchImpl' | 'messages'> & { readonly messages: readonly AgentMessage[] }) => {
     const ownerSignal = currentProviderConnections()?.signal;
     request = { ...request, signal: ownerSignal && request.signal ? AbortSignal.any([request.signal, ownerSignal]) : request.signal ?? ownerSignal };
     request.signal?.throwIfAborted();
-    const summaryProvider = summaryRole ? await summaryRole.resolve() : { ...provider, ...effectiveLimits, serviceTier };
+    assertAdmission(input.admission);
+    const summaryProvider = summaryRole ? await summaryRole.resolve(() => { request.signal?.throwIfAborted(); return input.admission?.(); })
+      : { ...provider, ...effectiveLimits, serviceTier };
     request.signal?.throwIfAborted();
     const blocked = input.admission?.();
     if (blocked) throw new Error(blocked);
@@ -144,11 +148,17 @@ export function buildCompactionWiring(input: {
     request.signal?.throwIfAborted();
     const changed = input.admission?.();
     if (changed) throw new Error(changed);
-    return prepareCompactionRequest({ ...request, messages, provider: summaryProvider,
+    const transport = summaryTransport(!summaryRole && prepared ? prepared.target : {
+      fetchImpl: providerFetchForEndpoint(runtimeConfig, summaryProvider.endpoint, endpointShape, input.admission),
+      modelTransport: providerModelTransport(runtimeConfig, summaryProvider.endpoint, input.admission),
+    }, input.admission);
+    const captured = prepareCompactionRequest({ ...request, messages, provider: summaryProvider,
       onUsage: usageFor({ provider: summaryProvider.providerId ?? '', model: summaryProvider.model,
         baseUrl: summaryProvider.baseUrl, rates: catalogModel(input.catalog, summaryProvider.providerId ?? '', summaryProvider.model, summaryProvider.baseUrl)?.cost }),
-      fetchImpl: providerFetchForEndpoint(runtimeConfig, summaryProvider.endpoint, endpointShape, input.admission),
-      modelTransport: providerModelTransport(runtimeConfig, summaryProvider.endpoint, input.admission) });
+      ...transport });
+    return Object.freeze({ ...captured, send: (dispatch?: CompactionDispatch) => {
+      request.signal?.throwIfAborted(); assertAdmission(input.admission); return captured.send(dispatch);
+    } });
   };
   const historyRequest = (request: Parameters<SummarizeHistory>[0]) => ({
     requestPolicy: input.requestPolicy, maxOutputTokens: summaryLimits.maxOutputTokens,
@@ -162,23 +172,24 @@ export function buildCompactionWiring(input: {
   // Resolved per model rather than read from one global number: the catalog
   // knows each model's window, and using a single value compacted a million-token
   // model at sixty-four thousand.
-  const resolvedWindow = resolveContextWindow({
+  const resolvedWindow = prepared?.contextWindow !== undefined ? { window: prepared.contextWindow, warning: undefined } : resolveContextWindow({
     catalog: input.catalog,
     provider: provider.providerId,
     model: provider.model,
     baseUrl: provider.baseUrl,
-    configured: configuredContextWindow(runtimeConfig, input.resolution ?? { provider: provider.providerId, model: provider.model }),
+    configured: prepared ? undefined : configuredContextWindow(runtimeConfig, input.resolution ?? { provider: provider.providerId, model: provider.model }),
   });
   const mainModel = catalogModel(input.catalog, provider.providerId, provider.model, provider.baseUrl);
   if (resolvedWindow.warning !== undefined) {
     windowLogger.warn(resolvedWindow.warning);
   }
-  const summaryReserve = resolveTokenBudget(runtimeConfig.modelTokenBudgets, provider.providerId, provider.model,
-    'reserveTokens', runtimeConfig.reserveTokens, 0);
-  const fallbackBudget = summaryBudget({ contextWindow: resolvedWindow.window, inputLimit: mainModel?.inputLimit,
+  const summaryReserve = prepared ? prepared.reserveTokens ?? 0 : resolveTokenBudget(runtimeConfig.modelTokenBudgets,
+    provider.providerId, provider.model, 'reserveTokens', runtimeConfig.reserveTokens, 0);
+  const inputLimit = prepared ? prepared.inputLimit : mainModel?.inputLimit;
+  const fallbackBudget = summaryBudget({ contextWindow: resolvedWindow.window, inputLimit,
     maxOutputCeiling: mainModel?.maxTokens, reserveTokens: summaryReserve,
     providerOwnedOutput: endpointShape(provider.endpoint).outputControl === 'provider' });
-  const summaryLimits = summaryRole?.limits ?? { contextWindow: resolvedWindow.window, inputLimit: mainModel?.inputLimit,
+  const summaryLimits = summaryRole?.limits ?? { contextWindow: resolvedWindow.window, inputLimit,
     maxOutputTokens: fallbackBudget.maxOutputTokens, reserveTokens: summaryReserve };
   // The fallback summarizer is the main model, so its request shape is the one
   // the turn already resolved: the wiring site passes it on the provider. The
@@ -189,6 +200,12 @@ export function buildCompactionWiring(input: {
   const effectiveLimits = fallbackShape ? { ...summaryLimits, shape: fallbackShape } : summaryLimits;
   const emptySchemaDigest = requestIdentity({ tools: [] }).schemaDigest;
   return {
+    forRequest: (request, admission) => {
+      const admit = () => input.admission?.() ?? admission() ?? (!request.isCurrent() ? 'The captured request target changed.' : undefined);
+      assertAdmission(admit);
+      return compactionWiring({ ...input, provider: summaryTarget(request), admission: admit,
+        resolution: { provider: request.activeProvider, model: request.activeModel } }, summaryRole, request);
+    },
     policy: {
       enabled: runtimeConfig.compactionEnabled,
       summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([
@@ -198,12 +215,12 @@ export function buildCompactionWiring(input: {
       segmentTokens: summaryRole?.segmentTokens ?? fallbackBudget.segmentTokens,
       mergeTokens: summaryRole?.mergeTokens ?? fallbackBudget.mergeTokens,
       contextWindow: resolvedWindow.window,
-      inputLimit: mainModel?.inputLimit,
+      inputLimit,
       // Per-model budgets where the user set them, the global value otherwise.
       // A single global budget cannot suit every model: the same "keep the last
       // twenty thousand tokens" is most of a small model's window and a
       // rounding error in a large one.
-      reserveTokens: resolveTokenBudget(
+      reserveTokens: prepared ? prepared.reserveTokens ?? 0 : resolveTokenBudget(
         runtimeConfig.modelTokenBudgets,
         provider.providerId,
         provider.model,
@@ -211,7 +228,7 @@ export function buildCompactionWiring(input: {
         runtimeConfig.reserveTokens,
         DEFAULT_RESERVE_TOKENS,
       ),
-      outputTokens: configuredOutputLimit(runtimeConfig, provider.endpoint),
+      outputTokens: prepared ? prepared.outputTokens : configuredOutputLimit(runtimeConfig, provider.endpoint),
       keepRecentTokens: resolveTokenBudget(
         runtimeConfig.modelTokenBudgets,
         provider.providerId,

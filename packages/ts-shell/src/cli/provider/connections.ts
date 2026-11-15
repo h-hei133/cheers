@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { CompactionSetup } from '../../turn/session.js';
+import type { CompactionBinding } from '../../turn/compaction.js';
 import { withProviderConnections, type ProviderConnectionLifetime } from '../../provider/request/connection.js';
 import type { PreparedSummaryStep } from '../../session/compaction/contract.js';
 
@@ -25,7 +26,7 @@ export function createProviderConnections(context: ShellRuntimeContext) {
     return current.lifetime;
   };
   const run = <T>(operation: () => T): T => withProviderConnections(capture(), operation);
-  const compaction = (setup: CompactionSetup, scope: ProviderConnectionLifetime): CompactionSetup => {
+  const compaction = <T extends CompactionBinding>(setup: T & Pick<CompactionSetup, 'forRequest'>, scope: ProviderConnectionLifetime): T & Pick<CompactionSetup, 'forRequest'> => {
     const summarize = setup.summarize;
     const prefix = setup.summarizeTurnPrefix;
     const prepare = <T extends readonly unknown[]>(callback: (...args: T) => Promise<PreparedSummaryStep>) =>
@@ -36,6 +37,8 @@ export function createProviderConnections(context: ShellRuntimeContext) {
           withProviderConnections(scope, () => captured.send(dispatch)) });
       });
     return { ...setup,
+      ...(setup.forRequest ? { forRequest: (...args: Parameters<NonNullable<CompactionSetup['forRequest']>>) =>
+        withProviderConnections(scope, () => compaction(setup.forRequest!(...args), scope)) } : {}),
       summarize: Object.assign((...args: Parameters<typeof summarize>) => withProviderConnections(scope, () => summarize(...args)),
         { dispatchAware: summarize.dispatchAware, preflight: summarize.preflight,
           ...(summarize.prepare ? { prepare: prepare(summarize.prepare) } : {}) }),

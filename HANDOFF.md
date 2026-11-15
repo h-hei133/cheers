@@ -2613,3 +2613,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A virtual choice reaches a different model with the original endpoint, transport or credential; refresh can also adopt a replacement installed by the router itself.
 - **Root Cause:** Only model labels were routed, executable handles were captured after the callback, and returned reasoning retained the original replay namespace.
 - **Rule:** Capture original data and executable identities before routing. Resolve a complete physical target under the existing catalogue, scope and credential authority, retain it through candidate compaction and refresh, and revalidate at transport handoff. Bind response origin to that target's replay identity. A later callback must not renew the authority of the original request.
+
+### Shared Renewal Success Does Not Belong To Its First Consumer
+- **Symptom:** A retired summary consumer dispatches after renewal, or its rejection poisons a successful rotation needed by the next consumer.
+- **Root Cause:** Renewal has a host-owned credential result but request-owned dispatch authority; caching the first consumer's post-renewal check conflates the two lifetimes.
+- **Rule:** Check each consumer before renewal dispatch and again when consuming the shared result. Cache successful credentials under the host lifetime, then apply consumer rejection separately. Preserve conditional persistence of verified already-dispatched rotations; cancellation cannot erase an external rotation. Bind automatic summaries, budgets and transport to the prepared physical request while keeping explicit-role precedence and the existing compaction progress owner.

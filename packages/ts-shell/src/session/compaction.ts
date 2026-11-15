@@ -754,14 +754,16 @@ export interface CompactionStepOptions {
 export function createCompactionStep(
   policy: CompactionPolicy,
   options: CompactionStepOptions,
-): (snapshot: NextStepSnapshot, signal?: AbortSignal, currentPolicy?: CompactionPolicy) => Promise<NextStepUpdate | undefined> {
+): (snapshot: NextStepSnapshot, signal?: AbortSignal, currentPolicy?: CompactionPolicy,
+  summarizers?: Pick<CompactionStepOptions, 'summarize' | 'summarizeTurnPrefix'>) => Promise<NextStepUpdate | undefined> {
   const reason = options.reason ?? "threshold";
   const progress = reason === 'threshold' ? createCompactionProgress(policy, options.onDeadEnd) : undefined;
   // A refusal is reported once per run of identical context, not once per step.
   // The step runs before every model call in a tool loop, so a context that
   // cannot be condensed would otherwise repeat the same sentence on each one.
   let reportedRefusal: string | undefined;
-  const step = async (snapshot: NextStepSnapshot, signal?: AbortSignal, currentPolicy?: CompactionPolicy): Promise<NextStepUpdate | undefined> => {
+  const step = async (snapshot: NextStepSnapshot, signal?: AbortSignal, currentPolicy?: CompactionPolicy,
+    summarizers: Pick<CompactionStepOptions, 'summarize' | 'summarizeTurnPrefix'> = options): Promise<NextStepUpdate | undefined> => {
     if (signal?.aborted) {
       return undefined;
     }
@@ -772,8 +774,8 @@ export function createCompactionStep(
       const input = captureCompactionInput({
         messages: snapshot.messages,
         policy: currentPolicy ?? policy,
-        summarize: options.summarize,
-        summarizeTurnPrefix: options.summarizeTurnPrefix,
+        summarize: summarizers.summarize,
+        summarizeTurnPrefix: summarizers.summarizeTurnPrefix,
         signal,
         ...(snapshot.toolsAllowed !== undefined ? { toolsAllowed: snapshot.toolsAllowed } : {}),
         ...(options.lifecycle ? { lifecycle: options.lifecycle } : {}),

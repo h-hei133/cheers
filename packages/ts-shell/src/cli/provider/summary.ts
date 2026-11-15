@@ -29,7 +29,7 @@ export function captureSummaryRole(input: {
   readonly admission?: Admission;
   readonly onCredentialPersisted?: () => void;
 }): { readonly identity: string; readonly segmentTokens: number; readonly mergeTokens: number; readonly limits: Pick<CompactionProvider, 'contextWindow' | 'inputLimit' | 'maxOutputTokens' | 'reserveTokens' | 'shape'>;
-  readonly resolve: () => Promise<CompactionProvider> } | undefined {
+  readonly resolve: (admission?: Admission) => Promise<CompactionProvider> } | undefined {
   const role = input.config.sessionModelRoles?.summary;
   if (!role) return undefined;
   const main = resolveProviderCredential({ runtimeConfig: input.config, env: {} });
@@ -57,13 +57,14 @@ export function captureSummaryRole(input: {
   const identity = createHash('sha256').update(JSON.stringify([role, resolution.baseUrl, endpoint,
     credentialIdentityFor(resolution.provider, credential), model, shape, maxOutputTokens, reserveTokens, serviceTier])).digest('hex');
   let pending: Promise<CompactionProvider> | undefined;
-  const renew = async (): Promise<CompactionProvider> => {
-    assertAdmission(input.admission);
+  const renew = async (admission: Admission): Promise<CompactionProvider> => {
+    assertAdmission(admission);
     if (!input.workspaceRoot) throw new Error('The summary role workspace is unavailable.');
-    const renewed = await renewStoredAccount({ workspaceRoot: input.workspaceRoot, resolution: selected, admission: input.admission,
-      fetchImpl: admittedFetch(providerFetchFromTimeouts(providerTimeoutsFrom(input.config)), input.admission) });
+    const renewed = await renewStoredAccount({ workspaceRoot: input.workspaceRoot, resolution: selected, admission,
+      fetchImpl: admittedFetch(providerFetchFromTimeouts(providerTimeoutsFrom(input.config)), admission) });
     if (renewed.failure) throw new Error(renewed.failure);
     if (renewed.stored) input.onCredentialPersisted?.();
+    // A retired consumer cannot poison a successful rotation shared by later requests.
     assertAdmission(input.admission);
     const auth = renewed.accountAuth ?? accountAuth;
     const identity = credentialIdentityFor(resolution.provider, { connectionId: credential.connectionId, apiKey: credential.apiKey, accountAuth: auth });
@@ -73,9 +74,10 @@ export function captureSummaryRole(input: {
       shape, contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens,
     };
   };
-  return { identity, segmentTokens, mergeTokens, limits: { contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens, shape }, resolve: () => {
-    assertAdmission(input.admission);
+  return { identity, segmentTokens, mergeTokens, limits: { contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens, shape }, resolve: consumer => {
+    const admission = () => input.admission?.() ?? consumer?.();
+    assertAdmission(admission);
     // History and turn-prefix steps share one captured credential renewal.
-    return pending ??= renew();
+    return (pending ??= renew(admission)).then(provider => { assertAdmission(admission); return provider; });
   } };
 }

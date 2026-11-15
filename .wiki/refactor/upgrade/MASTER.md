@@ -22,8 +22,8 @@
 
 ## Current status
 
-**Current phase**: active；T3.1已提交`d683a3d`，C.1完整物理目标捕获子批本地验证完成；继续摘要目标、会话注册及分支状态。合计21/62项完成。
-**Last completed batch**: C.1物理目标捕获复用CLI凭据／scope／renewal owner，route前冻结原transport与authority，candidate／refresh／reframe保持同一目标，reasoning使用实际replay身份。六门、15套件297项、0monoliths及build `3ff7e7c3ad7b`通过，限定独立复核CLEAR；六项有效反转红且逐字节恢复。Linux同代内部编译invocation两loopback验证实际URL／凭据／origin及拒绝零派发，公开SDK配置模型一次actual请求通过。公开virtual注册仍未接入，C.1和E.7保持部分；按批本地提交，没有push或远端CI。
+**Current phase**: active；T3.1已提交`d683a3d`，C.1物理目标捕获已提交`e61a340`，自动／overflow摘要目标子批本地验证完成；继续会话注册及分支状态。合计21/62项完成。
+**Last completed batch**: 自动与overflow摘要绑定prepared physical target的完整transport／replay／预算，显式summary角色优先且共享一次成功renewal。原compaction progress与connection lifetime保持；消费者撤权阻止摘要，但不阻断已派发并验证的凭据rotation持久化，也不污染后继消费者。六门、15套件246项、0monoliths及build `9e91decd500a`通过，限定独立复核CLEAR；五项有效反转红且逐字节恢复。Linux同代内部编译invocation覆盖自动／overflow／显式role，两实际loopback每格只route一次；公开SDK配置模型prompt和compact共两次actual bodySent通过。公共virtual注册、manual direct route与分支状态仍未接入，C.1/E.7保持部分；按批本地提交，没有push或远端CI。
 **Goal**: active；41项未完成，其中13部分、12已有待验收、14确认缺口、2待核实。保留完整规划，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -45,10 +45,13 @@
 
 本批遥测：实际L；结构复审10/10，复用SDK／command／runtime／scheduler原owner，没有新运行时或依赖库；新增未预见依赖2（取消回调失败边界、goal scheduler空闲判断）。此前未记录统一估算／数值基线，不补造历史delta或累计drift；后续C.1按已核实的完整目标重绑定和会话注册依赖拆批，先完成物理目标捕获，再实施session-owned注册和持久状态。
 
+摘要目标子批遥测：实际L，复用检查10/10，新增未预见依赖2（显式角色renewal的消费者准入、成功rotation共享结果归属）。复用原压缩进度、预算、凭据renewal及connection owner，不修改auth core。下一批提升既有codemode分支store为session owner，使用隔离namespace和原捕获lease，避免建立平行持久化路径；注册和正式路由须在这些前置合同成立后启用。
+
 ## Session log
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-15 | C.1摘要目标子批六门、15/246、0monoliths、build `9e91decd500a`与五断言反转通过；限定复核CLEAR。同代Linux内部自动／overflow／role均route一次，公开SDK配置模型两次bodySent完成prompt／compact。原生前两次夹具先触发threshold而非overflow，失败receipt/source保留；最终只扩大overflow物理窗口并核对首POST拒绝。证据`.omx/artifacts/upgrade-summary-target-2026-11-15/delivery.json`，C.1/E.7开项、21/62保持。 |
 | 2026-11-15 | C.1物理目标子批六门、15/297、0monoliths、build `3ff7e7c3ad7b`和同代Linux内部compiled route／公开SDK配置模型一次请求通过；六反转实际断言红且exact恢复，限定复核CLEAR。最初candidate反转触发普通拒绝而未到断言，收紧成功断言后重跑六项；初日志保留。当前21/62，继续摘要fallback／session注册／分支状态；T3.1已提交`d683a3d`。 |
 | 2026-11-15 | 恢复后T3.1本地完成。compact和取消／idle完整等待，goal scheduler尾部反例修复；六门16/236、0monoliths、build `d9acacbc4260`及同代隔离安装15入口／严格类型／四次配置模型请求passed。四反转red且exact恢复，限定独立复核CLEAR；21完成／41未完成，继续C.1，按批本地提交。 |
 | 2026-11-15 | 用户要求在手子批完成后暂停。SDK loader／dispose已提交`c8d14775`，6/34、六门、0monoliths、当前编译原生能力撤权／后继保留通过，build `1787d90736d1`；两个实际反转红且exact恢复，限定复核CLEAR。记录20完成／42未完成，提交暂停总结；不进入compact／虚拟路由后续任务，不宣称push／CI或整体完成。 |
