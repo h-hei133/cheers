@@ -194,6 +194,8 @@ describe("pictures a tool returned", () => {
 describe('terminal image admission', () => {
   const png = pngImage();
   const gif = { type: 'image' as const, mimeType: 'image/gif', data: 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' };
+  // Complete 320 × 160 lossless WebP, independently encoded and decoded with libwebp.
+  const webp = { type: 'image' as const, mimeType: 'image/webp', data: 'UklGRiQAAABXRUJQVlA4TBcAAAAvP8EnAAcQUf/+BwQkif//UxH9T/vfPwA=' };
   const cases = [
     { name: 'unknown format', image: { ...png, mimeType: 'image/svg+xml' } },
     { name: 'invalid base64', image: { ...png, data: 'QUJD' } },
@@ -224,6 +226,39 @@ describe('terminal image admission', () => {
     expect(iterm).toContain('\x1b]1337;');
     expect(iterm).toContain(gif.data);
     expect(block.images[0]).toBe(gif);
+  });
+
+  it.each(['user', 'tool'] as const)('admits a complete WebP at the %s boundary and reserves its measured rows', kind => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const block = { ...textBlock(kind, ''), title: 'read', images: [webp], collapsed: true };
+    const rows = renderBlock(block, WIDTH, { imageProtocol: 'iterm2' });
+    expect(rows).toHaveLength((kind === 'user' ? 0 : 1) + 10 + 1);
+    const graphics = rows.filter(row => row.includes('\x1b]1337;'));
+    expect(graphics).toHaveLength(1);
+    expect(graphics[0]).toContain('width=40;height=10:');
+    expect(graphics[0]).toContain(webp.data);
+    expect(rows.join('')).not.toContain('image/webp');
+    const fallback = renderBlock(block, WIDTH, { imageProtocol: 'kitty' }).join('\n');
+    expect(fallback).not.toMatch(/\x1b_G|\x1b\]1337;/);
+    expect(stripAnsi(fallback)).toContain(`${kind === 'user' ? 'image attachment:' : 'image result:'} image/webp`);
+    expect(block.images[0]).toBe(webp);
+  });
+
+  it.each(['user', 'tool'] as const)('refuses damaged WebP headers and decoded overflow at the %s boundary', kind => {
+    const invalidSignature = Buffer.from(webp.data, 'base64');
+    invalidSignature[20] = 0;
+    const decodedOverflow = Buffer.from(webp.data, 'base64');
+    decodedOverflow.writeUInt32LE((5000 - 1) | ((4000 - 1) << 14), 21);
+    for (const image of [
+      { ...webp, data: invalidSignature.toString('base64') },
+      { ...webp, data: Buffer.from(webp.data, 'base64').subarray(0, 24).toString('base64') },
+      { ...webp, data: decodedOverflow.toString('base64') },
+      { ...webp, mimeType: 'image/png' },
+    ]) {
+      const rows = renderBlock({ ...textBlock(kind, ''), title: 'read', images: [image] }, WIDTH, { imageProtocol: 'iterm2' });
+      expect(rows.join('')).not.toMatch(/\x1b_G|\x1b\]1337;/);
+      expect(rows.map(stripAnsi).join('\n')).toContain(kind === 'user' ? 'image attachment:' : 'image result:');
+    }
   });
 
   it.each(['user', 'tool'] as const)('does not emit terminal controls from a refused %s image MIME label', kind => {

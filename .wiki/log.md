@@ -11831,3 +11831,8 @@ regular图片预清完整reserved rows后绘制，独立occurrence ID和p=1避�
 document浮层复用已有1049借屏，用原文档有界tail裁剪后composite，原native history/placement不改；进出screenRevision使旧选择失效，背景pointer/composer/choice坐标退休，浮层保留自身bounds。fullscreen清ID在真实terminal.stop恢复主屏之前，继续尝试全部cleanup并保留首错。
 
 六静态门、8套件244项、0monoliths、build `f78d9a11fe0d`通过；实际Screen证明partial主图层/cursor/scrollback关闭后精确恢复及同ID跨屏清退隔离，限定独立复核CLEAR。Linux当前编译CLI两协议通过临时input hook触发实际OverlayStack借屏／抑图／还屏且exit0，两反转红且逐字节恢复。 初非公开模块probe、overlay截断和fixture完全可见均保留分类。regular`ea0af2c`后本地18项不变，B.3待最终资格审计，按批提交。
+
+
+### 2026-11-15：图片预算任务最终本地验收
+
+B.3最后两项资格缺口已补：完整WebP走实际user/tool渲染边界，占行／iTerm传输／Kitty回退及坏头／decoded预算拒绝；六门、3套件56项通过，无生产改动。paint/lifecycle回执目的文件错位从原日志恢复，源码hash核对、失败JSON和修复摘要保留，不声称重新跑native。原history重排／物理像素／其他平台边界保持。B.3本地完成，总体19/62项，继续B2.1并按批提交。

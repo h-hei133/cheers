@@ -2554,3 +2554,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Exiting fullscreen deletes pictures retained on the original main screen, or a native-tail overlay covers an unerasable historical placement.
 - **Root Cause:** The terminal driver's restore includes leaving the alternate screen; later graphics deletion then targets the restored main-screen registry. A sliced tail also loses an earlier image anchor needed for occlusion.
 - **Rule:** Retire private uploads before driver restore. Borrow the existing alternate screen for native-document floating overlays and crop the bounded original tail before composition; preserve main history and retire background selection/click coordinates on enter and exit. Test actual 1049 restoration and the same image ID on both screens.
+
+
+### Native Receipts Must Keep Their Own Output Destination
+- **Symptom:** A successful overlay probe overwrites the graphics-paint receipt, while its own canonical receipt still reports an earlier failed probe.
+- **Root Cause:** A copied diagnostic driver retained the previous batch's JSON destination; exit status and console logs passed without checking receipt ownership.
+- **Rule:** Before publishing evidence pointers, verify the receipt's batch, build and source hashes against the original command output. Keep failed receipts separately; restore misplaced success receipts from their original logs with before/after hashes, and do not claim a new execution from restoration.

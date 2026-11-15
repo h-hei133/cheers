@@ -21,8 +21,8 @@
 
 ## Current status
 
-**Active phase**: T1、A四项、B.1/B.2/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
-**Active batch**: regular已提交`ea0af2c`；document-tail与真实fullscreen stop顺序子批已完成所述验证，按批提交后审计B.3剩余资格与下一终端协议批次。B.3部分、整体本地验收18项，C.6原生协议缺口保留。
+**Active phase**: T1、A四项、B.1/B.2/B.3/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
+**Active batch**: document-tail已提交`63c0aba`；B.3最终资格补完整WebP消费者并恢复错位原生回执，3套件56项与六门通过，按批本地提交。整体本地验收19/62项；接续B2.1状态探测／停止生命周期与提示区导航，C.6原生协议缺口保留。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -38,7 +38,7 @@
 
 ## Adaptive control
 
-当前本地验收任务数为18，包含T1五项、A四项、B.1/B.2/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3；核实不计实现完成。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
+当前本地验收任务数为19/62，包含T1五项、A四项、B.1/B.2/B.3/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3；核实不计实现完成。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 
 ## Session log
 
@@ -100,3 +100,5 @@
 | 2026-11-15 | regular图片预清完整reserved rows后绘制，独立occurrence ID和p=1避免重复source重传及叠加placement；完整visible隐藏按pair撤图、替换释放无历史upload，partial placement交给native LF，document替换先保存crossing残余。同步输出throw保留原cause并退休painter，后续paint/start/外部移交拒绝，stop仅恢复mode/cursor，不伪造物理回滚。六静态门、7套件248项、0monoliths和build `d3c1c005a1a5`通过；Linux编译CLI regular Kitty/iTerm完整extent预清、同源双图、typing不重传、保留history退出均exit0。两个反转红且逐字节恢复；限定独立复核CLEAR。 初native夹具错误将startup短暂借屏视为regular接管，按实际1049归还顺序修正后重验通过，失败日志保留。实际L／额外依赖2（named placement和unknown-write退休），18项不变，tail overlay／fullscreen stop另批。 |
 
 | 2026-11-15 | document浮层复用已有1049借屏，用原文档有界tail裁剪后composite，原native history/placement不改；进出screenRevision使旧选择失效，背景pointer/composer/choice坐标退休，浮层保留自身bounds。fullscreen清ID在真实terminal.stop恢复主屏之前，继续尝试全部cleanup并保留首错。六静态门、8套件244项、0monoliths、build `f78d9a11fe0d`通过；实际Screen证明partial主图层/cursor/scrollback关闭后精确恢复及同ID跨屏清退隔离，限定独立复核CLEAR。Linux当前编译CLI两协议通过临时input hook触发实际OverlayStack借屏／抑图／还屏且exit0，两反转红且逐字节恢复。 独立owner probe错误导入非公开dist路径导致ERR_MODULE_NOT_FOUND，改用当前CLI已编译owner的临时触发钩子，未新增产品入口；初fixture超长label截断及完全visible高度已更正，失败日志保留。实际M／额外依赖1（选择退休），18项不变，物理像素与native history重排不计完成。 |
+
+| 2026-11-15 | B.3最终资格：完整WebP经实际user/tool block的占行／iTerm传输／Kitty回退和损坏／decoded拒绝通过，六门与3套件56项通过；无生产改动。错位paint/lifecycle receipt从原日志恢复且源码hash验证，失败probe另存保留，修正诊断driver目的文件避免再覆盖。原native history不可重排、无physical pixels／其他平台边界不升级；19/62项本地完成，整体active。下一批B2.1先重现7501 DA1顺序与stop后setter复活，再补提示区消费者及真实Linux tmux。 |
