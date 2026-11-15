@@ -1,0 +1,32 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+const root = process.cwd(), directory = path.join(root, '.tmp/rpc-controls');
+const cases = [
+  { name: 'compaction-admission', file: 'packages/ts-shell/src/cli/rpc/handlers.ts',
+    before: " || command.type === 'compact'", after: '', title: 'before an immediate RPC abort' },
+  { name: 'compaction-controls', file: 'packages/ts-shell/src/cli/runtime/inputStream.ts',
+    before: " && rpcCommand.type !== 'compact'", after: '', title: 'JSONL controls' },
+  { name: 'compaction-outcome', file: 'packages/ts-shell/src/cli/rpc/handlers.ts',
+    before: 'return { handled: true, error: reason, data: { ...outcome } };',
+    after: 'return { handled: true, error: reason };', title: 'actual no-compaction result' },
+];
+const receipts = [];
+for (const reversal of cases) {
+  const file = path.join(root, reversal.file), original = fs.readFileSync(file), source = original.toString();
+  assert.equal(source.split(reversal.before).length, 2);
+  try {
+    fs.writeFileSync(file, source.replace(reversal.before, reversal.after));
+    const logFile = path.join(directory, `reversal-${reversal.name}.log`), log = fs.openSync(logFile, 'w');
+    const run = spawnSync('rtk', ['env', 'VITEST_MAX_THREADS=1', 'VITEST_MIN_THREADS=1', 'npm', 'run', 'test', '-w', 'packages/ts-shell', '--', 'src/cli/rpc/compaction.test.ts', '-t', reversal.title],
+      { cwd: root, stdio: ['ignore', log, log], timeout: 60000 });
+    fs.closeSync(log); const output = fs.readFileSync(logFile, 'utf8');
+    assert.equal(run.status, 1); assert.ok(output.includes('AssertionError')); assert.match(output, /1 failed/);
+    receipts.push({ name: reversal.name, assertionFailed: true, status: run.status,
+      sourceSha256: createHash('sha256').update(original).digest('hex') });
+  } finally { fs.writeFileSync(file, original); assert.deepEqual(fs.readFileSync(file), original); }
+  receipts.at(-1).restoredExactly = true; console.log(JSON.stringify(receipts.at(-1)));
+}
+fs.writeFileSync(path.join(directory, 'compaction-reversals.json'), JSON.stringify({ cases: receipts }, null, 2) + '\n');

@@ -1,0 +1,21 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "status": "failed",
+  "realProvider": false,
+  "buildId": "1a9b082e419dc0dafe23220b1189c890e2d48bfd86b8b0bc5c72031a06c7ac68",
+  "probeSha256": "a92688b675ebdde829d5e32af8619940408a57cb514dd2025fe0c4a499d4a279",
+  "stages": {
+    "empty": {
+      "passed": true,
+      "status": "nothing",
+      "zeroProviderRequests": true
+    }
+  },
+  "failedStage": "controls",
+  "posts": 1,
+  "failure": {
+    "name": "Error",
+    "message": "Loopback compaction probe failed; inspect bounded assertions in the retained driver."
+  }
+}

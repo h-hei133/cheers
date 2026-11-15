@@ -80,7 +80,7 @@ async function handleTreeAndExecution(command: RpcCommand, host: RpcHost): Promi
       const outcome = await host.compact(command.customInstructions);
       if (outcome.status === "compacted") return { handled: true, data: { ...outcome } };
       const reason = "reason" in outcome ? outcome.reason : "Compaction cannot start while a run is active.";
-      return { handled: true, error: reason };
+      return { handled: true, error: reason, data: { ...outcome } };
     }
     case "set_auto_compaction": {
       if (!host.setAutoCompaction) return unavailable(command.type);
@@ -132,9 +132,9 @@ async function handleTreeAndExecution(command: RpcCommand, host: RpcHost): Promi
 
 /** Dispatch extended session, model, thinking, compaction, tree, and bash RPC commands. */
 export async function handleExtendedRpcCommand(command: RpcCommand, host: RpcHost, signal?: AbortSignal): Promise<RpcHandlerOutcome> {
-  // Register shell ownership during admission, before the transport admits a
-  // following abort or session command. Its response may settle much later.
-  if (command.type === 'bash' || command.type === 'abort_bash') return handleTreeAndExecution(command, host);
+  // Register command ownership before the transport admits a following abort
+  // or session command. Its response may settle much later.
+  if (command.type === 'bash' || command.type === 'abort_bash' || command.type === 'compact') return handleTreeAndExecution(command, host);
   const sessionOutcome = await handleSessionAndStats(command, host, signal);
   if (sessionOutcome.handled) return sessionOutcome;
   const modelOutcome = await handleModelAndThinking(command, host);

@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-15",
+  "task": "D.1",
+  "batch": "RPC compaction control and structured outcomes",
+  "status": "locally-validated",
+  "delivery": "local commit containing this receipt; not pushed",
+  "baseCommit": "0caf82c42b216ed5b4dfff91fa68272a96b0b7c1",
+  "buildId": "1a9b082e419dc0dafe23220b1189c890e2d48bfd86b8b0bc5c72031a06c7ac68",
+  "source": {
+    "packages/ts-shell/src/cli/rpc/handlers.ts": {
+      "snapshot": "source/cli/rpc/handlers.ts.txt",
+      "sha256": "6b057890495f041cf29871d703b586ecc1918acbfa268a36143892f97f6eb687"
+    },
+    "packages/ts-shell/src/cli/runtime/inputStream.ts": {
+      "snapshot": "source/cli/runtime/inputStream.ts.txt",
+      "sha256": "74c7cd247d7418a16e5b4ee6d5ecd4777de238b7463e54ca990db05790a5b295"
+    },
+    "packages/ts-shell/src/cli/rpc/compaction.test.ts": {
+      "snapshot": "source/cli/rpc/compaction.test.ts.txt",
+      "sha256": "fb3d248de2bd8bfe76a3e8d42d47a6fdb9300ef1e8834889434bee7c26cfb127"
+    }
+  },
+  "documents": {
+    ".wiki/log.md": {
+      "snapshot": "docs/.wiki/log.md.txt",
+      "sha256": "65c24388831098f458a90153df78c243e135249fbaa7040af99c7c6b8840cca0"
+    },
+    ".wiki/refactor/upgrade/MASTER.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/MASTER.md.txt",
+      "sha256": "344b9126d905ba2cf16e33cf2ec832436ec8ff0ca01f398073063381cf3f23c5"
+    },
+    ".wiki/refactor/upgrade/design.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/design.md.txt",
+      "sha256": "a35a20efdd9af313f67b3ce6cb30c36f1bc3dbd1db5768c21fc1ea098cae4ae6"
+    },
+    ".wiki/refactor/upgrade/tasks.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/tasks.md.txt",
+      "sha256": "50367fcc6cedb8aae8c2a9d26fca786b0aeeb9d3b4579dbc22f8fb1f98316e47"
+    },
+    "HANDOFF.md": {
+      "snapshot": "docs/HANDOFF.md.txt",
+      "sha256": "45a344cc5daeaf6cae5a8c20e0a04b5f0b01089955a724743fca29da6b694f24"
+    }
+  },
+  "validation": {
+    "tests": {
+      "status": "passed",
+      "suites": 4,
+      "tests": 43,
+      "log": "compaction-green.log"
+    },
+    "restored": {
+      "suites": 1,
+      "tests": 5,
+      "log": "compaction-accepted.log"
+    },
+    "gates": {
+      "status": "passed",
+      "count": 6,
+      "log": "compaction-accepted.log",
+      "docsAdvisories": 119
+    },
+    "docs": {
+      "status": "passed",
+      "log": "compaction-docs.log"
+    },
+    "responsibility": {
+      "modules": 2647,
+      "monoliths": 0
+    },
+    "build": {
+      "status": "passed",
+      "log": "compaction-accepted.log"
+    },
+    "reversals": {
+      "count": 3,
+      "assertionFailed": true,
+      "exactRestoration": true,
+      "receipt": "compaction-reversals.json"
+    },
+    "native": {
+      "status": "passed",
+      "receipt": "compaction-native.json",
+      "posts": 3,
+      "platform": "linux",
+      "compiledCli": true
+    },
+    "configuredProvider": {
+      "status": "passed",
+      "receipt": "compaction-real.json",
+      "posts": 2,
+      "platform": "linux",
+      "compiledCli": true,
+      "bodyInspectable": false
+    },
+    "review": {
+      "code": "APPROVE",
+      "architecture": "CLEAR"
+    }
+  },
+  "limits": {
+    "fullD1": false,
+    "remaining": [
+      "retry-specific cancellation",
+      "joint D.1 acceptance"
+    ],
+    "tasksComplete": 22,
+    "tasksTotal": 62,
+    "goal": "active",
+    "otherPlatforms": false,
+    "push": false,
+    "ci": false
+  },
+  "failureClassification": "classification.md",
+  "evidence": {
+    "build-manifest.json": "0533e53e4b612e71b9fe8a16d99aa28ecb79d93c250c5943a66dde216c329797",
+    "classification.md": "73c938531c0f8860fdb9699246c5d80fd1fb2fc688a368bb8d7d32efd386fb01",
+    "compaction-accepted.log": "ed78e4f3862ec76ee2e501ed971aca20e091c42136075ff0fa505af4cecf507b",
+    "compaction-docs.log": "b343ccc12290561bb865a2691e96199dd78ed3f156ca83960e19e35fd2e1eb3d",
+    "compaction-green.log": "538e3c33167e7f4bdcbd9422f5a9aa56409648a250a1933ca645cf319115d9a2",
+    "compaction-native-first.json": "d47dca062ebe238930e0e5f8552c91d12a378995c7cc62aabe00ee382c5adafd",
+    "compaction-native-first.log": "7412fe981dfb7d4145530a23357ecb7fba5229a9eec5f5ff11e042b6d6657e46",
+    "compaction-native-first.mjs.txt": "a92688b675ebdde829d5e32af8619940408a57cb514dd2025fe0c4a499d4a279",
+    "compaction-native-fourth.json": "77866242a5ff397bd0ac687eea8e8d560578a2536b8e733a9b8da91287e2f57d",
+    "compaction-native-fourth.log": "8a0e09ce1c804574ff0b567c4065bf9a4a8134fa11012f97684316b0e4b7a2c3",
+    "compaction-native-fourth.mjs.txt": "4fa03f23092686fa67b0b05a2bb8af8101a8764535cbcc454aa37d3b764fc6cf",
+    "compaction-native-second.json": "fdacb0e140b25500121ede295b06bc2ec27bb8cdcef323ab6e6d3d08b68a0e42",
+    "compaction-native-second.log": "ea2d83898ca781db39fef5806a244e7a0438a364e7dfa0d734cfc1ab8c37909f",
+    "compaction-native-second.mjs.txt": "1344aeca7915e1b41d62e90e46c5878abfe318dc2e084744e565c25767af9611",
+    "compaction-native-third.json": "035b0cb831bcc5f7b16779a6bc03e327d785b636a8422e43b4c4aca7e31733f7",
+    "compaction-native-third.log": "24db60ce00b179bf1a84938ddad1b91efc77f2ff9b4019c7bc63995cb607ea5d",
+    "compaction-native-third.mjs.txt": "519501bbb28faf2eaf3c06253f5232d941d4d80a310a69f6749628346ffc5c6e",
+    "compaction-native.json": "847a187d65e234c4a69667ea423f2c22d89901ebb1ffe15f65d433433ec297db",
+    "compaction-native.log": "65d0a16e7e8717b97c5987fcdb26686dbc88664427d0378b04047ea5a4148c7e",
+    "compaction-native.mjs.txt": "da3b3f371618ee1a835a02c801738ab39ac365094505d2d8b3a627fc752b802f",
+    "compaction-real.json": "3044c7d3fa2bfb77faab4e7cfd174e57d487419d72fde0b0ab501ef663001405",
+    "compaction-real.log": "cd05de4e76b33586cf4d6e4afbbb68006e5327a88d2100e934ce7b7b5d6efccd",
+    "compaction-real.mjs.txt": "d499f04477b69ad80df333c4e84aedab5baa7d42f7428650422e7bd24740ffe0",
+    "compaction-red.log": "586f04aa970d3e7d874c98909d16fb7959e3d22e4b4f1d30647180f86cf011a4",
+    "compaction-reversals.json": "8b77ba94387d602e8cce9aff7ba06fa0767a0978572f389dabdcae3cd9f1f59a",
+    "compaction-reversals.log": "95ad554f523b35b71caa81c8e1b59b64f4789a44b032348258077aa64d89f9e3",
+    "compaction-reversals.mjs.txt": "25e9b657f9008ebbdb59e3eb6a39467342caed257e4963b9d4aee38c011953e3",
+    "docs/.wiki/log.md.txt": "65c24388831098f458a90153df78c243e135249fbaa7040af99c7c6b8840cca0",
+    "docs/.wiki/refactor/upgrade/MASTER.md.txt": "344b9126d905ba2cf16e33cf2ec832436ec8ff0ca01f398073063381cf3f23c5",
+    "docs/.wiki/refactor/upgrade/design.md.txt": "a35a20efdd9af313f67b3ce6cb30c36f1bc3dbd1db5768c21fc1ea098cae4ae6",
+    "docs/.wiki/refactor/upgrade/tasks.md.txt": "50367fcc6cedb8aae8c2a9d26fca786b0aeeb9d3b4579dbc22f8fb1f98316e47",
+    "docs/HANDOFF.md.txt": "45a344cc5daeaf6cae5a8c20e0a04b5f0b01089955a724743fca29da6b694f24",
+    "reversal-compaction-admission.log": "39d8254a24393a1623a2ea151b2a585b0a46d8059252b4a01d1bad009e0a396a",
+    "reversal-compaction-controls.log": "fa834a72995da8c28b3ac35ba546d2f9aeca2d480919b0c17b8de7448267545f",
+    "reversal-compaction-outcome.log": "6ee28f5abf2532f1886b435c7fc06729da4da8a2cc5f540aa05948f51b60a826",
+    "review-architecture.json": "499f16bcdfb65347ed89a41897b26017bab7c41b3fcf467a8db703fbfff72a99",
+    "review-code.json": "7343a5c4639a4896f06a1bcfbec3dd0ee47a192156a7e4bbbf0f53390c4c9a2b",
+    "source/cli/rpc/compaction.test.ts.txt": "fb3d248de2bd8bfe76a3e8d42d47a6fdb9300ef1e8834889434bee7c26cfb127",
+    "source/cli/rpc/handlers.ts.txt": "6b057890495f041cf29871d703b586ecc1918acbfa268a36143892f97f6eb687",
+    "source/cli/runtime/inputStream.ts.txt": "74c7cd247d7418a16e5b4ee6d5ecd4777de238b7463e54ca990db05790a5b295"
+  }
+}

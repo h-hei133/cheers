@@ -2675,3 +2675,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Command discovery returns a skill after its registration predicate is revoked, or a pending skill read blocks the cancellation command intended to stop it.
 - **Root Cause:** The loader's final check precedes additional handler awaits; contribution identity alone does not cover a changing skill predicate, and transport control waits for asynchronous discovery.
 - **Rule:** Reuse the dispatched catalog and invocation owners. Carry the original session, configuration, contribution and selected-skill admission closure through every await to emission; recheck binding after callbacks and file verification. Let read responses join at EOF while later controls can cancel their original read signal. Do not replace private loader errors with raw exception messages.
+
+
+### Cancellable RPC Commands Must Register Before Their First Await
+- **Symptom:** A compact request blocks the abort intended to stop it, or an immediate abort observes no active controller and the compaction starts afterward.
+- **Root Cause:** Sequential RPC handler awaits precede the existing command owner's synchronous registration, and the transport serializes the full response instead of admission.
+- **Rule:** Reach command admission before yielding, then let the existing response join own EOF while later controls proceed. Keep operation settlement in the session owner so busy refusals and queued prompts retain their ordering. Preserve the producer's structured unsuccessful outcome; native persistence probes must inspect the actual commit record and supply history with a legal cut.

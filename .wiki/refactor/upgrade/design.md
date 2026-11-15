@@ -412,3 +412,14 @@ shell生产入口已提交`c10c5291`。当前thinking发现曾照搬语法表，
 Linux同代compiled CLI两loopback POST：high→max→auto→high循环及actual high wire、disabled无动作、扩展／alias／named invocation、no-skills下显式skill仍准入并进入请求、发现skill被关闭、virtual选择与effort及自动设置同会话重开保留、显式config retry=false与stored user=true区别、JSONL和EOF通过。配置模型单次actual bodySent返回探针标记，之前发现／auto effort／auto设置通过；原active连接与凭据不变，损坏catalog仅在隔离home使用原目标最小有效entry。该observer不能检查Undici body，真实wire effort未验证。两条独立限定复核为APPROVE／CLEAR，未运行tests；停滞实现lane没有review资格。证据`.omx/artifacts/upgrade-rpc-settings-2026-11-15/delivery.json`。
 
 实际L，复用10/10，额外依赖3（完整publication、应用callback换代、发现发布与取消）。D.1保持部分／22/62：abort_retry仍调用通用cancelCurrentRun，compact等待仍阻塞后续控制且handler丢弃非compacted结构化status。下一复用原retry waits与command settlement修复，不新增重试引擎；所谓post-commit hook rejection未确认为原生缺陷，正常HookDispatcher会捕获，不据此扩大压缩改造。仅Linux本地证据，无push／CI或其他平台声明。
+
+
+## RPC compaction transport and outcomes (2026-11-15)
+
+设置／发现子批已提交`0caf82c`。当前ShellSessionRuntime.compactHistory已在commands.run中登记controller与settled，但RPC经过前两个async handler后才调用，transport又等待整个compact响应，后续abort不能到达。参考每行独立处理、session持有压缩owner的决定采用；本项目保留已存在的localControlChain顺序，只将compact同步登记提前，再把响应等待加入原rpcResponses EOF集合，不新建任务／压缩引擎。原waitForIdle仍阻止queued prompt抢占尚未settled的压缩，new_session／overlap继续busy拒绝，ordinary EOF允许成功完成。non-compacted结果继续success=false，并带原status／reason，调用者能分辨nothing、busy和failed。
+
+五测试中四实际AssertionError先红：empty结果缺data、immediate abort未见登记、busy缺status和JSONL abort被压缩阻塞；EOF成功join原已通过。修复后相关4套件43项、六静态门通过；同步admission／response detach／structured outcome三反转全部实际AssertionError，逐字节恢复后1/5通过。结构2647模块0monoliths、build `1a9b082e419dc0dafe23220b1189c890e2d48bfd86b8b0bc5c72031a06c7ac68`，两条限定只读复核APPROVE／CLEAR，reviewer未执行验证。
+
+Linux当前compiled CLI三loopback POST实际覆盖：空历史nothing且零provider；summary已发未响应时get_state／new_session拒绝／compact busy／abort可达，取消socket关闭且无compaction-commit；另次指令允许新summary，成功缩小并写一条verified commit，EOF等响应后exit0。初两次fixture只有一条旧shell记录，无法形成现有合法cut，按现有policy补第二条旧记录；后两次observer查旧compaction事件名，实际生产记录为compaction-prepared／compaction-commit，修观察器而非产品。四失败receipt／driver完整保留。配置模型两次actual bodySent分别prompt和manual summary，当前RPC返回compacted、验证持久commit、JSONL／EOF通过；原连接与凭据不改，隔离最小有效catalog的限制及body不可检查继续明示。
+
+证据`.omx/artifacts/upgrade-rpc-compaction-2026-11-15/delivery.json`。实际M、复用10/10、无新生产依赖。D.1仍缺retry专属取消，22/62保持；不以本子批扩大为全压缩路径验收，无其他平台／push／CI。

@@ -1,0 +1,153 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+const directory = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(directory, '../..');
+const receipt = { platform: process.platform, compiledCliRpc: true, status: 'not_run', realProvider: false,
+  buildId: JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'))).buildId,
+  probeSha256: createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex'), stages: {} };
+const root = fs.mkdtempSync(path.join(directory, 'native-state-'));
+let stage = 'setup', child, server, current, number = 0, bodyCount = 0;
+const clients = new Set(), requestBodies = [], requests = [];
+const watchdog = setTimeout(() => { for (const client of clients) client.process.kill('SIGTERM'); }, 180_000);
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function until(predicate, label, timeout = 20_000) {
+  const end = Date.now() + timeout;
+  for (;;) { if (predicate()) return; if (Date.now() > end) throw new Error(`Deadline: ${label}`); await delay(25); }
+}
+function setup(name, settings = {}) {
+  const state = path.join(root, name), home = path.join(state, 'home'), workspace = path.join(state, 'work');
+  fs.mkdirSync(workspace, { recursive: true }); fs.mkdirSync(home);
+  const storage = path.join(home, '.cheers'); fs.mkdirSync(storage);
+  fs.writeFileSync(path.join(storage, 'config.json'), JSON.stringify({ agentMode: 'build', maxOutputTokens: 128,
+    reserveTokens: 0, keepRecentTokens: 80, compactionEnabled: false, retryEnabled: false, cacheWarming: 'off', ...settings }));
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: 'openai', providerCredentials: {
+    openai: { model: 'rpc-controls', baseUrl, apiKey: 'synthetic-controls' } } }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: { openai: {
+    runtime: 'openai', endpoint: 'openai-compatible', auth: 'api-key', baseUrl,
+    models: [{ id: 'rpc-controls', contextWindow: 64_000, maxTokens: 2048 }] } } }));
+  return { state, home, workspace, storage };
+}
+function start(fixture, approval = 'allow-once', sessionId) {
+  const responses = [], frames = [], waiters = new Set(); let lines = '', invalidLines = 0;
+  const env = { ...process.env, HOME: fixture.home, USERPROFILE: fixture.home, CHEERS_TEST_ROOT: fixture.home,
+    GIT_CEILING_DIRECTORIES: root, CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '', OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '',
+    CHEERS_MARKETPLACES_FILE: path.join(fixture.home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(fixture.home, 'extensions.json') };
+  const spawned = spawn('rtk', ['node', path.join(repo, 'scripts/start.mjs'), '--rpc', '--project', fixture.workspace,
+    '--no-context-files', '--no-skills', '--tools', 'bash,read', '--model', 'openai/rpc-controls',
+    '--non-interactive-approval', approval, ...(sessionId ? ['--session-id', sessionId] : [])],
+    { cwd: fixture.workspace, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  const closed = new Promise(resolve => spawned.on('close', (code, signal) => resolve({ code, signal })));
+  spawned.stderr.on('data', () => {});
+  spawned.stdout.on('data', chunk => {
+    lines += chunk.toString();
+    for (;;) {
+      const newline = lines.indexOf('\n'); if (newline < 0) break;
+      const line = lines.slice(0, newline); lines = lines.slice(newline + 1);
+      if (!line.trim()) continue;
+      let value; try { value = JSON.parse(line); } catch { invalidLines++; continue; }
+      frames.push(value); if (value.type === 'response') responses.push(value);
+      for (const waiter of [...waiters]) if (waiter.predicate(value)) waiter.resolve(value);
+    }
+  });
+  function waitFor(predicate, from = frames.length) {
+    const found = frames.slice(from).find(predicate); if (found) return Promise.resolve(found);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { waiters.delete(waiter); reject(new Error('RPC response deadline.')); }, 30_000);
+      const waiter = { predicate, resolve: value => { clearTimeout(timer); waiters.delete(waiter); resolve(value); } };
+      waiters.add(waiter);
+    });
+  }
+  function command(type, values = {}) {
+    const id = String(++number), response = waitFor(value => value.type === 'response' && value.id === id);
+    spawned.stdin.write(JSON.stringify({ id, type, ...values }) + '\n'); return response;
+  }
+  const client = { ...fixture, process: spawned, closed, frames, command, waitFor, get invalidLines() { return invalidLines; },
+    async finish() {
+      spawned.stdin.end(); const result = await closed; clients.delete(client);
+      assert.deepEqual(result, { code: 0, signal: null }); assert.equal(invalidLines, 0); assert.equal(lines.trim(), '');
+      return result;
+    } };
+  clients.add(client); return client;
+}
+function transcript(client, id) {
+  return fs.readFileSync(path.join(client.storage, 'sessions', id, 'transcript.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+}
+
+let baseUrl, held, closedSummary = false;
+try {
+  assert.equal(process.platform, 'linux');
+  server = http.createServer(async (request, response) => {
+    const chunks = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    if (request.method !== 'POST') { response.writeHead(200, { 'content-type': 'application/json' }); response.end('{"data":[]}'); return; }
+    const body = JSON.parse(Buffer.concat(chunks).toString()); requestBodies.push(body); bodyCount++;
+    if (bodyCount === 2) {
+      held = response;
+      response.once('close', () => { closedSummary = true; });
+      return;
+    }
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'RPC_COMPACTION_ACK' }, finish_reason: 'stop' }] }));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
+  const fixture = setup('compaction'); current = start(fixture);
+  stage = 'empty'; const initial = await current.command('get_state'); assert.equal(initial.success, true);
+  const sessionId = initial.data.sessionId;
+  const empty = await current.command('compact');
+  assert.equal(empty.success, false); assert.equal(empty.data.status, 'nothing'); assert.equal(bodyCount, 0);
+  receipt.stages.empty = { passed: true, status: empty.data.status, zeroProviderRequests: true };
+  stage = 'seed';
+  assert.equal((await current.command('bash', { command: "printf 'RPC_OLDER_CONTEXT'; printf '%08192d' 0" })).success, true);
+  assert.equal((await current.command('bash', { command: 'printf RPC_ADDITIONAL_CONTEXT' })).success, true);
+  const firstEnd = current.waitFor(frame => frame.type === 'agent_end');
+  assert.equal((await current.command('prompt', { message: 'Return RPC_COMPACTION_ACK. ' + 'History verification sample. '.repeat(80) })).success, true);
+  assert.equal((await firstEnd).status, 'completed'); assert.equal(bodyCount, 1);
+  const before = transcript(current, sessionId).filter(event => event.type === 'compaction').length;
+  stage = 'controls';
+  const compact = current.command('compact', { customInstructions: 'COMPACTION_CANCEL_PROBE' });
+  compact.then(result => { receipt.earlyCompact = { success: result.success, data: result.data, error: result.error }; });
+  await until(() => Boolean(held) || Boolean(receipt.earlyCompact), 'summary dispatch');
+  assert.ok(held, 'Expected an actual summary dispatch.');
+  assert.ok(JSON.stringify(requestBodies[1]).includes('COMPACTION_CANCEL_PROBE'));
+  assert.equal((await current.command('get_state')).success, true);
+  assert.equal((await current.command('new_session')).data.cancelled, true);
+  const overlap = await current.command('compact'); assert.equal(overlap.success, false); assert.equal(overlap.data.status, 'busy');
+  assert.equal((await current.command('abort')).success, true);
+  const cancelled = await compact;
+  assert.equal(cancelled.success, false); assert.equal(cancelled.data.status, 'failed'); assert.match(cancelled.data.reason, /cancelled/i);
+  await until(() => closedSummary, 'summary socket closed');
+  assert.equal(transcript(current, sessionId).filter(event => event.type === 'compaction').length, before);
+  receipt.stages.cancel = { passed: true, actualSummaryRequest: true, controlsReachable: true,
+    busyRefusal: true, socketClosed: true, noCompactionCommitted: true, structuredOutcome: true };
+  stage = 'reuse-eof';
+  const done = current.command('compact', { customInstructions: 'COMPACTION_SUCCESS_PROBE' });
+  const finished = current.finish();
+  const result = await done;
+  receipt.finalCompaction = { success: result.success, data: result.data, error: result.error };
+  assert.equal(result.success, true); assert.equal(result.data.status, 'compacted');
+  assert.ok(result.data.tokensAfter < result.data.tokensBefore);
+  await finished;
+  receipt.eventTypes = [...new Set(transcript(current, sessionId).map(event => event.type))];
+  receipt.compactionCount = transcript(current, sessionId).filter(event => event.type === 'compaction').length;
+  assert.equal(receipt.compactionCount, before + 1);
+  assert.ok(requestBodies.slice(2).some(body => JSON.stringify(body).includes('COMPACTION_SUCCESS_PROBE')));
+  receipt.stages.reuse = { passed: true, successfulSummary: true, durableCompaction: true,
+    eofWaitedForResponse: true, eofExit0: true, validJsonLines: true };
+  receipt.posts = bodyCount; receipt.status = 'passed';
+} catch(error) {
+  receipt.status = 'failed'; receipt.failedStage = stage; receipt.posts = bodyCount;
+  receipt.failure = { name: error?.name, message: 'Loopback compaction probe failed; inspect bounded assertions in the retained driver.' };
+  receipt.assertion = { code: error?.code, stackFrame: error?.stack?.split('\n').find(line => line.includes('compaction-native.mjs:')) };
+  process.exitCode = 1;
+} finally {
+  clearTimeout(watchdog);
+  held?.destroy(); server?.closeAllConnections();
+  for (const client of clients) { client.process.kill('SIGTERM'); await Promise.race([client.closed, delay(5000)]); }
+  await new Promise(resolve => server ? server.close(resolve) : resolve());
+  fs.writeFileSync(path.join(directory, 'compaction-native.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt)); fs.rmSync(root, { recursive: true, force: true });
+}

@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "name": "compaction-admission",
+      "assertionFailed": true,
+      "status": 1,
+      "sourceSha256": "6b057890495f041cf29871d703b586ecc1918acbfa268a36143892f97f6eb687",
+      "restoredExactly": true
+    },
+    {
+      "name": "compaction-controls",
+      "assertionFailed": true,
+      "status": 1,
+      "sourceSha256": "74c7cd247d7418a16e5b4ee6d5ecd4777de238b7463e54ca990db05790a5b295",
+      "restoredExactly": true
+    },
+    {
+      "name": "compaction-outcome",
+      "assertionFailed": true,
+      "status": 1,
+      "sourceSha256": "6b057890495f041cf29871d703b586ecc1918acbfa268a36143892f97f6eb687",
+      "restoredExactly": true
+    }
+  ]
+}

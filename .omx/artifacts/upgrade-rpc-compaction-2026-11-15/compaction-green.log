@@ -1,0 +1,40 @@
+scc-gate root=packages/ts-shell/src files=3353
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=66 read=66 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=15 registered=15 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=24 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+Checked 3 files in 8ms. No fixes applied.
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/compaction.test.ts src/cli/rpc/rpcServer.test.ts src/cli/runtime/inputStream.extensions.test.ts src/cli/rpc/shell.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/rpc/compaction.test.ts (5 tests) 190ms
+ ✓ src/cli/rpc/shell.test.ts (19 tests) 5166ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  472ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  437ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  420ms
+   ✓ keeps actual exit evidence when after-call hooks fail  378ms
+   ✓ reports unverified message persistence without losing the completed native outcome  361ms
+   ✓ retains completed effects without saving history after configuration retirement  382ms
+   ✓ retains completed effects without saving history after deletion retirement  361ms
+   ✓ preserves an unverified excluded report write in the RPC outcome  383ms
+   ✓ does not publish a completed shell result into a changed session  398ms
+   ✓ does not publish a completed shell result into a changed branch  368ms
+   ✓ redacts credential-shaped command output in the response and durable records  356ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  500ms
+ ✓ src/cli/runtime/inputStream.extensions.test.ts (16 tests) 2018ms
+ ✓ src/cli/rpc/rpcServer.test.ts (3 tests) 4ms
+
+ Test Files  4 passed (4)
+      Tests  43 passed (43)
+   Start at  21:39:37
+   Duration  23.11s (transform 6.44s, setup 0ms, collect 13.94s, tests 7.38s, environment 0ms, prepare 179ms)
+

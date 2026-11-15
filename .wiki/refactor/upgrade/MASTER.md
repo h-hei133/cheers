@@ -22,8 +22,8 @@
 
 ## Current status
 
-**Current phase**: active；D.1 shell子批已提交`c10c5291`。settings／thinking／commands子批完成本地验收，随本记录提交；下一修复已确认的abort_retry误取消及compact阻塞JSONL控制，再做D.1联合验收。当前22/62项完成。
-**Last completed batch**: RPC thinking按当前端点能力与输出预算或虚拟定义发现和循环，保存后发布完整配置；自动设置返回已存／请求／生效值与来源。commands复用注册、invocation和skill准入，携原snapshot校验到响应发布，异步读取可取消并在EOF结算。联合11/200、最终发现相关3/29、设置反转恢复3/62、七有效反转exact恢复、六门、2646模块0monoliths及build `119bed2092d3`通过；限定代码APPROVE／架构CLEAR。Linux当前CLI两loopback POST覆盖实际effort／skill派发、重开与配置优先级；配置模型一次actual bodySent返回标记，精确真实wire effort未检查。D.1整项仍部分。
+**Current phase**: active；D.1设置／发现子批已提交`0caf82c`。compact控制与结果子批完成本地验收，随本记录提交；下一修复已确认的abort_retry误取消，再做D.1联合验收。当前22/62项完成。
+**Last completed batch**: compact在首个handler await前登记原command owner，响应复用rpcResponses在EOF结算，读取／busy／abort保持可达，非compacted结果保留结构化status。四实际断言红后修，六门4/43、恢复1/5、三个有效反转exact恢复、2647模块0monoliths及build `1a9b082e419d`通过；限定APPROVE／CLEAR。Linux当前CLI三loopback POST验证空历史、挂起摘要取消／无commit、复用成功／持久commit与EOF；配置模型两次actual bodySent完成prompt与compact。D.1整项仍部分。
 **Goal**: active；40项未完成，其中14部分、11已有待验收、13确认缺口、2待核实。保留完整规划，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -61,10 +61,13 @@ RPC shell子批遥测：实际L；复用检查通过原gate／commands／capture
 
 RPC设置／发现子批遥测：实际L；复用检查10/10，沿用配置publication、effort capability／endpoint budget、command invocation、skill catalog和原JSONL response join，无新loader或执行平面。额外依赖3（保存后的完整publication、应用callback换代、异步发现到最终响应的准入与取消）。project默认覆盖显式user值的推断被反证，保留原优先级；实际launch／显式config输入差异如实报告。下一批只接原retry等待的取消归属与compact command admission，不重建重试或压缩引擎，22/62保持。
 
+RPC压缩控制子批遥测：实际M；复用10/10，原session commands／compaction／JSONL owner不变，无新增生产依赖。两处原生夹具错误分别为缺少合法旧prefix及旧compaction事件名，保留失败记录并修观察器，不修改压缩切点／持久化规则。retry所有权独立实施；22/62保持。
+
 ## Session log
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-15 | 设置／发现已提交0caf82c；compact控制／结构化结果4/43、六门、三个反转exact恢复、build `1a9b082e419d`和限定APPROVE/CLEAR通过。Linux三loopback POST取消／reuse／EOF与两次配置模型请求／durable commit passed。原native夹具失败保留，证据upgrade-rpc-compaction-2026-11-15；22/62不变，继续retry专属取消，不push。 |
 | 2026-11-15 | shell已提交c10c5291；settings／thinking／commands当前11/200、发现最终3/29、七反转exact恢复、六门、2646模块0monoliths、build `119bed2092d3`通过，限定APPROVE/CLEAR。Linux两loopback POST与配置模型一次actual请求、effort／skill派发、同会话重开／配置优先级／EOF全passed；证据upgrade-rpc-settings-2026-11-15。D.1仍部分，22/62；继续retry专属取消与compact控制，不push。 |
 | 2026-11-15 | RPC fork已提交b1d46c3；shell／abort接通原owner，六门13/227、最终3/59／恢复5/68、五反转exact恢复、0monoliths、build `90499a5f654c`通过，限定复核APPROVE/CLEAR。Linux当前CLI两loopback POST与配置模型一次actual请求、组合归档／排除／重开／fork／取消／EOF全passed；证据upgrade-rpc-shell-2026-11-15。D.1仍部分，22/62，按批本地提交不push。 |
 | 2026-11-15 | RPC read已提交5ded288；fork／commands子批七反例红、六门6/65、五反转、0monoliths、build `8f67e032b1c9`和Linux三POST session/model/tree/busy矩阵passed，限定复审APPROVE/CLEAR。D.1 bash／abort_bash待接入，22/62保持，按批本地提交。 |

@@ -11936,3 +11936,8 @@ fork批已提交b1d46c3。bash／abort_bash复用原gate、commands和唯一Exec
 shell已提交c10c5291。thinking按实际endpoint capability／budget或virtual定义发现和循环，setModel完整publication发布后状态立即一致；自动设置返回stored／requested／effective与来源。commands复用原catalog／invocation／skill owner并保持优先级，snapshot准入到响应发布、撤权与取消、EOF结算均有反例。
 
 联合11/200、最终发现3/29、设置反转恢复3/62、七有效反转exact恢复、六门、2646模块0monoliths及build `119bed2092d3`通过，限定APPROVE／CLEAR。Linux同代两loopback POST验effort／skill实际wire和重开／优先级；配置模型一次bodySent返标记，原连接／凭据未改，body不可检查。误判project优先级已撤回，旧构建证据保持代际；归档upgrade-rpc-settings-2026-11-15。D.1仍部分、22/62；继续retry专属取消与compact控制，本地按批提交，不push。
+
+
+### 2026-11-15：RPC压缩控制与结构化结果
+
+设置／发现已提交0caf82c。compact在首个await前登记原command owner，响应复用EOF join，后续读取／busy／abort可达；nothing／busy／failed保留结构化data。四实际反例红后4/43与六门绿，三个反转exact恢复、1/5恢复测试、2647模块0monoliths及build `1a9b082e419d`通过；限定APPROVE／CLEAR。Linux三loopback POST挂起摘要取消／无commit／复用成功commit和EOF、配置模型两次actual请求通过。四次native夹具／观察器失败保留，归档upgrade-rpc-compaction-2026-11-15；D.1部分22/62，下一retry取消，不push。

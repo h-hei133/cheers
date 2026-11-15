@@ -1,0 +1,343 @@
+import readline from 'node:readline';
+import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
+import type { PromptAttachments, ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
+import type { SessionManager } from '../../session/SessionManager.js';
+import type { Session } from '../../session/schema/sessionRecord.js';
+import { writeRawStdout } from '../../core/shell/outputGuard.js';
+import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
+import type { StructuredLogger } from '../../observability/structuredLogger.js';
+import { formatCliContextTag } from '../../entrypoints/cliInteractiveLoopState.js';
+import { isFenceLine, opensMultilineLiteralPrompt, parseTransportPrompts, updateFenceState } from '../../core/shell/printPromptInput.js';
+import { SubmissionQueue } from '../interactive/inputQueue.js';
+import { attachInputQueue, isQueueControl } from './inputQueue.js';
+import { isGoalControl } from './goal.js';
+import { isSecurityControl } from './security.js';
+import { isAgentsControl } from './agents.js';
+import { bindExtensionUiFor, isExtensionControl, refreshExtensionsFor } from './extensions.js';
+import { isMcpRequest, isMcpConfiguration, isMcpControl, mcpControl } from '../mcp/content.js';
+import { cancelMcpFor } from './mcp.js';
+import { sshControl } from '../ssh/control.js';
+import { jobsControl } from '../jobs/control.js';
+import { cancelSshFor } from './ssh.js';
+import { isAdvisorControl } from './advisor.js';
+import { isResearchControl } from './research.js';
+import { isPlanningStreamControl } from './planning.js';
+import { handoffControl } from './handoff.js';
+import { directorControl } from './director.js';
+import { evaluationControl, cancelEvaluationFor } from './evaluation.js';
+import { mediaControl, cancelMediaCommand, withoutRecordingInput } from './media.js';
+import { attachGoalSubmission, schedulerForRuntime } from './goalScheduling.js';
+import { handleRpcCommand, tryParseRpcCommand, tryParseRpcUiResponse } from '../rpc/rpcServer.js';
+import { createRpcUiBridge, type RpcUiBridge } from '../rpc/uiBridge.js';
+import { createRuntimeRpcHost } from '../rpc/runtimeHost.js';
+
+const rpcInputOwners = new WeakMap<ShellRuntimeContext, object>();
+
+export async function runPromptInputStream(options: {
+  readonly stdin?: NodeJS.ReadableStream;
+  readonly runtimeContext: ShellRuntimeContext;
+  readonly sessionRuntime: ShellSessionRuntime;
+  readonly sessionManager?: SessionManager;
+  readonly renderer: StreamingRenderer;
+  readonly logger: StructuredLogger;
+  readonly runPrompt: (prompt: string, attachments?: PromptAttachments) => Promise<'exit' | void>;
+  readonly switchSession?: (session: Session) => boolean;
+  readonly onRpcUiBridge?: (bridge: RpcUiBridge) => void;
+  readonly onFirstFrame?: () => void;
+  readonly onUserIntent?: () => void;
+  readonly rpcMode?: boolean;
+}): Promise<void> {
+  const contextTag = (): string =>
+    formatCliContextTag({
+      projectRoot: options.runtimeContext.projectRoot,
+      sessionId: options.runtimeContext.session.id,
+    });
+  if (!options.rpcMode) {
+    options.renderer.renderLine(
+      `Non-TTY stdin mode ${contextTag()}: waiting for newline-delimited prompts.`,
+    );
+    options.renderer.renderLine(
+      "Send one prompt per line, or paste fenced/multiline content. Close stdin to finish.\n",
+    );
+  }
+  options.onFirstFrame?.();
+  options.logger.info("CLI non-TTY stdin stream mode started", {
+    sessionId: options.runtimeContext.session.id,
+  });
+  const stdinReader = readline.createInterface({
+    input: options.stdin ?? process.stdin,
+    crlfDelay: Infinity,
+    terminal: false,
+  });
+
+  let processedCount = 0;
+  let exitRequested = false;
+  let turnChain = Promise.resolve();
+  let controlChain = Promise.resolve();
+  let localControlChain = Promise.resolve();
+  const rpcResponses = new Set<Promise<void>>();
+  let rpcReads = new AbortController();
+  let rpcResponseFailure: unknown;
+  let contentCancellation = Promise.resolve();
+  let mcpCancellationGeneration = 0;
+  let pendingControls = 0;
+  let pendingPrompt: {
+    lines: string[];
+    inFence: boolean;
+    multilineLiteral: boolean;
+  } | null = null;
+
+  let closed = false; let busy = false;
+  let rpcUiBridge: RpcUiBridge | undefined;
+  let rpcInputOwner: object | undefined;
+  let releaseUi: (() => void) | undefined;
+  const closeRpcUi = (): void => {
+    if (rpcInputOwner && rpcInputOwners.get(options.runtimeContext) === rpcInputOwner) {
+      rpcInputOwners.delete(options.runtimeContext);
+    }
+    const release = releaseUi; releaseUi = undefined;
+    try { release?.(); } finally { rpcUiBridge?.dispose(); }
+  };
+  const stdinClosed = new Promise<void>((resolve, reject) => {
+    stdinReader.once('close', () => {
+      closed = true;
+      try { closeRpcUi(); resolve(); } catch (error) { reject(error); }
+    });
+  });
+  let roundBarrier = Promise.resolve(); let releaseRound: (() => void) | undefined;
+  const queue = new SubmissionQueue(() => options.runtimeContext.session, () => {
+    options.renderer.renderLine('Queued input was not executed because the session changed. Queue it again explicitly.');
+  });
+  const dispatch = async (prompt: string, attachments?: PromptAttachments): Promise<void> => {
+    if (exitRequested) return;
+    processedCount += 1;
+    withoutRecordingInput(options.runtimeContext, () => options.renderer.renderLine(`${contextTag()} > ${prompt}`));
+    const outcome = await options.runPrompt(prompt, attachments);
+    if (outcome === 'exit') { exitRequested = true; pendingPrompt = null; queue.splice(0); stdinReader.close(); }
+  };
+  const drain = (): void => {
+    turnChain = turnChain.then(async () => {
+      await roundBarrier;
+      await options.sessionRuntime.waitForIdle().catch(() => undefined);
+      // A cancellation can overtake this host's queue. Let it settle before
+      // dispatching a later explicit request from that same queue.
+      for (;;) {
+        const cancellation = contentCancellation;
+        await cancellation;
+        if (cancellation === contentCancellation) break;
+      }
+      const prompt = queue.shift(); if (prompt === undefined || exitRequested) return;
+      const attachments = queue.takeAttachments();
+      busy = true;
+      try { await dispatch(prompt, attachments); } finally { busy = false; }
+    }).catch(error => options.renderer.renderLine(`Run failed: ${error instanceof Error ? error.message : 'runtime failure'}`));
+  };
+  const enqueuePrompt = (prompt: string, attachments?: PromptAttachments): void => {
+    const media = mediaControl(prompt);
+    if (media) {
+      if (media.stop) {
+        queue.cancelWhere(value => new RegExp(`^/${media.name}(?:\\s|$)`, 'i').test(value.trim())); cancelMediaCommand(options.runtimeContext, media.name, media.args[0]?.toLowerCase() === 'stop' ? 'stopped' : 'cancelled');
+      }
+      pendingControls++;
+      localControlChain = localControlChain.then(() => dispatch(prompt))
+        .catch(() => options.renderer.renderLine('Media control is unavailable; inspect retained outcomes.'))
+        .finally(() => { pendingControls--; }); return;
+    }
+    const evaluation = evaluationControl(prompt);
+    if (evaluation) {
+      if (evaluation === 'stop') {
+        queue.cancelWhere(value => /^\/improve(?:\s|$)/i.test(value.trim())); cancelEvaluationFor(options.runtimeContext);
+      }
+      pendingControls++;
+      localControlChain = localControlChain.then(() => dispatch(prompt))
+        .catch(() => options.renderer.renderLine('Evaluation control is unavailable; inspect retained outcomes.'))
+        .finally(() => { pendingControls--; }); return;
+    }
+    const cancellingContent = mcpControl(prompt)?.action === 'cancel';
+    const ssh = sshControl(prompt);
+    if (ssh && ['status', 'jobs', 'cancel-pending', 'disconnect'].includes(ssh.action)) {
+      if (ssh.action === 'cancel-pending' || ssh.action === 'disconnect') {
+        queue.cancelWhere(value => /^\/ssh(?:\s|$)/i.test(value.trim())); cancelSshFor(options.runtimeContext);
+      }
+      pendingControls++;
+      localControlChain = localControlChain.then(() => dispatch(prompt))
+        .catch(() => options.renderer.renderLine('Local SSH control is unavailable; retained remote jobs may still run.'))
+        .finally(() => { pendingControls--; }); return;
+    }
+    if (cancellingContent) { mcpCancellationGeneration++; queue.cancelWhere(isMcpRequest); cancelMcpFor(options.runtimeContext); }
+    if (isQueueControl(prompt) || isGoalControl(prompt) || isPlanningStreamControl(prompt) || handoffControl(prompt) || directorControl(prompt) || isAdvisorControl(prompt) || isSecurityControl(prompt) || isAgentsControl(prompt) || isResearchControl(prompt) || isExtensionControl(prompt) || isMcpControl(prompt) || isMcpConfiguration(prompt) || sshControl(prompt) || jobsControl(prompt)) {
+      pendingControls += 1;
+      const generation = mcpCancellationGeneration;
+      controlChain = controlChain.then(() => {
+        if (isMcpConfiguration(prompt) && generation !== mcpCancellationGeneration) {
+          options.renderer.renderLine('Queued MCP configuration command cancelled before dispatch.'); return;
+        }
+        return dispatch(prompt);
+      })
+        .catch(error => options.renderer.renderLine(`Control failed: ${error instanceof Error ? error.message : 'runtime failure'}`))
+        .finally(() => { pendingControls -= 1; });
+      if (cancellingContent) contentCancellation = controlChain;
+      return;
+    }
+    queue.push(prompt, attachments); drain();
+  };
+  const releaseQueue = attachInputQueue(options.sessionRuntime, { control: queue.control, enqueue: text => queue.push(text), drain });
+  const releaseGoal = attachGoalSubmission(options.sessionRuntime, {
+    ready: () => !closed && !busy && pendingControls === 0 && queue.length === 0 && !pendingPrompt,
+    submit: async (prompt, promptMetadata) => {
+      busy = true; roundBarrier = new Promise<void>(resolve => { releaseRound = resolve; });
+      await options.sessionRuntime.executePrompt(options.runtimeContext.session.id, prompt, { promptMetadata, outputMode: 'print' });
+    },
+    settled: () => { busy = false; releaseRound?.(); releaseRound = undefined; },
+  });
+
+  try {
+    rpcUiBridge = options.rpcMode
+      ? createRpcUiBridge(request => writeRawStdout(`${JSON.stringify(request)}\n`))
+      : undefined;
+    if (rpcUiBridge) {
+      rpcInputOwner = {};
+      rpcInputOwners.set(options.runtimeContext, rpcInputOwner);
+      releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
+      if (closed) closeRpcUi();
+      options.onRpcUiBridge?.(rpcUiBridge);
+    }
+    const rpcHost = options.rpcMode
+      ? createRuntimeRpcHost({
+          runtimeContext: options.runtimeContext,
+          sessionRuntime: options.sessionRuntime,
+          sessionManager: options.sessionManager,
+          queue,
+          isStreaming: () => busy,
+          enqueuePrompt,
+          switchSession: options.switchSession,
+          ui: rpcUiBridge,
+        })
+      : undefined;
+
+    const flushPendingPrompt = () => {
+      if (!pendingPrompt) {
+        return;
+      }
+      const prompt = pendingPrompt.lines.join("\n").trim();
+      pendingPrompt = null;
+      if (prompt.length > 0) {
+        enqueuePrompt(prompt);
+      }
+    };
+
+    stdinReader.on("line", (line) => {
+      options.onUserIntent?.();
+      if (exitRequested) return;
+      const normalizedLine = line.replace(/^\uFEFF/, "");
+      if (pendingPrompt) {
+        if (
+          pendingPrompt.multilineLiteral &&
+          !pendingPrompt.inFence &&
+          normalizedLine.trim().length === 0
+        ) {
+          flushPendingPrompt();
+          return;
+        }
+        pendingPrompt.lines.push(normalizedLine);
+        pendingPrompt.inFence = updateFenceState(
+          pendingPrompt.inFence,
+          normalizedLine,
+        );
+        if (!pendingPrompt.inFence && pendingPrompt.lines.some(isFenceLine)) {
+          flushPendingPrompt();
+        }
+        return;
+      }
+
+      if (normalizedLine.trim().length === 0) {
+        return;
+      }
+
+      const uiResponse = rpcUiBridge ? tryParseRpcUiResponse(normalizedLine) : undefined;
+      if (uiResponse && rpcUiBridge) {
+        rpcUiBridge.handleUiResponse(uiResponse);
+        return;
+      }
+
+      const rpcCommand = options.rpcMode ? tryParseRpcCommand(normalizedLine) : undefined;
+      if (rpcCommand && rpcHost) {
+        pendingControls++;
+        localControlChain = localControlChain
+          .then(() => {
+            if (rpcCommand.type === 'abort') {
+              const previous = rpcReads; rpcReads = new AbortController(); previous.abort();
+            }
+            const background = options.runtimeContext.configuration.backgroundSignal;
+            const pending = handleRpcCommand(rpcCommand, rpcHost, rpcCommand.type === 'get_commands' ? rpcReads.signal : undefined).then(response => {
+              if (!response.success || background === options.runtimeContext.configuration.backgroundSignal) return;
+              if (closed || exitRequested || !rpcUiBridge || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
+              // A successful transition retires its old surface. Refresh the
+              // existing extension owner before binding the current input again.
+              refreshExtensionsFor(options.runtimeContext);
+              if (closed || exitRequested || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
+              releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
+            }).finally(() => { pendingControls--; });
+            if (rpcCommand.type !== 'bash' && rpcCommand.type !== 'compact' && rpcCommand.type !== 'get_commands') return pending;
+            // The session's command owner joins execution. This set only joins
+            // response writes at EOF while later controls can reach cancellation.
+            rpcResponses.add(pending);
+            pending.then(() => rpcResponses.delete(pending), error => {
+              rpcResponses.delete(pending); rpcResponseFailure ??= error;
+            });
+          });
+        return;
+      }
+
+      const startsFence = isFenceLine(normalizedLine);
+      if (startsFence || opensMultilineLiteralPrompt(normalizedLine)) {
+        pendingPrompt = {
+          lines: [normalizedLine],
+          inFence: updateFenceState(false, normalizedLine),
+          multilineLiteral: opensMultilineLiteralPrompt(normalizedLine),
+        };
+        if (!pendingPrompt.inFence && startsFence) {
+          flushPendingPrompt();
+        }
+        return;
+      }
+
+      for (const prompt of parseTransportPrompts(normalizedLine, {
+        allowComments: false,
+      })) {
+        enqueuePrompt(prompt);
+      }
+    });
+
+    await stdinClosed;
+    flushPendingPrompt();
+    for (;;) {
+      const localControls = localControlChain;
+      await localControls;
+      const controls = controlChain;
+      await controls;
+      await Promise.allSettled([...rpcResponses]);
+      if (rpcResponseFailure !== undefined) throw rpcResponseFailure;
+      const turns = turnChain;
+      await turns;
+      if (localControls === localControlChain && controls === controlChain && turns === turnChain) break;
+    }
+    await schedulerForRuntime(options.sessionRuntime)?.stop('cancelled');
+    if (!options.rpcMode) {
+      options.renderer.renderLine(
+        `\nStdin stream closed. Processed ${processedCount} prompt(s).\n`,
+      );
+    }
+    options.logger.info("CLI non-TTY stdin stream mode closed", {
+      sessionId: options.runtimeContext.session.id,
+      processedCount,
+    });
+  } finally {
+    rpcReads.abort();
+    try { closeRpcUi(); } finally {
+      stdinReader.close();
+      releaseGoal?.();
+      releaseQueue();
+    }
+  }
+}

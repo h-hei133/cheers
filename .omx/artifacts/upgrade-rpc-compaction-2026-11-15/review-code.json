@@ -1,0 +1,10 @@
+{
+  "reviewer": "/root/routing_delivery_review",
+  "recommendation": "APPROVE",
+  "base": "0caf82c",
+  "filesReviewed": 3,
+  "findings": [],
+  "evidence": "Early registration reaches the existing command owner, later controls can reach abort, EOF joins the response, and unsuccessful responses retain structured outcome.",
+  "validationRunByReviewer": false,
+  "limits": "Retry and unrelated compaction behavior excluded."
+}

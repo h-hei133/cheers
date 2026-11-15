@@ -1,0 +1,41 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "realProvider": true,
+  "status": "passed",
+  "buildId": "1a9b082e419dc0dafe23220b1189c890e2d48bfd86b8b0bc5c72031a06c7ac68",
+  "probeSha256": "d499f04477b69ad80df333c4e84aedab5baa7d42f7428650422e7bd24740ffe0",
+  "stages": {
+    "compact": {
+      "passed": true,
+      "actualSummaryBodySent": true,
+      "durableCompaction": true,
+      "stateControlResponded": true,
+      "structuredOutcome": "compacted"
+    },
+    "eof": {
+      "passed": true,
+      "exit0": true,
+      "validJsonLines": true
+    }
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "existingConfiguredTarget": true,
+    "originalConfigUnchanged": true,
+    "minimalConfiguredModelEntry": true,
+    "isolatedValidObjects": true
+  },
+  "promptStatus": "completed",
+  "requests": 2,
+  "wireObservation": [
+    {
+      "created": true,
+      "bodyInspectable": false
+    },
+    {
+      "created": true,
+      "bodyInspectable": false
+    }
+  ]
+}

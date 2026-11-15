@@ -1,0 +1,60 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "status": "passed",
+  "realProvider": false,
+  "buildId": "1a9b082e419dc0dafe23220b1189c890e2d48bfd86b8b0bc5c72031a06c7ac68",
+  "probeSha256": "da3b3f371618ee1a835a02c801738ab39ac365094505d2d8b3a627fc752b802f",
+  "stages": {
+    "empty": {
+      "passed": true,
+      "status": "nothing",
+      "zeroProviderRequests": true
+    },
+    "cancel": {
+      "passed": true,
+      "actualSummaryRequest": true,
+      "controlsReachable": true,
+      "busyRefusal": true,
+      "socketClosed": true,
+      "noCompactionCommitted": true,
+      "structuredOutcome": true
+    },
+    "reuse": {
+      "passed": true,
+      "successfulSummary": true,
+      "durableCompaction": true,
+      "eofWaitedForResponse": true,
+      "eofExit0": true,
+      "validJsonLines": true
+    }
+  },
+  "earlyCompact": {
+    "success": false,
+    "data": {
+      "status": "failed",
+      "reason": "Compaction was cancelled."
+    },
+    "error": "Compaction was cancelled."
+  },
+  "finalCompaction": {
+    "success": true,
+    "data": {
+      "status": "compacted",
+      "summarized": 2,
+      "kept": 2,
+      "tokensBefore": 4003,
+      "tokensAfter": 1694
+    }
+  },
+  "eventTypes": [
+    "session",
+    "query-event",
+    "message",
+    "lifecycle",
+    "compaction-prepared",
+    "compaction-commit"
+  ],
+  "compactionCount": 1,
+  "posts": 3
+}
