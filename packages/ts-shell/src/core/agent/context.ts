@@ -61,3 +61,13 @@ export function sameContext(messages: readonly AgentMessage[], captured: readonl
   try { return isDeepStrictEqual(captureContext(messages), captured); }
   catch { return false; }
 }
+
+/** Awaited preparation must still belong to the history captured before it started. */
+export function assertContextCurrent(messages: readonly AgentMessage[], captured: readonly AgentMessage[],
+  isCurrent: ((messages: readonly AgentMessage[]) => boolean) | undefined, signal?: AbortSignal): void {
+  signal?.throwIfAborted();
+  if (!sameContext(messages, captured) || !(isCurrent?.(captured) ?? true)) {
+    throw new Error('Agent history changed during preparation.');
+  }
+  signal?.throwIfAborted();
+}

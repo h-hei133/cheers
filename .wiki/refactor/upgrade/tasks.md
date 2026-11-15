@@ -30,7 +30,7 @@
 
 ## C: 循环、消息与缓存（P1，并包含深度审计 P0）
 
-- [ ] **C.1** prepareNextTurn／prepareRequest／finishTurn 与虚拟路由：部分验收。follow-up优先于人工context-only续轮、steering仍优先，两项反转红例有效；独立暂存树4套件111项、六静态门、build `1e9c526087ec`通过，限定复核CLEAR。其他hook调用顺序与真实配置模型验收仍待完成。
+- [ ] **C.1** prepareNextTurn／prepareRequest／finishTurn 与虚拟路由：部分验收。follow-up优先于人工context-only续轮、steering仍优先，原两反转红例有效。准备边界子批补齐初始／续轮／逐请求的取消与原历史复验、结束hook取消退出、turn_start后继历史拒绝；原PendingQueue只读peek使准备前不取输入，撤回不造空请求、晚steering按单条优先。初6红、复审5红及observer单红均先复现后修；8套件161项、六门、0monoliths及build `3bed083698af`通过，限定只读复核CLEAR。两有效反转红／逐字节恢复后3套件74项通过；首npm筛选拒绝及一次误并发终止不计验证。Linux当前编译loop入口经SDK adapter两次已配置模型actual bodySent与准备取消零派发通过，非完整虚拟路由联合验收。当前虚拟路由仍缺完整target/auth/transport重绑定、scope复验和路由状态撤权／归属，C.1不勾选，总体20/62项不变。
 - [ ] **C.2** message_update 流式部分消息及 x-should-retry：已有待验收，部分响应不重放、内外重试一致。
 - [x] **C.3** AgentMessage 与 provider Message 分离及 convertToLlm：本地验收完成。独立基础类型、custom持久化／显示、前台SDK、摘要和普通请求完整capture均已提交；同一raw路由／转换／system／工具／图片／budget／最终body经过统一准备owner，自动／手动／prefix／merge／branch／overflow／rewind／重开保持一致，取消后可复用。当前`e4d27485`联合30套件502项、六静态门通过，限定只读复核CLEAR；Linux编译build `c7857153d401`两组配置模型各7次actual bodySent通过，隐藏raw未送出，取消零派发及声明ID／顺序保持。账户刷新fixture因移除override后默认4096超过main旧100 ceiling而早拒绝，定向复现零renewal／零dispatch；仅修正fixture前台预算，原拒绝／一次刷新／两次新凭据／持久化和历史断言均通过。详细范围与首次失败见design及`context-joint-final.log`；不表示C.6原生协议、缓存收益、其他平台或远端CI完成。
 - [ ] **C.4** 默认历史工具文本保留与一致测量：已有待验收，真实多轮请求前缀与压缩预算。
@@ -60,7 +60,7 @@
 - [ ] **E.8** shortcuts／flags：部分。目前收集但 CLI／SDK 未消费；冲突、默认值、实际参数与按键生命周期。
 - [ ] **E.9** 包安装来源和 CLI 入口：部分。已有签名 marketplace 安装，npm／git／local adapter 和顶层安装入口尚缺；保留显式批准、完整性、精确版本与写入边界。
 - [ ] **T2.1** CLI 参数集合、单遍解析与早期启动判断：部分，主循环已存在；测试完整启动矩阵并处理早期多遍语义。
-- [ ] **T3.1** createAgentSession／DefaultResourceLoader：已有待验收，公开类型／包安装、真实模型调用、取消后复用及 dispose。
+- [ ] **T3.1** createAgentSession／DefaultResourceLoader：部分。公开入口与消费者已存在；本轮只读核实发现dispose未撤销消费的loader generation，compact未纳入idle／取消等待且可覆盖controller，并发dispose不join。需先反例、修复，再同一当前安装包做严格类型、真实模型调用、取消后复用与dispose联合验收；T1/C.3旧证据不替代本项。
 
 ## F1 / F2: 协议、目录和遥测（P2）
 

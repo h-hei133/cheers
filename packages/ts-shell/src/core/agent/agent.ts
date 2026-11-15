@@ -189,6 +189,7 @@ export class AgentCore {
       },
       isContextCurrent: messages => sameContext(this.internalState.messages, messages),
       streamStep: this.options.streamStep,
+      hasQueuedMessages: lane => (lane === 'steering' ? this.steeringQueue : this.followUpQueue).hasItems(),
       getSteeringMessages: async () => this.steeringQueue.drain(),
       getFollowUpMessages: async () => this.followUpQueue.drain(),
     };

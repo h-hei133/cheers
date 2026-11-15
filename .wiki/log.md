@@ -11868,3 +11868,9 @@ Linux当前编译CLI regular/fullscreen及65提示旧页三格全exit0；普通�
 B2.1当前build `fbb35f5b6199`联合六門、15/430及导航3/状态4/cell-size4/真实tmux两client×两宿主均passed，receipt/source身份核验，限定独立审计CLEAR。支持位实际来自tmux客户端feature，actual CLI OSC8支持时输出否则回退，原16t query/split回复/paste与停止状态保持，全exit0。
 
 B2.1勾选后整体20/62项，本验收批仅文档按用户要求提交；物理终端、其他平台、真实provider、deadline后无tag严格归属、push和CI不宣称。完整研究任务保留，总目标active，继续C.1循环hook/T3.1 SDK。
+
+### 2026-11-15：循环准备边界独立子批
+
+C.1初始／续轮准备的取消、后继历史及结束hook退出六红例先复现后修；复审补出停止hook、未接收队列和carrier／turn_start重入缺陷，同批修复。复用原PendingQueue只读peek，准备完成后才取单条输入，撤回不造空请求、晚steering优先；临时请求持久化权限和合法compaction保留。
+
+六门、8套件161项、0monoliths及build `3bed083698af`通过，限定只读复核CLEAR；两有效反转红、三生产文件逐字节恢复后3/74通过。npm筛选setup拒绝和一次误并发终止均保留不计绿；Linux当前编译loop经SDK adapter两actual配置模型请求与取消零派发通过。虚拟路由完整target／scope／状态和T3.1 loader／compact仍开，整体20/62、goal active；本批按用户要求提交，不宣称push／CI。

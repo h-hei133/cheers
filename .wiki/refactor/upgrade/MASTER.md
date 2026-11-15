@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
-**Active batch**: B2.1完整消息边界已提交`2d9c8c0a`，当前build `fbb35f5b6199`六门、15/430及状态/cell-size/导航/真实tmux联合回执全部通过，限定独立审计CLEAR。B2.1勾选后整体20/62项；本验收文档批按用户要求提交。接续C.1循环hook与T3.1 SDK，C.6原生服务缺口保留。
+**Active batch**: C.1准备边界子批六门、8/161、0monoliths及build `3bed083698af`通过，限定只读复审CLEAR；两有效反转红／逐字节恢复3/74，当前编译loop经SDK adapter配置模型两actual请求和取消零派发通过。本地提交本批后接续T3.1的loader撤权／compact等待，再处理虚拟路由完整target／scope／状态。C.1未勾选，总体20/62；C.6原生服务缺口保留。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 

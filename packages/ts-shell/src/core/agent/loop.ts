@@ -5,7 +5,7 @@ import { flushMetrics, recordCount, recordTiming } from "../../observability/met
 import type { AgentMessage, AgentStopReason } from "./state.js";
 import { convertMessages, type MessageConverter, type MessageProjection } from './messages.js';
 import type { ProviderMessage } from '../../model-adapters/message.js';
-import { captureContext, captureDeclarationAppend, lastContextMessageIndex, sameContext, type RequestContextOwner } from './context.js';
+import { assertContextCurrent, captureContext, captureDeclarationAppend, lastContextMessageIndex, sameContext, type RequestContextOwner } from './context.js';
 import {
   exceedsRetryCeiling,
   isRetryableFailure,
@@ -136,6 +136,7 @@ export interface AgentLoopConfig {
    * computed for the next request prices the instruction that request carries.
    */
   readonly toolsAllowedOnNextStep?: () => boolean;
+  /** Prepare initial history and each scheduled next turn; retries prepare only the request. */
   readonly prepareNextStep?: (
     snapshot: NextStepSnapshot,
     signal?: AbortSignal,
@@ -143,6 +144,8 @@ export interface AgentLoopConfig {
   readonly onContextReplaced?: (messages: readonly AgentMessage[]) => void;
   /** A request must not replace successor state that changed while preparation awaited. */
   readonly isContextCurrent?: (messages: readonly AgentMessage[]) => boolean;
+  /** Inspect an owned queue without taking messages before asynchronous preparation. */
+  readonly hasQueuedMessages?: (lane: 'steering' | 'followUp') => boolean;
   readonly getSteeringMessages?: () => Promise<AgentMessage[]>;
   readonly getFollowUpMessages?: () => Promise<AgentMessage[]>;
   /**
@@ -244,8 +247,10 @@ async function retryStep(
   let attempt = 0;
   for (;;) {
     let capturedContext = captureContext(context);
+    signal?.throwIfAborted();
     const reason = attempt > 0 ? 'retry' : context[lastContextMessageIndex(context)]?.role === 'user' ? 'user' : 'continuation';
-    const prepared = await config.prepareRequest?.({ reason, attempt, messages: context }, signal);
+    const prepared = config.prepareRequest ? await config.prepareRequest({ reason, attempt, messages: context }, signal) : undefined;
+    if (config.prepareRequest) assertContextCurrent(context, capturedContext, config.isContextCurrent, signal);
     const activeStep = prepared?.streamStep ?? config.streamStep;
     const activeMessages = prepared?.messages ?? context;
     // Native preparation routes raw history before adding declarations and converting it.
@@ -324,7 +329,7 @@ async function retryStep(
         });
       },
     });
-    signal?.throwIfAborted();
+    assertContextCurrent(context, capturedContext, config.isContextCurrent, signal);
     const step = await activeStep(deferredSource ? activeMessages : converted!.messages, signal, request);
     await emitChain;
     // Once partial output has reached listeners, or the step's own layer
@@ -393,7 +398,7 @@ async function driveLoop(
     config.beforeToolCall || config.afterToolCall
       ? { beforeToolCall: config.beforeToolCall, afterToolCall: config.afterToolCall }
       : undefined;
-  let pending: AgentMessage[] = seedSteering ? await pollSteering(config) : [];
+  let pending: AgentMessage[] = [];
   let completedStep: NextStepSnapshot | undefined;
 
   // Check the budget once before the first step.
@@ -407,28 +412,59 @@ async function driveLoop(
   if (prepareInitial && config.prepareNextStep) {
     // A copy, like every later snapshot: the caller may cache against array
     // identity, and this context is mutated in place as the run proceeds.
+    const captured = captureContext(context);
+    assertContextCurrent(context, captured, config.isContextCurrent, signal);
     const first = await config.prepareNextStep({ toolResults: [], messages: [...context] }, signal);
-    if (first?.messages) {
-      replaceContext(context, first.messages);
-      config.onContextReplaced?.(first.messages);
+    const messages = first?.messages;
+    const next = messages ? captureContext(messages) : undefined;
+    assertContextCurrent(context, captured, config.isContextCurrent, signal);
+    if (next) {
+      config.onContextReplaced?.(next);
+      replaceContext(context, next);
     }
   }
+  signal?.throwIfAborted();
+  if (seedSteering) pending = await pollSteering(config);
 
   let explicitContinuation = false;
+  let withoutInput = true;
+  let followUpAllowed = true;
   while (true) {
     let hasMoreToolCalls = true;
     while (hasMoreToolCalls || pending.length > 0) {
       explicitContinuation = false;
       if (completedStep) {
-        const update = await config.prepareNextStep?.(completedStep, signal);
-        if (update?.messages) {
-          replaceContext(context, update.messages);
-          config.onContextReplaced?.(update.messages);
+        if (config.prepareNextStep) {
+          const captured = captureContext(context);
+          assertContextCurrent(context, captured, config.isContextCurrent, signal);
+          const update = await config.prepareNextStep(completedStep, signal);
+          const messages = update?.messages;
+          const next = messages ? captureContext(messages) : undefined;
+          assertContextCurrent(context, captured, config.isContextCurrent, signal);
+          if (next) {
+            config.onContextReplaced?.(next);
+            replaceContext(context, next);
+          }
         }
-        if (pending.length === 0) {
+        signal?.throwIfAborted();
+        if (config.hasQueuedMessages) {
+          if (!withoutInput && !config.hasQueuedMessages('steering') && !config.hasQueuedMessages('followUp')) {
+            await emit({ type: 'agent_end', messages: [...produced] });
+            return;
+          }
+          const starting = captureContext(context);
+          await emit({ type: 'turn_start' });
+          assertContextCurrent(context, starting, config.isContextCurrent, signal);
           pending = await pollSteering(config);
+          if (pending.length === 0 && followUpAllowed) pending = await pollFollowUp(config);
+          if (!withoutInput && pending.length === 0) {
+            await emit({ type: 'agent_end', messages: [...produced] });
+            return;
+          }
+        } else {
+          if (pending.length === 0) pending = await pollSteering(config);
+          await emit({ type: 'turn_start' });
         }
-        await emit({ type: "turn_start" });
       }
 
       for (const message of pending) {
@@ -511,8 +547,8 @@ async function driveLoop(
 
       const snapshot: NextStepSnapshot = { message: assistant, toolResults, messages: [...context] };
       const turnDecision = await config.finishTurn?.(snapshot, signal);
-      const stopping = await config.shouldStopAfterStep?.(snapshot);
-      const endRequested = turnDecision?.action === "end" || Boolean(stopping);
+      const stopping = !signal?.aborted && turnDecision?.action !== 'end' ? await config.shouldStopAfterStep?.(snapshot) : false;
+      const endRequested = turnDecision?.action === "end" || Boolean(stopping) || Boolean(signal?.aborted);
       const continueRequested = turnDecision?.action === "continue" && !endRequested;
       await emit({
         type: "turn_end",
@@ -520,7 +556,7 @@ async function driveLoop(
         toolResults,
         willContinue: endRequested ? false : (hasMoreToolCalls || continueRequested),
       });
-      if (endRequested) {
+      if (endRequested || signal?.aborted) {
         await emit({ type: "agent_end", messages: [...produced] });
         return;
       }
@@ -528,7 +564,21 @@ async function driveLoop(
       // instruction instead of tools, so the next request carries one more
       // message than the conversation does.
       const toolsAllowed = config.toolsAllowedOnNextStep?.();
+      if (signal?.aborted) {
+        await emit({ type: 'agent_end', messages: [...produced] });
+        return;
+      }
       completedStep = { ...snapshot, ...(toolsAllowed !== undefined ? { toolsAllowed } : {}) };
+      if (config.hasQueuedMessages) {
+        withoutInput = hasMoreToolCalls || continueRequested;
+        followUpAllowed = !hasMoreToolCalls;
+        if (!withoutInput && !config.hasQueuedMessages('steering') && !config.hasQueuedMessages('followUp')) {
+          await emit({ type: 'agent_end', messages: [...produced] });
+          return;
+        }
+        hasMoreToolCalls = true;
+        continue;
+      }
       pending = await pollSteering(config);
       explicitContinuation = continueRequested && !hasMoreToolCalls && pending.length === 0;
     }

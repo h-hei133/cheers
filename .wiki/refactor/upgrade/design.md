@@ -39,6 +39,16 @@ flowchart TD
 
 真实提供方支持受当前配置和服务端能力限制；不以自定义 capability 或 synthetic 应答冒充真实兼容。用户已允许 Linux 真实测试，执行使用已有配置模型；需要人工同意的登录验证如未发生，明确保留缺证据。
 
+## Loop preparation ownership (2026-11-15)
+
+原研究的prepareNextTurn在本项目由prepareNextStep承担，含首次预算检查；不新增同义hook。定向参考确认finish在assistant/tool结果发布后、prepare在下一请求前、逐retry只做request准备，end不再poll或进入下一准备；本实现进一步在异步返回和turn_start observer后复验原history／signal，准备返回的carrier读取完后再复验。合法compaction仍由原onContextReplaced和requestContext.accept推进同一历史，无新durable权限。
+
+参考的prepare后再接收steering保留；原PendingQueue通过同步hasItems只读选择续轮，prepare成功／turn_start返回后才drain单个lane。自然tool继续不提前取followUp，晚steering优先，准备中撤回唯一队列则结束；未提供peek的通用异步getter保留原poll合同，不宣称回滚未确认的外部取消息。取消后的已完成assistant保留，未取输入不丢失。
+
+`.omx/artifacts/upgrade-loop-2026-11-15/`保存初6红、复审5红与observer单红；最终8套件161项、六门、0monoliths和build `3bed083698af`通过，限定只读复核CLEAR。两有效反转红，三个生产文件逐字节恢复后3/74通过；首npm12筛选拒绝、一次误并发后终止两测试以及不收敛反转另存失败记录，不当有效反转。当前编译loop入口经SDK adapter完成两次实际配置模型请求，hooks顺序和准备取消零写回／零派发通过；该adapter不证明整个CLI虚拟路由接通。
+
+本批实际L、额外依赖1（复用原队列的非破坏peek），结构检查通过。静态路由核实仍有原credential／address／transport沿用、实际目标scope未复核及late state问题，T3.1还有loader消费generation撤权和compact settlement缺口；均保留任务，不以本子批勾选C.1或全规划。
+
 ## Toolchain publication contract (2026-11-14)
 
 公开入口与CLI由一次shared graph构建，元数据产生静态public.js，stable wrappers经唯一current.js共享运行时。别名由specifier和export name编码，新增入口不会重用旧别名；默认和live binding保留。manifest v3把全部wrapper、声明转发和pack规则绑定到输入与产物；journal v2记录旧字节/模式/不存在状态，兼容旧日志恢复。仅清理旧manifest记录且未被用户改动的managed files，不宽泛清目录。旧build保留在磁盘，dist/.npmignore仅打包当前代，防止安装包携带989代历史。声明目录复制原JSON资源，公开类型的Node依赖随包安装。

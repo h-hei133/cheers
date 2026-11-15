@@ -2583,3 +2583,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A tool-calling preamble becomes a navigable answer, or a stopped partial block acquires a message boundary without a completed-message fact.
 - **Root Cause:** message_end precedes tool_execution_start; finalization also runs on cancellation, failure and message replacement, so neither the next tool nor finalized alone states whether a message contains tools.
 - **Rule:** Project the actual completed-message tool-call state at message_end, write it before finalization in one transcript update, and keep unknown partial state distinct from confirmed false. Restore the same fact from durable tool_calls; navigation and rendering require explicit eligibility, without upgrading failed message completion to success.
+
+### Preparation Must Not Take Unaccepted Queue Entries
+- **Symptom:** Cancelled preparation replaces newer history, or a follow-up vanishes before it ever reaches message_end.
+- **Root Cause:** The loop drains inputs before awaiting preparation and trusts history checked before a returned carrier or lifecycle observer runs.
+- **Rule:** Capture history before preparation, capture returned data before the final history/signal check, and revalidate after turn_start before taking input. Select owned lanes through the existing queue's non-destructive hasItems; drain one lane after preparation, keep steering ahead of follow-ups, and stop if the sole queued input was withdrawn. Finish cancellation must bypass later stop hooks and queue polling.
+
+### A Yielded Validation Process Is Still Running
+- **Symptom:** Restoration testing starts while a mutation probe is still running, or a command-option rejection is counted as a red test.
+- **Root Cause:** A yielded session_id is mistaken for completion and npm option parsing is mistaken for an executed test; broad mutation tests may lose their terminating fixture condition.
+- **Rule:** Join the live execution until exit before another heavy command or mutation. Use direct Vitest with a bounded scenario when forwarding selection through npm is uncertain, require an actual assertion failure, and restore exact bytes in finally before a separate green check. Keep interrupted and setup-failed receipts separate from validation evidence.
