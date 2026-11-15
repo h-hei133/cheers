@@ -11874,3 +11874,10 @@ B2.1勾选后整体20/62项，本验收批仅文档按用户要求提交；物�
 C.1初始／续轮准备的取消、后继历史及结束hook退出六红例先复现后修；复审补出停止hook、未接收队列和carrier／turn_start重入缺陷，同批修复。复用原PendingQueue只读peek，准备完成后才取单条输入，撤回不造空请求、晚steering优先；临时请求持久化权限和合法compaction保留。
 
 六门、8套件161项、0monoliths及build `3bed083698af`通过，限定只读复核CLEAR；两有效反转红、三生产文件逐字节恢复后3/74通过。npm筛选setup拒绝和一次误并发终止均保留不计绿；Linux当前编译loop经SDK adapter两actual配置模型请求与取消零派发通过。虚拟路由完整target／scope／状态和T3.1 loader／compact仍开，整体20/62、goal active；本批按用户要求提交，不宣称push／CI。
+
+
+### 2026-11-15：SDK资源消费收尾后按用户要求暂停
+
+loader／dispose子批已提交`c8d14775`：原代际claim、失败绑定保留caller资源／deny rules、消费资源撤权和后继reload保留，并发dispose共享等待与原首错，失败后继续cleanup／terminate。两WATCH补实际setHost排序和pending cache拒绝，六门、6套件34项、0monoliths、build `1787d90736d1`通过；两反转为真实断言红且源码逐字节恢复，最终限定只读复核CLEAR。
+
+Linux当前编译SDK inline／TS文件扩展撤权、abort复用和后继资源保留passed，synthetic provider；临时driver归档后清理。T3.1 compact／当前安装包／真实模型联合仍未完成，整体20完成／42未完成。用户要求完成在手子批后暂停，记录[暂停总结](refactor/upgrade/summary.md)和逐项缺口；不启动后续任务，不宣称push／CI或总目标完成。

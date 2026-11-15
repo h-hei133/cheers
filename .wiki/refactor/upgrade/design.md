@@ -47,7 +47,17 @@ flowchart TD
 
 `.omx/artifacts/upgrade-loop-2026-11-15/`保存初6红、复审5红与observer单红；最终8套件161项、六门、0monoliths和build `3bed083698af`通过，限定只读复核CLEAR。两有效反转红，三个生产文件逐字节恢复后3/74通过；首npm12筛选拒绝、一次误并发后终止两测试以及不收敛反转另存失败记录，不当有效反转。当前编译loop入口经SDK adapter完成两次实际配置模型请求，hooks顺序和准备取消零写回／零派发通过；该adapter不证明整个CLI虚拟路由接通。
 
-本批实际L、额外依赖1（复用原队列的非破坏peek），结构检查通过。静态路由核实仍有原credential／address／transport沿用、实际目标scope未复核及late state问题，T3.1还有loader消费generation撤权和compact settlement缺口；均保留任务，不以本子批勾选C.1或全规划。
+本批实际L、额外依赖1（复用原队列的非破坏peek），结构检查通过。静态路由核实仍有原credential／address／transport沿用、实际目标scope未复核及late state问题。T3.1当时发现loader消费generation撤权和compact settlement缺口；loader／dispose已由下述独立子批修复，compact仍未完成，不以本子批勾选C.1或全规划。
+
+## SDK resource retirement (2026-11-15)
+
+定向只读参考会话dispose会使旧扩展上下文失效，并在abort hook失败后仍清除listeners与会话资源。本项目保留既有SDK／loader／runtime owner与异步cleanup契约：普通abort只取消当前轮，dispose才撤销消费资源；清理失败继续其他cleanup，同时向所有调用者报告原首错，不采用吞错即成功。
+
+create前捕获加载generation及其binding claim，在异步初始化后核对原代际；setHost先构造退休闭包再提交host，claim成功后才替换deny rules。失败的第二session不能更改caller资源；退休只释放消费generation，不释放随后reload创建的资源。旧`setHost(...): void` override类型兼容保留。一个dispose promise在执行外部回调前发布，取消等待、各独立cleanup和terminate都进行尝试；allSettled拒绝必须进入最终错误结果。
+
+`c8d14775`的最终六静态门、6套件34项、0monoliths、build `1787d90736d1`和限定只读复核CLEAR有实际日志。两个WATCH分别补正常首次capture／第二次setHost capture失败后新claim成功，以及pending cache cleanup异步拒绝的等待／同错传播；两收尾反转均为真实AssertionError，原源码逐字节恢复后联合再绿。当前编译SDK实际加载inline和TS文件扩展，普通abort仍可读、dispose撤权、后继reload保留均通过；使用synthetic provider，回执和源码hash一致。证据位于`.omx/artifacts/upgrade-sdk-2026-11-15/`，临时driver已归档文本并删除。
+
+本子批新增依赖仅原代际binding claim，未增加第二资源owner；不关闭T3.1。compact未纳入idle／取消等待及controller覆盖仍需反例和修复，当前安装包严格类型／真实模型／取消复用／dispose联合验收未运行。用户要求当前子批后暂停，因此这些后续工作保留为未完成。
 
 ## Toolchain publication contract (2026-11-14)
 

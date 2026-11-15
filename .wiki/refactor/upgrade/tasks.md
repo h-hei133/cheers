@@ -60,7 +60,7 @@
 - [ ] **E.8** shortcuts／flags：部分。目前收集但 CLI／SDK 未消费；冲突、默认值、实际参数与按键生命周期。
 - [ ] **E.9** 包安装来源和 CLI 入口：部分。已有签名 marketplace 安装，npm／git／local adapter 和顶层安装入口尚缺；保留显式批准、完整性、精确版本与写入边界。
 - [ ] **T2.1** CLI 参数集合、单遍解析与早期启动判断：部分，主循环已存在；测试完整启动矩阵并处理早期多遍语义。
-- [ ] **T3.1** createAgentSession／DefaultResourceLoader：部分。公开入口与消费者已存在；本轮只读核实发现dispose未撤销消费的loader generation，compact未纳入idle／取消等待且可覆盖controller，并发dispose不join。需先反例、修复，再同一当前安装包做严格类型、真实模型调用、取消后复用与dispose联合验收；T1/C.3旧证据不替代本项。
+- [ ] **T3.1** createAgentSession／DefaultResourceLoader：部分。loader／dispose子批已提交`c8d14775`：初始化前捕获资源代际、绑定前复验、构造退休闭包后才提交host，成功claim后更新deny rules；dispose撤销消费代际且保留后继reload，所有并发调用等待同一cleanup并收到原首错，其他cleanup与terminate继续执行。六静态门、6套件34项、0monoliths与build `1787d90736d1`通过，最终限定只读复核CLEAR；两项收尾反转为真实断言失败，源码逐字节恢复。Linux当前编译SDK实际inline／TS文件扩展撤权与后继保留通过，使用synthetic provider。compact仍未纳入idle／取消等待且可覆盖controller；同一当前安装包严格类型、真实配置模型调用、取消复用与dispose联合验收仍待完成，T1/C.3旧证据不替代。本子批后按用户要求暂停，20/62项不变。
 
 ## F1 / F2: 协议、目录和遥测（P2）
 
@@ -102,6 +102,8 @@
 - **P3-DESKTOP** 独立 Web／桌面产品矩阵：原文暂缓；不把 Linux 桌面自动化工具称作桌面产品。
 
 ## Validation ledger
+
+2026-11-15 暂停收尾：T3.1 loader／dispose子批`c8d14775`完成，证据在`.omx/artifacts/upgrade-sdk-2026-11-15/lifecycle-closing-delivery.json`。实际六门、6套件34项、函数上限0超限、build `1787d90736d1`及Linux当前编译SDK inline／TS文件消费撤权与后继保留通过；使用synthetic provider，没有新增真实服务调用。`lifecycle-closing-reversals.json`两项实际AssertionError失败且逐字节恢复，最终只读复核限定CLEAR。补齐半绑定排序和异步cleanup拒绝两WATCH；早期重复匹配的mutation脚本拒绝、一次相对config/root启动失败和未写resolves断言的反转诊断不计有效验证。用户要求完成在手子批后暂停，未开始compact或虚拟路由后续修改；整体20完成／42未完成，详见[暂停总结](summary.md)。
 
 2026-11-14 初次核实：真实 Node import 中14个非根入口全部 ERR_MODULE_NOT_FOUND，作为 T1 的修复前反例。
 
