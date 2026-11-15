@@ -2537,3 +2537,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Eviction removes a picture but retains decoded pixels; duplicate same-data pictures lose the first placement; failed output followed by text leaves hidden uploads untracked.
 - **Root Cause:** Lowercase Kitty deletion clears placements, while uppercase deletion frees data. Re-uploading an existing ID removes its earlier placements; the visible-only all-delete does not cover unplaced cache entries. Pre-write registry mutation can also forget an eviction or unknown upload before the terminal receives cleanup.
 - **Rule:** Use per-ID d=I to retire uploads, d=a only to replace visible placements, and same-frame upload-once then placement for duplicate IDs. Preserve previous and proposed IDs across write failures and cleanup failures, force fresh upload on retry, and release all known IDs on owned-screen exit. Draw all clears/text before graphics and repaint after any covered-cell change.
+
+
+### Native History Graphics Cannot Be Partially Deleted
+- **Symptom:** A clipped redraw erases the earlier scrollback picture, or covered-cell repaint accumulates overlapping graphics.
+- **Root Cause:** Kitty text erase does not remove graphics; deleting/updating a placement acts on its complete extent, including history. Re-uploading the same image ID replaces all its placements.
+- **Rule:** Give native occurrences independent upload IDs and a named placement. Update/remove only wholly visible placements, let partial placements scroll unchanged, and preserve crossing remnants before replacing the document. Reserve and clear complete extents before painting; an iTerm wrapper must use one cursor-save slot.
+
+### Unknown Terminal Writes Retire Relative Cursor Accounts
+- **Symptom:** Retrying a throwing write leaves empty images, deletes history, or shifts the composer and caret.
+- **Root Cause:** A synchronous throw does not disclose which bytes reached the terminal. Rolling back cached bindings/cursor cannot roll back uploads, cursor movement or scrollback.
+- **Rule:** Preserve the original failure and retire the painter across paint/start/external handoff. Best-effort stop restores modes, shows the cursor and advances without using the unknown relative account or deleting native graphics. Test bytes-delivered-then-thrown and bytes-refused with a graphics/cursor interpreter, not only a recording sink.

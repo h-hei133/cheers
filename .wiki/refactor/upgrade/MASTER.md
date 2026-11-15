@@ -22,7 +22,7 @@
 ## Current status
 
 **Active phase**: T1、A四项、B.1/B.2/B2.2/B2.3、D.2/D.3/D.5、E.2和C.3已完成所述本地验收；继续终端与运行时。
-**Active batch**: B.3裁剪已提交`cf3b504`；fullscreen图片最后绘制／placement清退和精确预算子批已通过六门、9/261、0monoliths、build `e240273b687f`及Linux编译CLI两协议同图双placement／重排／按ID释放，限定独立复核CLEAR。两反转红且逐字节恢复。按批提交后继续regular scrollback与document-tail；B.3部分、整体本地验收18项，C.6原生协议缺口保留。
+**Active batch**: fullscreen绘制已提交`33ed26a`；regular native图片子批已完成所述本地验证，按批提交后处理document-tail浮层和真实terminal.stop清退顺序。B.3部分、整体本地验收18项，C.6原生协议缺口保留。
 **Goal**: active；仍有未实施与未验收任务，不得关闭。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -96,3 +96,5 @@
 | 2026-11-15 | B.3裁剪子批8/243、六门、函数上限、build `2443a54998eb`、Linux fullscreen两协议crop/fallback/扩屏恢复通过，限定复核CLEAR；两反转红且逐字节恢复。仅记录本批完成，B.3仍部分、本地18项不变，按批提交后继续painter和预算。 |
 
 | 2026-11-15 | B.3fullscreen绘图／精确预算9/261、六门、0monoliths、build `e240273b687f`和Linux编译CLI两协议双placement／重排／exit通过；复审duplicate首帧和failed upload/cleanup身份反例修复，限定CLEAR，两反转红且逐字节恢复。regular仍开项，18项不变，按批提交。 |
+
+| 2026-11-15 | regular图片预清完整reserved rows后绘制，独立occurrence ID和p=1避免重复source重传及叠加placement；完整visible隐藏按pair撤图、替换释放无历史upload，partial placement交给native LF，document替换先保存crossing残余。同步输出throw保留原cause并退休painter，后续paint/start/外部移交拒绝，stop仅恢复mode/cursor，不伪造物理回滚。六静态门、7套件248项、0monoliths和build `d3c1c005a1a5`通过；Linux编译CLI regular Kitty/iTerm完整extent预清、同源双图、typing不重传、保留history退出均exit0。两个反转红且逐字节恢复；限定独立复核CLEAR。 初native夹具错误将startup短暂借屏视为regular接管，按实际1049归还顺序修正后重验通过，失败日志保留。实际L／额外依赖2（named placement和unknown-write退休），18项不变，tail overlay／fullscreen stop另批。 |

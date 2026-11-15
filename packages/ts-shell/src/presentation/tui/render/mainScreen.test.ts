@@ -5,6 +5,9 @@ import { StartupSurface } from "../../../cli/interactive/startup.js";
 import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminalDouble.js";
 import { InteractiveSurface } from "../surface/view.js";
 import { stripAnsi } from "../text/ansi.js";
+import { inlineImageRows } from '../image.js';
+import { pngImage } from '../../../test-utils/image.js';
+import { setCellDimensions } from '../imageDimensions.js';
 
 /**
  * Painting to the terminal's own screen.
@@ -24,7 +27,11 @@ class Screen {
   private row = 0;
   private column = 0;
   private started = false;
-  private mainScreen: { readonly rows: string[]; readonly row: number; readonly column: number } | undefined;
+  private savedCursor: { readonly row: number; readonly column: number } | undefined;
+  private placements = new Map<string, { readonly imageId: number; readonly placementId: number; top: number; readonly rows: number; readonly column: number }>();
+  private uploads = new Set<number>();
+  private anonymousPlacement = 0;
+  private mainScreen: { readonly rows: string[]; readonly row: number; readonly column: number; readonly placements: typeof this.placements; readonly uploads: Set<number> } | undefined;
 
   constructor(
     private columns = 40,
@@ -39,6 +46,13 @@ class Screen {
   write(data: string): void {
     for (let index = 0; index < data.length; index++) {
       const rest = data.slice(index);
+      const graphics = /^\x1b_G([^;\x1b]*)(?:;[^\x1b]*)?\x1b\\/.exec(rest);
+      if (graphics) { this.applyGraphics(graphics[1]!); index += graphics[0].length - 1; continue; }
+      if (rest.startsWith('\x1b7')) { this.savedCursor = { row: this.row, column: this.column }; index++; continue; }
+      if (rest.startsWith('\x1b8')) {
+        if (this.savedCursor) { this.row = this.savedCursor.row; this.column = this.savedCursor.column; }
+        index++; continue;
+      }
       const hyperlink = /^\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/.exec(rest);
       if (hyperlink) { index += hyperlink[0].length - 1; continue; }
       // Private modes are written `\x1b[?...` and must be matched too, or their
@@ -87,13 +101,41 @@ class Screen {
   private alternate(enabled: boolean): void {
     if (enabled && !this.mainScreen) {
       this.started = true;
-      this.mainScreen = { rows: this.rows, row: this.row, column: this.column };
+      this.mainScreen = { rows: this.rows, row: this.row, column: this.column, placements: this.placements, uploads: this.uploads };
+      this.placements = new Map(); this.uploads = new Set();
       this.rows = Array.from({ length: this.height }, () => "");
       this.row = 0; this.column = 0;
     } else if (!enabled && this.mainScreen) {
       this.rows = this.mainScreen.rows; this.row = this.mainScreen.row; this.column = this.mainScreen.column;
+      this.placements = this.mainScreen.placements; this.uploads = this.mainScreen.uploads;
       this.mainScreen = undefined;
     }
+  }
+
+  private applyGraphics(header: string): void {
+    const controls = Object.fromEntries(header.split(',').map(control => control.split('=')));
+    const imageId = Number(controls.i);
+    const placementId = Number(controls.p ?? 0);
+    if (controls.a === 'd') {
+      for (const [key, image] of this.placements) {
+        const selected = controls.d?.toLowerCase() === 'a' ? image.top + image.rows > 0 && image.top < this.height
+          : image.imageId === imageId && (controls.p === undefined || image.placementId === placementId);
+        if (selected) this.placements.delete(key);
+      }
+      if (controls.d === 'I') this.uploads.delete(imageId);
+      return;
+    }
+    if (controls.a === 'T') {
+      for (const [key, image] of this.placements) if (image.imageId === imageId) this.placements.delete(key);
+      this.uploads.add(imageId);
+    } else if (controls.a !== 'p') return;
+    if (!this.uploads.has(imageId)) return;
+    const key = placementId === 0 ? `${imageId}:anonymous:${this.anonymousPlacement++}` : `${imageId}:${placementId}`;
+    this.placements.set(key, { imageId, placementId, top: this.row, rows: Number(controls.r ?? 1), column: this.column });
+  }
+
+  graphics(): readonly { readonly imageId: number; readonly placementId: number; readonly top: number; readonly rows: number; readonly column: number }[] {
+    return [...this.placements.values()].map(image => ({ ...image }));
   }
 
   private applySequence(parameters: readonly number[], final: string): void {
@@ -132,6 +174,7 @@ class Screen {
     if (this.row >= this.height) {
       // Scrolling is what moves a row out of the screen and into the history.
       const leaving = this.rows.shift() ?? "";
+      for (const placement of this.placements.values()) placement.top--;
       if (!this.mainScreen) this.scrollback.push(leaving);
       this.row = this.height - 1;
       this.rows[this.height - 1] = "";
@@ -258,6 +301,247 @@ describe("startup cursor geometry", () => {
 });
 
 describe("MainScreenPainter", () => {
+  it.each(['kitty', 'iterm2'] as const)('preclears a complete %s image extent before appending its graphics', protocol => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new RecordingTerminal(); terminal.rows = 20;
+    const painter = new MainScreenPainter(terminal); painter.start(); terminal.drain();
+    const image = pngImage(320, 161);
+    const rows = inlineImageRows(image, protocol, 16)!;
+    painter.paint([...rows, 'following text', `prompt>${CURSOR_MARKER}`], [`prompt>${CURSOR_MARKER}`]);
+    const bytes = terminal.drain();
+    const start = protocol === 'kitty' ? bytes.indexOf('\x1b_Ga=T') : bytes.indexOf('\x1b]1337;File=');
+    expect(bytes.slice(0, start).match(/\x1b\[2K/g)).toHaveLength(rows.length);
+    expect(bytes.slice(start, bytes.indexOf('following text'))).not.toContain('\x1b[2K\r\n\x1b[2K');
+    expect(painter.trackedCursorRow).toBe(rows.length + 1);
+    painter.paint([...rows, 'following text', `edited>${CURSOR_MARKER}`], [`edited>${CURSOR_MARKER}`]);
+    expect(terminal.drain()).not.toContain(image.data);
+  });
+
+  it('redraws a complete visible image after clearing a changed covered row', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new RecordingTerminal(); terminal.rows = 20;
+    const painter = new MainScreenPainter(terminal); painter.start();
+    const image = pngImage(320, 161);
+    const rows = [...inlineImageRows(image, 'kitty', 16)!, 'following text'];
+    const chrome = [`prompt>${CURSOR_MARKER}`];
+    painter.paint([...rows, ...chrome], chrome); terminal.drain();
+    rows[1] = 'changed covered cells';
+    painter.paint([...rows, ...chrome], chrome);
+    const bytes = terminal.drain();
+    expect(bytes).toContain('\x1b_Ga=p');
+    expect(bytes).not.toContain(image.data);
+    expect(bytes.indexOf('\x1b_Ga=p')).toBeGreaterThan(bytes.lastIndexOf('\x1b[2K'));
+    expect(bytes.indexOf('\x1b_Ga=p')).toBeGreaterThan(bytes.indexOf('changed covered cells'));
+  });
+
+  it('uses text when a new picture cannot fit on the physical screen', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new RecordingTerminal(); terminal.rows = 3;
+    const painter = new MainScreenPainter(terminal); painter.start();
+    const rows = inlineImageRows(pngImage(320, 161), 'kitty', 16)!;
+    painter.paint([...rows, 'prompt>'], ['prompt>']);
+    const bytes = terminal.drain();
+    expect(bytes).not.toContain('\x1b_G');
+    expect(bytes).toContain('image (does not fit)');
+  });
+
+  it('assigns separate terminal identities to duplicate scrollback images', () => {
+    const terminal = new RecordingTerminal(); terminal.rows = 20;
+    const painter = new MainScreenPainter(terminal); painter.start();
+    const rows = inlineImageRows(pngImage(80, 80), 'kitty', 4)!;
+    painter.paint([...rows, 'between', ...rows, 'prompt>'], ['prompt>']);
+    const ids = [...terminal.drain().matchAll(/\x1b_Ga=T[^;]*,i=(\d+)/g)].map(match => match[1]);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it('lets native scrolling preserve a partially historical picture through covered-cell repaint', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new Screen(40, 6);
+    const painter = new MainScreenPainter(terminal.asDevice()); painter.start();
+    const rows = [...inlineImageRows(pngImage(320, 161), 'kitty', 16)!];
+    const chrome = [`prompt>${CURSOR_MARKER}`];
+    painter.paint([...rows, ...chrome], chrome);
+    expect(terminal.graphics()).toHaveLength(1);
+    expect(terminal.graphics()[0]).toMatchObject({ top: 0, rows: 5 });
+    rows.push('following'); painter.paint([...rows, ...chrome], chrome);
+    const historical = terminal.graphics();
+    expect(historical[0]).toMatchObject({ top: -1, rows: 5 });
+    rows[2] = 'changed visible cells'; painter.paint([...rows, ...chrome], chrome);
+    expect(terminal.graphics()).toEqual(historical);
+    expect(terminal.screenLines()).toContain('changed visible cells');
+    expect(terminal.cursorScreenRow).toBe(5);
+    expect(terminal.cursorScreenColumn).toBe(7);
+  });
+
+  it('updates the same visible placement instead of accumulating overlapping copies', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new Screen(40, 20);
+    const painter = new MainScreenPainter(terminal.asDevice()); painter.start();
+    const rows = [...inlineImageRows(pngImage(320, 161), 'kitty', 16)!];
+    const chrome = [`prompt>${CURSOR_MARKER}`];
+    painter.paint([...rows, ...chrome], chrome);
+    const placement = terminal.graphics();
+    expect(placement).toHaveLength(1);
+    expect(placement[0]).toMatchObject({ top: 0, rows: 5, column: 0, placementId: 1 });
+    for (let frame = 0; frame < 3; frame++) {
+      rows[2] = `covered text ${frame}`;
+      painter.paint([...rows, ...chrome], chrome);
+      expect(terminal.graphics()).toEqual(placement);
+      expect(terminal.screenLines()).toContain(`covered text ${frame}`);
+      expect(terminal.cursorScreenRow).toBe(5);
+    }
+  });
+
+  it('removes a hidden or replaced visible picture with dedicated placement deletion', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new Screen(40, 20);
+    const painter = new MainScreenPainter(terminal.asDevice()); painter.start();
+    const first = inlineImageRows(pngImage(320, 161), 'kitty', 16)!;
+    const second = inlineImageRows(pngImage(320, 161, 'replacement'), 'kitty', 16)!;
+    const chrome = ['prompt>'];
+    painter.paint([...first, ...chrome], chrome);
+    const original = terminal.graphics()[0]!.imageId;
+    painter.paint([...second, ...chrome], chrome);
+    expect(terminal.graphics()).toHaveLength(1);
+    expect(terminal.graphics()[0]!.imageId).not.toBe(original);
+    painter.paint([...Array<string>(first.length).fill(''), ...chrome], chrome);
+    expect(terminal.graphics()).toEqual([]);
+  });
+
+  it.each([false, true])('retires a failed paint instead of reusing an unknown physical cursor with delivered=%s', delivered => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new Screen(40, 20);
+    const device = terminal.asDevice();
+    const painter = new MainScreenPainter(device); painter.start();
+    const rows = inlineImageRows(pngImage(320, 161), 'kitty', 16)!;
+    const chrome = [`prompt>${CURSOR_MARKER}`, 'hint'];
+    painter.paint([...rows, ...chrome], chrome);
+    const changed = ['prompt>', `hint${CURSOR_MARKER}`];
+    const failure = new Error('private unknown image frame');
+    const write = device.write.bind(device);
+    const spy = vi.spyOn(device, 'write').mockImplementationOnce((bytes, callback) => {
+      if (delivered) write(bytes, callback);
+      throw failure;
+    });
+    expect(() => painter.paint([...rows, ...changed], changed)).toThrow(failure);
+    const physical = terminal.cursorScreenRow;
+    expect(physical).toBe(delivered ? 6 : 5);
+    const placements = terminal.graphics();
+    spy.mockClear();
+    for (let retry = 0; retry < 2; retry++) {
+      expect(() => painter.paint([...rows, ...changed], changed)).toThrow(failure);
+      expect(() => painter.leaveForExternalOutput()).toThrow(failure);
+      expect(() => painter.resumeAfterExternalOutput()).toThrow(failure);
+    }
+    expect(spy).not.toHaveBeenCalled();
+    expect(terminal.cursorScreenRow).toBe(physical);
+    painter.stop();
+    expect(terminal.graphics()).toEqual(placements);
+    expect(terminal.cursorScreenRow).toBe(physical + 1);
+    expect(spy).toHaveBeenCalledWith('\x1b[?7h\x1b[?2026l\r\n\x1b[?25h', undefined);
+    spy.mockClear(); painter.stop(); painter.paint([...rows, ...chrome], chrome);
+    expect(() => painter.start()).toThrow(failure);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it.each(['start', 'handoff'] as const)('retires the painter after a failed %s write', action => {
+    const terminal = new RecordingTerminal();
+    const painter = new MainScreenPainter(terminal);
+    if (action === 'handoff') { painter.start(); painter.paint(['retained', 'prompt>'], ['prompt>']); }
+    const failure = new Error('private failed terminal ownership');
+    const spy = vi.spyOn(terminal, 'write').mockImplementationOnce(() => { throw failure; });
+    expect(() => action === 'start' ? painter.start() : painter.leaveForExternalOutput()).toThrow(failure);
+    spy.mockClear();
+    expect(() => painter.paint(['next', 'prompt>'], ['prompt>'])).toThrow(failure);
+    expect(() => painter.resumeAfterExternalOutput()).toThrow(failure);
+    expect(spy).not.toHaveBeenCalled();
+    painter.stop();
+    expect(() => painter.start()).toThrow(failure);
+  });
+
+  it.each(['hide', 'replace'] as const)('preserves the actual layer and stops after an unaccepted %s frame', action => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new Screen(40, 20);
+    const device = terminal.asDevice();
+    const painter = new MainScreenPainter(device); painter.start();
+    const first = inlineImageRows(pngImage(320, 161), 'kitty', 16)!;
+    const next = action === 'hide' ? Array<string>(first.length).fill('')
+      : inlineImageRows(pngImage(320, 161, 'after failed write'), 'kitty', 16)!;
+    const chrome = [`prompt>${CURSOR_MARKER}`];
+    painter.paint([...first, ...chrome], chrome);
+    const placements = terminal.graphics();
+    const failure = new Error('private unaccepted image frame');
+    const spy = vi.spyOn(device, 'write').mockImplementationOnce(() => { throw failure; });
+    expect(() => painter.paint([...next, ...chrome], chrome)).toThrow(failure);
+    spy.mockClear();
+    expect(() => painter.paint([...next, ...chrome], chrome)).toThrow(failure);
+    expect(spy).not.toHaveBeenCalled();
+    expect(terminal.graphics()).toEqual(placements);
+    painter.stop();
+    expect(terminal.graphics()).toEqual(placements);
+  });
+
+  it('cleans a replaced document picture without deleting a previously retained history picture', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new Screen(40, 10);
+    const painter = new MainScreenPainter(terminal.asDevice()); painter.start();
+    const rows = inlineImageRows(pngImage(320, 161), 'kitty', 16)!;
+    const chrome = ['prompt>'];
+    const document = {};
+    painter.paint([...rows, ...Array<string>(10).fill('history'), ...rows, ...chrome], chrome, undefined, document);
+    const historical = terminal.graphics().filter(image => image.top < 0);
+    expect(historical).toHaveLength(1);
+    expect(terminal.graphics()).toHaveLength(2);
+    painter.paint(['new conversation', ...chrome], chrome, undefined, {});
+    expect(terminal.graphics()).toEqual(historical);
+  });
+
+  it('scrolls a crossing picture fully into history before replacing its document', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new Screen(40, 6);
+    const painter = new MainScreenPainter(terminal.asDevice()); painter.start();
+    const rows = [...inlineImageRows(pngImage(320, 161), 'kitty', 16)!, 'following'];
+    const chrome = ['prompt>'];
+    painter.paint([...rows, ...chrome], chrome, undefined, {});
+    const imageId = terminal.graphics()[0]!.imageId;
+    expect(terminal.graphics()[0]).toMatchObject({ top: -1, rows: 5 });
+    painter.paint(['new conversation', ...chrome], chrome, undefined, {});
+    expect(terminal.graphics()).toHaveLength(1);
+    expect(terminal.graphics()[0]).toMatchObject({ imageId, rows: 5 });
+    expect(terminal.graphics()[0]!.top + 5).toBeLessThanOrEqual(0);
+    expect(terminal.screenLines()).toContain('new conversation');
+    expect(terminal.screenLines()).toContain('prompt>');
+    expect(terminal.cursorScreenRow).toBe(1);
+  });
+
+  it.each([false, true])('preserves crossing historical pictures and retires failed document replacement with delivered=%s', delivered => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const terminal = new Screen(40, 6);
+    const device = terminal.asDevice();
+    const painter = new MainScreenPainter(device); painter.start();
+    const rows = [...inlineImageRows(pngImage(320, 161), 'kitty', 16)!, 'following'];
+    const chrome = [`prompt>${CURSOR_MARKER}`];
+    painter.paint([...rows, ...chrome], chrome, undefined, {});
+    const imageId = terminal.graphics()[0]!.imageId;
+    const replacement = {};
+    const failure = new Error('private failed document replacement');
+    const write = device.write.bind(device);
+    const spy = vi.spyOn(device, 'write').mockImplementationOnce((bytes, callback) => {
+      if (delivered) write(bytes, callback);
+      throw failure;
+    });
+    expect(() => painter.paint(['new conversation', ...chrome], chrome, undefined, replacement)).toThrow(failure);
+    spy.mockClear();
+    expect(() => painter.paint(['new conversation', ...chrome], chrome, undefined, replacement)).toThrow(failure);
+    expect(spy).not.toHaveBeenCalled();
+    expect(terminal.graphics()).toHaveLength(1);
+    expect(terminal.graphics()[0]).toMatchObject({ imageId, rows: 5 });
+    painter.stop();
+    expect(terminal.graphics()).toHaveLength(1);
+    expect(terminal.graphics()[0]!.imageId).toBe(imageId);
+  });
+
   it("keeps the caret account through scrolling, appends, and external output", () => {
     const terminal = new Screen(40, 6);
     const painter = new MainScreenPainter(terminal.asDevice());

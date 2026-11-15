@@ -11817,3 +11817,10 @@ Linux当前compiled CLI regular/fullscreen×Kitty/iTerm2四格完整PNG、native
 裁剪`cf3b504`后同render owner先清文本后图，covered row变更重画、d=a撤placement、d=I真正释放像素。复审首帧同图第二upload会删第一placement与写失败身份反例已修复；恢复保留snapshot并按ID清退，正常stop释放隐藏cache。
 
 六门、9/261、0monoliths、build `e240273b687f`及Linux编译CLI fullscreen两协议双图/reflow/exit0通过，限定复核CLEAR，两反转红且逐字节恢复。完整PNG独立16count/32MiB wire/64MiB decoded边界通过；预算仅offscreen cache，不称终端总内存。regular scrollback与document-tail仍待，本地18项不变，按批提交。
+
+
+### 2026-11-15：regular原生图片placement独立子批
+
+regular图片预清完整reserved rows后绘制，独立occurrence ID和p=1避免重复source重传及叠加placement；完整visible隐藏按pair撤图、替换释放无历史upload，partial placement交给native LF，document替换先保存crossing残余。同步输出throw保留原cause并退休painter，后续paint/start/外部移交拒绝，stop仅恢复mode/cursor，不伪造物理回滚。
+
+六静态门、7套件248项、0monoliths和build `d3c1c005a1a5`通过；Linux编译CLI regular Kitty/iTerm完整extent预清、同源双图、typing不重传、保留history退出均exit0。两个反转红且逐字节恢复；限定独立复核CLEAR。 初native startup借屏观察与spy callback夹具错误保留分类；partial native history不裁剪重画。tail浮层和真实fullscreen stop另批，本地18项不变，按批提交。

@@ -35,6 +35,8 @@
 
 import { cursorTarget, paintBegin, paintEnd, prepareRows } from "./paint.js";
 import { BoundedTerminalWriter } from "./boundedWriter.js";
+import { imageRowsChanged } from './images.js';
+import { appendedImageControl, MainScreenImages } from './image/history.js';
 
 /** Everything this needs from the terminal, so a double can stand in for one. */
 export interface MainScreenDevice {
@@ -48,6 +50,7 @@ const ERASE_LINE = "\x1b[2K";
 const ERASE_TO_END_OF_SCREEN = "\x1b[J";
 
 export class MainScreenPainter {
+  private readonly images = new MainScreenImages();
   /**
    * The rows on screen that are content, top row first.
    *
@@ -74,13 +77,15 @@ export class MainScreenPainter {
    */
   private viewportUnplaced = false;
   private documentId?: object;
+  private writeFailure: { readonly cause: unknown } | undefined;
 
   constructor(private readonly device: MainScreenDevice) {}
 
   /** Put the cursor below the fixed block and hand the cursor back to the user. */
   start(): void {
+    if (this.writeFailure) throw this.writeFailure.cause;
     this.started = true;
-    this.device.write(SHOW_CURSOR);
+    this.write(SHOW_CURSOR);
   }
 
   /**
@@ -93,14 +98,26 @@ export class MainScreenPainter {
    */
   paint(rows: readonly string[], chromeRows: readonly string[], onWritten?: () => void, documentId?: object): void {
     if (!this.started) return;
-    let replacement = '';
-    if (documentId !== undefined) {
-      if (this.documentId !== undefined && this.documentId !== documentId) replacement = this.replaceDocument();
-      this.documentId = documentId;
+    if (this.writeFailure) throw this.writeFailure.cause;
+    try {
+      this.paintFrame(rows, chromeRows, onWritten, documentId);
+    } catch (cause) {
+      // A throwing write gives no receipt for the bytes the terminal accepted.
+      // Retrying relative moves could corrupt both the screen and its history.
+      this.writeFailure = { cause };
+      throw cause;
     }
+  }
+
+  private paintFrame(rows: readonly string[], chromeRows: readonly string[], onWritten?: () => void, documentId?: object): void {
     const dimensions = this.device.getDimensions();
     const height = Math.max(1, dimensions.rows);
     const width = Math.max(1, dimensions.columns);
+    let replacement = '';
+    if (documentId !== undefined) {
+      if (this.documentId !== undefined && this.documentId !== documentId) replacement = this.replaceDocument(height);
+      this.documentId = documentId;
+    }
 
     // `content` is the document minus the fixed block at its end. The block is
     // subtracted by count rather than by identity: a caller may pass rows whose
@@ -137,9 +154,11 @@ export class MainScreenPainter {
     // Immutable scrollback is never painted again. Only prepare rows that can
     // be written this frame, so typing does not parse the entire transcript.
     const appendRows = rawContent.length > writtenTotal ? prepareRows(rawContent.slice(writtenTotal), width) : [];
+    const appended = this.images.append(appendRows, writtenTotal, height, width);
     const overflow = Math.max(0, rawContent.length - contentCapacity);
     const newScrolled = Math.max(this.scrolled, overflow);
     const onScreenContent = rawContent.length > newScrolled ? prepareRows(rawContent.slice(newScrolled), width) : [];
+    const graphics = this.images.visible(onScreenContent, newScrolled);
 
     // The previous frame's on-screen rows, adjusted for anything that scrolled
     // out during this one. The two lists compared below both cover only rows
@@ -168,9 +187,10 @@ export class MainScreenPainter {
       return delta > 0 ? `\x1b[${delta}B\r` : `\x1b[${-delta}A\r`;
     };
 
-    const output = new BoundedTerminalWriter(this.device);
+    const output = new BoundedTerminalWriter({ write: (bytes, callback) => this.write(bytes, callback) });
     output.append(paintBegin(this.device.capabilities.supportsDec2026Sync));
     output.append(replacement);
+    output.append(graphics.deletions);
     if (appendRows.length > 0) {
       // Appending happens at the bottom of the content, which means stepping
       // over the fixed block to reach it. `writtenTotal` is that bottom, and it
@@ -178,12 +198,20 @@ export class MainScreenPainter {
       // because the two differ and the append has to land on the row that is
       // actually free.
       output.append(move(writtenTotal));
-      for (const row of appendRows) {
+      for (let index = 0; index < appendRows.length; index++) {
         // The newline after each row is what feeds the scrollback: a row written
         // on the screen's last line stays there until a newline pushes it up,
         // and without that push the transcript would stop growing at one screen
         // and the bottom line would be overwritten forever.
-        output.append(`${ERASE_LINE}${row}\r\n`);
+        const images = appended.images.filter(image => image.top === index);
+        const end = images.reduce((end, image) => Math.max(end, image.bottom), index + 1);
+        for (let row = index; row < end; row++) {
+          output.append(`${ERASE_LINE}${appended.text[row] ?? ''}`);
+          if (row < end - 1) output.append('\r\n');
+        }
+        for (const image of images) output.append(appendedImageControl(image, end - 1));
+        output.append('\r\n');
+        index = end - 1;
       }
       // Each appended row ended with a newline, so the cursor is one row past
       // the last of them. That is also the row the fixed block starts on when
@@ -203,7 +231,7 @@ export class MainScreenPainter {
     if (changedFrom < sharedContent) {
       output.append(move(newScrolled + changedFrom));
       for (let index = changedFrom; index < sharedContent; index++) {
-        output.append(`${ERASE_LINE}${onScreenContent[index] ?? ""}`);
+        output.append(`${ERASE_LINE}${graphics.text[index] ?? ""}`);
         // A newline between rows moves the cursor down; a trailing one would
         // step past the last row and leave the account one ahead of the
         // terminal for every move that follows.
@@ -248,6 +276,17 @@ export class MainScreenPainter {
       if (fixed.length > 0) cursor = newScrolled + onScreenContent.length + fixed.length - 1;
     }
 
+    // Update one named placement after its visible cells changed. Partly
+    // historical placements remain terminal-owned and continue scrolling.
+    if (imageRowsChanged(previousOnScreen, onScreenContent, graphics.images)) {
+      for (const image of graphics.images) {
+        if (newScrolled + image.row >= writtenTotal) continue;
+        output.append(move(newScrolled + image.row));
+        if (image.column > 0) output.append(`\x1b[${image.column}C`);
+        output.append(image.sequence);
+      }
+    }
+
     // Only visible rows can own the caret. Moving through the same account is
     // essential: the next append, redraw or suspension starts from this row.
     const caret = cursorTarget([...rawContent.slice(newScrolled), ...rawFixed], 0, height);
@@ -268,14 +307,23 @@ export class MainScreenPainter {
   }
 
   /** Clear owned visible rows while leaving earlier native scrollback intact. */
-  private replaceDocument(): string {
-    const move = this.viewportUnplaced ? '\r' : this.moveToRow(this.scrolled);
+  private replaceDocument(height: number): string {
+    const bottom = this.images.crossingBottom(this.scrolled);
+    const deletions = this.images.clear(this.scrolled);
+    let preserve = '';
+    if (!this.viewportUnplaced && bottom > this.scrolled) {
+      // A crossing placement cannot be partially deleted. Scroll its remaining
+      // cells into history before clearing the owned screen for a new document.
+      preserve = this.moveToRow(this.scrolled + height - 1) + '\r\n'.repeat(bottom - this.scrolled);
+      this.cursorRow = bottom + height - 1;
+    }
+    const move = this.viewportUnplaced ? '\r' : this.moveToRow(bottom);
     this.visibleContent = [];
     this.scrolled = 0;
     this.cursorRow = 0;
     this.fixedRows = [];
     this.viewportUnplaced = false;
-    return move + ERASE_TO_END_OF_SCREEN;
+    return deletions + preserve + move + ERASE_TO_END_OF_SCREEN;
   }
 
   /**
@@ -288,11 +336,12 @@ export class MainScreenPainter {
    */
   leaveForExternalOutput(): void {
     if (!this.started) return;
+    if (this.writeFailure) throw this.writeFailure.cause;
     // The block is this painter's own and is redrawn on return, so it is erased
     // rather than left behind: a copy above the child's output would read as a
     // second prompt the session never drew.
     const blockTop = this.scrolled + this.visibleContent.length;
-    this.device.write(`${this.moveToRow(blockTop)}${ERASE_TO_END_OF_SCREEN}${SHOW_CURSOR}`);
+    this.write(`${this.moveToRow(blockTop)}${ERASE_TO_END_OF_SCREEN}${SHOW_CURSOR}`);
     this.cursorRow = blockTop;
     // Whatever the child does next, the account cannot follow it: the child
     // writes as many rows as it likes. So the next frame does not compute a
@@ -316,6 +365,7 @@ export class MainScreenPainter {
    */
   resumeAfterExternalOutput(): void {
     if (!this.started) return;
+    if (this.writeFailure) throw this.writeFailure.cause;
     // Rows already written are a fact about the scrollback and do not change:
     // the count is what tells the next frame which document rows are new. The
     // window this painter had on screen is not a fact any more — the block was
@@ -325,6 +375,7 @@ export class MainScreenPainter {
     this.scrolled = written;
     this.visibleContent = [];
     this.fixedRows = [];
+    this.images.clear();
   }
 
   /**
@@ -337,8 +388,17 @@ export class MainScreenPainter {
   stop(): void {
     if (!this.started) return;
     this.started = false;
+    if (this.writeFailure) {
+      this.write(`${paintEnd(this.device.capabilities.supportsDec2026Sync)}\r\n${SHOW_CURSOR}`);
+      return;
+    }
     const total = this.scrolled + this.visibleContent.length + this.fixedRows.length;
-    this.device.write(`${this.moveToRow(total)}\r\n${SHOW_CURSOR}`);
+    this.write(`${this.moveToRow(total)}\r\n${SHOW_CURSOR}`);
+  }
+
+  private write(bytes: string, callback?: () => void): void {
+    try { this.device.write(bytes, callback); }
+    catch (cause) { this.writeFailure ??= { cause }; throw cause; }
   }
 
   /**
