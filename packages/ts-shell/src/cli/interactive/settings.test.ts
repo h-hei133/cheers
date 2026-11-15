@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getProjectConfigPath, getUserRuntimeConfigPath, type RuntimeConfigOverrides } from '../../config/runtimeConfig.js';
 import * as configFiles from '../../config/runtimeConfig.js';
 import { ConfigWriteError } from '../../config/outcome.js';
-import { createShellRuntimeContext, refreshShellRuntimeConfig, applyShellSubstrateTransition } from '../../core/shell/runtimeContext.js';
+import { createShellRuntimeContext, refreshShellRuntimeConfig, applyShellSubstrateTransition, switchActiveSession } from '../../core/shell/runtimeContext.js';
 import { openSettings } from './settings.js';
 import { ComposerPreference } from './tuiSettings.js';
 import { settingsPicker } from './picker/settings.js';
@@ -39,6 +39,21 @@ function runtime(overrides?: RuntimeConfigOverrides) {
     session: { id: 'settings-session', createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] },
   });
 }
+
+it('does not mix an original setting write with a successor binding changed by its application callback', async () => {
+  const context = runtime();
+  const draft = openSettings(context, () => {
+    const next = { ...context.session, id: 'settings-successor' };
+    switchActiveSession(context, next, root, { cwd: root, projectRoot: root });
+    refreshShellRuntimeConfig(context);
+  });
+  const saved = await draft.save('retryEnabled', false);
+  expect(saved.applied).toBe(false);
+  expect(saved.note).toContain('Saved to your user configuration.');
+  expect(saved.value).toBeUndefined();
+  expect(context.session.id).toBe('settings-successor');
+  expect(JSON.parse(fs.readFileSync(file, 'utf8')).retryEnabled).toBe(false);
+});
 
 it.each([
   { key: 'collapseThinking', value: false, raw: undefined },

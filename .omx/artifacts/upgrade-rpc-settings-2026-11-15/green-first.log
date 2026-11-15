@@ -1,0 +1,85 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/thinking.test.ts src/cli/rpc/settings.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/thinking.test.ts (7 tests | 1 failed) 327ms
+   ✓ discovers only automatic effort for a reasoning-disabled endpoint and cycling is a no-op 36ms
+   × cycles the selected endpoint map through automatic effort and persists the exact sequence 38ms
+     → expected 'auto' to be 'high' // Object.is equality
+   ✓ retains locally admissible legacy levels as unverified and preserves the setter notice 32ms
+   ✓ keeps off as a provider-decides alias and refuses explicit unsupported effort without a write 29ms
+   ✓ keeps auto as a provider-decides alias and refuses explicit unsupported effort without a write 42ms
+   ✓ keeps none as a provider-decides alias and refuses explicit unsupported effort without a write 61ms
+   ✓ discovers virtual levels without routing, then refuses a retired registration without physical fallback 88ms
+ ❯ src/cli/rpc/settings.test.ts (5 tests | 1 failed) 254ms
+   ✓ returns verified stored and effective auto-compaction values and preserves them on reopen 66ms
+   ✓ returns verified stored and effective auto-retry values and preserves them on reopen 51ms
+   ✓ reports the launch override when a saved auto-compaction choice is not effective 47ms
+   × keeps project retry policy while reporting a different verified user default 66ms
+     → expected { type: 'response', …(3) } to match object { success: true, data: { …(5) } }
+(8 matching properties omitted from actual)
+   ✓ keeps an unverified setting write unsuccessful without refreshing the accepted state 23ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/settings.test.ts > keeps project retry policy while reporting a different verified user default
+AssertionError: expected { type: 'response', …(3) } to match object { success: true, data: { …(5) } }
+(8 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "data": {
+-     "applied": false,
+-     "effective": false,
++     "applied": true,
++     "effective": true,
+      "saved": true,
+-     "source": StringContaining "project",
++     "source": "user",
+      "stored": true,
+    },
+    "success": true,
+  }
+
+ ❯ src/cli/rpc/settings.test.ts:64:83
+     62|   const { context, host } = fixture(); expect(context.runtimeConfig.re…
+     63|   const before = fs.readFileSync(project);
+     64|   expect(await handleRpcCommand({ type: 'set_auto_retry', enabled: tru…
+       |                                                                                   ^
+     65|     data: { saved: true, stored: true, effective: false, applied: fals…
+     66|   expect((await handleRpcCommand({ type: 'get_state' }, host)).data?.a…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/cli/rpc/thinking.test.ts > cycles the selected endpoint map through automatic effort and persists the exact sequence
+AssertionError: expected 'auto' to be 'high' // Object.is equality
+
+Expected: "high"
+Received: "auto"
+
+ ❯ src/cli/rpc/thinking.test.ts:70:87
+     68|       .toMatchObject({ success: true, data: { level } });
+     69|     expect(readSessionModel(context.session.id)?.thinkingEffort).toBe(…
+     70|     expect((await handleRpcCommand({ type: 'get_state' }, host)).data?…
+       |                                                                                       ^
+     71|   }
+     72| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 10 passed (12)
+   Start at  20:46:37
+   Duration  11.17s (transform 5.35s, setup 0ms, collect 10.10s, tests 581ms, environment 0ms, prepare 104ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/thinking.test.ts src/cli/rpc/settings.test.ts

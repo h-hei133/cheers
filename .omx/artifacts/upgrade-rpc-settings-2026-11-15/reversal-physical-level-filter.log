@@ -1,0 +1,62 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/thinking.test.ts -t reasoning-disabled endpoint
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/thinking.test.ts (10 tests | 1 failed | 9 skipped) 38ms
+   × discovers only automatic effort for a reasoning-disabled endpoint and cycling is a no-op 37ms
+     → expected { …(2) } to match object { levels: [ 'off' ], …(1) }
+   ↓ cycles the selected endpoint map through automatic effort and persists the exact sequence
+   ↓ retains locally admissible legacy levels as unverified and preserves the setter notice
+   ↓ publishes the saved effort to the same running host before the next cycle
+   ↓ does not cycle into explicit effort when the endpoint output budget cannot support it
+   ↓ keeps off as a provider-decides alias and refuses explicit unsupported effort without a write
+   ↓ keeps auto as a provider-decides alias and refuses explicit unsupported effort without a write
+   ↓ keeps none as a provider-decides alias and refuses explicit unsupported effort without a write
+   ↓ discovers virtual levels without routing, then refuses a retired registration without physical fallback
+   ↓ keeps virtual effort discovery independent of unavailable dormant physical credentials
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/thinking.test.ts > discovers only automatic effort for a reasoning-disabled endpoint and cycling is a no-op
+AssertionError: expected { …(2) } to match object { levels: [ 'off' ], …(1) }
+
+- Expected
++ Received
+
+  {
+    "levels": [
++     "minimal",
++     "low",
++     "medium",
++     "high",
++     "xhigh",
++     "max",
+      "off",
+    ],
+    "unverifiedLevels": [],
+  }
+
+ ❯ src/cli/rpc/thinking.test.ts:55:6
+     53|   const { host, context } = fixture({ reasoning: false });
+     54|   expect((await handleRpcCommand({ type: 'get_available_thinking_level…
+     55|     .toMatchObject({ levels: ['off'], unverifiedLevels: [] });
+       |      ^
+     56|   expect(await handleRpcCommand({ type: 'cycle_thinking_level' }, host…
+     57|     .toMatchObject({ success: true, data: { level: null } });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  21:03:00
+   Duration  9.16s (transform 5.47s, setup 0ms, collect 8.85s, tests 38ms, environment 0ms, prepare 57ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/thinking.test.ts -t 'reasoning-disabled endpoint'

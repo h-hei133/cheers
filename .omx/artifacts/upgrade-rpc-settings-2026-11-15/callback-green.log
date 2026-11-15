@@ -1,0 +1,14 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/settings.test.ts src/cli/interactive/settings.test.ts src/config/inputs/publication.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/settings.test.ts (46 tests) 1003ms
+ ✓ src/config/inputs/publication.test.ts (10 tests) 375ms
+ ✓ src/cli/rpc/settings.test.ts (6 tests) 331ms
+
+ Test Files  3 passed (3)
+      Tests  62 passed (62)
+   Start at  20:54:46
+   Duration  12.11s (transform 5.59s, setup 0ms, collect 9.76s, tests 1.71s, environment 0ms, prepare 146ms)
+

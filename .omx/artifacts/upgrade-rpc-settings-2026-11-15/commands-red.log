@@ -1,0 +1,76 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/commands.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/commands.test.ts (4 tests | 3 failed) 107ms
+   × discovers extension and named invocations with the same builtin precedence and drops retired registrations 37ms
+     → expected [ 'pin', 'history', 'import', …(99) ] to include 'fixture'
+   × uses explicit skill paths with no-skills and applies the existing project trust decision 20ms
+     → expected [ 'pin', 'history', 'import', …(99) ] to include 'skill:named'
+   × refuses an asynchronous skill result after the selected session changes 35ms
+     → expected { type: 'response', …(3) } to match object { success: false }
+(4 matching properties omitted from actual)
+   ✓ does not return a skill whose contribution was retired during acquisition 15ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/commands.test.ts > discovers extension and named invocations with the same builtin precedence and drops retired registrations
+AssertionError: expected [ 'pin', 'history', 'import', …(99) ] to include 'fixture'
+ ❯ src/cli/rpc/commands.test.ts:56:113
+     54|   const rows = response.data!.commands as Array<{ name: string; descri…
+     55|   const names = rows.map(row => row.name);
+     56|   for (const name of ['fixture', 'alias', 'recall', 'retain', 'reload-…
+       |                                                                                                                 ^
+     57|   expect(rows.find(row => row.name === 'help')!.description).not.toBe(…
+     58|   expect(new Set(names).size).toBe(names.length);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/cli/rpc/commands.test.ts > uses explicit skill paths with no-skills and applies the existing project trust decision
+AssertionError: expected [ 'pin', 'history', 'import', …(99) ] to include 'skill:named'
+ ❯ src/cli/rpc/commands.test.ts:72:22
+     70|   const names = async () => ((await handleRpcCommand({ type: 'get_comm…
+     71|   const restricted = await names();
+     72|   expect(restricted).toContain('skill:named'); expect(restricted).not.…
+       |                      ^
+     73|   context.skillOptions = { skillPaths: [explicit] };
+     74|   projectTrust.setProjectTrust(root, 'untrusted'); refreshShellRuntime…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/cli/rpc/commands.test.ts > refuses an asynchronous skill result after the selected session changes
+AssertionError: expected { type: 'response', …(3) } to match object { success: false }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "success": false,
++   "success": true,
+  }
+
+ ❯ src/cli/rpc/commands.test.ts:92:27
+     90|   switchActiveSession(context, next, root, { cwd: root, projectRoot: r…
+     91|   release([]);
+     92|   expect(await operation).toMatchObject({ success: false });
+       |                           ^
+     93| });
+     94| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 1 passed (4)
+   Start at  21:06:19
+   Duration  9.02s (transform 5.34s, setup 0ms, collect 8.65s, tests 107ms, environment 0ms, prepare 56ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/commands.test.ts

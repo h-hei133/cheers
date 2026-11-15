@@ -9,6 +9,7 @@ import { currentTheme } from '../../presentation/theme/theme.js';
 import { configTrustNotice } from '../../config/trust.js';
 import { configurationBinding } from '../../core/shell/configuration.js';
 import { assertCurrentProfile, currentProfile } from '../../core/paths/profile/context.js';
+import type { ConfigApplication } from '../../config/fields.js';
 
 export interface SettingValue {
   readonly effective: unknown;
@@ -33,6 +34,9 @@ export interface SettingsSaveResult {
   readonly note: string;
   /** True only when this runtime confirmed acceptance of the saved configuration. */
   readonly applied: boolean;
+  /** Captured at confirmed application, before an asynchronous consumer can observe another binding. */
+  readonly value?: SettingValue;
+  readonly application?: ConfigApplication;
 }
 
 function unapplied(note: string): SettingsSaveResult { return { note, applied: false }; }
@@ -81,6 +85,13 @@ function applicationNotice(context: ShellRuntimeContext, setting: SettingDefinit
     : setting.policy.application === 'restart' ? 'Matches the installed setting.' : 'Effective for the next operation.';
 }
 
+function settingSnapshot(context: ShellRuntimeContext, setting: SettingDefinition, stored: unknown): SettingValue {
+  const requested = settingValue(context.configuration.current.requested, setting);
+  return { effective: effective(context, setting), requested, stored, source: source(context, setting),
+    requestedSource: source(context, setting, true), projectTrustNotice: projectTrustNotice(context, setting),
+    restartRequired: setting.policy.application === 'restart' && !sameValue(settingValue(context.runtimeConfig, setting), requested) };
+}
+
 /** A menu holds its own explicit scope and edit baseline until Apply. */
 export function openSettings(context: ShellRuntimeContext, onApplied: () => void, scope: SettingsScope = 'user'): SettingsDraft {
   const file = scope === 'project' ? getProjectConfigPath(context.projectRoot) : getUserRuntimeConfigPath();
@@ -100,12 +111,8 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
     catch { return false; }
   };
   const definitions = CONFIG_SETTINGS.filter(setting => setting.policy.sensitivity === 'public' && setting.policy.sources.includes(scope));
-  const values = Object.fromEntries(definitions.map(setting => {
-    const actual = effective(context, setting); const requested = settingValue(context.configuration.current.requested, setting);
-    return [setting.key, { effective: actual, requested, stored: settingValue(edit.values, setting), source: source(context, setting),
-      requestedSource: source(context, setting, true), projectTrustNotice: projectTrustNotice(context, setting),
-      restartRequired: setting.policy.application === 'restart' && !sameValue(settingValue(context.runtimeConfig, setting), requested) }];
-  }));
+  const values = Object.fromEntries(definitions.map(setting =>
+    [setting.key, settingSnapshot(context, setting, settingValue(edit.values, setting))]));
   let consumed = false;
   return {
     scope, file, definitions, values,
@@ -135,7 +142,9 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
         const result = refreshShellRuntimeConfig(context);
         if (result.status !== 'applied') return unapplied(`${saved} Configuration was not applied (${result.status}).${result.admissionBlocked ? ' New actions are blocked until a valid configuration is loaded.' : ''}`);
         onApplied();
-        return { note: `${saved} ${applicationNotice(context, setting, value, scope)}`, applied: true };
+        if (!ownerCurrent() || !sourceCurrent()) return unapplied(`${saved} Settings binding or source changed; application is unconfirmed. Reopen Settings.`);
+        return { note: `${saved} ${applicationNotice(context, setting, value, scope)}`, applied: true,
+          value: settingSnapshot(context, setting, value), application: setting.policy.application };
       } catch { return unapplied(`${saved} Configuration application outcome is unverified.`); }
     },
   };

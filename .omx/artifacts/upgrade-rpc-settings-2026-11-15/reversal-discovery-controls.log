@@ -1,0 +1,52 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/commands.test.ts -t JSONL reads
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/commands.test.ts (10 tests | 1 failed | 9 skipped) 599ms
+   ↓ discovers extension and named invocations with the same builtin precedence and drops retired registrations
+   ↓ uses explicit skill paths with no-skills and applies the existing project trust decision
+   ↓ refuses an asynchronous skill result after the selected session changes
+   ↓ does not return a skill whose contribution was retired during acquisition
+   ↓ refuses a contribution retired between catalogue resolution and the RPC consumer
+   ↓ refuses synchronous retirement in the final skill validity callback
+   ↓ revalidates discovery after the host promise resolves and before emitting its response
+   ↓ refuses a revoked skill at response publication even when its contribution stays registered
+   × keeps JSONL reads and cancellation responsive during skill acquisition and joins a refused read at EOF 598ms
+     → expected undefined to be true // Object.is equality
+   ↓ keeps private skill-loader failures out of the RPC response
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/commands.test.ts > keeps JSONL reads and cancellation responsive during skill acquisition and joins a refused read at EOF
+AssertionError: expected undefined to be true // Object.is equality
+
+- Expected: 
+true
+
++ Received: 
+undefined
+
+ ❯ vi.waitFor.timeout src/cli/rpc/commands.test.ts:173:97
+    171|     await vi.waitFor(() => expect(entered).toBe(true));
+    172|     stdin.write('{"id":"state","type":"get_state"}\n{"id":"abort","typ…
+    173|     await vi.waitFor(() => expect(responses.find(response => response.…
+       |                                                                                                 ^
+    174|     await vi.waitFor(() => expect(responses.find(response => response.…
+    175|     expect(runtime.cancelCurrentRun).toHaveBeenCalledOnce();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  21:23:20
+   Duration  11.45s (transform 6.68s, setup 0ms, collect 10.60s, tests 599ms, environment 0ms, prepare 48ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/commands.test.ts -t 'JSONL reads'

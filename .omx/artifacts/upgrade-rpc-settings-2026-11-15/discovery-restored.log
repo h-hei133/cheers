@@ -1,0 +1,14 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/commands.test.ts src/cli/rpc/rpcServer.test.ts src/cli/runtime/inputStream.extensions.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/rpc/commands.test.ts (10 tests) 399ms
+ ✓ src/cli/runtime/inputStream.extensions.test.ts (16 tests) 2085ms
+ ✓ src/cli/rpc/rpcServer.test.ts (3 tests) 5ms
+
+ Test Files  3 passed (3)
+      Tests  29 passed (29)
+   Start at  21:23:32
+   Duration  15.76s (transform 6.76s, setup 0ms, collect 12.60s, tests 2.49s, environment 0ms, prepare 151ms)
+

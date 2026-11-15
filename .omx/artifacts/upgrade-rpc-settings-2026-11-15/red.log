@@ -1,0 +1,254 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/thinking.test.ts src/cli/rpc/settings.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/thinking.test.ts (7 tests | 4 failed) 271ms
+   × discovers only automatic effort for a reasoning-disabled endpoint and cycling is a no-op 38ms
+     → expected { levels: [ 'minimal', 'low', …(5) ] } to match object { levels: [ 'off' ], …(1) }
+   × cycles the selected endpoint map through automatic effort and persists the exact sequence 19ms
+     → expected { levels: [ 'minimal', 'low', …(5) ] } to match object { …(2) }
+   × retains locally admissible legacy levels as unverified and preserves the setter notice 24ms
+     → expected { levels: [ 'minimal', 'low', …(5) ] } to match object { …(2) }
+   ✓ keeps off as a provider-decides alias and refuses explicit unsupported effort without a write 49ms
+   ✓ keeps auto as a provider-decides alias and refuses explicit unsupported effort without a write 43ms
+   ✓ keeps none as a provider-decides alias and refuses explicit unsupported effort without a write 46ms
+   × discovers virtual levels without routing, then refuses a retired registration without physical fallback 51ms
+     → expected { levels: [ 'minimal', 'low', …(5) ] } to match object { …(2) }
+ ❯ src/cli/rpc/settings.test.ts (5 tests | 4 failed) 191ms
+   × returns verified stored and effective auto-compaction values and preserves them on reopen 54ms
+     → expected { type: 'response', …(2) } to match object { success: true, data: { …(6) } }
+(2 matching properties omitted from actual)
+   × returns verified stored and effective auto-retry values and preserves them on reopen 33ms
+     → expected { type: 'response', …(2) } to match object { success: true, data: { …(6) } }
+(2 matching properties omitted from actual)
+   × reports the launch override when a saved auto-compaction choice is not effective 39ms
+     → expected { type: 'response', …(2) } to match object { success: true, data: { …(6) } }
+(2 matching properties omitted from actual)
+   × keeps project retry policy while reporting a different verified user default 39ms
+     → expected { type: 'response', …(2) } to match object { success: true, data: { …(5) } }
+(2 matching properties omitted from actual)
+   ✓ keeps an unverified setting write unsuccessful without refreshing the accepted state 23ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/settings.test.ts > returns verified stored and effective auto-compaction values and preserves them on reopen
+ FAIL  src/cli/rpc/settings.test.ts > returns verified stored and effective auto-retry values and preserves them on reopen
+AssertionError: expected { type: 'response', …(2) } to match object { success: true, data: { …(6) } }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "data": {
+-     "application": "next operation",
+-     "applied": true,
+-     "effective": false,
+-     "note": StringContaining "Saved to your user configuration.",
+-     "saved": true,
+-     "stored": false,
+-   },
+    "success": true,
+  }
+
+ ❯ src/cli/rpc/settings.test.ts:41:61
+     39|   const key = kind === 'compaction' ? 'compactionEnabled' : 'retryEnab…
+     40|   for (const enabled of [false, true]) {
+     41|     expect(await handleRpcCommand({ type, enabled }, host)).toMatchObj…
+       |                                                             ^
+     42|       data: { saved: true, effective: enabled, stored: enabled, applie…
+     43|         note: expect.stringContaining('Saved to your user configuratio…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/cli/rpc/settings.test.ts > reports the launch override when a saved auto-compaction choice is not effective
+AssertionError: expected { type: 'response', …(2) } to match object { success: true, data: { …(6) } }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "data": {
+-     "applied": false,
+-     "effective": true,
+-     "note": StringContaining "launch override",
+-     "saved": true,
+-     "source": StringContaining "override",
+-     "stored": false,
+-   },
+    "success": true,
+  }
+
+ ❯ src/cli/rpc/settings.test.ts:52:89
+     50|   const { context, host } = fixture({ compactionEnabled: true });
+     51|   expect(context.runtimeConfig.compactionEnabled).toBe(true);
+     52|   expect(await handleRpcCommand({ type: 'set_auto_compaction', enabled…
+       |                                                                                         ^
+     53|     data: { saved: true, stored: false, effective: true, applied: fals…
+     54|       note: expect.stringContaining('launch override') } });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/cli/rpc/settings.test.ts > keeps project retry policy while reporting a different verified user default
+AssertionError: expected { type: 'response', …(2) } to match object { success: true, data: { …(5) } }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "data": {
+-     "applied": false,
+-     "effective": false,
+-     "saved": true,
+-     "source": StringContaining "project",
+-     "stored": true,
+-   },
+    "success": true,
+  }
+
+ ❯ src/cli/rpc/settings.test.ts:64:83
+     62|   const { context, host } = fixture(); expect(context.runtimeConfig.re…
+     63|   const before = fs.readFileSync(project);
+     64|   expect(await handleRpcCommand({ type: 'set_auto_retry', enabled: tru…
+       |                                                                                   ^
+     65|     data: { saved: true, stored: true, effective: false, applied: fals…
+     66|   expect((await handleRpcCommand({ type: 'get_state' }, host)).data?.a…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/cli/rpc/thinking.test.ts > discovers only automatic effort for a reasoning-disabled endpoint and cycling is a no-op
+AssertionError: expected { levels: [ 'minimal', 'low', …(5) ] } to match object { levels: [ 'off' ], …(1) }
+
+- Expected
++ Received
+
+  {
+    "levels": [
++     "minimal",
++     "low",
++     "medium",
++     "high",
++     "xhigh",
++     "max",
+      "off",
+    ],
+-   "unverifiedLevels": [],
+  }
+
+ ❯ src/cli/rpc/thinking.test.ts:55:6
+     53|   const { host, context } = fixture({ reasoning: false });
+     54|   expect((await handleRpcCommand({ type: 'get_available_thinking_level…
+     55|     .toMatchObject({ levels: ['off'], unverifiedLevels: [] });
+       |      ^
+     56|   expect(await handleRpcCommand({ type: 'cycle_thinking_level' }, host…
+     57|     .toMatchObject({ success: true, data: { level: null } });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/cli/rpc/thinking.test.ts > cycles the selected endpoint map through automatic effort and persists the exact sequence
+AssertionError: expected { levels: [ 'minimal', 'low', …(5) ] } to match object { …(2) }
+
+- Expected
++ Received
+
+  {
+    "levels": [
++     "minimal",
++     "low",
++     "medium",
+      "high",
++     "xhigh",
+      "max",
+      "off",
+    ],
+-   "unverifiedLevels": [],
+  }
+
+ ❯ src/cli/rpc/thinking.test.ts:65:6
+     63|     thinkingLevelMap: { low: null, medium: null, high: 'deep', max: 'm…
+     64|   expect((await handleRpcCommand({ type: 'get_available_thinking_level…
+     65|     .toMatchObject({ levels: ['high', 'max', 'off'], unverifiedLevels:…
+       |      ^
+     66|   for (const level of ['high', 'max', 'auto', 'high']) {
+     67|     expect(await handleRpcCommand({ type: 'cycle_thinking_level' }, ho…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  src/cli/rpc/thinking.test.ts > retains locally admissible legacy levels as unverified and preserves the setter notice
+AssertionError: expected { levels: [ 'minimal', 'low', …(5) ] } to match object { …(2) }
+
+- Expected
++ Received
+
+  {
+    "levels": [
++     "minimal",
+      "low",
+      "medium",
+      "high",
++     "xhigh",
++     "max",
+      "off",
+-   ],
+-   "unverifiedLevels": [
+-     "low",
+-     "medium",
+-     "high",
+    ],
+  }
+
+ ❯ src/cli/rpc/thinking.test.ts:77:6
+     75|   const { host } = fixture();
+     76|   expect((await handleRpcCommand({ type: 'get_available_thinking_level…
+     77|     .toMatchObject({ levels: ['low', 'medium', 'high', 'off'], unverif…
+       |      ^
+     78|   expect(await handleRpcCommand({ type: 'set_thinking_level', level: '…
+     79|     .toMatchObject({ success: true, data: { level: 'low', note: expect…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  src/cli/rpc/thinking.test.ts > discovers virtual levels without routing, then refuses a retired registration without physical fallback
+AssertionError: expected { levels: [ 'minimal', 'low', …(5) ] } to match object { …(2) }
+
+- Expected
++ Received
+
+  {
+    "levels": [
++     "minimal",
++     "low",
++     "medium",
+      "high",
++     "xhigh",
+      "max",
+      "off",
+    ],
+-   "unverifiedLevels": [],
+  }
+
+ ❯ src/cli/rpc/thinking.test.ts:102:6
+    100|   expect((await handleRpcCommand({ type: 'set_model', provider: 'adapt…
+    101|   expect((await handleRpcCommand({ type: 'get_available_thinking_level…
+    102|     .toMatchObject({ levels: ['high', 'max', 'off'], unverifiedLevels:…
+       |      ^
+    103|   expect(await handleRpcCommand({ type: 'cycle_thinking_level' }, host…
+    104|   const saved = readSessionModel(context.session.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 4 passed (12)
+   Start at  20:44:18
+   Duration  11.47s (transform 5.41s, setup 0ms, collect 10.47s, tests 462ms, environment 0ms, prepare 132ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/thinking.test.ts src/cli/rpc/settings.test.ts

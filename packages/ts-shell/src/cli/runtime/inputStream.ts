@@ -76,6 +76,7 @@ export async function runPromptInputStream(options: {
   let controlChain = Promise.resolve();
   let localControlChain = Promise.resolve();
   const rpcResponses = new Set<Promise<void>>();
+  let rpcReads = new AbortController();
   let rpcResponseFailure: unknown;
   let contentCancellation = Promise.resolve();
   let mcpCancellationGeneration = 0;
@@ -264,8 +265,11 @@ export async function runPromptInputStream(options: {
         pendingControls++;
         localControlChain = localControlChain
           .then(() => {
+            if (rpcCommand.type === 'abort') {
+              const previous = rpcReads; rpcReads = new AbortController(); previous.abort();
+            }
             const background = options.runtimeContext.configuration.backgroundSignal;
-            const pending = handleRpcCommand(rpcCommand, rpcHost).then(response => {
+            const pending = handleRpcCommand(rpcCommand, rpcHost, rpcCommand.type === 'get_commands' ? rpcReads.signal : undefined).then(response => {
               if (!response.success || background === options.runtimeContext.configuration.backgroundSignal) return;
               if (closed || exitRequested || !rpcUiBridge || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
               // A successful transition retires its old surface. Refresh the
@@ -274,7 +278,7 @@ export async function runPromptInputStream(options: {
               if (closed || exitRequested || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
               releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
             }).finally(() => { pendingControls--; });
-            if (rpcCommand.type !== 'bash') return pending;
+            if (rpcCommand.type !== 'bash' && rpcCommand.type !== 'get_commands') return pending;
             // The session's command owner joins execution. This set only joins
             // response writes at EOF while later controls can reach cancellation.
             rpcResponses.add(pending);
@@ -329,6 +333,7 @@ export async function runPromptInputStream(options: {
       processedCount,
     });
   } finally {
+    rpcReads.abort();
     try { closeRpcUi(); } finally {
       stdinReader.close();
       releaseGoal?.();

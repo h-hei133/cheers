@@ -1,0 +1,88 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/interactive/settings.test.ts -t does not mix an original setting
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/interactive/settings.test.ts (46 tests | 1 failed | 45 skipped) 49ms
+   × does not mix an original setting write with a successor binding changed by its application callback 48ms
+     → expected true to be false // Object.is equality
+   ↓ stages, discards, saves and reopens 'collapseThinking' through keyboard and the real settings owner
+   ↓ stages, discards, saves and reopens 'attentionOnIdle' through keyboard and the real settings owner
+   ↓ stages, discards, saves and reopens 'steeringMode' through keyboard and the real settings owner
+   ↓ stages, discards, saves and reopens 'maxTurns' through keyboard and the real settings owner
+   ↓ stages, discards, saves and reopens 'disabledTools' through keyboard and the real settings owner
+   ↓ stages, discards, saves and reopens 'modelTokenBudgets' through keyboard and the real settings owner
+   ↓ stages, discards, saves and reopens 'tui.statusItems' through keyboard and the real settings owner
+   ↓ stages, discards, saves and reopens 'theme' through keyboard and the real settings owner
+   ↓ stages and reads back list, object and choice values through the real settings owner without saving discarded edits
+   ↓ ends the child theme preview before constructing the parent after Escape
+   ↓ retains a numeric draft after a real write conflict and requires a new Apply to overwrite the reloaded value
+   ↓ loads the default, project, user and explicit launch notification preference through validation
+   ↓ saves and publishes the chosen preference, retaining unrelated concurrent edits and JSONC trivia
+   ↓ rejects a stale menu baseline instead of overwriting an intervening explicit choice
+   ↓ reports saved but launch-overridden settings separately from the effective value
+   ↓ does not claim a baseline-equal choice was saved when a concurrent writer changed it
+   ↓ reports the actual offline policy with environment override 0
+   ↓ reports the actual offline policy with environment override 1
+   ↓ reports unverifiable saved selection without applying or leaking read errors
+   ↓ keeps accepted settings after invalid reload and distinguishes persistence from rejected publication
+   ↓ preserves the unchanged save outcome without publishing
+   ↓ preserves the unknown save outcome without publishing
+   ↓ preserves the persisted save outcome without publishing
+   ↓ invalidates a menu after a substrate transition and consumes an applied choice once
+   ↓ rejects a project menu when a new directory document shadows its captured legacy source
+   ↓ validates advanced numbers before writing and applies a valid request setting
+   ↓ keeps project targeting explicit and reports ordinary user precedence
+   ↓ shows renderer defaults and accepted display preferences while a restart is pending
+   ↓ saves one nested display leaf and retains concurrent sibling changes and comments
+   ↓ removes only the selected stored field and exposes the remaining project value
+   ↓ reports saved but inactive project 'maxTurns' even when the fallback value is equal
+   ↓ reports saved but inactive project 'theme' even when the fallback value is equal
+   ↓ reports saved but inactive project 'agentMode' even when the fallback value is equal
+   ↓ excludes providerConnections from generic editing
+   ↓ excludes providerCredentials from generic editing
+   ↓ excludes allowUntrustedHooks from generic editing
+   ↓ excludes unknown from generic editing
+   ↓ rejects unsupported status IDs without writing while preserving legacy loading compatibility
+   ↓ explains merged restrictions without falsely prescribing removal of a launch override
+   ↓ previews actual shapes without writing, restores on cancel, and publishes only Apply
+   ↓ revokes a composer preview after a real external configuration publication
+   ↓ revokes a status preview after a real external configuration publication
+   ↓ keeps project shape precedence and exposes the user shape when the project choice is removed
+   ↓ exposes applicable settings categories and sections and marks stored values
+   ↓ restores the accepted shape after save failure and retains a retryable pending choice
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/interactive/settings.test.ts > does not mix an original setting write with a successor binding changed by its application callback
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/cli/interactive/settings.test.ts:51:25
+     49|   });
+     50|   const saved = await draft.save('retryEnabled', false);
+     51|   expect(saved.applied).toBe(false);
+       |                         ^
+     52|   expect(saved.note).toContain('Saved to your user configuration.');
+     53|   expect(saved.value).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 45 skipped (46)
+   Start at  21:03:29
+   Duration  2.15s (transform 1.16s, setup 0ms, collect 1.86s, tests 49ms, environment 0ms, prepare 52ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/interactive/settings.test.ts -t 'does not mix an original setting'

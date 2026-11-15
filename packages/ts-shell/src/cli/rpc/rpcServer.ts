@@ -73,7 +73,7 @@ function handleExportHtml(command: Extract<RpcCommand, { type: "export_html" }>,
 }
 
 /** Execute a parsed `RpcCommand` against `host` and emit the JSONL response frame. */
-export async function handleRpcCommand(command: RpcCommand, host: RpcHost): Promise<RpcResponse> {
+export async function handleRpcCommand(command: RpcCommand, host: RpcHost, signal?: AbortSignal): Promise<RpcResponse> {
   const emit = host.emitResponse ?? ((res: RpcResponse) => writeRawStdout(`${JSON.stringify(res)}\n`));
   let response: RpcResponse;
   try {
@@ -146,13 +146,14 @@ export async function handleRpcCommand(command: RpcCommand, host: RpcHost): Prom
         break;
       }
       default: {
-        const extended = await handleExtendedRpcCommand(command, host);
+        const extended = await handleExtendedRpcCommand(command, host, signal);
         if (!extended.handled) {
           response = buildResponse(undefined, "unknown", false, { error: "Unsupported RPC command." });
         } else if ("error" in extended) {
           response = buildResponse(command.id, command.type, false, { error: extended.error,
             ...(extended.data ? { data: extended.data } : {}) });
         } else {
+          extended.assertCurrent?.();
           response = buildResponse(command.id, command.type, true, extended.data ? { data: extended.data } : undefined);
         }
       }

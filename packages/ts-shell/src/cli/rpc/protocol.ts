@@ -115,6 +115,36 @@ export type RpcExtensionUiResponse =
   | { readonly type: "extension_ui_response"; readonly id: string; readonly confirmed: boolean }
   | { readonly type: "extension_ui_response"; readonly id: string; readonly cancelled: true };
 
+export interface RpcThinkingLevels {
+  readonly levels: readonly string[];
+  readonly unverifiedLevels: readonly string[];
+}
+
+export type RpcThinkingResult = {
+  readonly level: string;
+  readonly note?: string;
+};
+
+/** Read-only discovery retains its lease until the response is published. */
+export interface RpcCommandSnapshot {
+  readonly commands: readonly Record<string, unknown>[];
+  readonly assertCurrent: () => void;
+}
+
+/** Confirmed user-default storage and its captured effective configuration are separate facts. */
+export interface RpcSettingResult {
+  readonly saved: true;
+  readonly stored: unknown;
+  readonly requested: unknown;
+  readonly effective: unknown;
+  readonly source: string;
+  readonly requestedSource: string;
+  readonly applied: boolean;
+  readonly application: 'next operation' | 'immediate' | 'restart' | 'metadata';
+  readonly restartRequired: boolean;
+  readonly note: string;
+}
+
 export interface RpcHost {
   readonly sessionId: string;
   readonly workspaceRoot: string;
@@ -135,14 +165,14 @@ export interface RpcHost {
   readonly setModel?: (provider: string, modelId: string) => Promise<Record<string, unknown>>;
   readonly cycleModel?: () => Promise<Record<string, unknown> | null>;
   readonly getAvailableModels?: () => readonly Record<string, unknown>[];
-  readonly setThinkingLevel?: (level: string) => Promise<{ readonly level: string }>;
-  readonly cycleThinkingLevel?: () => Promise<{ readonly level: string } | null>;
-  readonly getAvailableThinkingLevels?: () => readonly string[];
+  readonly setThinkingLevel?: (level: string) => Promise<RpcThinkingResult>;
+  readonly cycleThinkingLevel?: () => Promise<RpcThinkingResult | null>;
+  readonly getAvailableThinkingLevels?: () => readonly string[] | RpcThinkingLevels;
   readonly setSteeringMode?: (mode: RpcQueueMode) => Promise<void> | void;
   readonly setFollowUpMode?: (mode: RpcQueueMode) => Promise<void> | void;
   readonly compact?: (customInstructions?: string) => Promise<CompactionOutcome>;
-  readonly setAutoCompaction?: (enabled: boolean) => Promise<void> | void;
-  readonly setAutoRetry?: (enabled: boolean) => Promise<void> | void;
+  readonly setAutoCompaction?: (enabled: boolean) => Promise<RpcSettingResult | void> | RpcSettingResult | void;
+  readonly setAutoRetry?: (enabled: boolean) => Promise<RpcSettingResult | void> | RpcSettingResult | void;
   readonly abortRetry?: () => void;
   readonly fork?: (entryId: string) => Promise<{ readonly text?: string; readonly sessionId?: string; readonly cancelled: boolean }>;
   readonly cloneSession?: () => Promise<{ readonly sessionId?: string; readonly cancelled: boolean }>;
@@ -150,7 +180,8 @@ export interface RpcHost {
   readonly getEntries?: (since?: string | number) => Promise<Record<string, unknown>>;
   readonly getTree?: () => Promise<Record<string, unknown>>;
   readonly navigateTree?: (entryId: string, expectedVersion?: string) => Promise<SessionNavigationResult>;
-  readonly getCommands?: () => readonly Record<string, unknown>[];
+  readonly getCommands?: (signal?: AbortSignal) => readonly Record<string, unknown>[] | RpcCommandSnapshot
+    | Promise<readonly Record<string, unknown>[] | RpcCommandSnapshot>;
   readonly runBash?: (command: string, excludeFromContext?: boolean) => Promise<Record<string, unknown>>;
   readonly abortBash?: () => void;
   readonly ui?: RpcUiBridge;

@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "name": "physical-level-filter",
+      "assertionFailed": true,
+      "status": 1,
+      "sourceSha256": "3a68622d2388b54fbbb823696afb5ca22ac2dade0a54989cdecced2ff1d8c6b7",
+      "restoredExactly": true
+    },
+    {
+      "name": "accepted-publication",
+      "assertionFailed": true,
+      "status": 1,
+      "sourceSha256": "2ea2d44cacc9ba6858ceed7338681c018979fc670627a8df57248153db2c226b",
+      "restoredExactly": true
+    },
+    {
+      "name": "effective-setting",
+      "assertionFailed": true,
+      "status": 1,
+      "sourceSha256": "2ea2d44cacc9ba6858ceed7338681c018979fc670627a8df57248153db2c226b",
+      "restoredExactly": true
+    },
+    {
+      "name": "callback-binding",
+      "assertionFailed": true,
+      "status": 1,
+      "sourceSha256": "b53d42a3013c0aa8aa1155cfda65b49c1cd15bf0140682d5fcdbf62e97068c32",
+      "restoredExactly": true
+    },
+    {
+      "name": "endpoint-budget",
+      "assertionFailed": true,
+      "status": 1,
+      "sourceSha256": "3a68622d2388b54fbbb823696afb5ca22ac2dade0a54989cdecced2ff1d8c6b7",
+      "restoredExactly": true
+    }
+  ]
+}

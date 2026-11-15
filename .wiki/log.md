@@ -11929,3 +11929,10 @@ read修复已提交5ded288。fork候选仅可用user问题、成功选择后返�
 fork批已提交b1d46c3。bash／abort_bash复用原gate、commands和唯一ExecutionService，included custom／excluded report、组合输出／artifact结构元数据接通；pre-hook旧branch拒绝、完整busy和partial started失败结算经反例修复。可选read limits传入原branch owner并覆盖catch-up，旧writer未整体有界、普通message追加不声称跨进程原子。
 
 六门13/227、最终3/59／恢复5/68、五反转exact恢复、2641模块0monoliths、build `90499a5f654c`和限定代码APPROVE／架构CLEAR通过。Linux同代CLI两loopback POST普通／summary排除、196637字节归档、重开／fork／native取消／EOF passed；配置模型一次actual请求正确回读shell标记，隔离最小目录／原凭据边界保持。setup／observer错误均保留分类，归档upgrade-rpc-shell-2026-11-15，按批本地提交；D.1仍部分／22/62，不push或宣称CI。
+
+
+### 2026-11-15：RPC设置、推理档位与命令发现
+
+shell已提交c10c5291。thinking按实际endpoint capability／budget或virtual定义发现和循环，setModel完整publication发布后状态立即一致；自动设置返回stored／requested／effective与来源。commands复用原catalog／invocation／skill owner并保持优先级，snapshot准入到响应发布、撤权与取消、EOF结算均有反例。
+
+联合11/200、最终发现3/29、设置反转恢复3/62、七有效反转exact恢复、六门、2646模块0monoliths及build `119bed2092d3`通过，限定APPROVE／CLEAR。Linux同代两loopback POST验effort／skill实际wire和重开／优先级；配置模型一次bodySent返标记，原连接／凭据未改，body不可检查。误判project优先级已撤回，旧构建证据保持代际；归档upgrade-rpc-settings-2026-11-15。D.1仍部分、22/62；继续retry专属取消与compact控制，本地按批提交，不push。

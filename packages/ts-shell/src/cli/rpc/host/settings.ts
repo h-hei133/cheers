@@ -4,13 +4,11 @@ import {
   assertModelApplied,
   buildRpcCommandContext,
   cycleRpcModel,
-  cycleRpcThinking,
-  listRpcCommands,
   listRpcModels,
   saveRpcSetting,
-  setRpcThinking,
-  THINKING_LEVELS,
 } from "../runtimeOps.js";
+import { cycleRpcThinking, rpcThinkingLevels, setRpcThinking } from '../thinking.js';
+import { listRpcCommands } from '../commands.js';
 import type { RuntimeRpcHostOptions } from "./contract.js";
 
 type SettingsHost = Pick<RpcHost, "setModel" | "cycleModel" | "getAvailableModels" | "setThinkingLevel"
@@ -29,11 +27,11 @@ export function settingsHost(options: RuntimeRpcHostOptions): SettingsHost {
     getAvailableModels: () => listRpcModels(runtimeContext),
     setThinkingLevel: (level) => setRpcThinking(runtimeContext, level),
     cycleThinkingLevel: () => cycleRpcThinking(runtimeContext),
-    getAvailableThinkingLevels: () => THINKING_LEVELS,
+    getAvailableThinkingLevels: () => rpcThinkingLevels(runtimeContext),
     compact: (customInstructions) => sessionRuntime.compactHistory(runtimeContext.session.id, customInstructions),
     setAutoCompaction: (enabled) => saveRpcSetting(runtimeContext, "compactionEnabled", enabled),
     setAutoRetry: (enabled) => saveRpcSetting(runtimeContext, "retryEnabled", enabled),
     abortRetry: () => sessionRuntime.cancelCurrentRun(),
-    getCommands: () => listRpcCommands(runtimeContext),
+    getCommands: (signal) => listRpcCommands(runtimeContext, signal),
   };
 }

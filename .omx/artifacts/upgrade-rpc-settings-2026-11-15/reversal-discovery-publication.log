@@ -1,0 +1,56 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/commands.test.ts -t before emitting
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/commands.test.ts (10 tests | 1 failed | 9 skipped) 56ms
+   ↓ discovers extension and named invocations with the same builtin precedence and drops retired registrations
+   ↓ uses explicit skill paths with no-skills and applies the existing project trust decision
+   ↓ refuses an asynchronous skill result after the selected session changes
+   ↓ does not return a skill whose contribution was retired during acquisition
+   ↓ refuses a contribution retired between catalogue resolution and the RPC consumer
+   ↓ refuses synchronous retirement in the final skill validity callback
+   × revalidates discovery after the host promise resolves and before emitting its response 55ms
+     → expected { type: 'response', …(3) } to match object { success: false }
+(4 matching properties omitted from actual)
+   ↓ refuses a revoked skill at response publication even when its contribution stays registered
+   ↓ keeps JSONL reads and cancellation responsive during skill acquisition and joins a refused read at EOF
+   ↓ keeps private skill-loader failures out of the RPC response
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/commands.test.ts > revalidates discovery after the host promise resolves and before emitting its response
+AssertionError: expected { type: 'response', …(3) } to match object { success: false }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "success": false,
++   "success": true,
+  }
+
+ ❯ src/cli/rpc/commands.test.ts:142:65
+    140|   const get = host.getCommands!;
+    141|   const rpc = { ...host, getCommands: async () => { const result = awa…
+    142|   expect(await handleRpcCommand({ type: 'get_commands' }, rpc)).toMatc…
+       |                                                                 ^
+    143| });
+    144| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  21:23:09
+   Duration  10.85s (transform 6.64s, setup 0ms, collect 10.52s, tests 56ms, environment 0ms, prepare 55ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/commands.test.ts -t 'before emitting'

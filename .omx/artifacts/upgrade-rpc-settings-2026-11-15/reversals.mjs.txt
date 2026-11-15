@@ -1,0 +1,43 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+const root = process.cwd(), directory = path.join(root, '.tmp/rpc-settings');
+const cases = [
+  { name: 'physical-level-filter', file: 'packages/ts-shell/src/cli/rpc/thinking.ts',
+    before: "available.filter(item => item.capability !== 'unsupported').map(item => item.level)", after: 'available.map(item => item.level)',
+    test: 'src/cli/rpc/thinking.test.ts', title: 'reasoning-disabled endpoint' },
+  { name: 'accepted-publication', file: 'packages/ts-shell/src/cli/rpc/runtimeOps.ts',
+    before: '    refreshRuntimeConfig: () => refreshShellRuntimeConfig(runtimeContext),\n', after: '',
+    test: 'src/cli/rpc/thinking.test.ts', title: 'publishes the saved effort' },
+  { name: 'effective-setting', file: 'packages/ts-shell/src/cli/rpc/runtimeOps.ts',
+    before: 'applied: sameValue(result.value.effective, value)', after: 'applied: true',
+    test: 'src/cli/rpc/settings.test.ts', title: 'launch override' },
+  { name: 'callback-binding', file: 'packages/ts-shell/src/cli/interactive/settings.ts',
+    before: '        onApplied();\n        if (!ownerCurrent() || !sourceCurrent()) return unapplied(`${saved} Settings binding or source changed; application is unconfirmed. Reopen Settings.`);',
+    after: '        onApplied();',
+    test: 'src/cli/interactive/settings.test.ts', title: 'does not mix an original setting' },
+  { name: 'endpoint-budget', file: 'packages/ts-shell/src/cli/rpc/thinking.ts',
+    before: "  if (effortOutputFailure(shape, output)) return { levels: ['off'], unverifiedLevels: [] };\n", after: '',
+    test: 'src/cli/rpc/thinking.test.ts', title: 'endpoint output budget' },
+];
+const receipts = [];
+for (const reversal of cases) {
+  const file = path.join(root, reversal.file), original = fs.readFileSync(file), source = original.toString();
+  assert.equal(source.split(reversal.before).length, 2);
+  try {
+    fs.writeFileSync(file, source.replace(reversal.before, reversal.after));
+    const log = fs.openSync(path.join(directory, `reversal-${reversal.name}.log`), 'w');
+    const run = spawnSync('rtk', ['env', 'VITEST_MAX_THREADS=1', 'VITEST_MIN_THREADS=1', 'npm', 'run', 'test', '-w', 'packages/ts-shell', '--', reversal.test, '-t', reversal.title],
+      { cwd: root, stdio: ['ignore', log, log], timeout: 60000 });
+    fs.closeSync(log);
+    const output = fs.readFileSync(path.join(directory, `reversal-${reversal.name}.log`), 'utf8');
+    assert.equal(run.status, 1); assert.ok(output.includes('AssertionError')); assert.match(output, /1 failed/);
+    receipts.push({ name: reversal.name, assertionFailed: true, status: run.status,
+      sourceSha256: createHash('sha256').update(original).digest('hex') });
+  } finally { fs.writeFileSync(file, original); assert.deepEqual(fs.readFileSync(file), original); }
+  receipts.at(-1).restoredExactly = true;
+  console.log(JSON.stringify(receipts.at(-1)));
+}
+fs.writeFileSync(path.join(directory, 'reversals.json'), JSON.stringify({ cases: receipts }, null, 2) + '\n');

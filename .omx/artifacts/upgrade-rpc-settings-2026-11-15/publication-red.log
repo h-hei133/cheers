@@ -1,0 +1,57 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/thinking.test.ts -t publishes the saved effort
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/thinking.test.ts (8 tests | 1 failed | 7 skipped) 68ms
+   ↓ discovers only automatic effort for a reasoning-disabled endpoint and cycling is a no-op
+   ↓ cycles the selected endpoint map through automatic effort and persists the exact sequence
+   ↓ retains locally admissible legacy levels as unverified and preserves the setter notice
+   × publishes the saved effort to the same running host before the next cycle 67ms
+     → expected { type: 'response', …(3) } to match object { success: true, …(1) }
+(3 matching properties omitted from actual)
+   ↓ keeps off as a provider-decides alias and refuses explicit unsupported effort without a write
+   ↓ keeps auto as a provider-decides alias and refuses explicit unsupported effort without a write
+   ↓ keeps none as a provider-decides alias and refuses explicit unsupported effort without a write
+   ↓ discovers virtual levels without routing, then refuses a retired registration without physical fallback
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/thinking.test.ts > publishes the saved effort to the same running host before the next cycle
+AssertionError: expected { type: 'response', …(3) } to match object { success: true, …(1) }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "data": {
+-     "level": "max",
+-   },
+-   "success": true,
++   "success": false,
+  }
+
+ ❯ src/cli/rpc/thinking.test.ts:88:6
+     86|   expect(readSessionModel(context.session.id)?.thinkingEffort).toBe('h…
+     87|   expect(await handleRpcCommand({ type: 'cycle_thinking_level' }, host…
+     88|     .toMatchObject({ success: true, data: { level: 'max' } });
+       |      ^
+     89| });
+     90| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  20:47:55
+   Duration  8.93s (transform 5.33s, setup 0ms, collect 8.59s, tests 68ms, environment 0ms, prepare 58ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/thinking.test.ts -t 'publishes the saved effort'

@@ -1,0 +1,92 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/commands.test.ts -t before emitting|JSONL reads|private skill-loader
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/commands.test.ts (9 tests | 3 failed | 6 skipped) 661ms
+   ↓ discovers extension and named invocations with the same builtin precedence and drops retired registrations
+   ↓ uses explicit skill paths with no-skills and applies the existing project trust decision
+   ↓ refuses an asynchronous skill result after the selected session changes
+   ↓ does not return a skill whose contribution was retired during acquisition
+   ↓ refuses a contribution retired between catalogue resolution and the RPC consumer
+   ↓ refuses synchronous retirement in the final skill validity callback
+   × revalidates discovery after the host promise resolves and before emitting its response 54ms
+     → expected { type: 'response', …(3) } to match object { success: false }
+(4 matching properties omitted from actual)
+   × keeps JSONL reads and cancellation responsive during skill acquisition and joins a refused read at EOF 579ms
+     → expected undefined to be true // Object.is equality
+   × keeps private skill-loader failures out of the RPC response 27ms
+     → expected '{"type":"response","command":"get_com…' not to contain 'private loader payload'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/commands.test.ts > revalidates discovery after the host promise resolves and before emitting its response
+AssertionError: expected { type: 'response', …(3) } to match object { success: false }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "success": false,
++   "success": true,
+  }
+
+ ❯ src/cli/rpc/commands.test.ts:142:65
+    140|   const get = host.getCommands!;
+    141|   const rpc = { ...host, getCommands: async () => { const result = awa…
+    142|   expect(await handleRpcCommand({ type: 'get_commands' }, rpc)).toMatc…
+       |                                                                 ^
+    143| });
+    144| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/cli/rpc/commands.test.ts > keeps JSONL reads and cancellation responsive during skill acquisition and joins a refused read at EOF
+AssertionError: expected undefined to be true // Object.is equality
+
+- Expected: 
+true
+
++ Received: 
+undefined
+
+ ❯ vi.waitFor.timeout src/cli/rpc/commands.test.ts:162:97
+    160|     await vi.waitFor(() => expect(entered).toBe(true));
+    161|     stdin.write('{"id":"state","type":"get_state"}\n{"id":"abort","typ…
+    162|     await vi.waitFor(() => expect(responses.find(response => response.…
+       |                                                                                                 ^
+    163|     await vi.waitFor(() => expect(responses.find(response => response.…
+    164|     expect(runtime.cancelCurrentRun).toHaveBeenCalledOnce();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/cli/rpc/commands.test.ts > keeps private skill-loader failures out of the RPC response
+AssertionError: expected '{"type":"response","command":"get_com…' not to contain 'private loader payload'
+
+Expected: "private loader payload"
+Received: "{"type":"response","command":"get_commands","success":false,"error":"private loader payload"}"
+
+ ❯ src/cli/rpc/commands.test.ts:175:78
+    173|     skills: async () => { throw new Error('private loader payload'); }…
+    174|   const response = await handleRpcCommand({ type: 'get_commands' }, ho…
+    175|   expect(response.success).toBe(false); expect(JSON.stringify(response…
+       |                                                                              ^
+    176| });
+    177| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 6 skipped (9)
+   Start at  21:16:36
+   Duration  11.92s (transform 6.85s, setup 0ms, collect 10.97s, tests 661ms, environment 0ms, prepare 60ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/commands.test.ts -t 'before emitting|JSONL reads|private skill-loader'

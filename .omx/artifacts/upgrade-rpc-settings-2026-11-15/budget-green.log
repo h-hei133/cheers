@@ -1,0 +1,14 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/thinking.test.ts src/cli/interactive/picker/thinking.test.ts src/core/commands/model/virtual.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/interactive/picker/thinking.test.ts (36 tests) 1909ms
+ ✓ src/cli/rpc/thinking.test.ts (9 tests) 651ms
+ ✓ src/core/commands/model/virtual.test.ts (14 tests) 364ms
+
+ Test Files  3 passed (3)
+      Tests  59 passed (59)
+   Start at  20:56:20
+   Duration  13.73s (transform 5.66s, setup 0ms, collect 10.14s, tests 2.92s, environment 0ms, prepare 159ms)
+

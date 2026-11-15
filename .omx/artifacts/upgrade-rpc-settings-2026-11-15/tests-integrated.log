@@ -1,0 +1,21 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/thinking.test.ts src/cli/rpc/settings.test.ts src/cli/rpc/commands.test.ts src/cli/rpc/runtimeHost.test.ts src/cli/rpc/rpcServer.test.ts src/cli/interactive/settings.test.ts src/cli/runtime/inputStream.extensions.test.ts src/cli/interactive/picker/thinking.test.ts src/core/commands/model/virtual.test.ts src/config/inputs/publication.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/runtime/inputStream.extensions.test.ts (16 tests) 2091ms
+ ✓ src/cli/interactive/picker/thinking.test.ts (36 tests) 1888ms
+ ✓ src/cli/interactive/settings.test.ts (46 tests) 1029ms
+ ✓ src/cli/rpc/runtimeHost.test.ts (31 tests) 1079ms
+ ✓ src/cli/rpc/thinking.test.ts (10 tests) 914ms
+ ✓ src/config/inputs/publication.test.ts (10 tests) 383ms
+ ✓ src/core/commands/model/virtual.test.ts (14 tests) 367ms
+ ✓ src/cli/rpc/settings.test.ts (6 tests) 320ms
+ ✓ src/cli/rpc/commands.test.ts (4 tests) 159ms
+ ✓ src/cli/rpc/rpcServer.test.ts (3 tests) 4ms
+
+ Test Files  10 passed (10)
+      Tests  176 passed (176)
+   Start at  21:08:45
+   Duration  30.36s (transform 7.53s, setup 0ms, collect 20.09s, tests 8.23s, environment 1ms, prepare 478ms)
+

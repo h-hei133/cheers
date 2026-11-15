@@ -1,0 +1,245 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-15",
+  "task": "D.1",
+  "batch": "RPC settings, thinking and command discovery",
+  "status": "locally-validated",
+  "delivery": "local commit containing this receipt; not pushed",
+  "baseCommit": "c10c52916c118530c692b6b10363db63cf5514e3",
+  "buildId": "119bed2092d3f9233c63078e013a835b953dacd617460d8444ffb5e93338cd7a",
+  "source": {
+    "packages/ts-shell/src/cli/interactive/settings.test.ts": {
+      "snapshot": "source/cli/interactive/settings.test.ts.txt",
+      "sha256": "42a0cffa64e36b5b20690fa14b735941979fe0b55c155de2ff9c33cd26b9cfc1"
+    },
+    "packages/ts-shell/src/cli/interactive/settings.ts": {
+      "snapshot": "source/cli/interactive/settings.ts.txt",
+      "sha256": "b53d42a3013c0aa8aa1155cfda65b49c1cd15bf0140682d5fcdbf62e97068c32"
+    },
+    "packages/ts-shell/src/cli/rpc/commands.test.ts": {
+      "snapshot": "source/cli/rpc/commands.test.ts.txt",
+      "sha256": "a76ac210f6c962183098d3ee900e63225c520aaf7e0e2815170ea55176f7cea1"
+    },
+    "packages/ts-shell/src/cli/rpc/commands.ts": {
+      "snapshot": "source/cli/rpc/commands.ts.txt",
+      "sha256": "5dbd7f59cb9516c079fcf4ca9f9499918ea840d3706ecb9c4a2bb96e8e2cd336"
+    },
+    "packages/ts-shell/src/cli/rpc/handlers.ts": {
+      "snapshot": "source/cli/rpc/handlers.ts.txt",
+      "sha256": "a2d740e37a64c9abee7f36a75b5f27a36b34bcfd9a91a9a9d95ddf6ed29be451"
+    },
+    "packages/ts-shell/src/cli/rpc/host/settings.ts": {
+      "snapshot": "source/cli/rpc/host/settings.ts.txt",
+      "sha256": "ae230518430179c9f53160c03f14647aa8761914ab1e2a65e5fb7d059ab66338"
+    },
+    "packages/ts-shell/src/cli/rpc/protocol.ts": {
+      "snapshot": "source/cli/rpc/protocol.ts.txt",
+      "sha256": "cbeccd4030939cc0a0c4229bed094517f5a620bf323ee2fe754ae16db47edcd2"
+    },
+    "packages/ts-shell/src/cli/rpc/rpcServer.ts": {
+      "snapshot": "source/cli/rpc/rpcServer.ts.txt",
+      "sha256": "34453f778dc99b50883ac9fd3cdfccfa1d52440fd30ec7ec4aae478b132433a7"
+    },
+    "packages/ts-shell/src/cli/rpc/runtimeOps.ts": {
+      "snapshot": "source/cli/rpc/runtimeOps.ts.txt",
+      "sha256": "2ea2d44cacc9ba6858ceed7338681c018979fc670627a8df57248153db2c226b"
+    },
+    "packages/ts-shell/src/cli/rpc/settings.test.ts": {
+      "snapshot": "source/cli/rpc/settings.test.ts.txt",
+      "sha256": "0960a556cc574ffbeb0e349a7d108fb581db4c179d958b445ba32c93d5729334"
+    },
+    "packages/ts-shell/src/cli/rpc/thinking.test.ts": {
+      "snapshot": "source/cli/rpc/thinking.test.ts.txt",
+      "sha256": "d71054d49c8d833bee2ed24671edc74d8cee4219060536ebe69dc9fd49b54906"
+    },
+    "packages/ts-shell/src/cli/rpc/thinking.ts": {
+      "snapshot": "source/cli/rpc/thinking.ts.txt",
+      "sha256": "3a68622d2388b54fbbb823696afb5ca22ac2dade0a54989cdecced2ff1d8c6b7"
+    },
+    "packages/ts-shell/src/cli/runtime/inputStream.ts": {
+      "snapshot": "source/cli/runtime/inputStream.ts.txt",
+      "sha256": "4433ba70eedcdbb48fe4252360d34ceb67c502c6a9a710f145fb3a4dc6c38473"
+    }
+  },
+  "documents": {
+    ".wiki/log.md": {
+      "snapshot": "docs/.wiki/log.md.txt",
+      "sha256": "f557e4c8e7027f0a5ddc4116916cffc2fd565a20dfb8b1f78c5174306c6ecae4"
+    },
+    ".wiki/refactor/upgrade/MASTER.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/MASTER.md.txt",
+      "sha256": "f4f4f1a2f8cb04c49a44fcc1f1d6d69d0d3bc40fdcfd44c01a92a31d53a35103"
+    },
+    ".wiki/refactor/upgrade/design.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/design.md.txt",
+      "sha256": "961a2f7b07368da97989f0797d8e4ab79ad015dcf8f4b03e75f5956ec6429abd"
+    },
+    ".wiki/refactor/upgrade/tasks.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/tasks.md.txt",
+      "sha256": "c2f5dbdcdff0f4938f67485aaf64cf478ba9e20ec7a54be473a363ebf1cfb4d1"
+    },
+    "HANDOFF.md": {
+      "snapshot": "docs/HANDOFF.md.txt",
+      "sha256": "fbbe71b2a8bc19d00a12acdae87af4b252485db7c831aba4e42218e5ecd2ec32"
+    }
+  },
+  "validation": {
+    "tests": {
+      "status": "passed",
+      "suites": 11,
+      "tests": 200,
+      "log": "tests-final.log",
+      "beforeFinalSkillPredicate": true
+    },
+    "finalAffected": {
+      "status": "passed",
+      "suites": 3,
+      "tests": 29,
+      "log": "discovery-restored.log"
+    },
+    "settingsRestored": {
+      "status": "passed",
+      "suites": 3,
+      "tests": 62,
+      "log": "restored-tests.log"
+    },
+    "gates": {
+      "status": "passed",
+      "count": 6,
+      "log": "delivery-gates.log",
+      "docsSourceAdvisories": 119
+    },
+    "responsibility": {
+      "modules": 2646,
+      "monoliths": 0,
+      "log": "delivery-gates.log"
+    },
+    "reversals": {
+      "count": 7,
+      "assertionFailed": true,
+      "exactRestoration": true,
+      "receipts": [
+        "reversals.json",
+        "discovery-reversals.json"
+      ]
+    },
+    "build": {
+      "status": "passed",
+      "log": "build-delivery.log"
+    },
+    "native": {
+      "status": "passed",
+      "receipt": "native.json",
+      "loopbackPosts": 2,
+      "platform": "linux",
+      "compiledCli": true
+    },
+    "configuredProvider": {
+      "status": "passed",
+      "receipt": "real-native.json",
+      "posts": 1,
+      "platform": "linux",
+      "compiledCli": true,
+      "bodyInspectable": false,
+      "minimalIsolatedCatalogue": true,
+      "originalConfigUnchanged": true
+    },
+    "review": {
+      "code": "APPROVE",
+      "architecture": "CLEAR",
+      "receipts": [
+        "review-code.json",
+        "review-architecture.json"
+      ]
+    }
+  },
+  "limits": {
+    "fullD1": false,
+    "remaining": [
+      "retry-specific cancellation",
+      "compaction transport control and structured outcomes",
+      "joint D.1 acceptance"
+    ],
+    "tasksComplete": 22,
+    "tasksTotal": 62,
+    "goal": "active",
+    "configuredProviderExactEffortWireInspected": false,
+    "otherPlatforms": false,
+    "push": false,
+    "ci": false
+  },
+  "failureClassification": "classification.md",
+  "evidence": {
+    "budget-green.log": "c696931cb237e26b3791c5e4e061ebfae3b7187a4857dda302dc138306c724fb",
+    "budget-red.log": "add1e8fa62bd43882755d72f8c2f2b657674196d3e70a84462be1d71aaf0fc06",
+    "build-delivery.log": "110467fc1316617fa369bb584718b602ce0e181f031d53f3b8896122c114f876",
+    "build-final.log": "27a56ef9b7cadda2d5857c7bf8c643abd9ce2c031f7e95fbd24d065e6f333d67",
+    "build-manifest.json": "9c4d7b836d5d377aeaff2a5c5c2a82eb3f41c44e371fd264ee9f1deb838218e1",
+    "build.log": "0cca32f58264f600b09ba54a2c6cbd0a266774602ad180e56311dfddec5d5e6d",
+    "callback-green.log": "1ed7b7aabb65f9da103f080035299b2078eef3d780f9e5d216107a756ff21bf2",
+    "callback-red.log": "b885d7d41c091f713c6079fa29251809f776617ae684199e8292fe731df3f756",
+    "classification.md": "0a7a84f0f60d11d27830c47fce0a063960c5a826d7f6a3bcb24e823639fbf085",
+    "commands-green.log": "065504ebb65736009c903ef03cfa7783c278664405328c1b7032bdd7c7c813c2",
+    "commands-red.log": "0c64d54de11fd4e2f863228b0f19f30b130ff6165192da59a3c190615923c5e5",
+    "commands-retirement-green.log": "64a6056dd2018abf78804c1caba749792ea9f89dd948a9ee7f6ab401c81d355c",
+    "commands-retirement-red.log": "3c1929fdf670ed5230a72ac4d10b29e77bb18287a9e32e667c0cd62e67ad7e9b",
+    "delivery-gates.log": "cd7f75d30992fdc2f514bddf96bacc7d47277603f3dc57d4b2de5646b9edf007",
+    "discovery-response-green.log": "b6e018b3bccab2d62dbde570badd851872eabae949f31511db452f2b5d3430a2",
+    "discovery-response-red.log": "bcd6a5a60da11c9d21862f5d4817d045fee31982dc44cda4ac05838499c7a413",
+    "discovery-restored.log": "8099cc15ac3e13c14ccfb1ffd633cffd4425e41009c141a64c0b59f39287266a",
+    "discovery-reversals.json": "e3162fd5ee31d07026ed64e475bedbf41fe6b217e0962d3b83fcf32de8bccc80",
+    "discovery-reversals.log": "417322af63eeed0e62fb99f84d782c013c0c815b8447c946f09c7a0562be073c",
+    "discovery-reversals.mjs.txt": "7448671d7f16f4fc3c1e99ac933e6008f365c08773195bd70dbc2aab60ac2ced",
+    "docs/.wiki/log.md.txt": "f557e4c8e7027f0a5ddc4116916cffc2fd565a20dfb8b1f78c5174306c6ecae4",
+    "docs/.wiki/refactor/upgrade/MASTER.md.txt": "f4f4f1a2f8cb04c49a44fcc1f1d6d69d0d3bc40fdcfd44c01a92a31d53a35103",
+    "docs/.wiki/refactor/upgrade/design.md.txt": "961a2f7b07368da97989f0797d8e4ab79ad015dcf8f4b03e75f5956ec6429abd",
+    "docs/.wiki/refactor/upgrade/tasks.md.txt": "c2f5dbdcdff0f4938f67485aaf64cf478ba9e20ec7a54be473a363ebf1cfb4d1",
+    "docs/HANDOFF.md.txt": "fbbe71b2a8bc19d00a12acdae87af4b252485db7c831aba4e42218e5ecd2ec32",
+    "gates-current.log": "879cedaadc707f7558bd2f07ceac25318a6c8aafbbd43ba69b2414c5a46acfe5",
+    "gates-final.log": "f9bd6bbf614d928b8ffcf2cc516e9d9175ba96632e2032d1670dfed38531d9a8",
+    "gates-integrated.log": "bb5cda76d38232003505901eb4e6998dcf181608da6d55fa7e4be47c17b38e6b",
+    "gates.log": "d6ee9159805b142568fd362fcdff2b25cd6863e7d22cb97b55697059ac96916f",
+    "green-first.log": "bfaa1811add6f8140522c5f78ff045e3cbc2ed58f07af3183d2f1cf103382612",
+    "green-second.log": "db5cf6252411b025536e77d8bf2fc5acf7e3461ab9537e22a9d9a57116640e1c",
+    "native.json": "651efbb84ac8f23a63549d95cdf3166e5bd8c316bc725d2063a874cb877eb3f1",
+    "native.log": "06f9968ee782fe10034e13998946924de9d458021559e46855abdc4f2d646105",
+    "native.mjs.txt": "1e34b7d66f32620943af2d4f2d0e2f258e1527e3fbb6f0c4935ac6bda185ec82",
+    "publication-red.log": "09d8898e50f0403ffb4b7c93733f6a2bf813eb855ff9dcca73ab8eb56e4e9293",
+    "real-native.json": "56d360f76b677083f2490e8d75193c895a237c7d50b93338742393c436531687",
+    "real-native.log": "0488008156fb70cab94ef24ed263b9c464d69f29ae60d517f7c4c959e53b375d",
+    "real-native.mjs.txt": "6446a9e1126797b7c4385ee557100f7d977925929a52df361e4ab9cd3c9f3ff5",
+    "red.log": "4d504de4eb680de8e69ef88bcb7beae18daa70dcd726e6c15e312ba6f3dc157c",
+    "restored-tests.log": "2e08f6186f59dbe125c8af066defc4a06502bb256c8cc3263f11e892b75c7c17",
+    "reversal-accepted-publication.log": "6e2f81f7f2d59fb60cb5d4f1f281f7875ff5cd4345f1976dec91c9e1bdcb08a9",
+    "reversal-callback-binding.log": "ffd415faea3fde5fb1ee20bd4c3a6e1d550ff174f8fe7c3ffb725fb934b4f98b",
+    "reversal-discovery-controls.log": "6874016b08d21ed9004ece2e47d5813798c75af0a6530ed520e389ba7c9f5a2d",
+    "reversal-discovery-publication.log": "fa2d778f0372aa78b819090aab4b9b9f06550ddf7bce19a79b0b70226aa7a107",
+    "reversal-effective-setting.log": "780e0966633ca4a3e674fd6103e386009e8f608a3565d26b84507546fd329d8f",
+    "reversal-endpoint-budget.log": "ac4f79bf741e6861060e5f0b64f157b0b4893fddde81d8df42715dce18d239a4",
+    "reversal-physical-level-filter.log": "fb1fa9590b786dff44d08f2d4151b57e2c5a3c6a99711973478a46c495ebb5d2",
+    "reversals.json": "a29086e72a01a1a3f68e95c9d034ff5ad57d31b9f926cf97a1cadec34b49b8df",
+    "reversals.log": "8a21bc57ed1e83ba596d7b2e8908fe87e4a23fc91e54a40513100d5c2acc8061",
+    "reversals.mjs.txt": "99a852ad9551f3069f487755118b3bf25554c9e362727c35e0ec9a3f214b68df",
+    "review-architecture.json": "36b75d1b81d444b9b99fa0c4d62a5bd701413687acc9c556c3f1ad6e24d81b2b",
+    "review-code.json": "a39780ba79c73064dcf40683ae25ea2d9fb9214adac009915c4b059290384806",
+    "skill-revocation-green.log": "dc4bd9b9c2241f505244e8ba8f640b950344eba7af80be2281273608441b2ed2",
+    "skill-revocation-red.log": "e3c36464555adf5eceb3589af9ee9f1feff195170c50dc6650072b5900013df0",
+    "source/cli/interactive/settings.test.ts.txt": "42a0cffa64e36b5b20690fa14b735941979fe0b55c155de2ff9c33cd26b9cfc1",
+    "source/cli/interactive/settings.ts.txt": "b53d42a3013c0aa8aa1155cfda65b49c1cd15bf0140682d5fcdbf62e97068c32",
+    "source/cli/rpc/commands.test.ts.txt": "a76ac210f6c962183098d3ee900e63225c520aaf7e0e2815170ea55176f7cea1",
+    "source/cli/rpc/commands.ts.txt": "5dbd7f59cb9516c079fcf4ca9f9499918ea840d3706ecb9c4a2bb96e8e2cd336",
+    "source/cli/rpc/handlers.ts.txt": "a2d740e37a64c9abee7f36a75b5f27a36b34bcfd9a91a9a9d95ddf6ed29be451",
+    "source/cli/rpc/host/settings.ts.txt": "ae230518430179c9f53160c03f14647aa8761914ab1e2a65e5fb7d059ab66338",
+    "source/cli/rpc/protocol.ts.txt": "cbeccd4030939cc0a0c4229bed094517f5a620bf323ee2fe754ae16db47edcd2",
+    "source/cli/rpc/rpcServer.ts.txt": "34453f778dc99b50883ac9fd3cdfccfa1d52440fd30ec7ec4aae478b132433a7",
+    "source/cli/rpc/runtimeOps.ts.txt": "2ea2d44cacc9ba6858ceed7338681c018979fc670627a8df57248153db2c226b",
+    "source/cli/rpc/settings.test.ts.txt": "0960a556cc574ffbeb0e349a7d108fb581db4c179d958b445ba32c93d5729334",
+    "source/cli/rpc/thinking.test.ts.txt": "d71054d49c8d833bee2ed24671edc74d8cee4219060536ebe69dc9fd49b54906",
+    "source/cli/rpc/thinking.ts.txt": "3a68622d2388b54fbbb823696afb5ca22ac2dade0a54989cdecced2ff1d8c6b7",
+    "source/cli/runtime/inputStream.ts.txt": "4433ba70eedcdbb48fe4252360d34ceb67c502c6a9a710f145fb3a4dc6c38473",
+    "structure-final.log": "2fabcc22a677e56de9bb5bf12a54575b456f946ab39e469fd49e59006fbbc17b",
+    "structure.log": "cc42f0ce23cb3d19cd6d4ab20126367cd4e61e9884feb38f0c3eec9b4c90082d",
+    "tests-final.log": "1559f7ed1a8a1d38e3d754e9dbf58f068e89717084a1412c259fcabcb26623f2",
+    "tests-integrated.log": "b624c2bc75283702686c057d38a3f979b736d23d69c10df51c6284b0dcc80008"
+  }
+}

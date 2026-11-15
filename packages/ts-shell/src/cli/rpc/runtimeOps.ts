@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
-import { switchActiveSession } from "../../core/shell/runtimeContext.js";
+import { refreshShellRuntimeConfig, switchActiveSession } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { TurnInput } from "../../turn/session.js";
 import type { SubmissionQueue } from "../interactive/inputQueue.js";
@@ -10,10 +10,8 @@ import { readModelCatalog } from "../../core/commands/modelCommandRuntime.js";
 import { setModel } from "../../core/commands/model/selection.js";
 import { modelRequest } from "../../core/commands/model/target.js";
 import { captureThinkingPreference } from "../../core/models/preference.js";
-import { thinkingSyntax } from "../../core/commands/thinking/syntax.js";
 import { costModel } from "../../core/commands/cost/model.js";
 import { loadCatalog } from "../../core/models/catalogStore.js";
-import { listVisibleCommands } from "../../core/commands/registry.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
 import { readSessionEntries, readSessionTree } from "../../session/query/sessionEntries.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../../session/store/sessionFileLayout.js";
@@ -26,10 +24,8 @@ import { openSettings } from "../interactive/settings.js";
 import { navigateSession } from "../runtime/navigation.js";
 import { readLogicalModel } from '../../session/model/logical.js';
 import { sessionModelCatalog } from '../../core/catalog/models.js';
-
-export const THINKING_LEVELS = thinkingSyntax.actions
-  .map(action => action.name)
-  .filter((name): name is string => name.length > 0);
+import { sameValue } from '../../config/values.js';
+import type { RpcSettingResult } from './protocol.js';
 
 const SESSION_ARTIFACT_FILES = new Set(["metadata", "state", "transcript"]);
 
@@ -52,10 +48,8 @@ export function buildRpcCommandContext(runtimeContext: ShellRuntimeContext) {
     admission: configurationAdmission(runtimeContext),
     logicalModelAdmission: configurationAdmission(runtimeContext, { deferredModel: true }),
     resolveConfigTarget: runtimeContext.resolveConfigTarget,
-    readConfiguration: () => ({
-      config: runtimeContext.configuration.current.config,
-      catalog: runtimeContext.configuration.current.catalog,
-    }),
+    readConfiguration: () => runtimeContext.configuration.current,
+    refreshRuntimeConfig: () => refreshShellRuntimeConfig(runtimeContext),
   };
 }
 
@@ -66,10 +60,13 @@ export function assertModelApplied(output: string): string {
   return output;
 }
 
-export async function saveRpcSetting(runtimeContext: ShellRuntimeContext, key: string, value: unknown): Promise<void> {
+export async function saveRpcSetting(runtimeContext: ShellRuntimeContext, key: string, value: unknown): Promise<RpcSettingResult> {
   const draft = openSettings(runtimeContext, () => undefined, "user");
   const result = await draft.save(key, value);
   if (!result.applied) throw new Error(result.note);
+  if (!result.value || !result.application) throw new Error('Saved configuration application details are unavailable.');
+  return { saved: true, ...result.value, applied: sameValue(result.value.effective, value),
+    application: result.application, note: result.note };
 }
 
 export function readRpcSessionStats(session: Session): Record<string, unknown> {
@@ -118,26 +115,6 @@ export async function cycleRpcModel(runtimeContext: ShellRuntimeContext): Promis
   return { model: nextModel, note };
 }
 
-export async function setRpcThinking(runtimeContext: ShellRuntimeContext, level: string): Promise<{ readonly level: string }> {
-  const action = thinkingSyntax.actions.find(item => item.name === level || item.aliases?.includes(level));
-  if (!action || action.effort === undefined) throw new Error(`Unknown thinking level '${level}'.`);
-  assertModelApplied(await setModel([], buildRpcCommandContext(runtimeContext), false, action.effort));
-  return { level: action.effort ?? "auto" };
-}
-
-export async function cycleRpcThinking(runtimeContext: ShellRuntimeContext): Promise<{ readonly level: string } | null> {
-  const ctx = buildRpcCommandContext(runtimeContext);
-  const active = modelRequest(ctx, runtimeContext.runtimeConfig);
-  const logical = readLogicalModel(runtimeContext.session.id);
-  const current = (logical ? logical.thinkingEffort : captureThinkingPreference(runtimeContext.projectRoot, active.thinkingEffort).thinkingEffort) ?? "off";
-  const idx = THINKING_LEVELS.indexOf(current);
-  const nextName = THINKING_LEVELS[(idx + 1) % THINKING_LEVELS.length]!;
-  const action = thinkingSyntax.actions.find(item => item.name === nextName);
-  if (!action || action.effort === undefined) return null;
-  assertModelApplied(await setModel([], ctx, false, action.effort));
-  return { level: action.effort ?? "auto" };
-}
-
 export async function readRpcEntries(runtimeContext: ShellRuntimeContext, since?: string | number): Promise<Record<string, unknown>> {
   const layout = locateExistingSessionLayout(createSessionStoreLayout(), runtimeContext.session.id);
   const events = readTranscriptEvents(layout.transcriptPath);
@@ -173,14 +150,6 @@ export function listRpcModels(runtimeContext?: ShellRuntimeContext): readonly Re
     maxTokens: model.maxTokens,
   }))), ...catalog.virtual.map(model => ({ provider: model.provider, id: model.id, virtual: true,
     contextWindow: model.contextWindow, maxTokens: model.maxTokens }))];
-}
-
-export function listRpcCommands(runtimeContext: ShellRuntimeContext): readonly Record<string, unknown>[] {
-  return listVisibleCommands(runtimeContext.cwd, runtimeContext.runtimeConfig).map(cmd => ({
-    name: cmd.name,
-    description: cmd.summary,
-    ...(cmd.aliases ? { aliases: cmd.aliases } : {}),
-  }));
 }
 
 export function applyRpcSessionSwitch(

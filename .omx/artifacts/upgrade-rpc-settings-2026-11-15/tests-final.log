@@ -1,0 +1,34 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/cli/rpc/thinking.test.ts src/cli/rpc/settings.test.ts src/cli/rpc/commands.test.ts src/cli/rpc/runtimeHost.test.ts src/cli/rpc/rpcServer.test.ts src/cli/rpc/shell.test.ts src/cli/interactive/settings.test.ts src/cli/runtime/inputStream.extensions.test.ts src/cli/interactive/picker/thinking.test.ts src/core/commands/model/virtual.test.ts src/config/inputs/publication.test.ts
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/rpc/shell.test.ts (19 tests) 5286ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  472ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  431ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  375ms
+   ✓ keeps actual exit evidence when after-call hooks fail  395ms
+   ✓ reports unverified message persistence without losing the completed native outcome  386ms
+   ✓ retains completed effects without saving history after configuration retirement  393ms
+   ✓ retains completed effects without saving history after deletion retirement  374ms
+   ✓ preserves an unverified excluded report write in the RPC outcome  376ms
+   ✓ does not publish a completed shell result into a changed session  392ms
+   ✓ does not publish a completed shell result into a changed branch  405ms
+   ✓ redacts credential-shaped command output in the response and durable records  381ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  517ms
+ ✓ src/cli/runtime/inputStream.extensions.test.ts (16 tests) 2089ms
+ ✓ src/cli/interactive/picker/thinking.test.ts (36 tests) 1890ms
+ ✓ src/cli/rpc/runtimeHost.test.ts (31 tests) 989ms
+ ✓ src/cli/interactive/settings.test.ts (46 tests) 1016ms
+ ✓ src/cli/rpc/thinking.test.ts (10 tests) 521ms
+ ✓ src/cli/rpc/commands.test.ts (9 tests) 372ms
+ ✓ src/config/inputs/publication.test.ts (10 tests) 381ms
+ ✓ src/core/commands/model/virtual.test.ts (14 tests) 368ms
+ ✓ src/cli/rpc/settings.test.ts (6 tests) 278ms
+ ✓ src/cli/rpc/rpcServer.test.ts (3 tests) 4ms
+
+ Test Files  11 passed (11)
+      Tests  200 passed (200)
+   Start at  21:20:29
+   Duration  38.70s (transform 7.91s, setup 0ms, collect 22.30s, tests 13.19s, environment 1ms, prepare 520ms)
+

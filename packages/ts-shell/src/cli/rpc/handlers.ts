@@ -1,7 +1,7 @@
 import type { RpcCommand, RpcHost } from "./protocol.js";
 
 export type RpcHandlerOutcome =
-  | { readonly handled: true; readonly data?: Record<string, unknown> }
+  | { readonly handled: true; readonly data?: Record<string, unknown>; readonly assertCurrent?: () => void }
   | { readonly handled: true; readonly error: string; readonly data?: Record<string, unknown> }
   | { readonly handled: false };
 
@@ -9,7 +9,7 @@ function unavailable(name: string): RpcHandlerOutcome {
   return { handled: true, error: `RPC command '${name}' is unavailable in this host.` };
 }
 
-async function handleSessionAndStats(command: RpcCommand, host: RpcHost): Promise<RpcHandlerOutcome> {
+async function handleSessionAndStats(command: RpcCommand, host: RpcHost, signal?: AbortSignal): Promise<RpcHandlerOutcome> {
   switch (command.type) {
     case "new_session":
       return host.newSession ? { handled: true, data: await host.newSession(command.parentSession) } : unavailable(command.type);
@@ -26,8 +26,12 @@ async function handleSessionAndStats(command: RpcCommand, host: RpcHost): Promis
       return host.getLastAssistantText
         ? { handled: true, data: { text: host.getLastAssistantText() } }
         : unavailable(command.type);
-    case "get_commands":
-      return host.getCommands ? { handled: true, data: { commands: host.getCommands() } } : unavailable(command.type);
+    case "get_commands": {
+      if (!host.getCommands) return unavailable(command.type);
+      const result = await host.getCommands(signal);
+      return 'commands' in result ? { handled: true, data: { commands: result.commands }, assertCurrent: result.assertCurrent }
+        : { handled: true, data: { commands: result } };
+    }
     default:
       return { handled: false };
   }
@@ -51,8 +55,11 @@ async function handleModelAndThinking(command: RpcCommand, host: RpcHost): Promi
       const next = await host.cycleThinkingLevel();
       return { handled: true, data: next ?? { level: null } };
     }
-    case "get_available_thinking_levels":
-      return host.getAvailableThinkingLevels ? { handled: true, data: { levels: host.getAvailableThinkingLevels() } } : unavailable(command.type);
+    case "get_available_thinking_levels": {
+      if (!host.getAvailableThinkingLevels) return unavailable(command.type);
+      const result = host.getAvailableThinkingLevels();
+      return { handled: true, data: 'levels' in result ? { ...result } : { levels: result } };
+    }
     default:
       return { handled: false };
   }
@@ -75,14 +82,16 @@ async function handleTreeAndExecution(command: RpcCommand, host: RpcHost): Promi
       const reason = "reason" in outcome ? outcome.reason : "Compaction cannot start while a run is active.";
       return { handled: true, error: reason };
     }
-    case "set_auto_compaction":
+    case "set_auto_compaction": {
       if (!host.setAutoCompaction) return unavailable(command.type);
-      await host.setAutoCompaction(command.enabled);
-      return { handled: true };
-    case "set_auto_retry":
+      const result = await host.setAutoCompaction(command.enabled);
+      return { handled: true, ...(result ? { data: { ...result } } : {}) };
+    }
+    case "set_auto_retry": {
       if (!host.setAutoRetry) return unavailable(command.type);
-      await host.setAutoRetry(command.enabled);
-      return { handled: true };
+      const result = await host.setAutoRetry(command.enabled);
+      return { handled: true, ...(result ? { data: { ...result } } : {}) };
+    }
     case "abort_retry":
       if (!host.abortRetry) return unavailable(command.type);
       host.abortRetry();
@@ -122,11 +131,11 @@ async function handleTreeAndExecution(command: RpcCommand, host: RpcHost): Promi
 }
 
 /** Dispatch extended session, model, thinking, compaction, tree, and bash RPC commands. */
-export async function handleExtendedRpcCommand(command: RpcCommand, host: RpcHost): Promise<RpcHandlerOutcome> {
+export async function handleExtendedRpcCommand(command: RpcCommand, host: RpcHost, signal?: AbortSignal): Promise<RpcHandlerOutcome> {
   // Register shell ownership during admission, before the transport admits a
   // following abort or session command. Its response may settle much later.
   if (command.type === 'bash' || command.type === 'abort_bash') return handleTreeAndExecution(command, host);
-  const sessionOutcome = await handleSessionAndStats(command, host);
+  const sessionOutcome = await handleSessionAndStats(command, host, signal);
   if (sessionOutcome.handled) return sessionOutcome;
   const modelOutcome = await handleModelAndThinking(command, host);
   if (modelOutcome.handled) return modelOutcome;

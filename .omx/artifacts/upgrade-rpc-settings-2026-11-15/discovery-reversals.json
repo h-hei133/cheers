@@ -1,0 +1,18 @@
+{
+  "cases": [
+    {
+      "name": "discovery-publication",
+      "assertionFailed": true,
+      "status": 1,
+      "sourceSha256": "34453f778dc99b50883ac9fd3cdfccfa1d52440fd30ec7ec4aae478b132433a7",
+      "restoredExactly": true
+    },
+    {
+      "name": "discovery-controls",
+      "assertionFailed": true,
+      "status": 1,
+      "sourceSha256": "4433ba70eedcdbb48fe4252360d34ceb67c502c6a9a710f145fb3a4dc6c38473",
+      "restoredExactly": true
+    }
+  ]
+}

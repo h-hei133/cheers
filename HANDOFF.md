@@ -2664,3 +2664,14 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A pre-call hook changes the saved branch, but an approved native command still runs; only its later history write is refused. A partially recorded started event can also remain pending after command admission fails.
 - **Root Cause:** Runtime object identity does not detect persisted branch navigation, and append-then-state event writes can throw after the started record already exists.
 - **Rule:** Revalidate the captured branch lease before native effects and history publication; use the existing full command settlement owner for busy and cancellation. Attempt a report-safe failed result after a started-event write was attempted, preserve observed native output independently of hooks and persistence, and do not infer cross-process atomicity from a separate branch check plus ordinary message append. Captured read limits must cover compatibility catch-up as well as saved records.
+
+
+### Saved Settings Need Their Accepted Publication And Original Callback Binding
+- **Symptom:** Saving effort leaves the live RPC state stale and the next cycle fails, or a setting response combines an original write with a successor session's effective value.
+- **Root Cause:** A command adapter supplies only config/catalog instead of the accepted publication and omits refresh; an application callback can replace the binding before the result is captured.
+- **Rule:** Delegate refresh to the existing configuration owner and expose its complete publication. Keep immediate-setting installation callbacks in their original order, then recheck the captured owner and source before capturing response facts. Report stored, requested and effective values separately; preserve existing user/project/input precedence.
+
+### Discovery Must Carry Skill Admission Through Response Publication
+- **Symptom:** Command discovery returns a skill after its registration predicate is revoked, or a pending skill read blocks the cancellation command intended to stop it.
+- **Root Cause:** The loader's final check precedes additional handler awaits; contribution identity alone does not cover a changing skill predicate, and transport control waits for asynchronous discovery.
+- **Rule:** Reuse the dispatched catalog and invocation owners. Carry the original session, configuration, contribution and selected-skill admission closure through every await to emission; recheck binding after callbacks and file verification. Let read responses join at EOF while later controls can cancel their original read signal. Do not replace private loader errors with raw exception messages.

@@ -1,0 +1,41 @@
+{
+  "platform": "linux",
+  "buildId": "119bed2092d3f9233c63078e013a835b953dacd617460d8444ffb5e93338cd7a",
+  "probeSha256": "1e34b7d66f32620943af2d4f2d0e2f258e1527e3fbb6f0c4935ac6bda185ec82",
+  "status": "passed",
+  "stages": {
+    "thinking": {
+      "passed": true,
+      "actualWireEffort": "high",
+      "sequence": [
+        "high",
+        "max",
+        "auto",
+        "high"
+      ],
+      "noOpWhenDisabled": true
+    },
+    "discovery": {
+      "passed": true,
+      "extensionAndAlias": true,
+      "namedInvocations": true,
+      "explicitSkillUnderNoSkills": true,
+      "discoveredSkillsSuppressed": true,
+      "skillReachedWire": true,
+      "uniqueNames": true
+    },
+    "persistence": {
+      "passed": true,
+      "sameSession": true,
+      "virtualLevel": true,
+      "defaults": true,
+      "eofExit0": true
+    },
+    "precedence": {
+      "passed": true,
+      "explicitInputPreserved": true,
+      "storedTrueEffectiveFalse": true
+    }
+  },
+  "posts": 2
+}
