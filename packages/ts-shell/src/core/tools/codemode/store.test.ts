@@ -205,6 +205,55 @@ describe('codemode saved branch storage', () => {
     expect(storeEvents()).toHaveLength(1);
   });
 
+  it('refuses a before-await lease after a written value changes away and back', async () => {
+    loadCodemodeStore(sessionId, workspace).commit({ value: '"original"' });
+    const result = await run('store("value", "stale"); await tools.barrier({});', () => {
+      loadCodemodeStore(sessionId, workspace).commit({ value: '"intermediate"' });
+      loadCodemodeStore(sessionId, workspace).commit({ value: '"original"' });
+    });
+    expect(result.success).toBe(false);
+    expect(result.metadata?.codemodeStore).toMatchObject({ status: 'unchanged', reason: 'conflict' });
+    expect(loadCodemodeStore(sessionId, workspace).initial.value).toBe('"original"');
+    expect(storeEvents()).toHaveLength(3);
+  });
+
+  it('retains a deletion revision when a previously absent key is created and deleted during await', async () => {
+    const result = await run('store("value", "stale"); await tools.barrier({});', () => {
+      loadCodemodeStore(sessionId, workspace).commit({ value: '"intermediate"' });
+      loadCodemodeStore(sessionId, workspace).commit({ value: null });
+    });
+    expect(result.success).toBe(false);
+    expect(result.metadata?.codemodeStore).toMatchObject({ status: 'unchanged', reason: 'conflict' });
+    expect(loadCodemodeStore(sessionId, workspace).initial.value).toBeUndefined();
+    expect(storeEvents()).toHaveLength(2);
+  });
+
+  it('checks empty commits against the captured branch instead of reporting a retired lease as unchanged', () => {
+    manager.addTurn(sessionId, { role: 'user', content: 'before lease' });
+    const captured = loadCodemodeStore(sessionId, workspace);
+    manager.addTurn(sessionId, { role: 'assistant', content: 'after lease' });
+    const before = fs.readFileSync(layout().transcriptPath, 'utf8');
+    expect(() => captured.commit({})).toThrow(expect.objectContaining({ reason: 'conflict', status: 'unchanged' }));
+    expect(fs.readFileSync(layout().transcriptPath, 'utf8')).toBe(before);
+  });
+
+  it('checks admission for an empty successful worker result after await', async () => {
+    const result = await run('await tools.barrier({}); return "state-free";', () => {
+      manager.addTurn(sessionId, { role: 'user', content: 'replacement history' });
+    });
+    expect(result.success).toBe(false);
+    expect(result.metadata?.codemodeStore).toMatchObject({ status: 'unchanged', reason: 'conflict' });
+    expect(storeEvents()).toHaveLength(0);
+  });
+
+  it('does not bypass an explicit admission refusal on an empty commit', () => {
+    const captured = loadCodemodeStore(sessionId, workspace);
+    const before = fs.readFileSync(layout().transcriptPath, 'utf8');
+    expect(() => captured.commit({}, () => { throw new Error('fixture-private-admission'); }))
+      .toThrow(expect.objectContaining({ reason: 'lock-failed', status: 'unchanged' }));
+    expect(fs.readFileSync(layout().transcriptPath, 'utf8')).toBe(before);
+  });
+
   it('checks the current persisted store budget under competing updates', async () => {
     const result = await run('store("pending", "p".repeat(120000)); await tools.barrier({});', () => {
       loadCodemodeStore(sessionId, workspace).commit(Object.fromEntries(['a', 'b', 'c', 'd'].map(key => [key, JSON.stringify('x'.repeat(240000))])));
@@ -238,6 +287,20 @@ describe('codemode saved branch storage', () => {
     expect(result.metadata?.codemodeStore).toMatchObject({ status: 'unknown' });
     expect(JSON.stringify(result)).not.toContain('fixture-private-sync-detail');
     expect(loadCodemodeStore(sessionId, workspace).initial.value).toBe('"landed-without-sync"');
+  });
+
+  it('preserves confirmed codemode persistence when lock release fails', async () => {
+    const files = layout(); const remove = fs.rmSync;
+    vi.spyOn(fs, 'rmSync').mockImplementation((...args: Parameters<typeof fs.rmSync>) => {
+      if (args[0] === files.stateLockPath) throw new Error('fixture-private-lock-release'); return remove(...args);
+    });
+    syncBuiltinESMExports();
+    const result = await run('store("value", "confirmed");');
+    expect(result.success).toBe(false);
+    expect(result.metadata?.codemodeStore).toMatchObject({ reason: 'lock-failed', status: 'persisted' });
+    expect(JSON.stringify(result)).not.toContain('fixture-private-lock-release');
+    vi.restoreAllMocks(); syncBuiltinESMExports(); fs.rmSync(files.stateLockPath);
+    expect(loadCodemodeStore(sessionId, workspace).initial.value).toBe('"confirmed"');
   });
 
   it('refuses a mismatching append descriptor before writing through the existing transcript owner', () => {

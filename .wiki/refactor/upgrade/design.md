@@ -324,3 +324,13 @@ native.json绑定最终build／五个生产owner／probe源码hash。Linux当前
 最终accepted-gates六门、accepted-tests15套件246项、0monoliths和build `9e91decd500a`通过，限定独立复核CLEAR。五反转覆盖binding、physical budget、connection wrapper、renewal admission及shared-success poisoning，均实际AssertionError且exact恢复。旧build `0336c1545dc8`不作最终依据。初次命令scratch相对路径失败在test前、显式role缺连接夹具失败另存。
 
 native.json绑定最终build／六生产owner／probe哈希。探针从同代compiled chunk的复制件仅导出private wiring，静态依赖保持原frozen generation；此为内部消费者验收，不是公共virtual API。两实际loopback的automatic／overflow／explicit-role分别route一次、compact一次，fallback只发physical，role只摘要到指定summary模型；公开SDK配置模型prompt+manual compact共两actual bodySent通过。前两原生探针因默认工具开销先触发threshold，后续overflow已无历史，保持失败JSON/source；最终只扩大overflow场景physical窗口，核对首前台32请求后summary512再重试32，未改产品。证据`.omx/artifacts/upgrade-summary-target-2026-11-15/delivery.json`。实际L、额外依赖2、复用10/10；C.1/E.7、manual direct、注册、分支持久化和缓存归属继续开项，总21/62。
+
+## Session branch storage (2026-11-15, routing prerequisite)
+
+参考决定为state由调用方分支持有，direct不读写；现阶段先提升原codemode store/state为session/branch/store的contract/replay/state/index，不另建数据库或全局Map。codemode薄适配保持错误名、status及字符串JSON/null wire。内部使用branch-store事件与独立host namespace、必需source anchor，避免旧codemode reader忽略新增namespace字段后泄漏内部状态。原fork owner映射root，分支路径与navigationRevision、原始prefix/inode、profile/workspace及lock/fsync/readback均复用。
+
+每键revision从已接受事件计数，删除不存在键也留tombstone；内部写集合、read集合及durable revision键均限制16,384项/1Mi键字符，旧codemode live预算不改变。非空commit复验写键而允许无关键并行追加；assertCurrent可选读键，[]只复验历史，空commit复验namespace。句柄从capture前固定admission与history，不在await后重取；确认失败永久退休，unknown不自动重试。已确认append遇lock release失败仍报告persisted，append/fsync/readback未知仍unknown。后续router在同一个key的commit中CAS，分离read-check与write不能冒充原子读写。
+
+原八断言反例（ABA、empty、mixed重开/fork）已修；限定复审指出callback递归同handle后吞inner lock失败，outer仍写。补2真实红例后添加transacting及每个owner/per-call callback之后的retired复验，避免再进同步锁或继续退休写。最终六门8/247、0monoliths、build `7bcb4574ea2a`、五有效反转exact恢复通过，限定复核CLEAR。首次错误Vitest二进制为setup failure，首联合实际7/240没有writer消费者；后补真实create并最终单进程8/247。旧build `03a9bbdbae07`属重入修复前历史。
+
+native.json记录三fresh Node进程和九生产owner哈希，同代chunk复制件仅暴露private store binding，所有依赖仍指原generation。public SessionManager与codemode worker真实执行：seed两个namespace、reopen读取／worker只见codemode、ABA/tombstone/empty拒绝、fork继承并独立写、第三进程恢复parent/fork各值。没有替代存储实现、provider请求或生产router消费者。证据`.omx/artifacts/upgrade-branch-store-2026-11-15/delivery.json`；实际L、额外依赖2、复用10/10，C.1/E.7和21/62保持。

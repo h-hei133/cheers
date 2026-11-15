@@ -6,6 +6,8 @@ import type { SessionMessage } from "./schema/sessionMessage.js";
 import { isReadableTranscriptEvent } from "./transcript/validation.js";
 import type { ReportTranscriptEntry } from './reports/model.js';
 import { captureCustomMessage } from '../core/agent/custom.js';
+import type { BranchStoreTranscriptEntry } from './branch/store/contract.js';
+export type { BranchStoreTranscriptEntry } from './branch/store/contract.js';
 export type TranscriptLifecycleEventName =
   | "run-started"
   | "run-interrupted"
@@ -74,7 +76,8 @@ export type TranscriptEvent =
   | { type: 'compaction-commit'; id: string; compactionId: string; digest: string; timestamp: string }
   | ReportTranscriptEntry
   | BranchSummaryTranscriptEntry
-  | CodemodeStoreTranscriptEntry;
+  | CodemodeStoreTranscriptEntry
+  | BranchStoreTranscriptEntry;
 
 export interface CodemodeStoreTranscriptEntry {
   readonly type: "codemode-store";

@@ -3,6 +3,7 @@ import { readableOutput, readableQueryResult, readableToolEvent } from "./output
 import { readableLifecycleRecord } from './lifecycle.js';
 import { isCustomMessage } from '../../core/agent/custom.js';
 import { captureRequestDeclaration } from '../../core/agent/declarations/codec.js';
+import { isBranchStoreNamespace } from '../branch/store/contract.js';
 
 const ROLES: ReadonlySet<unknown> = new Set(["system", "user", "assistant", "tool"]);
 const AGENT_ROLES: ReadonlySet<unknown> = new Set(["planner", "coder", "reviewer"]);
@@ -84,6 +85,10 @@ export function isReadableTranscriptEvent(value: unknown): boolean {
     case "codemode-store": return optionalString(value.sourceEntryId)
       && record(value.entries)
       && Object.values(value.entries).every(v => typeof v === "string" || v === null);
+    case 'branch-store': return typeof value.id === 'string' && value.id.length > 0
+      && typeof value.sourceEntryId === 'string' && value.sourceEntryId.length > 0
+      && isBranchStoreNamespace(value.namespace) && record(value.entries)
+      && Object.entries(value.entries).every(([key, item]) => key.length > 0 && (typeof item === 'string' || item === null));
     default: return false;
   }
 }

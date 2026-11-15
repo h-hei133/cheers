@@ -38,7 +38,7 @@ export function forkTranscriptEvents(events: readonly TranscriptEvent[], sourceI
     .filter(event => event.type !== 'query-event' || !('taskId' in event.event)
       || !unfinished.has((event.event as { readonly taskId: string }).taskId))
     .map(event => {
-    if (event.type === 'codemode-store' && event.sourceEntryId === sourceRoot) return { ...event, sourceEntryId: targetRoot };
+    if ((event.type === 'codemode-store' || event.type === 'branch-store') && event.sourceEntryId === sourceRoot) return { ...event, sourceEntryId: targetRoot };
     if (event.type === 'compaction' && event.sourceActivePath) {
       const next = { ...event, sourceActivePath: event.sourceActivePath.map(id => id === sourceRoot ? targetRoot : id) };
       if (event.id && published.has(event)) proofs.set(event.id,

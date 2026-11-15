@@ -22,8 +22,8 @@
 
 ## Current status
 
-**Current phase**: active；T3.1已提交`d683a3d`，C.1物理目标捕获已提交`e61a340`，自动／overflow摘要目标子批本地验证完成；继续会话注册及分支状态。合计21/62项完成。
-**Last completed batch**: 自动与overflow摘要绑定prepared physical target的完整transport／replay／预算，显式summary角色优先且共享一次成功renewal。原compaction progress与connection lifetime保持；消费者撤权阻止摘要，但不阻断已派发并验证的凭据rotation持久化，也不污染后继消费者。六门、15套件246项、0monoliths及build `9e91decd500a`通过，限定独立复核CLEAR；五项有效反转红且逐字节恢复。Linux同代内部编译invocation覆盖自动／overflow／显式role，两实际loopback每格只route一次；公开SDK配置模型prompt和compact共两次actual bodySent通过。公共virtual注册、manual direct route与分支状态仍未接入，C.1/E.7保持部分；按批本地提交，没有push或远端CI。
+**Current phase**: active；T3.1已提交`d683a3d`，C.1物理目标`e61a340`、摘要目标`9bf68f9`已提交，session branch-store前置子批本地验证完成；继续会话注册和生产路由接入。合计21/62项完成。
+**Last completed batch**: 既有codemode存储提升为session/branch/store，旧wire与worker ABI由薄适配保持；内部namespace使用独立事件。捕获原历史lease，revision/tombstone识别ABA，空结果和读键同样复验，内部键数量／大小有界；准入回调重入退休后不继续写。六门、8套件247项、0monoliths及build `7bcb4574ea2a`通过，五有效反转红且exact恢复，限定独立复核CLEAR。Linux同代三个独立进程验证seed/reopen/fork、实际worker隔离、ABA与空结果拒绝。该前置能力尚未接入生产router；C.1/E.7保持部分，没有新增真实provider调用或push／CI。
 **Goal**: active；41项未完成，其中13部分、12已有待验收、14确认缺口、2待核实。保留完整规划，不关闭总目标。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -47,10 +47,13 @@
 
 摘要目标子批遥测：实际L，复用检查10/10，新增未预见依赖2（显式角色renewal的消费者准入、成功rotation共享结果归属）。复用原压缩进度、预算、凭据renewal及connection owner，不修改auth core。下一批提升既有codemode分支store为session owner，使用隔离namespace和原捕获lease，避免建立平行持久化路径；注册和正式路由须在这些前置合同成立后启用。
 
+分支store子批遥测：实际L，复用检查10/10，新增未预见依赖2（无输出的read-key验证、准入同步重入）。单coder负责既有owner提升，主线程捕反例／串行验证，限定独立审查发现重入后两红修复。正式router应将同一个状态键加入写CAS；分开的assertCurrent与commit不能被宣称为原子读写事务。下一注册批复用catalog contribution与扩展代际，virtual元数据不伪造physical auth。
+
 ## Session log
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-15 | 分支store前置：基线8断言红，重入补2红后修；最终六门8/247、0monoliths、build `7bcb4574ea2a`，五反转exact恢复，限定复审CLEAR。Linux同代三进程重开/分叉/实际worker namespace隔离和冲突拒绝passed。证据`.omx/artifacts/upgrade-branch-store-2026-11-15/delivery.json`；无新增provider调用，21/62保持，继续注册／路由consumer。 |
 | 2026-11-15 | C.1摘要目标子批六门、15/246、0monoliths、build `9e91decd500a`与五断言反转通过；限定复核CLEAR。同代Linux内部自动／overflow／role均route一次，公开SDK配置模型两次bodySent完成prompt／compact。原生前两次夹具先触发threshold而非overflow，失败receipt/source保留；最终只扩大overflow物理窗口并核对首POST拒绝。证据`.omx/artifacts/upgrade-summary-target-2026-11-15/delivery.json`，C.1/E.7开项、21/62保持。 |
 | 2026-11-15 | C.1物理目标子批六门、15/297、0monoliths、build `3ff7e7c3ad7b`和同代Linux内部compiled route／公开SDK配置模型一次请求通过；六反转实际断言红且exact恢复，限定复核CLEAR。最初candidate反转触发普通拒绝而未到断言，收紧成功断言后重跑六项；初日志保留。当前21/62，继续摘要fallback／session注册／分支状态；T3.1已提交`d683a3d`。 |
 | 2026-11-15 | 恢复后T3.1本地完成。compact和取消／idle完整等待，goal scheduler尾部反例修复；六门16/236、0monoliths、build `d9acacbc4260`及同代隔离安装15入口／严格类型／四次配置模型请求passed。四反转red且exact恢复，限定独立复核CLEAR；21完成／41未完成，继续C.1，按批本地提交。 |

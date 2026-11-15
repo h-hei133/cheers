@@ -51,7 +51,7 @@
 ## E / T2 / T3: 编程与扩展（P1／P2）
 
 - [ ] **E.1** 沙箱组合、嵌套权限／hook／过滤结果：已有待验收，真实一轮多工具、不污染中间历史。
-- [x] **E.2** codemode 分支持久化：本地验收完成。删除失败后全局Map退路，真实会话捕获scope/原始前缀/分支，锁内重读与写键CAS/当前预算，同FD校验、fsync和回读后报告persisted；疑似已落盘失败为unknown。损坏持久分支先拒绝再catch-up，多级fork根映射；Linux编译产物独立进程重启读取/分叉通过。E.4确定性重放仍未实现。
+- [x] **E.2** codemode 分支持久化：本地验收完成。删除失败后全局Map退路，真实会话捕获scope/原始前缀/分支，锁内重读与写键CAS/当前预算，同FD校验、fsync和回读后报告persisted；疑似已落盘失败为unknown。损坏持久分支先拒绝再catch-up，多级fork根映射。C.1前置批将存储提升为session owner，codemode保留wire/worker ABI；版本与tombstone补ABA，空结果复验，独立内部namespace不向worker泄漏。六门8/247、build `7bcb4574ea2a`和Linux三独立进程重开/分叉/真实worker隔离通过，五断言反转exact恢复，限定复核CLEAR。E.4确定性重放仍未实现。
 - [ ] **E.3** TS 声明／namespace／image／models API：已有待验收，真实脚本调用与输出预算。
 - [ ] **E.4** 确定性重放：待核实。已有 worker 不等于声明中的可恢复确定性执行；先明确记录和副作用边界再实现。
 - [ ] **E.5** TS 文件／异步工厂及共享宿主：部分验收。异步原子发布、旧代际撤权、SDK/shared host和在途reload确认取消通过独立暂存树8/46及turn4/114、五静态门/build；安装产物最终验收、SDK配置发布后的UI重绑定WATCH仍待核实。
@@ -102,6 +102,8 @@
 - **P3-DESKTOP** 独立 Web／桌面产品矩阵：原文暂缓；不把 Linux 桌面自动化工具称作桌面产品。
 
 ## Validation ledger
+
+2026-11-15 C.1分支store前置：原codemode owner提升至session/branch/store，保留旧discriminator/JSON字符串ABI；内部事件明确namespace和source anchor，旧worker只读codemode。原before-await lease、锁、prefix/inode/fsync/readback复用，per-key revision/tombstone拒绝ABA，read-key和empty复验，内部16,384键／1Mi键字符上限。基线8真实断言红后实现；复核再现准入吞掉同handle重入失败却继续append，2红后加事务重入退休与逐callback后检查。最终六门8/247、0monoliths、build `7bcb4574ea2a`、五断言反转exact恢复，限定复审CLEAR；Linux三fresh process seed/reopen/fork、实际codemode worker隔离、ABA/空lease拒绝passed。初命令workspace Vitest不存在为setup失败，首联合包含不存在writer路径实际仅7套件，最终改真实create消费者八套件。实际L／复用10/10／额外依赖2，证据`.omx/artifacts/upgrade-branch-store-2026-11-15/delivery.json`。router consumer尚未接入，C.1/E.7和21/62保持；不同锁的read-check/commit不是原子publication。
 
 2026-11-15 C.1摘要目标子批：自动／overflow摘要继承prepared physical endpoint、headers、credential/replay、fetch/transport、shape与预算，显式角色仍优先；原compaction progress和connection lifetime不重建。消费者准入达到renewal/dispatch，同时保留已派发rotation的条件持久化；shared pending只缓存host-owned成功，逐消费者拒绝不污染后继。六门、15/246、0monoliths、build `9e91decd500a`与五真实断言反转通过，exact恢复，限定复核CLEAR。Linux同代内部compiled三场景实际两loopback全通过，每格route一次；公开SDK配置模型prompt／compact共两次actual bodySent。两次原生夹具threshold先行导致overflow未覆盖，失败receipt/source保留，最终扩大该场景physical窗口并断言首POST拒绝。实际L、复用10/10、额外依赖2；证据`.omx/artifacts/upgrade-summary-target-2026-11-15/delivery.json`。manual/branch direct、生产注册及持久路由状态另批，C.1/E.7和21/62不变。
 

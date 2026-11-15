@@ -11900,3 +11900,9 @@ Linux同代compiled内部invocation实际两loopback验证正确派发、scope�
 物理目标批已提交`e61a340`。自动／overflow压缩现绑定prepared physical target的transport／replay／shape／预算，显式summary角色优先；保留原进度与connection owner。显式角色renewal接收消费者准入，但已派发且验证的rotation仍按原owner保存，成功共享结果不被退休消费者污染。六门、15/246、0monoliths、build `9e91decd500a`通过，五断言反转红且exact恢复，限定独立复核CLEAR。
 
 Linux同代内部compiled三场景实际两loopback通过，每格route/compact一次；公开SDK配置模型prompt和compact共两次actual bodySent。前两原生夹具错误触发threshold而非overflow，失败回执/source保存；最终调整该场景物理窗口后验证首请求拒绝→摘要→原target重试，未修改产品。证据归档`.omx/artifacts/upgrade-summary-target-2026-11-15/`，临时状态清理。C.1/E.7、生产注册／分支状态／direct路由仍开，21/62保持，继续后续批次，无push／CI声明。
+
+### 2026-11-15：分支状态存储归属与路由前置
+
+摘要目标已提交`9bf68f9`。提升原codemode存储为session/branch/store，薄适配保留wire/worker ABI，内部namespace独立事件；revision/tombstone拒绝ABA，原历史lease与empty/read-key复验、内部预算及unknown/persisted语义保持。八基线断言红后实现，复核同handle准入重入补2红后修。最终六门8/247、0monoliths、build `7bcb4574ea2a`及五反转exact恢复通过，限定复核CLEAR。
+
+Linux同代三独立Node进程验证重开／分叉独立持久化、actual worker namespace隔离和过期结果拒绝。原错误二进制／不存在writer测试路径均记录为setup/范围问题，最终实际create消费者包含在八套件。证据`.omx/artifacts/upgrade-branch-store-2026-11-15/`；无新增provider调用，生产router接入仍待下一批，C.1/E.7未勾选、21/62保持。按批本地提交，不push。
