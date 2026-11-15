@@ -2548,3 +2548,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Retrying a throwing write leaves empty images, deletes history, or shifts the composer and caret.
 - **Root Cause:** A synchronous throw does not disclose which bytes reached the terminal. Rolling back cached bindings/cursor cannot roll back uploads, cursor movement or scrollback.
 - **Rule:** Preserve the original failure and retire the painter across paint/start/external handoff. Best-effort stop restores modes, shows the cursor and advances without using the unknown relative account or deleting native graphics. Test bytes-delivered-then-thrown and bytes-refused with a graphics/cursor interpreter, not only a recording sink.
+
+
+### Graphics Cleanup Must Run On The Screen That Owns It
+- **Symptom:** Exiting fullscreen deletes pictures retained on the original main screen, or a native-tail overlay covers an unerasable historical placement.
+- **Root Cause:** The terminal driver's restore includes leaving the alternate screen; later graphics deletion then targets the restored main-screen registry. A sliced tail also loses an earlier image anchor needed for occlusion.
+- **Rule:** Retire private uploads before driver restore. Borrow the existing alternate screen for native-document floating overlays and crop the bounded original tail before composition; preserve main history and retire background selection/click coordinates on enter and exit. Test actual 1049 restoration and the same image ID on both screens.

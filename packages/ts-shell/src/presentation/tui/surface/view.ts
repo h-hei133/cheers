@@ -6,6 +6,7 @@ import type { ScrollbarGeometry } from "../transcript/viewport.js";
 import { createViewState, type ChoiceRegions, type ComposerGeometry, type InteractiveView, type PointerGeometry, type ViewContext, type ViewState } from "./contract.js";
 import { TranscriptPane } from "./pane.js";
 import { renderChrome } from "./chrome.js";
+import { clipImageRows } from '../image/viewport.js';
 
 /**
  * The surface: one frame from host-owned state.
@@ -27,6 +28,8 @@ export class InteractiveSurface implements InteractiveView {
   private readonly pane: TranscriptPane;
   private suggesting = false;
   private lastComposerGeometry: ComposerGeometry | undefined;
+  private borrowedOverlay = false;
+  private screenRevision = 0;
   pointerGeometry: PointerGeometry | undefined;
 
   constructor(
@@ -62,6 +65,11 @@ export class InteractiveSurface implements InteractiveView {
       return { rows: [], chromeRows: [] };
     }
     const chrome = renderChrome(this.context, this, width, height);
+    const borrowedOverlay = layout === 'document' && this.context.overlayStack?.hasVisible(width, height) === true;
+    if (borrowedOverlay !== this.borrowedOverlay) {
+      this.borrowedOverlay = borrowedOverlay;
+      this.screenRevision++;
+    }
     if (this.context.overlayFullScreen()) {
       this.pane.invalidatePageAvailability();
       this.choiceRegions = { overlay: { top: 0, height } };
@@ -109,12 +117,23 @@ export class InteractiveSurface implements InteractiveView {
     const baseRows = [...transcriptRows, ...chrome.rows];
     let rows: readonly string[] = baseRows;
     if (this.context.overlayStack?.hasVisible(width, height)) {
-      if (layout === "document" && baseRows.length > height) {
-        const split = baseRows.length - height;
-        rows = [...baseRows.slice(0, split), ...this.context.overlayStack.composite(baseRows.slice(split), width, height)];
-      } else {
-        rows = this.context.overlayStack.composite(baseRows, width, height);
+      if (layout === "document") {
+        // A floating overlay cannot erase only the visible part of native
+        // graphics. Borrow the existing private screen and preserve history.
+        const tail = clipImageRows(baseRows, Math.max(0, baseRows.length - height), height, width);
+        this.pane.invalidatePageAvailability();
+        this.pointerGeometry = undefined;
+        this.lastComposerGeometry = undefined;
+        this.choiceRegions = {};
+        return {
+          documentId: this.transcript.all(),
+          fullScreen: true,
+          rows: this.context.overlayStack.composite(tail, width, height),
+          sensitiveRows: this.pane.sensitiveRows,
+          pointerMotion: this.context.overlayPointerMotion?.() === true,
+        };
       }
+      rows = this.context.overlayStack.composite(baseRows, width, height);
     }
     return {
       documentId: this.transcript.all(),
@@ -172,7 +191,7 @@ export class InteractiveSurface implements InteractiveView {
   }
 
   selectionRevision(): number {
-    return this.pane.selectionRevision();
+    return this.pane.selectionRevision() + this.screenRevision;
   }
 
   selectionTop(): number {

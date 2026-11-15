@@ -8,6 +8,8 @@ import { stripAnsi } from "../text/ansi.js";
 import { inlineImageRows } from '../image.js';
 import { pngImage } from '../../../test-utils/image.js';
 import { setCellDimensions } from '../imageDimensions.js';
+import { TUI } from './engine.js';
+import { OverlayStack } from './overlayStack.js';
 
 /**
  * Painting to the terminal's own screen.
@@ -237,6 +239,62 @@ describe("physical terminal coordinates", () => {
     expect(screen.screenLines()).toEqual(main);
     expect(screen.cursorScreenRow).toBe(4);
     expect(screen.cursorScreenColumn).toBe(7);
+  });
+
+  it('keeps native image placements and cursor intact across a document-tail floating screen', () => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const overlays = new OverlayStack();
+    const view = new InteractiveSurface({
+      facts: () => ({ model: 'fixture', provider: 'fixture' }), statusItems: () => [],
+      activity: () => undefined, busy: () => false, queuedCount: () => 0, now: () => 0,
+      ambient: () => ({ openTodos: 0, peerSessions: 0 }), cancelArmed: () => false,
+      overlayFullScreen: () => false, overlayRows: () => [], selection: () => undefined,
+      imageProtocol: () => 'kitty', overlayStack: overlays, composerShape: () => 'borderless',
+    });
+    view.transcript.append({ kind: 'notice', text: 'history line', finalized: true });
+    view.transcript.append({ kind: 'user', text: '', finalized: true, images: [pngImage(320, 640)] });
+    view.transcript.append({ kind: 'notice', text: 'tail marker', finalized: true });
+    const terminal = new RecordingTerminal(); terminal.columns = 20; terminal.rows = 23;
+    const screen = new Screen(terminal.columns, terminal.rows);
+    vi.spyOn(terminal, 'write').mockImplementation((bytes, callback) => {
+      terminal.writes.push(bytes); screen.write(bytes); callback?.();
+    });
+    const scheduler = new ManualScheduler();
+    const tui = new TUI(terminal, scheduler); tui.setFrameProvider(view);
+    tui.start({ useAlternateScreen: false }); tui.renderNow();
+    const native = screen.graphics();
+    expect(native).toHaveLength(1);
+    expect(native[0]!.top).toBeLessThan(0);
+    const scrollback = [...screen.scrollback];
+    const cursor = [screen.cursorScreenRow, screen.cursorScreenColumn];
+    const handle = overlays.push({ render: () => ['private overlay'] }, { row: 0, col: 0, width: 20 });
+    tui.renderNow();
+    expect(screen.screenLines()[0]).toBe('private overlay');
+    expect(screen.graphics()).toEqual([]);
+    expect(screen.scrollback).toEqual(scrollback);
+    handle.hide(); tui.renderNow();
+    expect(screen.graphics()).toEqual(native);
+    expect([screen.cursorScreenRow, screen.cursorScreenColumn]).toEqual(cursor);
+    expect(screen.scrollback).toEqual(scrollback);
+    tui.stop();
+  });
+
+  it('retires private uploads while their screen is active and preserves a colliding native ID', () => {
+    const terminal = new RecordingTerminal(); terminal.columns = 20; terminal.rows = 10;
+    const screen = new Screen(20, 10);
+    screen.write('\x1b_Ga=T,i=29,p=1,r=5,C=1;QUJD\x1b\\');
+    const native = screen.graphics();
+    vi.spyOn(terminal, 'write').mockImplementation((bytes, callback) => {
+      terminal.writes.push(bytes); screen.write(bytes); callback?.();
+    });
+    vi.spyOn(terminal, 'stop').mockImplementation(() => { terminal.write('\x1b[?1049l'); });
+    const tui = new TUI(terminal, new ManualScheduler());
+    tui.setFrameProvider({ renderFrame: () => ({ rows: ['\x1b_Ga=T,i=29,r=1,C=1;REVG\x1b\\'] }) });
+    tui.start(); tui.renderNow();
+    expect(screen.graphics()).toHaveLength(1);
+    expect(screen.graphics()[0]).toMatchObject({ imageId: 29, rows: 1 });
+    tui.stop();
+    expect(screen.graphics()).toEqual(native);
   });
 });
 

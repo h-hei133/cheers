@@ -11824,3 +11824,10 @@ Linux当前compiled CLI regular/fullscreen×Kitty/iTerm2四格完整PNG、native
 regular图片预清完整reserved rows后绘制，独立occurrence ID和p=1避免重复source重传及叠加placement；完整visible隐藏按pair撤图、替换释放无历史upload，partial placement交给native LF，document替换先保存crossing残余。同步输出throw保留原cause并退休painter，后续paint/start/外部移交拒绝，stop仅恢复mode/cursor，不伪造物理回滚。
 
 六静态门、7套件248项、0monoliths和build `d3c1c005a1a5`通过；Linux编译CLI regular Kitty/iTerm完整extent预清、同源双图、typing不重传、保留history退出均exit0。两个反转红且逐字节恢复；限定独立复核CLEAR。 初native startup借屏观察与spy callback夹具错误保留分类；partial native history不裁剪重画。tail浮层和真实fullscreen stop另批，本地18项不变，按批提交。
+
+
+### 2026-11-15：document-tail浮层与active-screen清退独立子批
+
+document浮层复用已有1049借屏，用原文档有界tail裁剪后composite，原native history/placement不改；进出screenRevision使旧选择失效，背景pointer/composer/choice坐标退休，浮层保留自身bounds。fullscreen清ID在真实terminal.stop恢复主屏之前，继续尝试全部cleanup并保留首错。
+
+六静态门、8套件244项、0monoliths、build `f78d9a11fe0d`通过；实际Screen证明partial主图层/cursor/scrollback关闭后精确恢复及同ID跨屏清退隔离，限定独立复核CLEAR。Linux当前编译CLI两协议通过临时input hook触发实际OverlayStack借屏／抑图／还屏且exit0，两反转红且逐字节恢复。 初非公开模块probe、overlay截断和fixture完全可见均保留分类。regular`ea0af2c`后本地18项不变，B.3待最终资格审计，按批提交。

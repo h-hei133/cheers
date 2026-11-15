@@ -367,6 +367,20 @@ describe("taking the screen", () => {
     tui.stop();
   });
 
+  it('frees alternate-screen images before the real driver restores the main screen', () => {
+    const { tui, terminal, provider } = boot();
+    provider.rows = [...inlineImageRows(pngImage(80, 80), 'kitty', 4)!];
+    tui.start(); tui.renderNow(); terminal.drain();
+    vi.spyOn(terminal, 'stop').mockImplementation(() => {
+      terminal.write('\x1b[?1049l');
+    });
+    tui.stop();
+    const released = terminal.drain();
+    expect(released).toContain('a=d,d=I');
+    expect(released.lastIndexOf('\x1b_Ga=d')).toBeLessThan(released.indexOf('\x1b[?1049l'));
+    expect(released.slice(released.indexOf('\x1b[?1049l'))).not.toContain('\x1b_Ga=d');
+  });
+
   it('leaves no conversation under the restored screen', () => {
     // The alternate screen is private: leaving it must restore the terminal as
     // the session found it. This assertion used to require the opposite — the

@@ -294,10 +294,8 @@ export class TUI {
     if (!this.started || this.stopped) return;
     this.stopped = true;
     this.started = false;
-    // The driver restores every mode it may have set, unbuffered, and that
-    // battery includes leaving the screen — which on most terminals also puts the
-    // cursor back where it was when the screen was taken. So the driver goes
-    // first, and only then is the screen left (again, harmlessly).
+    // Graphics cleanup belongs to the active private screen. The driver then
+    // restores modes and the original main-screen cursor, before cursor cleanup.
     const mainScreen = this.mainScreen;
     this.mainScreen = undefined;
     let failure: { readonly cause: unknown } | undefined;
@@ -310,13 +308,13 @@ export class TUI {
         this.overlayScreen = false;
         this.terminal.write(this.forgetTransmittedImages({ free: true }) + EXIT_ALT_SCREEN);
       },
-      () => this.terminal.stop(),
       () => {
         // Main-screen images belong to retained scrollback; alternate images
         // are freed. Both paths forget their ids before a subsequent start.
         const freed = this.forgetTransmittedImages({ free: !mainScreen });
         if (freed) this.terminal.write(freed);
       },
+      () => this.terminal.stop(),
       () => {
         if (mainScreen) { mainScreen.stop(); return; }
         this.terminal.write(leaveScreen([], this.terminal.capabilities.supportsDec2026Sync));

@@ -16,6 +16,7 @@ import { OverlayHost } from "../../../cli/interactive/overlay.js";
 import { parseKeyEvent } from '../input/keys.js';
 import { pngImage } from '../../../test-utils/image.js';
 import { setCellDimensions } from '../imageDimensions.js';
+import { OverlayStack } from '../render/overlayStack.js';
 
 /** Facts a test can change between frames; the surface reads them at paint time. */
 interface Facts {
@@ -69,6 +70,85 @@ function surface(overrides: Partial<ViewContext> = {}): { view: InteractiveSurfa
 }
 
 const SIZE = { columns: 60, rows: 16 };
+
+describe('native document floating overlays', () => {
+  it.each(['kitty', 'iterm2'] as const)('borrows a bounded screen before overlaying a %s extent crossing the document tail', protocol => {
+    setCellDimensions({ widthPx: 9, heightPx: 18 });
+    const overlays = new OverlayStack();
+    const { view } = surface({ imageProtocol: () => protocol, overlayStack: overlays });
+    view.transcript.append({ kind: 'notice', text: 'earlier history', finalized: true });
+    view.transcript.append({ kind: 'user', text: '', finalized: true, images: [pngImage(320, 640)] });
+    view.transcript.append({ kind: 'notice', text: 'tail marker', finalized: true });
+    const size = { columns: 20, rows: 10 };
+    const original = view.renderFrame(size, 'document');
+    const split = original.rows.length - size.rows;
+    const anchor = original.rows.findIndex(row => row.includes(protocol === 'kitty' ? '\x1b_G' : '\x1b]1337;File='));
+    expect(split).toBeGreaterThan(0);
+    expect(protocol === 'kitty' ? anchor < split : anchor >= split).toBe(true);
+    const document = view.transcript.all();
+    const handle = overlays.push({ render: () => ['floating choice'] }, { row: 0, col: 0, width: size.columns });
+    const borrowed = view.renderFrame(size, 'document');
+    expect(borrowed.fullScreen).toBe(true);
+    expect(borrowed.rows).toHaveLength(size.rows);
+    expect(borrowed.rows.join('')).toContain('floating choice');
+    expect(borrowed.rows.join('')).toContain('tail marker');
+    expect(borrowed.rows.join('')).not.toContain('\x1b_G');
+    expect(borrowed.rows.join('')).not.toContain('\x1b]1337;File=');
+    expect(view.pointerGeometry).toBeUndefined();
+    expect(view.composerGeometry()).toBeUndefined();
+    expect(view.transcript.all()).toBe(document);
+    handle.hide();
+    const restored = view.renderFrame(size, 'document');
+    expect(restored.fullScreen).not.toBe(true);
+    expect(restored.rows).toEqual(original.rows);
+  });
+
+  it('keeps borrowed overlay text out of native scrollback through the actual surface and engine', () => {
+    const overlays = new OverlayStack();
+    const { view } = surface({ overlayStack: overlays });
+    for (let index = 0; index < 20; index++) view.transcript.append({ kind: 'notice', text: `history ${index}`, finalized: true });
+    const terminal = new RecordingTerminal(); terminal.columns = 20; terminal.rows = 10;
+    const scheduler = new ManualScheduler();
+    const tui = new TUI(terminal, scheduler); tui.setFrameProvider(view);
+    tui.start({ useAlternateScreen: false }); tui.renderNow(); terminal.drain();
+    const handle = overlays.push({ render: () => ['private overlay'] }, { row: 0, width: 20 });
+    tui.renderNow();
+    const entered = terminal.drain();
+    expect(entered).toContain('\x1b[?1049h');
+    expect(entered).toContain('private overlay');
+    expect(entered).not.toContain('history 0');
+    handle.hide(); tui.renderNow();
+    const restored = terminal.drain();
+    expect(restored).toContain('\x1b[?1049l');
+    expect(restored).not.toContain('private overlay');
+    expect(restored).not.toContain('history 19');
+    tui.stop();
+  });
+
+  it('retires a retained selection when borrowing and restoring a floating screen', () => {
+    const overlays = new OverlayStack();
+    const { view } = surface({ overlayStack: overlays });
+    view.transcript.append({ kind: 'notice', text: 'selectable document', finalized: true });
+    view.renderFrame(SIZE, 'document');
+    const copy = vi.fn();
+    const pointer = new Pointer({ view: () => view, rows: () => view.contentRows(), copy, redraw: () => {} });
+    const event = { row: 0, button: 0, shift: false, alt: false, ctrl: false };
+    pointer.handle({ ...event, column: 1, kind: 'press' });
+    pointer.handle({ ...event, column: 6, kind: 'drag' });
+    expect(pointer.selection).toBeDefined();
+    const originalRevision = view.selectionRevision();
+    const handle = overlays.push({ render: () => ['floating'] }, { row: 0, width: 20 });
+    view.renderFrame(SIZE, 'document');
+    const borrowedRevision = view.selectionRevision();
+    expect(borrowedRevision).toBeGreaterThan(originalRevision);
+    expect(pointer.copySelection()).toBe(false);
+    expect(copy).not.toHaveBeenCalled();
+    view.renderFrame(SIZE, 'document');
+    expect(view.selectionRevision()).toBe(borrowedRevision);
+    handle.hide(); view.renderFrame(SIZE, 'document');
+    expect(view.selectionRevision()).toBeGreaterThan(borrowedRevision);
+  });
+});
 
 describe('painted pointer geometry', () => {
   it('retires text selection coordinates when image cell geometry changes with unchanged width and transcript', () => {
