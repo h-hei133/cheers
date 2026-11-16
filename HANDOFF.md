@@ -2712,3 +2712,23 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A second overflow caller reports no compaction while waiting for an identical pending summary and during its own final publication hook.
 - **Root Cause:** Joining a generation skips that caller's lifecycle-before hook, where its activity was registered.
 - **Rule:** Admit the original captured legal cut before shared-generation lookup, register each caller there, and pass the same plan into generation. Retain each caller's activity through its own commit and final hooks, releasing in finally; generation reuse must not create activity for a refused cut.
+
+### Stdout Capture Must Follow The Actual Input And Output Devices
+- **Symptom:** Redirecting only stderr moves TUI frames away from an otherwise interactive stdout; a mocked-console test misses the device regression.
+- **Root Cause:** Capture eligibility treats stderr TTY state as an input/output-mode switch, and the fixture bypasses the terminal writer.
+- **Rule:** Capture product stdout before bootstrap for print, JSON, RPC or non-TTY stdin/stdout. Preserve TUI stdout when only stderr is redirected. Test the real TerminalOutput-to-process.stdout-to-device path with both stderr states.
+
+### Synchronous Exit Must Settle Its Captured Output Owner
+- **Symptom:** Startup failure loses queued diagnostics, or shutdown reaches its deadline while output remains captured and callbacks stay pending.
+- **Root Cause:** Synchronous process.exit outruns asynchronous writer settlement; a timed-out flush is left running with authority to restore a later owner.
+- **Rule:** Defer the original exit through cleanup, bounded flush and restoration. At the existing shutdown deadline, synchronously cancel and retire the same captured owner, wake its callbacks and preserve the first failure. A true write return still requires its callback; cancellation cannot claim successful delivery.
+
+### HTTP Retry Facts Must Survive Error Body Failure And Outer Handoff
+- **Symptom:** A failed error-body read loses its HTTP classification, or an outer loop refuses a status such as 529 that the inner retry policy admitted.
+- **Root Cause:** Retryability is inferred later from message wording or captured only when an explicit retry header exists.
+- **Rule:** Capture status, the canonical header-or-status retry decision and server delay before reading the body, then pass that structured decision to the outer owner. Preserve explicit false, exhausted-inner fences and the non-replay boundary for every accepted response, including silent error completion.
+
+### Launcher Exit Witnesses Must Identify The Actual Captured Child
+- **Symptom:** A native probe reports an unrestored output owner although the CLI child restored it, or overwrites one process's exit witness with another's.
+- **Root Cause:** The public launcher spawns the actual CLI; preload and exit observers run in both processes, so a single receipt conflates their owners.
+- **Rule:** Append witnesses with PID and parent PID, bind the captured output owner to the actual launched CLI process, and join its close before evaluating cleanup. Preserve failed observer receipts; launcher completion alone does not prove child settlement.

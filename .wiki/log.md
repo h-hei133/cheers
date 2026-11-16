@@ -11955,3 +11955,10 @@ compact已提交bf01f8f。abort_retry复用原wait owner，只取消已登记ret
 D.1完整命令矩阵补严格JSONL／optional字段、异步读取最终准入、完整compaction活动。独立架构WATCH的共享raw overflow第二caller遗漏先真实AssertionError后修，同一合法cut获准后、generation查询前逐caller登记，保留至自身commit／PostCompact／finally。最终六门34/912、相关15/268、七反转exact恢复、恢复3/110、2648模块0monoliths及build `43da5c29fee3`通过；Linux同代七组55 loopback POST、配置模型四actual请求／durable commit／压缩后复用passed。
 
 新独立代码APPROVE限定12生产文件、架构CLEAR绑定35源文件，当前hash核验，旧无结果review lane为unavailable。旧构建／911测试／六反转和setup／observer失败保留，原配置hash不变、隔离最小catalog／body不可检查／未制造真实限流边界保持。归档upgrade-rpc-acceptance-2026-11-16，D.1本地完成23/62、39项未完成，按批本地提交不push。C.9真实启动exit／shutdown超时反例与C.2capture反例隔离继续修复，目标active，无远端CI或整体完成声明。
+
+
+### 2026-11-16：stdout owner与累计流式消息验收
+
+C.9捕获普通print／JSON／RPC／非TTY输入或输出，保留仅stderr重定向的TUI stdout；有界writer等待callback，启动同步exit结算原输出，shutdown超时同步取消并恢复同owner。C.2复用request公共累计capture／reasoning replacement／closing reset，读取错误body前保留HTTP retry事实，独立复审的529两实际反例修复；所有accepted错误响应不重放或执行工具。当前18源码hash与限定APPROVE／CLEAR一致，六静态门28/482、六有效反转exact恢复、2655生产模块0monoliths及build `ceabe4b89b3d`通过。Linux21场景／53本地POST、两模式stderr-only PTY／exit143及配置模型3actual bodySent passed；原配置hash不变、body不可检查、未制造真实服务故障，首launcher PID观察错误和旧build失败保留。
+
+归档upgrade-output-stream-2026-11-16，25/62仅指Linux功能验收，另有正常NormProof exit2／not_proven：blocking unresolved为missing，基线16484／当前16511边均超过16384。临时32768只读诊断unresolved=0不是默认门禁通过，原18tracked NormProof文件未改。按批本地提交不push或宣称CI；C.7代码审查四旧cost夹具REQUEST_CHANGES待主线程分类，整体goal active。

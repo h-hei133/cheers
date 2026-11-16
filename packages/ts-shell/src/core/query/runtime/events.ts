@@ -11,6 +11,12 @@ import type {
 } from './harness.js'
 import type { QueryRuntimeProofProjection } from './proof.js'
 
+/** Public cumulative display capture; signed or opaque replay data never travels here. */
+export interface QueryStreamingMessage {
+  readonly content: string;
+  readonly reasoning?: { readonly text: string };
+}
+
 export type QueryEvent =
   | import('./lifecycle.js').LifecycleRecord
   | { readonly type: 'execution.command'; readonly proof: import('../../../runtime/execution/proof.js').NativeCommandProof; readonly sourcePromptEntryId: string }
@@ -106,7 +112,7 @@ export type QueryEvent =
      */
     readonly images?: readonly import('../../../model-adapters/multimodal.js').ImageContent[];
   }
-  | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string }
+  | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string; readonly message?: QueryStreamingMessage }
   /** Transient display boundary before callbacks from one model request. */
   | { readonly type: 'message.started'; readonly role: AgentRole }
   /**
@@ -125,15 +131,15 @@ export type QueryEvent =
    * it is not the answer: a reasoning model's working can run longer than its
    * conclusion, and merging the two buries the part that was asked for.
    */
-  | { readonly type: 'reasoning.delta'; readonly role: AgentRole; readonly delta: string }
+  | { readonly type: 'reasoning.delta'; readonly role: AgentRole; readonly delta: string; readonly message?: QueryStreamingMessage }
   /** Replace this model message's reasoning with its validated public text. */
-  | { readonly type: 'reasoning.replace'; readonly role: AgentRole; readonly text: string }
+  | { readonly type: 'reasoning.replace'; readonly role: AgentRole; readonly text: string; readonly message?: QueryStreamingMessage }
   /**
    * Replace what has been streamed so far for this message. Sent only when the
    * assembled text differs from the concatenated deltas — which happens when tool
    * calls were embedded in the prose and had to be lifted out of it.
    */
-  | { readonly type: 'message.replace'; readonly role: AgentRole; readonly text: string }
+  | { readonly type: 'message.replace'; readonly role: AgentRole; readonly text: string; readonly message?: QueryStreamingMessage }
   | { readonly type: 'turn.completed'; readonly output: AgentExecutionOutput }
   | { readonly type: 'lifecycle.cancelled'; readonly reason: string }
   | { readonly type: 'lifecycle.error'; readonly error: string }

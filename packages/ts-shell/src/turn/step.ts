@@ -259,7 +259,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         let requestedDelayMs: number | undefined;
         let transient = false;
         let retryableAtTurn = true;
-        let forceRetryAtTurn = false;
+        let responseStatus: number | undefined;
         let releaseNow = true;
         try {
           if (!prepared.isCurrent()) return stamp(errorStep('Request preparation changed before dispatch. No request was sent.', true));
@@ -336,6 +336,17 @@ export function createStepFunction(request: StepRequest): StepFunction {
             break;
           }
           modelAttempt.settle();
+          responseStatus = attemptResponse.status;
+          // The observed HTTP decision survives a failed error-body read.
+          const shouldRetryHeader = attemptResponse.headers.get("x-should-retry");
+          transient = shouldRetryResponse(shouldRetryHeader, responseStatus);
+          retryableAtTurn = transient;
+          if (transient) {
+            requestedDelayMs = serverRequestedDelayMs(
+              attemptResponse.headers.get("retry-after-ms"),
+              attemptResponse.headers.get("retry-after"),
+            );
+          }
           const detail = await attemptResponse.text();
           // The conversation outgrew the window. That is answered by condensing,
           // not by asking again, so it keeps its own prefix and stops here.
@@ -354,29 +365,23 @@ export function createStepFunction(request: StepRequest): StepFunction {
             message: detail,
           });
           refusal = `Provider HTTP ${attemptResponse.status}: ${refusalClass}. Response details withheld.`;
-          const shouldRetryHeader = attemptResponse.headers.get("x-should-retry");
-          const normalizedRetryHeader = shouldRetryHeader?.trim().toLowerCase();
-          transient = shouldRetryResponse(shouldRetryHeader, attemptResponse.status);
-          if (normalizedRetryHeader === "false") retryableAtTurn = false;
-          else if (normalizedRetryHeader === "true") forceRetryAtTurn = true;
-          if (transient) {
-            requestedDelayMs = serverRequestedDelayMs(
-              attemptResponse.headers.get("retry-after-ms"),
-              attemptResponse.headers.get("retry-after"),
-            );
-          }
         } catch (error) {
           if (error instanceof TurnPreparationError) return stamp(errorStep(error.message, error.inputLimit));
           if (error instanceof InputLimitError) return stamp(errorStep(error.message, true));
           if (error instanceof ModelAdmissionError) return stamp({ ...errorStep(error.message, true), admissionFailure: error.code });
           if (signal?.aborted) return stamp(abortedStep(""));
-          // No response was observed. This does not establish whether the
-          // provider received or charged the dispatched request.
-          const failure = providerRequestError(error);
-          refusal = failure.message;
-          refusalClass = failure.failureClass;
-          retryableAtTurn = failure.retryable;
-          transient = failure.retryable;
+          if (responseStatus !== undefined) {
+            refusalClass = classifyProviderFailure({ status: responseStatus });
+            refusal = `Provider HTTP ${responseStatus}: ${refusalClass}. Response details withheld.`;
+          } else {
+            // No response was observed. This does not establish whether the
+            // provider received or charged the dispatched request.
+            const failure = providerRequestError(error);
+            refusal = failure.message;
+            refusalClass = failure.failureClass;
+            retryableAtTurn = failure.retryable;
+            transient = failure.retryable;
+          }
         } finally {
           // An attempt whose body is not being read releases its connection now.
           if (releaseNow) releaseStream.abort();
@@ -394,7 +399,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             ...(refusalClass
               ? failedStep(refusal, "", refusalClass, tried)
               : errorStep(refusal, tried)),
-            ...(forceRetryAtTurn ? { retryable: true } : {}),
+            ...(retryableAtTurn ? { retryable: true } : {}),
             ...(requestedDelayMs !== undefined ? { requestedDelayMs } : {}),
           });
         }
@@ -470,7 +475,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         const completed = ownsReplay && activeOrigin
           ? { ...decoded, origin: { ...activeOrigin, replayBinding: prepared.replayBinding } } : decoded;
         return stamp({ ...completed, ...(promptMeasurement ? { promptMeasurement } : {}),
-          ...(shownAnything && completed.stopReason === 'error' ? { retriesExhausted: true } : {}) });
+          ...((acceptedResponse || shownAnything) && completed.stopReason === 'error' ? { retriesExhausted: true } : {}) });
       } catch (error) {
         if (!prepared.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         if (error instanceof ModelAdmissionError) return stamp({ ...failedStep(error.message, shown, undefined, true), admissionFailure: error.code });

@@ -450,3 +450,14 @@ Linux同代compiled CLI六loopback POST覆盖：普通已接受响应不被abort
 Linux当前compiled CLI七组55 loopback POST通过logical／physical选择、当前读取、fork draft、tree／clone／switch、shell gate／上下文排除／全文归档／持久化、effort／settings／发现、两层retry取消、queue／clear／后继、自动／手动compaction／commit、四UI对话／换代及EOF。配置模型同代四实际请求通过普通对话、清队列与专属取消、历史操作、手动summary durable commit及压缩后继续；原配置hash不变，隔离最小catalog／body不可检查／未制造真实限流的边界保留。
 
 当前独立代码APPROVE由新12生产文件审查给出，架构CLEAR绑定35源文件，均未运行验证；原无报告代码lane是unavailable，不作批准。主线程已核对逐项合同和当前hash，D.1本地完成，23/62、goal active。证据`.omx/artifacts/upgrade-rpc-acceptance-2026-11-16/delivery.json`。实际L、复用10/10、额外依赖4，无新生产依赖或执行／存储平面；C.9／C.2隔离后续尚未完成，无push、CI或其他平台声明。
+
+
+## Stdout ownership and cumulative stream facts (2026-11-16)
+
+普通print原先未捕获外部stdout；原capture重试不等true-write callback且没有完整有界drain。只读参考比较采用原capture／公共累计partial／headers-first retry决定，本项目保留更严格的accepted-response不重放。沿用本地stdout writer／bootstrap输出／shutdown与request owner，RPC只投影公共字段，不另建adapter accumulator或运行状态。print／JSON／RPC／非TTY stdin或stdout在bootstrap前取得输出owner；仅stderr重定向时保留TUI stdout。writer限64MiB／1024 frames／8瞬时retry／30s写与drain期限，同步exit等待cleanup／flush／restore，总shutdown期限到达同步取消同owner并保留首错。
+
+公共累计text／reasoning来自createTurnRequest，validated replacement及显式空清空保留；closing复用并重置同一listener，opaque／signed replay不投影。读取HTTP错误body前捕获status／shouldRetryResponse完整决定及server delay；529经独立复审新增四例实际2红／2控制后贯通外层。显式false、普通400及内层耗尽fence不放宽。HTTP200已接受响应的错误完成或body故障，即使没有可见输出亦禁止重放及工具执行。
+
+最终18源码hash核验与两项限定独立APPROVE／CLEAR一致。当前联合28套件482项、六静态门、2655生产模块0monoliths和build `ceabe4b89b3d`通过；六有效反转实际AssertionError、隔离树逐字节恢复，主仓库未被反转。Linux当前CLI21场景／53 loopback POST、两模式stderr-only PTY／exit143与配置模型3actual bodySent passed；后者body不可检查、未制造真实服务故障、原四配置hash不变，最小有效model entry仅用于隔离home。初launch observer把公共launcher与其CLI child混在同一回执，改为PID／parentPID追加并绑定实际captured owner；两失败observer／旧build取消失败保留。
+
+正常pinned NormProof judge exit2／not_proven，blocking unresolved obligation为missing。完整manifest图超过16384边，collector已排除dist、node_modules及symlink。相同parser／collector／manifest诊断：HEAD基线3356模块／16484边、当前3361／16511边，均在原上限失败；本批新增27边。临时32768诊断副本完整图unresolved=0，但未验证该上限通用安全包络，不能当默认judge通过。副本已删除，原18tracked NormProof文件hash不变；未改变scope、gate、bundle或package scripts，生产0monoliths与无关测试21-name advisory分别陈述。功能任务C.9／C.2本地勾选，仓库门禁仍未完成；证据`.omx/artifacts/upgrade-output-stream-2026-11-16/delivery.json`，整体goal active。

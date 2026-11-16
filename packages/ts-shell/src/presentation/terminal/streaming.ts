@@ -16,6 +16,8 @@ export interface RendererSink {
   line(text: string, report?: CommandReport): void;
   /** A partial chunk of a streaming line, with no newline implied. */
   chunk(text: string): void;
+  /** Wait for delivery when this sink owns an asynchronous output queue. */
+  flush?(): Promise<void>;
 }
 
 export interface RendererSinkOptions {
@@ -83,7 +85,7 @@ export class StreamingRenderer {
 
   /** Wait until writes already queued on the device have completed. */
   flush(): Promise<void> {
-    if (this.sink) return Promise.resolve();
+    if (this.sink) return this.sink.flush?.() ?? Promise.resolve();
     return new Promise((resolve, reject) => {
       try {
         process.stdout.write("", (error) => {

@@ -1,6 +1,14 @@
-import type { QueryEvent } from "../../core/query/runtime/events.js";
+import type { QueryEvent, QueryStreamingMessage } from "../../core/query/runtime/events.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import { writeRawStdout } from "../../core/shell/outputGuard.js";
+
+/** Project public snapshot fields only; custom delta-only producers retain their wire shape. */
+function streamMessage(event: { readonly role: string; readonly message?: QueryStreamingMessage }, fallback: Partial<QueryStreamingMessage>): Record<string, unknown> {
+  const message = event.message ?? fallback;
+  return { role: event.role,
+    ...(message.content !== undefined ? { content: message.content } : {}),
+    ...(message.reasoning !== undefined ? { reasoning: { text: message.reasoning.text } } : {}) };
+}
 
 /** Translate an internal `QueryEvent` into an RPC JSONL event frame when relevant. */
 export function toRpcEvent(event: QueryEvent): Record<string, unknown> | undefined {
@@ -12,11 +20,13 @@ export function toRpcEvent(event: QueryEvent): Record<string, unknown> | undefin
     case "message.started":
       return { type: "message_start", message: { role: event.role, content: "" } };
     case "message.delta":
-      return { type: "message_update", delta: event.delta, message: { role: event.role, content: event.delta } };
+      return { type: "message_update", delta: event.delta, message: streamMessage(event, { content: event.delta }) };
     case "reasoning.delta":
-      return { type: "message_update", delta: event.delta, channel: "reasoning", message: { role: event.role, reasoning: { text: event.delta } } };
+      return { type: "message_update", delta: event.delta, channel: "reasoning", message: streamMessage(event, { reasoning: { text: event.delta } }) };
+    case "reasoning.replace":
+      return { type: "message_update", text: event.text, channel: "reasoning", message: streamMessage(event, { reasoning: { text: event.text } }) };
     case "message.replace":
-      return { type: "message_update", text: event.text, message: { role: event.role, content: event.text } };
+      return { type: "message_update", text: event.text, message: streamMessage(event, { content: event.text }) };
     case "message.finished":
       return { type: "message_end", message: { role: event.role } };
     case "tool.started":

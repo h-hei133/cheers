@@ -14,7 +14,7 @@ import { runCollaborationServiceMode } from '../collaboration/service.js';
 import type { Interface as ReadlineInterface } from "node:readline";
 
 import { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
-import { flushRawStdout, restoreStdout } from "../../core/shell/outputGuard.js";
+import { createCliOutput } from './output.js';
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import {
   createComponentLogger,
@@ -141,268 +141,279 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
   const options: StartupModelOptions = recovery ? { ...parsedCliArgs.args.options, sessionId: recovery.sessionId,
     projectPath: recovery.workspaceRoot, promptArg: undefined, replayFile: undefined, migrateSessionRoot: false }
     : { ...parsedCliArgs.args.options };
-  const rootContext = createCliRootContext({
-    configInputs,
-    launchCwd: input.launchCwd,
-    options,
+  const output = createCliOutput({
+    enabled: !parsedCliArgs.args.doctorRequested && Boolean(options.printMode || options.jsonEvents || options.rpcMode
+      || !input.stdin.isTTY || !input.process.stdout.isTTY),
+    stdout: input.process.stdout,
+    stderr: input.process.stderr,
     writeError: input.writeError,
     exit: input.exit,
   });
-  if (child && rootContext.workspaceRoot !== child.plan.workspace.path) throw new Error('Profile handoff workspace changed before bootstrap.');
-
-  if (parsedCliArgs.args.doctorRequested) {
-    printCliDoctor(rootContext.workspaceRoot, input.launchCwd);
-    return;
-  }
-
-  time("arguments parsed");
-  const bootstrapRuntime = createCliBootstrapRuntimeContext({
-    launchCwd: input.launchCwd,
-    options,
-    rootContext,
-    writeError: input.writeError,
-    exit: input.exit,
-    freshSessionId: child?.targetSessionId,
-  });
-  time("runtime bootstrapped");
-  const {
-    sessionManager,
-    renderer,
-    recoveryCandidate,
-    runtimeContext,
-  } = bootstrapRuntime;
-  if (child) admitSwitchChild(child, runtimeContext.session.id, sessionManager.captureReportWriter(runtimeContext.session.id));
-  installMediaSurface(runtimeContext, input.process.stdout, input.process.stderr);
-  const providerRuntimeBridge = createCliProviderRuntimeBridge({
-    runtimeConfig: () => runtimeContext.runtimeConfig,
-    options,
-    sessionId: () => runtimeContext.session.id,
-  });
-  // The configured theme has to be applied to the shared palette before any
-  // surface renders, or the first frame is drawn in the default and never
-  // redrawn.
-  // The workspace root is passed so a theme the project ships is found, not only
-  // the user's and the built-in ones.
-  applyStartupTheme({
-    options,
-    workspaceRoot: runtimeContext.projectRoot ?? runtimeContext.cwd,
-    configured: runtimeContext.runtimeConfig.theme,
-    renderer,
-  });
-  runtimeContext.configuration.recordDisplay({ theme: selectedTheme() });
-  // Chosen once here for the same reason the theme is: it decides how every
-  // frame is built, so reading it later would let the display change between two
-  // frames of the same answer.
-  setDiagramMode(readDiagramMode(runtimeContext.projectRoot ?? runtimeContext.cwd, runtimeContext.runtimeConfig));
-  const resolvedCredential =
-    providerRuntimeBridge.resolveCredentialSnapshot();
-  const mcpGateway = bootstrapRuntime.mcpGateway;
-  let cancelRun: (() => Promise<void>) | undefined;
-  let isBusy: (() => boolean) | undefined;
+  let shutdown: ReturnType<typeof createCliShutdown> | undefined;
   let requested: RestartRequest | SwitchTicket | undefined;
-  const stopSurface = new AbortController();
-  const startup = createCliStartupNotices({ context: runtimeContext, sessionManager, renderer, logger,
-    lifecycleNotices: bootstrapRuntime.bootstrap.lifecycleNotices });
-  const shutdown = createCliShutdown({
-    onSignal: signalSessionClose(runtimeContext, sessionManager, () => isBusy?.() ?? false),
-    close: async () => {
-      const results = await Promise.allSettled([
-        Promise.resolve().then(startup.cancel),
-        Promise.resolve().then(() => cancelRun?.()),
-        closeMediaFor(runtimeContext), closeDirectorFor(runtimeContext), closeJobsFor(runtimeContext, Boolean(requested && 'kind' in requested)), closeSshFor(runtimeContext),
-        closeCollaborationFor(runtimeContext), closeExtensionsFor(runtimeContext), closeTraceDashboard(), mcpGateway.close(),
-        Promise.resolve().then(async () => { if (await runtimeContext.freshState?.clearCache?.() === 'unknown') throw new Error('Provider cache cleanup is unverified.'); }),
-      ]);
-      if (options.jsonEvents || options.rpcMode) {
-        await flushRawStdout();
-        restoreStdout();
-      }
-      const failure = results.find(result => result.status === 'rejected');
-      if (failure?.status === 'rejected') throw failure.reason;
-    }, process: input.process, exit: input.exit, writeError: input.writeError,
-    streams: [input.stdin, input.process.stdout, input.process.stderr],
-    handleInterrupt: options.printMode === true || options.jsonEvents === true || options.rpcMode === true || !input.stdin.isTTY,
-  });
-  // These bridges are installed after bootstrap has the real resource owners.
-  // Only bootstrap can retire this host and read back a new runtime generation.
-  runtimeContext.startupArgs = [...input.args];
-  const restart: RestartPort = {
-    request: async (request): Promise<RestartOutcome> => {
-      if (requested) return { status: 'unavailable', reason: 'A restart is already pending.' };
-      if (isBusy?.()) return { status: 'unavailable', reason: 'Wait for the current provider turn before restarting.' };
-      if (request.sessionId !== runtimeContext.session.id || !sessionManager.sessionExists(runtimeContext.session.id)
-        || request.argv.length !== input.args.length || request.argv.some((arg, index) => arg !== input.args[index])) {
-        return { status: 'unavailable', reason: 'Restart identity or startup arguments changed; recovery was not admitted.' };
-      }
-      const admitted = { ...request, workspaceRoot: runtimeContext.projectRoot, workingDirectory: runtimeContext.cwd };
-      requested = admitted;
-      // Let command publication finish before retiring the interactive surface.
-      setImmediate(() => stopSurface.abort());
-      return { status: 'requested', request: admitted };
-    },
-  };
-  runtimeContext.restart = restart;
-  const activeProfile = currentProfile();
-  if (activeProfile) runtimeContext.profileSwitch = profileSwitchPort({ source: activeProfile,
-    depth: switchDepth,
-    interactive: Boolean(input.stdin.isTTY && input.process.stdout.isTTY && input.process.stderr.isTTY) && !options.printMode && !options.jsonEvents,
-    current: () => ({ sessionId: runtimeContext.session.id,
-      generation: JSON.stringify([runtimeContext.session.createdAt, runtimeContext.workspaceRevision, runtimeContext.configuration.current.revision,
-        runtimeContext.configuration.current.binding.trustRevision]),
-      workspace: runtimeContext.projectRoot, cwd: runtimeContext.cwd, offline: options.offline === true || runtimeContext.runtimeConfig.offline === true }),
-    busy: () => isBusy?.() ?? false, pending: () => requested !== undefined,
-    admission: () => runtimeContext.workspaceAdmission?.() ?? configurationAdmission(runtimeContext)(),
-    executableAvailable: () => { freshExecutable(input.process.execPath, input.process.argv[1]); },
-    retire: ticket => { requested = ticket; setImmediate(() => stopSurface.abort()); },
-  });
-
-  try {
-    const stdinPromptCapture = recovery && (options.printMode || !input.stdin.isTTY) ? {
-      stdinTransportMode: 'capture-batch' as const, pipedInput: null, nonInteractivePrompts: [], cliModePlan: { kind: 'stdin-batch' as const },
-    } : await captureCliStdinPrompts({
-      options,
-      stdin: input.stdin,
-    });
-    time("stdin captured");
-    const startupSurface = await projectAndRenderCliStartupSurface({
-      options,
-      stdin: input.stdin,
-      stdout: input.process.stdout,
-      cliModePlan: stdinPromptCapture.cliModePlan,
-      stdinTransportMode: stdinPromptCapture.stdinTransportMode,
-      nonInteractivePromptCount:
-        stdinPromptCapture.nonInteractivePrompts.length,
+  return output.run(async () => {
+    const rootContext = createCliRootContext({
+      configInputs,
       launchCwd: input.launchCwd,
-      bootstrapRuntime,
-      providerCredentialResolution: resolvedCredential,
-      providerModeEnv: providerRuntimeBridge.providerModeEnv(),
-    });
-    time("startup surface prepared");
-    const recoveryHintEligible = !options.sessionId && !options.printMode
-      && !options.replayFile
-      && stdinPromptCapture.nonInteractivePrompts.length === 0;
-    startup.configure(startupSurface.fullScreenHost, recoveryHintEligible);
-    logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
-    // Started and not waited on, so the first frame is never behind a network
-    // call. Only for an interactive session: a scripted run has nobody to read a
-    // notice, and asking on its behalf would be traffic with no reader.
-    if (!options.printMode) {
-      void checkForUpdate({
-        env: process.env,
-        configuredOffline: runtimeContext.runtimeConfig.offline === true,
-      }).then((result) => {
-        const notice = formatUpdateNotice(result);
-        if (notice) renderer.renderLine(`\n${notice}\n`);
-      });
-    }
-
-    let readline: ReadlineInterface | null = null;
-    let interactiveApprovalPrompt:
-      | ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>)
-      | undefined;
-
-    const sessionRuntime = createCliSessionRuntime({
-      mcpGateway,
-      sessionManager,
-      renderer,
-      runtimeContext,
       options,
-      approvalTrustPolicy,
-      providerRuntimeBridge,
-      getReadline: () => readline,
-      isStdinTty: () => Boolean(input.stdin.isTTY),
-      // Reported as present only once the interactive surface has actually
-      // installed a handler. Handing over a fallback closure here would make the
-      // approval bridge treat every run as interactive and skip the
-      // non-interactive policy path entirely. The getter is read at prompt time
-      // because the interactive surface installs its handler after this runtime
-      // is built.
-      getPromptInteractiveApproval: () => interactiveApprovalPrompt,
-    });
-    await waitForExtensionsFor(runtimeContext);
-    await applyStartupModel(runtimeContext, options);
-    bootstrapRuntime.settleModel();
-    const modelConfiguration = refreshShellRuntimeConfig(runtimeContext);
-    if (modelConfiguration.status !== 'applied' && runtimeContext.configuration.current.admissionBlocked) {
-      throw new ConfigurationRefusalError(runtimeContext.configuration.current.diagnostics);
-    }
-    time("runtime ready");
-    cancelRun = () => cancelGoalRunForShutdown(sessionRuntime);
-    isBusy = () => sessionRuntime.getCurrentRunController() !== null;
-    if (bootstrapRuntime.writeJsonEvent) {
-      sessionRuntime.observeEvents(bootstrapRuntime.writeJsonEvent);
-    } else if (options.rpcMode) {
-      const { attachRpcEventBridge } = await import("../rpc/events.js");
-      attachRpcEventBridge(sessionRuntime);
-    }
-    if (recovery) {
-      const saved = sessionManager.getSession(runtimeContext.session.id);
-      if (!saved || saved.id !== recovery.sessionId || saved.projectRoot !== runtimeContext.projectRoot) throw new Error('Restart recovery could not verify the selected saved session.');
-      input.writeOutput(`Restart recovery: runtime rebuilt and saved session ${saved.id} read back. Startup prompt and captured input were not replayed.`);
-      if (options.printMode || !input.stdin.isTTY) return;
-    }
-
-    const handledPrintMode = await runCliPrintModeRouter({
-      cliModePlan: stdinPromptCapture.cliModePlan,
-      options,
-      nonInteractivePrompts: stdinPromptCapture.nonInteractivePrompts,
-      pipedInput: stdinPromptCapture.pipedInput,
-      bootstrapRuntime,
-      sessionRuntime,
-      logger,
       writeError: input.writeError,
-      exit: input.exit,
-      approvalTrustPolicy,
-      stopRequested: () => requested !== undefined,
-      onFirstFrame: startup.onFirstFrame,
-      onUserIntent: startup.onUserIntent,
+      exit: output.exit,
     });
-    if (handledPrintMode) {
-      return requested;
+    if (child && rootContext.workspaceRoot !== child.plan.workspace.path) throw new Error('Profile handoff workspace changed before bootstrap.');
+
+    if (parsedCliArgs.args.doctorRequested) {
+      printCliDoctor(rootContext.workspaceRoot, input.launchCwd);
+      return;
     }
 
-    await runInteractiveLoop({
-      stdin: input.stdin,
-      stdout: input.process.stdout,
-      process: input.process,
+    time("arguments parsed");
+    const bootstrapRuntime = createCliBootstrapRuntimeContext({
+      ...(output.guard ? { output: output.guard } : {}),
+      launchCwd: input.launchCwd,
+      options,
+      rootContext,
+      writeError: input.writeError,
+      exit: output.exit,
+      freshSessionId: child?.targetSessionId,
+    });
+    time("runtime bootstrapped");
+    const {
       sessionManager,
       renderer,
+      recoveryCandidate,
       runtimeContext,
-      sessionRuntime,
-      logger,
-      approvalTrustPolicy,
-      fallbackSessionId: recoveryCandidate?.id,
-      onFirstFrame: startup.onFirstFrame,
-      onUserIntent: startup.onUserIntent,
-      setStartupNotice: startup.setTranscriptWriter,
-      initialMcpGateway: mcpGateway,
-      setReadline: (nextReadline) => {
-        readline = nextReadline;
-      },
-      setInteractiveApprovalPrompt: (handler) => {
-        interactiveApprovalPrompt = handler;
-      },
-      ...(options.themePaths ? { themePaths: options.themePaths } : {}),
-      ...(options.resumeSession ? { resumeOnStart: true } : {}),
-      exit: shutdown.exit,
-      stopSignal: stopSurface.signal,
+    } = bootstrapRuntime;
+    if (child) admitSwitchChild(child, runtimeContext.session.id, sessionManager.captureReportWriter(runtimeContext.session.id));
+    installMediaSurface(runtimeContext, input.process.stdout, input.process.stderr);
+    const providerRuntimeBridge = createCliProviderRuntimeBridge({
+      runtimeConfig: () => runtimeContext.runtimeConfig,
+      options,
+      sessionId: () => runtimeContext.session.id,
     });
-    return requested;
-  } catch (error) {
-    // A configuration the runtime refuses to run on is an answer about the
-    // user's files, not a crash in this program. Reporting it as a fatal error
-    // printed the stack that led here and hid the cause, which the publication
-    // already knew. The causes are printed instead, with the same exit code the
-    // other argument-level refusals use.
-    if (error instanceof ConfigurationRefusalError) {
-      input.writeError(error.message);
-      input.exit(1);
+    // The configured theme has to be applied to the shared palette before any
+    // surface renders, or the first frame is drawn in the default and never
+    // redrawn.
+    // The workspace root is passed so a theme the project ships is found, not only
+    // the user's and the built-in ones.
+    applyStartupTheme({
+      options,
+      workspaceRoot: runtimeContext.projectRoot ?? runtimeContext.cwd,
+      configured: runtimeContext.runtimeConfig.theme,
+      renderer,
+    });
+    runtimeContext.configuration.recordDisplay({ theme: selectedTheme() });
+    // Chosen once here for the same reason the theme is: it decides how every
+    // frame is built, so reading it later would let the display change between two
+    // frames of the same answer.
+    setDiagramMode(readDiagramMode(runtimeContext.projectRoot ?? runtimeContext.cwd, runtimeContext.runtimeConfig));
+    const resolvedCredential =
+      providerRuntimeBridge.resolveCredentialSnapshot();
+    const mcpGateway = bootstrapRuntime.mcpGateway;
+    let cancelRun: (() => Promise<void>) | undefined;
+    let isBusy: (() => boolean) | undefined;
+    const stopSurface = new AbortController();
+    const startup = createCliStartupNotices({ context: runtimeContext, sessionManager, renderer, logger,
+      lifecycleNotices: bootstrapRuntime.bootstrap.lifecycleNotices });
+    shutdown = createCliShutdown({
+      onSignal: signalSessionClose(runtimeContext, sessionManager, () => isBusy?.() ?? false),
+      close: () => output.run(async () => {
+        const results = await Promise.allSettled([
+          Promise.resolve().then(startup.cancel),
+          Promise.resolve().then(() => cancelRun?.()),
+          closeMediaFor(runtimeContext), closeDirectorFor(runtimeContext), closeJobsFor(runtimeContext, Boolean(requested && 'kind' in requested)), closeSshFor(runtimeContext),
+          closeCollaborationFor(runtimeContext), closeExtensionsFor(runtimeContext), closeTraceDashboard(), mcpGateway.close(),
+          Promise.resolve().then(async () => { if (await runtimeContext.freshState?.clearCache?.() === 'unknown') throw new Error('Provider cache cleanup is unverified.'); }),
+        ]);
+        const failure = results.find(result => result.status === 'rejected');
+        if (failure?.status === 'rejected') throw failure.reason;
+      }), process: input.process, exit: input.exit, writeError: input.writeError,
+      onTimeout: output.cancel,
+      streams: [input.stdin, input.process.stdout, input.process.stderr],
+      handleInterrupt: options.printMode === true || options.jsonEvents === true || options.rpcMode === true || !input.stdin.isTTY,
+    });
+    // These bridges are installed after bootstrap has the real resource owners.
+    // Only bootstrap can retire this host and read back a new runtime generation.
+    runtimeContext.startupArgs = [...input.args];
+    const restart: RestartPort = {
+      request: async (request): Promise<RestartOutcome> => {
+        if (requested) return { status: 'unavailable', reason: 'A restart is already pending.' };
+        if (isBusy?.()) return { status: 'unavailable', reason: 'Wait for the current provider turn before restarting.' };
+        if (request.sessionId !== runtimeContext.session.id || !sessionManager.sessionExists(runtimeContext.session.id)
+          || request.argv.length !== input.args.length || request.argv.some((arg, index) => arg !== input.args[index])) {
+          return { status: 'unavailable', reason: 'Restart identity or startup arguments changed; recovery was not admitted.' };
+        }
+        const admitted = { ...request, workspaceRoot: runtimeContext.projectRoot, workingDirectory: runtimeContext.cwd };
+        requested = admitted;
+        // Let command publication finish before retiring the interactive surface.
+        setImmediate(() => stopSurface.abort());
+        return { status: 'requested', request: admitted };
+      },
+    };
+    runtimeContext.restart = restart;
+    const activeProfile = currentProfile();
+    if (activeProfile) runtimeContext.profileSwitch = profileSwitchPort({ source: activeProfile,
+      depth: switchDepth,
+      interactive: Boolean(input.stdin.isTTY && input.process.stdout.isTTY && input.process.stderr.isTTY) && !options.printMode && !options.jsonEvents,
+      current: () => ({ sessionId: runtimeContext.session.id,
+        generation: JSON.stringify([runtimeContext.session.createdAt, runtimeContext.workspaceRevision, runtimeContext.configuration.current.revision,
+          runtimeContext.configuration.current.binding.trustRevision]),
+        workspace: runtimeContext.projectRoot, cwd: runtimeContext.cwd, offline: options.offline === true || runtimeContext.runtimeConfig.offline === true }),
+      busy: () => isBusy?.() ?? false, pending: () => requested !== undefined,
+      admission: () => runtimeContext.workspaceAdmission?.() ?? configurationAdmission(runtimeContext)(),
+      executableAvailable: () => { freshExecutable(input.process.execPath, input.process.argv[1]); },
+      retire: ticket => { requested = ticket; setImmediate(() => stopSurface.abort()); },
+    });
+
+    try {
+      const stdinPromptCapture = recovery && (options.printMode || !input.stdin.isTTY) ? {
+        stdinTransportMode: 'capture-batch' as const, pipedInput: null, nonInteractivePrompts: [], cliModePlan: { kind: 'stdin-batch' as const },
+      } : await captureCliStdinPrompts({
+        options,
+        stdin: input.stdin,
+      });
+      time("stdin captured");
+      const startupSurface = await projectAndRenderCliStartupSurface({
+        options,
+        stdin: input.stdin,
+        stdout: input.process.stdout,
+        cliModePlan: stdinPromptCapture.cliModePlan,
+        stdinTransportMode: stdinPromptCapture.stdinTransportMode,
+        nonInteractivePromptCount:
+          stdinPromptCapture.nonInteractivePrompts.length,
+        launchCwd: input.launchCwd,
+        bootstrapRuntime,
+        providerCredentialResolution: resolvedCredential,
+        providerModeEnv: providerRuntimeBridge.providerModeEnv(),
+      });
+      time("startup surface prepared");
+      const recoveryHintEligible = !options.sessionId && !options.printMode
+        && !options.replayFile
+        && stdinPromptCapture.nonInteractivePrompts.length === 0;
+      startup.configure(startupSurface.fullScreenHost, recoveryHintEligible);
+      logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
+      // Started and not waited on, so the first frame is never behind a network
+      // call. Only for an interactive session: a scripted run has nobody to read a
+      // notice, and asking on its behalf would be traffic with no reader.
+      if (!options.printMode) {
+        void checkForUpdate({
+          env: process.env,
+          configuredOffline: runtimeContext.runtimeConfig.offline === true,
+        }).then((result) => {
+          const notice = formatUpdateNotice(result);
+          if (notice) renderer.renderLine(`\n${notice}\n`);
+        });
+      }
+
+      let readline: ReadlineInterface | null = null;
+      let interactiveApprovalPrompt:
+        | ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>)
+        | undefined;
+
+      const sessionRuntime = createCliSessionRuntime({
+        mcpGateway,
+        sessionManager,
+        renderer,
+        runtimeContext,
+        options,
+        approvalTrustPolicy,
+        providerRuntimeBridge,
+        getReadline: () => readline,
+        isStdinTty: () => Boolean(input.stdin.isTTY),
+        // Reported as present only once the interactive surface has actually
+        // installed a handler. Handing over a fallback closure here would make the
+        // approval bridge treat every run as interactive and skip the
+        // non-interactive policy path entirely. The getter is read at prompt time
+        // because the interactive surface installs its handler after this runtime
+        // is built.
+        getPromptInteractiveApproval: () => interactiveApprovalPrompt,
+      });
+      await waitForExtensionsFor(runtimeContext);
+      await applyStartupModel(runtimeContext, options);
+      bootstrapRuntime.settleModel();
+      const modelConfiguration = refreshShellRuntimeConfig(runtimeContext);
+      if (modelConfiguration.status !== 'applied' && runtimeContext.configuration.current.admissionBlocked) {
+        throw new ConfigurationRefusalError(runtimeContext.configuration.current.diagnostics);
+      }
+      time("runtime ready");
+      cancelRun = () => cancelGoalRunForShutdown(sessionRuntime);
+      isBusy = () => sessionRuntime.getCurrentRunController() !== null;
+      if (bootstrapRuntime.writeJsonEvent) {
+        sessionRuntime.observeEvents(bootstrapRuntime.writeJsonEvent);
+      } else if (options.rpcMode) {
+        const { attachRpcEventBridge } = await import("../rpc/events.js");
+        attachRpcEventBridge(sessionRuntime, output.guard?.write);
+      }
+      if (recovery) {
+        const saved = sessionManager.getSession(runtimeContext.session.id);
+        if (!saved || saved.id !== recovery.sessionId || saved.projectRoot !== runtimeContext.projectRoot) throw new Error('Restart recovery could not verify the selected saved session.');
+        input.writeOutput(`Restart recovery: runtime rebuilt and saved session ${saved.id} read back. Startup prompt and captured input were not replayed.`);
+        if (options.printMode || !input.stdin.isTTY) return;
+      }
+
+      const handledPrintMode = await runCliPrintModeRouter({
+        cliModePlan: stdinPromptCapture.cliModePlan,
+        options,
+        nonInteractivePrompts: stdinPromptCapture.nonInteractivePrompts,
+        pipedInput: stdinPromptCapture.pipedInput,
+        bootstrapRuntime,
+        sessionRuntime,
+        logger,
+        writeError: input.writeError,
+        exit: output.exit,
+        approvalTrustPolicy,
+        stopRequested: () => requested !== undefined,
+        onFirstFrame: startup.onFirstFrame,
+        onUserIntent: startup.onUserIntent,
+      });
+      if (handledPrintMode) {
+        return requested;
+      }
+
+      await runInteractiveLoop({
+        stdin: input.stdin,
+        stdout: input.process.stdout,
+        process: input.process,
+        sessionManager,
+        renderer,
+        runtimeContext,
+        sessionRuntime,
+        logger,
+        approvalTrustPolicy,
+        fallbackSessionId: recoveryCandidate?.id,
+        onFirstFrame: startup.onFirstFrame,
+        onUserIntent: startup.onUserIntent,
+        setStartupNotice: startup.setTranscriptWriter,
+        initialMcpGateway: mcpGateway,
+        setReadline: (nextReadline) => {
+          readline = nextReadline;
+        },
+        setInteractiveApprovalPrompt: (handler) => {
+          interactiveApprovalPrompt = handler;
+        },
+        ...(options.themePaths ? { themePaths: options.themePaths } : {}),
+        ...(options.resumeSession ? { resumeOnStart: true } : {}),
+        exit: shutdown.exit,
+        stopSignal: stopSurface.signal,
+      });
+      return requested;
+    } catch (error) {
+      // A configuration the runtime refuses to run on is an answer about the
+      // user's files, not a crash in this program. Reporting it as a fatal error
+      // printed the stack that led here and hid the cause, which the publication
+      // already knew. The causes are printed instead, with the same exit code the
+      // other argument-level refusals use.
+      if (error instanceof ConfigurationRefusalError) {
+        input.writeError(error.message);
+        output.exit(1);
+      }
+      throw error;
     }
-    throw error;
-  } finally {
-    if (requested && 'kind' in requested) await drainProfileSwitch(requested, () => shutdown.close());
-    else await shutdown.close();
-  }
+  }, async () => {
+    if (!shutdown) return;
+    const activeShutdown = shutdown;
+    if (requested && 'kind' in requested) await drainProfileSwitch(requested, () => activeShutdown.close());
+    else await activeShutdown.close();
+  });
 }
 
 /**

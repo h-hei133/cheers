@@ -1,7 +1,9 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
+import { TerminalOutput } from "../../presentation/tui/terminal/output.js";
+import { supportsFullScreenSurface } from "../interactive/surfaceCapability.js";
 
 vi.mock("../../entrypoints/cliArgs.js", () => ({ parseCliArgs: vi.fn() }));
 vi.mock("../../core/paths/profile/context.js", async () => {
@@ -86,12 +88,15 @@ import { runCliPrintModeRouter } from "../print/printModeRouter.js";
 import { runCliProcess } from "./cliProcessRunner.js";
 import * as usage from '../../observability/usageTelemetry.js';
 import { createEmptyLifecycleIndex } from '../../core/tools/toolResultLifecycle.js';
+import { flushRawStdout, isStdoutTakenOver, restoreStdout, takeOverStdout, writeRawStdout } from '../../core/shell/outputGuard.js';
 
 const projectRoot = "/tmp/cli-process-runner-project";
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+afterEach(() => { restoreStdout(); });
 
 it.each(['idle', 'busy', 'pending', 'unknown', 'unreadable', 'save-failed'] as const)("routes startup notices and preserves signal lifecycle for %s work", async state => {
   const renderer = new StreamingRenderer();
@@ -364,4 +369,238 @@ it("waits for the line-loop first-frame callback before starting the recovery hi
   expect(routed?.onFirstFrame).toBe(interactiveInput?.onFirstFrame);
   expect(routed?.onUserIntent).toBe(interactiveInput?.onUserIntent);
   expect(shutdown.close).toHaveBeenCalledOnce();
+});
+
+type OutputPort = { write(text: string): void; flush(): Promise<void> };
+type OutputFixtureOptions = {
+  options?: Record<string, unknown>;
+  stdinTty?: boolean;
+  stdoutTty?: boolean;
+  stderrTty?: boolean;
+  plan?: 'interactive' | 'stdin-batch' | 'stdin-stream';
+  rootFailure?: Error;
+  bootstrapFailure?: Error;
+  writeFailure?: Error;
+  cleanupFailure?: Error;
+  holdOutput?: boolean;
+  exitAt?: 'root' | 'bootstrap' | 'router';
+};
+
+function outputFixture(settings: OutputFixtureOptions = {}) {
+  const output: string[] = [];
+  const errors: string[] = [];
+  const guardAtRoot: boolean[] = [];
+  let completeOutput: (() => void) | undefined;
+  const deviceWrite = (target: string[]) => (chunk: string | Uint8Array,
+    encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
+    callback?: (error?: Error | null) => void) => {
+    const text = String(chunk);
+    if (text) target.push(text);
+    const complete = typeof encodingOrCallback === 'function' ? encodingOrCallback : callback;
+    if (target === output && text.includes('answer')) {
+      if (settings.holdOutput) completeOutput = () => complete?.();
+      else queueMicrotask(() => complete?.(settings.writeFailure));
+    } else complete?.();
+    return true;
+  };
+  const stdout = Object.assign(new EventEmitter(), {
+    isTTY: settings.stdoutTty ?? true, write: vi.fn(deviceWrite(output)),
+  });
+  const stderr = Object.assign(new EventEmitter(), {
+    isTTY: settings.stderrTty ?? true, write: vi.fn(deviceWrite(errors)),
+  });
+  const originalWrite = stdout.write;
+  const processEvents = Object.assign(new EventEmitter(), {
+    stdout, stderr, env: {}, execPath: process.execPath, argv: [process.execPath, 'cli'],
+  }) as unknown as NodeJS.Process;
+  const stdin = Object.assign(new PassThrough(), { isTTY: settings.stdinTty ?? true });
+  const options = settings.options ?? {};
+  const plan = settings.plan ?? 'stdin-batch';
+  const renderer = new StreamingRenderer();
+  const runtimeContext = {
+    session: { id: 'output-session', createdAt: '2026-11-16T00:00:00.000Z' },
+    projectRoot, cwd: projectRoot, originalCwd: projectRoot,
+    runtimeConfig: { offline: true, provider: 'openai', maxTurns: 15, configDiagnostics: [] },
+    configuration: { current: { revision: 1, config: {} }, recordDisplay: vi.fn() },
+    startupArgs: [],
+  };
+  const mcpGateway = { close: vi.fn(async () => {
+    stdout.write('cleanup noise\n');
+    if (settings.cleanupFailure) throw settings.cleanupFailure;
+  }) };
+  const boot = {
+    sessionManager: { getRecoveryHintAsync: vi.fn(async () => null) }, renderer,
+    recoveryCandidate: null, recoveryCandidateSummary: null, runtimeContext,
+    bootstrap: { lifecycleNotices: [] }, settleModel: vi.fn(), mcpGateway,
+  };
+  vi.mocked(parseCliArgs).mockReturnValue({ ok: true,
+    args: { options, versionRequested: false, doctorRequested: false } } as never);
+  vi.mocked(createCliRootContext).mockImplementation(input => {
+    guardAtRoot.push(isStdoutTakenOver());
+    stdout.write('root noise\n');
+    if (settings.exitAt === 'root') { writeRawStdout('root blocked\n'); input.exit(1); }
+    if (settings.rootFailure) throw settings.rootFailure;
+    return { workspaceRoot: projectRoot, runtimeConfig: runtimeContext.runtimeConfig } as never;
+  });
+  vi.mocked(createCliBootstrapRuntimeContext).mockImplementation(input => {
+    const supplied = (input as unknown as { output?: OutputPort }).output;
+    if (!supplied && (options.jsonEvents || options.rpcMode)) takeOverStdout(stdout as never, stderr as never);
+    const port = supplied ?? (options.jsonEvents || options.rpcMode
+      ? { write: writeRawStdout, flush: flushRawStdout }
+      : { write: (text: string) => { stdout.write(text); }, flush: async () => {} });
+    const framed = Boolean(options.jsonEvents || options.rpcMode);
+    renderer.setSink({
+      line: (text: string) => port.write(framed ? `${JSON.stringify({ type: 'cli.output', text: `${text}\n` })}\n` : `${text}\n`),
+      chunk: (text: string) => port.write(framed ? `${JSON.stringify({ type: 'cli.output', text })}\n` : text),
+      flush: () => port.flush(),
+    } as never, { ownsTranscript: false });
+    stdout.write('bootstrap noise\n');
+    if (settings.exitAt === 'bootstrap') { renderer.renderLine('bootstrap blocked'); input.exit(1); }
+    if (settings.bootstrapFailure) throw settings.bootstrapFailure;
+    return boot as never;
+  });
+  vi.mocked(projectAndRenderCliStartupSurface).mockResolvedValue({
+    fullScreenHost: false, showStartupSurface: false, startupPlan: {},
+  } as never);
+  vi.mocked(createCliProviderRuntimeBridge).mockReturnValue({
+    resolveCredentialSnapshot: () => ({}), providerModeEnv: () => undefined,
+  } as never);
+  vi.mocked(captureCliStdinPrompts).mockResolvedValue({
+    stdinTransportMode: plan === 'stdin-stream' ? 'stream-live' : 'capture-batch',
+    pipedInput: null, nonInteractivePrompts: [], cliModePlan: { kind: plan },
+  } as never);
+  vi.mocked(createCliSessionRuntime).mockReturnValue({
+    getCurrentRunController: () => null, terminate: vi.fn(), observeEvents: vi.fn(),
+    getState: () => 'idle', waitForIdle: vi.fn(async () => undefined),
+  } as never);
+  vi.mocked(createCliShutdown).mockImplementation(input => ({ close: vi.fn(input.close), exit: vi.fn() }));
+  vi.mocked(runCliPrintModeRouter).mockImplementation(async input => {
+    if (plan === 'interactive') return false;
+    input.bootstrapRuntime.renderer.renderLine('answer');
+    if (settings.exitAt === 'router') input.exit(1);
+    return true;
+  });
+  vi.mocked(runInteractiveLoop).mockImplementation(async input => { input.renderer.renderLine('answer'); });
+  const writeError = vi.fn();
+  const terminalExit = new Error('fixture terminal exit');
+  const exitState: { code: number; guarded: boolean; restored: boolean; stdout: string }[] = [];
+  const exit = vi.fn((code: number): never => {
+    exitState.push({ code, guarded: isStdoutTakenOver(), restored: stdout.write === originalWrite,
+      stdout: output.join('') });
+    throw terminalExit;
+  });
+  return {
+    output, errors, guardAtRoot, stdin, stdout, originalWrite, writeError, exit, exitState, terminalExit,
+    complete: () => completeOutput?.(),
+    run: () => runCliProcess({ args: [], launchCwd: projectRoot, stdin: stdin as never,
+      process: processEvents, writeOutput: vi.fn(), writeError,
+      exit }),
+    dispose: () => stdin.destroy(),
+  };
+}
+
+it.each(['root', 'bootstrap', 'router'] as const)('drains and restores before a synchronous %s exit', async exitAt => {
+  const fixture = outputFixture({ options: { printMode: true }, exitAt });
+  const expected = exitAt === 'router' ? 'answer\n' : `${exitAt} blocked\n`;
+  try {
+    await expect(fixture.run()).rejects.toBe(fixture.terminalExit);
+    expect(fixture.exit).toHaveBeenCalledOnce();
+    expect(fixture.exitState).toEqual([{ code: 1, guarded: false, restored: true, stdout: expected }]);
+    expect(fixture.output.join('')).toBe(expected);
+  } finally { fixture.dispose(); }
+});
+
+it.each([
+  { name: 'print', options: { printMode: true } },
+  { name: 'json', options: { jsonEvents: true } },
+  { name: 'rpc', options: { rpcMode: true } },
+  { name: 'stdin batch', stdinTty: false, plan: 'stdin-batch' as const },
+  { name: 'stdin stream', stdinTty: false, plan: 'stdin-stream' as const },
+  { name: 'redirected stdout', stdoutTty: false, plan: 'interactive' as const },
+])('protects $name output before root setup and through resource cleanup', async settings => {
+  const fixture = outputFixture(settings);
+  try {
+    await fixture.run();
+    expect(fixture.guardAtRoot).toEqual([true]);
+    expect(fixture.output.join('')).toContain('answer');
+    expect(fixture.output.join('')).not.toContain('noise');
+    expect(fixture.errors.join('')).toBe('root noise\nbootstrap noise\ncleanup noise\n');
+    expect(fixture.stdout.write).toBe(fixture.originalWrite);
+    expect(isStdoutTakenOver()).toBe(false);
+  } finally { fixture.dispose(); }
+});
+
+it.each([true, false])('keeps native terminal frames on stdout with stderr TTY %s', async stderrTty => {
+  const fixture = outputFixture({ plan: 'interactive', stderrTty });
+  const frame = '\u001b[2J\u001b[Hterminal frame\n';
+  const disconnect = vi.fn();
+  const terminal = new TerminalOutput(() => false, disconnect);
+  const nativeWrite = vi.spyOn(process.stdout, 'write').mockImplementation((chunk, encodingOrCallback, callback) =>
+    fixture.stdout.write(chunk, encodingOrCallback, callback));
+  vi.mocked(runInteractiveLoop).mockImplementation(async () => { terminal.write(frame); });
+  try {
+    expect(supportsFullScreenSurface(fixture.stdin as never, fixture.stdout as never)).toBe(true);
+    await fixture.run();
+    expect({ stdout: fixture.output.join(''), stderr: fixture.errors.join('') }).toEqual({
+      stdout: `root noise\nbootstrap noise\n${frame}cleanup noise\n`, stderr: '',
+    });
+    expect(fixture.guardAtRoot).toEqual([false]);
+    expect(fixture.stdout.write).toBe(fixture.originalWrite);
+    expect(terminal.pendingBytes).toBe(0);
+    expect(disconnect).not.toHaveBeenCalled();
+  } finally { nativeWrite.mockRestore(); fixture.dispose(); }
+});
+
+it.each(['root', 'bootstrap'] as const)('restores protected stdout after %s setup failure', async owner => {
+  const failure = new Error(`${owner} setup failed`);
+  const fixture = outputFixture({ options: { printMode: true },
+    ...(owner === 'root' ? { rootFailure: failure } : { bootstrapFailure: failure }) });
+  try {
+    await expect(fixture.run()).rejects.toBe(failure);
+    expect(fixture.output).toEqual([]);
+    expect(fixture.errors.join('')).toContain('root noise\n');
+    expect(fixture.stdout.write).toBe(fixture.originalWrite);
+    expect(isStdoutTakenOver()).toBe(false);
+  } finally { fixture.dispose(); }
+});
+
+it('waits for the print device callback before completing the process cycle', async () => {
+  const fixture = outputFixture({ options: { printMode: true }, holdOutput: true });
+  let completed = false;
+  const pending = fixture.run().then(() => { completed = true; });
+  void pending.catch(() => {});
+  try {
+    await vi.waitFor(() => { expect(fixture.output.join('')).toBe('answer\n'); });
+    expect(completed).toBe(false);
+    fixture.complete();
+    await pending;
+    expect(fixture.stdout.write).toBe(fixture.originalWrite);
+  } finally {
+    fixture.complete();
+    await pending.catch(() => {});
+    fixture.dispose();
+  }
+});
+
+it('propagates output drain failure and restores the writer', async () => {
+  const failure = Object.assign(new Error('output closed'), { code: 'EPIPE' });
+  const fixture = outputFixture({ options: { printMode: true }, writeFailure: failure });
+  try {
+    await expect(fixture.run()).rejects.toBe(failure);
+    expect(fixture.stdout.write).toBe(fixture.originalWrite);
+    expect(isStdoutTakenOver()).toBe(false);
+  } finally { fixture.dispose(); }
+});
+
+it('preserves an earlier cleanup failure while reporting secondary output failure safely', async () => {
+  const cleanupFailure = new Error('resource cleanup failed');
+  const outputFailure = Object.assign(new Error('private device detail'), { code: 'EPIPE' });
+  const fixture = outputFixture({ options: { jsonEvents: true }, cleanupFailure, writeFailure: outputFailure });
+  try {
+    await expect(fixture.run()).rejects.toBe(cleanupFailure);
+    expect(fixture.writeError).toHaveBeenCalledWith(expect.stringMatching(/output.*failed.*delivery.*not verified/i));
+    expect(fixture.writeError.mock.calls.flat().join('')).not.toContain('private device detail');
+    expect(fixture.stdout.write).toBe(fixture.originalWrite);
+    expect(isStdoutTakenOver()).toBe(false);
+  } finally { fixture.dispose(); }
 });

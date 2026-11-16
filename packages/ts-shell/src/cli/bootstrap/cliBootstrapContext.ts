@@ -12,7 +12,7 @@ import {
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { createJsonEventWriter } from "../../presentation/terminal/jsonEvents.js";
-import { takeOverStdout, writeRawStdout } from "../../core/shell/outputGuard.js";
+import { takeOverStdout, type StdoutGuard } from "../../core/shell/outputGuard.js";
 import type { StructuredLogger } from "../../observability/index.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { sessionWorkspaceAdmission } from '../../session/continuation/workspace.js';
@@ -85,6 +85,7 @@ export function createCliRootContext(
 }
 
 export interface CreateCliBootstrapRuntimeContextInput {
+  readonly output?: StdoutGuard;
   readonly freshSessionId?: string;
   readonly launchCwd: string;
   readonly options: CliOptions;
@@ -96,88 +97,102 @@ export interface CreateCliBootstrapRuntimeContextInput {
 export function createCliBootstrapRuntimeContext(
   input: CreateCliBootstrapRuntimeContextInput,
 ): CliBootstrapRuntimeContext {
-  const sessionManager = new SessionManager();
-  const renderer = new StreamingRenderer();
-  if (input.options.jsonEvents || input.options.rpcMode) takeOverStdout();
-  const writeJsonEvent = input.options.jsonEvents
-    ? createJsonEventWriter((line) => writeRawStdout(line))
-    : undefined;
-  if (writeJsonEvent) {
-    renderer.setSink({
-      line: (text, report) => writeJsonEvent({ type: "cli.output", text: `${text}\n`, ...(report ? { report } : {}) }),
-      chunk: (text) => writeJsonEvent({ type: "cli.output", text }),
-    });
-  } else if (input.options.rpcMode) {
-    renderer.setSink({
-      line: (text, report) => writeRawStdout(`${JSON.stringify({ type: "cli.output", text: `${text}\n`, ...(report ? { report } : {}) })}\n`),
-      chunk: (text) => writeRawStdout(`${JSON.stringify({ type: "cli.output", text })}\n`),
-    });
-  }
-  // Recovery suggestions are discovered after the first frame. The interactive
-  // and print paths retain their explicit on-demand resolution semantics.
-  const recoveryCandidate = null;
-  const recoveryCandidateSummary = null;
-  const recoveryBlockedNotice = null;
-  let pendingModel = Boolean(input.options.model);
-  const bootstrap = (() => {
-    try {
-      return bootstrapShellRuntime({
-        cwd: input.rootContext.workspaceRoot,
-        launchCwd: input.launchCwd,
-        runtimeConfig: input.rootContext.runtimeConfig,
-        runtimeConfigOverrides: configOverrides(input.options),
-        resolveConfigTarget: (config, sessionId) => resolveCliCredential(config, input.options, process.env, sessionId),
-        deferredModel: () => pendingModel,
-        ...(input.options.skillPaths || input.options.noSkills
-          ? {
-              skillOptions: {
-                ...(input.options.skillPaths ? { skillPaths: input.options.skillPaths } : {}),
-                ...(input.options.noSkills ? { noSkills: true } : {}),
-              },
-            }
-          : {}),
-        ...(input.options.themePaths ? { themePaths: input.options.themePaths } : {}),
-        gitContext: input.rootContext.gitContext,
-        requestedWorkspaceRoot: input.rootContext.runtimeBaseDir,
-        sessionManager,
-        renderer,
-        requestedSessionId: input.options.sessionId,
-        freshSessionId: input.freshSessionId,
-        allowSessionRootMigration: input.options.migrateSessionRoot === true,
-        emitLifecycleMessages: false,
-        // A one-shot run or explicit `-c`/`--continue` continues where the user left off;
-        // an ordinary interactive launch starts its own fresh session.
-        adoptCurrentSession: input.options.printMode === true || input.options.continueSession === true,
-        ...(input.options.forkSource ? { forkSource: input.options.forkSource } : {}),
+  const output = input.output ?? (input.options.printMode || input.options.jsonEvents || input.options.rpcMode
+    ? takeOverStdout() : undefined);
+  try {
+    const sessionManager = new SessionManager();
+    const renderer = new StreamingRenderer();
+    const writeJsonEvent = input.options.jsonEvents && output
+      ? createJsonEventWriter(output.write)
+      : undefined;
+    if (writeJsonEvent && output) {
+      renderer.setSink({
+        line: (text, report) => writeJsonEvent({ type: "cli.output", text: `${text}\n`, ...(report ? { report } : {}) }),
+        chunk: (text) => writeJsonEvent({ type: "cli.output", text }),
+        flush: output.flush,
       });
-    } catch (error) {
-      handleCliBootstrapError({
-        error,
-        renderer,
-        writeError: input.writeError,
-        exit: input.exit,
+    } else if (input.options.rpcMode && output) {
+      renderer.setSink({
+        line: (text, report) => output.write(`${JSON.stringify({ type: "cli.output", text: `${text}\n`, ...(report ? { report } : {}) })}\n`),
+        chunk: (text) => output.write(`${JSON.stringify({ type: "cli.output", text })}\n`),
+        flush: output.flush,
       });
+    } else if (output) {
+      renderer.setSink({
+        line: text => output.write(`${text}\n`),
+        chunk: output.write,
+        flush: output.flush,
+      }, { ownsTranscript: false });
     }
-  })();
-  const runtimeContext = bootstrap.context;
-  if (input.options.scopedModels?.length) runtimeContext.scopedModels = input.options.scopedModels;
-  if (input.options.extensionPaths?.length) runtimeContext.cliExtensionPaths = input.options.extensionPaths;
-  runtimeContext.workspaceAdmission = () => sessionWorkspaceAdmission(sessionManager, runtimeContext.session);
-  const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext));
+    // Recovery suggestions are discovered after the first frame. The interactive
+    // and print paths retain their explicit on-demand resolution semantics.
+    const recoveryCandidate = null;
+    const recoveryCandidateSummary = null;
+    const recoveryBlockedNotice = null;
+    let pendingModel = Boolean(input.options.model);
+    const bootstrap = (() => {
+      try {
+        return bootstrapShellRuntime({
+          cwd: input.rootContext.workspaceRoot,
+          launchCwd: input.launchCwd,
+          runtimeConfig: input.rootContext.runtimeConfig,
+          runtimeConfigOverrides: configOverrides(input.options),
+          resolveConfigTarget: (config, sessionId) => resolveCliCredential(config, input.options, process.env, sessionId),
+          deferredModel: () => pendingModel,
+          ...(input.options.skillPaths || input.options.noSkills
+            ? {
+                skillOptions: {
+                  ...(input.options.skillPaths ? { skillPaths: input.options.skillPaths } : {}),
+                  ...(input.options.noSkills ? { noSkills: true } : {}),
+                },
+              }
+            : {}),
+          ...(input.options.themePaths ? { themePaths: input.options.themePaths } : {}),
+          gitContext: input.rootContext.gitContext,
+          requestedWorkspaceRoot: input.rootContext.runtimeBaseDir,
+          sessionManager,
+          renderer,
+          requestedSessionId: input.options.sessionId,
+          freshSessionId: input.freshSessionId,
+          allowSessionRootMigration: input.options.migrateSessionRoot === true,
+          emitLifecycleMessages: false,
+          // A one-shot run or explicit `-c`/`--continue` continues where the user left off;
+          // an ordinary interactive launch starts its own fresh session.
+          adoptCurrentSession: input.options.printMode === true || input.options.continueSession === true,
+          ...(input.options.forkSource ? { forkSource: input.options.forkSource } : {}),
+        });
+      } catch (error) {
+        handleCliBootstrapError({
+          error,
+          renderer,
+          writeError: input.writeError,
+          exit: input.exit,
+        });
+      }
+    })();
+    const runtimeContext = bootstrap.context;
+    if (input.options.scopedModels?.length) runtimeContext.scopedModels = input.options.scopedModels;
+    if (input.options.extensionPaths?.length) runtimeContext.cliExtensionPaths = input.options.extensionPaths;
+    runtimeContext.workspaceAdmission = () => sessionWorkspaceAdmission(sessionManager, runtimeContext.session);
+    const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext));
 
-  return {
-    ...input.rootContext,
-    sessionManager,
-    renderer,
-    ...(writeJsonEvent ? { writeJsonEvent } : {}),
-    recoveryCandidate,
-    recoveryCandidateSummary,
-    recoveryBlockedNotice,
-    bootstrap,
-    runtimeContext,
-    mcpGateway,
-    settleModel: () => { pendingModel = false; },
-  };
+    return {
+      ...input.rootContext,
+      sessionManager,
+      renderer,
+      ...(writeJsonEvent ? { writeJsonEvent } : {}),
+      recoveryCandidate,
+      recoveryCandidateSummary,
+      recoveryBlockedNotice,
+      bootstrap,
+      runtimeContext,
+      mcpGateway,
+      settleModel: () => { pendingModel = false; },
+    };
+  } catch (error) {
+    if (!input.output) output?.restore();
+    throw error;
+  }
 }
 
 export interface LogCliBootstrapSessionInitializedInput {

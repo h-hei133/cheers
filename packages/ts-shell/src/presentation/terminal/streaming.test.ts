@@ -108,6 +108,29 @@ describe("captured channel", () => {
     }
   });
 
+  it("waits for an installed sink's flush and propagates its failure", async () => {
+    let reject!: (error: Error) => void;
+    const gate = new Promise<void>((_resolve, rejected) => { reject = rejected; });
+    const renderer = new StreamingRenderer();
+    const flush = vi.fn(() => gate);
+    renderer.setSink({ line: () => {}, chunk: () => {}, flush } as never, { ownsTranscript: false });
+    let settled = false;
+    const pending = renderer.flush().then(() => { settled = true; });
+    void pending.catch(() => {});
+    await Promise.resolve();
+    expect(flush).toHaveBeenCalledOnce();
+    expect(settled).toBe(false);
+    const failure = new Error('sink output failed');
+    reject(failure);
+    await expect(pending).rejects.toBe(failure);
+  });
+
+  it("keeps sinks without a flush callback compatible", async () => {
+    const renderer = new StreamingRenderer();
+    renderer.setSink({ line: () => {}, chunk: () => {} });
+    await expect(renderer.flush()).resolves.toBeUndefined();
+  });
+
   it("exposes every method the runtime streaming path calls", () => {
     // The old ad-hoc capture object omitted renderChunk, which threw on the first
     // streamed token of every turn.

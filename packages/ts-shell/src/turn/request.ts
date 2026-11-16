@@ -6,7 +6,7 @@ import type { SentRequest } from '../provider/request/sentRequest.js';
 import { getSessionUsage, recordRequestContext } from '../observability/usageTelemetry.js';
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 import type { CacheWarmingRunner } from './cacheWarm.js';
-import type { StepFunction, StepOptions } from './step.js';
+import type { StepFunction, StepListener, StepOptions } from './step.js';
 import type { PreparedTurnContext } from './context/contract.js';
 import type { RequestContextOwner } from '../core/agent/context.js';
 import type { MessageConverter, MessageProjection } from '../core/agent/messages.js';
@@ -174,38 +174,39 @@ export function createTurnRequest(
     let latestPrepared: PreparedTurnContext | undefined;
     let streamedText = "";
     let streamedReasoning = "";
-    const emitStreamUpdate = (delta?: string) => {
-      request?.onUpdate?.({
+    const emitStreamUpdate = (event: Extract<QueryEvent, { type: 'message.delta' | 'reasoning.delta' | 'message.replace' | 'reasoning.replace' }>, delta?: string) => {
+      const partial = {
         text: streamedText,
-        ...(streamedReasoning ? { reasoning: streamedReasoning } : {}),
+        ...(streamedReasoning || event.type === 'reasoning.replace' ? { reasoning: streamedReasoning } : {}),
         ...(delta !== undefined ? { delta } : {}),
-      });
+      };
+      // RPC consumes the same public capture as the kernel, without another accumulator.
+      channel.push({ ...event, message: { content: partial.text,
+        ...(partial.reasoning !== undefined ? { reasoning: { text: partial.reasoning } } : {}) } });
+      request?.onUpdate?.(partial);
+    };
+    const listener: StepListener = {
+      onText: (delta) => {
+        streamedText += delta;
+        emitStreamUpdate({ type: "message.delta", role: "coder", delta }, delta);
+      },
+      onReasoning: (delta) => {
+        streamedReasoning += delta;
+        emitStreamUpdate({ type: "reasoning.delta", role: "coder", delta });
+      },
+      onReasoningReplace: (text) => {
+        streamedReasoning = text;
+        emitStreamUpdate({ type: "reasoning.replace", role: "coder", text });
+      },
+      onReplace: (text) => {
+        streamedText = text;
+        emitStreamUpdate({ type: "message.replace", role: "coder", text });
+      },
     };
     let step = await stepRequest(
       activeMessages,
       signal,
-      {
-        onText: (delta) => {
-          streamedText += delta;
-          channel.push({ type: "message.delta", role: "coder", delta });
-          emitStreamUpdate(delta);
-        },
-        onReasoning: (delta) => {
-          streamedReasoning += delta;
-          channel.push({ type: "reasoning.delta", role: "coder", delta });
-          emitStreamUpdate();
-        },
-        onReasoningReplace: (text) => {
-          streamedReasoning = text;
-          channel.push({ type: "reasoning.replace", role: "coder", text });
-          emitStreamUpdate();
-        },
-        onReplace: (text) => {
-          streamedText = text;
-          channel.push({ type: "message.replace", role: "coder", text });
-          emitStreamUpdate();
-        },
-      },
+      listener,
       {
         allowTools: toolsAllowed,
         routeReason: request?.reason,
@@ -256,18 +257,15 @@ export function createTurnRequest(
     );
     if (!signal?.aborted && step.admissionFailure === 'exhausted' && options.claimBudgetSummary?.()) {
       budgetSummary = true;
+      streamedText = "";
+      streamedReasoning = "";
       // This instruction is request-local: it has no user-message lifecycle,
       // persistence or display event. The ordinary step still enforces the cap.
       const instruction = { role: 'user' as const, content: BUDGET_SUMMARY_MESSAGE };
       const pendingSource = latestPrepared?.pendingDeclaration ? latestPrepared.sourceMessages : undefined;
       const closingMessages = [...(pendingSource ?? activeMessages), instruction];
       const closing = await stepRequest(closingMessages,
-      signal, {
-        onText: delta => channel.push({ type: 'message.delta', role: 'coder', delta }),
-        onReasoning: delta => channel.push({ type: 'reasoning.delta', role: 'coder', delta }),
-        onReasoningReplace: text => channel.push({ type: 'reasoning.replace', role: 'coder', text }),
-        onReplace: text => channel.push({ type: 'message.replace', role: 'coder', text }),
-      }, { allowTools: false, routeReason: 'direct', ...(pendingSource ? { sourceMessages: closingMessages, convertToLlm: options.convertToLlm }
+      signal, listener, { allowTools: false, routeReason: 'direct', ...(pendingSource ? { sourceMessages: closingMessages, convertToLlm: options.convertToLlm }
         : activeProjection.sourceMessages ? {
         sourceMessages: [...activeProjection.sourceMessages, instruction],
       } : {}), ...(!pendingSource && activeProjection.providerMessages ? { providerMessages: [...activeProjection.providerMessages, instruction] } : {}),

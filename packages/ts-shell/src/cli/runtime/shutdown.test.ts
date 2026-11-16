@@ -1,8 +1,12 @@
 import { EventEmitter } from "node:events";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { killAllTrackedProcesses } from "../../core/shell/platform/processTree.js";
 import { createCliShutdown } from "./shutdown.js";
+import { createCliOutput } from '../bootstrap/output.js';
+import { isStdoutTakenOver, restoreStdout } from '../../core/shell/outputGuard.js';
 vi.mock("../../core/shell/platform/processTree.js", () => ({ killAllTrackedProcesses: vi.fn() }));
+
+afterEach(() => { restoreStdout(); vi.useRealTimers(); });
 
 it.each([false, true])("waits for process cleanup even if resource close fails (%s)", async fails => {
   let release!: () => void;
@@ -106,4 +110,76 @@ it('joins a signal received during ordinary close into its original cleanup budg
   await expect(pending).rejects.toThrow('private fixture');
   expect(await exited).toBe(1);
   expect(close).toHaveBeenCalledOnce(); expect(persist.mock.calls).toEqual([['SIGHUP']]);
+});
+
+it.each([undefined, 20])('restores held output at the original resource cleanup deadline (%s)', async timeoutMs => {
+  vi.useFakeTimers();
+  vi.mocked(killAllTrackedProcesses).mockResolvedValue(undefined);
+  const writes: string[] = [];
+  let held: (() => void) | undefined;
+  const stdout = { write: (text: string, callback?: () => void) => {
+    writes.push(text);
+    if (text === 'held frame') held = callback; else callback?.();
+    return true;
+  } };
+  const stderr = { write: () => true };
+  const originalWrite = stdout.write;
+  const output = createCliOutput({ enabled: true, stdout: stdout as never, stderr: stderr as never,
+    writeError: vi.fn(), exit: ((_code: number): never => { throw new Error('unexpected deferred exit'); }) });
+  output.guard!.write('held frame');
+  const exitState: { code: number; guarded: boolean; restored: boolean }[] = [];
+  const exit = vi.fn((code: number) => {
+    exitState.push({ code, guarded: isStdoutTakenOver(), restored: stdout.write === originalWrite });
+  });
+  const onTimeout = vi.fn(() => output.cancel());
+  const shutdown = createCliShutdown({ process: new EventEmitter() as NodeJS.Process,
+    close: () => output.run(async () => {}), onTimeout, exit, writeError: vi.fn(),
+    ...(timeoutMs === undefined ? {} : { timeoutMs }) });
+  shutdown.exit(143);
+  const deadline = timeoutMs ?? 10_000;
+  await vi.advanceTimersByTimeAsync(deadline - 1);
+  expect(held).toBeDefined();
+  expect(exit).not.toHaveBeenCalled();
+  expect(onTimeout).not.toHaveBeenCalled();
+  expect(isStdoutTakenOver()).toBe(true);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(onTimeout).toHaveBeenCalledOnce();
+  expect(exit).toHaveBeenCalledOnce();
+  expect(exitState).toEqual([{ code: 1, guarded: false, restored: true }]);
+  await expect(shutdown.close()).rejects.toThrow('Resource cleanup timed out; runtime reentry is blocked.');
+  held?.();
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(writes).toEqual(['held frame']);
+  expect(exit).toHaveBeenCalledOnce();
+});
+
+it('runs timeout cancellation synchronously and preserves the report-safe timeout if it throws', async () => {
+  vi.useFakeTimers();
+  vi.mocked(killAllTrackedProcesses).mockResolvedValue(undefined);
+  const order: string[] = [];
+  const shutdown = createCliShutdown({ process: new EventEmitter() as NodeJS.Process,
+    close: () => new Promise<void>(() => {}), timeoutMs: 20, writeError: vi.fn(), exit: vi.fn(),
+    onTimeout: () => { order.push('cancel'); throw new Error('private cancellation detail'); } });
+  const pending = shutdown.close().catch(error => { order.push('reject'); return error as Error; });
+  await vi.advanceTimersByTimeAsync(20);
+  const failure = await pending;
+  expect(order).toEqual(['cancel', 'reject']);
+  expect(failure.message).toBe('Resource cleanup timed out; runtime reentry is blocked.');
+});
+
+it('keeps a cancelled output owner from restoring its successor', async () => {
+  const device = () => ({ write: (_text: string, callback?: () => void) => { callback?.(); return true; } });
+  const input = { enabled: true, stderr: device() as never, writeError: vi.fn(),
+    exit: ((_code: number): never => { throw new Error('unexpected deferred exit'); }) };
+  const previous = createCliOutput({ ...input, stdout: device() as never });
+  previous.cancel();
+  const stdout = device();
+  const originalWrite = stdout.write;
+  const successor = createCliOutput({ ...input, stdout: stdout as never });
+  previous.cancel();
+  expect(isStdoutTakenOver()).toBe(true);
+  expect(stdout.write).not.toBe(originalWrite);
+  await successor.run(async () => { successor.guard!.write('successor frame'); });
+  expect(stdout.write).toBe(originalWrite);
+  expect(isStdoutTakenOver()).toBe(false);
 });

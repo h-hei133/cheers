@@ -13,6 +13,8 @@ export function createCliShutdown(input: {
   onSignal?: (signal: 'SIGTERM' | 'SIGHUP') => void | Promise<void>;
   /** Total bound across resource owners; expiry never admits runtime reentry. */
   timeoutMs?: number;
+  /** Cancel owned output synchronously before a cleanup timeout rejects or exits. */
+  onTimeout?: () => void;
 }): { close(): Promise<void>; exit(code?: number): void } {
   let exiting = false;
   let exitCode = 0;
@@ -57,7 +59,11 @@ export function createCliShutdown(input: {
         return results;
       })();
       const results = await Promise.race([cleanup, new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('Resource cleanup timed out; runtime reentry is blocked.')), input.timeoutMs ?? 10_000);
+        timer = setTimeout(() => {
+          try { input.onTimeout?.(); }
+          catch { /* Retain the report-safe timeout if its cancellation hook fails. */ }
+          reject(new Error('Resource cleanup timed out; runtime reentry is blocked.'));
+        }, input.timeoutMs ?? 10_000);
       })]);
       const failure = results.find((result) => result.status === "rejected");
       if (failure?.status === "rejected") throw failure.reason;
