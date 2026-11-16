@@ -30,6 +30,59 @@ async function drain(events: AsyncIterable<QueryEvent>): Promise<void> {
 afterEach(() => { setStructuredLogSink(null); });
 
 describe('session compaction boundaries', () => {
+  it('reports active automatic compaction through publication and the final hook', async () => {
+    let entered!: () => void, release!: () => void, afterEntered!: () => void, afterRelease!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const finalHook = new Promise<void>(resolve => { afterEntered = resolve; });
+    const hookHold = new Promise<void>(resolve => { afterRelease = resolve; });
+    const phases: Array<boolean | undefined> = [];
+    let run!: ReturnType<typeof runTurn>;
+    const input = options({ sessionId: 'compaction-activity', history: overBudgetHistory,
+      hooks: { dispatch: async (event: { eventName: string }) => {
+        if (event.eventName === 'PreCompact') phases.push(run.isCompacting?.());
+        if (event.eventName === 'PostCompact') { phases.push(run.isCompacting?.()); afterEntered(); await hookHold; }
+        return { decision: 'allow', stopChecks: [] };
+      } } as unknown as HookDispatcher });
+    run = runTurn({ ...input, compaction: { ...input.compaction!,
+      summarize: async () => { entered(); await hold; return 'previous work'; },
+      onCompact: () => { phases.push(run.isCompacting?.()); } } });
+    const running = drain(run.events);
+    try {
+      await started; expect(run.isCompacting?.()).toBe(true);
+      release(); await finalHook; expect(run.isCompacting?.()).toBe(true);
+    } finally { release(); afterRelease(); await running; }
+    expect(phases).toEqual([true, true, true]);
+    expect(run.isCompacting?.()).toBe(false);
+  });
+
+  it.each(['missing', 'rejected', 'cancelled'] as const)('retires automatic compaction activity after a %s summary', async outcome => {
+    let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const controller = new AbortController();
+    const input = options({ sessionId: `compaction-activity-${outcome}`, history: overBudgetHistory, signal: controller.signal });
+    const run = runTurn({ ...input, compaction: { ...input.compaction!, summarize: async () => {
+      entered(); await hold;
+      if (outcome === 'rejected') throw new Error('The summary was unavailable.');
+      return undefined;
+    } } });
+    const running = drain(run.events);
+    try { await started; expect(run.isCompacting?.()).toBe(true); }
+    finally { if (outcome === 'cancelled') controller.abort(); release(); await running; }
+    expect(run.isCompacting?.()).toBe(false);
+  });
+
+  it('does not report compaction during an ordinary budget check below threshold', async () => {
+    let run!: ReturnType<typeof runTurn>;
+    const phases: Array<boolean | undefined> = [];
+    const input = options({ history: [{ role: 'user', content: 'short' }], step: async () => {
+      phases.push(run.isCompacting?.()); return { text: 'done', toolCalls: [], stopReason: 'stop' };
+    } });
+    run = runTurn(input); await drain(run.events);
+    expect(phases).toEqual([false]); expect(run.isCompacting?.()).toBe(false);
+  });
+
   it('shows a thrown summary admission refusal through the actual turn adapter before sending', async () => {
     const notices: string[] = [];
     const summarize = Object.assign(vi.fn(async () => 'unexpected summary'), {

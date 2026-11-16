@@ -615,12 +615,64 @@ describe("runTurn", () => {
     expect(events.at(-1)?.type).toBe('query.failed');
   });
 
+  it('tracks raw overflow while joining an identical pending compaction', async () => {
+    const history: SessionMessage[] = [];
+    for (let index = 0; index < 4; index++) history.push(
+      { role: 'user', content: 'q' + index + ' ' + 'x'.repeat(400) },
+      { role: 'assistant', content: 'a' + index + ' ' + 'y'.repeat(400) },
+    );
+    let enter!: () => void, release!: () => void, secondStep!: () => void;
+    const started = new Promise<void>(resolve => { enter = resolve; });
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const secondStarted = new Promise<void>(resolve => { secondStep = resolve; });
+    const summarize = vi.fn(async () => { enter(); await held; return 'older work'; });
+    const post: Array<{ index: number; active: boolean | undefined }> = [];
+    const runs: Array<ReturnType<typeof runTurn>> = [];
+    const start = (index: number) => {
+      let calls = 0;
+      const run = runTurn(options({
+        sessionId: 'overflow_activity_join', history,
+        hooks: { dispatch: async (event: { eventName: string }) => {
+          if (event.eventName === 'PostCompact') post.push({ index, active: runs[index]?.isCompacting?.() });
+          return { decision: 'allow', stopChecks: [] };
+        } } as unknown as HookDispatcher,
+        step: async () => {
+          if (++calls === 1) {
+            if (index === 1) secondStep();
+            return { text: '', toolCalls: [], stopReason: 'error',
+              errorMessage: CONTEXT_OVERFLOW_PREFIX + 'too big' };
+          }
+          return { text: 'done', toolCalls: [], stopReason: 'stop' };
+        },
+        compaction: { policy: { contextWindow: 1_000_000, keepRecentTokens: 300 },
+          summarize, onCompact: () => {} },
+      }));
+      runs[index] = run;
+      return drain(run.events);
+    };
+    const first = start(0);
+    await started;
+    const second = start(1);
+    try {
+      await secondStarted;
+      // All remaining local recovery preparation is synchronous or microtask work.
+      // Yield one event-loop turn so the second caller reaches the existing pending promise.
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(summarize).toHaveBeenCalledOnce();
+      expect(runs[0]?.isCompacting?.()).toBe(true);
+      expect(runs[1]?.isCompacting?.()).toBe(true);
+    } finally { release(); await Promise.all([first, second]); }
+    expect(post).toContainEqual({ index: 1, active: true });
+    expect(runs.every(run => run.isCompacting?.() === false)).toBe(true);
+  });
+
   it("tells a hook the rescue compaction is an overflow", async () => {
     // The rescue is the compaction that discards the most context, and it used
     // to reach `condenseContext` without a lifecycle at all — so a hook watching
     // for the context being cut never heard about this one. The reason it
     // reported to be told about is `overflow`, which no code produced.
-    const seen: Array<{ name: string; reason?: string }> = [];
+    const seen: Array<{ name: string; reason?: string; compacting?: boolean }> = [];
+    let run!: ReturnType<typeof runTurn> & { isCompacting?: () => boolean };
     const history: SessionMessage[] = [];
     for (let index = 0; index < 4; index += 1) {
       history.push(
@@ -633,7 +685,7 @@ describe("runTurn", () => {
       history,
       hooks: {
         dispatch: async (input: { eventName: string; reason?: string }) => {
-          seen.push({ name: input.eventName, ...(input.reason ? { reason: input.reason } : {}) });
+          seen.push({ name: input.eventName, compacting: run.isCompacting?.(), ...(input.reason ? { reason: input.reason } : {}) });
           return { decision: "allow" as const };
         },
       } as unknown as HookDispatcher,
@@ -648,11 +700,13 @@ describe("runTurn", () => {
         onCompact: () => {},
       },
     });
-    await drain(runTurn(setup).events);
+    run = runTurn(setup); await drain(run.events);
 
     const compactHooks = seen.filter((entry) => entry.name === "PreCompact" || entry.name === "PostCompact");
     expect(compactHooks.map((entry) => entry.name)).toEqual(["PreCompact", "PostCompact"]);
     expect(compactHooks.every((entry) => entry.reason === "overflow")).toBe(true);
+    expect(compactHooks.every((entry) => entry.compacting === true)).toBe(true);
+    expect(run.isCompacting?.()).toBe(false);
   });
 
   it("reports overflow failure when the summarizer fails", async () => {

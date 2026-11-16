@@ -1,0 +1,79 @@
+Checked 3500 files in 607ms. No fixes applied.
+scc-gate root=packages/ts-shell/src files=3355
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=66 read=66 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=15 registered=15 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=24 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/runtime/navigation.test.ts (41 tests) 17958ms
+   ✓ session tree navigation > keeps every admitted deep entry in bounded tree and history terminal output without changing saved files  15532ms
+ ✓ src/cli/rpc/shell.test.ts (19 tests) 5581ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  486ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  412ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  451ms
+   ✓ keeps actual exit evidence when after-call hooks fail  401ms
+   ✓ reports unverified message persistence without losing the completed native outcome  400ms
+   ✓ retains completed effects without saving history after configuration retirement  384ms
+   ✓ retains completed effects without saving history after deletion retirement  380ms
+   ✓ preserves an unverified excluded report write in the RPC outcome  423ms
+   ✓ does not publish a completed shell result into a changed session  408ms
+   ✓ does not publish a completed shell result into a changed branch  462ms
+   ✓ redacts credential-shaped command output in the response and durable records  452ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  533ms
+ ✓ src/session/model/selection.test.ts (69 tests) 3880ms
+ ✓ src/session/SessionManager.test.ts (95 tests) 3199ms
+ ✓ src/cli/runtime/inputStream.extensions.test.ts (16 tests) 2086ms
+ ✓ src/session/model/effort.test.ts (26 tests) 1485ms
+ ✓ src/cli/rpc/runtimeHost.test.ts (38 tests) 1232ms
+ ✓ src/session/branch/store/index.test.ts (37 tests) 1081ms
+ ✓ src/cli/interactive/settings.test.ts (46 tests) 1049ms
+ ✓ src/cli/runtime/compaction.test.ts (51 tests) 880ms
+ ✓ src/cli/rpc/thinking.test.ts (10 tests) 538ms
+ ✓ src/turn/step.test.ts (117 tests) 572ms
+ ✓ src/turn/session.test.ts (50 tests) 521ms
+ ✓ src/cli/rpc/retry.test.ts (8 tests) 474ms
+ ✓ src/core/shell/sessionRuntime.test.ts (50 tests) 410ms
+ ✓ src/cli/runtime/inputStream.rpc.test.ts (12 tests) 383ms
+ ✓ src/cli/rpc/commands.test.ts (10 tests) 403ms
+{"type":"extension_ui_request","id":"81a33db5-8bcc-4e98-bc8f-bfa06b4c70c2","method":"select","title":"Choose","options":["a","b"]}
+{"id":"p1","type":"response","command":"prompt","success":true}
+{"id":"p2","type":"response","command":"prompt","success":true}
+{"id":"cq","type":"response","command":"clear_queue","success":true,"data":{"cleared":1,"steering":[],"followUp":["stale"]}}
+{"id":"p3","type":"response","command":"prompt","success":true}
+ ✓ src/cli/runtime/inputStream.test.ts (10 tests) 325ms
+   ✓ routes RPC commands, attachments, queue clears, and extension_ui_response in rpcMode without emitting the non-TTY prose banner  307ms
+ ✓ src/cli/rpc/compaction.test.ts (11 tests) 304ms
+ ✓ src/cli/rpc/settings.test.ts (6 tests) 295ms
+ ✓ src/session/compaction/progress.test.ts (19 tests) 112ms
+ ✓ src/cli/runtime/settings.test.ts (2 tests) 93ms
+ ✓ src/cli/runtime/sessionCommands.test.ts (2 tests) 83ms
+ ✓ src/session/compaction.test.ts (46 tests) 68ms
+ ✓ src/core/agent/retry.test.ts (43 tests) 50ms
+ ✓ src/turn/retry.test.ts (9 tests) 51ms
+ ✓ src/turn/compaction.test.ts (13 tests) 52ms
+ ✓ src/cli/rpc/uiBridge.test.ts (7 tests) 30ms
+ ✓ src/core/shell/compaction.test.ts (10 tests) 25ms
+ ✓ src/core/shell/sessionIdle.test.ts (6 tests) 15ms
+ ✓ src/turn/pendingInput.test.ts (8 tests) 6ms
+ ✓ src/cli/rpc/rpcServer.test.ts (3 tests) 6ms
+ ✓ src/cli/rpc/protocol.test.ts (19 tests) 5ms
+ ✓ src/session/query/navigation.test.ts (2 tests) 4ms
+
+ Test Files  34 passed (34)
+      Tests  911 passed (911)
+   Start at  16:55:17
+   Duration  92.61s (transform 9.25s, setup 0ms, collect 41.34s, tests 43.25s, environment 4ms, prepare 1.63s)
+
+module-facade-check ceiling=20 modules=2648 reported=0 thresholds=delegationRatio>=0.9,branching<=0,ownStateWrites<=0
+  verdict         names lines  delegation  branching  lines/name  module
+module-facade-summary monoliths=0 thin_facades=0
+Wrote build manifest 1b750e0da086 for @cheers/ts-shell@0.1.0

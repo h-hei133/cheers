@@ -11,7 +11,7 @@ import {
   resolveSessionTargetId,
 } from "../runtimeOps.js";
 import type { RuntimeRpcHostOptions } from "./contract.js";
-import { readRpcForkMessages, readRpcNavigation, readRpcSession } from './read.js';
+import { readRpcForkMessages, readRpcNavigation, readRpcSession, readSnapshot } from './read.js';
 
 type SessionHost = Pick<RpcHost, "newSession" | "switchSession" | "setSessionName" | "getSessionStats"
   | "getLastAssistantText" | "fork" | "cloneSession" | "getForkMessages" | "getEntries" | "getTree" | "navigateTree">;
@@ -63,8 +63,8 @@ export function sessionHost(options: RuntimeRpcHostOptions, manager: SessionMana
       return selectSession(cloned);
     },
     getForkMessages: () => readRpcForkMessages(runtimeContext),
-    getEntries: (since) => readRpcEntries(runtimeContext, since),
-    getTree: () => readRpcTree(runtimeContext),
+    getEntries: (since) => readSnapshot(runtimeContext, () => readRpcEntries(runtimeContext, since)),
+    getTree: () => readSnapshot(runtimeContext, () => readRpcTree(runtimeContext)),
     navigateTree: (entryId, expectedVersion) => {
       if (busy()) throw new Error('A session operation is still running.');
       return navigateRpcTree(runtimeContext, manager, sessionRuntime, entryId, expectedVersion);

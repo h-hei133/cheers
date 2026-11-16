@@ -1,0 +1,119 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { buildInputDigest } from '../../scripts/build-identity.mjs';
+
+const repo = process.cwd();
+const scratch = path.join(repo, '.tmp/rpc-acceptance-2026-11-16');
+const directory = path.join(repo, '.omx/artifacts/upgrade-rpc-acceptance-2026-11-16');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const read = name => JSON.parse(fs.readFileSync(path.join(scratch, name), 'utf8'));
+const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'), 'utf8'));
+assert.equal(buildInputDigest(repo, manifest.compilerInputs).digest, manifest.inputsDigest);
+const validation = fs.readFileSync(path.join(scratch, 'final-validation.log'), 'utf8');
+assert.match(validation, /Test Files\s+34 passed \(34\)/);
+assert.match(validation, /Tests\s+912 passed \(912\)/);
+assert.ok(validation.includes(`Wrote build manifest ${manifest.buildId.slice(0, 12)}`));
+
+const nativeNames = ['commands-logical', 'commands-physical', 'shell', 'settings', 'compact', 'retry', 'joint'];
+const probes = nativeNames.map(name => ({ name, receipt: read(name + '.json') }));
+for (const { name, receipt } of probes) {
+  assert.equal(receipt.status, 'passed', name);
+  assert.equal(receipt.buildId, manifest.buildId, name);
+  const script = name.startsWith('commands-') ? 'commands' : name;
+  assert.equal(receipt.probeSha256, hash(fs.readFileSync(path.join(scratch, script + '.mjs'))), name);
+}
+const real = read('real.json');
+assert.equal(real.status, 'passed');
+assert.equal(real.buildId, manifest.buildId);
+assert.equal(real.probeSha256, hash(fs.readFileSync(path.join(scratch, 'real.mjs'))));
+assert.equal(real.requests, 4);
+assert.equal(real.originalConfigUnchanged, true);
+const reversals = read('reversal.json');
+assert.equal(reversals.status, 'passed');
+assert.equal(reversals.cases.length, 7);
+for (const item of reversals.cases) {
+  assert.equal(item.assertionFailure, true);
+  assert.equal(item.exactRestoration, true);
+  assert.equal(item.exitCode, 1);
+  assert.equal(item.sourceSha256, hash(fs.readFileSync(path.join(repo, item.file))));
+}
+const code = read('review-code.json'), architecture = read('review-architecture.json');
+assert.equal(code.recommendation, 'APPROVE');
+assert.equal(architecture.status, 'CLEAR');
+for (const review of [code, architecture]) {
+  assert.ok(Object.keys(review.sourceHashes).length > 0);
+  for (const [file, expected] of Object.entries(review.sourceHashes)) {
+    assert.equal(hash(fs.readFileSync(path.join(repo, file))), expected, file);
+  }
+}
+
+fs.mkdirSync(directory, { recursive: true });
+for (const entry of fs.readdirSync(scratch, { withFileTypes: true })) {
+  assert.equal(entry.isFile(), true, 'Temporary runtime state must be removed before archival.');
+  const name = entry.name.endsWith('.mjs') ? entry.name + '.txt' : entry.name;
+  fs.copyFileSync(path.join(scratch, entry.name), path.join(directory, name));
+}
+fs.copyFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'), path.join(directory, 'build-manifest.json'));
+const changed = execFileSync('rtk', ['proxy', 'git', 'diff', '--name-only'], { encoding: 'utf8' }).trim().split('\n');
+const untracked = execFileSync('rtk', ['proxy', 'git', 'ls-files', '--others', '--exclude-standard', 'packages/ts-shell/src'], { encoding: 'utf8' }).trim().split('\n');
+const source = {};
+for (const file of [...new Set([...changed, ...untracked])].filter(file => file.startsWith('packages/ts-shell/src/'))) {
+  const bytes = fs.readFileSync(path.join(repo, file));
+  const snapshot = 'source/' + file.replace('packages/ts-shell/src/', '') + '.txt';
+  fs.mkdirSync(path.dirname(path.join(directory, snapshot)), { recursive: true });
+  fs.writeFileSync(path.join(directory, snapshot), bytes);
+  source[file] = { snapshot, sha256: hash(bytes) };
+}
+const documents = {};
+for (const file of ['.wiki/log.md', '.wiki/refactor/upgrade/MASTER.md', '.wiki/refactor/upgrade/tasks.md',
+  '.wiki/refactor/upgrade/design.md', '.wiki/refactor/upgrade/summary.md', 'HANDOFF.md']) {
+  const bytes = fs.readFileSync(path.join(repo, file)), snapshot = 'docs/' + file + '.txt';
+  fs.mkdirSync(path.dirname(path.join(directory, snapshot)), { recursive: true });
+  fs.writeFileSync(path.join(directory, snapshot), bytes);
+  documents[file] = { snapshot, sha256: hash(bytes) };
+}
+const evidence = {};
+function visit(folder) {
+  for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
+    const file = path.join(folder, entry.name);
+    if (entry.isDirectory()) visit(file);
+    else if (entry.name !== 'delivery.json') evidence[path.relative(directory, file)] = hash(fs.readFileSync(file));
+  }
+}
+visit(directory);
+const posts = probes.reduce((total, item) => total + (item.receipt.posts ?? item.receipt.loopbackPosts ?? 0), 0);
+const delivery = {
+  schemaVersion: 1, date: '2026-11-16', task: 'D.1', batch: 'Complete RPC command acceptance and ownership repairs',
+  status: 'locally-validated', delivery: 'Local commit containing this receipt; not pushed',
+  baseCommit: execFileSync('rtk', ['proxy', 'git', 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  buildId: manifest.buildId, source, documents,
+  validation: {
+    tests: { status: 'passed', suites: 34, tests: 912, log: 'final-validation.log',
+      affectedCompaction: { suites: 15, tests: 268, log: 'fixed-shared-overflow.log' },
+      afterRestoration: { suites: 3, tests: 110, log: 'shared-fix-restored.log' } },
+    gates: { status: 'passed', count: 6, log: 'final-validation.log', docsSourceAdvisories: 119 },
+    responsibility: { modules: 2648, monoliths: 0, log: 'final-validation.log' },
+    build: { status: 'passed', log: 'final-validation.log', currentInputDigestVerified: true },
+    reversals: { status: 'passed', count: 7, actualAssertionsFailed: true, restoredExactly: true, receipt: 'reversal.json',
+      sharedGenerationRed: 'red-shared-overflow.log', initialArchitectureFinding: 'review-architecture-first.json' },
+    native: { status: 'passed', platform: 'linux', compiledCli: true, sameBuild: true, loopbackPosts: posts,
+      receipts: nativeNames.map(name => name + '.json'), log: 'final-native.log' },
+    configuredProvider: { status: 'passed', platform: 'linux', compiledCli: true, receipt: 'real.json', requests: 4,
+      sameBuild: true, originalActiveTarget: true, originalConfigUnchanged: true, minimalIsolatedCatalogue: true,
+      bodyInspectable: false, actualRetryFailureInduced: false },
+    review: { code: 'APPROVE', architecture: 'CLEAR', reviewersExecutedValidation: false,
+      receipts: ['review-code.json', 'review-architecture.json'] },
+  },
+  limits: { tasksComplete: 23, tasksTotal: 62, remaining: 39,
+    pending: { partial: 13, existingAwaitingAcceptance: 11, gaps: 13, needsVerification: 2 },
+    goal: 'active', otherPlatforms: false, physicalDisplay: false, push: false, ci: false,
+    fullRepositorySuite: false, deterministicRealProviderFailure: false, providerBodyInspection: false,
+    arbitraryOversizedSingleMessageCompaction: false },
+  failureClassification: 'classification.md', evidence,
+};
+fs.writeFileSync(path.join(directory, 'delivery.json'), JSON.stringify(delivery, null, 2) + '\n');
+console.log(JSON.stringify({ status: delivery.status, buildId: manifest.buildId,
+  sourceSnapshots: Object.keys(source).length, evidenceFiles: Object.keys(evidence).length, loopbackPosts: posts }));

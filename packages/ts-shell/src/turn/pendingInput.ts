@@ -43,6 +43,7 @@ export function pendingTurnInput(): PendingTurnInput {
   ]);
 
   const input: TurnInput = {
+    isCompacting: () => live?.isCompacting?.() ?? false,
     abortRetry: () => live?.abortRetry?.(),
     activeTools: () => live?.activeTools?.() ?? [],
     setQueueMode: (lane, mode) => {

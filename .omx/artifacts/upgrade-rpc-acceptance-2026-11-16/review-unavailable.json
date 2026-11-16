@@ -1,0 +1,11 @@
+{
+  "status": "unavailable",
+  "lanes": [
+    "rpc_review_bounded",
+    "rpc_code_completion"
+  ],
+  "reason": "No completed report was returned; lanes were interrupted and replaced.",
+  "usedAsApproval": false,
+  "finalCodeReview": "rpc_completion_review",
+  "finalReceipt": "review-code.json"
+}

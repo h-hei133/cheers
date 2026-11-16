@@ -131,6 +131,12 @@ export interface RpcCommandSnapshot {
   readonly assertCurrent: () => void;
 }
 
+/** Captured read data retains its original admission until response publication. */
+export interface RpcReadSnapshot<T> {
+  readonly data: T;
+  readonly assertCurrent: () => void;
+}
+
 /** Confirmed user-default storage and its captured effective configuration are separate facts. */
 export interface RpcSettingResult {
   readonly saved: true;
@@ -176,9 +182,10 @@ export interface RpcHost {
   readonly abortRetry?: () => void;
   readonly fork?: (entryId: string) => Promise<{ readonly text?: string; readonly sessionId?: string; readonly cancelled: boolean }>;
   readonly cloneSession?: () => Promise<{ readonly sessionId?: string; readonly cancelled: boolean }>;
-  readonly getForkMessages?: () => Promise<readonly { readonly entryId: string; readonly text: string }[]>;
-  readonly getEntries?: (since?: string | number) => Promise<Record<string, unknown>>;
-  readonly getTree?: () => Promise<Record<string, unknown>>;
+  readonly getForkMessages?: () => Promise<readonly { readonly entryId: string; readonly text: string }[]
+    | RpcReadSnapshot<readonly { readonly entryId: string; readonly text: string }[]>>;
+  readonly getEntries?: (since?: string | number) => Promise<Record<string, unknown> | RpcReadSnapshot<Record<string, unknown>>>;
+  readonly getTree?: () => Promise<Record<string, unknown> | RpcReadSnapshot<Record<string, unknown>>>;
   readonly navigateTree?: (entryId: string, expectedVersion?: string) => Promise<SessionNavigationResult>;
   readonly getCommands?: (signal?: AbortSignal) => readonly Record<string, unknown>[] | RpcCommandSnapshot
     | Promise<readonly Record<string, unknown>[] | RpcCommandSnapshot>;
@@ -211,6 +218,23 @@ function parseJsonLine(line: string): Record<string, unknown> | undefined {
   }
 }
 
+/** Project invalid input without returning its body or parser exception. */
+export function rpcInputFailure(line: string): RpcResponse {
+  const parsed = parseJsonLine(line);
+  const id = typeof parsed?.id === 'string' && parsed.id.length <= 256
+    && !/[\u0000-\u001f\u007f]/.test(parsed.id) ? parsed.id : undefined;
+  const command = !parsed ? 'parse'
+    : typeof parsed.type === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(parsed.type) ? parsed.type : 'unknown';
+  return {
+    type: 'response',
+    ...(id !== undefined ? { id } : {}),
+    command,
+    success: false,
+    error: command === 'parse' ? 'Invalid RPC JSON object.'
+      : command === 'extension_ui_response' ? 'Invalid RPC UI response.' : 'Invalid RPC command.',
+  };
+}
+
 function parseImages(raw: unknown): readonly RpcImageAttachment[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const images: RpcImageAttachment[] = [];
@@ -236,11 +260,13 @@ export function tryParseRpcUiResponse(line: string): RpcExtensionUiResponse | un
 export function tryParseRpcCommand(line: string): RpcCommand | undefined {
   const parsed = parseJsonLine(line);
   if (!parsed || typeof parsed.type !== "string" || !RPC_COMMAND_TYPES.has(parsed.type)) return undefined;
+  if (parsed.id !== undefined && typeof parsed.id !== "string") return undefined;
   const id = typeof parsed.id === "string" ? parsed.id : undefined;
   const base = id !== undefined ? { id } : {};
   switch (parsed.type) {
     case "prompt": {
       if (typeof parsed.message !== "string") return undefined;
+      if (parsed.streamingBehavior !== undefined && parsed.streamingBehavior !== "steer" && parsed.streamingBehavior !== "followUp") return undefined;
       const images = parsed.images !== undefined ? parseImages(parsed.images) : undefined;
       if (parsed.images !== undefined && !images) return undefined;
       return {
@@ -257,8 +283,10 @@ export function tryParseRpcCommand(line: string): RpcCommand | undefined {
       return { ...base, type: parsed.type, message: parsed.message, ...(images ? { images } : {}) };
     }
     case "export_html":
+      if (parsed.outputPath !== undefined && typeof parsed.outputPath !== "string") return undefined;
       return { ...base, type: "export_html", ...(typeof parsed.outputPath === "string" ? { outputPath: parsed.outputPath } : {}) };
     case "new_session":
+      if (parsed.parentSession !== undefined && typeof parsed.parentSession !== "string") return undefined;
       return { ...base, type: "new_session", ...(typeof parsed.parentSession === "string" ? { parentSession: parsed.parentSession } : {}) };
     case "switch_session":
       return typeof parsed.sessionPath === "string" ? { ...base, type: "switch_session", sessionPath: parsed.sessionPath } : undefined;
@@ -273,6 +301,7 @@ export function tryParseRpcCommand(line: string): RpcCommand | undefined {
     case "set_follow_up_mode":
       return parsed.mode === "one-at-a-time" || parsed.mode === "all" ? { ...base, type: parsed.type, mode: parsed.mode } : undefined;
     case "compact":
+      if (parsed.customInstructions !== undefined && typeof parsed.customInstructions !== "string") return undefined;
       return { ...base, type: "compact", ...(typeof parsed.customInstructions === "string" ? { customInstructions: parsed.customInstructions } : {}) };
     case "set_auto_compaction":
     case "set_auto_retry":
@@ -280,6 +309,7 @@ export function tryParseRpcCommand(line: string): RpcCommand | undefined {
     case "fork":
       return typeof parsed.entryId === "string" ? { ...base, type: "fork", entryId: parsed.entryId } : undefined;
     case "get_entries":
+      if (parsed.since !== undefined && typeof parsed.since !== "string" && !(typeof parsed.since === "number" && Number.isFinite(parsed.since))) return undefined;
       return {
         ...base,
         type: "get_entries",
@@ -288,10 +318,12 @@ export function tryParseRpcCommand(line: string): RpcCommand | undefined {
           : {}),
       };
     case "navigate_tree":
+      if (parsed.expectedVersion !== undefined && typeof parsed.expectedVersion !== "string") return undefined;
       return typeof parsed.entryId === "string"
         ? { ...base, type: "navigate_tree", entryId: parsed.entryId, ...(typeof parsed.expectedVersion === "string" ? { expectedVersion: parsed.expectedVersion } : {}) }
         : undefined;
     case "bash":
+      if (parsed.excludeFromContext !== undefined && typeof parsed.excludeFromContext !== "boolean") return undefined;
       return typeof parsed.command === "string"
         ? { ...base, type: "bash", command: parsed.command, ...(typeof parsed.excludeFromContext === "boolean" ? { excludeFromContext: parsed.excludeFromContext } : {}) }
         : undefined;

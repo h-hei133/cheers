@@ -1,0 +1,53 @@
+{
+  "status": "passed",
+  "cases": [
+    {
+      "name": "strict-input",
+      "file": "packages/ts-shell/src/cli/runtime/inputStream.ts",
+      "assertionFailure": true,
+      "exactRestoration": true,
+      "sourceSha256": "fff3a8a90906aaa09aedbce26dde8d0286b3e0cba0c9aa63b1db596ad392411a",
+      "exitCode": 1
+    },
+    {
+      "name": "optional-exclusion",
+      "file": "packages/ts-shell/src/cli/rpc/protocol.ts",
+      "assertionFailure": true,
+      "exactRestoration": true,
+      "sourceSha256": "c20f51c50762743325d3318eac73acac7ccf7ead6248f3327247798499ff7faf",
+      "exitCode": 1
+    },
+    {
+      "name": "read-admission",
+      "file": "packages/ts-shell/src/cli/rpc/handlers.ts",
+      "assertionFailure": true,
+      "exactRestoration": true,
+      "sourceSha256": "29967640db9d95a89ceefb9d06a8fe69c5a7766b6dd124a6fae940ec54a04907",
+      "exitCode": 1
+    },
+    {
+      "name": "manual-activity",
+      "file": "packages/ts-shell/src/core/shell/sessionRuntime.ts",
+      "assertionFailure": true,
+      "exactRestoration": true,
+      "sourceSha256": "99447e807b136bc1d226762399b3ca7a1390d8422a270c80d4b15ae992c9587b",
+      "exitCode": 1
+    },
+    {
+      "name": "automatic-activity",
+      "file": "packages/ts-shell/src/turn/compaction.ts",
+      "assertionFailure": true,
+      "exactRestoration": true,
+      "sourceSha256": "aa3e76e74bf1609322d2a1c67f5c0cd354779f1cb74afa658d39882cd9851c38",
+      "exitCode": 1
+    },
+    {
+      "name": "overflow-activity",
+      "file": "packages/ts-shell/src/turn/session.ts",
+      "assertionFailure": true,
+      "exactRestoration": true,
+      "sourceSha256": "2465c55e5b067f8c6fbfa471ec28964ee2d79b136d609b24199391f17b60e7c4",
+      "exitCode": 1
+    }
+  ]
+}

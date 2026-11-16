@@ -1,0 +1,45 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "status": "passed",
+  "realProvider": false,
+  "buildId": "1b750e0da086a9197253ffcd072cdbae05d6acd50b3a6a45ced2a21016c9c953",
+  "probeSha256": "5a511f0c6d68e88d6fc6e71808ef3293260818db1a8d94fba8142a854452b47a",
+  "stages": {
+    "ordinary": {
+      "passed": true,
+      "acceptedStreamSurvived": true,
+      "completed": true,
+      "singlePost": true
+    },
+    "provider": {
+      "passed": true,
+      "failedOutcome": true,
+      "singlePost": true,
+      "noSecondAttempt": true,
+      "explicitReuseCompleted": true
+    },
+    "outer": {
+      "passed": true,
+      "failedOutcome": true,
+      "singlePost": true,
+      "noSecondAttempt": true,
+      "explicitReuseCompleted": true
+    },
+    "command": {
+      "passed": true,
+      "nativeCommandSurvived": true,
+      "exit0": true
+    },
+    "acceptedStream": {
+      "passed": true,
+      "retryControlWasNoop": true,
+      "bodyFailureWasFailed": true,
+      "noReplay": true,
+      "singlePost": true
+    }
+  },
+  "posts": 6,
+  "validJsonLines": true,
+  "eofExit0": true
+}

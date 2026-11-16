@@ -1,0 +1,253 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/cli/rpc/compaction.test.ts (11 tests | 7 failed) 300ms
+   ✓ preserves the actual no-compaction result of an empty stored session 62ms
+   ✓ registers compaction before an immediate RPC abort and retains its cancellation outcome 18ms
+   ✓ returns a structured busy result while another local operation owns settlement 16ms
+   × publishes manual compaction activity from synchronous admission through cancelled settlement 22ms
+     → expected undefined to be false // Object.is equality
+   × retires compaction activity after compacted settles 17ms
+     → expected undefined to be false // Object.is equality
+   × retires compaction activity after nothing settles 17ms
+     → expected undefined to be false // Object.is equality
+   × retires compaction activity after failed settles 16ms
+     → expected undefined to be false // Object.is equality
+   × retires compaction activity after rejected settles 16ms
+     → expected undefined to be false // Object.is equality
+   × retains branch summary activity and forwards cancellation until its own settlement 16ms
+     → expected undefined to be true // Object.is equality
+   × lets JSONL controls cancel compaction while EOF and queued prompts wait for its full settlement 82ms
+     → expected { id: 'state', type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(15 matching properties omitted from actual)
+   ✓ joins a successful compaction response at ordinary EOF without cancelling it 17ms
+ ❯ src/turn/session.test.ts (50 tests | 1 failed) 572ms
+   ✓ keeps the goal budget closing instruction internal for summary 10ms
+   ✓ keeps the goal budget closing instruction internal for no-room 2ms
+   ✓ keeps the goal budget closing instruction internal for tool-refusal 2ms
+   ✓ keeps the goal budget closing instruction internal for unknown 1ms
+   ✓ preserves only already displayed public reasoning after compatible-eof without granting replay 24ms
+   ✓ preserves only already displayed public reasoning after responses-failed without granting replay 7ms
+   ✓ preserves only already displayed public reasoning after responses-eof without granting replay 3ms
+   ✓ persists and restores actual reasoning-only output as an unanswered stopped result 4ms
+   ✓ keeps only meaningful reasoning evidence from otherwise empty messages: {"text":" \n\t","keep":false} 1ms
+   ✓ keeps only meaningful reasoning evidence from otherwise empty messages: {"text":"","signature":"synthetic-opaque","redacted":true,"keep":true} 1ms
+   ✓ reports an unanswered output limit without diagnosing context overflow: {"stream":false,"reasoning":""} 3ms
+   ✓ reports an unanswered output limit without diagnosing context overflow: {"stream":true,"reasoning":""} 3ms
+   ✓ reports an unanswered output limit without diagnosing context overflow: {"stream":false,"reasoning":"Public reasoning"} 3ms
+   ✓ reports an unanswered output limit without diagnosing context overflow: {"stream":true,"reasoning":"Public reasoning"} 2ms
+   ✓ settles terminal reasoning tails before stop hooks finish in the actual response loop 52ms
+   ✓ keeps verified reasoning in its own model message through the real tool loop and sink 28ms
+   ✓ carries registered MCP hints into the turn's plan gate 3ms
+   ✓ runTurn > rejects tools returned by the actual closing request ({"maxSteps":1,"inline":false}) 3ms
+   ✓ runTurn > rejects tools returned by the actual closing request ({"maxSteps":2,"inline":false}) 5ms
+   ✓ runTurn > rejects tools returned by the actual closing request ({"maxSteps":1,"inline":true}) 4ms
+   ✓ runTurn > rejects tools returned by the actual closing request ({"maxSteps":2,"inline":true}) 6ms
+   ✓ runTurn > attributes the request after a discovery result without inferring from prose 0ms
+   ✓ runTurn > ties accepted request dimensions to its own usage (undefined) and excludes durable snapshots 3ms
+   ✓ runTurn > ties accepted request dimensions to its own usage (0) and excludes durable snapshots 3ms
+   ✓ runTurn > ties accepted request dimensions to its own usage (21) and excludes durable snapshots 2ms
+   ✓ runTurn > does not reattach a request observation after a context reset during usage delivery 1ms
+   ✓ runTurn > publishes the exact accepted wire prompt identity 1ms
+   ✓ runTurn > keeps the foreground receipt when a shared step sends a delegated request 143ms
+   ✓ runTurn > invalidates a metered prefix before a later step that reports no usage 2ms
+   ✓ runTurn > does not warm a unmetered response using the previous context gauge 8ms
+   ✓ runTurn > does not warm a unfinished response using the previous context gauge 2ms
+   ✓ runTurn > does not warm a refused response using the previous context gauge 1ms
+   ✓ runTurn > streams the answer and reports a completed run 1ms
+   ✓ runTurn > persists the assistant and tool messages but never the opening prompt 3ms
+   ✓ runTurn > refuses tool calls the model truncated and lets it re-issue them 1ms
+   ✓ runTurn > ends quietly when interrupted, keeping what was already said 1ms
+   ✓ runTurn > reports a failed model call as a failed run 1ms
+   ✓ runTurn > compacts once and retries when the provider reports an overflow 12ms
+   ✓ runTurn > retains an overflow failure without summarizing or retrying when auto compaction is disabled 1ms
+   × runTurn > tells a hook the rescue compaction is an overflow 7ms
+     → expected false to be true // Object.is equality
+   ✓ runTurn > reports overflow failure when the summarizer fails 1ms
+   ✓ runTurn > delivers steering before the next step and follow-ups after the run would stop 2ms
+   ✓ runTurn > hands undelivered input back when the queue is cleared 0ms
+   ✓ runTurn > drops blank steering and follow-up input at the boundary 0ms
+   ✓ tool events reach the shell before the batch is assembled > reports a call settled as soon as that call stops running 22ms
+   ✓ progress from a tool reaches the shell > carries output a tool reports while it runs 2ms
+   ✓ a subagent's calls answer to the session's rules > refuses, inside the subagent, a tool the session refuses 76ms
+   ✓ a subagent's calls answer to the session's rules > refuses a tool the session refuses, even when a subagent asks for it 3ms
+   ✓ binds the delegated reviewer mode through the real turn composition 58ms
+   ✓ delivers a subagent's exhausted budget and partial narration to the parent as failure 44ms
+ ❯ src/turn/compaction.test.ts (13 tests | 5 failed) 56ms
+   × session compaction boundaries > reports active automatic compaction through publication and the final hook 16ms
+     → expected undefined to be true // Object.is equality
+   × session compaction boundaries > retires automatic compaction activity after a missing summary 4ms
+     → expected undefined to be true // Object.is equality
+   × session compaction boundaries > retires automatic compaction activity after a rejected summary 3ms
+     → expected undefined to be true // Object.is equality
+   × session compaction boundaries > retires automatic compaction activity after a cancelled summary 4ms
+     → expected undefined to be true // Object.is equality
+   × session compaction boundaries > does not report compaction during an ordinary budget check below threshold 4ms
+     → expected [ undefined ] to deeply equal [ false ]
+   ✓ session compaction boundaries > shows a thrown summary admission refusal through the actual turn adapter before sending 4ms
+   ✓ session compaction boundaries > reports a missing summary once and retains the original request context 3ms
+   ✓ session compaction boundaries > keeps arbitrary provider bodies and credentials out of the failure notice 2ms
+   ✓ session compaction boundaries > scrubs local refusal details before the user-visible callback 3ms
+   ✓ session compaction boundaries > keeps an ordinary context below the threshold silent 1ms
+   ✓ session compaction boundaries > checks before kernel entry, retains the opening once, and checks between tool steps 6ms
+   ✓ session compaction boundaries > cancels preflight without entering the kernel or sending the first request 2ms
+   ✓ session compaction boundaries > skips only the externally prepared prompt and still prepares a queued restart 2ms
+ ❯ src/turn/pendingInput.test.ts (8 tests | 1 failed) 11ms
+   × input held before a run exists > reads only the adopted run compaction activity without retaining a previous run phase 5ms
+     → expected undefined to be false // Object.is equality
+   ✓ input held before a run exists > forwards retry cancellation to the adopted run without buffering it for a future run 2ms
+   ✓ input held before a run exists > carries queue mode changes through readiness adoption and updates the same live queue 1ms
+   ✓ input held before a run exists > preserves pending IDs across adoption and edits the queue consumed by the live run 1ms
+   ✓ input held before a run exists > holds what arrives, then hands it to the run when it is adopted 0ms
+   ✓ input held before a run exists > reports and drains the run's queue once the run holds the messages 0ms
+   ✓ input held before a run exists > hands undelivered text back once, and only what was not yet delivered 0ms
+   ✓ input held before a run exists > keeps holding when the run turned out to take no input 0ms
+ Test Files  4 failed (4)
+      Tests  14 failed | 68 passed (82)
+   Start at  15:51:34
+   Duration  19.16s (transform 9.70s, setup 0ms, collect 16.74s, tests 939ms, environment 1ms, prepare 359ms)
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/turn/compaction.test.ts > session compaction boundaries > reports active automatic compaction through publication and the final hook
+AssertionError: expected undefined to be true // Object.is equality
+- Expected: 
+true
++ Received: 
+undefined
+ ❯ src/turn/compaction.test.ts:52:51
+     50|     const running = drain(run.events);
+     51|     try {
+     52|       await started; expect(run.isCompacting?.()).toBe(true);
+       |                                                   ^
+     53|       release(); await finalHook; expect(run.isCompacting?.()).toBe(tr…
+     54|     } finally { release(); afterRelease(); await running; }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+ FAIL  src/turn/compaction.test.ts > session compaction boundaries > retires automatic compaction activity after a missing summary
+ FAIL  src/turn/compaction.test.ts > session compaction boundaries > retires automatic compaction activity after a rejected summary
+ FAIL  src/turn/compaction.test.ts > session compaction boundaries > retires automatic compaction activity after a cancelled summary
+AssertionError: expected undefined to be true // Object.is equality
+- Expected: 
+true
++ Received: 
+undefined
+ ❯ src/turn/compaction.test.ts:71:55
+     69|     } } }) as ReturnType<typeof runTurn> & { isCompacting?: () => bool…
+     70|     const running = drain(run.events);
+     71|     try { await started; expect(run.isCompacting?.()).toBe(true); }
+       |                                                       ^
+     72|     finally { if (outcome === 'cancelled') controller.abort(); release…
+     73|     expect(run.isCompacting?.()).toBe(false);
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯
+ FAIL  src/turn/compaction.test.ts > session compaction boundaries > does not report compaction during an ordinary budget check below threshold
+AssertionError: expected [ undefined ] to deeply equal [ false ]
+- Expected
++ Received
+  [
+-   false,
++   undefined,
+  ]
+ ❯ src/turn/compaction.test.ts:83:20
+     81|     } });
+     82|     run = runTurn(input); await drain(run.events);
+     83|     expect(phases).toEqual([false]); expect(run.isCompacting?.()).toBe…
+       |                    ^
+     84|   });
+     85| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯
+ FAIL  src/turn/pendingInput.test.ts > input held before a run exists > reads only the adopted run compaction activity without retaining a previous run phase
+AssertionError: expected undefined to be false // Object.is equality
+- Expected: 
+false
++ Received: 
+undefined
+ ❯ src/turn/pendingInput.test.ts:40:36
+     38|     const input = pending.input as TurnInput & { isCompacting?: () => …
+     39|     let firstActive = true, secondActive = false;
+     40|     expect(input.isCompacting?.()).toBe(false);
+       |                                    ^
+     41|     pending.adopt({ input: { ...first.input, isCompacting: () => first…
+     42|     expect(input.isCompacting?.()).toBe(true);
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯
+ FAIL  src/turn/session.test.ts > runTurn > tells a hook the rescue compaction is an overflow
+AssertionError: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ src/turn/session.test.ts:657:70
+    655|     expect(compactHooks.map((entry) => entry.name)).toEqual(["PreCompa…
+    656|     expect(compactHooks.every((entry) => entry.reason === "overflow"))…
+    657|     expect(compactHooks.every((entry) => entry.compacting === true)).t…
+       |                                                                      ^
+    658|     expect(run.isCompacting?.()).toBe(false);
+    659|   });
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯
+ FAIL  src/cli/rpc/compaction.test.ts > publishes manual compaction activity from synchronous admission through cancelled settlement
+AssertionError: expected undefined to be false // Object.is equality
+- Expected: 
+false
++ Received: 
+undefined
+ ❯ src/cli/rpc/compaction.test.ts:89:47
+     87|     return { status: 'failed', reason: 'Compaction was cancelled.' };
+     88|   });
+     89|   expect(test.host.getState?.().isCompacting).toBe(false);
+       |                                               ^
+     90|   const compact = handleRpcCommand({ type: 'compact' }, test.host);
+     91|   try {
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯
+ FAIL  src/cli/rpc/compaction.test.ts > retires compaction activity after compacted settles
+ FAIL  src/cli/rpc/compaction.test.ts > retires compaction activity after nothing settles
+ FAIL  src/cli/rpc/compaction.test.ts > retires compaction activity after failed settles
+ FAIL  src/cli/rpc/compaction.test.ts > retires compaction activity after rejected settles
+AssertionError: expected undefined to be false // Object.is equality
+- Expected: 
+false
++ Received: 
+undefined
+ ❯ src/cli/rpc/compaction.test.ts:109:47
+    107|   });
+    108|   await handleRpcCommand({ type: 'compact' }, test.host);
+    109|   expect(test.host.getState?.().isCompacting).toBe(false);
+       |                                               ^
+    110|   let release!: () => void;
+    111|   const running = test.runtime.commands.run(() => new Promise<void>(re…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯
+ FAIL  src/cli/rpc/compaction.test.ts > retains branch summary activity and forwards cancellation until its own settlement
+AssertionError: expected undefined to be true // Object.is equality
+- Expected: 
+true
++ Received: 
+undefined
+ ❯ src/cli/rpc/compaction.test.ts:127:49
+    125|   await Promise.resolve();
+    126|   try {
+    127|     expect(test.host.getState?.().isCompacting).toBe(true);
+       |                                                 ^
+    128|     controller.abort(); expect(owned?.aborted).toBe(true);
+    129|     await handleRpcCommand({ type: 'abort' }, test.host);
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/14]⎯
+ FAIL  src/cli/rpc/compaction.test.ts > lets JSONL controls cancel compaction while EOF and queued prompts wait for its full settlement
+AssertionError: expected { id: 'state', type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(15 matching properties omitted from actual)
+- Expected
++ Received
+  {
+    "data": {
+-     "isCompacting": true,
+      "isStreaming": false,
+    },
+    "success": true,
+  }
+ ❯ src/cli/rpc/compaction.test.ts:159:65
+    157|     await vi.waitFor(() => expect(responses.find(response => response.…
+    158|     expect(signal.aborted).toBe(true); expect(test.runtime.isRunning()…
+    159|     expect(responses.find(response => response.id === 'state')).toMatc…
+       |                                                                 ^
+    160|       data: { isCompacting: true, isStreaming: false } });
+    161|     expect(responses.find(response => response.id === 'new')).toMatchO…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/14]⎯
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/turn/compaction.test.ts src/turn/pendingInput.test.ts src/turn/session.test.ts src/cli/rpc/compaction.test.ts

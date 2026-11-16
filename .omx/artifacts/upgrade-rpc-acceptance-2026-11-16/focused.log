@@ -1,0 +1,132 @@
+Checked 3500 files in 695ms. No fixes applied.
+scc-gate root=packages/ts-shell/src files=3355
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=66 read=66 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=15 registered=15 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=24 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/cli/rpc/runtimeHost.test.ts (38 tests | 3 failed) 1348ms
+   ✓ clears both live input lanes and pending submissions without cancelling the active turn 33ms
+   ✓ changes the running steering delivery mode before the next actual model step 38ms
+   ✓ changes the running followUp delivery mode before the next actual model step 32ms
+   ✓ reports a refused new_session without changing the current selection 46ms
+   ✓ reports a refused switch_session without changing the current selection 36ms
+   ✓ reports a refused fork without changing the current selection 58ms
+   ✓ reports a refused clone without changing the current selection 48ms
+   ✓ persists new-session ancestry while starting with an empty conversation 38ms
+   ✓ accepts a same-project session callback and selects only after acceptance 36ms
+   ✓ reads persisted conversation updates through get_messages after the host was created 32ms
+   × reads persisted conversation updates through get_state after the host was created 37ms
+     → expected false to be true // Object.is equality
+   ✓ reads persisted conversation updates through get_session_stats after the host was created 36ms
+   ✓ reads persisted conversation updates through get_last_assistant_text after the host was created 108ms
+   × reads the accepted new session on the next call through the existing host 49ms
+     → expected undefined to match object { …(2) }
+   ✓ refuses get_messages when the selected stored session is unavailable 21ms
+   ✓ refuses get_state when the selected stored session is unavailable 20ms
+   ✓ refuses get_session_stats when the selected stored session is unavailable 20ms
+   ✓ refuses get_last_assistant_text when the selected stored session is unavailable 20ms
+   ✓ rejects a changed identity during a current-session read 34ms
+   ✓ rejects a changed selection during a current-session read 32ms
+   × reports the resolved physical provider together with its model for a CLI override 24ms
+     → expected { type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(3 matching properties omitted from actual)
+   ✓ offers only saved user questions for a fork and returns their exact editable text 70ms
+   ✓ returns a saved question as a fork draft after the branch was accepted 52ms
+   ✓ refuses get_fork_messages when its session changes during acquisition 37ms
+   ✓ refuses fork when its session changes during acquisition 41ms
+   ✓ binds a fork draft to the acquired history version before creating a session 30ms
+   ✓ keeps a refused fork switch separate from an accepted editable draft 34ms
+   ✓ refuses a fork when the host becomes busy while acquiring its draft 23ms
+   ✓ omits unavailable saved questions from fork candidates 23ms
+   ✓ refuses get_fork_messages when selection changes after the nested read resolves 30ms
+   ✓ refuses fork when selection changes after the nested read resolves 27ms
+   ✓ refuses get_fork_messages when selection changes after the host read resolves 30ms
+   ✓ refuses get_entries when selection changes after the host read resolves 27ms
+   ✓ refuses get_tree when selection changes after the host read resolves 28ms
+   ✓ refuses get_fork_messages when configuration retires after the host read resolves 25ms
+   ✓ refuses get_entries when configuration retires after the host read resolves 20ms
+   ✓ refuses get_tree when configuration retires after the host read resolves 20ms
+   ✓ preserves legacy custom read hosts without exposing admission callbacks in response data 28ms
+ ✓ src/cli/runtime/inputStream.rpc.test.ts (12 tests) 395ms
+ ✓ src/turn/session.test.ts (50 tests) 491ms
+ ✓ src/cli/rpc/compaction.test.ts (11 tests) 311ms
+ ✓ src/turn/compaction.test.ts (13 tests) 43ms
+ ✓ src/cli/rpc/protocol.test.ts (19 tests) 5ms
+ ✓ src/turn/pendingInput.test.ts (8 tests) 5ms
+ ✓ src/session/compaction/progress.test.ts (19 tests) 111ms
+ ✓ src/session/compaction.test.ts (46 tests) 72ms
+ Test Files  1 failed | 8 passed (9)
+      Tests  3 failed | 213 passed (216)
+   Start at  15:55:03
+   Duration  22.58s (transform 7.69s, setup 0ms, collect 18.00s, tests 2.78s, environment 1ms, prepare 425ms)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads persisted conversation updates through get_state after the host was created
+AssertionError: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ src/cli/rpc/runtimeHost.test.ts:152:30
+    150|     expect(startup.turns).toEqual([]);
+    151|     const response = await handleRpcCommand({ type }, rpc);
+    152|     expect(response.success).toBe(true);
+       |                              ^
+    153|     const expected = type === 'get_messages' ? { messages: [
+    154|       expect.objectContaining({ role: 'user', content: 'new question' …
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reads the accepted new session on the next call through the existing host
+AssertionError: expected undefined to match object { …(2) }
+- Expected: 
+{
+  "messageCount": 2,
+  "sessionId": "sess_4bb0a1ee4e92aee1_1794815714766",
+}
++ Received: 
+undefined
+ ❯ src/cli/rpc/runtimeHost.test.ts:172:69
+    170|   manager.addTurn(target.id, { role: 'assistant', content: 'latest ans…
+    171|   expect((await handleRpcCommand({ type: 'get_last_assistant_text' }, …
+    172|   expect((await handleRpcCommand({ type: 'get_state' }, rpc)).data).to…
+       |                                                                     ^
+    173| });
+    174| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+ FAIL  src/cli/rpc/runtimeHost.test.ts > reports the resolved physical provider together with its model for a CLI override
+AssertionError: expected { type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(3 matching properties omitted from actual)
+- Expected
++ Received
+  {
+-   "data": {
+-     "model": {
+-       "id": "physical",
+-       "provider": "anthropic",
+-     },
+-     "thinkingLevel": "low",
+-   },
+-   "success": true,
++   "success": false,
+  }
+ ❯ src/cli/rpc/runtimeHost.test.ts:212:20
+    210|   expect(actual).toMatchObject({ provider: 'anthropic', model: 'physic…
+    211|   const response = await handleRpcCommand({ type: 'get_state' }, host(…
+    212|   expect(response).toMatchObject({ success: true, data: { model: { pro…
+       |                    ^
+    213| });
+    214| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/runtime/inputStream.rpc.test.ts src/cli/rpc/protocol.test.ts src/cli/rpc/runtimeHost.test.ts src/cli/rpc/compaction.test.ts src/turn/compaction.test.ts src/turn/pendingInput.test.ts src/turn/session.test.ts src/session/compaction.test.ts src/session/compaction/progress.test.ts

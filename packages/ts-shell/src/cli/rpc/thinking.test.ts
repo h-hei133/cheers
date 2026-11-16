@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserRuntimeConfigPath } from '../../config/runtimeConfig.js';
 import { registerCatalogContribution } from '../../core/catalog/contributions.js';
 import { userCatalogPath } from '../../core/models/catalogStore.js';
+import { ShellCommandRuntime } from '../../core/shell/command.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../../core/shell/runtimeContext.js';
 import { SessionManager } from '../../session/SessionManager.js';
 import { readSessionModel } from '../../session/model/state.js';
@@ -43,7 +44,7 @@ function fixture(model: Record<string, unknown> = {}, endpoint?: string) {
     targetPathBase: root, gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: true },
     session, runtimeConfig: getRuntimeConfig(root) });
   const host = { ...createRuntimeRpcHost({ runtimeContext: context, sessionManager: manager,
-    sessionRuntime: { getState: () => 'idle' } as ShellSessionRuntime,
+    sessionRuntime: { commands: new ShellCommandRuntime(), getState: () => 'idle' } as ShellSessionRuntime,
     queue: new SubmissionQueue(() => context.session, () => {}), isStreaming: () => false, enqueuePrompt: () => {} }),
     emitResponse: () => {} };
   return { context, host, manager };

@@ -11948,3 +11948,10 @@ shell已提交c10c5291。thinking按实际endpoint capability／budget或virtual
 compact已提交bf01f8f。abort_retry复用原wait owner，只取消已登记retry而不abort kernel run／native command／generic services；登记先于scheduled，callback失败仍被观察，取消明确failed。真实CLI发现readiness输入代理缺转发，先红后补原代理，早期取消不缓存。最终六门14/412、五反转exact恢复、恢复4/67、2648模块0monoliths和build `754fdcb217b0`通过；Linux同代六loopback POST验两层取消／普通stream与native命令保留／后继复用／accepted body不重放，配置模型两次bodySent完成在途控制与再用，原配置hash不变。首次真实产品接线失败和SSE夹具错误保留分类，本子批独立代码APPROVE／架构CLEAR，未借用历史批准。
 
 按用户要求当前子批本地提交后暂停后续任务；22/62项完成，40项未完成（14部分、11已有待验收、13确认缺口、2待核实），D.1整项联合验收尚未发生。完整已完成范围、真实测试和未完成清单见refactor/upgrade/summary.md，未push、未取得本轮远端CI。
+
+
+### 2026-11-16：RPC整项联合验收与共享压缩活动
+
+D.1完整命令矩阵补严格JSONL／optional字段、异步读取最终准入、完整compaction活动。独立架构WATCH的共享raw overflow第二caller遗漏先真实AssertionError后修，同一合法cut获准后、generation查询前逐caller登记，保留至自身commit／PostCompact／finally。最终六门34/912、相关15/268、七反转exact恢复、恢复3/110、2648模块0monoliths及build `43da5c29fee3`通过；Linux同代七组55 loopback POST、配置模型四actual请求／durable commit／压缩后复用passed。
+
+新独立代码APPROVE限定12生产文件、架构CLEAR绑定35源文件，当前hash核验，旧无结果review lane为unavailable。旧构建／911测试／六反转和setup／observer失败保留，原配置hash不变、隔离最小catalog／body不可检查／未制造真实限流边界保持。归档upgrade-rpc-acceptance-2026-11-16，D.1本地完成23/62、39项未完成，按批本地提交不push。C.9真实启动exit／shutdown超时反例与C.2capture反例隔离继续修复，目标active，无远端CI或整体完成声明。

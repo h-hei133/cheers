@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/runtime/inputStream.extensions.test.ts (16 tests) 2041ms
+ ✓ src/cli/rpc/commands.test.ts (10 tests) 382ms
+ ✓ src/cli/rpc/thinking.test.ts (10 tests) 522ms
+ ✓ src/cli/rpc/settings.test.ts (6 tests) 260ms
+
+ Test Files  4 passed (4)
+      Tests  42 passed (42)
+   Start at  16:54:16
+   Duration  18.79s (transform 6.35s, setup 0ms, collect 14.71s, tests 3.20s, environment 0ms, prepare 190ms)
+

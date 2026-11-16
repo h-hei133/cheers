@@ -1,0 +1,47 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/runtime/inputStream.rpc.test.ts (12 tests | 1 failed | 11 skipped) 44ms
+   ↓ routes JSONL clear_queue into the running turn before EOF drains later explicit prompts
+   ↓ returns cancelled for refused JSONL session switching and preserves current selection
+   ↓ rejects invalid RPC input 'parse' without dispatching a model prompt
+   ↓ rejects invalid RPC input 'parse' without dispatching a model prompt
+   ↓ rejects invalid RPC input 'unknown' without dispatching a model prompt
+   ↓ rejects invalid RPC input 'bash' without dispatching a model prompt
+   ↓ rejects invalid RPC input 'unused_command' without dispatching a model prompt
+   ↓ rejects invalid RPC input 'extension_ui_response' without dispatching a model prompt
+   ↓ rejects invalid RPC input 'parse' without dispatching a model prompt
+   × keeps invalid RPC input separate from subsequent valid controls and explicit prompts through EOF 43ms
+     → expected [ …(2) ] to deeply equal [ 'EXPLICIT_PROMPT' ]
+   ↓ leaves a pending RPC dialog live after rejecting a malformed answer and accepts its later valid answer
+   ↓ retains newline prompt transport for ordinary non-RPC stdin
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/runtime/inputStream.rpc.test.ts > keeps invalid RPC input separate from subsequent valid controls and explicit prompts through EOF
+AssertionError: expected [ …(2) ] to deeply equal [ 'EXPLICIT_PROMPT' ]
+
+- Expected
++ Received
+
+  [
++   "{\"id\":\"bad\",\"type\":\"bash\",\"command\":17}",
+    "EXPLICIT_PROMPT",
+  ]
+
+ ❯ src/cli/runtime/inputStream.rpc.test.ts:132:19
+    130|     + '{"id":"accepted","type":"prompt","message":"EXPLICIT_PROMPT"}\n…
+    131|   await run;
+    132|   expect(prompts).toEqual(['EXPLICIT_PROMPT']);
+       |                   ^
+    133|   expect(frames.find(frame => frame.id === 'bad')).toMatchObject({ com…
+    134|   expect(frames.find(frame => frame.id === 'read')).toMatchObject({ su…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 skipped (12)
+   Start at  16:45:14
+   Duration  16.43s (transform 8.81s, setup 0ms, collect 16.07s, tests 44ms, environment 0ms, prepare 85ms)
+

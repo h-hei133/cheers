@@ -1,0 +1,30 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "realProvider": true,
+  "status": "failed",
+  "buildId": "3923b90896f93852325829a28b2998caa5ef47096e06cdc9ece8a820bd76491a",
+  "probeSha256": "be29b9c80b5b0cbbc3af7f96e0fbd64cbf60dedd92021e2b00fe9102fd54471c",
+  "stages": {},
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "existingConfiguredTarget": true,
+    "minimalConfiguredModelEntry": true,
+    "isolatedValidObjects": true
+  },
+  "selectionAdmission": {
+    "success": false,
+    "budgetRefusal": false,
+    "credentialRefusal": true
+  },
+  "failedStage": "setup",
+  "requests": 0,
+  "failure": {
+    "name": "AssertionError",
+    "code": "ERR_ASSERTION",
+    "message": "Configured retry probe failed; provider details withheld."
+  },
+  "assertion": {
+    "stackFrame": "    at file:///home/wang/projects/cheers/.tmp/rpc-acceptance-2026-11-16/real.mjs:128:10"
+  }
+}

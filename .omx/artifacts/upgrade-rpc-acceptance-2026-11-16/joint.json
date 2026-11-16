@@ -1,0 +1,149 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "realProvider": false,
+  "status": "passed",
+  "stages": {
+    "input": {
+      "passed": true,
+      "invalidFrames": 10,
+      "zeroModelDispatch": true,
+      "zeroNativeDispatch": true,
+      "redacted": true
+    },
+    "clear": {
+      "passed": true,
+      "sameSession": true,
+      "cleared": 5,
+      "currentRequestPreserved": true,
+      "explicitSuccessor": true
+    },
+    "one-at-a-time": {
+      "passed": true,
+      "sameSession": true,
+      "steeringBeforeFollowUp": true,
+      "delivered": 4,
+      "posts": 5
+    },
+    "all": {
+      "passed": true,
+      "sameSession": true,
+      "steeringBeforeFollowUp": true,
+      "delivered": 4,
+      "posts": 3
+    },
+    "native": {
+      "passed": true,
+      "busyRefusal": true,
+      "retryCancellationPreservedCommand": true,
+      "scopedCancellation": true
+    },
+    "automatic": {
+      "passed": true,
+      "sameSessionModelSwitch": true,
+      "activityDuringActualSummary": true,
+      "scopedControlsPreserved": true,
+      "durableCommit": true
+    },
+    "manual": {
+      "passed": true,
+      "activityDuringActualSummary": true,
+      "busyRefusal": true,
+      "scopedControlsPreserved": true,
+      "genericAbortSettled": true
+    },
+    "ui": {
+      "passed": true,
+      "fourDialogs": true,
+      "malformedAnswerThenValid": true,
+      "renewedAfterConfiguration": true,
+      "retiredReplyIsolated": true,
+      "zeroProviderDispatch": true
+    },
+    "export": {
+      "passed": true,
+      "sameSession": true,
+      "html": true
+    },
+    "eof": {
+      "passed": true,
+      "unresolvedDialogCancelled": true,
+      "joined": true,
+      "validJsonLines": true,
+      "exit0": true
+    }
+  },
+  "buildId": "43da5c29fee3242388eace0f20d122a1304454898d18d8d2435061bb38d39294",
+  "probeSha256": "d571809224a9e791969fd4a0074cf351270a4b58a5b89a59723104433acaf96c",
+  "modelSwitch": {
+    "success": true,
+    "note": "Model switched to small.\nReasoning effort: auto (provider decides).\nProvider: openai\nCredential source: config\nScope: current session (saved for resume)."
+  },
+  "automaticEnd": {
+    "status": "completed"
+  },
+  "posts": 36,
+  "compactionFacts": [
+    {
+      "type": "compaction-prepared",
+      "tokensBefore": 9340,
+      "keptMessages": 5
+    },
+    {
+      "type": "compaction-commit"
+    }
+  ],
+  "failureEvents": [
+    {
+      "type": "response",
+      "command": "get_entries",
+      "error": "Invalid RPC command."
+    },
+    {
+      "type": "response",
+      "command": "navigate_tree",
+      "error": "Invalid RPC command."
+    },
+    {
+      "type": "response",
+      "command": "set_auto_compaction",
+      "error": "Invalid RPC command."
+    },
+    {
+      "type": "response",
+      "command": "extension_ui_response",
+      "error": "Invalid RPC UI response."
+    },
+    {
+      "type": "response",
+      "command": "navigate_tree",
+      "error": "A session operation is still running."
+    },
+    {
+      "type": "response",
+      "command": "compact",
+      "error": "Compaction cannot start while a run is active."
+    },
+    {
+      "type": "response",
+      "command": "bash",
+      "error": "Shell command did not complete successfully; execution evidence is retained in data."
+    },
+    {
+      "type": "response",
+      "command": "compact",
+      "error": "Compaction cannot start while a run is active."
+    },
+    {
+      "type": "response",
+      "command": "compact",
+      "error": "Compaction was cancelled."
+    },
+    {
+      "type": "response",
+      "command": "extension_ui_response",
+      "error": "Invalid RPC UI response."
+    }
+  ],
+  "compactionNotices": []
+}

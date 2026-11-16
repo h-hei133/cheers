@@ -1,0 +1,57 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/protocol.test.ts (19 tests | 2 failed | 10 skipped) 8ms
+   ✓ RPC command input > rejects malformed optional 'id' in 'get_messages' instead of silently choosing defaults 1ms
+   ✓ RPC command input > rejects malformed optional 'streamingBehavior' in 'prompt' instead of silently choosing defaults 0ms
+   ✓ RPC command input > rejects malformed optional 'outputPath' in 'export_html' instead of silently choosing defaults 0ms
+   ✓ RPC command input > rejects malformed optional 'parentSession' in 'new_session' instead of silently choosing defaults 0ms
+   ✓ RPC command input > rejects malformed optional 'customInstructions' in 'compact' instead of silently choosing defaults 0ms
+   ✓ RPC command input > rejects malformed optional 'since' in 'get_entries' instead of silently choosing defaults 0ms
+   ✓ RPC command input > rejects malformed optional 'expectedVersion' in 'navigate_tree' instead of silently choosing defaults 0ms
+   × RPC command input > rejects malformed optional 'excludeFromContext' in 'bash' instead of silently choosing defaults 5ms
+     → expected { type: 'bash', …(1) } to be undefined
+   × RPC command input > rejects malformed optional 'excludeFromContext' in 'bash' instead of silently choosing defaults 1ms
+     → expected { type: 'bash', …(1) } to be undefined
+   ↓ RPC command input > rejects a non-finite entries cursor instead of silently returning the full history
+   ↓ RPC command input > preserves explicit optional values for 'prompt'
+   ↓ RPC command input > preserves explicit optional values for 'bash'
+   ↓ RPC command input > preserves explicit optional values for 'navigate_tree'
+   ↓ RPC command input > preserves explicit optional values for 'get_entries'
+   ↓ RPC command input > preserves explicit optional values for 'export_html'
+   ↓ RPC command input > preserves explicit optional values for 'compact'
+   ↓ RPC command input > preserves explicit optional values for 'new_session'
+   ↓ RPC command input > accepts unknown metadata fields without using them as command parameters
+   ↓ RPC command input > omits oversized or control-bearing failure metadata while keeping the private payload out of the response
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'excludeFromContext' in 'bash' instead of silently choosing defaults
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'excludeFromContext' in 'bash' instead of silently choosing defaults
+AssertionError: expected { type: 'bash', …(1) } to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+{
+  "command": "printf private-output",
+  "type": "bash",
+}
+
+ ❯ src/cli/rpc/protocol.test.ts:16:55
+     14|     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash'…
+     15|   ])('rejects malformed optional $field in $type instead of silently c…
+     16|     expect(tryParseRpcCommand(JSON.stringify(frame))).toBeUndefined();
+       |                                                       ^
+     17|   });
+     18| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 7 passed | 10 skipped (19)
+   Start at  16:46:58
+   Duration  324ms (transform 50ms, setup 0ms, collect 44ms, tests 8ms, environment 0ms, prepare 84ms)
+

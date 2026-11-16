@@ -1,0 +1,19 @@
+# RPC acceptance evidence classification
+
+The previous 30-suite / 790-test invocation is the pre-repair baseline. The nine-suite / 216-test run covers the integrated ownership and input changes. Neither substitutes for the final combined invocation.
+
+The first expanded combined run passed 897 tests and failed 14. Nine loaded-extension scenarios sent bare slash lines in RPC mode; the new strict input boundary correctly refused them. Five state assertions used runtime stubs without their mandatory command owner. Only these four fixtures were corrected, with all original cancellation, renewal, ordering, persistence and EOF assertions preserved. The focused correction passed 4 suites / 42 tests. The final combined run and build have their own receipt.
+
+The first reversal filter selected no parameterized optional-field tests. This skipped invocation is not evidence of success. The next invocation reached two actual exclusion-field assertions, then stopped before mutation because the read target count included the pre-existing command-discovery consumer. The corrected driver limits mutation to the read owner's handler region. The first six cases required actual AssertionErrors and exact restoration; final shared-generation coverage raises the current set to seven. Initial failures and scripts are retained.
+
+The initial final-validation command used a nonexistent lint script and did not run tests. It was corrected to check:lint. Earlier npm test flag forwarding and setup/build errors remain in their original logs and are not green validation.
+
+The early automatic-compaction probe used an indivisible oversized user message and could not prove a budget-admissible complete candidate. The bounded eight-turn fixture preserves the original activity, scoped cancellation, durable commit and final completion assertions. The absent original cut is not reconstructed as fact; the acceptance audit's explanation is source-based inference. Success does not prove arbitrary oversized single messages can be compacted.
+
+Early configured-model attempts remain unsuccessful receipts. Four stopped before provider dispatch during setup or credential admission; two later attempts made two requests each but did not complete all assertions. Their safe receipts do not establish the precise external failure cause. The final successful scenario reports four actual requests and unchanged original configuration. Earlier requests are not added to that final scenario's count or presented as success.
+
+All final native receipts must match one current manifest and their exact probe hashes. The pre-fixture receipts belong to the earlier build and are retained separately. Provider bodies, induced real-service retry failures, other platforms, physical display correctness, push and CI remain unproven.
+
+The completed independent architecture review initially returned WATCH for an identical raw-overflow generation join that bypassed the second caller's activity registration. Its executable regression reached an actual AssertionError in red-shared-overflow.log. The repair moves the same captured legal-cut plan ahead of shared-generation lookup and notifies each original caller there; the caller retains its token through publication and PostCompact. The original WATCH report and previous final-build evidence are preserved separately. The affected 15 suites / 268 tests passed after this repair; final combined/build/native evidence must use the new generation.
+
+The old code-review lanes returned no completed report despite status requests and were interrupted/replaced. They are unavailable, never approval. The final recommendation is from rpc_completion_review, which independently inspected the exact twelve production files and relevant regressions, rechecked all hashes and published review-code.json. Reviewers performed no validation.

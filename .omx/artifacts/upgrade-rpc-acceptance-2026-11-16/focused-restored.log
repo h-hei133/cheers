@@ -1,0 +1,23 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ✓ src/cli/rpc/runtimeHost.test.ts (38 tests) 1504ms
+ ✓ src/turn/session.test.ts (50 tests) 629ms
+ ✓ src/cli/runtime/inputStream.rpc.test.ts (12 tests) 471ms
+ ✓ src/cli/rpc/compaction.test.ts (11 tests) 306ms
+ ✓ src/session/compaction/progress.test.ts (19 tests) 112ms
+ ✓ src/session/compaction.test.ts (46 tests) 65ms
+ ✓ src/turn/compaction.test.ts (13 tests) 52ms
+ ✓ src/turn/pendingInput.test.ts (8 tests) 5ms
+ ✓ src/cli/rpc/protocol.test.ts (19 tests) 4ms
+ Test Files  9 passed (9)
+      Tests  216 passed (216)
+   Start at  15:57:11
+   Duration  32.74s (transform 13.01s, setup 0ms, collect 27.44s, tests 3.15s, environment 1ms, prepare 486ms)
+module-facade-check ceiling=20 modules=2648 reported=0 thresholds=delegationRatio>=0.9,branching<=0,ownStateWrites<=0
+  verdict         names lines  delegation  branching  lines/name  module
+module-facade-summary monoliths=0 thin_facades=0
+packages/ts-shell/src/turn/session.ts(400,36): error TS2322: Type '(event: { readonly reason: CompactionReason; readonly tokensBefore: number; readonly messageCount: number; }) => Promise<boolean | undefined>' is not assignable to type '(input: { readonly reason: CompactionReason; readonly tokensBefore: number; readonly messageCount: number; }) => boolean | Promise<boolean>'.
+  Type 'Promise<boolean | undefined>' is not assignable to type 'boolean | Promise<boolean>'.
+    Type 'Promise<boolean | undefined>' is not assignable to type 'Promise<boolean>'.
+      Type 'boolean | undefined' is not assignable to type 'boolean'.
+        Type 'undefined' is not assignable to type 'boolean'.
+Build failed: TypeScript build failed with exit 1.

@@ -1,0 +1,186 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/cli/runtime/inputStream.rpc.test.ts (12 tests | 9 failed) 1429ms
+   ✓ routes JSONL clear_queue into the running turn before EOF drains later explicit prompts 205ms
+   ✓ returns cancelled for refused JSONL session switching and preserves current selection 29ms
+   × rejects invalid RPC input 'parse' without dispatching a model prompt 20ms
+     → expected [ Array(1) ] to deeply equal []
+   × rejects invalid RPC input 'parse' without dispatching a model prompt 17ms
+     → expected [ '["PRIVATE_RPC_INPUT"]' ] to deeply equal []
+   × rejects invalid RPC input 'unknown' without dispatching a model prompt 15ms
+     → expected [ Array(1) ] to deeply equal []
+   × rejects invalid RPC input 'bash' without dispatching a model prompt 16ms
+     → expected [ Array(1) ] to deeply equal []
+   × rejects invalid RPC input 'unused_command' without dispatching a model prompt 16ms
+     → expected [ Array(1) ] to deeply equal []
+   × rejects invalid RPC input 'extension_ui_response' without dispatching a model prompt 20ms
+     → expected [ Array(1) ] to deeply equal []
+   × rejects invalid RPC input 'parse' without dispatching a model prompt 26ms
+     → expected [ 'PRIVATE_RPC_INPUT' ] to deeply equal []
+   × keeps invalid RPC input separate from subsequent valid controls and explicit prompts through EOF 24ms
+     → expected [ …(2) ] to deeply equal [ 'EXPLICIT_PROMPT' ]
+   × leaves a pending RPC dialog live after rejecting a malformed answer and accepts its later valid answer 1023ms
+     → expected undefined to be false // Object.is equality
+   ✓ retains newline prompt transport for ordinary non-RPC stdin 16ms
+ ❯ src/cli/rpc/compaction.test.ts (10 tests | 6 failed) 251ms
+   ✓ preserves the actual no-compaction result of an empty stored session 36ms
+   ✓ registers compaction before an immediate RPC abort and retains its cancellation outcome 17ms
+   ✓ returns a structured busy result while another local operation owns settlement 17ms
+   × publishes manual compaction activity from synchronous admission through cancelled settlement 24ms
+     → expected undefined to be false // Object.is equality
+   × retires compaction activity after compacted settles 18ms
+     → expected undefined to be false // Object.is equality
+   × retires compaction activity after nothing settles 17ms
+     → expected undefined to be false // Object.is equality
+   × retires compaction activity after failed settles 16ms
+     → expected undefined to be false // Object.is equality
+   × retires compaction activity after rejected settles 15ms
+     → expected undefined to be false // Object.is equality
+   × lets JSONL controls cancel compaction while EOF and queued prompts wait for its full settlement 75ms
+     → expected { id: 'state', type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(15 matching properties omitted from actual)
+   ✓ joins a successful compaction response at ordinary EOF without cancelling it 17ms
+ Test Files  2 failed (2)
+      Tests  15 failed | 7 passed (22)
+   Start at  15:42:12
+   Duration  17.78s (transform 8.21s, setup 0ms, collect 15.35s, tests 1.68s, environment 0ms, prepare 162ms)
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/cli/rpc/compaction.test.ts > publishes manual compaction activity from synchronous admission through cancelled settlement
+AssertionError: expected undefined to be false // Object.is equality
+- Expected: 
+false
++ Received: 
+undefined
+ ❯ src/cli/rpc/compaction.test.ts:87:47
+     85|     return { status: 'failed', reason: 'Compaction was cancelled.' };
+     86|   });
+     87|   expect(test.host.getState?.().isCompacting).toBe(false);
+       |                                               ^
+     88|   const compact = handleRpcCommand({ type: 'compact' }, test.host);
+     89|   try {
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/15]⎯
+ FAIL  src/cli/rpc/compaction.test.ts > retires compaction activity after compacted settles
+ FAIL  src/cli/rpc/compaction.test.ts > retires compaction activity after nothing settles
+ FAIL  src/cli/rpc/compaction.test.ts > retires compaction activity after failed settles
+ FAIL  src/cli/rpc/compaction.test.ts > retires compaction activity after rejected settles
+AssertionError: expected undefined to be false // Object.is equality
+- Expected: 
+false
++ Received: 
+undefined
+ ❯ src/cli/rpc/compaction.test.ts:107:47
+    105|   });
+    106|   await handleRpcCommand({ type: 'compact' }, test.host);
+    107|   expect(test.host.getState?.().isCompacting).toBe(false);
+       |                                               ^
+    108|   let release!: () => void;
+    109|   const running = test.runtime.commands.run(() => new Promise<void>(re…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/15]⎯
+ FAIL  src/cli/rpc/compaction.test.ts > lets JSONL controls cancel compaction while EOF and queued prompts wait for its full settlement
+AssertionError: expected { id: 'state', type: 'response', …(3) } to match object { success: true, data: { …(2) } }
+(15 matching properties omitted from actual)
+- Expected
++ Received
+  {
+    "data": {
+-     "isCompacting": true,
+      "isStreaming": false,
+    },
+    "success": true,
+  }
+ ❯ src/cli/rpc/compaction.test.ts:140:65
+    138|     await vi.waitFor(() => expect(responses.find(response => response.…
+    139|     expect(signal.aborted).toBe(true); expect(test.runtime.isRunning()…
+    140|     expect(responses.find(response => response.id === 'state')).toMatc…
+       |                                                                 ^
+    141|       data: { isCompacting: true, isStreaming: false } });
+    142|     expect(responses.find(response => response.id === 'new')).toMatchO…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/15]⎯
+ FAIL  src/cli/runtime/inputStream.rpc.test.ts > rejects invalid RPC input 'parse' without dispatching a model prompt
+ FAIL  src/cli/runtime/inputStream.rpc.test.ts > rejects invalid RPC input 'unknown' without dispatching a model prompt
+ FAIL  src/cli/runtime/inputStream.rpc.test.ts > rejects invalid RPC input 'bash' without dispatching a model prompt
+ FAIL  src/cli/runtime/inputStream.rpc.test.ts > rejects invalid RPC input 'unused_command' without dispatching a model prompt
+ FAIL  src/cli/runtime/inputStream.rpc.test.ts > rejects invalid RPC input 'extension_ui_response' without dispatching a model prompt
+AssertionError: expected [ Array(1) ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "{\"id\":\"broken\",\"type\":\"prompt\",\"message\":\"PRIVATE_RPC_INPUT\"",
++ ]
+ ❯ src/cli/runtime/inputStream.rpc.test.ts:113:19
+    111|   stdin.end(`${line}\n`);
+    112|   await run;
+    113|   expect(prompts).toEqual([]);
+       |                   ^
+    114|   expect(frames).toHaveLength(1);
+    115|   expect(frames[0]).toMatchObject({ type: 'response', command, success…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/15]⎯
+ FAIL  src/cli/runtime/inputStream.rpc.test.ts > rejects invalid RPC input 'parse' without dispatching a model prompt
+AssertionError: expected [ '["PRIVATE_RPC_INPUT"]' ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "[\"PRIVATE_RPC_INPUT\"]",
++ ]
+ ❯ src/cli/runtime/inputStream.rpc.test.ts:113:19
+    111|   stdin.end(`${line}\n`);
+    112|   await run;
+    113|   expect(prompts).toEqual([]);
+       |                   ^
+    114|   expect(frames).toHaveLength(1);
+    115|   expect(frames[0]).toMatchObject({ type: 'response', command, success…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/15]⎯
+ FAIL  src/cli/runtime/inputStream.rpc.test.ts > rejects invalid RPC input 'parse' without dispatching a model prompt
+AssertionError: expected [ 'PRIVATE_RPC_INPUT' ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "PRIVATE_RPC_INPUT",
++ ]
+ ❯ src/cli/runtime/inputStream.rpc.test.ts:113:19
+    111|   stdin.end(`${line}\n`);
+    112|   await run;
+    113|   expect(prompts).toEqual([]);
+       |                   ^
+    114|   expect(frames).toHaveLength(1);
+    115|   expect(frames[0]).toMatchObject({ type: 'response', command, success…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/15]⎯
+ FAIL  src/cli/runtime/inputStream.rpc.test.ts > keeps invalid RPC input separate from subsequent valid controls and explicit prompts through EOF
+AssertionError: expected [ …(2) ] to deeply equal [ 'EXPLICIT_PROMPT' ]
+- Expected
++ Received
+  [
++   "{\"id\":\"bad\",\"type\":\"bash\",\"command\":17}",
+    "EXPLICIT_PROMPT",
+  ]
+ ❯ src/cli/runtime/inputStream.rpc.test.ts:132:19
+    130|     + '{"id":"accepted","type":"prompt","message":"EXPLICIT_PROMPT"}\n…
+    131|   await run;
+    132|   expect(prompts).toEqual(['EXPLICIT_PROMPT']);
+       |                   ^
+    133|   expect(frames.find(frame => frame.id === 'bad')).toMatchObject({ com…
+    134|   expect(frames.find(frame => frame.id === 'read')).toMatchObject({ su…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/15]⎯
+ FAIL  src/cli/runtime/inputStream.rpc.test.ts > leaves a pending RPC dialog live after rejecting a malformed answer and accepts its later valid answer
+AssertionError: expected undefined to be false // Object.is equality
+- Expected: 
+false
++ Received: 
+undefined
+ ❯ src/cli/runtime/inputStream.rpc.test.ts:152:91
+    150|   try {
+    151|     stdin.write(JSON.stringify({ type: 'extension_ui_response', id: re…
+    152|     await vi.waitFor(() => expect(frames.find(frame => frame.id === re…
+       |                                                                                           ^
+    153|     expect(prompts).toEqual([]);
+    154|     expect(bridge.pendingCount()).toBe(1);
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/15]⎯
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/runtime/inputStream.rpc.test.ts src/cli/rpc/compaction.test.ts

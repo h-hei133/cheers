@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ↓ src/cli/rpc/protocol.test.ts (19 tests | 19 skipped)
+
+ Test Files  1 skipped (1)
+      Tests  19 skipped (19)
+   Start at  16:45:31
+   Duration  268ms (transform 41ms, setup 0ms, collect 42ms, tests 0ms, environment 0ms, prepare 66ms)
+

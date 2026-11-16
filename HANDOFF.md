@@ -2688,7 +2688,27 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Root Cause:** Generic cancellation owns more than a retry wait, the readiness input proxy omits a new control, and wait registration happens after a scheduling observer can issue cancellation.
 - **Rule:** Keep retry control in the existing wait owner, keyed by the exact kernel run signal; register before scheduling publication, join the original callback and clean only that wait. Forward through the adopted input without buffering an early cancellation for a later run. Report cancelled retries as failed while preserving explicit queued input. Test both direct owners and the current compiled CLI. A failed body after accepted headers remains non-replayable; construct pre-response failures when testing backoff.
 
+### RPC Input Errors Must Remain Outside Prompt Admission
+- **Symptom:** An invalid command or malformed UI answer becomes model input, or a mistyped optional field silently selects a write or context default.
+- **Root Cause:** An unsuccessful protocol parse falls through to ordinary stdin handling, and optional fields are omitted rather than validated.
+- **Rule:** In RPC mode, reject invalid frames with fixed errors and bounded metadata before ordinary prompt parsing. Keep explicit JSONL prompts and UI responses separate; preserve ordinary stdin behavior outside RPC. Extension fixtures must submit JSONL prompts even when their message is a slash command, and runtime fixtures must include the command owner consumed by state projection.
+
+### Compaction Activity Must Cover The Original Settlement
+- **Symptom:** State reports no compaction while a summary, durable publication, or final hook is still pending.
+- **Root Cause:** Activity is inferred from streaming or controller presence instead of the operation that owns settlement; a readiness proxy can also drop the getter.
+- **Rule:** Project manual summaries from the existing command owner. Register automatic activity only after a legal cut is admitted, retain it through publication and final hooks, and release in finally. Forward the live getter through input adoption; scoped retry or shell cancellation must not cancel compaction. A large indivisible message may leave no budget-admissible candidate, so acceptance fixtures must prove both a legal cut and a fitting complete candidate, then assert the actual commit and terminal outcome.
+
+### Asynchronous Read Admission Must Reach Response Publication
+- **Symptom:** A read is current when its helper resolves but stale by the time the RPC response is constructed.
+- **Root Cause:** The original session and configuration admission is checked only inside the reader and discarded across later awaits.
+- **Rule:** Carry the captured admission with inert read data to the final response owner and check it before publication. Keep callbacks out of wire data and preserve existing plain custom-host results. Do not recapture a successor binding to authorize the original result.
+
 ### Process Checks Must Not Print Command Arguments
 - **Symptom:** A broad process inventory prints a service token carried in its command line.
 - **Root Cause:** Full argv is treated as harmless diagnostic metadata even though unrelated services may pass credentials there.
 - **Rule:** Inspect process IDs, parent IDs, state and executable names only. Do not print or archive full command arguments when checking for test/build residue; report the process state needed for the serial-validation decision.
+
+### Shared Summary Generation Does Not Share Caller Activity
+- **Symptom:** A second overflow caller reports no compaction while waiting for an identical pending summary and during its own final publication hook.
+- **Root Cause:** Joining a generation skips that caller's lifecycle-before hook, where its activity was registered.
+- **Rule:** Admit the original captured legal cut before shared-generation lookup, register each caller there, and pass the same plan into generation. Retain each caller's activity through its own commit and final hooks, releasing in finally; generation reuse must not create activity for a refused cut.

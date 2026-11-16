@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/turn/session.test.ts (51 tests) 509ms
+ ✓ src/session/compaction.test.ts (46 tests) 42ms
+ ✓ src/turn/compaction.test.ts (13 tests) 62ms
+
+ Test Files  3 passed (3)
+      Tests  110 passed (110)
+   Start at  17:56:47
+   Duration  5.18s (transform 2.24s, setup 0ms, collect 3.99s, tests 613ms, environment 0ms, prepare 152ms)
+

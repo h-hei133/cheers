@@ -1,0 +1,17 @@
+{"name":"strict-input","file":"packages/ts-shell/src/cli/runtime/inputStream.ts","assertionFailure":true,"exactRestoration":true,"sourceSha256":"fff3a8a90906aaa09aedbce26dde8d0286b3e0cba0c9aa63b1db596ad392411a","exitCode":1}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: optional-exclusion did not fail.
+    at file:///home/wang/projects/cheers/.tmp/rpc-acceptance-2026-11-16/reversal.mjs:50:12
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 0,
+  expected: 0,
+  operator: 'notStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.15.0

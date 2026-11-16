@@ -18,13 +18,14 @@
 - [Task inventory](tasks.md)：唯一任务与验收清单。
 - [Design and evidence](design.md)：结构事实、参考决策、复用与实施顺序。
 - [Earlier repair evidence](../../wiki/references/runtime-upgrade-review-2026-11.md)：上一轮证据，不能替代本轮任务验收。
-- [Pause summary](summary.md)：2026-11-16当前暂停总结，列出已完成范围、实际测试及全部40项未完成任务。
+- [Progress summary](summary.md)：当前已完成范围、实际验证及全部39项未完成任务。
 
 ## Current status
 
-**Current phase**: paused（用户要求当前子批收尾后暂停后续任务）；compact子批已提交`bf01f8f`，retry专属取消子批随本记录本地提交。当前22/62项完成，D.1仍为部分，未进入整项联合验收。
-**Last completed batch**: abort_retry只取消当前kernel signal登记的retry waits，原run／command／generic cancellation不受影响；登记先于retry_scheduled，callback结算与失败继续被观察。取消报告明确failed且不再重试，显式后继队列独立；CLI就绪输入代理向已adopted handle转发，早期取消不缓存。六门、14套件412项、五个有效反转exact恢复、恢复4/67、2648模块0monoliths及build `754fdcb217b0`通过。Linux同代CLI六loopback POST验证两层取消、普通stream／native command保留、复用和不重放；配置模型两次bodySent验证普通在途取消无动作及后继请求。本子批独立代码APPROVE／架构CLEAR，限于10文件；原生回执由root执行。
-**Goal**: paused；40项未完成，其中14部分、11已有待验收、13确认缺口、2待核实。保留完整规划，恢复须由用户授权，不关闭总目标。
+**Current phase**: in_progress；D.1整项Linux本地验收完成，当前23/62项完成。继续C.9 stdout保护与C.2流式合同，再逐项执行其余仍成立的研究任务。
+**Last completed batch**: D.1严格RPC输入／可选字段、最终异步读取准入和完整压缩活动结算。共享raw overflow原caller在合法cut获准后、generation查询前登记，活动保留至自身commit／PostCompact／finally。当前六门、34套件912项、15相关套件268项、七有效反转exact恢复、恢复3/110、2648模块0monoliths及build `43da5c29fee3`通过；同代Linux七组55 loopback POST及配置模型四实际请求通过。独立代码APPROVE限定12生产文件，架构CLEAR限定35源文件，当前哈希已核验；证据归档upgrade-rpc-acceptance-2026-11-16，本地提交不push。
+**Current batch**: C.9与C.2在独立工作树实施，尚未集成或验收完成。C.9原四个产品反例／58项隔离绿后，架构WATCH的真实Linux子进程证明启动同步exit丢失已排队诊断、shutdown总预算到期仍未恢复guard，正在修复原输出和关闭owner。C.2修正绕过createTurnRequest的telemetry夹具后，11个基线AssertionError／13控制且exact恢复；当前snapshot空reasoning清空与注入式closing旧capture两个实际反例已修，正在串行验证。
+**Goal**: active；39项未完成，其中13部分、11已有待验收、13确认缺口、2待核实。保留全部原规划与暂缓条件，不将本地验收扩展成全平台或远端CI证据。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -39,7 +40,7 @@
 
 ## Adaptive control
 
-当前本地验收任务数为22/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.2/D.3/D.5、E.2、C.1、C.3和T3.1；核实不计实现完成。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
+当前本地验收任务数为23/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.3和T3.1；核实不计实现完成。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 
 恢复时已核对干净工作区与`560c0cc4`。T3.1 compact仅持有controller、不登记settlement，且只凭状态机拒绝重入；该缺口经源码核实仍成立。复用原commands owner登记完整压缩操作、保持忙时拒绝，覆盖prompt／command互斥和SDK dispose等待；不建立第二任务管理器。C.1完整路由由独立只读核实线检查，后续独立实施；已有证据不扩展为新构建的重新验收。
 
@@ -65,10 +66,13 @@ RPC压缩控制子批遥测：实际M；复用10/10，原session commands／comp
 
 RPC重试取消子批遥测：实际M；复用原retry wait、kernel run signal、TurnInput和CLI就绪代理，无新重试引擎／执行平面或生产依赖。额外依赖2（retry_scheduled发布前所有权、就绪输入转发）；真实CLI首先证明仅接runTurn不足，补代理后重建并重跑。已接收SSE不重放是既有合同，错误重试夹具修为pre-response网络失败并另验accepted stream。配置模型实际请求通过，但没有主动制造真实服务限流或读其body；失败取消证据来自本地HTTP及聚焦测试。按用户要求此批后暂停，D.1联合验收及其余40项保留。
 
+RPC整项遥测：实际L，复用检查10/10，未增加依赖或执行／存储平面；额外依赖4（严格输入隔离、最后读取准入、完整活动投影、共享generation的caller活动）。原架构WATCH有真实反例并修复；无结果的旧代码review lane记unavailable，最终APPROVE来自新独立12文件审查。此前没有统一数值估算，不补造历史drift。
+
 ## Session log
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-16 | D.1最终build `43da5c29fee3`六门34/912、七反转exact恢复、恢复3/110、Linux七组55本地POST与四配置模型请求passed；原共享overflow WATCH先红后修，当前架构CLEAR／新独立代码APPROVE，23/62与active。归档后本地提交；C.9真实退出反例和C.2当前capture反例在隔离树继续修复，不push。 |
 | 2026-11-15 | 设置／发现已提交0caf82c；compact控制／结构化结果4/43、六门、三个反转exact恢复、build `1a9b082e419d`和限定APPROVE/CLEAR通过。Linux三loopback POST取消／reuse／EOF与两次配置模型请求／durable commit passed。原native夹具失败保留，证据upgrade-rpc-compaction-2026-11-15；22/62不变，继续retry专属取消，不push。 |
 | 2026-11-15 | shell已提交c10c5291；settings／thinking／commands当前11/200、发现最终3/29、七反转exact恢复、六门、2646模块0monoliths、build `119bed2092d3`通过，限定APPROVE/CLEAR。Linux两loopback POST与配置模型一次actual请求、effort／skill派发、同会话重开／配置优先级／EOF全passed；证据upgrade-rpc-settings-2026-11-15。D.1仍部分，22/62；继续retry专属取消与compact控制，不push。 |
 | 2026-11-15 | RPC fork已提交b1d46c3；shell／abort接通原owner，六门13/227、最终3/59／恢复5/68、五反转exact恢复、0monoliths、build `90499a5f654c`通过，限定复核APPROVE/CLEAR。Linux当前CLI两loopback POST与配置模型一次actual请求、组合归档／排除／重开／fork／取消／EOF全passed；证据upgrade-rpc-shell-2026-11-15。D.1仍部分，22/62，按批本地提交不push。 |

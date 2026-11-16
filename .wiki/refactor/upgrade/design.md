@@ -438,3 +438,15 @@ wait登记先于retry_scheduled callback，包括零delay；callback的结算和
 Linux同代compiled CLI六loopback POST覆盖：普通已接受响应不被abort_retry取消并正常完成；HTTP429的provider／outer两层等待各单POST取消为failed，无第二请求，之后显式新prompt正常；真实native bash运行中retry取消无动作且exit0；已接受stream后body故障只失败一次、不重放。所有独立进程JSONL有效、EOF exit0。已配置模型同代两次actual bodySent通过，在途abort_retry保留普通请求、idle取消不缓存、第二prompt成功；未主动制造真实provider限流／网络故障，无法检查Undici body，失败取消证明来自本地网络。沿用原active连接与凭据，损坏models目录仅在隔离home用同目标最小有效entry，原四配置文件hash不变，临时秘密清除。
 
 证据`.omx/artifacts/upgrade-rpc-retry-2026-11-16/delivery.json`。独立代码APPROVE／架构CLEAR，各自实读10文件且未执行验证；本子批报告另存，上一批批准不延伸；完整D.1审计lane未完成，不作approval。实际M，无新生产依赖，额外依赖2（scheduled发布前捕获、readiness代理转发）。本子批后按用户要求暂停；D.1整项仍部分，22/62保持，后续恢复时先做整项联合验收。没有push、远端CI或其他平台声明。
+
+## RPC complete command acceptance (2026-11-16)
+
+同一最终构建覆盖完整命令及错误／busy／取消／EOF矩阵。核实并修复非法JSONL或UI响应落入普通prompt、异步读取准入在helper到响应之间丢失、压缩活动只按streaming推断。采用参考的严格命令／独立UI响应和完整压缩活动决定；保留原queue、command settlement、compaction cut／publication、读取和transport owner。失败响应只投影有界安全元数据，optional字段必须验证；custom host原数组／对象兼容，回调不进入wire。
+
+手动和分支摘要复用commands owner；自动压缩在合法cut后登记活动，经durable commit和final hook结算后finally释放。独立架构原WATCH发现共享raw overflow跳过第二caller的generation-before hook；真实regression先AssertionError。修复在同一捕获plan合法获准后、共享generation lookup前通知每个原caller，generation消费同plan，每个caller保留自身活动至自身commit／PostCompact／finally。CLI readiness转发同一getter，abort_retry／abort_bash不取消摘要；异步fork／entries／tree携带原session与configuration准入至响应。
+
+最终六门、34套件912项、2648模块0monoliths及build `43da5c29fee3242388eace0f20d122a1304454898d18d8d2435061bb38d39294`通过，inputsDigest实际核验；相关15/268和恢复3/110通过，七反转均实际AssertionError且exact恢复。首次扩大测试14失败属于夹具漂移：九个RPC扩展发裸slash、五个runtime桩缺mandatory commands；只修四文件夹具并保留断言。原六反转／911测试／旧build和失败驱动分别保留，不能替代当前代际。
+
+Linux当前compiled CLI七组55 loopback POST通过logical／physical选择、当前读取、fork draft、tree／clone／switch、shell gate／上下文排除／全文归档／持久化、effort／settings／发现、两层retry取消、queue／clear／后继、自动／手动compaction／commit、四UI对话／换代及EOF。配置模型同代四实际请求通过普通对话、清队列与专属取消、历史操作、手动summary durable commit及压缩后继续；原配置hash不变，隔离最小catalog／body不可检查／未制造真实限流的边界保留。
+
+当前独立代码APPROVE由新12生产文件审查给出，架构CLEAR绑定35源文件，均未运行验证；原无报告代码lane是unavailable，不作批准。主线程已核对逐项合同和当前hash，D.1本地完成，23/62、goal active。证据`.omx/artifacts/upgrade-rpc-acceptance-2026-11-16/delivery.json`。实际L、复用10/10、额外依赖4，无新生产依赖或执行／存储平面；C.9／C.2隔离后续尚未完成，无push、CI或其他平台声明。

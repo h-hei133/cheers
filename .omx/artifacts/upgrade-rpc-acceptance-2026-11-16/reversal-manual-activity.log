@@ -1,0 +1,50 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/cli/rpc/compaction.test.ts (11 tests | 1 failed | 10 skipped) 37ms
+   ↓ preserves the actual no-compaction result of an empty stored session
+   ↓ registers compaction before an immediate RPC abort and retains its cancellation outcome
+   ↓ returns a structured busy result while another local operation owns settlement
+   × publishes manual compaction activity from synchronous admission through cancelled settlement 36ms
+     → expected { …(13) } to match object { isCompacting: true, …(2) }
+(12 matching properties omitted from actual)
+   ↓ retires compaction activity after compacted settles
+   ↓ retires compaction activity after nothing settles
+   ↓ retires compaction activity after failed settles
+   ↓ retires compaction activity after rejected settles
+   ↓ retains branch summary activity and forwards cancellation until its own settlement
+   ↓ lets JSONL controls cancel compaction while EOF and queued prompts wait for its full settlement
+   ↓ joins a successful compaction response at ordinary EOF without cancelling it
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/compaction.test.ts > publishes manual compaction activity from synchronous admission through cancelled settlement
+AssertionError: expected { …(13) } to match object { isCompacting: true, …(2) }
+(12 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "isBashRunning": false,
+-   "isCompacting": true,
++   "isCompacting": false,
+    "isStreaming": false,
+  }
+
+ ❯ src/cli/rpc/compaction.test.ts:92:36
+     90|   const compact = handleRpcCommand({ type: 'compact' }, test.host);
+     91|   try {
+     92|     expect(test.host.getState?.()).toMatchObject({ isCompacting: true,…
+       |                                    ^
+     93|     await handleRpcCommand({ type: 'abort' }, test.host);
+     94|     expect((await handleRpcCommand({ type: 'get_state' }, test.host)).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 skipped (11)
+   Start at  16:47:59
+   Duration  10.76s (transform 6.66s, setup 0ms, collect 10.46s, tests 37ms, environment 0ms, prepare 52ms)
+

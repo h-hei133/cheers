@@ -1,16 +1,16 @@
-# 规划执行暂停总结（2026-11-16）
+# 规划执行进展（2026-11-16）
 
-当前重试取消修复已完成所述本地验证，代码、证据与本总结按同一批本地提交；按用户要求暂停后续任务。**62项中22项完成本地验收，40项未完成**：14项部分完成、11项已有实现待验收、13项确认缺口、2项待核实。完整D.1仍未联合验收，不能因其几个子批通过而勾选整项。
+用户已恢复完整规划，当前目标active。**62项中23项完成本地验收，39项未完成**：13项部分完成、11项已有实现待验收、13项确认缺口、2项待核实。D.1已完成同一最终构建的完整联合测试、Linux原生验收和独立代码APPROVE／架构CLEAR，按批本地提交。C.9／C.2仍在隔离工作树实施，全部验证由主线程串行执行。
 
-本总结依据[任务清单](tasks.md)、[当前状态](MASTER.md)和保存的实际命令回执。此前20/62的暂停总结已归档为[历史快照](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/summary-2026-11-15.md)；之后C.1与T3.1完成，使当前增加到22项。用户仅授权本地分批提交，**未推送，未取得本轮远端CI**。原定暂缓的原生插件／独立桌面产品两项不在62项中，继续暂缓；T6保留原规划按需条件。
+本总结依据[任务清单](tasks.md)、[当前状态](MASTER.md)和保存的实际命令回执。此前20/62的暂停总结已归档为[历史快照](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/summary-2026-11-15.md)；之后C.1、T3.1和D.1完成，使当前增加到23项。用户仅授权本地分批提交，**未推送，未取得本轮远端CI**。原定暂缓的原生插件／独立桌面产品两项不在62项中，继续暂缓；T6保留原规划按需条件。
 
-## 当前完成的子批
+## 当前批次的验证
 
-RPC的abort_retry此前调用通用取消，会误取消普通provider请求、原生命令及无关取消服务。当前沿用原waitBeforeRetry，把取消绑定到当前kernel run的已登记retry waits；登记先于retry_scheduled，包括零delay。取消后原请求明确失败且不再重试，callback结算／拒绝仍被观察，显式排队的新问题保留。
+本批修复非法RPC输入回落到模型prompt、异步读取准入未到最终响应、压缩活动未覆盖完整结算三处缺口。复用原输入、command、读取、compaction和响应owner，保留JSONL与UI响应分离、custom host兼容、取消隔离、持久化和未知结果合同。
 
-真实CLI第一次验证发现就绪输入代理没有转发新方法，直接turn单测虽绿，实际入口仍重试。已用真实反例和RPC代理回归先复现，再补原pendingTurnInput的转发；adopt前的取消不缓存到未来run。已接受HTTP响应后的故障继续按既有规则不重放。没有新增重试引擎、运行时、执行平面或生产依赖。
+首次扩大联合测试14失败属于夹具漂移：九个RPC扩展发裸slash，五个runtime桩缺mandatory commands。只修四文件夹具并保留断言。独立架构WATCH随后发现共享raw overflow第二caller活动登记被跳过；真实反例AssertionError后把同一合法cut的caller登记提前到共享generation查询前。旧构建／911测试／六反转与失败驱动保留原代际。
 
-当前build为`754fdcb217b0`，六静态门、14套件412项、五项有效反转及逐字节恢复通过；最终恢复4套件67项通过，职责检查2648模块／0monoliths。Linux当前编译CLI六次本地POST和已配置模型两次实际bodySent通过。独立代码／架构复审结果只覆盖此批，见[交付证据](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/delivery.json)；未完成的整项审计不算批准。
+当前build `43da5c29fee3`六静态门、34套件912项、2648模块0monoliths及inputsDigest核验通过；相关15/268和恢复3/110通过，七反转全部AssertionError且exact恢复。同代Linux七组55 loopback POST和配置模型四实际请求通过，含完整命令／queue／UI／错误／busy／取消／compaction／EOF、durable commit与压缩后继续；原配置hash不变，隔离最小catalog、body不可检查、未制造真实限流边界保留。独立代码APPROVE限定12生产文件、架构CLEAR绑定35源文件，主线程核验hash和逐项合同；[整项交付](../../../.omx/artifacts/upgrade-rpc-acceptance-2026-11-16/delivery.json)。
 
 从此前暂停点继续完成的本地提交：
 
@@ -25,9 +25,9 @@ RPC的abort_retry此前调用通用取消，会误取消普通provider请求、�
 | `c10c5291` | RPC shell生产执行、取消、上下文内／排除报告、完整输出归档及历史。 |
 | `0caf82c` | 设置完整publication、thinking按端点／预算发现、stored／requested／effective分离、异步commands准入和取消。 |
 | `bf01f8f` | compact同步登记原command owner，controls可达、EOF结算、失败结果保留结构化status。 |
-| 随本总结提交 | retry专属取消及就绪代理转发；D.1仍保留部分状态。 |
+| `ae9a3f59` | retry专属取消及就绪代理转发；D.1整项验收在恢复后继续。 |
 
-## 已完成的22项
+## 已完成的23项
 
 | 编号 | 项数 | 已完成的所述范围 |
 | --- | ---: | --- |
@@ -36,7 +36,7 @@ RPC的abort_retry此前调用通用取消，会误取消普通provider请求、�
 | B.1–B.3 | 3 | Unicode显示宽度、1MiB writer与背压、图片准入／占行／裁剪／绘制／placement清退及缓存预算。 |
 | B2.1–B2.3 | 3 | 终端状态／首次协商、提示／助手边界导航、tmux超链接、完整调色板、可组合浮层及录制输入过滤。 |
 | C.1、C.3 | 2 | 循环准备／结束与完整虚拟路由；AgentMessage和provider消息分离、统一转换／声明／预算准备及压缩／重开。 |
-| D.2、D.3、D.5 | 3 | RPC队列清空／模式实时更新、UI请求响应和换代重绑定、导出持久token／费用并保留未知覆盖。 |
+| D.1–D.3、D.5 | 4 | RPC完整会话／模型／树／shell／设置／压缩／retry命令、严格输入和最终准入；队列／UI响应、导出持久token／费用并保留未知覆盖。 |
 | E.2 | 1 | codemode分支状态持久化、原前缀／CAS／ABA保护、进程重启和多级fork隔离；不包含确定性重放。 |
 | T3.1 | 1 | SDK资源代际绑定／撤权、并发dispose结算／首错、compact与prompt／command互斥和完整idle；安装入口／严格类型／配置模型联合验收。 |
 
@@ -44,16 +44,17 @@ RPC的abort_retry此前调用通用取消，会误取消普通provider请求、�
 
 ## 实际运行过的测试
 
-下表核对保存的日志／回执；历史批次没有在本次暂停收尾全部重跑。测试或请求存在重叠，**不累加成全仓唯一通过总数**。本地HTTP、PTY和真实模型请求分别陈述。
+下表核对保存的日志／回执；历史批次没有在当前构建全部重跑。测试或请求存在重叠，**不累加成全仓唯一通过总数**。本地HTTP、PTY和真实模型请求分别陈述。
 
 | 类别 | 实际运行与结果 | 证据及限制 |
 | --- | --- | --- |
-| 当前retry聚焦回归 | 14套件412项通过，覆盖kernel、provider、turn、RPC及CLI就绪代理；六门／build／0monoliths通过。五个有效反转都触发AssertionError，源码逐字节恢复，恢复4/67通过。 | [本批交付](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/delivery.json)。初SSE夹具错误及原生proxy缺口均保留，不将初绿代替最终验证。 |
-| 当前Linux编译CLI网络／原生命令 | 六个loopback POST：provider／outer等待各一次取消为failed且零第二请求，显式新prompt可复用；普通已接受响应与native bash不受影响；accepted body故障不重放。所有进程有效JSONL／EOF exit0。 | [原生回执](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/retry-native.json)，build `754fdcb217b0`，本地服务明确不是外部真实provider。 |
-| 当前已配置模型 | 两次实际bodySent；在普通请求进行中发abort_retry仍completed，idle发取消不影响第二prompt，EOF exit0。原四配置文件hash保持。 | [真实模型回执](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/retry-real.json)。未主动制造真实服务限流／故障，Undici body不可检查。 |
+| 当前D.1整项联合 | 六门、34/912、七反转exact恢复、相关15/268、恢复3/110、0monoliths及build `43da5c29fee3`通过。Linux七组55本地POST、配置模型四actual请求通过，独立APPROVE／CLEAR。 | [整项交付](../../../.omx/artifacts/upgrade-rpc-acceptance-2026-11-16/delivery.json)，当前hash／build一致；限于Linux本地。 |
+| 此前retry聚焦回归 | 14套件412项通过，覆盖kernel、provider、turn、RPC及CLI就绪代理；六门／build／0monoliths通过。五个有效反转都触发AssertionError，源码逐字节恢复，恢复4/67通过。 | [本批交付](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/delivery.json)。初SSE夹具错误及原生proxy缺口均保留，不将初绿代替最终验证。 |
+| 此前retry Linux编译CLI | 六个loopback POST：provider／outer等待各一次取消为failed且零第二请求，显式新prompt可复用；普通已接受响应与native bash不受影响；accepted body故障不重放。所有进程有效JSONL／EOF exit0。 | [原生回执](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/retry-native.json)，build `754fdcb217b0`，本地服务明确不是外部真实provider。 |
+| 此前retry配置模型 | 两次实际bodySent；在普通请求进行中发abort_retry仍completed，idle发取消不影响第二prompt，EOF exit0。原四配置文件hash保持。 | [真实模型回执](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/retry-real.json)。未主动制造真实服务限流／故障，Undici body不可检查。 |
 | C.1完整路由 | 39套件840项、六门、十反转、strict安装类型通过；安装SDK10／CLI2／自动摘要12／重试续轮8／RPC1个本地POST，配置模型4个真实POST通过。 | [路由交付](../../../.omx/artifacts/upgrade-virtual-routing-2026-11-15/delivery.json)，当时build `083b3d78d8bf`。该批RPC仅限定选择和持久origin，旧messages缺口由后续批修复。 |
 | T3.1 SDK联合验收 | 16套件236项、六门、四反转、15公开入口strict类型通过；Linux配置模型4次实际请求覆盖prompt／compact／复用／同ID重开，取消零派发／零commit及资源撤权通过。 | [SDK交付](../../../.omx/artifacts/upgrade-sdk-2026-11-15/compaction-delivery.json)，当时build `d9acacbc4260`；不作全平台承诺。 |
-| RPC会话／树／fork | 当前持久读取／切回／删除拒绝两进程各1POST通过；随后真实JSONL矩阵3POST覆盖rename、排他cursor、树导航、clone／fork原文draft、往返history、busy／abort／missing和EOF。 | [读取](../../../.omx/artifacts/upgrade-rpc-read-2026-11-15/delivery.json)、[命令](../../../.omx/artifacts/upgrade-rpc-commands-2026-11-15/delivery.json)，各自构建；尚未合并为最终D.1整项验收。 |
+| RPC会话／树／fork | 当前持久读取／切回／删除拒绝两进程各1POST通过；随后真实JSONL矩阵3POST覆盖rename、排他cursor、树导航、clone／fork原文draft、往返history、busy／abort／missing和EOF。 | [读取](../../../.omx/artifacts/upgrade-rpc-read-2026-11-15/delivery.json)、[命令](../../../.omx/artifacts/upgrade-rpc-commands-2026-11-15/delivery.json)，各自历史构建；当前整项证据另列，历史请求不累计。 |
 | RPC shell／设置／压缩 | shell13/227及最终恢复5/68、196637字节artifact逐字节比对、2本地／1配置模型POST；设置11/200、最后发现3/29、设置恢复3/62、2本地／1真实POST；compact4/43、3反转、3本地／2真实POST，socket取消／零commit与复用commit通过。 | [shell](../../../.omx/artifacts/upgrade-rpc-shell-2026-11-15/delivery.json)、[设置](../../../.omx/artifacts/upgrade-rpc-settings-2026-11-15/delivery.json)、[压缩](../../../.omx/artifacts/upgrade-rpc-compaction-2026-11-15/delivery.json)。各自代际；设置200项在最终skill predicate修复前，受影响29项另跑通过。 |
 | 消息／声明配置模型联合路径 | 两组各7次实际请求通过，覆盖统一context、跨轮tools／effort、自动／手动压缩、rewind／重开、取消零派发与复用。 | [14次请求回执](../../../.omx/artifacts/upgrade-messages-2026-11-14/context-joint-native-evidence.json)，当时build `c7857153d401`；目标nativeHistoryProtocol=false，不能证明Anthropic原生历史control。 |
 | 安装／下限／输出与存储 | 隔离npm安装15入口strict类型、TS扩展／worker、Node20.3及Linux单文件exe prompt；8MiB输出全文artifact/read、codemode独立进程重启／fork通过。 | [工程基础](../../../.omx/artifacts/upgrade-toolchain-2026-11-14/validation.json)、[输出](../../../.omx/artifacts/upgrade-output-2026-11-14/validation.json)。入口使用synthetic provider，不证明真实任务质量或性能提升。 |
@@ -62,7 +63,7 @@ RPC的abort_retry此前调用通用取消，会误取消普通provider请求、�
 
 真实模型沿用既有active连接和凭据。用户models目录的原JSON损坏，相关新原生测试在隔离home使用原目标的最小有效目录entry；原用户配置未修改，该证据不代表原损坏目录可加载。失败、setup错误和observer错误均单独保存。没有Windows、物理终端、真实Azure／Mistral／Anthropic原生control、OAuth真人同意／续期、服务账单对照或性能收益基准。本次只跑聚焦检查，未宣称全仓测试／全仓类型通过；六静态门保留119条既有非阻断文档source提示。
 
-## 文档中尚未完成的40项
+## 文档中尚未完成的39项
 
 “已有待验收”表示代码／消费者存在，缺本轮整项证据；“部分”表示实现已有进展但仍缺行为或资格验证。以下列出每个未勾选编号，恢复时以tasks.md逐项继续。
 
@@ -75,7 +76,6 @@ RPC的abort_retry此前调用通用取消，会误取消普通provider请求、�
 | C.7 | 已有待验收 | 逐轮缓存未命中、真实usage缺失保持未知及成本归因。 |
 | C.8 | 已有待验收 | 六个核心工具、动态prompt、BM25／词干／Schema索引、search→execute与失效代际。 |
 | C.9 | 部分 | 普通print的stdout保护；JSON／RPC已接入。 |
-| D.1 | 部分 | 当前会话读取、fork／树、shell、设置／thinking／commands、compact与retry子批已修并各有证据；缺同一最终构建的完整命令／错误／busy／取消／EOF联合验收。 |
 | D.4 | 已有待验收 | HTML高亮、GFM／CJK、Thinking、Diff、灯箱及转义安全的完整离线导出。 |
 | E.1 | 已有待验收 | 沙箱组合、多工具嵌套权限／hook／过滤结果与中间历史。 |
 | E.3 | 已有待验收 | TS声明、namespace／image／models API的真实脚本调用与输出预算。 |
@@ -109,6 +109,6 @@ RPC的abort_retry此前调用通用取消，会误取消普通provider请求、�
 | T6.2 | 缺口 | 协作流式传输与断线续接，保持撤权和后继owner。 |
 | T6.3 | 缺口 | 常驻远程多路连接／文件能力，复用唯一执行边界，取消／deadline／EOF及未知派发。 |
 
-## 暂停交接
+## 后续工作
 
-用户已要求本子批之后暂停，未启动D.1整项联合验收或其他新任务。恢复时先核对干净工作区、本地HEAD、构建及本批receipt／source hash，再做D.1完整命令资格审计；随后继续其余未完成任务，保留原暂缓条件。总目标保持paused，不能标complete；不存在本轮push或CI完成证据。
+D.1本地提交后继续C.9和C.2：C.9真实子进程已证启动exit丢诊断、关闭超时未恢复guard，正修原owner；C.2真实请求owner夹具纠正后，canonical空reasoning和注入式closing capture两个反例已修，联合验证与独立复核仍待收齐。C.4／C.7只读资格审计随后继续。全部原规划和暂缓条件保留，总目标active，未push或取得远端CI。

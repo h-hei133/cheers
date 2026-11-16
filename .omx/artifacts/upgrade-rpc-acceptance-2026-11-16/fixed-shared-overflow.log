@@ -1,0 +1,29 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/turn/session.test.ts src/turn/compaction.test.ts src/session/compaction.test.ts src/session/compaction/ --maxWorkers=1 --no-file-parallelism
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/turn/session.test.ts (51 tests) 814ms
+ ✓ src/session/compaction/commit.test.ts (44 tests) 4578ms
+   ✓ allows metadata lifecycle publication while the summary is generated  324ms
+ ✓ src/session/compaction/state.test.ts (11 tests) 879ms
+   ✓ retains unknown request evidence across steps material eviction  323ms
+   ✓ retains unknown request evidence across operations material eviction  344ms
+ ✓ src/session/compaction/generation.test.ts (19 tests) 663ms
+ ✓ src/session/compaction/declarations.test.ts (9 tests) 359ms
+ ✓ src/session/compaction/progress.test.ts (19 tests) 103ms
+ ✓ src/session/compaction.test.ts (46 tests) 76ms
+ ✓ src/turn/compaction.test.ts (13 tests) 52ms
+ ✓ src/session/compaction/authority.test.ts (14 tests) 38ms
+ ✓ src/session/compaction/preparation.test.ts (11 tests) 24ms
+ ✓ src/session/compaction/budget.test.ts (9 tests) 16ms
+ ✓ src/session/compaction/schedule.test.ts (16 tests) 11ms
+ ✓ src/session/compaction/publication.test.ts (2 tests) 5ms
+ ✓ src/session/compaction/dispatch.test.ts (2 tests) 11ms
+ ✓ src/session/compaction/projection.test.ts (2 tests) 5ms
+
+ Test Files  15 passed (15)
+      Tests  268 passed (268)
+   Start at  17:44:49
+   Duration  19.31s (transform 4.22s, setup 0ms, collect 8.83s, tests 7.63s, environment 2ms, prepare 747ms)
+

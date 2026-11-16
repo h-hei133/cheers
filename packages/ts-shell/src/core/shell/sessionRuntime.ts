@@ -485,7 +485,7 @@ export class ShellSessionRuntime {
       return { status: "failed", reason: "No provider is available to summarize the conversation." };
     }
     if (this.isRunning()) return { status: "busy" };
-    return this.commands.run(signal => this.deps.compactHistory!(sessionId, signal, instructions));
+    return this.commands.run(signal => this.deps.compactHistory!(sessionId, signal, instructions), 'compaction');
   }
 
   /**
@@ -497,7 +497,8 @@ export class ShellSessionRuntime {
    */
   async summarizeAbandonedTurns(messages: readonly SessionMessage[], signal?: AbortSignal): Promise<string | undefined> {
     if (!this.deps.summarizeAbandonedTurns) return undefined;
-    return this.deps.summarizeAbandonedTurns(messages, signal);
+    if (this.isRunning()) return undefined;
+    return this.commands.run(owned => this.deps.summarizeAbandonedTurns!(messages, owned), 'compaction', signal);
   }
 
   terminate(sessionId: string): void {

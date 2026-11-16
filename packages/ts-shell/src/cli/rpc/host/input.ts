@@ -44,7 +44,8 @@ export function inputHost(options: RuntimeRpcHostOptions, manager: SessionManage
       const pending = sessionRuntime.input?.()?.pending();
       return { ...readRpcState(runtimeContext, queue.length + (pending?.steering.length ?? 0)
         + (pending?.followUps.length ?? 0), options.isStreaming(), readRpcSession(runtimeContext, manager)),
-        isBashRunning: shellRuntimeFor(runtimeContext)?.isRunning() ?? false };
+        isBashRunning: shellRuntimeFor(runtimeContext)?.isRunning() ?? false,
+        isCompacting: sessionRuntime.commands.current?.kind === 'compaction' || sessionRuntime.input?.()?.isCompacting?.() === true };
     },
     setSteeringMode: (mode) => setRpcQueueMode(runtimeContext, sessionRuntime, 'steering', mode),
     setFollowUpMode: (mode) => setRpcQueueMode(runtimeContext, sessionRuntime, 'followUp', mode),

@@ -1,0 +1,41 @@
+{
+  "recommendation": "APPROVE",
+  "baseHead": "ae9a3f592f4573e0197a7b49e81f34d2e6510a22",
+  "scope": [
+    "packages/ts-shell/src/cli/rpc/handlers.ts",
+    "packages/ts-shell/src/cli/rpc/host/input.ts",
+    "packages/ts-shell/src/cli/rpc/host/read.ts",
+    "packages/ts-shell/src/cli/rpc/host/session.ts",
+    "packages/ts-shell/src/cli/rpc/protocol.ts",
+    "packages/ts-shell/src/cli/runtime/inputStream.ts",
+    "packages/ts-shell/src/core/shell/command.ts",
+    "packages/ts-shell/src/core/shell/sessionRuntime.ts",
+    "packages/ts-shell/src/session/compaction.ts",
+    "packages/ts-shell/src/turn/compaction.ts",
+    "packages/ts-shell/src/turn/pendingInput.ts",
+    "packages/ts-shell/src/turn/session.ts"
+  ],
+  "findings": [],
+  "sourceHashes": {
+    "packages/ts-shell/src/cli/rpc/handlers.ts": "29967640db9d95a89ceefb9d06a8fe69c5a7766b6dd124a6fae940ec54a04907",
+    "packages/ts-shell/src/cli/rpc/host/input.ts": "82bc511afe3c6b7911a31465151cc4ff0a321d7cd5277a123a791cadffd6839f",
+    "packages/ts-shell/src/cli/rpc/host/read.ts": "87011a15d068376fb0a04bcb9d64b0293498546944d770d816c60995761dfadd",
+    "packages/ts-shell/src/cli/rpc/host/session.ts": "e730cea3bf65832406cc8b73657154dda6842920310eb257ed7abb520b698658",
+    "packages/ts-shell/src/cli/rpc/protocol.ts": "c20f51c50762743325d3318eac73acac7ccf7ead6248f3327247798499ff7faf",
+    "packages/ts-shell/src/cli/runtime/inputStream.ts": "fff3a8a90906aaa09aedbce26dde8d0286b3e0cba0c9aa63b1db596ad392411a",
+    "packages/ts-shell/src/core/shell/command.ts": "908bf29f0b128c196443e0b8363723e861107dd50a4cd45c421416a33c5b55ae",
+    "packages/ts-shell/src/core/shell/sessionRuntime.ts": "99447e807b136bc1d226762399b3ca7a1390d8422a270c80d4b15ae992c9587b",
+    "packages/ts-shell/src/session/compaction.ts": "e7a41b116ba4ea95bb5d269a72134a2e22d713b1e90590dc15ed80548cc16600",
+    "packages/ts-shell/src/turn/compaction.ts": "aa3e76e74bf1609322d2a1c67f5c0cd354779f1cb74afa658d39882cd9851c38",
+    "packages/ts-shell/src/turn/pendingInput.ts": "539de7927b2ee0710840f22d18cdf2a7fe7c0bd0005c522f636fa3ec8f41e28f",
+    "packages/ts-shell/src/turn/session.ts": "5c51e7f9d2edfd349c22df995070213ad11ad94fde5e18e16009502bef22b678"
+  },
+  "reviewersExecutedValidation": false,
+  "independentReview": true,
+  "sourceSnapshotStable": true,
+  "reviewedAt": "2026-11-16T10:33:04.953Z",
+  "reviewMethod": "Read-only review of every changed production hunk, its directly relevant admission/cancellation/publication consumers, and the modified RPC/compaction regressions. No build, test, gate, NormProof, or provider execution.",
+  "residualRisks": [
+    "Approval is limited to the twelve named production files; runtime validation was owned by the root agent and not independently rerun by this reviewer."
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "status": "passed",
+  "realProvider": false,
+  "buildId": "43da5c29fee3242388eace0f20d122a1304454898d18d8d2435061bb38d39294",
+  "probeSha256": "5420b4802dbc838dc7bd1d3c98cf651ee5611a401316a1feb7e55f0e996e9790",
+  "stages": {
+    "denied": {
+      "passed": true,
+      "zeroNativeWrite": true,
+      "eofExit0": true
+    },
+    "disabled": {
+      "passed": true,
+      "zeroNativeWrite": true,
+      "eofExit0": true
+    },
+    "execution": {
+      "passed": true,
+      "nativeSuccess": true,
+      "bothStreams": true,
+      "nonzeroExit": 7,
+      "saved": true
+    },
+    "context": {
+      "passed": true,
+      "actualPromptBody": true,
+      "actualSummaryBody": true,
+      "reportVisibleInExport": true,
+      "excludedAbsent": true
+    },
+    "output": {
+      "passed": true,
+      "combinedArtifact": true,
+      "artifactBytes": 196637,
+      "artifactSha256": "3e32654e0e4b6fea0769cd7b05f462601fd423d9be01060feb701d1f50f02a12",
+      "boundedResponse": true
+    },
+    "persistence": {
+      "passed": true,
+      "reopen": true,
+      "forkReport": true,
+      "excludedAbsent": true
+    },
+    "cancellation": {
+      "passed": true,
+      "nativeStopped": true,
+      "concurrentReads": true,
+      "overlapRefused": true,
+      "navigationRefused": true,
+      "reusable": true
+    },
+    "eof": {
+      "passed": true,
+      "drainsShellResponse": true,
+      "exit0": true,
+      "validJsonLines": true
+    }
+  },
+  "summaryObservation": {
+    "success": true,
+    "data": {
+      "status": "compacted",
+      "summarized": 2,
+      "kept": 2,
+      "tokensBefore": 4024,
+      "tokensAfter": 1690
+    },
+    "bodyCount": 2,
+    "includes": true,
+    "excludes": true
+  },
+  "exportObservation": {
+    "success": true,
+    "included": true,
+    "excluded": true
+  },
+  "largeObservation": {
+    "success": true,
+    "status": "completed",
+    "truncated": true,
+    "artifact": "artifact://0",
+    "bytes": 164,
+    "hasEnd": true,
+    "outputTail": "RPC_LARGE_ERR\n\n\n[Showing last 2 of 4 lines (0KB of 192KB). Full text output saved: artifact://0]\n[To read full or earlier sections: read(path=\"artifact://0:1-500\")]",
+    "artifactFound": true,
+    "candidates": [
+      "accepted/work/.ts-shell/sessions/sess_06444cbd7277d566_1794822643777/artifacts/0.bash.log"
+    ]
+  },
+  "posts": 2
+}

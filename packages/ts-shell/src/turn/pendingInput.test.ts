@@ -33,6 +33,20 @@ function recordingRun(): {
 }
 
 describe("input held before a run exists", () => {
+  it('reads only the adopted run compaction activity without retaining a previous run phase', () => {
+    const pending = pendingTurnInput(), first = recordingRun(), second = recordingRun();
+    const input = pending.input;
+    let firstActive = true, secondActive = false;
+    expect(input.isCompacting?.()).toBe(false);
+    pending.adopt({ input: { ...first.input, isCompacting: () => firstActive } });
+    expect(input.isCompacting?.()).toBe(true);
+    firstActive = false; expect(input.isCompacting?.()).toBe(false);
+    pending.adopt({ input: { ...second.input, isCompacting: () => secondActive } });
+    firstActive = true; expect(input.isCompacting?.()).toBe(false);
+    secondActive = true; expect(input.isCompacting?.()).toBe(true);
+    pending.adopt(recordingRun()); expect(input.isCompacting?.()).toBe(false);
+  });
+
   it('forwards retry cancellation to the adopted run without buffering it for a future run', () => {
     const buffered = pendingTurnInput(), first = recordingRun(), second = recordingRun();
     const firstCancel = vi.fn(), secondCancel = vi.fn();

@@ -1,0 +1,269 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+
+const directory = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(directory, '../..');
+const root = fs.mkdtempSync(path.join(directory, 'joint-state-'));
+const home = path.join(root, 'home'), work = path.join(root, 'work'), storage = path.join(home, '.cheers');
+fs.mkdirSync(storage, { recursive: true, mode: 0o700 }); fs.mkdirSync(work);
+const receipt = { platform: process.platform, compiledCliRpc: true, realProvider: false, status: 'not_run', stages: {},
+  buildId: JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'))).buildId,
+  probeSha256: createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex') };
+const frames = [], requests = [], waiters = new Set();
+let stage = 'setup', child, closed, server, timer, sequence = 0, buffer = '', invalidLines = 0, holdNext = false, held;
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function until(predicate, label) {
+  const deadline = Date.now() + 25_000;
+  while (!predicate()) { if (Date.now() > deadline) throw new Error(`Deadline: ${label}`); await delay(20); }
+}
+function waitFor(predicate, from = frames.length) {
+  const found = frames.slice(from).find(predicate); if (found) return Promise.resolve(found);
+  return new Promise((resolve, reject) => {
+    const deadline = setTimeout(() => { waiters.delete(waiter); reject(new Error('Joint RPC response deadline.')); }, 30_000);
+    const waiter = { predicate, resolve: value => { clearTimeout(deadline); waiters.delete(waiter); resolve(value); } };
+    waiters.add(waiter);
+  });
+}
+function send(frame) { child.stdin.write(JSON.stringify(frame) + '\n'); }
+function command(type, values = {}) {
+  const id = `joint-${++sequence}`, pending = waitFor(frame => frame.type === 'response' && frame.id === id);
+  send({ id, type, ...values }); return pending;
+}
+function answer(id, values) { send({ type: 'extension_ui_response', id, ...values }); }
+function endSince(from) { return waitFor(frame => frame.type === 'agent_end', from); }
+function reply(response) {
+  response.writeHead(200, { 'content-type': 'application/json' });
+  response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'JOINT_ACK' }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 40, completion_tokens: 2, total_tokens: 42 } }));
+}
+function release() { const response = held; held = undefined; if (response && !response.destroyed) reply(response); }
+const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
+
+try {
+  assert.equal(process.platform, 'linux');
+  server = http.createServer(async (request, response) => {
+    const chunks = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    if (request.method !== 'POST') { response.writeHead(200, { 'content-type': 'application/json' }); response.end('{"data":[]}'); return; }
+    const body = JSON.parse(Buffer.concat(chunks).toString()); requests.push(body);
+    if (holdNext) { holdNext = false; held = response; return; }
+    reply(response);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
+  fs.writeFileSync(path.join(storage, 'config.json'), JSON.stringify({ agentMode: 'build', maxOutputTokens: 128,
+    reserveTokens: 0, keepRecentTokens: 80, compactionEnabled: false, retryEnabled: false, cacheWarming: 'off' }));
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: 'openai', providerCredentials: {
+    openai: { model: 'large', baseUrl, apiKey: 'synthetic-joint' } } }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: { openai: {
+    runtime: 'openai', endpoint: 'openai-compatible', auth: 'api-key', baseUrl, models: [
+      { id: 'large', contextWindow: 64_000, maxTokens: 2048, reasoning: false },
+      { id: 'small', contextWindow: 6000, maxTokens: 2048, reasoning: false },
+    ] } } }));
+  const extension = path.join(work, 'dialogs.ts');
+  fs.writeFileSync(extension, `export default api => {
+    api.registerCommand({ name: 'dialog-check', kind: 'local', summary: 'Check dialogs', group: 'session', supportsNonInteractive: true,
+      execute: async () => {
+        const selected = await api.ui.select('Joint selection', ['first', 'second']);
+        const confirmed = await api.ui.confirm('Joint confirmation', 'Continue?');
+        const input = await api.ui.input('Joint input');
+        const edited = await api.ui.editor('Joint editor', 'original draft');
+        api.ui.notify(selected === 'second' && confirmed && input === 'exact input' && edited === 'exact draft' ? 'JOINT_UI_OK' : 'JOINT_UI_FAILED');
+        return { kind: 'local', output: 'Dialog check settled.' };
+      } });
+    api.registerCommand({ name: 'pending-edit', kind: 'local', summary: 'Hold editor', group: 'session', supportsNonInteractive: true,
+      execute: async () => { const value = await api.ui.editor('Pending joint editor', 'pending draft');
+        if (value !== undefined) api.ui.notify('JOINT_LATE_UI'); return { kind: 'local', output: 'Editor settled.' }; } });
+  };`);
+  const env = { ...process.env, HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home, GIT_CEILING_DIRECTORIES: root,
+    CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '', OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '',
+    CHEERS_MARKETPLACES_FILE: path.join(home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(home, 'extensions.json') };
+  child = spawn('rtk', ['node', path.join(repo, 'scripts/start.mjs'), '--rpc', '--project', work, '--no-context-files', '--no-skills',
+    '--tools', 'bash,read', '--extension', extension, '--non-interactive-approval', 'allow-once'],
+    { cwd: work, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  closed = new Promise(resolve => child.on('close', (code, signal) => resolve({ code, signal })));
+  child.stderr.on('data', () => {});
+  child.stdout.on('data', bytes => {
+    buffer += bytes.toString();
+    for (;;) {
+      const newline = buffer.indexOf('\n'); if (newline < 0) break;
+      const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1); if (!line.trim()) continue;
+      let frame; try { frame = JSON.parse(line); } catch { invalidLines++; continue; }
+      frames.push(frame); for (const waiter of [...waiters]) if (waiter.predicate(frame)) waiter.resolve(frame);
+    }
+  });
+  timer = setTimeout(() => child.kill('SIGTERM'), 240_000);
+  const initial = await command('get_state'); assert.equal(initial.success, true); const sessionId = initial.data.sessionId;
+  assert.equal(initial.data.isCompacting, false);
+
+  stage = 'strict-input';
+  for (const line of ['PRIVATE_INVALID_FRAME', '```text', '["PRIVATE_JSON_ARRAY"]']) {
+    const from = frames.length, failed = waitFor(frame => frame.type === 'response' && frame.success === false, from);
+    child.stdin.write(line + '\n'); assert.equal((await failed).command, 'parse');
+  }
+  for (const values of [
+    { type: 'prompt', message: 'PRIVATE_INVALID_FRAME', streamingBehavior: 'later' },
+    { type: 'bash', command: 'printf forbidden > unintended.txt', excludeFromContext: 'false' },
+    { type: 'compact', customInstructions: { private: 'PRIVATE_INVALID_FRAME' } },
+    { type: 'get_entries', since: {} }, { type: 'navigate_tree', entryId: 'none', expectedVersion: 17 },
+    { type: 'set_auto_compaction', enabled: 'true' }, { type: 'extension_ui_response', confirmed: 'PRIVATE_INVALID_FRAME' },
+  ]) {
+    const id = `invalid-${++sequence}`, failed = waitFor(frame => frame.type === 'response' && frame.id === id);
+    send({ id, ...values }); assert.equal((await failed).success, false);
+  }
+  assert.equal(requests.length, 0); assert.equal(fs.existsSync(path.join(work, 'unintended.txt')), false);
+  assert.equal(JSON.stringify(frames).includes('PRIVATE_'), false);
+  assert.equal((await command('get_messages')).data.messages.length, 0);
+  receipt.stages.input = { passed: true, invalidFrames: 10, zeroModelDispatch: true, zeroNativeDispatch: true, redacted: true };
+
+  stage = 'queue-clear';
+  holdNext = true; let from = frames.length, ended = endSince(from);
+  assert.equal((await command('prompt', { message: 'JOINT_HELD_CLEAR' })).success, true);
+  await until(() => held !== undefined, 'held clear request');
+  assert.equal((await command('set_steering_mode', { mode: 'all' })).success, true);
+  assert.equal((await command('set_follow_up_mode', { mode: 'all' })).success, true);
+  for (const [type, message, streamingBehavior] of [['steer', 'CLEARED_STEER'], ['follow_up', 'CLEARED_FOLLOW'],
+    ['prompt', 'CLEARED_PROMPT_STEER', 'steer'], ['prompt', 'CLEARED_PROMPT_FOLLOW', 'followUp'], ['prompt', 'CLEARED_SUBMISSION']]) {
+    assert.equal((await command(type, { message, ...(streamingBehavior ? { streamingBehavior } : {}) })).success, true);
+  }
+  assert.equal((await command('get_state')).data.pendingMessageCount, 5);
+  const cleared = await command('clear_queue'); assert.equal(cleared.success, true); assert.equal(cleared.data.cleared, 5);
+  assert.deepEqual(cleared.data.steering, ['CLEARED_STEER', 'CLEARED_PROMPT_STEER']);
+  assert.deepEqual(cleared.data.followUp, ['CLEARED_FOLLOW', 'CLEARED_PROMPT_FOLLOW', 'CLEARED_SUBMISSION']);
+  assert.equal((await command('get_state')).data.pendingMessageCount, 0);
+  assert.equal((await command('abort_bash')).success, true); assert.equal((await command('abort_retry')).success, true);
+  release(); assert.equal((await ended).status, 'completed'); assert.equal(requests.length, 1);
+  from = frames.length; ended = endSince(from);
+  assert.equal((await command('prompt', { message: 'JOINT_EXPLICIT_SUCCESSOR' })).success, true);
+  assert.equal((await ended).status, 'completed'); assert.equal(requests.length, 2);
+  assert.equal(JSON.stringify(requests).includes('CLEARED_'), false);
+  receipt.stages.clear = { passed: true, sameSession: true, cleared: 5, currentRequestPreserved: true, explicitSuccessor: true };
+
+  for (const mode of ['one-at-a-time', 'all']) {
+    stage = `queue-${mode}`;
+    assert.equal((await command('set_steering_mode', { mode })).success, true);
+    assert.equal((await command('set_follow_up_mode', { mode })).success, true);
+    const before = requests.length; from = frames.length; ended = endSince(from); holdNext = true;
+    assert.equal((await command('prompt', { message: `JOINT_MODE_${mode}` })).success, true);
+    await until(() => held !== undefined, 'queue request');
+    for (const [type, message] of [['steer', `${mode}_S1`], ['steer', `${mode}_S2`], ['follow_up', `${mode}_F1`], ['follow_up', `${mode}_F2`]]) {
+      assert.equal((await command(type, { message })).success, true);
+    }
+    assert.equal((await command('get_state')).data.pendingMessageCount, 4);
+    release(); assert.equal((await ended).status, 'completed');
+    assert.equal(requests.length - before, mode === 'all' ? 3 : 5);
+    const history = (await command('get_messages')).data.messages.filter(message => message.role === 'user').map(message => message.content);
+    const delivered = [`${mode}_S1`, `${mode}_S2`, `${mode}_F1`, `${mode}_F2`];
+    assert.deepEqual(history.filter(message => delivered.includes(message)), delivered);
+    assert.equal((await command('get_state')).data.pendingMessageCount, 0);
+    receipt.stages[mode] = { passed: true, sameSession: true, steeringBeforeFollowUp: true, delivered: 4, posts: requests.length - before };
+  }
+
+  stage = 'native-scope';
+  fs.writeFileSync(path.join(work, 'hold.cjs'), "require('node:fs').writeFileSync('native-started', 'ready'); process.stdout.write('JOINT_NATIVE_STARTED'); setInterval(() => {}, 1000);");
+  const bash = command('bash', { command: `${quote(process.execPath)} hold.cjs`, excludeFromContext: true });
+  await until(() => fs.existsSync(path.join(work, 'native-started')), 'native start');
+  assert.equal((await command('get_state')).data.isBashRunning, true);
+  assert.equal((await command('abort_retry')).success, true);
+  assert.equal((await command('get_state')).data.isBashRunning, true);
+  for (const type of ['new_session', 'clone', 'switch_session']) {
+    assert.equal((await command(type, type === 'switch_session' ? { sessionPath: sessionId } : {})).data.cancelled, true);
+  }
+  assert.equal((await command('navigate_tree', { entryId: `${sessionId}:root` })).success, false);
+  assert.equal((await command('compact')).data.status, 'busy');
+  assert.equal((await command('abort_bash')).success, true);
+  const cancelledBash = await bash; assert.equal(cancelledBash.success, false); assert.equal(cancelledBash.data.cancelled, true);
+  assert.equal((await command('get_state')).data.isBashRunning, false);
+  receipt.stages.native = { passed: true, busyRefusal: true, retryCancellationPreservedCommand: true, scopedCancellation: true };
+
+  stage = 'auto-seed'; from = frames.length; ended = endSince(from);
+  assert.equal((await command('prompt', { message: 'JOINT_ARCHIVE ' + 'old history '.repeat(6000) })).success, true);
+  assert.equal((await ended).status, 'completed');
+  from = frames.length; ended = endSince(from);
+  assert.equal((await command('prompt', { message: 'JOINT_RECENT' })).success, true); assert.equal((await ended).status, 'completed');
+  const switchedModel = await command('set_model', { provider: 'openai', modelId: 'small' });
+  receipt.modelSwitch = { success: switchedModel.success, note: switchedModel.data?.note, error: switchedModel.error };
+  assert.equal(switchedModel.success, true);
+  assert.equal((await command('set_auto_compaction', { enabled: true })).success, true);
+  stage = 'automatic-activity'; from = frames.length; ended = endSince(from); holdNext = true;
+  assert.equal((await command('prompt', { message: 'JOINT_AUTO_AFTER_SWITCH' })).success, true);
+  await until(() => held !== undefined, 'automatic summary');
+  assert.equal((await command('get_state')).data.isCompacting, true);
+  assert.equal((await command('abort_bash')).success, true); assert.equal((await command('abort_retry')).success, true);
+  assert.equal((await command('get_state')).data.isCompacting, true);
+  release(); const automaticEnd = await ended;
+  receipt.automaticEnd = { status: automaticEnd.status, error: automaticEnd.error };
+  assert.equal(automaticEnd.status, 'completed');
+  assert.equal((await command('get_state')).data.isCompacting, false);
+  const events = fs.readFileSync(path.join(storage, 'sessions', sessionId, 'transcript.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.ok(events.some(event => event.type === 'compaction-commit'));
+  receipt.stages.automatic = { passed: true, sameSessionModelSwitch: true, activityDuringActualSummary: true, scopedControlsPreserved: true, durableCommit: true };
+
+  stage = 'manual-activity';
+  assert.equal((await command('set_auto_compaction', { enabled: false })).success, true);
+  holdNext = true; const compact = command('compact', { customInstructions: 'Retain the recent work.' });
+  await until(() => held !== undefined, 'manual summary');
+  assert.equal((await command('get_state')).data.isCompacting, true);
+  assert.equal((await command('abort_bash')).success, true); assert.equal((await command('abort_retry')).success, true);
+  assert.equal((await command('get_state')).data.isCompacting, true);
+  assert.equal((await command('new_session')).data.cancelled, true);
+  assert.equal((await command('compact')).data.status, 'busy');
+  assert.equal((await command('abort')).success, true);
+  const cancelledCompact = await compact; assert.equal(cancelledCompact.success, false);
+  held?.destroy(); held = undefined;
+  assert.equal((await command('get_state')).data.isCompacting, false);
+  assert.equal((await command('get_state')).data.sessionId, sessionId);
+  receipt.stages.manual = { passed: true, activityDuringActualSummary: true, busyRefusal: true, scopedControlsPreserved: true, genericAbortSettled: true };
+
+  stage = 'ui-dialogs';
+  const beforeUi = requests.length; from = frames.length;
+  assert.equal((await command('prompt', { message: '/dialog-check' })).success, true);
+  let dialog = await waitFor(frame => frame.type === 'extension_ui_request' && frame.method === 'select', from);
+  const firstDialogId = dialog.id; answer(dialog.id, { value: 'second' });
+  dialog = await waitFor(frame => frame.type === 'extension_ui_request' && frame.method === 'confirm', from);
+  const malformed = waitFor(frame => frame.type === 'response' && frame.id === dialog.id && frame.success === false);
+  answer(dialog.id, { confirmed: 'PRIVATE_INVALID_UI' }); await malformed;
+  assert.equal(JSON.stringify(frames).includes('PRIVATE_INVALID_UI'), false); answer(dialog.id, { confirmed: true });
+  dialog = await waitFor(frame => frame.type === 'extension_ui_request' && frame.method === 'input', from); answer(dialog.id, { value: 'exact input' });
+  dialog = await waitFor(frame => frame.type === 'extension_ui_request' && frame.method === 'editor', from); answer(dialog.id, { value: 'exact draft' });
+  await waitFor(frame => frame.type === 'extension_ui_request' && frame.method === 'notify' && frame.message === 'JOINT_UI_OK', from);
+  assert.equal(requests.length, beforeUi);
+  assert.equal((await command('set_auto_retry', { enabled: true })).success, true);
+  from = frames.length; assert.equal((await command('prompt', { message: '/pending-edit' })).success, true);
+  dialog = await waitFor(frame => frame.type === 'extension_ui_request' && frame.method === 'editor', from);
+  assert.notEqual(dialog.id, firstDialogId); answer(firstDialogId, { value: 'late retired answer' });
+  assert.equal((await command('get_state')).success, true);
+  assert.equal(frames.slice(from).some(frame => frame.method === 'notify' && frame.message === 'JOINT_LATE_UI'), false);
+  answer(dialog.id, { cancelled: true });
+  receipt.stages.ui = { passed: true, fourDialogs: true, malformedAnswerThenValid: true, renewedAfterConfiguration: true, retiredReplyIsolated: true, zeroProviderDispatch: true };
+
+  stage = 'export';
+  const exported = await command('export_html'); assert.equal(exported.success, true); assert.equal(typeof exported.data.html, 'string');
+  assert.ok(exported.data.html.includes('<html')); assert.equal((await command('get_state')).data.sessionId, sessionId);
+  receipt.stages.export = { passed: true, sameSession: true, html: true };
+  stage = 'eof-join'; from = frames.length;
+  assert.equal((await command('prompt', { message: '/pending-edit' })).success, true);
+  await waitFor(frame => frame.type === 'extension_ui_request' && frame.method === 'editor', from);
+  child.stdin.end(); assert.deepEqual(await closed, { code: 0, signal: null });
+  assert.equal(invalidLines, 0); assert.equal(buffer.trim(), '');
+  assert.equal(frames.slice(from).some(frame => frame.method === 'notify' && frame.message === 'JOINT_LATE_UI'), false);
+  receipt.stages.eof = { passed: true, unresolvedDialogCancelled: true, joined: true, validJsonLines: true, exit0: true };
+  receipt.posts = requests.length; receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage;
+  receipt.failure = { name: error?.name, message: 'Joint RPC acceptance failed; frame contents withheld.',
+    line: error?.stack?.split('\n').find(line => line.includes('joint.mjs:')) };
+  if (error?.name === 'AssertionError') receipt.assertion = { operator: error.operator,
+    actual: typeof error.actual === 'number' || typeof error.actual === 'boolean' ? error.actual : undefined,
+    expected: typeof error.expected === 'number' || typeof error.expected === 'boolean' ? error.expected : undefined };
+  receipt.posts = requests.length; process.exitCode = 1;
+} finally {
+  clearTimeout(timer); held?.destroy();
+  if (child && child.exitCode === null) { child.kill('SIGTERM'); await Promise.race([closed, delay(5000)]); }
+  if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  fs.writeFileSync(path.join(directory, 'joint.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt)); fs.rmSync(root, { recursive: true, force: true });
+}

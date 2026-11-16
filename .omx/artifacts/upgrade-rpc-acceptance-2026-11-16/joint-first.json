@@ -1,0 +1,56 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "realProvider": false,
+  "status": "failed",
+  "stages": {
+    "input": {
+      "passed": true,
+      "invalidFrames": 10,
+      "zeroModelDispatch": true,
+      "zeroNativeDispatch": true,
+      "redacted": true
+    },
+    "clear": {
+      "passed": true,
+      "sameSession": true,
+      "cleared": 5,
+      "currentRequestPreserved": true,
+      "explicitSuccessor": true
+    },
+    "one-at-a-time": {
+      "passed": true,
+      "sameSession": true,
+      "steeringBeforeFollowUp": true,
+      "delivered": 4,
+      "posts": 5
+    },
+    "all": {
+      "passed": true,
+      "sameSession": true,
+      "steeringBeforeFollowUp": true,
+      "delivered": 4,
+      "posts": 3
+    },
+    "native": {
+      "passed": true,
+      "busyRefusal": true,
+      "retryCancellationPreservedCommand": true,
+      "scopedCancellation": true
+    }
+  },
+  "buildId": "3923b90896f93852325829a28b2998caa5ef47096e06cdc9ece8a820bd76491a",
+  "probeSha256": "a485043e06c790a782056b047f60ace637d10120b8c0a4c082a94f16d762f6de",
+  "failedStage": "auto-seed",
+  "failure": {
+    "name": "AssertionError",
+    "message": "Joint RPC acceptance failed; frame contents withheld.",
+    "line": "    at file:///home/wang/projects/cheers/.tmp/rpc-acceptance-2026-11-16/joint.mjs:187:10"
+  },
+  "assertion": {
+    "operator": "strictEqual",
+    "actual": false,
+    "expected": true
+  },
+  "posts": 12
+}

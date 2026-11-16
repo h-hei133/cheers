@@ -1,0 +1,24 @@
+Checked 3500 files in 733ms. No fixes applied.
+✘ [ERROR] Could not resolve "/home/wang/projects/cheers/packages/ts-shell/packages/ts-shell/vitest.config.ts"
+
+failed to load config from /home/wang/projects/cheers/packages/ts-shell/packages/ts-shell/vitest.config.ts
+
+⎯⎯⎯⎯⎯⎯⎯ Startup Error ⎯⎯⎯⎯⎯⎯⎯⎯
+Error: Build failed with 1 error:
+error: Could not resolve "/home/wang/projects/cheers/packages/ts-shell/packages/ts-shell/vitest.config.ts"
+    at failureErrorWithLog (/home/wang/projects/cheers/node_modules/esbuild/lib/main.js:1752:15)
+    at /home/wang/projects/cheers/node_modules/esbuild/lib/main.js:1211:25
+    at runOnEndCallbacks (/home/wang/projects/cheers/node_modules/esbuild/lib/main.js:1592:45)
+    at buildResponseToResult (/home/wang/projects/cheers/node_modules/esbuild/lib/main.js:1209:7)
+    at /home/wang/projects/cheers/node_modules/esbuild/lib/main.js:1236:16
+    at responseCallbacks.<computed> (/home/wang/projects/cheers/node_modules/esbuild/lib/main.js:886:9)
+    at handleIncomingPacket (/home/wang/projects/cheers/node_modules/esbuild/lib/main.js:941:12)
+    at Socket.readFromStdout (/home/wang/projects/cheers/node_modules/esbuild/lib/main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+
+
+

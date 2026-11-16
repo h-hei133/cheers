@@ -1,4 +1,4 @@
-import type { RpcCommand, RpcHost } from "./protocol.js";
+import type { RpcCommand, RpcHost, RpcReadSnapshot } from "./protocol.js";
 
 export type RpcHandlerOutcome =
   | { readonly handled: true; readonly data?: Record<string, unknown>; readonly assertCurrent?: () => void }
@@ -7,6 +7,11 @@ export type RpcHandlerOutcome =
 
 function unavailable(name: string): RpcHandlerOutcome {
   return { handled: true, error: `RPC command '${name}' is unavailable in this host.` };
+}
+
+function isReadSnapshot<T>(result: T | RpcReadSnapshot<T>): result is RpcReadSnapshot<T> {
+  return result !== null && typeof result === 'object' && 'data' in result
+    && 'assertCurrent' in result && typeof result.assertCurrent === 'function';
 }
 
 async function handleSessionAndStats(command: RpcCommand, host: RpcHost, signal?: AbortSignal): Promise<RpcHandlerOutcome> {
@@ -100,12 +105,24 @@ async function handleTreeAndExecution(command: RpcCommand, host: RpcHost): Promi
       return host.fork ? { handled: true, data: await host.fork(command.entryId) } : unavailable(command.type);
     case "clone":
       return host.cloneSession ? { handled: true, data: await host.cloneSession() } : unavailable(command.type);
-    case "get_fork_messages":
-      return host.getForkMessages ? { handled: true, data: { messages: await host.getForkMessages() } } : unavailable(command.type);
-    case "get_entries":
-      return host.getEntries ? { handled: true, data: await host.getEntries(command.since) } : unavailable(command.type);
-    case "get_tree":
-      return host.getTree ? { handled: true, data: await host.getTree() } : unavailable(command.type);
+    case "get_fork_messages": {
+      if (!host.getForkMessages) return unavailable(command.type);
+      const result = await host.getForkMessages();
+      return isReadSnapshot(result) ? { handled: true, data: { messages: result.data }, assertCurrent: result.assertCurrent }
+        : { handled: true, data: { messages: result } };
+    }
+    case "get_entries": {
+      if (!host.getEntries) return unavailable(command.type);
+      const result = await host.getEntries(command.since);
+      return isReadSnapshot(result) ? { handled: true, data: result.data, assertCurrent: result.assertCurrent }
+        : { handled: true, data: result };
+    }
+    case "get_tree": {
+      if (!host.getTree) return unavailable(command.type);
+      const result = await host.getTree();
+      return isReadSnapshot(result) ? { handled: true, data: result.data, assertCurrent: result.assertCurrent }
+        : { handled: true, data: result };
+    }
     case "navigate_tree": {
       if (!host.navigateTree) return unavailable(command.type);
       const nav = await host.navigateTree(command.entryId, command.expectedVersion);

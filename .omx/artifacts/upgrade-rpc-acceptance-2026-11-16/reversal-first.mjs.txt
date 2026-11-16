@@ -1,0 +1,62 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+
+const directory = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(directory, '../..');
+const source = 'packages/ts-shell/src/';
+const cases = [
+  { name: 'strict-input', file: source + 'cli/runtime/inputStream.ts', test: 'src/cli/runtime/inputStream.rpc.test.ts',
+    selection: 'keeps invalid RPC input separate', count: 1,
+    remove: "      if (options.rpcMode) {\n        writeRawStdout(`${JSON.stringify(rpcInputFailure(normalizedLine))}\\n`);\n        return;\n      }\n\n" },
+  { name: 'optional-exclusion', file: source + 'cli/rpc/protocol.ts', test: 'src/cli/rpc/protocol.test.ts',
+    selection: 'rejects malformed optional excludeFromContext', count: 1,
+    remove: '      if (parsed.excludeFromContext !== undefined && typeof parsed.excludeFromContext !== "boolean") return undefined;\n' },
+  { name: 'read-admission', file: source + 'cli/rpc/handlers.ts', test: 'src/cli/rpc/runtimeHost.test.ts',
+    selection: 'when selection changes after the host read resolves', count: 3,
+    remove: ', assertCurrent: result.assertCurrent' },
+  { name: 'manual-activity', file: source + 'core/shell/sessionRuntime.ts', test: 'src/cli/rpc/compaction.test.ts',
+    selection: 'publishes manual compaction activity', count: 1,
+    remove: ', \'compaction\');', replacement: ');' },
+  { name: 'automatic-activity', file: source + 'turn/compaction.ts', test: 'src/turn/compaction.test.ts',
+    selection: 'reports active automatic compaction', count: 2,
+    remove: '    onStarted: begin,\n' },
+  { name: 'overflow-activity', file: source + 'turn/session.ts', test: 'src/turn/session.test.ts',
+    selection: 'tells a hook the rescue compaction is an overflow', count: 1,
+    remove: '          release ??= compaction?.begin();\n' },
+];
+const results = [];
+function execute(entry) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('rtk', ['env', 'VITEST_MAX_THREADS=2', 'VITEST_MIN_THREADS=2', '../../node_modules/.bin/vitest',
+      'run', entry.test, '-t', entry.selection], { cwd: path.join(repo, 'packages/ts-shell'), env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const chunks = []; child.stdout.on('data', chunk => chunks.push(chunk)); child.stderr.on('data', chunk => chunks.push(chunk));
+    child.on('error', reject); child.on('close', (code, signal) => resolve({ code, signal, output: Buffer.concat(chunks).toString() }));
+  });
+}
+for (const entry of cases) {
+  const file = path.join(repo, entry.file), original = fs.readFileSync(file);
+  const text = original.toString('utf8'), count = text.split(entry.remove).length - 1;
+  assert.equal(count, entry.count, `${entry.name} mutation target changed.`);
+  const mutated = text.replaceAll(entry.remove, entry.replacement ?? '');
+  let result;
+  try {
+    fs.writeFileSync(file, mutated);
+    result = await execute(entry);
+    fs.writeFileSync(path.join(directory, `reversal-${entry.name}.log`), result.output);
+    assert.equal(result.signal, null, `${entry.name} was interrupted.`);
+    assert.notEqual(result.code, 0, `${entry.name} did not fail.`);
+    assert.ok(/AssertionError/.test(result.output), `${entry.name} did not reach a real assertion.`);
+    assert.ok(!/Startup Error|Failed Suites|No test files found/.test(result.output), `${entry.name} had a setup failure.`);
+  } finally {
+    fs.writeFileSync(file, original);
+    assert.ok(fs.readFileSync(file).equals(original), `${entry.name} byte restoration failed.`);
+  }
+  const evidence = { name: entry.name, file: entry.file, assertionFailure: true, exactRestoration: true,
+    sourceSha256: createHash('sha256').update(original).digest('hex'), exitCode: result.code };
+  results.push(evidence); console.log(JSON.stringify(evidence));
+  fs.writeFileSync(path.join(directory, 'reversal.json'), JSON.stringify({ status: 'in_progress', cases: results }, null, 2) + '\n');
+}
+fs.writeFileSync(path.join(directory, 'reversal.json'), JSON.stringify({ status: 'passed', cases: results }, null, 2) + '\n');

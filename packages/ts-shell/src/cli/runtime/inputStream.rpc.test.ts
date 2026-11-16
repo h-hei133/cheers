@@ -11,7 +11,7 @@ import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import { SessionManager } from '../../session/SessionManager.js';
 import { runTurn, type TurnInput } from '../../turn/session.js';
-import type { RpcResponse } from '../rpc/protocol.js';
+import type { RpcResponse, RpcUiBridge } from '../rpc/protocol.js';
 import { runPromptInputStream } from './inputStream.js';
 
 let directory: string;
@@ -91,4 +91,83 @@ it('returns cancelled for refused JSONL session switching and preserves current 
   expect(frames.find(frame => frame.id === 'switch')).toMatchObject({ success: true, data: { cancelled: true } });
   expect(context.session).toBe(original);
   expect(manager.getCurrentSessionForProject(directory)?.id).toBe(original.id);
+});
+
+it.each([
+  { line: '{"id":"broken","type":"prompt","message":"PRIVATE_RPC_INPUT"', command: 'parse', id: undefined },
+  { line: '["PRIVATE_RPC_INPUT"]', command: 'parse', id: undefined },
+  { line: '{"id":"missing-type","message":"PRIVATE_RPC_INPUT"}', command: 'unknown', id: 'missing-type' },
+  { line: '{"id":"bad-bash","type":"bash","command":17,"private":"PRIVATE_RPC_INPUT"}', command: 'bash', id: 'bad-bash' },
+  { line: '{"id":"bad-type","type":"unused_command","private":"PRIVATE_RPC_INPUT"}', command: 'unused_command', id: 'bad-type' },
+  { line: '{"id":"bad-ui","type":"extension_ui_response","confirmed":"PRIVATE_RPC_INPUT"}', command: 'extension_ui_response', id: 'bad-ui' },
+  { line: 'PRIVATE_RPC_INPUT', command: 'parse', id: undefined },
+])('rejects invalid RPC input $command without dispatching a model prompt', async ({ line, command, id }) => {
+  const stdin = new PassThrough(); inputs.push(stdin);
+  const prompts: string[] = [];
+  const runtime = { waitForIdle: async () => {}, getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
+  const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true,
+    runPrompt: async prompt => { prompts.push(prompt); } });
+  stdin.end(`${line}\n`);
+  await run;
+  expect(prompts).toEqual([]);
+  expect(frames).toHaveLength(1);
+  expect(frames[0]).toMatchObject({ type: 'response', command, success: false, error: expect.any(String) });
+  expect(frames[0]?.id).toBe(id);
+  expect(frames[0]?.data).toBeUndefined();
+  expect(JSON.stringify(frames)).not.toContain('PRIVATE_RPC_INPUT');
+});
+
+it('keeps invalid RPC input separate from subsequent valid controls and explicit prompts through EOF', async () => {
+  const stdin = new PassThrough(); inputs.push(stdin);
+  const prompts: string[] = [];
+  const runtime = { waitForIdle: async () => {}, getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
+  const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true,
+    runPrompt: async prompt => { prompts.push(prompt); } });
+  stdin.end('{"id":"bad","type":"bash","command":17}\n'
+    + '{"id":"read","type":"get_messages"}\n'
+    + '{"id":"accepted","type":"prompt","message":"EXPLICIT_PROMPT"}\n');
+  await run;
+  expect(prompts).toEqual(['EXPLICIT_PROMPT']);
+  expect(frames.find(frame => frame.id === 'bad')).toMatchObject({ command: 'bash', success: false });
+  expect(frames.find(frame => frame.id === 'read')).toMatchObject({ success: true, data: { messages: [] } });
+  expect(frames.find(frame => frame.id === 'accepted')).toMatchObject({ success: true });
+});
+
+it('leaves a pending RPC dialog live after rejecting a malformed answer and accepts its later valid answer', async () => {
+  const stdin = new PassThrough(); inputs.push(stdin);
+  const prompts: string[] = [];
+  let bridge!: RpcUiBridge;
+  const runtime = { waitForIdle: async () => {}, getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
+  const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true,
+    onRpcUiBridge: value => { bridge = value; }, runPrompt: async prompt => { prompts.push(prompt); } });
+  const answer = bridge.confirm('Confirm action', 'Proceed with this action?');
+  const request = vi.mocked(outputGuard.writeRawStdout).mock.calls.map(([text]) => JSON.parse(text))
+    .find(frame => frame.type === 'extension_ui_request');
+  expect(request).toBeDefined();
+  try {
+    stdin.write(JSON.stringify({ type: 'extension_ui_response', id: request.id, confirmed: 'PRIVATE_RPC_INPUT' }) + '\n');
+    await vi.waitFor(() => expect(frames.find(frame => frame.id === request.id)?.success).toBe(false));
+    expect(prompts).toEqual([]);
+    expect(bridge.pendingCount()).toBe(1);
+    expect(JSON.stringify(frames)).not.toContain('PRIVATE_RPC_INPUT');
+    stdin.write(JSON.stringify({ type: 'extension_ui_response', id: request.id, confirmed: true }) + '\n');
+    expect(await answer).toBe(true);
+    expect(bridge.pendingCount()).toBe(0);
+  } finally { stdin.end(); await run; }
+});
+
+it('retains newline prompt transport for ordinary non-RPC stdin', async () => {
+  const stdin = new PassThrough(); inputs.push(stdin);
+  const prompts: string[] = [];
+  const runtime = { waitForIdle: async () => {}, getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
+  const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never,
+    runPrompt: async prompt => { prompts.push(prompt); } });
+  stdin.end('ORDINARY_PROMPT\n');
+  await run;
+  expect(prompts).toEqual(['ORDINARY_PROMPT']);
+  expect(frames).toEqual([]);
 });

@@ -547,6 +547,8 @@ export interface CondenseInput {
    * missed its size in the first place.
    */
   readonly force?: boolean;
+  /** A legal cut was admitted for this caller, including when generation is shared. */
+  readonly onStarted?: () => void;
   /**
    * Before generation may refuse it; callers dispatch after only following verified commit.
    *
@@ -596,6 +598,17 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
   }
   const offset = source ? original.length - source.history.length : 0;
   const captured = capturedGenerationInput(input, preparedPolicy, tokensBefore);
+  const plan = captured.force
+    ? planCompactionCut(captured.messages, captured.policy)
+    : planCompaction(captured.messages, captured.policy, captured.toolsAllowed);
+  if (!plan) {
+    if (!captured.force && isBelowThreshold(captured.messages, captured.policy, captured.toolsAllowed)) {
+      return { status: 'declined', reason: 'below-threshold' };
+    }
+    return { status: 'declined', reason: explainNoCut(captured.messages, captured.policy) };
+  }
+  // Activity belongs to each caller's settlement, even when only one summary is generated.
+  input.onStarted?.();
   const key = captured.operation && !input.policy.prepare && !input.policy.estimateContextTokens
     && !preparedPolicy.prepare && !preparedPolicy.estimateContextTokens ? digest([{ ...captured.operation,
     source: captured.operation.source && { sessionId: captured.operation.source.sessionId,
@@ -605,7 +618,7 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
     captured.policy.outputTokens, captured.policy.keepRecentTokens, captured.policy.segmentTokens, captured.policy.mergeTokens,
     captured.policy.enabled, Boolean(captured.summarizeTurnPrefix)]) : undefined;
   const joined = key ? pendingCompactions.get(key) : undefined;
-  const pending = joined ?? generateContext(captured);
+  const pending = joined ?? generateContext(captured, plan);
   if (key && !joined) pendingCompactions.set(key, pending);
   try {
     const result = await pending;
@@ -633,19 +646,7 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
   }
 }
 
-async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
-  const plan = input.force
-    ? planCompactionCut(input.messages, input.policy)
-    : planCompaction(input.messages, input.policy, input.toolsAllowed);
-  if (!plan) {
-    // Which refusal this is matters to whoever reads it. An explicit `/compact`
-    // skips the threshold, so its refusal is always about the conversation's
-    // shape; a scheduled step can also be refusing because nothing is due yet.
-    if (!input.force && isBelowThreshold(input.messages, input.policy, input.toolsAllowed)) {
-      return { status: "declined", reason: "below-threshold" };
-    }
-    return { status: "declined", reason: explainNoCut(input.messages, input.policy) };
-  }
+async function generateContext(input: CondenseInput, plan: CompactionPlan): Promise<CondenseOutcome> {
   // A leading system message is carried over verbatim by applyCompaction, so
   // summarizing it as well would pay to restate what is still there.
   const head = contextCheckpointIndex(input.messages);
@@ -738,6 +739,8 @@ export interface CompactionStepOptions {
   readonly onDeclined?: (message: string) => void;
   /** A published threshold compaction did not create enough room to continue compacting. */
   readonly onDeadEnd?: (message: string) => void;
+  /** A legal cut entered compaction; release its activity only after publication and hooks settle. */
+  readonly onStarted?: () => () => void;
   readonly onCompact?: (input: {
     readonly summary: string;
     readonly keptMessages: number;
@@ -764,88 +767,94 @@ export function createCompactionStep(
   let reportedRefusal: string | undefined;
   const step = async (snapshot: NextStepSnapshot, signal?: AbortSignal, currentPolicy?: CompactionPolicy,
     summarizers: Pick<CompactionStepOptions, 'summarize' | 'summarizeTurnPrefix'> = options): Promise<NextStepUpdate | undefined> => {
-    if (signal?.aborted) {
-      return undefined;
-    }
-    let condensed: CondenseOutcome;
-    let source: CompactionSource | undefined;
+    let release: (() => void) | undefined;
     try {
-      source = options.authority?.capture(snapshot.messages);
-      const input = captureCompactionInput({
-        messages: snapshot.messages,
-        policy: currentPolicy ?? policy,
-        summarize: summarizers.summarize,
-        summarizeTurnPrefix: summarizers.summarizeTurnPrefix,
-        signal,
-        ...(snapshot.toolsAllowed !== undefined ? { toolsAllowed: snapshot.toolsAllowed } : {}),
-        ...(options.lifecycle ? { lifecycle: options.lifecycle } : {}),
-        lifecycleReason: reason,
-        ...(options.sessionId ? { operation: { sessionId: options.sessionId,
-          ...(source ? { source } : {}), ...(options.authority?.identity ? { identity: options.authority.identity } : {}),
-          ...(options.provider ? { provider: options.provider } : {}), ...(options.model ? { model: options.model } : {}) } } : {}),
-      });
-      source = input.operation?.source ?? source;
-      const preparedPolicy = await prepareCompactionPolicy(input.policy, input.messages, signal, snapshot.toolsAllowed);
-      if (options.authority?.admission?.()) throw new Error('Compaction source ownership changed.');
-      const prepared = options.force ? planCompactionCut(input.messages, preparedPolicy)
-        : planCompaction(input.messages, preparedPolicy, snapshot.toolsAllowed);
-      if (progress?.blocks(input.messages, prepared?.cut, snapshot.toolsAllowed, preparedPolicy)) return undefined;
-      if (prepared?.tokensBefore === undefined) {
-        const refusal = compactionRefusalReason(input.messages, preparedPolicy, snapshot.toolsAllowed);
-        if (refusal && refusal.key !== reportedRefusal) {
-          reportedRefusal = refusal.key;
-          options.onDeclined?.(refusal.message);
-        }
-        return undefined;
-      }
-      // The preparation closure reuses this exact raw capture in condenseContext.
-      condensed = await condenseContext({ ...input, policy: preparedPolicy, force: options.force });
-    } catch (error) {
-      if (error instanceof ModelAdmissionError) throw error;
       if (signal?.aborted) {
         return undefined;
       }
-      options.onError?.(error);
-      return undefined;
-    }
-    if (signal?.aborted) return undefined;
-    if (condensed.status === 'failed') {
-      options.onError?.(new CompactionSummaryError());
-      return undefined;
-    }
-    // Decisions after the threshold was crossed still need an explanation.
-    // Unknown sends retain their decline state and never authorize a replay.
-    if (condensed.status === "declined") {
-      if ((condensed.reason === 'blocked-by-hook' || condensed.reason === 'would-not-shrink'
-        || condensed.reason === 'step-unknown') && reportedRefusal !== condensed.reason) {
-        reportedRefusal = condensed.reason;
-        options.onDeclined?.(COMPACTION_DECLINE_MESSAGES[condensed.reason]);
-      }
-      return undefined;
-    }
-    reportedRefusal = undefined;
-    const { plan, summary } = condensed;
-    const candidatePolicy = condensed.preparedPolicy ?? currentPolicy ?? policy;
-    const admission = (): string | undefined => candidatePolicy.admission?.() ?? options.authority?.admission?.();
-    const blocked = admission();
-    if (blocked) {
-      options.onDeclined?.(`Automatic compaction was not published: ${blocked}`);
-      return undefined;
-    }
-    if (source && options.authority) {
-      const committed = options.authority.commit({ source, summary, keptMessages: plan.keptMessages,
-        tokensBefore: plan.tokensBefore, signal, admission });
-      if (committed.status === 'unverified') throw new CompactionPublicationError();
-      if (committed.status !== 'committed') {
-        options.onDeclined?.(`Automatic compaction was not published: ${committed.reason}`);
+      let condensed: CondenseOutcome;
+      let source: CompactionSource | undefined;
+      try {
+        source = options.authority?.capture(snapshot.messages);
+        const input = captureCompactionInput({
+          messages: snapshot.messages,
+          policy: currentPolicy ?? policy,
+          summarize: summarizers.summarize,
+          summarizeTurnPrefix: summarizers.summarizeTurnPrefix,
+          signal,
+          ...(snapshot.toolsAllowed !== undefined ? { toolsAllowed: snapshot.toolsAllowed } : {}),
+          ...(options.lifecycle ? { lifecycle: options.lifecycle } : {}),
+          lifecycleReason: reason,
+          ...(options.sessionId ? { operation: { sessionId: options.sessionId,
+            ...(source ? { source } : {}), ...(options.authority?.identity ? { identity: options.authority.identity } : {}),
+            ...(options.provider ? { provider: options.provider } : {}), ...(options.model ? { model: options.model } : {}) } } : {}),
+        });
+        source = input.operation?.source ?? source;
+        const preparedPolicy = await prepareCompactionPolicy(input.policy, input.messages, signal, snapshot.toolsAllowed);
+        if (options.authority?.admission?.()) throw new Error('Compaction source ownership changed.');
+        const prepared = options.force ? planCompactionCut(input.messages, preparedPolicy)
+          : planCompaction(input.messages, preparedPolicy, snapshot.toolsAllowed);
+        if (progress?.blocks(input.messages, prepared?.cut, snapshot.toolsAllowed, preparedPolicy)) return undefined;
+        if (prepared?.tokensBefore === undefined) {
+          const refusal = compactionRefusalReason(input.messages, preparedPolicy, snapshot.toolsAllowed);
+          if (refusal && refusal.key !== reportedRefusal) {
+            reportedRefusal = refusal.key;
+            options.onDeclined?.(refusal.message);
+          }
+          return undefined;
+        }
+        // The preparation closure reuses this exact raw capture in condenseContext.
+        release = options.onStarted?.();
+        condensed = await condenseContext({ ...input, policy: preparedPolicy, force: options.force });
+      } catch (error) {
+        if (error instanceof ModelAdmissionError) throw error;
+        if (signal?.aborted) {
+          return undefined;
+        }
+        options.onError?.(error);
         return undefined;
       }
+      if (signal?.aborted) return undefined;
+      if (condensed.status === 'failed') {
+        options.onError?.(new CompactionSummaryError());
+        return undefined;
+      }
+      // Decisions after the threshold was crossed still need an explanation.
+      // Unknown sends retain their decline state and never authorize a replay.
+      if (condensed.status === "declined") {
+        if ((condensed.reason === 'blocked-by-hook' || condensed.reason === 'would-not-shrink'
+          || condensed.reason === 'step-unknown') && reportedRefusal !== condensed.reason) {
+          reportedRefusal = condensed.reason;
+          options.onDeclined?.(COMPACTION_DECLINE_MESSAGES[condensed.reason]);
+        }
+        return undefined;
+      }
+      reportedRefusal = undefined;
+      const { plan, summary } = condensed;
+      const candidatePolicy = condensed.preparedPolicy ?? currentPolicy ?? policy;
+      const admission = (): string | undefined => candidatePolicy.admission?.() ?? options.authority?.admission?.();
+      const blocked = admission();
+      if (blocked) {
+        options.onDeclined?.(`Automatic compaction was not published: ${blocked}`);
+        return undefined;
+      }
+      if (source && options.authority) {
+        const committed = options.authority.commit({ source, summary, keptMessages: plan.keptMessages,
+          tokensBefore: plan.tokensBefore, signal, admission });
+        if (committed.status === 'unverified') throw new CompactionPublicationError();
+        if (committed.status !== 'committed') {
+          options.onDeclined?.(`Automatic compaction was not published: ${committed.reason}`);
+          return undefined;
+        }
+      }
+      if (options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore }) === false) return undefined;
+      await options.lifecycle?.after?.({ reason, summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
+      if (signal?.aborted) return undefined;
+      progress?.accepted(condensed.messages, plan.keptMessages, snapshot.toolsAllowed, candidatePolicy);
+      return { messages: condensed.messages };
+    } finally {
+      release?.();
     }
-    if (options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore }) === false) return undefined;
-    await options.lifecycle?.after?.({ reason, summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
-    if (signal?.aborted) return undefined;
-    progress?.accepted(condensed.messages, plan.keptMessages, snapshot.toolsAllowed, candidatePolicy);
-    return { messages: condensed.messages };
   };
   return step;
 }

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import type { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { initialConfiguration } from '../../core/shell/configuration.js';
+import { ShellCommandRuntime } from '../../core/shell/command.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import { SessionManager } from '../../session/SessionManager.js';
@@ -43,7 +44,7 @@ afterEach(() => {
 });
 
 function host(input?: TurnInput, switchSession?: (session: Session) => boolean) {
-  const runtime = { input: () => input, cancelCurrentRun: () => {}, getState: () => input ? 'running' : 'idle',
+  const runtime = { commands: new ShellCommandRuntime(), input: () => input, cancelCurrentRun: () => {}, getState: () => input ? 'running' : 'idle',
     summarizeAbandonedTurns: async () => undefined } as unknown as ShellSessionRuntime;
   return { ...createRuntimeRpcHost({ runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
     queue, isStreaming: () => Boolean(input), enqueuePrompt: text => { queue.push(text); }, switchSession }), emitResponse: () => {} };
@@ -321,4 +322,68 @@ it.each(['get_fork_messages', 'fork'] as const)('refuses %s when selection chang
   expect(response.data).toBeUndefined();
   expect(fork).not.toHaveBeenCalled();
   expect(context.session).toBe(successor);
+});
+
+it.each(['get_fork_messages', 'get_entries', 'get_tree'] as const)(
+  'refuses %s when selection changes after the host read resolves', async type => {
+    manager.addTurn(context.session.id, { role: 'user', content: 'Retired read result' });
+    const successor = manager.createNew(directory, { activate: false });
+    const rpc = host();
+    const method = type === 'get_fork_messages' ? 'getForkMessages' : type === 'get_entries' ? 'getEntries' : 'getTree';
+    const read = rpc[method]!;
+    const emitted = vi.fn();
+    Object.defineProperty(rpc, method, { value: async () => {
+      const result = await read();
+      queueMicrotask(() => { context.session = successor; });
+      return result;
+    } });
+    const response = await handleRpcCommand({ type }, { ...rpc, emitResponse: emitted });
+    expect(response).toMatchObject({ success: false, error: 'The selected session changed during the read.' });
+    expect(response.data).toBeUndefined();
+    expect(emitted).toHaveBeenCalledOnce();
+    expect(emitted).toHaveBeenCalledWith(response);
+    expect(context.session).toBe(successor);
+  },
+);
+
+it.each(['get_fork_messages', 'get_entries', 'get_tree'] as const)(
+  'refuses %s when configuration retires after the host read resolves', async type => {
+    manager.addTurn(context.session.id, { role: 'user', content: 'Retired configuration read' });
+    const rpc = host();
+    const method = type === 'get_fork_messages' ? 'getForkMessages' : type === 'get_entries' ? 'getEntries' : 'getTree';
+    const read = rpc[method]!;
+    const emitted = vi.fn();
+    Object.defineProperty(rpc, method, { value: async () => {
+      const result = await read();
+      queueMicrotask(() => { context.configuration.transition(context.configuration.current.binding); });
+      return result;
+    } });
+    const response = await handleRpcCommand({ type }, { ...rpc, emitResponse: emitted });
+    expect(response).toMatchObject({ success: false });
+    expect(response.error).toMatch(/abort|selected session changed/i);
+    expect(response.data).toBeUndefined();
+    expect(emitted).toHaveBeenCalledOnce();
+    expect(emitted).toHaveBeenCalledWith(response);
+  },
+);
+
+it('preserves legacy custom read hosts without exposing admission callbacks in response data', async () => {
+  const rpc = { ...host(),
+    getForkMessages: async () => [{ entryId: 'question', text: 'Editable question' }],
+    getEntries: async () => ({ entries: [{ id: 'question' }], leafId: 'question' }),
+    getTree: async () => ({ tree: [{ id: 'question' }], leafId: 'question' }),
+  };
+  expect(await handleRpcCommand({ type: 'get_fork_messages' }, rpc)).toMatchObject({ success: true,
+    data: { messages: [{ entryId: 'question', text: 'Editable question' }] } });
+  expect(await handleRpcCommand({ type: 'get_entries' }, rpc)).toMatchObject({ success: true,
+    data: { entries: [{ id: 'question' }], leafId: 'question' } });
+  expect(await handleRpcCommand({ type: 'get_tree' }, rpc)).toMatchObject({ success: true,
+    data: { tree: [{ id: 'question' }], leafId: 'question' } });
+  manager.addTurn(context.session.id, { role: 'user', content: 'Current saved question' });
+  for (const type of ['get_fork_messages', 'get_entries', 'get_tree'] as const) {
+    const response = await handleRpcCommand({ type }, host());
+    expect(response.success).toBe(true);
+    expect(response.data).not.toHaveProperty('assertCurrent');
+    expect(JSON.stringify(response)).not.toContain('assertCurrent');
+  }
 });

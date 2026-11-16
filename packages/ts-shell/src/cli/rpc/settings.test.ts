@@ -6,6 +6,7 @@ import * as configFiles from '../../config/runtimeConfig.js';
 import { ConfigWriteError } from '../../config/outcome.js';
 import { createConfigInputs } from '../../config/inputs/selection.js';
 import type { ConfigInputs } from '../../config/inputs/model.js';
+import { ShellCommandRuntime } from '../../core/shell/command.js';
 import { createShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import { SessionManager } from '../../session/SessionManager.js';
@@ -29,7 +30,7 @@ function fixture(overrides?: RuntimeConfigOverrides, id?: string, inputs?: Confi
     targetPathBase: root, gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: true }, session,
     runtimeConfig: getRuntimeConfig(root, overrides, inputs), runtimeConfigOverrides: overrides });
   const host = { ...createRuntimeRpcHost({ runtimeContext: context, sessionManager: manager,
-    sessionRuntime: { getState: () => 'idle' } as ShellSessionRuntime,
+    sessionRuntime: { commands: new ShellCommandRuntime(), getState: () => 'idle' } as ShellSessionRuntime,
     queue: new SubmissionQueue(() => context.session, () => {}), isStreaming: () => false, enqueuePrompt: () => {} }),
     emitResponse: () => {} };
   return { context, host };

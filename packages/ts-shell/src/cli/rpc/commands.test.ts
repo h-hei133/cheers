@@ -6,6 +6,7 @@ import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import { registerCatalogContribution } from '../../core/catalog/contributions.js';
 import type { CommandDefinition } from '../../core/commands/types.js';
 import { projectTrust } from '../../core/security/trust/store.js';
+import { ShellCommandRuntime } from '../../core/shell/command.js';
 import { createShellRuntimeContext, refreshShellRuntimeConfig, switchActiveSession } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import * as outputGuard from '../../core/shell/outputGuard.js';
@@ -33,7 +34,7 @@ function fixture() {
   const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, rootMode: 'direct',
     targetPathBase: root, gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: true }, session,
     runtimeConfig: getRuntimeConfig(root) });
-  const runtime = { getState: () => 'idle', waitForIdle: async () => {}, cancelCurrentRun: vi.fn() } as unknown as ShellSessionRuntime;
+  const runtime = { commands: new ShellCommandRuntime(), getState: () => 'idle', waitForIdle: async () => {}, cancelCurrentRun: vi.fn() } as unknown as ShellSessionRuntime;
   const host = { ...createRuntimeRpcHost({ runtimeContext: context, sessionManager: manager, sessionRuntime: runtime,
     queue: new SubmissionQueue(() => context.session, () => {}), isStreaming: () => false, enqueuePrompt: () => {} }), emitResponse: () => {} };
   return { context, manager, host, runtime };

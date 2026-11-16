@@ -1,0 +1,107 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "status": "passed",
+  "realProvider": false,
+  "stages": {
+    "prompt": {
+      "passed": true,
+      "physicalDispatch": true,
+      "durablePhysicalOrigin": true
+    },
+    "reads": {
+      "passed": true,
+      "currentMessages": true,
+      "currentCount": true,
+      "currentStats": true,
+      "currentLastText": true
+    },
+    "inspection": {
+      "passed": true,
+      "rename": true,
+      "entries": true,
+      "exclusiveCursor": true,
+      "unknownCursor": true,
+      "tree": true,
+      "currentLeaf": true,
+      "invalidEntry": true,
+      "staleVersion": true
+    },
+    "branching": {
+      "passed": true,
+      "clone": true,
+      "forkDraft": true,
+      "sourceUnchanged": true,
+      "navigateAndReturn": true,
+      "historyRetained": true
+    },
+    "switch": {
+      "passed": true,
+      "emptySuccessor": true,
+      "originalRestored": true
+    },
+    "busy": {
+      "passed": true,
+      "sessionCommandsCancelled": 4,
+      "navigationRefused": true,
+      "selectionPreserved": true,
+      "abortSettled": true
+    },
+    "missing": {
+      "passed": true,
+      "readsRefused": 4
+    }
+  },
+  "buildId": "3923b90896f93852325829a28b2998caa5ef47096e06cdc9ece8a820bd76491a",
+  "probeSha256": "6273dd3522a9e6cf555415e0af3bef575aa0a86d37212d0e3c647f7e1e3a62cb",
+  "initialModel": {
+    "provider": "anthropic",
+    "id": "physical"
+  },
+  "initialEffort": "low",
+  "selection": "physical",
+  "messageFacts": [
+    {
+      "role": "user",
+      "isText": true,
+      "matches": false,
+      "contains": true,
+      "hasOrigin": false,
+      "physical": false,
+      "keys": [
+        "id",
+        "role",
+        "content",
+        "timestamp"
+      ]
+    },
+    {
+      "role": "assistant",
+      "isText": true,
+      "matches": true,
+      "contains": true,
+      "hasOrigin": true,
+      "physical": true,
+      "keys": [
+        "id",
+        "role",
+        "content",
+        "origin",
+        "timestamp"
+      ]
+    }
+  ],
+  "forkMessages": [
+    {
+      "entryId": "turn_aadf4d3e",
+      "text": "Return RPC_ACK."
+    }
+  ],
+  "forkResult": {
+    "cancelled": false,
+    "sessionId": "sess_9f228e44bd66e775_1794816449186",
+    "text": "Return RPC_ACK."
+  },
+  "gaps": [],
+  "loopbackPosts": 3
+}

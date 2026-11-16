@@ -1,0 +1,313 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/cli/rpc/runtimeHost.test.ts (38 tests | 6 failed) 1505ms
+   ✓ clears both live input lanes and pending submissions without cancelling the active turn 57ms
+   ✓ changes the running steering delivery mode before the next actual model step 41ms
+   ✓ changes the running followUp delivery mode before the next actual model step 38ms
+   ✓ reports a refused new_session without changing the current selection 55ms
+   ✓ reports a refused switch_session without changing the current selection 39ms
+   ✓ reports a refused fork without changing the current selection 64ms
+   ✓ reports a refused clone without changing the current selection 63ms
+   ✓ persists new-session ancestry while starting with an empty conversation 41ms
+   ✓ accepts a same-project session callback and selects only after acceptance 38ms
+   ✓ reads persisted conversation updates through get_messages after the host was created 36ms
+   ✓ reads persisted conversation updates through get_state after the host was created 36ms
+   ✓ reads persisted conversation updates through get_session_stats after the host was created 33ms
+   ✓ reads persisted conversation updates through get_last_assistant_text after the host was created 140ms
+   ✓ reads the accepted new session on the next call through the existing host 49ms
+   ✓ refuses get_messages when the selected stored session is unavailable 24ms
+   ✓ refuses get_state when the selected stored session is unavailable 25ms
+   ✓ refuses get_session_stats when the selected stored session is unavailable 25ms
+   ✓ refuses get_last_assistant_text when the selected stored session is unavailable 27ms
+   ✓ rejects a changed identity during a current-session read 33ms
+   ✓ rejects a changed selection during a current-session read 33ms
+   ✓ reports the resolved physical provider together with its model for a CLI override 19ms
+   ✓ offers only saved user questions for a fork and returns their exact editable text 68ms
+   ✓ returns a saved question as a fork draft after the branch was accepted 50ms
+   ✓ refuses get_fork_messages when its session changes during acquisition 40ms
+   ✓ refuses fork when its session changes during acquisition 39ms
+   ✓ binds a fork draft to the acquired history version before creating a session 44ms
+   ✓ keeps a refused fork switch separate from an accepted editable draft 40ms
+   ✓ refuses a fork when the host becomes busy while acquiring its draft 23ms
+   ✓ omits unavailable saved questions from fork candidates 25ms
+   ✓ refuses get_fork_messages when selection changes after the nested read resolves 30ms
+   ✓ refuses fork when selection changes after the nested read resolves 32ms
+   × refuses get_fork_messages when selection changes after the host read resolves 48ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+   × refuses get_entries when selection changes after the host read resolves 28ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(5 matching properties omitted from actual)
+   × refuses get_tree when selection changes after the host read resolves 27ms
+     → expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(5 matching properties omitted from actual)
+   × refuses get_fork_messages when configuration retires after the host read resolves 24ms
+     → expected { type: 'response', …(3) } to match object { success: false }
+(4 matching properties omitted from actual)
+   × refuses get_entries when configuration retires after the host read resolves 20ms
+     → expected { type: 'response', …(3) } to match object { success: false }
+(5 matching properties omitted from actual)
+   × refuses get_tree when configuration retires after the host read resolves 20ms
+     → expected { type: 'response', …(3) } to match object { success: false }
+(5 matching properties omitted from actual)
+   ✓ preserves legacy custom read hosts without exposing admission callbacks in response data 25ms
+ ❯ src/cli/rpc/protocol.test.ts (18 tests | 10 failed) 16ms
+   × RPC command input > rejects malformed optional 'id' in 'get_messages' instead of silently choosing defaults 8ms
+     → expected { type: 'get_messages' } to be undefined
+   × RPC command input > rejects malformed optional 'streamingBehavior' in 'prompt' instead of silently choosing defaults 1ms
+     → expected { type: 'prompt', …(1) } to be undefined
+   × RPC command input > rejects malformed optional 'outputPath' in 'export_html' instead of silently choosing defaults 1ms
+     → expected { type: 'export_html' } to be undefined
+   × RPC command input > rejects malformed optional 'parentSession' in 'new_session' instead of silently choosing defaults 1ms
+     → expected { type: 'new_session' } to be undefined
+   × RPC command input > rejects malformed optional 'customInstructions' in 'compact' instead of silently choosing defaults 1ms
+     → expected { type: 'compact' } to be undefined
+   × RPC command input > rejects malformed optional 'since' in 'get_entries' instead of silently choosing defaults 1ms
+     → expected { type: 'get_entries' } to be undefined
+   × RPC command input > rejects malformed optional 'expectedVersion' in 'navigate_tree' instead of silently choosing defaults 0ms
+     → expected { type: 'navigate_tree', …(1) } to be undefined
+   × RPC command input > rejects malformed optional 'excludeFromContext' in 'bash' instead of silently choosing defaults 1ms
+     → expected { type: 'bash', …(1) } to be undefined
+   × RPC command input > rejects malformed optional 'excludeFromContext' in 'bash' instead of silently choosing defaults 1ms
+     → expected { type: 'bash', …(1) } to be undefined
+   × RPC command input > rejects a non-finite entries cursor instead of silently returning the full history 1ms
+     → expected { type: 'get_entries' } to be undefined
+   ✓ RPC command input > preserves explicit optional values for 'prompt' 1ms
+   ✓ RPC command input > preserves explicit optional values for 'bash' 0ms
+   ✓ RPC command input > preserves explicit optional values for 'navigate_tree' 0ms
+   ✓ RPC command input > preserves explicit optional values for 'get_entries' 0ms
+   ✓ RPC command input > preserves explicit optional values for 'export_html' 0ms
+   ✓ RPC command input > preserves explicit optional values for 'compact' 0ms
+   ✓ RPC command input > preserves explicit optional values for 'new_session' 0ms
+   ✓ RPC command input > accepts unknown metadata fields without using them as command parameters 0ms
+ Test Files  2 failed (2)
+      Tests  16 failed | 40 passed (56)
+   Start at  15:44:41
+   Duration  15.04s (transform 7.58s, setup 0ms, collect 12.79s, tests 1.52s, environment 0ms, prepare 169ms)
+⎯⎯⎯⎯⎯⎯ Failed Tests 16 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'id' in 'get_messages' instead of silently choosing defaults
+AssertionError: expected { type: 'get_messages' } to be undefined
+- Expected: 
+undefined
++ Received: 
+{
+  "type": "get_messages",
+}
+ ❯ src/cli/rpc/protocol.test.ts:16:55
+     14|     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash'…
+     15|   ])('rejects malformed optional $field in $type instead of silently c…
+     16|     expect(tryParseRpcCommand(JSON.stringify(frame))).toBeUndefined();
+       |                                                       ^
+     17|   });
+     18| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'streamingBehavior' in 'prompt' instead of silently choosing defaults
+AssertionError: expected { type: 'prompt', …(1) } to be undefined
+- Expected: 
+undefined
++ Received: 
+{
+  "message": "explicit input",
+  "type": "prompt",
+}
+ ❯ src/cli/rpc/protocol.test.ts:16:55
+     14|     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash'…
+     15|   ])('rejects malformed optional $field in $type instead of silently c…
+     16|     expect(tryParseRpcCommand(JSON.stringify(frame))).toBeUndefined();
+       |                                                       ^
+     17|   });
+     18| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'outputPath' in 'export_html' instead of silently choosing defaults
+AssertionError: expected { type: 'export_html' } to be undefined
+- Expected: 
+undefined
++ Received: 
+{
+  "type": "export_html",
+}
+ ❯ src/cli/rpc/protocol.test.ts:16:55
+     14|     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash'…
+     15|   ])('rejects malformed optional $field in $type instead of silently c…
+     16|     expect(tryParseRpcCommand(JSON.stringify(frame))).toBeUndefined();
+       |                                                       ^
+     17|   });
+     18| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/16]⎯
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'parentSession' in 'new_session' instead of silently choosing defaults
+AssertionError: expected { type: 'new_session' } to be undefined
+- Expected: 
+undefined
++ Received: 
+{
+  "type": "new_session",
+}
+ ❯ src/cli/rpc/protocol.test.ts:16:55
+     14|     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash'…
+     15|   ])('rejects malformed optional $field in $type instead of silently c…
+     16|     expect(tryParseRpcCommand(JSON.stringify(frame))).toBeUndefined();
+       |                                                       ^
+     17|   });
+     18| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/16]⎯
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'customInstructions' in 'compact' instead of silently choosing defaults
+AssertionError: expected { type: 'compact' } to be undefined
+- Expected: 
+undefined
++ Received: 
+{
+  "type": "compact",
+}
+ ❯ src/cli/rpc/protocol.test.ts:16:55
+     14|     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash'…
+     15|   ])('rejects malformed optional $field in $type instead of silently c…
+     16|     expect(tryParseRpcCommand(JSON.stringify(frame))).toBeUndefined();
+       |                                                       ^
+     17|   });
+     18| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/16]⎯
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'since' in 'get_entries' instead of silently choosing defaults
+AssertionError: expected { type: 'get_entries' } to be undefined
+- Expected: 
+undefined
++ Received: 
+{
+  "type": "get_entries",
+}
+ ❯ src/cli/rpc/protocol.test.ts:16:55
+     14|     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash'…
+     15|   ])('rejects malformed optional $field in $type instead of silently c…
+     16|     expect(tryParseRpcCommand(JSON.stringify(frame))).toBeUndefined();
+       |                                                       ^
+     17|   });
+     18| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/16]⎯
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'expectedVersion' in 'navigate_tree' instead of silently choosing defaults
+AssertionError: expected { type: 'navigate_tree', …(1) } to be undefined
+- Expected: 
+undefined
++ Received: 
+{
+  "entryId": "old-entry",
+  "type": "navigate_tree",
+}
+ ❯ src/cli/rpc/protocol.test.ts:16:55
+     14|     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash'…
+     15|   ])('rejects malformed optional $field in $type instead of silently c…
+     16|     expect(tryParseRpcCommand(JSON.stringify(frame))).toBeUndefined();
+       |                                                       ^
+     17|   });
+     18| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/16]⎯
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'excludeFromContext' in 'bash' instead of silently choosing defaults
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects malformed optional 'excludeFromContext' in 'bash' instead of silently choosing defaults
+AssertionError: expected { type: 'bash', …(1) } to be undefined
+- Expected: 
+undefined
++ Received: 
+{
+  "command": "printf private-output",
+  "type": "bash",
+}
+ ❯ src/cli/rpc/protocol.test.ts:16:55
+     14|     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash'…
+     15|   ])('rejects malformed optional $field in $type instead of silently c…
+     16|     expect(tryParseRpcCommand(JSON.stringify(frame))).toBeUndefined();
+       |                                                       ^
+     17|   });
+     18| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/16]⎯
+ FAIL  src/cli/rpc/protocol.test.ts > RPC command input > rejects a non-finite entries cursor instead of silently returning the full history
+AssertionError: expected { type: 'get_entries' } to be undefined
+- Expected: 
+undefined
++ Received: 
+{
+  "type": "get_entries",
+}
+ ❯ src/cli/rpc/protocol.test.ts:20:72
+     18| 
+     19|   it('rejects a non-finite entries cursor instead of silently returnin…
+     20|     expect(tryParseRpcCommand('{"type":"get_entries","since":1e999}'))…
+       |                                                                        ^
+     21|   });
+     22| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/16]⎯
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_fork_messages when selection changes after the host read resolves
+AssertionError: expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(4 matching properties omitted from actual)
+- Expected
++ Received
+  {
+-   "error": "The selected session changed during the read.",
+-   "success": false,
++   "success": true,
+  }
+ ❯ src/cli/rpc/runtimeHost.test.ts:340:22
+    338|     } });
+    339|     const response = await handleRpcCommand({ type }, { ...rpc, emitRe…
+    340|     expect(response).toMatchObject({ success: false, error: 'The selec…
+       |                      ^
+    341|     expect(response.data).toBeUndefined();
+    342|     expect(emitted).toHaveBeenCalledOnce();
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/16]⎯
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_entries when selection changes after the host read resolves
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_tree when selection changes after the host read resolves
+AssertionError: expected { type: 'response', …(3) } to match object { success: false, …(1) }
+(5 matching properties omitted from actual)
+- Expected
++ Received
+  {
+-   "error": "The selected session changed during the read.",
+-   "success": false,
++   "success": true,
+  }
+ ❯ src/cli/rpc/runtimeHost.test.ts:340:22
+    338|     } });
+    339|     const response = await handleRpcCommand({ type }, { ...rpc, emitRe…
+    340|     expect(response).toMatchObject({ success: false, error: 'The selec…
+       |                      ^
+    341|     expect(response.data).toBeUndefined();
+    342|     expect(emitted).toHaveBeenCalledOnce();
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/16]⎯
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_fork_messages when configuration retires after the host read resolves
+AssertionError: expected { type: 'response', …(3) } to match object { success: false }
+(4 matching properties omitted from actual)
+- Expected
++ Received
+  {
+-   "success": false,
++   "success": true,
+  }
+ ❯ src/cli/rpc/runtimeHost.test.ts:361:22
+    359|     } });
+    360|     const response = await handleRpcCommand({ type }, { ...rpc, emitRe…
+    361|     expect(response).toMatchObject({ success: false });
+       |                      ^
+    362|     expect(response.error).toMatch(/abort|selected session changed/i);
+    363|     expect(response.data).toBeUndefined();
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/16]⎯
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_entries when configuration retires after the host read resolves
+ FAIL  src/cli/rpc/runtimeHost.test.ts > refuses get_tree when configuration retires after the host read resolves
+AssertionError: expected { type: 'response', …(3) } to match object { success: false }
+(5 matching properties omitted from actual)
+- Expected
++ Received
+  {
+-   "success": false,
++   "success": true,
+  }
+ ❯ src/cli/rpc/runtimeHost.test.ts:361:22
+    359|     } });
+    360|     const response = await handleRpcCommand({ type }, { ...rpc, emitRe…
+    361|     expect(response).toMatchObject({ success: false });
+       |                      ^
+    362|     expect(response.error).toMatch(/abort|selected session changed/i);
+    363|     expect(response.data).toBeUndefined();
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/16]⎯
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/cli/rpc/protocol.test.ts src/cli/rpc/runtimeHost.test.ts

@@ -1,0 +1,91 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+
+const repository = process.cwd();
+const scratch = path.join(repository, '.tmp/rpc-acceptance-2026-11-16');
+for (const [name, field, expected] of [['review-code.json', 'recommendation', 'APPROVE'], ['review-architecture.json', 'status', 'CLEAR']]) {
+  const review = JSON.parse(fs.readFileSync(path.join(scratch, name), 'utf8'));
+  assert.equal(review[field], expected);
+  for (const [file, hash] of Object.entries(review.sourceHashes)) {
+    assert.equal(createHash('sha256').update(fs.readFileSync(path.join(repository, file))).digest('hex'), hash, file);
+  }
+}
+function revise(file, operation) {
+  const target = path.join(repository, file);
+  const before = fs.readFileSync(target, 'utf8');
+  const after = operation(before);
+  assert.notEqual(after, before, file);
+  fs.writeFileSync(target, after);
+}
+function replace(text, pattern, value) {
+  assert.ok(pattern.test(text), String(pattern));
+  return text.replace(pattern, value);
+}
+
+revise('.wiki/refactor/upgrade/MASTER.md', text => {
+  text = replace(text, /^- \[Pause summary\].+$/m,
+    '- [Progress summary](summary.md)：当前已完成范围、实际验证及全部39项未完成任务。');
+  text = replace(text, /^\*\*Current phase\*\*:.+$/m,
+    '**Current phase**: in_progress；D.1整项Linux本地验收完成，当前23/62项完成。继续C.9 stdout保护与C.2流式合同，再逐项执行其余仍成立的研究任务。');
+  text = replace(text, /^\*\*Last completed batch\*\*:.+$/m,
+    '**Last completed batch**: D.1严格RPC输入／可选字段、最终异步读取准入和完整压缩活动结算。共享raw overflow原caller在合法cut获准后、generation查询前登记，活动保留至自身commit／PostCompact／finally。当前六门、34套件912项、15相关套件268项、七有效反转exact恢复、恢复3/110、2648模块0monoliths及build `43da5c29fee3`通过；同代Linux七组55 loopback POST及配置模型四实际请求通过。独立代码APPROVE限定12生产文件，架构CLEAR限定35源文件，当前哈希已核验；证据归档upgrade-rpc-acceptance-2026-11-16，本地提交不push。');
+  text = replace(text, /^\*\*Current batch\*\*:.+$/m,
+    '**Current batch**: C.9与C.2在独立工作树实施，尚未集成或验收完成。C.9原四个产品反例／58项隔离绿后，架构WATCH的真实Linux子进程证明启动同步exit丢失已排队诊断、shutdown总预算到期仍未恢复guard，正在修复原输出和关闭owner。C.2修正绕过createTurnRequest的telemetry夹具后，11个基线AssertionError／13控制且exact恢复；当前snapshot空reasoning清空与注入式closing旧capture两个实际反例已修，正在串行验证。');
+  text = replace(text, /^\*\*Goal\*\*:.+$/m,
+    '**Goal**: active；39项未完成，其中13部分、11已有待验收、13确认缺口、2待核实。保留全部原规划与暂缓条件，不将本地验收扩展成全平台或远端CI证据。');
+  text = replace(text, /当前本地验收任务数为22\/62，包含T1五项、A四项、B\.1\/B\.2\/B\.3\/B2\.1\/B2\.2\/B2\.3、D\.2\/D\.3\/D\.5、E\.2、C\.1、C\.3和T3\.1；/,
+    '当前本地验收任务数为23/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.3和T3.1；');
+  text = replace(text, /^## Session log$/m,
+    'RPC整项遥测：实际L，复用检查10/10，未增加依赖或执行／存储平面；额外依赖4（严格输入隔离、最后读取准入、完整活动投影、共享generation的caller活动）。原架构WATCH有真实反例并修复；无结果的旧代码review lane记unavailable，最终APPROVE来自新独立12文件审查。此前没有统一数值估算，不补造历史drift。\n\n## Session log');
+  text = replace(text, /^\| 2026-11-16 \| D\.1联合修复.+$/m,
+    '| 2026-11-16 | D.1最终build `43da5c29fee3`六门34/912、七反转exact恢复、恢复3/110、Linux七组55本地POST与四配置模型请求passed；原共享overflow WATCH先红后修，当前架构CLEAR／新独立代码APPROVE，23/62与active。归档后本地提交；C.9真实退出反例和C.2当前capture反例在隔离树继续修复，不push。 |');
+  return text;
+});
+
+revise('.wiki/refactor/upgrade/tasks.md', text => replace(text, /^- \[ \] \*\*D\.1\*\*.+$/m,
+  '- [x] **D.1** 会话／模型／树命令：Linux本地整项验收完成。当前stored session读取与一致physical配对、fork原文draft／source version／最终selection准入、tree／clone／switch、唯一shell执行与完整结算、settings／thinking／commands、同步compact admission／结构化失败及retry专属取消保留。完整联合修复严格JSONL／optional字段隔离、最后读取响应准入及自动／手动／共享raw overflow活动到commit／PostCompact；原共享generation WATCH实际反例先红后修。当前六门34套件912项、相关15/268、七个有效AssertionError反转exact恢复、恢复3/110、2648模块0monoliths及build `43da5c29fee3`通过；同代Linux七组55本地POST覆盖命令／错误／busy／取消／queue／UI／compaction／EOF，配置模型四actual请求含手动commit与压缩后复用通过。独立代码APPROVE限定12生产文件、架构CLEAR限定35源文件，当前哈希已核验。原损坏catalog仅在隔离home提取原目标最小有效entry，原配置hash不变；未主动制造真实限流、body不可检查，无其他平台／push／CI声明。历史子批和失败分类保留，最终证据`.omx/artifacts/upgrade-rpc-acceptance-2026-11-16/delivery.json`。'));
+
+revise('.wiki/refactor/upgrade/design.md', text => {
+  const marker = '## RPC complete command acceptance (2026-11-16)';
+  const position = text.indexOf(marker);
+  assert.ok(position >= 0);
+  return text.slice(0, position) + marker + '\n\n'
+    + '同一最终构建覆盖完整命令及错误／busy／取消／EOF矩阵。核实并修复非法JSONL或UI响应落入普通prompt、异步读取准入在helper到响应之间丢失、压缩活动只按streaming推断。采用参考的严格命令／独立UI响应和完整压缩活动决定；保留原queue、command settlement、compaction cut／publication、读取和transport owner。失败响应只投影有界安全元数据，optional字段必须验证；custom host原数组／对象兼容，回调不进入wire。\n\n'
+    + '手动和分支摘要复用commands owner；自动压缩在合法cut后登记活动，经durable commit和final hook结算后finally释放。独立架构原WATCH发现共享raw overflow跳过第二caller的generation-before hook；真实regression先AssertionError。修复在同一捕获plan合法获准后、共享generation lookup前通知每个原caller，generation消费同plan，每个caller保留自身活动至自身commit／PostCompact／finally。CLI readiness转发同一getter，abort_retry／abort_bash不取消摘要；异步fork／entries／tree携带原session与configuration准入至响应。\n\n'
+    + '最终六门、34套件912项、2648模块0monoliths及build `43da5c29fee3242388eace0f20d122a1304454898d18d8d2435061bb38d39294`通过，inputsDigest实际核验；相关15/268和恢复3/110通过，七反转均实际AssertionError且exact恢复。首次扩大测试14失败属于夹具漂移：九个RPC扩展发裸slash、五个runtime桩缺mandatory commands；只修四文件夹具并保留断言。原六反转／911测试／旧build和失败驱动分别保留，不能替代当前代际。\n\n'
+    + 'Linux当前compiled CLI七组55 loopback POST通过logical／physical选择、当前读取、fork draft、tree／clone／switch、shell gate／上下文排除／全文归档／持久化、effort／settings／发现、两层retry取消、queue／clear／后继、自动／手动compaction／commit、四UI对话／换代及EOF。配置模型同代四实际请求通过普通对话、清队列与专属取消、历史操作、手动summary durable commit及压缩后继续；原配置hash不变，隔离最小catalog／body不可检查／未制造真实限流的边界保留。\n\n'
+    + '当前独立代码APPROVE由新12生产文件审查给出，架构CLEAR绑定35源文件，均未运行验证；原无报告代码lane是unavailable，不作批准。主线程已核对逐项合同和当前hash，D.1本地完成，23/62、goal active。证据`.omx/artifacts/upgrade-rpc-acceptance-2026-11-16/delivery.json`。实际L、复用10/10、额外依赖4，无新生产依赖或执行／存储平面；C.9／C.2隔离后续尚未完成，无push、CI或其他平台声明。\n';
+});
+
+revise('.wiki/refactor/upgrade/summary.md', text => {
+  text = replace(text, /用户已恢复完整规划，当前目标active。.+(?=\n\n本总结)/,
+    '用户已恢复完整规划，当前目标active。**62项中23项完成本地验收，39项未完成**：13项部分完成、11项已有实现待验收、13项确认缺口、2项待核实。D.1已完成同一最终构建的完整联合测试、Linux原生验收和独立代码APPROVE／架构CLEAR，按批本地提交。C.9／C.2仍在隔离工作树实施，全部验证由主线程串行执行。');
+  text = replace(text, /之后C\.1与T3\.1完成，使当前增加到22项。/, '之后C.1、T3.1和D.1完成，使当前增加到23项。');
+  text = replace(text, /首次扩大联合测试的14个失败属于夹具漂移：.+(?=\n\n从此前暂停点)/,
+    '首次扩大联合测试14失败属于夹具漂移：九个RPC扩展发裸slash，五个runtime桩缺mandatory commands。只修四文件夹具并保留断言。独立架构WATCH随后发现共享raw overflow第二caller活动登记被跳过；真实反例AssertionError后把同一合法cut的caller登记提前到共享generation查询前。旧构建／911测试／六反转与失败驱动保留原代际。\n\n当前build `43da5c29fee3`六静态门、34套件912项、2648模块0monoliths及inputsDigest核验通过；相关15/268和恢复3/110通过，七反转全部AssertionError且exact恢复。同代Linux七组55 loopback POST和配置模型四实际请求通过，含完整命令／queue／UI／错误／busy／取消／compaction／EOF、durable commit与压缩后继续；原配置hash不变，隔离最小catalog、body不可检查、未制造真实限流边界保留。独立代码APPROVE限定12生产文件、架构CLEAR绑定35源文件，主线程核验hash和逐项合同；[整项交付](../../../.omx/artifacts/upgrade-rpc-acceptance-2026-11-16/delivery.json)。');
+  text = replace(text, /^## 已完成的22项$/m, '## 已完成的23项');
+  text = replace(text, /^\| D\.2、D\.3、D\.5 \| 3 \|.+$/m,
+    '| D.1–D.3、D.5 | 4 | RPC完整会话／模型／树／shell／设置／压缩／retry命令、严格输入和最终准入；队列／UI响应、导出持久token／费用并保留未知覆盖。 |');
+  text = replace(text, /^\| 当前retry聚焦回归/m,
+    '| 当前D.1整项联合 | 六门、34/912、七反转exact恢复、相关15/268、恢复3/110、0monoliths及build `43da5c29fee3`通过。Linux七组55本地POST、配置模型四actual请求通过，独立APPROVE／CLEAR。 | [整项交付](../../../.omx/artifacts/upgrade-rpc-acceptance-2026-11-16/delivery.json)，当前hash／build一致；限于Linux本地。 |\n| 此前retry聚焦回归');
+  text = replace(text, /各自构建；尚未合并为最终D\.1整项验收。/, '各自历史构建；当前整项证据另列，历史请求不累计。');
+  text = replace(text, /^## 文档中尚未完成的40项$/m, '## 文档中尚未完成的39项');
+  text = replace(text, /^\| D\.1 \| 部分 \|.+\n/m, '');
+  text = replace(text, /^D\.1收齐独立复核后.+$/m,
+    'D.1本地提交后继续C.9和C.2：C.9真实子进程已证启动exit丢诊断、关闭超时未恢复guard，正修原owner；C.2真实请求owner夹具纠正后，canonical空reasoning和注入式closing capture两个反例已修，联合验证与独立复核仍待收齐。C.4／C.7只读资格审计随后继续。全部原规划和暂缓条件保留，总目标active，未push或取得远端CI。');
+  return text;
+});
+
+revise('.tmp/rpc-acceptance-2026-11-16/classification.md', text => text
+  .replace('All six final cases require an actual AssertionError and exact byte restoration; initial failures and scripts are retained.',
+    'The first six cases required actual AssertionErrors and exact restoration; final shared-generation coverage raises the current set to seven. Initial failures and scripts are retained.')
+  + '\nThe old code-review lanes returned no completed report despite status requests and were interrupted/replaced. They are unavailable, never approval. The final recommendation is from rpc_completion_review, which independently inspected the exact twelve production files and relevant regressions, rechecked all hashes and published review-code.json. Reviewers performed no validation.\n');
+fs.writeFileSync(path.join(scratch, 'review-unavailable.json'), JSON.stringify({ status: 'unavailable',
+  lanes: ['rpc_review_bounded', 'rpc_code_completion'], reason: 'No completed report was returned; lanes were interrupted and replaced.',
+  usedAsApproval: false, finalCodeReview: 'rpc_completion_review', finalReceipt: 'review-code.json' }, null, 2) + '\n');
+revise('.wiki/log.md', text => text + '\n\n### 2026-11-16：RPC整项联合验收与共享压缩活动\n\n'
+  + 'D.1完整命令矩阵补严格JSONL／optional字段、异步读取最终准入、完整compaction活动。独立架构WATCH的共享raw overflow第二caller遗漏先真实AssertionError后修，同一合法cut获准后、generation查询前逐caller登记，保留至自身commit／PostCompact／finally。最终六门34/912、相关15/268、七反转exact恢复、恢复3/110、2648模块0monoliths及build `43da5c29fee3`通过；Linux同代七组55 loopback POST、配置模型四actual请求／durable commit／压缩后复用passed。\n\n'
+  + '新独立代码APPROVE限定12生产文件、架构CLEAR绑定35源文件，当前hash核验，旧无结果review lane为unavailable。旧构建／911测试／六反转和setup／observer失败保留，原配置hash不变、隔离最小catalog／body不可检查／未制造真实限流边界保持。归档upgrade-rpc-acceptance-2026-11-16，D.1本地完成23/62、39项未完成，按批本地提交不push。C.9真实启动exit／shutdown超时反例与C.2capture反例隔离继续修复，目标active，无远端CI或整体完成声明。\n');
+console.log(JSON.stringify({ status: 'updated', tasksComplete: 23, total: 62, remaining: 39 }));

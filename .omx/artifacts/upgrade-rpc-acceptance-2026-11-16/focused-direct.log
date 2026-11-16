@@ -1,0 +1,19 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/rpc/runtimeHost.test.ts (38 tests) 1325ms
+ ✓ src/turn/session.test.ts (50 tests) 560ms
+ ✓ src/cli/runtime/inputStream.rpc.test.ts (12 tests) 1187ms
+   ✓ routes JSONL clear_queue into the running turn before EOF drains later explicit prompts  970ms
+ ✓ src/cli/rpc/compaction.test.ts (11 tests) 306ms
+ ✓ src/session/compaction/progress.test.ts (19 tests) 105ms
+ ✓ src/session/compaction.test.ts (46 tests) 68ms
+ ✓ src/turn/compaction.test.ts (13 tests) 43ms
+ ✓ src/turn/pendingInput.test.ts (8 tests) 6ms
+ ✓ src/cli/rpc/protocol.test.ts (19 tests) 5ms
+
+ Test Files  9 passed (9)
+      Tests  216 passed (216)
+   Start at  16:03:42
+   Duration  26.45s (transform 8.25s, setup 0ms, collect 20.93s, tests 3.61s, environment 1ms, prepare 476ms)
+

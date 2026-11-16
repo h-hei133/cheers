@@ -125,7 +125,7 @@ it.each(['set_auto_retry', 'set_auto_compaction'] as const)('admits a fresh load
     if (result.kind === 'local') outputs.push(result.output);
   }, value => { bridge = value; });
   try {
-    stdin.write('/dialog editor\n');
+    stdin.write(JSON.stringify({ type: 'prompt', message: '/dialog editor' }) + '\n');
     await vi.waitFor(() => expect(frames.filter(frame => frame.method === 'editor')).toHaveLength(1));
     const oldRequest = frames.find(frame => frame.method === 'editor')!;
     const background = context.configuration.backgroundSignal;
@@ -136,7 +136,7 @@ it.each(['set_auto_retry', 'set_auto_compaction'] as const)('admits a fresh load
     expect(background.aborted).toBe(true);
     expect(context.configuration.current.config[key]).toBe(enabled);
     await vi.waitFor(() => expect(outputs).toEqual(['cancelled']));
-    stdin.write('/dialog select\n');
+    stdin.write(JSON.stringify({ type: 'prompt', message: '/dialog select' }) + '\n');
     await vi.waitFor(() => expect(frames.filter(frame => frame.method === 'select')).toHaveLength(1));
     const request = frames.find(frame => frame.method === 'select')!;
     expect(request.id).not.toBe(oldRequest.id);
@@ -175,7 +175,7 @@ it.each(['new_session', 'switch_session'] as const)('admits current-session exte
     if (target) expect(context.session.id).toBe(target.id);
     expect(background.aborted).toBe(true);
     expect(await oldOutcome).toMatch(/^(?:cancelled|retired)$/);
-    stdin.write('/dialog select\n');
+    stdin.write(JSON.stringify({ type: 'prompt', message: '/dialog select' }) + '\n');
     await vi.waitFor(() => expect(frames.filter(frame => frame.method === 'select')).toHaveLength(1));
     const request = frames.find(frame => frame.method === 'select')!;
     expect(request.id).not.toBe(oldRequest.id);
@@ -215,7 +215,7 @@ it.each(['turn', 'control'])('cancels a loaded extension editor on EOF before wa
       sessionId: context.session.id } as never);
     if (result.kind === 'local') outputs.push(result.output);
   }, value => { bridge = value; });
-  stdin.write(lane === 'turn' ? '/dialog editor\n' : '/plugin list\n');
+  stdin.write(JSON.stringify({ type: 'prompt', message: lane === 'turn' ? '/dialog editor' : '/plugin list' }) + '\n');
   await vi.waitFor(() => expect(frames.some(frame => frame.method === 'editor')).toBe(true));
   expect(bridge?.pendingCount()).toBe(1);
   const emitted = frames.length;
@@ -239,7 +239,7 @@ it('keeps queued extension dialogs cancelled when EOF arrives before their dispa
       sessionId: context.session.id } as never);
     if (result.kind === 'local') outputs.push(result.output);
   }, value => { bridge = value; });
-  stdin.write('/dialog input\n');
+  stdin.write(JSON.stringify({ type: 'prompt', message: '/dialog input' }) + '\n');
   await waitingForIdle;
   const ended = new Promise<void>(resolve => { stdin.once('end', resolve); });
   stdin.end();
@@ -261,9 +261,9 @@ it('cancels outstanding UI when a separate control requests exit', async () => {
       sessionId: context.session.id } as never);
     if (result.kind === 'local') outputs.push(result.output);
   }, value => { bridge = value; });
-  stdin.write('/dialog input\n');
+  stdin.write(JSON.stringify({ type: 'prompt', message: '/dialog input' }) + '\n');
   await vi.waitFor(() => expect(frames.some(frame => frame.method === 'input')).toBe(true));
-  stdin.write('/plugin cancel\n');
+  stdin.write(JSON.stringify({ type: 'prompt', message: '/plugin cancel' }) + '\n');
   await run;
   expect(outputs).toEqual(['cancelled']);
   expect(bridge?.pendingCount()).toBe(0);
@@ -279,13 +279,13 @@ it('isolates late answers and release callbacks when another input consumer repl
     if (result.kind === 'local') outputs.push(result.output);
   };
   const first = start(() => invoke(firstOutputs), bridge => { firstBridge = bridge; });
-  first.stdin.write('/dialog select\n');
+  first.stdin.write(JSON.stringify({ type: 'prompt', message: '/dialog select' }) + '\n');
   await vi.waitFor(() => expect(frames.filter(frame => frame.method === 'select')).toHaveLength(1));
   const oldRequest = frames.find(frame => frame.method === 'select')!;
   const second = start(() => invoke(secondOutputs), bridge => { secondBridge = bridge; });
   await vi.waitFor(() => expect(firstOutputs).toEqual(['cancelled']));
   expect(firstBridge?.pendingCount()).toBe(0);
-  second.stdin.write('/dialog select\n');
+  second.stdin.write(JSON.stringify({ type: 'prompt', message: '/dialog select' }) + '\n');
   await vi.waitFor(() => expect(frames.filter(frame => frame.method === 'select')).toHaveLength(2));
   const newRequest = frames.filter(frame => frame.method === 'select')[1]!;
   second.stdin.write(JSON.stringify({ type: 'extension_ui_response', id: oldRequest.id, value: 'fast' }) + '\n');

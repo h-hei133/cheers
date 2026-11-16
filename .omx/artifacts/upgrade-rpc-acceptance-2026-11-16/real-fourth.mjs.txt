@@ -1,0 +1,220 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseTree, findNodeAtLocation } from 'jsonc-parser';
+const directory = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(directory, '../..');
+const { getRuntimeConfig } = await import(pathToFileURL(path.join(repo, 'packages/ts-shell/dist/index.js')).href);
+// Capture configured credentials before creating the isolated runtime home.
+const configured = getRuntimeConfig(repo);
+const catalogs = new Map();
+for (const name of ['models.json', 'models-cache.json']) {
+  const file = path.join(os.homedir(), '.cheers', name);
+  if (fs.existsSync(file)) catalogs.set(name, fs.readFileSync(file));
+}
+// Recover only complete JSON provider objects from the malformed user file.
+// Choose an already connected configured record; do not invent model metadata.
+const rawCatalog = catalogs.get('models.json')?.toString('utf8') ?? '';
+const providerNodes = findNodeAtLocation(parseTree(rawCatalog, [], { allowTrailingComma: true }), ['providers']);
+const validProviders = [];
+for (const property of providerNodes?.children ?? []) {
+  const id = property.children?.[0]?.value, value = property.children?.[1];
+  try { validProviders.push({ id, ...JSON.parse(rawCatalog.slice(value.offset, value.offset + value.length)) }); } catch {}
+}
+const originalActive = configured.providerConnections.find(connection => connection.id === configured.activeProviderConnectionId);
+let minimalConfiguredModelEntry = false;
+for (const property of providerNodes?.children ?? []) {
+  if (!originalActive) break;
+  const id = property.children?.[0]?.value, node = property.children?.[1];
+  if (validProviders.some(provider => provider.id === id)) continue;
+  const fields = {};
+  for (const entry of node?.children ?? []) {
+    const key = entry.children?.[0]?.value, value = entry.children?.[1];
+    if (!['label', 'runtime', 'endpoint', 'auth', 'baseUrl', 'envVar'].includes(key)) continue;
+    try { fields[key] = JSON.parse(rawCatalog.slice(value.offset, value.offset + value.length)); } catch {}
+  }
+  if (fields.runtime === originalActive.provider && fields.baseUrl?.replace(/\/+$/, '') === originalActive.baseUrl?.replace(/\/+$/, '')
+    && fields.endpoint && fields.auth) {
+    // The active model list is malformed. The isolated fixture declares only
+    // its already configured identity; it asserts no new capability metadata.
+    validProviders.push({ id, ...fields, models: [{ id: originalActive.model }] });
+    minimalConfiguredModelEntry = true;
+  }
+}
+const connections = [...configured.providerConnections].sort((a, b) => Number(b.id === configured.activeProviderConnectionId) - Number(a.id === configured.activeProviderConnectionId));
+const candidates = connections.filter(connection => connection.status === 'connected' && validProviders.some(provider =>
+  (provider.runtime ?? provider.id) === connection.provider
+  && provider.baseUrl?.replace(/\/+$/, '') === connection.baseUrl?.replace(/\/+$/, '')
+  && provider.models.some(model => model.id === connection.model)));
+const candidateIndex = 0;
+const selectedConnection = candidates[candidateIndex];
+const receipt = { platform: process.platform, compiledCliRpc: true, realProvider: true, status: 'not_run',
+  buildId: JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'))).buildId,
+  probeSha256: createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex'), stages: {} };
+const root = fs.mkdtempSync(path.join(directory, 'real-state-')), home = path.join(root, 'home'), workspace = path.join(root, 'work');
+fs.mkdirSync(home, { mode: 0o700 }); fs.mkdirSync(workspace);
+const storage = path.join(home, '.cheers'); fs.mkdirSync(storage, { mode: 0o700 });
+const observed = path.join(root, 'requests.jsonl');
+const include = 'SHELL_CONTEXT_742619', exclude = 'SHELL_PRIVATE_983267';
+let stage = 'setup', child, closed, timer, sequence = 0, lines = '', invalid = 0;
+const frames = [], waiters = new Set();
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+function readFacts() { return fs.existsSync(observed) ? fs.readFileSync(observed, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : []; }
+function waitFor(predicate, from = frames.length) {
+  const found = frames.slice(from).find(predicate); if (found) return Promise.resolve(found);
+  return new Promise((resolve, reject) => {
+    const deadline = setTimeout(() => { waiters.delete(waiter); reject(new Error('Response deadline.')); }, 75_000);
+    const waiter = { predicate, resolve: value => { clearTimeout(deadline); waiters.delete(waiter); resolve(value); } }; waiters.add(waiter);
+  });
+}
+function command(type, values = {}) {
+  const id = String(++sequence), result = waitFor(value => value.type === 'response' && value.id === id);
+  child.stdin.write(JSON.stringify({ id, type, ...values }) + '\n'); return result;
+}
+
+const originalFiles = ['auth.json', 'config.json', 'models.json', 'models-cache.json'].map(name => path.join(os.homedir(), '.cheers', name));
+const originalHashes = new Map(originalFiles.map(file => [file, fs.existsSync(file) ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : undefined]));
+async function until(predicate, label) {
+  const deadline = Date.now() + 60_000;
+  while (!predicate()) { if (Date.now() >= deadline) throw new Error(label); await delay(20); }
+}
+try {
+  assert.equal(process.platform, 'linux'); assert.ok(selectedConnection, 'Configured model unavailable.');
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: configured.provider,
+    providerCredentials: configured.providerCredentials, providerConnections: configured.providerConnections,
+    activeProviderConnectionId: selectedConnection.id, accountPool: configured.accountPool }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: Object.fromEntries(validProviders.map(provider => [provider.id, provider])) }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'config.json'), JSON.stringify({ agentMode: 'build', maxOutputTokens: 256,
+    reserveTokens: 0, keepRecentTokens: 80, compactionEnabled: false, retryEnabled: true, retryMaxRetries: 1,
+    providerRetryMaxRetries: 1, cacheWarming: 'off', providerConnectTimeoutMs: 10_000,
+    providerHeadersTimeoutMs: 60_000, providerBodyTimeoutMs: 60_000 }));
+  receipt.catalogueSetup = { originalActiveSelected: selectedConnection.id === configured.activeProviderConnectionId,
+    existingConfiguredTarget: true, minimalConfiguredModelEntry, isolatedValidObjects: true };
+  const observer = path.join(root, 'observer.mjs');
+  fs.writeFileSync(observer, `import fs from 'node:fs'; import { channel } from 'node:diagnostics_channel';\nchannel('undici:request:bodySent').subscribe(({request}) => { if(request.method === 'POST') fs.appendFileSync(${JSON.stringify(observed)}, JSON.stringify({bodySent:true})+'\\n'); });\n`);
+  const env = { ...process.env, HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home, GIT_CEILING_DIRECTORIES: root,
+    CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '1',
+    CHEERS_MARKETPLACES_FILE: path.join(home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(home, 'extensions.json'),
+    NODE_OPTIONS: '--import ' + pathToFileURL(observer).href };
+  child = spawn('rtk', ['node', path.join(repo, 'scripts/start.mjs'), '--rpc', '--project', workspace,
+    '--no-context-files', '--no-skills', '--tools', 'bash,read', '--non-interactive-approval', 'allow-once'],
+    { cwd: workspace, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  child.stderr.on('data', () => {});
+  closed = new Promise(resolve => child.on('close', (code, signal) => resolve({ code, signal })));
+  child.stdout.on('data', bytes => {
+    lines += bytes.toString();
+    for (;;) {
+      const newline = lines.indexOf('\n'); if (newline < 0) break;
+      const line = lines.slice(0, newline); lines = lines.slice(newline + 1); if (!line.trim()) continue;
+      let frame; try { frame = JSON.parse(line); } catch { invalid++; continue; }
+      frames.push(frame); for (const waiter of [...waiters]) if (waiter.predicate(frame)) waiter.resolve(frame);
+    }
+  });
+  timer = setTimeout(() => child.kill('SIGTERM'), 240_000);
+  const initial = await command('get_state'); assert.equal(initial.success, true); const sessionId = initial.data.sessionId;
+  const catalog = await command('get_available_models'); assert.equal(catalog.success, true);
+  const activeCatalog = validProviders.find(provider => (provider.runtime ?? provider.id) === selectedConnection.provider
+    && provider.baseUrl?.replace(/\/+$/, '') === selectedConnection.baseUrl?.replace(/\/+$/, '')
+    && provider.models.some(model => model.id === selectedConnection.model));
+  assert.ok(activeCatalog); assert.equal(initial.data.model.id, selectedConnection.model);
+  assert.ok(catalog.data.models.some(model => model.provider === activeCatalog.id && model.id === selectedConnection.model));
+  assert.equal((await command('set_thinking_level', { level: 'auto' })).success, true);
+  const modelSelection = await command('set_model', { provider: activeCatalog.id, modelId: selectedConnection.model });
+  const knownRefusals = [
+    'Model switch blocked: the current request credential is unavailable. Select a ready connection before changing its model or effort.',
+    'Model switch blocked: the request provider differs from the saved active connection. Select a matching connection with /connect use, or restart without the provider override.',
+    'Model switch blocked: the selected credential binding is unavailable or request overrides change its target.',
+    'Model switch blocked: the provider credential or endpoint differs from the current request. Reload before selecting a model.',
+  ];
+  receipt.selectionAdmission = { success: modelSelection.success, budgetRefusal: /budget|token|output|effort/i.test(modelSelection.error ?? ''),
+    credentialRefusal: /credential|connection/i.test(modelSelection.error ?? ''), knownRefusal: knownRefusals.find(value => value === modelSelection.error) };
+  assert.equal(modelSelection.success, true);
+  assert.equal((await command('get_available_thinking_levels')).success, true);
+  assert.equal((await command('set_thinking_level', { level: 'auto' })).success, true);
+  assert.equal((await command('set_steering_mode', { mode: 'all' })).success, true);
+  assert.equal((await command('set_follow_up_mode', { mode: 'all' })).success, true);
+  fs.writeFileSync(path.join(workspace, 'seed.cjs'), "process.stdout.write('JOINT_LIVE_SEED\\n' + 'old context '.repeat(260) + '\\n');");
+  const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
+  assert.equal((await command('bash', { command: `${quote(process.execPath)} seed.cjs` })).success, true);
+  assert.ok(JSON.stringify((await command('get_messages')).data.messages).includes('JOINT_LIVE_SEED'));
+  assert.equal(readFacts().length, 0);
+  receipt.stages.discovery = { passed: true, configuredModelFound: true, sameModelSelected: true, effortDiscovered: true,
+    zeroProviderDispatch: true, nativeSeedIncluded: true };
+  assert.equal((await command('abort_retry')).success, true);
+  stage = 'ordinary-request';
+  let ended = waitFor(frame => frame.type === 'agent_end');
+  assert.equal((await command('prompt', { message: 'Return exactly RPC_RETRY_LIVE_READY with no tool calls.' })).success, true);
+  await until(() => readFacts().some(fact => fact.bodySent), 'actual request dispatch');
+  const inFlight = await command('get_state'); assert.equal(inFlight.data.isStreaming, true);
+  assert.equal((await command('abort_retry')).success, true);
+  assert.equal((await command('steer', { message: 'LIVE_CLEARED_STEER' })).success, true);
+  assert.equal((await command('follow_up', { message: 'LIVE_CLEARED_FOLLOW' })).success, true);
+  const clear = await command('clear_queue'); assert.equal(clear.success, true); assert.equal(clear.data.cleared, 2);
+  assert.equal((await ended).status, 'completed');
+  assert.equal(readFacts().filter(fact => fact.bodySent).length, 1);
+  assert.equal(JSON.stringify((await command('get_messages')).data.messages).includes('LIVE_CLEARED_'), false);
+  receipt.stages.ordinary = { passed: true, actualBodySent: true, inFlightControl: true, completed: true, singlePost: true,
+    sameSessionQueuesCleared: true, clearedInputNotPersisted: true };
+  stage = 'reuse';
+  assert.equal((await command('abort_retry')).success, true);
+  ended = waitFor(frame => frame.type === 'agent_end');
+  assert.equal((await command('prompt', { message: 'Return exactly RPC_RETRY_REUSED with no tool calls.' })).success, true);
+  assert.equal((await ended).status, 'completed');
+  assert.equal(readFacts().filter(fact => fact.bodySent).length, 2);
+  receipt.stages.reuse = { passed: true, idleControlNotBuffered: true, explicitSuccessorCompleted: true, singleAdditionalPost: true };
+  stage = 'history-navigation';
+  const messages = await command('get_messages'); assert.equal(messages.success, true);
+  assert.equal((await command('get_state')).data.messageCount, messages.data.messages.length);
+  assert.equal((await command('get_session_stats')).data.totalMessages, messages.data.messages.length);
+  assert.equal((await command('get_last_assistant_text')).success, true);
+  const entries = await command('get_entries'); assert.equal(entries.success, true);
+  assert.deepEqual((await command('get_entries', { since: entries.data.entries.at(-1).id })).data.entries, []);
+  const tree = await command('get_tree'); assert.equal(tree.success, true); assert.equal(tree.data.leafId, entries.data.leafId);
+  const drafts = await command('get_fork_messages'); assert.equal(drafts.success, true);
+  const draft = drafts.data.messages.find(message => message.text === 'Return exactly RPC_RETRY_REUSED with no tool calls.'); assert.ok(draft);
+  const forked = await command('fork', { entryId: draft.entryId }); assert.equal(forked.success, true); assert.equal(forked.data.cancelled, false);
+  assert.equal(forked.data.text, draft.text); assert.notEqual(forked.data.sessionId, sessionId);
+  assert.equal((await command('switch_session', { sessionPath: sessionId })).data.cancelled, false);
+  const cloned = await command('clone'); assert.equal(cloned.success, true); assert.equal(cloned.data.cancelled, false);
+  assert.notEqual(cloned.data.sessionId, sessionId);
+  assert.equal((await command('switch_session', { sessionPath: sessionId })).data.cancelled, false);
+  assert.equal((await command('set_session_name', { name: 'Configured joint acceptance' })).success, true);
+  const exported = await command('export_html'); assert.equal(exported.success, true); assert.equal(typeof exported.data.html, 'string');
+  receipt.stages.history = { passed: true, currentReadCounts: true, exclusiveCursor: true, tree: true, exactForkDraft: true,
+    cloneAndSwitchBack: true, rename: true, htmlExport: true };
+  stage = 'manual-compaction';
+  const compact = command('compact', { customInstructions: 'Summarize the earlier work briefly and retain the current request.' });
+  await until(() => readFacts().filter(fact => fact.bodySent).length >= 3, 'actual summary dispatch');
+  assert.equal((await command('get_state')).data.isCompacting, true);
+  assert.equal((await command('abort_retry')).success, true); assert.equal((await command('abort_bash')).success, true);
+  const compacted = await compact; assert.equal(compacted.success, true); assert.equal(compacted.data.status, 'compacted');
+  assert.equal(readFacts().filter(fact => fact.bodySent).length, 3);
+  assert.equal((await command('get_state')).data.isCompacting, false);
+  const events = fs.readFileSync(path.join(storage, 'sessions', sessionId, 'transcript.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.ok(events.some(event => event.type === 'compaction-commit'));
+  receipt.stages.compaction = { passed: true, actualSummaryBodySent: true, activeState: true, scopedControlsPreserved: true, durableCommit: true };
+  stage = 'post-compaction-reuse'; ended = waitFor(frame => frame.type === 'agent_end');
+  assert.equal((await command('prompt', { message: 'Return exactly JOINT_LIVE_FINAL with no tool calls.' })).success, true);
+  assert.equal((await ended).status, 'completed'); assert.equal(readFacts().filter(fact => fact.bodySent).length, 4);
+  assert.equal((await command('get_state')).data.sessionId, sessionId);
+  receipt.stages.afterCompaction = { passed: true, sameSession: true, actualBodySent: true, completed: true };
+  stage = 'eof'; child.stdin.end(); assert.deepEqual(await closed, { code: 0, signal: null }); assert.equal(invalid, 0);
+  for (const [file, hash] of originalHashes) {
+    assert.equal(fs.existsSync(file) ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : undefined, hash);
+  }
+  receipt.originalConfigUnchanged = true; receipt.requests = 4; receipt.bodyInspectable = false;
+  receipt.actualRetryFailureInduced = false; receipt.stages.eof = { passed: true, exit0: true, validJsonLines: true };
+  receipt.status = 'passed';
+} catch(error) {
+  receipt.status = 'failed'; receipt.failedStage = stage; receipt.requests = readFacts().filter(fact => fact.bodySent).length;
+  receipt.failure = { name: error?.name, code: error?.code, message: 'Configured retry probe failed; provider details withheld.' };
+  receipt.assertion = { stackFrame: error?.stack?.split('\n').find(line => line.includes('real.mjs:')) };
+  process.exitCode = 1;
+} finally {
+  clearTimeout(timer); if(child && child.exitCode === null) { child.kill('SIGTERM'); await Promise.race([closed,delay(5000)]); }
+  fs.writeFileSync(path.join(directory, 'real.json'), JSON.stringify(receipt,null,2)+'\n'); console.log(JSON.stringify(receipt));
+  fs.rmSync(root,{recursive:true,force:true});
+}

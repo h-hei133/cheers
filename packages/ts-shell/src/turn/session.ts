@@ -147,6 +147,8 @@ export interface TurnOptions {
 
 /** Input the user can hand a running turn. */
 export interface TurnInput {
+  /** Whether this run currently owns automatic compaction through its final publication hook. */
+  readonly isCompacting?: () => boolean;
   /** Cancel a current retry wait without aborting the run or clearing its queues. */
   readonly abortRetry?: () => void;
   /** Exact tool names currently offered by this running turn. */
@@ -382,43 +384,49 @@ export function runTurn(options: TurnOptions): TurnRun {
     const source = options.compaction.authority?.capture(kept);
     const lifecycle = buildCompactionLifecycle({ hooks: options.hooks, sessionId: options.sessionId,
       workspaceRoot: options.workspaceRoot, reason: 'overflow' });
-    const condensed = await condenseContext({
-      messages: kept,
-      policy: options.compaction.policy,
-      summarize: options.compaction.summarize,
-      summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
-      signal: options.signal,
-      force: true,
-      // The rescue is a compaction like any other, and the only one whose reason
-      // is `overflow`: a hook that watches for the context being cut has to see
-      // this one, or the case that discards the most context is the one it never
-      // hears about. `overflow` was a declared reason with no producer.
-      lifecycle,
-      lifecycleReason: "overflow",
-      operation: { sessionId: options.sessionId, source, identity: options.compaction.authority?.identity },
-    }).catch(error => { if (error instanceof ModelAdmissionError) throw error; return undefined; });
-    // A decline here leaves the run reporting the overflow it already hit: the
-    // engine judged that condensing would not make the context smaller, so
-    // retrying the same request would fail the same way.
-    if (!condensed || condensed.status !== "condensed") return false;
-    if (options.signal.aborted) return false;
-    const { plan } = condensed;
-    if (source && options.compaction.authority) {
-      const committed = options.compaction.authority.commit({ source, summary: condensed.summary,
-        keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore, signal: options.signal,
-        admission: () => condensed.preparedPolicy?.admission?.() ?? options.compaction?.authority?.admission?.() });
-      if (committed.status === 'unverified') throw new CompactionPublicationError();
-      if (committed.status !== 'committed') return false;
+    let release: (() => void) | undefined;
+    try {
+      const condensed = await condenseContext({
+        messages: kept,
+        policy: options.compaction.policy,
+        summarize: options.compaction.summarize,
+        summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
+        signal: options.signal,
+        force: true,
+        // The rescue is a compaction like any other, and the only one whose reason
+        // is `overflow`: a hook that watches for the context being cut has to see
+        // this one, or the case that discards the most context is the one it never
+        // hears about. `overflow` was a declared reason with no producer.
+        onStarted: () => { release = compaction?.begin(); },
+        lifecycle,
+        lifecycleReason: "overflow",
+        operation: { sessionId: options.sessionId, source, identity: options.compaction.authority?.identity },
+      }).catch(error => { if (error instanceof ModelAdmissionError) throw error; return undefined; });
+      // A decline here leaves the run reporting the overflow it already hit: the
+      // engine judged that condensing would not make the context smaller, so
+      // retrying the same request would fail the same way.
+      if (!condensed || condensed.status !== "condensed") return false;
+      if (options.signal.aborted) return false;
+      const { plan } = condensed;
+      if (source && options.compaction.authority) {
+        const committed = options.compaction.authority.commit({ source, summary: condensed.summary,
+          keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore, signal: options.signal,
+          admission: () => condensed.preparedPolicy?.admission?.() ?? options.compaction?.authority?.admission?.() });
+        if (committed.status === 'unverified') throw new CompactionPublicationError();
+        if (committed.status !== 'committed') return false;
+      }
+      options.compaction.onCompact({
+        summary: condensed.summary,
+        keptMessages: plan.keptMessages,
+        tokensBefore: plan.tokensBefore,
+      });
+      core.state.messages = condensed.messages;
+      await lifecycle.after?.({ reason: 'overflow', summary: condensed.summary,
+        keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
+      return true;
+    } finally {
+      release?.();
     }
-    options.compaction.onCompact({
-      summary: condensed.summary,
-      keptMessages: plan.keptMessages,
-      tokensBefore: plan.tokensBefore,
-    });
-    core.state.messages = condensed.messages;
-    await lifecycle.after?.({ reason: 'overflow', summary: condensed.summary,
-      keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
-    return true;
   };
 
   /** Report how the run ended, in the terms the shell reads. */
@@ -507,6 +515,7 @@ export function runTurn(options: TurnOptions): TurnRun {
 
   return {
     events: channel,
+    isCompacting: () => compaction?.isCompacting() ?? false,
     activeTools: () => [...toolPool().keys()],
     setQueueMode: (lane, mode) => core.setQueueMode(lane, mode),
     queue,

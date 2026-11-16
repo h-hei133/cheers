@@ -1,0 +1,84 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/turn/session.test.ts (51 tests | 1 failed | 50 skipped) 24ms
+   ↓ keeps the goal budget closing instruction internal for summary
+   ↓ keeps the goal budget closing instruction internal for no-room
+   ↓ keeps the goal budget closing instruction internal for tool-refusal
+   ↓ keeps the goal budget closing instruction internal for unknown
+   ↓ preserves only already displayed public reasoning after compatible-eof without granting replay
+   ↓ preserves only already displayed public reasoning after responses-failed without granting replay
+   ↓ preserves only already displayed public reasoning after responses-eof without granting replay
+   ↓ persists and restores actual reasoning-only output as an unanswered stopped result
+   ↓ keeps only meaningful reasoning evidence from otherwise empty messages: {"text":" \n\t","keep":false}
+   ↓ keeps only meaningful reasoning evidence from otherwise empty messages: {"text":"","signature":"synthetic-opaque","redacted":true,"keep":true}
+   ↓ reports an unanswered output limit without diagnosing context overflow: {"stream":false,"reasoning":""}
+   ↓ reports an unanswered output limit without diagnosing context overflow: {"stream":true,"reasoning":""}
+   ↓ reports an unanswered output limit without diagnosing context overflow: {"stream":false,"reasoning":"Public reasoning"}
+   ↓ reports an unanswered output limit without diagnosing context overflow: {"stream":true,"reasoning":"Public reasoning"}
+   ↓ settles terminal reasoning tails before stop hooks finish in the actual response loop
+   ↓ keeps verified reasoning in its own model message through the real tool loop and sink
+   ↓ carries registered MCP hints into the turn's plan gate
+   ↓ runTurn > rejects tools returned by the actual closing request ({"maxSteps":1,"inline":false})
+   ↓ runTurn > rejects tools returned by the actual closing request ({"maxSteps":2,"inline":false})
+   ↓ runTurn > rejects tools returned by the actual closing request ({"maxSteps":1,"inline":true})
+   ↓ runTurn > rejects tools returned by the actual closing request ({"maxSteps":2,"inline":true})
+   ↓ runTurn > attributes the request after a discovery result without inferring from prose
+   ↓ runTurn > ties accepted request dimensions to its own usage (undefined) and excludes durable snapshots
+   ↓ runTurn > ties accepted request dimensions to its own usage (0) and excludes durable snapshots
+   ↓ runTurn > ties accepted request dimensions to its own usage (21) and excludes durable snapshots
+   ↓ runTurn > does not reattach a request observation after a context reset during usage delivery
+   ↓ runTurn > publishes the exact accepted wire prompt identity
+   ↓ runTurn > keeps the foreground receipt when a shared step sends a delegated request
+   ↓ runTurn > invalidates a metered prefix before a later step that reports no usage
+   ↓ runTurn > does not warm a unmetered response using the previous context gauge
+   ↓ runTurn > does not warm a unfinished response using the previous context gauge
+   ↓ runTurn > does not warm a refused response using the previous context gauge
+   ↓ runTurn > streams the answer and reports a completed run
+   ↓ runTurn > persists the assistant and tool messages but never the opening prompt
+   ↓ runTurn > refuses tool calls the model truncated and lets it re-issue them
+   ↓ runTurn > ends quietly when interrupted, keeping what was already said
+   ↓ runTurn > reports a failed model call as a failed run
+   ↓ runTurn > compacts once and retries when the provider reports an overflow
+   ↓ runTurn > retains an overflow failure without summarizing or retrying when auto compaction is disabled
+   ↓ runTurn > tracks raw overflow while joining an identical pending compaction
+   × runTurn > tells a hook the rescue compaction is an overflow 22ms
+     → expected false to be true // Object.is equality
+   ↓ runTurn > reports overflow failure when the summarizer fails
+   ↓ runTurn > delivers steering before the next step and follow-ups after the run would stop
+   ↓ runTurn > hands undelivered input back when the queue is cleared
+   ↓ runTurn > drops blank steering and follow-up input at the boundary
+   ↓ tool events reach the shell before the batch is assembled > reports a call settled as soon as that call stops running
+   ↓ progress from a tool reaches the shell > carries output a tool reports while it runs
+   ↓ a subagent's calls answer to the session's rules > refuses, inside the subagent, a tool the session refuses
+   ↓ a subagent's calls answer to the session's rules > refuses a tool the session refuses, even when a subagent asks for it
+   ↓ binds the delegated reviewer mode through the real turn composition
+   ↓ delivers a subagent's exhausted budget and partial narration to the parent as failure
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/session.test.ts > runTurn > tells a hook the rescue compaction is an overflow
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/turn/session.test.ts:708:70
+    706|     expect(compactHooks.map((entry) => entry.name)).toEqual(["PreCompa…
+    707|     expect(compactHooks.every((entry) => entry.reason === "overflow"))…
+    708|     expect(compactHooks.every((entry) => entry.compacting === true)).t…
+       |                                                                      ^
+    709|     expect(run.isCompacting?.()).toBe(false);
+    710|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 50 skipped (51)
+   Start at  17:55:24
+   Duration  4.51s (transform 2.66s, setup 0ms, collect 4.21s, tests 24ms, environment 0ms, prepare 70ms)
+

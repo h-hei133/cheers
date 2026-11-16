@@ -1,0 +1,341 @@
+Checked 3500 files in 632ms. No fixes applied.
+scc-gate root=packages/ts-shell/src files=3355
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=66 read=66 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=15 registered=15 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=24 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/cli/rpc/runtimeHost.test.ts (38 tests) 1107ms
+ ✓ src/cli/runtime/inputStream.rpc.test.ts (12 tests) 382ms
+ ✓ src/cli/rpc/compaction.test.ts (11 tests) 298ms
+ ✓ src/turn/compaction.test.ts (13 tests) 48ms
+ ✓ src/turn/session.test.ts (50 tests) 507ms
+ ✓ src/cli/rpc/protocol.test.ts (19 tests) 4ms
+ ✓ src/cli/runtime/navigation.test.ts (41 tests) 13290ms
+   ✓ session tree navigation > keeps every admitted deep entry in bounded tree and history terminal output without changing saved files  11045ms
+ ✓ src/cli/rpc/shell.test.ts (19 tests) 4973ms
+   ✓ runs the production shell RPC through the native gate and persists its result for the next request  453ms
+   ✓ retains excluded output as a branch report without adding it to model history, including after reopen and fork  382ms
+   ✓ keeps a nonzero exit and stderr visible in an unsuccessful RPC response and its saved message  378ms
+   ✓ keeps actual exit evidence when after-call hooks fail  383ms
+   ✓ reports unverified message persistence without losing the completed native outcome  376ms
+   ✓ retains completed effects without saving history after configuration retirement  360ms
+   ✓ retains completed effects without saving history after deletion retirement  342ms
+   ✓ preserves an unverified excluded report write in the RPC outcome  371ms
+   ✓ does not publish a completed shell result into a changed session  361ms
+   ✓ does not publish a completed shell result into a changed branch  355ms
+   ✓ redacts credential-shaped command output in the response and durable records  349ms
+   ✓ lets JSONL reads, busy refusals and abort reach a native shell before its response settles  497ms
+ ✓ src/session/model/selection.test.ts (69 tests) 3942ms
+ ✓ src/session/SessionManager.test.ts (95 tests) 3150ms
+ ❯ src/cli/runtime/inputStream.extensions.test.ts (16 tests | 9 failed) 39156ms
+   ✓ routes a loaded extension select dialog and its JSONL response through the real input consumer 184ms
+   ✓ routes a loaded extension confirm dialog and its JSONL response through the real input consumer 130ms
+   ✓ routes a loaded extension input dialog and its JSONL response through the real input consumer 132ms
+   ✓ routes a loaded extension editor dialog and its JSONL response through the real input consumer 130ms
+   × admits a fresh loaded-extension dialog after successful JSONL set_auto_retry and isolates the cancelled request 1035ms
+     → expected [] to have a length of 1 but got +0
+   × admits a fresh loaded-extension dialog after successful JSONL set_auto_compaction and isolates the cancelled request 1028ms
+     → expected [] to have a length of 1 but got +0
+   × admits current-session extension UI after successful JSONL new_session and refuses the old answer 1134ms
+     → expected [] to have a length of 1 but got +0
+   × admits current-session extension UI after successful JSONL switch_session and refuses the old answer 1138ms
+     → expected [] to have a length of 1 but got +0
+   ✓ keeps loaded-extension UI retired when JSONL set_auto_retry settles after EOF 40ms
+   ✓ keeps loaded-extension UI retired when JSONL new_session settles after EOF 46ms
+   × cancels a loaded extension editor on EOF before waiting for the turn chain to drain 1025ms
+     → expected false to be true // Object.is equality
+   × cancels a loaded extension editor on EOF before waiting for the control chain to drain 1021ms
+     → expected false to be true // Object.is equality
+   × keeps queued extension dialogs cancelled when EOF arrives before their dispatch 30029ms
+     → Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   × cancels outstanding UI when a separate control requests exit 1028ms
+     → expected false to be true // Object.is equality
+   × isolates late answers and release callbacks when another input consumer replaces the UI binding 1027ms
+     → expected [] to have a length of 1 but got +0
+   ✓ cleans up an RPC UI binding if the observer callback throws during setup 29ms
+ ✓ src/session/model/effort.test.ts (26 tests) 1404ms
+ ✓ src/cli/runtime/compaction.test.ts (51 tests) 829ms
+ ✓ src/cli/interactive/settings.test.ts (46 tests) 941ms
+ ✓ src/session/branch/store/index.test.ts (37 tests) 988ms
+ ✓ src/turn/step.test.ts (117 tests) 515ms
+ ❯ src/cli/rpc/thinking.test.ts (10 tests | 1 failed) 435ms
+   ✓ discovers only automatic effort for a reasoning-disabled endpoint and cycling is a no-op 30ms
+   × cycles the selected endpoint map through automatic effort and persists the exact sequence 44ms
+     → expected undefined to be 'high' // Object.is equality
+   ✓ retains locally admissible legacy levels as unverified and preserves the setter notice 30ms
+   ✓ publishes the saved effort to the same running host before the next cycle 51ms
+   ✓ does not cycle into explicit effort when the endpoint output budget cannot support it 20ms
+   ✓ keeps off as a provider-decides alias and refuses explicit unsupported effort without a write 56ms
+   ✓ keeps auto as a provider-decides alias and refuses explicit unsupported effort without a write 44ms
+   ✓ keeps none as a provider-decides alias and refuses explicit unsupported effort without a write 44ms
+   ✓ discovers virtual levels without routing, then refuses a retired registration without physical fallback 50ms
+   ✓ keeps virtual effort discovery independent of unavailable dormant physical credentials 63ms
+ ✓ src/cli/rpc/retry.test.ts (8 tests) 444ms
+ ✓ src/core/shell/sessionRuntime.test.ts (50 tests) 396ms
+ ❯ src/cli/rpc/commands.test.ts (10 tests | 1 failed) 838ms
+   ✓ discovers extension and named invocations with the same builtin precedence and drops retired registrations 45ms
+   ✓ uses explicit skill paths with no-skills and applies the existing project trust decision 54ms
+   ✓ refuses an asynchronous skill result after the selected session changes 35ms
+   ✓ does not return a skill whose contribution was retired during acquisition 19ms
+   ✓ refuses a contribution retired between catalogue resolution and the RPC consumer 22ms
+   ✓ refuses synchronous retirement in the final skill validity callback 20ms
+   ✓ revalidates discovery after the host promise resolves and before emitting its response 21ms
+   ✓ refuses a revoked skill at response publication even when its contribution stays registered 21ms
+   × keeps JSONL reads and cancellation responsive during skill acquisition and joins a refused read at EOF 577ms
+     → expected false to be true // Object.is equality
+   ✓ keeps private skill-loader failures out of the RPC response 23ms
+{"type":"extension_ui_request","id":"2a3ca9bd-81d3-443a-bbd2-98cbf351cb51","method":"select","title":"Choose","options":["a","b"]}
+{"id":"p1","type":"response","command":"prompt","success":true}
+{"id":"p2","type":"response","command":"prompt","success":true}
+{"id":"cq","type":"response","command":"clear_queue","success":true,"data":{"cleared":1,"steering":[],"followUp":["stale"]}}
+{"id":"p3","type":"response","command":"prompt","success":true}
+ ✓ src/cli/runtime/inputStream.test.ts (10 tests) 321ms
+   ✓ routes RPC commands, attachments, queue clears, and extension_ui_response in rpcMode without emitting the non-TTY prose banner  307ms
+ ❯ src/cli/rpc/settings.test.ts (6 tests | 3 failed) 265ms
+   ✓ returns verified stored and effective auto-compaction values and preserves them on reopen 66ms
+   ✓ returns verified stored and effective auto-retry values and preserves them on reopen 45ms
+   × reports the launch override when a saved auto-compaction choice is not effective 45ms
+     → expected undefined to be true // Object.is equality
+   × reports the accepted user retry default over the existing project value without rewriting that file 40ms
+     → expected undefined to be true // Object.is equality
+   × reports an explicit read-only retry input that still overrides a saved personal default 47ms
+     → expected undefined to be false // Object.is equality
+   ✓ keeps an unverified setting write unsuccessful without refreshing the accepted state 20ms
+ ✓ src/session/compaction/progress.test.ts (19 tests) 106ms
+ ✓ src/cli/runtime/settings.test.ts (2 tests) 85ms
+ ✓ src/cli/runtime/sessionCommands.test.ts (2 tests) 71ms
+ ✓ src/turn/retry.test.ts (9 tests) 49ms
+ ✓ src/core/agent/retry.test.ts (43 tests) 51ms
+ ✓ src/session/compaction.test.ts (46 tests) 64ms
+ ✓ src/cli/rpc/uiBridge.test.ts (7 tests) 29ms
+ ✓ src/core/shell/compaction.test.ts (10 tests) 28ms
+ ✓ src/core/shell/sessionIdle.test.ts (6 tests) 15ms
+ ✓ src/turn/pendingInput.test.ts (8 tests) 6ms
+ ✓ src/cli/rpc/rpcServer.test.ts (3 tests) 5ms
+ ✓ src/session/query/navigation.test.ts (2 tests) 4ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cli/rpc/commands.test.ts > keeps JSONL reads and cancellation responsive during skill acquisition and joins a refused read at EOF
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ vi.waitFor.timeout src/cli/rpc/commands.test.ts:173:97
+    171|     await vi.waitFor(() => expect(entered).toBe(true));
+    172|     stdin.write('{"id":"state","type":"get_state"}\n{"id":"abort","typ…
+    173|     await vi.waitFor(() => expect(responses.find(response => response.…
+       |                                                                                                 ^
+    174|     await vi.waitFor(() => expect(responses.find(response => response.…
+    175|     expect(runtime.cancelCurrentRun).toHaveBeenCalledOnce();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+
+ FAIL  src/cli/rpc/settings.test.ts > reports the launch override when a saved auto-compaction choice is not effective
+AssertionError: expected undefined to be true // Object.is equality
+
+- Expected: 
+true
+
++ Received: 
+undefined
+
+ ❯ src/cli/rpc/settings.test.ts:57:93
+     55|     data: { saved: true, stored: false, effective: true, applied: fals…
+     56|       note: expect.stringContaining('launch override') } });
+     57|   expect((await handleRpcCommand({ type: 'get_state' }, host)).data?.a…
+       |                                                                                             ^
+     58|   expect(fixture(undefined, context.session.id).context.runtimeConfig.…
+     59| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯
+
+ FAIL  src/cli/rpc/settings.test.ts > reports the accepted user retry default over the existing project value without rewriting that file
+AssertionError: expected undefined to be true // Object.is equality
+
+- Expected: 
+true
+
++ Received: 
+undefined
+
+ ❯ src/cli/rpc/settings.test.ts:68:88
+     66|   expect(await handleRpcCommand({ type: 'set_auto_retry', enabled: tru…
+     67|     data: { saved: true, stored: true, effective: true, applied: true,…
+     68|   expect((await handleRpcCommand({ type: 'get_state' }, host)).data?.a…
+       |                                                                                        ^
+     69|   expect(fs.readFileSync(project)).toEqual(before);
+     70| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯
+
+ FAIL  src/cli/rpc/settings.test.ts > reports an explicit read-only retry input that still overrides a saved personal default
+AssertionError: expected undefined to be false // Object.is equality
+
+- Expected: 
+false
+
++ Received: 
+undefined
+
+ ❯ src/cli/rpc/settings.test.ts:79:88
+     77|   expect(await handleRpcCommand({ type: 'set_auto_retry', enabled: tru…
+     78|     data: { saved: true, stored: true, effective: false, applied: fals…
+     79|   expect((await handleRpcCommand({ type: 'get_state' }, host)).data?.a…
+       |                                                                                        ^
+     80|   expect(fs.readFileSync(input)).toEqual(before);
+     81|   expect(fixture(undefined, context.session.id).context.runtimeConfig.…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯
+
+ FAIL  src/cli/rpc/thinking.test.ts > cycles the selected endpoint map through automatic effort and persists the exact sequence
+AssertionError: expected undefined to be 'high' // Object.is equality
+
+- Expected: 
+"high"
+
++ Received: 
+undefined
+
+ ❯ src/cli/rpc/thinking.test.ts:70:87
+     68|       .toMatchObject({ success: true, data: { level } });
+     69|     expect(readSessionModel(context.session.id)?.thinkingEffort).toBe(…
+     70|     expect((await handleRpcCommand({ type: 'get_state' }, host)).data?…
+       |                                                                                       ^
+     71|   }
+     72| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯
+
+ FAIL  src/cli/runtime/inputStream.extensions.test.ts > admits a fresh loaded-extension dialog after successful JSONL set_auto_retry and isolates the cancelled request
+ FAIL  src/cli/runtime/inputStream.extensions.test.ts > admits a fresh loaded-extension dialog after successful JSONL set_auto_compaction and isolates the cancelled request
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/cli/runtime/inputStream.extensions.test.ts:129:86
+    127|   try {
+    128|     stdin.write('/dialog editor\n');
+    129|     await vi.waitFor(() => expect(frames.filter(frame => frame.method …
+       |                                                                                      ^
+    130|     const oldRequest = frames.find(frame => frame.method === 'editor')…
+    131|     const background = context.configuration.backgroundSignal;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯
+
+ FAIL  src/cli/runtime/inputStream.extensions.test.ts > admits current-session extension UI after successful JSONL new_session and refuses the old answer
+ FAIL  src/cli/runtime/inputStream.extensions.test.ts > admits current-session extension UI after successful JSONL switch_session and refuses the old answer
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/cli/runtime/inputStream.extensions.test.ts:179:86
+    177|     expect(await oldOutcome).toMatch(/^(?:cancelled|retired)$/);
+    178|     stdin.write('/dialog select\n');
+    179|     await vi.waitFor(() => expect(frames.filter(frame => frame.method …
+       |                                                                                      ^
+    180|     const request = frames.find(frame => frame.method === 'select')!;
+    181|     expect(request.id).not.toBe(oldRequest.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯
+
+ FAIL  src/cli/runtime/inputStream.extensions.test.ts > cancels a loaded extension editor on EOF before waiting for the turn chain to drain
+ FAIL  src/cli/runtime/inputStream.extensions.test.ts > cancels a loaded extension editor on EOF before waiting for the control chain to drain
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/cli/runtime/inputStream.extensions.test.ts:219:82
+    217|   }, value => { bridge = value; });
+    218|   stdin.write(lane === 'turn' ? '/dialog editor\n' : '/plugin list\n');
+    219|   await vi.waitFor(() => expect(frames.some(frame => frame.method === …
+       |                                                                                  ^
+    220|   expect(bridge?.pendingCount()).toBe(1);
+    221|   const emitted = frames.length;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/14]⎯
+
+ FAIL  src/cli/runtime/inputStream.extensions.test.ts > keeps queued extension dialogs cancelled when EOF arrives before their dispatch
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/cli/runtime/inputStream.extensions.test.ts:229:1
+    227| });
+    228| 
+    229| it('keeps queued extension dialogs cancelled when EOF arrives before t…
+       | ^
+    230|   const command = await installDialog();
+    231|   const outputs: string[] = [];
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/14]⎯
+
+ FAIL  src/cli/runtime/inputStream.extensions.test.ts > cancels outstanding UI when a separate control requests exit
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/cli/runtime/inputStream.extensions.test.ts:265:81
+    263|   }, value => { bridge = value; });
+    264|   stdin.write('/dialog input\n');
+    265|   await vi.waitFor(() => expect(frames.some(frame => frame.method === …
+       |                                                                                 ^
+    266|   stdin.write('/plugin cancel\n');
+    267|   await run;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/14]⎯
+
+ FAIL  src/cli/runtime/inputStream.extensions.test.ts > isolates late answers and release callbacks when another input consumer replaces the UI binding
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/cli/runtime/inputStream.extensions.test.ts:283:84
+    281|   const first = start(() => invoke(firstOutputs), bridge => { firstBri…
+    282|   first.stdin.write('/dialog select\n');
+    283|   await vi.waitFor(() => expect(frames.filter(frame => frame.method ==…
+       |                                                                                    ^
+    284|   const oldRequest = frames.find(frame => frame.method === 'select')!;
+    285|   const second = start(() => invoke(secondOutputs), bridge => { second…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/14]⎯
+
+
+ Test Files  4 failed | 30 passed (34)
+      Tests  14 failed | 897 passed (911)
+   Start at  16:49:27
+   Duration  120.42s (transform 8.71s, setup 0ms, collect 38.10s, tests 74.74s, environment 4ms, prepare 1.55s)
+

@@ -27,7 +27,8 @@ import { directorControl } from './director.js';
 import { evaluationControl, cancelEvaluationFor } from './evaluation.js';
 import { mediaControl, cancelMediaCommand, withoutRecordingInput } from './media.js';
 import { attachGoalSubmission, schedulerForRuntime } from './goalScheduling.js';
-import { handleRpcCommand, tryParseRpcCommand, tryParseRpcUiResponse } from '../rpc/rpcServer.js';
+import { handleRpcCommand } from '../rpc/rpcServer.js';
+import { rpcInputFailure, tryParseRpcCommand, tryParseRpcUiResponse } from '../rpc/protocol.js';
 import { createRpcUiBridge, type RpcUiBridge } from '../rpc/uiBridge.js';
 import { createRuntimeRpcHost } from '../rpc/runtimeHost.js';
 
@@ -286,6 +287,11 @@ export async function runPromptInputStream(options: {
               rpcResponses.delete(pending); rpcResponseFailure ??= error;
             });
           });
+        return;
+      }
+
+      if (options.rpcMode) {
+        writeRawStdout(`${JSON.stringify(rpcInputFailure(normalizedLine))}\n`);
         return;
       }
 

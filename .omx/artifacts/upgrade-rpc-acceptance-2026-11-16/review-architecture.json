@@ -1,0 +1,285 @@
+{
+  "status": "CLEAR",
+  "findings": [],
+  "scope": {
+    "repository": "/home/wang/projects/cheers",
+    "target": "D.1 uncommitted batch versus HEAD",
+    "base": "ae9a3f592f4573e0197a7b49e81f34d2e6510a22",
+    "head": "ae9a3f592f4573e0197a7b49e81f34d2e6510a22",
+    "reviewComplete": true,
+    "productionPaths": [
+      "packages/ts-shell/src/cli/rpc/handlers.ts",
+      "packages/ts-shell/src/cli/rpc/host/input.ts",
+      "packages/ts-shell/src/cli/rpc/host/read.ts",
+      "packages/ts-shell/src/cli/rpc/host/session.ts",
+      "packages/ts-shell/src/cli/rpc/protocol.ts",
+      "packages/ts-shell/src/cli/runtime/inputStream.ts",
+      "packages/ts-shell/src/core/shell/command.ts",
+      "packages/ts-shell/src/core/shell/sessionRuntime.ts",
+      "packages/ts-shell/src/session/compaction.ts",
+      "packages/ts-shell/src/turn/compaction.ts",
+      "packages/ts-shell/src/turn/pendingInput.ts",
+      "packages/ts-shell/src/turn/session.ts"
+    ],
+    "changedTestPaths": [
+      "packages/ts-shell/src/cli/rpc/commands.test.ts",
+      "packages/ts-shell/src/cli/rpc/compaction.test.ts",
+      "packages/ts-shell/src/cli/rpc/protocol.test.ts",
+      "packages/ts-shell/src/cli/rpc/runtimeHost.test.ts",
+      "packages/ts-shell/src/cli/rpc/settings.test.ts",
+      "packages/ts-shell/src/cli/rpc/thinking.test.ts",
+      "packages/ts-shell/src/cli/runtime/inputStream.extensions.test.ts",
+      "packages/ts-shell/src/cli/runtime/inputStream.rpc.test.ts",
+      "packages/ts-shell/src/turn/compaction.test.ts",
+      "packages/ts-shell/src/turn/pendingInput.test.ts",
+      "packages/ts-shell/src/turn/session.test.ts"
+    ],
+    "immediateOwnerPaths": [
+      "packages/ts-shell/src/cli/rpc/rpcServer.ts",
+      "packages/ts-shell/src/cli/rpc/runtimeHost.ts",
+      "packages/ts-shell/src/cli/rpc/runtimeOps.ts",
+      "packages/ts-shell/src/cli/rpc/host/contract.ts",
+      "packages/ts-shell/src/core/shell/runtimeContext.ts",
+      "packages/ts-shell/src/core/shell/configuration.ts",
+      "packages/ts-shell/src/config/state.ts",
+      "packages/ts-shell/src/session/compaction/contract.ts",
+      "packages/ts-shell/src/session/compaction/budget.ts",
+      "packages/ts-shell/src/session/compaction/state.ts",
+      "packages/ts-shell/src/turn/opening.ts",
+      "packages/ts-shell/src/turn/prompt.ts"
+    ],
+    "actualSourceFilesRead": [
+      "packages/ts-shell/src/cli/rpc/handlers.ts",
+      "packages/ts-shell/src/cli/rpc/host/input.ts",
+      "packages/ts-shell/src/cli/rpc/host/read.ts",
+      "packages/ts-shell/src/cli/rpc/host/session.ts",
+      "packages/ts-shell/src/cli/rpc/protocol.ts",
+      "packages/ts-shell/src/cli/runtime/inputStream.ts",
+      "packages/ts-shell/src/core/shell/command.ts",
+      "packages/ts-shell/src/core/shell/sessionRuntime.ts",
+      "packages/ts-shell/src/session/compaction.ts",
+      "packages/ts-shell/src/turn/compaction.ts",
+      "packages/ts-shell/src/turn/pendingInput.ts",
+      "packages/ts-shell/src/turn/session.ts",
+      "packages/ts-shell/src/cli/rpc/commands.test.ts",
+      "packages/ts-shell/src/cli/rpc/compaction.test.ts",
+      "packages/ts-shell/src/cli/rpc/protocol.test.ts",
+      "packages/ts-shell/src/cli/rpc/runtimeHost.test.ts",
+      "packages/ts-shell/src/cli/rpc/settings.test.ts",
+      "packages/ts-shell/src/cli/rpc/thinking.test.ts",
+      "packages/ts-shell/src/cli/runtime/inputStream.extensions.test.ts",
+      "packages/ts-shell/src/cli/runtime/inputStream.rpc.test.ts",
+      "packages/ts-shell/src/turn/compaction.test.ts",
+      "packages/ts-shell/src/turn/pendingInput.test.ts",
+      "packages/ts-shell/src/turn/session.test.ts",
+      "packages/ts-shell/src/cli/rpc/rpcServer.ts",
+      "packages/ts-shell/src/cli/rpc/runtimeHost.ts",
+      "packages/ts-shell/src/cli/rpc/runtimeOps.ts",
+      "packages/ts-shell/src/cli/rpc/host/contract.ts",
+      "packages/ts-shell/src/core/shell/runtimeContext.ts",
+      "packages/ts-shell/src/core/shell/configuration.ts",
+      "packages/ts-shell/src/config/state.ts",
+      "packages/ts-shell/src/session/compaction/contract.ts",
+      "packages/ts-shell/src/session/compaction/budget.ts",
+      "packages/ts-shell/src/session/compaction/state.ts",
+      "packages/ts-shell/src/turn/opening.ts",
+      "packages/ts-shell/src/turn/prompt.ts"
+    ],
+    "readCoverage": "All original scoped changed hunks and owner seams were reviewed. Re-review inspected all repair hunks and their original-source, legal-cut, shared-generation, publication and release bodies; all other 32 source hashes match this reviewer's completed first review.",
+    "instructionsRead": [
+      "/home/wang/.codex/RTK.md",
+      "/home/wang/projects/cheers/AGENTS.md",
+      "/home/wang/projects/cheers/HANDOFF.md (relevant ownership, cancellation, RPC and read-admission pitfalls)",
+      "/home/wang/projects/cheers/agent-rules/architecture-boundaries.md",
+      "/home/wang/projects/cheers/agent-rules/file-placement-and-naming.md",
+      "/home/wang/projects/cheers/agent-rules/evidence-and-truthfulness.md",
+      "/home/wang/.codex/plugins/cache/spec-driven-develop/spec-driven-develop/1.15.0/skills/review-spd/SKILL.md",
+      "/home/wang/.codex/memories/MEMORY.md:133-179",
+      "Serena initial_instructions"
+    ],
+    "exclusions": [
+      ".tmp/output-guard-worktree and all C.9 changes",
+      "Pre-existing separate C.2 event/retry work",
+      "Repository-wide architecture, unrelated roadmap work, provider/auth core, release/default gates, package scripts/build behavior",
+      "Tests/builds/verification/normproof/provider calls and further delegation"
+    ],
+    "reReview": {
+      "target": "RPC-D1-ARCH-01 repair plus remaining original bounded D.1 diff",
+      "changedSinceFirstReview": [
+        "packages/ts-shell/src/session/compaction.ts",
+        "packages/ts-shell/src/turn/session.ts",
+        "packages/ts-shell/src/turn/session.test.ts"
+      ],
+      "unchangedSourceHashesReusedFromOwnCompletedReview": 32,
+      "freshSourceReads": [
+        "packages/ts-shell/src/session/compaction.ts",
+        "packages/ts-shell/src/turn/session.ts",
+        "packages/ts-shell/src/turn/session.test.ts"
+      ],
+      "evidenceReads": [
+        ".tmp/rpc-acceptance-2026-11-16/review-architecture-first.json (metadata only)",
+        ".tmp/rpc-acceptance-2026-11-16/red-shared-overflow.log (assertion/result only)",
+        ".tmp/rpc-acceptance-2026-11-16/fixed-shared-overflow.log (result summary only)"
+      ],
+      "otherReviewerApprovalsUsed": false
+    }
+  },
+  "conclusions": {
+    "singleOwnerReuse": "Manual and branch summaries reuse ShellCommandRuntime; automatic and raw overflow activity use the existing run-local turnCompaction token owner. Every raw overflow caller now receives its own start notification even when generation is shared. The existing pending-generation map still owns shared work; no new execution or persistence owner was introduced.",
+    "inwardDependencies": "Added imports remain inside the RPC surface or reuse existing core/session/turn owner interfaces; core command additions depend only on AbortController/Promise. No newly reversed dependency or second execution plane was found in the diff.",
+    "originalLifetime": "ShellCommandRuntime retains its original entry/controller until settled and removes only that entry's external abort listener. ReadSnapshot retains the captured configuration publication, original background signal, session/active identity and roots through rpcServer's final admission check. It does not recapture a successor. The repaired raw overflow start callback captures only its own release closure; activity is retained through the original authority commit, onCompact and PostCompact and released in that caller's finally.",
+    "schemaCompatibility": "Existing plain custom RpcHost read results remain accepted. Snapshot admission callbacks are separated from response data. Strict JSONL parsing rejects malformed recognized optionals before ordinary stdin admission; UI responses remain separately parsed and ordinary non-RPC transport is preserved. CondenseInput.onStarted is an optional in-process callback; it does not enter RPC data or change existing callers' wire schemas.",
+    "functionCeiling": "Manual changed-declaration inspection found no newly over-ceiling owner. core/shell/sessionRuntime.ts retains 20 named class methods excluding its constructor; session/compaction.ts retains 18 named function declarations plus its step/admission variable bindings. Added named bindings in command.ts, protocol.ts, read.ts and turn/compaction.ts remain below 20. No global facade/gate run was performed. The repair adds a plan value and an optional callback property, with no added named function declaration or variable-function binding in the near-ceiling owner.",
+    "sourceStability": "Only session/compaction.ts, turn/session.ts and turn/session.test.ts changed from the first review; all three were re-reviewed. Final hashes were rechecked before receipt publication."
+  },
+  "validation": {
+    "reviewerExecuted": [
+      "Read-only repair diff and owner-body inspection",
+      "Source SHA256 metadata",
+      "Inspection of root's red assertion and fixed result summaries"
+    ],
+    "reviewerDidNotExecute": [
+      "build",
+      "tests",
+      "verify/check gates",
+      "normproof",
+      "provider/network probes",
+      "push",
+      "CI"
+    ],
+    "rootExecutedEvidenceInspected": {
+      "redLog": ".tmp/rpc-acceptance-2026-11-16/red-shared-overflow.log",
+      "redResult": "One actual failed assertion in the new shared-overflow regression; 50 other tests skipped.",
+      "fixedLog": ".tmp/rpc-acceptance-2026-11-16/fixed-shared-overflow.log",
+      "fixedResult": "15 affected suites / 268 tests passed."
+    },
+    "earlierRootEvidencePreRepairOnly": {
+      "staticGates": 6,
+      "suites": 34,
+      "tests": 911,
+      "assertionReversals": 6,
+      "moduleCount": 2648,
+      "monolithCount": 0,
+      "buildHashPrefix": "1b750e0da086",
+      "loopbackPosts": 55,
+      "configuredModelRequests": 4,
+      "includesDurableCompactAndReuse": true
+    },
+    "evidenceLimits": "CLEAR is this reviewer's completed bounded architecture verdict for the hashes below. Root executed the regression and affected tests; the reviewer inspected their output without executing validation. Earlier gate/build/provider counts are pre-repair attribution and do not establish checks for this repaired source. No new build, push, CI or other-platform evidence is claimed. No other review receipt was adopted as evidence."
+  },
+  "sourceHashes": {
+    "packages/ts-shell/src/cli/rpc/handlers.ts": "29967640db9d95a89ceefb9d06a8fe69c5a7766b6dd124a6fae940ec54a04907",
+    "packages/ts-shell/src/cli/rpc/host/input.ts": "82bc511afe3c6b7911a31465151cc4ff0a321d7cd5277a123a791cadffd6839f",
+    "packages/ts-shell/src/cli/rpc/host/read.ts": "87011a15d068376fb0a04bcb9d64b0293498546944d770d816c60995761dfadd",
+    "packages/ts-shell/src/cli/rpc/host/session.ts": "e730cea3bf65832406cc8b73657154dda6842920310eb257ed7abb520b698658",
+    "packages/ts-shell/src/cli/rpc/protocol.ts": "c20f51c50762743325d3318eac73acac7ccf7ead6248f3327247798499ff7faf",
+    "packages/ts-shell/src/cli/runtime/inputStream.ts": "fff3a8a90906aaa09aedbce26dde8d0286b3e0cba0c9aa63b1db596ad392411a",
+    "packages/ts-shell/src/core/shell/command.ts": "908bf29f0b128c196443e0b8363723e861107dd50a4cd45c421416a33c5b55ae",
+    "packages/ts-shell/src/core/shell/sessionRuntime.ts": "99447e807b136bc1d226762399b3ca7a1390d8422a270c80d4b15ae992c9587b",
+    "packages/ts-shell/src/session/compaction.ts": "e7a41b116ba4ea95bb5d269a72134a2e22d713b1e90590dc15ed80548cc16600",
+    "packages/ts-shell/src/turn/compaction.ts": "aa3e76e74bf1609322d2a1c67f5c0cd354779f1cb74afa658d39882cd9851c38",
+    "packages/ts-shell/src/turn/pendingInput.ts": "539de7927b2ee0710840f22d18cdf2a7fe7c0bd0005c522f636fa3ec8f41e28f",
+    "packages/ts-shell/src/turn/session.ts": "5c51e7f9d2edfd349c22df995070213ad11ad94fde5e18e16009502bef22b678",
+    "packages/ts-shell/src/cli/rpc/commands.test.ts": "5a1d04329f8367b306a26df72892bc2fbab2fbb968b87d52b02deb91e40db3da",
+    "packages/ts-shell/src/cli/rpc/compaction.test.ts": "be1b51f19cdb280a3de1e42c8f61a8a2fa8d48cfd88a4dc84ab2343661ace73f",
+    "packages/ts-shell/src/cli/rpc/protocol.test.ts": "0fe2883640197f8447cbd22c90c18ba7e21ff8c3a9ffbc6d5ccaef6541a32b9f",
+    "packages/ts-shell/src/cli/rpc/runtimeHost.test.ts": "1660cf8cb867ee8f635cfdfdb289b78f67a579618bcbdc3d31efc337f89f407e",
+    "packages/ts-shell/src/cli/rpc/settings.test.ts": "ab0c384f170a2c3d8492538156ed3afea15e3838d2e28e8da38afb82be1c203c",
+    "packages/ts-shell/src/cli/rpc/thinking.test.ts": "cebe44bb2bc9d3c3d4fbc7186f5138f4dc4bc42b7b2ca3d87c57d9d5266183b8",
+    "packages/ts-shell/src/cli/runtime/inputStream.extensions.test.ts": "39c8d6d200a0153a41fa6c0f7eca593b5e7eee99dd3f52e7372215a52e269d42",
+    "packages/ts-shell/src/cli/runtime/inputStream.rpc.test.ts": "fe113b924af082d2c74d0e983f535d4e1b7a46a3f187f002162d27588ffe9862",
+    "packages/ts-shell/src/turn/compaction.test.ts": "2aafb415c82c882abbfb592d2ed33a448d4942221e3b6a354509db102d4aa062",
+    "packages/ts-shell/src/turn/pendingInput.test.ts": "42362edab3084f7a33b507be34193ff5c168b88fe01823ab8412895bdb02a1cd",
+    "packages/ts-shell/src/turn/session.test.ts": "0771a7a5fd35cf6732a1ba9661bfb3f418f1587954d3331e3b97678e13f44d8b",
+    "packages/ts-shell/src/cli/rpc/rpcServer.ts": "34453f778dc99b50883ac9fd3cdfccfa1d52440fd30ec7ec4aae478b132433a7",
+    "packages/ts-shell/src/cli/rpc/runtimeHost.ts": "b67742cbdcf28cfdeb79576825178e3a3f54180326404e079f540b773ea1a95a",
+    "packages/ts-shell/src/cli/rpc/runtimeOps.ts": "2ea2d44cacc9ba6858ceed7338681c018979fc670627a8df57248153db2c226b",
+    "packages/ts-shell/src/cli/rpc/host/contract.ts": "56d559c102cc266cd987bd541c2dbbf99f67ef26994158af350ece8d5fdd54c1",
+    "packages/ts-shell/src/core/shell/runtimeContext.ts": "f729f451c34f21d7b772639addf66c6c1c6647e1d5bcf678c9268468ebf67311",
+    "packages/ts-shell/src/core/shell/configuration.ts": "6566c418716e7bbbadcb839a385e76a802b1ce71267074538ccc331f1f75e175",
+    "packages/ts-shell/src/config/state.ts": "8758a0daff6a4e2b01313a547fc05e5f1c87b4c6103fc97d8423e06d20a35cdb",
+    "packages/ts-shell/src/session/compaction/contract.ts": "6b24263ef18d6f488d40cffc52e42b207d3eac89a1bbe8789f1c5490da0773fe",
+    "packages/ts-shell/src/session/compaction/budget.ts": "3055842767f4b7f3a39f6422a74e489d8769269d3dae17d8a7f5ef1465093b4e",
+    "packages/ts-shell/src/session/compaction/state.ts": "5b3d656500bb350759a5dd1ef7d1caa5788271989ba041892777dc50a09adb62",
+    "packages/ts-shell/src/turn/opening.ts": "94d3b4f6baba466941836dc9118b4cf06b1664aac08ecbc40df32afd367d8ac6",
+    "packages/ts-shell/src/turn/prompt.ts": "f27935a957ef749eec09859ce6516b02d381d7b6394f7ce5e553177afd0b5f16"
+  },
+  "resolvedFindings": [
+    {
+      "id": "RPC-D1-ARCH-01",
+      "status": "resolved",
+      "firstReport": {
+        "path": "/home/wang/projects/cheers/.tmp/rpc-acceptance-2026-11-16/review-architecture-first.json",
+        "sha256": "758e38cd4d0f2a8ec0d8318034124d6fb4fb786b03a83c54f4fbdc702e3db5c3",
+        "status": "WATCH",
+        "findingIds": [
+          "RPC-D1-ARCH-01"
+        ]
+      },
+      "summary": "Each raw overflow caller now registers its own activity after admission of the exact captured legal-cut plan, before shared-generation lookup, and releases only after its own original publication/final-hook settlement.",
+      "sourceEvidence": [
+        {
+          "file": "packages/ts-shell/src/session/compaction.ts",
+          "line": 599,
+          "note": "The original captured source is projected to generation input before planning."
+        },
+        {
+          "file": "packages/ts-shell/src/session/compaction.ts",
+          "line": 601,
+          "note": "Legal-cut planning precedes activity; no-plan refusal returns without invoking onStarted."
+        },
+        {
+          "file": "packages/ts-shell/src/session/compaction.ts",
+          "line": 611,
+          "note": "The original caller's onStarted runs before pendingCompactions lookup, including on a join."
+        },
+        {
+          "file": "packages/ts-shell/src/session/compaction.ts",
+          "line": 621,
+          "note": "New generation receives this exact plan instead of making a second plan."
+        },
+        {
+          "file": "packages/ts-shell/src/turn/session.ts",
+          "line": 400,
+          "note": "The callback acquires a token from the existing turnCompaction owner rather than a lifecycle hook that shared work can skip."
+        },
+        {
+          "file": "packages/ts-shell/src/turn/session.ts",
+          "line": 412,
+          "note": "Original authority commit and admission are retained."
+        },
+        {
+          "file": "packages/ts-shell/src/turn/session.ts",
+          "line": 423,
+          "note": "The caller awaits its own PostCompact before returning."
+        },
+        {
+          "file": "packages/ts-shell/src/turn/session.ts",
+          "line": 427,
+          "note": "Finally releases only this caller's token after success, refusal, cancellation or failure."
+        },
+        {
+          "file": "packages/ts-shell/src/turn/session.test.ts",
+          "line": 618,
+          "note": "Integrated regression holds an existing summary, starts a matching overflow caller, proves one summary with both getters active, checks joined PostCompact and final retirement."
+        }
+      ],
+      "regressionEvidence": {
+        "executedBy": "root",
+        "independentlyExecutedByReviewer": false,
+        "inspectedByReviewer": true,
+        "redLog": ".tmp/rpc-acceptance-2026-11-16/red-shared-overflow.log",
+        "redAssertion": "Actual AssertionError: expected false to be true at runs[1]?.isCompacting?.(), original fixture line 663.",
+        "fixedLog": ".tmp/rpc-acceptance-2026-11-16/fixed-shared-overflow.log",
+        "fixedResult": {
+          "suitesPassed": 15,
+          "testsPassed": 268
+        }
+      }
+    }
+  ],
+  "residualRisks": [
+    "C.9 and C.2 work remain excluded from this receipt.",
+    "Runtime/provider/platform/release completion and new source validation beyond the root-executed affected suite remain separate from this bounded source review."
+  ]
+}

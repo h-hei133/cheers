@@ -1,0 +1,21 @@
+Checked 3500 files in 568ms. No fixes applied.
+scc-gate root=packages/ts-shell/src files=3355
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=66 read=66 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=15 registered=15 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=24 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run cheers@0.1.0 test:ts
+npm notice run npm run test -w packages/ts-shell --no-file-parallelism src/cli/runtime/inputStream.rpc.test.ts src/cli/rpc/protocol.test.ts src/cli/rpc/runtimeHost.test.ts src/cli/rpc/compaction.test.ts src/session/compaction.test.ts src/session/compaction/progress.test.ts src/turn/compaction.test.ts src/turn/pendingInput.test.ts src/turn/session.test.ts
+npm warn "src/cli/runtime/inputStream.rpc.test.ts" is being parsed as a normal command line argument.
+npm error code EUNKNOWNCONFIG
+npm error Unknown cli flag:
+npm error   - --file-parallelism
+npm error Run `npm help config` for supported options.
+npm error A complete log of this run can be found in: /home/wang/.npm/_logs/2026-11-16T08_01_34_619Z-debug-0.log

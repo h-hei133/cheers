@@ -1,0 +1,387 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-16",
+  "task": "D.1",
+  "batch": "Complete RPC command acceptance and ownership repairs",
+  "status": "locally-validated",
+  "delivery": "Local commit containing this receipt; not pushed",
+  "baseCommit": "ae9a3f592f4573e0197a7b49e81f34d2e6510a22",
+  "buildId": "43da5c29fee3242388eace0f20d122a1304454898d18d8d2435061bb38d39294",
+  "source": {
+    "packages/ts-shell/src/cli/rpc/commands.test.ts": {
+      "snapshot": "source/cli/rpc/commands.test.ts.txt",
+      "sha256": "5a1d04329f8367b306a26df72892bc2fbab2fbb968b87d52b02deb91e40db3da"
+    },
+    "packages/ts-shell/src/cli/rpc/compaction.test.ts": {
+      "snapshot": "source/cli/rpc/compaction.test.ts.txt",
+      "sha256": "be1b51f19cdb280a3de1e42c8f61a8a2fa8d48cfd88a4dc84ab2343661ace73f"
+    },
+    "packages/ts-shell/src/cli/rpc/handlers.ts": {
+      "snapshot": "source/cli/rpc/handlers.ts.txt",
+      "sha256": "29967640db9d95a89ceefb9d06a8fe69c5a7766b6dd124a6fae940ec54a04907"
+    },
+    "packages/ts-shell/src/cli/rpc/host/input.ts": {
+      "snapshot": "source/cli/rpc/host/input.ts.txt",
+      "sha256": "82bc511afe3c6b7911a31465151cc4ff0a321d7cd5277a123a791cadffd6839f"
+    },
+    "packages/ts-shell/src/cli/rpc/host/read.ts": {
+      "snapshot": "source/cli/rpc/host/read.ts.txt",
+      "sha256": "87011a15d068376fb0a04bcb9d64b0293498546944d770d816c60995761dfadd"
+    },
+    "packages/ts-shell/src/cli/rpc/host/session.ts": {
+      "snapshot": "source/cli/rpc/host/session.ts.txt",
+      "sha256": "e730cea3bf65832406cc8b73657154dda6842920310eb257ed7abb520b698658"
+    },
+    "packages/ts-shell/src/cli/rpc/protocol.ts": {
+      "snapshot": "source/cli/rpc/protocol.ts.txt",
+      "sha256": "c20f51c50762743325d3318eac73acac7ccf7ead6248f3327247798499ff7faf"
+    },
+    "packages/ts-shell/src/cli/rpc/runtimeHost.test.ts": {
+      "snapshot": "source/cli/rpc/runtimeHost.test.ts.txt",
+      "sha256": "1660cf8cb867ee8f635cfdfdb289b78f67a579618bcbdc3d31efc337f89f407e"
+    },
+    "packages/ts-shell/src/cli/rpc/settings.test.ts": {
+      "snapshot": "source/cli/rpc/settings.test.ts.txt",
+      "sha256": "ab0c384f170a2c3d8492538156ed3afea15e3838d2e28e8da38afb82be1c203c"
+    },
+    "packages/ts-shell/src/cli/rpc/thinking.test.ts": {
+      "snapshot": "source/cli/rpc/thinking.test.ts.txt",
+      "sha256": "cebe44bb2bc9d3c3d4fbc7186f5138f4dc4bc42b7b2ca3d87c57d9d5266183b8"
+    },
+    "packages/ts-shell/src/cli/runtime/inputStream.extensions.test.ts": {
+      "snapshot": "source/cli/runtime/inputStream.extensions.test.ts.txt",
+      "sha256": "39c8d6d200a0153a41fa6c0f7eca593b5e7eee99dd3f52e7372215a52e269d42"
+    },
+    "packages/ts-shell/src/cli/runtime/inputStream.rpc.test.ts": {
+      "snapshot": "source/cli/runtime/inputStream.rpc.test.ts.txt",
+      "sha256": "fe113b924af082d2c74d0e983f535d4e1b7a46a3f187f002162d27588ffe9862"
+    },
+    "packages/ts-shell/src/cli/runtime/inputStream.ts": {
+      "snapshot": "source/cli/runtime/inputStream.ts.txt",
+      "sha256": "fff3a8a90906aaa09aedbce26dde8d0286b3e0cba0c9aa63b1db596ad392411a"
+    },
+    "packages/ts-shell/src/core/shell/command.ts": {
+      "snapshot": "source/core/shell/command.ts.txt",
+      "sha256": "908bf29f0b128c196443e0b8363723e861107dd50a4cd45c421416a33c5b55ae"
+    },
+    "packages/ts-shell/src/core/shell/sessionRuntime.ts": {
+      "snapshot": "source/core/shell/sessionRuntime.ts.txt",
+      "sha256": "99447e807b136bc1d226762399b3ca7a1390d8422a270c80d4b15ae992c9587b"
+    },
+    "packages/ts-shell/src/session/compaction.ts": {
+      "snapshot": "source/session/compaction.ts.txt",
+      "sha256": "e7a41b116ba4ea95bb5d269a72134a2e22d713b1e90590dc15ed80548cc16600"
+    },
+    "packages/ts-shell/src/turn/compaction.test.ts": {
+      "snapshot": "source/turn/compaction.test.ts.txt",
+      "sha256": "2aafb415c82c882abbfb592d2ed33a448d4942221e3b6a354509db102d4aa062"
+    },
+    "packages/ts-shell/src/turn/compaction.ts": {
+      "snapshot": "source/turn/compaction.ts.txt",
+      "sha256": "aa3e76e74bf1609322d2a1c67f5c0cd354779f1cb74afa658d39882cd9851c38"
+    },
+    "packages/ts-shell/src/turn/pendingInput.test.ts": {
+      "snapshot": "source/turn/pendingInput.test.ts.txt",
+      "sha256": "42362edab3084f7a33b507be34193ff5c168b88fe01823ab8412895bdb02a1cd"
+    },
+    "packages/ts-shell/src/turn/pendingInput.ts": {
+      "snapshot": "source/turn/pendingInput.ts.txt",
+      "sha256": "539de7927b2ee0710840f22d18cdf2a7fe7c0bd0005c522f636fa3ec8f41e28f"
+    },
+    "packages/ts-shell/src/turn/session.test.ts": {
+      "snapshot": "source/turn/session.test.ts.txt",
+      "sha256": "0771a7a5fd35cf6732a1ba9661bfb3f418f1587954d3331e3b97678e13f44d8b"
+    },
+    "packages/ts-shell/src/turn/session.ts": {
+      "snapshot": "source/turn/session.ts.txt",
+      "sha256": "5c51e7f9d2edfd349c22df995070213ad11ad94fde5e18e16009502bef22b678"
+    },
+    "packages/ts-shell/src/cli/rpc/protocol.test.ts": {
+      "snapshot": "source/cli/rpc/protocol.test.ts.txt",
+      "sha256": "0fe2883640197f8447cbd22c90c18ba7e21ff8c3a9ffbc6d5ccaef6541a32b9f"
+    }
+  },
+  "documents": {
+    ".wiki/log.md": {
+      "snapshot": "docs/.wiki/log.md.txt",
+      "sha256": "903fcc9c1259a7d59eccf57ddf57c91ce06b15808487270963894267ade17379"
+    },
+    ".wiki/refactor/upgrade/MASTER.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/MASTER.md.txt",
+      "sha256": "6ca210cba7ddae3b934d704ad79253dadd618c1a19f399c8fe33ea5154e71c42"
+    },
+    ".wiki/refactor/upgrade/tasks.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/tasks.md.txt",
+      "sha256": "4bd64762da43d1002e5afbd7088b1a53ef53af5c3878d7a1cd6738ad0864f803"
+    },
+    ".wiki/refactor/upgrade/design.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/design.md.txt",
+      "sha256": "d50087f7afd545fbe3b0b34656ff0908bc8d6a2d9201e8f872e42d2e92682d38"
+    },
+    ".wiki/refactor/upgrade/summary.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/summary.md.txt",
+      "sha256": "aa6b1f823bcaa26b1181eaa1af0a4feb88a6f3d54ce05c68b622138d8a27d9fd"
+    },
+    "HANDOFF.md": {
+      "snapshot": "docs/HANDOFF.md.txt",
+      "sha256": "464d722b22cb0f578e6afa05b85412e3f010cf29638e9e41e1686bae275c02d6"
+    }
+  },
+  "validation": {
+    "tests": {
+      "status": "passed",
+      "suites": 34,
+      "tests": 912,
+      "log": "final-validation.log",
+      "affectedCompaction": {
+        "suites": 15,
+        "tests": 268,
+        "log": "fixed-shared-overflow.log"
+      },
+      "afterRestoration": {
+        "suites": 3,
+        "tests": 110,
+        "log": "shared-fix-restored.log"
+      }
+    },
+    "gates": {
+      "status": "passed",
+      "count": 6,
+      "log": "final-validation.log",
+      "docsSourceAdvisories": 119
+    },
+    "responsibility": {
+      "modules": 2648,
+      "monoliths": 0,
+      "log": "final-validation.log"
+    },
+    "build": {
+      "status": "passed",
+      "log": "final-validation.log",
+      "currentInputDigestVerified": true
+    },
+    "reversals": {
+      "status": "passed",
+      "count": 7,
+      "actualAssertionsFailed": true,
+      "restoredExactly": true,
+      "receipt": "reversal.json",
+      "sharedGenerationRed": "red-shared-overflow.log",
+      "initialArchitectureFinding": "review-architecture-first.json"
+    },
+    "native": {
+      "status": "passed",
+      "platform": "linux",
+      "compiledCli": true,
+      "sameBuild": true,
+      "loopbackPosts": 55,
+      "receipts": [
+        "commands-logical.json",
+        "commands-physical.json",
+        "shell.json",
+        "settings.json",
+        "compact.json",
+        "retry.json",
+        "joint.json"
+      ],
+      "log": "final-native.log"
+    },
+    "configuredProvider": {
+      "status": "passed",
+      "platform": "linux",
+      "compiledCli": true,
+      "receipt": "real.json",
+      "requests": 4,
+      "sameBuild": true,
+      "originalActiveTarget": true,
+      "originalConfigUnchanged": true,
+      "minimalIsolatedCatalogue": true,
+      "bodyInspectable": false,
+      "actualRetryFailureInduced": false
+    },
+    "review": {
+      "code": "APPROVE",
+      "architecture": "CLEAR",
+      "reviewersExecutedValidation": false,
+      "receipts": [
+        "review-code.json",
+        "review-architecture.json"
+      ]
+    }
+  },
+  "limits": {
+    "tasksComplete": 23,
+    "tasksTotal": 62,
+    "remaining": 39,
+    "pending": {
+      "partial": 13,
+      "existingAwaitingAcceptance": 11,
+      "gaps": 13,
+      "needsVerification": 2
+    },
+    "goal": "active",
+    "otherPlatforms": false,
+    "physicalDisplay": false,
+    "push": false,
+    "ci": false,
+    "fullRepositorySuite": false,
+    "deterministicRealProviderFailure": false,
+    "providerBodyInspection": false,
+    "arbitraryOversizedSingleMessageCompaction": false
+  },
+  "failureClassification": "classification.md",
+  "evidence": {
+    "archive.mjs.txt": "972d4a8691a8956f4f36c3e4c0b04b1d0cd6dd9089f337a9a9f68b3e9066059a",
+    "before-shared-fix-commands-logical.json": "e6dafb0edd27e96c5488764190f358c29c9dbb838707fb42279eaed7dbc41cfa",
+    "before-shared-fix-commands-physical.json": "5992abe712bcdd4ca225142315e5b4ac618fa8c880eadd5600ebf254dead6070",
+    "before-shared-fix-compact.json": "39e2388fba9d81ad4fd9f5ebc080a95ca6fcdbff72dddbe321ad547176352d39",
+    "before-shared-fix-joint.json": "b039147ebd1c2e5a9966be10715fca626497c66de7192e84899fdbdca5b8a9af",
+    "before-shared-fix-real.json": "101d8d24185e972aa36f8a4634e5e6d3d55c3485ac2f4c24acbe3276efae6b28",
+    "before-shared-fix-retry.json": "030c3f2f4f225a53293679bde8eee11e09061e8b22530b42403fa2c806b7b938",
+    "before-shared-fix-reversal-overflow-activity.log": "085ad525013f28517210116f1fdf916f435c534c74969bceeb287ace355a0b8b",
+    "before-shared-fix-reversal.json": "27297b488ca97f8b8d3cb1334b7bde65770105f5d75de50ce3206aaa672f15b8",
+    "before-shared-fix-reversal.mjs.txt": "6597eb8a7db8134f1ae4c1231e238e27ecd51e595e6276473f958267a942928c",
+    "before-shared-fix-settings.json": "b119b807f2697050b89a1c98ddb2758af84dd13803a97a2cdcd18a5388725fb1",
+    "before-shared-fix-shell.json": "a2e5ec56993a92bdd3882c74a011176f5241aa5fced54226ba2cd567b14977a0",
+    "build-manifest.json": "3eac7cd48b7f4646ab192fdcece522d704404e7d43a8ee427c5fa2ae5fa180e8",
+    "classification.md": "6ec00463d6e5b47942eb2bbb362432c86cb84315f3f082415e5a8b6025b6846b",
+    "cleanup-plan.md": "ddeb08a939972729b5845c0eda69a8ba3866ca2b487787e00ba3693f2e963c59",
+    "commands-logical.json": "d09f93880250c991b359fe1b37348574d578125a6d7a199037ea5e1a416ae6fd",
+    "commands-physical.json": "24eb74b313f7eb731f9d51267319fefdb5e4a1a15da918295c9063e8c260b996",
+    "commands.mjs.txt": "6273dd3522a9e6cf555415e0af3bef575aa0a86d37212d0e3c647f7e1e3a62cb",
+    "compact.json": "3765a403b565544994a01d313f64dd6c8972127c4f1eb35a321c51b7aac05117",
+    "compact.mjs.txt": "c226c09fd1ca4158a1f3fb4a469389c9e7f81b76cb3b158f9454d55160d4bb38",
+    "current-build.log": "de33dd7481712b5937baeae961d80c238e92303d419e3ed1088d3d2aaf233e25",
+    "docs/.wiki/log.md.txt": "903fcc9c1259a7d59eccf57ddf57c91ce06b15808487270963894267ade17379",
+    "docs/.wiki/refactor/upgrade/MASTER.md.txt": "6ca210cba7ddae3b934d704ad79253dadd618c1a19f399c8fe33ea5154e71c42",
+    "docs/.wiki/refactor/upgrade/design.md.txt": "d50087f7afd545fbe3b0b34656ff0908bc8d6a2d9201e8f872e42d2e92682d38",
+    "docs/.wiki/refactor/upgrade/summary.md.txt": "aa6b1f823bcaa26b1181eaa1af0a4feb88a6f3d54ce05c68b622138d8a27d9fd",
+    "docs/.wiki/refactor/upgrade/tasks.md.txt": "4bd64762da43d1002e5afbd7088b1a53ef53af5c3878d7a1cd6738ad0864f803",
+    "docs/HANDOFF.md.txt": "464d722b22cb0f578e6afa05b85412e3f010cf29638e9e41e1686bae275c02d6",
+    "docs-validation.log": "b343ccc12290561bb865a2691e96199dd78ed3f156ca83960e19e35fd2e1eb3d",
+    "final-docs-validation.log": "b343ccc12290561bb865a2691e96199dd78ed3f156ca83960e19e35fd2e1eb3d",
+    "final-native.log": "43609b23a114d1862e48beb9eb23ab5efe9698e93486d412879197f33ee12638",
+    "final-real.log": "f47e19865d88c1ba799a8c0f66c3899dc57a6e3aee2e651e5389d7ab1c7bca62",
+    "final-validation-fixture-failures.log": "a0babc5efa9abfde4049515f81766f331626bdef6a8b0465a19c787aec7bc2a9",
+    "final-validation-missing-script.log": "8545ef4446d407086017a8ad17ac27e8d683615f1aeece5a957cc5c8c70eddad",
+    "final-validation.log": "9008a992270e53c1e548ef97be981fd7532631041265b6d7d82693bd18fddac1",
+    "finish-docs-first-failed.mjs.txt": "220c83c0f096fb33c2603b89259327165e6cd9f926b2b1d2f2d078c3e97717ef",
+    "finish-docs.mjs.txt": "23500a5dc4e2b360afc36822f62d7d76e24fc3c62de1ce66de701bfe85df8296",
+    "fixed-shared-overflow.log": "8009c2dec8752c5ad05d289b91e595cbd0636c9d6b8245262c36d2673c2469fd",
+    "fixture-restored.log": "52b9d3427fc08bc30cb57c256fb52de9fa360289574860ad152a7733b394312f",
+    "focused-built.log": "28d87de8fe91f7a02e0b3e0e1e43f77326b81f8c220445644d38467e92f29bc6",
+    "focused-direct.log": "c92c8f31c5650f6a6f310fe1183f0edfaa9a58abcc167d05d0d7c11091628779",
+    "focused-restored.log": "db6fdf6e3c5c0ef931c82274aea51b63417eac1d4050091eb4baaa0afae91576",
+    "focused.log": "ec39578025bb19ce93789bbf90f4991197a1b16ce5664fde9952fbdda9043a2f",
+    "input-binding.json": "83c5544f5c47b5033cc7c075c0c464d4c70040aab75e7cc2898048fb890e34db",
+    "joint-fifth.json": "65781d97be555dc87a2e8adbb2710d9c87d2b855ac4a17481aecd0460c712bbe",
+    "joint-fifth.log": "81fe10e4db372fd5cdbe6a94792d96c6d0d45a9cdd4e393f82d426a7ef35cb13",
+    "joint-fifth.mjs.txt": "80c01d3d9fc12b4c80b8d67e3ff5a09fa83edf99970ec8623eafce37c66165e2",
+    "joint-first.json": "6b5f93e553a1f84c440fd67941130f70e93cbabfba77de3dbb81f35e6a353568",
+    "joint-first.log": "d016e13a0990bc510307ebb84ac415a9eeb1433416169bb92db7c16a5695d546",
+    "joint-first.mjs.txt": "a485043e06c790a782056b047f60ace637d10120b8c0a4c082a94f16d762f6de",
+    "joint-fourth.json": "d138ef4f0f142c154bd3990b8dc82cfccb326829dae0eedf7dab551a4f4c66d6",
+    "joint-fourth.log": "cb3ae2d17d4fd78a1f34e4be1270a2dce7203450968483be02f0170764b2ea9f",
+    "joint-fourth.mjs.txt": "931fd8488ddf85b32e5e51f10b2b6745acbf148f712cae70dda9f941dd6bd0c6",
+    "joint-second.json": "6068fc6e40be71e4ae3b6feb53ca05782f1a0e96ec6134397fe0084907e5c3fa",
+    "joint-second.log": "7da507940aa7536ea1bb75fd56561675aaf9eddd4ccd69f05809b40d9d2fd12d",
+    "joint-second.mjs.txt": "b5fd05324d16b591f9e0f70047d49c98d8cda887612e0242deedae8c21e33c44",
+    "joint-third.json": "1bba3d85000a59b57b9b752f7070c6c8891fc33b4a2effb53ab578d7986419de",
+    "joint-third.log": "b5ab4d42617fee497b8fc25582c5b212baacd1a86d3191028d278b05933ce884",
+    "joint-third.mjs.txt": "15a306dc540ea61d35bd845e51c29aee4dba1a45de34b217a2e9d58ef0083bdf",
+    "joint.json": "82fd37dc9a00d31a201c0e1b93e878533e4fd53f2fd9de38df7557a493ddbaa3",
+    "joint.log": "3d1445149bc1a191a339b02b083d7bd95840775e0f07f808a163c476531d1f3a",
+    "joint.mjs.txt": "d571809224a9e791969fd4a0074cf351270a4b58a5b89a59723104433acaf96c",
+    "native-matrix.log": "2493bf706e15f10e4596e402f77de37b316eea1909daa0655dd9b2ebed6beabc",
+    "post-cleanup-tests.log": "b7e5ae9bf9d04e2b0a305bcbfca48a34e9212426aa6e780a6bcadfdc9491243a",
+    "post-cleanup.log": "c8a8bad0ff70643f61a3d33b02a3cb6bc924ab99f8347895dddb6c9631e0161e",
+    "pre-fixture-commands-logical.json": "6811c6027b70c4a5ebbb7b6c517f18341098ac32498713d58db97fe9679b3cd8",
+    "pre-fixture-commands-physical.json": "f9ad84a34c8e96f0629362441d1729fcceb8b707dba9fddea46c5cb7d668cc09",
+    "pre-fixture-compact.json": "c53e8e031adcfb0ed3c991567d01192864780c76588063f0dd5fcfac4261f32d",
+    "pre-fixture-joint.json": "fd6dfb4d302e480d51b4f35a4cd6385b7f9c53a8be5a8d031bf1a9eaba818e85",
+    "pre-fixture-native-matrix.log": "2493bf706e15f10e4596e402f77de37b316eea1909daa0655dd9b2ebed6beabc",
+    "pre-fixture-real.json": "1f3179fd98349f3425034d0a9e0e83400614712c7844457b4520bf61b7d38ba1",
+    "pre-fixture-real.log": "2bf58190d0576a45d70ef411bf250fb2e6e3a74d3dd748a6ff9f410d0f36facf",
+    "pre-fixture-retry.json": "2e430b4f91832339226707b9b39842dfe094dfd055bf171349a1d9f0abd94052",
+    "pre-fixture-settings.json": "4e07e38c7aadbc1d596b2f3afb0fb46a2e87be319d4e6a386ea634666bfadfa6",
+    "pre-fixture-shell.json": "dc0e1b5c039b55f6a22a61f784b40dab75b8a08bc8414c938c4e151b4510fa9b",
+    "pre-shared-fix-validation.log": "7bf3dce00e30bc4ceaa1d10d7e60dab3e3c272a27685c2dc52b28dc2c45b67be",
+    "previous-build-manifest.json": "4e2eadacfea9f17808c5410e6bae34ee8693f75b2887113f6a98bc45badd3cb0",
+    "real-fifth.json": "58169b1176a84be2c628bf25d3daa4a4eae0279257c42fcd424684c902152d19",
+    "real-fifth.log": "9b73f960bcb74c0cb82e3ae634217fbae16ee3dfa56841fbf90c667134e9c42e",
+    "real-fifth.mjs.txt": "52f05df229e208d891132c5ba1626821b6239a69b05c62e11d9c552c9a8b6f3c",
+    "real-first.json": "cf6b89bf553d470b51af5791cf111e402aa3b4324cf15c5ac34c07599db899b3",
+    "real-first.log": "b10be738427378bb7430c7df1f9ef46fc899efce3df0daf9658863b42071cec2",
+    "real-first.mjs.txt": "27621bea9c99fdab1e37535f4f957c93615433587eaac3de1f2e5d2e7f31d42d",
+    "real-fourth.json": "f1757cf3ea3fcc4d0bedee0fcce3fc0735d4180401427d49d14353ae2a862aec",
+    "real-fourth.log": "93b09f85a05c9f56e75bcdbcae18bb83b1e377d3ab5a760d3791c2b463bf5504",
+    "real-fourth.mjs.txt": "c1a1ceef6b07050f8c0a38417c0da02fb58ee32f4af5bbe6a8c6bfef27dc75e2",
+    "real-second.json": "c4b8dd3f4e023a007cbeadaabc0366b02f7c0cf8048421fe47997ea9371b4952",
+    "real-second.log": "e29982e3d262c4a8eacfb9e8d1795937fcd5e8ab8b8a3507d72c324a33c70e67",
+    "real-second.mjs.txt": "070dd7d50a559a0d326b698e4f2434d6530a97197cb4deaef78a9d63bdd9587f",
+    "real-sixth.json": "defb76b6181659087f329a68a3eb1434690c7f64d9740d7569cf683bedaa704b",
+    "real-sixth.log": "095b8fad89faa2c994b7b7935e1e1b0a0537d99a44ff0669b59310b488ddb32d",
+    "real-sixth.mjs.txt": "6498ecea67ffd80cd2fed0e00d7ac1b9380cdc263c5158a323da5ea3560bdd8e",
+    "real-third.json": "55fda9869a30d46007bb6a9acfc4b6f161f26ce666e92006faa85ee41da39322",
+    "real-third.log": "437f6b5234c22de0e46a69c2ff72f2b644fc580da2f8e571d1cf3d2a793da1f4",
+    "real-third.mjs.txt": "be29b9c80b5b0cbbc3af7f96e0fbd64cbf60dedd92021e2b00fe9102fd54471c",
+    "real.json": "1d6e400337da3fade8b9252c6902a406da3e1a11e0d48a195dabca083d9ff424",
+    "real.log": "2bf58190d0576a45d70ef411bf250fb2e6e3a74d3dd748a6ff9f410d0f36facf",
+    "real.mjs.txt": "7c2f9d9b9ebd91283ed94626c55ab25ad5fdeb0d92bf4ecbcd4db59d69d4ae34",
+    "red-activity.log": "707e73d76f9c5e19bb14f2a7b340f0098cd40a987cd1d02f371243edfa4b6d6e",
+    "red-input-state.log": "074c27bdc6ae2e273ea59e4297bf9b1fd351cca3af379149b34bebe3cc173197",
+    "red-shared-overflow.log": "a735d2598a796290b99dcc0dc0a4a52e5779d1bd3125f49706b7703726ff5261",
+    "red-validation-read.log": "0eff963e83ab6f03f859e045b8f99809e533af2bdfd21da5ab3bec077d9da166",
+    "retry.json": "49c894cc041e52a45a3537e43829c071823e721bb07d5fe1dbf40aa750ee7612",
+    "retry.mjs.txt": "5a511f0c6d68e88d6fc6e71808ef3293260818db1a8d94fba8142a854452b47a",
+    "reversal-automatic-activity.log": "70ad4b6d9a37484cb50887648f0f7f9b103538cb801636a7405aa24631571450",
+    "reversal-first.log": "3e86f37fdbd72d4515497307da965549afdb1efd47c28be095fbba09fe4eadfa",
+    "reversal-first.mjs.txt": "d2cef248b02dbfcb780fc1852ac33da11ec17b2754b5dd3e2ceccefcbc7dc619",
+    "reversal-manual-activity.log": "c1b32ff19964d36c57ead1608a31925d2301bca68ecc743667c2947c40483bcd",
+    "reversal-optional-exclusion-skipped.log": "5f039b0505f05e8e897b53d1c1b77ddd258e2ef48572ccdfb23bdb81422594f8",
+    "reversal-optional-exclusion.log": "a83bc0ea9ca5f75eb59bb15af38200ac972183654b74d32365a448242b99cc85",
+    "reversal-overflow-activity.log": "6c23d6bb480a73ac38c51a32505f26d8677291edc6f8194e60df1726d67164b8",
+    "reversal-read-admission.log": "caf75d50a4c5072c5b188a083e8ee00f00aee5288f2afa72b4fdb456f52498cf",
+    "reversal-shared-fix.log": "d086c3fd058d9aee4868cfa3ca0fc702421e4a71ca070a9d27383b33740a4394",
+    "reversal-shared-overflow-activity.log": "bd26bde1db275a94a87488e5d6137c6fccf4b56f4d99d949d15df3a606dd8a7a",
+    "reversal-strict-input.log": "7268e08fed06610cea72477f7b9cccb54921c41907c7fa7ec52faf28052685ec",
+    "reversal-target-mismatch.log": "9edb93fc591243b609b2216c68f33175e5207f9aa6bd7b540dd12b507a68457f",
+    "reversal.json": "732a41324065c5a3e3f9b753a60ce5dc4bd1c2c8faf36cec8e3666f589dbd103",
+    "reversal.log": "89ce4f94ef7941dde5318d6834aaa944e653bda7e25126e6c24f6cf91223f3e0",
+    "reversal.mjs.txt": "3d94fa6f949aaa05fdffdae95b0e07f255ee406f1a0f5dadbffb63c668914e82",
+    "review-architecture-first.json": "758e38cd4d0f2a8ec0d8318034124d6fb4fb786b03a83c54f4fbdc702e3db5c3",
+    "review-architecture.json": "51cbf4577be8d9e5eb719474c8c554373642b0dffe50f0ed354b4c2ab5c6f9cd",
+    "review-code.json": "22f4c9d3290e98546c5c18a0203cc1c57b86e39c7383d02b1cc387ee40eb30c6",
+    "review-unavailable.json": "21c89f5906a44fda96c64d5148f8026e78b275c575281de606ac598820db5458",
+    "settings.json": "ebf38544275fd75dc0923cb3cb69bc63da6c30ff0612347738102c05a6a514cf",
+    "settings.mjs.txt": "0933c0c552a2e5fadb911bcd5a52e24c3bedbf0cfb89cfd6eea79ad1ff52193a",
+    "shared-fix-restored.log": "4e9b4a7502424b7b978c4d809fa8c7c117b1004888d6894194514f40254c2e0a",
+    "shell.json": "daea4f53f38fd4b56936c9ff54ba75565bf1bb2c4cca553197a4ae41cbe34117",
+    "shell.mjs.txt": "5420b4802dbc838dc7bd1d3c98cf651ee5611a401316a1feb7e55f0e996e9790",
+    "source/cli/rpc/commands.test.ts.txt": "5a1d04329f8367b306a26df72892bc2fbab2fbb968b87d52b02deb91e40db3da",
+    "source/cli/rpc/compaction.test.ts.txt": "be1b51f19cdb280a3de1e42c8f61a8a2fa8d48cfd88a4dc84ab2343661ace73f",
+    "source/cli/rpc/handlers.ts.txt": "29967640db9d95a89ceefb9d06a8fe69c5a7766b6dd124a6fae940ec54a04907",
+    "source/cli/rpc/host/input.ts.txt": "82bc511afe3c6b7911a31465151cc4ff0a321d7cd5277a123a791cadffd6839f",
+    "source/cli/rpc/host/read.ts.txt": "87011a15d068376fb0a04bcb9d64b0293498546944d770d816c60995761dfadd",
+    "source/cli/rpc/host/session.ts.txt": "e730cea3bf65832406cc8b73657154dda6842920310eb257ed7abb520b698658",
+    "source/cli/rpc/protocol.test.ts.txt": "0fe2883640197f8447cbd22c90c18ba7e21ff8c3a9ffbc6d5ccaef6541a32b9f",
+    "source/cli/rpc/protocol.ts.txt": "c20f51c50762743325d3318eac73acac7ccf7ead6248f3327247798499ff7faf",
+    "source/cli/rpc/runtimeHost.test.ts.txt": "1660cf8cb867ee8f635cfdfdb289b78f67a579618bcbdc3d31efc337f89f407e",
+    "source/cli/rpc/settings.test.ts.txt": "ab0c384f170a2c3d8492538156ed3afea15e3838d2e28e8da38afb82be1c203c",
+    "source/cli/rpc/thinking.test.ts.txt": "cebe44bb2bc9d3c3d4fbc7186f5138f4dc4bc42b7b2ca3d87c57d9d5266183b8",
+    "source/cli/runtime/inputStream.extensions.test.ts.txt": "39c8d6d200a0153a41fa6c0f7eca593b5e7eee99dd3f52e7372215a52e269d42",
+    "source/cli/runtime/inputStream.rpc.test.ts.txt": "fe113b924af082d2c74d0e983f535d4e1b7a46a3f187f002162d27588ffe9862",
+    "source/cli/runtime/inputStream.ts.txt": "fff3a8a90906aaa09aedbce26dde8d0286b3e0cba0c9aa63b1db596ad392411a",
+    "source/core/shell/command.ts.txt": "908bf29f0b128c196443e0b8363723e861107dd50a4cd45c421416a33c5b55ae",
+    "source/core/shell/sessionRuntime.ts.txt": "99447e807b136bc1d226762399b3ca7a1390d8422a270c80d4b15ae992c9587b",
+    "source/session/compaction.ts.txt": "e7a41b116ba4ea95bb5d269a72134a2e22d713b1e90590dc15ed80548cc16600",
+    "source/turn/compaction.test.ts.txt": "2aafb415c82c882abbfb592d2ed33a448d4942221e3b6a354509db102d4aa062",
+    "source/turn/compaction.ts.txt": "aa3e76e74bf1609322d2a1c67f5c0cd354779f1cb74afa658d39882cd9851c38",
+    "source/turn/pendingInput.test.ts.txt": "42362edab3084f7a33b507be34193ff5c168b88fe01823ab8412895bdb02a1cd",
+    "source/turn/pendingInput.ts.txt": "539de7927b2ee0710840f22d18cdf2a7fe7c0bd0005c522f636fa3ec8f41e28f",
+    "source/turn/session.test.ts.txt": "0771a7a5fd35cf6732a1ba9661bfb3f418f1587954d3331e3b97678e13f44d8b",
+    "source/turn/session.ts.txt": "5c51e7f9d2edfd349c22df995070213ad11ad94fde5e18e16009502bef22b678",
+    "summary-before-acceptance.md": "db0ff185a7116b9892a29513a68ebe06c9508effecfbfba45cb26d07efa31ce6",
+    "validation.log": "3204f06285bae65c687cdf1778d3ec8f41233315a220cb2ee58e9bad0daf1974"
+  }
+}

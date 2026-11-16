@@ -1,0 +1,48 @@
+{
+  "platform": "linux",
+  "compiledCliRpc": true,
+  "realProvider": true,
+  "status": "failed",
+  "buildId": "3923b90896f93852325829a28b2998caa5ef47096e06cdc9ece8a820bd76491a",
+  "probeSha256": "6498ecea67ffd80cd2fed0e00d7ac1b9380cdc263c5158a323da5ea3560bdd8e",
+  "stages": {
+    "discovery": {
+      "passed": true,
+      "configuredModelFound": true,
+      "sameModelSelected": true,
+      "effortDiscovered": true,
+      "zeroProviderDispatch": true,
+      "nativeSeedIncluded": true
+    },
+    "ordinary": {
+      "passed": true,
+      "actualBodySent": true,
+      "inFlightControl": true,
+      "completed": true,
+      "singlePost": true,
+      "sameSessionQueuesCleared": true,
+      "clearedInputNotPersisted": true
+    }
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "existingConfiguredTarget": true,
+    "minimalConfiguredModelEntry": true,
+    "isolatedValidObjects": true
+  },
+  "selectionAdmission": {
+    "success": true,
+    "budgetRefusal": false,
+    "credentialRefusal": false
+  },
+  "failedStage": "reuse",
+  "requests": 2,
+  "failure": {
+    "name": "AssertionError",
+    "code": "ERR_ASSERTION",
+    "message": "Configured retry probe failed; provider details withheld."
+  },
+  "assertion": {
+    "stackFrame": "    at file:///home/wang/projects/cheers/.tmp/rpc-acceptance-2026-11-16/real.mjs:165:10"
+  }
+}

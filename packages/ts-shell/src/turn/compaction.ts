@@ -54,8 +54,16 @@ export function turnCompaction(input: {
   readonly beforeStep: NonNullable<AgentLoopConfig['prepareNextStep']>;
   readonly prepareContext: (prepared: PreparedTurnContext, signal: AbortSignal | undefined, context: RequestContextOwner) => Promise<PreparedTurnContext | undefined>;
   readonly recoverContext: (prepared: PreparedTurnContext, signal: AbortSignal | undefined, context: RequestContextOwner) => Promise<PreparedTurnContext | undefined>;
+  readonly isCompacting: () => boolean;
+  readonly begin: () => () => void;
 } {
   const { setup } = input;
+  const active = new Set<object>();
+  const begin = () => {
+    const operation = {};
+    active.add(operation);
+    return () => { active.delete(operation); };
+  };
   const log = createComponentLogger('turn.compaction');
   const prepare = createCompactionStep(setup.policy, {
     summarize: setup.summarize,
@@ -64,6 +72,7 @@ export function turnCompaction(input: {
     onCompact: setup.onCompact,
     onDeclined: setup.onDeclined,
     onDeadEnd: setup.onDeadEnd,
+    onStarted: begin,
     onError: error => { setup.onDeclined?.(`Compaction failed: ${compactionErrorMessage(error, input.workspaceRoot)}`); },
     authority: setup.authority,
     lifecycle: buildCompactionLifecycle({ hooks: input.hooks, sessionId: input.sessionId,
@@ -75,6 +84,7 @@ export function turnCompaction(input: {
     return prepare(snapshot, signal);
   };
   const recover = createCompactionStep(setup.policy, { summarize: setup.summarize, sessionId: input.sessionId,
+    onStarted: begin,
     summarizeTurnPrefix: setup.summarizeTurnPrefix, onCompact: setup.onCompact, onDeclined: setup.onDeclined,
     onError: error => setup.onDeclined?.(`Compaction failed: ${compactionErrorMessage(error, input.workspaceRoot)}`),
     authority: setup.authority, reason: 'overflow', force: true,
@@ -112,6 +122,8 @@ export function turnCompaction(input: {
     return candidate;
   };
   return {
+    isCompacting: () => active.size > 0,
+    begin,
     beforePrompt: async (history, opening, signal) => {
       if (input.prepared || input.converted || history.some(message => message.role === 'custom')) return history;
       // The first step carries tools unless the run is limited to that one

@@ -1,0 +1,20 @@
+{"name":"optional-exclusion","file":"packages/ts-shell/src/cli/rpc/protocol.ts","assertionFailure":true,"exactRestoration":true,"sourceSha256":"c20f51c50762743325d3318eac73acac7ccf7ead6248f3327247798499ff7faf","exitCode":1}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: read-admission mutation target changed.
+
+4 !== 3
+
+    at file:///home/wang/projects/cheers/.tmp/rpc-acceptance-2026-11-16/reversal.mjs:48:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 4,
+  expected: 3,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.15.0
