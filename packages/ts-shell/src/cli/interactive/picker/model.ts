@@ -1,4 +1,4 @@
-import { projectModelSelection, projectSessionModel } from "../../../session/model/projection.js";
+import { projectModelSelection } from "../../../session/model/projection.js";
 import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
 import { loadCatalogSnapshot } from "../../../core/models/catalogStore.js";
 import { availabilityLabel, availabilitySnapshot, endpointLabel, matchesCatalog, type ConnectionAvailability } from "../../../core/models/availability.js";
@@ -12,7 +12,7 @@ import { isFocusable } from "../../../presentation/tui/chrome/option.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
 import { applyModelPreset, resolveModelPreset, wholePresetFailure } from "../../../core/commands/model/preset.js";
 import { readProfilePresets } from "../../../core/commands/model/presetStore.js";
-import { readSessionModel } from "../../../session/model/state.js";
+import { decodeSessionModel } from "../../../session/model/state.js";
 import type { SessionModelRole, SessionModelTarget } from "../../../session/model/contract.js";
 import { exactTargetMatches, scopedModelTarget, targetResolutionIdentity } from "../../../core/commands/model/target.js";
 import { captureModelChoice } from "../../../core/commands/model/choice.js";
@@ -38,7 +38,6 @@ import { ModelActionOwner, modelActionAdmission, modelBrowserOwned } from './mod
 import { providerBindingAvailable, providerScopeSelected } from '../../../core/auth/binding.js';
 import { sessionVirtualModels, sessionModelCatalog } from '../../../core/catalog/models.js';
 import { setVirtualModel } from '../../../core/commands/model/virtual.js';
-import { readLogicalModel } from '../../../session/model/logical.js';
 import { virtualModelEffortPicker } from './model/virtual.js';
 
 interface RoleSelection {
@@ -110,19 +109,22 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       inspectionAdmission = admitInspection;
       const publication = context.readConfiguration?.();
       observedRevision = publication?.revision;
-      const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+      const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd);
       const local = choice || publication ? undefined : loadCatalogSnapshot();
       const catalog = choice?.catalog ?? publication?.catalog ?? local!.providers;
-      const logical = readLogicalModel(context.sessionId);
+      // A failed capture cannot make accepted physical defaults into current session facts.
+      const selection = decodeSessionModel(choice?.baseline?.selection);
+      const logical = selection?.virtualModel;
+      const selectionAvailable = !context.sessionId || Boolean(choice?.baseline);
       catalogDiagnostics = choice?.catalogDiagnostics ?? publication?.catalogDiagnostics ?? local?.diagnostics ?? [];
-      const active = context.resolveConfigTarget?.(config, context.sessionId)
-        ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
+      const active = context.resolveConfigTarget?.(config, selectionAvailable ? context.sessionId : undefined)
+        ?? resolveProviderCredential({ runtimeConfig: config, ...(selectionAvailable && context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
       // Inspecting prospective targets must not remember them as the session's next pool account.
       // Keep the host's request overrides, while actual activation retains the original context.
       const inspectionContext = { ...context, sessionId: undefined };
       const activeAddress = providerCredentialBaseUrl(catalog, active);
       const currentProviderSlot = providerScopeSelected(config, active);
-      const activeReady = Boolean(!active.blocked && (active.credential
+      const activeReady = Boolean(selectionAvailable && !active.blocked && (active.credential
         || (currentProviderSlot && providerBindingAvailable(catalog, active))));
       const availability = availabilitySnapshot({ config, catalog });
       const thinkingEffort = assigning ? assigning.thinkingEffort
@@ -184,7 +186,8 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               : !resolutionReady ? resolution?.credential ? 'request unavailable' : 'credential unavailable'
               : !exact ? 'request target mismatch'
               : ambiguous ? 'model catalogue endpoint is ambiguous'
-              : unsupported ? 'reasoning effort unsupported' : !choice?.baseline ? 'active session required' : undefined;
+              : unsupported ? 'reasoning effort unsupported' : !selectionAvailable ? 'saved session unavailable'
+              : !choice?.baseline ? 'active session required' : undefined;
             const metadata = listedModelMetadata(catalog, provider, model.id, modelAddress);
             rows.push({ id, label: model.id,
               detail: [connection?.connectionId ?? (effectiveResolution?.credential ? `${effectiveResolution.credential.source} credential` : undefined), connection?.label, provider.label, connection?.endpoint ?? endpointLabel(modelAddress),
@@ -311,7 +314,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       const currentConnection = active.credential && !active.blocked ? active.credential.connectionId
         : active.selection?.connectionId ?? (active.selection?.credentialScope !== 'provider'
           ? config.sessionConnection?.id ?? config.activeProviderConnectionId : undefined);
-      if (!logical && currentModel && !rows.some(row => row.note === 'active')) {
+      if (selectionAvailable && !logical && currentModel && !rows.some(row => row.note === 'active')) {
         const id = 'model:current';
         groups.set(id, { category: currentProvider });
         const reportAddress = activeReady ? activeAddress : active.baseUrl;
@@ -346,15 +349,14 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
       }
       if (context.sessionId && !assigning) {
         try {
-          const selection = readSessionModel(context.sessionId);
           for (const role of ['default', 'subagent', 'summary', 'advisor'] as const) {
-            const target = role === 'default' ? logical ? { ...logical, connectionId: undefined } : { provider: active.provider, model: active.model, connectionId: active.credential?.connectionId, thinkingEffort }
+            const target = !selectionAvailable ? undefined : role === 'default' ? logical ? { ...logical, connectionId: undefined } : { provider: active.provider, model: active.model, connectionId: active.credential?.connectionId, thinkingEffort }
               : (selection?.roles ?? config.sessionModelRoles)?.[role];
             const id = `role:${role}`;
             rows.push({ id, label: role === 'default' ? 'Default' : role[0].toUpperCase() + role.slice(1),
-              detail: target?.model ? `${target.provider}/${target.model}` : 'Uses default model', disabled: true, focusable: true });
+              detail: !selectionAvailable ? 'unknown' : target?.model ? `${target.provider}/${target.model}` : 'Uses default model', disabled: true, focusable: true });
             groups.set(id, { category: 'roles' });
-            details.set(id, [`Role: ${role}`, target?.model ? `Model: ${target.provider}/${target.model}` : 'Model: follows the default',
+            details.set(id, [`Role: ${role}`, !selectionAvailable ? 'Model: unknown' : target?.model ? `Model: ${target.provider}/${target.model}` : 'Model: follows the default',
               ...(target?.connectionId ? [`Connection: ${target.connectionId}`] : []),
               ...(role !== 'default' && target ? [`Reasoning effort: ${target.thinkingEffort ?? 'provider decides'}`] : []),
               'Role assignments and presets share the existing session model owner.']);
@@ -365,7 +367,7 @@ export function modelPicker(context: CommandContext, focus?: string, navigation 
               inspections.set(id, () => {
                 const back = (note?: string, fresh = context) => modelPicker(fresh, id, navigation, undefined, note, signIn, parent);
                 return modelRoleEditor(context, role,
-                  (assign, thinkingEffort) => modelPicker(context, undefined, new CatalogNavigation(), { role, assign, back, thinkingEffort }, undefined, signIn), back);
+                  (assign, thinkingEffort) => modelPicker(context, undefined, new CatalogNavigation(), { role, assign, back, thinkingEffort }, undefined, signIn), back, notice);
               });
             }
           }

@@ -30,12 +30,20 @@ export function shortenPath(target: string): string {
 
 /** Model identifier selected for requests by this host. */
 export function activeModelName(context: ShellRuntimeContext): string {
-  const logical = readLogicalModel(context.session.id);
-  if (logical) return `${logical.provider}/${logical.model}`;
-  const config = context.configuration.current.config;
-  const active = context.resolveConfigTarget?.(config, context.session.id)
-    ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
-  return active.model ?? active.provider;
+  const selected = readModelStatus(context);
+  return selected?.logical ? `${selected.logical.provider}/${selected.logical.model}`
+    : selected?.active.model ?? selected?.active.provider ?? 'unknown';
+}
+
+/** Display cannot grant a request target when the strict session reader refuses it. */
+function readModelStatus(context: ShellRuntimeContext) {
+  try {
+    const logical = readLogicalModel(context.session.id);
+    const config = context.configuration.current.config;
+    const active = context.resolveConfigTarget?.(config, context.session.id)
+      ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
+    return { logical, active };
+  } catch { return undefined; }
 }
 
 /**
@@ -59,19 +67,21 @@ export function readStatusFacts(
   live: LiveStatusFacts = {},
 ): StatusFacts {
   const { config, catalog } = context.configuration.current;
-  const logical = readLogicalModel(context.session.id);
-  const active = context.resolveConfigTarget?.(config, context.session.id)
-    ?? resolveProviderCredential({ runtimeConfig: config, pool: { sessionId: context.session.id } });
-  let activeBaseUrl = active.baseUrl;
+  const selected = readModelStatus(context);
+  const logical = selected?.logical;
+  const active = selected?.active;
+  let activeBaseUrl = active?.baseUrl;
   let activeEndpoint: string | undefined;
   try {
-    activeBaseUrl = providerCredentialBaseUrl(catalog, active);
-    activeEndpoint = providerCredentialEndpoint(catalog, active, activeBaseUrl) ?? DEFAULT_ENDPOINT_KIND;
+    if (active) {
+      activeBaseUrl = providerCredentialBaseUrl(catalog, active);
+      activeEndpoint = providerCredentialEndpoint(catalog, active, activeBaseUrl) ?? DEFAULT_ENDPOINT_KIND;
+    }
   } catch {
     activeEndpoint = undefined;
   }
   const usage = getSessionUsage(context.session.id);
-  const measured = active.model && activeEndpoint ? measuredPromptContext(context.session.id, {
+  const measured = active?.model && activeEndpoint ? measuredPromptContext(context.session.id, {
     ...(context.promptIdentity ?? {}), provider: active.provider, model: active.model, endpoint: activeEndpoint,
     ...(activeBaseUrl ? { endpointId: captureUsageAttribution({ provider: active.provider,
       model: active.model, baseUrl: activeBaseUrl }).endpointId } : {}) },
@@ -84,18 +94,19 @@ export function readStatusFacts(
   const { cost, usesAssumedRates, partial, zeroCostSupported } = estimateSessionCost(usage, (provider, model) =>
     resolveModelCost(catalog, provider, model),
   );
-  const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, baseUrl: activeBaseUrl,
-    configured: configuredContextWindow(config, active) });
+  const window = active ? resolveContextWindow({ catalog, provider: active.provider, model: active.model, baseUrl: activeBaseUrl,
+    configured: configuredContextWindow(config, active) }) : undefined;
   const preview = live.promptContext;
   // Keep the latest request footprint during busy work and refreshes; a stale
   // source remains explicit instead of reverting to an older measured prefix.
-  const contextFact = preview?.tokens !== undefined && preview.source !== 'unknown'
+  const contextFact = !selected ? { contextSource: 'unknown' as const }
+    : preview?.tokens !== undefined && preview.source !== 'unknown'
     ? { contextUsed: preview.tokens, contextSource: preview.source }
     : measured ? { contextUsed: measured.tokens, contextSource: 'measured' as const }
       : preview ? { contextSource: preview.source } : {};
   return {
-    model: logical ? `${logical.provider}/${logical.model}` : active.model ?? active.provider,
-    provider: logical?.provider ?? active.provider,
+    model: logical ? `${logical.provider}/${logical.model}` : active?.model ?? active?.provider ?? 'unknown',
+    provider: logical?.provider ?? active?.provider ?? 'unknown',
     branch: context.gitContext.branch ?? undefined,
     directory: shortenPath(context.projectRoot || path.resolve(".")),
     sessionId: context.session.id,
@@ -107,7 +118,7 @@ export function readStatusFacts(
     openTodos: getSessionTodos(context.session.id).filter((todo) => todo.status !== "done" && todo.status !== "dropped").length,
     // The denominator is the same resolution compaction uses, even when its
     // numerator is unknown after startup, restoration, or context replacement.
-    ...(logical ? {} : { contextWindow: window.window, contextWindowSource: window.source, contextWarning: window.warning }),
+    ...(!logical && window ? { contextWindow: window.window, contextWindowSource: window.source, contextWarning: window.warning } : {}),
     ...(logical && !preview ? {} : contextFact),
     ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),

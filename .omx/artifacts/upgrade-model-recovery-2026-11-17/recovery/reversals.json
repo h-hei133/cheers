@@ -1,0 +1,84 @@
+{
+  "status": "passed",
+  "cases": [
+    {
+      "name": "raw-cache-presence",
+      "exitCode": 1,
+      "tests": 19,
+      "failed": 8,
+      "assertionFailures": 8,
+      "restoredExactly": true,
+      "receipt": "reversal-raw-cache-presence.json",
+      "mainSourcesMutated": false
+    },
+    {
+      "name": "sticky-history-is-not-current-evidence",
+      "exitCode": 1,
+      "tests": 19,
+      "failed": 8,
+      "assertionFailures": 8,
+      "restoredExactly": true,
+      "receipt": "reversal-sticky-history-is-not-current-evidence.json",
+      "mainSourcesMutated": false
+    },
+    {
+      "name": "captured-write-premium",
+      "exitCode": 1,
+      "tests": 19,
+      "failed": 2,
+      "assertionFailures": 2,
+      "restoredExactly": true,
+      "receipt": "reversal-captured-write-premium.json",
+      "mainSourcesMutated": false
+    },
+    {
+      "name": "persisted-explicit-zero",
+      "exitCode": 1,
+      "tests": 19,
+      "failed": 4,
+      "assertionFailures": 4,
+      "restoredExactly": true,
+      "receipt": "reversal-persisted-explicit-zero.json",
+      "mainSourcesMutated": false
+    },
+    {
+      "name": "default-retained-tool-text",
+      "exitCode": 1,
+      "tests": 6,
+      "failed": 2,
+      "assertionFailures": 2,
+      "restoredExactly": true,
+      "receipt": "reversal-default-retained-tool-text.json",
+      "mainSourcesMutated": false
+    },
+    {
+      "name": "unavailable-target-context-is-unknown",
+      "exitCode": 1,
+      "tests": 31,
+      "failed": 2,
+      "assertionFailures": 2,
+      "restoredExactly": true,
+      "receipt": "reversal-unavailable-target-context-is-unknown.json",
+      "mainSourcesMutated": false
+    },
+    {
+      "name": "unverified-role-notice-survives-return",
+      "exitCode": 1,
+      "tests": 5,
+      "failed": 2,
+      "assertionFailures": 2,
+      "restoredExactly": true,
+      "receipt": "reversal-unverified-role-notice-survives-return.json",
+      "mainSourcesMutated": false
+    }
+  ],
+  "mainSourcesMutated": false,
+  "mainSourcesMatch": true,
+  "restoredExactly": true,
+  "failuresRetained": [
+    "reversals-first-setup-failure.json",
+    "reversals-ineffective-default.json",
+    "reversals-default-fragment-setup-failure.json"
+  ],
+  "postSplitReversal": true
+}

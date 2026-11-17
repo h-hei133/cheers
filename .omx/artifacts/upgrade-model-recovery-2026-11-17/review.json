@@ -1,0 +1,111 @@
+{
+  "reviewer": "/root/recovery_handoff_review",
+  "reviewedAt": "2026-11-17T05:35:00.126Z",
+  "verdict": "APPROVE",
+  "scope": [
+    "packages/ts-shell/src/cli/interactive/sessionFacts.ts",
+    "packages/ts-shell/src/cli/interactive/sessionFacts.test.ts",
+    "packages/ts-shell/src/cli/interactive/picker/model.ts",
+    "packages/ts-shell/src/cli/interactive/picker/model.test.ts",
+    "packages/ts-shell/src/cli/interactive/picker/model/snapshot.test.ts"
+  ],
+  "source": {
+    "packages/ts-shell/src/cli/interactive/sessionFacts.ts": "6d439ff22c60f9fa285ce81245d494a977b741e7354a1726d826944b8a3b422f",
+    "packages/ts-shell/src/cli/interactive/sessionFacts.test.ts": "7e2db8823011bd7f362745e7403c72bdd8953575495d326ffe0bd5f94b9d3589",
+    "packages/ts-shell/src/cli/interactive/picker/model.ts": "6dbbffc677cf8ff05de4474eb868b46d74af2a7969caa55424b2cbf9fe4f1149",
+    "packages/ts-shell/src/cli/interactive/picker/model.test.ts": "7d81fa9a417fc6f7dd13c71bc5edb5d56def525ca52e0e39eac34b2e0b37034f",
+    "packages/ts-shell/src/cli/interactive/picker/model/snapshot.test.ts": "6172ccd63aae0cb013f20680f596a3ee80c7c1a8bb6e084d8b22a5fb3353ff39"
+  },
+  "frozenSnapshot": ".tmp/history-cost-validation/current-sources.json",
+  "allSourceHashesMatchFrozen": true,
+  "findings": [],
+  "rationale": [
+    {
+      "file": "packages/ts-shell/src/cli/interactive/sessionFacts.ts",
+      "lines": [
+        33,
+        39,
+        70,
+        102,
+        121
+      ],
+      "reasoning": "readModelStatus confines exception recovery to presentation. A strict saved-model or target read failure produces unknown model/provider and context source, omits target-dependent context amount/window, and retains recorded usage, turns and cost. The resolver is reached only after the strict logical-model read succeeds."
+    },
+    {
+      "file": "packages/ts-shell/src/cli/interactive/picker/model.ts",
+      "lines": [
+        101,
+        118,
+        120,
+        208,
+        317,
+        352,
+        369,
+        450
+      ],
+      "reasoning": "Displayed saved selection comes from the captured validated baseline. Failed capture resolves prospective targets without session identity, suppresses active/current claims and shows every role as unknown. Captured activation and effort actions are absent on this path. apply delegates only installed actions or assignments, so disabled discovery cannot itself write."
+    },
+    {
+      "file": "packages/ts-shell/src/cli/interactive/picker/model/role.ts",
+      "lines": [
+        14,
+        15,
+        18,
+        51
+      ],
+      "reasoning": "Role inspection recaptures prepareModelRole authority. A still-unreadable state returns to the original role focus with the passed notice; repaired state requires a new explicit role inspection and admission before a write. captureModelChoice and strict durable readers were inspected as unchanged seams."
+    },
+    {
+      "file": "packages/ts-shell/src/cli/interactive/picker/model/snapshot.test.ts",
+      "lines": [
+        34,
+        54,
+        65,
+        69,
+        73,
+        76,
+        81
+      ],
+      "reasoning": "Standalone and accepted-configuration cases assert unknown roles, no active/current rows, no effort action, no writer call, unchanged corrupt bytes and config, sanitized presentation, preserved recovery focus/notice, strict request refusal and successful explicitly recaptured editing after restoration. Existing catalogue coverage was moved from model.test.ts without assertion removal."
+    }
+  ],
+  "unchangedSeamsInspected": [
+    "packages/ts-shell/src/core/commands/model/choice.ts",
+    "packages/ts-shell/src/core/commands/model/role.ts",
+    "packages/ts-shell/src/session/model/state.ts",
+    "packages/ts-shell/src/session/model/logical.ts",
+    "packages/ts-shell/src/cli/interactive/picker/model/role.ts"
+  ],
+  "execution": {
+    "testsRunByReviewer": false,
+    "buildsRunByReviewer": false,
+    "verificationGatesRunByReviewer": false,
+    "normproofRunByReviewer": false,
+    "providerCallsRunByReviewer": false,
+    "productionFilesEditedByReviewer": false,
+    "sharedDocumentsEditedByReviewer": false,
+    "onlyWrittenFile": ".tmp/history-cost-validation/recovery-review.json"
+  },
+  "savedEvidenceInspected": {
+    "path": ".tmp/history-cost-validation/final-combined.json",
+    "executedByReviewer": false,
+    "files": 21,
+    "tests": 933,
+    "passed": 933,
+    "failed": 0,
+    "success": true
+  },
+  "parentReportedEvidence": {
+    "independentlyExecutedByReviewer": false,
+    "baselineAssertionFailures": 10,
+    "effectiveRecoveryReversals": 2,
+    "reversalRestoration": "exact",
+    "ownershipSplitPassedTests": 48
+  },
+  "limitations": [
+    "Bounded code review covers only the five scoped files and necessary unchanged reader/admission seams; separate provider usage and cache changes were not reviewed.",
+    "Saved combined validation includes separate cache changes and is not isolated evidence for a recovery-only commit.",
+    "No native unreadable-model UI probe was run, and this review does not claim native, real-provider, push or CI validation.",
+    "The previous reviewer produced no usable result; its silence was not treated as approval."
+  ]
+}

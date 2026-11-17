@@ -2732,3 +2732,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A native probe reports an unrestored output owner although the CLI child restored it, or overwrites one process's exit witness with another's.
 - **Root Cause:** The public launcher spawns the actual CLI; preload and exit observers run in both processes, so a single receipt conflates their owners.
 - **Rule:** Append witnesses with PID and parent PID, bind the captured output owner to the actual launched CLI process, and join its close before evaluating cleanup. Preserve failed observer receipts; launcher completion alone does not prove child settlement.
+
+### Unreadable Model Selection Must Keep Presentation Unknown And Recovery Available
+- **Symptom:** A saved-model read failure crashes status rendering and the picker return, or physical defaults appear as the session's current target after capture failed.
+- **Root Cause:** Presentation repeats the strict persisted-selection read instead of using its accepted capture; role reconstruction drops the original failure notice.
+- **Rule:** Keep strict request admission intact. Catch unavailable selection only in presentation, withhold target-dependent context/window facts and retain recorded usage. Decode the captured model-choice baseline for roles; failed capture keeps prospective models read-only and every role unknown. Carry the original notice and focus through the return; a new explicit edit must capture fresh authority after restoration.

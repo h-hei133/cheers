@@ -18,6 +18,32 @@ import { selectPooledConnection } from '../../core/auth/account/pool.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
 import { DEFAULT_ENDPOINT_KIND } from '../../provider/endpoints/index.js';
+import { SessionManager } from '../../session/SessionManager.js';
+import { readSessionModelEdit, readSessionModelStrict } from '../../session/model/state.js';
+
+it.each([false, true])('keeps unavailable model display separate from strict request admission (resolver: %s)', bound => {
+  const session = new SessionManager().createNew(testHome);
+  const statePath = readSessionModelEdit(session.id).statePath;
+  const original = fs.readFileSync(statePath);
+  const runtime = context(session.id);
+  if (bound) runtime.resolveConfigTarget = (config, sessionId) => resolveCliCredential(config, {}, {}, sessionId);
+  const resolver = bound ? vi.spyOn(runtime, 'resolveConfigTarget') : undefined;
+  const modelFailure = () => expect(() => readSessionModelStrict(session.id)).toThrow(/read-failed/);
+  recordSessionUsage(session.id, { model: 'opus-5', provider: 'openai', promptTokens: 1234, completionTokens: 6 });
+  fs.writeFileSync(statePath, '{unreadable');
+  try {
+    expect(activeModelName(runtime)).toBe('unknown');
+    const facts = readStatusFacts(runtime, { promptContext: { tokens: 1234, source: 'measured' } });
+    expect(facts).toMatchObject({ model: 'unknown', provider: 'unknown', sessionTokens: 1240, turns: 1, contextSource: 'unknown' });
+    expect(facts.contextUsed).toBeUndefined(); expect(facts.contextWindow).toBeUndefined();
+    if (resolver) expect(resolver).not.toHaveBeenCalled();
+    modelFailure();
+    expect(fs.readFileSync(statePath, 'utf8')).toBe('{unreadable');
+    fs.writeFileSync(statePath, original);
+    expect(activeModelName(runtime)).toBe('opus-5');
+    expect(readStatusFacts(runtime).contextWindow).toBe(200_000);
+  } finally { fs.writeFileSync(statePath, original); resetSessionUsage(session.id); }
+});
 
 let testHome: string;
 beforeEach(() => {
