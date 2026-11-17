@@ -1,0 +1,500 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { createServer } from 'node:http';
+import { spawn } from 'node:child_process';
+import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { channel } from 'node:diagnostics_channel';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { create as createTar } from 'tar';
+
+// Authored only: the main agent builds and executes this helper serially.
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const packageName = 'sdk-ui-signed';
+const sourceName = 'ui-fixture';
+const toolName = 'ext_sdk_ui_signed_worker_ui';
+const keyId = 'ui-publisher';
+const hash = value => createHash('sha256').update(value).digest('hex');
+const canonical = value => Array.isArray(value) ? `[${value.map(canonical).join(',')}]`
+  : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`
+    : JSON.stringify(value);
+const receipt = { schemaVersion: 1, task: 'E.5', status: 'not_run', platform: process.platform,
+  probeSha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), providerMode: 'synthetic',
+  realProviderExecution: 'not_run', publicCompiledSdk: false, signedInstallation: false, cases: [], lifecycle: [],
+  boundaries: [
+    'Compiled CLI marketplace/plugin commands own installation and grants; the SDK-bound public ExtensionService is a separate service over that same installed state.',
+    'The SDK boots against an empty isolated registry so its private service cannot duplicate public installed-tool ownership; the public service registers that installed tool on the captured SDK session.',
+    'The public ResourceLoader captureBinding contract supplies the original SDK shared host; no internal host lookup or facade is used.',
+    'The public service uses its original prepared script call with caller-supplied explicit allow-once approval and an empty hook dispatcher; the SDK private gate is unavailable.',
+    'The async TypeScript factory and exported run use the public script route. Named registered-tool dispatch is not exposed by the public service and is not claimed.',
+  ] };
+const previousEnv = new Map();
+const personalInputs = new Map();
+const children = new Set();
+const sockets = new Set();
+const serverEvents = [];
+const wire = { mainNative: 0, mainUndici: 0, mainPosts: 0, childNative: 0, childUndici: 0,
+  childPosts: 0, childReady: 0, foreignRequests: 0, serverPosts: 0 };
+let stage = 'setup';
+let privateRoot, workspace, storage, registryFile, sourcesFile, observerFile, observerLog;
+let server, authority, archiveBytes, manifest, compiled, sdk, ExtensionService, sourceBefore;
+let envelopeMode = 'valid', archiveMode = 'valid';
+let receiptFile = path.resolve(process.argv[2] ?? path.join(directory, 'signed-native.json'));
+
+function check(condition, code) {
+  if (condition) return;
+  const error = new Error(code); error.probeCode = code; throw error;
+}
+
+function setEnv(key, value) {
+  if (!previousEnv.has(key)) previousEnv.set(key, process.env[key]);
+  if (value === undefined) delete process.env[key]; else process.env[key] = value;
+}
+
+function held() {
+  let resolve;
+  const promise = new Promise(accept => { resolve = accept; });
+  return { promise, resolve };
+}
+
+async function bounded(promise, ms, code) {
+  let timer;
+  try { return await Promise.race([promise, new Promise((_, reject) => {
+    timer = setTimeout(() => { const error = new Error(code); error.probeCode = code; reject(error); }, ms);
+  })]); } finally { clearTimeout(timer); }
+}
+
+async function until(predicate, code, ms = 6000) {
+  const end = Date.now() + ms;
+  while (!predicate()) {
+    check(Date.now() < end, code);
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+}
+
+function sourceHashes() {
+  return Object.fromEntries([
+    'packages/ts-shell/src/config/state.ts',
+    'packages/ts-shell/src/sdk/agentSession.ts',
+    'packages/ts-shell/src/sdk/ui.ts',
+    'packages/ts-shell/src/sdk/resourceLoader.ts',
+    'packages/ts-shell/src/cli/runtime/extensions/host.ts',
+    'packages/ts-shell/src/extensions/service.ts',
+    'packages/ts-shell/src/extensions/registry/client.ts',
+    'packages/ts-shell/src/extensions/lifecycle/install.ts',
+    'packages/ts-shell/src/extensions/lifecycle/grants.ts',
+    'packages/ts-shell/src/extensions/runtime/execute.ts',
+    'packages/ts-shell/src/extensions/runtime/inProcessLoader.ts',
+    'packages/ts-shell/src/extensions/runtime/workerSource.ts',
+  ].map(file => [file, hash(fs.readFileSync(path.join(repo, file)))]));
+}
+
+function observeMain({ request }, kind) {
+  if (!request) return;
+  wire[kind === 'native' ? 'mainNative' : 'mainUndici']++;
+  if (String(request.method).toUpperCase() === 'POST') wire.mainPosts++;
+  const target = kind === 'native' ? String(request.getHeader?.('host') ?? request.host ?? '') : String(request.origin ?? '');
+  if (target !== authority && target !== `http://${authority}`) wire.foreignRequests++;
+}
+const nativeChannel = channel('http.client.request.start');
+const undiciChannel = channel('undici:request:create');
+const onNative = message => observeMain(message, 'native');
+const onUndici = message => observeMain(message, 'undici');
+
+async function command(file, args, cwd = workspace) {
+  let output = '', bytes = 0, overflow = false;
+  const child = spawn(file, args, { cwd, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  children.add(child);
+  const capture = chunk => {
+    bytes += chunk.length;
+    if (bytes > 256 * 1024) { overflow = true; child.kill('SIGTERM'); return; }
+    output += chunk.toString('utf8');
+  };
+  child.stdout.on('data', capture); child.stderr.on('data', capture);
+  let killTimer;
+  const timer = setTimeout(() => {
+    child.kill('SIGTERM'); killTimer = setTimeout(() => child.kill('SIGKILL'), 750);
+  }, 15_000);
+  try {
+    const exit = await new Promise(resolve => {
+      child.once('error', () => resolve({ code: null, signal: 'spawn_error' }));
+      child.once('close', (code, signal) => resolve({ code, signal }));
+    });
+    check(!overflow, 'native-output-bound');
+    return { ...exit, output, bytes, outputSha256: hash(output) };
+  } finally { clearTimeout(timer); clearTimeout(killTimer); children.delete(child); }
+}
+
+async function cli(label, text, expected) {
+  stage = label;
+  const result = await command(process.execPath, ['--max-old-space-size=512', '--import', observerFile, compiled.entry,
+    '--project', workspace, '--no-context-files', '--no-skills',
+    '--non-interactive-approval', 'allow-once', '--print', text]);
+  // Command exit zero alone does not prove a lifecycle operation succeeded.
+  check(result.code === 0 && !result.signal, `${label}-cli-exit`);
+  const confirmed = /Effect: (?:saved|published); durability: confirmed\./.test(result.output);
+  const refused = /(?:Extension|Marketplace) refused:/.test(result.output);
+  check(expected === 'confirmed' ? confirmed && !refused : expected.test(result.output) && !confirmed,
+    `${label}-effect-receipt`);
+  receipt.lifecycle.push({ code: label, cliExit: result.code, effect: confirmed ? 'confirmed' : 'refused',
+    outputBytes: result.bytes, outputSha256: result.outputSha256 });
+}
+
+function state() {
+  return fs.existsSync(registryFile) ? JSON.parse(fs.readFileSync(registryFile, 'utf8')) : { packages: [] };
+}
+
+function decoded(observation, expectedTitle, answer, continuation, catalogue) {
+  check(observation.kind === 'returned', `${expectedTitle}-service-return`);
+  let value;
+  try { value = JSON.parse(observation.output.split(/\r?\n/)[0]); } catch { check(false, `${expectedTitle}-worker-output`); }
+  check(value.probe === 'E5_SIGNED_UI' && value.factoryAwaited === true && value.title === expectedTitle,
+    `${expectedTitle}-async-factory`);
+  check(value.answer === answer && value.continuation === continuation, `${expectedTitle}-answer`);
+  check(canonical(value.counts) === canonical(catalogue.counts) && typeof value.catalogueText === 'string'
+    && hash(value.catalogueText) === catalogue.sha256,
+    `${expectedTitle}-real-catalogue`);
+  check(value.hasTool && value.activeTool && value.coreRead && value.pluginCommand, `${expectedTitle}-catalogue-consumers`);
+  check(observation.output.includes(`Extension execution: completed; exit 0; mode in-process; source ${sourceName}; SHA256 ${receipt.archiveSha256}.`),
+    `${expectedTitle}-actual-worker-receipt`);
+  return value;
+}
+
+async function runMode(mode) {
+  stage = mode;
+  const inputs = [], notifications = [], hooks = [], approvals = [], workers = [];
+  const pending = new Map(['Before publication', 'After publication', 'Before cancellation', 'After cancellation', 'Before disposal']
+    .map(title => [title, held()]));
+  const host = {
+    input(title, _placeholder, options) {
+      inputs.push({ title, signal: options?.signal });
+      return pending.get(title)?.promise ?? Promise.reject(new Error('unexpected-ui-dialog'));
+    },
+    notify(message) { notifications.push(message); },
+  };
+  let shared, bindings = 0, session, service, release;
+  class CapturingLoader extends sdk.DefaultResourceLoader {
+    captureBinding() {
+      const bind = super.captureBinding();
+      return bridge => { shared = bridge; bindings++; return bind(bridge); };
+    }
+  }
+  const loader = new CapturingLoader({ cwd: workspace, noExtensions: true, noSkills: true, noThemes: true, noContextFiles: true });
+  try {
+    // The SDK's own private service must not register the same tool as the
+    // separately constructed public installed service in this session.
+    setEnv('CHEERS_EXTENSIONS_FILE', path.join(storage, 'extensions', `sdk-bootstrap-${mode.replace(/[^a-z]/g, '_')}.json`));
+    try {
+      await loader.reload();
+      session = (await sdk.createAgentSession({ cwd: workspace, resourceLoader: loader,
+        permissionScope: 'ask', nonInteractiveApproval: 'allow-once', ...(mode === 'options.ui' ? { ui: host } : {}) })).session;
+    } finally { setEnv('CHEERS_EXTENSIONS_FILE', registryFile); }
+    if (mode === 'bindUi') release = session.bindUi(host);
+    check(shared && bindings === 1, 'public-original-host-binding');
+    const original = shared;
+    const current = () => {
+      check(session.runtimeContext.configuration.current.config.configValidation.valid, 'configuration-unavailable');
+      // This original host consumer supplies its real disposal/session admission.
+      shared.getAllTools();
+    };
+    service = new ExtensionService({ root: workspace, extensionHost: original, check: current, offline: () => true,
+      denyRules: () => [], assertWorkspace: write => { current(); check(!write, 'unexpected-write-grant'); },
+      gate: () => ({ sessionId: session.sessionId, workspaceRoot: workspace, permissionScope: 'ask', agentMode: 'build',
+        admission: () => { try { current(); return undefined; } catch { return 'Original SDK host authority is unavailable.'; } },
+        // Public assembly contract: no SDK-private dispatcher is exported.
+        hooks: { dispatch: async payload => { hooks.push(payload.eventName); return { decision: 'allow' }; } },
+        emit: () => {}, escalationPromptHandler: async prompt => {
+          approvals.push(prompt.context.toolName); return { decision: 'allow-once' };
+        } }) });
+    const record = service.store.read().packages.find(entry => entry.name === packageName);
+    check(record && service.errors.length === 0, 'public-installed-service-state');
+    service.current(record, 'script:main'); service.current(record, 'tool:worker_ui');
+    const all = shared.getAllTools(), active = shared.getActiveTools(), commands = shared.getCommands();
+    const catalogue = { counts: { all: all.length, active: active.length, commands: commands.length },
+      sha256: hash(canonical({ all: [...all].sort(), active: [...active].sort(), commands: [...commands].sort() })) };
+    check(all.includes(toolName) && active.includes(toolName) && all.includes('read') && commands.includes('plugin'), 'installed-real-catalogue');
+    const invoke = title => {
+      const observed = { done: false };
+      observed.promise = service.run(packageName, 'main', [title]).then(output => {
+        observed.done = true; return { kind: 'returned', output };
+      }, () => { observed.done = true; return { kind: 'refused' }; });
+      workers.push(observed.promise); return observed;
+    };
+    const first = invoke('Before publication');
+    await until(() => inputs.length === 1, `${mode}-first-dialog`);
+    check(inputs[0].signal && !inputs[0].signal.aborted, 'original-dialog-admitted');
+    const configuration = session.runtimeContext.configuration;
+    const before = configuration.current, background = configuration.backgroundSignal, substrate = configuration.substrateRevision;
+    const publication = configuration.publish(configuration.begin(before.binding), before.requested, before.binding);
+    check(publication.status === 'applied' && configuration.current.revision > before.revision
+      && canonical(configuration.current.binding) === canonical(before.binding) && configuration.substrateRevision === substrate,
+    'real-same-substrate-publication');
+    check(background.aborted && inputs[0].signal.aborted, 'publication-cancels-original-dialog');
+    decoded(await bounded(first.promise, 6000, 'original-worker-drain'), 'Before publication', null, null, catalogue);
+    check(inputs.length === 1 && notifications.length === 0, 'retired-worker-continuation-suppressed');
+
+    // No SDK api.ui access, host replacement, or explicit rebinding occurs here.
+    const fresh = invoke('After publication');
+    await until(() => inputs.length === 2, `${mode}-fresh-dialog`);
+    check(inputs[1].title === 'After publication' && !inputs[1].signal.aborted, 'renewed-original-host-dialog');
+    pending.get('Before publication').resolve('Late original answer');
+    await new Promise(resolve => setImmediate(resolve));
+    check(!fresh.done && !inputs[1].signal.aborted && notifications.length === 0, 'late-original-cannot-settle-fresh');
+    pending.get('After publication').resolve('Fresh worker answer');
+    decoded(await bounded(fresh.promise, 6000, 'fresh-worker-drain'), 'After publication', 'Fresh worker answer', null, catalogue);
+    check(notifications.length === 1 && notifications[0] === 'Answered After publication', 'fresh-notification');
+
+    const cancelled = invoke('Before cancellation');
+    await until(() => inputs.length === 3, `${mode}-cancellation-dialog`);
+    await bounded(session.abort(), 6000, 'sdk-abort-drain');
+    check(inputs[2].signal.aborted, 'sdk-abort-cancels-dialog');
+    decoded(await bounded(cancelled.promise, 6000, 'cancelled-worker-drain'), 'Before cancellation', null, null, catalogue);
+    check(inputs.length === 3 && notifications.length === 1, 'cancelled-continuation-suppressed');
+    const afterCancel = invoke('After cancellation');
+    await until(() => inputs.length === 4, `${mode}-post-cancellation-dialog`);
+    check(!inputs[3].signal.aborted, 'fresh-after-cancellation-admitted');
+    pending.get('Before cancellation').resolve('Late cancelled answer');
+    await new Promise(resolve => setImmediate(resolve));
+    check(!afterCancel.done && !inputs[3].signal.aborted, 'late-cancelled-cannot-settle-fresh');
+    pending.get('After cancellation').resolve('Fresh cancellation answer');
+    decoded(await bounded(afterCancel.promise, 6000, 'post-cancellation-worker-drain'),
+      'After cancellation', 'Fresh cancellation answer', null, catalogue);
+    check(notifications.length === 2 && notifications[1] === 'Answered After cancellation', 'post-cancellation-notification');
+    check(bindings === 1 && shared === original && service.options.extensionHost === original, 'original-host-retained');
+
+    const disposing = invoke('Before disposal');
+    await until(() => inputs.length === 5, `${mode}-disposal-dialog`);
+    const disposal = session.dispose();
+    check(session.dispose() === disposal, 'sdk-disposal-shared-promise');
+    await bounded(disposal, 8000, 'sdk-disposal-drain');
+    check(inputs[4].signal.aborted, 'sdk-disposal-cancels-dialog');
+    const disposedResult = await bounded(disposing.promise, 6000, 'disposed-worker-drain');
+    decoded(disposedResult, 'Before disposal', null, null, catalogue);
+    check(/Extension authority changed after execution|Extension execution authority changed after ordinary hooks|Original SDK host authority is unavailable/.test(disposedResult.output),
+      'disposed-result-preserves-authority-refusal');
+    const refused = await bounded(invoke('After disposal').promise, 4000, 'disposed-fresh-refusal');
+    check(refused.kind === 'refused' || !refused.output.includes('E5_SIGNED_UI')
+      && /authority|changed|blocked|cancelled/i.test(refused.output), 'disposed-host-refuses-fresh-work');
+    pending.get('Before disposal').resolve('Late disposed answer');
+    await new Promise(resolve => setImmediate(resolve));
+    check(inputs.length === 5 && notifications.length === 2, 'disposed-host-effects-suppressed');
+    check(approvals.length >= 5 && hooks.includes('PermissionRequest') && hooks.includes('PreToolUse')
+      && hooks.includes('PostToolUse') && !service.store.outcomes.some(entry => entry.durability === 'unknown'),
+    'ordinary-approved-execution-and-confirmed-drainage');
+    receipt.cases.push({ mode, status: 'passed', originalRawHostRetained: true, asyncFactoryAwaited: true,
+      sdkBootstrapRegistry: 'empty-isolated', installedRegistrationOwner: 'public-ExtensionService',
+      installedCatalogue: catalogue, publicationApplied: true, revisionDelta: configuration.current.revision - before.revision,
+      substrateUnchanged: true, oldDialogCancelled: true, oldContinuationSuppressed: true,
+      freshDialogAdmitted: true, lateOldSettlementIsolated: true, sdkAbortCancelled: true,
+      freshAfterAbortAdmitted: true, disposalCancelled: true, disposedResultRetainsAuthorityRefusal: true,
+      disposedFreshRefused: true, dialogs: inputs.length, notifications: notifications.length,
+      ordinaryApprovals: approvals.length, ordinaryHookEvents: hooks.length });
+  } finally {
+    for (const item of pending.values()) item.resolve(undefined);
+    const failures = [];
+    try { await service?.cancel(); } catch { failures.push('service-cancel'); }
+    try { await bounded(Promise.allSettled(workers), 8000, 'worker-cleanup-bound'); } catch { failures.push('workers'); }
+    try { release?.(); } catch { failures.push('ui-release'); }
+    try { await service?.close(); } catch { failures.push('service-close'); }
+    try { await session?.dispose(); } catch { failures.push('session-dispose'); }
+    check(failures.length === 0, 'native-case-cleanup');
+  }
+}
+
+try {
+  check(receiptFile.startsWith(`${path.join(repo, '.tmp')}${path.sep}`), 'receipt-path-boundary');
+  sourceBefore = sourceHashes(); receipt.source = sourceBefore;
+  const realHome = process.env.USERPROFILE || process.env.HOME || os.homedir();
+  const names = ['config.json', 'auth.json', 'models.json', 'models-cache.json', 'marketplaces.json', 'plugins.json', 'extensions/registry.json'];
+  for (const dir of ['.cheers', '.cheer', '.private-agents', '.coding-agents']) for (const name of names) {
+    const file = path.join(realHome, dir, name); personalInputs.set(file, fs.existsSync(file) ? hash(fs.readFileSync(file)) : null);
+  }
+  for (const key of ['CHEERS_MARKETPLACES_FILE', 'CHEERS_EXTENSIONS_FILE', 'CHEERS_PLUGINS_FILE']) {
+    const file = process.env[key]; if (file) personalInputs.set(file, fs.existsSync(file) ? hash(fs.readFileSync(file)) : null);
+  }
+  privateRoot = fs.mkdtempSync(path.join(directory, 'signed-private-')); fs.chmodSync(privateRoot, 0o700);
+  workspace = path.join(privateRoot, 'workspace'); const isolatedHome = path.join(privateRoot, 'home');
+  storage = path.join(isolatedHome, '.cheers');
+  fs.mkdirSync(workspace, { recursive: true }); fs.mkdirSync(storage, { recursive: true });
+  registryFile = path.join(storage, 'extensions/registry.json'); sourcesFile = path.join(storage, 'marketplaces.json');
+  for (const key of Object.keys(process.env)) if (/API_KEY|TOKEN|SECRET|AUTH|^AWS_|^GOOGLE_|^GEMINI_|^OPENAI_|^ANTHROPIC_|^AZURE_|^VERTEX_|^CHEERS_PROVIDER/.test(key)) setEnv(key, undefined);
+  for (const [key, value] of Object.entries({ HOME: isolatedHome, USERPROFILE: isolatedHome, CHEERS_TEST_ROOT: privateRoot,
+    GIT_CEILING_DIRECTORIES: privateRoot, CHEERS_PROFILE: 'default', CHEERS_PROVIDER_MODE: 'synthetic', CHEERS_OFFLINE: '0',
+    CHEERS_MARKETPLACES_FILE: sourcesFile, CHEERS_EXTENSIONS_FILE: registryFile, CHEERS_PLUGINS_FILE: path.join(storage, 'plugins.json'),
+    CHEERS_LOG_DIR: path.join(storage, 'logs'), NODE_OPTIONS: '' })) setEnv(key, value);
+  for (const key of ['CHEERS_PROFILE_HANDOFF', 'CHEERS_STREAM_TRACE_PATH', 'CHEERS_MODEL_PRESETS_FILE', 'CHEERS_REFRESH_LEASES_FILE',
+    'CHEERS_BROWSER_RECEIPT_CACHE_ROOT', 'CHEERS_BROWSER_RECEIPT_CACHE_MANIFEST']) setEnv(key, undefined);
+  fs.writeFileSync(path.join(storage, 'config.json'), JSON.stringify({ agentMode: 'build', offline: false, toolDiscovery: 'full' }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: 'openai', providerCredentials: {} }), { mode: 0o600 });
+  check((await command('git', ['init', '-q', workspace])).code === 0, 'isolated-git-workspace');
+  const pkg = JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/package.json'), 'utf8'));
+  const { checkBuild } = await import(pathToFileURL(path.join(repo, 'scripts/start-lib.mjs')).href);
+  compiled = checkBuild({ root: repo, dist: path.join(repo, 'packages/ts-shell/dist'), version: pkg.version, executablePolicy: 'ignore' });
+  check(compiled.ok, 'public-compiled-build-unavailable');
+  receipt.buildId = compiled.manifest.buildId; receipt.buildInputsDigest = compiled.manifest.inputsDigest;
+  receipt.publicEntries = Object.fromEntries(['.', './extensions'].map(name => {
+    const declared = pkg.exports[name]; const target = declared?.import ?? declared?.default;
+    check(typeof target === 'string' && target.startsWith('./dist/'), 'public-export-unavailable');
+    return [name, { path: target, sha256: hash(fs.readFileSync(path.join(repo, 'packages/ts-shell', target))) }];
+  }));
+
+  const signing = generateKeyPairSync('ed25519');
+  const publicPem = signing.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+  receipt.trustFingerprint = hash(signing.publicKey.export({ type: 'spki', format: 'der' }));
+  fs.writeFileSync(path.join(workspace, 'publisher.pem'), publicPem, { mode: 0o600 });
+  manifest = { schema: 1, name: packageName, version: '1.0.0', description: 'Signed SDK UI validation fixture',
+    permissions: { workspace: 'read', network: 'none' }, skills: [], scripts: [{ name: 'main', path: 'scripts/worker.ts' }],
+    commands: [], tools: [{ name: 'worker_ui', description: 'Ask through the original shared SDK host.', script: 'main' }] };
+  const workerSource = `
+import { defineExtension } from '@cheers/extension-api';
+let factoryAwaited = false;
+export default defineExtension(async api => {
+  await Promise.resolve();
+  api.registerTool({ name: 'worker_ui', description: 'Ask through the original shared SDK host.',
+    argsSchema: { type: 'object' }, execute: async () => ({ success: true, output: 'REGISTERED_WORKER_UI' }) });
+  factoryAwaited = true;
+});
+export async function run({ args, api }) {
+  if (!factoryAwaited) throw new Error('ASYNC_FACTORY_NOT_AWAITED');
+  const title = String(args[0]);
+  const all = await api.getAllTools(), active = await api.getActiveTools(), commands = await api.getCommands();
+  const canonical = value => Array.isArray(value) ? '[' + value.map(canonical).join(',') + ']'
+    : value && typeof value === 'object' ? '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}'
+      : JSON.stringify(value);
+  // The worker cannot import arbitrary Node modules. The observer hashes this
+  // exact catalogue text against a separate original-host acquisition.
+  const catalogueText = canonical({ all: [...all].sort(), active: [...active].sort(), commands: [...commands].sort() });
+  const answer = await api.ui.input(title);
+  const continuation = title.startsWith('Before ') ? await api.ui.input('Retired ' + title) : undefined;
+  await api.ui.notify('Answered ' + title);
+  return { success: true, output: JSON.stringify({ probe: 'E5_SIGNED_UI', factoryAwaited, title,
+    answer: answer ?? null, continuation: continuation ?? null,
+    counts: { all: all.length, active: active.length, commands: commands.length }, catalogueText,
+    hasTool: all.includes('${toolName}'), activeTool: active.includes('${toolName}'), coreRead: all.includes('read'), pluginCommand: commands.includes('plugin') }) };
+}
+`;
+  receipt.workerSourceSha256 = hash(workerSource);
+  const archiveSource = path.join(privateRoot, 'archive-source'); fs.mkdirSync(path.join(archiveSource, 'scripts'), { recursive: true });
+  fs.writeFileSync(path.join(archiveSource, 'extension.json'), JSON.stringify(manifest));
+  fs.writeFileSync(path.join(archiveSource, 'scripts/worker.ts'), workerSource);
+  const archiveFile = path.join(privateRoot, 'fixture.tgz');
+  await createTar({ gzip: true, portable: true, cwd: archiveSource, file: archiveFile }, ['extension.json', 'scripts']);
+  archiveBytes = fs.readFileSync(archiveFile); receipt.archiveSha256 = hash(archiveBytes); receipt.archiveBytes = archiveBytes.length;
+  server = createServer((request, response) => {
+    const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
+    const kind = pathname === `/registry/v1/packages/${packageName}` ? 'details'
+      : pathname === '/registry/archives/1.0.0.tgz' ? 'archive' : 'unexpected';
+    serverEvents.push({ stage, kind, envelopeMode, archiveMode });
+    if (request.method === 'POST') wire.serverPosts++;
+    if (request.method !== 'GET' || kind === 'unexpected') { response.writeHead(404); response.end(); return; }
+    if (kind === 'archive') {
+      const body = Buffer.from(archiveBytes); if (archiveMode === 'tampered') body[body.length - 1] ^= 1;
+      response.writeHead(200, { 'content-type': 'application/gzip', 'content-length': body.length }); response.end(body); return;
+    }
+    const payload = { protocol: 'extension-registry/v1', name: packageName,
+      versions: [{ manifest, digest: receipt.archiveSha256, url: `http://${authority}/registry/archives/1.0.0.tgz` }] };
+    const signature = envelopeMode === 'tampered' ? Buffer.alloc(64).toString('base64')
+      : sign(null, Buffer.from(canonical(payload)), signing.privateKey).toString('base64');
+    const body = JSON.stringify({ payload, keyId, signature });
+    response.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }); response.end(body);
+  });
+  server.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); authority = `127.0.0.1:${server.address().port}`;
+  observerFile = path.join(privateRoot, 'observer.mjs'); observerLog = path.join(privateRoot, 'wire.jsonl');
+  fs.writeFileSync(observerFile, `import fs from 'node:fs'; import { channel } from 'node:diagnostics_channel';
+const file = ${JSON.stringify(observerLog)}, authority = ${JSON.stringify(authority)};
+const note = value => fs.appendFileSync(file, JSON.stringify(value) + '\\n', { mode: 0o600 });
+note({ kind: 'ready' });
+channel('http.client.request.start').subscribe(({request}) => {
+  const target = String(request?.getHeader?.('host') ?? request?.host ?? '');
+  note({ kind: 'native', post: String(request?.method).toUpperCase() === 'POST', foreign: target !== authority });
+});
+channel('undici:request:create').subscribe(({request}) => {
+  note({ kind: 'undici', post: String(request?.method).toUpperCase() === 'POST', foreign: String(request?.origin) !== 'http://' + authority });
+});
+`, { mode: 0o600 });
+  nativeChannel.subscribe(onNative); undiciChannel.subscribe(onUndici);
+  await cli('source-add', `/marketplace add ${sourceName} http://${authority}/registry`, 'confirmed');
+  await cli('source-trust', `/marketplace trust ${sourceName} ${keyId} publisher.pem`, 'confirmed');
+  const source = JSON.parse(fs.readFileSync(sourcesFile, 'utf8')).find(entry => entry.name === sourceName);
+  check(source?.trust?.fingerprint === receipt.trustFingerprint && source.trust.keyId === keyId
+    && source.trust.publicKey === publicPem && source.trust.provenance.startsWith('explicit-user-file:'), 'actual-explicit-trust');
+  check(state().packages.length === 0 && serverEvents.length === 0, 'registration-does-not-install');
+  envelopeMode = 'tampered';
+  await cli('bad-signature', `/plugin install ${sourceName}:${packageName}@1.0.0`, /Extension refused: Untrusted registry signature\./);
+  check(state().packages.length === 0 && !serverEvents.some(entry => entry.kind === 'archive'), 'signature-refusal-before-archive');
+  envelopeMode = 'valid'; archiveMode = 'tampered';
+  await cli('bad-archive', `/plugin install ${sourceName}:${packageName}@1.0.0`, /Extension archive integrity mismatch or size limit\./);
+  check(state().packages.length === 0 && !fs.existsSync(path.join(path.dirname(registryFile), 'packages', packageName, receipt.archiveSha256)),
+    'bad-archive-not-installed');
+  archiveMode = 'valid';
+  await cli('signed-install', `/plugin install ${sourceName}:${packageName}@1.0.0`, 'confirmed');
+  const installed = state().packages.find(entry => entry.name === packageName);
+  check(installed && installed.active.digest === receipt.archiveSha256 && installed.active.source === sourceName
+    && installed.active.sourceIdentity === hash(canonical(source)) && installed.active.trustFingerprint === receipt.trustFingerprint
+    && canonical(installed.active.manifest) === canonical(manifest) && installed.active.storage.length > 0
+    && installed.active.files['scripts/worker.ts'] === receipt.workerSourceSha256
+    && Object.keys(installed.activation).length === 0, 'signed-installed-provenance');
+  check(hash(fs.readFileSync(path.join(path.dirname(registryFile), 'packages', packageName, receipt.archiveSha256, 'scripts/worker.ts')))
+    === receipt.workerSourceSha256, 'downloaded-installed-worker-bytes');
+  await cli('enable', `/plugin enable ${packageName}`, 'confirmed');
+  check(state().packages[0].activation[fs.realpathSync(workspace)].enabled
+    && state().packages[0].activation[fs.realpathSync(workspace)].grants.length === 0, 'enable-does-not-grant');
+  await cli('script-grant', `/plugin grant ${packageName} script:main`, 'confirmed');
+  await cli('tool-grant', `/plugin grant ${packageName} tool:worker_ui`, 'confirmed');
+  const activation = state().packages[0].activation[fs.realpathSync(workspace)];
+  check(activation.enabled && canonical([...activation.grants].sort()) === canonical(['script:main', 'tool:worker_ui']), 'actual-separate-grants');
+  receipt.signedInstallation = true; receipt.sourceIdentity = installed.active.sourceIdentity;
+  receipt.inventoryFiles = Object.keys(installed.active.files).length;
+  setEnv('CHEERS_OFFLINE', '1');
+  sdk = await import(pathToFileURL(path.join(repo, 'packages/ts-shell', pkg.exports['.'].import)).href);
+  ({ ExtensionService } = await import(pathToFileURL(path.join(repo, 'packages/ts-shell', pkg.exports['./extensions'].import)).href));
+  check(typeof sdk.createAgentSession === 'function' && typeof sdk.DefaultResourceLoader === 'function'
+    && typeof ExtensionService === 'function', 'public-sdk-exports');
+  receipt.publicCompiledSdk = true;
+  await runMode('options.ui');
+  await runMode('bindUi');
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failure = { stage, code: error?.probeCode ?? 'unexpected-error' }; process.exitCode = 1;
+} finally {
+  nativeChannel.unsubscribe(onNative); undiciChannel.unsubscribe(onUndici);
+  if (observerLog && fs.existsSync(observerLog)) {
+    try { for (const line of fs.readFileSync(observerLog, 'utf8').trim().split('\n').filter(Boolean)) {
+      const value = JSON.parse(line);
+      if (value.kind === 'ready') wire.childReady++;
+      if (value.kind === 'native') wire.childNative++;
+      if (value.kind === 'undici') wire.childUndici++;
+      if (value.post) wire.childPosts++; if (value.foreign) wire.foreignRequests++;
+    } } catch { receipt.status = 'failed'; receipt.wireFailure = 'observer-log-unreadable'; process.exitCode = 1; }
+  }
+  receipt.wire = wire; receipt.registryRequests = serverEvents;
+  receipt.zeroProviderRequests = wire.mainPosts + wire.childPosts + wire.serverPosts === 0;
+  receipt.wirePositiveControl = wire.childNative >= serverEvents.filter(entry => entry.kind !== 'unexpected').length
+    && wire.childReady === receipt.lifecycle.length && serverEvents.filter(entry => entry.kind === 'details').length >= 3;
+  if (receipt.status === 'passed' && (!receipt.zeroProviderRequests || !receipt.wirePositiveControl || wire.foreignRequests > 0
+    || serverEvents.some(entry => entry.kind === 'unexpected'))) {
+    receipt.status = 'failed'; receipt.wireFailure = 'zero-provider-or-loopback-observation'; process.exitCode = 1;
+  }
+  for (const child of children) child.kill('SIGKILL');
+  for (const socket of sockets) socket.destroy();
+  if (server) await bounded(new Promise(resolve => server.close(resolve)), 2500, 'registry-server-cleanup')
+    .catch(() => { receipt.status = 'failed'; receipt.cleanupFailure = 'registry-server'; process.exitCode = 1; });
+  for (const [key, value] of previousEnv) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  try {
+    receipt.personalInputsUnchanged = [...personalInputs].every(([file, before]) => (fs.existsSync(file) ? hash(fs.readFileSync(file)) : null) === before);
+    receipt.personalInputsChecked = personalInputs.size;
+    receipt.sourceUnchanged = sourceBefore !== undefined && canonical(sourceHashes()) === canonical(sourceBefore);
+    if (privateRoot) fs.rmSync(privateRoot, { recursive: true, force: true });
+    receipt.privateStateRemoved = privateRoot === undefined || !fs.existsSync(privateRoot);
+  } catch { receipt.privateStateRemoved = false; }
+  if (!receipt.personalInputsUnchanged || !receipt.sourceUnchanged || !receipt.privateStateRemoved) {
+    receipt.status = 'failed'; receipt.cleanupFailure ??= 'private-state-or-input-identity'; process.exitCode = 1;
+  }
+  if (receiptFile.startsWith(`${path.join(repo, '.tmp')}${path.sep}`)) {
+    fs.mkdirSync(path.dirname(receiptFile), { recursive: true });
+    fs.writeFileSync(receiptFile, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+  }
+  process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
+}

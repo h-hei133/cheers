@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-17",
+  "status": "counterexamples_reproduced",
+  "productionUnchangedDuringRed": true,
+  "tests": 4,
+  "passedControls": 2,
+  "genuineAssertionFailures": 2,
+  "failure": "After accepted same-binding configuration publication, the fresh SDK input hook reaches no retained UI host; observed input callback count remains 1 instead of 2.",
+  "variants": ["options.ui", "bindUi"],
+  "priorAssertionsPassed": ["original dialog was called", "publication was applied with unchanged binding/substrate", "old dialog was cancelled", "old continuation/effects were refused"],
+  "laterHarnessCorrection": "Unsupported toHaveBeenCalledExactlyOnceWith is replaced by exact call count and call argument assertions. Original red failed before reaching that matcher.",
+  "scope": "Same-binding UI renewal; explicit release/dispose and changed session/workspace/trust must still revoke."
+}

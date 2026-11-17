@@ -1,0 +1,48 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = process.cwd();
+const dir = path.join(root, '.wiki/refactor/upgrade');
+const delivery = '../../../.omx/artifacts/upgrade-ui-discovery-2026-11-17/delivery.json';
+for (const file of ['.tmp/ui-renewal-validation/final-integrated.json', '.tmp/ui-renewal-validation/signed-native.json',
+  '.tmp/ui-renewal-validation/package-native.json', '.tmp/discovery-validation/native.json']) {
+  const value = JSON.parse(fs.readFileSync(path.join(root, file)));
+  if (!(value.success === true || value.status === 'passed')) throw new Error('Acceptance receipt is not passed: ' + file);
+}
+const ui = '- [x] **E.5** TS 文件／异步工厂及共享宿主：Linux本地验收完成。原共享host在新UI调用前刷新当前snapshot，SDK loader／inline／file／installed worker共用同owner；旧调用保持取消，blocked publication独立撤权，修正后需显式新binding。七源文件独立APPROVE，最终25文件355项／七静态门／2662生产模块0monoliths与build89344ffebd35通过；三有效反转共8AssertionErrors、exact恢复／串行4文件29项通过。当前npm包15入口strict NodeNext／skipLibCheck=false及两模式实际async TS input hook passed。编译CLI签名安装／坏签名和坏archive拒绝／分开enable与script/tool grant、公开ExtensionService async TS脚本／原SDK host两模式续绑／旧答案隔离／abort复用／dispose拒绝passed，零provider请求。构造VersionRecord的worker测试与真实签名安装分开，服务为公开caller assembly，未宣称SDK私有gate或命名tool service派发。[交付](' + delivery + ')；NormProof仍exit2／not_proven，无其他平台／push／CI。';
+const discovery = '- [x] **C.8** 六个核心工具、动态 prompt、BM25／词干／Schema 索引和单步激活：Linux本地验收完成。保留既有工具集／prompt／ranker及catalogue digest缓存，删除caller-retained mutable nested schema的永久identity fingerprint；三真实反例先红后修，旧execute和批准后的prepared effect零效果拒绝，fresh及无关定义保留。最终共享25文件355项、10文件187项、三有效反转／exact恢复2文件22项、三源文件独立APPROVE及build89344ffebd35通过。2000 deferred有限目录／20样本：full2006声明865141bytes，initial8声明5915bytes，one-load9、limit32 deferred／40声明；410source输入hash仍匹配，不作通用性能／收益声明。Linux最终公开SDK配置模型8actual请求验schema-only search＋load单步、下一exact schema／stable system、普通批准、hook零效果拒绝及hidden exclusion。[交付](' + delivery + ')；原1e7d99a7eb37 receipt保留旧代际，不宣称native增量历史协议／缓存TTL／push／CI。';
+let tasks = fs.readFileSync(path.join(dir, 'tasks.md'), 'utf8');
+for (const [id, replacement] of [['E.5', ui], ['C.8', discovery]]) {
+  const pattern = new RegExp('^- \\[ \\] \\*\\*' + id.replace('.', '\\.') + '\\*\\*.*$', 'm');
+  if (!pattern.test(tasks)) throw new Error('Task promotion no longer applies: ' + id);
+  tasks = tasks.replace(pattern, replacement);
+}
+tasks += '\n2026-11-17 E.5／C.8：history/cache1285ff4与模型恢复a9099ca已本地提交。最终共享25文件355项、七门／0monoliths、build89344ffebd35、UI三反转8AssertionErrors／恢复4文件29项及C.8三反转／恢复2文件22项passed。当前npm包15入口strict类型与实际async TS文件两模式、编译CLI签名安装／公开service实际worker两模式和配置模型8actual发现请求passed；相关10hash与两独立APPROVE匹配。E.5实际L／额外依赖3（blocked撤权、原共享host、真实安装消费者），C.8实际M／额外依赖1（可变schema指纹成本），复用10/10，无新依赖或运行平面。29/62本地功能验收／33待办；正常NormProof实际exit2／not_proven、18pinned文件未改。下一E.1／E.3真实codemode消费者反例，无push或CI。\n';
+fs.writeFileSync(path.join(dir, 'tasks.md'), tasks);
+
+let master = fs.readFileSync(path.join(dir, 'MASTER.md'), 'utf8');
+master = master.replace('全部35项未完成功能任务', '全部33项未完成功能任务');
+master = master.replace(/^\*\*Current phase\*\*:.*$/m, '**Current phase**: in_progress；E.5／C.8完成当前Linux功能验收，29/62、33任务未完成，完整仓库NormProof仍not_proven。继续E.1／E.3实际codemode消费者，再执行全部剩余仍成立的规划，不缩小总体目标。');
+master = master.replace(/^\*\*Last completed batch\*\*:.*$/m, '**Last completed batch**: E.5原SDK共享host续绑／独立blocked revocation与C.8可变nested schema指纹。最终25文件355项、七静态门／2662生产模块0monoliths和build89344ffebd35通过，10源文件与两独立APPROVE匹配。UI三有效反转8AssertionErrors／恢复4文件29项及发现三反转／恢复2文件22项passed；当前npm15入口strict类型、async TS文件两模式、编译CLI签名安装／公开service共享worker两模式、配置模型8actual发现请求passed。2000 deferred有限目录410输入仍匹配，历史原生receipt保持旧代际；证据upgrade-ui-discovery-2026-11-17。');
+master = master.replace(/^\*\*Current batch\*\*:.*$/m, '**Current batch**: E.1／E.3只读核实确认已有nested普通权限／hook路径及TS／namespace／image／models API，不能再造重复功能。源码发现bootstrap bridge globals删除未生效、sample名称与raw工具名不一致，主线程接下来复现并分类；未执行反例、未修改该生产slice，不计完成。');
+master = master.replace(/^\*\*Goal\*\*:.*$/m, '**Goal**: active；33功能任务未完成，其中11部分、7已有待验收、13缺口、2待核实；另有仓库NormProof缺口。模型恢复a9099ca、history/cache1285ff4已本地提交；本批E.5／C.8交付中，无push或本轮远端CI。');
+master = master.replace('当前Linux功能验收任务数为27/62', '当前Linux功能验收任务数为29/62').replace('、C.7、C.9和T3.1；', '、C.7、C.8、C.9、E.5和T3.1；');
+master = master.replace('## Session log', 'E.5本批实际L／额外依赖3（blocked publication独立撤权、原共享host消费、签名与npm当前安装），C.8实际M／额外依赖1（caller可变schema指纹与成本）。复用检查10/10，原UI binder／ConfigState／discovery digest和guard保留，无新增库、执行或存储平面。counterexample／独立review／最终serial receipt均绑定10source hash，原构建保持历史；未补造统一drift数字。\n\n## Session log');
+master = master.replace('| Date | Evidence and next action |\n| --- | --- |', '| Date | Evidence and next action |\n| --- | --- |\n| 2026-11-17 | E.5／C.8最终25文件355项／七门／0monoliths、build89344ffebd35、UI三反转／串行4/29恢复和发现三反转／2/22恢复passed，两限定独立APPROVE及10hash匹配；当前npm15入口strict类型、实际async TS／签名安装共享host两模式、配置模型8actual发现请求passed。29/62功能验收；33任务及默认NormProof not_proven保留，继续E.1／E.3，不push。 |');
+fs.writeFileSync(path.join(dir, 'MASTER.md'), master);
+
+let summary = fs.readFileSync(path.join(dir, 'summary.md'), 'utf8');
+summary = summary.replace('62项中27项完成Linux功能验收，35项功能任务未完成', '62项中29项完成Linux功能验收，33项功能任务未完成').replace('12项部分完成、8项已有实现待验收', '11项部分完成、7项已有实现待验收');
+summary = summary.replace('C.4／C.7已完成当前联合测试、Linux配置模型消费者和限定独立APPROVE；', 'E.5／C.8已完成当前联合测试、安装与Linux消费者及限定独立APPROVE；C.4／C.7已本地提交1285ff4，保留冻结构建验收；');
+summary = summary.replace('使当前增加到27项', '以及E.5、C.8使当前增加到29项');
+summary = summary.replace('## 当前批次的验证', '## 当前批次的验证\n\nE.5原共享host在fresh UI acquisition续绑，旧snapshot取消不复活，blocked publication独立revocation要求显式新binding。C.8删除mutable nested schema的永久对象identity memo，保留原catalogue digest和逐定义guard。当前两独立APPROVE绑定10文件hash；最终25文件355项、七门／2662生产模块0monoliths和build89344ffebd35通过，UI三反转8AssertionErrors／串行恢复4文件29项及发现三反转／恢复2文件22项passed。\n\n当前npm-installed包15公开入口strict NodeNext／skipLibCheck=false及两模式实际async TS文件input hook passed；compiled CLI真实签名安装／坏签名与archive拒绝／enable与分开grants、public ExtensionService实际async TS脚本共享原SDK host两模式passed。安装与service分别持有原owner，caller提供明确批准／空hook assembly，不宣称SDK-private gate或named-tool service dispatch；运行零provider请求。配置模型最终8actual发现请求覆盖允许、hook阻断零效果及hidden exclusion，source-only 2000 deferred／20样本目录410input哈希仍匹配；无通用延迟／缓存收益／native历史协议声明。[本批交付](' + delivery + ')。\n\n以下为此前批次的冻结证据，保留各自构建与范围。');
+summary = summary.replace('## 已完成功能验收的27项', '## 已完成功能验收的29项');
+summary = summary.replace('| C.1、C.2、C.3、C.4、C.7、C.9 | 6 |', '| C.1、C.2、C.3、C.4、C.7、C.8、C.9 | 7 |');
+summary = summary.replace('| E.2、T3.1 | 2 |', '| E.2、E.5、T3.1 | 3 |');
+summary = summary.replace('当前cache presence／captured write premium／估算报告。 |', '当前cache presence／captured write premium／估算报告；工具发现／mutable schema guard与实际激活消费者。 |');
+summary = summary.replace('| 类别 | 实际运行与结果 | 证据及限制 |\n| --- | --- | --- |', '| 类别 | 实际运行与结果 | 证据及限制 |\n| --- | --- | --- |\n| 当前E.5／C.8共享构建 | 25文件355项、七静态门、0monoliths、build89344ffebd35；六有效反转、exact恢复，UI串行4/29、发现2/22通过。 | [交付](' + delivery + ')；独立APPROVE绑定10source hash，默认NormProof仍exit2／not_proven。 |\n| 当前安装与发现消费者 | npm15公开入口strict类型、实际async TS文件两模式及signed CLI安装／公开service共享host两模式passed；配置模型8actual发现请求passed，2000 deferred有限目录410输入未变。 | 安装运行零provider，native配置模型与source-bundle性能分开；服务调用方assembly、named-tool派发和native历史协议未宣称。 |');
+summary = summary.replace('## 文档中尚未完成的35项功能任务', '## 文档中尚未完成的33项功能任务');
+summary = summary.replace(/^\| C\.8 \|.*\n/m, '').replace(/^\| E\.5 \|.*\n/m, '');
+summary = summary.replace(/^C\.9／C\.2已提交cbd44218；.*$/m, 'history/cache1285ff4与模型恢复a9099ca已本地提交；E.5／C.8本批归档并本地提交。主线程继续E.1／E.3已有codemode消费者的实际反例，随后执行全部剩余33任务。仓库NormProof容量缺口保留，未改scope／bundle／default gate，不通过缩图隐藏missing。全部原规划和暂缓条件保留，总目标active，未push或取得远端CI。');
+fs.writeFileSync(path.join(dir, 'summary.md'), summary);
+console.log(JSON.stringify({ accepted: 29, total: 62, remaining: 33, promoted: ['E.5', 'C.8'], goal: 'active' }));

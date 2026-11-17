@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "mainSourcesMutated": false,
+  "processExitCode": 1,
+  "assertionFailures": 3,
+  "selectedTests": 3,
+  "restoredExactly": true,
+  "mainSourceMatches": true
+}

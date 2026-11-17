@@ -1,0 +1,410 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+// Authored only. Main executes pack, install, strict types and native consumers serially.
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const packageRoot = path.join(repo, 'packages/ts-shell');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const canonical = value => Array.isArray(value) ? `[${value.map(canonical).join(',')}]`
+  : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`
+    : JSON.stringify(value);
+const receiptFile = path.resolve(process.argv[2] ?? path.join(directory, 'package-native.json'));
+const receipt = { schemaVersion: 1, task: 'E.5', status: 'not_run', platform: process.platform, node: process.version,
+  helperSha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), commands: [], npmInstalled: false,
+  strictInstalledTypes: false, installedSdkRuntime: false, configuredProvider: false, providerMode: 'synthetic',
+  realProviderExecution: 'not_run', namedToolDispatch: 'not_run', signedRegistryInstallation: 'not_run',
+  boundaries: [
+    'npm dependency installation may use its package registry. Runtime observations begin after installation and classify two loopback GET controls separately.',
+    'The async TypeScript file is loaded by the installed public DefaultResourceLoader and invoked by the actual SDK input-hook route. It is not a signed registry worker.',
+    'Registered tool visibility is checked; named tool dispatch and configured-model execution remain unclaimed.',
+  ] };
+const previousEnv = new Map(), originals = new Map(), children = new Set();
+let privateRoot, install, installedRoot, runtime, stage = 'setup', beforeSources, beforeManifest;
+
+function check(condition, code) { if (!condition) { const error = new Error(code); error.probeCode = code; throw error; } }
+function env(key, value) {
+  if (!previousEnv.has(key)) previousEnv.set(key, process.env[key]);
+  if (value === undefined) delete process.env[key]; else process.env[key] = value;
+}
+function sources() {
+  return Object.fromEntries(['config/state.ts', 'sdk/agentSession.ts', 'sdk/ui.ts', 'sdk/resourceLoader.ts',
+    'cli/runtime/extensions/host.ts', 'extensions/runtime/inProcessLoader.ts', 'extensions/runtime/virtual.ts',
+    'extensions/runtime/context.ts'].map(file => [file, hash(fs.readFileSync(path.join(packageRoot, 'src', file)))]));
+}
+async function run(code, command, args, cwd, timeout = 120_000) {
+  stage = code;
+  const child = spawn(command, args, { cwd, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] }); children.add(child);
+  let stdout = '', stderr = '', bytes = 0, overflow = false, timedOut = false, hardKill;
+  const collect = (chunk, output) => {
+    bytes += chunk.length;
+    if (bytes > 8 * 1024 * 1024) { overflow = true; child.kill('SIGKILL'); return; }
+    if (output) stdout += chunk.toString('utf8'); else stderr += chunk.toString('utf8');
+  };
+  child.stdout.on('data', chunk => collect(chunk, true)); child.stderr.on('data', chunk => collect(chunk, false));
+  const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); hardKill = setTimeout(() => child.kill('SIGKILL'), 750); }, timeout);
+  try {
+    const result = await new Promise(resolve => {
+      child.once('error', () => resolve({ exit: null, signal: 'spawn_error' }));
+      child.once('close', (exit, signal) => resolve({ exit, signal }));
+    });
+    receipt.commands.push({ code, ...result, outputBytes: bytes, stdoutSha256: hash(stdout), stderrSha256: hash(stderr), timedOut, overflow });
+    check(result.exit === 0 && !result.signal && !timedOut && !overflow, `${code}-command-failed`);
+    return stdout;
+  } finally { clearTimeout(timer); clearTimeout(hardKill); children.delete(child); }
+}
+
+const fileConsumer = `import type { ExtensionAPI } from '@cheers/ts-shell';
+export let awaited = false;
+export const observations: Array<{ title: string; answer: string | null; continuation: string | null;
+  workspaceRead: boolean; coreRead: boolean; registered: boolean; commands: boolean; activeCount: number }> = [];
+export default async (api: ExtensionAPI): Promise<void> => {
+  await Promise.resolve();
+  api.registerTool({ name: 'npm_ui_registered', description: 'Npm UI file registration control', argsSchema: { type: 'object' },
+    execute: async () => ({ success: true, output: 'NAMED_DISPATCH_UNEXERCISED' }) });
+  api.on('input', async payload => {
+    const title = String((payload as { prompt: string }).prompt);
+    const all = await api.getAllTools(), active = await api.getActiveTools(), commands = await api.getCommands();
+    const text = await api.readWorkspaceFile('note.txt');
+    const answer = await api.ui.input(title);
+    const continuation = title.startsWith('Before ') ? await api.ui.input('Retired ' + title) : undefined;
+    observations.push({ title, answer: answer ?? null, continuation: continuation ?? null,
+      workspaceRead: text === 'NPM_INSTALLED_WORKSPACE_FACT', coreRead: all.includes('read'),
+      registered: all.includes('npm_ui_registered'), commands: commands.includes('plugin'), activeCount: active.length });
+    api.ui.notify('Answered ' + title);
+    return { decision: 'block', reason: 'E5_NPM_UI_INPUT_BLOCK' };
+  });
+  awaited = true;
+};
+`;
+
+const strictConsumer = `import { createAgentSession, DefaultResourceLoader, type AgentSession,
+  type CreateAgentSessionOptions, type ResourceLoader, type ExtensionAPI, type ExtensionHostBridge,
+  type ExtensionUiHost, type ExtensionUiDialogOptions, type ExtensionUiRequestOptions, type ModelRouteSignal } from '@cheers/ts-shell';
+import { ExtensionService, type ExtensionServiceOptions } from '@cheers/ts-shell/extensions';
+
+export async function consume(cwd: string, api: ExtensionAPI, callbackSignal: ModelRouteSignal): Promise<void> {
+  const native = new AbortController().signal;
+  const callbackOptions: ExtensionUiRequestOptions = { signal: callbackSignal };
+  const hostOptions: ExtensionUiDialogOptions = { signal: native };
+  const host: ExtensionUiHost = {
+    input: async (title, placeholder, options) => {
+      const signal: AbortSignal | undefined = options?.signal;
+      signal?.throwIfAborted(); return title + (placeholder ?? '');
+    },
+    confirm: async (_title, _message, options) => { options?.signal?.throwIfAborted(); return true; },
+    notify: (_message, kind) => { const value: 'info' | 'warning' | 'error' | undefined = kind; void value; },
+  };
+  await api.ui.input('Callback', undefined, callbackOptions);
+  await host.input?.('Native host', undefined, hostOptions);
+  // @ts-expect-error Callback observations do not promise native AbortSignal branding.
+  const invalidHost: ExtensionUiDialogOptions = callbackOptions;
+  // @ts-expect-error Native UI hosts cannot receive callback-only signal options.
+  await host.input?.('Invalid host call', undefined, callbackOptions);
+  const invalidUi: ExtensionUiHost = {
+    // @ts-expect-error Host input must resolve a string or undefined.
+    input: async () => 17,
+  };
+  let shared: ExtensionHostBridge | undefined;
+  class Capture extends DefaultResourceLoader {
+    override captureBinding(): (host: ExtensionHostBridge) => () => void {
+      const bind = super.captureBinding();
+      return bridge => { shared = bridge; return bind(bridge); };
+    }
+  }
+  const loader: ResourceLoader = new Capture({ cwd, noSkills: true, noThemes: true, noContextFiles: true,
+    additionalExtensionPaths: ['./ui-file.ts'] });
+  await loader.reload();
+  const options: CreateAgentSessionOptions = { cwd, resourceLoader: loader, noTools: 'all', ui: host, offline: true };
+  const first: AgentSession = (await createAgentSession(options)).session;
+  const release: () => void = first.bindUi(host); release();
+  const state = first.runtimeContext.configuration;
+  const publication = state.current;
+  const result = state.publish(state.begin(publication.binding), publication.requested, publication.binding);
+  const status: string = result.status; void status;
+  await first.abort(); await first.dispose();
+  const second = (await createAgentSession({ cwd, resourceLoader: loader, noTools: 'all' })).session;
+  const releaseSecond: () => void = second.bindUi(host); releaseSecond(); await second.dispose();
+  void shared; void invalidHost; void invalidUi;
+}
+export function extensionServiceContract(options: ExtensionServiceOptions): Promise<string> {
+  const service = new ExtensionService(options);
+  return service.run('declared-package', 'declared-script', []);
+}
+`;
+
+// This module is written beneath the private npm install. Every package import
+// is a bare declared export resolved from that install, with no source aliases.
+const nativeConsumer = `import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { createServer, get } from 'node:http';
+import { channel } from 'node:diagnostics_channel';
+const require = createRequire(import.meta.url);
+const check = (condition, code) => { if (!condition) { const error = new Error(code); error.probeCode = code; throw error; } };
+const held = () => { let resolve; const promise = new Promise(accept => { resolve = accept; }); return { promise, resolve }; };
+async function bound(promise, code, ms = 6000) {
+  let timer; try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => {
+    const error = new Error(code); error.probeCode = code; reject(error); }, ms); })]); } finally { clearTimeout(timer); }
+}
+async function until(predicate, code) {
+  const end = Date.now() + 6000;
+  while (!predicate()) { check(Date.now() < end, code); await new Promise(resolve => setTimeout(resolve, 10)); }
+}
+export async function qualify(input) {
+  const result = { status: 'not_run', providerMode: 'synthetic', configuredProvider: false, exports: [], cases: [],
+    wire: { native: 0, undici: 0, posts: 0, foreign: 0, loopbackGets: 0 }, controls: {} };
+  let server, authority, phase = 'imports'; const sockets = new Set();
+  const native = channel('http.client.request.start'), undici = channel('undici:request:create');
+  const observeNative = ({request}) => { result.wire.native++; if (request?.method === 'POST') result.wire.posts++;
+    const destination = String(request?.getHeader?.('host') ?? request?.host ?? '');
+    if (phase !== 'observer-controls' || destination !== authority) result.wire.foreign++; };
+  const observeUndici = ({request}) => { result.wire.undici++; if (request?.method === 'POST') result.wire.posts++;
+    if (phase !== 'observer-controls' || String(request?.origin) !== 'http://' + authority) result.wire.foreign++; };
+  native.subscribe(observeNative); undici.subscribe(observeUndici);
+  try {
+    const installed = path.join(input.install, 'node_modules/@cheers/ts-shell');
+    const packageJson = JSON.parse(fs.readFileSync(path.join(installed, 'package.json'), 'utf8'));
+    for (const key of Object.keys(packageJson.exports)) {
+      const specifier = packageJson.name + (key === '.' ? '' : key.slice(1));
+      const expected = path.join(installed, packageJson.exports[key].import);
+      check(require.resolve(specifier) === expected && !fs.lstatSync(installed).isSymbolicLink(), 'installed-public-resolution');
+      await import(specifier); result.exports.push(specifier);
+    }
+    const sdk = await import('@cheers/ts-shell');
+    check(JSON.parse(fs.readFileSync(path.join(installed, 'dist/build-manifest.json'), 'utf8')).buildId === input.buildId, 'installed-runtime-build');
+    phase = 'observer-controls';
+    server = createServer((request, response) => { if (request.method === 'GET') result.wire.loopbackGets++;
+      response.writeHead(204); response.end(); });
+    server.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
+    await bound(new Promise(resolve => server.listen(0, '127.0.0.1', resolve)), 'observer-server-start');
+    authority = '127.0.0.1:' + server.address().port;
+    await bound(new Promise((resolve, reject) => { const request = get('http://' + authority + '/native', response => {
+      response.resume(); response.once('end', resolve); }); request.once('error', reject); }), 'native-observer-control');
+    const { fetch } = await import('undici');
+    const response = await bound(fetch('http://' + authority + '/undici'), 'undici-observer-control');
+    await response.arrayBuffer();
+    check(result.wire.native >= 1 && result.wire.undici >= 1 && result.wire.loopbackGets === 2 && result.wire.posts === 0
+      && result.wire.foreign === 0, 'observer-positive-controls');
+    result.controls = { nativeHttpGet: true, installedUndiciGet: true, providerRequests: 0 };
+    phase = 'sdk-runtime';
+    for (const mode of ['options.ui', 'bindUi']) {
+      const workspace = path.join(input.privateRoot, mode === 'bindUi' ? 'work-bind' : 'work-options'); fs.mkdirSync(workspace);
+      fs.writeFileSync(path.join(workspace, 'note.txt'), 'NPM_INSTALLED_WORKSPACE_FACT');
+      fs.copyFileSync(input.fileSource, path.join(workspace, 'ui-file.ts'));
+      const inputs = [], notifications = [], pendingPrompts = [];
+      const pending = new Map(['Before publication', 'After publication', 'Before cancellation', 'After cancellation', 'Before disposal']
+        .map(title => [title, held()]));
+      const host = { input: (title, _placeholder, options) => { inputs.push({ title, signal: options?.signal });
+        return pending.get(title)?.promise ?? Promise.reject(new Error('unexpected-host-dialog')); },
+        notify: message => notifications.push(message) };
+      let shared, bindings = 0, session, release;
+      class Capture extends sdk.DefaultResourceLoader { captureBinding() {
+        const bind = super.captureBinding(); return bridge => { shared = bridge; bindings++; return bind(bridge); };
+      } }
+      const loader = new Capture({ cwd: workspace, noSkills: true, noThemes: true, noContextFiles: true,
+        additionalExtensionPaths: ['./ui-file.ts'] });
+      try {
+        await loader.reload(); check(loader.getExtensions().errors.length === 0, 'installed-file-load');
+        const file = loader.getExtensions().extensions.find(entry => entry.source.endsWith('ui-file.ts'))?.extension;
+        check(file?.exports.awaited === true && file.tools.some(tool => tool.name === 'npm_ui_registered'), 'async-file-factory-awaited');
+        session = (await sdk.createAgentSession({ cwd: workspace, resourceLoader: loader, noTools: 'all', offline: true,
+          ...(mode === 'options.ui' ? { ui: host } : {}) })).session;
+        if (mode === 'bindUi') release = session.bindUi(host);
+        check(shared && bindings === 1, 'original-sdk-host-captured');
+        const rows = file.exports.observations;
+        const observe = title => {
+          const tracked = { settled: false };
+          tracked.promise = session.prompt(title).then(() => { tracked.settled = true; return { rejected: false }; }, error => {
+            tracked.settled = true; return { rejected: true, fixtureBlock: String(error?.message).includes('E5_NPM_UI_INPUT_BLOCK') };
+          }); pendingPrompts.push(tracked.promise); return tracked;
+        };
+        const row = (title, answer, continuation = null) => {
+          const found = rows.find(value => value.title === title);
+          check(found && found.answer === answer && found.continuation === continuation, title + '-file-answer');
+          check(found.workspaceRead && found.coreRead && found.registered && found.commands && found.activeCount === 0,
+            title + '-actual-file-catalogue');
+        };
+        const publish = () => { const state = session.runtimeContext.configuration, before = state.current;
+          const signal = state.backgroundSignal, substrate = state.substrateRevision;
+          check(state.publish(state.begin(before.binding), before.requested, before.binding).status === 'applied'
+            && state.current.revision > before.revision && JSON.stringify(state.current.binding) === JSON.stringify(before.binding)
+            && state.substrateRevision === substrate && signal.aborted, 'installed-real-publication'); };
+        const first = observe('Before publication');
+        await until(() => inputs.length === 1, mode + '-original-dialog');
+        check(!inputs[0].signal.aborted, 'original-file-dialog-admitted'); publish();
+        check(inputs[0].signal.aborted, 'publication-aborts-original-file-dialog');
+        await bound(first.promise, 'original-file-prompt-drain'); row('Before publication', null);
+        check(inputs.length === 1 && notifications.length === 0, 'old-file-continuation-retired');
+        const fresh = observe('After publication');
+        await until(() => inputs.length === 2, mode + '-renewed-dialog');
+        pending.get('Before publication').resolve('Late original answer'); await new Promise(resolve => setImmediate(resolve));
+        check(!fresh.settled && !inputs[1].signal.aborted && notifications.length === 0, 'late-file-settlement-isolated');
+        pending.get('After publication').resolve('Fresh file answer');
+        check((await bound(fresh.promise, 'fresh-file-prompt-drain')).fixtureBlock, 'fresh-input-hook-block');
+        row('After publication', 'Fresh file answer');
+        check(notifications.length === 1 && notifications[0] === 'Answered After publication', 'fresh-file-notification');
+        const cancelling = observe('Before cancellation');
+        await until(() => inputs.length === 3, 'cancel-file-dialog'); await bound(session.abort(), 'sdk-cancel-drain');
+        check(inputs[2].signal.aborted, 'sdk-cancels-file-dialog'); await bound(cancelling.promise, 'cancel-file-prompt-drain');
+        row('Before cancellation', null); check(inputs.length === 3 && notifications.length === 1, 'cancel-file-continuation-retired');
+        const afterCancel = observe('After cancellation'); await until(() => inputs.length === 4, 'post-cancel-file-dialog');
+        pending.get('Before cancellation').resolve('Late cancelled answer'); await new Promise(resolve => setImmediate(resolve));
+        check(!afterCancel.settled && !inputs[3].signal.aborted, 'late-cancel-file-settlement-isolated');
+        pending.get('After cancellation').resolve('Fresh cancellation answer');
+        check((await bound(afterCancel.promise, 'post-cancel-file-drain')).fixtureBlock, 'post-cancel-input-hook-block');
+        row('After cancellation', 'Fresh cancellation answer'); check(notifications.length === 2, 'post-cancel-file-notification');
+        const successorInputs = [], successorNotifications = [];
+        const releaseSuccessor = session.bindUi({ input: async title => { successorInputs.push(title); return 'Explicit successor'; },
+          notify: message => successorNotifications.push(message) });
+        release?.();
+        check((await bound(observe('Explicit successor').promise, 'successor-file-drain')).fixtureBlock, 'successor-input-hook-block');
+        row('Explicit successor', 'Explicit successor');
+        check(successorInputs.length === 1 && successorNotifications.length === 1 && inputs.length === 4, 'old-release-preserves-successor');
+        releaseSuccessor(); publish();
+        check((await bound(observe('After release').promise, 'released-file-drain')).fixtureBlock, 'released-input-hook-block');
+        row('After release', null);
+        check(inputs.length === 4 && successorInputs.length === 1 && successorNotifications.length === 1, 'released-binding-stays-unavailable');
+        session.bindUi(host);
+        const disposing = observe('Before disposal'); await until(() => inputs.length === 5, 'disposing-file-dialog');
+        const disposal = session.dispose(); check(session.dispose() === disposal, 'installed-shared-disposal-promise');
+        await bound(disposal, 'installed-session-disposal'); await bound(disposing.promise, 'disposed-file-prompt-drain');
+        check(inputs[4].signal.aborted && notifications.length === 2, 'disposal-retires-file-ui');
+        const after = await session.prompt('After disposal').then(() => false, error => /disposed/i.test(String(error?.message)));
+        check(after, 'installed-session-disposed-refusal');
+        const fileRetired = await Promise.resolve().then(() => file.readWorkspaceFile('note.txt')).then(() => false, () => true);
+        check(fileRetired, 'installed-file-generation-retired');
+        pending.get('Before disposal').resolve('Late disposed answer'); await new Promise(resolve => setImmediate(resolve));
+        check(inputs.length === 5 && bindings === 1 && notifications.length === 2, 'installed-original-host-and-late-disposal');
+        result.cases.push({ mode, status: 'passed', asyncTypeScriptFile: true, actualInputHook: true, originalHostRetained: true,
+          acceptedPublication: true, oldDialogCancelled: true, oldContinuationSuppressed: true, freshDialogAdmitted: true,
+          lateSettlementIsolated: true, cancellationAndReuse: true, successorSurvivesOldRelease: true,
+          releasedBindingUnavailable: true, disposalCancelled: true, disposedFreshRefused: true,
+          retiredFileRefused: true, namedToolVisibilityOnly: true, inputCalls: inputs.length, notifications: notifications.length });
+      } finally {
+        for (const value of pending.values()) value.resolve(undefined);
+        await bound(session?.dispose() ?? Promise.resolve(), 'case-session-cleanup', 8000);
+        await bound(Promise.allSettled(pendingPrompts), 'case-prompt-cleanup', 8000);
+        loader.captureRetirement()();
+      }
+    }
+    check(result.wire.posts === 0 && result.wire.foreign === 0 && result.wire.native === 1 && result.wire.undici === 1,
+      'runtime-no-provider-network'); result.zeroProviderRequests = true; result.status = 'passed';
+  } catch (error) { result.status = 'failed'; result.failureCode = error?.probeCode ?? 'unexpected-native-error'; }
+  finally {
+    native.unsubscribe(observeNative); undici.unsubscribe(observeUndici);
+    for (const socket of sockets) socket.destroy();
+    if (server) await bound(new Promise(resolve => server.close(resolve)), 'observer-server-cleanup', 2500)
+      .catch(() => { result.status = 'failed'; result.cleanupFailure = true; });
+  }
+  return result;
+}
+`;
+
+try {
+  check(receiptFile.startsWith(path.join(repo, '.tmp') + path.sep), 'receipt-path-boundary');
+  beforeSources = sources(); receipt.source = beforeSources;
+  beforeManifest = fs.readFileSync(path.join(packageRoot, 'dist/build-manifest.json'));
+  const realHome = process.env.USERPROFILE || process.env.HOME || os.homedir();
+  for (const dir of ['.cheers', '.cheer', '.private-agents', '.coding-agents']) {
+    for (const file of ['config.json', 'auth.json', 'models.json', 'models-cache.json', 'marketplaces.json', 'plugins.json', 'extensions/registry.json']) {
+      const absolute = path.join(realHome, dir, file); originals.set(absolute, fs.existsSync(absolute) ? hash(fs.readFileSync(absolute)) : null);
+    }
+  }
+  for (const key of ['CHEERS_MARKETPLACES_FILE', 'CHEERS_EXTENSIONS_FILE', 'CHEERS_PLUGINS_FILE']) {
+    const absolute = process.env[key]; if (absolute) originals.set(absolute, fs.existsSync(absolute) ? hash(fs.readFileSync(absolute)) : null);
+  }
+  receipt.originalInputSnapshotSha256 = hash(canonical([...originals].map(([file, content]) => [hash(file), content]).sort()));
+  privateRoot = fs.mkdtempSync(path.join(directory, 'package-private-')); fs.chmodSync(privateRoot, 0o700);
+  install = path.join(privateRoot, 'install'); const isolatedHome = path.join(privateRoot, 'home');
+  const storage = path.join(isolatedHome, '.cheers'); fs.mkdirSync(install); fs.mkdirSync(storage, { recursive: true });
+  for (const key of Object.keys(process.env)) if (/API_KEY|TOKEN|SECRET|AUTH|^AWS_|^GOOGLE_|^GEMINI_|^OPENAI_|^ANTHROPIC_|^AZURE_|^VERTEX_|^CHEERS_PROVIDER/.test(key)) env(key, undefined);
+  for (const [key, value] of Object.entries({ HOME: isolatedHome, USERPROFILE: isolatedHome, CHEERS_TEST_ROOT: privateRoot,
+    GIT_CEILING_DIRECTORIES: privateRoot, CHEERS_PROFILE: 'default', CHEERS_PROVIDER_MODE: 'synthetic', CHEERS_OFFLINE: '1',
+    CHEERS_MARKETPLACES_FILE: path.join(storage, 'marketplaces.json'), CHEERS_EXTENSIONS_FILE: path.join(storage, 'extensions/registry.json'),
+    CHEERS_PLUGINS_FILE: path.join(storage, 'plugins.json'), CHEERS_LOG_DIR: path.join(storage, 'logs'), NODE_OPTIONS: '',
+    npm_config_userconfig: path.join(privateRoot, 'npmrc'), npm_config_globalconfig: path.join(privateRoot, 'global-npmrc'),
+    npm_config_cache: path.join(privateRoot, 'npm-cache') })) env(key, value);
+  for (const key of ['CHEERS_PROFILE_HANDOFF', 'CHEERS_STREAM_TRACE_PATH', 'CHEERS_MODEL_PRESETS_FILE', 'CHEERS_REFRESH_LEASES_FILE',
+    'CHEERS_BROWSER_RECEIPT_CACHE_ROOT', 'CHEERS_BROWSER_RECEIPT_CACHE_MANIFEST']) env(key, undefined);
+  fs.writeFileSync(path.join(privateRoot, 'npmrc'), ''); fs.writeFileSync(path.join(privateRoot, 'global-npmrc'), '');
+  fs.writeFileSync(path.join(storage, 'config.json'), JSON.stringify({ agentMode: 'build', offline: true }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: 'openai', providerCredentials: {} }), { mode: 0o600 });
+  const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
+  const { checkBuild } = await import(pathToFileURL(path.join(repo, 'scripts/start-lib.mjs')).href);
+  const build = checkBuild({ root: repo, dist: path.join(packageRoot, 'dist'), version: packageJson.version, executablePolicy: 'ignore' });
+  check(build.ok, 'fresh-compiled-package-unavailable'); receipt.buildId = build.manifest.buildId;
+  receipt.buildInputsDigest = build.manifest.inputsDigest; receipt.buildManifestSha256 = hash(beforeManifest);
+  const packText = await run('pack', 'npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', privateRoot], packageRoot);
+  let packed; try { const parsed = JSON.parse(packText); [packed] = Array.isArray(parsed) ? parsed : Object.values(parsed); }
+  catch { check(false, 'pack-result-unreadable'); }
+  check(packed?.name === packageJson.name && typeof packed.filename === 'string' && path.basename(packed.filename) === packed.filename
+    && Array.isArray(packed.files), 'pack-result-contract');
+  const archive = path.join(privateRoot, packed.filename); const files = new Set(packed.files.map(file => file.path));
+  const selected = 'dist/builds/' + receipt.buildId + '/';
+  check(files.has('dist/index.js') && files.has('dist/current.js') && files.has('dist/build-manifest.json')
+    && files.has('dist/types/index.d.ts') && files.has(selected + 'public.js') && ![...files].some(file => file.startsWith('src/')
+      || file.startsWith('dist/builds/') && !file.startsWith(selected) || /(?:^|\/)\.staging/.test(file)), 'pack-selected-generation');
+  receipt.package = { entries: files.size, compressedBytes: fs.statSync(archive).size, sha256: hash(fs.readFileSync(archive)), integrity: packed.integrity };
+  const exact = name => JSON.parse(fs.readFileSync(path.join(repo, 'node_modules', name, 'package.json'), 'utf8')).version;
+  fs.writeFileSync(path.join(install, 'package.json'), JSON.stringify({ name: 'cheers-ui-package-consumer', version: '1.0.0', private: true,
+    type: 'module', dependencies: { [packageJson.name]: 'file:' + archive, typescript: exact('typescript'),
+      '@types/node': exact('@types/node'), '@types/picomatch': exact('@types/picomatch'), '@types/which': exact('@types/which') } }), { mode: 0o600 });
+  await run('install', 'npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline'], install, 240_000);
+  installedRoot = path.join(install, 'node_modules/@cheers/ts-shell');
+  check(!fs.lstatSync(installedRoot).isSymbolicLink(), 'installed-package-copy');
+  check(hash(fs.readFileSync(path.join(installedRoot, 'dist/build-manifest.json'))) === receipt.buildManifestSha256, 'installed-current-manifest');
+  for (const artifact of build.manifest.artifacts) {
+    const absolute = path.join(installedRoot, 'dist', artifact.path);
+    check(files.has('dist/' + artifact.path) && fs.statSync(absolute).size === artifact.size
+      && hash(fs.readFileSync(absolute)) === artifact.sha256, 'installed-immutable-artifact');
+  }
+  for (const file of build.manifest.publicApi.files) {
+    const relative = path.relative(packageRoot, path.join(repo, file.path));
+    // npm consumes this packaging rule and intentionally omits the rule file.
+    if (path.basename(relative) === '.npmignore') continue;
+    check(files.has(relative) && hash(fs.readFileSync(path.join(installedRoot, relative))) === file.sha256, 'installed-public-wrapper');
+  }
+  receipt.npmInstalled = true; receipt.verifiedInstalledArtifacts = build.manifest.artifacts.length;
+  const entries = Object.keys(packageJson.exports).map(key => packageJson.name + (key === '.' ? '' : key.slice(1)));
+  const imports = entries.map((name, index) => 'import * as entry' + index + ' from ' + JSON.stringify(name) + ';\nvoid entry' + index + ';').join('\n');
+  const strictFile = path.join(install, 'consumer.mts'), fileSource = path.join(install, 'ui-file.ts');
+  fs.writeFileSync(strictFile, imports + '\n' + strictConsumer); fs.writeFileSync(fileSource, fileConsumer);
+  fs.writeFileSync(path.join(install, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext',
+    moduleResolution: 'NodeNext', strict: true, skipLibCheck: false, noEmit: true, types: ['node'], lib: ['ES2022', 'DOM'] },
+    files: ['./consumer.mts', './ui-file.ts'] }));
+  receipt.consumerSha256 = hash(fs.readFileSync(strictFile)); receipt.asyncFileSha256 = hash(fileConsumer);
+  await run('strict-types', process.execPath, ['--max-old-space-size=768', path.join(install, 'node_modules/typescript/bin/tsc'),
+    '--project', path.join(install, 'tsconfig.json'), '--pretty', 'false'], install);
+  receipt.strictInstalledTypes = true; receipt.publicEntries = entries.length;
+  receipt.typeChecks = { strict: true, skipLibCheck: false, nodeNext: true, optionsUi: true, bindUi: true,
+    resourceBinding: true, nativeSignalPositive: true, observationSignalNegative: true, invalidInputReturnNegative: true, publicExtensionService: true };
+  const nativeFile = path.join(install, 'native.mjs'); fs.writeFileSync(nativeFile, nativeConsumer);
+  receipt.nativeConsumerSha256 = hash(nativeConsumer); stage = 'installed-sdk-runtime';
+  runtime = await (await import(pathToFileURL(nativeFile).href)).qualify({ install, privateRoot, fileSource, buildId: receipt.buildId });
+  receipt.runtime = runtime; check(runtime.status === 'passed' && runtime.exports.length === entries.length, 'installed-runtime-failed');
+  receipt.installedSdkRuntime = true; receipt.zeroProviderRequests = runtime.zeroProviderRequests; receipt.status = 'passed';
+} catch (error) { receipt.status = 'failed'; receipt.failure = { stage, code: error?.probeCode ?? 'unexpected-error' }; process.exitCode = 1; }
+finally {
+  for (const child of children) child.kill('SIGKILL');
+  for (const [key, value] of previousEnv) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  try {
+    receipt.originalInputsChecked = originals.size;
+    receipt.originalInputsUnchanged = [...originals].every(([file, before]) => (fs.existsSync(file) ? hash(fs.readFileSync(file)) : null) === before);
+    receipt.sourceUnchanged = beforeSources !== undefined && canonical(sources()) === canonical(beforeSources);
+    receipt.compiledPackageUnchanged = beforeManifest !== undefined && fs.readFileSync(path.join(packageRoot, 'dist/build-manifest.json')).equals(beforeManifest);
+    if (privateRoot) fs.rmSync(privateRoot, { recursive: true, force: true });
+    receipt.privateStateRemoved = privateRoot === undefined || !fs.existsSync(privateRoot);
+  } catch { receipt.privateStateRemoved = false; }
+  if (!receipt.originalInputsUnchanged || !receipt.sourceUnchanged || !receipt.compiledPackageUnchanged || !receipt.privateStateRemoved) {
+    receipt.status = 'failed'; receipt.cleanupFailure = 'private-state-or-original-identity'; process.exitCode = 1;
+  }
+  if (receiptFile.startsWith(path.join(repo, '.tmp') + path.sep)) {
+    fs.mkdirSync(path.dirname(receiptFile), { recursive: true }); fs.writeFileSync(receiptFile, JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
+  }
+  process.stdout.write(JSON.stringify(receipt, null, 2) + '\n');
+}

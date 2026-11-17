@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "buildId": "89344ffebd356718e7cba331b8f3ec8defe25c4af3aad7fa5050089e8e042fdc",
+  "inputsDigest": "afb1c0da3d5b0213b2fc14e472359e19c1d2a4a9f01c7106adc3ca87134c2d47",
+  "compilerInputsVerified": true,
+  "source": {
+    "ui": {
+      "packages/ts-shell/src/config/state.ts": "a968bf0f6f02a7032b292243ba184739059358f6dc146cbd03cd239a8bc170c8",
+      "packages/ts-shell/src/sdk/agentSession.ts": "defb6005939318778029bb3f5cc6b65815d3d84c316edee07126fa3a8e15e502",
+      "packages/ts-shell/src/sdk/ui.ts": "052ccfe1a1c753b6c50d2e99947eddfba2ef70b2c05069f5fd923e0eca484b26",
+      "packages/ts-shell/src/sdk/ui.test.ts": "43d7d352b0818c71b84c03178deec86ab5a1eb8f7e2559fbc5166a18ee832592",
+      "packages/ts-shell/src/sdk/ui/retirement.test.ts": "c65bb95ccbfbd23254ddef2c11927ef8d48a10f3db82d08d5a07b68651135a2f",
+      "packages/ts-shell/src/sdk/ui/installed.test.ts": "894b0ff80374a2775d8bd50e4789988a9e8906ed50ab9a1fdc8bde43ef83eee7",
+      "packages/ts-shell/src/cli/runtime/extensions/host.ts": "945c1a2aeab17306c7a9e8b14813a516c719e1ffc148266b4c8075a24617bfab"
+    },
+    "discovery": {
+      "packages/ts-shell/src/core/tools/discovery/state.ts": "3377ea925331a741d42d9cb014b1f74fe0cc1cffe5b92fd36302d248e59be1b7",
+      "packages/ts-shell/src/core/tools/discovery/contract.test.ts": "d6492754c4afa64e3494c89c6debbbba33ed09b034060cacdc7ed1165332f6da",
+      "packages/ts-shell/src/core/tools/discovery/ranker.test.ts": "157b298dc88e4f21354e7e4fa0accb1dfe9bfc05a9cbd85fbb73e92f9ef740cc"
+    }
+  },
+  "reviewedFiles": 10,
+  "validation": {
+    "receipt": "final-integrated.json",
+    "files": 25,
+    "tests": 355,
+    "passed": true
+  },
+  "boundary": "Final SDK UI and tool discovery sources; prior history/cache compiled receipts keep their frozen build."
+}

@@ -469,3 +469,15 @@ C.4的默认旧正文裁剪缺口经当前pruneToolText=false与唯一projection
 冻结18源文件仍匹配build0247cb1b526d的归档。最终联合21文件933项、六静态门、2657生产模块0monoliths、七有效AssertionError反转exact恢复及恢复4文件61项通过；五实际HTTP→request→accounting→persistence→cost与四两模式通知消费者通过。新独立cache审查APPROVE限定13文件，模型恢复审查APPROVE限定另5文件；主线程重核所有hash。模型恢复已独立提交a9099ca，严格请求准入未变，native未读模型UI未验证。
 
 Linux同代公开SDK／CLI配置模型21实际请求／10prompt轮通过：两次6144字节builtin read、年龄边界保留、同ID重开、显式pruning控制、真实automatic compaction commit及checkpoint续轮。压缩压力来自32seeded pairs／64messages和本地16000window，不当真实provider轮数或远端容量。两响应reported read、十九缺失，captured prices=null；不宣称节省、TTL、账单或native preview相等。实际normproof exit2／not_proven，shadow exit0不等价，未改变pinned输入或范围。证据upgrade-history-cost-2026-11-17；C.4／C.7本地功能验收，27/62、goal active。E.5／C.8后续源码改变构建输入，与冻结本批证据分开。
+
+## Shared SDK UI and mutable tool discovery acceptance (2026-11-17)
+
+E.5两个options.ui／bindUi发布后新dialog真实AssertionErrors先复现；随后未观察blocked→corrected publication复活旧host和实际installed worker绕过SDK facade另有真实反例。采用参考的session保留UI／重建重绑／先退休旧runner决定，复用本项目原shared host与binder。SessionUi只持有原host及admission，原bridge获取新UI前刷新snapshot，所有loader／inline／file／installed worker共享它；已进入的hook／worker保留原取消snapshot。ConfigState单独记录blocked publication revocation，不能借substrateRevision撤销原host或允许修正自动恢复旧授权。
+
+C.8六builtin及BM25／词干／local schema ref／search+load已有，原研究的全缺口被当前消费者反证。唯一确认缺陷是caller-retained nested schema永久WeakMap fingerprint；三实际反例先红后删除该memo，catalogue digest缓存与逐定义guard保留。采用参考按当前contract重新索引／单步加载／hidden排除的决定，保留本项目optional loading和all-admitted查询语义；loaded state仍run-local，不宣称新增branch activation持久化或原生增量工具历史协议。
+
+最终25文件355项、七门／2662生产模块0monoliths和build89344ffebd35的compilerInputs核验通过；七UI源与三发现源hash匹配两个独立APPROVE。UI三有效反转共8AssertionErrors，exact恢复后串行4文件29项；发现三AssertionErrors有效反转／exact恢复2文件22项。先前恢复短暂与反转进程重叠已排除，其回执独立保存，不当最终串行证据。
+
+当前npm包15public entries裸导入、严格NodeNext／skipLibCheck=false及实际async TS file input hook两模式通过。编译CLI marketplace明确trust、坏签名／坏archive拒绝、签名安装与独立enable／script+tool grants通过；SDK捕获原shared host，公开ExtensionService在同installed state实际运行async TS脚本，两模式续绑／晚答案隔离／abort复用／dispose拒绝通过。服务为公开caller assembly，明确allow-once与empty hooks，不宣称SDK私有gate或named-tool service dispatch。两安装运行零provider；npm依赖下载网络与运行的两loopback GET observer controls分开。
+
+Linux当前公开SDK配置模型8actual请求覆盖schema-only search＋load单步、下一exact schema／stable system、普通批准、hook零效果阻断及hidden exclusion。有限目录2000 deferred／20samples，full2006声明865141bytes、initial8声明5915bytes、one-load9、limit32 deferred／40声明；410输入hash当前仍一致，保持source-bundle／bounded latency证据，不泛化为性能或cache收益。默认NormProof实际exit2／not_proven，原18tracked pinned文件未改；旧1e7d99a7eb37 native保留历史。证据upgrade-ui-discovery-2026-11-17；29/62本地功能验收，33任务／仓库门禁缺口保留，无push／CI。

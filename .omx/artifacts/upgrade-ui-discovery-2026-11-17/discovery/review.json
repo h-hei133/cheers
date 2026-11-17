@@ -1,0 +1,122 @@
+{
+  "task": "C.8 mutable retained SDK schema discovery generation repair",
+  "verdict": "APPROVE",
+  "scope": {
+    "files": [
+      "packages/ts-shell/src/core/tools/discovery/state.ts",
+      "packages/ts-shell/src/core/tools/discovery/contract.test.ts",
+      "packages/ts-shell/src/core/tools/discovery/ranker.test.ts"
+    ],
+    "writableArtifact": ".tmp/discovery-validation/review.json",
+    "independence": "Reviewer authored E.5 SDK UI changes, not this C.8 repair.",
+    "boundary": "Bounded source and existing-receipt review; no validation execution or broader task acceptance."
+  },
+  "sourceSha256": {
+    "packages/ts-shell/src/core/tools/discovery/state.ts": "3377ea925331a741d42d9cb014b1f74fe0cc1cffe5b92fd36302d248e59be1b7",
+    "packages/ts-shell/src/core/tools/discovery/contract.test.ts": "d6492754c4afa64e3494c89c6debbbba33ed09b034060cacdc7ed1165332f6da",
+    "packages/ts-shell/src/core/tools/discovery/ranker.test.ts": "157b298dc88e4f21354e7e4fa0accb1dfe9bfc05a9cbd85fbb73e92f9ef740cc"
+  },
+  "hashesMatchRepairedSourcesReceipt": true,
+  "hashesStableAcrossReview": true,
+  "findings": [],
+  "assessment": [
+    {
+      "claim": "Fresh nested description/schema fingerprints replace permanent object-identity memoization; unchanged catalogue digest reuse remains.",
+      "evidence": [
+        "state.ts:54-75",
+        "contract.test.ts:130-150",
+        "contract.test.ts:202-221"
+      ],
+      "implication": "Mutating the retained public SDK nested schema advances generation and declaration identity without forcing unrelated system-text changes."
+    },
+    {
+      "claim": "Catalogue-owned snapshots still check exact definition identity and fresh fingerprint; unrelated captured definitions stay callable.",
+      "evidence": [
+        "state.ts:78-103",
+        "contract.test.ts:152-170",
+        "contract.test.ts:223-246"
+      ],
+      "implication": "Replacement and nested changes refuse captured old execution while stable definitions preserve ordinary calls."
+    },
+    {
+      "claim": "Prepared effects retain final generation verification after asynchronous preparation and ordinary approval.",
+      "evidence": [
+        "state.ts:90-94",
+        "state.ts:156-164",
+        "contract.test.ts:172-200",
+        "contract.test.ts:248-287",
+        "packages/ts-shell/src/turn/tools.ts:206-219"
+      ],
+      "implication": "Pending replacement or nested contract mutation cannot authorize the captured prepared effect when approval completes."
+    },
+    {
+      "claim": "Search/load remains schema discovery through the ordinary gated execution path; disabled and hidden definitions remain unavailable.",
+      "evidence": [
+        "state.ts:136-147",
+        "contract.test.ts:289-354",
+        "contract.test.ts:358-380",
+        "packages/ts-shell/src/turn/tools.ts:125-153",
+        "packages/ts-shell/src/core/prompts/request.ts:41-44"
+      ],
+      "implication": "Single-step schema loading does not bypass argument validation or permission refusal."
+    },
+    {
+      "claim": "New ranking tests exercise existing local-reference, variant, Unicode/stemming, exact-name and deterministic ordering behavior without changing ranking production code.",
+      "evidence": [
+        "ranker.test.ts:9-91",
+        "packages/ts-shell/src/core/tools/discovery/ranker.ts"
+      ],
+      "implication": "No ranking behavior regression is introduced by the production fingerprint diff."
+    }
+  ],
+  "existingEvidenceInspected": {
+    "redClassification": {
+      "path": ".tmp/discovery-validation/classification.json",
+      "productAssertionFailures": 3,
+      "fixtureFailures": 2,
+      "classification": "Nested retained SDK schema product drift; shared lookup query caused two fixture failures without a hidden-definition leak."
+    },
+    "combined": {
+      "path": ".tmp/discovery-validation/combined.json",
+      "success": true,
+      "tests": 187,
+      "passed": 187,
+      "failed": 0,
+      "note": "Main reported 10 files; Vitest receipt reports 19 suites. No subagent validation executed."
+    },
+    "reversal": {
+      "path": ".tmp/discovery-validation/reversal.json",
+      "status": "passed",
+      "assertionFailures": 3,
+      "restoredExactly": true,
+      "mainSourcesMutated": false,
+      "mainSourceMatches": true
+    },
+    "restored": {
+      "path": ".tmp/discovery-validation/restored.json",
+      "success": true,
+      "tests": 22,
+      "passed": 22,
+      "failed": 0
+    },
+    "staticGates": "Main reports passed; this reviewer did not independently execute or inspect a separate static-gate receipt."
+  },
+  "validationExecutedByReviewer": [],
+  "residualRisks": [
+    {
+      "item": "Large-catalogue performance",
+      "status": "pending main evidence",
+      "basis": "Fresh JSON serialization now runs for unchanged catalogue entries and per-definition guard checks. Removing stale identity caching is correct for mutable public inputs; cost at catalogue scale remains unmeasured in this review."
+    },
+    {
+      "item": "Compiled native consumer acceptance",
+      "status": "pending main evidence",
+      "basis": "Existing source tests and reversal receipts do not establish current compiled native or configured-provider acceptance."
+    },
+    {
+      "item": "Overall C.8 completion",
+      "status": "outside bounded review",
+      "basis": "This APPROVE applies to the frozen three-file repair and regression tests, not the full roadmap or pending evidence."
+    }
+  ]
+}

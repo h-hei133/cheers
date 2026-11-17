@@ -1,0 +1,3 @@
+JSON report written to /home/wang/projects/cheers/.tmp/ui-renewal-validation/reversal-shared-host-renewal.json
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/sdk/ui/installed.test.ts -t fresh installed-worker consumer --no-file-parallelism --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/ui-renewal-validation/reversal-shared-host-renewal.json

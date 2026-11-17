@@ -19,6 +19,7 @@ interface HostState {
   readonly host: ExtensionHostBridge;
   readonly admission: () => string | undefined;
   readonly close: () => void;
+  refreshUi?: () => void;
 }
 const hosts = new WeakMap<ShellRuntimeContext, HostState>();
 const surfaces = new WeakMap<ShellRuntimeContext, UiBinding>();
@@ -44,6 +45,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
   const host: ExtensionHostBridge = {
     get ui() {
       if (admission()) { lastUi?.release(); return lastUi?.host; }
+      state.refreshUi?.();
       lastUi = surfaces.get(context);
       return lastUi?.host;
     },
@@ -71,6 +73,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
   };
   const state: HostState = { host, admission, close: () => {
     closed = true;
+    state.refreshUi = undefined;
     lastUi?.release();
     if (hosts.get(context) === state) surfaces.get(context)?.release();
   } };
@@ -80,6 +83,13 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
 
 export function extensionHostFor(context: ShellRuntimeContext): ExtensionHostBridge | undefined {
   return hosts.get(context)?.host;
+}
+
+/** A consumer retains renewal authority; all shared-host callers acquire its current surface. */
+export function bindExtensionUiRefreshFor(context: ShellRuntimeContext, refresh: () => void): () => void {
+  const state = hosts.get(context);
+  if (state) state.refreshUi = refresh;
+  return () => { if (state?.refreshUi === refresh) state.refreshUi = undefined; };
 }
 
 /** Surface replacement cancels old work; its late release cannot retire its successor. */

@@ -54,6 +54,7 @@ export function projectAccepted(installed: RuntimeConfig, candidate: RuntimeConf
 export class ConfigState {
   private background = new AbortController();
   private substrateGeneration = 0;
+  private revocationGeneration = 0;
   private generation = 0;
   private publication: ConfigPublication;
 
@@ -67,6 +68,8 @@ export class ConfigState {
 
   get current(): ConfigPublication { return this.publication; }
   get substrateRevision(): number { return this.substrateGeneration; }
+  /** A later correction cannot reauthorize a host retained before a blocked publication. */
+  get revocationRevision(): number { return this.revocationGeneration; }
   get backgroundSignal(): AbortSignal { return this.background.signal; }
 
   /** Called only after the owning surface installs an explicit display change. */
@@ -137,6 +140,7 @@ export class ConfigState {
   }
 
   private reject(diagnostics: readonly string[], block: boolean): void {
+    if (block) this.revocationGeneration++;
     this.publication = freezeDeep({ ...this.publication, revision: this.publication.revision + 1,
       admissionBlocked: this.publication.admissionBlocked || block, modelConstraintsOnly: false, diagnostics: [...diagnostics] });
   }

@@ -1,0 +1,216 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { createHash } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { build } from 'esbuild';
+
+// Authored only. Main executes serially; the scratch bundle imports the current real owning modules.
+// This is local source-bundle/helper evidence, not compiled SDK/provider acceptance or a performance guarantee.
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const DEFERRED_COUNT = 2000;
+const SAMPLE_COUNT = 20;
+const CAPABILITY = 'heliotrope976413';
+const TARGET = 'deferred_0000';
+const LOADED_LIMIT = 32;
+const source = path.join(repo, 'packages/ts-shell/src');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const equal = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+const previousEnv = new Map();
+const receipt = { status: 'not_run', platform: process.platform, node: process.versions.node,
+  probeSha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), method: 'current-owner-source-bundle',
+  providerRequests: 0, samples: SAMPLE_COUNT, deferredDefinitions: DEFERRED_COUNT,
+  caveat: 'Measured finite local fixture only; not provider acceptance, a universal latency guarantee or a cache-cost claim.' };
+let root, workspace, stage = 'setup', targetEffects = 0, preparedEffects = 0, bundled;
+
+function check(condition, code) {
+  if (condition) return;
+  const error = new Error(code); error.probeCode = code; throw error;
+}
+
+function surface(tools) {
+  const json = JSON.stringify(tools);
+  return { tools: tools.length, bytes: Buffer.byteLength(json), characters: json.length, sha256: hash(json) };
+}
+
+function sample(label, operation) {
+  const times = [];
+  let value;
+  for (let index = 0; index < SAMPLE_COUNT; index++) {
+    const began = performance.now();
+    value = operation();
+    times.push(performance.now() - began);
+  }
+  const ordered = [...times].sort((left, right) => left - right);
+  receipt.timings ??= {};
+  receipt.timings[label] = { unit: 'ms', samples: times, min: ordered[0],
+    median: (ordered[9] + ordered[10]) / 2, p95: ordered[18], max: ordered[19],
+    mean: times.reduce((total, value) => total + value, 0) / times.length };
+  return value;
+}
+
+function deferred(index) {
+  const name = `deferred_${String(index).padStart(4, '0')}`;
+  return {
+    name,
+    description: 'Inspect one finite record descriptor.',
+    argsSchema: {
+      type: 'object',
+      $defs: { Filter: { type: 'object', properties: {
+        selector: { type: 'string', description: index === 0 ? CAPABILITY : `facet${String(index).padStart(4, '0')}` },
+      }, additionalProperties: false } },
+      properties: { filter: { $ref: '#/$defs/Filter' }, limit: { type: 'integer', minimum: 1, maximum: 10 } },
+      required: ['filter'],
+      additionalProperties: false,
+    },
+    ...(index === 0 ? { prepare: async () => ({ targets: [], preview: 'Finite record observation',
+      execute: async () => { preparedEffects++; return { success: true, output: 'prepared observation' }; } }) } : {}),
+    execute: async () => { if (index === 0) targetEffects++; return { success: true, output: 'observed record' }; },
+  };
+}
+
+async function bundleOwners() {
+  const definitions = [
+    [path.join(source, 'core/prompts/request.ts'), ['preparePromptRequest']],
+    [path.join(source, 'core/tools/registry.ts'), ['createCoreToolRegistry']],
+    [path.join(source, 'turn/tools.ts'), ['toolSchemas']],
+    [path.join(source, 'core/tools/discovery/state.ts'), ['PINNED_TOOL_NAMES', 'DISCOVERY_SEARCH_TOOL', 'DISCOVERY_LOAD_TOOL']],
+    [path.join(source, 'config/runtimeConfig.ts'), ['getRuntimeConfig']],
+    [path.join(source, 'observability/structuredLogger.ts'), ['setFilePersistenceEnabled']],
+  ];
+  const outfile = path.join(root, 'owners.mjs');
+  const result = await build({
+    absWorkingDir: repo,
+    stdin: { contents: definitions.map(([file, names]) => `export { ${names.join(', ')} } from ${JSON.stringify(file)};`).join('\n'),
+      resolveDir: source, sourcefile: 'catalogue-probe-entry.mjs', loader: 'js' },
+    outfile,
+    bundle: true,
+    format: 'esm', platform: 'node', target: 'node20.3', packages: 'external', keepNames: true,
+    banner: { js: 'import { createRequire as __probeCreateRequire } from "node:module"; const require = __probeCreateRequire(import.meta.url);' },
+    metafile: true, write: false, logLevel: 'silent',
+  });
+  check(result.outputFiles.length === 1, 'scratch-bundle-shape');
+  receipt.inputs = Object.entries(result.metafile.inputs).filter(([file]) => !file.startsWith('<') && !file.endsWith('catalogue-probe-entry.mjs'))
+    .map(([file]) => ({ path: path.relative(repo, path.resolve(repo, file)), sha256: hash(fs.readFileSync(path.resolve(repo, file))) }))
+    .sort((left, right) => left.path.localeCompare(right.path));
+  const output = result.outputFiles[0];
+  fs.writeFileSync(outfile, output.contents, { mode: 0o600 });
+  receipt.bundle = { bytes: output.contents.length, sha256: hash(output.contents), inputs: receipt.inputs.length };
+  return import(pathToFileURL(outfile).href);
+}
+
+try {
+  root = fs.mkdtempSync(path.join(directory, 'catalogue-state-')); fs.chmodSync(root, 0o700);
+  workspace = path.join(root, 'work'); const home = path.join(root, 'home');
+  fs.mkdirSync(workspace); fs.mkdirSync(path.join(workspace, '.git')); fs.mkdirSync(home);
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home,
+    GIT_CEILING_DIRECTORIES: root, CHEERS_PROVIDER_MODE: 'synthetic' })) {
+    previousEnv.set(key, process.env[key]); process.env[key] = value;
+  }
+  stage = 'bundle-current-owners';
+  bundled = await bundleOwners();
+  bundled.setFilePersistenceEnabled(false);
+  const tools = Array.from({ length: DEFERRED_COUNT }, (_, index) => deferred(index));
+  const pinned = [...bundled.PINNED_TOOL_NAMES];
+  const registry = bundled.createCoreToolRegistry();
+  const admittedBuiltin = new Map(pinned.map(name => [name, registry.get(name)]));
+  check([...admittedBuiltin.values()].every(Boolean), 'actual-pinned-registry-definitions-missing');
+  const full = [...admittedBuiltin.values(), ...tools];
+  receipt.surfaces = { full: surface(bundled.toolSchemas(new Map(full.map(tool => [tool.name, tool])))) };
+  const config = { ...bundled.getRuntimeConfig(workspace), agentMode: 'build', toolDiscovery: 'dynamic', enableMcpTools: false,
+    disabledTools: [], hiddenToolPrefixes: [], offline: true, instructionBudgetBytes: 0 };
+  stage = 'actual-prompt-preparation';
+  const began = performance.now();
+  const prepared = await bundled.preparePromptRequest({ workspaceRoot: workspace, sessionId: 'catalogue-fixture', runtimeConfig: config,
+    catalogContent: { skills: new Map(), tools } }, () => admittedBuiltin);
+  receipt.promptPreparationMs = performance.now() - began;
+  const discovery = prepared.discovery;
+  check(discovery, 'dynamic-discovery-missing');
+  const meta = [bundled.DISCOVERY_SEARCH_TOOL, bundled.DISCOVERY_LOAD_TOOL];
+  check(discovery.catalog.size === DEFERRED_COUNT + pinned.length, 'admitted-catalogue-size-mismatch');
+  check(equal([...prepared.currentTools().keys()], [...pinned, ...meta]), 'initial-six-plus-meta-mismatch');
+  receipt.pinned = pinned;
+  receipt.metaTools = meta;
+  receipt.surfaces.initial = surface(prepared.currentOverhead().tools);
+  check(receipt.surfaces.initial.tools === 8, 'initial-declaration-count');
+  stage = 'twenty-catalogue-checks';
+  const initialGeneration = sample('generationUnchanged', () => discovery.generation);
+  sample('initialSnapshot', () => discovery.snapshot());
+  const matches = sample('schemaOnlySearch', () => discovery.search(CAPABILITY, 8));
+  check(matches.length === 1 && matches[0].name === TARGET && matches[0].loaded === false && matches[0].pinned === false,
+    'unique-local-ref-rank-mismatch');
+  const firstSystem = prepared.currentOverhead().systemPrompt;
+  const loadResult = discovery.load([TARGET]);
+  check(equal(loadResult, { loaded: [TARGET], rejected: [] }), 'target-load-mismatch');
+  const loaded = prepared.currentOverhead();
+  check(loaded.tools.length === 9 && equal(loaded.tools.find(tool => tool.function.name === TARGET)?.function.parameters, tools[0].argsSchema),
+    'loaded-schema-exactness-mismatch');
+  check(loaded.systemPrompt === firstSystem, 'assembled-system-mutated-during-load');
+  receipt.surfaces.afterOneLoad = surface(loaded.tools);
+  receipt.loadedMatches = matches.map(match => ({ name: match.name, loaded: match.loaded, pinned: match.pinned }));
+  const stale = prepared.currentTools().get(TARGET);
+  const context = { workspaceRoot: workspace, taskId: 'local-catalogue-fixture' };
+  const preparation = await stale.prepare({ filter: { selector: 'first' } }, context);
+  const beforeMutation = discovery.generation;
+  stage = 'mutable-contract-revalidation';
+  tools[0].argsSchema.$defs.Filter.properties.selector.description = 'cinnabar976413';
+  const changed = discovery.generation;
+  check(changed !== beforeMutation, 'mutable-generation-not-revoked');
+  let refusedExecute = false, refusedPrepared = false;
+  try { await stale.execute({ filter: { selector: 'first' } }, context); }
+  catch (error) { refusedExecute = error?.name === 'ToolGenerationError'; }
+  try { await preparation.execute(context); }
+  catch (error) { refusedPrepared = error?.name === 'ToolGenerationError'; }
+  check(refusedExecute && refusedPrepared && targetEffects === 0 && preparedEffects === 0, 'stale-effect-was-not-refused');
+  const current = prepared.currentTools().get(TARGET);
+  check((await current.execute({ filter: { selector: 'first' } }, context)).success && targetEffects === 1,
+    'fresh-contract-not-callable');
+  receipt.mutableContract = { initialGeneration, beforeMutation, changedGeneration: changed,
+    oldExecuteRefused: refusedExecute, preparedEffectRefused: refusedPrepared, oldEffects: 0, freshEffects: targetEffects };
+  sample('generationAfterMutation', () => discovery.generation);
+  sample('snapshotAfterMutation', () => discovery.snapshot());
+  stage = 'loaded-limit';
+  const names = tools.slice(1, LOADED_LIMIT + 1).map(tool => tool.name);
+  const loading = discovery.load(names);
+  check(loading.loaded.length === LOADED_LIMIT - 1 && equal(loading.rejected, [names.at(-1)]), 'loaded-limit-not-enforced');
+  const atLimit = prepared.currentOverhead();
+  check(atLimit.tools.length === pinned.length + meta.length + LOADED_LIMIT, 'loaded-limit-surface-mismatch');
+  const pinnedLoad = discovery.load([pinned[0]]);
+  check(equal(pinnedLoad, { loaded: [pinned[0]], rejected: [] }), 'pinned-load-budget-mismatch');
+  check(equal(discovery.load([tools[LOADED_LIMIT + 1].name]), { loaded: [], rejected: [tools[LOADED_LIMIT + 1].name] }),
+    'loaded-limit-overflow-not-refused');
+  receipt.surfaces.atLoadedLimit = surface(atLimit.tools);
+  receipt.loadedLimit = { value: LOADED_LIMIT, deferredAccepted: loading.loaded.length + 1,
+    rejected: loading.rejected, pinnedExplicitLoadAccepted: true, resultingDeclarations: atLimit.tools.length };
+  sample('generationAtLoadedLimit', () => discovery.generation);
+  sample('snapshotAtLoadedLimit', () => discovery.snapshot());
+  sample('overheadAtLoadedLimit', () => prepared.currentOverhead());
+  const changedMatches = sample('schemaOnlySearchAtLoadedLimit', () => discovery.search('cinnabar976413', 8));
+  check(changedMatches.length === 1 && changedMatches[0].name === TARGET && changedMatches[0].loaded,
+    'changed-loaded-schema-search-mismatch');
+  check(receipt.inputs.every(input => hash(fs.readFileSync(path.join(repo, input.path))) === input.sha256),
+    'source-inputs-changed-during-probe');
+  receipt.sourceInputsUnchanged = true;
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage;
+  if (stage === 'bundle-current-owners') receipt.bundleErrors = (error?.errors ?? []).map(item => ({
+    text: item.text, file: item.location?.file ?? null, line: item.location?.line ?? null,
+  }));
+  receipt.failure = { code: error?.probeCode ?? 'local-catalogue-operation-failed',
+    category: stage === 'bundle-current-owners' ? 'scratch-bundle-or-environment' : 'product-or-probe-contract' };
+  receipt.failureLine = String(error?.stack ?? '').match(/catalogue\.mjs:(\d+)/)?.[1] ?? null;
+  process.exitCode = 1;
+} finally {
+  for (const [key, value] of previousEnv) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  try { if (root) fs.rmSync(root, { recursive: true, force: true }); }
+  catch { receipt.status = 'failed'; process.exitCode = 1; }
+  receipt.privateStateRemoved = !root || !fs.existsSync(root);
+  if (!receipt.privateStateRemoved) { receipt.status = 'failed'; process.exitCode = 1; }
+  fs.writeFileSync(path.join(directory, 'catalogue.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
+  console.log(JSON.stringify({ status: receipt.status, failedStage: receipt.failedStage ?? null, failure: receipt.failure ?? null,
+    deferredDefinitions: DEFERRED_COUNT, samples: SAMPLE_COUNT, surfaces: receipt.surfaces,
+    privateStateRemoved: receipt.privateStateRemoved }));
+}

@@ -1,0 +1,6 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/sdk/ui.test.ts src/sdk/ui/retirement.test.ts src/config/publication.test.ts src/config/inputs/publication.test.ts src/config/scope/admission.test.ts src/core/shell/configurationRefusal.test.ts src/sdk/lifecycle.test.ts src/sdk/resourceLoader.test.ts src/cli/interactive/extensions.test.ts src/cli/runtime/extensions.test.ts src/extensions/runtime/ui.test.ts src/extensions/runtime/initialization.test.ts src/extensions/runtime/inProcessLoader.test.ts src/extensions/extensions.test.ts --no-file-parallelism --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/ui-renewal-validation/blocked-repair-combined.json
+(node:1249732) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+JSON report written to /home/wang/projects/cheers/.tmp/ui-renewal-validation/blocked-repair-combined.json

@@ -1,0 +1,5 @@
+{
+  "packages/ts-shell/src/core/tools/discovery/state.ts": "3377ea925331a741d42d9cb014b1f74fe0cc1cffe5b92fd36302d248e59be1b7",
+  "packages/ts-shell/src/core/tools/discovery/contract.test.ts": "d6492754c4afa64e3494c89c6debbbba33ed09b034060cacdc7ed1165332f6da",
+  "packages/ts-shell/src/core/tools/discovery/ranker.test.ts": "157b298dc88e4f21354e7e4fa0accb1dfe9bfc05a9cbd85fbb73e92f9ef740cc"
+}

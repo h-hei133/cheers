@@ -1,0 +1,125 @@
+--- a/packages/ts-shell/src/sdk/ui.test.ts
++++ b/packages/ts-shell/src/sdk/ui.test.ts
+@@ -2,7 +2,7 @@
+ import os from 'node:os';
+ import path from 'node:path';
+ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+-import { createAgentSession, DefaultResourceLoader, type ExtensionAPI } from '../index.js';
++import { createAgentSession, DefaultResourceLoader, type AgentSession, type ExtensionAPI, type ExtensionUiHost } from '../index.js';
+ 
+ let root: string;
+ beforeEach(() => {
+@@ -47,3 +47,113 @@
+   await observed;
+   expect(signal?.aborted).toBe(true);
+ });
++
++function held<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
++  let resolve!: (value: T) => void;
++  const promise = new Promise<T>(accept => { resolve = accept; });
++  return { promise, resolve };
++}
++
++function publishSameBinding(session: AgentSession): void {
++  const state = session.runtimeContext.configuration;
++  const before = state.current;
++  const substrate = state.substrateRevision;
++  const background = state.backgroundSignal;
++  const result = state.publish(state.begin(before.binding), before.requested, before.binding);
++  expect(result.status).toBe('applied');
++  expect(state.current.revision).toBeGreaterThan(before.revision);
++  expect(state.current.binding).toEqual(before.binding);
++  expect(state.substrateRevision).toBe(substrate);
++  expect(background.aborted).toBe(true);
++  expect(state.backgroundSignal.aborted).toBe(false);
++}
++
++it.each(['options.ui', 'bindUi'] as const)(
++  'renews retained %s after same-binding publication without reviving old input hooks', async mode => {
++    let api!: ExtensionAPI;
++    const answers: Array<{ prompt: string; answer: string | undefined }> = [];
++    const continuations: Array<string | undefined> = [];
++    const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true,
++      extensionFactories: [value => {
++        api = value;
++        value.on('input', async payload => {
++          const prompt = (payload as { prompt: string }).prompt;
++          const answer = await value.ui.input(prompt);
++          answers.push({ prompt, answer });
++          value.ui.notify(`Answered ${prompt}`);
++          if (prompt === 'Before publication') continuations.push(await value.ui.input('Old continuation'));
++          return { decision: 'block', reason: 'SDK UI publication fixture' };
++        });
++      }] });
++    await loader.reload();
++    const original = held<string | undefined>();
++    const next = held<string | undefined>();
++    const signals: Array<AbortSignal | undefined> = [];
++    const input = vi.fn<NonNullable<ExtensionUiHost['input']>>((title, _placeholder, options) => {
++      signals.push(options?.signal);
++      if (title === 'Before publication') return original.promise;
++      if (title === 'After publication') return next.promise;
++      return Promise.resolve('Unexpected input');
++    });
++    const notify = vi.fn();
++    const host: ExtensionUiHost = { input, notify };
++    const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all',
++      ...(mode === 'options.ui' ? { ui: host } : {}) });
++    const release = mode === 'bindUi' ? session.bindUi(host) : undefined;
++    try {
++      const firstPrompt = session.prompt('Before publication');
++      const firstObserved = firstPrompt.catch(() => undefined);
++      await vi.waitFor(() => expect(input).toHaveBeenCalledTimes(1));
++      expect(signals[0]?.aborted).toBe(false);
++      publishSameBinding(session);
++      expect(signals[0]?.aborted).toBe(true);
++      await firstObserved;
++      expect(answers).toEqual([{ prompt: 'Before publication', answer: undefined }]);
++      expect(continuations).toEqual([undefined]);
++      expect(input).toHaveBeenCalledTimes(1);
++      expect(notify).not.toHaveBeenCalled();
++
++      let nextSettled = false;
++      const nextPrompt = session.prompt('After publication');
++      const nextObserved = nextPrompt.then(() => { nextSettled = true; }, () => { nextSettled = true; });
++      await vi.waitFor(() => expect(input).toHaveBeenCalledTimes(2));
++      expect(input.mock.calls[1]?.[0]).toBe('After publication');
++      expect(signals[1]?.aborted).toBe(false);
++      original.resolve('Late original answer');
++      await new Promise<void>(resolve => setImmediate(resolve));
++      expect(nextSettled).toBe(false);
++      expect(signals[1]?.aborted).toBe(false);
++      expect(answers).toEqual([{ prompt: 'Before publication', answer: undefined }]);
++      expect(notify).not.toHaveBeenCalled();
++      next.resolve('Fresh answer');
++      await nextObserved;
++      expect(answers).toEqual([
++        { prompt: 'Before publication', answer: undefined },
++        { prompt: 'After publication', answer: 'Fresh answer' },
++      ]);
++      expect(notify).toHaveBeenCalledTimes(1);
++      expect(notify).toHaveBeenCalledWith('Answered After publication');
++
++      const successorInput = vi.fn(async () => 'Explicit replacement');
++      const successorNotify = vi.fn();
++      const releaseSuccessor = session.bindUi({ input: successorInput, notify: successorNotify });
++      release?.();
++      await session.prompt('Explicit successor').catch(() => undefined);
++      expect(successorInput).toHaveBeenCalledTimes(1);
++      expect(answers.at(-1)).toEqual({ prompt: 'Explicit successor', answer: 'Explicit replacement' });
++      expect(successorNotify).toHaveBeenCalledTimes(1);
++      expect(successorNotify).toHaveBeenCalledWith('Answered Explicit successor');
++      releaseSuccessor();
++      publishSameBinding(session);
++      await session.prompt('After release').catch(() => undefined);
++      expect(answers.at(-1)).toEqual({ prompt: 'After release', answer: undefined });
++      expect(input).toHaveBeenCalledTimes(2);
++      expect(successorInput).toHaveBeenCalledTimes(1);
++      expect(successorNotify).toHaveBeenCalledTimes(1);
++    } finally { await session.dispose(); }
++    expect(() => session.bindUi(host)).toThrow(/disposed/i);
++    await expect(session.prompt('After dispose')).rejects.toThrow(/disposed/i);
++    await expect(Promise.resolve().then(() => api.ui.input('After dispose'))).rejects.toThrow(/retired/i);
++    expect(input).toHaveBeenCalledTimes(2);
++  },
++);

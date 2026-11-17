@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 2,
+  "date": "2026-11-17",
+  "reviewer": "/root/ui_review",
+  "scope": "E.5 SDK retained UI renewal through the original shared host, with blocked-publication revocation",
+  "verdict": "APPROVE",
+  "source": {
+    "packages/ts-shell/src/config/state.ts": "a968bf0f6f02a7032b292243ba184739059358f6dc146cbd03cd239a8bc170c8",
+    "packages/ts-shell/src/sdk/agentSession.ts": "defb6005939318778029bb3f5cc6b65815d3d84c316edee07126fa3a8e15e502",
+    "packages/ts-shell/src/sdk/ui.ts": "052ccfe1a1c753b6c50d2e99947eddfba2ef70b2c05069f5fd923e0eca484b26",
+    "packages/ts-shell/src/sdk/ui.test.ts": "43d7d352b0818c71b84c03178deec86ab5a1eb8f7e2559fbc5166a18ee832592",
+    "packages/ts-shell/src/sdk/ui/retirement.test.ts": "c65bb95ccbfbd23254ddef2c11927ef8d48a10f3db82d08d5a07b68651135a2f",
+    "packages/ts-shell/src/sdk/ui/installed.test.ts": "894b0ff80374a2775d8bd50e4789988a9e8906ed50ab9a1fdc8bde43ef83eee7",
+    "packages/ts-shell/src/cli/runtime/extensions/host.ts": "945c1a2aeab17306c7a9e8b14813a516c719e1ffc148266b4c8075a24617bfab"
+  },
+  "inspectedUnchangedSeams": {
+    "packages/ts-shell/src/sdk/resourceLoader.ts": "0d686088b5ea8e5f65236a0f3a3d11e2c153ab766f4bc396093c18af0bbc2e04",
+    "packages/ts-shell/src/extensions/runtime/context.ts": "9fa24c6186ea8f1cd67871d99b41b8836f60e74db2ebf461a11637ff83321aa0",
+    "packages/ts-shell/src/extensions/runtime/ui.ts": "14a60aad1f4f60221c7ebe59a92b1747396120d5b5f636d64362044394594cc6",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "e6ba89ec1c80300924e9c959f19b68a8229d8cde7bf1acc7da68e05558ee1806",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "9a55c984a726a68f60e13b345bd74824598f944429d959f7bbaa819cd2deeb52"
+  },
+  "findings": [],
+  "resolvedFindings": [
+    {
+      "id": "SDK_UI_BLOCKED_PUBLICATION_RENEWAL",
+      "originalReview": "review-blocked-request-changes.json",
+      "originalRootRed": "blocked-unobserved-red.json",
+      "resolution": "ConfigState records a monotonic revocationRevision whenever reject receives block=true. SessionUi.bind captures that revision in the retained admission; later correction cannot make it equal again. Explicit bind captures the corrected revision and remains usable without changing substrateRevision or replacing the shared host.",
+      "coverage": [
+        "Unobserved and observed blocked rejectCandidate paths.",
+        "Security-invalid candidate followed by correction without UI access.",
+        "Application-unverified publication followed by correction without UI access.",
+        "Existing substrateRevision remains unchanged and explicit bindUi can acquire fresh usable authority."
+      ]
+    },
+    {
+      "id": "INSTALLED_WORKER_SHARED_HOST_RENEWAL",
+      "originalRootRed": "installed-red.json",
+      "originalRootAssertionFailures": 2,
+      "resolution": "SessionUi owns a refresh callback registered on the original HostState. The raw host.ui getter invokes it after original host admission and before reading the current surface. SDK loader, SDK contributions, CLI file extensions and ExtensionService retain that same bridge; no SDK-only facade or duplicate host remains.",
+      "coverage": "Two actual executeInProcessScript workers use the raw shared host directly for options.ui and bindUi. The fresh worker reaches the renewed input host without any intervening SDK UI call; the original worker continuation and late result remain cancelled."
+    }
+  ],
+  "reviewedInvariants": [
+    {
+      "invariant": "Same-binding successful publication permits only fresh calls to reacquire UI.",
+      "evidence": "sdk/ui.ts current checks retained admission, accepted configuration object and diagnostics before using the existing binder. ConfigState abort-before-publication ordering preserves old dialog cancellation; lazy renewal runs only on a new raw host.ui acquisition."
+    },
+    {
+      "invariant": "Previously admitted callbacks never acquire a replacement UI.",
+      "evidence": "extensions/runtime/context.ts stores the captured UI in AsyncLocalStorage; collector APIs use currentExtensionInvocation.ui. Worker dispatch captures options.host.ui before starting the worker and retains that snapshot for every worker RPC."
+    },
+    {
+      "invariant": "Blocked publications revoke a retained host even if no API call observes them.",
+      "evidence": "ConfigState reject(block=true) increments revocationGeneration synchronously before publishing refusal state. SessionUi admission compares the originally captured revision; corrected current state does not erase this fact. Ordinary nonblocking rejection leaves the counter unchanged."
+    },
+    {
+      "invariant": "Existing session, workspace, trust, profile and substrate admission remains authoritative.",
+      "evidence": "SessionUi retains original configurationAdmission and raw host identity. HostState checks its original captured configuration admission before invoking refresh. Existing revisions reject A-to-B-to-A; no second substrate generation or host reconstruction was added."
+    },
+    {
+      "invariant": "Refresh ownership is released without removing a later owner.",
+      "evidence": "bindExtensionUiRefreshFor captures the original HostState and callback; release clears only state.refreshUi===refresh. close clears that state's refresh callback before releasing UI. SessionUi.dispose retires refresh before release and cleanup."
+    },
+    {
+      "invariant": "Refresh does not recursively read raw host.ui.",
+      "evidence": "Final SessionUi.current and install only invoke admission and bindExtensionUiFor. Neither reads shared.ui nor a facade getter. The original host getter reads surfaces once after refresh."
+    },
+    {
+      "invariant": "Explicit replacement and old releases preserve successor authority.",
+      "evidence": "SessionUi.release clears only its captured retained object and releases that binding; old release callbacks cannot delete a new retained object. Successful same-binding renewal keeps the same retained owner while replacing only its retired surface."
+    },
+    {
+      "invariant": "Ordinary abort remains reusable and disposal retains settlement/failure behavior.",
+      "evidence": "Existing cancelExtensionUiFor replaces the wrapper under the same binding; fresh raw host reads receive that wrapper. AgentSession.dispose retires SessionUi before loader/runtime cleanup and retains first-error aggregation and shared disposal promise."
+    },
+    {
+      "invariant": "Non-UI shared-host capabilities remain on their original owner.",
+      "evidence": "AgentSession resource binding and SDK event accessor again use the original extensionHostFor bridge. No inherited facade or spread changes the getActiveTools/getAllTools/getCommands/sendMessage/appendEntry contracts."
+    }
+  ],
+  "inspectedExistingValidation": {
+    "reviewerExecuted": false,
+    "finalCombined": {
+      "receipt": "shared-owner-combined.json",
+      "commandLog": "shared-owner-combined.log",
+      "files": 15,
+      "tests": 168,
+      "passed": 168,
+      "failed": 0,
+      "success": true,
+      "sourceState": "Final original shared-host implementation inspected above"
+    },
+    "staticInSameCommandLog": {
+      "status": "passed",
+      "commandLog": "shared-owner-combined.log",
+      "dependencyCycles": 0,
+      "productionModules": 2662,
+      "productionMonoliths": 0,
+      "docsSourceAdvisories": 119
+    },
+    "priorCounterexamples": {
+      "sdkFreshCalls": {
+        "receipt": "red.json",
+        "assertionFailures": 2
+      },
+      "unobservedBlockedPublication": {
+        "receipt": "blocked-unobserved-red.json",
+        "selectedCases": 2,
+        "assertionFailures": 1,
+        "passedControls": 1
+      },
+      "installedWorkerFreshCalls": {
+        "receipt": "installed-red.json",
+        "selectedCases": 2,
+        "assertionFailures": 2
+      }
+    },
+    "historicalReversals": {
+      "receipt": "reversals.json",
+      "status": "passed",
+      "count": 2,
+      "restoredExactly": true,
+      "mainSourcesMutated": false,
+      "boundary": "These reversals and current-sources.json capture the earlier five-file implementation, before final shared-host callback integration. They do not prove the final seven-file source/build state or shared-host callback reversal."
+    }
+  },
+  "residualRisks": [
+    "Approval is limited to the seven captured files and the inspected source contracts; it does not promote E.5 as a whole.",
+    "The installed.test.ts cases use the actual worker execution owner with an inert manually constructed VersionRecord. They do not prove signed archive install, registry/grant lifecycle, integrity rechecks or a complete installed ExtensionService invocation.",
+    "Current compiled-native and signed installed async-TS/shared-host qualification remain owned by Root; the reviewer ran neither.",
+    "Current-sources.json and its buildId belong to the earlier five-file state. Root must bind final compilation and native evidence to the final seven-file source state.",
+    "No package installation, other-platform, physical UI, provider, full-repository or remote CI claim follows from this review."
+  ],
+  "execution": {
+    "sourceEdits": false,
+    "testsRun": false,
+    "buildRun": false,
+    "verificationGatesRun": false,
+    "providerCalls": false,
+    "normproofRun": false,
+    "onlyWrittenFile": ".tmp/ui-renewal-validation/review.json"
+  }
+}

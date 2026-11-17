@@ -1,0 +1,1 @@
+{"status":"failed","failedStage":"bundle-current-owners","failure":{"code":"local-catalogue-operation-failed","category":"scratch-bundle-or-environment"},"deferredDefinitions":2000,"samples":20,"privateStateRemoved":true}

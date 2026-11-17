@@ -1,0 +1,3 @@
+JSON report written to /home/wang/projects/cheers/.tmp/ui-renewal-validation/reversal-fresh-sdk-call-renewal.json
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/sdk/ui.test.ts -t renews retained --no-file-parallelism --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/ui-renewal-validation/reversal-fresh-sdk-call-renewal.json

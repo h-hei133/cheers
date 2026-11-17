@@ -1,0 +1,653 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "publicCompiledSdk": true,
+  "configuredProvider": true,
+  "probeSha256": "1c4119fa6af82a367e2cc37f74a731760349e76ed7c876c5a789bc0760640cf4",
+  "cases": [
+    {
+      "name": "allowed",
+      "calls": [
+        {
+          "id": "call_22deace0d6d44ebc927586018b45798c",
+          "name": "tool_search",
+          "schemaQueryExact": true,
+          "singleStepLoad": true,
+          "selectedInputExact": null
+        },
+        {
+          "id": "call_718a900352d14476bd771542a7669813",
+          "name": "record_lookup",
+          "schemaQueryExact": null,
+          "singleStepLoad": null,
+          "selectedInputExact": true
+        }
+      ],
+      "results": [
+        {
+          "id": "call_22deace0d6d44ebc927586018b45798c",
+          "name": "tool_search",
+          "success": true,
+          "outputSha256": "cb118bbb0ae775e000c71cb64a6b31ac53e6d170037b963969d69c641c655651",
+          "outputBytes": 265,
+          "marker": false,
+          "hookBlock": false,
+          "search": {
+            "queryExact": true,
+            "matches": [
+              {
+                "name": "record_lookup",
+                "loaded": false,
+                "pinned": false
+              }
+            ],
+            "loaded": [
+              "record_lookup"
+            ],
+            "rejected": [],
+            "generation": "b30086a224a14d10f30e49ffe76f351efbb90de0617d6f310a9d80891b1ea51c"
+          }
+        },
+        {
+          "id": "call_718a900352d14476bd771542a7669813",
+          "name": "record_lookup",
+          "success": true,
+          "outputSha256": "7ad60f517f07bed5d6c4efb8530541ef40f00fc0b9e0fc84b4377675e9b41d2d",
+          "outputBytes": 32,
+          "marker": true,
+          "hookBlock": false
+        }
+      ],
+      "approvals": [
+        {
+          "name": "tool_search",
+          "outcome": "approved"
+        },
+        {
+          "name": "record_lookup",
+          "outcome": "approved"
+        }
+      ],
+      "effects": 1,
+      "visibleEffects": 0,
+      "blockedHooks": 0,
+      "terminalStatus": "completed",
+      "configuredTargetAdmitted": true,
+      "actualRequests": 3,
+      "acknowledged": true,
+      "answerSha256": "42631743f18ad223edc7346172cbdf6de4b2a227d0ba6561c13aea21587ba874",
+      "schemaOnlyQueryObserved": true,
+      "nextSchemaExact": true,
+      "systemStableDuringLoad": true,
+      "passed": true
+    },
+    {
+      "name": "blocked",
+      "calls": [
+        {
+          "id": "call_2e28d4d8471c42c698ae131c1b3198c7",
+          "name": "tool_search",
+          "schemaQueryExact": true,
+          "singleStepLoad": true,
+          "selectedInputExact": null
+        },
+        {
+          "id": "call_4fcd4ac31648440db1c452751d48cc91",
+          "name": "record_lookup",
+          "schemaQueryExact": null,
+          "singleStepLoad": null,
+          "selectedInputExact": true
+        }
+      ],
+      "results": [
+        {
+          "id": "call_2e28d4d8471c42c698ae131c1b3198c7",
+          "name": "tool_search",
+          "success": true,
+          "outputSha256": "cb118bbb0ae775e000c71cb64a6b31ac53e6d170037b963969d69c641c655651",
+          "outputBytes": 265,
+          "marker": false,
+          "hookBlock": false,
+          "search": {
+            "queryExact": true,
+            "matches": [
+              {
+                "name": "record_lookup",
+                "loaded": false,
+                "pinned": false
+              }
+            ],
+            "loaded": [
+              "record_lookup"
+            ],
+            "rejected": [],
+            "generation": "b30086a224a14d10f30e49ffe76f351efbb90de0617d6f310a9d80891b1ea51c"
+          }
+        },
+        {
+          "id": "call_4fcd4ac31648440db1c452751d48cc91",
+          "name": "record_lookup",
+          "success": false,
+          "outputSha256": "078621692cf91f2772564c59dc5346d446a771687f8f4980e41979cdc1513937",
+          "outputBytes": 51,
+          "marker": false,
+          "hookBlock": true
+        }
+      ],
+      "approvals": [
+        {
+          "name": "tool_search",
+          "outcome": "approved"
+        },
+        {
+          "name": "record_lookup",
+          "outcome": "approved"
+        }
+      ],
+      "effects": 0,
+      "visibleEffects": 0,
+      "blockedHooks": 1,
+      "terminalStatus": "completed",
+      "configuredTargetAdmitted": true,
+      "actualRequests": 3,
+      "acknowledged": true,
+      "answerSha256": "7a55f6e97131fb1b7de965611cd7327b4bfd0655c82524862c24098acc05dba4",
+      "schemaOnlyQueryObserved": true,
+      "nextSchemaExact": true,
+      "systemStableDuringLoad": true,
+      "passed": true
+    },
+    {
+      "name": "hidden",
+      "calls": [
+        {
+          "id": "call_fb0f1582654849fdb317604fe9de00a7",
+          "name": "tool_search",
+          "schemaQueryExact": true,
+          "singleStepLoad": true,
+          "selectedInputExact": null
+        }
+      ],
+      "results": [
+        {
+          "id": "call_fb0f1582654849fdb317604fe9de00a7",
+          "name": "tool_search",
+          "success": true,
+          "outputSha256": "0bc9ea0d9e8c1ea96017dd48bd721dee4c09624e9b62741b2ef685184aea77a0",
+          "outputBytes": 223,
+          "marker": false,
+          "hookBlock": false,
+          "search": {
+            "queryExact": true,
+            "matches": [],
+            "loaded": [],
+            "rejected": [],
+            "generation": "5b4d7d4de8fcb0efdc1d6330ec0a7ad648c794ee6ba6b7383214fe4073e63401"
+          }
+        }
+      ],
+      "approvals": [
+        {
+          "name": "tool_search",
+          "outcome": "approved"
+        }
+      ],
+      "effects": 0,
+      "visibleEffects": 0,
+      "blockedHooks": 0,
+      "terminalStatus": "completed",
+      "configuredTargetAdmitted": true,
+      "actualRequests": 2,
+      "acknowledged": true,
+      "answerSha256": "04d15339c7bd6fa3a86b75f291e5f2d19816daee722db22f45e02ed71cd5b811",
+      "hiddenTargetAbsent": true,
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "stage": "allowed",
+      "bodySent": true,
+      "requestBytes": 2897,
+      "requestSha256": "3f1318d6e45331c7aa64bd4a2c4a4459e846cc5ba931ff28d51162f38055e892",
+      "declarations": [
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157,
+          "targetSchemaExact": null
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131,
+          "targetSchemaExact": null
+        }
+      ],
+      "toolResults": [],
+      "schemaSha256": "bc6fb94bc9e9d0e02bd47ab11b01929f27bae797f91f68f0c0ff7a3a46f42981",
+      "systemSha256": "179483dfb41b19a9083e752f02fea34c14bad7ad2a8eb6f95440663104988c89",
+      "systemBytes": 1358,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 5132,
+      "responseSha256": "987d1fa5342a433a6275f558c74e8e464e49c47acb3cd60ff77dfa0ada90ee58",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 18,
+        "completionMarker": true
+      }
+    },
+    {
+      "stage": "allowed",
+      "bodySent": true,
+      "requestBytes": 3820,
+      "requestSha256": "cac72744a0babaf7710bce9e492bd8a4ba99f2c339fa43656c5ebd88fbe002c6",
+      "declarations": [
+        {
+          "name": "record_lookup",
+          "schemaSha256": "533e4eb3712d279a21619906bb896516bb9bff01454fe5e34ac915b9d22625c7",
+          "schemaBytes": 214,
+          "targetSchemaExact": true
+        },
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157,
+          "targetSchemaExact": null
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131,
+          "targetSchemaExact": null
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "call_22deace0d6d44ebc927586018b45798c",
+          "sha256": "cb118bbb0ae775e000c71cb64a6b31ac53e6d170037b963969d69c641c655651",
+          "bytes": 265,
+          "marker": false,
+          "search": {
+            "queryExact": true,
+            "matches": [
+              {
+                "name": "record_lookup",
+                "loaded": false,
+                "pinned": false
+              }
+            ],
+            "loaded": [
+              "record_lookup"
+            ],
+            "rejected": [],
+            "generation": "b30086a224a14d10f30e49ffe76f351efbb90de0617d6f310a9d80891b1ea51c"
+          }
+        }
+      ],
+      "schemaSha256": "3650b6c5f60ca1bff532f362caa78edfb7657af8ca3fdba608f36a1c7f9cf6e5",
+      "systemSha256": "179483dfb41b19a9083e752f02fea34c14bad7ad2a8eb6f95440663104988c89",
+      "systemBytes": 1358,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 2573,
+      "responseSha256": "39a737fcf1e22ec3ffeeb19cdf9bc76a4b679949f33161a10d4ff91809114e00",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 9,
+        "completionMarker": true
+      }
+    },
+    {
+      "stage": "allowed",
+      "bodySent": true,
+      "requestBytes": 4125,
+      "requestSha256": "245d6aab3f3b03c62164e6ef2abe944b04f9b5f8ffaebf4668b2bcf4b7bad2ff",
+      "declarations": [
+        {
+          "name": "record_lookup",
+          "schemaSha256": "533e4eb3712d279a21619906bb896516bb9bff01454fe5e34ac915b9d22625c7",
+          "schemaBytes": 214,
+          "targetSchemaExact": true
+        },
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157,
+          "targetSchemaExact": null
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131,
+          "targetSchemaExact": null
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "call_22deace0d6d44ebc927586018b45798c",
+          "sha256": "cb118bbb0ae775e000c71cb64a6b31ac53e6d170037b963969d69c641c655651",
+          "bytes": 265,
+          "marker": false,
+          "search": {
+            "queryExact": true,
+            "matches": [
+              {
+                "name": "record_lookup",
+                "loaded": false,
+                "pinned": false
+              }
+            ],
+            "loaded": [
+              "record_lookup"
+            ],
+            "rejected": [],
+            "generation": "b30086a224a14d10f30e49ffe76f351efbb90de0617d6f310a9d80891b1ea51c"
+          }
+        },
+        {
+          "id": "call_718a900352d14476bd771542a7669813",
+          "sha256": "7ad60f517f07bed5d6c4efb8530541ef40f00fc0b9e0fc84b4377675e9b41d2d",
+          "bytes": 32,
+          "marker": true
+        }
+      ],
+      "schemaSha256": "3650b6c5f60ca1bff532f362caa78edfb7657af8ca3fdba608f36a1c7f9cf6e5",
+      "systemSha256": "179483dfb41b19a9083e752f02fea34c14bad7ad2a8eb6f95440663104988c89",
+      "systemBytes": 1358,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 6375,
+      "responseSha256": "0a942dfc3ba85e1ce50d912ce313b18282553905492d7c7cdd7394d3d2a16f48",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 26,
+        "completionMarker": true
+      }
+    },
+    {
+      "stage": "blocked",
+      "bodySent": true,
+      "requestBytes": 2897,
+      "requestSha256": "3f1318d6e45331c7aa64bd4a2c4a4459e846cc5ba931ff28d51162f38055e892",
+      "declarations": [
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157,
+          "targetSchemaExact": null
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131,
+          "targetSchemaExact": null
+        }
+      ],
+      "toolResults": [],
+      "schemaSha256": "bc6fb94bc9e9d0e02bd47ab11b01929f27bae797f91f68f0c0ff7a3a46f42981",
+      "systemSha256": "179483dfb41b19a9083e752f02fea34c14bad7ad2a8eb6f95440663104988c89",
+      "systemBytes": 1358,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 5132,
+      "responseSha256": "2f383fd151cf2196a69ea6ff326aa0cd85072785772f5ee321d466b29e1fb899",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 18,
+        "completionMarker": true
+      }
+    },
+    {
+      "stage": "blocked",
+      "bodySent": true,
+      "requestBytes": 3820,
+      "requestSha256": "bc051e61ee1a364f5b196acb7c4945fb9c09ca7ce2d927c606dfb2bb293f0ab5",
+      "declarations": [
+        {
+          "name": "record_lookup",
+          "schemaSha256": "533e4eb3712d279a21619906bb896516bb9bff01454fe5e34ac915b9d22625c7",
+          "schemaBytes": 214,
+          "targetSchemaExact": true
+        },
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157,
+          "targetSchemaExact": null
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131,
+          "targetSchemaExact": null
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "call_2e28d4d8471c42c698ae131c1b3198c7",
+          "sha256": "cb118bbb0ae775e000c71cb64a6b31ac53e6d170037b963969d69c641c655651",
+          "bytes": 265,
+          "marker": false,
+          "search": {
+            "queryExact": true,
+            "matches": [
+              {
+                "name": "record_lookup",
+                "loaded": false,
+                "pinned": false
+              }
+            ],
+            "loaded": [
+              "record_lookup"
+            ],
+            "rejected": [],
+            "generation": "b30086a224a14d10f30e49ffe76f351efbb90de0617d6f310a9d80891b1ea51c"
+          }
+        }
+      ],
+      "schemaSha256": "3650b6c5f60ca1bff532f362caa78edfb7657af8ca3fdba608f36a1c7f9cf6e5",
+      "systemSha256": "179483dfb41b19a9083e752f02fea34c14bad7ad2a8eb6f95440663104988c89",
+      "systemBytes": 1358,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 2573,
+      "responseSha256": "33755ed886fcbf6b32156ab0b3347b0a5f6ddb596a65130dad747996b1344772",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 9,
+        "completionMarker": true
+      }
+    },
+    {
+      "stage": "blocked",
+      "bodySent": true,
+      "requestBytes": 4144,
+      "requestSha256": "6749eaa54eef615c112a0bc1f4fd3eca504ee0f1484d6b3db2c65aaf049a87c8",
+      "declarations": [
+        {
+          "name": "record_lookup",
+          "schemaSha256": "533e4eb3712d279a21619906bb896516bb9bff01454fe5e34ac915b9d22625c7",
+          "schemaBytes": 214,
+          "targetSchemaExact": true
+        },
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157,
+          "targetSchemaExact": null
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131,
+          "targetSchemaExact": null
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "call_2e28d4d8471c42c698ae131c1b3198c7",
+          "sha256": "cb118bbb0ae775e000c71cb64a6b31ac53e6d170037b963969d69c641c655651",
+          "bytes": 265,
+          "marker": false,
+          "search": {
+            "queryExact": true,
+            "matches": [
+              {
+                "name": "record_lookup",
+                "loaded": false,
+                "pinned": false
+              }
+            ],
+            "loaded": [
+              "record_lookup"
+            ],
+            "rejected": [],
+            "generation": "b30086a224a14d10f30e49ffe76f351efbb90de0617d6f310a9d80891b1ea51c"
+          }
+        },
+        {
+          "id": "call_4fcd4ac31648440db1c452751d48cc91",
+          "sha256": "078621692cf91f2772564c59dc5346d446a771687f8f4980e41979cdc1513937",
+          "bytes": 51,
+          "marker": false
+        }
+      ],
+      "schemaSha256": "3650b6c5f60ca1bff532f362caa78edfb7657af8ca3fdba608f36a1c7f9cf6e5",
+      "systemSha256": "179483dfb41b19a9083e752f02fea34c14bad7ad2a8eb6f95440663104988c89",
+      "systemBytes": 1358,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 5164,
+      "responseSha256": "642a8f1c3b7605f5a4ab6f9711fe7e3d27f0bb4de3beade4cc66d03938c136da",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 21,
+        "completionMarker": true
+      }
+    },
+    {
+      "stage": "hidden",
+      "bodySent": true,
+      "requestBytes": 2703,
+      "requestSha256": "8917c7526fc8315d7dcda8c8a2b92814011e464edf1632f9276fa3e636193e54",
+      "declarations": [
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157,
+          "targetSchemaExact": null
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131,
+          "targetSchemaExact": null
+        }
+      ],
+      "toolResults": [],
+      "schemaSha256": "bc6fb94bc9e9d0e02bd47ab11b01929f27bae797f91f68f0c0ff7a3a46f42981",
+      "systemSha256": "179483dfb41b19a9083e752f02fea34c14bad7ad2a8eb6f95440663104988c89",
+      "systemBytes": 1358,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 5132,
+      "responseSha256": "b91c499c6c32425dfe94e65aaa1b718371421a953ce7cce2d0930fb03f570ab4",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 18,
+        "completionMarker": true
+      }
+    },
+    {
+      "stage": "hidden",
+      "bodySent": true,
+      "requestBytes": 3234,
+      "requestSha256": "4fd230e33c1bea13d7d245fccae8256fbfa45b8e163690435d76b54522b00585",
+      "declarations": [
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157,
+          "targetSchemaExact": null
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131,
+          "targetSchemaExact": null
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "call_fb0f1582654849fdb317604fe9de00a7",
+          "sha256": "0bc9ea0d9e8c1ea96017dd48bd721dee4c09624e9b62741b2ef685184aea77a0",
+          "bytes": 223,
+          "marker": false,
+          "search": {
+            "queryExact": true,
+            "matches": [],
+            "loaded": [],
+            "rejected": [],
+            "generation": "5b4d7d4de8fcb0efdc1d6330ec0a7ad648c794ee6ba6b7383214fe4073e63401"
+          }
+        }
+      ],
+      "schemaSha256": "bc6fb94bc9e9d0e02bd47ab11b01929f27bae797f91f68f0c0ff7a3a46f42981",
+      "systemSha256": "179483dfb41b19a9083e752f02fea34c14bad7ad2a8eb6f95440663104988c89",
+      "systemBytes": 1358,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 5643,
+      "responseSha256": "1946ae9171bca2f20cb4d8a0cfe25c20053f799b29c4350c8029bd03cc9ecfee",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 23,
+        "completionMarker": true
+      }
+    }
+  ],
+  "buildId": "89344ffebd356718e7cba331b8f3ec8defe25c4af3aad7fa5050089e8e042fdc",
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "isolatedValidObjects": true,
+    "minimalConfiguredModelEntry": true,
+    "originalConfiguredCredentials": true,
+    "inventedPrices": false,
+    "inventedRemoteLimits": false,
+    "localContextWindow": 32000,
+    "localOutputCap": 1024,
+    "publishedContextWindow": null,
+    "publishedInputLimit": null,
+    "originalPricesPresent": false
+  },
+  "schema": {
+    "name": "record_lookup",
+    "schemaSha256": "533e4eb3712d279a21619906bb896516bb9bff01454fe5e34ac915b9d22625c7",
+    "capabilityOnlyInSchema": true,
+    "expectedSelectorSha256": "a7937b64b8caa58f03721bb6bacf5c78cb235febe0e70b1b84cd99541461a08e",
+    "noWrites": true
+  },
+  "cacheClaim": "Only local system/schema identity is observed; no provider cache, pricing, TTL, savings or remote-capacity claim.",
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "observerEvents": {
+    "create": 8,
+    "bodySent": 8,
+    "headers": 16,
+    "data": 53,
+    "complete": 0,
+    "retired": 8,
+    "finalized": 8
+  },
+  "actualRequests": 8
+}

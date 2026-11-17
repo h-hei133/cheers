@@ -1,0 +1,22 @@
+{
+  "status": "counterexamples_reproduced",
+  "productionUnchangedDuringRed": true,
+  "tests": 22,
+  "passed": 17,
+  "failed": 5,
+  "genuineAssertionFailures": 3,
+  "fixtureFailures": 2,
+  "classification": [
+    {
+      "tests": "retained SDK schema",
+      "cause": "same object mutable nested schema has stale memoized fingerprint",
+      "category": "product behavior drift"
+    },
+    {
+      "tests": "hidden/disabled search result",
+      "cause": "lookup is shared query term with permitted_lookup; no hidden definition leaked",
+      "category": "harness/setup drift",
+      "repair": "query unique archive and assert permitted capability separately"
+    }
+  ]
+}

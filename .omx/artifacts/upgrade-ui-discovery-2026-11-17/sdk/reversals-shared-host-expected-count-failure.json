@@ -1,0 +1,25 @@
+{
+  "status": "failed",
+  "mainSourcesMutated": false,
+  "cases": [
+    {
+      "name": "fresh-sdk-call-renewal",
+      "processExitCode": 1,
+      "selected": 2,
+      "assertionFailures": 2,
+      "passedControls": 0,
+      "restoredExactly": true
+    },
+    {
+      "name": "unobserved-blocked-publication",
+      "processExitCode": 1,
+      "selected": 4,
+      "assertionFailures": 4,
+      "passedControls": 0,
+      "restoredExactly": true
+    }
+  ],
+  "failure": "Ineffective reversal: unobserved-blocked-publication",
+  "restoredExactly": true,
+  "mainSourcesMatch": true
+}

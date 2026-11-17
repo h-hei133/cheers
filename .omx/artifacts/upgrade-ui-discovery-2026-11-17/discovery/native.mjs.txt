@@ -1,0 +1,495 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { createHash } from 'node:crypto';
+import { channel } from 'node:diagnostics_channel';
+import { gunzipSync, inflateSync, brotliDecompressSync } from 'node:zlib';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseTree, findNodeAtLocation } from 'jsonc-parser';
+
+// Authored only. The main agent builds and executes this serially after integration.
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const MAX_BYTES = 4 * 1024 * 1024;
+const MAX_REQUESTS = 18;
+const SEARCH = 'tool_search';
+const LOAD = 'tool_load';
+const TARGET = 'record_lookup';
+const VISIBLE = 'visible_probe';
+const CAPABILITY = 'chrysoprase824617';
+const SELECTOR = 'first';
+const MARKER = 'DISCOVERY_RECORD_OBSERVED_824617';
+const BLOCK = 'DISCOVERY_NATIVE_HOOK_BLOCK_824617';
+const ACK = 'DISCOVERY_NATIVE_ACK_824617';
+const schema = {
+  type: 'object',
+  $defs: { Selector: { type: 'string', enum: [SELECTOR], description: CAPABILITY } },
+  properties: { selector: { $ref: '#/$defs/Selector' } },
+  required: ['selector'],
+  additionalProperties: false,
+};
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+// Schema/argument ownership follows inert JSON values; decoded records may have null prototypes.
+const equal = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+const textOf = value => typeof value === 'string' ? value : Array.isArray(value)
+  ? value.filter(part => typeof part?.text === 'string').map(part => part.text).join('\n') : '';
+const receipt = { status: 'not_run', platform: process.platform, publicCompiledSdk: true, configuredProvider: true,
+  probeSha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), cases: [], requests: [] };
+const originalHashes = new Map(), previousEnv = new Map(), observations = [], pending = new WeakMap(), captures = new Set();
+const counters = { create: 0, bodySent: 0, headers: 0, data: 0, complete: 0, retired: 0, finalized: 0 };
+const creating = channel('undici:request:create'), sent = channel('undici:request:bodySent');
+const headers = channel('undici:request:headers'), trailers = channel('undici:request:trailers');
+let sdk, configured, selected, owner, root, workspace, storage, fixtureConfig, session, deadline;
+let stage = 'setup', targetOrigin, observerFailure, lastFailure, modelEntry, caseState;
+
+function check(condition, code) {
+  if (condition) return;
+  const error = new Error(code); error.probeCode = code; throw error;
+}
+
+function wireProjection(body) {
+  const declarations = [], results = [], system = [], wireSchemas = [];
+  const addDeclaration = (name, parameters) => {
+    if (typeof name !== 'string' || !parameters || typeof parameters !== 'object') return;
+    const bytes = JSON.stringify(parameters);
+    wireSchemas.push({ name, parameters });
+    declarations.push({ name, schemaSha256: hash(bytes), schemaBytes: Buffer.byteLength(bytes),
+      targetSchemaExact: name === TARGET ? equal(parameters, schema) : null });
+  };
+  const addResult = (id, content) => {
+    const text = textOf(content);
+    const value = { id: typeof id === 'string' ? id : null, sha256: hash(text), bytes: Buffer.byteLength(text), marker: text === MARKER };
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed?.query === CAPABILITY && Array.isArray(parsed.matches) && parsed.matches.length <= 20
+        && parsed.matches.every(match => typeof match?.name === 'string' && match.name.length <= 240)
+        && (!Array.isArray(parsed.loaded) || parsed.loaded.length <= 32 && parsed.loaded.every(name => typeof name === 'string' && name.length <= 240))
+        && (!Array.isArray(parsed.rejected) || parsed.rejected.length <= 32 && parsed.rejected.every(name => typeof name === 'string' && name.length <= 240))) value.search = {
+        queryExact: true,
+        matches: parsed.matches.map(match => ({ name: match.name, loaded: match.loaded === true, pinned: match.pinned === true })),
+        loaded: Array.isArray(parsed.loaded) ? parsed.loaded : [],
+        rejected: Array.isArray(parsed.rejected) ? parsed.rejected : [],
+        generation: typeof parsed.generation === 'string' && /^[a-f0-9]{64}$/.test(parsed.generation) ? parsed.generation : null,
+      };
+    } catch { /* Ordinary tool output is represented only by a digest. */ }
+    results.push(value);
+  };
+  for (const tool of body.tools ?? []) {
+    if (tool.function) addDeclaration(tool.function.name, tool.function.parameters);
+    else if (Array.isArray(tool.functionDeclarations)) for (const definition of tool.functionDeclarations)
+      addDeclaration(definition.name, definition.parameters ?? definition.parametersJsonSchema);
+    else addDeclaration(tool.name, tool.input_schema ?? tool.parameters);
+  }
+  for (const tool of body.toolConfig?.tools ?? []) addDeclaration(tool.toolSpec?.name, tool.toolSpec?.inputSchema?.json);
+  for (const message of body.messages ?? []) {
+    if (message.role === 'system') system.push(textOf(message.content));
+    if (message.role === 'tool') addResult(message.tool_call_id, message.content);
+    for (const block of Array.isArray(message.content) ? message.content : []) {
+      if (block.type === 'tool_result') addResult(block.tool_use_id, block.content);
+      if (block.toolResult) addResult(block.toolResult.toolUseId, block.toolResult.content);
+    }
+  }
+  for (const item of Array.isArray(body.input) ? body.input : []) {
+    if (item.type === 'function_call_output') addResult(item.call_id, item.output);
+    if (item.role === 'system') system.push(textOf(item.content));
+  }
+  for (const content of body.contents ?? []) for (const part of content.parts ?? [])
+    if (part.functionResponse) addResult(part.functionResponse.id, part.functionResponse.response?.output);
+  if (body.instructions !== undefined) system.push(textOf(body.instructions));
+  if (body.system !== undefined) system.push(textOf(body.system));
+  if (body.systemInstruction?.parts) system.push(textOf(body.systemInstruction.parts));
+  const systemText = system.join('\n');
+  return { declarations, toolResults: results, schemaSha256: hash(JSON.stringify(wireSchemas)),
+    systemSha256: hash(systemText), systemBytes: Buffer.byteLength(systemText),
+    modelMatchesConfigured: typeof body.model === 'string' ? body.model === selected.model : null };
+}
+
+function responseFacts(bytes, encoding) {
+  const decompress = encoding === 'gzip' ? gunzipSync : encoding === 'deflate' ? inflateSync
+    : encoding === 'br' ? brotliDecompressSync : undefined;
+  const text = (decompress ? decompress(bytes, { maxOutputLength: MAX_BYTES }) : bytes).toString('utf8');
+  let frames = 0, completionMarker = false;
+  const capture = frame => {
+    if (!frame || typeof frame !== 'object') return;
+    frames++;
+    completionMarker ||= frame.type === 'response.completed' || frame.type === 'message_stop'
+      || typeof frame.stop_reason === 'string' || frame.choices?.some(choice => typeof choice.finish_reason === 'string') === true
+      || frame.candidates?.some(candidate => typeof candidate.finishReason === 'string') === true;
+  };
+  try { const value = JSON.parse(text); for (const frame of Array.isArray(value) ? value : [value]) capture(frame); }
+  catch {
+    for (const line of text.split(/\r?\n/)) {
+      if (!line.startsWith('data:')) continue;
+      const value = line.slice(5).trim();
+      if (value === '[DONE]') { completionMarker = true; continue; }
+      if (!value) continue;
+      try { capture(JSON.parse(value)); } catch { /* Malformed provider content is not persisted. */ }
+    }
+  }
+  return { inspectable: frames > 0, frames, completionMarker };
+}
+
+function finalize(request, end) {
+  const capture = pending.get(request); if (!capture || capture.finalized) return;
+  capture.finalized = true; counters.finalized++;
+  try {
+    check(capture.incomingBytes <= MAX_BYTES, 'response-capture-limit');
+    if (capture.observation) Object.assign(capture.observation, {
+      responseStatus: capture.statusCode ?? null,
+      responseBytes: capture.incomingBytes,
+      responseSha256: hash(Buffer.concat(capture.incoming)),
+      responseEnd: end,
+      response: responseFacts(Buffer.concat(capture.incoming), capture.encoding),
+    });
+  } catch { observerFailure = 'response-capture'; }
+  finally { capture.outgoing.length = 0; capture.incoming.length = 0; captures.delete(capture); pending.delete(request); }
+}
+
+function onHeaders({ request, response }) {
+  const capture = pending.get(request); if (!capture) return;
+  counters.headers++; capture.statusCode = response.statusCode;
+  for (let index = 0; index < response.headers.length; index += 2)
+    if (String(response.headers[index]).toLowerCase() === 'content-encoding')
+      capture.encoding = String(response.headers[index + 1]).toLowerCase();
+}
+
+function onCreate({ request }) {
+  if (request.method !== 'POST' || String(request.origin) !== targetOrigin) return;
+  counters.create++;
+  const capture = { stage, outgoing: [], incoming: [], outgoingBytes: 0, incomingBytes: 0 };
+  pending.set(request, capture); captures.add(capture);
+  const originalBody = request.onBodySent, originalData = request.onData, originalHeaders = request.onHeaders;
+  const originalComplete = request.onComplete, originalError = request.onError;
+  request.onBodySent = function (chunk) {
+    try {
+      capture.outgoingBytes += Buffer.byteLength(chunk);
+      if (capture.outgoingBytes <= MAX_BYTES) capture.outgoing.push(Buffer.from(chunk));
+      else { observerFailure = 'request-capture-limit'; capture.outgoing.length = 0; }
+    } catch { observerFailure = 'request-capture'; }
+    return originalBody.call(this, chunk);
+  };
+  request.onData = function (chunk) {
+    try {
+      counters.data++; capture.incomingBytes += Buffer.byteLength(chunk);
+      if (capture.incomingBytes <= MAX_BYTES) capture.incoming.push(Buffer.from(chunk));
+      else { observerFailure = 'response-capture-limit'; capture.incoming.length = 0; }
+    } catch { observerFailure = 'response-capture'; }
+    return originalData.call(this, chunk);
+  };
+  request.onHeaders = function (statusCode, rawHeaders, ...rest) {
+    onHeaders({ request: this, response: { statusCode, headers: rawHeaders } });
+    return originalHeaders.call(this, statusCode, rawHeaders, ...rest);
+  };
+  request.onComplete = function (...args) {
+    counters.complete++; finalize(this, 'transport-complete');
+    return originalComplete.apply(this, args);
+  };
+  request.onError = function (...args) {
+    counters.retired++;
+    // SDK stream cleanup may retire an accepted transport before trailers. Preserve its already captured data.
+    // Native query/effect assertions below remain independent; an accepted status is not a success verdict.
+    finalize(this, capture.statusCode >= 200 && capture.statusCode < 300 && capture.incomingBytes > 0
+      ? 'accepted-stream-retirement' : 'transport-error');
+    return originalError.apply(this, args);
+  };
+}
+
+function onSent({ request }) {
+  const capture = pending.get(request); if (!capture) return;
+  try {
+    check(observations.length < MAX_REQUESTS, 'native-request-limit');
+    check(capture.outgoingBytes <= MAX_BYTES, 'request-capture-limit');
+    const bytes = Buffer.concat(capture.outgoing), body = JSON.parse(bytes.toString('utf8'));
+    counters.bodySent++;
+    capture.observation = { stage: capture.stage, bodySent: true, requestBytes: capture.outgoingBytes,
+      requestSha256: hash(bytes), ...wireProjection(body) };
+    observations.push(capture.observation);
+  } catch (error) { observerFailure = error.probeCode ?? 'request-capture'; void session?.abort().catch(() => {}); }
+  finally { capture.outgoing.length = 0; }
+}
+
+function onTrailers({ request }) { finalize(request, 'transport-complete'); }
+
+function observeEvent(event) {
+  if (!caseState) return;
+  if (event.type === 'query.completed') caseState.terminalStatus = event.result?.status ?? null;
+  if (event.type === 'query.completed_unproven') caseState.unproven = true;
+  if (event.type === 'query.failed' || event.type === 'lifecycle.error') lastFailure = String(event.error);
+  if (event.type === 'tool.started') caseState.calls.push({ id: event.taskId, name: event.toolName,
+    schemaQueryExact: event.toolName === SEARCH ? event.args?.query === CAPABILITY : null,
+    singleStepLoad: event.toolName === SEARCH ? event.args?.load === true : null,
+    selectedInputExact: event.toolName === TARGET ? equal(event.args, { selector: SELECTOR }) : null });
+  if (event.type === 'approval.resolved') caseState.approvals.push({ name: event.toolName, outcome: event.outcome });
+  if (event.type === 'tool.result') {
+    const output = event.output ?? '';
+    const value = { id: event.taskId, name: event.toolName, success: event.success, outputSha256: hash(output),
+      outputBytes: Buffer.byteLength(output), marker: output === MARKER, hookBlock: output.includes(BLOCK) };
+    if (event.toolName === SEARCH && event.success) {
+      try {
+        const parsed = JSON.parse(output);
+        check(Array.isArray(parsed.matches) && parsed.matches.length <= 20
+          && parsed.matches.every(match => typeof match?.name === 'string' && match.name.length <= 240)
+          && (!Array.isArray(parsed.loaded) || parsed.loaded.length <= 32 && parsed.loaded.every(name => typeof name === 'string' && name.length <= 240))
+          && (!Array.isArray(parsed.rejected) || parsed.rejected.length <= 32 && parsed.rejected.every(name => typeof name === 'string' && name.length <= 240)),
+          'search-observation-shape');
+        value.search = { queryExact: parsed.query === CAPABILITY,
+          matches: (parsed.matches ?? []).map(match => ({ name: match.name, loaded: match.loaded === true, pinned: match.pinned === true })),
+          loaded: parsed.loaded ?? [], rejected: parsed.rejected ?? [],
+          generation: typeof parsed.generation === 'string' && /^[a-f0-9]{64}$/.test(parsed.generation) ? parsed.generation : null };
+      } catch { caseState.searchUninspectable = true; }
+    }
+    caseState.results.push(value);
+  }
+}
+
+async function close() {
+  const current = session;
+  try { await current?.dispose(); }
+  finally { if (session === current) session = undefined; }
+}
+
+async function open(mode) {
+  caseState = { name: mode, calls: [], results: [], approvals: [], effects: 0, visibleEffects: 0, blockedHooks: 0, terminalStatus: null };
+  const definition = { name: TARGET, description: 'Look up an isolated fixture record.', argsSchema: schema,
+    execute: async args => {
+      check(equal(args, { selector: SELECTOR }), 'custom-input-mismatch');
+      caseState.effects++;
+      return { success: true, output: MARKER };
+    } };
+  const visible = { name: VISIBLE, description: 'Inspect an unrelated admitted fixture.',
+    argsSchema: { type: 'object', properties: {} },
+    execute: async () => { caseState.visibleEffects++; return { success: true, output: 'visible fixture' }; } };
+  const loader = new sdk.DefaultResourceLoader({ cwd: workspace, noContextFiles: true, noExtensions: true,
+    noSkills: true, noThemes: true,
+    systemPrompt: 'This is a bounded no-write tool-discovery check. Follow the exact requested tool order. '
+      + 'For a capability query use tool_search with load:true once, wait until the next request, then use its matched declaration. '
+      + 'Use no fallback tools. If a tool is blocked or no tool matches, stop calling tools and acknowledge that observation. '
+      + 'Final answers are one sentence containing ' + ACK + '.',
+    ...(mode === 'blocked' ? { extensionFactories: [api => { api.on('PreToolUse', payload => {
+      if (payload?.toolName !== TARGET) return { decision: 'allow' };
+      caseState.blockedHooks++;
+      return { decision: 'block', reason: BLOCK };
+    }); }] } : {}),
+  });
+  await loader.reload();
+  check(loader.getExtensions().errors.length === 0, 'extension-setup');
+  session = (await sdk.createAgentSession({ cwd: workspace, resourceLoader: loader,
+    runtimeConfig: { ...sdk.getRuntimeConfig(workspace), ...fixtureConfig,
+      allowedTools: [SEARCH, LOAD, TARGET, VISIBLE], disabledTools: [], hiddenToolPrefixes: mode === 'hidden' ? [TARGET] : [],
+      sessionModelRoles: undefined },
+    customTools: [definition, visible], permissionScope: 'ask', nonInteractiveApproval: 'allow-once',
+  })).session;
+  const resolution = session.runtimeContext.resolveConfigTarget(session.runtimeContext.runtimeConfig, session.sessionId);
+  check(!resolution.blocked && resolution.credential && resolution.provider === selected.provider
+    && resolution.model === selected.model, 'configured-target-admission');
+  check((resolution.baseUrl ?? resolution.credential.baseUrl)?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, ''),
+    'configured-destination-admission');
+  const physical = session.getModelCatalog().physical.filter(provider => (provider.runtime ?? provider.id) === selected.provider
+    && provider.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, ''));
+  check(physical.length === 1 && physical[0].models.some(model => model.id === selected.model), 'configured-catalogue-ownership');
+  modelEntry = physical[0].models.find(model => model.id === selected.model);
+  caseState.configuredTargetAdmitted = true;
+}
+
+async function scenario(mode) {
+  stage = mode; lastFailure = undefined;
+  await open(mode);
+  const first = observations.length;
+  const unsubscribe = session.subscribe(observeEvent);
+  let output;
+  try {
+    output = await session.prompt(mode === 'hidden'
+      ? `Call tool_search exactly once with query "${CAPABILITY}" and load:true. Report whether any admitted tool matches. If none, make no more tool calls and finish with ${ACK}.`
+      : `Inspect the capability "${CAPABILITY}". First call tool_search exactly once with that query and load:true. After its matched schema is declared on the next request, call the matched tool exactly once with selector "${SELECTOR}". Do not call tool_load separately. If the matched tool is blocked, make no further tool calls and acknowledge the block. Finish with ${ACK}.`);
+  } finally { unsubscribe(); }
+  await session.waitForIdle();
+  await close();
+  check(!receipt.deadline, 'native-deadline');
+  check(!observerFailure, observerFailure ?? 'wire-observer');
+  check(!lastFailure && !caseState.unproven, 'native-query-failure');
+  const requests = observations.slice(first);
+  caseState.actualRequests = requests.length;
+  caseState.acknowledged = typeof output === 'string' && output.includes(ACK);
+  caseState.answerSha256 = hash(output ?? '');
+  check(caseState.terminalStatus !== null && caseState.acknowledged, 'native-query-unsettled');
+  check(requests.length >= 2 && requests.length <= 4, 'bounded-native-rounds');
+  check(requests.every(request => request.bodySent && request.responseStatus >= 200 && request.responseStatus < 300
+    && request.responseBytes > 0 && request.response?.inspectable), 'native-accepted-response-unobservable');
+  check(requests.every(request => request.modelMatchesConfigured !== false), 'configured-wire-model-mismatch');
+  check(equal(requests[0].declarations.map(tool => tool.name).sort(), [SEARCH, LOAD].sort()),
+    'initial-discovery-declarations-mismatch');
+  const searches = caseState.results.filter(result => result.name === SEARCH);
+  check(searches.length === 1 && searches[0].success && searches[0].search?.queryExact, 'actual-search-not-observed');
+  check(caseState.calls.filter(call => call.name === SEARCH).every(call => call.schemaQueryExact && call.singleStepLoad),
+    'single-step-search-shape-mismatch');
+  check(!caseState.calls.some(call => call.name === LOAD) && caseState.visibleEffects === 0, 'unexpected-extra-tool');
+  check(caseState.calls[0]?.name === SEARCH && caseState.calls.length === (mode === 'hidden' ? 1 : 2),
+    'unexpected-native-tool-order');
+  if (mode === 'hidden') {
+    check(searches[0].search.matches.length === 0 && searches[0].search.loaded.length === 0, 'hidden-tool-search-leak');
+    check(requests.every(request => !request.declarations.some(tool => tool.name === TARGET)), 'hidden-tool-declaration-leak');
+    check(caseState.effects === 0 && !caseState.calls.some(call => call.name === TARGET), 'hidden-tool-execution-leak');
+    check(caseState.terminalStatus === 'completed', 'hidden-observation-not-completed');
+    caseState.hiddenTargetAbsent = true;
+  } else {
+    check(searches[0].search.matches.length === 1 && searches[0].search.matches[0].name === TARGET
+      && searches[0].search.matches[0].loaded === false && searches[0].search.matches[0].pinned === false
+      && equal(searches[0].search.loaded, [TARGET]) && searches[0].search.rejected.length === 0,
+      'schema-only-search-load-mismatch');
+    const next = requests[1];
+    check(next.declarations.some(tool => tool.name === TARGET && tool.targetSchemaExact === true), 'next-request-schema-missing');
+    check(next.schemaSha256 !== requests[0].schemaSha256 && next.systemSha256 === requests[0].systemSha256,
+      'schema-or-system-identity-mismatch');
+    check(next.toolResults.some(result => result.search?.queryExact && result.search.loaded.includes(TARGET)),
+      'next-request-search-result-missing');
+    const targetCalls = caseState.calls.filter(call => call.name === TARGET);
+    const targetResults = caseState.results.filter(result => result.name === TARGET);
+    check(targetCalls.length === 1 && targetCalls[0].selectedInputExact && targetResults.length === 1,
+      'loaded-tool-call-not-observed');
+    check(caseState.approvals.some(approval => approval.name === TARGET && approval.outcome === 'approved'),
+      'ordinary-loaded-tool-approval-missing');
+    if (mode === 'allowed') {
+      check(caseState.effects === 1 && targetResults[0].success && targetResults[0].marker, 'approved-effect-not-observed');
+      check(requests.slice(2).some(request => request.toolResults.some(result => result.marker)), 'effect-result-not-returned-to-provider');
+      check(caseState.terminalStatus === 'completed', 'approved-observation-not-completed');
+    } else {
+      check(caseState.effects === 0 && caseState.blockedHooks === 1 && !targetResults[0].success && targetResults[0].hookBlock,
+        'hook-refusal-did-not-stop-effect');
+    }
+    caseState.schemaOnlyQueryObserved = true;
+    caseState.nextSchemaExact = true;
+    caseState.systemStableDuringLoad = true;
+  }
+  receipt.cases.push({ ...caseState, passed: true });
+  caseState = undefined;
+}
+
+function selectedOwner(raw) {
+  const providers = findNodeAtLocation(parseTree(raw, [], { allowTrailingComma: true }), ['providers']);
+  let found, minimal = false;
+  for (const property of providers?.children ?? []) {
+    const id = property.children?.[0]?.value, node = property.children?.[1];
+    if (typeof id !== 'string' || !node) continue;
+    let entry;
+    try { entry = JSON.parse(raw.slice(node.offset, node.offset + node.length)); }
+    catch {
+      entry = {};
+      for (const field of node.children ?? []) {
+        const key = field.children?.[0]?.value, value = field.children?.[1];
+        if (!value || !['label', 'runtime', 'endpoint', 'auth', 'baseUrl', 'envVar'].includes(key)) continue;
+        try { entry[key] = JSON.parse(raw.slice(value.offset, value.offset + value.length)); } catch {}
+      }
+      if (entry.runtime === selected.provider && entry.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, '')
+        && entry.endpoint && entry.auth) { entry.models = [{ id: selected.model }]; minimal = true; }
+    }
+    if ((entry.runtime ?? id) === selected.provider && entry.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, '')
+      && entry.models?.some(model => model.id === selected.model)) {
+      check(!found, 'active-configured-catalogue-ambiguous');
+      found = { id, ...entry, models: entry.models.filter(model => model.id === selected.model) };
+    }
+  }
+  check(found, 'active-configured-catalogue-unavailable');
+  receipt.catalogueSetup = { originalActiveSelected: true, isolatedValidObjects: true,
+    minimalConfiguredModelEntry: minimal, originalConfiguredCredentials: true, inventedPrices: false, inventedRemoteLimits: false };
+  return found;
+}
+
+async function setup() {
+  check(process.platform === 'linux', 'linux-required');
+  sdk = await import(pathToFileURL(path.join(repo, 'packages/ts-shell/dist/index.js')).href);
+  const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'), 'utf8'));
+  receipt.buildId = manifest.buildId;
+  check(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/current.js'), 'utf8').includes(manifest.buildId), 'sdk-build-identity');
+  configured = sdk.getRuntimeConfig(repo);
+  const originalStorage = path.join(os.homedir(), '.cheers');
+  for (const file of ['auth.json', 'config.json', 'models.json', 'models-cache.json'].map(name => path.join(originalStorage, name))
+    .concat([path.join(repo, '.cheers.json')])) originalHashes.set(file, fs.existsSync(file) ? hash(fs.readFileSync(file)) : null);
+  selected = configured.providerConnections.find(connection => connection.id === configured.activeProviderConnectionId);
+  check(selected?.status === 'connected' && typeof selected.baseUrl === 'string' && selected.model, 'active-configured-target-unavailable');
+  owner = selectedOwner(fs.readFileSync(path.join(originalStorage, 'models.json'), 'utf8'));
+  root = fs.mkdtempSync(path.join(directory, 'native-state-')); fs.chmodSync(root, 0o700);
+  workspace = path.join(root, 'work'); storage = path.join(root, 'home', '.cheers');
+  fs.mkdirSync(workspace); fs.mkdirSync(path.join(workspace, '.git'));
+  fs.mkdirSync(storage, { recursive: true, mode: 0o700 });
+  const home = path.dirname(storage);
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home,
+    GIT_CEILING_DIRECTORIES: root, CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '1',
+    CHEERS_MARKETPLACES_FILE: path.join(home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(home, 'extensions.json') })) {
+    previousEnv.set(key, process.env[key]); process.env[key] = value;
+  }
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: selected.provider,
+    providerCredentials: configured.providerCredentials, providerConnections: configured.providerConnections,
+    activeProviderConnectionId: selected.id, accountPool: configured.accountPool }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: { [owner.id]: owner } }), { mode: 0o600 });
+  const declared = owner.models[0];
+  const limits = [32000, configured.contextWindow, declared.contextWindow].filter(value => Number.isSafeInteger(value) && value > 0);
+  const localWindow = Math.min(...limits);
+  check(localWindow >= 8000, 'bounded-discovery-limits-unavailable');
+  const output = Math.min(1024, Number.isSafeInteger(declared.maxTokens) && declared.maxTokens > 0 ? declared.maxTokens : 1024);
+  fixtureConfig = { agentMode: 'build', toolDiscovery: 'dynamic', contextWindow: localWindow,
+    maxOutputTokens: output, reserveTokens: 0, maxTurns: 4, compactionEnabled: false,
+    pruneToolText: false, enableMcpTools: false, instructionBudgetBytes: 0, offline: false,
+    retryEnabled: false, retryMaxRetries: 0, providerRetryMaxRetries: 0,
+    cacheWarming: 'off', cacheWarmIntervalSeconds: 0,
+    providerConnectTimeoutMs: 10000, providerHeadersTimeoutMs: 45000, providerBodyTimeoutMs: 45000 };
+  fs.writeFileSync(path.join(storage, 'config.json'), JSON.stringify(fixtureConfig), { mode: 0o600 });
+  receipt.catalogueSetup.localContextWindow = localWindow;
+  receipt.catalogueSetup.localOutputCap = output;
+  receipt.catalogueSetup.publishedContextWindow = declared.contextWindow ?? null;
+  receipt.catalogueSetup.publishedInputLimit = declared.inputLimit ?? null;
+  receipt.catalogueSetup.originalPricesPresent = declared.cost !== undefined;
+  receipt.schema = { name: TARGET, schemaSha256: hash(JSON.stringify(schema)), capabilityOnlyInSchema: true,
+    expectedSelectorSha256: hash(SELECTOR), noWrites: true };
+  targetOrigin = new URL(selected.baseUrl).origin;
+  creating.subscribe(onCreate); sent.subscribe(onSent); headers.subscribe(onHeaders); trailers.subscribe(onTrailers);
+  deadline = setTimeout(() => { receipt.deadline = true; void session?.abort().catch(() => {}); }, 540000);
+}
+
+try {
+  await setup();
+  await scenario('allowed');
+  await scenario('blocked');
+  await scenario('hidden');
+  check(JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'), 'utf8')).buildId === receipt.buildId,
+    'build-changed-during-probe');
+  receipt.cacheClaim = 'Only local system/schema identity is observed; no provider cache, pricing, TTL, savings or remote-capacity claim.';
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage;
+  const detail = String(error?.message ?? '') + ' ' + (lastFailure ?? '');
+  receipt.failure = { category: receipt.deadline ? 'deadline'
+    : /429|quota|rate.?limit/i.test(detail) ? 'provider-quota'
+      : /401|403|auth|credential/i.test(detail) ? 'provider-auth'
+        : /ECONN|EHOST|ENOTFOUND|fetch failed|network|timeout/i.test(detail) ? 'provider-network'
+          : /schema|invalid.*param|unsupported.*param/i.test(lastFailure ?? '') ? 'provider-protocol-or-content'
+            : error.probeCode?.includes('configured') ? 'configured-target-admission'
+              : /actual-search|single-step-search|actual.*call|query-unsettled|bounded-native-rounds/.test(error.probeCode ?? '')
+                ? 'provider-behavior-or-probe-contract' : 'product-or-probe-contract',
+    code: error.probeCode ?? 'native-operation-failed' };
+  receipt.failureLine = String(error?.stack ?? '').match(/native\.mjs:(\d+)/)?.[1] ?? null;
+  if (caseState) receipt.incompleteCase = { ...caseState, passed: false };
+  process.exitCode = 1;
+} finally {
+  clearTimeout(deadline);
+  try { await close(); } catch { receipt.cleanupSettled = false; receipt.status = 'failed'; process.exitCode = 1; }
+  creating.unsubscribe(onCreate); sent.unsubscribe(onSent); headers.unsubscribe(onHeaders); trailers.unsubscribe(onTrailers);
+  for (const capture of captures) { capture.outgoing.length = 0; capture.incoming.length = 0; }
+  captures.clear();
+  for (const [key, value] of previousEnv) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  try { if (root) fs.rmSync(root, { recursive: true, force: true }); }
+  catch { receipt.status = 'failed'; process.exitCode = 1; }
+  receipt.privateStateRemoved = !root || !fs.existsSync(root);
+  try {
+    receipt.originalConfigUnchanged = originalHashes.size > 0 ? [...originalHashes].every(([file, before]) =>
+      (fs.existsSync(file) ? hash(fs.readFileSync(file)) : null) === before) : null;
+  } catch { receipt.originalConfigUnchanged = false; }
+  if (!receipt.privateStateRemoved || receipt.originalConfigUnchanged === false) { receipt.status = 'failed'; process.exitCode = 1; }
+  receipt.requests = observations;
+  receipt.observerEvents = counters;
+  receipt.actualRequests = observations.length;
+  fs.writeFileSync(path.join(directory, 'native.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
+  console.log(JSON.stringify({ status: receipt.status, buildId: receipt.buildId,
+    failedStage: receipt.failedStage ?? null, failure: receipt.failure ?? null,
+    actualRequests: receipt.actualRequests, passedCases: receipt.cases.map(item => item.name),
+    privateStateRemoved: receipt.privateStateRemoved, originalConfigUnchanged: receipt.originalConfigUnchanged }));
+}

@@ -1,0 +1,223 @@
+{
+  "schemaVersion": 1,
+  "task": "E.5",
+  "status": "passed",
+  "platform": "linux",
+  "probeSha256": "54293bc83107d3c7a09854d197718dd78d050f8465f963eb900588d9b088755c",
+  "providerMode": "synthetic",
+  "realProviderExecution": "not_run",
+  "publicCompiledSdk": true,
+  "signedInstallation": true,
+  "cases": [
+    {
+      "mode": "options.ui",
+      "status": "passed",
+      "originalRawHostRetained": true,
+      "asyncFactoryAwaited": true,
+      "sdkBootstrapRegistry": "empty-isolated",
+      "installedRegistrationOwner": "public-ExtensionService",
+      "installedCatalogue": {
+        "counts": {
+          "all": 21,
+          "active": 21,
+          "commands": 102
+        },
+        "sha256": "07987bb22fd9857d18404f03534cfc95427a74872079e127f8b6a15bfdd39986"
+      },
+      "publicationApplied": true,
+      "revisionDelta": 1,
+      "substrateUnchanged": true,
+      "oldDialogCancelled": true,
+      "oldContinuationSuppressed": true,
+      "freshDialogAdmitted": true,
+      "lateOldSettlementIsolated": true,
+      "sdkAbortCancelled": true,
+      "freshAfterAbortAdmitted": true,
+      "disposalCancelled": true,
+      "disposedResultRetainsAuthorityRefusal": true,
+      "disposedFreshRefused": true,
+      "dialogs": 5,
+      "notifications": 2,
+      "ordinaryApprovals": 5,
+      "ordinaryHookEvents": 15
+    },
+    {
+      "mode": "bindUi",
+      "status": "passed",
+      "originalRawHostRetained": true,
+      "asyncFactoryAwaited": true,
+      "sdkBootstrapRegistry": "empty-isolated",
+      "installedRegistrationOwner": "public-ExtensionService",
+      "installedCatalogue": {
+        "counts": {
+          "all": 21,
+          "active": 21,
+          "commands": 102
+        },
+        "sha256": "07987bb22fd9857d18404f03534cfc95427a74872079e127f8b6a15bfdd39986"
+      },
+      "publicationApplied": true,
+      "revisionDelta": 1,
+      "substrateUnchanged": true,
+      "oldDialogCancelled": true,
+      "oldContinuationSuppressed": true,
+      "freshDialogAdmitted": true,
+      "lateOldSettlementIsolated": true,
+      "sdkAbortCancelled": true,
+      "freshAfterAbortAdmitted": true,
+      "disposalCancelled": true,
+      "disposedResultRetainsAuthorityRefusal": true,
+      "disposedFreshRefused": true,
+      "dialogs": 5,
+      "notifications": 2,
+      "ordinaryApprovals": 5,
+      "ordinaryHookEvents": 15
+    }
+  ],
+  "lifecycle": [
+    {
+      "code": "source-add",
+      "cliExit": 0,
+      "effect": "confirmed",
+      "outputBytes": 1007,
+      "outputSha256": "bbfc5811e01de8573a0326c7d84eb8b5a34bbfdd26f715d927c256e44d48464f"
+    },
+    {
+      "code": "source-trust",
+      "cliExit": 0,
+      "effect": "confirmed",
+      "outputBytes": 1009,
+      "outputSha256": "4055bc8fc255c9f24b9642c052bb3855f69a94eedb0d5738a9220ef902b1a7e9"
+    },
+    {
+      "code": "bad-signature",
+      "cliExit": 0,
+      "effect": "refused",
+      "outputBytes": 49,
+      "outputSha256": "b89e9fbe22fbdd4f8666ae20c375732ed9c255727a12af5c82ee2eafeb245632"
+    },
+    {
+      "code": "bad-archive",
+      "cliExit": 0,
+      "effect": "refused",
+      "outputBytes": 980,
+      "outputSha256": "2580341518ed0c431a341e0615d89ab0d516ac64137daef577b74cbd56de7ea7"
+    },
+    {
+      "code": "signed-install",
+      "cliExit": 0,
+      "effect": "confirmed",
+      "outputBytes": 1024,
+      "outputSha256": "b00f19c5a55713d7b60287959f8c9926d02cf97afeb2fd186ebc0a4cfcdd68d9"
+    },
+    {
+      "code": "enable",
+      "cliExit": 0,
+      "effect": "confirmed",
+      "outputBytes": 986,
+      "outputSha256": "909a88232940d1cea7e2cd6c3b5106e99cabfb666ea45060f73fe356fecc1657"
+    },
+    {
+      "code": "script-grant",
+      "cliExit": 0,
+      "effect": "confirmed",
+      "outputBytes": 997,
+      "outputSha256": "480c19a566e2f402a73e3414fa2557760332c3b2c6ed1d1932712a069544dbf1"
+    },
+    {
+      "code": "tool-grant",
+      "cliExit": 0,
+      "effect": "confirmed",
+      "outputBytes": 1000,
+      "outputSha256": "904dca6488b07cc09ae66f58caf7e97c6a4dc0e5ef46bfd3b14222c32e7a6a2d"
+    }
+  ],
+  "boundaries": [
+    "Compiled CLI marketplace/plugin commands own installation and grants; the SDK-bound public ExtensionService is a separate service over that same installed state.",
+    "The SDK boots against an empty isolated registry so its private service cannot duplicate public installed-tool ownership; the public service registers that installed tool on the captured SDK session.",
+    "The public ResourceLoader captureBinding contract supplies the original SDK shared host; no internal host lookup or facade is used.",
+    "The public service uses its original prepared script call with caller-supplied explicit allow-once approval and an empty hook dispatcher; the SDK private gate is unavailable.",
+    "The async TypeScript factory and exported run use the public script route. Named registered-tool dispatch is not exposed by the public service and is not claimed."
+  ],
+  "source": {
+    "packages/ts-shell/src/config/state.ts": "a968bf0f6f02a7032b292243ba184739059358f6dc146cbd03cd239a8bc170c8",
+    "packages/ts-shell/src/sdk/agentSession.ts": "defb6005939318778029bb3f5cc6b65815d3d84c316edee07126fa3a8e15e502",
+    "packages/ts-shell/src/sdk/ui.ts": "052ccfe1a1c753b6c50d2e99947eddfba2ef70b2c05069f5fd923e0eca484b26",
+    "packages/ts-shell/src/sdk/resourceLoader.ts": "0d686088b5ea8e5f65236a0f3a3d11e2c153ab766f4bc396093c18af0bbc2e04",
+    "packages/ts-shell/src/cli/runtime/extensions/host.ts": "945c1a2aeab17306c7a9e8b14813a516c719e1ffc148266b4c8075a24617bfab",
+    "packages/ts-shell/src/extensions/service.ts": "19770ac7c7e4bb77f32c6e26873ec537370561162d245f380b33bac2f839dcf7",
+    "packages/ts-shell/src/extensions/registry/client.ts": "a43cc45ab41e53c28fffd531b86d62f9a643ba7599fbe0cbb54ab07cad01b299",
+    "packages/ts-shell/src/extensions/lifecycle/install.ts": "db3992253980309b23710557b109687728bb09e03a6bc1bbbb9da0b917804490",
+    "packages/ts-shell/src/extensions/lifecycle/grants.ts": "a465c88dbad5458ee09cd8d6d44faddad5246dc092ef14665ea9d7714180f09a",
+    "packages/ts-shell/src/extensions/runtime/execute.ts": "af12289eb24fdb0e5b55035aee721bc4af6eaaf53d3d66df903d8195d31eadd3",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "e6ba89ec1c80300924e9c959f19b68a8229d8cde7bf1acc7da68e05558ee1806",
+    "packages/ts-shell/src/extensions/runtime/workerSource.ts": "9f10decbfc3a7c6f9b026417727e18e7f1cea1c2727d7c4e2e750f9478697d3f"
+  },
+  "buildId": "89344ffebd356718e7cba331b8f3ec8defe25c4af3aad7fa5050089e8e042fdc",
+  "buildInputsDigest": "afb1c0da3d5b0213b2fc14e472359e19c1d2a4a9f01c7106adc3ca87134c2d47",
+  "publicEntries": {
+    ".": {
+      "path": "./dist/index.js",
+      "sha256": "f0a712e7c474d49621095aba58337c1b23ec5bc58fd3213eb1d3fc3725cfc02f"
+    },
+    "./extensions": {
+      "path": "./dist/extensions/service.js",
+      "sha256": "37c11a9ff490e1659638e4cf7fc1c2aa60fe6dc2afeeca8a39c2c3946a852138"
+    }
+  },
+  "trustFingerprint": "805a81e7effb0ef35f7b0c53a1e57299c3e097092d2828118f0691ff453f575d",
+  "workerSourceSha256": "06418c3da880b48dac363715a030f7a45b40d2abe5b4851771b1f1e9f42e6769",
+  "archiveSha256": "ffb31cd7a3677457c4ebe04043f9419adb09a386b794c6fd00689feead1c89e9",
+  "archiveBytes": 1218,
+  "sourceIdentity": "31e445c95e2bbf38a402837f05b2832f1bb052bcbc0ce5357a9326857ab7ba41",
+  "inventoryFiles": 2,
+  "wire": {
+    "mainNative": 0,
+    "mainUndici": 0,
+    "mainPosts": 0,
+    "childNative": 5,
+    "childUndici": 0,
+    "childPosts": 0,
+    "childReady": 8,
+    "foreignRequests": 0,
+    "serverPosts": 0
+  },
+  "registryRequests": [
+    {
+      "stage": "bad-signature",
+      "kind": "details",
+      "envelopeMode": "tampered",
+      "archiveMode": "valid"
+    },
+    {
+      "stage": "bad-archive",
+      "kind": "details",
+      "envelopeMode": "valid",
+      "archiveMode": "tampered"
+    },
+    {
+      "stage": "bad-archive",
+      "kind": "archive",
+      "envelopeMode": "valid",
+      "archiveMode": "tampered"
+    },
+    {
+      "stage": "signed-install",
+      "kind": "details",
+      "envelopeMode": "valid",
+      "archiveMode": "valid"
+    },
+    {
+      "stage": "signed-install",
+      "kind": "archive",
+      "envelopeMode": "valid",
+      "archiveMode": "valid"
+    }
+  ],
+  "zeroProviderRequests": true,
+  "wirePositiveControl": true,
+  "personalInputsUnchanged": true,
+  "personalInputsChecked": 28,
+  "sourceUnchanged": true,
+  "privateStateRemoved": true
+}

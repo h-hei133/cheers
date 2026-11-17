@@ -4,7 +4,7 @@ import type { CliOptions } from "../cli/options/cliOptions.js";
 import { resolveCliCredential } from "../cli/provider/cliProviderRuntimeBridge.js";
 import { closeCollaborationFor } from "../cli/runtime/collaboration.js";
 import { closeDirectorFor } from "../cli/runtime/director.js";
-import { bindExtensionUiFor, closeExtensionsFor, extensionHostFor, waitForExtensionsFor } from "../cli/runtime/extensions.js";
+import { closeExtensionsFor, extensionHostFor, waitForExtensionsFor } from "../cli/runtime/extensions.js";
 import { cancelExtensionUiFor, closeExtensionHost } from "../cli/runtime/extensions/host.js";
 import { closeJobsFor } from "../cli/runtime/jobs.js";
 import { closeMediaFor } from "../cli/runtime/media.js";
@@ -28,6 +28,7 @@ import { SessionManager } from "../session/SessionManager.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 import { DefaultResourceLoader, type LoadExtensionsResult, type ResourceLoader } from "./resourceLoader.js";
+import { SessionUi } from './ui.js';
 import { snapshotCustomMessage } from '../core/agent/custom.js';
 import { snapshotData } from '../core/values/data.js';
 import type { CatalogProvider } from '../core/models/catalog.js';
@@ -179,11 +180,12 @@ export class AgentSession {
     private readonly ownsMcpGateway: boolean,
     private readonly contributionCleanups: readonly (() => void)[],
     private readonly retireResources?: () => void,
+    private readonly ui: SessionUi = new SessionUi(runtimeContext, extensionHostFor(runtimeContext)),
   ) {}
 
   bindUi(host: ExtensionUiHost): () => void {
     if (this.disposed) throw new Error('Agent session is disposed.');
-    return bindExtensionUiFor(this.runtimeContext, host);
+    return this.ui.bind(host);
   }
 
   get sessionId(): string {
@@ -278,6 +280,7 @@ export class AgentSession {
     this.disposed = true;
     void (async () => {
       const errors: unknown[] = [];
+      try { this.ui.dispose(); } catch (error) { errors.push(error); }
       try { this.retireResources?.(); } catch (error) { errors.push(error); }
       try { closeExtensionHost(this.runtimeContext); } catch (error) { errors.push(error); }
       try { await this.sessionRuntime.cancelAndWait(); } catch (error) { errors.push(error); }
@@ -412,6 +415,7 @@ export async function createAgentSession(
 
   let sessionRuntime: ShellSessionRuntime;
   let retireResources: (() => void) | undefined;
+  let sessionUi: SessionUi | undefined;
   const approvalTrustPolicy = options.approvalTrustPolicy ?? new ApprovalTrustPolicy();
   const providerRuntimeBridge = {
     resolveCredentialSnapshot: () => resolveSdkCredential(runtimeContext.runtimeConfig, runtimeContext.session.id),
@@ -436,12 +440,12 @@ export async function createAgentSession(
     });
     await waitForExtensionsFor(runtimeContext);
     const host = extensionHostFor(runtimeContext);
+    sessionUi = new SessionUi(runtimeContext, host);
     if (host) {
       const release = bindResources ? bindResources(host) : resourceLoader.setHost?.(host);
       retireResources = typeof release === 'function' ? release : resourceLoader.captureRetirement?.();
     }
     resourceLoader.setDenyRules?.(() => runtimeContextRef?.runtimeConfig.denyRules ?? runtimeConfig.denyRules);
-    if (options.ui) bindExtensionUiFor(runtimeContext, options.ui);
     if (startupModel.kind === 'virtual') {
       if (!startupDefinition || !sessionVirtualModels(runtimeContext.cwd, runtimeContext.session.id).includes(startupDefinition)) {
         throw new Error('Virtual startup model registration changed during initialization.');
@@ -471,7 +475,9 @@ export async function createAgentSession(
         if (!output.startsWith('Model switched to ') && !output.startsWith('Model preference saved for ')) throw new Error(output);
       }
     }
+    if (options.ui) sessionUi.bind(options.ui);
   } catch (error) {
+    try { sessionUi?.dispose(); } catch { /* Keep the initialization failure. */ }
     try { retireResources?.(); } catch { /* Keep the initialization failure. */ }
     if (!retireResources) {
       try { retireUnboundResources?.(); } catch { /* Keep the initialization failure. */ }
@@ -500,6 +506,7 @@ export async function createAgentSession(
     ownsMcpGateway,
     cleanups,
     retireResources,
+    sessionUi,
   );
 
   return {

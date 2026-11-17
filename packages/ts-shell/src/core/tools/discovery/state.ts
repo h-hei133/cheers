@@ -51,15 +51,8 @@ export function createToolDiscovery(input: {
   const notify = (): void => {
     for (const listener of [...listeners]) listener();
   };
-  const fingerprints = new WeakMap<ToolDefinition, string>();
-  const toolFingerprint = (tool: ToolDefinition): string => {
-    let fp = fingerprints.get(tool);
-    if (fp === undefined) {
-      fp = JSON.stringify([tool.description, tool.argsSchema]);
-      fingerprints.set(tool, fp);
-    }
-    return fp;
-  };
+  // SDK and extension callers retain mutable nested schemas; identity alone cannot cache their contract.
+  const toolFingerprint = (tool: ToolDefinition): string => JSON.stringify([tool.description, tool.argsSchema]);
   let cachedEntries: Array<{ readonly name: string; readonly tool: ToolDefinition; readonly fingerprint: string }> = [];
   let cachedDigest = '';
   const generation = (): string => {

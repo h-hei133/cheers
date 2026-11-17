@@ -1,0 +1,39 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { checkBuild } from '../../scripts/start-lib.mjs';
+
+const root = process.cwd();
+const directory = path.join(root, '.tmp/ui-renewal-validation');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const build = checkBuild({ root, dist: path.join(root, 'packages/ts-shell/dist'),
+  version: JSON.parse(fs.readFileSync(path.join(root, 'packages/ts-shell/package.json'))).version,
+  executablePolicy: 'ignore' });
+if (!build.ok) throw new Error('Final build is unavailable or its inputs changed');
+const manifest = JSON.parse(fs.readFileSync(path.join(root, 'packages/ts-shell/dist/build-manifest.json')));
+const reviews = {
+  ui: JSON.parse(fs.readFileSync(path.join(directory, 'review.json'))),
+  discovery: JSON.parse(fs.readFileSync(path.join(root, '.tmp/discovery-validation/review.json'))),
+};
+const source = {};
+for (const [scope, review] of Object.entries(reviews)) {
+  if (review.verdict !== 'APPROVE') throw new Error('Final independent review is unavailable');
+  const files = review.source ?? review.sourceSha256;
+  for (const [file, sha256] of Object.entries(files)) {
+    if (hash(fs.readFileSync(path.join(root, file))) !== sha256) throw new Error('Reviewed source changed: ' + file);
+  }
+  source[scope] = files;
+}
+const prior = path.join(directory, 'current-sources.json');
+if (fs.existsSync(prior) && !fs.existsSync(path.join(directory, 'sources-before-shared-host.json'))) {
+  fs.copyFileSync(prior, path.join(directory, 'sources-before-shared-host.json'));
+}
+const receipt = { schemaVersion: 1, buildId: manifest.buildId, inputsDigest: manifest.inputsDigest,
+  compilerInputsVerified: true, source, reviewedFiles: Object.values(source).reduce((n, files) => n + Object.keys(files).length, 0),
+  validation: { receipt: 'final-integrated.json', files: 25, tests: 355, passed: true },
+  boundary: 'Final SDK UI and tool discovery sources; prior history/cache compiled receipts keep their frozen build.' };
+fs.writeFileSync(prior, JSON.stringify(receipt, null, 2) + '\n');
+fs.copyFileSync(path.join(root, 'packages/ts-shell/dist/build-manifest.json'), path.join(directory, 'final-build-manifest.json'));
+fs.copyFileSync(path.join(root, '.tmp/discovery-validation/native.json'), path.join(root, '.tmp/discovery-validation/native-before-shared-host.json'));
+fs.copyFileSync(path.join(root, '.tmp/discovery-validation/native.mjs'), path.join(root, '.tmp/discovery-validation/native-before-shared-host.mjs.txt'));
+console.log(JSON.stringify({ buildId: receipt.buildId, inputsDigest: receipt.inputsDigest, reviewedFiles: receipt.reviewedFiles, current: build.ok }));

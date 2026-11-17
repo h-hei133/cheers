@@ -1,0 +1,42 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+
+const root = '/home/wang/projects/cheers';
+const tree = path.join(root, '.tmp/continuation-reversal');
+const out = path.join(root, '.tmp/discovery-validation');
+const file = 'packages/ts-shell/src/core/tools/discovery/state.ts';
+const scoped = [file, 'packages/ts-shell/src/core/tools/discovery/contract.test.ts', 'packages/ts-shell/src/core/tools/discovery/ranker.test.ts'];
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const original = new Map(scoped.map(name => [name, fs.readFileSync(path.join(root, name))]));
+for (const [name, bytes] of original) fs.writeFileSync(path.join(tree, name), bytes);
+const marker = '  // SDK and extension callers retain mutable nested schemas; identity alone cannot cache their contract.\n  const toolFingerprint = (tool: ToolDefinition): string => JSON.stringify([tool.description, tool.argsSchema]);';
+const reverted = '  const fingerprints = new WeakMap<ToolDefinition, string>();\n  const toolFingerprint = (tool: ToolDefinition): string => {\n    let fp = fingerprints.get(tool);\n    if (fp === undefined) {\n      fp = JSON.stringify([tool.description, tool.argsSchema]);\n      fingerprints.set(tool, fp);\n    }\n    return fp;\n  };';
+let text = original.get(file).toString('utf8');
+if (text.split(marker).length !== 2) throw new Error('Reversal fragment not unique');
+const receipt = { status: 'running', mainSourcesMutated: false };
+try {
+  fs.writeFileSync(path.join(tree, file), text.replace(marker, reverted));
+  const result = spawnSync('rtk', ['env', 'NODE_OPTIONS=--max-old-space-size=1536', 'VITEST_MAX_THREADS=1', 'VITEST_MIN_THREADS=1',
+    'GIT_CEILING_DIRECTORIES=' + path.dirname(tree), 'npm', 'exec', '-w', 'packages/ts-shell', '--', 'vitest', 'run',
+    'src/core/tools/discovery/contract.test.ts', '-t', 'retained SDK schema', '--no-file-parallelism', '--maxWorkers=1', '--minWorkers=1',
+    '--reporter=json', '--outputFile=' + path.join(out, 'reversed.json')],
+    { cwd: tree, encoding: 'utf8', timeout: 90_000, maxBuffer: 1024 * 1024 });
+  fs.writeFileSync(path.join(out, 'reversed.log'), (result.stdout ?? '') + (result.stderr ?? ''));
+  const report = JSON.parse(fs.readFileSync(path.join(out, 'reversed.json'), 'utf8'));
+  const failed = report.testResults.flatMap(suite => suite.assertionResults.filter(test => test.status === 'failed'));
+  receipt.processExitCode = result.status;
+  receipt.assertionFailures = failed.filter(test => test.failureMessages.some(message => message.includes('AssertionError'))).length;
+  receipt.selectedTests = report.numPassedTests + report.numFailedTests;
+  if (result.status !== 1 || receipt.assertionFailures !== 3) throw new Error('Ineffective reversal');
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.error = String(error.message); process.exitCode = 1;
+} finally {
+  for (const [name, bytes] of original) fs.writeFileSync(path.join(tree, name), bytes);
+  receipt.restoredExactly = scoped.every(name => hash(fs.readFileSync(path.join(tree, name))) === hash(original.get(name)));
+  receipt.mainSourceMatches = scoped.every(name => hash(fs.readFileSync(path.join(root, name))) === hash(original.get(name)));
+  fs.writeFileSync(path.join(out, 'reversal.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt));
+}

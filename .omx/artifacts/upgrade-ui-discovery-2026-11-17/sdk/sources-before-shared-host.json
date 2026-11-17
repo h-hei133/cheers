@@ -1,0 +1,11 @@
+{
+  "buildId": "1e7d99a7eb37d02b1a659d0c1a433b45251d943f04f66d1d1345f808636ff7b8",
+  "inputsDigest": "858fcbe764bccc507a42eab59c0b349fe27a93b8b171f7a0641cae3b410530bc",
+  "source": {
+    "packages/ts-shell/src/sdk/agentSession.ts": "43c11c8196318971bff9014ee63cc1956f62ef98fdb9bdab94b5b93512eb652e",
+    "packages/ts-shell/src/sdk/ui.ts": "43f5b84b40bb762a278ec937a64c5ebfc5104515ca840b40ee61dff9ccf395df",
+    "packages/ts-shell/src/sdk/ui.test.ts": "43d7d352b0818c71b84c03178deec86ab5a1eb8f7e2559fbc5166a18ee832592",
+    "packages/ts-shell/src/sdk/ui/retirement.test.ts": "c65bb95ccbfbd23254ddef2c11927ef8d48a10f3db82d08d5a07b68651135a2f",
+    "packages/ts-shell/src/config/state.ts": "a968bf0f6f02a7032b292243ba184739059358f6dc146cbd03cd239a8bc170c8"
+  }
+}

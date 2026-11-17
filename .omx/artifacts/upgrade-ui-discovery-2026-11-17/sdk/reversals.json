@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "mainSourcesMutated": false,
+  "cases": [
+    {
+      "name": "fresh-sdk-call-renewal",
+      "processExitCode": 1,
+      "selected": 2,
+      "assertionFailures": 2,
+      "passedControls": 0,
+      "restoredExactly": true
+    },
+    {
+      "name": "unobserved-blocked-publication",
+      "processExitCode": 1,
+      "selected": 4,
+      "assertionFailures": 4,
+      "passedControls": 0,
+      "restoredExactly": true
+    },
+    {
+      "name": "shared-host-renewal",
+      "processExitCode": 1,
+      "selected": 2,
+      "assertionFailures": 2,
+      "passedControls": 0,
+      "restoredExactly": true
+    }
+  ],
+  "restoredExactly": true,
+  "mainSourcesMatch": true
+}

@@ -2742,3 +2742,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Missing cache counters look like measured zero, or a cache-overlap estimate understates writes and changes when the model catalogue updates.
 - **Root Cause:** Sticky historical cache flags cannot establish current category presence, and cache-write prices are full captured rates rather than an incremental premium.
 - **Rule:** Preserve current valid read/write presence separately, including explicit zero. Leave missing, invalid and unpriced observed writes unknown; break comparisons on gaps or resets. Estimate overlap using captured ordinary-input and full cache-write rates, retain write premiums and label estimates and possible expiry. Never refill missing captured prices from the current catalogue or infer savings from response counters alone.
+
+### Retained SDK UI Renewal Belongs To The Original Shared Host
+- **Symptom:** SDK UI works before configuration publication but fresh installed workers cannot open a later dialog, or a blocked then corrected publication revives an old host.
+- **Root Cause:** A facade refreshes only SDK calls while other consumers retain the original bridge. Publication cancellation and durable authority revocation are different events; an unobserved blocked interval disappears from a latest-state check.
+- **Rule:** Renew new UI snapshots at the original shared host acquisition using the caller's retained admission. Keep old hooks and workers on their cancelled snapshot. Track blocked-publication revocation separately from substrate identity so correction requires an explicit new binding. Cover the actual installed worker consumer, late answers, release, abort, disposal and source-bound compiled installation; hand-constructed registry records do not prove signed installation.
+
+### Mutable Tool Contracts Cannot Use Permanent Identity Fingerprints
+- **Symptom:** A caller changes a retained nested schema but the catalogue generation, search results and prepared execution still describe its earlier contract.
+- **Root Cause:** A WeakMap permanently caches the fingerprint by definition identity even though SDK callers retain mutable nested schema objects.
+- **Rule:** Recompute the contract fingerprint from current description/schema bytes, retain catalogue digest caching and per-definition execution guards, and reject old execute/prepared effects after mutation. Verify schema-only search through real refs, fresh execution, hidden exclusion and the loaded-definition limit with a bounded catalogue fixture.

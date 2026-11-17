@@ -1,0 +1,97 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { checkBuild } from '../../scripts/start-lib.mjs';
+
+const root = process.cwd();
+const output = path.join(root, '.omx/artifacts/upgrade-ui-discovery-2026-11-17');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const read = file => JSON.parse(fs.readFileSync(path.join(root, file)));
+const identity = read('.tmp/ui-renewal-validation/current-sources.json');
+const pkg = read('packages/ts-shell/package.json');
+const build = checkBuild({ root, dist: path.join(root, 'packages/ts-shell/dist'), version: pkg.version, executablePolicy: 'ignore' });
+if (!build.ok || build.manifest.buildId !== identity.buildId) throw new Error('Final current build changed');
+const combined = read('.tmp/ui-renewal-validation/final-integrated.json');
+const signed = read('.tmp/ui-renewal-validation/signed-native.json');
+const installed = read('.tmp/ui-renewal-validation/package-native.json');
+const native = read('.tmp/discovery-validation/native.json');
+const catalogue = read('.tmp/discovery-validation/catalogue.json');
+if (!combined.success || combined.numTotalTests !== 355 || combined.testResults.length !== 25
+  || ![signed, installed, native].every(r => r.status === 'passed' && r.buildId === identity.buildId)) throw new Error('Final acceptance unavailable');
+for (const entry of catalogue.inputs) if (hash(fs.readFileSync(path.join(root, entry.path))) !== entry.sha256) throw new Error('Catalogue input changed');
+const manifest = {};
+const source = {};
+function copy(file, target) {
+  const bytes = fs.readFileSync(path.join(root, file));
+  const absolute = path.join(output, target);
+  fs.mkdirSync(path.dirname(absolute), { recursive: true }); fs.writeFileSync(absolute, bytes);
+  return manifest[target] = { bytes: bytes.length, sha256: hash(bytes) };
+}
+for (const [scope, files] of Object.entries(identity.source)) {
+  source[scope] = {};
+  for (const [file, sha256] of Object.entries(files)) {
+    const snapshot = 'source/' + file + '.txt';
+    if (copy(file, snapshot).sha256 !== sha256) throw new Error('Reviewed source changed');
+    source[scope][file] = { sha256, snapshot };
+  }
+}
+for (const [dir, prefix] of [['.tmp/ui-renewal-validation', 'sdk'], ['.tmp/discovery-validation', 'discovery']]) {
+  for (const name of fs.readdirSync(path.join(root, dir))) {
+    const file = path.join(dir, name);
+    if (!fs.statSync(path.join(root, file)).isFile()) throw new Error('Private task state remains: ' + dir);
+    copy(file, prefix + '/' + (/\.[cm]?js$/.test(name) ? name + '.txt' : name));
+  }
+}
+function tree(dir, prefix) {
+  for (const name of fs.readdirSync(path.join(root, dir))) {
+    const file = path.join(dir, name), target = prefix + '/' + name;
+    if (fs.statSync(path.join(root, file)).isDirectory()) tree(file, target); else copy(file, target);
+  }
+}
+tree('.normproof/out', 'normproof/normal-judge');
+const pinned = read('.omx/artifacts/upgrade-history-cost-2026-11-17/accounting/pinned-normproof-sources.json');
+for (const [file, sha256] of Object.entries(pinned.sha256)) {
+  if (hash(fs.readFileSync(path.join(root, file))) !== sha256) throw new Error('Pinned NormProof changed');
+}
+copy('.omx/artifacts/upgrade-history-cost-2026-11-17/accounting/pinned-normproof-sources.json', 'normproof/pinned-sources.json');
+const documents = {};
+for (const file of ['HANDOFF.md', '.wiki/log.md', '.wiki/refactor/upgrade/MASTER.md', '.wiki/refactor/upgrade/tasks.md',
+  '.wiki/refactor/upgrade/design.md', '.wiki/refactor/upgrade/summary.md']) documents[file] = { snapshot: 'docs/' + file + '.txt', ...copy(file, 'docs/' + file + '.txt') };
+const receipt = { schemaVersion: 1, date: '2026-11-17', batch: ['E.5', 'C.8'],
+  status: 'linux_functionally_accepted_repository_gate_not_proven',
+  baseCommit: execFileSync('rtk', ['proxy', 'git', 'rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+  delivery: { localCommit: 'containing Git commit supplies the receipt', push: false, ci: false },
+  build: { buildId: identity.buildId, inputsDigest: identity.inputsDigest, currentCompilerInputsVerified: true,
+    manifest: 'sdk/final-build-manifest.json', compiledReceiptsBelongToThisBuild: true }, source, documents,
+  validation: { combined: { files: 25, tests: 355, passed: 355, failed: 0, receipt: 'sdk/final-integrated.json', log: 'sdk/final-integrated.log' },
+    static: { count: 7, status: 'passed', productionModules: 2662, monoliths: 0, receipt: 'sdk/final-static.log', docsSourceAdvisories: 119 },
+    uiReversals: { status: 'passed', cases: 3, assertionFailures: 8, restoredExactly: true, mainSourcesMutated: false,
+      receipt: 'sdk/reversals.json', restored: { files: 4, tests: 29, receipt: 'sdk/reversal-restored-final.json' },
+      excludedOverlappedReceipt: 'sdk/reversal-restored-overlap.json', classification: 'sdk/concurrency-classification.md' },
+    discoveryReversals: { status: 'passed', assertionFailures: 3, restoredExactly: true, mainSourcesMutated: false,
+      receipt: 'discovery/reversal.json', restored: { files: 2, tests: 22, receipt: 'discovery/restored.json' } },
+    review: { ui: { verdict: 'APPROVE', files: 7, receipt: 'sdk/review.json' }, discovery: { verdict: 'APPROVE', files: 3, receipt: 'discovery/review.json' },
+      currentHashesCheckedByRoot: true, reviewersRanValidation: false },
+    signedInstallation: { status: 'passed', compiledCli: true, publicExtensionService: true, lifecycleCases: 8, uiModes: 2,
+      zeroProviderRequests: signed.zeroProviderRequests, receipt: 'sdk/signed-native.json',
+      boundaries: signed.boundaries, originalConfigUnchanged: signed.personalInputsUnchanged, privateStateRemoved: signed.privateStateRemoved },
+    npmInstalled: { status: 'passed', publicEntries: installed.publicEntries, package: installed.package, strict: true, skipLibCheck: false,
+      actualAsyncTypeScriptFile: true, uiModes: 2, zeroProviderRequests: installed.zeroProviderRequests, receipt: 'sdk/package-native.json',
+      boundaries: installed.boundaries, originalConfigUnchanged: installed.originalInputsUnchanged, privateStateRemoved: installed.privateStateRemoved },
+    configuredDiscovery: { status: 'passed', actualRequests: native.actualRequests, cases: native.cases.map(c => c.name), receipt: 'discovery/native.json',
+      originalConfigUnchanged: native.originalConfigUnchanged, privateStateRemoved: native.privateStateRemoved,
+      priorCompiledReceipt: 'discovery/native-before-shared-host.json', priorReceiptHistoricalOnly: true },
+    finiteCatalogue: { status: 'passed', deferredDefinitions: 2000, samples: 20, inputs: 410, currentInputsVerified: true,
+      surfaces: catalogue.surfaces, loadedLimit: catalogue.loadedLimit, receipt: 'discovery/catalogue.json',
+      boundary: 'Source bundle and finite fixture only; not universal performance, provider billing, cache savings or native declaration protocol.' },
+    normproof: { actualCommandExitCode: 2, verdict: 'not_proven', unresolvedSpecifierObligation: 'missing',
+      reason: 'Full graph exceeds pinned 16384 edge ceiling', enforcementMode: 'shadow', enforcementExitCode: 0,
+      pinnedFilesUnchanged: 18, defaultGatePassed: false, receipt: 'normproof/normal-judge/verdict.json', log: 'sdk/final-normproof.log' } },
+  progress: { accepted: 29, total: 62, remaining: 33, overallGoal: 'active' },
+  exclusions: ['No push or CI', 'No other platform or physical-pixel qualification', 'No named-tool dispatch through public installed service',
+    'Caller-assembled public service gate is not the SDK private gate', 'No general VM security, cache savings, TTL, billing or native increment declaration qualification'],
+  files: manifest };
+fs.writeFileSync(path.join(output, 'delivery.json'), JSON.stringify(receipt, null, 2) + '\n');
+console.log(JSON.stringify({ artifact: path.relative(root, output), buildId: identity.buildId, files: Object.keys(manifest).length,
+  sources: Object.values(source).reduce((n, files) => n + Object.keys(files).length, 0), accepted: 29, remaining: 33 }));

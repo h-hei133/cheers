@@ -1,0 +1,19 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "node": "24.15.0",
+  "probeSha256": "8c20d0521b357d4a883d4561c64c68884fdde3bd08d3ee84575edabde3c1a84c",
+  "method": "current-owner-source-bundle",
+  "providerRequests": 0,
+  "samples": 20,
+  "deferredDefinitions": 2000,
+  "caveat": "Measured finite local fixture only; not provider acceptance, a universal latency guarantee or a cache-cost claim.",
+  "failedStage": "bundle-current-owners",
+  "bundleErrors": [],
+  "failure": {
+    "code": "local-catalogue-operation-failed",
+    "category": "scratch-bundle-or-environment"
+  },
+  "failureLine": "96",
+  "privateStateRemoved": true
+}

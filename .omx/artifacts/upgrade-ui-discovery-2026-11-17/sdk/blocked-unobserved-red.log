@@ -1,0 +1,3 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/sdk/ui/retirement.test.ts -t requires an explicit new binding --no-file-parallelism --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/ui-renewal-validation/blocked-unobserved-red.json
+JSON report written to /home/wang/projects/cheers/.tmp/ui-renewal-validation/blocked-unobserved-red.json

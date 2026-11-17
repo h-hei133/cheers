@@ -1,0 +1,2 @@
+{"timestamp":"2026-11-17T06:00:34.989Z","level":"info","source":"check-run","message":"Harness Check Event Trace","metadata":{"model":"unknown-model","normProfile":"software-structure-v0","contextVolume":59,"gateStatus":{"mode":"shadow","wouldBlock":true,"didBlock":false}}}
+{"timestamp":"2026-11-17T06:00:34.996Z","level":"info","source":"check-run","message":"Check-run evaluation completed with status: not_proven"}

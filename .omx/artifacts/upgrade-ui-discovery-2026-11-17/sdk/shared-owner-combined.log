@@ -1,0 +1,22 @@
+scc-gate root=packages/ts-shell/src files=3368
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+config-consumer-check fields=66 read=66 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+declaration-check hook_events=18 dispatched=18 tool_factories=15 registered=15 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=24 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+Checked 3513 files in 854ms. No fixes applied.
+module-facade-check ceiling=20 modules=2662 reported=0 thresholds=delegationRatio>=0.9,branching<=0,ownStateWrites<=0
+  verdict         names lines  delegation  branching  lines/name  module
+module-facade-summary monoliths=0 thin_facades=0
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/sdk/ui.test.ts src/sdk/ui/retirement.test.ts src/sdk/ui/installed.test.ts src/config/publication.test.ts src/config/inputs/publication.test.ts src/config/scope/admission.test.ts src/core/shell/configurationRefusal.test.ts src/sdk/lifecycle.test.ts src/sdk/resourceLoader.test.ts src/cli/interactive/extensions.test.ts src/cli/runtime/extensions.test.ts src/extensions/runtime/ui.test.ts src/extensions/runtime/initialization.test.ts src/extensions/runtime/inProcessLoader.test.ts src/extensions/extensions.test.ts --no-file-parallelism --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/ui-renewal-validation/shared-owner-combined.json
+(node:1266853) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+JSON report written to /home/wang/projects/cheers/.tmp/ui-renewal-validation/shared-owner-combined.json

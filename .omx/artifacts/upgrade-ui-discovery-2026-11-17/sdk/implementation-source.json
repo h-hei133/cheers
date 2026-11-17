@@ -1,0 +1,10 @@
+{
+  "scope": "E.5 SDK UI renewal",
+  "status": "implemented-unverified",
+  "files": {
+    "packages/ts-shell/src/sdk/agentSession.ts": "43c11c8196318971bff9014ee63cc1956f62ef98fdb9bdab94b5b93512eb652e",
+    "packages/ts-shell/src/sdk/ui.ts": "c7db50e9008aa061030c99428b660972b4215d2505f29260f571b5aa698830cc",
+    "packages/ts-shell/src/sdk/ui.test.ts": "ea135c6cd0686446444ab503450a079babc6c4f917c3cb31c595743d520e9900",
+    "packages/ts-shell/src/sdk/ui/retirement.test.ts": "9537d9c1c6d79e5ae2bf00219c3e285f7c5ffb631ba48619ac382168a58506e0"
+  }
+}

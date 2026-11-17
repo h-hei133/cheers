@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-17",
+  "reviewer": "/root/ui_review",
+  "scope": "E.5 SDK retained UI renewal and directly affected host consumers",
+  "verdict": "REQUEST_CHANGES",
+  "source": {
+    "packages/ts-shell/src/sdk/agentSession.ts": "43c11c8196318971bff9014ee63cc1956f62ef98fdb9bdab94b5b93512eb652e",
+    "packages/ts-shell/src/sdk/ui.ts": "c7db50e9008aa061030c99428b660972b4215d2505f29260f571b5aa698830cc",
+    "packages/ts-shell/src/sdk/ui.test.ts": "43d7d352b0818c71b84c03178deec86ab5a1eb8f7e2559fbc5166a18ee832592",
+    "packages/ts-shell/src/sdk/ui/retirement.test.ts": "417fb20bb694486f262eec559eded721c78f3bf493c9fe1bb18c443d487879aa"
+  },
+  "testSourceChange": "Root expanded blocked retirement to observed and unobserved cases during this review. Production source remained unchanged in the inspected hash state.",
+  "findings": [
+    {
+      "id": "SDK_UI_BLOCKED_PUBLICATION_RENEWAL",
+      "severity": "high",
+      "title": "Preserve blocked-publication revocation when no UI call observes the block",
+      "file": "packages/ts-shell/src/sdk/ui.ts",
+      "lineStart": 58,
+      "lineEnd": 66,
+      "impact": "After a same-binding blocked publication is corrected, the retained old host is renewed without an explicit bindUi call if no API UI call occurred while the block was current. Confirmation can return true and host effects become available despite the contract requiring explicit new authority after a blocked configuration.",
+      "cause": "bindExtensionUiFor's abort callback invokes SessionUi.install's onRelease while ConfigState.retireBackground is still exposing the preceding valid publication. The retained owner therefore survives. It remains associated with the already-aborted old background signal and is not notified when a later blocked publication is replaced. At the next UI call, current() sees only the corrected publication and accepted old binding, so install(retained) reinstalls the original host. The observed-block test explicitly accesses UI during the block and releases retained, masking the unobserved case.",
+      "relatedReferences": [
+        "packages/ts-shell/src/sdk/ui.ts:80-85",
+        "packages/ts-shell/src/config/state.ts:120-125",
+        "packages/ts-shell/src/config/state.ts:134-141",
+        "packages/ts-shell/src/sdk/ui/retirement.test.ts:103-129"
+      ],
+      "minimalReproduction": [
+        "Create an SDK session with preloaded inline ExtensionAPI and options.ui.confirm returning true.",
+        "Confirm once before publication to establish the original retained host.",
+        "Call state.rejectCandidate(state.begin(before.binding), before.binding, diagnostics, true).",
+        "Do not access api.ui while the blocked publication is current.",
+        "Immediately publish before.requested with the same binding as a correction.",
+        "api.ui.confirm after correction must be false until an explicit session.bindUi call, but the inspected implementation returns true."
+      ],
+      "validation": {
+        "reviewerExecuted": false,
+        "rootExecutedReceipt": "blocked-unobserved-red.json",
+        "rootExecutedCommandLog": "blocked-unobserved-red.log",
+        "selectedCases": 2,
+        "passedControls": 1,
+        "assertionFailures": 1,
+        "failure": "Unobserved blocked access case: expected true to be false at retirement.test.ts:119."
+      },
+      "repairConstraints": [
+        "Preserve an observed monotonic blocked-publication fact through correction, instead of inferring authority from the latest state alone.",
+        "Explicit bindUi after correction must still reacquire usable authority.",
+        "Do not repurpose substrateRevision without accounting for the old shared host's captured configuration admission and SessionUi's immutable host identity; that would retire the old raw host even for explicit rebind.",
+        "A microtask listener cannot reliably reattach across same-stack blocked publication and correction because retireBackground replaces its controller only after abort listeners run."
+      ]
+    }
+  ],
+  "reviewedInvariants": [
+    "Input/event callbacks run under currentExtensionInvocation and retain the admitted UI snapshot; the changed contribution accessor captures SessionUi.host.ui only for a newly admitted event.",
+    "DefaultResourceLoader's file and inline collectors read the SessionUi facade through their generation-bound host proxy; retired generations remain refused.",
+    "Ordinary abort uses the existing UI binding cancel method; SessionUi retrieves the same raw host's successor wrapper without renewing old callback snapshots.",
+    "Explicit retained release clears that captured host and release callback before calling the binder; late release of an old owner does not remove the new retained object.",
+    "Session, root, workspace, trust and substrate changes remain fenced by the original configurationAdmission and captured raw-host identity; A-to-B-to-A is rejected through existing revisions.",
+    "Dispose retires SessionUi before resource generation cleanup and runtime settlement; cleanup failure retains the existing first-error aggregation.",
+    "The facade inherits non-UI methods from the raw shared host, whose arrow functions still use its original captured checks."
+  ],
+  "residualRisks": [
+    "The existing ten-file 130-pass receipt predates Root's new unobserved-block control; it cannot prove the finding resolved.",
+    "ExtensionService and CLI file registrations still receive the original raw installExtensionHost bridge. Installed executeInProcessScript captures options.host.ui directly and does not invoke SessionUi.current, so the changed DefaultResourceLoader path alone does not establish installed async-TS/shared-host publication renewal qualification.",
+    "No current compiled-native, signed installed extension, package-install or other-platform validation was run by this reviewer.",
+    "The inspected change must not promote E.5 as a whole before its remaining consumer qualification and Root's serial post-fix validation."
+  ],
+  "execution": {
+    "sourceEdits": false,
+    "testsRun": false,
+    "buildRun": false,
+    "verificationGatesRun": false,
+    "providerCalls": false,
+    "normproofRun": false,
+    "onlyWrittenFile": ".tmp/ui-renewal-validation/review.json"
+  }
+}

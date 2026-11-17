@@ -1,0 +1,3 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/core/tools/discovery/contract.test.ts src/core/tools/discovery/ranker.test.ts --no-file-parallelism --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/discovery-validation/restored.json
+JSON report written to /home/wang/projects/cheers/.tmp/discovery-validation/restored.json

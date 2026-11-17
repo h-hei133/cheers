@@ -11968,3 +11968,9 @@ C.9捕获普通print／JSON／RPC／非TTY输入或输出，保留仅stderr重�
 C.4默认旧正文裁剪结论被现有false配置及唯一projection反证，沿用原owner并补实际消费者验收。C.7保留当次有效read/write presence，missing／invalid保持unknown；估算用captured普通input／完整write费率，缺价不补填，gap／reset断比较，输出标estimated overlap／possible expiry。最终21文件933项、六静态门、七有效反转exact恢复／恢复4文件61项、0生产monoliths与build0247cb1b526d通过；独立13cache源文件APPROVE。另5文件模型恢复限定APPROVE、单独本地提交a9099ca，严格请求准入保持。
 
 Linux同代公开SDK／CLI配置模型21实际请求／10prompt轮覆盖两次builtin read／跨年龄保留／save-reopen／显式pruning／automatic commit与checkpoint续轮；压力单列32seeded pairs／64messages，不当真实provider轮数。两read-reported／十九缺失与null价格不证明节省、TTL或账单。归档upgrade-history-cost-2026-11-17，27/62为本地功能验收；正常NormProof仍exit2／not_proven，未改变pinned bundle／scope／gate。E.5原共享host续绑／blocked revocation及C.8可变schema已修与限定复审通过，最终构建／安装／共享原生资格待完成。整体goal active，不push或宣称远端CI。
+
+### 2026-11-17：共享SDK UI续绑和工具发现最终验收
+
+模型恢复a9099ca与历史缓存1285ff4已本地提交。本批E.5原shared host刷新新UI snapshot、blocked publication独立撤权；C.8仅删除caller可变schema的永久identity fingerprint，原digest／guard及检索机制保留。两独立APPROVE和10source hash匹配；最终25文件355项、七门／0monoliths、build89344ffebd35，UI三反转8AssertionErrors／串行恢复4/29及发现三反转／恢复2/22passed。
+
+同代npm15入口strict NodeNext／skipLibCheck=false与实际async TS file两模式passed；编译CLI签名安装／坏签名及archive拒绝／分开grants、公开ExtensionService实际async TS worker与原SDK host两模式passed，零provider请求。公开caller gate assembly与SDK私有gate、构造VersionRecord测试与签名安装资格分别记录；named-tool service派发不宣称。最终配置模型8actual发现请求覆盖允许／hook零效果／hidden排除，2000 deferred有限目录410source输入hash未变，不作通用性能／cache收益声明。归档upgrade-ui-discovery-2026-11-17，29/62功能验收／33任务未完成，正常NormProof仍实际exit2／not_proven、18pinned文件未改；下一E.1／E.3真实codemode消费者。整体goal active，无push或远端CI。
