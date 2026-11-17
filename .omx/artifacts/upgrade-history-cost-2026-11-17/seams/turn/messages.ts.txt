@@ -1,0 +1,94 @@
+import { microcompactMessages } from '../core/query/microCompact.js';
+import type { AgentMessage } from '../core/agent/state.js';
+import { toChatMessages, type ChatMessage } from './prompt.js';
+import type { ProviderMessage } from '../model-adapters/message.js';
+
+/** Every endpoint accepts system text through the request's system field. */
+export function providerSystemPrompt(base: string, messages: readonly ProviderMessage[]): string {
+  const parts = base ? [base] : [];
+  for (const message of messages) {
+    if (message.role !== 'system' || message.requestDeclaration || message.content == null) continue;
+    if (typeof message.content === 'string') parts.push(message.content);
+    else {
+      if (message.content.some(block => block.type !== 'text')) throw new Error('System message content must contain text only.');
+      parts.push(message.content.map(block => block.type === 'text' ? block.text : '').join('\n'));
+    }
+  }
+  return parts.join('\n\n');
+}
+
+export interface OutgoingProjectionOptions {
+  readonly pruneToolText?: boolean;
+  readonly keepRecentTurns?: number;
+  readonly maxOutputChars?: number;
+  readonly transformMessages?: (messages: readonly ChatMessage[]) => readonly ChatMessage[];
+}
+
+/** Identical source projection for dispatch and local preview. */
+export function outgoingProjection(
+  messages: readonly AgentMessage[],
+  bridge: boolean,
+  pruneOrOptions: boolean | OutgoingProjectionOptions = false,
+) {
+  const opts: OutgoingProjectionOptions = typeof pruneOrOptions === 'boolean'
+    ? { pruneToolText: pruneOrOptions }
+    : pruneOrOptions;
+  const pruneToolText = opts.pruneToolText ?? false;
+  const converted = toChatMessages(messages);
+  const { messages: compacted, prunedCount, savedChars } = microcompactMessages(converted, {
+    pruneToolText,
+    ...(opts.keepRecentTurns !== undefined ? { keepRecentTurns: opts.keepRecentTurns } : {}),
+    ...(opts.maxOutputChars !== undefined ? { maxOutputChars: opts.maxOutputChars } : {}),
+  });
+  let result: ChatMessage[] = compacted;
+  if (bridge) {
+    result = [];
+    for (const message of compacted) {
+      if (message.role === 'user' && result.at(-1)?.role === 'tool') {
+        result.push({ role: 'assistant', content: 'I have processed the tool results.' });
+      }
+      result.push(message);
+    }
+  }
+  if (opts.transformMessages) {
+    result = [...opts.transformMessages(result)];
+  }
+  return {
+    messages: result,
+    savedChars,
+    // Count equality alone misses a removed orphan and an inserted result
+    // cancelling each other. A source-indexed prefix needs every index intact.
+    indexAligned: !opts.transformMessages && converted.length === messages.length && result.length === compacted.length
+      && converted.every((message, index) => message.role === messages[index]!.role
+        && message.tool_call_id === messages[index]!.tool_call_id
+        && message.content === messages[index]!.content),
+    sourceAligned: !opts.transformMessages && converted.length === messages.length && prunedCount === 0 && result.length === compacted.length,
+  };
+}
+
+export function outgoingMessages(
+  messages: readonly AgentMessage[],
+  bridge: boolean,
+  pruneOrOptions: boolean | OutgoingProjectionOptions = false,
+): readonly ChatMessage[] {
+  return outgoingProjection(messages, bridge, pruneOrOptions).messages;
+}
+
+export const FINAL_STEP_MESSAGE =
+  'You have reached the limit of steps you may take. You cannot call any more tools on this turn. ' +
+  'Answer now with what you have: say what you did, what you found, and what remains unfinished.';
+
+export function finalStepMessages(messages: readonly ChatMessage[], allowTools: boolean, hadTools: boolean): readonly ChatMessage[] {
+  if (allowTools || !hadTools) return messages;
+  return [...messages, { role: 'user', content: FINAL_STEP_MESSAGE }];
+}
+
+/** Whether a request history requires the selected model to understand tools. */
+export function hasToolHistory(messages: readonly { readonly role: string; readonly tool_calls?: ChatMessage['tool_calls'] }[]): boolean {
+  return messages.some(message =>
+    message.role === 'tool' || (message.role === 'assistant' && (message.tool_calls?.length ?? 0) > 0),
+  );
+}
+
+export const TOOL_HISTORY_UNSUPPORTED_MESSAGE =
+  'The selected model does not support tool history. Start a new session or select a tool-capable model.';

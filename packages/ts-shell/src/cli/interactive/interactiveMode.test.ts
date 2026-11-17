@@ -75,12 +75,53 @@ import { researchHarness, cleanupResearch } from '../../test-utils/research.js';
 import { researchFor } from '../runtime/research.js';
 import { currentResearch, readResearch } from '../../research/run/store.js';
 import * as modelDetails from './picker/model/details.js';
-import { recordSessionUsage, resetSessionUsage } from '../../observability/usageTelemetry.js';
+import { getSessionUsage, recordSessionUsage, resetSessionUsage } from '../../observability/usageTelemetry.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import type { Keybindings } from './keybindings.js';
 import { buildToolEscalationPrompt } from '../../core/query/toolPolicy.js';
 import { AgentRegistryScanner } from '../../core/messaging/agentRegistryScanner.js';
 import { detectTerminalCapabilities } from '../../presentation/tui/terminalCapabilities.js';
+import { usageFromProvider } from '../../provider/response/usage.js';
+
+it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
+  [false, true].map(reported => ({ kind, reported }))))(
+  'shows a cache estimate in the actual $kind host only for measured reads (reported=$reported)', async ({ kind, reported }) => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/cache-notice-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const { mode, terminal } = build({ tuiMode: kind });
+    const host = mode as unknown as { busy: boolean; view: InteractiveView; options: { runtimeContext: ShellRuntimeContext } };
+    const sessionId = `cache-notice-${kind}-${reported}`;
+    host.options.runtimeContext.session.id = sessionId;
+    resetSessionUsage(sessionId);
+    const attribution = captureUsageAttribution({ provider: 'openai', model: 'meter', baseUrl: 'https://relay.invalid',
+      rates: { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1 } });
+    const promptIdentity = { provider: 'openai', model: 'meter', endpoint: 'openai-compatible' };
+    recordSessionUsage(sessionId, { ...usageFromProvider({ prompt_tokens: 10_000, completion_tokens: 1,
+      prompt_tokens_details: { cached_tokens: 8_000 } }), attribution, promptIdentity });
+    const route = vi.spyOn(commandRouter, 'routeInteractiveCommand').mockImplementation(async () => {
+      recordSessionUsage(sessionId, { ...usageFromProvider({ prompt_tokens: 12_000, completion_tokens: 1,
+        ...(reported ? { prompt_tokens_details: { cached_tokens: 0 } } : {}) }), attribution, promptIdentity });
+      return { turnNumber: 1 };
+    });
+    mode.start();
+    try {
+      terminal.input('inspect\r');
+      await vi.waitFor(() => expect(route).toHaveBeenCalledOnce());
+      await vi.waitFor(() => expect(host.busy).toBe(false));
+      const notices = host.view.transcript.all().filter(block => block.kind === 'notice' && block.text.includes('cache miss'));
+      expect(notices).toHaveLength(reported ? 1 : 0);
+      if (reported) {
+        expect(notices[0]!.text).toContain('Estimated cache miss: 10,000 overlapping prompt tokens');
+        expect(notices[0]!.text).toContain('+$0.0090');
+      }
+      expect(getSessionUsage(sessionId).recentRequests.at(-1)?.cacheReadReported).toBe(reported);
+    } finally {
+      mode.stop(); route.mockRestore(); resetSessionUsage(sessionId); vi.unstubAllEnvs();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
 
 it.each((['regular', 'fullscreen'] as const).flatMap(kind =>
   [true, false].map(supportsHyperlinks => ({ kind, supportsHyperlinks }))))(

@@ -3,46 +3,39 @@ import type { UsageHistoryEntry } from "./usage/model.js";
 import { bucketIdentity, bucketRates, cacheIdentity } from './usage/identity.js';
 
 /**
- * What the prompt cache failed to save.
+ * Estimated prompt overlap and extra cost against a cache read.
  *
- * Every request resends the conversation, so most of a prompt is text the
- * provider has already seen. Providers charge a fraction of the normal rate for
- * the part they recognize, which makes a miss — prompt that was sent before and
- * charged in full anyway — the one cache number worth reporting: the tokens are
- * the same either way, and only the money differs.
- *
- * Nothing here is inferred from a provider's own hit-rate figure, because there
- * is not one. What is measured is the difference between what the previous
- * request sent and what the current one was charged full price for.
+ * Recorded prompt and cache-read counts bound potential overlap with the prior
+ * request. They do not establish identical text, provider cache eligibility, or
+ * an invoice. The current paid categories and captured prices supply an estimate
+ * of the extra cost that overlap could have incurred.
  */
 
 /**
  * Tokens below which a shortfall is not counted.
  *
- * A prompt is cached at breakpoints, so the boundary between cached and not
- * lands somewhere inside the text. A few hundred tokens on the wrong side of it
- * is how the mechanism works, not a failure of it; counting those would bury the
- * real misses in noise.
+ * Small differences can reflect tokenization or cache granularity. This floor
+ * is a reporting heuristic, not an observed provider cache contract.
  */
 export const NOISE_FLOOR_TOKENS = 1024;
 
-/** How long an idle gap has to be before it is worth naming as a likely cause. */
+/** Idle-gap heuristic for suggesting possible expiry; no provider TTL is measured. */
 export const CACHE_TTL_MS = 5 * 60 * 1000;
 
-/** One request that paid full price for prompt it had already sent. */
+/** One request with a material estimated shortfall in cache reads. */
 export interface CacheMiss {
-  /** Prompt tokens that were in the previous request and re-billed in this one. */
+  /** Potential overlapping prompt tokens beyond the current reported cache reads. */
   readonly missedTokens: number;
-  /** Extra dollars paid against what a cache read would have cost. */
+  /** Estimated extra dollars against a cache read, using the current paid categories. */
   readonly missedCost: number;
-  /** Time since the previous request, which is how a cache expires. */
+  /** Time since the previous request; expiry remains a possible explanation. */
   readonly idleMs: number;
-  /** Whether these tokens were sent to a different model than last time. */
+  /** Whether the selected model changed since the previous request. */
   readonly modelChanged: boolean;
   readonly endpointChanged?: boolean;
 }
 
-/** All the misses found in a history, and what they cost. */
+/** All estimated shortfalls found in a history, and their estimated cost. */
 export interface CacheWaste {
   readonly missedTokens: number;
   readonly missedCost: number;
@@ -75,13 +68,14 @@ export interface CacheUsageSummary {
 /**
  * The provider-reported cache hit rate over the retained, cache-accounted
  * requests. Requests without cache accounting are excluded rather than treated
- * as misses: zero can mean a real miss or an unsupported provider, and the
- * telemetry already records that distinction in `reportedCache`.
+ * as misses. Current category evidence distinguishes an observed zero from an
+ * omitted field; sticky historical activity cannot establish that evidence.
  */
 export function summarizeCacheUsage(
   history: readonly UsageHistoryEntry[],
 ): CacheUsageSummary {
-  const accounted = history.filter((entry) => entry.kind === "request" && entry.reportedCache);
+  const accounted = history.filter((entry) => entry.kind === "request"
+    && cacheCategoryMeasured(entry.cacheReadTokens, entry.cacheReadReported));
   const promptTokens = accounted.reduce((sum, entry) => sum + entry.promptTokens, 0);
   const cacheReadTokens = accounted.reduce((sum, entry) => sum + entry.cacheReadTokens, 0);
   return {
@@ -96,8 +90,8 @@ export function summarizeCacheUsage(
 interface Comparable {
   readonly promptTokens: number;
   readonly cacheReadTokens: number;
-  /** Full-price prompt: input plus the write premium. */
-  readonly paidTokens: number;
+  /** Weighted rate of observed ordinary input and cache writes, per million tokens. */
+  readonly paidPerMTok: number;
   readonly rates: ModelCostRates;
   readonly bucketKey: string;
   readonly modelKey: string;
@@ -105,17 +99,20 @@ interface Comparable {
   readonly timestamp: number;
 }
 
+/** Older snapshots prove positive activity only; their zero counts lack current category evidence. */
+function cacheCategoryMeasured(tokens: number, reported: boolean | undefined): boolean {
+  return Number.isFinite(tokens) && tokens >= 0 && (reported ?? tokens > 0);
+}
+
 /**
- * Find every request that should have been a cache read and was not.
+ * Estimate material cache-read shortfalls over comparable recorded requests.
  *
  * Takes the recorded history rather than reading anything itself, so the same
  * arithmetic serves a report over a session's recent requests and a test with
  * three entries in it.
  *
- * A request is only comparable against another on the same model: the cache is
- * the provider's, keyed to the model it was built for, so a switch legitimately
- * re-bills the whole prompt. Those are reported as the model having changed
- * rather than silently dropped, because the money was still spent.
+ * Proven destination/model changes are retained as context. They do not prove
+ * a cache defect or identical prompt content across those requests.
  */
 export function findCacheWaste(
   history: readonly UsageHistoryEntry[],
@@ -133,8 +130,8 @@ export function findCacheWaste(
     }
 
     const current = comparable(entry, rateFor);
-    // A request with no published rate is stored for the next comparison but
-    // never judged: the tokens are known and the money is not.
+    // Missing current cache-read evidence or paid-category prices cannot supply
+    // a dollar estimate or establish a comparable request across the gap.
     const missed = previous && current ? detectMiss(previous, current) : undefined;
     if (missed) misses.push(missed);
     previous = current;
@@ -150,7 +147,7 @@ export function findCacheWaste(
   };
 }
 
-/** Detect whether the most recent request in `history` suffered a prompt cache miss. */
+/** Estimate a cache-read shortfall for the most recent comparable request. */
 export function detectLatestCacheMiss(
   history: readonly UsageHistoryEntry[],
   rateFor: CacheRateLookup,
@@ -173,12 +170,12 @@ export function formatCacheMissNotice(miss: CacheMiss): string {
     : miss.endpointChanged
       ? " [endpoint changed]"
       : miss.idleMs > CACHE_TTL_MS
-        ? ` [idle ${Math.round(miss.idleMs / 1000)}s > TTL]`
+        ? ` [idle ${Math.round(miss.idleMs / 1000)}s; possible expiry]`
         : "";
-  return `Cache miss: ${tokens} prompt tokens re-billed${cost}${cause}.`;
+  return `Estimated cache miss: ${tokens} overlapping prompt tokens${cost}${cause}.`;
 }
 
-/** Return a turn-end warning string when the latest priced request had a material cache miss. */
+/** Return a turn-end estimate when the latest comparable request had a material shortfall. */
 export function turnCacheMissNotice(
   history: readonly UsageHistoryEntry[],
   rateFor: CacheRateLookup,
@@ -191,21 +188,26 @@ export function turnCacheMissNotice(
 /**
  * The one request shaped for comparison, or nothing when it cannot be judged.
  *
- * `promptTokens` is the whole prompt the provider was sent, because that is what
- * the next request's cache reads are measured against. `paidTokens` is the part
- * billed at the full rate: input, plus cache writes, which carry their own
- * premium. Those are the only buckets a missed token can land in.
+ * `promptTokens` is the recorded whole prompt. Ordinary input and cache writes
+ * supply a weighted paid rate for allocating cost to potential overlap. A paid
+ * category with no captured price cannot supply a dollar estimate.
  */
 function comparable(entry: UsageHistoryEntry, rateFor: CacheRateLookup): Comparable | undefined {
-  if (entry.promptTokens <= 0) return undefined;
+  if (entry.promptTokens <= 0 || !cacheCategoryMeasured(entry.cacheReadTokens, entry.cacheReadReported)
+    || !Number.isFinite(entry.cacheWriteTokens) || entry.cacheWriteTokens < 0) return undefined;
   const rates = bucketRates(entry.bucketKey, entry, rateFor);
   if (!rates || rates.cacheReadPerMTok === undefined) return undefined;
   const identity = bucketIdentity(entry.bucketKey, entry);
   const cacheRead = entry.cacheReadTokens;
+  const paidTokens = entry.promptTokens - cacheRead;
+  const inputTokens = paidTokens - entry.cacheWriteTokens;
+  if (inputTokens < 0 || (entry.cacheWriteTokens > 0
+    && (!cacheCategoryMeasured(entry.cacheWriteTokens, entry.cacheWriteReported) || rates.cacheWritePerMTok === undefined))) return undefined;
   return {
     promptTokens: entry.promptTokens,
     cacheReadTokens: cacheRead,
-    paidTokens: entry.promptTokens - cacheRead,
+    paidPerMTok: paidTokens > 0
+      ? (inputTokens * rates.promptPerMTok + entry.cacheWriteTokens * (rates.cacheWritePerMTok ?? 0)) / paidTokens : 0,
     rates,
     bucketKey: cacheIdentity(entry.bucketKey, entry.attribution),
     modelKey: JSON.stringify([identity.provider, identity.model]),
@@ -215,12 +217,10 @@ function comparable(entry: UsageHistoryEntry, rateFor: CacheRateLookup): Compara
 }
 
 /**
- * How much of the previous prompt was re-billed in this one.
+ * Estimate shared prompt counts beyond the current reported cache reads.
  *
- * The prompt can be shorter than last time — after a compaction, or when a turn
- * sent less — so the comparison is against the smaller of the two. Only the part
- * that was actually sent again could have been cached, and charging the current
- * request for tokens it never sent would invent a miss.
+ * The prompt can be shorter than last time, so potential overlap is bounded by
+ * the smaller recorded count. Counts alone do not identify which text was shared.
  */
 function detectMiss(previous: Comparable, current: Comparable): CacheMiss | undefined {
   // A legacy entry never identified an endpoint. Migration cannot establish
@@ -230,15 +230,12 @@ function detectMiss(previous: Comparable, current: Comparable): CacheMiss | unde
   const missedTokens = shared - current.cacheReadTokens;
   if (missedTokens <= NOISE_FLOOR_TOKENS) return undefined;
 
-  // What the miss cost is the gap between the two published rates: those tokens
-  // were billed at the full prompt rate when a cache read would have been
-  // charged the read rate. Both come from the same model's own prices, so no
-  // assumption about the ratio between them is baked in.
+  // Allocate potential overlap using the current paid buckets' weighted rate.
+  // Input/write distribution within that overlap is unknown, so this remains an
+  // estimate rather than a measured re-billing or an invoice adjustment.
   //
-  // Clamped at zero. A model that prices reads above the full rate would make a
-  // miss a saving, and reporting a negative cost would be arithmetic nobody can
-  // act on.
-  const extraPerToken = Math.max(0, current.rates.promptPerMTok - (current.rates.cacheReadPerMTok ?? 0));
+  // A read price above the weighted paid rate supplies no positive extra cost.
+  const extraPerToken = Math.max(0, current.paidPerMTok - current.rates.cacheReadPerMTok!);
   return {
     missedTokens,
     missedCost: pricePerMillion(extraPerToken, missedTokens),

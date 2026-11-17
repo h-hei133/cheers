@@ -1,0 +1,408 @@
+{
+  "status": "CLEAR",
+  "recommendation": "APPROVE",
+  "findings": [],
+  "reviewer": "/root/rpc_architecture_bounded",
+  "reviewedAtUtc": "2026-11-16T12:04:45Z",
+  "noValidationExecution": true,
+  "scope": {
+    "task": "C.7 bounded independent architecture review of the frozen cache-category presence and estimated miss-cost repair",
+    "sourceRoot": "/home/wang/projects/cheers",
+    "worktree": "/home/wang/projects/cheers/.tmp/history-cost-worktree",
+    "baseHead": "d974d3a22166f04816abe22ae993aea99524172b",
+    "frozenReceipt": ".tmp/history-cost-validation/source-receipt.json",
+    "scopedPaths": [
+      "packages/ts-shell/src/provider/response/usage.ts",
+      "packages/ts-shell/src/observability/usageTelemetry.ts",
+      "packages/ts-shell/src/observability/cacheWaste.ts",
+      "packages/ts-shell/src/observability/usage/model.ts",
+      "packages/ts-shell/src/observability/usage/snapshot.ts",
+      "packages/ts-shell/src/provider/response/usage.test.ts",
+      "packages/ts-shell/src/observability/usage/attribution.test.ts",
+      "packages/ts-shell/src/observability/cacheWaste.test.ts",
+      "packages/ts-shell/src/observability/usage/presence.test.ts"
+    ],
+    "inspectedWorktreeSeamPaths": [
+      "packages/ts-shell/src/observability/usage/identity.ts",
+      "packages/ts-shell/src/observability/usage/recovery.ts",
+      "packages/ts-shell/src/core/commands/cost/model.ts",
+      "packages/ts-shell/src/session/store/usage.ts",
+      "packages/ts-shell/src/provider/endpoints/responses/output.ts",
+      "packages/ts-shell/src/provider/endpoints/anthropicMessages.ts",
+      "packages/ts-shell/src/provider/endpoints/bedrockConverse.ts",
+      "packages/ts-shell/src/provider/endpoints/googleWire.ts",
+      "packages/ts-shell/src/provider/response/metering.ts",
+      "packages/ts-shell/src/core/commands/cost/cache.ts",
+      "packages/ts-shell/src/session/store/sessionStateStore.ts",
+      "packages/ts-shell/src/session/agent/persistence.ts",
+      "packages/ts-shell/src/core/shell/runtimeContext.ts"
+    ],
+    "inspectedMainSeamPaths": [
+      "packages/ts-shell/src/turn/step.ts",
+      "packages/ts-shell/src/core/commands/btwCommandRuntime.ts",
+      "packages/ts-shell/src/session/store/usage.ts",
+      "packages/ts-shell/src/turn/request.ts",
+      "packages/ts-shell/src/core/commands/cost/model.ts",
+      "packages/ts-shell/src/cli/interactive/interactiveMode.ts"
+    ],
+    "sourceReviewComplete": true,
+    "sourceState": "Frozen and uncommitted; approval applies only to the reviewed source and seam hashes.",
+    "exclusions": [
+      "Other reviewers' approval adoption",
+      "Source/docs, existing receipts, shared Serena activation or project indexing changes",
+      "Tests/builds/gates/NormProof/native/provider execution or new delegation",
+      "Commit/push/CI, entire-repository architecture clearance or overall-goal completion"
+    ]
+  },
+  "architectureChecks": {
+    "normalizationAndEvidence": {
+      "result": "The existing canonical normalizer preserves current category evidence independently of zero-filled numeric billing. Finite nonnegative raw category counts, including zero, report true; missing, negative and nonfinite category values report false. Numeric billing arithmetic is unchanged. Session recording copies these facts into the existing bounded history and also recognizes a valid explicit zero supplied through its direct recording API.",
+      "anchors": [
+        {
+          "file": "packages/ts-shell/src/provider/response/usage.ts",
+          "line": 11,
+          "note": "The canonical normalized accounting record carries read/write presence alongside unchanged numeric category calculations."
+        },
+        {
+          "file": "packages/ts-shell/src/provider/response/usage.ts",
+          "line": 31,
+          "note": "reportedCount requires a finite nonnegative numeric raw count."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usageTelemetry.ts",
+          "line": 128,
+          "note": "An explicit canonical false is preserved; direct valid nonnegative numeric categories are measurable."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usageTelemetry.ts",
+          "line": 210,
+          "note": "Per-request presence is stored separately from destination-specific sticky positive activity."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usage/model.ts",
+          "line": 149,
+          "note": "Presence is optional for legacy compatibility; reportedCache describes earlier positive activity only."
+        }
+      ]
+    },
+    "producerAndConsumerPropagation": {
+      "result": "The inspected Responses, Anthropic, Bedrock and Google translation bodies preserve missing category values as absent/undefined before canonical normalization, and retain an explicit zero. Main foreground turn accounting spreads the complete canonical record. /btw and the auxiliary usage recorder do the same while remaining outside foreground cache history. turn/request.ts consumes numeric values for tracing/context and does not rebuild an accounting record. The existing /cost model and actual interactive turn-end notice use the shared cache summary/comparison owners.",
+      "anchors": [
+        {
+          "file": "packages/ts-shell/src/provider/endpoints/responses/output.ts",
+          "line": 58,
+          "note": "Conditional emission uses a validator that returns undefined for an absent/invalid category, rather than zero."
+        },
+        {
+          "file": "packages/ts-shell/src/provider/endpoints/anthropicMessages.ts",
+          "line": 477,
+          "note": "Whole-body translation copies optional native category values."
+        },
+        {
+          "file": "packages/ts-shell/src/provider/endpoints/anthropicMessages.ts",
+          "line": 776,
+          "note": "Stream usage merges only halves of the same request and does not default missing cache categories to zero."
+        },
+        {
+          "file": "packages/ts-shell/src/provider/endpoints/bedrockConverse.ts",
+          "line": 394,
+          "note": "Native disjoint category values remain optional."
+        },
+        {
+          "file": "packages/ts-shell/src/provider/endpoints/googleWire.ts",
+          "line": 476,
+          "note": "The cached-content value remains optional; output subtotal handling is a separate numeric contract."
+        },
+        {
+          "file": "packages/ts-shell/src/turn/step.ts",
+          "line": 436,
+          "note": "The main inspected foreground producer spreads counted into SessionUsageRecord before accounting."
+        },
+        {
+          "file": "packages/ts-shell/src/core/commands/btwCommandRuntime.ts",
+          "line": 96,
+          "note": "The inspected main /btw producer spreads canonical usage into auxiliary accounting."
+        },
+        {
+          "file": "packages/ts-shell/src/session/store/usage.ts",
+          "line": 70,
+          "note": "The durable auxiliary recording path forwards canonical presence with captured attribution."
+        },
+        {
+          "file": "packages/ts-shell/src/provider/response/metering.ts",
+          "line": 5,
+          "note": "This is a separate ModelUsage contract with its own completeness evidence, not a zero-filled producer for session usage."
+        },
+        {
+          "file": "packages/ts-shell/src/core/commands/cost/model.ts",
+          "line": 37,
+          "note": "The existing /cost model uses summarizeCacheUsage and findCacheWaste."
+        },
+        {
+          "file": "packages/ts-shell/src/cli/interactive/interactiveMode.ts",
+          "line": 1260,
+          "note": "The actual main interactive consumer projects the latest history through turnCacheMissNotice."
+        }
+      ],
+      "mainIntegrationNote": "The main C.2 turn/step.ts has a different hash from the C.7 worktree base; the inspected main accounting producer preserves the canonical spread and was stable at publication. No main caller edit is included in the C.7 patch."
+    },
+    "legacyAndPersistence": {
+      "result": "Optional presence fields are strictly validated as booleans, copied without filling absent legacy evidence, and included in no-ID history equality. Existing stable-ID overlap, 64-entry bounds, cumulative counter delta merge and snapshot freezing remain in place. Legacy positive counts remain category evidence; legacy sticky-only zeros stay unknown. Invalid persisted presence is rejected and tolerant recovery inserts a usage-gap while retaining degraded accounting health. Session-state writes pass the whole usage snapshot through the existing state lock and atomic writer; activation/reopening invokes the existing restore boundary.",
+      "anchors": [
+        {
+          "file": "packages/ts-shell/src/observability/usage/snapshot.ts",
+          "line": 98,
+          "note": "Defined presence fields must be booleans."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usage/snapshot.ts",
+          "line": 117,
+          "note": "Absent legacy flags remain absent."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usage/snapshot.ts",
+          "line": 130,
+          "note": "Stable IDs retain existing identity semantics; no-ID equality now distinguishes category evidence."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usage/recovery.ts",
+          "line": 27,
+          "note": "Rejected history entries become continuity-breaking usage-gap entries."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usageTelemetry.ts",
+          "line": 380,
+          "note": "Restore uses recovery and establishes the existing persistence baseline."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usageTelemetry.ts",
+          "line": 404,
+          "note": "Persistence remains accounting-only; admission/copying precedes publication and the baseline changes only after write returns."
+        },
+        {
+          "file": "packages/ts-shell/src/session/store/sessionStateStore.ts",
+          "line": 80,
+          "note": "The ordinary session writer retains state-lock ownership and publishes usage through persistSessionUsage."
+        },
+        {
+          "file": "packages/ts-shell/src/session/agent/persistence.ts",
+          "line": 69,
+          "note": "Agent persistence passes the complete usage snapshot through the same accounting boundary."
+        },
+        {
+          "file": "packages/ts-shell/src/core/shell/runtimeContext.ts",
+          "line": 158,
+          "note": "Activation restores the persisted usage record."
+        },
+        {
+          "file": "packages/ts-shell/src/core/shell/runtimeContext.ts",
+          "line": 260,
+          "note": "A different session restores its own usage snapshot."
+        }
+      ]
+    },
+    "comparisonAndCapturedPricing": {
+      "result": "Summary and comparison require current read-category evidence, including explicit zero. Unknown/unpriced rows and nonrequest reset/gap entries break comparison continuity. Positive observed writes additionally require write-category evidence and a captured write rate. Attributed prices, including captured absence, never use the later catalog fallback; only legacy records retain current-price lookup. Price edits remain distinct from destination identity, and a legacy/attributed boundary cannot establish continuity. The rate allocated to potential overlap is weighted by the current observed ordinary-input and cache-write categories, with negative ordinary input rejected.",
+      "formula": {
+        "paidTokens": "currentWholePrompt - currentCacheRead",
+        "ordinaryInputTokens": "paidTokens - currentCacheWrite",
+        "paidPerMTok": "(ordinaryInputTokens * currentPromptRate + currentCacheWrite * currentWriteRate) / paidTokens",
+        "potentialOverlapTokens": "min(previousWholePrompt, currentWholePrompt) - currentCacheRead",
+        "estimatedExtraCost": "max(0, paidPerMTok - currentCacheReadRate) * potentialOverlapTokens / 1000000"
+      },
+      "anchors": [
+        {
+          "file": "packages/ts-shell/src/observability/cacheWaste.ts",
+          "line": 74,
+          "note": "Cache summaries include only request rows with measured read-category evidence."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/cacheWaste.ts",
+          "line": 103,
+          "note": "Legacy positive counts remain evidence; legacy zeros do not use sticky reportedCache."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/cacheWaste.ts",
+          "line": 117,
+          "note": "Unknown/unpriced/nonrequest entries reset the previous comparison anchor."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/cacheWaste.ts",
+          "line": 195,
+          "note": "Comparable rows require observed reads and valid paid category allocation; observed writes require evidence and a write rate."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/cacheWaste.ts",
+          "line": 225,
+          "note": "Estimated overlap is bounded by the smaller prompt and refuses a legacy/attributed identity transition."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usage/identity.ts",
+          "line": 91,
+          "note": "Captured-null prices return undefined without querying the current catalog."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usage/identity.ts",
+          "line": 99,
+          "note": "Cache identity excludes price edits and includes provider/model/destination."
+        }
+      ],
+      "arithmeticExamples": {
+        "evidenceType": "Independent source arithmetic expectations, not executed test results.",
+        "explicitZeroAfter10000TokenPrompt": "At prompt rate 1 and read rate 0.1, a 10000-token estimated overlap costs 0.009 USD.",
+        "allWrite10000Tokens": "At write rate 1.25 and read rate 0.1, the estimated extra cost is 0.0115 USD.",
+        "ordinary2000Write8000Tokens": "At prompt rate 1, write rate 1.25 and read rate 0.1, the estimated extra cost is 0.011 USD.",
+        "observedWriteWithoutCapturedRate": "No dollar miss is emitted, including after a later catalog supplies the missing write rate."
+      }
+    },
+    "estimateAndAuthorityBoundaries": {
+      "result": "The turn-end notice now identifies an estimated cache miss and overlapping prompt tokens. Its five-minute idle threshold says possible expiry rather than a measured provider TTL. The existing /cost report labels extra cost as an estimate against a cache read and disclaims invoice authority. Counts alone do not prove which prompt text or paid category occupied the overlap. The patch does not change prompt measurement/replay authority, request preparation, live provider/auth, cache protocol, package/build behavior or cumulative numeric billing sums.",
+      "anchors": [
+        {
+          "file": "packages/ts-shell/src/observability/cacheWaste.ts",
+          "line": 165,
+          "note": "The actual shared turn-end formatter uses estimated overlap and possible-expiry wording."
+        },
+        {
+          "file": "packages/ts-shell/src/core/commands/cost/cache.ts",
+          "line": 15,
+          "note": "The existing /cost projection identifies estimated overlap and an estimated extra cost based on prices, not an invoice."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/usageTelemetry.ts",
+          "line": 347,
+          "note": "Reset/gap markers retain the reason and explicitly lack current category evidence."
+        },
+        {
+          "file": "packages/ts-shell/src/turn/step.ts",
+          "line": 440,
+          "note": "The inspected main request-bound measurement remains validated separately from cache-category presence."
+        }
+      ]
+    },
+    "ownershipAndLocalStructure": {
+      "result": "No new production file, store, runtime owner or import edge is introduced. reportedCount stays with canonical provider normalization, cacheCategoryMeasured stays with cache comparison, and optional persistence fields stay with the existing usage model/decoder. Source inspection found every scoped module below the 20-name responsibility ceiling. These are bounded source observations, not global graph, import-resolution or gate proof.",
+      "newNamedHelpers": [
+        "reportedCount",
+        "cacheCategoryMeasured"
+      ],
+      "manuallyInspectedFunctionLikeNameCounts": {
+        "provider/response/usage.ts": 4,
+        "observability/usageTelemetry.ts": 16,
+        "observability/cacheWaste.ts": 9,
+        "observability/usage/model.ts": 0,
+        "observability/usage/snapshot.ts": 13
+      },
+      "addedImports": [],
+      "nodeFloorObservation": "The new implementation uses existing basic numeric/object operations and introduces no newer Node API."
+    }
+  },
+  "testReview": {
+    "casesInspectedInPresenceFile": 19,
+    "originalCases": 13,
+    "addedControls": 6,
+    "initialCounterexampleFileExactlyPreserved": true,
+    "initialCounterexampleFileSha256": "3143f5615706502d0edef5e6e69c1fda5c67ad1293904824543f160d8a6704dd",
+    "inspectedFiles": [
+      "packages/ts-shell/src/provider/response/usage.test.ts",
+      "packages/ts-shell/src/observability/usage/attribution.test.ts",
+      "packages/ts-shell/src/observability/cacheWaste.test.ts",
+      "packages/ts-shell/src/observability/usage/presence.test.ts"
+    ],
+    "classification": "The original 13 case bodies are byte-for-byte preserved as the final file's first 178 lines. Six appended controls cover invalid raw read categories, direct recording of numeric zero and measured reads with an omitted write category. Existing test changes supply explicit zero evidence where older fixtures expected a measured miss from prompt-only usage, strengthen the legacy/attributed identity control, preserve all numeric billing expectations, and extend strict decoding/notice wording checks.",
+    "execution": "Inspected only. No test case was executed by this reviewer."
+  },
+  "rootValidationEvidence": {
+    "owner": "/root",
+    "baseline": {
+      "status": "Counterexamples reproduced against unchanged production, corroborated by inspected red.json and red.log.",
+      "baseHead": "d974d3a22166f04816abe22ae993aea99524172b",
+      "cases": 13,
+      "assertionFailures": 10,
+      "passingControls": 3,
+      "exitCode": 1,
+      "receipt": ".tmp/history-cost-validation/red.json",
+      "log": ".tmp/history-cost-validation/red.log"
+    },
+    "repairedSnapshot": {
+      "status": "AWAITING_ROOT_VALIDATION",
+      "note": "The lane directory contains no green result receipt for the repaired 19-case snapshot at this review. Owner/source receipts explicitly say no delegated validation was run. Source approval must not be presented as 19 passing cases, build success or runtime acceptance."
+    },
+    "reviewerRanTestsBuildsGatesNormProofOrRuntime": false,
+    "codeReviewerApprovalAdopted": false
+  },
+  "outstandingProof": {
+    "boundedApproval": "CLEAR/APPROVE is an independent source-architecture verdict for the exact scoped and inspected seam hashes; it is not C.7 runtime acceptance or entire-repository clearance.",
+    "rootReportedGlobalGap": "Root reports a repository-wide NormProof graph capture overflow at 16384. This reviewer did not reproduce or clear it. The missing repository-wide proof remains separate from this bounded approval.",
+    "remaining": [
+      "Root-owned focused validation and reversal checks after integration, tied to the integrated source/build identities.",
+      "Same-build normal runtime accounting, /cost, actual turn-end notice, save/reopen and reset/gap consumer evidence.",
+      "Report-safe configured-provider usage-field and captured-price evidence; missing categories/prices remain unknown.",
+      "Applicable final gates, build, commit/push/CI evidence remain root-owned and unclaimed here."
+    ],
+    "noClaims": [
+      "Remote cache behavior or savings",
+      "Measured provider cache TTL",
+      "Universal service capacity",
+      "Other platforms",
+      "Final CI or overall-goal completion"
+    ]
+  },
+  "sourceIdentity": {
+    "recheck": {
+      "headMatches": true,
+      "scopeMatches": true,
+      "receiptMatches": true,
+      "patchesMatch": true,
+      "worktreeSeamsMatch": true,
+      "rootSeamsMatch": true
+    },
+    "scopedSha256": {
+      "packages/ts-shell/src/provider/response/usage.ts": "1083ad99b20c78e4fdc621670fee9e0f821b9116cfd15e228dd43d26add007c6",
+      "packages/ts-shell/src/observability/usageTelemetry.ts": "c16b39096985ae4dfaae371c407661464aa7c84fca48d84c380be0e57ac0b1c7",
+      "packages/ts-shell/src/observability/cacheWaste.ts": "9043cbe9aebf24987ef59f78d923908919fd2986a98fc75f4a985f000a8767c8",
+      "packages/ts-shell/src/observability/usage/model.ts": "75244433acf0959941745a9f272f78d0bd04de6f195474ec275e265b066ae568",
+      "packages/ts-shell/src/observability/usage/snapshot.ts": "86f01c4583c25dbf6341e19c52964504558b6e44235fed3ff163278f228edcb1",
+      "packages/ts-shell/src/provider/response/usage.test.ts": "d3feaf10a9100f35f755181e528faf52fa8dc288c3daea9d8dfdfc40e58e0b2e",
+      "packages/ts-shell/src/observability/usage/attribution.test.ts": "0a130cb5a7dd917ca77e0c539894380524f756bac23dc450dc759d946ee9741c",
+      "packages/ts-shell/src/observability/cacheWaste.test.ts": "6fb9586744a089de86baed24882fb8558a8618313c3df7656fcabe211aa0e2ef",
+      "packages/ts-shell/src/observability/usage/presence.test.ts": "0f9687f347e4cb07adcaeb1d4e6281ec30331737adda78af92ce774bf2c68d8b"
+    },
+    "inspectedWorktreeSeamSha256": {
+      "packages/ts-shell/src/observability/usage/identity.ts": "77927fd7a31a58696bf890316e647958ebe2e1617f24949fe58f03ba96dc411b",
+      "packages/ts-shell/src/observability/usage/recovery.ts": "71f06b109b6beb5b8d739044c1e8e7d6cc352eddadcf0ac1daea28a5942a9acb",
+      "packages/ts-shell/src/core/commands/cost/model.ts": "4fb8bf8003f61e0480bbd2d6cd9ba02cf53ecb519b3b79b2d195a295cec6112c",
+      "packages/ts-shell/src/session/store/usage.ts": "c6144c4aee770daf2f11123b90fb80281c1571dc1e014634e01ba4689bc9b7f0",
+      "packages/ts-shell/src/provider/endpoints/responses/output.ts": "b606c00728f3b0624d3f548363f70da4247122ac4e808f2c70ee5c3ce0f2e374",
+      "packages/ts-shell/src/provider/endpoints/anthropicMessages.ts": "cc56d4ad1846151d6c7e8402e5bce47995bd2e8a86086acf5fbb1538a91d8de8",
+      "packages/ts-shell/src/provider/endpoints/bedrockConverse.ts": "0185d931da70c07f9593e5c6990078072a7d4613f8c6a7c8bef6f0536389754c",
+      "packages/ts-shell/src/provider/endpoints/googleWire.ts": "98996d0becc0b9f67ca7b03b1e441c3b287935854401c1ad1f2ae5ccaf7c599f",
+      "packages/ts-shell/src/provider/response/metering.ts": "b57b5ffbc7140c03095103d6db5049e565d4aec6df4e63f3c053ca2261ac1aaa",
+      "packages/ts-shell/src/core/commands/cost/cache.ts": "d650573fa957d58bc139223997b6bae87b2a342a424c37a59d026e2b9d98160f",
+      "packages/ts-shell/src/session/store/sessionStateStore.ts": "86070bbbd2bc124c9c6ef6b453c6e306e74135a9826f98e9a3faa3eedcf9628c",
+      "packages/ts-shell/src/session/agent/persistence.ts": "85ccd26cdabf4f0075fca2c1f991701c6737d5288d6e0c3af56571bbcf65974f",
+      "packages/ts-shell/src/core/shell/runtimeContext.ts": "f729f451c34f21d7b772639addf66c6c1c6647e1d5bcf678c9268468ebf67311"
+    },
+    "inspectedMainSeamSha256": {
+      "packages/ts-shell/src/turn/step.ts": "ff3f33cd48af0f5ab648d947749c4b7abfbed63ff68b7d227a257d6c748b68fc",
+      "packages/ts-shell/src/core/commands/btwCommandRuntime.ts": "5a2ef153b98c80135dc0bc7742843ccae2b32629ee759f28afde02c1c98ed88e",
+      "packages/ts-shell/src/session/store/usage.ts": "c6144c4aee770daf2f11123b90fb80281c1571dc1e014634e01ba4689bc9b7f0",
+      "packages/ts-shell/src/turn/request.ts": "3db97e80e8cc1dff6db423e9deffebf84fc77436e4d59a107c4674ffed053779",
+      "packages/ts-shell/src/core/commands/cost/model.ts": "4fb8bf8003f61e0480bbd2d6cd9ba02cf53ecb519b3b79b2d195a295cec6112c",
+      "packages/ts-shell/src/cli/interactive/interactiveMode.ts": "7ff25d3ff35766da318b55c17e070fcb4633bcd5d719658212fb79f8153e9906"
+    },
+    "receiptAndInspectedArtifactSha256": {
+      "source-receipt.json": "394adbd84cac46304bdd5d7c3116228c27a993e662516762598def70553b1b54",
+      "production.patch": "780c959da6ccbf647ae8f4e907f9aac8dd4753772104fe252fe2200847d74b4d",
+      "tests-final.patch": "82715cd6b79a59136a434f1ee8ac5328de9bbf6f0e95b357ac823794c98d4b67",
+      "tests.patch": "79306983013d1dcded0b50c7abf32d54c251ea31ee10ddc826b964d1c21ee5e4",
+      "red.json": "d1551d5ff0ba669fe3dcde1a310e402873c5d7c194c3c2997ec344c1bf54ea47",
+      "red.log": "13b19977c862624743511169ab43ddf480fed209a7e70be280753859db70d7be",
+      "classification.md": "852c303a033cc115f67c6f95fc8376d145b5f222261331d9db3ea505c1ff8a4b",
+      "audit.md": "a02fec4ffdea97f0d9675cb4696fb3451945d34f776951a6982f12ed7f4e9787",
+      "tests-receipt.md": "c4801f7cff70ea38119c8a870f432da014af01dc66cdcdcc19b937377686539c"
+    },
+    "worktreeStatus": "Exactly the five scoped production files and three existing tests are modified; presence.test.ts is the sole untracked source file. No source/docs or existing artifact were edited by this reviewer."
+  },
+  "output": ".tmp/history-cost-validation/review-architecture.json"
+}

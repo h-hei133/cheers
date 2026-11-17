@@ -1,0 +1,75 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "publicCompiledSdk": true,
+  "configuredProvider": true,
+  "probeSha256": "6301030a4f3af4367b18965ca7f99aa172ef3c9d8f810edfe834ca315242cdda",
+  "cases": [],
+  "requests": [
+    {
+      "stage": "read-one",
+      "bodySent": true,
+      "bytes": 2773,
+      "sha256": "681963062a25cd028cf048b6c2fd8cacd27b0b0ad853b7ab79d865a494f275ee",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": null,
+      "responseBytes": null,
+      "usage": {
+        "inspectable": false
+      }
+    },
+    {
+      "stage": "read-one",
+      "bodySent": true,
+      "bytes": 9288,
+      "sha256": "e1b949340f39c6dc67557a6a6a45a95b64eba8ae6d1e016f817a3b7db81b3b7a",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": null,
+      "responseBytes": null,
+      "usage": {
+        "inspectable": false
+      }
+    }
+  ],
+  "buildId": "0247cb1b526d5450829e0b3374dffe3c6572f18b06bd24cd03529ce2027e5820",
+  "source": {
+    "bytes": 6144,
+    "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+    "middleOutsideLegacyEnds": true
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "isolatedValidObjects": true,
+    "minimalConfiguredModelEntry": true,
+    "originalConfiguredCredentials": true,
+    "nativeDefaultPolicyFalse": true,
+    "localRetentionWindow": 32000,
+    "publishedContextWindow": null,
+    "publishedInputLimit": null
+  },
+  "failedStage": "read-one",
+  "failure": {
+    "category": "product-or-probe-contract",
+    "code": "response-usage-unobservable"
+  },
+  "failureLine": "24",
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "observerEvents": {
+    "create": 2,
+    "headers": 4,
+    "trailers": 0,
+    "data": 13,
+    "complete": 0
+  },
+  "actualRequests": 2
+}

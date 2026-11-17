@@ -1,0 +1,197 @@
+{
+  "recommendation": "REQUEST_CHANGES",
+  "scope": {
+    "lane": "C.7 per-request cache evidence and estimated history cost",
+    "sourceRoot": "/home/wang/projects/cheers/.tmp/history-cost-worktree",
+    "canonicalCallerRoot": "/home/wang/projects/cheers",
+    "patchBase": "d974d3a22166f04816abe22ae993aea99524172b",
+    "frozenManifest": ".tmp/history-cost-validation/source-receipt.json",
+    "productionPaths": [
+      "packages/ts-shell/src/provider/response/usage.ts",
+      "packages/ts-shell/src/observability/usageTelemetry.ts",
+      "packages/ts-shell/src/observability/cacheWaste.ts",
+      "packages/ts-shell/src/observability/usage/model.ts",
+      "packages/ts-shell/src/observability/usage/snapshot.ts"
+    ],
+    "testPaths": [
+      "packages/ts-shell/src/provider/response/usage.test.ts",
+      "packages/ts-shell/src/observability/usage/attribution.test.ts",
+      "packages/ts-shell/src/observability/cacheWaste.test.ts",
+      "packages/ts-shell/src/observability/usage/presence.test.ts"
+    ],
+    "patches": [
+      ".tmp/history-cost-validation/production.patch",
+      ".tmp/history-cost-validation/tests-final.patch"
+    ],
+    "classification": ".tmp/history-cost-validation/classification.md",
+    "mainTreeIntegrationVerified": false,
+    "reviewComplete": true
+  },
+  "findings": [
+    {
+      "id": "RPC-C7-CODE-01",
+      "severity": "medium",
+      "priority": 2,
+      "file": "packages/ts-shell/src/core/commands/costCommand.test.ts",
+      "line": 176,
+      "title": "Update four cost-command fixtures for measured reads and known write prices",
+      "classification": "stale test fixtures under the intended C.7 contract",
+      "impact": "The production change leaves four existing cost-command tests with cache-output assertions that cannot be satisfied by their supplied records. Their fixtures omit current cache-read evidence, so the summary has no accounted requests and the miss comparison has no comparable pair. The write-only miss fixture also omits the write price needed to compute its expected dollar estimate. A focused integration run including this suite must classify and repair these fixtures before this change can be approved.",
+      "trigger": "Inspect the tiny-cache, cache-unpriced, write-only miss, and model-switch fixtures in the unchanged costCommand.test.ts. They supply prompt-only or write-only records, yet expect a cache hit rate, positive extra cost, or a model-change cache notice.",
+      "evidence": [
+        {
+          "file": "packages/ts-shell/src/observability/usageTelemetry.ts",
+          "line": 212,
+          "note": "Omitted cacheReadTokens becomes cacheReadReported:false in every newly recorded history entry."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/cacheWaste.ts",
+          "line": 78,
+          "note": "Summary inclusion requires current read evidence; a write-only record cannot prove a measured zero read."
+        },
+        {
+          "file": "packages/ts-shell/src/observability/cacheWaste.ts",
+          "line": 196,
+          "note": "A miss comparison requires read evidence. Positive writes additionally require measured write evidence and a write price at line 205."
+        },
+        {
+          "file": "packages/ts-shell/src/core/commands/cost/cache.ts",
+          "line": 10,
+          "note": "The actual report renderer omits the cache section when both accounted request count and miss count are zero."
+        },
+        {
+          "file": "packages/ts-shell/src/core/commands/costCommand.test.ts",
+          "line": 176,
+          "note": "tiny-cache supplies no read category; assertions at lines 180 and 183 nevertheless require a positive cache estimate."
+        },
+        {
+          "file": "packages/ts-shell/src/core/commands/costCommand.test.ts",
+          "line": 228,
+          "note": "cache-unpriced supplies only a write category; line 233 still expects a measured 0% cache-read hit rate."
+        },
+        {
+          "file": "packages/ts-shell/src/core/commands/costCommand.test.ts",
+          "line": 346,
+          "note": "The write-only miss records at lines 346/348 omit reads and the fixture catalogue omits a write price. Lines 352, 354 and 356 expect a 0% hit rate, 100,000 overlapping tokens and $0.2700."
+        },
+        {
+          "file": "packages/ts-shell/src/core/commands/costCommand.test.ts",
+          "line": 444,
+          "note": "The model-switch records at lines 444/446 omit reads; lines 450/451 nevertheless require a cache section and its model-change notice."
+        }
+      ],
+      "suggestedFix": "Retain root-owned actual failures and classify these existing fixtures before editing. Supply explicit numeric read zero where a test intends a measured miss. Supply a known write price or a fixture without an observed write bucket where it intends a priced miss. Preserve the tiny-cost, unknown-read-price and model-change purposes and their meaningful numerical assertions. Keep the original 13 counterexample bodies unchanged.",
+      "disposition": "open; root acknowledged all four fixtures and plans an actual serial failure/classification followed by contract-preserving fixture updates",
+      "reviewerExecutedReproduction": false,
+      "confidence": "high from the supplied fixture fields, recording/filter conditions and actual cache report renderer"
+    }
+  ],
+  "coverage": {
+    "rawNormalization": "Inspected all of provider/response/usage.ts and its tests. Valid finite nonnegative native or nested raw category values, including zero, produce presence evidence before billing defaults. Missing/invalid categories produce false. Existing exclusive native input, inclusive compatible input, output and total-token arithmetic remains unchanged. Inspected Anthropic, Google, Bedrock and Responses usage mappings, including within-request stream merging, to verify absence is preserved before the canonical normalizer.",
+    "recordingAndLegacy": "Inspected all of usageTelemetry.ts and usage/model.ts. Canonical false flags refuse inference from zero-filled counts; direct finite nonnegative numeric categories, including zero, are measured. Explicit true without a numeric category cannot invent evidence. Current category flags remain separate from historical reportedCache. Older positive category counts remain evidence; sticky-only legacy zeros remain unknown. Price edits retain destination metadata without promoting current absence.",
+    "summariesAndContinuity": "Inspected all of cacheWaste.ts. Summaries include only measured read requests. Missing read evidence and unpriced observed writes break miss comparison continuity. Context resets, usage gaps and damaged-history recovery gap placeholders prevent comparisons across lost requests. Legacy-to-attributed identity boundaries remain fenced, and the bounded history size/merge behavior remains intact.",
+    "pricesAndEstimates": "Inspected captured-rate identity and actual cost-model consumers. Weighted ordinary-input and write prices correctly account for all-write and mixed-write premiums, while observed unpriced writes withhold a dollar miss. Captured unknown prices are not replenished from a later catalogue. Count overlap remains explicitly an estimate; the changed turn-end wording says estimated overlapping tokens, and the idle label says possible expiry.",
+    "persistenceAndReopen": "Inspected all of usage/snapshot.ts and the recovery path. Optional category evidence accepts booleans only, retains absent legacy fields, and survives strict decode/copy/freeze/reopen. Legacy history equality includes the new flags so distinct evidence is not collapsed. Corrupt evidence is rejected, with tolerant recovery retaining independently valid billing and a usage-gap placeholder rather than joining history across the loss.",
+    "canonicalProducers": "Read actual main-tree turn/step.ts:436-466, btwCommandRuntime.ts:84-98, and session/store/usage.ts:29-70. They spread the canonical normalized records without dropping presence. Foreground prompt/context admission retains its existing validated measurement/identity contract; auxiliary requests retain affectsContext:false. No caller plumbing repair or replay/context authority change is required.",
+    "tests": "Inspected all four frozen test files and both final patches. Nineteen presence cases cover raw absence, empty details, write-only records, explicit zero, legacy sticky-only records, reset/gap boundaries, write premiums, unknown captured prices, later catalogues, invalid raw reads, direct numeric zero and partial categories. Provider body/stream normalization and persistence-corruption controls retain existing numerical assertions. Reconstructed the original counterexample source from tests.patch and confirmed its exact SHA-256 and unchanged prefix in the current file.",
+    "existingTestIntegration": "Inspected the actual downstream cost model/report and relevant existing costCommand.test.ts fixtures. The four stale integration fixtures are reported above; this report does not infer passing broader validation.",
+    "boundaries": "Read-only product/test review. Only this requested receipt was written. No tests, builds, gates, NormProof, provider/native execution, git mutations, language-server indexing or delegation. No other review or architecture approval was adopted."
+  },
+  "reviewersExecutedValidation": false,
+  "independentReview": true,
+  "otherReviewApprovalsUsed": false,
+  "normproofUsedForVerdict": false,
+  "rootOwnedEvidence": {
+    "paths": [
+      ".tmp/history-cost-validation/red.json",
+      ".tmp/history-cost-validation/red.log"
+    ],
+    "status": "original counterexamples reproduced by root on unchanged production",
+    "cases": 13,
+    "assertionFailures": 10,
+    "passingControls": 3,
+    "reviewerExecutedReproduction": false,
+    "currentPresenceCases": 19,
+    "currentCasesPassedByReviewer": false
+  },
+  "originalCounterexampleIntegrity": {
+    "originalCounterexampleSha256": "3143f5615706502d0edef5e6e69c1fda5c67ad1293904824543f160d8a6704dd",
+    "matchesInitialReceipt": true,
+    "currentRetainsOriginalPrefix": true
+  },
+  "residualRisks": [
+    "This is an independent static review. The reviewer executed no validation and does not claim the nineteen current presence cases, modified suites or integration passed.",
+    "The reviewed sources are the frozen isolated patch. Main-tree integration, commit, push, CI and actual provider/cache billing evidence are outside this receipt.",
+    "RPC-C7-CODE-01 remains open until the four existing cost-command fixtures are classified and corrected; the predicted assertion incompatibilities were not executed by this reviewer."
+  ],
+  "reviewedAt": "2026-11-16T11:59:37.834Z",
+  "sourceHashes": {
+    "packages/ts-shell/src/provider/response/usage.ts": "1083ad99b20c78e4fdc621670fee9e0f821b9116cfd15e228dd43d26add007c6",
+    "packages/ts-shell/src/observability/usageTelemetry.ts": "c16b39096985ae4dfaae371c407661464aa7c84fca48d84c380be0e57ac0b1c7",
+    "packages/ts-shell/src/observability/cacheWaste.ts": "9043cbe9aebf24987ef59f78d923908919fd2986a98fc75f4a985f000a8767c8",
+    "packages/ts-shell/src/observability/usage/model.ts": "75244433acf0959941745a9f272f78d0bd04de6f195474ec275e265b066ae568",
+    "packages/ts-shell/src/observability/usage/snapshot.ts": "86f01c4583c25dbf6341e19c52964504558b6e44235fed3ff163278f228edcb1",
+    "packages/ts-shell/src/provider/response/usage.test.ts": "d3feaf10a9100f35f755181e528faf52fa8dc288c3daea9d8dfdfc40e58e0b2e",
+    "packages/ts-shell/src/observability/usage/attribution.test.ts": "0a130cb5a7dd917ca77e0c539894380524f756bac23dc450dc759d946ee9741c",
+    "packages/ts-shell/src/observability/cacheWaste.test.ts": "6fb9586744a089de86baed24882fb8558a8618313c3df7656fcabe211aa0e2ef",
+    "packages/ts-shell/src/observability/usage/presence.test.ts": "0f9687f347e4cb07adcaeb1d4e6281ec30331737adda78af92ce774bf2c68d8b"
+  },
+  "sourceSnapshotStable": true,
+  "matchesFrozenManifest": true,
+  "frozenManifestSha256": "394adbd84cac46304bdd5d7c3116228c27a993e662516762598def70553b1b54",
+  "artifactHashes": {
+    "production.patch": "780c959da6ccbf647ae8f4e907f9aac8dd4753772104fe252fe2200847d74b4d",
+    "tests-final.patch": "82715cd6b79a59136a434f1ee8ac5328de9bbf6f0e95b357ac823794c98d4b67",
+    "tests.patch": "79306983013d1dcded0b50c7abf32d54c251ea31ee10ddc826b964d1c21ee5e4"
+  },
+  "inspectedConsumerHashes": [
+    {
+      "sourceRoot": "/home/wang/projects/cheers",
+      "file": "packages/ts-shell/src/turn/step.ts",
+      "sha256": "ff3f33cd48af0f5ab648d947749c4b7abfbed63ff68b7d227a257d6c748b68fc"
+    },
+    {
+      "sourceRoot": "/home/wang/projects/cheers",
+      "file": "packages/ts-shell/src/core/commands/btwCommandRuntime.ts",
+      "sha256": "5a2ef153b98c80135dc0bc7742843ccae2b32629ee759f28afde02c1c98ed88e"
+    },
+    {
+      "sourceRoot": "/home/wang/projects/cheers",
+      "file": "packages/ts-shell/src/session/store/usage.ts",
+      "sha256": "c6144c4aee770daf2f11123b90fb80281c1571dc1e014634e01ba4689bc9b7f0"
+    },
+    {
+      "sourceRoot": "/home/wang/projects/cheers/.tmp/history-cost-worktree",
+      "file": "packages/ts-shell/src/core/commands/costCommand.test.ts",
+      "sha256": "a6b628337a6ede4a166a7fbf5663158e61cf56955e202b74c5416ab61d5d043b"
+    },
+    {
+      "sourceRoot": "/home/wang/projects/cheers/.tmp/history-cost-worktree",
+      "file": "packages/ts-shell/src/core/commands/cost/model.ts",
+      "sha256": "4fb8bf8003f61e0480bbd2d6cd9ba02cf53ecb519b3b79b2d195a295cec6112c"
+    },
+    {
+      "sourceRoot": "/home/wang/projects/cheers/.tmp/history-cost-worktree",
+      "file": "packages/ts-shell/src/core/commands/cost/cache.ts",
+      "sha256": "d650573fa957d58bc139223997b6bae87b2a342a424c37a59d026e2b9d98160f"
+    },
+    {
+      "sourceRoot": "/home/wang/projects/cheers/.tmp/history-cost-worktree",
+      "file": "packages/ts-shell/src/observability/usage/identity.ts",
+      "sha256": "77927fd7a31a58696bf890316e647958ebe2e1617f24949fe58f03ba96dc411b"
+    },
+    {
+      "sourceRoot": "/home/wang/projects/cheers/.tmp/history-cost-worktree",
+      "file": "packages/ts-shell/src/observability/usage/recovery.ts",
+      "sha256": "71f06b109b6beb5b8d739044c1e8e7d6cc352eddadcf0ac1daea28a5942a9acb"
+    }
+  ],
+  "publicationHashRecheck": {
+    "initialCheckedAt": "2026-11-16T11:50:04.562Z",
+    "checkedAt": "2026-11-16T11:59:37.834Z",
+    "allNineHashesRechecked": true,
+    "allNineMatchFrozenManifest": true,
+    "consumerHashesRechecked": true,
+    "artifactHashesRechecked": true
+  }
+}

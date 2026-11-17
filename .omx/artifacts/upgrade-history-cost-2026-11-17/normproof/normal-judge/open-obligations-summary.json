@@ -1,0 +1,83 @@
+{
+  "summaryVersion": "0.10.1",
+  "runId": "generated-structure-judge",
+  "sourceVerdict": "not_proven",
+  "enforcementMode": "shadow",
+  "wouldBlock": true,
+  "didBlock": false,
+  "openBlockingObligationCount": 1,
+  "openBlockingObligations": [
+    {
+      "obligationId": "source_graph_has_no_unresolved_specifiers",
+      "title": "Every module import resolves within the declared source graph",
+      "status": "missing",
+      "blocking": true,
+      "topGapTypes": [
+        "unreadable_file"
+      ],
+      "neededEvidence": [
+        "source_module_graph"
+      ],
+      "repairItemIds": [],
+      "reason": "Failed to read evidence file source_module_graph: oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete"
+    }
+  ],
+  "topProofGaps": [
+    {
+      "obligationId": "source_graph_is_acyclic",
+      "kind": "unreadable_file",
+      "reason": "Failed to read evidence file source_module_graph: oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete",
+      "requiredEvidenceId": "source_module_graph",
+      "evidenceId": "source_module_graph"
+    },
+    {
+      "obligationId": "source_graph_has_no_unresolved_specifiers",
+      "kind": "unreadable_file",
+      "reason": "Failed to read evidence file source_module_graph: oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete",
+      "requiredEvidenceId": "source_module_graph",
+      "evidenceId": "source_module_graph"
+    },
+    {
+      "obligationId": "source_graph_is_acyclic",
+      "kind": "unreadable_file",
+      "reason": "Failed to read evidence file source_module_graph: oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete",
+      "requiredEvidenceId": "source_module_graph"
+    },
+    {
+      "obligationId": "source_graph_has_no_unresolved_specifiers",
+      "kind": "unreadable_file",
+      "reason": "Failed to read evidence file source_module_graph: oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete",
+      "requiredEvidenceId": "source_module_graph"
+    },
+    {
+      "obligationId": "declared_functions_within_module_ceiling",
+      "kind": "contradictory_evidence",
+      "reason": "21 declared names against a ceiling of 20",
+      "claimId": "packages/ts-shell/src/cli/interactive/interactiveMode.test.ts"
+    }
+  ],
+  "nextEvidenceNeeded": [
+    "source_module_graph"
+  ],
+  "repairItemSummaries": [],
+  "artifactPaths": {
+    "verdict": "verdict.json",
+    "ledger": "ledger.json",
+    "enforcement": "enforcement.json",
+    "report": "report.md"
+  },
+  "scopeHints": {
+    "capacityStatus": "healthy",
+    "totalGapsCount": 5,
+    "totalObligationsCount": 1,
+    "totalRepairItemsCount": 0,
+    "isTruncated": false,
+    "message": "Capacity usage is within safe limits."
+  },
+  "tokenBudgetHint": {
+    "estimatedCategory": "high",
+    "recommendedLimit": 8000,
+    "contextSizeRecommendation": "Requires full context analysis."
+  },
+  "createdAt": "2026-11-16T16:47:24.699Z"
+}

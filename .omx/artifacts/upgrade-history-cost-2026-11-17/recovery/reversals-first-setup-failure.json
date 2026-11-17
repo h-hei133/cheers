@@ -1,0 +1,47 @@
+{
+  "status": "failed",
+  "mainSourcesMutated": false,
+  "cases": [
+    {
+      "name": "raw-cache-presence",
+      "exitCode": 1,
+      "tests": 19,
+      "failed": 8,
+      "assertionFailures": 8,
+      "restoredExactly": true,
+      "receipt": "reversal-raw-cache-presence.json",
+      "mainSourcesMutated": false
+    },
+    {
+      "name": "sticky-history-is-not-current-evidence",
+      "exitCode": 1,
+      "tests": 19,
+      "failed": 8,
+      "assertionFailures": 8,
+      "restoredExactly": true,
+      "receipt": "reversal-sticky-history-is-not-current-evidence.json",
+      "mainSourcesMutated": false
+    },
+    {
+      "name": "captured-write-premium",
+      "exitCode": 1,
+      "tests": 19,
+      "failed": 2,
+      "assertionFailures": 2,
+      "restoredExactly": true,
+      "receipt": "reversal-captured-write-premium.json",
+      "mainSourcesMutated": false
+    },
+    {
+      "name": "persisted-explicit-zero",
+      "exitCode": 1,
+      "tests": 19,
+      "failed": 4,
+      "assertionFailures": 4,
+      "restoredExactly": true,
+      "receipt": "reversal-persisted-explicit-zero.json",
+      "mainSourcesMutated": false
+    }
+  ],
+  "failure": "Cannot read properties of undefined (reading 'toString')"
+}

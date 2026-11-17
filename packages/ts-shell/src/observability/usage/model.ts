@@ -131,8 +131,8 @@ export interface SessionUsageTelemetry {
  *
  * `promptTokens` is the whole prompt the provider was sent — input plus both
  * cache figures — because that is what the next request's cache reads are
- * measured against. `cacheRead`/`cacheWrite` stay separate so a request that
- * reported no cache activity at all can be told from one that reported zero.
+ * measured against. Category presence stays separate from zero-filled billing
+ * counts so an omitted cache field cannot become a measured zero.
  */
 export interface UsageHistoryEntry {
   /** Stable identity for bounded-history merges; absent on legacy snapshots. */
@@ -146,16 +146,16 @@ export interface UsageHistoryEntry {
   readonly purpose?: string;
   readonly cacheReadTokens: number;
   readonly cacheWriteTokens: number;
+  /** Current-request category evidence; absent on older snapshots, where only positive counts prove reporting. */
+  readonly cacheReadReported?: boolean;
+  readonly cacheWriteReported?: boolean;
   /** Opaque accounting bucket key. Attribution distinguishes destination from price changes. */
   readonly bucketKey: string;
   readonly timestamp: number;
   /**
-   * Whether any request up to here reported cache activity.
-   *
-   * Sticky across the history, and not per-entry. A provider that never reports
-   * caching and a provider that reports a total miss look identical on one
-   * request; what separates them is whether caching was ever seen. Without this
-   * the first request on a cache-capable provider reads as a miss on every turn.
+   * Whether earlier requests at this destination reported positive cache activity.
+   * Sticky history metadata, never evidence that the current request reported a
+   * zero cache category or that another destination supports caching.
    */
   readonly reportedCache: boolean;
   /**

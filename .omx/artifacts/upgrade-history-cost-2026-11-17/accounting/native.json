@@ -1,0 +1,881 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "publicCompiledSdk": true,
+  "configuredProvider": true,
+  "probeSha256": "93083f1e4e0fb71d247d87d1502e8c82e3159d7a86d8e03dbfe6e046d9d4c932",
+  "cases": [
+    {
+      "name": "read-one",
+      "passed": true,
+      "actualRequests": 2,
+      "successfulRead": 1,
+      "toolStarts": 1,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 540,
+          "completionTokens": 45,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        },
+        {
+          "kind": "request",
+          "promptTokens": 1517,
+          "completionTokens": 19,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "read-two",
+      "passed": true,
+      "actualRequests": 2,
+      "successfulRead": 1,
+      "toolStarts": 1,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 1578,
+          "completionTokens": 51,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        },
+        {
+          "kind": "request",
+          "promptTokens": 2556,
+          "completionTokens": 20,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "continue-1",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 2643,
+          "completionTokens": 13,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "continue-2",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 2662,
+          "completionTokens": 29,
+          "cacheReadTokens": 1408,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": true,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "continue-3",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 2690,
+          "completionTokens": 28,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "continue-4",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 2718,
+          "completionTokens": 25,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "save-reopen",
+      "passed": true,
+      "exactUsageEquality": true,
+      "unchangedRequestIdsAndTimestamps": true,
+      "originalToolResultsUnchanged": true
+    },
+    {
+      "name": "reopened-default",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 2746,
+          "completionTokens": 32,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "explicit-pruning-control",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 1083,
+          "completionTokens": 31,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "retention-and-pruning",
+      "passed": true,
+      "defaultRetainedDuplicateDigests": [
+        "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+        "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619"
+      ],
+      "explicitControlRemovedMiddle": true,
+      "originalTranscriptUnchanged": true
+    },
+    {
+      "name": "cli-cost",
+      "passed": true,
+      "zeroProviderDispatch": true,
+      "outputBytes": 955,
+      "unknownPricesPreserved": true,
+      "absentCacheHitRatePreserved": null
+    },
+    {
+      "name": "automatic-compaction",
+      "passed": true,
+      "actualRequests": 10,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": true
+    },
+    {
+      "name": "automatic-publication",
+      "passed": true,
+      "actualCommitIncrease": 1,
+      "checkpointDispatched": true,
+      "seededPressure": true
+    },
+    {
+      "name": "reopened-checkpoint",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 1514,
+          "completionTokens": 44,
+          "cacheReadTokens": 1280,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": true,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    }
+  ],
+  "requests": [
+    {
+      "stage": "read-one",
+      "bodySent": true,
+      "bytes": 2773,
+      "sha256": "c03a5cb6fe593868be374ce862e9acc16d753ed01ba3ddfc6a9bd7cfdb6183bf",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 5465,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 540,
+        "output": 45,
+        "total": 585,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "read-one",
+      "bodySent": true,
+      "bytes": 9288,
+      "sha256": "cae502ffb67c5f1f85d88c0004d3a191e772a226d8ebd51e0d9769f34576624e",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 4431,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 1517,
+        "output": 19,
+        "total": 1536,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "read-two",
+      "bodySent": true,
+      "bytes": 9601,
+      "sha256": "783f0542119fcb6e5dcc85e8e81656898bce0d7f6d8408288abae138f48c3e2e",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 5754,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 1578,
+        "output": 51,
+        "total": 1629,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "read-two",
+      "bodySent": true,
+      "bytes": 16121,
+      "sha256": "e6fe9f78e3f5462c6f1bb6ce4e18355dbacc80a8b754974d1bcb91ad21a6f1c2",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 4676,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2556,
+        "output": 20,
+        "total": 2576,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "continue-1",
+      "bodySent": true,
+      "bytes": 16581,
+      "sha256": "ecdcf0bff6a57204701b7263a663a61a6b3199877fafecf40b8e84f3d282ac86",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 2965,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2643,
+        "output": 13,
+        "total": 2656,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "continue-2",
+      "bodySent": true,
+      "bytes": 16688,
+      "sha256": "5a1f8d143ad3268576f99e1a578602519ac7f1635071908383493e61c636bfc6",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 3064,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2662,
+        "output": 29,
+        "total": 2691,
+        "read": 1408,
+        "write": 0,
+        "readReported": true,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "continue-3",
+      "bodySent": true,
+      "bytes": 16835,
+      "sha256": "32a23b152f216814afb5dd846bd0b5315d3295d68dbca4d6e0a1eb634c7c698a",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 3017,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2690,
+        "output": 28,
+        "total": 2718,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "continue-4",
+      "bodySent": true,
+      "bytes": 16982,
+      "sha256": "5a80e05be82a975ccb782c916868dc99186d10abafc42218fa651c1367a1cdad",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 3017,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2718,
+        "output": 25,
+        "total": 2743,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "reopened-default",
+      "bodySent": true,
+      "bytes": 17131,
+      "sha256": "83d3c4eb1936767e786e442cedd9115f8fa931198b2dfb23abb443fb371f1d87",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 3759,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2746,
+        "output": 32,
+        "total": 2778,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "explicit-pruning-control",
+      "bodySent": true,
+      "bytes": 6014,
+      "sha256": "b43182adf22c5b8467b87569c98fef7da479f0b0777198cba7c53880d3adbd18",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "7d31ca5fd670a26be9a3b71abee86dd2cee13c33b863fac75d4932de02122163",
+          "bytes": 1071,
+          "middleRetained": false,
+          "legacyPruned": true
+        },
+        {
+          "sha256": "aeb80f25e754b78e8b7e0301ab3fcf300dc90040bd9cf0d5406dbeb787db0a67",
+          "bytes": 73,
+          "middleRetained": false,
+          "legacyPruned": true
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 3762,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 1083,
+        "output": 31,
+        "total": 1114,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "automatic-compaction",
+      "bodySent": true,
+      "bytes": 21172,
+      "sha256": "d05ddc0dc8ae19af08b2ed6e0e96a036f6c7e8ea52693128a6442c191829cec4",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 1229,
+      "responseEnd": "transport-complete",
+      "usage": {
+        "inspectable": true,
+        "input": 3423,
+        "output": 543,
+        "total": 3966,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "automatic-compaction",
+      "bodySent": true,
+      "bytes": 20508,
+      "sha256": "3d87403e31299289a191abf8219e1091bacc966771265e68ff8e6e86fe85f67e",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 1106,
+      "responseEnd": "transport-complete",
+      "usage": {
+        "inspectable": true,
+        "input": 3611,
+        "output": 442,
+        "total": 4053,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "automatic-compaction",
+      "bodySent": true,
+      "bytes": 20529,
+      "sha256": "d5bfd665ef9f07a9cfba135a2f6dcbd2999a15f49f8236827957b0abfff01eeb",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 1032,
+      "responseEnd": "transport-complete",
+      "usage": {
+        "inspectable": true,
+        "input": 3585,
+        "output": 381,
+        "total": 3966,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "automatic-compaction",
+      "bodySent": true,
+      "bytes": 20523,
+      "sha256": "0fbe3eb868733def88bbce29b7aea324d1b721fea7cac6896fdca26ef80a3b19",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 1081,
+      "responseEnd": "transport-complete",
+      "usage": {
+        "inspectable": true,
+        "input": 3581,
+        "output": 474,
+        "total": 4055,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "automatic-compaction",
+      "bodySent": true,
+      "bytes": 18013,
+      "sha256": "52dd7cab76006115e3a68055b5c65f7da2faa336be34f9594e6972d5a1a12590",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 1146,
+      "responseEnd": "transport-complete",
+      "usage": {
+        "inspectable": true,
+        "input": 3147,
+        "output": 439,
+        "total": 3586,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "automatic-compaction",
+      "bodySent": true,
+      "bytes": 6159,
+      "sha256": "740c74b688818e99a33ad8fbf8b2418cfeb99f0965acc495a30b9a16afca8da9",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 1097,
+      "responseEnd": "transport-complete",
+      "usage": {
+        "inspectable": true,
+        "input": 1185,
+        "output": 493,
+        "total": 1678,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "automatic-compaction",
+      "bodySent": true,
+      "bytes": 5063,
+      "sha256": "3ac6a9277c5620614e9dfde0f1330477498de9f27a43a68ea91f78eb30396260",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 979,
+      "responseEnd": "transport-complete",
+      "usage": {
+        "inspectable": true,
+        "input": 951,
+        "output": 345,
+        "total": 1296,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "automatic-compaction",
+      "bodySent": true,
+      "bytes": 5962,
+      "sha256": "9e0f68ec82f76dbb1105a58b4da04dfe11da7c940751f42929c6888b10d2c95b",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 906,
+      "responseEnd": "transport-complete",
+      "usage": {
+        "inspectable": true,
+        "input": 1148,
+        "output": 363,
+        "total": 1511,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "automatic-compaction",
+      "bodySent": true,
+      "bytes": 5327,
+      "sha256": "0fa8fb4da0e14d5c12f1960a03c6f6acc6052c62130a3345babba3dec09d141e",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 1090,
+      "responseEnd": "transport-complete",
+      "usage": {
+        "inspectable": true,
+        "input": 1017,
+        "output": 460,
+        "total": 1477,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "automatic-compaction",
+      "bodySent": true,
+      "bytes": 7969,
+      "sha256": "b9f5ce20948b2d94a5362980d4a81d019bd0ec3f3d31676d334f982b0c4555e9",
+      "checkpoint": true,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 3017,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 1486,
+        "output": 43,
+        "total": 1529,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "reopened-checkpoint",
+      "bodySent": true,
+      "bytes": 8118,
+      "sha256": "844c0c389c237d0aa5458625be85761db8ca03b5c931454bc584cb6c71dc7e79",
+      "checkpoint": true,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 3810,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 1514,
+        "output": 44,
+        "total": 1558,
+        "read": 1280,
+        "write": 0,
+        "readReported": true,
+        "writeReported": false
+      }
+    }
+  ],
+  "buildId": "0247cb1b526d5450829e0b3374dffe3c6572f18b06bd24cd03529ce2027e5820",
+  "source": {
+    "bytes": 6144,
+    "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+    "middleOutsideLegacyEnds": true
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "isolatedValidObjects": true,
+    "minimalConfiguredModelEntry": true,
+    "originalConfiguredCredentials": true,
+    "nativeDefaultPolicyFalse": true,
+    "localRetentionWindow": 32000,
+    "publishedContextWindow": null,
+    "publishedInputLimit": null
+  },
+  "readAttempts": [
+    {
+      "name": "read-one",
+      "toolStarts": 1,
+      "successfulRead": 1,
+      "newSourceResults": 1
+    },
+    {
+      "name": "read-two",
+      "toolStarts": 1,
+      "successfulRead": 1,
+      "newSourceResults": 1
+    }
+  ],
+  "compactionFixture": {
+    "seededPairs": 32,
+    "seededMessages": 64,
+    "localWindow": 16000,
+    "keepRecentTokens": 600,
+    "inventedRemoteLimits": false,
+    "seededMessagesAreProviderRounds": false
+  },
+  "realPromptRounds": 10,
+  "cacheClaim": "Only observed category presence and recorded counters; no savings, TTL, cache-control or remote-capacity claim.",
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "observerEvents": {
+    "create": 21,
+    "headers": 42,
+    "trailers": 21,
+    "data": 90,
+    "complete": 9,
+    "retired": 12
+  },
+  "actualRequests": 21
+}

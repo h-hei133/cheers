@@ -13,7 +13,7 @@ export function cacheLines(cache: CostModel['cache']): ReportLine[] {
       span(usage.hitRate === undefined ? 'unknown' : `${usage.hitRate.toFixed(1)}%`, usage.hitRate === undefined ? 'warning' : 'number')] }];
   if (waste.totals.missCount > 0) {
     lines.push({ kind: 'text', bullet: true, spans: [span(waste.totals.missedTokens.toLocaleString(), 'number'),
-      span(' prompt tokens were sent again, across '), span(waste.totals.missCount, 'number'), span(' requests (estimated overlap)')] },
+      span(' prompt tokens across '), span(waste.totals.missCount, 'number'), span(' requests (estimated overlap)')] },
     { kind: 'text', bullet: true, spans: [span('Estimated extra cost against a cache read: '),
       span(money(waste.totals.missedCost), 'number'), span('; based on published rates, not an invoice')] });
     const switched = waste.misses.filter(miss => miss.modelChanged || miss.endpointChanged).length;
@@ -21,10 +21,10 @@ export function cacheLines(cache: CostModel['cache']): ReportLine[] {
       span(' followed a model or destination change; those could not have been cache reads at all')] });
     const idled = waste.misses.filter(miss => miss.idleMs > CACHE_TTL_MS).length;
     if (idled > 0) lines.push({ kind: 'text', bullet: true, spans: [span(idled, 'number'),
-      span(` followed an idle gap longer than ${Math.round(CACHE_TTL_MS / 60000)} minutes, long enough for a cache to expire`)] });
+      span(` followed an idle gap longer than ${Math.round(CACHE_TTL_MS / 60000)} minutes; possible expiry`)] });
   }
-  lines.push({ kind: 'text', spans: [span('Counted over '), span(cache.retainedRequests, 'number'),
-    span(' measured requests in the retained history ('), span(cache.retainedEntries, 'number'),
+  lines.push({ kind: 'text', spans: [span('Cache reads reported by '), span(usage.requestCount, 'number'),
+    span(' of '), span(cache.retainedRequests, 'number'), span(' retained requests ('), span(cache.retainedEntries, 'number'),
     span(' entries including context resets and usage gaps), not the whole session.')] });
   return lines;
 }

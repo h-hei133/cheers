@@ -1,0 +1,457 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "publicCompiledSdk": true,
+  "configuredProvider": true,
+  "probeSha256": "2084ddcc73ee4aaf36edc60be06f2dab1915df3960548e1f4c95fdf8cc137862",
+  "cases": [
+    {
+      "name": "read-one",
+      "passed": true,
+      "actualRequests": 2,
+      "successfulRead": 1,
+      "toolStarts": 1,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 539,
+          "completionTokens": 45,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        },
+        {
+          "kind": "request",
+          "promptTokens": 1516,
+          "completionTokens": 19,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "read-two",
+      "passed": true,
+      "actualRequests": 2,
+      "successfulRead": 1,
+      "toolStarts": 1,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 1577,
+          "completionTokens": 49,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        },
+        {
+          "kind": "request",
+          "promptTokens": 2555,
+          "completionTokens": 20,
+          "cacheReadTokens": 1408,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": true,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "continue-1",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 2642,
+          "completionTokens": 34,
+          "cacheReadTokens": 1408,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": true,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "continue-2",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 2661,
+          "completionTokens": 28,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "continue-3",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 2689,
+          "completionTokens": 31,
+          "cacheReadTokens": 1408,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": true,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    },
+    {
+      "name": "continue-4",
+      "passed": true,
+      "actualRequests": 1,
+      "successfulRead": 0,
+      "toolStarts": 0,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 2717,
+          "completionTokens": 28,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    }
+  ],
+  "requests": [
+    {
+      "stage": "read-one",
+      "bodySent": true,
+      "bytes": 2773,
+      "sha256": "8ad1bed02c118e4b4854616f2244a1da34c9ec8876dfa0ebe77fff532ff019bb",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 5465,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 539,
+        "output": 45,
+        "total": 584,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "read-one",
+      "bodySent": true,
+      "bytes": 9288,
+      "sha256": "8a2b848ab7dd85547d4d49c2b904ae2dbbfede51def239f5f789aa9ccb2326a0",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 4431,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 1516,
+        "output": 19,
+        "total": 1535,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "read-two",
+      "bodySent": true,
+      "bytes": 9601,
+      "sha256": "62e6a849a1a4311f5d4dc6740fc14d3459a08839d0b66fe3861d20db3b25e28a",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 5754,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 1577,
+        "output": 49,
+        "total": 1626,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "read-two",
+      "bodySent": true,
+      "bytes": 16121,
+      "sha256": "6b7dc085a6c2e5f7a38a469aa95fad69e5945db50f8d8e03778d4f9d9bf0e94a",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 4723,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2555,
+        "output": 20,
+        "total": 2575,
+        "read": 1408,
+        "write": 0,
+        "readReported": true,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "continue-1",
+      "bodySent": true,
+      "bytes": 16581,
+      "sha256": "48c31fe3587a47dffe697728b2329616bf2c1232ccbd1ea940d37f3749e578c2",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 3064,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2642,
+        "output": 34,
+        "total": 2676,
+        "read": 1408,
+        "write": 0,
+        "readReported": true,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "continue-2",
+      "bodySent": true,
+      "bytes": 16688,
+      "sha256": "8d427fa85da02048d688f81ece014977a35543aa5534122b7556695bd80c6fdb",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 3017,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2661,
+        "output": 28,
+        "total": 2689,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "continue-3",
+      "bodySent": true,
+      "bytes": 16835,
+      "sha256": "e78df71586e4a9f70f2e27d6741aa30383af34b8c51a2b54f2433e46af823dd3",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 3064,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2689,
+        "output": 31,
+        "total": 2720,
+        "read": 1408,
+        "write": 0,
+        "readReported": true,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "continue-4",
+      "bodySent": true,
+      "bytes": 16982,
+      "sha256": "48ff7d22cff02c59bc64f019591bdde5d075ff37c280cf1b4cf987a8a8b78248",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        },
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 3017,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 2717,
+        "output": 28,
+        "total": 2745,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    }
+  ],
+  "buildId": "0247cb1b526d5450829e0b3374dffe3c6572f18b06bd24cd03529ce2027e5820",
+  "source": {
+    "bytes": 6144,
+    "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+    "middleOutsideLegacyEnds": true
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "isolatedValidObjects": true,
+    "minimalConfiguredModelEntry": true,
+    "originalConfiguredCredentials": true,
+    "nativeDefaultPolicyFalse": true,
+    "localRetentionWindow": 32000,
+    "publishedContextWindow": null,
+    "publishedInputLimit": null
+  },
+  "readAttempts": [
+    {
+      "name": "read-one",
+      "toolStarts": 1,
+      "successfulRead": 1,
+      "newSourceResults": 1
+    },
+    {
+      "name": "read-two",
+      "toolStarts": 1,
+      "successfulRead": 1,
+      "newSourceResults": 1
+    }
+  ],
+  "failedStage": "continue-4",
+  "failure": {
+    "category": "product-or-probe-contract",
+    "code": "reopened-usage-decoder-mismatch"
+  },
+  "failureLine": "24",
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "observerEvents": {
+    "create": 8,
+    "headers": 16,
+    "trailers": 8,
+    "data": 45,
+    "complete": 0,
+    "retired": 8
+  },
+  "actualRequests": 8
+}

@@ -1,0 +1,59 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+
+const root = '/home/wang/projects/cheers';
+const output = path.join(root, '.omx/artifacts/upgrade-model-recovery-2026-11-17');
+const shared = path.join(root, '.omx/artifacts/upgrade-history-cost-2026-11-17');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+const reviewPath = path.join(root, '.tmp/history-cost-validation/recovery-review.json');
+if (!fs.existsSync(reviewPath)) throw new Error('Final independent recovery review is absent');
+const review = read(reviewPath);
+const verdict = review.verdict ?? review.recommendation ?? review.status;
+if (verdict !== 'APPROVE') throw new Error('Recovery review has not approved');
+const files = ['cli/interactive/sessionFacts.ts', 'cli/interactive/sessionFacts.test.ts', 'cli/interactive/picker/model.ts',
+  'cli/interactive/picker/model.test.ts', 'cli/interactive/picker/model/snapshot.test.ts'];
+const frozen = read(path.join(root, '.tmp/history-cost-validation/current-sources.json')).source;
+fs.mkdirSync(output, { recursive: true });
+function copy(file, target) {
+  const bytes = fs.readFileSync(file);
+  fs.mkdirSync(path.dirname(path.join(output, target)), { recursive: true });
+  fs.writeFileSync(path.join(output, target), bytes);
+  return { snapshot: target, sha256: hash(bytes) };
+}
+const source = {};
+for (const file of files) {
+  const relative = 'packages/ts-shell/src/' + file;
+  const entry = copy(path.join(root, relative), 'source/' + file + '.txt');
+  if (entry.sha256 !== frozen[relative]) throw new Error('Recovery source changed');
+  source[relative] = entry;
+}
+for (const file of ['recovery/recovery-combined.json', 'recovery/status-red.json', 'recovery/status-green-first.json',
+  'recovery/snapshot-split.json', 'recovery/reversal-restored.json', 'recovery/reversals.json',
+  'recovery/reversal-unavailable-target-context-is-unknown.json', 'recovery/reversal-unavailable-target-context-is-unknown.log',
+  'recovery/reversal-unverified-role-notice-survives-return.json', 'recovery/reversal-unverified-role-notice-survives-return.log',
+  'recovery/production-tests.patch', 'accounting/unreadable-state-main-baseline.json', 'accounting/final-static.log',
+  'accounting/build-manifest.json', 'accounting/build-identity.json']) copy(path.join(shared, file), file.replace(/^accounting\//, 'validation/'));
+copy(reviewPath, 'review.json');
+copy(path.join(root, 'HANDOFF.md'), 'docs/HANDOFF.md.txt');
+const receipt = {
+  schemaVersion: 1, date: '2026-11-17', task: 'Saved model presentation and recovery', batch: ['C.1 recovery'],
+  status: 'locally_verified_repository_gate_not_proven', source,
+  delivery: { localCommit: 'containing Git commit provides the commit receipt', push: false, ci: false },
+  baseline: { selected: 16, passed: 6, assertionFailures: 10, production: 'main without C.7', receipt: 'validation/unreadable-state-main-baseline.json' },
+  validation: { combinedBeforeTestSplit: { files: 20, tests: 933, status: 'passed', receipt: '../upgrade-history-cost-2026-11-17/accounting/current-combined.json',
+      caveat: 'Shared workspace included the separate C.7 changes; not an isolated recovery-only commit test.' },
+    changedTestOwnership: { files: 2, tests: 48, status: 'passed', receipt: 'recovery/snapshot-split.json' },
+    restored: { files: 4, tests: 61, status: 'passed', receipt: 'recovery/reversal-restored.json' },
+    effectiveRecoveryReversals: 2, restoredExactly: true, mainSourcesMutated: false,
+    static: { status: 'passed', receipt: 'validation/final-static.log', productionModules: 2657, monoliths: 0, docsSourceAdvisories: 119, callReachabilityAdvisories: 11 },
+    build: read(path.join(root, '.tmp/history-cost-validation/build-identity.json')), review: { verdict, receipt: 'review.json', reviewerExecutedValidation: false },
+    repositoryNormproof: { actualCommandExitCode: 2, verdict: 'not_proven', reason: 'Pinned full graph exceeds 16384 edge ceiling; unresolved-specifier obligation is missing.',
+      receipt: '../upgrade-history-cost-2026-11-17/normproof/normal-judge/verdict.json' } },
+  scope: ['Presentation failure stays unknown while preserving recorded usage.', 'Strict persisted-model request admission unchanged.',
+    'Read-only prospective model discovery after failed capture; all role rows unknown.', 'Original failure notice and focus survive return; explicit recovery edits recapture fresh authority.'],
+  exclusions: ['No native unreadable-model UI probe was run for this repair.', 'No other-platform, push, CI, provider savings or full-goal completion claim.'],
+};
+fs.writeFileSync(path.join(output, 'delivery.json'), JSON.stringify(receipt, null, 2) + '\n');
+console.log(JSON.stringify({artifact: path.relative(root, output), verdict, sources: files.length}));

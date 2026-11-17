@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+
+const directory = path.resolve('.tmp/history-cost-validation');
+const worktree = path.resolve('.tmp/history-cost-worktree');
+const log = fs.readFileSync(path.join(directory, 'red.log'), 'utf8');
+assert.match(log, /Tests\s+10 failed \| 3 passed \(13\)/);
+assert.match(log, /AssertionError/);
+assert.doesNotMatch(log, /Failed Suites|Startup Error|No test files found/);
+const changed = execFileSync('rtk', ['proxy', 'git', 'diff', '--name-only'], { cwd: worktree, encoding: 'utf8' }).trim();
+assert.equal(changed, '', 'Production must remain unchanged for the baseline.');
+const test = 'packages/ts-shell/src/observability/usage/presence.test.ts';
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const files = ['provider/response/usage.ts', 'observability/usageTelemetry.ts', 'observability/cacheWaste.ts',
+  'observability/usage/model.ts', 'observability/usage/snapshot.ts'].map(file => 'packages/ts-shell/src/' + file);
+const sourceHashes = Object.fromEntries(files.map(file => [file, hash(fs.readFileSync(path.join(worktree, file)))]));
+const receipt = { status: 'counterexamples-reproduced', base: execFileSync('rtk', ['proxy', 'git', 'rev-parse', 'HEAD'],
+  { cwd: worktree, encoding: 'utf8' }).trim(), tests: 13, assertionFailures: 10, passingControls: 3,
+  log: 'red.log', exitCode: 1, productionUnchanged: true, testSha256: hash(fs.readFileSync(path.join(worktree, test))), sourceHashes };
+fs.writeFileSync(path.join(directory, 'red.json'), JSON.stringify(receipt, null, 2) + '\n');
+console.log(JSON.stringify(receipt));

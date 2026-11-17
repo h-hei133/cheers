@@ -11962,3 +11962,9 @@ D.1完整命令矩阵补严格JSONL／optional字段、异步读取最终准入�
 C.9捕获普通print／JSON／RPC／非TTY输入或输出，保留仅stderr重定向的TUI stdout；有界writer等待callback，启动同步exit结算原输出，shutdown超时同步取消并恢复同owner。C.2复用request公共累计capture／reasoning replacement／closing reset，读取错误body前保留HTTP retry事实，独立复审的529两实际反例修复；所有accepted错误响应不重放或执行工具。当前18源码hash与限定APPROVE／CLEAR一致，六静态门28/482、六有效反转exact恢复、2655生产模块0monoliths及build `ceabe4b89b3d`通过。Linux21场景／53本地POST、两模式stderr-only PTY／exit143及配置模型3actual bodySent passed；原配置hash不变、body不可检查、未制造真实服务故障，首launcher PID观察错误和旧build失败保留。
 
 归档upgrade-output-stream-2026-11-16，25/62仅指Linux功能验收，另有正常NormProof exit2／not_proven：blocking unresolved为missing，基线16484／当前16511边均超过16384。临时32768只读诊断unresolved=0不是默认门禁通过，原18tracked NormProof文件未改。按批本地提交不push或宣称CI；C.7代码审查四旧cost夹具REQUEST_CHANGES待主线程分类，整体goal active。
+
+### 2026-11-17：默认历史保留和当次缓存归因验收
+
+C.4默认旧正文裁剪结论被现有false配置及唯一projection反证，沿用原owner并补实际消费者验收。C.7保留当次有效read/write presence，missing／invalid保持unknown；估算用captured普通input／完整write费率，缺价不补填，gap／reset断比较，输出标estimated overlap／possible expiry。最终21文件933项、六静态门、七有效反转exact恢复／恢复4文件61项、0生产monoliths与build0247cb1b526d通过；独立13cache源文件APPROVE。另5文件模型恢复限定APPROVE、单独本地提交a9099ca，严格请求准入保持。
+
+Linux同代公开SDK／CLI配置模型21实际请求／10prompt轮覆盖两次builtin read／跨年龄保留／save-reopen／显式pruning／automatic commit与checkpoint续轮；压力单列32seeded pairs／64messages，不当真实provider轮数。两read-reported／十九缺失与null价格不证明节省、TTL或账单。归档upgrade-history-cost-2026-11-17，27/62为本地功能验收；正常NormProof仍exit2／not_proven，未改变pinned bundle／scope／gate。E.5原共享host续绑／blocked revocation及C.8可变schema已修与限定复审通过，最终构建／安装／共享原生资格待完成。整体goal active，不push或宣称远端CI。

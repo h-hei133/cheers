@@ -126,6 +126,9 @@ export function recordSessionUsage(
     promptProjection?: PromptMeasurement['projection'];
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
+    /** Raw category evidence; normalization sets false when its zero is only an accounting default. */
+    cacheReadReported?: boolean;
+    cacheWriteReported?: boolean;
     /** Why this request was sent, when the caller can prove it from the wire context. */
     purpose?: string;
   },
@@ -204,11 +207,17 @@ export function recordSessionUsage(
       purpose: usage.purpose ?? "turn",
       cacheReadTokens: cacheRead,
       cacheWriteTokens: cacheWrite,
+      // Direct callers can supply measured numeric categories, including zero.
+      // Normalized raw absence explicitly refuses that inference.
+      cacheReadReported: usage.cacheReadReported !== false && typeof usage.cacheReadTokens === 'number'
+        && Number.isFinite(usage.cacheReadTokens) && usage.cacheReadTokens >= 0,
+      cacheWriteReported: usage.cacheWriteReported !== false && typeof usage.cacheWriteTokens === 'number'
+        && Number.isFinite(usage.cacheWriteTokens) && usage.cacheWriteTokens >= 0,
       bucketKey: key,
       ...(attribution ? { attribution } : {}),
       timestamp: existing.lastUpdated,
-      // A price edit keeps cache support, while a destination or model switch
-      // cannot establish that the new request supports cache accounting.
+      // Keep earlier activity as metadata across price edits, without treating
+      // it as evidence of the current request's category presence.
       reportedCache: cacheRead + cacheWrite > 0 || Boolean(previous?.reportedCache &&
         cacheIdentity(previous.bucketKey, previous.attribution) === cacheIdentity(key, attribution)),
       // Persist the refusal even if the newer assistant is never appended.
@@ -347,6 +356,8 @@ export function markContextUnknown(sessionId: string, kind: 'context-reset' | 'u
     purpose: kind,
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
+    cacheReadReported: false,
+    cacheWriteReported: false,
     bucketKey: existing.lastBucketKey,
     ...(attribution ? { attribution } : {}),
     timestamp: Date.now(),

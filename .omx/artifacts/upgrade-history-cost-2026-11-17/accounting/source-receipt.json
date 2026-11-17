@@ -1,0 +1,32 @@
+{
+  "status": "frozen-uncommitted-awaiting-root-validation",
+  "owner": "/root/cache_presence",
+  "worktree": "/home/wang/projects/cheers/.tmp/history-cost-worktree",
+  "branch": "work/history-cost",
+  "base": "d974d3a22166f04816abe22ae993aea99524172b",
+  "ownerRanTestsBuildsGatesOrRuntime": false,
+  "rootBaseline": { "counterexampleCases": 13, "assertionFailures": 10, "passingControls": 3, "evidence": "red.json and red.log" },
+  "initialCounterexampleFileSha256": "3143f5615706502d0edef5e6e69c1fda5c67ad1293904824543f160d8a6704dd",
+  "counterexampleChanges": "Initial 13 case bodies unchanged; 6 additional validity, direct-zero and partial-category controls appended.",
+  "productionSha256": {
+    "packages/ts-shell/src/provider/response/usage.ts": "1083ad99b20c78e4fdc621670fee9e0f821b9116cfd15e228dd43d26add007c6",
+    "packages/ts-shell/src/observability/usageTelemetry.ts": "c16b39096985ae4dfaae371c407661464aa7c84fca48d84c380be0e57ac0b1c7",
+    "packages/ts-shell/src/observability/cacheWaste.ts": "9043cbe9aebf24987ef59f78d923908919fd2986a98fc75f4a985f000a8767c8",
+    "packages/ts-shell/src/observability/usage/model.ts": "75244433acf0959941745a9f272f78d0bd04de6f195474ec275e265b066ae568",
+    "packages/ts-shell/src/observability/usage/snapshot.ts": "86f01c4583c25dbf6341e19c52964504558b6e44235fed3ff163278f228edcb1"
+  },
+  "testSha256": {
+    "packages/ts-shell/src/provider/response/usage.test.ts": "d3feaf10a9100f35f755181e528faf52fa8dc288c3daea9d8dfdfc40e58e0b2e",
+    "packages/ts-shell/src/observability/usage/attribution.test.ts": "0a130cb5a7dd917ca77e0c539894380524f756bac23dc450dc759d946ee9741c",
+    "packages/ts-shell/src/observability/cacheWaste.test.ts": "6fb9586744a089de86baed24882fb8558a8618313c3df7656fcabe211aa0e2ef",
+    "packages/ts-shell/src/observability/usage/presence.test.ts": "0f9687f347e4cb07adcaeb1d4e6281ec30331737adda78af92ce774bf2c68d8b"
+  },
+  "artifactSha256": {
+    "production.patch": "780c959da6ccbf647ae8f4e907f9aac8dd4753772104fe252fe2200847d74b4d",
+    "tests-final.patch": "82715cd6b79a59136a434f1ee8ac5328de9bbf6f0e95b357ac823794c98d4b67",
+    "tests.patch": "79306983013d1dcded0b50c7abf32d54c251ea31ee10ddc826b964d1c21ee5e4"
+  },
+  "integrationBoundary": "No turn/step.ts, main-worktree production, shared docs or scripts changed. Numeric billing sums and prompt-context/replay authority unchanged.",
+  "propagationInspection": "turn/step.ts, /btw and session/store/usage.ts spread canonical normalized records. turn/request.ts reads numeric counts for tracing and context only. No caller patch required.",
+  "moduleChanges": "No new production domain files; only added named helpers are reportedCount and cacheCategoryMeasured."
+}

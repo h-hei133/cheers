@@ -1,0 +1,24 @@
+{
+  "unchanged": true,
+  "count": 18,
+  "sha256": {
+    ".normproof/EXPERIENCE.md": "0bb6e234d4a9556c1f9ade884353611a5ff9314f66e3eed5cb0476d9d3bbe267",
+    ".normproof/adapter/artifact.mjs": "9508c62b0422c90a8da79be6fedf0b01d9f5f983d8471b17c9c7a7a373f55d80",
+    ".normproof/adapter/cli.mjs": "41647f846ca65a26791cc5dafa9b6ee46a6804019de1b4c3b67b51dfb8ff402c",
+    ".normproof/adapter/contract.json": "0a1a4584f8a209087c0094127d575c5d343bb703ba33660db8f4c55b93f92747",
+    ".normproof/adapter/fixtures/graph.json": "3cdbe229bc861f2ea2fe4350e2304266193c53db996730bf0e93d4fab1fdc541",
+    ".normproof/adapter/shadow.mjs": "174826a6d0d229154f43bad5a2de9bb4cf09da10714114c1d222f09c587b8900",
+    ".normproof/bundle.json": "cbcc3d3814fba42232a96f187c509fb2e3225b6f5bbe6835d563d3914255cf2c",
+    ".normproof/dispositions.md": "2e9c58e778d3f9555cbd7fd2a74b6ef1f4ba16df591bce3588ba714d729803ca",
+    ".normproof/evidence-manifest.json": "d41cf5ab7301600a73d4361713c9cb98ccf17651edc48bca3f2633cefe2b3481",
+    ".normproof/judge-input.json": "bbc748511adf459d53c40be992a6e7f1e3af9e5e7bf1f06c906fe766671f68b1",
+    ".normproof/norm-packs/software-structure-v0/profile.json": "2a69c9e14ed8e9b6b38c6a795920c4d574850662d16a9ac8a0ce17bdc0db81db",
+    ".normproof/normproof-0.1.0.tgz": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985",
+    ".normproof/package.mjs": "eede122100d899df2ab163909ce562167880c88ad98de177a1d38c7466703945",
+    ".normproof/patches/graph.patch": "3cb6617066340386b1658b62c4a0fc8fbbbc21d403cc3d278f8886a077b6e833",
+    ".normproof/write-gate/artifact.json": "ffc27bb7407b2f13056487cacc392cac77a7601c9fc385187a4f73b6a07384ee",
+    ".normproof/write-gate/cli.mjs": "817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d",
+    ".normproof/write-gate/package.mjs": "3e14b8d2ce1e6a7ad66a34a2ec7fe97785ad65552abc307d1691538e5b02d158",
+    ".normproof/write-rules.json": "0e8960273bddcf3a56705693929ae8a7bdb0367d6e72652cee437cbd89e491a2"
+  }
+}

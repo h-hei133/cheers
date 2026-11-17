@@ -12,8 +12,8 @@ const A = 'attributed-a', B = 'attributed-b';
 const rates = { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1 };
 const capture = (baseUrl = 'https://relay.invalid/v1', prices = rates) => captureUsageAttribution({ provider: 'p', model: 'org/model', baseUrl, rates: prices });
 const record = (session = A, attribution = capture(), tokens = 1_000_000) => recordSessionUsage(session, { attribution, promptTokens: tokens });
-const recordRequest = (session = A, attribution = capture(), tokens = 1_000_000) => recordSessionUsage(session, {
-  attribution, promptTokens: tokens, promptIdentity: { provider: attribution.provider, model: attribution.model,
+const recordRequest = (session = A, attribution = capture(), tokens = 1_000_000, cacheReadTokens?: number) => recordSessionUsage(session, {
+  attribution, promptTokens: tokens, cacheReadTokens, promptIdentity: { provider: attribution.provider, model: attribution.model,
     endpoint: 'openai-compatible', endpointId: attribution.endpointId },
 });
 afterEach(() => { resetSessionUsage(A); resetSessionUsage(B); });
@@ -113,7 +113,7 @@ it('merges independent v1 and v2 writers, and retries failed persistence without
   expect(mergeUsageDelta(disk, legacy, legacy)).toEqual(disk);
 });
 
-it.each(['missing', 'price', 'endpoint', 'origin', 'negative', 'unknown-version', 'unknown-key'])('rejects %s attribution corruption', kind => {
+it.each(['missing', 'price', 'endpoint', 'origin', 'negative', 'unknown-version', 'unknown-key', 'read-presence', 'write-presence'])('rejects %s attribution corruption', kind => {
   record();
   let snapshot: any;
   persistSessionUsage(A, undefined, next => { snapshot = JSON.parse(JSON.stringify(next)); });
@@ -126,13 +126,15 @@ it.each(['missing', 'price', 'endpoint', 'origin', 'negative', 'unknown-version'
   if (kind === 'negative') bucket.attribution.rates.promptPerMTok = -1;
   if (kind === 'unknown-version') snapshot.schemaVersion = 3;
   if (kind === 'unknown-key') { snapshot.byModel['@usage:other'] = { ...bucket }; delete snapshot.byModel['@usage:other'].attribution; }
+  if (kind === 'read-presence') snapshot.recentRequests[0].cacheReadReported = 'yes';
+  if (kind === 'write-presence') snapshot.recentRequests[0].cacheWriteReported = 1;
   expect(() => decodeUsageSnapshot(snapshot)).toThrow();
 });
 
 it('uses current captured cache prices while separating price edits from destination changes', () => {
-  recordRequest(A, capture(), 10_000);
-  recordRequest(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 10_000);
-  recordRequest(A, capture('https://relay.invalid/v2', { ...rates, promptPerMTok: 5 }), 10_000);
+  recordRequest(A, capture(), 10_000, 0);
+  recordRequest(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 10_000, 0);
+  recordRequest(A, capture('https://relay.invalid/v2', { ...rates, promptPerMTok: 5 }), 10_000, 0);
   const result = findCacheWaste(getSessionUsage(A).recentRequests, () => { throw new Error('must not reprice'); });
   expect(result.misses).toMatchObject([
     { modelChanged: false, endpointChanged: false },
@@ -143,18 +145,18 @@ it('uses current captured cache prices while separating price edits from destina
 });
 
 it('does not infer cache continuity between a legacy request and an attributed one', () => {
-  recordSessionUsage(A, { provider: 'p', model: 'org/model', promptTokens: 10_000,
+  recordSessionUsage(A, { provider: 'p', model: 'org/model', promptTokens: 10_000, cacheReadTokens: 0,
     promptIdentity: { provider: 'p', model: 'org/model' } });
-  recordRequest(A, capture(), 10_000);
+  recordRequest(A, capture(), 10_000, 0);
   expect(getSessionUsage(A).recentRequests.map(entry => entry.kind)).toEqual(['request', 'request']);
   expect(findCacheWaste(getSessionUsage(A).recentRequests, () => rates).misses).toEqual([]);
 });
 
-it('keeps cache accounting across price edits without inferring support at another destination', () => {
+it('keeps measured cache accounting across price edits without inferring it at another destination', () => {
   const attribution = capture();
   recordSessionUsage(A, { attribution, promptTokens: 100, cacheReadTokens: 100,
     promptIdentity: { provider: attribution.provider, model: attribution.model, endpointId: attribution.endpointId } });
-  recordRequest(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 200);
+  recordRequest(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 200, 0);
   recordRequest(A, capture('https://relay.invalid/v2'), 300);
   const history = getSessionUsage(A).recentRequests;
   expect(history.map(entry => entry.reportedCache)).toEqual([true, true, false]);
@@ -215,10 +217,10 @@ it.each(['context-reset', 'usage-gap'] as const)('persists %s after attributed u
 it('detects and formats real-time turn-end cache miss warnings', () => {
   resetSessionUsage(A);
   const attr = capture('https://relay.invalid/v1', rates);
-  recordRequest(A, attr, 10_000);
+  recordRequest(A, attr, 10_000, 0);
   expect(detectLatestCacheMiss(getSessionUsage(A).recentRequests, () => rates)).toBeUndefined();
-  recordRequest(A, attr, 12_000);
+  recordRequest(A, attr, 12_000, 0);
   const miss = detectLatestCacheMiss(getSessionUsage(A).recentRequests, () => rates);
   expect(miss).toBeDefined();
-  expect(formatCacheMissNotice(miss!)).toContain('Cache miss: 10,000 prompt tokens re-billed');
+  expect(formatCacheMissNotice(miss!)).toContain('Estimated cache miss: 10,000 overlapping prompt tokens');
 });

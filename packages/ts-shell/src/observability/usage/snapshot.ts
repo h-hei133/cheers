@@ -95,6 +95,11 @@ export function decodeUsageHistory(value: unknown): UsageHistoryEntry[] {
     const promptTokens = count(entry.promptTokens);
     const cacheReadTokens = count(entry.cacheReadTokens);
     const cacheWriteTokens = count(entry.cacheWriteTokens);
+    for (const field of ['cacheReadReported', 'cacheWriteReported'] as const) {
+      if (entry[field] !== undefined && typeof entry[field] !== 'boolean') {
+        throw new Error('Invalid persisted session usage cache presence');
+      }
+    }
     const timestamp = count(entry.timestamp);
     if (entry.purpose !== undefined && !text(entry.purpose)) {
       throw new Error("Invalid persisted session usage purpose");
@@ -109,6 +114,8 @@ export function decodeUsageHistory(value: unknown): UsageHistoryEntry[] {
       promptTokens,
       cacheReadTokens,
       cacheWriteTokens,
+      ...(entry.cacheReadReported === undefined ? {} : { cacheReadReported: entry.cacheReadReported as boolean }),
+      ...(entry.cacheWriteReported === undefined ? {} : { cacheWriteReported: entry.cacheWriteReported as boolean }),
       bucketKey: entry.bucketKey,
       timestamp,
       reportedCache: entry.reportedCache,
@@ -127,6 +134,8 @@ function sameHistoryEntry(left: UsageHistoryEntry, right: UsageHistoryEntry): bo
     && left.purpose === right.purpose
     && left.cacheReadTokens === right.cacheReadTokens
     && left.cacheWriteTokens === right.cacheWriteTokens
+    && left.cacheReadReported === right.cacheReadReported
+    && left.cacheWriteReported === right.cacheWriteReported
     && left.bucketKey === right.bucketKey
     && left.timestamp === right.timestamp
     && left.reportedCache === right.reportedCache

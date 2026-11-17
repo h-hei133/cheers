@@ -2,7 +2,7 @@
 
 > **Task**: 核实研究规划，实施仍然成立的任务，并按实际生产路径验收。
 > **Started**: 2026-11-14
-> **Last Updated**: 2026-11-16
+> **Last Updated**: 2026-11-17
 > **Mode**: LOCAL_ONLY
 
 ## Scope and authority
@@ -18,15 +18,15 @@
 - [Task inventory](tasks.md)：唯一任务与验收清单。
 - [Design and evidence](design.md)：结构事实、参考决策、复用与实施顺序。
 - [Earlier repair evidence](../../wiki/references/runtime-upgrade-review-2026-11.md)：上一轮证据，不能替代本轮任务验收。
-- [Progress summary](summary.md)：当前已完成范围、实际验证及全部37项未完成功能任务和仓库门禁缺口。
+- [Progress summary](summary.md)：当前已完成范围、实际验证及全部35项未完成功能任务和仓库门禁缺口。
 
 ## Current status
 
-**Current phase**: in_progress；C.9／C.2已集成并完成Linux功能验收，当前25/62项功能任务完成；完整仓库NormProof未通过，不能称全门禁完成。继续C.7缓存presence／成本归因，再执行C.4多轮历史／measurement验收及其余仍成立的研究任务。
-**Last completed batch**: C.9捕获stdout／有界writer／退出owner与C.2公共累计capture／HTTP retry事实。最终18源码hash匹配两项独立APPROVE／CLEAR；联合28套件482项、六静态门、六个有效AssertionError反转exact恢复、2655生产模块0monoliths及build `ceabe4b89b3d`通过。同代Linux两模式PTY stderr-only重定向／SIGTERM exit143、21CLI场景／53 loopback POST及配置模型3实际bodySent通过；归档upgrade-output-stream-2026-11-16，按批本地提交不push。配置原文件未改、body不可检查、未制造真实服务故障。
-**Current batch**: C.7五生产／四测试补丁冻结于独立工作树，13原始反例为10 AssertionErrors／3控制，追加6控制未由worker运行验证。代码审查REQUEST_CHANGES限定四个旧costCommand夹具的read-presence／write-price不一致，待主线程实际分类与修正；架构审查仍进行，尚未集成或验收。
-**Repository gate**: 正常pinned NormProof judge exit2／not_proven，blocking unresolved-specifier obligation为missing。manifest完整图超16384边；同parser／collector／manifest诊断比较：HEAD基线16484、当前16511，均在原上限失败，已知容量缺口新增27边。临时32768副本完整诊断unresolved=0且已删除，不是默认门禁通过或容量安全包络验证；18个tracked NormProof文件hash不变，未修改scope、bundle、package scripts或gate。
-**Goal**: active；37项功能任务未完成，其中12部分、10已有待验收、13确认缺口、2待核实；另有仓库NormProof缺口。保留全部原规划与暂缓条件，不将Linux功能验收扩展成全门禁、全平台或远端CI证据。
+**Current phase**: in_progress；C.4／C.7完成Linux所述功能验收，当前27/62，完整仓库NormProof未通过。继续E.5续绑／安装与C.8工具发现验收，再执行全部剩余35任务，不缩小总体目标。
+**Last completed batch**: C.4默认工具正文保留裁定／实际多轮与压缩验收、C.7当次cache presence／captured write premium／估算报告。当前21文件933项、六门、七有效反转exact恢复／恢复4文件61项、2657生产模块0monoliths及build `0247cb1b526d`通过。Linux同代公开SDK／CLI21实际配置模型请求／10prompt轮、两次真实builtin read／跨年龄保留／同ID重开／显式pruning控制／自动commit与checkpoint续轮通过；压缩压力明确32seeded pairs／64messages、本地16000window。2read-reported／19absent-read和null价格只描述观察，不证明节省。限定独立APPROVE与源码hash归档upgrade-history-cost-2026-11-17；模型恢复独立提交。
+**Current batch**: E.5复用原共享host在新UI调用前刷新已绑定snapshot；SDK loader／inline／file／installed worker共用同owner，旧调用和blocked publication继续撤权。最终七源文件独立APPROVE、15文件168项及三有效反转／串行恢复4文件29项通过；当前最终构建、签名安装和公开安装SDK资格待完成。C.8可变nested schema的三反例已修，10文件187项／三有效反转／恢复2文件22项和独立APPROVE通过；2000 deferred目录及配置模型8次实际请求通过，原native build为1e7d99a7eb37，最终共享构建复验待完成。
+**Repository gate**: 当前normal pinned judge实际exit2／not_proven，unresolved-specifier obligation因完整图超16384边为missing；shadow enforcement didBlock=false／exitCode0不能取代CLI退出码。当前未做扩大graph诊断；cbd44218前批的基线16484／当前16511和临时32768诊断unresolved0仅为历史证据，不延伸到新源码。18tracked pinned文件不变，未修改scope、bundle、default gate或package scripts。测试interactiveMode.test.ts21-name既有advisory仍保留，生产0monoliths另列。
+**Goal**: active；35功能任务未完成，其中12部分、8已有待验收、13缺口、2待核实；另有仓库NormProof缺口。模型恢复已单独本地提交a9099ca，C.4／C.7交付中；全部原规划及暂缓条件保留，未push或取得远端CI。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -41,7 +41,7 @@
 
 ## Adaptive control
 
-当前Linux功能验收任务数为25/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.9和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
+当前Linux功能验收任务数为27/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.9和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 
 恢复时已核对干净工作区与`560c0cc4`。T3.1 compact仅持有controller、不登记settlement，且只凭状态机拒绝重入；该缺口经源码核实仍成立。复用原commands owner登记完整压缩操作、保持忙时拒绝，覆盖prompt／command互斥和SDK dispose等待；不建立第二任务管理器。C.1完整路由由独立只读核实线检查，后续独立实施；已有证据不扩展为新构建的重新验收。
 
@@ -69,10 +69,13 @@ RPC重试取消子批遥测：实际M；复用原retry wait、kernel run signal�
 
 RPC整项遥测：实际L，复用检查10/10，未增加依赖或执行／存储平面；额外依赖4（严格输入隔离、最后读取准入、完整活动投影、共享generation的caller活动）。原架构WATCH有真实反例并修复；无结果的旧代码review lane记unavailable，最终APPROVE来自新独立12文件审查。此前没有统一数值估算，不补造历史drift。
 
+C.4／C.7子批实际L，复用normalizer／usage history／captured rates／cost report与原projection／compaction owner，结构检查10/10，无新依赖、执行或存储平面。额外依赖3：缺失字段presence、旧cost消费者夹具、同代native observer接受清退。模型恢复发现C.1既有显示回归，单独commit；C.4研究结论不成立仍做有效反转及真实消费者。未补造历史估算／drift数值。
+
 ## Session log
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-17 | C.4／C.7当前21文件933项、六门、七有效反转exact恢复／恢复4/61、build0247cb1b526d与13源码独立APPROVE；Linux配置模型21实际请求／10轮、真实read保留／重开／显式pruning／实际compaction commit passed。27/62功能验收，35任务／NormProof容量缺口保留；模型恢复另批提交，继续E.5／C.8，不push。 |
 | 2026-11-16 | C.9／C.2当前18源码hash及build `ceabe4b89b3d`核验，六静态门28/482、六有效反转exact恢复、0生产monoliths、Linux21场景／53本地POST、两模式PTY exit143及配置模型3actual请求passed，限定APPROVE／CLEAR。25/62仅指Linux功能；正常NormProof exit2／not_proven，基线16484／当前16511边均超过16384，诊断不升级为门禁。归档upgrade-output-stream-2026-11-16并本地提交；C.7四旧cost夹具REQUEST_CHANGES待实际分类，不push。 |
 | 2026-11-16 | D.1最终build `43da5c29fee3`六门34/912、七反转exact恢复、恢复3/110、Linux七组55本地POST与四配置模型请求passed；原共享overflow WATCH先红后修，当前架构CLEAR／新独立代码APPROVE，23/62与active。归档后本地提交；C.9真实退出反例和C.2当前capture反例在隔离树继续修复，不push。 |
 | 2026-11-15 | 设置／发现已提交0caf82c；compact控制／结构化结果4/43、六门、三个反转exact恢复、build `1a9b082e419d`和限定APPROVE/CLEAR通过。Linux三loopback POST取消／reuse／EOF与两次配置模型请求／durable commit passed。原native夹具失败保留，证据upgrade-rpc-compaction-2026-11-15；22/62不变，继续retry专属取消，不push。 |

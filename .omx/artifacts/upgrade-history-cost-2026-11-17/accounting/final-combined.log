@@ -1,0 +1,30 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/config/runtimeConfig.test.ts src/observability/cacheWaste.test.ts src/observability/usageTelemetry.test.ts src/turn/accounting.test.ts src/turn/measurement.test.ts src/turn/retention.test.ts src/cli/interactive/interactiveMode.test.ts src/cli/interactive/sessionFacts.test.ts src/cli/runtime/compaction.test.ts src/core/commands/costCommand.test.ts src/core/query/compaction.test.ts src/observability/usage/attribution.test.ts src/observability/usage/presence.test.ts src/observability/usage/recovery.test.ts src/provider/response/usage.test.ts src/session/store/usage.test.ts src/cli/interactive/picker/model.test.ts src/cli/interactive/picker/model/snapshot.test.ts src/cli/runtime/context/preview.test.ts src/cli/interactive/picker/model/auth.test.ts src/cli/interactive/picker/model/publication.test.ts --no-file-parallelism --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/history-cost-validation/final-combined.json
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Interactive cleanup failed; terminal restoration was not fully verified.
+
+Interactive cleanup failed; terminal restoration was not fully verified.
+
+
+JSON report written to /home/wang/projects/cheers/.tmp/history-cost-validation/final-combined.json

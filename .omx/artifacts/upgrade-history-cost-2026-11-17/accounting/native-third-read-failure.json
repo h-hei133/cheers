@@ -1,0 +1,153 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "publicCompiledSdk": true,
+  "configuredProvider": true,
+  "probeSha256": "e8a5717d82f0725b0897e53a236929c32ae518107ded7ff2b7d34c1eab6e0140",
+  "cases": [
+    {
+      "name": "read-one",
+      "passed": true,
+      "actualRequests": 2,
+      "successfulRead": 1,
+      "toolStarts": 1,
+      "acknowledged": true,
+      "completed": true,
+      "seededHistory": false,
+      "usage": [
+        {
+          "kind": "request",
+          "promptTokens": 541,
+          "completionTokens": 50,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        },
+        {
+          "kind": "request",
+          "promptTokens": 1518,
+          "completionTokens": 19,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "cacheReadReported": false,
+          "cacheWriteReported": false,
+          "capturedRates": null
+        }
+      ]
+    }
+  ],
+  "requests": [
+    {
+      "stage": "read-one",
+      "bodySent": true,
+      "bytes": 2773,
+      "sha256": "5e62ece6062745f81447b38d476a7b7cef2f22bcb30021fa8e93e7fa4783bcb8",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": 200,
+      "responseBytes": 5465,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 541,
+        "output": 50,
+        "total": 591,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "read-one",
+      "bodySent": true,
+      "bytes": 9288,
+      "sha256": "d3e72f30db07053dad4aef96e52771b23a89f77c92e34275e694a4c1cc7a9682",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 4431,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 1518,
+        "output": 19,
+        "total": 1537,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    },
+    {
+      "stage": "read-two",
+      "bodySent": true,
+      "bytes": 9504,
+      "sha256": "f052790008725d2e95c1516db62a8b727aa56efee1d3f59a172e70f02f0b1942",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": 200,
+      "responseBytes": 7185,
+      "responseEnd": "accepted-stream-retirement",
+      "usage": {
+        "inspectable": true,
+        "input": 1560,
+        "output": 106,
+        "total": 1666,
+        "read": 0,
+        "write": 0,
+        "readReported": false,
+        "writeReported": false
+      }
+    }
+  ],
+  "buildId": "0247cb1b526d5450829e0b3374dffe3c6572f18b06bd24cd03529ce2027e5820",
+  "source": {
+    "bytes": 6144,
+    "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+    "middleOutsideLegacyEnds": true
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "isolatedValidObjects": true,
+    "minimalConfiguredModelEntry": true,
+    "originalConfiguredCredentials": true,
+    "nativeDefaultPolicyFalse": true,
+    "localRetentionWindow": 32000,
+    "publishedContextWindow": null,
+    "publishedInputLimit": null
+  },
+  "failedStage": "read-two",
+  "failure": {
+    "category": "product-or-probe-contract",
+    "code": "actual-read-not-observed"
+  },
+  "failureLine": "24",
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "observerEvents": {
+    "create": 3,
+    "headers": 6,
+    "trailers": 3,
+    "data": 23,
+    "complete": 0,
+    "retired": 3
+  },
+  "actualRequests": 3
+}

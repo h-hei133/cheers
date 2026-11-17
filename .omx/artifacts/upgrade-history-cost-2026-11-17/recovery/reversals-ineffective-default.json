@@ -1,0 +1,17 @@
+{
+  "status": "failed",
+  "mainSourcesMutated": false,
+  "cases": [
+    {
+      "name": "default-retained-tool-text",
+      "exitCode": 0,
+      "tests": 6,
+      "failed": 0,
+      "assertionFailures": 0,
+      "restoredExactly": true,
+      "receipt": "reversal-default-retained-tool-text.json",
+      "mainSourcesMutated": false
+    }
+  ],
+  "failure": "invalid-reversal:default-retained-tool-text"
+}

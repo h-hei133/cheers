@@ -1,0 +1,10 @@
+{
+  "date": "2026-11-17",
+  "batch": "cbd44218 output and stream",
+  "freshOptionalStdoutReview": "unavailable",
+  "freshOptionalStreamReview": "unavailable",
+  "reason": "No completed report or verdict arrived after continuation requests; root interrupted the pending optional lanes to continue authorized work.",
+  "silenceIsApproval": false,
+  "earlierReviews": "Existing committed APPROVE/CLEAR receipts remain bounded to their captured source hashes and ceabe4b89b3d build. They are not newly rerun reviews.",
+  "currentBatchReviews": "C.7 and model-recovery final reviews are separate and remain pending."
+}

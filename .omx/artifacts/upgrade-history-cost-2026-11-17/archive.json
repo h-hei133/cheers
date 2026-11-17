@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-17",
+  "status": "frozen_archive_pending_final_reviews",
+  "baseCommit": "cbd442186fd5d0798cf2f50882cd2095d661ac39",
+  "source": {
+    "packages/ts-shell/src/provider/response/usage.ts": {
+      "snapshot": "source/provider/response/usage.ts.txt",
+      "sha256": "1083ad99b20c78e4fdc621670fee9e0f821b9116cfd15e228dd43d26add007c6"
+    },
+    "packages/ts-shell/src/observability/usageTelemetry.ts": {
+      "snapshot": "source/observability/usageTelemetry.ts.txt",
+      "sha256": "c16b39096985ae4dfaae371c407661464aa7c84fca48d84c380be0e57ac0b1c7"
+    },
+    "packages/ts-shell/src/observability/cacheWaste.ts": {
+      "snapshot": "source/observability/cacheWaste.ts.txt",
+      "sha256": "9043cbe9aebf24987ef59f78d923908919fd2986a98fc75f4a985f000a8767c8"
+    },
+    "packages/ts-shell/src/observability/usage/model.ts": {
+      "snapshot": "source/observability/usage/model.ts.txt",
+      "sha256": "75244433acf0959941745a9f272f78d0bd04de6f195474ec275e265b066ae568"
+    },
+    "packages/ts-shell/src/observability/usage/snapshot.ts": {
+      "snapshot": "source/observability/usage/snapshot.ts.txt",
+      "sha256": "86f01c4583c25dbf6341e19c52964504558b6e44235fed3ff163278f228edcb1"
+    },
+    "packages/ts-shell/src/core/commands/cost/cache.ts": {
+      "snapshot": "source/core/commands/cost/cache.ts.txt",
+      "sha256": "e904c4c27b030c95c0e87d61fbc98c590fb43e262c5539843e14c753c04600f1"
+    },
+    "packages/ts-shell/src/provider/response/usage.test.ts": {
+      "snapshot": "source/provider/response/usage.test.ts.txt",
+      "sha256": "d3feaf10a9100f35f755181e528faf52fa8dc288c3daea9d8dfdfc40e58e0b2e"
+    },
+    "packages/ts-shell/src/observability/usage/attribution.test.ts": {
+      "snapshot": "source/observability/usage/attribution.test.ts.txt",
+      "sha256": "0a130cb5a7dd917ca77e0c539894380524f756bac23dc450dc759d946ee9741c"
+    },
+    "packages/ts-shell/src/observability/cacheWaste.test.ts": {
+      "snapshot": "source/observability/cacheWaste.test.ts.txt",
+      "sha256": "6fb9586744a089de86baed24882fb8558a8618313c3df7656fcabe211aa0e2ef"
+    },
+    "packages/ts-shell/src/observability/usage/presence.test.ts": {
+      "snapshot": "source/observability/usage/presence.test.ts.txt",
+      "sha256": "0f9687f347e4cb07adcaeb1d4e6281ec30331737adda78af92ce774bf2c68d8b"
+    },
+    "packages/ts-shell/src/core/commands/costCommand.test.ts": {
+      "snapshot": "source/core/commands/costCommand.test.ts.txt",
+      "sha256": "440fe5197cf1a3c8e57e8f8453eadc7491b337ef429c58a5fd017bc444c0ae74"
+    },
+    "packages/ts-shell/src/turn/accounting.test.ts": {
+      "snapshot": "source/turn/accounting.test.ts.txt",
+      "sha256": "029dafd0c56bc7076ca50b8495bc0a48a34bcbf557a47f371a917fc642e2f546"
+    },
+    "packages/ts-shell/src/cli/interactive/interactiveMode.test.ts": {
+      "snapshot": "source/cli/interactive/interactiveMode.test.ts.txt",
+      "sha256": "d4953af3416e04ade85620084394689a15df5062fce7b86aa180fb21fe18d97a"
+    },
+    "packages/ts-shell/src/cli/interactive/sessionFacts.ts": {
+      "snapshot": "source/cli/interactive/sessionFacts.ts.txt",
+      "sha256": "6d439ff22c60f9fa285ce81245d494a977b741e7354a1726d826944b8a3b422f"
+    },
+    "packages/ts-shell/src/cli/interactive/sessionFacts.test.ts": {
+      "snapshot": "source/cli/interactive/sessionFacts.test.ts.txt",
+      "sha256": "7e2db8823011bd7f362745e7403c72bdd8953575495d326ffe0bd5f94b9d3589"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/model.ts": {
+      "snapshot": "source/cli/interactive/picker/model.ts.txt",
+      "sha256": "6dbbffc677cf8ff05de4474eb868b46d74af2a7969caa55424b2cbf9fe4f1149"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/model.test.ts": {
+      "snapshot": "source/cli/interactive/picker/model.test.ts.txt",
+      "sha256": "7d81fa9a417fc6f7dd13c71bc5edb5d56def525ca52e0e39eac34b2e0b37034f"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/model/snapshot.test.ts": {
+      "snapshot": "source/cli/interactive/picker/model/snapshot.test.ts.txt",
+      "sha256": "6172ccd63aae0cb013f20680f596a3ee80c7c1a8bb6e084d8b22a5fb3353ff39"
+    }
+  },
+  "unchangedSeams": {
+    "packages/ts-shell/src/config/runtimeConfig.ts": {
+      "snapshot": "seams/config/runtimeConfig.ts.txt",
+      "sha256": "89e53def9d63ccfae698c1bf6729a3768fb82e4574a0bace85de5b0fdf718eb4"
+    },
+    "packages/ts-shell/src/turn/messages.ts": {
+      "snapshot": "seams/turn/messages.ts.txt",
+      "sha256": "3f219a0340114ac38bf8c5e2cb73134ed3fa31f0b4e43732ed0036b2c5ad610e"
+    },
+    "packages/ts-shell/src/core/query/microCompact.ts": {
+      "snapshot": "seams/core/query/microCompact.ts.txt",
+      "sha256": "5c962af2c0326bff3811715bebae1b4249f1c5061b47c82c0a2150d299c6a9ec"
+    },
+    "packages/ts-shell/src/turn/context/prepare.ts": {
+      "snapshot": "seams/turn/context/prepare.ts.txt",
+      "sha256": "22cb1d276d37278ee418743e6f36c6810656e191d4110e522fb09b9e07d8786c"
+    },
+    "packages/ts-shell/src/turn/measurement.ts": {
+      "snapshot": "seams/turn/measurement.ts.txt",
+      "sha256": "a50faecdc7cf3c1ef33a0700db58236ddf64ed56b95fe7b84be30bc6495ebbc3"
+    },
+    "packages/ts-shell/src/cli/provider/step.ts": {
+      "snapshot": "seams/cli/provider/step.ts.txt",
+      "sha256": "9e09008340ccef1efab357650fa3563b22753b8ac08c702bade3618e36b08dae"
+    },
+    "packages/ts-shell/src/cli/runtime/context/preview.ts": {
+      "snapshot": "seams/cli/runtime/context/preview.ts.txt",
+      "sha256": "384dbacea134566f35d4650d8516c4676a3e9087aa44e664297e05b26f5cbd66"
+    },
+    "packages/ts-shell/src/cli/runtime/compaction.ts": {
+      "snapshot": "seams/cli/runtime/compaction.ts.txt",
+      "sha256": "62c991e9eaa6fb2165dcdf6f6529ef1c1d0d63587b8301904345827b96561f53"
+    },
+    "packages/ts-shell/src/session/context/selection.ts": {
+      "snapshot": "seams/session/context/selection.ts.txt",
+      "sha256": "8d124752d7acf7dc922bc75dbefee6e1719d8348dbea94a07fa41a5fa732500b"
+    },
+    "packages/ts-shell/src/observability/usage/identity.ts": {
+      "snapshot": "seams/observability/usage/identity.ts.txt",
+      "sha256": "77927fd7a31a58696bf890316e647958ebe2e1617f24949fe58f03ba96dc411b"
+    },
+    "packages/ts-shell/src/turn/step.ts": {
+      "snapshot": "seams/turn/step.ts.txt",
+      "sha256": "ff3f33cd48af0f5ab648d947749c4b7abfbed63ff68b7d227a257d6c748b68fc"
+    },
+    "packages/ts-shell/src/session/store/usage.ts": {
+      "snapshot": "seams/session/store/usage.ts.txt",
+      "sha256": "c6144c4aee770daf2f11123b90fb80281c1571dc1e014634e01ba4689bc9b7f0"
+    },
+    "packages/ts-shell/src/core/commands/cost/model.ts": {
+      "snapshot": "seams/core/commands/cost/model.ts.txt",
+      "sha256": "4fb8bf8003f61e0480bbd2d6cd9ba02cf53ecb519b3b79b2d195a295cec6112c"
+    },
+    "packages/ts-shell/src/cli/interactive/interactiveMode.ts": {
+      "snapshot": "seams/cli/interactive/interactiveMode.ts.txt",
+      "sha256": "7ff25d3ff35766da318b55c17e070fcb4633bcd5d719658212fb79f8153e9906"
+    }
+  },
+  "build": {
+    "buildId": "0247cb1b526d5450829e0b3374dffe3c6572f18b06bd24cd03529ce2027e5820",
+    "inputsDigest": "71e1d5f70db0c3593ded7978bc92e1bb2e5bf7e444987ca7e58951e554b4443f",
+    "currentInputDigestVerified": true,
+    "files": 3983,
+    "manifest": "accounting/build-manifest.json",
+    "identity": "accounting/build-identity.json",
+    "buildCommandLogAvailable": false
+  },
+  "rawValidation": {
+    "combined": "accounting/current-combined.json",
+    "afterSplit": "recovery/snapshot-split.json",
+    "restored": "recovery/reversal-restored.json",
+    "static": "accounting/final-static.log",
+    "reversals": "recovery/reversals.json",
+    "native": "accounting/native.json",
+    "normproof": "normproof/normal-judge/verdict.json",
+    "normproofActualCommandExitCode": 2,
+    "normproofEnforcementShadowExitCode": 0
+  }
+}

@@ -1,0 +1,266 @@
+{
+  "findings": [],
+  "verdict": "APPROVE",
+  "summary": "No evidence-backed correctness or regression finding in the 13 frozen cache-accounting files.",
+  "schemaVersion": 1,
+  "reviewer": "/root/cache_handoff_review",
+  "completedAt": "2026-11-17T05:36:58.219665+00:00",
+  "scope": {
+    "registry": ".tmp/history-cost-validation/current-sources.json",
+    "baseCommit": "cbd442186fd5d0798cf2f50882cd2095d661ac39",
+    "productionFileCount": 6,
+    "testFileCount": 7,
+    "fileCount": 13,
+    "hashes": [
+      {
+        "path": "packages/ts-shell/src/provider/response/usage.ts",
+        "expectedSha256": "1083ad99b20c78e4fdc621670fee9e0f821b9116cfd15e228dd43d26add007c6",
+        "currentSha256": "1083ad99b20c78e4fdc621670fee9e0f821b9116cfd15e228dd43d26add007c6",
+        "archiveSha256": "1083ad99b20c78e4fdc621670fee9e0f821b9116cfd15e228dd43d26add007c6",
+        "archiveSnapshotSha256": "1083ad99b20c78e4fdc621670fee9e0f821b9116cfd15e228dd43d26add007c6",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/observability/usageTelemetry.ts",
+        "expectedSha256": "c16b39096985ae4dfaae371c407661464aa7c84fca48d84c380be0e57ac0b1c7",
+        "currentSha256": "c16b39096985ae4dfaae371c407661464aa7c84fca48d84c380be0e57ac0b1c7",
+        "archiveSha256": "c16b39096985ae4dfaae371c407661464aa7c84fca48d84c380be0e57ac0b1c7",
+        "archiveSnapshotSha256": "c16b39096985ae4dfaae371c407661464aa7c84fca48d84c380be0e57ac0b1c7",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/observability/cacheWaste.ts",
+        "expectedSha256": "9043cbe9aebf24987ef59f78d923908919fd2986a98fc75f4a985f000a8767c8",
+        "currentSha256": "9043cbe9aebf24987ef59f78d923908919fd2986a98fc75f4a985f000a8767c8",
+        "archiveSha256": "9043cbe9aebf24987ef59f78d923908919fd2986a98fc75f4a985f000a8767c8",
+        "archiveSnapshotSha256": "9043cbe9aebf24987ef59f78d923908919fd2986a98fc75f4a985f000a8767c8",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/observability/usage/model.ts",
+        "expectedSha256": "75244433acf0959941745a9f272f78d0bd04de6f195474ec275e265b066ae568",
+        "currentSha256": "75244433acf0959941745a9f272f78d0bd04de6f195474ec275e265b066ae568",
+        "archiveSha256": "75244433acf0959941745a9f272f78d0bd04de6f195474ec275e265b066ae568",
+        "archiveSnapshotSha256": "75244433acf0959941745a9f272f78d0bd04de6f195474ec275e265b066ae568",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/observability/usage/snapshot.ts",
+        "expectedSha256": "86f01c4583c25dbf6341e19c52964504558b6e44235fed3ff163278f228edcb1",
+        "currentSha256": "86f01c4583c25dbf6341e19c52964504558b6e44235fed3ff163278f228edcb1",
+        "archiveSha256": "86f01c4583c25dbf6341e19c52964504558b6e44235fed3ff163278f228edcb1",
+        "archiveSnapshotSha256": "86f01c4583c25dbf6341e19c52964504558b6e44235fed3ff163278f228edcb1",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/core/commands/cost/cache.ts",
+        "expectedSha256": "e904c4c27b030c95c0e87d61fbc98c590fb43e262c5539843e14c753c04600f1",
+        "currentSha256": "e904c4c27b030c95c0e87d61fbc98c590fb43e262c5539843e14c753c04600f1",
+        "archiveSha256": "e904c4c27b030c95c0e87d61fbc98c590fb43e262c5539843e14c753c04600f1",
+        "archiveSnapshotSha256": "e904c4c27b030c95c0e87d61fbc98c590fb43e262c5539843e14c753c04600f1",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/provider/response/usage.test.ts",
+        "expectedSha256": "d3feaf10a9100f35f755181e528faf52fa8dc288c3daea9d8dfdfc40e58e0b2e",
+        "currentSha256": "d3feaf10a9100f35f755181e528faf52fa8dc288c3daea9d8dfdfc40e58e0b2e",
+        "archiveSha256": "d3feaf10a9100f35f755181e528faf52fa8dc288c3daea9d8dfdfc40e58e0b2e",
+        "archiveSnapshotSha256": "d3feaf10a9100f35f755181e528faf52fa8dc288c3daea9d8dfdfc40e58e0b2e",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/observability/usage/attribution.test.ts",
+        "expectedSha256": "0a130cb5a7dd917ca77e0c539894380524f756bac23dc450dc759d946ee9741c",
+        "currentSha256": "0a130cb5a7dd917ca77e0c539894380524f756bac23dc450dc759d946ee9741c",
+        "archiveSha256": "0a130cb5a7dd917ca77e0c539894380524f756bac23dc450dc759d946ee9741c",
+        "archiveSnapshotSha256": "0a130cb5a7dd917ca77e0c539894380524f756bac23dc450dc759d946ee9741c",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/observability/cacheWaste.test.ts",
+        "expectedSha256": "6fb9586744a089de86baed24882fb8558a8618313c3df7656fcabe211aa0e2ef",
+        "currentSha256": "6fb9586744a089de86baed24882fb8558a8618313c3df7656fcabe211aa0e2ef",
+        "archiveSha256": "6fb9586744a089de86baed24882fb8558a8618313c3df7656fcabe211aa0e2ef",
+        "archiveSnapshotSha256": "6fb9586744a089de86baed24882fb8558a8618313c3df7656fcabe211aa0e2ef",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/observability/usage/presence.test.ts",
+        "expectedSha256": "0f9687f347e4cb07adcaeb1d4e6281ec30331737adda78af92ce774bf2c68d8b",
+        "currentSha256": "0f9687f347e4cb07adcaeb1d4e6281ec30331737adda78af92ce774bf2c68d8b",
+        "archiveSha256": "0f9687f347e4cb07adcaeb1d4e6281ec30331737adda78af92ce774bf2c68d8b",
+        "archiveSnapshotSha256": "0f9687f347e4cb07adcaeb1d4e6281ec30331737adda78af92ce774bf2c68d8b",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/core/commands/costCommand.test.ts",
+        "expectedSha256": "440fe5197cf1a3c8e57e8f8453eadc7491b337ef429c58a5fd017bc444c0ae74",
+        "currentSha256": "440fe5197cf1a3c8e57e8f8453eadc7491b337ef429c58a5fd017bc444c0ae74",
+        "archiveSha256": "440fe5197cf1a3c8e57e8f8453eadc7491b337ef429c58a5fd017bc444c0ae74",
+        "archiveSnapshotSha256": "440fe5197cf1a3c8e57e8f8453eadc7491b337ef429c58a5fd017bc444c0ae74",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/turn/accounting.test.ts",
+        "expectedSha256": "029dafd0c56bc7076ca50b8495bc0a48a34bcbf557a47f371a917fc642e2f546",
+        "currentSha256": "029dafd0c56bc7076ca50b8495bc0a48a34bcbf557a47f371a917fc642e2f546",
+        "archiveSha256": "029dafd0c56bc7076ca50b8495bc0a48a34bcbf557a47f371a917fc642e2f546",
+        "archiveSnapshotSha256": "029dafd0c56bc7076ca50b8495bc0a48a34bcbf557a47f371a917fc642e2f546",
+        "match": true
+      },
+      {
+        "path": "packages/ts-shell/src/cli/interactive/interactiveMode.test.ts",
+        "expectedSha256": "d4953af3416e04ade85620084394689a15df5062fce7b86aa180fb21fe18d97a",
+        "currentSha256": "d4953af3416e04ade85620084394689a15df5062fce7b86aa180fb21fe18d97a",
+        "archiveSha256": "d4953af3416e04ade85620084394689a15df5062fce7b86aa180fb21fe18d97a",
+        "archiveSnapshotSha256": "d4953af3416e04ade85620084394689a15df5062fce7b86aa180fb21fe18d97a",
+        "match": true
+      }
+    ],
+    "allFrozenHashesMatch": true,
+    "excludedRegistryFiles": [
+      "packages/ts-shell/src/cli/interactive/sessionFacts.ts",
+      "packages/ts-shell/src/cli/interactive/sessionFacts.test.ts",
+      "packages/ts-shell/src/cli/interactive/picker/model.ts",
+      "packages/ts-shell/src/cli/interactive/picker/model.test.ts",
+      "packages/ts-shell/src/cli/interactive/picker/model/snapshot.test.ts"
+    ],
+    "verdictBoundary": "Only the 13 named frozen files and their directly inspected accounting consumers; not current whole-workspace acceptance or the five model-recovery files."
+  },
+  "inspectedSeams": [
+    {
+      "behavior": "Raw cache category presence",
+      "evidence": [
+        "packages/ts-shell/src/provider/response/usage.ts:10",
+        "packages/ts-shell/src/provider/response/usage.test.ts:70",
+        "packages/ts-shell/src/observability/usage/presence.test.ts:181"
+      ],
+      "conclusion": "Finite nonnegative counts, including explicit zero, are reported. Missing, negative and nonfinite cache counters remain unreported after zero-filled accounting."
+    },
+    {
+      "behavior": "Recording and legacy compatibility",
+      "evidence": [
+        "packages/ts-shell/src/observability/usageTelemetry.ts:208",
+        "packages/ts-shell/src/observability/usage/model.ts:149",
+        "packages/ts-shell/src/observability/usage/presence.test.ts:75",
+        "packages/ts-shell/src/observability/usage/presence.test.ts:100"
+      ],
+      "conclusion": "Per-request flags survive recording and reopen. Sticky reportedCache does not supply current evidence. Legacy positive read counts remain measured and legacy zero counts remain unknown. The direct API can intentionally supply measured numeric zero."
+    },
+    {
+      "behavior": "Snapshot validation and bounded merges",
+      "evidence": [
+        "packages/ts-shell/src/observability/usage/snapshot.ts:98",
+        "packages/ts-shell/src/observability/usage/snapshot.ts:130",
+        "packages/ts-shell/src/observability/usage/snapshot.ts:154",
+        "packages/ts-shell/src/observability/usage/attribution.test.ts:116"
+      ],
+      "conclusion": "Optional presence flags are validated as booleans and preserved without synthesizing legacy values. Legacy history equality includes both flags; stable-id entries retain existing immutable-identity merge behavior."
+    },
+    {
+      "behavior": "Captured paid-category pricing and comparison boundaries",
+      "evidence": [
+        "packages/ts-shell/src/observability/cacheWaste.ts:102",
+        "packages/ts-shell/src/observability/cacheWaste.ts:123",
+        "packages/ts-shell/src/observability/cacheWaste.ts:195",
+        "packages/ts-shell/src/observability/usage/presence.test.ts:125",
+        "packages/ts-shell/src/observability/usage/presence.test.ts:143",
+        "packages/ts-shell/src/observability/usage/presence.test.ts:152"
+      ],
+      "contextSnapshot": "seams/observability/usage/identity.ts.txt:91",
+      "conclusion": "Read coverage uses current category evidence. Positive observed cache writes require their captured price and contribute to the weighted paid rate. Attributed missing prices cannot refill from current catalog rates. Context resets, usage gaps and uncomparable requests break pairwise comparisons."
+    },
+    {
+      "behavior": "Actual accounting, report and interactive consumers",
+      "evidence": [
+        "packages/ts-shell/src/turn/accounting.test.ts:43",
+        "packages/ts-shell/src/core/commands/cost/cache.ts:15",
+        "packages/ts-shell/src/core/commands/costCommand.test.ts:424",
+        "packages/ts-shell/src/cli/interactive/interactiveMode.test.ts:89"
+      ],
+      "contextSnapshots": [
+        "seams/turn/step.ts.txt:436",
+        "seams/session/store/usage.ts.txt:21",
+        "seams/core/commands/cost/model.ts.txt:37",
+        "seams/cli/interactive/interactiveMode.ts.txt:1258"
+      ],
+      "conclusion": "The existing consumers propagate normalized flags and use the shared comparison code. Tests inspect actual HTTP dispatch, durable state, cost-command output and both interactive hosts. Overlap and expiry wording remains explicitly estimated; retained read coverage is stated separately from total retained requests."
+    }
+  ],
+  "verificationEvidence": {
+    "executionByReviewer": "None. Existing receipts inspected only; no tests, builds, gates, providers or NormProof were executed.",
+    "combined": {
+      "path": ".tmp/history-cost-validation/final-combined.json",
+      "success": true,
+      "files": 21,
+      "tests": 933,
+      "passed": 933,
+      "failed": 0
+    },
+    "reversals": {
+      "path": ".tmp/continuation-validation/reversals.json",
+      "status": "passed",
+      "totalCases": 7,
+      "cacheCases": [
+        {
+          "name": "raw-cache-presence",
+          "exitCode": 1,
+          "failed": 8,
+          "assertionFailures": 8,
+          "restoredExactly": true,
+          "mainSourcesMutated": false
+        },
+        {
+          "name": "sticky-history-is-not-current-evidence",
+          "exitCode": 1,
+          "failed": 8,
+          "assertionFailures": 8,
+          "restoredExactly": true,
+          "mainSourcesMutated": false
+        },
+        {
+          "name": "captured-write-premium",
+          "exitCode": 1,
+          "failed": 2,
+          "assertionFailures": 2,
+          "restoredExactly": true,
+          "mainSourcesMutated": false
+        },
+        {
+          "name": "persisted-explicit-zero",
+          "exitCode": 1,
+          "failed": 4,
+          "assertionFailures": 4,
+          "restoredExactly": true,
+          "mainSourcesMutated": false
+        }
+      ],
+      "restoredExactly": true,
+      "mainSourcesMatch": true
+    },
+    "native": {
+      "path": ".tmp/history-cost-validation/native.json",
+      "status": "passed",
+      "buildId": "0247cb1b526d5450829e0b3374dffe3c6572f18b06bd24cd03529ce2027e5820",
+      "actualRequests": 21,
+      "cacheClaim": "Only observed category presence and recorded counters; no savings, TTL, cache-control or remote-capacity claim."
+    },
+    "frozenBuild": {
+      "archive": ".omx/artifacts/upgrade-history-cost-2026-11-17/archive.json",
+      "buildId": "0247cb1b526d5450829e0b3374dffe3c6572f18b06bd24cd03529ce2027e5820",
+      "buildCommandLogAvailable": false
+    },
+    "interpretation": "Receipts support bounded coverage and sensitivity evidence. The approval rests on source review; they do not establish current whole-workspace native/build acceptance."
+  },
+  "residualRisks": [
+    "Token counts do not prove identical prompt text or provider cache eligibility. Weighted allocation within potential overlap is an estimate, and a long idle gap only suggests possible expiry.",
+    "Legacy zero cache counts lack recoverable per-request presence evidence and remain unknown. Legacy unattributed pricing retains the existing catalog lookup behavior.",
+    "Configured-model evidence covers the archived build and observed category counters. It does not establish provider billing, cache-control behavior, TTL or universal provider/platform coverage.",
+    "Later SDK/UI work and the five excluded model-recovery files require their own review and validation; this verdict cannot be applied to the current whole workspace."
+  ],
+  "writeBoundary": {
+    "onlyWrittenFile": ".tmp/history-cost-validation/review-code-final-independent.json",
+    "productionAndTestsEdited": false,
+    "sharedDocsEdited": false
+  }
+}

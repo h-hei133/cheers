@@ -1,16 +1,22 @@
-# 规划执行进展（2026-11-16）
+# 规划执行进展（2026-11-17）
 
-用户已恢复完整规划，当前目标active。**62项中25项完成Linux功能验收，37项功能任务未完成**：12项部分完成、10项已有实现待验收、13项确认缺口、2项待核实。C.9／C.2已集成并完成当前源码／构建的联合测试、Linux原生验收和限定独立APPROVE／CLEAR；完整仓库NormProof仍exit2／not_proven，不能称全门禁完成。C.7冻结补丁的代码审查发现四个旧费用夹具不符合新presence合同，待主线程实际分类、修复和复审；所有验证串行执行。
+用户已恢复完整规划，当前目标active。**62项中27项完成Linux功能验收，35项功能任务未完成**：12项部分完成、8项已有实现待验收、13项确认缺口、2项待核实。C.4／C.7已完成当前联合测试、Linux配置模型消费者和限定独立APPROVE；C.9／C.2已本地提交cbd44218并保留原构建的验收证据；完整仓库NormProof仍exit2／not_proven，不能称全门禁完成。C.7四个旧费用夹具已实际分类并修正，模型状态十个既有恢复失败独立修复；所有验证串行执行。
 
-本总结依据[任务清单](tasks.md)、[当前状态](MASTER.md)和保存的实际命令回执。此前20/62的暂停总结已归档为[历史快照](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/summary-2026-11-15.md)；之后C.1、T3.1、D.1、C.2和C.9达到各自Linux功能验收，使当前增加到25项。用户仅授权本地分批提交，**未推送，未取得本轮远端CI**。原定暂缓的原生插件／独立桌面产品两项不在62项中，继续暂缓；T6保留原规划按需条件。
+本总结依据[任务清单](tasks.md)、[当前状态](MASTER.md)和保存的实际命令回执。此前20/62的暂停总结已归档为[历史快照](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/summary-2026-11-15.md)；之后C.1、T3.1、D.1、C.2和C.9达到各自Linux功能验收，以及C.4、C.7使当前增加到27项。用户仅授权本地分批提交，**未推送，未取得本轮远端CI**。原定暂缓的原生插件／独立桌面产品两项不在62项中，继续暂缓；T6保留原规划按需条件。
 
 ## 当前批次的验证
 
+C.7保留当前响应的cache read/write有效presence；缺失或invalid以及旧sticky-only零不计为已观测零。cache miss美元估算使用captured普通input／write费率含premium；缺少已观察write价格不估算也不从新目录补填。实际/cost与两模式notice标estimated overlap／possible expiry并计retained-request读覆盖。C.4默认false保留机制原已存在，研究结论被当前源及实际wire反证，沿用同projection／measurement／compaction owner。
+
+当前21文件933项、六静态门、2657生产模块0monoliths与build `0247cb1b526d`输入摘要核验通过；七有效反转全AssertionErrors／exact恢复，恢复4文件61项、分拆测试2/48通过。五实际HTTP→accounting→persistence→cost和四regular/fullscreen通知案例通过；原13反例10红／3控制、追加6控制、四cost夹具41/45再45/45和十旧恢复失败均归档。[本批交付](../../../.omx/artifacts/upgrade-history-cost-2026-11-17/delivery.json)，限定当前13cache源文件独立APPROVE；模型恢复单独提交，原可选补充output／stream评审未完成为unavailable，不升级成新批准。
+
+同代Linux公开SDK／CLI使用原配置目标21实际请求／10prompt轮：两个6144字节builtin read、四续轮跨年龄保留精确digest、save/reopen原usage与request ID/timestamp及history、默认重开续轮和显式pruning控制、零provider的/cost、实际automatic compaction commit／checkpoint重开均passed。compaction压力明确32seeded pairs／64messages、本地16000window、keep600；不是32真实provider轮。实际response两read-reported／19absent，captured prices=null，不宣称节省／TTL／cache-control／远端容量或native preview等价。
+
 C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅stderr重定向时TUI的stdout。原writer具有限额／重试／deadline；write返回true仍等callback，同步退出先结算输出，shutdown超时取消原owner并恢复设备。C.2把现有request公共累计capture传到RPC，保留reasoning替换／空清空／closing reset；HTTP retry事实在读取错误body前捕获，529默认决定贯通外层，所有已接受错误响应都不重放或执行工具。
 
-当前18源码hash与两项限定独立APPROVE／CLEAR匹配；28套件482项、六静态门、2655生产模块0monoliths与build `ceabe4b89b3d`输入摘要核验通过。六个有效反转均实际AssertionError且在隔离树exact恢复，主仓库未反转。Linux当前CLI 21场景／53本地POST、regular／fullscreen stderr-only重定向PTY／SIGTERM exit143、已配置模型3实际bodySent通过；[本批交付](../../../.omx/artifacts/upgrade-output-stream-2026-11-16/delivery.json)。保留最初旧构建取消失败、错误退出observer及被复审修复的529反例。
+此前18源码hash与两项限定独立APPROVE／CLEAR匹配；28套件482项、六静态门、2655生产模块0monoliths与build `ceabe4b89b3d`输入摘要核验通过。六个有效反转均实际AssertionError且在隔离树exact恢复，主仓库未反转。Linux当前CLI 21场景／53本地POST、regular／fullscreen stderr-only重定向PTY／SIGTERM exit143、已配置模型3实际bodySent通过；[本批交付](../../../.omx/artifacts/upgrade-output-stream-2026-11-16/delivery.json)。保留最初旧构建取消失败、错误退出observer及被复审修复的529反例。
 
-正常pinned NormProof judge仍exit2／not_proven，blocking unresolved-specifier obligation为missing，完整图超过16384边。相同manifest／collector／parser的只读比较得到HEAD基线16484边、当前16511边；两者原上限均失败，新增27边。临时32768诊断副本完整图unresolved=0，但这不是默认judge通过，也未验证32768通用安全包络；副本已删除，18个tracked NormProof文件hash不变。功能任务勾选只表示上述Linux验收，仓库门禁缺口另列，不能升级为整体完成。
+本批正常pinned NormProof judge仍exit2／not_proven，blocking unresolved-specifier obligation为missing，完整图超过16384边。前一批相同manifest／collector／parser的只读比较得到HEAD基线16484边、当时16511边；两者原上限均失败，新增27边。临时32768诊断副本完整图unresolved=0，但这不是默认judge通过，也未验证32768通用安全包络；副本已删除，18个tracked NormProof文件hash不变；当前批未另做扩大图诊断。功能任务勾选只表示上述Linux验收，仓库门禁缺口另列，不能升级为整体完成。
 
 此前D.1批次修复非法RPC输入回落到模型prompt、异步读取准入未到最终响应、压缩活动未覆盖完整结算三处缺口。复用原输入、command、读取、compaction和响应owner，保留JSONL与UI响应分离、custom host兼容、取消隔离、持久化和未知结果合同。
 
@@ -33,7 +39,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | `bf01f8f` | compact同步登记原command owner，controls可达、EOF结算、失败结果保留结构化status。 |
 | `ae9a3f59` | retry专属取消及就绪代理转发；D.1整项验收在恢复后继续。 |
 
-## 已完成功能验收的25项
+## 已完成功能验收的27项
 
 | 编号 | 项数 | 已完成的所述范围 |
 | --- | ---: | --- |
@@ -41,7 +47,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | A.1–A.4 | 4 | edit统一Schema与有界匹配、单次准备序列化、read／工具结果统一行字节预算及全文归档、patch写前effects与批准身份。 |
 | B.1–B.3 | 3 | Unicode显示宽度、1MiB writer与背压、图片准入／占行／裁剪／绘制／placement清退及缓存预算。 |
 | B2.1–B2.3 | 3 | 终端状态／首次协商、提示／助手边界导航、tmux超链接、完整调色板、可组合浮层及录制输入过滤。 |
-| C.1、C.2、C.3、C.9 | 4 | 循环准备／结束与完整虚拟路由；消息分离与统一准备；公共累计流式快照／HTTP retry事实／已接受响应不重放；stdout隔离／有界writer与退出结算。 |
+| C.1、C.2、C.3、C.4、C.7、C.9 | 6 | 循环准备／结束与完整虚拟路由；消息分离与统一准备；公共累计流式快照／HTTP retry事实／已接受响应不重放；stdout隔离／有界writer与退出结算；默认正文保留／measurement／compaction消费者，当前cache presence／captured write premium／估算报告。 |
 | D.1–D.3、D.5 | 4 | RPC完整会话／模型／树／shell／设置／压缩／retry命令、严格输入和最终准入；队列／UI响应、导出持久token／费用并保留未知覆盖。 |
 | E.2 | 1 | codemode分支状态持久化、原前缀／CAS／ABA保护、进程重启和多级fork隔离；不包含确定性重放。 |
 | T3.1 | 1 | SDK资源代际绑定／撤权、并发dispose结算／首错、compact与prompt／command互斥和完整idle；安装入口／严格类型／配置模型联合验收。 |
@@ -54,7 +60,9 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 | 类别 | 实际运行与结果 | 证据及限制 |
 | --- | --- | --- |
-| 当前C.9／C.2联合 | 六静态门、28/482、六有效反转exact恢复、0生产monoliths及build `ceabe4b89b3d`通过。Linux21场景／53本地POST、两模式PTY exit143、配置模型3actual请求通过；限定APPROVE／CLEAR。 | [交付](../../../.omx/artifacts/upgrade-output-stream-2026-11-16/delivery.json)，当前18源码hash／build一致；正常NormProof exit2／not_proven单列，诊断不代替门禁。 |
+| 当前C.4／C.7及模型恢复 | 21文件933项、六门、七有效反转exact恢复／恢复4/61、拆分2/48、0生产monoliths；五实际HTTP/accounting/persistence/cost与四两模式notice passed。 | [交付](../../../.omx/artifacts/upgrade-history-cost-2026-11-17/delivery.json)，build0247cb1b526d；13cache源码独立APPROVE，模型恢复独立提交。 |
+| 当前配置模型history/cache | 21实际请求／10prompt轮，两次builtin read／四续轮／save-reopen／显式pruning／automatic commit及checkpoint续轮passed，CLI/cost零派发。 | [native](../../../.omx/artifacts/upgrade-history-cost-2026-11-17/accounting/native.json)，压缩64条seeded消息单列，2read-reported／19absent-read、价格null；不宣称节省、TTL、远端capacity或native preview等价。 |
+| 此前C.9／C.2联合 | 六静态门、28/482、六有效反转exact恢复、0生产monoliths及build `ceabe4b89b3d`通过。Linux21场景／53本地POST、两模式PTY exit143、配置模型3actual请求通过；限定APPROVE／CLEAR。 | [交付](../../../.omx/artifacts/upgrade-output-stream-2026-11-16/delivery.json)，当前18源码hash／build一致；正常NormProof exit2／not_proven单列，诊断不代替门禁。 |
 | 此前D.1整项联合 | 六门、34/912、七反转exact恢复、相关15/268、恢复3/110、0monoliths及build `43da5c29fee3`通过。Linux七组55本地POST、配置模型四actual请求通过，独立APPROVE／CLEAR。 | [整项交付](../../../.omx/artifacts/upgrade-rpc-acceptance-2026-11-16/delivery.json)，绑定该批hash／build；限于Linux本地。 |
 | 此前retry聚焦回归 | 14套件412项通过，覆盖kernel、provider、turn、RPC及CLI就绪代理；六门／build／0monoliths通过。五个有效反转都触发AssertionError，源码逐字节恢复，恢复4/67通过。 | [本批交付](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/delivery.json)。初SSE夹具错误及原生proxy缺口均保留，不将初绿代替最终验证。 |
 | 此前retry Linux编译CLI | 六个loopback POST：provider／outer等待各一次取消为failed且零第二请求，显式新prompt可复用；普通已接受响应与native bash不受影响；accepted body故障不重放。所有进程有效JSONL／EOF exit0。 | [原生回执](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/retry-native.json)，build `754fdcb217b0`，本地服务明确不是外部真实provider。 |
@@ -70,22 +78,20 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 真实模型沿用既有active连接和凭据。用户models目录的原JSON损坏，相关新原生测试在隔离home使用原目标的最小有效目录entry；原用户配置未修改，该证据不代表原损坏目录可加载。失败、setup错误和observer错误均单独保存。没有Windows、物理终端、真实Azure／Mistral／Anthropic原生control、OAuth真人同意／续期、服务账单对照或性能收益基准。本次只跑聚焦检查，未宣称全仓测试／全仓类型通过；六静态门保留119条既有非阻断文档source提示。
 
-## 文档中尚未完成的37项功能任务
+## 文档中尚未完成的35项功能任务
 
 “已有待验收”表示代码／消费者存在，缺本轮整项证据；“部分”表示实现已有进展但仍缺行为或资格验证。以下列出每个未勾选编号，恢复时以tasks.md逐项继续。
 
 | 编号 | 状态 | 尚缺任务或证据 |
 | --- | --- | --- |
-| C.4 | 已有待验收 | 默认历史工具正文保留、多轮前缀与压缩测量一致性。 |
 | C.5 | 已有待验收 | Anthropic历史缓存marker、OpenAI／Responses affinity和TTL的最终wire与能力边界。 |
 | C.6 | 部分 | 历史声明、转换、压缩／重开已有实现；Anthropic原生历史control缺真实服务证据。 |
-| C.7 | 已有待验收 | 五生产／四测试冻结补丁修presence与captured write premium；四旧costCommand夹具审查REQUEST_CHANGES，待实际分类／修正、当前联合验证、持久化／真实usage消费者及复审。 |
-| C.8 | 已有待验收 | 六个核心工具、动态prompt、BM25／词干／Schema索引、search→execute与失效代际。 |
+| C.8 | 已有待验收 | 三nested schema反例已修，10文件187项／三反转／恢复2文件22项与独立APPROVE。2000 deferred目录和配置模型8次实际请求通过；原native build为1e7d99a7eb37，最终共享构建复验待完成。 |
 | D.4 | 已有待验收 | HTML高亮、GFM／CJK、Thinking、Diff、灯箱及转义安全的完整离线导出。 |
 | E.1 | 已有待验收 | 沙箱组合、多工具嵌套权限／hook／过滤结果与中间历史。 |
 | E.3 | 已有待验收 | TS声明、namespace／image／models API的真实脚本调用与输出预算。 |
 | E.4 | 待核实 | 确定性重放的记录、恢复和副作用边界，已有worker不等于可安全重放。 |
-| E.5 | 部分 | 异步／代际／共享宿主已修；安装产物最终资格及SDK配置发布后的UI重绑定仍待核实。 |
+| E.5 | 部分 | 原共享host续绑及独立blocked revocation已修，七源文件独立APPROVE、15文件168项／三反转／串行恢复4文件29项通过。实际worker测试使用构造的VersionRecord；最终构建、签名安装和公开安装SDK资格待完成。 |
 | E.6 | 部分 | 逐个完整生命周期事件的dispatch与结果消费者。 |
 | E.7 | 部分 | virtual注册／逻辑路由已接通；provider、MCP、renderer和其余runtime setters仍缺，worker virtual明确unsupported。 |
 | E.8 | 部分 | shortcuts／flags的CLI／SDK消费者、冲突、默认值、参数与按键生命周期。 |
@@ -116,4 +122,4 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 ## 后续工作
 
-C.9／C.2证据归档和本地提交后，主线程继续C.7旧夹具实际分类／修正、冻结补丁复审、集成验证和真实usage消费者；再做C.4实际多轮retained tool-text／measurement／compaction验收。仓库NormProof容量缺口保留，未获或实施scope／bundle／default gate修改，不通过缩图隐藏missing。全部原规划和暂缓条件保留，总目标active，未push或取得远端CI。
+C.9／C.2已提交cbd44218；本批模型恢复独立提交，C.4／C.7证据与实现同批提交。主线程继续E.5原host续绑／当前安装消费者和C.8发现／gated execute／大目录／配置模型验收，随后执行全部剩余35任务。仓库NormProof容量缺口保留，未获或实施scope／bundle／default gate修改，不通过缩图隐藏missing。全部原规划和暂缓条件保留，总目标active，未push或取得远端CI。

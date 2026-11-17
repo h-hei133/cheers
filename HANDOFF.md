@@ -2737,3 +2737,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A saved-model read failure crashes status rendering and the picker return, or physical defaults appear as the session's current target after capture failed.
 - **Root Cause:** Presentation repeats the strict persisted-selection read instead of using its accepted capture; role reconstruction drops the original failure notice.
 - **Rule:** Keep strict request admission intact. Catch unavailable selection only in presentation, withhold target-dependent context/window facts and retain recorded usage. Decode the captured model-choice baseline for roles; failed capture keeps prospective models read-only and every role unknown. Carry the original notice and focus through the return; a new explicit edit must capture fresh authority after restoration.
+
+### Cache Presence And Captured Prices Belong To The Observed Request
+- **Symptom:** Missing cache counters look like measured zero, or a cache-overlap estimate understates writes and changes when the model catalogue updates.
+- **Root Cause:** Sticky historical cache flags cannot establish current category presence, and cache-write prices are full captured rates rather than an incremental premium.
+- **Rule:** Preserve current valid read/write presence separately, including explicit zero. Leave missing, invalid and unpriced observed writes unknown; break comparisons on gaps or resets. Estimate overlap using captured ordinary-input and full cache-write rates, retain write premiums and label estimates and possible expiry. Never refill missing captured prices from the current catalogue or infer savings from response counters alone.

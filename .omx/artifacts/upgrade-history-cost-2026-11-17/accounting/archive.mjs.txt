@@ -1,0 +1,75 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { buildInputDigest } from '../../scripts/build-identity.mjs';
+
+const root = '/home/wang/projects/cheers';
+const scratch = path.join(root, '.tmp/history-cost-validation');
+const output = path.join(root, '.omx/artifacts/upgrade-history-cost-2026-11-17');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const read = file => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
+const source = read('.tmp/history-cost-validation/current-sources.json').source;
+const manifest = read('.tmp/history-cost-validation/build-manifest.json');
+const mismatches = Object.entries(source).filter(([file, digest]) => hash(fs.readFileSync(path.join(root, file))) !== digest);
+const inputs = buildInputDigest(root, manifest.compilerInputs);
+if (mismatches.length || inputs.digest !== manifest.inputsDigest) throw new Error('Frozen source/build identity changed');
+fs.mkdirSync(output, { recursive: true });
+
+function copyFile(file, target) {
+  const bytes = fs.readFileSync(file);
+  const destination = path.join(output, target);
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.writeFileSync(destination, bytes);
+  return { snapshot: target, sha256: hash(bytes) };
+}
+
+function copyDirectory(directory, prefix) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    const target = path.join(prefix, entry.name);
+    if (entry.isDirectory()) copyDirectory(file, target);
+    else if (entry.isFile()) copyFile(file, /\.(?:mjs|py|ts)$/.test(entry.name) ? target + '.txt' : target);
+  }
+}
+
+for (const [directory, prefix] of [
+  [scratch, 'accounting'],
+  [path.join(root, '.tmp/continuation-validation'), 'recovery'],
+]) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const file = path.join(directory, entry.name);
+    copyFile(file, path.join(prefix, /\.(?:mjs|py|ts)$/.test(entry.name) ? entry.name + '.txt' : entry.name));
+  }
+}
+copyDirectory(path.join(root, '.normproof/out'), 'normproof/normal-judge');
+const snapshots = {};
+for (const file of Object.keys(source)) snapshots[file] = copyFile(path.join(root, file), 'source/' + file.replace('packages/ts-shell/src/', '') + '.txt');
+const unchanged = ['config/runtimeConfig.ts', 'turn/messages.ts', 'core/query/microCompact.ts', 'turn/context/prepare.ts',
+  'turn/measurement.ts', 'cli/provider/step.ts', 'cli/runtime/context/preview.ts', 'cli/runtime/compaction.ts',
+  'session/context/selection.ts', 'observability/usage/identity.ts', 'turn/step.ts', 'session/store/usage.ts',
+  'core/commands/cost/model.ts', 'cli/interactive/interactiveMode.ts'];
+const seams = {};
+for (const file of unchanged) {
+  const target = 'packages/ts-shell/src/' + file;
+  seams[target] = copyFile(path.join(root, target), 'seams/' + file + '.txt');
+}
+const recoveryFiles = ['cli/interactive/sessionFacts.ts', 'cli/interactive/sessionFacts.test.ts', 'cli/interactive/picker/model.ts',
+  'cli/interactive/picker/model.test.ts'];
+const recoveryDiff = spawnSync('rtk', ['proxy', 'git', 'diff', '--', ...recoveryFiles.map(file => 'packages/ts-shell/src/' + file)],
+  { cwd: root, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 });
+if (recoveryDiff.status !== 0) throw new Error('Could not capture recovery diff');
+fs.writeFileSync(path.join(output, 'recovery/production-tests.patch'), recoveryDiff.stdout);
+const state = {
+  schemaVersion: 1, date: '2026-11-17', status: 'frozen_archive_pending_final_reviews', baseCommit: read('.tmp/history-cost-validation/current-sources.json').baseCommit,
+  source: snapshots, unchangedSeams: seams,
+  build: { buildId: manifest.buildId, inputsDigest: manifest.inputsDigest, currentInputDigestVerified: true, files: inputs.files,
+    manifest: 'accounting/build-manifest.json', identity: 'accounting/build-identity.json', buildCommandLogAvailable: false },
+  rawValidation: { combined: 'accounting/current-combined.json', afterSplit: 'recovery/snapshot-split.json', restored: 'recovery/reversal-restored.json',
+    static: 'accounting/final-static.log', reversals: 'recovery/reversals.json', native: 'accounting/native.json',
+    normproof: 'normproof/normal-judge/verdict.json', normproofActualCommandExitCode: 2, normproofEnforcementShadowExitCode: 0 },
+};
+fs.writeFileSync(path.join(output, 'archive.json'), JSON.stringify(state, null, 2) + '\n');
+console.log(JSON.stringify({archive: path.relative(root, output), sources: Object.keys(snapshots).length, seams: Object.keys(seams).length,
+  buildId: manifest.buildId, currentInputDigestVerified: true}));

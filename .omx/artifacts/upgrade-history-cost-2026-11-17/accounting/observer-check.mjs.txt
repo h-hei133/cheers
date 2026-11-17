@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const source = fs.readFileSync(path.join(directory, 'native-first.mjs.txt'), 'utf8');
+const split = source.indexOf('const transcript =');
+const exercise = source.slice(0, split)
+  + `\nconst lifecycle = [];\n`
+  + `const onAnyHeaders = ({request}) => lifecycle.push({event:'headers',same:pendingBodies.has(request)});\n`
+  + `const onAnyTrailers = ({request}) => lifecycle.push({event:'trailers',same:pendingBodies.has(request)});\n`
+  + `const onAnySent = ({request}) => lifecycle.push({event:'sent',same:pendingBodies.has(request)});\n`
+  + `creating.subscribe(onCreate); sent.subscribe(onSent); headers.subscribe(onHeaders); trailers.subscribe(onTrailers);\n`
+  + `sent.subscribe(onAnySent); headers.subscribe(onAnyHeaders); trailers.subscribe(onAnyTrailers);\n`
+  + `const {fetch} = await import('../../packages/ts-shell/node_modules/undici/index.js');\n`
+  + `const http = await import('node:http');\n`
+  + `const server = http.createServer((request,response)=> { request.resume(); request.on('end',()=> {response.setHeader('content-type','application/json'); response.end(JSON.stringify({usage:{prompt_tokens:10,completion_tokens:1,prompt_tokens_details:{cached_tokens:0}}}));});});\n`
+  + `await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve)); targetOrigin='http://127.0.0.1:'+server.address().port;\n`
+  + `try { const response=await fetch(targetOrigin,{method:'POST',body:JSON.stringify({messages:[]})}); await response.text();\n`
+  + ` console.log(JSON.stringify({observerFailure:observerFailure??null,lifecycle,observations})); } finally { server.closeAllConnections(); await new Promise(resolve=>server.close(resolve)); creating.unsubscribe(onCreate);sent.unsubscribe(onSent);headers.unsubscribe(onHeaders);trailers.unsubscribe(onTrailers);sent.unsubscribe(onAnySent);headers.unsubscribe(onAnyHeaders);trailers.unsubscribe(onAnyTrailers); }\n`;
+const file = path.join(directory, 'observer-exercise.mjs');
+fs.writeFileSync(file, exercise);
+try { await import(pathToFileURL(file).href); }
+finally { fs.unlinkSync(file); }

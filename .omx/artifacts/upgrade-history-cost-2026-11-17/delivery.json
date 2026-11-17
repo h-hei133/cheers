@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-17",
+  "task": "Runtime development",
+  "batch": [
+    "C.4",
+    "C.7"
+  ],
+  "status": "linux_functionally_accepted_repository_gate_not_proven",
+  "baseCommit": "cbd442186fd5d0798cf2f50882cd2095d661ac39",
+  "delivery": {
+    "localCommit": "containing Git commit provides the commit receipt",
+    "push": false,
+    "ci": false
+  },
+  "buildId": "0247cb1b526d5450829e0b3374dffe3c6572f18b06bd24cd03529ce2027e5820",
+  "build": {
+    "buildId": "0247cb1b526d5450829e0b3374dffe3c6572f18b06bd24cd03529ce2027e5820",
+    "inputsDigest": "71e1d5f70db0c3593ded7978bc92e1bb2e5bf7e444987ca7e58951e554b4443f",
+    "currentInputDigestVerified": true,
+    "files": 3983,
+    "manifest": "accounting/build-manifest.json",
+    "identity": "accounting/build-identity.json",
+    "buildCommandLogAvailable": false,
+    "currentInputDigestVerifiedAtFrozenArchive": true,
+    "currentWorkspaceBuildMayHaveLaterIndependentChanges": true,
+    "boundary": "This compiled evidence belongs to the archived eighteen-file source state. Later SDK/discovery compiler-input edits are a separate batch."
+  },
+  "source": {
+    "packages/ts-shell/src/provider/response/usage.ts": {
+      "snapshot": "source/provider/response/usage.ts.txt",
+      "sha256": "1083ad99b20c78e4fdc621670fee9e0f821b9116cfd15e228dd43d26add007c6"
+    },
+    "packages/ts-shell/src/observability/usageTelemetry.ts": {
+      "snapshot": "source/observability/usageTelemetry.ts.txt",
+      "sha256": "c16b39096985ae4dfaae371c407661464aa7c84fca48d84c380be0e57ac0b1c7"
+    },
+    "packages/ts-shell/src/observability/cacheWaste.ts": {
+      "snapshot": "source/observability/cacheWaste.ts.txt",
+      "sha256": "9043cbe9aebf24987ef59f78d923908919fd2986a98fc75f4a985f000a8767c8"
+    },
+    "packages/ts-shell/src/observability/usage/model.ts": {
+      "snapshot": "source/observability/usage/model.ts.txt",
+      "sha256": "75244433acf0959941745a9f272f78d0bd04de6f195474ec275e265b066ae568"
+    },
+    "packages/ts-shell/src/observability/usage/snapshot.ts": {
+      "snapshot": "source/observability/usage/snapshot.ts.txt",
+      "sha256": "86f01c4583c25dbf6341e19c52964504558b6e44235fed3ff163278f228edcb1"
+    },
+    "packages/ts-shell/src/core/commands/cost/cache.ts": {
+      "snapshot": "source/core/commands/cost/cache.ts.txt",
+      "sha256": "e904c4c27b030c95c0e87d61fbc98c590fb43e262c5539843e14c753c04600f1"
+    },
+    "packages/ts-shell/src/provider/response/usage.test.ts": {
+      "snapshot": "source/provider/response/usage.test.ts.txt",
+      "sha256": "d3feaf10a9100f35f755181e528faf52fa8dc288c3daea9d8dfdfc40e58e0b2e"
+    },
+    "packages/ts-shell/src/observability/usage/attribution.test.ts": {
+      "snapshot": "source/observability/usage/attribution.test.ts.txt",
+      "sha256": "0a130cb5a7dd917ca77e0c539894380524f756bac23dc450dc759d946ee9741c"
+    },
+    "packages/ts-shell/src/observability/cacheWaste.test.ts": {
+      "snapshot": "source/observability/cacheWaste.test.ts.txt",
+      "sha256": "6fb9586744a089de86baed24882fb8558a8618313c3df7656fcabe211aa0e2ef"
+    },
+    "packages/ts-shell/src/observability/usage/presence.test.ts": {
+      "snapshot": "source/observability/usage/presence.test.ts.txt",
+      "sha256": "0f9687f347e4cb07adcaeb1d4e6281ec30331737adda78af92ce774bf2c68d8b"
+    },
+    "packages/ts-shell/src/core/commands/costCommand.test.ts": {
+      "snapshot": "source/core/commands/costCommand.test.ts.txt",
+      "sha256": "440fe5197cf1a3c8e57e8f8453eadc7491b337ef429c58a5fd017bc444c0ae74"
+    },
+    "packages/ts-shell/src/turn/accounting.test.ts": {
+      "snapshot": "source/turn/accounting.test.ts.txt",
+      "sha256": "029dafd0c56bc7076ca50b8495bc0a48a34bcbf557a47f371a917fc642e2f546"
+    },
+    "packages/ts-shell/src/cli/interactive/interactiveMode.test.ts": {
+      "snapshot": "source/cli/interactive/interactiveMode.test.ts.txt",
+      "sha256": "d4953af3416e04ade85620084394689a15df5062fce7b86aa180fb21fe18d97a"
+    },
+    "packages/ts-shell/src/cli/interactive/sessionFacts.ts": {
+      "snapshot": "source/cli/interactive/sessionFacts.ts.txt",
+      "sha256": "6d439ff22c60f9fa285ce81245d494a977b741e7354a1726d826944b8a3b422f"
+    },
+    "packages/ts-shell/src/cli/interactive/sessionFacts.test.ts": {
+      "snapshot": "source/cli/interactive/sessionFacts.test.ts.txt",
+      "sha256": "7e2db8823011bd7f362745e7403c72bdd8953575495d326ffe0bd5f94b9d3589"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/model.ts": {
+      "snapshot": "source/cli/interactive/picker/model.ts.txt",
+      "sha256": "6dbbffc677cf8ff05de4474eb868b46d74af2a7969caa55424b2cbf9fe4f1149"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/model.test.ts": {
+      "snapshot": "source/cli/interactive/picker/model.test.ts.txt",
+      "sha256": "7d81fa9a417fc6f7dd13c71bc5edb5d56def525ca52e0e39eac34b2e0b37034f"
+    },
+    "packages/ts-shell/src/cli/interactive/picker/model/snapshot.test.ts": {
+      "snapshot": "source/cli/interactive/picker/model/snapshot.test.ts.txt",
+      "sha256": "6172ccd63aae0cb013f20680f596a3ee80c7c1a8bb6e084d8b22a5fb3353ff39"
+    }
+  },
+  "unchangedSeams": {
+    "packages/ts-shell/src/config/runtimeConfig.ts": {
+      "snapshot": "seams/config/runtimeConfig.ts.txt",
+      "sha256": "89e53def9d63ccfae698c1bf6729a3768fb82e4574a0bace85de5b0fdf718eb4"
+    },
+    "packages/ts-shell/src/turn/messages.ts": {
+      "snapshot": "seams/turn/messages.ts.txt",
+      "sha256": "3f219a0340114ac38bf8c5e2cb73134ed3fa31f0b4e43732ed0036b2c5ad610e"
+    },
+    "packages/ts-shell/src/core/query/microCompact.ts": {
+      "snapshot": "seams/core/query/microCompact.ts.txt",
+      "sha256": "5c962af2c0326bff3811715bebae1b4249f1c5061b47c82c0a2150d299c6a9ec"
+    },
+    "packages/ts-shell/src/turn/context/prepare.ts": {
+      "snapshot": "seams/turn/context/prepare.ts.txt",
+      "sha256": "22cb1d276d37278ee418743e6f36c6810656e191d4110e522fb09b9e07d8786c"
+    },
+    "packages/ts-shell/src/turn/measurement.ts": {
+      "snapshot": "seams/turn/measurement.ts.txt",
+      "sha256": "a50faecdc7cf3c1ef33a0700db58236ddf64ed56b95fe7b84be30bc6495ebbc3"
+    },
+    "packages/ts-shell/src/cli/provider/step.ts": {
+      "snapshot": "seams/cli/provider/step.ts.txt",
+      "sha256": "9e09008340ccef1efab357650fa3563b22753b8ac08c702bade3618e36b08dae"
+    },
+    "packages/ts-shell/src/cli/runtime/context/preview.ts": {
+      "snapshot": "seams/cli/runtime/context/preview.ts.txt",
+      "sha256": "384dbacea134566f35d4650d8516c4676a3e9087aa44e664297e05b26f5cbd66"
+    },
+    "packages/ts-shell/src/cli/runtime/compaction.ts": {
+      "snapshot": "seams/cli/runtime/compaction.ts.txt",
+      "sha256": "62c991e9eaa6fb2165dcdf6f6529ef1c1d0d63587b8301904345827b96561f53"
+    },
+    "packages/ts-shell/src/session/context/selection.ts": {
+      "snapshot": "seams/session/context/selection.ts.txt",
+      "sha256": "8d124752d7acf7dc922bc75dbefee6e1719d8348dbea94a07fa41a5fa732500b"
+    },
+    "packages/ts-shell/src/observability/usage/identity.ts": {
+      "snapshot": "seams/observability/usage/identity.ts.txt",
+      "sha256": "77927fd7a31a58696bf890316e647958ebe2e1617f24949fe58f03ba96dc411b"
+    },
+    "packages/ts-shell/src/turn/step.ts": {
+      "snapshot": "seams/turn/step.ts.txt",
+      "sha256": "ff3f33cd48af0f5ab648d947749c4b7abfbed63ff68b7d227a257d6c748b68fc"
+    },
+    "packages/ts-shell/src/session/store/usage.ts": {
+      "snapshot": "seams/session/store/usage.ts.txt",
+      "sha256": "c6144c4aee770daf2f11123b90fb80281c1571dc1e014634e01ba4689bc9b7f0"
+    },
+    "packages/ts-shell/src/core/commands/cost/model.ts": {
+      "snapshot": "seams/core/commands/cost/model.ts.txt",
+      "sha256": "4fb8bf8003f61e0480bbd2d6cd9ba02cf53ecb519b3b79b2d195a295cec6112c"
+    },
+    "packages/ts-shell/src/cli/interactive/interactiveMode.ts": {
+      "snapshot": "seams/cli/interactive/interactiveMode.ts.txt",
+      "sha256": "7ff25d3ff35766da318b55c17e070fcb4633bcd5d719658212fb79f8153e9906"
+    }
+  },
+  "documents": {
+    "HANDOFF.md": {
+      "snapshot": "docs/HANDOFF.md.txt",
+      "sha256": "afd27077d76d2466d74b5eb192f1c464aac6156de2c0af2e581a1c86947dfbfa"
+    },
+    ".wiki/log.md": {
+      "snapshot": "docs/.wiki/log.md.txt",
+      "sha256": "962c49b4f3825cc512889414674088ac39c7fbc1671e94214c48601b4e273bb6"
+    },
+    ".wiki/refactor/upgrade/MASTER.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/MASTER.md.txt",
+      "sha256": "15f46b7c5fec61697c48b03de47abeb9bc67149597a6df9c18fcacb16fdeffdf"
+    },
+    ".wiki/refactor/upgrade/tasks.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/tasks.md.txt",
+      "sha256": "85b669d95a366f421df9ae8d61298b4433cc75a371fc21c96c757dba9ff78f90"
+    },
+    ".wiki/refactor/upgrade/design.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/design.md.txt",
+      "sha256": "4dfbce71dd945d882c53c24fe82f5828dc550e545ef1f453de4a824986fd757b"
+    },
+    ".wiki/refactor/upgrade/summary.md": {
+      "snapshot": "docs/.wiki/refactor/upgrade/summary.md.txt",
+      "sha256": "72bebb0756f7243bc268e2d8151e80a6e652dbaadf14ef4ad657a9fb7f8f2af3"
+    }
+  },
+  "validation": {
+    "combined": {
+      "files": 21,
+      "tests": 933,
+      "passed": 933,
+      "failed": 0,
+      "receipt": "accounting/final-combined.json",
+      "commandLog": "accounting/final-combined.log"
+    },
+    "priorCombined": {
+      "files": 20,
+      "tests": 933,
+      "receipt": "accounting/current-combined.json",
+      "priorToTestOwnershipSplit": true
+    },
+    "afterTestOwnershipSplit": {
+      "files": 2,
+      "tests": 48,
+      "passed": true,
+      "receipt": "recovery/snapshot-split.json"
+    },
+    "static": {
+      "status": "passed",
+      "count": 6,
+      "commandLog": "accounting/final-static.log",
+      "docsSourceAdvisories": 119,
+      "callReachabilityAdvisories": 11,
+      "productionModules": 2657,
+      "monoliths": 0,
+      "finalDocumentationGate": "docs-validation.log"
+    },
+    "reversals": {
+      "status": "passed",
+      "count": 7,
+      "allEffectiveAssertionFailures": true,
+      "restoredExactly": true,
+      "mainSourcesMutated": false,
+      "receipt": "recovery/reversals.json",
+      "recoveryOwned": 2,
+      "retentionOwned": 1,
+      "accountingOwned": 4,
+      "restored": {
+        "files": 4,
+        "tests": 61,
+        "receipt": "recovery/reversal-restored.json"
+      },
+      "invalidSetupAttemptsRetained": [
+        "reversals-first-setup-failure.json",
+        "reversals-ineffective-default.json",
+        "reversals-default-fragment-setup-failure.json"
+      ]
+    },
+    "originalCounterexamples": {
+      "tests": 13,
+      "assertionFailures": 10,
+      "controlsPassed": 3,
+      "productionUnchanged": true,
+      "receipt": "accounting/red.json",
+      "sixAdditionalControls": true,
+      "bodiesNotWeakened": true
+    },
+    "staleCostFixtures": {
+      "classifiedFailures": 4,
+      "beforePassed": 41,
+      "total": 45,
+      "correctedPassed": 45,
+      "red": "accounting/cost-classification.json",
+      "green": "accounting/cost-corrected-final.json"
+    },
+    "consumerHttp": {
+      "actualLoopbackRequests": true,
+      "scenarios": 5,
+      "passed": true,
+      "receipt": "accounting/request-consumer-first.json",
+      "path": "HTTP response -> actual request -> usage accounting -> persistence -> /cost"
+    },
+    "terminalConsumer": {
+      "scenarios": 4,
+      "modes": [
+        "regular",
+        "fullscreen"
+      ],
+      "passed": true,
+      "selectedCases": true,
+      "totalDiscovered": 413,
+      "selectedPassed": 4,
+      "receipt": "accounting/terminal-consumer-first.json"
+    },
+    "configuredProvider": {
+      "platform": "linux",
+      "status": "passed",
+      "publicCompiledSdk": true,
+      "compiledCliCost": true,
+      "actualRequests": 21,
+      "realPromptRounds": 10,
+      "stages": 14,
+      "receipt": "accounting/native.json",
+      "probe": "accounting/native.mjs.txt",
+      "probeSha256": "93083f1e4e0fb71d247d87d1502e8c82e3159d7a86d8e03dbfe6e046d9d4c932",
+      "sourceBytes": 6144,
+      "sourceSha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+      "reportedReadResponses": 2,
+      "absentReadResponses": 19,
+      "capturedPrices": null,
+      "privateStateRemoved": true,
+      "originalConfigUnchanged": true,
+      "compactionFixture": {
+        "seededPairs": 32,
+        "seededMessages": 64,
+        "localWindow": 16000,
+        "keepRecentTokens": 600,
+        "inventedRemoteLimits": false,
+        "seededMessagesAreProviderRounds": false
+      },
+      "perRequestAccountingCorrelationDuringCompaction": false,
+      "boundary": "Observed fields only; compaction used explicit seeded history and local window. No savings/TTL/native cache-control/invoice/remote-capacity claim."
+    },
+    "independentCodeReview": {
+      "verdict": "APPROVE",
+      "receipt": "accounting/review-code-final-independent.json",
+      "rootCheckedCurrentHashes": true,
+      "reviewerExecutedValidation": false
+    },
+    "priorArchitectureReview": {
+      "verdict": "CLEAR",
+      "receipt": "accounting/review-architecture.json",
+      "scope": "Frozen original nine files plus inspected seams; final cost report wording and later consumer fixtures require the independent current thirteen-file review."
+    },
+    "unavailableOptionalReviews": {
+      "receipt": "accounting/optional-review-status.json",
+      "verdictInferred": false
+    },
+    "modelRecovery": {
+      "separateBatch": true,
+      "delivery": "../upgrade-model-recovery-2026-11-17/delivery.json",
+      "baselineSelected": 16,
+      "passed": 6,
+      "failed": 10,
+      "receipt": "accounting/unreadable-state-main-baseline.json"
+    },
+    "normproof": {
+      "command": "rtk npm exec --package .normproof/normproof-*.tgz -- normproof judge",
+      "actualCommandExitCode": 2,
+      "verdict": "not_proven",
+      "unresolvedSpecifierObligation": "missing",
+      "reason": "Full declared source graph exceeds the pinned 16384 edge ceiling.",
+      "enforcementMode": "shadow",
+      "enforcementDidBlock": false,
+      "enforcementExitCode": 0,
+      "report": "normproof/normal-judge/report.md",
+      "verdictReceipt": "normproof/normal-judge/verdict.json",
+      "trackedPinnedFilesUnchanged": 18,
+      "pinnedReceipt": "accounting/pinned-normproof-sources.json",
+      "freshExpandedGraphDiagnostic": false,
+      "previousExpandedDiagnosis": "../upgrade-output-stream-2026-11-16/delivery.json"
+    }
+  },
+  "taskDisposition": {
+    "C.4": "Historical default age-pruning absence claim is false for current single projection owner. Existing retention/measurement is validated through focused and compiled native consumers.",
+    "C.7": "Current category evidence, captured write premium, unknown prices and estimated report wording repaired and validated through consumers.",
+    "remainingAcceptedCount": 27,
+    "totalTaskCount": 62,
+    "remainingTaskCount": 35,
+    "overallGoal": "active"
+  },
+  "exclusions": [
+    "No push or CI.",
+    "No other platform or physical terminal.",
+    "No invoice, savings, TTL, native cache-control or remote capacity proof.",
+    "No full repository test/typecheck claim.",
+    "NormProof default gate remains not_proven.",
+    "E.5/C.8 and remaining tasks have separate incomplete acceptance."
+  ]
+}

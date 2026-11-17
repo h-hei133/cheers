@@ -1,0 +1,18 @@
+{
+  "status": "counterexamples-reproduced",
+  "base": "d974d3a22166f04816abe22ae993aea99524172b",
+  "tests": 13,
+  "assertionFailures": 10,
+  "passingControls": 3,
+  "log": "red.log",
+  "exitCode": 1,
+  "productionUnchanged": true,
+  "testSha256": "3143f5615706502d0edef5e6e69c1fda5c67ad1293904824543f160d8a6704dd",
+  "sourceHashes": {
+    "packages/ts-shell/src/provider/response/usage.ts": "aa6f32d740a08495ddc12856f8b542f1eb6815603756890780cbfb87f4bda7d5",
+    "packages/ts-shell/src/observability/usageTelemetry.ts": "e4210e363b55e9c745af58fcd4629598844feeb5fcfc98b2e68055a0e62713a5",
+    "packages/ts-shell/src/observability/cacheWaste.ts": "3dc077512bddc6d0537f81527a511a92a28ec0b7ab03cb13edeb4958221be281",
+    "packages/ts-shell/src/observability/usage/model.ts": "96cfad7524b6ae2af5b16091b542cb0ff66bdf909e4aea34ca0ad786a73b9985",
+    "packages/ts-shell/src/observability/usage/snapshot.ts": "3d229789ae7961129f7e118fd6ac95fab77b2bcbfc66154ce7cedf9ad591edb1"
+  }
+}

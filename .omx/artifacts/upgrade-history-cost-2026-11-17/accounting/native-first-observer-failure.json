@@ -1,0 +1,66 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "publicCompiledSdk": true,
+  "configuredProvider": true,
+  "probeSha256": "1ff8d8f23735af29fbc181c16cfbc13666e7e37c56766a9c8feb59524314e1d9",
+  "cases": [],
+  "requests": [
+    {
+      "stage": "read-one",
+      "bodySent": true,
+      "bytes": 2773,
+      "sha256": "001e4c6754ee6477d41e57f83d35e70a0a25753aa2a9db9b0f88b82b02c0006d",
+      "checkpoint": false,
+      "toolDigests": [],
+      "responseStatus": null,
+      "usage": {
+        "inspectable": false
+      }
+    },
+    {
+      "stage": "read-one",
+      "bodySent": true,
+      "bytes": 9288,
+      "sha256": "05aa5d560592f25655cf7c23fbb56be2001415df86bc94ac2c99037b0e61d0cf",
+      "checkpoint": false,
+      "toolDigests": [
+        {
+          "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+          "bytes": 6144,
+          "middleRetained": true,
+          "legacyPruned": false
+        }
+      ],
+      "responseStatus": null,
+      "usage": {
+        "inspectable": false
+      }
+    }
+  ],
+  "buildId": "0247cb1b526d5450829e0b3374dffe3c6572f18b06bd24cd03529ce2027e5820",
+  "source": {
+    "bytes": 6144,
+    "sha256": "04c588491f6568b263724e86e4abca509ce339f939bac62e285f1a89dbe7e619",
+    "middleOutsideLegacyEnds": true
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "isolatedValidObjects": true,
+    "minimalConfiguredModelEntry": true,
+    "originalConfiguredCredentials": true,
+    "nativeDefaultPolicyFalse": true,
+    "localRetentionWindow": 32000,
+    "publishedContextWindow": null,
+    "publishedInputLimit": null
+  },
+  "failedStage": "read-one",
+  "failure": {
+    "category": "product-or-probe-contract",
+    "code": "response-usage-unobservable"
+  },
+  "failureLine": "24",
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "actualRequests": 2
+}

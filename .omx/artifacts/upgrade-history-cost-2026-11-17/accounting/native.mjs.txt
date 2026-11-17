@@ -1,0 +1,466 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { createHash } from 'node:crypto';
+import { channel } from 'node:diagnostics_channel';
+import { spawn } from 'node:child_process';
+import { gunzipSync, inflateSync, brotliDecompressSync } from 'node:zlib';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseTree, findNodeAtLocation } from 'jsonc-parser';
+import { isDeepStrictEqual } from 'node:util';
+
+// Authored only. Root executes this after integrating and building the product.
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_REQUESTS = 24;
+const ACK = 'HISTORY_NATIVE_ACK_91642';
+const MIDDLE = 'HISTORY_SOURCE_MIDDLE_62491';
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const positive = value => Number.isSafeInteger(value) && value > 0;
+const reported = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+const textOf = value => typeof value === 'string' ? value : Array.isArray(value)
+  ? value.filter(part => typeof part?.text === 'string').map(part => part.text).join('\n') : '';
+const check = (condition, code) => { if (!condition) { const error = new Error(code); error.probeCode = code; throw error; } };
+const equal = (actual, expected, code) => check(isDeepStrictEqual(actual, expected), code);
+const receipt = { status: 'not_run', platform: process.platform, publicCompiledSdk: true, configuredProvider: true,
+  probeSha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), cases: [], requests: [] };
+const previousEnv = new Map(), originalHashes = new Map(), observations = [], pendingBodies = new WeakMap();
+const observerEvents = { create: 0, headers: 0, trailers: 0, data: 0, complete: 0, retired: 0 };
+const creating = channel('undici:request:create'), sent = channel('undici:request:bodySent');
+const headers = channel('undici:request:headers'), trailers = channel('undici:request:trailers');
+let root, storage, workspace, session, activeId, sdk, configured, selected, owner, acceptedModel, rates;
+let stage = 'setup', targetOrigin, observerFailure, lastFailure, deadline, fixtureConfig;
+
+function wireTools(body) {
+  const tools = [];
+  const add = (id, content) => {
+    const text = textOf(content);
+    tools.push({ id, digest: hash(text), bytes: Buffer.byteLength(text), middle: text.includes(MIDDLE),
+      pruned: text.includes('[... Omitted') || text.includes('Duplicate tool output') });
+  };
+  for (const message of body.messages ?? []) {
+    if (message.role === 'tool') add(message.tool_call_id, message.content);
+    for (const block of Array.isArray(message.content) ? message.content : []) {
+      if (block.type === 'tool_result') add(block.tool_use_id, block.content);
+      if (block.toolResult) add(block.toolResult.toolUseId, block.toolResult.content);
+    }
+  }
+  for (const item of Array.isArray(body.input) ? body.input : []) {
+    if (item.type === 'function_call_output') add(item.call_id, item.output);
+  }
+  for (const content of body.contents ?? []) for (const part of content.parts ?? []) {
+    if (part.functionResponse) add(part.functionResponse.id, part.functionResponse.response?.output);
+  }
+  return tools;
+}
+
+// Keep raw chunks only until completion; headers, credentials and bodies never reach a receipt.
+function responseUsage(bytes, encoding) {
+  const decompress = encoding === 'gzip' ? gunzipSync : encoding === 'deflate' ? inflateSync
+    : encoding === 'br' ? brotliDecompressSync : undefined;
+  const body = (decompress ? decompress(bytes, { maxOutputLength: MAX_BYTES }) : bytes).toString('utf8');
+  const usage = {};
+  let parsed = 0;
+  const capture = frame => {
+    parsed++;
+    const value = frame?.response?.usage ?? frame?.message?.usage ?? frame?.usage;
+    if (value && typeof value === 'object') {
+      for (const [field, candidates] of Object.entries({
+        input: [value.prompt_tokens, value.input_tokens],
+        output: [value.completion_tokens, value.output_tokens],
+        total: [value.total_tokens],
+        read: [value.cache_read_input_tokens, value.prompt_tokens_details?.cached_tokens, value.input_tokens_details?.cached_tokens],
+        write: [value.cache_creation_input_tokens],
+      })) {
+        const found = candidates.find(reported);
+        if (found !== undefined) usage[field] = found;
+      }
+    }
+    const google = frame?.usageMetadata;
+    if (google) for (const [field, name] of Object.entries({
+      input: 'promptTokenCount', output: 'candidatesTokenCount', total: 'totalTokenCount', read: 'cachedContentTokenCount',
+    })) if (reported(google[name])) usage[field] = google[name];
+  };
+  try { const frame = JSON.parse(body); for (const value of Array.isArray(frame) ? frame : [frame]) capture(value); }
+  catch {
+    for (const line of body.split(/\r?\n/)) {
+      if (!line.startsWith('data:')) continue;
+      const value = line.slice(5).trim(); if (!value || value === '[DONE]') continue;
+      try { capture(JSON.parse(value)); } catch { /* No raw malformed event is recorded. */ }
+    }
+  }
+  return { inspectable: parsed > 0, input: usage.input ?? null, output: usage.output ?? null, total: usage.total ?? null,
+    read: usage.read ?? 0, write: usage.write ?? 0, readReported: reported(usage.read), writeReported: reported(usage.write) };
+}
+
+const onCreate = ({ request }) => {
+  if (request.method !== 'POST' || String(request.origin) !== targetOrigin) return;
+  observerEvents.create++;
+  const capture = { stage, outgoing: [], incoming: [], outgoingBytes: 0, incomingBytes: 0 };
+  pendingBodies.set(request, capture);
+  const originalBody = request.onBodySent, originalData = request.onData;
+  const originalHeaders = request.onHeaders, originalComplete = request.onComplete;
+  const originalError = request.onError;
+  request.onBodySent = function (chunk) {
+    try {
+      capture.outgoingBytes += Buffer.byteLength(chunk);
+      if (capture.outgoingBytes <= MAX_BYTES) capture.outgoing.push(Buffer.from(chunk));
+      else { observerFailure = 'request-capture-limit'; capture.outgoing.length = 0; }
+    } catch { observerFailure = 'request-capture'; }
+    return originalBody.call(this, chunk);
+  };
+  request.onData = function (chunk) {
+    try {
+      observerEvents.data++;
+      capture.incomingBytes += Buffer.byteLength(chunk);
+      if (capture.incomingBytes <= MAX_BYTES) capture.incoming.push(Buffer.from(chunk));
+      else { observerFailure = 'response-capture-limit'; capture.incoming.length = 0; }
+    } catch { observerFailure = 'response-capture'; }
+    return originalData.call(this, chunk);
+  };
+  request.onHeaders = function (statusCode, rawHeaders, ...rest) {
+    onHeaders({ request: this, response: { statusCode, headers: rawHeaders } });
+    return originalHeaders.call(this, statusCode, rawHeaders, ...rest);
+  };
+  request.onComplete = function (...args) {
+    observerEvents.complete++;
+    onTrailers({ request: this });
+    return originalComplete.apply(this, args);
+  };
+  request.onError = function (...args) {
+    observerEvents.retired++;
+    const captured = pendingBodies.get(this);
+    if (captured?.statusCode) {
+      captured.endedBy = 'accepted-stream-retirement';
+      onTrailers({ request: this });
+    }
+    return originalError.apply(this, args);
+  };
+};
+const onSent = ({ request }) => {
+  const capture = pendingBodies.get(request); if (!capture) return;
+  try {
+    check(observations.length < MAX_REQUESTS, 'native-request-limit');
+    check(capture.outgoingBytes <= MAX_BYTES, 'request-capture-limit');
+    const bytes = Buffer.concat(capture.outgoing), body = JSON.parse(bytes.toString('utf8'));
+    capture.observation = { stage: capture.stage, bodySent: true, bytes: capture.outgoingBytes,
+      digest: hash(bytes), checkpoint: bytes.includes(Buffer.from('[Context Checkpoint]')), tools: wireTools(body) };
+    observations.push(capture.observation);
+  } catch (error) { observerFailure = error.probeCode ?? 'request-capture'; void session?.abort().catch(() => {}); }
+  finally { capture.outgoing.length = 0; }
+};
+const onHeaders = ({ request, response }) => {
+  const capture = pendingBodies.get(request); if (!capture) return;
+  observerEvents.headers++;
+  capture.statusCode = response.statusCode;
+  for (let index = 0; index < response.headers.length; index += 2) {
+    if (String(response.headers[index]).toLowerCase() === 'content-encoding')
+      capture.encoding = String(response.headers[index + 1]).toLowerCase();
+  }
+};
+const onTrailers = ({ request }) => {
+  const capture = pendingBodies.get(request); if (!capture) return;
+  observerEvents.trailers++;
+  try {
+    check(capture.incomingBytes <= MAX_BYTES, 'response-capture-limit');
+    if (capture.observation) Object.assign(capture.observation, {
+      responseStatus: capture.statusCode, usage: responseUsage(Buffer.concat(capture.incoming), capture.encoding),
+      responseBytes: capture.incomingBytes,
+      responseEnd: capture.endedBy ?? 'transport-complete',
+    });
+  } catch { observerFailure = 'response-capture'; }
+  finally { capture.incoming.length = 0; pendingBodies.delete(request); }
+};
+
+const transcript = () => session.sessionManager.getTranscriptEvents(session.sessionId);
+const sourceResults = () => transcript().filter(event => event.type === 'message' && event.role === 'tool'
+  && typeof event.content === 'string' && event.content.includes(MIDDLE));
+const savedUsage = () => JSON.parse(fs.readFileSync(path.join(storage, 'sessions', activeId, 'state.json'), 'utf8')).usage;
+
+async function open(config, id) {
+  const loader = new sdk.DefaultResourceLoader({ cwd: workspace, noContextFiles: true, noExtensions: true,
+    noSkills: true, noThemes: true, systemPrompt: 'This is a bounded read-only source-history probe. '
+      + 'Use only read when explicitly requested. Read the named file exactly once. Later acknowledgement requests need no tools. '
+      + 'Normal answers include ' + ACK + '. Summaries must keep that acknowledgement token and use fewer than 80 words.' });
+  await loader.reload();
+  check(loader.getExtensions().errors.length === 0, 'extension-setup');
+  const created = await sdk.createAgentSession({ cwd: workspace, runtimeConfig: config, resourceLoader: loader,
+    tools: ['read'], nonInteractiveApproval: 'allow-once', ...(id ? { sessionId: id } : {}) });
+  session = created.session; activeId = session.sessionId;
+  const resolution = session.runtimeContext.resolveConfigTarget(session.runtimeContext.runtimeConfig, session.sessionId);
+  check(!resolution.blocked && resolution.credential && resolution.model === selected.model
+    && resolution.provider === selected.provider, 'configured-target-admission');
+  check((resolution.baseUrl ?? resolution.credential.baseUrl)?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, ''),
+    'configured-destination-admission');
+  const physical = session.getModelCatalog().physical.filter(provider => (provider.runtime ?? provider.id) === selected.provider
+    && provider.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, ''));
+  check(physical.length === 1, 'configured-catalogue-ownership');
+  acceptedModel = physical[0].models.find(model => model.id === selected.model);
+  check(acceptedModel, 'configured-model-admission');
+  rates = acceptedModel.cost ?? null;
+  // Decoding uses an inert null-prototype bucket map; compare the persisted JSON contract.
+  if (id) equal(JSON.parse(JSON.stringify(session.getState().usage)), savedUsage(), 'reopened-usage-decoder-mismatch');
+}
+
+async function close() {
+  const current = session;
+  try { await current?.dispose(); }
+  finally { if (session === current) session = undefined; }
+}
+
+function verifyAccounting(rows, requests) {
+  check(rows.length === requests.length, 'accounting-request-correlation');
+  for (const [index, row] of rows.entries()) {
+    const raw = requests[index].usage;
+    check(raw?.inspectable, 'response-usage-unobservable');
+    check(typeof row.cacheReadReported === 'boolean' && typeof row.cacheWriteReported === 'boolean',
+      'cache-category-presence-missing');
+    check(row.cacheReadReported === raw.readReported && row.cacheWriteReported === raw.writeReported,
+      'cache-category-presence-mismatch');
+    check(row.cacheReadTokens === raw.read && row.cacheWriteTokens === raw.write, 'cache-counter-mismatch');
+    if (row.attribution) {
+      check(row.attribution.provider === selected.provider && row.attribution.model === selected.model, 'usage-target-mismatch');
+      equal(row.attribution.rates, rates, 'captured-prices-mismatch');
+    }
+    if (row.kind === 'request') {
+      check(row.attribution && raw.input !== null, 'request-measurement-missing');
+      check(typeof row.id === 'string' && Number.isSafeInteger(row.timestamp), 'request-persistence-identity');
+    } else check(row.kind === 'usage-gap', 'unexpected-accounting-boundary');
+  }
+  return rows.map(row => ({ kind: row.kind, promptTokens: row.promptTokens, completionTokens: row.completionTokens ?? null,
+    cacheReadTokens: row.cacheReadTokens, cacheWriteTokens: row.cacheWriteTokens,
+    cacheReadReported: row.cacheReadReported, cacheWriteReported: row.cacheWriteReported,
+    capturedRates: row.attribution ? row.attribution.rates : null }));
+}
+
+async function prompt(name, input, { expectRead = false, accounting = true } = {}) {
+  stage = name; lastFailure = undefined;
+  const first = observations.length, beforeUsage = savedUsage()?.recentRequests ?? [], beforeTools = sourceResults().length;
+  let completed = false, unproven = false, successfulRead = 0, toolStarts = 0;
+  const unsubscribe = session.subscribe(event => {
+    if (event.type === 'query.completed') completed = true;
+    if (event.type === 'query.completed_unproven') unproven = true;
+    if (event.type === 'query.failed' || event.type === 'lifecycle.error') lastFailure = String(event.error);
+    if (event.type === 'tool.started') toolStarts++;
+    if (event.type === 'tool.result' && event.toolName === 'read' && event.success) successfulRead++;
+  });
+  let result;
+  try { result = await session.prompt(input); } finally { unsubscribe(); }
+  check(!observerFailure, observerFailure ?? 'wire-observer');
+  check(!receipt.deadline, 'native-deadline');
+  check(!lastFailure && !unproven && (completed || result.includes(ACK)), 'query-not-completed');
+  const requests = observations.slice(first);
+  check(requests.length > 0 && requests.every(request => request.bodySent), 'native-dispatch-missing');
+  if (expectRead) {
+    receipt.readAttempts ??= [];
+    receipt.readAttempts.push({ name, toolStarts, successfulRead, newSourceResults: sourceResults().length - beforeTools });
+    check(toolStarts === 1 && successfulRead === 1 && sourceResults().length === beforeTools + 1, 'actual-read-not-observed');
+  }
+  else check(toolStarts === 0 && successfulRead === 0, 'unexpected-tool-during-continuation');
+  const beforeIds = new Set(beforeUsage.map(entry => entry.id));
+  const rows = (savedUsage()?.recentRequests ?? []).filter(entry => !beforeIds.has(entry.id));
+  const usage = accounting ? verifyAccounting(rows, requests) : undefined;
+  receipt.cases.push({ name, passed: true, actualRequests: requests.length, successfulRead, toolStarts, acknowledged: result.includes(ACK),
+    completed, seededHistory: name === 'automatic-compaction', ...(usage ? { usage } : {}) });
+  return requests;
+}
+
+async function costCommand(id) {
+  stage = 'cli-cost';
+  const facts = path.join(root, 'cli-dispatch.jsonl'), observer = path.join(root, 'cli-observer.mjs');
+  fs.writeFileSync(observer, "import fs from 'node:fs'; import { channel } from 'node:diagnostics_channel';\n"
+    + "channel('undici:request:bodySent').subscribe(({request}) => { if (request.method === 'POST') fs.appendFileSync("
+    + JSON.stringify(facts) + ", '{\"bodySent\":true}\\n'); });\n", { mode: 0o600 });
+  const env = { ...process.env, NODE_OPTIONS: '--max-old-space-size=768 --import ' + pathToFileURL(observer).href };
+  const child = spawn('rtk', ['node', path.join(repo, 'dist/cli.js'), '--project', workspace, '--session-id', id,
+    '--no-context-files', '--no-skills', '--tools', 'read', '--print', '/cost'], { cwd: workspace, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '', stderr = '', overflow = false;
+  const limit = chunk => { if (stdout.length + stderr.length + chunk.length > 1024 * 1024) { overflow = true; child.kill('SIGTERM'); return false; } return true; };
+  child.stdout.on('data', chunk => { if (limit(chunk)) stdout += chunk.toString(); });
+  child.stderr.on('data', chunk => { if (limit(chunk)) stderr += chunk.toString(); });
+  const timer = setTimeout(() => child.kill('SIGTERM'), 30_000);
+  const hardTimer = setTimeout(() => child.kill('SIGKILL'), 33_000);
+  let outcome;
+  try {
+    outcome = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', (code, signal) => resolve({ code, signal })); });
+  } finally { clearTimeout(timer); clearTimeout(hardTimer); }
+  check(!overflow && outcome.code === 0 && outcome.signal === null, 'local-cost-command-failed');
+  check(!fs.existsSync(facts) || fs.statSync(facts).size === 0, 'local-cost-dispatched-provider');
+  check(/Usage|tokens reported by the provider|No usage has been recorded/.test(stdout), 'local-cost-report-missing');
+  if (rates === null) check(/unknown/i.test(stdout), 'unknown-prices-presented-as-known');
+  const allReadAbsent = (savedUsage()?.recentRequests ?? []).filter(entry => entry.kind === 'request')
+    .every(entry => entry.cacheReadReported === false);
+  if (allReadAbsent) check(!/Prompt cache hit rate:\s*[\d.]+%/i.test(stdout), 'absent-cache-presented-as-hit-rate');
+  receipt.cases.push({ name: stage, passed: true, zeroProviderDispatch: true, outputBytes: Buffer.byteLength(stdout),
+    unknownPricesPreserved: rates === null ? /unknown/i.test(stdout) : null, absentCacheHitRatePreserved: allReadAbsent ? true : null });
+}
+
+try {
+  check(process.platform === 'linux', 'linux-required');
+  sdk = await import(pathToFileURL(path.join(repo, 'packages/ts-shell/dist/index.js')).href);
+  const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'), 'utf8'));
+  receipt.buildId = manifest.buildId;
+  check(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/current.js'), 'utf8').includes(manifest.buildId), 'sdk-build-identity');
+  configured = sdk.getRuntimeConfig(repo);
+  const originalStorage = path.join(os.homedir(), '.cheers');
+  for (const file of ['auth.json', 'config.json', 'models.json', 'models-cache.json'].map(name => path.join(originalStorage, name))
+    .concat([path.join(repo, '.cheers.json')])) originalHashes.set(file, fs.existsSync(file) ? hash(fs.readFileSync(file)) : null);
+  selected = configured.providerConnections.find(connection => connection.id === configured.activeProviderConnectionId);
+  check(selected?.status === 'connected' && typeof selected.baseUrl === 'string' && selected.model, 'active-configured-target-unavailable');
+  const raw = fs.readFileSync(path.join(originalStorage, 'models.json'), 'utf8');
+  const providers = findNodeAtLocation(parseTree(raw, [], { allowTrailingComma: true }), ['providers']);
+  let minimal = false;
+  for (const property of providers?.children ?? []) {
+    const id = property.children?.[0]?.value, node = property.children?.[1];
+    let entry;
+    try { entry = JSON.parse(raw.slice(node.offset, node.offset + node.length)); }
+    catch {
+      entry = {};
+      for (const field of node?.children ?? []) {
+        const key = field.children?.[0]?.value, value = field.children?.[1];
+        if (!['label', 'runtime', 'endpoint', 'auth', 'baseUrl', 'envVar'].includes(key)) continue;
+        try { entry[key] = JSON.parse(raw.slice(value.offset, value.offset + value.length)); } catch {}
+      }
+      if (entry.runtime === selected.provider && entry.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, '')
+        && entry.endpoint && entry.auth) { entry.models = [{ id: selected.model }]; minimal = true; }
+    }
+    if ((entry.runtime ?? id) === selected.provider && entry.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, '')
+      && entry.models?.some(model => model.id === selected.model)) {
+      check(!owner, 'active-configured-catalogue-ambiguous');
+      owner = { id, ...entry, models: entry.models.filter(model => model.id === selected.model) };
+    }
+  }
+  check(owner, 'active-configured-catalogue-unavailable');
+  root = fs.mkdtempSync(path.join(directory, 'native-state-')); fs.chmodSync(root, 0o700);
+  workspace = path.join(root, 'work'); storage = path.join(root, 'home', '.cheers');
+  fs.mkdirSync(workspace); fs.mkdirSync(storage, { recursive: true, mode: 0o700 });
+  const home = path.dirname(storage);
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home,
+    GIT_CEILING_DIRECTORIES: root, CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '1',
+    CHEERS_MARKETPLACES_FILE: path.join(home, 'sources.json'), CHEERS_EXTENSIONS_FILE: path.join(home, 'extensions.json') })) {
+    previousEnv.set(key, process.env[key]); process.env[key] = value;
+  }
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: selected.provider,
+    providerCredentials: configured.providerCredentials, providerConnections: configured.providerConnections,
+    activeProviderConnectionId: selected.id, accountPool: configured.accountPool }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: { [owner.id]: owner } }), { mode: 0o600 });
+  check(sdk.getRuntimeConfig(workspace).pruneToolText === false, 'default-retention-policy-changed');
+  const declared = owner.models[0], windowBounds = [32_000, configured.contextWindow, declared.contextWindow].filter(positive);
+  const retentionWindow = Math.min(...windowBounds);
+  const output = Math.min(1024, positive(declared.maxTokens) ? declared.maxTokens : 1024);
+  fixtureConfig = { agentMode: 'build', contextWindow: retentionWindow, maxOutputTokens: output, reserveTokens: 0,
+    keepRecentTokens: 800, maxTurns: 3, compactionEnabled: false,
+    retryEnabled: false, retryMaxRetries: 0, providerRetryMaxRetries: 0, cacheWarming: 'off', cacheWarmIntervalSeconds: 0,
+    providerConnectTimeoutMs: 10_000, providerHeadersTimeoutMs: 45_000, providerBodyTimeoutMs: 45_000 };
+  check(retentionWindow >= 8000, 'bounded-retention-limits-unavailable');
+  fs.writeFileSync(path.join(storage, 'config.json'), JSON.stringify(fixtureConfig), { mode: 0o600 });
+  const filler = 'Stable bounded source facts; original text must survive ordinary continuation.\n'.repeat(100);
+  const marker = '\n' + MIDDLE + '\n', source = filler.slice(0, 3000) + marker + filler.slice(0, 6144 - 3000 - marker.length);
+  fs.writeFileSync(path.join(workspace, 'source.txt'), source);
+  fs.writeFileSync(path.join(workspace, 'source-copy.txt'), source);
+  receipt.source = { bytes: Buffer.byteLength(source), sha256: hash(source), middleOutsideLegacyEnds: true };
+  receipt.catalogueSetup = { originalActiveSelected: true, isolatedValidObjects: true, minimalConfiguredModelEntry: minimal,
+    originalConfiguredCredentials: true, nativeDefaultPolicyFalse: true, localRetentionWindow: retentionWindow,
+    publishedContextWindow: declared.contextWindow ?? null, publishedInputLimit: declared.inputLimit ?? null };
+  targetOrigin = new URL(selected.baseUrl).origin;
+  creating.subscribe(onCreate); sent.subscribe(onSent); headers.subscribe(onHeaders); trailers.subscribe(onTrailers);
+  deadline = setTimeout(() => { receipt.deadline = true; void session?.abort().catch(() => {}); }, 540_000);
+  const defaultConfig = { ...sdk.getRuntimeConfig(workspace), ...fixtureConfig, sessionModelRoles: undefined };
+  await open(defaultConfig);
+  await prompt('read-one', 'Read source.txt in full with read exactly once, then acknowledge the completed read.', { expectRead: true });
+  await prompt('read-two', 'The separate source-copy.txt now needs inspection. Call read on source-copy.txt exactly once and read it in full, then acknowledge. Reading that separate path is required for this check.', { expectRead: true });
+  const originalTools = structuredClone(sourceResults());
+  check(originalTools.length === 2 && originalTools[0].content === originalTools[1].content, 'duplicate-read-source-not-identical');
+  const toolDigests = originalTools.map(tool => hash(tool.content));
+  for (let index = 0; index < 4; index++) {
+    const requests = await prompt('continue-' + (index + 1), 'Continue ' + (index + 1) + ': acknowledge without calling tools.');
+    for (const request of requests) equal(request.tools.map(tool => tool.digest), toolDigests, 'default-retained-tool-wire-mismatch');
+    equal(sourceResults(), originalTools, 'default-mutated-original-transcript');
+  }
+  const beforeReopen = structuredClone(savedUsage());
+  const id = session.sessionId;
+  stage = 'save-reopen';
+  await close(); await open(defaultConfig, id);
+  equal(savedUsage(), beforeReopen, 'reopened-persisted-usage-mismatch');
+  equal(sourceResults(), originalTools, 'reopened-original-transcript-mismatch');
+  receipt.cases.push({ name: 'save-reopen', passed: true, exactUsageEquality: true,
+    unchangedRequestIdsAndTimestamps: true, originalToolResultsUnchanged: true });
+  const resumed = await prompt('reopened-default', 'Acknowledge the continued session without tools.');
+  for (const request of resumed) equal(request.tools.map(tool => tool.digest), toolDigests, 'reopened-retained-tool-wire-mismatch');
+  await close(); await open({ ...defaultConfig, pruneToolText: true }, id);
+  const control = await prompt('explicit-pruning-control', 'Acknowledge this continuation without tools.');
+  for (const request of control) check(request.tools.length === 2 && request.tools.every(tool => !tool.middle && tool.pruned)
+    && request.tools.every((tool, index) => tool.digest !== toolDigests[index]), 'explicit-pruning-control-not-observed');
+  equal(sourceResults(), originalTools, 'control-mutated-original-transcript');
+  receipt.cases.push({ name: 'retention-and-pruning', passed: true, defaultRetainedDuplicateDigests: toolDigests,
+    explicitControlRemovedMiddle: true, originalTranscriptUnchanged: true });
+  await close(); await costCommand(id);
+  const pressureWindow = Math.min(16_000, retentionWindow);
+  check(pressureWindow >= 8000, 'bounded-compaction-limits-unavailable');
+  const pressureConfig = { ...defaultConfig, contextWindow: pressureWindow, compactionEnabled: true, keepRecentTokens: 600 };
+  await open(pressureConfig, id);
+  const pairs = Math.ceil(pressureWindow / 500);
+  const commitsBefore = transcript().filter(event => event.type === 'compaction-commit').length;
+  for (let index = 0; index < pairs; index++) {
+    const facts = ('Seeded bounded observation ' + index + ': preserve the acknowledged source-history decision. ').repeat(20).slice(0, 1200);
+    session.sessionManager.addTurn(id, { role: 'user', content: 'Recorded fixture work ' + index + ': ' + facts });
+    session.sessionManager.addTurn(id, { role: 'assistant', content: 'Recorded fixture result ' + index + ': ' + facts });
+  }
+  receipt.compactionFixture = { seededPairs: pairs, seededMessages: pairs * 2, localWindow: pressureWindow,
+    keepRecentTokens: 600, inventedRemoteLimits: false, seededMessagesAreProviderRounds: false };
+  const automatic = await prompt('automatic-compaction', 'Continue with a brief acknowledgement and no tools.', { accounting: false });
+  const commitsAfter = transcript().filter(event => event.type === 'compaction-commit').length;
+  check(commitsAfter > commitsBefore && automatic.some(request => request.checkpoint), 'automatic-compaction-not-published');
+  const storedTools = transcript().filter(event => event.type === 'message' && event.role === 'tool'
+    && originalTools.some(tool => tool.id === event.id));
+  check(storedTools.length === 2 && storedTools.every(event => originalTools.find(tool => tool.id === event.id).content === event.content),
+    'compaction-mutated-original-tool-source');
+  receipt.cases.push({ name: 'automatic-publication', passed: true, actualCommitIncrease: commitsAfter - commitsBefore,
+    checkpointDispatched: true, seededPressure: true });
+  const afterCompactionUsage = structuredClone(savedUsage());
+  await close(); await open(pressureConfig, id);
+  equal(savedUsage(), afterCompactionUsage, 'compaction-reopen-usage-mismatch');
+  const continued = await prompt('reopened-checkpoint', 'Acknowledge the continued session without tools.');
+  check(continued.some(request => request.checkpoint), 'reopened-checkpoint-not-dispatched');
+  await close();
+  check(JSON.parse(fs.readFileSync(path.join(repo, 'packages/ts-shell/dist/build-manifest.json'), 'utf8')).buildId === receipt.buildId,
+    'build-changed-during-probe');
+  receipt.realPromptRounds = receipt.cases.filter(item => typeof item.actualRequests === 'number').length;
+  receipt.cacheClaim = 'Only observed category presence and recorded counters; no savings, TTL, cache-control or remote-capacity claim.';
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage;
+  const detail = String(error?.message ?? '') + ' ' + (lastFailure ?? '');
+  receipt.failure = { category: receipt.deadline ? 'deadline' : /429|quota|rate.?limit/i.test(detail) ? 'provider-quota'
+    : /401|403|auth|credential/i.test(detail) ? 'provider-auth' : /ECONN|EHOST|ENOTFOUND|fetch failed|network|timeout/i.test(detail) ? 'provider-network'
+      : error.probeCode?.includes('configured') ? 'configured-target-admission' : 'product-or-probe-contract',
+    code: error.probeCode ?? 'native-operation-failed' };
+  receipt.failureLine = String(error?.stack ?? '').match(/native\.mjs:(\d+)/)?.[1] ?? null;
+  process.exitCode = 1;
+} finally {
+  clearTimeout(deadline);
+  try { await close(); } catch { receipt.cleanupSettled = false; receipt.status = 'failed'; process.exitCode = 1; }
+  creating.unsubscribe(onCreate); sent.unsubscribe(onSent); headers.unsubscribe(onHeaders); trailers.unsubscribe(onTrailers);
+  for (const [key, value] of previousEnv) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  try { if (root) fs.rmSync(root, { recursive: true, force: true }); }
+  catch { receipt.status = 'failed'; process.exitCode = 1; }
+  receipt.privateStateRemoved = !root || !fs.existsSync(root);
+  try {
+    receipt.originalConfigUnchanged = originalHashes.size > 0 ? [...originalHashes].every(([file, before]) =>
+      (fs.existsSync(file) ? hash(fs.readFileSync(file)) : null) === before) : null;
+  } catch { receipt.originalConfigUnchanged = false; }
+  if (!receipt.privateStateRemoved || receipt.originalConfigUnchanged === false) { receipt.status = 'failed'; process.exitCode = 1; }
+  receipt.requests = observations.map(request => ({ stage: request.stage, bodySent: request.bodySent, bytes: request.bytes,
+    sha256: request.digest, checkpoint: request.checkpoint, toolDigests: request.tools.map(tool => ({ sha256: tool.digest,
+      bytes: tool.bytes, middleRetained: tool.middle, legacyPruned: tool.pruned })), responseStatus: request.responseStatus ?? null,
+    responseBytes: request.responseBytes ?? null, responseEnd: request.responseEnd ?? null,
+    usage: request.usage ?? { inspectable: false } }));
+  receipt.observerEvents = observerEvents;
+  receipt.actualRequests = observations.length;
+  fs.writeFileSync(path.join(directory, 'native.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify({ status: receipt.status, buildId: receipt.buildId,
+    failedStage: receipt.failedStage ?? null, failure: receipt.failure ?? null,
+    actualRequests: receipt.actualRequests, passedCases: receipt.cases.map(item => item.name),
+    privateStateRemoved: receipt.privateStateRemoved, originalConfigUnchanged: receipt.originalConfigUnchanged }));
+}

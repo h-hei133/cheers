@@ -1,0 +1,389 @@
+diff --git a/packages/ts-shell/src/observability/cacheWaste.test.ts b/packages/ts-shell/src/observability/cacheWaste.test.ts
+index e8daf739..fe52e43d 100644
+--- a/packages/ts-shell/src/observability/cacheWaste.test.ts
++++ b/packages/ts-shell/src/observability/cacheWaste.test.ts
+@@ -1,11 +1,13 @@
+ import { describe, expect, it } from "vitest";
+-import { summarizeCacheUsage } from "./cacheWaste.js";
++import { CACHE_TTL_MS, formatCacheMissNotice, summarizeCacheUsage } from "./cacheWaste.js";
+ 
+ describe("summarizeCacheUsage", () => {
+   it("reports cache reads as a percentage of prompt tokens over the retained history", () => {
+     const result = summarizeCacheUsage([
+-      { promptTokens: 1000, cacheReadTokens: 0, cacheWriteTokens: 1000, bucketKey: "p/m", timestamp: 1, reportedCache: true, kind: "request" },
+-      { promptTokens: 2000, cacheReadTokens: 1500, cacheWriteTokens: 0, bucketKey: "p/m", timestamp: 2, reportedCache: true, kind: "request" },
++      { promptTokens: 1000, cacheReadTokens: 0, cacheWriteTokens: 1000, cacheReadReported: true, cacheWriteReported: true,
++        bucketKey: "p/m", timestamp: 1, reportedCache: true, kind: "request" },
++      { promptTokens: 2000, cacheReadTokens: 1500, cacheWriteTokens: 0, cacheReadReported: true, cacheWriteReported: true,
++        bucketKey: "p/m", timestamp: 2, reportedCache: true, kind: "request" },
+     ]);
+ 
+     expect(result).toEqual({ promptTokens: 3000, cacheReadTokens: 1500, hitRate: 50, requestCount: 2 });
+@@ -13,9 +15,18 @@ describe("summarizeCacheUsage", () => {
+ 
+   it("does not claim a hit rate when no request reports cache accounting", () => {
+     const result = summarizeCacheUsage([
+-      { promptTokens: 1000, cacheReadTokens: 0, cacheWriteTokens: 0, bucketKey: "p/m", timestamp: 1, reportedCache: false, kind: "request" },
++      { promptTokens: 1000, cacheReadTokens: 0, cacheWriteTokens: 0, cacheReadReported: false, cacheWriteReported: false,
++        bucketKey: "p/m", timestamp: 1, reportedCache: false, kind: "request" },
+     ]);
+ 
+     expect(result).toEqual({ promptTokens: 0, cacheReadTokens: 0, hitRate: undefined, requestCount: 0 });
+   });
+ });
++
++it('describes an idle gap as possible expiry rather than a measured provider TTL', () => {
++  const notice = formatCacheMissNotice({ missedTokens: 10_000, missedCost: 0.009,
++    idleMs: CACHE_TTL_MS + 1_000, modelChanged: false });
++  expect(notice).toContain('Estimated cache miss');
++  expect(notice).toContain('possible expiry');
++  expect(notice).not.toContain('> TTL');
++});
+diff --git a/packages/ts-shell/src/observability/usage/attribution.test.ts b/packages/ts-shell/src/observability/usage/attribution.test.ts
+index f859b703..cf267357 100644
+--- a/packages/ts-shell/src/observability/usage/attribution.test.ts
++++ b/packages/ts-shell/src/observability/usage/attribution.test.ts
+@@ -12,8 +12,8 @@ const A = 'attributed-a', B = 'attributed-b';
+ const rates = { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1 };
+ const capture = (baseUrl = 'https://relay.invalid/v1', prices = rates) => captureUsageAttribution({ provider: 'p', model: 'org/model', baseUrl, rates: prices });
+ const record = (session = A, attribution = capture(), tokens = 1_000_000) => recordSessionUsage(session, { attribution, promptTokens: tokens });
+-const recordRequest = (session = A, attribution = capture(), tokens = 1_000_000) => recordSessionUsage(session, {
+-  attribution, promptTokens: tokens, promptIdentity: { provider: attribution.provider, model: attribution.model,
++const recordRequest = (session = A, attribution = capture(), tokens = 1_000_000, cacheReadTokens?: number) => recordSessionUsage(session, {
++  attribution, promptTokens: tokens, cacheReadTokens, promptIdentity: { provider: attribution.provider, model: attribution.model,
+     endpoint: 'openai-compatible', endpointId: attribution.endpointId },
+ });
+ afterEach(() => { resetSessionUsage(A); resetSessionUsage(B); });
+@@ -113,7 +113,7 @@ it('merges independent v1 and v2 writers, and retries failed persistence without
+   expect(mergeUsageDelta(disk, legacy, legacy)).toEqual(disk);
+ });
+ 
+-it.each(['missing', 'price', 'endpoint', 'origin', 'negative', 'unknown-version', 'unknown-key'])('rejects %s attribution corruption', kind => {
++it.each(['missing', 'price', 'endpoint', 'origin', 'negative', 'unknown-version', 'unknown-key', 'read-presence', 'write-presence'])('rejects %s attribution corruption', kind => {
+   record();
+   let snapshot: any;
+   persistSessionUsage(A, undefined, next => { snapshot = JSON.parse(JSON.stringify(next)); });
+@@ -126,13 +126,15 @@ it.each(['missing', 'price', 'endpoint', 'origin', 'negative', 'unknown-version'
+   if (kind === 'negative') bucket.attribution.rates.promptPerMTok = -1;
+   if (kind === 'unknown-version') snapshot.schemaVersion = 3;
+   if (kind === 'unknown-key') { snapshot.byModel['@usage:other'] = { ...bucket }; delete snapshot.byModel['@usage:other'].attribution; }
++  if (kind === 'read-presence') snapshot.recentRequests[0].cacheReadReported = 'yes';
++  if (kind === 'write-presence') snapshot.recentRequests[0].cacheWriteReported = 1;
+   expect(() => decodeUsageSnapshot(snapshot)).toThrow();
+ });
+ 
+ it('uses current captured cache prices while separating price edits from destination changes', () => {
+-  recordRequest(A, capture(), 10_000);
+-  recordRequest(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 10_000);
+-  recordRequest(A, capture('https://relay.invalid/v2', { ...rates, promptPerMTok: 5 }), 10_000);
++  recordRequest(A, capture(), 10_000, 0);
++  recordRequest(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 10_000, 0);
++  recordRequest(A, capture('https://relay.invalid/v2', { ...rates, promptPerMTok: 5 }), 10_000, 0);
+   const result = findCacheWaste(getSessionUsage(A).recentRequests, () => { throw new Error('must not reprice'); });
+   expect(result.misses).toMatchObject([
+     { modelChanged: false, endpointChanged: false },
+@@ -143,18 +145,18 @@ it('uses current captured cache prices while separating price edits from destina
+ });
+ 
+ it('does not infer cache continuity between a legacy request and an attributed one', () => {
+-  recordSessionUsage(A, { provider: 'p', model: 'org/model', promptTokens: 10_000,
++  recordSessionUsage(A, { provider: 'p', model: 'org/model', promptTokens: 10_000, cacheReadTokens: 0,
+     promptIdentity: { provider: 'p', model: 'org/model' } });
+-  recordRequest(A, capture(), 10_000);
++  recordRequest(A, capture(), 10_000, 0);
+   expect(getSessionUsage(A).recentRequests.map(entry => entry.kind)).toEqual(['request', 'request']);
+   expect(findCacheWaste(getSessionUsage(A).recentRequests, () => rates).misses).toEqual([]);
+ });
+ 
+-it('keeps cache accounting across price edits without inferring support at another destination', () => {
++it('keeps measured cache accounting across price edits without inferring it at another destination', () => {
+   const attribution = capture();
+   recordSessionUsage(A, { attribution, promptTokens: 100, cacheReadTokens: 100,
+     promptIdentity: { provider: attribution.provider, model: attribution.model, endpointId: attribution.endpointId } });
+-  recordRequest(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 200);
++  recordRequest(A, capture('https://relay.invalid/v1', { ...rates, promptPerMTok: 3 }), 200, 0);
+   recordRequest(A, capture('https://relay.invalid/v2'), 300);
+   const history = getSessionUsage(A).recentRequests;
+   expect(history.map(entry => entry.reportedCache)).toEqual([true, true, false]);
+@@ -215,10 +217,10 @@ it.each(['context-reset', 'usage-gap'] as const)('persists %s after attributed u
+ it('detects and formats real-time turn-end cache miss warnings', () => {
+   resetSessionUsage(A);
+   const attr = capture('https://relay.invalid/v1', rates);
+-  recordRequest(A, attr, 10_000);
++  recordRequest(A, attr, 10_000, 0);
+   expect(detectLatestCacheMiss(getSessionUsage(A).recentRequests, () => rates)).toBeUndefined();
+-  recordRequest(A, attr, 12_000);
++  recordRequest(A, attr, 12_000, 0);
+   const miss = detectLatestCacheMiss(getSessionUsage(A).recentRequests, () => rates);
+   expect(miss).toBeDefined();
+-  expect(formatCacheMissNotice(miss!)).toContain('Cache miss: 10,000 prompt tokens re-billed');
++  expect(formatCacheMissNotice(miss!)).toContain('Estimated cache miss: 10,000 overlapping prompt tokens');
+ });
+diff --git a/packages/ts-shell/src/provider/response/usage.test.ts b/packages/ts-shell/src/provider/response/usage.test.ts
+index 25d55a8b..ab8790e0 100644
+--- a/packages/ts-shell/src/provider/response/usage.test.ts
++++ b/packages/ts-shell/src/provider/response/usage.test.ts
+@@ -24,18 +24,22 @@ const cases = [
+   { endpoint: "openai-compatible", body: { choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+     usage: { prompt_tokens: 100, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 80 } } },
+     events: [{ choices: [{ delta: { content: "ok" }, finish_reason: "stop" }], usage: { prompt_tokens: 100, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 80 } } }],
+-    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 0, totalTokens: 105 } },
++    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 0,
++      cacheReadReported: true, cacheWriteReported: false, totalTokens: 105 } },
+   { endpoint: "anthropic-messages", body: { content: [{ type: "text", text: "ok" }], stop_reason: "end_turn",
+     usage: { input_tokens: 20, output_tokens: 5, cache_read_input_tokens: 80, cache_creation_input_tokens: 10 } },
+     events: [{ type: "message_start", message: { usage: { input_tokens: 20, cache_read_input_tokens: 80, cache_creation_input_tokens: 10 } } },
+       { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 5 } }],
+-    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 10, totalTokens: 115 } },
++    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 10,
++      cacheReadReported: true, cacheWriteReported: true, totalTokens: 115 } },
+   ...["google-generative-ai", "google-vertex"].map(endpoint => ({ endpoint,
+     body: { candidates: [{ content: { parts: [{ text: "ok" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 2, thoughtsTokenCount: 3, cachedContentTokenCount: 80, totalTokenCount: 105 } },
+     events: [{ candidates: [{ finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 2, thoughtsTokenCount: 3, cachedContentTokenCount: 80, totalTokenCount: 105 } }],
+-    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 0, totalTokens: 105 } })),
++    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 0,
++      cacheReadReported: true, cacheWriteReported: false, totalTokens: 105 } })),
+   { endpoint: "bedrock-converse-stream", body: { output: { message: { content: [{ text: "ok" }] } }, usage: { inputTokens: 20, outputTokens: 5, cacheReadInputTokens: 80, cacheWriteInputTokens: 10, totalTokens: 115 } },
+-    events: [], expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 10, totalTokens: 115 } },
++    events: [], expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 10,
++      cacheReadReported: true, cacheWriteReported: true, totalTokens: 115 } },
+ ];
+ 
+ describe.each(cases)("$endpoint usage", ({ endpoint, body, events, expected }) => {
+@@ -62,3 +66,13 @@ describe.each(cases)("$endpoint usage", ({ endpoint, body, events, expected }) =
+     expect(usageFromProvider(next.value.usage!)).toEqual(expected);
+   });
+ });
++
++it.each([
++  { name: 'missing cache categories', usage: { prompt_tokens: 12, completion_tokens: 1 }, read: false, write: false },
++  { name: 'reported nested zero read', usage: { prompt_tokens: 12, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, read: true, write: false },
++  { name: 'reported native zero categories', usage: { prompt_tokens: 12, completion_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }, read: true, write: true },
++  { name: 'invalid native cache categories', usage: { prompt_tokens: 12, completion_tokens: 1, cache_read_input_tokens: NaN, cache_creation_input_tokens: -1 }, read: false, write: false },
++])('preserves $name independently of zero-filled billing counts', ({ usage, read, write }) => {
++  expect(usageFromProvider(usage)).toEqual({ promptTokens: 12, completionTokens: 1,
++    cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 13, cacheReadReported: read, cacheWriteReported: write });
++});
+diff --git a/packages/ts-shell/src/observability/usage/presence.test.ts b/packages/ts-shell/src/observability/usage/presence.test.ts
+new file mode 100644
+index 00000000..095d3078
+--- /dev/null
++++ b/packages/ts-shell/src/observability/usage/presence.test.ts
+@@ -0,0 +1,217 @@
++import { afterEach, describe, expect, it } from 'vitest';
++import type { ModelCostRates } from '../../core/models/catalog.js';
++import { costModel } from '../../core/commands/cost/model.js';
++import { usageFromProvider } from '../../provider/response/usage.js';
++import type { ProviderUsage } from '../../turn/completion.js';
++import { detectLatestCacheMiss, findCacheWaste, formatCacheMissNotice, summarizeCacheUsage, turnCacheMissNotice } from '../cacheWaste.js';
++import { getSessionUsage, markContextUnknown, persistSessionUsage, recordSessionUsage, resetSessionUsage, restoreSessionUsage, totalTokens } from '../usageTelemetry.js';
++import { attributedBucketKey, captureUsageAttribution } from './identity.js';
++import type { SessionUsageSnapshot, UsageAttribution, UsageHistoryEntry } from './model.js';
++import { decodeUsageHistory } from './snapshot.js';
++
++const A = 'cache-presence-a', B = 'cache-presence-b';
++const rates: ModelCostRates = { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1.25 };
++const readRates: ModelCostRates = { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1 };
++const firstHit: ProviderUsage = { prompt_tokens: 10_000, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 8_000 } };
++const capture = (prices = rates) => captureUsageAttribution({ provider: 'p', model: 'org/model', baseUrl: 'https://relay.invalid/v1', rates: prices });
++
++afterEach(() => { resetSessionUsage(A); resetSessionUsage(B); });
++
++function recordRaw(usage: ProviderUsage, attribution: UsageAttribution = capture(), session = A): void {
++  recordSessionUsage(session, {
++    ...usageFromProvider(usage), attribution,
++    promptIdentity: { provider: attribution.provider, model: attribution.model,
++      endpoint: 'openai-compatible', endpointId: attribution.endpointId },
++  });
++}
++
++function reopenedHistory(): UsageHistoryEntry[] {
++  let saved: SessionUsageSnapshot | undefined;
++  persistSessionUsage(A, undefined, next => { saved = next; });
++  restoreSessionUsage(B, JSON.parse(JSON.stringify(saved)));
++  return getSessionUsage(B).recentRequests;
++}
++
++function expectNoMiss(history: readonly UsageHistoryEntry[], prices = rates): void {
++  expect(findCacheWaste(history, () => prices).misses).toEqual([]);
++  expect(detectLatestCacheMiss(history, () => prices)).toBeUndefined();
++  expect(turnCacheMissNotice(history, () => prices)).toBeUndefined();
++}
++
++describe('provider cache accounting presence', () => {
++  it('keeps two prompt-only responses unknown without fabricating a cache miss or hit rate', () => {
++    recordRaw({ prompt_tokens: 10_000, completion_tokens: 1 });
++    recordRaw({ prompt_tokens: 12_000, completion_tokens: 1 });
++    const telemetry = getSessionUsage(A);
++    expect(telemetry.recentRequests.map(entry => entry.kind)).toEqual(['request', 'request']);
++    expect(telemetry.recentRequests.map(entry => entry.promptTokens)).toEqual([10_000, 12_000]);
++    expect(totalTokens(telemetry)).toBe(22_002);
++    expect(summarizeCacheUsage(telemetry.recentRequests)).toEqual({
++      promptTokens: 0, cacheReadTokens: 0, hitRate: undefined, requestCount: 0,
++    });
++    expectNoMiss(telemetry.recentRequests);
++    const reopened = reopenedHistory();
++    expect(summarizeCacheUsage(reopened).hitRate).toBeUndefined();
++    expectNoMiss(reopened);
++  });
++
++  it.each([
++    { name: 'omitted cache fields', usage: { prompt_tokens: 12_000, completion_tokens: 1 } },
++    { name: 'empty cache details', usage: { prompt_tokens: 12_000, completion_tokens: 1, prompt_tokens_details: {} } },
++    { name: 'only a cache-write category', usage: { prompt_tokens: 0, completion_tokens: 1, cache_creation_input_tokens: 12_000 } },
++  ] satisfies { name: string; usage: ProviderUsage }[])('excludes $name after a reported hit instead of inheriting a zero read', ({ usage }) => {
++    recordRaw(firstHit);
++    recordRaw(usage);
++    const expected = { promptTokens: 10_000, cacheReadTokens: 8_000, hitRate: 80, requestCount: 1 };
++    const history = getSessionUsage(A).recentRequests;
++    expect(history.map(entry => entry.promptTokens)).toEqual([10_000, 12_000]);
++    expect(summarizeCacheUsage(history)).toEqual(expected);
++    expectNoMiss(history);
++    const reopened = reopenedHistory();
++    expect(summarizeCacheUsage(reopened)).toEqual(expected);
++    expectNoMiss(reopened);
++  });
++
++  it('retains an explicit zero cache-read category as measured after a hit and after reopen', () => {
++    recordRaw(firstHit);
++    recordRaw({ prompt_tokens: 12_000, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } });
++    for (const history of [getSessionUsage(A).recentRequests, reopenedHistory()]) {
++      const summary = summarizeCacheUsage(history);
++      expect(summary).toMatchObject({ promptTokens: 22_000, cacheReadTokens: 8_000, requestCount: 2 });
++      expect(summary.hitRate).toBeCloseTo(8_000 / 22_000 * 100);
++      const miss = detectLatestCacheMiss(history, () => rates);
++      expect(miss?.missedTokens).toBe(10_000);
++      expect(miss?.missedCost).toBeCloseTo(0.009, 8);
++      expect(findCacheWaste(history, () => rates).misses).toEqual([miss]);
++    }
++  });
++
++  it.each(['context-reset', 'usage-gap'] as const)('does not compare an explicit measured zero across a %s', kind => {
++    recordRaw(firstHit);
++    markContextUnknown(A, kind);
++    recordRaw({ prompt_tokens: 12_000, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } });
++    const history = getSessionUsage(A).recentRequests;
++    expect(history.map(entry => entry.kind)).toEqual(['request', kind, 'request']);
++    expect(summarizeCacheUsage(history).requestCount).toBe(2);
++    expectNoMiss(history);
++    expectNoMiss(reopenedHistory());
++  });
++
++  it('treats old sticky-only zero entries as unknown while preserving positive legacy cache-read evidence', () => {
++    const attribution = capture();
++    const bucketKey = attributedBucketKey(attribution);
++    // Authored in the old schema: reportedCache describes earlier activity,
++    // and no per-request field-presence evidence was persisted for either row.
++    const history: UsageHistoryEntry[] = [
++      { promptTokens: 10_000, completionTokens: 1, cacheReadTokens: 8_000, cacheWriteTokens: 0,
++        bucketKey, attribution, timestamp: 1, reportedCache: true, kind: 'request' },
++      { promptTokens: 12_000, completionTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0,
++        bucketKey, attribution, timestamp: 2, reportedCache: true, kind: 'request' },
++    ];
++    const snapshot: SessionUsageSnapshot = {
++      schemaVersion: 2, byModel: { [bucketKey]: { attribution, promptTokens: 14_000, completionTokens: 2,
++        totalTokens: 22_002, cacheReadTokens: 8_000, cacheWriteTokens: 0, turnsCount: 2 } },
++      recentRequests: history, turnsCount: 2, toolCallsCount: 0, lastBucketKey: bucketKey, lastUpdated: 2,
++    };
++    restoreSessionUsage(B, JSON.parse(JSON.stringify(snapshot)));
++    expect(totalTokens(getSessionUsage(B))).toBe(22_002);
++    for (const decoded of [decodeUsageHistory(history), getSessionUsage(B).recentRequests]) {
++      expect(summarizeCacheUsage(decoded)).toEqual({ promptTokens: 10_000, cacheReadTokens: 8_000, hitRate: 80, requestCount: 1 });
++      expectNoMiss(decoded);
++    }
++  });
++});
++
++describe('estimated cache miss cost from observed paid categories', () => {
++  it.each([
++    { name: 'all cache-write input', input: 0, write: 10_000, extra: 0.0115 },
++    { name: 'mixed ordinary and cache-write input', input: 2_000, write: 8_000, extra: 0.011 },
++  ])('includes the write premium for $name', ({ input, write, extra }) => {
++    recordRaw(firstHit);
++    recordRaw({ prompt_tokens: input, completion_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: write });
++    for (const history of [getSessionUsage(A).recentRequests, reopenedHistory()]) {
++      expect(history.at(-1)?.promptTokens).toBe(10_000);
++      const result = findCacheWaste(history, () => rates);
++      expect(result.misses).toHaveLength(1);
++      expect(result.misses[0]?.missedTokens).toBe(10_000);
++      expect(result.misses[0]?.missedCost).toBeCloseTo(extra, 8);
++      expect(result.totals.missedCost).toBeCloseTo(extra, 8);
++      expect(detectLatestCacheMiss(history, () => rates)?.missedCost).toBeCloseTo(extra, 8);
++    }
++  });
++
++  it('withholds a dollar miss when an observed cache-write bucket had no captured rate', () => {
++    const attribution = capture(readRates);
++    recordRaw(firstHit, attribution);
++    recordRaw({ prompt_tokens: 0, completion_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 10_000 }, attribution);
++    expect(costModel(getSessionUsage(A), []).estimate.coverage).toBe('partial');
++    expectNoMiss(getSessionUsage(A).recentRequests);
++    expectNoMiss(reopenedHistory());
++  });
++
++  it('does not refill an absent captured write rate from a later catalogue publication', () => {
++    recordRaw(firstHit, capture());
++    recordRaw({ prompt_tokens: 0, completion_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 10_000 }, capture(readRates));
++    const catalogue = [{ id: 'p', models: [{ id: 'org/model', cost: rates }] }];
++    const report = costModel(getSessionUsage(A), catalogue as never);
++    expect(report.estimate.coverage).toBe('partial');
++    expect(report.buckets.every(bucket => bucket.rateBasis === 'captured')).toBe(true);
++    expect(report.buckets.find(bucket => bucket.cacheWriteTokens > 0)?.rates.cacheWritePerMTok).toBeNull();
++    expect(report.cache.waste.misses).toEqual([]);
++    expectNoMiss(getSessionUsage(A).recentRequests, rates);
++    const reopened = reopenedHistory();
++    expect(costModel(getSessionUsage(B), catalogue as never).cache.waste.misses).toEqual([]);
++    expectNoMiss(reopened, rates);
++  });
++
++  it('labels the turn-end notice as estimated overlap or potential extra cost', () => {
++    recordRaw(firstHit);
++    recordRaw({ prompt_tokens: 12_000, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } });
++    const history = getSessionUsage(A).recentRequests;
++    const miss = detectLatestCacheMiss(history, () => rates);
++    expect(miss).toBeDefined();
++    const notice = turnCacheMissNotice(history, () => rates);
++    expect(notice).toBe(formatCacheMissNotice(miss!));
++    expect(notice).toMatch(/\b(?:estimat(?:e|ed)|potential extra cost)\b/i);
++    expect(notice).not.toContain('prompt tokens re-billed');
++  });
++});
++
++describe('cache category evidence controls', () => {
++  it.each([
++    { name: 'negative nested read', usage: { prompt_tokens: 12_000, completion_tokens: 1, prompt_tokens_details: { cached_tokens: -1 } } },
++    { name: 'non-finite nested read', usage: { prompt_tokens: 12_000, completion_tokens: 1, prompt_tokens_details: { cached_tokens: NaN } } },
++    { name: 'infinite native read', usage: { prompt_tokens: 12_000, completion_tokens: 1, cache_read_input_tokens: Infinity } },
++    { name: 'negative native read', usage: { prompt_tokens: 12_000, completion_tokens: 1, cache_read_input_tokens: -1 } },
++  ] satisfies { name: string; usage: ProviderUsage }[])('does not turn a $name into a measured zero', ({ usage }) => {
++    recordRaw(firstHit);
++    recordRaw(usage);
++    for (const history of [getSessionUsage(A).recentRequests, reopenedHistory()]) {
++      expect(summarizeCacheUsage(history)).toEqual({ promptTokens: 10_000, cacheReadTokens: 8_000, hitRate: 80, requestCount: 1 });
++      expectNoMiss(history);
++    }
++  });
++
++  it('keeps an explicit numeric zero supplied through the direct recording API measurable', () => {
++    const attribution = capture();
++    recordRaw(firstHit, attribution);
++    recordSessionUsage(A, { attribution, promptTokens: 12_000, completionTokens: 1, cacheReadTokens: 0,
++      promptIdentity: { provider: attribution.provider, model: attribution.model,
++        endpoint: 'openai-compatible', endpointId: attribution.endpointId } });
++    for (const history of [getSessionUsage(A).recentRequests, reopenedHistory()]) {
++      expect(summarizeCacheUsage(history).requestCount).toBe(2);
++      expect(detectLatestCacheMiss(history, () => rates)?.missedTokens).toBe(10_000);
++    }
++  });
++
++  it('retains measured cache reads when the write category is omitted', () => {
++    recordRaw(firstHit);
++    recordRaw({ prompt_tokens: 3_000, completion_tokens: 1, cache_read_input_tokens: 9_000 });
++    for (const history of [getSessionUsage(A).recentRequests, reopenedHistory()]) {
++      const summary = summarizeCacheUsage(history);
++      expect(summary).toMatchObject({ promptTokens: 22_000, cacheReadTokens: 17_000, requestCount: 2 });
++      expect(summary.hitRate).toBeCloseTo(17_000 / 22_000 * 100);
++      expectNoMiss(history);
++    }
++  });
++});

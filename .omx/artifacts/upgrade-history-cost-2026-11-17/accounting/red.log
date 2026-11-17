@@ -1,0 +1,216 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/history-cost-worktree/packages/ts-shell
+
+ ❯ src/observability/usage/presence.test.ts (13 tests | 10 failed) 70ms
+   × provider cache accounting presence > keeps two prompt-only responses unknown without fabricating a cache miss or hit rate 9ms
+     → expected [ { missedTokens: 10000, …(4) } ] to deeply equal []
+   × provider cache accounting presence > excludes 'omitted cache fields' after a reported hit instead of inheriting a zero read 2ms
+     → expected { promptTokens: 22000, …(3) } to deeply equal { promptTokens: 10000, …(3) }
+   × provider cache accounting presence > excludes 'empty cache details' after a reported hit instead of inheriting a zero read 1ms
+     → expected { promptTokens: 22000, …(3) } to deeply equal { promptTokens: 10000, …(3) }
+   × provider cache accounting presence > excludes 'only a cache-write category' after a reported hit instead of inheriting a zero read 1ms
+     → expected { promptTokens: 22000, …(3) } to deeply equal { promptTokens: 10000, …(3) }
+   ✓ provider cache accounting presence > retains an explicit zero cache-read category as measured after a hit and after reopen 3ms
+   ✓ provider cache accounting presence > does not compare an explicit measured zero across a context-reset 2ms
+   ✓ provider cache accounting presence > does not compare an explicit measured zero across a usage-gap 1ms
+   × provider cache accounting presence > treats old sticky-only zero entries as unknown while preserving positive legacy cache-read evidence 1ms
+     → expected { promptTokens: 22000, …(3) } to deeply equal { promptTokens: 10000, …(3) }
+   × estimated cache miss cost from observed paid categories > includes the write premium for 'all cache-write input' 2ms
+     → expected 0.009000000000000001 to be close to 0.0115, received difference is 0.0024999999999999988, but expected 5e-9
+   × estimated cache miss cost from observed paid categories > includes the write premium for 'mixed ordinary and cache-write input' 1ms
+     → expected 0.009000000000000001 to be close to 0.011, received difference is 0.0019999999999999983, but expected 5e-9
+   × estimated cache miss cost from observed paid categories > withholds a dollar miss when an observed cache-write bucket had no captured rate 1ms
+     → expected [ { missedTokens: 10000, …(4) } ] to deeply equal []
+   × estimated cache miss cost from observed paid categories > does not refill an absent captured write rate from a later catalogue publication 6ms
+     → expected [ { missedTokens: 10000, …(4) } ] to deeply equal []
+   × estimated cache miss cost from observed paid categories > labels the turn-end notice as estimated overlap or potential extra cost 40ms
+     → expected 'Cache miss: 10,000 prompt tokens re-b…' to match /\b(?:estimat(?:e|ed)|potential extra…/i
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/observability/usage/presence.test.ts > provider cache accounting presence > keeps two prompt-only responses unknown without fabricating a cache miss or hit rate
+AssertionError: expected [ { missedTokens: 10000, …(4) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "endpointChanged": false,
++     "idleMs": 0,
++     "missedCost": 0.009000000000000001,
++     "missedTokens": 10000,
++     "modelChanged": false,
++   },
++ ]
+
+ ❯ expectNoMiss src/observability/usage/presence.test.ts:36:56
+     34| 
+     35| function expectNoMiss(history: readonly UsageHistoryEntry[], prices = …
+     36|   expect(findCacheWaste(history, () => prices).misses).toEqual([]);
+       |                                                        ^
+     37|   expect(detectLatestCacheMiss(history, () => prices)).toBeUndefined();
+     38|   expect(turnCacheMissNotice(history, () => prices)).toBeUndefined();
+ ❯ src/observability/usage/presence.test.ts:52:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  src/observability/usage/presence.test.ts > provider cache accounting presence > excludes 'omitted cache fields' after a reported hit instead of inheriting a zero read
+ FAIL  src/observability/usage/presence.test.ts > provider cache accounting presence > excludes 'empty cache details' after a reported hit instead of inheriting a zero read
+ FAIL  src/observability/usage/presence.test.ts > provider cache accounting presence > excludes 'only a cache-write category' after a reported hit instead of inheriting a zero read
+AssertionError: expected { promptTokens: 22000, …(3) } to deeply equal { promptTokens: 10000, …(3) }
+
+- Expected
++ Received
+
+  {
+    "cacheReadTokens": 8000,
+-   "hitRate": 80,
+-   "promptTokens": 10000,
+-   "requestCount": 1,
++   "hitRate": 36.36363636363637,
++   "promptTokens": 22000,
++   "requestCount": 2,
+  }
+
+ ❯ src/observability/usage/presence.test.ts:68:42
+     66|     const history = getSessionUsage(A).recentRequests;
+     67|     expect(history.map(entry => entry.promptTokens)).toEqual([10_000, …
+     68|     expect(summarizeCacheUsage(history)).toEqual(expected);
+       |                                          ^
+     69|     expectNoMiss(history);
+     70|     const reopened = reopenedHistory();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  src/observability/usage/presence.test.ts > provider cache accounting presence > treats old sticky-only zero entries as unknown while preserving positive legacy cache-read evidence
+AssertionError: expected { promptTokens: 22000, …(3) } to deeply equal { promptTokens: 10000, …(3) }
+
+- Expected
++ Received
+
+  {
+    "cacheReadTokens": 8000,
+-   "hitRate": 80,
+-   "promptTokens": 10000,
+-   "requestCount": 1,
++   "hitRate": 36.36363636363637,
++   "promptTokens": 22000,
++   "requestCount": 2,
+  }
+
+ ❯ src/observability/usage/presence.test.ts:119:44
+    117|     expect(totalTokens(getSessionUsage(B))).toBe(22_002);
+    118|     for (const decoded of [decodeUsageHistory(history), getSessionUsag…
+    119|       expect(summarizeCacheUsage(decoded)).toEqual({ promptTokens: 10_…
+       |                                            ^
+    120|       expectNoMiss(decoded);
+    121|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  src/observability/usage/presence.test.ts > estimated cache miss cost from observed paid categories > includes the write premium for 'all cache-write input'
+AssertionError: expected 0.009000000000000001 to be close to 0.0115, received difference is 0.0024999999999999988, but expected 5e-9
+ ❯ src/observability/usage/presence.test.ts:137:44
+    135|       expect(result.misses).toHaveLength(1);
+    136|       expect(result.misses[0]?.missedTokens).toBe(10_000);
+    137|       expect(result.misses[0]?.missedCost).toBeCloseTo(extra, 8);
+       |                                            ^
+    138|       expect(result.totals.missedCost).toBeCloseTo(extra, 8);
+    139|       expect(detectLatestCacheMiss(history, () => rates)?.missedCost).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  src/observability/usage/presence.test.ts > estimated cache miss cost from observed paid categories > includes the write premium for 'mixed ordinary and cache-write input'
+AssertionError: expected 0.009000000000000001 to be close to 0.011, received difference is 0.0019999999999999983, but expected 5e-9
+ ❯ src/observability/usage/presence.test.ts:137:44
+    135|       expect(result.misses).toHaveLength(1);
+    136|       expect(result.misses[0]?.missedTokens).toBe(10_000);
+    137|       expect(result.misses[0]?.missedCost).toBeCloseTo(extra, 8);
+       |                                            ^
+    138|       expect(result.totals.missedCost).toBeCloseTo(extra, 8);
+    139|       expect(detectLatestCacheMiss(history, () => rates)?.missedCost).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  src/observability/usage/presence.test.ts > estimated cache miss cost from observed paid categories > withholds a dollar miss when an observed cache-write bucket had no captured rate
+AssertionError: expected [ { missedTokens: 10000, …(4) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "endpointChanged": false,
++     "idleMs": 0,
++     "missedCost": 0.009000000000000001,
++     "missedTokens": 10000,
++     "modelChanged": false,
++   },
++ ]
+
+ ❯ expectNoMiss src/observability/usage/presence.test.ts:36:56
+     34| 
+     35| function expectNoMiss(history: readonly UsageHistoryEntry[], prices = …
+     36|   expect(findCacheWaste(history, () => prices).misses).toEqual([]);
+       |                                                        ^
+     37|   expect(detectLatestCacheMiss(history, () => prices)).toBeUndefined();
+     38|   expect(turnCacheMissNotice(history, () => prices)).toBeUndefined();
+ ❯ src/observability/usage/presence.test.ts:148:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  src/observability/usage/presence.test.ts > estimated cache miss cost from observed paid categories > does not refill an absent captured write rate from a later catalogue publication
+AssertionError: expected [ { missedTokens: 10000, …(4) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "endpointChanged": false,
++     "idleMs": 0,
++     "missedCost": 0.009000000000000001,
++     "missedTokens": 10000,
++     "modelChanged": false,
++   },
++ ]
+
+ ❯ src/observability/usage/presence.test.ts:160:39
+    158|     expect(report.buckets.every(bucket => bucket.rateBasis === 'captur…
+    159|     expect(report.buckets.find(bucket => bucket.cacheWriteTokens > 0)?…
+    160|     expect(report.cache.waste.misses).toEqual([]);
+       |                                       ^
+    161|     expectNoMiss(getSessionUsage(A).recentRequests, rates);
+    162|     const reopened = reopenedHistory();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  src/observability/usage/presence.test.ts > estimated cache miss cost from observed paid categories > labels the turn-end notice as estimated overlap or potential extra cost
+AssertionError: expected 'Cache miss: 10,000 prompt tokens re-b…' to match /\b(?:estimat(?:e|ed)|potential extra…/i
+
+- Expected: 
+/\b(?:estimat(?:e|ed)|potential extra cost)\b/i
+
++ Received: 
+"Cache miss: 10,000 prompt tokens re-billed (+$0.0090)."
+
+ ❯ src/observability/usage/presence.test.ts:175:20
+    173|     const notice = turnCacheMissNotice(history, () => rates);
+    174|     expect(notice).toBe(formatCacheMissNotice(miss!));
+    175|     expect(notice).toMatch(/\b(?:estimat(?:e|ed)|potential extra cost)…
+       |                    ^
+    176|     expect(notice).not.toContain('prompt tokens re-billed');
+    177|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  10 failed | 3 passed (13)
+   Start at  18:50:01
+   Duration  637ms (transform 256ms, setup 0ms, collect 344ms, tests 70ms, environment 0ms, prepare 54ms)
+

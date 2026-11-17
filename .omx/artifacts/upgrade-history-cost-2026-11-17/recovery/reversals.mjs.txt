@@ -1,0 +1,78 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const tree = path.join(repo, '.tmp/continuation-reversal');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'reversal-sources.json'), 'utf8'));
+const originals = new Map(Object.keys(manifest).map(file => [file, fs.readFileSync(path.join(tree, file))]));
+const receipt = { status: 'running', mainSourcesMutated: false, cases: [] };
+const remaining = process.argv.includes('--remaining');
+const moved = process.argv.includes('--moved');
+const presence = 'src/observability/usage/presence.test.ts';
+const changes = [
+  { name: 'raw-cache-presence', file: 'provider/response/usage.ts', tests: [presence],
+    replacements: [['cacheReadReported: reportedCount(cacheRead)', 'cacheReadReported: true'],
+      ['cacheWriteReported: reportedCount(usage.cache_creation_input_tokens)', 'cacheWriteReported: true']] },
+  { name: 'sticky-history-is-not-current-evidence', file: 'observability/cacheWaste.ts', tests: [presence],
+    replacements: [['&& cacheCategoryMeasured(entry.cacheReadTokens, entry.cacheReadReported));', '&& entry.reportedCache);']] },
+  { name: 'captured-write-premium', file: 'observability/cacheWaste.ts', tests: [presence],
+    replacements: [['Math.max(0, current.paidPerMTok - current.rates.cacheReadPerMTok!)',
+      'Math.max(0, current.rates.promptPerMTok - current.rates.cacheReadPerMTok!)']] },
+  { name: 'persisted-explicit-zero', file: 'observability/usage/snapshot.ts', tests: [presence],
+    replacements: [["      ...(entry.cacheReadReported === undefined ? {} : { cacheReadReported: entry.cacheReadReported as boolean }),\n", ''],
+      ["      ...(entry.cacheWriteReported === undefined ? {} : { cacheWriteReported: entry.cacheWriteReported as boolean }),\n", '']] },
+  { name: 'default-retained-tool-text', file: 'turn/messages.ts', tests: ['src/turn/retention.test.ts'],
+    replacements: [['  pruneOrOptions: boolean | OutgoingProjectionOptions = false,\n) {',
+      '  pruneOrOptions: boolean | OutgoingProjectionOptions = true,\n) {']] },
+  { name: 'unavailable-target-context-is-unknown', file: 'cli/interactive/sessionFacts.ts', tests: ['src/cli/interactive/sessionFacts.test.ts'],
+    filter: 'keeps unavailable model display',
+    replacements: [["const contextFact = !selected ? { contextSource: 'unknown' as const }\n    : preview?.tokens", 'const contextFact = preview?.tokens']] },
+  { name: 'unverified-role-notice-survives-return', file: 'cli/interactive/picker/model.ts', tests: ['src/cli/interactive/picker/model/snapshot.test.ts'],
+    filter: 'keeps unreadable saved choices',
+    replacements: [['undefined, signIn), back, notice);', 'undefined, signIn), back);']] },
+];
+
+try {
+  for (const change of moved ? changes.slice(6) : remaining ? changes.slice(4) : changes) {
+    const file = 'packages/ts-shell/src/' + change.file;
+    let source = originals.get(file).toString('utf8');
+    for (const [before, after] of change.replacements) {
+      if (source.split(before).length !== 2) throw new Error('reversal-fragment-not-unique:' + change.name);
+      source = source.replace(before, after);
+    }
+    fs.writeFileSync(path.join(tree, file), source);
+    const output = path.join(directory, 'reversal-' + change.name + '.json');
+    const args = ['env', 'NODE_OPTIONS=--max-old-space-size=1536', 'VITEST_MAX_THREADS=1', 'VITEST_MIN_THREADS=1',
+      'GIT_CEILING_DIRECTORIES=' + path.dirname(tree), 'npm', 'exec', '-w', 'packages/ts-shell', '--', 'vitest', 'run',
+      ...change.tests, ...(change.filter ? ['-t', change.filter] : []), '--no-file-parallelism', '--maxWorkers=1', '--minWorkers=1',
+      '--reporter=json', '--outputFile=' + output];
+    let result;
+    try {
+      result = spawnSync('rtk', args, { cwd: tree, encoding: 'utf8', timeout: 90_000, maxBuffer: 1024 * 1024 });
+      fs.writeFileSync(path.join(directory, 'reversal-' + change.name + '.log'), (result.stdout ?? '') + (result.stderr ?? ''));
+    } finally { fs.writeFileSync(path.join(tree, file), originals.get(file)); }
+    const report = fs.existsSync(output) ? JSON.parse(fs.readFileSync(output, 'utf8')) : undefined;
+    const failures = report?.testResults.flatMap(suite => suite.assertionResults.filter(test => test.status === 'failed')) ?? [];
+    const assertionFailures = failures.filter(test => test.failureMessages.some(message => message.includes('AssertionError')));
+    const restored = hash(fs.readFileSync(path.join(tree, file))) === manifest[file];
+    receipt.cases.push({ name: change.name, exitCode: result?.status ?? null, tests: report?.numTotalTests ?? null,
+      failed: report?.numFailedTests ?? null, assertionFailures: assertionFailures.length, restoredExactly: restored,
+      receipt: path.basename(output), mainSourcesMutated: false });
+    console.log(JSON.stringify(receipt.cases.at(-1)));
+    if (result?.status !== 1 || assertionFailures.length === 0 || !restored) throw new Error('invalid-reversal:' + change.name);
+  }
+  receipt.mainSourcesMatch = Object.entries(manifest).every(([file, digest]) => hash(fs.readFileSync(path.join(repo, file))) === digest);
+  receipt.restoredExactly = Object.entries(manifest).every(([file, digest]) => hash(fs.readFileSync(path.join(tree, file))) === digest);
+  if (!receipt.mainSourcesMatch || !receipt.restoredExactly) throw new Error('source-restoration-mismatch');
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failure = String(error.message); process.exitCode = 1;
+} finally {
+  for (const [file, bytes] of originals) fs.writeFileSync(path.join(tree, file), bytes);
+  fs.writeFileSync(path.join(directory, moved ? 'reversals-moved.json' : remaining ? 'reversals-remaining.json' : 'reversals.json'), JSON.stringify(receipt, null, 2) + '\n');
+}

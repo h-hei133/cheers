@@ -24,18 +24,22 @@ const cases = [
   { endpoint: "openai-compatible", body: { choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
     usage: { prompt_tokens: 100, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 80 } } },
     events: [{ choices: [{ delta: { content: "ok" }, finish_reason: "stop" }], usage: { prompt_tokens: 100, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 80 } } }],
-    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 0, totalTokens: 105 } },
+    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 0,
+      cacheReadReported: true, cacheWriteReported: false, totalTokens: 105 } },
   { endpoint: "anthropic-messages", body: { content: [{ type: "text", text: "ok" }], stop_reason: "end_turn",
     usage: { input_tokens: 20, output_tokens: 5, cache_read_input_tokens: 80, cache_creation_input_tokens: 10 } },
     events: [{ type: "message_start", message: { usage: { input_tokens: 20, cache_read_input_tokens: 80, cache_creation_input_tokens: 10 } } },
       { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 5 } }],
-    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 10, totalTokens: 115 } },
+    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 10,
+      cacheReadReported: true, cacheWriteReported: true, totalTokens: 115 } },
   ...["google-generative-ai", "google-vertex"].map(endpoint => ({ endpoint,
     body: { candidates: [{ content: { parts: [{ text: "ok" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 2, thoughtsTokenCount: 3, cachedContentTokenCount: 80, totalTokenCount: 105 } },
     events: [{ candidates: [{ finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 2, thoughtsTokenCount: 3, cachedContentTokenCount: 80, totalTokenCount: 105 } }],
-    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 0, totalTokens: 105 } })),
+    expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 0,
+      cacheReadReported: true, cacheWriteReported: false, totalTokens: 105 } })),
   { endpoint: "bedrock-converse-stream", body: { output: { message: { content: [{ text: "ok" }] } }, usage: { inputTokens: 20, outputTokens: 5, cacheReadInputTokens: 80, cacheWriteInputTokens: 10, totalTokens: 115 } },
-    events: [], expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 10, totalTokens: 115 } },
+    events: [], expected: { promptTokens: 20, completionTokens: 5, cacheReadTokens: 80, cacheWriteTokens: 10,
+      cacheReadReported: true, cacheWriteReported: true, totalTokens: 115 } },
 ];
 
 describe.each(cases)("$endpoint usage", ({ endpoint, body, events, expected }) => {
@@ -61,4 +65,14 @@ describe.each(cases)("$endpoint usage", ({ endpoint, body, events, expected }) =
     while (!next.done) next = await reader.next();
     expect(usageFromProvider(next.value.usage!)).toEqual(expected);
   });
+});
+
+it.each([
+  { name: 'missing cache categories', usage: { prompt_tokens: 12, completion_tokens: 1 }, read: false, write: false },
+  { name: 'reported nested zero read', usage: { prompt_tokens: 12, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, read: true, write: false },
+  { name: 'reported native zero categories', usage: { prompt_tokens: 12, completion_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }, read: true, write: true },
+  { name: 'invalid native cache categories', usage: { prompt_tokens: 12, completion_tokens: 1, cache_read_input_tokens: NaN, cache_creation_input_tokens: -1 }, read: false, write: false },
+])('preserves $name independently of zero-filled billing counts', ({ usage, read, write }) => {
+  expect(usageFromProvider(usage)).toEqual({ promptTokens: 12, completionTokens: 1,
+    cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 13, cacheReadReported: read, cacheWriteReported: write });
 });

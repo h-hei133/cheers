@@ -1,0 +1,3 @@
+JSON report written to /home/wang/projects/cheers/.tmp/continuation-validation/reversal-unavailable-target-context-is-unknown.json
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/cli/interactive/sessionFacts.test.ts -t keeps unavailable model display --no-file-parallelism --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/continuation-validation/reversal-unavailable-target-context-is-unknown.json

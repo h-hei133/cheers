@@ -461,3 +461,11 @@ Linux当前compiled CLI七组55 loopback POST通过logical／physical选择、�
 最终18源码hash核验与两项限定独立APPROVE／CLEAR一致。当前联合28套件482项、六静态门、2655生产模块0monoliths和build `ceabe4b89b3d`通过；六有效反转实际AssertionError、隔离树逐字节恢复，主仓库未被反转。Linux当前CLI21场景／53 loopback POST、两模式stderr-only PTY／exit143与配置模型3actual bodySent passed；后者body不可检查、未制造真实服务故障、原四配置hash不变，最小有效model entry仅用于隔离home。初launch observer把公共launcher与其CLI child混在同一回执，改为PID／parentPID追加并绑定实际captured owner；两失败observer／旧build取消失败保留。
 
 正常pinned NormProof judge exit2／not_proven，blocking unresolved obligation为missing。完整manifest图超过16384边，collector已排除dist、node_modules及symlink。相同parser／collector／manifest诊断：HEAD基线3356模块／16484边、当前3361／16511边，均在原上限失败；本批新增27边。临时32768诊断副本完整图unresolved=0，但未验证该上限通用安全包络，不能当默认judge通过。副本已删除，原18tracked NormProof文件hash不变；未改变scope、gate、bundle或package scripts，生产0monoliths与无关测试21-name advisory分别陈述。功能任务C.9／C.2本地勾选，仓库门禁仍未完成；证据`.omx/artifacts/upgrade-output-stream-2026-11-16/delivery.json`，整体goal active。
+
+## History retention and cache accounting acceptance (2026-11-17)
+
+C.4的默认旧正文裁剪缺口经当前pruneToolText=false与唯一projection调用链反证；沿用现有保留／测量／压缩owner。C.7仅修复当次cache read/write presence、captured完整write费率和估算报告，不另建缓存或账单系统。缺失／invalid／legacy sticky-only zero保持unknown，有效zero可测量；已观察但未定价的write不从现目录补填，gap／reset断比较。参考的前缀保留和按请求观察决定采用，保留本项目更严格的unknown语义。
+
+冻结18源文件仍匹配build0247cb1b526d的归档。最终联合21文件933项、六静态门、2657生产模块0monoliths、七有效AssertionError反转exact恢复及恢复4文件61项通过；五实际HTTP→request→accounting→persistence→cost与四两模式通知消费者通过。新独立cache审查APPROVE限定13文件，模型恢复审查APPROVE限定另5文件；主线程重核所有hash。模型恢复已独立提交a9099ca，严格请求准入未变，native未读模型UI未验证。
+
+Linux同代公开SDK／CLI配置模型21实际请求／10prompt轮通过：两次6144字节builtin read、年龄边界保留、同ID重开、显式pruning控制、真实automatic compaction commit及checkpoint续轮。压缩压力来自32seeded pairs／64messages和本地16000window，不当真实provider轮数或远端容量。两响应reported read、十九缺失，captured prices=null；不宣称节省、TTL、账单或native preview相等。实际normproof exit2／not_proven，shadow exit0不等价，未改变pinned输入或范围。证据upgrade-history-cost-2026-11-17；C.4／C.7本地功能验收，27/62、goal active。E.5／C.8后续源码改变构建输入，与冻结本批证据分开。

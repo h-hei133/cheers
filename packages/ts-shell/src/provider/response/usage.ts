@@ -4,12 +4,13 @@ import type { ProviderUsage } from "../../turn/completion.js";
 export function hasUsage(usage: ProviderUsage | undefined): usage is ProviderUsage {
   return usage != null && [usage.prompt_tokens, usage.completion_tokens, usage.total_tokens,
     usage.cache_read_input_tokens, usage.cache_creation_input_tokens, usage.prompt_tokens_details?.cached_tokens]
-    .some(value => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+    .some(reportedCount);
 }
 
 /** Exclusive billing categories shared by foreground and background requests. */
 export function usageFromProvider(usage: ProviderUsage) {
-  const cacheReadTokens = count(usage.cache_read_input_tokens ?? usage.prompt_tokens_details?.cached_tokens);
+  const cacheRead = usage.cache_read_input_tokens ?? usage.prompt_tokens_details?.cached_tokens;
+  const cacheReadTokens = count(cacheRead);
   const cacheWriteTokens = count(usage.cache_creation_input_tokens);
   // Top-level cache counters accompany exclusive input on native protocols.
   // Compatible chat APIs include cached reads in prompt_tokens.
@@ -18,10 +19,17 @@ export function usageFromProvider(usage: ProviderUsage) {
   const completionTokens = count(usage.completion_tokens);
   return {
     promptTokens, completionTokens, cacheReadTokens, cacheWriteTokens,
+    // Zero-filled accounting must not invent a provider-reported cache category.
+    cacheReadReported: reportedCount(cacheRead),
+    cacheWriteReported: reportedCount(usage.cache_creation_input_tokens),
     totalTokens: usage.total_tokens === undefined
       ? promptTokens + completionTokens + cacheReadTokens + cacheWriteTokens
       : count(usage.total_tokens),
   };
+}
+
+function reportedCount(value: number | undefined): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function count(value: number | undefined): number {

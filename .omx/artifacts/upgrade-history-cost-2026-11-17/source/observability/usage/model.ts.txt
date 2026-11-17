@@ -1,0 +1,178 @@
+/**
+ * What one model was used for, within a session.
+ *
+ * Usage is bucketed by model because a session can switch models partway through
+ * and the rates differ. A single flat record meant the newest model's rate was
+ * applied to every token the session had ever spent, so `/cost` reported an
+ * amount nobody would be billed: the counts were measured correctly and then
+ * attributed to the wrong model.
+ */
+import type { PromptMeasurementIdentity, RequestContext } from '../../context/request/model.js';
+import type { ModelCostRates } from '../../core/models/catalog.js';
+export type { PromptMeasurementIdentity } from '../../context/request/model.js';
+
+/**
+ * Bound the durable per-request history as well as the live view. The history
+ * covers a cache lifetime at normal pace without growing for an all-day session.
+ */
+export const MAX_RECENT_REQUESTS = 64;
+
+export interface UsageAttribution {
+  readonly provider: string;
+  readonly model: string;
+  /** Digest of the actual base address; never a raw credential-bearing URL. */
+  readonly endpointId: string;
+  /** Display origin only, without userinfo, path, query or fragment. */
+  readonly origin?: string;
+  /** Prices captured before sending. Null means no published price was known. */
+  readonly rates: Readonly<ModelCostRates> | null;
+}
+
+export interface ModelUsageBucket {
+  readonly attribution?: UsageAttribution;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** How many requests this model answered. */
+  turnsCount: number;
+}
+
+/** Missing accounting remains unknown after a successful write or a new request. */
+export interface UsageHealth {
+  readonly status: 'degraded';
+  /** Largest observed number of rejected records, not an invented token count. */
+  readonly rejectedBuckets: number;
+  readonly rejectedHistoryEntries: number;
+  readonly invalidSnapshot: boolean;
+}
+
+/** Partial identity captured before a request is accepted. */
+export type PromptIdentitySnapshot = Partial<PromptMeasurementIdentity>;
+
+export interface SessionUsageTelemetry {
+  lastPromptProjection?: import('../../context/request/model.js').PromptMeasurement['projection'];
+  readonly schemaVersion?: 2;
+  usageHealth?: UsageHealth;
+  /** Last accepted foreground request in this runtime, never persisted as cumulative usage. */
+  requestContext?: RequestContext;
+  /**
+   * Usage per destination and captured price, with legacy provider/model keys.
+   * Keys are opaque; attributed buckets carry their own identity.
+   *
+   * The only place token counts live. A session-level total would be a second
+   * copy that could disagree with the buckets it was derived from, and the whole
+   * point of the buckets is that one number cannot describe two models.
+   *
+   * The provider is part of the key because rates are published per provider: a
+   * model id that two providers both serve can cost different amounts, so keying
+   * by model alone repriced every earlier bucket the moment the user switched,
+   * which is the same defect the buckets were introduced to remove, one axis over.
+   *
+   * Built with a null prototype. A plain object inherits from `Object.prototype`,
+   * so a model named `__proto__` or `constructor` — both reachable, since the id
+   * is unvalidated input from `/model` and from a provider's model list — resolved
+   * to an inherited value and was written into it, corrupting the prototype for
+   * the whole process and reporting `NaN` tokens for that model.
+   */
+  byModel: Record<string, ModelUsageBucket>;
+  /**
+   * The last few requests, newest last, for reading what happened turn to turn.
+   *
+   * The buckets above answer "what has this session spent". They cannot answer
+   * "was the cache used well", because that is a question about one request
+   * relative to the one before it — how much of this prompt should have been a
+   * cache read, given what the previous request had already sent. That comparison
+   * needs both requests, and summing loses exactly the ordering it depends on.
+   *
+   * Bounded rather than complete. It is a running view for a report read during
+   * the session, not a ledger: a session left open for a day does not need every
+   * request it ever made kept in memory to answer a question about the recent
+   * past, and the oldest entries are the least relevant to it.
+   */
+  recentRequests: UsageHistoryEntry[];
+  /**
+   * Prompt tokens of the most recent request. This, not the cumulative total, is
+   * the session's live context footprint: every request resends the whole
+   * conversation, so the sum across turns counts the same context many times over.
+   * Undefined means no provider measurement bound to a request identity;
+   * a bound reported zero stays zero. Unbound usage still counts toward spend.
+   */
+  lastPromptTokens: number | undefined;
+  /**
+   * How many selected messages the context measurement is based on.
+   *
+   * The measured count only covers what was sent. Anything the conversation
+   * gained afterwards is not in the provider's number, so the two have to be
+   * added together before either can answer whether the next request fits.
+   * A projected request carries its exact wire count in `wireMessageCount`.
+   */
+  lastPromptMessageCount: number;
+  /** What the measurement describes; a different model or schema makes it stale. */
+  lastPromptIdentity?: PromptMeasurementIdentity;
+  turnsCount: number;
+  toolCallsCount: number;
+  /**
+   * The bucket key of the last recorded request.
+   *
+   * Not for display: it exists so a report that arrives without a model name is
+   * attributed to the one that last answered rather than to a separate `default`
+   * bucket that would split a single model's tokens in two. It was previously
+   * documented as "for display" while nothing displayed it, and every reader that
+   * once used it had been migrated to the bucket keys.
+   */
+  lastBucketKey: string;
+  lastUpdated: number;
+}
+
+/**
+ * One request, as the cache comparison needs to see it.
+ *
+ * `promptTokens` is the whole prompt the provider was sent — input plus both
+ * cache figures — because that is what the next request's cache reads are
+ * measured against. Category presence stays separate from zero-filled billing
+ * counts so an omitted cache field cannot become a measured zero.
+ */
+export interface UsageHistoryEntry {
+  /** Stable identity for bounded-history merges; absent on legacy snapshots. */
+  readonly id?: string;
+  readonly attribution?: UsageAttribution;
+  /** The prompt the provider was sent, in total. */
+  promptTokens: number;
+  /** Provider-reported output tokens for this request, when available. */
+  readonly completionTokens?: number;
+  /** Why the request was sent; only values the caller can prove are recorded. */
+  readonly purpose?: string;
+  readonly cacheReadTokens: number;
+  readonly cacheWriteTokens: number;
+  /** Current-request category evidence; absent on older snapshots, where only positive counts prove reporting. */
+  readonly cacheReadReported?: boolean;
+  readonly cacheWriteReported?: boolean;
+  /** Opaque accounting bucket key. Attribution distinguishes destination from price changes. */
+  readonly bucketKey: string;
+  readonly timestamp: number;
+  /**
+   * Whether earlier requests at this destination reported positive cache activity.
+   * Sticky history metadata, never evidence that the current request reported a
+   * zero cache category or that another destination supports caching.
+   */
+  readonly reportedCache: boolean;
+  /**
+   * Whether this entry marks a rebuilt context rather than a request.
+   *
+   * A compaction or a branch move replaces the conversation, so the prompt that
+   * follows shares nothing with the one before. Comparing them would count the
+   * whole rebuilt prompt as a miss that should have been a cache read, which is
+   * the opposite of what happened.
+   * A usage-gap marks a request without a reusable, request-bound prompt count; its
+   * numeric fields may retain reported usage but never establish measured
+   * context or cache continuity. Cumulative billing remains in the buckets.
+   */
+  readonly kind: "request" | "context-reset" | "usage-gap";
+}
+
+
+/** Durable cumulative counts plus the bounded request history used by attribution. */
+export type SessionUsageSnapshot = Pick<SessionUsageTelemetry,
+  "schemaVersion" | "usageHealth" | "byModel" | "turnsCount" | "toolCallsCount" | "lastBucketKey" | "lastUpdated" | "recentRequests">;
