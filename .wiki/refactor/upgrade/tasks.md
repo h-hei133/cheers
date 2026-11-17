@@ -70,7 +70,7 @@
 - [ ] **F1.4** OAuth 提供方及设备登录／更新：部分。原生 OpenAI／Google／Copilot 与设备兑换存在，其他提供方不能仅加按钮；复用凭据 proof 与更新 owner，真实同意缺失单列。
 - [ ] **F1.5** MCP PKCE／loopback／renewal 和懒加载：已有待验收。CLI 鉴权已向 gateway 注入 provider，旧“仅 Bearer”判断不成立；实际 OAuth fixture／撤权与 tools readiness。
 - [ ] **F2.1** 图片／分类器模型类别和媒体能力：部分，逐端点确认消费者、预算与真实 Linux 输入；不把目录字段当功能。
-- [ ] **F2.2** 远程目录 ETag 增量更新：部分，源码核实确认待修。304缺有效缓存正文仍报告成功；旧200可覆盖后继正文，旧304可重标后继ETag；取消／admission未到写入边界；null／primitive模型可被制造为有效条目，304计数／cachePath文案不准确。已有refresh/store owner应捕获source/path/raw身份并在写前复验，沿用配置publication；冻结源码真实loopback30项26红/4控制、storage/command追加19项全红已证实；本批无刷新生产修改，后续接通每次rename前guard及安全saved/unknown/unchanged结果，真实刷新验收尚未完成。
+- [x] **F2.2** 远程目录 ETag 增量更新：Linux本地功能验收完成。仅有效非空captured body、同source URL与matching validator可发ETag；304复用原body、真实counts/path，同validator保持格式原字节。cache owner固定profile/path/父identity/同FD raw+inode，所有writer同物理锁与原atomic，每次rename retry前复验原admission/signal/raw；旧响应不得覆盖/重标后继。producer保留saved/unknown/unchanged、固定安全失败分类及未读body清退；commands完整登记到apply/read，data拒绝携带冻结receipt/notice/cause，AbortError及文本list失败保留保存事实。最终20文件596项、七门/2682modules/0monoliths、buildc5ae05070276、13反转25AssertionErrors/exact恢复73项及限定独立FIXED/APPROVE通过。Linux同代11组26GET与配置模型两actual请求，npm15入口strict类型/10组25GET通过；原配置hash不变、私有state清理。只承诺当前Linux功能，不承诺editor最后rename窗口跨进程CAS；正常pinned judge实际exit2/not_proven，18tracked files不变。[交付](../../../.omx/artifacts/upgrade-catalog-2026-11-18/delivery.json)。
 - [ ] **F2.3** 无 eval Schema 校验：缺口。当前 AJV 运行时 compile；替换原校验 owner，覆盖 dialect／ref／format、无 coercion、unknown 拒绝及安全错误。
 - [ ] **F2.4** 阶梯计价：缺口。当前只有平费率；按单次请求含缓存输入的严格阈值选择完整费率并持久化，不用会话累计重新选档。
 - [ ] **F2.5** Span／Event／Link／检索／作用域：部分验收。真实runTurn/session/request/tool及普通日志接通，11个新增反例先红后修，独立暂存树9套件70项、五静态门、build `2c8cce9867b8`通过。独立Linux进程验证异步observer/span拒绝不崩溃、custom recorder捕获sink；缺ID持久读保留并标missing。dashboard的profile/session检索来源一致性仍待核实，未勾选；F2.6另列。
@@ -200,3 +200,5 @@
 
 
 2026-11-18 E.1/E.3/D.4验证收尾：最终49文件963项、七静态门、2678生产module/0monoliths及build3e05e202dc57通过。12script反转23AssertionErrors/96恢复项、7export反转18AssertionErrors/149恢复项，main source未反转且exact恢复；同代public SDK配置模型6actual requests完整allowed/retry，六raw controls、npm15入口strict类型/安装后读写、Linux实际CLI及离线Chromiumpassed。当前source/build/config hash复核，private runtime state removed；旧构建成功、model-no-script/provider-network失败及probe/fixture回归保留。E.3 richer dispatch/provider image、D.4 fullGFM继续部分；E.1独立审查待收齐，29/62保持。F2.2只读核实确认缓存body/旧响应/取消/无效record缺口，转部分。默认NormProof仍actual exit2/not_proven，临时32768诊断16661边/0unresolved不代替默认门禁，18pinned files未改。交付draft在upgrade-composition-export-2026-11-18，无push/CI。
+
+2026-11-18 F2.2：冻结源码30项26红/4控制、storage/command追加19红后修。复审headers body两红、data结果两红、body network一红、post-read六红和post-result callback三红均保留；最终596项联合/13有效反转/同代native及npm安装passed。旧b2ba99581604及5beb3a8bd3c4保持历史，不将初绿扩展至最终源码。完整NormProof容量missing继续not_proven，31/62；按授权本地提交后继续F2.4，不push。

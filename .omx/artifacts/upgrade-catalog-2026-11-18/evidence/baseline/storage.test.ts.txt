@@ -1,0 +1,377 @@
+import fs from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
+import type { Socket } from 'node:net';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { refreshCatalog } from '../../../packages/ts-shell/src/core/models/catalogRefresh.js';
+import { catalogCachePath, writeCatalogCache } from '../../../packages/ts-shell/src/core/models/catalogStore.js';
+
+// These intersections describe the pending contract without changing frozen sources.
+type RefreshOptions = NonNullable<Parameters<typeof refreshCatalog>[1]> & {
+  readonly signal?: AbortSignal;
+  readonly admission?: () => string | undefined;
+};
+type RefreshResult = Awaited<ReturnType<typeof refreshCatalog>> & {
+  readonly cacheOutcome?: 'unchanged' | 'saved' | 'unknown';
+  readonly errorKind?: 'network' | 'http' | 'json' | 'invalid_index' | 'cancelled' | 'admission' | 'stale' | 'storage';
+};
+interface Request {
+  readonly incoming: http.IncomingMessage;
+  readonly response: http.ServerResponse;
+}
+interface Index {
+  url(): string;
+  refresh(options?: RefreshOptions): Promise<RefreshResult>;
+  request(position?: number): Promise<Request>;
+}
+
+// External edits bypass the observed call so an injected owner effect is never recursive.
+const native = {
+  openSync: fs.openSync,
+  readFileSync: fs.readFileSync,
+  writeFileSync: fs.writeFileSync,
+  fsyncSync: fs.fsyncSync,
+  renameSync: fs.renameSync,
+  rmSync: fs.rmSync,
+};
+
+let isolatedHome: string;
+beforeEach(() => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  isolatedHome = fs.mkdtempSync('/tmp/cheers-test/catalog-storage-');
+  vi.stubEnv('HOME', isolatedHome);
+  vi.stubEnv('USERPROFILE', isolatedHome);
+  vi.stubEnv('CHEERS_TEST_ROOT', isolatedHome);
+  expect(path.relative(isolatedHome, catalogCachePath())).toBe(path.join('.cheers', 'models-cache.json'));
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  fs.rmSync(isolatedHome, { recursive: true, force: true });
+});
+
+function rawCache(): string | undefined {
+  const file = catalogCachePath();
+  return fs.existsSync(file) ? native.readFileSync(file, 'utf8') : undefined;
+}
+
+function seedCache(indexUrl: string): string {
+  expect(writeCatalogCache([{ id: 'demo', models: [{ id: 'accepted' }] }], { indexUrl, etag: '"old"' }))
+    .toBe(catalogCachePath());
+  return rawCache()!;
+}
+
+function successor(indexUrl: string): string {
+  return JSON.stringify({ indexUrl, etag: '"successor"', providers: {
+    demo: { id: 'demo', models: [{ id: 'successor' }] },
+  } }, null, 2) + '\n';
+}
+
+function replaceCache(file: string, text: string): void {
+  const external = file + '.external';
+  native.writeFileSync(external, text);
+  native.renameSync(external, file);
+}
+
+function storageError(code = 'EIO'): NodeJS.ErrnoException {
+  return Object.assign(new Error('PRIVATE_STORAGE_DETAIL'), { code });
+}
+
+function respond(request: Request): void {
+  request.response.setHeader('content-type', 'application/json');
+  request.response.setHeader('etag', '"downloaded"');
+  request.response.end(JSON.stringify({ demo: { models: { downloaded: { id: 'downloaded' } } } }));
+}
+
+/** Hook the real same-directory temporary file only after its real fsync completes. */
+function observeStaging(file: string, observe: () => void): void {
+  const staged = new Set<number>();
+  vi.spyOn(fs, 'openSync').mockImplementation((target, flags, mode) => {
+    const fd = native.openSync(target, flags, mode);
+    if (typeof target === 'string' && target.startsWith(file + '.tmp-')) staged.add(fd);
+    else staged.delete(fd);
+    return fd;
+  });
+  vi.spyOn(fs, 'fsyncSync').mockImplementation(fd => {
+    native.fsyncSync(fd);
+    if (staged.delete(fd)) observe();
+  });
+}
+
+async function withIndex<T>(run: (index: Index) => Promise<T>, onRequest?: (request: Request) => void): Promise<T> {
+  const requests: Request[] = [];
+  const operations: Promise<RefreshResult>[] = [];
+  const sockets = new Set<Socket>();
+  let closing = false;
+  const server = http.createServer((incoming, response) => {
+    const request = { incoming, response };
+    requests.push(request);
+    if (closing) { response.statusCode = 503; response.end(); }
+    else onRequest?.(request);
+  });
+  server.on('connection', socket => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const url = 'http://127.0.0.1:' + (server.address() as { port: number }).port + '/api.json';
+  const index: Index = {
+    url: () => url,
+    refresh: options => {
+      const operation = refreshCatalog(url, options) as Promise<RefreshResult>;
+      operations.push(operation);
+      return operation;
+    },
+    request: async (position = 0) => {
+      await vi.waitFor(() => expect(requests[position]).toBeDefined(), { timeout: 2_000, interval: 10 });
+      return requests[position]!;
+    },
+  };
+  try { return await run(index); }
+  finally {
+    closing = true;
+    for (const { response } of requests) {
+      if (!response.writableEnded && !response.destroyed) {
+        if (!response.headersSent) response.statusCode = 503;
+        response.end();
+      }
+    }
+    await Promise.allSettled(operations);
+    await new Promise<void>((resolve, reject) => {
+      server.close(error => error ? reject(error) : resolve());
+      for (const socket of sockets) socket.destroy();
+    });
+  }
+}
+
+describe('catalogue storage publication', () => {
+  it('refuses a cache replacement after the real staging fsync', async () => {
+    await withIndex(async index => {
+      seedCache(index.url());
+      const file = catalogCachePath(), accepted = successor(index.url());
+      let staged = false, renames = 0;
+      observeStaging(file, () => { staged = true; replaceCache(file, accepted); });
+      vi.spyOn(fs, 'renameSync').mockImplementation((source, target) => {
+        if (target === file) renames++;
+        native.renameSync(source, target);
+      });
+      const operation = index.refresh();
+      respond(await index.request());
+      expect(await operation).toMatchObject({ ok: false, cacheOutcome: 'unchanged', errorKind: 'stale' });
+      expect(staged).toBe(true);
+      expect(renames).toBe(0);
+      expect(rawCache()).toBe(accepted);
+    });
+  });
+
+  it('rechecks cache identity before retrying a rename that returned EBUSY', async () => {
+    await withIndex(async index => {
+      seedCache(index.url());
+      const file = catalogCachePath(), accepted = successor(index.url());
+      let attempts = 0;
+      vi.spyOn(fs, 'renameSync').mockImplementation((source, target) => {
+        if (target === file) {
+          attempts++;
+          if (attempts === 1) {
+            replaceCache(file, accepted);
+            throw storageError('EBUSY');
+          }
+        }
+        native.renameSync(source, target);
+      });
+      const operation = index.refresh();
+      respond(await index.request());
+      expect(await operation).toMatchObject({ ok: false, cacheOutcome: 'unchanged', errorKind: 'stale' });
+      expect(attempts).toBe(1);
+      expect(rawCache()).toBe(accepted);
+    });
+  });
+
+  it('reports saved bytes and actual counts when lock release fails after a successful rename', async () => {
+    await withIndex(async index => {
+      seedCache(index.url());
+      const file = catalogCachePath();
+      let published = false, releaseFailed = false;
+      vi.spyOn(fs, 'renameSync').mockImplementation((source, target) => {
+        native.renameSync(source, target);
+        if (target === file) published = true;
+      });
+      vi.spyOn(fs, 'rmSync').mockImplementation((target, options) => {
+        if (target === file + '.lock' && published) {
+          releaseFailed = true;
+          throw storageError();
+        }
+        native.rmSync(target, options);
+      });
+      const operation = index.refresh();
+      respond(await index.request());
+      const result = await operation;
+      expect(published).toBe(true);
+      expect(releaseFailed).toBe(true);
+      expect(result).toMatchObject({ ok: false, cacheOutcome: 'saved', errorKind: 'storage',
+        providers: 1, models: 1, cachePath: file });
+      expect(JSON.parse(rawCache()!)).toMatchObject({ etag: '"downloaded"', providers: {
+        demo: { models: [{ id: 'downloaded' }] },
+      } });
+      expect(JSON.stringify(result)).not.toContain('PRIVATE_STORAGE_DETAIL');
+    });
+  });
+
+  it('rechecks the cache after a reentrant admission callback at the final rename guard', async () => {
+    await withIndex(async index => {
+      seedCache(index.url());
+      const file = catalogCachePath(), accepted = successor(index.url());
+      let staged = false, callbackWrote = false;
+      observeStaging(file, () => { staged = true; });
+      const operation = index.refresh({ admission: () => {
+        if (staged && !callbackWrote) {
+          callbackWrote = true;
+          // Model an external synchronous effect without recursively taking the owner's lock.
+          replaceCache(file, accepted);
+        }
+        return undefined;
+      } });
+      respond(await index.request());
+      expect(await operation).toMatchObject({ ok: false, cacheOutcome: 'unchanged', errorKind: 'stale' });
+      expect(staged).toBe(true);
+      expect(callbackWrote).toBe(true);
+      expect(rawCache()).toBe(accepted);
+    });
+  });
+
+  it('refuses publication after the parent of an absent cache changes identity', async () => {
+    await withIndex(async index => {
+      const file = catalogCachePath(), directory = path.dirname(file);
+      fs.mkdirSync(directory, { recursive: true });
+      expect(rawCache()).toBeUndefined();
+      const original = fs.statSync(directory);
+      const operation = index.refresh();
+      const request = await index.request();
+      native.renameSync(directory, directory + '-retired');
+      fs.mkdirSync(directory);
+      native.writeFileSync(path.join(directory, 'owner.txt'), 'successor owns this directory');
+      expect(fs.statSync(directory).ino).not.toBe(original.ino);
+      respond(request);
+      expect(await operation).toMatchObject({ ok: false, cacheOutcome: 'unchanged', errorKind: 'stale' });
+      expect(rawCache()).toBeUndefined();
+      expect(fs.readdirSync(directory)).toEqual(['owner.txt']);
+      expect(fs.readdirSync(directory + '-retired')).toEqual([]);
+    });
+  });
+
+  it('preserves exact formatted bytes when a valid 304 repeats the same ETag', async () => {
+    await withIndex(async index => {
+      seedCache(index.url());
+      const file = catalogCachePath();
+      native.writeFileSync(file, ' \n' + rawCache()!.trimEnd() + '\n\t');
+      const before = rawCache();
+      const rename = vi.spyOn(fs, 'renameSync');
+      const operation = index.refresh();
+      const request = await index.request();
+      expect(request.incoming.headers['if-none-match']).toBe('"old"');
+      request.response.statusCode = 304;
+      request.response.setHeader('etag', '"old"');
+      request.response.end();
+      expect(await operation).toMatchObject({ ok: true, notModified: true, cacheOutcome: 'unchanged',
+        providers: 1, models: 1, cachePath: file, etag: '"old"' });
+      expect(rawCache()).toBe(before);
+      expect(rename).not.toHaveBeenCalled();
+    });
+  });
+
+  it('classifies an actual invalid JSON body without leaking PRIVATE_REMOTE_BODY', async () => {
+    await withIndex(async index => {
+      const before = seedCache(index.url());
+      const operation = index.refresh();
+      const request = await index.request();
+      request.response.setHeader('content-type', 'application/json');
+      request.response.setHeader('etag', '"invalid"');
+      request.response.end('PRIVATE_REMOTE_BODY');
+      const result = await operation;
+      expect(result).toMatchObject({ ok: false, cacheOutcome: 'unchanged', errorKind: 'json' });
+      expect(result.error).toEqual(expect.any(String));
+      expect(JSON.stringify(result)).not.toContain('PRIVATE_REMOTE_BODY');
+      expect(rawCache()).toBe(before);
+    });
+  });
+
+  it('retains the original cache when staging fsync fails before rename starts', async () => {
+    await withIndex(async index => {
+      const before = seedCache(index.url()), file = catalogCachePath();
+      let failed = false, renamed = false;
+      observeStaging(file, () => { failed = true; throw storageError(); });
+      vi.spyOn(fs, 'renameSync').mockImplementation((source, target) => {
+        if (target === file) renamed = true;
+        native.renameSync(source, target);
+      });
+      const operation = index.refresh();
+      respond(await index.request());
+      const result = await operation;
+      expect(failed).toBe(true);
+      expect(renamed).toBe(false);
+      expect(result).toMatchObject({ ok: false, cacheOutcome: 'unchanged', errorKind: 'storage' });
+      expect(JSON.stringify(result)).not.toContain('PRIVATE_STORAGE_DETAIL');
+      expect(rawCache()).toBe(before);
+      expect(fs.readdirSync(path.dirname(file))).toEqual([path.basename(file)]);
+    });
+  });
+
+  it('keeps the outcome unknown when rename throws after its actual filesystem effect', async () => {
+    await withIndex(async index => {
+      seedCache(index.url());
+      const file = catalogCachePath();
+      let renameCompleted = false;
+      vi.spyOn(fs, 'renameSync').mockImplementation((source, target) => {
+        native.renameSync(source, target);
+        if (target === file) {
+          renameCompleted = true;
+          throw storageError();
+        }
+      });
+      const operation = index.refresh();
+      respond(await index.request());
+      const result = await operation;
+      expect(renameCompleted).toBe(true);
+      expect(result).toMatchObject({ ok: false, cacheOutcome: 'unknown', errorKind: 'storage' });
+      expect(JSON.stringify(result)).not.toContain('PRIVATE_STORAGE_DETAIL');
+      expect(JSON.parse(rawCache()!)).toMatchObject({ etag: '"downloaded"', providers: {
+        demo: { models: [{ id: 'downloaded' }] },
+      } });
+    });
+  });
+
+  it('binds captured bytes to the same fd and refuses a same-byte replacement with a different inode', async () => {
+    await withIndex(async index => {
+      const before = seedCache(index.url()), file = catalogCachePath();
+      const original = fs.statSync(file);
+      const opened = new Set<number>();
+      let replaced = false, readFromFd = false;
+      vi.spyOn(fs, 'openSync').mockImplementation((target, flags, mode) => {
+        const fd = native.openSync(target, flags, mode);
+        if (target === file) opened.add(fd);
+        else opened.delete(fd);
+        return fd;
+      });
+      vi.spyOn(fs, 'readFileSync').mockImplementation((target, options) => {
+        const content = native.readFileSync(target, options);
+        if (!replaced && (target === file || typeof target === 'number' && opened.has(target))) {
+          readFromFd = typeof target === 'number';
+          replaced = true;
+          // The fd still names the old inode, although the selected path has identical bytes.
+          replaceCache(file, before);
+        }
+        return content;
+      });
+      // A capture refusal may precede HTTP; any admitted request still gets a real response.
+      const result = await index.refresh();
+      expect(replaced).toBe(true);
+      expect(readFromFd).toBe(true);
+      expect(fs.statSync(file).ino).not.toBe(original.ino);
+      expect(result).toMatchObject({ ok: false, cacheOutcome: 'unchanged', errorKind: 'stale' });
+      expect(rawCache()).toBe(before);
+    }, respond);
+  });
+});

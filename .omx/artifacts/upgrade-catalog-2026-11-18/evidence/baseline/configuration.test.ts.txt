@@ -1,0 +1,389 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { getRuntimeConfig, getUserRuntimeConfigPath, type RuntimeConfigFile } from '../../../packages/ts-shell/src/core/commands/../../config/runtimeConfig.js';
+import { userCatalogPath } from '../../../packages/ts-shell/src/core/commands/../models/catalogStore.js';
+import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../../../packages/ts-shell/src/core/commands/../shell/runtimeContext.js';
+import { configurationAdmission } from '../../../packages/ts-shell/src/core/commands/../shell/configuration.js';
+import { resolveCliCredential } from '../../../packages/ts-shell/src/core/commands/../../cli/provider/cliProviderRuntimeBridge.js';
+import { SessionManager } from '../../../packages/ts-shell/src/core/commands/../../session/SessionManager.js';
+import { recordRequestContext, recordSessionUsage } from '../../../packages/ts-shell/src/core/commands/../../observability/usageTelemetry.js';
+import { captureUsageAttribution } from '../../../packages/ts-shell/src/core/commands/../../observability/usage/identity.js';
+import type { CommandReport } from '../../../packages/ts-shell/src/core/commands/./report/contract.js';
+import { requestContext } from '../../../packages/ts-shell/src/core/commands/../../context/request/projection.js';
+import { requestIdentity } from '../../../packages/ts-shell/src/core/commands/../../context/request/identity.js';
+import * as transport from '../../../packages/ts-shell/src/core/commands/../../provider/request/fetch.js';
+import * as refresh from '../../../packages/ts-shell/src/core/commands/../models/catalogRefresh.js';
+import { runBtwCommand } from '../../../packages/ts-shell/src/core/commands/./btwCommandRuntime.js';
+import { runContextCommand } from '../../../packages/ts-shell/src/core/commands/./contextCommandRuntime.js';
+import { runModelCommand } from './modelCommandRuntime.js';
+import { modelPicker } from '../../../packages/ts-shell/src/core/commands/../../cli/interactive/picker/model.js';
+import { connectionPicker } from '../../../packages/ts-shell/src/core/commands/../../cli/interactive/picker/connections.js';
+import { activeModelName, readStatusFacts, readWelcomeState } from '../../../packages/ts-shell/src/core/commands/../../cli/interactive/sessionFacts.js';
+import { createCatalogLoader, catalogIdentity } from '../../../packages/ts-shell/src/core/commands/../../cli/interactive/completion/catalog.js';
+import { buildCliCommandExecution } from '../../../packages/ts-shell/src/core/commands/../../entrypoints/cliCommandExecutionBridge.js';
+import { StreamingRenderer } from '../../../packages/ts-shell/src/core/commands/../../presentation/terminal/streaming.js';
+import type { CliMcpGateway } from '../../../packages/ts-shell/src/core/commands/../../entrypoints/cliMcpModule.js';
+import type { CommandContext } from '../../../packages/ts-shell/src/core/commands/./types.js';
+import { Pager, pageLongOutput } from '../../../packages/ts-shell/src/core/commands/../../presentation/tui/chrome/pager.js';
+import { visibleWidth } from '../../../packages/ts-shell/src/core/commands/../../presentation/tui/text/measure.js';
+import { reportText } from '../../../packages/ts-shell/src/core/commands/./report/projection.js';
+import { ShellCommandRuntime } from '../../../packages/ts-shell/src/core/commands/../shell/command.js';
+
+let root: string;
+let file: string;
+let settings: RuntimeConfigFile;
+beforeEach(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'command-config-'));
+  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root);
+  file = getUserRuntimeConfigPath(); fs.mkdirSync(path.dirname(file), { recursive: true });
+  const connection = { authType: 'api-key' as const, apiKey: 'saved-synthetic', createdAt: '2026-01-01', updatedAt: '2026-01-01' };
+  settings = { provider: 'openai', activeProviderConnectionId: 'main', maxOutputTokens: 1024, reserveTokens: 8000,
+    providerConnections: [{ ...connection, id: 'main', provider: 'openai', model: 'other' },
+      { ...connection, id: 'alternate', provider: 'google', model: 'chosen', baseUrl: 'https://chosen.invalid' }],
+    modelTokenBudgets: { 'google/chosen': { reserveTokens: 0 } } };
+  fs.writeFileSync(file, JSON.stringify(settings));
+  catalog();
+});
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
+
+function catalog(extra = 'accepted-only', window = 16000) {
+  fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: {
+    google: { endpoint: 'openai-compatible', models: [
+      { id: 'chosen', contextWindow: window, maxTokens: 2048, cost: { promptPerMTok: window / 1000, completionPerMTok: 0 }, compat: { supportsTemperature: false } }, { id: extra },
+    ] },
+    custom: { runtime: 'openai-compatible', baseUrl: `https://${extra}.invalid`, models: [{ id: extra }] },
+  } }));
+}
+
+it('accepts only a live calibrated context result and preserves cancellation during inspection', async () => {
+  const { context } = fixture();
+  const target = context.resolveConfigTarget!(context.runtimeConfig!, context.sessionId);
+  const attribution = captureUsageAttribution({ provider: target.provider, model: target.model!, baseUrl: target.baseUrl! });
+  const read = vi.fn(async () => ({ tokens: 3000, source: 'calibrated' as const, method: 'characters/3.5' as const,
+    identity: { provider: target.provider, model: target.model!, endpoint: 'openai-compatible', endpointId: attribution.endpointId } }));
+  const result = await runContextCommand([], { ...context, contextEstimate: read, getToolPool: async () => new Map() });
+  expect(result.report?.facts.prompt).toEqual({ status: 'calibrated', tokens: 3000 });
+  expect(read).toHaveBeenCalledTimes(1);
+  const changed = await runContextCommand([], { ...context, getToolPool: async () => new Map(),
+    contextEstimate: async signal => ({ ...await read(), identity: { ...(await read()).identity, model: 'other' } }) });
+  expect(changed.report?.facts.prompt).toEqual({ status: 'unknown' });
+  const controller = new AbortController();
+  await expect(runContextCommand([], { ...context, signal: controller.signal, getToolPool: async () => new Map(),
+    contextEstimate: async () => { controller.abort(); throw new Error('stale'); } })).rejects.toThrow();
+});
+
+it.each(['tool pool', 'estimate', 'estimate failure'] as const)('refuses a configuration publication replaced during %s', async phase => {
+  const { shell, context } = fixture();
+  let publication = shell.configuration.current;
+  const replace = () => { publication = { ...publication, config: { ...publication.config, reserveTokens: 999 } }; };
+  const result = await runContextCommand([], { ...context, readConfiguration: () => publication,
+    getToolPool: async () => { if (phase === 'tool pool') replace(); return new Map(); },
+    contextEstimate: async () => {
+      replace();
+      if (phase === 'estimate failure') throw new Error('unavailable');
+      return { tokens: 3000, source: 'calibrated', method: 'characters/3.5',
+        identity: { provider: 'google', model: 'chosen', endpoint: 'openai-compatible',
+          endpointId: captureUsageAttribution({ provider: 'google', model: 'chosen', baseUrl: 'https://chosen.invalid' }).endpointId } };
+    } });
+  expect(result.output).toBe('Context changed during inspection.');
+  expect(result.report).toBeUndefined();
+});
+
+it('rechecks admission when current context estimation fails', async () => {
+  const { context } = fixture(); let stale = false;
+  const result = await runContextCommand([], { ...context,
+    admission: () => stale ? 'Session changed' : undefined,
+    contextEstimate: async () => { stale = true; throw new Error('unavailable'); } });
+  expect(result).toEqual({ kind: 'local', output: 'Session changed' });
+});
+function fixture() {
+  const shell = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+    rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+    session: new SessionManager().createNew(root), runtimeConfig: getRuntimeConfig(root),
+    resolveConfigTarget: config => resolveCliCredential(config, { provider: 'google', apiKey: 'cli-synthetic' }, {}) });
+  const context: CommandContext = { cwd: root, projectRoot: root, sessionId: shell.session.id,
+    runtimeConfig: shell.runtimeConfig, readConfiguration: () => shell.configuration.current,
+    resolveConfigTarget: shell.resolveConfigTarget, admission: configurationAdmission(shell),
+    refreshRuntimeConfig: scope => refreshShellRuntimeConfig(shell, scope), getToolPool: async () => new Map() };
+  return { shell, context };
+}
+
+it.each([
+  ['interactive', 'current'], ['print', 'current'],
+  ['interactive', 'missing'], ['print', 'missing'],
+  ['interactive', 'replaced'], ['print', 'replaced'],
+] as const)('keeps live request identity through the %s context command bridge (%s)', async (mode, state) => {
+  const { shell, context } = fixture();
+  const attribution = captureUsageAttribution({ provider: 'google', model: 'chosen', baseUrl: 'https://chosen.invalid' });
+  const identity = {
+    provider: 'google', model: 'chosen', endpoint: 'openai-compatible', endpointId: attribution.endpointId,
+    schemaDigest: 'a'.repeat(64), systemDigest: 'b'.repeat(64), historyDigest: 'c'.repeat(64),
+    wireHistoryDigest: 'd'.repeat(64), wireMessageCount: 3, replayBinding: 'e'.repeat(64),
+  };
+  recordSessionUsage(shell.session.id, { provider: 'google', model: 'chosen', promptTokens: 802,
+    completionTokens: 2, promptMessageCount: 3, promptIdentity: identity, attribution });
+  shell.promptIdentity = state === 'missing' ? undefined
+    : state === 'replaced' ? { ...identity, wireHistoryDigest: 'f'.repeat(64) } : identity;
+  expect(readStatusFacts(shell).contextUsed).toBe(state === 'current' ? 802 : undefined);
+  let report: CommandReport | undefined;
+  const renderer = new StreamingRenderer();
+  renderer.setSink({ line: (_text, value) => { report = value; }, chunk: () => {} });
+  await buildCliCommandExecution({ ...context, promptIdentity: shell.promptIdentity, prompt: '/context', renderer,
+    interactive: mode === 'interactive', printMode: mode === 'print' });
+  expect(report?.facts.prompt).toEqual(state === 'current' ? { status: 'measured', tokens: 802 } : { status: 'stale' });
+});
+
+it.each(['before', 'after'] as const)('rejects obsolete context report admission %s catalog loading', async phase => {
+  const { context } = fixture(); let stale = phase === 'before', release!: () => void;
+  const read = vi.fn(context.readConfiguration!);
+  const getToolPool = vi.fn(async () => { if (phase === 'after') await new Promise<void>(resolve => { release = resolve; }); return new Map(); });
+  const pending = runContextCommand([], { ...context, readConfiguration: read, getToolPool,
+    admission: () => stale ? 'original binding changed' : undefined });
+  if (phase === 'after') { await vi.waitFor(() => expect(release).toBeTypeOf('function')); stale = true; release(); }
+  else release?.();
+  const result = await pending;
+  expect(result.output).toBe('original binding changed'); expect(result.report).toBeUndefined();
+  if (phase === 'before') { expect(read).not.toHaveBeenCalled(); expect(getToolPool).not.toHaveBeenCalled(); }
+});
+
+it('forwards context cancellation to tool discovery and does not inspect schemas after abort', async () => {
+  const { context } = fixture();
+  const controller = new AbortController();
+  const getToolPool = vi.fn(async (signal?: AbortSignal) => {
+    expect(signal).toBe(controller.signal);
+    controller.abort();
+    return new Map([['read', {
+      name: 'read',
+      get description(): string { throw new Error('schema inspection continued after abort'); },
+      argsSchema: { type: 'object' },
+      execute: async () => ({ success: true, output: '' }),
+    }]]);
+  });
+
+  await expect(runContextCommand([], { ...context, signal: controller.signal, getToolPool }))
+    .rejects.toMatchObject({ name: 'AbortError' });
+  expect(getToolPool).toHaveBeenCalledOnce();
+});
+
+it('rejects pre-cancelled context inspection before configuration and tool acquisition', async () => {
+  const { context } = fixture(), controller = new AbortController(); controller.abort();
+  const read = vi.fn(context.readConfiguration!), getToolPool = vi.fn(async () => new Map());
+  await expect(runContextCommand([], { ...context, signal: controller.signal, readConfiguration: read, getToolPool }))
+    .rejects.toMatchObject({ name: 'AbortError' });
+  expect(read).not.toHaveBeenCalled(); expect(getToolPool).not.toHaveBeenCalled();
+});
+
+it('withholds schema work when final context admission cancels the original command', async () => {
+  const { context } = fixture(), controller = new AbortController(); let checks = 0;
+  const description = vi.fn(() => 'Read a file');
+  const tool = { name: 'read', get description() { return description(); }, execute: async () => ({ success: true, output: '' }) };
+  await expect(runContextCommand([], { ...context, signal: controller.signal,
+    getToolPool: async () => new Map([[tool.name, tool]]),
+    admission: () => { if (++checks === 2) controller.abort(); return undefined; },
+  })).rejects.toMatchObject({ name: 'AbortError' });
+  expect(checks).toBe(2); expect(description).not.toHaveBeenCalled();
+});
+
+it('preserves original context cancellation inside the registered command lifetime', async () => {
+  const { context } = fixture(), original = new AbortController(), commands = new ShellCommandRuntime();
+  await expect(runContextCommand([], { ...context, signal: original.signal, runCancellable: operation => commands.run(operation),
+    getToolPool: async signal => { expect(signal?.aborted).toBe(false); original.abort(); return new Map(); },
+  })).rejects.toMatchObject({ name: 'AbortError' });
+  expect(commands.current).toBeUndefined();
+});
+
+it('measures the exact tool-schema array size incrementally', async () => {
+  const { context } = fixture();
+  const tool = {
+    name: 'read',
+    description: 'Read 😀',
+    argsSchema: { type: 'object', properties: { path: { type: 'string' } } },
+    execute: async () => ({ success: true, output: '' }),
+  };
+  const expected = JSON.stringify([{ type: 'function', function: {
+    name: tool.name, description: tool.description, parameters: tool.argsSchema,
+  } }]);
+  const result = await runContextCommand([], { ...context, getToolPool: async () => new Map([[tool.name, tool]]) });
+  expect(result.report?.facts.toolSchemas).toMatchObject({
+    size: { bytes: Buffer.byteLength(expected, 'utf8'), codeUnits: expected.length },
+  });
+});
+
+it('keeps actual context report acquisition separate from repeated reader draws and close', async () => {
+  const { context } = fixture();
+  const tool = { name: 'read', description: 'Read 😀', argsSchema: { type: 'object' }, execute: async () => ({ success: true, output: '' }) };
+  const getToolPool = vi.fn(async () => new Map([[tool.name, tool]]));
+  const pager = new Pager();
+  for (let round = 0; round < 10; round++) {
+    const result = await runContextCommand([], { ...context, getToolPool });
+    expect(getToolPool).toHaveBeenCalledTimes(round + 1);
+    expect(result.report?.facts.toolSchemas).toMatchObject({ toolCount: 1 });
+    const report = result.report!, before = JSON.stringify(report), block = { text: reportText(report), report, collapsed: false };
+    expect(pageLongOutput(pager, '/context', block)).toBe(true); expect(block.collapsed).toBe(true);
+    pager.handlePaste('tool');
+    for (const width of [20, 40, 80, 120, 200]) for (const height of [8, 24, 40, 80]) {
+      const rows = pager.render(width, height, height);
+      expect(rows.length).toBeLessThanOrEqual(height); expect(rows.every(row => visibleWidth(row) <= width)).toBe(true);
+    }
+    pager.handleKey('escape', undefined, 24);
+    expect(pager.active).toBe(false); expect(pager.text).toBe('');
+    expect(pager as unknown as { report?: unknown; rows: unknown[]; filter: string }).toMatchObject({ report: undefined, rows: [], filter: '' });
+    expect(block.report).toBe(report); expect(JSON.stringify(block.report)).toBe(before);
+    expect(getToolPool).toHaveBeenCalledTimes(round + 1);
+  }
+});
+
+it('uses the original workspace to project accepted request identity without changing raw measurements', async () => {
+  const { context } = fixture();
+  const captured = requestContext({ body: '{"messages":[],"unicode":"😀"}', provider: 'google', model: 'chosen', endpoint: `file://${root}/protocol` });
+  recordRequestContext(context.sessionId!, captured);
+  const result = await runContextCommand([], context);
+  expect(result.report?.facts.request).toMatchObject({ provider: 'google', model: 'chosen', endpoint: '[project]/protocol', body: captured.body,
+    usage: { status: 'unknown' } });
+  expect(captured.endpoint).toBe(`file://${root}/protocol`);
+});
+
+it('keeps menus, completion, and context on the accepted catalogue until successful reload', async () => {
+  const { shell, context } = fixture();
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no implicit network'));
+  const loader = createCatalogLoader(() => shell, {} as CliMcpGateway, []);
+  const identity = catalogIdentity(shell);
+  const models = await modelPicker(context).load();
+  expect(models.find(row => row.note === 'active')).toMatchObject({ label: 'chosen', detail: expect.stringContaining('cli') });
+  expect(models.some(row => row.label === 'accepted-only')).toBe(true);
+  expect(models.some(row => row.label === 'pending-only')).toBe(false);
+  catalog('pending-only', 24000);
+  const measurementIdentity = { provider: 'google', model: 'chosen', endpoint: 'openai-compatible',
+    endpointId: captureUsageAttribution({ provider: 'google', model: 'chosen', baseUrl: 'https://chosen.invalid' }).endpointId,
+    ...requestIdentity({ tools: [] }) };
+  shell.promptIdentity = measurementIdentity;
+  context.promptIdentity = measurementIdentity;
+  recordSessionUsage(shell.session.id, { promptTokens: 1000, completionTokens: 10, provider: 'google', model: 'chosen',
+    promptIdentity: measurementIdentity });
+  const facts = readStatusFacts(shell);
+  expect(facts).toMatchObject({ provider: 'google', model: 'chosen', contextUsed: 1000,
+    contextWindow: 16000, contextWindowSource: 'catalog', costRates: 'catalog' });
+  expect(facts.costUsd).toBeCloseTo(0.016);
+  expect(activeModelName(shell)).toBe('chosen');
+  expect(readWelcomeState(shell, undefined, false).model).toBe('chosen');
+  const connections = connectionPicker(context);
+  expect((await connections.load()).find(row => row.id === 'login:custom')?.detail).toContain('accepted-only');
+  expect((await connections.apply(['login:custom']))?.draft).toContain('--model accepted-only');
+  const report = await runContextCommand([], context);
+  expect(report.report?.facts.prompt).toEqual({ status: 'measured', tokens: 1000 });
+  expect(report.output).toContain('of 16,000 tokens');
+  expect(report.output).toContain('13,976 free before the 0-token reserve');
+  expect(report.output).toContain('0 inspection definitions');
+  expect(report.report?.facts.toolSchemas).toMatchObject({ toolCount: 0, scope: 'inspection-catalogue', firstRequestLowerBound: false });
+  expect(report.output).not.toContain('Instructions and conversation');
+  for (const args of [[], ['list'], ['list', 'google']]) {
+    const result = await runModelCommand(args, context);
+    expect(result.output).toContain('accepted-only'); expect(result.output).not.toContain('pending-only');
+  }
+  expect((await loader('model', new AbortController().signal)).map(row => row.value)).toContain('google/accepted-only');
+  expect(fetch).not.toHaveBeenCalled();
+  fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 3000 }));
+  expect(refreshShellRuntimeConfig(shell).status).toBe('rejected');
+  expect((await runModelCommand(['list'], context)).output).toContain('accepted-only');
+  expect(readStatusFacts(shell)).toMatchObject({ contextWindow: 16000, costUsd: facts.costUsd });
+  expect((await connections.apply(['login:custom']))?.draft).toContain('--model accepted-only');
+  fs.writeFileSync(file, JSON.stringify(settings));
+  expect(refreshShellRuntimeConfig(shell).status).toBe('applied');
+  expect(catalogIdentity(shell)).not.toBe(identity);
+  expect((await runModelCommand(['list'], context)).output).toContain('pending-only');
+  expect((await loader('model', new AbortController().signal)).map(row => row.value)).toContain('google/pending-only');
+  expect((await runContextCommand([], context)).output).toContain('of 24,000 tokens');
+  expect(readStatusFacts(shell)).toMatchObject({ contextWindow: 24000 });
+  expect(readStatusFacts(shell).costUsd).toBeCloseTo(0.024);
+  expect((await connections.load()).find(row => row.id === 'login:custom')?.detail).toContain('pending-only');
+  expect((await connections.apply(['login:custom']))?.draft).toContain('--model pending-only');
+});
+
+it('reopens models through catalogue-only publication while ordinary settings remain accepted', async () => {
+  const { shell, context } = fixture();
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no implicit network'));
+  const refreshConfig = vi.fn(context.refreshRuntimeConfig!);
+  const loader = createCatalogLoader(() => shell, {} as CliMcpGateway, []);
+  const previous = shell.configuration.current;
+  const model = await modelPicker(context).load();
+  expect(model.some(row => row.label === 'accepted-only')).toBe(true);
+  expect(refreshConfig).not.toHaveBeenCalled();
+  catalog('pending-only', 24000);
+  const changed = JSON.stringify({ ...settings, maxOutputTokens: 3000 });
+  fs.writeFileSync(file, changed);
+  const reopened = await modelPicker({ ...context, refreshRuntimeConfig: refreshConfig }).load();
+  expect(refreshConfig).toHaveBeenCalledOnce();
+  expect(refreshConfig).toHaveBeenCalledWith('catalog');
+  expect(reopened.find(row => row.note === 'active')).toMatchObject({ label: 'chosen', detail: expect.stringContaining('cli') });
+  expect(reopened.some(row => row.label === 'pending-only')).toBe(true);
+  expect(reopened.some(row => row.label === 'accepted-only')).toBe(false);
+  expect(shell.configuration.current).not.toBe(previous);
+  expect(shell.configuration.current.requested.maxOutputTokens).toBe(previous.requested.maxOutputTokens);
+  expect(shell.configuration.current.config.maxOutputTokens).toBe(1024);
+  expect(shell.configuration.current.requested.providerConnections).toEqual(previous.requested.providerConnections);
+  expect(readStatusFacts(shell)).toMatchObject({ model: 'chosen', contextWindow: 24000 });
+  expect((await runModelCommand(['list'], context)).output).toContain('pending-only');
+  expect((await loader('model', new AbortController().signal)).map(row => row.value)).toContain('google/pending-only');
+  const accepted = shell.configuration.current;
+  expect(refreshShellRuntimeConfig(shell).status).toBe('rejected');
+  expect(shell.configuration.current.catalog).toEqual(accepted.catalog);
+  expect(shell.configuration.current.config.maxOutputTokens).toBe(1024);
+  expect(fs.readFileSync(file, 'utf8')).toBe(changed);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it('uses the host credential and one accepted configuration for a side question through the command bridge', async () => {
+  const { shell, context } = fixture();
+  const sent: Array<{ url: string; init?: RequestInit }> = [];
+  vi.spyOn(transport, 'providerFetchForEndpoint').mockImplementation(() => (async (url, init) => {
+    sent.push({ url: String(url), init });
+    fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 512 }));
+    catalog('next-only', 24000);
+    expect(refreshShellRuntimeConfig(shell).status).toBe('applied');
+    return Response.json({ choices: [{ message: { content: 'side answer' }, finish_reason: 'stop' }] });
+  }) as typeof fetch);
+  const lines: string[] = [];
+  await buildCliCommandExecution({ ...context, prompt: '/btw question', interactive: true, printMode: false,
+    renderer: { renderLine: line => lines.push(line) } as StreamingRenderer });
+  expect(lines.join(' ')).toContain('side answer');
+  expect(sent[0].url).toBe('https://chosen.invalid/chat/completions');
+  expect(new Headers(sent[0].init?.headers).get('authorization')).toBe('Bearer cli-synthetic');
+  expect(JSON.parse(String(sent[0].init?.body))).toMatchObject({ model: 'chosen', max_tokens: 1024 });
+  expect(JSON.parse(String(sent[0].init?.body))).not.toHaveProperty('temperature');
+  await runBtwCommand(['next'], context);
+  expect(JSON.parse(String(sent[1].init?.body))).toMatchObject({ model: 'chosen', max_tokens: 512 });
+  expect(lines.join(' ')).not.toMatch(/cli-synthetic|saved-synthetic/);
+});
+
+it('publishes an explicit catalogue refresh and retains accepted values when publication fails', async () => {
+  const { shell, context } = fixture();
+  const refreshSpy = vi.spyOn(refresh, 'refreshCatalog').mockImplementation(async () => {
+    catalog('refreshed-only', 24000);
+    return { ok: true, providers: 1, models: 2, cachePath: 'synthetic-cache' };
+  });
+  expect((await runModelCommand(['list', 'does-not-exist', '--refresh'], context)).output).toContain('Unknown provider');
+  expect(refreshSpy).not.toHaveBeenCalled();
+  fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 3000 }));
+  const failed = await runModelCommand(['list', 'google', '--refresh'], context);
+  expect(failed.output).toContain('Configuration was not applied (rejected)');
+  expect(failed.output).toContain('accepted-only'); expect(failed.output).not.toContain('- refreshed-only');
+  fs.writeFileSync(file, JSON.stringify(settings));
+  const applied = await runModelCommand(['list', 'google', '--refresh'], context);
+  expect(applied.output).toContain('Catalogue applied for the next operation.');
+  expect(applied.output).toContain('- refreshed-only');
+  expect(shell.configuration.current.catalog.find(provider => provider.id === 'google')?.models.some(model => model.id === 'refreshed-only')).toBe(true);
+});
+
+it('accepts exact provider ids from completion before compatibility aliases without implicit network', async () => {
+  const stored = JSON.parse(fs.readFileSync(userCatalogPath(), 'utf8'));
+  stored.providers.MixedCase = { label: 'Custom', runtime: 'openai-compatible', models: [{ id: 'custom-model' }] };
+  fs.writeFileSync(userCatalogPath(), JSON.stringify(stored));
+  const { context } = fixture();
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no implicit network'));
+  expect((await runModelCommand(['list', 'siliconflow'], context)).output).toContain('Models for provider=siliconflow');
+  expect((await runModelCommand(['list', 'MixedCase'], context)).output).toContain('- custom-model');
+  expect((await runModelCommand(['list', 'openai-compatible'], context)).output).toContain('No models listed for this provider.');
+  expect(fetch).not.toHaveBeenCalled();
+});

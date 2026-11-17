@@ -18,15 +18,15 @@
 - [Task inventory](tasks.md)：唯一任务与验收清单。
 - [Design and evidence](design.md)：结构事实、参考决策、复用与实施顺序。
 - [Earlier repair evidence](../../wiki/references/runtime-upgrade-review-2026-11.md)：上一轮证据，不能替代本轮任务验收。
-- [Progress summary](summary.md)：当前已完成范围、实际验证及全部32项未完成功能任务和仓库门禁缺口。
+- [Progress summary](summary.md)：当前已完成范围、实际验证及全部31项未完成功能任务和仓库门禁缺口。
 
 ## Current status
 
-**Current phase**: in_progress；E.1当前Linux功能验收完成，E.3/D.4子批验证及限定独立复审通过。30/62功能任务已验收，32未完成；richer model dispatch和完整GFM继续部分，F2.2缓存publication进入实际反例修复。完整仓库NormProof仍not_proven。
-**Last completed batch**: E.1完整脚本组合与E.3/D.4子批修复33生产/12测试；当前50文件987项、七门/2678modules/0monoliths和build19af1f6dc3f2通过。原12script/7export反转保持当前相关source hash，新增两反转5AssertionErrors/exact恢复96项；配置模型6actual requests、七raw controls、npm15入口strict类型/实际读写及离线浏览器passed。限定独立FIXED/APPROVE已核对，按授权本地提交；E.5/C.8的cccc7208保持历史证据。
-**Current batch**: F2.2先运行冻结源码真实loopback反例：30项26红/4控制；storage/command追加19项全红。拟复用catalogStore/原锁及atomic writer、profile identity和configuration publication，capture原body/source/path/raw，在每次rename前复验，保留saved/unknown/unchanged。当前只完成反例，不计F2.2完成。
-**Repository gate**: 当前normal pinned judge实际exit2/not_proven，blocking unresolved obligation因完整图超过16384边为missing；shadow enforcement didBlock=false/exitCode0不能取代CLI。临时32768 collector诊断当前16661边/unresolved0、HEAD cccc7208基线16575边且原上限均失败；仅诊断，不作默认proof或容量资格。18tracked pinned文件不变，未改scope/bundle/gate/package scripts；interactiveMode.test.ts21-name既有advisory单列。
-**Goal**: active；32功能任务未完成，其中14部分、3已有待验收、13缺口、2待核实；另有仓库NormProof缺口。E.1已达到当前Linux功能验收；E.3及D.4完整范围仍开项，F2.2反例已证实。仅本地分批提交，未push或取得远端CI。
+**Current phase**: in_progress；F2.2当前Linux功能验收完成，31/62功能任务已验收，31未完成；richer model dispatch和完整GFM继续部分。完整仓库NormProof仍not_proven。
+**Last completed batch**: F2.2复用catalog cache/原锁/atomic/configuration/commands owner，保留captured body/source/path/raw及saved/unknown/unchanged。最终20文件596项、七门/2682modules/0monoliths、buildc5ae05070276通过；13反转25AssertionErrors/exact恢复73项。Linux同代11组26真实GET、配置模型两actual requests及npm15入口strict类型/10组25GET通过，限定独立FIXED/APPROVE；此前E.1/E.3/D.4已本地提交42d7d49a。
+**Current batch**: F2.2已满足当前Linux功能验收，归档后按授权本地提交。下一F2.4阶梯计价经只读owner核实仍成立；复用请求捕获/normalized usage/attributed bucket和cost/export，先证明单次阈值/累计误选/缓存完整性反例，不能仅增目录字段。
+**Repository gate**: 当前normal pinned judge实际exit2/not_proven，blocking unresolved obligation因完整图超过16384边为missing；helper exit0不代表CLI passed。以前临时32768诊断只保留历史定位，本批未扩大范围或容量；18tracked pinned文件不变，未改scope/bundle/gate/package scripts。119既有docs与11call-reachability advisory继续单列。
+**Goal**: active；31功能任务未完成，其中13部分、3已有待验收、13缺口、2待核实；另有仓库NormProof缺口。F2.2已达到当前Linux功能验收，E.3及D.4完整范围仍开项。仅本地分批提交，未push或取得远端CI。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -41,7 +41,7 @@
 
 ## Adaptive control
 
-当前Linux功能验收任务数为30/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.8、C.9、E.5、E.1和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
+当前Linux功能验收任务数为31/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.8、C.9、E.5、E.1、F2.2和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 
 恢复时已核对干净工作区与`560c0cc4`。T3.1 compact仅持有controller、不登记settlement，且只凭状态机拒绝重入；该缺口经源码核实仍成立。复用原commands owner登记完整压缩操作、保持忙时拒绝，覆盖prompt／command互斥和SDK dispose等待；不建立第二任务管理器。C.1完整路由由独立只读核实线检查，后续独立实施；已有证据不扩展为新构建的重新验收。
 
@@ -164,3 +164,5 @@ E.5本批实际L／额外依赖3（blocked publication独立撤权、原共享ho
 C.9／C.2联合子批遥测：实际L，复用检查10/10，沿用原stdout／shutdown／request／provider retry／RPC event owner，无新生产依赖或执行／存储平面。额外依赖4（stderr-only终端资格、同步exit结算、shutdown总预算取消、529决定跨层传递）；各复审缺口均有实际反例并已修。仓库graph容量缺口作为独立门禁证据问题保留，未补造统一历史drift基线。
 
 本批遥测：E.1实际L，E.3/D.4子批各L；原gate/worker/catalog/session source/renderer复用核对10/10，无新增依赖或执行平面。未预见依赖四项：caller-retained definition隔离、child allow/deny、未闭合math streaming回归、source pairing与media omission分开。新独立composition/export审查各确认一P2；三effect barrier/两nested style反例实际红后复用原owner修复，限定FIXED/APPROVE。当前50/987及build19af1f6dc3f2通过，E.1功能完成数增至30；旧build和503/provider_network失败run保持独立，F2.2按真实反例继续。
+
+F2.2本批实际L，结构复用检查10/10，无新增依赖、执行或存储平面；额外依赖四项：same-FD/absent-parent cache identity、每次native retry前guard、post-result callback安全结算、read拒绝携带自身publication receipt。最终限定独立复核通过；旧build/失败/unknown保留原范围，无统一历史估算不补造drift。功能31/62，F2.4只读核实后继续单次request pricing owner。

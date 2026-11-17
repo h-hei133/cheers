@@ -1,0 +1,3 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/core/models/cache/refresh.test.ts -t closes the actual response body --no-file-parallelism --reporter=json --outputFile=../../.tmp/catalog-validation/review-body-red.json
+JSON report written to /home/wang/projects/cheers/.tmp/catalog-validation/review-body-red.json

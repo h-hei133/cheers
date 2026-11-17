@@ -1,0 +1,21 @@
+{
+  "acceptedReceipt": "final-current.json",
+  "actualFiles": 20,
+  "totalPassed": 596,
+  "failed": 0,
+  "allRequestedPathsRan": true,
+  "testsSourceSha256": {
+    "core/models/cache/store.ts": "397ca0a389f22017f1942652fb6b034d64b6f2c77a1028c50e521ebe35c2b751",
+    "core/models/catalogStore.ts": "3e0837a730b3b37d80618837605fae3922d7017935838f1178da5fab0239dfa2",
+    "core/models/catalogRefresh.ts": "0141b5da8fad1597c165921e2b0aa4c8e3ab992c320cce3f9cd53ce41336ca5b",
+    "core/commands/modelCommandRuntime.ts": "ce5073f978c025299b11e566f409b9bdcad537f016afc4eb68e6bbf75ec9abac",
+    "session/store/sessionFileStore.ts": "9e71d2c89fd12833c2cbd4c025d7d60acfdb21dc4a3b334b7f04e9d6ab67054b",
+    "core/models/cache/refresh.test.ts": "c95f91d5fd5aef541709e2e6c924c45176e2d71839cd4bed84697c4b210d7fc6",
+    "core/models/cache/storage.test.ts": "9cc42e9fb98610dbda7882d44a0f594b789fc2ab3b475763437f9ea7ad3b81be",
+    "core/commands/model/refresh.test.ts": "6d6594d5aa92fd828e0fb499d5072ad412782289efcb010e6ba48fa8d3fd5866",
+    "session/store/atomic.test.ts": "5e3eb86b2e03f6c86d6800adeae84cbd716208b19e7ba1b90baf7c6a551c13c1",
+    "core/commands/configuration.test.ts": "d59c4a4224e2540931e16cc1d0c8c9e6ecae3fef64379ef384710e725f04a70a"
+  },
+  "build": "c5ae05070276bb6448c8633cff985048e8b5b17304b60c71295581aceec0fcb4",
+  "inputsDigest": "680f6e6721c94cf7fc448961f3b34165991ebf7c3e87019a7670d161db8d44b7"
+}

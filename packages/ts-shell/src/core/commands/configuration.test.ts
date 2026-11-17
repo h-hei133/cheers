@@ -359,6 +359,7 @@ it('uses the host credential and one accepted configuration for a side question 
 
 it('publishes an explicit catalogue refresh and retains accepted values when publication fails', async () => {
   const { shell, context } = fixture();
+  const accepted = shell.configuration.current;
   const refreshSpy = vi.spyOn(refresh, 'refreshCatalog').mockImplementation(async () => {
     catalog('refreshed-only', 24000);
     return { ok: true, providers: 1, models: 2, cachePath: 'synthetic-cache' };
@@ -366,9 +367,21 @@ it('publishes an explicit catalogue refresh and retains accepted values when pub
   expect((await runModelCommand(['list', 'does-not-exist', '--refresh'], context)).output).toContain('Unknown provider');
   expect(refreshSpy).not.toHaveBeenCalled();
   fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 3000 }));
-  const failed = await runModelCommand(['list', 'google', '--refresh'], context);
+  const refreshed = await runModelCommand(['list', 'google', '--refresh'], context);
+  expect(refreshed.output).toContain('Catalogue applied for the next operation.');
+  expect(refreshed.output).toContain('- refreshed-only');
+  expect(shell.configuration.current.config.maxOutputTokens).toBe(accepted.config.maxOutputTokens);
+  expect(shell.configuration.current.requested.maxOutputTokens).toBe(accepted.requested.maxOutputTokens);
+  expect(fs.readFileSync(file, 'utf8')).toBe(JSON.stringify({ ...settings, maxOutputTokens: 3000 }));
+  const published = shell.configuration.current;
+  const failed = await runModelCommand(['list', 'google', '--refresh'], { ...context,
+    refreshRuntimeConfig: () => ({ status: 'rejected', admissionBlocked: false,
+      before: published.config, after: published.config, revision: published.revision,
+      restartRequired: [], diagnostics: ['The refreshed catalogue did not pass model constraints.'] }),
+  });
   expect(failed.output).toContain('Configuration was not applied (rejected)');
-  expect(failed.output).toContain('accepted-only'); expect(failed.output).not.toContain('- refreshed-only');
+  expect(failed.output).toContain('- refreshed-only');
+  expect(shell.configuration.current).toBe(published);
   fs.writeFileSync(file, JSON.stringify(settings));
   const applied = await runModelCommand(['list', 'google', '--refresh'], context);
   expect(applied.output).toContain('Catalogue applied for the next operation.');

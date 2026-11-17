@@ -1,0 +1,7 @@
+{
+  "classification": "harness_setup_drift",
+  "processExitCode": 0,
+  "selected": 0,
+  "reason": "Vitest each title quotes interpolated label; literal filter selected zero cases. Not passing behavior evidence.",
+  "mainSourcesMutated": false
+}

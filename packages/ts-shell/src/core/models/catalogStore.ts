@@ -7,6 +7,8 @@ import {
   mergeProviders,
   type CatalogProvider,
 } from "./catalog.js";
+import { catalogCachePath } from './cache/store.js';
+export { catalogCachePath, writeCatalogCache } from './cache/store.js';
 
 /**
  * Where the catalogue comes from at runtime.
@@ -46,11 +48,6 @@ export function userCatalogPath(): string {
   return resolveUserDataFile(USER_FILE);
 }
 
-/** Path of the cache an explicit refresh writes. */
-export function catalogCachePath(): string {
-  return resolveUserDataFile(CACHE_FILE);
-}
-
 /** The full catalogue: snapshot, then any refreshed copy, then the user's file. */
 export function loadCatalog(): readonly CatalogProvider[] {
   return loadCatalogSnapshot().providers;
@@ -69,56 +66,6 @@ export function loadCatalogSnapshot(): CatalogSnapshot {
   const user = readOverlay(userCatalogPath(), USER_FILE);
   if (user.providers.length > 0) providers = mergeProviders(providers, user.providers, { origin: "user" });
   return { providers, diagnostics: [...cached.diagnostics, ...user.diagnostics] };
-}
-
-/** Write a fetched catalogue into the cache the next load will read. */
-export function writeCatalogCache(
-  providers: readonly Partial<CatalogProvider>[],
-  metadata?: { readonly etag?: string; readonly indexUrl?: string },
-): string {
-  const target = catalogCachePath();
-  const byId: Record<string, Partial<CatalogProvider>> = {};
-  for (const provider of providers) {
-    if (provider.id) byId[provider.id] = provider;
-  }
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(
-    target,
-    `${JSON.stringify({
-      ...(metadata?.etag ? { etag: metadata.etag } : {}),
-      ...(metadata?.indexUrl ? { indexUrl: metadata.indexUrl } : {}),
-      providers: byId,
-    }, null, 2)}\n`,
-    "utf8",
-  );
-  return target;
-}
-
-export function readCatalogCacheEtag(indexUrl?: string): string | undefined {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(catalogCachePath(), "utf8")) as StoredCatalog;
-    if (indexUrl && parsed?.indexUrl && parsed.indexUrl !== indexUrl) return undefined;
-    if (indexUrl && !parsed?.indexUrl) return undefined;
-    return typeof parsed?.etag === "string" && parsed.etag ? parsed.etag : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function updateCatalogCacheEtag(etag: string, indexUrl: string): void {
-  try {
-    const target = catalogCachePath();
-    const parsed = JSON.parse(fs.readFileSync(target, "utf8")) as StoredCatalog;
-    if (parsed && typeof parsed === "object" && parsed.providers) {
-      fs.writeFileSync(
-        target,
-        `${JSON.stringify({ ...parsed, etag, indexUrl }, null, 2)}\n`,
-        "utf8",
-      );
-    }
-  } catch {
-    // Ignore if cache file is absent or unreadable.
-  }
 }
 
 /**

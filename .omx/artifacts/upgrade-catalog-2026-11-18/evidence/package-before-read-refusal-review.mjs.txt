@@ -1,0 +1,134 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const repo = '/home/wang/projects/cheers', output = path.dirname(fileURLToPath(import.meta.url));
+const product = path.join(repo, 'packages/ts-shell');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const envBefore = new Map(), originals = new Map();
+const receipt = { status: 'running', platform: process.platform, helperSha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))),
+  commands: [], publicRefreshExportClaim: false, configuredProviderRequests: 0 };
+let root, install, manifestBytes, source, stage = 'setup';
+function check(condition, code) { if (!condition) throw Object.assign(new Error(code), { probeCode: code }); }
+function env(key, value) { if (!envBefore.has(key)) envBefore.set(key, process.env[key]);
+  if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+function actualSource() { return Object.fromEntries(Object.keys(source).map(file => [file, hash(fs.readFileSync(path.join(product, 'src', file)))])); }
+function firstJson(text) {
+  let quoted = false, escaped = false, depth = 0;
+  const start = text.search(/[\[{]/); check(start >= 0, 'pack-json-missing');
+  for (let index = start; index < text.length; index++) {
+    const char = text[index];
+    if (quoted) { if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') quoted = false; }
+    else if (char === '"') quoted = true;
+    else if (char === '{' || char === '[') depth++;
+    else if (char === '}' || char === ']') { if (--depth === 0) return JSON.parse(text.slice(start, index + 1)); }
+  }
+  check(false, 'pack-json-incomplete');
+}
+async function run(name, args, cwd, ms = 180000) {
+  stage = name; const child = spawn('rtk', args, { cwd, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '', stderr = '', bytes = 0, timedOut = false, overflow = false;
+  const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, ms);
+  const append = (data, out) => { bytes += data.length; if (bytes > 8 * 1024 * 1024) { overflow = true; child.kill('SIGKILL'); return; }
+    if (out) stdout += data.toString('utf8'); else stderr += data.toString('utf8'); };
+  child.stdout.on('data', data => append(data, true)); child.stderr.on('data', data => append(data, false));
+  try { const result = await new Promise(resolve => { child.once('error', () => resolve({ exit: null, signal: 'spawn-error' }));
+    child.once('close', (exit, signal) => resolve({ exit, signal })); });
+    fs.writeFileSync(path.join(output, 'package-' + name + '.log'), stdout + stderr, { mode: 0o600 });
+    receipt.commands.push({ name, args: args.slice(0, 6), ...result, timedOut, overflow, bytes, stdoutSha256: hash(stdout), stderrSha256: hash(stderr) });
+    console.log(JSON.stringify({ command: name, ...result, timedOut, overflow }));
+    check(result.exit === 0 && !result.signal && !timedOut && !overflow, 'package-' + name + '-failed'); return stdout;
+  } finally { clearTimeout(timer); }
+}
+const consumer = `import { type AgentSession, type RuntimeConfig, type CreateAgentSessionOptions } from '@cheers/ts-shell';
+export async function capturedCommand(session: AgentSession, parent: AbortSignal): Promise<void> {
+  const operation: Promise<void> = session.sessionRuntime.commands.run(async signal => {
+    signal.throwIfAborted(); parent.throwIfAborted();
+    const publication = session.runtimeContext.configuration.current;
+    const config: RuntimeConfig = publication.config;
+    const models = session.getModelCatalog();
+    const id: string = session.sessionId;
+    void config; void models; void id;
+  }, 'command', parent);
+  const registered = session.sessionRuntime.commands.current;
+  const settlement: Promise<unknown> | undefined = registered?.settled;
+  const signal: AbortSignal | undefined = registered?.controller.signal;
+  void settlement; void signal; await operation;
+}
+const options: CreateAgentSessionOptions = { noTools: 'all', offline: true };
+void options;
+// @ts-expect-error The original command cancellation requires an actual AbortSignal.
+void ((session: AgentSession) => session.sessionRuntime.commands.run(async () => undefined, 'command', { aborted: true }));
+`;
+try {
+  check(process.platform === 'linux', 'linux-required');
+  const native = JSON.parse(fs.readFileSync(path.join(output, 'native-budget-observed.json'), 'utf8'));
+  source = native.source; check(native.status === 'passed' && native.sourceUnchanged && native.compiledBuildUnchanged
+    && JSON.stringify(actualSource()) === JSON.stringify(source), 'current-native-evidence-required');
+  receipt.source = source; receipt.nativeReceiptSha256 = hash(fs.readFileSync(path.join(output, 'native-budget-observed.json')));
+  const realHome = process.env.USERPROFILE || process.env.HOME || os.homedir();
+  for (const file of ['auth.json', 'config.json', 'models.json', 'models-cache.json']) {
+    const target = path.join(realHome, '.cheers', file); originals.set(target, fs.existsSync(target) ? hash(fs.readFileSync(target)) : null); }
+  const { checkBuild } = await import(pathToFileURL(path.join(repo, 'scripts/start-lib.mjs')).href);
+  const pkg = JSON.parse(fs.readFileSync(path.join(product, 'package.json'), 'utf8'));
+  const build = checkBuild({ root: repo, dist: path.join(product, 'dist'), version: pkg.version, executablePolicy: 'ignore' });
+  check(build.ok && build.manifest.buildId === native.buildId, 'fresh-native-build-required'); receipt.buildId = build.manifest.buildId;
+  manifestBytes = fs.readFileSync(path.join(product, 'dist/build-manifest.json'));
+  root = fs.mkdtempSync(path.join(output, 'package-private-')); fs.chmodSync(root, 0o700);
+  install = path.join(root, 'install'); const home = path.join(root, 'home'); fs.mkdirSync(install); fs.mkdirSync(home);
+  for (const key of Object.keys(process.env)) if (/API_KEY|TOKEN|SECRET|AUTH|^AWS_|^GOOGLE_|^GEMINI_|^OPENAI_|^ANTHROPIC_|^AZURE_|^VERTEX_|^CHEERS_PROVIDER/.test(key)) env(key, undefined);
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home, GIT_CEILING_DIRECTORIES: root,
+    CHEERS_PROFILE: 'default', CHEERS_PROVIDER_MODE: 'synthetic', CHEERS_OFFLINE: '1',
+    npm_config_cache: path.join(root, 'cache'), npm_config_userconfig: path.join(root, 'npmrc'), npm_config_globalconfig: path.join(root, 'global-npmrc') })) env(key, value);
+  fs.writeFileSync(path.join(root, 'npmrc'), ''); fs.writeFileSync(path.join(root, 'global-npmrc'), '');
+  const packText = await run('pack', ['proxy', 'npm', 'pack', '--json', '--ignore-scripts', '--pack-destination', root], product);
+  const packValue = firstJson(packText);
+  const pack = (Array.isArray(packValue) ? packValue : Object.values(packValue))[0];
+  check(pack.name === pkg.name && path.basename(pack.filename) === pack.filename && Array.isArray(pack.files), 'pack-contract');
+  const archive = path.join(root, pack.filename), prefix = 'dist/builds/' + receipt.buildId + '/';
+  check(pack.files.some(file => file.path === 'dist/current.js') && !pack.files.some(file => file.path.startsWith('src/')
+    || file.path.startsWith('dist/builds/') && !file.path.startsWith(prefix)), 'package-generation-mismatch');
+  receipt.packageSha256 = hash(fs.readFileSync(archive)); receipt.packageEntries = pack.files.length;
+  const exact = name => JSON.parse(fs.readFileSync(path.join(repo, 'node_modules', name, 'package.json'), 'utf8')).version;
+  fs.writeFileSync(path.join(install, 'package.json'), JSON.stringify({ name: 'cheers-catalogue-consumer', version: '1.0.0', private: true,
+    type: 'module', dependencies: { [pkg.name]: 'file:' + archive, typescript: exact('typescript'), '@types/node': exact('@types/node'),
+      '@types/picomatch': exact('@types/picomatch'), '@types/which': exact('@types/which') } }));
+  await run('install', ['proxy', 'npm', 'install', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline'], install, 240000);
+  const installed = path.join(install, 'node_modules/@cheers/ts-shell');
+  check(!fs.lstatSync(installed).isSymbolicLink() && fs.readFileSync(path.join(installed, 'dist/build-manifest.json')).equals(manifestBytes), 'installed-copy-identity');
+  for (const artifact of build.manifest.artifacts)
+    check(hash(fs.readFileSync(path.join(installed, 'dist', artifact.path))) === artifact.sha256, 'installed-artifact-identity');
+  const entries = Object.keys(pkg.exports).map(key => pkg.name + (key === '.' ? '' : key.slice(1)));
+  fs.writeFileSync(path.join(install, 'consumer.mts'), entries.map((name, index) => 'import * as e' + index + ' from ' + JSON.stringify(name) + '; void e' + index + ';').join('\n') + '\n' + consumer);
+  fs.writeFileSync(path.join(install, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext',
+    strict: true, skipLibCheck: false, noEmit: true, types: ['node'], lib: ['ES2022', 'DOM'] }, files: ['./consumer.mts'] }));
+  await run('strict-types', ['node', '--max-old-space-size=768', path.join(install, 'node_modules/typescript/bin/tsc'), '--project', path.join(install, 'tsconfig.json'), '--pretty', 'false'], install);
+  receipt.strictInstalledTypes = true; receipt.publicEntries = entries.length;
+  const importCheck = `import {createRequire} from 'node:module'; import fs from 'node:fs'; import path from 'node:path';
+const require=createRequire(import.meta.url); const root=path.join(process.cwd(),'node_modules/@cheers/ts-shell');
+const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')); for(const [key,value] of Object.entries(pkg.exports)) {
+const spec=pkg.name+(key==='.'?'':key.slice(1)); if(require.resolve(spec)!==path.join(root,value.import)) throw new Error('installed-export-resolution'); await import(spec); }
+console.log(JSON.stringify({status:'passed',publicEntries:Object.keys(pkg.exports).length}));`;
+  fs.writeFileSync(path.join(install, 'imports.mjs'), importCheck);
+  receipt.imports = JSON.parse(await run('imports', ['node', path.join(install, 'imports.mjs')], install));
+  const nativeText = await run('runtime', ['node', path.join(output, 'native.mjs'), '--local-only', '--receipt=native-installed.json', '--package-root=' + installed], install, 120000);
+  void nativeText;
+  receipt.runtime = JSON.parse(fs.readFileSync(path.join(output, 'native-installed.json'), 'utf8'));
+  check(receipt.runtime.status === 'passed' && receipt.runtime.installedPackage && receipt.runtime.providerRequests.length === 0,
+    'installed-runtime-matrix-failed'); receipt.status = 'passed';
+} catch (error) { receipt.status = 'failed'; receipt.failure = { stage, code: error?.probeCode ?? 'unclassified-harness-error' }; process.exitCode = 1; }
+finally {
+  for (const [key, value] of envBefore) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  receipt.originalInputsUnchanged = [...originals].every(([file, before]) => (fs.existsSync(file) ? hash(fs.readFileSync(file)) : null) === before);
+  receipt.sourceUnchanged = source !== undefined && JSON.stringify(actualSource()) === JSON.stringify(source);
+  receipt.buildUnchanged = manifestBytes !== undefined && fs.readFileSync(path.join(product, 'dist/build-manifest.json')).equals(manifestBytes);
+  if (root) fs.rmSync(root, { recursive: true, force: true }); receipt.privateStateRemoved = root === undefined || !fs.existsSync(root);
+  if (!receipt.originalInputsUnchanged || !receipt.sourceUnchanged || !receipt.buildUnchanged || !receipt.privateStateRemoved) { receipt.status = 'failed'; process.exitCode = 1; }
+  fs.writeFileSync(path.join(output, 'package.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
+  console.log(JSON.stringify({ status: receipt.status, failure: receipt.failure, strictInstalledTypes: receipt.strictInstalledTypes,
+    publicEntries: receipt.publicEntries, runtimeCases: receipt.runtime?.cases.length, originalInputsUnchanged: receipt.originalInputsUnchanged,
+    sourceUnchanged: receipt.sourceUnchanged, buildUnchanged: receipt.buildUnchanged, privateStateRemoved: receipt.privateStateRemoved }));
+}

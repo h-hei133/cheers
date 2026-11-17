@@ -1,0 +1,11 @@
+{"scenario":"200-304-accepted-catalogue","status":"passed","actualLoopbackGets":3}
+{"scenario":"missing-and-different-source-validator","status":"passed","actualLoopbackGets":3}
+{"scenario":"successor-after-real-body-acquisition","status":"passed","actualLoopbackGets":2}
+{"scenario":"original-admission-and-command-cancellation","status":"passed","actualLoopbackGets":2}
+{"scenario":"header-retirement-closes-native-body","status":"passed","actualLoopbackGets":1}
+{"scenario":"staging-and-retry-final-fences","status":"passed","actualLoopbackGets":2}
+{"scenario":"actual-save-and-unknown-consumers","status":"passed","actualLoopbackGets":4}
+{"scenario":"rejected-data-retains-native-publication","status":"passed","actualLoopbackGets":5}
+{"scenario":"failed-list-retains-native-save-notice","status":"passed","actualLoopbackGets":1}
+{"scenario":"named-profile-and-legacy-selection","status":"passed","actualLoopbackGets":2}
+{"status":"passed","cases":10,"actualLoopbackGets":25,"providerRequests":[],"sourceUnchanged":true,"compiledBuildUnchanged":true,"originalInputsUnchanged":true,"privateStateRemoved":true}

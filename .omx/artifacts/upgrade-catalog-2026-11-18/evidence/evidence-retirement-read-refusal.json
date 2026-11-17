@@ -1,0 +1,7 @@
+{
+  "status": "historical_scope_only",
+  "reason": "Post-refresh cancellation/admission/read failure can discard own saved or unknown receipt; production contract fix pending. Earlier commands remain genuine but do not accept the upcoming source generation.",
+  "priorBuildId": "b2ba99581604fa6f666ab4df1393eeb0319ff5b03f0e3b6b4948913ec73f8152",
+  "independentReview": "REQUEST_CHANGES",
+  "actualInstalledTestsPassed": true
+}

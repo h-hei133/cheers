@@ -1,0 +1,118 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+
+const repo = '/home/wang/projects/cheers';
+const output = path.join(repo, '.tmp/catalog-validation');
+const tree = path.join(output, 'reversal-tree');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+for (const entry of ['packages/ts-shell/src', 'contracts']) {
+  fs.mkdirSync(path.dirname(path.join(tree, entry)), { recursive: true });
+  fs.cpSync(path.join(repo, entry), path.join(tree, entry), { recursive: true });
+}
+for (const entry of ['package.json', 'packages/ts-shell/package.json', 'packages/ts-shell/vitest.config.ts', 'packages/ts-shell/tsconfig.json'])
+  fs.copyFileSync(path.join(repo, entry), path.join(tree, entry));
+for (const entry of ['node_modules', 'packages/ts-shell/node_modules'])
+  if (!fs.existsSync(path.join(tree, entry))) fs.symlinkSync(path.join(repo, entry), path.join(tree, entry), 'dir');
+
+const sourceRoot = 'packages/ts-shell/src';
+const files = ['core/models/cache/store.ts', 'core/models/catalogStore.ts', 'core/models/catalogRefresh.ts',
+  'core/commands/modelCommandRuntime.ts', 'session/store/sessionFileStore.ts', 'core/models/cache/refresh.test.ts',
+  'core/models/cache/storage.test.ts', 'core/commands/model/refresh.test.ts', 'session/store/atomic.test.ts',
+  'core/commands/configuration.test.ts'];
+const originals = new Map(files.map(file => [file, fs.readFileSync(path.join(repo, sourceRoot, file))]));
+const cases = [
+  { name: 'body-backed-validator', file: 'core/models/cache/store.ts',
+    from: ' || !Object.keys(providers).length', to: '',
+    tests: ['src/core/models/cache/refresh.test.ts'], filter: '304 with.*empty providers', expected: 1 },
+  { name: 'source-url-isolation', file: 'core/models/catalogRefresh.ts',
+    from: 'stored?.indexUrl === indexUrl', to: 'stored !== undefined',
+    tests: ['src/core/models/cache/refresh.test.ts'], filter: 'isolates ETags between index URLs', expected: 2 },
+  { name: 'captured-body-publication', file: 'core/models/cache/store.ts',
+    from: '  assertOwner(snapshot);\n  try {\n    if (pathIdentity(snapshot.directory)',
+    to: '  assertOwner(snapshot);\n  return;\n  try {\n    if (pathIdentity(snapshot.directory)',
+    tests: ['src/core/models/cache/refresh.test.ts'], filter: 'successor cache', expected: 4 },
+  { name: 'final-staging-fence', file: 'core/models/cache/store.ts', from: '        beforeRename: guard,', to: '',
+    tests: ['src/core/models/cache/storage.test.ts'], filter: 'after the real staging fsync', expected: 1 },
+  { name: 'rename-retry-fence', file: 'session/store/sessionFileStore.ts',
+    from: '      options.beforeRename?.();', to: '      if (attempt === 1) options.beforeRename?.();',
+    tests: ['src/core/models/cache/storage.test.ts', 'src/session/store/atomic.test.ts'],
+    filter: 'before retrying a rename|before a second rename', expected: 2 },
+  { name: 'unknown-native-effect', file: 'core/models/cache/store.ts',
+    from: "onRenameStart: () => { state.outcome = 'unknown'; }", to: "onRenameStart: () => { state.outcome = 'unchanged'; }",
+    tests: ['src/core/models/cache/storage.test.ts'], filter: 'outcome unknown', expected: 1 },
+  { name: 'saved-cleanup-receipt', file: 'core/models/cache/store.ts',
+    from: "onRenameSuccess: () => { state.outcome = 'saved'; }", to: "onRenameSuccess: () => { state.outcome = 'unchanged'; }",
+    tests: ['src/core/models/cache/storage.test.ts'], filter: 'lock release fails', expected: 1 },
+  { name: 'command-owner-settlement', file: 'core/commands/modelCommandRuntime.ts',
+    from: 'if (runCancellable) return runCancellable(signal => {', to: 'if (runCancellable) return (async (signal: AbortSignal) => {',
+    extraFrom: '    return operation(owned);\n  });', extraTo: '    return operation(owned);\n  })(new AbortController().signal);',
+    tests: ['src/core/commands/model/refresh.test.ts'], filter: 'registered through refresh', expected: 2 },
+  { name: 'refreshing-data-receipt', file: 'core/commands/modelCommandRuntime.ts',
+    from: 'return { ...result, refresh: refreshed.result, refreshNotice: refreshed.output };', to: 'return result;',
+    tests: ['src/core/commands/model/refresh.test.ts'], filter: 'refreshing data API', expected: 2 },
+  { name: 'rejected-data-receipt', file: 'core/commands/modelCommandRuntime.ts',
+    from: '      throw new CatalogReadError(refreshed.result, refreshed.output, error, captured.signal?.aborted);',
+    to: '      throw error;', tests: ['src/core/commands/model/refresh.test.ts'],
+    filter: 'data read fails after|final data acquisition', expected: 5 },
+  { name: 'rejected-list-notice', file: 'core/commands/modelCommandRuntime.ts',
+    from: "return [notice, 'Catalogue list is unavailable.'].join('\\n');", to: "return 'Catalogue list is unavailable.';",
+    tests: ['src/core/commands/model/refresh.test.ts'], filter: 'list acquisition fails', expected: 1 },
+  { name: 'post-result-admission-throw', file: 'core/commands/modelCommandRuntime.ts',
+    from: "    const changed = context.admission?.();\n    const cancelled = context.signal?.aborted;",
+    to: "    const changed = undefined;\n    const cancelled = context.signal?.aborted;",
+    tests: ['src/core/commands/model/refresh.test.ts'], filter: 'post-refresh admission throws through data', expected: 1 },
+  { name: 'unread-response-retirement', file: 'core/models/catalogRefresh.ts',
+    from: '    controller.abort();', to: '    // Reversed only in this isolated tree.',
+    tests: ['src/core/models/cache/refresh.test.ts'], filter: 'closes the actual response body', expected: 2 },
+];
+const receipt = { status: 'running', mainSourcesMutated: false,
+  source: Object.fromEntries([...originals].map(([file, bytes]) => [file, hash(bytes)])), cases: [] };
+function run(name, tests, filter) {
+  const file = path.join(output, 'reversal-' + name + '.json');
+  const args = ['env', 'NODE_OPTIONS=--max-old-space-size=1536', 'VITEST_MAX_THREADS=1', 'VITEST_MIN_THREADS=1',
+    'GIT_CEILING_DIRECTORIES=' + path.dirname(tree), path.join(tree, 'node_modules/.bin/vitest'), 'run', ...tests,
+    ...(filter ? ['-t', filter] : []), '--no-file-parallelism', '--maxWorkers=1', '--minWorkers=1',
+    '--reporter=json', '--outputFile=' + file];
+  const process = spawnSync('rtk', args, { cwd: path.join(tree, 'packages/ts-shell'),
+    encoding: 'utf8', timeout: 90000, maxBuffer: 2 * 1024 * 1024 });
+  fs.writeFileSync(path.join(output, 'reversal-' + name + '.log'), (process.stdout ?? '') + (process.stderr ?? ''));
+  const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const failed = report.testResults.flatMap(suite => suite.assertionResults.filter(test => test.status === 'failed'));
+  return { exit: process.status, selected: report.numPassedTests + report.numFailedTests, passed: report.numPassedTests,
+    failed: report.numFailedTests, assertionFailures: failed.filter(test => test.failureMessages.some(message => message.includes('AssertionError'))).length };
+}
+try {
+  for (const item of cases) {
+    let source = originals.get(item.file).toString('utf8');
+    for (const [from, to] of [[item.from, item.to], ...(item.extraFrom ? [[item.extraFrom, item.extraTo]] : [])]) {
+      if (source.split(from).length !== 2) throw new Error('non-unique-reversal-' + item.name);
+      source = source.replace(from, to);
+    }
+    const target = path.join(tree, sourceRoot, item.file);
+    fs.writeFileSync(target, source);
+    let result;
+    try { result = run(item.name, item.tests, item.filter); }
+    finally { fs.writeFileSync(target, originals.get(item.file)); }
+    receipt.cases.push({ name: item.name, ...result, restoredExactly: hash(fs.readFileSync(target)) === hash(originals.get(item.file)) });
+    fs.writeFileSync(path.join(output, 'reversals.json'), JSON.stringify(receipt, null, 2) + '\n');
+    console.log(JSON.stringify({ reversal: item.name, ...result }));
+    if (result.exit !== 1 || result.assertionFailures !== item.expected || result.failed !== item.expected)
+      throw new Error('ineffective-reversal-' + item.name);
+  }
+  receipt.restoredSuite = run('restored', ['src/core/models/cache/refresh.test.ts', 'src/core/models/cache/storage.test.ts',
+    'src/core/commands/model/refresh.test.ts', 'src/session/store/atomic.test.ts']);
+  if (receipt.restoredSuite.exit !== 0 || receipt.restoredSuite.failed !== 0 || receipt.restoredSuite.passed !== 73)
+    throw new Error('restored-suite-failed');
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failure = error.message; process.exitCode = 1;
+} finally {
+  for (const [file, bytes] of originals) fs.writeFileSync(path.join(tree, sourceRoot, file), bytes);
+  receipt.restoredExactly = files.every(file => hash(fs.readFileSync(path.join(tree, sourceRoot, file))) === hash(originals.get(file)));
+  receipt.mainSourcesMatch = files.every(file => hash(fs.readFileSync(path.join(repo, sourceRoot, file))) === hash(originals.get(file)));
+  fs.writeFileSync(path.join(output, 'reversals.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify({ status: receipt.status, failure: receipt.failure, cases: receipt.cases.length,
+    restoredExactly: receipt.restoredExactly, mainSourcesMatch: receipt.mainSourcesMatch, restoredSuite: receipt.restoredSuite }));
+}

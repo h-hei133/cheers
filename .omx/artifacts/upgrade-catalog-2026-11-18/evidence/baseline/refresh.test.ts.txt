@@ -1,0 +1,384 @@
+import fs from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
+import type { Socket } from 'node:net';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { refreshCatalog } from '../../../packages/ts-shell/src/core/models/catalogRefresh.js';
+import { catalogCachePath, writeCatalogCache } from '../../../packages/ts-shell/src/core/models/catalogStore.js';
+
+// Temporary intersection keeps this draft type-compatible with the frozen owner.
+type RefreshOptions = NonNullable<Parameters<typeof refreshCatalog>[1]> & {
+  readonly signal?: AbortSignal;
+  readonly admission?: () => string | undefined;
+};
+type RefreshResult = Awaited<ReturnType<typeof refreshCatalog>>;
+interface Request {
+  readonly incoming: http.IncomingMessage;
+  readonly response: http.ServerResponse;
+}
+interface Index {
+  readonly requests: Request[];
+  url(pathname?: string): string;
+  refresh(pathname?: string, options?: RefreshOptions): Promise<RefreshResult>;
+  request(position: number): Promise<Request>;
+}
+interface Stored {
+  readonly indexUrl?: string;
+  readonly etag?: string;
+  readonly providers: Record<string, { readonly models: readonly { readonly id: string }[] }>;
+}
+
+let isolatedHome: string;
+beforeEach(() => {
+  fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+  isolatedHome = fs.mkdtempSync('/tmp/cheers-test/catalog-refresh-');
+  vi.stubEnv('HOME', isolatedHome);
+  vi.stubEnv('USERPROFILE', isolatedHome);
+  vi.stubEnv('CHEERS_TEST_ROOT', isolatedHome);
+  // Refuse a leaked process profile before touching any cache.
+  expect(path.relative(isolatedHome, catalogCachePath())).toBe(path.join('.cheers', 'models-cache.json'));
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  fs.rmSync(isolatedHome, { recursive: true, force: true });
+});
+
+function rawCache(): string | undefined {
+  const file = catalogCachePath();
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
+}
+
+function storedCache(): Stored {
+  return JSON.parse(rawCache()!) as Stored;
+}
+
+function seedCache(indexUrl: string, etag = '"old"'): string {
+  expect(writeCatalogCache([{ id: 'demo', models: [{ id: 'accepted' }] }], { indexUrl, etag }))
+    .toBe(catalogCachePath());
+  return rawCache()!;
+}
+
+function document(id = 'downloaded'): unknown {
+  return { demo: { models: { [id]: { id, limit: { context: 8_000 } } } } };
+}
+
+function respond(request: Request, body: unknown, etag?: string): void {
+  request.response.setHeader('content-type', 'application/json');
+  if (etag !== undefined) request.response.setHeader('etag', etag);
+  request.response.end(JSON.stringify(body));
+}
+
+/** Observe the actual fetch result; no response, body, or transport is fabricated. */
+function observeResponse(observe: (response: Response) => void): void {
+  const nativeFetch = globalThis.fetch;
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const response = await nativeFetch(input, init);
+    observe(response);
+    return response;
+  });
+}
+
+/** All response gates and refresh promises settle before the server/home is retired. */
+async function withIndex<T>(run: (index: Index) => Promise<T>): Promise<T> {
+  const requests: Request[] = [];
+  const operations: Promise<RefreshResult>[] = [];
+  const sockets = new Set<Socket>();
+  let closing = false;
+  const server = http.createServer((incoming, response) => {
+    requests.push({ incoming, response });
+    if (closing) { response.statusCode = 503; response.end(); }
+  });
+  server.on('connection', socket => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const origin = 'http://127.0.0.1:' + (server.address() as { port: number }).port;
+  const index: Index = {
+    requests,
+    url: (pathname = '/api.json') => origin + pathname,
+    refresh: (pathname = '/api.json', options) => {
+      const operation = refreshCatalog(origin + pathname, options);
+      operations.push(operation);
+      return operation;
+    },
+    request: async position => {
+      await vi.waitFor(() => expect(requests[position]).toBeDefined(), { timeout: 2_000, interval: 10 });
+      return requests[position]!;
+    },
+  };
+  try { return await run(index); }
+  finally {
+    closing = true;
+    for (const { response } of requests) {
+      if (!response.writableEnded && !response.destroyed) {
+        if (!response.headersSent) response.statusCode = 503;
+        response.end();
+      }
+    }
+    await Promise.allSettled(operations);
+    await new Promise<void>((resolve, reject) => {
+      server.close(error => error ? reject(error) : resolve());
+      for (const socket of sockets) socket.destroy();
+    });
+  }
+}
+
+describe('catalogue refresh publication', () => {
+  it.each([
+    { label: 'absent cache', providers: undefined, present: false },
+    { label: 'metadata only', providers: undefined, present: true },
+    { label: 'null providers', providers: null, present: true },
+    { label: 'array providers', providers: [], present: true },
+    { label: 'empty providers', providers: {}, present: true },
+    { label: 'primitive providers', providers: 'invalid', present: true },
+    { label: 'empty model body', providers: { demo: { models: [] } }, present: true },
+    { label: 'null model body', providers: { demo: { models: [null] } }, present: true },
+  ])('does not revalidate or accept 304 with $label', async ({ providers, present }) => {
+    await withIndex(async index => {
+      if (present) {
+        fs.mkdirSync(path.dirname(catalogCachePath()), { recursive: true });
+        fs.writeFileSync(catalogCachePath(), JSON.stringify({ indexUrl: index.url(), etag: '"unbacked"', providers }) + '\n');
+      }
+      const before = rawCache();
+      const operation = index.refresh();
+      const request = await index.request(0);
+      expect(request.incoming.headers['if-none-match']).toBeUndefined();
+      request.response.statusCode = 304;
+      request.response.setHeader('etag', '"rotated-unbacked"');
+      request.response.end();
+      const result = await operation;
+      expect(result.ok).toBe(false);
+      expect(result.notModified).not.toBe(true);
+      expect(result.cachePath).toBeUndefined();
+      expect(rawCache()).toBe(before);
+    });
+  });
+
+  it('does not let a caller ETag supply the missing body', async () => {
+    await withIndex(async index => {
+      const operation = index.refresh('/api.json', { etag: '"unbacked"' });
+      const request = await index.request(0);
+      expect(request.incoming.headers['if-none-match']).toBeUndefined();
+      request.response.statusCode = 304;
+      request.response.end();
+      expect((await operation).ok).toBe(false);
+      expect(rawCache()).toBeUndefined();
+    });
+  });
+
+  it.each([undefined, '"old"'])('isolates ETags between index URLs with caller validator %s', async etag => {
+    await withIndex(async index => {
+      seedCache(index.url('/a.json'));
+      const next = index.refresh('/b.json', etag === undefined ? undefined : { etag });
+      const b = await index.request(0);
+      expect(b.incoming.url).toBe('/b.json');
+      expect(b.incoming.headers['if-none-match']).toBeUndefined();
+      respond(b, document('from-b'), '"b"');
+      expect((await next).ok).toBe(true);
+      expect(storedCache()).toMatchObject({ indexUrl: index.url('/b.json'), etag: '"b"' });
+      const original = index.refresh('/a.json');
+      const a = await index.request(1);
+      expect(a.incoming.headers['if-none-match']).toBeUndefined();
+      respond(a, document('from-a'), '"a"');
+      expect((await original).ok).toBe(true);
+      expect(storedCache()).toMatchObject({ indexUrl: index.url('/a.json'), etag: '"a"' });
+    });
+  });
+
+  it.each(['headers', 'json'] as const)('does not overwrite a successor cache after waiting for %s', async phase => {
+    await withIndex(async index => {
+      seedCache(index.url());
+      let readingBody = false;
+      if (phase === 'json') observeResponse(response => {
+        const json = response.json.bind(response);
+        vi.spyOn(response, 'json').mockImplementation(async () => {
+          readingBody = true;
+          return await json();
+        });
+      });
+      const old = index.refresh();
+      const delayed = await index.request(0);
+      expect(delayed.incoming.headers['if-none-match']).toBe('"old"');
+      if (phase === 'json') {
+        delayed.response.setHeader('content-type', 'application/json');
+        delayed.response.setHeader('etag', '"late"');
+        delayed.response.write(JSON.stringify(document('late')));
+        await vi.waitFor(() => expect(readingBody).toBe(true), { timeout: 2_000, interval: 10 });
+      }
+      const next = index.refresh();
+      respond(await index.request(1), document('successor'), '"successor"');
+      expect((await next).ok).toBe(true);
+      const accepted = rawCache();
+      if (phase === 'json') delayed.response.end();
+      else respond(delayed, document('late'), '"late"');
+      const result = await old;
+      expect(result.ok).toBe(false);
+      expect(result.cachePath).toBeUndefined();
+      expect(rawCache()).toBe(accepted);
+      expect(storedCache().providers.demo.models.map(model => model.id)).toEqual(['successor']);
+    });
+  });
+
+  it.each([
+    { label: 'same source without response ETag', nextPath: '/a.json', rotated: undefined },
+    { label: 'different source with rotated response ETag', nextPath: '/b.json', rotated: '"late-rotated"' },
+  ])('does not retag a successor cache on old 304: $label', async ({ nextPath, rotated }) => {
+    await withIndex(async index => {
+      seedCache(index.url('/a.json'));
+      const old = index.refresh('/a.json');
+      const delayed = await index.request(0);
+      expect(delayed.incoming.headers['if-none-match']).toBe('"old"');
+      const next = index.refresh(nextPath);
+      respond(await index.request(1), document('successor'), '"successor"');
+      expect((await next).ok).toBe(true);
+      const accepted = rawCache();
+      delayed.response.statusCode = 304;
+      if (rotated !== undefined) delayed.response.setHeader('etag', rotated);
+      delayed.response.end();
+      const result = await old;
+      expect(result.ok).toBe(false);
+      expect(result.notModified).not.toBe(true);
+      expect(rawCache()).toBe(accepted);
+      expect(storedCache()).toMatchObject({ indexUrl: index.url(nextPath), etag: '"successor"' });
+    });
+  });
+
+  it.each((['abort', 'admission'] as const).flatMap(cause =>
+    (['headers', 'json'] as const).map(phase => ({ cause, phase }))))
+  ('refuses cache publication after $cause at the real $phase await', async ({ cause, phase }) => {
+    await withIndex(async index => {
+      const before = seedCache(index.url());
+      const controller = new AbortController();
+      let refusal: string | undefined;
+      let retired = false;
+      const retire = () => {
+        retired = true;
+        if (cause === 'abort') controller.abort();
+        else refusal = 'Original refresh admission retired.';
+      };
+      observeResponse(response => {
+        if (phase === 'headers') retire();
+        else {
+          const json = response.json.bind(response);
+          vi.spyOn(response, 'json').mockImplementation(async () => {
+            const body = await json();
+            retire();
+            return body;
+          });
+        }
+      });
+      const operation = index.refresh('/api.json', { signal: controller.signal, admission: () => refusal });
+      respond(await index.request(0), document('refused'), '"refused"');
+      const result = await operation;
+      expect(retired).toBe(true);
+      expect(result.ok).toBe(false);
+      expect(result.cachePath).toBeUndefined();
+      expect(rawCache()).toBe(before);
+    });
+  });
+
+  it.each(['abort', 'admission'] as const)('does not rotate an ETag after %s at 304 headers', async cause => {
+    await withIndex(async index => {
+      const before = seedCache(index.url());
+      const controller = new AbortController();
+      let refusal: string | undefined;
+      let retired = false;
+      observeResponse(() => {
+        retired = true;
+        if (cause === 'abort') controller.abort();
+        else refusal = 'Original refresh admission retired.';
+      });
+      const operation = index.refresh('/api.json', { signal: controller.signal, admission: () => refusal });
+      const request = await index.request(0);
+      expect(request.incoming.headers['if-none-match']).toBe('"old"');
+      request.response.statusCode = 304;
+      request.response.setHeader('etag', '"refused-rotation"');
+      request.response.end();
+      const result = await operation;
+      expect(retired).toBe(true);
+      expect(result.ok).toBe(false);
+      expect(result.notModified).not.toBe(true);
+      expect(rawCache()).toBe(before);
+    });
+  });
+
+  it.each([
+    { label: 'null model', models: { invented: null } },
+    { label: 'primitive model', models: { invented: 7 } },
+    { label: 'array model', models: { invented: [] } },
+    { label: 'null model map', models: null },
+    { label: 'primitive model map', models: 'invented' },
+    { label: 'array model map', models: [{ id: 'invented' }] },
+  ])('does not manufacture entries from $label', async ({ models }) => {
+    await withIndex(async index => {
+      const before = seedCache(index.url());
+      const operation = index.refresh();
+      respond(await index.request(0), { demo: { models } }, '"invalid"');
+      const result = await operation;
+      expect(result.ok).toBe(false);
+      expect(result.cachePath).toBeUndefined();
+      expect(rawCache()).toBe(before);
+      expect(storedCache().providers.demo.models.map(model => model.id)).toEqual(['accepted']);
+    });
+  });
+
+  it.each(['http', 'json'] as const)('retains exact old cache bytes on %s failure', async failure => {
+    await withIndex(async index => {
+      seedCache(index.url());
+      // Preserve harmless formatting too: failure must not normalize or rewrite it.
+      fs.writeFileSync(catalogCachePath(), '  ' + rawCache()!.trimEnd() + '\n\n');
+      const before = rawCache();
+      const operation = index.refresh();
+      const request = await index.request(0);
+      request.response.setHeader('content-type', 'application/json');
+      request.response.setHeader('etag', '"failed-response"');
+      if (failure === 'http') {
+        request.response.statusCode = 503;
+        request.response.end(JSON.stringify(document('failed')));
+      } else request.response.end('{"demo":{"models":');
+      const result = await operation;
+      expect(result.ok).toBe(false);
+      expect(result.cachePath).toBeUndefined();
+      expect(rawCache()).toBe(before);
+    });
+  });
+
+  it('reports actual counts and cache path through 200, rotated 304, and unchanged 304', async () => {
+    await withIndex(async index => {
+      const body = {
+        demo: { models: { image: { id: 'image', type: 'image' }, classifier: { id: 'classifier', type: 'classifier' } } },
+        other: { models: { chat: { id: 'chat', type: 'chat' } } },
+      };
+      const first = index.refresh();
+      const initial = await index.request(0);
+      expect(initial.incoming.headers['if-none-match']).toBeUndefined();
+      respond(initial, body, '"v1"');
+      expect(await first).toMatchObject({ ok: true, providers: 2, models: 3, cachePath: catalogCachePath(), etag: '"v1"' });
+      const providers = storedCache().providers;
+      const second = index.refresh();
+      const revalidation = await index.request(1);
+      expect(revalidation.incoming.headers['if-none-match']).toBe('"v1"');
+      revalidation.response.statusCode = 304;
+      revalidation.response.setHeader('etag', 'W/"v2"');
+      revalidation.response.end();
+      expect(await second).toMatchObject({ ok: true, notModified: true, providers: 2, models: 3,
+        cachePath: catalogCachePath(), etag: 'W/"v2"' });
+      expect(storedCache().providers).toEqual(providers);
+      expect(storedCache()).toMatchObject({ indexUrl: index.url(), etag: 'W/"v2"' });
+      const before = rawCache();
+      const third = index.refresh();
+      const unchanged = await index.request(2);
+      expect(unchanged.incoming.headers['if-none-match']).toBe('W/"v2"');
+      unchanged.response.statusCode = 304;
+      unchanged.response.end();
+      expect(await third).toMatchObject({ ok: true, notModified: true, providers: 2, models: 3,
+        cachePath: catalogCachePath(), etag: 'W/"v2"' });
+      expect(rawCache()).toBe(before);
+    });
+  });
+});

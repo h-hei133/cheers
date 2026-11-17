@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+for (const file of process.argv.slice(2)) {
+  const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const failures = report.testResults.flatMap(suite => suite.assertionResults
+    .filter(test => test.status === 'failed')
+    .map(test => ({ name: test.fullName,
+      errors: test.failureMessages.map(message => message.split('\n').slice(0, 3).join('\n')) })));
+  console.log(JSON.stringify({ file, success: report.success, files: report.testResults.length,
+    tests: report.numTotalTests, passed: report.numPassedTests, failed: report.numFailedTests, failures }, null, 2));
+}

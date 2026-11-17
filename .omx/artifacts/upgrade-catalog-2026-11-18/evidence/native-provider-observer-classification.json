@@ -1,0 +1,6 @@
+{
+  "classification": "harness_setup_drift",
+  "reason": "Native SDK terminal contract is query.completed with result status; message.delta carries a string. The initial observer expected a different terminal event and structured delta. Two actual sent provider requests/HTTP200 remain unverified outcome evidence.",
+  "receipt": "native-provider-observer-initial.json",
+  "sourceChanged": false
+}

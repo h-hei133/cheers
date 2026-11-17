@@ -1,0 +1,6 @@
+{
+  "classification": "harness_setup_drift",
+  "reason": "Passing undefined for response ETag invoked the helper default downloaded validator, rotating rather than keeping the old validator. Failed native receipt retained; product source unchanged.",
+  "receipt": "native-local-initial.json",
+  "responseContract": "No ETag must be explicit null to suppress the response helper default."
+}

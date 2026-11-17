@@ -1,5 +1,5 @@
 import { THINKING_LEVELS, type CatalogProvider, type CatalogModel, type ModelCostRates } from "./catalog.js";
-import { readCatalogCacheEtag, updateCatalogCacheEtag, writeCatalogCache } from "./catalogStore.js";
+import { assertCacheCurrent, CacheFailure, captureCache, encodeCache, publishCache, type CacheOutcome } from './cache/store.js';
 import { positiveTokenLimit } from "./limits.js";
 import { normalizeModalities, withDefaultImageLimits } from "./modalities.js";
 
@@ -26,6 +26,15 @@ export interface RefreshResult {
   readonly etag?: string;
   readonly cachePath?: string;
   readonly error?: string;
+  /** This operation's own publication, independent of session application. */
+  readonly cacheOutcome?: CacheOutcome;
+  readonly errorKind?: 'network' | 'http' | 'json' | 'invalid_index' | 'cancelled' | 'admission' | 'stale' | 'storage';
+}
+
+export interface RefreshOptions {
+  readonly etag?: string;
+  readonly signal?: AbortSignal;
+  readonly admission?: () => string | undefined;
 }
 
 /** Shape of the public index: provider id → { name, models: { id → model } }. */
@@ -75,44 +84,81 @@ interface IndexReasoningOption {
 
 export async function refreshCatalog(
   indexUrl: string = DEFAULT_INDEX,
-  options?: { readonly etag?: string },
+  options?: RefreshOptions,
 ): Promise<RefreshResult> {
+  const { etag: suppliedEtag, signal: callerSignal, admission } = options ?? {};
   const controller = new AbortController();
+  const signal = callerSignal ? AbortSignal.any([callerSignal, controller.signal]) : controller.signal;
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let phase: NonNullable<RefreshResult['errorKind']> = 'storage';
+  const checkAdmission = () => {
+    if (signal.aborted) throw new CacheFailure('cancelled');
+    let refused: string | undefined;
+    try { refused = admission?.(); }
+    catch { throw new CacheFailure('admission'); }
+    if (signal.aborted) throw new CacheFailure('cancelled');
+    if (refused) throw new CacheFailure('admission');
+  };
   try {
-    const validator = options?.etag ?? readCatalogCacheEtag(indexUrl);
+    checkAdmission();
+    const captured = captureCache();
+    const guard = () => { checkAdmission(); assertCacheCurrent(captured); };
+    guard();
+    const stored = captured.stored;
+    const validator = stored?.indexUrl === indexUrl && typeof stored.etag === 'string' && stored.etag
+      && (suppliedEtag === undefined || suppliedEtag === stored.etag) ? stored.etag : undefined;
+    phase = 'network';
     const response = await fetch(indexUrl, {
-      signal: controller.signal,
+      signal,
       ...(validator ? { headers: { "if-none-match": validator } } : {}),
     });
+    guard();
     if (response.status === 304) {
+      if (!stored || !validator) return refreshFailure('invalid_index');
       const rotatedEtag = response.headers.get("etag") ?? validator;
-      if (rotatedEtag) updateCatalogCacheEtag(rotatedEtag, indexUrl);
-      return { ok: true, providers: 0, models: 0, notModified: true, ...(rotatedEtag ? { etag: rotatedEtag } : {}) };
+      const content = rotatedEtag === stored.etag ? undefined : `${JSON.stringify({ ...stored, etag: rotatedEtag }, null, 2)}\n`;
+      const publication = publishCache(captured, content, checkAdmission);
+      return { ...publication, providers: publication.ok || publication.cacheOutcome === 'saved' ? captured.providers : 0,
+        models: publication.ok || publication.cacheOutcome === 'saved' ? captured.models : 0,
+        ...(publication.ok ? { notModified: true } : {}),
+        ...(publication.ok || publication.cacheOutcome === 'saved' ? { etag: rotatedEtag } : {}) };
     }
     if (!response.ok) {
-      return { ok: false, providers: 0, models: 0, error: `index returned ${response.status}` };
+      void response.body?.cancel().catch(() => {});
+      return refreshFailure('http', response.status);
     }
     const responseEtag = response.headers.get("etag") ?? undefined;
-    const index = (await response.json()) as Record<string, IndexProvider>;
+    phase = 'json';
+    const index: unknown = await response.json();
+    guard();
+    phase = 'invalid_index';
     const providers = projectIndex(index);
-    if (providers.length === 0) {
-      return { ok: false, providers: 0, models: 0, error: "index held no providers" };
-    }
+    if (providers.length === 0) return refreshFailure('invalid_index');
     const models = providers.reduce((total, provider) => total + (provider.models?.length ?? 0), 0);
+    const publication = publishCache(captured, encodeCache(providers, { indexUrl, etag: responseEtag }), checkAdmission);
     return {
-      ok: true,
-      providers: providers.length,
-      models,
-      ...(responseEtag ? { etag: responseEtag } : {}),
-      cachePath: writeCatalogCache(providers, responseEtag ? { etag: responseEtag, indexUrl } : { indexUrl }),
+      ...publication,
+      providers: publication.ok || publication.cacheOutcome === 'saved' ? providers.length : 0,
+      models: publication.ok || publication.cacheOutcome === 'saved' ? models : 0,
+      ...(responseEtag && (publication.ok || publication.cacheOutcome === 'saved') ? { etag: responseEtag } : {}),
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { ok: false, providers: 0, models: 0, error: message };
+    return refreshFailure(error instanceof CacheFailure ? error.kind : signal.aborted ? 'cancelled'
+      : phase === 'json' && !(error instanceof SyntaxError) ? 'network' : phase);
   } finally {
     clearTimeout(timer);
+    // A rejected header-only response still owns an open body until its request is retired.
+    controller.abort();
   }
+}
+
+function refreshFailure(kind: NonNullable<RefreshResult['errorKind']>, status?: number): RefreshResult {
+  const error = kind === 'network' ? 'Catalogue index is unavailable.'
+    : kind === 'http' ? `Catalogue index returned HTTP ${status}.`
+    : kind === 'json' ? 'Catalogue index returned invalid JSON.'
+    : kind === 'invalid_index' ? 'Catalogue index held no usable model body.'
+    : new CacheFailure(kind).message;
+  return { ok: false, providers: 0, models: 0, cacheOutcome: 'unchanged', errorKind: kind, error };
 }
 
 /**
@@ -124,14 +170,19 @@ export async function refreshCatalog(
  * provider, and guessing that from a string would break a connection that
  * already works.
  */
-function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProvider>[] {
+function projectIndex(index: unknown): Partial<CatalogProvider>[] {
   const providers: Partial<CatalogProvider>[] = [];
-  for (const [id, entry] of Object.entries(index)) {
-    if (!id || typeof entry !== "object" || entry === null) continue;
+  if (!index || typeof index !== 'object' || Array.isArray(index)) return providers;
+  for (const [id, value] of Object.entries(index)) {
+    if (!id.trim() || !value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const entry = value as IndexProvider;
+    if (!entry.models || typeof entry.models !== 'object' || Array.isArray(entry.models)) continue;
     const models: CatalogModel[] = [];
-    for (const [modelId, model] of Object.entries(entry.models ?? {})) {
-      const resolved = model?.id ?? modelId;
-      if (!resolved) continue;
+    for (const [modelId, value] of Object.entries(entry.models)) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const model = value as IndexModel;
+      const resolved = model.id === undefined ? modelId : model.id;
+      if (typeof resolved !== 'string' || !resolved.trim()) continue;
       const context = positiveTokenLimit(model?.limit?.context);
       const inputLimit = positiveTokenLimit(model?.limit?.input);
       const maxTokens = positiveTokenLimit(model?.limit?.output);
@@ -169,9 +220,9 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
     if (models.length === 0) continue;
     providers.push({
       id,
-      label: entry.name ?? id,
+      label: typeof entry.name === 'string' && entry.name.trim() ? entry.name : id,
       models,
-      ...(entry.env?.[0] ? { envVar: entry.env[0] } : {}),
+      ...(Array.isArray(entry.env) && typeof entry.env[0] === 'string' && entry.env[0] ? { envVar: entry.env[0] } : {}),
     });
   }
   return providers;

@@ -186,8 +186,17 @@ export function writeJsonFileAtomic(filePath: string, payload: unknown): void {
   writeTextFileAtomic(filePath, JSON.stringify(payload, null, 2));
 }
 
+export interface AtomicWriteOptions {
+  /** Runs before each native rename attempt; throwing refuses publication. */
+  readonly beforeRename?: () => void;
+  readonly onRenameStart?: () => void;
+  readonly onRenameSuccess?: () => void;
+  /** Observes only native rename errors; observer failures preserve the original error. */
+  readonly onRenameError?: (error: unknown) => void;
+}
+
 /** Publishes complete contents without truncating the current file on failure. */
-export function writeTextFileAtomic(filePath: string, content: string, mode?: number): void {
+export function writeTextFileAtomic(filePath: string, content: string, mode?: number, options: AtomicWriteOptions = {}): void {
   const directory = path.dirname(filePath);
   if (!fs.existsSync(directory)) {
     fs.mkdirSync(directory, { recursive: true });
@@ -203,14 +212,19 @@ export function writeTextFileAtomic(filePath: string, content: string, mode?: nu
       fs.closeSync(tempFd);
     }
     for (let attempt = 1; ; attempt++) {
+      options.beforeRename?.();
+      options.onRenameStart?.();
       try {
         fs.renameSync(tempPath, filePath);
-        break;
       } catch (error) {
+        try { options.onRenameError?.(error); } catch { /* An observer must not replace the native error. */ }
         // A busy destination may become replaceable, but must never be truncated.
         if (!isTransientIoError(error) || attempt >= STATE_IO_MAX_ATTEMPTS) throw error;
         sleepBlocking(STATE_IO_RETRY_DELAY_MS);
+        continue;
       }
+      options.onRenameSuccess?.();
+      break;
     }
   } finally {
     if (fs.existsSync(tempPath)) {

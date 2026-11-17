@@ -1,0 +1,117 @@
+{
+  "status": "passed",
+  "mainSourcesMutated": false,
+  "source": {
+    "core/models/cache/store.ts": "397ca0a389f22017f1942652fb6b034d64b6f2c77a1028c50e521ebe35c2b751",
+    "core/models/catalogStore.ts": "3e0837a730b3b37d80618837605fae3922d7017935838f1178da5fab0239dfa2",
+    "core/models/catalogRefresh.ts": "0141b5da8fad1597c165921e2b0aa4c8e3ab992c320cce3f9cd53ce41336ca5b",
+    "core/commands/modelCommandRuntime.ts": "e719ad20fb17e10fbffaa1667cf310fb43074414a164045d0c382d0d04ddc485",
+    "session/store/sessionFileStore.ts": "9e71d2c89fd12833c2cbd4c025d7d60acfdb21dc4a3b334b7f04e9d6ab67054b",
+    "core/models/cache/refresh.test.ts": "c95f91d5fd5aef541709e2e6c924c45176e2d71839cd4bed84697c4b210d7fc6",
+    "core/models/cache/storage.test.ts": "9cc42e9fb98610dbda7882d44a0f594b789fc2ab3b475763437f9ea7ad3b81be",
+    "core/commands/model/refresh.test.ts": "dd2f660d052b6bbe352afec02ab2c0717238839183c54b35307193aaed1e9c14",
+    "session/store/atomic.test.ts": "5e3eb86b2e03f6c86d6800adeae84cbd716208b19e7ba1b90baf7c6a551c13c1",
+    "core/commands/configuration.test.ts": "d59c4a4224e2540931e16cc1d0c8c9e6ecae3fef64379ef384710e725f04a70a"
+  },
+  "cases": [
+    {
+      "name": "body-backed-validator",
+      "exit": 1,
+      "selected": 1,
+      "passed": 0,
+      "failed": 1,
+      "assertionFailures": 1,
+      "restoredExactly": true
+    },
+    {
+      "name": "source-url-isolation",
+      "exit": 1,
+      "selected": 2,
+      "passed": 0,
+      "failed": 2,
+      "assertionFailures": 2,
+      "restoredExactly": true
+    },
+    {
+      "name": "captured-body-publication",
+      "exit": 1,
+      "selected": 4,
+      "passed": 0,
+      "failed": 4,
+      "assertionFailures": 4,
+      "restoredExactly": true
+    },
+    {
+      "name": "final-staging-fence",
+      "exit": 1,
+      "selected": 1,
+      "passed": 0,
+      "failed": 1,
+      "assertionFailures": 1,
+      "restoredExactly": true
+    },
+    {
+      "name": "rename-retry-fence",
+      "exit": 1,
+      "selected": 2,
+      "passed": 0,
+      "failed": 2,
+      "assertionFailures": 2,
+      "restoredExactly": true
+    },
+    {
+      "name": "unknown-native-effect",
+      "exit": 1,
+      "selected": 1,
+      "passed": 0,
+      "failed": 1,
+      "assertionFailures": 1,
+      "restoredExactly": true
+    },
+    {
+      "name": "saved-cleanup-receipt",
+      "exit": 1,
+      "selected": 1,
+      "passed": 0,
+      "failed": 1,
+      "assertionFailures": 1,
+      "restoredExactly": true
+    },
+    {
+      "name": "command-owner-settlement",
+      "exit": 1,
+      "selected": 2,
+      "passed": 0,
+      "failed": 2,
+      "assertionFailures": 2,
+      "restoredExactly": true
+    },
+    {
+      "name": "refreshing-data-receipt",
+      "exit": 1,
+      "selected": 2,
+      "passed": 0,
+      "failed": 2,
+      "assertionFailures": 2,
+      "restoredExactly": true
+    },
+    {
+      "name": "unread-response-retirement",
+      "exit": 1,
+      "selected": 2,
+      "passed": 0,
+      "failed": 2,
+      "assertionFailures": 2,
+      "restoredExactly": true
+    }
+  ],
+  "restoredSuite": {
+    "exit": 0,
+    "selected": 64,
+    "passed": 64,
+    "failed": 0,
+    "assertionFailures": 0
+  },
+  "restoredExactly": true,
+  "mainSourcesMatch": true
+}

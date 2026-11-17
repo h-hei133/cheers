@@ -1,0 +1,163 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "helperSha256": "3929b97ae59f4cfed20fdd09209ff593d5e819b0db22374eafd57213baf11ab2",
+  "publicCompiledSdk": true,
+  "internalExportsManifestBound": true,
+  "publicRefreshExportClaim": false,
+  "cases": [
+    {
+      "name": "200-304-accepted-catalogue",
+      "status": "passed",
+      "originalCommandOwner": true,
+      "actualCounts": [
+        2,
+        2
+      ],
+      "unchangedRawPreserved": true,
+      "actualLoopbackGets": 3
+    },
+    {
+      "name": "missing-and-different-source-validator",
+      "status": "passed",
+      "invalidSourcesRefused": 3,
+      "actualLoopbackGets": 3
+    },
+    {
+      "name": "successor-after-real-body-acquisition",
+      "status": "passed",
+      "actualBodyAcquired": true,
+      "successorBytesPreserved": true,
+      "originalHostBusy": true,
+      "actualLoopbackGets": 2
+    },
+    {
+      "name": "original-admission-and-command-cancellation",
+      "status": "passed",
+      "originalCallbackRetained": true,
+      "cancelledCommandSettled": true,
+      "actualLoopbackGets": 2
+    },
+    {
+      "name": "header-retirement-closes-native-body",
+      "status": "passed",
+      "nativeResponseClosed": true,
+      "actualLoopbackGets": 1
+    },
+    {
+      "name": "staging-and-retry-final-fences",
+      "status": "passed",
+      "actualFsyncObserved": true,
+      "nativeBusyAttempt": 1,
+      "successorPreserved": true,
+      "actualLoopbackGets": 2
+    },
+    {
+      "name": "actual-save-and-unknown-consumers",
+      "status": "passed",
+      "realRenameEffects": 4,
+      "confirmedSaveCleanupFailures": 2,
+      "unconfirmedNativeEffects": 2,
+      "actualLoopbackGets": 4
+    },
+    {
+      "name": "named-profile-and-legacy-selection",
+      "status": "passed",
+      "legacyPathRetained": true,
+      "namedProfileIsolated": true,
+      "actualLoopbackGets": 2
+    },
+    {
+      "name": "configured-provider-after-publication",
+      "status": "running",
+      "actualLoopbackGets": 1
+    }
+  ],
+  "providerRequests": [
+    {
+      "index": 0,
+      "bodySent": true,
+      "status": 200
+    },
+    {
+      "index": 1,
+      "bodySent": true,
+      "status": 200
+    }
+  ],
+  "limitations": [
+    "Catalogue fetches are actual loopback HTTP; only the public index URL is redirected. Responses are not fabricated.",
+    "Filesystem faults are injected at actual native calls, after the recorded real effect where stated.",
+    "Locks and guarded rename retries do not provide cross-process CAS against an editor in the final rename window.",
+    "Configured provider bodies and credentials are never recorded; catalogue service availability is not proven by loopback."
+  ],
+  "source": {
+    "core/models/cache/store.ts": "397ca0a389f22017f1942652fb6b034d64b6f2c77a1028c50e521ebe35c2b751",
+    "core/models/catalogStore.ts": "3e0837a730b3b37d80618837605fae3922d7017935838f1178da5fab0239dfa2",
+    "core/models/catalogRefresh.ts": "0141b5da8fad1597c165921e2b0aa4c8e3ab992c320cce3f9cd53ce41336ca5b",
+    "core/commands/modelCommandRuntime.ts": "e719ad20fb17e10fbffaa1667cf310fb43074414a164045d0c382d0d04ddc485",
+    "session/store/sessionFileStore.ts": "9e71d2c89fd12833c2cbd4c025d7d60acfdb21dc4a3b334b7f04e9d6ab67054b",
+    "core/models/cache/refresh.test.ts": "c95f91d5fd5aef541709e2e6c924c45176e2d71839cd4bed84697c4b210d7fc6",
+    "core/models/cache/storage.test.ts": "9cc42e9fb98610dbda7882d44a0f594b789fc2ab3b475763437f9ea7ad3b81be",
+    "core/commands/model/refresh.test.ts": "dd2f660d052b6bbe352afec02ab2c0717238839183c54b35307193aaed1e9c14",
+    "session/store/atomic.test.ts": "5e3eb86b2e03f6c86d6800adeae84cbd716208b19e7ba1b90baf7c6a551c13c1",
+    "core/commands/configuration.test.ts": "d59c4a4224e2540931e16cc1d0c8c9e6ecae3fef64379ef384710e725f04a70a"
+  },
+  "buildId": "b2ba99581604fa6f666ab4df1393eeb0319ff5b03f0e3b6b4948913ec73f8152",
+  "buildInputsDigest": "fea954d80aadc34257e66dad2a88bd5bbaefd1ea351678b6ee7ad522e978f845",
+  "buildManifestSha256": "d5a0814fb1e62dec788e620fe8e26e2d1fcb5678c33483c6e150df040c75f1a7",
+  "configuredCatalogue": {
+    "minimalConfiguredModelEntry": false,
+    "originalCredentials": true,
+    "originalEndpointFields": true,
+    "inventedPrices": false
+  },
+  "configuredTarget": {
+    "configuredIndex": 1,
+    "connectionIdSha256": "3b1acfc0a8e86a1c8a555959021b73d11ab3aa251190d8cc4863e6e9f6670f70",
+    "modelIdSha256": "1e2d53ebb53c779c090d004202999080f1b6aa48b3c5bffa5b7946921d18d729",
+    "providerIdSha256": "7e341752813dcf844ffc5197123e0f41f6cfe860a8ea52cb8f92749667afc142",
+    "originalActive": false
+  },
+  "internalOwners": {
+    "readModelCatalog": {
+      "artifact": "builds/b2ba99581604fa6f666ab4df1393eeb0319ff5b03f0e3b6b4948913ec73f8152/chunks/chunk-OGWYIASJ.js",
+      "sha256": "29b7713b2cfecedfd930a092de296f89acd1bf83ff5442a9b546c0ac3a7c520f"
+    },
+    "createCommandRegistry": {
+      "artifact": "builds/b2ba99581604fa6f666ab4df1393eeb0319ff5b03f0e3b6b4948913ec73f8152/chunks/chunk-OGWYIASJ.js",
+      "sha256": "29b7713b2cfecedfd930a092de296f89acd1bf83ff5442a9b546c0ac3a7c520f"
+    },
+    "configurationAdmission": {
+      "artifact": "builds/b2ba99581604fa6f666ab4df1393eeb0319ff5b03f0e3b6b4948913ec73f8152/chunks/chunk-QMDJ4HUR.js",
+      "sha256": "cae6c1bc5c9ef14a2759443ff20138b00ab2c504151856156cf8a7c340cf2b98"
+    },
+    "refreshShellRuntimeConfig": {
+      "artifact": "builds/b2ba99581604fa6f666ab4df1393eeb0319ff5b03f0e3b6b4948913ec73f8152/chunks/chunk-QMDJ4HUR.js",
+      "sha256": "cae6c1bc5c9ef14a2759443ff20138b00ab2c504151856156cf8a7c340cf2b98"
+    },
+    "catalogCachePath": {
+      "artifact": "builds/b2ba99581604fa6f666ab4df1393eeb0319ff5b03f0e3b6b4948913ec73f8152/chunks/chunk-P2NDUYG4.js",
+      "sha256": "4b3edfaa087916802382f9d7d02b17150199f15df66c733632b748ca96e53d59"
+    },
+    "createProfileContext": {
+      "artifact": "builds/b2ba99581604fa6f666ab4df1393eeb0319ff5b03f0e3b6b4948913ec73f8152/chunks/chunk-JV4NXGZ5.js",
+      "sha256": "0811221ff0b23c81f87b4d76edb37eb0bcc2682756692845cbe57951cf64e84b"
+    },
+    "withProfile": {
+      "artifact": "builds/b2ba99581604fa6f666ab4df1393eeb0319ff5b03f0e3b6b4948913ec73f8152/chunks/chunk-JV4NXGZ5.js",
+      "sha256": "0811221ff0b23c81f87b4d76edb37eb0bcc2682756692845cbe57951cf64e84b"
+    }
+  },
+  "failure": {
+    "stage": "configured-provider-after-publication",
+    "code": "configured-provider-terminal-missing",
+    "providerRequestCount": 2
+  },
+  "sourceUnchanged": true,
+  "compiledBuildUnchanged": true,
+  "originalInputsChecked": 29,
+  "originalInputsUnchanged": true,
+  "actualLoopbackGets": 20,
+  "privateStateRemoved": true
+}

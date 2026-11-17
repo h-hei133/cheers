@@ -11981,3 +11981,10 @@ Linux同代公开SDK／CLI配置模型21实际请求／10prompt轮覆盖两次bu
 E.1复用原worker/gate/catalog修复child退休与完整host join、普通approval/hooks/结果、restricted deferred snapshot和delegated边界；新独立复审确认mixed write/read屏障及nested样式reset两P2，五实际反例红后修，复用原fence/active与theme scoped style。最终50文件987项、七门/2678modules/0monoliths、build19af1f6dc3f2通过；原12script/7export反转对应source保持，追加两反转5AssertionErrors/exact恢复96项。限定metadata/composition/export FIXED/APPROVE hash核对，旧中断lane为unavailable。
 
 同代已配置连接index1两次完整allowed/retry组合6actual requests、七compiled raw controls、npm15入口strict NodeNext/skipLibCheck=false及实际读写、CLI/public HTML/Linux离线Chromium零网络/零页面错误passed。原活动连接两次503和另连接零bodySent/provider_network失败保留，原配置与stored session不变，私有state清理。E.1本地功能验收30/62、32未完成；E.3 richer dispatch/provider image及D.4完整GFM仍部分。正常pinned NormProof actual exit2/not_proven/超16384边missing，18tracked files未改；临时32768图诊断不替代默认proof。F2.2冻结源码30项26红/4控制及storage/command19红已证实，接续原owner修复。按批本地提交，不push/CI，整体goal active。
+
+
+### 2026-11-18：目录ETag与publication结果验收
+
+前批42d7d49a已本地提交。F2.2冻结反例30项26红/4控制及storage/command19红后，复用cache/原锁/atomic/configuration/commands；有效captured body/source/path/raw/inode、每次rename retryguard和signal/admission贯通。304计数/path准确、同ETag保持原字节，旧响应拒绝覆盖后继；saved/unknown不被cleanup、post-result callback或final-read refusal抹掉，数据错误携带冻结receipt、文本保留notice。
+
+最终20文件596项、七门/2682module/0monoliths及buildc5ae05070276通过；13有效反转25AssertionErrors/exact恢复4/73、限定独立FIXED/APPROVE核对。Linux同代11组26GET、配置模型两actual requests/completed标记及npm15入口strict类型/10组25GETpassed；失败与旧build证据保留、原配置/source hash保持、私有state清理。normal pinned judge实际exit2/not_proven/超过16384边，18tracked文件不变；不承诺锁外editor最后rename窗口跨进程CAS。归档upgrade-catalog-2026-11-18，31/62为Linux功能验收；按授权本地提交，下一F2.4单次阶梯价已只读核实，不push/CI或关闭目标。

@@ -1,0 +1,25 @@
+{
+  "build": "b2ba99581604fa6f666ab4df1393eeb0319ff5b03f0e3b6b4948913ec73f8152",
+  "acceptedSuites": [
+    {
+      "receipt": "final-combined.json",
+      "actualFiles": 18,
+      "passed": 542,
+      "requestedAbsentPaths": [
+        "src/cli/rpc/runtime.test.ts",
+        "src/sdk/session.test.ts"
+      ],
+      "absenceIsNotRun": true
+    },
+    {
+      "receipt": "consumer-additional.json",
+      "actualFiles": 2,
+      "passed": 45,
+      "actualPaths": [
+        "src/cli/rpc/runtimeHost.test.ts",
+        "src/sdk/agentSession.test.ts"
+      ]
+    }
+  ],
+  "totalPassed": 587
+}

@@ -1,0 +1,416 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import http from 'node:http';
+import { syncBuiltinESMExports } from 'node:module';
+import { createHash } from 'node:crypto';
+import { channel } from 'node:diagnostics_channel';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseTree, findNodeAtLocation } from 'jsonc-parser';
+
+const repo = '/home/wang/projects/cheers';
+const output = path.dirname(fileURLToPath(import.meta.url));
+const productRoot = path.join(repo, 'packages/ts-shell');
+const installedRoot = process.argv.find(arg => arg.startsWith('--package-root='))?.slice(15);
+const packageRoot = installedRoot ?? productRoot;
+const receiptName = process.argv.find(arg => arg.startsWith('--receipt='))?.slice(10) ?? 'native.json';
+const doProvider = !process.argv.includes('--local-only');
+const INDEX = 'https://models.dev/api.json';
+const ACK = 'NATIVE_CATALOG_ACK_184207';
+const hash = value => createHash('sha256').update(value).digest('hex');
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const sourceFiles = ['core/models/cache/store.ts', 'core/models/catalogStore.ts', 'core/models/catalogRefresh.ts',
+  'core/commands/modelCommandRuntime.ts', 'session/store/sessionFileStore.ts', 'core/models/cache/refresh.test.ts',
+  'core/models/cache/storage.test.ts', 'core/commands/model/refresh.test.ts', 'session/store/atomic.test.ts',
+  'core/commands/configuration.test.ts'];
+const originals = new Map(), envBefore = new Map(), requests = [], sockets = new Set(), operations = new Set();
+const nativeFs = Object.fromEntries(['openSync', 'fsyncSync', 'renameSync', 'rmSync'].map(key => [key, fs[key]]));
+const fetchBefore = globalThis.fetch;
+const receipt = { status: 'running', platform: process.platform, helperSha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))),
+  publicCompiledSdk: true, internalExportsManifestBound: true, publicRefreshExportClaim: false,
+  cases: [], providerRequests: [], limitations: [
+    'Catalogue fetches are actual loopback HTTP; only the public index URL is redirected. Responses are not fabricated.',
+    'Filesystem faults are injected at actual native calls, after the recorded real effect where stated.',
+    'Locks and guarded rename retries do not provide cross-process CAS against an editor in the final rename window.',
+    'Configured provider bodies and credentials are never recorded; catalogue service availability is not proven by loopback.',
+  ] };
+let privateRoot, home, sdk, compiled, manifest, manifestBytes, session, server, selected, configured, owner;
+let responseObserver, stage = 'setup', beforeSource, liveState, deadline;
+function check(condition, code) { if (!condition) throw Object.assign(new Error(code), { probeCode: code }); }
+function env(key, value) {
+  if (!envBefore.has(key)) envBefore.set(key, process.env[key]);
+  if (value === undefined) delete process.env[key]; else process.env[key] = value;
+}
+function source() {
+  return Object.fromEntries(sourceFiles.map(file => [file, hash(fs.readFileSync(path.join(productRoot, 'src', file)))]));
+}
+function original(file) { originals.set(file, fs.existsSync(file) ? hash(fs.readFileSync(file)) : null); }
+async function bound(promise, code, ms = 6000) {
+  let timer;
+  try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error(code), { probeCode: code })), ms); })]); }
+  finally { clearTimeout(timer); }
+}
+async function until(predicate, code, ms = 3000) {
+  const end = Date.now() + ms;
+  while (!predicate()) { check(Date.now() < end, code); await new Promise(resolve => setTimeout(resolve, 10)); }
+}
+async function importOwner(name) {
+  const pattern = new RegExp('^(?:async )?function ' + name + '\\(', 'm');
+  const found = manifest.artifacts.filter(item => item.path.includes('/chunks/') && item.path.endsWith('.js'))
+    .filter(item => pattern.test(fs.readFileSync(path.join(packageRoot, 'dist', item.path), 'utf8')));
+  check(found.length === 1, 'compiled-owner-not-unique-' + name);
+  const item = found[0], file = path.join(packageRoot, 'dist', item.path);
+  check(hash(fs.readFileSync(file)) === item.sha256, 'compiled-owner-digest-' + name);
+  const exports = await import(pathToFileURL(file).href);
+  check(typeof exports[name] === 'function', 'compiled-owner-unexported-' + name);
+  receipt.internalOwners ??= {}; receipt.internalOwners[name] = { artifact: item.path, sha256: item.sha256 };
+  return exports[name];
+}
+function setHome(target, real = false) {
+  home = target; fs.mkdirSync(home, { recursive: true, mode: 0o700 });
+  const store = path.join(home, '.cheers'); fs.mkdirSync(store, { recursive: true, mode: 0o700 });
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home,
+    GIT_CEILING_DIRECTORIES: privateRoot, CHEERS_PROFILE: 'default', CHEERS_PROVIDER_MODE: real ? 'real' : 'synthetic',
+    CHEERS_REAL_PROVIDER_SMOKE: real ? '1' : undefined, CHEERS_OFFLINE: real ? undefined : '1',
+    CHEERS_MARKETPLACES_FILE: path.join(store, 'marketplaces.json'), CHEERS_EXTENSIONS_FILE: path.join(store, 'extensions/registry.json'),
+    CHEERS_PLUGINS_FILE: path.join(store, 'plugins.json'), CHEERS_LOG_DIR: path.join(store, 'logs') })) env(key, value);
+  for (const key of ['CHEERS_PROFILE_HANDOFF', 'CHEERS_STREAM_TRACE_PATH', 'CHEERS_MODEL_PRESETS_FILE',
+    'CHEERS_REFRESH_LEASES_FILE', 'CHEERS_BROWSER_RECEIPT_CACHE_ROOT', 'CHEERS_BROWSER_RECEIPT_CACHE_MANIFEST']) env(key, undefined);
+  return store;
+}
+function cache() { const file = compiled.catalogCachePath(); check(path.relative(privateRoot, file).split(path.sep)[0] !== '..', 'cache-escaped-isolation'); return file; }
+function raw() { return fs.existsSync(cache()) ? fs.readFileSync(cache(), 'utf8') : undefined; }
+function seed(label = 'accepted', indexUrl = INDEX) {
+  const file = cache(); fs.mkdirSync(path.dirname(file), { recursive: true });
+  const text = JSON.stringify({ indexUrl, etag: '"' + label + '"', providers: {
+    google: { id: 'google', models: [{ id: label }] }, auxiliary: { id: 'auxiliary', models: [{ id: 'control' }] },
+  } }, null, 2) + '\n'; fs.writeFileSync(file, text); return text;
+}
+function replace(file, text) { fs.writeFileSync(file + '.external', text); nativeFs.renameSync(file + '.external', file); }
+function document(label) { return { google: { models: { [label]: { id: label, limit: { context: 16000, output: 2048 } } } },
+  auxiliary: { models: { control: { id: 'control' } } } }; }
+function respond(request, body = document('downloaded'), etag = '"downloaded"', status = 200) {
+  request.response.statusCode = status; request.response.setHeader('content-type', 'application/json');
+  if (etag) request.response.setHeader('etag', etag);
+  request.response.end(status === 304 ? undefined : typeof body === 'string' ? body : JSON.stringify(body));
+}
+async function request(index) { await until(() => requests[index], 'loopback-request-not-arrived'); return requests[index]; }
+function track(promise) { operations.add(promise); promise.finally(() => operations.delete(promise)).catch(() => {}); return promise; }
+function context() {
+  const shell = session.runtimeContext, commands = session.sessionRuntime.commands;
+  const state = { registrations: 0, reads: [], applications: [], activeAtApply: [] };
+  const captured = { cwd: shell.cwd, projectRoot: shell.projectRoot, sessionId: shell.session.id, runtimeConfig: shell.runtimeConfig,
+    resolveConfigTarget: shell.resolveConfigTarget, admission: compiled.configurationAdmission(shell),
+    readConfiguration: () => { state.reads.push(Boolean(commands.current)); return shell.configuration.current; },
+    runCancellable: operation => { state.registrations++; return commands.run(operation); },
+    refreshRuntimeConfig: scope => { state.applications.push(scope); state.activeAtApply.push(Boolean(commands.current));
+      return compiled.refreshShellRuntimeConfig(shell, scope); } };
+  return { captured, state, commands };
+}
+function data(ctx) { return track(compiled.readModelCatalog(true, ctx.captured.sessionId, ctx.captured.runtimeConfig, ctx.captured)); }
+function command(args, ctx) {
+  const definition = compiled.createCommandRegistry(ctx.captured.cwd, ctx.captured.runtimeConfig, undefined, { includeTemplates: false }).get('model');
+  return track(definition.execute(args, ctx.captured));
+}
+async function open(name, real = false) {
+  const work = path.join(privateRoot, name); fs.mkdirSync(work); fs.mkdirSync(path.join(work, '.git'));
+  const loader = new sdk.DefaultResourceLoader({ cwd: work, noContextFiles: true, noExtensions: true, noSkills: true, noThemes: true,
+    systemPrompt: 'Answer briefly and follow the exact requested response.' });
+  await loader.reload();
+  session = (await sdk.createAgentSession({ cwd: work, resourceLoader: loader, noTools: 'all', offline: !real,
+    runtimeConfig: { ...sdk.getRuntimeConfig(work), contextWindow: 16000, maxOutputTokens: real ? 4096 : 1024,
+      reserveTokens: 0, compactionEnabled: false, retryEnabled: false, retryMaxRetries: 0, providerRetryMaxRetries: 0,
+      enableMcpTools: false, cacheWarming: 'off', cacheWarmIntervalSeconds: 0, maxTurns: real ? 4 : 2,
+      providerConnectTimeoutMs: 10000, providerHeadersTimeoutMs: 120000, providerBodyTimeoutMs: 120000 } })).session;
+  return work;
+}
+async function close() { const current = session; try { if (current) await bound(current.dispose(), 'session-disposal', 15000); } finally { if (session === current) session = undefined; } }
+async function scenario(name, run) {
+  stage = name; const start = requests.length;
+  const facts = { name, status: 'running' }; receipt.cases.push(facts);
+  try { await run(facts); facts.status = 'passed'; }
+  catch (error) { facts.status = 'failed'; throw error; }
+  finally { facts.actualLoopbackGets = requests.length - start; responseObserver = undefined;
+    for (const [key, value] of Object.entries(nativeFs)) fs[key] = value; syncBuiltinESMExports(); }
+  console.log(JSON.stringify({ scenario: name, status: facts.status, actualLoopbackGets: facts.actualLoopbackGets }));
+}
+async function localCases() {
+  await scenario('200-304-accepted-catalogue', async facts => {
+    seed('accepted'); const ctx = context(), start = requests.length;
+    const first = command(['list', 'google', '--refresh'], ctx); check(Boolean(ctx.commands.current), 'command-synchronous-registration');
+    const req = await request(start); check(req.incoming.headers['if-none-match'] === '"accepted"', 'body-backed-validator');
+    respond(req); const result = await bound(first, 'first-refresh');
+    check(result.output.includes('2 providers, 2 models') && result.output.includes('downloaded'), 'refreshed-list-consumer');
+    check(ctx.state.registrations === 1 && same(ctx.state.applications, ['catalog']) && ctx.state.activeAtApply.every(Boolean)
+      && ctx.state.reads.every(Boolean) && !ctx.commands.current, 'complete-command-owner');
+    const providers = JSON.parse(raw()).providers, ctx2 = context(), next = requests.length, second = data(ctx2);
+    const req2 = await request(next); check(req2.incoming.headers['if-none-match'] === '"downloaded"', 'rotated-input-validator');
+    respond(req2, undefined, 'W/"rotated"', 304); const catalog = await bound(second, 'rotated-refresh');
+    check(catalog.refresh.ok && catalog.refresh.notModified && catalog.refresh.cacheOutcome === 'saved'
+      && catalog.refresh.providers === 2 && catalog.refresh.models === 2 && same(JSON.parse(raw()).providers, providers), 'rotated-captured-body');
+    fs.writeFileSync(cache(), ' \n' + raw().trimEnd() + '\n\t'); const before = raw(), ctx3 = context(), last = requests.length;
+    let renames = 0; fs.renameSync = (a, b) => { if (b === cache()) renames++; return nativeFs.renameSync(a, b); }; syncBuiltinESMExports();
+    const third = data(ctx3); const req3 = await request(last); check(req3.incoming.headers['if-none-match'] === 'W/"rotated"', 'same-validator');
+    respond(req3, undefined, null, 304); const stable = await bound(third, 'same-refresh');
+    check(stable.refresh.ok && stable.refresh.cacheOutcome === 'unchanged' && stable.refresh.cachePath === cache()
+      && raw() === before && renames === 0, 'same-validator-exact-bytes');
+    facts.originalCommandOwner = true; facts.actualCounts = [2, 2]; facts.unchangedRawPreserved = true;
+  });
+  await scenario('missing-and-different-source-validator', async facts => {
+    for (const invalid of ['absent', 'metadata-only', 'different-source']) {
+      if (invalid === 'absent') nativeFs.rmSync(cache(), { force: true });
+      else if (invalid === 'metadata-only') fs.writeFileSync(cache(), JSON.stringify({ etag: '"unbacked"', indexUrl: INDEX }));
+      else seed('other-source', 'https://another-index.invalid/api.json');
+      const before = raw(), ctx = context(), start = requests.length, operation = data(ctx);
+      const req = await request(start); check(req.incoming.headers['if-none-match'] === undefined, 'invalid-validator-sent-' + invalid);
+      respond(req, undefined, '"unbacked"', 304); const result = await bound(operation, 'invalid-304');
+      check(!result.refresh.ok && result.refresh.cacheOutcome === 'unchanged' && raw() === before && ctx.state.applications.length === 0,
+        'unbacked-304-accepted-' + invalid);
+    }
+    facts.invalidSourcesRefused = 3;
+  });
+  await scenario('successor-after-real-body-acquisition', async facts => {
+    seed('race-start'); const oldCtx = context(), start = requests.length; let reading = false;
+    responseObserver = response => { const original = response.json.bind(response); response.json = async () => { reading = true; return original(); }; };
+    const old = data(oldCtx); const delayed = await request(start); delayed.response.setHeader('content-type', 'application/json');
+    delayed.response.setHeader('etag', '"late"'); delayed.response.write(JSON.stringify(document('late')));
+    await until(() => reading, 'actual-body-not-acquired'); responseObserver = undefined;
+    let busy = false; try { await command(['refresh'], context()); } catch { busy = true; }
+    check(busy && oldCtx.commands.current, 'original-host-busy');
+    const successor = compiled.readModelCatalog(true, undefined, undefined, { cwd: oldCtx.captured.cwd });
+    track(successor); respond(await request(start + 1), document('successor'), '"successor"');
+    check((await bound(successor, 'successor-refresh')).refresh.ok, 'successor-refused'); const accepted = raw();
+    delayed.response.end(); const late = await bound(old, 'old-refresh-settlement');
+    check(!late.refresh.ok && late.refresh.errorKind === 'stale' && raw() === accepted && oldCtx.state.applications.length === 0, 'old-body-overwrote-successor');
+    facts.actualBodyAcquired = true; facts.successorBytesPreserved = true; facts.originalHostBusy = true;
+  });
+  await scenario('original-admission-and-command-cancellation', async facts => {
+    for (const cause of ['admission', 'cancel']) {
+      const before = seed('before-' + cause), ctx = context(), start = requests.length;
+      const operation = command(['refresh'], ctx); const req = await request(start);
+      if (cause === 'cancel') ctx.commands.current.controller.abort();
+      else { session.runtimeContext.workspaceRevision++; ctx.captured.admission = () => undefined; }
+      respond(req, document('forbidden'), '"forbidden"'); const result = await bound(operation, 'retired-command');
+      check(result.output.includes('unchanged') && raw() === before && ctx.state.applications.length === 0 && !ctx.commands.current,
+        'retired-command-published-' + cause);
+      if (cause === 'admission') session.runtimeContext.workspaceRevision--;
+    }
+    facts.originalCallbackRetained = true; facts.cancelledCommandSettled = true;
+  });
+  await scenario('header-retirement-closes-native-body', async facts => {
+    const before = seed('header-owner'), ctx = context(), start = requests.length;
+    responseObserver = () => { session.runtimeContext.workspaceRevision++; };
+    const operation = command(['refresh'], ctx), req = await request(start);
+    req.response.statusCode = 503; req.response.setHeader('content-type', 'application/json'); req.response.flushHeaders();
+    const result = await bound(operation, 'headers-refusal'); await until(() => req.response.destroyed, 'unread-body-still-open');
+    check(result.output.includes('unchanged') && raw() === before && ctx.state.applications.length === 0, 'headers-retirement-published');
+    session.runtimeContext.workspaceRevision--; facts.nativeResponseClosed = true;
+  });
+  await scenario('staging-and-retry-final-fences', async facts => {
+    for (const boundary of ['fsync', 'rename-retry']) {
+      seed('fence-' + boundary); const file = cache(), accepted = JSON.stringify({ etag: '"external"', indexUrl: INDEX,
+        providers: { google: { models: [{ id: 'external' }] } } }); let staged = false, attempts = 0;
+      if (boundary === 'fsync') {
+        const fds = new Set(); fs.openSync = (target, flags, mode) => { const fd = nativeFs.openSync(target, flags, mode);
+          if (typeof target === 'string' && target.startsWith(file + '.tmp-')) fds.add(fd); else fds.delete(fd); return fd; };
+        fs.fsyncSync = fd => { nativeFs.fsyncSync(fd); if (fds.delete(fd)) { staged = true; replace(file, accepted); } };
+      }
+      fs.renameSync = (a, b) => { if (b === file) { attempts++;
+        if (boundary === 'rename-retry' && attempts === 1) { replace(file, accepted); throw Object.assign(new Error('PRIVATE_STORAGE_DETAIL'), { code: 'EBUSY' }); } }
+        return nativeFs.renameSync(a, b); }; syncBuiltinESMExports();
+      const ctx = context(), start = requests.length, operation = data(ctx); respond(await request(start));
+      const result = await bound(operation, 'final-fence'); check(result.refresh.cacheOutcome === 'unchanged' && result.refresh.errorKind === 'stale'
+        && raw() === accepted && attempts === (boundary === 'fsync' ? 0 : 1) && (boundary !== 'fsync' || staged), 'final-fence-missed-' + boundary);
+      for (const [key, value] of Object.entries(nativeFs)) fs[key] = value; syncBuiltinESMExports();
+    }
+    facts.actualFsyncObserved = true; facts.nativeBusyAttempt = 1; facts.successorPreserved = true;
+  });
+  await scenario('actual-save-and-unknown-consumers', async facts => {
+    for (const route of ['data', 'command']) for (const failure of ['cleanup', 'unknown']) {
+      seed('outcome-' + route + '-' + failure); const file = cache(); let published = false, injected = false, renames = 0;
+      fs.renameSync = (a, b) => { nativeFs.renameSync(a, b); if (b === file) { published = true; renames++;
+        if (failure === 'unknown') { injected = true; throw Object.assign(new Error('PRIVATE_STORAGE_DETAIL'), { code: 'EIO' }); } } };
+      fs.rmSync = (target, options) => { if (failure === 'cleanup' && target === file + '.lock' && published) {
+        injected = true; throw Object.assign(new Error('PRIVATE_STORAGE_DETAIL'), { code: 'EIO' }); } return nativeFs.rmSync(target, options); };
+      syncBuiltinESMExports(); const ctx = context(), start = requests.length, operation = route === 'data' ? data(ctx) : command(['refresh'], ctx);
+      respond(await request(start)); const result = await bound(operation, 'fault-consumer');
+      const expected = failure === 'cleanup' ? 'saved' : 'unknown', text = route === 'data' ? result.refreshNotice : result.output;
+      if (route === 'data') check(!result.refresh.ok && result.refresh.cacheOutcome === expected && result.refresh.errorKind === 'storage'
+        && (expected !== 'saved' || result.refresh.models === 2 && result.refresh.cachePath === file), 'data-outcome-lost');
+      check(injected && published && renames === 1 && JSON.parse(raw()).providers.google.models[0].id === 'downloaded'
+        && ctx.state.applications.length === 0 && !ctx.commands.current, 'actual-effect-or-fault-not-observed');
+      check(failure === 'cleanup' ? text.includes('Catalogue saved') && text.includes('not applied')
+        : text.includes('outcome is unknown') && !text.includes('cache is unchanged') && !text.includes('Catalogue saved'), 'fault-notice-upgraded');
+      check(!text.includes('PRIVATE_STORAGE_DETAIL') && !JSON.stringify(result).includes('PRIVATE_STORAGE_DETAIL'), 'private-storage-detail-leaked');
+      for (const [key, value] of Object.entries(nativeFs)) fs[key] = value; syncBuiltinESMExports(); nativeFs.rmSync(file + '.lock', { force: true });
+    }
+    facts.realRenameEffects = 4; facts.confirmedSaveCleanupFailures = 2; facts.unconfirmedNativeEffects = 2;
+  });
+  await close();
+  await scenario('named-profile-and-legacy-selection', async facts => {
+    const isolated = path.join(privateRoot, 'profiles-home'); setHome(isolated);
+    const base = path.join(isolated, '.cheers'), legacy = path.join(isolated, '.cheer'); fs.mkdirSync(legacy);
+    const legacyFile = path.join(legacy, 'models-cache.json'); fs.writeFileSync(legacyFile, JSON.stringify({ etag: '"legacy"', indexUrl: INDEX,
+      providers: { google: { models: [{ id: 'legacy' }] } } }));
+    check(cache() === legacyFile, 'legacy-selection-changed'); const start = requests.length;
+    const legacyOp = track(compiled.readModelCatalog(true, undefined, undefined, { cwd: isolated }));
+    const req = await request(start); check(req.incoming.headers['if-none-match'] === '"legacy"', 'legacy-validator-missing'); respond(req);
+    check((await bound(legacyOp, 'legacy-refresh')).refresh.cachePath === legacyFile && !fs.existsSync(path.join(base, 'models-cache.json')), 'legacy-owner-split');
+    const legacyBefore = fs.readFileSync(legacyFile), profile = compiled.createProfileContext({ name: 'catalogue', homeDir: isolated, env: {} });
+    await compiled.withProfile(profile, async () => {
+      const file = cache(); check(file === path.join(base, 'profiles/catalogue/models-cache.json'), 'named-profile-path');
+      const pos = requests.length, operation = track(compiled.readModelCatalog(true, undefined, undefined, { cwd: isolated }));
+      const r = await request(pos); check(r.incoming.headers['if-none-match'] === undefined, 'named-profile-inherited-legacy-validator'); respond(r);
+      check((await bound(operation, 'named-profile-refresh')).refresh.cachePath === file && fs.existsSync(file), 'named-profile-publication');
+    });
+    check(fs.readFileSync(legacyFile).equals(legacyBefore), 'named-profile-wrote-default'); facts.legacyPathRetained = true; facts.namedProfileIsolated = true;
+  });
+}
+function selectedOwner(raw) {
+  const providers = findNodeAtLocation(parseTree(raw, [], { allowTrailingComma: true }), ['providers']); let found, minimal = false;
+  for (const property of providers?.children ?? []) {
+    const id = property.children?.[0]?.value, node = property.children?.[1]; if (typeof id !== 'string' || !node) continue;
+    let entry; try { entry = JSON.parse(raw.slice(node.offset, node.offset + node.length)); }
+    catch { entry = {}; for (const field of node.children ?? []) { const key = field.children?.[0]?.value, value = field.children?.[1];
+      if (!value || !['label', 'runtime', 'endpoint', 'auth', 'baseUrl', 'envVar'].includes(key)) continue;
+      try { entry[key] = JSON.parse(raw.slice(value.offset, value.offset + value.length)); } catch {} }
+      if (entry.runtime === selected.provider && entry.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, '')
+        && entry.endpoint && entry.auth) { entry.models = [{ id: selected.model }]; minimal = true; } }
+    if ((entry.runtime ?? id) === selected.provider && entry.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, '')
+      && entry.models?.some(model => model.id === selected.model)) {
+      check(!found, 'configured-catalogue-ambiguous'); found = { id, ...entry, models: entry.models.filter(model => model.id === selected.model) }; }
+  }
+  check(found, 'configured-catalogue-unavailable'); receipt.configuredCatalogue = { minimalConfiguredModelEntry: minimal, originalCredentials: true,
+    originalEndpointFields: true, inventedPrices: false }; return found;
+}
+const createChannel = channel('undici:request:create'), sentChannel = channel('undici:request:bodySent'), headersChannel = channel('undici:request:headers');
+const liveRequests = new WeakMap();
+function onCreate({ request }) {
+  if (!liveState) return; const origin = String(request.origin); if (origin !== new URL(selected.baseUrl).origin) return;
+  const row = { index: receipt.providerRequests.length, bodySent: false, status: null }; liveRequests.set(request, row); receipt.providerRequests.push(row);
+}
+function onSent({ request }) { const row = liveRequests.get(request); if (row) row.bodySent = true; }
+function onHeaders({ request, response }) { const row = liveRequests.get(request); if (row) row.status = response.statusCode; }
+async function providerCase() {
+  await scenario('configured-provider-after-publication', async facts => {
+    const store = setHome(path.join(privateRoot, 'live-home'), true);
+    fs.writeFileSync(path.join(store, 'auth.json'), JSON.stringify({ provider: selected.provider, providerCredentials: configured.providerCredentials,
+      providerConnections: configured.providerConnections, activeProviderConnectionId: selected.id, accountPool: configured.accountPool }), { mode: 0o600 });
+    fs.writeFileSync(path.join(store, 'models.json'), JSON.stringify({ providers: { [owner.id]: owner } }), { mode: 0o600 });
+    fs.writeFileSync(path.join(store, 'config.json'), JSON.stringify({ provider: selected.provider, offline: false, compactionEnabled: false,
+      maxOutputTokens: 1024, contextWindow: 16000, reserveTokens: 0, retryEnabled: false, enableMcpTools: false, cacheWarming: 'off' }), { mode: 0o600 });
+    await open('live-work', true); const shell = session.runtimeContext;
+    const before = shell.resolveConfigTarget(shell.runtimeConfig, session.sessionId);
+    check(!before.blocked && before.provider === selected.provider && before.model === selected.model && before.credential, 'configured-target-admission');
+    const ctx = context(), start = requests.length, operation = command(['refresh'], ctx);
+    respond(await request(start), { [owner.id]: { models: { [selected.model]: { id: selected.model } } } }, '"live-catalogue"');
+    const result = await bound(operation, 'live-catalogue-refresh'); check(result.output.includes('applied for the next operation'), 'live-catalogue-not-applied');
+    const after = shell.resolveConfigTarget(shell.runtimeConfig, session.sessionId);
+    check(after.provider === before.provider && after.model === before.model && after.credential.apiKey === before.credential.apiKey
+      && (after.baseUrl ?? after.credential.baseUrl) === (before.baseUrl ?? before.credential.baseUrl), 'publication-changed-configured-target');
+    let terminal, text = ''; const unsubscribe = session.subscribe(event => {
+      if (event.type === 'message.delta' && typeof event.delta === 'string') text += event.delta;
+      if (event.type === 'message.replace') text = event.text;
+      if (event.type === 'query.completed') {
+        terminal = event.result?.status;
+        const reason = String(event.result?.stopReason ?? event.result?.finalOutput ?? '');
+        facts.terminalReasonSha256 = hash(reason);
+        facts.terminalReasonKind = /no.*(?:model|response|reply)|(?:model|response|reply).*no/i.test(reason) ? 'missing-model-response'
+          : /limit|token|budget/i.test(reason) ? 'request-limits'
+          : /auth|credential/i.test(reason) ? 'provider-auth'
+            : /network|fetch|connection/i.test(reason) ? 'provider-network' : 'other';
+      }
+      if (event.type === 'query.failed' || event.type === 'lifecycle.error') {
+        const error = String(event.error ?? '');
+        facts.runtimeErrorSha256 = hash(error);
+        facts.runtimeErrorKind = /no.*(?:model|response|reply)|(?:model|response|reply).*no/i.test(error) ? 'missing-model-response'
+          : /auth|credential/i.test(error) ? 'provider-auth' : /network|fetch|connection/i.test(error) ? 'provider-network'
+            : /limit|token|budget/i.test(error) ? 'request-limits' : 'other';
+        if (event.type === 'query.failed') terminal = 'failed';
+      }
+    });
+    liveState = true; createChannel.subscribe(onCreate); sentChannel.subscribe(onSent); headersChannel.subscribe(onHeaders);
+    try { await bound(session.prompt('Reply with exactly ' + ACK + ' and no other text.'), 'configured-provider-deadline', 240000); }
+    finally { unsubscribe(); liveState = false; createChannel.unsubscribe(onCreate); sentChannel.unsubscribe(onSent); headersChannel.unsubscribe(onHeaders); }
+    facts.textBytes = Buffer.byteLength(text); facts.responseMarkerObserved = text.includes(ACK);
+    facts.terminalStatus = terminal ?? null;
+    check(receipt.providerRequests.some(row => row.bodySent), 'configured-provider-zero-body-sent');
+    check(terminal === 'completed', 'configured-provider-terminal-' + (terminal ?? 'missing'));
+    const messages = session.getState().messages ?? [];
+    check(text.includes(ACK) || JSON.stringify(messages).includes(ACK), 'configured-provider-marker-missing');
+    facts.originalTargetPreserved = true; facts.actualBodySent = receipt.providerRequests.filter(row => row.bodySent).length;
+    facts.terminalStatus = terminal; facts.responseMarkerObserved = true; await close();
+  });
+}
+try {
+  check(process.platform === 'linux' && /^[a-z0-9-]+\.json$/.test(receiptName), 'unsupported-probe-platform-or-output');
+  beforeSource = source(); receipt.source = beforeSource;
+  const { checkBuild } = await import(pathToFileURL(path.join(repo, 'scripts/start-lib.mjs')).href);
+  const version = JSON.parse(fs.readFileSync(path.join(productRoot, 'package.json'), 'utf8')).version;
+  const build = checkBuild({ root: repo, dist: path.join(productRoot, 'dist'), version, executablePolicy: 'ignore' });
+  check(build.ok, 'compiled-build-not-fresh'); manifest = build.manifest; manifestBytes = fs.readFileSync(path.join(packageRoot, 'dist/build-manifest.json'));
+  if (installedRoot) {
+    check(path.isAbsolute(installedRoot) && installedRoot.startsWith(output + path.sep) && !fs.lstatSync(installedRoot).isSymbolicLink(), 'installed-root-invalid');
+    check(manifestBytes.equals(fs.readFileSync(path.join(productRoot, 'dist/build-manifest.json'))), 'installed-manifest-not-current');
+    receipt.installedPackage = true;
+  }
+  receipt.buildId = manifest.buildId; receipt.buildInputsDigest = manifest.inputsDigest; receipt.buildManifestSha256 = hash(manifestBytes);
+  sdk = await import(pathToFileURL(path.join(packageRoot, 'dist/index.js')).href); configured = sdk.getRuntimeConfig(repo);
+  const realHome = process.env.USERPROFILE || process.env.HOME || os.homedir();
+  for (const base of new Set([realHome, os.homedir()])) for (const dir of ['.cheers', '.cheer', '.private-agents', '.coding-agents'])
+    for (const file of ['auth.json', 'config.json', 'models.json', 'models-cache.json', 'marketplaces.json', 'plugins.json', 'extensions/registry.json'])
+      original(path.join(base, dir, file));
+  original(path.join(repo, '.cheers.json'));
+  for (const key of ['CHEERS_MARKETPLACES_FILE', 'CHEERS_EXTENSIONS_FILE', 'CHEERS_PLUGINS_FILE', 'CHEERS_MODEL_PRESETS_FILE', 'CHEERS_REFRESH_LEASES_FILE'])
+    if (process.env[key]) original(process.env[key]);
+  if (doProvider) { selected = configured.providerConnections.filter(connection => connection.status === 'connected')[1];
+    check(selected?.baseUrl && selected?.model, 'configured-index-one-unavailable'); owner = selectedOwner(fs.readFileSync(path.join(os.homedir(), '.cheers/models.json'), 'utf8'));
+    receipt.configuredTarget = { configuredIndex: 1, connectionIdSha256: hash(selected.id), modelIdSha256: hash(selected.model),
+      providerIdSha256: hash(selected.provider), originalActive: selected.id === configured.activeProviderConnectionId }; }
+  privateRoot = fs.mkdtempSync(path.join(output, 'native-private-')); fs.chmodSync(privateRoot, 0o700);
+  deadline = setTimeout(() => { receipt.deadline = true; void session?.abort().catch(() => {}); }, 360000);
+  const store = setHome(path.join(privateRoot, 'local-home'));
+  fs.writeFileSync(path.join(store, 'config.json'), JSON.stringify({ provider: 'google', offline: true, maxOutputTokens: 1024, reserveTokens: 0 }), { mode: 0o600 });
+  fs.writeFileSync(path.join(store, 'auth.json'), JSON.stringify({ provider: 'google', activeProviderConnectionId: 'native', providerConnections: [
+    { id: 'native', provider: 'google', authType: 'api-key', apiKey: 'unused-synthetic', model: 'chosen', baseUrl: 'https://chosen.invalid',
+      status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01' } ] }), { mode: 0o600 });
+  fs.writeFileSync(path.join(store, 'models.json'), JSON.stringify({ providers: { google: { endpoint: 'openai-compatible', models: [
+    { id: 'chosen', contextWindow: 16000, maxTokens: 2048 }, { id: 'accepted-only' } ] } } }));
+  compiled = {}; for (const name of ['readModelCatalog', 'createCommandRegistry', 'configurationAdmission', 'refreshShellRuntimeConfig',
+    'catalogCachePath', 'createProfileContext', 'withProfile']) compiled[name] = await importOwner(name);
+  server = http.createServer((incoming, response) => { requests.push({ incoming, response }); });
+  server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  globalThis.fetch = async (input, options) => {
+    const url = String(input); if (url !== INDEX) return fetchBefore(input, options);
+    const response = await fetchBefore('http://127.0.0.1:' + server.address().port + '/api.json', options);
+    responseObserver?.(response); return response;
+  };
+  await open('local-work'); await localCases(); if (doProvider) await providerCase();
+  receipt.status = 'passed';
+} catch (error) { receipt.status = 'failed'; receipt.failure = { stage, code: error?.probeCode ?? 'unclassified-harness-error',
+    providerRequestCount: receipt.providerRequests.length }; process.exitCode = 1; }
+finally {
+  clearTimeout(deadline); responseObserver = undefined;
+  for (const [key, value] of Object.entries(nativeFs)) fs[key] = value; syncBuiltinESMExports(); globalThis.fetch = fetchBefore;
+  for (const request of requests) if (!request.response.writableEnded && !request.response.destroyed) request.response.end();
+  await Promise.allSettled([...operations]);
+  try { await close(); } catch { receipt.cleanupFailed = true; }
+  if (server) await new Promise(resolve => { server.close(resolve); for (const socket of sockets) socket.destroy(); });
+  createChannel.unsubscribe(onCreate); sentChannel.unsubscribe(onSent); headersChannel.unsubscribe(onHeaders);
+  for (const [key, value] of envBefore) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  receipt.sourceUnchanged = beforeSource !== undefined && same(beforeSource, source());
+  receipt.compiledBuildUnchanged = manifestBytes !== undefined && fs.readFileSync(path.join(packageRoot, 'dist/build-manifest.json')).equals(manifestBytes);
+  receipt.originalInputsChecked = originals.size;
+  receipt.originalInputsUnchanged = [...originals].every(([file, before]) => (fs.existsSync(file) ? hash(fs.readFileSync(file)) : null) === before);
+  receipt.actualLoopbackGets = requests.length;
+  if (privateRoot) nativeFs.rmSync(privateRoot, { recursive: true, force: true });
+  receipt.privateStateRemoved = privateRoot === undefined || !fs.existsSync(privateRoot);
+  if (!receipt.sourceUnchanged || !receipt.compiledBuildUnchanged || !receipt.originalInputsUnchanged || !receipt.privateStateRemoved || receipt.cleanupFailed) {
+    receipt.status = 'failed'; receipt.identityOrCleanupFailure = true; process.exitCode = 1; }
+  fs.writeFileSync(path.join(output, receiptName), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
+  console.log(JSON.stringify({ status: receipt.status, failure: receipt.failure, cases: receipt.cases.length,
+    actualLoopbackGets: receipt.actualLoopbackGets, providerRequests: receipt.providerRequests, sourceUnchanged: receipt.sourceUnchanged,
+    compiledBuildUnchanged: receipt.compiledBuildUnchanged, originalInputsUnchanged: receipt.originalInputsUnchanged,
+    privateStateRemoved: receipt.privateStateRemoved }));
+}

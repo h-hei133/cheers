@@ -1,0 +1,7 @@
+JSON report written to /home/wang/projects/cheers/.tmp/catalog-validation/reversal-restored.json
+▲ [WARNING] This value must be a string, an object, an array, or null [package.json]
+
+    ../../../package.json:114:21:
+      114 │     "publicEntries": 15
+          ╵                      ~~
+

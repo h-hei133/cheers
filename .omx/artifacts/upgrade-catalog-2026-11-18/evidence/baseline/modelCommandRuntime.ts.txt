@@ -1,0 +1,413 @@
+import { parseEffortFlag } from "../../../packages/ts-shell/src/core/commands/./model/preference.js";
+import { setModel } from "../../../packages/ts-shell/src/core/commands/./model/selection.js";
+import {
+  RUNTIME_PROVIDERS,
+  getRuntimeConfig,
+  type ProviderConnectionConfig,
+  type RuntimeConfig,
+  type RuntimeProvider,
+} from "../../../packages/ts-shell/src/core/commands/../../config/runtimeConfig.js";
+import type { CommandContext, LocalCommandResult } from "../../../packages/ts-shell/src/core/commands/./types.js";
+import { parseModelArgs, modelSyntax } from "../../../packages/ts-shell/src/core/commands/./model/syntax.js";
+import { syntaxHelp } from "../../../packages/ts-shell/src/core/commands/./syntax/projection.js";
+import { projectSessionModel } from "../../../packages/ts-shell/src/core/commands/../../session/model/projection.js";
+import { loadCatalogSnapshot, ensureUserCatalog, userCatalogPath } from "../../../packages/ts-shell/src/core/commands/../models/catalogStore.js";
+import { catalogProvider } from '../../../packages/ts-shell/src/core/commands/../models/catalog.js';
+import { refreshCatalog } from "../../../packages/ts-shell/src/core/commands/../models/catalogRefresh.js";
+import { renderCatalog } from "../../../packages/ts-shell/src/core/commands/../models/catalogSurface.js";
+import { availabilitySnapshot, catalogAvailabilitySnapshot, type AvailabilitySnapshot } from "../../../packages/ts-shell/src/core/commands/../models/availability.js";
+import { selectionRequest } from '../../../packages/ts-shell/src/core/commands/./model/target.js';
+import { resolveProviderCredential } from "../../../packages/ts-shell/src/core/commands/../shell/providerCredentials.js";
+import { configurationApplicationNotice } from "../../../packages/ts-shell/src/core/commands/./configuration.js";
+import { needsUserEndpoint, providerFacts } from "../../../packages/ts-shell/src/core/commands/../providers/facts.js";
+import { runModelPresetCommand } from '../../../packages/ts-shell/src/core/commands/./model/presetCommand.js';
+import { providerCredentialBaseUrl } from '../../../packages/ts-shell/src/core/commands/../auth/account/target.js';
+import { modelDefaultSource, modelDefaultSourceLine, sessionOwnsModel } from '../../../packages/ts-shell/src/core/commands/./model/defaultSource.js';
+import { sessionModelCatalog } from '../../../packages/ts-shell/src/core/commands/../catalog/models.js';
+import { readLogicalModel } from '../../../packages/ts-shell/src/core/commands/../../session/model/logical.js';
+import type { VirtualModelMetadata } from '../../../packages/ts-shell/src/core/commands/../models/virtual/contract.js';
+
+
+/**
+ * The models an OpenAI account connection can use.
+ *
+ * Read from the provider's declaration rather than kept here. The same list was
+ * spelled out in this file and in the login runtime, so a model added to one and
+ * missed in the other would be offered by `/model list` and then refused by the
+ * switch.
+ */
+function accountAuthModelFacts(): { readonly allowed: readonly string[]; readonly defaultModel?: string } {
+  const facts = providerFacts("openai");
+  return { allowed: facts.accountAuthAllowedModels ?? [], defaultModel: facts.accountAuthDefaultModel };
+}
+
+export async function runModelCommand(
+  args: string[],
+  context: CommandContext,
+): Promise<LocalCommandResult> {
+  const parsed = parseModelArgs(args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid model arguments: ${parsed.reason}\n${getModelHelpText()}` };
+  const action = parsed.action.name;
+  const rest = [...parsed.args];
+  if (!action) {
+    return { kind: "local", output: renderCatalogView(context) };
+  }
+  if (action === "status") {
+    return { kind: "local", output: renderModelStatus(context) };
+  }
+  if (action === "refresh") {
+    return { kind: "local", output: await refreshModels(context) };
+  }
+
+  if (action === "config") {
+    const path = ensureUserCatalog();
+    return {
+      kind: "local",
+      output: [
+        `Your model catalogue is \`${path}\` (user profile only).`,
+        "",
+        "An entry with a known provider id patches it — a different base URL, extra models, a different key variable. An unknown id adds a provider outright.",
+        "Add entries inside the existing providers object. Settings and global model defaults are stored in config.json; connections and credentials in auth.json.",
+      ].join("\n"),
+    };
+  }
+
+  if (action === "preset" || action === "presets") {
+    return runModelPresetCommand(rest, context);
+  }
+
+  if (action === "list" || action === "ls") {
+    return { kind: "local", output: await listModels(rest, parsed.flags.has("refresh"), context) };
+  }
+
+  if (action === "use" || action === "set") {
+    return { kind: "local", output: await setModel(rest, context, parsed.flags.has("global"), parseEffortFlag(parsed.flags.get("effort"))) };
+  }
+  if (action === "help" || action === "--help" || action === "-h") {
+    return {
+      kind: "local",
+      output: getModelHelpText(),
+    };
+  }
+
+  return { kind: "local", output: getModelHelpText() };
+}
+/**
+ * The catalogue, with this session's connection state folded in.
+ *
+ * Bare `/model` answers "what can I use", which is a question about providers and
+ * models together — the old bare form answered "what am I using", which is
+ * `/model status`.
+ */
+function modelConfiguration(context: CommandContext) {
+  const publication = context.readConfiguration?.();
+  const local = publication ? undefined : loadCatalogSnapshot();
+  const config = publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+  return { config, catalog: publication?.catalog ?? local!.providers, catalogDiagnostics: publication?.catalogDiagnostics ?? local?.diagnostics ?? [],
+    active: context.resolveConfigTarget?.(config, context.sessionId)
+      ?? resolveProviderCredential({ runtimeConfig: config, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) }) };
+}
+
+function renderCatalogView(context: CommandContext): string {
+  const { config, catalog, active, catalogDiagnostics } = modelConfiguration(context);
+  const physical = renderCatalog({ providers: catalog, configPath: userCatalogPath(), diagnostics: catalogDiagnostics,
+    availability: modelCatalogAvailability(context, { config, catalog, active }) });
+  const virtual = context.sessionId ? sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual : [];
+  return virtual.length ? `${physical}\n\nVirtual models\n${virtual.map(model => `- ${model.provider}/${model.id} (${model.name})`).join('\n')}` : physical;
+}
+
+function modelCatalogAvailability(context: CommandContext, input: Pick<ReturnType<typeof modelConfiguration>, 'config' | 'catalog' | 'active'>) {
+  return catalogAvailabilitySnapshot({ ...input,
+    // Local presence uses neither CLI overrides nor a live session's pool affinity.
+    resolveLocal: (provider, connectionId) => selectionRequest({ cwd: context.cwd }, input.config, {
+      provider, model: '', ...(connectionId === undefined ? { connectionScope: 'provider' } : { connectionScope: 'session', connectionId }),
+    }) });
+}
+
+function renderModelStatus(context: CommandContext): string {
+  const { config, catalog, active: request, catalogDiagnostics } = modelConfiguration(context);
+  const logical = readLogicalModel(context.sessionId);
+  if (logical) {
+    const available = Boolean(context.sessionId && sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual
+      .some(model => model.provider === logical.provider && model.id === logical.model));
+    return ['Model selection status', ...catalogDiagnostics, `Model: ${logical.provider}/${logical.model}`,
+      `Thinking effort: ${logical.thinkingEffort ?? 'auto'}`, `Virtual model: ${available ? 'registered' : 'unavailable'}`,
+      'Physical destination and request authentication are resolved per request.',
+      `Saved physical provider: ${config.provider}`, `Saved physical model: ${request.model ?? 'unset'}`,
+      'Use /model use <provider>/<model> to select a model.'].join('\n');
+  }
+  const connections = normalizeConnections(config);
+  const activeId = config.activeProviderConnectionId?.trim();
+  const activeConnection = connections.find((item) => item.id === activeId);
+  const signed = modelCatalogAvailability(context, { config, catalog, active: request })
+    .some(entry => entry.active && entry.state === 'signed');
+  const provider = activeConnection?.provider ?? config.provider ?? "openai";
+  const authType = activeConnection?.authType ?? "api-key";
+  // Provenance children are indexed by the stored array, so read the index
+  // from the configuration rather than from the normalized copy above.
+  const storedIndex = activeConnection
+    ? config.providerConnections.findIndex(item => item.id.trim() === activeId) : -1;
+  const connectionIndex = storedIndex < 0 ? undefined : storedIndex;
+  const source = modelDefaultSource({
+    connectionModel: activeConnection?.model,
+    providerModel: config.providerCredentials?.[provider]?.model,
+    accountDefault: provider === "openai" && authType === "account-auth"
+      ? providerFacts("openai").accountAuthDefaultModel : undefined,
+    // A projected session selection overwrites the stored leaf it shadows, so
+    // name it as the session's choice rather than as a saved default.
+    sessionSelected: sessionOwnsModel(config, provider, connectionIndex),
+  });
+  const model = source.effective;
+  const sourceLine = modelDefaultSourceLine(source);
+
+  return [
+    "Model selection status",
+    ...catalogDiagnostics,
+    `Provider: ${provider}`,
+    `Auth type: ${authType}`,
+    `Active connection: ${activeId ?? "none"}`,
+    `Model: ${model ?? "unset"}`,
+    ...(sourceLine ? [sourceLine] : []),
+    `Request provider: ${request.provider}`,
+    `Request model: ${request.model ?? "unset"}`,
+    ...(signed ? ['Request auth: authentication at request'] : []),
+    "",
+    ...renderProviderReadinessLines({
+      activeConnectionId: activeId,
+      activeConnection,
+      model,
+      signed,
+      availability: availabilitySnapshot({ config, catalog }),
+    }),
+    "",
+    "Use /model list to inspect available models.",
+    "Use /model use <model-id> to switch active model.",
+  ].join("\n");
+}
+
+function renderProviderReadinessLines(input: {
+  readonly activeConnectionId?: string;
+  readonly activeConnection?: ProviderConnectionConfig;
+  readonly model?: string;
+  readonly signed?: boolean;
+  readonly availability: AvailabilitySnapshot;
+}): string[] {
+  const projected = input.availability.providers.flatMap(provider => provider.connections)
+    .find(connection => connection.connectionId === input.activeConnectionId?.trim());
+  if (input.signed) return [
+    'Request readiness',
+    '- Request status: authentication at request.',
+    '- Signing credentials and live endpoint are unverified.',
+  ];
+  if (!input.activeConnectionId) {
+    return [
+      "Provider readiness",
+      "- Config status: no active connection selected.",
+      "- Next: run /connect status, then /connect login or /connect use.",
+    ];
+  }
+
+  if (!input.activeConnection) {
+    return [
+      "Provider readiness",
+      `- Config status: active connection not found (${input.activeConnectionId}).`,
+      "- Next: run /connect status, then /connect use <connection-id>.",
+    ];
+  }
+
+  if (projected?.state === "pending" || input.activeConnection.status === "pending") {
+    return [
+      "Provider readiness",
+      "- Config status: connection setup is pending.",
+      "- Next: finish the login/browser flow or rerun /connect login.",
+    ];
+  }
+
+  if (projected?.state === "error" || input.activeConnection.status === "error") {
+    return [
+      "Provider readiness",
+      "- Config status: connection setup is in error state.",
+      "- Next: rerun /connect login for this provider.",
+    ];
+  }
+
+  if (projected?.state === "pool-unavailable") {
+    return [
+      "Provider readiness",
+      "- Config status: active connection is unavailable in the account pool.",
+      "- Next: select an available pool member or correct the account pool configuration.",
+    ];
+  }
+
+  if (projected?.state === "credential-missing" || (input.activeConnection.authType !== "account-auth" && !input.activeConnection.apiKey?.trim())) {
+    return [
+      "Provider readiness",
+      "- Config status: credential missing for active connection.",
+      `- Next: run /connect login ${input.activeConnection.provider} --api-key <key>.`,
+    ];
+  }
+
+  if (
+    needsUserEndpoint(input.activeConnection.provider) &&
+    !input.activeConnection.baseUrl?.trim()
+  ) {
+    return [
+      "Provider readiness",
+      `- Config status: ${input.activeConnection.provider} requires base URL.`,
+      `- Next: run /connect login ${input.activeConnection.provider} --api-key <key> --base-url <url> --model <model>.`,
+    ];
+  }
+
+  if (!input.model) {
+    return [
+      "Provider readiness",
+      "- Config status: active connection exists, but no model is selected.",
+      "- Next: run /model list, then /model use <model-id>.",
+    ];
+  }
+
+  return [
+    "Provider readiness",
+    "- Config status: active connection and model are configured.",
+    "- Live check: run npm run verify:provider-readiness from the project root.",
+    "- If the live check reports provider-network-inconclusive, retry later or check proxy/firewall/network.",
+  ];
+}
+
+export interface ModelCatalog {
+  readonly provider: RuntimeProvider;
+  readonly models: readonly string[];
+  readonly active?: string;
+  /** The list is read locally; network refresh is always an explicit separate action. */
+  readonly offline: boolean;
+  readonly virtual?: readonly VirtualModelMetadata[];
+  readonly logical?: { readonly provider: string; readonly model: string };
+}
+
+/**
+ * The model catalog as data, for callers that present a chooser rather than
+ * text. Shares the local catalogue and explicit refresh owner with `/model list` so
+ * the two can never offer different models.
+ */
+export async function readModelCatalog(refresh = false, sessionId?: string, runtimeConfig?: RuntimeConfig, suppliedContext?: CommandContext): Promise<ModelCatalog> {
+  const context = suppliedContext ?? { cwd: process.cwd(), sessionId, runtimeConfig };
+  if (refresh) await refreshModels(context);
+  const { catalog, active } = modelConfiguration(context);
+  const allowed = active.credential?.authMode === 'account-auth' ? providerFacts(active.provider).accountAuthAllowedModels : undefined;
+  const binding = catalogProvider(catalog, active.provider, providerCredentialBaseUrl(catalog, active));
+  return { provider: active.provider, models: binding.ambiguous ? [] : allowed ?? binding.entry?.models.map(model => model.id) ?? [],
+    active: active.model, offline: true,
+    ...(context.sessionId ? { virtual: sessionModelCatalog(context.cwd, context.sessionId, catalog).virtual,
+      logical: readLogicalModel(context.sessionId) } : {}) };
+}
+
+async function refreshModels(context: CommandContext): Promise<string> {
+  const blocked = context.admission?.();
+  if (blocked) return `Catalogue refresh blocked: ${blocked}`;
+  const result = await refreshCatalog();
+  if (!result.ok) return `Catalogue refresh failed (${result.error}). The accepted catalogue is unchanged.`;
+  const changed = context.admission?.();
+  const notice = changed ? `Catalogue saved but not applied: ${changed}` : configurationApplicationNotice(context);
+  return [
+    `Catalogue refreshed: ${result.providers} providers, ${result.models} models, cached in \`${result.cachePath}\`. Your own entries in \`${userCatalogPath()}\` still win.`,
+    notice ?? (context.refreshRuntimeConfig ? 'Catalogue applied for the next operation.' : 'Catalogue saved for the next load.'),
+  ].join('\n');
+}
+
+async function listModels(args: string[], refresh: boolean, context: CommandContext): Promise<string> {
+  let snapshot = modelConfiguration(context);
+  const hint = args[0]?.trim();
+  const requested = hint ? (snapshot.catalog.some(entry => entry.id === hint) ? hint : normalizeProvider(hint) ?? hint) : undefined;
+  const virtual = context.sessionId ? sessionModelCatalog(context.cwd, context.sessionId, snapshot.catalog).virtual : [];
+  const logical = readLogicalModel(context.sessionId);
+  const virtualProvider = requested ?? logical?.provider;
+  const virtualRows = virtual.filter(model => model.provider === virtualProvider);
+  if (virtualRows.length || virtualProvider === logical?.provider) return [
+    `Virtual models for provider=${virtualProvider}`,
+    'Source: current session extensions',
+    ...virtualRows.map(model => `${logical?.provider === model.provider && logical.model === model.id ? '*' : '-'} ${model.id} (${model.name})`),
+    ...(!virtualRows.length ? ['The selected virtual model is unavailable.'] : []),
+  ].join('\n');
+  if (requested && !snapshot.catalog.some(entry => entry.id === requested) && !RUNTIME_PROVIDERS.some(id => id === requested)) {
+    return [...snapshot.catalogDiagnostics, 'Unknown provider. Use /model to inspect the catalogue.'].join('\n');
+  }
+  const notice = refresh ? await refreshModels(context) : undefined;
+  if (refresh) snapshot = modelConfiguration(context);
+  const { catalog, active, catalogDiagnostics } = snapshot;
+  const provider = requested ?? active.provider;
+  const binding = catalogProvider(catalog, provider, provider === active.provider ? providerCredentialBaseUrl(catalog, active) : undefined);
+  if (binding.ambiguous) return [...catalogDiagnostics, 'Model list unavailable: multiple catalogue entries claim the active endpoint.'].join('\n');
+  const entry = binding.entry;
+
+  const activeModel = provider === active.provider ? active.model : undefined;
+  if (provider === 'openai' && active.provider === provider && active.credential?.authMode === 'account-auth') {
+    return [notice, ...catalogDiagnostics, renderOpenAIAccountAuthModelList(activeModel)].filter(Boolean).join('\n');
+  }
+  return [
+    notice,
+    ...catalogDiagnostics,
+    `Models for provider=${provider}`,
+    'Catalogue: models.json (user profile only); settings: config.json; connections: auth.json.',
+    context.readConfiguration ? 'Source: accepted session catalogue' : 'Source: local catalogue (shipped, refreshed, then user entries)',
+    ...(entry?.models ?? []).map(model => model.id === activeModel ? `* ${model.id} (active)` : `- ${model.id}`),
+    entry?.models.length ? undefined : 'No models listed for this provider.',
+    '',
+    'Use /model use <model-id> to switch active model.',
+  ].filter(line => line !== undefined).join('\n');
+}
+
+function renderOpenAIAccountAuthModelList(activeModel?: string): string {
+  return [
+    "Models for provider=openai (account-auth)",
+    "Source: local account-auth allowed model set",
+    ...accountAuthModelFacts().allowed.map((model) =>
+      model === activeModel ? `* ${model} (active)` : `- ${model}`,
+    ),
+    "",
+    "Use /model use <model-id> to switch active model.",
+  ].join("\n");
+}
+
+
+function normalizeProvider(input?: string): RuntimeProvider | undefined {
+  const value = input?.trim().toLowerCase();
+  const normalized = value === "siliconflow" || value === "openai_compatible" ? "openai-compatible"
+    : value === "gemini" ? "google" : value;
+  return RUNTIME_PROVIDERS.find(provider => provider === normalized);
+}
+
+function normalizeConnections(config: { readonly providerConnections?: readonly ProviderConnectionConfig[] }): ProviderConnectionConfig[] {
+  if (!config.providerConnections || config.providerConnections.length === 0) {
+    return [];
+  }
+  return config.providerConnections
+    .filter((item) => Boolean(item.id && item.provider))
+    .map((item) => ({
+      ...item,
+      id: item.id.trim(),
+      label: normalizeText(item.label),
+      baseUrl: normalizeBaseUrl(item.baseUrl),
+      model: normalizeText(item.model),
+      apiKey: normalizeText(item.apiKey),
+      status: item.status ?? "connected",
+      createdAt: item.createdAt || new Date().toISOString(),
+      updatedAt: item.updatedAt || new Date().toISOString(),
+    }));
+}
+
+function normalizeText(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function normalizeBaseUrl(baseUrl?: string): string | undefined {
+  const trimmed = normalizeText(baseUrl);
+  if (!trimmed) {
+    return undefined;
+  }
+  return trimmed.replace(/\/+$/, "");
+}
+
+function getModelHelpText(): string {
+  return `Model selection commands\n${syntaxHelp(modelSyntax)}\n/model <model-id> [--global]\nDefault: current session, saved for resume. --global also changes the global default.`;
+}

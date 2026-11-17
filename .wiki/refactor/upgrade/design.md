@@ -504,3 +504,18 @@ D.4沿用同一个Markdown scanner/source-span inline owner，两renderer共享c
 F2.2先核实本地refresh/store/command链路，再只读比较远端catalog reference：仅有有效非空缓存正文才发送ETag、响应/解析后复查取消、304复用captured body/publication、失败保留旧body/validator等决定适用。源码已确认无body 304、旧200覆盖、旧304重标、取消/撤权写入及null/primitive模型制造；正常profile不可切换且async context保持原身份，不能把普通跨profile写入推断当已证实缺陷。后续复用原owner捕获source/path/raw并在持久化前复验，不新增定时刷新或provider/auth路径。
 
 F2.2实际冻结源码30项26红/4控制，追加storage/command19项全红。补充边界为staging后/EBUSY retry前复验、same-FD bytes/inode与absent-parent identity、rename后saved/unknown、原command signal/admission贯通以及固定安全错误。原atomic writer须每次rename前guard，所有cache writer同物理锁，仍不宣称锁外editor最后rename窗口的跨进程CAS。仅反例，未改变本批生产refresh/store。
+
+
+## Catalogue publication and result acceptance (2026-11-18)
+
+F2.2最初研究的body/stale/cancel缺陷成立。新cache/store仅拥有物理缓存capture与publication；catalogStore保留薄兼容export，移除无人消费的旧ETag reader/updater。profile/path/父目录身份与同FD raw/inode绑定，每次native rename前复验；原withFileLock只重试acquisition，不重放action，native errno和observer拒绝分开。没有新增timer/shard/网络provider路径，atomic第四可选参数保留原三参数API。
+
+有效正文和同index URL才可提供stored validator，caller ETag不提供body。304重复ETag不写格式字节；rotated304使用原captured body与真实provider/model数。旧200/304或回调重入后的后继cache拒绝，signal/admission从命令原context一次capture至最终publication。headers拒绝后关闭内部request body，不取消caller；正文断网归network，SyntaxError归json，HTTP/invalid/storage安全分类不泄漏body或fs错误。
+
+producer明确unchanged/saved/unknown，rename后cleanup失败保留path/counts/saved，EIO不确认completion保持unknown。文本和数据consumer共享原commands lifetime，catalog-only configuration publication保持既有settings；post-result的路径和admission/应用回调及final read拒绝都保留原receipt/notice。CatalogReadError冻结flat回执，拒绝stale data并保留cause；取消name AbortError、原signal.reason保持。可能已应用的异常只报application unverified，不能倒推未应用。仅schema/metadata存在不能替代真实命令consumer。
+
+最终20文件596项、七门/2682module/0monoliths、AST最大18函数名和buildc5ae05070276通过；13反转25AssertionErrors、exact恢复4/73。Linuxcompiled SDK/真实registry/原command owner共11组26真实loopback GET，实际rename后cleanup及EIO、final-read/throw/abort拒绝均保留结果；配置模型index1两actual bodySent/HTTP200/completed及标记passed。npm同代pack/install/15公开入口strict NodeNext skipLibCheck=false与10组25GET全部passed，内部refresh导出只按manifest hash定位，未冒充公开package export。
+
+b2ba99581604/5beb3a8bd3c4旧绿及各失败原生回执保留历史。最初缺root src、Vitest bin位置及zero-selected each filter归harness；default ETag参数/SDK事件及npm object+notice JSON漂移保持失败记录。两次真实模型stopped_error未伪装成功，后续标记请求当前build通过；body不记录，不把HTTP200当完成。原配置hash保持、私有state清理，18tracked NormProof文件不变；normal pinned judge当前actual exit2/not_proven/16384边overflow，未扩图替代proof。锁外editor最后rename窗口不承诺cross-process CAS。完整交付在upgrade-catalog-2026-11-18。
+
+F2.4只读核实：当前ModelCostRates/projectCost/ratesSnapshot仍flat，normalized request入bucket前缺阈值选档。参考严格单次input+cacheRead+cacheWrite > threshold、最高命中、整组rates应用于全request；不能使用会话累计或recent64重建。计划原request同时深capture完整schedule，再在已有accounting owner选最终flat rates，保留v2 persisted bucket/cost/export。当前协议缺失usage零填充不能证明完整输入，unknown必须保留；不复制参考missing价=0默认。此项尚无当前production修改或验收。

@@ -1,0 +1,99 @@
+{
+  "status": "passed",
+  "ceiling": 20,
+  "results": [
+    {
+      "file": "core/models/cache/store.ts",
+      "names": [
+        "catalogCachePath",
+        "assertOwner",
+        "captureCache",
+        "assertCacheCurrent",
+        "readStored",
+        "encodeCache",
+        "publishCache",
+        "guard",
+        "writeCatalogCache",
+        "constructor"
+      ],
+      "count": 10,
+      "sha256": "397ca0a389f22017f1942652fb6b034d64b6f2c77a1028c50e521ebe35c2b751"
+    },
+    {
+      "file": "core/models/catalogStore.ts",
+      "names": [
+        "userCatalogPath",
+        "loadCatalog",
+        "loadCatalogSnapshot",
+        "ensureUserCatalog",
+        "readOverlay",
+        "duplicateProviders",
+        "onObjectBegin",
+        "onArrayBegin",
+        "onObjectEnd",
+        "onArrayEnd",
+        "onObjectProperty"
+      ],
+      "count": 11,
+      "sha256": "3e0837a730b3b37d80618837605fae3922d7017935838f1178da5fab0239dfa2"
+    },
+    {
+      "file": "core/models/catalogRefresh.ts",
+      "names": [
+        "refreshCatalog",
+        "checkAdmission",
+        "guard",
+        "refreshFailure",
+        "projectIndex",
+        "projectCost",
+        "finite",
+        "projectThinkingLevelMap"
+      ],
+      "count": 8,
+      "sha256": "0141b5da8fad1597c165921e2b0aa4c8e3ab992c320cce3f9cd53ce41336ca5b"
+    },
+    {
+      "file": "core/commands/modelCommandRuntime.ts",
+      "names": [
+        "accountAuthModelFacts",
+        "runModelCommand",
+        "modelConfiguration",
+        "renderCatalogView",
+        "modelCatalogAvailability",
+        "renderModelStatus",
+        "renderProviderReadinessLines",
+        "readModelCatalog",
+        "runCatalogOperation",
+        "refreshModels",
+        "listModels",
+        "renderOpenAIAccountAuthModelList",
+        "normalizeProvider",
+        "normalizeConnections",
+        "normalizeText",
+        "normalizeBaseUrl",
+        "getModelHelpText",
+        "constructor"
+      ],
+      "count": 18,
+      "sha256": "ce5073f978c025299b11e566f409b9bdcad537f016afc4eb68e6bbf75ec9abac"
+    },
+    {
+      "file": "session/store/sessionFileStore.ts",
+      "names": [
+        "readJsonFileWithRetry",
+        "readJsonFileWithRetryAsync",
+        "withFileLock",
+        "releaseOwnedLock",
+        "writeJsonFileAtomic",
+        "writeTextFileAtomic",
+        "sleepBlocking",
+        "sleepAsync",
+        "isTransientLockError",
+        "isTransientIoError"
+      ],
+      "count": 10,
+      "sha256": "9e71d2c89fd12833c2cbd4c025d7d60acfdb21dc4a3b334b7f04e9d6ab67054b"
+    }
+  ],
+  "constructorsIncluded": true
+}

@@ -1,0 +1,6 @@
+{
+  "classification": "harness_setup_drift",
+  "processExitCode": 0,
+  "reason": "npm emits an object pack result followed by notice text in this workspace. Strict array/whole-output JSON assumptions fail. No installed tests ran.",
+  "mainSourceChanged": false
+}

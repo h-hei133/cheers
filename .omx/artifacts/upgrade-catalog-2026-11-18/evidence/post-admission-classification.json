@@ -1,0 +1,20 @@
+{
+  "classification": "product_behavior_drift",
+  "failures": [
+    {
+      "name": "keeps the saved receipt when post-refresh admission throws through data",
+      "assertionFailure": true
+    },
+    {
+      "name": "keeps the saved receipt when post-refresh admission throws through refresh",
+      "assertionFailure": false
+    },
+    {
+      "name": "keeps the saved receipt when post-refresh admission throws through list",
+      "assertionFailure": false
+    }
+  ],
+  "reason": "Producer result already existed; callback rejection bypassed publication receipt.",
+  "priorBuild": "5beb3a8bd3c4",
+  "sourceFix": "Protect all post-producer callbacks with the captured receipt, preserve possible application as unknown."
+}

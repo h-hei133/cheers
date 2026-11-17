@@ -1,0 +1,33 @@
+{
+  "rootInvocation": {
+    "receipt": "integrated-initial.json",
+    "classification": "harness_setup_drift",
+    "reason": "Root filter also discovered .tmp source copies; not current 35-file evidence."
+  },
+  "atomicBaseline": {
+    "receipt": "atomic-red.json",
+    "currentFileTests": 10,
+    "currentFileFailed": 6,
+    "rootTotalsAreNotCurrentScope": true
+  },
+  "storageObservers": {
+    "receipts": [
+      "integrated-owning.json",
+      "integrated-observer-fixed.json",
+      "storage-observer-corrected.json"
+    ],
+    "classification": "harness_setup_drift",
+    "reason": "Default fs spy replacement did not affect named fs imports; shared vi.fn must be altered in-place, with seed rename count cleared before 304 observation."
+  },
+  "productSourcesChangedForObserver": false,
+  "configurationBaseline": {
+    "receipt": "configuration-baseline.json",
+    "classification": "pre_existing_product_defect",
+    "confirmedRed": 2,
+    "reason": "HEAD listModels compares undefined virtual provider with undefined logical provider and takes virtual empty-list branch."
+  },
+  "configurationScope": {
+    "classification": "stale_expectation",
+    "reason": "Explicit catalogue refresh uses catalog scope and preserves accepted ordinary settings, matching existing catalogue-only picker contract."
+  }
+}

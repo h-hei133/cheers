@@ -13,12 +13,11 @@ import { syntaxHelp } from "./syntax/projection.js";
 import { projectSessionModel } from "../../session/model/projection.js";
 import { loadCatalogSnapshot, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
 import { catalogProvider } from '../models/catalog.js';
-import { refreshCatalog } from "../models/catalogRefresh.js";
+import { refreshCatalog, type RefreshResult } from "../models/catalogRefresh.js";
 import { renderCatalog } from "../models/catalogSurface.js";
 import { availabilitySnapshot, catalogAvailabilitySnapshot, type AvailabilitySnapshot } from "../models/availability.js";
 import { selectionRequest } from './model/target.js';
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
-import { configurationApplicationNotice } from "./configuration.js";
 import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
 import { runModelPresetCommand } from './model/presetCommand.js';
 import { providerCredentialBaseUrl } from '../auth/account/target.js';
@@ -56,7 +55,8 @@ export async function runModelCommand(
     return { kind: "local", output: renderModelStatus(context) };
   }
   if (action === "refresh") {
-    return { kind: "local", output: await refreshModels(context) };
+    return runCatalogOperation<LocalCommandResult>(context, async captured =>
+      ({ kind: "local", output: (await refreshModels(captured)).output }));
   }
 
   if (action === "config") {
@@ -77,7 +77,10 @@ export async function runModelCommand(
   }
 
   if (action === "list" || action === "ls") {
-    return { kind: "local", output: await listModels(rest, parsed.flags.has("refresh"), context) };
+    return parsed.flags.has("refresh")
+      ? runCatalogOperation<LocalCommandResult>(context, async captured =>
+        ({ kind: "local", output: await listModels(rest, true, captured) }))
+      : { kind: "local", output: await listModels(rest, false, context) };
   }
 
   if (action === "use" || action === "set") {
@@ -282,6 +285,9 @@ export interface ModelCatalog {
   readonly offline: boolean;
   readonly virtual?: readonly VirtualModelMetadata[];
   readonly logical?: { readonly provider: string; readonly model: string };
+  /** Present for explicit refresh, including saved, unknown and unchanged failures. */
+  readonly refresh?: RefreshResult;
+  readonly refreshNotice?: string;
 }
 
 /**
@@ -289,9 +295,36 @@ export interface ModelCatalog {
  * text. Shares the local catalogue and explicit refresh owner with `/model list` so
  * the two can never offer different models.
  */
+/** Rejects unavailable read data while retaining this refresh's own storage outcome. */
+export class CatalogReadError extends Error {
+  readonly refresh: RefreshResult | undefined;
+
+  constructor(refresh: RefreshResult | undefined, readonly refreshNotice: string, cause: unknown, cancelled = false) {
+    super(cancelled ? 'Catalogue data read was cancelled after refresh.' : 'Catalogue data is unavailable after refresh.', { cause });
+    this.name = cancelled ? 'AbortError' : 'CatalogReadError';
+    this.refresh = refresh ? Object.freeze({ ...refresh }) : undefined;
+  }
+}
+
 export async function readModelCatalog(refresh = false, sessionId?: string, runtimeConfig?: RuntimeConfig, suppliedContext?: CommandContext): Promise<ModelCatalog> {
   const context = suppliedContext ?? { cwd: process.cwd(), sessionId, runtimeConfig };
-  if (refresh) await refreshModels(context);
+  if (refresh) return runCatalogOperation<ModelCatalog>(context, async captured => {
+    const refreshed = await refreshModels(captured);
+    try {
+      captured.signal?.throwIfAborted();
+      const blocked = captured.admission?.();
+      captured.signal?.throwIfAborted();
+      if (blocked) throw new Error(blocked);
+      const result = await readModelCatalog(false, sessionId, runtimeConfig, captured);
+      captured.signal?.throwIfAborted();
+      const changed = captured.admission?.();
+      captured.signal?.throwIfAborted();
+      if (changed) throw new Error(changed);
+      return { ...result, refresh: refreshed.result, refreshNotice: refreshed.output };
+    } catch (error) {
+      throw new CatalogReadError(refreshed.result, refreshed.output, error, captured.signal?.aborted);
+    }
+  });
   const { catalog, active } = modelConfiguration(context);
   const allowed = active.credential?.authMode === 'account-auth' ? providerFacts(active.provider).accountAuthAllowedModels : undefined;
   const binding = catalogProvider(catalog, active.provider, providerCredentialBaseUrl(catalog, active));
@@ -301,28 +334,92 @@ export async function readModelCatalog(refresh = false, sessionId?: string, runt
       logical: readLogicalModel(context.sessionId) } : {}) };
 }
 
-async function refreshModels(context: CommandContext): Promise<string> {
+/** Capture the original command owner once; child readers must not register again. */
+function runCatalogOperation<T>(context: CommandContext, operation: (captured: CommandContext) => Promise<T>): Promise<T> {
+  const { runCancellable, ...captured } = context;
+  if (runCancellable) return runCancellable(signal => {
+    const owned = { ...captured, signal: captured.signal ? AbortSignal.any([captured.signal, signal]) : signal };
+    owned.signal.throwIfAborted();
+    return operation(owned);
+  });
+  captured.signal?.throwIfAborted();
+  return operation(captured);
+}
+
+async function refreshModels(context: CommandContext): Promise<{ readonly output: string; readonly result?: RefreshResult }> {
+  context.signal?.throwIfAborted();
   const blocked = context.admission?.();
-  if (blocked) return `Catalogue refresh blocked: ${blocked}`;
-  const result = await refreshCatalog();
-  if (!result.ok) return `Catalogue refresh failed (${result.error}). The accepted catalogue is unchanged.`;
-  const changed = context.admission?.();
-  const notice = changed ? `Catalogue saved but not applied: ${changed}` : configurationApplicationNotice(context);
-  return [
-    `Catalogue refreshed: ${result.providers} providers, ${result.models} models, cached in \`${result.cachePath}\`. Your own entries in \`${userCatalogPath()}\` still win.`,
-    notice ?? (context.refreshRuntimeConfig ? 'Catalogue applied for the next operation.' : 'Catalogue saved for the next load.'),
-  ].join('\n');
+  context.signal?.throwIfAborted();
+  if (blocked) return { output: `Catalogue refresh blocked: ${blocked}` };
+  const result = await refreshCatalog(undefined, { signal: context.signal, admission: context.admission });
+  if (result.cacheOutcome === 'unknown') {
+    return { result, output: `Catalogue refresh failed (${result.error ?? 'cache write was not confirmed'}). Catalogue cache write outcome is unknown.` };
+  }
+  const receipt = `${result.providers} providers, ${result.models} models${result.cachePath ? `, cached in \`${result.cachePath}\`` : ''}.`;
+  if (!result.ok) {
+    if (result.cacheOutcome === 'saved') return { result, output: [
+      `Catalogue saved: ${receipt}`,
+      `Catalogue refresh did not finish (${result.error ?? 'cache cleanup is unverified'}). The saved catalogue was not applied.`,
+    ].join('\n') };
+    return { result, output: `Catalogue refresh failed (${result.error ?? 'refresh outcome is unavailable'}).${result.cacheOutcome === 'unchanged' ? ' Catalogue cache is unchanged.' : ''}` };
+  }
+  const saved = result.cacheOutcome === 'saved' || (result.cacheOutcome === undefined && !result.notModified && Boolean(result.cachePath));
+  const summary = [
+    `Catalogue ${result.notModified ? 'not modified' : 'refreshed'}: ${receipt}`,
+    ...(result.notModified && saved ? ['Cache validator saved.'] : []),
+  ];
+  try {
+    summary[0] += ` Your own entries in \`${userCatalogPath()}\` still win.`;
+    const changed = context.admission?.();
+    const cancelled = context.signal?.aborted;
+    if (changed || cancelled) return { result, output: [...summary,
+      `${saved ? 'Catalogue saved but not applied' : 'Catalogue not applied'}: ${cancelled ? 'Catalogue refresh was cancelled.' : changed}`,
+    ].join('\n') };
+    let notice = saved ? 'Catalogue saved for the next load.' : 'Existing catalogue remains available for the next load.';
+    if (context.refreshRuntimeConfig) {
+      try {
+        const application = context.refreshRuntimeConfig('catalog');
+        const stale = context.admission?.();
+        if (application.status !== 'applied') {
+          notice = `Configuration was not applied (${application.status}).${application.admissionBlocked ? ' New actions are blocked until a valid configuration is loaded.' : ''}`;
+        } else if (context.signal?.aborted || stale) {
+          notice = `Configuration application outcome is unverified.${stale ? ` ${stale}` : ' Catalogue refresh was cancelled.'}`;
+        } else {
+          notice = 'Catalogue applied for the next operation.';
+        }
+      } catch {
+        notice = 'Configuration application outcome is unverified.';
+      }
+    }
+    return { result, output: [...summary, notice].join('\n') };
+  } catch {
+    return { result, output: [...summary,
+      `${saved ? 'Catalogue saved but not applied' : 'Catalogue not applied'}: Catalogue refresh admission is unavailable.`,
+    ].join('\n') };
+  }
 }
 
 async function listModels(args: string[], refresh: boolean, context: CommandContext): Promise<string> {
+  if (refresh) {
+    context.signal?.throwIfAborted();
+    const blocked = context.admission?.();
+    context.signal?.throwIfAborted();
+    if (blocked) return `Catalogue refresh blocked: ${blocked}`;
+  }
   let snapshot = modelConfiguration(context);
+  if (refresh) {
+    context.signal?.throwIfAborted();
+    const changed = context.admission?.();
+    context.signal?.throwIfAborted();
+    if (changed) return `Catalogue refresh blocked: ${changed}`;
+  }
   const hint = args[0]?.trim();
   const requested = hint ? (snapshot.catalog.some(entry => entry.id === hint) ? hint : normalizeProvider(hint) ?? hint) : undefined;
   const virtual = context.sessionId ? sessionModelCatalog(context.cwd, context.sessionId, snapshot.catalog).virtual : [];
   const logical = readLogicalModel(context.sessionId);
   const virtualProvider = requested ?? logical?.provider;
   const virtualRows = virtual.filter(model => model.provider === virtualProvider);
-  if (virtualRows.length || virtualProvider === logical?.provider) return [
+  if (virtualRows.length || logical && virtualProvider === logical.provider) return [
     `Virtual models for provider=${virtualProvider}`,
     'Source: current session extensions',
     ...virtualRows.map(model => `${logical?.provider === model.provider && logical.model === model.id ? '*' : '-'} ${model.id} (${model.name})`),
@@ -331,12 +428,27 @@ async function listModels(args: string[], refresh: boolean, context: CommandCont
   if (requested && !snapshot.catalog.some(entry => entry.id === requested) && !RUNTIME_PROVIDERS.some(id => id === requested)) {
     return [...snapshot.catalogDiagnostics, 'Unknown provider. Use /model to inspect the catalogue.'].join('\n');
   }
-  const notice = refresh ? await refreshModels(context) : undefined;
-  if (refresh) snapshot = modelConfiguration(context);
+  const notice = refresh ? (await refreshModels(context)).output : undefined;
+  if (refresh) {
+    try {
+      const changed = context.admission?.();
+      if (context.signal?.aborted || changed) return [notice,
+        context.signal?.aborted ? 'Catalogue list cancelled.' : `Catalogue list unavailable: ${changed}`,
+      ].join('\n');
+      snapshot = modelConfiguration(context);
+      const stale = context.admission?.();
+      if (context.signal?.aborted || stale) return [notice,
+        context.signal?.aborted ? 'Catalogue list cancelled.' : `Catalogue list unavailable: ${stale}`,
+      ].join('\n');
+    } catch {
+      return [notice, 'Catalogue list is unavailable.'].join('\n');
+    }
+  }
   const { catalog, active, catalogDiagnostics } = snapshot;
   const provider = requested ?? active.provider;
   const binding = catalogProvider(catalog, provider, provider === active.provider ? providerCredentialBaseUrl(catalog, active) : undefined);
-  if (binding.ambiguous) return [...catalogDiagnostics, 'Model list unavailable: multiple catalogue entries claim the active endpoint.'].join('\n');
+  if (binding.ambiguous) return [notice, ...catalogDiagnostics, 'Model list unavailable: multiple catalogue entries claim the active endpoint.']
+    .filter(line => line !== undefined).join('\n');
   const entry = binding.entry;
 
   const activeModel = provider === active.provider ? active.model : undefined;

@@ -2777,3 +2777,18 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** The tail of nested italic or struck text loses its outer style while the Markdown source and HTML nesting remain correct.
 - **Root Cause:** A fixed ANSI closing code disables the terminal attribute for both inner and outer scopes.
 - **Rule:** Render Markdown attributes through the existing scoped style owner, which reopens outer attributes after inner resets. Test the actual emitted close/reopen sequence and the final close outside the source span; stripping ANSI alone cannot detect this regression.
+
+### Catalogue Revalidation Needs Its Captured Body And Publication Owner
+- **Symptom:** A metadata-only cache accepts 304, or an old response overwrites or retags a successor cache after waiting for headers or body.
+- **Root Cause:** A validator is treated as usable data, and publication rereads ambient paths or contents without retaining the original acquisition.
+- **Rule:** Require an admitted nonempty body from the same index URL before sending its validator. Capture profile, selected physical path, parent identity and same-FD bytes/inode; recheck the original admission and acquisition around awaits and before every native rename retry. All cache writers use the same physical lock and atomic writer. An unchanged validator preserves exact bytes; a lock does not provide CAS against an editor in the last rename window.
+
+### Refresh Read Refusal Must Retain Its Storage Receipt
+- **Symptom:** A refresh saves before cancellation, a callback throws after rename, or final directory reading fails; the caller receives a bare error and loses saved or unknown evidence.
+- **Root Cause:** Read lifetime refusal and durable publication outcome are projected independently, and callbacks after the producer result run outside receipt-aware catches.
+- **Rule:** Protect all post-result callbacks and final acquisition with the original storage receipt. Reject stale read data with a safe identifiable error carrying a frozen receipt and full notice; preserve AbortError classification and the original signal reason. Text consumers keep the saved or unknown notice when reading fails. A possible application failure stays unverified, and confirmed cleanup failure must not become unchanged.
+
+### Native Filesystem Observers Must Follow Every Import Form
+- **Symptom:** A default-fs spy sees a seed write but misses the atomic owner's named-fs rename or fsync.
+- **Root Cause:** Replacing the default object's property does not replace an already imported named function.
+- **Rule:** In Vitest, share the same vi.fn between default and named exports and mutate its implementation in place. Native compiled probes update builtin ESM exports after installing and restoring observers. Count only the actual target file's effects and clear setup writes before asserting a no-write path.

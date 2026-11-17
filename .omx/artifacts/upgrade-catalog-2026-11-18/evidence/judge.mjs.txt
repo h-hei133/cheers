@@ -1,0 +1,33 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { extractPinned, sourceSnapshot, digest } from '../../.normproof/adapter/artifact.mjs';
+
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const scratch = fs.mkdtempSync(path.join(directory, 'judge-private-'));
+const output = path.join(directory, 'accepted-judge-current');
+const receipt = { status: 'unobserved', acceptedAsProof: false, scopeModified: false, gateModified: false };
+try {
+  receipt.identity = extractPinned(scratch); receipt.source = sourceSnapshot(repo);
+  if (fs.existsSync(output)) throw new Error('output-owner-already-exists');
+  const run = spawnSync('rtk', ['proxy', process.execPath,
+    path.join(scratch, 'package/dist/adapters/cli/normproof.js'), 'judge',
+    path.join(repo, '.normproof/judge-input.json'), output, '--evidence-manifest',
+    path.join(repo, '.normproof/evidence-manifest.json')],
+  { cwd: repo, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 120000 });
+  fs.writeFileSync(path.join(directory, 'accepted-judge-current.log'), (run.stdout ?? '') + (run.stderr ?? ''));
+  receipt.exitCode = run.status; receipt.signal = run.signal; receipt.error = run.error?.code ?? null;
+  const verdictFile = path.join(output, 'verdict.json');
+  receipt.verdict = fs.existsSync(verdictFile) ? JSON.parse(fs.readFileSync(verdictFile, 'utf8')).status : null;
+  receipt.verdictSha256 = fs.existsSync(verdictFile) ? digest(fs.readFileSync(verdictFile)) : null;
+  receipt.sourceUnchanged = sourceSnapshot(repo).sha256 === receipt.source.sha256;
+  receipt.status = !run.error && [0, 2].includes(run.status) && receipt.verdict && receipt.sourceUnchanged ? 'observed' : 'unknown';
+} catch (error) { receipt.failure = { name: error.name, messageSha256: digest(error.message) }; process.exitCode = 1; }
+finally {
+  fs.rmSync(scratch, { recursive: true, force: true }); receipt.privateStateRemoved = !fs.existsSync(scratch);
+  fs.writeFileSync(path.join(directory, 'accepted-judge-current.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify({ status: receipt.status, exitCode: receipt.exitCode, verdict: receipt.verdict,
+    acceptedAsProof: false, sourceUnchanged: receipt.sourceUnchanged, privateStateRemoved: receipt.privateStateRemoved }));
+}

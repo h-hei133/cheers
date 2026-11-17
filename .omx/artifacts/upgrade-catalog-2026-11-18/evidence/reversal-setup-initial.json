@@ -1,0 +1,9 @@
+{
+  "status": "failed",
+  "classification": "harness_setup_drift",
+  "processExitCode": 1,
+  "code": "ENOENT",
+  "reason": "Isolation setup tried to copy an absent root src directory; actual product owner is packages/ts-shell/src. No tests ran.",
+  "mainSourcesMutated": false,
+  "helperSha256": "30cc7c3666a7b2900403f8c5ba5ddcb44207d9fa9b2bec75b620e35e9a8c87da"
+}
