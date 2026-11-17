@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "rawLogBytesModified": false,
+  "rawScriptBytesModified": false,
+  "executableDiagnosticCopiesRemoved": [
+    {
+      "removed": "codemode/integrated.mjs",
+      "retained": "codemode/integrated.mjs.txt",
+      "sha256": "570991af9b4de50aee7036218f3ff650ec93f179af9669bc0a4dd27ee3d357a9",
+      "historicalDraft": false
+    },
+    {
+      "removed": "codemode/judge.mjs",
+      "retained": "codemode/judge.mjs.txt",
+      "sha256": "9e8d2042dca5e26337200a9431b1ff97d5287dfb1bb65c98c732f90744a7348d",
+      "historicalDraft": false
+    },
+    {
+      "removed": "codemode/native.mjs",
+      "retained": "codemode/native-archived-draft.mjs.txt",
+      "sha256": "15bbbfb10c0e1b3f697c2f1f6e67f60b76f34dfb938ba6e80ed205b98ade9de4",
+      "historicalDraft": true
+    },
+    {
+      "removed": "codemode/package.mjs",
+      "retained": "codemode/package.mjs.txt",
+      "sha256": "17add943ad5fbb81a84b08d376eab21475d57a12d5b6873e69b9c099560488af",
+      "historicalDraft": false
+    },
+    {
+      "removed": "codemode/reversal.mjs",
+      "retained": "codemode/reversal.mjs.txt",
+      "sha256": "4a7f9550bcc82f5ed656ee9fc238500cd6e3db3ad3d89a98062d90c4ec1905a8",
+      "historicalDraft": false
+    },
+    {
+      "removed": "export/boundary.mjs",
+      "retained": "export/boundary.mjs.txt",
+      "sha256": "f32bcebcdba5364593b6ad9e283524366e6f6393cbe3d1f4d24aa8baaf36214b",
+      "historicalDraft": false
+    },
+    {
+      "removed": "export/graph-capacity.mjs",
+      "retained": "export/graph-capacity.mjs.txt",
+      "sha256": "670be1473a90b37ccba8d0856c7743ecd487a2dd0caa910c3e8440d12a3d6d9b",
+      "historicalDraft": false
+    },
+    {
+      "removed": "export/native.mjs",
+      "retained": "export/native.mjs.txt",
+      "sha256": "f7761df021cfb966e01c15830185bc81acbd031bdd9b2216d40450af49dcf387",
+      "historicalDraft": false
+    },
+    {
+      "removed": "export/reversal.mjs",
+      "retained": "export/reversal.mjs.txt",
+      "sha256": "71ee9fa335ed0d45cd5c7aa6afc8e42217b3b6120ef114b36ed0d4dd323058cd",
+      "historicalDraft": false
+    }
+  ],
+  "historicalSnapshots": [
+    {
+      "manifest": "source-before-final-review.json",
+      "source": "packages/ts-shell/src/presentation/tui/transcript/inline.ts",
+      "sha256": "886a301b4c2f90cb7ee085eaf91265058dc8688437fa33a42164e8e112236e53",
+      "previousSnapshot": "source/packages/ts-shell/src/presentation/tui/transcript/inline.ts.txt"
+    },
+    {
+      "manifest": "source-before-final-review.json",
+      "source": "packages/ts-shell/src/presentation/tui/transcript/markdown.test.ts",
+      "sha256": "6ad724bd30f2a206e391ccf5208eb74098fe53bc6fe77beb1330b75fcd9b9112",
+      "previousSnapshot": "source/packages/ts-shell/src/presentation/tui/transcript/markdown.test.ts.txt"
+    },
+    {
+      "manifest": "source-before-final-review.json",
+      "source": "packages/ts-shell/src/turn/nestedTools.test.ts",
+      "sha256": "326e2ab356b5fb44512c83671c022bab6e08244d8f6de7b87669bb1052c31260",
+      "previousSnapshot": "source/packages/ts-shell/src/turn/nestedTools.test.ts.txt"
+    },
+    {
+      "manifest": "source-before-final-review.json",
+      "source": "packages/ts-shell/src/turn/nestedTools.ts",
+      "sha256": "ef2eaf427d4f47f88050c42a6645f1341f8a2114a6b61ffd89b2f38d779e5c3b",
+      "previousSnapshot": "source/packages/ts-shell/src/turn/nestedTools.ts.txt"
+    },
+    {
+      "manifest": "documents-before-final-review.json",
+      "source": "HANDOFF.md",
+      "sha256": "2fbd9eecfe8d4b6267825a4534165503dd72e3a588c8371340718961690d4eed",
+      "previousSnapshot": "docs/HANDOFF.md.txt"
+    },
+    {
+      "manifest": "documents-before-final-review.json",
+      "source": ".wiki/log.md",
+      "sha256": "154485976089d6adbccb35eb3edafda79d01ca3abab85ecfaf04421fd55f3ce0",
+      "previousSnapshot": "docs/.wiki/log.md.txt"
+    },
+    {
+      "manifest": "documents-before-final-review.json",
+      "source": ".wiki/refactor/upgrade/MASTER.md",
+      "sha256": "304700976702e1510d17d2373a5026b5586f53f15e077aaa0c12dafe33c0905a",
+      "previousSnapshot": "docs/.wiki/refactor/upgrade/MASTER.md.txt"
+    },
+    {
+      "manifest": "documents-before-final-review.json",
+      "source": ".wiki/refactor/upgrade/tasks.md",
+      "sha256": "b7bc2812985cdd6cc18996f27bed758ba04270d7109d27f8cedbbce4e524bf3b",
+      "previousSnapshot": "docs/.wiki/refactor/upgrade/tasks.md.txt"
+    },
+    {
+      "manifest": "documents-before-final-review.json",
+      "source": ".wiki/refactor/upgrade/design.md",
+      "sha256": "91b6706fc2657a1135040c68787698bbbb8b23a21a7b4c629de348bbe53ba486",
+      "previousSnapshot": "docs/.wiki/refactor/upgrade/design.md.txt"
+    },
+    {
+      "manifest": "documents-before-final-review.json",
+      "source": ".wiki/refactor/upgrade/summary.md",
+      "sha256": "4fba6ee9704acc6abf6708ab11335e2a58faa786b8382286f01d8012dd280a0b",
+      "previousSnapshot": "docs/.wiki/refactor/upgrade/summary.md.txt"
+    }
+  ],
+  "historicalSnapshotsUnavailable": 10,
+  "currentSourceAndDocumentSnapshotsVerified": true,
+  "productValidationRepeated": false
+}

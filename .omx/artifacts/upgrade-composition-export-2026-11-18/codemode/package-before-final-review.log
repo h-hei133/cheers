@@ -1,0 +1,1 @@
+{"status":"passed","buildId":"3e05e202dc57f189c409d981803850882e01a3450d7e3daefcf543091daed0e1","strictInstalledTypes":true,"native":{"status":"passed","publicEntries":15,"providerRequests":0,"actualReadWrite":true,"nestedCalls":3,"immutableCapturedModels":true,"mediaDeclaration":true},"failure":null,"privateStateRemoved":true,"originalConfigUnchanged":true}

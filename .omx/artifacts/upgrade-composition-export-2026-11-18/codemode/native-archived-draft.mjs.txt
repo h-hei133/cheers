@@ -1,0 +1,937 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { createHash } from 'node:crypto';
+import { channel } from 'node:diagnostics_channel';
+import { gunzipSync, inflateSync, brotliDecompressSync } from 'node:zlib';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseTree, findNodeAtLocation } from 'jsonc-parser';
+
+// The root agent runs this bounded Linux helper serially.
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const packageRoot = path.join(repo, 'packages/ts-shell');
+const MAX_BYTES = 4 * 1024 * 1024;
+const MAX_REQUESTS = 16;
+const SCENARIO_MS = 300000;
+const OVERALL_MS = 660000;
+const SEARCH = 'tool_search', LOAD = 'tool_load', SCRIPT = 'codemode';
+const EFFECT = 'fixture:effect', COLLISION = 'fixture_effect';
+const SELECTED = 'NATIVE_CODEMODE_SELECTED_734921';
+const WRITE_VALUE = 'NATIVE_CODEMODE_WRITTEN_734921';
+const RETRY = 'NATIVE_CODEMODE_RETRY_734921';
+const ACK = 'NATIVE_CODEMODE_ACK_734921';
+const IMAGE_ACK = 'NATIVE_CODEMODE_IMAGE_734921';
+const RAW_A = 'NATIVE_CODEMODE_DISCARDED_A_734921';
+const RAW_B = 'NATIVE_CODEMODE_DISCARDED_B_734921';
+const PIXEL_DATA = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+const effectSchema = { type: 'object', additionalProperties: false, required: ['value'],
+  properties: { value: { type: 'string', enum: [WRITE_VALUE] } } };
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const equal = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+const textOf = value => typeof value === 'string' ? value : Array.isArray(value)
+  ? value.filter(part => typeof part?.text === 'string').map(part => part.text).join('\n') : '';
+const receipt = { status: 'not_run', platform: process.platform, publicCompiledSdk: true,
+  configuredProvider: true, probeSha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))),
+  referenceProbeSha256: hash(fs.readFileSync(path.join(repo, '.tmp/discovery-validation/native.mjs'))),
+  providerCases: [], rawCases: [], requests: [] };
+const providerOnly = process.argv.includes('--provider-only');
+const retryOnly = process.argv.includes('--retry-only');
+const selectedIndex = process.argv.find(value => value.startsWith('--configured-index='))?.split('=')[1];
+const originalHashes = new Map(), previousEnv = new Map(), observations = [], pending = new WeakMap(), captures = new Set();
+const counters = { create: 0, bodySent: 0, headers: 0, data: 0, complete: 0, retired: 0, finalized: 0 };
+const creating = channel('undici:request:create'), sent = channel('undici:request:bodySent');
+const headers = channel('undici:request:headers'), trailers = channel('undici:request:trailers');
+let sdk, configured, selected, owner, root, workspace, storage, fixtureConfig, session, deadline, executionDeadline;
+let checkBuild, buildManifest, beforeSource, manifestHash, compiled;
+let stage = 'setup', targetOrigin, observerFailure, lastFailure, modelEntry, caseState;
+let foreignRequests = 0, rawRequests = 0, providerActive = false;
+
+function check(condition, code) {
+  if (condition) return;
+  const error = new Error(code); error.probeCode = code; throw error;
+}
+function env(key, value) {
+  if (!previousEnv.has(key)) previousEnv.set(key, process.env[key]);
+  if (value === undefined) delete process.env[key]; else process.env[key] = value;
+}
+function sourceSnapshot() {
+  const files = ['packages/ts-shell/src/index.ts', 'packages/ts-shell/src/tools/types.ts',
+    'packages/ts-shell/src/core/tools/catalog.ts', 'packages/ts-shell/src/core/tools/discovery/state.ts',
+    'packages/ts-shell/src/core/tools/codemode/tool.ts', 'packages/ts-shell/src/core/tools/codemode/prelude.ts',
+    'packages/ts-shell/src/core/tools/codemode/execution.ts', 'packages/ts-shell/src/core/tools/codemode/image.ts',
+    'packages/ts-shell/src/core/tools/codemode/models.ts', 'packages/ts-shell/src/core/tools/codemode/nestedCalls.ts',
+    'packages/ts-shell/src/core/tools/codemode/declarations.ts', 'packages/ts-shell/src/core/tools/codemode/output.ts',
+    'packages/ts-shell/src/core/tools/codemode/catalog.ts', 'packages/ts-shell/src/turn/execution.ts',
+    'packages/ts-shell/src/turn/subagent.ts', 'packages/ts-shell/src/turn/session.ts',
+    'packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts',
+    'packages/ts-shell/src/turn/tools.ts', 'packages/ts-shell/src/turn/nestedTools.ts',
+    'packages/ts-shell/src/core/tools/read.ts', 'packages/ts-shell/src/runtime/execution/media/image.ts'];
+  const entries = files.map(file => ({ file, sha256: hash(fs.readFileSync(path.join(repo, file))) }));
+  return { files: entries, sha256: hash(JSON.stringify(entries)) };
+}
+function original(file) {
+  originalHashes.set(file, fs.existsSync(file) ? hash(fs.readFileSync(file)) : null);
+}
+function freshBuild() {
+  const version = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version;
+  const build = checkBuild({ root: repo, dist: path.join(packageRoot, 'dist'), version, executablePolicy: 'ignore' });
+  check(build.ok, 'fresh-compiled-build-unavailable');
+  return build.manifest;
+}
+async function bound(operation, code, ms = SCENARIO_MS, retire) {
+  let timer;
+  const promise = Promise.resolve(operation);
+  void promise.catch(() => {});
+  try {
+    return await Promise.race([promise, new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        if (retire) void Promise.resolve(retire()).catch(() => {});
+        const error = new Error(code); error.probeCode = code; reject(error);
+      }, ms);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+function held() {
+  let resolve;
+  const promise = new Promise(accept => { resolve = accept; });
+  return { promise, resolve };
+}
+async function until(predicate, code, ms = 3000) {
+  const end = Date.now() + ms;
+  while (!predicate()) {
+    check(Date.now() < end, code);
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+}
+function safeNested(metadata) {
+  const nested = metadata?.nestedCalls;
+  if (!nested) return null;
+  check(Array.isArray(nested.calls) && nested.calls.length <= 256, 'nested-record-limit');
+  return { complete: nested.complete === true, calls: nested.calls.map(call => ({
+    id: typeof call.id === 'string' ? call.id : null,
+    name: typeof call.name === 'string' ? call.name : null,
+    status: call.status, argumentsSha256: hash(JSON.stringify(call.arguments ?? {})),
+    durationMs: typeof call.durationMs === 'number' ? call.durationMs : null,
+    errorSha256: typeof call.error === 'string' ? hash(call.error) : null,
+  })) };
+}
+function resultFact(id, content) {
+  const text = textOf(content);
+  const blocks = Array.isArray(content) ? content : [];
+  return { id: typeof id === 'string' ? id : null, sha256: hash(text), bytes: Buffer.byteLength(text),
+    selected: text.includes(SELECTED), discarded: text.includes(RAW_A) || text.includes(RAW_B),
+    imageAck: text.includes(IMAGE_ACK), images: blocks.filter(block => block?.type === 'image'
+      || block?.type === 'image_url' || block?.type === 'input_image').length };
+}
+function nativeSummary(output) {
+  const value = JSON.parse(output.replace(/^Script completed\s*/, ''));
+  const inspection = {};
+  for (const key of ['collisionSafe', 'namespace', 'physical', 'logical', 'missing', 'frozen', 'callbacks'])
+    inspection[key] = value?.inspection?.[key] === true;
+  return { selected: value?.selected === SELECTED, recordsExact: equal(value?.records, ['alpha', 'beta']),
+    written: value?.written === true, rejected: value?.rejected === true,
+    retryReason: value?.retryReason === true, inspection };
+}
+function wireProjection(body) {
+  const declarations = [], results = [], system = [], schemas = [];
+  const addDeclaration = (name, parameters) => {
+    if (typeof name !== 'string' || !parameters || typeof parameters !== 'object') return;
+    const json = JSON.stringify(parameters);
+    declarations.push({ name, schemaSha256: hash(json), schemaBytes: Buffer.byteLength(json) });
+    schemas.push({ name, parameters });
+  };
+  const addResult = (id, content) => {
+    const value = resultFact(id, content);
+    try {
+      const parsed = JSON.parse(textOf(content));
+      if (parsed?.query === SCRIPT && Array.isArray(parsed.loaded)) value.search = {
+        queryExact: true, loadedScript: parsed.loaded.includes(SCRIPT),
+        matches: Array.isArray(parsed.matches) ? parsed.matches.map(match => ({
+          name: typeof match?.name === 'string' ? match.name : null,
+          loaded: match?.loaded === true, pinned: match?.pinned === true })) : [],
+      };
+    } catch { /* Only fixture facts and digests are retained. */ }
+    results.push(value);
+  };
+  for (const tool of body.tools ?? []) {
+    if (tool.function) addDeclaration(tool.function.name, tool.function.parameters);
+    else if (Array.isArray(tool.functionDeclarations)) for (const definition of tool.functionDeclarations)
+      addDeclaration(definition.name, definition.parameters ?? definition.parametersJsonSchema);
+    else addDeclaration(tool.name, tool.input_schema ?? tool.parameters);
+  }
+  for (const tool of body.toolConfig?.tools ?? []) addDeclaration(tool.toolSpec?.name, tool.toolSpec?.inputSchema?.json);
+  for (const message of body.messages ?? []) {
+    if (message.role === 'system') system.push(textOf(message.content));
+    if (message.role === 'tool') addResult(message.tool_call_id, message.content);
+    for (const block of Array.isArray(message.content) ? message.content : []) {
+      if (block.type === 'tool_result') addResult(block.tool_use_id, block.content);
+      if (block.toolResult) addResult(block.toolResult.toolUseId, block.toolResult.content);
+    }
+  }
+  for (const item of Array.isArray(body.input) ? body.input : []) {
+    if (item.type === 'function_call_output') addResult(item.call_id, item.output);
+    if (item.role === 'system') system.push(textOf(item.content));
+  }
+  for (const content of body.contents ?? []) for (const part of content.parts ?? [])
+    if (part.functionResponse) addResult(part.functionResponse.id, part.functionResponse.response?.output);
+  if (body.instructions !== undefined) system.push(textOf(body.instructions));
+  if (body.system !== undefined) system.push(textOf(body.system));
+  if (body.systemInstruction?.parts) system.push(textOf(body.systemInstruction.parts));
+  const systemText = system.join('\n');
+  return { declarations, toolResults: results, schemaSha256: hash(JSON.stringify(schemas)),
+    systemSha256: hash(systemText), systemBytes: Buffer.byteLength(systemText),
+    modelMatchesConfigured: typeof body.model === 'string' ? body.model === selected.model : null };
+}
+
+function responseFacts(bytes, encoding) {
+  const decompress = encoding === 'gzip' ? gunzipSync : encoding === 'deflate' ? inflateSync
+    : encoding === 'br' ? brotliDecompressSync : undefined;
+  const text = (decompress ? decompress(bytes, { maxOutputLength: MAX_BYTES }) : bytes).toString('utf8');
+  let frames = 0, completionMarker = false;
+  const capture = frame => {
+    if (!frame || typeof frame !== 'object') return;
+    frames++;
+    completionMarker ||= frame.type === 'response.completed' || frame.type === 'message_stop'
+      || typeof frame.stop_reason === 'string' || frame.choices?.some(choice => typeof choice.finish_reason === 'string') === true
+      || frame.candidates?.some(candidate => typeof candidate.finishReason === 'string') === true;
+  };
+  try { const value = JSON.parse(text); for (const frame of Array.isArray(value) ? value : [value]) capture(frame); }
+  catch {
+    for (const line of text.split(/\r?\n/)) {
+      if (!line.startsWith('data:')) continue;
+      const value = line.slice(5).trim();
+      if (value === '[DONE]') { completionMarker = true; continue; }
+      if (!value) continue;
+      try { capture(JSON.parse(value)); } catch { /* Malformed provider content is not persisted. */ }
+    }
+  }
+  return { inspectable: frames > 0, frames, completionMarker };
+}
+
+function finalize(request, end) {
+  const capture = pending.get(request); if (!capture || capture.finalized) return;
+  capture.finalized = true; counters.finalized++;
+  try {
+    check(capture.incomingBytes <= MAX_BYTES, 'response-capture-limit');
+    if (capture.observation) Object.assign(capture.observation, {
+      responseStatus: capture.statusCode ?? null,
+      responseBytes: capture.incomingBytes,
+      responseSha256: hash(Buffer.concat(capture.incoming)),
+      responseEnd: end,
+      response: responseFacts(Buffer.concat(capture.incoming), capture.encoding),
+    });
+  } catch { observerFailure = 'response-capture'; }
+  finally { capture.outgoing.length = 0; capture.incoming.length = 0; captures.delete(capture); pending.delete(request); }
+}
+
+function onHeaders({ request, response }) {
+  const capture = pending.get(request); if (!capture) return;
+  counters.headers++; capture.statusCode = response.statusCode;
+  for (let index = 0; index < response.headers.length; index += 2)
+    if (String(response.headers[index]).toLowerCase() === 'content-encoding')
+      capture.encoding = String(response.headers[index + 1]).toLowerCase();
+}
+
+function onCreate({ request }) {
+  if (request.method !== 'POST' || String(request.origin) !== targetOrigin) return;
+  counters.create++;
+  const capture = { stage, outgoing: [], incoming: [], outgoingBytes: 0, incomingBytes: 0 };
+  pending.set(request, capture); captures.add(capture);
+  const originalBody = request.onBodySent, originalData = request.onData, originalHeaders = request.onHeaders;
+  const originalComplete = request.onComplete, originalError = request.onError;
+  request.onBodySent = function (chunk) {
+    try {
+      capture.outgoingBytes += Buffer.byteLength(chunk);
+      if (capture.outgoingBytes <= MAX_BYTES) capture.outgoing.push(Buffer.from(chunk));
+      else { observerFailure = 'request-capture-limit'; capture.outgoing.length = 0; }
+    } catch { observerFailure = 'request-capture'; }
+    return originalBody.call(this, chunk);
+  };
+  request.onData = function (chunk) {
+    try {
+      counters.data++; capture.incomingBytes += Buffer.byteLength(chunk);
+      if (capture.incomingBytes <= MAX_BYTES) capture.incoming.push(Buffer.from(chunk));
+      else { observerFailure = 'response-capture-limit'; capture.incoming.length = 0; }
+    } catch { observerFailure = 'response-capture'; }
+    return originalData.call(this, chunk);
+  };
+  request.onHeaders = function (statusCode, rawHeaders, ...rest) {
+    onHeaders({ request: this, response: { statusCode, headers: rawHeaders } });
+    return originalHeaders.call(this, statusCode, rawHeaders, ...rest);
+  };
+  request.onComplete = function (...args) {
+    counters.complete++; finalize(this, 'transport-complete');
+    return originalComplete.apply(this, args);
+  };
+  request.onError = function (...args) {
+    counters.retired++;
+    // SDK stream cleanup may retire an accepted transport before trailers. Preserve its already captured data.
+    // Native query/effect assertions below remain independent; an accepted status is not a success verdict.
+    finalize(this, capture.statusCode >= 200 && capture.statusCode < 300 && capture.incomingBytes > 0
+      ? 'accepted-stream-retirement' : 'transport-error');
+    return originalError.apply(this, args);
+  };
+}
+
+function onSent({ request }) {
+  const capture = pending.get(request); if (!capture) return;
+  try {
+    check(observations.length < MAX_REQUESTS, 'native-request-limit');
+    check(capture.outgoingBytes <= MAX_BYTES, 'request-capture-limit');
+    const bytes = Buffer.concat(capture.outgoing), body = JSON.parse(bytes.toString('utf8'));
+    counters.bodySent++;
+    capture.observation = { stage: capture.stage, bodySent: true, requestBytes: capture.outgoingBytes,
+      requestSha256: hash(bytes), ...wireProjection(body) };
+    observations.push(capture.observation);
+  } catch (error) { observerFailure = error.probeCode ?? 'request-capture'; void session?.abort().catch(() => {}); }
+  finally { capture.outgoing.length = 0; }
+}
+
+function onTrailers({ request }) { finalize(request, 'transport-complete'); }
+
+
+function eventObservation(event) {
+  if (!caseState) return;
+  if (event.type === 'query.completed') {
+    caseState.terminalStatus = event.result?.status ?? null;
+    const reason = String(event.result?.stopReason ?? event.result?.finalOutput ?? '');
+    caseState.terminal = {
+      status: event.result?.status ?? null,
+      reasonSha256: hash(reason),
+      reasonBytes: Buffer.byteLength(reason),
+      code: /provider-readiness:network/i.test(reason) ? 'provider-readiness-network'
+        : /provider-readiness:auth/i.test(reason) ? 'provider-readiness-auth'
+          : /provider-readiness:configuration/i.test(reason) ? 'provider-readiness-configuration'
+            : /no.*(?:model|response|reply)|(?:model|response|reply).*no/i.test(reason) ? 'missing-model-response'
+        : /limit|budget|context|token/i.test(reason) ? 'request-limits'
+          : /admission|declaration|history|changed|stale/i.test(reason) ? 'request-admission'
+            : /credential|auth|configured|catalog|provider|model/i.test(reason) ? 'configured-target'
+              : /refus|denied|permission|approval/i.test(reason) ? 'tool-refusal' : 'unknown-stop',
+    };
+    if (event.result?.status !== 'completed') lastFailure = reason;
+  }
+  if (event.type === 'query.completed_unproven') caseState.unproven = true;
+  if (event.type === 'query.failed' || event.type === 'lifecycle.error') lastFailure = String(event.error);
+  if (event.type === 'tool.started') caseState.calls.push({ id: event.taskId, name: event.toolName,
+    argumentsSha256: hash(JSON.stringify(event.args ?? {})),
+    exactScript: event.toolName === SCRIPT ? event.args?.code === caseState.script : null,
+    schemaQueryExact: event.toolName === SEARCH ? event.args?.query === SCRIPT : null,
+    singleStepLoad: event.toolName === SEARCH ? event.args?.load === true : null });
+  if (event.type === 'approval.resolved') caseState.approvals.push({
+    id: event.taskId, name: event.toolName, outcome: event.outcome });
+  if (event.type === 'tool.result') {
+    const text = event.output ?? '';
+    const fact = { id: event.taskId, name: event.toolName, success: event.success,
+      outputSha256: hash(text), outputBytes: Buffer.byteLength(text),
+      selected: text.includes(SELECTED), discarded: text.includes(RAW_A) || text.includes(RAW_B),
+      images: event.images?.length ?? 0 };
+    if (event.toolName === SCRIPT && event.success) {
+      try { fact.summary = nativeSummary(text); }
+      catch { caseState.summaryUninspectable = true; }
+    }
+    if (event.toolName === SEARCH && event.success) {
+      try {
+        const value = JSON.parse(text);
+        fact.search = { queryExact: value.query === SCRIPT, loadedScript: value.loaded?.includes(SCRIPT) === true,
+          matches: value.matches?.map(match => ({ name: match.name, loaded: match.loaded === true, pinned: match.pinned === true })) };
+      } catch { caseState.searchUninspectable = true; }
+    }
+    caseState.results.push(fact);
+  }
+}
+function hookObservation(payload, mode) {
+  if (!caseState) return { decision: 'allow' };
+  const output = payload.output ?? payload.error ?? '';
+  caseState.hooks.push({ event: payload.eventName, name: payload.toolName, id: payload.toolCallId,
+    argumentsSha256: hash(JSON.stringify(payload.args ?? {})),
+    outputSha256: hash(output), discarded: output.includes(RAW_A) || output.includes(RAW_B) });
+  if (payload.eventName === 'PreToolUse' && payload.toolName === EFFECT && mode === 'retry') {
+    caseState.retryHooks++;
+    return { decision: 'retry', reason: RETRY };
+  }
+  return { decision: 'allow' };
+}
+function scriptFor(mode) {
+  const fixture = { effect: EFFECT, collision: COLLISION, value: WRITE_VALUE,
+    selected: SELECTED, retry: RETRY, provider: owner.id, model: selected.model };
+  const lines = [
+    'const fixture = ' + JSON.stringify(fixture) + ';',
+    'const signature = await describeTool(fixture.effect);',
+    'const namespace = await describeNamespace("fixture");',
+    'const physical = models.get(fixture.provider, fixture.model);',
+    'const logical = models.get("probe_logical", "metadata");',
+    'const inspection = { collisionSafe: signature.includes("tools[" + JSON.stringify(fixture.effect) + "](args:"),',
+    '  namespace: namespace.tools.includes(fixture.effect) && namespace.tools.includes(fixture.collision),',
+    '  physical: physical?.id === fixture.model, logical: logical?.id === "metadata",',
+    '  missing: models.get("probe_logical", "missing") === null,',
+    '  frozen: Object.isFrozen(physical) && Object.isFrozen(logical), callbacks: typeof logical?.route === "undefined" };',
+    'if (Object.values(inspection).some(value => value !== true)) throw new Error("native-inspection-contract");',
+  ];
+  if (mode === 'allowed') lines.push(
+    'const values = await Promise.all([tools.read({path:"first.json"}), tools.read({path:"second.json"}),',
+    '  tools[fixture.effect]({value:fixture.value})]);',
+    'return { selected: fixture.selected, records: values.slice(0,2).map(value => JSON.parse(value).selected),',
+    '  written: values[2].includes(fixture.value), inspection };',
+  );
+  else lines.push(
+    'const values = await Promise.allSettled([tools.read({path:"first.json"}), tools.read({path:"second.json"}),',
+    '  tools[fixture.effect]({value:fixture.value})]);',
+    'return { selected: fixture.selected, records: values.slice(0,2).map(value =>',
+    '  value.status === "fulfilled" ? JSON.parse(value.value).selected : "read-rejected"),',
+    '  rejected: values[2].status === "rejected",',
+    '  retryReason: values[2].status === "rejected" && values[2].reason.message.includes(fixture.retry), inspection };',
+  );
+  return lines.join('\n');
+}
+async function close() {
+  const current = session;
+  try { await bound(current?.dispose(), 'session-cleanup-timeout', 15000); }
+  finally { if (session === current) session = undefined; }
+}
+async function open(mode) {
+  const work = path.join(root, mode);
+  fs.mkdirSync(work); fs.mkdirSync(path.join(work, '.git'));
+  fs.writeFileSync(path.join(work, 'first.json'), JSON.stringify({ selected: 'alpha', discarded: RAW_A }) + '\n');
+  fs.writeFileSync(path.join(work, 'second.json'), JSON.stringify({ selected: 'beta', discarded: RAW_B }) + '\n');
+  fs.writeFileSync(path.join(work, 'pixel.png'), Buffer.from(PIXEL_DATA, 'base64'));
+  const state = { name: mode, calls: [], results: [], approvals: [], hooks: [],
+    effects: 0, collisionEffects: 0, routeCalls: 0, retryHooks: 0, terminalStatus: null, work };
+  caseState = state;
+  const loader = new sdk.DefaultResourceLoader({ cwd: work, noContextFiles: true, noExtensions: true,
+    noSkills: true, noThemes: true,
+    systemPrompt: 'Follow this bounded fixture workflow exactly. First discover and load codemode with one '
+      + 'tool_search call using query codemode and load true. After its schema appears on the next request, '
+      + 'make exactly one codemode call using the supplied code verbatim. Do not call any other outer tool. '
+      + 'Report only the selected summary. End with ' + ACK + '.',
+    extensionFactories: [api => {
+      api.registerTool({ name: EFFECT, description: 'Write one isolated fixture record.',
+        argsSchema: effectSchema, execute: async (args, context) => {
+          check(equal(args, { value: WRITE_VALUE }), 'custom-input-mismatch');
+          context.abortSignal?.throwIfAborted();
+          state.effects++;
+          const destination = path.join(work, 'effect.txt');
+          await fs.promises.writeFile(destination, args.value, { flag: 'wx' });
+          context.abortSignal?.throwIfAborted();
+          return { success: true, output: WRITE_VALUE, metadata: { fixture: 'native-write-completed' } };
+        } });
+      api.registerTool({ name: COLLISION, description: 'Unrelated spelling-collision control; never execute.',
+        argsSchema: { type: 'object', properties: {} }, execute: async () => {
+          state.collisionEffects++;
+          return { success: true, output: 'unexpected-collision-effect' };
+        } });
+      api.registerVirtualModel({ provider: 'probe_logical', id: 'metadata', name: 'Native metadata fixture',
+        route: () => { state.routeCalls++; return { provider: selected.provider, modelId: selected.model }; } });
+      for (const event of ['PreToolUse', 'PostToolUse', 'PostToolUseFailure'])
+        api.on(event, payload => hookObservation(payload, mode));
+    }],
+  });
+  await loader.reload();
+  check(loader.getExtensions().errors.length === 0, 'extension-setup');
+  session = (await sdk.createAgentSession({ cwd: work, resourceLoader: loader,
+    runtimeConfig: { ...sdk.getRuntimeConfig(work), ...fixtureConfig,
+      allowedTools: [SEARCH, LOAD, SCRIPT, 'read', EFFECT, COLLISION], disabledTools: [], hiddenToolPrefixes: [],
+      sessionModelRoles: undefined },
+    permissionScope: 'ask', nonInteractiveApproval: 'allow-once',
+  })).session;
+  const resolution = session.runtimeContext.resolveConfigTarget(session.runtimeContext.runtimeConfig, session.sessionId);
+  check(!resolution.blocked && resolution.credential && resolution.provider === selected.provider
+    && resolution.model === selected.model, 'configured-target-admission');
+  check((resolution.baseUrl ?? resolution.credential.baseUrl)?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, ''),
+    'configured-destination-admission');
+  const physical = session.getModelCatalog().physical.filter(provider => (provider.runtime ?? provider.id) === selected.provider
+    && provider.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, ''));
+  check(physical.length === 1 && physical[0].id === owner.id
+    && physical[0].models.some(model => model.id === selected.model), 'configured-catalogue-ownership');
+  modelEntry = physical[0].models.find(model => model.id === selected.model);
+  caseState.configuredTargetAdmitted = true;
+  return work;
+}
+function publicCase(state) {
+  const { script: _script, work: _work, ...value } = state;
+  return value;
+}
+async function providerScenario(mode) {
+  stage = 'provider-' + mode; lastFailure = undefined;
+  check(!receipt.deadline && Date.now() < executionDeadline, 'native-deadline');
+  const first = observations.length;
+  await open(mode);
+  caseState.script = scriptFor(mode);
+  caseState.scriptSha256 = hash(caseState.script);
+  const unsubscribe = session.subscribe(eventObservation);
+  let answer;
+  providerActive = true;
+  try {
+    answer = await bound(session.prompt('First call tool_search exactly once with query "codemode" and load:true. '
+      + 'Wait for the next request to expose the loaded schema. Then call codemode exactly once with the following '
+      + 'JavaScript as its code argument, without modifying it. Do not call any other outer tools. '
+      + 'After that parent result, finish with ' + ACK + '.\n\n' + caseState.script),
+    'provider-scenario-timeout', SCENARIO_MS, () => session?.abort());
+    await bound(session.waitForIdle(), 'provider-idle-timeout', 15000);
+  } finally { providerActive = false; unsubscribe(); }
+  const history = session.getState().turns;
+  const requestFacts = observations.slice(first);
+  if (requestFacts.length === 0 && caseState.terminalStatus !== 'completed') {
+    check(false, 'request-stopped-before-dispatch');
+  }
+  check(!receipt.deadline && !observerFailure && !lastFailure && !caseState.unproven, 'native-query-failure');
+  check(requestFacts.length >= 3 && requestFacts.length <= 4, 'bounded-native-rounds');
+  check(requestFacts.every(request => request.bodySent && request.responseStatus >= 200 && request.responseStatus < 300
+    && request.responseBytes > 0 && request.response?.inspectable), 'native-accepted-response-unobservable');
+  check(requestFacts.every(request => request.modelMatchesConfigured !== false), 'configured-wire-model-mismatch');
+  check(!requestFacts[0].declarations.some(tool => [SCRIPT, EFFECT, COLLISION].includes(tool.name)),
+    'initial-deferred-schema-leak');
+  check(requestFacts[0].declarations.some(tool => tool.name === SEARCH), 'initial-discovery-schema-missing');
+  check(requestFacts[1].declarations.some(tool => tool.name === SCRIPT), 'next-script-schema-missing');
+  check(requestFacts[1].schemaSha256 !== requestFacts[0].schemaSha256
+    && requestFacts[1].systemSha256 === requestFacts[0].systemSha256, 'schema-only-load-identity');
+  check(requestFacts.every(request => !request.declarations.some(tool => [EFFECT, COLLISION].includes(tool.name))),
+    'deferred-custom-outer-schema-leak');
+  check(caseState.calls.length === 2 && caseState.calls[0].name === SEARCH && caseState.calls[1].name === SCRIPT
+    && caseState.calls[0].schemaQueryExact && caseState.calls[0].singleStepLoad && caseState.calls[1].exactScript,
+    'actual-native-call-order');
+  const search = caseState.results.find(result => result.name === SEARCH);
+  const parent = caseState.results.find(result => result.name === SCRIPT);
+  check(search?.success && search.search?.queryExact && search.search.loadedScript, 'schema-only-search-load');
+  check(parent?.success && parent.selected && !parent.discarded && !caseState.summaryUninspectable,
+    'native-parent-result-uninspectable');
+  check(caseState.collisionEffects === 0 && caseState.routeCalls === 0, 'unexpected-capability-effect');
+  check(caseState.approvals.some(approval => approval.name === SCRIPT && approval.outcome === 'approved')
+    && caseState.approvals.some(approval => approval.name === EFFECT && approval.outcome === 'approved'),
+    'ordinary-script-nested-approval-missing');
+  check(caseState.hooks.filter(hook => hook.event === 'PreToolUse' && hook.name === 'read').length === 2
+    && caseState.hooks.filter(hook => hook.event === 'PostToolUse' && hook.name === 'read' && hook.discarded).length === 2
+    && caseState.hooks.filter(hook => hook.event === 'PreToolUse' && hook.name === EFFECT).length === 1,
+    'actual-nested-hook-observation');
+  const summary = parent.summary;
+  check(summary?.recordsExact && Object.values(summary?.inspection ?? {}).length === 7
+    && Object.values(summary?.inspection ?? {}).every(value => value === true), 'selected-summary-contract');
+  const messages = history.filter(message => message.role === 'tool');
+  const parentMessages = messages.filter(message => message.tool_call_id === parent.id);
+  check(parentMessages.length === 1, 'parent-history-pairing');
+  check(!JSON.stringify(parentMessages).includes(RAW_A) && !JSON.stringify(parentMessages).includes(RAW_B),
+    'discarded-history-leak');
+  const nested = safeNested(parentMessages[0].metadata);
+  check(nested?.complete && equal(nested.calls.map(call => call.name), ['read', 'read', EFFECT]), 'native-nested-records');
+  check(requestFacts.slice(2).some(request => request.toolResults.some(result => result.id === parent.id && result.selected)),
+    'parent-feedback-missing-on-wire');
+  check(requestFacts.every(request => request.toolResults.every(result => !result.discarded
+    && !nested.calls.some(call => call.id === result.id))), 'raw-nested-feedback-on-wire');
+  if (mode === 'allowed') {
+    check(caseState.effects === 1 && fs.readFileSync(path.join(caseState.work, 'effect.txt'), 'utf8') === WRITE_VALUE
+      && summary.written === true && nested.calls.every(call => call.status === 'ok'), 'allowed-os-write-unobserved');
+    check(caseState.hooks.filter(hook => hook.event === 'PostToolUse' && hook.name === EFFECT).length === 1,
+      'nested-write-post-hook-missing');
+  } else {
+    check(caseState.effects === 0 && !fs.existsSync(path.join(caseState.work, 'effect.txt'))
+      && caseState.retryHooks === 1 && summary.rejected === true && summary.retryReason === true
+      && nested.calls[2].status === 'error', 'retry-allowed-custom-effect');
+  }
+  caseState.nested = nested;
+  caseState.parentOnlyFeedback = true;
+  caseState.osOutcomeVerified = true;
+  check(caseState.terminalStatus === 'completed' && typeof answer === 'string' && answer.trim().length > 0
+    && !answer.includes(RAW_A) && !answer.includes(RAW_B),
+    'provider-query-unsettled');
+  caseState.finalSelectedSummary = answer.includes(SELECTED) && answer.includes('alpha') && answer.includes('beta');
+  caseState.requestedAckObserved = answer.includes(ACK);
+  caseState.actualRequests = requestFacts.length; caseState.answerSha256 = hash(answer);
+  caseState.nested = nested; caseState.parentOnlyFeedback = true;
+  caseState.status = 'passed';
+  receipt.providerCases.push(publicCase(caseState));
+  await close(); caseState = undefined;
+}
+function onAnyRequest({ request }) {
+  const origin = String(request.origin);
+  if (!providerActive) rawRequests++;
+  if (counters.create >= MAX_REQUESTS || observations.length >= MAX_REQUESTS) {
+    observerFailure = 'native-request-limit';
+    void session?.abort().catch(() => {});
+  }
+  if (origin !== targetOrigin) {
+    foreignRequests++;
+    observerFailure = 'unexpected-network-destination';
+    void session?.abort().catch(() => {});
+  }
+}
+
+
+async function importCompiled() {
+  stage = 'compiled-controls-import';
+  const symbols = ['createCoreToolRegistry', 'createCodemodeToolDefinition', 'adaptTools',
+    'createToolHooks', 'executeToolBatch', 'HookDispatcher', 'inspectImage', 'sessionModelCatalog', 'classifyProviderFailure'];
+  const artifacts = buildManifest.artifacts.filter(item => item.path.endsWith('.js')).map(item => {
+    const file = path.join(packageRoot, 'dist', item.path), bytes = fs.readFileSync(file);
+    check(hash(bytes) === item.sha256, 'compiled-control-artifact-changed');
+    return { ...item, file, text: bytes.toString('utf8') };
+  });
+  const result = {}, owners = [];
+  for (const symbol of symbols) {
+    const candidates = artifacts.filter(item =>
+      new RegExp('(?:function|class|var) ' + symbol + '[ (=]').test(item.text)
+      && [...item.text.matchAll(/^export \{([\s\S]*?)^\};/gm)].some(match =>
+        match[1].split(',').map(value => value.trim()).includes(symbol)));
+    check(candidates.length === 1, 'compiled-control-symbol-unavailable');
+    const artifact = candidates[0], imported = await import(pathToFileURL(artifact.file).href);
+    check(typeof imported[symbol] === 'function', 'compiled-control-export-unavailable');
+    result[symbol] = imported[symbol];
+    owners.push({ symbol, artifact: artifact.path, sha256: artifact.sha256 });
+  }
+  receipt.compiledControls = { manifestBoundInternalExports: true, publicPackageExportClaim: false, owners };
+  return result;
+}
+function rawHost(name, extra = []) {
+  const work = path.join(root, 'raw-' + name);
+  fs.mkdirSync(work); fs.mkdirSync(path.join(work, '.git'));
+  const sessionId = 'raw-' + name;
+  new sdk.SessionManager().createNewWithId(sessionId, work);
+  const registry = compiled.createCoreToolRegistry();
+  const names = ['read', 'write'];
+  const tools = new Map(names.map(name => [name, registry.get(name)]));
+  for (const tool of extra) tools.set(tool.name, tool);
+  tools.set(SCRIPT, compiled.createCodemodeToolDefinition(() => tools));
+  const hooks = new compiled.HookDispatcher();
+  const events = [], hookEvents = [];
+  for (const event of ['PreToolUse', 'PostToolUse', 'PostToolUseFailure']) hooks.registerInProcessHook({
+    event, name: 'raw-native-observer',
+    handler: payload => {
+      hookEvents.push({ event: payload.eventName, name: payload.toolName, id: payload.toolCallId,
+        outputSha256: hash(payload.output ?? payload.error ?? '') });
+      return { decision: 'allow' };
+    },
+  });
+  return { work, sessionId, tools, hooks, events, hookEvents,
+    gate: { sessionId, workspaceRoot: work, permissionScope: 'allow-all', hooks,
+      modelCatalog: compiled.sessionModelCatalog(work, sessionId, [owner]), emit: event => {
+        events.push({ type: event.type, name: event.toolName, id: event.taskId, outcome: event.outcome });
+      } },
+  };
+}
+async function rawBatch(host, code, signal) {
+  const adapted = compiled.adaptTools(host.tools, host.gate);
+  const batch = await bound(compiled.executeToolBatch(adapted, { role: 'assistant', content: '' },
+    [{ id: 'raw-parent', name: SCRIPT, args: { code } }], compiled.createToolHooks(host.gate, host.tools),
+    'sequential', signal, () => {}), 'raw-batch-timeout', 20000);
+  check(batch.messages.length === 1, 'raw-parent-message-count');
+  return { message: batch.messages[0] };
+}
+function parsedMessage(message) {
+  const text = textOf(message.content);
+  check(text.startsWith('Script completed'), /bounded native media reader is unavailable/i.test(text)
+    ? 'native-media-unavailable' : 'raw-script-failed');
+  return JSON.parse(text.replace(/^Script completed\s*/, ''));
+}
+async function rawScenario(name, run) {
+  stage = 'raw-' + name;
+  check(!receipt.deadline && Date.now() < executionDeadline, 'native-deadline');
+  const before = rawRequests, first = observations.length;
+  try {
+    const value = await run();
+    check(rawRequests === before && observations.length === first, 'raw-provider-network');
+    receipt.rawCases.push({ name, status: 'passed', zeroProviderRequests: true, ...value });
+  } catch (error) {
+    receipt.rawCases.push({ name, status: 'failed', zeroProviderRequests: rawRequests === before,
+      failureCode: error.probeCode ?? 'raw-operation-failed' });
+    throw error;
+  }
+}
+async function rawControls() {
+  await rawScenario('builtin-read-write', async () => {
+    const host = rawHost('read-write');
+    fs.writeFileSync(path.join(host.work, 'input.txt'), 'native file input\n');
+    const code = [
+      'const input = await tools.read({path:"input.txt"});',
+      'const result = await tools.write({path:"output.txt",content:"native file output"});',
+      'return { read: input.includes("native file input"), write: result.includes("output.txt") };',
+    ].join('\n');
+    const { message } = await rawBatch(host, code);
+    check(equal(parsedMessage(message), { read: true, write: true }), 'raw-builtin-result');
+    check(fs.readFileSync(path.join(host.work, 'output.txt'), 'utf8') === 'native file output', 'raw-builtin-os-write');
+    const nested = safeNested(message.metadata);
+    check(nested?.complete && equal(nested.calls.map(call => call.name), ['read', 'write'])
+      && nested.calls.every(call => call.status === 'ok'), 'raw-builtin-nested-metadata');
+    return { builtinDefinitions: true, nativeOsReadWrite: true, nested,
+      outputSha256: hash(textOf(message.content)), hookEvents: host.hookEvents };
+  });
+  await rawScenario('ordinary-deny', async () => {
+    let effects = 0;
+    const tool = { name: EFFECT, description: 'Denied isolated native effect.', argsSchema: effectSchema,
+      execute: async (_args, context) => {
+        effects++; await fs.promises.writeFile(path.join(context.workspaceRoot, 'effect.txt'), WRITE_VALUE);
+        return { success: true, output: WRITE_VALUE };
+      } };
+    const host = rawHost('deny', [tool]);
+    host.gate.denyRules = [{ tool: EFFECT }];
+    const code = 'const result = await Promise.allSettled([tools[' + JSON.stringify(EFFECT)
+      + ']({value:' + JSON.stringify(WRITE_VALUE) + '})]); return {rejected:result[0].status==="rejected"};';
+    const { message } = await rawBatch(host, code);
+    check(parsedMessage(message).rejected === true && effects === 0
+      && !fs.existsSync(path.join(host.work, 'effect.txt')), 'raw-deny-effect');
+    const nested = safeNested(message.metadata);
+    check(nested?.complete && nested.calls[0]?.status === 'error', 'raw-deny-record');
+    return { rejected: true, effects, fileAbsent: true, nested, ordinaryDenyRule: true };
+  });
+  await rawScenario('completed-effect-then-script-failure', async () => {
+    const host = rawHost('completed-failure');
+    const script = compiled.adaptTools(host.tools, host.gate).find(tool => tool.name === SCRIPT);
+    const result = await bound(script.execute('raw-parent', { code:
+      'await tools.write({path:"completed.txt",content:"completed effect"}); throw new Error("after-completed-effect");' }),
+    'raw-completed-effect-timeout', 10000);
+    const text = result.output;
+    check(result.isError && text.includes('after-completed-effect'), 'raw-failed-status-lost');
+    check(fs.readFileSync(path.join(host.work, 'completed.txt'), 'utf8') === 'completed effect',
+      'raw-completed-effect-lost');
+    const nested = safeNested(result.metadata);
+    check(nested?.complete && nested.calls[0]?.status === 'ok', 'raw-completed-effect-record');
+    return { isError: true, completedEffectPreserved: true, nested, outputSha256: hash(text) };
+  });
+  await rawScenario('native-media-read-image', async () => {
+    check(process.platform === 'linux', 'native-media-linux-required');
+    const host = rawHost('media');
+    fs.writeFileSync(path.join(host.work, 'pixel.png'), Buffer.from(PIXEL_DATA, 'base64'));
+    const { message } = await rawBatch(host, 'await image(await tools.read({path:"pixel.png"})); return '
+      + JSON.stringify(IMAGE_ACK) + ';');
+    const text = textOf(message.content);
+    check(!/bounded native media reader is unavailable/i.test(text), 'native-media-unavailable');
+    const images = Array.isArray(message.content)
+      ? message.content.filter(block => block.type === 'image') : [];
+    check(text.includes(IMAGE_ACK) && images.length === 1, 'raw-native-media-published');
+    const dimensions = compiled.inspectImage(images[0]);
+    check(dimensions.widthPx === 1 && dimensions.heightPx === 1
+      && images[0].mimeType === 'image/jpeg' && images[0].data !== PIXEL_DATA, 'raw-native-media-decoder');
+    const nested = safeNested(message.metadata);
+    check(nested?.complete && nested.calls[0]?.name === 'read' && nested.calls[0]?.status === 'ok',
+      'raw-native-media-record');
+    receipt.media = { nativeDecoder: true, providerVision: false, width: 1, height: 1,
+      mimeType: 'image/jpeg', encodedSha256: hash(images[0].data) };
+    return { actualNativeDecoder: true, imagePublished: true, dimensions, imageSha256: hash(images[0].data), nested };
+  });
+  for (const ending of ['timeout', 'parent-cancel']) await rawScenario(ending + '-pending-effect', async () => {
+    const started = held(), release = held(), finished = held();
+    let nestedSignal, effects = 0, settled = false;
+    const target = { name: 'pending_effect', description: 'Native cancellation effect control.',
+      argsSchema: { type: 'object', properties: {} }, execute: async (_args, context) => {
+        context.abortSignal?.throwIfAborted(); effects++;
+        await fs.promises.writeFile(path.join(context.workspaceRoot, 'late.txt'), 'late effect');
+        return { success: true, output: 'late effect' };
+      } };
+    const host = rawHost(ending, [target]);
+    const nativeDispatch = host.hooks.dispatch.bind(host.hooks);
+    host.hooks.dispatch = async (payload, options) => {
+      if (payload.eventName === 'PreToolUse' && payload.toolName === target.name) {
+        nestedSignal = options?.signal; started.resolve();
+        try { await release.promise; } finally { finished.resolve(); }
+      }
+      return nativeDispatch(payload, options);
+    };
+    const parent = new AbortController();
+    const script = compiled.adaptTools(host.tools, host.gate).find(tool => tool.name === SCRIPT);
+    const pendingResult = script.execute('raw-parent', { code: '// @options: {"timeout_ms":500}\n'
+      + 'void tools.pending_effect({}); await new Promise(() => {});' }, parent.signal)
+      .then(result => { settled = true; return result; });
+    void pendingResult.catch(() => {});
+    try {
+      await bound(started.promise, 'raw-effect-start-unobservable', 3000, () => parent.abort());
+      if (ending === 'parent-cancel') parent.abort();
+      await until(() => nestedSignal?.aborted, 'raw-child-lifetime-not-retired', 3000);
+      check(!settled, 'raw-parent-settled-before-child-boundary');
+    } finally {
+      release.resolve();
+      await bound(pendingResult, 'raw-pending-cleanup-unsettled', 5000);
+    }
+    await bound(finished.promise, 'raw-hook-boundary-unsettled', 3000);
+    const result = await bound(pendingResult, 'raw-pending-parent-unsettled', 5000);
+    check(result.isError && effects === 0 && !fs.existsSync(path.join(host.work, 'late.txt')),
+      'raw-retired-effect-survived');
+    check(parent.signal.aborted === (ending === 'parent-cancel'), 'raw-child-cancelled-parent');
+    return { isError: true, effects, childRetired: true, parentWaitedForBoundary: true,
+      parentAborted: parent.signal.aborted, lateFileAbsent: true, outputSha256: hash(result.output) };
+  });
+}
+
+function selectedOwner(raw) {
+  const providers = findNodeAtLocation(parseTree(raw, [], { allowTrailingComma: true }), ['providers']);
+  let found, minimal = false;
+  for (const property of providers?.children ?? []) {
+    const id = property.children?.[0]?.value, node = property.children?.[1];
+    if (typeof id !== 'string' || !node) continue;
+    let entry;
+    try { entry = JSON.parse(raw.slice(node.offset, node.offset + node.length)); }
+    catch {
+      entry = {};
+      for (const field of node.children ?? []) {
+        const key = field.children?.[0]?.value, value = field.children?.[1];
+        if (!value || !['label', 'runtime', 'endpoint', 'auth', 'baseUrl', 'envVar'].includes(key)) continue;
+        try { entry[key] = JSON.parse(raw.slice(value.offset, value.offset + value.length)); } catch {}
+      }
+      if (entry.runtime === selected.provider && entry.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, '')
+        && entry.endpoint && entry.auth) { entry.models = [{ id: selected.model }]; minimal = true; }
+    }
+    if ((entry.runtime ?? id) === selected.provider && entry.baseUrl?.replace(/\/+$/, '') === selected.baseUrl.replace(/\/+$/, '')
+      && entry.models?.some(model => model.id === selected.model)) {
+      check(!found, 'active-configured-catalogue-ambiguous');
+      found = { id, ...entry, models: entry.models.filter(model => model.id === selected.model) };
+    }
+  }
+  check(found, 'active-configured-catalogue-unavailable');
+  receipt.catalogueSetup = { originalActiveSelected: true, isolatedValidObjects: true,
+    minimalConfiguredModelEntry: minimal, originalConfiguredCredentials: true, inventedPrices: false, inventedRemoteLimits: false };
+  return found;
+}
+
+
+async function setup() {
+  ({ checkBuild } = await import(pathToFileURL(path.join(repo, 'scripts/start-lib.mjs')).href));
+  beforeSource = sourceSnapshot();
+  buildManifest = freshBuild();
+  manifestHash = hash(fs.readFileSync(path.join(packageRoot, 'dist/build-manifest.json')));
+  receipt.buildId = buildManifest.buildId; receipt.buildInputsDigest = buildManifest.inputsDigest;
+  receipt.buildManifestSha256 = manifestHash; receipt.source = beforeSource;
+  sdk = await import(pathToFileURL(path.join(packageRoot, 'dist/index.js')).href);
+  check(fs.readFileSync(path.join(packageRoot, 'dist/current.js'), 'utf8').includes(buildManifest.buildId),
+    'sdk-build-identity');
+  configured = sdk.getRuntimeConfig(repo);
+  const realHome = process.env.USERPROFILE || process.env.HOME || os.homedir();
+  const originalStorage = path.join(os.homedir(), '.cheers');
+  for (const name of ['.cheers', '.cheer', '.private-agents', '.coding-agents'])
+    for (const file of ['auth.json', 'config.json', 'models.json', 'models-cache.json', 'hooks.json',
+      'marketplaces.json', 'plugins.json', 'extensions/registry.json']) original(path.join(realHome, name, file));
+  for (const file of ['auth.json', 'config.json', 'models.json', 'models-cache.json'])
+    original(path.join(originalStorage, file));
+  original(path.join(repo, '.cheers.json'));
+  for (const key of ['CHEERS_MARKETPLACES_FILE', 'CHEERS_EXTENSIONS_FILE', 'CHEERS_PLUGINS_FILE',
+    'CHEERS_MODEL_PRESETS_FILE', 'CHEERS_REFRESH_LEASES_FILE', 'CHEERS_BROWSER_RECEIPT_CACHE_MANIFEST']) {
+    if (process.env[key]) original(process.env[key]);
+  }
+  selected = selectedIndex === undefined
+    ? configured.providerConnections.find(connection => connection.id === configured.activeProviderConnectionId)
+    : configured.providerConnections.filter(connection => connection.status === 'connected')[Number(selectedIndex)];
+  check(selected?.status === 'connected' && typeof selected.baseUrl === 'string' && selected.model,
+    'active-configured-target-unavailable');
+  owner = selectedOwner(fs.readFileSync(path.join(originalStorage, 'models.json'), 'utf8'));
+  receipt.configuredTarget = { providerIdSha256: hash(selected.provider), connectionIdSha256: hash(selected.id),
+    modelIdSha256: hash(selected.model), catalogueIdSha256: hash(owner.id),
+    originalActive: selected.id === configured.activeProviderConnectionId, configuredIndex: selectedIndex ?? null };
+  root = fs.mkdtempSync(path.join(directory, 'native-state-')); fs.chmodSync(root, 0o700);
+  workspace = path.join(root, 'work'); storage = path.join(root, 'home', '.cheers');
+  fs.mkdirSync(workspace); fs.mkdirSync(path.join(workspace, '.git'));
+  fs.mkdirSync(storage, { recursive: true, mode: 0o700 });
+  const home = path.dirname(storage);
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: home,
+    GIT_CEILING_DIRECTORIES: root, CHEERS_PROFILE: 'default', CHEERS_PROVIDER_MODE: 'real', CHEERS_REAL_PROVIDER_SMOKE: '1',
+    CHEERS_MARKETPLACES_FILE: path.join(storage, 'marketplaces.json'),
+    CHEERS_EXTENSIONS_FILE: path.join(storage, 'extensions/registry.json'),
+    CHEERS_PLUGINS_FILE: path.join(storage, 'plugins.json'), CHEERS_LOG_DIR: path.join(storage, 'logs') })) env(key, value);
+  for (const key of ['CHEERS_PROFILE_HANDOFF', 'CHEERS_STREAM_TRACE_PATH', 'CHEERS_MODEL_PRESETS_FILE',
+    'CHEERS_REFRESH_LEASES_FILE', 'CHEERS_BROWSER_RECEIPT_CACHE_ROOT', 'CHEERS_BROWSER_RECEIPT_CACHE_MANIFEST',
+    'CHEERS_OFFLINE']) env(key, undefined);
+  fs.writeFileSync(path.join(storage, 'auth.json'), JSON.stringify({ provider: selected.provider,
+    providerCredentials: configured.providerCredentials, providerConnections: configured.providerConnections,
+    activeProviderConnectionId: selected.id, accountPool: configured.accountPool }), { mode: 0o600 });
+  fs.writeFileSync(path.join(storage, 'models.json'), JSON.stringify({ providers: { [owner.id]: owner } }), { mode: 0o600 });
+  const declared = owner.models[0];
+  const limits = [32000, configured.contextWindow, declared.contextWindow].filter(value => Number.isSafeInteger(value) && value > 0);
+  const localWindow = Math.min(...limits);
+  check(localWindow >= 8000, 'bounded-native-limits-unavailable');
+  const output = Math.min(4096, Number.isSafeInteger(declared.maxTokens) && declared.maxTokens > 0 ? declared.maxTokens : 4096);
+  fixtureConfig = { agentMode: 'build', toolDiscovery: 'dynamic', contextWindow: localWindow,
+    maxOutputTokens: output, reserveTokens: 0, maxTurns: 4, compactionEnabled: false,
+    pruneToolText: false, enableMcpTools: false, instructionBudgetBytes: 0, offline: false,
+    retryEnabled: false, retryMaxRetries: 0, providerRetryMaxRetries: 0,
+    cacheWarming: 'off', cacheWarmIntervalSeconds: 0,
+    providerConnectTimeoutMs: 10000, providerHeadersTimeoutMs: 120000, providerBodyTimeoutMs: 120000 };
+  fs.writeFileSync(path.join(storage, 'config.json'), JSON.stringify(fixtureConfig), { mode: 0o600 });
+  receipt.catalogueSetup.localContextWindow = localWindow;
+  receipt.catalogueSetup.localOutputCap = output;
+  receipt.catalogueSetup.publishedContextWindow = declared.contextWindow ?? null;
+  receipt.catalogueSetup.publishedInputLimit = declared.inputLimit ?? null;
+  receipt.catalogueSetup.originalPricesPresent = declared.cost !== undefined;
+  receipt.originalInputsSha256 = hash(JSON.stringify([...originalHashes].map(([file, digest]) => [hash(file), digest]).sort()));
+  targetOrigin = new URL(selected.baseUrl).origin;
+  creating.subscribe(onAnyRequest); creating.subscribe(onCreate); sent.subscribe(onSent);
+  headers.subscribe(onHeaders); trailers.subscribe(onTrailers);
+  executionDeadline = Date.now() + OVERALL_MS;
+  deadline = setTimeout(() => { receipt.deadline = true; void session?.abort().catch(() => {}); }, OVERALL_MS);
+  compiled = await importCompiled();
+}
+try {
+  await setup();
+  if (providerOnly) {
+    const priorFile = path.join(directory, 'native-network-failed.json');
+    const prior = JSON.parse(fs.readFileSync(priorFile, 'utf8'));
+    check(prior.buildId === buildManifest.buildId && prior.source?.sha256 === beforeSource.sha256
+      && prior.sourceUnchanged && prior.originalConfigUnchanged && prior.privateStateRemoved
+      && prior.rawCases.length === 6 && prior.rawCases.every(item => item.status === 'passed' && item.zeroProviderRequests),
+    'retained-raw-controls-stale');
+    receipt.retainedRawControls = { file: 'native-network-failed.json', sha256: hash(fs.readFileSync(priorFile)),
+      passed: prior.rawCases.map(item => item.name), previousActualRequests: prior.actualRequests };
+  } else await rawControls();
+  if (!retryOnly) await providerScenario('allowed');
+  await providerScenario('retry');
+  receipt.providerImage = { status: 'not_run', reason: 'Native decoded image transport was exercised by compiled raw controls.',
+    targetVision: modelEntry?.vision === true || modelEntry?.input?.includes('image') === true };
+  check(foreignRequests === 0 && rawRequests === 0, 'unexpected-network-observation');
+  const current = freshBuild();
+  check(current.buildId === buildManifest.buildId && current.inputsDigest === buildManifest.inputsDigest
+    && hash(fs.readFileSync(path.join(packageRoot, 'dist/build-manifest.json'))) === manifestHash,
+    'build-changed-during-probe');
+  check(sourceSnapshot().sha256 === beforeSource.sha256, 'source-changed-during-probe');
+  check(hash(fs.readFileSync(fileURLToPath(import.meta.url))) === receipt.probeSha256, 'helper-changed-during-probe');
+  receipt.cacheClaim = 'Local system/schema identity only; no provider cache, pricing, capacity or full model-dispatch parity claim.';
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failedStage = stage;
+  const detail = String(error?.message ?? '') + ' ' + (lastFailure ?? '');
+  const providerTransport = stage.startsWith('provider-');
+  receipt.failure = { category: receipt.deadline ? 'deadline'
+    : error.probeCode === 'request-stopped-before-dispatch' ? 'local-request-admission-or-harness'
+    : /native-media-unavailable|native-media-linux-required/.test(error.probeCode ?? '') ? 'native-capability-unavailable'
+    : providerTransport && /429|quota|rate.?limit/i.test(detail) ? 'provider-quota'
+      : providerTransport && /401|403|auth|credential/i.test(lastFailure ?? '') ? 'provider-auth'
+        : providerTransport && /ECONN|EHOST|ENOTFOUND|fetch failed|network|timeout/i.test(detail) ? 'provider-network'
+          : providerTransport && /schema|invalid.*param|unsupported.*param/i.test(lastFailure ?? '') ? 'provider-protocol-or-content'
+            : error.probeCode?.includes('configured') ? 'configured-target-admission'
+              : /actual-native-call|query-unsettled|bounded-native-rounds/.test(error.probeCode ?? '')
+                ? 'provider-behavior-or-probe-contract' : 'product-or-probe-contract',
+    code: error.probeCode ?? 'native-operation-failed' };
+  if (providerTransport && lastFailure && compiled?.classifyProviderFailure) {
+    const projected = compiled.classifyProviderFailure({ message: lastFailure });
+    receipt.failure.closedProviderClass = projected;
+    if (projected === 'provider_rate_limited') receipt.failure.category = 'provider-rate-limited';
+  }
+  receipt.failureLine = String(error?.stack ?? '').match(/native\.mjs:(\d+)/)?.[1] ?? null;
+  if (caseState) receipt.incompleteCase = publicCase(caseState);
+  process.exitCode = 1;
+} finally {
+  clearTimeout(deadline);
+  try { await close(); receipt.cleanupSettled = true; }
+  catch { receipt.cleanupSettled = false; receipt.status = 'failed'; process.exitCode = 1; }
+  creating.unsubscribe(onAnyRequest); creating.unsubscribe(onCreate); sent.unsubscribe(onSent);
+  headers.unsubscribe(onHeaders); trailers.unsubscribe(onTrailers);
+  for (const capture of captures) { capture.outgoing.length = 0; capture.incoming.length = 0; }
+  captures.clear();
+  for (const [key, value] of previousEnv) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  try { if (root) fs.rmSync(root, { recursive: true, force: true }); }
+  catch { receipt.status = 'failed'; process.exitCode = 1; }
+  receipt.privateStateRemoved = !root || !fs.existsSync(root);
+  try {
+    receipt.originalConfigUnchanged = originalHashes.size > 0 ? [...originalHashes].every(([file, before]) =>
+      (fs.existsSync(file) ? hash(fs.readFileSync(file)) : null) === before) : null;
+    receipt.sourceUnchanged = beforeSource ? sourceSnapshot().sha256 === beforeSource.sha256 : null;
+    receipt.buildUnchanged = buildManifest
+      ? hash(fs.readFileSync(path.join(packageRoot, 'dist/build-manifest.json'))) === manifestHash : null;
+  } catch { receipt.originalConfigUnchanged = false; }
+  if (!receipt.privateStateRemoved || receipt.originalConfigUnchanged === false
+    || receipt.sourceUnchanged === false || receipt.buildUnchanged === false) {
+    receipt.status = 'failed'; process.exitCode = 1;
+  }
+  receipt.requests = observations; receipt.observerEvents = counters;
+  receipt.actualRequests = observations.length; receipt.foreignRequests = foreignRequests; receipt.rawNetworkRequests = rawRequests;
+  fs.writeFileSync(path.join(directory, 'native.json'), JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
+  console.log(JSON.stringify({ status: receipt.status, buildId: receipt.buildId,
+    failedStage: receipt.failedStage ?? null, failure: receipt.failure ?? null, actualRequests: receipt.actualRequests,
+    providerCases: receipt.providerCases.map(item => item.name), rawCases: receipt.rawCases.map(item => item.name),
+    privateStateRemoved: receipt.privateStateRemoved, originalConfigUnchanged: receipt.originalConfigUnchanged,
+    sourceUnchanged: receipt.sourceUnchanged, buildUnchanged: receipt.buildUnchanged }));
+}
+

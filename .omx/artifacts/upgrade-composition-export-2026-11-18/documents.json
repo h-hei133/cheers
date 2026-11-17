@@ -1,0 +1,26 @@
+{
+  "HANDOFF.md": {
+    "sha256": "907738a1f4bdf8d1385c0003fd81cd9d00178f9957e54b7f361d857abb00bc4a",
+    "snapshot": "docs/HANDOFF.md.txt"
+  },
+  ".wiki/log.md": {
+    "sha256": "b9a1417838cfeb22ece82783cfd6804a4ca19781ac0f6fb803ac79f502d18367",
+    "snapshot": "docs/.wiki/log.md.txt"
+  },
+  ".wiki/refactor/upgrade/MASTER.md": {
+    "sha256": "292664369b961cd2e60d5b4ee538c6a795394a579b1f0cea47d088c516d33261",
+    "snapshot": "docs/.wiki/refactor/upgrade/MASTER.md.txt"
+  },
+  ".wiki/refactor/upgrade/tasks.md": {
+    "sha256": "1fad28e982025f6955d3c481ec4a81832e786aecaeaa30a3625bb86d01aa6007",
+    "snapshot": "docs/.wiki/refactor/upgrade/tasks.md.txt"
+  },
+  ".wiki/refactor/upgrade/design.md": {
+    "sha256": "e1263a13aac3841dfd0aaa1844bbe9c6995b26c3f6d11b5e0eee637e097944ba",
+    "snapshot": "docs/.wiki/refactor/upgrade/design.md.txt"
+  },
+  ".wiki/refactor/upgrade/summary.md": {
+    "sha256": "b8748bc03cb6f67cc0807a61a86f93c5167e49587a318e970c862bdd5596f3f7",
+    "snapshot": "docs/.wiki/refactor/upgrade/summary.md.txt"
+  }
+}

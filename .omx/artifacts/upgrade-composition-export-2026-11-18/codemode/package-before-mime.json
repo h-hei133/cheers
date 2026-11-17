@@ -1,0 +1,161 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "commands": [
+    {
+      "code": "pack",
+      "exit": 0,
+      "signal": null,
+      "timedOut": false,
+      "overflow": false,
+      "bytes": 429732,
+      "stdoutSha256": "d511108058c262562377c301247d5f415604b14657716ab8fbd865ba9693b1e8",
+      "stderrSha256": "9d609df7ecb995d0eb5d4a09879b96b68d13e5a840e2b39da54ec29267fea2aa"
+    },
+    {
+      "code": "install",
+      "exit": 0,
+      "signal": null,
+      "timedOut": false,
+      "overflow": false,
+      "bytes": 27,
+      "stdoutSha256": "d3986d96a016c59191f8596f248f4f833e69036d3490c796df7ef849fd0cc085",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "code": "strict-types",
+      "exit": 0,
+      "signal": null,
+      "timedOut": false,
+      "overflow": false,
+      "bytes": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "code": "public-native",
+      "exit": 0,
+      "signal": null,
+      "timedOut": false,
+      "overflow": false,
+      "bytes": 154,
+      "stdoutSha256": "072c7cb5a9b89e77a077cc55057f0bd83d32595b3cc77e49a48a9638b7d6fc73",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "helperSha256": "80e997267fb2722a94d556fd1206b34437e2856362155c5ab1aef078f6df1a04",
+  "providerRequests": 0,
+  "boundaries": [
+    "The public direct tool consumer does not prove ordinary permission or hook behavior; native.json owns that evidence."
+  ],
+  "buildId": "b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192",
+  "source": {
+    "files": [
+      {
+        "file": "packages/ts-shell/src/index.ts",
+        "sha256": "a6ef28d898c9bc48717b08ca682e146a073b5d3923bf83550b061e48e0daffb1"
+      },
+      {
+        "file": "packages/ts-shell/src/tools/types.ts",
+        "sha256": "d4afb32f31f98eeac4d51236c264703a51120a29081eac0554fd05bb02a0ab2b"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/catalog.ts",
+        "sha256": "953e011e3ab68e0705656979579e537a217612ec947cdb751c745cdb181ee6fd"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/discovery/state.ts",
+        "sha256": "ebc63d4c7ed9b67f204766ecd6e7a66e10d7b821e9b4f4c9c660e87aa40ac622"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/tool.ts",
+        "sha256": "4403ec624010f45e86c7bae7c38a4ead7d1726797cc7902c4cff9496f32106f5"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/prelude.ts",
+        "sha256": "bf4669c30290e1267838eabbfc1600ae673b38ede985ae234b2b6a79175ef1f9"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/execution.ts",
+        "sha256": "ed9b71d2772f66b570faba4d0ad4c3f5475918abf180cd63030d67d25e27263e"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/image.ts",
+        "sha256": "63b3867038c67c8ff35366610a38968033f40dc923483ad9c88ea50482184da9"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/models.ts",
+        "sha256": "89ae843cdb7712013fbb6efd9b4ce7a3f6cdf8170976583033109ffec4e0ff2f"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/nestedCalls.ts",
+        "sha256": "5e38cfb0433814ea278d0699a026fcddbdbf53d7a80d49651fa82fff5bd604d5"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/declarations.ts",
+        "sha256": "873182669754960da87708d8f57bfda3b7ef83243ff7385331eafa22c202ab2e"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/output.ts",
+        "sha256": "f3275a67764c4c1c57730fc511da9f3d84839f3f33efda5bac15cd8c1bd50841"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/catalog.ts",
+        "sha256": "a6a527b1be724e2bd6808ad74d4ab610571e9e2c41edc869fe63a03e263434b1"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/execution.ts",
+        "sha256": "c5f8d75d83893f67439ec1abe84330eca2b5784040e11489d42c6ea64aab54ba"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/subagent.ts",
+        "sha256": "3bc31537c51d4ef1589652b6139a4aa20e30f026165151fc2130656a48bfdf24"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/session.ts",
+        "sha256": "213852747bf94d6bbc2f59f6b63e63832a2710d6652566e33687a041f69d951f"
+      },
+      {
+        "file": "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts",
+        "sha256": "9cba0dddccacf90149fbb5dfe793a1e169437f034adc70231d10cacd8063c950"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/tools.ts",
+        "sha256": "429b08f174f8c9f23b9e74f07f2f2bdbf262abe84ff38c64e84b183f2ec3eeaf"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/nestedTools.ts",
+        "sha256": "ef2eaf427d4f47f88050c42a6645f1341f8a2114a6b61ffd89b2f38d779e5c3b"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/read.ts",
+        "sha256": "5d7f3a04b4367a3d8bb43e0d954e6b291c3a5d69cbfeeaf3b1294a7a01c46388"
+      },
+      {
+        "file": "packages/ts-shell/src/runtime/execution/media/image.ts",
+        "sha256": "4e551f8e2ed6559824bc87083d0d91027bf51bdf7f2047a29df6f938d9c147f5"
+      }
+    ],
+    "sha256": "69035fe3d0c6d36aeffed73501ce59533f161592d7cb512abb8eef97c1c567af"
+  },
+  "retainedInstallation": {
+    "file": "package-types-failed.json",
+    "sha256": "cd3a977df656a9c8fa82a19e497f02394a56610ae2310ec8b5ef2edf16f49d29"
+  },
+  "packageSha256": "a15c7f70168b84cef2d8069d8ff229a1d7ffc924759d51763efed061d78e21d5",
+  "strictInstalledTypes": true,
+  "publicEntries": 15,
+  "native": {
+    "status": "passed",
+    "publicEntries": 15,
+    "providerRequests": 0,
+    "actualReadWrite": true,
+    "nestedCalls": 3,
+    "immutableCapturedModels": true,
+    "mediaDeclaration": true
+  },
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "privateStateRemoved": true
+}

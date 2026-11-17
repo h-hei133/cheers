@@ -1,0 +1,38 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/core/tools/codemode/models.test.ts (4 tests | 1 failed | 3 skipped) 48ms
+   ↓ native model metadata inside the actual script worker > uses the captured physical and virtual catalogue despite ambient replacements
+   ↓ native model metadata inside the actual script worker > does not reload ambient models for an explicitly empty native catalogue
+   × native model metadata inside the actual script worker > keeps model records and all nested metadata immutable across list/get mutation attempts 47ms
+     → expected false to be true // Object.is equality
+   ↓ native model metadata inside the actual script worker > publishes only inert public metadata without provider secrets or route capabilities
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  23:23:52
+   Duration  1.06s (transform 519ms, setup 0ms, collect 795ms, tests 48ms, environment 0ms, prepare 58ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-model-immutable.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/models.test.ts > native model metadata inside the actual script worker > keeps model records and all nested metadata immutable across list/get mutation attempts
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/core/tools/codemode/models.test.ts:142:30
+    140|           selected.thinkingLevelMap, selected.serviceTiers, logical, l…
+    141|     `, modelCatalog)
+    142|     expect(result.unchanged).toBe(true)
+       |                              ^
+    143|     expect(result.forged).toBeNull()
+    144|     expect(result.frozen).toEqual(Array.from({ length: 13 }, () => tru…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

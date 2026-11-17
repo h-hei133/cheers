@@ -1,0 +1,75 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/core/tools/codemode/output.test.ts (19 tests | 3 failed | 16 skipped) 101ms
+   ↓ bounded feedback from the actual script worker > renders separate text and console output with actual line endings
+   × bounded feedback from the actual script worker > bounds top-level return together with the final status and notice 41ms
+     → expected 642 to be less than or equal to 256
+   × bounded feedback from the actual script worker > bounds multibyte text together with the final status and notice 27ms
+     → expected 808 to be less than or equal to 256
+   × bounded feedback from the actual script worker > bounds combined text, console and return together with the final status and notice 31ms
+     → expected 661 to be less than or equal to 256
+   ↓ bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: text("界".repeat(2000));
+   ↓ bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: return "界".repeat(2000);
+   ↓ validated images retained by the actual script worker > keeps a complete image total within both existing media limits
+   ↓ validated images retained by the actual script worker > omits repeated images after four, with bounded feedback metadata
+   ↓ validated images retained by the actual script worker > enforces the encoded aggregate limit before the four-image count is reached
+   ↓ validated images retained by the actual script worker > rejects a complete individually oversized image before retaining a valid successor
+   ↓ validated images retained by the actual script worker > rejects PNG signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects JPEG signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects GIF signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects WebP signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged object MIME before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged data URI MIME before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged image_url MIME before retention and still accepts complete bytes
+   ↓ builtin read results through the real tool gate and worker > keeps text-only nested read results compatible with string consumers
+   ↓ builtin read results through the real tool gate and worker > forwards inert image-bearing read results into published model feedback
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 16 skipped (19)
+   Start at  23:24:03
+   Duration  2.90s (transform 1.64s, setup 0ms, collect 2.58s, tests 101ms, environment 0ms, prepare 53ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-output-budget.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/output.test.ts > bounded feedback from the actual script worker > bounds top-level return together with the final status and notice
+AssertionError: expected 642 to be less than or equal to 256
+ ❯ assertBoundedFeedback src/core/tools/codemode/output.test.ts:56:45
+     54|   const output = feedback(result)
+     55|   expect(output).toMatch(new RegExp(`^${status}`))
+     56|   expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(SMALL_…
+       |                                             ^
+     57|   expect(output).not.toContain('\uFFFD')
+     58|   const message = createToolResultMessage('script-owner', output, resu…
+ ❯ src/core/tools/codemode/output.test.ts:111:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/core/tools/codemode/output.test.ts > bounded feedback from the actual script worker > bounds multibyte text together with the final status and notice
+AssertionError: expected 808 to be less than or equal to 256
+ ❯ assertBoundedFeedback src/core/tools/codemode/output.test.ts:56:45
+     54|   const output = feedback(result)
+     55|   expect(output).toMatch(new RegExp(`^${status}`))
+     56|   expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(SMALL_…
+       |                                             ^
+     57|   expect(output).not.toContain('\uFFFD')
+     58|   const message = createToolResultMessage('script-owner', output, resu…
+ ❯ src/core/tools/codemode/output.test.ts:111:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/core/tools/codemode/output.test.ts > bounded feedback from the actual script worker > bounds combined text, console and return together with the final status and notice
+AssertionError: expected 661 to be less than or equal to 256
+ ❯ assertBoundedFeedback src/core/tools/codemode/output.test.ts:56:45
+     54|   const output = feedback(result)
+     55|   expect(output).toMatch(new RegExp(`^${status}`))
+     56|   expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(SMALL_…
+       |                                             ^
+     57|   expect(output).not.toContain('\uFFFD')
+     58|   const message = createToolResultMessage('script-owner', output, resu…
+ ❯ src/core/tools/codemode/output.test.ts:111:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

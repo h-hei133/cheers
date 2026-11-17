@@ -1,9 +1,14 @@
 import { findCodeSpan } from "./codeSpan.js";
+import { matchEmphasis, type EmphasisMatch, type EmphasisStyle } from "./emphasis.js";
 
 export interface InlineRenderers {
   readonly renderCode: (code: string) => string;
   readonly renderText: (text: string) => string;
   readonly renderLink: (label: string, href: string, context: InlineContext) => string;
+  readonly renderEmphasis?: (text: string, style: EmphasisStyle) => string;
+  readonly renderEscape?: (character: string) => string;
+  /** Enabled by a renderer only where newlines and explicit table breaks belong. */
+  readonly renderBreak?: () => string;
   /** Find one math token at `start`; callers own the bounded parser. */
   readonly findMath?: (start: number) => { readonly end: number; readonly text: string } | undefined;
   readonly renderMath?: (text: string) => string;
@@ -18,9 +23,16 @@ const ROOT_CONTEXT: InlineContext = Object.freeze({ depth: 0, allowLinks: true }
 const MAX_INLINE_BYTES = 64 * 1024;
 const MAX_INLINE_DEPTH = 8;
 const MAX_LINK_HREF_CHARS = 4096;
+const ESCAPABLE = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_{|}~]/;
+
+interface InlineToken {
+  readonly start: number;
+  readonly end: number;
+  readonly rendered: string;
+}
 
 /**
- * Transform top-level inline links and code spans in source order.
+ * Transform inline spans from their original source positions.
  *
  * Code spans are recognized before links, so link-like text inside code stays
  * literal. A link label is passed back to the renderer as source text, allowing
@@ -35,24 +47,19 @@ export function transformInline(
   if (!inlineWithinBudget(text, context)) {
     return render.renderText(text);
   }
-  const tokens: string[] = [];
-  const prefix = uniqueMarkerPrefix(text);
+  const tokens: InlineToken[] = [];
   const delimiters = context.allowLinks ? matchDelimiters(text) : undefined;
-  let tokenized = "";
-  let cursor = 0;
+  const explicitBreak = /<br\s*\/?>/iy;
   let index = 0;
-  const addToken = (rendered: string): void => {
-    tokenized += text.slice(cursor, index);
-    tokens.push(rendered);
-    tokenized += `${prefix}${tokens.length - 1}\uE001`;
+  const addToken = (end: number, rendered: string): void => {
+    tokens.push({ start: index, end, rendered });
+    index = end;
   };
   while (index < text.length) {
     if (text[index] === "`") {
       const span = findCodeSpan(text, index);
       if (span) {
-        addToken(render.renderCode(text.slice(index + span.run, span.close)));
-        index = span.end;
-        cursor = span.end;
+        addToken(span.end, render.renderCode(text.slice(index + span.run, span.close)));
         continue;
       }
       index += backtickRun(text, index);
@@ -61,30 +68,76 @@ export function transformInline(
     if (render.findMath && (text[index] === "$" || text[index] === "\\")) {
       const math = render.findMath(index);
       if (math) {
-        addToken(render.renderMath ? render.renderMath(math.text) : math.text);
-        index = math.end;
-        cursor = index;
+        addToken(math.end, render.renderMath ? render.renderMath(math.text) : math.text);
         continue;
+      }
+    }
+    if (text[index] === "\\") {
+      const escaped = text[index + 1];
+      // Unclosed formulas stay visible while the next streaming chunk arrives.
+      // Their openers belong to math even when no complete projection exists.
+      if (render.findMath && (escaped === "(" || escaped === "[")) {
+        addToken(index + 2, render.renderText(text.slice(index, index + 2)));
+        continue;
+      }
+      if (escaped && escaped !== "`" && ESCAPABLE.test(escaped)) {
+        addToken(index + 2, render.renderEscape ? render.renderEscape(escaped) : render.renderText(escaped));
+        continue;
+      }
+      // Escaped backticks retain the established literal-source contract.
+      if (escaped === "`") { index += 2; continue; }
+    }
+    if (render.renderBreak) {
+      if (text[index] === "\n" || text.slice(index, index + 2) === "\r\n") {
+        addToken(index + (text[index] === "\r" ? 2 : 1), render.renderBreak());
+        continue;
+      }
+      if (text.slice(index, index + 3).toLowerCase() === "<br") {
+        explicitBreak.lastIndex = index;
+        const lineBreak = explicitBreak.exec(text);
+        if (lineBreak) { addToken(explicitBreak.lastIndex, render.renderBreak()); continue; }
       }
     }
     if (context.allowLinks && text[index] === "[") {
       const close = delimiters!.brackets.get(index);
       const link = close === undefined ? undefined : parseLink(text, index, close, delimiters!.parentheses);
       if (link) {
-        addToken(render.renderLink(link.label, link.href, {
+        addToken(link.end, render.renderLink(link.label, link.href, {
           depth: context.depth + 1,
           allowLinks: false,
         }));
-        index = link.end;
-        cursor = index;
         continue;
       }
     }
     index++;
   }
-  tokenized += text.slice(cursor);
-  const marker = new RegExp(`${prefix}(\\d+)\uE001`, "g");
-  return render.renderText(tokenized).replace(marker, (_match, tokenIndex: string) => tokens[Number(tokenIndex)]!);
+  return renderTokens(text, tokens, render.renderEmphasis ? matchEmphasis(text, tokens) : [], render, context);
+}
+
+function renderTokens(text: string, tokens: readonly InlineToken[], matches: readonly EmphasisMatch[],
+  render: InlineRenderers, context: InlineContext): string {
+  const opaque = new Map(tokens.map(token => [token.start, token]));
+  const openings = new Map(matches.map(match => [match.openStart, match]));
+  const range = (start: number, end: number, depth: number): string => {
+    if (context.depth + depth > MAX_INLINE_DEPTH) return render.renderText(text.slice(start, end));
+    const parts: string[] = [];
+    let index = start;
+    while (index < end) {
+      const token = opaque.get(index);
+      if (token) { parts.push(token.rendered); index = token.end; continue; }
+      const match = openings.get(index);
+      if (match && match.closeEnd <= end) {
+        parts.push(render.renderEmphasis!(range(match.openEnd, match.closeStart, depth + 1), match.style));
+        index = match.closeEnd;
+        continue;
+      }
+      const plain = index++;
+      while (index < end && !opaque.has(index) && !openings.has(index)) index++;
+      parts.push(render.renderText(text.slice(plain, index)));
+    }
+    return parts.join("");
+  };
+  return range(0, text.length, 0);
 }
 
 export function inlineWithinBudget(text: string, context: InlineContext = ROOT_CONTEXT): boolean {
@@ -154,14 +207,4 @@ function backtickRun(text: string, start: number): number {
   let run = 1;
   while (text[start + run] === "`") run++;
   return run;
-}
-
-function uniqueMarkerPrefix(text: string): string {
-  const used = new Set(text);
-  for (let codePoint = 0xE000; codePoint <= 0x10FFFF; codePoint++) {
-    if (codePoint >= 0xD800 && codePoint <= 0xDFFF) continue;
-    const candidate = String.fromCodePoint(codePoint);
-    if (!used.has(candidate)) return candidate;
-  }
-  throw new Error("Inline text exhausted the Unicode marker space.");
 }

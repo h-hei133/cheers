@@ -1,0 +1,2 @@
+{"name":"image-mime","status":"passed","failedTests":3,"assertionFailures":3,"restoredExactly":true}
+{"status":"passed","cases":12,"restoredExactly":true,"mainSourceMatches":true,"isolatedTreeRemoved":true,"restoredTests":96}

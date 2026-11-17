@@ -1,0 +1,227 @@
+{
+  "status": "passed",
+  "mainSourcesMutated": false,
+  "cases": [
+    {
+      "name": "bootstrap-private",
+      "file": "packages/ts-shell/src/core/tools/codemode/prelude.ts",
+      "sourceSha256": "bf4669c30290e1267838eabbfc1600ae673b38ede985ae234b2b6a79175ef1f9",
+      "reversedSha256": "b251a70ae5777a39200183d78230accc5471ddc1930f037a86ed8a17477f74a0",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 3,
+      "assertionFailures": 3,
+      "failedNames": [
+        "actual worker bridge admission keeps bootstrap transport, registrars and limits out of the script global",
+        "actual worker bridge admission follows the real script failure after a forged terminal attempt",
+        "actual worker bridge admission cannot bypass host bounds with the bootstrap sender"
+      ],
+      "reportSha256": "21555905c7f5056c6181d0cc97d681ee4de05b31e23f1e4ff6c0a4b25db41bd7",
+      "logSha256": "ed2f7601bd8bb88d72ec08e6f0035a85e5911efb5125b29ccfe887b76211bfe8",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "nested-retirement",
+      "file": "packages/ts-shell/src/core/tools/codemode/execution.ts",
+      "sourceSha256": "ed9b71d2772f66b570faba4d0ad4c3f5475918abf180cd63030d67d25e27263e",
+      "reversedSha256": "1d94b184202faeecdad9c85276f41426dd706d745d5779d3e955d6ee906bd8ac",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 2,
+      "assertionFailures": 2,
+      "failedNames": [
+        "script-owned nested settlement through the actual gate retires a pending effect on return and waits for the real boundary to settle",
+        "script-owned nested settlement through the actual gate retires a pending effect on timeout and waits for the real boundary to settle"
+      ],
+      "reportSha256": "82e0cffc9b6bab6a9a0a60b318957c172d27c08032dba40849a43b3f7368aabc",
+      "logSha256": "5b9853ba9011ea8b92d4e9ab6fee5fb92619bf006b877330d720de3a493e3004",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "caller-catalog",
+      "file": "packages/ts-shell/src/core/tools/catalog.ts",
+      "sourceSha256": "953e011e3ab68e0705656979579e537a217612ec947cdb751c745cdb181ee6fd",
+      "reversedSha256": "19e0e7e5df6abecdd2a89e2eb5780549eb3ada616291fa670ea87c278edeec46",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 2,
+      "assertionFailures": 2,
+      "failedNames": [
+        "the composed catalog consumed by the actual codemode worker keeps mutable caller definitions isolated across catalog composition",
+        "the composed catalog consumed by the actual codemode worker keeps frozen caller definitions isolated across catalog composition"
+      ],
+      "reportSha256": "7f525b7f162fc89d09b3658af2beae971dffd3110426ce9c84fd0582ab17f11b",
+      "logSha256": "200a35f23caa81be70b13b1c7a75a4f5fd1ea99213e8f4ca8e6f91890ab8b189",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "deferred-catalog",
+      "file": "packages/ts-shell/src/core/tools/catalog.ts",
+      "sourceSha256": "953e011e3ab68e0705656979579e537a217612ec947cdb751c745cdb181ee6fd",
+      "reversedSha256": "6798b5f99e6f05590d5556dd679c64cfef6df2b3b7d5861d95ad5f1f536c14a7",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 2,
+      "assertionFailures": 2,
+      "failedNames": [
+        "the composed catalog consumed by the actual codemode worker calls an admitted deferred tool without loading its outer schema through the adapted consumer",
+        "the composed catalog consumed by the actual codemode worker calls an admitted deferred tool without loading its outer schema through the direct consumer"
+      ],
+      "reportSha256": "63bfb08a9f1223667267e311657ce6e7567955646d05dbe8960206c18ca3b718",
+      "logSha256": "89567b61ba94fadaa47d44197e24f29336185fb9c02a1ed124ff20b2d9200fbc",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "deferred-guard",
+      "file": "packages/ts-shell/src/core/tools/catalog.ts",
+      "sourceSha256": "953e011e3ab68e0705656979579e537a217612ec947cdb751c745cdb181ee6fd",
+      "reversedSha256": "6a1f31eb38fe6b9decdea61177d994011e0c30f9a9d0a5b46e7b9c5380e6b547",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 2,
+      "assertionFailures": 2,
+      "failedNames": [
+        "captured nested contracts in the real composed gate settles 'schema mutation' with deferred=true before the captured effect",
+        "captured nested contracts in the real composed gate settles 'definition replacement' with deferred=true before the captured effect"
+      ],
+      "reportSha256": "de27b8e3cfcaaf2e985e35a2ab4ce6c7a7592979a46feff638608b271e4c1c30",
+      "logSha256": "67ed7bac2a80e3c6514ff6b6b3c7e1c4e270bfb3da340c13057285eb0e1cf58b",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "outer-order",
+      "file": "packages/ts-shell/src/turn/execution.ts",
+      "sourceSha256": "c5f8d75d83893f67439ec1abe84330eca2b5784040e11489d42c6ea64aab54ba",
+      "reversedSha256": "02eaad77c4a0254a5de9d59863daf1f047c74c85f805fc5c37e23599bd515630",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 1,
+      "assertionFailures": 1,
+      "failedNames": [
+        "nested execution policy through adapted tools serializes separate outer scripts that may contain ordered effects"
+      ],
+      "reportSha256": "6f739b95c2cb137f49b76dbe7365dd8ec0d18eb6b8636ffe1c2e6f555adaef76",
+      "logSha256": "d069db16753b48aa9db30f7b4802c056843da74ab378422b313ad2c43bc4ca2b",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "child-boundary",
+      "file": "packages/ts-shell/src/turn/subagent.ts",
+      "sourceSha256": "3bc31537c51d4ef1589652b6139a4aa20e30f026165151fc2130656a48bfdf24",
+      "reversedSha256": "15f44742c3ca4cbe1c780a513c17517d166e31525addd4a73f56394182d73cc7",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 2,
+      "assertionFailures": 2,
+      "failedNames": [
+        "keeps the declared allowlist effective in an actual child script",
+        "keeps the declared denylist effective in an actual child script"
+      ],
+      "reportSha256": "e080cc3707e5bf668f7eeb5cb5c82ecbe0a2ab99a6881a385a8a8c26ab982875",
+      "logSha256": "65fe970f7fdb9998614033805db2ad248f7ca04e9f631962e5511940e477e183",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "model-immutable",
+      "file": "packages/ts-shell/src/core/tools/codemode/prelude.ts",
+      "sourceSha256": "bf4669c30290e1267838eabbfc1600ae673b38ede985ae234b2b6a79175ef1f9",
+      "reversedSha256": "f8473d6ca54bacd0824aac538f88b20ae7372beed291abace720971bddbc57cb",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 1,
+      "assertionFailures": 1,
+      "failedNames": [
+        "native model metadata inside the actual script worker keeps model records and all nested metadata immutable across list/get mutation attempts"
+      ],
+      "reportSha256": "0a0b7afee7b3888cf1dc55cf5ae52c6a63fd3063f257f225aa9dd90e2761c8fb",
+      "logSha256": "b51c47597c733a25c0bd9194ab99f93c0e351471f5350e6decc745408123b490",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "image-result",
+      "file": "packages/ts-shell/src/core/tools/codemode/nestedCalls.ts",
+      "sourceSha256": "5e38cfb0433814ea278d0699a026fcddbdbf53d7a80d49651fa82fff5bd604d5",
+      "reversedSha256": "7e8589f9fac8dde92b4fa84112f7f090edac62a53d001cbb8d964aefb1741759",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 1,
+      "assertionFailures": 1,
+      "failedNames": [
+        "builtin read results through the real tool gate and worker forwards inert image-bearing read results into published model feedback"
+      ],
+      "reportSha256": "7f46f3cc248057a068607409ee505485ffe1477b192725bd1c01d53f14020a7c",
+      "logSha256": "71ac15c9f911ca104f7a008995123d19c0926c3cd37b73bdb17d7c6cf1142f2d",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "result-declaration",
+      "file": "packages/ts-shell/src/core/tools/codemode/declarations.ts",
+      "sourceSha256": "873182669754960da87708d8f57bfda3b7ef83243ff7385331eafa22c202ab2e",
+      "reversedSha256": "a5924998235cd47a5f351c6ffc45fc37483c8aa1a287f08bcd30d46d7e6101d3",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 1,
+      "assertionFailures": 1,
+      "failedNames": [
+        "declares both actual read result shapes and requires narrowing before string operations"
+      ],
+      "reportSha256": "a4b58f9e23a4873de244d1e07eab2357a7d32d5477fe252a52afbd0fde177f1e",
+      "logSha256": "7d4c8154824f78f7df2fcb92ff2143ac7e5abafa113a9f80bbc4d86b9735e1b7",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "output-budget",
+      "file": "packages/ts-shell/src/core/tools/codemode/output.ts",
+      "sourceSha256": "f3275a67764c4c1c57730fc511da9f3d84839f3f33efda5bac15cd8c1bd50841",
+      "reversedSha256": "77148341d91dae8038b60eee3dff69b120cbc405f69cb4012ec6d469c71f8837",
+      "exitCode": 1,
+      "signal": null,
+      "passedTests": 0,
+      "failedTests": 3,
+      "assertionFailures": 3,
+      "failedNames": [
+        "bounded feedback from the actual script worker bounds top-level return together with the final status and notice",
+        "bounded feedback from the actual script worker bounds multibyte text together with the final status and notice",
+        "bounded feedback from the actual script worker bounds combined text, console and return together with the final status and notice"
+      ],
+      "reportSha256": "8571a30339518c32469050b0e5fa6288630d163ce4c52301d076b317d3a4c082",
+      "logSha256": "3e8516128da61b4673bf66bf03c27e97b7b3f446cf739dd1df722693f73192fd",
+      "restoredExactly": true,
+      "status": "passed"
+    }
+  ],
+  "restoredValidation": {
+    "exitCode": 0,
+    "signal": null,
+    "passedTests": 93,
+    "failedTests": 0,
+    "assertionFailures": 0,
+    "failedNames": [],
+    "reportSha256": "7e71242463680f0afc3d55cc5c62b6a1fa7810be8237f2df86efd5ddea1445bc",
+    "logSha256": "16f69b4025cc9b852d9be924274fe07904b77d4cc9047e8916ea3f4f2fe1fe47"
+  },
+  "restoredExactly": true,
+  "mainSourceMatches": true,
+  "mainSourceSha256": "5654a57d82ea52e8155d5d42ee9237061e3e2db99f44d0e33825d9c912c151b4",
+  "isolatedTreeRemoved": true
+}

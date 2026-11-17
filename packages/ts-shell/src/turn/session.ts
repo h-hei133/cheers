@@ -45,6 +45,7 @@ import type { TelemetryContext } from '../observability/tracing/types.js';
  */
 
 export interface TurnOptions {
+  readonly modelCatalog?: ToolGateOptions['modelCatalog'];
   /** Optional recorder; CLI and SDK runs otherwise use their captured log owner. */
   readonly telemetry?: TelemetryContext;
   readonly configScope?: ToolGateOptions['configScope'];
@@ -169,13 +170,6 @@ export interface TurnRun extends TurnInput {
   readonly events: AsyncIterable<QueryEvent>;
 }
 
-/** Tools whose calls must not interleave: each one changes what the next sees. */
-// Tools whose calls must not overlap. `task` and `team` are here because each
-// one runs a subagent loop of its own: nothing counts how many of those are
-// live at once, so two calls in one step would double the model requests
-// without any budget noticing.
-const SEQUENTIAL_TOOLS = new Set(["bash", "write", "edit", 'apply_patch', "task", "team", "browser"]);
-
 export { requestPurposeFor } from './request.js';
 
 /**
@@ -192,6 +186,7 @@ function gateOptionsFor(
 ): ToolGateOptions {
   return {
     configScope: options.configScope,
+    modelCatalog: options.modelCatalog,
     admission: options.admission,
     correlationId: options.correlationId,
     commandProof: options.commandProof,
@@ -238,9 +233,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     ...(options.steeringMode ? { steeringMode: options.steeringMode } : {}),
     ...(options.followUpMode ? { followUpMode: options.followUpMode } : {}),
     ...(options.retry ? { retry: options.retry } : {}),
-    tools: () => adaptTools(toolPool(), gate).map((tool) =>
-      SEQUENTIAL_TOOLS.has(tool.name) ? { ...tool, executionMode: "sequential" as const } : tool,
-    ),
+    tools: () => adaptTools(toolPool(), gate),
     beforeToolCall: hooks.beforeToolCall,
     afterToolCall: hooks.afterToolCall,
     streamStep: createTurnRequest({ ...options, prepareContext: compaction?.prepareContext,

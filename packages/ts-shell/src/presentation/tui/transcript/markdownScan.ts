@@ -12,6 +12,7 @@
  * neither renderer's concerns appear here.
  */
 import { MATH_ENVIRONMENTS } from "./math.js";
+import { tableAlignments, type TableAlignment } from "./table.js";
 
 /** One line that carries no structure of its own. */
 export interface TextBlock {
@@ -49,6 +50,7 @@ export interface TableBlock {
   readonly kind: "table";
   readonly header: string;
   readonly rows: readonly string[];
+  readonly alignments: readonly TableAlignment[];
   readonly sourceStart: number;
   readonly sourceEnd: number;
 }
@@ -72,6 +74,7 @@ export interface ListBlock {
   readonly indent: string;
   readonly marker: string;
   readonly text: string;
+  readonly task?: { readonly checked: boolean; readonly text: string };
   readonly sourceStart: number;
   readonly sourceEnd: number;
 }
@@ -96,11 +99,9 @@ export type MarkdownBlock =
 const FENCE = /^\s*(`{3,}|~{3,})\s*([\w+-]*)\s*$/;
 const HEADING = /^(#{1,6})\s+(.*)$/;
 const BULLET = /^(\s*)([-*+])\s+(.*)$/;
-const ORDERED = /^(\s*)(\d+)[.)]\s+(.*)$/;
+const ORDERED = /^(\s*)(\d{1,9})[.)]\s+(.*)$/;
 const QUOTE = /^\s*>\s?(.*)$/;
 const RULE = /^\s*([-*_])\1{2,}\s*$/;
-const TABLE_ROW = /^\s*\|(.+)\|\s*$/;
-const TABLE_RULE = /^\s*\|[\s:|-]+\|\s*$/;
 
 /**
  * `text` as blocks, in order.
@@ -170,24 +171,26 @@ export function scanBlocks(text: string): readonly MarkdownBlock[] {
       break;
     }
 
-    if (TABLE_ROW.test(line) && TABLE_RULE.test(lines[index + 1] ?? "")) {
+    const alignments = tableAlignments(line, lines[index + 1] ?? "");
+    if (alignments) {
       const rows: string[] = [];
       let cursor = index + 2;
-      while (cursor < lines.length && TABLE_ROW.test(lines[cursor]!)) {
+      while (cursor < lines.length && lines[cursor]!.trim() !== "" && lines[cursor]!.includes("|")) {
         rows.push(lines[cursor]!);
         cursor += 1;
       }
-      blocks.push({ kind: "table", header: line, rows, sourceStart, sourceEnd: cursor - 1 });
+      blocks.push({ kind: "table", header: line, rows, alignments, sourceStart, sourceEnd: cursor - 1 });
       index = cursor;
       continue;
     }
 
     const fence = FENCE.exec(line);
     if (fence) {
-      const closing = fence[1]!;
+      const marker = fence[1]!;
+      const closing = new RegExp(`^[ \\t]*${marker[0]}{${marker.length},}[ \\t]*\\r?$`);
       const body: string[] = [];
       index += 1;
-      while (index < lines.length && !lines[index]!.trimStart().startsWith(closing)) {
+      while (index < lines.length && !closing.test(lines[index]!)) {
         body.push(lines[index]!);
         index += 1;
       }
@@ -213,7 +216,9 @@ export function scanBlocks(text: string): readonly MarkdownBlock[] {
 
     const bullet = BULLET.exec(line);
     if (bullet) {
-      blocks.push({ kind: "list", indent: bullet[1]!, marker: bullet[2]!, text: bullet[3]!, sourceStart, sourceEnd: index });
+      const task = /^\[([ xX])\][ \t]+(.*)$/.exec(bullet[3]!);
+      blocks.push({ kind: "list", indent: bullet[1]!, marker: bullet[2]!, text: bullet[3]!,
+        ...(task ? { task: { checked: task[1]!.toLowerCase() === "x", text: task[2]! } } : {}), sourceStart, sourceEnd: index });
       index += 1;
       continue;
     }

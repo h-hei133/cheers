@@ -1,0 +1,38 @@
+{
+  "reviewer": "export_final_audit",
+  "status": "FIXED",
+  "scope": "limited_approve",
+  "findings": [
+    {
+      "severity": "P2",
+      "finding": "Nested terminal italic and strike resets closed their outer attribute.",
+      "resolution": "Reuse existing scoped applyStyles; theme implementation unchanged.",
+      "counterexample": "codemode/review-boundary-red.json",
+      "reversal": "codemode/review-reversal.json"
+    }
+  ],
+  "sources": {
+    "packages/ts-shell/src/session/export/collect.ts": "d32923b6d29d1445d204b15ec326387b2b8ce7d130803be26fc11f46e3060940",
+    "packages/ts-shell/src/session/export/html.ts": "0a1bf113b39bba9807a69a46b76197d2f195c2943009febc7527585bb6e23ed3",
+    "packages/ts-shell/src/session/export/htmlRender.ts": "f5780ca021176108cf0d569e7f71f8714c2e7482740da6180958e5db3b338738",
+    "packages/ts-shell/src/session/export/model.ts": "112772351cfcad41f9d098b2a6fa321db277ded672cf1ba57fce7f96df8f4efd",
+    "packages/ts-shell/src/session/export/sanitize.ts": "90f19e767f97e704d0d9f058942de5676d5fb443dfca0abb937422e8d804f5ee",
+    "packages/ts-shell/src/session/export/template.ts": "35bfeb0e80cf54189e20b4120e1e54cb065af2f5bfbaa05ca1846e3e902259a7",
+    "packages/ts-shell/src/session/export/media.ts": "62d1e03cc6a430db8bebace5f83c9e2a24ae28a7ff757fc0d6430b87c830fbfb",
+    "packages/ts-shell/src/presentation/tui/text/inline.ts": "e35ca76219a8e33c45f3e78ed86799ac3162514a079b69decda3d607009ff619",
+    "packages/ts-shell/src/presentation/tui/text/emphasis.ts": "328b6960b1ba56451e921b898ac6d21c82f1f881dfba37a75985002a6cda44be",
+    "packages/ts-shell/src/presentation/tui/transcript/inline.ts": "5b92e2981aae235be28f6b1c5ac3af19b469d7fa1afe3c8d05541b1e16b85934",
+    "packages/ts-shell/src/presentation/tui/transcript/markdown.ts": "b77803cbb79ce487992e8847c7e5d1577cc43848432311b3087e129487586abb",
+    "packages/ts-shell/src/presentation/tui/transcript/markdownScan.ts": "73d8f5f2e6a710ddfceb4dd4094841c963dbe161eac0ab0ff0f0c33ceff3ab49",
+    "packages/ts-shell/src/presentation/tui/transcript/table.ts": "0f7330d2356aee95e46996799ac8a3b9d7377fc2f75058351d435957618540ae",
+    "packages/ts-shell/src/presentation/theme/theme.ts": "9755ca0e132f2e36b4df2f7d077fd4bc58ba83d8defbfa2f313b94b5e2fc89fc"
+  },
+  "productionTestsRunByReviewer": false,
+  "boundaries": [
+    "Full GFM remains an open task.",
+    "No review of shared inspector, math, codeSpan and link internals.",
+    "theme.ts final fix is an export-only change to the existing style owner."
+  ],
+  "finalFixSha256": "5b92e2981aae235be28f6b1c5ac3af19b469d7fa1afe3c8d05541b1e16b85934",
+  "currentHashesMatch": true
+}

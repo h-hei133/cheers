@@ -1,0 +1,15 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/codemode/composition.test.ts src/turn/subagent.test.ts --no-file-parallelism --maxWorkers=1 --reporter=default --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/codemode-validation/child-repaired.json
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/core/tools/codemode/composition.test.ts (22 tests) 1681ms
+   ✓ the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer  353ms
+ ✓ src/turn/subagent.test.ts (22 tests) 276ms
+
+ Test Files  2 passed (2)
+      Tests  44 passed (44)
+   Start at  23:02:48
+   Duration  7.73s (transform 2.93s, setup 0ms, collect 5.34s, tests 1.96s, environment 0ms, prepare 106ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/child-repaired.json

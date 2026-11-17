@@ -1,5 +1,6 @@
 import { renderPage } from "./template.js";
 import type { ExportPayload } from "./model.js";
+import { sanitizeExport } from './sanitize.js';
 
 /**
  * A session as one self-contained HTML file.
@@ -21,14 +22,15 @@ import type { ExportPayload } from "./model.js";
  */
 
 export function renderExportHtml(payload: ExportPayload): string {
-  const payloadBase64 = Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+  const safe = sanitizeExport(payload);
+  const payloadBase64 = Buffer.from(JSON.stringify(safe), "utf8").toString("base64");
   return renderPage({
-    title: `Session ${payload.header.sessionId}`,
+    title: `Session ${safe.header.sessionId}`,
     subtitle: [
-      `${payload.entries.length} messages`,
-      payload.header.workspace,
-      payload.header.exportedAt,
-      ...payload.warnings,
+      `${safe.entries.length} messages`,
+      safe.header.workspace,
+      safe.header.exportedAt,
+      ...safe.warnings,
     ].join(" · "),
     payloadBase64,
   });

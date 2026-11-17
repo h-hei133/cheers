@@ -1,0 +1,92 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "source": [
+    {
+      "file": "packages/ts-shell/src/session/export/html.ts",
+      "sha256": "0a1bf113b39bba9807a69a46b76197d2f195c2943009febc7527585bb6e23ed3"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/sanitize.ts",
+      "sha256": "90f19e767f97e704d0d9f058942de5676d5fb443dfca0abb937422e8d804f5ee"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/media.ts",
+      "sha256": "62d1e03cc6a430db8bebace5f83c9e2a24ae28a7ff757fc0d6430b87c830fbfb"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/collect.ts",
+      "sha256": "d32923b6d29d1445d204b15ec326387b2b8ce7d130803be26fc11f46e3060940"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/template.ts",
+      "sha256": "35bfeb0e80cf54189e20b4120e1e54cb065af2f5bfbaa05ca1846e3e902259a7"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/htmlRender.ts",
+      "sha256": "f5780ca021176108cf0d569e7f71f8714c2e7482740da6180958e5db3b338738"
+    },
+    {
+      "file": "packages/ts-shell/src/presentation/tui/text/inline.ts",
+      "sha256": "e35ca76219a8e33c45f3e78ed86799ac3162514a079b69decda3d607009ff619"
+    },
+    {
+      "file": "packages/ts-shell/src/presentation/tui/text/emphasis.ts",
+      "sha256": "328b6960b1ba56451e921b898ac6d21c82f1f881dfba37a75985002a6cda44be"
+    },
+    {
+      "file": "packages/ts-shell/src/presentation/tui/transcript/markdownScan.ts",
+      "sha256": "73d8f5f2e6a710ddfceb4dd4094841c963dbe161eac0ab0ff0f0c33ceff3ab49"
+    },
+    {
+      "file": "packages/ts-shell/src/presentation/tui/transcript/table.ts",
+      "sha256": "0f7330d2356aee95e46996799ac8a3b9d7377fc2f75058351d435957618540ae"
+    }
+  ],
+  "buildId": "3e05e202dc57f189c409d981803850882e01a3450d7e3daefcf543091daed0e1",
+  "manifestSha256": "2bd9b5120414db1b1a8a148fe4cc1e3787f29d69c6ab34e93b68d42bb09704dd",
+  "helperSha256": "f7761df021cfb966e01c15830185bc81acbd031bdd9b2216d40450af49dcf387",
+  "publicBoundary": "compiled ./session/export",
+  "actualCliExport": true,
+  "compiledStorageFixture": true,
+  "fullGfmClaim": false,
+  "cli": {
+    "exit": 0,
+    "signal": null,
+    "stdoutSha256": "b3d3623653807bccfb8f92999ca8444d1f7889f97ed5c2c48c905e0f533cac73",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "storedSessionChanges": [],
+  "readOnlyStoredSession": true,
+  "publicProjection": {
+    "handlerExecutions": 0,
+    "eventAttributes": 0,
+    "originalBodyVisible": true,
+    "callerBodyAbsent": true
+  },
+  "richExport": {
+    "cjkStrong": true,
+    "syntaxHighlighted": true,
+    "orderedStart": "7",
+    "nestedList": true,
+    "tableAligned": true,
+    "diffComplete": true,
+    "imageCount": 6,
+    "imagesDecoded": true,
+    "omissionsVisible": true,
+    "eventAttributes": 0
+  },
+  "thinking": {
+    "sameTool": true,
+    "toolStillOpen": true,
+    "sameThinking": true,
+    "thinkingClosed": true,
+    "pressedFalse": true
+  },
+  "lightboxOpenedDecodedClosed": true,
+  "networkRequests": 0,
+  "pageErrors": 0,
+  "privateStateRemoved": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true
+}

@@ -1,0 +1,24 @@
+{
+  "enforcementVersion": "0.10",
+  "runId": "generated-structure-judge",
+  "mode": "shadow",
+  "sourceVerdict": "not_proven",
+  "wouldBlock": true,
+  "didBlock": false,
+  "exitCode": 0,
+  "reason": "Shadow mode records that the proof verdict would block in blocking mode but does not block.",
+  "openBlockingObligationCount": 1,
+  "openBlockingObligations": [
+    {
+      "id": "source_graph_has_no_unresolved_specifiers",
+      "title": "Every module import resolves within the declared source graph",
+      "status": "missing",
+      "reason": "Failed to read evidence file source_module_graph: oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete"
+    }
+  ],
+  "proofGapSummary": [
+    "source_graph_has_no_unresolved_specifiers: missing - Failed to read evidence file source_module_graph: oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete"
+  ],
+  "repairPlanAvailable": false,
+  "createdAt": "2026-11-17T19:32:37.978Z"
+}

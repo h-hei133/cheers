@@ -19,45 +19,62 @@ let pendingCounter = () => 0;
 const registerPending = Object.setPrototypeOf((fn) => {
   pendingCounter = fn;
 }, null);
+let isExit = () => false;
+const registerExit = Object.setPrototypeOf((fn) => { isExit = fn; }, null);
 let snapshotWrites = () => ({});
 const registerWrites = Object.setPrototypeOf((fn) => {
   snapshotWrites = fn;
 }, null);
 
-Object.defineProperty(vmCtx, '__send', { value: sendBridge, enumerable: false });
-Object.defineProperty(vmCtx, '__onReply', { value: registerReceiver, enumerable: false });
-Object.defineProperty(vmCtx, '__registerPending', { value: registerPending, enumerable: false });
-Object.defineProperty(vmCtx, '__registerWrites', { value: registerWrites, enumerable: false });
-Object.defineProperty(vmCtx, '__ALL_TOOLS_JSON', { value: JSON.stringify(workerData.allTools), enumerable: false });
-Object.defineProperty(vmCtx, '__STORE_JSON', { value: JSON.stringify(workerData.initialStore || {}), enumerable: false });
-Object.defineProperty(vmCtx, '__MODELS_JSON', { value: JSON.stringify(workerData.models || []), enumerable: false });
-Object.defineProperty(vmCtx, '__MAX_OUTPUT_CHARS', { value: Number(workerData.maxOutputChars || 65536), enumerable: false });
-Object.defineProperty(vmCtx, '__MAX_STORE_VALUE', { value: Number(workerData.maxStoreValueChars || 262144), enumerable: false });
-Object.defineProperty(vmCtx, '__MAX_STORE_TOTAL', { value: Number(workerData.maxStoreTotalChars || 1048576), enumerable: false });
+Object.defineProperty(vmCtx, '__registerExit', { value: registerExit, enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__send', { value: sendBridge, enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__onReply', { value: registerReceiver, enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__registerPending', { value: registerPending, enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__registerWrites', { value: registerWrites, enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__ALL_TOOLS_JSON', { value: JSON.stringify(workerData.allTools), enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__CALLABLE_TOOLS_JSON', { value: JSON.stringify(workerData.callableTools || []), enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__STORE_JSON', { value: JSON.stringify(workerData.initialStore || {}), enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__MODELS_JSON', { value: JSON.stringify(workerData.models || []), enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__MAX_OUTPUT_CHARS', { value: Number(workerData.maxOutputChars || 65536), enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__MAX_STORE_VALUE', { value: Number(workerData.maxStoreValueChars || 262144), enumerable: false, configurable: true });
+Object.defineProperty(vmCtx, '__MAX_STORE_TOTAL', { value: Number(workerData.maxStoreTotalChars || 1048576), enumerable: false, configurable: true });
 
 const bootstrap = new vm.Script(\`
 (() => {
+  const registerExit = globalThis.__registerExit;
   const send = globalThis.__send;
   const onReply = globalThis.__onReply;
   const registerPending = globalThis.__registerPending;
   const registerWrites = globalThis.__registerWrites;
   const allToolsList = JSON.parse(globalThis.__ALL_TOOLS_JSON);
+  const callableTools = JSON.parse(globalThis.__CALLABLE_TOOLS_JSON);
   const storeMap = new Map(Object.entries(JSON.parse(globalThis.__STORE_JSON)));
   const writesMap = new Map();
-  const modelsCatalog = Object.freeze(JSON.parse(globalThis.__MODELS_JSON));
+  const modelsCatalog = JSON.parse(globalThis.__MODELS_JSON);
   const MAX_OUT = globalThis.__MAX_OUTPUT_CHARS;
   const MAX_VAL = globalThis.__MAX_STORE_VALUE;
   const MAX_TOT = globalThis.__MAX_STORE_TOTAL;
+  delete globalThis.__registerExit;
   delete globalThis.__send;
   delete globalThis.__onReply;
   delete globalThis.__registerPending;
   delete globalThis.__registerWrites;
   delete globalThis.__ALL_TOOLS_JSON;
+  delete globalThis.__CALLABLE_TOOLS_JSON;
   delete globalThis.__STORE_JSON;
   delete globalThis.__MODELS_JSON;
   delete globalThis.__MAX_OUTPUT_CHARS;
   delete globalThis.__MAX_STORE_VALUE;
   delete globalThis.__MAX_STORE_TOTAL;
+
+  function freezeData(value) {
+    if (value && typeof value === 'object') {
+      for (const item of Object.values(value)) freezeData(item);
+      Object.freeze(value);
+    }
+    return value;
+  }
+  freezeData(modelsCatalog);
 
   let seq = 0;
   let emittedChars = 0;
@@ -94,7 +111,7 @@ const bootstrap = new vm.Script(\`
   class ExitSignal extends Error {
     constructor() { super('CODEMODE_EXIT'); }
   }
-  globalThis.__ExitSignal = ExitSignal;
+  registerExit(error => error instanceof ExitSignal);
 
   function fmt(v) {
     if (typeof v === 'string') return v;
@@ -133,6 +150,12 @@ const bootstrap = new vm.Script(\`
       enumerable: true,
     });
   }
+  for (const tool of callableTools) {
+    if (tool.alias && tool.alias !== tool.name) {
+      Object.defineProperty(toolsObj, tool.alias, { value: toolsObj[tool.name], enumerable: true });
+    }
+  }
+  Object.freeze(toolsObj);
 
   globalThis.ALL_TOOLS = Object.freeze([...allToolsList]);
   globalThis.tools = new Proxy(toolsObj, {
@@ -188,7 +211,7 @@ const bootstrap = new vm.Script(\`
   globalThis.describeNamespace = (name) => rpc('describeNamespace', { name: String(name ?? '') });
   globalThis.models = Object.freeze({
     list: (provider) => provider
-      ? modelsCatalog.filter(m => m.provider === String(provider))
+      ? Object.freeze(modelsCatalog.filter(m => m.provider === String(provider)))
       : modelsCatalog,
     get: (provider, id) => modelsCatalog.find(m => m.provider === String(provider) && m.id === String(id)) ?? null,
   });
@@ -275,7 +298,7 @@ parentPort.on('message', (msg) => {
   } catch (err) {
     if (settled) return;
     settled = true;
-    if (err && err.message === 'CODEMODE_EXIT') {
+    if (isExit(err)) {
       parentPort.postMessage({ kind: 'exit', json: JSON.stringify({ writes: snapshotWrites() }) });
     } else {
       parentPort.postMessage({ kind: 'error', json: err instanceof Error ? err.message : String(err) });

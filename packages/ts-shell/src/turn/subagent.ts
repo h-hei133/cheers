@@ -1,5 +1,5 @@
 import { runSubagent, type SubagentRunner, type SubagentRunResult, type SubagentPreparation } from "../core/subagents/runner.js";
-import { subagentMode } from "../core/subagents/boundary.js";
+import { subagentMode, subagentTools } from "../core/subagents/boundary.js";
 import { delegationTools } from '../core/subagents/capability.js';
 import type { ToolDefinition } from "../tools/types.js";
 import type { StepFunction } from "./step.js";
@@ -71,9 +71,10 @@ export function createSubagentRunner(
     const gate = { ...parent, workspaceRoot: input.workspace, agentMode,
       admission: () => parent.admission?.() ?? input.admission?.(),
       workspaceRoots: input.workspace === parent.workspaceRoot ? parent.workspaceRoots : undefined };
-    const hooks = createToolHooks(gate, tools);
+    const childTools = subagentToolPool(input.definition, tools);
+    const hooks = createToolHooks(gate, childTools);
     const result = await runSubagent(input, {
-      tools: new Map(adaptTools(tools, gate).map((tool) => [tool.name, tool])),
+      tools: new Map(adaptTools(childTools, gate).map((tool) => [tool.name, tool])),
       step: (messages, signal, options) => step(messages, signal, {}, { ...options, agentMode }),
       ...(host.acceptsTools ? { acceptsTools: host.acceptsTools(model) } : {}),
       beforeToolCall: hooks.beforeToolCall,
@@ -88,4 +89,18 @@ export function createSubagentRunner(
     await host.prepareModel?.(model ?? '', admission, effort, input.workspace, input.accountPublication);
     const refused = admission(); if (refused) throw new Error(refused);
   } });
+}
+
+/** Apply the same declared child boundary before adapting outer and composed calls. */
+function subagentToolPool(definition: Parameters<typeof subagentTools>[0], tools: ReadonlyMap<string, ToolDefinition>): ReadonlyMap<string, ToolDefinition> {
+  const select = (pool: ReadonlyMap<string, ToolDefinition>): Map<string, ToolDefinition> => {
+    const allowed = new Set(subagentTools(definition, [...pool.keys()]));
+    return new Map([...pool].filter(([name]) => allowed.has(name)));
+  };
+  const selected = select(tools);
+  const script = selected.get('codemode');
+  if (script) selected.set(script.name, { ...script,
+    nestedToolCatalog: () => select(script.nestedToolCatalog?.() ?? tools),
+  });
+  return selected;
 }

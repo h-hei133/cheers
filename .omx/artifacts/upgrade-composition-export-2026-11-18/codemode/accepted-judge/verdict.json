@@ -1,0 +1,53 @@
+{
+  "runId": "generated-structure-judge",
+  "status": "not_proven",
+  "obligations": [
+    {
+      "id": "source_graph_is_acyclic",
+      "title": "No dependency cycle among source modules",
+      "blocking": false,
+      "status": "missing",
+      "evidenceIds": [
+        "source_module_graph"
+      ],
+      "reason": "Failed to read evidence file source_module_graph: oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete"
+    },
+    {
+      "id": "source_graph_has_no_unresolved_specifiers",
+      "title": "Every module import resolves within the declared source graph",
+      "blocking": true,
+      "status": "missing",
+      "evidenceIds": [
+        "source_module_graph"
+      ],
+      "reason": "Failed to read evidence file source_module_graph: oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete"
+    },
+    {
+      "id": "declared_functions_within_module_ceiling",
+      "title": "No module declares more function-like names than the responsibility ceiling allows",
+      "blocking": false,
+      "status": "failed",
+      "evidenceIds": [
+        "source_module_functions"
+      ],
+      "reason": "Obligation declared_functions_within_module_ceiling does not hold: 1 module(s) exceed the 20-name ceiling: packages/ts-shell/src/cli/interactive/interactiveMode.test.ts"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "task",
+      "kind": "task",
+      "path": "task.md",
+      "authority": "A1",
+      "summary": "Original user task."
+    },
+    {
+      "id": "source_module_functions",
+      "kind": "source_module_functions",
+      "path": "packages/**/*.ts*",
+      "authority": "A0",
+      "summary": "Registered source_module_functions evidence."
+    }
+  ],
+  "summary": "1 blocking obligation(s) are open or failed; 1 blocking proof gap(s) remain."
+}

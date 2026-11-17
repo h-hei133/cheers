@@ -2,7 +2,6 @@ import type { SessionThreadSnapshot } from "../schema/sessionThread.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 import { redactExportText } from "../../core/security/redaction.js";
 import { messageToText } from "../../model-adapters/multimodal.js";
-import { renderMarkdownHtml } from "./htmlRender.js";
 import { projectExportTree, visibleExportTree } from "./graph.js";
 import { sanitizeExport } from "./sanitize.js";
 import { readExportSource, readExportState } from "./source.js";
@@ -13,6 +12,7 @@ import { restoreReport } from '../reports/projection.js';
 import type { ReportTranscriptEntry } from '../reports/model.js';
 import type { SessionStoreLayout } from '../store/sessionFileLayout.js';
 import type { ReadTranscript } from '../transcript/sessionTranscript.js';
+import { scanBlocks } from '../../presentation/tui/transcript/markdownScan.js';
 export type { ExportEntry, ExportPayload, ExportSessionStats, ExportTreeNode } from "./model.js";
 export type ExportGatherResult =
   | { readonly ok: true; readonly payload: ExportPayload }
@@ -38,7 +38,7 @@ export function gatherExport(input: {
       const saved = restoreReport(event);
       if (!saved) return [];
       const content = redactExportText(saved.text);
-      return [{ id: saved.id, role: 'command', content, html: renderMarkdownHtml(content),
+      return [{ id: saved.id, role: 'command', content, html: '',
         timestamp: saved.timestamp, sourceEntryId: saved.sourceEntryId }];
     });
   if (messages.length === 0 && reports.length === 0) {
@@ -58,6 +58,7 @@ export function gatherExport(input: {
   const sanitized = sanitizeExport({
     header: { sessionId: input.sessionId, exportedAt: (input.now ?? (() => new Date()))().toISOString(), workspace: input.workspace },
     tree: tree.nodes, entries: entries.filter(entry => !hidden.has(entry.id)), leafId: tree.leafId, warnings,
+    toolPairing: warnings.length ? 'unavailable' : 'verified',
   });
   return {
     ok: true,
@@ -68,19 +69,12 @@ export function gatherExport(input: {
   };
 }
 
-const ALLOWED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
-const BASE64_PATTERN = /^[A-Za-z0-9+/=]+$/;
-
 function extractImages(content: Extract<TranscriptEvent, { type: "message" }>["content"]): readonly ExportImage[] | undefined {
   if (typeof content === "string") return undefined;
   const images: ExportImage[] = [];
   for (const block of content) {
     if (block.type !== "image") continue;
-    const mimeType = block.mimeType.trim().toLowerCase();
-    const data = block.data.trim();
-    if (ALLOWED_IMAGE_MIMES.has(mimeType) && data.length > 0 && BASE64_PATTERN.test(data)) {
-      images.push({ mediaType: mimeType, data });
-    }
+    images.push({ mediaType: block.mimeType, data: block.data });
   }
   return images.length > 0 ? images : undefined;
 }
@@ -89,8 +83,9 @@ function extractToolDiff(event: Extract<TranscriptEvent, { type: "message" }>, c
   const metaDiff = event.metadata?.diff;
   if (typeof metaDiff === "string" && metaDiff.trim()) return redactExportText(metaDiff);
   if (event.role !== "tool") return undefined;
-  const fenced = /```diff\r?\n([\s\S]*?)```/.exec(contentText);
-  return fenced?.[1]?.trim() ? redactExportText(fenced[1].replace(/\r?\n$/, "")) : undefined;
+  const fenced = scanBlocks(contentText).find(block => block.kind === 'fence' && block.language === 'diff');
+  const diff = fenced?.kind === 'fence' ? fenced.lines.join('\n') : undefined;
+  return diff?.trim() ? redactExportText(diff) : undefined;
 }
 
 function toExportEntry(event: Extract<TranscriptEvent, { type: "message" }>): ExportEntry {
@@ -106,7 +101,7 @@ function toExportEntry(event: Extract<TranscriptEvent, { type: "message" }>): Ex
     ? { text: redactExportText(event.reasoning.text ?? ""), ...(event.reasoning.redacted ? { redacted: true } : {}) }
     : undefined;
   return {
-    id: event.id ?? "", role: event.role, content, html: renderMarkdownHtml(content),
+    id: event.id ?? "", role: event.role, content, html: '',
     ...(reasoning !== undefined ? { reasoning } : {}),
     ...(images !== undefined ? { images } : {}),
     ...(toolCalls?.length ? { toolCalls } : {}),

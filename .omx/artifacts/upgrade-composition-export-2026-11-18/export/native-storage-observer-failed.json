@@ -1,0 +1,68 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "source": [
+    {
+      "file": "packages/ts-shell/src/session/export/html.ts",
+      "sha256": "0a1bf113b39bba9807a69a46b76197d2f195c2943009febc7527585bb6e23ed3"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/sanitize.ts",
+      "sha256": "adcb86f1389578a53c7555aa4cec5bad931b2d11200426b63b111834761d2d26"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/media.ts",
+      "sha256": "62d1e03cc6a430db8bebace5f83c9e2a24ae28a7ff757fc0d6430b87c830fbfb"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/collect.ts",
+      "sha256": "60391186147f021e1f9a118af4e4ab396402c251f1bce3e9e603bbab9c3b1c05"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/template.ts",
+      "sha256": "f76052b7749ea86c58c16cfb716de478c571457a300531d0b90ea954110fe9dd"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/htmlRender.ts",
+      "sha256": "f5780ca021176108cf0d569e7f71f8714c2e7482740da6180958e5db3b338738"
+    },
+    {
+      "file": "packages/ts-shell/src/presentation/tui/text/inline.ts",
+      "sha256": "e35ca76219a8e33c45f3e78ed86799ac3162514a079b69decda3d607009ff619"
+    },
+    {
+      "file": "packages/ts-shell/src/presentation/tui/text/emphasis.ts",
+      "sha256": "328b6960b1ba56451e921b898ac6d21c82f1f881dfba37a75985002a6cda44be"
+    },
+    {
+      "file": "packages/ts-shell/src/presentation/tui/transcript/markdownScan.ts",
+      "sha256": "73d8f5f2e6a710ddfceb4dd4094841c963dbe161eac0ab0ff0f0c33ceff3ab49"
+    },
+    {
+      "file": "packages/ts-shell/src/presentation/tui/transcript/table.ts",
+      "sha256": "0f7330d2356aee95e46996799ac8a3b9d7377fc2f75058351d435957618540ae"
+    }
+  ],
+  "buildId": "a4c971b25674a2b202920877d3a11db1ea6f4d475fe1cc5b108d23c4e4001aa7",
+  "manifestSha256": "40febb8bdb46fc81800bff858049c837f868a184d1767912421e97bf80518eaf",
+  "helperSha256": "dc25393c97c2cae9df1eb2f482d6c6940716aea51756a962f34f9700c199cb36",
+  "publicBoundary": "compiled ./session/export",
+  "actualCliExport": true,
+  "compiledStorageFixture": true,
+  "fullGfmClaim": false,
+  "cli": {
+    "exit": 0,
+    "signal": null,
+    "stdoutSha256": "660ae41753da6366432edc99d96c3e73c06c4b26b00e818c926e947222923151",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "failure": {
+    "name": "AssertionError",
+    "code": "ERR_ASSERTION",
+    "messageSha256": "dd258b66549d228471662523f064c2e845bbfd1d00f93687a4e77543816b91d5",
+    "line": "106"
+  },
+  "privateStateRemoved": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true
+}

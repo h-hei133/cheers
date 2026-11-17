@@ -1,0 +1,57 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/core/tools/codemode/output.test.ts (19 tests | 1 failed | 18 skipped) 93ms
+   ↓ bounded feedback from the actual script worker > renders separate text and console output with actual line endings
+   ↓ bounded feedback from the actual script worker > bounds top-level return together with the final status and notice
+   ↓ bounded feedback from the actual script worker > bounds multibyte text together with the final status and notice
+   ↓ bounded feedback from the actual script worker > bounds combined text, console and return together with the final status and notice
+   ↓ bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: text("界".repeat(2000));
+   ↓ bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: return "界".repeat(2000);
+   ↓ validated images retained by the actual script worker > keeps a complete image total within both existing media limits
+   ↓ validated images retained by the actual script worker > omits repeated images after four, with bounded feedback metadata
+   ↓ validated images retained by the actual script worker > enforces the encoded aggregate limit before the four-image count is reached
+   ↓ validated images retained by the actual script worker > rejects a complete individually oversized image before retaining a valid successor
+   ↓ validated images retained by the actual script worker > rejects PNG signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects JPEG signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects GIF signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects WebP signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged object MIME before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged data URI MIME before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged image_url MIME before retention and still accepts complete bytes
+   ↓ builtin read results through the real tool gate and worker > keeps text-only nested read results compatible with string consumers
+   × builtin read results through the real tool gate and worker > forwards inert image-bearing read results into published model feedback 92ms
+     → Script failed
+
+Script error: TypeError: Cannot read properties of undefined (reading 'length'): expected true to be false // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  23:23:53
+   Duration  3.04s (transform 1.72s, setup 0ms, collect 2.72s, tests 93ms, environment 0ms, prepare 55ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-image-result.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/output.test.ts > builtin read results through the real tool gate and worker > forwards inert image-bearing read results into published model feedback
+AssertionError: Script failed
+
+Script error: TypeError: Cannot read properties of undefined (reading 'length'): expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/core/tools/codemode/output.test.ts:253:43
+    251|       return shape;
+    252|     `, { ...createDefaultExecutionService(), readMedia })
+    253|     expect(result.isError, result.output).toBe(false)
+       |                                           ^
+    254|     expect(readMedia).toHaveBeenCalledTimes(2)
+    255|     expect(returned(result.output)).toEqual({ type: 'object', keys: ['…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

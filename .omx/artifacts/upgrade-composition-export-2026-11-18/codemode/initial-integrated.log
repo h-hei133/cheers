@@ -1,0 +1,50 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/core/tools/codemode/composition.test.ts (18 tests | 2 failed) 1251ms
+   ✓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the adapted consumer 234ms
+   ✓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the direct consumer 61ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'adapted' consumer 64ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'direct' consumer 81ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'adapted' consumer 46ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'direct' consumer 41ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'adapted' consumer 51ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'direct' consumer 43ms
+   ✓ the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer 74ms
+   ✓ the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the direct consumer 44ms
+   ✓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=false before the captured effect 98ms
+   × captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=false before the captured effect 53ms
+     → expected 'e13fa78f94b0d0a67a1283555330d03675773…' not to be 'e13fa78f94b0d0a67a1283555330d03675773…' // Object.is equality
+   ✓ captured nested contracts in the real composed gate > settles 'removal' with deferred=false before the captured effect 46ms
+   ✓ captured nested contracts in the real composed gate > settles 'unchanged control' with deferred=false before the captured effect 47ms
+   ✓ captured nested contracts in the real composed gate > settles 'unrelated change control' with deferred=false before the captured effect 46ms
+   ✓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=true before the captured effect 88ms
+   × captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect 44ms
+     → expected 'e13fa78f94b0d0a67a1283555330d03675773…' not to be 'e13fa78f94b0d0a67a1283555330d03675773…' // Object.is equality
+   ✓ persists one filtered parent result after two real builtin reads in runTurn 88ms
+ ✓ src/core/tools/codemode/models.test.ts (4 tests) 167ms
+ ✓ src/core/tools/codemode/declarations.test.ts (12 tests) 3712ms
+   ✓ strict TypeScript consumers of projected argument types > requires the intersection field for every first union branch  395ms
+   ✓ strict TypeScript consumers of projected argument types > requires the intersection field for every last union branch  667ms
+   ✓ strict TypeScript consumers of projected argument types > requires the intersection field for every reference union branch  588ms
+   ✓ strict TypeScript consumers of projected argument types > keeps a sibling union branch independent of the other branch intersection  505ms
+   ✓ discovers and calls only the requested MCP server namespace through the actual worker  842ms
+ ✓ src/core/tools/codemode/execution.test.ts (11 tests) 541ms
+ ✓ src/core/tools/codemode/output.test.ts (18 tests) 716ms
+ ✓ src/core/tools/codemode/tool.test.ts (4 tests) 754ms
+ ✓ src/turn/nestedTools.test.ts (17 tests) 27ms
+ Test Files  1 failed | 6 passed (7)
+      Tests  2 failed | 82 passed (84)
+   Start at  19:24:18
+   Duration  16.32s (transform 2.99s, setup 0ms, collect 7.83s, tests 7.17s, environment 1ms, prepare 314ms)
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/initial-integrated.json
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/core/tools/codemode/composition.test.ts > captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=false before the captured effect
+ FAIL  src/core/tools/codemode/composition.test.ts > captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect
+AssertionError: expected 'e13fa78f94b0d0a67a1283555330d03675773…' not to be 'e13fa78f94b0d0a67a1283555330d03675773…' // Object.is equality
+ ❯ src/core/tools/codemode/composition.test.ts:302:83
+    300|       expect(result.error ?? result.output).toContain('older discovery…
+    301|     }
+    302|     if (change !== 'unchanged control') expect(catalog.discovery!.gene…
+       |                                                                                   ^
+    303|     if (change === 'schema mutation' || change === 'definition replace…
+    304|       const fresh = await executeScript(catalog.discovery!.snapshot(),…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯

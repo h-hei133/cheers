@@ -182,6 +182,70 @@ describe("gathering a session for export", () => {
     expect(result.ok === false && result.reason).toContain("not found");
   });
 
+  it('keeps every diff line containing an added code fence', () => {
+    writeSession([{ role: 'user', content: 'start' }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    const diff = ['@@ -1 +1,4 @@', '-old', '+```ts', '+const value = "中文";', '+```', '+TAIL_LINE'].join('\n');
+    fs.appendFileSync(layout.transcriptPath, JSON.stringify({ type: 'message', id: 'diff', role: 'tool',
+      timestamp: '2026-11-18T00:00:00Z', content: `Updated file\n\n\`\`\`diff\n${diff}\n\`\`\`` }) + '\n');
+    const before = fs.readFileSync(layout.transcriptPath);
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.entries.at(-1)!.toolDiff).toBe(diff);
+    expect(fs.readFileSync(layout.transcriptPath).equals(before)).toBe(true);
+  });
+
+  it('canonicalizes the existing JPEG alias without a transcript rewrite', () => {
+    writeSession([{ role: 'user', content: 'start' }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    const data = Buffer.from([255, 216, 255, 192, 0, 17, 8, 3, 0, 4, 0, 3, 1, 34, 0, 2, 17, 1, 3, 17, 1, 255, 217]).toString('base64');
+    fs.appendFileSync(layout.transcriptPath, JSON.stringify({ type: 'message', id: 'alias', role: 'user',
+      timestamp: '2026-11-18T00:00:00Z', content: [{ type: 'image', mimeType: 'image/jpg', data }] }) + '\n');
+    const before = fs.readFileSync(layout.transcriptPath);
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.entries.at(-1)!.images).toEqual([{ mediaType: 'image/jpeg', data }]);
+    expect(fs.readFileSync(layout.transcriptPath).equals(before)).toBe(true);
+  });
+
+  it('reports omitted damaged images without discarding valid historical attachments', () => {
+    writeSession([{ role: 'user', content: 'start' }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    const data = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+    fs.appendFileSync(layout.transcriptPath, JSON.stringify({ type: 'message', id: 'images', role: 'user',
+      timestamp: '2026-11-18T00:00:00Z', content: [...Array.from({ length: 6 }, () => ({ type: 'image', mimeType: 'image/png', data })),
+        { type: 'image', mimeType: 'image/png', data: '=' }, { type: 'image', mimeType: 'image/jpeg', data }] }) + '\n');
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.entries.at(-1)!.images).toHaveLength(6);
+    expect(result.payload.warnings.join(' ')).toMatch(/2.*image.*omitted/i);
+    // This directly appended fixture has no corresponding durable branch node.
+    expect(result.payload.toolPairing).toBe('unavailable');
+  });
+
+  it('keeps complete branch pairing when only verified media is omitted', () => {
+    const session = writeSession([{ role: 'user', content: 'start' }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    const data = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+    appendSessionTurn({ session, message: { role: 'user', content: [
+      { type: 'image', mimeType: 'image/png', data }, { type: 'image', mimeType: 'image/png', data: '=' },
+    ] }, timestamp: '2026-11-18T00:00:00Z',
+    append: event => appendTranscriptEvent(layout.transcriptPath, event),
+    writeMetadata: next => writeSessionMetadataRecord({ session: next, layout }),
+    writeState: next => writeSessionState({ session: next, layout }),
+    });
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.toolPairing).toBe('verified');
+    expect(result.payload.entries.at(-1)!.images).toHaveLength(1);
+    expect(result.payload.warnings).toHaveLength(1);
+    expect(result.payload.warnings[0]).toMatch(/1 image was omitted/i);
+  });
+
   it("scrubs structured credentials and metadata without merging entry identities", () => {
     writeSession([{ role: "user", content: "start" }]);
     const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });

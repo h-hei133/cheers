@@ -1,0 +1,233 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "publicCompiledSdk": true,
+  "configuredProvider": true,
+  "probeSha256": "da44fd84e3650f4c5e4ffe59f9a9a15b71da5afbc5dd7c91a109e32b1337a2f1",
+  "referenceProbeSha256": "1c4119fa6af82a367e2cc37f74a731760349e76ed7c876c5a789bc0760640cf4",
+  "providerCases": [],
+  "rawCases": [],
+  "requests": [],
+  "buildId": "b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192",
+  "buildInputsDigest": "d70959b43efeefdd7b109e5989c621183d14789694309b9962fada878960ffd3",
+  "buildManifestSha256": "1ca27538c04a8f6796ef68c1cd2a89a0e9e37dce1724c9ab45e6c9365c3eed32",
+  "source": {
+    "files": [
+      {
+        "file": "packages/ts-shell/src/index.ts",
+        "sha256": "a6ef28d898c9bc48717b08ca682e146a073b5d3923bf83550b061e48e0daffb1"
+      },
+      {
+        "file": "packages/ts-shell/src/tools/types.ts",
+        "sha256": "d4afb32f31f98eeac4d51236c264703a51120a29081eac0554fd05bb02a0ab2b"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/catalog.ts",
+        "sha256": "953e011e3ab68e0705656979579e537a217612ec947cdb751c745cdb181ee6fd"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/discovery/state.ts",
+        "sha256": "ebc63d4c7ed9b67f204766ecd6e7a66e10d7b821e9b4f4c9c660e87aa40ac622"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/tool.ts",
+        "sha256": "4403ec624010f45e86c7bae7c38a4ead7d1726797cc7902c4cff9496f32106f5"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/prelude.ts",
+        "sha256": "bf4669c30290e1267838eabbfc1600ae673b38ede985ae234b2b6a79175ef1f9"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/execution.ts",
+        "sha256": "ed9b71d2772f66b570faba4d0ad4c3f5475918abf180cd63030d67d25e27263e"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/image.ts",
+        "sha256": "63b3867038c67c8ff35366610a38968033f40dc923483ad9c88ea50482184da9"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/models.ts",
+        "sha256": "89ae843cdb7712013fbb6efd9b4ce7a3f6cdf8170976583033109ffec4e0ff2f"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/nestedCalls.ts",
+        "sha256": "5e38cfb0433814ea278d0699a026fcddbdbf53d7a80d49651fa82fff5bd604d5"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/declarations.ts",
+        "sha256": "873182669754960da87708d8f57bfda3b7ef83243ff7385331eafa22c202ab2e"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/output.ts",
+        "sha256": "f3275a67764c4c1c57730fc511da9f3d84839f3f33efda5bac15cd8c1bd50841"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/catalog.ts",
+        "sha256": "a6a527b1be724e2bd6808ad74d4ab610571e9e2c41edc869fe63a03e263434b1"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/execution.ts",
+        "sha256": "c5f8d75d83893f67439ec1abe84330eca2b5784040e11489d42c6ea64aab54ba"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/subagent.ts",
+        "sha256": "3bc31537c51d4ef1589652b6139a4aa20e30f026165151fc2130656a48bfdf24"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/session.ts",
+        "sha256": "213852747bf94d6bbc2f59f6b63e63832a2710d6652566e33687a041f69d951f"
+      },
+      {
+        "file": "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts",
+        "sha256": "9cba0dddccacf90149fbb5dfe793a1e169437f034adc70231d10cacd8063c950"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/tools.ts",
+        "sha256": "429b08f174f8c9f23b9e74f07f2f2bdbf262abe84ff38c64e84b183f2ec3eeaf"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/nestedTools.ts",
+        "sha256": "ef2eaf427d4f47f88050c42a6645f1341f8a2114a6b61ffd89b2f38d779e5c3b"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/read.ts",
+        "sha256": "5d7f3a04b4367a3d8bb43e0d954e6b291c3a5d69cbfeeaf3b1294a7a01c46388"
+      },
+      {
+        "file": "packages/ts-shell/src/runtime/execution/media/image.ts",
+        "sha256": "4e551f8e2ed6559824bc87083d0d91027bf51bdf7f2047a29df6f938d9c147f5"
+      }
+    ],
+    "sha256": "69035fe3d0c6d36aeffed73501ce59533f161592d7cb512abb8eef97c1c567af"
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "isolatedValidObjects": true,
+    "minimalConfiguredModelEntry": false,
+    "originalConfiguredCredentials": true,
+    "inventedPrices": false,
+    "inventedRemoteLimits": false,
+    "localContextWindow": 32000,
+    "localOutputCap": 4096,
+    "publishedContextWindow": 1000000,
+    "publishedInputLimit": null,
+    "originalPricesPresent": false
+  },
+  "configuredTarget": {
+    "providerIdSha256": "7e341752813dcf844ffc5197123e0f41f6cfe860a8ea52cb8f92749667afc142",
+    "connectionIdSha256": "dba23287577acf9bd7ce905858f9130c2babae00b1b63a6f5e2f0442a3c81b92",
+    "modelIdSha256": "e37302aa52f528ed50dc165264e06a6470b4af7c9dfa396a4e65b0e8f85190e7",
+    "catalogueIdSha256": "141de3607294359efa20824d76e730c9664ad02074e0531cbc79e4400b02be6a",
+    "originalActive": false,
+    "configuredIndex": "0"
+  },
+  "originalInputsSha256": "ce298c2f7b2a5664c495d78fc8b9fde599378bd0fded9e346da8b3af06bc67d5",
+  "compiledControls": {
+    "manifestBoundInternalExports": true,
+    "publicPackageExportClaim": false,
+    "owners": [
+      {
+        "symbol": "createCoreToolRegistry",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-JGJRH6RT.js",
+        "sha256": "247afe05eb9ba15b9b7737c1291c2f64962b5361bfc1311ed3f84a3ba2a23601"
+      },
+      {
+        "symbol": "createCodemodeToolDefinition",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-GSL6J4GG.js",
+        "sha256": "68697027e726adfe1b46d16b57518061264845c2a56f1038ae2acda22a7e1506"
+      },
+      {
+        "symbol": "adaptTools",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-4HI5RV5D.js",
+        "sha256": "3c42683e954dfc8821dcbac3578d7cbcd2fd952cab6653788d5efeec07dc44e1"
+      },
+      {
+        "symbol": "createToolHooks",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-4HI5RV5D.js",
+        "sha256": "3c42683e954dfc8821dcbac3578d7cbcd2fd952cab6653788d5efeec07dc44e1"
+      },
+      {
+        "symbol": "executeToolBatch",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-BHWSQQ3R.js",
+        "sha256": "29d08cc168d9049ee6fd20784708eabcd71b2cbb1fffdcf7e8039cf40e978486"
+      },
+      {
+        "symbol": "HookDispatcher",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-JGJRH6RT.js",
+        "sha256": "247afe05eb9ba15b9b7737c1291c2f64962b5361bfc1311ed3f84a3ba2a23601"
+      },
+      {
+        "symbol": "inspectImage",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-4CFNRW32.js",
+        "sha256": "2d9c24f7fe8400a326801549246247c4ff862736ee7e080b6239b12561515616"
+      },
+      {
+        "symbol": "sessionModelCatalog",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-DL7HRZK7.js",
+        "sha256": "eef03e44ea848585dfaced4ed9fe0f7ab249eb204d14675f6b4fb9e8ff138c78"
+      },
+      {
+        "symbol": "classifyProviderFailure",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-XS66ZFVQ.js",
+        "sha256": "213eab81fcd4429747444158aed47c1d328a5f696fe9c7e4b0f567b886efd46c"
+      }
+    ]
+  },
+  "retainedRawControls": {
+    "file": "native-network-failed.json",
+    "sha256": "b8949480396dc7dc3881c28f230de5953d2f8097d0222663184c00aeddbeebad",
+    "passed": [
+      "builtin-read-write",
+      "ordinary-deny",
+      "completed-effect-then-script-failure",
+      "native-media-read-image",
+      "timeout-pending-effect",
+      "parent-cancel-pending-effect"
+    ],
+    "previousActualRequests": 2
+  },
+  "failedStage": "provider-allowed",
+  "failure": {
+    "category": "local-request-admission-or-harness",
+    "code": "request-stopped-before-dispatch",
+    "closedProviderClass": "provider_network"
+  },
+  "failureLine": "52",
+  "incompleteCase": {
+    "name": "allowed",
+    "calls": [],
+    "results": [],
+    "approvals": [],
+    "hooks": [],
+    "effects": 0,
+    "collisionEffects": 0,
+    "routeCalls": 0,
+    "retryHooks": 0,
+    "terminalStatus": "stopped_error",
+    "configuredTargetAdmitted": true,
+    "scriptSha256": "0ae887a7501000d7bb73553cbf5cc16e8f88f2e083f1cbb7b6d2a9215a1a2fe6",
+    "terminal": {
+      "status": "stopped_error",
+      "reasonSha256": "c9eee67eca9b8d66a00226f2ea599de36245e1825ceb94c53ccdb235e1f67637",
+      "reasonBytes": 270,
+      "code": "configured-target"
+    }
+  },
+  "cleanupSettled": true,
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "observerEvents": {
+    "create": 0,
+    "bodySent": 0,
+    "headers": 0,
+    "data": 0,
+    "complete": 0,
+    "retired": 0,
+    "finalized": 0
+  },
+  "actualRequests": 0,
+  "foreignRequests": 0,
+  "rawNetworkRequests": 0
+}

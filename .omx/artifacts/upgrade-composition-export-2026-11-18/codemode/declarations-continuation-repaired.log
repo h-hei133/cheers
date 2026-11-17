@@ -1,0 +1,16 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/codemode/declarations.test.ts src/core/tools/codemode/tool.test.ts --no-file-parallelism --maxWorkers=1 --reporter=default --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/codemode-validation/declarations-continuation-repaired.json
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/core/tools/codemode/declarations.test.ts (18 tests) 3179ms
+   ✓ strict TypeScript consumers of projected argument types > requires the intersection field for every first union branch  347ms
+   ✓ declares both actual read result shapes and requires narrowing before string operations  667ms
+ ✓ src/core/tools/codemode/tool.test.ts (4 tests) 742ms
+
+ Test Files  2 passed (2)
+      Tests  22 passed (22)
+   Start at  23:05:14
+   Duration  9.21s (transform 2.17s, setup 0ms, collect 3.87s, tests 3.92s, environment 0ms, prepare 93ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/declarations-continuation-repaired.json

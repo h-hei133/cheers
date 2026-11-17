@@ -11974,3 +11974,10 @@ Linux同代公开SDK／CLI配置模型21实际请求／10prompt轮覆盖两次bu
 模型恢复a9099ca与历史缓存1285ff4已本地提交。本批E.5原shared host刷新新UI snapshot、blocked publication独立撤权；C.8仅删除caller可变schema的永久identity fingerprint，原digest／guard及检索机制保留。两独立APPROVE和10source hash匹配；最终25文件355项、七门／0monoliths、build89344ffebd35，UI三反转8AssertionErrors／串行恢复4/29及发现三反转／恢复2/22passed。
 
 同代npm15入口strict NodeNext／skipLibCheck=false与实际async TS file两模式passed；编译CLI签名安装／坏签名及archive拒绝／分开grants、公开ExtensionService实际async TS worker与原SDK host两模式passed，零provider请求。公开caller gate assembly与SDK私有gate、构造VersionRecord测试与签名安装资格分别记录；named-tool service派发不宣称。最终配置模型8actual发现请求覆盖允许／hook零效果／hidden排除，2000 deferred有限目录410source输入hash未变，不作通用性能／cache收益声明。归档upgrade-ui-discovery-2026-11-17，29/62功能验收／33任务未完成，正常NormProof仍实际exit2／not_proven、18pinned文件未改；下一E.1／E.3真实codemode消费者。整体goal active，无push或远端CI。
+
+
+### 2026-11-18：脚本组合与富文本导出子批验收
+
+E.1复用原worker/gate/catalog修复child退休与完整host join、普通approval/hooks/结果、restricted deferred snapshot和delegated边界；新独立复审确认mixed write/read屏障及nested样式reset两P2，五实际反例红后修，复用原fence/active与theme scoped style。最终50文件987项、七门/2678modules/0monoliths、build19af1f6dc3f2通过；原12script/7export反转对应source保持，追加两反转5AssertionErrors/exact恢复96项。限定metadata/composition/export FIXED/APPROVE hash核对，旧中断lane为unavailable。
+
+同代已配置连接index1两次完整allowed/retry组合6actual requests、七compiled raw controls、npm15入口strict NodeNext/skipLibCheck=false及实际读写、CLI/public HTML/Linux离线Chromium零网络/零页面错误passed。原活动连接两次503和另连接零bodySent/provider_network失败保留，原配置与stored session不变，私有state清理。E.1本地功能验收30/62、32未完成；E.3 richer dispatch/provider image及D.4完整GFM仍部分。正常pinned NormProof actual exit2/not_proven/超16384边missing，18tracked files未改；临时32768图诊断不替代默认proof。F2.2冻结源码30项26红/4控制及storage/command19红已证实，接续原owner修复。按批本地提交，不push/CI，整体goal active。

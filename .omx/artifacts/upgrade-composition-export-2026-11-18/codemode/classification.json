@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "local": {
+    "staticGates": 7,
+    "files": 23,
+    "tests": 413,
+    "passed": true,
+    "productionModuleCount": 2673,
+    "monoliths": 0
+  },
+  "reversals": {
+    "count": 11,
+    "assertionFailures": 20,
+    "restoredTests": 93,
+    "mainSourcesMutated": false
+  },
+  "native": {
+    "compiledRawControls": 6,
+    "configuredProviderTotalRequests": 17,
+    "completedProviderCases": 2,
+    "partialAllowedComposition": true,
+    "missing": [
+      "real provider image acceptance",
+      "richer classifier/image-generation dispatch"
+    ],
+    "completedProviderCaseRequests": 6,
+    "currentReceipt": "native.json",
+    "rawControlsReceipt": "native-network-failed.json"
+  },
+  "failures": [
+    {
+      "receipt": "native-import-failed.json",
+      "category": "harness",
+      "reason": "Source-relative modules are not individually emitted by the shared build; existing manifest-bound chunk exports used instead."
+    },
+    {
+      "receipt": "reversal-initial.json",
+      "category": "harness",
+      "reason": "One -t selector ignored Vitest quoted interpolation; it discovered zero selected tests and was rejected as ineffective."
+    },
+    {
+      "receipt": "package-types-failed.json",
+      "category": "harness",
+      "reason": "Strict consumer omitted mandatory taskId; retained installed copy corrected and validated."
+    },
+    {
+      "receipt": "native-network-failed.json",
+      "category": "provider_network",
+      "reason": "Second dispatched request had no accepted response."
+    },
+    {
+      "receipt": "native-deadline-failed.json",
+      "category": "provider_or_deadline",
+      "reason": "Second accepted response produced three bytes then exceeded the 45-second fixture transport limit."
+    },
+    {
+      "receipt": "native-quota-failed.json",
+      "category": "provider_failure_heuristic",
+      "reason": "Configured provider executed the exact composition; final response failed with quota-like wording. No closed error class was captured by that revision."
+    },
+    {
+      "receipt": "native-retry-failed.json",
+      "category": "provider_unknown",
+      "reason": "Initial retry scenario failed with quota-like wording but the existing closed classifier returned provider_unknown. Raw response was not retained."
+    },
+    {
+      "receipt": "native-zero-dispatch-initial.json",
+      "category": "harness-classification",
+      "reason": "Zero POST stopped_error originally misclassified as model behavior; closed stable terminal text later proved provider-readiness:network."
+    },
+    {
+      "receipt": "native-readiness-network.json",
+      "category": "provider_network",
+      "reason": "Existing configured index0 failed five native GET readiness attempts before chat dispatch; exact hashed stable terminal reason matches product provider-readiness:network."
+    },
+    {
+      "receipt": "native-answer-format-failed.json",
+      "category": "harness",
+      "reason": "Configured index1 completed three requests, exact composition and all prior effect/history checks; only requested ACK absent. Preserve failed fixture and validate actual terminal/effects/feedback with corrected probe."
+    }
+  ],
+  "scope": {
+    "E1": "Linux functional acceptance pending independent review; public SDK allowed/retry complete, raw six controls and installed consumer pass",
+    "E3": "partial; typed declarations/namespace/images/captured list-get accepted locally; richer typed model dispatch absent",
+    "F21": "partial; existing input media path verified; specialist generation/classification absent"
+  },
+  "referencesReadOnly": true
+}

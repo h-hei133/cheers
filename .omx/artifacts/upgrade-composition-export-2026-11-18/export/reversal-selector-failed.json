@@ -1,0 +1,66 @@
+{
+  "status": "failed",
+  "mainSourcesMutated": false,
+  "helperSha256": "9364fa7757d10f27254dd8d3f960ffa83f5f43f8e84da7347f962334c16e1230",
+  "cases": [
+    {
+      "name": "public-html",
+      "file": "packages/ts-shell/src/session/export/html.ts",
+      "sourceSha256": "0a1bf113b39bba9807a69a46b76197d2f195c2943009febc7527585bb6e23ed3",
+      "reversedSha256": "a424dedd85d4cd62d2119352b6e78f59fd251784783627e986332e5acf37788e",
+      "exitCode": 1,
+      "signal": null,
+      "failedTests": 3,
+      "passedTests": 0,
+      "assertionFailures": 3,
+      "names": [
+        "public standalone export projection renders the original content instead of trusting caller HTML",
+        "public standalone export projection applies the same text redaction to public content, calls and previews",
+        "public standalone export projection refuses malformed attachments visibly without changing valid source content"
+      ],
+      "reportSha256": "315092cb6b3b6248e2c2818beb897835f4e8fd1ddeb3860c5a5d8f84a4305a07",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "media-inspection",
+      "file": "packages/ts-shell/src/session/export/media.ts",
+      "sourceSha256": "62d1e03cc6a430db8bebace5f83c9e2a24ae28a7ff757fc0d6430b87c830fbfb",
+      "reversedSha256": "84145fb8315c9fc2c2bc9803e2c3b1bdc0ae5474144346f0f0cc2aca107dbe9c",
+      "exitCode": 1,
+      "signal": null,
+      "failedTests": 2,
+      "passedTests": 0,
+      "assertionFailures": 2,
+      "names": [
+        "gathering a session for export reports omitted damaged images without discarding valid historical attachments",
+        "public standalone export projection refuses malformed attachments visibly without changing valid source content"
+      ],
+      "reportSha256": "994c3202cb2f7da6be661e09108f19c843b19e8a864ae538ad7fe586b2e0227a",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "diff-fence",
+      "file": "packages/ts-shell/src/session/export/collect.ts",
+      "sourceSha256": "d32923b6d29d1445d204b15ec326387b2b8ce7d130803be26fc11f46e3060940",
+      "reversedSha256": "4a7e29807b6961701958c5fae669525594cda6bad14d2cbb2afa7afc892c446f",
+      "exitCode": 0,
+      "signal": null,
+      "failedTests": 0,
+      "passedTests": 0,
+      "assertionFailures": 0,
+      "names": [],
+      "reportSha256": "dc5ade04dd7e43c1a90377d4e98620bcfe04b9be1c21fa46077ca529f500f832",
+      "restoredExactly": true,
+      "status": "failed"
+    }
+  ],
+  "failure": {
+    "name": "Error",
+    "message": "diff-fence-ineffective-reversal"
+  },
+  "mainSourceUnchanged": true,
+  "restoredExactly": true,
+  "privateStateRemoved": true
+}

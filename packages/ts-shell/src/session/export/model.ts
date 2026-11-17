@@ -8,6 +8,7 @@ export interface ExportEntry {
   readonly id: string;
   readonly role: string;
   readonly content: string;
+  /** Derived Markdown preview. The standalone renderer recomputes it from content. */
   readonly html: string;
   readonly reasoning?: { readonly text: string; readonly redacted?: boolean };
   readonly images?: readonly ExportImage[];
@@ -73,5 +74,7 @@ export interface ExportPayload {
   readonly entries: readonly ExportEntry[];
   readonly leafId: string | null;
   readonly warnings: readonly string[];
+  /** Source completeness for pairing calls with results, independent of media notices. */
+  readonly toolPairing?: 'verified' | 'unavailable';
   readonly stats?: ExportSessionStats;
 }

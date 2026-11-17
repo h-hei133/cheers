@@ -1,0 +1,3 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/core/tools/codemode/output.test.ts --maxWorkers=1 --minWorkers=1 --no-file-parallelism --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/codemode-validation/image-mime-repaired.json
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/image-mime-repaired.json

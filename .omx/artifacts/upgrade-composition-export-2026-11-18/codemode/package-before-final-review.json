@@ -1,0 +1,157 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "commands": [
+    {
+      "code": "pack",
+      "exit": 0,
+      "signal": null,
+      "timedOut": false,
+      "overflow": false,
+      "bytes": 430496,
+      "stdoutSha256": "1f4adb42cd00fa1717d2149d6a8a8effdff9329e6c3b40e3b02d15edcd409584",
+      "stderrSha256": "9d609df7ecb995d0eb5d4a09879b96b68d13e5a840e2b39da54ec29267fea2aa"
+    },
+    {
+      "code": "install",
+      "exit": 0,
+      "signal": null,
+      "timedOut": false,
+      "overflow": false,
+      "bytes": 27,
+      "stdoutSha256": "2c847f749eedb8161f5c42a6e3fe5036eba2f554d688c21bbd07c2078508a0a5",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "code": "strict-types",
+      "exit": 0,
+      "signal": null,
+      "timedOut": false,
+      "overflow": false,
+      "bytes": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "code": "public-native",
+      "exit": 0,
+      "signal": null,
+      "timedOut": false,
+      "overflow": false,
+      "bytes": 154,
+      "stdoutSha256": "072c7cb5a9b89e77a077cc55057f0bd83d32595b3cc77e49a48a9638b7d6fc73",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "helperSha256": "17add943ad5fbb81a84b08d376eab21475d57a12d5b6873e69b9c099560488af",
+  "providerRequests": 0,
+  "boundaries": [
+    "The public direct tool consumer does not prove ordinary permission or hook behavior; native.json owns that evidence."
+  ],
+  "buildId": "3e05e202dc57f189c409d981803850882e01a3450d7e3daefcf543091daed0e1",
+  "source": {
+    "files": [
+      {
+        "file": "packages/ts-shell/src/index.ts",
+        "sha256": "a6ef28d898c9bc48717b08ca682e146a073b5d3923bf83550b061e48e0daffb1"
+      },
+      {
+        "file": "packages/ts-shell/src/tools/types.ts",
+        "sha256": "d4afb32f31f98eeac4d51236c264703a51120a29081eac0554fd05bb02a0ab2b"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/catalog.ts",
+        "sha256": "953e011e3ab68e0705656979579e537a217612ec947cdb751c745cdb181ee6fd"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/discovery/state.ts",
+        "sha256": "ebc63d4c7ed9b67f204766ecd6e7a66e10d7b821e9b4f4c9c660e87aa40ac622"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/tool.ts",
+        "sha256": "4403ec624010f45e86c7bae7c38a4ead7d1726797cc7902c4cff9496f32106f5"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/prelude.ts",
+        "sha256": "bf4669c30290e1267838eabbfc1600ae673b38ede985ae234b2b6a79175ef1f9"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/execution.ts",
+        "sha256": "ed9b71d2772f66b570faba4d0ad4c3f5475918abf180cd63030d67d25e27263e"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/image.ts",
+        "sha256": "a3b4ffe32574249be584f603a9d5cd30f4d3a5e35aa6946dae87a4cc5715a072"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/models.ts",
+        "sha256": "89ae843cdb7712013fbb6efd9b4ce7a3f6cdf8170976583033109ffec4e0ff2f"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/nestedCalls.ts",
+        "sha256": "5e38cfb0433814ea278d0699a026fcddbdbf53d7a80d49651fa82fff5bd604d5"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/declarations.ts",
+        "sha256": "873182669754960da87708d8f57bfda3b7ef83243ff7385331eafa22c202ab2e"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/output.ts",
+        "sha256": "f3275a67764c4c1c57730fc511da9f3d84839f3f33efda5bac15cd8c1bd50841"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/catalog.ts",
+        "sha256": "a6a527b1be724e2bd6808ad74d4ab610571e9e2c41edc869fe63a03e263434b1"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/execution.ts",
+        "sha256": "c5f8d75d83893f67439ec1abe84330eca2b5784040e11489d42c6ea64aab54ba"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/subagent.ts",
+        "sha256": "3bc31537c51d4ef1589652b6139a4aa20e30f026165151fc2130656a48bfdf24"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/session.ts",
+        "sha256": "213852747bf94d6bbc2f59f6b63e63832a2710d6652566e33687a041f69d951f"
+      },
+      {
+        "file": "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts",
+        "sha256": "9cba0dddccacf90149fbb5dfe793a1e169437f034adc70231d10cacd8063c950"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/tools.ts",
+        "sha256": "429b08f174f8c9f23b9e74f07f2f2bdbf262abe84ff38c64e84b183f2ec3eeaf"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/nestedTools.ts",
+        "sha256": "ef2eaf427d4f47f88050c42a6645f1341f8a2114a6b61ffd89b2f38d779e5c3b"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/read.ts",
+        "sha256": "5d7f3a04b4367a3d8bb43e0d954e6b291c3a5d69cbfeeaf3b1294a7a01c46388"
+      },
+      {
+        "file": "packages/ts-shell/src/runtime/execution/media/image.ts",
+        "sha256": "4e551f8e2ed6559824bc87083d0d91027bf51bdf7f2047a29df6f938d9c147f5"
+      }
+    ],
+    "sha256": "f7cd616aa0b2272370342b502e00c1930ea902ee1997b8a1b9b65e8e539bf0f8"
+  },
+  "packageSha256": "6689040cdad62d5b691610e7603292ddaac75f8e396e422a7554e9779512ffe6",
+  "strictInstalledTypes": true,
+  "publicEntries": 15,
+  "native": {
+    "status": "passed",
+    "publicEntries": 15,
+    "providerRequests": 0,
+    "actualReadWrite": true,
+    "nestedCalls": 3,
+    "immutableCapturedModels": true,
+    "mediaDeclaration": true
+  },
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "privateStateRemoved": true
+}

@@ -76,14 +76,27 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
   // explicitly allowed deferred tool remains callable without a forbidden load.
   const discover = input.discover && restricted.size > 0 && (!input.runtimeConfig
     || filterVisibleToolNames(discoveryNames, input.runtimeConfig).length === discoveryNames.length);
-  if (!discover) return { skills, tools: restricted };
+  if (!discover) {
+    const tools: ReadonlyMap<string, ToolDefinition> = bindNestedCatalog(restricted, () => tools);
+    return { skills, tools };
+  }
   // Feature tools are the run's explicit capability, not general catalogue
   // entries: a director's worker controls or a research probe must be present
   // in the first request, so they join the initial set alongside pinned tools.
   const initial = [...(input.initialTools ?? []), ...(input.featureTools ?? []).map(tool => tool.name)];
-  const discovery = createToolDiscovery({ catalog: restricted, ...(initial.length ? { initial } : {}) });
+  const nested = bindNestedCatalog(restricted, () => discovery.snapshot(true));
+  const discovery: ToolDiscovery = createToolDiscovery({ catalog: nested, ...(initial.length ? { initial } : {}) });
   discovery.attachMeta(discoveryTools(discovery));
   return { skills, tools: discovery.snapshot(), discovery };
+}
+
+/** Rebind a run-owned script definition without modifying retained caller definitions. */
+function bindNestedCatalog(pool: ReadonlyMap<string, ToolDefinition>, capture: () => ReadonlyMap<string, ToolDefinition>): ReadonlyMap<string, ToolDefinition> {
+  const script = pool.get('codemode');
+  if (!script) return pool;
+  const bound = new Map(pool);
+  bound.set(script.name, { ...script, nestedToolCatalog: capture });
+  return bound;
 }
 
 /**

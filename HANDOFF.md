@@ -2752,3 +2752,28 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A caller changes a retained nested schema but the catalogue generation, search results and prepared execution still describe its earlier contract.
 - **Root Cause:** A WeakMap permanently caches the fingerprint by definition identity even though SDK callers retain mutable nested schema objects.
 - **Rule:** Recompute the contract fingerprint from current description/schema bytes, retain catalogue digest caching and per-definition execution guards, and reject old execute/prepared effects after mutation. Verify schema-only search through real refs, fresh execution, hidden exclusion and the loaded-definition limit with a bounded catalogue fixture.
+
+### Script Retirement Must Join Its Original Nested Calls
+- **Symptom:** A script returns or times out while an admitted nested call can still perform an effect, or a child script can discover tools excluded by its declared boundary.
+- **Root Cause:** Worker exit is treated as complete host settlement; discovery, execution and delegated adaptation use different tool pools. Non-configurable bootstrap globals also survive an attempted delete.
+- **Rule:** Give nested work the script's child signal, retire it at the first terminal outcome and join every admitted host boundary before reporting completion. Capture one restricted, guarded catalogue for discovery and execution, apply the child's boundary before adaptation, and clone run-owned script definitions instead of mutating retained caller definitions. Keep bridge senders and limits in inaccessible lexical bindings; verify actual workers and real prehook cancellation boundaries.
+
+### Export Warnings Cannot Decide Tool Ownership
+- **Symptom:** A damaged attachment hides otherwise verified tool results, or toggling Thinking resets an open tool card. A public caller's HTML can also bypass the text renderer.
+- **Root Cause:** Every export warning disables pairing, Thinking rebuilds the whole conversation, and caller markup is trusted at the public output boundary.
+- **Rule:** Carry the stored source's pairing disposition separately from media omission notices; preserve explicit unavailable pairing. Toggle existing Thinking elements in place. Re-render scrubbed source content at the public HTML boundary, validate attachments through the shared image inspector, and keep rejected media visibly omitted without changing saved history.
+
+### Live Model Completion Does Not Prove Requested Script Execution
+- **Symptom:** A model loads the script schema and then returns a completed answer without calling the required script.
+- **Root Cause:** A successful terminal state or schema search is treated as proof of the requested workflow.
+- **Rule:** Require the exact observed script call, nested effects, selected feedback and final settlement. Preserve a no-script run as a model-behavior or probe-contract failure even when it ends normally and writes nothing. Keep each retry's receipt and build identity separate; earlier successful runs remain historical when build inputs change.
+
+### Dynamic Nested Calls Need An Effect Barrier Around Reads
+- **Symptom:** A script starts a read while its preceding write is still awaiting approval or post-hook settlement, so the read sees old state even though ordinary tool batches preserve the order.
+- **Root Cause:** Only sequential tools join the queue; parallel calls bypass it and earlier parallel calls are not included in a later write's dependencies.
+- **Rule:** Capture the current fence and active-call snapshot synchronously. Sequential calls wait for both; later reads wait for that fence. Register the complete gate, finalizer and cleanup before yielding, settle failures without poisoning later calls, and check cancellation when queued work actually starts. Keep read-only calls concurrent; a dynamic RPC stream cannot preinspect a future batch.
+
+### Nested Terminal Attributes Must Reopen Their Parent Scope
+- **Symptom:** The tail of nested italic or struck text loses its outer style while the Markdown source and HTML nesting remain correct.
+- **Root Cause:** A fixed ANSI closing code disables the terminal attribute for both inner and outer scopes.
+- **Rule:** Render Markdown attributes through the existing scoped style owner, which reopens outer attributes after inner resets. Test the actual emitted close/reopen sequence and the final close outside the source span; stripping ANSI alone cannot detect this regression.

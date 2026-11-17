@@ -45,16 +45,23 @@ export interface ToolExecutionContext {
    */
   readonly runSubagent?: SubagentRunner
   readonly interactiveAsk?: InteractiveAsk
+  /** The same admitted snapshot used by the host gate for nested discovery and execution. */
+  readonly toolCatalog?: ReadonlyMap<string, ToolDefinition>
+  /** Captured public model metadata; physical credentials and route callbacks remain native. */
+  readonly modelCatalog?: ReturnType<typeof import('../core/catalog/models.js').sessionModelCatalog>
   /** Execute a nested tool call through the host's full permission, plan-mode, and hook gate. */
   readonly executeNestedTool?: (
     name: string,
     args: Record<string, unknown>,
     callId: string,
+    signal?: AbortSignal,
   ) => Promise<ToolExecutionResult>
 }
 
 export interface ToolExecutionResult {
   readonly success: boolean
+  /** An ordinary tool or hook may require the owning run to end. */
+  readonly terminate?: boolean
   readonly output?: string
   readonly error?: string
   /** outputNotice reserves essential page/recovery facts when model text is shortened. */
@@ -65,6 +72,8 @@ export interface ToolExecutionResult {
 }
 
 export interface ToolDefinition<Preparation = ToolPreparation | Promise<ToolPreparation>> {
+  /** Admitted composed catalogue, including guarded deferred definitions for script composition. */
+  readonly nestedToolCatalog?: () => ReadonlyMap<string, ToolDefinition>
   /** Captured native authority may be revoked by ordinary after-call hooks. */
   readonly resultAdmission?: () => string | undefined;
   /** Native observation of a refused call; must not perform target effects. */

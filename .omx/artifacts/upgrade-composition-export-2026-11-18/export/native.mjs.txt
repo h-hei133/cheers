@@ -1,0 +1,187 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { chromium } from 'playwright-core';
+import { checkBuild } from '../../scripts/start-lib.mjs';
+
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const packageRoot = path.join(repo, 'packages/ts-shell');
+const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+const owners = ['session/export/html.ts', 'session/export/sanitize.ts', 'session/export/media.ts',
+  'session/export/collect.ts', 'session/export/template.ts', 'session/export/htmlRender.ts',
+  'presentation/tui/text/inline.ts', 'presentation/tui/text/emphasis.ts',
+  'presentation/tui/transcript/markdownScan.ts', 'presentation/tui/transcript/table.ts'];
+const source = owners.map(file => ({ file: 'packages/ts-shell/src/' + file,
+  sha256: sha256(fs.readFileSync(path.join(packageRoot, 'src', file))) }));
+const manifestFile = path.join(packageRoot, 'dist/build-manifest.json');
+const manifestBytes = fs.readFileSync(manifestFile), manifest = JSON.parse(manifestBytes);
+const receipt = { status: 'not_run', platform: process.platform, source,
+  buildId: manifest.buildId, manifestSha256: sha256(manifestBytes),
+  helperSha256: sha256(fs.readFileSync(fileURLToPath(import.meta.url))),
+  publicBoundary: 'compiled ./session/export', actualCliExport: false,
+  compiledStorageFixture: true, fullGfmClaim: false };
+const privateRoot = fs.mkdtempSync(path.join(directory, 'native-private-'));
+const previousEnv = new Map();
+let browser;
+function env(key, value) {
+  previousEnv.set(key, process.env[key]);
+  if (value === undefined) delete process.env[key]; else process.env[key] = value;
+}
+function members(root) {
+  const members = [], pending = [root];
+  while (pending.length) {
+    const dir = pending.pop();
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) pending.push(file);
+      else if (entry.isFile()) members.push([path.relative(root, file), sha256(fs.readFileSync(file))]);
+    }
+  }
+  return members.sort(([a], [b]) => a.localeCompare(b));
+}
+function capture(root) {
+  return sha256(JSON.stringify(members(root)));
+}
+async function nativeCli(args, cwd) {
+  const child = spawn('rtk', ['proxy', process.execPath, path.join(repo, 'scripts/start.mjs'), ...args],
+    { cwd, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '', stderr = '';
+  const timer = setTimeout(() => child.kill('SIGKILL'), 30000);
+  child.stdout.on('data', bytes => { stdout += bytes; }); child.stderr.on('data', bytes => { stderr += bytes; });
+  try {
+    const result = await new Promise(resolve => {
+      child.once('error', () => resolve({ exit: null, signal: 'spawn-error' }));
+      child.once('close', (exit, signal) => resolve({ exit, signal }));
+    });
+    receipt.cli = { ...result, stdoutSha256: sha256(stdout), stderrSha256: sha256(stderr) };
+    assert.equal(result.exit, 0); assert.equal(result.signal, null);
+  } finally { clearTimeout(timer); }
+}
+try {
+  assert.equal(process.platform, 'linux');
+  const version = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version;
+  assert.equal(checkBuild({ root: repo, dist: path.join(packageRoot, 'dist'), version, executablePolicy: 'ignore' }).ok, true);
+  const home = path.join(privateRoot, 'home'), work = path.join(privateRoot, 'work');
+  fs.mkdirSync(home); fs.mkdirSync(work); fs.mkdirSync(path.join(work, '.git'));
+  for (const key of Object.keys(process.env)) if (/API_KEY|TOKEN|SECRET|AUTH|^AWS_|^GOOGLE_|^GEMINI_|^OPENAI_|^ANTHROPIC_|^AZURE_|^VERTEX_|^CHEERS_PROVIDER/.test(key)) env(key, undefined);
+  for (const [key, value] of Object.entries({ HOME: home, USERPROFILE: home, CHEERS_TEST_ROOT: privateRoot,
+    GIT_CEILING_DIRECTORIES: privateRoot, CHEERS_PROVIDER_MODE: 'synthetic', CHEERS_OFFLINE: '1' })) env(key, value);
+  const artifacts = manifest.artifacts.filter(item => item.path.endsWith('.js')).map(item => {
+    const file = path.join(packageRoot, 'dist', item.path), bytes = fs.readFileSync(file);
+    assert.equal(sha256(bytes), item.sha256); return { ...item, file, text: bytes.toString('utf8') };
+  });
+  const storage = {};
+  for (const symbol of ['createSessionStoreLayout', 'projectSessionFileLayout', 'writeSessionMetadataRecord',
+    'writeSessionState', 'appendSessionTurn', 'appendTranscriptEvent']) {
+    const candidates = artifacts.filter(item => new RegExp('function ' + symbol + '[ (=]').test(item.text)
+      && [...item.text.matchAll(/^export \{([\s\S]*?)^\};/gm)].some(match =>
+        match[1].split(',').map(value => value.trim()).includes(symbol)));
+    assert.equal(candidates.length, 1, symbol);
+    storage[symbol] = (await import(pathToFileURL(candidates[0].file).href))[symbol];
+  }
+  const { SessionManager } = await import(pathToFileURL(path.join(packageRoot, 'dist/index.js')).href);
+  const { renderExportHtml } = await import(pathToFileURL(path.join(packageRoot, 'dist/session/export/html.js')).href);
+  const session = new SessionManager().createNewWithId('offline-export-native', work);
+  const layout = storage.projectSessionFileLayout({ sessionsDir: storage.createSessionStoreLayout(home).sessionsDir,
+    sessionId: session.id });
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  const markdown = '**一句话说清：**一台机器\n\n7. 父\n   - 子\n8. 后\n\n名称 | 数量\n:--- | ---:\n甲 | 12\n\n```ts\nconst 值 = 1;\n```';
+  let order = 0;
+  const append = message => storage.appendSessionTurn({ session, message,
+    timestamp: '2026-11-18T00:00:0' + (++order) + 'Z',
+    append: event => storage.appendTranscriptEvent(layout.transcriptPath, event),
+    writeMetadata: current => storage.writeSessionMetadataRecord({ session: current, layout }),
+    writeState: current => storage.writeSessionState({ session: current, layout }) });
+  append({ role: 'user', content: [{ type: 'text', text: 'PUBLIC_SAFE_CONTENT\n<img src=x onerror="window.exportHandlerSentinel=1">' },
+    ...Array.from({ length: 6 }, () => ({ type: 'image', mimeType: 'IMAGE/PNG', data: png })),
+    { type: 'image', mimeType: 'image/png', data: '=' }, { type: 'image', mimeType: 'image/jpeg', data: png }] });
+  append({ role: 'assistant', content: markdown, reasoning: { text: 'VISIBLE_THINKING' },
+    tool_calls: [{ id: 'call-edit', type: 'function', function: { name: 'edit', arguments: '{}' } }] });
+  append({ role: 'tool', tool_call_id: 'call-edit', content: 'Updated file\n\n```diff\n-old\n+```ts\n+const 值 = 1;\n+TAIL_IN_DIFF\n```', metadata: { isError: false } });
+  const storeRoot = layout.sessionDir;
+  const beforeMembers = new Map(members(storeRoot));
+  const beforeStore = capture(storeRoot);
+  const cliFile = path.join(work, 'cli-export.html');
+  await nativeCli(['--export', session.id, cliFile], work);
+  assert.equal(fs.existsSync(cliFile), true); receipt.actualCliExport = true;
+  const afterMembers = new Map(members(storeRoot));
+  receipt.storedSessionChanges = [...new Set([...beforeMembers.keys(), ...afterMembers.keys()])]
+    .filter(file => beforeMembers.get(file) !== afterMembers.get(file));
+  assert.equal(capture(storeRoot), beforeStore); receipt.readOnlyStoredSession = true;
+  const publicFile = path.join(work, 'public-export.html');
+  const publicPayload = { header: { sessionId: 'public-boundary', workspace: 'isolated fixture', exportedAt: '2026-11-18' },
+    entries: [{ id: 'one', role: 'assistant', content: 'PUBLIC_SAFE_CONTENT',
+      html: '<img src="data:image/png;base64,=" onerror="window.exportHandlerSentinel=1">PUBLIC_INJECTED_HTML' }],
+    tree: [{ id: 'one', depth: 0, kind: 'turn-message', preview: 'safe preview' }], leafId: 'one', warnings: [] };
+  const publicBefore = JSON.stringify(publicPayload); fs.writeFileSync(publicFile, renderExportHtml(publicPayload));
+  assert.equal(JSON.stringify(publicPayload), publicBefore);
+  browser = await chromium.launch({ executablePath: '/home/wang/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome', headless: true });
+  const context = await browser.newContext({ offline: true });
+  const network = [], errors = [];
+  context.on('request', request => { if (/^https?:/.test(request.url())) network.push(sha256(request.url())); });
+  const page = await context.newPage(); page.on('pageerror', error => errors.push(sha256(error.message)));
+  await page.goto(pathToFileURL(publicFile).href);
+  await page.locator('#conversation .body').waitFor({ state: 'attached' });
+  receipt.publicProjection = await page.evaluate(() => ({ handlerExecutions: window.exportHandlerSentinel === 1 ? 1 : 0,
+    eventAttributes: document.querySelectorAll('#conversation [onerror]').length,
+    originalBodyVisible: document.querySelector('#conversation').textContent.includes('PUBLIC_SAFE_CONTENT'),
+    callerBodyAbsent: !document.querySelector('#conversation').textContent.includes('PUBLIC_INJECTED_HTML') }));
+  assert.deepEqual(receipt.publicProjection, { handlerExecutions: 0, eventAttributes: 0, originalBodyVisible: true, callerBodyAbsent: true });
+  await page.goto(pathToFileURL(cliFile).href);
+  await page.locator('#conversation .thinking').waitFor({ state: 'attached' });
+  await page.locator('#conversation .call summary').click();
+  await page.locator('#conversation .call .tool-diff').waitFor({ state: 'attached' });
+  receipt.richExport = await page.evaluate(async () => {
+    const images = [...document.querySelectorAll('#conversation .msg-image')];
+    await Promise.all(images.map(image => image.decode()));
+    const thinking = document.querySelector('#conversation .thinking'), tool = document.querySelector('#conversation .call');
+    window.exportToolIdentity = tool; window.exportThinkingIdentity = thinking;
+    return { cjkStrong: [...document.querySelectorAll('#conversation strong')].some(item => item.textContent === '一句话说清：'),
+      syntaxHighlighted: document.querySelectorAll('#conversation .hljs-keyword').length > 0,
+      orderedStart: document.querySelector('#conversation ol')?.getAttribute('start'),
+      nestedList: !!document.querySelector('#conversation ol > li > ul'),
+      tableAligned: document.querySelector('#conversation td:last-child')?.style.textAlign === 'right',
+      diffComplete: document.querySelector('#conversation .tool-diff').textContent.includes('+TAIL_IN_DIFF'),
+      imageCount: images.length, imagesDecoded: images.every(image => image.naturalWidth === 1 && image.naturalHeight === 1),
+      omissionsVisible: document.querySelector('header').textContent.includes('2 images were omitted'),
+      eventAttributes: document.querySelectorAll('#conversation [onerror]').length };
+  });
+  assert.equal(receipt.richExport.cjkStrong, true); assert.equal(receipt.richExport.syntaxHighlighted, true);
+  assert.equal(receipt.richExport.orderedStart, '7'); assert.equal(receipt.richExport.nestedList, true);
+  assert.equal(receipt.richExport.tableAligned, true); assert.equal(receipt.richExport.diffComplete, true);
+  assert.equal(receipt.richExport.imageCount, 6); assert.equal(receipt.richExport.imagesDecoded, true);
+  assert.equal(receipt.richExport.omissionsVisible, true); assert.equal(receipt.richExport.eventAttributes, 0);
+  await page.locator('#toggle-thinking').click();
+  receipt.thinking = await page.evaluate(() => ({ sameTool: window.exportToolIdentity === document.querySelector('#conversation .call'),
+    toolStillOpen: document.querySelector('#conversation .call').open,
+    sameThinking: window.exportThinkingIdentity === document.querySelector('#conversation .thinking'),
+    thinkingClosed: !document.querySelector('#conversation .thinking').open,
+    pressedFalse: document.querySelector('#toggle-thinking').getAttribute('aria-pressed') === 'false' }));
+  assert.equal(Object.values(receipt.thinking).every(Boolean), true);
+  await page.locator('#conversation .msg-image').first().click();
+  assert.equal(await page.locator('#image-modal').evaluate(node => node.classList.contains('open')), true);
+  assert.equal(await page.locator('#modal-image').evaluate(async node => { await node.decode(); return node.naturalWidth === 1; }), true);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#image-modal').evaluate(node => node.classList.contains('open')), false);
+  receipt.lightboxOpenedDecodedClosed = true;
+  receipt.networkRequests = network.length; receipt.pageErrors = errors.length;
+  assert.equal(network.length, 0); assert.equal(errors.length, 0);
+  assert.equal(capture(storeRoot), beforeStore); receipt.readOnlyStoredSession = true;
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed'; receipt.failure = { name: error.name, code: error.code ?? 'browser-or-probe-contract',
+    messageSha256: sha256(error.message), line: String(error.stack).match(/native\.mjs:(\d+)/)?.[1] ?? null };
+  process.exitCode = 1;
+} finally {
+  await browser?.close();
+  for (const [key, value] of previousEnv) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  fs.rmSync(privateRoot, { recursive: true, force: true }); receipt.privateStateRemoved = !fs.existsSync(privateRoot);
+  receipt.sourceUnchanged = source.every(item => sha256(fs.readFileSync(path.join(repo, item.file))) === item.sha256);
+  receipt.buildUnchanged = fs.readFileSync(manifestFile).equals(manifestBytes);
+  fs.writeFileSync(path.join(directory, 'native.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt));
+}

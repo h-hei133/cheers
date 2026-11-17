@@ -4,10 +4,10 @@ import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { graphemeBoundaries, visibleWidth } from "../text/measure.js";
 import { DIAGRAM_LANGUAGE, renderDiagram } from "./mermaid.js";
 import { scanBlocks } from "./markdownScan.js";
-import { createMathFinder, latexToDisplayText } from "./math.js";
+import { latexToDisplayText } from "./math.js";
 import { splitTableRow } from "./table.js";
-import { inlineWithinBudget, transformInline, type InlineContext } from "../text/inline.js";
-import { closeTerminalHyperlink, displayLinkUrl, terminalHyperlink } from "../text/link.js";
+import { renderInline, renderInlineAt, type MarkdownRenderOptions } from "./inline.js";
+import { closeTerminalHyperlink } from "../text/link.js";
 /**
  * Markdown rendering for assistant prose.
  *
@@ -44,10 +44,7 @@ export interface MarkdownRender {
   readonly sources: readonly (MarkdownSourceLine | undefined)[];
 }
 
-export interface MarkdownRenderOptions {
-  /** Captured terminal support; omitted calls retain the standalone renderer default. */
-  readonly supportsHyperlinks?: boolean;
-}
+export { renderInline, type MarkdownRenderOptions } from "./inline.js";
 
 /** Drop a trailing partial code fence so a streaming block does not flicker. */
 export function trimPartialFence(text: string): string {
@@ -58,36 +55,6 @@ export function trimPartialFence(text: string): string {
     return lines.join("\n");
   }
   return text;
-}
-
-/** Inline emphasis, code spans, and link labels for one line. */
-export function renderInline(text: string, options?: MarkdownRenderOptions): string {
-  return renderInlineAt(text, undefined, options);
-}
-
-function renderInlineAt(text: string, context?: InlineContext, options?: MarkdownRenderOptions): string {
-  if (!inlineWithinBudget(text, context)) return text;
-  return transformInline(text, {
-    renderCode: (code) => {
-      if (code.includes("/") || code.includes("\\") || /\.[a-zA-Z0-9_-]+$/.test(code)) {
-        return defaultTheme.fg("filename", code);
-      }
-      return defaultTheme.fg("mdCode", code);
-    },
-    renderText: renderPlainInline,
-    renderLink: (label, href, next) => {
-      const renderedLabel = defaultTheme.fg("mdLink", renderInlineAt(label, next, options));
-      const visibleTarget = displayLinkUrl(href);
-      return `${terminalHyperlink(renderedLabel, href, options?.supportsHyperlinks)}${visibleTarget ? defaultTheme.fg("mdLinkUrl", ` (${visibleTarget})`) : ""}`;
-    },
-    findMath: createMathFinder(text),
-  }, context);
-}
-
-function renderPlainInline(text: string): string {
-  return text
-    .replace(/\*\*([^*]+)\*\*/g, (_match, body: string) => defaultTheme.bold(body))
-    .replace(/(^|[^*])\*([^*\n]+)\*/g, (_match, lead: string, body: string) => `${lead}\x1b[3m${body}\x1b[23m`);
 }
 
 /**
@@ -213,11 +180,11 @@ function renderTableWithSources(block: Extract<import("./markdownScan.js").Markd
         node, nodeRow: index, nodeRows: values.length });
     }
   };
-  push(formatRow(wrapped[0]!, widths, true), lines[block.sourceStart]!, block.sourceStart);
+  push(formatRow(wrapped[0]!, widths, true, block.alignments), lines[block.sourceStart]!, block.sourceStart);
   push([line], lines[block.sourceStart + 1]!, block.sourceStart + 1);
   for (let index = 0; index < rowsOfCells.length; index++) {
     const sourceIndex = block.sourceStart + 2 + index;
-    push(formatRow(wrapped[index + 1]!, widths, false), lines[sourceIndex]!, sourceIndex);
+    push(formatRow(wrapped[index + 1]!, widths, false, block.alignments), lines[sourceIndex]!, sourceIndex);
   }
   return { rows: rendered, sources };
 }
@@ -228,8 +195,8 @@ function tableCellsFit(rows: readonly string[][], widths: readonly number[], opt
     const wrappedRow: string[][] = [];
     for (let column = 0; column < widths.length; column++) {
       const lines: string[] = [];
-      for (const segment of (row[column] ?? "").split(/<br\s*\/?>/i)) {
-        lines.push(...wrapToWidth(renderInline(segment, options), widths[column]!));
+      for (const segment of renderInlineAt(row[column] ?? "", undefined, options, true).split("\n")) {
+        lines.push(...wrapToWidth(segment, widths[column]!));
       }
       const cell = lines.length ? lines : [""];
       if (cell.length > MAX_CELL_LINES) return undefined;
@@ -312,7 +279,7 @@ function columnWidths(rows: readonly string[][], cells: number, options?: Markdo
   const widths = new Array<number>(count).fill(0);
   for (const row of rows) {
     for (let column = 0; column < count; column++) {
-      const rendered = (row[column] ?? "").split(/<br\s*\/?>/i).map(segment => renderInline(segment, options));
+      const rendered = renderInlineAt(row[column] ?? "", undefined, options, true).split("\n");
       widths[column] = Math.max(widths[column]!, ...rendered.map(segment => visibleWidth(segment)));
     }
   }
@@ -333,12 +300,17 @@ function columnWidths(rows: readonly string[][], cells: number, options?: Markdo
 }
 
 /** One logical row, wrapped to each column and padded to the tallest cell. */
-function formatRow(wrapped: readonly (readonly string[])[], widths: readonly number[], header: boolean): string[] {
+function formatRow(wrapped: readonly (readonly string[])[], widths: readonly number[], header: boolean,
+  alignments: readonly import("./table.js").TableAlignment[]): string[] {
   const height = Math.max(...wrapped.map(lines => lines.length));
   const rows: string[] = [];
   for (let line = 0; line < height; line++) {
-    rows.push(wrapped.map((lines, column) =>
-      padToWidth(closeTerminalHyperlink(header ? defaultTheme.bold(lines[line] ?? "") : lines[line] ?? ""), widths[column]!))
+    rows.push(wrapped.map((lines, column) => {
+      const text = closeTerminalHyperlink(header ? defaultTheme.bold(lines[line] ?? "") : lines[line] ?? "");
+      const padding = Math.max(0, widths[column]! - visibleWidth(text));
+      const before = alignments[column] === "right" ? padding : alignments[column] === "center" ? Math.floor(padding / 2) : 0;
+      return padToWidth(" ".repeat(before) + text, widths[column]!);
+    })
       .join(defaultTheme.fg("border", " │ ")));
   }
   return rows;

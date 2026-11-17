@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-18",
+  "batch": [
+    "E.1",
+    "E.3",
+    "D.4"
+  ],
+  "status": "linux_validation_passed_independent_review_pending",
+  "baseCommit": "cccc72089ebe3b280a6bd26a67b7d4ecf24841eb",
+  "delivery": {
+    "localCommit": "pending",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "3e05e202dc57f189c409d981803850882e01a3450d7e3daefcf543091daed0e1",
+    "inputsDigest": "f94c76f5c9eb31a80486438952e44902dc85efc446d6ea12b06804f9b446eb43",
+    "manifest": "build-manifest.json",
+    "compiledReceiptsBelongToThisBuild": true
+  },
+  "source": {
+    "receipt": "source.json",
+    "productionFiles": 32,
+    "testFiles": 12,
+    "snapshotsAreNonExecutableText": true,
+    "currentHashesMatch": true
+  },
+  "validation": {
+    "combined": {
+      "files": 49,
+      "tests": 963,
+      "passed": 963,
+      "failed": 0,
+      "receipt": "codemode/final-combined.json"
+    },
+    "static": {
+      "count": 7,
+      "status": "passed",
+      "productionModules": 2678,
+      "monoliths": 0,
+      "docsSourceAdvisories": 119,
+      "receipt": "codemode/final-accepted-gates-build.log"
+    },
+    "codemodeReversals": {
+      "cases": 12,
+      "assertionFailures": 23,
+      "restoredExactly": true,
+      "mainSourcesMutated": false,
+      "restoredTests": 96,
+      "receipt": "codemode/reversal.json"
+    },
+    "exportReversals": {
+      "cases": 7,
+      "assertionFailures": 18,
+      "restoredExactly": true,
+      "mainSourcesMutated": false,
+      "restoredTests": 149,
+      "receipt": "export/reversal.json"
+    },
+    "nativeComposition": {
+      "status": "passed",
+      "actualConfiguredRequests": 6,
+      "providerCases": [
+        "allowed",
+        "retry"
+      ],
+      "rawControls": [
+        "builtin-read-write",
+        "ordinary-deny",
+        "completed-effect-then-script-failure",
+        "native-media-read-image",
+        "timeout-pending-effect",
+        "parent-cancel-pending-effect"
+      ],
+      "foreignRequests": 0,
+      "rawNetworkRequests": 0,
+      "parentOnlyFeedback": true,
+      "originalConfigUnchanged": true,
+      "privateStateRemoved": true,
+      "sourceUnchanged": true,
+      "buildUnchanged": true,
+      "receipt": "codemode/native.json"
+    },
+    "installedConsumer": {
+      "status": "passed",
+      "publicEntries": 15,
+      "strictInstalledTypes": true,
+      "providerRequests": 0,
+      "actualReadWrite": true,
+      "receipt": "codemode/package.json"
+    },
+    "offlineExport": {
+      "status": "passed",
+      "actualCliExport": true,
+      "publicBoundary": "compiled ./session/export",
+      "networkRequests": 0,
+      "pageErrors": 0,
+      "readOnlyStoredSession": true,
+      "lightboxOpenedDecodedClosed": true,
+      "fullGfmClaim": false,
+      "sourceUnchanged": true,
+      "buildUnchanged": true,
+      "privateStateRemoved": true,
+      "receipt": "export/native.json"
+    }
+  },
+  "repositoryGate": {
+    "status": "not_proven",
+    "exitCode": 2,
+    "blockingObligation": "source_graph_has_no_unresolved_specifiers",
+    "obligationStatus": "missing",
+    "reason": "Complete source graph exceeds the pinned 16384-edge collection ceiling.",
+    "normalReceipt": "codemode/accepted-judge.json",
+    "diagnostic": "export/graph-capacity.json",
+    "expandedLimit": 32768,
+    "expandedEdges": 16661,
+    "expandedUnresolved": 0,
+    "expandedIsProof": false,
+    "baselineEdges": 16575,
+    "pinnedTrackedFiles": 18,
+    "scopeModified": false,
+    "gateModified": false
+  },
+  "review": {
+    "metadata": "limited_approve_current_hashes_match",
+    "composition": "pending",
+    "workerLifetime": "pending",
+    "export": "pending"
+  },
+  "taskDisposition": {
+    "E.1": "linux_validation_passed_independent_review_pending",
+    "E.3": "partial: captured list/get metadata, declarations, namespace and bounded image output validated; richer classifier/image-generation dispatch and real provider image acceptance remain absent.",
+    "D.4": "partial: CLI/public offline export, highlighter, CJK emphasis, task/table/list subset, Thinking/Diff/lightbox and sanitization validated; full GFM acceptance remains open.",
+    "F2.2": "confirmed cache-body, stale publication, invalid record and cancellation gaps; no production change in this batch."
+  },
+  "limitations": [
+    "Linux local evidence only.",
+    "Worker plus node:vm is not proof of a general security sandbox.",
+    "No deterministic replay, real-provider image acceptance, generation/classifier dispatch, universal token accuracy, billing or cache benefit claim.",
+    "No push or remote CI."
+  ]
+}

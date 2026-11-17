@@ -1,0 +1,554 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "publicCompiledSdk": true,
+  "configuredProvider": true,
+  "probeSha256": "e047ca9774d189267b80b240b3fd10711337471ed81d3a5945802bbe0f8b0a72",
+  "referenceProbeSha256": "1c4119fa6af82a367e2cc37f74a731760349e76ed7c876c5a789bc0760640cf4",
+  "providerCases": [],
+  "rawCases": [],
+  "requests": [
+    {
+      "stage": "provider-allowed",
+      "bodySent": true,
+      "requestBytes": 5323,
+      "requestSha256": "e17de3df1bb72663ae483c7394ab019973e0bae52182188a26a0ce3a0ef414cc",
+      "declarations": [
+        {
+          "name": "read",
+          "schemaSha256": "1c377880a9e58d4ff7a7bc852a3ed57aac4e55873143b2c76cf8a60b299172af",
+          "schemaBytes": 486
+        },
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131
+        }
+      ],
+      "toolResults": [],
+      "schemaSha256": "11b274863085393cb9aec87d9b43c51c50df05c8760a2ed4a3b07349c8d23d00",
+      "systemSha256": "b6335f51eb4fa8f200374574e108d442641fce1e1dbccca3d4fcd53bf970f2e1",
+      "systemBytes": 1377,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 4052,
+      "responseSha256": "cf38f6994896dd3c964374e74c41d268baedcda3ca7bf1c91d7fc243c13090b7",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 14,
+        "completionMarker": true
+      }
+    },
+    {
+      "stage": "provider-allowed",
+      "bodySent": true,
+      "requestBytes": 6893,
+      "requestSha256": "f70b2f4e1898f57e01ebee441a7a78003b538a9d5c51bb678e4f30f8311c8507",
+      "declarations": [
+        {
+          "name": "read",
+          "schemaSha256": "1c377880a9e58d4ff7a7bc852a3ed57aac4e55873143b2c76cf8a60b299172af",
+          "schemaBytes": 486
+        },
+        {
+          "name": "codemode",
+          "schemaSha256": "4e2396e18e4c6f60f6a5408b0a229e605f1682a2c1cc26740f16c51f3285061b",
+          "schemaBytes": 242
+        },
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "call_eebed877e51a4185991f9a6afbb0faf1",
+          "sha256": "d0791373651c22050aa2c63af6c84b967faf9f63a0b6c858d40335549b168998",
+          "bytes": 451,
+          "selected": false,
+          "discarded": false,
+          "imageAck": false,
+          "images": 0,
+          "search": {
+            "queryExact": true,
+            "loadedScript": true,
+            "matches": [
+              {
+                "name": "codemode",
+                "loaded": false,
+                "pinned": false
+              }
+            ]
+          }
+        }
+      ],
+      "schemaSha256": "efc1709b7e6f705396e56200bbfee43d6f786c846aedc80746bb5a447b5bbef1",
+      "systemSha256": "b6335f51eb4fa8f200374574e108d442641fce1e1dbccca3d4fcd53bf970f2e1",
+      "systemBytes": 1377,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 101711,
+      "responseSha256": "44f3b667dd6d977ff7992c00c77c90aa214cb7b571d9bb3e67e3129152737f3e",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 355,
+        "completionMarker": true
+      }
+    },
+    {
+      "stage": "provider-allowed",
+      "bodySent": true,
+      "requestBytes": 9056,
+      "requestSha256": "a2eadbbf204a194af11a7ac152e1d3e4af9c64f3758e7b612750eeff27af5595",
+      "declarations": [
+        {
+          "name": "read",
+          "schemaSha256": "1c377880a9e58d4ff7a7bc852a3ed57aac4e55873143b2c76cf8a60b299172af",
+          "schemaBytes": 486
+        },
+        {
+          "name": "codemode",
+          "schemaSha256": "4e2396e18e4c6f60f6a5408b0a229e605f1682a2c1cc26740f16c51f3285061b",
+          "schemaBytes": 242
+        },
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "call_eebed877e51a4185991f9a6afbb0faf1",
+          "sha256": "d0791373651c22050aa2c63af6c84b967faf9f63a0b6c858d40335549b168998",
+          "bytes": 451,
+          "selected": false,
+          "discarded": false,
+          "imageAck": false,
+          "images": 0,
+          "search": {
+            "queryExact": true,
+            "loadedScript": true,
+            "matches": [
+              {
+                "name": "codemode",
+                "loaded": false,
+                "pinned": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "call_266f8db4b3ce4089885698806a88dc61",
+          "sha256": "c08a2b4d5835f2ebd012ec6486e76771271f1ecd149b15cd83771af63a0291ac",
+          "bytes": 311,
+          "selected": true,
+          "discarded": false,
+          "imageAck": false,
+          "images": 0
+        }
+      ],
+      "schemaSha256": "efc1709b7e6f705396e56200bbfee43d6f786c846aedc80746bb5a447b5bbef1",
+      "systemSha256": "b6335f51eb4fa8f200374574e108d442641fce1e1dbccca3d4fcd53bf970f2e1",
+      "systemBytes": 1377,
+      "modelMatchesConfigured": true,
+      "responseStatus": 200,
+      "responseBytes": 173,
+      "responseSha256": "50448f673b388bdfeb67ebc115ec09a58737ea5fd2f9fac11309679c20d7e711",
+      "responseEnd": "accepted-stream-retirement",
+      "response": {
+        "inspectable": true,
+        "frames": 1,
+        "completionMarker": false
+      }
+    }
+  ],
+  "buildId": "b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192",
+  "buildInputsDigest": "d70959b43efeefdd7b109e5989c621183d14789694309b9962fada878960ffd3",
+  "buildManifestSha256": "1ca27538c04a8f6796ef68c1cd2a89a0e9e37dce1724c9ab45e6c9365c3eed32",
+  "source": {
+    "files": [
+      {
+        "file": "packages/ts-shell/src/index.ts",
+        "sha256": "a6ef28d898c9bc48717b08ca682e146a073b5d3923bf83550b061e48e0daffb1"
+      },
+      {
+        "file": "packages/ts-shell/src/tools/types.ts",
+        "sha256": "d4afb32f31f98eeac4d51236c264703a51120a29081eac0554fd05bb02a0ab2b"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/catalog.ts",
+        "sha256": "953e011e3ab68e0705656979579e537a217612ec947cdb751c745cdb181ee6fd"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/discovery/state.ts",
+        "sha256": "ebc63d4c7ed9b67f204766ecd6e7a66e10d7b821e9b4f4c9c660e87aa40ac622"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/tool.ts",
+        "sha256": "4403ec624010f45e86c7bae7c38a4ead7d1726797cc7902c4cff9496f32106f5"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/prelude.ts",
+        "sha256": "bf4669c30290e1267838eabbfc1600ae673b38ede985ae234b2b6a79175ef1f9"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/execution.ts",
+        "sha256": "ed9b71d2772f66b570faba4d0ad4c3f5475918abf180cd63030d67d25e27263e"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/image.ts",
+        "sha256": "63b3867038c67c8ff35366610a38968033f40dc923483ad9c88ea50482184da9"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/models.ts",
+        "sha256": "89ae843cdb7712013fbb6efd9b4ce7a3f6cdf8170976583033109ffec4e0ff2f"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/nestedCalls.ts",
+        "sha256": "5e38cfb0433814ea278d0699a026fcddbdbf53d7a80d49651fa82fff5bd604d5"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/declarations.ts",
+        "sha256": "873182669754960da87708d8f57bfda3b7ef83243ff7385331eafa22c202ab2e"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/output.ts",
+        "sha256": "f3275a67764c4c1c57730fc511da9f3d84839f3f33efda5bac15cd8c1bd50841"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/catalog.ts",
+        "sha256": "a6a527b1be724e2bd6808ad74d4ab610571e9e2c41edc869fe63a03e263434b1"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/execution.ts",
+        "sha256": "c5f8d75d83893f67439ec1abe84330eca2b5784040e11489d42c6ea64aab54ba"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/subagent.ts",
+        "sha256": "3bc31537c51d4ef1589652b6139a4aa20e30f026165151fc2130656a48bfdf24"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/session.ts",
+        "sha256": "213852747bf94d6bbc2f59f6b63e63832a2710d6652566e33687a041f69d951f"
+      },
+      {
+        "file": "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts",
+        "sha256": "9cba0dddccacf90149fbb5dfe793a1e169437f034adc70231d10cacd8063c950"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/tools.ts",
+        "sha256": "429b08f174f8c9f23b9e74f07f2f2bdbf262abe84ff38c64e84b183f2ec3eeaf"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/nestedTools.ts",
+        "sha256": "ef2eaf427d4f47f88050c42a6645f1341f8a2114a6b61ffd89b2f38d779e5c3b"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/read.ts",
+        "sha256": "5d7f3a04b4367a3d8bb43e0d954e6b291c3a5d69cbfeeaf3b1294a7a01c46388"
+      },
+      {
+        "file": "packages/ts-shell/src/runtime/execution/media/image.ts",
+        "sha256": "4e551f8e2ed6559824bc87083d0d91027bf51bdf7f2047a29df6f938d9c147f5"
+      }
+    ],
+    "sha256": "69035fe3d0c6d36aeffed73501ce59533f161592d7cb512abb8eef97c1c567af"
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "isolatedValidObjects": true,
+    "minimalConfiguredModelEntry": true,
+    "originalConfiguredCredentials": true,
+    "inventedPrices": false,
+    "inventedRemoteLimits": false,
+    "localContextWindow": 32000,
+    "localOutputCap": 4096,
+    "publishedContextWindow": null,
+    "publishedInputLimit": null,
+    "originalPricesPresent": false
+  },
+  "configuredTarget": {
+    "providerIdSha256": "7e341752813dcf844ffc5197123e0f41f6cfe860a8ea52cb8f92749667afc142",
+    "connectionIdSha256": "53793a6c1cf5bdcd5eaa2dffa613b5ed1bf7d9e2d425728ff71004e46689e998",
+    "modelIdSha256": "901b676976668ae9f8734593d5fcff241c6b46b1f08e702ef6c272f82290ba9c",
+    "catalogueIdSha256": "f856222c5b7d1f3e56f094a7b1cb14957b96e9299566a03a0d12ab4bbe2ae221"
+  },
+  "originalInputsSha256": "ce298c2f7b2a5664c495d78fc8b9fde599378bd0fded9e346da8b3af06bc67d5",
+  "compiledControls": {
+    "manifestBoundInternalExports": true,
+    "publicPackageExportClaim": false,
+    "owners": [
+      {
+        "symbol": "createCoreToolRegistry",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-JGJRH6RT.js",
+        "sha256": "247afe05eb9ba15b9b7737c1291c2f64962b5361bfc1311ed3f84a3ba2a23601"
+      },
+      {
+        "symbol": "createCodemodeToolDefinition",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-GSL6J4GG.js",
+        "sha256": "68697027e726adfe1b46d16b57518061264845c2a56f1038ae2acda22a7e1506"
+      },
+      {
+        "symbol": "adaptTools",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-4HI5RV5D.js",
+        "sha256": "3c42683e954dfc8821dcbac3578d7cbcd2fd952cab6653788d5efeec07dc44e1"
+      },
+      {
+        "symbol": "createToolHooks",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-4HI5RV5D.js",
+        "sha256": "3c42683e954dfc8821dcbac3578d7cbcd2fd952cab6653788d5efeec07dc44e1"
+      },
+      {
+        "symbol": "executeToolBatch",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-BHWSQQ3R.js",
+        "sha256": "29d08cc168d9049ee6fd20784708eabcd71b2cbb1fffdcf7e8039cf40e978486"
+      },
+      {
+        "symbol": "HookDispatcher",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-JGJRH6RT.js",
+        "sha256": "247afe05eb9ba15b9b7737c1291c2f64962b5361bfc1311ed3f84a3ba2a23601"
+      },
+      {
+        "symbol": "inspectImage",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-4CFNRW32.js",
+        "sha256": "2d9c24f7fe8400a326801549246247c4ff862736ee7e080b6239b12561515616"
+      },
+      {
+        "symbol": "sessionModelCatalog",
+        "artifact": "builds/b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192/chunks/chunk-DL7HRZK7.js",
+        "sha256": "eef03e44ea848585dfaced4ed9fe0f7ab249eb204d14675f6b4fb9e8ff138c78"
+      }
+    ]
+  },
+  "retainedRawControls": {
+    "file": "native-network-failed.json",
+    "sha256": "b8949480396dc7dc3881c28f230de5953d2f8097d0222663184c00aeddbeebad",
+    "passed": [
+      "builtin-read-write",
+      "ordinary-deny",
+      "completed-effect-then-script-failure",
+      "native-media-read-image",
+      "timeout-pending-effect",
+      "parent-cancel-pending-effect"
+    ],
+    "previousActualRequests": 2
+  },
+  "failedStage": "provider-allowed",
+  "failure": {
+    "category": "provider-quota",
+    "code": "native-operation-failed"
+  },
+  "failureLine": null,
+  "incompleteCase": {
+    "name": "allowed",
+    "calls": [
+      {
+        "id": "call_eebed877e51a4185991f9a6afbb0faf1",
+        "name": "tool_search",
+        "argumentsSha256": "b1d8a8d86da53a8e1f420b2f8f9841ac82a54efd5450f40d9307ed26ad601878",
+        "exactScript": null,
+        "schemaQueryExact": true,
+        "singleStepLoad": true
+      },
+      {
+        "id": "call_266f8db4b3ce4089885698806a88dc61",
+        "name": "codemode",
+        "argumentsSha256": "8efc0b71620f2c92cef4b4b05cc5fb7f44c10234a99dd727937d0928a0438d1a",
+        "exactScript": true,
+        "schemaQueryExact": null,
+        "singleStepLoad": null
+      }
+    ],
+    "results": [
+      {
+        "id": "call_eebed877e51a4185991f9a6afbb0faf1",
+        "name": "tool_search",
+        "success": true,
+        "outputSha256": "d0791373651c22050aa2c63af6c84b967faf9f63a0b6c858d40335549b168998",
+        "outputBytes": 451,
+        "selected": false,
+        "discarded": false,
+        "images": 0,
+        "search": {
+          "queryExact": true,
+          "loadedScript": true,
+          "matches": [
+            {
+              "name": "codemode",
+              "loaded": false,
+              "pinned": false
+            }
+          ]
+        }
+      },
+      {
+        "id": "call_266f8db4b3ce4089885698806a88dc61",
+        "name": "codemode",
+        "success": true,
+        "outputSha256": "c08a2b4d5835f2ebd012ec6486e76771271f1ecd149b15cd83771af63a0291ac",
+        "outputBytes": 311,
+        "selected": true,
+        "discarded": false,
+        "images": 0,
+        "summary": {
+          "selected": true,
+          "recordsExact": true,
+          "written": true,
+          "rejected": false,
+          "retryReason": false,
+          "inspection": {
+            "collisionSafe": true,
+            "namespace": true,
+            "physical": true,
+            "logical": true,
+            "missing": true,
+            "frozen": true,
+            "callbacks": true
+          }
+        }
+      }
+    ],
+    "approvals": [
+      {
+        "id": "call_eebed877e51a4185991f9a6afbb0faf1",
+        "name": "tool_search",
+        "outcome": "approved"
+      },
+      {
+        "id": "call_266f8db4b3ce4089885698806a88dc61",
+        "name": "codemode",
+        "outcome": "approved"
+      },
+      {
+        "id": "call_266f8db4b3ce4089885698806a88dc61/3",
+        "name": "fixture:effect",
+        "outcome": "approved"
+      }
+    ],
+    "hooks": [
+      {
+        "event": "PreToolUse",
+        "name": "tool_search",
+        "id": "call_eebed877e51a4185991f9a6afbb0faf1",
+        "argumentsSha256": "b1d8a8d86da53a8e1f420b2f8f9841ac82a54efd5450f40d9307ed26ad601878",
+        "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "discarded": false
+      },
+      {
+        "event": "PostToolUse",
+        "name": "tool_search",
+        "id": "call_eebed877e51a4185991f9a6afbb0faf1",
+        "argumentsSha256": "b1d8a8d86da53a8e1f420b2f8f9841ac82a54efd5450f40d9307ed26ad601878",
+        "outputSha256": "d0791373651c22050aa2c63af6c84b967faf9f63a0b6c858d40335549b168998",
+        "discarded": false
+      },
+      {
+        "event": "PreToolUse",
+        "name": "codemode",
+        "id": "call_266f8db4b3ce4089885698806a88dc61",
+        "argumentsSha256": "8efc0b71620f2c92cef4b4b05cc5fb7f44c10234a99dd727937d0928a0438d1a",
+        "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "discarded": false
+      },
+      {
+        "event": "PreToolUse",
+        "name": "read",
+        "id": "call_266f8db4b3ce4089885698806a88dc61/1",
+        "argumentsSha256": "35365c22bb4ae9d1bd22dc5830a69daf4c9fc5f914584829327297dfe3074373",
+        "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "discarded": false
+      },
+      {
+        "event": "PreToolUse",
+        "name": "read",
+        "id": "call_266f8db4b3ce4089885698806a88dc61/2",
+        "argumentsSha256": "22f8a5ca54e02eae5ea1a20c48ed41dca73fbd6a92042a4d4400fc75441b1687",
+        "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "discarded": false
+      },
+      {
+        "event": "PreToolUse",
+        "name": "fixture:effect",
+        "id": "call_266f8db4b3ce4089885698806a88dc61/3",
+        "argumentsSha256": "a8a600a54f901421dee11a107dc09a607cf9b41fea3432fa1ea3d92ce2280fdc",
+        "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "discarded": false
+      },
+      {
+        "event": "PostToolUse",
+        "name": "fixture:effect",
+        "id": "call_266f8db4b3ce4089885698806a88dc61/3",
+        "argumentsSha256": "a8a600a54f901421dee11a107dc09a607cf9b41fea3432fa1ea3d92ce2280fdc",
+        "outputSha256": "4bc0f935496777071308849b8e36f0d60daa09a55f8cce17732c7a58fe1a5a77",
+        "discarded": false
+      },
+      {
+        "event": "PostToolUse",
+        "name": "read",
+        "id": "call_266f8db4b3ce4089885698806a88dc61/1",
+        "argumentsSha256": "35365c22bb4ae9d1bd22dc5830a69daf4c9fc5f914584829327297dfe3074373",
+        "outputSha256": "b41a2f27e222458c50c8085f3ca153727fc1685b9ac36310120828728d6b9493",
+        "discarded": true
+      },
+      {
+        "event": "PostToolUse",
+        "name": "read",
+        "id": "call_266f8db4b3ce4089885698806a88dc61/2",
+        "argumentsSha256": "22f8a5ca54e02eae5ea1a20c48ed41dca73fbd6a92042a4d4400fc75441b1687",
+        "outputSha256": "ed7e5acc14d8b4112351d57ddd67cb03d364c771410502429938a41b6f8a533c",
+        "discarded": true
+      },
+      {
+        "event": "PostToolUse",
+        "name": "codemode",
+        "id": "call_266f8db4b3ce4089885698806a88dc61",
+        "argumentsSha256": "8efc0b71620f2c92cef4b4b05cc5fb7f44c10234a99dd727937d0928a0438d1a",
+        "outputSha256": "c08a2b4d5835f2ebd012ec6486e76771271f1ecd149b15cd83771af63a0291ac",
+        "discarded": false
+      }
+    ],
+    "effects": 1,
+    "collisionEffects": 0,
+    "routeCalls": 0,
+    "retryHooks": 0,
+    "terminalStatus": null,
+    "configuredTargetAdmitted": true,
+    "scriptSha256": "591308395a09fb3350228f4458dfc3de464634ada2a34f6c8cbdc1b799efa219"
+  },
+  "cleanupSettled": true,
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "observerEvents": {
+    "create": 3,
+    "bodySent": 3,
+    "headers": 6,
+    "data": 89,
+    "complete": 0,
+    "retired": 3,
+    "finalized": 3
+  },
+  "actualRequests": 3,
+  "foreignRequests": 0,
+  "rawNetworkRequests": 0
+}

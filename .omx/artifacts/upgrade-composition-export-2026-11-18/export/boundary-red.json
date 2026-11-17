@@ -1,0 +1,41 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "consumer": "compiled ./session/export",
+  "buildId": "b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192",
+  "manifestSha256": "1ca27538c04a8f6796ef68c1cd2a89a0e9e37dce1724c9ab45e6c9365c3eed32",
+  "source": [
+    {
+      "file": "packages/ts-shell/src/session/export/html.ts",
+      "sha256": "bfa32808ccfce289a060f32339ba72e475cafdd72b7bbe07d09a1941ef3cbb45"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/sanitize.ts",
+      "sha256": "ec1a4981813adcd16796bf2a2c34c4491cd05c49965cd91bb01c99621e5d8942"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/template.ts",
+      "sha256": "ae926ec73a6e1351b4ea225c1de8e53d42a96b9b4bd56f60abb91524117094bf"
+    },
+    {
+      "file": "packages/ts-shell/src/session/export/htmlRender.ts",
+      "sha256": "05f23afc12a45681740d23b339876225e6bfa6ad5ee4fef7934293c7d40b4683"
+    }
+  ],
+  "helperSha256": "f32bcebcdba5364593b6ad9e283524366e6f6393cbe3d1f4d24aa8baaf36214b",
+  "expectedHandlerExecutions": 0,
+  "handlerExecutions": 1,
+  "safeContentVisible": false,
+  "injectedContentVisible": true,
+  "eventAttributes": 1,
+  "networkRequests": 0,
+  "pageErrors": 0,
+  "failure": {
+    "name": "AssertionError",
+    "code": "ERR_ASSERTION",
+    "messageSha256": "42b670c0d35c38c10ba313ac59025d170dfc848bd325781fa34dd0942e1c7989"
+  },
+  "privateStateRemoved": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true
+}

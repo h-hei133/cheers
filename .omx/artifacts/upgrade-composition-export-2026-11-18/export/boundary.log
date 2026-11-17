@@ -1,0 +1,1 @@
+{"status":"failed","handlerExecutions":1,"safeContentVisible":false,"eventAttributes":1,"failure":{"name":"AssertionError","code":"ERR_ASSERTION","messageSha256":"42b670c0d35c38c10ba313ac59025d170dfc848bd325781fa34dd0942e1c7989"},"privateStateRemoved":true}

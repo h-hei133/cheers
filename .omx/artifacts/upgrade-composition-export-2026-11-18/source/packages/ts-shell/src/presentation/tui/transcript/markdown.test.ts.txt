@@ -1,0 +1,537 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { setDiagramMode } from "./mermaid.js";
+import { renderInline, renderMarkdown, renderMarkdownWithSources, trimPartialFence } from "./markdown.js";
+import { scanBlocks } from "./markdownScan.js";
+import { visibleWidth } from "../text/measure.js";
+import { stripAnsi } from "../text/ansi.js";
+import { defaultTheme } from "../../theme/theme.js";
+import { getDefaultTheme } from "../../themes/index.js";
+
+const WIDTH = 40;
+
+const plain = (rows: readonly string[]): string => rows.map(stripAnsi).join("\n");
+
+describe("shared conversation Markdown contracts", () => {
+  it("recognizes pipe tables without optional outer delimiters in both scan and terminal", () => {
+    const source = "名称 | 说明\n--- | ---\n甲 | 乙";
+    expect(scanBlocks(source)).toMatchObject([
+      { kind: "table", header: "名称 | 说明", rows: ["甲 | 乙"], sourceStart: 0, sourceEnd: 2 },
+    ]);
+    const rendered = renderMarkdownWithSources(source, 60);
+    expect(plain(rendered.rows)).toContain("甲");
+    expect(plain(rendered.rows)).toContain("乙");
+    expect(plain(rendered.rows)).toContain("┼");
+    expect(rendered.sources.filter(value => value?.breakAfter === "logical").map(value => value?.text))
+      .toEqual(source.split("\n"));
+  });
+
+  it("does not close a shared fence on trailing language text and retains source coordinates", () => {
+    const source = "```unknown\nfirst\n```ts\nTAIL_IN_FENCE\n```";
+    expect(scanBlocks(source)).toMatchObject([
+      { kind: "fence", language: "unknown", lines: ["first", "```ts", "TAIL_IN_FENCE"], sourceStart: 0, sourceEnd: 4 },
+    ]);
+    const rendered = renderMarkdownWithSources(source, 60);
+    expect(plain(rendered.rows)).toContain("```ts");
+    expect(plain(rendered.rows)).toContain("TAIL_IN_FENCE");
+    expect(rendered.sources.filter(value => value?.breakAfter === "logical").map(value => value?.text))
+      .toEqual(source.split("\n"));
+  });
+
+  it("keeps an added fence marker inside the shared diff block", () => {
+    const source = "```diff\n+```ts\n+const 值 = 1;\n+TAIL_IN_DIFF\n```";
+    expect(scanBlocks(source)).toMatchObject([
+      { kind: "fence", language: "diff", lines: ["+```ts", "+const 值 = 1;", "+TAIL_IN_DIFF"], sourceStart: 0, sourceEnd: 4 },
+    ]);
+    expect(plain(renderMarkdown(source, 60))).toContain("+TAIL_IN_DIFF");
+  });
+
+  it("keeps table breaks inside code literal and renders outside breaks on another row", () => {
+    const source = "| 代码 | 换行 |\n| --- | --- |\n| `a<br>b` | first<br>second |";
+    const rows = renderMarkdown(source, 60).map(stripAnsi);
+    expect(rows.some(row => row.includes("a<br>b"))).toBe(true);
+    expect(rows.some(row => row.includes("first"))).toBe(true);
+    expect(rows.some(row => row.includes("second"))).toBe(true);
+    expect(rows.some(row => row.includes("first") && row.includes("second"))).toBe(false);
+  });
+
+  it("shares underscore and escaped-emphasis decisions with the exported renderer", () => {
+    expect(stripAnsi(renderInline("_斜体_ and __粗体__"))).toBe("斜体 and 粗体");
+    expect(stripAnsi(renderInline("\\*字\\* and \\_字\\_"))).toBe("*字* and _字_");
+  });
+
+  it("preserves non-CJK delimiter flanking in the terminal", () => {
+    expect(stripAnsi(renderInline("**end.**Then next"))).toBe("**end.**Then next");
+  });
+
+  it("preserves authored nested indentation and ordered numbering in terminal rows", () => {
+    const source = "7. 父\n   - 子\n8. 后";
+    expect(plain(renderMarkdown(source, 60))).toBe("7. 父\n   • 子\n8. 后");
+  });
+});
+
+describe("inline styling", () => {
+  it.each([
+    { source: "*outer *inner* tail*", open: "\x1b[3m", close: "\x1b[23m" },
+    { source: "~~outer ~~inner~~ tail~~", open: "\x1b[9m", close: "\x1b[29m" },
+  ])("keeps the outer attribute after nested styling: $source", ({ source, open, close }) => {
+    const rendered = renderInline(source + " outside");
+    expect(stripAnsi(rendered)).toBe("outer inner tail outside");
+    expect(rendered).toContain(`${close}${open} tail`);
+    expect(rendered).toContain(`${close} outside`);
+  });
+
+  it("removes the markup and keeps the words", () => {
+    expect(stripAnsi(renderInline("a **bold** and *italic* word"))).toBe("a bold and italic word");
+  });
+
+  it("renders a code span without its backticks", () => {
+    expect(stripAnsi(renderInline("call `run()` now"))).toBe("call run() now");
+  });
+
+  it("distinguishes escaped, multi-run, and unmatched backticks", () => {
+    expect(stripAnsi(renderInline("\\`text $x^2$\\`"))).toBe("\\`text x²\\`");
+    expect(stripAnsi(renderInline("``code $x^2$``"))).toBe("code $x^2$");
+    expect(stripAnsi(renderInline("`unmatched $x^2$"))).toBe("`unmatched x²");
+    expect(stripAnsi(renderInline("``unmatched"))).toBe("``unmatched");
+    expect(stripAnsi(renderInline("``unmatched`"))).toBe("``unmatched`");
+  });
+
+  it("does not apply emphasis inside a code span", () => {
+    expect(stripAnsi(renderInline("`**literal**` and **bold**"))).toBe("**literal** and bold");
+  });
+
+  it("projects inline math as one opaque token", () => {
+    expect(stripAnsi(renderInline("$x^2 + y_1$"))).toBe("x² + y₁");
+    expect(stripAnsi(renderInline("$a*b*c$"))).toBe("a*b*c");
+    expect(stripAnsi(renderInline("$[docs](https://example.test)$"))).toBe("[docs](https://example.test)");
+    expect(renderInline("$[docs](https://example.test)$")).not.toContain("\x1b]8;;");
+  });
+
+  it("keeps the complete formula when projection cannot preserve it", () => {
+    const unknown = "$\\unknown{x}+\\alpha$";
+    const missing = "$\\frac{a}$";
+    expect(stripAnsi(renderInline(unknown))).toBe(unknown);
+    expect(stripAnsi(renderInline(missing))).toBe(missing);
+  });
+
+  it("allows emphasis to wrap code and link tokens", () => {
+    expect(stripAnsi(renderInline("**`x`**"))).toBe("x");
+    expect(stripAnsi(renderInline("**[x](https://e.test)**"))).toBe("x (https://e.test)");
+  });
+
+  it("shows a link label with its target", () => {
+    expect(stripAnsi(renderInline("[docs](https://x/y)"))).toBe("docs (https://x/y)");
+  });
+
+  it("emits a terminal hyperlink for a safe target and keeps unsafe targets inert", () => {
+    const restore = defaultTheme.snapshot();
+    defaultTheme.apply(getDefaultTheme(), "none");
+    try {
+      expect(renderInline("[docs](https://example.test/path)")).toContain(
+        "\x1b]8;;https://example.test/path\x07docs\x1b]8;;\x07",
+      );
+      expect(renderInline("[docs](javascript:alert(1))")).not.toContain("\x1b]8;;");
+      const sanitized = stripAnsi(renderInline("[docs](https://example.test/\u009dpath)"));
+      expect(sanitized).toBe("docs (https://example.test/path)");
+      expect(sanitized).not.toContain("\u009d");
+    } finally {
+      restore();
+    }
+  });
+
+  it("renders code spans inside link labels", () => {
+    expect(stripAnsi(renderInline("[`x`](https://e.test)"))).toBe("x (https://e.test)");
+    expect(stripAnsi(renderInline("[``x``](https://e.test)"))).toBe("x (https://e.test)");
+    expect(stripAnsi(renderInline("[`a ] b`](https://e.test)"))).toBe("a ] b (https://e.test)");
+    expect(stripAnsi(renderInline("[`a [ b`](https://e.test)"))).toBe("a [ b (https://e.test)");
+  });
+
+  it("bounds large unmatched bracket input", () => {
+    const input = "[".repeat(80_000);
+    expect(stripAnsi(renderInline(input))).toBe(input);
+  });
+
+  it("chooses an inline marker without rescanning a large private-use run", () => {
+    const input = "\uE000".repeat(60_000);
+    expect(stripAnsi(renderInline(input))).toBe(input);
+  });
+
+  it("keeps the exact 64 KiB budget and preserves raw source one byte over", () => {
+    const prefix = "`**literal**` $x^2$ [x](https://e.test)";
+    const exact = prefix + "a".repeat(64 * 1024 - Buffer.byteLength(prefix, "utf8"));
+    const over = `${exact}a`;
+    const projected = stripAnsi(renderInline(exact));
+    expect(projected).toContain("**literal**");
+    expect(projected).toContain("x²");
+    expect(projected).toContain("x (https://e.test)");
+    expect(stripAnsi(renderInline(over))).toBe(over);
+  });
+
+  it("does not rescan an unmatched 64 KiB backtick run", () => {
+    const input = "`".repeat(64 * 1024);
+    expect(stripAnsi(renderInline(input))).toBe(input);
+  });
+
+  it("does not rescan unmatched 64 KiB escaped math openers", () => {
+    const input = "\\[".repeat(32 * 1024);
+    expect(stripAnsi(renderInline(input))).toBe(input);
+  });
+
+  it("does not recurse into a link nested inside a label", () => {
+    const source = "[[inner](https://inner.test)](https://outer.test)";
+    expect(stripAnsi(renderInline(source))).toContain("[inner](https://inner.test) (https://outer.test)");
+  });
+
+  it("leaves plain prose untouched", () => {
+    expect(renderInline("nothing to do here")).toBe("nothing to do here");
+  });
+});
+
+describe("block structure", () => {
+  it.each([
+    "[**`docs`**](https://example.test)",
+    "# [docs](https://example.test)",
+    "- [docs](https://example.test)",
+    "> [docs](https://example.test)",
+    "| Link |\n| --- |\n| [docs](https://example.test) |",
+  ])("honors captured hyperlink support throughout markdown: %s", source => {
+    const enabled = renderMarkdownWithSources(source, 80, { supportsHyperlinks: true });
+    const disabled = renderMarkdownWithSources(source, 80, { supportsHyperlinks: false });
+    expect(enabled.rows.join("\n")).toContain("\x1b]8;;https://example.test\x07");
+    expect(disabled.rows.join("\n")).not.toContain("\x1b]8;");
+    expect(plain(disabled.rows)).toContain("docs (https://example.test)");
+    expect(plain(disabled.rows)).toBe(plain(enabled.rows));
+    expect(disabled.sources).toEqual(enabled.sources);
+  });
+
+  it.each([true, false])("preserves URL and control-byte safety with hyperlinks %s", supportsHyperlinks => {
+    const rows = renderMarkdown(
+      "[unsafe](javascript:alert(1))\n[docs](https://example.test/\0\x1b]8;;injected\x07\u009dpath)",
+      160,
+      { supportsHyperlinks },
+    );
+    const rendered = rows.join("\n");
+    expect(rendered).not.toContain("\x1b]8;;javascript:");
+    expect(rendered).not.toContain("\x1b]8;;injected");
+    expect(rendered).not.toContain("\0");
+    expect(rendered).not.toContain("\u009d");
+    expect(plain(rows)).toContain("unsafe (javascript:alert(1))");
+    expect(plain(rows)).toContain("docs (https://example.test/]8;;injectedpath)");
+    if (!supportsHyperlinks) expect(rendered).not.toContain("\x1b]8;");
+  });
+
+  it("renders headings without their hashes", () => {
+    expect(plain(renderMarkdown("## Results", WIDTH))).toBe("Results");
+  });
+
+  it("renders bullets and numbered items with aligned continuations", () => {
+    const rows = renderMarkdown("- first item that is long enough to wrap twice over", 20);
+    expect(stripAnsi(rows[0]!).startsWith("• ")).toBe(true);
+    expect(stripAnsi(rows[1]!).startsWith("  ")).toBe(true);
+    expect(plain(renderMarkdown("1. step one", WIDTH))).toBe("1. step one");
+  });
+
+  it("marks a blockquote with a rail", () => {
+    expect(plain(renderMarkdown("> quoted", WIDTH))).toBe("▏ quoted");
+  });
+
+  it("renders a horizontal rule at the full width", () => {
+    expect(visibleWidth(renderMarkdown("---", WIDTH)[0]!)).toBe(WIDTH);
+  });
+
+  it("frames a fenced block and labels its language", () => {
+    const rows = renderMarkdown("```ts\nconst x = 1;\n```", WIDTH);
+    expect(stripAnsi(rows[0]!)).toContain("ts");
+    expect(plain(rows)).toContain("const x = 1;");
+    expect(stripAnsi(rows.at(-1)!)).toMatch(/^└─+┘$/);
+  });
+
+  it("highlights an entire fence before wrapping its lines", () => {
+    defaultTheme.apply(getDefaultTheme(), "truecolor");
+    try {
+      const rows = renderMarkdown("```js\n/* first\nsecond */\nconst value = 1234567890;\n```", 18);
+      expect(rows[2]).toContain(defaultTheme.fg("syntaxComment", "second */"));
+      expect(rows[3]).toContain(defaultTheme.fg("syntaxKeyword", "const"));
+      for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(18);
+    } finally {
+      defaultTheme.apply(getDefaultTheme(), "none");
+    }
+  });
+
+  it.each(["", "unknown"])("uses the fallback code role for a %s fence", (language) => {
+    defaultTheme.apply({ ...getDefaultTheme(), colors: { ...getDefaultTheme().colors, syntaxText: "#abcdef", mdCodeBlock: "#123456" } }, "truecolor");
+    try {
+      expect(renderMarkdown(`\x60\x60\x60${language}\nplain body\n\x60\x60\x60`, 30)[1])
+        .toContain("\x1b[38;2;18;52;86mplain body\x1b[39m");
+    } finally {
+      defaultTheme.apply(getDefaultTheme(), "none");
+    }
+  });
+
+  it("closes an unterminated fence at the end of the text", () => {
+    const rows = renderMarkdown("```\nunfinished", WIDTH);
+    expect(plain(rows)).toContain("unfinished");
+    expect(stripAnsi(rows.at(-1)!)).toMatch(/^└─+┘$/);
+  });
+
+  it("keeps every row inside the width", () => {
+    const source = "# Title\n\nSome **long** prose that should wrap at this narrow width.\n\n- a bullet item that also wraps\n\n```js\nconst value = 12345678901234567890;\n```";
+    for (const row of renderMarkdown(source, 24)) {
+      expect(visibleWidth(row)).toBeLessThanOrEqual(24);
+    }
+  });
+
+  it.each([
+    "$$\nx^2 + y_1\n$$",
+    "\\[\nx^2 + y_1\n\\]",
+  ])("projects multiline display math", source => {
+    expect(plain(renderMarkdown(source, WIDTH))).toContain("x² + y₁");
+  });
+
+  it("renders display matrices as separate physical rows", () => {
+    const rows = renderMarkdown("$$\n\\begin{bmatrix}1&20\\\\300&4\\end{bmatrix}\n$$", WIDTH);
+    const matrixRows = rows.map(stripAnsi).filter(row => row.includes("[") || row.includes("]"));
+    expect(matrixRows).toEqual(["[ 1    20 ]", "[ 300  4 ]"]);
+    expect(rows.every(row => !row.includes("\n"))).toBe(true);
+  });
+
+  it("renders whitelisted standalone environments without swallowing their delimiters", () => {
+    const equationSource = "\\begin{equation}\n\\alpha+\\beta\n\\end{equation}";
+    const equation = renderMarkdown(equationSource, WIDTH);
+    expect(equation.map(stripAnsi).filter(Boolean)).toEqual(["α+β"]);
+    expect(scanBlocks(equationSource)).toMatchObject([
+      { kind: "math", body: equationSource, raw: equationSource, sourceStart: 0, sourceEnd: 2 },
+    ]);
+
+    const cases = renderMarkdown("\\begin{cases}\nx&x>0\\\\-x&x\\le0\n\\end{cases}", WIDTH);
+    expect(cases.map(stripAnsi).filter(Boolean)).toEqual(["x | x>0", "-x | x≤0"]);
+
+    const matrix = renderMarkdown("\\begin{bmatrix}\n1&20\\\\300&4\n\\end{bmatrix}", WIDTH);
+    expect(matrix.map(stripAnsi).filter(Boolean)).toEqual(["[ 1    20 ]", "[ 300  4 ]"]);
+  });
+
+  it.each([
+    "$$\nx^2 + y_1",
+    "\\[\nx^2 + y_1",
+  ])("preserves an unterminated display-math delimiter", source => {
+    const rendered = plain(renderMarkdown(source, WIDTH));
+    expect(rendered).toContain(source.split("\n")[0]!);
+    expect(rendered).toContain("x^2 + y_1");
+  });
+
+  it("keeps the complete source when display math exceeds its projection budget", () => {
+    const source = `$$\n${"x".repeat(5000)}\n$$`;
+    const rendered = plain(renderMarkdown(source, WIDTH));
+    expect(rendered).toContain("$$");
+    expect(rendered).toContain("x".repeat(40));
+  });
+});
+
+describe("tables", () => {
+  const TABLE = [
+    "| Name | State | From |",
+    "| :--- | :--- | :--- |",
+    "| alpha | enabled | ./tools/alpha |",
+    "| beta | unresolved | beta-package |",
+  ].join("\n");
+
+  it("aligns cells into columns rather than leaving the pipes in place", () => {
+    const rows = plain(renderMarkdown(TABLE, 60)).split("\n");
+    const header = rows.find((row) => row.includes("Name"))!;
+    const alpha = rows.find((row) => row.includes("alpha"))!;
+
+    expect(header.indexOf("State")).toBe(alpha.indexOf("enabled"));
+    expect(header).not.toContain("|");
+  });
+
+  it("keeps a separator rule out of the body", () => {
+    expect(plain(renderMarkdown(TABLE, 60))).not.toContain(":---");
+  });
+
+  it("squeezes wide columns instead of overflowing the frame", () => {
+    for (const row of renderMarkdown(TABLE, 24)) {
+      expect(visibleWidth(row)).toBeLessThanOrEqual(24);
+    }
+  });
+
+  it("leaves a pipe-bearing line alone when no rule follows it", () => {
+    expect(plain(renderMarkdown("| not | a table |", 40))).toContain("| not | a table |");
+  });
+});
+
+describe("streaming stability", () => {
+  it("keeps an incomplete formula visible and projects it once closed", () => {
+    for (const source of ["$", "$$", "$x", "$x^2 + y_1", "\\(", "\\[\\begin{matrix}1"]) {
+      expect(stripAnsi(renderInline(source))).toBe(source);
+    }
+    expect(stripAnsi(renderInline("$x^2 + y_1$"))).toBe("x² + y₁");
+  });
+
+  it("drops a trailing partial fence", () => {
+    expect(trimPartialFence("text\n``")).toBe("text");
+    expect(trimPartialFence("text\n`")).toBe("text");
+  });
+
+  it("keeps a complete fence", () => {
+    expect(trimPartialFence("text\n```")).toBe("text\n```");
+  });
+
+  it("keeps ordinary trailing text", () => {
+    expect(trimPartialFence("text\nmore")).toBe("text\nmore");
+  });
+});
+
+describe("diagrams in a fenced block", () => {
+  afterEach(() => setDiagramMode("streaming"));
+  const CHART = "```mermaid\nflowchart TD\n  A[Start] --> B[End]\n```";
+
+  it("draws a diagram instead of showing its source", () => {
+    const rows = plain(renderMarkdown(CHART, 60));
+    expect(rows).toContain("Start");
+    expect(rows).not.toContain("flowchart");
+  });
+
+  it("falls back to the code block when drawing is switched off", () => {
+    // The fallback is the point: a diagram that cannot be drawn has to leave the
+    // reader with the code they wrote, not with nothing.
+    setDiagramMode("off");
+    const rows = plain(renderMarkdown(CHART, 60));
+    expect(rows).toContain("flowchart TD");
+    expect(rows).toContain("mermaid");
+  });
+
+  it("falls back when the diagram does not fit the width", () => {
+    // Narrow enough that the code block wraps, so the assertion is on the block
+    // being shown rather than on the source surviving one line.
+    const rows = plain(renderMarkdown(CHART, 6));
+    expect(rows).toContain("mermaid");
+    expect(rows).toContain("flow");
+  });
+
+  it("falls back when the source is not a diagram", () => {
+    const rows = plain(renderMarkdown("```mermaid\nnot a diagram at all\n```", 60));
+    expect(rows).toContain("not a diagram at all");
+  });
+
+  it("does not draw the same diagram twice", () => {
+    // Every delta of a streaming answer re-renders the whole block, so this path
+    // is walked many times for one diagram.
+    const first = renderMarkdown(CHART, 60);
+    const second = renderMarkdown(CHART, 60);
+    expect(second).toEqual(first);
+  });
+});
+
+
+it("lets Markdown roles differ from surrounding chrome", () => {
+  const base = getDefaultTheme();
+  defaultTheme.apply({ ...base, colors: { ...base.colors, mdLinkUrl: "#102030", mdQuoteText: "#203040",
+    mdQuoteBorder: "#304050", mdListBullet: "#405060", mdRule: "#506070", mdCodeBorder: "#607080" } }, "truecolor");
+  try {
+    expect(renderInline("[docs](https://example.test)")).toContain(defaultTheme.fg("mdLinkUrl", " (https://example.test)"));
+    const quote = renderMarkdown("> quote", 40).join("\n");
+    expect(quote).toContain(defaultTheme.fg("mdQuoteText", "quote"));
+    expect(quote).toContain(defaultTheme.fg("mdQuoteBorder", "▏"));
+    expect(renderMarkdown("- item", 40)[0]).toContain(defaultTheme.fg("mdListBullet", "•"));
+    expect(renderMarkdown("---", 40)[0]).toBe(defaultTheme.fg("mdRule", "─".repeat(40)));
+    const fence = renderMarkdown("```\nbody\n```", 40);
+    expect(fence[1]).toContain(defaultTheme.fg("mdCodeBorder", "│"));
+    expect(fence[0]).toContain("\x1b[38;2;96;112;128m┌");
+  } finally { defaultTheme.apply(base, "none"); }
+});
+
+describe("table cell semantics", () => {
+  it("keeps escaped and code-span pipes inside their cell", () => {
+    const rows = renderMarkdown("| a | b |\n|---|---|\n| x \\| y | `p | q` |", 80).map(stripAnsi);
+    expect(rows.join("\n")).toContain("x | y");
+    expect(rows.join("\n")).toContain("p | q");
+  });
+
+  it("keeps a multi-backtick code-span pipe in one cell", () => {
+    const rows = renderMarkdown("| left | right |\n|---|---|\n| alpha | ``x | y`` |", 80).map(stripAnsi);
+    const body = rows.find((row) => row.includes("alpha"))!;
+    expect(body).toContain("x | y");
+    expect(body.match(/ │ /g)).toHaveLength(1);
+  });
+
+  it("renders an explicit <br> as a second line and pads the shorter cell", () => {
+    const rows = renderMarkdown("| a | b |\n|---|---|\n| one | first<br>second |", 80).map(stripAnsi);
+    expect(rows.some(row => row.includes("first"))).toBe(true);
+    expect(rows.some(row => row.includes("second"))).toBe(true);
+  });
+
+  it("keeps inline links intact across soft-wrapped table-cell rows", () => {
+    const source = "| Link |\n|---|\n| [a long label](https://example.com/path) |";
+    const body = plain(renderMarkdown(source, 24));
+    expect(body).not.toContain("](");
+    expect(body).toContain("a long label");
+    expect(body.replace(/\s/g, "")).toContain("https://example.com/path");
+  });
+
+  it("closes terminal hyperlinks independently on every wrapped table-cell row", () => {
+    const source = "| Link |\n|---|\n| [a very long label that must wrap across rows](https://example.com/path) |";
+    const rows = renderMarkdown(source, 24);
+    const linked = rows.filter(row => row.includes("\x1b]8;;https://example.com/path\x07"));
+    expect(linked.length).toBeGreaterThan(1);
+    for (const row of linked) {
+      expect(row).toContain("\x1b]8;;\x07");
+      expect(visibleWidth(row)).toBeLessThanOrEqual(24);
+    }
+  });
+
+  it("falls back to the raw table when a column cannot keep three cells", () => {
+    const table = "| left | right |\n|---|---|\n| alpha | beta |";
+    const rows = renderMarkdown(table, 12).map(stripAnsi);
+    const text = rows.join("\n");
+    expect(text).toContain("left");
+    expect(text).toContain("alpha");
+    expect(text).not.toContain("┼");
+  });
+
+  it("stays inside the width for wide glyphs and long cells", () => {
+    const table = "| 名称 | 说明 |\n|---|---|\n| 中文 | " + "长".repeat(200) + " |";
+    for (const row of renderMarkdown(table, 40)) expect(visibleWidth(row)).toBeLessThanOrEqual(40);
+    expect(plain(renderMarkdown(table, 40)).replace(/\s/g, "")).toContain("长".repeat(200));
+  });
+
+  it("refuses more columns than the budget and shows the source", () => {
+    const header = "|" + Array.from({ length: 20 }, (_, index) => `c${index}`).join("|") + "|";
+    const rule = "|" + Array.from({ length: 20 }, () => "---").join("|") + "|";
+    const rows = renderMarkdown(`${header}\n${rule}\n|${Array.from({ length: 20 }, () => "x").join("|")}|`, 200).map(stripAnsi);
+    expect(rows.join("\n")).toContain("c0");
+  });
+
+  it("bounds the raw fallback when a table exceeds the structured budget", () => {
+    const columns = 20;
+    const header = "|" + Array.from({ length: columns }, (_, index) => `c${index}`).join("|") + "|";
+    const rule = "|" + Array.from({ length: columns }, () => "---").join("|") + "|";
+    const body = Array.from({ length: 500 }, (_, row) => "|" + Array.from({ length: columns }, (_, column) => `${row}-${column}`).join("|") + "|");
+    const rows = renderMarkdown([header, rule, ...body].join("\n"), 80);
+    expect(rows.length).toBeLessThanOrEqual(401);
+    expect(plain(rows)).toContain("table truncated");
+  });
+
+  it("uses UTF-8 bytes rather than code units when bounding a raw table", () => {
+    const columns = 20;
+    const header = "|" + Array.from({ length: columns }, (_, index) => `c${index}`).join("|") + "|";
+    const rule = "|" + Array.from({ length: columns }, () => "---").join("|") + "|";
+    const rows = renderMarkdown(`${header}\n${rule}\n|${"🙂".repeat(20000)}|`, 80);
+    const text = plain(rows);
+    expect(text).not.toContain("\ufffd");
+    expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(64 * 1024);
+  });
+
+  it("counts ANSI bytes and row separators in the raw-table budget", () => {
+    const base = getDefaultTheme();
+    defaultTheme.apply(base, "truecolor");
+    try {
+      const columns = 20;
+      const header = "|" + Array.from({ length: columns }, (_, index) => `c${index}`).join("|") + "|";
+      const rule = "|" + Array.from({ length: columns }, () => "---").join("|") + "|";
+      const rows = renderMarkdown(`${header}\n${rule}\n|${"🙂".repeat(20000)}|`, 80);
+      expect(Buffer.byteLength(rows.join("\n"), "utf8")).toBeLessThanOrEqual(64 * 1024);
+    } finally {
+      defaultTheme.apply(base, "none");
+    }
+  });
+});

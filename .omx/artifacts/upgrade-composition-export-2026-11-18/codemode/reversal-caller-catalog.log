@@ -1,0 +1,78 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/core/tools/codemode/composition.test.ts (22 tests | 2 failed | 20 skipped) 38ms
+   × the composed catalog consumed by the actual codemode worker > keeps mutable caller definitions isolated across catalog composition 26ms
+     → expected [Function] to be undefined
+   × the composed catalog consumed by the actual codemode worker > keeps frozen caller definitions isolated across catalog composition 11ms
+     → expected TypeError: Cannot define property nestedT… to be undefined
+   ↓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the adapted consumer
+   ↓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the direct consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'adapted' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'direct' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'adapted' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'direct' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'adapted' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'direct' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer
+   ↓ the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the direct consumer
+   ↓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'removal' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'unchanged control' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'unrelated change control' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=true before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect
+   ↓ persists one filtered parent result after two real builtin reads in runTurn
+   ↓ keeps the declared allowlist effective in an actual child script
+   ↓ keeps the declared denylist effective in an actual child script
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 20 skipped (22)
+   Start at  23:22:23
+   Duration  5.48s (transform 3.14s, setup 0ms, collect 5.21s, tests 38ms, environment 0ms, prepare 50ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-caller-catalog.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > keeps mutable caller definitions isolated across catalog composition
+AssertionError: expected [Function] to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+[Function anonymous]
+
+ ❯ src/core/tools/codemode/composition.test.ts:116:40
+    114|     } catch (failure) { error = failure }
+    115|     expect(error).toBeUndefined()
+    116|     expect(original.nestedToolCatalog).toBeUndefined()
+       |                                        ^
+    117|     expect(first!.tools.get('codemode')).not.toBe(second!.tools.get('c…
+    118|     for (const [catalog, own, foreign, value] of [
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > keeps frozen caller definitions isolated across catalog composition
+AssertionError: expected TypeError: Cannot define property nestedT… to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+TypeError {
+  "message": "Cannot define property nestedToolCatalog, object is not extensible",
+}
+
+ ❯ src/core/tools/codemode/composition.test.ts:115:19
+    113|       second = await compose(fixtureTool('second_lookup', effectB))
+    114|     } catch (failure) { error = failure }
+    115|     expect(error).toBeUndefined()
+       |                   ^
+    116|     expect(original.nestedToolCatalog).toBeUndefined()
+    117|     expect(first!.tools.get('codemode')).not.toBe(second!.tools.get('c…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

@@ -1,0 +1,671 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/turn/nestedTools.test.ts (17 tests | 16 failed) 97ms
+   × nested tool admission > refuses effects when the parent is cancelled during prepare 32ms
+     → expected "spy" to not be called at all, but actually been called 1 times
+Received: 
+  1st spy call:
+    Array [
+      Object {
+        "argsSchema": Object {
+          "type": "object",
+        },
+        "description": "Observe write",
+        "execute": [Function execute],
+        "name": "write",
+      },
+      "cancelled-parent",
+      Object {
+        "content": "new",
+        "path": "owned.txt",
+      },
+      AbortSignal {
+        Symbol(kEvents): Map {},
+        Symbol(events.maxEventTargetListeners): 0,
+        Symbol(events.maxEventTargetListenersWarned): false,
+        Symbol(kHandlers): Map {},
+        Symbol(kAborted): true,
+        Symbol(kReason): [AbortError: This operation was aborted],
+        Symbol(kComposite): false,
+      },
+    ]
+Number of calls: 1
+   × nested tool admission > refuses effects when the parent is cancelled during before hook 1ms
+     → expected "spy" to not be called at all, but actually been called 1 times
+Received: 
+  1st spy call:
+    Array [
+      Object {
+        "argsSchema": Object {
+          "type": "object",
+        },
+        "description": "Observe write",
+        "execute": [Function execute],
+        "name": "write",
+      },
+      "cancelled-parent",
+      Object {
+        "content": "new",
+        "path": "owned.txt",
+      },
+      AbortSignal {
+        Symbol(kEvents): Map {},
+        Symbol(events.maxEventTargetListeners): 0,
+        Symbol(events.maxEventTargetListenersWarned): false,
+        Symbol(kHandlers): Map {},
+        Symbol(kAborted): true,
+        Symbol(kReason): [AbortError: This operation was aborted],
+        Symbol(kComposite): false,
+      },
+    ]
+Number of calls: 1
+   × nested tool admission > cancels only the child lifetime during prepare 4ms
+     → expected false to be true // Object.is equality
+   × nested tool admission > cancels only the child lifetime during before hook 1ms
+     → expected false to be true // Object.is equality
+   × nested tool admission > does not prepare or execute for an already cancelled parent 2ms
+     → expected "spy" to not be called at all, but actually been called 1 times
+Received: 
+  1st spy call:
+    Array [
+      Object {
+        "argsSchema": Object {
+          "type": "object",
+        },
+        "description": "Observe write",
+        "execute": [Function execute],
+        "name": "write",
+      },
+      Object {},
+      AbortSignal {
+        Symbol(kEvents): Map {},
+        Symbol(events.maxEventTargetListeners): 0,
+        Symbol(events.maxEventTargetListenersWarned): false,
+        Symbol(kHandlers): Map {},
+        Symbol(kAborted): true,
+        Symbol(kReason): [AbortError: This operation was aborted],
+        Symbol(kComposite): false,
+      },
+    ]
+Number of calls: 1
+   × nested execution policy through adapted tools > offers the same forced sequential policy to the outer and nested owners 4ms
+     → expected { bash: undefined, …(7) } to match object { bash: 'sequential', …(6) }
+(1 matching property omitted from actual)
+   × nested execution policy through adapted tools > preserves bash concurrency policy through the actual nested gate 33ms
+     → expected [ 'first', 'second' ] to deeply equal [ 'first' ]
+   ✓ nested execution policy through adapted tools > preserves read concurrency policy through the actual nested gate 2ms
+   × nested execution policy through adapted tools > retains real approval and post-hook facts for a accepted nested result 9ms
+     → expected { receipt: 'executed-once' } to deeply equal { receipt: 'executed-once', …(1) }
+   × nested execution policy through adapted tools > retains real approval and post-hook facts for a revoked nested result 3ms
+     → expected { receipt: 'executed-once' } to deeply equal { receipt: 'executed-once', …(1) }
+   × nested result publication > cannot clear an actual execution failure with post-hook isError:false 1ms
+     → expected { success: true, …(2) } to deeply equal { success: false, …(2) }
+   × nested result publication > carries images into the post hook and merges its metadata when feedback is appended 1ms
+     → expected { …(3) } to deeply equal { …(4) }
+   × nested result publication > does not publish old images or notices after a hook replaces their output 1ms
+     → expected { receipt: 'original', …(1) } to deeply equal { receipt: 'original', …(1) }
+   × nested result publication > preserves termination from the execution result owner 1ms
+     → expected { success: true, …(2) } to match object { success: true, …(2) }
+(1 matching property omitted from actual)
+   × nested result publication > preserves termination from the post hook result owner 1ms
+     → expected { success: true, …(2) } to match object { success: true, …(2) }
+(1 matching property omitted from actual)
+   × nested result publication > rechecks original result admission after the awaited post hook without losing actual effects 1ms
+     → expected true to be false // Object.is equality
+   × nested result publication > preserves completed output, metadata and media when the post hook fails 1ms
+     → expected undefined to be false // Object.is equality
+ ❯ src/core/tools/codemode/declarations.test.ts (12 tests | 10 failed) 4489ms
+   ✓ declarations consumed by the actual script worker > calls the emitted identifier for 'fixture_lookup' and preserves raw lookup  488ms
+   × declarations consumed by the actual script worker > calls the emitted identifier for 'docs:lookup' and preserves raw lookup 129ms
+     → Script failed
+Script error: TypeError: Unknown tool: tools.docs_lookup. Did you mean: docs:lookup?: expected false to be true // Object.is equality
+   × declarations consumed by the actual script worker > calls the emitted identifier for 'class' and preserves raw lookup 79ms
+     → Script failed
+Script error: TypeError: Unknown tool: tools.class_. Did you mean: class?: expected false to be true // Object.is equality
+   × declarations consumed by the actual script worker > calls the emitted identifier for '9lookup' and preserves raw lookup 82ms
+     → Script failed
+Script error: TypeError: Unknown tool: tools._9lookup. Did you mean: 9lookup?: expected false to be true // Object.is equality
+   × declarations consumed by the actual script worker > never routes 'two normalized aliases' to the wrong tool, in either catalog order 71ms
+     → Script failed
+Script error: TypeError: Unknown tool: tools.my_tool. Did you mean: my-tool, my:tool?: expected false to be true // Object.is equality
+   × declarations consumed by the actual script worker > never routes 'an alias matching another raw name' to the wrong tool, in either catalog order 195ms
+     → expected { advertised: [ …(2) ], …(2) } to deeply equal { advertised: [ …(2) ], …(2) }
+   × declarations consumed by the actual script worker > never routes 'a keyword alias matching another raw …' to the wrong tool, in either catalog order 101ms
+     → expected { advertised: [ …(2) ], …(2) } to deeply equal { advertised: [ …(2) ], …(2) }
+   × strict TypeScript consumers of projected argument types > requires the intersection field for every first union branch 556ms
+     → expected [ Array(1) ] to deeply equal []
+   × strict TypeScript consumers of projected argument types > requires the intersection field for every last union branch 1157ms
+     → expected [ Array(1) ] to deeply equal []
+   × strict TypeScript consumers of projected argument types > requires the intersection field for every reference union branch 951ms
+     → expected [ Array(1) ] to deeply equal []
+   ✓ strict TypeScript consumers of projected argument types > keeps a sibling union branch independent of the other branch intersection 280ms
+   × discovers and calls only the requested MCP server namespace through the actual worker 398ms
+     → expected null to match object { name: 'mcp__github' }
+ ❯ src/core/tools/codemode/execution.test.ts (11 tests | 9 failed) 6387ms
+   × actual worker bridge admission > keeps bootstrap transport, registrars and limits out of the script global 42ms
+     → expected [ '__ExitSignal', '__send', …(9) ] to deeply equal []
+   × actual worker bridge admission > follows the real script failure after a forged terminal attempt 35ms
+     → expected true to be false // Object.is equality
+   × actual worker bridge admission > cannot bypass host bounds with the bootstrap sender 32ms
+     → expected 'Script completed\n\n==> text 1/2 <==\…' to be 'Script completed\n\nbounded-control' // Object.is equality
+   × actual worker bridge admission > does not recognize an ordinary error string as a successful exit 27ms
+     → expected true to be false // Object.is equality
+   ✓ actual worker bridge admission > keeps process and string code generation unavailable 30ms
+   × script-owned nested settlement through the actual gate > retires a pending effect on return and waits for the real boundary to settle 1549ms
+     → expected false to be true // Object.is equality
+   × script-owned nested settlement through the actual gate > retires a pending effect on throw and waits for the real boundary to settle 1540ms
+     → expected false to be true // Object.is equality
+   × script-owned nested settlement through the actual gate > retires a pending effect on exit and waits for the real boundary to settle 1528ms
+     → expected false to be true // Object.is equality
+   × script-owned nested settlement through the actual gate > retires a pending effect on timeout and waits for the real boundary to settle 1529ms
+     → expected false to be true // Object.is equality
+   × script-owned nested settlement through the actual gate > retires a pending effect on parent cancellation and waits for the real boundary to settle 44ms
+     → expected { Object (calls, complete) } to match object { complete: true, calls: [ { …(3) } ] }
+(3 matching properties omitted from actual)
+   ✓ script-owned nested settlement through the actual gate > preserves actual completed effects when the script subsequently fails 29ms
+ Test Files  3 failed (3)
+      Tests  35 failed | 5 passed (40)
+   Start at  16:15:58
+   Duration  21.01s (transform 4.33s, setup 0ms, collect 9.18s, tests 10.97s, environment 0ms, prepare 240ms)
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/red.json
+⎯⎯⎯⎯⎯⎯ Failed Tests 35 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/turn/nestedTools.test.ts > nested tool admission > refuses effects when the parent is cancelled during prepare
+ FAIL  src/turn/nestedTools.test.ts > nested tool admission > refuses effects when the parent is cancelled during before hook
+AssertionError: expected "spy" to not be called at all, but actually been called 1 times
+Received: 
+  1st spy call:
+    Array [
+      Object {
+        "argsSchema": Object {
+          "type": "object",
+        },
+        "description": "Observe write",
+        "execute": [Function execute],
+        "name": "write",
+      },
+      "cancelled-parent",
+      Object {
+        "content": "new",
+        "path": "owned.txt",
+      },
+      AbortSignal {
+        Symbol(kEvents): Map {},
+        Symbol(events.maxEventTargetListeners): 0,
+        Symbol(events.maxEventTargetListenersWarned): false,
+        Symbol(kHandlers): Map {},
+        Symbol(kAborted): true,
+        Symbol(kReason): [AbortError: This operation was aborted],
+        Symbol(kComposite): false,
+      },
+    ]
+Number of calls: 1
+ ❯ src/turn/nestedTools.test.ts:70:25
+     68|     await started.promise; controller.abort(); release.resolve();
+     69|     const result = await observed;
+     70|     expect(execute).not.toHaveBeenCalled();
+       |                         ^
+     71|     expect(after).not.toHaveBeenCalled();
+     72|     expect(result?.success).not.toBe(true);
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested tool admission > cancels only the child lifetime during prepare
+ FAIL  src/turn/nestedTools.test.ts > nested tool admission > cancels only the child lifetime during before hook
+AssertionError: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ src/turn/nestedTools.test.ts:97:37
+     95|     const result = await observed;
+     96|     expect(parent.signal.aborted).toBe(false);
+     97|     expect(admittedSignal?.aborted).toBe(true);
+       |                                     ^
+     98|     expect(execute).not.toHaveBeenCalled();
+     99|     expect(result?.success).not.toBe(true);
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested tool admission > does not prepare or execute for an already cancelled parent
+AssertionError: expected "spy" to not be called at all, but actually been called 1 times
+Received: 
+  1st spy call:
+    Array [
+      Object {
+        "argsSchema": Object {
+          "type": "object",
+        },
+        "description": "Observe write",
+        "execute": [Function execute],
+        "name": "write",
+      },
+      Object {},
+      AbortSignal {
+        Symbol(kEvents): Map {},
+        Symbol(events.maxEventTargetListeners): 0,
+        Symbol(events.maxEventTargetListenersWarned): false,
+        Symbol(kHandlers): Map {},
+        Symbol(kAborted): true,
+        Symbol(kReason): [AbortError: This operation was aborted],
+        Symbol(kComposite): false,
+      },
+    ]
+Number of calls: 1
+ ❯ src/turn/nestedTools.test.ts:109:25
+    107|     const call = createGatedNestedToolExecutor({ tools: new Map([[targ…
+    108|     await call('write', {}, 'already-cancelled').catch(() => undefined…
+    109|     expect(prepare).not.toHaveBeenCalled(); expect(execute).not.toHave…
+       |                         ^
+    110|   });
+    111| });
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested execution policy through adapted tools > offers the same forced sequential policy to the outer and nested owners
+AssertionError: expected { bash: undefined, …(7) } to match object { bash: 'sequential', …(6) }
+(1 matching property omitted from actual)
+- Expected
++ Received
+  {
+-   "apply_patch": "sequential",
+-   "bash": "sequential",
+-   "browser": "sequential",
+-   "edit": "sequential",
+-   "task": "sequential",
+-   "team": "sequential",
+-   "write": "sequential",
++   "apply_patch": undefined,
++   "bash": undefined,
++   "browser": undefined,
++   "edit": undefined,
++   "task": undefined,
++   "team": undefined,
++   "write": undefined,
+  }
+ ❯ src/turn/nestedTools.test.ts:118:19
+    116|     const adapted = adaptTools(new Map(names.map(name => [name, defini…
+    117|     const modes = Object.fromEntries(adapted.map(tool => [tool.name, t…
+    118|     expect(modes).toMatchObject({ bash: 'sequential', write: 'sequenti…
+       |                   ^
+    119|       apply_patch: 'sequential', task: 'sequential', team: 'sequential…
+    120|     expect(modes.read).not.toBe('sequential');
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested execution policy through adapted tools > preserves bash concurrency policy through the actual nested gate
+AssertionError: expected [ 'first', 'second' ] to deeply equal [ 'first' ]
+- Expected
++ Received
+  [
+    "first",
++   "second",
+  ]
+ ❯ src/turn/nestedTools.test.ts:147:22
+    145|     } finally { release.resolve(); }
+    146|     const result = await pending;
+    147|     expect(initial!).toEqual(name === 'bash' ? ['first'] : ['first', '…
+       |                      ^
+    148|     expect(maximum).toBe(name === 'bash' ? 1 : 2);
+    149|     expect(entries).toEqual(['first', 'second']);
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested execution policy through adapted tools > retains real approval and post-hook facts for a accepted nested result
+ FAIL  src/turn/nestedTools.test.ts > nested execution policy through adapted tools > retains real approval and post-hook facts for a revoked nested result
+AssertionError: expected { receipt: 'executed-once' } to deeply equal { receipt: 'executed-once', …(1) }
+- Expected
++ Received
+  {
+-   "approval": {
+-     "decision": "allow-once",
+-     "operation": "write",
+-   },
+    "receipt": "executed-once",
+  }
+ ❯ src/turn/nestedTools.test.ts:175:32
+    173|     expect(approval).toHaveBeenCalledTimes(1);
+    174|     expect(events.map(event => event.eventName)).toEqual(['PermissionR…
+    175|     expect(captured?.metadata).toEqual({ receipt: 'executed-once', app…
+       |                                ^
+    176|     expect(captured?.success).toBe(outcome === 'accepted');
+    177|     expect(captured?.output ?? captured?.error).toContain('actual effe…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested result publication > cannot clear an actual execution failure with post-hook isError:false
+AssertionError: expected { success: true, …(2) } to deeply equal { success: false, …(2) }
+- Expected
++ Received
+  {
+-   "error": "safe failure projection",
+    "metadata": {
+      "receipt": "failed-effect",
+    },
+-   "success": false,
++   "output": "safe failure projection",
++   "success": true,
+  }
+ ❯ src/turn/nestedTools.test.ts:188:20
+    186|       metadata: { receipt: 'failed-effect' } }, { afterToolCall: async…
+    187|       ('read', {}, 'failed-nested');
+    188|     expect(result).toEqual({ success: false, error: 'safe failure proj…
+       |                    ^
+    189|   });
+    190| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested result publication > carries images into the post hook and merges its metadata when feedback is appended
+AssertionError: expected { …(3) } to deeply equal { …(4) }
+- Expected
++ Received
+@@ -1,13 +1,6 @@
+  {
+-   "images": [
+-     {
+-       "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==",
+-       "mimeType": "image/png",
+-       "type": "image",
+-     },
+-   ],
+    "isError": false,
+    "metadata": {
+      "outputNotice": "Source retained.",
+      "receipt": "source-receipt",
+      "same": "source",
+ ❯ src/turn/nestedTools.test.ts:199:22
+    197|       return { output: result.output + '\nVerification retained.', met…
+    198|     } })('read', {}, 'image-nested');
+    199|     expect(observed).toEqual(raw);
+       |                      ^
+    200|     expect(result.images).toEqual([image]);
+    201|     expect(result.metadata).toEqual({ receipt: 'source-receipt', same:…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested result publication > does not publish old images or notices after a hook replaces their output
+AssertionError: expected { receipt: 'original', …(1) } to deeply equal { receipt: 'original', …(1) }
+- Expected
++ Received
+  {
++   "outputNotice": "Original media notice",
+    "receipt": "original",
+-   "replacement": true,
+  }
+ ❯ src/turn/nestedTools.test.ts:213:29
+    211|     expect(result.success).toBe(true); expect(result.output).toBe('Red…
+    212|     expect(result.images).toBeUndefined();
+    213|     expect(result.metadata).toEqual({ receipt: 'original', replacement…
+       |                             ^
+    214|   });
+    215| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested result publication > preserves termination from the execution result owner
+ FAIL  src/turn/nestedTools.test.ts > nested result publication > preserves termination from the post hook result owner
+AssertionError: expected { success: true, …(2) } to match object { success: true, …(2) }
+(1 matching property omitted from actual)
+- Expected
++ Received
+  {
+    "output": "Captured completion",
+    "success": true,
+-   "terminate": true,
+  }
+ ❯ src/turn/nestedTools.test.ts:220:20
+    218|       ...(owner === 'execution' ? { terminate: true } : {}) },
+    219|     owner === 'post hook' ? { afterToolCall: async () => ({ terminate:…
+    220|     expect(result).toMatchObject({ success: true, output: 'Captured co…
+       |                    ^
+    221|   });
+    222| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested result publication > rechecks original result admission after the awaited post hook without losing actual effects
+AssertionError: expected true to be false // Object.is equality
+- Expected
++ Received
+- false
++ true
+ ❯ src/turn/nestedTools.test.ts:233:28
+    231|     await started.promise; revoked = true; release.resolve();
+    232|     const result = await pending;
+    233|     expect(result.success).toBe(false);
+       |                            ^
+    234|     expect(result.error ?? result.output).toContain('Actual completed …
+    235|     expect(result.error ?? result.output).toContain('Original result r…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/35]⎯
+ FAIL  src/turn/nestedTools.test.ts > nested result publication > preserves completed output, metadata and media when the post hook fails
+AssertionError: expected undefined to be false // Object.is equality
+- Expected: 
+false
++ Received: 
+undefined
+ ❯ src/turn/nestedTools.test.ts:243:29
+    241|       images: [image], metadata: { receipt: 'completed-effect' } },
+    242|     { afterToolCall: async () => { throw new Error('Verification obser…
+    243|     expect(result?.success).toBe(false);
+       |                             ^
+    244|     expect(result?.error ?? result?.output).toContain('Actual complete…
+    245|     expect(result?.error ?? result?.output).toContain('Verification ob…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/35]⎯
+ FAIL  src/core/tools/codemode/declarations.test.ts > declarations consumed by the actual script worker > calls the emitted identifier for 'docs:lookup' and preserves raw lookup
+AssertionError: Script failed
+Script error: TypeError: Unknown tool: tools.docs_lookup. Did you mean: docs:lookup?: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ runScript src/core/tools/codemode/declarations.test.ts:67:57
+     65|     taskId: 'declaration-consumer',
+     66|   })
+     67|   expect(result.success, result.error ?? result.output).toBe(true)
+       |                                                         ^
+     68|   return result
+     69| }
+ ❯ src/core/tools/codemode/declarations.test.ts:102:20
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/35]⎯
+ FAIL  src/core/tools/codemode/declarations.test.ts > declarations consumed by the actual script worker > calls the emitted identifier for 'class' and preserves raw lookup
+AssertionError: Script failed
+Script error: TypeError: Unknown tool: tools.class_. Did you mean: class?: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ runScript src/core/tools/codemode/declarations.test.ts:67:57
+     65|     taskId: 'declaration-consumer',
+     66|   })
+     67|   expect(result.success, result.error ?? result.output).toBe(true)
+       |                                                         ^
+     68|   return result
+     69| }
+ ❯ src/core/tools/codemode/declarations.test.ts:102:20
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/35]⎯
+ FAIL  src/core/tools/codemode/declarations.test.ts > declarations consumed by the actual script worker > calls the emitted identifier for '9lookup' and preserves raw lookup
+AssertionError: Script failed
+Script error: TypeError: Unknown tool: tools._9lookup. Did you mean: 9lookup?: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ runScript src/core/tools/codemode/declarations.test.ts:67:57
+     65|     taskId: 'declaration-consumer',
+     66|   })
+     67|   expect(result.success, result.error ?? result.output).toBe(true)
+       |                                                         ^
+     68|   return result
+     69| }
+ ❯ src/core/tools/codemode/declarations.test.ts:102:20
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/35]⎯
+ FAIL  src/core/tools/codemode/declarations.test.ts > declarations consumed by the actual script worker > never routes 'two normalized aliases' to the wrong tool, in either catalog order
+AssertionError: Script failed
+Script error: TypeError: Unknown tool: tools.my_tool. Did you mean: my-tool, my:tool?: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ runScript src/core/tools/codemode/declarations.test.ts:67:57
+     65|     taskId: 'declaration-consumer',
+     66|   })
+     67|   expect(result.success, result.error ?? result.output).toBe(true)
+       |                                                         ^
+     68|   return result
+     69| }
+ ❯ src/core/tools/codemode/declarations.test.ts:129:22
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/35]⎯
+ FAIL  src/core/tools/codemode/declarations.test.ts > declarations consumed by the actual script worker > never routes 'an alias matching another raw name' to the wrong tool, in either catalog order
+ FAIL  src/core/tools/codemode/declarations.test.ts > declarations consumed by the actual script worker > never routes 'a keyword alias matching another raw …' to the wrong tool, in either catalog order
+AssertionError: expected { advertised: [ …(2) ], …(2) } to deeply equal { advertised: [ …(2) ], …(2) }
+- Expected
++ Received
+@@ -1,8 +1,8 @@
+  {
+    "advertised": [
+-     "my-tool:advertised",
++     "my_tool:advertised",
+      "my_tool:advertised",
+    ],
+    "alias": {
+      "value": "my_tool:alias",
+    },
+ ❯ src/core/tools/codemode/declarations.test.ts:138:34
+    136|       `)
+    137| 
+    138|       expect(scriptJson(result)).toEqual({
+       |                                  ^
+    139|         advertised: names.map(name => `${name}:advertised`),
+    140|         raw: names.map(name => `${name}:raw`),
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/35]⎯
+ FAIL  src/core/tools/codemode/declarations.test.ts > strict TypeScript consumers of projected argument types > requires the intersection field for every first union branch
+ FAIL  src/core/tools/codemode/declarations.test.ts > strict TypeScript consumers of projected argument types > requires the intersection field for every last union branch
+ FAIL  src/core/tools/codemode/declarations.test.ts > strict TypeScript consumers of projected argument types > requires the intersection field for every reference union branch
+AssertionError: expected [ Array(1) ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "2578: Unused '@ts-expect-error' directive.",
++ ]
+ ❯ src/core/tools/codemode/declarations.test.ts:199:81
+    197| 
+    198|     const sample = renderToolSample(fixtureTool('fixture_lookup', sche…
+    199|     expect(strictConsumerErrors(signatureArgumentType(sample), valid, …
+       |                                                                                 ^
+    200|   })
+    201| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/35]⎯
+ FAIL  src/core/tools/codemode/declarations.test.ts > discovers and calls only the requested MCP server namespace through the actual worker
+AssertionError: expected null to match object { name: 'mcp__github' }
+- Expected: 
+{
+  "name": "mcp__github",
+}
++ Received: 
+null
+ ❯ src/core/tools/codemode/declarations.test.ts:246:28
+    244|   `))
+    245| 
+    246|   expect(result.namespace).toMatchObject({ name: 'mcp__github' })
+       |                            ^
+    247|   expect(result.namespace!.tools.slice().sort()).toEqual(['mcp__github…
+    248|   expect(result.enterprise).toMatchObject({ name: 'mcp__github_enterpr…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/35]⎯
+ FAIL  src/core/tools/codemode/execution.test.ts > actual worker bridge admission > keeps bootstrap transport, registrars and limits out of the script global
+AssertionError: expected [ '__ExitSignal', '__send', …(9) ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "__ExitSignal",
++   "__send",
++   "__onReply",
++   "__registerPending",
++   "__registerWrites",
++   "__ALL_TOOLS_JSON",
++   "__STORE_JSON",
++   "__MODELS_JSON",
++   "__MAX_OUTPUT_CHARS",
++   "__MAX_STORE_VALUE",
++   "__MAX_STORE_TOTAL",
++ ]
+ ❯ src/core/tools/codemode/execution.test.ts:54:76
+     52|     ` }, context())
+     53|     expect(result.success).toBe(true)
+     54|     expect(JSON.parse(result.output!.replace(/^Script completed\s*/, '…
+       |                                                                            ^
+     55|   })
+     56| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/35]⎯
+ FAIL  src/core/tools/codemode/execution.test.ts > actual worker bridge admission > follows the real script failure after a forged terminal attempt
+AssertionError: expected true to be false // Object.is equality
+- Expected
++ Received
+- false
++ true
+ ❯ src/core/tools/codemode/execution.test.ts:64:28
+     62|       throw new Error('actual-script-failure');
+     63|     ` }, context())
+     64|     expect(result.success).toBe(false)
+       |                            ^
+     65|     expect(output(result)).toContain('actual-script-failure')
+     66|     expect(output(result)).not.toContain('forged-success')
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/35]⎯
+ FAIL  src/core/tools/codemode/execution.test.ts > actual worker bridge admission > cannot bypass host bounds with the bootstrap sender
+AssertionError: expected 'Script completed\n\n==> text 1/2 <==\…' to be 'Script completed\n\nbounded-control' // Object.is equality
+- Expected
++ Received
+  Script completed
++ ==> text 1/2 <==
++ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
++
++ ... [truncated 1861 chars] ...
++
++ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
++
++ ==> text 2/2 <==
+  bounded-control
+ ❯ src/core/tools/codemode/execution.test.ts:75:28
+     73|     ` }, context())
+     74|     expect(result.success).toBe(true)
+     75|     expect(output(result)).toBe('Script completed\n\nbounded-control')
+       |                            ^
+     76|   })
+     77| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/35]⎯
+ FAIL  src/core/tools/codemode/execution.test.ts > actual worker bridge admission > does not recognize an ordinary error string as a successful exit
+AssertionError: expected true to be false // Object.is equality
+- Expected
++ Received
+- false
++ true
+ ❯ src/core/tools/codemode/execution.test.ts:80:28
+     78|   it('does not recognize an ordinary error string as a successful exit…
+     79|     const result = await scriptTool().execute({ code: 'throw new Error…
+     80|     expect(result.success).toBe(false)
+       |                            ^
+     81|     expect(output(result)).toContain('CODEMODE_EXIT')
+     82|   })
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/35]⎯
+ FAIL  src/core/tools/codemode/execution.test.ts > script-owned nested settlement through the actual gate > retires a pending effect on return and waits for the real boundary to settle
+ FAIL  src/core/tools/codemode/execution.test.ts > script-owned nested settlement through the actual gate > retires a pending effect on throw and waits for the real boundary to settle
+ FAIL  src/core/tools/codemode/execution.test.ts > script-owned nested settlement through the actual gate > retires a pending effect on exit and waits for the real boundary to settle
+ FAIL  src/core/tools/codemode/execution.test.ts > script-owned nested settlement through the actual gate > retires a pending effect on timeout and waits for the real boundary to settle
+AssertionError: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ vi.waitFor.timeout src/core/tools/codemode/execution.test.ts:138:62
+    136|         if (ending === 'parent cancellation') parent.abort()
+    137|         // Let the actual terminal frame or script deadline reach the …
+    138|         await vi.waitFor(() => expect(nestedSignal?.aborted).toBe(true…
+       |                                                              ^
+    139|         expect(outerSettled).toBe(false)
+    140|       } finally { release.resolve() }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/35]⎯
+ FAIL  src/core/tools/codemode/execution.test.ts > script-owned nested settlement through the actual gate > retires a pending effect on parent cancellation and waits for the real boundary to settle
+AssertionError: expected { Object (calls, complete) } to match object { complete: true, calls: [ { …(3) } ] }
+(3 matching properties omitted from actual)
+- Expected
++ Received
+  {
+    "calls": [
+      {
+        "id": "script-owner/1",
+        "name": "write",
+-       "status": "error",
++       "status": "unfinished",
+      },
+    ],
+-   "complete": true,
++   "complete": false,
+  }
+ ❯ src/core/tools/codemode/execution.test.ts:147:44
+    145|       expect(fs.existsSync(effectPath)).toBe(false)
+    146|       expect(result.isError).toBe(true)
+    147|       expect(result.metadata?.nestedCalls).toMatchObject({ complete: t…
+       |                                            ^
+    148|         calls: [{ id: 'script-owner/1', name: 'write', status: 'error'…
+    149|     },
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/35]⎯

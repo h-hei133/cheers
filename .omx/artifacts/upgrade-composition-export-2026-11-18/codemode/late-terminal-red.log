@@ -1,0 +1,35 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/core/tools/codemode/execution.test.ts (12 tests | 1 failed | 11 skipped) 133ms
+   ↓ actual worker bridge admission > keeps bootstrap transport, registrars and limits out of the script global
+   ↓ actual worker bridge admission > follows the real script failure after a forged terminal attempt
+   ↓ actual worker bridge admission > cannot bypass host bounds with the bootstrap sender
+   ↓ actual worker bridge admission > does not recognize an ordinary error string as a successful exit
+   ↓ actual worker bridge admission > keeps process and string code generation unavailable
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on return and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on throw and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on exit and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on timeout and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on parent cancellation and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > preserves actual completed effects when the script subsequently fails
+   × script-owned nested settlement through the actual gate > retains a terminating completed result that arrives during script retirement 131ms
+     → expected undefined to be true // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 skipped (12)
+   Start at  19:30:24
+   Duration  6.27s (transform 3.26s, setup 0ms, collect 5.25s, tests 133ms, environment 0ms, prepare 184ms)
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/late-terminal-red.json
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/core/tools/codemode/execution.test.ts > script-owned nested settlement through the actual gate > retains a terminating completed result that arrives during script retirement
+AssertionError: expected undefined to be true // Object.is equality
+- Expected: 
+true
++ Received: 
+undefined
+ ❯ src/core/tools/codemode/execution.test.ts:186:30
+    184|     const result = await pending
+    185|     expect(result.success).toBe(false)
+    186|     expect(result.terminate).toBe(true)
+       |                              ^
+    187|     expect(result.metadata?.nestedCalls).toMatchObject({ complete: tru…
+    188|       calls: [{ name: 'read', status: 'ok', terminate: true }] })
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

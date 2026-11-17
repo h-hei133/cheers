@@ -1,0 +1,723 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/core/tools/codemode/composition.test.ts (18 tests | 9 failed) 4193ms
+   ✓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the adapted consumer 157ms
+   × the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the direct consumer 71ms
+     → Script failed
+Script error: TypeError: Unknown tool: tools.feature_lookup.: expected false to be true // Object.is equality
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'adapted' consumer 97ms
+   × the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'direct' consumer 81ms
+     → expected [ 'glob' ] to deeply equal []
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'adapted' consumer 57ms
+   × the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'direct' consumer 68ms
+     → expected [ 'glob' ] to deeply equal []
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'adapted' consumer 54ms
+   × the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'direct' consumer 69ms
+     → expected [ 'glob' ] to deeply equal []
+   × the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer 60ms
+     → Script failed
+Script error: TypeError: Unknown tool: tools.session_deferred.: expected false to be true // Object.is equality
+   × the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the direct consumer 54ms
+     → Script failed
+Script error: TypeError: Unknown tool: tools.session_deferred.: expected false to be true // Object.is equality
+   ✓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=false before the captured effect 90ms
+   × captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=false before the captured effect 49ms
+     → expected 'e13fa78f94b0d0a67a1283555330d03675773…' not to be 'e13fa78f94b0d0a67a1283555330d03675773…' // Object.is equality
+   ✓ captured nested contracts in the real composed gate > settles 'removal' with deferred=false before the captured effect 49ms
+   ✓ captured nested contracts in the real composed gate > settles 'unchanged control' with deferred=false before the captured effect 52ms
+   ✓ captured nested contracts in the real composed gate > settles 'unrelated change control' with deferred=false before the captured effect 52ms
+   × captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=true before the captured effect 1518ms
+     → expected false to be true // Object.is equality
+   × captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect 1514ms
+     → expected false to be true // Object.is equality
+   ✓ persists one filtered parent result after two real builtin reads in runTurn 101ms
+ ❯ src/core/tools/codemode/output.test.ts (18 tests | 16 failed) 767ms
+   × bounded feedback from the actual script worker > bounds top-level return together with the final status and notice 49ms
+     → expected 289 to be less than or equal to 256
+   × bounded feedback from the actual script worker > bounds multibyte text together with the final status and notice 32ms
+     → expected 581 to be less than or equal to 256
+   × bounded feedback from the actual script worker > bounds combined text, console and return together with the final status and notice 30ms
+     → expected 569 to be less than or equal to 256
+   ✓ bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: text("界".repeat(2000)); 29ms
+   × bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: return "界".repeat(2000); 31ms
+     → expected 766 to be less than or equal to 256
+   ✓ validated images retained by the actual script worker > keeps a complete image total within both existing media limits 29ms
+   × validated images retained by the actual script worker > omits repeated images after four, with bounded feedback metadata 41ms
+     → expected [ { type: 'image', …(2) }, …(8) ] to deeply equal [ { type: 'image', …(2) }, …(3) ]
+   × validated images retained by the actual script worker > enforces the encoded aggregate limit before the four-image count is reached 101ms
+     → expected [ { type: 'image', …(2) }, …(1) ] to have a length of 1 but got 2
+   × validated images retained by the actual script worker > rejects a complete individually oversized image before retaining a valid successor 139ms
+     → expected { rejected: false } to deeply equal { rejected: true }
+   × validated images retained by the actual script worker > rejects PNG signature only before retention and still accepts complete bytes 28ms
+     → expected { rejected: false } to deeply equal { rejected: true }
+   × validated images retained by the actual script worker > rejects JPEG signature only before retention and still accepts complete bytes 29ms
+     → expected { rejected: false } to deeply equal { rejected: true }
+   × validated images retained by the actual script worker > rejects GIF signature only before retention and still accepts complete bytes 32ms
+     → expected { rejected: false } to deeply equal { rejected: true }
+   × validated images retained by the actual script worker > rejects WebP signature only before retention and still accepts complete bytes 30ms
+     → expected { rejected: false } to deeply equal { rejected: true }
+   × validated images retained by the actual script worker > rejects forged object MIME before retention and still accepts complete bytes 29ms
+     → expected { rejected: false } to deeply equal { rejected: true }
+   × validated images retained by the actual script worker > rejects forged data URI MIME before retention and still accepts complete bytes 33ms
+     → expected { rejected: false } to deeply equal { rejected: true }
+   × validated images retained by the actual script worker > rejects forged image_url MIME before retention and still accepts complete bytes 26ms
+     → expected { rejected: false } to deeply equal { rejected: true }
+   × builtin read results through the real tool gate and worker > keeps text-only nested read results compatible with string consumers 47ms
+     → expected true to be false // Object.is equality
+   × builtin read results through the real tool gate and worker > forwards inert image-bearing read results into published model feedback 30ms
+     → expected true to be false // Object.is equality
+ ❯ src/core/tools/codemode/models.test.ts (4 tests | 4 failed) 182ms
+   × native model metadata inside the actual script worker > uses the captured physical and virtual catalogue despite ambient replacements 80ms
+     → expected { …(8) } to deeply equal { …(8) }
+   × native model metadata inside the actual script worker > does not reload ambient models for an explicitly empty native catalogue 35ms
+     → expected { …(3) } to deeply equal { Object (all, filtered, ...) }
+   × native model metadata inside the actual script worker > keeps model records and all nested metadata immutable across list/get mutation attempts 34ms
+     → expected false to be true // Object.is equality
+   × native model metadata inside the actual script worker > publishes only inert public metadata without provider secrets or route capabilities 31ms
+     → expected false to be true // Object.is equality
+ Test Files  3 failed (3)
+      Tests  29 failed | 11 passed (40)
+   Start at  19:12:48
+   Duration  17.75s (transform 6.40s, setup 0ms, collect 11.66s, tests 5.14s, environment 0ms, prepare 216ms)
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/catalog-output-red.json
+⎯⎯⎯⎯⎯⎯ Failed Tests 29 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the direct consumer
+AssertionError: Script failed
+Script error: TypeError: Unknown tool: tools.feature_lookup.: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ scriptJson src/core/tools/codemode/composition.test.ts:86:57
+     84| 
+     85| function scriptJson<T>(result: ToolExecutionResult): T {
+     86|   expect(result.success, result.error ?? result.output).toBe(true)
+       |                                                         ^
+     87|   expect(result.output).toMatch(/^Script completed\s/)
+     88|   return JSON.parse(result.output!.replace(/^Script completed\s*/, '')…
+ ❯ src/core/tools/codemode/composition.test.ts:120:19
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/29]⎯
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'direct' consumer
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'direct' consumer
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'direct' consumer
+AssertionError: expected [ 'glob' ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "glob",
++ ]
+ ❯ src/core/tools/codemode/composition.test.ts:179:32
+    177|       const value = scriptJson<{ advertised: string[]; described: unkn…
+    178|         attempts: string[]; permitted: string }>(result)
+    179|       expect(value.advertised).toEqual([])
+       |                                ^
+    180|       expect(value.described).toEqual([null, null])
+    181|       expect(value.searched).not.toContain('glob')
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/29]⎯
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the direct consumer
+AssertionError: Script failed
+Script error: TypeError: Unknown tool: tools.session_deferred.: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ scriptJson src/core/tools/codemode/composition.test.ts:86:57
+     84| 
+     85| function scriptJson<T>(result: ToolExecutionResult): T {
+     86|   expect(result.success, result.error ?? result.output).toBe(true)
+       |                                                         ^
+     87|   expect(result.output).toMatch(/^Script completed\s/)
+     88|   return JSON.parse(result.output!.replace(/^Script completed\s*/, '')…
+ ❯ src/core/tools/codemode/composition.test.ts:214:19
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/29]⎯
+ FAIL  src/core/tools/codemode/composition.test.ts > captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=false before the captured effect
+AssertionError: expected 'e13fa78f94b0d0a67a1283555330d03675773…' not to be 'e13fa78f94b0d0a67a1283555330d03675773…' // Object.is equality
+ ❯ src/core/tools/codemode/composition.test.ts:302:83
+    300|       expect(result.error ?? result.output).toContain('older discovery…
+    301|     }
+    302|     if (change !== 'unchanged control') expect(catalog.discovery!.gene…
+       |                                                                                   ^
+    303|     if (change === 'schema mutation' || change === 'definition replace…
+    304|       const fresh = await executeScript(catalog.discovery!.snapshot(),…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/29]⎯
+ FAIL  src/core/tools/codemode/composition.test.ts > captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=true before the captured effect
+ FAIL  src/core/tools/codemode/composition.test.ts > captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect
+AssertionError: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ vi.waitFor.timeout src/core/tools/codemode/composition.test.ts:270:46
+    268|     `, hooks, parent.signal)
+    269|     try {
+    270|       await vi.waitFor(() => expect(entered).toBe(true), { timeout: 15…
+       |                                              ^
+    271|       expect(effect).not.toHaveBeenCalled()
+    272|       if (change === 'schema mutation') {
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/29]⎯
+ FAIL  src/core/tools/codemode/models.test.ts > native model metadata inside the actual script worker > uses the captured physical and virtual catalogue despite ambient replacements
+AssertionError: expected { …(8) } to deeply equal { …(8) }
+- Expected
++ Received
+@@ -285,27 +285,22 @@
+        "provider": "vllm",
+        "reasoning": false,
+      },
+      {
+        "contextWindow": 777,
+-       "id": "ambient-first",
++       "id": "ambient-second",
+        "provider": "fixture",
+        "reasoning": false,
+      },
+    ],
+-   "ambient": {
+-     "contextWindow": 777,
+-     "id": "ambient-first",
+-     "provider": "fixture",
+-     "reasoning": false,
+-   },
++   "ambient": null,
+    "disabled": null,
+    "missing": null,
+    "physical": [
+      {
+        "contextWindow": 777,
+-       "id": "ambient-first",
++       "id": "ambient-second",
+        "provider": "fixture",
+        "reasoning": false,
+      },
+    ],
+    "selected": null,
+ ❯ src/core/tools/codemode/models.test.ts:88:20
+     86|     ambientCatalogue('ambient-second')
+     87|     const second = await run<Record<string, unknown>>(code, modelCatal…
+     88|     expect(second).toEqual(first)
+       |                    ^
+     89|     const all = first.all as Array<Record<string, unknown>>
+     90|     expect(all).toHaveLength(5)
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/29]⎯
+ FAIL  src/core/tools/codemode/models.test.ts > native model metadata inside the actual script worker > does not reload ambient models for an explicitly empty native catalogue
+AssertionError: expected { …(3) } to deeply equal { Object (all, filtered, ...) }
+- Expected
++ Received
+  {
+-   "all": [],
+-   "filtered": [],
+-   "missing": null,
++   "all": [
++     {
++       "contextWindow": 200000,
++       "id": "claude-opus-4-6",
++       "provider": "anthropic",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 200000,
++       "id": "claude-sonnet-4-5",
++       "provider": "anthropic",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 200000,
++       "id": "claude-haiku-4-5",
++       "provider": "anthropic",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 200000,
++       "id": "anthropic.claude-sonnet-4-5-v1:0",
++       "provider": "bedrock",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 200000,
++       "id": "anthropic.claude-opus-4-5-v1:0",
++       "provider": "bedrock",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 300000,
++       "id": "amazon.nova-pro-v1:0",
++       "provider": "bedrock",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 1000000,
++       "id": "gemini-2.5-pro",
++       "provider": "google-ai",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 1000000,
++       "id": "gemini-2.5-flash",
++       "provider": "google-ai",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 1000000,
++       "id": "gemini-2.5-pro",
++       "provider": "vertex",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 1000000,
++       "id": "gemini-2.5-flash",
++       "provider": "vertex",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 400000,
++       "id": "gpt-5.3",
++       "provider": "openai",
++       "reasoning": true,
++     },
++     {
++       "contextWindow": 400000,
++       "id": "gpt-5.3-codex",
++       "maxTokens": 128000,
++       "provider": "openai",
++       "reasoning": true,
++     },
++     {
++       "contextWindow": 400000,
++       "id": "gpt-5.1-mini",
++       "provider": "openai",
++       "reasoning": true,
++     },
++     {
++       "contextWindow": 200000,
++       "id": "o4-mini",
++       "provider": "openai",
++       "reasoning": true,
++     },
++     {
++       "contextWindow": 1048576,
++       "id": "gemini-3-pro",
++       "provider": "google",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 1048576,
++       "id": "gemini-2.5-flash",
++       "provider": "google",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 1048576,
++       "id": "gemini-2.5-pro",
++       "provider": "google",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "deepseek-chat",
++       "provider": "deepseek",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "deepseek-reasoner",
++       "provider": "deepseek",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "deepseek-ai/DeepSeek-V4-Flash",
++       "provider": "siliconflow",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "deepseek-ai/DeepSeek-V3.2",
++       "provider": "siliconflow",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "Qwen/Qwen3-235B-A22B",
++       "provider": "siliconflow",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 200000,
++       "id": "anthropic/claude-sonnet-4.5",
++       "provider": "openrouter",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 400000,
++       "id": "openai/gpt-5.3",
++       "provider": "openrouter",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 1048576,
++       "id": "google/gemini-3-pro",
++       "provider": "openrouter",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "deepseek/deepseek-chat",
++       "provider": "openrouter",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 256000,
++       "id": "grok-4",
++       "provider": "xai",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 256000,
++       "id": "grok-4-fast",
++       "provider": "xai",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "llama-4-maverick-17b-128e",
++       "provider": "groq",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "qwen3-32b",
++       "provider": "groq",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "mistral-large-latest",
++       "provider": "mistral",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "devstral-medium-latest",
++       "provider": "mistral",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "deepseek-ai/DeepSeek-V3",
++       "provider": "together",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "Qwen/Qwen3-235B-A22B-Instruct",
++       "provider": "together",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "accounts/fireworks/models/deepseek-v3",
++       "provider": "fireworks",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "accounts/fireworks/models/qwen3-235b-a22b",
++       "provider": "fireworks",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "qwen-3-coder-480b",
++       "provider": "cerebras",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "llama-4-scout-17b",
++       "provider": "cerebras",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 256000,
++       "id": "kimi-k2-turbo-preview",
++       "provider": "moonshot",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "moonshot-v1-128k",
++       "provider": "moonshot",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "glm-4.7",
++       "provider": "zhipu",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 128000,
++       "id": "glm-4.6-air",
++       "provider": "zhipu",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 256000,
++       "id": "qwen3-max",
++       "provider": "dashscope",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 256000,
++       "id": "qwen3-coder-plus",
++       "provider": "dashscope",
++       "reasoning": false,
++     },
++     {
++       "id": "qwen3-coder",
++       "provider": "ollama",
++       "reasoning": false,
++     },
++     {
++       "id": "llama4",
++       "provider": "ollama",
++       "reasoning": false,
++     },
++     {
++       "id": "local-model",
++       "provider": "lmstudio",
++       "reasoning": false,
++     },
++     {
++       "id": "local-model",
++       "provider": "vllm",
++       "reasoning": false,
++     },
++     {
++       "contextWindow": 777,
++       "id": "ambient-only",
++       "provider": "fixture",
++       "reasoning": false,
++     },
++   ],
++   "filtered": [
++     {
++       "contextWindow": 777,
++       "id": "ambient-only",
++       "provider": "fixture",
++       "reasoning": false,
++     },
++   ],
++   "missing": {
++     "contextWindow": 777,
++     "id": "ambient-only",
++     "provider": "fixture",
++     "reasoning": false,
++   },
+  }
+ ❯ src/core/tools/codemode/models.test.ts:111:20
+    109|     const result = await run<Record<string, unknown>>(`return { all: m…
+    110|       missing: models.get('fixture', 'ambient-only') };`, modelCatalog)
+    111|     expect(result).toEqual({ all: [], filtered: [], missing: null })
+       |                    ^
+    112|   })
+    113| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/29]⎯
+ FAIL  src/core/tools/codemode/models.test.ts > native model metadata inside the actual script worker > keeps model records and all nested metadata immutable across list/get mutation attempts
+AssertionError: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ run src/core/tools/codemode/models.test.ts:73:26
+     71|   const context: ContextWithCatalog = { workspaceRoot: workspace, task…
+     72|   const result = await createCodemodeToolDefinition(() => new Map()).e…
+     73|   expect(result.success).toBe(true)
+       |                          ^
+     74|   return JSON.parse(result.output!.replace(/^Script completed\s*/, '')…
+     75| }
+ ❯ src/core/tools/codemode/models.test.ts:116:20
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/29]⎯
+ FAIL  src/core/tools/codemode/models.test.ts > native model metadata inside the actual script worker > publishes only inert public metadata without provider secrets or route capabilities
+AssertionError: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ run src/core/tools/codemode/models.test.ts:73:26
+     71|   const context: ContextWithCatalog = { workspaceRoot: workspace, task…
+     72|   const result = await createCodemodeToolDefinition(() => new Map()).e…
+     73|   expect(result.success).toBe(true)
+       |                          ^
+     74|   return JSON.parse(result.output!.replace(/^Script completed\s*/, '')…
+     75| }
+ ❯ src/core/tools/codemode/models.test.ts:155:20
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/29]⎯
+ FAIL  src/core/tools/codemode/output.test.ts > bounded feedback from the actual script worker > bounds top-level return together with the final status and notice
+AssertionError: expected 289 to be less than or equal to 256
+ ❯ assertBoundedFeedback src/core/tools/codemode/output.test.ts:55:45
+     53|   const output = feedback(result)
+     54|   expect(output).toMatch(new RegExp(`^${status}`))
+     55|   expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(SMALL_…
+       |                                             ^
+     56|   expect(output).not.toContain('\uFFFD')
+     57|   const message = createToolResultMessage('script-owner', output, resu…
+ ❯ src/core/tools/codemode/output.test.ts:102:20
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/29]⎯
+ FAIL  src/core/tools/codemode/output.test.ts > bounded feedback from the actual script worker > bounds multibyte text together with the final status and notice
+AssertionError: expected 581 to be less than or equal to 256
+ ❯ assertBoundedFeedback src/core/tools/codemode/output.test.ts:55:45
+     53|   const output = feedback(result)
+     54|   expect(output).toMatch(new RegExp(`^${status}`))
+     55|   expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(SMALL_…
+       |                                             ^
+     56|   expect(output).not.toContain('\uFFFD')
+     57|   const message = createToolResultMessage('script-owner', output, resu…
+ ❯ src/core/tools/codemode/output.test.ts:102:20
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/29]⎯
+ FAIL  src/core/tools/codemode/output.test.ts > bounded feedback from the actual script worker > bounds combined text, console and return together with the final status and notice
+AssertionError: expected 569 to be less than or equal to 256
+ ❯ assertBoundedFeedback src/core/tools/codemode/output.test.ts:55:45
+     53|   const output = feedback(result)
+     54|   expect(output).toMatch(new RegExp(`^${status}`))
+     55|   expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(SMALL_…
+       |                                             ^
+     56|   expect(output).not.toContain('\uFFFD')
+     57|   const message = createToolResultMessage('script-owner', output, resu…
+ ❯ src/core/tools/codemode/output.test.ts:102:20
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/29]⎯
+ FAIL  src/core/tools/codemode/output.test.ts > bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: return "界".repeat(2000);
+AssertionError: expected 766 to be less than or equal to 256
+ ❯ assertBoundedFeedback src/core/tools/codemode/output.test.ts:55:45
+     53|   const output = feedback(result)
+     54|   expect(output).toMatch(new RegExp(`^${status}`))
+     55|   expect(Buffer.byteLength(output, 'utf8')).toBeLessThanOrEqual(SMALL_…
+       |                                             ^
+     56|   expect(output).not.toContain('\uFFFD')
+     57|   const message = createToolResultMessage('script-owner', output, resu…
+ ❯ src/core/tools/codemode/output.test.ts:113:7
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/29]⎯
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > omits repeated images after four, with bounded feedback metadata
+AssertionError: expected [ { type: 'image', …(2) }, …(8) ] to deeply equal [ { type: 'image', …(2) }, …(3) ]
+- Expected
++ Received
+@@ -17,6 +17,31 @@
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "mimeType": "image/png",
+      "type": "image",
+    },
++   {
++     "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
++     "mimeType": "image/png",
++     "type": "image",
++   },
++   {
++     "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
++     "mimeType": "image/png",
++     "type": "image",
++   },
++   {
++     "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
++     "mimeType": "image/png",
++     "type": "image",
++   },
++   {
++     "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
++     "mimeType": "image/png",
++     "type": "image",
++   },
++   {
++     "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
++     "mimeType": "image/png",
++     "type": "image",
++   },
+  ]
+ ❯ src/core/tools/codemode/output.test.ts:151:27
+    149|     ` }, context())
+    150|     expect(result.success).toBe(true)
+    151|     expect(result.images).toEqual(Array.from({ length: 4 }, () => PIXE…
+       |                           ^
+    152|     const output = assertBoundedFeedback(result, 'Script completed')
+    153|     expect(result.metadata?.outputNotice).toMatch(/image.*omitted|omit…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/29]⎯
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > enforces the encoded aggregate limit before the four-image count is reached
+AssertionError: expected [ { type: 'image', …(2) }, …(1) ] to have a length of 1 but got 2
+- Expected
++ Received
+- 1
++ 2
+ ❯ src/core/tools/codemode/output.test.ts:170:27
+    168|     ` }, context())
+    169|     expect(result.success).toBe(true)
+    170|     expect(result.images).toHaveLength(1)
+       |                           ^
+    171|     expect(result.images?.[0]).toEqual(image)
+    172|     const output = assertBoundedFeedback(result, 'Script completed')
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/29]⎯
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > rejects a complete individually oversized image before retaining a valid successor
+AssertionError: expected { rejected: false } to deeply equal { rejected: true }
+- Expected
++ Received
+  {
+-   "rejected": true,
++   "rejected": false,
+  }
+ ❯ src/core/tools/codemode/output.test.ts:188:38
+    186|     ` }, context())
+    187|     expect(result.success).toBe(true)
+    188|     expect(returned(result.output!)).toEqual({ rejected: true })
+       |                                      ^
+    189|     expect(result.images).toEqual([PIXEL])
+    190|   })
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/29]⎯
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > rejects PNG signature only before retention and still accepts complete bytes
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > rejects JPEG signature only before retention and still accepts complete bytes
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > rejects GIF signature only before retention and still accepts complete bytes
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > rejects WebP signature only before retention and still accepts complete bytes
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > rejects forged object MIME before retention and still accepts complete bytes
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > rejects forged data URI MIME before retention and still accepts complete bytes
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > rejects forged image_url MIME before retention and still accepts complete bytes
+AssertionError: expected { rejected: false } to deeply equal { rejected: true }
+- Expected
++ Received
+  {
+-   "rejected": true,
++   "rejected": false,
+  }
+ ❯ src/core/tools/codemode/output.test.ts:208:38
+    206|     ` }, context())
+    207|     expect(result.success).toBe(true)
+    208|     expect(returned(result.output!)).toEqual({ rejected: true })
+       |                                      ^
+    209|     expect(result.images).toEqual([PIXEL])
+    210|   })
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/29]⎯
+ FAIL  src/core/tools/codemode/output.test.ts > builtin read results through the real tool gate and worker > keeps text-only nested read results compatible with string consumers
+AssertionError: expected true to be false // Object.is equality
+- Expected
++ Received
+- false
++ true
+ ❯ src/core/tools/codemode/output.test.ts:220:28
+    218|       return { type: typeof item, firstLine: item.split('\\n')[0] };
+    219|     `)
+    220|     expect(result.isError).toBe(false)
+       |                            ^
+    221|     expect(returned(result.output)).toEqual({ type: 'string', firstLin…
+    222|     expect(result.metadata?.nestedCalls).toMatchObject({ complete: tru…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/29]⎯
+ FAIL  src/core/tools/codemode/output.test.ts > builtin read results through the real tool gate and worker > forwards inert image-bearing read results into published model feedback
+AssertionError: expected true to be false // Object.is equality
+- Expected
++ Received
+- false
++ true
+ ❯ src/core/tools/codemode/output.test.ts:244:28
+    242|       return shape;
+    243|     `, { ...createDefaultExecutionService(), readMedia })
+    244|     expect(result.isError).toBe(false)
+       |                            ^
+    245|     expect(readMedia).toHaveBeenCalledTimes(2)
+    246|     expect(returned(result.output)).toEqual({ type: 'object', keys: ['…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/29]⎯

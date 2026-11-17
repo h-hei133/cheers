@@ -1,0 +1,47 @@
+{
+  "status": "partial",
+  "sourceBound": true,
+  "buildId": "b5c9a284a588718fc8dea27f705fb3104028cd213db8c72531ef1f7b89e72192",
+  "scenario": "configured-provider-allowed",
+  "actualRequests": 3,
+  "actualScriptVerbatim": true,
+  "completedParent": true,
+  "selectedOnly": true,
+  "summary": {
+    "selected": true,
+    "recordsExact": true,
+    "written": true,
+    "rejected": false,
+    "retryReason": false,
+    "inspection": {
+      "collisionSafe": true,
+      "namespace": true,
+      "physical": true,
+      "logical": true,
+      "missing": true,
+      "frozen": true,
+      "callbacks": true
+    }
+  },
+  "ordinaryApproval": [
+    {
+      "id": "call_266f8db4b3ce4089885698806a88dc61",
+      "name": "codemode",
+      "outcome": "approved"
+    },
+    {
+      "id": "call_266f8db4b3ce4089885698806a88dc61/3",
+      "name": "fixture:effect",
+      "outcome": "approved"
+    }
+  ],
+  "realOsEffect": true,
+  "zeroCollisionEffects": true,
+  "zeroRouteCallbacks": true,
+  "parentFeedbackOnActualWire": true,
+  "allObservedFeedbackFiltered": true,
+  "queryCompleted": false,
+  "providerRetryScenarioCompleted": false,
+  "cleanup": true,
+  "boundary": "The final provider answer failed. Native OS content and durable nested metadata were not separately captured by this incomplete helper. Raw compiled controls own those proofs."
+}

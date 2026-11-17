@@ -1,0 +1,126 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+
+const repo = '/home/wang/projects/cheers';
+const out = path.join(repo, '.tmp/codemode-validation');
+const tree = path.join(out, 'reversal-tree');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const owner = 'packages/ts-shell/src/';
+const cases = [
+  { name: 'bootstrap-private', file: 'core/tools/codemode/prelude.ts',
+    before: "delete globalThis.__send;", after: 'void globalThis.__send;',
+    tests: ['core/tools/codemode/execution.test.ts'], select: 'bootstrap transport|forged terminal|bootstrap sender' },
+  { name: 'nested-retirement', file: 'core/tools/codemode/execution.ts',
+    before: "controller.abort(new Error(outcome.error ?? 'Script lifetime ended.'))",
+    after: 'void controller;', tests: ['core/tools/codemode/execution.test.ts'],
+    select: 'pending effect on return|pending effect on timeout' },
+  { name: 'caller-catalog', file: 'core/tools/catalog.ts',
+    before: "bound.set(script.name, { ...script, nestedToolCatalog: capture });",
+    after: "Object.defineProperty(script, 'nestedToolCatalog', { value: capture, configurable: true });\n  bound.set(script.name, script);",
+    tests: ['core/tools/codemode/composition.test.ts'], select: 'caller definitions isolated' },
+  { name: 'deferred-catalog', file: 'core/tools/catalog.ts',
+    before: 'bindNestedCatalog(restricted, () => discovery.snapshot(true))',
+    after: 'bindNestedCatalog(restricted, () => discovery.snapshot())',
+    tests: ['core/tools/codemode/composition.test.ts'], select: 'admitted deferred tool' },
+  { name: 'deferred-guard', file: 'core/tools/catalog.ts',
+    before: 'bindNestedCatalog(restricted, () => discovery.snapshot(true))',
+    after: 'bindNestedCatalog(restricted, () => discovery.catalog)',
+    tests: ['core/tools/codemode/composition.test.ts'], select: 'with deferred=true' },
+  { name: 'outer-order', file: 'turn/execution.ts', before: "'browser', 'codemode'", after: "'browser'",
+    tests: ['turn/nestedTools.test.ts'], select: 'serializes separate outer scripts' },
+  { name: 'child-boundary', file: 'turn/subagent.ts',
+    before: 'const childTools = subagentToolPool(input.definition, tools);', after: 'const childTools = tools;',
+    tests: ['core/tools/codemode/composition.test.ts'], select: 'effective in an actual child script' },
+  { name: 'model-immutable', file: 'core/tools/codemode/prelude.ts',
+    before: 'freezeData(modelsCatalog);', after: 'void modelsCatalog;',
+    tests: ['core/tools/codemode/models.test.ts'], select: 'metadata immutable' },
+  { name: 'image-result', file: 'core/tools/codemode/nestedCalls.ts',
+    before: "return bounded.images?.length ? { output: bounded.output, images: bounded.images } : bounded.output",
+    after: 'return bounded.output', tests: ['core/tools/codemode/output.test.ts'], select: 'image-bearing read results' },
+  { name: 'result-declaration', file: 'core/tools/codemode/declarations.ts',
+    before: `const outputType = 'string | { readonly output: string; readonly images: readonly { readonly type: "image"; readonly data: string; readonly mimeType: string }[] }'`,
+    after: "const outputType = 'string'", tests: ['core/tools/codemode/declarations.test.ts'], select: 'declares both actual read result shapes' },
+  { name: 'output-budget', file: 'core/tools/codemode/output.ts',
+    before: "if (Buffer.byteLength(text + (notice ? '\\n' + notice : ''), 'utf8') > this.maxBytes)",
+    after: 'if (false)', tests: ['core/tools/codemode/output.test.ts'], select: 'bounds .* together with the final status' },
+  { name: 'image-mime', file: 'core/tools/codemode/image.ts',
+    before: 'canonicalImageMime(declaredMime.trim().toLowerCase())', after: 'canonicalImageMime(declaredMime)',
+    tests: ['core/tools/codemode/output.test.ts'], select: 'normalizes a valid declared MIME' },
+];
+const originals = new Map(cases.map(item => [owner + item.file, fs.readFileSync(path.join(repo, owner + item.file))]));
+const receipt = { status: 'running', mainSourcesMutated: false, cases: [] };
+const previous = JSON.parse(fs.readFileSync(path.join(out, 'reversal-before-mime.json'), 'utf8'));
+const restores = new Set();
+let packageDir;
+function run(label, tests, select) {
+  const reportFile = path.join(out, 'reversal-' + label + '.json');
+  const args = ['env', 'NODE_OPTIONS=--max-old-space-size=768', 'GIT_CEILING_DIRECTORIES=' + tree,
+    'node', path.join(repo, 'node_modules/vitest/vitest.mjs'), 'run', ...tests.map(name => 'src/' + name),
+    ...(select ? ['-t', select] : []), '--maxWorkers=1', '--no-file-parallelism', '--reporter=default',
+    '--reporter=json', '--outputFile=' + reportFile];
+  const result = spawnSync('rtk', args, { cwd: packageDir, encoding: 'utf8', timeout: 90_000, maxBuffer: 2 * 1024 * 1024 });
+  fs.writeFileSync(path.join(out, 'reversal-' + label + '.log'), (result.stdout ?? '') + (result.stderr ?? ''));
+  const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+  const failed = report.testResults.flatMap(suite => suite.assertionResults.filter(test => test.status === 'failed'));
+  return { exitCode: result.status, signal: result.signal, passedTests: report.numPassedTests, failedTests: report.numFailedTests,
+    assertionFailures: failed.filter(test => test.failureMessages.some(message => message.includes('AssertionError'))).length,
+    failedNames: failed.map(test => test.fullName), runtimeErrors: report.numRuntimeErrorTestSuites,
+    reportSha256: hash(fs.readFileSync(reportFile)), logSha256: hash(fs.readFileSync(path.join(out, 'reversal-' + label + '.log'))) };
+}
+try {
+  if (fs.existsSync(tree)) throw new Error('Isolated reversal tree already exists.');
+  packageDir = path.join(tree, 'packages/ts-shell');
+  fs.mkdirSync(packageDir, { recursive: true }); fs.mkdirSync(path.join(tree, '.git'));
+  fs.symlinkSync(path.join(repo, 'node_modules'), path.join(tree, 'node_modules'), 'dir');
+  fs.copyFileSync(path.join(repo, 'package.json'), path.join(tree, 'package.json'));
+  fs.cpSync(path.join(repo, owner), path.join(packageDir, 'src'), { recursive: true });
+  for (const file of ['package.json', 'tsconfig.json', 'vitest.config.ts'])
+    fs.copyFileSync(path.join(repo, 'packages/ts-shell', file), path.join(packageDir, file));
+  for (const item of cases) {
+    const file = owner + item.file;
+    const before = originals.get(file);
+    const text = before.toString('utf8');
+    if (text.split(item.before).length !== 2) throw new Error(item.name + ': reversal fragment is not unique.');
+    const reversed = Buffer.from(text.replace(item.before, item.after));
+    const retained = previous.cases.find(value => value.name === item.name && value.status === 'passed'
+      && value.sourceSha256 === hash(before) && value.reversedSha256 === hash(reversed));
+    if (retained) { receipt.cases.push(retained); continue; }
+    let observation;
+    try {
+      fs.writeFileSync(path.join(tree, file), reversed);
+      observation = run(item.name, item.tests, item.select);
+    } finally {
+      fs.writeFileSync(path.join(tree, file), before);
+      restores.add(file);
+    }
+    const result = { name: item.name, file, sourceSha256: hash(before), reversedSha256: hash(reversed),
+      ...observation, restoredExactly: hash(fs.readFileSync(path.join(tree, file))) === hash(before) };
+    result.status = result.exitCode === 1 && result.failedTests > 0 && result.assertionFailures === result.failedTests
+      && !result.runtimeErrors && result.restoredExactly ? 'passed' : 'failed';
+    receipt.cases.push(result); console.log(JSON.stringify({ name: result.name, status: result.status,
+      failedTests: result.failedTests, assertionFailures: result.assertionFailures, restoredExactly: result.restoredExactly }));
+    if (result.status !== 'passed') throw new Error(item.name + ': reversal did not produce only actual assertion failures.');
+  }
+  receipt.restoredValidation = run('restored', [...new Set(cases.flatMap(item => item.tests))]);
+  if (receipt.restoredValidation.exitCode !== 0 || receipt.restoredValidation.failedTests !== 0
+    || receipt.restoredValidation.passedTests === 0 || receipt.restoredValidation.runtimeErrors) throw new Error('Restored validation failed.');
+  receipt.status = 'passed';
+} catch (error) { receipt.status = 'failed'; receipt.error = String(error.message); process.exitCode = 1; }
+finally {
+  for (const file of restores) fs.writeFileSync(path.join(tree, file), originals.get(file));
+  receipt.restoredExactly = [...originals].every(([file, before]) => !fs.existsSync(path.join(tree, file))
+    || hash(fs.readFileSync(path.join(tree, file))) === hash(before));
+  receipt.mainSourceMatches = [...originals].every(([file, before]) => hash(fs.readFileSync(path.join(repo, file))) === hash(before));
+  receipt.mainSourceSha256 = hash(JSON.stringify([...originals].map(([file, before]) => [file, hash(before)])));
+  fs.rmSync(tree, { recursive: true, force: true });
+  receipt.isolatedTreeRemoved = !fs.existsSync(tree);
+  if (!receipt.restoredExactly || !receipt.mainSourceMatches || !receipt.isolatedTreeRemoved) {
+    receipt.status = 'failed'; process.exitCode = 1;
+  }
+  fs.writeFileSync(path.join(out, 'reversal.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify({ status: receipt.status, cases: receipt.cases.length, restoredExactly: receipt.restoredExactly,
+    mainSourceMatches: receipt.mainSourceMatches, isolatedTreeRemoved: receipt.isolatedTreeRemoved,
+    restoredTests: receipt.restoredValidation?.passedTests ?? null }));
+}

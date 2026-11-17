@@ -1,0 +1,149 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/codemode/declarations.test.ts --no-file-parallelism --maxWorkers=1 --reporter=default --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/codemode-validation/declarations-continuation-red.json
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/codemode/declarations.test.ts (18 tests | 6 failed) 5618ms
+   ✓ declarations consumed by the actual script worker > calls the emitted identifier for 'fixture_lookup' and preserves raw lookup 245ms
+   ✓ declarations consumed by the actual script worker > calls the emitted identifier for 'docs:lookup' and preserves raw lookup 163ms
+   ✓ declarations consumed by the actual script worker > calls the emitted identifier for 'class' and preserves raw lookup 102ms
+   ✓ declarations consumed by the actual script worker > calls the emitted identifier for '9lookup' and preserves raw lookup 121ms
+   ✓ declarations consumed by the actual script worker > never routes 'two normalized aliases' to the wrong tool, in either catalog order 201ms
+   ✓ declarations consumed by the actual script worker > never routes 'an alias matching another raw name' to the wrong tool, in either catalog order 165ms
+   ✓ declarations consumed by the actual script worker > never routes 'a keyword alias matching another raw …' to the wrong tool, in either catalog order 192ms
+   ✓ strict TypeScript consumers of projected argument types > requires the intersection field for every first union branch  619ms
+   ✓ strict TypeScript consumers of projected argument types > requires the intersection field for every last union branch  539ms
+   ✓ strict TypeScript consumers of projected argument types > requires the intersection field for every reference union branch  614ms
+   ✓ strict TypeScript consumers of projected argument types > keeps a sibling union branch independent of the other branch intersection  522ms
+   × strict TypeScript consumers of projected argument types > rejects a boolean false property reached through literal schema 146ms
+     → expected [ …(2) ] to deeply equal []
+   × strict TypeScript consumers of projected argument types > rejects a boolean false property reached through reference schema 126ms
+     → expected [ …(2) ] to deeply equal []
+   × strict TypeScript consumers of projected argument types > preserves Draft 7 tuple element types and order for strict consumers 140ms
+     → expected [ …(4) ] to deeply equal []
+   × strict TypeScript consumers of projected argument types > keeps valid property tags with a Unicode line terminator in strict TypeScript 223ms
+     → expected [ …(8) ] to deeply equal []
+   × strict TypeScript consumers of projected argument types > keeps valid property tags with a Unicode line terminator in strict TypeScript 264ms
+     → expected [ …(8) ] to deeply equal []
+   × declares both actual read result shapes and requires narrowing before string operations 1182ms
+     → expected [ { type: 'image', …(2) } ] to deeply equal [ { type: 'image', …(2) } ]
+   ✓ discovers and calls only the requested MCP server namespace through the actual worker 51ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/declarations.test.ts > strict TypeScript consumers of projected argument types > rejects a boolean false property reached through literal schema
+ FAIL  src/core/tools/codemode/declarations.test.ts > strict TypeScript consumers of projected argument types > rejects a boolean false property reached through reference schema
+AssertionError: expected [ …(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "2578: Unused '@ts-expect-error' directive.",
++   "2578: Unused '@ts-expect-error' directive.",
++ ]
+
+ ❯ src/core/tools/codemode/declarations.test.ts:228:81
+    226| 
+    227|     const sample = renderToolSample(fixtureTool('fixture_lookup', sche…
+    228|     expect(strictConsumerErrors(signatureArgumentType(sample), valid, …
+       |                                                                                 ^
+    229|   })
+    230| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/core/tools/codemode/declarations.test.ts > strict TypeScript consumers of projected argument types > preserves Draft 7 tuple element types and order for strict consumers
+AssertionError: expected [ …(4) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "2578: Unused '@ts-expect-error' directive.",
++   "2578: Unused '@ts-expect-error' directive.",
++   "2578: Unused '@ts-expect-error' directive.",
++   "2578: Unused '@ts-expect-error' directive.",
++ ]
+
+ ❯ src/core/tools/codemode/declarations.test.ts:242:81
+    240| 
+    241|     const sample = renderToolSample(fixtureTool('fixture_lookup', sche…
+    242|     expect(strictConsumerErrors(signatureArgumentType(sample), valid, …
+       |                                                                                 ^
+    243|   })
+    244| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/core/tools/codemode/declarations.test.ts > strict TypeScript consumers of projected argument types > keeps valid property tags with a Unicode line terminator in strict TypeScript
+ FAIL  src/core/tools/codemode/declarations.test.ts > strict TypeScript consumers of projected argument types > keeps valid property tags with a Unicode line terminator in strict TypeScript
+AssertionError: expected [ …(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "1131: Property or signature expected.",
++   "2304: Cannot find name 'second$'.",
++   "1005: ';' expected.",
++   "2304: Cannot find name 'first'.",
++   "1434: Unexpected keyword or identifier.",
++   "2304: Cannot find name 'second'.",
++   "1002: Unterminated string literal.",
++   "1128: Declaration or statement expected.",
++ ]
+
+ ❯ src/core/tools/codemode/declarations.test.ts:255:81
+    253| 
+    254|     const sample = renderToolSample(fixtureTool('fixture_lookup', sche…
+    255|     expect(strictConsumerErrors(signatureArgumentType(sample), valid, …
+       |                                                                                 ^
+    256|   })
+    257| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/core/tools/codemode/declarations.test.ts > declares both actual read result shapes and requires narrowing before string operations
+AssertionError: expected [ { type: 'image', …(2) } ] to deeply equal [ { type: 'image', …(2) } ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+-     "mimeType": "image/png",
++     "data": "/9j//gAQTGF2YzYwLjMxLjEwMgD/2wBDAAgGBgcGBwgICAgICAkJCQoKCgkJCQkKCgoKCgoMDAwKCgoKCgoKDAwMDA0ODQ0NDA0ODg8PDxISEREVFRUZGR//xABLAAEBAAAAAAAAAAAAAAAAAAAACAEBAAAAAAAAAAAAAAAAAAAAABABAAAAAAAAAAAAAAAAAAAAABEBAAAAAAAAAAAAAAAAAAAAAP/AABEIAAEAAQMBEgACEgADEgD/2gAMAwEAAhEDEQA/AJ/AB//Z",
++     "mimeType": "image/jpeg",
+      "type": "image",
+    },
+  ]
+
+ ❯ src/core/tools/codemode/declarations.test.ts:275:33
+    273|     await runScript(registry, `return { sample: await describeTool('re…
+    274|       media: await tools.read({ path: 'pixel.png' }), plain: await too…
+    275|   expect(observed.media.images).toEqual([image])
+       |                                 ^
+    276|   expect(observed.media.output).toEqual(expect.any(String))
+    277|   expect(observed.plain).toContain('plain-text-control')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 12 passed (18)
+   Start at  22:53:15
+   Duration  10.71s (transform 2.27s, setup 0ms, collect 3.79s, tests 5.62s, environment 0ms, prepare 57ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/declarations-continuation-red.json
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/core/tools/codemode/declarations.test.ts --no-file-parallelism --maxWorkers=1 --reporter=default --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/codemode-validation/declarations-continuation-red.json

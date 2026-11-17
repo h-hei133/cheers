@@ -1,0 +1,64 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/core/tools/codemode/composition.test.ts (22 tests | 2 failed | 20 skipped) 171ms
+   ↓ the composed catalog consumed by the actual codemode worker > keeps mutable caller definitions isolated across catalog composition
+   ↓ the composed catalog consumed by the actual codemode worker > keeps frozen caller definitions isolated across catalog composition
+   ↓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the adapted consumer
+   ↓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the direct consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'adapted' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'direct' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'adapted' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'direct' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'adapted' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'direct' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer
+   ↓ the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the direct consumer
+   ↓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'removal' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'unchanged control' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'unrelated change control' with deferred=false before the captured effect
+   × captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=true before the captured effect 107ms
+     → Script completed
+
+captured-effect-receipt: expected true to be false // Object.is equality
+   × captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect 63ms
+     → Script completed
+
+captured-effect-receipt: expected true to be false // Object.is equality
+   ↓ persists one filtered parent result after two real builtin reads in runTurn
+   ↓ keeps the declared allowlist effective in an actual child script
+   ↓ keeps the declared denylist effective in an actual child script
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 20 skipped (22)
+   Start at  23:23:38
+   Duration  5.74s (transform 3.26s, setup 0ms, collect 5.32s, tests 171ms, environment 0ms, prepare 59ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-deferred-guard.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/composition.test.ts > captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=true before the captured effect
+ FAIL  src/core/tools/codemode/composition.test.ts > captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect
+AssertionError: Script completed
+
+captured-effect-receipt: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/core/tools/codemode/composition.test.ts:325:59
+    323|     const result = await pending
+    324|     const unchanged = change.endsWith('control')
+    325|     expect(result.success, result.error ?? result.output).toBe(unchang…
+       |                                                           ^
+    326|     expect(result.metadata?.nestedCalls).toMatchObject({ complete: tru…
+    327|       calls: [{ id: 'composition-owner/1', name: target.name, status: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+

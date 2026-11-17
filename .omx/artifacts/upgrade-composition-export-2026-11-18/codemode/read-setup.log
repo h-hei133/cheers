@@ -1,0 +1,25 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  19:16:41
+   Duration  3.64s (transform 1.59s, setup 0ms, collect 0ms, tests 0ms, environment 0ms, prepare 186ms)
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/read-setup.json
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/core/tools/codemode/output.test.ts [ src/core/tools/codemode/output.test.ts ]
+Error: Transform failed with 1 error:
+/home/wang/projects/cheers/packages/ts-shell/src/core/tools/codemode/tool.ts:200:149: ERROR: Unterminated string literal
+  Plugin: vite:esbuild
+  File: /home/wang/projects/cheers/packages/ts-shell/src/core/tools/codemode/tool.ts:200:149
+  Unterminated string literal
+  198 |              const failure = error instanceof CodemodeStoreError ? error : new CodemodeStoreError('unavailable', 'unkn...
+  199 |              const projected = output.result('Script failed',
+  200 |  ...' Completed nested tool effects were not rolled back.' : '))
+      |                                                                 ^
+  201 |              return { ...deniedResult(projected.text, { ...projected.metadata,
+  202 |                ...(nestedCalls ? { nestedCalls } : {}), codemodeStore: { status: failure.status, reason: failure.reaso...
+ ❯ failureErrorWithLog ../../node_modules/esbuild/lib/main.js:1752:15
+ ❯ ../../node_modules/esbuild/lib/main.js:1019:50
+ ❯ responseCallbacks.<computed> ../../node_modules/esbuild/lib/main.js:886:9
+ ❯ handleIncomingPacket ../../node_modules/esbuild/lib/main.js:941:12
+ ❯ Socket.readFromStdout ../../node_modules/esbuild/lib/main.js:864:7
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

@@ -17,6 +17,7 @@ import { type CatalogContent, type ToolCatalogInput } from "../core/tools/catalo
 import type { ToolDiscovery } from "../core/tools/discovery/state.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
 import { catalogProvider, type CatalogProvider } from "../core/models/catalog.js";
+import { sessionModelCatalog } from '../core/catalog/models.js';
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { RequestOverhead } from "../session/context.js";
@@ -336,6 +337,7 @@ async function startTurn(
 ): Promise<CliRuntimeInvocationResult> {
   assertAdmission(request.admission);
   request = { ...request, ...request.prepareProviderResources?.(request.providerCredentialResolution),
+    providerCatalog: request.providerCatalog ?? loadCatalog(),
     ...(request.virtualModel ? { cacheWarming: undefined } : {}) };
   const hooks = dependencies.hooks ?? defaultHookDispatcher;
   setupBuiltinVerificationHooks(hooks);
@@ -377,6 +379,7 @@ async function startTurn(
   const step = control?.step ?? baseStep;
 
   const run = runTurn({
+    modelCatalog: sessionModelCatalog(request.workspaceRoot, request.sessionId, request.providerCatalog ?? []),
     ...(request.convertToLlm ? { convertToLlm: request.convertToLlm } : {}),
     configScope: toolScopeBinding(request.runtimeConfig),
     ...(discovery ? { toolSnapshot: () => discovery.snapshot() } : {}),

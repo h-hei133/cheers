@@ -26,7 +26,7 @@ export interface ToolDiscovery {
   readonly generation: string;
   readonly catalog: ReadonlyMap<string, ToolDefinition>;
   subscribe(listener: () => void): () => void;
-  snapshot(): ReadonlyMap<string, ToolDefinition>;
+  snapshot(includeDeferred?: boolean): ReadonlyMap<string, ToolDefinition>;
   search(query: string, limit?: number): readonly DiscoveryMatch[];
   load(names: readonly string[]): { readonly loaded: readonly string[]; readonly rejected: readonly string[] };
   attachMeta(tools: readonly ToolDefinition[]): void;
@@ -103,11 +103,11 @@ export function createToolDiscovery(input: {
     };
   };
 
-  const snapshot = (): ReadonlyMap<string, ToolDefinition> => {
+  const snapshot = (includeDeferred = false): ReadonlyMap<string, ToolDefinition> => {
     const snapshotGeneration = generation();
     const selected = new Map<string, ToolDefinition>();
     for (const [name, tool] of input.catalog) {
-      if (pinned.has(name) || loaded.has(name)) selected.set(name, guard(tool, snapshotGeneration, true));
+      if (includeDeferred || pinned.has(name) || loaded.has(name)) selected.set(name, guard(tool, snapshotGeneration, true));
     }
     for (const tool of meta) selected.set(tool.name, guard(tool, snapshotGeneration, false));
     return selected;

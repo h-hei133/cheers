@@ -48,7 +48,13 @@ function runPage(payload: unknown) {
   elements.get("conversation")!.connected = true;
   elements.get("DATA")!.textContent = Buffer.from(JSON.stringify(payload)).toString("base64");
   vm.runInNewContext(PAGE_SCRIPT, {
-    document: { getElementById: (id: string) => elements.get(id), createElement: () => new Element(), body: new Element() },
+    document: { getElementById: (id: string) => elements.get(id), createElement: () => new Element(), body: new Element(),
+      querySelectorAll: (selector: string) => {
+        const descendants = (element: Element): Element[] => element.children.flatMap(child => [child, ...descendants(child)]);
+        return selector === '#conversation .thinking'
+          ? descendants(elements.get('conversation')!).filter(child => child.className === 'thinking') : [];
+      },
+    },
     TextDecoder, Uint8Array, atob: (value: string) => Buffer.from(value, "base64").toString("binary"),
     location: { hash: "" }, history: { replaceState() {} }, setTimeout() {},
     ResizeObserver: class {
@@ -204,6 +210,46 @@ describe("exported page branch traversal", () => {
     expect(elements.get("modal-image")!.attributes.get("src")).toBe("data:image/png;base64,AAAA");
     elements.get("image-modal")!.listeners.get("click")?.();
     expect(elements.get("image-modal")!.className).not.toContain("open");
+  });
+
+  it('toggles thinking in place while keeping tool expansion and controls', () => {
+    const elements = runPage({ entries: [entry('a', 'assistant', { reasoning: { text: 'analysis' }, toolCalls: [call('call_0')] }),
+      entry('t', 'tool', { toolCallId: 'call_0', content: 'long output\n'.repeat(100) })],
+      tree: [node('a'), node('t', 'a')], leafId: 't' });
+    const pane = elements.get('conversation')!;
+    const first = pane.children[0]!;
+    const thinking = first.children.find(child => child.className === 'thinking')!;
+    const tool = first.children.find(child => child.className === 'call')!;
+    tool.open = true;
+    tool.listeners.get('toggle')?.();
+    const before = [...tool.children];
+    elements.get('toggle-thinking')!.listeners.get('click')!();
+    expect(pane.children[0]).toBe(first);
+    expect(tool.open).toBe(true);
+    expect(tool.children).toEqual(before);
+    expect(thinking.open).toBe(false);
+    expect(elements.get('toggle-thinking')!.attributes.get('aria-pressed')).toBe('false');
+    elements.get('toggle-thinking')!.listeners.get('click')!();
+    expect(thinking.open).toBe(true);
+  });
+
+  it('keeps verified tool pairing when media omissions are reported', () => {
+    const elements = runPage({ entries: [entry('a', 'assistant', { toolCalls: [call('call_0')] }),
+      entry('t', 'tool', { toolCallId: 'call_0', content: 'paired result', toolDiff: '+tail' })],
+      tree: [node('a'), node('t', 'a')], leafId: 't', toolPairing: 'verified',
+      warnings: ['1 image was omitted because its encoded data could not be verified.'] });
+    const tool = elements.get('conversation')!.children[0]!.children.find(child => child.className === 'call')!;
+    expect(tool.children.some(child => child.className === 'tool-diff')).toBe(true);
+    expect(tool.children.some(child => child.className === 'result' && child.textContent === 'paired result')).toBe(true);
+  });
+
+  it('refuses explicitly unavailable tool pairing even without a display warning', () => {
+    const elements = runPage({ entries: [entry('a', 'assistant', { toolCalls: [call('call_0')] }),
+      entry('t', 'tool', { toolCallId: 'call_0', content: 'unverified result', toolDiff: '+tail' })],
+      tree: [node('a'), node('t', 'a')], leafId: 't', toolPairing: 'unavailable', warnings: [] });
+    const tool = elements.get('conversation')!.children[0]!.children.find(child => child.className === 'call')!;
+    expect(tool.children.some(child => child.className === 'tool-diff')).toBe(false);
+    expect(tool.children.some(child => child.className === 'result')).toBe(false);
   });
 
   it("shows unknown categories and dispatched usage gaps without substituting zero", () => {

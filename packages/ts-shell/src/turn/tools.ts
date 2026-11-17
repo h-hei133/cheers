@@ -39,6 +39,7 @@ import type { ToolScopeBinding } from '../config/scope/tools.js';
 import { bindToolScope, forgetToolScope, toolScopePolicy } from './scope.js';
 import { authorizeFileAccess, bindFileAccess, captureFileAccess, fileAccessArguments, fileAccessOptions, fileAccessPrompt, forgetFileAccess, requireFileAccess } from './workspace.js';
 import { createGatedNestedToolExecutor } from './nestedTools.js';
+import { toolExecutionMode } from './execution.js';
 const traceLogger = createComponentLogger("tool-call");
 
 /** A tool definition in the shape a chat completion request takes. */
@@ -62,6 +63,7 @@ export interface ToolSchema {
  */
 
 export interface ToolGateOptions {
+  readonly modelCatalog?: ToolExecutionContext['modelCatalog'];
   readonly configScope?: ToolScopeBinding;
   readonly background?: ToolExecutionContext['background'];
   readonly correlationId?: string;
@@ -155,18 +157,25 @@ export function adaptTools(
   };
   return [...tools.values()].map((tool) => ({
     name: tool.name,
-    ...(tool.prepare ? { executionMode: 'sequential' as const } : {}),
+    ...(toolExecutionMode(tool) ? { executionMode: toolExecutionMode(tool) } : {}),
     prepareArguments: (args, signal) => prepareArgsFor(tool, args, signal),
-    execute: (toolCallId, args, signal, onUpdate) =>
-      executeTool(tool, toolCallId, args, signal, options, onUpdate, tool.name === 'codemode'
+    execute: (toolCallId, args, signal, onUpdate) => {
+      const nestedCatalog = tool.name === 'codemode' ? tool.nestedToolCatalog?.() ?? tools : undefined;
+      return executeTool(tool, toolCallId, args, signal, options, onUpdate, nestedCatalog
         ? createGatedNestedToolExecutor({
-            tools,
-            hooks: createToolHooks(options, tools),
+            tools: nestedCatalog,
+            hooks: createToolHooks(options, nestedCatalog),
             prepare: (nestedTool, nestedArgs, nestedSignal) => prepareArgsFor(nestedTool, nestedArgs, nestedSignal),
             execute: (nestedTool, nestedCallId, nestedArgs, nestedSignal) =>
               executeTool(nestedTool, nestedCallId, nestedArgs, nestedSignal, options),
+            cleanup: (_nestedTool, nestedArgs) => {
+              discardToolCall(nestedArgs);
+              forgetToolScope(nestedArgs);
+              forgetFileAccess(nestedArgs);
+            },
           }, signal)
-        : undefined),
+        : undefined, nestedCatalog);
+    },
   }));
 }
 
@@ -190,6 +199,7 @@ async function executeTool(
   options: ToolGateOptions,
   onUpdate?: (partialResult: unknown) => void,
   executeNestedTool?: ToolExecutionContext['executeNestedTool'],
+  nestedCatalog?: ReadonlyMap<string, ToolDefinition>,
 ): Promise<AgentToolResult> {
   let accumulator: OutputAccumulator | undefined;
   let settled = false;
@@ -278,6 +288,8 @@ async function executeTool(
       ...(options.background ? { background: options.background } : {}),
       ...(options.runSubagent ? { runSubagent: options.runSubagent } : {}),
       ...(executeNestedTool ? { executeNestedTool } : {}),
+      ...(nestedCatalog ? { toolCatalog: nestedCatalog } : {}),
+      ...(options.modelCatalog ? { modelCatalog: options.modelCatalog } : {}),
       // unaffected, since the callback only fires if the tool calls it.
       onOutput: (chunk: string) => {
         if (settled) return;
@@ -293,6 +305,7 @@ async function executeTool(
       isError: !result.success,
       ...(result.metadata ? { metadata: result.metadata } : {}),
       ...(result.images ? { images: result.images } : {}),
+      ...(result.terminate !== undefined ? { terminate: result.terminate } : {}),
     };
   } catch (error) {
     traceLogger.warn("tool call failed", { toolCallId, tool: tool.name, requestId: options.correlationId, error: error instanceof Error ? error.message : String(error) });

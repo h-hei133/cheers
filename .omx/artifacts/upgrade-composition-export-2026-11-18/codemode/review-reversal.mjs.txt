@@ -1,0 +1,69 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+
+const repo = '/home/wang/projects/cheers';
+const out = path.join(repo, '.tmp/codemode-validation');
+const tree = path.join(out, 'review-reversal-tree');
+const owner = 'packages/ts-shell/src/';
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const cases = [
+  { name: 'mixed-barrier', file: 'turn/nestedTools.ts', tests: ['turn/nestedTools.test.ts'],
+    select: 'ordered effect barriers|complete write finalizer',
+    before: "const ready = isSequential ? Promise.all([sequential, ...active]) : sequential;\n    const pending = ready.then(run);",
+    after: "const pending = isSequential ? sequential.then(run) : run();" },
+  { name: 'nested-style', file: 'presentation/tui/transcript/inline.ts',
+    tests: ['presentation/tui/transcript/markdown.test.ts'], select: 'outer attribute after nested styling',
+    before: 'applyStyles(body, [style === "em" ? ["\\x1b[3m", 23] : ["\\x1b[9m", 29]])',
+    after: 'style === "em" ? `\\x1b[3m${body}\\x1b[23m` : `\\x1b[9m${body}\\x1b[29m`' },
+];
+const originals = new Map(cases.map(item => [item.file, fs.readFileSync(path.join(repo, owner, item.file))]));
+const receipt = { status: 'running', mainSourcesMutated: false, cases: [] };
+function run(label, tests, select) {
+  const reportFile = path.join(out, 'review-reversal-' + label + '.json');
+  const result = spawnSync('rtk', ['env', 'NODE_OPTIONS=--max-old-space-size=768',
+    'GIT_CEILING_DIRECTORIES=' + tree, 'node', path.join(repo, 'node_modules/vitest/vitest.mjs'),
+    'run', ...tests.map(file => 'src/' + file), ...(select ? ['-t', select] : []),
+    '--maxWorkers=1', '--no-file-parallelism', '--reporter=json', '--outputFile=' + reportFile], {
+    cwd: path.join(tree, 'packages/ts-shell'), encoding: 'utf8', timeout: 90000, maxBuffer: 4 * 1024 * 1024,
+  });
+  fs.writeFileSync(path.join(out, 'review-reversal-' + label + '.log'), (result.stdout ?? '') + (result.stderr ?? ''));
+  const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+  const failures = report.testResults.flatMap(suite => suite.assertionResults.filter(test => test.status === 'failed'));
+  return { exitCode: result.status, passed: report.numPassedTests, failed: report.numFailedTests,
+    assertionFailures: failures.filter(test => test.failureMessages.some(message => message.includes('AssertionError'))).length,
+    runtimeErrors: report.numRuntimeErrorTestSuites, reportSha256: hash(fs.readFileSync(reportFile)) };
+}
+try {
+  if (fs.existsSync(tree)) throw new Error('Reversal tree already exists');
+  fs.mkdirSync(path.join(tree, 'packages/ts-shell'), { recursive: true }); fs.mkdirSync(path.join(tree, '.git'));
+  fs.symlinkSync(path.join(repo, 'node_modules'), path.join(tree, 'node_modules'), 'dir');
+  fs.copyFileSync(path.join(repo, 'package.json'), path.join(tree, 'package.json'));
+  fs.cpSync(path.join(repo, owner), path.join(tree, owner), { recursive: true });
+  for (const file of ['package.json', 'tsconfig.json', 'vitest.config.ts'])
+    fs.copyFileSync(path.join(repo, 'packages/ts-shell', file), path.join(tree, 'packages/ts-shell', file));
+  for (const item of cases) {
+    const original = originals.get(item.file), text = original.toString('utf8');
+    if (text.split(item.before).length !== 2) throw new Error('Reversal fragment not unique: ' + item.name);
+    const file = path.join(tree, owner, item.file), reversed = Buffer.from(text.replace(item.before, item.after));
+    let observation;
+    try { fs.writeFileSync(file, reversed); observation = run(item.name, item.tests, item.select); }
+    finally { fs.writeFileSync(file, original); }
+    const result = { name: item.name, file: owner + item.file, sourceSha256: hash(original),
+      reversedSha256: hash(reversed), ...observation, restoredExactly: fs.readFileSync(file).equals(original) };
+    result.status = result.exitCode === 1 && result.failed > 0 && result.failed === result.assertionFailures
+      && !result.runtimeErrors && result.restoredExactly ? 'passed' : 'failed';
+    receipt.cases.push(result); console.log(JSON.stringify(result));
+    if (result.status !== 'passed') throw new Error('Reversal did not fail only through assertions');
+  }
+  receipt.restored = run('restored', [...new Set(cases.flatMap(item => item.tests))]);
+  if (receipt.restored.exitCode !== 0 || receipt.restored.failed || receipt.restored.runtimeErrors) throw new Error('Restored validation failed');
+  receipt.status = 'passed';
+} catch (error) { receipt.status = 'failed'; receipt.error = error.message; process.exitCode = 1; }
+finally {
+  receipt.mainSourcesUnchanged = [...originals].every(([file, bytes]) => fs.readFileSync(path.join(repo, owner, file)).equals(bytes));
+  fs.rmSync(tree, { recursive: true, force: true }); receipt.isolatedTreeRemoved = !fs.existsSync(tree);
+  if (!receipt.mainSourcesUnchanged || !receipt.isolatedTreeRemoved) { receipt.status = 'failed'; process.exitCode = 1; }
+  fs.writeFileSync(path.join(out, 'review-reversal.json'), JSON.stringify(receipt, null, 2) + '\n');
+}

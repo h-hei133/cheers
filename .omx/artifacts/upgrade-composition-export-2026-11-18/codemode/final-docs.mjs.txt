@@ -1,0 +1,83 @@
+import fs from 'node:fs';
+
+const build = '19af1f6dc3f2';
+const root = '.wiki/refactor/upgrade/';
+function change(file, transforms) {
+  let text = fs.readFileSync(file, 'utf8');
+  for (const [before, after] of transforms) {
+    if (!text.includes(before)) throw new Error('Missing final document fragment: ' + file + ': ' + before.slice(0, 80));
+    text = text.replaceAll(before, after);
+  }
+  fs.writeFileSync(file, text);
+}
+
+change(root + 'MASTER.md', [
+  ['全部33项未完成功能任务', '全部32项未完成功能任务'],
+  ['**Current phase**: in_progress；E.1/E.3/D.4当前联合Linux验证通过，独立审查待收齐。29/62功能任务已验收，33未完成；E.3 richer model dispatch和D.4完整GFM继续部分，F2.2新核实cache publication缺口。完整仓库NormProof仍not_proven。',
+    '**Current phase**: in_progress；E.1当前Linux功能验收完成，E.3/D.4子批验证及限定独立复审通过。30/62功能任务已验收，32未完成；richer model dispatch和完整GFM继续部分，F2.2缓存publication进入实际反例修复。完整仓库NormProof仍not_proven。'],
+  ['**Last completed batch**: E.5共享SDK UI续绑/C.8可变schema已本地提交cccc7208；其25文件355项、build89344ffebd35和10source限定APPROVE继续历史证据。当前E.1/E.3/D.4修复32生产/12测试，最终49文件963项、七门/2678modules/0monoliths、12script及7export有效反转/exact恢复、build3e05e202dc57通过；6配置模型actual requests和六raw/installed15入口/离线浏览器passed，review收齐前不计新完成。',
+    '**Last completed batch**: E.1完整脚本组合与E.3/D.4子批修复33生产/12测试；当前50文件987项、七门/2678modules/0monoliths和build' + build + '通过。原12script/7export反转保持当前相关source hash，新增两反转5AssertionErrors/exact恢复96项；配置模型6actual requests、七raw controls、npm15入口strict类型/实际读写及离线浏览器passed。限定独立FIXED/APPROVE已核对，按授权本地提交；E.5/C.8的cccc7208保持历史证据。'],
+  ['**Current batch**: E.1原worker/普通gate/catalog复用修复完整settlement、restricted guarded deferred tool snapshot和child boundary；E.3声明/namespace/冻结session metadata/read-media/输出预算，D.4public sanitize/图片/Thinking/pairing/CJK共享inline已实际验证。source/build/config原身份与cleanup核验通过，证据draft upgrade-composition-export-2026-11-18；metadata限定FIXED/APPROVE hash匹配，其余复审running，不借旧中断lane批准。',
+    '**Current batch**: F2.2先运行冻结源码真实loopback反例：30项26红/4控制；storage/command追加19项全红。拟复用catalogStore/原锁及atomic writer、profile identity和configuration publication，capture原body/source/path/raw，在每次rename前复验，保留saved/unknown/unchanged。当前只完成反例，不计F2.2完成。'],
+  ['**Goal**: active；33功能任务未完成，其中14部分、4已有待验收、13缺口、2待核实；另有仓库NormProof缺口。E.1当前验证已过但独立审查仍待收齐，暂不勾选。E.3及D.4完整范围仍开项；F2.2已确认待修。仅本地分批提交，未push或取得远端CI。',
+    '**Goal**: active；32功能任务未完成，其中14部分、3已有待验收、13缺口、2待核实；另有仓库NormProof缺口。E.1已达到当前Linux功能验收；E.3及D.4完整范围仍开项，F2.2反例已证实。仅本地分批提交，未push或取得远端CI。'],
+  ['当前Linux功能验收任务数为29/62', '当前Linux功能验收任务数为30/62'],
+  ['、E.5和T3.1；核实不计实现完成', '、E.5、E.1和T3.1；核实不计实现完成'],
+  ['当前复审待收齐，功能完成数不提前增加；旧build和失败run保持独立，后续先关闭当前审查再提交，F2.2按source-first实际反例继续。',
+    '新独立composition/export审查各确认一P2；三effect barrier/两nested style反例实际红后复用原owner修复，限定FIXED/APPROVE。当前50/987及build' + build + '通过，E.1功能完成数增至30；旧build和503/provider_network失败run保持独立，F2.2按真实反例继续。'],
+]);
+
+const taskFile = root + 'tasks.md';
+let tasks = fs.readFileSync(taskFile, 'utf8');
+tasks = tasks.replaceAll('当前build `3e05e202dc57`', '当前build `' + build + '`')
+  .replaceAll('联合49文件963项', '联合50文件987项')
+  .replaceAll('联合963项passed', '联合987项passed')
+  .replace('独立审查结论待收齐，不勾选整项。', '独立限定FIXED/APPROVE已核对，嵌套样式reset回归两红后修，完整GFM未完成，不勾选整项。')
+  .replace('- [ ] **E.1** 沙箱组合、嵌套权限／hook／过滤结果：当前Linux验证通过，独立审查待收齐。',
+    '- [x] **E.1** 沙箱组合、嵌套权限／hook／过滤结果：Linux本地功能验收完成。')
+  .replace('六compiled raw controls及同代npm15入口strict类型／安装后实际读写通过；',
+    '七compiled raw controls含实际write审批前read屏障及同代npm15入口strict类型／安装后实际读写通过；新独立composition/export各一P2经五实际反例修复、两反转5AssertionErrors／exact恢复96项及限定FIXED/APPROVE hash核对。')
+  .replace('当前本批仅核实，无产品修改或真实刷新验收。',
+    '冻结源码真实loopback30项26红/4控制、storage/command追加19项全红已证实；本批无刷新生产修改，后续接通每次rename前guard及安全saved/unknown/unchanged结果，真实刷新验收尚未完成。');
+fs.writeFileSync(taskFile, tasks);
+
+change(root + 'summary.md', [
+  ['62项中29项完成Linux功能验收，33项功能任务未完成', '62项中30项完成Linux功能验收，32项功能任务未完成'],
+  ['14项部分完成、4项已有实现待验收', '14项部分完成、3项已有实现待验收'],
+  ['当前E.1/E.3/D.4联合49文件963项、七门、build3e05e202dc57、配置模型两次完整组合/6actual requests、六raw controls、installed15入口strict类型/实际读写及离线浏览器passed。独立审查待收齐，E.1暂不勾选；',
+    '当前E.1/E.3/D.4联合50文件987项、七门、build' + build + '、配置模型两次完整组合/6actual requests、七raw controls、installed15入口strict类型/实际读写及离线浏览器passed。两项独立P2经五真实反例修复，限定FIXED/APPROVE hash已核对，E.1勾选；'],
+  ['使当前增加到29项', '及E.1使当前增加到30项'],
+  ['当前build3e05e202dc57、12script有效反转23AssertionErrors/恢复96项及7export反转18AssertionErrors/恢复149项，源码exact恢复；',
+    '当前build' + build + '、12script有效反转23AssertionErrors/恢复96项及7export反转18AssertionErrors/恢复149项保持对应source；追加两反转5AssertionErrors/exact恢复96项；'],
+  ['6compiled raw controls零provider', '7compiled raw controls零provider'],
+  ['metadata七文件限定FIXED/APPROVE，其余审查未收齐。[当前交付draft]',
+    'metadata七文件及新独立composition/export限定FIXED/APPROVE已核对，旧中断lane为unavailable。[当前交付]'],
+  ['## 已完成功能验收的29项', '## 已完成功能验收的30项'],
+  ['| E.2 | 1 | codemode分支状态持久化、原前缀／CAS／ABA保护、进程重启和多级fork隔离；不包含确定性重放。 |',
+    '| E.1、E.2、E.5 | 3 | 脚本完整host settlement、普通gate/hooks/child boundary/动态读写effect barrier；codemode分支状态持久化、原前缀／CAS／ABA保护、进程重启和多级fork隔离；共享SDK UI续绑／撤权。不包含确定性重放。 |'],
+  ['## 文档中尚未完成的33项功能任务', '## 文档中尚未完成的32项功能任务'],
+  ['| E.1 | 已有待验收 | 当前两次完整配置模型组合、gate/cancel/history与安装验证已过；独立审查待收齐。 |\n', ''],
+  ['完整GFM仍未验收，独立审查收尾。', '完整GFM仍未验收；限定独立FIXED/APPROVE通过。'],
+  ['无body304、旧200覆盖/304重标、取消后写入与invalid model record已源码确认；待实际反例及修复。',
+    '无body304、旧200覆盖/304重标、取消后写入与invalid model record已真实26红/4控制确认；追加storage/command19红，待生产修复。'],
+  ['当前E.1/E.3/D.4验证通过、独立审查收尾，先核对最终review/hash后提交本批；',
+    '当前E.1功能验收及E.3/D.4子批验证/限定独立复审通过，按授权本地提交本批；'],
+]);
+let summary = fs.readFileSync(root + 'summary.md', 'utf8');
+summary = summary.replace('| 当前E.5／C.8共享构建 |',
+  '| 当前E.1／E.3／D.4 | 50文件987项、七门、build' + build + '；原19反转和补两反转5AssertionErrors/exact恢复96项。配置模型6actual requests、七raw controls、安装15入口strict类型与离线CLI/Chromium passed。 | [交付](../../../.omx/artifacts/upgrade-composition-export-2026-11-18/delivery.json)，限定FIXED/APPROVE已核对；E.3 richer dispatch/D.4完整GFM仍开项。 |\n| 此前E.5／C.8共享构建 |');
+fs.writeFileSync(root + 'summary.md', summary);
+
+change(root + 'design.md', [
+  ['统一sequential policy供outer和nested使用，read可并行，可能有序effect的独立script不交错。',
+    'outer和nested复用同executionMode；动态RPC同步捕获fence和active快照，write等待此前read/effect完整gate/finalizer，后续read等待write，read/read保持并行。动态stream不能预读未来batch；可能有序effect的独立script不交错。'],
+  ['当前冻结build 3e05e202dc57与32生产/12测试source hash匹配。最终联合49文件963项',
+    '当前冻结build ' + build + '与33生产/12测试source hash匹配。最终联合50文件987项'],
+  ['六compiled raw controls覆盖builtin读写/deny/完成effect后失败/native ffmpeg图/timeout/cancel',
+    '七compiled raw controls覆盖混合write/read审批屏障、builtin读写/deny/完成effect后失败/native ffmpeg图/timeout/cancel'],
+  ['完整证据在upgrade-composition-export-2026-11-18，独立复审待收齐，暂不勾选E.1或提交。',
+    '完整证据在upgrade-composition-export-2026-11-18；新独立composition/export各确认一P2，三effect barrier与两nested样式反例实际红后修，复用原active/fence和theme scoped style。两补充反转实际5AssertionErrors/exact恢复96项、当前限定FIXED/APPROVE hash核对；旧无结论lane为unavailable。E.1 Linux功能验收，E.3/D.4整项开；同代活动连接两次503、其他连接零bodySent的provider_network分别保留，已配置index1成功6actual requests不改变原配置。'],
+]);
+fs.appendFileSync(root + 'design.md', '\nF2.2实际冻结源码30项26红/4控制，追加storage/command19项全红。补充边界为staging后/EBUSY retry前复验、same-FD bytes/inode与absent-parent identity、rename后saved/unknown、原command signal/admission贯通以及固定安全错误。原atomic writer须每次rename前guard，所有cache writer同物理锁，仍不宣称锁外editor最后rename窗口的跨进程CAS。仅反例，未改变本批生产refresh/store。\n');
+fs.appendFileSync('.wiki/log.md', '\n\n### 2026-11-18：脚本组合与富文本导出子批验收\n\nE.1复用原worker/gate/catalog修复child退休与完整host join、普通approval/hooks/结果、restricted deferred snapshot和delegated边界；新独立复审确认mixed write/read屏障及nested样式reset两P2，五实际反例红后修，复用原fence/active与theme scoped style。最终50文件987项、七门/2678modules/0monoliths、build' + build + '通过；原12script/7export反转对应source保持，追加两反转5AssertionErrors/exact恢复96项。限定metadata/composition/export FIXED/APPROVE hash核对，旧中断lane为unavailable。\n\n同代已配置连接index1两次完整allowed/retry组合6actual requests、七compiled raw controls、npm15入口strict NodeNext/skipLibCheck=false及实际读写、CLI/public HTML/Linux离线Chromium零网络/零页面错误passed。原活动连接两次503和另连接零bodySent/provider_network失败保留，原配置与stored session不变，私有state清理。E.1本地功能验收30/62、32未完成；E.3 richer dispatch/provider image及D.4完整GFM仍部分。正常pinned NormProof actual exit2/not_proven/超16384边missing，18tracked files未改；临时32768图诊断不替代默认proof。F2.2冻结源码30项26红/4控制及storage/command19红已证实，接续原owner修复。按批本地提交，不push/CI，整体goal active。\n');
+console.log(JSON.stringify({ accepted: 30, total: 62, remaining: 32, build }));

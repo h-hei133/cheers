@@ -1,0 +1,60 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/core/tools/codemode/output.test.ts (22 tests | 3 failed | 19 skipped) 146ms
+   ↓ bounded feedback from the actual script worker > renders separate text and console output with actual line endings
+   ↓ bounded feedback from the actual script worker > bounds top-level return together with the final status and notice
+   ↓ bounded feedback from the actual script worker > bounds multibyte text together with the final status and notice
+   ↓ bounded feedback from the actual script worker > bounds combined text, console and return together with the final status and notice
+   ↓ bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: text("界".repeat(2000));
+   ↓ bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: return "界".repeat(2000);
+   × validated images retained by the actual script worker > normalizes a valid declared MIME before the shared inspector: "data:IMAGE/PNG;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" 68ms
+     → expected false to be true // Object.is equality
+   × validated images retained by the actual script worker > normalizes a valid declared MIME before the shared inspector: {"data":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=","mimeType":" IMAGE/PNG "} 44ms
+     → expected false to be true // Object.is equality
+   × validated images retained by the actual script worker > normalizes a valid declared MIME before the shared inspector: {"image_url":{"url":"data:Image/Png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="}} 33ms
+     → expected false to be true // Object.is equality
+   ↓ validated images retained by the actual script worker > keeps a complete image total within both existing media limits
+   ↓ validated images retained by the actual script worker > omits repeated images after four, with bounded feedback metadata
+   ↓ validated images retained by the actual script worker > enforces the encoded aggregate limit before the four-image count is reached
+   ↓ validated images retained by the actual script worker > rejects a complete individually oversized image before retaining a valid successor
+   ↓ validated images retained by the actual script worker > rejects PNG signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects JPEG signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects GIF signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects WebP signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged object MIME before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged data URI MIME before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged image_url MIME before retention and still accepts complete bytes
+   ↓ builtin read results through the real tool gate and worker > keeps text-only nested read results compatible with string consumers
+   ↓ builtin read results through the real tool gate and worker > forwards inert image-bearing read results into published model feedback
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 19 skipped (22)
+   Start at  00:50:55
+   Duration  3.13s (transform 1.72s, setup 0ms, collect 2.73s, tests 146ms, environment 0ms, prepare 57ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-image-mime.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > normalizes a valid declared MIME before the shared inspector: "data:IMAGE/PNG;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > normalizes a valid declared MIME before the shared inspector: {"data":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=","mimeType":" IMAGE/PNG "}
+ FAIL  src/core/tools/codemode/output.test.ts > validated images retained by the actual script worker > normalizes a valid declared MIME before the shared inspector: {"image_url":{"url":"data:Image/Png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="}}
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/core/tools/codemode/output.test.ts:140:28
+    138|   ])('normalizes a valid declared MIME before the shared inspector: %j…
+    139|     const result = await scriptTool().execute({ code: `await image(${J…
+    140|     expect(result.success).toBe(true)
+       |                            ^
+    141|     expect(result.images).toEqual([PIXEL])
+    142|     expect(result.metadata?.outputNotice).toBeUndefined()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+

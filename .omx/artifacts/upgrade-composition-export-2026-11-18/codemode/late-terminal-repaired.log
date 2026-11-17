@@ -1,0 +1,8 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ✓ src/core/tools/codemode/execution.test.ts (12 tests) 789ms
+ ✓ src/turn/nestedTools.test.ts (17 tests) 28ms
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+   Start at  19:31:03
+   Duration  3.58s (transform 1.08s, setup 0ms, collect 2.24s, tests 817ms, environment 0ms, prepare 138ms)
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/late-terminal-repaired.json

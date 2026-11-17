@@ -1,0 +1,451 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "publicCompiledSdk": true,
+  "configuredProvider": true,
+  "probeSha256": "e8c9796abc854e1e8562897534b3ff4fc2b3a3a35aa5602e70cde36b67978ff7",
+  "referenceProbeSha256": "1c4119fa6af82a367e2cc37f74a731760349e76ed7c876c5a789bc0760640cf4",
+  "providerCases": [],
+  "rawCases": [
+    {
+      "name": "mixed-write-read-barrier",
+      "status": "passed",
+      "zeroProviderRequests": true,
+      "actualWorker": true,
+      "builtinDefinitions": true,
+      "readWaitedForWriteGate": true,
+      "nativeOsReadWrite": true,
+      "nested": {
+        "complete": true,
+        "calls": [
+          {
+            "id": "raw-parent/1",
+            "name": "write",
+            "status": "ok",
+            "argumentsSha256": "08ce8d1e0219bfa697fa3a06fc6af8a43cd3b07df852044bb2aa3f8a5bca98fd",
+            "durationMs": 86,
+            "errorSha256": null
+          },
+          {
+            "id": "raw-parent/2",
+            "name": "read",
+            "status": "ok",
+            "argumentsSha256": "4702ddd62bec0260b77e2cb6a40ac2a1b33879ec07291892897f3bc2deee3f5c",
+            "durationMs": 91,
+            "errorSha256": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "builtin-read-write",
+      "status": "passed",
+      "zeroProviderRequests": true,
+      "builtinDefinitions": true,
+      "nativeOsReadWrite": true,
+      "nested": {
+        "complete": true,
+        "calls": [
+          {
+            "id": "raw-parent/1",
+            "name": "read",
+            "status": "ok",
+            "argumentsSha256": "82f9054a785d7a1a04e1eae2bbbf9dc46f46f76bbc0243ea2350a65795cf40de",
+            "durationMs": 5,
+            "errorSha256": null
+          },
+          {
+            "id": "raw-parent/2",
+            "name": "write",
+            "status": "ok",
+            "argumentsSha256": "86c29087f3419923098de611421e8f33ebdd48c4ff4769746661d18c28e8e0b8",
+            "durationMs": 60,
+            "errorSha256": null
+          }
+        ]
+      },
+      "outputSha256": "2641ce4d8d0083bfd460bd75d93848444f80de03df91e4e5d5e1a584f2cb63dc",
+      "hookEvents": [
+        {
+          "event": "PreToolUse",
+          "name": "codemode",
+          "id": "raw-parent",
+          "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "event": "PreToolUse",
+          "name": "read",
+          "id": "raw-parent/1",
+          "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "event": "PostToolUse",
+          "name": "read",
+          "id": "raw-parent/1",
+          "outputSha256": "0ed152ba75f6eb52b6d4861e1d4517dd5e6ab3a1cbc0cb2a3e6fd51474429a6e"
+        },
+        {
+          "event": "PreToolUse",
+          "name": "write",
+          "id": "raw-parent/2",
+          "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "event": "PostToolUse",
+          "name": "write",
+          "id": "raw-parent/2",
+          "outputSha256": "fe64438f338ec2edc1c9ea5e8902f6f3b5e306740a98153b598549cc05470c5b"
+        },
+        {
+          "event": "PostToolUse",
+          "name": "codemode",
+          "id": "raw-parent",
+          "outputSha256": "2641ce4d8d0083bfd460bd75d93848444f80de03df91e4e5d5e1a584f2cb63dc"
+        }
+      ]
+    },
+    {
+      "name": "ordinary-deny",
+      "status": "passed",
+      "zeroProviderRequests": true,
+      "rejected": true,
+      "effects": 0,
+      "fileAbsent": true,
+      "nested": {
+        "complete": true,
+        "calls": [
+          {
+            "id": "raw-parent/1",
+            "name": "fixture:effect",
+            "status": "error",
+            "argumentsSha256": "a8a600a54f901421dee11a107dc09a607cf9b41fea3432fa1ea3d92ce2280fdc",
+            "durationMs": 0,
+            "errorSha256": "508186f145c77516be413328adeec3b4bc6cb552b3d031977d0c4b9721aebc6e"
+          }
+        ]
+      },
+      "ordinaryDenyRule": true
+    },
+    {
+      "name": "completed-effect-then-script-failure",
+      "status": "passed",
+      "zeroProviderRequests": true,
+      "isError": true,
+      "completedEffectPreserved": true,
+      "nested": {
+        "complete": true,
+        "calls": [
+          {
+            "id": "raw-parent/1",
+            "name": "write",
+            "status": "ok",
+            "argumentsSha256": "05652454ac76a78f09539e34e0974f89182aa3b13a10e53b835d1f800e09c917",
+            "durationMs": 58,
+            "errorSha256": null
+          }
+        ]
+      },
+      "outputSha256": "952fae58e9ceb3b0704dcab643f052d424d19287e93367a150ed6a75bc62d457"
+    },
+    {
+      "name": "native-media-read-image",
+      "status": "passed",
+      "zeroProviderRequests": true,
+      "actualNativeDecoder": true,
+      "imagePublished": true,
+      "dimensions": {
+        "widthPx": 1,
+        "heightPx": 1,
+        "bytes": 204
+      },
+      "imageSha256": "a3bdae5d57267bbcbe3c941adca85e22850332b3b30f10f366ae4327d09bdb51",
+      "nested": {
+        "complete": true,
+        "calls": [
+          {
+            "id": "raw-parent/1",
+            "name": "read",
+            "status": "ok",
+            "argumentsSha256": "385001e036f8ed8d41bd72447ca5d5bba1ac453189d766bc94f2ba9950b38889",
+            "durationMs": 245,
+            "errorSha256": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "timeout-pending-effect",
+      "status": "passed",
+      "zeroProviderRequests": true,
+      "isError": true,
+      "effects": 0,
+      "childRetired": true,
+      "parentWaitedForBoundary": true,
+      "parentAborted": false,
+      "lateFileAbsent": true,
+      "outputSha256": "e7b37d90eeff78c9fb6f7b301311805c2303a10e4737334744187ba75d633e1f"
+    },
+    {
+      "name": "parent-cancel-pending-effect",
+      "status": "passed",
+      "zeroProviderRequests": true,
+      "isError": true,
+      "effects": 0,
+      "childRetired": true,
+      "parentWaitedForBoundary": true,
+      "parentAborted": true,
+      "lateFileAbsent": true,
+      "outputSha256": "2decf4694d6f98430d7cc65057e13d599460cc4cb932ca83b8c5ebf73978ec0b"
+    }
+  ],
+  "requests": [
+    {
+      "stage": "provider-allowed",
+      "bodySent": true,
+      "requestBytes": 5323,
+      "requestSha256": "74dfba9a816afa5f1cfc2e28f21811271486eeca4865342f5680a99c7580d47b",
+      "declarations": [
+        {
+          "name": "read",
+          "schemaSha256": "1c377880a9e58d4ff7a7bc852a3ed57aac4e55873143b2c76cf8a60b299172af",
+          "schemaBytes": 486
+        },
+        {
+          "name": "tool_search",
+          "schemaSha256": "c74838ac162e5ae2334169c5e8186184e8fca771986cc6b63cfd1ec8ecd31dd4",
+          "schemaBytes": 157
+        },
+        {
+          "name": "tool_load",
+          "schemaSha256": "d5a04637c64846f4835d4fd9a6212d2d668de6851ac4b111bee111eab9cc4db7",
+          "schemaBytes": 131
+        }
+      ],
+      "toolResults": [],
+      "schemaSha256": "11b274863085393cb9aec87d9b43c51c50df05c8760a2ed4a3b07349c8d23d00",
+      "systemSha256": "b6335f51eb4fa8f200374574e108d442641fce1e1dbccca3d4fcd53bf970f2e1",
+      "systemBytes": 1377,
+      "modelMatchesConfigured": true,
+      "responseStatus": 503,
+      "responseBytes": 74,
+      "responseSha256": "431c90b418e751fbeba9f41c2f9246ca70fbb194510618789ff1e161e3a17c3a",
+      "responseEnd": "transport-complete",
+      "response": {
+        "inspectable": true,
+        "frames": 1,
+        "completionMarker": false
+      }
+    }
+  ],
+  "buildId": "19af1f6dc3f28424cb6f11622ca0d2c78186ee2165a579abecc7cbabd5534d62",
+  "buildInputsDigest": "9b9981a020bac00ca6dff9228f7a341d2493ff41d418798a6b48f6acb51fe3ea",
+  "buildManifestSha256": "f4ba025fa8e7bf2a4b221ac0dfb850252fed3dab8ed92db51923be8cccc0c79c",
+  "source": {
+    "files": [
+      {
+        "file": "packages/ts-shell/src/index.ts",
+        "sha256": "a6ef28d898c9bc48717b08ca682e146a073b5d3923bf83550b061e48e0daffb1"
+      },
+      {
+        "file": "packages/ts-shell/src/tools/types.ts",
+        "sha256": "d4afb32f31f98eeac4d51236c264703a51120a29081eac0554fd05bb02a0ab2b"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/catalog.ts",
+        "sha256": "953e011e3ab68e0705656979579e537a217612ec947cdb751c745cdb181ee6fd"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/discovery/state.ts",
+        "sha256": "ebc63d4c7ed9b67f204766ecd6e7a66e10d7b821e9b4f4c9c660e87aa40ac622"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/tool.ts",
+        "sha256": "4403ec624010f45e86c7bae7c38a4ead7d1726797cc7902c4cff9496f32106f5"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/prelude.ts",
+        "sha256": "bf4669c30290e1267838eabbfc1600ae673b38ede985ae234b2b6a79175ef1f9"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/execution.ts",
+        "sha256": "ed9b71d2772f66b570faba4d0ad4c3f5475918abf180cd63030d67d25e27263e"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/image.ts",
+        "sha256": "a3b4ffe32574249be584f603a9d5cd30f4d3a5e35aa6946dae87a4cc5715a072"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/models.ts",
+        "sha256": "89ae843cdb7712013fbb6efd9b4ce7a3f6cdf8170976583033109ffec4e0ff2f"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/nestedCalls.ts",
+        "sha256": "5e38cfb0433814ea278d0699a026fcddbdbf53d7a80d49651fa82fff5bd604d5"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/declarations.ts",
+        "sha256": "873182669754960da87708d8f57bfda3b7ef83243ff7385331eafa22c202ab2e"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/output.ts",
+        "sha256": "f3275a67764c4c1c57730fc511da9f3d84839f3f33efda5bac15cd8c1bd50841"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/codemode/catalog.ts",
+        "sha256": "a6a527b1be724e2bd6808ad74d4ab610571e9e2c41edc869fe63a03e263434b1"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/execution.ts",
+        "sha256": "c5f8d75d83893f67439ec1abe84330eca2b5784040e11489d42c6ea64aab54ba"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/subagent.ts",
+        "sha256": "3bc31537c51d4ef1589652b6139a4aa20e30f026165151fc2130656a48bfdf24"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/session.ts",
+        "sha256": "213852747bf94d6bbc2f59f6b63e63832a2710d6652566e33687a041f69d951f"
+      },
+      {
+        "file": "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts",
+        "sha256": "9cba0dddccacf90149fbb5dfe793a1e169437f034adc70231d10cacd8063c950"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/tools.ts",
+        "sha256": "429b08f174f8c9f23b9e74f07f2f2bdbf262abe84ff38c64e84b183f2ec3eeaf"
+      },
+      {
+        "file": "packages/ts-shell/src/turn/nestedTools.ts",
+        "sha256": "855e328901fdefd4125dafd7e539b93d5edb66d53804dbb5b6021b66a17e45b3"
+      },
+      {
+        "file": "packages/ts-shell/src/core/tools/read.ts",
+        "sha256": "5d7f3a04b4367a3d8bb43e0d954e6b291c3a5d69cbfeeaf3b1294a7a01c46388"
+      },
+      {
+        "file": "packages/ts-shell/src/runtime/execution/media/image.ts",
+        "sha256": "4e551f8e2ed6559824bc87083d0d91027bf51bdf7f2047a29df6f938d9c147f5"
+      }
+    ],
+    "sha256": "eba8fe185bc455e494dfcec693ab9bf86ac0e4a0eda42c92690b30760fbde6c3"
+  },
+  "catalogueSetup": {
+    "originalActiveSelected": true,
+    "isolatedValidObjects": true,
+    "minimalConfiguredModelEntry": true,
+    "originalConfiguredCredentials": true,
+    "inventedPrices": false,
+    "inventedRemoteLimits": false,
+    "localContextWindow": 32000,
+    "localOutputCap": 4096,
+    "publishedContextWindow": null,
+    "publishedInputLimit": null,
+    "originalPricesPresent": false
+  },
+  "configuredTarget": {
+    "providerIdSha256": "7e341752813dcf844ffc5197123e0f41f6cfe860a8ea52cb8f92749667afc142",
+    "connectionIdSha256": "53793a6c1cf5bdcd5eaa2dffa613b5ed1bf7d9e2d425728ff71004e46689e998",
+    "modelIdSha256": "901b676976668ae9f8734593d5fcff241c6b46b1f08e702ef6c272f82290ba9c",
+    "catalogueIdSha256": "f856222c5b7d1f3e56f094a7b1cb14957b96e9299566a03a0d12ab4bbe2ae221",
+    "originalActive": true,
+    "configuredIndex": null
+  },
+  "originalInputsSha256": "ce298c2f7b2a5664c495d78fc8b9fde599378bd0fded9e346da8b3af06bc67d5",
+  "compiledControls": {
+    "manifestBoundInternalExports": true,
+    "publicPackageExportClaim": false,
+    "owners": [
+      {
+        "symbol": "createCoreToolRegistry",
+        "artifact": "builds/19af1f6dc3f28424cb6f11622ca0d2c78186ee2165a579abecc7cbabd5534d62/chunks/chunk-QUYR5AG3.js",
+        "sha256": "18ac8fdcd32f670c4c288ca00a04f10dad1ce259550c3b78ae79718b90ecaf6a"
+      },
+      {
+        "symbol": "createCodemodeToolDefinition",
+        "artifact": "builds/19af1f6dc3f28424cb6f11622ca0d2c78186ee2165a579abecc7cbabd5534d62/chunks/chunk-DDS7PV2V.js",
+        "sha256": "d5a565a3f27ecef557ebe879b53a9db79e04b2e619e335f39b4232c1e1052d40"
+      },
+      {
+        "symbol": "adaptTools",
+        "artifact": "builds/19af1f6dc3f28424cb6f11622ca0d2c78186ee2165a579abecc7cbabd5534d62/chunks/chunk-QQJCJTF5.js",
+        "sha256": "d06976640951deba5f1ae1852d38693adf2c2ec8b7630e61c6338232ff0b6f03"
+      },
+      {
+        "symbol": "createToolHooks",
+        "artifact": "builds/19af1f6dc3f28424cb6f11622ca0d2c78186ee2165a579abecc7cbabd5534d62/chunks/chunk-QQJCJTF5.js",
+        "sha256": "d06976640951deba5f1ae1852d38693adf2c2ec8b7630e61c6338232ff0b6f03"
+      },
+      {
+        "symbol": "executeToolBatch",
+        "artifact": "builds/19af1f6dc3f28424cb6f11622ca0d2c78186ee2165a579abecc7cbabd5534d62/chunks/chunk-BHWSQQ3R.js",
+        "sha256": "29d08cc168d9049ee6fd20784708eabcd71b2cbb1fffdcf7e8039cf40e978486"
+      },
+      {
+        "symbol": "HookDispatcher",
+        "artifact": "builds/19af1f6dc3f28424cb6f11622ca0d2c78186ee2165a579abecc7cbabd5534d62/chunks/chunk-QUYR5AG3.js",
+        "sha256": "18ac8fdcd32f670c4c288ca00a04f10dad1ce259550c3b78ae79718b90ecaf6a"
+      },
+      {
+        "symbol": "inspectImage",
+        "artifact": "builds/19af1f6dc3f28424cb6f11622ca0d2c78186ee2165a579abecc7cbabd5534d62/chunks/chunk-4CFNRW32.js",
+        "sha256": "2d9c24f7fe8400a326801549246247c4ff862736ee7e080b6239b12561515616"
+      },
+      {
+        "symbol": "sessionModelCatalog",
+        "artifact": "builds/19af1f6dc3f28424cb6f11622ca0d2c78186ee2165a579abecc7cbabd5534d62/chunks/chunk-URZML3HL.js",
+        "sha256": "c1d6d5a8f1c0f099babf326f681e7a0dc28b90b23d197ed5b84bdbfe8ffeb78e"
+      },
+      {
+        "symbol": "classifyProviderFailure",
+        "artifact": "builds/19af1f6dc3f28424cb6f11622ca0d2c78186ee2165a579abecc7cbabd5534d62/chunks/chunk-XS66ZFVQ.js",
+        "sha256": "213eab81fcd4429747444158aed47c1d328a5f696fe9c7e4b0f567b886efd46c"
+      }
+    ]
+  },
+  "media": {
+    "nativeDecoder": true,
+    "providerVision": false,
+    "width": 1,
+    "height": 1,
+    "mimeType": "image/jpeg",
+    "encodedSha256": "a3bdae5d57267bbcbe3c941adca85e22850332b3b30f10f366ae4327d09bdb51"
+  },
+  "failedStage": "provider-allowed",
+  "failure": {
+    "category": "product-or-probe-contract",
+    "code": "native-operation-failed",
+    "closedProviderClass": "provider_unknown"
+  },
+  "failureLine": null,
+  "incompleteCase": {
+    "name": "allowed",
+    "calls": [],
+    "results": [],
+    "approvals": [],
+    "hooks": [],
+    "effects": 0,
+    "collisionEffects": 0,
+    "routeCalls": 0,
+    "retryHooks": 0,
+    "terminalStatus": null,
+    "configuredTargetAdmitted": true,
+    "scriptSha256": "591308395a09fb3350228f4458dfc3de464634ada2a34f6c8cbdc1b799efa219"
+  },
+  "cleanupSettled": true,
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "observerEvents": {
+    "create": 1,
+    "bodySent": 1,
+    "headers": 2,
+    "data": 1,
+    "complete": 1,
+    "retired": 0,
+    "finalized": 1
+  },
+  "actualRequests": 1,
+  "foreignRequests": 0,
+  "rawNetworkRequests": 0
+}

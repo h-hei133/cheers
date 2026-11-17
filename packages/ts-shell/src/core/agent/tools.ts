@@ -352,7 +352,7 @@ async function executePreparedCall(
   });
 }
 
-async function finalizeExecutedCall(
+export async function finalizeExecutedCall(
   assistantMessage: AgentMessage,
   call: AgentToolCall,
   args: Record<string, unknown>,

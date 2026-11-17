@@ -21,7 +21,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function resolveRef(root: Record<string, unknown>, ref: string): Record<string, unknown> | undefined {
+function resolveRef(root: Record<string, unknown>, ref: string): Record<string, unknown> | boolean | undefined {
   if (ref === '#') return root
   if (!ref.startsWith('#/')) return undefined
   let cursor: unknown = root
@@ -35,7 +35,7 @@ function resolveRef(root: Record<string, unknown>, ref: string): Record<string, 
     if (!isObject(cursor) || !(key in cursor)) return undefined
     cursor = cursor[key]
   }
-  return isObject(cursor) ? cursor : undefined
+  return isObject(cursor) || typeof cursor === 'boolean' ? cursor : undefined
 }
 
 function collectConstraintTags(schema: Record<string, unknown>): string[] {
@@ -47,7 +47,8 @@ function collectConstraintTags(schema: Record<string, unknown>): string[] {
   if (schema.uniqueItems === true) tags.push('@uniqueItems')
   if (schema.default !== undefined) tags.push(`@default ${JSON.stringify(schema.default)}`)
   if (schema.deprecated === true) tags.push('@deprecated')
-  return tags
+  return tags.map(tag => tag.replace(/[\r\n\u2028\u2029]/g,
+    char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`))
 }
 
 function renderObjectType(
@@ -80,28 +81,59 @@ function renderObjectType(
   return `{\n${lines.join('\n')}\n${indent}}`
 }
 
+function renderArrayType(
+  schema: Record<string, unknown>,
+  root: Record<string, unknown>,
+  ctx: { readonly includeTags: boolean; refs: number; readonly active: Set<string> },
+  indent: string,
+): string {
+  const modernTuple = Array.isArray(schema.prefixItems)
+  const tuple = modernTuple ? schema.prefixItems as unknown[] : Array.isArray(schema.items) ? schema.items : undefined
+  if (!tuple) return `Array<${schema.items === undefined ? 'unknown' : toType(schema.items, root, ctx, indent)}>`
+  const minimum = typeof schema.minItems === 'number' && Number.isInteger(schema.minItems) && schema.minItems >= 0
+    ? schema.minItems : 0
+  const maximum = typeof schema.maxItems === 'number' && Number.isInteger(schema.maxItems) && schema.maxItems >= 0
+    ? schema.maxItems : undefined
+  const remainder = modernTuple ? schema.items : schema.additionalItems
+  if ((maximum !== undefined && minimum > maximum) || (remainder === false && minimum > tuple.length)) return 'never'
+  const prefix = maximum === undefined ? tuple : tuple.slice(0, maximum)
+  const members = prefix.map((item, index) => {
+    const type = toType(item, root, ctx, indent)
+    return index < minimum ? type : `(${type})?`
+  })
+  if (remainder !== false && (maximum === undefined || maximum > tuple.length)) {
+    members.push(`...Array<${remainder === undefined ? 'unknown' : toType(remainder, root, ctx, indent)}>`)
+  }
+  return `[${members.join(', ')}]`
+}
+
 function toType(
   raw: unknown,
   root: Record<string, unknown>,
   ctx: { readonly includeTags: boolean; refs: number; readonly active: Set<string> },
   indent = '',
 ): string {
+  if (raw === false) return 'never'
   if (!isObject(raw)) return 'unknown'
   if (typeof raw.$ref === 'string') {
     if (ctx.active.has(raw.$ref) || ctx.refs >= MAX_REF_EXPANSIONS) return 'unknown'
     const resolved = resolveRef(root, raw.$ref)
-    if (!resolved) return 'unknown'
+    if (resolved === undefined) return 'unknown'
     ctx.refs += 1
     ctx.active.add(raw.$ref)
-    const out = toType(resolved, root, ctx, indent)
-    ctx.active.delete(raw.$ref)
-    return out
+    try {
+      return toType(resolved, root, ctx, indent)
+    } finally {
+      ctx.active.delete(raw.$ref)
+    }
   }
   if ('const' in raw) return JSON.stringify(raw.const) ?? 'unknown'
   if (Array.isArray(raw.enum)) return raw.enum.map(item => JSON.stringify(item) ?? 'unknown').join(' | ') || 'never'
   if (Array.isArray(raw.anyOf)) return raw.anyOf.map(item => toType(item, root, ctx, indent)).join(' | ') || 'unknown'
   if (Array.isArray(raw.oneOf)) return raw.oneOf.map(item => toType(item, root, ctx, indent)).join(' | ') || 'unknown'
-  if (Array.isArray(raw.allOf)) return raw.allOf.map(item => toType(item, root, ctx, indent)).join(' & ') || 'unknown'
+  // Intersection binds more tightly than union in TypeScript. Preserve each
+  // schema member as a whole, including unions reached through local refs.
+  if (Array.isArray(raw.allOf)) return raw.allOf.map(item => `(${toType(item, root, ctx, indent)})`).join(' & ') || 'unknown'
   if (Array.isArray(raw.type)) {
     return raw.type.map(kind => toType({ ...raw, type: kind }, root, ctx, indent)).join(' | ') || 'unknown'
   }
@@ -109,12 +141,7 @@ function toType(
   if (raw.type === 'number' || raw.type === 'integer') return 'number'
   if (raw.type === 'boolean') return 'boolean'
   if (raw.type === 'null') return 'null'
-  if (raw.type === 'array') {
-    if (Array.isArray(raw.prefixItems)) {
-      return `[${raw.prefixItems.map(item => toType(item, root, ctx, indent)).join(', ')}]`
-    }
-    return `Array<${raw.items !== undefined ? toType(raw.items, root, ctx, indent) : 'unknown'}>`
-  }
+  if (raw.type === 'array') return renderArrayType(raw, root, ctx, indent)
   if (raw.type === 'object' || isObject(raw.properties) || raw.additionalProperties !== undefined) {
     return renderObjectType(raw, root, ctx, indent)
   }
@@ -123,6 +150,7 @@ function toType(
 
 export function schemaToType(schema: unknown, opts?: { readonly maxChars?: number }): string {
   const maxChars = opts?.maxChars ?? DEFAULT_SCHEMA_MAX_CHARS
+  if (schema === false) return 'never'
   if (!isObject(schema)) return 'unknown'
   const withTags = toType(schema, schema, { includeTags: true, refs: 0, active: new Set() })
   if (withTags.length <= maxChars) return withTags
@@ -130,14 +158,19 @@ export function schemaToType(schema: unknown, opts?: { readonly maxChars?: numbe
   return plain.length <= maxChars ? plain : 'unknown'
 }
 
-export function renderToolSample(tool: ToolDefinition): string {
-  const jsName = toCodemodeIdentifier(tool.name)
+export function renderToolSample(tool: ToolDefinition, expression = `tools.${toCodemodeIdentifier(tool.name)}`): string {
   const inputType = schemaToType(tool.argsSchema)
   const summary = tool.description.trim()
-  return [summary, `tools.${jsName}(args: ${inputType}): Promise<string>;`].filter(Boolean).join('\n\n')
+  // Every nested tool shares the same text-or-media result contract.
+  const outputType = 'string | { readonly output: string; readonly images: readonly { readonly type: "image"; readonly data: string; readonly mimeType: string }[] }'
+  return [summary, `${expression}(args: ${inputType}): Promise<${outputType}>;`].filter(Boolean).join('\n\n')
 }
 
 export function toolNamespace(name: string): string {
+  if (name.startsWith('mcp__')) {
+    const separator = name.indexOf('__', 'mcp__'.length)
+    if (separator > 'mcp__'.length) return name.slice(0, separator)
+  }
   if (name.startsWith('ext_')) {
     const parts = name.split('_')
     return parts.length >= 3 ? `${parts[0]}_${parts[1]}` : 'extensions'

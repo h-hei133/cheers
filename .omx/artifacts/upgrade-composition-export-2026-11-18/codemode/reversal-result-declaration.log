@@ -1,0 +1,57 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/core/tools/codemode/declarations.test.ts (18 tests | 1 failed | 17 skipped) 598ms
+   ↓ declarations consumed by the actual script worker > calls the emitted identifier for 'fixture_lookup' and preserves raw lookup
+   ↓ declarations consumed by the actual script worker > calls the emitted identifier for 'docs:lookup' and preserves raw lookup
+   ↓ declarations consumed by the actual script worker > calls the emitted identifier for 'class' and preserves raw lookup
+   ↓ declarations consumed by the actual script worker > calls the emitted identifier for '9lookup' and preserves raw lookup
+   ↓ declarations consumed by the actual script worker > never routes 'two normalized aliases' to the wrong tool, in either catalog order
+   ↓ declarations consumed by the actual script worker > never routes 'an alias matching another raw name' to the wrong tool, in either catalog order
+   ↓ declarations consumed by the actual script worker > never routes 'a keyword alias matching another raw …' to the wrong tool, in either catalog order
+   ↓ strict TypeScript consumers of projected argument types > requires the intersection field for every first union branch
+   ↓ strict TypeScript consumers of projected argument types > requires the intersection field for every last union branch
+   ↓ strict TypeScript consumers of projected argument types > requires the intersection field for every reference union branch
+   ↓ strict TypeScript consumers of projected argument types > keeps a sibling union branch independent of the other branch intersection
+   ↓ strict TypeScript consumers of projected argument types > rejects a boolean false property reached through literal schema
+   ↓ strict TypeScript consumers of projected argument types > rejects a boolean false property reached through reference schema
+   ↓ strict TypeScript consumers of projected argument types > preserves Draft 7 tuple element types and order for strict consumers
+   ↓ strict TypeScript consumers of projected argument types > keeps valid property tags with a Unicode line terminator in strict TypeScript
+   ↓ strict TypeScript consumers of projected argument types > keeps valid property tags with a Unicode line terminator in strict TypeScript
+   × declares both actual read result shapes and requires narrowing before string operations 597ms
+     → expected [ …(4) ] to deeply equal []
+   ↓ discovers and calls only the requested MCP server namespace through the actual worker
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 skipped (18)
+   Start at  23:23:57
+   Duration  5.52s (transform 2.23s, setup 0ms, collect 3.69s, tests 598ms, environment 0ms, prepare 51ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-result-declaration.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/declarations.test.ts > declares both actual read result shapes and requires narrowing before string operations
+AssertionError: expected [ …(4) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "2322: Type '{ output: string; images: { type: string; mimeType: string; data: string; }[]; }' is not assignable to type 'string'.",
++   "2578: Unused '@ts-expect-error' directive.",
++   "2339: Property 'output' does not exist on type 'never'.",
++   "2339: Property 'images' does not exist on type 'never'.",
++ ]
+
+ ❯ src/core/tools/codemode/declarations.test.ts:298:7
+    296|     '// @ts-expect-error The image data field is text, not a number.',
+    297|     'const invalidResult: Result = { output: "text", images: [{ type: …
+    298|   ])).toEqual([])
+       |       ^
+    299| })
+    300| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

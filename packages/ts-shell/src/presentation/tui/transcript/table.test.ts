@@ -23,4 +23,13 @@ describe("table row cells", () => {
   it("treats an unmatched code run literally and keeps later pipes as cells", () => {
     expect(splitTableRow("| a | `oops | b |")).toEqual(["a", "`oops", "b"]);
   });
+
+  it.each(["left | right", "| left | right", "left | right |"])("accepts optional outer pipes in %s", source => {
+    expect(splitTableRow(source)).toEqual(["left", "right"]);
+  });
+
+  it("preserves escaped and code-span pipes without outer delimiters", () => {
+    expect(splitTableRow("left \\| middle | ``code | tail``"))
+      .toEqual(["left | middle", "``code | tail``"]);
+  });
 });

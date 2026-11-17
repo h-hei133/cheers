@@ -1,0 +1,22 @@
+{
+  "reviewer": "metadata_audit",
+  "status": "FIXED",
+  "scope": "limited_approve",
+  "productionTestsRunByReviewer": false,
+  "sources": {
+    "packages/ts-shell/src/core/tools/codemode/declarations.ts": "873182669754960da87708d8f57bfda3b7ef83243ff7385331eafa22c202ab2e",
+    "packages/ts-shell/src/core/tools/codemode/models.ts": "89ae843cdb7712013fbb6efd9b4ce7a3f6cdf8170976583033109ffec4e0ff2f",
+    "packages/ts-shell/src/core/tools/codemode/prelude.ts": "bf4669c30290e1267838eabbfc1600ae673b38ede985ae234b2b6a79175ef1f9",
+    "packages/ts-shell/src/core/tools/codemode/image.ts": "a3b4ffe32574249be584f603a9d5cd30f4d3a5e35aa6946dae87a4cc5715a072",
+    "packages/ts-shell/src/core/tools/codemode/output.ts": "f3275a67764c4c1c57730fc511da9f3d84839f3f33efda5bac15cd8c1bd50841",
+    "packages/ts-shell/src/core/tools/codemode/catalog.ts": "a6a527b1be724e2bd6808ad74d4ab610571e9e2c41edc869fe63a03e263434b1",
+    "packages/ts-shell/src/core/tools/codemode/tool.ts": "4403ec624010f45e86c7bae7c38a4ead7d1726797cc7902c4cff9496f32106f5"
+  },
+  "findings": {
+    "MIME_normalization": "fixed_and_rechecked"
+  },
+  "boundaries": [
+    "No review of permission, execution or IPC owners outside these seven files."
+  ],
+  "currentHashesMatch": true
+}

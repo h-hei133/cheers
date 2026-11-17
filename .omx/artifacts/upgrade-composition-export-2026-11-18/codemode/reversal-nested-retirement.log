@@ -1,0 +1,48 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/core/tools/codemode/execution.test.ts (12 tests | 2 failed | 10 skipped) 3103ms
+   ↓ actual worker bridge admission > keeps bootstrap transport, registrars and limits out of the script global
+   ↓ actual worker bridge admission > follows the real script failure after a forged terminal attempt
+   ↓ actual worker bridge admission > cannot bypass host bounds with the bootstrap sender
+   ↓ actual worker bridge admission > does not recognize an ordinary error string as a successful exit
+   ↓ actual worker bridge admission > keeps process and string code generation unavailable
+   × script-owned nested settlement through the actual gate > retires a pending effect on return and waits for the real boundary to settle 1565ms
+     → expected false to be true // Object.is equality
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on throw and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on exit and waits for the real boundary to settle
+   × script-owned nested settlement through the actual gate > retires a pending effect on timeout and waits for the real boundary to settle 1536ms
+     → expected false to be true // Object.is equality
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on parent cancellation and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > preserves actual completed effects when the script subsequently fails
+   ↓ script-owned nested settlement through the actual gate > retains a terminating completed result that arrives during script retirement
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 10 skipped (12)
+   Start at  23:22:18
+   Duration  4.81s (transform 902ms, setup 0ms, collect 1.48s, tests 3.10s, environment 0ms, prepare 50ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-nested-retirement.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/execution.test.ts > script-owned nested settlement through the actual gate > retires a pending effect on return and waits for the real boundary to settle
+ FAIL  src/core/tools/codemode/execution.test.ts > script-owned nested settlement through the actual gate > retires a pending effect on timeout and waits for the real boundary to settle
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ vi.waitFor.timeout src/core/tools/codemode/execution.test.ts:138:62
+    136|         if (ending === 'parent cancellation') parent.abort()
+    137|         // Let the actual terminal frame or script deadline reach the …
+    138|         await vi.waitFor(() => expect(nestedSignal?.aborted).toBe(true…
+       |                                                              ^
+    139|         expect(outerSettled).toBe(false)
+    140|       } finally { release.resolve() }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+

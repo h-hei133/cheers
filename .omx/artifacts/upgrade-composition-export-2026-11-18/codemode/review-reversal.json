@@ -1,0 +1,41 @@
+{
+  "status": "passed",
+  "mainSourcesMutated": false,
+  "cases": [
+    {
+      "name": "mixed-barrier",
+      "file": "packages/ts-shell/src/turn/nestedTools.ts",
+      "sourceSha256": "855e328901fdefd4125dafd7e539b93d5edb66d53804dbb5b6021b66a17e45b3",
+      "reversedSha256": "cc9b27f6ffbc95dce27decc63532231b183113a6555568b946ef863abcbd8c57",
+      "exitCode": 1,
+      "passed": 0,
+      "failed": 3,
+      "assertionFailures": 3,
+      "reportSha256": "061afe5f870efc61245a1ea875df70b183ac077c117cc769ead324cd7a749926",
+      "restoredExactly": true,
+      "status": "passed"
+    },
+    {
+      "name": "nested-style",
+      "file": "packages/ts-shell/src/presentation/tui/transcript/inline.ts",
+      "sourceSha256": "5b92e2981aae235be28f6b1c5ac3af19b469d7fa1afe3c8d05541b1e16b85934",
+      "reversedSha256": "37adbd89a911960585d88c3dddca3785cb5d6ee0c7f791e737f90e758b3d2057",
+      "exitCode": 1,
+      "passed": 0,
+      "failed": 2,
+      "assertionFailures": 2,
+      "reportSha256": "b23a4c27be054e28c737bd677a1c641c80aac9ff4b34e2a66cd39854c8bbd52d",
+      "restoredExactly": true,
+      "status": "passed"
+    }
+  ],
+  "restored": {
+    "exitCode": 0,
+    "passed": 96,
+    "failed": 0,
+    "assertionFailures": 0,
+    "reportSha256": "27a02bb47a855dff0a3270f28868ec1f8d761313841f31c2b377dd6aabd6fe6a"
+  },
+  "mainSourcesUnchanged": true,
+  "isolatedTreeRemoved": true
+}

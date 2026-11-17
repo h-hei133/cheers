@@ -1,0 +1,21 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ✓ src/core/tools/codemode/composition.test.ts (18 tests) 1065ms
+ ✓ src/core/tools/codemode/declarations.test.ts (12 tests) 1624ms
+   ✓ strict TypeScript consumers of projected argument types > requires the intersection field for every first union branch  367ms
+ ✓ src/core/tools/codemode/tool.test.ts (4 tests) 701ms
+ ✓ src/core/tools/codemode/output.test.ts (18 tests) 694ms
+ ✓ src/core/tools/codemode/execution.test.ts (11 tests) 554ms
+ ✓ src/turn/session.test.ts (51 tests) 516ms
+ ✓ src/core/tools/discovery/contract.test.ts (12 tests) 362ms
+ ✓ src/turn/tools.test.ts (54 tests) 305ms
+ ✓ src/turn/nestedTools.test.ts (17 tests) 26ms
+ ✓ src/core/agent/tools.test.ts (32 tests) 20ms
+ ✓ src/turn/subagent.test.ts (22 tests) 234ms
+ ✓ src/core/tools/codemode/models.test.ts (4 tests) 157ms
+ ✓ src/core/tools/discovery/ranker.test.ts (10 tests) 15ms
+ ✓ src/core/tools/catalog.test.ts (10 tests) 11ms
+ Test Files  14 passed (14)
+      Tests  275 passed (275)
+   Start at  19:27:04
+   Duration  25.58s (transform 6.89s, setup 0ms, collect 16.80s, tests 6.28s, environment 1ms, prepare 617ms)
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/integrated.json

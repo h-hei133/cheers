@@ -1,0 +1,54 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/turn/nestedTools.test.ts (18 tests | 1 failed | 17 skipped) 23ms
+   ↓ nested tool admission > refuses effects when the parent is cancelled during prepare
+   ↓ nested tool admission > refuses effects when the parent is cancelled during before hook
+   ↓ nested tool admission > cancels only the child lifetime during prepare
+   ↓ nested tool admission > cancels only the child lifetime during before hook
+   ↓ nested tool admission > does not prepare or execute for an already cancelled parent
+   × nested execution policy through adapted tools > serializes separate outer scripts that may contain ordered effects 21ms
+     → expected [ 'first', 'second' ] to deeply equal [ 'first' ]
+   ↓ nested execution policy through adapted tools > offers the same forced sequential policy to the outer and nested owners
+   ↓ nested execution policy through adapted tools > preserves bash concurrency policy through the actual nested gate
+   ↓ nested execution policy through adapted tools > preserves read concurrency policy through the actual nested gate
+   ↓ nested execution policy through adapted tools > retains real approval and post-hook facts for a accepted nested result
+   ↓ nested execution policy through adapted tools > retains real approval and post-hook facts for a revoked nested result
+   ↓ nested result publication > cannot clear an actual execution failure with post-hook isError:false
+   ↓ nested result publication > carries images into the post hook and merges its metadata when feedback is appended
+   ↓ nested result publication > does not publish old images or notices after a hook replaces their output
+   ↓ nested result publication > preserves termination from the execution result owner
+   ↓ nested result publication > preserves termination from the post hook result owner
+   ↓ nested result publication > rechecks original result admission after the awaited post hook without losing actual effects
+   ↓ nested result publication > preserves completed output, metadata and media when the post hook fails
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 skipped (18)
+   Start at  23:23:44
+   Duration  1.27s (transform 603ms, setup 0ms, collect 1.03s, tests 23ms, environment 0ms, prepare 52ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-outer-order.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/nestedTools.test.ts > nested execution policy through adapted tools > serializes separate outer scripts that may contain ordered effects
+AssertionError: expected [ 'first', 'second' ] to deeply equal [ 'first' ]
+
+- Expected
++ Received
+
+  [
+    "first",
++   "second",
+  ]
+
+ ❯ src/turn/nestedTools.test.ts:137:22
+    135|     } finally { release.resolve(); }
+    136|     const result = await pending;
+    137|     expect(admitted).toEqual(['first']);
+       |                      ^
+    138|     expect(entries).toEqual(['first', 'second']);
+    139|     expect(maximum).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

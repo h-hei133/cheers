@@ -1,0 +1,13 @@
+{
+  "receipt": ".tmp/codemode-validation/native-final-review-initial.json",
+  "sha256": "c270e1013693d09ece8b1e1236573323a8ff6834186c721758dae811c317da3b",
+  "classification": "provider-http",
+  "observedStatus": 503,
+  "actualRequests": 1,
+  "productRouteProof": false,
+  "rawControlsPassed": 7,
+  "rawProviderRequests": 0,
+  "rawReceiptPreserved": true,
+  "rawFailureClassifier": "provider_unknown",
+  "reason": "Observed service HTTP 503 before any model tool call; no response body was printed or saved."
+}

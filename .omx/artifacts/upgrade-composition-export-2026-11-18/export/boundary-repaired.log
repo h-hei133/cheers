@@ -1,0 +1,3 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/session/export/html.test.ts src/session/export/collect.test.ts src/session/export/template.test.ts src/session/export/source.test.ts src/session/export/graph.test.ts src/session/export/accounting.test.ts --maxWorkers=1 --minWorkers=1 --no-file-parallelism --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/export-validation/boundary-repaired.json
+JSON report written to /home/wang/projects/cheers/.tmp/export-validation/boundary-repaired.json

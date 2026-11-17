@@ -1,0 +1,70 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { chromium } from 'playwright-core';
+
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+const sources = ['packages/ts-shell/src/session/export/html.ts', 'packages/ts-shell/src/session/export/sanitize.ts',
+  'packages/ts-shell/src/session/export/template.ts', 'packages/ts-shell/src/session/export/htmlRender.ts'];
+const before = sources.map(file => ({ file, sha256: sha256(fs.readFileSync(path.join(repo, file))) }));
+const manifestFile = path.join(repo, 'packages/ts-shell/dist/build-manifest.json');
+const manifestBytes = fs.readFileSync(manifestFile);
+const manifest = JSON.parse(manifestBytes);
+const { renderExportHtml } = await import(pathToFileURL(path.join(repo, 'packages/ts-shell/dist/session/export/html.js')).href);
+const privateRoot = fs.mkdtempSync(path.join(directory, 'boundary-state-'));
+const htmlPath = path.join(privateRoot, 'session.html');
+const payload = {
+  header: { sessionId: 'public-export-boundary', workspace: 'isolated fixture', exportedAt: '2026-11-18T00:00:00Z' },
+  entries: [{ id: 'entry', role: 'assistant', content: 'PUBLIC_SAFE_CONTENT',
+    html: '<img src="data:image/png;base64,=" onerror="window.exportHandlerSentinel=1">PUBLIC_INJECTED_HTML' }],
+  tree: [{ id: 'entry', depth: 0, role: 'assistant', kind: 'turn-message', preview: 'safe fixture' }],
+  leafId: 'entry', warnings: [],
+};
+fs.writeFileSync(htmlPath, renderExportHtml(payload));
+const receipt = { status: 'not_run', platform: process.platform, consumer: 'compiled ./session/export',
+  buildId: manifest.buildId, manifestSha256: sha256(manifestBytes), source: before,
+  helperSha256: sha256(fs.readFileSync(fileURLToPath(import.meta.url))), expectedHandlerExecutions: 0 };
+let browser;
+try {
+  browser = await chromium.launch({ executablePath: '/home/wang/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome', headless: true });
+  const context = await browser.newContext({ offline: true });
+  const requests = [], errors = [];
+  context.on('request', request => { if (/^https?:/.test(request.url())) requests.push(sha256(request.url())); });
+  const page = await context.newPage();
+  page.on('pageerror', error => errors.push(sha256(error.message)));
+  await page.goto(pathToFileURL(htmlPath).href);
+  await page.locator('#conversation .body').waitFor({ state: 'attached', timeout: 5000 });
+  await page.waitForFunction(() => window.exportHandlerSentinel === 1, { timeout: 1000 }).catch(() => {});
+  const actual = await page.evaluate(() => ({
+    handlerExecutions: window.exportHandlerSentinel === 1 ? 1 : 0,
+    safeContentVisible: document.querySelector('#conversation').textContent.includes('PUBLIC_SAFE_CONTENT'),
+    injectedContentVisible: document.querySelector('#conversation').textContent.includes('PUBLIC_INJECTED_HTML'),
+    eventAttributes: document.querySelectorAll('#conversation [onerror]').length,
+  }));
+  Object.assign(receipt, actual, { networkRequests: requests.length, pageErrors: errors.length });
+  assert.equal(actual.handlerExecutions, 0, 'Public export executed caller HTML handler.');
+  assert.equal(actual.eventAttributes, 0);
+  assert.equal(actual.safeContentVisible, true);
+  assert.equal(actual.injectedContentVisible, false);
+  assert.equal(requests.length, 0);
+  assert.equal(errors.length, 0);
+  receipt.status = 'passed';
+} catch (error) {
+  receipt.status = 'failed';
+  receipt.failure = { name: error.name, code: error.code ?? 'browser-harness', messageSha256: sha256(error.message) };
+  process.exitCode = 1;
+} finally {
+  await browser?.close();
+  fs.rmSync(privateRoot, { recursive: true, force: true });
+  receipt.privateStateRemoved = !fs.existsSync(privateRoot);
+  receipt.sourceUnchanged = before.every(entry => sha256(fs.readFileSync(path.join(repo, entry.file))) === entry.sha256);
+  receipt.buildUnchanged = sha256(fs.readFileSync(manifestFile)) === receipt.manifestSha256;
+  fs.writeFileSync(path.join(directory, 'boundary.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify({ status: receipt.status, handlerExecutions: receipt.handlerExecutions,
+    safeContentVisible: receipt.safeContentVisible, eventAttributes: receipt.eventAttributes,
+    failure: receipt.failure, privateStateRemoved: receipt.privateStateRemoved }));
+}

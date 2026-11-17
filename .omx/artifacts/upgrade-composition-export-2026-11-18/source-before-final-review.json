@@ -1,0 +1,186 @@
+{
+  "packages/ts-shell/src/core/agent/tools.ts": {
+    "sha256": "983f91c9e5af8bf262f7e2c0b0f8f0cfac2c78ab745caa6a5f06b0dbe7405f94",
+    "snapshot": "source/packages/ts-shell/src/core/agent/tools.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/catalog.ts": {
+    "sha256": "953e011e3ab68e0705656979579e537a217612ec947cdb751c745cdb181ee6fd",
+    "snapshot": "source/packages/ts-shell/src/core/tools/catalog.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/catalog.ts": {
+    "sha256": "a6a527b1be724e2bd6808ad74d4ab610571e9e2c41edc869fe63a03e263434b1",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/catalog.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/composition.test.ts": {
+    "sha256": "93cec4fecbf02d11ba07ec5297ba329bd714d6a908732baddea3f8716be64435",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/composition.test.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/declarations.test.ts": {
+    "sha256": "d1ee35cfadf45fde0c14702f633088ad2f589339db806074af5d808a9309489c",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/declarations.test.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/declarations.ts": {
+    "sha256": "873182669754960da87708d8f57bfda3b7ef83243ff7385331eafa22c202ab2e",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/declarations.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/execution.test.ts": {
+    "sha256": "9c3c181edc1926eec71de6cb2fc9e40652604e4f9fde59063b9d14217a2eba1c",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/execution.test.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/execution.ts": {
+    "sha256": "ed9b71d2772f66b570faba4d0ad4c3f5475918abf180cd63030d67d25e27263e",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/execution.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/image.ts": {
+    "sha256": "a3b4ffe32574249be584f603a9d5cd30f4d3a5e35aa6946dae87a4cc5715a072",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/image.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/models.test.ts": {
+    "sha256": "d90b94825eb8a565df39e6a3332d1f8f2f568406dd59e5a0162a662ff6bdc21b",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/models.test.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/models.ts": {
+    "sha256": "89ae843cdb7712013fbb6efd9b4ce7a3f6cdf8170976583033109ffec4e0ff2f",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/models.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/nestedCalls.ts": {
+    "sha256": "5e38cfb0433814ea278d0699a026fcddbdbf53d7a80d49651fa82fff5bd604d5",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/nestedCalls.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/output.test.ts": {
+    "sha256": "f20d8ef49effe97b729d48e679d32d07c867954207a3e7e070f3d4c0f5ce502d",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/output.test.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/output.ts": {
+    "sha256": "f3275a67764c4c1c57730fc511da9f3d84839f3f33efda5bac15cd8c1bd50841",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/output.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/prelude.ts": {
+    "sha256": "bf4669c30290e1267838eabbfc1600ae673b38ede985ae234b2b6a79175ef1f9",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/prelude.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/codemode/tool.ts": {
+    "sha256": "4403ec624010f45e86c7bae7c38a4ead7d1726797cc7902c4cff9496f32106f5",
+    "snapshot": "source/packages/ts-shell/src/core/tools/codemode/tool.ts.txt"
+  },
+  "packages/ts-shell/src/core/tools/discovery/state.ts": {
+    "sha256": "ebc63d4c7ed9b67f204766ecd6e7a66e10d7b821e9b4f4c9c660e87aa40ac622",
+    "snapshot": "source/packages/ts-shell/src/core/tools/discovery/state.ts.txt"
+  },
+  "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts": {
+    "sha256": "9cba0dddccacf90149fbb5dfe793a1e169437f034adc70231d10cacd8063c950",
+    "snapshot": "source/packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts.txt"
+  },
+  "packages/ts-shell/src/presentation/tui/text/emphasis.ts": {
+    "sha256": "328b6960b1ba56451e921b898ac6d21c82f1f881dfba37a75985002a6cda44be",
+    "snapshot": "source/packages/ts-shell/src/presentation/tui/text/emphasis.ts.txt"
+  },
+  "packages/ts-shell/src/presentation/tui/text/inline.ts": {
+    "sha256": "e35ca76219a8e33c45f3e78ed86799ac3162514a079b69decda3d607009ff619",
+    "snapshot": "source/packages/ts-shell/src/presentation/tui/text/inline.ts.txt"
+  },
+  "packages/ts-shell/src/presentation/tui/transcript/inline.ts": {
+    "sha256": "886a301b4c2f90cb7ee085eaf91265058dc8688437fa33a42164e8e112236e53",
+    "snapshot": null,
+    "previousSnapshot": "source/packages/ts-shell/src/presentation/tui/transcript/inline.ts.txt",
+    "snapshotStatus": "historical_hash_only_snapshot_overwritten"
+  },
+  "packages/ts-shell/src/presentation/tui/transcript/markdown.test.ts": {
+    "sha256": "6ad724bd30f2a206e391ccf5208eb74098fe53bc6fe77beb1330b75fcd9b9112",
+    "snapshot": null,
+    "previousSnapshot": "source/packages/ts-shell/src/presentation/tui/transcript/markdown.test.ts.txt",
+    "snapshotStatus": "historical_hash_only_snapshot_overwritten"
+  },
+  "packages/ts-shell/src/presentation/tui/transcript/markdown.ts": {
+    "sha256": "b77803cbb79ce487992e8847c7e5d1577cc43848432311b3087e129487586abb",
+    "snapshot": "source/packages/ts-shell/src/presentation/tui/transcript/markdown.ts.txt"
+  },
+  "packages/ts-shell/src/presentation/tui/transcript/markdownScan.ts": {
+    "sha256": "73d8f5f2e6a710ddfceb4dd4094841c963dbe161eac0ab0ff0f0c33ceff3ab49",
+    "snapshot": "source/packages/ts-shell/src/presentation/tui/transcript/markdownScan.ts.txt"
+  },
+  "packages/ts-shell/src/presentation/tui/transcript/table.test.ts": {
+    "sha256": "a5c1f97f042957b0e0c6fb0b7dadfc40daa5a2b4b69c03bd37ee5a5e9c4dc029",
+    "snapshot": "source/packages/ts-shell/src/presentation/tui/transcript/table.test.ts.txt"
+  },
+  "packages/ts-shell/src/presentation/tui/transcript/table.ts": {
+    "sha256": "0f7330d2356aee95e46996799ac8a3b9d7377fc2f75058351d435957618540ae",
+    "snapshot": "source/packages/ts-shell/src/presentation/tui/transcript/table.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/collect.test.ts": {
+    "sha256": "327f611d6cc6bff68ad12e01337282008d71fbfdef439aa08956858a96556e76",
+    "snapshot": "source/packages/ts-shell/src/session/export/collect.test.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/collect.ts": {
+    "sha256": "d32923b6d29d1445d204b15ec326387b2b8ce7d130803be26fc11f46e3060940",
+    "snapshot": "source/packages/ts-shell/src/session/export/collect.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/html.test.ts": {
+    "sha256": "be77d0132fe83eb96ff1c3bcbd19119d5827637f0183672de898e6356c5ac551",
+    "snapshot": "source/packages/ts-shell/src/session/export/html.test.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/html.ts": {
+    "sha256": "0a1bf113b39bba9807a69a46b76197d2f195c2943009febc7527585bb6e23ed3",
+    "snapshot": "source/packages/ts-shell/src/session/export/html.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/htmlRender.ts": {
+    "sha256": "f5780ca021176108cf0d569e7f71f8714c2e7482740da6180958e5db3b338738",
+    "snapshot": "source/packages/ts-shell/src/session/export/htmlRender.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/markdown.test.ts": {
+    "sha256": "a32945b4a313c144007d2099bf5ecb30bd9e9d1fc7bf3fdc7dfdfad149e35f97",
+    "snapshot": "source/packages/ts-shell/src/session/export/markdown.test.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/media.ts": {
+    "sha256": "62d1e03cc6a430db8bebace5f83c9e2a24ae28a7ff757fc0d6430b87c830fbfb",
+    "snapshot": "source/packages/ts-shell/src/session/export/media.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/model.ts": {
+    "sha256": "112772351cfcad41f9d098b2a6fa321db277ded672cf1ba57fce7f96df8f4efd",
+    "snapshot": "source/packages/ts-shell/src/session/export/model.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/sanitize.ts": {
+    "sha256": "90f19e767f97e704d0d9f058942de5676d5fb443dfca0abb937422e8d804f5ee",
+    "snapshot": "source/packages/ts-shell/src/session/export/sanitize.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/template.test.ts": {
+    "sha256": "0daa07dc16b3d6605f9ea04f10fc9a59893731ec0bc875692e4ac6ba21c4e934",
+    "snapshot": "source/packages/ts-shell/src/session/export/template.test.ts.txt"
+  },
+  "packages/ts-shell/src/session/export/template.ts": {
+    "sha256": "35bfeb0e80cf54189e20b4120e1e54cb065af2f5bfbaa05ca1846e3e902259a7",
+    "snapshot": "source/packages/ts-shell/src/session/export/template.ts.txt"
+  },
+  "packages/ts-shell/src/tools/types.ts": {
+    "sha256": "d4afb32f31f98eeac4d51236c264703a51120a29081eac0554fd05bb02a0ab2b",
+    "snapshot": "source/packages/ts-shell/src/tools/types.ts.txt"
+  },
+  "packages/ts-shell/src/turn/execution.ts": {
+    "sha256": "c5f8d75d83893f67439ec1abe84330eca2b5784040e11489d42c6ea64aab54ba",
+    "snapshot": "source/packages/ts-shell/src/turn/execution.ts.txt"
+  },
+  "packages/ts-shell/src/turn/nestedTools.test.ts": {
+    "sha256": "326e2ab356b5fb44512c83671c022bab6e08244d8f6de7b87669bb1052c31260",
+    "snapshot": null,
+    "previousSnapshot": "source/packages/ts-shell/src/turn/nestedTools.test.ts.txt",
+    "snapshotStatus": "historical_hash_only_snapshot_overwritten"
+  },
+  "packages/ts-shell/src/turn/nestedTools.ts": {
+    "sha256": "ef2eaf427d4f47f88050c42a6645f1341f8a2114a6b61ffd89b2f38d779e5c3b",
+    "snapshot": null,
+    "previousSnapshot": "source/packages/ts-shell/src/turn/nestedTools.ts.txt",
+    "snapshotStatus": "historical_hash_only_snapshot_overwritten"
+  },
+  "packages/ts-shell/src/turn/session.ts": {
+    "sha256": "213852747bf94d6bbc2f59f6b63e63832a2710d6652566e33687a041f69d951f",
+    "snapshot": "source/packages/ts-shell/src/turn/session.ts.txt"
+  },
+  "packages/ts-shell/src/turn/subagent.ts": {
+    "sha256": "3bc31537c51d4ef1589652b6139a4aa20e30f026165151fc2130656a48bfdf24",
+    "snapshot": "source/packages/ts-shell/src/turn/subagent.ts.txt"
+  },
+  "packages/ts-shell/src/turn/tools.ts": {
+    "sha256": "429b08f174f8c9f23b9e74f07f2f2bdbf262abe84ff38c64e84b183f2ec3eeaf",
+    "snapshot": "source/packages/ts-shell/src/turn/tools.ts.txt"
+  }
+}

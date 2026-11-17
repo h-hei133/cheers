@@ -1,0 +1,43 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/core/tools/codemode/output.test.ts (18 tests | 1 failed | 16 skipped) 165ms
+   ↓ bounded feedback from the actual script worker > bounds top-level return together with the final status and notice
+   ↓ bounded feedback from the actual script worker > bounds multibyte text together with the final status and notice
+   ↓ bounded feedback from the actual script worker > bounds combined text, console and return together with the final status and notice
+   ↓ bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: text("界".repeat(2000));
+   ↓ bounded feedback from the actual script worker > preserves a bounded terminal outcome for output above the worker buffer: return "界".repeat(2000);
+   ↓ validated images retained by the actual script worker > keeps a complete image total within both existing media limits
+   ↓ validated images retained by the actual script worker > omits repeated images after four, with bounded feedback metadata
+   ↓ validated images retained by the actual script worker > enforces the encoded aggregate limit before the four-image count is reached
+   ↓ validated images retained by the actual script worker > rejects a complete individually oversized image before retaining a valid successor
+   ↓ validated images retained by the actual script worker > rejects PNG signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects JPEG signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects GIF signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects WebP signature only before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged object MIME before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged data URI MIME before retention and still accepts complete bytes
+   ↓ validated images retained by the actual script worker > rejects forged image_url MIME before retention and still accepts complete bytes
+   ✓ builtin read results through the real tool gate and worker > keeps text-only nested read results compatible with string consumers 106ms
+   × builtin read results through the real tool gate and worker > forwards inert image-bearing read results into published model feedback 58ms
+     → Script failed
+Script error: TypeError: Cannot read properties of undefined (reading 'length'): expected true to be false // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 16 skipped (18)
+   Start at  19:19:05
+   Duration  3.17s (transform 1.71s, setup 0ms, collect 2.75s, tests 165ms, environment 0ms, prepare 64ms)
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/read-harness-corrected-red.json
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/core/tools/codemode/output.test.ts > builtin read results through the real tool gate and worker > forwards inert image-bearing read results into published model feedback
+AssertionError: Script failed
+Script error: TypeError: Cannot read properties of undefined (reading 'length'): expected true to be false // Object.is equality
+- Expected
++ Received
+- false
++ true
+ ❯ src/core/tools/codemode/output.test.ts:247:43
+    245|       return shape;
+    246|     `, { ...createDefaultExecutionService(), readMedia })
+    247|     expect(result.isError, result.output).toBe(false)
+       |                                           ^
+    248|     expect(readMedia).toHaveBeenCalledTimes(2)
+    249|     expect(returned(result.output)).toEqual({ type: 'object', keys: ['…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

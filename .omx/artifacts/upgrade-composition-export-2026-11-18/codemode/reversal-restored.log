@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ✓ src/core/tools/codemode/composition.test.ts (22 tests) 1428ms
+ ✓ src/core/tools/codemode/declarations.test.ts (18 tests) 4080ms
+   ✓ strict TypeScript consumers of projected argument types > requires the intersection field for every first union branch  1118ms
+   ✓ declares both actual read result shapes and requires narrowing before string operations  837ms
+ ✓ src/turn/nestedTools.test.ts (18 tests) 36ms
+ ✓ src/core/tools/codemode/output.test.ts (22 tests) 905ms
+ ✓ src/core/tools/codemode/models.test.ts (4 tests) 163ms
+ ✓ src/core/tools/codemode/execution.test.ts (12 tests) 599ms
+
+ Test Files  6 passed (6)
+      Tests  96 passed (96)
+   Start at  00:50:59
+   Duration  17.16s (transform 3.42s, setup 0ms, collect 7.75s, tests 7.21s, environment 1ms, prepare 294ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-restored.json

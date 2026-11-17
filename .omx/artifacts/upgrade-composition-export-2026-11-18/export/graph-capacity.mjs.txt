@@ -1,0 +1,61 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { extractPinned, digest } from '../../.normproof/adapter/artifact.mjs';
+
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const scratch = fs.mkdtempSync(path.join(directory, 'capacity-private-'));
+const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+const command = args => execFileSync('rtk', ['proxy', ...args], { cwd: repo, maxBuffer: 64 * 1024 * 1024 });
+const receipt = { classification: 'unobserved', diagnosticOnly: true, gateModified: false, sourceModified: false,
+  helperSha256: sha256(fs.readFileSync(fileURLToPath(import.meta.url))) };
+try {
+  receipt.pinned = extractPinned(scratch);
+  const graphFile = path.join(scratch, 'package/dist/adapters/sidecar-file/module-graph.js');
+  const native = await import(pathToFileURL(graphFile).href);
+  const files = command(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'packages'])
+    .toString().split('\0').filter(file => /\.tsx?$/.test(file) && fs.existsSync(path.join(repo, file))).sort();
+  const sources = new Map(files.map(file => [file, fs.readFileSync(path.join(repo, file), 'utf8')]));
+  receipt.currentSource = { files: sources.size, sha256: digest(JSON.stringify(files.map(file => [file, sha256(sources.get(file))]))) };
+  const collected = native.buildModuleGraph(sources);
+  receipt.native = { failure: collected.failure ?? null, completeGraph: Array.isArray(collected.edges),
+    edges: collected.edges?.length ?? null, unresolved: collected.unresolved?.length ?? null };
+  if (!/16384 edge ceiling/.test(collected.failure ?? '')) throw new Error('unexpected-collection-failure');
+  const original = fs.readFileSync(graphFile, 'utf8');
+  const diagnostic = original.replace('MODULE_GRAPH_MAX_EDGES = 16384', 'MODULE_GRAPH_MAX_EDGES = 32768');
+  if (diagnostic === original) throw new Error('diagnostic-limit-not-found');
+  fs.writeFileSync(graphFile, diagnostic);
+  const expanded = await import(pathToFileURL(graphFile).href + '?diagnostic-capacity');
+  const current = expanded.buildModuleGraph(sources);
+  receipt.expandedDiagnostic = { limit: 32768, failure: current.failure ?? null, edges: current.edges?.length ?? null,
+    unresolved: current.unresolved?.length ?? null, unresolvedSpecifiers: current.unresolved ?? null,
+    proofClaim: false, archiveSha256: receipt.pinned.archiveSha256 };
+  const baselineRoot = path.join(scratch, 'baseline'); fs.mkdirSync(baselineRoot);
+  const archive = path.join(scratch, 'baseline.tar'); fs.writeFileSync(archive, command(['git', 'archive', 'HEAD', 'packages']));
+  command(['tar', '-xf', archive, '-C', baselineRoot]);
+  const baseline = new Map();
+  const pending = [path.join(baselineRoot, 'packages')];
+  while (pending.length) for (const entry of fs.readdirSync(pending.pop(), { withFileTypes: true })) {
+    const file = path.join(entry.parentPath ?? entry.path, entry.name);
+    if (entry.isDirectory()) pending.push(file);
+    else if (entry.isFile() && /\.tsx?$/.test(entry.name)) baseline.set(path.relative(baselineRoot, file), fs.readFileSync(file, 'utf8'));
+  }
+  const previousNative = native.buildModuleGraph(baseline);
+  const previousExpanded = expanded.buildModuleGraph(baseline);
+  receipt.baseline = { commit: command(['git', 'rev-parse', 'HEAD']).toString().trim(), files: baseline.size,
+    nativeFailure: previousNative.failure ?? null, expandedEdges: previousExpanded.edges?.length ?? null,
+    expandedUnresolved: previousExpanded.unresolved?.length ?? null, proofClaim: false };
+  const pinnedFiles = command(['git', 'ls-files', '-z', '--', '.normproof']).toString().split('\0').filter(Boolean);
+  receipt.pinnedTracked = { files: pinnedFiles.length, unchanged: pinnedFiles.every(file =>
+    fs.readFileSync(path.join(repo, file)).equals(command(['git', 'show', 'HEAD:' + file]))) };
+  receipt.classification = 'preexisting-pinned-graph-capacity';
+} catch (error) {
+  receipt.failure = { name: error.name, messageSha256: sha256(error.message) }; process.exitCode = 1;
+} finally {
+  fs.rmSync(scratch, { recursive: true, force: true }); receipt.privateStateRemoved = !fs.existsSync(scratch);
+  fs.writeFileSync(path.join(directory, 'graph-capacity.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt));
+}

@@ -1,0 +1,27 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const repo = '/home/wang/projects/cheers';
+const files = JSON.parse(fs.readFileSync(path.join(directory, 'final-tests.json'), 'utf8'));
+const result = spawnSync('rtk', ['proxy', process.execPath, '--max-old-space-size=768',
+  path.join(repo, 'node_modules/vitest/vitest.mjs'), 'run', ...files, '--reporter=json',
+  '--outputFile=' + path.join(directory, 'final-combined.json')], {
+  cwd: path.join(repo, 'packages/ts-shell'), env: { ...process.env,
+    GIT_CEILING_DIRECTORIES: path.join(repo, '.tmp'), VITEST_MAX_THREADS: '2', VITEST_MIN_THREADS: '2' },
+  encoding: 'utf8', maxBuffer: 20 * 1024 * 1024, timeout: 300000,
+});
+fs.writeFileSync(path.join(directory, 'final-combined.log'), (result.stdout ?? '') + (result.stderr ?? ''));
+const reportFile = path.join(directory, 'final-combined.json');
+if (fs.existsSync(reportFile)) {
+  const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+  console.log(JSON.stringify({ exit: result.status, files: report.testResults.length, tests: report.numTotalTests,
+    passed: report.numPassedTests, failed: report.numFailedTests,
+    failures: report.testResults.flatMap(suite => suite.assertionResults.filter(item => item.status !== 'passed')
+      .map(item => ({ file: suite.name.replace(repo + '/', ''), title: item.fullName, status: item.status,
+        messages: item.failureMessages }))) }));
+} else console.log(JSON.stringify({ exit: result.status, signal: result.signal, error: result.error?.code ?? null,
+  reportMissing: true }));
+process.exitCode = result.status === 0 && !result.error ? 0 : 1;

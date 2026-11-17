@@ -1,0 +1,27 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/codemode/tool.test.ts src/core/tools/codemode/composition.test.ts src/core/tools/codemode/execution.test.ts src/core/tools/codemode/declarations.test.ts src/core/tools/codemode/output.test.ts src/core/tools/codemode/models.test.ts src/core/tools/codemode/store.test.ts src/turn/nestedTools.test.ts src/turn/tools.test.ts src/turn/session.test.ts src/core/tools/catalog.test.ts src/core/tools/discovery/state.test.ts --no-file-parallelism --maxWorkers=1 --reporter=default --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/codemode-validation/current-integrated.json
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/core/tools/codemode/declarations.test.ts (12 tests) 1956ms
+   ✓ strict TypeScript consumers of projected argument types > requires the intersection field for every first union branch  339ms
+   ✓ strict TypeScript consumers of projected argument types > keeps a sibling union branch independent of the other branch intersection  309ms
+ ✓ src/core/tools/codemode/store.test.ts (28 tests) 1639ms
+ ✓ src/core/tools/codemode/composition.test.ts (18 tests) 1124ms
+ ✓ src/core/tools/codemode/execution.test.ts (12 tests) 613ms
+ ✓ src/core/tools/codemode/tool.test.ts (4 tests) 736ms
+ ✓ src/core/tools/codemode/output.test.ts (18 tests) 788ms
+ ✓ src/turn/session.test.ts (51 tests) 506ms
+ ✓ src/turn/tools.test.ts (54 tests) 445ms
+   ✓ createToolHooks > shows the same plan eligibility that the execution gate enforces for every built-in  311ms
+ ✓ src/core/tools/codemode/models.test.ts (4 tests) 171ms
+ ✓ src/turn/nestedTools.test.ts (17 tests) 23ms
+ ✓ src/core/tools/discovery/state.test.ts (11 tests) 15ms
+ ✓ src/core/tools/catalog.test.ts (10 tests) 12ms
+
+ Test Files  12 passed (12)
+      Tests  239 passed (239)
+   Start at  22:31:02
+   Duration  21.38s (transform 3.52s, setup 0ms, collect 11.16s, tests 8.03s, environment 1ms, prepare 584ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/current-integrated.json

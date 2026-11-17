@@ -11,7 +11,75 @@ const WIDTH = 40;
 
 const plain = (rows: readonly string[]): string => rows.map(stripAnsi).join("\n");
 
+describe("shared conversation Markdown contracts", () => {
+  it("recognizes pipe tables without optional outer delimiters in both scan and terminal", () => {
+    const source = "名称 | 说明\n--- | ---\n甲 | 乙";
+    expect(scanBlocks(source)).toMatchObject([
+      { kind: "table", header: "名称 | 说明", rows: ["甲 | 乙"], sourceStart: 0, sourceEnd: 2 },
+    ]);
+    const rendered = renderMarkdownWithSources(source, 60);
+    expect(plain(rendered.rows)).toContain("甲");
+    expect(plain(rendered.rows)).toContain("乙");
+    expect(plain(rendered.rows)).toContain("┼");
+    expect(rendered.sources.filter(value => value?.breakAfter === "logical").map(value => value?.text))
+      .toEqual(source.split("\n"));
+  });
+
+  it("does not close a shared fence on trailing language text and retains source coordinates", () => {
+    const source = "```unknown\nfirst\n```ts\nTAIL_IN_FENCE\n```";
+    expect(scanBlocks(source)).toMatchObject([
+      { kind: "fence", language: "unknown", lines: ["first", "```ts", "TAIL_IN_FENCE"], sourceStart: 0, sourceEnd: 4 },
+    ]);
+    const rendered = renderMarkdownWithSources(source, 60);
+    expect(plain(rendered.rows)).toContain("```ts");
+    expect(plain(rendered.rows)).toContain("TAIL_IN_FENCE");
+    expect(rendered.sources.filter(value => value?.breakAfter === "logical").map(value => value?.text))
+      .toEqual(source.split("\n"));
+  });
+
+  it("keeps an added fence marker inside the shared diff block", () => {
+    const source = "```diff\n+```ts\n+const 值 = 1;\n+TAIL_IN_DIFF\n```";
+    expect(scanBlocks(source)).toMatchObject([
+      { kind: "fence", language: "diff", lines: ["+```ts", "+const 值 = 1;", "+TAIL_IN_DIFF"], sourceStart: 0, sourceEnd: 4 },
+    ]);
+    expect(plain(renderMarkdown(source, 60))).toContain("+TAIL_IN_DIFF");
+  });
+
+  it("keeps table breaks inside code literal and renders outside breaks on another row", () => {
+    const source = "| 代码 | 换行 |\n| --- | --- |\n| `a<br>b` | first<br>second |";
+    const rows = renderMarkdown(source, 60).map(stripAnsi);
+    expect(rows.some(row => row.includes("a<br>b"))).toBe(true);
+    expect(rows.some(row => row.includes("first"))).toBe(true);
+    expect(rows.some(row => row.includes("second"))).toBe(true);
+    expect(rows.some(row => row.includes("first") && row.includes("second"))).toBe(false);
+  });
+
+  it("shares underscore and escaped-emphasis decisions with the exported renderer", () => {
+    expect(stripAnsi(renderInline("_斜体_ and __粗体__"))).toBe("斜体 and 粗体");
+    expect(stripAnsi(renderInline("\\*字\\* and \\_字\\_"))).toBe("*字* and _字_");
+  });
+
+  it("preserves non-CJK delimiter flanking in the terminal", () => {
+    expect(stripAnsi(renderInline("**end.**Then next"))).toBe("**end.**Then next");
+  });
+
+  it("preserves authored nested indentation and ordered numbering in terminal rows", () => {
+    const source = "7. 父\n   - 子\n8. 后";
+    expect(plain(renderMarkdown(source, 60))).toBe("7. 父\n   • 子\n8. 后");
+  });
+});
+
 describe("inline styling", () => {
+  it.each([
+    { source: "*outer *inner* tail*", open: "\x1b[3m", close: "\x1b[23m" },
+    { source: "~~outer ~~inner~~ tail~~", open: "\x1b[9m", close: "\x1b[29m" },
+  ])("keeps the outer attribute after nested styling: $source", ({ source, open, close }) => {
+    const rendered = renderInline(source + " outside");
+    expect(stripAnsi(rendered)).toBe("outer inner tail outside");
+    expect(rendered).toContain(`${close}${open} tail`);
+    expect(rendered).toContain(`${close} outside`);
+  });
+
   it("removes the markup and keeps the words", () => {
     expect(stripAnsi(renderInline("a **bold** and *italic* word"))).toBe("a bold and italic word");
   });

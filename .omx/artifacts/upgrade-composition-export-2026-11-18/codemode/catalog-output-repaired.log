@@ -1,0 +1,73 @@
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+ ❯ src/core/tools/codemode/composition.test.ts (18 tests | 4 failed) 5012ms
+   ✓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the adapted consumer  322ms
+   ✓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the direct consumer 175ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'adapted' consumer 111ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'direct' consumer 159ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'adapted' consumer 114ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'direct' consumer 96ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'adapted' consumer 49ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'direct' consumer 81ms
+   × the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer 102ms
+     → Script failed
+Script error: TypeError: Unknown tool: tools.session_deferred.: expected false to be true // Object.is equality
+   ✓ the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the direct consumer 48ms
+   ✓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=false before the captured effect 82ms
+   × captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=false before the captured effect 58ms
+     → expected 'e13fa78f94b0d0a67a1283555330d03675773…' not to be 'e13fa78f94b0d0a67a1283555330d03675773…' // Object.is equality
+   ✓ captured nested contracts in the real composed gate > settles 'removal' with deferred=false before the captured effect 82ms
+   ✓ captured nested contracts in the real composed gate > settles 'unchanged control' with deferred=false before the captured effect 122ms
+   ✓ captured nested contracts in the real composed gate > settles 'unrelated change control' with deferred=false before the captured effect 128ms
+   × captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=true before the captured effect 1529ms
+     → expected false to be true // Object.is equality
+   × captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect 1519ms
+     → expected false to be true // Object.is equality
+   ✓ persists one filtered parent result after two real builtin reads in runTurn 232ms
+ ✓ src/core/tools/codemode/output.test.ts (18 tests) 828ms
+ Test Files  1 failed | 1 passed (2)
+      Tests  4 failed | 32 passed (36)
+   Start at  19:21:40
+   Duration  15.62s (transform 3.21s, setup 0ms, collect 9.20s, tests 5.84s, environment 0ms, prepare 117ms)
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/catalog-output-repaired.json
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer
+AssertionError: Script failed
+Script error: TypeError: Unknown tool: tools.session_deferred.: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ scriptJson src/core/tools/codemode/composition.test.ts:86:57
+     84| 
+     85| function scriptJson<T>(result: ToolExecutionResult): T {
+     86|   expect(result.success, result.error ?? result.output).toBe(true)
+       |                                                         ^
+     87|   expect(result.output).toMatch(/^Script completed\s/)
+     88|   return JSON.parse(result.output!.replace(/^Script completed\s*/, '')…
+ ❯ src/core/tools/codemode/composition.test.ts:214:19
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+ FAIL  src/core/tools/codemode/composition.test.ts > captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=false before the captured effect
+AssertionError: expected 'e13fa78f94b0d0a67a1283555330d03675773…' not to be 'e13fa78f94b0d0a67a1283555330d03675773…' // Object.is equality
+ ❯ src/core/tools/codemode/composition.test.ts:302:83
+    300|       expect(result.error ?? result.output).toContain('older discovery…
+    301|     }
+    302|     if (change !== 'unchanged control') expect(catalog.discovery!.gene…
+       |                                                                                   ^
+    303|     if (change === 'schema mutation' || change === 'definition replace…
+    304|       const fresh = await executeScript(catalog.discovery!.snapshot(),…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+ FAIL  src/core/tools/codemode/composition.test.ts > captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=true before the captured effect
+ FAIL  src/core/tools/codemode/composition.test.ts > captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect
+AssertionError: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ vi.waitFor.timeout src/core/tools/codemode/composition.test.ts:270:46
+    268|     `, hooks, parent.signal)
+    269|     try {
+    270|       await vi.waitFor(() => expect(entered).toBe(true), { timeout: 15…
+       |                                              ^
+    271|       expect(effect).not.toHaveBeenCalled()
+    272|       if (change === 'schema mutation') {
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯

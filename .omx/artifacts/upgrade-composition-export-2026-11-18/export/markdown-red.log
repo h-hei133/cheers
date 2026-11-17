@@ -1,0 +1,3 @@
+npm notice run cheers@0.1.0 npx
+npm notice run 'vitest' run src/session/export/markdown.test.ts src/presentation/tui/transcript/table.test.ts src/presentation/tui/transcript/markdown.test.ts src/session/export/template.test.ts --maxWorkers=1 --minWorkers=1 --no-file-parallelism --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/export-validation/markdown-red.json
+JSON report written to /home/wang/projects/cheers/.tmp/export-validation/markdown-red.json

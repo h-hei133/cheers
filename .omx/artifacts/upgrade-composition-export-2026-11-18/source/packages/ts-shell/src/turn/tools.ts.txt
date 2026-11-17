@@ -1,0 +1,611 @@
+import path from 'node:path';
+import type { PermissionScope } from "../cli/approval/permissionScope.js";
+import { boundText, TOOL_OUTPUT_LIMIT, type AgentTool, type AgentToolResult, type ToolHooks } from "../core/agent/tools.js";
+import { OutputAccumulator } from "../core/tools/outputAccumulator.js";
+import { DEFAULT_MAX_LINES } from "../core/tools/truncation.js";
+import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
+import { DoomLoopDetector } from "../core/query/doomLoopDetector.js";
+import { buildToolEscalationPrompt, evaluateToolPermissionScope, planModeBlock } from "../core/query/toolPolicy.js";
+import type { DenyRule } from "../core/shell/approval/deny.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
+import type { InteractiveAsk } from "../core/tools/ask/contract.js";
+import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
+import { approvalCallBinding } from '../core/shell/approval/binding.js';
+import type { ToolDefinition, ToolExecutionContext, ToolPreparation } from "../tools/types.js";
+import type { SubagentRunner } from "../core/subagents/runner.js";
+import { neutraliseForDisplay } from "../core/text/safety.js";
+import { redactExportText } from "../core/security/redaction.js";
+import { validateToolArguments } from "../core/tools/arguments.js";
+import { workspaceToolBinding } from '../core/workspace/tools.js';
+import type { WorkspaceRoot } from '../core/workspace/model.js';
+import {
+  authorizeToolCall,
+  bindPreparedToolCall,
+  consumeToolCall,
+  discardToolCall,
+  preparedSelection,
+  preparedSelectionRevision,
+  preparedToolCall,
+  prepareToolCall,
+  setPreparedSelection,
+} from '../tools/preparation.js';
+import { preparationContext, preparationPermission } from './preparation.js';
+import { bindExecutionTarget, executionApprovalPreview } from '../runtime/execution/binding.js';
+import { assertSourceAccess } from '../core/query/sourcePolicy.js';
+import { assertArtifactSourceAccess } from '../core/session/artifacts/access.js';
+import { EditOperationError } from '../edit/recovery/operation/write.js';
+import { createComponentLogger } from "../observability/structuredLogger.js";
+import type { ToolScopeBinding } from '../config/scope/tools.js';
+import { bindToolScope, forgetToolScope, toolScopePolicy } from './scope.js';
+import { authorizeFileAccess, bindFileAccess, captureFileAccess, fileAccessArguments, fileAccessOptions, fileAccessPrompt, forgetFileAccess, requireFileAccess } from './workspace.js';
+import { createGatedNestedToolExecutor } from './nestedTools.js';
+import { toolExecutionMode } from './execution.js';
+const traceLogger = createComponentLogger("tool-call");
+
+/** A tool definition in the shape a chat completion request takes. */
+export interface ToolSchema {
+  readonly type: "function";
+  readonly function: {
+    readonly name: string;
+    readonly description?: string;
+    readonly parameters: Record<string, unknown>;
+  };
+}
+
+/**
+ * The registry's tools as the kernel runs them.
+ *
+ * The kernel knows how to run a tool and pair its result; it does not know
+ * what the user allowed, what mode the session is in, or which hooks want a
+ * say. Those decisions live here, in front of every call, and the answer to
+ * each is written into the tool result so the model learns why a call did not
+ * run rather than seeing it silently skipped.
+ */
+
+export interface ToolGateOptions {
+  readonly modelCatalog?: ToolExecutionContext['modelCatalog'];
+  readonly configScope?: ToolScopeBinding;
+  readonly background?: ToolExecutionContext['background'];
+  readonly correlationId?: string;
+  readonly commandProof?: import('../runtime/execution/proof.js').CommandProofObserver;
+  /** Rechecked at each effect boundary, including after asynchronous approvals. */
+  readonly admission?: () => string | undefined;
+  readonly sessionId: string;
+  readonly workspaceRoot: string;
+  readonly workspaceRoots?: readonly WorkspaceRoot[];
+  readonly agentMode?: "plan" | "build";
+  readonly permissionScope?: PermissionScope;
+  readonly hooks: HookDispatcher;
+  readonly escalationPromptHandler?: (prompt: EscalationPrompt) => Promise<EscalationResponse>;
+  readonly interactiveAsk?: InteractiveAsk;
+  /** Approval events, so a card can say it is waiting and how it was answered. */
+  readonly emit: (event: QueryEvent) => void;
+  /**
+   * What a command the model runs should know about the session it runs in.
+   *
+   * Resolved once by whoever assembled the turn and handed down, because the
+   * tool layer is where a command is built and the values are about the model
+   * answering, not about this process.
+   */
+  readonly commandEnv?: Readonly<Record<string, string>>;
+  /**
+   * How to run a subagent, handed down so the delegating tool can reach it.
+   *
+   * Supplied by whoever assembled the turn, because running one needs the model
+   * side and this layer has none of it. Absent means the tool cannot delegate.
+   */
+  readonly runSubagent?: SubagentRunner;
+  /**
+   * Tools this session refuses, whatever else says otherwise.
+   *
+   * Read from the run's configuration. Empty means nothing is refused, which is
+   * what a session that declares no rules has always had.
+   */
+  readonly denyRules?: readonly DenyRule[];
+}
+
+/** Key the step runner uses to carry an argument parse failure into the call. */
+export const PARSE_ERROR_KEY = "__parseError";
+
+/** The registry's schemas in the shape a chat completion request takes. */
+export function toolSchemas(tools: ReadonlyMap<string, ToolDefinition>): readonly ToolSchema[] {
+  const result: ToolSchema[] = [];
+  for (const tool of tools.values()) {
+    result.push({
+      type: "function",
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: (tool.argsSchema as Record<string, unknown>) ?? { type: "object", properties: {} },
+      },
+    });
+  }
+  return result;
+}
+
+/** Wrap every registry tool so the kernel can execute it. */
+export function adaptTools(
+  tools: ReadonlyMap<string, ToolDefinition>,
+  options: ToolGateOptions,
+): readonly AgentTool[] {
+  const prepareArgsFor = (tool: ToolDefinition, args: unknown, signal: AbortSignal | undefined) => {
+    const prepared = prepareArguments(tool.name, args);
+    if (tool.validateArguments) tool.validateArguments(prepared);
+    else validateToolArguments(tool.argsSchema, prepared);
+    captureFileAccess(tool.name, prepared, options);
+    if (!tool.prepare) return prepared;
+    const context = preparationContext(tool.name, options, signal, prepared);
+    let refusal: 'blocked' | 'failed' = 'failed';
+    const verify = () => {
+      signal?.throwIfAborted();
+      const blocked = options.admission?.() ?? planModeBlock(options.agentMode, tool.name, prepared, tool);
+      if (blocked) { refusal = 'blocked'; throw new Error(blocked); }
+    };
+    const refused = (error: unknown): never => {
+      forgetFileAccess(prepared);
+      tool.onRefusal?.(prepared, context, signal?.aborted && error === signal.reason ? 'cancelled' : refusal);
+      throw error;
+    };
+    try {
+      verify();
+      const result = prepareToolCall(tool, prepared, context, options, verify);
+      if (result instanceof Promise) return result.then(selected => { bindToolScope(prepared, selected, options); bindFileAccess(prepared, selected); return selected; }).catch(refused);
+      bindToolScope(prepared, result, options);
+      bindFileAccess(prepared, result);
+      return result;
+    } catch (error) { return refused(error); }
+  };
+  return [...tools.values()].map((tool) => ({
+    name: tool.name,
+    ...(toolExecutionMode(tool) ? { executionMode: toolExecutionMode(tool) } : {}),
+    prepareArguments: (args, signal) => prepareArgsFor(tool, args, signal),
+    execute: (toolCallId, args, signal, onUpdate) => {
+      const nestedCatalog = tool.name === 'codemode' ? tool.nestedToolCatalog?.() ?? tools : undefined;
+      return executeTool(tool, toolCallId, args, signal, options, onUpdate, nestedCatalog
+        ? createGatedNestedToolExecutor({
+            tools: nestedCatalog,
+            hooks: createToolHooks(options, nestedCatalog),
+            prepare: (nestedTool, nestedArgs, nestedSignal) => prepareArgsFor(nestedTool, nestedArgs, nestedSignal),
+            execute: (nestedTool, nestedCallId, nestedArgs, nestedSignal) =>
+              executeTool(nestedTool, nestedCallId, nestedArgs, nestedSignal, options),
+            cleanup: (_nestedTool, nestedArgs) => {
+              discardToolCall(nestedArgs);
+              forgetToolScope(nestedArgs);
+              forgetFileAccess(nestedArgs);
+            },
+          }, signal)
+        : undefined, nestedCatalog);
+    },
+  }));
+}
+
+function prepareArguments(toolName: string, args: unknown): Record<string, unknown> {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error(`Error: Malformed JSON arguments for tool '${toolName}': arguments must be a JSON object.`);
+  }
+  const record = args as Record<string, unknown>;
+  const parseError = record[PARSE_ERROR_KEY];
+  if (typeof parseError === "string") {
+    throw new Error(`Error: Malformed JSON arguments for tool '${toolName}': ${parseError}`);
+  }
+  return record;
+}
+
+async function executeTool(
+  tool: ToolDefinition,
+  toolCallId: string,
+  args: Record<string, unknown>,
+  signal: AbortSignal | undefined,
+  options: ToolGateOptions,
+  onUpdate?: (partialResult: unknown) => void,
+  executeNestedTool?: ToolExecutionContext['executeNestedTool'],
+  nestedCatalog?: ReadonlyMap<string, ToolDefinition>,
+): Promise<AgentToolResult> {
+  let accumulator: OutputAccumulator | undefined;
+  let settled = false;
+  const snapshotStreamed = (): string | undefined => {
+    settled = true;
+    if (!accumulator) return undefined;
+    accumulator.finish();
+    const text = accumulator.snapshot().content;
+    return text.length > 0 ? text : undefined;
+  };
+  const startedAt = Date.now();
+  traceLogger.info("tool call started", { toolCallId, tool: tool.name, requestId: options.correlationId });
+  try {
+    const blocked = options.admission?.();
+    if (blocked) throw new Error(blocked);
+    if (tool.validateArguments) tool.validateArguments(args);
+    else validateToolArguments(tool.argsSchema, args);
+    toolScopePolicy(tool.name, args, options, preparedToolCall(args, options));
+    requireFileAccess(args, toolCallId);
+    const accessOptions = fileAccessOptions(tool.name, args, options);
+    const binding = workspaceToolBinding(tool.name, fileAccessArguments(tool.name, args), options.workspaceRoot, accessOptions.workspaceRoots);
+    const selection = preparedSelection(args);
+    const selectionRevision = preparedSelectionRevision(args);
+    const preparation = consumeToolCall(args, options, tool, toolCallId);
+    const execute = preparation ? (_args: Record<string, unknown>, context: import('../tools/types.js').ToolExecutionContext) =>
+      preparation.execute(context, selection, selectionRevision ? { revision: selectionRevision } : undefined)
+      : tool.execute.bind(tool);
+    const result = await execute(binding.args, {
+      workspaceRoot: binding.root,
+      workspaceRoots: accessOptions.workspaceRoots,
+      artifactRoot: options.workspaceRoot,
+      taskId: toolCallId,
+      abortSignal: signal,
+      admission: options.admission,
+      interactiveAsk: options.interactiveAsk,
+      sessionId: options.sessionId,
+      correlationId: options.correlationId,
+      commandProof: options.commandProof,
+      assertSourceAccess: absolute => {
+        if (tool.name === 'task') preparationContext(tool.name, options, signal, args).assertSourceAccess!(absolute);
+        else {
+          const scoped = toolScopePolicy(tool.name, args, options, undefined, absolute);
+          assertArtifactSourceAccess(absolute, options.workspaceRoot, options.sessionId, options.workspaceRoots, options.permissionScope, [...options.denyRules ?? [], ...scoped.denyRules ?? []]);
+        }
+      },
+      assertFileAccess: (absolutePath) => {
+        if (preparation) { preparationContext(tool.name, options, signal, args).assertFileAccess!(absolutePath); return; }
+        const blocked = options.admission?.();
+        if (blocked) throw new Error(blocked);
+        const scoped = toolScopePolicy(tool.name, args, options, undefined, absolutePath);
+        const denyRules = [...options.denyRules ?? [], ...scoped.denyRules ?? []];
+        if (tool.name === 'read' && typeof args.path === 'string' && args.path.startsWith('artifact://')) {
+          assertArtifactSourceAccess(absolutePath, options.workspaceRoot, options.sessionId, options.workspaceRoots, options.permissionScope, denyRules);
+          return;
+        }
+        const actualArgs = { ...args, path: absolutePath, filePath: absolutePath };
+        const access = fileAccessOptions(tool.name, args, options, absolutePath);
+        // Original reads and post-publication verification require read access.
+        // Recheck it at every file boundary, including absent creation targets.
+        if (tool.name === 'write' || tool.name === 'edit') {
+          for (const root of new Set([options.workspaceRoot, binding.root])) {
+            const read = evaluateToolPermissionScope('read', actualArgs, options.permissionScope, root, denyRules);
+            if (read.denied) throw new Error(read.reason);
+          }
+        }
+        if (tool.name === 'browser') assertSourceAccess(absolutePath, options.workspaceRoot, options.workspaceRoots, options.permissionScope, denyRules);
+        if (tool.name === 'lsp') {
+          const fileArgs = { ...actualArgs, backend: 'scanner' };
+          const selected = workspaceToolBinding('lsp', fileArgs, options.workspaceRoot, options.workspaceRoots);
+          for (const root of new Set([options.workspaceRoot, selected.root])) {
+            for (const name of ['lsp', 'read']) {
+              const checked = evaluateToolPermissionScope(name, fileArgs, options.permissionScope, root, denyRules);
+              if (checked.denied) throw new Error(checked.reason);
+            }
+          }
+        }
+        if (binding.scoped) {
+          const actual = workspaceToolBinding(tool.name, actualArgs, options.workspaceRoot, access.workspaceRoots);
+          if (actual.root !== binding.root) throw new Error('The tool target changed workspace roots.');
+        }
+        const decision = binding.scoped ? evaluateWorkspacePermission(tool.name, actualArgs, options, undefined, access.workspaceRoots)
+          : evaluateToolPermissionScope(tool.name, actualArgs, options.permissionScope, options.workspaceRoot, denyRules);
+        if (decision.denied) throw new Error(decision.reason);
+      },
+      ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
+      ...(options.background ? { background: options.background } : {}),
+      ...(options.runSubagent ? { runSubagent: options.runSubagent } : {}),
+      ...(executeNestedTool ? { executeNestedTool } : {}),
+      ...(nestedCatalog ? { toolCatalog: nestedCatalog } : {}),
+      ...(options.modelCatalog ? { modelCatalog: options.modelCatalog } : {}),
+      // unaffected, since the callback only fires if the tool calls it.
+      onOutput: (chunk: string) => {
+        if (settled) return;
+        (accumulator ??= new OutputAccumulator({ maxLines: DEFAULT_MAX_LINES, maxBytes: TOOL_OUTPUT_LIMIT })).append(chunk);
+        onUpdate?.(chunk);
+      },
+    });
+    const output = result.output ?? result.content ?? snapshotStreamed();
+    traceLogger.info("tool call completed", { toolCallId, tool: tool.name, requestId: options.correlationId, success: result.success, durationMs: Math.max(0, Date.now() - startedAt) });
+    return {
+      output: result.success ? output ?? "Success"
+        : [result.error, output].filter(Boolean).join("\n") || "Tool failed.",
+      isError: !result.success,
+      ...(result.metadata ? { metadata: result.metadata } : {}),
+      ...(result.images ? { images: result.images } : {}),
+      ...(result.terminate !== undefined ? { terminate: result.terminate } : {}),
+    };
+  } catch (error) {
+    traceLogger.warn("tool call failed", { toolCallId, tool: tool.name, requestId: options.correlationId, error: error instanceof Error ? error.message : String(error) });
+    const errorLine = `Tool execution error: ${error instanceof Error ? error.message : String(error)}`;
+    const streamed = snapshotStreamed();
+    const prefix = streamed ? boundText(streamed, Math.max(0, TOOL_OUTPUT_LIMIT - errorLine.length - 2)) : "";
+    return { output: [prefix, errorLine].filter(Boolean).join("\n"), isError: true,
+      ...(error instanceof EditOperationError ? { metadata: { operationId: error.operationId, status: error.status } } : {}) };
+  } finally { discardToolCall(args); forgetFileAccess(args); }
+}
+
+/**
+ * The gate in front of each call and the hook behind it.
+ *
+ * Before: plan mode, repeated identical calls, the permission scope with the
+ * user's answer, then the pre-use hook. After: the post-use hook, whose
+ * feedback (a compile error after an edit, say) is attached to the result so
+ * the model reads it with the output it belongs to.
+ */
+export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<string, ToolDefinition> | (() => ReadonlyMap<string, ToolDefinition>)): ToolHooks {
+  const toolFor = (name: string) => (typeof tools === 'function' ? tools() : tools)?.get(name);
+  const doomLoop = new DoomLoopDetector(3);
+  const approvals = new Map<string, { operation: string; decision: string }>();
+  return {
+    beforeToolCall: async ({ call, args }, signal) => {
+      let authorized = false;
+      let refusal: 'blocked' | 'denied' = 'blocked';
+      try {
+      const blocked = options.admission?.();
+      if (blocked) return { block: true, reason: blocked };
+      if (toolFor(call.name)?.prepare && !preparedToolCall(args, options)) return { block: true, reason: 'The original prepared tool call is required.' };
+      const planBlock = planModeBlock(options.agentMode, call.name, args, toolFor(call.name));
+      if (planBlock) return { block: true, reason: planBlock };
+      const permission = await askPermission(call.id, call.name, args, options, signal, toolFor(call.name));
+      if (permission.blocked) { refusal = 'denied'; return { block: true, reason: permission.blocked }; }
+      const afterApproval = options.admission?.();
+      if (afterApproval) return { block: true, reason: afterApproval };
+      toolScopePolicy(call.name, args, options, preparedToolCall(args, options));
+      if (permission.approved) approvals.set(call.id, permission.approved);
+      bindPreparedToolCall(args, options, call.name, call.id);
+      const decision = await options.hooks.dispatch({
+        eventName: "PreToolUse",
+        sessionId: options.sessionId,
+        workspaceRoot: options.workspaceRoot,
+        timestamp: new Date().toISOString(),
+        toolName: call.name,
+        toolCallId: call.id,
+        args,
+      }, { signal });
+      const afterHook = options.admission?.();
+      if (afterHook) { approvals.delete(call.id); return { block: true, reason: afterHook }; }
+      toolScopePolicy(call.name, args, options, preparedToolCall(args, options));
+      if (decision.decision === "block") {
+        approvals.delete(call.id);
+        return { block: true, reason: `Blocked by Hook: ${decision.reason || "Action rejected by security/verification hook policy."}` };
+      }
+      if (decision.decision === "retry") {
+        // Asked to try again rather than refused. Treated as a block carrying the
+        // hook's reason, which is what a retry has to say to be actionable — the
+        // previous behaviour dropped the decision entirely, so a hook asking for
+        // another attempt was indistinguishable from one that had nothing to say.
+        approvals.delete(call.id);
+        return {
+          block: true,
+          reason: `Hook asked for a different attempt: ${decision.reason || "Retry with different arguments."}`,
+        };
+      }
+      const repeat = doomLoop.recordAndCheck(call.name, args);
+      if (repeat.isDoomLoop) {
+        const observation = repeat.cycleLength === 1
+          ? `Tool '${call.name}' was requested ${repeat.repeatCount} consecutive times with identical arguments.`
+          : `A ${repeat.cycleLength}-request pattern repeated ${repeat.repeatCount} times with the same tool names and arguments.`;
+        approvals.delete(call.id);
+        return {
+          block: true,
+          reason: `Warning: Doom Loop detected! ${observation} This request was blocked. Try different arguments or respond using the available observations.`,
+        };
+      }
+      authorizeToolCall(args, options, call.name, call.id);
+      authorizeFileAccess(args, call.id);
+      authorized = true;
+      return undefined;
+      } finally { if (!authorized) {
+        try { toolFor(call.name)?.onRefusal?.(args, preparationContext(call.name, options), signal?.aborted ? 'cancelled' : refusal); }
+        finally { discardToolCall(args); forgetToolScope(args); forgetFileAccess(args); }
+      } }
+    },
+    afterToolCall: async ({ call, args, result, isError }) => {
+      discardToolCall(args);
+      forgetFileAccess(args);
+      const approval = approvals.get(call.id);
+      approvals.delete(call.id);
+      let output = result.output;
+      // A call that failed is announced as a failure. Sending it on
+      // `PostToolUse` alone would make the event name mean "a call finished",
+      // and a hook watching for breakage would have to re-derive the outcome
+      // from a field rather than being told.
+      const decision = isError
+        ? await options.hooks.dispatch({
+            eventName: "PostToolUseFailure",
+            sessionId: options.sessionId,
+            workspaceRoot: options.workspaceRoot,
+            timestamp: new Date().toISOString(),
+            toolName: call.name,
+            toolCallId: call.id,
+            args,
+            error: output,
+          })
+        : await options.hooks.dispatch({
+            eventName: "PostToolUse",
+            sessionId: options.sessionId,
+            workspaceRoot: options.workspaceRoot,
+            timestamp: new Date().toISOString(),
+            toolName: call.name,
+            toolCallId: call.id,
+            args,
+            output,
+            success: true,
+          });
+      if (decision.feedback) {
+        // Hook feedback reaches the model, and a hook's text can come from a
+        // project-supplied configuration. Neutralised so a newline or a control
+        // character cannot forge extra lines or repaint the transcript.
+        output = `${output}\n\n[Verification feedback]\n${neutraliseForDisplay(redactExportText(decision.feedback))}`;
+      }
+      let refused = toolFor(call.name)?.resultAdmission?.();
+      try { toolScopePolicy(call.name, args, options); }
+      catch { refused ??= 'Configuration scope changed before result publication.'; }
+      finally { forgetToolScope(args); }
+      if (refused) return { isError: true, output: `${output}\n${refused} Actual effect evidence remains visible.`, ...(approval ? { metadata: { approval } } : {}) };
+      if (output === result.output && !approval) return undefined;
+      return {
+        ...(output === result.output ? {} : { output }),
+        ...(approval ? { metadata: { approval } } : {}),
+      };
+    },
+  };
+}
+
+/**
+ * Whether the user allows this call under the session's scope.
+ *
+ * A denial with a comment is the user's instruction for what to do instead, and
+ * travels to the model verbatim; a bare denial only says no.
+ */
+async function askPermission(
+  toolCallId: string,
+  toolName: string,
+  args: Record<string, unknown>,
+  options: ToolGateOptions,
+  signal: AbortSignal | undefined,
+  tool?: ToolDefinition,
+): Promise<{ readonly blocked?: string; readonly approved?: { operation: string; decision: string } }> {
+  let evaluation: ReturnType<typeof evaluateToolPermissionScope>;
+  let preparation: ToolPreparation | undefined;
+  let callBinding: string | undefined;
+  try {
+    captureFileAccess(toolName, args, options);
+    if (toolName === 'lsp' && args.backend !== 'scanner') bindExecutionTarget(args, args.server, options.workspaceRoot);
+    preparation = preparedToolCall(args, options);
+    evaluation = preparation ? preparationPermission(toolName, preparation, options, args) : evaluateWorkspacePermission(toolName, args, options, tool);
+    callBinding = approvalCallBinding(preparation?.permissionToolName ?? toolName, args, preparation);
+    const external = fileAccessPrompt(args);
+    if (external && !evaluation.denied) evaluation = { ...evaluation, requiresEscalation: true,
+      target: external, reason: `This call accesses files outside the registered workspace roots. One-time approval is required.\n${evaluation.reason}` };
+  }
+  catch (error) { return { blocked: error instanceof Error ? error.message : 'Workspace access could not be checked.' }; }
+  // A refusal is an answer, not a question. Asking about it would offer the user
+  // a chance to override what the user already wrote, and the tool would be
+  // usable again by answering "allow" — which is what makes a rule real.
+  if (evaluation.denied) {
+    options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
+    await options.hooks.dispatch({
+      eventName: "PermissionDenied",
+      sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot,
+      timestamp: new Date().toISOString(),
+      toolName,
+      toolCallId,
+      args,
+      reason: evaluation.reason,
+    });
+    return { blocked: `Blocked: ${evaluation.reason}` };
+  }
+  const requiresSelection = Boolean(preparation?.selections?.length);
+  if (!evaluation.requiresEscalation && !requiresSelection) return {};
+  if (!options.escalationPromptHandler) {
+    return {
+      blocked: requiresSelection
+        ? `Blocked: Tool '${toolName}' requires an explicit group selection, but no interactive handler is available.`
+        : `Blocked: Tool '${toolName}' requires permission (${evaluation.reason}), but no interactive handler is available.`,
+    };
+  }
+  options.emit({ type: "approval.requested", toolName, taskId: toolCallId });
+  if (evaluation.requiresEscalation) {
+    await options.hooks.dispatch({
+      eventName: "PermissionRequest",
+      sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot,
+      timestamp: new Date().toISOString(),
+      toolName,
+      toolCallId,
+      args,
+    });
+  }
+  const promptReason = evaluation.requiresEscalation
+    ? evaluation.reason
+    : "The permission scope allows this operation, but the exact patch groups still require explicit selection.";
+  const prompt = buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, promptReason);
+  if (callBinding !== undefined) prompt.context.callBinding = callBinding;
+  if (fileAccessPrompt(args)) {
+    prompt.context.explicitApproval = true;
+    prompt.options = prompt.options.filter(option => option.value !== 'allow-always');
+  }
+  if (preparation) {
+    prompt.context.preview = preparation.preview; prompt.context.previewKind = preparation.previewKind;
+    if (preparation.selections) prompt.context.selections = preparation.selections;
+    if (preparation.selectionRevision) prompt.context.selectionRevision = preparation.selectionRevision;
+    if (preparation.selectionPreview) prompt.context.selectionPreview = preparation.selectionPreview;
+  }
+  else if (toolName === 'lsp' && args.backend !== 'scanner') {
+    prompt.context.preview = executionApprovalPreview(args, args.server, options.workspaceRoot);
+    prompt.context.previewKind = 'execution';
+  }
+  const response = await options.escalationPromptHandler(prompt);
+  if (signal?.aborted) return { blocked: "Operation aborted" };
+  if ((toolName === 'apply_patch' || fileAccessPrompt(args)) && response.decision === 'allow-always') {
+    options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
+    return {
+      blocked: toolName === 'apply_patch'
+        ? "Blocked: apply_patch requires an exact one-time selection; allow-always is not available for this tool."
+        : "Blocked: external file access requires one-time approval; allow-always is not available.",
+    };
+  }
+  if (response.decision === "deny") {
+    options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
+    const feedback =
+      response.userComment && !response.userComment.startsWith("CLI explicit approval")
+        ? response.userComment.replace(/^User denied with reason:\s*/i, "").trim()
+        : "";
+    if (evaluation.requiresEscalation) {
+      await options.hooks.dispatch({
+        eventName: "PermissionDenied",
+        sessionId: options.sessionId,
+        workspaceRoot: options.workspaceRoot,
+        timestamp: new Date().toISOString(),
+        toolName,
+        toolCallId,
+        args,
+        reason: feedback || evaluation.reason,
+      });
+    }
+    return {
+      blocked: feedback
+        ? `[User Denied Permission]: The user explicitly rejected this tool call.\nUser feedback / instructions: "${feedback}"\nYou MUST follow the user's instructions above instead of repeating the rejected action.`
+        : !evaluation.requiresEscalation && requiresSelection
+          ? `Blocked: User declined the exact group selection for '${toolName}' on '${evaluation.target}'.`
+          : `Blocked: User denied permission for tool '${toolName}' (${evaluation.operation}) on '${evaluation.target}'.`,
+    };
+  }
+  if (preparation?.selections?.length) {
+    const selected = response.selected;
+    const offered = new Set(preparation.selections.map(selection => selection.id));
+    const unique = Array.isArray(selected) ? new Set(selected) : undefined;
+    if (!Array.isArray(selected) || selected.length === 0
+      || typeof response.selectionRevision !== "string" || !response.selectionRevision.trim()) {
+      options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
+      return {
+        blocked: "Blocked: this tool requires an explicit group selection and exact selection revision. Nothing was executed.",
+      };
+    }
+    if (unique?.size !== selected.length || selected.some(id => typeof id !== "string" || !offered.has(id))) {
+      options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
+      return {
+        blocked: "Blocked: the approval selected unknown or duplicate groups. Nothing was executed.",
+      };
+    }
+    setPreparedSelection(args, selected, response.selectionRevision);
+  }
+  options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "approved" });
+  return { approved: { operation: evaluation.operation, decision: response.decision } };
+}
+
+/** Denials apply to the requested spelling and to the selected root's relative paths. */
+function evaluateWorkspacePermission(toolName: string, args: Record<string, unknown>, options: ToolGateOptions, tool?: ToolDefinition,
+  roots?: readonly WorkspaceRoot[]) {
+  const scoped = toolScopePolicy(toolName, args, options);
+  const denyRules = [...options.denyRules ?? [], ...scoped.denyRules ?? []];
+  const original = evaluateToolPermissionScope(toolName, args, options.permissionScope, options.workspaceRoot, denyRules, tool);
+  if (original.denied) return original;
+  const access = fileAccessOptions(toolName, args, options);
+  const binding = workspaceToolBinding(toolName, args, options.workspaceRoot, roots ?? access.workspaceRoots);
+  // Writers read originals and verify their published bytes. Refuse read-denied
+  // targets before hooks or writes, even when the target does not exist yet.
+  if ((toolName === 'write' || toolName === 'edit') && typeof binding.args.path === 'string') {
+    for (const root of new Set([options.workspaceRoot, binding.root])) {
+      const read = evaluateToolPermissionScope('read', binding.args, options.permissionScope, root, denyRules);
+      if (read.denied) return read;
+    }
+  }
+  return binding.root === options.workspaceRoot ? original
+    : evaluateToolPermissionScope(toolName, binding.args, options.permissionScope, binding.root, denyRules, tool);
+}

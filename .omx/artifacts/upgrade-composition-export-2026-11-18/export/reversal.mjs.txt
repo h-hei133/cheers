@@ -1,0 +1,87 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+
+const repo = '/home/wang/projects/cheers';
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const tree = fs.mkdtempSync(path.join(directory, 'reversal-private-'));
+const packageDir = path.join(tree, 'packages/ts-shell');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const owner = 'packages/ts-shell/src/';
+const cases = [
+  { name: 'public-html', file: 'session/export/html.ts', before: 'const safe = sanitizeExport(payload);', after: 'const safe = payload;',
+    tests: ['session/export/html.test.ts'], select: 'standalone export projection' },
+  { name: 'media-inspection', file: 'session/export/media.ts', before: "inspectImage({ type: 'image', mimeType: mediaType, data });",
+    after: 'void data;', tests: ['session/export/html.test.ts', 'session/export/collect.test.ts'], select: 'malformed attachments|omitted damaged images' },
+  { name: 'diff-fence', file: 'session/export/collect.ts',
+    before: "const fenced = scanBlocks(contentText).find(block => block.kind === 'fence' && block.language === 'diff');\n  const diff = fenced?.kind === 'fence' ? fenced.lines.join('\\n') : undefined;",
+    after: "const diff = /```diff\\s*\\n([\\s\\S]*?)```/.exec(contentText)?.[1];",
+    tests: ['session/export/collect.test.ts'], select: 'every diff line' },
+  { name: 'thinking-state', file: 'session/export/template.ts', before: 'setThinkingExpanded(!thinkingExpanded);',
+    after: 'thinkingExpanded = !thinkingExpanded; renderConversation();', first: true,
+    tests: ['session/export/template.test.ts'], select: 'toggles thinking in place' },
+  { name: 'pairing-state', file: 'session/export/template.ts',
+    before: "var pairingUnavailable = data.toolPairing === 'unavailable'\n      || (data.toolPairing !== 'verified' && (data.warnings || []).length);",
+    after: "var pairingUnavailable = (data.warnings || []).length;",
+    tests: ['session/export/template.test.ts'], select: 'media omissions|explicitly unavailable' },
+  { name: 'streaming-math', file: 'presentation/tui/text/inline.ts',
+    before: 'if (render.findMath && (escaped === "(" || escaped === "[")) {', after: 'if (false) {',
+    tests: ['session/export/markdown.test.ts', 'presentation/tui/transcript/markdown.test.ts'], select: 'incomplete formula|unterminated display-math|escaped math openers' },
+  { name: 'cjk-flanking', file: 'presentation/tui/text/emphasis.ts',
+    before: 'PUNCTUATION.test(before) && !CJK_PUNCTUATION.test(before) && !CJK.test(after)', after: 'PUNCTUATION.test(before)',
+    tests: ['session/export/markdown.test.ts'], select: 'CJK punctuation flanking' },
+];
+const originals = new Map(cases.map(item => [owner + item.file, fs.readFileSync(path.join(repo, owner + item.file))]));
+const receipt = { status: 'running', mainSourcesMutated: false, helperSha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), cases: [] };
+function run(name, tests, select) {
+  const reportFile = path.join(directory, 'reversal-' + name + '.json');
+  const result = spawnSync('rtk', ['proxy', process.execPath, '--max-old-space-size=768',
+    path.join(repo, 'node_modules/vitest/vitest.mjs'), 'run', ...tests.map(file => 'src/' + file),
+    ...(select ? ['-t', select] : []), '--reporter=json', '--outputFile=' + reportFile],
+  { cwd: packageDir, env: { ...process.env, GIT_CEILING_DIRECTORIES: tree }, encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024, timeout: 90000 });
+  fs.writeFileSync(path.join(directory, 'reversal-' + name + '.log'), (result.stdout ?? '') + (result.stderr ?? ''));
+  if (!fs.existsSync(reportFile)) return { exitCode: result.status, signal: result.signal, reportMissing: true };
+  const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+  const failures = report.testResults.flatMap(suite => suite.assertionResults.filter(test => test.status === 'failed'));
+  return { exitCode: result.status, signal: result.signal, failedTests: report.numFailedTests,
+    passedTests: report.numPassedTests, runtimeErrors: report.numRuntimeErrorTestSuites,
+    assertionFailures: failures.filter(test => test.failureMessages.some(message => message.includes('AssertionError'))).length,
+    names: failures.map(test => test.fullName), reportSha256: hash(fs.readFileSync(reportFile)) };
+}
+try {
+  fs.mkdirSync(packageDir, { recursive: true }); fs.mkdirSync(path.join(tree, '.git'));
+  fs.symlinkSync(path.join(repo, 'node_modules'), path.join(tree, 'node_modules'), 'dir');
+  fs.copyFileSync(path.join(repo, 'package.json'), path.join(tree, 'package.json'));
+  fs.cpSync(path.join(repo, owner), path.join(packageDir, 'src'), { recursive: true });
+  for (const file of ['package.json', 'tsconfig.json', 'vitest.config.ts'])
+    fs.copyFileSync(path.join(repo, 'packages/ts-shell', file), path.join(packageDir, file));
+  for (const item of cases) {
+    const file = owner + item.file, before = originals.get(file), text = before.toString('utf8');
+    if (item.first ? !text.includes(item.before) : text.split(item.before).length !== 2) throw new Error(item.name + '-fragment-not-unique');
+    const reversed = Buffer.from(text.replace(item.before, item.after));
+    let observed;
+    try { fs.writeFileSync(path.join(tree, file), reversed); observed = run(item.name, item.tests, item.select); }
+    finally { fs.writeFileSync(path.join(tree, file), before); }
+    const result = { name: item.name, file, sourceSha256: hash(before), reversedSha256: hash(reversed), ...observed,
+      restoredExactly: fs.readFileSync(path.join(tree, file)).equals(before) };
+    result.status = result.exitCode === 1 && result.failedTests > 0 && result.assertionFailures === result.failedTests
+      && !result.runtimeErrors && result.restoredExactly ? 'passed' : 'failed';
+    receipt.cases.push(result); console.log(JSON.stringify(result));
+    if (result.status !== 'passed') throw new Error(item.name + '-ineffective-reversal');
+  }
+  receipt.restoredValidation = run('restored', [...new Set(cases.flatMap(item => item.tests))]);
+  if (receipt.restoredValidation.exitCode !== 0 || receipt.restoredValidation.failedTests !== 0 || !receipt.restoredValidation.passedTests)
+    throw new Error('restored-validation-failed');
+  receipt.status = 'passed';
+} catch (error) { receipt.status = 'failed'; receipt.failure = { name: error.name, message: error.message }; process.exitCode = 1; }
+finally {
+  receipt.mainSourceUnchanged = [...originals].every(([file, before]) => fs.readFileSync(path.join(repo, file)).equals(before));
+  receipt.restoredExactly = [...originals].every(([file, before]) => fs.readFileSync(path.join(tree, file)).equals(before));
+  fs.rmSync(tree, { recursive: true, force: true }); receipt.privateStateRemoved = !fs.existsSync(tree);
+  fs.writeFileSync(path.join(directory, 'reversal.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify({ status: receipt.status, cases: receipt.cases.length, restoredTests: receipt.restoredValidation?.passedTests,
+    mainSourceUnchanged: receipt.mainSourceUnchanged, privateStateRemoved: receipt.privateStateRemoved }));
+}

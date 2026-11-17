@@ -1,0 +1,2 @@
+packages/ts-shell/src/core/tools/codemode/output.ts(38,17): error TS2339: Property 'metadata' does not exist on type '{ output: string; images: ImageContent[]; }'.
+Build failed: TypeScript build failed with exit 1.

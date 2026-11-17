@@ -1,0 +1,38 @@
+{
+  "reviewer": "composition_final_audit",
+  "status": "FIXED",
+  "scope": "limited_approve",
+  "findings": [
+    {
+      "severity": "P2",
+      "finding": "Read bypassed an earlier write gate and finalizer.",
+      "resolution": "Synchronous active snapshot and effect fence, keeping read/read concurrency.",
+      "counterexample": "codemode/review-boundary-red.json",
+      "reversal": "codemode/review-reversal.json"
+    }
+  ],
+  "sources": {
+    "packages/ts-shell/src/core/tools/codemode/execution.ts": "ed9b71d2772f66b570faba4d0ad4c3f5475918abf180cd63030d67d25e27263e",
+    "packages/ts-shell/src/core/tools/codemode/nestedCalls.ts": "5e38cfb0433814ea278d0699a026fcddbdbf53d7a80d49651fa82fff5bd604d5",
+    "packages/ts-shell/src/core/tools/codemode/tool.ts": "4403ec624010f45e86c7bae7c38a4ead7d1726797cc7902c4cff9496f32106f5",
+    "packages/ts-shell/src/core/tools/catalog.ts": "953e011e3ab68e0705656979579e537a217612ec947cdb751c745cdb181ee6fd",
+    "packages/ts-shell/src/core/tools/discovery/state.ts": "ebc63d4c7ed9b67f204766ecd6e7a66e10d7b821e9b4f4c9c660e87aa40ac622",
+    "packages/ts-shell/src/turn/execution.ts": "c5f8d75d83893f67439ec1abe84330eca2b5784040e11489d42c6ea64aab54ba",
+    "packages/ts-shell/src/turn/nestedTools.ts": "855e328901fdefd4125dafd7e539b93d5edb66d53804dbb5b6021b66a17e45b3",
+    "packages/ts-shell/src/turn/tools.ts": "429b08f174f8c9f23b9e74f07f2f2bdbf262abe84ff38c64e84b183f2ec3eeaf",
+    "packages/ts-shell/src/turn/session.ts": "213852747bf94d6bbc2f59f6b63e63832a2710d6652566e33687a041f69d951f",
+    "packages/ts-shell/src/turn/subagent.ts": "3bc31537c51d4ef1589652b6139a4aa20e30f026165151fc2130656a48bfdf24",
+    "packages/ts-shell/src/core/agent/tools.ts": "983f91c9e5af8bf262f7e2c0b0f8f0cfac2c78ab745caa6a5f06b0dbe7405f94",
+    "packages/ts-shell/src/tools/types.ts": "d4afb32f31f98eeac4d51236c264703a51120a29081eac0554fd05bb02a0ab2b",
+    "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts": "9cba0dddccacf90149fbb5dfe793a1e169437f034adc70231d10cacd8063c950"
+  },
+  "productionTestsRunByReviewer": false,
+  "boundaries": [
+    "turn/session.ts: reviewed lines 180-280 and current diff",
+    "entrypoints/cliRuntimeInvocation.ts: reviewed lines 1-80,315-420 and current diff",
+    "turn/tools.ts: content after line 541 not fully read",
+    "No general VM security approval"
+  ],
+  "finalFixSha256": "855e328901fdefd4125dafd7e539b93d5edb66d53804dbb5b6021b66a17e45b3",
+  "currentHashesMatch": true
+}

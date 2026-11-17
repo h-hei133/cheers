@@ -460,7 +460,9 @@ export const PAGE_SCRIPT = String.raw`
     }
     // A degraded source may hide the call that owns a reused ID. Results remain
     // visible as recorded tool messages; no inline ownership is inferred.
-    var results = (data.warnings || []).length ? new Map() : resultsOnPath(chain);
+    var pairingUnavailable = data.toolPairing === 'unavailable'
+      || (data.toolPairing !== 'verified' && (data.warnings || []).length);
+    var results = pairingUnavailable ? new Map() : resultsOnPath(chain);
     messages.forEach(function (entry) { pane.appendChild(renderTurn(entry, results)); });
     var target = document.getElementById('entry-' + selected);
     if (target) {
@@ -491,10 +493,16 @@ export const PAGE_SCRIPT = String.raw`
     document.body.classList.toggle('no-sidebar');
   });
   var toggleThinking = document.getElementById('toggle-thinking');
+  function setThinkingExpanded(expanded) {
+    thinkingExpanded = expanded;
+    if (toggleThinking) toggleThinking.setAttribute('aria-pressed', String(expanded));
+    if (typeof document.querySelectorAll === 'function') {
+      document.querySelectorAll('#conversation .thinking').forEach(function (details) { details.open = expanded; });
+    }
+  }
   if (toggleThinking) {
     toggleThinking.addEventListener('click', function () {
-      thinkingExpanded = !thinkingExpanded;
-      renderConversation();
+      setThinkingExpanded(!thinkingExpanded);
     });
   }
   var imageModal = document.getElementById('image-modal');
@@ -504,9 +512,10 @@ export const PAGE_SCRIPT = String.raw`
   if (typeof document.addEventListener === 'function') {
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape' && imageModal) imageModal.classList.remove('open');
-      else if ((event.key === 't' || event.key === 'T') && event.target && event.target.tagName !== 'INPUT') {
-        thinkingExpanded = !thinkingExpanded;
-        renderConversation();
+      else if ((event.key === 't' || event.key === 'T') && !event.ctrlKey && !event.metaKey && !event.altKey
+        && event.target && !event.target.isContentEditable
+        && !/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) {
+        setThinkingExpanded(!thinkingExpanded);
       }
     });
   }
@@ -516,6 +525,7 @@ export const PAGE_SCRIPT = String.raw`
   renderStats();
   renderSidebar();
   renderConversation();
+  setThinkingExpanded(thinkingExpanded);
 })();
 `;
 

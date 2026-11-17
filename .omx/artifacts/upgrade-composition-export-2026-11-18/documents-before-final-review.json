@@ -1,0 +1,38 @@
+{
+  "HANDOFF.md": {
+    "sha256": "2fbd9eecfe8d4b6267825a4534165503dd72e3a588c8371340718961690d4eed",
+    "snapshot": null,
+    "previousSnapshot": "docs/HANDOFF.md.txt",
+    "snapshotStatus": "historical_hash_only_snapshot_overwritten"
+  },
+  ".wiki/log.md": {
+    "sha256": "154485976089d6adbccb35eb3edafda79d01ca3abab85ecfaf04421fd55f3ce0",
+    "snapshot": null,
+    "previousSnapshot": "docs/.wiki/log.md.txt",
+    "snapshotStatus": "historical_hash_only_snapshot_overwritten"
+  },
+  ".wiki/refactor/upgrade/MASTER.md": {
+    "sha256": "304700976702e1510d17d2373a5026b5586f53f15e077aaa0c12dafe33c0905a",
+    "snapshot": null,
+    "previousSnapshot": "docs/.wiki/refactor/upgrade/MASTER.md.txt",
+    "snapshotStatus": "historical_hash_only_snapshot_overwritten"
+  },
+  ".wiki/refactor/upgrade/tasks.md": {
+    "sha256": "b7bc2812985cdd6cc18996f27bed758ba04270d7109d27f8cedbbce4e524bf3b",
+    "snapshot": null,
+    "previousSnapshot": "docs/.wiki/refactor/upgrade/tasks.md.txt",
+    "snapshotStatus": "historical_hash_only_snapshot_overwritten"
+  },
+  ".wiki/refactor/upgrade/design.md": {
+    "sha256": "91b6706fc2657a1135040c68787698bbbb8b23a21a7b4c629de348bbe53ba486",
+    "snapshot": null,
+    "previousSnapshot": "docs/.wiki/refactor/upgrade/design.md.txt",
+    "snapshotStatus": "historical_hash_only_snapshot_overwritten"
+  },
+  ".wiki/refactor/upgrade/summary.md": {
+    "sha256": "4fba6ee9704acc6abf6708ab11335e2a58faa786b8382286f01d8012dd280a0b",
+    "snapshot": null,
+    "previousSnapshot": "docs/.wiki/refactor/upgrade/summary.md.txt",
+    "snapshotStatus": "historical_hash_only_snapshot_overwritten"
+  }
+}

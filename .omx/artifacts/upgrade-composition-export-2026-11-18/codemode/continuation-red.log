@@ -1,0 +1,127 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/codemode/composition.test.ts src/core/tools/codemode/output.test.ts src/turn/nestedTools.test.ts --no-file-parallelism --maxWorkers=1 --reporter=default --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/codemode-validation/continuation-red.json
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ❯ src/core/tools/codemode/composition.test.ts (20 tests | 2 failed) 1535ms
+   × the composed catalog consumed by the actual codemode worker > keeps mutable caller definitions isolated across catalog composition 21ms
+     → expected [Function] to be undefined
+   × the composed catalog consumed by the actual codemode worker > keeps frozen caller definitions isolated across catalog composition 13ms
+     → expected TypeError: Cannot define property nestedT… to be undefined
+   ✓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the adapted consumer 207ms
+   ✓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the direct consumer 78ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'adapted' consumer 92ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'direct' consumer 53ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'adapted' consumer 49ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'direct' consumer 50ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'adapted' consumer 57ms
+   ✓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'direct' consumer 59ms
+   ✓ the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer 106ms
+   ✓ the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the direct consumer 113ms
+   ✓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=false before the captured effect 131ms
+   ✓ captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=false before the captured effect 106ms
+   ✓ captured nested contracts in the real composed gate > settles 'removal' with deferred=false before the captured effect 57ms
+   ✓ captured nested contracts in the real composed gate > settles 'unchanged control' with deferred=false before the captured effect 51ms
+   ✓ captured nested contracts in the real composed gate > settles 'unrelated change control' with deferred=false before the captured effect 48ms
+   ✓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=true before the captured effect 72ms
+   ✓ captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect 77ms
+   ✓ persists one filtered parent result after two real builtin reads in runTurn 91ms
+ ✓ src/core/tools/codemode/output.test.ts (19 tests) 828ms
+ ❯ src/turn/nestedTools.test.ts (18 tests | 1 failed) 39ms
+   ✓ nested tool admission > refuses effects when the parent is cancelled during prepare 3ms
+   ✓ nested tool admission > refuses effects when the parent is cancelled during before hook 1ms
+   ✓ nested tool admission > cancels only the child lifetime during prepare 1ms
+   ✓ nested tool admission > cancels only the child lifetime during before hook 0ms
+   ✓ nested tool admission > does not prepare or execute for an already cancelled parent 0ms
+   × nested execution policy through adapted tools > serializes separate outer scripts that may contain ordered effects 23ms
+     → expected [ 'first', 'second' ] to deeply equal [ 'first' ]
+   ✓ nested execution policy through adapted tools > offers the same forced sequential policy to the outer and nested owners 1ms
+   ✓ nested execution policy through adapted tools > preserves bash concurrency policy through the actual nested gate 2ms
+   ✓ nested execution policy through adapted tools > preserves read concurrency policy through the actual nested gate 1ms
+   ✓ nested execution policy through adapted tools > retains real approval and post-hook facts for a accepted nested result 3ms
+   ✓ nested execution policy through adapted tools > retains real approval and post-hook facts for a revoked nested result 2ms
+   ✓ nested result publication > cannot clear an actual execution failure with post-hook isError:false 0ms
+   ✓ nested result publication > carries images into the post hook and merges its metadata when feedback is appended 0ms
+   ✓ nested result publication > does not publish old images or notices after a hook replaces their output 0ms
+   ✓ nested result publication > preserves termination from the execution result owner 0ms
+   ✓ nested result publication > preserves termination from the post hook result owner 0ms
+   ✓ nested result publication > rechecks original result admission after the awaited post hook without losing actual effects 0ms
+   ✓ nested result publication > preserves completed output, metadata and media when the post hook fails 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/turn/nestedTools.test.ts > nested execution policy through adapted tools > serializes separate outer scripts that may contain ordered effects
+AssertionError: expected [ 'first', 'second' ] to deeply equal [ 'first' ]
+
+- Expected
++ Received
+
+  [
+    "first",
++   "second",
+  ]
+
+ ❯ src/turn/nestedTools.test.ts:137:22
+    135|     } finally { release.resolve(); }
+    136|     const result = await pending;
+    137|     expect(admitted).toEqual(['first']);
+       |                      ^
+    138|     expect(entries).toEqual(['first', 'second']);
+    139|     expect(maximum).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > keeps mutable caller definitions isolated across catalog composition
+AssertionError: expected [Function] to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+[Function anonymous]
+
+ ❯ src/core/tools/codemode/composition.test.ts:115:40
+    113|     } catch (failure) { error = failure }
+    114|     expect(error).toBeUndefined()
+    115|     expect(original.nestedToolCatalog).toBeUndefined()
+       |                                        ^
+    116|     expect(first!.tools.get('codemode')).not.toBe(second!.tools.get('c…
+    117|     for (const [catalog, own, foreign, value] of [
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > keeps frozen caller definitions isolated across catalog composition
+AssertionError: expected TypeError: Cannot define property nestedT… to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+TypeError {
+  "message": "Cannot define property nestedToolCatalog, object is not extensible",
+}
+
+ ❯ src/core/tools/codemode/composition.test.ts:114:19
+    112|       second = await compose(fixtureTool('second_lookup', effectB))
+    113|     } catch (failure) { error = failure }
+    114|     expect(error).toBeUndefined()
+       |                   ^
+    115|     expect(original.nestedToolCatalog).toBeUndefined()
+    116|     expect(first!.tools.get('codemode')).not.toBe(second!.tools.get('c…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed | 1 passed (3)
+      Tests  3 failed | 54 passed (57)
+   Start at  22:48:15
+   Duration  9.86s (transform 3.24s, setup 0ms, collect 6.86s, tests 2.40s, environment 0ms, prepare 142ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/continuation-red.json
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/wang/projects/cheers/packages/ts-shell
+npm error workspace @cheers/ts-shell@0.1.0
+npm error location /home/wang/projects/cheers/packages/ts-shell
+npm error command failed
+npm error command sh -c vitest run src/core/tools/codemode/composition.test.ts src/core/tools/codemode/output.test.ts src/turn/nestedTools.test.ts --no-file-parallelism --maxWorkers=1 --reporter=default --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/codemode-validation/continuation-red.json

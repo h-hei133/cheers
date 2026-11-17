@@ -1,0 +1,15 @@
+npm notice run @cheers/ts-shell@0.1.0 test
+npm notice run vitest run src/core/tools/codemode/composition.test.ts src/core/tools/codemode/output.test.ts src/turn/nestedTools.test.ts --no-file-parallelism --maxWorkers=1 --reporter=default --reporter=json --outputFile=/home/wang/projects/cheers/.tmp/codemode-validation/continuation-repaired.json
+
+ RUN  v3.2.7 /home/wang/projects/cheers/packages/ts-shell
+
+ ✓ src/core/tools/codemode/composition.test.ts (20 tests) 1215ms
+ ✓ src/turn/nestedTools.test.ts (18 tests) 30ms
+ ✓ src/core/tools/codemode/output.test.ts (19 tests) 941ms
+
+ Test Files  3 passed (3)
+      Tests  57 passed (57)
+   Start at  22:49:42
+   Duration  8.62s (transform 3.12s, setup 0ms, collect 5.85s, tests 2.19s, environment 0ms, prepare 144ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/continuation-repaired.json

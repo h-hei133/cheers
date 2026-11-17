@@ -1,0 +1,88 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/core/tools/codemode/execution.test.ts (12 tests | 3 failed | 9 skipped) 109ms
+   × actual worker bridge admission > keeps bootstrap transport, registrars and limits out of the script global 47ms
+     → expected [ '__send' ] to deeply equal []
+   × actual worker bridge admission > follows the real script failure after a forged terminal attempt 32ms
+     → expected true to be false // Object.is equality
+   × actual worker bridge admission > cannot bypass host bounds with the bootstrap sender 28ms
+     → expected false to be true // Object.is equality
+   ↓ actual worker bridge admission > does not recognize an ordinary error string as a successful exit
+   ↓ actual worker bridge admission > keeps process and string code generation unavailable
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on return and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on throw and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on exit and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on timeout and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > retires a pending effect on parent cancellation and waits for the real boundary to settle
+   ↓ script-owned nested settlement through the actual gate > preserves actual completed effects when the script subsequently fails
+   ↓ script-owned nested settlement through the actual gate > retains a terminating completed result that arrives during script retirement
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 9 skipped (12)
+   Start at  23:22:16
+   Duration  1.89s (transform 937ms, setup 0ms, collect 1.55s, tests 109ms, environment 0ms, prepare 58ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-bootstrap-private.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/execution.test.ts > actual worker bridge admission > keeps bootstrap transport, registrars and limits out of the script global
+AssertionError: expected [ '__send' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "__send",
++ ]
+
+ ❯ src/core/tools/codemode/execution.test.ts:54:76
+     52|     ` }, context())
+     53|     expect(result.success).toBe(true)
+     54|     expect(JSON.parse(result.output!.replace(/^Script completed\s*/, '…
+       |                                                                            ^
+     55|   })
+     56| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/core/tools/codemode/execution.test.ts > actual worker bridge admission > follows the real script failure after a forged terminal attempt
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/core/tools/codemode/execution.test.ts:64:28
+     62|       throw new Error('actual-script-failure');
+     63|     ` }, context())
+     64|     expect(result.success).toBe(false)
+       |                            ^
+     65|     expect(output(result)).toContain('actual-script-failure')
+     66|     expect(output(result)).not.toContain('forged-success')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/core/tools/codemode/execution.test.ts > actual worker bridge admission > cannot bypass host bounds with the bootstrap sender
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/core/tools/codemode/execution.test.ts:74:28
+     72|       return 'bounded-control';
+     73|     ` }, context())
+     74|     expect(result.success).toBe(true)
+       |                            ^
+     75|     expect(output(result)).toBe('Script completed\n\nbounded-control')
+     76|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

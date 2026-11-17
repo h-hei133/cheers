@@ -2,7 +2,7 @@
 
 > **Task**: 核实研究规划，实施仍然成立的任务，并按实际生产路径验收。
 > **Started**: 2026-11-14
-> **Last Updated**: 2026-11-17
+> **Last Updated**: 2026-11-18
 > **Mode**: LOCAL_ONLY
 
 ## Scope and authority
@@ -18,15 +18,15 @@
 - [Task inventory](tasks.md)：唯一任务与验收清单。
 - [Design and evidence](design.md)：结构事实、参考决策、复用与实施顺序。
 - [Earlier repair evidence](../../wiki/references/runtime-upgrade-review-2026-11.md)：上一轮证据，不能替代本轮任务验收。
-- [Progress summary](summary.md)：当前已完成范围、实际验证及全部33项未完成功能任务和仓库门禁缺口。
+- [Progress summary](summary.md)：当前已完成范围、实际验证及全部32项未完成功能任务和仓库门禁缺口。
 
 ## Current status
 
-**Current phase**: in_progress；E.5／C.8完成当前Linux功能验收，29/62、33任务未完成，完整仓库NormProof仍not_proven。继续E.1／E.3实际codemode消费者，再执行全部剩余仍成立的规划，不缩小总体目标。
-**Last completed batch**: E.5原SDK共享host续绑／独立blocked revocation与C.8可变nested schema指纹。最终25文件355项、七静态门／2662生产模块0monoliths和build89344ffebd35通过，10源文件与两独立APPROVE匹配。UI三有效反转8AssertionErrors／恢复4文件29项及发现三反转／恢复2文件22项passed；当前npm15入口strict类型、async TS文件两模式、编译CLI签名安装／公开service共享worker两模式、配置模型8actual发现请求passed。2000 deferred有限目录410输入仍匹配，历史原生receipt保持旧代际；证据upgrade-ui-discovery-2026-11-17。
-**Current batch**: E.1／E.3只读核实确认已有nested普通权限／hook路径及TS／namespace／image／models API，不能再造重复功能。源码发现bootstrap bridge globals删除未生效、sample名称与raw工具名不一致，主线程接下来复现并分类；未执行反例、未修改该生产slice，不计完成。
-**Repository gate**: 当前normal pinned judge实际exit2／not_proven，unresolved-specifier obligation因完整图超16384边为missing；shadow enforcement didBlock=false／exitCode0不能取代CLI退出码。当前未做扩大graph诊断；cbd44218前批的基线16484／当前16511和临时32768诊断unresolved0仅为历史证据，不延伸到新源码。18tracked pinned文件不变，未修改scope、bundle、default gate或package scripts。测试interactiveMode.test.ts21-name既有advisory仍保留，生产0monoliths另列。
-**Goal**: active；33功能任务未完成，其中11部分、7已有待验收、13缺口、2待核实；另有仓库NormProof缺口。模型恢复a9099ca、history/cache1285ff4已本地提交；本批E.5／C.8交付中，无push或本轮远端CI。
+**Current phase**: in_progress；E.1当前Linux功能验收完成，E.3/D.4子批验证及限定独立复审通过。30/62功能任务已验收，32未完成；richer model dispatch和完整GFM继续部分，F2.2缓存publication进入实际反例修复。完整仓库NormProof仍not_proven。
+**Last completed batch**: E.1完整脚本组合与E.3/D.4子批修复33生产/12测试；当前50文件987项、七门/2678modules/0monoliths和build19af1f6dc3f2通过。原12script/7export反转保持当前相关source hash，新增两反转5AssertionErrors/exact恢复96项；配置模型6actual requests、七raw controls、npm15入口strict类型/实际读写及离线浏览器passed。限定独立FIXED/APPROVE已核对，按授权本地提交；E.5/C.8的cccc7208保持历史证据。
+**Current batch**: F2.2先运行冻结源码真实loopback反例：30项26红/4控制；storage/command追加19项全红。拟复用catalogStore/原锁及atomic writer、profile identity和configuration publication，capture原body/source/path/raw，在每次rename前复验，保留saved/unknown/unchanged。当前只完成反例，不计F2.2完成。
+**Repository gate**: 当前normal pinned judge实际exit2/not_proven，blocking unresolved obligation因完整图超过16384边为missing；shadow enforcement didBlock=false/exitCode0不能取代CLI。临时32768 collector诊断当前16661边/unresolved0、HEAD cccc7208基线16575边且原上限均失败；仅诊断，不作默认proof或容量资格。18tracked pinned文件不变，未改scope/bundle/gate/package scripts；interactiveMode.test.ts21-name既有advisory单列。
+**Goal**: active；32功能任务未完成，其中14部分、3已有待验收、13缺口、2待核实；另有仓库NormProof缺口。E.1已达到当前Linux功能验收；E.3及D.4完整范围仍开项，F2.2反例已证实。仅本地分批提交，未push或取得远端CI。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -41,7 +41,7 @@
 
 ## Adaptive control
 
-当前Linux功能验收任务数为29/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.8、C.9、E.5和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
+当前Linux功能验收任务数为30/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.8、C.9、E.5、E.1和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 
 恢复时已核对干净工作区与`560c0cc4`。T3.1 compact仅持有controller、不登记settlement，且只凭状态机拒绝重入；该缺口经源码核实仍成立。复用原commands owner登记完整压缩操作、保持忙时拒绝，覆盖prompt／command互斥和SDK dispose等待；不建立第二任务管理器。C.1完整路由由独立只读核实线检查，后续独立实施；已有证据不扩展为新构建的重新验收。
 
@@ -162,3 +162,5 @@ E.5本批实际L／额外依赖3（blocked publication独立撤权、原共享ho
 | 2026-11-15 | B2.1最终本地验收：同build `fbb35f5b6199`六门15/430、navigation3/status4/cell4/tmux2client×2host全passed，source/receipt身份核验，限定只读审计CLEAR。B2.1勾选、20/62，独立文档提交后继续C.1/T3.1；physical/provider/其他平台/push/CI均未证明，不关闭总目标。 |
 
 C.9／C.2联合子批遥测：实际L，复用检查10/10，沿用原stdout／shutdown／request／provider retry／RPC event owner，无新生产依赖或执行／存储平面。额外依赖4（stderr-only终端资格、同步exit结算、shutdown总预算取消、529决定跨层传递）；各复审缺口均有实际反例并已修。仓库graph容量缺口作为独立门禁证据问题保留，未补造统一历史drift基线。
+
+本批遥测：E.1实际L，E.3/D.4子批各L；原gate/worker/catalog/session source/renderer复用核对10/10，无新增依赖或执行平面。未预见依赖四项：caller-retained definition隔离、child allow/deny、未闭合math streaming回归、source pairing与media omission分开。新独立composition/export审查各确认一P2；三effect barrier/两nested style反例实际红后复用原owner修复，限定FIXED/APPROVE。当前50/987及build19af1f6dc3f2通过，E.1功能完成数增至30；旧build和503/provider_network失败run保持独立，F2.2按真实反例继续。

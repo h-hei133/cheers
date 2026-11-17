@@ -5,8 +5,10 @@
  */
 import { findCodeSpan } from "../text/codeSpan.js";
 
+export type TableAlignment = "left" | "center" | "right" | undefined;
+
 export function splitTableRow(line: string): string[] {
-  const inner = /^\s*\|(.+)\|\s*$/.exec(line)?.[1] ?? "";
+  const inner = line.trim();
   const cells: string[] = [];
   let current = "";
   let codeSpanClose = -1;
@@ -50,5 +52,20 @@ export function splitTableRow(line: string): string[] {
     current += character;
   }
   cells.push(current.trim());
+  if (inner.startsWith("|")) cells.shift();
+  // An escaped trailing pipe belongs to its cell, so a final empty cell is the
+  // evidence that the final pipe was an actual optional outer delimiter.
+  if (inner.endsWith("|") && cells.at(-1) === "") cells.pop();
   return cells;
+}
+
+/** A delimiter row must account for every header cell; alignment is source data. */
+export function tableAlignments(header: string, delimiter: string): readonly TableAlignment[] | undefined {
+  if (!header.includes("|") || !delimiter.includes("|")) return undefined;
+  const headings = splitTableRow(header);
+  const cells = splitTableRow(delimiter);
+  if (headings.length !== cells.length || cells.length === 0 || cells.some(cell => !/^:?-{3,}:?$/.test(cell))) return undefined;
+  return cells.map(cell => cell.startsWith(":")
+    ? cell.endsWith(":") ? "center" : "left"
+    : cell.endsWith(":") ? "right" : undefined);
 }

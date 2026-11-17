@@ -1,0 +1,292 @@
+npm notice run cheers@0.1.0 verify:import-cycles
+npm notice run node scripts/check-import-cycles.mjs
+scc-gate root=packages/ts-shell/src files=3384
+scc-gate runtime_cycles=0 type_only_cycles=0
+[pass] no-dependency-cycles - every module import resolves acyclically
+npm notice run cheers@0.1.0 check:config-consumers
+npm notice run node scripts/check-config-consumers.mjs
+config-consumer-check fields=66 read=66 declared_without_reader=0 findings=0
+[pass] config-consumers - every declared field has a production reader or a recorded reason
+npm notice run cheers@0.1.0 check:declarations
+npm notice run node scripts/check-declarations.mjs
+declaration-check hook_events=18 dispatched=18 tool_factories=15 registered=15 findings=0
+[pass] declarations - every hook event dispatches and every tool factory is registered or recorded
+npm notice run cheers@0.1.0 check:node-floor
+npm notice run node scripts/check-node-floor.mjs
+[pass] node-floor - no use of a runtime API newer than the declared >=20.3.0
+npm notice run cheers@0.1.0 verify:docs-drift:strict
+npm notice run node scripts/verify-docs-and-rules-drift.mjs --strict
+drift-check rules_files=11 rules_refs=86 rules_dangling=0 rules_source_dangling=0
+drift-check docs_files=24 docs_refs=456 docs_dangling=0 docs_source_dangling=119
+[pass] rules-drift - every binding rule reference resolves
+[advisory] docs-source-drift - 119 unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on
+npm notice run cheers@0.1.0 check:lint
+npm notice run biome lint --error-on-warnings --max-diagnostics=30
+Checked 3529 files in 602ms. No fixes applied.
+npm notice run cheers@0.1.0 test:scripts
+npm notice run node --test --test-concurrency=1 scripts/*.test.mjs
+✔ defaults to warm cache and rejects unknown controls (1.516333ms)
+✔ allows global cold control only on Linux (0.109854ms)
+✔ warm control prepares without running commands (0.575177ms)
+✔ global cold control syncs then drops caches without a password prompt (0.181847ms)
+✔ global cold control fails closed on command errors (0.94332ms)
+✔ cache evidence rejects missing or mislabeled preparations (0.46896ms)
+✔ early frame requires the real Loading editor and keeps readiness separate (1.152498ms)
+✔ line and pipe retain their own surfaces without inventing an interactive frame (0.158885ms)
+✔ startup output acquisition is bounded (2.914107ms)
+✔ process timing distinguishes early input and write from runtime adoption and write (0.708614ms)
+✔ missing, duplicated, invalid or out-of-order startup evidence is rejected (0.93791ms)
+✔ key measurement ignores unrelated output and waits for complete UTF-8 input (0.470813ms)
+✔ key measurement fails on timeout and releases listeners (10.79583ms)
+✔ key measurement fails when output closes or the input write fails (0.683288ms)
+✔ process settlement waits for stream close, including a signal exit (1.332773ms)
+✔ launch errors are retained until close and remain observable (0.268698ms)
+✔ an observation timeout does not settle or relaunch the live process (5.807245ms)
+✔ cleanup forwards termination and waits for actual close (0.963558ms)
+✔ hard timeout cannot look successful even if the wrapper closes with zero (5.086287ms)
+✔ Linux PTY termination closes the wrapper and its actual target (2043.602473ms)
+✔ Linux target observation distinguishes a zombie from a running process (2058.968414ms)
+✔ bundled public entries share live bindings and lazy owners in a deployed graph (30.998752ms)
+✔ public aggregation preserves side effects of an entry with no runtime exports (13.523006ms)
+✔ missing, ambiguous and unsafe public sources refuse bundling before staging changes (5.393658ms)
+✔ a module whose exported function nothing calls is reported (43.247736ms)
+✔ an import is not a call (39.990397ms)
+✔ a call through an object literal counts, so the module is not reported (38.384521ms)
+✔ a module that registers itself on import is not reported (40.874061ms)
+✔ an entry point is exempt, because the process calls it (40.305491ms)
+✔ a name mentioned only inside a comment does not count as a call (37.441277ms)
+✔ a name inside a string literal does not count as a call (40.809246ms)
+✔ a call to a three-letter name counts, so it is not reported (37.49159ms)
+✔ a call from a .tsx file counts, so the callee is not reported (39.513898ms)
+✔ the gate passes on a tree where everything is called (34.867297ms)
+✔ an exported singleton counts as a use of the class it instantiates (44.564998ms)
+✔ a tree with no source files cannot pass (34.649932ms)
+✔ a spread call counts, so the callee is not reported (36.491331ms)
+✔ passes when every declared field has a production reader (39.298859ms)
+✔ reports a field that is declared, defaulted and merged but never read (36.365967ms)
+✔ reports a field read only by a test as having no production reader (42.326771ms)
+✔ counts a field read from another production module as consumed (34.065675ms)
+✔ does not count a member access as reading the config field of the same name (35.260341ms)
+✔ fails loudly when a required interface cannot be found (35.314851ms)
+✔ fails loudly when an interface declares no readonly fields (31.106623ms)
+✔ fails loudly when the config module is absent (34.414917ms)
+✔ passes when every event dispatches and every factory is registered (42.222599ms)
+✔ reports a hook event that nothing dispatches (37.763054ms)
+✔ reports a tool factory the registry never calls (36.820545ms)
+✔ an exempted factory name is reported as recorded, not as a finding (39.946245ms)
+✔ does not count the declaration module itself as a dispatch site (34.652622ms)
+✔ counts a dispatch from any production module (39.031387ms)
+✔ fails loudly when the hook union is not found (35.329379ms)
+✔ fails loudly when the union parses to fewer members than the floor (41.187769ms)
+✔ fails loudly when no tool factory is found (34.064672ms)
+✔ fails loudly when the source tree is missing (31.480567ms)
+✔ passes when nothing newer than the declared floor is used (38.145915ms)
+✔ reports the API that actually reached the tree (32.797857ms)
+✔ reports the line the call is on, not the line after a collapsed comment (33.924558ms)
+✔ finds a use written after a string containing two slashes (34.588639ms)
+✔ does not report an API named only in a comment (34.28201ms)
+✔ passes when the declared floor is new enough (30.74838ms)
+✔ fails loudly when the floor cannot be read (33.721881ms)
+✔ fails loudly when the tree holds no source (35.893662ms)
+✔ ignores test files, which may name an API while asserting about it (31.505143ms)
+✔ split documents join defaults and leave all user state unchanged (1014.974324ms)
+✔ auth-only, settings-only and legacy sources use runtime fallback without migration (2736.424221ms)
+✔ absent documents and missing HOME never create user directories (1797.398592ms)
+✔ named profile isolates default/legacy credentials and refuses missing or linked profiles (2673.589767ms)
+✔ malformed, invalid and unreadable documents refuse with value-free diagnostics (3503.736499ms)
+✔ environment priority, pending connection and closed pool use the credential owner (3585.778723ms)
+✔ explicit empty model owner prevents legacy defaults from reviving (884.68112ms)
+✔ readiness preflight accepts split defaults and reports invalid sources without secrets (1867.479134ms)
+✔ doctor accepts auth-only documents while keeping authentication unverified (6071.570026ms)
+✔ daily and broader select explicit auth-only HOME and read its joined active connection (3529.834908ms)
+✔ baseline uses split model and exact authorization, drains stream and reports no body (995.167578ms)
+✔ mismatched baseline and pending connection never dispatch requests (2671.129933ms)
+✔ HTTP refusal and redirects never report response bodies or forward credentials (1868.942647ms)
+✔ a stream that breaks after its first chunk remains inconclusive (1015.649534ms)
+✔ stable links work but same-byte auth retarget during response refuses publication (1861.470989ms)
+✔ settings and catalogue changes during the baseline refuse stale success (1885.495585ms)
+✔ the installed runner executes isolated assertions serially and emits the admitted JSON report (516.394434ms)
+✔ a SIGINT interruption stops the owned runner and restores process listeners (89.144485ms)
+✔ a SIGTERM interruption stops the owned runner and restores process listeners (66.033063ms)
+✔ a timed out runner settles and preserves cleanup truth for owned descendants (1510.510824ms)
+✔ a timed out runner settles and preserves cleanup truth for escaped descendants (4550.451087ms)
+✔ the configured lint gate rejects duplicate object keys and accepts an ordinary module (163.035746ms)
+{"archiveSha256":"6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985","patchSha256":"3cb6617066340386b1658b62c4a0fc8fbbbc21d403cc3d278f8886a077b6e833","members":{"package/dist/adapters/sidecar-file/module-graph.js":"d55723ea4aa21ae24264ad724e07d734b64326b01771a226a30524bce4e64faa","package/dist/engine/proof/expression/evaluate.js":"8c723a91502b9e164c1da7881639aebd1be046d2be7a509e31a776c2d3adb988"},"parserVersion":"5.9.3","packageNodeEngine":">=24","node":"v24.15.0","writeArtifactSha256":"817aaa8838df536212907ca56ece9360385b9bda8f8ff87383d1c8fd6f46580d","writeProvenance":{"package":"normproof","commit":"a6ff094ac14049843b6c471eabd2aaa4a55ac8fb","entry":"src/adapters/write-gate/hook.ts","bundler":"esbuild@0.27.7","inputs":{"src/adapters/sidecar-file/module-graph.ts":"9bc4ce90144c797805610183c8a8aa87c4fe64562b18d6c4d47b616b5b7aab61","src/adapters/write-gate/facts.ts":"caeeafc3fa4b41da6dfd5b66c9b96750b8abff0ec22e2b81336c61f396d9d5da","src/adapters/write-gate/hook.ts":"d2f64bb6c0f557b0b09b7c97ada8866dc02f9bff623f478fce3d02fd00190583","src/contracts/base/workspace-config.ts":"f7f7b432e6de79b121022adbf96e5d49bb5370603c68c18387b33803fc6819b8","src/contracts/hooks/write-gate-contracts.ts":"f8d4feaa231be302826d5a0b4509bb91c229b11ada9263c4fa57df62f0e15826","src/contracts/hooks/write-rule-contracts.ts":"25b0c65c6be986237bbaa25ea11036502a553152b1f8a11eb986016430b55d9a","src/runtime/run-records/record-paths.ts":"a6d31c5701a79956e7b691267bf97915a49c9072b02d104cebd1c7500074e0b0","src/runtime/write-gate/decision.ts":"2c0ed08de763d50193cb76ed9dead03fdc816fa1e3f78bdfbf215b15d2d2b7dc","src/utils/canonical-json.ts":"decb8f9e1eb2e38af400a8f19bbd77b7514c7f8ef4a3b3e72904a610f9c739e2","src/utils/deep-freeze.ts":"436710b90b3f4329a70055cfe349dfea0e0f338db9b18c3c13a0a3a18a0ab6ef","src/utils/glob-pattern.ts":"4cb4acf85eabf7f0c7a7e2ad67eb80bcda8e883806e11b3a64f9a789c21a49f8"}},"hunks":6}
+{"ceiling":16384,"overflow":{"failure":"oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete"},"evaluator":{"satisfied":false,"consultedEvidenceIds":["graph"],"reason":"evidence graph could not be read: oversized: module graph exceeds the 16384 edge ceiling; collection is incomplete"}}
+✔ artifact: actual archive still carries all six pinned hunks; stale bytes and runtime are refused (1.208923ms)
+✔ paths: explicit .js only TS/TSX; explicit .ts/.tsx only themselves; extensionless and self edges survive (4.608941ms)
+✔ ast/comment: AST declarations, escapes, literal dynamics, TSX and whole-collection syntax refusal (5.776257ms)
+✔ capacity: 16384 edges admitted by collector and evaluator, next edge oversized without partial evidence (146.128815ms)
+{"paths":{"id":"graph","path":"packages/**/*.ts*","present":false,"byteSize":0,"contentLoaded":false,"error":"oversized: module set exceeds the 4096 path ceiling; narrow the pattern"},"sourceFileBytes":1048577,"shadow":{"underlyingExitCode":2,"hostExitCode":0,"proofVerdict":"not_proven"}}
+{"exitCode":0,"verdict":"partial","advisoryVisible":true,"failedOnlySectionIncludesAdvisory":false}
+{"surface":"pinned Stop","output":null,"capability":"unsupported R0a envelope"}
+{"surface":"pinned Stop","output":"{\"decision\":\"block\",\"reason\":\"NormProof completion gate: blocking obligations are still open.\\n\\n- source_graph_has_no_unresolved_specifiers: Every module import resolves within the declared source graph\\n  status: failed\\n  why: Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: packages/entry.ts -> ./missing.js\\n\\nClose these obligations, then finish. If one cannot be closed, say so and stop rather than working around the gate.\"}","capability":"unsupported R0a envelope"}
+{"fixture":"compliant","evidenceTier":"captured-R0a-output-current-host-parser","output":{"decision":"allow","reasonCode":"proven","proofVerdict":"proven","evidenceIdentity":["run_metadata","source_module_functions","source_module_graph","task","task_manifest"],"reason":"Every blocking obligation holds."}}
+{"fixture":"violating","evidenceTier":"captured-R0a-output-current-host-parser","output":{"decision":"block","reasonCode":"actionable_gap","proofVerdict":"failed","evidenceIdentity":["run_metadata","source_module_functions","source_module_graph","task","task_manifest"],"reason":"NormProof completion gate: blocking obligations are still open.\n\n- source_graph_has_no_unresolved_specifiers: Every module import resolves within the declared source graph\n  status: failed\n  why: Obligation source_graph_has_no_unresolved_specifiers does not hold: 1 member(s) of source_module_graph match unresolved: */** but must not: unresolved: src/module.ts -> ./missing.js\n\nClose these obligations, then finish. If one cannot be closed, say so and stop rather than working around the gate."}}
+{"fixture":"not-configured","evidenceTier":"captured-R0a-output-current-host-parser","output":{"decision":"allow","stopDisposition":"completed_unproven","reasonCode":"not_configured","proofVerdict":"not_reported","evidenceIdentity":["unspecified"]}}
+{"fixture":"reentry","evidenceTier":"captured-R0a-output-current-host-parser","output":{"decision":"allow","stopDisposition":"completed_unproven","reasonCode":"already_blocked_once","proofVerdict":"not_reported","evidenceIdentity":["run_metadata","source_module_functions","source_module_graph","task","task_manifest"]}}
+�   ��o"type"test:enqueue"datao"nestingI "name"XR0a captured command envelopes reach the real Cheers parser without changing proof truth"type"test"lineI"columnI�"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:dequeue"datao"nestingI "name"XR0a captured command envelopes reach the real Cheers parser without changing proof truth"type"test"lineI"columnI�"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:enqueue"datao"nestingI "name"Jmissing, malformed and incompatible Stop envelopes cannot synthesize proof"type"test"lineI"columnI�"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�  (�o"type"test:complete"datao"name"XR0a captured command envelopes reach the real Cheers parser without changing proof truth"nestingI "
+testNumberI"detailso"duration_msN�H��@"type"test"passedT{"lineI"columnI�"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"
+test:start"datao"nestingI "name"XR0a captured command envelopes reach the real Cheers parser without changing proof truth"lineI"columnI�"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�  �o"type"	test:pass"datao"name"XR0a captured command envelopes reach the real Cheers parser without changing proof truth"nestingI "
+testNumberI"detailso"duration_msN�H��@"type"test{"lineI"columnI�"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:dequeue"datao"nestingI "name"Jmissing, malformed and incompatible Stop envelopes cannot synthesize proof"type"test"lineI"columnI�"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�  �o"type"test:complete"datao"name"Jmissing, malformed and incompatible Stop envelopes cannot synthesize proof"nestingI "
+testNumberI"detailso"duration_msNT�<��?"type"test"passedT{"lineI"columnI�"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"
+test:start"datao"nestingI "name"Jmissing, malformed and incompatible Stop envelopes cannot synthesize proof"lineI"columnI�"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�  �o"type"	test:pass"datao"name"Jmissing, malformed and incompatible Stop envelopes cannot synthesize proof"nestingI "
+testNumberI"detailso"duration_msNT�<��?"type"test{"lineI"columnI�"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"	test:plan"datao"nestingI "countI"lineI"columnI"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:diagnostic"datao"nestingI "message"tests 2"level"info"lineI"columnI"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:diagnostic"datao"nestingI "message"suites 0"level"info"lineI"columnI"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:diagnostic"datao"nestingI "message"pass 2"level"info"lineI"columnI"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:diagnostic"datao"nestingI "message"fail 0"level"info"lineI"columnI"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:diagnostic"datao"nestingI "message"cancelled 0"level"info"lineI"columnI"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:diagnostic"datao"nestingI "message"	skipped 0"level"info"lineI"columnI"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:diagnostic"datao"nestingI "message"todo 0"level"info"lineI"columnI"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:diagnostic"datao"nestingI "message"duration_ms 12.216596"level"info"lineI"columnI"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{�   ��o"type"test:summary"datao"successT"countso"testsI"failedI "passedI"	cancelledI "skippedI "todoI "topLevelI"suitesI {"duration_msN�����n(@"file":/home/wang/projects/cheers/scripts/normproof/host.test.mts{{
+{"protocolVersion":"2025-11-25","output":{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found: initialize"}},"capability":"unsupported"}
+{"protocolVersion":"2026-07-28","output":{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found: initialize"}},"capability":"unsupported"}
+{"protocolVersion":"unknown-version","output":{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found: initialize"}},"capability":"unsupported"}
+{"mode":"shadow","canBlock":false,"underlyingExitCode":2,"hostExitCode":0,"proofVerdict":"failed"}
+✔ capacity: 4096 paths admitted, 4097 refused; 1 MiB enforced by shadow manifest and native verdict is not_proven (3554.718659ms)
+✔ report: native advisory cycle/name ceiling remain visible with partial verdict and exit 0 (287.033697ms)
+✔ hooks: pinned write allow/block JSON; legacy Stop silence and block lack R0a envelope (657.117432ms)
+✔ hooks: current host consumes captured R0a envelopes; fixture producer is not the pinned release (241.989382ms)
+✔ MCP initialize: old pinned server returns explicit unsupported for known and unknown versions (733.541843ms)
+✔ shadow: a real blocking failure remains failed while observation exits 0; blocking command is unavailable (508.991001ms)
+✔ the installed archive and adapted entries match the reproducible artifact (9.505998ms)
+✔ a graph above the old capacity reaches the real evaluator and late missing imports remain visible (68.487279ms)
+✔ the declared capacity is accepted exactly and one additional edge fails without a partial graph (101.166502ms)
+✔ wide imports, literal dynamic imports and TSX paths cannot disappear or resolve to a different explicit file (3.08814ms)
+✖ the complete repository declaration graph matches TypeScript and remains acyclic (5781.959025ms)
+✔ the unchanged blocking obligation rejects a native CLI workspace with a missing TSX import (306.652182ms)
+✔ ASI declarations cannot hide a missing side-effect import from the native blocking obligation (271.583686ms)
+✔ a native self import remains a cycle under the unchanged advisory obligation (260.964282ms)
+✔ literal syntax and file grammar retain targets, while parse errors discard the entire collection (2.733733ms)
+✔ bounded large ASI export input cannot cause quadratic clause scanning (455.073157ms)
+✔ the Phase 20 audit covers every declared task ID exactly once (1.945439ms)
+✔ a missing or extra task ID fails the audit (1.227217ms)
+✔ complete rows cannot retain missing evidence and partial rows cannot hide it (0.332477ms)
+✔ the current matrix does not claim Phase 20 completion (0.623216ms)
+✔ waits for the complete copy result and targets the relocated painted diff (1.909683ms)
+✔ handles native success without changing source geometry (0.456608ms)
+✔ refuses a source row that was erased or only partially painted (4.801478ms)
+✔ waits for the initial source row to finish painting across output chunks (0.45261ms)
+✔ still rejects wrong-side source even when both copy operations emit OSC52 (0.531376ms)
+✔ waits when another source row repaint is incomplete after the copy result (0.386607ms)
+✔ isolates the packaged PTY probe from real homes, credentials and Git config (4.445359ms)
+✔ relays terminal input and output without a parent TTY (62.854978ms)
+✔ the run manifest binds every evidence class and rejects later changes (11.914977ms)
+✔ ratings extend the manifest without blessing changed or extra evidence (10.617529ms)
+✔ the run manifest decoder rejects unsafe, duplicate and unsorted entries (0.434937ms)
+✔ the shipped quality corpus is bounded and includes a blind-human task (3.671883ms)
+✔ the formal corpus covers every preregistered category and language-neutral task shape (2.226491ms)
+✔ a qualifying corpus cannot silently drop a required category (0.556703ms)
+✔ the tokenizer corpus requires all four language strata (1.141647ms)
+✔ a corpus cannot self-promote or omit its qualification state (0.322438ms)
+✔ a deterministic task cannot pass without an observable check (0.23173ms)
+✔ a corpus cannot override harness-owned provider, config or session arguments (0.446979ms)
+✔ quality event parsing rejects prose and non-monotonic order (0.348006ms)
+✔ run projection keeps tool, discovery, final-text and usage facts separate (0.618417ms)
+✔ run projection measures turns, approvals, argument failures, cache and priced cost (0.375276ms)
+✔ run projection falls back to the terminal result when turn content is empty (0.223765ms)
+✔ deterministic scoring reads final files and never treats a blind rubric as a pass (0.405442ms)
+✔ deterministic scoring distinguishes attempted, successful, denied and absent-file facts (0.15597ms)
+✔ blind ratings require two independent values and adjudicate disagreement (0.362362ms)
+✔ blind ratings update only subjective outcomes and preserve execution facts (0.223515ms)
+✔ raw evidence hashes model text instead of persisting the response body (0.616153ms)
+✔ blind review text is redacted before it can be written as an artifact (0.786299ms)
+✔ paired risk difference is deterministic and retains discordant counts (8.809054ms)
+✔ tokenizer error is reported by language without promoting missing strata (2.10156ms)
+✔ report status remains inconclusive or partial when evidence is missing (3.592045ms)
+✔ complete requires a qualifying corpus, measured runtime, ratings and policy evidence (190.733253ms)
+✔ a policy violation prevents a complete quality verdict (0.956815ms)
+✔ restore acceptance compares exact workspace, record and blob bytes (10.131464ms)
+✔ session acceptance requires persisted successful results for every tool call (4.867251ms)
+✔ uses Linux script options for a real terminal (0.965421ms)
+✔ uses the Python PTY relay on macOS (0.143517ms)
+✔ refuses terminal modes on Windows instead of faking a PTY (0.270202ms)
+✔ preserves Node execution options when launching the verified child (1.305232ms)
+✔ does not inherit the launcher inspector in a real child process (33.778899ms)
+✔ applies launcher Node execution options in a real child process (32.354806ms)
+✔ accepts a complete immutable build and returns its contained entry (43.271625ms)
+✔ binds a single-file executable to the published build and rejects tampering (35.980848ms)
+✔ restricts executable output to a file directly inside dist/bin (0.952267ms)
+✔ keeps the executable suffix Bun requires for a Windows compile target (0.213546ms)
+✔ recognizes both host target spellings and keeps other targets cross-target (0.094666ms)
+✔ names immutable Windows executables with the .exe suffix (49.590374ms)
+✔ restores the previous manifest when executable verification fails (28.282751ms)
+✔ refuses to bind an executable without compiler provenance (19.920721ms)
+✔ refuses to attach an executable after build inputs change (20.549757ms)
+✔ rejects an empty executable and keeps the previous manifest (22.305846ms)
+✔ does not claim a cross-target executable was host-verified (28.995703ms)
+✔ rejects host verification recorded for a different target (22.005654ms)
+✔ rejects host verification recorded for a different build version (27.973992ms)
+✔ publishes a complete build through the transaction (24.371489ms)
+✔ binds enumerated compiler inputs outside known type roots (45.889568ms)
+✔ rejects missing, outdated and version-mismatched manifests (18.905192ms)
+✔ rejects a missing immutable build directory (18.327294ms)
+✔ rejects a manifest that omits required runtime assets (18.537353ms)
+✔ rejects changed build inputs before executing an old artifact (18.917408ms)
+✔ binds compiler libraries and the build mode (56.834039ms)
+✔ rejects input changes between compilation and publication (22.699235ms)
+✔ rejects changed or extra emitted bytes (39.19445ms)
+✔ rejects missing emitted assets and changed launcher bytes (60.650861ms)
+✔ rejects symlinked build inputs and emitted artifacts (39.584193ms)
+✔ rejects an ancestor symlink around the immutable build set (19.393783ms)
+✔ rejects entries outside or unlisted by the immutable build (36.344693ms)
+✔ rejects malformed artifact metadata without throwing (17.73765ms)
+✔ refuses to overwrite an existing build with different bytes (24.429977ms)
+✔ does not publish when a required final artifact is missing (15.051968ms)
+✔ restores the previous launcher when compilation or publication fails (17.290484ms)
+✔ rolls back the package main pointer when manifest publication fails (31.813531ms)
+✔ recovers a publish journal before a new publication (21.703388ms)
+✔ does not recover a transaction while its build lock is active (19.291102ms)
+✔ publishes native subpath imports with shared identity, default and live bindings (69.350832ms)
+✔ recovers every public file, original mode and prior absence from the journal (22.264719ms)
+✔ rejects a forged recovery path before changing any public file (19.966355ms)
+✔ packing includes only the selected generation and declared public files (332.990334ms)
+✔ fails closed on a stale build lock without changing the transaction (18.956631ms)
+✔ holds the build lock before recovering a transaction (18.044709ms)
+✔ preserves the TypeScript compiler exit code (29.555387ms)
+✔ does not remove a lock owned by another build (10.889714ms)
+✔ fails publication without removing a lock replaced during compilation (17.978098ms)
+✔ repairs a launcher with the correct bytes and wrong mode (11.134643ms)
+[pass] test-valid
+[product-regression] test-failed - apply_patch reported a failed or compensated result
+{"schemaVersion":"run-event-stream.v1","eventType":"approval.resolved","order":8,"facts":{"toolName":"apply_patch","taskId":"call-1","outcome":"approved"},"toolCallId":"call-1","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"tool.result","order":10,"facts":{"toolName":"apply_patch","taskId":"call-1","success":false,"output":"committed","metadata":{"files":[{"compensation":"none"}]}},"toolCallId":"call-1","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"query.completed","order":11,"facts":{"result":{"status":"completed"}},"truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+[product-regression] test-order - apply_patch approval/result ordering or correlation is invalid
+{"schemaVersion":"run-event-stream.v1","eventType":"approval.resolved","order":12,"facts":{"toolName":"apply_patch","taskId":"call-1","outcome":"approved"},"toolCallId":"call-1","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"tool.result","order":10,"facts":{"toolName":"apply_patch","taskId":"call-1","success":true,"output":"committed","metadata":{"files":[{"compensation":"none"}]}},"toolCallId":"call-1","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"query.completed","order":11,"facts":{"result":{"status":"completed"}},"truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+[product-regression] test-correlation - apply_patch approval/result ordering or correlation is invalid
+{"schemaVersion":"run-event-stream.v1","eventType":"approval.resolved","order":8,"facts":{"toolName":"apply_patch","taskId":"call-1","outcome":"approved"},"toolCallId":"call-other","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"tool.result","order":10,"facts":{"toolName":"apply_patch","taskId":"call-1","success":true,"output":"committed","metadata":{"files":[{"compensation":"none"}]}},"toolCallId":"call-1","truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+{"schemaVersion":"run-event-stream.v1","eventType":"query.completed","order":11,"facts":{"result":{"status":"completed"}},"truthfulness":{"observationOnly":true,"terminalSuccessClaim":false}}
+✔ accepts a correlated successful approval and tool result (1.1695ms)
+✔ rejects a tool result that reports failure (0.234335ms)
+✔ rejects approval ordering after the tool result (0.25345ms)
+✔ rejects approval and result call-id mismatch (1.017638ms)
+✔ routing requires current suites and executed critical scenarios (4.577403ms)
+✔ local execution requires current suites and executed critical scenarios (1.469886ms)
+✔ error taxonomy requires current suites and executed critical scenarios (0.704577ms)
+✔ error taxonomy pins both report-safety variants (0.11901ms)
+✔ accepts a report only with executed passing contract assertions (1.004434ms)
+✔ rejects skipped, pending, todo and failed assertions despite runner success (0.297943ms)
+✔ rejects runner or suite failure and malformed reports (0.232662ms)
+✔ rejects a missing required scenario even when its suite has other passing assertions (0.250745ms)
+✔ requires every declared variant of a parameterized contract scenario (0.205502ms)
+✔ classifies contract failures without collapsing product and setup states (1.185129ms)
+✔ release orchestration preserves every gate exit classification (0.227181ms)
+✔ successful gate cleanup reports an uncertain retained artifact (0.132686ms)
+ℹ tests 210
+ℹ suites 0
+ℹ pass 209
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 68036.151741
+
+✖ failing tests:
+
+test at scripts/normproof.test.mjs:79:1
+✖ the complete repository declaration graph matches TypeScript and remains acyclic (5781.959025ms)
+  TypeError: Cannot read properties of undefined (reading 'length')
+      at TestContext.<anonymous> (file:///home/wang/projects/cheers/scripts/normproof.test.mjs:98:29)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)

@@ -65,7 +65,7 @@ function reopenStyles(text: string, prefix: string, openings: ReadonlyMap<number
 }
 
 /** Open in order, close in reverse order, and preserve nesting of each property. */
-function applyStyles(text: string, layers: readonly StyleLayer[]): string {
+export function applyStyles(text: string, layers: readonly StyleLayer[]): string {
   let prefix = "";
   let suffix = "";
   const openings = new Map<number, string>();

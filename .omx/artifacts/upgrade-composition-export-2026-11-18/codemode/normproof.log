@@ -1,0 +1,51 @@
+npm warn exec The following package was not found and will be installed: file:.normproof/normproof-0.1.0.tgz
+npm notice run cheers@0.1.0 npx
+npm notice run 'normproof' judge
+[2026-11-17T15:47:54.729Z] [check-run] [INFO] Harness Check Event Trace
+[2026-11-17T15:47:54.737Z] [check-run] [INFO] Check-run evaluation completed with status: not_proven
+{
+  "contract": {
+    "name": "normproof.sidecar.check-run",
+    "version": "0.22.0",
+    "compatibility": {
+      "hostNeutral": true,
+      "piShadowInternalsRequired": false,
+      "rawEvidenceContentRequired": false
+    }
+  },
+  "verdictStatus": "not_proven",
+  "artifactPaths": {
+    "verdict": "verdict.json",
+    "ledger": "ledger.json",
+    "enforcement": "enforcement.json",
+    "openObligationsSummary": "open-obligations-summary.json",
+    "report": "report.md",
+    "runTrace": "evidence/run-trace.jsonl",
+    "contextBundle": "context-bundle.json",
+    "normReviewResult": "norm-review-result.json",
+    "feedbackToNormProposal": "feedback-to-norm-proposal.json",
+    "sidecarResult": "sidecar-result.json"
+  },
+  "contextCostTelemetry": {
+    "taskTextBytes": 59,
+    "evidencePointerCount": 2,
+    "evidencePointerMetadataBytes": 311,
+    "declaredEvidenceContentBytes": 809407,
+    "presentEvidenceCount": 1,
+    "missingEvidenceCount": 1,
+    "openObligationCount": 2,
+    "failedObligationCount": 1,
+    "proofGapCount": 5,
+    "reportArtifactBytes": 5034,
+    "ledgerArtifactBytes": 12426,
+    "contextBundleArtifactBytes": 0,
+    "fullContextEstimatedBytes": 827749,
+    "minimalContextEstimatedBytes": 768,
+    "omittedEstimatedBytes": 826981
+  },
+  "hostClaim": {
+    "completionClaimed": false,
+    "acceptedAsProof": false
+  },
+  "errors": []
+}

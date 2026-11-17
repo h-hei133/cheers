@@ -1,0 +1,65 @@
+
+ RUN  v3.2.7 /home/wang/projects/cheers/.tmp/codemode-validation/reversal-tree/packages/ts-shell
+
+ ❯ src/core/tools/codemode/composition.test.ts (22 tests | 2 failed | 20 skipped) 152ms
+   ↓ the composed catalog consumed by the actual codemode worker > keeps mutable caller definitions isolated across catalog composition
+   ↓ the composed catalog consumed by the actual codemode worker > keeps frozen caller definitions isolated across catalog composition
+   ↓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the adapted consumer
+   ↓ the composed catalog consumed by the actual codemode worker > discovers and calls feature and session tools through the direct consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'adapted' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'allowlist' effective for nested discovery and calls through the 'direct' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'adapted' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'disabled tools' effective for nested discovery and calls through the 'direct' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'adapted' consumer
+   ↓ the composed catalog consumed by the actual codemode worker > keeps 'hidden prefixes' effective for nested discovery and calls through the 'direct' consumer
+   × the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer 100ms
+     → Script failed
+
+Script error: TypeError: Unknown tool: tools.session_deferred.: expected false to be true // Object.is equality
+   × the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the direct consumer 51ms
+     → Script failed
+
+Script error: TypeError: Unknown tool: tools.session_deferred.: expected false to be true // Object.is equality
+   ↓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'removal' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'unchanged control' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'unrelated change control' with deferred=false before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'schema mutation' with deferred=true before the captured effect
+   ↓ captured nested contracts in the real composed gate > settles 'definition replacement' with deferred=true before the captured effect
+   ↓ persists one filtered parent result after two real builtin reads in runTurn
+   ↓ keeps the declared allowlist effective in an actual child script
+   ↓ keeps the declared denylist effective in an actual child script
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 20 skipped (22)
+   Start at  23:22:29
+   Duration  5.62s (transform 3.18s, setup 0ms, collect 5.22s, tests 152ms, environment 0ms, prepare 50ms)
+
+JSON report written to /home/wang/projects/cheers/.tmp/codemode-validation/reversal-deferred-catalog.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the adapted consumer
+ FAIL  src/core/tools/codemode/composition.test.ts > the composed catalog consumed by the actual codemode worker > calls an admitted deferred tool without loading its outer schema through the direct consumer
+AssertionError: Script failed
+
+Script error: TypeError: Unknown tool: tools.session_deferred.: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ scriptJson src/core/tools/codemode/composition.test.ts:88:57
+     86| 
+     87| function scriptJson<T>(result: ToolExecutionResult): T {
+     88|   expect(result.success, result.error ?? result.output).toBe(true)
+       |                                                         ^
+     89|   expect(result.output).toMatch(/^Script completed\s/)
+     90|   return JSON.parse(result.output!.replace(/^Script completed\s*/, '')…
+ ❯ src/core/tools/codemode/composition.test.ts:249:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+

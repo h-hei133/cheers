@@ -1,0 +1,553 @@
+import type { ImageContent } from "../model-adapters/multimodal.js";
+import { messageToText } from "../model-adapters/multimodal.js";
+import { AgentCore } from "../core/agent/agent.js";
+import { inputQueueControl } from '../core/agent/queue.js';
+import type { AgentLifecycleEvent } from "../core/agent/events.js";
+import type { AgentMessage } from "../core/agent/state.js";
+import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
+import type { SessionMessage } from "../session/schema/sessionMessage.js";
+import type { AgentLoopConfig } from "../core/agent/loop.js";
+import { captureContext, lastContextMessageIndex, sameContext, type RequestContextOwner } from '../core/agent/context.js';
+import type { PreparedTurnContext } from './context/contract.js';
+import {
+  condenseContext,
+} from "../session/compaction.js";
+import { turnCompaction, type CompactionSetup } from './compaction.js';
+export type { CompactionSetup } from './compaction.js';
+import { openingMessage } from './opening.js';
+import { buildCompactionLifecycle } from "../core/shell/compaction.js";
+import { concludeRun, TurnProjection } from "./projection.js";
+import { EventChannel } from "./stream.js";
+import { createTurnRequest, requestPurposeFor } from "./request.js";
+import { isOverflowFailure, type StepFunction } from "./step.js";
+import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
+import { ModelAdmissionError } from '../core/agent/request/model.js';
+import { createSubagentRunner } from "./subagent.js";
+import type { DenyRule } from "../core/shell/approval/deny.js";
+import type { CacheWarmingRunner } from "./cacheWarm.js";
+import type { ToolDefinition } from "../tools/types.js";
+import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
+import { StopLifecycle } from './stop.js';
+import { runSessionTrace } from '../observability/tracing/runtime.js';
+import { currentTrace } from '../observability/tracing/context.js';
+import type { TelemetryContext } from '../observability/tracing/types.js';
+
+/**
+ * One user turn, driven through the kernel.
+ *
+ * The kernel runs the model and its tools and reports what happened; this is
+ * where the product decisions around it live. Which messages are persisted and
+ * when, how the context is kept inside the window, what a run reports when it
+ * ends, and how input typed while it runs reaches it — all of that is decided
+ * here, so the kernel stays a pure loop and the shell keeps reading the event
+ * stream it always has.
+ */
+
+export interface TurnOptions {
+  readonly modelCatalog?: ToolGateOptions['modelCatalog'];
+  /** Optional recorder; CLI and SDK runs otherwise use their captured log owner. */
+  readonly telemetry?: TelemetryContext;
+  readonly configScope?: ToolGateOptions['configScope'];
+  /** Observes kernel facts after the ordinary transcript writer and projection have accepted them. */
+  readonly observe?: import('../core/agent/events.js').AgentEventListener;
+  readonly correlationId?: string;
+  readonly commandProof?: ToolGateOptions['commandProof'];
+  /** Current-session objective, projected by the goal owner at CLI composition. */
+  readonly goalObjective?: string;
+  /** Claims the native budget owner's one closing attempt, without authorizing a send. */
+  readonly claimBudgetSummary?: () => boolean;
+  readonly workspaceRoots?: ToolGateOptions['workspaceRoots'];
+  readonly admission?: ToolGateOptions['admission'];
+  readonly sessionId: string;
+  /** Where the session's files live, when the caller knows. Carried into the event stream. */
+  readonly sessionPath?: string;
+  readonly prompt: string;
+  /** Accepted prompt-barrier message before transient request framing. */
+  readonly storedPrompt?: SessionMessage;
+  /** Historical context for this run; never persisted as a new user prompt. */
+  readonly continuityContext?: string;
+  /** Commit prepared prompt context after startup checks, immediately before kernel entry. */
+  readonly onPromptAccepted?: () => void;
+  /** Receives the exact prompt identity for each accepted foreground request. */
+  readonly onPromptIdentity?: (identity: PromptIdentitySnapshot) => void;
+  /**
+   * Images the user attached to this prompt.
+   *
+   * They become blocks on the opening message rather than a message of their own,
+   * because they belong to the sentence the user wrote: a picture sent on its own
+   * is not a turn, and a turn split in two would read as two things said.
+   */
+  readonly attachments?: { readonly images: readonly ImageContent[] };
+  readonly workspaceRoot: string;
+  readonly agentMode?: "plan" | "build";
+  readonly permissionScope?: ToolGateOptions["permissionScope"];
+  readonly escalationPromptHandler?: ToolGateOptions["escalationPromptHandler"];
+  readonly interactiveAsk?: ToolGateOptions["interactiveAsk"];
+  /** The conversation so far, without the prompt being sent. */
+  readonly history: readonly SessionMessage[];
+  /** A message the model saw or wrote has completed; keep it. */
+  readonly onMessage: (message: SessionMessage) => void;
+  readonly step: StepFunction;
+  readonly tools: ReadonlyMap<string, ToolDefinition>;
+  /** Read again before each batch so a tool loaded mid-run is available next. */
+  readonly toolSnapshot?: () => ReadonlyMap<string, ToolDefinition>;
+  readonly hooks: HookDispatcher;
+  /** Model steps a run may take before it is asked to conclude. */
+  readonly maxSteps: number;
+  readonly compaction?: CompactionSetup;
+  readonly signal: AbortSignal;
+  /** What a command the model runs should know about this session. */
+  readonly commandEnv?: Readonly<Record<string, string>>;
+  readonly background?: ToolGateOptions['background'];
+  /**
+   * What a subagent needs from the model side, when this session can delegate.
+   *
+   * A step and a budget, not a whole runner: the tool set a subagent may use has
+   * to be adapted with this session's gate, and the session is where that gate
+   * exists. A caller that composed the runner itself would be writing the gate
+   * options out a second time, and the two lists drift — the first version of
+   * this left the user's refusals out of the subagent's copy, so a rule held at
+   * the front door and not at the one the subagent came through.
+   */
+  readonly subagentHost?: import('./subagent.js').SubagentHost;
+  readonly checkpoint?: import('./checkpoint.js').TurnCheckpointHandler;
+  readonly checkpointError?: (message: string) => void;
+  /** Calls this session refuses outright; see `ToolGateOptions.denyRules`. */
+  readonly denyRules?: readonly DenyRule[];
+  /**
+   * How a failed step is retried, resolved once by the caller.
+   *
+   * Absent means the turn layer's default, which is to retry. Resolved outside
+   * so the setting is read once per run rather than once per attempt.
+   */
+  readonly retry?: {
+    readonly enabled?: boolean;
+    readonly maxRetries?: number;
+    readonly baseDelayMs?: number;
+    readonly maxDelayMs?: number;
+  };
+  readonly prepareRequest?: AgentLoopConfig['prepareRequest'];
+  readonly convertToLlm?: AgentLoopConfig['convertToLlm'];
+  readonly finishTurn?: AgentLoopConfig['finishTurn'];
+  /**
+   * Keeping this run's prompt cached between requests.
+   *
+   * Absent means the session does not do it: the runner needs the model's prices
+   * and a way to send a refresh, and a caller that supplies neither has opted
+   * out by not supplying them.
+   */
+  readonly cacheWarming?: CacheWarmingRunner;
+  /** How many queued steering messages reach the model at once. */
+  readonly steeringMode?: "one-at-a-time" | "all";
+  /** How many queued follow-up messages reach the model at once. */
+  readonly followUpMode?: "one-at-a-time" | "all";
+  /** Restrict the model schemas for this one user request after `/force`. */
+  readonly allowedTools?: readonly string[];
+}
+
+/** Input the user can hand a running turn. */
+export interface TurnInput {
+  /** Whether this run currently owns automatic compaction through its final publication hook. */
+  readonly isCompacting?: () => boolean;
+  /** Cancel a current retry wait without aborting the run or clearing its queues. */
+  readonly abortRetry?: () => void;
+  /** Exact tool names currently offered by this running turn. */
+  readonly activeTools?: () => readonly string[];
+  /** Change the delivery mode on the queues owned by this live run. */
+  readonly setQueueMode?: (lane: 'steering' | 'followUp', mode: 'one-at-a-time' | 'all') => void;
+  /** Deliver before the model's next step, inside the current work. */
+  steer(text: string, id?: string): void;
+  /** Deliver once the current work has stopped. */
+  followUp(text: string, id?: string): void;
+  readonly queue?: import('../core/agent/queue.js').InputQueueControl;
+  pending(): { readonly steering: readonly string[]; readonly followUps: readonly string[] };
+  /** Take back everything not yet delivered. */
+  clearQueue(): string[];
+}
+
+export interface TurnRun extends TurnInput {
+  readonly events: AsyncIterable<QueryEvent>;
+}
+
+export { requestPurposeFor } from './request.js';
+
+/**
+ * Everything a tool call is judged by, from the turn's own options.
+ *
+ * One function because there is one set of facts. The session's gate and a
+ * subagent's are both built from this, so a rule added here reaches both — the
+ * defect this replaced was two hand-written lists, and the subagent's was
+ * missing the user's refusals.
+ */
+function gateOptionsFor(
+  options: TurnOptions,
+  emit: (event: QueryEvent) => void,
+): ToolGateOptions {
+  return {
+    configScope: options.configScope,
+    modelCatalog: options.modelCatalog,
+    admission: options.admission,
+    correlationId: options.correlationId,
+    commandProof: options.commandProof,
+    sessionId: options.sessionId,
+    workspaceRoot: options.workspaceRoot,
+    workspaceRoots: options.workspaceRoots,
+    agentMode: options.agentMode,
+    permissionScope: options.permissionScope,
+    hooks: options.hooks,
+    escalationPromptHandler: options.escalationPromptHandler,
+    interactiveAsk: options.interactiveAsk,
+    emit,
+    ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
+    ...(options.background ? { background: options.background } : {}),
+    ...(options.denyRules ? { denyRules: options.denyRules } : {}),
+  };
+}
+
+export function runTurn(options: TurnOptions): TurnRun {
+  const channel = new EventChannel<QueryEvent>();
+  const stop = new StopLifecycle(event => channel.push(event));
+  const parentGate = gateOptionsFor(options, event => stop.query(event));
+  const runSubagent = options.subagentHost
+    ? createSubagentRunner(options.subagentHost, options.tools, parentGate)
+    : undefined;
+  const gate: ToolGateOptions = { ...parentGate, ...(runSubagent ? { runSubagent } : {}) };
+  const opening = openingMessage(options);
+  // The opening prompt carries the environment prefix; the surface already drew
+  // the user's own text, so its delivery is not reported again.
+  const projection = new TurnProjection(opening);
+  const toolPool = () => options.toolSnapshot?.() ?? options.tools;
+  const hooks = createToolHooks(gate, toolPool);
+  const compaction = options.compaction ? turnCompaction({ setup: options.compaction,
+    sessionId: options.sessionId, workspaceRoot: options.workspaceRoot, hooks: options.hooks,
+    maxSteps: options.maxSteps, hasTools: toolPool().size > 0,
+    prepared: options.step.preparesContext === true, converted: Boolean(options.convertToLlm) }) : undefined;
+  let preparedRequest: { readonly prepared: PreparedTurnContext; readonly context: RequestContextOwner } | undefined;
+  let recoveredContext: PreparedTurnContext | undefined;
+  const core = new AgentCore({
+    initialState: { messages: options.history as readonly AgentMessage[] },
+    // Absent means the kernel's own default, which is the same value the config
+    // default carries — so a run that sets neither behaves exactly as it did
+    // before these options had a reader.
+    ...(options.steeringMode ? { steeringMode: options.steeringMode } : {}),
+    ...(options.followUpMode ? { followUpMode: options.followUpMode } : {}),
+    ...(options.retry ? { retry: options.retry } : {}),
+    tools: () => adaptTools(toolPool(), gate),
+    beforeToolCall: hooks.beforeToolCall,
+    afterToolCall: hooks.afterToolCall,
+    streamStep: createTurnRequest({ ...options, prepareContext: compaction?.prepareContext,
+      onPreparedContext: (prepared, context) => { preparedRequest = { prepared, context }; },
+      consumePreparedContext: messages => {
+        const recovered = recoveredContext;
+        recoveredContext = undefined;
+        return recovered && recovered.isCurrent() && sameContext(messages, recovered.sourceMessages) ? recovered : undefined;
+      },
+    }, projection, channel, options.storedPrompt ? { opening, stored: options.storedPrompt } : undefined),
+    shouldStopAfterStep: () => projection.stepCount >= options.maxSteps,
+    // The request layer allows tools while the step counter is below the
+    // budget, and that counter has already advanced when the request is built.
+    // Answering for "the step after this one" keeps a compaction budget and
+    // the request it predicts on the same question.
+    toolsAllowedOnNextStep: () => projection.stepCount + 1 < options.maxSteps,
+    prepareNextStep: compaction?.beforeStep,
+    ...(options.finishTurn ? { finishTurn: options.finishTurn } : {}),
+    ...(options.prepareRequest ? { prepareRequest: options.prepareRequest } : {}),
+    ...(options.convertToLlm ? { convertToLlm: (messages, signal) => {
+      if (recoveredContext?.isCurrent() && sameContext(messages, recoveredContext.sourceMessages)) {
+        return recoveredContext.messageProjection.providerMessages!;
+      }
+      return options.convertToLlm!(messages, signal);
+    } } : {}),
+  });
+
+  const queues = core.pendingQueues;
+  const queue = inputQueueControl([
+    { lane: 'steering', queue: queues.steering, text: message => messageToText(message.content), replace: (message, text) => ({ ...message, content: text }) },
+    { lane: 'followUp', queue: queues.followUps, text: message => messageToText(message.content), replace: (message, text) => ({ ...message, content: text }) },
+  ]);
+  core.subscribe(async (event: AgentLifecycleEvent, signal) => {
+    if (event.type === "message_end" && event.message !== opening) persist(options.onMessage, event.message);
+    for (const projected of projection.project(event)) stop.query(projected);
+    stop.observe(event, projection.stepCount);
+    await options.observe?.(event, signal);
+    if (event.type === 'turn_end' && options.checkpoint && runSubagent) {
+      try { await options.checkpoint({ messages: core.state.messages, step: projection.stepCount,
+        willContinue: Boolean(event.willContinue) && projection.stepCount < options.maxSteps,
+        failed: signal.aborted || event.message.stopReason === 'error' || event.message.stopReason === 'aborted',
+      }, runSubagent, signal); }
+      catch { try { options.checkpointError?.('Checkpoint observer failed; the main turn continues without its advice.'); } catch { /* Observer reporting cannot change the main outcome. */ } }
+    }
+  });
+
+  let overflowRecovered = false;
+  const drive = async (): Promise<void> => {
+    channel.push({
+      type: "query.started",
+      sessionId: options.sessionId,
+      prompt: options.prompt,
+      // Reported so a consumer of the event stream can find the transcript without
+      // reconstructing the directory layout, which would make that layout part of
+      // the contract by accident.
+      ...(options.sessionPath !== undefined ? { sessionPath: options.sessionPath } : {}),
+    });
+    const started = await options.hooks.dispatch({
+      eventName: "SessionStart",
+      sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot,
+      timestamp: new Date().toISOString(),
+      resumed: options.history.length > 0,
+    }, { signal: options.signal });
+    if (started.decision === "block" || started.decision === "retry") {
+      throw new Error(`SessionStart hook ${started.decision}: ${started.reason || started.feedback || "Prompt admission refused."}`);
+    }
+    if (options.signal.aborted) return;
+    const submitted = await options.hooks.dispatch({
+      eventName: "UserPromptSubmit",
+      sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot,
+      timestamp: new Date().toISOString(),
+      prompt: options.prompt,
+    }, { signal: options.signal });
+    if (submitted.decision === "block" || submitted.decision === "retry") {
+      throw new Error(`UserPromptSubmit hook ${submitted.decision}: ${submitted.reason || submitted.feedback || "Prompt admission refused."}`);
+    }
+    if (options.signal.aborted) return;
+    const onAbort = (): void => core.abort();
+    options.signal.addEventListener("abort", onAbort, { once: true });
+    try {
+      options.onPromptAccepted?.();
+      if (compaction) core.state.messages = [...await compaction.beforePrompt(core.state.messages, opening, options.signal)];
+      if (options.signal.aborted) return;
+      await core.prompt(opening, { skipInitialPreparation: Boolean(compaction) });
+      // Input that arrived as the run was ending is still owed a run: the
+      // kernel restarts from its queues rather than leaving them behind.
+      while (!options.signal.aborted && ((await recoverOverflow()) || core.hasQueuedMessages())) {
+        await core.continue();
+      }
+      while (!options.signal.aborted && await conclude()) {
+        if (options.signal.aborted) break;
+        await core.continue();
+        while (!options.signal.aborted && ((await recoverOverflow()) || core.hasQueuedMessages())) await core.continue();
+      }
+      if (options.signal.aborted) stop.finish('stopped', 'cancelled', false);
+    } finally {
+      options.signal.removeEventListener("abort", onAbort);
+    }
+  };
+
+  /**
+   * A provider that refused the context for its size gets one more chance:
+   * the failed answer is dropped, the head condensed, and the step retried.
+   *
+   */
+  const recoverOverflow = async (): Promise<boolean> => {
+    const messages = core.state.messages;
+    const lastIndex = lastContextMessageIndex(messages);
+    const last = messages[lastIndex];
+    if (!last || last.role !== "assistant" || !isOverflowFailure(last) || !options.compaction
+      || options.compaction.policy.enabled === false) return false;
+    if (overflowRecovered) return false;
+    overflowRecovered = true;
+    // The same operation the scheduled path uses, so the rescue cannot cut
+    // somewhere the scheduled path would not have. It runs without the
+    // threshold check standing in the way: the provider already refused the
+    // request, so the context is over budget by definition, not by estimate.
+    const kept = [...messages.slice(0, lastIndex), ...messages.slice(lastIndex + 1)];
+    if (preparedRequest || options.convertToLlm || kept.some(message => message.role === 'custom')) {
+      const prior = preparedRequest;
+      if (!prior?.context.eligible || !compaction || !sameContext(kept, prior.prepared.sourceMessages)) return false;
+      let expected = captureContext(messages);
+      const context: RequestContextOwner = {
+        eligible: true,
+        isCurrent: () => !options.signal.aborted && sameContext(core.state.messages, expected),
+        accept: candidate => {
+          if (!candidate.sourceMessages || !context.isCurrent()) return false;
+          expected = captureContext(candidate.sourceMessages);
+          core.state.messages = [...expected];
+          return true;
+        },
+      };
+      const next = await prior.prepared.reframe({ allowTools: projection.stepCount + 1 < options.maxSteps,
+        allowedTools: options.allowedTools, requestPurpose: requestPurposeFor(kept) }, options.signal);
+      if (!context.isCurrent()) return false;
+      recoveredContext = await compaction.recoverContext(next, options.signal, context);
+      return recoveredContext !== undefined;
+    }
+    const source = options.compaction.authority?.capture(kept);
+    const lifecycle = buildCompactionLifecycle({ hooks: options.hooks, sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot, reason: 'overflow' });
+    let release: (() => void) | undefined;
+    try {
+      const condensed = await condenseContext({
+        messages: kept,
+        policy: options.compaction.policy,
+        summarize: options.compaction.summarize,
+        summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
+        signal: options.signal,
+        force: true,
+        // The rescue is a compaction like any other, and the only one whose reason
+        // is `overflow`: a hook that watches for the context being cut has to see
+        // this one, or the case that discards the most context is the one it never
+        // hears about. `overflow` was a declared reason with no producer.
+        onStarted: () => { release = compaction?.begin(); },
+        lifecycle,
+        lifecycleReason: "overflow",
+        operation: { sessionId: options.sessionId, source, identity: options.compaction.authority?.identity },
+      }).catch(error => { if (error instanceof ModelAdmissionError) throw error; return undefined; });
+      // A decline here leaves the run reporting the overflow it already hit: the
+      // engine judged that condensing would not make the context smaller, so
+      // retrying the same request would fail the same way.
+      if (!condensed || condensed.status !== "condensed") return false;
+      if (options.signal.aborted) return false;
+      const { plan } = condensed;
+      if (source && options.compaction.authority) {
+        const committed = options.compaction.authority.commit({ source, summary: condensed.summary,
+          keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore, signal: options.signal,
+          admission: () => condensed.preparedPolicy?.admission?.() ?? options.compaction?.authority?.admission?.() });
+        if (committed.status === 'unverified') throw new CompactionPublicationError();
+        if (committed.status !== 'committed') return false;
+      }
+      options.compaction.onCompact({
+        summary: condensed.summary,
+        keptMessages: plan.keptMessages,
+        tokensBefore: plan.tokensBefore,
+      });
+      core.state.messages = condensed.messages;
+      await lifecycle.after?.({ reason: 'overflow', summary: condensed.summary,
+        keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
+      return true;
+    } finally {
+      release?.();
+    }
+  };
+
+  /** Report how the run ended, in the terms the shell reads. */
+  const conclude = async (): Promise<boolean> => {
+    const outcome = concludeRun(core.state.messages, options.prompt, options.sessionId, projection.stepCount,
+      projection.stepCount >= options.maxSteps && Boolean(core.state.messages.filter(message => message.role === 'assistant').at(-1)?.tool_calls?.length));
+    if (outcome.kind === "failed") {
+      currentTrace()?.span.setAttributes({ outcome: 'error' });
+      currentTrace()?.span.setStatus({ status: 'error', error: { name: 'ModelError', message: 'Model step failed.' } });
+      stop.finish('stopped', 'model_failed', false);
+      await options.hooks.dispatch({
+        eventName: "StopFailure",
+        sessionId: options.sessionId,
+        workspaceRoot: options.workspaceRoot,
+        timestamp: new Date().toISOString(),
+        turnsExecuted: projection.stepCount,
+        error: outcome.error,
+      });
+      channel.push({ type: "query.failed", error: outcome.error, ...(outcome.admissionFailure ? { admissionFailure: outcome.admissionFailure } : {}) });
+      return false;
+    }
+    if (outcome.explained) {
+      channel.push({ type: "message.delta", role: "coder", delta: outcome.finalOutput });
+      options.onMessage({ role: "assistant", content: outcome.finalOutput });
+    }
+    stop.beginCheck();
+    const decision = await options.hooks.dispatch({
+      eventName: "Stop",
+      ...stop.attempt(),
+      sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot,
+      timestamp: new Date().toISOString(),
+      turnsExecuted: projection.stepCount,
+      finalOutput: outcome.finalOutput,
+    }, { signal: options.signal, onResult: result => stop.checked(result) });
+    if (options.signal.aborted) { stop.finish('stopped', 'cancelled', false); return false; }
+    const next = stop.decide(decision, projection.stepCount < options.maxSteps, outcome.completed.result.status === 'completed');
+    if (next === 'terminal') return false;
+    if (next === 'repair') {
+      core.state.messages = [...core.state.messages, { role: 'system', content: stop.repairMessage(decision) }];
+      return true;
+    }
+    if (next === 'completed_unproven') {
+      channel.push({ type: 'query.completed_unproven', ...stop.attempt(),
+        reasonCode: decision.reasonCode as import('../core/hooks/stop/model.js').UnprovenCompletionReason,
+        proofVerdict: 'not_reported', result: { ...outcome.completed.result,
+          status: 'completed_unproven', terminalReason: 'completed_unproven', terminalClassification: 'completed_unproven',
+          stopReason: decision.reasonCode } });
+      return false;
+    }
+    channel.push(outcome.completed);
+    return false;
+  };
+
+  void runSessionTrace({ sessionId: options.sessionId, workspaceRoot: options.workspaceRoot }, async span => {
+    await drive()
+    .catch((error: unknown) => {
+      span.setAttributes({ outcome: options.signal.aborted ? 'aborted' : 'error' });
+      span.setStatus({ status: 'error', error: { name: 'RunError', message: options.signal.aborted ? 'Session run aborted.' : 'Session run failed.' } });
+      if (options.signal.aborted) { stop.finish('stopped', 'cancelled', false); return; }
+      stop.finish('stopped', 'runtime_failed', false);
+      channel.push({ type: "query.failed", error: error instanceof Error ? error.message : String(error),
+        ...(error instanceof ModelAdmissionError ? { admissionFailure: error.code } : {}) });
+    })
+    .finally(async () => {
+      if (options.signal.aborted) stop.finish('stopped', 'cancelled', false);
+      // The run is over, so the session is waiting on a person rather than on a
+      // model. What that means for refreshing is the runner's decision.
+      options.cacheWarming?.noteSettled();
+      await options.hooks
+        .dispatch({
+          eventName: "SessionEnd",
+          sessionId: options.sessionId,
+          workspaceRoot: options.workspaceRoot,
+          timestamp: new Date().toISOString(),
+          turnsExecuted: projection.stepCount,
+        })
+        .catch(() => undefined);
+    });
+    if (options.signal.aborted) {
+      span.setAttributes({ outcome: 'aborted' });
+      span.setStatus({ status: 'error', error: { name: 'AbortError', message: 'Session run aborted.' } });
+    }
+    span.setAttributes({ steps: projection.stepCount });
+  }, options.telemetry).catch(() => undefined).finally(() => channel.close());
+
+  return {
+    events: channel,
+    isCompacting: () => compaction?.isCompacting() ?? false,
+    activeTools: () => [...toolPool().keys()],
+    setQueueMode: (lane, mode) => core.setQueueMode(lane, mode),
+    queue,
+    abortRetry: () => core.abortRetry(),
+    steer: (text, id) => {
+      if (!text.trim()) return;
+      core.steer({ role: "user", content: text }, id);
+    },
+    followUp: (text, id) => {
+      if (!text.trim()) return;
+      core.followUp({ role: "user", content: text }, id);
+    },
+    pending: () => ({ steering: queue.entries().filter(entry => entry.lane === 'steering').map(entry => entry.text),
+      followUps: queue.entries().filter(entry => entry.lane === 'followUp').map(entry => entry.text) }),
+    clearQueue: () => {
+      const taken = queue.entries().map(entry => entry.text);
+      core.clearAllQueues();
+      return taken;
+    },
+  };
+}
+
+/**
+ * Keep what the model saw or said. An assistant message that carried nothing —
+ * an aborted or failed step — has no place in the conversation the next run
+ * is built from.
+ *
+ * The step's bookkeeping (why it stopped, what went wrong) is stripped because
+ * it describes the attempt, not the answer. The origin survives that strip: it
+ * names which model produced the answer, and a later run still needs to know
+ * that — a failure written by a retired model must not be mistaken for the
+ * current model's once the model that wrote it is gone.
+ */
+function persist(onMessage: (message: SessionMessage) => void, message: AgentMessage): void {
+  if (message.role === "assistant" && !message.content && !message.tool_calls?.length
+    && !message.reasoning?.text.trim() && !message.reasoning?.signature && !message.reasoning?.redacted
+    && !message.promptMeasurement) return;
+  if (message.role === "system") return;
+  const { stopReason: _stopReason, errorMessage: _errorMessage, ...stored } = message;
+  onMessage(stored);
+}
+import { CompactionPublicationError } from '../session/compaction/contract.js';
