@@ -4,6 +4,18 @@
 
 只有一个 workspace 包。单个模块的 import 图无环不等于可以直接搬目录成为无环包：browser/core、workflow/core、planning/session/provider 的双向边存在。现有分支树、CAS 状态写入、任务日志、远端作业派发栅栏均已实现；问题是事务权威和独立模块边界未完成，不能重造另一套执行器或任务系统。
 
+## Extension kernel notifications and settlement (2026-11-19)
+
+E.6首子批复用既有contribution与invocation入口。原agent_end只是StopFailure别名，成功和取消没有扩展消费者；现直接观察kernel lifecycle，并删除失败别名。agent_end表示每个kernel loop结束，agent_settled表示自动重试、压缩、Stop修复与队列没有剩余续轮，不能把Stop当kernel end。
+
+turn/events在排队前捕获受众及inert冻结副本，非JSON观察数据仅通用warning而不破坏产品结果。bridge有5秒总预算、原生signal准入、串行受众和失败回执；contribution在await前后核对generation并撤销owned event signal。SDK／CLI共用handler owner，notification返回值忽略且单个异常不阻止后续handler，原普通Hook权限合同保留。终态通知使用独立signal但仍受generation约束。stream return等待实际settlement，开始结算后steer／followUp拒绝，避免扩展消息成功返回但永远丢失。
+
+首红日志及fixture纠正全部保留。10个有效反转11AssertionErrors，隔离树逐字节恢复后3文件37项通过，主源码未反转。原failed-alias fixture只按传入event名记录、不消费aliases，第一次反转green不能证明别名删除；补原runEventHandlers真实消费者后red。隔离树最初用root node_modules无法解析package-owned Undici，仅修fixture依赖路径。最终14文件216项、七静态门／2714modules／0monoliths、builda62d41f8a9cd输入摘要核验通过，限定独立APPROVE。
+
+同代Linux公开compiled SDK／CLI七场景11POST、Node20.3禁动态生成同组通过；成功／stream update／401／cancel复用／工具更新hold与followup／实际Stop命令修复／文件扩展持久通知均由原生产路径观察。安装15公开入口strict NodeNext／skipLibCheck=false、engine-strict、六场景10POST通过。探针曾误用Session.messages、未接收waitForIdle既有失败及注册未消费的extension Stop，均只修probe并保留原失败。配置模型provider-auth／0requests，原配置未改、私有state清理。normal judgeexit2/not_proven，pinned图容量缺口不被局部功能成功覆盖。[交付](../../../.omx/artifacts/upgrade-events-2026-11-19/delivery.json)。
+
+E.6后续真实生命周期审计：SDK create应在资源绑定／模型／UI／permission完成后start；dispose必须先关闭host新操作、cancel/join，再shutdown并退休generation。CLI当前cancel与closeExtensions并行，需同序列。switch/new/resume/fork先before取消与目标版本复查，候选用activate:false；通知旧受众后才通过原同步事务激活和重绑。/resume还经过core/shell/recovery，不能漏掉该激活入口。tree同session只发before_tree/tree，不发shutdown/start，unknown写不得发成功；不要嵌套原summary command owner。普通/reload只改配置，真实plugin reload与外部resourceLoader.reload代际另外接受控序列。授权撤回/watch仍立即fail-closed，不为通知延长权限。SDK contribution与loader host各自捕获generation，CLI重绑不证明SDK迁移；首后续子批限定create/dispose和CLI启动／关闭，其余仍开项。
+
 ## Cache request controls and refresh windows (2026-11-19)
 
 C.5核实确认普通配置缺少retention、亲和与长档共用判断、摘要和侧问丢参数／端点亲和头、预热固定short且以结算时刻延长窗口。参考的独立能力与按请求窗口决定采用，沿用本项目原config／endpoint／request／summary／cacheWarm／accounting owner；新增provider/cache只有协议字段和已发送窗口的责任，无第二缓存、计费、执行或配置系统。

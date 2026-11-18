@@ -19,6 +19,8 @@ import { captureVirtualDefinition, MAX_VIRTUAL_MODELS } from '../../core/models/
 import type { ModelRouteInput, CapturedVirtualModelDefinition, VirtualModelDefinition } from '../../core/models/virtual/contract.js'
 import { createVirtualBridge } from './virtual.js'
 export type { ExtensionUiHost, ExtensionUiDialogOptions, ExtensionUiApi, ExtensionUiRequestOptions } from './ui.js'
+import type { ExtensionRunEventName, ExtensionRunEventPayload } from '../events/model.js'
+export type { ExtensionRunEvent, ExtensionRunEventName, ExtensionRunEventPayload } from '../events/model.js'
 
 export interface ExtensionHostBridge {
   readonly ui?: ExtensionUiHost
@@ -59,6 +61,7 @@ export interface ExtensionAPI {
   registerShortcut(shortcut: ExtensionShortcut): void
   registerFlag(flag: ExtensionFlag): void
   getFlag(name: string): string | boolean | undefined
+  on<Name extends ExtensionRunEventName>(event: Name, handler: (payload: ExtensionRunEventPayload<Name>) => void | Promise<void>): void
   on(event: string, handler: (payload: unknown) => unknown | Promise<unknown>): void
   readWorkspaceFile(relativePath: string): string | Promise<string>
   getActiveTools(): Promise<readonly string[]>

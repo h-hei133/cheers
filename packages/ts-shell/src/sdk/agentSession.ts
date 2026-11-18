@@ -22,6 +22,7 @@ import type { PromptAttachments, ShellSessionRuntime } from "../core/shell/sessi
 import { createCliMcpGateway } from "../entrypoints/cliMcpModule.js";
 import type { ExtensionUiHost } from "../extensions/runtime/ui.js";
 import { runExtensionInvocation } from "../extensions/runtime/context.js";
+import { runEventHandlers } from '../extensions/events/dispatch.js';
 import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { Session } from "../session/schema/sessionRecord.js";
 import { SessionManager } from "../session/SessionManager.js";
@@ -134,18 +135,8 @@ function registerSdkContributions(
     for (const loaded of extensionsResult.extensions) {
       const ext = loaded.extension;
       const onEvent = ext.handlers.size > 0
-        ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => runExtensionInvocation(ui(), signal, async () => {
-            let current = payload;
-            let matched = false;
-            for (const name of [event, ...(aliases ?? [])]) {
-              for (const handler of ext.handlers.get(name) ?? []) {
-                matched = true;
-                const next = await handler(current);
-                if (next !== undefined) current = next;
-              }
-            }
-            return matched ? current : undefined;
-          })
+        ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => runExtensionInvocation(ui(), signal,
+          () => runEventHandlers({ handlers: ext.handlers, event, payload, aliases, signal, ownerSignal: ext.signal }))
         : undefined;
       cleanups.push(
         registerCatalogContribution({

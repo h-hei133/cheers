@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-19",
+  "batch": [
+    "E.6 kernel notifications and run settlement"
+  ],
+  "status": "subbatch_linux_accepted_E6_open_repository_gate_not_proven",
+  "baseCommit": "dbc4f37ea4b8eba74dae9ecc21d5d522d71bcd61",
+  "delivery": {
+    "localCommit": "containing Git commit supplies identity",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "a62d41f8a9cdbe3d9512a8ad3c8c57fe5cc21080e1cce4b323198631d215332f",
+    "inputsDigest": "d6eef5c66a015d9c58a4068bee9620bac5019549c6009f3f07c5cd9a4fde54ae",
+    "inputDigestMatches": true,
+    "node": "24.15.0"
+  },
+  "source": {
+    "files": 14,
+    "production": 11,
+    "receipt": "evidence/source.json",
+    "hashesMatch": true
+  },
+  "validation": {
+    "combined": {
+      "files": 14,
+      "passed": 216,
+      "failed": 0,
+      "receipt": "raw.tar.gz::joint-accepted.log"
+    },
+    "static": {
+      "count": 7,
+      "passed": true,
+      "productionModules": 2714,
+      "monoliths": 0,
+      "receipt": "raw.tar.gz::static-accepted.log"
+    },
+    "reversal": {
+      "cases": 10,
+      "assertionFailures": 11,
+      "exactRestoration": true,
+      "mainSourceUnchanged": true,
+      "restoredPassed": 37,
+      "receipt": "evidence/reversal.json"
+    },
+    "linux": {
+      "compiledPassed": 7,
+      "posts": 11,
+      "receipt": "evidence/native.json",
+      "sourceUnchanged": true,
+      "privateStateRemoved": true
+    },
+    "nodeFloor": {
+      "runtime": "20.3.0",
+      "codeGenerationDisabled": true,
+      "compiledPassed": 7,
+      "posts": 11,
+      "receipt": "evidence/native-node20.json"
+    },
+    "installed": {
+      "publicEntries": 15,
+      "strictTypes": true,
+      "engineStrict": true,
+      "nativePassed": 6,
+      "posts": 10,
+      "receipt": "evidence/package.json"
+    },
+    "configuredProvider": {
+      "status": "failed",
+      "failureClass": "provider-auth",
+      "requests": 0,
+      "receipt": "evidence/native-live-reviewed.json"
+    },
+    "normproof": {
+      "exit": 2,
+      "verdict": "not_proven",
+      "acceptedAsProof": false,
+      "reason": "pinned module graph exceeds 16384 edge capacity",
+      "sourceUnchanged": true,
+      "scopeModified": false,
+      "gateModified": false,
+      "receipt": "evidence/judge-current.json"
+    }
+  },
+  "review": {
+    "status": "APPROVE",
+    "scopeLimited": true,
+    "receipt": "evidence/review.json"
+  },
+  "remaining": [
+    "real session startup and shutdown",
+    "session switch/fork/tree cancellation and notifications",
+    "provider/cache decision hooks",
+    "input/context/message/tool/compaction result consumers"
+  ],
+  "taskCount": {
+    "accepted": 36,
+    "open": 26,
+    "fullE6Accepted": false
+  },
+  "boundaries": [
+    "Linux only",
+    "no push or CI",
+    "no live provider success",
+    "legacy per-prompt session aliases still present"
+  ],
+  "evidenceStorage": {
+    "archive": "raw.tar.gz",
+    "index": "evidence/raw-index.json",
+    "rawBytesPreserved": true
+  }
+}

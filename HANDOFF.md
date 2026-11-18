@@ -2846,3 +2846,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** A compatible endpoint receives unsupported long-cache fields, an idle transition prolongs an old prefix, or slow credential renewal sends a refresh after its safe window.
 - **Root cause** Affinity support was used as retention capability, warming always selected the model's short tier, and scheduling used response or phase notification time. Summary and side-request bodies also bypassed endpoint-owned affinity headers.
 - **Rule** Capture requested preference separately from the effective serialized tier and the exact-address model window. Admit key, long tier and extension options independently with strict boolean declarations. Cap native short and long markers by their protocol duration; include shared gateway codecs. Anchor expiry to actual dispatch, retain it through phase changes, and carry both the cache and phase age deadline plus source admission to final transport handoff. Failed, void or cancelled refreshes never renew it. Revalidate the original generation after callbacks before clearing state or attributing usage. Use the endpoint's same header owner for ordinary, summary and side requests.
+
+### Queued Extension Notifications Must Capture Their Original Audience
+- **Symptom** A delayed old event reaches a newly registered extension, or non-JSON tool progress makes an otherwise successful turn fail.
+- **Root cause** Audience lookup and data capture happen after queueing, so the observer adopts a successor or runs against product-owned data.
+- **Rule** Capture the audience and inert immutable payload before queueing; recheck each contribution generation around await. Unsupported observation data emits a generic warning and skips observation. Terminal cancellation facts use a separate notification signal while retaining source admission. Keep serial ordering and a bounded aggregate callback deadline.
+
+### Run Settlement Must Join Consumers And Refuse Late Input
+- **Symptom** A consumer stops at query.failed before cleanup finishes, or agent_settled accepts a followup that never executes.
+- **Root cause** The async iterator has no return/join and input queues remain open after continuation is decided.
+- **Rule** Iterator.return joins actual settlement. Close new input admission before final callbacks and reject late messages truthfully. Distinguish each kernel agent_end from the one final agent_settled; notification returns grant no permission and cannot replace later handlers' payloads. Test legacy aliases through the real handler dispatcher rather than a recorder that ignores aliases.

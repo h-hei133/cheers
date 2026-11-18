@@ -1,0 +1,133 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "node": "v24.15.0",
+  "buildId": "a62d41f8a9cdbe3d9512a8ad3c8c57fe5cc21080e1cce4b323198631d215332f",
+  "inputsDigest": "d6eef5c66a015d9c58a4068bee9620bac5019549c6009f3f07c5cd9a4fde54ae",
+  "live": false,
+  "installed": false,
+  "source": {
+    "packages/ts-shell/src/core/hooks/extensionBridge.test.ts": "0ba1b1e8ce094e864ed7deb760bf9fa149f5639519ecd50d5d06e4977ae1eada",
+    "packages/ts-shell/src/extensions/events/dispatch.ts": "637f70201e4c9f86e68f2b102f5b657b764c09daaaaaec21b48b763e22d40751",
+    "packages/ts-shell/src/extensions/events/model.ts": "88ec9a729c72aa284a5ecde613b4e18d4fb54c9be50d12af2ee8b770092ee10e",
+    "packages/ts-shell/src/turn/events.test.ts": "74ee3c820c4eabcb12c0b912670e7435d856f00e6c5d29ae9ac2359bf5107f0f",
+    "packages/ts-shell/src/turn/events.ts": "33780beb17a8fd6d76d6172e853d626cf65b2db9f6e941ab54e929dc93e35bb8",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "3d89ffe6faba0c5381337476ae75039c4b323d701366f93d08969c0434159b8a",
+    "packages/ts-shell/src/core/catalog/contributions.ts": "02e05f7ce2467ad0627eb23903775ffa9c458486516c1ba92f3f3c97ef6f0126",
+    "packages/ts-shell/src/core/hooks/extensionBridge.ts": "7d69f0ee30f405f8eef1cb5de2e61268f2df2441eab4e2b313aa096fa9a08d6b",
+    "packages/ts-shell/src/core/hooks/hookDispatcher.ts": "3f2da294c8b00c476428c500cd9ea083a7af8cb70c321ac839f2064e4392492c",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "8e5a1f34fd532a1801be104d948f7823a8c172ffd04af196af680c4d31ae4be0",
+    "packages/ts-shell/src/index.ts": "d7a9c28f81d2ce9180ac8603785f38f3610749dfebab0e317129f6889f1bc144",
+    "packages/ts-shell/src/sdk/agentSession.ts": "fdf33b113e65b51c8ec14180f7ce96e0356f2d6edb20dedfdf381cbf19543ffd",
+    "packages/ts-shell/src/sdk/lifecycle.test.ts": "84aa434ca3e67e8325f787c889bedc993ac5a6281c3d9dadde69f6963848a8d3",
+    "packages/ts-shell/src/turn/session.ts": "9183d588a577ea4e713a22c8c12218018682d6c103aea2feb499c58042d04b53"
+  },
+  "cases": [
+    {
+      "name": "sdk-success-isolation-immutable-and-settlement",
+      "status": "passed",
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "agent_end",
+        "agent_settled"
+      ],
+      "immutable": true,
+      "latePromptRefused": true,
+      "siblingIsolated": true,
+      "settlementJoined": true,
+      "posts": 1
+    },
+    {
+      "name": "sdk-streaming-updates",
+      "status": "passed",
+      "updates": 1,
+      "posts": 1
+    },
+    {
+      "name": "sdk-failure-no-duplicate-end",
+      "status": "passed",
+      "failurePreserved": true,
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "agent_end",
+        "agent_settled"
+      ],
+      "posts": 1
+    },
+    {
+      "name": "sdk-cancellation-end-and-reuse",
+      "status": "passed",
+      "cancelledTerminal": true,
+      "reused": true,
+      "posts": 2
+    },
+    {
+      "name": "sdk-tool-update-and-followup-queue",
+      "status": "passed",
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_end",
+        "tool_execution_start",
+        "tool_execution_update",
+        "tool_execution_end",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "agent_end",
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "agent_end",
+        "agent_settled"
+      ],
+      "pendingUpdateJoined": true,
+      "followupLoops": 2,
+      "posts": 3
+    },
+    {
+      "name": "sdk-stop-repair-single-settlement",
+      "status": "passed",
+      "kernelLoops": 2,
+      "settlementCount": 1,
+      "realStopCommand": true,
+      "posts": 2
+    },
+    {
+      "name": "compiled-cli-file-extension",
+      "status": "passed",
+      "exit": 0,
+      "persistedNotifications": true,
+      "posts": 1
+    }
+  ],
+  "providerRequests": [],
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "loopbackPosts": 11
+}

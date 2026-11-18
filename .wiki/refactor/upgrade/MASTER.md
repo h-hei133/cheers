@@ -23,10 +23,10 @@
 ## Current status
 
 **Current phase** 按批实施。36/62 项完成 Linux 本地功能验收，26 项开放。
-**Completed batch** C.5缓存配置／实际能力／窗口贯通。最终27文件848项、七静态检查、十一反转13AssertionErrors／exact恢复138项；buildecdb41348d63当前Linuxcompiled13场景34POST和source预热2POST、Node20.3compiled13／34、安装15公开strict类型／12场景32POST通过，限定两独立APPROVE。
-**Next batch** E.6真实缺口已核实。先typed kernel事件与完整settlement，后会话生命周期／返回值；复用原extension invocation和contribution，不加第二事件总线。
-**Repository gate** 当前定向script29项通过；历史完整套件209/210。当前默认judge仍exit2/not_proven、16384图容量缺口；18个pinned文件未改。
-**Evidence boundary** 当前构建配置模型在鉴权阶段停止，0requests；真实服务TTL／cache收益和其他平台未验证。已获得当前安装证据，本轮仅本地按批提交，不push或宣称CI。
+**Completed batch** E.6 kernel通知／完整结算子批，整项仍部分。14文件216项、七静态检查／2714modules／0monoliths、10有效反转11AssertionErrors／exact恢复37项；builda62d41f8a9cd的Linuxcompiled7场景11POST、Node20.3禁动态生成同组和安装15入口strict类型／6场景10POST通过，限定APPROVE。C.5已提交dbc4f37e，证据保持此前source范围。
+**Next batch** E.6真实session_start／shutdown。先SDK create/dispose与CLI启动／关闭，后switch／fork／tree及可修改结果消费者；关闭新操作准入后结算旧run，通知后才退休原extension generation。
+**Repository gate** 当前normal judgeexit2/not_proven，16384图容量缺口；pinned输入未改。定向script29项与完整209/210为前批历史，不升为当前script验证。
+**Evidence boundary** 当前构建配置模型provider-auth，0requests；Linux本地HTTP／安装证据不证明真实服务或其他平台。本轮仅本地按批提交，不push或宣称CI。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -41,7 +41,7 @@
 
 ## Adaptive control
 
-C.5当前批实际L，复用config／endpoint／summary／request／warming／accounting原owner，未新增依赖、缓存或执行平面。额外发现八类边界：summary与side参数丢失、endpoint headers bypass、callback reentry／idle幂等、actual sentAt、unknown／void窗口、final source及cache／phase deadline、shared gateway codec、native short协议上限。最终两项限定APPROVE，旧广审unavailable；无统一历史估算不补造drift。整体36/62与goal active，下一E.6按事件和结果责任分批。
+E.6首子批实际L，复用contribution／invocation／kernel／channel owner，结构检查10/10，无新增依赖或事件总线。额外依赖5项：queued audience capture、non-inert observer隔离、逐handler异常、late input真实拒绝及iterator cleanup join。10个反转均AssertionError，原alias测试不消费aliases与隔离树Undici归属错误均单列分类后重验。36/62与goal active不变，完整session/result生命周期继续开放；未补造历史估算／drift。
 
 当前Linux功能验收任务数为32/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.8、C.9、E.5、E.1、F2.2、F2.4和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 

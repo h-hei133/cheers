@@ -1,10 +1,14 @@
 # 规划执行进展（2026-11-19）
 
-本轮接续已核实任务，完成 C.5 的 Linux 本地功能验收。**62 项中 36 项已完成，26 项仍开放**。默认依赖图判定仍为 `not_proven`。
+本轮接续已核实任务，完成 E.6 的 kernel通知与完整结算子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
 
 核查与取舍见[工程记录](design.md)，当前验收和次序见[任务清单](tasks.md)。源码按批本地提交。远端推送和本轮 CI 尚未发生。原定暂缓的原生插件与独立桌面产品不计入 62 项，T6 保留按需求开启。
 
 ## 当前批次的验证
+
+E.6首子批沿原contribution／invocation派发typed kernel事件，区分每次agent_end与最终单次agent_settled；immutable快照、排队前受众、generation撤权、5秒有界串行handler、返回值忽略／异常隔离和iterator.return结算等待已接通，late prompt真实拒绝。当前14文件216项、七静态门／2714modules／0monoliths、builda62d41f8a9cd、10有效反转11AssertionErrors／exact恢复37项通过。Linuxcompiled七场景11POST和Node20.3禁动态生成同组、安装15入口strict类型／六场景10POST通过，限定独立APPROVE。配置模型provider-auth／0requests；正常judgeexit2/not_proven／容量缺口，原配置未改、私有state清理。真实session_start／shutdown与switch／fork／tree及结果消费者仍缺，下一子批补实际create/dispose和CLI启动／关闭。[首子批交付](../../../.omx/artifacts/upgrade-events-2026-11-19/delivery.json)。
+
+以下C.5为此前冻结source的证据，已本地提交dbc4f37e。
 
 C.5复用原配置／请求／摘要／预热owner，补short／long／none个人选择、独立协议能力、实际地址和final body窗口、发送时间及最终handoff deadline／source检查；摘要、side、preview共享偏好和端点headers。最终27文件848项、七静态检查／2709生产模块0monoliths、十一有效反转13AssertionErrors且exact恢复6文件138项、buildecdb41348d63通过。Linux当前compiled13场景34POST和source owner预热2POST、Node20.3禁动态生成compiled13／34、安装包15公开strict类型和12场景32POST通过，两项限定独立APPROVE。广范围旧审未返回报告，保持unavailable。当前配置模型鉴权停止、0provider requests，原配置／source／build保持且私有state清理；真实TTL／收益无证据。定向script29项通过，默认NormProof仍exit2/not_proven。[本批交付](../../../.omx/artifacts/upgrade-cache-2026-11-19/delivery.json)。
 

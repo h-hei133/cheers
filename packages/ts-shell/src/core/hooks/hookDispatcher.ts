@@ -432,7 +432,6 @@ const EXTENSION_EVENT_ALIASES: Readonly<Record<string, readonly string[]>> = {
   PostCompact: ['session_compact'],
   PreModelSwitch: ['model_select'],
   PostModelSwitch: ['model_select'],
-  StopFailure: ['agent_end'],
 };
 
 async function dispatchExtensionHooks(

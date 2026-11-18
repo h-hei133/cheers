@@ -32,6 +32,7 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
   const assertSignal = signal && AbortSignal.prototype.throwIfAborted.bind(signal);
   assertSignal?.();
   let active = true;
+  const eventLifetime = new AbortController();
   const admission = () => { if (!active) throw new Error('Catalog contribution is retired.'); assertSignal?.(); };
   const virtualModels = captureVirtualDefinitions(entry.virtualModels ?? [], admission);
   const existing = catalogContributions(entry.root, entry.sessionId).flatMap(value => value.commands).flatMap(commandInvocations).map(value => value.name);
@@ -50,11 +51,24 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
     if (identities.has(key)) throw new Error('Virtual model registration collision.');
     identities.add(key);
   }
-  const captured = Object.freeze({ ...entry, root: path.resolve(entry.root), virtualModels });
+  const originalOnEvent = entry.onEvent;
+  const onEvent: CatalogContribution['onEvent'] = originalOnEvent && (async (event, payload, aliases, callerSignal) => {
+    admission();
+    const currentSignal = callerSignal ? AbortSignal.any([eventLifetime.signal, callerSignal]) : eventLifetime.signal;
+    const assertCurrentSignal = AbortSignal.prototype.throwIfAborted.bind(currentSignal);
+    assertCurrentSignal();
+    const result = await originalOnEvent(event, payload, aliases, currentSignal);
+    admission(); assertCurrentSignal();
+    return result;
+  });
+  const captured = Object.freeze({ ...entry, root: path.resolve(entry.root), virtualModels, ...(onEvent ? { onEvent } : {}) });
   const retire = () => {
+    if (!active) return;
     active = false;
     if (signal) EventTarget.prototype.removeEventListener.call(signal, 'abort', retire);
-    if (entries.delete(captured)) changes.notify(captured.root, '*');
+    const removed = entries.delete(captured);
+    eventLifetime.abort();
+    if (removed) changes.notify(captured.root, '*');
   };
   if (signal) EventTarget.prototype.addEventListener.call(signal, 'abort', retire, { once: true });
   admission(); entries.add(captured);

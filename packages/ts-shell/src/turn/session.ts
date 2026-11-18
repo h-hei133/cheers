@@ -32,6 +32,7 @@ import { StopLifecycle } from './stop.js';
 import { runSessionTrace } from '../observability/tracing/runtime.js';
 import { currentTrace } from '../observability/tracing/context.js';
 import type { TelemetryContext } from '../observability/tracing/types.js';
+import { createTurnEvents } from './events.js';
 
 /**
  * One user turn, driven through the kernel.
@@ -208,6 +209,7 @@ function gateOptionsFor(
 export function runTurn(options: TurnOptions): TurnRun {
   const channel = new EventChannel<QueryEvent>();
   const stop = new StopLifecycle(event => channel.push(event));
+  let acceptingInput = true;
   const parentGate = gateOptionsFor(options, event => stop.query(event));
   const runSubagent = options.subagentHost
     ? createSubagentRunner(options.subagentHost, options.tools, parentGate)
@@ -262,11 +264,14 @@ export function runTurn(options: TurnOptions): TurnRun {
   });
 
   const queues = core.pendingQueues;
+  const extensionEvents = createTurnEvents({ workspaceRoot: options.workspaceRoot, sessionId: options.sessionId,
+    ...(options.admission ? { admission: options.admission } : {}) });
   const queue = inputQueueControl([
     { lane: 'steering', queue: queues.steering, text: message => messageToText(message.content), replace: (message, text) => ({ ...message, content: text }) },
     { lane: 'followUp', queue: queues.followUps, text: message => messageToText(message.content), replace: (message, text) => ({ ...message, content: text }) },
   ]);
   core.subscribe(async (event: AgentLifecycleEvent, signal) => {
+    await extensionEvents.observe(event, signal);
     if (event.type === "message_end" && event.message !== opening) persist(options.onMessage, event.message);
     for (const projected of projection.project(event)) stop.query(projected);
     stop.observe(event, projection.stepCount);
@@ -474,7 +479,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     return false;
   };
 
-  void runSessionTrace({ sessionId: options.sessionId, workspaceRoot: options.workspaceRoot }, async span => {
+  const settled = runSessionTrace({ sessionId: options.sessionId, workspaceRoot: options.workspaceRoot }, async span => {
     await drive()
     .catch((error: unknown) => {
       span.setAttributes({ outcome: options.signal.aborted ? 'aborted' : 'error' });
@@ -485,6 +490,7 @@ export function runTurn(options: TurnOptions): TurnRun {
         ...(error instanceof ModelAdmissionError ? { admissionFailure: error.code } : {}) });
     })
     .finally(async () => {
+      acceptingInput = false;
       if (options.signal.aborted) stop.finish('stopped', 'cancelled', false);
       // The run is over, so the session is waiting on a person rather than on a
       // model. What that means for refreshing is the runner's decision.
@@ -498,6 +504,7 @@ export function runTurn(options: TurnOptions): TurnRun {
           turnsExecuted: projection.stepCount,
         })
         .catch(() => undefined);
+      await extensionEvents.settled(options.signal.aborted);
     });
     if (options.signal.aborted) {
       span.setAttributes({ outcome: 'aborted' });
@@ -507,17 +514,27 @@ export function runTurn(options: TurnOptions): TurnRun {
   }, options.telemetry).catch(() => undefined).finally(() => channel.close());
 
   return {
-    events: channel,
+    events: {
+      [Symbol.asyncIterator]: () => {
+        const iterator = channel[Symbol.asyncIterator]();
+        return { next: () => iterator.next(), return: async () => {
+          await settled;
+          return { done: true, value: undefined as never };
+        } };
+      },
+    },
     isCompacting: () => compaction?.isCompacting() ?? false,
     activeTools: () => [...toolPool().keys()],
     setQueueMode: (lane, mode) => core.setQueueMode(lane, mode),
     queue,
     abortRetry: () => core.abortRetry(),
     steer: (text, id) => {
+      if (!acceptingInput) throw new Error('The run has settled; submit a new prompt after completion.');
       if (!text.trim()) return;
       core.steer({ role: "user", content: text }, id);
     },
     followUp: (text, id) => {
+      if (!acceptingInput) throw new Error('The run has settled; submit a new prompt after completion.');
       if (!text.trim()) return;
       core.followUp({ role: "user", content: text }, id);
     },

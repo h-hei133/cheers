@@ -41,6 +41,64 @@ it('retires the loaded extension capabilities when their consuming session is di
   expect(() => api.events.emit('late')).toThrow('retired');
 });
 
+it('delivers native events through the public extension API and joins final settlement', async () => {
+  const events: Array<{ type: string; content?: unknown }> = []; let ready!: () => void; let release!: () => void;
+  const reached = new Promise<void>(resolve => { ready = resolve; }); const wait = new Promise<void>(resolve => { release = resolve; });
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true,
+    extensionFactories: [api => {
+      api.on('agent_start', event => { events.push({ type: event.type }); });
+      api.on('message_end', event => { events.push({ type: event.type, content: event.message.content }); });
+      api.on('agent_end', event => { events.push({ type: event.type }); });
+      api.on('agent_settled', async event => { events.push({ type: event.type }); ready(); await wait; });
+    }] });
+  await loader.reload(); const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all' });
+  try {
+    let returned = false; const pending = session.prompt('Say done.').then(() => { returned = true; });
+    await reached; expect(returned).toBe(false);
+    expect(events[0]?.type).toBe('agent_start'); expect(events.filter(event => event.type === 'agent_end')).toHaveLength(1);
+    release(); await pending;
+    expect(events.at(-1)?.type).toBe('agent_settled');
+  } finally { release(); await session.dispose(); }
+});
+
+it('ignores notification return values while preserving original payloads for later handlers', async () => {
+  const observed: string[] = [];
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true,
+    extensionFactories: [api => {
+      // Dynamic registration remains compatible, but native notifications have no result contract.
+      (api.on as (name: string, handler: (event: unknown) => unknown) => void)('agent_start', () => ({ decision: 'block', replaced: true }));
+      api.on('agent_start', event => { observed.push(event.type); });
+    }] });
+  await loader.reload(); const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all' });
+  try { await session.prompt('Say done.'); expect(observed).toEqual(['agent_start']); }
+  finally { await session.dispose(); }
+});
+
+it('keeps later native notification handlers admitted after one handler throws', async () => {
+  const observed: string[] = [];
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true,
+    extensionFactories: [api => {
+      api.on('agent_start', () => { throw new Error('Synthetic notification failure'); });
+      api.on('agent_start', event => { observed.push(event.type); });
+    }] });
+  await loader.reload(); const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all' });
+  try { await session.prompt('Say done.'); expect(observed).toEqual(['agent_start']); }
+  finally { await session.dispose(); }
+});
+
+it('refuses a late extension prompt after the run has declared settlement', async () => {
+  let refused: unknown; let accepted = false;
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true, extensionFactories: [api => {
+    api.on('agent_settled', async () => { try { await api.sendMessage('This cannot enter the settled run'); accepted = true; } catch (error) { refused = error; } });
+  }] });
+  await loader.reload(); const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all' });
+  try {
+    await session.prompt('Say done.'); expect(accepted).toBe(false);
+    expect(refused).toBeInstanceOf(Error);
+    expect(String((refused as Error).message)).toContain('settled');
+  } finally { await session.dispose(); }
+});
+
 it('releases only the loader generation consumed by the disposed session', async () => {
   fs.writeFileSync(path.join(root, 'note.txt'), 'Workspace text');
   const apis: ExtensionAPI[] = [];

@@ -1,0 +1,182 @@
+{
+  "status": "passed",
+  "source": {
+    "packages/ts-shell/src/core/hooks/extensionBridge.test.ts": "0ba1b1e8ce094e864ed7deb760bf9fa149f5639519ecd50d5d06e4977ae1eada",
+    "packages/ts-shell/src/extensions/events/dispatch.ts": "637f70201e4c9f86e68f2b102f5b657b764c09daaaaaec21b48b763e22d40751",
+    "packages/ts-shell/src/extensions/events/model.ts": "88ec9a729c72aa284a5ecde613b4e18d4fb54c9be50d12af2ee8b770092ee10e",
+    "packages/ts-shell/src/turn/events.test.ts": "74ee3c820c4eabcb12c0b912670e7435d856f00e6c5d29ae9ac2359bf5107f0f",
+    "packages/ts-shell/src/turn/events.ts": "33780beb17a8fd6d76d6172e853d626cf65b2db9f6e941ab54e929dc93e35bb8",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "3d89ffe6faba0c5381337476ae75039c4b323d701366f93d08969c0434159b8a",
+    "packages/ts-shell/src/core/catalog/contributions.ts": "02e05f7ce2467ad0627eb23903775ffa9c458486516c1ba92f3f3c97ef6f0126",
+    "packages/ts-shell/src/core/hooks/extensionBridge.ts": "7d69f0ee30f405f8eef1cb5de2e61268f2df2441eab4e2b313aa096fa9a08d6b",
+    "packages/ts-shell/src/core/hooks/hookDispatcher.ts": "3f2da294c8b00c476428c500cd9ea083a7af8cb70c321ac839f2064e4392492c",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "8e5a1f34fd532a1801be104d948f7823a8c172ffd04af196af680c4d31ae4be0",
+    "packages/ts-shell/src/index.ts": "d7a9c28f81d2ce9180ac8603785f38f3610749dfebab0e317129f6889f1bc144",
+    "packages/ts-shell/src/sdk/agentSession.ts": "fdf33b113e65b51c8ec14180f7ce96e0356f2d6edb20dedfdf381cbf19543ffd",
+    "packages/ts-shell/src/sdk/lifecycle.test.ts": "84aa434ca3e67e8325f787c889bedc993ac5a6281c3d9dadde69f6963848a8d3",
+    "packages/ts-shell/src/turn/session.ts": "9183d588a577ea4e713a22c8c12218018682d6c103aea2feb499c58042d04b53"
+  },
+  "cases": [
+    {
+      "name": "kernel-notifications",
+      "file": "turn/session.ts",
+      "beforeSha256": "9183d588a577ea4e713a22c8c12218018682d6c103aea2feb499c58042d04b53",
+      "reversedSha256": "ef12f105746d08b0bf8adc90f9c68230cbeb0ade6e92573101e2ed1353cde6f1",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-kernel-notifications.log",
+      "logSha256": "a4c67302e8e73f4dd924cbe46710aed08bb9e127d84887c82f1b12fb04134dc8",
+      "terminalTests": "1 failed | 9 skipped (10)"
+    },
+    {
+      "name": "failure-alias",
+      "file": "core/hooks/hookDispatcher.ts",
+      "beforeSha256": "3f2da294c8b00c476428c500cd9ea083a7af8cb70c321ac839f2064e4392492c",
+      "reversedSha256": "8172210b3aba9cb3e1b2c64ddbf102ce66fd5fa3e962293ac48e3b64526dc282",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-failure-alias.log",
+      "logSha256": "6e08478e53ba7b203d8bc4d6dc15e23c06d3993a2d13fe335cda1280249fec72",
+      "terminalTests": "1 failed | 9 skipped (10)"
+    },
+    {
+      "name": "captured-audience",
+      "file": "turn/events.ts",
+      "beforeSha256": "33780beb17a8fd6d76d6172e853d626cf65b2db9f6e941ab54e929dc93e35bb8",
+      "reversedSha256": "2d6cfa19872e93bc0d662e4aa04fe3882e1f044b474379fed0c7f0f63438612c",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-captured-audience.log",
+      "logSha256": "3c4b55c359e10d4a5745ad43ad5569d589ad75a61ba2d09486ab32c891d2fe13",
+      "terminalTests": "1 failed | 9 skipped (10)"
+    },
+    {
+      "name": "pending-queue",
+      "file": "turn/events.ts",
+      "beforeSha256": "33780beb17a8fd6d76d6172e853d626cf65b2db9f6e941ab54e929dc93e35bb8",
+      "reversedSha256": "ccca55c133161efc32fe279232280f5fcc5bf4765c2d25497f93c0c104e74b5a",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-pending-queue.log",
+      "logSha256": "ecb5b2b794a200a2d448cc3864ba3008b1feed0a43a82899c051ce4b761d662f",
+      "terminalTests": "1 failed | 9 skipped (10)"
+    },
+    {
+      "name": "notification-returns",
+      "file": "extensions/events/dispatch.ts",
+      "beforeSha256": "637f70201e4c9f86e68f2b102f5b657b764c09daaaaaec21b48b763e22d40751",
+      "reversedSha256": "b082ffdee95cd6e65dce4b6d9a18f80ad172f6f35de4f8ad0f41f6b1b3f619a2",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-notification-returns.log",
+      "logSha256": "2fd283f3d1a73814a35412edd2ef30d3f9399debbd304e5525cfb81b27339ad2",
+      "terminalTests": "1 failed | 13 skipped (14)"
+    },
+    {
+      "name": "late-input",
+      "file": "turn/session.ts",
+      "beforeSha256": "9183d588a577ea4e713a22c8c12218018682d6c103aea2feb499c58042d04b53",
+      "reversedSha256": "02e762f5c5cc9cf307e663ac4d44e4775dc4c143812f23618cf262f616914880",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-late-input.log",
+      "logSha256": "080e57567ed111c27a5578f38aad01dd8708e2a185f8b0f47fb118bd3967689a",
+      "terminalTests": "1 failed | 13 skipped (14)"
+    },
+    {
+      "name": "iterator-join",
+      "file": "turn/session.ts",
+      "beforeSha256": "9183d588a577ea4e713a22c8c12218018682d6c103aea2feb499c58042d04b53",
+      "reversedSha256": "3efad62d95c5bc476b2d3b25842de2044bc1f00c17ecf695279e169384118db1",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-iterator-join.log",
+      "logSha256": "45d8e362d5c88e6fc227ce15b51320b236fcb70f81803e8a683993b677f643b6",
+      "terminalTests": "1 failed | 9 skipped (10)"
+    },
+    {
+      "name": "retired-audience",
+      "file": "core/catalog/contributions.ts",
+      "beforeSha256": "02e05f7ce2467ad0627eb23903775ffa9c458486516c1ba92f3f3c97ef6f0126",
+      "reversedSha256": "c4e51b3bc5122b44c369186eda599cb0ea01b98f02c9cafce589d62015f2c4b7",
+      "exit": 1,
+      "assertionFailures": 2,
+      "log": "reversal-retired-audience.log",
+      "logSha256": "8895818ed100cdd944a06162d4f3fea21d784ebbbf3f117c9021526e4307e7e4",
+      "terminalTests": "2 failed | 11 skipped (13)"
+    },
+    {
+      "name": "immutable-observation",
+      "file": "turn/events.ts",
+      "beforeSha256": "33780beb17a8fd6d76d6172e853d626cf65b2db9f6e941ab54e929dc93e35bb8",
+      "reversedSha256": "75a8202601941e0a6da34e7cc23941c0ebd0d5bbae29cc96b1b2b29f223dfec6",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-immutable-observation.log",
+      "logSha256": "b484db1eca3f76e57e3f45e60cbd713bec1f83a3ffa94515eb48de100fc7ab9e",
+      "terminalTests": "1 failed | 9 skipped (10)"
+    },
+    {
+      "name": "cancelled-terminal",
+      "file": "turn/events.ts",
+      "beforeSha256": "33780beb17a8fd6d76d6172e853d626cf65b2db9f6e941ab54e929dc93e35bb8",
+      "reversedSha256": "a333f5709539ec8a2ab8f85c61056bdd677d7b8a862918be4efa89ea3aabe1a2",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-cancelled-terminal.log",
+      "logSha256": "7495302fffd0196dd645a0388444a5d5127eeaa034f8aa7c5a90dd3990648e97",
+      "terminalTests": "1 failed | 9 skipped (10)"
+    }
+  ],
+  "restored": [
+    {
+      "name": "kernel-notifications",
+      "exact": true
+    },
+    {
+      "name": "failure-alias",
+      "exact": true
+    },
+    {
+      "name": "captured-audience",
+      "exact": true
+    },
+    {
+      "name": "pending-queue",
+      "exact": true
+    },
+    {
+      "name": "notification-returns",
+      "exact": true
+    },
+    {
+      "name": "late-input",
+      "exact": true
+    },
+    {
+      "name": "iterator-join",
+      "exact": true
+    },
+    {
+      "name": "retired-audience",
+      "exact": true
+    },
+    {
+      "name": "immutable-observation",
+      "exact": true
+    },
+    {
+      "name": "cancelled-terminal",
+      "exact": true
+    }
+  ],
+  "restoredTests": {
+    "exit": 0,
+    "assertionFailures": 0,
+    "log": "restored.log",
+    "logSha256": "1fed8cf5ab50883704ae243b206c368f4495fd71ea6e86fa92e67afc968e1097",
+    "terminalTests": "37 passed (37)"
+  },
+  "mainSourceUnchanged": true,
+  "privateTreeRemoved": true
+}

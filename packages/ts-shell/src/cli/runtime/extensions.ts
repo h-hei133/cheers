@@ -17,6 +17,7 @@ import type { ExtensionManager } from '../../extensions/view/model.js';
 import type { SessionManager } from '../../session/SessionManager.js';
 import { cancelExtensionUiFor, closeExtensionHost, installExtensionHost } from './extensions/host.js';
 import { runExtensionInvocation } from '../../extensions/runtime/context.js';
+import { runEventHandlers } from '../../extensions/events/dispatch.js';
 import type { CoreMcpGateway } from '../../core/mcp/gateway.js';
 export { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
 
@@ -122,16 +123,8 @@ async function registerCliExtensions(
         },
       }));
       const onEvent = loaded.handlers.size > 0
-        ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => runExtensionInvocation(host.ui, signal, async () => {
-            let current = payload;
-            for (const name of [event, ...(aliases ?? [])]) {
-              for (const handler of loaded.handlers.get(name) ?? []) {
-                const next = await handler(current);
-                if (next !== undefined) current = next;
-              }
-            }
-            return current;
-          })
+        ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => runExtensionInvocation(host.ui, signal,
+          () => runEventHandlers({ handlers: loaded.handlers, event, payload, aliases, signal, ownerSignal: loaded.signal }))
         : undefined;
       contributions.push({
         root,
