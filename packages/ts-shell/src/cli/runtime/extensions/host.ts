@@ -18,6 +18,8 @@ interface UiBinding {
 interface HostState {
   readonly host: ExtensionHostBridge;
   readonly admission: () => string | undefined;
+  readonly uiAdmission: () => string | undefined;
+  readonly quiesce: () => void;
   readonly close: () => void;
   refreshUi?: () => void;
 }
@@ -33,10 +35,13 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
   const root = context.cwd;
   const configured = configurationAdmission(context);
   let closed = false;
+  let closing = false;
   let lastUi: UiBinding | undefined;
   const admission = () => closed || context.session.id !== sessionId || context.session.createdAt !== createdAt || context.cwd !== root
     ? 'Extension session or workspace changed.' : configured();
   const check = () => { const refusal = admission(); if (refusal) throw new Error(refusal); };
+  const operations = () => { check(); if (closing) throw new Error('Extension session is closing.'); };
+  const uiAdmission = () => admission() ?? (closing ? 'Extension session is closing.' : undefined);
   const allTools = () => {
     check();
     return [...new Set([...createCoreToolRegistry().keys(), ...catalogContributions(root, sessionId).flatMap(entry => entry.tools.map(tool => tool.name)),
@@ -44,7 +49,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
   };
   const host: ExtensionHostBridge = {
     get ui() {
-      if (admission()) { lastUi?.release(); return lastUi?.host; }
+      if (uiAdmission()) { lastUi?.release(); return lastUi?.host; }
       state.refreshUi?.();
       lastUi = surfaces.get(context);
       return lastUi?.host;
@@ -54,24 +59,29 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
     getCommands: () => { check(); return [...new Set([...createCommandRegistry(root, context.runtimeConfig).keys(),
       ...catalogContributions(root, sessionId).flatMap(entry => entry.commands.map(command => command.name))])]; },
     sendMessage: async message => {
-      check();
+      operations();
       if (typeof message !== 'string' || !message.trim()) throw new Error('Extension message must be nonempty text.');
       const input = runtime.input();
       if (input) input.followUp(message, 'extension');
       else await runtime.executePrompt(sessionId, message, { outputMode: 'print' });
     },
     appendEntry: async (customType, data) => {
-      check();
+      operations();
       if (!store) throw new Error('Extension entry storage is unavailable.');
       const write = store.captureReportWriter(sessionId);
       const text = typeof data === 'string' ? data : JSON.stringify(data);
-      check();
+      operations();
       const result = write({ version: 1, title: `extension:${customType}`, facts: { customType },
         lines: [{ kind: 'text', spans: [{ text: text ?? '', role: 'text' }] }] });
       if (result !== 'saved') throw new Error(result === 'unverified' ? 'Extension entry persistence is unverified.' : 'Extension entry was not saved.');
     },
   };
-  const state: HostState = { host, admission, close: () => {
+  const state: HostState = { host, admission, uiAdmission, quiesce: () => {
+    closing = true;
+    state.refreshUi = undefined;
+    lastUi?.release();
+    if (hosts.get(context) === state) surfaces.get(context)?.release();
+  }, close: () => {
     closed = true;
     state.refreshUi = undefined;
     lastUi?.release();
@@ -83,6 +93,12 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
 
 export function extensionHostFor(context: ShellRuntimeContext): ExtensionHostBridge | undefined {
   return hosts.get(context)?.host;
+}
+
+/** Stop new operations while the original generation remains available to shutdown observers. */
+export function quiesceExtensionHost(context: ShellRuntimeContext, expected?: ExtensionHostBridge): void {
+  const state = hosts.get(context);
+  if (state && (!expected || state.host === expected)) state.quiesce();
 }
 
 /** A consumer retains renewal authority; all shared-host callers acquire its current surface. */
@@ -114,7 +130,7 @@ export function bindExtensionUiFor(context: ShellRuntimeContext, ui: ExtensionUi
     callback?.();
   };
   const admission = () => {
-    const refusal = state?.admission() || admitted();
+    const refusal = state?.uiAdmission() || admitted();
     if (refusal) release();
     return refusal;
   };
@@ -130,7 +146,7 @@ export function bindExtensionUiFor(context: ShellRuntimeContext, ui: ExtensionUi
   } };
   surfaces.set(context, binding);
   background.addEventListener('abort', release, { once: true });
-  if (background.aborted || state?.admission() || admitted()) release();
+  if (background.aborted || state?.uiAdmission() || admitted()) release();
   return release;
 }
 

@@ -1,10 +1,14 @@
 # 规划执行进展（2026-11-19）
 
-本轮接续已核实任务，完成 E.6 的 kernel通知与完整结算子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
+本轮接续已核实任务，完成 E.6 的 kernel结算与实际startup／shutdown子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
 
 核查与取舍见[工程记录](design.md)，当前验收和次序见[任务清单](tasks.md)。源码按批本地提交。远端推送和本轮 CI 尚未发生。原定暂缓的原生插件与独立桌面产品不计入 62 项，T6 保留按需求开启。
 
 ## 当前批次的验证
+
+实际session_start／shutdown已从每轮prompt别名中移出。SDK资源／model／UI／permission完成后start；关闭先同步拒绝新消息、追加和UI，等待旧run，再通知原受众并退休generation。CLI结构化事件桥先于start回调，cleanup错误由共享结算保留。最终16文件255项、七门／2716modules／0monoliths、builddce69239cca0、9反转9AssertionErrors／exact恢复53项、Linuxcompiled11场景16POST与Node20.3同组、安装15入口strict类型／9场景13POST通过，限定APPROVE。当前CLI额外2POST／两shutdown warning证明实际两handler消费者。配置模型provider-auth／0requests，normal judge仍exit2/not_proven。switch/fork/tree、controlled reload、CLI startup UI时机和mutating results保持开放。[当前交付](../../../.omx/artifacts/upgrade-lifecycle-2026-11-19/delivery.json)。
+
+以下kernel子批已提交cb4f69d6，保持原source范围。
 
 E.6首子批沿原contribution／invocation派发typed kernel事件，区分每次agent_end与最终单次agent_settled；immutable快照、排队前受众、generation撤权、5秒有界串行handler、返回值忽略／异常隔离和iterator.return结算等待已接通，late prompt真实拒绝。当前14文件216项、七静态门／2714modules／0monoliths、builda62d41f8a9cd、10有效反转11AssertionErrors／exact恢复37项通过。Linuxcompiled七场景11POST和Node20.3禁动态生成同组、安装15入口strict类型／六场景10POST通过，限定独立APPROVE。配置模型provider-auth／0requests；正常judgeexit2/not_proven／容量缺口，原配置未改、私有state清理。真实session_start／shutdown与switch／fork／tree及结果消费者仍缺，下一子批补实际create/dispose和CLI启动／关闭。[首子批交付](../../../.omx/artifacts/upgrade-events-2026-11-19/delivery.json)。
 

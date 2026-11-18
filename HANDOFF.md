@@ -2856,3 +2856,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** A consumer stops at query.failed before cleanup finishes, or agent_settled accepts a followup that never executes.
 - **Root cause** The async iterator has no return/join and input queues remain open after continuation is decided.
 - **Rule** Iterator.return joins actual settlement. Close new input admission before final callbacks and reject late messages truthfully. Distinguish each kernel agent_end from the one final agent_settled; notification returns grant no permission and cannot replace later handlers' payloads. Test legacy aliases through the real handler dispatcher rather than a recorder that ignores aliases.
+
+### Session Shutdown Must Quiesce Before Retiring Its Handlers
+- **Symptom** Native session events repeat on every prompt, shutdown disappears after resource retirement, or synchronous UI release schedules duplicate shutdown and loses an error for later callers.
+- **Root cause** Prompt Hook aliases are treated as session lifecycle, and cleanup mixes host admission, handler retirement and shared settlement ordering.
+- **Rule** Start native notifications from the prepared session owner. Synchronously refuse new host operations before cancelling and joining the old run, then notify its captured audience before retiring resources. Store the shared shutdown Promise before UI release callbacks can reenter, and retain release errors for every waiter while continuing cleanup. Install machine event observers before startup callbacks can submit a prompt. Retired UI uses its existing cancellation fallback; it does not grant permission or start another dialog.

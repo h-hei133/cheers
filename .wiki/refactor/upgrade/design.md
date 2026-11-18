@@ -4,6 +4,18 @@
 
 只有一个 workspace 包。单个模块的 import 图无环不等于可以直接搬目录成为无环包：browser/core、workflow/core、planning/session/provider 的双向边存在。现有分支树、CAS 状态写入、任务日志、远端作业派发栅栏均已实现；问题是事务权威和独立模块边界未完成，不能重造另一套执行器或任务系统。
 
+## Session startup and shutdown ownership (2026-11-19)
+
+目标是让native session事件对应真正create/dispose，不再随prompt重复；普通SessionStart/End Hook原合同保留，删除两native别名。参考teardown先abort／join、shutdown后才invalidate，采用该顺序但保留本项目configuration、host、贡献与资源owner，不另建session runtime。SDK在resource binding／logical model／UI／permission准备后等待start，初始化失败走原完整cleanup。CLI在actual runtime与model准备和machine observer安装后等待start，cleanup在原run join与old shutdown之后才退休extensions。
+
+新extensions/lifecycle仅持有一个session/generation的start及shutdown Promise、原始audience和身份准入；notification immutable且忽略结果。host区分closing与retired：关闭新sendMessage／append／UI，原只读信息保留至shutdown结束。共享closing永久阻止service重新获取host。SDK dispose共享一次cleanup，任何资源错误继续清理并原样返回。原runtime cancel失败不伪造shutdown已完成。
+
+先捕owner五红、SDK六红、CLI顺序红；复审三个实际缺陷分别由bindExtensionUiFor释放时reentry、release throw双caller与startup提交前JSON桥消费者复现后修复。先登记共享shutdown再quiesce，释放失败合并到共享结果，机器observer在start之前安装。SDK退休UI返回false的既有取消合同保留；probe初错JSON参数／外层envelope和fixture mock未reset造成的失败保留分类，仅修观察器。最终16文件255项、七门／2716modules／0monoliths、builddce69239cca0与输入摘要核验通过，限定APPROVE；9有效反转9AssertionErrors，隔离树exact恢复后3文件53项passed。
+
+同代Linuxcompiled11场景16POST与Node20.3禁动态生成同组；SDK actual start／two prompts／double disposal／pending agent_settled／外部reload旧受众隔离和CLI实际文件扩展／startup提交完整JSON帧通过。安装15入口strict NodeNext／skipLibCheck=false／engine-strict，9场景13POSTpassed。CLI追加2POST、原日志两条notification失败分别证明throw与UI unavailable两个shutdown handler确实被消费，不把exit0代替证据。配置模型provider-auth／0requests，normal judgeexit2/not_proven仍为pinned图容量缺口。[当前交付](../../../.omx/artifacts/upgrade-lifecycle-2026-11-19/delivery.json)。
+
+下一子批需把CLI interactive/RPC UI实际绑定后的start接回同owner，以及switch/new/resume/fork/tree与受控reload事件；现在core recovery同步activation和CLI service同步key refresh仍未有before取消消费者，SDK外部loader.reload后旧handler失效不追补旧shutdown。此子批不表示完整E.6或其他26项完成。
+
 ## Extension kernel notifications and settlement (2026-11-19)
 
 E.6首子批复用既有contribution与invocation入口。原agent_end只是StopFailure别名，成功和取消没有扩展消费者；现直接观察kernel lifecycle，并删除失败别名。agent_end表示每个kernel loop结束，agent_settled表示自动重试、压缩、Stop修复与队列没有剩余续轮，不能把Stop当kernel end。

@@ -1,4 +1,4 @@
-import { isRunEvent } from './model.js';
+import { isNotificationEvent } from './model.js';
 import { createComponentLogger } from '../../observability/structuredLogger.js';
 
 const logger = createComponentLogger('extension-events');
@@ -12,7 +12,7 @@ export async function runEventHandlers(input: {
   readonly signal?: AbortSignal;
   readonly ownerSignal?: AbortSignal;
 }): Promise<unknown> {
-  const notification = isRunEvent(input.event);
+  const notification = isNotificationEvent(input.event);
   const admitted = () => {
     if (input.signal) AbortSignal.prototype.throwIfAborted.call(input.signal);
     if (input.ownerSignal) AbortSignal.prototype.throwIfAborted.call(input.ownerSignal);

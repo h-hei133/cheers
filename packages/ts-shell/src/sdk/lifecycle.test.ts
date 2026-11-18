@@ -6,6 +6,15 @@ import { createAgentSession } from './agentSession.js';
 import { DefaultResourceLoader } from './resourceLoader.js';
 import type { ExtensionAPI } from '../extensions/runtime/inProcessLoader.js';
 import { getRuntimeConfig } from '../config/runtimeConfig.js';
+import { ShellSessionRuntime } from '../core/shell/sessionRuntime.js';
+import { readLogicalModel } from '../session/model/logical.js';
+
+interface SessionNotification {
+  readonly type: 'session_start' | 'session_shutdown';
+  readonly sessionId: string;
+  readonly workspaceRoot: string;
+  readonly reason: string;
+}
 
 let root: string;
 beforeEach(() => {
@@ -17,6 +26,198 @@ beforeEach(() => {
   vi.stubEnv('CHEERS_PROVIDER_MODE', 'synthetic');
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }); });
+
+it('starts the SDK session once before create returns and retains that start across prompts', async () => {
+  fs.writeFileSync(path.join(root, 'note.txt'), 'Workspace text');
+  const events: SessionNotification[] = [];
+  const ready: Array<{ text: string; commands: readonly string[]; confirmed: boolean; scope: unknown }> = [];
+  const scope = vi.spyOn(ShellSessionRuntime.prototype, 'setPermissionScope');
+  const confirm = vi.fn(async () => true);
+  let release!: () => void;
+  const hold = new Promise<void>(resolve => { release = resolve; });
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true, extensionFactories: [api => {
+    api.registerCommand({ name: 'captured', description: 'Captured command', execute: async () => 'Captured' });
+    api.on('session_start', async event => {
+      events.push(event as SessionNotification);
+      ready.push({ text: await api.readWorkspaceFile('note.txt'), commands: await api.getCommands(),
+        confirmed: await api.ui.confirm('Starting', 'Ready?'), scope: scope.mock.calls.at(-1)?.[0] });
+      await hold;
+      return { decision: 'block', replaced: true };
+    });
+    api.on('session_start', event => { events.push(event as SessionNotification); });
+  }] });
+  await loader.reload();
+  let returned = false;
+  const creating = createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all',
+    permissionScope: 'accept-edits', ui: { confirm } }).then(result => { returned = true; return result; });
+  void creating.catch(() => {});
+  try {
+    await vi.waitFor(() => expect(ready).toHaveLength(1));
+    expect(returned).toBe(false);
+    expect(ready[0]).toEqual({ text: 'Workspace text', commands: expect.arrayContaining(['captured']),
+      confirmed: true, scope: 'accept-edits' });
+    release();
+    const { session } = await creating;
+    const notification = { type: 'session_start', sessionId: session.sessionId, workspaceRoot: root, reason: 'startup' };
+    expect(events).toEqual([notification, notification]);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    await session.prompt('Say first.');
+    await session.prompt('Say second.');
+    expect(events).toEqual([notification, notification]);
+  } finally { release(); const created = await creating; await created.session.dispose(); }
+});
+
+it('publishes SDK session_start after selecting the startup model and applying its permission scope', async () => {
+  const observed: Array<{ event: SessionNotification; model: unknown; scope: unknown }> = [];
+  const scope = vi.spyOn(ShellSessionRuntime.prototype, 'setPermissionScope');
+  const route = vi.fn(() => ({ provider: 'openai', modelId: 'physical' }));
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true, extensionFactories: [api => {
+    api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Adaptive', route });
+    api.on('session_start', event => {
+      const notification = event as SessionNotification;
+      observed.push({ event: notification, model: readLogicalModel(notification.sessionId), scope: scope.mock.calls.at(-1)?.[0] });
+    });
+  }] });
+  await loader.reload();
+  const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all',
+    model: 'adaptive/auto', permissionScope: 'allow-all' });
+  try {
+    expect(observed).toEqual([{ event: { type: 'session_start', sessionId: session.sessionId, workspaceRoot: root, reason: 'startup' },
+      model: { provider: 'adaptive', model: 'auto' }, scope: 'allow-all' }]);
+    expect(route).not.toHaveBeenCalled();
+  } finally { await session.dispose(); }
+});
+
+it('joins one SDK shutdown while preserving original read access and refusing new host work', async () => {
+  fs.writeFileSync(path.join(root, 'note.txt'), 'Workspace text');
+  let api!: ExtensionAPI;
+  const events: SessionNotification[] = [];
+  const reads: Array<{ text: string; tools: readonly string[]; commands: readonly string[] }> = [];
+  const refused: Array<{ operation: string; error: unknown }> = [];
+  const confirmed: boolean[] = [];
+  const confirm = vi.fn(async () => true);
+  let release!: () => void;
+  const hold = new Promise<void>(resolve => { release = resolve; });
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true, extensionFactories: [value => {
+    api = value;
+    value.registerCommand({ name: 'captured', description: 'Captured command', execute: async () => 'Captured' });
+    value.on('session_shutdown', async event => {
+      events.push(event as SessionNotification);
+      reads.push({ text: await value.readWorkspaceFile('note.txt'), tools: await value.getActiveTools(), commands: await value.getCommands() });
+      try { await value.sendMessage('A shutdown must not start another prompt'); }
+      catch (error) { refused.push({ operation: 'sendMessage', error }); }
+      try { await value.appendEntry('shutdown', 'A shutdown must not append another entry'); }
+      catch (error) { refused.push({ operation: 'appendEntry', error }); }
+      confirmed.push(await value.ui.confirm('Shutdown', 'This must not open'));
+      await hold;
+      return { decision: 'block', replaced: true };
+    });
+    value.on('session_shutdown', event => { events.push(event as SessionNotification); });
+  }] });
+  await loader.reload();
+  const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all', ui: { confirm } });
+  const cancel = vi.spyOn(session.sessionRuntime, 'cancelAndWait');
+  const terminate = vi.spyOn(session.sessionRuntime, 'terminate');
+  let finished = false;
+  const first = session.dispose();
+  const second = session.dispose();
+  const settled = Promise.allSettled([first, second]).then(results => { finished = true; return results; });
+  try {
+    expect(first).toBe(second);
+    await vi.waitFor(() => expect(confirmed).toEqual([false]));
+    expect(reads).toEqual([{ text: 'Workspace text', tools: [], commands: expect.arrayContaining(['captured']) }]);
+    expect(refused).toEqual(['sendMessage', 'appendEntry'].map(operation => ({ operation, error: expect.any(Error) })));
+    expect(confirm).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(terminate).not.toHaveBeenCalled();
+    expect(finished).toBe(false);
+    expect(await api.readWorkspaceFile('note.txt')).toBe('Workspace text');
+    release();
+    expect(await settled).toEqual([{ status: 'fulfilled', value: undefined }, { status: 'fulfilled', value: undefined }]);
+    const notification = { type: 'session_shutdown', sessionId: session.sessionId, workspaceRoot: root, reason: 'quit' };
+    expect(events).toEqual([notification, notification]);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(terminate).toHaveBeenCalledTimes(1);
+    expect(() => api.readWorkspaceFile('note.txt')).toThrow('retired');
+    await session.dispose();
+    expect(events).toHaveLength(2);
+  } finally { release(); await settled; }
+});
+
+it('joins the pending agent_settled notification before publishing SDK session_shutdown', async () => {
+  const events: string[] = [];
+  let release!: () => void;
+  const hold = new Promise<void>(resolve => { release = resolve; });
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true, extensionFactories: [api => {
+    api.on('agent_settled', async () => { events.push('agent_settled'); await hold; events.push('agent_settled_done'); });
+    api.on('session_shutdown', () => { events.push('session_shutdown'); });
+  }] });
+  await loader.reload();
+  const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all' });
+  const prompting = Promise.allSettled([session.prompt('Say done.')]);
+  let disposing: Promise<PromiseSettledResult<void>[]> | undefined;
+  try {
+    await vi.waitFor(() => expect(events).toEqual(['agent_settled']));
+    const cancel = vi.spyOn(session.sessionRuntime, 'cancelAndWait');
+    let finished = false;
+    disposing = Promise.allSettled([session.dispose()]).then(results => { finished = true; return results; });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(finished).toBe(false);
+    expect(events).toEqual(['agent_settled']);
+    release();
+    await prompting;
+    expect(await disposing).toEqual([{ status: 'fulfilled', value: undefined }]);
+    expect(events).toEqual(['agent_settled', 'agent_settled_done', 'session_shutdown']);
+  } finally { release(); await prompting; await (disposing ?? session.dispose()); }
+});
+
+it('does not notify a loader successor when disposing the SDK session that consumed its retired generation', async () => {
+  fs.writeFileSync(path.join(root, 'note.txt'), 'Workspace text');
+  const apis: ExtensionAPI[] = [];
+  const events: Array<{ generation: number; event: SessionNotification }> = [];
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true, extensionFactories: [api => {
+    apis.push(api);
+    const generation = apis.length;
+    api.on('session_start', event => { events.push({ generation, event: event as SessionNotification }); });
+    api.on('session_shutdown', event => { events.push({ generation, event: event as SessionNotification }); });
+  }] });
+  await loader.reload();
+  const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all' });
+  try {
+    await loader.reload();
+    await session.dispose();
+    expect(events).toEqual([{ generation: 1,
+      event: { type: 'session_start', sessionId: session.sessionId, workspaceRoot: root, reason: 'startup' } }]);
+    expect(() => apis[0]!.readWorkspaceFile('note.txt')).toThrow('retired');
+    expect(await apis[1]!.readWorkspaceFile('note.txt')).toBe('Workspace text');
+  } finally { await session.dispose(); }
+});
+
+it('continues SDK initialization and cleanup after native session notification handlers throw', async () => {
+  fs.writeFileSync(path.join(root, 'note.txt'), 'Workspace text');
+  let api!: ExtensionAPI;
+  const observed: SessionNotification[] = [];
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true, extensionFactories: [value => {
+    api = value;
+    value.on('session_start', () => { throw new Error('Synthetic startup notification failure'); });
+    value.on('session_start', event => { observed.push(event as SessionNotification); });
+    value.on('session_shutdown', () => { throw new Error('Synthetic shutdown notification failure'); });
+    value.on('session_shutdown', event => { observed.push(event as SessionNotification); });
+  }] });
+  await loader.reload();
+  const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all' });
+  const terminate = vi.spyOn(session.sessionRuntime, 'terminate');
+  try {
+    await session.dispose();
+    expect(observed).toEqual([
+      { type: 'session_start', sessionId: session.sessionId, workspaceRoot: root, reason: 'startup' },
+      { type: 'session_shutdown', sessionId: session.sessionId, workspaceRoot: root, reason: 'quit' },
+    ]);
+    expect(terminate).toHaveBeenCalledTimes(1);
+    expect(() => api.readWorkspaceFile('note.txt')).toThrow('retired');
+  } finally { await session.dispose(); }
+});
 
 it('retires the loaded extension capabilities when their consuming session is disposed', async () => {
   fs.writeFileSync(path.join(root, 'note.txt'), 'Workspace text');

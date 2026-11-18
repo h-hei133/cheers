@@ -23,8 +23,8 @@
 ## Current status
 
 **Current phase** 按批实施。36/62 项完成 Linux 本地功能验收，26 项开放。
-**Completed batch** E.6 kernel通知／完整结算子批，整项仍部分。14文件216项、七静态检查／2714modules／0monoliths、10有效反转11AssertionErrors／exact恢复37项；builda62d41f8a9cd的Linuxcompiled7场景11POST、Node20.3禁动态生成同组和安装15入口strict类型／6场景10POST通过，限定APPROVE。C.5已提交dbc4f37e，证据保持此前source范围。
-**Next batch** E.6真实session_start／shutdown。先SDK create/dispose与CLI启动／关闭，后switch／fork／tree及可修改结果消费者；关闭新操作准入后结算旧run，通知后才退休原extension generation。
+**Completed batch** E.6实际startup／shutdown子批，整项仍部分。16文件255项、七静态检查／2716modules／0monoliths、9有效反转9AssertionErrors／exact恢复53项；builddce69239cca0的Linuxcompiled11场景16POST、Node20.3禁动态生成同组和安装15入口strict类型／9场景13POST通过，限定APPROVE。kernel／settlement已提交cb4f69d6，保持此前source证据。
+**Next batch** E.6 switch／fork／tree取消与生命周期，随后可修改结果消费者。SDK create/dispose和CLI启动／关闭已接真实owner；CLI interactive/RPC start时UI尚未建立仍需单独接入，不称完整E.6完成。
 **Repository gate** 当前normal judgeexit2/not_proven，16384图容量缺口；pinned输入未改。定向script29项与完整209/210为前批历史，不升为当前script验证。
 **Evidence boundary** 当前构建配置模型provider-auth，0requests；Linux本地HTTP／安装证据不证明真实服务或其他平台。本轮仅本地按批提交，不push或宣称CI。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
@@ -41,7 +41,7 @@
 
 ## Adaptive control
 
-E.6首子批实际L，复用contribution／invocation／kernel／channel owner，结构检查10/10，无新增依赖或事件总线。额外依赖5项：queued audience capture、non-inert observer隔离、逐handler异常、late input真实拒绝及iterator cleanup join。10个反转均AssertionError，原alias测试不消费aliases与隔离树Undici归属错误均单列分类后重验。36/62与goal active不变，完整session/result生命周期继续开放；未补造历史估算／drift。
+E.6生命周期子批实际L，结构复用10/10，原runtime/contribution/host/SDK/CLI cleanup保持，无新增依赖或事件总线。额外依赖3项：同步UI release重入、release错误共享、startup提交前machine bridge。六SDK反例与五owner反例先红；三review反例先红后修。UI false/throw和JSON外层envelope期待、fixture mock未reset归类并保留，不为绿改生产合同。36/62与goal active不变，switch/result和完整UI start仍开放，未补造历史估算。
 
 当前Linux功能验收任务数为32/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.8、C.9、E.5、E.1、F2.2、F2.4和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 

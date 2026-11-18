@@ -19,20 +19,30 @@ import { cancelExtensionUiFor, closeExtensionHost, installExtensionHost } from '
 import { runExtensionInvocation } from '../../extensions/runtime/context.js';
 import { runEventHandlers } from '../../extensions/events/dispatch.js';
 import type { CoreMcpGateway } from '../../core/mcp/gateway.js';
+import { ExtensionSessionLifecycle } from './extensions/lifecycle.js';
+import type { ExtensionSessionEvent } from '../../extensions/events/model.js';
 export { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
 
-interface ExtensionRuntime { readonly service: () => ExtensionService; readonly ready: () => Promise<void>; readonly close: () => Promise<void>; readonly cancel: () => Promise<void>; readonly run: ExtensionRun }
+interface ExtensionRuntime {
+  readonly service: () => ExtensionService; readonly ready: () => Promise<void>; readonly close: () => Promise<void>; readonly cancel: () => Promise<void>; readonly run: ExtensionRun;
+  readonly start: (reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason']) => Promise<void>;
+  readonly shutdown: (reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason'], settle?: () => Promise<void>) => Promise<void>;
+}
 const runtimes = new WeakMap<ShellRuntimeContext, ExtensionRuntime>();
 export function installExtensionRuntime(context: ShellRuntimeContext, runtime: ShellSessionRuntime, gate: (tool?: string) => ToolGateOptions, store?: SessionManager,
   gateway?: Pick<CoreMcpGateway, 'peekSnapshot'>): void {
   let service: ExtensionService | undefined; let identity: string | undefined;
-  let closed = false; let retiredUnknown = false;
+  let closed = false; let closing = false; let retiredUnknown = false;
   const cliCleanups: Array<() => void> = [];
   const retiring = new Set<Promise<void>>();
   let initialization: AbortController | undefined;
   let initializing = false;
   let ready: Promise<void> = Promise.resolve();
-  runtimes.set(context, { run: operation => runtime.commands.run(operation), ready: () => ready, cancel: async () => { if (initializing) initialization?.abort(); await service?.cancel(); }, close: async () => {
+  let lifecycle: ExtensionSessionLifecycle | undefined;
+  runtimes.set(context, { run: operation => runtime.commands.run(operation), ready: () => ready,
+    start: reason => lifecycle!.start(() => ready, reason),
+    shutdown: (reason, settle) => { closing = true; return lifecycle!.shutdown(settle ?? (() => runtime.cancelAndWait()), reason); },
+    cancel: async () => { if (initializing) initialization?.abort(); await service?.cancel(); }, close: async () => {
     closed = true;
     closeExtensionHost(context);
     initialization?.abort();
@@ -41,7 +51,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
     await ready.catch(() => {});
     if (retiredUnknown || results.some(result => result.status === 'rejected')) throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
   }, service: () => {
-    if (closed || retiredUnknown) throw new Error('Extension runtime is closed or prior cleanup is unknown.');
+    if (closed || closing || retiredUnknown) throw new Error('Extension runtime is closing, closed or prior cleanup is unknown.');
     const key = JSON.stringify([context.session.id, context.session.createdAt, context.cwd, context.configuration.substrateRevision, context.workspaceRevision]);
     if (!service || identity !== key) {
       initialization?.abort();
@@ -51,6 +61,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
       }
       identity = key; const session = context.session.id; const root = context.cwd;
       const extensionHost = installExtensionHost(context, runtime, store, gateway);
+      lifecycle = new ExtensionSessionLifecycle(context);
       const check = () => { const refused = configurationAdmission(context)() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session or workspace changed.' : undefined); if (refused) throw new Error(refused); };
       service = new ExtensionService({ root, gate: tool => ({ ...gate(tool), admission: () => gate(tool).admission?.() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session changed.' : undefined) }),
         check, extensionHost, offline: () => context.runtimeConfig.offline === true, denyRules: () => context.runtimeConfig.denyRules,
@@ -154,6 +165,14 @@ export function extensionCommandFor(context: ShellRuntimeContext): NonNullable<C
 }
 export function cancelExtensionsFor(context: ShellRuntimeContext): void { cancelExtensionUiFor(context); void runtimes.get(context)?.cancel(); }
 export async function closeExtensionsFor(context: ShellRuntimeContext): Promise<void> { await runtimes.get(context)?.close(); }
+export async function startExtensionsFor(context: ShellRuntimeContext, reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason'] = 'startup'): Promise<void> {
+  const owner = runtimes.get(context);
+  if (owner) { owner.service(); await owner.start(reason); }
+}
+export function shutdownExtensionsFor(context: ShellRuntimeContext, reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason'] = 'quit', settle?: () => Promise<void>): Promise<void> {
+  const owner = runtimes.get(context);
+  return owner ? owner.shutdown(reason, settle) : settle?.() ?? Promise.resolve();
+}
 export function refreshExtensionsFor(context: ShellRuntimeContext): void { runtimes.get(context)?.service(); }
 export async function waitForExtensionsFor(context: ShellRuntimeContext): Promise<void> {
   const runtime = runtimes.get(context);

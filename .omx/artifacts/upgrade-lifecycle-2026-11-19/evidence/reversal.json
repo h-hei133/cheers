@@ -1,0 +1,166 @@
+{
+  "status": "passed",
+  "source": {
+    "packages/ts-shell/src/cli/runtime/extensions/lifecycle.test.ts": "0337f07ddd5eeb747413749904cc82638cbf6804c950b01cb26f528c871d1afd",
+    "packages/ts-shell/src/cli/runtime/extensions/lifecycle.ts": "e8858901318a9031770a1eeb92dc9808d389aedd9fe4c66c483a4598d8498737",
+    "packages/ts-shell/src/cli/bootstrap/cliProcessRunner.test.ts": "69c86d1a4c4d871ed0a989fd9acd35e89b4ea3ed3560c65e3244afbfc8b55f1b",
+    "packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts": "51302872d939d85cddad620304b66b6ca05f0011a99068176389893c998aabaf",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "1d8cf1e48c1038b5197905efeea5c20d2b9884a981bbd07a4ac1eb32a6905998",
+    "packages/ts-shell/src/cli/runtime/extensions/host.ts": "e0d486944f2e0368652c6656d3c18b0e32650348f73b6b4f3af9e5987aed7efd",
+    "packages/ts-shell/src/core/hooks/hookDispatcher.ts": "1f574d7641ab05d9758fcae294883847834df0580a7977094a61bf2fe94f8195",
+    "packages/ts-shell/src/extensions/events/dispatch.ts": "8fcdc7d1fb24fc5fe5fd9aed35ef04c9d0f97141e8302e789549bbca49a39d1a",
+    "packages/ts-shell/src/extensions/events/model.ts": "d02b8f5a785328ce51bd703cfa3e3373dfbfdc484858e20e9097f5b448ff07ee",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "bedb81cf4c548908890ad510586e323f52e4669b942f054502796980404c816b",
+    "packages/ts-shell/src/index.ts": "324300a4c25921e132f65560018d3d3a6deae4587c6f41f935cfaab9e2a52fe0",
+    "packages/ts-shell/src/sdk/agentSession.ts": "7e79eac5f88da37dd844d7547f26572930a9be6c7a2323f5a2976f8575913c89",
+    "packages/ts-shell/src/sdk/lifecycle.test.ts": "ba9b764fe2d0ec64f6eb010be8c50a4a1b8c83658141c42fc0c562d410eb157e"
+  },
+  "cases": [
+    {
+      "name": "sdk-start",
+      "file": "sdk/agentSession.ts",
+      "beforeSha256": "7e79eac5f88da37dd844d7547f26572930a9be6c7a2323f5a2976f8575913c89",
+      "reversedSha256": "33c1d60b9e7b47da7ee21734226a23dd557b05f9044bf91e9bfaf12195d4c417",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-sdk-start.log",
+      "logSha256": "68cd95559d0e6aaf4652b55e68f0070ec3a26df63f7b636e80a9bdb2c47cb272",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "sdk-shutdown",
+      "file": "sdk/agentSession.ts",
+      "beforeSha256": "7e79eac5f88da37dd844d7547f26572930a9be6c7a2323f5a2976f8575913c89",
+      "reversedSha256": "c94d8964a30c4d05aa6b45ee20821a1438778f9dc7883a2cfe800c019eba6a79",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-sdk-shutdown.log",
+      "logSha256": "824258a3601eb16e20e6eb985c2990d752f5ac59049b0013506bcc48fd1bd088",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "prompt-session-alias",
+      "file": "core/hooks/hookDispatcher.ts",
+      "beforeSha256": "1f574d7641ab05d9758fcae294883847834df0580a7977094a61bf2fe94f8195",
+      "reversedSha256": "3f2da294c8b00c476428c500cd9ea083a7af8cb70c321ac839f2064e4392492c",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-prompt-session-alias.log",
+      "logSha256": "04334bcba3c4007fe07ffac956ed6ffe95959fef278f56d638690d26c97549f9",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "pinned-shutdown-audience",
+      "file": "cli/runtime/extensions/lifecycle.ts",
+      "beforeSha256": "e8858901318a9031770a1eeb92dc9808d389aedd9fe4c66c483a4598d8498737",
+      "reversedSha256": "4d2b77b4a40bff23aaac1ca5b61d12a81764024b8a467059185578869f537537",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-pinned-shutdown-audience.log",
+      "logSha256": "c7a755a8d7aad720ad57824f1f4c19021a3ce370413ce023d645d2b8af788d54",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "quiesce-new-work",
+      "file": "cli/runtime/extensions/host.ts",
+      "beforeSha256": "e0d486944f2e0368652c6656d3c18b0e32650348f73b6b4f3af9e5987aed7efd",
+      "reversedSha256": "f3ccd7f5db65579431e4ddabbd2a66f9aee5878086245824bfdc13a6b59b2184",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-quiesce-new-work.log",
+      "logSha256": "65aa96f45d57fb2ad8c6131f92f2d4af2ff0fb0b7f284a4a2f3fa1730bfd57d8",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "shutdown-run-join",
+      "file": "cli/runtime/extensions/lifecycle.ts",
+      "beforeSha256": "e8858901318a9031770a1eeb92dc9808d389aedd9fe4c66c483a4598d8498737",
+      "reversedSha256": "970a6fc7941a7ba4d67b64ec5dc7bab0cecd3e6a50763ce339c4c1d246393b4f",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-shutdown-run-join.log",
+      "logSha256": "4bf58cc07b2959db820a4913486045a68ae25f465791207d7511e0470501a9b9",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "shutdown-reentry",
+      "file": "cli/runtime/extensions/lifecycle.ts",
+      "beforeSha256": "e8858901318a9031770a1eeb92dc9808d389aedd9fe4c66c483a4598d8498737",
+      "reversedSha256": "2a8392c3d75fe7a5c91f8c8b442535ca661f1e5e378484a85ea71181d579811a",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-shutdown-reentry.log",
+      "logSha256": "28a8601ea9e40efa60354e85b4885197397bfa579791202d2a4ecfda81ce8a3a",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "release-failure",
+      "file": "cli/runtime/extensions/lifecycle.ts",
+      "beforeSha256": "e8858901318a9031770a1eeb92dc9808d389aedd9fe4c66c483a4598d8498737",
+      "reversedSha256": "e33b53dc99c413a53fb8bf93243783480793821fb0420b7a65bf86892e32227e",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-release-failure.log",
+      "logSha256": "03ef1eed1e4e91ac01091775b1171fa428cb56533532b887ce71ca3dcd401819",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "session-handler-contract",
+      "file": "extensions/events/model.ts",
+      "beforeSha256": "d02b8f5a785328ce51bd703cfa3e3373dfbfdc484858e20e9097f5b448ff07ee",
+      "reversedSha256": "5341d9314948478d2eb5fe60455973182aaa5a47f1ccb1d8cd5200084b91d856",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-session-handler-contract.log",
+      "logSha256": "e5cf18b08a298217933b45efb9a888394889d4d8ec56d75c6103f1a3ca881c6e",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    }
+  ],
+  "restored": [
+    {
+      "name": "sdk-start",
+      "exact": true
+    },
+    {
+      "name": "sdk-shutdown",
+      "exact": true
+    },
+    {
+      "name": "prompt-session-alias",
+      "exact": true
+    },
+    {
+      "name": "pinned-shutdown-audience",
+      "exact": true
+    },
+    {
+      "name": "quiesce-new-work",
+      "exact": true
+    },
+    {
+      "name": "shutdown-run-join",
+      "exact": true
+    },
+    {
+      "name": "shutdown-reentry",
+      "exact": true
+    },
+    {
+      "name": "release-failure",
+      "exact": true
+    },
+    {
+      "name": "session-handler-contract",
+      "exact": true
+    }
+  ],
+  "restoredTests": {
+    "exit": 0,
+    "assertionFailures": 0,
+    "log": "restored.log",
+    "logSha256": "7e71b3b80ee13bda96359cb6bee2f7d92f322b8fc03d493e1c87905f8f251a1f",
+    "terminalTests": "53 passed (53)"
+  },
+  "mainSourceUnchanged": true,
+  "privateTreeRemoved": true
+}

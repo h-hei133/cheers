@@ -1,0 +1,20 @@
+{
+  "baseCommit": "cb4f69d63137289d154333af411555fc9c89f786",
+  "buildId": "dce69239cca0c3e430b17fc5b63c32bc50ecdd951433b44a6b06be811990fe94",
+  "inputsDigest": "504faa143efd72f66786f38da6c28188cdde960297a0bc7e7ba0f4c364780165",
+  "source": {
+    "packages/ts-shell/src/cli/runtime/extensions/lifecycle.test.ts": "0337f07ddd5eeb747413749904cc82638cbf6804c950b01cb26f528c871d1afd",
+    "packages/ts-shell/src/cli/runtime/extensions/lifecycle.ts": "e8858901318a9031770a1eeb92dc9808d389aedd9fe4c66c483a4598d8498737",
+    "packages/ts-shell/src/cli/bootstrap/cliProcessRunner.test.ts": "69c86d1a4c4d871ed0a989fd9acd35e89b4ea3ed3560c65e3244afbfc8b55f1b",
+    "packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts": "51302872d939d85cddad620304b66b6ca05f0011a99068176389893c998aabaf",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "1d8cf1e48c1038b5197905efeea5c20d2b9884a981bbd07a4ac1eb32a6905998",
+    "packages/ts-shell/src/cli/runtime/extensions/host.ts": "e0d486944f2e0368652c6656d3c18b0e32650348f73b6b4f3af9e5987aed7efd",
+    "packages/ts-shell/src/core/hooks/hookDispatcher.ts": "1f574d7641ab05d9758fcae294883847834df0580a7977094a61bf2fe94f8195",
+    "packages/ts-shell/src/extensions/events/dispatch.ts": "8fcdc7d1fb24fc5fe5fd9aed35ef04c9d0f97141e8302e789549bbca49a39d1a",
+    "packages/ts-shell/src/extensions/events/model.ts": "d02b8f5a785328ce51bd703cfa3e3373dfbfdc484858e20e9097f5b448ff07ee",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "bedb81cf4c548908890ad510586e323f52e4669b942f054502796980404c816b",
+    "packages/ts-shell/src/index.ts": "324300a4c25921e132f65560018d3d3a6deae4587c6f41f935cfaab9e2a52fe0",
+    "packages/ts-shell/src/sdk/agentSession.ts": "7e79eac5f88da37dd844d7547f26572930a9be6c7a2323f5a2976f8575913c89",
+    "packages/ts-shell/src/sdk/lifecycle.test.ts": "ba9b764fe2d0ec64f6eb010be8c50a4a1b8c83658141c42fc0c562d410eb157e"
+  }
+}

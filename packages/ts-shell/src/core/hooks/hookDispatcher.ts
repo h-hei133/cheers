@@ -422,8 +422,6 @@ export class HookDispatcher {
 }
 
 const EXTENSION_EVENT_ALIASES: Readonly<Record<string, readonly string[]>> = {
-  SessionStart: ['session_start'],
-  SessionEnd: ['session_shutdown'],
   UserPromptSubmit: ['input'],
   PreToolUse: ['tool_call'],
   PostToolUse: ['tool_result'],

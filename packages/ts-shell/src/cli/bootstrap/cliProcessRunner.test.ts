@@ -52,7 +52,10 @@ vi.mock("../runtime/media.js", () => ({
 }));
 vi.mock("../runtime/jobs.js", () => ({ closeJobsFor: vi.fn() }));
 vi.mock("../runtime/director.js", () => ({ closeDirectorFor: vi.fn() }));
-vi.mock("../runtime/extensions.js", () => ({ closeExtensionsFor: vi.fn(), waitForExtensionsFor: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("../runtime/extensions.js", () => ({
+  closeExtensionsFor: vi.fn(), waitForExtensionsFor: vi.fn().mockResolvedValue(undefined), startExtensionsFor: vi.fn().mockResolvedValue(undefined),
+  shutdownExtensionsFor: vi.fn(async (_context, _reason, settle) => { await settle?.(); }),
+}));
 vi.mock("../../observability/traceDashboard.js", () => ({
   closeTraceDashboard: vi.fn(),
 }));
@@ -83,6 +86,8 @@ import { runInteractiveLoop } from "../interactive/interactiveLoop.js";
 import { createCliShutdown } from "../runtime/shutdown.js";
 import { createCliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
 import { createCliSessionRuntime } from "../runtime/cliSessionRuntimeFactory.js";
+import { closeExtensionsFor, startExtensionsFor, shutdownExtensionsFor } from '../runtime/extensions.js';
+import { cancelGoalRunForShutdown } from '../runtime/goalScheduling.js';
 import { captureCliStdinPrompts } from "../print/stdinPromptCapture.js";
 import { runCliPrintModeRouter } from "../print/printModeRouter.js";
 import { runCliProcess } from "./cliProcessRunner.js";
@@ -94,6 +99,10 @@ const projectRoot = "/tmp/cli-process-runner-project";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(startExtensionsFor).mockResolvedValue(undefined);
+  vi.mocked(shutdownExtensionsFor).mockImplementation(async (_context, _reason, settle) => { await settle?.(); });
+  vi.mocked(closeExtensionsFor).mockResolvedValue(undefined);
+  vi.mocked(cancelGoalRunForShutdown).mockResolvedValue(undefined);
 });
 
 afterEach(() => { restoreStdout(); });
@@ -498,6 +507,38 @@ function outputFixture(settings: OutputFixtureOptions = {}) {
     dispose: () => stdin.destroy(),
   };
 }
+
+it('awaits session startup before the first prompt and drains the run before session shutdown and extension retirement', async () => {
+  const fixture = outputFixture({ options: { printMode: true } });
+  const order: string[] = [];
+  let ready!: () => void; let finishRun!: () => void;
+  const started = new Promise<void>(resolve => { ready = resolve; }); const running = new Promise<void>(resolve => { finishRun = resolve; });
+  vi.mocked(startExtensionsFor).mockImplementation(async () => { order.push('start'); await started; order.push('started'); });
+  vi.mocked(runCliPrintModeRouter).mockImplementation(async () => { order.push('prompt'); return true; });
+  vi.mocked(cancelGoalRunForShutdown).mockImplementation(async () => { order.push('cancel'); await running; order.push('settled'); });
+  vi.mocked(shutdownExtensionsFor).mockImplementation(async (_context, _reason, settle) => { await settle?.(); order.push('shutdown'); });
+  vi.mocked(closeExtensionsFor).mockImplementation(async () => { order.push('retired'); });
+  let pending: Promise<unknown> | undefined;
+  try {
+    pending = fixture.run();
+    await vi.waitFor(() => expect(order).toContain('start'));
+    expect(order).not.toContain('prompt'); ready();
+    await vi.waitFor(() => expect(order).toContain('cancel'));
+    expect(order).not.toContain('shutdown'); expect(order).not.toContain('retired'); finishRun(); await pending;
+    expect(order).toEqual(['start', 'started', 'prompt', 'cancel', 'settled', 'shutdown', 'retired']);
+  } finally { ready(); finishRun(); await pending?.catch(() => undefined); fixture.dispose(); }
+});
+
+it('attaches structured event observers before a startup extension can submit a prompt', async () => {
+  const fixture = outputFixture({ options: { jsonEvents: true } });
+  const bootstrap = vi.mocked(createCliBootstrapRuntimeContext).getMockImplementation()!;
+  vi.mocked(createCliBootstrapRuntimeContext).mockImplementation(input => ({ ...bootstrap(input), writeJsonEvent: vi.fn() }));
+  vi.mocked(startExtensionsFor).mockImplementation(async () => {
+    const runtime = vi.mocked(createCliSessionRuntime).mock.results.at(-1)?.value;
+    expect(runtime.observeEvents).toHaveBeenCalledOnce();
+  });
+  try { await fixture.run(); } finally { fixture.dispose(); }
+});
 
 it.each(['root', 'bootstrap', 'router'] as const)('drains and restores before a synchronous %s exit', async exitAt => {
   const fixture = outputFixture({ options: { printMode: true }, exitAt });

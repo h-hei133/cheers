@@ -6,7 +6,7 @@ import { closeSshFor } from '../runtime/ssh.js';
 import { installMediaSurface, closeMediaFor } from '../runtime/media.js';
 import { closeJobsFor } from '../runtime/jobs.js';
 import { closeDirectorFor } from '../runtime/director.js';
-import { closeExtensionsFor, waitForExtensionsFor } from '../runtime/extensions.js';
+import { closeExtensionsFor, waitForExtensionsFor, startExtensionsFor, shutdownExtensionsFor } from '../runtime/extensions.js';
 import { applyStartupModel, type StartupModelOptions } from './model.js';
 import { refreshShellRuntimeConfig } from '../../core/shell/runtimeContext.js';
 import { closeTraceDashboard } from '../../observability/traceDashboard.js';
@@ -217,14 +217,16 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
     shutdown = createCliShutdown({
       onSignal: signalSessionClose(runtimeContext, sessionManager, () => isBusy?.() ?? false),
       close: () => output.run(async () => {
-        const results = await Promise.allSettled([
+        const lifecycleResults = await Promise.allSettled([
           Promise.resolve().then(startup.cancel),
-          Promise.resolve().then(() => cancelRun?.()),
+          shutdownExtensionsFor(runtimeContext, requested && 'kind' in requested ? 'reload' : 'quit', () => cancelRun?.() ?? Promise.resolve()),
+        ]);
+        const results = await Promise.allSettled([
           closeMediaFor(runtimeContext), closeDirectorFor(runtimeContext), closeJobsFor(runtimeContext, Boolean(requested && 'kind' in requested)), closeSshFor(runtimeContext),
           closeCollaborationFor(runtimeContext), closeExtensionsFor(runtimeContext), closeTraceDashboard(), mcpGateway.close(),
           Promise.resolve().then(async () => { if (await runtimeContext.freshState?.clearCache?.() === 'unknown') throw new Error('Provider cache cleanup is unverified.'); }),
         ]);
-        const failure = results.find(result => result.status === 'rejected');
+        const failure = [...lifecycleResults, ...results].find(result => result.status === 'rejected');
         if (failure?.status === 'rejected') throw failure.reason;
       }), process: input.process, exit: input.exit, writeError: input.writeError,
       onTimeout: output.cancel,
@@ -343,6 +345,7 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
         const { attachRpcEventBridge } = await import("../rpc/events.js");
         attachRpcEventBridge(sessionRuntime, output.guard?.write);
       }
+      await startExtensionsFor(runtimeContext, options.resumeSession || recovery ? 'resume' : options.forkSource ? 'fork' : 'startup');
       if (recovery) {
         const saved = sessionManager.getSession(runtimeContext.session.id);
         if (!saved || saved.id !== recovery.sessionId || saved.projectRoot !== runtimeContext.projectRoot) throw new Error('Restart recovery could not verify the selected saved session.');

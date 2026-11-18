@@ -4,7 +4,7 @@ import type { CliOptions } from "../cli/options/cliOptions.js";
 import { resolveCliCredential } from "../cli/provider/cliProviderRuntimeBridge.js";
 import { closeCollaborationFor } from "../cli/runtime/collaboration.js";
 import { closeDirectorFor } from "../cli/runtime/director.js";
-import { closeExtensionsFor, extensionHostFor, waitForExtensionsFor } from "../cli/runtime/extensions.js";
+import { closeExtensionsFor, extensionHostFor, shutdownExtensionsFor, startExtensionsFor, waitForExtensionsFor } from "../cli/runtime/extensions.js";
 import { cancelExtensionUiFor, closeExtensionHost } from "../cli/runtime/extensions/host.js";
 import { closeJobsFor } from "../cli/runtime/jobs.js";
 import { closeMediaFor } from "../cli/runtime/media.js";
@@ -272,9 +272,9 @@ export class AgentSession {
     void (async () => {
       const errors: unknown[] = [];
       try { this.ui.dispose(); } catch (error) { errors.push(error); }
+      try { await shutdownExtensionsFor(this.runtimeContext); } catch (error) { errors.push(error); }
       try { this.retireResources?.(); } catch (error) { errors.push(error); }
       try { closeExtensionHost(this.runtimeContext); } catch (error) { errors.push(error); }
-      try { await this.sessionRuntime.cancelAndWait(); } catch (error) { errors.push(error); }
       for (const unregister of this.contributionCleanups) {
         try { unregister(); } catch (error) { errors.push(error); }
       }
@@ -404,7 +404,8 @@ export async function createAgentSession(
   const mcpGateway = options.mcpGateway ?? createCliMcpGateway(() => runtimeContext.cwd);
   const cleanups: Array<() => void> = [];
 
-  let sessionRuntime: ShellSessionRuntime;
+  let sessionRuntime: ShellSessionRuntime | undefined;
+  let session: AgentSession | undefined;
   let retireResources: (() => void) | undefined;
   let sessionUi: SessionUi | undefined;
   const approvalTrustPolicy = options.approvalTrustPolicy ?? new ApprovalTrustPolicy();
@@ -467,42 +468,51 @@ export async function createAgentSession(
       }
     }
     if (options.ui) sessionUi.bind(options.ui);
+
+    if (options.permissionScope) sessionRuntime.setPermissionScope(options.permissionScope);
+
+    const credential = providerRuntimeBridge.resolveCredentialSnapshot();
+    const modelFallbackMessage = !readLogicalModel(runtimeContext.session.id) && credential.blocked
+      ? `Provider credential status: ${credential.blocked}${credential.provider ? ` (${credential.provider})` : ""}`
+      : undefined;
+
+    session = new AgentSession(
+      runtimeContext,
+      sessionRuntime,
+      sessionManager,
+      resourceLoader,
+      mcpGateway,
+      ownsMcpGateway,
+      cleanups,
+      retireResources,
+      sessionUi,
+    );
+    await startExtensionsFor(runtimeContext);
+
+    return {
+      session,
+      extensionsResult,
+      ...(modelFallbackMessage ? { modelFallbackMessage } : {}),
+    };
   } catch (error) {
+    if (session) {
+      await session.dispose().catch(() => {});
+      throw error;
+    }
     try { sessionUi?.dispose(); } catch { /* Keep the initialization failure. */ }
+    try { await shutdownExtensionsFor(runtimeContext, 'quit', () => sessionRuntime?.cancelAndWait() ?? Promise.resolve()); }
+    catch { /* Keep the initialization failure. */ }
     try { retireResources?.(); } catch { /* Keep the initialization failure. */ }
     if (!retireResources) {
       try { retireUnboundResources?.(); } catch { /* Keep the initialization failure. */ }
     }
+    try { closeExtensionHost(runtimeContext); } catch { /* Keep the initialization failure. */ }
     await closeExtensionsFor(runtimeContext).catch(() => {});
-    cleanups.splice(0).forEach((unregister) => unregister());
+    for (const unregister of cleanups.splice(0)) {
+      try { unregister(); } catch { /* Keep cleaning up after the initialization failure. */ }
+    }
     if (ownsMcpGateway) await mcpGateway.close().catch(() => {});
+    try { sessionRuntime?.terminate(runtimeContext.session.id); } catch { /* Keep the initialization failure. */ }
     throw error;
   }
-
-  if (options.permissionScope) {
-    sessionRuntime.setPermissionScope(options.permissionScope);
-  }
-
-  const credential = providerRuntimeBridge.resolveCredentialSnapshot();
-  const modelFallbackMessage = !readLogicalModel(runtimeContext.session.id) && credential.blocked
-    ? `Provider credential status: ${credential.blocked}${credential.provider ? ` (${credential.provider})` : ""}`
-    : undefined;
-
-  const session = new AgentSession(
-    runtimeContext,
-    sessionRuntime,
-    sessionManager,
-    resourceLoader,
-    mcpGateway,
-    ownsMcpGateway,
-    cleanups,
-    retireResources,
-    sessionUi,
-  );
-
-  return {
-    session,
-    extensionsResult,
-    ...(modelFallbackMessage ? { modelFallbackMessage } : {}),
-  };
 }
