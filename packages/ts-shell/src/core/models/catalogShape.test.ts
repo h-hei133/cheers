@@ -2,6 +2,16 @@ import { describe, expect, it } from "vitest";
 import { BUILTIN_PROVIDERS, catalogModel, mergeProviders, providerEndpoint } from "./catalog.js";
 import { resolveRequestShape } from "./requestShape.js";
 
+it('keeps a price schedule as one source while unrelated model patches preserve it', () => {
+  const cost = { promptPerMTok: 1, completionPerMTok: 2, tiers: [{ inputTokensAbove: 100, promptPerMTok: 3 }] };
+  const base = [{ id: 'fixture', label: 'Fixture', runtime: 'openai-compatible' as const, auth: 'none' as const,
+    models: [{ id: 'meter', cost }] }];
+  expect(catalogModel(mergeProviders(base, [{ id: 'fixture', models: [{ id: 'meter', contextWindow: 1000 }] }]), 'fixture', 'meter')?.cost).toEqual(cost);
+  const flat = { promptPerMTok: 5 };
+  expect(catalogModel(mergeProviders(base, [{ id: 'fixture', models: [{ id: 'meter', cost: flat }] }]), 'fixture', 'meter')?.cost).toEqual(flat);
+  expect(catalogModel(mergeProviders(base, [{ id: 'fixture', models: [{ id: 'meter', cost: flat }] }]), 'fixture', 'meter')?.cost).not.toHaveProperty('tiers');
+});
+
 /**
  * What the models the shell ships with actually send.
  *

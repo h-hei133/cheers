@@ -25,6 +25,7 @@ export function googlePath(model: string, stream: boolean): string {
 }
 
 declareEndpoint("google-generative-ai", {
+  usageInput: 'inclusive',
   opaqueReplay: true,
   contextFields: { system: 'systemInstruction', conversation: 'contents', tools: 'tools' },
   // The model is in the path, and the streaming method is a different one.

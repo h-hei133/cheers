@@ -4,6 +4,7 @@ import { readResponse } from './output.js';
 import { readResponseStream } from './stream.js';
 
 declareEndpoint('openai-responses', {
+  usageInput: 'inclusive',
   opaqueReplay: true,
   contextFields: { system: 'instructions', conversation: 'input', tools: 'tools' },
   serviceTiers: ['default', 'auto', 'priority', 'flex'],

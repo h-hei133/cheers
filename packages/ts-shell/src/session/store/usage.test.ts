@@ -18,6 +18,7 @@ import { attributedBucketKey, captureUsageAttribution, legacyBucketKey } from '.
 import { costModel } from '../../core/commands/cost/model.js';
 import { createProfileContext, withProfile } from '../../core/paths/profile/context.js';
 import { SessionManager } from '../SessionManager.js';
+import type { CatalogProvider } from '../../core/models/catalog.js';
 
 const ID = "sess_usage_roundtrip";
 let directory: string;
@@ -323,4 +324,65 @@ it('returns a same-ID late response only to the captured profile even inside ano
   } finally {
     for (const profile of profiles) withProfile(profile!, () => resetSessionUsage(ID));
   }
+});
+
+it.each(['inclusive', 'exclusive'] as const)(
+  'persists each request tier from %s input and restores the flat captured rates after reset and manager resume', usageInput => {
+    vi.stubEnv('CHEERS_TEST_ROOT', directory);
+    new SessionManager().createNewWithId(ID, directory);
+    const layout = locateExistingSessionLayout(createSessionStoreLayout(), ID);
+    const tier = { inputTokensAbove: 100, promptPerMTok: 5, completionPerMTok: 10, cacheReadPerMTok: 0.5, cacheWritePerMTok: 6.25 };
+    const rates = { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1.25, tiers: [tier] };
+    const target = { provider: 'relay', model: 'same', baseUrl: 'https://relay.invalid/v1', rates, usageInput };
+    const record = sessionUsageRecorder(ID)(target);
+    for (const ordinary of [40, 41]) record(usageInput === 'inclusive'
+      ? { prompt_tokens: ordinary + 60, completion_tokens: 2, prompt_tokens_details: { cached_tokens: 60 } }
+      : { prompt_tokens: ordinary, completion_tokens: 2, cache_read_input_tokens: 40, cache_creation_input_tokens: 20 });
+    const saved = readStateSnapshotSafely(layout.statePath)!.usage!;
+    expect(saved.turnsCount).toBe(2);
+    expect(Object.values(saved.byModel)).toHaveLength(2);
+    expect(Object.values(saved.byModel).map(bucket => bucket.attribution?.rates)).toEqual(expect.arrayContaining([
+      { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1.25 },
+      { promptPerMTok: 5, completionPerMTok: 10, cacheReadPerMTok: 0.5, cacheWritePerMTok: 6.25 },
+    ]));
+    const before = costModel(getSessionUsage(ID), []);
+    expect(before.estimate.usd).toBeCloseTo(usageInput === 'inclusive' ? 0.000305 : 0.000443, 10);
+    rates.promptPerMTok = 90; rates.completionPerMTok = 180;
+    tier.inputTokensAbove = 0; tier.promptPerMTok = 900; tier.completionPerMTok = 1800;
+    const repriced: CatalogProvider[] = [{ id: target.provider, label: 'Relay', runtime: 'openai-compatible', auth: 'none',
+      baseUrl: target.baseUrl, models: [{ id: target.model, cost: rates }] }];
+    resetSessionUsage(ID);
+    const resumed = new SessionManager().resume(ID, directory);
+    activate(resumed);
+    const restored = costModel(getSessionUsage(ID), repriced);
+    expect(restored.buckets).toEqual(before.buckets);
+    expect(restored.estimate).toEqual(before.estimate);
+    expect(restored.recordedTurns).toBe(2);
+    expect(totalTokens(getSessionUsage(ID))).toBe(205);
+    expect(Object.values(resumed.usage!.byModel).map(bucket => bucket.attribution?.rates))
+      .toEqual(Object.values(saved.byModel).map(bucket => bucket.attribution?.rates));
+  },
+);
+
+it('persists unknown tier prices for exclusive input with missing cache categories and keeps them unknown on resume', () => {
+  vi.stubEnv('CHEERS_TEST_ROOT', directory);
+  new SessionManager().createNewWithId(ID, directory);
+  const layout = locateExistingSessionLayout(createSessionStoreLayout(), ID);
+  const rates = { promptPerMTok: 1, completionPerMTok: 2,
+    tiers: [{ inputTokensAbove: 100, promptPerMTok: 5, completionPerMTok: 10 }] };
+  const target = { provider: 'relay', model: 'same', baseUrl: 'https://relay.invalid/v1', rates, usageInput: 'exclusive' as const };
+  sessionUsageRecorder(ID)(target)({ prompt_tokens: 200, completion_tokens: 1 });
+  const saved = readStateSnapshotSafely(layout.statePath)!.usage!;
+  expect(saved.turnsCount).toBe(1);
+  expect(Object.values(saved.byModel)).toHaveLength(1);
+  expect(Object.values(saved.byModel)[0]).toMatchObject({ promptTokens: 200, completionTokens: 1, attribution: { rates: null } });
+  const catalog: CatalogProvider[] = [{ id: target.provider, label: 'Relay', runtime: 'anthropic', auth: 'none',
+    endpoint: 'anthropic-messages', baseUrl: target.baseUrl, models: [{ id: target.model, cost: rates }] }];
+  resetSessionUsage(ID);
+  activate(new SessionManager().resume(ID, directory));
+  const report = costModel(getSessionUsage(ID), catalog);
+  expect(report.recordedTurns).toBe(1);
+  expect(report.buckets[0]).toMatchObject({ rateBasis: 'captured', rateSource: 'unknown', promptTokens: 200, completionTokens: 1,
+    rates: { promptPerMTok: null, completionPerMTok: null, cacheReadPerMTok: null, cacheWritePerMTok: null } });
+  expect(report.estimate).toMatchObject({ usd: null, coverage: 'partial' });
 });

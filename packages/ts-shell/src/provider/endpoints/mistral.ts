@@ -61,6 +61,7 @@ function normalizeMistralPayload(body: Record<string, unknown>, input: Pick<Simp
 const baseShape = (): ReturnType<typeof endpointShape> => endpointShape("openai-compatible");
 
 const chatShape: EndpointShape = {
+  usageInput: 'inclusive',
   contextFields: { conversation: "messages", tools: "tools", firstMessageIsSystem: true },
   path: () => "/chat/completions",
   modelsPath: "/models",

@@ -1,4 +1,4 @@
-import type { ModelCostRates } from "./catalog.js";
+import { captureCostSchedule, selectCostRates, type ModelCostSchedule } from './pricing.js';
 
 /**
  * Whether keeping a prompt cached is worth what it costs.
@@ -81,7 +81,7 @@ export function cacheWarmingDelayMs(ttlMs: number): number | undefined {
 
 export interface CacheWarmingInput {
   /** The rates the model publishes, when it publishes any. */
-  readonly cost?: ModelCostRates;
+  readonly cost?: ModelCostSchedule;
   /** Tokens in the prefix that would be kept warm. */
   readonly promptTokens: number;
   readonly phase: WarmingPhase;
@@ -115,11 +115,11 @@ export interface CacheWarmingDecision {
  */
 export function evaluateCacheWarming(input: CacheWarmingInput): CacheWarmingDecision {
   const tokens = Math.max(0, Math.floor(input.promptTokens));
-  const cost = input.cost;
+  const cost = input.cost ? selectCostRates(captureCostSchedule(input.cost), { inputTokens: tokens, inputComplete: true }) : null;
   const continuationProbability =
     input.phase === "idle" ? IDLE_CONTINUATION_PROBABILITY : 1;
 
-  if (!cost || tokens === 0) {
+  if (!cost || tokens === 0 || cost.promptPerMTok === undefined || cost.completionPerMTok === undefined || cost.cacheReadPerMTok === undefined) {
     return {
       warmCost: 0,
       missCost: 0,

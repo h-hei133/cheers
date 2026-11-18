@@ -83,7 +83,8 @@ function bucketLines(bucket: CostModel['buckets'][number], heading: boolean): Re
     category('Cache write', bucket.cacheWriteTokens, bucket.rates.cacheWritePerMTok));
   lines.push({ kind: 'columns', cells: [[span('Total')], [span(bucket.totalTokens.toLocaleString(), 'number')], [span('')],
     [span(money(bucket.estimate.usd), bucket.estimate.usd === null ? 'warning' : 'number')]] });
-  if (!bucket.estimate.fullyAllocated) lines.push({ kind: 'text', spans: [span('Reported total differs from the recorded token categories.', 'warning')] });
+  if (!bucket.estimate.fullyAllocated) lines.push({ kind: 'text', spans: [span(bucket.allocationIncomplete
+    ? 'The provider did not report a complete token allocation.' : 'Reported total differs from the recorded token categories.', 'warning')] });
   return lines;
 }
 

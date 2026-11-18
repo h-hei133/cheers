@@ -1,7 +1,8 @@
 import { persistSessionUsage, recordSessionUsage, type SessionUsageRecord } from "../../observability/usageTelemetry.js";
 import { bindUsageOwner, sessionTelemetries } from '../../observability/usage/state.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
-import type { ModelCostRates } from '../../core/models/catalog.js';
+import type { ModelCostSchedule } from '../../core/models/pricing.js';
+import type { UsageInputMode } from '../../provider/response/metering.js';
 import type { ProviderUsage } from '../../turn/completion.js';
 import { hasUsage, usageFromProvider } from '../../provider/response/usage.js';
 import { createComponentLogger } from '../../observability/structuredLogger.js';
@@ -59,15 +60,16 @@ export function sessionUsageSink(sessionId: string): (usage: SessionUsageRecord)
 
 /** Each request captures its destination prices before sending. */
 export function sessionUsageRecorder(sessionId: string): (target: {
-  readonly provider: string; readonly model: string; readonly baseUrl?: string; readonly rates?: ModelCostRates;
+  readonly provider: string; readonly model: string; readonly baseUrl?: string; readonly rates?: ModelCostSchedule;
+  readonly usageInput?: UsageInputMode;
 }) => (usage: ProviderUsage | undefined) => void {
   const record = sessionUsageSink(sessionId);
   return target => {
     const attribution = target.baseUrl === undefined ? undefined : captureUsageAttribution({ ...target, baseUrl: target.baseUrl });
-    const provider = target.provider; const model = target.model;
+    const provider = target.provider; const model = target.model; const usageInput = target.usageInput;
     return usage => {
       if (!hasUsage(usage)) return;
-      record({ ...usageFromProvider(usage), provider, model, ...(attribution ? { attribution } : {}) });
+      record({ ...usageFromProvider(usage, usageInput, !attribution?.costSchedule), provider, model, ...(attribution ? { attribution } : {}) });
     };
   };
 }

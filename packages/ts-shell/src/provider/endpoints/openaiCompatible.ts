@@ -54,6 +54,7 @@ function promptCacheFields(input: Pick<SimpleRequest, 'sessionId' | 'baseUrl' | 
 }
 
 declareEndpoint("openai-compatible", {
+  usageInput: 'inclusive',
   serviceTiers: ['default', 'auto', 'priority', 'fast', 'flex'],
   contextFields: { conversation: 'messages', tools: 'tools', firstMessageIsSystem: true },
   // The model travels in the body, so the path is the same for every one.

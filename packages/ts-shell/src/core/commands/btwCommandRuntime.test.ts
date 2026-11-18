@@ -9,6 +9,9 @@ import { getSessionUsage, recordSessionUsage, resetSessionUsage } from '../../ob
 import { readBoundSessionState } from '../../session/store/bound.js';
 import { costModel } from './cost/model.js';
 import { sessionUsageSink } from '../../session/store/usage.js';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import type { CatalogProvider } from '../models/catalog.js';
 
 vi.mock("../../config/runtimeConfig.js", async () => ({
   ...await vi.importActual<typeof import('../../config/runtimeConfig.js')>('../../config/runtimeConfig.js'),
@@ -152,4 +155,100 @@ it.each(["", "  \t\n"])("rejects an empty side question before resolving credent
   expect(result.output).toContain("Usage: /btw <question>");
   expect(resolveProviderCredential).not.toHaveBeenCalled();
   expect(providerFetchForEndpoint).not.toHaveBeenCalled();
+});
+
+async function sideQuestionServer(replies: unknown[], beforeReply?: () => Promise<void>) {
+  const requests: string[] = [];
+  const server = http.createServer(async (request, response) => {
+    for await (const _chunk of request) { /* Consume the actual side question. */ }
+    requests.push(request.url!);
+    await beforeReply?.();
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify(replies.shift()));
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  return { server, requests, baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}` };
+}
+
+it.each(['openai-compatible', 'anthropic-messages', 'copilot-messages'])(
+  'captures side-question prices at N/N+1 including cache through %s', async endpoint => {
+    vi.stubEnv('CHEERS_TEST_ROOT', '/tmp/cheers-test');
+    const setup = createAdvisorHarness(false, false);
+    const rates = { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1.25,
+      tiers: [{ inputTokensAbove: 100, promptPerMTok: 5, completionPerMTok: 10, cacheReadPerMTok: 0.5, cacheWritePerMTok: 6.25 }] };
+    const inclusive = endpoint === 'openai-compatible';
+    const replies = [40, 41].map(ordinary => inclusive
+      ? { choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: ordinary + 60, completion_tokens: 2, prompt_tokens_details: { cached_tokens: 60 } } }
+      : { content: [{ type: 'text', text: 'answer' }], stop_reason: 'end_turn',
+        usage: { input_tokens: ordinary, output_tokens: 2, cache_read_input_tokens: 40, cache_creation_input_tokens: 20 } });
+    const fixture = await sideQuestionServer(replies);
+    const catalog: CatalogProvider[] = [{ id: 'fixture', label: 'Fixture', runtime: 'openai-compatible', auth: 'api-key',
+      endpoint, baseUrl: fixture.baseUrl, models: [{ id: 'm', cost: rates }] }];
+    vi.mocked(loadCatalog).mockReturnValue(catalog);
+    vi.mocked(resolveProviderCredential).mockReturnValue({ provider: 'fixture', model: 'm', baseUrl: fixture.baseUrl,
+      credential: { apiKey: 'synthetic' } } as never);
+    vi.mocked(providerFetchForEndpoint).mockReturnValue(fetch);
+    const recordAuxiliaryUsage = sessionUsageSink(setup.session.id);
+    try {
+      for (const question of ['first', 'second']) {
+        expect((await runBtwCommand([question], { cwd: setup.root, projectRoot: setup.root, sessionId: setup.session.id,
+          recordAuxiliaryUsage })).report?.facts?.delivered).toBe(true);
+      }
+      expect(fixture.requests).toHaveLength(2);
+      const report = costModel(getSessionUsage(setup.session.id), []);
+      expect(report.recordedTurns).toBe(2);
+      expect(report.buckets).toHaveLength(2);
+      expect(report.buckets.find(bucket => bucket.rates.promptPerMTok === 1)).toMatchObject({ rateBasis: 'captured', turnsCount: 1,
+        promptTokens: 40, completionTokens: 2, cacheReadTokens: inclusive ? 60 : 40, cacheWriteTokens: inclusive ? 0 : 20,
+        rates: { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1.25 } });
+      expect(report.buckets.find(bucket => bucket.rates.promptPerMTok === 5)).toMatchObject({ rateBasis: 'captured', turnsCount: 1,
+        promptTokens: 41, completionTokens: 2, cacheReadTokens: inclusive ? 60 : 40, cacheWriteTokens: inclusive ? 0 : 20,
+        rates: { promptPerMTok: 5, completionPerMTok: 10, cacheReadPerMTok: 0.5, cacheWritePerMTok: 6.25 } });
+      expect(report.estimate.usd).toBeCloseTo(inclusive ? 0.000305 : 0.000443, 10);
+      expect(readBoundSessionState(setup.manager, setup.session).state.usage!.byModel).toEqual(getSessionUsage(setup.session.id).byModel);
+      expect(getSessionUsage(setup.session.id).recentRequests).toEqual([]);
+    } finally {
+      resetSessionUsage(setup.session.id);
+      fixture.server.closeAllConnections();
+      await new Promise<void>(resolve => fixture.server.close(() => resolve()));
+    }
+  },
+);
+
+it('uses side-question tier thresholds and inherited rates captured before the HTTP request when the schedule changes', async () => {
+  vi.stubEnv('CHEERS_TEST_ROOT', '/tmp/cheers-test');
+  const setup = createAdvisorHarness(false, false);
+  const tier = { inputTokensAbove: 100, promptPerMTok: 9, cacheReadPerMTok: 0.9 };
+  const rates = { promptPerMTok: 3, completionPerMTok: 6, cacheReadPerMTok: 0.3, cacheWritePerMTok: 3.75, tiers: [tier] };
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const fixture = await sideQuestionServer([{ choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 101, completion_tokens: 2, prompt_tokens_details: { cached_tokens: 60 } } }], () => held);
+  vi.mocked(loadCatalog).mockReturnValue([{ id: 'fixture', label: 'Fixture', runtime: 'openai-compatible', auth: 'api-key',
+    endpoint: 'openai-compatible', baseUrl: fixture.baseUrl, models: [{ id: 'm', cost: rates }] }]);
+  vi.mocked(resolveProviderCredential).mockReturnValue({ provider: 'fixture', model: 'm', baseUrl: fixture.baseUrl,
+    credential: { apiKey: 'synthetic' } } as never);
+  vi.mocked(providerFetchForEndpoint).mockReturnValue(fetch);
+  const pending = runBtwCommand(['question'], { cwd: setup.root, projectRoot: setup.root, sessionId: setup.session.id,
+    recordAuxiliaryUsage: sessionUsageSink(setup.session.id) });
+  try {
+    try {
+      await vi.waitFor(() => expect(fixture.requests).toHaveLength(1), { timeout: 1500, interval: 10 });
+      tier.inputTokensAbove = 1000; tier.promptPerMTok = 99; tier.cacheReadPerMTok = 9.9;
+      rates.completionPerMTok = 60; rates.cacheWritePerMTok = 37.5;
+    } finally { release(); }
+    expect((await pending).report?.facts?.delivered).toBe(true);
+    const report = costModel(getSessionUsage(setup.session.id), []);
+    expect(report.buckets).toHaveLength(1);
+    expect(report.buckets[0]).toMatchObject({ rateBasis: 'captured', turnsCount: 1,
+      rates: { promptPerMTok: 9, completionPerMTok: 6, cacheReadPerMTok: 0.9, cacheWritePerMTok: 3.75 } });
+    expect(report.estimate.usd).toBeCloseTo(0.000435, 10);
+    expect(readBoundSessionState(setup.manager, setup.session).state.usage?.turnsCount).toBe(1);
+  } finally {
+    release(); await pending.catch(() => undefined);
+    resetSessionUsage(setup.session.id);
+    fixture.server.closeAllConnections();
+    await new Promise<void>(resolve => fixture.server.close(() => resolve()));
+  }
 });

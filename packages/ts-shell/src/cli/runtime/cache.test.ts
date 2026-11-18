@@ -6,6 +6,7 @@ import { getSessionUsage, recordSessionUsage, resetSessionUsage } from '../../ob
 import { costModel } from '../../core/commands/cost/model.js';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
 import { readBoundSessionState } from '../../session/store/bound.js';
+import { createCacheWarmingRunner } from '../../turn/cacheWarm.js';
 
 let server: http.Server;
 let url: string;
@@ -99,4 +100,51 @@ it("rejects a captured endpoint that differs from the prepared transport", async
   expect(await cache.refresh!(sent, new AbortController().signal)).toBeUndefined();
   expect(renewHeaders).not.toHaveBeenCalled();
   expect(requests).toEqual([]);
+});
+
+it('records one captured tier charge for one HTTP refresh through the real cache runner', async () => {
+  server.removeAllListeners('request');
+  server.on('request', (request, response) => {
+    requests.push(request.headers); request.resume();
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ choices: [{ message: { content: 'x' }, finish_reason: 'stop' }], usage: {
+      prompt_tokens: 100, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 0 },
+    } }));
+  });
+  vi.stubEnv('CHEERS_TEST_ROOT', '/tmp/cheers-test');
+  const setup = createAdvisorHarness(false, false);
+  const sessionId = setup.session.id;
+  const tier = { inputTokensAbove: 99, promptPerMTok: 9, completionPerMTok: 18 };
+  const prices = { promptPerMTok: 3, completionPerMTok: 6, cacheReadPerMTok: 0.3, tiers: [tier] };
+  const cache = cacheRefreshFor({ sessionId, runtimeConfig: {} as never,
+    provider: { providerId: 'fixture', model: 'fixture' }, baseUrl: url, rates: prices,
+    isCurrent: () => true, renewHeaders: async () => ({}),
+  });
+  let clock = Date.now();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const runner = createCacheWarmingRunner({ mode: 'streaming', cost: prices, promptCache: { short: 300 },
+    ...cache, now: () => clock });
+  try {
+    runner.noteRequest(100_000, captured());
+    const due = runner.status().nextRefreshAt!;
+    expect(due - clock).toBe(270_000);
+    tier.promptPerMTok = 99; tier.completionPerMTok = 198;
+    clock = due;
+    vi.advanceTimersByTime(270_000);
+    // The real HTTP transport starts after credential renewal resumes.
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(runner.status().nextRefreshAt).toBe(due + 270_000), { timeout: 2500, interval: 10 });
+    expect(requests).toHaveLength(1);
+    expect(getSessionUsage(sessionId)).toMatchObject({ turnsCount: 1 });
+    expect(readBoundSessionState(setup.manager, setup.session).state.usage).toMatchObject({ turnsCount: 1 });
+    const report = costModel(getSessionUsage(sessionId), []);
+    expect(report.buckets).toHaveLength(1);
+    expect(report.buckets[0]).toMatchObject({ rateBasis: 'captured', turnsCount: 1, promptTokens: 100, completionTokens: 1,
+      rates: { promptPerMTok: 9, completionPerMTok: 18, cacheReadPerMTok: 0.3 } });
+    expect(report.estimate.usd).toBeCloseTo(0.000918, 10);
+  } finally {
+    vi.useRealTimers();
+    await runner.reset();
+    resetSessionUsage(sessionId);
+  }
 });

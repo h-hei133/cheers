@@ -134,6 +134,23 @@ describe("the warming decision", () => {
 });
 
 describe("the mode", () => {
+  it('uses the request input tier for both cache futures without counting refresh output in the threshold', () => {
+    const prices = { promptPerMTok: 3, completionPerMTok: 15, cacheReadPerMTok: 0.3, cacheWritePerMTok: 3.75,
+      tiers: [{ inputTokensAbove: 100_000, promptPerMTok: 9, completionPerMTok: 45, cacheReadPerMTok: 0.9, cacheWritePerMTok: 11.25 }] };
+    const atThreshold = evaluateCacheWarming({ cost: prices, promptTokens: 100_000, phase: 'streaming' });
+    const aboveThreshold = evaluateCacheWarming({ cost: prices, promptTokens: 100_001, phase: 'streaming' });
+    expect(atThreshold.warmCost).toBeCloseTo(0.030015, 10);
+    expect(aboveThreshold.warmCost).toBeCloseTo(0.0900459, 10);
+    expect(aboveThreshold.missCost).toBeCloseTo(1.03501035, 10);
+  });
+
+  it('does not justify a paid refresh from an omitted output or cache-read price', () => {
+    for (const cost of [{ promptPerMTok: 3, cacheReadPerMTok: 0.3 }, { promptPerMTok: 3, completionPerMTok: 15 }]) {
+      expect(evaluateCacheWarming({ cost, promptTokens: 100_000, phase: 'streaming' })).toMatchObject({
+        action: 'stop', economicsAvailable: false,
+      });
+    }
+  });
   it("accepts the three modes it defines", () => {
     for (const mode of CACHE_WARMING_MODES) {
       expect(resolveCacheWarmingMode(mode)).toBe(mode);

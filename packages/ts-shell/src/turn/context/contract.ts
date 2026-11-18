@@ -19,7 +19,8 @@ import type { PromptSource, PromptMeasurementIdentity } from '../../context/requ
 import type { RequestBudgetResult } from '../../context/request/budget.js';
 import type { RequestOverhead } from '../../session/context.js';
 import type { SessionUsageRecord } from '../../observability/usageTelemetry.js';
-import type { UsageAttribution } from '../../observability/usage/model.js';
+import type { RequestUsageAttribution } from '../../observability/usage/model.js';
+import type { UsageInputMode } from '../../provider/response/metering.js';
 import type { storedPromptProjection } from '../measurement.js';
 
 export interface ProviderTarget {
@@ -207,7 +208,8 @@ export interface PreparedTurnContext {
   readonly shape: ResolvedRequestShape;
   readonly protocol: EndpointShape;
   readonly modelEntry?: CatalogModel;
-  readonly usageAttribution: UsageAttribution;
+  readonly usageAttribution: RequestUsageAttribution;
+  readonly usageInput?: UsageInputMode;
   readonly inputLimits?: ModelInputLimits;
   readonly payload: Readonly<Record<string, unknown>>;
   readonly requestHeaders: Readonly<Record<string, string>>;

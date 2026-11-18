@@ -1,4 +1,5 @@
-import { THINKING_LEVELS, type CatalogProvider, type CatalogModel, type ModelCostRates } from "./catalog.js";
+import { THINKING_LEVELS, type CatalogProvider, type CatalogModel } from "./catalog.js";
+import { projectIndexPrices } from './prices.js';
 import { assertCacheCurrent, CacheFailure, captureCache, encodeCache, publishCache, type CacheOutcome } from './cache/store.js';
 import { positiveTokenLimit } from "./limits.js";
 import { normalizeModalities, withDefaultImageLimits } from "./modalities.js";
@@ -74,6 +75,8 @@ interface IndexModel {
     readonly output?: number;
     readonly cache_read?: number;
     readonly cache_write?: number;
+    readonly tiers?: readonly unknown[];
+    readonly context_over_200k?: unknown;
   };
 }
 
@@ -186,7 +189,7 @@ function projectIndex(index: unknown): Partial<CatalogProvider>[] {
       const context = positiveTokenLimit(model?.limit?.context);
       const inputLimit = positiveTokenLimit(model?.limit?.input);
       const maxTokens = positiveTokenLimit(model?.limit?.output);
-      const cost = projectCost(model?.cost);
+      const cost = projectIndexPrices(model?.cost);
       const inputModalities = normalizeModalities(model?.modalities?.input);
       const outputModalities = normalizeModalities(model?.modalities?.output);
       const vision = inputModalities
@@ -226,38 +229,6 @@ function projectIndex(index: unknown): Partial<CatalogProvider>[] {
     });
   }
   return providers;
-}
-
-/**
- * The published prices, in this project's terms.
- *
- * The index names its rates `input`/`output`/`cache_read`/`cache_write` and
- * quotes them per million tokens, which is what `ModelCostRates` expects — the
- * mapping is a rename rather than a conversion, and it is written out so the two
- * vocabularies cannot drift apart silently.
- *
- * Absent when the index states no price at all. A model whose rates are all
- * missing is one whose cost cannot be reported, and a zero-filled entry would
- * claim it is free.
- */
-function projectCost(cost: IndexModel["cost"]): ModelCostRates | undefined {
-  if (!cost) return undefined;
-  const prompt = finite(cost.input);
-  const completion = finite(cost.output);
-  if (prompt === undefined && completion === undefined) return undefined;
-  const cacheRead = finite(cost.cache_read);
-  const cacheWrite = finite(cost.cache_write);
-  return {
-    promptPerMTok: prompt ?? 0,
-    completionPerMTok: completion ?? 0,
-    ...(cacheRead !== undefined ? { cacheReadPerMTok: cacheRead } : {}),
-    ...(cacheWrite !== undefined ? { cacheWritePerMTok: cacheWrite } : {}),
-  };
-}
-
-/** A published rate, or nothing when the index did not state one. */
-function finite(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
 /**

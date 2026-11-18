@@ -2,6 +2,8 @@ import type { AgentCoreOptions } from '../core/agent/agent.js';
 import type { QueryEvent } from '../core/query/runtime/events.js';
 import type { SessionMessage } from '../session/schema/sessionMessage.js';
 import { hasUsage, usageFromProvider } from '../provider/response/usage.js';
+import { endpointShape } from '../provider/endpoints/index.js';
+import type { UsageInputMode } from '../provider/response/metering.js';
 import type { SentRequest } from '../provider/request/sentRequest.js';
 import { getSessionUsage, recordRequestContext } from '../observability/usageTelemetry.js';
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
@@ -46,20 +48,29 @@ function tracedStep(step: StepFunction): StepFunction {
       requestId, purpose: options.requestPurpose ?? 'turn', usage: 'unknown',
     } }, async span => {
       let sent = false;
+      let usageInput: UsageInputMode | undefined;
+      let preparedUsageInput: UsageInputMode | undefined;
+      let preparedCaptured = false;
       const result = await step(messages, signal, listener, { ...options, requestId,
         onRequestSent: request => {
           sent = true;
+          usageInput = preparedCaptured ? preparedUsageInput : endpointShape(request.endpoint).usageInput;
           span?.setAttributes({ endpoint: request.endpoint ?? 'unknown', prepared: true });
           options.onRequestSent?.(request);
         },
+        onPreparedContext: prepared => {
+          preparedCaptured = true;
+          preparedUsageInput = prepared.usageInput;
+          options.onPreparedContext?.(prepared);
+        },
         onRequestUsage: usage => {
           if (hasUsage(usage)) {
-            const counted = usageFromProvider(usage);
-            const inputReported = [usage.prompt_tokens, usage.cache_read_input_tokens, usage.cache_creation_input_tokens]
-              .some(value => typeof value === 'number' && Number.isFinite(value) && value >= 0);
-            const outputReported = typeof usage.completion_tokens === 'number' && Number.isFinite(usage.completion_tokens) && usage.completion_tokens >= 0;
+            const counted = usageFromProvider(usage, usageInput);
+            const inputReported = counted.inputComplete === true;
+            const outputReported = typeof usage.completion_tokens === 'number' && Number.isSafeInteger(usage.completion_tokens)
+              && usage.completion_tokens >= 0 && usage.metering_output_complete !== false;
             span?.setAttributes({ usage: inputReported && outputReported ? 'reported' : 'partial',
-              ...(inputReported ? { inputCount: counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens } : {}),
+              ...(inputReported ? { inputCount: counted.inputTokens } : {}),
               ...(outputReported ? { outputCount: counted.completionTokens } : {}) });
           }
           options.onRequestUsage?.(usage);
@@ -156,17 +167,19 @@ export function createTurnRequest(
     lastSentRequest = undefined;
     let sentRequest: SentRequest | undefined;
     let inputTokens = 0;
+    let usageInput: UsageInputMode | undefined;
     const onRequestSent: NonNullable<StepOptions['onRequestSent']> = sent => {
       sentRequest = sent;
       inputTokens = 0;
+      usageInput = latestPrepared ? latestPrepared.usageInput : endpointShape(sent.endpoint).usageInput;
       if (sent.context) recordRequestContext(options.sessionId, sent.context);
       if (sent.promptIdentity) options.onPromptIdentity?.(sent.promptIdentity);
     };
     const onRequestUsage: NonNullable<StepOptions['onRequestUsage']> = usage => {
-      const counted = usageFromProvider(usage);
-      inputTokens = counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens;
+      const counted = usageFromProvider(usage, usageInput);
+      inputTokens = counted.inputComplete === true ? counted.inputTokens ?? 0 : 0;
       if (sentRequest?.context && getSessionUsage(options.sessionId).requestContext === sentRequest.context &&
-        typeof usage.prompt_tokens === 'number' && Number.isFinite(usage.prompt_tokens) && usage.prompt_tokens >= 0 && Number.isFinite(inputTokens)) {
+        counted.inputComplete === true && Number.isSafeInteger(inputTokens)) {
         recordRequestContext(options.sessionId, Object.freeze({ ...sentRequest.context, promptTokens: inputTokens }));
       }
     };

@@ -25,7 +25,7 @@ export function modelMetadataDetails(catalog: readonly CatalogProvider[], provid
     `Tool calls: ${metadata?.toolCalling === false ? 'unsupported' : metadata?.toolCalling === true ? 'supported' : 'unverified'}`,
     `Reasoning settings: ${reasoning}`,
     `Effort levels: ${levels.map(([level, status]) => `${level} ${status}`).join(' · ')}`,
-    ...(metadata?.cost ? [`Price per 1M tokens: input ${metadata.cost.promptPerMTok} · output ${metadata.cost.completionPerMTok}`
+    ...(metadata?.cost ? [`${metadata.cost.tiers?.length ? 'Base price' : 'Price'} per 1M tokens: input ${metadata.cost.promptPerMTok ?? 'unknown'} · output ${metadata.cost.completionPerMTok ?? 'unknown'}`
       + (metadata.cost.cacheReadPerMTok === undefined ? '' : ` · cache read ${metadata.cost.cacheReadPerMTok}`)
       + (metadata.cost.cacheWritePerMTok === undefined ? '' : ` · cache write ${metadata.cost.cacheWritePerMTok}`)] : []),
   ];

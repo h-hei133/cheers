@@ -49,6 +49,10 @@ export function decodeUsageBucket(key: string, raw: unknown, attributed: boolean
   if (!isRecord(raw)) throw new Error('Invalid persisted session usage bucket');
   const attribution = decodeAttribution(key, attributed ? raw.attribution : undefined);
   const bucket = { ...(attribution ? { attribution } : {}) } as ModelUsageBucket;
+  if (raw.allocationIncomplete !== undefined) {
+    if (raw.allocationIncomplete !== true) throw new Error('Invalid persisted session usage allocation');
+    bucket.allocationIncomplete = true;
+  }
   for (const field of bucketFields) bucket[field] = count(raw[field]);
   return bucket;
 }
@@ -195,6 +199,7 @@ export function mergeUsageDelta(
     for (const field of bucketFields) {
       result[field] = addDelta(result[field] ?? 0, bucket[field], previous?.[field] ?? 0);
     }
+    if (result.allocationIncomplete || bucket.allocationIncomplete || previous?.allocationIncomplete) result.allocationIncomplete = true;
     merged.byModel[key] = result;
   }
   merged.turnsCount = addDelta(merged.turnsCount, live.turnsCount, baseline?.turnsCount ?? 0);

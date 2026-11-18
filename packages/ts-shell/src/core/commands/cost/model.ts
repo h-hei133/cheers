@@ -2,6 +2,7 @@ import type { CatalogProvider, ModelCostRates } from '../../models/catalog.js';
 import { resolveModelCost } from '../../models/window.js';
 import { estimateSessionCost, totalTokens, usageBuckets, USAGE_RATES, type SessionUsageTelemetry } from '../../../observability/usageTelemetry.js';
 import { bucketIdentity, bucketRates } from '../../../observability/usage/identity.js';
+import { unpricedTokenCount } from '../../models/pricing.js';
 import { findCacheWaste, summarizeCacheUsage } from '../../../observability/cacheWaste.js';
 
 /** Recorded accounting only; neither the live context gauge nor a provider bill. */
@@ -11,10 +12,10 @@ export function costModel(telemetry: SessionUsageTelemetry, catalog: readonly Ca
   const buckets = usageBuckets(telemetry).map(([key, bucket]) => {
     const identity = bucketIdentity(key, bucket);
     const published = bucketRates(key, bucket, rateFor);
-    const rates: ModelCostRates | undefined = published ?? (bucket.attribution ? undefined : USAGE_RATES);
+    const rates: ModelCostRates | undefined = published ?? (bucket.attribution || published === null ? undefined : USAGE_RATES);
     const estimate = estimateSessionCost({ ...telemetry, usageHealth: undefined, byModel: { [key]: bucket } }, rateFor);
-    const unpricedTokens = rates ? (rates.cacheReadPerMTok === undefined ? bucket.cacheReadTokens : 0)
-      + (rates.cacheWritePerMTok === undefined ? bucket.cacheWriteTokens : 0) : bucket.totalTokens;
+    const allocatedTokens = bucket.promptTokens + bucket.completionTokens + bucket.cacheReadTokens + bucket.cacheWriteTokens;
+    const unpricedTokens = rates ? unpricedTokenCount(bucket, rates) + Math.max(0, bucket.totalTokens - allocatedTokens) : bucket.totalTokens;
     const modelLabel = identity.provider ? `${identity.provider}/${identity.model}` : identity.model;
     const label = bucket.attribution ? `${modelLabel} · ${bucket.attribution.origin ?? 'unknown origin'} · destination ${destinations.indexOf(bucket.attribution.endpointId) + 1}` : modelLabel;
     return { key, provider: identity.provider, model: identity.model, label, ...bucket,

@@ -51,6 +51,7 @@ function responsesUrl(baseUrl: string, model: string): string {
 }
 
 declareEndpoint("azure-openai-responses", {
+  usageInput: 'inclusive',
   contextFields: { system: "instructions", conversation: "input", tools: "tools" },
   path: (model) => {
     validateModel(model);

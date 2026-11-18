@@ -58,6 +58,27 @@ function readCache(path: string): Record<string, { models?: readonly Record<stri
 }
 
 describe("refreshing the catalogue", () => {
+  it('keeps context tiers and partial base prices through the real refresh cache and catalog merge', async () => {
+    const document = { fixture: { models: { meter: { id: 'meter', cost: { input: 1, cache_read: 0.1,
+      tiers: [{ input: 3, output: 0, cache_read: 0.3, tier: { type: 'context', size: 100 } }] } } } } };
+    await withIndex(document, async url => {
+      const result = await refreshCatalog(url);
+      expect(result).toMatchObject({ ok: true, cacheOutcome: 'saved', models: 1 });
+      expect(catalogModel(loadCatalog(), 'fixture', 'meter')?.cost).toEqual({ promptPerMTok: 1, cacheReadPerMTok: 0.1,
+        tiers: [{ inputTokensAbove: 100, promptPerMTok: 3, completionPerMTok: 0, cacheReadPerMTok: 0.3 }] });
+    });
+  });
+
+  it('rejects invalid price thresholds without replacing a previously saved cache body', async () => {
+    await withIndex({ fixture: { models: { meter: { cost: { input: 1, output: 2 } } } } }, async url => {
+      expect((await refreshCatalog(url)).ok).toBe(true);
+    });
+    const before = fs.readFileSync(catalogCachePath());
+    await withIndex({ fixture: { models: { meter: { cost: { input: 1, tiers: [{ input: 3, tier: { type: 'context', size: -1 } }] } } } } }, async url => {
+      expect(await refreshCatalog(url)).toMatchObject({ ok: false, cacheOutcome: 'unchanged', errorKind: 'invalid_index' });
+    });
+    expect(fs.readFileSync(catalogCachePath())).toEqual(before);
+  });
   it("keeps the prices the index publishes", () => {
     // Dropped before, which is why no cost could be reported and why a decision
     // weighing a saving against a spend had nothing to weigh.
@@ -116,7 +137,7 @@ describe("refreshing the catalogue", () => {
     return withIndex(document, async (url) => {
       const result = await refreshCatalog(url);
       const models = readCache(result.cachePath!).demo?.models ?? [];
-      expect(models[0]?.cost).toEqual({ promptPerMTok: 1, completionPerMTok: 0, cacheReadPerMTok: 0.1 });
+      expect(models[0]?.cost).toEqual({ promptPerMTok: 1, cacheReadPerMTok: 0.1 });
     });
   });
 

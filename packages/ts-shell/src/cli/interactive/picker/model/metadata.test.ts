@@ -8,6 +8,7 @@ import { readSessionModelEdit } from '../../../../session/model/state.js';
 import { OverlayHost } from '../../overlay.js';
 import { parseKeyEvent } from '../../../../presentation/tui/input/keys.js';
 import { stripAnsi } from '../../../../presentation/tui/text/ansi.js';
+import { modelMetadataDetails } from './metadata.js';
 
 let root: string, sessionId: string;
 beforeEach(() => {
@@ -28,6 +29,14 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 const context = () => ({ cwd: root, projectRoot: root, sessionId });
 const target = (model = 'shared') => `model:${JSON.stringify([null, 'relay', model])}`;
+
+it('labels the base price of a schedule and preserves unknown output separately from explicit free input', () => {
+  const provider = { id: 'fixture', label: 'Fixture', runtime: 'openai-compatible' as const, auth: 'none' as const,
+    models: [{ id: 'meter', cost: { promptPerMTok: 0, tiers: [{ inputTokensAbove: 100, promptPerMTok: 3 }] } }] };
+  const details = modelMetadataDetails([provider], provider, 'meter');
+  expect(details).toContain('Base price per 1M tokens: input 0 · output unknown');
+  expect(details.join('\n')).not.toContain('undefined');
+});
 
 it('shows an unconfigured relay model using its exact metadata rather than the same-name official entry', async () => {
   const picker = modelPicker(context()), rows = await picker.load();

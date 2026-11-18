@@ -32,6 +32,9 @@ import * as measurement from '../../turn/measurement.js';
 import { estimatePrompt } from '../../context/request/estimate.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
 import type { MessageConverter } from '../../core/agent/messages.js';
+import { costModel } from '../../core/commands/cost/model.js';
+import { readBoundSessionState } from '../../session/store/bound.js';
+import type { ModelCostSchedule } from '../../core/models/pricing.js';
 
 const fixture = vi.hoisted(() => ({
   deps: undefined as SessionRuntimeDependencies | undefined,
@@ -41,6 +44,7 @@ const fixture = vi.hoisted(() => ({
   resolution: {} as Record<string, unknown>,
   toolCalling: undefined as boolean | undefined,
   endpoint: "test-signed-summary",
+  prices: undefined as ModelCostSchedule | undefined,
   config: { providerConnectTimeoutMs: 1000, providerHeadersTimeoutMs: 1000, providerBodyTimeoutMs: 1000, offline: true,
     disabledTools: [], hiddenToolPrefixes: [], toolDiscovery: 'full', skillful: false },
 }));
@@ -51,7 +55,7 @@ vi.mock('./goalScheduling.js', () => ({ installGoalScheduler: () => undefined })
 vi.mock("../../core/shell/providerCredentials.js", () => ({ resolveProviderCredential: () => fixture.resolution }));
 vi.mock("../../core/models/catalogStore.js", () => ({ loadCatalog: () => [{
   id: "fixture", endpoint: fixture.endpoint, models: [{ id: "fixture-model", contextWindow: 10000,
-    promptCache: { short: 300 }, cost: { promptPerMTok: 10, cacheReadPerMTok: 1, completionPerMTok: 1 },
+    promptCache: { short: 300 }, cost: fixture.prices ?? { promptPerMTok: 10, cacheReadPerMTok: 1, completionPerMTok: 1 },
     ...(fixture.toolCalling === undefined ? {} : { toolCalling: fixture.toolCalling }),
   }],
 }] }));
@@ -91,6 +95,7 @@ beforeEach(async () => {
   fixture.compaction = undefined;
   fixture.toolCalling = undefined;
   fixture.endpoint = "test-signed-summary";
+  fixture.prices = undefined;
   fixture.config.offline = true;
   vi.mocked(createCacheWarmingRunner).mockClear();
   declareEndpoint("test-signed-summary", {
@@ -136,6 +141,37 @@ function runtime(withKey: boolean, convertToLlm?: MessageConverter) {
   } as never);
   return fixture.deps!;
 }
+
+it.each(['manual', 'automatic', 'branch'] as const)('keeps %s summary requests on their own captured price tiers and durable usage', async mode => {
+  fixture.prices = { promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1.25,
+    tiers: [{ inputTokensAbove: 100, promptPerMTok: 5, completionPerMTok: 10, cacheReadPerMTok: 0.5, cacheWritePerMTok: 6.25 }] };
+  server.removeAllListeners('request');
+  server.on('request', async (request, response) => {
+    const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(chunk);
+    received.push({ path: request.url!, body: JSON.parse(Buffer.concat(chunks).toString()) });
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ output: { message: { content: [{ text: 'SUMMARY_ANSWER' }] } }, stopReason: 'end_turn',
+      usage: { inputTokens: 41, outputTokens: 2, cacheReadInputTokens: 40, cacheWriteInputTokens: 20, totalTokens: 103 } }));
+  });
+  const deps = runtime(true);
+  if (mode === 'manual') await deps.compactHistory!('signed-summary', new AbortController().signal);
+  else if (mode === 'automatic') {
+    deps.runPrompt('hello', new AbortController().signal);
+    await fixture.compaction!.summarize({ messages: [] });
+    await fixture.compaction!.summarizeTurnPrefix!([]);
+  } else await deps.summarizeAbandonedTurns!([]);
+  const count = mode === 'branch' ? 1 : 2;
+  expect(received).toHaveLength(count);
+  const report = costModel(getSessionUsage('signed-summary'), []);
+  expect(report.recordedTurns).toBe(count);
+  expect(report.buckets).toHaveLength(1);
+  expect(report.buckets[0]).toMatchObject({ promptTokens: 41 * count, completionTokens: 2 * count,
+    cacheReadTokens: 40 * count, cacheWriteTokens: 20 * count,
+    rates: { promptPerMTok: 5, completionPerMTok: 10, cacheReadPerMTok: 0.5, cacheWritePerMTok: 6.25 } });
+  expect(report.estimate.usd).toBeCloseTo(0.00037 * count, 10);
+  const manager = new SessionManager(), session = manager.getSession('signed-summary')!;
+  expect(readBoundSessionState(manager, session).state.usage?.turnsCount).toBe(count);
+});
 
 it.each([true, false])("signs side questions with final JSON URL/body (apiKey=%s)", async withKey => {
   runtime(withKey);

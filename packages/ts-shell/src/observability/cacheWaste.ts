@@ -201,13 +201,13 @@ function comparable(entry: UsageHistoryEntry, rateFor: CacheRateLookup): Compara
   const cacheRead = entry.cacheReadTokens;
   const paidTokens = entry.promptTokens - cacheRead;
   const inputTokens = paidTokens - entry.cacheWriteTokens;
-  if (inputTokens < 0 || (entry.cacheWriteTokens > 0
+  if (inputTokens < 0 || inputTokens > 0 && rates.promptPerMTok === undefined || (entry.cacheWriteTokens > 0
     && (!cacheCategoryMeasured(entry.cacheWriteTokens, entry.cacheWriteReported) || rates.cacheWritePerMTok === undefined))) return undefined;
   return {
     promptTokens: entry.promptTokens,
     cacheReadTokens: cacheRead,
     paidPerMTok: paidTokens > 0
-      ? (inputTokens * rates.promptPerMTok + entry.cacheWriteTokens * (rates.cacheWritePerMTok ?? 0)) / paidTokens : 0,
+      ? (inputTokens * (rates.promptPerMTok ?? 0) + entry.cacheWriteTokens * (rates.cacheWritePerMTok ?? 0)) / paidTokens : 0,
     rates,
     bucketKey: cacheIdentity(entry.bucketKey, entry.attribution),
     modelKey: JSON.stringify([identity.provider, identity.model]),

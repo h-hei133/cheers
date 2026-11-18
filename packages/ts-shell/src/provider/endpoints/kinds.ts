@@ -3,6 +3,7 @@ import type { RequestSigner } from "../request/fetch.js";
 import type { ToolSchema } from "../../turn/tools.js";
 import type { ContextFields } from '../../context/request/model.js';
 import type { RequestBound } from '../../core/agent/request/model.js';
+import type { UsageInputMode } from '../response/metering.js';
 import {
   isEventStream,
   type CompletedBody,
@@ -43,6 +44,8 @@ export type EndpointKind = string;
 
 /** What one endpoint needs to say about itself. */
 export interface EndpointShape {
+  /** Whether prompt_tokens already includes cache input in this protocol. */
+  readonly usageInput?: UsageInputMode;
   /** This protocol can project durable request declarations at history boundaries. */
   readonly historyDeclarations?: boolean;
   /** Auxiliary requests may require the same native stream as full turns. */

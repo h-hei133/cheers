@@ -85,6 +85,7 @@ export async function runBtwCommand(
     const shape = resolveRequestShape(catalog, resolution.provider, model, undefined, baseUrl, endpoint);
     const attribution = captureUsageAttribution({ provider: resolution.provider, model, baseUrl: baseUrl ?? '',
       rates: catalogModel(catalog, resolution.provider, model, baseUrl)?.cost });
+    const usageInput = endpointShape(endpoint).usageInput;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), SIDE_QUESTION_TIMEOUT_MS);
     try {
@@ -93,7 +94,7 @@ export async function runBtwCommand(
           shape,
           onUsage: usage => {
             if (!hasUsage(usage)) return;
-            const record = { ...usageFromProvider(usage), provider: resolution.provider, model, attribution };
+            const record = { ...usageFromProvider(usage, usageInput, !attribution.costSchedule), provider: resolution.provider, model, attribution };
             if (context.recordAuxiliaryUsage) context.recordAuxiliaryUsage(record);
             else if (context.sessionId) recordSessionUsage(context.sessionId, record, { affectsContext: false });
           },

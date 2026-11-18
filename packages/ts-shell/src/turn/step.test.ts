@@ -60,7 +60,7 @@ describe("createStepFunction", () => {
       fetchImpl: async (_url, init) => {
         sends++; serialized = String(init?.body);
         return jsonResponse({ content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn',
-          usage: { input_tokens: 123, output_tokens: 1 } });
+          usage: { input_tokens: 123, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } });
       },
     });
     try {

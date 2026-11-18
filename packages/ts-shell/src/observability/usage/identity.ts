@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { isRecord } from '../../core/values/record.js';
-import type { ModelCostRates } from '../../core/models/catalog.js';
-import type { UsageAttribution } from './model.js';
+import { captureCostSchedule, captureModelRates, selectCostRates, type ModelCostRates, type ModelCostSchedule } from '../../core/models/pricing.js';
+import type { RequestUsageAttribution, UsageAttribution } from './model.js';
 
 const namespace = '@usage:';
 const legacyPrefix = `${namespace}legacy:`;
@@ -28,22 +28,15 @@ function digest(value: string): string {
 }
 
 function ratesSnapshot(value: unknown): Readonly<ModelCostRates> | null {
-  if (value === null) return null;
-  if (!isRecord(value)) throw new Error('Invalid session usage rates');
-  const result: Record<string, number> = {};
-  for (const field of ['promptPerMTok', 'completionPerMTok', 'cacheReadPerMTok', 'cacheWritePerMTok'] as const) {
-    const rate = value[field];
-    if (rate === undefined && (field === 'cacheReadPerMTok' || field === 'cacheWritePerMTok')) continue;
-    if (typeof rate !== 'number' || !Number.isFinite(rate) || rate < 0) throw new Error('Invalid session usage rates');
-    result[field] = rate;
-  }
-  return Object.freeze(result) as unknown as Readonly<ModelCostRates>;
+  try { return captureModelRates(value); }
+  catch { throw new Error('Invalid session usage rates'); }
 }
 
 /** Capture only accounting identity; a URL's credentials, path and query never persist. */
 export function captureUsageAttribution(input: {
-  readonly provider: string; readonly model: string; readonly baseUrl: string; readonly rates?: ModelCostRates;
-}): UsageAttribution {
+  readonly provider: string; readonly model: string; readonly baseUrl: string; readonly rates?: ModelCostSchedule;
+}): RequestUsageAttribution {
+  const schedule = captureCostSchedule(input.rates ?? null);
   let origin: string | undefined;
   try {
     const url = new URL(input.baseUrl);
@@ -51,7 +44,17 @@ export function captureUsageAttribution(input: {
   } catch { /* Invalid targets retain an opaque identity, never their raw address. */ }
   return Object.freeze({ provider: input.provider, model: input.model,
     endpointId: digest(input.baseUrl.trim().replace(/\/+$/, '')),
-    ...(origin ? { origin } : {}), rates: ratesSnapshot(input.rates ?? null) });
+    ...(origin ? { origin } : {}), rates: selectCostRates(schedule, { inputTokens: 0, inputComplete: true }),
+    ...(schedule?.tiers ? { costSchedule: schedule } : {}) });
+}
+
+/** Select before bucket identity is computed; the cumulative store never receives a schedule. */
+export function settleUsageAttribution(attribution: RequestUsageAttribution, input: {
+  readonly inputTokens?: number; readonly inputComplete?: boolean;
+}): UsageAttribution {
+  if (!attribution.costSchedule) return attribution;
+  const { costSchedule, ...identity } = attribution;
+  return Object.freeze({ ...identity, rates: selectCostRates(costSchedule, input) });
 }
 
 export function attributedBucketKey(attribution: UsageAttribution): string {
@@ -89,10 +92,12 @@ export function bucketIdentity(key: string, bucket: { readonly attribution?: Usa
 }
 
 export function bucketRates(key: string, bucket: { readonly attribution?: UsageAttribution },
-  rateFor: (provider: string, model: string) => ModelCostRates | undefined): ModelCostRates | undefined {
+  rateFor: (provider: string, model: string) => ModelCostSchedule | undefined): ModelCostRates | null | undefined {
   if (bucket.attribution) return bucket.attribution.rates ?? undefined;
   const identity = splitBucketKey(key);
-  return rateFor(identity.provider, identity.model);
+  const rates = rateFor(identity.provider, identity.model);
+  // Aggregate legacy counters cannot establish which requests crossed a price threshold.
+  return rates?.tiers?.length ? null : rates;
 }
 
 /** A price update alone does not replace the provider's prompt cache. */

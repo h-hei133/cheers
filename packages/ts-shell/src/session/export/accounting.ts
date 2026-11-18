@@ -28,7 +28,8 @@ function projectRecordedUsage(raw: unknown): Omit<ExportAccounting, 'scope' | 's
   }
   const total = buckets.reduce((sum, bucket) => sum + bucket.totalTokens, 0);
   const requests = buckets.reduce((sum, bucket) => sum + bucket.turnsCount, 0);
-  const allocated = buckets.every(bucket => bucket.totalTokens === bucket.promptTokens + bucket.completionTokens + bucket.cacheReadTokens + bucket.cacheWriteTokens);
+  const allocated = buckets.every(bucket => !bucket.allocationIncomplete
+    && bucket.totalTokens === bucket.promptTokens + bucket.completionTokens + bucket.cacheReadTokens + bucket.cacheWriteTokens);
   if (!Number.isSafeInteger(total) || !Number.isSafeInteger(requests)) return { usageStatus: 'unavailable' };
   const known = !usage.usageHealth && allocated;
   const tokens = known ? {

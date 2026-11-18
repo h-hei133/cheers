@@ -169,7 +169,8 @@ function compactionWiring(input: CompactionInput, summaryRole: ReturnType<typeof
     }, input.admission);
     const captured = prepareCompactionRequest({ ...request, messages, provider: summaryProvider,
       onUsage: usageFor({ provider: summaryProvider.providerId ?? '', model: summaryProvider.model,
-        baseUrl: summaryProvider.baseUrl, rates: catalogModel(input.catalog, summaryProvider.providerId ?? '', summaryProvider.model, summaryProvider.baseUrl)?.cost }),
+        baseUrl: summaryProvider.baseUrl, rates: catalogModel(input.catalog, summaryProvider.providerId ?? '', summaryProvider.model, summaryProvider.baseUrl)?.cost,
+        usageInput: endpointShape(summaryProvider.endpoint).usageInput }),
       ...transport });
     return Object.freeze({ ...captured, send: (dispatch?: CompactionDispatch) => {
       request.signal?.throwIfAborted(); assertAdmission(input.admission); return captured.send(dispatch);

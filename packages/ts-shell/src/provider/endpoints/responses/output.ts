@@ -59,9 +59,14 @@ export function responseUsage(value: unknown): ProviderUsage | undefined {
   if (!isRecord(value)) return undefined;
   const input = count(value.input_tokens); const output = count(value.output_tokens); const total = count(value.total_tokens);
   const cached = isRecord(value.input_tokens_details) ? count(value.input_tokens_details.cached_tokens) : undefined;
+  const invalidInput = value.input_tokens !== undefined && input === undefined
+    || value.input_tokens_details !== undefined && (!isRecord(value.input_tokens_details)
+      || value.input_tokens_details.cached_tokens !== undefined && cached === undefined)
+    || input !== undefined && cached !== undefined && cached > input;
   return { ...(input !== undefined ? { prompt_tokens: input } : {}),
     ...(output !== undefined ? { completion_tokens: output } : {}), ...(total !== undefined ? { total_tokens: total } : {}),
-    ...(cached !== undefined ? { prompt_tokens_details: { cached_tokens: cached } } : {}) };
+    ...(cached !== undefined ? { prompt_tokens_details: { cached_tokens: cached } } : {}),
+    ...(invalidInput ? { metering_input_complete: false } : {}) };
 }
 
 function count(value: unknown): number | undefined {

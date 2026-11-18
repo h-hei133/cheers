@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { ModelAdmissionError, type ModelAttempt, type ModelTransport, type RequestPolicy } from '../../core/agent/request/model.js';
 import { endpointShape } from '../endpoints/index.js';
-import { modelUsage } from '../response/metering.js';
+import { modelUsage, type UsageInputMode } from '../response/metering.js';
 import type { ProviderUsage } from '../../turn/completion.js';
 import { credentialBackoffRemaining, noteCredentialRateLimit, responseBackoffMs,
   type CredentialKey } from './backoff.js';
@@ -20,9 +20,11 @@ export async function prepareRequestAttempt(request: {
   readonly purpose: string; readonly requestId?: string; readonly policy?: RequestPolicy;
   readonly credential?: CredentialKey;
   readonly inputLimits?: ModelInputLimits;
+  readonly usageInput?: UsageInputMode | null;
 }): Promise<RequestAttempt> {
   request = Object.freeze({ ...request, inputLimits: requestInputLimits(request.inputLimits),
     ...(request.credential ? { credential: Object.freeze({ ...request.credential }) } : {}) });
+  const usageInput = request.usageInput === undefined ? endpointShape(request.endpoint).usageInput : request.usageInput;
   if (request.inputLimits) assertRequestInput(request.body, endpointShape(request.endpoint).contextFields, request.inputLimits);
   // A credential that a provider just rate-limited is not asked again until its
   // own deadline. Another credential of the same provider is unaffected.
@@ -66,6 +68,6 @@ export async function prepareRequestAttempt(request: {
         throw error;
       }
     },
-    settle: usage => { attempt?.settle(modelUsage(usage, request.endpoint)); },
+    settle: usage => { attempt?.settle(modelUsage(usage, request.endpoint, usageInput ?? null)); },
   };
 }

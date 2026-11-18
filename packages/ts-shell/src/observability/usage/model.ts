@@ -8,7 +8,7 @@
  * attributed to the wrong model.
  */
 import type { PromptMeasurementIdentity, RequestContext } from '../../context/request/model.js';
-import type { ModelCostRates } from '../../core/models/catalog.js';
+import type { ModelCostRates, ModelCostSchedule } from '../../core/models/pricing.js';
 export type { PromptMeasurementIdentity } from '../../context/request/model.js';
 
 /**
@@ -24,12 +24,19 @@ export interface UsageAttribution {
   readonly endpointId: string;
   /** Display origin only, without userinfo, path, query or fragment. */
   readonly origin?: string;
-  /** Prices captured before sending. Null means no published price was known. */
+  /** Final request prices selected from the captured schedule. Null means the price is unknown. */
   readonly rates: Readonly<ModelCostRates> | null;
+}
+
+/** The schedule is transient; only this request's selected flat prices persist. */
+export interface RequestUsageAttribution extends UsageAttribution {
+  readonly costSchedule?: Readonly<ModelCostSchedule>;
 }
 
 export interface ModelUsageBucket {
   readonly attribution?: UsageAttribution;
+  /** At least one request lacked a complete disjoint allocation; later requests cannot fill it. */
+  allocationIncomplete?: true;
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;

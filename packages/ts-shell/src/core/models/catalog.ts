@@ -3,6 +3,7 @@ import type { EndpointKind } from "../../provider/endpoints/kinds.js";
 import { sanitizeModelLimits } from "./limits.js";
 import { mergeInputLimits, type ModelInputLimits, type ModelInputModality } from "./modalities.js";
 import { nativeOpenAIResponses } from './protocol.js';
+import type { ModelCostSchedule } from './pricing.js';
 /**
  * Provider and model catalogue.
  *
@@ -38,7 +39,7 @@ export interface CatalogModel {
    * guess would be worse than an admission: a cost report that silently
    * substitutes a made-up rate reads like a measurement.
    */
-  readonly cost?: ModelCostRates;
+  readonly cost?: ModelCostSchedule;
   /**
    * Whether this model accepts a reasoning setting.
    *
@@ -191,12 +192,7 @@ export { THINKING_LEVELS, type ThinkingLevel } from './effort.js';
 import type { ThinkingLevel } from './effort.js';
 
 /** Prices per million tokens, as the model publishes them. */
-export interface ModelCostRates {
-  readonly promptPerMTok: number;
-  readonly completionPerMTok: number;
-  readonly cacheReadPerMTok?: number;
-  readonly cacheWritePerMTok?: number;
-}
+export type { ModelCostRates, ModelCostTier, ModelCostSchedule } from './pricing.js';
 
 export interface CatalogProvider {
   readonly id: string;

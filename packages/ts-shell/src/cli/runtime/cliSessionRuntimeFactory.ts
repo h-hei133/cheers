@@ -235,7 +235,8 @@ export function createCliSessionRuntime(input: {
           signal,
           requestPolicy, purpose: 'branch-summary', maxOutputTokens: virtualModel ? provider.maxOutputTokens : configuredOutputLimit(config, provider.endpoint),
           onUsage: usageFor({ provider: provider.providerId ?? '', model: provider.model, baseUrl: provider.baseUrl,
-            rates: catalogModel(catalog, provider.providerId ?? '', provider.model, provider.baseUrl)?.cost }),
+            rates: catalogModel(catalog, provider.providerId ?? '', provider.model, provider.baseUrl)?.cost,
+            usageInput: endpointShape(provider.endpoint).usageInput }),
           provider,
           // The third of the three summarisers, and the one that was missed: it kept
           // the global fetch, so a `/back` whose summary stalled waited forever with

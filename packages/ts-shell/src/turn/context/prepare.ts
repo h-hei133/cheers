@@ -173,6 +173,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     const modelEntry = catalogModel(request.catalog ?? [], activeProvider, activeModel, catalogAddress);
     const usageAttribution = captureUsageAttribution({ provider: activeProvider, model: activeModel,
       baseUrl: target.provider.baseUrl, rates: modelEntry?.cost });
+    const usageInput = protocol.usageInput;
     const projectionOptions = {
       ...request.projection,
       ...(request.pruneToolText !== undefined ? { pruneToolText: request.pruneToolText } : {}),
@@ -317,7 +318,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       promptIdentity: Object.freeze(promptIdentity), promptProjection: promptProjection && Object.freeze(promptProjection),
       projection: freezeDeep(projection), activeProvider, activeModel, effort, allowTools, allowedTools, tools, systemPrompt,
       regeneratedPrompt, endpoint, shape: Object.freeze(shape), protocol,
-      modelEntry: modelEntry && structuredClone(modelEntry), usageAttribution, inputLimits,
+      modelEntry: modelEntry && structuredClone(modelEntry), usageAttribution, usageInput, inputLimits,
       payload: freezeDeep(payload!), requestHeaders: Object.freeze({ ...requestHeaders }), body,
       url: endpointUrl(target.provider.baseUrl, endpoint, activeModel), headers: Object.freeze({ ...target.provider.headers }),
       replayBinding, ...(refusal ? { refusal: Object.freeze(refusal) } : {}), isCurrent,

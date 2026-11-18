@@ -265,6 +265,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           if (!prepared.isCurrent()) return stamp(errorStep('Request preparation changed before dispatch. No request was sent.', true));
           const modelAttempt = await prepareRequestAttempt({ body, provider: activeProvider, model: activeModel,
             endpoint, purpose: prepared.agentMode ? 'subagent' : 'turn', requestId, policy: request.requestPolicy, inputLimits,
+            usageInput: prepared.usageInput ?? null,
             ...(target.provider.credentialId && target.provider.credentialGeneration
               ? { credential: { credentialId: target.provider.credentialId, generation: target.provider.credentialGeneration } } : {}) });
           const attemptResponse = await modelAttempt.send(
@@ -433,14 +434,13 @@ export function createStepFunction(request: StepRequest): StepFunction {
         const usage = completion.usage;
         const choice = completion.choices?.[0];
         const stopReason = choice?.message ? stopReasonOf(choice.finish_reason) : 'error';
-        const counted = hasUsage(usage) ? usageFromProvider(usage) : undefined;
+        const counted = hasUsage(usage) ? usageFromProvider(usage, prepared.usageInput, !usageAttribution.costSchedule) : undefined;
         // Both live reuse and persistence depend on this exact validated count.
         // Classify before accounting without invoking display callbacks: their
         // failure must not discard usage the provider has already reported.
-        const promptMeasurement = !prepared.agentMode && counted && typeof usage?.prompt_tokens === 'number'
-          && Number.isSafeInteger(usage.prompt_tokens) && usage.prompt_tokens >= 0
+        const promptMeasurement = !prepared.agentMode && counted?.inputComplete === true
           && stopReason !== 'error' && stopReason !== 'aborted'
-          ? decodePromptMeasurement({ tokens: counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens,
+          ? decodePromptMeasurement({ tokens: counted.inputTokens,
             messageCount: sourceMessages.length, identity: promptIdentity,
             projection: promptProjection }) : undefined;
         if (usage && counted) {

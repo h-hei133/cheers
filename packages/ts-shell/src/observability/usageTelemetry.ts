@@ -1,9 +1,10 @@
 import { currentUsage, sessionTelemetries } from './usage/state.js';
 import { randomUUID } from 'node:crypto';
 import type { ModelCostRates } from "../core/models/catalog.js";
+import { unpricedTokenCount, type ModelCostSchedule } from '../core/models/pricing.js';
 import type { PromptMeasurement, RequestContext } from '../context/request/model.js';
-import type { PromptMeasurementIdentity, UsageAttribution } from './usage/model.js';
-import { attributedBucketKey, bucketRates, cacheIdentity, decodeAttribution, usageBucketKey } from './usage/identity.js';
+import type { PromptMeasurementIdentity, RequestUsageAttribution } from './usage/model.js';
+import { attributedBucketKey, bucketRates, cacheIdentity, decodeAttribution, settleUsageAttribution, usageBucketKey } from './usage/identity.js';
 export { splitBucketKey, usageBucketKey } from './usage/identity.js';
 
 export type { ModelCostRates };
@@ -34,8 +35,8 @@ export function estimateUsageCost(
   rates: ModelCostRates = USAGE_RATES,
 ): number {
   return (
-    (bucket.promptTokens / 1_000_000) * rates.promptPerMTok +
-    (bucket.completionTokens / 1_000_000) * rates.completionPerMTok +
+    (bucket.promptTokens / 1_000_000) * (rates.promptPerMTok ?? 0) +
+    (bucket.completionTokens / 1_000_000) * (rates.completionPerMTok ?? 0) +
     (bucket.cacheReadTokens / 1_000_000) * (rates.cacheReadPerMTok ?? 0) +
     (bucket.cacheWriteTokens / 1_000_000) * (rates.cacheWritePerMTok ?? 0)
   );
@@ -67,7 +68,7 @@ export function totalTokens(telemetry: SessionUsageTelemetry): number {
  */
 export function estimateSessionCost(
   telemetry: SessionUsageTelemetry,
-  rateFor: (provider: string, model: string) => ModelCostRates | undefined,
+  rateFor: (provider: string, model: string) => ModelCostSchedule | undefined,
 ): { readonly cost: number; readonly everyRatePublished: boolean; readonly zeroCostSupported: boolean;
   readonly fullyAllocated: boolean; readonly usesAssumedRates: boolean; readonly partial: boolean } {
   let cost = 0;
@@ -78,20 +79,17 @@ export function estimateSessionCost(
   let recorded = 0;
   for (const [key, bucket] of Object.entries(telemetry.byModel)) {
     recorded += bucket.totalTokens;
-    allocated &&= bucket.totalTokens === bucket.promptTokens + bucket.completionTokens + bucket.cacheReadTokens + bucket.cacheWriteTokens;
+    allocated &&= !bucket.allocationIncomplete
+      && bucket.totalTokens === bucket.promptTokens + bucket.completionTokens + bucket.cacheReadTokens + bucket.cacheWriteTokens;
     const published = bucketRates(key, bucket, rateFor);
-    // A published rate that omits the cache prices is not a published rate for a
-    // bucket that spent cache tokens: those are priced at zero below, and a footer
-    // claiming the rates are the model's own would be false for the row above it.
-    const cacheUnpriced =
-      (bucket.cacheReadTokens > 0 && published?.cacheReadPerMTok === undefined) ||
-      (bucket.cacheWriteTokens > 0 && published?.cacheWritePerMTok === undefined);
-    if (!published || cacheUnpriced) everyRatePublished = false;
+    // Missing prices exclude their categories from the known subtotal.
+    const categoryUnpriced = unpricedTokenCount(bucket, published ?? undefined) > 0;
+    if (!published || categoryUnpriced) everyRatePublished = false;
     // Legacy records retain the explicitly labelled fallback. A captured absence
     // is evidence that these tokens have no known price, even after catalog edits.
-    const rates = published ?? (bucket.attribution ? undefined : USAGE_RATES);
-    usesAssumedRates ||= !published && !bucket.attribution;
-    unpriced ||= !rates || cacheUnpriced;
+    const rates = published ?? (bucket.attribution || published === null ? undefined : USAGE_RATES);
+    usesAssumedRates ||= published === undefined && !bucket.attribution;
+    unpriced ||= !rates || unpricedTokenCount(bucket, rates) > 0;
     if (rates) cost += estimateUsageCost(bucket, rates);
   }
   // A total-only report supplies no category prices. Zero is supportable only
@@ -117,7 +115,13 @@ export function recordSessionUsage(
     /** Which provider served the request; part of the bucket key. */
     provider?: string;
     /** Actual destination and immutable price snapshot, captured before dispatch. */
-    attribution?: UsageAttribution;
+    attribution?: RequestUsageAttribution;
+    /** Complete input from the captured protocol, before zero-filled accounting. */
+    inputTokens?: number;
+    inputComplete?: boolean;
+    /** Raw input can select a tier without proving its ordinary/cache allocation. */
+    promptAllocated?: boolean;
+    allocationComplete?: boolean;
     /** How many messages the request carried, so trailing ones can be counted. */
     promptMessageCount?: number;
     /** Which request the measurement belongs to; required for context reuse. */
@@ -140,13 +144,19 @@ export function recordSessionUsage(
   // A report that does not name a model belongs to whichever one last answered:
   // creating a `default` bucket for it would split that model's tokens in two and
   // price them at two different rates.
-  const key = usage.attribution ? attributedBucketKey(usage.attribution) : usage.model
+  const settledAttribution = usage.attribution ? settleUsageAttribution(usage.attribution, usage) : undefined;
+  const key = settledAttribution ? attributedBucketKey(settledAttribution) : usage.model
     ? usageBucketKey(usage.provider ?? "", usage.model)
     : existing.lastBucketKey || usageBucketKey(usage.provider ?? "", "default");
 
-  const pTokens = usage.promptTokens ?? 0;
+  const tiered = usage.attribution?.costSchedule !== undefined;
+  const reportedPrompt = usage.promptTokens ?? 0;
+  // Inclusive input with no cache split cannot be priced as ordinary input.
+  const pTokens = tiered && usage.promptAllocated !== true ? 0 : reportedPrompt;
   const cTokens = usage.completionTokens ?? 0;
-  const promptTotal = pTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0);
+  const cacheRead = usage.cacheReadTokens ?? 0;
+  const cacheWrite = usage.cacheWriteTokens ?? 0;
+  const promptTotal = reportedPrompt + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0);
   const promptMeasured = options.promptMeasured ?? (usage.promptTokens !== undefined && Number.isFinite(usage.promptTokens) && usage.promptTokens >= 0);
   const tTokens = usage.totalTokens ?? promptTotal + cTokens;
 
@@ -157,7 +167,7 @@ export function recordSessionUsage(
   const existingBucket = Object.prototype.hasOwnProperty.call(existing.byModel, key)
     ? existing.byModel[key]
     : undefined;
-  const attribution = usage.attribution ? decodeAttribution(key, usage.attribution) : existingBucket?.attribution;
+  const attribution = settledAttribution ? decodeAttribution(key, settledAttribution) : existingBucket?.attribution;
   if (existingBucket && JSON.stringify(existingBucket.attribution) !== JSON.stringify(attribution)) {
     throw new Error('Conflicting session usage attribution');
   }
@@ -170,11 +180,12 @@ export function recordSessionUsage(
     cacheWriteTokens: 0,
     turnsCount: 0,
   };
+  if (tiered && usage.allocationComplete !== true) bucket.allocationIncomplete = true;
   bucket.promptTokens += pTokens;
   bucket.completionTokens += cTokens;
   bucket.totalTokens += tTokens;
-  bucket.cacheReadTokens += usage.cacheReadTokens ?? 0;
-  bucket.cacheWriteTokens += usage.cacheWriteTokens ?? 0;
+  bucket.cacheReadTokens += cacheRead;
+  bucket.cacheWriteTokens += cacheWrite;
   bucket.turnsCount += 1;
   existing.byModel[key] = bucket;
 
@@ -197,8 +208,6 @@ export function recordSessionUsage(
 
   // The per-request view, which the buckets cannot provide: they sum, and cache
   // waste is a comparison between one request and the one before it.
-  const cacheRead = usage.cacheReadTokens ?? 0;
-  const cacheWrite = usage.cacheWriteTokens ?? 0;
   const previous = existing.recentRequests.at(-1);
   if (options.affectsContext !== false) {
     pushHistory(existing, {

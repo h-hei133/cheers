@@ -21,6 +21,7 @@ import { formatNonVisionFallback, messageToText, type MultimodalContentBlock } f
 import { IncompleteStreamError } from '../response/error.js';
 import type { CompletedBody, StreamFragment, StreamedCompletion } from "../../turn/completion.js";
 import { validGoogleFrame } from './google/frame.js';
+import { isRecord } from '../../core/values/record.js';
 import type { GooglePart, GoogleContent, GoogleMessage } from './google/model.js';
 import { appendGoogleOutput, createGoogleOutput, googleOutput, googleProjection, googleSignature, replayGoogle, legacyGoogleSignature } from './google/replay.js';
 export type { GooglePart, GoogleContent, GoogleMessage } from './google/model.js';
@@ -307,7 +308,9 @@ export async function* readGoogleStream(
       if (finishReason !== undefined && candidate?.content?.parts?.length) { malformed = true; continue; }
       if (candidate?.finishReason && (finishReason === undefined || finishReason === 'stop')) finishReason = mapGoogleFinishReason(candidate.finishReason);
       if (parsed.usageMetadata) {
-        usage = googleUsage(parsed.usageMetadata);
+        const invalidInput = usage?.metering_input_complete === false;
+        const next = googleUsage(parsed.usageMetadata);
+        usage = next && invalidInput ? { ...next, metering_input_complete: false } : next;
       }
 
       const parts = googleOutput(candidate?.content?.parts ?? []);
@@ -351,7 +354,9 @@ export async function* readGoogleStream(
         if (finishReason !== undefined && candidate?.content?.parts?.length) throw new Error('Content arrived after Google completion.');
         if (candidate?.finishReason && (finishReason === undefined || finishReason === 'stop')) finishReason = mapGoogleFinishReason(candidate.finishReason);
         if (parsed.usageMetadata) {
-          usage = googleUsage(parsed.usageMetadata);
+          const invalidInput = usage?.metering_input_complete === false;
+          const next = googleUsage(parsed.usageMetadata);
+          usage = next && invalidInput ? { ...next, metering_input_complete: false } : next;
         }
         const parts = googleOutput(candidate?.content?.parts ?? []);
         if (!parts) throw new Error('Malformed Google model output.');
@@ -474,13 +479,21 @@ export function googleRefreshBody(body: Record<string, unknown>, model: { readon
 
 /** Input includes cache reads; output includes separately reported thinking. */
 function googleUsage(usage: Chunk["usageMetadata"]): CompletedBody["usage"] {
-  if (!usage) return undefined;
+  if (!isRecord(usage)) return undefined;
+  const count = (value: unknown): number | undefined => typeof value === 'number'
+    && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+  const prompt = count(usage.promptTokenCount), cached = count(usage.cachedContentTokenCount);
+  const candidates = count(usage.candidatesTokenCount), thoughts = count(usage.thoughtsTokenCount);
+  const output = candidates === undefined && thoughts === undefined ? undefined : (candidates ?? 0) + (thoughts ?? 0);
+  const invalidInput = usage.promptTokenCount !== undefined && prompt === undefined
+    || usage.cachedContentTokenCount !== undefined && cached === undefined
+    || prompt !== undefined && cached !== undefined && cached > prompt;
   return {
-    prompt_tokens: usage.promptTokenCount,
-    completion_tokens: usage.candidatesTokenCount === undefined && usage.thoughtsTokenCount === undefined
-      ? undefined : (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0),
-    metering_output_complete: usage.candidatesTokenCount !== undefined && usage.thoughtsTokenCount !== undefined,
-    prompt_tokens_details: { cached_tokens: usage.cachedContentTokenCount },
+    prompt_tokens: prompt,
+    completion_tokens: output !== undefined && Number.isSafeInteger(output) ? output : undefined,
+    metering_output_complete: candidates !== undefined && thoughts !== undefined && Number.isSafeInteger(output),
+    prompt_tokens_details: { cached_tokens: cached },
+    ...(invalidInput ? { metering_input_complete: false } : {}),
     ...(usage.totalTokenCount !== undefined ? { total_tokens: usage.totalTokenCount } : {}),
   };
 }

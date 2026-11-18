@@ -8,6 +8,7 @@ import {
   type CatalogProvider,
 } from "./catalog.js";
 import { catalogCachePath } from './cache/store.js';
+import { captureCostSchedule } from './pricing.js';
 export { catalogCachePath, writeCatalogCache } from './cache/store.js';
 
 /**
@@ -112,8 +113,21 @@ function readOverlay(file: string, label: typeof USER_FILE | typeof CACHE_FILE):
       || providers !== undefined && (!providers || typeof providers !== 'object' || Array.isArray(providers))) {
       return { providers: [], diagnostics: [`${label} must contain a providers object; its catalogue entries were ignored.`] };
     }
-    return { providers: Object.entries(providers ?? {}).map(([id, patch]) => ({ ...patch, id })),
-      diagnostics: duplicateProviders(raw) ? [`${label} repeats the top-level providers key; only the last object is used. Merge the provider entries into one providers object.`] : [] };
+    const diagnostics = duplicateProviders(raw) ? [`${label} repeats the top-level providers key; only the last object is used. Merge the provider entries into one providers object.`] : [];
+    let invalidPrices = false;
+    const patches = Object.entries(providers ?? {}).map(([id, patch]) => {
+      const models = Array.isArray(patch?.models) ? patch.models.map(model => {
+        if (model?.cost === undefined) return model;
+        try { return { ...model, cost: captureCostSchedule(model.cost) ?? {} }; }
+        catch {
+          invalidPrices = true;
+          return { ...model, cost: {} };
+        }
+      }) : patch?.models;
+      return { ...patch, id, ...(models !== undefined ? { models } : {}) };
+    });
+    if (invalidPrices) diagnostics.push(`${label} contains invalid prices; affected model prices are unavailable.`);
+    return { providers: patches, diagnostics };
   } catch {
     // A hand-edited file with a stray comma should degrade to "no overlay", not
     // to a session that cannot start.

@@ -6,7 +6,7 @@ import {
   type CacheWarmingDecision,
   type CacheWarmingMode,
 } from "../core/models/cacheEconomics.js";
-import type { ModelCostRates } from "../core/models/catalog.js";
+import { captureCostSchedule, type ModelCostSchedule } from '../core/models/pricing.js';
 import type { SentRequest } from "../provider/request/sentRequest.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
 import { InputLimitError } from '../provider/request/input.js';
@@ -54,7 +54,7 @@ const MAX_STREAMING_AGE_MS = 60 * 60_000;
 export interface CacheWarmingOptions {
   readonly mode: CacheWarmingMode | undefined;
   /** The rates the model publishes, when it publishes any. */
-  readonly cost?: ModelCostRates;
+  readonly cost?: ModelCostSchedule;
   readonly promptCache?: { readonly short?: number; readonly long?: number };
   /**
    * Send the refresh.
@@ -96,6 +96,7 @@ export interface CacheWarmingRunner {
 }
 
 export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWarmingRunner {
+  const cost = captureCostSchedule(options.cost ?? null) ?? undefined;
   const mode = resolveCacheWarmingMode(options.mode);
   const now = options.now ?? Date.now;
 
@@ -161,7 +162,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
     }
 
     const decision = evaluateCacheWarming({
-      ...(options.cost ? { cost: options.cost } : {}),
+      ...(cost ? { cost } : {}),
       promptTokens: latestTokens,
       phase,
     });

@@ -73,6 +73,7 @@ export function vertexTarget(env: Readonly<Record<string, string | undefined>>):
 }
 
 declareEndpoint("google-vertex", {
+  usageInput: 'inclusive',
   opaqueReplay: true,
   contextFields: { system: 'systemInstruction', conversation: 'contents', tools: 'tools' },
   // The base address carries the account; this adds the model and the method.

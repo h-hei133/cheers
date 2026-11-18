@@ -22,6 +22,7 @@ function clampSessionId(sessionId: string | undefined): string | undefined {
 }
 
 declareEndpoint('openai-account-responses', {
+  usageInput: 'inclusive',
   opaqueReplay: true,
   contextFields: { system: 'instructions', conversation: 'input', tools: 'tools' },
   simpleResponse: 'stream',
