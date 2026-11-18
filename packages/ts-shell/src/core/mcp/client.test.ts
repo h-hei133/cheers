@@ -93,3 +93,40 @@ it("refuses a tools/list response that exceeds the cumulative catalog byte limit
     expect(client.peekTools()).toBeUndefined();
   } finally { await client.close(); }
 });
+
+it("keeps callable tools from every page when another output schema is unsupported", async () => {
+  vi.spyOn(Client.prototype, "connect").mockResolvedValue(undefined);
+  vi.spyOn(Client.prototype, "getServerCapabilities").mockReturnValue({ tools: {} });
+  const inputSchema = { type: "object" };
+  const request = vi.spyOn(Client.prototype, "request")
+    .mockResolvedValueOnce({ nextCursor: "second", tools: [{
+      name: "annotated",
+      inputSchema,
+      outputSchema: {
+        type: "object",
+        required: ["x-count"],
+        properties: { "x-count": { type: "integer", "x-display": true } },
+        "x-description": { type: "inert" },
+      },
+    }] })
+    .mockResolvedValueOnce({ tools: [
+      { name: "unsupported", inputSchema, outputSchema: { type: "object", unsupportedConstraint: true } },
+      { name: "last", inputSchema },
+    ] })
+    .mockResolvedValueOnce({ content: [], structuredContent: { "x-count": 2 } })
+    .mockResolvedValueOnce({ content: [], structuredContent: { "x-count": "2" } })
+    .mockResolvedValueOnce({ content: [{ type: "text", text: "last result" }] });
+  const client = new CoreMcpClient("local", { transport: "stdio", command: process.execPath, scope: "user" });
+  try {
+    const tools = await client.listTools();
+    expect(tools.map(tool => tool.toolName)).toEqual(["annotated", "unsupported", "last"]);
+    await expect(client.invokeTool("unsupported", {})).rejects.toMatchObject({
+      failureClass: "tool-unavailable",
+      safeDetail: "MCP tool declares an unsupported output schema.",
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+    await expect(client.invokeTool("annotated", {})).resolves.toMatchObject({ content: '{"x-count":2}' });
+    await expect(client.invokeTool("annotated", {})).rejects.toMatchObject({ failureClass: "malformed-result" });
+    await expect(client.invokeTool("last", {})).resolves.toMatchObject({ content: "last result" });
+  } finally { await client.close(); }
+});

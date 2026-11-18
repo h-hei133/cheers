@@ -17,3 +17,16 @@ it.each([{ tiers: [{ inputTokensAbove: -1 }] }, { tiers: [{ inputTokensAbove: 0.
   { tiers: [{ inputTokensAbove: 1, cacheWritePerMTok: -1 }] }])('rejects malformed or ambiguous imported schedules', cost => {
   expect(() => importCatalog(document(cost))).toThrow(/invalid|Invalid/);
 });
+
+it.each([
+  { providers: [{}] },
+  { providers: { fixture: { baseUrl: [{}] } } },
+  { providers: { fixture: { models: [[{}]] } } },
+])('uses the catalog validation error for mismatched array shapes', input => {
+  expect(() => importCatalog(JSON.stringify(input))).toThrow('Imported catalog contains invalid declared data.');
+});
+
+it('drops undeclared own names even when they match properties on Object.prototype', () => {
+  const input = '{"constructor":42,"providers":{"fixture":{"toString":"extra","models":[{"id":"meter","__proto__":{},"valueOf":1}]}}}';
+  expect(JSON.parse(importCatalog(input))).toEqual({ providers: { fixture: { models: [{ id: 'meter' }] } } });
+});

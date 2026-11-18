@@ -86,6 +86,20 @@ describe('tool argument boundary', () => {
     expect(() => validateToolArguments(schema, {})).toThrow('required')
   })
 
+  it('checks tool argument constraints next to a Draft 7 reference', () => {
+    const schema = { type: 'object', properties: { amount: { $ref: '#/definitions/number', minimum: 1 } },
+      definitions: { number: { type: 'number' } } }
+    expect(() => validateToolArguments(schema, { amount: 1 })).not.toThrow()
+    expect(() => validateToolArguments(schema, { amount: 0 })).toThrow('minimum')
+    expect(() => validateToolArguments(schema, { amount: '1' })).toThrow('constraint failed')
+  })
+
+  it('checks very small multipleOf constraints without rounding data into a multiple', () => {
+    const schema = { type: 'object', properties: { amount: { type: 'number', multipleOf: 2.5e-7 } } }
+    expect(() => validateToolArguments(schema, { amount: 5e-7 })).not.toThrow()
+    expect(() => validateToolArguments(schema, { amount: 3e-7 })).toThrow('multipleOf')
+  })
+
   it('compiles every built-in contract and supports declared modern schema dialects', () => {
     for (const tool of createCoreToolRegistry().values()) {
       try { validateToolArguments(tool.argsSchema, {}) } catch (error) {

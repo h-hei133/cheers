@@ -1,4 +1,6 @@
-import { Ajv, type AnySchemaObject, type ValidateFunction } from 'ajv';
+import type { AnySchemaObject } from 'ajv';
+import { compileValidator } from '../core/validation/compiler.js';
+import type { CompiledValidator } from '../core/validation/contract.js';
 import { booleanSchema, connectionSchema, countSchema, credentialSchema, delaySchema, enumSchema, listSchema, nameSchema, objectSchema, positiveSchema, textSchema, tuiSchemas } from './schema.js';
 import { SCOPE_FIELDS } from './scope/registry.js';
 import type { ScopeFieldPolicy } from './scope/contract.js';
@@ -9,7 +11,7 @@ export type MergePolicy = 'replace' | 'intersect' | 'union' | 'deny' | 'disable'
 export type ConfigApplication = 'next operation' | 'immediate' | 'restart' | 'metadata';
 export interface ConfigField {
   readonly schema: AnySchemaObject;
-  readonly validate: ValidateFunction;
+  readonly validate: CompiledValidator;
   readonly sources: readonly ConfigSource[];
   readonly merge: MergePolicy;
   readonly security: boolean;
@@ -21,13 +23,11 @@ export interface ConfigField {
   readonly scope?: ScopeFieldPolicy;
 }
 export type ConfigFields = Readonly<Record<string, ConfigField>>;
-const ajv = new Ajv({ allErrors: false, strict: true });
-ajv.addKeyword({ keyword: 'environment', schemaType: 'boolean', valid: true });
 
 function field(schema: AnySchemaObject, sources: readonly ConfigSource[] = ['project', 'user'], merge: MergePolicy = 'replace', security = false,
   metadata: Partial<Pick<ConfigField, 'application' | 'sensitivity' | 'projectTrust' | 'environment'>> = {}): ConfigField {
   if (metadata.environment && !sources.includes('environment')) throw new Error(`Environment input ${metadata.environment} requires the environment source.`);
-  return { schema, validate: ajv.compile(schema), sources, merge, security,
+  return { schema, validate: compileValidator(schema, { formats: false, annotations: ['environment'] }), sources, merge, security,
     application: metadata.application ?? 'next operation', sensitivity: metadata.sensitivity ?? 'public', projectTrust: metadata.projectTrust ?? 'required',
     ...(metadata.environment ? { environment: metadata.environment } : {}) };
 }

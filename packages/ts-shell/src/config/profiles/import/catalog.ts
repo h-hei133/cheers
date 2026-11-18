@@ -1,4 +1,4 @@
-import { Ajv } from 'ajv';
+import { compileValidator } from '../../../core/validation/compiler.js';
 import { RUNTIME_PROVIDERS } from '../../runtimeConfig.js';
 import { booleanSchema, enumSchema, listSchema, nameSchema, objectSchema, positiveSchema, textSchema } from '../../schema.js';
 import { nonsecretUrl } from './config.js';
@@ -25,14 +25,34 @@ const model = objectSchema({
 }, ['id']);
 const provider = objectSchema({ label: textSchema, runtime: enumSchema(RUNTIME_PROVIDERS), auth: enumSchema(['api-key', 'oauth', 'none']),
   baseUrl: nameSchema, endpoint: nameSchema, envVar: { type: 'string', pattern: '^[A-Za-z_][A-Za-z0-9_]*$' }, models: listSchema(model) });
-const validate = new Ajv({ strict: true, removeAdditional: true }).compile(objectSchema({
+const catalogSchema = objectSchema({
   providers: { type: 'object', propertyNames: { type: 'string', pattern: '^[A-Za-z0-9_.-]{1,128}$' }, additionalProperties: provider },
-}, ['providers']));
+}, ['providers']);
+const validate = compileValidator(catalogSchema, { formats: false });
+
+/** Imported undeclared fields are removed by the import owner before validation. */
+function declared(value: unknown, schema: Record<string, unknown>): unknown {
+  if (Array.isArray(value)) {
+    const items = schema.items;
+    if (!items || typeof items !== 'object' || Array.isArray(items)) return value;
+    const itemSchema = items as Record<string, unknown>;
+    return value.map(child => declared(child, itemSchema));
+  }
+  if (!value || typeof value !== 'object') return value;
+  const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
+  const additional = schema.additionalProperties;
+  const fallback = additional && typeof additional === 'object' ? additional as Record<string, unknown> : undefined;
+  return Object.fromEntries(Object.entries(value).flatMap(([key, child]) => {
+    const next = properties && Object.hasOwn(properties, key) ? properties[key] : fallback;
+    return next ? [[key, declared(child, next)]] : additional === false ? [] : [[key, child]];
+  }));
+}
 
 /** Copy declared catalog data only; arbitrary nested credential containers are discarded. */
 export function importCatalog(text: string): string {
   let value: unknown;
   try { value = JSON.parse(text); } catch { throw new Error('Imported catalog requires valid JSON.'); }
+  value = declared(value, catalogSchema);
   if (!validate(value)) throw new Error('Imported catalog contains invalid declared data.');
   const providers = (value as { providers: Record<string, { baseUrl?: string; models?: { id: string; cost?: unknown }[] }> }).providers;
   for (const patch of Object.values(providers)) {

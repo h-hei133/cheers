@@ -1,11 +1,10 @@
-import { Ajv } from 'ajv';
+import { compileValidator } from '../../core/validation/compiler.js';
 import { recordLimits, type Cast, type CastEvent, type CastHeader, type RecordOptions } from './model.js';
 export const recordOptionsSchema = { type: 'object', additionalProperties: false, required: ['retention', 'maxBytes', 'seconds'], properties: {
   retention: { enum: ['keep', 'discard'] }, maxBytes: { type: 'integer', minimum: 1024, maximum: recordLimits.fileBytes },
   seconds: { type: 'integer', minimum: 1, maximum: recordLimits.seconds } } };
-const ajv = new Ajv({ allErrors: false });
-const optionsValid = ajv.compile<RecordOptions>(recordOptionsSchema);
-const headerValid = ajv.compile<CastHeader>({ type: 'object', additionalProperties: false,
+const optionsValid = compileValidator<RecordOptions>(recordOptionsSchema);
+const headerValid = compileValidator<CastHeader>({ type: 'object', additionalProperties: false,
   required: ['version', 'width', 'height', 'timestamp', 'cheers'], properties: { version: { const: 2 },
     width: { type: 'integer', minimum: 1, maximum: 10000 }, height: { type: 'integer', minimum: 1, maximum: 10000 },
     timestamp: { type: 'integer', minimum: 0 }, cheers: { type: 'object', additionalProperties: false,

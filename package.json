@@ -10,6 +10,9 @@
   "workspaces": [
     "packages/ts-shell"
   ],
+  "overrides": {
+    "idn-hostname": "15.1.8"
+  },
   "scripts": {
     "bootstrap": "node scripts/bootstrap.mjs",
     "setup": "node scripts/setup.mjs",

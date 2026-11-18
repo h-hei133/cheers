@@ -1,10 +1,10 @@
-import { Ajv } from 'ajv';
+import { compileValidator } from '../../core/validation/compiler.js';
 import { sameValue } from '../../config/values.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
 import { readBoundSessionState, publishBoundSessionState, type BoundSessionHost } from '../../session/store/bound.js';
 import { recordOptionsSchema } from './codec.js';
 import { recordLimits, type RecordingState, type RecordingRow } from './model.js';
-const valid = new Ajv().compile<RecordingState>({ type: 'object', additionalProperties: false, required: ['version', 'revision', 'runs'],
+const valid = compileValidator<RecordingState>({ type: 'object', additionalProperties: false, required: ['version', 'revision', 'runs'],
   properties: { version: { const: 1 }, revision: { type: 'integer', minimum: 0 }, runs: { type: 'array', maxItems: 32, items: {
     type: 'object', additionalProperties: false, required: ['id', 'scope', 'file', 'options', 'phase', 'bytes'], properties: {
       id: { type: 'string', minLength: 1, maxLength: 256 }, scope: { type: 'object' }, file: { type: 'string', minLength: 1, maxLength: 4096 },

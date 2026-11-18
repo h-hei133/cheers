@@ -1,4 +1,4 @@
-import { Ajv } from 'ajv';
+import { compileValidator } from '../../core/validation/compiler.js';
 import { sameValue } from '../../config/values.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
 import { readBoundSessionState, publishBoundSessionState, type BoundSessionHost, type BoundSessionScope } from '../../session/store/bound.js';
@@ -6,7 +6,7 @@ import { liveLimits, type LiveRun, type LiveState } from './model.js';
 
 const text = { type: 'string', minLength: 1, maxLength: 256 };
 const time = { type: 'number', minimum: 0, maximum: Number.MAX_SAFE_INTEGER };
-const validate = new Ajv({ allErrors: false }).compile({ type: 'object', additionalProperties: false,
+const validate = compileValidator({ type: 'object', additionalProperties: false,
   required: ['version', 'revision', 'runs'], properties: { version: { const: 1 }, revision: { type: 'integer', minimum: 0 },
     runs: { type: 'array', maxItems: 16, items: { type: 'object', additionalProperties: false,
       required: ['id', 'scope', 'options', 'createdAt', 'phase', 'finalUsage', 'cleanup', 'fragments'], properties: {

@@ -1,3 +1,4 @@
+import { SchemaValidatorProvider } from '../validation/provider.js';
 import { assertAdmission, type Admission } from "../network/admission.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { CallToolResultSchema, ListToolsResultSchema, ToolListChangedNotificationSchema, ResultSchema, ErrorCode, McpError, type Tool } from "@modelcontextprotocol/sdk/types.js";
@@ -74,7 +75,7 @@ export class CoreMcpClient {
     this.abort.signal.throwIfAborted();
     signal?.throwIfAborted();
     const client = new Client({ name: "cheers", version: packageVersion() ?? "unknown" }, {
-      capabilities: {}, enforceStrictCapabilities: true,
+      capabilities: {}, enforceStrictCapabilities: true, jsonSchemaValidator: new SchemaValidatorProvider(),
     });
     const transport = this.config.transport === 'http' ? new McpHttpTransport(this.config, admission, this.authorization) : new McpStdioTransport({
       command: this.config.command!,
