@@ -90,6 +90,24 @@ async function fixture(explicitSummary = false) {
   return { setup, original, physical, config, catalog, request, target, route, wireInput, history, onCompact, onDeclined, execute };
 }
 
+it('keeps the captured explicit cache preference for physical history, prefix and merge summaries', async () => {
+  const test = await fixture();
+  const catalog = test.catalog.map(provider => ({ ...provider, models: provider.models.map(model => ({ ...model,
+    compat: { promptCacheKey: true, supportsLongCacheRetention: true } })) }));
+  const request = { ...test.request, catalog, cacheRetention: 'long' as 'short' | 'long' | 'none' };
+  const prepared = await capture(request);
+  const wiring = buildCompactionWiring({ ...test.wireInput, catalog, runtimeConfig: { ...test.config, cacheRetention: 'none' } });
+  const bound = wiring.forRequest(prepared, () => undefined);
+  expect(await generateCompaction({ history: test.history, prefix: [{ role: 'user', content: 'Opening context.' }],
+    summarize: bound.summarize, summarizeTurnPrefix: bound.summarizeTurnPrefix,
+    maxTokens: bound.policy.segmentTokens, maxMergeTokens: bound.policy.mergeTokens })).toContain('Saved work.');
+  expect(test.original.requests).toHaveLength(0);
+  expect(test.physical.requests.length).toBeGreaterThan(3);
+  for (const request of test.physical.requests) expect(request.body).toMatchObject({ prompt_cache_key: expect.any(String), prompt_cache_retention: '24h' });
+  expect(new Set(test.physical.requests.map(request => request.body.prompt_cache_key)).size).toBe(1);
+  expect(test.route).toHaveBeenCalledOnce();
+});
+
 it('sends automatic fallback summaries only through the captured physical transport', async () => {
   const test = await fixture(); await test.execute();
   expect(test.onCompact).toHaveBeenCalledOnce();

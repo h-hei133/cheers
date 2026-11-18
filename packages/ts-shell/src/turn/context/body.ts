@@ -39,6 +39,8 @@ export function prepareTurnBody(context: TurnBodyContext) {
     sessionId: request.sessionId,
     ...(request.provider.baseUrl ? { baseUrl: request.provider.baseUrl } : {}),
     ...(shape.promptCacheKey !== undefined ? { supportsPromptCacheKey: shape.promptCacheKey } : {}),
+    ...(shape.supportsLongCacheRetention !== undefined ? { supportsLongCacheRetention: shape.supportsLongCacheRetention } : {}),
+    ...(shape.supportsExplicitPromptCacheMode !== undefined ? { supportsExplicitPromptCacheMode: shape.supportsExplicitPromptCacheMode } : {}),
     replayBinding,
     systemPrompt,
     messages: finalMessages,

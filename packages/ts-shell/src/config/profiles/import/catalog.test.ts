@@ -3,6 +3,12 @@ import { importCatalog } from './catalog.js';
 
 const document = (cost: unknown) => JSON.stringify({ providers: { fixture: { models: [{ id: 'meter', cost }] } } });
 
+it('preserves independent cache capabilities across profile export and import', () => {
+  const compat = { promptCacheKey: true, supportsLongCacheRetention: false, supportsExplicitPromptCacheMode: true };
+  const body = JSON.stringify({ providers: { fixture: { baseUrl: 'https://relay.fixture/v1', models: [{ id: 'meter', compat }] } } });
+  expect(JSON.parse(importCatalog(body)).providers.fixture.models[0].compat).toEqual(compat);
+});
+
 it('imports partial schedules, explicit zero and context thresholds without dropping the overrides', () => {
   const cost = { promptPerMTok: 1, cacheReadPerMTok: 0.1, tiers: [{ inputTokensAbove: 100, promptPerMTok: 3, completionPerMTok: 0 }] };
   const imported = JSON.parse(importCatalog(document(cost)));

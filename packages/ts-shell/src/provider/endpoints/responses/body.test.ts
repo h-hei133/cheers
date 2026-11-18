@@ -129,7 +129,7 @@ describe('Responses requests', () => {
     expect(official.prompt_cache_key).toBe(sessionId.slice(0, 64));
     const relay = endpointTurnBody('openai-responses', { ...turn, sessionId, baseUrl: 'https://relay.example.invalid/v1' });
     expect(relay).not.toHaveProperty('prompt_cache_key');
-    const longRetention = endpointTurnBody('openai-responses', { ...turn, sessionId, supportsPromptCacheKey: true, cacheRetention: 'long' });
+    const longRetention = endpointTurnBody('openai-responses', { ...turn, sessionId, supportsPromptCacheKey: true, supportsLongCacheRetention: true, cacheRetention: 'long' });
     expect(longRetention.prompt_cache_retention).toBe('24h');
     expect(longRetention).not.toHaveProperty('prompt_cache_options');
     const disabled = endpointTurnBody('openai-responses', { ...turn, sessionId, baseUrl: 'https://api.openai.com/v1', cacheRetention: 'none' });

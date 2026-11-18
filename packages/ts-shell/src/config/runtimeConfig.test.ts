@@ -48,6 +48,7 @@ describe("runtime config", () => {
     expect(config.hiddenToolPrefixes).toEqual([]);
     expect(config.enableMcpTools).toBe(true);
     expect(config.pruneToolText).toBe(false);
+    expect(config.cacheRetention).toBe('short');
     expect(config.activeProviderConnectionId).toBeUndefined();
     expect(config.providerConnections).toEqual([]);
     expect(config.providerCredentials).toEqual({});
@@ -86,6 +87,29 @@ describe("runtime config", () => {
     writeUserRuntimeConfigFile({ pruneToolText: true }, readRuntimeConfigEditAt(userPath));
     expect(readUserRuntimeConfigFile().pruneToolText).toBe(true);
     expect(getRuntimeConfig(fakeRoot).pruneToolText).toBe(true);
+  });
+
+  it.each(['long', 'none'] as const)('persists and reloads the personal %s cache retention preference', retention => {
+    const file = getUserRuntimeConfigPath();
+    writeUserRuntimeConfigFile({ cacheRetention: retention }, readRuntimeConfigEditAt(file));
+    expect(readUserRuntimeConfigFile().cacheRetention).toBe(retention);
+    expect(getRuntimeConfig(fakeRoot).cacheRetention).toBe(retention);
+  });
+
+  it('refuses project cache retention and reports invalid personal preferences', () => {
+    const projectPath = path.join(fakeRoot, '.cheers.json');
+    fs.writeFileSync(projectPath, JSON.stringify({ cacheRetention: 'long' }));
+    projectTrust.setProjectTrust(fakeRoot, 'session-only');
+    expect(getRuntimeConfig(fakeRoot).cacheRetention).toBe('short');
+    const file = getUserRuntimeConfigPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ cacheRetention: '24h' }));
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.cacheRetention).toBe('short');
+    expect(config.configValidation.valid).toBe(false);
+    expect(config.configProvenance.cacheRetention.rejected).toEqual([
+      { source: 'project', reason: 'source-not-allowed' }, { source: 'user', reason: 'invalid-value' },
+    ]);
   });
 
   it('rejects malformed tool-text retention without treating it as a disabled policy', () => {

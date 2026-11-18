@@ -124,7 +124,7 @@ export interface EndpointShape {
     readonly maxTokensField?: TurnRequest["maxTokensField"];
   }) => Record<string, unknown> | undefined;
   /** Gateway metadata derived from the provider and conversation. */
-  readonly requestHeaders?: (input: TurnRequest) => Record<string, string>;
+  readonly requestHeaders?: (input: SimpleRequest | TurnRequest) => Record<string, string>;
   /** A complete, non-streamed answer, flattened to the shape both kinds share. */
   readonly readBody: (body: unknown) => CompletedBody;
   /** The chunks of a streamed answer, and the completion they add up to. */
@@ -135,7 +135,7 @@ export interface EndpointShape {
 
 /** A request with no tools, which is what a summarizer or a side question sends. */
 export interface SimpleRequest extends Partial<Pick<TurnRequest,
-  'vision' | 'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'reasoningSummary' | 'reasoningReplayField' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'thinkingBudgetMaximum' | 'allowEmptySignature' | 'serviceTier' | 'sessionId' | 'baseUrl' | 'cacheRetention' | 'supportsPromptCacheKey'>> {
+  'vision' | 'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'reasoningSummary' | 'reasoningReplayField' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'thinkingBudgetMaximum' | 'allowEmptySignature' | 'serviceTier' | 'sessionId' | 'baseUrl' | 'cacheRetention' | 'supportsPromptCacheKey' | 'supportsLongCacheRetention' | 'supportsExplicitPromptCacheMode'>> {
   readonly model: string;
   readonly provider?: string;
   readonly replayBinding?: string;
@@ -226,6 +226,8 @@ export interface TurnRequest {
   readonly cacheRetention?: 'short' | 'long' | 'none';
   /** Explicit override for OpenAI `prompt_cache_key` support. */
   readonly supportsPromptCacheKey?: boolean;
+  readonly supportsLongCacheRetention?: boolean;
+  readonly supportsExplicitPromptCacheMode?: boolean;
   /** Initial tool schemas for mid-conversation cache-preserving `tool_addition`/`tool_removal`. */
   readonly initialTools?: readonly ToolSchema[];
   readonly supportsMidConvoToolChanges?: boolean;

@@ -148,7 +148,7 @@ export function providerStepRequest(
     tools: toolSchemas(tools),
     ...(discovery ? { toolSnapshot: () => toolSchemas(discovery.snapshot()) } : {}),
     initialTools: toolSchemas(tools),
-    ...(request.cacheRetention !== undefined ? { cacheRetention: request.cacheRetention } : {}),
+    cacheRetention: request.cacheRetention ?? request.runtimeConfig?.cacheRetention ?? 'short',
     ...(logical ? { virtualModel: { provider: logical.provider, modelId: logical.model },
       captureRouteState: (provider: string, modelId: string, admission: () => void) => captureRoutingState({
         sessionId: request.sessionId, cwd: request.workspaceRoot, provider, modelId,

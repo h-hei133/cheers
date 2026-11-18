@@ -241,6 +241,8 @@ export interface RuntimeConfig {
    * because the decision is arithmetic on those prices.
    */
   readonly cacheWarming?: "off" | "streaming" | "idle";
+  /** Prompt-cache preference; the selected endpoint controls supported retention. */
+  readonly cacheRetention?: 'short' | 'long' | 'none';
   readonly agentMode?: "plan" | "build";
   readonly theme?: string;
   /** Modal editing in the prompt; Insert is the starting mode. */
@@ -410,6 +412,7 @@ export interface RuntimeConfigFile {
   offline?: boolean;
   attentionOnIdle?: boolean;
   cacheWarming?: "off" | "streaming" | "idle";
+  cacheRetention?: 'short' | 'long' | 'none';
   agentMode?: "plan" | "build";
   theme?: string;
   vimMode?: boolean;
@@ -455,6 +458,7 @@ export const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProven
   offline: false,
   attentionOnIdle: false,
   cacheWarming: "streaming",
+  cacheRetention: 'short',
   agentMode: "build",
   theme: "dark",
   vimMode: false,
@@ -585,6 +589,7 @@ export function getRuntimeConfig(
     offline: merged.offline ?? DEFAULT_CONFIG.offline,
     attentionOnIdle: merged.attentionOnIdle ?? DEFAULT_CONFIG.attentionOnIdle,
     cacheWarming: merged.cacheWarming ?? DEFAULT_CONFIG.cacheWarming,
+    cacheRetention: merged.cacheRetention ?? DEFAULT_CONFIG.cacheRetention,
     // The registry accepts this exemption only from validated CLI overrides.
     // A malformed security document also suppresses the exemption.
     allowUntrustedHooks: merged.allowUntrustedHooks ?? DEFAULT_CONFIG.allowUntrustedHooks,

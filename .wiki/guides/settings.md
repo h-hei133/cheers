@@ -59,3 +59,7 @@ If a role's saved thinking effort is no longer available, its row stays focused 
 The catalogue and settings panel expose supported entries. Their presence does not establish that every provider, desktop terminal or configuration scope has been tested. Current implementation evidence and remaining interaction work are recorded in [Phase 20 additions](../features/phase-20-addition.md#15-实施与验证证据).
 
 The login and logout shortcuts reuse the connection command's grammar and credential owner. Their help text and completions are projections, not a second authentication path.
+
+Context → Cache → Cache retention offers `short` (default), `long` and `none`. You can also save a personal choice with `/settings set cacheRetention long` or `/settings set cacheRetention none`. Project configuration cannot enable this preference. The same choice applies to ordinary requests, side questions and summaries. The selected endpoint decides the supported cache controls; a long preference uses its short tier when the extended tier is unsupported. A `none` preference omits cache markers and affinity controls where supported by the protocol, but cannot disable a provider's implicit caching.
+
+Cache warming remains a separate preference. It uses the window captured with the request that was sent, and only schedules when that model publishes a duration and usable prices. A long window beyond the existing run or idle age limit does not fall back to a short refresh timer. Failed or cancelled refreshes do not establish a new cache window.

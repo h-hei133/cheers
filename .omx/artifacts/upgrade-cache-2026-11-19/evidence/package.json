@@ -1,0 +1,41 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "node": "v24.15.0",
+  "buildId": "ecdb41348d63372afdbb32a78e9fd81ca13b408f330bef51613658fcada09def",
+  "commands": [
+    {
+      "name": "pack",
+      "exit": 0,
+      "bytes": 434855,
+      "log": "package-pack.log"
+    },
+    {
+      "name": "install",
+      "exit": 0,
+      "bytes": 27,
+      "log": "package-install.log"
+    },
+    {
+      "name": "types",
+      "exit": 0,
+      "bytes": 0,
+      "log": "package-types.log"
+    },
+    {
+      "name": "native",
+      "exit": 0,
+      "bytes": 1619,
+      "log": "package-native.log"
+    }
+  ],
+  "packageSha256": "d878d5298a6de3ee149b917b082aa5e887aa39cc2a352eed9c0636915d4a531e",
+  "publicEntries": 15,
+  "strictTypes": true,
+  "engineStrict": true,
+  "nativePassed": 12,
+  "loopbackPosts": 32,
+  "nativeReceipt": "native-installed.json",
+  "privateStateRemoved": true,
+  "buildUnchanged": true
+}

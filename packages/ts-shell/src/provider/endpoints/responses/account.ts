@@ -10,6 +10,8 @@ function accountBody(input: SimpleRequest | TurnRequest): Record<string, unknown
   const body = responseBody(input, true);
   delete body.temperature;
   delete body.top_p;
+  delete body.prompt_cache_retention;
+  delete body.prompt_cache_options;
   return { ...body, instructions: input.systemPrompt || 'You are a helpful assistant.' };
 }
 

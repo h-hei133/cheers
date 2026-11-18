@@ -21,7 +21,8 @@ const model = objectSchema({
   promptCache: objectSchema({ short: positiveSchema, long: positiveSchema }),
   thinkingLevelMap: objectSchema(Object.fromEntries(THINKING_LEVELS.map(key => [key, { type: ['string', 'null'] }]))),
   compat: objectSchema({ endpoint: nameSchema, systemRole: enumSchema(['system', 'developer']), maxTokensField: enumSchema(['max_tokens', 'max_completion_tokens']),
-    reasoningEffort: booleanSchema, reasoningSummary: booleanSchema, assistantAfterToolResult: booleanSchema, allowEmptySignature: booleanSchema, supportsTemperature: booleanSchema }),
+    reasoningEffort: booleanSchema, reasoningSummary: booleanSchema, assistantAfterToolResult: booleanSchema, allowEmptySignature: booleanSchema, supportsTemperature: booleanSchema,
+    promptCacheKey: booleanSchema, supportsLongCacheRetention: booleanSchema, supportsExplicitPromptCacheMode: booleanSchema }),
 }, ['id']);
 const provider = objectSchema({ label: textSchema, runtime: enumSchema(RUNTIME_PROVIDERS), auth: enumSchema(['api-key', 'oauth', 'none']),
   baseUrl: nameSchema, endpoint: nameSchema, envVar: { type: 'string', pattern: '^[A-Za-z_][A-Za-z0-9_]*$' }, models: listSchema(model) });

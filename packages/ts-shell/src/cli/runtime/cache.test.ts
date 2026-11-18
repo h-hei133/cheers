@@ -7,6 +7,7 @@ import { costModel } from '../../core/commands/cost/model.js';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
 import { readBoundSessionState } from '../../session/store/bound.js';
 import { createCacheWarmingRunner } from '../../turn/cacheWarm.js';
+import { sendSentRequest } from '../../provider/request/sentRequest.js';
 
 let server: http.Server;
 let url: string;
@@ -75,6 +76,55 @@ it.each(["cancel", "context"])("does not dispatch after %s during credential ren
   expect(requests).toEqual([]);
 });
 
+it('refuses an expired cache window before and after credential renewal', async () => {
+  let clock = 1000; vi.spyOn(Date, 'now').mockImplementation(() => clock);
+  let finish!: (headers: Record<string, string>) => void;
+  const renewHeaders = vi.fn(() => new Promise<Record<string, string>>(resolve => { finish = resolve; }));
+  const cache = cacheRefreshFor({ sessionId: 'cache-deadline', runtimeConfig: {} as never,
+    provider: { providerId: 'fixture', model: 'fixture' }, isCurrent: () => true, renewHeaders });
+  const controller = new AbortController();
+  const pending = cache.refresh(captured(), controller.signal, 2000);
+  clock = 2001; finish({});
+  expect(await pending).toBeUndefined();
+  expect(await cache.refresh(captured(), controller.signal, 2000)).toBeUndefined();
+  expect(renewHeaders).toHaveBeenCalledOnce();
+  expect(requests).toEqual([]);
+});
+
+it('refuses a cache refresh after transport preparation crosses its final dispatch deadline', async () => {
+  let clock = 1000; vi.spyOn(Date, 'now').mockImplementation(() => clock);
+  let finish!: () => void;
+  const transport = vi.fn(async (url: RequestInfo | URL, init: RequestInit, beforeDispatch: () => void) => {
+    await new Promise<void>(resolve => { finish = resolve; });
+    beforeDispatch();
+    return fetch(url, init);
+  });
+  const unsent = vi.fn(); const dispatched = vi.fn();
+  const policy = { reserve: () => ({ dispatch: dispatched, confirmUnsent: unsent, settle: vi.fn() }) };
+  const pending = sendSentRequest(captured(), new AbortController().signal, fetch, {
+    deadline: 2000, provider: 'fixture', model: 'fixture', transport, policy: policy as never });
+  await vi.waitFor(() => expect(transport).toHaveBeenCalledOnce());
+  clock = 2001; finish();
+  expect(await pending).toBeUndefined();
+  expect(dispatched).not.toHaveBeenCalled();
+  expect(unsent).toHaveBeenCalledOnce();
+  expect(requests).toEqual([]);
+});
+
+it('refuses a cache refresh whose source retires during transport preparation', async () => {
+  let current = true; let finish!: () => void;
+  const transport = vi.fn(async (url: RequestInfo | URL, init: RequestInit, beforeDispatch: () => void) => {
+    await new Promise<void>(resolve => { finish = resolve; }); beforeDispatch(); return fetch(url, init);
+  });
+  const unsent = vi.fn(); const dispatched = vi.fn();
+  const policy = { reserve: () => ({ dispatch: dispatched, confirmUnsent: unsent, settle: vi.fn() }) };
+  const pending = sendSentRequest(captured(), new AbortController().signal, fetch, {
+    provider: 'fixture', model: 'fixture', transport, policy: policy as never, isCurrent: () => current } as never);
+  await vi.waitFor(() => expect(transport).toHaveBeenCalledOnce()); current = false; finish();
+  expect(await pending).toBeUndefined(); expect(dispatched).not.toHaveBeenCalled();
+  expect(unsent).toHaveBeenCalledOnce(); expect(requests).toEqual([]);
+});
+
 it.each([
   [{ "X-Api-Key": "old" }, { Authorization: "Bearer renewed" }, "x-api-key"],
   [{ Authorization: "Bearer old", "chatgpt-account-id": "old-account" }, { "x-api-key": "renewed" }, "authorization"],
@@ -122,10 +172,10 @@ it('records one captured tier charge for one HTTP refresh through the real cache
   });
   let clock = Date.now();
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-  const runner = createCacheWarmingRunner({ mode: 'streaming', cost: prices, promptCache: { short: 300 },
+  const runner = createCacheWarmingRunner({ mode: 'streaming', cost: prices,
     ...cache, now: () => clock });
   try {
-    runner.noteRequest(100_000, captured());
+    runner.noteRequest(100_000, { ...captured(), sentAt: clock, cache: { retention: 'short', ttlMs: 300_000 } });
     const due = runner.status().nextRefreshAt!;
     expect(due - clock).toBe(270_000);
     tier.promptPerMTok = 99; tier.completionPerMTok = 198;

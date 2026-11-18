@@ -329,6 +329,7 @@ it('sends clamped prompt_cache_key on official OpenAI or explicit compat without
     ...baseRequest,
     baseUrl: 'https://relay.invalid/v1',
     supportsPromptCacheKey: true,
+    supportsLongCacheRetention: true,
     cacheRetention: 'long',
   });
   expect(explicit.prompt_cache_key).toBe('s'.repeat(64));

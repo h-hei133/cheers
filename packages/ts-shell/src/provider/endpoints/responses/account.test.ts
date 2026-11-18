@@ -7,6 +7,16 @@ import { configuredOutputLimit } from '../../request/output.js';
 import { DEFAULT_CONFIG, type RuntimeConfig } from '../../../config/runtimeConfig.js';
 
 const kind = 'openai-account-responses';
+
+it('retains account affinity while excluding unsupported extended-cache vocabulary', () => {
+  const input = { model: 'm', messages: [], sessionId: 'account-cache', cacheRetention: 'long' as const,
+    supportsPromptCacheKey: true, supportsLongCacheRetention: true, supportsExplicitPromptCacheMode: true };
+  const body = endpointBody(kind, input);
+  expect(body.prompt_cache_key).toBe('account-cache');
+  expect(body).not.toHaveProperty('prompt_cache_retention');
+  expect(body).not.toHaveProperty('prompt_cache_options');
+  expect(endpointShape(kind).requestHeaders?.(input)).toEqual({ 'session-id': 'account-cache', 'x-client-request-id': 'account-cache' });
+});
 const message = { type: 'message', id: 'msg_1', role: 'assistant', status: 'completed', phase: 'final_answer',
   content: [{ type: 'output_text', text: 'answer' }] };
 const reasoning = { type: 'reasoning', id: 'rs_1', summary: [], encrypted_content: 'synthetic-cipher' };

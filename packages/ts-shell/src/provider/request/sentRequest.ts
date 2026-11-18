@@ -8,9 +8,14 @@ import type { PromptIdentitySnapshot } from '../../observability/usage/model.js'
 import { prepareRequestAttempt } from './attempt.js';
 import type { ModelInputLimits } from '../../core/models/modalities.js';
 import { InputLimitError } from './input.js';
+import type { CacheWindow } from '../cache/model.js';
 
 /** A prepared request captured before transport signing, with its exact prompt prefix. */
 export interface SentRequest {
+  /** Actual transport handoff time, before waiting for the response. */
+  readonly sentAt?: number;
+  /** Effective wire tier and exact-model window captured before dispatch. */
+  readonly cache?: CacheWindow;
   /** Size-only observation of this accepted request, independent of cache refresh replay. */
   readonly context?: RequestContext;
   /** Exact prompt shape sent to the provider, including whether tools were omitted. */
@@ -50,11 +55,13 @@ export async function sendSentRequest(
   signal: AbortSignal | undefined,
   fetchImpl: typeof fetch = fetch,
   metering?: { readonly policy?: RequestPolicy; readonly transport?: ModelTransport; readonly provider: string; readonly model: string;
+    readonly deadline?: number;
+    readonly isCurrent?: () => boolean;
     readonly onUsage?: (usage: ProviderUsage | undefined) => void;
     readonly credential?: { readonly credentialId: string; readonly generation: string } },
 ): Promise<ProviderUsage | undefined> {
   const body = refreshBody(sent);
-  if (!body || signal?.aborted) return undefined;
+  if (!body || signal?.aborted || metering?.isCurrent?.() === false || (metering?.deadline !== undefined && Date.now() > metering.deadline)) return undefined;
   const release = new AbortController();
   try {
     const serialized = JSON.stringify(body);
@@ -68,7 +75,17 @@ export async function sendSentRequest(
       headers: Object.fromEntries(headers.entries()),
       body: serialized,
       signal: signal ? AbortSignal.any([signal, release.signal]) : release.signal,
-    }, fetchImpl, metering?.transport);
+    }, fetchImpl, (url, init, beforeDispatch) => {
+      const admittedDispatch = () => {
+        signal?.throwIfAborted();
+        if (metering?.isCurrent?.() === false) throw new Error('The cache refresh source retired before dispatch.');
+        if (metering?.deadline !== undefined && Date.now() > metering.deadline) throw new Error('Cache refresh window expired before dispatch.');
+        beforeDispatch();
+      };
+      if (metering?.transport) return metering.transport(url, init, admittedDispatch);
+      admittedDispatch();
+      return fetchImpl(url, init);
+    });
     if (!response.ok) { attempt.settle(); return undefined; }
     const shape = endpointShape(sent.endpoint);
     let usage: ProviderUsage | undefined;

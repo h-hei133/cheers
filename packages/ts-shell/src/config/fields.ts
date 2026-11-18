@@ -69,6 +69,7 @@ export function createConfigFields(providers: readonly string[]) {
     allowUntrustedHooks: field(booleanSchema, ['override'], 'replace', true),
     // Idle warming can spend money without a new prompt; only a personal choice enables it.
     cacheWarming: field(enumSchema(['off', 'streaming', 'idle']), personal),
+    cacheRetention: field(enumSchema(['short', 'long', 'none']), personal),
     agentMode: field(enumSchema(['plan', 'build']), undefined, 'replace', false, { projectTrust: ['plan'] }),
     theme: field(nameSchema, withOverride, 'replace', false, { application: 'immediate' }),
     vimMode: field(booleanSchema, withOverride, 'replace', false, { ...safe, application: 'immediate' }),

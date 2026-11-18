@@ -4,6 +4,20 @@
 
 只有一个 workspace 包。单个模块的 import 图无环不等于可以直接搬目录成为无环包：browser/core、workflow/core、planning/session/provider 的双向边存在。现有分支树、CAS 状态写入、任务日志、远端作业派发栅栏均已实现；问题是事务权威和独立模块边界未完成，不能重造另一套执行器或任务系统。
 
+## Cache request controls and refresh windows (2026-11-19)
+
+C.5核实确认普通配置缺少retention、亲和与长档共用判断、摘要和侧问丢参数／端点亲和头、预热固定short且以结算时刻延长窗口。参考的独立能力与按请求窗口决定采用，沿用本项目原config／endpoint／request／summary／cacheWarm／accounting owner；新增provider/cache只有协议字段和已发送窗口的责任，无第二缓存、计费、执行或配置系统。
+
+个人cacheRetention默认short，long／none使用原配置registry与settings保存；显式请求优先。promptCacheKey、supportsLongCacheRetention、supportsExplicitPromptCacheMode独立，strict boolean和实际地址准入；Responses扩展使用30m或explicit，普通long用24h，Anthropic用1h并在不支持时保留short。账户协议不接扩展long字段。摘要、分段／合并、direct／virtual／role、侧问和预览捕获同一requested偏好、session及实际shape；报文与亲和headers共用端点owner，准备身份保留即使wire相同的偏好区别。
+
+PreparedTurnContext及SentRequest捕获final body的effective tier和exact-address model window，协议duration为上限、missing不补短档；真正transport handoff捕获sentAt。原runner按此窗口和发送时间保留expiry，idle结算幂等、callback代际复核、失败／void／中断不续期。renewal和签名前后最终dispatch deadline共同拒绝晚发，one-token refresh只由原endpoint.refreshBody降低输出；原账本／prices归属保持。半小时／一小时age limit保持，24h窗口不会回退短timer。
+
+初始7文件27AssertionErrors、追加callback4红／false回调1红、protocol13红、summary headers2红、side7红/1控制、malformed bool2红/2控制先记录后修；Responses侧问两control追加于修改后，不称red。复审phase age／Anthropic short上限各1红，加gateway别名／迟到source handoff2红修复。最终联合27文件848项、七静态检查／2709生产模块0monoliths、buildecdb41348d63通过。十一有效反转13AssertionErrors，exact恢复6文件138项；去掉renewal单层guard仍被最终transport guard挡住，作为冗余防线control单列，不造red。
+
+Linux当前编译SDK／CLI／摘要／重开／侧问13实际场景34POST及source owner预热2POST共14场景36POST通过；source预热不是未导出compiled函数的验证，最初compiled owner探针失败保留。Node20.3禁动态生成compiled同13场景34POST通过，source TS loader失败为harness，不升级其预热。隔离npm15公开入口strict NodeNext／skipLibCheck=false、engine-strict及12installed场景32POST通过，private state清理。配置模型最新原生尝试在鉴权停止、0provider requests；真实TTL／收益仍无证据。默认pinned judge当前exit2/not_proven、16384边容量缺口保持，不改bundle或门禁。
+
+E.6下一批只读核实：agent_end只有StopFailure别名，成功／取消与kernel事件未接扩展；session_start/shutdown目前按prompt，原生session生命周期和结果消费仍缺。先沿现有CatalogContribution.onEvent／runExtensionInvocation补typed kernel notifications及settlement，再分批会话转换与返回值，不把Stop修复重入当单次agent_end，不增加第二event bus。
+
 起始工具链为 TypeScript 5.9.3、Vitest 0.34.6、Vite 5.4.21；实际 Undici 7.18.2 要求 Node >=20.18.1，和声明／CI 的 >=20.3.0 冲突。Node API 静态门不能代替依赖下限运行证据。TypeScript 编译器由 graph parser、language scanner、扩展转译和 post-mutation diagnostics 直接消费，移除运行时依赖会损坏产品。此条研究主张予以纠正，保留编译器依赖。
 
 当前静态包 export 宣告 14 个非根入口，但 publisher 只保留 stable index，其余目录被清理。实际导入证实全部失败。公开 SDK／子路径和 CLI 需要共用一个 immutable generation，不能把每条入口独立打包而产生多份 WeakMap／单例。

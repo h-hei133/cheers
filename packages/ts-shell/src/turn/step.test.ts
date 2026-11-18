@@ -2090,7 +2090,7 @@ it('forwards mid-convo cache preservation flags, anthropic-beta headers, and res
         id: 'claude-sonnet-4-6',
         reasoning: true,
         toolCalling: true,
-        compat: { supportsMidConvoToolChanges: true, supportsMidConvoEffort: true },
+        compat: { supportsMidConvoToolChanges: true, supportsMidConvoEffort: true, supportsLongCacheRetention: true },
       }],
     }],
     tools: initialTools,

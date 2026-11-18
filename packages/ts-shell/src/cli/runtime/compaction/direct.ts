@@ -18,6 +18,7 @@ import { summaryTarget } from './target.js';
 export async function directCompactionTarget(request: StepRequest, messages: readonly AgentMessage[], signal?: AbortSignal,
   admission?: Admission) {
   const original = captureStepTarget(request), resolver = request.resolveTarget;
+  const cacheRetention = request.cacheRetention ?? 'short', sessionId = request.sessionId;
   const captured = captureContext(messages);
   const thinking = captureThinkingPreference(request.workspaceRoot, request.thinkingEffort);
   const rawEffort = thinking.thinkingEffort ?? undefined;
@@ -48,6 +49,7 @@ export async function directCompactionTarget(request: StepRequest, messages: rea
   const failure = explicitEffort && effort ? effortOutputFailure(endpointShape(endpoint), limits.maxOutputTokens) : undefined;
   if (failure) throw new Error(failure);
   return { target, admission: admit, provider: { ...summaryTarget({ target, activeProvider, activeModel, endpoint, shape,
+    cacheRetention, sessionId,
     replayBinding: target.provider.replayBinding ?? requestReplayBinding(target.provider) }),
     contextWindow, inputLimit: model?.inputLimit, maxOutputTokens: limits.maxOutputTokens, reserveTokens } };
 }

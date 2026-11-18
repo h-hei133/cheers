@@ -31,6 +31,7 @@ import { prepareTurnBody } from './body.js';
 import { captureStepTarget, resolveStepTarget } from './target.js';
 import { prepareModelRoute, type PreparedRoute } from './route.js';
 import { requestReplayBinding } from '../../provider/request/replay.js';
+import { requestCacheWindow } from '../../provider/cache/window.js';
 import type { PreparedTurnContext, StepOptions, StepRequest, StepTarget } from './contract.js';
 
 const CAPTURE_LIMITS = { bytes: 64 * 1024 * 1024, nodes: 250_000, depth: 48 } as const;
@@ -284,6 +285,10 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
     refusal = !budget.ok && budget.reason !== 'unknown'
       ? { detail: `Context overflow: ${budget.detail}` } : undefined;
     const body = JSON.stringify(payload!);
+    const cacheModel = catalogProvider(request.catalog ?? [], activeProvider, catalogAddress).entry;
+    const cache = requestCacheWindow({ endpoint, retention: activeRequest.cacheRetention, payload: payload!,
+      ...(cacheModel?.baseUrl && cacheModel.baseUrl.replace(/\/+$/, '') === catalogAddress?.replace(/\/+$/, '')
+        ? { model: modelEntry } : {}) });
     try { assertRequestInput(body, protocol.contextFields, inputLimits); }
     catch (error) {
       if (!(error instanceof InputLimitError)) throw error;
@@ -318,6 +323,7 @@ export function createTurnContextPreparer(request: StepRequest, options: StepOpt
       promptIdentity: Object.freeze(promptIdentity), promptProjection: promptProjection && Object.freeze(promptProjection),
       projection: freezeDeep(projection), activeProvider, activeModel, effort, allowTools, allowedTools, tools, systemPrompt,
       regeneratedPrompt, endpoint, shape: Object.freeze(shape), protocol,
+      cache, cacheRetention: activeRequest.cacheRetention ?? 'short', sessionId: request.sessionId,
       modelEntry: modelEntry && structuredClone(modelEntry), usageAttribution, usageInput, inputLimits,
       payload: freezeDeep(payload!), requestHeaders: Object.freeze({ ...requestHeaders }), body,
       url: endpointUrl(target.provider.baseUrl, endpoint, activeModel), headers: Object.freeze({ ...target.provider.headers }),

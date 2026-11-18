@@ -1,4 +1,5 @@
 import { endpointBody, endpointKind, endpointShape, endpointUrl, type EndpointKind } from "../endpoints/index.js";
+import type { SimpleRequest } from '../endpoints/kinds.js';
 import { classifyProviderFailure, type ProviderFailureClass } from "../registry/provider.js";
 import { REFUSAL } from "../../core/agent/retry.js";
 import type { ChatMessage } from "../../turn/prompt.js";
@@ -8,7 +9,6 @@ import type { ResolvedRequestShape } from '../../core/models/requestShape.js';
 import type { ProviderUsage } from '../../turn/completion.js';
 import { requestReplayBinding } from './replay.js';
 import { readCompletion } from '../response/read.js';
-import { copilotRequestHeaders } from '../endpoints/copilotHeaders.js';
 import { normalizeRequestImages, requestInputLimits } from './input.js';
 
 /**
@@ -61,6 +61,8 @@ export interface SimpleCompletionRequest {
   readonly onUsage?: (usage: ProviderUsage | undefined) => void;
   readonly shape?: ResolvedRequestShape;
   readonly requestPolicy?: RequestPolicy;
+  readonly sessionId?: string;
+  readonly cacheRetention?: 'short' | 'long' | 'none';
   readonly provider: SimpleProvider;
   readonly messages: readonly ChatMessage[];
   /** The ceiling this request may produce. Absent leaves the field off. */
@@ -85,8 +87,12 @@ export interface SimpleCompletionRequest {
 export async function requestSimpleCompletion(
   request: SimpleCompletionRequest,
 ): Promise<string | undefined> {
-  const kind = endpointKind(request.provider.endpoint);
-  const fetchImpl = request.provider.fetchImpl ?? fetch;
+  const provider = { ...request.provider };
+  const kind = endpointKind(provider.endpoint);
+  const protocol = endpointShape(kind);
+  const fetchImpl = provider.fetchImpl ?? fetch;
+  const shape = request.shape && { ...request.shape };
+  const headers = new Headers(provider.headers);
   // The system instruction travels in its own field, because that is the only
   // place one protocol accepts it: a `system` role inside `messages` is dropped
   // there rather than converted. A caller writing the instruction as the first
@@ -96,34 +102,35 @@ export async function requestSimpleCompletion(
     .filter((message) => message.role === "system")
     .map((message) => message.content)
     .join("\n\n");
-  const inputLimits = requestInputLimits(request.shape?.inputLimits);
-  const messages = await normalizeRequestImages(request.messages.filter((message) => message.role !== "system"),
-    request.shape?.vision === true, inputLimits, request.workspaceRoot ?? process.cwd(), request.signal);
-  const headers = new Headers(request.provider.headers);
-  if (kind === 'copilot-chat-completions' || kind === 'copilot-messages') {
-    for (const [name, value] of Object.entries(copilotRequestHeaders({ provider: request.provider.providerId, messages }))) headers.set(name, value);
-  }
-  headers.set("accept", endpointShape(kind).simpleResponse === 'stream' ? 'text/event-stream' : 'application/json');
-  const serialized = JSON.stringify(
-    endpointBody(kind, {
-      ...request.shape,
-      model: request.provider.model, provider: request.provider.providerId,
-      serviceTier: request.provider.serviceTier,
-      replayBinding: requestReplayBinding({ ...request.provider, provider: request.provider.providerId }), systemPrompt, messages,
-      ...(request.maxOutputTokens !== undefined ? { maxOutputTokens: request.maxOutputTokens } : {}),
-      ...(request.supportsTemperature !== undefined ? { supportsTemperature: request.supportsTemperature } : {}),
-    }),
-  );
-  const attempt = await prepareRequestAttempt({ body: serialized, provider: request.provider.providerId ?? '', model: request.provider.model,
+  const captured: SimpleRequest = {
+    ...shape,
+    sessionId: request.sessionId, cacheRetention: request.cacheRetention ?? 'short',
+    supportsPromptCacheKey: shape?.promptCacheKey, supportsLongCacheRetention: shape?.supportsLongCacheRetention,
+    supportsExplicitPromptCacheMode: shape?.supportsExplicitPromptCacheMode,
+    baseUrl: provider.baseUrl, model: provider.model, provider: provider.providerId,
+    serviceTier: provider.serviceTier,
+    replayBinding: requestReplayBinding({ ...provider, provider: provider.providerId }), systemPrompt,
+    messages: request.messages.filter((message) => message.role !== "system"),
+    ...(request.maxOutputTokens !== undefined ? { maxOutputTokens: request.maxOutputTokens } : {}),
+    ...(request.supportsTemperature !== undefined ? { supportsTemperature: request.supportsTemperature } : {}),
+  };
+  const inputLimits = requestInputLimits(shape?.inputLimits);
+  const messages = await normalizeRequestImages(captured.messages, shape?.vision === true, inputLimits,
+    request.workspaceRoot ?? process.cwd(), request.signal);
+  const input: SimpleRequest = { ...captured, messages };
+  for (const [name, value] of Object.entries(protocol.requestHeaders?.(input) ?? {})) headers.set(name, value);
+  headers.set("accept", protocol.simpleResponse === 'stream' ? 'text/event-stream' : 'application/json');
+  const serialized = JSON.stringify(endpointBody(kind, input));
+  const attempt = await prepareRequestAttempt({ body: serialized, provider: provider.providerId ?? '', model: provider.model,
     endpoint: kind ?? 'openai-compatible', purpose: 'side-question', policy: request.requestPolicy, inputLimits,
-    ...(request.provider.credentialId && request.provider.credentialGeneration
-      ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
-  const res = await attempt.send(endpointUrl(request.provider.baseUrl, kind, request.provider.model, false), {
+    ...(provider.credentialId && provider.credentialGeneration
+      ? { credential: { credentialId: provider.credentialId, generation: provider.credentialGeneration } } : {}) });
+  const res = await attempt.send(endpointUrl(provider.baseUrl, kind, provider.model, false), {
     method: "POST",
     headers,
     body: serialized,
     ...(request.signal ? { signal: request.signal } : {}),
-  }, fetchImpl, request.provider.modelTransport);
+  }, fetchImpl, provider.modelTransport);
   if (!res.ok) {
     attempt.settle();
     request.onFailure?.(classifyProviderFailure({ status: res.status }));

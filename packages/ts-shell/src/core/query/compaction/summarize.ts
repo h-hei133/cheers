@@ -11,6 +11,7 @@ import {
   parseCompactedSummary,
 } from "./summarizer.js";
 import { endpointBody, endpointKind, endpointUrl, type EndpointKind } from "../../../provider/endpoints/index.js";
+import type { SimpleRequest } from '../../../provider/endpoints/kinds.js';
 import { endpointShape } from '../../../provider/endpoints/index.js';
 import { prepareRequestAttempt } from '../../../provider/request/attempt.js';
 import type { ModelTransport, RequestPolicy } from '../../agent/request/model.js';
@@ -33,6 +34,11 @@ import { assertRequestInput, requestInputLimits } from '../../../provider/reques
  */
 
 export interface CompactionProvider {
+  readonly sessionId?: string;
+  readonly cacheRetention?: 'short' | 'long' | 'none';
+  readonly supportsPromptCacheKey?: boolean;
+  readonly supportsLongCacheRetention?: boolean;
+  readonly supportsExplicitPromptCacheMode?: boolean;
   readonly serviceTier?: string;
   readonly shape?: ResolvedRequestShape;
   readonly contextWindow?: number;
@@ -235,6 +241,10 @@ export function prepareCompactionRequest(request: CompactionRequest): PreparedSu
       endpoint: request.provider.endpoint, replayBinding: request.provider.replayBinding,
       credentialId: request.provider.credentialId, credentialGeneration: request.provider.credentialGeneration,
       shape: request.provider.shape, serviceTier: request.provider.serviceTier,
+      sessionId: request.provider.sessionId, cacheRetention: request.provider.cacheRetention,
+      supportsPromptCacheKey: request.provider.supportsPromptCacheKey ?? request.provider.shape?.promptCacheKey,
+      supportsLongCacheRetention: request.provider.supportsLongCacheRetention ?? request.provider.shape?.supportsLongCacheRetention,
+      supportsExplicitPromptCacheMode: request.provider.supportsExplicitPromptCacheMode ?? request.provider.shape?.supportsExplicitPromptCacheMode,
       contextWindow: request.provider.contextWindow, inputLimit: request.provider.inputLimit,
       maxOutputTokens: request.provider.maxOutputTokens, reserveTokens: request.provider.reserveTokens,
       supportsTemperature: request.provider.supportsTemperature,
@@ -252,9 +262,15 @@ export function prepareCompactionRequest(request: CompactionRequest): PreparedSu
   const kind = endpointKind(captured.provider.endpoint) ?? 'openai-compatible';
   headers.set('accept', endpointShape(kind).simpleResponse === 'stream' ? 'text/event-stream' : 'application/json');
   const maxOutputTokens = captured.provider.maxOutputTokens ?? captured.maxOutputTokens;
-  const body = JSON.stringify(endpointBody(kind, {
+  const bodyInput: SimpleRequest = {
     ...captured.provider.shape,
     model: captured.provider.model,
+    baseUrl: captured.provider.baseUrl,
+    sessionId: captured.provider.sessionId,
+    cacheRetention: captured.provider.cacheRetention,
+    supportsPromptCacheKey: captured.provider.supportsPromptCacheKey,
+    supportsLongCacheRetention: captured.provider.supportsLongCacheRetention,
+    supportsExplicitPromptCacheMode: captured.provider.supportsExplicitPromptCacheMode,
     provider: captured.provider.providerId,
     replayBinding: captured.provider.replayBinding,
     serviceTier: captured.provider.serviceTier,
@@ -263,7 +279,9 @@ export function prepareCompactionRequest(request: CompactionRequest): PreparedSu
     ...(captured.temperature !== undefined ? { temperature: captured.temperature } : {}),
     systemPrompt: messages.filter(message => message.role === 'system').map(message => message.content ?? '').join('\n\n'),
     messages: messages.filter(message => message.role !== 'system'),
-  }));
+  };
+  for (const [name, value] of Object.entries(endpointShape(kind).requestHeaders?.(bodyInput) ?? {})) headers.set(name, value);
+  const body = JSON.stringify(endpointBody(kind, bodyInput));
   try { assertRequestInput(body, endpointShape(kind).contextFields, requestInputLimits(captured.provider.shape?.inputLimits)); }
   catch { throw new SummaryAdmissionError('Summary request refused: the complete input exceeds the selected model limits.'); }
   const url = endpointUrl(captured.provider.baseUrl, kind, captured.provider.model, false);
@@ -271,6 +289,8 @@ export function prepareCompactionRequest(request: CompactionRequest): PreparedSu
     'prepared-summary-v1', createHash('sha256').update(url).digest('hex'),
     createHash('sha256').update(body).digest('hex'), captured.provider.providerId ?? '', captured.provider.model, kind,
     captured.provider.replayBinding ?? '', captured.provider.credentialId ?? '', captured.provider.credentialGeneration ?? '',
+    captured.provider.sessionId, captured.provider.cacheRetention, captured.provider.supportsPromptCacheKey,
+    captured.provider.supportsLongCacheRetention, captured.provider.supportsExplicitPromptCacheMode,
     captured.provider.shape, captured.provider.contextWindow, captured.provider.inputLimit,
     captured.provider.reserveTokens, maxOutputTokens, captured.purpose ?? 'compaction',
   ])).digest('hex');

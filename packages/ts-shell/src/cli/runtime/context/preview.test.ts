@@ -133,6 +133,20 @@ it('estimates an empty startup through the actual tool projection without provid
   expect(files.map(target => fs.readFileSync(target))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
 });
 
+it('previews the admitted cache retention and endpoint capabilities without dispatch', async () => {
+  const test = fixture();
+  const config = { ...test.context.runtimeConfig, cacheRetention: 'none' as const };
+  const providers = test.context.configuration.current.catalog.map(provider => ({ ...provider,
+    models: provider.models.map(model => ({ ...model, compat: { promptCacheKey: true,
+      supportsLongCacheRetention: false, supportsExplicitPromptCacheMode: true } })) }));
+  Object.assign(test.context, { runtimeConfig: config, configuration: new ConfigState(config, configurationBinding(test.context), providers) });
+  const body = vi.spyOn(endpoints, 'endpointTurnBody');
+  const result = await test.load('Inspect cached input'); result.verify();
+  expect(body.mock.calls.at(-1)![1]).toMatchObject({ cacheRetention: 'none', supportsPromptCacheKey: true,
+    supportsLongCacheRetention: false, supportsExplicitPromptCacheMode: true });
+  expect(test.gateway.snapshot).not.toHaveBeenCalled();
+});
+
 it('inspects current history without adding a pending opening or connecting the gateway', async () => {
   const { context, manager, gateway, layout } = fixture();
   const before = [layout.metadataPath, layout.statePath, layout.transcriptPath].map(file => fs.readFileSync(file));

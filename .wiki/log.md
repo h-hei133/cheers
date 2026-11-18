@@ -1,5 +1,11 @@
 # Wiki Activity Log
 
+### 2026-11-19：请求缓存配置与预热窗口
+
+C.5复用原配置、协议、请求、摘要和预热owner，个人short／long／none贯通foreground／side／summary／preview，独立能力与实际地址、final body tier／window／sentAt和最终派发source／cache／age deadline保持。复审两实际边界先红后修，两项限定APPROVE；最终27文件848项、七静态检查／2709modules0monoliths、十一反转13AssertionErrors／exact恢复6文件138项及buildecdb41348d63通过。Linux当前compiled13场景34POST和sourcewarm2POST、Node20.3禁生成compiled13／34、安装15入口strict类型／12场景32POST通过；配置模型auth停止0requests、原配置和source保持、临时运行state清理。
+
+默认pinned judge仍exit2/not_proven、16384容量缺口，未改门禁或bundle。归档upgrade-cache-2026-11-19，36/62本地功能验收、26开放，按授权本地提交不push／CI。下一E.6已核实typed kernel事件／settlement与真实会话生命周期及返回值消费者缺口，不能靠StopFailure别名闭项。
+
 ## [2026-08-28] init | Project local wiki initialized for coding-agents
 ## [2026-08-28] ingest | Coding Agents Architecture and Sprint Overview (raw/notes/2026-08-28-architecture-and-sprint-overview.md)
 ## [2026-09-06] docs | GitHub MCP comparison of OpenTUI, Ink, and Pi TUI; selected Pi TUI adapter path and recorded staged migration plan

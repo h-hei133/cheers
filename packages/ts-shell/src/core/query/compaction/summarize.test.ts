@@ -38,6 +38,56 @@ const readCall = (path: string) => ({
   tool_calls: [{ id: `call-${path}`, function: { name: "read", arguments: JSON.stringify({ path }) } }],
 });
 
+it('sends captured summary cache controls and session affinity through the actual endpoint body', async () => {
+  const provider = { headers: {}, baseUrl: 'https://summary-relay.invalid/v1', model: 'summary',
+    endpoint: 'openai-compatible', sessionId: 'summary-session', cacheRetention: 'long' as 'short' | 'long' | 'none',
+    supportsPromptCacheKey: true, supportsLongCacheRetention: true, supportsExplicitPromptCacheMode: false };
+  const bodies: Record<string, unknown>[] = [];
+  const request = { provider, messages: [{ role: 'user' as const, content: 'Source work' }],
+    fetchImpl: (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return Response.json({ choices: [{ message: { content: 'Summary' } }] });
+    }) as typeof fetch };
+  const prepared = prepareCompactionRequest(request);
+  const short = prepareCompactionRequest({ ...request, provider: { ...provider, cacheRetention: 'short' } });
+  expect(short.identity).not.toBe(prepared.identity);
+  provider.cacheRetention = 'none'; provider.sessionId = 'successor-session'; provider.supportsLongCacheRetention = false;
+  await prepared.send();
+  expect(bodies[0]).toMatchObject({ prompt_cache_key: expect.any(String), prompt_cache_retention: '24h' });
+  await prepareCompactionRequest(request).send();
+  expect(bodies[1]).not.toHaveProperty('prompt_cache_key');
+  expect(bodies[1]).not.toHaveProperty('prompt_cache_retention');
+});
+
+it('binds a prepared summary to requested cache retention and session even when the endpoint emits no controls', () => {
+  const request = { provider: { headers: {}, baseUrl: 'https://unsupported-summary.invalid', model: 'summary',
+    sessionId: 'first-session', cacheRetention: 'short' as const, supportsPromptCacheKey: false, supportsLongCacheRetention: false },
+    messages: [{ role: 'user' as const, content: 'Captured work' }], fetchImpl: vi.fn() };
+  const short = prepareCompactionRequest(request);
+  expect(prepareCompactionRequest({ ...request, provider: { ...request.provider, cacheRetention: 'none' } }).identity).not.toBe(short.identity);
+  expect(prepareCompactionRequest({ ...request, provider: { ...request.provider, sessionId: 'second-session' } }).identity).not.toBe(short.identity);
+});
+
+it.each(['mistral-chat-completions', 'openai-account-responses'])('sends endpoint-owned %s summary affinity headers and suppresses them when disabled', async endpoint => {
+  const observed: Headers[] = [];
+  const provider = { headers: {}, baseUrl: 'https://summary-affinity.invalid/v1', model: 'summary',
+    endpoint, sessionId: 'summary-affinity', cacheRetention: 'long' as 'long' | 'none' };
+  const request = { provider, messages: [{ role: 'user' as const, content: 'Source work' }],
+    fetchImpl: async (_url: RequestInfo | URL, init?: RequestInit) => {
+      observed.push(new Headers(init?.headers));
+      return endpoint === 'openai-account-responses' ? new Response('data: ' + JSON.stringify({ type: 'response.completed', response: {
+        id: 'summary-response', status: 'completed', output: [{ id: 'summary-message', type: 'message', role: 'assistant',
+          content: [{ type: 'output_text', text: 'Summary' }] }] } }) + '\n\n', { headers: { 'content-type': 'text/event-stream' } })
+        : Response.json({ choices: [{ message: { content: 'Summary' } }] });
+    } };
+  const prepared = prepareCompactionRequest(request);
+  provider.sessionId = 'successor-affinity';
+  await prepared.send();
+  expect(observed[0]!.get(endpoint === 'openai-account-responses' ? 'session-id' : 'x-affinity')).toBe('summary-affinity');
+  provider.cacheRetention = 'none'; await prepareCompactionRequest(request).send();
+  expect(observed[1]!.has(endpoint === 'openai-account-responses' ? 'session-id' : 'x-affinity')).toBe(false);
+});
+
 describe("requestCompactionSummary", () => {
   it('reports billed usage even when the response has no summary', async () => {
     const onUsage = vi.fn();

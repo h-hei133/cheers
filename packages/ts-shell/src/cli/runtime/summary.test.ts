@@ -99,6 +99,15 @@ function runtime(setup: Awaited<ReturnType<typeof fixture>>) {
   return { deps: observed.deps!, context };
 }
 
+function declareSummaryCache() {
+  const catalog = loadCatalog();
+  const connection = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.providerConnections!.find(connection => connection.id === 'b')!;
+  writeCatalogCache([...catalog, { id: 'summary-cache', runtime: 'openai', auth: 'api-key',
+    endpoint: 'openai-compatible', baseUrl: connection.baseUrl,
+    models: catalog.find(provider => provider.id === 'openai')!.models.map(model => ({ ...model,
+      compat: { ...model.compat, promptCacheKey: true, supportsLongCacheRetention: true } })) }]);
+}
+
 type SummaryKind = 'manual' | 'automatic' | 'branch' | 'prefix';
 const summaryKinds: readonly SummaryKind[] = ['manual', 'automatic', 'branch', 'prefix'];
 
@@ -128,6 +137,33 @@ async function sendSummary(setup: Awaited<ReturnType<typeof fixture>>, kind: Sum
       operation: { sessionId: setup.session.id } })).toMatchObject({ status: 'condensed' });
   }
 }
+
+it.each(summaryKinds)('uses personal long cache retention and session affinity on the actual %s summary request', async kind => {
+  const setup = await fixture();
+  declareSummaryCache();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, cacheRetention: 'long' }, edit);
+  const unchanged = unchangedPreferences(setup);
+  await sendSummary(setup, kind);
+  expect(setup.requests.length).toBeGreaterThan(0);
+  for (const request of setup.requests) {
+    expect(request.path).toBe('/b/v1/chat/completions');
+    expect(request.body).toMatchObject({ model: 'namespace/summary', prompt_cache_key: expect.any(String), prompt_cache_retention: '24h' });
+  }
+  unchanged();
+});
+
+it('binds the dedicated summary cache preference and session before credential renewal', async () => {
+  const setup = await fixture();
+  declareSummaryCache();
+  const config = { ...projectSessionModel(getRuntimeConfig(setup.root), setup.session.id),
+    cacheRetention: 'long' as 'short' | 'long' | 'none' };
+  const captured = captureSummaryRole({ config, catalog: loadCatalog(), workspaceRoot: setup.root, sessionId: setup.session.id })!;
+  const short = captureSummaryRole({ config: { ...config, cacheRetention: 'short' }, catalog: loadCatalog(), workspaceRoot: setup.root, sessionId: setup.session.id })!;
+  expect(short.identity).not.toBe(captured.identity);
+  config.cacheRetention = 'none';
+  expect(await captured.resolve()).toMatchObject({ cacheRetention: 'long', sessionId: setup.session.id });
+});
 
 it.each(summaryKinds.flatMap(kind => ['main', 'different-model', 'sibling', 'inherited'].map(target => ({ kind, target }))))(
   'sends the admitted tier for $kind summaries on $target', async ({ kind, target }) => {

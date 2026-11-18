@@ -9,6 +9,7 @@ import { readCompletionStream, readReasoningText, type CompletedBody } from "../
 import type { ChatMessage } from "../../turn/prompt.js";
 import { copilotRequestHeaders } from "./copilotHeaders.js";
 import { declareEndpoint, type SimpleRequest } from "./kinds.js";
+import { promptCacheFields } from '../cache/protocol.js';
 
 /**
  * The default wire shape.
@@ -23,36 +24,6 @@ import { declareEndpoint, type SimpleRequest } from "./kinds.js";
 
 /** Where a request goes, appended to the base URL. */
 const PATH = "/chat/completions";
-const OPENAI_PROMPT_CACHE_KEY_MAX_LENGTH = 64;
-
-function clampPromptCacheKey(key: string | undefined): string | undefined {
-  if (!key) return undefined;
-  const chars = Array.from(key);
-  return chars.length <= OPENAI_PROMPT_CACHE_KEY_MAX_LENGTH ? key : chars.slice(0, OPENAI_PROMPT_CACHE_KEY_MAX_LENGTH).join('');
-}
-
-function isOfficialOpenAIBaseUrl(baseUrl: string | undefined): boolean {
-  if (!baseUrl) return false;
-  try {
-    const hostname = new URL(baseUrl).hostname.toLowerCase();
-    return hostname === 'api.openai.com' || hostname.endsWith('.api.openai.com');
-  } catch {
-    return false;
-  }
-}
-
-function promptCacheFields(input: Pick<SimpleRequest, 'sessionId' | 'baseUrl' | 'cacheRetention' | 'supportsPromptCacheKey'>): Record<string, unknown> {
-  if (!input.sessionId || input.cacheRetention === 'none') return {};
-  const supported = input.supportsPromptCacheKey === true
-    || (input.supportsPromptCacheKey !== false && isOfficialOpenAIBaseUrl(input.baseUrl));
-  if (!supported) return {};
-  const key = clampPromptCacheKey(input.sessionId);
-  return {
-    ...(key ? { prompt_cache_key: key } : {}),
-    ...(input.cacheRetention === 'long' ? { prompt_cache_retention: '24h' } : {}),
-  };
-}
-
 declareEndpoint("openai-compatible", {
   usageInput: 'inclusive',
   serviceTiers: ['default', 'auto', 'priority', 'fast', 'flex'],

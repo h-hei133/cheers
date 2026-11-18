@@ -26,6 +26,7 @@ export function captureSummaryRole(input: {
   readonly config: RuntimeConfig;
   readonly catalog: readonly CatalogProvider[];
   readonly workspaceRoot?: string;
+  readonly sessionId?: string;
   readonly admission?: Admission;
   readonly onCredentialPersisted?: () => void;
 }): { readonly identity: string; readonly segmentTokens: number; readonly mergeTokens: number; readonly limits: Pick<CompactionProvider, 'contextWindow' | 'inputLimit' | 'maxOutputTokens' | 'reserveTokens' | 'shape'>;
@@ -54,8 +55,10 @@ export function captureSummaryRole(input: {
   if (failure) throw new Error(`Summary role refused: ${failure}`);
   const credential = resolution.credential!;
   const accountAuth = accountAuthFor(resolution.provider, credential);
+  const cacheRetention = input.config.cacheRetention ?? 'short';
+  const sessionId = input.sessionId;
   const identity = createHash('sha256').update(JSON.stringify([role, resolution.baseUrl, endpoint,
-    credentialIdentityFor(resolution.provider, credential), model, shape, maxOutputTokens, reserveTokens, serviceTier])).digest('hex');
+    credentialIdentityFor(resolution.provider, credential), model, shape, maxOutputTokens, reserveTokens, serviceTier, cacheRetention, sessionId])).digest('hex');
   let pending: Promise<CompactionProvider> | undefined;
   const renew = async (admission: Admission): Promise<CompactionProvider> => {
     assertAdmission(admission);
@@ -68,10 +71,12 @@ export function captureSummaryRole(input: {
     assertAdmission(input.admission);
     const auth = renewed.accountAuth ?? accountAuth;
     const identity = credentialIdentityFor(resolution.provider, { connectionId: credential.connectionId, apiKey: credential.apiKey, accountAuth: auth });
-    return { providerId: role.provider, model: role.model, baseUrl: resolution.baseUrl!, endpoint, serviceTier,
+    return { providerId: role.provider, model: role.model, baseUrl: resolution.baseUrl!, endpoint, serviceTier, cacheRetention, sessionId,
       headers: providerAuthorization({ apiKey: credential.apiKey, accountAuth: auth, endpoint }).headers,
       ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
-      shape, contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens,
+      shape, supportsPromptCacheKey: shape.promptCacheKey, supportsLongCacheRetention: shape.supportsLongCacheRetention,
+      supportsExplicitPromptCacheMode: shape.supportsExplicitPromptCacheMode,
+      contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens,
     };
   };
   return { identity, segmentTokens, mergeTokens, limits: { contextWindow: model.contextWindow, inputLimit: model.inputLimit, maxOutputTokens, reserveTokens, shape }, resolve: consumer => {

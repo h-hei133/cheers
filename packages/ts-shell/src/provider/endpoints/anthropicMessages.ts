@@ -112,6 +112,7 @@ export interface AnthropicRequestInput {
   readonly thinkingBudgetMaximum?: boolean;
   /** Prompt cache retention preference (`short` | `long` | `none`). */
   readonly cacheRetention?: "short" | "long" | "none";
+  readonly supportsLongCacheRetention?: boolean;
   /** Initial pinned tool schemas for mid-conversation `tool_addition`/`tool_removal` preservation. */
   readonly initialTools?: readonly ToolSchema[];
   readonly supportsMidConvoToolChanges?: boolean;
@@ -141,7 +142,7 @@ export function anthropicHeaders(apiKey?: string): Record<string, string> {
  * Tool results are folded into user turns, where this API accepts them.
  */
 export function anthropicRequestBody(input: AnthropicRequestInput): Record<string, unknown> {
-  const cacheControl = cacheControlFor(input.cacheRetention);
+  const cacheControl = cacheControlFor(input.cacheRetention, input.supportsLongCacheRetention);
   const declarations = projectRequestDeclarations(input, cacheControl);
   const wireMessages = convertMessages(input.messages, input.vision, input.allowEmptySignature === true, declarations);
   let finalMessages: Array<WireMessage | Record<string, unknown>> = cacheControl
@@ -383,9 +384,10 @@ function parseArguments(raw: string): unknown {
  */
 function cacheControlFor(
   retention: AnthropicRequestInput["cacheRetention"],
+  supportsLong = true,
 ): { readonly type: "ephemeral"; readonly ttl?: "1h" } | undefined {
   if (retention === "none") return undefined;
-  return retention === "long" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
+  return retention === "long" && supportsLong ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
 }
 
 function markLastForCaching(
@@ -855,6 +857,7 @@ declareEndpoint("anthropic-messages", {
       ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
       ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
       ...(input.cacheRetention !== undefined ? { cacheRetention: input.cacheRetention } : {}),
+      ...(input.supportsLongCacheRetention !== undefined ? { supportsLongCacheRetention: input.supportsLongCacheRetention } : {}),
     }),
   /**
    * The full turn. The simpler `body` above sends a prompt and no tools; this
@@ -880,6 +883,7 @@ declareEndpoint("anthropic-messages", {
       ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
       ...(input.thinkingBudgetMaximum ? { thinkingBudgetMaximum: true } : {}),
       ...(input.cacheRetention !== undefined ? { cacheRetention: input.cacheRetention } : {}),
+      ...(input.supportsLongCacheRetention !== undefined ? { supportsLongCacheRetention: input.supportsLongCacheRetention } : {}),
       ...(input.initialTools !== undefined ? { initialTools: input.initialTools } : {}),
       ...(input.supportsMidConvoToolChanges !== undefined ? { supportsMidConvoToolChanges: input.supportsMidConvoToolChanges } : {}),
       ...(input.supportsMidConvoEffort !== undefined ? { supportsMidConvoEffort: input.supportsMidConvoEffort } : {}),

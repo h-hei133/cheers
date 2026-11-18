@@ -2,7 +2,7 @@
 
 > **Task**: 核实研究规划，实施仍然成立的任务，并按实际生产路径验收。
 > **Started**: 2026-11-14
-> **Last Updated**: 2026-11-18
+> **Last Updated**: 2026-11-19
 > **Mode**: LOCAL_ONLY
 
 ## Scope and authority
@@ -18,15 +18,15 @@
 - [Task inventory](tasks.md)：唯一任务与验收清单。
 - [Design and evidence](design.md)：结构事实、参考决策、复用与实施顺序。
 - [Earlier repair evidence](../../wiki/references/runtime-upgrade-review-2026-11.md)：上一轮证据，不能替代本轮任务验收。
-- [Progress summary](summary.md) 记录当前验收、27 个未完成任务和仓库门禁结果。
+- [Progress summary](summary.md) 记录当前验收、26 个未完成任务和仓库门禁结果。
 
 ## Current status
 
-**Current phase** 按批实施。35/62 项完成 Linux 本地功能验收，27 项开放。
-**Completed batches** `980bb6d1` 完成无动态代码生成的校验，`a069b2d4` 完成追踪和看板，`898a324a` 完成启动参数。联合 53 文件 737 项，最后变更后 6 文件 178 项。构建 `bf2547057b22` 支持已验证的 12 个 Linux CLI 场景、Node 24 和 20.3 禁代码生成入口及编译版追踪命令。
-**Next batch** C.5 已确认缺口。先将缓存模式和物理目标能力绑定原请求，再验收摘要、预热和真实协议。
-**Repository gate** 脚本套件 209/210。基线 `02237103` 和当前源图均超过 16384 边，锁定的默认判定退出 2，结果 `not_proven`。18 个跟踪文件保持原样。
-**Evidence boundary** 最新构建的配置模型尝试两次在鉴权阶段停止，观测到零次请求。此前的模型和安装结果仍绑定历史构建，本次仅本地分批提交。
+**Current phase** 按批实施。36/62 项完成 Linux 本地功能验收，26 项开放。
+**Completed batch** C.5缓存配置／实际能力／窗口贯通。最终27文件848项、七静态检查、十一反转13AssertionErrors／exact恢复138项；buildecdb41348d63当前Linuxcompiled13场景34POST和source预热2POST、Node20.3compiled13／34、安装15公开strict类型／12场景32POST通过，限定两独立APPROVE。
+**Next batch** E.6真实缺口已核实。先typed kernel事件与完整settlement，后会话生命周期／返回值；复用原extension invocation和contribution，不加第二事件总线。
+**Repository gate** 当前定向script29项通过；历史完整套件209/210。当前默认judge仍exit2/not_proven、16384图容量缺口；18个pinned文件未改。
+**Evidence boundary** 当前构建配置模型在鉴权阶段停止，0requests；真实服务TTL／cache收益和其他平台未验证。已获得当前安装证据，本轮仅本地按批提交，不push或宣称CI。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -40,6 +40,8 @@
 所有仍然成立的必需任务均需实现和相应范围的当前证据；“代码已有但未验收”“部分完成”“证据不足”都不算完成。研究结论被反证时记录具体消费者与理由，不为删除任务而缩小目标。缺少某一家服务或人类授权时继续其他独立工作，保留该项状态。Linux 证据不扩展为 Windows 或全平台验证。每批更新 tasks 和本文件；总目标只在逐项审计通过后关闭。
 
 ## Adaptive control
+
+C.5当前批实际L，复用config／endpoint／summary／request／warming／accounting原owner，未新增依赖、缓存或执行平面。额外发现八类边界：summary与side参数丢失、endpoint headers bypass、callback reentry／idle幂等、actual sentAt、unknown／void窗口、final source及cache／phase deadline、shared gateway codec、native short协议上限。最终两项限定APPROVE，旧广审unavailable；无统一历史估算不补造drift。整体36/62与goal active，下一E.6按事件和结果责任分批。
 
 当前Linux功能验收任务数为32/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.8、C.9、E.5、E.1、F2.2、F2.4和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 
@@ -77,6 +79,7 @@ E.5本批实际L／额外依赖3（blocked publication独立撤权、原共享ho
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-19 | C.5本地功能验收，27／848、七静态门、十一反转13AssertionErrors／exact恢复6／138、buildecdb41348d63、Linuxcompiled13／34加sourcewarm2POST、Node20.3禁生成compiled13／34及安装15入口strict／12场景32POST通过；两独立限定APPROVE，旧广审无报告unavailable。配置模型auth零requests、默认judge容量not_proven；36／62、26开放，下一E.6typed内核事件与settlement，按批本地提交不push。 |
 | 2026-11-18 | 核实此前 30 个开放项，三个生产批次完成验收并本地提交。最终 35/62，下一批 C.5。基线和当前图均超出锁定容量，当前配置模型鉴权未完成。 |
 | 2026-11-17 | E.5／C.8最终25文件355项／七门／0monoliths、build89344ffebd35、UI三反转／串行4/29恢复和发现三反转／2/22恢复passed，两限定独立APPROVE及10hash匹配；当前npm15入口strict类型、实际async TS／签名安装共享host两模式、配置模型8actual发现请求passed。29/62功能验收；33任务及默认NormProof not_proven保留，继续E.1／E.3，不push。 |
 | 2026-11-17 | C.4／C.7当前21文件933项、六门、七有效反转exact恢复／恢复4/61、build0247cb1b526d与13源码独立APPROVE；Linux配置模型21实际请求／10轮、真实read保留／重开／显式pruning／实际compaction commit passed。27/62功能验收，35任务／NormProof容量缺口保留；模型恢复另批提交，继续E.5／C.8，不push。 |

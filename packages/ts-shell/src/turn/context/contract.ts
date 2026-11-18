@@ -173,6 +173,10 @@ export interface StepRequest extends StepTarget {
 
 /** One complete local request capture; publication and dispatch remain with their existing owners. */
 export interface PreparedTurnContext {
+  /** Requested preference remains available to summary consumers after protocol fallback. */
+  readonly cacheRetention: 'short' | 'long' | 'none';
+  readonly sessionId: string;
+  readonly cache: NonNullable<SentRequest['cache']>;
   /** Accept routing state before compaction or declaration publication changes branch ancestry. */
   readonly acceptRoute?: () => void;
   readonly target: StepTarget;

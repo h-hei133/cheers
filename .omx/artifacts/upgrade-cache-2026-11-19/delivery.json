@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-19",
+  "batch": [
+    "C.5"
+  ],
+  "status": "linux_functionally_accepted_repository_gate_not_proven",
+  "baseCommit": "988afcaf0a708f33db1784c7f455a617b5b96ecd",
+  "delivery": {
+    "localCommit": "containing Git commit supplies identity",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "ecdb41348d63372afdbb32a78e9fd81ca13b408f330bef51613658fcada09def",
+    "inputsDigest": "5769fc9ff7233e0c911535f6f8762a224964f01f1d2d0ed445a630c2b468c658",
+    "node": "24.15.0",
+    "schemaVersion": 3
+  },
+  "source": {
+    "files": 55,
+    "receipt": "evidence/source.json",
+    "sourceHashesMatch": true
+  },
+  "validation": {
+    "combined": {
+      "files": 27,
+      "passed": 848,
+      "failed": 0,
+      "receipt": "raw.tar.gz::evidence/joint-reviewed.log"
+    },
+    "static": {
+      "passed": true,
+      "count": 7,
+      "productionModules": 2709,
+      "monoliths": 0,
+      "receipt": "raw.tar.gz::evidence/build-final-reviewed.log"
+    },
+    "reversal": {
+      "cases": 11,
+      "assertionFailures": 13,
+      "exactlyRestored": true,
+      "mainSourceUnchanged": true,
+      "restoredFiles": 6,
+      "restoredPassed": 138,
+      "receipt": "evidence/reversal.json",
+      "redundantRenewalGuardControl": true
+    },
+    "linux": {
+      "compiledPassed": 13,
+      "compiledPosts": 34,
+      "sourceOwnerRefreshPosts": 2,
+      "receipt": "evidence/native-reviewed.json",
+      "sourceRefreshIsNotCompiledOwnerEvidence": true,
+      "privateStateRemoved": true,
+      "originalConfigUnchanged": true
+    },
+    "nodeFloor": {
+      "runtime": "20.3.0",
+      "codeGenerationDisabled": true,
+      "compiledPassed": 13,
+      "posts": 34,
+      "sourceOwnerRefresh": "not_run; TS loader harness rejected source import",
+      "receipt": "evidence/native-node20-reviewed.json"
+    },
+    "installed": {
+      "publicEntries": 15,
+      "strictTypes": true,
+      "engineStrict": true,
+      "nativePassed": 12,
+      "posts": 32,
+      "receipt": "evidence/package.json",
+      "privateStateRemoved": true
+    },
+    "scripts": {
+      "passed": 29,
+      "failed": 0,
+      "receipt": "raw.tar.gz::evidence/script-checks.log"
+    },
+    "configuredProvider": {
+      "status": "failed",
+      "failureClass": "provider-auth",
+      "requests": 0,
+      "receipt": "evidence/native-live-reviewed.json",
+      "realTtlMeasured": false,
+      "cacheSavingsMeasured": false
+    },
+    "normproof": {
+      "exit": 2,
+      "status": "not_proven",
+      "reason": "declared source graph exceeds pinned 16384 edge capacity",
+      "receipt": "raw.tar.gz::evidence/judge-final/verdict.json",
+      "pinnedBundleUnchanged": true
+    }
+  },
+  "review": {
+    "status": "APPROVE",
+    "receipt": "evidence/review.json",
+    "scopeLimited": true,
+    "earlierBroad": "unavailable"
+  },
+  "next": [
+    "E.6 typed kernel events and complete settlement",
+    "E.6 session lifecycle and event result consumers"
+  ],
+  "boundaries": [
+    "Linux only",
+    "no push or CI",
+    "no live TTL or savings evidence",
+    "default repository proof remains not_proven"
+  ],
+  "evidenceStorage": {
+    "archive": "raw.tar.gz",
+    "index": "evidence/raw-index.json",
+    "rawBytesPreserved": true,
+    "archivedPathsUseDoubleColon": true
+  }
+}

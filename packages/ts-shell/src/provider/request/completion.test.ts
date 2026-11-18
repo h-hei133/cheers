@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { requestSimpleCompletion } from "./completion.js";
-import { endpointShape } from "../endpoints/index.js";
+import { declareEndpoint, endpointShape } from "../endpoints/index.js";
 import { ModelAdmissionError } from '../../core/agent/request/model.js';
 import { BUILTIN_PROVIDERS } from '../../core/models/catalog.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
@@ -32,6 +32,78 @@ function capturingFetch(): {
 }
 
 describe("an out-of-band completion", () => {
+  it.each(['short', 'long', 'none'] as const)('carries %s cache preference and independent capabilities on the actual side request', async cacheRetention => {
+    const baseUrl = 'https://completion-cache.invalid/v1';
+    const catalog = [{ id: 'openai', label: 'Isolated completion', runtime: 'openai' as const, auth: 'api-key' as const,
+      endpoint: 'openai-compatible', baseUrl, models: [{ id: 'side', compat: { promptCacheKey: true,
+        supportsLongCacheRetention: true, supportsExplicitPromptCacheMode: true } }] }];
+    const { fetchImpl, requests } = capturingFetch();
+    expect(await requestSimpleCompletion({ provider: { headers: {}, baseUrl, model: 'side', endpoint: 'openai-compatible', fetchImpl },
+      sessionId: 'side-cache-session', cacheRetention, shape: resolveRequestShape(catalog, 'openai', 'side', undefined, baseUrl, 'openai-compatible'),
+      messages: [{ role: 'user', content: 'Side question' }] })).toBe('the answer');
+    const body = JSON.parse(String(requests[0]!.init.body));
+    if (cacheRetention === 'none') {
+      expect(body).not.toHaveProperty('prompt_cache_key');
+      expect(body).not.toHaveProperty('prompt_cache_options');
+    } else {
+      expect(body.prompt_cache_key).toEqual(expect.any(String));
+      if (cacheRetention === 'long') expect(body.prompt_cache_retention).toBe('24h');
+      else expect(body).not.toHaveProperty('prompt_cache_retention');
+    }
+  });
+
+  it.each(['long', 'none'] as const)('uses explicit Responses cache controls for a %s side request', async cacheRetention => {
+    const baseUrl = 'https://explicit-side.invalid/v1';
+    const catalog = [{ id: 'openai', label: 'Isolated responses', runtime: 'openai' as const, auth: 'api-key' as const,
+      endpoint: 'openai-responses', baseUrl, models: [{ id: 'side', compat: { promptCacheKey: true,
+        supportsLongCacheRetention: true, supportsExplicitPromptCacheMode: true } }] }];
+    const requests: Record<string, unknown>[] = [];
+    const answer = await requestSimpleCompletion({ sessionId: 'side-explicit-session', cacheRetention,
+      provider: { headers: {}, baseUrl, model: 'side', endpoint: 'openai-responses', fetchImpl: async (_url, init) => {
+        requests.push(JSON.parse(String(init?.body)));
+        return Response.json({ status: 'completed', output: [{ type: 'message', role: 'assistant', id: 'side-message',
+          content: [{ type: 'output_text', text: 'Side answer' }] }] });
+      } }, shape: resolveRequestShape(catalog, 'openai', 'side', undefined, baseUrl, 'openai-responses'),
+      messages: [{ role: 'user', content: 'Side question' }] });
+    expect(answer).toBe('Side answer');
+    expect(requests[0]!.prompt_cache_options).toEqual(cacheRetention === 'none' ? { mode: 'explicit' } : { ttl: '30m' });
+    if (cacheRetention === 'none') expect(requests[0]).not.toHaveProperty('prompt_cache_key');
+    else expect(requests[0]!.prompt_cache_key).toEqual(expect.any(String));
+    expect(requests[0]).not.toHaveProperty('prompt_cache_retention');
+  });
+
+  it.each(['short', 'none'] as const)('uses endpoint-owned Mistral affinity headers for a %s side request', async cacheRetention => {
+    const { fetchImpl, requests } = capturingFetch();
+    await requestSimpleCompletion({ provider: { headers: { authorization: 'Bearer synthetic-side' },
+      baseUrl: 'https://mistral-side.invalid/v1', model: 'side', endpoint: 'mistral-chat-completions', fetchImpl },
+      sessionId: 'side-session', cacheRetention, messages: [{ role: 'user', content: 'Side question' }] });
+    const headers = new Headers(requests[0]!.init.headers);
+    expect(headers.get('authorization')).toBe('Bearer synthetic-side');
+    expect(headers.get('x-affinity')).toBe(cacheRetention === 'none' ? null : 'side-session');
+    const body = JSON.parse(String(requests[0]!.init.body));
+    if (cacheRetention === 'none') expect(body).not.toHaveProperty('prompt_cache_key');
+    else expect(body.prompt_cache_key).toBe('side-session');
+  });
+
+  it('captures side request cache metadata before asynchronous image normalization and calls the endpoint header owner once', async () => {
+    const endpoint = 'captured-side-cache-fixture';
+    const requestHeaders = vi.fn((input: { sessionId?: string; cacheRetention?: string }) =>
+      input.cacheRetention === 'none' ? {} : { 'x-captured-session': input.sessionId! });
+    declareEndpoint(endpoint, { ...endpointShape('openai-compatible'), requestHeaders });
+    const { fetchImpl, requests } = capturingFetch();
+    const request = { provider: { headers: {}, baseUrl: 'https://captured-side.invalid/v1', model: 'side', endpoint, fetchImpl },
+      sessionId: 'captured-side-session', cacheRetention: 'long' as 'short' | 'long' | 'none',
+      shape: { ...resolveRequestShape([], 'openai', 'side'), promptCacheKey: true, supportsLongCacheRetention: true },
+      messages: [{ role: 'user' as const, content: 'Side question' }] };
+    const pending = requestSimpleCompletion(request);
+    request.cacheRetention = 'none'; request.sessionId = 'successor-side-session'; request.shape.promptCacheKey = false;
+    request.provider.baseUrl = 'https://successor-side.invalid/v1'; request.provider.model = 'successor-model';
+    await pending;
+    expect(requestHeaders).toHaveBeenCalledOnce();
+    expect(new Headers(requests[0]!.init.headers).get('x-captured-session')).toBe('captured-side-session');
+    expect(requests[0]!.url).toBe('https://captured-side.invalid/v1/chat/completions');
+    expect(JSON.parse(String(requests[0]!.init.body))).toMatchObject({ model: 'side', prompt_cache_key: expect.any(String), prompt_cache_retention: '24h' });
+  });
   it('carries native summary-only shape through the simple request without inventing effort', async () => {
     let body: Record<string, unknown> | undefined;
     const answer = await requestSimpleCompletion({ provider: { headers: {}, providerId: 'openai',

@@ -23,7 +23,7 @@
 import type { CatalogModel, CatalogProvider, ModelRequestShape, ThinkingLevel } from "./catalog.js";
 import { THINKING_LEVELS, catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint } from "./catalog.js";
 import { modelInputModalities, modelSupportsVision, type ModelInputLimits, type ModelInputModality } from "./modalities.js";
-import { summaryProtocol } from './protocol.js';
+import { nativeCacheAddress, summaryProtocol } from './protocol.js';
 
 /** What a request needs to know, with every choice already decided. */
 export interface ResolvedRequestShape {
@@ -106,6 +106,8 @@ export interface ResolvedRequestShape {
   readonly thinkingBudgetMaximum?: boolean;
   /** Whether OpenAI-style `prompt_cache_key` may be sent when a session id is available. */
   readonly promptCacheKey?: boolean;
+  readonly supportsLongCacheRetention?: boolean;
+  readonly supportsExplicitPromptCacheMode?: boolean;
   /** Whether this model preserves prompt cache across mid-conversation tool changes (`tool_addition`/`tool_removal`). */
   readonly supportsMidConvoToolChanges?: boolean;
   /** Whether this model preserves prompt cache across mid-conversation effort markers. */
@@ -180,6 +182,9 @@ export function resolveRequestShape(
   const reasoningSummary = entry.reasoning === false || compat.reasoningSummary === false ? false
     : compat.reasoningSummary === true && summaryProtocol(owner, catalogBaseUrl(catalog, provider, baseUrl), wire) ? true : undefined;
   const address = catalogBaseUrl(catalog, provider, baseUrl);
+  const cacheOwner = address !== undefined && owner?.baseUrl !== undefined
+    && owner.baseUrl.replace(/\/+$/, '') === address.replace(/\/+$/, '');
+  const nativeCache = nativeCacheAddress(address, wire === 'anthropic-messages' ? 'anthropic' : 'openai');
   const reasoningReplayField = provider && address && owner?.baseUrl
     && owner.baseUrl.replace(/\/+$/, '') === address.replace(/\/+$/, '')
     && owner.models.some(candidate => candidate === entry)
@@ -199,7 +204,9 @@ export function resolveRequestShape(
     assistantAfterToolResult: compat.assistantAfterToolResult === true,
     allowEmptySignature: compat.allowEmptySignature === true,
     supportsTemperature: compat.supportsTemperature !== false,
-    ...(compat.promptCacheKey !== undefined ? { promptCacheKey: compat.promptCacheKey } : {}),
+    promptCacheKey: cacheOwner && (compat.promptCacheKey === undefined ? nativeCache : compat.promptCacheKey === true),
+    supportsLongCacheRetention: cacheOwner && (compat.supportsLongCacheRetention === undefined ? nativeCache : compat.supportsLongCacheRetention === true),
+    supportsExplicitPromptCacheMode: cacheOwner && compat.supportsExplicitPromptCacheMode === true,
     ...(compat.supportsMidConvoToolChanges === true && compat.supportsMidConvoSystemMessages !== false ? { supportsMidConvoToolChanges: true } : {}),
     ...(compat.supportsMidConvoEffort === true && compat.supportsMidConvoSystemMessages !== false ? { supportsMidConvoEffort: true } : {}),
     vision: modelSupportsVision(entry),

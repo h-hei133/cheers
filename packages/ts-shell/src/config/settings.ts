@@ -31,6 +31,7 @@ const descriptions = {
   modelTokenBudgets: ['Context', 'Model token budgets', 'JSON object mapping provider/model identifiers to reserveTokens and keepRecentTokens'],
   instructionBudgetBytes: ['Context', 'Instruction bytes', 'Project instruction byte budget; 0 disables loading'],
   cacheWarming: ['Session', 'Cache warming', 'Idle warming can incur charges without a new prompt'],
+  cacheRetention: ['Context', 'Cache retention', 'Prompt-cache preference; long retention depends on the endpoint and may cost more'],
   agentMode: ['Session', 'Default agent mode', 'Initial mode preference; explicit session mode selection takes precedence'],
   steeringMode: ['Session', 'Steering delivery', 'Deliver queued steering messages one at a time or together'],
   followUpMode: ['Session', 'Follow-up delivery', 'Deliver queued follow-up messages one at a time or together'],
@@ -72,6 +73,7 @@ export const CONFIG_SETTINGS: readonly SettingDefinition[] = Object.entries(desc
 }).sort((left, right) => left.group.localeCompare(right.group));
 
 function settingNavigation(key: string, group: string): { group: string; section: string } {
+  if (key === 'cacheRetention') return { group: 'Context', section: 'Cache' };
   if (key === 'theme') return { group: 'Appearance', section: 'Theme' };
   if (key.startsWith('tui.') || key === 'tuiMode') return { group: 'Appearance', section: key.includes('status') ? 'Status line' : key.includes('composer') ? 'Composer' : 'Display' };
   if (key === 'vimMode') return { group: 'Interaction', section: 'Input' };

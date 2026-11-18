@@ -1,0 +1,174 @@
+{
+  "status": "passed",
+  "reversals": [
+    {
+      "name": "foreground-preference",
+      "file": "cli/provider/step.ts",
+      "exit": 1,
+      "assertionFailures": 1,
+      "beforeSha256": "79b5b82a6f31872fa758c0e1f7aef52c6f4eadb63cb751230b8e82660addab11",
+      "reversedSha256": "cf748dcdb210595eb08e8113c79cdf326c13e6ae9f753c87db6f6eff45c8ece9",
+      "log": "reversal-foreground-preference.log",
+      "logSha256": "9a06a128fee35132e05c35f5da04a7f943ebec85213fb0470a32c2f44415e136"
+    },
+    {
+      "name": "long-capability",
+      "file": "provider/cache/protocol.ts",
+      "exit": 1,
+      "assertionFailures": 3,
+      "beforeSha256": "019ae057e3adab818ce3864da3aeb62e61a52825ca0c202b9de21520b1c8e4e8",
+      "reversedSha256": "d15d7fb3fe695a6428997b95a8cdbf7c4d3de0f1dcba8f5eeb0d064edf078246",
+      "log": "reversal-long-capability.log",
+      "logSha256": "6dbd231d5b1d80b5b7797af3c149cead5a3c4b5d6ccc998f6dc5a2a8b81ad4dc"
+    },
+    {
+      "name": "responses-vocabulary",
+      "file": "provider/cache/protocol.ts",
+      "exit": 1,
+      "assertionFailures": 1,
+      "beforeSha256": "019ae057e3adab818ce3864da3aeb62e61a52825ca0c202b9de21520b1c8e4e8",
+      "reversedSha256": "a6a49b509973940b93320235a4600cd1711c8b52db47f9cc65c550e7ed89d842",
+      "log": "reversal-responses-vocabulary.log",
+      "logSha256": "a80671e5c036db51bc4b1e1a111035088b8c79ba4648386386d8ea694d833748"
+    },
+    {
+      "name": "captured-window",
+      "file": "turn/cacheWarm.ts",
+      "exit": 1,
+      "assertionFailures": 1,
+      "beforeSha256": "44294d63a39b889ec378078300f7836e351607c26226b999114f13fc36ad0438",
+      "reversedSha256": "de5e01ff9865aed9e2d48f8c25428a4e9d5d5e7a4e6aae06d891ea2e38deeedb",
+      "log": "reversal-captured-window.log",
+      "logSha256": "98098f7f074cc02c2b0b69722167942f179704109c73b84159143f0e24381680"
+    },
+    {
+      "name": "send-time-anchor",
+      "file": "turn/cacheWarm.ts",
+      "exit": 1,
+      "assertionFailures": 1,
+      "beforeSha256": "44294d63a39b889ec378078300f7836e351607c26226b999114f13fc36ad0438",
+      "reversedSha256": "35ea207a29caf89fa88554c692895ac33dc3665f11b88738e46d431a56346a29",
+      "log": "reversal-send-time-anchor.log",
+      "logSha256": "ac7723e9ddc9ac63f56b10a14481b8b5847e446e5164b06b6f3d346346715078"
+    },
+    {
+      "name": "summary-preference",
+      "file": "core/query/compaction/summarize.ts",
+      "exit": 1,
+      "assertionFailures": 1,
+      "beforeSha256": "089b30a1e9a66fe5f4b238d953ef936b2aab23b82ab015fde9f2984f804fe08c",
+      "reversedSha256": "2436abeb2b3f4a42b1ec77cd4f8341289eb5067c6e1ecd8f569b48d088032ffc",
+      "log": "reversal-summary-preference.log",
+      "logSha256": "76071e6ed47313a397ad7598bde0931ca8923eb2ad09996845bc9e0e547c75e6"
+    },
+    {
+      "name": "transport-deadline",
+      "file": "provider/request/sentRequest.ts",
+      "exit": 1,
+      "assertionFailures": 1,
+      "beforeSha256": "87763356f7c3b7f908c89787ce133dabe17510c1db11f71c73ce3dda425b319e",
+      "reversedSha256": "dbfb44bed6f4c2ef0b70ad92674ea5f7b79734fbe800bb87059d15605a6863b7",
+      "log": "reversal-transport-deadline.log",
+      "logSha256": "5cacc6075503b9a73e4eb35d4b79f08b6ddc93f5998e7fea12bb78a7ded81325"
+    },
+    {
+      "name": "source-handoff",
+      "file": "provider/request/sentRequest.ts",
+      "exit": 1,
+      "assertionFailures": 1,
+      "beforeSha256": "87763356f7c3b7f908c89787ce133dabe17510c1db11f71c73ce3dda425b319e",
+      "reversedSha256": "2a2eec1b81976ee4706dcafc10545c3b7946687639f533d3bc8a64606d239ae2",
+      "log": "reversal-source-handoff.log",
+      "logSha256": "5a57385ad25a03727116a2de3a8cea43a893d672ff7066233961d95d19fe675e"
+    },
+    {
+      "name": "phase-deadline",
+      "file": "turn/cacheWarm.ts",
+      "exit": 1,
+      "assertionFailures": 1,
+      "beforeSha256": "44294d63a39b889ec378078300f7836e351607c26226b999114f13fc36ad0438",
+      "reversedSha256": "f8ee2fbfa9656cb6447d1b40ed957f061e05e3e10d549236691b21236a2e2f94",
+      "log": "reversal-phase-deadline.log",
+      "logSha256": "79796e161de94a1daacf6db78b5461c046ccd54dc57e2dceb409324ff208e8ec"
+    },
+    {
+      "name": "gateway-window",
+      "file": "provider/cache/window.ts",
+      "exit": 1,
+      "assertionFailures": 1,
+      "beforeSha256": "80401ba65d24639670961fb8269b40c442126f3007c7b126173c5c0bcd406f46",
+      "reversedSha256": "393328ec9b04c3ab91de3c6aead79147c4ae82ac485bee1297b7273f02c0e128",
+      "log": "reversal-gateway-window.log",
+      "logSha256": "8dc656b9b2345d759f3cf7e39a9ae3e005dd4dcf580e58246720231106cb0713"
+    },
+    {
+      "name": "short-window-cap",
+      "file": "provider/cache/window.ts",
+      "exit": 1,
+      "assertionFailures": 1,
+      "beforeSha256": "80401ba65d24639670961fb8269b40c442126f3007c7b126173c5c0bcd406f46",
+      "reversedSha256": "966ad65fca9ac09e493f7bc5a832332d8d04a2c6a18e92b44e414e31d541d5c2",
+      "log": "reversal-short-window-cap.log",
+      "logSha256": "0a4fce9536c49a71edff245f836c07c4b1c596e5019943d76f93695d6ec7829f"
+    }
+  ],
+  "restored": [
+    {
+      "name": "foreground-preference",
+      "exact": true
+    },
+    {
+      "name": "long-capability",
+      "exact": true
+    },
+    {
+      "name": "responses-vocabulary",
+      "exact": true
+    },
+    {
+      "name": "captured-window",
+      "exact": true
+    },
+    {
+      "name": "send-time-anchor",
+      "exact": true
+    },
+    {
+      "name": "summary-preference",
+      "exact": true
+    },
+    {
+      "name": "transport-deadline",
+      "exact": true
+    },
+    {
+      "name": "source-handoff",
+      "exact": true
+    },
+    {
+      "name": "phase-deadline",
+      "exact": true
+    },
+    {
+      "name": "gateway-window",
+      "exact": true
+    },
+    {
+      "name": "short-window-cap",
+      "exact": true
+    }
+  ],
+  "mainSourceUnchanged": true,
+  "defenseControl": {
+    "name": "renewal-deadline",
+    "reversedGuardStillBlockedByFinalTransport": true,
+    "receipt": "reversal-redundant-guard-control.json",
+    "log": "reversal-renewal-deadline.log"
+  },
+  "restoredTests": {
+    "exit": 0,
+    "log": "restored.log",
+    "logSha256": "ff2e24c9918c96ea5216d17eea6969e53fe4b58a06357301418b3357d9a2361c"
+  },
+  "privateTreeRemoved": true
+}

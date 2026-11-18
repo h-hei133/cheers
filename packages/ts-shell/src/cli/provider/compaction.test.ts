@@ -44,6 +44,16 @@ function fixture() {
     providers: createCompactionProviders({ runtimeContext, renderer }) };
 }
 
+it('keeps fallback summary cache retention on the captured configuration instead of a later publication', () => {
+  const test = fixture();
+  const config = { ...test.config, cacheRetention: 'long' as const };
+  const current = test.configuration.current;
+  expect(test.configuration.publish(test.configuration.begin(test.binding), { ...current.config, cacheRetention: 'none' }, test.binding).status).toBe('applied');
+  const captured = test.providers.provider(main, catalog, config)!;
+  expect(captured).toMatchObject({ sessionId: setup.session.id, cacheRetention: 'long' });
+  expect(test.providers.provider(main, catalog)).toMatchObject({ cacheRetention: 'none' });
+});
+
 it('keeps connection owners isolated and resets only the captured session lifetime', async () => {
   const first = fixture();
   const second = fixture();

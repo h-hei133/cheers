@@ -190,7 +190,10 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     ?? requestReplayBinding({ provider: resolution.provider, endpoint, baseUrl: base });
   const body = endpointTurnBody(endpoint, { model: resolution.model, provider: resolution.provider,
     sessionId: expected.id, ...(base ? { baseUrl: base } : {}),
+    cacheRetention: config.cacheRetention ?? 'short',
     ...(shape.promptCacheKey !== undefined ? { supportsPromptCacheKey: shape.promptCacheKey } : {}),
+    ...(shape.supportsLongCacheRetention !== undefined ? { supportsLongCacheRetention: shape.supportsLongCacheRetention } : {}),
+    ...(shape.supportsExplicitPromptCacheMode !== undefined ? { supportsExplicitPromptCacheMode: shape.supportsExplicitPromptCacheMode } : {}),
     replayBinding,
     systemPrompt, messages: wireMessages,
     tools: schemas, allowTools, vision: shape.vision, temperature: config.temperature ?? 0.7,

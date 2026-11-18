@@ -60,6 +60,8 @@ export async function runBtwCommand(
   if (blocked) return { kind: "local", output: blocked };
   const publication = context.readConfiguration?.();
   const runtimeConfig = publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+  const sessionId = context.sessionId;
+  const cacheRetention = runtimeConfig.cacheRetention ?? 'short';
   const resolution = context.resolveConfigTarget?.(runtimeConfig, context.sessionId)
     ?? resolveProviderCredential({ runtimeConfig, ...(context.sessionId ? { pool: { sessionId: context.sessionId } } : {}) });
   const credential = resolution.credential;
@@ -91,7 +93,7 @@ export async function runBtwCommand(
     try {
       answer =
         (await requestSimpleCompletion({
-          shape,
+          shape, sessionId, cacheRetention,
           onUsage: usage => {
             if (!hasUsage(usage)) return;
             const record = { ...usageFromProvider(usage, usageInput, !attribution.costSchedule), provider: resolution.provider, model, attribution };

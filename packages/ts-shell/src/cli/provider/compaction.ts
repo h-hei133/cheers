@@ -93,7 +93,7 @@ export function createCompactionProviders(input: {
     }
     if (config?.sessionModelRoles?.summary) {
       try {
-        captureSummaryRole({ config, catalog, workspaceRoot: input.runtimeContext.projectRoot });
+        captureSummaryRole({ config, catalog, workspaceRoot: input.runtimeContext.projectRoot, sessionId: input.runtimeContext.session.id });
       } catch {
         return { available: false, reason: 'The configured summary model is unavailable for compaction.' };
       }
@@ -102,7 +102,8 @@ export function createCompactionProviders(input: {
   };
 
   /** The provider the turn's own compaction summarizes with. */
-  const compactionProvider = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[]): CompactionProvider | undefined => {
+  const compactionProvider = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[],
+    config: RuntimeConfig = input.runtimeContext.configuration.current.config): CompactionProvider | undefined => {
     const target = compactionTarget(resolved, catalog);
     if (!target) return undefined;
     // Resolved from the catalogue the way the turn resolves it, so a model
@@ -118,6 +119,8 @@ export function createCompactionProviders(input: {
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
+      sessionId: input.runtimeContext.session.id,
+      cacheRetention: config.cacheRetention ?? 'short',
       replayBinding: requestTarget.replayBinding,
       ...(target.endpoint ? { endpoint: target.endpoint } : {}),
       ...(requestTarget.credentialId ? { credentialId: requestTarget.credentialId,
@@ -135,6 +138,8 @@ export function createCompactionProviders(input: {
     if (!selected.available) return { failure: selected.reason };
     const target = selected.target;
     const serviceTier = requestServiceTier(config, resolved, catalog, target.baseUrl, target.endpoint);
+    const cacheRetention = config.cacheRetention ?? 'short';
+    const sessionId = input.runtimeContext.session.id;
     const renewed = await renewStoredAccount({
       workspaceRoot: input.runtimeContext.projectRoot,
       sessionId: input.runtimeContext.session.id,
@@ -159,6 +164,7 @@ export function createCompactionProviders(input: {
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
+      sessionId, cacheRetention,
       replayBinding: requestTarget.replayBinding,
       serviceTier,
       shape,

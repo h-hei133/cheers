@@ -102,6 +102,8 @@ interface CompactionInput {
     readonly credentialGeneration?: string;
     readonly replayBinding?: string;
     readonly serviceTier?: string;
+    readonly sessionId?: string;
+    readonly cacheRetention?: 'short' | 'long' | 'none';
   };
   readonly runtimeConfig: RuntimeConfig;
   /** Captured request identity, including its credential namespace. Never reselect here. */
@@ -122,14 +124,14 @@ interface CompactionInput {
 /** Manual and automatic summaries share policy construction and one explicit role renewal. */
 export function buildCompactionWiring(input: CompactionInput): CompactionWiring {
   const summaryRole = captureSummaryRole({ config: input.runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
-    admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
+    sessionId: input.sessionId, admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
   return compactionWiring(input, summaryRole);
 }
 
 /** Logical selections have no physical budget or summarizer until a request is routed. */
 export function routedCompactionWiring(input: Omit<CompactionInput, 'provider' | 'resolution'>): CompactionWiring {
   const summaryRole = captureSummaryRole({ config: input.runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
-    admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
+    sessionId: input.sessionId, admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
   const unavailable = async (): Promise<never> => { throw new Error('Compaction requires a captured physical request.'); };
   return { policy: { enabled: input.runtimeConfig.compactionEnabled, contextWindow: 0 },
     summarize: unavailable, summarizeTurnPrefix: unavailable,
@@ -147,6 +149,8 @@ function compactionWiring(input: CompactionInput, summaryRole: ReturnType<typeof
   const usageFor = sessionUsageRecorder(input.sessionId);
   if (catalogProvider(input.catalog, provider.providerId, provider.baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before compacting.');
   const runtimeConfig = input.runtimeConfig;
+  const sessionId = prepared?.sessionId ?? provider.sessionId ?? input.sessionId;
+  const cacheRetention = prepared?.cacheRetention ?? provider.cacheRetention ?? runtimeConfig.cacheRetention ?? 'short';
   const serviceTier = summaryRole ? undefined : prepared ? provider.serviceTier : requestServiceTier(runtimeConfig,
     input.resolution ?? { provider: provider.providerId, model: provider.model }, input.catalog, provider.baseUrl, provider.endpoint);
   const prepare = async (request: Omit<CompactionRequest, 'provider' | 'fetchImpl' | 'messages'> & { readonly messages: readonly AgentMessage[] }) => {
@@ -155,7 +159,7 @@ function compactionWiring(input: CompactionInput, summaryRole: ReturnType<typeof
     request.signal?.throwIfAborted();
     assertAdmission(input.admission);
     const summaryProvider = summaryRole ? await summaryRole.resolve(() => { request.signal?.throwIfAborted(); return input.admission?.(); })
-      : { ...provider, ...effectiveLimits, serviceTier };
+      : { ...provider, ...effectiveLimits, serviceTier, sessionId, cacheRetention };
     request.signal?.throwIfAborted();
     const blocked = input.admission?.();
     if (blocked) throw new Error(blocked);
@@ -226,7 +230,7 @@ function compactionWiring(input: CompactionInput, summaryRole: ReturnType<typeof
       enabled: runtimeConfig.compactionEnabled,
       summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([
         provider.providerId, provider.model, provider.baseUrl, provider.endpoint, provider.credentialId,
-        provider.credentialGeneration, provider.replayBinding, effectiveLimits, serviceTier,
+        provider.credentialGeneration, provider.replayBinding, effectiveLimits, serviceTier, sessionId, cacheRetention,
       ])).digest('hex'),
       segmentTokens: summaryRole?.segmentTokens ?? fallbackBudget.segmentTokens,
       mergeTokens: summaryRole?.mergeTokens ?? fallbackBudget.mergeTokens,

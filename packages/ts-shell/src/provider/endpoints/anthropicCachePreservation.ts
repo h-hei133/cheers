@@ -1,5 +1,5 @@
 import type { ToolSchema } from "../../turn/tools.js";
-import type { TurnRequest } from "./kinds.js";
+import type { SimpleRequest, TurnRequest } from "./kinds.js";
 import { projectRequestDeclarations, toolChangeBlocks, topLevelTools, type DeclarationInput, type NativeSystemMessage } from './anthropic/declarations.js';
 export { DEFERRED_TOOL_PLACEHOLDER } from './anthropic/declarations.js';
 
@@ -8,11 +8,9 @@ const THINKING_BINDING_CONTROLS_BETA = "thinking-binding-controls-2026-08-01";
 const INLINE_TOOLS_BETA = "inline-tools-2026-09-15";
 
 export function anthropicBetaHeaders(
-  input: Pick<
-    TurnRequest,
-    "allowTools" | "tools" | "initialTools" | "supportsMidConvoToolChanges" | "supportsMidConvoEffort" | "thinkingLevelName"
-  > & Pick<DeclarationInput, 'messages' | 'declarationTarget'>,
+  input: SimpleRequest | TurnRequest,
 ): Record<string, string> {
+  if (!('tools' in input)) return {};
   const declarations = projectRequestDeclarations(input);
   const betas: string[] = [];
   if (declarations ? declarations.nativeEffort : input.supportsMidConvoEffort && input.thinkingLevelName !== undefined) {

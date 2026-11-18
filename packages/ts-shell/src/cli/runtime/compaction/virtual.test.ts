@@ -42,6 +42,7 @@ async function fixture(explicit = false, dormant = true, input: {
   readonly physical?: Partial<CatalogModel>;
   readonly converter?: MessageConverter;
   readonly endpoint?: EndpointKind;
+  readonly cacheRetention?: 'short' | 'long' | 'none';
 } = {}) {
   const setup = createAdvisorHarness(false, false);
   const requests: Array<{ authorization?: string; body: Record<string, unknown> }> = [];
@@ -60,7 +61,7 @@ async function fixture(explicit = false, dormant = true, input: {
       createdAt: '2026-11-15', updatedAt: '2026-11-15' }] : [],
     activeProviderConnectionId: undefined, sessionConnection: undefined, accountPool: undefined, configScopes: undefined,
     allowedModels: undefined, contextWindow: undefined, maxOutputTokens: 64, reserveTokens: 0, keepRecentTokens: 100,
-    retryEnabled: false, cacheWarming: 'on' as const,
+    retryEnabled: false, cacheWarming: 'on' as const, cacheRetention: input.cacheRetention ?? 'short',
     providerCredentials: {
       openai: { ...(dormant ? {} : { apiKey: 'synthetic-dormant' }), model: 'dormant', baseUrl },
       anthropic: { apiKey: 'synthetic-route', model: 'physical', baseUrl },
@@ -109,6 +110,17 @@ it.each(['manual', 'branch'] as const)('routes %s summaries once without reading
   expect(test.requests.length).toBeGreaterThan(0);
   expect(test.requests.every(request => request.body.model === 'physical' && request.authorization === 'Bearer synthetic-route')).toBe(true);
   expect(test.requests.every(request => request.body.max_tokens === 512)).toBe(true);
+});
+
+it.each(['manual', 'branch'] as const)('carries long cache retention through the actual direct %s virtual summary', async kind => {
+  const test = await fixture(false, true, { cacheRetention: 'long',
+    physical: { compat: { promptCacheKey: true, supportsLongCacheRetention: true } } });
+  if (kind === 'manual') expect(await test.deps.compactHistory!(test.session.id, test.signal)).toMatchObject({ status: 'compacted' });
+  else expect(await test.deps.summarizeAbandonedTurns!(test.manager.getSession(test.session.id)!.turns, test.signal)).toContain('Condensed routed history.');
+  expect(test.requests.length).toBeGreaterThan(0);
+  for (const request of test.requests) expect(request.body).toMatchObject({ model: 'physical', prompt_cache_key: expect.any(String), prompt_cache_retention: '24h' });
+  expect(test.route).toHaveBeenCalledOnce();
+  expect(test.store().initial[test.key]).toBe('7');
 });
 
 it.each(['manual', 'branch'] as const)('keeps an explicit summary role for %s with dormant credentials unavailable', async kind => {

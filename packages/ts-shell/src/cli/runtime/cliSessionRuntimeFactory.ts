@@ -211,7 +211,7 @@ export function createCliSessionRuntime(input: {
       const admission = operation.admission;
       const virtualModel = readLogicalModel(input.runtimeContext.session.id);
       const role = captureSummaryRole({ config, catalog, workspaceRoot: input.runtimeContext.projectRoot, admission,
-        onCredentialPersisted: providers.publication });
+        sessionId: input.runtimeContext.session.id, onCredentialPersisted: providers.publication });
       const selected: Promise<{ readonly provider?: import('./compaction.js').CompactionProvider;
         readonly target?: StepTarget; readonly admission?: Admission }> = role
         ? role.resolve().then(provider => ({ provider: { ...provider, providerId: provider.providerId ?? '' } })) : virtualModel

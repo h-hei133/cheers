@@ -268,6 +268,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             usageInput: prepared.usageInput ?? null,
             ...(target.provider.credentialId && target.provider.credentialGeneration
               ? { credential: { credentialId: target.provider.credentialId, generation: target.provider.credentialGeneration } } : {}) });
+          let sentAt: number | undefined;
           const attemptResponse = await modelAttempt.send(
             prepared.url,
             {
@@ -299,6 +300,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
                 requestSignal.throwIfAborted();
                 if (!prepared.isCurrent()) throw new TurnPreparationError('Request preparation changed before dispatch. No request was sent.', true);
                 beforeDispatch();
+                sentAt = Date.now();
                 dispatchedOrigin = activeOrigin;
               };
               if (target.modelTransport) {
@@ -317,6 +319,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
             response = attemptResponse;
             responseAttempt = modelAttempt;
             options.onRequestSent?.({
+              sentAt,
+              cache: prepared.cache,
               promptIdentity,
               context: requestContext({ body, endpoint, fields: protocol.contextFields,
                 provider: activeProvider, model: activeModel,

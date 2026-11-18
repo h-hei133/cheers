@@ -30,13 +30,15 @@ export function cacheRefreshFor(input: {
   return {
     isCurrent: input.isCurrent,
     canRefresh,
-    refresh: async (sent, signal) => {
-      if (signal.aborted || !input.isCurrent() || !canRefresh(sent)) return;
+    refresh: async (sent, signal, deadline) => {
+      if (signal.aborted || !input.isCurrent() || !canRefresh(sent) || (deadline !== undefined && Date.now() > deadline)) return;
       const renewed = await input.renewHeaders();
-      if (!renewed || signal.aborted || !input.isCurrent()) return;
+      if (!renewed || signal.aborted || !input.isCurrent() || (deadline !== undefined && Date.now() > deadline)) return;
       return sendSentRequest({ ...sent, headers: renewed }, signal, fetchImpl, {
         policy: input.requestPolicy, provider: provider!.providerId, model: provider!.model,
         onUsage,
+        deadline,
+        isCurrent: input.isCurrent,
         ...(input.credential ? { credential: input.credential } : {}),
         transport: providerModelTransport(input.runtimeConfig, provider!.endpoint, input.admission),
       });

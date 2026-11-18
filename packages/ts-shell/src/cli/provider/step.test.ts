@@ -81,6 +81,27 @@ function ordinaryTurn(setup: ReturnType<typeof createAdvisorHarness>, server: Aw
   return { messages, finished: (async () => { for await (const _event of turn.events) { /* consume actual native turn */ } })() };
 }
 
+it('captures configured cache retention before foreground dispatch and preserves explicit request precedence', async () => {
+  const setup = createAdvisorHarness(false, false);
+  const server = await wire(setup);
+  const providerCatalog = server.request.providerCatalog!.map(provider => ({ ...provider,
+    models: provider.models.map(model => ({ ...model,
+      compat: { promptCacheKey: true, supportsLongCacheRetention: true } })) }));
+  const runtimeConfig = { ...server.request.runtimeConfig!, reserveTokens: 0, cacheRetention: 'long' as 'short' | 'long' | 'none' };
+  const captured = createProviderStep({ ...server.request, providerCatalog, runtimeConfig }, new Map(), {});
+  runtimeConfig.cacheRetention = 'none';
+  await captured([{ role: 'user', content: 'Keep the captured preference' }], setup.signal, {}, { allowTools: true });
+  await createProviderStep({ ...server.request, providerCatalog, runtimeConfig }, new Map(), {})(
+    [{ role: 'user', content: 'Disable request caching' }], setup.signal, {}, { allowTools: true });
+  await createProviderStep({ ...server.request, providerCatalog, runtimeConfig: { ...runtimeConfig, cacheRetention: 'long' },
+    cacheRetention: 'short' }, new Map(), {})([{ role: 'user', content: 'Use explicit short preference' }], setup.signal, {}, { allowTools: true });
+  expect(server.received[0]).toMatchObject({ prompt_cache_key: expect.any(String), prompt_cache_retention: '24h' });
+  expect(server.received[1]).not.toHaveProperty('prompt_cache_key');
+  expect(server.received[1]).not.toHaveProperty('prompt_cache_retention');
+  expect(server.received[2]).toHaveProperty('prompt_cache_key');
+  expect(server.received[2]).not.toHaveProperty('prompt_cache_retention');
+});
+
 it('forwards configured tool-text retention through the provider host to the outgoing request', async () => {
   const setup = createAdvisorHarness(false, false);
   const server = await wire(setup);

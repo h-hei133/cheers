@@ -7,6 +7,17 @@ interface ProtocolOwner {
   }[];
 }
 
+/** Automatic cache controls require the service's exact HTTPS origin and API root. */
+export function nativeCacheAddress(address: string | undefined, provider: 'openai' | 'anthropic'): boolean {
+  if (!address) return false;
+  try {
+    const url = new URL(address);
+    return url.protocol === 'https:' && url.hostname === (provider === 'openai' ? 'api.openai.com' : 'api.anthropic.com')
+      && !url.port && !url.username && !url.password && !url.search && !url.hash
+      && url.pathname.replace(/\/+$/, '') === '/v1';
+  } catch { return false; }
+}
+
 /** Protocol ownership is independent of whether a model accepts effort settings. */
 export function nativeOpenAIResponses(entry: ProtocolOwner | undefined, address: string | undefined, model: string | undefined): boolean {
   return entry?.id === 'openai' && entry.runtime === 'openai'

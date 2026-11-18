@@ -31,6 +31,40 @@ beforeEach(() => {
 });
 afterEach(() => { cleanupAdvisorHarnesses(); vi.clearAllMocks(); vi.useRealTimers(); });
 
+it.each(['long', 'none'] as const)('applies the captured %s cache preference to a real side-command HTTP request', async cacheRetention => {
+  const setup = createAdvisorHarness(false, false);
+  const requests: { body: Record<string, unknown>; affinity?: string }[] = [];
+  const server = http.createServer(async (request, response) => {
+    const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    requests.push({ body: JSON.parse(Buffer.concat(chunks).toString('utf8')), affinity: request.headers['x-affinity'] as string | undefined });
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ choices: [{ message: { content: 'Side answer' }, finish_reason: 'stop' }] }));
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`;
+    const runtimeConfig = { cacheRetention } as never;
+    const catalog: CatalogProvider[] = [{ id: 'fixture', label: 'Side fixture', runtime: 'openai-compatible', auth: 'api-key', baseUrl,
+      endpoint: 'openai-compatible', models: [{ id: 'm', compat: { promptCacheKey: true,
+        supportsLongCacheRetention: true, supportsExplicitPromptCacheMode: true } }] }];
+    vi.mocked(resolveProviderCredential).mockReturnValue({ provider: 'fixture', model: 'm', baseUrl,
+      credential: { apiKey: 'synthetic-side-cache' } } as never);
+    vi.mocked(loadCatalog).mockReturnValue(catalog);
+    vi.mocked(providerFetchForEndpoint).mockReturnValue(fetch);
+    const before = structuredClone(setup.manager.getSession(setup.session.id)!.turns);
+    const result = await runBtwCommand(['question'], { cwd: setup.root, projectRoot: setup.root, sessionId: setup.session.id, runtimeConfig });
+    expect(result.output).toContain('Side answer');
+    expect(requests).toHaveLength(1);
+    if (cacheRetention === 'none') {
+      expect(requests[0]!.body).not.toHaveProperty('prompt_cache_key');
+      expect(requests[0]!.body).not.toHaveProperty('prompt_cache_options');
+    } else expect(requests[0]!.body).toMatchObject({ prompt_cache_key: expect.any(String), prompt_cache_retention: '24h' });
+    expect(setup.manager.getSession(setup.session.id)!.turns).toEqual(before);
+  } finally {
+    server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
+
 it('reports local byte admission refusal without inventing a provider failure or dispatching', async () => {
   vi.mocked(loadCatalog).mockReturnValue([{ id: 'fixture', label: 'Fixture', runtime: 'openai-compatible', auth: 'api-key',
     models: [{ id: 'm', inputLimits: { maxRequestBytes: 1 } }] }]);

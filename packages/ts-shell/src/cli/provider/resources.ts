@@ -140,7 +140,7 @@ export function createProviderResources(input: {
         const resources = { compaction: connections.compaction(setup, connectionScope) };
         return run.resources ? run.resources(resources) : resources;
       }
-      const activeProvider = providers.provider(resolved, catalog);
+      const activeProvider = providers.provider(resolved, catalog, config);
       measurementScope = undefined;
       if (activeProvider) {
         measurement.reset(activeProvider);
@@ -153,7 +153,7 @@ export function createProviderResources(input: {
       const mayRefreshOnItsOwn = allowsSelfInitiatedRequests({ configuredOffline: config.offline === true });
       const cacheWarming = createCacheWarmingRunner({
         mode: mayRefreshOnItsOwn ? resolveCacheWarmingMode(config.cacheWarming) : 'off',
-        ...(warmingModel ? { cost: warmingModel.cost, promptCache: warmingModel.promptCache } : {}),
+        ...(warmingModel ? { cost: warmingModel.cost } : {}),
         // Replay the captured request: rebuilding a prefix would buy a cache miss.
         ...cacheRefreshFor({ sessionId, runtimeConfig: config, admission, requestPolicy,
           ...(warmingTarget ? { baseUrl: warmingTarget.baseUrl, rates: warmingModel?.cost } : {}),

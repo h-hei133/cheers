@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createCacheWarmingRunner } from "./cacheWarm.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
 import { InputLimitError } from '../provider/request/input.js';
+import type { SentRequest } from '../provider/request/sentRequest.js';
 
 /**
  * What actually happens to a prompt between requests.
@@ -12,16 +13,16 @@ import { InputLimitError } from '../provider/request/input.js';
  */
 
 /** A request as it went out, which is what a refresh has to replay. */
-const sent = {
+const sent: SentRequest = {
   url: "https://api.test/v1/chat/completions",
   headers: { authorization: "Bearer k" },
   body: JSON.stringify({ model: "m", messages: [{ role: "user", content: "hi" }] }),
+  cache: { retention: 'short', ttlMs: 300_000 },
 };
 
 /** A model whose prices make a refresh clearly worth sending. */
 const priced = {
   cost: { promptPerMTok: 3, completionPerMTok: 15, cacheReadPerMTok: 0.3, cacheWritePerMTok: 3.75 },
-  promptCache: { short: 300 },
 };
 
 describe("the cache warming runner", () => {
@@ -92,7 +93,7 @@ describe("the cache warming runner", () => {
       refresh,
     });
 
-    runner.noteRequest(200_000, sent);
+    runner.noteRequest(200_000, { ...sent, cache: undefined });
 
     expect(refresh).not.toHaveBeenCalled();
     expect(runner.status().nextRefreshAt).toBeUndefined();
@@ -103,13 +104,13 @@ describe("the cache warming runner", () => {
     const refresh = vi.fn(async () => {});
     const runner = createCacheWarmingRunner({
       mode: "streaming",
-      promptCache: priced.promptCache,
       refresh,
     });
 
     runner.noteRequest(200_000, sent);
 
     expect(refresh).not.toHaveBeenCalled();
+    runner.stop();
   });
 
   it("schedules a refresh a little before the window lapses", async () => {
@@ -203,9 +204,9 @@ describe("the cache warming runner", () => {
     }
   });
 
-  it("carries on after a refresh that failed", async () => {
-    // A refresh that did not happen is not worth stopping for: nothing the user
-    // did caused it and nothing they could do would fix it.
+  it("waits for a new foreground request after a refresh that failed", async () => {
+    // Failure does not prove that the provider refreshed its prefix. A later
+    // foreground request can establish a new window without inventing one here.
     vi.useFakeTimers();
     try {
       const refresh = vi.fn(async () => {
@@ -217,7 +218,10 @@ describe("the cache warming runner", () => {
       await vi.advanceTimersByTimeAsync(270_000);
       expect(refresh).toHaveBeenCalledTimes(1);
 
-      // Still armed, so the next window is refreshed too.
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).toHaveBeenCalledTimes(1);
+      runner.noteRequest(200_000, sent);
       await vi.advanceTimersByTimeAsync(270_000);
       expect(refresh).toHaveBeenCalledTimes(2);
     } finally {
@@ -252,7 +256,6 @@ describe("the cache warming runner", () => {
       const runner = createCacheWarmingRunner({
         mode: "streaming",
         cost: { promptPerMTok: 0.1, completionPerMTok: 0.4, cacheReadPerMTok: 0.01 },
-        promptCache: { short: 300 },
         refresh,
         onDecision: (decision) => decisions.push(decision.action),
       });
@@ -354,7 +357,8 @@ describe("cache warming lifecycle", () => {
       expect(runner.status().nextRefreshAt).toBe(due);
       await vi.advanceTimersByTimeAsync(269_000);
       expect(refresh).toHaveBeenCalledTimes(2);
-      expect(refresh.mock.calls[1][0]).toBe(newer);
+      expect(refresh.mock.calls[1][0]).toEqual(newer);
+      expect(refresh.mock.calls[1][0]).not.toBe(newer);
       runner.stop();
     } finally { vi.useRealTimers(); }
   });
@@ -374,7 +378,7 @@ describe("cache warming lifecycle", () => {
     } finally { vi.useRealTimers(); }
   });
 
-  it("keeps the idle phase schedule when the streaming refresh finishes late", async () => {
+  it("keeps an interrupted streaming refresh disarmed after its late completion", async () => {
     vi.useFakeTimers();
     try {
       let finish!: () => void;
@@ -387,15 +391,17 @@ describe("cache warming lifecycle", () => {
       const runner = createCacheWarmingRunner({ mode: "idle", ...priced, refresh });
       runner.noteRequest(500_000, sent);
       await vi.advanceTimersByTimeAsync(270_000);
+      await vi.advanceTimersByTimeAsync(10_000);
       runner.noteSettled();
-      const due = runner.status().nextRefreshAt;
+      expect(runner.status().nextRefreshAt).toBeUndefined();
       expect(signal.aborted).toBe(true);
-      await vi.advanceTimersByTimeAsync(1_000);
       finish();
       await vi.advanceTimersByTimeAsync(0);
-      expect(runner.status().nextRefreshAt).toBe(due);
-      await vi.advanceTimersByTimeAsync(269_000);
-      expect(refresh).toHaveBeenCalledTimes(2);
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      runner.noteRequest(500_000, sent);
+      expect(runner.status().nextRefreshAt).toBeDefined();
       runner.stop();
     } finally { vi.useRealTimers(); }
   });
@@ -476,4 +482,366 @@ it("discards refresh usage after a branch or model change", async () => {
     expect(onUsage).not.toHaveBeenCalled();
     expect(runner.status().nextRefreshAt).toBeUndefined();
   } finally { vi.useRealTimers(); }
+});
+
+describe('captured cache windows', () => {
+  it('uses the sent long window instead of the model short window', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'streaming', ...priced, refresh });
+      runner.noteRequest(500_000, { ...sent, cache: { retention: 'long', ttlMs: 1_800_000 } } as SentRequest);
+      expect(runner.status().nextRefreshAt).toBe(1_620_000);
+      await vi.advanceTimersByTimeAsync(300_000);
+      expect(refresh).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1_320_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('does not replace a long window beyond the phase budget with a short timer', async () => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh });
+      runner.noteRequest(500_000, { ...sent, cache: { retention: 'long', ttlMs: 86_400_000 } } as SentRequest);
+      runner.noteSettled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(3_600_000);
+      expect(refresh).not.toHaveBeenCalled();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('continues confirmed refreshes within the original streaming age budget', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'streaming', ...priced, refresh });
+      runner.noteRequest(500_000, sent);
+      await vi.advanceTimersByTimeAsync(3_600_000);
+      expect(refresh).toHaveBeenCalledTimes(13);
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(3_600_000);
+      expect(refresh).toHaveBeenCalledTimes(13);
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it.each([
+    undefined,
+    { retention: 'none', ttlMs: 300_000 },
+    { retention: 'long' },
+    { retention: 'short', ttlMs: 0 },
+    { retention: 'short', ttlMs: Number.NaN },
+    { retention: 'short', ttlMs: Number.POSITIVE_INFINITY },
+    { retention: 'short', ttlMs: 10_000 },
+    { retention: 'short', ttlMs: Number.MAX_SAFE_INTEGER },
+  ])('leaves an unrefreshable captured window disarmed (%j)', async cache => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh });
+      runner.noteRequest(500_000, { ...sent, cache } as SentRequest);
+      runner.noteSettled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(refresh).not.toHaveBeenCalled();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('keeps the original expiry when streaming becomes idle', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh });
+      runner.noteRequest(500_000, { ...sent, cache: { retention: 'short', ttlMs: 300_000 } } as SentRequest);
+      await vi.advanceTimersByTimeAsync(260_000);
+      runner.noteSettled();
+      expect(runner.status().nextRefreshAt).toBe(270_000);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('retains the actual dispatch timestamp when notification arrives late', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(260_000);
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'streaming', ...priced, refresh });
+      runner.noteRequest(500_000, { ...sent, sentAt: 0, cache: { retention: 'short', ttlMs: 300_000 } } as SentRequest);
+      expect(runner.status().nextRefreshAt).toBe(270_000);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('rejects a notification whose original cache window already expired', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(310_000);
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh });
+      runner.noteRequest(500_000, { ...sent, sentAt: 0, cache: { retention: 'short', ttlMs: 300_000 } } as SentRequest);
+      runner.noteSettled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(refresh).not.toHaveBeenCalled();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('does not buy another request after settling beyond the safe expiry margin', async () => {
+    vi.useFakeTimers();
+    try {
+      let clock = 0;
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh, now: () => clock });
+      runner.noteRequest(500_000, { ...sent, cache: { retention: 'short', ttlMs: 300_000 } } as SentRequest);
+      clock = 286_000;
+      runner.noteSettled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(refresh).not.toHaveBeenCalled();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it.each(['void', 'failed'])('does not invent a new window from a %s refresh', async outcome => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => {
+        if (outcome === 'failed') throw new Error('network');
+      });
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh });
+      const captured = { ...sent, cache: { retention: 'short', ttlMs: 300_000 } } as SentRequest;
+      runner.noteRequest(500_000, captured);
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      runner.noteSettled();
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      runner.noteRequest(500_000, captured);
+      expect(runner.status().nextRefreshAt).toBeDefined();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('anchors a confirmed refresh at dispatch instead of its late completion', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      let finish!: (usage: { prompt_tokens: number }) => void;
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced,
+        refresh: async () => new Promise<{ prompt_tokens: number }>(resolve => { finish = resolve; }),
+      });
+      runner.noteRequest(500_000, { ...sent, cache: { retention: 'short', ttlMs: 300_000 } } as SentRequest);
+      await vi.advanceTimersByTimeAsync(270_000);
+      await vi.advanceTimersByTimeAsync(40_000);
+      finish({ prompt_tokens: 500_000 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runner.status().nextRefreshAt).toBe(540_000);
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('captures replay bytes and nested headers independently of caller mutation', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const captured = { ...sent, headers: { authorization: 'Bearer first' }, requestHeaders: { 'x-affinity': 'first' },
+        cache: { retention: 'short' as const, ttlMs: 300_000 }, inputLimits: { maxRequestBytes: 100_000 },
+      };
+      const expected = structuredClone(captured);
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh });
+      runner.noteRequest(500_000, captured);
+      captured.headers.authorization = 'Bearer later';
+      captured.requestHeaders['x-affinity'] = 'later';
+      captured.cache.ttlMs = 60_000;
+      captured.inputLimits.maxRequestBytes = 1;
+      captured.body = JSON.stringify({ model: 'other', messages: [] });
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(refresh.mock.calls[0][0]).toEqual(expected);
+      expect(Object.isFrozen(refresh.mock.calls[0][0].headers)).toBe(true);
+      expect(Object.isFrozen(refresh.mock.calls[0][0].cache)).toBe(true);
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+});
+
+describe('cache callback ownership', () => {
+  it('carries the streaming age cap through delayed transport admission', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const refresh = vi.fn(async (_sent: SentRequest, _signal: AbortSignal, _deadline?: number) => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'streaming', ...priced, refresh });
+      runner.noteRequest(500_000, sent);
+      // A foreground request near the age cap keeps the same active run's age.
+      vi.setSystemTime(3_330_000);
+      runner.noteRequest(500_000, { ...sent, sentAt: 3_330_000 });
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(refresh.mock.calls[0]![2]).toBe(3_600_000);
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+  it('preserves a successor when the retiring owner callback returns false', async () => {
+    vi.useFakeTimers();
+    try {
+      let retireOnRead = false;
+      const newer = { ...sent, body: JSON.stringify({ model: 'newer', messages: [] }) };
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh, isCurrent: () => {
+        if (retireOnRead) {
+          retireOnRead = false;
+          runner.noteRequest(500_000, newer);
+          return false;
+        }
+        return true;
+      } });
+      runner.noteRequest(500_000, sent);
+      retireOnRead = true;
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).not.toHaveBeenCalled();
+      expect(runner.status().nextRefreshAt).toBeDefined();
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(refresh.mock.calls[0][0].body).toBe(newer.body);
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('keeps an uncertain in-flight refresh disarmed when the phase changes', async () => {
+    vi.useFakeTimers();
+    try {
+      let finish!: (usage: { prompt_tokens: number }) => void;
+      let signal!: AbortSignal;
+      const onUsage = vi.fn();
+      const refresh = vi.fn(async (_sent, currentSignal) => {
+        signal = currentSignal;
+        return new Promise<{ prompt_tokens: number }>(resolve => { finish = resolve; });
+      });
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh, onUsage });
+      runner.noteRequest(500_000, sent);
+      await vi.advanceTimersByTimeAsync(270_000);
+      runner.noteSettled();
+      expect(signal.aborted).toBe(true);
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      finish({ prompt_tokens: 500_000 });
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(onUsage).not.toHaveBeenCalled();
+      runner.noteRequest(500_000, sent);
+      expect(runner.status().nextRefreshAt).toBeDefined();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('does not restart the idle age budget on repeated settlement notifications', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh });
+      runner.noteRequest(500_000, sent);
+      runner.noteSettled();
+      await vi.advanceTimersByTimeAsync(1_700_000);
+      expect(refresh).toHaveBeenCalledTimes(6);
+      runner.noteSettled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(refresh).toHaveBeenCalledTimes(6);
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('keeps a successor request admitted from the current-owner callback', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      let reenter = true;
+      const newer = { ...sent, body: JSON.stringify({ model: 'newer', messages: [] }) };
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh, isCurrent: () => {
+        if (reenter) { reenter = false; runner.noteRequest(500_000, newer); }
+        return true;
+      } });
+      runner.noteRequest(500_000, sent);
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(refresh.mock.calls[0][0].body).toBe(newer.body);
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('does not attribute old usage after owner callback replaces the request', async () => {
+    vi.useFakeTimers();
+    try {
+      let finish!: (usage: { prompt_tokens: number }) => void;
+      let replaceOnRead = false;
+      const onUsage = vi.fn();
+      const newer = { ...sent, body: JSON.stringify({ model: 'newer', messages: [] }) };
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, onUsage,
+        refresh: async () => new Promise<{ prompt_tokens: number }>(resolve => { finish = resolve; }),
+        isCurrent: () => {
+          if (replaceOnRead) { replaceOnRead = false; runner.noteRequest(500_000, newer); }
+          return true;
+        },
+      });
+      runner.noteRequest(500_000, sent);
+      await vi.advanceTimersByTimeAsync(270_000);
+      replaceOnRead = true;
+      finish({ prompt_tokens: 500_000 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(onUsage).not.toHaveBeenCalled();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('does not send after a decision callback exceeds the original deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      let clock = 0;
+      const refresh = vi.fn(async () => ({ prompt_tokens: 500_000 }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh, now: () => clock,
+        onDecision: () => { clock = 286_000; },
+      });
+      runner.noteRequest(500_000, sent);
+      clock = 270_000;
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).not.toHaveBeenCalled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('does not let a stale admission rejection stop a successor request', async () => {
+    vi.useFakeTimers();
+    try {
+      let reject!: (error: Error) => void;
+      const refresh = vi.fn(async () => new Promise<{ prompt_tokens: number }>((_resolve, refuse) => { reject = refuse; }));
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh });
+      runner.noteRequest(500_000, sent);
+      await vi.advanceTimersByTimeAsync(270_000);
+      runner.noteRequest(500_000, { ...sent, body: JSON.stringify({ model: 'newer', messages: [] }) });
+      const due = runner.status().nextRefreshAt;
+      reject(new ModelAdmissionError('old refusal'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runner.status().nextRefreshAt).toBe(due);
+      expect(runner.status().stopReason).toBeUndefined();
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
 });

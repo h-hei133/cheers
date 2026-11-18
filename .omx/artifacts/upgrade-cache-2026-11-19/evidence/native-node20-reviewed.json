@@ -1,0 +1,173 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "node": "v20.3.0",
+  "live": false,
+  "installed": false,
+  "buildId": "ecdb41348d63372afdbb32a78e9fd81ca13b408f330bef51613658fcada09def",
+  "inputsDigest": "5769fc9ff7233e0c911535f6f8762a224964f01f1d2d0ed445a630c2b468c658",
+  "source": {
+    "packages/ts-shell/src/cli/provider/compaction.test.ts": "eda17332d0da30b017bc56b07342a618abebaf0eab07a0c231ba2f565b8790df",
+    "packages/ts-shell/src/cli/provider/compaction.ts": "71716eea790080b7de057bd5281b822eb87fa18b910055c7b2ca2b70fab87ded",
+    "packages/ts-shell/src/cli/provider/resources.ts": "3d754314ff76cdaeabe096bb9f64952ba8dda23d491a5ae777248f412f40bbf7",
+    "packages/ts-shell/src/cli/provider/step.test.ts": "7c1f1e416fe43eb26a8beae2d6772aabc91e2500a3f65e0e32b91314544907fc",
+    "packages/ts-shell/src/cli/provider/step.ts": "79b5b82a6f31872fa758c0e1f7aef52c6f4eadb63cb751230b8e82660addab11",
+    "packages/ts-shell/src/cli/provider/summary.ts": "4ba3c88e3e15e70d1dd1aad542f22730577dd7813b871ea0fb1a8052cfaee9a4",
+    "packages/ts-shell/src/cli/runtime/cache.test.ts": "ab180e40a72368c0c765d3bc0805874a8cadc28d79afb8992e0cd5540199a14a",
+    "packages/ts-shell/src/cli/runtime/cache.ts": "9351dc41641e06dcbbe20bb3b7e2714f7dcf3e337d207aabebef1fca191cf493",
+    "packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts": "8c24fdfac61ced38f81c6f20cdfbd68b466254d5702f16f846a521647f194169",
+    "packages/ts-shell/src/cli/runtime/compaction.ts": "ac09a235d05a14f91fc2336ba75230ac413b7bef0c02b2f4b2cd04e0ff0707b7",
+    "packages/ts-shell/src/cli/runtime/compaction/direct.ts": "1ea8a3794e8f461d0cb1f07698dca067a22917afaf38946caed02c2c9daff32a",
+    "packages/ts-shell/src/cli/runtime/compaction/target.test.ts": "6de42d097fa1708dbbba9cbe8bf0e22e1f49fb3d45c6e7ab82c5c6cbcc74c951",
+    "packages/ts-shell/src/cli/runtime/compaction/target.ts": "b1c1a01dde646a7f1482d85766a458846937fbdc542dad44d2a975f4f91e081b",
+    "packages/ts-shell/src/cli/runtime/compaction/virtual.test.ts": "525744536e236deb542e251c2539dc34ce0f028fc7f353770d1bbe2ce7d37e4a",
+    "packages/ts-shell/src/cli/runtime/context/preview.test.ts": "bd9d478f3ed09ae4aed58bb92d43b627fc684fe25e790b81332a5f69cc382d61",
+    "packages/ts-shell/src/cli/runtime/context/preview.ts": "8b20f05432c7cd704dbdea6ee3c42627cd0908b36c2fc7fa64f4b7161d5f3494",
+    "packages/ts-shell/src/cli/runtime/summary.test.ts": "0bac43b066524dc28d50001522a30700b62cdc27d3b6d5037b9f698f897f5aaf",
+    "packages/ts-shell/src/config/fields.ts": "3a8f43a9fea39a97cc3968c2e4bb68bb756b6139a08a2a45447296935796557f",
+    "packages/ts-shell/src/config/profiles/import/catalog.test.ts": "74b7b46815609a772caa8cd81fded870b22770252d1ae3f5b20dc71761db8693",
+    "packages/ts-shell/src/config/profiles/import/catalog.ts": "ab07bc533219efc81a2fec074a553893e91d746245a058ffca047836b3a8c97b",
+    "packages/ts-shell/src/config/runtimeConfig.test.ts": "a271a43f47449e0b9634763a8a516a32fb800c687eacfabb2bc6e638c6d5795c",
+    "packages/ts-shell/src/config/runtimeConfig.ts": "0ae95bb2a29520ae7d5da8b125de99f018667c5bb2a7f2b60d2f266d762a392e",
+    "packages/ts-shell/src/config/settings.test.ts": "867d0850e5b83ac31c0658d7842306f6c3e4b87a62cf68bfe3ea813c84e72b8b",
+    "packages/ts-shell/src/config/settings.ts": "d639c3ee3dd53adccf4ae53ed081ada18c6681548bcbbb37d5ac15caecd4c44e",
+    "packages/ts-shell/src/core/commands/btwCommandRuntime.test.ts": "4e1c1101e416098a4db5ff9a981275e08bc20f28c3c88d9f8703b1e2ee4317b0",
+    "packages/ts-shell/src/core/commands/btwCommandRuntime.ts": "43cb9bd85fe3e23b392043016573d04575db1cca4b40d76ddbe70804d8e99353",
+    "packages/ts-shell/src/core/models/catalog.ts": "470b9a5d7fa554405e5ee9b97fb095f66098b0b5836bfa5530505ea0c3c296d6",
+    "packages/ts-shell/src/core/models/protocol.ts": "5ffa5295d41aec70d4fb431cfd2a1ba943c330606c97daa8849301a7a05fca0e",
+    "packages/ts-shell/src/core/models/requestShape.ts": "3af3465ee8fae06cbb6e9f1d7304ae18f53c6269997c0b9958dd2ec6d47b90f7",
+    "packages/ts-shell/src/core/query/compaction/summarize.test.ts": "4f7d6e0e5f30613aa5714d48babc62c4f7e75831120094c15d1ced5d4db32d5f",
+    "packages/ts-shell/src/core/query/compaction/summarize.ts": "089b30a1e9a66fe5f4b238d953ef936b2aab23b82ab015fde9f2984f804fe08c",
+    "packages/ts-shell/src/provider/endpoints/anthropicCachePreservation.ts": "9591f5be1885a4bd9fe01b2190c0a45890196ce5db3ed2389a57bd7459e19553",
+    "packages/ts-shell/src/provider/endpoints/anthropicMessages.ts": "b8547910920d9cd876d1229887f28d489b1bed3f88bc2d7a259c1ca751613217",
+    "packages/ts-shell/src/provider/endpoints/kinds.ts": "b646363237ce0abb220ea7b752b43567adf0f42d62c6083a3628fbfeb636a4a5",
+    "packages/ts-shell/src/provider/endpoints/openaiCompatible.test.ts": "0028ec9f311f9abbcfc0207f5616f6acc7c2d66d7362c7ab78cc7229902c4b52",
+    "packages/ts-shell/src/provider/endpoints/openaiCompatible.ts": "f39a83b05a014aa97e8524df47ca3a8e53eb1e226120e2e83d74d29ac9e22bca",
+    "packages/ts-shell/src/provider/endpoints/responses/account.test.ts": "6028387a5c04e385df4eb3df43b8fcce8ef7babce114435d28da9171ac705a58",
+    "packages/ts-shell/src/provider/endpoints/responses/account.ts": "60b9cce4b6af7c02fea6f6579f89af06655fcb8c8515c9ed73c34b0726ab1f09",
+    "packages/ts-shell/src/provider/endpoints/responses/body.test.ts": "562cf693a70238dc7a4144eb8fd9d7b2522945846adbd6044b85daab4b1e3037",
+    "packages/ts-shell/src/provider/endpoints/responses/body.ts": "4fd66cf61676ca4eb119ece6b74a6c43889b91cdf8bec23212f73dca9f84e7b9",
+    "packages/ts-shell/src/provider/request/completion.test.ts": "75d7d730d24a4272bb7e44b7f47270cca781f58d1aa2f531977ff800ea68dbcb",
+    "packages/ts-shell/src/provider/request/completion.ts": "aa7745273a85c4f1c8cc59a1c52c43972122d9dc614aef0f65e64af436b39a06",
+    "packages/ts-shell/src/provider/request/sentRequest.ts": "87763356f7c3b7f908c89787ce133dabe17510c1db11f71c73ce3dda425b319e",
+    "packages/ts-shell/src/turn/cacheWarm.test.ts": "045dde2353dfb91dd16412938b90b2ce16a356fa87d9849e0da40c7c88fd374a",
+    "packages/ts-shell/src/turn/cacheWarm.ts": "44294d63a39b889ec378078300f7836e351607c26226b999114f13fc36ad0438",
+    "packages/ts-shell/src/turn/context/body.ts": "8f3a6f241b68ecc2c5d95b7d1034e30749b215dcfce709858298fc9e382f6990",
+    "packages/ts-shell/src/turn/context/contract.ts": "af52292d6c7f43a86b02a07ac5d39327e853d7d1984b79e6367b8232027d444f",
+    "packages/ts-shell/src/turn/context/prepare.ts": "14dff69438ffe31007898f51248aa81c076ce6b0fd6efe3f252100ae3a7ebbda",
+    "packages/ts-shell/src/turn/step.test.ts": "de3b6b936ef498b5c1b0fd6119710bf1b103b28a4d579aa6ab247d2df37bf1bd",
+    "packages/ts-shell/src/turn/step.ts": "3f8bdc0db93742f89f7ca10a87ab057149f560642c98f87378a578df933a253f",
+    "packages/ts-shell/src/provider/cache/model.ts": "cd744bb74b2ecdbacc6ff0dc50e65beb76e875954b841b1c67a3217d7d9d2f90",
+    "packages/ts-shell/src/provider/cache/protocol.test.ts": "57fbda8056a8ff6fd21838f1c767e7837a6ee93c1813a987a374a35c05f0cc30",
+    "packages/ts-shell/src/provider/cache/protocol.ts": "019ae057e3adab818ce3864da3aeb62e61a52825ca0c202b9de21520b1c8e4e8",
+    "packages/ts-shell/src/provider/cache/window.test.ts": "9c9265f188387dc14f711754a3c79a236d66582f1f8e4988a7147d612c4f46bd",
+    "packages/ts-shell/src/provider/cache/window.ts": "80401ba65d24639670961fb8269b40c442126f3007c7b126173c5c0bcd406f46"
+  },
+  "cases": [
+    {
+      "name": "sdk-openai-compatible-short",
+      "status": "passed",
+      "sameSessionKey": true,
+      "configRead": "short",
+      "posts": 2
+    },
+    {
+      "name": "sdk-openai-compatible-long",
+      "status": "passed",
+      "sameSessionKey": true,
+      "configRead": "long",
+      "posts": 2
+    },
+    {
+      "name": "sdk-openai-compatible-none",
+      "status": "passed",
+      "sameSessionKey": true,
+      "configRead": "none",
+      "posts": 2
+    },
+    {
+      "name": "sdk-openai-responses-short",
+      "status": "passed",
+      "sameSessionKey": true,
+      "configRead": "short",
+      "posts": 2
+    },
+    {
+      "name": "sdk-openai-responses-long",
+      "status": "passed",
+      "sameSessionKey": true,
+      "configRead": "long",
+      "posts": 2
+    },
+    {
+      "name": "sdk-openai-responses-none",
+      "status": "passed",
+      "sameSessionKey": true,
+      "configRead": "none",
+      "posts": 2
+    },
+    {
+      "name": "sdk-anthropic-messages-short",
+      "status": "passed",
+      "sameSessionKey": true,
+      "configRead": "short",
+      "posts": 2
+    },
+    {
+      "name": "sdk-anthropic-messages-long",
+      "status": "passed",
+      "sameSessionKey": true,
+      "configRead": "long",
+      "posts": 2
+    },
+    {
+      "name": "sdk-anthropic-messages-none",
+      "status": "passed",
+      "sameSessionKey": true,
+      "configRead": "none",
+      "posts": 2
+    },
+    {
+      "name": "sdk-responses-explicit-and-unsupported-long",
+      "status": "passed",
+      "noMixedVocabulary": true,
+      "posts": 3
+    },
+    {
+      "name": "sdk-summary-reopen-affinity",
+      "status": "passed",
+      "summaryRequests": 2,
+      "compacted": true,
+      "reopened": true,
+      "posts": 6
+    },
+    {
+      "name": "sdk-mistral-summary-and-side-affinity",
+      "status": "passed",
+      "summaryRequests": 2,
+      "sideDelivered": true,
+      "posts": 5
+    },
+    {
+      "name": "compiled-cli-long-and-none",
+      "status": "passed",
+      "exits": [
+        0,
+        0
+      ],
+      "posts": 2
+    },
+    {
+      "name": "source-owner-refresh-window-and-replay",
+      "status": "not_run",
+      "observedSurface": "source-owner-not-run",
+      "posts": 0
+    }
+  ],
+  "providerRequests": [],
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "loopbackPosts": 34
+}

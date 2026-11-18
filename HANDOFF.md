@@ -2840,3 +2840,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** A credential value triggers version output, a consumed terminator hides a later command, or a path argument consumes a mode flag.
 - **Root cause** Early detection looks at raw tokens independently of the parser that owns their values.
 - **Rule** Share the same token scan from the lightweight entrypoint to bootstrap. Preserve literal credential values, reserved standalone flags and explicitly supplied paths. Reproject workspace-relative options only when the restart changes the working directory.
+
+### Cache Refresh Windows Follow The Sent Protocol And Dispatch Time
+
+- **Symptom** A compatible endpoint receives unsupported long-cache fields, an idle transition prolongs an old prefix, or slow credential renewal sends a refresh after its safe window.
+- **Root cause** Affinity support was used as retention capability, warming always selected the model's short tier, and scheduling used response or phase notification time. Summary and side-request bodies also bypassed endpoint-owned affinity headers.
+- **Rule** Capture requested preference separately from the effective serialized tier and the exact-address model window. Admit key, long tier and extension options independently with strict boolean declarations. Cap native short and long markers by their protocol duration; include shared gateway codecs. Anchor expiry to actual dispatch, retain it through phase changes, and carry both the cache and phase age deadline plus source admission to final transport handoff. Failed, void or cancelled refreshes never renew it. Revalidate the original generation after callbacks before clearing state or attributing usage. Use the endpoint's same header owner for ordinary, summary and side requests.

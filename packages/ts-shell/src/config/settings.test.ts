@@ -61,13 +61,24 @@ it('gives every public setting a typed editor, with no JSON fallback for numbers
     allowedTools: 'list', allowedModels: 'list', pathRules: 'list', disabledTools: 'list',
     hiddenToolPrefixes: 'list', denyRules: 'list',
     modelTokenBudgets: 'object',
-    attentionOnIdle: 'boolean', cacheWarming: 'choice', retryEnabled: 'boolean', enableMcpTools: 'boolean',
+    attentionOnIdle: 'boolean', cacheWarming: 'choice', cacheRetention: 'choice', retryEnabled: 'boolean', enableMcpTools: 'boolean',
     offline: 'boolean', vimMode: 'boolean', collapseThinking: 'boolean', backgroundFollowUp: 'boolean', compactionEnabled: 'boolean', pruneToolText: 'boolean', agentMode: 'choice', steeringMode: 'choice', followUpMode: 'choice',
     toolDiscovery: 'choice', tuiMode: 'choice', theme: 'theme',
     'tui.composerShape': 'choice', 'tui.statusItems': 'status-items', 'tui.diagrams': 'choice',
   };
   const editors = Object.fromEntries(CONFIG_SETTINGS.map(setting => [setting.key, settingEditor(setting)]));
   expect(editors).toEqual(expected);
+});
+
+it('edits cache retention through the personal setting registry', () => {
+  const setting = settingDefinition('cacheRetention')!;
+  expect(setting).toMatchObject({ group: 'Context', section: 'Cache', choices: ['short', 'long', 'none'] });
+  expect(setting.policy.sources).toEqual(['user']);
+  expect(setting.policy.application).toBe('next operation');
+  expect(validateSetting(setting, 'long')).toBeUndefined();
+  expect(validateSetting(setting, 'none')).toBeUndefined();
+  expect(validateSetting(setting, '24h')).toContain('Invalid value');
+  expect(settingPatch({ cacheWarming: 'idle' }, setting, 'none')).toEqual({ cacheRetention: 'none' });
 });
 
 it('parses each editor shape without quoting text or coercing list items', () => {

@@ -1,10 +1,14 @@
-# 规划执行进展（2026-11-18）
+# 规划执行进展（2026-11-19）
 
-本轮逐项核对此前未完成的 30 项，完成 F2.3、F2.5 和 T2.1 的 Linux 本地功能验收。**62 项中 35 项已完成，27 项仍开放**。默认依赖图判定仍为 `not_proven`。
+本轮接续已核实任务，完成 C.5 的 Linux 本地功能验收。**62 项中 36 项已完成，26 项仍开放**。默认依赖图判定仍为 `not_proven`。
 
-核查与取舍见[工程记录](design.md)，当前验收和次序见[任务清单](tasks.md)。三批源码已分开本地提交。远端推送和本轮 CI 尚未发生。原定暂缓的原生插件与独立桌面产品不计入 62 项，T6 保留按需求开启。
+核查与取舍见[工程记录](design.md)，当前验收和次序见[任务清单](tasks.md)。源码按批本地提交。远端推送和本轮 CI 尚未发生。原定暂缓的原生插件与独立桌面产品不计入 62 项，T6 保留按需求开启。
 
 ## 当前批次的验证
+
+C.5复用原配置／请求／摘要／预热owner，补short／long／none个人选择、独立协议能力、实际地址和final body窗口、发送时间及最终handoff deadline／source检查；摘要、side、preview共享偏好和端点headers。最终27文件848项、七静态检查／2709生产模块0monoliths、十一有效反转13AssertionErrors且exact恢复6文件138项、buildecdb41348d63通过。Linux当前compiled13场景34POST和source owner预热2POST、Node20.3禁动态生成compiled13／34、安装包15公开strict类型和12场景32POST通过，两项限定独立APPROVE。广范围旧审未返回报告，保持unavailable。当前配置模型鉴权停止、0provider requests，原配置／source／build保持且私有state清理；真实TTL／收益无证据。定向script29项通过，默认NormProof仍exit2/not_proven。[本批交付](../../../.omx/artifacts/upgrade-cache-2026-11-19/delivery.json)。
+
+以下为上一批的历史证据。
 
 - `980bb6d1` 将工具、配置、目录、媒体和 MCP 接入无动态代码生成的校验。独立复审中的五项新回归已修复。Node 24 和 20.3 各通过四组编译入口检查。标准核心用例 3261 通过、230 准入拒绝、1 项 Draft 7 差异保留旧工具入口的相邻断言。
 - `a069b2d4` 修复追踪配额、分页、隔离与撤权，补齐已接受响应的类型化事件、绝对时间和链接。编译版 `/trace` 的 HTML、JSON 和控制通过。
@@ -63,7 +67,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | `bf01f8f` | compact同步登记原command owner，controls可达、EOF结算、失败结果保留结构化status。 |
 | `ae9a3f59` | retry专属取消及就绪代理转发；D.1整项验收在恢复后继续。 |
 
-## 已完成功能验收的35项
+## 已完成功能验收的36项
 
 | 编号 | 项数 | 已完成的所述范围 |
 | --- | ---: | --- |
@@ -71,7 +75,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | A.1–A.4 | 4 | edit统一Schema与有界匹配、单次准备序列化、read／工具结果统一行字节预算及全文归档、patch写前effects与批准身份。 |
 | B.1–B.3 | 3 | Unicode显示宽度、1MiB writer与背压、图片准入／占行／裁剪／绘制／placement清退及缓存预算。 |
 | B2.1–B2.3 | 3 | 终端状态／首次协商、提示／助手边界导航、tmux超链接、完整调色板、可组合浮层及录制输入过滤。 |
-| C.1、C.2、C.3、C.4、C.7、C.8、C.9 | 7 | 循环准备／结束与完整虚拟路由；消息分离与统一准备；公共累计流式快照／HTTP retry事实／已接受响应不重放；stdout隔离／有界writer与退出结算；默认正文保留／measurement／compaction消费者，当前cache presence／captured write premium／估算报告；工具发现／mutable schema guard与实际激活消费者。 |
+| C.1、C.2、C.3、C.4、C.5、C.7、C.8、C.9 | 8 | 循环准备／结束与完整虚拟路由；消息分离与统一准备；公共累计流式快照／HTTP retry事实／已接受响应不重放；stdout隔离／有界writer与退出结算；默认正文保留／measurement／compaction消费者、缓存配置／协议能力／预热窗口，当前cache presence／captured write premium／估算报告；工具发现／mutable schema guard与实际激活消费者。 |
 | D.1–D.3、D.5 | 4 | RPC完整会话／模型／树／shell／设置／压缩／retry命令、严格输入和最终准入；队列／UI响应、导出持久token／费用并保留未知覆盖。 |
 | E.1、E.2、E.5 | 3 | 脚本完整host settlement、普通gate/hooks/child boundary/动态读写effect barrier；codemode分支状态持久化、原前缀／CAS／ABA保护、进程重启和多级fork隔离；共享SDK UI续绑／撤权。不包含确定性重放。 |
 | F2.2–F2.5 | 4 | 远程目录 ETag 和保存结果、无动态代码生成的校验、单次输入阶梯计价、追踪查询和类型化记录。 |
@@ -108,13 +112,12 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 真实模型沿用既有active连接和凭据。用户models目录的原JSON损坏，相关新原生测试在隔离home使用原目标的最小有效目录entry；原用户配置未修改，该证据不代表原损坏目录可加载。失败、setup错误和observer错误均单独保存。没有Windows、物理终端、真实Azure／Mistral／Anthropic原生control、OAuth真人同意／续期、服务账单对照或性能收益基准。本次只跑聚焦检查，未宣称全仓测试／全仓类型通过；六静态门保留119条既有非阻断文档source提示。
 
-## 文档中尚未完成的27项功能任务
+## 文档中尚未完成的26项功能任务
 
 “已有待验收”表示代码／消费者存在，缺本轮整项证据；“部分”表示实现已有进展但仍缺行为或资格验证。以下列出每个未勾选编号，恢复时以tasks.md逐项继续。
 
 | 编号 | 状态 | 尚缺任务或证据 |
 | --- | --- | --- |
-| C.5 | 部分 | 标记和亲和已接通。补常规配置、分离长档协议能力、冻结请求及实际预热窗口。 |
 | C.6 | 部分 | 历史声明、转换、压缩／重开已有实现；Anthropic原生历史control缺真实服务证据。 |
 | D.4 | 部分 | 高亮、CJK、Thinking/Diff/灯箱与离线安全已通过；完整GFM仍未验收；限定独立FIXED/APPROVE通过。 |
 | E.3 | 部分 | 声明、namespace、冻结session list/get、native image/输出预算已过；richer classify/generateImages派发与provider image缺。 |
@@ -144,7 +147,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 ## 后续工作
 
-下一批优先 C.5。现有标记和亲和路径直接复用，在物理路由确定后捕获协议能力及实际缓存窗口，再沿同一次请求、摘要和预热验证。定向核查也确认 E.6 的成功运行结算、F2.6 的指标归属和跨进程传播，以及 T5.1 的会话 ID 排他创建均有独立可验证的缺口。
+下一批优先 E.6。已确认成功／取消agent_end与kernel事件未派发给扩展，原session生命周期按prompt。先复用原contribution／invocation补typed kernel事件与最终settlement，再分别补真实会话转换及返回值消费者；保留普通Hook拒绝／批准／持久化边界。F2.6指标归属／跨进程传播和T5.1排他创建仍有独立已核实缺口。
 
 ## 阶梯计价历史验收
 
