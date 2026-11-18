@@ -1,0 +1,134 @@
+{
+  "status": "passed",
+  "source": {
+    "packages/ts-shell/src/cli/runtime/extensions/navigation.ts": "8113fbb3671dea1c6d9862b54bb87aa9c822238731103c44d9d554b7660f0bee",
+    "packages/ts-shell/src/cli/runtime/navigation.events.test.ts": "57c6fa599743233dc13aca066072459109b43d922b117553039ad29397f347fa",
+    "packages/ts-shell/src/extensions/events/decision.test.ts": "5aead3f1b68a76ad9976cbabd60af16a61aee74812a63acc0e88b3c13d4a662f",
+    "packages/ts-shell/src/extensions/events/decision.ts": "541fdbf603f73c8bbfa399ce4010e50411c964645a030ffc978a713907dfc6df",
+    "packages/ts-shell/src/cli/runtime/navigation.ts": "7b5f56a75d679817741b848a23c7156bf0465d956bfbca844cb985d9e5eb068f",
+    "packages/ts-shell/src/core/catalog/contributions.ts": "036b5d51d36b626a66cb0d0cfb3a3b0f9e31a71ecde2cfb2bfe4872cc67f1aff",
+    "packages/ts-shell/src/core/hooks/extensionBridge.ts": "9dae4959bd740b5a78a6cd836fa374f775e2a0e357b87161491244dcdb7c815e",
+    "packages/ts-shell/src/extensions/events/dispatch.ts": "34d991ac757077e0ef82ba19a982bc0721d1c86ba028b0608749b3da73f5f32a",
+    "packages/ts-shell/src/extensions/events/model.ts": "53b019acb6bcc4bf39491e7e177b0054e3e4a78b794b94ee7ef2308e3f14c3fc",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "eb31c269e6a5c38494757317400643688825968a5ee43e97222ed54973fb5834",
+    "packages/ts-shell/src/index.ts": "cae895387a7014d0ca57ce471b7e8f3b7d79cf5f3943a06b68fa262fba4a2ecb"
+  },
+  "cases": [
+    {
+      "name": "before-tree-cancel",
+      "file": "cli/runtime/navigation.ts",
+      "beforeSha256": "7b5f56a75d679817741b848a23c7156bf0465d956bfbca844cb985d9e5eb068f",
+      "reversedSha256": "d374cb241c8f70bb9f3f6176442da1617e8808ed943ef98d46120162c240724e",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-before-tree-cancel.log",
+      "logSha256": "a0609760ca3d8329f6dfd0c305f35ae32e57e8635621547663f627dc47ca3056",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "tree-notification",
+      "file": "cli/runtime/navigation.ts",
+      "beforeSha256": "7b5f56a75d679817741b848a23c7156bf0465d956bfbca844cb985d9e5eb068f",
+      "reversedSha256": "81cd8b21af009c94432bbfcff90e848c6e13b38bd9706ba1a869d2dd324cc68e",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-tree-notification.log",
+      "logSha256": "e80b73b9f4773ff9b502b54d6f54f9a356034e8813ec5d7767eef5d539f3418d",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "post-tree-identity",
+      "file": "cli/runtime/navigation.ts",
+      "beforeSha256": "7b5f56a75d679817741b848a23c7156bf0465d956bfbca844cb985d9e5eb068f",
+      "reversedSha256": "707fbdcd6c05b2de519b47d9bdb4d7b7d68662d7c3e100c7028e374a6820adfe",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-post-tree-identity.log",
+      "logSha256": "03ee41d989d3b975b086415100fce2efaeee4f9ae19d5b158781646adc429469",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "post-tree-version",
+      "file": "cli/runtime/navigation.ts",
+      "beforeSha256": "7b5f56a75d679817741b848a23c7156bf0465d956bfbca844cb985d9e5eb068f",
+      "reversedSha256": "ae479b7501369a0cc1b0884dfeeccaf947d4db423ee6639a68cf936592d1ac26",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-post-tree-version.log",
+      "logSha256": "ced4c200f4188cd757e6eea8bbe745fcbc5ff4772f05cf1b4e16273076ba6483",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "pinned-generation",
+      "file": "cli/runtime/extensions/navigation.ts",
+      "beforeSha256": "8113fbb3671dea1c6d9862b54bb87aa9c822238731103c44d9d554b7660f0bee",
+      "reversedSha256": "5badf7f9b11546472ab7f7010c60ec9cfd07e7ce9cc68696914b499f989fe3f7",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-pinned-generation.log",
+      "logSha256": "6a66a74ec1eb8637cb026b7b68cdde8bd0260276f6d9338e8335c2d2b3f03d85",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "cancel-result-consumer",
+      "file": "core/hooks/extensionBridge.ts",
+      "beforeSha256": "9dae4959bd740b5a78a6cd836fa374f775e2a0e357b87161491244dcdb7c815e",
+      "reversedSha256": "f45c4e3b15af196559a1b90a0ab5a51a56e8974402d50f6279726731844c4682",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-cancel-result-consumer.log",
+      "logSha256": "099fdd1c97268291966c4b1e2ddbc925efc523de497b0d3656aded950180f104",
+      "terminalTests": "1 failed | 3 skipped (4)"
+    },
+    {
+      "name": "cancel-envelope",
+      "file": "extensions/events/dispatch.ts",
+      "beforeSha256": "34d991ac757077e0ef82ba19a982bc0721d1c86ba028b0608749b3da73f5f32a",
+      "reversedSha256": "c23a049b78ffae3c62a73e813267224153ff499c52ce382d788f530164d35afa",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-cancel-envelope.log",
+      "logSha256": "456219508e10fcb952d61bfd07a8bbf73f07305b9558835bca2d7991a63339a5",
+      "terminalTests": "1 failed | 3 skipped (4)"
+    }
+  ],
+  "restored": [
+    {
+      "name": "before-tree-cancel",
+      "exact": true
+    },
+    {
+      "name": "tree-notification",
+      "exact": true
+    },
+    {
+      "name": "post-tree-identity",
+      "exact": true
+    },
+    {
+      "name": "post-tree-version",
+      "exact": true
+    },
+    {
+      "name": "pinned-generation",
+      "exact": true
+    },
+    {
+      "name": "cancel-result-consumer",
+      "exact": true
+    },
+    {
+      "name": "cancel-envelope",
+      "exact": true
+    }
+  ],
+  "restoredTests": {
+    "exit": 0,
+    "assertionFailures": 0,
+    "log": "restored.log",
+    "logSha256": "d68d73b477dbe37bf87c437167e97c13a74a07c7aa24c8039dc1fb0d711bc5a1",
+    "terminalTests": "25 passed (25)"
+  },
+  "mainSourceUnchanged": true,
+  "privateTreeRemoved": true
+}

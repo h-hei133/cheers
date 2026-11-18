@@ -1,0 +1,287 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "node": "v20.3.0",
+  "buildId": "be5ec38906f03753bd7e68695c43f8230bf518d0636a6f23c31292033676693c",
+  "inputsDigest": "9eca8e4d0d284c92c68bbf3a059dea226d6438300ee3d70dd14851d0496aae59",
+  "live": false,
+  "installed": true,
+  "source": {
+    "packages/ts-shell/src/cli/runtime/extensions/navigation.ts": "8113fbb3671dea1c6d9862b54bb87aa9c822238731103c44d9d554b7660f0bee",
+    "packages/ts-shell/src/cli/runtime/navigation.events.test.ts": "57c6fa599743233dc13aca066072459109b43d922b117553039ad29397f347fa",
+    "packages/ts-shell/src/extensions/events/decision.test.ts": "5aead3f1b68a76ad9976cbabd60af16a61aee74812a63acc0e88b3c13d4a662f",
+    "packages/ts-shell/src/extensions/events/decision.ts": "541fdbf603f73c8bbfa399ce4010e50411c964645a030ffc978a713907dfc6df",
+    "packages/ts-shell/src/cli/runtime/navigation.ts": "7b5f56a75d679817741b848a23c7156bf0465d956bfbca844cb985d9e5eb068f",
+    "packages/ts-shell/src/core/catalog/contributions.ts": "036b5d51d36b626a66cb0d0cfb3a3b0f9e31a71ecde2cfb2bfe4872cc67f1aff",
+    "packages/ts-shell/src/core/hooks/extensionBridge.ts": "9dae4959bd740b5a78a6cd836fa374f775e2a0e357b87161491244dcdb7c815e",
+    "packages/ts-shell/src/extensions/events/dispatch.ts": "34d991ac757077e0ef82ba19a982bc0721d1c86ba028b0608749b3da73f5f32a",
+    "packages/ts-shell/src/extensions/events/model.ts": "53b019acb6bcc4bf39491e7e177b0054e3e4a78b794b94ee7ef2308e3f14c3fc",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "eb31c269e6a5c38494757317400643688825968a5ee43e97222ed54973fb5834",
+    "packages/ts-shell/src/index.ts": "cae895387a7014d0ca57ce471b7e8f3b7d79cf5f3943a06b68fa262fba4a2ecb"
+  },
+  "cases": [
+    {
+      "name": "sdk-rpc-tree-cancel-then-confirmed-navigation",
+      "status": "not_run",
+      "reason": "Internal runtime owners are not exported by the published graph; compiled CLI RPC is the real consumer.",
+      "posts": 0
+    },
+    {
+      "name": "sdk-post-tree-source-change-retires-draft",
+      "status": "not_run",
+      "reason": "Post-tree race is validated through the source integration test; internal runtime owner is not a public export.",
+      "posts": 0
+    },
+    {
+      "name": "sdk-create-prompt-dispose-owned-lifecycle",
+      "status": "passed",
+      "events": [
+        "session_start",
+        "session_shutdown"
+      ],
+      "promptRounds": 2,
+      "shutdownJoined": true,
+      "newOperationsRefused": true,
+      "posts": 2
+    },
+    {
+      "name": "sdk-active-settlement-before-shutdown",
+      "status": "passed",
+      "events": [
+        "agent_settled",
+        "settled_done",
+        "session_shutdown"
+      ],
+      "posts": 1
+    },
+    {
+      "name": "sdk-reloaded-generation-does-not-receive-old-shutdown",
+      "status": "passed",
+      "events": [
+        {
+          "name": "session_start",
+          "generation": 1
+        }
+      ],
+      "posts": 0
+    },
+    {
+      "name": "sdk-success-isolation-immutable-and-settlement",
+      "status": "passed",
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "agent_end",
+        "agent_settled"
+      ],
+      "immutable": true,
+      "latePromptRefused": true,
+      "siblingIsolated": true,
+      "settlementJoined": true,
+      "posts": 1
+    },
+    {
+      "name": "sdk-streaming-updates",
+      "status": "passed",
+      "updates": 1,
+      "posts": 1
+    },
+    {
+      "name": "sdk-failure-no-duplicate-end",
+      "status": "passed",
+      "failurePreserved": true,
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "agent_end",
+        "agent_settled"
+      ],
+      "posts": 1
+    },
+    {
+      "name": "sdk-cancellation-end-and-reuse",
+      "status": "passed",
+      "cancelledTerminal": true,
+      "reused": true,
+      "posts": 2
+    },
+    {
+      "name": "sdk-tool-update-and-followup-queue",
+      "status": "passed",
+      "events": [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_end",
+        "tool_execution_start",
+        "tool_execution_update",
+        "tool_execution_end",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "agent_end",
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "agent_end",
+        "agent_settled"
+      ],
+      "pendingUpdateJoined": true,
+      "followupLoops": 2,
+      "posts": 3
+    },
+    {
+      "name": "sdk-stop-repair-single-settlement",
+      "status": "passed",
+      "kernelLoops": 2,
+      "settlementCount": 1,
+      "realStopCommand": true,
+      "posts": 2
+    },
+    {
+      "name": "compiled-cli-rpc-tree-cancel-and-confirm",
+      "status": "passed",
+      "entryKeys": [
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ]
+      ],
+      "exit": 0,
+      "before": 2,
+      "after": 1,
+      "cancelUnchanged": true,
+      "posts": 3
+    }
+  ],
+  "providerRequests": [],
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "loopbackPosts": 16
+}

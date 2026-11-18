@@ -4,6 +4,16 @@
 
 只有一个 workspace 包。单个模块的 import 图无环不等于可以直接搬目录成为无环包：browser/core、workflow/core、planning/session/provider 的双向边存在。现有分支树、CAS 状态写入、任务日志、远端作业派发栅栏均已实现；问题是事务权威和独立模块边界未完成，不能重造另一套执行器或任务系统。
 
+## Tree navigation event admission (2026-11-19)
+
+复用原tree/revert/readback与摘要owner，不把导航套进第二commands.run。参考before-tree可取消、成功tree携actual old/new leaf且不重启会话的决定采用；本批只消费cancel，custom summary/instructions结果明确留开。before handler沿原bridge有界调用，原payload对每handler保持、true取消不可被false覆盖；inert snapshot和严格boolean拒绝getter／proxy／非法result，不吞成allow。bridge可由原consuming owner在每结果后停止，native notification仍忽略返回值。
+
+原contribution wrapper持有自身generation admission，导航捕获original runners且最终revert.beforeWrite再次检查；before返回后summary期间退休不能写。通知在实际readback/adopt之后，随后校验原session对象／roots／signal／runtime与保存version，晚到结果不会把旧draft交给后继，confirmed write明确保留。初7行为red／2control及review三red（post-context、post-version、summary-retire）先修；当前9文件172项、七门／2720modules／0monoliths与buildbe5ec38906f0通过。构建暴露readonly JSON array窄化与Promise false union两类型问题已修，聚焦恢复25项验证同source；7有效反转7AssertionErrors、exact恢复25项，单层identity check冗余control保留。
+
+Linux实际compiled CLI RPC两轮provider、取消导航再确认，共3POST、两before UI notices／一after，exit0通过；Node20.3同组通过。内部navigateSession与createRuntimeRpcHost未公开export的probe失败保留，不宣称SDK原生helper资格；public安装CLI实际RPC同场景通过，15strict类型／10native场景16POST。CLI get_entries外层entry envelope初观察错误仅修probe。配置模型provider-auth／0requests，normal judge容量not_proven保持。[当前交付](../../../.omx/artifacts/upgrade-navigation-2026-11-19/delivery.json)。
+
+switch前审计发现原current-session registry锁内reread后无source/destination CAS且忽略readError；tryResume expectedVersion/beforeActivate与metadata/selection仍是多文件分步，无回滚，readback未绑定activationId。下一子批沿原writer增加guarded caller、候选activation捕获和最终锁内比较，再通过neutral sessionChange port复用原activate/publish；不通过无条件resume(old)补偿，不宣称跨文件原子性。
+
 ## Session startup and shutdown ownership (2026-11-19)
 
 目标是让native session事件对应真正create/dispose，不再随prompt重复；普通SessionStart/End Hook原合同保留，删除两native别名。参考teardown先abort／join、shutdown后才invalidate，采用该顺序但保留本项目configuration、host、贡献与资源owner，不另建session runtime。SDK在resource binding／logical model／UI／permission准备后等待start，初始化失败走原完整cleanup。CLI在actual runtime与model准备和machine observer安装后等待start，cleanup在原run join与old shutdown之后才退休extensions。

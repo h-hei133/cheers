@@ -1,9 +1,9 @@
-export type ExtensionEventRunner = (
+export type ExtensionEventRunner = ((
   event: string,
   payload: unknown,
   aliases?: readonly string[],
   signal?: AbortSignal,
-) => Promise<unknown>;
+) => Promise<unknown>) & { readonly admission?: () => void };
 
 type ExtensionEventProvider = (root: string, sessionId?: string) => readonly ExtensionEventRunner[];
 
@@ -36,6 +36,8 @@ export async function dispatchExtensionEvent(
     readonly timeoutMs?: number;
     /** A caller may pin the audience before queuing an observational event. */
     readonly runners?: readonly ExtensionEventRunner[];
+    /** Event-specific consuming owners may stop dispatch before admitting a write. */
+    readonly consume?: (result: unknown) => boolean;
   } = {},
 ): Promise<ExtensionEventDispatch> {
   const { signal, admission } = options;
@@ -70,12 +72,13 @@ export async function dispatchExtensionEvent(
       if (cancelled()) return { delivered, failed, cancelled: true };
       // Observe both outcomes even if cancellation wins the bounded wait.
       const pending = Promise.resolve().then(() => {
-        if (cancelled()) return false;
-        return runner(event, payload, undefined, controller.signal).then(() => true);
-      }).then(success => ({ success }), () => ({ success: false }));
-      const result = await Promise.race([pending, cancellation.then(() => ({ success: false }))]);
+        if (cancelled()) return { success: false, value: undefined };
+        return runner(event, payload, undefined, controller.signal).then(value => ({ success: true, value }));
+      }).then(result => result, () => ({ success: false, value: undefined }));
+      const result = await Promise.race([pending, cancellation.then(() => ({ success: false, value: undefined }))]);
       if (cancelled()) return { delivered, failed, cancelled: true };
       if (result.success) delivered++; else failed++;
+      if (result.success && options.consume && !options.consume(result.value)) return { delivered, failed, cancelled: true };
     }
     return { delivered, failed, cancelled: false };
   } finally {

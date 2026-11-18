@@ -1,0 +1,149 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "node": "v20.3.0",
+  "buildId": "be5ec38906f03753bd7e68695c43f8230bf518d0636a6f23c31292033676693c",
+  "inputsDigest": "9eca8e4d0d284c92c68bbf3a059dea226d6438300ee3d70dd14851d0496aae59",
+  "live": false,
+  "installed": false,
+  "source": {
+    "packages/ts-shell/src/cli/runtime/extensions/navigation.ts": "8113fbb3671dea1c6d9862b54bb87aa9c822238731103c44d9d554b7660f0bee",
+    "packages/ts-shell/src/cli/runtime/navigation.events.test.ts": "57c6fa599743233dc13aca066072459109b43d922b117553039ad29397f347fa",
+    "packages/ts-shell/src/extensions/events/decision.test.ts": "5aead3f1b68a76ad9976cbabd60af16a61aee74812a63acc0e88b3c13d4a662f",
+    "packages/ts-shell/src/extensions/events/decision.ts": "541fdbf603f73c8bbfa399ce4010e50411c964645a030ffc978a713907dfc6df",
+    "packages/ts-shell/src/cli/runtime/navigation.ts": "7b5f56a75d679817741b848a23c7156bf0465d956bfbca844cb985d9e5eb068f",
+    "packages/ts-shell/src/core/catalog/contributions.ts": "036b5d51d36b626a66cb0d0cfb3a3b0f9e31a71ecde2cfb2bfe4872cc67f1aff",
+    "packages/ts-shell/src/core/hooks/extensionBridge.ts": "9dae4959bd740b5a78a6cd836fa374f775e2a0e357b87161491244dcdb7c815e",
+    "packages/ts-shell/src/extensions/events/dispatch.ts": "34d991ac757077e0ef82ba19a982bc0721d1c86ba028b0608749b3da73f5f32a",
+    "packages/ts-shell/src/extensions/events/model.ts": "53b019acb6bcc4bf39491e7e177b0054e3e4a78b794b94ee7ef2308e3f14c3fc",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "eb31c269e6a5c38494757317400643688825968a5ee43e97222ed54973fb5834",
+    "packages/ts-shell/src/index.ts": "cae895387a7014d0ca57ce471b7e8f3b7d79cf5f3943a06b68fa262fba4a2ecb"
+  },
+  "cases": [
+    {
+      "name": "compiled-cli-rpc-tree-cancel-and-confirm",
+      "status": "passed",
+      "entryKeys": [
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ],
+        [
+          "id",
+          "type",
+          "timestamp",
+          "entry"
+        ]
+      ],
+      "exit": 0,
+      "before": 2,
+      "after": 1,
+      "cancelUnchanged": true,
+      "posts": 3
+    }
+  ],
+  "providerRequests": [],
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "loopbackPosts": 3
+}

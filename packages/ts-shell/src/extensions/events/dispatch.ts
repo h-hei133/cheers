@@ -1,4 +1,5 @@
 import { isNotificationEvent } from './model.js';
+import { isSessionBeforeEvent, sessionCancellation } from './decision.js';
 import { createComponentLogger } from '../../observability/structuredLogger.js';
 
 const logger = createComponentLogger('extension-events');
@@ -13,6 +14,7 @@ export async function runEventHandlers(input: {
   readonly ownerSignal?: AbortSignal;
 }): Promise<unknown> {
   const notification = isNotificationEvent(input.event);
+  const sessionBefore = isSessionBeforeEvent(input.event);
   const admitted = () => {
     if (input.signal) AbortSignal.prototype.throwIfAborted.call(input.signal);
     if (input.ownerSignal) AbortSignal.prototype.throwIfAborted.call(input.ownerSignal);
@@ -31,8 +33,12 @@ export async function runEventHandlers(input: {
         continue;
       }
       admitted();
+      if (sessionBefore && result !== undefined) {
+        if (sessionCancellation(result)) return Object.freeze({ cancel: true });
+        continue;
+      }
       if (!notification && result !== undefined) current = result;
     }
   }
-  return matched ? current : undefined;
+  return sessionBefore ? Object.freeze({ cancel: false }) : matched ? current : undefined;
 }

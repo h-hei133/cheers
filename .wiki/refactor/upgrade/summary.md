@@ -6,6 +6,10 @@
 
 ## 当前批次的验证
 
+树导航已沿原revert／readback／summary消费session_before_tree取消与确认后的session_tree通知。固定同受众，取消／malformed／deadline／失败拒绝写；原generation在摘要等待后仍须通过最终写guard。post-tree晚回重新校验对象／signal／runtime／保存version，失效no draft且保留已确认写入。当前9文件172项、七门／2720modules／0monoliths、buildbe5ec38906f0、7反转7AssertionErrors／exact恢复25项通过，限定APPROVE。实际compiled CLI RPC两个before／一个after／3POST、Node20.3同组与安装15strict入口／10场景16POST通过。配置模型provider-auth／0requests，normaljudge仍exit2/not_proven；before-tree custom summary、switch/fork及其他结果消费者保持开放。[当前交付](../../../.omx/artifacts/upgrade-navigation-2026-11-19/delivery.json)。
+
+以下startup／shutdown子批已提交c8f0dd7f，保持原source范围。
+
 实际session_start／shutdown已从每轮prompt别名中移出。SDK资源／model／UI／permission完成后start；关闭先同步拒绝新消息、追加和UI，等待旧run，再通知原受众并退休generation。CLI结构化事件桥先于start回调，cleanup错误由共享结算保留。最终16文件255项、七门／2716modules／0monoliths、builddce69239cca0、9反转9AssertionErrors／exact恢复53项、Linuxcompiled11场景16POST与Node20.3同组、安装15入口strict类型／9场景13POST通过，限定APPROVE。当前CLI额外2POST／两shutdown warning证明实际两handler消费者。配置模型provider-auth／0requests，normal judge仍exit2/not_proven。switch/fork/tree、controlled reload、CLI startup UI时机和mutating results保持开放。[当前交付](../../../.omx/artifacts/upgrade-lifecycle-2026-11-19/delivery.json)。
 
 以下kernel子批已提交cb4f69d6，保持原source范围。

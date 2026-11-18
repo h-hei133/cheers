@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-19",
+  "batch": [
+    "E.6 tree cancellation and confirmed navigation notification"
+  ],
+  "status": "subbatch_linux_accepted_E6_open_repository_gate_not_proven",
+  "baseCommit": "c8f0dd7f3a31bc5a3f6006307fa7cdbe944e9a7f",
+  "delivery": {
+    "localCommit": "containing Git commit supplies identity",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "be5ec38906f03753bd7e68695c43f8230bf518d0636a6f23c31292033676693c",
+    "inputsDigest": "9eca8e4d0d284c92c68bbf3a059dea226d6438300ee3d70dd14851d0496aae59",
+    "inputDigestMatches": true,
+    "node": "24.15.0"
+  },
+  "source": {
+    "files": 11,
+    "hashesMatch": true,
+    "receipt": "evidence/source.json"
+  },
+  "validation": {
+    "combined": {
+      "files": 9,
+      "passed": 172,
+      "receipt": "raw.tar.gz::joint-final.log"
+    },
+    "static": {
+      "count": 7,
+      "passed": true,
+      "productionModules": 2720,
+      "monoliths": 0,
+      "receipt": "raw.tar.gz::static.log"
+    },
+    "reversal": {
+      "cases": 7,
+      "assertionFailures": 7,
+      "exactRestoration": true,
+      "mainSourceUnchanged": true,
+      "restoredPassed": 25,
+      "receipt": "evidence/reversal.json",
+      "redundantSingleIdentityGuardControl": true
+    },
+    "linux": {
+      "compiledCliPassed": 1,
+      "posts": 3,
+      "beforeNotifications": 2,
+      "afterNotifications": 1,
+      "privateStateRemoved": true,
+      "receipt": "evidence/native-cli-tree.json"
+    },
+    "nodeFloor": {
+      "runtime": "20.3.0",
+      "compiledCliPassed": 1,
+      "posts": 3,
+      "receipt": "evidence/native-cli-tree-node20.json"
+    },
+    "installed": {
+      "publicEntries": 15,
+      "strictTypes": true,
+      "nativePassed": 10,
+      "posts": 16,
+      "actualCliRpcTreePassed": true,
+      "receipt": "evidence/package.json"
+    },
+    "configuredProvider": {
+      "status": "failed",
+      "failureClass": "provider-auth",
+      "requests": 0,
+      "receipt": "evidence/native-live.json"
+    },
+    "normproof": {
+      "exit": 2,
+      "verdict": "not_proven",
+      "acceptedAsProof": false,
+      "reason": "pinned module graph exceeds 16384 edge capacity",
+      "scopeModified": false,
+      "gateModified": false,
+      "receipt": "evidence/judge-current.json"
+    }
+  },
+  "review": {
+    "status": "APPROVE",
+    "scopeLimited": true,
+    "validationRunByReviewer": false,
+    "receipt": "evidence/review.json"
+  },
+  "taskCount": {
+    "accepted": 36,
+    "open": 26,
+    "fullE6Accepted": false
+  },
+  "remaining": [
+    "session switch/fork",
+    "controlled reload",
+    "before-tree custom summaries",
+    "mutating message/tool/input/provider results"
+  ],
+  "boundaries": [
+    "Linux only",
+    "internal navigation owner is not a public SDK export",
+    "no live provider success",
+    "no push or CI"
+  ],
+  "evidenceStorage": {
+    "archive": "raw.tar.gz",
+    "index": "evidence/raw-index.json",
+    "rawBytesPreserved": true
+  }
+}

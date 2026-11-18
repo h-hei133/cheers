@@ -10,6 +10,9 @@ import { normalizePathIdentity } from '../../session/continuation/roots.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
 import { navigationLines } from '../output/navigation.js';
 import type { SessionMessage } from '../../session/schema/sessionMessage.js';
+import { extensionNavigation } from './extensions/navigation.js';
+import { readSessionFileVersion } from '../../session/store/version.js';
+import { createSessionStoreLayout, locateExistingSessionLayout } from '../../session/store/sessionFileLayout.js';
 
 /** The back chooser shares the bounded saved branch and its navigation version. */
 export async function readBackSource(
@@ -111,6 +114,19 @@ export async function navigateSession(input: {
       ...(point.prompt !== undefined ? { draft: point.prompt } : {}),
     };
   }
+  const events = extensionNavigation(context, () => {
+    signal?.throwIfAborted(); validate();
+    if (context.session.id !== sessionId || context.session.createdAt !== boundSession.createdAt || context.cwd !== cwd || context.projectRoot !== projectRoot) {
+      throw new Error('The active session changed during its navigation event.');
+    }
+    if (runtime.getState() === 'running') throw new Error('The session became busy during its navigation event.');
+  }, signal);
+  const accepted = await events.before({ type: 'session_before_tree', sessionId, workspaceRoot: cwd, targetEntryId: entryId,
+    oldLeafId: thread.activeLeafId ?? null, version });
+  if (!accepted) return { status: 'unchanged', changed: false, output: 'Session navigation cancelled before its write.' };
+  validate();
+  if (!isCurrent()) throw new Error('The active session changed during its navigation event.');
+  events.check();
   let dropped: number | undefined;
   let failed = false;
   let warning = 'A storage error was reported while navigating.';
@@ -120,6 +136,7 @@ export async function navigateSession(input: {
       () => {
         signal?.throwIfAborted();
         validate();
+        events.check();
         if (!isCurrent() || runtime.getState() === 'running') {
           throw new Error('The active session changed while preparing navigation.');
         }
@@ -184,6 +201,17 @@ export async function navigateSession(input: {
   };
   const restored = verified.session;
   adoptSession(context, restored);
+  await events.after({ type: 'session_tree', sessionId, workspaceRoot: cwd,
+    oldLeafId: thread.activeLeafId ?? null, newLeafId: verified.thread.activeLeafId ?? null });
+  try {
+    signal?.throwIfAborted(); validate(); events.check();
+    if (context.session !== restored || runtime.getState() === 'running') throw new Error('Navigation view changed.');
+    const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId);
+    if (readSessionFileVersion(layout) !== verified.version) throw new Error('Saved navigation changed.');
+  } catch {
+    return { status: 'changed-with-warning', changed: false,
+      output: 'The navigation write was confirmed, but its selected view changed during notification. Reopen the session tree before applying a draft.' };
+  }
   if (verified.thread.activeLeafId !== entryId) return {
     status: 'changed-with-warning', changed: true,
     output: `The active conversation is now at ${verified.thread.activeLeafId}. The requested entry is not active; its draft was not applied. Other branches and files are kept.`,

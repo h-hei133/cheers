@@ -2861,3 +2861,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** Native session events repeat on every prompt, shutdown disappears after resource retirement, or synchronous UI release schedules duplicate shutdown and loses an error for later callers.
 - **Root cause** Prompt Hook aliases are treated as session lifecycle, and cleanup mixes host admission, handler retirement and shared settlement ordering.
 - **Rule** Start native notifications from the prepared session owner. Synchronously refuse new host operations before cancelling and joining the old run, then notify its captured audience before retiring resources. Store the shared shutdown Promise before UI release callbacks can reenter, and retain release errors for every waiter while continuing cleanup. Install machine event observers before startup callbacks can submit a prompt. Retired UI uses its existing cancellation fallback; it does not grant permission or start another dialog.
+
+### Navigation Notification Waits Need Both Source And Generation Revalidation
+- **Symptom** A post-tree callback replaces the active view but navigation still returns its old draft, or an extension retires during summary and its accepted navigation still writes.
+- **Root cause** The original write CAS does not cover a later notification await, and callback-generation checks end at the callback instead of the eventual write.
+- **Rule** Pin each admitted extension generation and recheck it in the original write owner's final guard. After notification, recheck the adopted view, runtime state, signal and saved version before returning a draft. Preserve a confirmed write as confirmed while withholding a stale draft; never retry or compensate with an unconditional activation.

@@ -1,0 +1,51 @@
+{
+  "status": "failed",
+  "platform": "linux",
+  "node": "v24.15.0",
+  "buildId": "be5ec38906f03753bd7e68695c43f8230bf518d0636a6f23c31292033676693c",
+  "inputsDigest": "9eca8e4d0d284c92c68bbf3a059dea226d6438300ee3d70dd14851d0496aae59",
+  "live": true,
+  "installed": false,
+  "source": {
+    "packages/ts-shell/src/cli/runtime/extensions/navigation.ts": "8113fbb3671dea1c6d9862b54bb87aa9c822238731103c44d9d554b7660f0bee",
+    "packages/ts-shell/src/cli/runtime/navigation.events.test.ts": "57c6fa599743233dc13aca066072459109b43d922b117553039ad29397f347fa",
+    "packages/ts-shell/src/extensions/events/decision.test.ts": "5aead3f1b68a76ad9976cbabd60af16a61aee74812a63acc0e88b3c13d4a662f",
+    "packages/ts-shell/src/extensions/events/decision.ts": "541fdbf603f73c8bbfa399ce4010e50411c964645a030ffc978a713907dfc6df",
+    "packages/ts-shell/src/cli/runtime/navigation.ts": "7b5f56a75d679817741b848a23c7156bf0465d956bfbca844cb985d9e5eb068f",
+    "packages/ts-shell/src/core/catalog/contributions.ts": "036b5d51d36b626a66cb0d0cfb3a3b0f9e31a71ecde2cfb2bfe4872cc67f1aff",
+    "packages/ts-shell/src/core/hooks/extensionBridge.ts": "9dae4959bd740b5a78a6cd836fa374f775e2a0e357b87161491244dcdb7c815e",
+    "packages/ts-shell/src/extensions/events/dispatch.ts": "34d991ac757077e0ef82ba19a982bc0721d1c86ba028b0608749b3da73f5f32a",
+    "packages/ts-shell/src/extensions/events/model.ts": "53b019acb6bcc4bf39491e7e177b0054e3e4a78b794b94ee7ef2308e3f14c3fc",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "eb31c269e6a5c38494757317400643688825968a5ee43e97222ed54973fb5834",
+    "packages/ts-shell/src/index.ts": "cae895387a7014d0ca57ce471b7e8f3b7d79cf5f3943a06b68fa262fba4a2ecb"
+  },
+  "cases": [
+    {
+      "name": "configured-provider-native-events",
+      "status": "failed",
+      "failureClass": "provider-auth",
+      "events": [],
+      "terminal": "stopped_error",
+      "posts": 0
+    }
+  ],
+  "providerRequests": [],
+  "configuredTarget": {
+    "providerSha256": "7e341752813dcf844ffc5197123e0f41f6cfe860a8ea52cb8f92749667afc142",
+    "modelSha256": "1e2d53ebb53c779c090d004202999080f1b6aa48b3c5bffa5b7946921d18d729",
+    "connectionSha256": "3b1acfc0a8e86a1c8a555959021b73d11ab3aa251190d8cc4863e6e9f6670f70"
+  },
+  "failure": {
+    "stage": "configured-provider-native-events",
+    "name": "Error",
+    "code": "live-terminal",
+    "messageSha256": "9045d630af7e9f42b548011018c05e53bddf6298725518426f5269281a2c57c7",
+    "classification": "provider-auth",
+    "sourceLocation": "at check (file:///home/wang/projects/cheers/.tmp/upgrade-navigation/native.mjs:17:66)"
+  },
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "loopbackPosts": 0
+}

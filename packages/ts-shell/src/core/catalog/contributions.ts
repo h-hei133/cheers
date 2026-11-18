@@ -6,6 +6,7 @@ import type { Skill } from '../skills/skillLoader.js';
 import type { SkillDiscovery } from '../skills/discovery.js';
 import type { ToolDefinition } from '../../tools/types.js';
 import { registerExtensionEventProvider } from '../hooks/extensionBridge.js';
+import type { ExtensionEventRunner } from '../hooks/extensionBridge.js';
 import type { CatalogProvider } from '../models/catalog.js';
 import type { CapturedVirtualModelDefinition } from '../models/virtual/contract.js';
 import { captureVirtualDefinitions, MAX_VIRTUAL_MODELS } from '../models/virtual/capture.js';
@@ -52,7 +53,7 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
     identities.add(key);
   }
   const originalOnEvent = entry.onEvent;
-  const onEvent: CatalogContribution['onEvent'] = originalOnEvent && (async (event, payload, aliases, callerSignal) => {
+  const onEvent: ExtensionEventRunner | undefined = originalOnEvent && Object.assign(async (event: string, payload: unknown, aliases?: readonly string[], callerSignal?: AbortSignal) => {
     admission();
     const currentSignal = callerSignal ? AbortSignal.any([eventLifetime.signal, callerSignal]) : eventLifetime.signal;
     const assertCurrentSignal = AbortSignal.prototype.throwIfAborted.bind(currentSignal);
@@ -60,7 +61,7 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
     const result = await originalOnEvent(event, payload, aliases, currentSignal);
     admission(); assertCurrentSignal();
     return result;
-  });
+  }, { admission });
   const captured = Object.freeze({ ...entry, root: path.resolve(entry.root), virtualModels, ...(onEvent ? { onEvent } : {}) });
   const retire = () => {
     if (!active) return;
