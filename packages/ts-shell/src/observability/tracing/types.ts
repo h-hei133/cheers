@@ -34,6 +34,7 @@ export type SpanStatus =
 
 export interface StoredSpanEvent {
   readonly name: string;
+  /** Elapsed milliseconds from the span's start. */
   readonly timeMs: number;
   readonly attributes: SpanAttributes;
 }

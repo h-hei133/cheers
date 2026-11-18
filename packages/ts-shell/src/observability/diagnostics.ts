@@ -15,14 +15,17 @@ export interface LogRead {
   readonly filesInspected: number;
   readonly unreadableFiles: number;
   readonly filesTruncated?: boolean;
+  readonly limitReached?: boolean;
   readonly bytesRead?: number;
 }
 
 /** Read bounded, already-redacted structured records from all log shards. */
-export function readStructuredLogs(directory: string, currentPath: string, limit = 200): LogRead {
+export function readStructuredLogs(directory: string, currentPath: string, limit = 200,
+  accept?: (entry: StructuredLogEntry) => boolean): LogRead {
   let directoryUnavailable = false;
   let unreadableFiles = 0;
   let filesTruncated = false;
+  let limitReached = false;
   const files = orderedLogFiles(directory, currentPath, {
     onUnavailable: target => { if (target === 'directory') directoryUnavailable = true; else unreadableFiles += 1; },
     maxEntries: LOG_DIRECTORY_ENTRIES, maxFiles: LOG_FILE_LIMIT,
@@ -33,6 +36,7 @@ export function readStructuredLogs(directory: string, currentPath: string, limit
   let filesInspected = unreadableFiles;
   let bytesRead = 0;
   for (const file of files) {
+    if (entries.length > limit) { limitReached = true; break; }
     const remaining = LOG_TOTAL_BYTES - bytesRead;
     if (remaining <= 0) { filesTruncated = true; break; }
     filesInspected += 1;
@@ -40,18 +44,22 @@ export function readStructuredLogs(directory: string, currentPath: string, limit
     try {
       lines = tailLines(file, Math.min(LOG_TAIL_BYTES, remaining), {
         strict: true, onBytes: bytes => { bytesRead += bytes; },
+        onTruncated: () => { filesTruncated = true; },
       });
     }
     catch { unreadableFiles += 1; continue; }
-    for (let index = lines.length - 1; index >= 0 && entries.length < limit; index -= 1) {
+    for (let index = lines.length - 1; index >= 0 && entries.length <= limit; index -= 1) {
       const entry = parseEntry(lines[index]!);
-      if (entry) entries.push(entry);
+      if (entry && (!accept || accept(entry))) entries.push(entry);
     }
-    if (entries.length >= limit) break;
+    if (entries.length > limit) { limitReached = true; break; }
+    if (entries.length === limit && !accept) break;
   }
   const status = unreadableFiles === 0 && !filesTruncated ? 'reported'
     : unreadableFiles === filesInspected && entries.length === 0 ? 'unavailable' : 'partial';
-  return { entries: entries.reverse(), status, filesInspected, unreadableFiles, filesTruncated, bytesRead };
+  const ordered = entries.reverse();
+  if (ordered.length > limit) ordered.splice(0, ordered.length - limit);
+  return { entries: ordered, status, filesInspected, unreadableFiles, filesTruncated, limitReached, bytesRead };
 }
 
 function parseEntry(line: string): StructuredLogEntry | undefined {
@@ -89,6 +97,8 @@ export interface TraceRow {
   readonly durationMs?: number;
   readonly component: string;
   readonly message: string;
+  readonly events?: readonly { readonly name: string; readonly timestamp: string; readonly endpoint?: string }[];
+  readonly links?: readonly { readonly traceId: string; readonly spanId: string }[];
 }
 
 function stringField(fields: Record<string, unknown>, key: string): string | undefined {

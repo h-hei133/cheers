@@ -15,6 +15,7 @@ import type { MessageConverter, MessageProjection } from '../core/agent/messages
 import { sameContext } from '../core/agent/context.js';
 import type { EventChannel } from './stream.js';
 import { rememberToolRequests, traceOperation } from '../observability/tracing/context.js';
+import { RESPONSE_ACCEPTED } from '../observability/tracing/operations.js';
 import { randomUUID } from 'node:crypto';
 import { types } from 'node:util';
 import { TurnPreparationError } from './context/prepare.js';
@@ -55,7 +56,9 @@ function tracedStep(step: StepFunction): StepFunction {
         onRequestSent: request => {
           sent = true;
           usageInput = preparedCaptured ? preparedUsageInput : endpointShape(request.endpoint).usageInput;
-          span?.setAttributes({ endpoint: request.endpoint ?? 'unknown', prepared: true });
+          const endpoint = request.endpoint ?? 'unknown';
+          span?.setAttributes({ endpoint, prepared: true });
+          span?.addEvent(RESPONSE_ACCEPTED, { endpoint });
           options.onRequestSent?.(request);
         },
         onPreparedContext: prepared => {

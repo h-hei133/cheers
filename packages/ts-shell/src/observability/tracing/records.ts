@@ -1,10 +1,12 @@
 import type { AttributeValue, SpanAttributes, SpanStatus, StoredSpan } from './types.js';
+import type { StructuredLogEntry } from '../types.js';
 
 export const MAX_SPAN_BYTES = 32 * 1024;
+export const MAX_SPAN_ATTRIBUTES = 32;
 export const MAX_SPAN_EVENTS = 16;
 export const MAX_SPAN_LINKS = 8;
 
-export function copyAttributes(attributes?: SpanAttributes, limit = 32): SpanAttributes {
+export function copyAttributes(attributes?: SpanAttributes, limit = MAX_SPAN_ATTRIBUTES): SpanAttributes {
   const result: Record<string, AttributeValue> = Object.create(null) as Record<string, AttributeValue>;
   for (const [name, value] of Object.entries(attributes ?? {}).slice(0, limit)) {
     const key = name.slice(0, 96);
@@ -49,7 +51,7 @@ export function copyStoredSpan(span: StoredSpan): StoredSpan {
 function validAttributes(value: unknown): value is SpanAttributes {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const entries = Object.entries(value);
-  return entries.length <= 32 && entries.every(([key, item]) => key.length <= 96 && (
+  return entries.length <= MAX_SPAN_ATTRIBUTES && entries.every(([key, item]) => key.length <= 96 && (
     (typeof item === 'string' && item.length <= 256) || typeof item === 'boolean' || (typeof item === 'number' && Number.isFinite(item)) ||
     (Array.isArray(item) && item.length <= 16 && (item.every(v => typeof v === 'string' && v.length <= 128) ||
       item.every(v => typeof v === 'boolean') || item.every(v => typeof v === 'number' && Number.isFinite(v))))
@@ -73,4 +75,8 @@ export function isValidStoredSpan(value: unknown): value is StoredSpan {
   return Array.isArray(span.links) && span.links.length <= MAX_SPAN_LINKS && span.links.every(link => link && typeof link.traceId === 'string' &&
     /^[0-9a-f]{32}$/.test(link.traceId) && typeof link.spanId === 'string' && /^[0-9a-f]{16}$/.test(link.spanId) &&
     (link.attributes === undefined || validAttributes(link.attributes)));
+}
+
+export function isStoredSpanLog(entry: StructuredLogEntry): entry is StructuredLogEntry & { fields: { storedSpan: StoredSpan } } {
+  return entry.component === 'span' && isValidStoredSpan(entry.fields.storedSpan);
 }

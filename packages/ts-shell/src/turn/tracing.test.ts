@@ -95,7 +95,43 @@ it('records actual session, requests and tool execution in ordinary logs read by
   const response = await fetch(`${traceDashboardStatus()!.url}data`);
   const data = await response.json() as { coverage: { status: string }; rows: Array<{ component: string; requestId?: string; toolId?: string }> };
   expect(data.coverage.status).toBe('partial');
-  expect(data.rows).toContainEqual(expect.objectContaining({ component: 'tool.execute', toolId: 'lookup-call', requestId: request.attributes.requestId }));
+  expect(data.rows).toContainEqual(expect.objectContaining({ component: 'tool.execute', toolId: 'lookup-call', requestId: request.attributes.requestId,
+    links: [{ traceId: request.traceId, spanId: request.id }] }));
+});
+
+it.each([200, 400])('projects accepted response events through the actual trace command (HTTP %i)', async status => {
+  const root = '/tmp/cheers-test';
+  fs.mkdirSync(root, { recursive: true });
+  const directory = fs.mkdtempSync(path.join(root, 'trace-response-'));
+  directories.push(directory);
+  const sink = new RotatingFileSink({ logDir: directory });
+  setGlobalRotatingFileSink(sink);
+  const store = new JsonlTraceStore({ sink, sessionId: 'trace-run' });
+  const step = createStepFunction({ sessionId: 'trace-run', workspaceRoot: process.cwd(), systemPrompt: '', tools: [],
+    provider: { provider: 'fixture', model: 'fixture', endpoint: 'openai-compatible', baseUrl: 'https://fixture.invalid/v1', headers: {} },
+    fetchImpl: async () => new Response(JSON.stringify({ choices: [{ message: { content: 'private fixture response' }, finish_reason: 'stop' }] }),
+      { status, headers: { 'content-type': 'application/json' } }),
+  });
+  await drain(setup(step, { telemetry: store }));
+  const request = store.readAllSpans().find(span => span.name === 'provider.request');
+  expect(request?.status.status).toBe(status === 200 ? 'ok' : 'error');
+  expect(request?.events).toEqual(status === 200 ? [expect.objectContaining({ name: 'response.accepted',
+    attributes: { endpoint: 'openai-compatible' } })] : []);
+
+  await runTraceCommand(['open'], { cwd: process.cwd(), sessionId: 'trace-run' });
+  const url = traceDashboardStatus()!.url;
+  const raw = await (await fetch(url + 'data')).text();
+  const { rows } = JSON.parse(raw) as { rows: Array<{ spanId: string; events?: { timestamp: string }[] }> };
+  const row = rows.find(item => item.spanId === request?.id);
+  expect(row?.events).toEqual(status === 200 ? [expect.objectContaining({ name: 'response.accepted', endpoint: 'openai-compatible' })] : undefined);
+  if (status === 200) {
+    const timestamp = Date.parse(row!.events![0]!.timestamp);
+    expect(timestamp).toBeGreaterThanOrEqual(Math.floor(request!.startedMs));
+    expect(timestamp).toBeLessThanOrEqual(request!.endedMs);
+  }
+  const markup = await (await fetch(url)).text();
+  expect(markup.includes('response.accepted')).toBe(status === 200);
+  expect(raw + markup).not.toContain('private fixture response');
 });
 
 it('records accepted cancellation without usage as aborted and unknown', async () => {

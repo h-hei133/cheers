@@ -18,6 +18,8 @@ import { ShellCommandRuntime } from '../../core/shell/command.js';
 import { SubmissionQueue } from './inputQueue.js';
 import { attachSubmissionQueue } from '../runtime/inputQueue.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
+import { closeTraceDashboard } from '../../observability/traceDashboard.js';
+import { RotatingFileSink, setGlobalRotatingFileSink } from '../../observability/rotatingFileSink.js';
 
 function createHarness(root = "/tmp/project-alpha") {
   const lines: string[] = [];
@@ -71,6 +73,45 @@ function createHarness(root = "/tmp/project-alpha") {
 }
 
 describe("interactive command router", () => {
+  it('requires a fresh trace dashboard after a blocked publication is corrected', async () => {
+    const scratch = path.join(os.tmpdir(), 'cheers-test');
+    fs.mkdirSync(scratch, { recursive: true });
+    const root = fs.mkdtempSync(path.join(scratch, 'trace-route-'));
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const harness = createHarness(root);
+    const { configuration } = harness.input.runtimeContext as { configuration: ConfigState };
+    const { requested, binding } = configuration.current;
+    const sink = new RotatingFileSink({ logDir: path.join(root, 'logs') });
+    setGlobalRotatingFileSink(sink);
+    const open = async () => {
+      harness.lines.length = 0;
+      await routeInteractiveCommand({ ...harness.input, prompt: '/trace open' });
+      const url = harness.lines.join('\n').match(/http:\/\/127\.0\.0\.1:\d+\//)?.[0];
+      expect(url).toBeDefined();
+      return url!;
+    };
+    try {
+      const original = await open();
+      expect(configuration.publish(configuration.begin(binding), requested, binding).status).toBe('applied');
+      expect((await fetch(original + 'data')).status).toBe(200);
+      expect(configuration.rejectCandidate(configuration.begin(binding), binding, ['Blocked test candidate'], true).status)
+        .toBe('rejected');
+      expect(configuration.current.admissionBlocked).toBe(true);
+      expect(configuration.publish(configuration.begin(binding), requested, binding).status).toBe('applied');
+      const retired = await fetch(original + 'data');
+      expect(retired.status).toBe(409);
+      expect(await retired.text()).toBe('The captured trace source is unavailable.');
+      const reopened = await open();
+      expect((await fetch(reopened + 'data')).status).toBe(200);
+    } finally {
+      await closeTraceDashboard();
+      setGlobalRotatingFileSink(null);
+      sink.flushAndClose();
+      vi.unstubAllEnvs();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it.each(['add ', ''])('retains images when queue %s is routed into the pending submission owner', async prefix => {
     const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
     const root = fs.mkdtempSync(path.join(scratch, 'queued-route-images-'));

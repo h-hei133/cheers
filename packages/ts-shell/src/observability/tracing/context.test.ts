@@ -101,6 +101,19 @@ describe('bound tracing', () => {
     expect(logged.find(entry => entry.message === 'second')!.traceId).toBe(b[0]!.traceId);
   });
 
+  it('retains session and workspace identity when caller span attributes reach the limit', async () => {
+    const recorder = new InMemoryTraceStore();
+    const attributes = Object.fromEntries(Array.from({ length: 32 }, (_, index) => [`caller.${index}`, index]));
+    await runTraceScope(recorder, { sessionId: 'bounded-session', workspaceRoot: '/bounded/workspace' },
+      { name: 'session.run', attributes }, () => {});
+    const [span] = recorder.snapshot();
+    expect(Object.keys(span!.attributes)).toHaveLength(32);
+    expect(span!.attributes).toMatchObject({ sessionId: 'bounded-session', workspaceRoot: '/bounded/workspace' });
+    expect(typeof span!.attributes.workspaceIdentity).toBe('string');
+    expect(span!.attributes['caller.28']).toBe(28);
+    expect(span!.attributes['caller.29']).toBeUndefined();
+  });
+
   it('keeps missing propagation identity rather than borrowing a long-lived logger identity', async () => {
     const logger = createComponentLogger('existing', {
       traceId: 'a'.repeat(32), spanId: 'b'.repeat(16), parentSpanId: 'c'.repeat(16),

@@ -2,6 +2,10 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { StructuredLogEntry } from '../types.js';
 import type { SpanOptions, TelemetryCarrier, TelemetryContext, TelemetrySpan } from './types.js';
 import { recordSpan } from './safe.js';
+import { workspaceIdentity } from './scope.js';
+import { MAX_SPAN_ATTRIBUTES } from './records.js';
+import type { SpanAttributes } from './types.js';
+import type { OperationName, OperationOptions, OperationSpan } from './operations.js';
 
 /** The sink is captured by the run owner, including its profile storage scope. */
 export interface TraceLogSink {
@@ -16,9 +20,19 @@ export interface TraceScope {
   readonly sink?: TraceLogSink;
 }
 
+type CapturedTraceScope = TraceScope & { readonly workspaceIdentity: string };
+
+function scopedAttributes(attributes: SpanAttributes | undefined, scope: CapturedTraceScope): SpanAttributes {
+  const reserved = new Set(['sessionId', 'workspaceRoot', 'workspaceIdentity']);
+  const retained = Object.entries(attributes ?? {}).filter(([name]) => !reserved.has(name))
+    .slice(0, MAX_SPAN_ATTRIBUTES - reserved.size);
+  return { sessionId: scope.sessionId, workspaceRoot: scope.workspaceRoot,
+    workspaceIdentity: scope.workspaceIdentity, ...Object.fromEntries(retained) };
+}
+
 interface ActiveTrace {
   readonly span: TelemetrySpan;
-  readonly scope: TraceScope;
+  readonly scope: CapturedTraceScope;
   readonly traceId?: string;
   readonly spanId?: string;
   readonly parentSpanId?: string;
@@ -48,8 +62,8 @@ export function runTraceScope<T>(
   options: SpanOptions,
   callback: (span: TelemetrySpan) => T | Promise<T>,
 ): Promise<T> {
-  const captured = Object.freeze({ ...scope });
-  return recordSpan(recorder, options, span => {
+  const captured = Object.freeze({ ...scope, workspaceIdentity: workspaceIdentity(scope.workspaceRoot) });
+  return recordSpan(recorder, { ...options, attributes: scopedAttributes(options.attributes, captured) }, span => {
     const carrier = span.propagation?.inject(span);
     return activeTrace.run({ span, scope: captured, ...identity(carrier),
       toolRequests: new Map(),
@@ -58,20 +72,18 @@ export function runTraceScope<T>(
 }
 
 /** Unbound callers retain their ordinary behavior; traced callers inherit the run. */
-export function traceOperation<T>(
-  options: SpanOptions,
-  callback: (span: TelemetrySpan | undefined) => T | Promise<T>,
+export function traceOperation<Name extends OperationName, T>(
+  options: OperationOptions<Name>,
+  callback: (span: OperationSpan<Name> | undefined) => T | Promise<T>,
 ): Promise<T> {
   const parent = currentTrace();
   if (!parent) return Promise.resolve().then(() => callback(undefined));
-  return parent.span.startSpan({ ...options, attributes: {
-    ...options.attributes, sessionId: parent.scope.sessionId, workspaceRoot: parent.scope.workspaceRoot,
-  } }, span => {
+  return parent.span.startSpan({ ...options, attributes: scopedAttributes(options.attributes, parent.scope) }, span => {
     const carrier = span.propagation?.inject(span);
     return activeTrace.run({ span, scope: parent.scope, ...identity(carrier), parentSpanId: parent.spanId,
       toolRequests: parent.toolRequests,
     }, async () => {
-      try { return await callback(span); }
+      try { return await callback(span as OperationSpan<Name>); }
       catch (error) {
         // Provider bodies and arbitrary thrown values must not become trace text.
         span.setStatus({ status: 'error', error: { name: 'OperationError', message: 'Operation failed.' } });

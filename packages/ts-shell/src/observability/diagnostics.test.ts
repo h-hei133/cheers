@@ -51,6 +51,43 @@ describe('diagnostic trace projection', () => {
     } finally { fs.rmSync(directory, { recursive: true, force: true }); }
   });
 
+  it('does not report the matching-row cap when the available rows end exactly at the cap', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-diag-exact-limit-'));
+    try {
+      const file = path.join(directory, 'one.log');
+      const record = { timestamp: 't', level: 'info', component: 'wanted', message: 'one', fields: {} };
+      fs.writeFileSync(file, JSON.stringify(record) + '\n');
+      const read = readStructuredLogs(directory, file, 1, entry => entry.component === 'wanted');
+      expect(read).toMatchObject({ status: 'reported', limitReached: false });
+      expect(read.entries.map(entry => entry.message)).toEqual(['one']);
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it('retains the newest matching rows when lookahead detects more than the limit', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-diag-lookahead-'));
+    try {
+      const file = path.join(directory, 'current.log');
+      const rows = Array.from({ length: 4 }, (_, index) => ({ timestamp: 't', level: 'info', component: 'wanted',
+        message: `row-${index + 1}`, fields: {} }));
+      fs.writeFileSync(file, rows.map(row => JSON.stringify(row)).join('\n') + '\n');
+      const read = readStructuredLogs(directory, file, 3);
+      expect(read.entries.map(entry => entry.message)).toEqual(['row-2', 'row-3', 'row-4']);
+      expect(read.limitReached).toBe(true);
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it('reports partial coverage when one shard tail omits its earlier records', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-diag-one-shard-'));
+    try {
+      const file = path.join(directory, 'current.log');
+      const record = { timestamp: 't', level: 'info', component: 'wanted', message: 'older-match', fields: {} };
+      fs.writeFileSync(file, `${JSON.stringify(record)}\n${'x'.repeat(LOG_TAIL_BYTES + 1)}`);
+      const read = readStructuredLogs(directory, file, 1, entry => entry.component === 'wanted');
+      expect(read).toMatchObject({ status: 'partial', filesTruncated: true });
+      expect(read.entries).toHaveLength(0);
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+
   it('reports unavailable when enumeration finds only unreadable files', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-diag-'));
     try {

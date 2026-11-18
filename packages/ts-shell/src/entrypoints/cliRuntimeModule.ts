@@ -212,6 +212,7 @@ export async function runNonInteractivePrompt(options: {
     compactionMeasurement: options.runtimeContext.compactionMeasurement,
     readConfiguration: () => options.runtimeContext.configuration.current,
     admission: configurationAdmission(options.runtimeContext),
+    configurationRevocation: () => options.runtimeContext.configuration.revocationRevision,
     refreshRuntimeConfig: scope => {
       return refreshShellRuntimeConfig(options.runtimeContext, scope);
     },

@@ -40,7 +40,11 @@ export function orderedLogFiles(directory: string, currentPath: string, options:
     && (!options.familyOnly || name === base || (name.startsWith(`${base}.`) && /^\d+$/.test(name.slice(base.length + 1)))))
     .flatMap((name) => {
       const file = path.join(directory, name);
-      try { const stat = fs.statSync(file); return stat.isFile() ? [{ file, time: stat.mtimeMs }] : []; } catch (error) {
+      try {
+        if (fs.lstatSync(file).isSymbolicLink()) throw new Error('Log shards must be regular files.');
+        const stat = fs.statSync(file);
+        return stat.isFile() ? [{ file, time: stat.mtimeMs }] : [];
+      } catch (error) {
         options.onUnavailable?.('file');
         if (!options.strict || (error as NodeJS.ErrnoException).code === "ENOENT") return [];
         throw error;
@@ -58,12 +62,15 @@ export function orderedLogFiles(directory: string, currentPath: string, options:
 
 /** A bounded tail, retaining only whole lines and respecting short reads. */
 export function tailLines(file: string, maxBytes = LOG_TAIL_BYTES,
-  options: { strict?: boolean; onBytes?: (bytes: number) => void } = {}): string[] {
+  options: { strict?: boolean; onBytes?: (bytes: number) => void; onTruncated?: () => void } = {}): string[] {
   let handle: number | undefined;
   try {
-    handle = fs.openSync(file, "r");
-    const size = fs.fstatSync(handle).size;
+    handle = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0));
+    const stat = fs.fstatSync(handle);
+    if (!stat.isFile()) throw new Error('Log shards must be regular files.');
+    const size = stat.size;
     const start = Math.max(0, size - maxBytes);
+    if (start > 0) options.onTruncated?.();
     const buffer = Buffer.alloc(size - start);
     let read = 0;
     while (read < buffer.length) {

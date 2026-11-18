@@ -117,7 +117,10 @@ export class StructuredLogger {
       parentSpanId: active ? active.parentSpanId : this.traceContext.parentSpanId,
       component: this.component,
       message: redactSecrets(message),
-      fields: redactSecretsFromObject(fields) as Record<string, unknown>,
+      fields: redactSecretsFromObject(active ? { ...fields,
+        sessionId: active.scope.sessionId, workspaceRoot: active.scope.workspaceRoot,
+        workspaceIdentity: active.scope.workspaceIdentity,
+      } : fields) as Record<string, unknown>,
     }
 
     if (globalSink) {

@@ -2,12 +2,13 @@ import { getGlobalRotatingFileSink } from '../rotatingFileSink.js';
 import { JsonlTraceStore } from './jsonlStore.js';
 import { runTraceScope, type TraceScope } from './context.js';
 import { InMemoryTraceStore } from './span.js';
-import type { TelemetryContext, TelemetrySpan } from './types.js';
+import type { TelemetryContext } from './types.js';
+import type { OperationSpan } from './operations.js';
 
 /** Capture storage once; async settlement never re-resolves the current profile. */
 export function runSessionTrace<T>(
   identity: { readonly sessionId: string; readonly workspaceRoot: string },
-  callback: (span: TelemetrySpan) => T | Promise<T>,
+  callback: (span: OperationSpan<'session.run'>) => T | Promise<T>,
   recorder?: TelemetryContext,
 ): Promise<T> {
   const persist = !process.env.VITEST && process.env.NODE_ENV !== 'test';
