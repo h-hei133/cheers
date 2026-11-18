@@ -2866,3 +2866,8 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** A post-tree callback replaces the active view but navigation still returns its old draft, or an extension retires during summary and its accepted navigation still writes.
 - **Root cause** The original write CAS does not cover a later notification await, and callback-generation checks end at the callback instead of the eventual write.
 - **Rule** Pin each admitted extension generation and recheck it in the original write owner's final guard. After notification, recheck the adopted view, runtime state, signal and saved version before returning a draft. Preserve a confirmed write as confirmed while withholding a stale draft; never retry or compensate with an unconditional activation.
+
+### Session Activation CAS Must Follow Its Last Callback And Native Rename
+- **Symptom** An asynchronous session choice overwrites a later activation, or failed lock release reads the same session ID and mistakes a successor activation for its own.
+- **Root cause** Locked reread lacks captured source/destination comparisons, and callback or fsync/retry gaps remain after admission.
+- **Rule** Explicit guarded callers compare captured source and destination records, including absent state, unique activation identity and legacy time. Recheck admission around reading, take the final fresh CAS after callbacks, and repeat at each native rename. Capture a prepared candidate before locking, then read back its exact activation only after all saved-file acquisitions. Metadata and selection are separate writes; registry refusal does not prove no metadata write, and cleanup failure cannot become clean success.

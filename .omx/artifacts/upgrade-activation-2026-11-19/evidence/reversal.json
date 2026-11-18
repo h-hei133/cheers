@@ -1,0 +1,160 @@
+{
+  "status": "passed",
+  "source": {
+    "packages/ts-shell/src/session/store/activation.test.ts": "be8b09156b7ea15aa2b22298470bd1afba5ba290a0939f11f6cf3aa2f6fcfaa0",
+    "packages/ts-shell/src/session/store/activation.ts": "ab39dfcc73c4a7241aaa653ede69f379856120196a35f6dfc21a91aef979c5d3",
+    "packages/ts-shell/src/session/SessionManager.ts": "630e9b901c5107bee68b7bcf886871f3a909b17c1a53e39c21ffd7eb8d63bdc9",
+    "packages/ts-shell/src/session/recovery/sessionResume.ts": "69bc90942d946c75e2b38f3e9f81db3e244a75f62e823209f910b85056ca4d38",
+    "packages/ts-shell/src/session/sessionReadSurface.ts": "ab2147129930349864d2e18ce9329456a63ee8971d173a4c3251c8f9ae68291e",
+    "packages/ts-shell/src/session/store/currentSessionRegistry.ts": "ca7588624e2f34c935a543b8aeebe779909c3a3f02120822e64a7667f251c8ac",
+    "packages/ts-shell/src/session/store/sessionStoreAccess.ts": "e6a1b6ddf2fc83301d157b9923f5f8728842193a0d3ee19fba92d81ec43684dd"
+  },
+  "cases": [
+    {
+      "name": "selection-cas",
+      "file": "session/store/activation.ts",
+      "beforeSha256": "ab39dfcc73c4a7241aaa653ede69f379856120196a35f6dfc21a91aef979c5d3",
+      "reversedSha256": "ab0eff3b9510519a6b8b3cd977b4e34a678a0593d66271005e73f3dfdec74205",
+      "exit": 1,
+      "assertionFailures": 3,
+      "log": "reversal-selection-cas.log",
+      "logSha256": "238125495c355123120475b6f76f3981b6b0984c7f9260aa16b00433552ee6ba",
+      "terminalTests": "5 failed | 15 skipped (20)"
+    },
+    {
+      "name": "activation-identity",
+      "file": "session/store/activation.ts",
+      "beforeSha256": "ab39dfcc73c4a7241aaa653ede69f379856120196a35f6dfc21a91aef979c5d3",
+      "reversedSha256": "cd1258cb71def60386d86bb482975c6bb7acf2f990f37bebef0072836911a40f",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-activation-identity.log",
+      "logSha256": "2b5f9669fb475bb8631875946dbdf16ea708a147cb4e9b8cc882b2bdd8c890a5",
+      "terminalTests": "2 failed | 18 skipped (20)"
+    },
+    {
+      "name": "legacy-time",
+      "file": "session/store/activation.ts",
+      "beforeSha256": "ab39dfcc73c4a7241aaa653ede69f379856120196a35f6dfc21a91aef979c5d3",
+      "reversedSha256": "860c76ee71d98fab0dd4c6f92b3a692af5de712dbf605c1c1b6ba293ba5c02fb",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-legacy-time.log",
+      "logSha256": "b2028e2a40ef8bd8041984c625aed7eb6751a71db9a333502ad37b61673b6d95",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "registry-unreadable",
+      "file": "session/store/activation.ts",
+      "beforeSha256": "ab39dfcc73c4a7241aaa653ede69f379856120196a35f6dfc21a91aef979c5d3",
+      "reversedSha256": "6424c8055b16b269fa5da271db4aca18fba91abd3aa2555c3ee4b6ac45d66734",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-registry-unreadable.log",
+      "logSha256": "f3f2ceb013efc3d62e4617cd59f098a075931d6d85a563e16f5bce949bfa6f23",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "rename-guard",
+      "file": "session/store/currentSessionRegistry.ts",
+      "beforeSha256": "ca7588624e2f34c935a543b8aeebe779909c3a3f02120822e64a7667f251c8ac",
+      "reversedSha256": "d12b790316fc7aceb87431d10801891d2ebfd8a1c1306cb0da5acc4f84c84f0a",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-rename-guard.log",
+      "logSha256": "c1dc2d38f0115ac73dff02d39e49c0d3541b9003a98fe12f59bfbf8694f6dc89",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "post-read-admission",
+      "file": "session/store/activation.ts",
+      "beforeSha256": "ab39dfcc73c4a7241aaa653ede69f379856120196a35f6dfc21a91aef979c5d3",
+      "reversedSha256": "77041366dd9395aeb6db2aafb9ee7e376455c567f4e5357daf03d277c727f420",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-post-read-admission.log",
+      "logSha256": "6730933638aa913d2f5e41fde58f5526be9131678ab3d6d62541c84651bff95c",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "candidate-capture",
+      "file": "session/store/currentSessionRegistry.ts",
+      "beforeSha256": "ca7588624e2f34c935a543b8aeebe779909c3a3f02120822e64a7667f251c8ac",
+      "reversedSha256": "cfda3fca576197d8d8c3579c7a9668e7d06678d6ec63c9a46b96551a2c5a654d",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-candidate-capture.log",
+      "logSha256": "1f70a77a2ad78e88abe554428faade5be3b7b91d0e0e18f78e287f7b8e82953a",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "resume-guard",
+      "file": "session/SessionManager.ts",
+      "beforeSha256": "630e9b901c5107bee68b7bcf886871f3a909b17c1a53e39c21ffd7eb8d63bdc9",
+      "reversedSha256": "79ef4343719bdd65bef10e0b758a8c0fc6d6bd67f7295a88160da906af35a03c",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-resume-guard.log",
+      "logSha256": "7e83b0214882050fb104c4260b82ed2ff4bf6c6bb74ff64d540f66caaf0a97a9",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "readback-activation",
+      "file": "session/recovery/sessionResume.ts",
+      "beforeSha256": "69bc90942d946c75e2b38f3e9f81db3e244a75f62e823209f910b85056ca4d38",
+      "reversedSha256": "c11ba73f8c7e5b843d066f8d91a91724c297ef09b490cb7d5b022ccc967ca714",
+      "exit": 1,
+      "assertionFailures": 2,
+      "log": "reversal-readback-activation.log",
+      "logSha256": "c60b2e98a5bd662061c93d5e8ccbf45cf5561967e4b59d5bef0594d2145ad80a",
+      "terminalTests": "2 failed | 18 skipped (20)"
+    }
+  ],
+  "restored": [
+    {
+      "name": "selection-cas",
+      "exact": true
+    },
+    {
+      "name": "activation-identity",
+      "exact": true
+    },
+    {
+      "name": "legacy-time",
+      "exact": true
+    },
+    {
+      "name": "registry-unreadable",
+      "exact": true
+    },
+    {
+      "name": "rename-guard",
+      "exact": true
+    },
+    {
+      "name": "post-read-admission",
+      "exact": true
+    },
+    {
+      "name": "candidate-capture",
+      "exact": true
+    },
+    {
+      "name": "resume-guard",
+      "exact": true
+    },
+    {
+      "name": "readback-activation",
+      "exact": true
+    }
+  ],
+  "restoredTests": {
+    "exit": 0,
+    "assertionFailures": 0,
+    "log": "restored.log",
+    "logSha256": "add1bf340276f1616f4a57d21987dc47c509fb55e2236955a52d624cb92aaf58",
+    "terminalTests": "30 passed (30)"
+  },
+  "mainSourceUnchanged": true,
+  "privateTreeRemoved": true
+}

@@ -23,8 +23,8 @@
 ## Current status
 
 **Current phase** 按批实施。36/62 项完成 Linux 本地功能验收，26 项开放。
-**Completed batch** E.6 tree取消／确认通知子批，整项仍部分。9文件172项、七静态检查／2720modules／0monoliths、7有效反转7AssertionErrors／exact恢复25项；buildbe5ec38906f0实际CLI RPC取消和确认两个before／一个after／3POST，Node20.3同组及安装15入口strict类型／10场景16POST通过，限定APPROVE。startup／shutdown已提交c8f0dd7f，保持此前source证据。
-**Next batch** E.6 switch／fork。先补原current-session registry的guarded锁内source/destination激活CAS，再接异步before／旧shutdown／原事务／受控重绑和start。CLI interactive/RPC start UI、controlled reload和可修改结果仍缺；不称完整E.6完成。
+**Completed batch** E.6 switch前置guarded activation。原registry锁内source/destination CAS／rename重试准入、candidate身份与resume最终readback已实施；8文件142项、七门／2722modules／0monoliths、9反转12AssertionErrors／exact恢复30项及build1f30f283e030通过。Linux公开SDK和Node20.3同激活场景、安装15strict入口／11场景16POST通过，限定APPROVE。tree已提交de8d2c0b，保持此前source证据。
+**Next batch** E.6 switch／fork异步before→旧shutdown→原guarded事务→受控重绑→start。CLI interactive/RPC start UI、controlled reload和可修改结果仍缺；metadata和selection仍非跨文件原子事务。
 **Repository gate** 当前normal judgeexit2/not_proven，16384图容量缺口；pinned输入未改。定向script29项与完整209/210为前批历史，不升为当前script验证。
 **Evidence boundary** 当前构建配置模型provider-auth，0requests；Linux本地HTTP／安装证据不证明真实服务或其他平台。本轮仅本地按批提交，不push或宣称CI。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
@@ -41,7 +41,7 @@
 
 ## Adaptive control
 
-E.6导航子批实际L，复用10/10，原revert/readback／summary／contribution／bridge owner保持，无新增依赖或事件总线。额外依赖2项：post-notification session/version重新准入与summary间generation退休写前检查；均真实red后修。7有效反转全部AssertionError，单层post-identity去掉仍被其他guard阻止为冗余control，组合相关source guard后才称有效反转。未导出内部owner probe保持harness失败，actual CLI RPC验收替代；36/62与goal active不变，switch/result和完整UI start仍开放。
+E.6激活前置实际L，复用10/10，原registry/state锁／atomic writer／resume/readback owner保持，无新依赖或事务系统。额外依赖4项：fsync/rename取消、admission自重入、load期间同id再激活、final read后撤权；均实际red后修。首probe在锁内再setter自死锁与named fs import spy缺syncBuiltinESMExports为fixture误用，已修并重验；源码窄化调整导致首reversal代际失效记录历史，最终9/12exact通过。36/62与goal active不变，switch本体未验收；metadata partial和normaljudge容量not_proven保留。
 
 当前Linux功能验收任务数为32/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.8、C.9、E.5、E.1、F2.2、F2.4和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 

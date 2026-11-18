@@ -22,6 +22,7 @@ import { forgetSessionTodos } from "../core/commands/todoCommandRuntime.js";
 import { sessionHasReentrySurface } from "./presentation/sessionReentrySurface.js";
 import type { SessionFiles } from './store/files.js';
 import type { SessionCatalog } from './store/catalog/index.js';
+import type { SessionActivationOptions } from './store/activation.js';
 import { buildRecoverySnapshotForSession } from "./recovery/sessionRecoveryRuntime.js";
 import {
   SessionLifecycleWrites,
@@ -108,8 +109,8 @@ export abstract class SessionReadSurface extends SessionLifecycleWrites {
     return this.host.store.resolveCurrentSessionForProject(projectRoot);
   }
 
-  setCurrentSessionForProject(projectRoot: string, sessionId: string): void {
-    this.host.store.setCurrentSessionForProject(projectRoot, sessionId);
+  setCurrentSessionForProject(projectRoot: string, sessionId: string, options?: SessionActivationOptions): void {
+    this.host.store.setCurrentSessionForProject(projectRoot, sessionId, options);
   }
 
   clearCurrentSessionForProject(projectRoot: string): void {

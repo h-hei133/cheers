@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import { randomUUID } from 'node:crypto';
-import { withFileLock, writeJsonFileAtomic } from "./sessionFileStore.js";
+import { withFileLock, writeJsonFileAtomic, writeTextFileAtomic } from "./sessionFileStore.js";
 import type { Session } from "../schema/sessionRecord.js";
 import {
   createEmptyCurrentSessionSelectionStore,
@@ -12,6 +12,7 @@ import {
 } from "./currentSelection.js";
 import { normalizePathIdentity } from '../continuation/roots.js';
 import { projectCurrentSessionMetadata } from "../sessionMetadataProjection.js";
+import { captureActivationGuard, assertActivationGuard, type SessionActivationOptions } from './activation.js';
 
 export interface SessionRegistryReadResult {
   readonly store: CurrentSessionSelectionStore;
@@ -247,27 +248,35 @@ export function setCurrentSessionSelection(input: {
   readonly projectRoot: string;
   readonly sessionId: string;
   readonly updatedAt: string;
-}): void {
+} & SessionActivationOptions): void {
+  input = { ...input };
   const normalizedProjectRoot = normalizePathIdentity(input.projectRoot) ?? '';
   const normalizedSessionId = input.sessionId.trim();
   if (!normalizedProjectRoot || !normalizedSessionId) {
+    if (input.guard) throw new Error('Current session activation target is unavailable.');
     return;
   }
+  const guard = captureActivationGuard(input.guard);
+  const candidate = Object.freeze({ sessionId: normalizedSessionId, updatedAt: input.updatedAt, activationId: randomUUID() });
+  input.captureSelection?.(candidate);
 
   // Whole-registry writers must reread after acquisition so an unrelated
   // project's stale snapshot cannot resurrect a superseded activation.
   withFileLock(`${input.storePath}.lock`, () => {
-    const current = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]).store;
-    writeSessionRegistryStore({
-      storePath: input.storePath,
-      store: projectCurrentSessionSelectionStore({
-        current,
-        normalizedProjectRoot,
-        sessionId: normalizedSessionId,
-        updatedAt: input.updatedAt,
-        activationId: randomUUID(),
-      }),
+    const read = () => readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]);
+    assertActivationGuard(guard, read, normalizedProjectRoot);
+    const registry = read();
+    const current = registry.store;
+    const store = projectCurrentSessionSelectionStore({
+      current,
+      normalizedProjectRoot,
+      sessionId: normalizedSessionId,
+      updatedAt: input.updatedAt,
+      activationId: candidate.activationId,
     });
+    if (guard) writeTextFileAtomic(input.storePath, JSON.stringify(store, null, 2), undefined,
+      { beforeRename: () => assertActivationGuard(guard, read, normalizedProjectRoot) });
+    else writeSessionRegistryStore({ storePath: input.storePath, store });
   }, { recovery: 'local-dead' });
 }
 

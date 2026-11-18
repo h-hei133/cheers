@@ -2,6 +2,7 @@ import type {
   CurrentSessionSelectionResolution,
   CurrentSessionSelectionRecord,
 } from "./currentSelection.js";
+import type { SessionActivationOptions } from './activation.js';
 import type { Session } from "../schema/sessionRecord.js";
 import type {
   SessionStateSnapshot,
@@ -201,7 +202,7 @@ export class SessionStoreAccess extends SessionStorePaths {
     });
   }
 
-  setCurrentSessionForProject(projectRoot: string, sessionId: string): void {
+  setCurrentSessionForProject(projectRoot: string, sessionId: string, options?: SessionActivationOptions): void {
     assertSessionStoreProfile(this.storeLayout, this.storeLayout.currentSessionStorePath);
     setCurrentSessionSelection({
       storePath: this.storeLayout.currentSessionStorePath,
@@ -209,6 +210,7 @@ export class SessionStoreAccess extends SessionStorePaths {
       projectRoot,
       sessionId,
       updatedAt: new Date().toISOString(),
+      ...options,
     });
   }
 

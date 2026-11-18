@@ -4,6 +4,16 @@
 
 只有一个 workspace 包。单个模块的 import 图无环不等于可以直接搬目录成为无环包：browser/core、workflow/core、planning/session/provider 的双向边存在。现有分支树、CAS 状态写入、任务日志、远端作业派发栅栏均已实现；问题是事务权威和独立模块边界未完成，不能重造另一套执行器或任务系统。
 
+## Guarded session activation prerequisite (2026-11-19)
+
+原registry setter虽locked reread，仍无caller source/destination CAS且忽略readError。异步before后调用会覆写竞争者的新selection。沿原setter添加可选activation guard，source/destination显式absent、完整sessionId/time/activationId捕获；普通caller默认合同保留。candidate在锁前捕获仅表示prepared，方便rename后release失败的readback，不把callback当write proof。
+
+guarded writer先callback／native取消，read后callback重查，最终fresh registry CAS和native check；每次atomic rename通过原beforeRename再执行同guard。不在最终CAS后外部callback，admission自重入无法覆写新source。resume沿SessionManager／read surface／store回调传入同guard，metadata写后保存version和candidate；存储失败readback先load／file检查，再最后读本次activation记录，后继同id不能沿旧snapshot获ok。registry拒绝时metadata可能先写，expectedVersion路径如实unknown；无补偿回滚或跨文件原子性声明。
+
+13反例初red中self-lock fixture误用先修，仍13red；resume两red／一control、review四类red（fsync取消、readback load重激活、admission reentry、final read撤权）修复。named fs import spy需syncBuiltinESMExports，只改probe。最终8文件142项、七门／2722modules／0monoliths、build1f30f283e030输入摘要核验、限定APPROVE；9有效反转12AssertionErrors和exact恢复30项通过。首反转受后续TypeScript selected窄化source调整而失效，保留历史、不当当前完成。
+
+Linux公开compiled SDK actual guarded resume拒绝保留source／成功candidate落盘／取消保留target通过，Node20.3同场景。安装15strict入口／11native场景16POST及同SDK激活通过；默认judge容量exit2/not_proven仍开，不另作配置模型请求，原授权模型的前批鉴权失败为历史。原配置source未改／private清理。[当前交付](../../../.omx/artifacts/upgrade-activation-2026-11-19/delivery.json)。完整E.6 switch/fork尚未接入；neutral sessionChange需避免join自己的command，保留activation/publish不同阶段guard。
+
 ## Tree navigation event admission (2026-11-19)
 
 复用原tree/revert/readback与摘要owner，不把导航套进第二commands.run。参考before-tree可取消、成功tree携actual old/new leaf且不重启会话的决定采用；本批只消费cancel，custom summary/instructions结果明确留开。before handler沿原bridge有界调用，原payload对每handler保持、true取消不可被false覆盖；inert snapshot和严格boolean拒绝getter／proxy／非法result，不吞成allow。bridge可由原consuming owner在每结果后停止，native notification仍忽略返回值。

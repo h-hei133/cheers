@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "node": "v20.3.0",
+  "buildId": "1f30f283e030599bf74a193dde7454279e04eb09b0d129fed9a1eb0f74c6d47a",
+  "inputsDigest": "66c2cedd3595004ef2d145e896479367f2b0c465be22165e124eb8f2f045e245",
+  "live": false,
+  "installed": false,
+  "source": {
+    "packages/ts-shell/src/session/store/activation.test.ts": "be8b09156b7ea15aa2b22298470bd1afba5ba290a0939f11f6cf3aa2f6fcfaa0",
+    "packages/ts-shell/src/session/store/activation.ts": "ab39dfcc73c4a7241aaa653ede69f379856120196a35f6dfc21a91aef979c5d3",
+    "packages/ts-shell/src/session/SessionManager.ts": "630e9b901c5107bee68b7bcf886871f3a909b17c1a53e39c21ffd7eb8d63bdc9",
+    "packages/ts-shell/src/session/recovery/sessionResume.ts": "69bc90942d946c75e2b38f3e9f81db3e244a75f62e823209f910b85056ca4d38",
+    "packages/ts-shell/src/session/sessionReadSurface.ts": "ab2147129930349864d2e18ce9329456a63ee8971d173a4c3251c8f9ae68291e",
+    "packages/ts-shell/src/session/store/currentSessionRegistry.ts": "ca7588624e2f34c935a543b8aeebe779909c3a3f02120822e64a7667f251c8ac",
+    "packages/ts-shell/src/session/store/sessionStoreAccess.ts": "e6a1b6ddf2fc83301d157b9923f5f8728842193a0d3ee19fba92d81ec43684dd"
+  },
+  "cases": [
+    {
+      "name": "compiled-sdk-guarded-resume-activation",
+      "status": "passed",
+      "refusedPreservesSource": true,
+      "acceptedCandidateMatches": true,
+      "cancelledPreservesTarget": true,
+      "posts": 0
+    }
+  ],
+  "providerRequests": [],
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "sourceUnchanged": true,
+  "buildUnchanged": true,
+  "loopbackPosts": 0
+}

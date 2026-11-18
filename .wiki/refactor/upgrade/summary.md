@@ -6,6 +6,10 @@
 
 ## 当前批次的验证
 
+switch前置的guarded activation已沿原registry／atomic writer／resume完成。锁内比较source/destination含absent、activationId和legacy时间；每次rename前重新准入和CAS，candidate捕获不代表写成。resume失败读回必须最终匹配本次activationId与saved version，后继同ID保持unknown。8文件142项、七門／2722modules／0monoliths、build1f30f283e030、9反转12AssertionErrors／exact恢复30项通过，限定APPROVE。Linux公开SDK及Node20.3激活资格、安装15strict入口／11场景16POST通过，原配置与source不变。只保证guarded registry不覆盖新选择；target metadata可能先写，不声称跨文件原子。完整switch/fork与其余26项仍开放。[当前交付](../../../.omx/artifacts/upgrade-activation-2026-11-19/delivery.json)。
+
+以下tree子批已提交de8d2c0b，保持原source范围。
+
 树导航已沿原revert／readback／summary消费session_before_tree取消与确认后的session_tree通知。固定同受众，取消／malformed／deadline／失败拒绝写；原generation在摘要等待后仍须通过最终写guard。post-tree晚回重新校验对象／signal／runtime／保存version，失效no draft且保留已确认写入。当前9文件172项、七门／2720modules／0monoliths、buildbe5ec38906f0、7反转7AssertionErrors／exact恢复25项通过，限定APPROVE。实际compiled CLI RPC两个before／一个after／3POST、Node20.3同组与安装15strict入口／10场景16POST通过。配置模型provider-auth／0requests，normaljudge仍exit2/not_proven；before-tree custom summary、switch/fork及其他结果消费者保持开放。[当前交付](../../../.omx/artifacts/upgrade-navigation-2026-11-19/delivery.json)。
 
 以下startup／shutdown子批已提交c8f0dd7f，保持原source范围。

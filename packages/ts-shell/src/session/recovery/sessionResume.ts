@@ -5,6 +5,9 @@ import { projectSessionFileLayout } from '../store/sessionFileLayout.js';
 import { readSessionFileVersion } from '../store/version.js';
 import { withSessionStateLock } from '../store/sessionStateStore.js';
 import { normalizePathIdentity } from '../continuation/roots.js';
+import type { SessionActivationOptions } from '../store/activation.js';
+import { captureActivationGuard } from '../store/activation.js';
+import type { CurrentSessionSelectionRecord } from '../store/currentSelection.js';
 
 export type SessionResumeResult =
   | { ok: true; session: Session; warning?: string }
@@ -14,6 +17,7 @@ export interface SessionResumeOptions {
   readonly mode?: "runtime-recovery" | "continuity-only";
   readonly expectedVersion?: string;
   readonly beforeActivate?: () => void;
+  readonly activation?: SessionActivationOptions;
 }
 
 interface SessionResumeCallbacks {
@@ -24,7 +28,9 @@ interface SessionResumeCallbacks {
   readonly setCurrentSessionForProject: (
     projectRoot: string,
     sessionId: string,
+    options?: SessionActivationOptions,
   ) => void;
+  readonly readCurrentSessionSelection?: (projectRoot: string) => CurrentSessionSelectionRecord | undefined;
   readonly getCurrentSessionForProject?: (projectRoot: string) => Session | null;
   readonly evaluateRecoveryTrustBoundary: (
     session: Session,
@@ -60,7 +66,18 @@ export function tryResumeSession(
   let activated: Session | undefined;
   let activatedVersion: string | undefined;
   let activationStarted = false;
+  let candidate: CurrentSessionSelectionRecord | undefined;
+  let publishedSession: Session | undefined;
+  let publishedVersion: string | undefined;
+  let activationOptions: SessionActivationOptions | undefined;
   try {
+    if (options?.activation) {
+      const capture = options.activation.captureSelection;
+      activationOptions = { guard: captureActivationGuard(options.activation.guard), captureSelection: value => {
+        candidate = value;
+        capture?.(value);
+      } };
+    }
     const validate = (): void => {
       options?.beforeActivate?.();
       if (options?.expectedVersion !== undefined) {
@@ -88,7 +105,12 @@ export function tryResumeSession(
       validate();
       if (session.id !== sessionId) throw new Error('The stored session identity does not match the selected session.');
       activationStarted = true;
-      activated = activateSession(callbacks, session, projectRoot);
+      activated = activateSession(callbacks, session, projectRoot, activationOptions, value => {
+        publishedSession = value;
+        if (activationOptions) publishedVersion = readSessionFileVersion(projectSessionFileLayout({
+          sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId,
+        }));
+      });
       if (options?.expectedVersion !== undefined) {
         activatedVersion = readSessionFileVersion(projectSessionFileLayout({
           sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId,
@@ -100,6 +122,23 @@ export function tryResumeSession(
       : withSessionStateLock(projectSessionFileLayout({ sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId }),
         activate, { requireExisting: true });
   } catch (error) {
+    if (publishedSession && candidate && options?.expectedVersion !== undefined && activationOptions) {
+      try {
+        const layout = projectSessionFileLayout({ sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId });
+        const current = callbacks.loadSession(sessionId);
+        const unchanged = publishedVersion !== undefined && readSessionFileVersion(layout) === publishedVersion;
+        const selected = callbacks.readCurrentSessionSelection?.(publishedSession.projectRoot || callbacks.cwd());
+        if (selected && selected.activationId === candidate.activationId && selected.sessionId === candidate.sessionId
+          && selected.updatedAt === candidate.updatedAt && current.id === publishedSession.id
+          && current.createdAt === publishedSession.createdAt && current.updatedAt === publishedSession.updatedAt
+          && normalizePathIdentity(current.projectRoot) === normalizePathIdentity(publishedSession.projectRoot)
+          && unchanged) {
+          return { ok: true, session: current, warning: 'The saved session activation was verified, but its storage lock could not be released. Restart before changing saved sessions.' };
+        }
+      } catch { /* A missing or replaced activation remains unknown. */ }
+      return { ok: false, activation: 'unknown', error: 'Saved session activation could not be verified after a storage failure.',
+        recoveryHint: 'Restart and inspect the current saved session before continuing.' };
+    }
     if (activationStarted && options?.expectedVersion !== undefined) {
       // Cleanup can fail after publication. Reread both the exact saved files
       // and durable selection before adopting that committed activation.
@@ -129,7 +168,7 @@ export function tryResumeSession(
   }
 }
 
-function activateSession(callbacks: SessionResumeCallbacks, loaded: Session, projectRoot?: string): Session {
+function activateSession(callbacks: SessionResumeCallbacks, loaded: Session, projectRoot?: string, options?: SessionActivationOptions, prepared?: (session: Session) => void): Session {
   const session: Session = {
     ...loaded,
     projectRoot: loaded.projectRoot?.trim() ? loaded.projectRoot : projectRoot?.trim() || loaded.projectRoot,
@@ -139,6 +178,7 @@ function activateSession(callbacks: SessionResumeCallbacks, loaded: Session, pro
   // Metadata stores identity and time. Durable status stays recoverable until
   // the runtime reentry boundary writes state; selection alone is not execution.
   callbacks.writeSessionMetadata(session);
-  callbacks.setCurrentSessionForProject(session.projectRoot || callbacks.cwd(), session.id);
+  prepared?.(session);
+  callbacks.setCurrentSessionForProject(session.projectRoot || callbacks.cwd(), session.id, options);
   return session;
 }

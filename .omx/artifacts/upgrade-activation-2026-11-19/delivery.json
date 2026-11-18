@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-19",
+  "batch": [
+    "E.6 guarded activation prerequisite"
+  ],
+  "status": "subbatch_linux_accepted_E6_open_repository_gate_not_proven",
+  "baseCommit": "de8d2c0ba6d9b06aa2c3d6002f66f29af783888d",
+  "delivery": {
+    "localCommit": "containing Git commit supplies identity",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "1f30f283e030599bf74a193dde7454279e04eb09b0d129fed9a1eb0f74c6d47a",
+    "inputsDigest": "66c2cedd3595004ef2d145e896479367f2b0c465be22165e124eb8f2f045e245",
+    "inputDigestMatches": true,
+    "node": "24.15.0"
+  },
+  "source": {
+    "files": 7,
+    "hashesMatch": true,
+    "receipt": "evidence/source.json"
+  },
+  "validation": {
+    "combined": {
+      "files": 8,
+      "passed": 142,
+      "receipt": "raw.tar.gz::joint-reviewed.log"
+    },
+    "static": {
+      "count": 7,
+      "passed": true,
+      "productionModules": 2722,
+      "monoliths": 0,
+      "receipt": "raw.tar.gz::build-final.log"
+    },
+    "reversal": {
+      "cases": 9,
+      "assertionFailures": 12,
+      "exactRestoration": true,
+      "mainSourceUnchanged": true,
+      "restoredPassed": 30,
+      "receipt": "evidence/reversal.json",
+      "earlierSourceGenerationRetired": true
+    },
+    "linux": {
+      "compiledSdkPassed": 1,
+      "providerRequests": 0,
+      "privateStateRemoved": true,
+      "receipt": "evidence/native-activation.json"
+    },
+    "nodeFloor": {
+      "runtime": "20.3.0",
+      "codeGenerationDisabled": true,
+      "compiledSdkPassed": 1,
+      "receipt": "evidence/native-activation-node20.json"
+    },
+    "installed": {
+      "publicEntries": 15,
+      "strictTypes": true,
+      "nativePassed": 11,
+      "posts": 16,
+      "guardedResumePassed": true,
+      "receipt": "evidence/package.json"
+    },
+    "configuredProvider": {
+      "status": "not_run_this_prerequisite",
+      "earlierE6Attempt": "provider-auth with zero requests"
+    },
+    "normproof": {
+      "exit": 2,
+      "verdict": "not_proven",
+      "acceptedAsProof": false,
+      "reason": "pinned module graph exceeds 16384 edge capacity",
+      "scopeModified": false,
+      "gateModified": false,
+      "receipt": "evidence/judge-current.json"
+    }
+  },
+  "review": {
+    "status": "APPROVE",
+    "scopeLimited": true,
+    "validationRunByReviewer": false,
+    "receipt": "evidence/review.json"
+  },
+  "taskCount": {
+    "accepted": 36,
+    "open": 26,
+    "fullE6Accepted": false
+  },
+  "remaining": [
+    "session switch/fork lifecycle coordination",
+    "controlled reload and startup UI timing",
+    "event result consumers"
+  ],
+  "boundaries": [
+    "Linux only",
+    "registry refusal does not prove no metadata write",
+    "metadata and selection are separate publications",
+    "no push or CI"
+  ],
+  "evidenceStorage": {
+    "archive": "raw.tar.gz",
+    "index": "evidence/raw-index.json",
+    "rawBytesPreserved": true
+  }
+}

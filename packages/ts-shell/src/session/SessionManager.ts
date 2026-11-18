@@ -8,6 +8,7 @@
  */
 
 import type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
+import type { SessionActivationOptions } from './store/activation.js';
 import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "./approval/sessionApprovalMemory.js";
 import { type TranscriptEvent } from "./sessionEventCodec.js";
 import { forkSession, type SessionForkOptions } from './branch/create.js';
@@ -105,8 +106,9 @@ export class SessionManager extends SessionReentrySurface {
       loadSession: (sessionId: string) => this.host.store.load(sessionId),
       writeSessionMetadata: (session: Session) =>
         this.host.store.writeSessionMetadata(session),
-      setCurrentSessionForProject: (projectRoot: string, sessionId: string) =>
-        this.setCurrentSessionForProject(projectRoot, sessionId),
+      setCurrentSessionForProject: (projectRoot: string, sessionId: string, options?: SessionActivationOptions) =>
+        this.setCurrentSessionForProject(projectRoot, sessionId, options),
+      readCurrentSessionSelection: (projectRoot: string) => this.host.store.readCurrentSessionSelection(projectRoot),
       getCurrentSessionForProject: (projectRoot: string) => this.host.store.getCurrentSessionForProject(projectRoot, { readOnly: true }),
       evaluateRecoveryTrustBoundary: (session: Session) =>
         this.evaluateRecoveryTrustBoundary(session),
