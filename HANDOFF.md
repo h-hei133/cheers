@@ -2792,3 +2792,51 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A default-fs spy sees a seed write but misses the atomic owner's named-fs rename or fsync.
 - **Root Cause:** Replacing the default object's property does not replace an already imported named function.
 - **Rule:** In Vitest, share the same vi.fn between default and named exports and mutate its implementation in place. Native compiled probes update builtin ESM exports after installing and restoring observers. Count only the actual target file's effects and clear setup writes before asserting a no-write path.
+
+### Price Tiers Need Input Qualification Before Cumulative Accounting
+- **Symptom:** Short requests reprice accumulated usage, an omitted native cache field selects a cheap tier, or inclusive cached input is counted twice.
+- **Root Cause:** Pricing reads aggregate counters or zero-filled categories instead of the captured protocol's single-request input; missing mode is repaired with a later mutable declaration.
+- **Rule:** Deep-capture the schedule with attribution and preserve even an unknown input mode. Select strictly above the highest input threshold before bucket identity and accumulation; output never enters it. Persist only final flat prices. Keep incomplete classification sticky across merge/reopen, exclude unclassified or invalid categories from known subtotals, and refuse tier pricing for legacy aggregate buckets. Warm/trace and request-ledger consumers must use the same original input qualification.
+
+### Native Usage Probes Must Follow Readiness And Cumulative Input Contracts
+- **Symptom:** A second controlled prompt fails despite correct pricing, or a real cached request appears to count cache input twice.
+- **Root Cause:** The probe consumes a completion reply for the native model-list readiness GET, or adds cache tokens to the bounded history field that already contains the full prompt. An RPC prompt response also acknowledges admission before agent settlement.
+- **Rule:** Keep readiness GET replies separate from metered POST replies. Compare full-input history to protocol input directly and use disjoint billing buckets for category totals. Await actual agent_end and settled persistence before reading costs or export; preserve failed probes with their original source and build identity.
+
+### Scoped Trace Readers Must Share Their Captured Source
+- **Symptom:** A session dashboard combines its spans with another session's logs, accepts stale data after an asynchronous read, or lets a successor control the old server.
+- **Root Cause:** Store and file readers apply different filters; server reuse and ordinary logger fields lose the original run's source identity.
+- **Rule:** Capture profile, session, workspace and admission once for both readers. Recheck before publication, bound client query fields, reject source replacement and keep opening/close with the original owner. Ordinary logs inherit the active run's session/workspace; caller fields cannot replace them. Retention still reports partial coverage.
+
+### Validator Compatibility Requires Native Imports And Own Dependency Triggers
+- **Symptom:** Vitest passes but compiled ESM cannot import a CommonJS URI helper, or dependency checks trigger for undefined fields and omit nonenumerable own fields.
+- **Root Cause:** Test transforms synthesize named CommonJS exports, and a dependency parser shares remapped legacy/modern maps while enumerating only Object.keys.
+- **Rule:** Verify the actual compiled SDK and CLI on the supported Node floor with string code generation disabled. Import CommonJS through its default owner; keep authored dependency maps separate, trigger only for defined own data, and retain the existing child evaluator. Direct registry execution does not prove the host's generic validation gate; probe through the actual adapter before asserting no dispatch.
+
+### Strict Schema Grammar Does Not Reject Ignored Constraints
+- **Symptom:** A replacement validator accepts orphan conditionals, array tail constraints without tuple items, or contains bounds that the previous strict compiler refused.
+- **Root Cause:** Official metaschemas validate keyword shapes but allow constraints that their surrounding schema makes ineffective. Interpreter admission does not inherit the old compiler's strict applicability checks.
+- **Rule:** Compare the previous compiler's actual refusal cases before switching consumers. Keep applicability checks beside schema admission, preserve meaningful positive controls, and retain the no-coercion, own-property and reference boundaries through the real tool gate.
+
+### Dependency Installation Must Be Verified On The Declared Runtime
+- **Symptom:** A compiled Node-floor probe passes while the installed dependency graph contains a package declaring a newer Node floor.
+- **Root Cause:** Bundled runtime assets and npm's transitive resolution are different contracts; root overrides do not govern an external package consumer.
+- **Rule:** Inspect exact resolved versions and engines, run a clean engine-strict installation with the declared Node version, and test the installed public entrypoints. Bind the result to that lock and runtime instead of inferring universal installation support from one compiled probe.
+
+### Dynamic References Follow Active Evaluation
+
+- **Symptom** A tool accepts data that violates an outer recursive rule, or rejects valid data after a sibling branch visited a same-named anchor.
+- **Root cause** The interpreter's validation path retains visited nodes. Dependency parsers also register callbacks directly, outside the usual keyword wrapper.
+- **Rule** Scope both kinds of evaluation callbacks with a balanced active stack. Preserve callback metadata used by the interpreter's merge logic. Keep separate controls for sibling resources, dependent schemas and the previous tool validator's adjacent Draft 7 assertions.
+
+### Trace Quotas Count Records Owned by the Query
+
+- **Symptom** Ordinary logs displace retained spans, later pages repeat persisted spans, or correcting a blocked configuration revives a previous viewer.
+- **Root cause** The span reader and ordinary log reader share persistence bytes, and a current configuration check cannot observe a completed revocation interval.
+- **Rule** Count admitted span records before capping the span query. Project each persisted span through its paged representation. Pin the configuration revocation revision, keep incomplete coverage until the store reports exhaustion, and add the span start to event offsets when rendering absolute timestamps.
+
+### Startup Commands Follow Argument Ownership
+
+- **Symptom** A credential value triggers version output, a consumed terminator hides a later command, or a path argument consumes a mode flag.
+- **Root cause** Early detection looks at raw tokens independently of the parser that owns their values.
+- **Rule** Share the same token scan from the lightweight entrypoint to bootstrap. Preserve literal credential values, reserved standalone flags and explicitly supplied paths. Reproject workspace-relative options only when the restart changes the working directory.

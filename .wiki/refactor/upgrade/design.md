@@ -519,3 +519,70 @@ producer明确unchanged/saved/unknown，rename后cleanup失败保留path/counts/
 b2ba99581604/5beb3a8bd3c4旧绿及各失败原生回执保留历史。最初缺root src、Vitest bin位置及zero-selected each filter归harness；default ETag参数/SDK事件及npm object+notice JSON漂移保持失败记录。两次真实模型stopped_error未伪装成功，后续标记请求当前build通过；body不记录，不把HTTP200当完成。原配置hash保持、私有state清理，18tracked NormProof文件不变；normal pinned judge当前actual exit2/not_proven/16384边overflow，未扩图替代proof。锁外editor最后rename窗口不承诺cross-process CAS。完整交付在upgrade-catalog-2026-11-18。
 
 F2.4只读核实：当前ModelCostRates/projectCost/ratesSnapshot仍flat，normalized request入bucket前缺阈值选档。参考严格单次input+cacheRead+cacheWrite > threshold、最高命中、整组rates应用于全request；不能使用会话累计或recent64重建。计划原request同时深capture完整schedule，再在已有accounting owner选最终flat rates，保留v2 persisted bucket/cost/export。当前协议缺失usage零填充不能证明完整输入，unknown必须保留；不复制参考missing价=0默认。此项尚无当前production修改或验收。
+
+## Request price schedules (2026-11-18, in progress)
+
+F2.2已提交`4ade753`。F2.4研究缺口由实际loopback request counterexamples确认；复用原catalog、prepare/step、btw、sessionUsageRecorder、attributed buckets和cost/export，不建第二计费账本。core/models/pricing为价格数据捕获/选档叶，prices为现public index类别/threshold投影；catalog保留公开类型转发，旧projectCost和重复rates decoder移除。新增模型cost schedule包含最多64唯一safe非负threshold，四类费率均可缺失，显式零保持零；tier部分override只补同捕获base，不继承低档或当前目录。现overlay cost整体替换，未指定cost才保留已有schedule。
+
+定向参考的具体决策：单次ordinary input+cacheRead+cacheWrite，严格>，最高命中threshold，整组费率用于整个request，output不参与阈值；本实现逐项同意并有有效反转。缺价默认为零的决定拒绝，原因是本项目unknown/partial契约；当前public v1 index权威tiers使用tier.type=context/size，context_over_200k只在没有tiers数组时兼容，不把272000重写成200000或把service条件用作input。
+
+价格schedule与原attribution同时深冻结；协议declared usageInput由各base endpoint持有，alias继承。inclusive input使用已含cache的prompt，exclusive要求prompt/read/write均为合法safe整数；输入完整性与output/分类完整性分开。Responses/Google先保留explicitinvalid否定marker再裁安全字段。普通request、side、summary/branch/cache全部提供捕获mode，unknown capture不得用后来protocol补齐；账本同样拒绝complete并保留pending。原warm/trace observer读同一input资格，unknown不arm，economics先选input tier且runner固定原schedule。
+
+选档在bucket key/累计之前，之后只保存flat rates。缺cache split的inclusive普通input不能以全prompt普通价进入known subtotal；保留total与sticky allocationIncomplete，已知output等独立类别仍可计。snapshot decode/merge/recovery、cost coverage/zero、HTML export全消费该flag；后来同档请求不能抹缺口。legacy聚合遇tier schedule通过null拒绝完整价格，不从累计token或recent64重新选档，undefined仍只用于旧无目录价labelled fallback。目录估价不等于providerbill，stream抛错未交付usage仍缺证据。
+
+当前37文件765项、七门/2690modules/0monoliths和build`a395e98082bc`通过；15有效反转24AssertionErrors/exact恢复7文件151项、限定独立FIXED/APPROVE。原红与旧build保留；初filter不匹配和一次judge与restored尾部未确认终态的协调违规已分类，恢复suite及judge严格串行重验。Normal pinned judge实际exit2/not_proven、16,384edge ceiling仍missing，18 tracked pinned文件不变。Native/package/配置模型资格尚在进行，F2.4不勾选，31/62保持。
+
+2026-11-18恢复验收：55源码hash与a395e980完全匹配。公开compiled SDK/CLI九组24真实loopback POST覆盖N/N+1/cache/output/cumulative/最高乱序档、publication前捕获、missing/invalid/failed completion、实际cost/side/两请求summary commit/HTML以及sticky partial重开；npm pack/install15公开入口strict NodeNext/skipLibCheck=false及安装八组23POST通过。配置模型最终两实际bodySent/200/completed/marker，wire input687/736与记录的完整prompt一致，cache512/256不重复；目录无价格仍unknown，cost/export/reopen不造价。三份native资格以显式aggregate引用，保持各helper/source/build身份；真实失败HTTP200/stopped_error、零body网络、误取内部未导出工厂、GET readiness误用completion队列、摘要cut/close后state和RPC agent_end观察修正均保留，不改production迎合probe。私有state已清理、原配置未变。独立代码/架构最终review待收尾，功能32/62，总目标active。
+
+## Runtime schema admission (2026-11-18, verified gap)
+
+F2.3实际源码核实：core/tools/arguments是普通和prepared/nested/direct tool参数校验owner，支持Draft7/2019-09/2020-12、格式、strict unknown和ownProperties；config/fields、profile catalog import、media live/record以及MCP catalog仍在runtime Ajv compile。MCP Client默认validator也须显式注入，但当前raw request调用绕过SDK缓存，不能声称每call重复compile。现目录cache/store已handwritten，不加入替换范围。Worker的eval:true为执行器，与schema compile不同，保留独立责任。
+
+定向参考闭包compile/lazy explanation、resource-scoped ref和unevaluated annotation值得复用，直接依赖或复制adapter会丢strict admission/2019/no-coerce且更改Node floor，不采用。先对已存在MCP optional解释器候选进行受限Linux no-codegen实测：4.1.6接受unknown和dynamicRef非法data，继承额外属性与ownProperties不同，明确拒绝。另一成熟解释器11.6.16的三方言/own-properties/no-coerce/format与dynamic/recursive positive-negative初探可用，但null关键词、duplicate-id、unused unresolved ref和Draft7 ref sibling admission仍需完整兼容包层与资格，暂不接入生产。候选包仅隔离于.tmp/schema-validation，无package/build/runtime变更；后续单一neutral schema叶供tools/config/media/MCP复用，保留catalog import明确剔除未声明字段的独立投影。
+
+F2.3候选资格补充：官方suite pinned89e83a7的三draft核心3490/3492passed，差异为custom metaschema省略validation vocabulary；optional429/438，content annotation/floatoverflow与旧Ajv相同，customformat vocabulary仍不支援。初remote/官方meta alias缺失24失败修正为node.addRemoteSchema完整retrieval IDs后仅两差异，未删除失败记录。现compileSchema自身null关键词/unknown/duplicateid并不严格；使用候选导出官方remotes data建立每draft独立meta validator正确拒绝required:null/nestedtype:null，再追加schema位置strict keyword/ref/format准入。实际参数baseline明确optionalundefined和unconstrainednonfinite等旧契约，不能以全局JSONcapture代替校验。prospective实现只写.tmp/draft待主线程整合，未修改package/runtime，F2.3继续缺口。
+
+## Scoped trace retrieval (2026-11-18, in progress)
+
+F2.5续核实：现JsonlTraceStore sink模式过滤session，filePath/read fallback不一致；dashboard普通logs未过滤但spanstore已过滤，globalactive返回旧会话/来源且pendingquery未重验准入。先五行为反例红、再并发open/实际tracecommand两红后修。复用原TelemetryStore、boundedlogs/profile/command admission，新增scope/view叶统一scope、query、report-safe projection，不增store或执行平面。Current五文件34tests及七门/0monoliths passed；build/native/reversal/独立review未完成，不勾F2.5。F2.4冻结55source未动，其最终复审继续等待。
+
+F2.5原生qualification：build088efb下actualpublicSDK inputhook和registrytraceconsumer persistedselectedlogs/provider/native spans、other-session controls拒绝、rootquery/partialcoverage与profile physicalreplace409两casepassed；初误用内部unexportedfunction改actualregistry/API，SDK before_agent_start fixture未触发改已有inputhook，query.name按existingroottrace语义观察。providerrequests0；latepending-store仅unit，failedprobes保存。6reversals6AssertionErrors/exactrestore11tests与6files39suite/七门passed。独立review待回、不称全功能验收。
+
+F2.3隔离消费者集成：shared compiler及MCP显式provider通过22文件395项，strict NodeNext生产类型passed。原生ESM发现fast-uri具名import不存在，Vitest合成interop绿不能覆盖；改default import，显式prospective版本4.2.3，同代compiled公开15入口及Node24/20.3禁字符串codegen的CLI、revision、SDK非法tool零effects／真实拒绝反馈、分页MCP输出及原adaptTools输入门四组通过。直接registryexecute不拥有通用参数校验，初probe错误保留并接原gate，不为probe改runtime。录制header遗漏旧compile、isolatedmedia缺.tmp父目录、MCPSDK实际provider类型／data:undefined以及错误test路径均分别保存分类。
+
+dependency适配的counterexample12项全红：库按Object.keys触发含undefined的依赖却遗漏nonenumerable own字段，相邻legacy/modern maps覆盖共享parsed字段。局部dependencies叶仅捕获每个keyword自己的parsedmap，以defined own triggers检查并交给同child evaluator／reducer，不另写完整JSONSchema验证器；修后14项和combined395passed。差分1220例中1218一致，余两为旧Ajv inactive dependentSchemas未初始化adjacent evaluated-properties、错误拒绝optional declared undefined的已知quirk；保持原optional-undefined规则且未知extra仍拒绝。官方wrappedcore3384pass/108external或customdialect准入拒绝，无runtimewrong，明确不声称fullconformance。生产Schema/source/package未改变，最终review／推广资格pending。
+
+F2.5后续npm pack/install15公开entry strictNodeNext skipLibCheck=false与installedSDK真实registry两组passed，build088efb／七sourcehash匹配且私有state清理。配置modelindex1原credential/endpoint/protocol以namedprofile隔离，实际bodySent/HTTP200/completed/marker及scope/query／profile409两组passed；初HTTP200/stopped_error为真实失败保留，不等同completed。原catalog局部models语法不可读，只保留原endpoint/auth/model identity，未造price或改用户config。原六review handles已不live且无终态report，恢复三批各代码／架构lane，不以失联批准。
+
+## Shared schema validation in production (2026-11-18)
+
+当前tools/config/import/media/MCP原Ajv编译点已接入core/validation叶，不增执行、配置或存储owner。使用json-schema-library11.6.16成熟解释器，原纯format表保留；strict grammar之外追加applicability，十实际反例红后拒绝被忽略的conditional、array tail、contains bounds和property-pattern overlap。保留原no-coerce/default/extra、defined-own依赖、revision-aware WeakMap及safe keyword errors。reference按捕获resource/真实target绑定，未知remote/custom dialect compile refusal；nullable仅私有schema归一化。目录导入的明确declared-field剔除留在import owner，不在通用validator改输入。MCP输出unsupported只隔离该tool，其余分页仍可用，Client显式注入同provider。
+
+定向参考决定：闭包/解释式编译、弱缓存生命周期和复制输入同意；按mutable source重验、no-coerce、whole-schema unresolved拒绝和keyword-only安全错误与参考不同，理由为既有严格批准/secret合同。不能依赖参考包的Node22.19最低要求，继续Node20.3和2019-09。root override固定无engine违约idn15.1.8；安装包clean Node20.3/npm9 --engine-strict实际选择compatible15.1.16，无override继承声明。optional第三方IDN format未被validator main/remotes使用，实际自有format仍原predicate；结果绑定精确解析lock，不承诺未来服务或全依赖版本。
+
+官方compiled owner3262/3492pass，230compile refusal因strict applicability或外部/自定义dialect，0runtime mismatch；较早3384/108资格保留历史，不能声称完整标准兼容。38实际文件684项、七门/2705modules/0monoliths/build397c1253；Node24/20.3 no-codegen四消费者、cleaninstalled15strict入口/同native及配置模型两actual200/completed/exact approval/effect1passed。首次live默认deny导致0effect/stopped_error，补probe明确allow-once，不改产品默认授权；launcher/helper误路径和reversal regex/JSONerror诊断错误均保留。7有效反转19实际AssertionErrors、exact源码恢复96项。独立code/architecture review待回，不当批准。
+
+## Remaining telemetry contracts (2026-11-18)
+
+trace scoped retrieval已修/资格通过，但原研究明确typed span/event schema，当前泛型SpanAttributes无生产闭合声明consumer。将该缺口保留F2.5，histogram/cross-process另F2.6，不能从缺省清单遗漏它。现metrics的processglobal pending、flush读取当前active scope、tag覆盖reserved fields、非法number/溢出以及无真实extract消费者经源码核实；下一批复用原log sink/ALS/run/dispatch，不建第二metricstore或执行平面。
+
+## Remaining work review
+
+本次按实际入口核查三份研究文档的 30 个未完成编号。先收尾工作区现有校验和追踪，再修复独立的启动参数问题。完整功能和验证状态以任务清单为准。
+
+| 范围 | 生产证据与实施顺序 |
+| --- | --- |
+| C.5、C.6 | 历史缓存标记、会话亲和键和原生历史声明均已接通。`cli/provider/step.ts` 和 `turn/context/body.ts` 只透传缓存模式，常规入口无法选择长档或关闭。OpenAI 长档和亲和键共用能力判断，`turn/cacheWarm.ts` 固定使用短档。先补请求快照和协议资格，再按目标验证历史控制和 TTL。 |
+| D.4 | `session/export/htmlRender.ts` 复用共享 Markdown 扫描。`presentation/tui/text/inline.ts` 的显式链接路径未覆盖裸链接，需对实际 HTML 输出核对其余 GFM 语法。 |
+| E.3、E.4 | `core/tools/codemode` 的模型目录和图片返回已接入宿主。脚本协议缺少分类和图片生成派发。分支键值可恢复，脚本仍依赖实时钟和随机源。确定性回放需要固定执行环境和已记录结果，未知副作用保持不可重派发。 |
+| E.6–E.9 | `core/hooks/hookDispatcher.ts` 将 `agent_end` 绑定到 `StopFailure`，成功运行缺少相应事件。`cli/runtime/extensions.ts` 和 `sdk/agentSession.ts` 发布工具、命令和虚拟模型，仍缺其他注册和快捷键、参数消费。`extensions/command/plugin.ts` 的签名市场安装和新增 npm、Git、本地来源需要分别验收。 |
+| T2.1 | 所有规划开关已有语法。早期帮助和版本原先独立扫描 raw argv，常规 bootstrap 也重复语义解析。本次统一参数归属，保留凭据字面值、终止符、已识别选项优先级、带短横线的路径及授权重启。 |
+| F1.1–F1.3 | `turn/completion.ts` 保留严格最终工具参数，缺少实际增量预览。Azure 和账户 WebSocket 已接通，Mistral 目前使用 Chat Completions 兼容别名。zstd 响应解码可用，压缩请求的 helper 缺生产调用。 |
+| F1.4、F1.5 | `core/auth/providerAuthRuntime.ts` 支持既有登录和续期。其他 OAuth 提供方仍需协议、同意及凭据证明。`entrypoints/cliMcpModule.ts` 已注入 MCP OAuth，集成测试覆盖 PKCE、续期和撤权，需继续验收原生 CLI 首轮惰性发现。 |
+| F2.1 | `provider/request/input.ts` 已做图片头、缩放和最终输入配额。图片生成和分类仍停留在 `core/models/catalogSurface.ts` 的目录类别。 |
+| F2.3、F2.5、F2.6 | 校验和追踪已有生产改动，本次补齐独立复审反例。指标仍使用进程级缓冲，跨进程提取缺产品调用方。后续应沿原有运行归属、日志和派发边界补直方图和传播。 |
+| T4.1–T4.4 | 工作区仍为单包。`core/tools/registry.ts` 静态加载垂直工具，`session/context/preview.ts` 调用规划解码器。先验证组合关系，再切可选包。根 `test` 与 `test:all` 存在相同脚本体，配置来源、信任和凭据职责需要继续单独梳理。 |
+| T5.1–T5.4 | `session/store/sessionStore.ts` 逐个初始化会话文件，分叉也存在多个独立写入。可先在原生产创建入口为相同 ID 做物理排他，完整事务契约、迁移及历史事件有独立验收。现有 DAG 栅栏支持未派发重启，已派发节点的安全续点仍缺。 |
+| T6.1–T6.3 | 服务端已有帧窗口，主机待发队列只在内存，来宾仍轮询。SSH 每个操作独立启动连接，现有任务起停和输出保留。这三项沿原计划按需求开启。 |
+
+实现取舍以现有所有者为准。校验沿同步求值记录当前资源与退出边界，同时保留旧工具入口对相邻 Draft 7 断言和倍数的检查。追踪在已接受响应处写入类型化事件，用原存储读取并脱敏投影链接和相对时间。启动路径共享同一次参数归属，由现有语义解析决定工作区和模式。三批均沿用现有生产入口。

@@ -1,10 +1,20 @@
 # 规划执行进展（2026-11-18）
 
-用户已恢复完整规划，当前目标active。**62项中31项完成Linux功能验收，31项功能任务未完成**：13项部分完成、3项已有实现待验收、13项确认缺口、2项待核实。F2.2最终20文件596项、七门、buildc5ae05070276、13有效反转/exact恢复73项、Linux11组26GET及配置模型两actual requests、npm15入口strict类型/10组25GETpassed，限定独立FIXED/APPROVE已核对。E.1/E.3/D.4前批已本地提交42d7d49a，E.3 richer dispatch与D.4完整GFM继续部分；所有历史成功继续原构建。完整仓库NormProof仍actual exit2/not_proven。
+本轮逐项核对此前未完成的 30 项，完成 F2.3、F2.5 和 T2.1 的 Linux 本地功能验收。**62 项中 35 项已完成，27 项仍开放**。默认依赖图判定仍为 `not_proven`。
 
-本总结依据[任务清单](tasks.md)、[当前状态](MASTER.md)和保存的实际命令回执。此前20/62的暂停总结已归档为[历史快照](../../../.omx/artifacts/upgrade-rpc-retry-2026-11-16/summary-2026-11-15.md)；之后C.1、T3.1、D.1、C.2和C.9达到各自Linux功能验收，以及C.4、C.7以及E.5、C.8及E.1及F2.2使当前增加到31项。用户仅授权本地分批提交，**未推送，未取得本轮远端CI**。原定暂缓的原生插件／独立桌面产品两项不在62项中，继续暂缓；T6保留原规划按需条件。
+核查与取舍见[工程记录](design.md)，当前验收和次序见[任务清单](tasks.md)。三批源码已分开本地提交。远端推送和本轮 CI 尚未发生。原定暂缓的原生插件与独立桌面产品不计入 62 项，T6 保留按需求开启。
 
 ## 当前批次的验证
+
+- `980bb6d1` 将工具、配置、目录、媒体和 MCP 接入无动态代码生成的校验。独立复审中的五项新回归已修复。Node 24 和 20.3 各通过四组编译入口检查。标准核心用例 3261 通过、230 准入拒绝、1 项 Draft 7 差异保留旧工具入口的相邻断言。
+- `a069b2d4` 修复追踪配额、分页、隔离与撤权，补齐已接受响应的类型化事件、绝对时间和链接。编译版 `/trace` 的 HTML、JSON 和控制通过。
+- `898a324a` 统一参数归属，保留帮助和版本的优先级、字面凭据及合法路径。缺少显式 provider 时停止启动。编译 CLI 的 12 个 Linux 场景通过。
+
+六项静态检查、53 文件 737 项联合验证及最终 6 文件 178 项通过。构建为 `bf2547057b22`，2707 个生产模块检查无超限报告。脚本套件 209/210，唯一失败由锁定的依赖图采集超过 16384 边触发。基线 `02237103` 和当前均复现，默认判定退出 2。配置模型两次调用均在鉴权阶段停止，观测到零次请求，原配置未变。
+
+F2.4已完成当前Linux功能资格：37文件765项、七静态门/2690生产module/0monoliths、build `a395e98082bc`、15有效反转24AssertionErrors/exact恢复7文件151项passed。公开compiled SDK/CLI九组24实际loopback POST、配置模型两实际bodySent/200/completed/marker与numeric usage、安装包15公开入口strict类型及八组23实际POST通过；各回执明确分别来自同构建的独立运行。价格schedule于请求前捕获，完整单次input严格选最高档后仅持久flat rates；unknown/partial allocation在cost/export/ledger/observer与重开保持。原配置/source/build未变、私有state清理；独立代码/架构最终review收尾中，不把审查pending视作批准。[本批交付](../../../.omx/artifacts/upgrade-pricing-2026-11-18/delivery.json)。
+
+以下F2.2保持其历史source/build资格。
 
 F2.2复用原cache/atomic/configuration/commands owner，body-backed同source validator、原path/raw/inode和每次rename retry准入贯通；saved/unknown及post-result/read refusal完整结果保留。最终20/596、七门、0monoliths、buildc5ae05070276及限定独立FIXED/APPROVE通过；13有效反转25AssertionErrors、exact恢复4/73。Linux同代11组26GET和配置模型两actual requests/completed标记、npm15入口strict类型/10组25GETpassed。原配置与source hash不变、私有state清理；锁外editor最后rename窗口不声称cross-process CAS。旧绿/模型stopped_error及harness失败回执保留，normal pinned judge当前exit2/not_proven/超过16384边，18tracked文件不变。[当前交付](../../../.omx/artifacts/upgrade-catalog-2026-11-18/delivery.json)。
 
@@ -53,7 +63,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | `bf01f8f` | compact同步登记原command owner，controls可达、EOF结算、失败结果保留结构化status。 |
 | `ae9a3f59` | retry专属取消及就绪代理转发；D.1整项验收在恢复后继续。 |
 
-## 已完成功能验收的31项
+## 已完成功能验收的35项
 
 | 编号 | 项数 | 已完成的所述范围 |
 | --- | ---: | --- |
@@ -64,7 +74,8 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | C.1、C.2、C.3、C.4、C.7、C.8、C.9 | 7 | 循环准备／结束与完整虚拟路由；消息分离与统一准备；公共累计流式快照／HTTP retry事实／已接受响应不重放；stdout隔离／有界writer与退出结算；默认正文保留／measurement／compaction消费者，当前cache presence／captured write premium／估算报告；工具发现／mutable schema guard与实际激活消费者。 |
 | D.1–D.3、D.5 | 4 | RPC完整会话／模型／树／shell／设置／压缩／retry命令、严格输入和最终准入；队列／UI响应、导出持久token／费用并保留未知覆盖。 |
 | E.1、E.2、E.5 | 3 | 脚本完整host settlement、普通gate/hooks/child boundary/动态读写effect barrier；codemode分支状态持久化、原前缀／CAS／ABA保护、进程重启和多级fork隔离；共享SDK UI续绑／撤权。不包含确定性重放。 |
-| F2.2 | 1 | 同source有效缓存正文、ETag/304、原path/raw准入、atomic retry及完整storage/read/command结果消费者。 |
+| F2.2–F2.5 | 4 | 远程目录 ETag 和保存结果、无动态代码生成的校验、单次输入阶梯计价、追踪查询和类型化记录。 |
+| T2.1 | 1 | 单次参数归属、早期命令及 Linux 启动。 |
 | T3.1 | 1 | SDK资源代际绑定／撤权、并发dispose结算／首错、compact与prompt／command互斥和完整idle；安装入口／严格类型／配置模型联合验收。 |
 
 完成指各项记录的Linux本地验收，依然保留证据边界。例如A.4的unsupported删除规则仍是缺口，B的协议字节验收不代表物理像素兼容，D.5没有供应商账单对照。C.6虽已有大量实现和配置模型验证，因原生历史control证据不足继续部分。
@@ -97,31 +108,27 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 真实模型沿用既有active连接和凭据。用户models目录的原JSON损坏，相关新原生测试在隔离home使用原目标的最小有效目录entry；原用户配置未修改，该证据不代表原损坏目录可加载。失败、setup错误和observer错误均单独保存。没有Windows、物理终端、真实Azure／Mistral／Anthropic原生control、OAuth真人同意／续期、服务账单对照或性能收益基准。本次只跑聚焦检查，未宣称全仓测试／全仓类型通过；六静态门保留119条既有非阻断文档source提示。
 
-## 文档中尚未完成的31项功能任务
+## 文档中尚未完成的27项功能任务
 
 “已有待验收”表示代码／消费者存在，缺本轮整项证据；“部分”表示实现已有进展但仍缺行为或资格验证。以下列出每个未勾选编号，恢复时以tasks.md逐项继续。
 
 | 编号 | 状态 | 尚缺任务或证据 |
 | --- | --- | --- |
-| C.5 | 已有待验收 | Anthropic历史缓存marker、OpenAI／Responses affinity和TTL的最终wire与能力边界。 |
+| C.5 | 部分 | 标记和亲和已接通。补常规配置、分离长档协议能力、冻结请求及实际预热窗口。 |
 | C.6 | 部分 | 历史声明、转换、压缩／重开已有实现；Anthropic原生历史control缺真实服务证据。 |
 | D.4 | 部分 | 高亮、CJK、Thinking/Diff/灯箱与离线安全已通过；完整GFM仍未验收；限定独立FIXED/APPROVE通过。 |
 | E.3 | 部分 | 声明、namespace、冻结session list/get、native image/输出预算已过；richer classify/generateImages派发与provider image缺。 |
-| E.4 | 待核实 | 确定性重放的记录、恢复和副作用边界，已有worker不等于可安全重放。 |
+| E.4 | 缺口 | 固定执行环境、记录结果交付、可验证的恢复及未知副作用零重派发。 |
 | E.6 | 部分 | 逐个完整生命周期事件的dispatch与结果消费者。 |
 | E.7 | 部分 | virtual注册／逻辑路由已接通；provider、MCP、renderer和其余runtime setters仍缺，worker virtual明确unsupported。 |
 | E.8 | 部分 | shortcuts／flags的CLI／SDK消费者、冲突、默认值、参数与按键生命周期。 |
 | E.9 | 部分 | npm／git／local安装adapter和顶层CLI入口、完整性／精确版本／批准边界。 |
-| T2.1 | 部分 | CLI参数集合、单遍解析、早期判断和完整启动矩阵。 |
 | F1.1 | 部分 | 增量工具JSON的实际预览UI／事件，不能恢复孤立parser。 |
-| F1.2 | 已有待验收 | Azure／Mistral／Responses WebSocket真实服务、连接复用／取消／代理／TLS。 |
+| F1.2 | 部分 | Azure 和账户 WebSocket 的真实服务资格。Mistral 独立 Conversations 协议仍缺。 |
 | F1.3 | 缺口 | 最终body准入／签名后由传输owner消费zstd，endpoint支持及未知派发不重放。 |
 | F1.4 | 部分 | 其他OAuth提供方、设备登录实际同意／续期，复用原凭据proof。 |
 | F1.5 | 已有待验收 | MCP PKCE／loopback／renewal／懒加载的OAuth fixture、撤权和tools readiness。 |
 | F2.1 | 部分 | 图片／分类器模型类别、逐端点媒体能力／预算与真实Linux输入。 |
-| F2.3 | 缺口 | 替换运行时eval式Schema compile，完整dialect／ref／format、严格不coerce及安全错误。 |
-| F2.4 | 缺口 | 单次请求阶梯定价、含缓存输入的严格阈值、完整费率选择和持久化。 |
-| F2.5 | 部分 | span／event／link基础已接通；dashboard的profile／session检索来源一致性待核实。 |
 | F2.6 | 缺口 | 有界直方图、跨进程传播接入实际运行边界及失败隔离。 |
 | T4.1 | 缺口 | 共享契约／组合方向，消除包级反向依赖。 |
 | T4.2 | 缺口 | browser／desktop／media可选领域包独立边界，核心仍可启动。 |
@@ -137,4 +144,8 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 ## 后续工作
 
-E.5/C.8已本地提交cccc7208。E.1/E.3/D.4已提交42d7d49a，F2.2当前Linux功能验收/限定复审通过，按授权本地提交本批；完整E.3/D.4保持开项，下一F2.4经只读核实仍成立，随后继续全部剩余仍成立的任务。仓库NormProof容量缺口保留，未改scope／bundle／default gate，不通过缩图隐藏missing。全部原规划和暂缓条件保留，总目标active，未push或取得远端CI。
+下一批优先 C.5。现有标记和亲和路径直接复用，在物理路由确定后捕获协议能力及实际缓存窗口，再沿同一次请求、摘要和预热验证。定向核查也确认 E.6 的成功运行结算、F2.6 的指标归属和跨进程传播，以及 T5.1 的会话 ID 排他创建均有独立可验证的缺口。
+
+## 阶梯计价历史验收
+
+F2.4已实现并完成当前Linux功能资格的单次input阈值最高档、请求前schedule/协议mode捕获、最终flat rate的v2 bucket持久化、原三入口和warm/trace/ledger消费；缺input/分类/价格、captured unknown和legacy聚合均保留unknown/partial。当前37文件765项、七门/2690modules/0monoliths、builda395e98082bc及15有效反转24AssertionErrors/exact恢复151项passed；正常pinned judge仍实际exit2/not_proven。Native/package/真实配置模型当前全部passed，32/62功能总数；独立审查收尾后本地提交，总目标active。

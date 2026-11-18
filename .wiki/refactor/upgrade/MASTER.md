@@ -18,15 +18,15 @@
 - [Task inventory](tasks.md)：唯一任务与验收清单。
 - [Design and evidence](design.md)：结构事实、参考决策、复用与实施顺序。
 - [Earlier repair evidence](../../wiki/references/runtime-upgrade-review-2026-11.md)：上一轮证据，不能替代本轮任务验收。
-- [Progress summary](summary.md)：当前已完成范围、实际验证及全部31项未完成功能任务和仓库门禁缺口。
+- [Progress summary](summary.md) 记录当前验收、27 个未完成任务和仓库门禁结果。
 
 ## Current status
 
-**Current phase**: in_progress；F2.2当前Linux功能验收完成，31/62功能任务已验收，31未完成；richer model dispatch和完整GFM继续部分。完整仓库NormProof仍not_proven。
-**Last completed batch**: F2.2复用catalog cache/原锁/atomic/configuration/commands owner，保留captured body/source/path/raw及saved/unknown/unchanged。最终20文件596项、七门/2682modules/0monoliths、buildc5ae05070276通过；13反转25AssertionErrors/exact恢复73项。Linux同代11组26真实GET、配置模型两actual requests及npm15入口strict类型/10组25GET通过，限定独立FIXED/APPROVE；此前E.1/E.3/D.4已本地提交42d7d49a。
-**Current batch**: F2.2已满足当前Linux功能验收，归档后按授权本地提交。下一F2.4阶梯计价经只读owner核实仍成立；复用请求捕获/normalized usage/attributed bucket和cost/export，先证明单次阈值/累计误选/缓存完整性反例，不能仅增目录字段。
-**Repository gate**: 当前normal pinned judge实际exit2/not_proven，blocking unresolved obligation因完整图超过16384边为missing；helper exit0不代表CLI passed。以前临时32768诊断只保留历史定位，本批未扩大范围或容量；18tracked pinned文件不变，未改scope/bundle/gate/package scripts。119既有docs与11call-reachability advisory继续单列。
-**Goal**: active；31功能任务未完成，其中13部分、3已有待验收、13缺口、2待核实；另有仓库NormProof缺口。F2.2已达到当前Linux功能验收，E.3及D.4完整范围仍开项。仅本地分批提交，未push或取得远端CI。
+**Current phase** 按批实施。35/62 项完成 Linux 本地功能验收，27 项开放。
+**Completed batches** `980bb6d1` 完成无动态代码生成的校验，`a069b2d4` 完成追踪和看板，`898a324a` 完成启动参数。联合 53 文件 737 项，最后变更后 6 文件 178 项。构建 `bf2547057b22` 支持已验证的 12 个 Linux CLI 场景、Node 24 和 20.3 禁代码生成入口及编译版追踪命令。
+**Next batch** C.5 已确认缺口。先将缓存模式和物理目标能力绑定原请求，再验收摘要、预热和真实协议。
+**Repository gate** 脚本套件 209/210。基线 `02237103` 和当前源图均超过 16384 边，锁定的默认判定退出 2，结果 `not_proven`。18 个跟踪文件保持原样。
+**Evidence boundary** 最新构建的配置模型尝试两次在鉴权阶段停止，观测到零次请求。此前的模型和安装结果仍绑定历史构建，本次仅本地分批提交。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -41,7 +41,7 @@
 
 ## Adaptive control
 
-当前Linux功能验收任务数为31/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.8、C.9、E.5、E.1、F2.2和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
+当前Linux功能验收任务数为32/62，包含T1五项、A四项、B.1/B.2/B.3/B2.1/B2.2/B2.3、D.1/D.2/D.3/D.5、E.2、C.1、C.2、C.3、C.4、C.7、C.8、C.9、E.5、E.1、F2.2、F2.4和T3.1；核实不计实现完成，仓库NormProof容量阻断单列。T1已提交`a8ffe683`，A写入批次已提交`e58d8786`，E.2已提交`43edd014`，D.2已提交`9c683208`，输出已提交`28ffb9e7`，参数/端点旧修复已分别提交`24a23997`/`a410eab2`，writer已提交`6e1e3eb4`。结构复核为单一发布/执行owner、无新增循环、入口共享代际。原路线图其余任务未删除，继续按每批反例、实现、验证、复审和本地提交推进。
 
 恢复时已核对干净工作区与`560c0cc4`。T3.1 compact仅持有controller、不登记settlement，且只凭状态机拒绝重入；该缺口经源码核实仍成立。复用原commands owner登记完整压缩操作、保持忙时拒绝，覆盖prompt／command互斥和SDK dispose等待；不建立第二任务管理器。C.1完整路由由独立只读核实线检查，后续独立实施；已有证据不扩展为新构建的重新验收。
 
@@ -77,6 +77,7 @@ E.5本批实际L／额外依赖3（blocked publication独立撤权、原共享ho
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-18 | 核实此前 30 个开放项，三个生产批次完成验收并本地提交。最终 35/62，下一批 C.5。基线和当前图均超出锁定容量，当前配置模型鉴权未完成。 |
 | 2026-11-17 | E.5／C.8最终25文件355项／七门／0monoliths、build89344ffebd35、UI三反转／串行4/29恢复和发现三反转／2/22恢复passed，两限定独立APPROVE及10hash匹配；当前npm15入口strict类型、实际async TS／签名安装共享host两模式、配置模型8actual发现请求passed。29/62功能验收；33任务及默认NormProof not_proven保留，继续E.1／E.3，不push。 |
 | 2026-11-17 | C.4／C.7当前21文件933项、六门、七有效反转exact恢复／恢复4/61、build0247cb1b526d与13源码独立APPROVE；Linux配置模型21实际请求／10轮、真实read保留／重开／显式pruning／实际compaction commit passed。27/62功能验收，35任务／NormProof容量缺口保留；模型恢复另批提交，继续E.5／C.8，不push。 |
 | 2026-11-16 | C.9／C.2当前18源码hash及build `ceabe4b89b3d`核验，六静态门28/482、六有效反转exact恢复、0生产monoliths、Linux21场景／53本地POST、两模式PTY exit143及配置模型3actual请求passed，限定APPROVE／CLEAR。25/62仅指Linux功能；正常NormProof exit2／not_proven，基线16484／当前16511边均超过16384，诊断不升级为门禁。归档upgrade-output-stream-2026-11-16并本地提交；C.7四旧cost夹具REQUEST_CHANGES待实际分类，不push。 |
@@ -166,3 +167,15 @@ C.9／C.2联合子批遥测：实际L，复用检查10/10，沿用原stdout／sh
 本批遥测：E.1实际L，E.3/D.4子批各L；原gate/worker/catalog/session source/renderer复用核对10/10，无新增依赖或执行平面。未预见依赖四项：caller-retained definition隔离、child allow/deny、未闭合math streaming回归、source pairing与media omission分开。新独立composition/export审查各确认一P2；三effect barrier/两nested style反例实际红后复用原owner修复，限定FIXED/APPROVE。当前50/987及build19af1f6dc3f2通过，E.1功能完成数增至30；旧build和503/provider_network失败run保持独立，F2.2按真实反例继续。
 
 F2.2本批实际L，结构复用检查10/10，无新增依赖、执行或存储平面；额外依赖四项：same-FD/absent-parent cache identity、每次native retry前guard、post-result callback安全结算、read拒绝携带自身publication receipt。最终限定独立复核通过；旧build/失败/unknown保留原范围，无统一历史估算不补造drift。功能31/62，F2.4只读核实后继续单次request pricing owner。
+
+F2.4当前遥测：实际L，结构复用检查10/10，无新依赖、执行或存储平面；额外依赖6项（原始用量资格、分类不完整持久化、账本同拒绝标记、实际warm/trace消费者、captured unknown mode、legacy聚合遇schedule拒绝）。普通schedule覆写仍整项替换，未列类别只继承同捕获base；不补造缺价或真实账单。反转launcher首次标题filter不匹配、一次judge早于restored suite终态的串行协调违规均保留分类，恢复suite与judge已严格串行重验。F2.4已完成native/package/配置模型资格，功能总数32/62，总目标active；最终独立review返回后提交。
+
+2026-11-18恢复收尾：当前55源码hash与a395e980构建匹配，无production修改。Linux九组24实际POST/安装八组23POST及配置模型两actual POST完成并重开passed。探针先误取非公开step factory，改公开SDK；GET readiness不消耗completion响应；失败API terminal异常、摘要实际两次dispatch/合法cut/关闭后state与RPC agent_end均按实际消费者修正，原失败回执保留。实时模型缺公布价格保持unknown；一次cache observer叠加full prompt的错误先保存后修，stopped_error/zero-body网络终态仍失败。F2.3解释式validator候选已实测不兼容，后续保留strict dialect/ref/format和ownProperties，避免直接接入错误替代。
+
+复审控制：原full-history代码/架构lane经多个明确返回请求仍无report，保持unavailable/pending而非APPROVE。主线程限定新独立code6文件与architecture7文件输入，前review-current限定结果和其余owner机器/原生证据继续原scope；不让等待导致扩大复审或重跑绿色suite。后续schema仅在.tmp/draft授权worker草拟，不触碰冻结pricing生产文件/依赖清单。
+
+用户说明当前子代理高延迟、要求继续后续任务；恢复旧review并保留新限定lane，不再重复打断。F2.5独立owner已核实修复：scope/query/view复用log/trace/profile，五红加两追加红，当前5/34及七门passed，仍待原生/build/反转/复审。F2.3draft主线程串行21+4=25tests/stricttypes/禁codegen原生guard passed，fullwrappedcore3372passed其余120为明确scope准入（remote/meta/自定义dialect）refusal，未假装fullconformancepassed；旧Draft7ref sibling$id两反转修复，仍仅draft未更改package/production。功能32/62总目标保持。
+
+F2.5更新：原profile/store/commands/logger owner贯通，普通logger捕获session/workspace不信callerfield，六files39tests/七门0monoliths、6有效反转/11restore、build088efb、compiledpublicSDK/inputhook/actualregistrytracecommand两组原生读取及physicalprofile409passed，独立review已启动。功能仍32/62，不勾F2.5。F2.3草稿33tests/strictNodeNextpassed，标准meta和实际annotationtarget保留；fullwrappedcore3384passed/108主动准入拒绝（remote/customdialect），schema生产尚未变。各价格source55hash未动，原a395native保留其source，不代表新tracebuild全部验证。
+
+F2.3当前草稿后续33tests及strictNodeNext passed，新增official/实际default-reference保持旧验证语义，先两实际红后修。rootbaseline显示旧Ajv允许validdefaultref/拒unknownref，不为更易测试而删特性；wrapper3372→3384核心控制通过，余108外部资源/customdialect主动refusal保留。Next独立source推广需等pricing审查提交界限，或隔离combinedbuild后分批stage；不将draft验收当production完成。
