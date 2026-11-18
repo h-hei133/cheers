@@ -35,7 +35,7 @@ function setup() {
   const refresh = vi.fn();
   return { manager, context, lines, refresh, run: (workspaceAction: 'add' | 'remove' | 'rebind' | 'attach', workspaceTarget = extra, workspaceAccess: 'read' | 'write' = 'read', busy = () => false) => {
     lines.length = 0;
-    runCliWorkspaceCommand({ renderer, sessionManager: manager, runtimeContext: context, workspaceAction,
+    return runCliWorkspaceCommand({ renderer, sessionManager: manager, runtimeContext: context, workspaceAction,
       workspaceTarget, workspaceAccess, busy, printMode: true, onProjectContextSwitched: refresh });
   } };
 }
@@ -50,7 +50,7 @@ describe('workspace session commands', () => {
     }
   });
 
-  it('persists roots across restart, fork and new session without changing resource discovery', () => {
+  it('persists roots across restart, fork and new session without changing resource discovery', async () => {
     fs.writeFileSync(path.join(extra, '.cheers.json'), '{"maxTurns":77}');
     projectTrust.setProjectTrust(extra, 'trusted');
     const tools = setup(); tools.run('add');
@@ -60,14 +60,14 @@ describe('workspace session commands', () => {
     expect(tools.manager.fork(source.id).workspaceRoots).toEqual(source.workspaceRoots);
     expect(tools.manager.fork(source.id, other).workspaceRoots ?? []).toEqual([]);
     tools.manager.addTurn(source.id, { role: 'user', content: 'keep the original session' });
-    startNewSession(tools.context, tools.manager);
+    await startNewSession(tools.context, tools.manager);
     expect(tools.context.session.id).not.toBe(source.id); expect(tools.context.session.workspaceRoots).toEqual(source.workspaceRoots);
     const revision = tools.context.workspaceRevision; tools.refresh.mockClear(); tools.run('add');
     expect(tools.context.workspaceRevision).toBe(revision); expect(tools.refresh).not.toHaveBeenCalled();
-    tools.run('attach', other); expect(tools.context.projectRoot).toBe(other); expect(tools.context.session.workspaceRoots ?? []).toEqual([]);
+    await tools.run('attach', other); expect(tools.context.projectRoot).toBe(other); expect(tools.context.session.workspaceRoots ?? []).toEqual([]);
   });
 
-  it('refuses busy, overlap and stale grants before any state write', () => {
+  it('refuses busy, overlap and stale grants before any state write', async () => {
     const tools = setup(); const file = path.join(tools.manager.getSessionDirPath(tools.context.session.id), 'state.json');
     const original = fs.readFileSync(file, 'utf8');
     tools.run('add', extra, 'write', () => true); expect(fs.readFileSync(file, 'utf8')).toBe(original);
@@ -76,7 +76,7 @@ describe('workspace session commands', () => {
     expect(changeSessionWorkspaceRoots({ manager, session: manager.getSession(tools.context.session.id)!, busy: () => false, action: 'add', target: other }).status).toBe('changed');
     const updated = fs.readFileSync(file, 'utf8'); tools.run('add'); expect(fs.readFileSync(file, 'utf8')).toBe(updated);
     expect(tools.context.session.workspaceRoots ?? []).toEqual([]); expect(configurationAdmission(tools.context)()).toContain('saved workspace');
-    expect(() => startNewSession(tools.context, tools.manager)).toThrow('saved workspace');
+    await expect(startNewSession(tools.context, tools.manager)).rejects.toThrow('saved workspace');
   });
 
   it('revokes missing and symlink-replaced roots by their registered path without deleting targets', () => {

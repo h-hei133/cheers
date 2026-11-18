@@ -62,6 +62,7 @@ import { sshControl, runSshControl } from '../ssh/control.js';
 import { isExtensionControl, extensionCommandFor, extensionManagerFor } from '../runtime/extensions.js';
 import { createExtensionUiAdapter } from './extensions.js';
 import { ExtensionUiBinding } from './extensions/binding.js';
+import { bindSessionSurface } from '../runtime/session/surface.js';
 import { isMcpRequest, isMcpConfiguration, mcpControl } from '../mcp/content.js';
 import { runMcpConfigurationControl } from '../mcp/control.js';
 import { cancelMcpFor, mcpDefinitionFor } from '../runtime/mcp.js';
@@ -287,6 +288,7 @@ export class InteractiveMode {
   private releaseGoalSubmission?: () => void;
   private releaseInputQueue?: () => void;
   private readonly extensionBinding: ExtensionUiBinding;
+  private releaseSessionSurface?: () => void;
   private readonly extensionUi: ReturnType<typeof createExtensionUiAdapter>;
   /**
    * The theme file being followed, when the theme in use came from one.
@@ -640,6 +642,10 @@ export class InteractiveMode {
       this.tui.requestRender();
     });
     this.tui.onInput((data) => this.stdin.feed(data));
+    this.releaseSessionSurface = bindSessionSurface(this.options.runtimeContext, () => {
+      if (this.stopped || this.closing) throw new Error('The interactive input host is closing.');
+      this.extensionBinding.refresh(this.extensionUi.host);
+    });
     this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
     this.releaseInputQueue = attachSubmissionQueue(this.options.sessionRuntime, this.queue, text => this.runQueued(text, this.queue.takeAttachments()),
       () => !(this.busy || this.pickerPending || this.overlay.active || this.extensionUi.active || this.stopped || this.questions.question()));
@@ -720,6 +726,7 @@ export class InteractiveMode {
       () => { this.releaseTerminalPalette?.(); this.releaseTerminalPalette = undefined; this.terminalTheme?.dispose(); this.terminalTheme = undefined; },
       () => { this.releaseTerminalProtocol?.(); this.releaseTerminalProtocol = undefined; },
       () => this.extensionBinding.dispose(),
+      () => { this.releaseSessionSurface?.(); this.releaseSessionSurface = undefined; },
       () => this.extensionUi.dispose(),
       () => this.promptContext.stop(),
       () => this.pickerLifecycles.abortAll(),
@@ -1296,7 +1303,7 @@ export class InteractiveMode {
       const output = this.sink.commandOutput;
       if (output) pageLongOutput(this.pager, output.title, output.block, this.state.transcript);
       this.sink.end();
-      this.busy = automatic || this.pickerPending;
+      this.busy = automatic || this.pickerPending || clearing;
       if (!this.busy) {
         this.terminal.setProgress?.(false);
         this.terminal.setProgramStatus?.({ state: "idle", app: "cheers" });
@@ -1309,15 +1316,17 @@ export class InteractiveMode {
       }
       if (clearing) {
         try {
-          startFreshSession(this.historyTarget());
-          this.extensionBinding.refresh(this.extensionUi.host);
-          this.sink.end(true);
+          if (await startFreshSession(this.historyTarget())) {
+            if (this.extensionBinding.needsRefresh()) this.extensionBinding.refresh(this.extensionUi.host);
+            this.sink.end(true);
+          }
         } catch (error) {
           this.state.transcript.append(textBlock('error', error instanceof Error ? error.message : String(error), 'error'));
         }
+        this.busy = automatic || this.pickerPending;
         this.tui.requestRender({ force: true });
       } else if (opened || navigation?.changed) {
-        this.extensionBinding.refresh(this.extensionUi.host);
+        if (this.extensionBinding.needsRefresh()) this.extensionBinding.refresh(this.extensionUi.host);
         showConversation(this.historyTarget(), navigation?.changed ? this.options.runtimeContext.session : undefined);
         this.tui.requestRender({ force: true });
       }

@@ -11994,3 +11994,10 @@ E.1复用原worker/gate/catalog修复child退休与完整host join、普通appro
 前批42d7d49a已本地提交。F2.2冻结反例30项26红/4控制及storage/command19红后，复用cache/原锁/atomic/configuration/commands；有效captured body/source/path/raw/inode、每次rename retryguard和signal/admission贯通。304计数/path准确、同ETag保持原字节，旧响应拒绝覆盖后继；saved/unknown不被cleanup、post-result callback或final-read refusal抹掉，数据错误携带冻结receipt、文本保留notice。
 
 最终20文件596项、七门/2682module/0monoliths及buildc5ae05070276通过；13有效反转25AssertionErrors/exact恢复4/73、限定独立FIXED/APPROVE核对。Linux同代11组26GET、配置模型两actual requests/completed标记及npm15入口strict类型/10组25GETpassed；失败与旧build证据保留、原配置/source hash保持、私有state清理。normal pinned judge实际exit2/not_proven/超过16384边，18tracked文件不变；不承诺锁外editor最后rename窗口跨进程CAS。归档upgrade-catalog-2026-11-18，31/62为Linux功能验收；按授权本地提交，下一F2.4单次阶梯价已只读核实，不push/CI或关闭目标。
+
+
+### 2026-11-19：CLI会话替换与旧资源结算
+
+前置guarded activation已提交934d8299。本批CLI new/resume/continue/panel/explicit/fork/workspace及RPCnew/switch/fork/clone接neutral port：before取消后inactive候选、oldshutdown/完整retirement、原registry CAS、sync publish/new UI/start/final readback。prepared target的state/目录/transcriptprefix在activation前捕获；仅startup report后缀允许，sameID activation/owner、saved history变化与postquiesce取消保持unknown并封锁。startup message只属于新host/exact command，失败cancel其entry保留user；RPC abort绕过长response等待，clear保持busy至projection且不清新chrome。SDK原resource owner明确拒绝inplace迁移。
+
+最终13文件250项、七静态门／2727modules／0monoliths、buildfe58e52bc89b与限定APPROVE通过；14有效反转14AssertionErrors／exact恢复119项，首redundant control／handler内expect隔离／isolated media目录及source CLI timeout均保留分类，原print5/5rerun。Linuxcompiled与Node20.3禁生成各6场景5POST，安装15入口strict类型／6场景5POSTpassed，原shutdown日志六warning／UI confirm/report/queued dispatch/late unknown均验证；source/config不变，private清理。未重复配置模型调用，normalpinnedjudge实际exit2/not_proven／16384图capacity缺口保持。归档upgrade-switch-2026-11-19，36/62、26任务开放，E.6initialstartup／reload／results继续，按授权本地提交、不push/CI。

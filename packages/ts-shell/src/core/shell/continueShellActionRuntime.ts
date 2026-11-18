@@ -7,6 +7,7 @@ import type {
   SessionManager,
 } from "../../session/SessionManager.js";
 import { resumeShellSession } from "./recovery.js";
+import { resumeShellContext } from './replacement.js';
 import type { ShellRuntimeContext } from "./runtimeContext.js";
 import { renderStoppedContinueGuidanceSurface } from "./sessionStateSurface.js";
 
@@ -70,10 +71,12 @@ export async function runResumeLikeShellAction(options: {
       targetSummary?.status === "completed" ||
       targetSummary?.terminalClassification === "stopped"
     ) {
-      const resumeResult = options.sessionManager.tryResume(
+      const resumeResult = await resumeShellContext(
+        options.runtimeContext,
+        options.sessionManager,
         targetSessionId,
-        options.runtimeContext.projectRoot,
         { mode: "continuity-only" },
+        session => options.switchRuntimeSessionProjectContext(options.runtimeContext, session),
       );
       if (isFailedResumeResult(resumeResult)) {
         options.renderer.renderLine(
@@ -83,11 +86,6 @@ export async function runResumeLikeShellAction(options: {
         );
         return { turnNumber: options.turnNumber ?? 0 };
       }
-
-      options.switchRuntimeSessionProjectContext(
-        options.runtimeContext,
-        resumeResult.session,
-      );
 
       if (targetSummary.terminalClassification === "stopped") {
         renderStoppedContinueGuidanceSurface(options.renderer, {

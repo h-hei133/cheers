@@ -1,10 +1,14 @@
 # 规划执行进展（2026-11-19）
 
-本轮接续已核实任务，完成 E.6 的 kernel结算与实际startup／shutdown子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
+本轮接续已核实任务，完成 E.6 的 kernel结算、实际startup／shutdown、树导航与CLI replacement子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
 
 核查与取舍见[工程记录](design.md)，当前验收和次序见[任务清单](tasks.md)。源码按批本地提交。远端推送和本轮 CI 尚未发生。原定暂缓的原生插件与独立桌面产品不计入 62 项，T6 保留按需求开启。
 
 ## 当前批次的验证
+
+CLI session replacement复用原commands／guarded activation／extension service。before取消后才创建inactive候选，旧shutdown及完整退休先于activation；publish→新UI→start→exact owner/activation/saved prefix readback，postquiesce unknown封锁。RPC异步合同贯穿且不重复selection写，before取消保留所有路由source和旧view；startup消息只绑定新host/command且取消自entry，clear在投影完成后drain。SDK inplace迁移明确拒绝，原resources可继续。当前13文件250项、七门／2727modules／0monoliths、14有效反转14AssertionErrors／exact恢复119项、buildfe58e52bc89b及限定APPROVE通过。Linuxcompiled与Node20.3禁生成各六场景5POST，安装15strict入口／6场景5POST通过；source print首timeout分类并原suite5/5rerun，旧build/native/control证据保留。未重复配置模型调用，normaljudge仍actualexit2/not_proven。[本批交付](../../../.omx/artifacts/upgrade-switch-2026-11-19/delivery.json)。initial CLI startup UI、controlled reload和结果消费者仍缺，整项E.6和26任务保持开放。
+
+以下guarded activation前置已提交934d8299，保持原source证据。
 
 switch前置的guarded activation已沿原registry／atomic writer／resume完成。锁内比较source/destination含absent、activationId和legacy时间；每次rename前重新准入和CAS，candidate捕获不代表写成。resume失败读回必须最终匹配本次activationId与saved version，后继同ID保持unknown。8文件142项、七門／2722modules／0monoliths、build1f30f283e030、9反转12AssertionErrors／exact恢复30项通过，限定APPROVE。Linux公开SDK及Node20.3激活资格、安装15strict入口／11场景16POST通过，原配置与source不变。只保证guarded registry不覆盖新选择；target metadata可能先写，不声称跨文件原子。完整switch/fork与其余26项仍开放。[当前交付](../../../.omx/artifacts/upgrade-activation-2026-11-19/delivery.json)。
 
@@ -163,7 +167,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 ## 后续工作
 
-下一批优先 E.6。已确认成功／取消agent_end与kernel事件未派发给扩展，原session生命周期按prompt。先复用原contribution／invocation补typed kernel事件与最终settlement，再分别补真实会话转换及返回值消费者；保留普通Hook拒绝／批准／持久化边界。F2.6指标归属／跨进程传播和T5.1排他创建仍有独立已核实缺口。
+下一批继续 E.6 initial CLI startup等待实际input/UI绑定，再补controlled reload、before-tree定制summary和其他结果消费者；保持原contribution、commands和普通Hook拒绝／批准／持久化边界。F2.6指标归属／跨进程传播和T5.1排他创建仍有独立已核实缺口。
 
 ## 阶梯计价历史验收
 

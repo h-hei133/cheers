@@ -28,6 +28,25 @@ export function attachInputQueue(runtime: ShellSessionRuntime, host: QueueHost):
   hosts.set(runtime, host); return () => { if (hosts.get(runtime) === host) hosts.delete(runtime); };
 }
 
+/** Lifecycle messages join the existing queue and execute after the replacement command settles. */
+export function queueExtensionMessage(runtime: ShellSessionRuntime, text: string, admission: () => string | undefined): boolean {
+  const command = runtime.commands.current;
+  const host = hosts.get(runtime);
+  if (command?.kind !== 'session-change' || !host) return false;
+  const refused = admission();
+  if (refused) throw new Error(refused);
+  const id = host.enqueue(text);
+  const cancel = () => { host.control.cancel(id); };
+  command.controller.signal.addEventListener('abort', cancel, { once: true });
+  void command.settled.then(result => {
+    command.controller.signal.removeEventListener('abort', cancel);
+    if (hosts.get(runtime) !== host || command.controller.signal.aborted || admission()
+      || (result as { status?: unknown } | undefined)?.status !== 'changed') cancel();
+    else host.drain();
+  }, () => { command.controller.signal.removeEventListener('abort', cancel); cancel(); }).catch(cancel);
+  return true;
+}
+
 export function attachSubmissionQueue(runtime: ShellSessionRuntime,
   queue: { readonly control: InputQueueControl; push(text: string, attachments?: PromptAttachments): string; shift(): string | undefined },
   run: (prompt: string) => Promise<unknown>, ready: () => boolean): () => void {

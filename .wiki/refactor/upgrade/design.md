@@ -4,6 +4,18 @@
 
 只有一个 workspace 包。单个模块的 import 图无环不等于可以直接搬目录成为无环包：browser/core、workflow/core、planning/session/provider 的双向边存在。现有分支树、CAS 状态写入、任务日志、远端作业派发栅栏均已实现；问题是事务权威和独立模块边界未完成，不能重造另一套执行器或任务系统。
 
+## CLI session replacement transaction (2026-11-19)
+
+参考runtime先before取消、inactive候选、旧run结算／shutdown／dispose、创建后重绑consumer的顺序采用；原参考重建整套runtime的方式不直接照搬，复用现有commands／extension service／guarded SessionManager和同步context publication。SDK resources由原loader和SessionUi固定host，CLI不能迁移其贡献，本批在SDK owner明确refused，后续如需inplace须由SDK完整rebinding。
+
+neutral sessionChange装在CLI composition，slash action在原command settled后调用，唯一session-change command负责取消与idle。before_switch/fork返回取消不创建候选；prepared target pin目录/state/transcript原prefix与version，shutdown前标quiesced，完整old resources retirement加入等待。退休后不用旧generation admission，source/config与registry captured source/destination CAS继续有效；after activation只允许本次metadata投影。publish后再建host，当前input owner在start前重绑UI。after await检查exact published object/cwd/root/config、state版本、原prefix与candidate activation，只有validated report后缀允许；无法证明时workspaceIssue封锁，不无条件resume旧selection。
+
+new／resume／completed continue／panel／explicit switch／interactive fork／different workspace attach及RPC new/switch/fork/clone接通；RPC contract完整await，删除第二次无guard selection写。startup消息仅新host的exact command token准入，abort／非changed结果只cancel其队列ID，保留用户input；RPC长replacement response加入已有EOF等待，abort及时到达。interactive clear保持busy至saved conversation/report投影结束，同新UI只needsRefresh，防止擦掉新prompt与chrome。
+
+真实反例按源码先红后修：首review9行为红中竞选warning文案仅夹具精度；target sameID／cwd、原service未join、quiesced错误、poststart fence及后续saved-state/prefix/dir四红，final read与RPC abort两红、startup queue两红、activation capture一红均归档。最终13文件250项、七静态门／2727modules／0monoliths和buildfe58e52bc89b通过；print source CLI初timeout1failed/254passed保留，原suite未改5/5rerun通过。14反转14AssertionErrors/exact恢复119项；首次冗余capture mutation是control、handler内expect被真实异常隔离及isolated mediaFixture目录错误分别修probe，绝不当有效red。
+
+Linuxcompiled public SDK原host拒绝／继续prompt，实际CLI RPC两取消／五accepted replacement／原shutdown六warning／startup UI confirm与report／queued prompt／abort-before reuse／poststart abort和saved state unknown fence／print clear取消六场景5POST通过，Node20.3禁生成同组通过；安装15strict入口／6场景5POST同build通过。未新增配置模型调用；normalpinnedjudge实际exit2/not_proven，16384图容量missing仍开。当前完整E.6和26任务未完成。[本批交付](../../../.omx/artifacts/upgrade-switch-2026-11-19/delivery.json)。
+
 ## Guarded session activation prerequisite (2026-11-19)
 
 原registry setter虽locked reread，仍无caller source/destination CAS且忽略readError。异步before后调用会覆写竞争者的新selection。沿原setter添加可选activation guard，source/destination显式absent、完整sessionId/time/activationId捕获；普通caller默认合同保留。candidate在锁前捕获仅表示prepared，方便rename后release失败的readback，不把callback当write proof。

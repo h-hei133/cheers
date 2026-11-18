@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-19",
+  "batch": [
+    "E.6 CLI session replacement"
+  ],
+  "status": "subbatch_linux_accepted_E6_open_repository_gate_not_proven",
+  "baseCommit": "934d82992ff63e49c1db291563332b78a77ef0fa",
+  "delivery": {
+    "localCommit": "containing Git commit supplies identity",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "fe58e52bc89b2e833fd37aed16d791eb1351329a7159914284888a63ab2cd2f7",
+    "inputsDigest": "c0d587e1fc8feb6fda30cbb989f27dc19ef61df72c4b72c8854a91cbf6d21a2a",
+    "inputDigestMatches": true,
+    "node": "24.15.0"
+  },
+  "source": {
+    "files": 32,
+    "productionFiles": 25,
+    "hashesMatch": true,
+    "receipt": "evidence/source.json"
+  },
+  "validation": {
+    "combined": {
+      "files": 13,
+      "passed": 250,
+      "receipt": "raw.tar.gz::joint-reviewed.log"
+    },
+    "static": {
+      "count": 7,
+      "passed": true,
+      "productionModules": 2727,
+      "monoliths": 0
+    },
+    "reversal": {
+      "cases": 14,
+      "assertionFailures": 14,
+      "exactRestoration": true,
+      "mainSourceUnchanged": true,
+      "restoredPassed": 119,
+      "receipt": "evidence/reversal.json"
+    },
+    "linux": {
+      "nativePassed": 6,
+      "posts": 5,
+      "receipt": "evidence/native-final.json"
+    },
+    "nodeFloor": {
+      "runtime": "20.3.0",
+      "codeGenerationDisabled": true,
+      "nativePassed": 6,
+      "posts": 5,
+      "receipt": "evidence/native-node20-final.json"
+    },
+    "installed": {
+      "publicEntries": 15,
+      "strictTypes": true,
+      "engineStrict": true,
+      "nativePassed": 6,
+      "posts": 5,
+      "receipt": "evidence/package.json"
+    },
+    "printRerun": {
+      "passed": 5,
+      "initialTimeout": true,
+      "testChanged": false,
+      "receipt": "raw.tar.gz::print-rerun.log"
+    },
+    "configuredProvider": {
+      "status": "not_run_this_subbatch",
+      "earlierE6Attempt": "provider-auth with zero requests"
+    },
+    "normproof": {
+      "exit": 2,
+      "verdict": "not_proven",
+      "acceptedAsProof": false,
+      "reason": "pinned module graph exceeds 16384 edge capacity",
+      "scopeModified": false,
+      "gateModified": false,
+      "receipt": "evidence/judge-current.json"
+    }
+  },
+  "review": {
+    "status": "APPROVE",
+    "scopeLimited": true,
+    "validationRunByReviewer": false,
+    "receipt": "evidence/review.json"
+  },
+  "taskCount": {
+    "accepted": 36,
+    "open": 26,
+    "fullE6Accepted": false
+  },
+  "remaining": [
+    "initial CLI session_start after input/UI readiness",
+    "controlled reload",
+    "before-tree custom summary",
+    "event result consumers",
+    "SDK controlled resource rebinding"
+  ],
+  "boundaries": [
+    "Linux only",
+    "no cross-file metadata and selection atomicity",
+    "unknown replacement blocks reentry",
+    "SDK inplace replacement refused",
+    "local HTTP evidence does not prove configured service",
+    "no push or CI"
+  ],
+  "evidenceStorage": {
+    "archive": "raw.tar.gz",
+    "index": "evidence/raw-index.json",
+    "rawBytesPreserved": true
+  }
+}

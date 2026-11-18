@@ -32,6 +32,7 @@ import {
 } from "./cliSessionProjection.js";
 import { openSessionsPanel } from "./sessionsPanel.js";
 import { renderSessionCommandMap } from "./slashCommandRegistry.js";
+import { resumeShellContext } from '../core/shell/replacement.js';
 
 export async function runCliSessionCommand(input: {
   readonly renderer: StreamingRenderer;
@@ -114,8 +115,9 @@ export async function runCliSessionCommand(input: {
         input.renderer.renderLine("");
         return;
       }
-      const resumed = input.sessionManager.resume(panelResult.switchedSessionId);
-      switchRuntimeSessionProjectContext(input.runtimeContext, resumed);
+      const result = await resumeShellContext(input.runtimeContext, input.sessionManager, panelResult.switchedSessionId,
+        { mode: 'continuity-only' }, session => switchRuntimeSessionProjectContext(input.runtimeContext, session));
+      if (!result.ok) throw new Error(result.error);
       renderProjectedLines(
         input.renderer,
         formatSessionPanelSwitchSuccessLines({
@@ -329,9 +331,11 @@ async function runCliSessionSwitch(input: {
       }
       return;
     }
-    const resumed = input.sessionManager.resume(resolvedSessionId);
     const previousSessionId = input.runtimeContext.session.id;
-    switchRuntimeSessionProjectContext(input.runtimeContext, resumed);
+    const result = await resumeShellContext(input.runtimeContext, input.sessionManager, resolvedSessionId, { mode: 'continuity-only' },
+      session => switchRuntimeSessionProjectContext(input.runtimeContext, session));
+    if (!result.ok) throw new Error(result.error);
+    const resumed = result.session;
     renderProjectedLines(
       input.renderer,
       formatSessionSwitchSuccessLines({

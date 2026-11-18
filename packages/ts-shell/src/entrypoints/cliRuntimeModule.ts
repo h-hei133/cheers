@@ -94,10 +94,6 @@ export async function runNonTtyPromptStream(options: {
     onFirstFrame: options.onFirstFrame,
     onUserIntent: options.onUserIntent,
     rpcMode: options.rpcMode,
-    switchSession: session => {
-      switchRuntimeSessionProjectContext(options.runtimeContext, session);
-      return true;
-    },
     runPrompt: (prompt, attachments) => runNonInteractivePrompt({ ...options, prompt, attachments, printMode: false, jsonEvents: options.rpcMode === true, awaitGoalScheduling: false }),
   });
 }
@@ -280,7 +276,7 @@ export async function runNonInteractivePrompt(options: {
     }
 
     if (resolved.slashResult.action === "show-workspace") {
-      runCliWorkspaceCommand({
+      await runCliWorkspaceCommand({
         renderer: options.renderer,
         sessionManager: options.sessionManager,
         runtimeContext: options.runtimeContext,

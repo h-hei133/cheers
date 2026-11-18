@@ -14,7 +14,7 @@ import {
   renderWorkspaceSummary,
 } from "./surface.js";
 
-export function runCliWorkspaceCommand(input: {
+export async function runCliWorkspaceCommand(input: {
   readonly renderer: StreamingRenderer;
   readonly sessionManager: SessionManager;
   readonly runtimeContext: ShellRuntimeContext;
@@ -24,7 +24,7 @@ export function runCliWorkspaceCommand(input: {
   readonly workspaceTarget?: string;
   readonly printMode: boolean;
   readonly onProjectContextSwitched?: () => void;
-}): void {
+}): Promise<void> {
   const workspaceAction = input.workspaceAction ?? "status";
   if (workspaceAction === 'add' || workspaceAction === 'remove' || workspaceAction === 'rebind') {
     const target = input.workspaceTarget?.trim();
@@ -58,14 +58,14 @@ export function runCliWorkspaceCommand(input: {
 
   if (workspaceAction === "attach") {
     if (input.busy?.()) { input.renderer.renderLine('Wait for the current session operation before switching workspaces.'); return; }
-    runCliWorkspaceAttach(input);
+    await runCliWorkspaceAttach(input);
     return;
   }
 
   renderWorkspaceSummary(input.renderer, input.runtimeContext);
 }
 
-function runCliWorkspaceAttach(input: {
+async function runCliWorkspaceAttach(input: {
   readonly renderer: StreamingRenderer;
   readonly sessionManager: SessionManager;
   readonly runtimeContext: ShellRuntimeContext;
@@ -73,7 +73,7 @@ function runCliWorkspaceAttach(input: {
   readonly printMode: boolean;
   readonly busy?: () => boolean;
   readonly onProjectContextSwitched?: () => void;
-}): void {
+}): Promise<void> {
   const attachTarget = input.workspaceTarget?.trim();
   if (!attachTarget) {
     input.renderer.renderLine(
@@ -120,14 +120,9 @@ function runCliWorkspaceAttach(input: {
       return;
     }
 
-    const attachedSession = input.sessionManager.createNew(attached.projectRoot, {
-      rootMode: attached.rootMode,
-      requestedWorkspaceRoot: attached.requestedRoot,
-      targetPathBase: attached.targetPathBase,
-      gitRoot: attached.gitRoot,
-    });
-    createdId = attachedSession.id;
-    switchActiveSession(input.runtimeContext, attachedSession, attached.projectRoot, {
+    const prepare = () => input.sessionManager.createNew(attached.projectRoot, { activate: false, rootMode: attached.rootMode,
+      requestedWorkspaceRoot: attached.requestedRoot, targetPathBase: attached.targetPathBase, gitRoot: attached.gitRoot });
+    const publish = (session: import('../../session/schema/sessionRecord.js').Session) => switchActiveSession(input.runtimeContext, session, attached.projectRoot, {
       cwd: attached.projectRoot,
       projectRoot: attached.projectRoot,
       rootMode: attached.rootMode,
@@ -137,6 +132,20 @@ function runCliWorkspaceAttach(input: {
       rootBindingDiagnostics: attachDiagnostics,
       gitContext: attached.gitContext,
     });
+    let attachedSession;
+    if (input.runtimeContext.sessionChange) {
+      const result = await input.runtimeContext.sessionChange({ reason: 'new', projectRoot: attached.projectRoot,
+        prepare: check => { check(); const session = prepare(); createdId = session.id; return session; }, publish });
+      if (result.status !== 'changed') {
+        input.renderer.renderLine(result.status === 'cancelled' ? 'Workspace switch cancelled.' : `Workspace switch ${result.status}: ${result.reason}`);
+        return;
+      }
+      attachedSession = result.session;
+    } else {
+      attachedSession = prepare(); createdId = attachedSession.id;
+      input.sessionManager.setCurrentSessionForProject(attached.projectRoot, attachedSession.id);
+      publish(attachedSession);
+    }
     switched = true;
 
     input.renderer.renderLine(

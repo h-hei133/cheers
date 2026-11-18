@@ -29,6 +29,9 @@ import { closeJobsFor } from '../runtime/jobs.js';
 import { routeSlashCommand } from '../../core/commands/slashRouter.js';
 import { decodeCast } from '../../media/record/codec.js';
 import { recordingText } from '../../media/record/playback.js';
+import { installSessionChange } from '../runtime/session/replacement.js';
+import * as extensions from '../runtime/extensions.js';
+import type { Transcript } from '../../presentation/tui/transcript/container.js';
 
 function interactive(tuiMode: 'regular' | 'fullscreen' = 'fullscreen', root = '/workspace', recording?: {
   context: ShellRuntimeContext; terminal: RecordingTerminal; manager: SessionManager;
@@ -59,6 +62,38 @@ function interactive(tuiMode: 'regular' | 'fullscreen' = 'fullscreen', root = '/
 }
 
 describe('interactive extension UI', () => {
+  it('finishes clear projection before queued startup work and preserves successor extension chrome', async () => {
+    const fixture = mediaFixture();
+    Object.assign(fixture.context, { originalCwd: fixture.root, rootMode: 'direct', targetPathBase: fixture.root,
+      gitContext: { insideGit: false, root: null, branch: null, isClean: true } });
+    const { mode, context, sessionRuntime, state } = interactive('fullscreen', fixture.root, { ...fixture, terminal: new RecordingTerminal() });
+    const host = mode as unknown as { busy: boolean; run(text: string): Promise<void>; runQueued(text: string): Promise<void>; state: { transcript: Transcript } };
+    sessionRuntime.isRunning = () => Boolean(sessionRuntime.commands.current);
+    sessionRuntime.input = () => undefined;
+    installExtensionRuntime(context, sessionRuntime, () => ({ workspaceRoot: context.cwd, sessionId: context.session.id, hooks: new HookDispatcher(), emit() {}, permissionScope: 'ask' }), fixture.manager);
+    installSessionChange(context, fixture.manager, sessionRuntime);
+    const start = extensions.startExtensionsFor;
+    const started = vi.spyOn(extensions, 'startExtensionsFor').mockImplementation(async (...args) => {
+      await start(...args);
+      extensionHostFor(context)!.ui!.setStatus!('current', 'Successor ready');
+      await extensionHostFor(context)!.sendMessage!('Queued startup request');
+    });
+    const queued = vi.spyOn(host, 'runQueued').mockImplementation(async text => {
+      expect(host.busy).toBe(false); host.state.transcript.append({ kind: 'user', text, finalized: true });
+    });
+    try {
+      mode.start(); await start(context); await host.run('/clear');
+      expect(context.workspaceIssue).toBeUndefined();
+      expect(host.state.transcript.all().filter(block => block.kind === 'error')).toEqual([]);
+      await vi.waitFor(() => expect(queued).toHaveBeenCalledWith('Queued startup request', undefined));
+      expect(host.state.transcript.all().some(block => block.kind === 'user' && block.text === 'Queued startup request')).toBe(true);
+      expect(state.extensionUi.chrome().status.join(' ')).toContain('Successor ready');
+    } finally {
+      started.mockRestore(); mode.stop(); await closeExtensionsFor(context); await closeJobsFor(context);
+      vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(fixture.scratch, { recursive: true, force: true });
+    }
+  });
+
   it.each(['regular', 'fullscreen'] as const)('excludes extension input and editor text from actual %s recordings while retaining later output', async tuiMode => {
     const fixture = mediaFixture();
     const binding = configurationBinding(fixture.context);

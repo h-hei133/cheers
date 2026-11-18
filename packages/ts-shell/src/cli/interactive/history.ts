@@ -193,9 +193,11 @@ export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'e
  * untouched session leaves nothing behind rather than an empty stub in the
  * re-entry list.
  */
-export function startFreshSession(target: HistoryTarget): void {
-  startNewSession(target.context, target.sessionManager);
+export async function startFreshSession(target: HistoryTarget): Promise<boolean> {
+  if (!await startNewSession(target.context, target.sessionManager)) return false;
   target.transcript.clear();
+  showConversation(target);
+  return true;
 }
 
 /** Older retained observations precede the visible turns; messages keep their own order. */

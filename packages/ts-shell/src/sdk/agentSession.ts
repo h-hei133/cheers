@@ -430,6 +430,7 @@ export async function createAgentSession(
       getReadline: () => null,
       isStdinTty: () => false,
     });
+    runtimeContext.sessionChange = async () => ({ status: 'refused', reason: 'Create a new AgentSession to replace SDK-owned resources.' });
     await waitForExtensionsFor(runtimeContext);
     const host = extensionHostFor(runtimeContext);
     sessionUi = new SessionUi(runtimeContext, host);

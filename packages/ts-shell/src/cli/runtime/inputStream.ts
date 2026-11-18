@@ -2,7 +2,7 @@ import readline from 'node:readline';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { PromptAttachments, ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import type { SessionManager } from '../../session/SessionManager.js';
-import type { Session } from '../../session/schema/sessionRecord.js';
+import type { SessionChangePort } from '../../core/shell/replacement.js';
 import { writeRawStdout } from '../../core/shell/outputGuard.js';
 import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 import type { StructuredLogger } from '../../observability/structuredLogger.js';
@@ -31,6 +31,7 @@ import { handleRpcCommand } from '../rpc/rpcServer.js';
 import { rpcInputFailure, tryParseRpcCommand, tryParseRpcUiResponse } from '../rpc/protocol.js';
 import { createRpcUiBridge, type RpcUiBridge } from '../rpc/uiBridge.js';
 import { createRuntimeRpcHost } from '../rpc/runtimeHost.js';
+import { bindSessionSurface } from './session/surface.js';
 
 const rpcInputOwners = new WeakMap<ShellRuntimeContext, object>();
 
@@ -42,7 +43,7 @@ export async function runPromptInputStream(options: {
   readonly renderer: StreamingRenderer;
   readonly logger: StructuredLogger;
   readonly runPrompt: (prompt: string, attachments?: PromptAttachments) => Promise<'exit' | void>;
-  readonly switchSession?: (session: Session) => boolean;
+  readonly switchSession?: SessionChangePort;
   readonly onRpcUiBridge?: (bridge: RpcUiBridge) => void;
   readonly onFirstFrame?: () => void;
   readonly onUserIntent?: () => void;
@@ -92,11 +93,13 @@ export async function runPromptInputStream(options: {
   let rpcUiBridge: RpcUiBridge | undefined;
   let rpcInputOwner: object | undefined;
   let releaseUi: (() => void) | undefined;
+  let releaseSessionSurface: (() => void) | undefined;
   const closeRpcUi = (): void => {
     if (rpcInputOwner && rpcInputOwners.get(options.runtimeContext) === rpcInputOwner) {
       rpcInputOwners.delete(options.runtimeContext);
     }
     const release = releaseUi; releaseUi = undefined;
+    releaseSessionSurface?.(); releaseSessionSurface = undefined;
     try { release?.(); } finally { rpcUiBridge?.dispose(); }
   };
   const stdinClosed = new Promise<void>((resolve, reject) => {
@@ -200,6 +203,10 @@ export async function runPromptInputStream(options: {
       rpcInputOwner = {};
       rpcInputOwners.set(options.runtimeContext, rpcInputOwner);
       releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
+      releaseSessionSurface = bindSessionSurface(options.runtimeContext, () => {
+        if (closed || exitRequested || !rpcUiBridge || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) throw new Error('The RPC input host is closing or replaced.');
+        releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
+      });
       if (closed) closeRpcUi();
       options.onRpcUiBridge?.(rpcUiBridge);
     }
@@ -279,7 +286,7 @@ export async function runPromptInputStream(options: {
               if (closed || exitRequested || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
               releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
             }).finally(() => { pendingControls--; });
-            if (rpcCommand.type !== 'bash' && rpcCommand.type !== 'compact' && rpcCommand.type !== 'get_commands') return pending;
+            if (!['bash', 'compact', 'get_commands', 'new_session', 'switch_session', 'fork', 'clone'].includes(rpcCommand.type)) return pending;
             // The session's command owner joins execution. This set only joins
             // response writes at EOF while later controls can reach cancellation.
             rpcResponses.add(pending);

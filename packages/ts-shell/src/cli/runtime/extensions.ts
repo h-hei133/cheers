@@ -27,6 +27,8 @@ interface ExtensionRuntime {
   readonly service: () => ExtensionService; readonly ready: () => Promise<void>; readonly close: () => Promise<void>; readonly cancel: () => Promise<void>; readonly run: ExtensionRun;
   readonly start: (reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason']) => Promise<void>;
   readonly shutdown: (reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason'], settle?: () => Promise<void>) => Promise<void>;
+  readonly replace: () => Promise<void>;
+  readonly retire: () => Promise<void>;
 }
 const runtimes = new WeakMap<ShellRuntimeContext, ExtensionRuntime>();
 export function installExtensionRuntime(context: ShellRuntimeContext, runtime: ShellSessionRuntime, gate: (tool?: string) => ToolGateOptions, store?: SessionManager,
@@ -39,9 +41,30 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
   let initializing = false;
   let ready: Promise<void> = Promise.resolve();
   let lifecycle: ExtensionSessionLifecycle | undefined;
+  const retire = async () => {
+    closing = true;
+    initialization?.abort();
+    cliCleanups.splice(0).forEach(unregister => unregister());
+    const results = await Promise.allSettled([...retiring, ...(service ? [service.close()] : [])]);
+    await ready.catch(() => {});
+    if (retiredUnknown || results.some(result => result.status === 'rejected')) {
+      retiredUnknown = true;
+      throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
+    }
+    service = undefined;
+    identity = undefined;
+  };
+  const rebind = async () => {
+    if (closed || retiredUnknown || service || retiring.size > 0) throw new Error('Extension retirement must complete before replacement.');
+    closing = false;
+    runtimes.get(context)!.service();
+    await ready;
+  };
   runtimes.set(context, { run: operation => runtime.commands.run(operation), ready: () => ready,
     start: reason => lifecycle!.start(() => ready, reason),
     shutdown: (reason, settle) => { closing = true; return lifecycle!.shutdown(settle ?? (() => runtime.cancelAndWait()), reason); },
+    replace: rebind,
+    retire,
     cancel: async () => { if (initializing) initialization?.abort(); await service?.cancel(); }, close: async () => {
     closed = true;
     closeExtensionHost(context);
@@ -172,6 +195,14 @@ export async function startExtensionsFor(context: ShellRuntimeContext, reason: E
 export function shutdownExtensionsFor(context: ShellRuntimeContext, reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason'] = 'quit', settle?: () => Promise<void>): Promise<void> {
   const owner = runtimes.get(context);
   return owner ? owner.shutdown(reason, settle) : settle?.() ?? Promise.resolve();
+}
+/** Explicit replacement reuses the installed runtime, its resource retirement and initialization owners. */
+export async function replaceExtensionsFor(context: ShellRuntimeContext): Promise<void> {
+  await runtimes.get(context)?.replace();
+}
+/** Join the original resources while its session is still published. */
+export async function retireExtensionsFor(context: ShellRuntimeContext): Promise<void> {
+  await runtimes.get(context)?.retire();
 }
 export function refreshExtensionsFor(context: ShellRuntimeContext): void { runtimes.get(context)?.service(); }
 export async function waitForExtensionsFor(context: ShellRuntimeContext): Promise<void> {

@@ -13,6 +13,7 @@ import { SessionManager } from '../../session/SessionManager.js';
 import { runTurn, type TurnInput } from '../../turn/session.js';
 import type { RpcResponse, RpcUiBridge } from '../rpc/protocol.js';
 import { runPromptInputStream } from './inputStream.js';
+import { ShellCommandRuntime } from '../../core/shell/command.js';
 
 let directory: string;
 let context: ShellRuntimeContext;
@@ -85,12 +86,33 @@ it('returns cancelled for refused JSONL session switching and preserves current 
   const runtime = { waitForIdle: async () => {}, getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
   const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
     renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true,
-    runPrompt: async () => {}, switchSession: () => false });
+    runPrompt: async () => {}, switchSession: async () => ({ status: 'cancelled', reason: 'Synthetic refusal' }) });
   stdin.end(JSON.stringify({ id: 'switch', type: 'switch_session', sessionPath: target.id }) + '\n');
   await run;
   expect(frames.find(frame => frame.id === 'switch')).toMatchObject({ success: true, data: { cancelled: true } });
   expect(context.session).toBe(original);
   expect(manager.getCurrentSessionForProject(directory)?.id).toBe(original.id);
+});
+
+it('lets JSONL abort reach a pending session replacement while EOF still joins its response', async () => {
+  const commands = new ShellCommandRuntime(), source = context.session;
+  let entered!: () => void; const ready = new Promise<void>(resolve => { entered = resolve; });
+  const stdin = new PassThrough(); inputs.push(stdin);
+  const runtime = { commands, waitForIdle: async () => { await commands.current?.settled; }, getCurrentRunController: () => commands.current?.controller ?? null,
+    isRunning: () => Boolean(commands.current), cancelCurrentRun: () => commands.current?.controller.abort() } as unknown as ShellSessionRuntime;
+  const running = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true, runPrompt: async () => {},
+    switchSession: () => commands.run(async signal => {
+      entered(); await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }));
+      return { status: 'cancelled', reason: 'Aborted before activation' };
+    }, 'session-change') });
+  stdin.write('{"id":"changing","type":"new_session"}\n'); await ready;
+  try {
+    stdin.write('{"id":"abort-changing","type":"abort"}\n');
+    await vi.waitFor(() => expect(commands.current?.controller.signal.aborted ?? true).toBe(true));
+  } finally { commands.current?.controller.abort(); stdin.end(); await running; }
+  expect(frames.find(frame => frame.id === 'changing')).toMatchObject({ success: true, data: { cancelled: true } });
+  expect(frames.find(frame => frame.id === 'abort-changing')?.success).toBe(true); expect(context.session).toBe(source);
 });
 
 it.each([

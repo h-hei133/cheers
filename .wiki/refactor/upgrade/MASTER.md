@@ -23,10 +23,10 @@
 ## Current status
 
 **Current phase** 按批实施。36/62 项完成 Linux 本地功能验收，26 项开放。
-**Completed batch** E.6 switch前置guarded activation。原registry锁内source/destination CAS／rename重试准入、candidate身份与resume最终readback已实施；8文件142项、七门／2722modules／0monoliths、9反转12AssertionErrors／exact恢复30项及build1f30f283e030通过。Linux公开SDK和Node20.3同激活场景、安装15strict入口／11场景16POST通过，限定APPROVE。tree已提交de8d2c0b，保持此前source证据。
-**Next batch** E.6 switch／fork异步before→旧shutdown→原guarded事务→受控重绑→start。CLI interactive/RPC start UI、controlled reload和可修改结果仍缺；metadata和selection仍非跨文件原子事务。
+**Completed batch** E.6 CLI session replacement。before取消后才创建inactive候选，旧shutdown／完整退休后guarded activation，publish后绑定新UI再start；exact owner／activation和prepared saved prefix保持，unknown封锁。13文件250项、七静态门／2727modules／0monoliths、14反转14AssertionErrors/exact恢复119项及buildfe58e52bc89b通过，限定APPROVE。Linuxcompiled和Node20.3各6场景5POST；安装15strict入口／6场景5POST通过。SDK原资源owner明确拒绝inplace迁移。
+**Next batch** E.6 initial CLI interactive/RPC session_start等待实际input/UI绑定；其后controlled reload、before-tree定制summary和其余结果consumer。36/62、26开放保持；metadata／selection仍非跨文件原子事务。
 **Repository gate** 当前normal judgeexit2/not_proven，16384图容量缺口；pinned输入未改。定向script29项与完整209/210为前批历史，不升为当前script验证。
-**Evidence boundary** 当前构建配置模型provider-auth，0requests；Linux本地HTTP／安装证据不证明真实服务或其他平台。本轮仅本地按批提交，不push或宣称CI。
+**Evidence boundary** 本批未重复调用配置模型，前批provider-auth／0requests保留历史；Linux本地HTTP／安装证据不证明真实服务或其他平台。本轮仅本地按批提交，不push或宣称CI。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance
@@ -40,6 +40,8 @@
 所有仍然成立的必需任务均需实现和相应范围的当前证据；“代码已有但未验收”“部分完成”“证据不足”都不算完成。研究结论被反证时记录具体消费者与理由，不为删除任务而缩小目标。缺少某一家服务或人类授权时继续其他独立工作，保留该项状态。Linux 证据不扩展为 Windows 或全平台验证。每批更新 tasks 和本文件；总目标只在逐项审计通过后关闭。
 
 ## Adaptive control
+
+E.6 CLI replacement实际L／复用10/10，原commands／guarded activation／service／queue／state lock不分裂，无新依赖。新增未预见依赖6（quiesced分类、retirement join、activation capture前target lease、postread owner、RPC abort chain、startup queue/UI投影）。逐个真实反例修复、14有效反转exact恢复，first source CLI timeout原suite重验passed；isolated目录与observer/handler assertion误用分别保留。只接受本batch范围，36/62、26开放，initial startup/reload/result继续；不补造统一历史drift数字。
 
 E.6激活前置实际L，复用10/10，原registry/state锁／atomic writer／resume/readback owner保持，无新依赖或事务系统。额外依赖4项：fsync/rename取消、admission自重入、load期间同id再激活、final read后撤权；均实际red后修。首probe在锁内再setter自死锁与named fs import spy缺syncBuiltinESMExports为fixture误用，已修并重验；源码窄化调整导致首reversal代际失效记录历史，最终9/12exact通过。36/62与goal active不变，switch本体未验收；metadata partial和normaljudge容量not_proven保留。
 

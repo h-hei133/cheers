@@ -357,11 +357,11 @@ describe("showing a session", () => {
     expect(getSessionTodos("s-shown").map((item) => item.text)).toEqual(["switch me"]);
   });
 
-  it("clears the checklist when a fresh session starts", () => {
+  it("clears the checklist when a fresh session starts", async () => {
     setSessionTodos("s-old", [{ id: 1, text: "from before", status: "pending" }]);
     const transcript = new Transcript();
 
-    startFreshSession({
+    await startFreshSession({
       transcript,
       sessionManager: {
         getSession: () => undefined,

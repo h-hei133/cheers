@@ -9,7 +9,6 @@ import { ShellCommandRuntime } from '../../core/shell/command.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import { SessionManager } from '../../session/SessionManager.js';
-import type { Session } from '../../session/schema/sessionRecord.js';
 import { runTurn, type TurnInput } from '../../turn/session.js';
 import type { StepFunction } from '../../turn/step.js';
 import { resolveCliCredential } from '../provider/cliProviderRuntimeBridge.js';
@@ -18,6 +17,7 @@ import { SubmissionQueue } from '../interactive/inputQueue.js';
 import type { RpcCommand } from './protocol.js';
 import { handleRpcCommand } from './rpcServer.js';
 import { createRuntimeRpcHost } from './runtimeHost.js';
+import type { SessionChangePort } from '../../core/shell/replacement.js';
 
 let directory: string;
 let context: ShellRuntimeContext;
@@ -43,7 +43,7 @@ afterEach(() => {
   vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(directory, { recursive: true, force: true });
 });
 
-function host(input?: TurnInput, switchSession?: (session: Session) => boolean) {
+function host(input?: TurnInput, switchSession?: SessionChangePort) {
   const runtime = { commands: new ShellCommandRuntime(), input: () => input, cancelCurrentRun: () => {}, getState: () => input ? 'running' : 'idle',
     summarizeAbandonedTurns: async () => undefined } as unknown as ShellSessionRuntime;
   return { ...createRuntimeRpcHost({ runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
@@ -106,7 +106,7 @@ it.each(['new_session', 'switch_session', 'fork', 'clone'] as const)('reports a 
   manager.addTurn(original.id, { role: 'user', content: 'fork question' });
   const entryId = manager.getSession(original.id)!.turns[0]!.id!;
   const target = manager.createNew(directory); manager.setCurrentSessionForProject(directory, original.id);
-  const callback = vi.fn(() => false);
+  const callback = vi.fn(async () => ({ status: 'cancelled' as const, reason: 'Synthetic refusal' }));
   const command: RpcCommand = type === 'switch_session' ? { type, sessionPath: target.id }
     : type === 'fork' ? { type, entryId } : { type };
   const response = await handleRpcCommand(command, host(undefined, callback));
@@ -131,10 +131,12 @@ it('persists new-session ancestry while starting with an empty conversation', as
 it('accepts a same-project session callback and selects only after acceptance', async () => {
   const original = context.session;
   const target = manager.createNew(directory); manager.setCurrentSessionForProject(directory, original.id);
-  const rpc = host(undefined, next => {
+  const rpc = host(undefined, async request => {
     expect(manager.getCurrentSessionForProject(directory)?.id).toBe(original.id);
-    context.session = next; context.activeSession = { sessionId: next.id, sessionProjectDir: next.projectRoot };
-    return true;
+    const next = request.prepare(() => {});
+    manager.setCurrentSessionForProject(next.projectRoot, next.id);
+    request.publish(next);
+    return { status: 'changed', session: next };
   });
   const response = await handleRpcCommand({ type: 'switch_session', sessionPath: target.id }, rpc);
   expect(response).toMatchObject({ success: true, data: { cancelled: false, sessionId: target.id } });
@@ -274,9 +276,40 @@ it('binds a fork draft to the acquired history version before creating a session
 it('keeps a refused fork switch separate from an accepted editable draft', async () => {
   manager.addTurn(context.session.id, { role: 'user', content: 'Unaccepted draft' });
   const entryId = manager.getSession(context.session.id)!.turns[0]!.id!;
-  const response = await handleRpcCommand({ type: 'fork', entryId }, host(undefined, () => false));
+  const response = await handleRpcCommand({ type: 'fork', entryId }, host(undefined, async () => ({ status: 'cancelled', reason: 'Synthetic refusal' })));
   expect(response).toMatchObject({ success: true, data: { cancelled: true } });
   expect(response.data?.text).toBeUndefined();
+});
+
+it.each(['new_session', 'fork', 'clone'] as const)('waits for %s before handlers without creating a refused candidate', async type => {
+  manager.addTurn(context.session.id, { role: 'user', content: 'Question' });
+  const entryId = manager.getSession(context.session.id)!.turns[0]!.id!;
+  const source = context.session, directoryCount = fs.readdirSync(path.dirname(manager.getSessionDirPath(source.id))).length;
+  let release!: () => void, reached!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; }), ready = new Promise<void>(resolve => { reached = resolve; });
+  const change: SessionChangePort = async () => { reached(); await held; return { status: 'cancelled', reason: 'Cancelled before preparation' }; };
+  let returned = false;
+  const pending = handleRpcCommand(type === 'fork' ? { type, entryId } : { type }, host(undefined, change)).then(result => { returned = true; return result; });
+  try {
+    await ready; await new Promise(resolve => setImmediate(resolve));
+    expect(returned).toBe(false);
+    expect(fs.readdirSync(path.dirname(manager.getSessionDirPath(source.id)))).toHaveLength(directoryCount);
+    expect(manager.getCurrentSessionForProject(directory)?.id).toBe(source.id);
+  } finally { release(); }
+  expect(await pending).toMatchObject({ success: true, data: { cancelled: true } });
+});
+
+it('preserves a competing activation after the async replacement port returns', async () => {
+  const target = manager.createNew(directory, { activate: false }), source = context.session;
+  let competitor!: string;
+  const rpc = host(undefined, async request => {
+    const next = request.prepare(() => {}); request.publish(next);
+    competitor = manager.createNew(directory).id;
+    return { status: 'unknown', reason: 'Activation changed during startup' };
+  });
+  const result = await handleRpcCommand({ type: 'switch_session', sessionPath: target.id }, rpc);
+  expect(result.success).toBe(false); expect(manager.getCurrentSessionForProject(directory)?.id).toBe(competitor);
+  expect(competitor).not.toBe(source.id);
 });
 
 it('refuses a fork when the host becomes busy while acquiring its draft', async () => {

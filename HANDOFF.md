@@ -2871,3 +2871,19 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** An asynchronous session choice overwrites a later activation, or failed lock release reads the same session ID and mistakes a successor activation for its own.
 - **Root cause** Locked reread lacks captured source/destination comparisons, and callback or fsync/retry gaps remain after admission.
 - **Rule** Explicit guarded callers compare captured source and destination records, including absent state, unique activation identity and legacy time. Recheck admission around reading, take the final fresh CAS after callbacks, and repeat at each native rename. Capture a prepared candidate before locking, then read back its exact activation only after all saved-file acquisitions. Metadata and selection are separate writes; registry refusal does not prove no metadata write, and cleanup failure cannot become clean success.
+
+
+### Session Replacement Must Retire Its Own Resources Without Joining Its Command
+- **Symptom:** Cancelled replacement creates a candidate, shutdown failure looks like an ordinary refusal, or successor startup runs while old resources still drain.
+- **Root cause:** Consumers activate before asynchronous before-events, shutdown joins the command that owns it, or explicit rebind adopts the passive refresh path's background retirement.
+- **Rule:** Call replacement after the original slash command settles, create inactive candidates only after before admission, and mark quiesced before awaiting shutdown. Join original resource retirement before guarded activation and synchronous publication; retire old generation checks once that retirement is intentional. Any uncertain outcome after quiescence blocks reentry. SDK loader contributions stay with their original host unless the SDK owner performs rebinding.
+
+### Replacement Readback Allows Reports Without Adopting Competing History
+- **Symptom:** A stable same-ID read accepts a newer branch, or legitimate startup observations invalidate every replacement.
+- **Root cause:** The target lease is captured after activation, or file stability is mistaken for correspondence to the prepared conversation.
+- **Rule:** Capture directory, state and transcript identity and prefix before shutdown and activation. After activation accept only its metadata projection; keep those original sources pinned. Startup may append validated command-output observations, while ordinary messages, branch/state changes, altered prefixes and replacement files refuse success. Perform final synchronous readback under the existing state lock, recheck the exact published owner after callback acquisitions, and bind the final selection to the captured activation identity.
+
+### Startup Input Must Follow The Replacement Outcome And Host Projection
+- **Symptom:** A cancelled before callback starts a prompt, an aborted startup message remains queued, RPC abort cannot reach a switch, or clear erases a new prompt and extension chrome.
+- **Root cause:** Queued messages borrow any active replacement command, only drain is guarded, or command settlement is treated as completion of the host's screen update.
+- **Rule:** Admit startup messages only from the successor host bound to that exact command. Cancel only their captured queue IDs on abort or unsuccessful settlement; preserve explicit user input. Release the RPC control chain while joining replacement responses at EOF. Keep clear busy through its conversation projection, bind successor UI before startup, and refresh it afterward only when its admission requires it. Assert isolated handler failures from the test owner rather than inside a handler whose exceptions production deliberately contains.

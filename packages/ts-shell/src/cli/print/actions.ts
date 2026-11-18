@@ -23,7 +23,8 @@ export async function runPrintSessionAction(
     return "handled";
   }
   if (action.action !== "clear-session") return undefined;
-  startNewSession(input.runtimeContext, input.sessionManager);
-  input.renderLine(`Started a new session: ${input.runtimeContext.session.id}`);
+  if (await startNewSession(input.runtimeContext, input.sessionManager)) {
+    input.renderLine(`Started a new session: ${input.runtimeContext.session.id}`);
+  } else input.renderLine('Session replacement cancelled.');
   return "handled";
 }

@@ -316,12 +316,24 @@ export async function routeInteractiveCommand(
       if (input.sessionRuntime.getCurrentRunController() !== null) throw new Error('Wait for the current turn before forking.');
       const point = slashResult.entryId === undefined ? undefined
         : readSessionNavigation(sourceId, input.runtimeContext.projectRoot).points.find(item => item.entryId === slashResult.entryId && item.prompt !== undefined && !item.unavailable);
-      const forked = input.sessionManager.fork(
-        sourceId,
-        input.runtimeContext.projectRoot,
-        { entryId: slashResult.entryId, ...(input.sessionSelection ? { expectedVersion: input.sessionSelection.version } : {}) },
-      );
-      switchRuntimeSessionProjectContext(input.runtimeContext, forked);
+      const projectRoot = input.runtimeContext.projectRoot;
+      const prepare = () => input.sessionManager.fork(sourceId, projectRoot,
+        { activate: false, entryId: slashResult.entryId, ...(input.sessionSelection ? { expectedVersion: input.sessionSelection.version } : {}) });
+      let forked;
+      if (input.runtimeContext.sessionChange) {
+        const result = await input.runtimeContext.sessionChange({ reason: 'fork', projectRoot, entryId: slashResult.entryId, signal: input.signal,
+          admission: () => input.sessionSelection?.admission(), prepare: check => { check(); return prepare(); },
+          publish: session => switchRuntimeSessionProjectContext(input.runtimeContext, session) });
+        if (result.status !== 'changed') {
+          input.renderer.renderLine(result.status === 'cancelled' ? 'Session fork cancelled.' : `Fork failed: ${result.reason}`);
+          return { turnNumber: nextTurnNumber };
+        }
+        forked = result.session;
+      } else {
+        forked = prepare();
+        input.sessionManager.setCurrentSessionForProject(forked.projectRoot, forked.id);
+        switchRuntimeSessionProjectContext(input.runtimeContext, forked);
+      }
       renderProjectedLines(input.renderer, [
         `Forked ${sourceId} into ${forked.id}: same conversation, new direction. The source is untouched.`,
         "",
@@ -344,7 +356,7 @@ export async function routeInteractiveCommand(
   }
   if (isShellAction(slashResult, "show-workspace")) {
     let projectContextSwitched = false;
-    runCliWorkspaceCommand({
+    await runCliWorkspaceCommand({
       renderer: input.renderer,
       sessionManager: input.sessionManager,
       runtimeContext: input.runtimeContext,

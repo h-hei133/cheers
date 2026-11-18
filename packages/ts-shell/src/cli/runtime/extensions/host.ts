@@ -9,6 +9,7 @@ import type { ExtensionHostBridge } from '../../../extensions/runtime/inProcessL
 import { resolveUiHost, type ExtensionUiHost } from '../../../extensions/runtime/ui.js';
 import type { SessionManager } from '../../../session/SessionManager.js';
 import type { CoreMcpGateway } from '../../../core/mcp/gateway.js';
+import { queueExtensionMessage } from '../inputQueue.js';
 
 interface UiBinding {
   host: Required<ExtensionUiHost>;
@@ -33,6 +34,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
   const sessionId = context.session.id;
   const createdAt = context.session.createdAt;
   const root = context.cwd;
+  const replacement = runtime.commands.current?.kind === 'session-change' ? runtime.commands.current : undefined;
   const configured = configurationAdmission(context);
   let closed = false;
   let closing = false;
@@ -63,6 +65,8 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
       if (typeof message !== 'string' || !message.trim()) throw new Error('Extension message must be nonempty text.');
       const input = runtime.input();
       if (input) input.followUp(message, 'extension');
+      else if (runtime.commands.current?.kind === 'session-change' && runtime.commands.current !== replacement) throw new Error('Messages are unavailable before session replacement.');
+      else if (queueExtensionMessage(runtime, message, uiAdmission)) return;
       else await runtime.executePrompt(sessionId, message, { outputMode: 'print' });
     },
     appendEntry: async (customType, data) => {

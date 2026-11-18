@@ -1,0 +1,246 @@
+{
+  "status": "passed",
+  "source": {
+    "packages/ts-shell/src/cli/runtime/session/replacement.test.ts": "758fbb93745919f6f4070d5b63fc1ec206b40b01dd8dadd9ba50824759306ea6",
+    "packages/ts-shell/src/cli/runtime/session/replacement.ts": "54dbf1a49d17e3c5bcafcdda6225f66d9fc5891b8c16ffa4fa55918c297b7873",
+    "packages/ts-shell/src/cli/runtime/session/surface.ts": "73a70e5439dd522c567da382db9138c69b982ae1c2517eebea5ee2951bfdd11a",
+    "packages/ts-shell/src/core/shell/replacement.ts": "09f77c2d2bc89de00b2723761883a138f2179bcc9b3ac8564e8d5a5f815e8cdb",
+    "packages/ts-shell/src/session/store/transition.ts": "0b2259a3c540b74ef8d0a18a0b6ee880ddc6b89111b8e64cf290d357eb9c645b",
+    "packages/ts-shell/src/cli/interactive/extensions.test.ts": "d843f06cf5231e653cd7566abb0310def9ed0b2429251b1365dd38a2d6ef2f3b",
+    "packages/ts-shell/src/cli/interactive/history.test.ts": "90d51daf33bf946160426441ecc4851ed4610c99f051d32213047c8471b46ff1",
+    "packages/ts-shell/src/cli/interactive/history.ts": "652f770d6a255475b7affea271bf848cac1d8b62dda1e2b4a5ec46ab723db105",
+    "packages/ts-shell/src/cli/interactive/interactiveCommandRouter.ts": "80ddc40099dec5f267bfef58737051f3af006b1de1907ae928a5cf9a731b3f87",
+    "packages/ts-shell/src/cli/interactive/interactiveMode.ts": "2408fee05f189df355f7e773dbb0eda09ad4e53730fdba2a525ef859e44c6783",
+    "packages/ts-shell/src/cli/print/actions.ts": "4e809a4a105ffba42948f3ebacc7483146c82e29c141e51a23d041a6ae2455b3",
+    "packages/ts-shell/src/cli/rpc/host/contract.ts": "0075020d87c8f443de4c0344dbe51eb523ec21ca6aff66a0aa94974ae55d1a5b",
+    "packages/ts-shell/src/cli/rpc/host/session.ts": "74d4aec139b36e0a1cb1d21e6a3d2a49d1baf23e6b42fefd4ae4f98101e4e97a",
+    "packages/ts-shell/src/cli/rpc/runtimeHost.test.ts": "16c3648ff8b4acbf032c8f126a0bdab992d5daa8402fc8150746b2906afb86bb",
+    "packages/ts-shell/src/cli/rpc/runtimeOps.ts": "b731661b9efd15a07f2eb503f548812672e0b9cf63cb23c8e361f5c47b8a7e8d",
+    "packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts": "2878b5547a6589896d773f0b91602191eeaaa5dcc135dc005a683f951063bae3",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "509644b2bbccab1e6c8a4d4c65d0761d05df532f42f92dc27efc22622bd05b7a",
+    "packages/ts-shell/src/cli/runtime/extensions/host.ts": "3539999f888cfa00126631647e7ccbd2f76e31498ad23fb2cf19480ab779d7bf",
+    "packages/ts-shell/src/cli/runtime/inputQueue.ts": "3d6c3315d0ff29783b20764149ded66acbd668f44bef1c5da58907565972c190",
+    "packages/ts-shell/src/cli/runtime/inputStream.rpc.test.ts": "549f034b58f444e429d128be08232095ae4e86aa56d735e554f19f4d591b5e83",
+    "packages/ts-shell/src/cli/runtime/inputStream.ts": "12c00c154cd3172e3b07a1c13ae54e4548b73e17803f65a97ccaa3ecaecc56fb",
+    "packages/ts-shell/src/cli/runtime/session.ts": "690c2cf6f4215d78bce9faa1b91634b332eac2392df5a7977be3d0b43712c845",
+    "packages/ts-shell/src/cli/workspace/command.test.ts": "e98166aa5989d79de998309c8210917aca0aa7184f695191029038e3baa4ece2",
+    "packages/ts-shell/src/cli/workspace/command.ts": "c2f531886dc2727c4495bd6c53d51d398d403cb31311a98e38c3e54a238c1a97",
+    "packages/ts-shell/src/core/shell/command.ts": "9afb971ad9c977d3616021ec45604867d74a9123645ad4e35273eff1507e607e",
+    "packages/ts-shell/src/core/shell/continueShellActionRuntime.ts": "defda59e780c2116dac49f25043cc1b9fb076e29aa3e07f783dc506271bae7df",
+    "packages/ts-shell/src/core/shell/recovery.ts": "54879dfc6413c9ff902c85847aba51af7df58e4aef0039742dffba8434159de3",
+    "packages/ts-shell/src/core/shell/runtimeContext.ts": "453cfab399c598b0354e7714766c01fbe2b276a95cc0e87a24d30bf559b71862",
+    "packages/ts-shell/src/entrypoints/cliRuntimeModule.ts": "b91ecd3eb4acaf65a51c8b1aefad7f18d8661aa6392cad8aa7428296b21a4c46",
+    "packages/ts-shell/src/entrypoints/cliSessionModule.ts": "31c8c2fce4c16d08542c12294993784dd5575e1fe1c49fe90968956c632fd62d",
+    "packages/ts-shell/src/sdk/agentSession.ts": "1b29e95ee9a515121181907018e2a1445b900a75228b33a846440ce3706ca864",
+    "packages/ts-shell/src/sdk/lifecycle.test.ts": "d27a56fab61c05d9d10d16b7269fefcd0881db9985500125948fa9447b486d33"
+  },
+  "cases": [
+    {
+      "name": "before-cancellation",
+      "file": "cli/runtime/session/replacement.ts",
+      "originalSha256": "54dbf1a49d17e3c5bcafcdda6225f66d9fc5891b8c16ffa4fa55918c297b7873",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-before-cancellation.log",
+      "logSha256": "ee0301aa55b62b9788e1364de61b752b064d152fa53480a32482b337d8c3e3a4",
+      "terminalTests": "1 failed | 29 skipped (30)"
+    },
+    {
+      "name": "quiesced-classification",
+      "file": "cli/runtime/session/replacement.ts",
+      "originalSha256": "54dbf1a49d17e3c5bcafcdda6225f66d9fc5891b8c16ffa4fa55918c297b7873",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-quiesced-classification.log",
+      "logSha256": "a4f993a08e96d552c0b344f83fd22536ac790af57ce0eac7bcfe640778a404ed",
+      "terminalTests": "1 failed | 29 skipped (30)"
+    },
+    {
+      "name": "retirement-join",
+      "file": "cli/runtime/session/replacement.ts",
+      "originalSha256": "54dbf1a49d17e3c5bcafcdda6225f66d9fc5891b8c16ffa4fa55918c297b7873",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-retirement-join.log",
+      "logSha256": "60d93f6da1f8fe0946437762689aac66a7e1071e37a677cfcb7403c0820f9b1c",
+      "terminalTests": "1 failed | 29 skipped (30)"
+    },
+    {
+      "name": "exact-candidate",
+      "file": "cli/runtime/session/replacement.ts",
+      "originalSha256": "54dbf1a49d17e3c5bcafcdda6225f66d9fc5891b8c16ffa4fa55918c297b7873",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-exact-candidate.log",
+      "logSha256": "e4e6cb23fbe1a494b2580af2e05eef53c1b553de9e97c8835878697ae1ee31ee",
+      "terminalTests": "1 failed | 29 skipped (30)"
+    },
+    {
+      "name": "saved-transition",
+      "file": "cli/runtime/session/replacement.ts",
+      "originalSha256": "54dbf1a49d17e3c5bcafcdda6225f66d9fc5891b8c16ffa4fa55918c297b7873",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-saved-transition.log",
+      "logSha256": "64b9fa67d35231aac02145a3b9f10ea757709eefdb3321c81c3889278286c086",
+      "terminalTests": "4 failed | 26 skipped (30)"
+    },
+    {
+      "name": "activation-capture",
+      "file": "cli/runtime/session/replacement.ts",
+      "originalSha256": "54dbf1a49d17e3c5bcafcdda6225f66d9fc5891b8c16ffa4fa55918c297b7873",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-activation-capture.log",
+      "logSha256": "24a382e52e8529488280ba58092ddc1c2d08ad23833ebc94bc2e6930fa73d23c",
+      "terminalTests": "1 failed | 29 skipped (30)"
+    },
+    {
+      "name": "exact-owner",
+      "file": "cli/runtime/session/replacement.ts",
+      "originalSha256": "54dbf1a49d17e3c5bcafcdda6225f66d9fc5891b8c16ffa4fa55918c297b7873",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-exact-owner.log",
+      "logSha256": "e61200b8b7b7a28f5bb4eaf5dc7ae3cc6a1b110a07cf8f37fa488831a8302bf8",
+      "terminalTests": "1 failed | 29 skipped (30)"
+    },
+    {
+      "name": "exact-activation",
+      "file": "cli/runtime/session/replacement.ts",
+      "originalSha256": "54dbf1a49d17e3c5bcafcdda6225f66d9fc5891b8c16ffa4fa55918c297b7873",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-exact-activation.log",
+      "logSha256": "aa85c3fccb8a90373fdf0053c658688249fd519d72591a247b6869d0a0b002d0",
+      "terminalTests": "1 failed | 29 skipped (30)"
+    },
+    {
+      "name": "startup-only-message",
+      "file": "cli/runtime/extensions/host.ts",
+      "originalSha256": "3539999f888cfa00126631647e7ccbd2f76e31498ad23fb2cf19480ab779d7bf",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-startup-only-message.log",
+      "logSha256": "b0a97c64aaa36980decd2d6ad2fce61307eea3d4e5b9b077e6affc63849d1f55",
+      "terminalTests": "1 failed | 29 skipped (30)"
+    },
+    {
+      "name": "startup-cancel-entry",
+      "file": "cli/runtime/inputQueue.ts",
+      "originalSha256": "3d6c3315d0ff29783b20764149ded66acbd668f44bef1c5da58907565972c190",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-startup-cancel-entry.log",
+      "logSha256": "e3aaa754ba0e0d723c77980b417bb15579c4881527d1c0581d5992df959246d3",
+      "terminalTests": "1 failed | 29 skipped (30)"
+    },
+    {
+      "name": "rpc-await",
+      "file": "cli/rpc/host/session.ts",
+      "originalSha256": "74d4aec139b36e0a1cb1d21e6a3d2a49d1baf23e6b42fefd4ae4f98101e4e97a",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-rpc-await.log",
+      "logSha256": "1b0fad8dd8921fe73c58a9f38d72b099980404aa95617e81f9bf8ceabddc8681",
+      "terminalTests": "1 failed | 41 skipped (42)"
+    },
+    {
+      "name": "rpc-abort",
+      "file": "cli/runtime/inputStream.ts",
+      "originalSha256": "12c00c154cd3172e3b07a1c13ae54e4548b73e17803f65a97ccaa3ecaecc56fb",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-rpc-abort.log",
+      "logSha256": "7b00908a910c5851019e306b4f0f58ad09f1dfcd9f75dddadbd6dbb7e8b0ef39",
+      "terminalTests": "1 failed | 12 skipped (13)"
+    },
+    {
+      "name": "clear-busy",
+      "file": "cli/interactive/interactiveMode.ts",
+      "originalSha256": "2408fee05f189df355f7e773dbb0eda09ad4e53730fdba2a525ef859e44c6783",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-clear-busy.log",
+      "logSha256": "c7643b7b6ba6d4fb638aaa3d02c12c4c23fb14c10ea12661d185a7afd86f71b4",
+      "terminalTests": "1 failed | 12 skipped (13)"
+    },
+    {
+      "name": "sdk-refusal",
+      "file": "sdk/agentSession.ts",
+      "originalSha256": "1b29e95ee9a515121181907018e2a1445b900a75228b33a846440ce3706ca864",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-sdk-refusal.log",
+      "logSha256": "e988eea452db3ea442b82daac19b67027c5d5902785e29ff38be48c226df24fe",
+      "terminalTests": "1 failed | 20 skipped (21)"
+    }
+  ],
+  "restored": [
+    {
+      "name": "before-cancellation",
+      "exact": true
+    },
+    {
+      "name": "quiesced-classification",
+      "exact": true
+    },
+    {
+      "name": "retirement-join",
+      "exact": true
+    },
+    {
+      "name": "exact-candidate",
+      "exact": true
+    },
+    {
+      "name": "saved-transition",
+      "exact": true
+    },
+    {
+      "name": "exact-owner",
+      "exact": true
+    },
+    {
+      "name": "exact-activation",
+      "exact": true
+    },
+    {
+      "name": "startup-only-message",
+      "exact": true
+    },
+    {
+      "name": "startup-only-message",
+      "exact": true
+    },
+    {
+      "name": "startup-cancel-entry",
+      "exact": true
+    },
+    {
+      "name": "rpc-await",
+      "exact": true
+    },
+    {
+      "name": "rpc-abort",
+      "exact": true
+    },
+    {
+      "name": "clear-busy",
+      "exact": true
+    },
+    {
+      "name": "sdk-refusal",
+      "exact": true
+    }
+  ],
+  "restoredTests": {
+    "exit": 0,
+    "assertionFailures": 0,
+    "log": "reversal-restored.log",
+    "logSha256": "c0860779bb279c0346b20320c5b3ad26f8bde2379a2a1ddc4bf31b126aecbd79",
+    "terminalTests": "119 passed (119)"
+  },
+  "mainSourceUnchanged": true,
+  "privateTreeRemoved": true
+}

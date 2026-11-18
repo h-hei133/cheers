@@ -27,6 +27,26 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }); });
 
+it('refuses in-place replacement before preparing a candidate while preserving SDK resources', async () => {
+  let api!: ExtensionAPI;
+  const before = vi.fn(), confirm = vi.fn(async () => true);
+  const loader = new DefaultResourceLoader({ cwd: root, noSkills: true, noThemes: true, extensionFactories: [value => {
+    api = value; api.registerCommand({ name: 'owned', description: 'SDK-owned', execute: async () => 'Ready' });
+    api.on('session_before_switch', before);
+  }] });
+  await loader.reload();
+  const { session } = await createAgentSession({ cwd: root, resourceLoader: loader, noTools: 'all', ui: { confirm } });
+  const prepare = vi.fn(() => session.sessionManager.createNew(root, { activate: false })), source = session.runtimeContext.session;
+  try {
+    const result = await session.runtimeContext.sessionChange!({ reason: 'new', prepare, publish: () => {} });
+    expect(result).toMatchObject({ status: 'refused', reason: expect.stringContaining('AgentSession') });
+    expect(before).not.toHaveBeenCalled(); expect(prepare).not.toHaveBeenCalled();
+    expect(session.runtimeContext.session).toBe(source); expect(await api.getCommands()).toContain('owned');
+    expect(await api.ui.confirm('Still bound', 'Continue?')).toBe(true);
+    expect(session.sessionManager.getCurrentSessionForProject(root)?.id).toBe(source.id);
+  } finally { await session.dispose(); }
+});
+
 it('starts the SDK session once before create returns and retains that start across prompts', async () => {
   fs.writeFileSync(path.join(root, 'note.txt'), 'Workspace text');
   const events: SessionNotification[] = [];

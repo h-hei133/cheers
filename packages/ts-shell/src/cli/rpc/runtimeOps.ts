@@ -5,6 +5,7 @@ import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { TurnInput } from "../../turn/session.js";
 import type { SubmissionQueue } from "../interactive/inputQueue.js";
 import type { Session } from "../../session/schema/sessionRecord.js";
+import type { SessionChangePort, SessionChangeRequest, SessionChangeResult } from '../../core/shell/replacement.js';
 import type { SessionManager } from "../../session/SessionManager.js";
 import { readModelCatalog } from "../../core/commands/modelCommandRuntime.js";
 import { setModel } from "../../core/commands/model/selection.js";
@@ -152,18 +153,22 @@ export function listRpcModels(runtimeContext?: ShellRuntimeContext): readonly Re
     contextWindow: model.contextWindow, maxTokens: model.maxTokens }))];
 }
 
-export function applyRpcSessionSwitch(
+export async function applyRpcSessionSwitch(
   runtimeContext: ShellRuntimeContext,
-  nextSession: Session,
-  switchSession?: (session: Session) => boolean,
-): boolean {
-  if (switchSession) {
-    return switchSession(nextSession);
-  } else {
-    switchActiveSession(runtimeContext, nextSession, nextSession.projectRoot,
-      { cwd: nextSession.projectRoot, projectRoot: nextSession.projectRoot });
-    return true;
-  }
+  request: SessionChangeRequest,
+  manager: SessionManager,
+  switchSession?: SessionChangePort,
+): Promise<SessionChangeResult> {
+  const port = switchSession ?? runtimeContext.sessionChange;
+  if (port) return await port(request);
+  // Hosts without extension lifecycle wiring retain synchronous storage ownership.
+  const check = () => { const refused = request.admission?.(); if (refused) throw new Error(refused); };
+  check();
+  const next = request.prepare(check);
+  check();
+  manager.setCurrentSessionForProject(next.projectRoot, next.id);
+  request.publish(next);
+  return { status: 'changed', session: next };
 }
 
 /** Snapshot and remove input from the same two live lanes and the host's submission queue. */

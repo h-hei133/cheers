@@ -49,6 +49,7 @@ import { installSecurityRuntime, cancelSecurityFor } from './security.js';
 import { installAgentsRuntime } from './agents.js';
 import { installMcpRuntime, cancelMcpFor } from './mcp.js';
 import { installExtensionRuntime, cancelExtensionsFor, refreshExtensionsFor, waitForExtensionsFor } from './extensions.js';
+import { installSessionChange } from './session/replacement.js';
 import { gitRequestMode } from '../../workflow/git/operation/policy.js';
 import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
 import { installGoalScheduler } from './goalScheduling.js';
@@ -406,5 +407,6 @@ export function createCliSessionRuntime(input: {
     usageResetApproval(input.runtimeContext, input.sessionManager, input.getPromptInteractiveApproval ?? (() => undefined)));
   if (input.mcpGateway) installMcpRuntime(input.runtimeContext, input.mcpGateway, nativeGate, url => input.renderer.renderLine(`Open this MCP sign-in URL in your browser:\n${url}`));
   installExtensionRuntime(input.runtimeContext, sessionRuntime, nativeGate, input.sessionManager, input.mcpGateway);
+  installSessionChange(input.runtimeContext, input.sessionManager, sessionRuntime);
   return sessionRuntime;
 }

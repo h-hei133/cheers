@@ -1,12 +1,12 @@
 /** Local commands share the host's cancellation and settlement boundary. */
 export class ShellCommandRuntime {
-  private active: { readonly kind: 'command' | 'compaction'; readonly controller: AbortController; settled: Promise<unknown> } | undefined;
+  private active: { readonly kind: 'command' | 'compaction' | 'session-change'; readonly controller: AbortController; settled: Promise<unknown> } | undefined;
 
-  get current(): { readonly kind: 'command' | 'compaction'; readonly controller: AbortController; readonly settled: Promise<unknown> } | undefined {
+  get current(): { readonly kind: 'command' | 'compaction' | 'session-change'; readonly controller: AbortController; readonly settled: Promise<unknown> } | undefined {
     return this.active;
   }
 
-  run<T>(operation: (signal: AbortSignal) => Promise<T>, kind: 'command' | 'compaction' = 'command', signal?: AbortSignal): Promise<T> {
+  run<T>(operation: (signal: AbortSignal) => Promise<T>, kind: 'command' | 'compaction' | 'session-change' = 'command', signal?: AbortSignal): Promise<T> {
     if (this.active) return Promise.reject(new Error('A local command is still running.'));
     const entry = { kind, controller: new AbortController(), settled: Promise.resolve() as Promise<unknown> };
     // Register before entering command code, including synchronous cancellation.

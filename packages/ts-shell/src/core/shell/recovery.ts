@@ -13,6 +13,7 @@ import {
   applyShellSubstrateTransition,
   type ShellRuntimeContext,
 } from "./runtimeContext.js";
+import { resumeShellContext } from './replacement.js';
 
 export function resolveSessionReference(input: {
   readonly reference?: string;
@@ -209,11 +210,17 @@ export async function resumeShellSession(input: {
   // Opening a session is not the same act as recovering an interrupted run.
   // `/resume` is the first: it makes a session current and restores its context,
   // whatever state it ended in. `/continue` is the second, and keeps the gate.
-  const resumeResult = input.sessionManager.tryResume(
+  const resumeResult = await resumeShellContext(
+    input.runtimeContext,
+    input.sessionManager,
     requestedSessionId,
-    input.runtimeContext.projectRoot,
     { mode: input.recoveryOnly === true ? "runtime-recovery" : "continuity-only",
       ...(input.selection ? { expectedVersion: input.selection.version, beforeActivate: validateSelection } : {}) },
+    session => {
+      const projectRoot = session.projectRoot || input.runtimeContext.projectRoot;
+      applyShellSubstrateTransition(input.runtimeContext, { cwd: projectRoot, projectRoot, gitContext: getWorkflowGitContext(projectRoot),
+        session, sessionProjectDir: projectRoot });
+    },
   );
   if (isFailedResume(resumeResult)) {
     if (resumeResult.activation === 'unknown') input.runtimeContext.workspaceIssue = resumeResult.recoveryHint;
@@ -222,15 +229,6 @@ export async function resumeShellSession(input: {
     return { resumed: false };
   }
 
-  const resumedProjectRoot =
-    resumeResult.session.projectRoot || input.runtimeContext.projectRoot;
-  applyShellSubstrateTransition(input.runtimeContext, {
-    cwd: resumedProjectRoot,
-    projectRoot: resumedProjectRoot,
-    gitContext: getWorkflowGitContext(resumedProjectRoot),
-    session: resumeResult.session,
-    sessionProjectDir: resumedProjectRoot,
-  });
   if (resumeResult.warning) {
     input.runtimeContext.workspaceIssue = resumeResult.warning;
     input.renderer.renderLine(resumeResult.warning);
