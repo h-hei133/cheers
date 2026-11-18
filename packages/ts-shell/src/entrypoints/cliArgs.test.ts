@@ -64,6 +64,64 @@ describe("cli args parser", () => {
     expect(isHelpRequested([])).toBe(false);
   });
 
+  it("consumes flag-looking API keys before classifying early commands", () => {
+    expect(isVersionRequested(["--api-key", "-v"])).toBe(false);
+    expect(isHelpRequested(["--api-key", "-h"])).toBe(false);
+    const parsed = expectParsed(["--api-key", "-v", "-p", "check"]);
+    expect(parsed.versionRequested).toBe(false);
+    expect(parsed.options).toMatchObject({ apiKey: "-v", printMode: true, promptArg: "check" });
+  });
+
+  it.each([["--provider", "--help"], ["--model", "-h"]])("keeps %s from consuming the %s command", (option, help) => {
+    expect(isHelpRequested([option, help])).toBe(true);
+  });
+
+  it.each([["--non-interactive-approval", "--version"], ["--fork", "-v"]])("keeps %s from consuming the %s command", (option, version) => {
+    expect(isVersionRequested([option, version])).toBe(true);
+    expect(expectParsed([option, version]).versionRequested).toBe(true);
+  });
+
+  it("gives a bare double dash to prompt text after a non-key option", () => {
+    expect(isVersionRequested(["--provider", "--", "--version"])).toBe(false);
+    expect(expectParsed(["--provider", "openai", "--", "--version"]).options).toMatchObject({ provider: "openai", promptArg: "--version" });
+    expect(expectParsed(["--model=-h", "--", "--version"]).options).toMatchObject({ model: "-h", promptArg: "--version" });
+  });
+
+  it.each([["--provider"], ["--provider="], ["--provider", "--", "prompt"]])(
+    "rejects a missing provider before selecting a default", (...args) => {
+      expect(expectParseError(args).message).toContain("Missing value for --provider");
+    },
+  );
+
+  it("uses the first unconsumed terminator for early commands and prompt text", () => {
+    expect(isVersionRequested(["--api-key", "--", "--version"])).toBe(true);
+    expect(isHelpRequested(["--api-key", "--", "--help"])).toBe(true);
+    expect(expectParsed(["--api-key", "--", "--version"]).versionRequested).toBe(true);
+    const parsed = expectParsed(["--api-key", "--", "--", "--version"]);
+    expect(parsed.versionRequested).toBe(false);
+    expect(parsed.options).toMatchObject({ apiKey: "--", promptArg: "--version" });
+  });
+
+  it.each(["--project", "--attach", "--session-id", "--replay-file"])("keeps --rpc out of a missing %s value", option => {
+    expect(expectParseError([option, "--rpc"]).message).toContain(`Missing value for ${option}`);
+  });
+
+  it("allows an explicitly specified workspace named like a flag in RPC mode", () => {
+    expect(expectParsed(["--project=--rpc", "--rpc"]).options).toMatchObject({ projectPath: "--rpc", rpcMode: true });
+    expect(expectParsed(["--project", "./--rpc", "--rpc"]).options).toMatchObject({ projectPath: "./--rpc", rpcMode: true });
+  });
+
+  it.each([['--project', 'projectPath', '-work'], ['--attach', 'projectPath', '-work'],
+    ['--session-id', 'sessionId', '-session'], ['--replay-file', 'replayFile', '-input.txt']])(
+    'preserves a separated %s value with a leading dash', (option, key, value) => {
+      expect(expectParsed([option, value]).options).toMatchObject({ [key]: value });
+    },
+  );
+
+  it("keeps a short mode flag out of a missing project value", () => {
+    expect(expectParseError(["--project", "-p"]).message).toContain("Missing value for --project");
+  });
+
   it("preserves workspace selection aliases and removes project path from prompt", () => {
     const projectRoot = path.join(cwd, "fixture-project");
     const parsed = expectParsed([

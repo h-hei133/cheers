@@ -28,7 +28,7 @@ import { selectTheme, selectedTheme } from "../../presentation/theme/selection.j
 import { readDiagramMode } from "../interactive/tuiSettings.js";
 import { setDiagramMode } from "../../presentation/tui/transcript/mermaid.js";
 import { listThemes, themeNamesFromPaths } from "../../presentation/themes/index.js";
-import type { CliOptions } from "../options/cliOptions.js";
+import type { CliArgs, CliOptions } from "../options/cliOptions.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { printCliDoctor } from "../../entrypoints/cliDoctor.js";
 import { versionLabel } from "../../core/version/current.js";
@@ -64,7 +64,8 @@ import type { RestartOutcome, RestartPort, RestartRequest } from '../../core/com
 import type { CliProcessRunnerInput } from './contract.js';
 import { createProfileContext, currentProfile, withProfile } from '../../core/paths/profile/context.js';
 import { configurationAdmission, ConfigurationRefusalError } from '../../core/shell/configuration.js';
-import { cliHelpText, isHelpRequested } from '../options/early.js';
+import { scanCliArgs, type CliInvocation } from '../options/argv.js';
+import { cliHelpText } from '../options/early.js';
 import { profileSwitchPort } from './profile/port.js';
 import { freshExecutable } from './profile/invocation.js';
 import { claimSwitchChild, admitSwitchChild } from './profile/admission.js';
@@ -77,16 +78,17 @@ export type { CliProcessRunnerInput } from './contract.js';
 
 export async function runCliProcess(
   input: CliProcessRunnerInput,
+  invocation: CliInvocation = scanCliArgs(input.args),
 ): Promise<void> {
-  if (isHelpRequested(input.args)) {
+  if (invocation.versionRequested) { input.writeOutput(versionLabel()); return; }
+  if (invocation.helpRequested) {
     input.writeOutput(cliHelpText());
     return;
   }
   // Explicit service mode has its own authenticated state owner and protocol.
-  if (input.args[0] === 'serve') { await runCliCycle(input); return; }
-  const parsed = parseCliArgs(input.args, { cwd: input.launchCwd });
+  if (input.args[0] === 'serve') { await runCollaborationServiceMode(input); return; }
+  const parsed = parseCliArgs(invocation, { cwd: input.launchCwd });
   if (parsed.ok === false) { input.writeError(parsed.error.message); input.exit(parsed.error.exitCode); return; }
-  if (parsed.args.versionRequested) { input.writeOutput(versionLabel()); return; }
   if (parsed.args.options.listModels !== undefined) {
     const pattern = typeof parsed.args.options.listModels === "string" ? parsed.args.options.listModels : undefined;
     input.writeOutput(formatCliModelList(pattern));
@@ -112,9 +114,18 @@ export async function runCliProcess(
     const configInputs = parsed.args.options.configPaths?.length
       ? createConfigInputs(parsed.args.options.configPaths.map(file => ({ path: file, source: 'user' })), input.launchCwd) : undefined;
     let recovery: RestartRequest | undefined;
+    let launchCwd = input.launchCwd;
+    let cycleArgs = parsed.args;
     for (;;) {
-      const request = await runCliCycle({ ...input, args: recovery?.argv ?? input.args,
-        launchCwd: recovery?.workingDirectory ?? input.launchCwd }, recovery, recovery ? undefined : child, switchDepth, configInputs);
+      const cwd = recovery?.workingDirectory ?? input.launchCwd;
+      if (cwd !== launchCwd) {
+        // Restart admission preserves the original argv. Only its workspace can change the projection.
+        const next = parseCliArgs(invocation, { cwd });
+        if (next.ok === false) { input.writeError(next.error.message); input.exit(next.error.exitCode); }
+        cycleArgs = next.args;
+        launchCwd = cwd;
+      }
+      const request = await runCliCycle({ ...input, launchCwd }, cycleArgs, recovery, recovery ? undefined : child, switchDepth, configInputs);
       if (!request) return;
       if ('kind' in request) { await runProfileSwitch(request, input); return; }
       recovery = request;
@@ -122,27 +133,16 @@ export async function runCliProcess(
   });
 }
 
-async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartRequest, child?: SwitchReceipt, switchDepth = 0, configInputs?: ConfigInputs): Promise<RestartRequest | SwitchTicket | undefined> {
-  if (await runCollaborationServiceMode(input)) return;
+async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recovery?: RestartRequest, child?: SwitchReceipt, switchDepth = 0, configInputs?: ConfigInputs): Promise<RestartRequest | SwitchTicket | undefined> {
   setGlobalTraceContext(createTraceContext());
   const logger = createComponentLogger("cli");
   const approvalTrustPolicy = new ApprovalTrustPolicy();
 
-  const parsedCliArgs = parseCliArgs(input.args, { cwd: input.launchCwd });
-  if (parsedCliArgs.ok === false) {
-    input.writeError(parsedCliArgs.error.message);
-    input.exit(parsedCliArgs.error.exitCode);
-  }
-  if (parsedCliArgs.args.versionRequested) {
-    input.writeOutput(versionLabel());
-    return;
-  }
-
-  const options: StartupModelOptions = recovery ? { ...parsedCliArgs.args.options, sessionId: recovery.sessionId,
+  const options: StartupModelOptions = recovery ? { ...parsed.options, sessionId: recovery.sessionId,
     projectPath: recovery.workspaceRoot, promptArg: undefined, replayFile: undefined, migrateSessionRoot: false }
-    : { ...parsedCliArgs.args.options };
+    : { ...parsed.options };
   const output = createCliOutput({
-    enabled: !parsedCliArgs.args.doctorRequested && Boolean(options.printMode || options.jsonEvents || options.rpcMode
+    enabled: !parsed.doctorRequested && Boolean(options.printMode || options.jsonEvents || options.rpcMode
       || !input.stdin.isTTY || !input.process.stdout.isTTY),
     stdout: input.process.stdout,
     stderr: input.process.stderr,
@@ -161,7 +161,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
     });
     if (child && rootContext.workspaceRoot !== child.plan.workspace.path) throw new Error('Profile handoff workspace changed before bootstrap.');
 
-    if (parsedCliArgs.args.doctorRequested) {
+    if (parsed.doctorRequested) {
       printCliDoctor(rootContext.workspaceRoot, input.launchCwd);
       return;
     }

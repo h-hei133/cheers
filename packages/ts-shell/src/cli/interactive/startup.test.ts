@@ -4,6 +4,7 @@ import { createConnection, createServer, type AddressInfo } from 'node:net';
 import { beginStartupSurface, stopStartupSurface, StartupSurface } from './startup.js';
 import { processTerminal } from '../../presentation/tui/terminal.js';
 import { startupEligible } from './startup/eligibility.js';
+import { scanCliArgs } from '../options/argv.js';
 import { RecordingTerminal, ManualScheduler } from '../../test-utils/terminalDouble.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 
@@ -27,11 +28,12 @@ async function queuedInput(terminal: RecordingTerminal, text: string) {
 }
 
 it.each([[], ['--project', '/fixture', '--no-skills'], ['--profile=test', '--offline'], ['--session-id', 'old']].map(args => [args]))(
-  'permits an explicit interactive prepaint: %j', args => { expect(startupEligible(args, true)).toBe(true); });
+  'permits an explicit interactive prepaint: %j', args => { expect(startupEligible(scanCliArgs(args), true)).toBe(true); });
 it.each([['--print'], ['--json'], ['--session-id', 'old', '--print'], ['--session-id'], ['--replay-file', 'file'], ['--doctor'], ['serve'],
-  ['prompt text'], ['--project'], ['--profile='], ['--', 'text'], ['--help'], ['--version']].map(args => [args]))(
-  'keeps other launches out of the early terminal owner: %j', args => { expect(startupEligible(args, true)).toBe(false); });
-it('never prepaints a pipe', () => { expect(startupEligible([], false)).toBe(false); });
+  ['prompt text'], ['--project'], ['--profile='], ['--', 'text'], ['--help'], ['--version'], ['--project', '--rpc'],
+  ['--api-key', '--', '--rpc']].map(args => [args]))(
+  'keeps other launches out of the early terminal owner: %j', args => { expect(startupEligible(scanCliArgs(args), true)).toBe(false); });
+it('never prepaints a pipe', () => { expect(startupEligible(scanCliArgs([]), false)).toBe(false); });
 
 it('holds heavy initialization until the early terminal has settled its startup queries', async () => {
   let settle: () => void = () => {};

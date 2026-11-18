@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import process from "node:process";
 import path from 'node:path';
-import { cliHelpText, isHelpRequested, isVersionRequested } from "../cli/options/early.js";
+import { scanCliArgs } from "../cli/options/argv.js";
+import { cliHelpText } from "../cli/options/early.js";
 import { handleCliFatalError } from "../cli/errors/cliFatalErrorBoundary.js";
 import { versionLabel } from "../core/version/current.js";
 import { time } from "../observability/startupTiming.js";
@@ -12,16 +13,17 @@ import { startupEligible } from '../cli/interactive/startup/eligibility.js';
 async function main(): Promise<void> {
   time("modules loaded");
   const args = process.argv.slice(2);
-  if (isVersionRequested(args)) {
+  const invocation = scanCliArgs(args);
+  if (invocation.versionRequested) {
     process.stdout.write(`${versionLabel()}\n`);
     return;
   }
-  if (isHelpRequested(args)) {
+  if (invocation.helpRequested) {
     process.stdout.write(`${cliHelpText()}\n`);
     return;
   }
   let stopStartup: (() => void) | undefined;
-  if (!process.env.CHEERS_PROFILE_HANDOFF && startupEligible(args, Boolean(process.stdin.isTTY && process.stdout.isTTY && process.stderr.isTTY))) {
+  if (!process.env.CHEERS_PROFILE_HANDOFF && startupEligible(invocation, Boolean(process.stdin.isTTY && process.stdout.isTTY && process.stderr.isTTY))) {
     const startup = await import('../cli/interactive/startup.js');
     stopStartup = startup.stopStartupSurface;
     await startup.beginStartupSurface();
@@ -48,7 +50,7 @@ async function main(): Promise<void> {
         installProcessProfile(profile);
         installCrashRecorder({ cwd: process.cwd(), filePath: path.join(profile.root, 'crashes.json') });
       },
-    });
+    }, invocation);
   } finally { stopStartup?.(); }
 }
 

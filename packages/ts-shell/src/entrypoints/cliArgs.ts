@@ -1,7 +1,7 @@
 import path from "node:path";
 import { profileName } from "../core/paths/profile/name.js";
 import { RUNTIME_PROVIDERS, isRuntimeProvider } from "../config/runtimeConfig.js";
-import { isVersionRequested } from "../cli/options/early.js";
+import { scanCliArgs, type CliInvocation } from "../cli/options/argv.js";
 import { listSlashInvocations, subscribeSlashCommands } from "./slashCommandRegistry.js";
 import type {
   CliArgParseError,
@@ -52,31 +52,6 @@ function parseError(message: string): { readonly ok: false; readonly error: CliA
   return { ok: false, error: { message, exitCode: 1 } };
 }
 
-function splitFlagToken(token: string): { readonly name: string; readonly inlineValue?: string } {
-  const eq = token.indexOf("=");
-  if (eq <= 0 || !token.startsWith("--")) return { name: token };
-  return { name: token.slice(0, eq), inlineValue: token.slice(eq + 1) };
-}
-
-function takeRequiredValue(
-  rawArgs: readonly string[],
-  index: number,
-  inlineValue: string | undefined,
-  rejectAnyDash = false,
-): { readonly value?: string; readonly nextIndex: number } {
-  if (inlineValue !== undefined) {
-    if (!inlineValue.trim() || (rejectAnyDash ? inlineValue.startsWith("-") : inlineValue.startsWith("--"))) {
-      return { nextIndex: index };
-    }
-    return { value: inlineValue, nextIndex: index };
-  }
-  const next = rawArgs[index + 1];
-  if (!next || (rejectAnyDash ? next.startsWith("-") : next.startsWith("--"))) {
-    return { nextIndex: index };
-  }
-  return { value: next, nextIndex: index + 1 };
-}
-
 function parseApprovalValue(raw: string): NonInteractiveApprovalMode | undefined {
   const normalized = raw.trim().toLowerCase();
   if (normalized === "deny" || normalized === "allow-once" || normalized === "allow-always") return normalized;
@@ -91,10 +66,12 @@ type MutableCliOptions = {
 };
 
 export function parseCliArgs(
-  rawArgs: readonly string[],
+  input: readonly string[] | CliInvocation,
   parseOptions: ParseCliArgsOptions,
 ): CliArgParseResult {
-  if (isVersionRequested(rawArgs)) {
+  const invocation = 'rawArgs' in input ? input : scanCliArgs(input);
+  const { rawArgs, positionals, tail } = invocation;
+  if (invocation.versionRequested) {
     return { ok: true, args: { rawArgs, options: {}, versionRequested: true, doctorRequested: false } };
   }
 
@@ -117,109 +94,70 @@ export function parseCliArgs(
   const skillPaths: string[] = [];
   const themePaths: string[] = [];
   const extensionPaths: string[] = [];
-  const positionalBeforeTerminator: string[] = [];
-  const tailAfterTerminator: string[] = [];
-
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const token = rawArgs[i]!;
-    if (token === "--") {
-      tailAfterTerminator.push(...rawArgs.slice(i + 1));
-      break;
-    }
-
-    const { name, inlineValue } = splitFlagToken(token);
+  for (const { name, value } of invocation.options) {
     if (name === "--profile") {
       if (profileSelected) return parseError("Select one --profile per process.");
       profileSelected = true;
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value || !got.value.trim()) return parseError("Missing value for --profile. Example: --profile work");
-      i = got.nextIndex;
-      try { opts.profile = profileName(got.value); }
+      if (!value?.trim()) return parseError("Missing value for --profile. Example: --profile work");
+      try { opts.profile = profileName(value); }
       catch (err) { return parseError((err as Error).message); }
     } else if (name === "--config") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue, true);
-      if (!got.value || !got.value.trim()) {
+      if (!value?.trim()) {
         return parseError("Missing or ambiguous value for --config. Use a path such as ./settings.json or ./-p.");
       }
       if (configPaths.length >= 32) return parseError("At most 32 --config inputs may be selected.");
-      configPaths.push(got.value);
-      i = got.nextIndex;
+      configPaths.push(value);
     } else if (name === "--project" || name === "--attach") {
-      const rawVal = inlineValue ?? rawArgs[i + 1];
-      if (!rawVal) {
+      if (!value) {
         return parseError(`Missing value for ${name}. Example: --project D:\\path\\to\\your-project`);
       }
-      if (inlineValue === undefined) i += 1;
-      if (name === "--project") explicitProject = rawVal;
-      else attachProject = rawVal;
+      if (name === "--project") explicitProject = value;
+      else attachProject = value;
     } else if (name === "--doctor") {
       doctorRequested = true;
     } else if (name === "--session-id") {
-      const val = inlineValue ?? rawArgs[i + 1];
-      if (val) { opts.sessionId = val; if (inlineValue === undefined) i += 1; }
+      if (!value) return parseError("Missing value for --session-id. Example: --session-id <id>");
+      opts.sessionId = value;
     } else if (name === "--continue" || name === "-c") {
       opts.continueSession = true;
     } else if (name === "--resume" || name === "-r") {
       opts.resumeSession = true;
     } else if (name === "--fork") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value) return parseError("Missing value for --fork. Example: --fork <session-id>");
-      opts.forkSource = got.value;
-      i = got.nextIndex;
+      if (!value) return parseError("Missing value for --fork. Example: --fork <session-id>");
+      opts.forkSource = value;
     } else if (name === "--provider") {
-      const rawProvider = inlineValue ?? rawArgs[i + 1];
-      if (rawProvider) {
-        if (inlineValue === undefined) i += 1;
-        const normalized = rawProvider.trim().toLowerCase();
+      const normalized = value?.trim().toLowerCase();
+      if (!normalized) {
+        pendingProviderError = "Missing value for --provider. Specify a provider name.";
+      } else {
         if (isRuntimeProvider(normalized)) opts.provider = normalized;
-        else pendingProviderError = `Invalid --provider value: ${rawProvider}. Expected one of: ${RUNTIME_PROVIDERS.join(", ")}.`;
+        else pendingProviderError = `Invalid --provider value: ${value}. Expected one of: ${RUNTIME_PROVIDERS.join(", ")}.`;
       }
     } else if (name === "--model") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value) return parseError("Missing value for --model. Example: --model gpt-5.4");
-      opts.model = got.value;
-      i = got.nextIndex;
+      if (!value) return parseError("Missing value for --model. Example: --model gpt-5.4");
+      opts.model = value;
     } else if (name === "--models") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value) return parseError("Missing value for --models. Example: --models gpt-5.4,claude-sonnet-4-5");
-      const patterns = got.value.split(",").map((s) => s.trim()).filter(Boolean);
+      if (!value) return parseError("Missing value for --models. Example: --models gpt-5.4,claude-sonnet-4-5");
+      const patterns = value.split(",").map((s) => s.trim()).filter(Boolean);
       if (patterns.length === 0) return parseError("No model patterns in --models. Example: --models gpt-5.4,claude-sonnet-4-5");
       opts.scopedModels = patterns;
-      i = got.nextIndex;
     } else if (name === "--thinking") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value) return parseError("Missing value for --thinking. Example: --thinking high");
-      const level = got.value.trim().toLowerCase();
+      if (!value) return parseError("Missing value for --thinking. Example: --thinking high");
+      const level = value.trim().toLowerCase();
       if (!VALID_THINKING_ARGS.has(level)) {
-        return parseError(`Invalid --thinking value: ${got.value}. Expected one of: ${[...VALID_THINKING_ARGS].join(", ")}.`);
+        return parseError(`Invalid --thinking value: ${value}. Expected one of: ${[...VALID_THINKING_ARGS].join(", ")}.`);
       }
       opts.thinking = level;
-      i = got.nextIndex;
     } else if (name === "--api-key") {
-      const val = inlineValue ?? rawArgs[i + 1];
-      if (val) { opts.apiKey = val; if (inlineValue === undefined) i += 1; }
+      if (value) opts.apiKey = value;
     } else if (name === "--replay-file") {
-      const val = inlineValue ?? rawArgs[i + 1];
-      if (!val) return parseError("Missing value for --replay-file. Example: --replay-file .\\replay.txt");
-      opts.replayFile = val;
-      if (inlineValue === undefined) i += 1;
+      if (!value) return parseError("Missing value for --replay-file. Example: --replay-file .\\replay.txt");
+      opts.replayFile = value;
     } else if (name === "--export") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value) return parseError("Missing value for --export. Example: --export <session-id-or-file>");
-      opts.exportTarget = got.value;
-      i = got.nextIndex;
+      if (!value) return parseError("Missing value for --export. Example: --export <session-id-or-file>");
+      opts.exportTarget = value;
     } else if (name === "--list-models") {
-      if (inlineValue !== undefined) {
-        opts.listModels = inlineValue.trim() || true;
-      } else {
-        const next = rawArgs[i + 1];
-        if (next && !next.startsWith("-") && !next.startsWith("@")) {
-          opts.listModels = next;
-          i += 1;
-        } else {
-          opts.listModels = true;
-        }
-      }
+      opts.listModels = value ?? true;
     } else if (name === "--print" || name === "-p") {
       opts.printMode = true;
     } else if (name === "--json") {
@@ -240,47 +178,33 @@ export function parseCliArgs(
     } else if (name === "--migrate-session-root") {
       opts.migrateSessionRoot = true;
     } else if (name === "--skill") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value) return parseError("Missing value for --skill. Example: --skill ./review.md");
-      skillPaths.push(got.value);
-      i = got.nextIndex;
+      if (!value) return parseError("Missing value for --skill. Example: --skill ./review.md");
+      skillPaths.push(value);
     } else if (name === "--theme") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value) return parseError("Missing value for --theme. Example: --theme ./my-theme.json");
-      themePaths.push(got.value);
-      i = got.nextIndex;
+      if (!value) return parseError("Missing value for --theme. Example: --theme ./my-theme.json");
+      themePaths.push(value);
     } else if (name === "--use-theme") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value) return parseError("Missing value for --use-theme. Example: --use-theme dark");
-      opts.useTheme = got.value;
-      i = got.nextIndex;
+      if (!value) return parseError("Missing value for --use-theme. Example: --use-theme dark");
+      opts.useTheme = value;
     } else if (name === "--extension" || name === "-e") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value) return parseError("Missing value for --extension. Example: --extension ./my-ext.ts");
-      extensionPaths.push(got.value);
-      i = got.nextIndex;
+      if (!value) return parseError("Missing value for --extension. Example: --extension ./my-ext.ts");
+      extensionPaths.push(value);
     } else if (name === "--tools") {
-      const got = takeRequiredValue(rawArgs, i, inlineValue);
-      if (!got.value) return parseError("Missing value for --tools. Example: --tools read,grep,glob");
-      const named = got.value.split(",").map((entry) => entry.trim()).filter(Boolean);
+      if (!value) return parseError("Missing value for --tools. Example: --tools read,grep,glob");
+      const named = value.split(",").map((entry) => entry.trim()).filter(Boolean);
       if (named.length === 0) return parseError("No tool names in --tools. Example: --tools read,grep,glob");
       opts.allowedTools = named;
-      i = got.nextIndex;
     } else if (name === "--non-interactive-approval") {
-      const rawApproval = inlineValue ?? rawArgs[i + 1];
-      if (!rawApproval) {
+      if (!value) {
         return parseError("Missing value for --non-interactive-approval. Use deny, allow-once, or allow-always.");
       }
-      if (inlineValue === undefined) i += 1;
-      const mode = parseApprovalValue(rawApproval);
+      const mode = parseApprovalValue(value);
       if (!mode) {
         return parseError(
-          `Invalid --non-interactive-approval value: ${rawApproval.trim().toLowerCase()}. Use deny, allow-once, or allow-always.`,
+          `Invalid --non-interactive-approval value: ${value.trim().toLowerCase()}. Use deny, allow-once, or allow-always.`,
         );
       }
       opts.nonInteractiveApproval = mode;
-    } else if (!token.startsWith("-")) {
-      positionalBeforeTerminator.push(token);
     }
   }
 
@@ -293,8 +217,8 @@ export function parseCliArgs(
   if (project) {
     opts.projectPath = project;
   } else if (!opts.exportTarget) {
-    const cmdIdx = positionalBeforeTerminator.findIndex((t) => leadingCommandName(t) !== undefined);
-    const candidates = cmdIdx === -1 ? positionalBeforeTerminator : positionalBeforeTerminator.slice(0, cmdIdx);
+    const cmdIdx = positionals.findIndex((t) => leadingCommandName(t) !== undefined);
+    const candidates = cmdIdx === -1 ? positionals : positionals.slice(0, cmdIdx);
     const fallbackProject = candidates.find((arg) => /[\\/]/.test(arg) && leadingCommandName(arg.trim()) === undefined);
     if (fallbackProject) opts.projectPath = fallbackProject;
   }
@@ -309,7 +233,7 @@ export function parseCliArgs(
     return parseError("--fork cannot be combined with --session-id, --continue, or --resume.");
   }
 
-  const promptTokens = [...positionalBeforeTerminator];
+  const promptTokens = [...positionals];
   if (opts.projectPath) {
     const normalizedProject = path.resolve(parseOptions.cwd, opts.projectPath).toLowerCase();
     const matchIdx = promptTokens.findIndex(
@@ -317,7 +241,7 @@ export function parseCliArgs(
     );
     if (matchIdx >= 0) promptTokens.splice(matchIdx, 1);
   }
-  promptTokens.push(...tailAfterTerminator);
+  promptTokens.push(...tail);
   const prompt = promptTokens.join(" ");
   opts.promptArg = prompt.trim().length > 0 ? prompt : undefined;
 

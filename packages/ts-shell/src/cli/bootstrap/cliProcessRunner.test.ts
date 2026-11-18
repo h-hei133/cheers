@@ -521,6 +521,7 @@ it.each([
   const fixture = outputFixture(settings);
   try {
     await fixture.run();
+    expect(parseCliArgs).toHaveBeenCalledOnce();
     expect(fixture.guardAtRoot).toEqual([true]);
     expect(fixture.output.join('')).toContain('answer');
     expect(fixture.output.join('')).not.toContain('noise');

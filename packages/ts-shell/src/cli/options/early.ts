@@ -1,22 +1,13 @@
-const VERSION_FLAGS = new Set(["--version", "-v", "-V"]);
-const HELP_FLAGS = new Set(["--help", "-h"]);
-
-function containsEarlyFlag(args: readonly string[], flags: ReadonlySet<string>): boolean {
-  for (const arg of args) {
-    if (arg === "--") return false;
-    if (flags.has(arg)) return true;
-  }
-  return false;
-}
+import { scanCliArgs } from './argv.js';
 
 /** Whether the invocation asks for the version before any prompt terminator. */
 export function isVersionRequested(args: readonly string[]): boolean {
-  return containsEarlyFlag(args, VERSION_FLAGS);
+  return scanCliArgs(args).versionRequested;
 }
 
 /** Whether the invocation asks for top-level CLI help before any prompt terminator. */
 export function isHelpRequested(args: readonly string[]): boolean {
-  return containsEarlyFlag(args, HELP_FLAGS);
+  return scanCliArgs(args).helpRequested;
 }
 
 /** Static help text; it deliberately does not load the runtime or command registry. */
@@ -46,6 +37,7 @@ Options:
   --list-models [pattern]           List available models and exit.
   --print, -p                       Run one prompt and exit.
   --json                            Emit run events as JSON lines.
+  --rpc                             Run a bidirectional JSON lines session.
   --non-interactive-approval <mode>  Use deny, allow-once, or allow-always.
   --tools <names>                   Limit the available tools.
   --no-tools, -nt                   Disable all built-in tools.
