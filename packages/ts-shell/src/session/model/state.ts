@@ -1,6 +1,7 @@
 import { createSessionStoreLayout, locateExistingSessionLayout, validateSessionId } from "../store/sessionFileLayout.js";
 import { readStateSnapshotRequired, readStateSnapshotSafely } from "../store/sessionStateStore.js";
 import { withFileLock, writeJsonFileAtomic } from "../store/sessionFileStore.js";
+import { assertNoPromptIntent } from '../store/prompt/intent.js';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { freezeDeep } from '../../core/values/freeze.js';
@@ -176,6 +177,7 @@ function commitModel(sessionId: string, modelSelection: SessionModelSelection | 
   let cleanupFailed = false;
   try {
     withFileLock(layout.stateLockPath, () => {
+      assertNoPromptIntent(layout);
       code = 'read-failed';
       const current = requiredState(layout.statePath);
       if (current.projectRoot !== baseline.projectRoot || current.modelRevision !== baseline.revision

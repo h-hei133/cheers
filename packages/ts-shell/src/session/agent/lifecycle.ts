@@ -1,5 +1,4 @@
 import type { SessionMessage } from "../schema/sessionMessage.js";
-import type { ImageContent } from "../../model-adapters/multimodal.js";
 import type { TerminalPersistence } from "../schema/sessionStateSnapshot.js";
 import type { QueryRuntimeRecoveryBoundary } from "../../core/query/runtime/state.js";
 import {
@@ -9,7 +8,6 @@ import {
   saveSessionInterrupted,
   saveSessionTerminated,
 } from "../lifecycle/sessionLifecycleStore.js";
-import { persistSessionUserPromptBarrier } from "../lifecycle/sessionPromptBarrier.js";
 import {
   saveSessionCompleted,
   saveSessionError,
@@ -23,27 +21,6 @@ export function handleMarkRunStarted(
   prompt: string,
 ): void {
   markSessionRunStarted(callbacks, sessionId, prompt);
-}
-
-export function handlePersistUserPromptBarrier(
-  callbacks: SessionLifecycleCallbacks,
-  sessionId: string,
-  prompt: string,
-  metadata?: Record<string, unknown>,
-  images?: readonly ImageContent[],
-): void {
-  const session = callbacks.loadSession(sessionId);
-  const timestamp = callbacks.now();
-  persistSessionUserPromptBarrier({
-    session,
-    prompt,
-    timestamp,
-    metadata,
-    images,
-    appendTranscriptEvent: (event) => callbacks.appendTranscriptEvent(sessionId, event),
-    writeSessionMetadata: (next) => callbacks.writeSessionMetadata(next),
-    writeSessionState: (next, overrides) => callbacks.writeSessionState(next, overrides),
-  });
 }
 
 export function handleMarkTurnActive(

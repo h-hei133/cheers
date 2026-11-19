@@ -13,6 +13,7 @@ import { isDurableQueryEvent } from "../query/runtime/events.js";
 import { notifyObservers } from './observers.js';
 import type { QueryRuntimeStateSeed } from "../query/runtime/state.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
+import { PromptPublicationError } from '../../session/store/prompt/intent.js';
 import {
   createRuntimeEventDigest,
   renderSessionQueryEventSurface,
@@ -315,7 +316,9 @@ export class ShellSessionRuntime {
         await this.deps.admitPrompt?.(effectivePrompt, promptMetadata, signal);
         preparedInput?.check();
         preparingInput = false;
-        if (attachments?.images.length) {
+        if (preparedInput?.checkWrite) {
+          this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, promptMetadata, attachments?.images, preparedInput.checkWrite);
+        } else if (attachments?.images.length) {
           this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, promptMetadata, attachments.images);
         } else {
           this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, promptMetadata);
@@ -451,6 +454,11 @@ export class ShellSessionRuntime {
         : terminalState.terminalStatus === 'completed' ? 'completed' : 'error', finalOutput: terminalState.finalOutput });
       return terminalState.finalOutput;
     } catch (error) {
+      if (error instanceof PromptPublicationError) {
+        if (error.persistence === 'unchanged') provenanceOutcome = signal.aborted ? 'cancelled' : 'failed';
+        if (signal.aborted) this.stateMachine.interruptRun(); else this.stateMachine.failRun();
+        throw error;
+      }
       if (preparedInput && !enteredQueryPhase && !preparingInput) {
         try {preparedInput.check();} catch {refusedInputSource = true;}
       }

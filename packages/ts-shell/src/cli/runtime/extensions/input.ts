@@ -57,6 +57,7 @@ export async function prepareExtensionInput(context: ShellRuntimeContext, reques
       published = true; check();
     };
     return Object.freeze({status:'continue', prompt:text, ...(images ? {images} : {}), check, published:publication,
+      checkWrite: () => { checkSource(); saved.verifyLocked(checkSource); checkSource(); },
       admission:inputAdmissionReceipt({sessionId:id, workspaceRoot:cwd, text, images, signal, check, hooks,
         onConsumed:() => {inputPending = false;}})});
   } catch {throw new InputPreparationError();}

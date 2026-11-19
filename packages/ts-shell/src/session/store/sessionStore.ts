@@ -22,6 +22,7 @@ import {
 } from "./sessionStateStore.js";
 import { decodeContextEntries } from '../../context/attachment/entry.js';
 import { projectSessionAnnotations } from '../context/projection.js';
+import { capturePromptRead, PromptPublicationError } from './prompt/intent.js';
 
 export function sessionExistsAtLayout(layout: Pick<SessionFileLayout, "sessionDir">): boolean {
   return fs.existsSync(layout.sessionDir);
@@ -171,6 +172,7 @@ export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecor
   assertSessionSources(input);
   try {
     input.signal?.throwIfAborted();
+    const assertCurrent = capturePromptRead(input.layout);
     const metadata = readSessionMetadataRecord(input.layout.metadataPath, input.limits?.metadataBytes, input.signal);
     const state = readStateSnapshotRequired(input.layout.statePath, input.limits?.stateBytes, input.signal);
     assertSessionEntryLimit(state, input.limits);
@@ -178,9 +180,11 @@ export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecor
     const transcript = readTranscriptSnapshot(input.layout.transcriptPath, input.limits ? {
       maxBytes: input.limits.transcriptBytes, maxLines: input.limits.transcriptLines,
     } : undefined, input.salvageTranscript === true, input.signal);
-    return projectSessionRecordSnapshot(input, metadata, state, transcript);
+    const snapshot = projectSessionRecordSnapshot(input, metadata, state, transcript);
+    assertCurrent();
+    return snapshot;
   } catch (error) {
-    if (input.signal?.aborted) throw error;
+    if (input.signal?.aborted || error instanceof PromptPublicationError) throw error;
     throw sessionReadError(input.sessionId, error);
   }
 }
@@ -190,6 +194,7 @@ export async function readSessionRecordSnapshotAsync(input: SessionReadInput): P
   input.signal?.throwIfAborted();
   assertSessionSources(input);
   try {
+    const assertCurrent = capturePromptRead(input.layout);
     await yieldForAbort(input.signal);
     const metadata = await readSessionMetadataRecordAsync(input.layout.metadataPath, input.limits?.metadataBytes, input.signal);
     const state = await readStateSnapshotRequiredAsync(input.layout.statePath, input.limits?.stateBytes, input.signal);
@@ -198,9 +203,11 @@ export async function readSessionRecordSnapshotAsync(input: SessionReadInput): P
     const transcript = await readTranscriptSnapshotAsync(input.layout.transcriptPath, input.limits ? {
       maxBytes: input.limits.transcriptBytes, maxLines: input.limits.transcriptLines,
     } : undefined, input.salvageTranscript === true, input.signal);
-    return await projectSessionRecordSnapshotAsync(input, metadata, state, transcript);
+    const snapshot = await projectSessionRecordSnapshotAsync(input, metadata, state, transcript);
+    assertCurrent();
+    return snapshot;
   } catch (error) {
-    if (input.signal?.aborted) throw error;
+    if (input.signal?.aborted || error instanceof PromptPublicationError) throw error;
     throw sessionReadError(input.sessionId, error);
   }
 }

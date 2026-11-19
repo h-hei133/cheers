@@ -13,6 +13,7 @@ import {
 import { normalizePathIdentity } from '../continuation/roots.js';
 import { projectCurrentSessionMetadata } from "../sessionMetadataProjection.js";
 import { captureActivationGuard, assertActivationGuard, type SessionActivationOptions } from './activation.js';
+import { PromptPublicationError } from './prompt/intent.js';
 
 export interface SessionRegistryReadResult {
   readonly store: CurrentSessionSelectionStore;
@@ -233,7 +234,7 @@ export function resolveCurrentSessionForProject(input: {
       sessionExists: true,
       loadError: error,
     });
-    if (!input.readOnly) clearCurrentSessionSelection({
+    if (!input.readOnly && !(error instanceof PromptPublicationError)) clearCurrentSessionSelection({
       storePath: input.storePath,
       normalizedProjectRoot,
     });

@@ -1,4 +1,5 @@
 import { lstatSync } from 'node:fs';
+import { assertNoPromptIntent } from './prompt/intent.js';
 import path from 'node:path';
 import { sameValue } from '../../config/values.js';
 import { captureWorkspaceRoot } from '../../core/workspace/roots.js';
@@ -25,6 +26,7 @@ export function sessionRequestStore(host: RequestStoreHost, session: Session, sc
       let persistence: ModelAdmissionError['persistence'] = 'unchanged';
       try {
         return withFileLock(layout.stateLockPath, () => {
+          assertNoPromptIntent(layout);
           if (layoutFor(host, session.id).sessionDir !== layout.sessionDir || directoryIdentity(layout) !== binding.directoryIdentity) throw new ModelAdmissionError('unavailable');
           const current = readCurrent(layout, binding);
           const decoded = current.state.requestLedger === undefined ? createRequestLedger(binding) : decodeRequestLedger(current.state.requestLedger);

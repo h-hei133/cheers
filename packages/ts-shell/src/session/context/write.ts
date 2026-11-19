@@ -2,6 +2,7 @@ import { lstatSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { sameValue } from '../../config/values.js';
 import { SessionPublicationError } from '../store/bound.js';
+import { assertNoPromptIntent } from '../store/prompt/intent.js';
 import { createSessionStoreLayout, locateExistingSessionLayout, validateSessionId, type SessionFileLayout } from '../store/sessionFileLayout.js';
 import { withFileLock, writeTextFileAtomic } from '../store/sessionFileStore.js';
 import { fileVersion, readSessionFileVersion } from '../store/version.js';
@@ -41,6 +42,7 @@ export function appendSessionAnnotation(input: AppendSessionAnnotation): Session
   let stage: SessionPublicationError['code'] = 'lock-failed';
   try {
     return withFileLock(layout.stateLockPath, () => {
+      assertNoPromptIntent(layout);
       if (admission?.()) throw new SessionPublicationError('conflict');
       stage = 'unavailable';
       const captured = readBranchStoreState(store, id, projectRoot, undefined, NAVIGATION_LIMITS);

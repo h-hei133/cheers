@@ -14,6 +14,7 @@ import type { QueryEvent } from "../query/runtime/events.js";
 import { checkRealProviderReadiness } from "./providerReadiness.js";
 import { buildPromptWithFutureTurnInjections } from "./sessionFutureTurnProjection.js";
 import { ShellSessionRuntime } from "./sessionRuntime.js";
+import { PromptPublicationError } from '../../session/store/prompt/intent.js';
 
 const sessionId = "admission";
 const sessionScopeId = `session:${sessionId}`;
@@ -104,6 +105,19 @@ function latch() {
 }
 
 describe("prompt admission", () => {
+  it('preserves a pending prompt transaction without a model request or contradictory terminal record', async () => {
+    const f = await fixture();
+    f.manager.persistUserPromptBarrier.mockImplementationOnce(() => { throw new PromptPublicationError('unknown'); });
+    const pending = f.snapshots();
+    await expect(f.runtime.executePrompt(sessionId, 'inspect notes')).rejects.toMatchObject({ persistence: 'unknown' });
+    expect(f.snapshots()).toEqual(pending);
+    expect(f.events).toEqual([]);
+    expect(f.model.prompts).toEqual([]);
+    expect(f.manager.saveError).not.toHaveBeenCalled();
+    expect(f.manager.saveInterrupted).not.toHaveBeenCalled();
+    expect(f.runtime.isRunning()).toBe(false);
+  });
+
   it("retains both pending contexts after a prompt barrier failure and injects them on retry", async () => {
     const f = await fixture();
     const pending = f.snapshots();

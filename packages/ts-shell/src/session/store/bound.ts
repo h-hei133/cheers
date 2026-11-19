@@ -1,4 +1,5 @@
 import { lstatSync, realpathSync } from 'node:fs';
+import { assertNoPromptIntent } from './prompt/intent.js';
 import path from 'node:path';
 import { captureWorkspaceRoot } from '../../core/workspace/roots.js';
 import { pathIdentity } from '../../core/workspace/files.js';
@@ -81,6 +82,7 @@ export function publishBoundSessionState(host: BoundSessionHost, session: Sessio
     const layout = layoutFor(host, session.id);
     if (layout.sessionDir !== baseline.layout.sessionDir) throw new SessionPublicationError('conflict');
     withFileLock(layout.stateLockPath, () => {
+      assertNoPromptIntent(layout);
       stage.failure = 'unavailable'; const current = readCurrent(layout, session);
       if (directoryIdentity(layout) !== baseline.directoryIdentity || !sameValue(current.scope, baseline.scope)
         || !matches(current.state, baseline.state)) throw new SessionPublicationError('conflict');

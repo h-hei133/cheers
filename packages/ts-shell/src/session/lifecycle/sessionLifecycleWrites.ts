@@ -33,7 +33,6 @@ import {
   handleMarkRecoveryReentry,
   handleMarkRunStarted,
   handleMarkTurnActive,
-  handlePersistUserPromptBarrier,
   handleSaveCompleted,
   handleSaveError,
   handleSaveInterrupted,
@@ -50,6 +49,7 @@ import { sessionHasConversation } from "../presentation/sessionReentrySurface.js
 import { captureReportWriter } from '../reports/persistence.js';
 import type { ReportWriter } from '../reports/model.js';
 import { SessionCompactionWrites } from '../compaction/writes.js';
+import { commitSessionPrompt } from '../store/prompt/commit.js';
 
 const sessionLogger = createComponentLogger("SessionManager");
 
@@ -140,14 +140,8 @@ export abstract class SessionLifecycleWrites extends SessionCompactionWrites {
     handleMarkRunStarted(this.createSessionLifecycleCallbacks(), sessionId, prompt);
   }
 
-  persistUserPromptBarrier(sessionId: string, prompt: string, metadata?: Record<string, unknown>, images?: readonly ImageContent[]): void {
-    handlePersistUserPromptBarrier(
-      this.createSessionLifecycleCallbacks(),
-      sessionId,
-      prompt,
-      metadata,
-      images,
-    );
+  persistUserPromptBarrier(sessionId: string, prompt: string, metadata?: Record<string, unknown>, images?: readonly ImageContent[], admission?: () => void): void {
+    commitSessionPrompt(this.host.store.stateLayout(sessionId), sessionId, { prompt, metadata, images, admission });
   }
 
   markTurnActive(sessionId: string): void {

@@ -13,19 +13,13 @@ import {
 } from "../sessionEventCodec.js";
 import { deriveSessionTitleFromPrompt } from "./sessionLifecycleStore.js";
 
-export function persistSessionUserPromptBarrier(input: {
+export function prepareSessionUserPromptBarrier(input: {
   readonly session: Session;
   readonly prompt: string;
   readonly timestamp: string;
   readonly metadata?: Record<string, unknown>;
   readonly images?: readonly ImageContent[];
-  readonly appendTranscriptEvent: (event: TranscriptEvent) => void;
-  readonly writeSessionMetadata: (session: Session) => void;
-  readonly writeSessionState: (
-    session: Session,
-    overrides?: SessionStateSnapshotOverrides,
-  ) => void;
-}): void {
+}): { readonly session: Session; readonly events: readonly TranscriptEvent[]; readonly overrides: SessionStateSnapshotOverrides } {
   const nextMessage: SessionMessage & { timestamp: string } = {
     role: "user",
     content: input.images?.length ? [{ type: "text", text: input.prompt }, ...input.images.map(image => ({ ...image }))] : input.prompt,
@@ -37,28 +31,19 @@ export function persistSessionUserPromptBarrier(input: {
     id: createTranscriptEntryId("turn"),
   };
 
-  input.session.status = "active";
-  delete input.session.lastError;
-  input.session.pendingPrompt = input.prompt;
-  input.session.updatedAt = input.timestamp;
-  if (!input.session.title?.trim()) {
+  const session: Session = { ...input.session, status: 'active', pendingPrompt: input.prompt,
+    updatedAt: input.timestamp, turns: [...input.session.turns, nextMessage] };
+  delete session.lastError;
+  if (!session.title?.trim()) {
     const derived = deriveSessionTitleFromPrompt(input.prompt);
-    if (derived) input.session.title = derived;
+    if (derived) session.title = derived;
   }
-  input.session.turns.push(nextMessage);
-
-  input.appendTranscriptEvent(
-    createLifecycleTranscriptEvent({
+  return { session, events: [createLifecycleTranscriptEvent({
       event: "run-started",
       sourceEntryId: nextMessage.id,
       timestamp: input.timestamp,
       detail: input.prompt,
-    }),
-  );
-  input.appendTranscriptEvent(createMessageTranscriptEvent(nextMessage));
-
-  input.writeSessionMetadata(input.session);
-  input.writeSessionState(input.session, {
+    }), createMessageTranscriptEvent(nextMessage)], overrides: {
     runPhase: "prompt-persisted",
     pendingPromptEntryId: nextMessage.id,
     interruptedKind: undefined,
@@ -67,5 +52,5 @@ export function persistSessionUserPromptBarrier(input: {
     terminalReasonCode: undefined,
     lastContinuationReason: undefined,
     pendingLifecycle: createEmptyLifecycleIndex(),
-  });
+  } };
 }

@@ -48,6 +48,7 @@ import {
   formatUnreadableSessionDirectoryWarning,
 } from "../presentation/sessionWarningSurface.js";
 import { ArtifactManager } from "../../core/session/artifactManager.js";
+import { recoverSessionPrompt } from './prompt/commit.js';
 
 export class SessionStoreAccess extends SessionStorePaths {
   readonly files: SessionFiles;
@@ -71,10 +72,12 @@ export class SessionStoreAccess extends SessionStorePaths {
     return sessionExistsAtLayout(locateExistingSessionLayout(this.storeLayout, sessionId.trim()));
   }
 
-  load(sessionId: string): Session {
+  load(sessionId: string, options?: { readonly readOnly?: boolean }): Session {
+    const layout = locateExistingSessionLayout(this.storeLayout, sessionId);
+    if (!options?.readOnly) recoverSessionPrompt(layout, sessionId);
     return loadSessionRecord({
       sessionId,
-      layout: locateExistingSessionLayout(this.storeLayout, sessionId),
+      layout,
       cwd: process.cwd(),
     });
   }
@@ -194,7 +197,7 @@ export class SessionStoreAccess extends SessionStorePaths {
       storeSearchPaths: this.storeLayout.currentSessionStoreSearchPaths,
       projectRoot,
       sessionExists: (sessionId) => this.sessionExists(sessionId),
-      loadSession: (sessionId) => this.load(sessionId),
+      loadSession: (sessionId) => this.load(sessionId, options),
       readOnly: options?.readOnly,
     });
   }

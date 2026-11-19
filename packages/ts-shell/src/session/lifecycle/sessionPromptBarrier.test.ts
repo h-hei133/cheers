@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { TranscriptEvent } from "../sessionEventCodec.js";
 import type { Session } from "../schema/sessionRecord.js";
-import type { SessionStateSnapshotOverrides } from "../schema/sessionStateSnapshot.js";
-import { persistSessionUserPromptBarrier } from "./sessionPromptBarrier.js";
+import { prepareSessionUserPromptBarrier } from "./sessionPromptBarrier.js";
 
 describe("sessionPromptBarrier", () => {
   it.each([false, true])("preserves image prompt content at the durable barrier (empty text=%s)", empty => {
@@ -10,25 +8,23 @@ describe("sessionPromptBarrier", () => {
     const image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
     const session: Session = { id: "sess_image", projectRoot: "/repo", createdAt: "2026-10-30T00:00:00.000Z",
       updatedAt: "2026-10-30T00:00:00.000Z", status: "error", turns: [] };
-    const transcript: TranscriptEvent[] = [], states: SessionStateSnapshotOverrides[] = [];
-    persistSessionUserPromptBarrier({ session, prompt, images: [image], metadata: { originalInput: "public input" },
-      timestamp: "2026-10-30T00:00:04.000Z", appendTranscriptEvent: event => transcript.push(event),
-      writeSessionMetadata: () => undefined, writeSessionState: (_session, state) => states.push(state ?? {}) });
+    const prepared = prepareSessionUserPromptBarrier({ session, prompt, images: [image], metadata: { originalInput: "public input" },
+      timestamp: "2026-10-30T00:00:04.000Z" });
     const content = [{ type: "text", text: prompt }, image];
-    expect(session.turns[0]).toMatchObject({ role: "user", content, metadata: { originalInput: "public input" } });
-    expect(transcript[1]).toMatchObject({ type: "message", content, id: session.turns[0]!.id });
-    expect(states[0]?.pendingPromptEntryId).toBe(session.turns[0]!.id);
-    expect(session.pendingPrompt).toBe(prompt);
+    expect(prepared.session.turns[0]).toMatchObject({ role: "user", content, metadata: { originalInput: "public input" } });
+    expect(prepared.events[1]).toMatchObject({ type: "message", content, id: prepared.session.turns[0]!.id });
+    expect(prepared.overrides.pendingPromptEntryId).toBe(prepared.session.turns[0]!.id);
+    expect(prepared.session.pendingPrompt).toBe(prompt);
+    expect(session.turns).toEqual([]);
     image.data = "later-mutated";
-    expect(session.turns[0]!.content).toEqual([{ type: "text", text: prompt }, { type: "image", data: "aGVsbG8=", mimeType: "image/png" }]);
+    expect(prepared.session.turns[0]!.content).toEqual([{ type: "text", text: prompt }, { type: "image", data: "aGVsbG8=", mimeType: "image/png" }]);
   });
 
   it("keeps an empty image collection as the original string content", () => {
     const session: Session = { id: "sess_plain", projectRoot: "/repo", createdAt: "2026-10-30T00:00:00.000Z",
       updatedAt: "2026-10-30T00:00:00.000Z", status: "completed", turns: [] };
-    persistSessionUserPromptBarrier({ session, prompt: "  plain\n", images: [], timestamp: "2026-10-30T00:00:04.000Z",
-      appendTranscriptEvent: () => undefined, writeSessionMetadata: () => undefined, writeSessionState: () => undefined });
-    expect(session.turns[0]!.content).toBe("  plain\n");
+    const prepared = prepareSessionUserPromptBarrier({ session, prompt: "  plain\n", images: [], timestamp: "2026-10-30T00:00:04.000Z" });
+    expect(prepared.session.turns[0]!.content).toBe("  plain\n");
   });
 
   it("appends run-started before the user prompt and persists prompt phase", () => {
@@ -41,31 +37,25 @@ describe("sessionPromptBarrier", () => {
       turns: [],
       lastError: "previous",
     };
-    const transcript: TranscriptEvent[] = [];
-    const states: SessionStateSnapshotOverrides[] = [];
-
-    persistSessionUserPromptBarrier({
+    const prepared = prepareSessionUserPromptBarrier({
       session,
       prompt: "continue",
       timestamp: "2026-05-28T00:00:04.000Z",
-      appendTranscriptEvent: (event) => transcript.push(event),
-      writeSessionMetadata: () => undefined,
-      writeSessionState: (_nextSession, overrides) => states.push(overrides ?? {}),
     });
 
-    expect(session.status).toBe("active");
-    expect(session.pendingPrompt).toBe("continue");
-    expect(session.lastError).toBeUndefined();
-    expect(session.turns).toEqual([
+    expect(prepared.session.status).toBe("active");
+    expect(prepared.session.pendingPrompt).toBe("continue");
+    expect(prepared.session.lastError).toBeUndefined();
+    expect(prepared.session.turns).toEqual([
       expect.objectContaining({ role: "user", content: "continue" }),
     ]);
-    expect(transcript.map((event) => event.type)).toEqual([
+    expect(prepared.events.map((event) => event.type)).toEqual([
       "lifecycle",
       "message",
     ]);
-    expect(transcript[0]).toMatchObject({ sourceEntryId: session.turns[0]!.id });
-    expect(states[0]?.pendingPromptEntryId).toBe(session.turns[0]!.id);
-    expect(states[0]).toEqual(
+    expect(prepared.events[0]).toMatchObject({ sourceEntryId: prepared.session.turns[0]!.id });
+    expect(prepared.overrides.pendingPromptEntryId).toBe(prepared.session.turns[0]!.id);
+    expect(prepared.overrides).toEqual(
       expect.objectContaining({
         runPhase: "prompt-persisted",
         terminalReason: undefined,

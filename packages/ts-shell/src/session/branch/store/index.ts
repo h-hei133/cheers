@@ -1,5 +1,6 @@
 import { createSessionStoreLayout, validateSessionId } from '../../store/sessionFileLayout.js';
 import { withFileLock } from '../../store/sessionFileStore.js';
+import { assertNoPromptIntent } from '../../store/prompt/intent.js';
 import { createTranscriptEntryId, type CodemodeStoreTranscriptEntry } from '../../sessionEventCodec.js';
 import { appendTranscriptEvent, TranscriptAppendError } from '../../transcript/sessionTranscript.js';
 import { sameValue } from '../../../config/values.js';
@@ -47,6 +48,7 @@ export function captureBranchStore(input: BranchStoreInput): BranchStoreHandle {
     transacting = true;
     try {
       withFileLock(captured.bound.layout.stateLockPath, () => {
+        assertNoPromptIntent(captured.bound.layout);
         ownerAdmission?.(); assertLive(); admission?.(); assertLive(); reason = 'unavailable';
         const current = readBranchStoreState(store, sessionId, cwd, captured.transcriptPrefix, limits);
         assertBranchStoreState(current, captured);

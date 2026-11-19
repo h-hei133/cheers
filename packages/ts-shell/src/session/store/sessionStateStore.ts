@@ -15,6 +15,8 @@ import {
 import type { SessionFileLayout } from "./sessionFileLayout.js";
 import { persistSessionUsage } from "../../observability/usageTelemetry.js";
 import { resolve } from 'node:path';
+import { assertNoPromptIntent } from './prompt/intent.js';
+import type { LockRecovery } from './lockStaleness.js';
 
 const heldStateLocks = new Set<string>();
 
@@ -60,14 +62,15 @@ export async function readStateSnapshotRequiredAsync(
 export function withSessionStateLock<T>(
   layout: Pick<SessionFileLayout, "stateLockPath">,
   action: () => T,
-  options?: { readonly requireExisting?: boolean },
+  options?: { readonly requireExisting?: boolean; readonly allowPromptIntent?: boolean; readonly recovery?: LockRecovery },
 ): T {
   const key = resolve(layout.stateLockPath);
   return withFileLock(layout.stateLockPath, () => {
+    if (!options?.allowPromptIntent) assertNoPromptIntent(layout);
     heldStateLocks.add(key);
     try { return action(); }
     finally { heldStateLocks.delete(key); }
-  }, { createParent: !options?.requireExisting });
+  }, { createParent: !options?.requireExisting, recovery: options?.recovery });
 }
 
 /** Metadata delegates to an existing synchronous state owner; other state lock calls remain nonreentrant. */

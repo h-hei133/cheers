@@ -16,6 +16,8 @@ import type {SessionStateSnapshot} from '../schema/sessionStateSnapshot.js';
 const REPORT_SUFFIX_BYTES = 16 * REPORT_BYTES;
 
 export type SessionTransitionReadback = ((readback: () => void) => void) & {
+  /** Validate the captured source when its original native state lock is already held. */
+  readonly verifyLocked: (readback: () => void) => void;
   /** Called only by the original native writer while it holds the state lock. */
   readonly publishState: (expected: SessionStateSnapshot, publish: () => void, admission: () => void) => void;
 };
@@ -39,15 +41,16 @@ export function captureSessionTransition(layout: SessionFileLayout, auditVersion
     const metadata = version(layout.metadataPath), stored = readSessionMetadataRecord(layout.metadataPath);
     const expected = Object.fromEntries(Object.entries(projectSessionMetadata(activated)).filter(([, value]) => value !== undefined));
     if (!stored || metadata !== version(layout.metadataPath) || !sameValue(stored, expected)) throw new Error('The saved metadata does not match this activation.');
-    const read = (readback: () => void) => withSessionStateLock(layout, () => {
+    const verifyLocked = (readback: () => void) => {
       const check = () => { checkSource(); if (version(layout.metadataPath) !== metadata) throw new Error('The saved metadata changed during replacement.'); };
       check();
       const before = transcript(layout.transcriptPath, prefix);
       readback();
       check();
       if (before.version !== version(layout.transcriptPath)) throw new Error('The saved transcript changed during replacement readback.');
-    }, { requireExisting: true });
-    return Object.assign(read, {publishState: (expected: SessionStateSnapshot, publish: () => void, admission: () => void) => {
+    };
+    const read = (readback: () => void) => withSessionStateLock(layout, () => verifyLocked(readback), { requireExisting: true });
+    return Object.assign(read, { verifyLocked, publishState: (expected: SessionStateSnapshot, publish: () => void, admission: () => void) => {
       checkSource();
       if (version(layout.metadataPath) !== metadata) throw new Error('The saved metadata changed before audit publication.');
       const before = transcript(layout.transcriptPath, prefix);

@@ -187,6 +187,7 @@ export function writeJsonFileAtomic(filePath: string, payload: unknown): void {
 }
 
 export interface AtomicWriteOptions {
+  readonly createParent?: boolean;
   /** Runs before each native rename attempt; throwing refuses publication. */
   readonly beforeRename?: () => void;
   readonly onRenameStart?: () => void;
@@ -199,6 +200,7 @@ export interface AtomicWriteOptions {
 export function writeTextFileAtomic(filePath: string, content: string, mode?: number, options: AtomicWriteOptions = {}): void {
   const directory = path.dirname(filePath);
   if (!fs.existsSync(directory)) {
+    if (options.createParent === false) throw new Error('The original publication directory is unavailable.');
     fs.mkdirSync(directory, { recursive: true });
   }
 

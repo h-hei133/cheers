@@ -12,6 +12,7 @@ export interface PromptInputRequest {
 }
 export type PreparedPromptInput = {readonly status:'handled'; readonly check: () => void}
   | {readonly status:'continue'; readonly prompt: string; readonly images?: readonly ImageContent[]; readonly check: () => void;
+    readonly checkWrite?: () => void;
     readonly published: () => void;
     readonly admission: InputAdmissionReceipt};
 
