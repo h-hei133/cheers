@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { loadToolCatalog } from './catalog.js';
 import type { McpToolDescriptor } from '../mcp/types.js';
-import { mcpCatalogFilter } from './mcp.js';
+import { mcpCatalogFilter, type ToolMcpGateway } from './mcp.js';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import { registerCatalogContribution } from '../catalog/contributions.js';
 import { assertScopeToolAllowed } from '../../config/scope/tools.js';
@@ -53,6 +53,65 @@ it('keeps an empty dynamic catalogue empty without adding discovery overhead', a
   const catalog = await loadToolCatalog({ workspaceRoot: process.cwd(), discover: true,
     catalogContent: { skills: new Map(), tools: [] } }, () => new Map());
   expect(catalog.tools.size).toBe(0); expect(catalog.discovery).toBeUndefined();
+});
+
+it('fills only reached MCP descriptors through the dynamic discovery tools', async () => {
+  const descriptor = (serverName: string, toolName: string): McpToolDescriptor => ({
+    serverName, toolName, qualifiedName: `mcp__${serverName}__${toolName}`, description: 'Find fixture records.', inputSchema: { type: 'object' },
+  });
+  const records = descriptor('docs', 'find_records');
+  const blocked = descriptor('docs', 'disabled');
+  const tickets = descriptor('issues', 'find_tickets');
+  const hidden = descriptor('hidden', 'find_secrets');
+  const snapshot = vi.fn<ToolMcpGateway['snapshot']>(async (_admission, _signal, filter) => ({ clients: [],
+    tools: [records, blocked, tickets, hidden].filter(tool => !filter || filter(tool.serverName)),
+  }));
+  const workspaceRoot = process.cwd();
+  const runtimeConfig = { enableMcpTools: true, disabledTools: [blocked.qualifiedName], hiddenToolPrefixes: ['mcp__hidden__'] } as RuntimeConfig;
+  const catalog = await loadToolCatalog({ workspaceRoot, discover: true, runtimeConfig, sdkSkills: new Map(), mcpGateway: { snapshot } });
+  const context = { workspaceRoot, taskId: 'dynamic' };
+  const load = catalog.tools.get('tool_load')!;
+  const search = catalog.tools.get('tool_search')!;
+  expect(snapshot).not.toHaveBeenCalled();
+  expect(catalog.tools.has(records.qualifiedName)).toBe(false);
+  await load.execute({ names: ['read', blocked.qualifiedName] }, context);
+  expect(snapshot).not.toHaveBeenCalled();
+
+  const loaded = await load.execute({ names: [records.qualifiedName] }, context);
+  expect(JSON.parse(loaded.output!)).toMatchObject({ loaded: [records.qualifiedName], rejected: [] });
+  const namedFilter = snapshot.mock.calls[0]![2]!;
+  expect(['docs', 'issues', 'hidden'].filter(namedFilter)).toEqual(['docs']);
+  expect(catalog.discovery!.snapshot().has(records.qualifiedName)).toBe(true);
+  expect(catalog.discovery!.catalog.has(tickets.qualifiedName)).toBe(false);
+
+  await search.execute({ query: 'fixture records' }, context);
+  expect(snapshot).toHaveBeenCalledTimes(2);
+  const searchFilter = snapshot.mock.calls[1]![2]!;
+  expect(['docs', 'issues', 'hidden'].filter(searchFilter)).toEqual(['docs', 'issues']);
+  expect(catalog.discovery!.catalog.has(tickets.qualifiedName)).toBe(true);
+  expect(catalog.discovery!.snapshot().has(tickets.qualifiedName)).toBe(false);
+  expect(catalog.discovery!.catalog.has(blocked.qualifiedName)).toBe(false);
+  expect(catalog.discovery!.catalog.has(hidden.qualifiedName)).toBe(false);
+});
+
+it('admits late MCP tools for an activated script and discards results after run revocation', async () => {
+  const tool: McpToolDescriptor = { serverName: 'docs', toolName: 'read_item', qualifiedName: 'mcp__docs__read_item',
+    description: 'Read an item.', inputSchema: { type: 'object' } };
+  const workspaceRoot = process.cwd();
+  const runtimeConfig = { enableMcpTools: true, disabledTools: [], hiddenToolPrefixes: [] } as unknown as RuntimeConfig;
+  const snapshot = vi.fn<ToolMcpGateway['snapshot']>(async () => ({ clients: [], tools: [tool] }));
+  const input = { workspaceRoot, discover: true, runtimeConfig, sdkSkills: new Map(), mcpGateway: { snapshot } };
+  const catalog = await loadToolCatalog(input);
+  const context = { workspaceRoot, taskId: 'script' };
+  await catalog.tools.get('tool_load')!.execute({ names: ['codemode'] }, context);
+  const script = catalog.discovery!.snapshot().get('codemode')!;
+  expect(script.nestedToolCatalog?.().has(tool.qualifiedName)).toBe(true);
+
+  let revoked = false;
+  snapshot.mockImplementationOnce(async () => { revoked = true; return { clients: [], tools: [tool] }; });
+  const retired = await loadToolCatalog({ ...input, admission: () => revoked ? 'Run admission was revoked.' : undefined });
+  await expect(retired.tools.get('tool_search')!.execute({ query: 'read item' }, context)).rejects.toThrow('Run admission was revoked.');
+  expect(retired.discovery!.catalog.has(tool.qualifiedName)).toBe(false);
 });
 
 it('retains ambiguous qualified-name prefixes until the real servers list tools', () => {

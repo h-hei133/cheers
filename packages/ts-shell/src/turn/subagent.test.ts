@@ -6,6 +6,9 @@ import type { ToolGateOptions } from "./tools.js";
 import { toolSchemas } from "./tools.js";
 import { SubagentLoader } from "../core/subagents/subagentLoader.js";
 import { createTaskToolDefinition } from "../core/tools/taskTool.js";
+import { createToolDiscovery } from "../core/tools/discovery/state.js";
+import { discoveryTools } from "../core/tools/discovery/tools.js";
+import type { ToolDefinition } from "../tools/types.js";
 
 function harness(overrides: Partial<ToolGateOptions> = {}, command = "printf changed > output.txt", afterTool?: () => void) {
   const execute = vi.fn(async () => ({ success: true, output: "executed" }));
@@ -169,6 +172,60 @@ it("gives the model the executable child tool set without changing the shared pa
   expect(read).toHaveBeenCalledOnce();
   await step([{ role: "user", content: "parent request" }], undefined, {}, { allowTools: true });
   expect(bodies[2].tools?.map((tool) => tool.function.name)).toEqual(["read", "write", "task"]);
+});
+
+it("scopes ordinary and script discovery to the child gate without opening the parent catalog", async () => {
+  const workspaceRoot = process.cwd();
+  const fixtureTool = (name: string): ToolDefinition => ({ name, description: "Fixture data", argsSchema: { type: "object" },
+    execute: vi.fn(async () => ({ success: true, output: name })) });
+  const allowed = fixtureTool("child_record");
+  const deferred = fixtureTool("child_nested");
+  const forbidden = fixtureTool("mcp__notes__parent_record");
+  const parentReady = vi.fn(async () => true);
+  const parent = createToolDiscovery({ catalog: new Map([allowed, deferred, forbidden].map(tool => [tool.name, tool])) });
+  const controls = discoveryTools(parent, parentReady);
+  const pool = new Map([allowed, forbidden, ...controls].map(tool => [tool.name, tool]));
+  const nested = new Map([...pool, [deferred.name, deferred]]);
+  const script: ToolDefinition = { name: "codemode", description: "Fixture script", argsSchema: { type: "object" },
+    nestedToolCatalog: () => nested,
+    async execute(_args, context) {
+      const invoke = context.executeNestedTool!;
+      const search = await invoke("tool_search", { query: "fixture" }, "script/search");
+      const admitted = await invoke(deferred.name, {}, "script/allowed");
+      const denied = await invoke(forbidden.name, {}, "script/blocked");
+      return { success: search.success && admitted.success && !denied.success,
+        output: JSON.stringify({ search: JSON.parse(search.output!), called: admitted.output, refused: !denied.success }) };
+    } };
+  pool.set(script.name, script);
+  nested.set(script.name, script);
+
+  const reports: string[] = [];
+  const step: StepFunction = async messages => {
+    const results = messages.filter(message => message.role === "tool");
+    if (results.length === 0) return { text: "", stopReason: "stop", toolCalls: [
+      { id: "search", name: "tool_search", args: { query: "fixture" } },
+      { id: "load", name: "tool_load", args: { names: [allowed.name, deferred.name, forbidden.name] } },
+    ] };
+    if (results.length === 2) return { text: "", stopReason: "stop", toolCalls: [{ id: "script", name: "codemode", args: {} }] };
+    reports.push(...results.map(result => String(result.content)));
+    return { text: "finished", stopReason: "stop", toolCalls: [] };
+  };
+  const run = createSubagentRunner({ step, defaultMaxSteps: 4 }, pool, {
+    sessionId: "child-discovery", workspaceRoot, permissionScope: "allow-all", agentMode: "build",
+    hooks: { dispatch: async () => ({ decision: "allow" }) } as ToolGateOptions["hooks"], emit() {},
+  });
+  const result = await run({ ...request, definition: { ...reviewer, maxTurns: 4, permissionMode: "default",
+    tools: [allowed.name, deferred.name, "tool_search", "tool_load", "codemode"] } });
+
+  expect(result.failed).toBe(false);
+  expect(result.allowedTools).toEqual([allowed.name, "tool_search", "tool_load", "codemode"]);
+  expect(JSON.parse(reports[0]!).matches.map((match: { name: string }) => match.name).sort()).toEqual([allowed.name, "codemode"]);
+  expect(JSON.parse(reports[1]!)).toMatchObject({ loaded: [allowed.name], rejected: [deferred.name, forbidden.name] });
+  const scriptReport = JSON.parse(reports[2]!);
+  expect(scriptReport).toMatchObject({ called: deferred.name, refused: true });
+  expect(scriptReport.search.matches.map((match: { name: string }) => match.name).sort()).toEqual([deferred.name, allowed.name]);
+  expect(parentReady).not.toHaveBeenCalled();
+  expect(forbidden.execute).not.toHaveBeenCalled();
 });
 
 it('refuses an unavailable explicit model with zero main-step fallback', async () => {

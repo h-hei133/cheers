@@ -1727,9 +1727,19 @@ it('refuses unavailable MCP without connection and invalidates revoked attachmen
   const result = await load('question'); result.verify();
   installCommandGate(context, () => ({ permissionScope: 'ask', admission: () => 'revoked' }));
   expect(() => result.verify()).toThrow('stale');
-  const config = { ...context.configuration.current.config, enableMcpTools: true };
+  const config = { ...context.configuration.current.config, enableMcpTools: true, toolDiscovery: 'full' as const };
   Object.assign(context, { configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
   await expect(load()).rejects.toThrow('MCP catalogue'); expect(gateway.snapshot).not.toHaveBeenCalled();
+});
+
+it('estimates the dynamic first prompt before an on-demand MCP catalog is available', async () => {
+  const { context, gateway, load } = fixture();
+  const config = { ...context.configuration.current.config, enableMcpTools: true, toolDiscovery: 'dynamic' as const };
+  Object.assign(context, { configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
+  const peekSnapshot = vi.fn(() => undefined);
+  Object.assign(gateway, { peekSnapshot });
+  const result = await load('question'); result.verify();
+  expect(peekSnapshot).not.toHaveBeenCalled(); expect(gateway.snapshot).not.toHaveBeenCalled();
 });
 
 it('estimates only the eligible MCP scope without connecting a cold server', async () => {

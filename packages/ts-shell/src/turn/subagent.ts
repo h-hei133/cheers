@@ -1,6 +1,8 @@
 import { runSubagent, type SubagentRunner, type SubagentRunResult, type SubagentPreparation } from "../core/subagents/runner.js";
 import { subagentMode, subagentTools } from "../core/subagents/boundary.js";
 import { delegationTools } from '../core/subagents/capability.js';
+import { createToolDiscovery, DISCOVERY_LOAD_TOOL, DISCOVERY_SEARCH_TOOL } from '../core/tools/discovery/state.js';
+import { discoveryTools } from '../core/tools/discovery/tools.js';
 import type { ToolDefinition } from "../tools/types.js";
 import type { StepFunction } from "./step.js";
 import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
@@ -100,7 +102,25 @@ function subagentToolPool(definition: Parameters<typeof subagentTools>[0], tools
   const selected = select(tools);
   const script = selected.get('codemode');
   if (script) selected.set(script.name, { ...script,
-    nestedToolCatalog: () => select(script.nestedToolCatalog?.() ?? tools),
+    nestedToolCatalog: () => {
+      const nested = select(script.nestedToolCatalog?.() ?? tools);
+      nested.delete(script.name);
+      return bindDiscoveryControls(nested);
+    },
   });
-  return selected;
+  return bindDiscoveryControls(selected);
+}
+
+/** Child discovery describes its own callable tools without inheriting parent readiness. */
+function bindDiscoveryControls(pool: Map<string, ToolDefinition>): ReadonlyMap<string, ToolDefinition> {
+  if (!pool.has(DISCOVERY_SEARCH_TOOL) && !pool.has(DISCOVERY_LOAD_TOOL)) return pool;
+  const catalog = new Map(pool);
+  catalog.delete(DISCOVERY_SEARCH_TOOL);
+  catalog.delete(DISCOVERY_LOAD_TOOL);
+  const available = [...catalog.keys()];
+  const discovery = createToolDiscovery({ catalog, pinned: available, initial: available });
+  for (const tool of discoveryTools(discovery)) {
+    if (pool.has(tool.name)) pool.set(tool.name, tool);
+  }
+  return pool;
 }

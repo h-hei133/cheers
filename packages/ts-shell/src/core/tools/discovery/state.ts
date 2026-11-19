@@ -15,6 +15,8 @@ export const DISCOVERY_SEARCH_TOOL = 'tool_search';
 export const DISCOVERY_LOAD_TOOL = 'tool_load';
 const LOADED_LIMIT = 32;
 
+interface CatalogEntry { readonly name: string; readonly tool: ToolDefinition; readonly fingerprint: string }
+
 export interface DiscoveryMatch {
   readonly name: string;
   readonly summary: string;
@@ -53,16 +55,17 @@ export function createToolDiscovery(input: {
   };
   // SDK and extension callers retain mutable nested schemas; identity alone cannot cache their contract.
   const toolFingerprint = (tool: ToolDefinition): string => JSON.stringify([tool.description, tool.argsSchema]);
-  let cachedEntries: Array<{ readonly name: string; readonly tool: ToolDefinition; readonly fingerprint: string }> = [];
+  const entryIsCurrent = (entry: CatalogEntry): boolean => {
+    const current = input.catalog.get(entry.name);
+    return current === entry.tool && toolFingerprint(current) === entry.fingerprint;
+  };
+  let cachedEntries: readonly CatalogEntry[] = [];
   let cachedDigest = '';
   const generation = (): string => {
     if (
       cachedDigest &&
       cachedEntries.length === input.catalog.size &&
-      cachedEntries.every(entry => {
-        const current = input.catalog.get(entry.name);
-        return current === entry.tool && toolFingerprint(current) === entry.fingerprint;
-      })
+      cachedEntries.every(entryIsCurrent)
     ) {
       return cachedDigest;
     }
@@ -75,17 +78,13 @@ export function createToolDiscovery(input: {
       .digest('hex');
     return cachedDigest;
   };
-  const guard = (tool: ToolDefinition, snapshotGeneration: string, catalogueOwned: boolean): ToolDefinition => {
+  const guard = (tool: ToolDefinition, snapshotEntries?: readonly CatalogEntry[]): ToolDefinition => {
     const fingerprint = toolFingerprint(tool);
     const verify = (): void => {
-      if (catalogueOwned) {
-        const current = input.catalog.get(tool.name);
-        if (!current || current !== tool || toolFingerprint(current) !== fingerprint) {
-          throw new ToolGenerationError(tool.name);
-        }
-      } else if (generation() !== snapshotGeneration) {
-        throw new ToolGenerationError(tool.name);
-      }
+      // Discovery actions can grow this run's catalog, including within one tool batch.
+      const current = snapshotEntries ? meta.includes(tool) && toolFingerprint(tool) === fingerprint && snapshotEntries.every(entryIsCurrent)
+        : entryIsCurrent({ name: tool.name, tool, fingerprint });
+      if (!current) throw new ToolGenerationError(tool.name);
     };
     const prepare = tool.prepare
       ? async (args: Record<string, unknown>, context: Parameters<NonNullable<ToolDefinition['prepare']>>[1]) => {
@@ -104,12 +103,12 @@ export function createToolDiscovery(input: {
   };
 
   const snapshot = (includeDeferred = false): ReadonlyMap<string, ToolDefinition> => {
-    const snapshotGeneration = generation();
+    generation();
     const selected = new Map<string, ToolDefinition>();
     for (const [name, tool] of input.catalog) {
-      if (includeDeferred || pinned.has(name) || loaded.has(name)) selected.set(name, guard(tool, snapshotGeneration, true));
+      if (includeDeferred || pinned.has(name) || loaded.has(name)) selected.set(name, guard(tool));
     }
-    for (const tool of meta) selected.set(tool.name, guard(tool, snapshotGeneration, false));
+    for (const tool of meta) selected.set(tool.name, guard(tool, cachedEntries));
     return selected;
   };
 

@@ -11,6 +11,7 @@ import { compositionPlan } from '../../../core/commands/composition/plan.js';
 import { prepareComposition } from '../../../core/commands/composition/prepare.js';
 import { preparePromptRequest } from '../../../core/prompts/request.js';
 import { mcpCatalogFilter } from '../../../core/tools/mcp.js';
+import { defersMcpDiscovery } from '../../../core/tools/catalog.js';
 import { foregroundTools, promptWithContext } from '../prompt.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../../core/auth/account/target.js';
 import { DEFAULT_ENDPOINT_KIND, endpointShape, endpointTurnBody } from '../../../provider/endpoints/index.js';
@@ -98,7 +99,8 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     throw new Error('Command request preparation is pending.');
   }
   const forcedTool = context.peekForcedTool?.();
-  const mcpFilter = mcpCatalogFilter(config, forcedTool);
+  const mcpFilter = defersMcpDiscovery({ discover: config.toolDiscovery !== 'full', runtimeConfig: config, forcedTool })
+    ? false : mcpCatalogFilter(config, forcedTool);
   const snapshot = mcpFilter === false ? undefined : gateway.peekSnapshot?.(mcpFilter);
   if (mcpFilter !== false && (!snapshot || snapshot.clients.some(client => client.type !== 'connected'))) {
     throw new Error('MCP catalogue is not ready for a complete estimate.');

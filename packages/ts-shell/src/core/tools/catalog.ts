@@ -12,7 +12,9 @@ import { catalogContributions } from '../catalog/contributions.js';
 import { createDefaultExecutionService } from '../../runtime/execution/service.js';
 import { createToolDiscovery, DISCOVERY_LOAD_TOOL, DISCOVERY_SEARCH_TOOL, type ToolDiscovery } from './discovery/state.js';
 import { discoveryTools } from './discovery/tools.js';
-import { mcpToolsForRun, type ToolMcpGateway } from './mcp.js';
+import { deferredMcpTools, mcpCatalogFilter, mcpToolsForRun, type ToolMcpGateway } from './mcp.js';
+
+const DISCOVERY_NAMES = [DISCOVERY_SEARCH_TOOL, DISCOVERY_LOAD_TOOL] as const;
 
 export interface ToolCatalogInput {
   /** Fixed content for an independently approved run; executable contributions remain owner-bound. */
@@ -50,6 +52,15 @@ export async function captureCatalogContent(input: ToolCatalogInput): Promise<Ca
   return { skills, tools: catalogContributions(input.workspaceRoot, input.sessionId).flatMap(entry => entry.tools) };
 }
 
+export function defersMcpDiscovery(input: Pick<ToolCatalogInput, 'discover' | 'runtimeConfig' | 'forcedTool' | 'initialTools' | 'catalogContent'>): boolean {
+  const config = input.runtimeConfig;
+  return input.discover === true && config?.enableMcpTools === true && config.allowedTools === undefined
+    && !input.forcedTool && !input.catalogContent
+    && !input.initialTools?.some(name => name === 'codemode' || name.startsWith(MCP_TOOL_PREFIX))
+    && filterVisibleToolNames(DISCOVERY_NAMES, config).length === DISCOVERY_NAMES.length
+    && mcpCatalogFilter(config) !== false;
+}
+
 /** Build the same current tool pool for a model run and for command inspection. */
 export async function loadToolCatalog(input: ToolCatalogInput, override?: () => ReadonlyMap<string, ToolDefinition>): Promise<{
   readonly skills: ReadonlyMap<string, Skill>;
@@ -58,7 +69,8 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
 }> {
   assertAdmission(input.admission);
   const { skills, tools: contributed } = input.catalogContent ?? await captureCatalogContent(input);
-  const mcp = await mcpToolsForRun(input);
+  const deferred = !override && input.mcpGateway !== undefined && defersMcpDiscovery(input);
+  const mcp = deferred ? undefined : await mcpToolsForRun(input);
   input.signal?.throwIfAborted();
   assertAdmission(input.admission);
   const registry = override?.() ?? createCoreToolRegistry({ skills,
@@ -70,7 +82,7 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
     if (combined.has(tool.name)) throw new Error('Feature tool registration collides with an existing tool.');
     combined.set(tool.name, tool);
   }
-  const discoveryNames = input.discover ? [DISCOVERY_SEARCH_TOOL, DISCOVERY_LOAD_TOOL] : [];
+  const discoveryNames = input.discover ? DISCOVERY_NAMES : [];
   const restricted = input.runtimeConfig ? restrictToolPool(combined, input.runtimeConfig, discoveryNames, input.forcedTool) : combined;
   // Generated entry points obey the same visibility contract as ordinary tools.
   // Without the complete discovery pair, offer admitted tools directly so an
@@ -85,9 +97,9 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
   // entries: a director's worker controls or a research probe must be present
   // in the first request, so they join the initial set alongside pinned tools.
   const initial = [...(input.initialTools ?? []), ...(input.featureTools ?? []).map(tool => tool.name)];
-  const nested = bindNestedCatalog(restricted, () => discovery.snapshot(true));
+  const nested = new Map(bindNestedCatalog(restricted, () => discovery.snapshot(true)));
   const discovery: ToolDiscovery = createToolDiscovery({ catalog: nested, ...(initial.length ? { initial } : {}) });
-  discovery.attachMeta(discoveryTools(discovery));
+  discovery.attachMeta(discoveryTools(discovery, deferred ? deferredMcpTools(input, nested) : undefined));
   return { skills, tools: discovery.snapshot(), discovery };
 }
 

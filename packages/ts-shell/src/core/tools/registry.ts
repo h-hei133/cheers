@@ -9,8 +9,8 @@ import {
   type ExecutionAuthority,
   type ExecutionService,
 } from '../../runtime/execution/service.js'
-import { McpGatewayBlockedError, type CoreMcpGateway } from '../mcp/gateway.js'
-import { classifyMcpFailure, classifyUnknownMcpFailure, mcpFailureMetadata } from '../mcp/errorTaxonomy.js'
+import type { CoreMcpGateway } from '../mcp/gateway.js'
+import { mcpToolDefinitions } from './mcp.js'
 import { createGlobToolDefinition } from './glob.js'
 import { createReadToolDefinition } from './read.js'
 import { createSkillToolDefinition, type SkillCatalog } from './skill.js'
@@ -30,7 +30,7 @@ import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { resolveToolTarget } from './permissionContext.js'
 import { validateToolArguments } from './arguments.js'
-import { approvedResult, deniedResult, runtimeErrorResult } from './toolResultLifecycle.js'
+import { approvedResult } from './toolResultLifecycle.js'
 import { createPatchToolDefinition } from '../../edit/patch/tool.js'
 import { createEditToolDefinition } from '../../edit/tool.js'
 import { createCodemodeToolDefinition } from './codemode/tool.js'
@@ -179,51 +179,7 @@ export function createCoreToolRegistry(options?: {
     tools.push(createSkillToolDefinition(options.skills))
   }
 
-  for (const tool of options?.mcpTools ?? []) {
-    tools.push({
-      name: tool.qualifiedName,
-      description: `[MCP:${tool.serverName}] ${tool.description}`,
-      argsSchema: tool.inputSchema ?? { type: 'object' },
-      mcpAnnotations: { readOnlyHint: tool.annotations?.readOnlyHint === true },
-      async execute(args, context) {
-        if (!options?.mcpGateway) {
-          // A tool without its gateway is a registration mistake, and the
-          // mistake is best said here rather than answered with a fake
-          // success the model cannot recover from.
-          return deniedResult(
-            `The MCP gateway is not connected, so ${tool.qualifiedName} cannot be called. Report this to the user.`,
-          )
-        }
-        try {
-          const answer = await options.mcpGateway.invokeTool(
-            tool.serverName,
-            tool.toolName,
-            args,
-            undefined,
-            { signal: context.abortSignal, contractId: tool.contractId },
-          )
-          if (answer.isError) {
-            // The server answered, and what it said is a failure in its own
-            // words. Handed back as success the model would believe the call
-            // worked; as a failure it can react, or tell the user what the
-            // server said.
-            return deniedResult(
-              `${tool.qualifiedName} failed on server "${tool.serverName}": ${answer.content}`,
-            )
-          }
-          return approvedResult(answer.content)
-        } catch (error) {
-          const failure = error instanceof McpGatewayBlockedError
-            ? classifyMcpFailure({ failureClass: error.mcpFailureClass, detail: error.mcpSafeDetail })
-            : classifyUnknownMcpFailure(error)
-          return runtimeErrorResult(
-            `[MCP ${failure.failureClass}; ${failure.failurePlane}] ${failure.safeDetail}`,
-            mcpFailureMetadata(failure),
-          )
-        }
-      },
-    })
-  }
+  for (const tool of mcpToolDefinitions(options?.mcpTools ?? [], options?.mcpGateway)) tools.push(tool)
   let toolMap = new Map<string, ToolDefinition>()
   tools.push(createCodemodeToolDefinition(() => toolMap))
   toolMap = new Map(tools.map(tool => [tool.name, tool]))
