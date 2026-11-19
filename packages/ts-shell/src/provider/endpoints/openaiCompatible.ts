@@ -8,7 +8,7 @@ import {
 import { readCompletionStream, readReasoningText, type CompletedBody } from "../../turn/completion.js";
 import type { ChatMessage } from "../../turn/prompt.js";
 import { copilotRequestHeaders } from "./copilotHeaders.js";
-import { declareEndpoint, type SimpleRequest } from "./kinds.js";
+import { declareEndpoint, type SimpleRequest, type TurnRequest } from "./kinds.js";
 import { promptCacheFields } from '../cache/protocol.js';
 
 /**
@@ -24,6 +24,8 @@ import { promptCacheFields } from '../cache/protocol.js';
 
 /** Where a request goes, appended to the base URL. */
 const PATH = "/chat/completions";
+type AssistantContent = (message: ChatMessage, input: SimpleRequest) => readonly unknown[] | undefined;
+
 declareEndpoint("openai-compatible", {
   usageInput: 'inclusive',
   serviceTiers: ['default', 'auto', 'priority', 'fast', 'flex'],
@@ -33,11 +35,22 @@ declareEndpoint("openai-compatible", {
   modelsPath: "/models",
   headers: (apiKey) => ({ ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) }),
   requestHeaders: copilotRequestHeaders,
-  body: (input) => ({
+  body: compatibleBody,
+  turnBody: compatibleTurnBody,
+  refreshBody: (body, model) => ({
+    ...body,
+    ["max_completion_tokens" in body ? "max_completion_tokens" : "max_tokens" in body ? "max_tokens" : model.maxTokensField ?? "max_tokens"]: 1,
+  }),
+  readBody: readBody,
+  readStream: (body, observe) => readCompletionStream(body, undefined, observe),
+});
+
+export function compatibleBody(input: SimpleRequest, assistantContent?: AssistantContent): Record<string, unknown> {
+  return {
     model: input.model,
     messages: [
       ...(input.systemPrompt ? [{ role: input.systemRole ?? 'system', content: input.systemPrompt }] : []),
-      ...wireMessages(input.messages, input.vision === true, false, input),
+      ...wireMessages(input, input.vision === true, false, assistantContent),
     ],
     // Gated the same way the full request gates it. A caller that declares the
     // model rejects a temperature gets a request without one, whether or not the
@@ -49,23 +62,19 @@ declareEndpoint("openai-compatible", {
     ...(input.maxOutputTokens !== undefined ? { [input.maxTokensField ?? 'max_tokens']: input.maxOutputTokens } : {}),
     ...(input.serviceTier !== undefined ? { service_tier: input.serviceTier } : {}),
     ...promptCacheFields(input),
-  }),
-  /**
-   * The full turn: the conversation, the tools, and the model's own vocabulary
-   * for its reasoning level.
-   *
-   * Every value here is chosen by the caller and merely written down by the
-   * protocol, which is what makes a third protocol a matter of writing this
-   * function rather than editing the turn loop.
-   */
-  turnBody: (input) => ({
+  };
+}
+
+/** The full turn writes the caller's resolved conversation, tools and reasoning controls. */
+export function compatibleTurnBody(input: TurnRequest, assistantContent?: AssistantContent): Record<string, unknown> {
+  return {
     model: input.model,
     messages: [
       { role: input.systemRole, content: input.systemPrompt },
       // A bare string, or an array of parts when the message carries images.
       // The bridging and the compaction the caller already did are its business,
       // not the protocol's; what is left here is how this wire writes a message.
-      ...wireMessages(input.messages, input.vision, input.assistantAfterToolResult, input),
+      ...wireMessages(input, input.vision, input.assistantAfterToolResult, assistantContent),
     ],
     // Omitted rather than sent with `tool_choice: "none"`, which is what the
     // other protocol already did. Both ways stop the call, but keeping the
@@ -96,17 +105,11 @@ declareEndpoint("openai-compatible", {
       ? { [input.maxTokensField]: input.maxOutputTokens }
       : {}),
     ...promptCacheFields(input),
-  }),
-  refreshBody: (body, model) => ({
-    ...body,
-    ["max_completion_tokens" in body ? "max_completion_tokens" : "max_tokens" in body ? "max_tokens" : model.maxTokensField ?? "max_tokens"]: 1,
-  }),
-  readBody: readBody,
-  readStream: (body, observe) => readCompletionStream(body, undefined, observe),
-});
+  };
+}
 
 /** Tool responses remain contiguous; this protocol accepts images in user turns. */
-function wireMessages(messages: readonly ChatMessage[], vision: boolean, bridge: boolean, input: SimpleRequest): Record<string, unknown>[] {
+function wireMessages(input: SimpleRequest, vision: boolean, bridge: boolean, assistantContent?: AssistantContent): Record<string, unknown>[] {
   const result: Record<string, unknown>[] = [];
   let pending: MultimodalContentBlock[] = [];
   const flush = (): void => {
@@ -115,7 +118,7 @@ function wireMessages(messages: readonly ChatMessage[], vision: boolean, bridge:
     result.push({ role: "user", content: wireContent(pending, vision) });
     pending = [];
   };
-  for (const message of messages) {
+  for (const message of input.messages) {
     if (message.requestDeclaration) continue;
     if (message.role !== "tool") flush();
     if (message.role === "tool" && Array.isArray(message.content)) {
@@ -123,7 +126,10 @@ function wireMessages(messages: readonly ChatMessage[], vision: boolean, bridge:
       const text = messageToText(message.content, { placeholderForImages: !vision });
       result.push({ ...wireMessage(message, input), content: text || (images.length ? "(see attached image)" : "") });
       if (vision && images.length) pending.push({ type: "text", text: `Image from tool result ${message.tool_call_id ?? "unknown"}:` }, ...images);
-    } else result.push({ ...wireMessage(message, input), content: wireContent(message.content, vision) });
+    } else {
+      const native = message.role === "assistant" ? assistantContent?.(message, input) : undefined;
+      result.push({ ...wireMessage(message, input), content: native ?? wireContent(message.content, vision) });
+    }
   }
   flush();
   return result;

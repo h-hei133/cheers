@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import { isRecord } from "../../core/values/record.js";
-import { readCompletionStream, type CompletionContentFragment } from "../../turn/completion.js";
+import { readCompletionStream, type CompletedBody } from "../../turn/completion.js";
+import { providerResponseError } from '../response/error.js';
 import { declareEndpoint, endpointShape, type EndpointShape, type SimpleRequest } from "./kinds.js";
+import { compatibleBody, compatibleTurnBody } from './openaiCompatible.js';
+import { projectContent, readContent } from './mistral/content.js';
+import { captureReplay, replayContent } from './mistral/replay.js';
 
 /**
  * Mistral Chat Completions endpoint.
@@ -60,31 +64,38 @@ function normalizeMistralPayload(body: Record<string, unknown>, input: Pick<Simp
   return { ...payload, messages };
 }
 
-function readMistralContent(parts: readonly unknown[]): readonly CompletionContentFragment[] {
-  const fragments: CompletionContentFragment[] = [];
-  for (const part of parts) {
-    if (typeof part === "string") {
-      if (part) fragments.push({ kind: "text", text: part });
-      continue;
-    }
-    if (!isRecord(part)) continue;
-    if (part.type === "text" && typeof part.text === "string" && part.text) {
-      fragments.push({ kind: "text", text: part.text });
-    } else if (part.type === "thinking" && Array.isArray(part.thinking)) {
-      let text = "";
-      for (const segment of part.thinking) {
-        if (isRecord(segment) && segment.type === "text" && typeof segment.text === "string") text += segment.text;
-      }
-      if (text) fragments.push({ kind: "reasoning", text });
-    }
-  }
-  return fragments;
-}
-
 const baseShape = (): ReturnType<typeof endpointShape> => endpointShape("openai-compatible");
+
+function readBody(body: unknown): CompletedBody {
+  if (isRecord(body) && body.error != null) throw providerResponseError(body.error);
+  const decoded = baseShape().readBody(body);
+  const { choices: rawChoices, usage } = decoded;
+  if (!Array.isArray(rawChoices)) return { usage };
+  let reasoning = decoded.reasoning;
+  let reasoningSignature: string | undefined;
+  const choices = rawChoices.map((choice: NonNullable<CompletedBody['choices']>[number], index) => {
+    const message = choice?.message;
+    const finish = choice?.finish_reason === 'model_length' ? 'length' : choice?.finish_reason;
+    if (!Array.isArray(message?.content)) return finish === choice?.finish_reason ? choice : { ...choice, finish_reason: finish };
+    const projected = projectContent(message.content);
+    if (index === 0) {
+      reasoning = projected.reasoning || reasoning;
+      const { role, prefix } = message as Record<string, unknown>;
+      if ((finish === 'stop' || finish === 'tool_calls')
+        && (role === undefined || role === 'assistant')
+        && (prefix === undefined || prefix === false)
+        && projected.reasoning === (reasoning ?? '')) {
+        reasoningSignature = captureReplay(message.content, message.tool_calls);
+      }
+    }
+    return { ...choice, message: { ...message, content: projected.text }, finish_reason: finish };
+  });
+  return { choices, usage, reasoning, ...(reasoningSignature ? { reasoningSignature } : {}) };
+}
 
 const chatShape: EndpointShape = {
   usageInput: 'inclusive',
+  opaqueReplay: true,
   contextFields: { conversation: "messages", tools: "tools", firstMessageIsSystem: true },
   path: () => "/chat/completions",
   modelsPath: "/models",
@@ -94,11 +105,11 @@ const chatShape: EndpointShape = {
     const affinity = sanitizeAffinity(input.sessionId);
     return affinity ? { "x-affinity": affinity } : {};
   },
-  body: (input) => normalizeMistralPayload(baseShape().body(input), input),
-  turnBody: (input) => normalizeMistralPayload(baseShape().turnBody(input), input),
+  body: (input) => normalizeMistralPayload(compatibleBody(input, replayContent), input),
+  turnBody: (input) => normalizeMistralPayload(compatibleTurnBody(input, replayContent), input),
   refreshBody: (body, model) => baseShape().refreshBody?.(body, model),
-  readBody: (body) => baseShape().readBody(body),
-  readStream: (body, observe) => readCompletionStream(body, readMistralContent, observe),
+  readBody,
+  readStream: (body, observe) => readCompletionStream(body, readContent, observe),
 };
 
 declareEndpoint("mistral-chat-completions", chatShape);
