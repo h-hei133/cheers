@@ -39,6 +39,7 @@ import { captureUsageAttribution } from '../../../observability/usage/identity.j
 import { estimateWirePromptDetails } from '../../../context/request/wire.js';
 import { createCommandRegistry } from '../../../core/commands/registry.js';
 import { parseCommandSource, resolveCommandInvocation } from '../../../core/commands/invocation.js';
+import { decodeGoal, goalMatchesScope } from '../../../planning/goal/codec.js';
 import { decodeHandoffs } from '../../../workflow/handoff/codec.js';
 import { decodeDirectors } from '../../../workflow/director/codec.js';
 import { requestReplayBinding } from '../../../provider/request/replay.js';
@@ -112,6 +113,10 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
     }, signal) : undefined;
   if (review) effectivePrompt = review.prompt;
   const session = await readPromptPreview(manager, expected, cwd, effectivePrompt, signal, sources.track);
+  const savedGoal = session.state.goal;
+  const goal = savedGoal === undefined ? undefined : decodeGoal(savedGoal);
+  if (savedGoal !== undefined && !goal) throw new Error('Saved goal is invalid.');
+  const goalObjective = goal?.phase === 'active' && goalMatchesScope(goal, session.scope) ? goal.objective : undefined;
   const researchArgs = composition?.driver?.method.definition.name === 'deep-research' ? composition.driver.args
     : researchStandalone && source ? tokenizeCommandArgs(source.argsText) : undefined;
   const parsedResearch = researchArgs ? parseResearchArgs(researchArgs) : undefined;
@@ -147,7 +152,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const endpoint = providerCredentialEndpoint(publication.catalog, resolution, base) ?? DEFAULT_ENDPOINT_KIND;
   const protocol = endpointShape(endpoint);
   const messages = [...selectModelContext(session.session), ...(currentHistory ? [] : [openingMessage({ workspaceRoot: cwd,
-    workspaceRoots: expected.workspaceRoots, permissionScope, goalObjective: session.goalObjective, continuityContext: session.continuityContextFor(effectivePrompt),
+    workspaceRoots: expected.workspaceRoots, permissionScope, goalObjective, continuityContext: session.continuityContextFor(effectivePrompt),
     prompt: promptWithContext(injected.prompt, entries), attachments })])];
   // Ownership also binds public text; only opaque payloads prevent local measurement.
   if (messages.some(message => message.reasoning?.signature || message.reasoning?.redacted)) {

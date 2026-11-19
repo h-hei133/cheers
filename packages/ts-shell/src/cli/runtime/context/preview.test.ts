@@ -41,6 +41,7 @@ import * as endpoints from '../../../provider/endpoints/index.js';
 import { toolSchemas } from '../../../turn/tools.js';
 import { openingMessage } from '../../../turn/opening.js';
 import { readPromptPreview } from '../../../session/context/preview.js';
+import { transitionGoal } from '../../../planning/goal/state.js';
 import { estimateWirePrompt } from '../../../context/request/wire.js';
 import { gitCommandFor, gitWorkbenchFor, installGitRuntime } from '../git.js';
 import { gitFixture, gitGate, stubGitEnvironment } from '../../../test-utils/git.js';
@@ -131,6 +132,37 @@ it('estimates an empty startup through the actual tool projection without provid
   expect(result.estimate.identity.endpointId).toMatch(/^[a-f0-9]{64}$/);
   expect(gateway.snapshot).not.toHaveBeenCalled(); expect(gateway.refresh).not.toHaveBeenCalled();
   expect(files.map(target => fs.readFileSync(target))).toEqual(before); expect(fs.existsSync(layout.stateLockPath)).toBe(false);
+});
+
+it('projects only the captured active goal for the current session and workspace', async () => {
+  const { cwd, layout, load, manager, session } = fixture();
+  const { scope } = await readPromptPreview(manager, session, cwd, 'question');
+  const objective = 'Verify the captured workspace';
+  const active = transitionGoal(undefined, scope, { type: 'set', objective })!;
+  const paused = transitionGoal(active, scope, { type: 'pause' });
+  const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
+  const save = (goal: unknown) => fs.writeFileSync(layout.statePath, JSON.stringify({ ...state, goal }));
+  const wire = vi.spyOn(endpoints, 'endpointTurnBody');
+  const opening = () => wire.mock.calls.at(-1)![1].messages[0]?.content;
+
+  save(active);
+  const preview = await load('question');
+  expect(opening()).toContain(`active_goal=${JSON.stringify(objective)}`);
+  save(paused);
+  expect(preview.verify).toThrow('changed');
+  await load('question');
+  expect(opening()).not.toContain('active_goal=');
+  save({ ...active, sessionCreatedAt: '2026-10-27T00:00:00.000Z' });
+  await load('question');
+  expect(opening()).not.toContain('active_goal=');
+  save({ ...active, workspace: { ...active.workspace, identity: 'retired-directory' } });
+  await load('question');
+  expect(opening()).not.toContain('active_goal=');
+
+  wire.mockClear();
+  save({ phase: 'active' });
+  await expect(load('question')).rejects.toThrow('Saved goal is invalid.');
+  expect(wire).not.toHaveBeenCalled();
 });
 
 it('previews the admitted cache retention and endpoint capabilities without dispatch', async () => {
@@ -953,7 +985,7 @@ it.each([
   expect(preview.estimate.identity.schemaDigest).toBe(requestIdentity(actual.currentOverhead()).schemaDigest);
   expect(preview.estimate.identity.systemDigest).toBe(requestIdentity(actual.currentOverhead()).systemDigest);
   const actualMessages = [openingMessage({ workspaceRoot: cwd, permissionScope: 'ask', prompt: expectedPrompt,
-    continuityContext: capturedSession.continuityContextFor(expectedPrompt), goalObjective: capturedSession.goalObjective })];
+    continuityContext: capturedSession.continuityContextFor(expectedPrompt) })];
   const actualBody = endpoints.endpointTurnBody(endpoint, { ...wireInput, messages: actualMessages,
     systemPrompt: actual.currentOverhead().systemPrompt!, tools: toolSchemas(actual.currentTools()) });
   expect(preview.estimate.tokens).toBe(estimateWirePrompt(actualBody, endpoints.endpointShape(endpoint).contextFields));
@@ -1475,7 +1507,6 @@ it('keeps preview and dispatch on the session-affine account-pool member', async
       workspaceRoot: cwd,
       workspaceRoots: session.workspaceRoots,
       permissionScope: 'ask',
-      goalObjective: captured.goalObjective,
       continuityContext: captured.continuityContextFor('question'),
       prompt: injected.prompt,
     })], signal, {}, { allowTools: true, onRequestSent: sent => { acceptedPromptIdentity = sent.promptIdentity; } });
@@ -1663,7 +1694,7 @@ it.each(previewDispatchCases)(
     };
     try {
       const run = runTurn({ sessionId: session.id, workspaceRoot: cwd, history: [], prompt, agentMode, permissionScope: 'ask',
-        continuityContext: captured.continuityContextFor(prompt), goalObjective: captured.goalObjective,
+        continuityContext: captured.continuityContextFor(prompt),
         step, tools: new Map([['read', readTool]]), maxSteps: maxTurns, onMessage: vi.fn(), signal: new AbortController().signal,
         hooks: { dispatch: async () => ({ decision: 'allow' }) } as unknown as HookDispatcher });
       for await (const _event of run.events) { /* Drain the real step lifecycle. */ }

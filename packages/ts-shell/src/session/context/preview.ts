@@ -2,7 +2,7 @@ import path from 'node:path';
 import { projectSessionFileLayout } from '../store/sessionFileLayout.js';
 import { readSessionFileVersion } from '../store/version.js';
 import { readSessionRecordSnapshotAsync } from '../store/sessionStore.js';
-import type { BoundSessionHost } from '../store/contract.js';
+import type { BoundSessionHost, BoundSessionScope } from '../store/contract.js';
 import type { Session } from '../schema/sessionRecord.js';
 import { captureWorkspaceRoot, assertWorkspaceRoot } from '../../core/workspace/roots.js';
 import { normalizeLegacyPermissionWorkingMemory } from '../continuation/projectRootRebaseProjection.js';
@@ -11,7 +11,6 @@ import { buildRecoverySnapshotForSession } from '../recovery/sessionRecoveryRunt
 import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from '../approval/sessionApprovalMemory.js';
 import { buildSessionResumeContext } from '../continuation/sessionPromptContinuity.js';
 import { historyDigest } from '../../context/request/identity.js';
-import { decodeGoal, goalMatchesScope } from '../../planning/goal/codec.js';
 import { directoryIdentity } from '../store/bound.js';
 
 /** Small, complete read only. Larger histories remain unknown rather than truncated. */
@@ -56,12 +55,9 @@ export async function readPromptPreview(host: BoundSessionHost, expected: Sessio
     recoverySnapshot: buildRecoverySnapshotForSession({ sessionId: session.id, session, state: normalized, transcriptEvents: events }),
     transcriptEvents: events, approvalHistoryLimit: SESSION_APPROVAL_AUDIT_HISTORY_LIMIT });
   verify();
-  const scope = { sessionId: session.id, sessionCreatedAt: session.createdAt,
+  const scope: BoundSessionScope = { sessionId: session.id, sessionCreatedAt: session.createdAt,
     workspace: { path: root.path, identity: root.identity } };
-  const goal = state.goal === undefined ? undefined : decodeGoal(state.goal);
-  if (state.goal !== undefined && !goal) throw new Error('Saved goal is invalid.');
   return { session, state, scope, directoryIdentity: capturedDirectoryIdentity,
-    goalObjective: goal && goalMatchesScope(goal, scope) && goal.phase === 'active' ? goal.objective : undefined,
     continuityContextFor: (currentPrompt: string) => buildSessionResumeContext({ currentPrompt, snapshot: continuity }),
     continuityContext: buildSessionResumeContext({ currentPrompt: prompt, snapshot: continuity }), verify };
 }

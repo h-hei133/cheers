@@ -56,9 +56,13 @@ it('fences context selection and workspace roots before disk publication', async
   expect(() => roots.verify()).toThrow('changed');
 });
 
-it('rejects malformed goals from the bounded snapshot', async () => {
+it('captures feature-owned state and fences later replacement', async () => {
   const { session, host, layout } = fixture();
-  const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8')); state.goal = { phase: 'active' };
+  const state = JSON.parse(fs.readFileSync(layout.statePath, 'utf8'));
+  const goal = { phase: 'active' };
+  fs.writeFileSync(layout.statePath, JSON.stringify({ ...state, goal }));
+  const preview = await readPromptPreview(host, session, root, 'question');
+  expect(preview.state.goal).toEqual(goal);
   fs.writeFileSync(layout.statePath, JSON.stringify(state));
-  await expect(readPromptPreview(host, session, root, 'question')).rejects.toThrow('goal');
+  expect(preview.verify).toThrow('changed');
 });
