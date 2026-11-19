@@ -8,6 +8,12 @@ import { sessionModelCatalog } from '../../catalog/models.js'
 import type { CatalogModel, CatalogProvider } from '../../models/catalog.js'
 import { loadCatalog, writeCatalogCache } from '../../models/catalogStore.js'
 import { createCodemodeToolDefinition } from './tool.js'
+import { imageGenerationTool } from '../../../cli/provider/media.js'
+import * as media from '../../../provider/request/media.js'
+import { pngImage } from '../../../test-utils/image.js'
+import { adaptTools } from '../../../turn/tools.js'
+import { HookDispatcher } from '../../hooks/hookDispatcher.js'
+import { SessionManager } from '../../../session/SessionManager.js'
 
 type ContextWithCatalog = ToolExecutionContext & {
   readonly modelCatalog?: ReturnType<typeof sessionModelCatalog>
@@ -75,6 +81,57 @@ async function run<T>(code: string, modelCatalog: ReturnType<typeof sessionModel
 }
 
 describe('native model metadata inside the actual script worker', () => {
+  it('gates image generation and forwards verified bytes through the normal script result', async () => {
+    const { id: sessionId } = new SessionManager().createNew(workspace)
+    const physical: readonly CatalogProvider[] = [{
+      id: 'openrouter', label: 'Image fixture', runtime: 'openai-compatible', auth: 'api-key',
+      baseUrl: 'https://openrouter.ai/api/v1', models: [
+        { id: 'fixture-image', modelType: 'image', input: ['text'], output: ['image'] },
+        { id: 'fixture-chat', modelType: 'chat', input: ['text'], output: ['text'] },
+      ],
+    }]
+    const tool = imageGenerationTool({
+      providerMode: 'real', providerCatalog: physical, workspaceRoot: workspace, sessionId,
+      providerCredentialResolution: { provider: 'openai-compatible', expectedEnvVarName: 'FIXTURE_KEY',
+        baseUrl: 'https://openrouter.ai/api/v1', credential: { provider: 'openai-compatible', source: 'cli',
+          authMode: 'api-key', apiKey: 'synthetic fixture key', envVarName: 'FIXTURE_KEY' } },
+    })!
+    const png = pngImage(2, 2)
+    const request = vi.spyOn(media, 'requestGeneratedImages').mockResolvedValue([png])
+    const catalog = new Map([[tool.name, tool]])
+    const modelCatalog = sessionModelCatalog(workspace, sessionId, physical)
+    const host: ToolExecutionContext = { workspaceRoot: workspace, sessionId,
+      taskId: 'script-image-owner', modelCatalog, toolCatalog: catalog }
+    const script = createCodemodeToolDefinition(() => catalog)
+    const args = { code: `const model = models.get('openrouter', 'fixture-image');
+      await image(await models.generateImages(model, {prompt:'Blue squares'}));` }
+    const unavailable = await script.execute(args, host)
+    expect(unavailable).toMatchObject({ success: false, error: expect.stringContaining('unavailable') })
+    expect(request).not.toHaveBeenCalled()
+
+    catalog.set(script.name, script)
+    const runWithApproval = (decision: 'deny' | 'allow-once') => {
+      const approval = vi.fn(async (prompt: { readonly id: string }) => ({ promptId: prompt.id, decision, respondedAt: Date.now() }))
+      const adapted = adaptTools(catalog, { workspaceRoot: workspace, sessionId, modelCatalog,
+        hooks: new HookDispatcher(), emit() {}, permissionScope: 'ask', escalationPromptHandler: approval })
+        .find(candidate => candidate.name === 'codemode')!
+      return { approval, result: adapted.execute('script-image-owner', args) }
+    }
+    const denied = runWithApproval('deny')
+    const refused = await denied.result
+    expect(refused).toMatchObject({ isError: true })
+    expect(denied.approval, refused.output).toHaveBeenCalledOnce()
+    expect(request).not.toHaveBeenCalled()
+
+    const allowed = runWithApproval('allow-once')
+    await expect(allowed.result).resolves.toMatchObject({ isError: false, images: [png], metadata: {
+      nestedCalls: { calls: [{ name: 'generate_image', status: 'ok' }], complete: true },
+    } })
+    expect(allowed.approval).toHaveBeenCalledOnce()
+    expect(request).toHaveBeenCalledOnce()
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ model: 'fixture-image', prompt: 'Blue squares' }))
+  })
+
   it('uses the captured physical and virtual catalogue despite ambient replacements', async () => {
     const { modelCatalog, published, route } = catalogueFixture()
     const code = `return { all: models.list(), physical: models.list('fixture'),

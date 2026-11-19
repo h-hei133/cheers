@@ -56,6 +56,7 @@ import { assertAdmission, admittedFetch, type Admission } from '../core/network/
 import { decodeWorkspaceRoots, type WorkspaceRoot } from '../core/workspace/model.js';
 import type { RequestPolicy } from '../core/agent/request/model.js';
 import { createProviderStep, delegatedSteps, providerToolsAvailable } from '../cli/provider/step.js';
+import { imageGenerationTool } from '../cli/provider/media.js';
 import { scopedRuntimeConfig, assertScopedModel } from '../config/scope/projection.js';
 import { credentialBlockMessage } from '../core/shell/providerCredentials.js';
 import { scopeAdmission } from '../config/scope/admission.js';
@@ -344,8 +345,10 @@ async function startTurn(
     text:request.effectiveInput ?? request.prompt, images:request.attachments?.images, signal:request.signal});
   const hooks = admittedHooks ?? prepareSessionHooks({workspaceRoot:request.workspaceRoot, admission:request.admission,
     escalationPromptHandler:request.escalationPromptHandler, allowUntrustedHooks:request.runtimeConfig?.allowUntrustedHooks}, dependencies.hooks);
+  const imageTool = imageGenerationTool(request);
   const { tools, discovery, promptContext, currentOverhead } = await preparePromptRequest({
-    ...request, toolsAvailable: providerToolsAvailable(request),
+    ...request, ...(imageTool ? { featureTools: [...request.featureTools ?? [], imageTool] } : {}),
+    toolsAvailable: providerToolsAvailable(request),
   }, dependencies.tools);
   let runtimePromptIdentity = request.readPromptIdentity?.();
   const publishPromptIdentity = (identity?: PromptIdentitySnapshot): void => {

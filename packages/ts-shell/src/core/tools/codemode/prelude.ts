@@ -214,6 +214,13 @@ const bootstrap = new vm.Script(\`
       ? Object.freeze(modelsCatalog.filter(m => m.provider === String(provider)))
       : modelsCatalog,
     get: (provider, id) => modelsCatalog.find(m => m.provider === String(provider) && m.id === String(id)) ?? null,
+    async generateImages(model, input) {
+      if (!model || !modelsCatalog.includes(model) || model.provider !== 'openrouter' || model.modelType !== 'image') {
+        throw new Error('models.generateImages requires a supported catalogue image model.');
+      }
+      if (!input || typeof input.prompt !== 'string') throw new Error('models.generateImages requires a text prompt.');
+      return rpc('generateImages', { model: model.id, prompt: input.prompt });
+    },
   });
   globalThis.exit = () => { throw new ExitSignal(); };
 

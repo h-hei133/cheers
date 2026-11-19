@@ -63,7 +63,7 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
   return {
     name: CODEMODE_TOOL_NAME,
     description:
-      'Run JavaScript in an isolated sandbox to compose, batch (Promise.allSettled), chain, and filter tool calls in a single turn. Globals: `await tools.<name>(args)`, `ALL_TOOLS`, `text(value)`, `await image(dataUriOrObj)`, `console.log(...)`, `store(key, value)` / `load(key)` (branch-scoped), `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`, `models.list()` / `models.get(provider, id)`, `exit()`, and top-level `return`.',
+      'Run JavaScript in an isolated sandbox to compose, batch (Promise.allSettled), chain, and filter tool calls in a single turn. Globals: `await tools.<name>(args)`, `ALL_TOOLS`, `text(value)`, `await image(dataUriOrObj)`, `console.log(...)`, `store(key, value)` / `load(key)` (branch-scoped), `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`, `models.list()` / `models.get(provider, id)`, `await models.generateImages(model, { prompt })` for admitted image models, `exit()`, and top-level `return`.',
     argsSchema: {
       type: 'object',
       additionalProperties: false,
@@ -135,6 +135,11 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
         try {
           if (op === 'call') {
             return { ok: true, json: JSON.stringify(await runner.call(String(payload.name ?? ''), payload.args)),
+              ...(runner.terminate ? { terminate: true } : {}) }
+          }
+          if (op === 'generateImages') {
+            if (!context.executeNestedTool || !catalog.has('generate_image')) throw new Error('Image generation is unavailable in this script.');
+            return { ok: true, json: JSON.stringify(await runner.call('generate_image', { model: payload.model, prompt: payload.prompt })),
               ...(runner.terminate ? { terminate: true } : {}) }
           }
           if (op === 'searchTools') {

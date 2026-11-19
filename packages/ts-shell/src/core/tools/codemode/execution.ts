@@ -7,9 +7,11 @@ export interface ScriptOutcome {
   readonly terminate?: boolean
 }
 
+const SCRIPT_OPERATIONS = ['call', 'searchTools', 'describeTool', 'describeNamespace', 'image', 'generateImages'] as const
+
 export interface ScriptRpc {
   readonly id: number
-  readonly op: 'call' | 'searchTools' | 'describeTool' | 'describeNamespace' | 'image'
+  readonly op: typeof SCRIPT_OPERATIONS[number]
   readonly payload: Record<string, unknown>
 }
 
@@ -41,7 +43,7 @@ function request(json: string): ScriptRpc {
   if (json.length > 6 * 1024 * 1024) throw new Error('BridgeError: RPC request exceeds the buffer limit.')
   const parsed: unknown = JSON.parse(json)
   if (!object(parsed) || !Number.isSafeInteger(parsed.id) || (parsed.id as number) < 1
-    || typeof parsed.op !== 'string' || !['call', 'searchTools', 'describeTool', 'describeNamespace', 'image'].includes(parsed.op)
+    || !SCRIPT_OPERATIONS.some(operation => operation === parsed.op)
     || !object(parsed.payload)) throw new Error('BridgeError: malformed RPC request payload.')
   return parsed as unknown as ScriptRpc
 }

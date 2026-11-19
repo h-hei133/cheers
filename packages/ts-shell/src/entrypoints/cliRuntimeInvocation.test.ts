@@ -113,6 +113,31 @@ function dependencies(): { deps: CliRuntimeInvocationDependencies; calls: string
 }
 
 describe("CLI runtime invocation", () => {
+  it.each([
+    { address: 'https://openrouter.ai/api/v1', eligible: true },
+    { address: 'https://relay.invalid/v1', eligible: false },
+  ])('only offers image generation for its exact provider binding ($eligible)', async ({ address, eligible }) => {
+    const { deps } = dependencies();
+    const step = vi.fn<NonNullable<CliRuntimeInvocationDependencies['createStep']>>((_request, tools) => {
+      const tool = tools.get('generate_image');
+      if (eligible) expect(tool?.argsSchema.properties).toMatchObject({ model: { enum: ['fixture-image'] } });
+      else expect(tool).toBeUndefined();
+      return async () => ({ text: 'done', stopReason: 'stop', toolCalls: [] });
+    });
+    const result = await runCliRuntimeInvocation(baseInput({
+      providerCatalog: [{ id: 'openrouter', label: 'Fixture', runtime: 'openai-compatible', auth: 'api-key',
+        baseUrl: 'https://openrouter.ai/api/v1', models: [
+          { id: 'fixture-chat', input: ['text'], output: ['text'] },
+          { id: 'fixture-image', modelType: 'image', input: ['text'], output: ['image'] },
+        ] }],
+      providerCredentialResolution: { ...providerCredentialResolution, provider: 'openai-compatible',
+        baseUrl: address, model: 'fixture-chat', credential: { ...providerCredentialResolution.credential!,
+          provider: 'openai-compatible', model: 'fixture-chat' } },
+    }), { ...deps, createStep: step });
+    await collect(result.events);
+    expect(step).toHaveBeenCalledOnce();
+  });
+
   it("binds compaction measurements to the effective schema and system prompt", () => {
     const compaction = {
       policy: { contextWindow: 10_000 },
