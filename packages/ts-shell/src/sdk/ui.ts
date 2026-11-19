@@ -17,9 +17,10 @@ interface RetainedUi {
 export class SessionUi {
   private retained?: RetainedUi;
   private closed = false;
-  private readonly retireRefresh: () => void;
+  private reloading = false;
+  private retireRefresh: () => void;
 
-  constructor(private readonly context: ShellRuntimeContext, private readonly shared: ExtensionHostBridge | undefined) {
+  constructor(private readonly context: ShellRuntimeContext, private shared: ExtensionHostBridge | undefined) {
     this.retireRefresh = bindExtensionUiRefreshFor(context, () => { this.current(); });
   }
 
@@ -46,6 +47,20 @@ export class SessionUi {
   }
 
   dispose(): void { this.closed = true; this.retireRefresh(); this.release(); }
+
+  /** Intentional host retirement keeps only the caller's still-live UI lease. */
+  beginReload(): void { this.reloading = true; }
+
+  rebind(shared: ExtensionHostBridge): void {
+    if (this.closed) throw new Error('Agent session is disposed.');
+    this.retireRefresh();
+    this.shared = shared;
+    this.reloading = false;
+    this.retireRefresh = bindExtensionUiRefreshFor(this.context, () => { this.current(); });
+    if (this.retained) this.install(this.retained);
+  }
+
+  abandonReload(): void { this.reloading = false; this.release(); }
 
   private admitted(retained: RetainedUi): boolean {
     try { return !this.closed && this.retained === retained && !retained.admission(); }
@@ -80,7 +95,7 @@ export class SessionUi {
       retained.release = undefined;
       // Publication aborts before its new state is installed. Renewal waits
       // for a fresh call; explicit replacement and binding retirement do not.
-      if (!background.aborted || !this.admitted(retained)) this.release(retained);
+      if (!this.reloading && (!background.aborted || !this.admitted(retained))) this.release(retained);
     });
     if (!retired) retained.release = release;
   }

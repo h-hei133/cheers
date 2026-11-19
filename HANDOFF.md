@@ -2904,3 +2904,13 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Source tests pass while a compiled worker cannot run its serialized capture function, or an isolated callback receives a host-owned object or error.
 - **Root cause:** Bundlers add naming decorators to function bodies serialized with toString; sharing a decoder can also return host objects through a VM bridge. Before-event reducers otherwise discard custom fields or replace the original envelope.
 - **Rule:** Give serialized capture factories explicit dependencies and verify the compiled public worker. Keep bridge replies primitive on success and failure, capture inert data before serialization, and reduce tree fields separately from the immutable event at each script and contribution boundary. Malformed overrides refuse before provider acquisition or durable writes.
+
+### Guarded Resource Reload Needs Publication Identity And Original Cleanup Owners
+- **Symptom:** A reload adopts old resources after an external reload/release, changes file-supplied tool authority, or disposal closes a synchronous successor installed by cancellation.
+- **Root cause:** Retirement erases active generation identity; callbacks run before the caller source and cleanup owner are captured; a generated SDK allowlist is treated as independent outer authority.
+- **Rule:** Retain the last publication identity across release and require an explicit single-use reload reservation. Publish the locally captured candidate before predecessor abort and keep it unbound until its receipt adopts the new host. Capture source, shutdown and close owners before callbacks, then recheck exact identity after waits. Recompute SDK names through independent current config restrictions and keep saved state/history pinned while allowing bounded startup reports.
+
+### Resource Snapshots And Startup Queues Need Their Own Stable Receipts
+- **Symptom:** Caller mutations change a published skill or diagnostic, a legacy bind exposes partially loaded resources, or idle returns after one startup message and loses an earlier failure.
+- **Root cause:** Only snapshot arrays are frozen, native Map mutation remains reachable, and queue settlement borrows a single ambient Promise or replaces failed receipts with later successes.
+- **Rule:** Capture inert resource records and registration membership before the next callback or await, retaining original callable capabilities and signals. Use a true readonly map view with native callback semantics; opaque module exports stay outside the data-freeze guarantee. Join all queued submissions and retain the original failure independently of later success. Keep cancellation and exact retirement on the original owner.

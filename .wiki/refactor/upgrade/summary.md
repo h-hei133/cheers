@@ -1,10 +1,14 @@
 # 规划执行进展（2026-11-19）
 
-本轮接续已核实任务，完成 E.6 的 kernel结算、实际startup／shutdown、树导航、CLI replacement、initial input/UI readiness、controlled CLI reload及before-tree定制摘要子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
+本轮接续已核实任务，完成 E.6 的 kernel结算、实际startup／shutdown、树导航、CLI replacement、initial input/UI readiness、controlled CLI reload、before-tree定制摘要及SDK controlled reload子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
 
 核查与取舍见[工程记录](design.md)，当前验收和次序见[任务清单](tasks.md)。源码按批本地提交。远端推送和本轮 CI 尚未发生。原定暂缓的原生插件与独立桌面产品不计入 62 项，T6 保留按需求开启。
 
 ## 当前批次的验证
+
+SDK现公开reload()，沿原commands与extension lifecycle协调关闭／退休、captured loader reservation与完整snapshot、新shared host／UI绑定和start；保留same session及saved state/selection/transcriptprefix，仅bounded startup reports允许。独立复审实际反例修复file/explicit工具限制、队列多消息与失败结算、oldowner关闭、snapshot别名/Map与controlledbind、capture同步重入。最终16文件309项、七门／2747modules／0monoliths、buildf83dd7313313和两限定APPROVE/hash通过；13有效反转15AssertionErrors／1redundant control／exact恢复105项。Linuxcompiled/Node20.3禁生成/installed各8场景2POST，15公开入口strict NodeNext/skipLibCheck=false/engine-strictpassed；报告readback、lateinput、取消及partial均验证。opaque moduleexports保原capability引用，明确不属metadata冻结。normalpinnedjudge实际exit2/not_proven，未新增配置模型调用。[当前交付](../../../.omx/artifacts/upgrade-sdk-reload-2026-11-19/delivery.json)。其余input/message/tool/compaction事件结果继续，整项E.6仍部分。
+
+以下before-tree摘要已提交e27ef805，证据保留原source范围。
 
 before-tree现分别合并摘要／追加或替换指令与单调取消，原event保持不可变；供给摘要沿原branch-note持久化且零默认摘要请求，零abandoned turns也保留。非法／空／超限结果拒绝provider和写入，file／installed worker使用同inert decoder与primitive桥。11文件255项、七门／2733modules／0monoliths通过；TypeScript narrowing调整后40影响项和build9018502b116fpassed，10有效反转10AssertionErrors／exact恢复96项与限定APPROVE/hash核对。Linuxcompiled／Node20.3禁生成／installed各8场景12POST，15strict公开入口／skipLibCheck=falsepassed；三Worker场景是public ExtensionService fixture record消费者资格，不冒充marketplace批准。默认judge实际exit2/not_proven，未新增配置模型调用。[当前交付](../../../.omx/artifacts/upgrade-tree-2026-11-19/delivery.json)。SDK controlled reload及其余input/message/tool/compaction结果消费者继续，E.6整项保持部分。
 

@@ -15,7 +15,7 @@ import { pluginCommand } from '../../extensions/command/plugin.js';
 import { extensionManager, type ExtensionRun } from '../../extensions/view/manager.js';
 import type { ExtensionManager } from '../../extensions/view/model.js';
 import type { SessionManager } from '../../session/SessionManager.js';
-import { cancelExtensionUiFor, closeExtensionHost, installExtensionHost } from './extensions/host.js';
+import { cancelExtensionUiFor, closeExtensionHost, extensionHostFor, installExtensionHost } from './extensions/host.js';
 import { runExtensionInvocation } from '../../extensions/runtime/context.js';
 import { runEventHandlers } from '../../extensions/events/dispatch.js';
 import type { CoreMcpGateway } from '../../core/mcp/gateway.js';
@@ -27,10 +27,12 @@ export { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
 interface ExtensionRuntime {
   readonly service: () => ExtensionService; readonly ready: () => Promise<void>; readonly close: () => Promise<void>; readonly cancel: () => Promise<readonly string[]>; readonly run: ExtensionRun;
   readonly start: (reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason'], signal?: AbortSignal) => Promise<void>;
-  readonly shutdown: (reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason'], settle?: () => Promise<void>) => Promise<void>;
-  readonly replace: () => Promise<void>;
+  readonly shutdown: (reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason'], settle?: () => Promise<void>, signal?: AbortSignal) => Promise<void>;
+  readonly replace: (signal?: AbortSignal) => Promise<ExtensionHostBridge>;
   readonly retire: () => Promise<void>;
   readonly reload: (signal?: AbortSignal) => Promise<ExtensionReloadResult>;
+  readonly current: () => boolean;
+  readonly diagnostics: () => readonly string[];
 }
 const runtimes = new WeakMap<ShellRuntimeContext, ExtensionRuntime>();
 export function installExtensionRuntime(context: ShellRuntimeContext, runtime: ShellSessionRuntime, gate: (tool?: string) => ToolGateOptions, store?: SessionManager,
@@ -60,25 +62,30 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
     identity = undefined;
   });
   const rebind = async (signal?: AbortSignal) => {
-    if (closed || retiredUnknown || service || retiring.size > 0) throw new Error('Extension retirement must complete before replacement.');
+    if (closed || runtimes.get(context) !== bound || retiredUnknown || service || retiring.size > 0) throw new Error('Extension retirement must complete before replacement.');
     closing = false;
     retirement = undefined;
-    runtimes.get(context)!.service();
+    bound.service();
     const controller = initialization;
+    const candidate = ownedHost!, prepared = ready;
     const cancel = () => controller?.abort();
     signal?.addEventListener('abort', cancel, { once: true });
     if (signal?.aborted) cancel();
-    try { await ready; signal?.throwIfAborted(); }
+    try {
+      await prepared; signal?.throwIfAborted();
+      if (closed || runtimes.get(context) !== bound || ownedHost !== candidate || extensionHostFor(context) !== candidate) throw new Error('Extension replacement owner changed.');
+      return candidate;
+    }
     finally { signal?.removeEventListener('abort', cancel); }
   };
   const bound: ExtensionRuntime = { run: operation => runtime.commands.run(operation), ready: () => ready,
     start: (reason, signal) => lifecycle!.start(() => ready, reason, signal),
-    shutdown: (reason, settle) => { closing = true; return lifecycle!.shutdown(settle ?? (() => runtime.cancelAndWait()), reason); },
+    shutdown: (reason, settle, signal) => { closing = true; return lifecycle!.shutdown(settle ?? (() => runtimes.get(context) === bound ? runtime.cancelAndWait() : Promise.resolve()), reason, signal); },
     replace: rebind,
     retire,
     cancel: async () => {
       const command = runtime.commands.current;
-      if (command?.kind === 'extension-reload') {
+      if (runtimes.get(context) === bound && command?.kind === 'extension-reload') {
         command.controller.abort();
         const result = await command.settled as ExtensionReloadResult;
         return 'reason' in result ? [result.reason] : result.diagnostics;
@@ -91,7 +98,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
     }, close: async () => {
     closed = true;
     const command = runtime.commands.current;
-    if (command?.kind === 'extension-reload') command.controller.abort();
+    if (runtimes.get(context) === bound && command?.kind === 'extension-reload') command.controller.abort();
     closeExtensionHost(context, ownedHost);
     await retire();
   }, service: () => {
@@ -127,11 +134,11 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
       });
     }
     return service;
-  }, reload: createExtensionReload(context, runtime, {
+  }, current: () => !closed && runtimes.get(context) === bound, diagnostics: () => service?.errors ?? [], reload: createExtensionReload(context, runtime, {
     current: () => !closed && runtimes.get(context) === bound,
     ready: () => ready,
     shutdown: signal => { closing = true; return lifecycle!.shutdown(async () => {}, 'reload', signal); },
-    retire, replace: rebind,
+    retire, replace: async signal => ({ host: await rebind(signal) }),
     start: signal => lifecycle!.start(() => ready, 'reload', signal),
     diagnostics: () => service?.errors ?? [],
   }) };
@@ -240,6 +247,10 @@ export function shutdownExtensionsFor(context: ShellRuntimeContext, reason: Extr
 /** Explicit replacement reuses the installed runtime, its resource retirement and initialization owners. */
 export async function replaceExtensionsFor(context: ShellRuntimeContext): Promise<void> {
   await runtimes.get(context)?.replace();
+}
+/** Capture the original resource owner before reload schedules its first await. */
+export function captureExtensionRuntimeFor(context: ShellRuntimeContext): Pick<ExtensionRuntime, 'current' | 'ready' | 'shutdown' | 'retire' | 'replace' | 'start' | 'diagnostics' | 'close'> | undefined {
+  return runtimes.get(context);
 }
 /** Join the original resources while its session is still published. */
 export async function retireExtensionsFor(context: ShellRuntimeContext): Promise<void> {

@@ -1,0 +1,55 @@
+{
+  "status": "APPROVE",
+  "scopeLimited": true,
+  "validationRunByReviewer": false,
+  "reviews": {
+    "consumer": {
+      "status": "APPROVE",
+      "sourceOnly": true,
+      "validationRunByReviewer": false,
+      "agent": "events_review",
+      "scope": "SDK reload consumers, shared coordinator, UI, policy and queue; loader reviewed independently",
+      "source": {
+        "packages/ts-shell/src/sdk/agentSession.ts": "1c243ac9892ee9ebdde2b6a0a84603af0724c90780c3c6f215c3a59692b9a770",
+        "packages/ts-shell/src/sdk/ui.ts": "829520341e393dde8d1cb2d8a1a4e657f9a9695488c94f7cd906accaab9e2e49",
+        "packages/ts-shell/src/sdk/resources/reload.ts": "8ebe567b2f20e3ffec1f6b6272d8ea63dfdc45f51d654e629a72009d107bf162",
+        "packages/ts-shell/src/sdk/resources/policy.ts": "14e7e3cefa60b4d4a325c7f742e07a9e5931e63a77984be844deb3d6d139f4cf",
+        "packages/ts-shell/src/sdk/resources/projection.ts": "06cb706e97a57f642c7bbc51ec353192b08bb6cd6cef9cc39241da4e3de559bc",
+        "packages/ts-shell/src/sdk/resources/catalog.ts": "2522c34b69af300dbcb59a163c4e706f49db4b9204a3a5361b04028b56feb22d",
+        "packages/ts-shell/src/sdk/resources/submission.ts": "e7723a29a115cce135f12e4f2127237e3ebd7b4155889c9b16e342bd750cd4e4",
+        "packages/ts-shell/src/cli/runtime/extensions.ts": "0ca2c33e5c15b0abf2e142a7d4e9954e927402f4f351728f49acd4d35af798ab",
+        "packages/ts-shell/src/cli/runtime/extensions/reload.ts": "0f1186ff73c72e0dd8bdaffd1f5323abda8f153f657c71ca27671231ee74c175",
+        "packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts": "402a7d89ef6589482af03f2a1ef0d8c834e04f27207f44c7927d2a035056c1a8",
+        "packages/ts-shell/src/core/shell/runtimeContext.ts": "0a998319b4f03b18869e81b23ef1f5752fab812b9c40620cea52e2500bebef50",
+        "packages/ts-shell/src/index.ts": "91d974c26d4abdb163a6fbf608ac7a58cedbf22a3cbc83426a874a58388d4bed"
+      },
+      "hashesMatch": true,
+      "fullE6Accepted": false
+    },
+    "loader": {
+      "status": "APPROVE",
+      "agent": "cache_boundary_review",
+      "sourceOnly": true,
+      "validationRunByReviewer": false,
+      "scope": "SDK loader generation, collection and captured resource metadata only",
+      "source": {
+        "packages/ts-shell/src/sdk/resourceLoader.ts": "c3718e98f54f7cfe90df70f4bded8ee44adfabc05606005c4fb1435b7dbc4f26",
+        "packages/ts-shell/src/sdk/resources/contract.ts": "2427cd83c34f342f9f03b37ade06569247694f904455202dabea0b3196b4b56e",
+        "packages/ts-shell/src/sdk/resources/generation.ts": "75c7ac504e8e2221b3bc79b525ab0aacf96683be63a5d6ba1fc3703e1a3d83a5",
+        "packages/ts-shell/src/sdk/resources/lease.ts": "c507c2b1954eb4dc8ad08004a0f0ee0ccabafc7274953b12c7b088ec0dbffd0a",
+        "packages/ts-shell/src/sdk/resources/collection.ts": "1d5c2add02e324b601bb2905318abdc22e608c666469948f24ccebd6088b29ea",
+        "packages/ts-shell/src/sdk/resources/host.ts": "368f075066ab2272b2cc8700c2af4f8cc2bd1a689fb7ca3882d1ced676daf532",
+        "packages/ts-shell/src/sdk/resources/data.ts": "a31980f9c64df63e65343393194982cc66d30db8c3fadeceb6f65eb52083f0c6",
+        "packages/ts-shell/src/sdk/resources/extension.ts": "7e3c5eac7efaaf9a67bd5e8895672e5426cd3dfc330111d1208079ae9d081151",
+        "packages/ts-shell/src/sdk/resources/snapshot.ts": "59e8abfe05f76dc65d83eb5df1329bdf45ee903ed7e0803ae8d0f9183919493c"
+      },
+      "bundleSha256": "45ddac9c8c7e355cd29cd6dadac430b14743233a36ec732853b26c30d80fcbac",
+      "expectedBundleSha256": "45ddac9c8c7e355cd29cd6dadac430b14743233a36ec732853b26c30d80fcbac",
+      "hashesMatch": true,
+      "boundaries": [
+        "Opaque module exports remain a captured executable capability outside immutable metadata",
+        "No consumer or non-Linux approval"
+      ]
+    }
+  }
+}

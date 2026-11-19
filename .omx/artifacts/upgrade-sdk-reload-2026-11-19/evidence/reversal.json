@@ -1,0 +1,279 @@
+{
+  "status": "passed",
+  "source": {
+    "packages/ts-shell/src/sdk/reload.test.ts": "e47f4d411ad0998c2fe89e121f19b3b149d3a5cf8bf65612d98d8f81d2f978de",
+    "packages/ts-shell/src/sdk/resources/catalog.ts": "2522c34b69af300dbcb59a163c4e706f49db4b9204a3a5361b04028b56feb22d",
+    "packages/ts-shell/src/sdk/resources/collection.ts": "1d5c2add02e324b601bb2905318abdc22e608c666469948f24ccebd6088b29ea",
+    "packages/ts-shell/src/sdk/resources/contract.ts": "2427cd83c34f342f9f03b37ade06569247694f904455202dabea0b3196b4b56e",
+    "packages/ts-shell/src/sdk/resources/data.ts": "a31980f9c64df63e65343393194982cc66d30db8c3fadeceb6f65eb52083f0c6",
+    "packages/ts-shell/src/sdk/resources/extension.ts": "7e3c5eac7efaaf9a67bd5e8895672e5426cd3dfc330111d1208079ae9d081151",
+    "packages/ts-shell/src/sdk/resources/generation.test.ts": "c237792d7e3484b0a48f85365e8d1f686ddbed1b4d0db0fb64b51d046c7d628c",
+    "packages/ts-shell/src/sdk/resources/generation.ts": "75c7ac504e8e2221b3bc79b525ab0aacf96683be63a5d6ba1fc3703e1a3d83a5",
+    "packages/ts-shell/src/sdk/resources/host.ts": "368f075066ab2272b2cc8700c2af4f8cc2bd1a689fb7ca3882d1ced676daf532",
+    "packages/ts-shell/src/sdk/resources/lease.ts": "c507c2b1954eb4dc8ad08004a0f0ee0ccabafc7274953b12c7b088ec0dbffd0a",
+    "packages/ts-shell/src/sdk/resources/policy.ts": "14e7e3cefa60b4d4a325c7f742e07a9e5931e63a77984be844deb3d6d139f4cf",
+    "packages/ts-shell/src/sdk/resources/projection.ts": "06cb706e97a57f642c7bbc51ec353192b08bb6cd6cef9cc39241da4e3de559bc",
+    "packages/ts-shell/src/sdk/resources/reload.ts": "8ebe567b2f20e3ffec1f6b6272d8ea63dfdc45f51d654e629a72009d107bf162",
+    "packages/ts-shell/src/sdk/resources/snapshot.ts": "59e8abfe05f76dc65d83eb5df1329bdf45ee903ed7e0803ae8d0f9183919493c",
+    "packages/ts-shell/src/sdk/resources/submission.ts": "e7723a29a115cce135f12e4f2127237e3ebd7b4155889c9b16e342bd750cd4e4",
+    "packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts": "402a7d89ef6589482af03f2a1ef0d8c834e04f27207f44c7927d2a035056c1a8",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "0ca2c33e5c15b0abf2e142a7d4e9954e927402f4f351728f49acd4d35af798ab",
+    "packages/ts-shell/src/cli/runtime/extensions/reload.test.ts": "4ff830fe10239736872d76a62e152f81dfe87b31462e6e224543214ab77b4ed3",
+    "packages/ts-shell/src/cli/runtime/extensions/reload.ts": "0f1186ff73c72e0dd8bdaffd1f5323abda8f153f657c71ca27671231ee74c175",
+    "packages/ts-shell/src/core/shell/runtimeContext.ts": "0a998319b4f03b18869e81b23ef1f5752fab812b9c40620cea52e2500bebef50",
+    "packages/ts-shell/src/index.ts": "91d974c26d4abdb163a6fbf608ac7a58cedbf22a3cbc83426a874a58388d4bed",
+    "packages/ts-shell/src/sdk/agentSession.ts": "1c243ac9892ee9ebdde2b6a0a84603af0724c90780c3c6f215c3a59692b9a770",
+    "packages/ts-shell/src/sdk/resourceLoader.ts": "c3718e98f54f7cfe90df70f4bded8ee44adfabc05606005c4fb1435b7dbc4f26",
+    "packages/ts-shell/src/sdk/ui.ts": "829520341e393dde8d1cb2d8a1a4e657f9a9695488c94f7cd906accaab9e2e49"
+  },
+  "cases": [
+    {
+      "name": "guarded-loader",
+      "file": "sdk/resources/reload.ts",
+      "originalSha256": "8ebe567b2f20e3ffec1f6b6272d8ea63dfdc45f51d654e629a72009d107bf162",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-guarded-loader.log",
+      "logSha256": "4769c3ddc8199d22f5f709a4abfc50ee227ab5b8d8a6473edb622b5cd1c861da",
+      "terminalTests": "1 failed | 1 passed | 38 skipped (40)"
+    },
+    {
+      "name": "empty-projection",
+      "file": "sdk/resources/projection.ts",
+      "originalSha256": "06cb706e97a57f642c7bbc51ec353192b08bb6cd6cef9cc39241da4e3de559bc",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-empty-projection.log",
+      "logSha256": "c7c816bbfea50b68833db310318bf08526998a825ae7a5f35c941b2826aa1a3d",
+      "terminalTests": "1 failed | 39 skipped (40)"
+    },
+    {
+      "name": "policy",
+      "file": "sdk/resources/reload.ts",
+      "originalSha256": "8ebe567b2f20e3ffec1f6b6272d8ea63dfdc45f51d654e629a72009d107bf162",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-policy.log",
+      "logSha256": "e017d978192dcfd123b59c0851e30ea9c20e0cd8952a809b3085ac5ff08dfae1",
+      "terminalTests": "1 failed | 2 passed | 37 skipped (40)"
+    },
+    {
+      "name": "ui-before-start",
+      "file": "sdk/resources/reload.ts",
+      "originalSha256": "8ebe567b2f20e3ffec1f6b6272d8ea63dfdc45f51d654e629a72009d107bf162",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-ui-before-start.log",
+      "logSha256": "2d6bfc8a059c2a2d5ce2935a233c3ce5a10a7c9284e6f0799cf1d8a6c008a11e",
+      "terminalTests": "1 failed | 39 skipped (40)"
+    },
+    {
+      "name": "caller-release",
+      "file": "sdk/ui.ts",
+      "originalSha256": "829520341e393dde8d1cb2d8a1a4e657f9a9695488c94f7cd906accaab9e2e49",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-caller-release.log",
+      "logSha256": "61cdd66ef0ecd955e6d99a4a1e92518f30427225f1154fe28074ba9516bce21c",
+      "terminalTests": "1 failed | 39 skipped (40)"
+    },
+    {
+      "name": "startup-queue",
+      "file": "sdk/agentSession.ts",
+      "originalSha256": "1c243ac9892ee9ebdde2b6a0a84603af0724c90780c3c6f215c3a59692b9a770",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-startup-queue.log",
+      "logSha256": "0c673896782f9b37dd7fc6eff9382753daf64eac11815de34066e9d0f2a79edb",
+      "terminalTests": "1 failed | 39 skipped (40)"
+    },
+    {
+      "name": "dispose-source",
+      "file": "sdk/agentSession.ts",
+      "originalSha256": "1c243ac9892ee9ebdde2b6a0a84603af0724c90780c3c6f215c3a59692b9a770",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-dispose-source.log",
+      "logSha256": "1a1195975271cf9dda3888aca6a0207881821302528b17c7e90658aeba0a0b76",
+      "terminalTests": "1 failed | 39 skipped (40)"
+    },
+    {
+      "name": "single-use",
+      "file": "sdk/resources/lease.ts",
+      "originalSha256": "c507c2b1954eb4dc8ad08004a0f0ee0ccabafc7274953b12c7b088ec0dbffd0a",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-single-use.log",
+      "logSha256": "da6cb01c67c8666244cad80708ebf544285bcade3c6e6c2dda46ae6891594c57",
+      "terminalTests": "1 failed | 17 skipped (18)"
+    },
+    {
+      "name": "epoch",
+      "file": "sdk/resources/generation.ts",
+      "originalSha256": "75c7ac504e8e2221b3bc79b525ab0aacf96683be63a5d6ba1fc3703e1a3d83a5",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-epoch.log",
+      "logSha256": "e04c57c0db1b342cd7ff69ad58dc6a8de6e87f5534cd537a04971abc7c4aaf69",
+      "terminalTests": "1 failed | 17 skipped (18)"
+    },
+    {
+      "name": "final-admission",
+      "file": "sdk/resources/generation.ts",
+      "originalSha256": "75c7ac504e8e2221b3bc79b525ab0aacf96683be63a5d6ba1fc3703e1a3d83a5",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-final-admission.log",
+      "logSha256": "314d740a76c6a0be6b9b765aefa198c6568dce4f7ca698a6f8a7a1acb3d30b9f",
+      "terminalTests": "1 failed | 17 skipped (18)"
+    },
+    {
+      "name": "saved-source",
+      "file": "sdk/resources/reload.ts",
+      "originalSha256": "8ebe567b2f20e3ffec1f6b6272d8ea63dfdc45f51d654e629a72009d107bf162",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 3,
+      "log": "reversal-saved-source.log",
+      "logSha256": "6ab82ffac9b925858281131075747c884f2799c514e4fb655292547191fcf920",
+      "terminalTests": "3 failed | 37 skipped (40)"
+    },
+    {
+      "name": "snapshot-copy",
+      "file": "sdk/resources/snapshot.ts",
+      "originalSha256": "59e8abfe05f76dc65d83eb5df1329bdf45ee903ed7e0803ae8d0f9183919493c",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-snapshot-copy.log",
+      "logSha256": "492108775d027ff4d5bc3ce91effa26da80ccbb94345870b9de153292d5c0119",
+      "terminalTests": "1 failed | 17 skipped (18)"
+    },
+    {
+      "name": "only-receipt",
+      "file": "sdk/resources/generation.ts",
+      "originalSha256": "75c7ac504e8e2221b3bc79b525ab0aacf96683be63a5d6ba1fc3703e1a3d83a5",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-only-receipt.log",
+      "logSha256": "e170dc033ccc254cf809c4efe64e352971c5859143b97000653c21e27a57caa1",
+      "terminalTests": "1 failed | 17 skipped (18)"
+    }
+  ],
+  "restored": [
+    {
+      "name": "guarded-loader",
+      "exact": true
+    },
+    {
+      "name": "empty-projection",
+      "exact": true
+    },
+    {
+      "name": "policy",
+      "exact": true
+    },
+    {
+      "name": "ui-before-start",
+      "exact": true
+    },
+    {
+      "name": "caller-release",
+      "exact": true
+    },
+    {
+      "name": "startup-queue",
+      "exact": true
+    },
+    {
+      "name": "dispose-source",
+      "exact": true
+    },
+    {
+      "name": "dispose-source",
+      "exact": true
+    },
+    {
+      "name": "single-use",
+      "exact": true
+    },
+    {
+      "name": "single-use",
+      "exact": true
+    },
+    {
+      "name": "epoch",
+      "exact": true
+    },
+    {
+      "name": "final-admission",
+      "exact": true
+    },
+    {
+      "name": "cancel-initializer",
+      "exact": true
+    },
+    {
+      "name": "saved-source",
+      "exact": true
+    },
+    {
+      "name": "snapshot-copy",
+      "exact": true
+    },
+    {
+      "name": "only-receipt",
+      "exact": true
+    }
+  ],
+  "fixtureAdapter": "Isolated copied successor UI requires a current surface; lease success is asserted with resolves so synchronous refusal becomes an explicit assertion failure",
+  "controls": [
+    {
+      "name": "cancel-initializer",
+      "file": "sdk/resources/generation.ts",
+      "originalSha256": "75c7ac504e8e2221b3bc79b525ab0aacf96683be63a5d6ba1fc3703e1a3d83a5",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 0,
+      "log": "reversal-cancel-initializer.log",
+      "logSha256": "b47f98ec7935fd0792bbeba7b1e1d3908aa96989090c3ccf8caaaa4ce5a56bdb",
+      "terminalTests": "1 passed | 17 skipped (18)"
+    }
+  ],
+  "restoredTests": {
+    "exit": 0,
+    "signal": null,
+    "error": null,
+    "assertionFailures": 0,
+    "log": "reversal-restored.log",
+    "logSha256": "0d947c3bc43734e0a6337fcefbc1de614b7da5a1112aa9361c878265d3c28619",
+    "terminalTests": "105 passed (105)"
+  },
+  "mainSourceUnchanged": true,
+  "privateTreeRemoved": true
+}

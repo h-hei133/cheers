@@ -182,7 +182,7 @@ export function createShellRuntimeContext(input: {
         gitContext: input.gitContext,
       }),
     configuration,
-    runtimeConfigOverrides: configuration.current.binding.overrides,
+    get runtimeConfigOverrides() { return configuration.current.binding.overrides; },
     resolveConfigTarget: input.resolveConfigTarget,
     deferredModel: input.deferredModel,
     get runtimeConfig() { return configuration.current.config; },

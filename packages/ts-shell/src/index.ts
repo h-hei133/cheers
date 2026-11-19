@@ -59,6 +59,7 @@ export {
   createAgentSession,
   type CreateAgentSessionOptions,
   type CreateAgentSessionResult,
+  type AgentSessionReloadResult,
 } from "./sdk/agentSession.js";
 export {
   DefaultResourceLoader,
@@ -67,6 +68,10 @@ export {
   type LoadExtensionsResult,
   type ResourceDiagnostic,
   type ResourceLoader,
+  type ResourceSnapshot,
+  type ResourceReloadLease,
+  type ResourceReloadReceipt,
+  type ResourceReloadOptions,
 } from "./sdk/resourceLoader.js";
 export type { ExtensionUiHost, ExtensionUiDialogOptions, ExtensionUiApi, ExtensionUiRequestOptions } from './extensions/runtime/ui.js';
 export type { ModelRoute, ModelRouteInput, ModelRouteRequest, ModelRouteReason, ModelRouteSignal, ModelRouteTarget, ModelRouteFailure, CapturedVirtualModelDefinition, VirtualModelDefinition, VirtualModelMetadata } from './core/models/virtual/contract.js';

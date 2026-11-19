@@ -12022,3 +12022,10 @@ Linuxcompiled/Node20.3/installed各5场景2POST、15strict入口/skipLibCheck=fa
 前批CLI reload已提交65699985。本批before-tree复用原revert／summary／note，供给summary省默认请求、zeroabandoned保留note，append/replace贯穿signed bounded transport；cancel单调、原event immutable，invalid／accessor／toJSON／空与超限拒绝provider/write。host/file/installed worker同inert capture factory与primitive VM桥；compiled name decorator实际反例后修，原source/generation/readback guards保留。
 
 11/255与七门2733modules/0monoliths通过；TypeScript-only narrowing后40影响项/build9018502b116fpassed，10有效反转10AssertionErrors/exact恢复96及限定APPROVE/hash匹配。Linuxcompiled/Node20.3禁生成/installed各8场景12POST、15strict入口/skipLibCheck=false；workerpublicService fixture消费者不当marketplace批准。isolated路径／断言／私有export失败保留、private清理/source/build/config保持，未新增配置模型调用；normalpinnedjudge actualexit2/not_proven/16384 capacity，36/62、26开项继续SDKcontrolledreload及其他结果。按授权本地提交，不push/CI或关闭总目标。
+
+
+### 2026-11-19：SDK受控资源重载与稳定收据
+
+树摘要e27ef805已本地提交。本批公开SDK reload复用原commands/coordinator，shutdown→originalretire→guardedunboundloader→snapshot/toolpolicy→newsharedhost/UI/start；same session/savedstate/selection/prefix保留，startup仅reports。两独立复审实际反例修oldownercleanup/file与explicitallowlists/queue全settlement和earlierfailure/snapshotalias与Mapcompat/controlledbind/capture同步重入；opaqueexports按原capability不伪冻，旧接口保compat。
+
+最终16/309七门2747modules/0monoliths/buildf83dd7313313、13有效反转15AssertionErrors/1绿控制/exact恢复105、两限定APPROVE21productionhash通过。Linuxcompiled/Node20.3禁生成/installed各8场景2POST、15strict入口/skipLibCheck=false/engine-strictpassed；原报告observer/typedmodelbaseline/compilationinput变化及isolated assertionadapter失败保留，private清理source/config/build不变。未新增配置模型或PTY资格，normalpinnedjudge actualexit2/not_proven/16384capacity仍缺。36/62、26开放，下一input/message/tool/compaction事件结果，按授权localcommit不push/CI不关总goal。

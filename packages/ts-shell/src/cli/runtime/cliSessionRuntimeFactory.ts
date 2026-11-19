@@ -376,12 +376,9 @@ export function createCliSessionRuntime(input: {
         agentMode: gitRequestMode(allTurns.at(-1)) ?? sessionRuntime.getAgentMode(),
         providerRuntimeBridge: input.providerRuntimeBridge,
         ...(forcedTool ? { forcedTool } : {}),
-        ...(input.options.skillPaths || input.options.noSkills
+        ...(input.runtimeContext.skillOptions
           ? {
-              skillOptions: {
-                ...(input.options.skillPaths ? { skillPaths: input.options.skillPaths } : {}),
-                ...(input.options.noSkills ? { noSkills: true } : {}),
-              },
+              skillOptions: input.runtimeContext.skillOptions,
             }
           : {}),
       });
@@ -401,7 +398,7 @@ export function createCliSessionRuntime(input: {
   installJobsRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate, {
     notice: input.renderer.renderLine.bind(input.renderer),
     providerRuntimeBridge: input.providerRuntimeBridge, mcpGateway: input.mcpGateway,
-    skillOptions: { skillPaths: input.options.skillPaths, noSkills: input.options.noSkills },
+    get skillOptions() { return input.runtimeContext.skillOptions; },
   });
   installSecurityRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installAgentsRuntime(input.runtimeContext, nativeGate);

@@ -4,7 +4,7 @@ import type { CliOptions } from "../cli/options/cliOptions.js";
 import { resolveCliCredential } from "../cli/provider/cliProviderRuntimeBridge.js";
 import { closeCollaborationFor } from "../cli/runtime/collaboration.js";
 import { closeDirectorFor } from "../cli/runtime/director.js";
-import { closeExtensionsFor, extensionHostFor, shutdownExtensionsFor, startExtensionsFor, waitForExtensionsFor } from "../cli/runtime/extensions.js";
+import { captureExtensionRuntimeFor, closeExtensionsFor, extensionHostFor, shutdownExtensionsFor, startExtensionsFor, waitForExtensionsFor } from "../cli/runtime/extensions.js";
 import { cancelExtensionUiFor, closeExtensionHost } from "../cli/runtime/extensions/host.js";
 import { closeJobsFor } from "../cli/runtime/jobs.js";
 import { closeMediaFor } from "../cli/runtime/media.js";
@@ -21,8 +21,6 @@ import type { ShellRuntimeContext } from "../core/shell/runtimeContext.js";
 import type { PromptAttachments, ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
 import { createCliMcpGateway } from "../entrypoints/cliMcpModule.js";
 import type { ExtensionUiHost } from "../extensions/runtime/ui.js";
-import { runExtensionInvocation } from "../extensions/runtime/context.js";
-import { runEventHandlers } from '../extensions/events/dispatch.js';
 import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { Session } from "../session/schema/sessionRecord.js";
 import { SessionManager } from "../session/SessionManager.js";
@@ -32,7 +30,6 @@ import { DefaultResourceLoader, type LoadExtensionsResult, type ResourceLoader }
 import { SessionUi } from './ui.js';
 import { snapshotCustomMessage } from '../core/agent/custom.js';
 import { snapshotData } from '../core/values/data.js';
-import type { CatalogProvider } from '../core/models/catalog.js';
 import { sessionModelCatalog, sessionVirtualModels } from '../core/catalog/models.js';
 import { parseModelSelection } from '../core/models/virtual/selection.js';
 import { setVirtualModel } from '../core/commands/model/virtual.js';
@@ -40,6 +37,11 @@ import { readLogicalModel } from '../session/model/logical.js';
 import { thinkingSyntax } from '../core/commands/thinking/syntax.js';
 import { configurationAdmission } from '../core/shell/configuration.js';
 import { setModel } from '../core/commands/model/selection.js';
+import { registerSdkExtensions } from './resources/catalog.js';
+import { captureSdkToolPolicy, boundedSdkToolPolicy } from './resources/policy.js';
+import { SessionResources, type AgentSessionReloadResult } from './resources/reload.js';
+import { attachSdkSubmissionQueue } from './resources/submission.js';
+export type { AgentSessionReloadResult } from './resources/reload.js';
 
 /**
  * Compose an embedded session from the existing runtime, session, and security owners.
@@ -88,76 +90,6 @@ function createSilentRenderer(): StreamingRenderer {
   return renderer;
 }
 
-function resolveSdkToolPolicy(
-  options: CreateAgentSessionOptions,
-  extensionsResult: LoadExtensionsResult,
-): { readonly allowedTools?: readonly string[]; readonly disabledTools?: readonly string[] } {
-  const extraNames = [
-    ...(options.customTools ?? []).map((t) => t.name),
-    ...extensionsResult.extensions.flatMap((entry) => entry.extension.tools.map((t) => t.name)),
-  ];
-  const excluded = new Set(options.excludeTools ?? []);
-
-  if (options.noTools === "all") return { allowedTools: [] };
-  if (options.noTools === "builtin") {
-    return { allowedTools: extraNames.filter((name) => !excluded.has(name)) };
-  }
-  if (options.tools) {
-    return { allowedTools: options.tools.filter((name) => !excluded.has(name)) };
-  }
-  if (excluded.size > 0) {
-    return { disabledTools: [...excluded] };
-  }
-  return {};
-}
-
-function registerSdkContributions(
-  root: string,
-  sessionId: string,
-  extensionsResult: LoadExtensionsResult,
-  customTools: readonly ToolDefinition[] | undefined,
-  ui: () => ExtensionUiHost | undefined,
-  catalog: readonly CatalogProvider[],
-): Array<() => void> {
-  const cleanups: Array<() => void> = [];
-  try {
-    if (customTools?.length) {
-      cleanups.push(
-        registerCatalogContribution({
-          root,
-          sessionId,
-          commands: [],
-          tools: customTools,
-          skills: () => [],
-        }),
-      );
-    }
-    for (const loaded of extensionsResult.extensions) {
-      const ext = loaded.extension;
-      const onEvent = ext.handlers.size > 0
-        ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => runExtensionInvocation(ui(), signal,
-          () => runEventHandlers({ handlers: ext.handlers, event, payload, aliases, signal, ownerSignal: ext.signal }))
-        : undefined;
-      cleanups.push(
-        registerCatalogContribution({
-          root,
-          sessionId,
-          commands: ext.commands,
-          tools: ext.tools,
-          virtualModels: ext.virtualModels,
-          signal: ext.signal,
-          skills: () => [],
-          ...(onEvent ? { onEvent } : {}),
-        }, catalog),
-      );
-    }
-    return cleanups;
-  } catch (error) {
-    cleanups.splice(0).forEach((unregister) => unregister());
-    throw error;
-  }
-}
-
 export class AgentSession {
   private disposed = false;
   private disposal: Promise<void> | undefined;
@@ -172,6 +104,8 @@ export class AgentSession {
     private readonly contributionCleanups: readonly (() => void)[],
     private readonly retireResources?: () => void,
     private readonly ui: SessionUi = new SessionUi(runtimeContext, extensionHostFor(runtimeContext)),
+    private readonly resources?: SessionResources,
+    private readonly submissions?: ReturnType<typeof attachSdkSubmissionQueue>,
   ) {}
 
   bindUi(host: ExtensionUiHost): () => void {
@@ -244,6 +178,12 @@ export class AgentSession {
 
   async waitForIdle(): Promise<void> {
     await this.sessionRuntime.waitForIdle();
+    await this.submissions?.wait();
+  }
+
+  /** Reload resources with the current session and durable model selection preserved. */
+  reload(options?: { readonly signal?: AbortSignal }): Promise<AgentSessionReloadResult> {
+    return this.resources?.reload(options?.signal) ?? Promise.resolve({status:'refused', reason:'Resource reload is unavailable for this session.'});
   }
 
   async compact(instructions?: string): Promise<CompactionOutcome> {
@@ -269,12 +209,18 @@ export class AgentSession {
     this.disposal = new Promise<void>((resolve, reject) => { settled = { resolve, reject }; });
     void this.disposal.catch(() => {});
     this.disposed = true;
+    const extensions = captureExtensionRuntimeFor(this.runtimeContext), host = extensionHostFor(this.runtimeContext);
+    const reloading = this.resources?.close();
+    this.submissions?.close();
     void (async () => {
       const errors: unknown[] = [];
       try { this.ui.dispose(); } catch (error) { errors.push(error); }
-      try { await shutdownExtensionsFor(this.runtimeContext); } catch (error) { errors.push(error); }
-      try { this.retireResources?.(); } catch (error) { errors.push(error); }
-      try { closeExtensionHost(this.runtimeContext); } catch (error) { errors.push(error); }
+      let shutdown: Promise<void> | undefined;
+      try { shutdown = extensions?.shutdown('quit') ?? this.sessionRuntime.cancelAndWait(); } catch (error) { errors.push(error); }
+      try { await reloading; } catch (error) { errors.push(error); }
+      try { await shutdown; } catch (error) { errors.push(error); }
+      try { if (this.resources) this.resources.retire(); else this.retireResources?.(); } catch (error) { errors.push(error); }
+      try { if (host) closeExtensionHost(this.runtimeContext, host); } catch (error) { errors.push(error); }
       for (const unregister of this.contributionCleanups) {
         try { unregister(); } catch (error) { errors.push(error); }
       }
@@ -284,7 +230,7 @@ export class AgentSession {
         Promise.resolve().then(() => closeJobsFor(this.runtimeContext, false)),
         Promise.resolve().then(() => closeSshFor(this.runtimeContext)),
         Promise.resolve().then(() => closeCollaborationFor(this.runtimeContext)),
-        Promise.resolve().then(() => closeExtensionsFor(this.runtimeContext)),
+        Promise.resolve().then(() => extensions?.close()),
         Promise.resolve().then(() => this.runtimeContext.freshState?.clearCache?.()),
         ...(this.ownsMcpGateway ? [Promise.resolve().then(() => this.mcpGateway?.close())] : []),
       ]);
@@ -304,6 +250,16 @@ export async function createAgentSession(
   const sessionManager = options.sessionManager ?? new SessionManager();
   const renderer = options.renderer ?? createSilentRenderer();
   const suppliedLoader = options.resourceLoader;
+  const customTools = options.customTools ? [...options.customTools] : undefined;
+  const policy = captureSdkToolPolicy({...options, customTools});
+  const originalOverrides = {...options.runtimeConfigOverrides,
+    ...(options.runtimeConfigOverrides?.allowedTools ? {allowedTools:[...options.runtimeConfigOverrides.allowedTools]} : {})};
+  const suppliedTools = options.runtimeConfig?.allowedTools;
+  const overrideTools = originalOverrides.allowedTools;
+  const explicitTools = suppliedTools === undefined ? overrideTools : overrideTools === undefined ? suppliedTools
+    : suppliedTools.filter(name => overrideTools.includes(name));
+  const suppliedBudget = options.runtimeConfig?.instructionBudgetBytes;
+  let callerOverrides = {...originalOverrides, ...(explicitTools !== undefined ? {allowedTools:[...explicitTools]} : {})};
   const ownsResources = suppliedLoader === undefined;
   const resourceLoader = suppliedLoader ?? new DefaultResourceLoader({ cwd });
 
@@ -319,10 +275,17 @@ export async function createAgentSession(
   const startupThinking = thinkingSyntax.actions.find(action => action.name === options.thinkingLevel
     || action.aliases?.includes(options.thinkingLevel ?? ''))?.effort;
   const bindResources = resourceLoader.captureBinding?.();
+  const reloadLease = resourceLoader.captureReload?.();
   const retireUnboundResources = ownsResources ? resourceLoader.captureRetirement?.() : undefined;
-  const toolPolicy = resolveSdkToolPolicy(options, extensionsResult);
+  const outerConfig = getRuntimeConfig(cwd, callerOverrides, options.runtimeConfig?.configInputs);
+  const configuredTools = outerConfig.allowedTools;
+  const contextBudget = {value:originalOverrides.instructionBudgetBytes ?? suppliedBudget ?? outerConfig.instructionBudgetBytes,
+    override:originalOverrides.instructionBudgetBytes, disabled:resourceLoader.getNoContextFiles()};
+  if (configuredTools !== undefined) callerOverrides = {...callerOverrides,
+    allowedTools:explicitTools === undefined ? [...configuredTools] : explicitTools.filter(name => configuredTools.includes(name))};
+  const toolPolicy = boundedSdkToolPolicy(policy, extensionsResult, callerOverrides);
   const overrides: RuntimeConfigOverrides = {
-    ...options.runtimeConfigOverrides,
+    ...originalOverrides,
     ...(resourceLoader.getNoContextFiles() ? { instructionBudgetBytes: 0 } : {}),
     ...(options.offline !== undefined ? { offline: options.offline } : {}),
     ...(options.allowUntrustedHooks !== undefined ? { allowUntrustedHooks: options.allowUntrustedHooks } : {}),
@@ -408,6 +371,9 @@ export async function createAgentSession(
   let session: AgentSession | undefined;
   let retireResources: (() => void) | undefined;
   let sessionUi: SessionUi | undefined;
+  let resources: SessionResources | undefined;
+  let resourceCleanups: Array<() => void> = [];
+  let submissions: ReturnType<typeof attachSdkSubmissionQueue> | undefined;
   const approvalTrustPolicy = options.approvalTrustPolicy ?? new ApprovalTrustPolicy();
   const providerRuntimeBridge = {
     resolveCredentialSnapshot: () => resolveSdkCredential(runtimeContext.runtimeConfig, runtimeContext.session.id),
@@ -415,8 +381,10 @@ export async function createAgentSession(
     realProviderSmokeOptIn: () => process.env.CHEERS_REAL_PROVIDER_SMOKE?.trim() === "1",
   };
   try {
-    cleanups.push(...registerSdkContributions(runtimeContext.cwd, runtimeContext.session.id, extensionsResult,
-      options.customTools, () => extensionHostFor(runtimeContext)?.ui, runtimeContext.configuration.current.catalog));
+    if (customTools?.length) cleanups.push(registerCatalogContribution({root:runtimeContext.cwd, sessionId:runtimeContext.session.id,
+      commands:[], tools:customTools, skills:() => []}));
+    resourceCleanups = registerSdkExtensions(runtimeContext.cwd, runtimeContext.session.id, extensionsResult,
+      () => extensionHostFor(runtimeContext)?.ui, runtimeContext.configuration.current.catalog);
     const startupDefinition = startupModel.kind === 'virtual' ? sessionVirtualModels(runtimeContext.cwd, runtimeContext.session.id)
       .find(model => model.provider === startupModel.virtualModel.provider && model.id === startupModel.virtualModel.model) : undefined;
     sessionRuntime = createCliSessionRuntime({
@@ -477,6 +445,9 @@ export async function createAgentSession(
       ? `Provider credential status: ${credential.blocked}${credential.provider ? ` (${credential.provider})` : ""}`
       : undefined;
 
+    resources = new SessionResources({context:runtimeContext, runtime:sessionRuntime, loader:resourceLoader, cleanups:resourceCleanups,
+      retirement:retireResources, lease:reloadLease, ui:sessionUi, policy, callerOverrides, contextBudget});
+    submissions = attachSdkSubmissionQueue(runtimeContext, sessionRuntime);
     session = new AgentSession(
       runtimeContext,
       sessionRuntime,
@@ -487,6 +458,8 @@ export async function createAgentSession(
       cleanups,
       retireResources,
       sessionUi,
+      resources,
+      submissions,
     );
     await startExtensionsFor(runtimeContext);
 
@@ -501,6 +474,7 @@ export async function createAgentSession(
       throw error;
     }
     try { sessionUi?.dispose(); } catch { /* Keep the initialization failure. */ }
+    submissions?.close();
     try { await shutdownExtensionsFor(runtimeContext, 'quit', () => sessionRuntime?.cancelAndWait() ?? Promise.resolve()); }
     catch { /* Keep the initialization failure. */ }
     try { retireResources?.(); } catch { /* Keep the initialization failure. */ }
@@ -510,6 +484,9 @@ export async function createAgentSession(
     try { closeExtensionHost(runtimeContext); } catch { /* Keep the initialization failure. */ }
     await closeExtensionsFor(runtimeContext).catch(() => {});
     for (const unregister of cleanups.splice(0)) {
+      try { unregister(); } catch { /* Keep cleaning up after the initialization failure. */ }
+    }
+    for (const unregister of resourceCleanups.splice(0)) {
       try { unregister(); } catch { /* Keep cleaning up after the initialization failure. */ }
     }
     if (ownsMcpGateway) await mcpGateway.close().catch(() => {});

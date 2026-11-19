@@ -1,0 +1,23 @@
+{
+  "status": "APPROVE",
+  "sourceOnly": true,
+  "validationRunByReviewer": false,
+  "agent": "events_review",
+  "scope": "SDK reload consumers, shared coordinator, UI, policy and queue; loader reviewed independently",
+  "source": {
+    "packages/ts-shell/src/sdk/agentSession.ts": "1c243ac9892ee9ebdde2b6a0a84603af0724c90780c3c6f215c3a59692b9a770",
+    "packages/ts-shell/src/sdk/ui.ts": "829520341e393dde8d1cb2d8a1a4e657f9a9695488c94f7cd906accaab9e2e49",
+    "packages/ts-shell/src/sdk/resources/reload.ts": "8ebe567b2f20e3ffec1f6b6272d8ea63dfdc45f51d654e629a72009d107bf162",
+    "packages/ts-shell/src/sdk/resources/policy.ts": "14e7e3cefa60b4d4a325c7f742e07a9e5931e63a77984be844deb3d6d139f4cf",
+    "packages/ts-shell/src/sdk/resources/projection.ts": "06cb706e97a57f642c7bbc51ec353192b08bb6cd6cef9cc39241da4e3de559bc",
+    "packages/ts-shell/src/sdk/resources/catalog.ts": "2522c34b69af300dbcb59a163c4e706f49db4b9204a3a5361b04028b56feb22d",
+    "packages/ts-shell/src/sdk/resources/submission.ts": "e7723a29a115cce135f12e4f2127237e3ebd7b4155889c9b16e342bd750cd4e4",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "0ca2c33e5c15b0abf2e142a7d4e9954e927402f4f351728f49acd4d35af798ab",
+    "packages/ts-shell/src/cli/runtime/extensions/reload.ts": "0f1186ff73c72e0dd8bdaffd1f5323abda8f153f657c71ca27671231ee74c175",
+    "packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts": "402a7d89ef6589482af03f2a1ef0d8c834e04f27207f44c7927d2a035056c1a8",
+    "packages/ts-shell/src/core/shell/runtimeContext.ts": "0a998319b4f03b18869e81b23ef1f5752fab812b9c40620cea52e2500bebef50",
+    "packages/ts-shell/src/index.ts": "91d974c26d4abdb163a6fbf608ac7a58cedbf22a3cbc83426a874a58388d4bed"
+  },
+  "hashesMatch": true,
+  "fullE6Accepted": false
+}

@@ -16,7 +16,7 @@ import { attachSubmissionQueue } from '../inputQueue.js';
 import { routeSlashCommand } from '../../../core/commands/slashRouter.js';
 import {bindSessionSurface} from '../session/surface.js';
 import {bindExtensionUiFor, extensionHostFor, installExtensionHost} from './host.js';
-import {closeExtensionsFor, extensionCommandFor, installExtensionRuntime, startExtensionsFor} from '../extensions.js';
+import {captureExtensionRuntimeFor, closeExtensionsFor, extensionCommandFor, installExtensionRuntime, startExtensionsFor} from '../extensions.js';
 
 let root: string, context: ShellRuntimeContext, runtime: ShellSessionRuntime, manager: SessionManager;
 let busy = false;
@@ -37,6 +37,17 @@ function install() {
   installExtensionRuntime(context,runtime,() => ({sessionId:context.session.id,workspaceRoot:root,hooks:new HookDispatcher(),emit(){},permissionScope:'ask'}),manager);
 }
 function reload(signal?: AbortSignal) {return extensionCommandFor(context)('plugin',['reload'],{cwd:root,projectRoot:root,sessionId:context.session.id,signal});}
+
+it('never cancels a successor command when a captured original runtime shuts down and closes', async () => {
+  install(); await startExtensionsFor(context); const original = captureExtensionRuntimeFor(context)!;
+  install(); await startExtensionsFor(context);
+  let release!: () => void; const hold = new Promise<void>(resolve => {release = resolve;});
+  const pending = runtime.commands.run(async () => hold, 'extension-reload'); const command = runtime.commands.current!;
+  try {
+    await original.shutdown('quit'); await original.close();
+    expect(command.controller.signal.aborted).toBe(false); expect(runtime.cancelAndWait).not.toHaveBeenCalled();
+  } finally {release(); await pending;}
+});
 
 it('reloads file contributions after old shutdown and binds successor UI before start', async () => {
   const file = path.join(root,'event.ts');

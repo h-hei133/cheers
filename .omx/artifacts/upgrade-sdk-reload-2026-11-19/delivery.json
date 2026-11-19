@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-19",
+  "batch": [
+    "E.6 SDK controlled resource reload"
+  ],
+  "status": "subbatch_linux_accepted_E6_open_repository_gate_not_proven",
+  "baseCommit": "e27ef805d867d08e719ab814ddeb956d6b0e081f",
+  "delivery": {
+    "localCommit": "containing Git commit supplies identity",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "f83dd7313313a3d6adc3b3eb65ecb728e459d07057dac22e65ff734150850ab2",
+    "inputsDigest": "0c81fddd2875319a3d61697ca48711d65386f20e0974ea82dc7c5bb642c5988c",
+    "inputDigestMatches": true,
+    "node": "24.15.0"
+  },
+  "source": {
+    "files": 24,
+    "productionFiles": 21,
+    "hashesMatch": true,
+    "receipt": "evidence/source.json"
+  },
+  "validation": {
+    "combined": {
+      "files": 16,
+      "passed": 309,
+      "receipt": "raw.tar.gz::joint-final.log"
+    },
+    "static": {
+      "count": 7,
+      "passed": true,
+      "productionModules": 2747,
+      "monoliths": 0
+    },
+    "reversal": {
+      "cases": 13,
+      "assertionFailures": 15,
+      "controls": 1,
+      "exactRestoration": true,
+      "mainSourceUnchanged": true,
+      "restoredPassed": 105,
+      "fixtureAdapter": "Isolated copied successor UI requires a current surface; lease success is asserted with resolves so synchronous refusal becomes an explicit assertion failure",
+      "receipt": "evidence/reversal.json"
+    },
+    "linux": {
+      "nativePassed": 8,
+      "posts": 2,
+      "receipt": "evidence/native.json"
+    },
+    "nodeFloor": {
+      "runtime": "20.3.0",
+      "codeGenerationDisabled": true,
+      "nativePassed": 8,
+      "posts": 2,
+      "receipt": "evidence/native-node20.json"
+    },
+    "installed": {
+      "publicEntries": 15,
+      "strictTypes": true,
+      "skipLibCheck": false,
+      "engineStrict": true,
+      "nativePassed": 8,
+      "posts": 2,
+      "receipt": "evidence/package.json"
+    },
+    "configuredProvider": {
+      "status": "not_run_this_subbatch",
+      "earlierE6Attempt": "provider-auth with zero requests"
+    },
+    "normproof": {
+      "exit": 2,
+      "verdict": "not_proven",
+      "acceptedAsProof": false,
+      "reason": "pinned graph exceeds 16384 edge capacity",
+      "scopeModified": false,
+      "gateModified": false,
+      "receipt": "evidence/judge-current.json"
+    }
+  },
+  "review": {
+    "status": "APPROVE",
+    "scopeLimited": true,
+    "hashesMatch": true,
+    "validationRunByReviewer": false,
+    "consumerFiles": 12,
+    "loaderFiles": 9,
+    "receipt": "evidence/review.json"
+  },
+  "taskCount": {
+    "accepted": 36,
+    "open": 26,
+    "fullE6Accepted": false
+  },
+  "setupFailuresRetained": [
+    "initial missing public reload API; model fixture separately lacked scope then ModelEdit baseline",
+    "shared replacement first implementation omitted local host import; refusal and concurrency controls remained safe",
+    "native report observer read turns rather than reports; corrected original public field",
+    "read-only reviews found and reproduced file/explicit tool restrictions, queue settlement/failure, disposition and snapshot binding gaps before fixes",
+    "one prefix-specific probe ran while production changed and is not standalone red evidence",
+    "opaque exports compatibility patch changed compiler input during build; old build retained and final build rerun",
+    "isolated stale UI and lease refusal reversals used explicit equivalent assertions to distinguish behavioral failure from native access error",
+    "one removed abort listener stayed green due final signal guard and remains a control"
+  ],
+  "remaining": [
+    "input/message/tool/compaction event result consumers",
+    "provider/MCP/renderer extension APIs",
+    "shortcuts and flags",
+    "additional package installation sources"
+  ],
+  "boundaries": [
+    "Linux only",
+    "same session and saved selection/state/transcript prefix pinned; only bounded startup reports may append",
+    "resource reload uses original shutdown/retirement and captures exact successor receipt before binding",
+    "legacy loaders lacking captured reload capability refuse before shutdown",
+    "current config restrictions intersect SDK-generated names; provider/auth settings remain original",
+    "original UI release and every queued startup failure remain observable",
+    "opaque module exports remain captured executable references outside immutable metadata",
+    "no new configured-provider evidence",
+    "no push or CI"
+  ],
+  "evidenceStorage": {
+    "archive": "raw.tar.gz",
+    "index": "evidence/raw-index.json",
+    "rawBytesPreserved": true
+  }
+}
