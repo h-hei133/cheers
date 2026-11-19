@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-19",
+  "batch": [
+    "E.6 controlled CLI extension reload"
+  ],
+  "status": "subbatch_linux_accepted_E6_open_repository_gate_not_proven",
+  "baseCommit": "472f23c7f4d5d2a88365b8c6dc4bdfe6ac1fd70c",
+  "delivery": {
+    "localCommit": "containing Git commit supplies identity",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "7bb49e3f40cef24f3cdaa810c44b08815e96f94bf9716aa30aa4f6cc09f7d9b5",
+    "inputsDigest": "1da76e81640feeae0263d9aa7f51de386b130abf364f57ffd1dd0ceb953219f3",
+    "inputDigestMatches": true,
+    "node": "24.15.0"
+  },
+  "source": {
+    "files": 9,
+    "productionFiles": 7,
+    "hashesMatch": true,
+    "receipt": "evidence/source.json"
+  },
+  "validation": {
+    "combined": {
+      "files": 11,
+      "passed": 179,
+      "receipt": "raw.tar.gz::joint-build-reviewed.log",
+      "boundary": "Joint 179 tests preceded a semantics-preserving narrowing fix; final affected 20 tests and build passed afterward."
+    },
+    "static": {
+      "count": 7,
+      "passed": true,
+      "productionModules": 2732,
+      "monoliths": 0
+    },
+    "reversal": {
+      "cases": 10,
+      "assertionFailures": 10,
+      "exactRestoration": true,
+      "mainSourceUnchanged": true,
+      "restoredPassed": 81,
+      "receipt": "evidence/reversal.json",
+      "assertionAdapter": "Close ownership check uses equivalent explicit no-throw assertion only in isolated test copy; production source exact restoration preserved."
+    },
+    "linux": {
+      "nativePassed": 5,
+      "posts": 2,
+      "receipt": "evidence/native.json"
+    },
+    "nodeFloor": {
+      "runtime": "20.3.0",
+      "codeGenerationDisabled": true,
+      "nativePassed": 5,
+      "posts": 2,
+      "receipt": "evidence/native-node20.json"
+    },
+    "installed": {
+      "publicEntries": 15,
+      "strictTypes": true,
+      "skipLibCheck": false,
+      "engineStrict": true,
+      "nativePassed": 5,
+      "posts": 2,
+      "receipt": "evidence/package.json"
+    },
+    "pty": {
+      "cases": 2,
+      "modes": [
+        "regular",
+        "fullscreen"
+      ],
+      "posts": 2,
+      "receipt": "evidence/pty.json",
+      "physicalTerminal": false
+    },
+    "configuredProvider": {
+      "status": "not_run_this_subbatch",
+      "earlierE6Attempt": "provider-auth with zero requests"
+    },
+    "normproof": {
+      "exit": 2,
+      "verdict": "not_proven",
+      "acceptedAsProof": false,
+      "reason": "pinned graph exceeds 16384 edge capacity",
+      "scopeModified": false,
+      "gateModified": false,
+      "receipt": "evidence/judge-current.json"
+    },
+    "strengthenedNative": {
+      "cases": 5,
+      "posts": 2,
+      "receipt": "evidence/native-final-strengthened.json"
+    },
+    "finalTypeFix": {
+      "passed": 20,
+      "receipt": "raw.tar.gz::build-type-fixed.log"
+    }
+  },
+  "review": {
+    "status": "APPROVE",
+    "scopeLimited": true,
+    "hashesMatch": true,
+    "validationRunByReviewer": false,
+    "receipt": "evidence/review.json"
+  },
+  "taskCount": {
+    "accepted": 36,
+    "open": 26,
+    "fullE6Accepted": false
+  },
+  "setupFailuresRetained": [
+    "shutdown UI observation unavailable by intended quiescence, corrected probe observes original read and held callback",
+    "first probe polling loop remained alive after timeout, terminated own PID and fixed bounded helper",
+    "two grouped union narrowing build failures fixed without runtime semantic changes",
+    "nonexistent host test selector ran nine files only, corrected eleven-file target list",
+    "close reversal raised native error, isolated assertion adapter gave equivalent explicit AssertionError",
+    "reversal string escape mismatch corrected before mutation"
+  ],
+  "remaining": [
+    "SDK controlled reload resource adoption",
+    "before-tree custom summary",
+    "event result consumers"
+  ],
+  "boundaries": [
+    "Linux only",
+    "same session and durable selection retained",
+    "watch and trust revocation remain immediate",
+    "partial registrations and unknown cancellation never become clean drainage",
+    "SDK controlled reload unimplemented",
+    "no new configured-provider evidence",
+    "no push or CI"
+  ],
+  "evidenceStorage": {
+    "archive": "raw.tar.gz",
+    "index": "evidence/raw-index.json",
+    "rawBytesPreserved": true
+  }
+}

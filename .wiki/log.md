@@ -12008,3 +12008,10 @@ E.1复用原worker/gate/catalog修复child退休与完整host join、普通appro
 前批replacement已提交866f835a。本批interactive/RPC session_start在实际input/UI绑定后启动，ordinary/slash/steer/follow-up/goal统一原queue准入，取消原signal贯穿通知／invocation，failed ready不重入、EOF join已受理response、primary startup错误保留。两限定复审的slash/live child绕过先6AssertionErrors后修；10文件215项、七静态门／2730modules／0monoliths、build1d61695fbd9f通过，7有效反转10AssertionErrors/exact恢复104与review source hash核验。
 
 Linuxcompiled／Node20.3禁生成／installed各4场景7POST、15strict入口／skipLibCheck=false；两模式PTY实际确认／append report／普通prompt各1POST及exit0，replacement回归6场景5POST通过。原生GET误拦截／Python basename／nested proxy TTY／isolated scratch失败均保留；配置/source/build保持、私有state清理，未新增配置模型调用。normalpinnedjudge actualexit2/not_proven，16384 capacity缺口未改。归档upgrade-startup-2026-11-19，36/62、26任务开放，E.6controlledreload／results继续，按授权本地提交、不push/CI。
+
+
+### 2026-11-19：受控CLI扩展重载
+
+前批initial readiness已提交472f23c7。CLI /plugin reload与named invocation执行旧shutdown/原generation共享retirement/file与installed重载/newUI/start，same session/selection保持。signal贯穿、cancel及时、partial和unknown不写clean成功；microtask source捕获、oldouter退休和close同步重入守卫经实际反例修复，限定七file APPROVE/hash。11文件179項与七静态门2732modules/0monoliths通过；一处TypeScript-only判别式调整后20影响项/build7bb49e3f40cepassed，10有效反转10AssertionErrors/exact恢复81项。
+
+Linuxcompiled/Node20.3/installed各5场景2POST、15strict入口/skipLibCheck=false和两模式PTY各1POSTpassed，真实command发现/UI/report/startup queue/取消及failed file零派发/未知封锁。旧probe observer/timeout loop与build夹具失败保留，原config/source/build保持、private清理。normalpinnedjudge actualexit2/not_proven/16384 capacity缺口，未新增配置模型调用。归档upgrade-reload-2026-11-19，36/62、26开放，SDKcontrolledreload/tree/result继续；按授权本地提交、不push/CI。

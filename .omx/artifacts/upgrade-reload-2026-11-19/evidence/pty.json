@@ -1,0 +1,35 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "buildId": "7bb49e3f40cef24f3cdaa810c44b08815e96f94bf9716aa30aa4f6cc09f7d9b5",
+  "realProvider": false,
+  "physicalTerminal": false,
+  "cases": [
+    {
+      "mode": "regular",
+      "reloadDialogAnswered": true,
+      "successorStatusPreserved": true,
+      "reportAccepted": true,
+      "ordinaryPromptCompleted": true,
+      "posts": 1,
+      "exit": 0,
+      "ptyBytes": 13025,
+      "ptySha256": "b2cd27c3cf3750174d93926146e0fa1e9002363c852f90fe970cd54f71fba4b7"
+    },
+    {
+      "mode": "fullscreen",
+      "reloadDialogAnswered": true,
+      "successorStatusPreserved": true,
+      "reportAccepted": true,
+      "ordinaryPromptCompleted": true,
+      "posts": 1,
+      "exit": 0,
+      "ptyBytes": 14739,
+      "ptySha256": "4e74d2d08417dfe7948307816856af32bea8464d34a1e1a271607212deeeeeea"
+    }
+  ],
+  "posts": 2,
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "buildUnchanged": true
+}

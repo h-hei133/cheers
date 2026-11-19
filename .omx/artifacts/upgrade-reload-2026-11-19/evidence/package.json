@@ -1,0 +1,40 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "node": "v24.15.0",
+  "buildId": "7bb49e3f40cef24f3cdaa810c44b08815e96f94bf9716aa30aa4f6cc09f7d9b5",
+  "commands": [
+    {
+      "name": "pack",
+      "exit": 0,
+      "log": "package-pack.log",
+      "logSha256": "753e0eae9db2736e5a30e47933cbb3fbd35af993c8d32c355efd691e44a90011"
+    },
+    {
+      "name": "install",
+      "exit": 0,
+      "log": "package-install.log",
+      "logSha256": "003dcb8a408310efe0b5208e1a452e8147239669c3c6edea2fd9ada460a51dec"
+    },
+    {
+      "name": "types",
+      "exit": 0,
+      "log": "package-types.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native",
+      "exit": 0,
+      "log": "package-native.log",
+      "logSha256": "1cdd678062a4ad19df5e5832f71e75401c52752535bac0a050aa29c48e869961"
+    }
+  ],
+  "packageSha256": "3b3a10e7f808cb2fecee3af3aa0af64b7f46b757771ad1c1406c1c89e215c7c0",
+  "publicEntries": 15,
+  "strictTypes": true,
+  "engineStrict": true,
+  "nativePassed": 5,
+  "loopbackPosts": 2,
+  "privateStateRemoved": true,
+  "buildUnchanged": true
+}

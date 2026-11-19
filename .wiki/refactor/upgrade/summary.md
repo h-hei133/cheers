@@ -1,10 +1,14 @@
 # 规划执行进展（2026-11-19）
 
-本轮接续已核实任务，完成 E.6 的 kernel结算、实际startup／shutdown、树导航、CLI replacement与initial input/UI readiness子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
+本轮接续已核实任务，完成 E.6 的 kernel结算、实际startup／shutdown、树导航、CLI replacement、initial input/UI readiness与controlled CLI reload子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
 
 核查与取舍见[工程记录](design.md)，当前验收和次序见[任务清单](tasks.md)。源码按批本地提交。远端推送和本轮 CI 尚未发生。原定暂缓的原生插件与独立桌面产品不计入 62 项，T6 保留按需求开启。
 
 ## 当前批次的验证
+
+controlled CLI reload现执行old shutdown→原generation退休→file/installed资源重载→新UI/start，保留same session/selection；busy拒绝，取消原signal、partial/unknown保持真实。11文件179项与七门2732modules/0monoliths通过，联合后仅TypeScript判别式调整，最终20影响项/build7bb49e3f40cepassed。10有效反转10AssertionErrors/exact恢复81项及限定APPROVE/hash通过。Linuxcompiled/Node20.3/installed各5场景2POST、15strict入口、两模式PTY各1POSTpassed；旧observer/fixture/build失败保留。未新增配置模型调用，normaljudge actualexit2/not_proven容量缺口保持。[当前交付](../../../.omx/artifacts/upgrade-reload-2026-11-19/delivery.json)。SDK controlled reload与tree/result consumers仍开，完整E.6保持部分。
+
+以下initial startup已提交472f23c7，证据保留原source范围。
 
 initial CLI启动现等待实际input与UI绑定，ordinary／slash／steer／follow-up／goal按admitted排队；原signal取消invocation，failed readiness不重入，EOF joins原responses，primary startup错误保留。10文件215项、七门／2730modules／0monoliths、7有效反转10AssertionErrors／exact恢复104项、build1d61695fbd9f及两项限定APPROVE/hash核验通过。Linuxcompiled／Node20.3／installed各4场景7POST、安装15strict入口，两模式PTY确认／报告／普通请求各1POST及replacement回归6场景5POST通过。probe与旧build失败保留，未重复配置模型调用；normaljudge actualexit2/not_proven、16384 capacity缺口不变。[当前交付](../../../.omx/artifacts/upgrade-startup-2026-11-19/delivery.json)。controlled reload／before-tree定制summary和其他结果消费者仍缺，完整E.6保持部分。
 
@@ -171,7 +175,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 ## 后续工作
 
-下一批继续 E.6 controlled reload、before-tree定制summary和其他结果消费者；保持原contribution、commands和普通Hook拒绝／批准／持久化边界。F2.6指标归属／跨进程传播和T5.1排他创建仍有独立已核实缺口。
+下一批继续 E.6 before-tree定制summary／instructions和其他结果消费者；SDK controlled reload另由原资源owner显式adoption；保持原contribution、commands和普通Hook拒绝／批准／持久化边界。F2.6指标归属／跨进程传播和T5.1排他创建仍有独立已核实缺口。
 
 ## 阶梯计价历史验收
 

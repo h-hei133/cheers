@@ -2893,3 +2893,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A slash prompt runs during initial startup, or steering enters a startup child before the other startup callbacks finish.
 - **Root cause:** Only ordinary drain waits for startup, while content controls and live TurnInput bypass it; pending=false is also true after failed startup.
 - **Rule:** Bind the actual input/UI before starting lifecycle callbacks. Before startup admission, enqueue all submitted text in the existing queue before slash routing and keep live steering/follow-up outside the child. Keep RPC UI/read/abort controls reachable without blocking their control chain. Use successful admission for every drain and goal host; preserve the original cancellation signal, cancel line startup before joining queued input on close, and retain the primary error when cleanup fails.
+
+### Controlled Resource Reload Must Capture Ownership Before Scheduling
+
+- **Symptom:** A reload adopts a synchronous successor, cancellation clears a newly installed host, or a late cancellation says drained after its original resources became unknown.
+- **Root cause:** Source identity is captured after the command microtask; cleanup uses ambient host/surface lookups after callback reentry; cancellation reacquires a cleared service and loses the previous receipt.
+- **Rule:** Capture the original source and host before commands.run. Join one retirement promise per resource generation and capture each service/surface before callbacks. Close only the expected host, including after synchronous abort reentry. Propagate the original reload signal through shutdown/start, keep unknown drainage on the original owner after settlement, and retain partial installed registration diagnostics. A resource reload cannot join its own command; only its captured successor may queue startup messages for successful settlement.

@@ -1,0 +1,28 @@
+{
+  "status": "APPROVE",
+  "sourceOnly": true,
+  "validationRunByReviewer": false,
+  "scope": "Controlled CLI extension reload including caller cancellation, native interrupt, RPC abort and plugin cancel; SDK reload outside scope",
+  "agent": "events_review",
+  "findingsFixed": [
+    "exact source captured before scheduling",
+    "unknown fence preserved on same-runtime config change",
+    "withheld capabilities and cancellation drainage keep partial/unknown",
+    "old resources retire even after outer replacement",
+    "original retirement and close join once",
+    "shutdown original signal cancellation",
+    "synchronous successor host preserved by exact close ownership"
+  ],
+  "source": {
+    "packages/ts-shell/src/cli/runtime/extensions/reload.ts": "e286ae169488af7fe8f28e9224df5578b2c3808fd0a8c81b4c54a39104d5309f",
+    "packages/ts-shell/src/cli/runtime/extensions/lifecycle.ts": "def54b06fcb8ec311e428a9faf838355e9dcf543d66f1262e72da799ce010cde",
+    "packages/ts-shell/src/cli/runtime/extensions/host.ts": "5d9688924dcef1ba3c8f2406d601937afa3d4c449849843ea6326829fd72981c",
+    "packages/ts-shell/src/cli/runtime/inputQueue.ts": "79e99fe97917eae6a1b03b9df91534736f970e019ed44a1d862801522c898bfc",
+    "packages/ts-shell/src/cli/runtime/inputStream.ts": "185a40066ee019e1e2f30a31b3bd8d19d4ecadead909a8ad873bcf30012eb6a2",
+    "packages/ts-shell/src/core/shell/command.ts": "89798a7ecd4e575e1d49a94c5288ce8cbaceb83b7737cf55dad920545d1ffd83",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "4a8cacc6fca8b094969eeaaca40173fbc12a1bf0493ad584dda954b66b8daefd"
+  },
+  "fullE6Accepted": false,
+  "finalNarrowingReviewed": true,
+  "hashesMatch": true
+}

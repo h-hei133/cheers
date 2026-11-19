@@ -1,0 +1,88 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "node": "v20.3.0",
+  "buildId": "7bb49e3f40cef24f3cdaa810c44b08815e96f94bf9716aa30aa4f6cc09f7d9b5",
+  "cases": [
+    {
+      "name": "compiled-rpc-controlled-reload-confirm",
+      "status": "passed",
+      "uiRebound": true,
+      "startupQueue": true,
+      "exit": 0,
+      "signal": null,
+      "posts": 2
+    },
+    {
+      "name": "compiled-rpc-controlled-reload-startup-abort",
+      "status": "passed",
+      "unknownFenced": true,
+      "exit": 0,
+      "signal": null,
+      "posts": 0
+    },
+    {
+      "name": "compiled-rpc-controlled-reload-startup-cancel",
+      "status": "passed",
+      "unknownFenced": true,
+      "exit": 0,
+      "signal": null,
+      "posts": 0
+    },
+    {
+      "name": "compiled-rpc-controlled-reload-old-shutdown-abort",
+      "status": "passed",
+      "unknownFenced": true,
+      "exit": 0,
+      "signal": null,
+      "posts": 0
+    },
+    {
+      "name": "compiled-rpc-controlled-reload-failed-file",
+      "status": "passed",
+      "unknownFenced": true,
+      "exit": 0,
+      "signal": null,
+      "posts": 0
+    }
+  ],
+  "loopbackRequests": [
+    {
+      "stage": "confirm",
+      "method": "GET",
+      "path": "/models",
+      "time": 1795051465785,
+      "users": []
+    },
+    {
+      "stage": "confirm",
+      "method": "POST",
+      "path": "/chat/completions",
+      "time": 1795051465873,
+      "users": [
+        "[Environment Context: cwd=/home/wang/projects/cheers/.tmp/upgrade-reload/native-private-gt7hSR/confirm | permission_scope=ask]\n\nRELOAD_STARTUP_REQUEST"
+      ]
+    },
+    {
+      "stage": "confirm",
+      "method": "GET",
+      "path": "/models",
+      "time": 1795051466001,
+      "users": []
+    },
+    {
+      "stage": "confirm",
+      "method": "POST",
+      "path": "/chat/completions",
+      "time": 1795051466061,
+      "users": [
+        "RELOAD_STARTUP_REQUEST",
+        "[Environment Context: cwd=/home/wang/projects/cheers/.tmp/upgrade-reload/native-private-gt7hSR/confirm | permission_scope=ask]\n\nAFTER_RELOAD_REQUEST"
+      ]
+    }
+  ],
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "buildUnchanged": true,
+  "posts": 2
+}

@@ -45,7 +45,7 @@ export class ExtensionSessionLifecycle {
     });
   }
 
-  shutdown(settle: () => Promise<void>, reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason']): Promise<void> {
+  shutdown(settle: () => Promise<void>, reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason'], signal?: AbortSignal): Promise<void> {
     if (this.shuttingDown) return this.shuttingDown;
     this.closing = true;
     const failures: unknown[] = [];
@@ -55,7 +55,7 @@ export class ExtensionSessionLifecycle {
         const started = this.started;
         if (started) {
           await started.catch(() => undefined);
-          if (!this.admission()) await this.publish({ type: 'session_shutdown', sessionId: this.sessionId, workspaceRoot: this.root, reason });
+          if (!this.admission()) await this.publish({ type: 'session_shutdown', sessionId: this.sessionId, workspaceRoot: this.root, reason }, signal);
         }
       } catch (error) { failures.push(error); }
       if (failures.length > 0) throw failures[0];

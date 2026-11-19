@@ -28,11 +28,11 @@ export function attachInputQueue(runtime: ShellSessionRuntime, host: QueueHost):
   hosts.set(runtime, host); return () => { if (hosts.get(runtime) === host) hosts.delete(runtime); };
 }
 
-/** Lifecycle messages join the existing queue and execute after the replacement command settles. */
+/** Lifecycle messages join the existing queue and execute after their resource command settles. */
 export function queueExtensionMessage(runtime: ShellSessionRuntime, text: string, admission: () => string | undefined): boolean {
   const command = runtime.commands.current;
   const host = hosts.get(runtime);
-  if (command?.kind !== 'session-change' || !host) return false;
+  if (!command || !['session-change', 'extension-reload'].includes(command.kind) || !host) return false;
   const refused = admission();
   if (refused) throw new Error(refused);
   const id = host.enqueue(text);
@@ -41,7 +41,7 @@ export function queueExtensionMessage(runtime: ShellSessionRuntime, text: string
   void command.settled.then(result => {
     command.controller.signal.removeEventListener('abort', cancel);
     if (hosts.get(runtime) !== host || command.controller.signal.aborted || admission()
-      || (result as { status?: unknown } | undefined)?.status !== 'changed') cancel();
+      || !['changed', 'reloaded'].includes(String((result as { status?: unknown } | undefined)?.status))) cancel();
     else host.drain();
   }, () => { command.controller.signal.removeEventListener('abort', cancel); cancel(); }).catch(cancel);
   return true;

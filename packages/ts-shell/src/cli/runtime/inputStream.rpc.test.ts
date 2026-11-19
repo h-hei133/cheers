@@ -15,6 +15,7 @@ import type { RpcResponse, RpcUiBridge } from '../rpc/protocol.js';
 import { runPromptInputStream } from './inputStream.js';
 import { ShellCommandRuntime } from '../../core/shell/command.js';
 import { registerCatalogContribution } from '../../core/catalog/contributions.js';
+import { extensionCommandFor, installExtensionRuntime, startExtensionsFor, closeExtensionsFor } from './extensions.js';
 
 let directory: string;
 let context: ShellRuntimeContext;
@@ -141,6 +142,28 @@ it('prepares startup only after binding RPC input and waits before dispatching o
     stdin.write(JSON.stringify({ type: 'extension_ui_response', id: request.id, confirmed: true }) + '\n');
     await vi.waitFor(() => expect(prompts).toEqual(['WAIT_FOR_START'])); expect(confirmed).toBe(true);
   } finally { stdin.end(); await running; }
+});
+
+it('lets RPC abort cancel a pending content reload while EOF joins its response', async () => {
+  const stdin=new PassThrough(); inputs.push(stdin); const commands=new ShellCommandRuntime();
+  const runtime={commands,isRunning:() => Boolean(commands.current),input:() => undefined,getPermissionScope:() => 'ask',waitForIdle:async () => {},
+    getCurrentRunController:() => commands.current?.controller ?? null,cancelCurrentRun:() => commands.current?.controller.abort(),cancelAndWait:async () => {}} as unknown as ShellSessionRuntime;
+  installExtensionRuntime(context,runtime,() => ({sessionId:context.session.id,workspaceRoot:directory,hooks:{dispatch:async () => ({decision:'allow'})} as never,emit(){},permissionScope:'ask'}),manager);
+  const retire=registerCatalogContribution({root:directory,sessionId:context.session.id,commands:[],tools:[],skills:() => [],onEvent:async event => {
+    if (event==='session_shutdown') await new Promise<void>(() => {});
+  }});
+  await startExtensionsFor(context); let outcome: Awaited<ReturnType<ReturnType<typeof extensionCommandFor>>> | undefined;
+  const running=runPromptInputStream({stdin,runtimeContext:context,sessionRuntime:runtime,sessionManager:manager,rpcMode:true,
+    renderer:{renderLine:() => {}} as never,logger:{info:() => {}} as never,
+    runPrompt:async () => {outcome=await extensionCommandFor(context)('plugin',['reload'],{cwd:directory,sessionId:context.session.id});}});
+  try {
+    stdin.write('{"id":"reload","type":"prompt","message":"/plugin reload"}\n');
+    await vi.waitFor(() => expect(commands.current?.kind).toBe('extension-reload'));
+    stdin.write('{"id":"abort-reload","type":"abort"}\n');
+    await vi.waitFor(() => expect(frames.find(frame => frame.id==='abort-reload')?.success).toBe(true));
+    expect(commands.current?.controller.signal.aborted ?? true).toBe(true);
+  } finally {stdin.end(); await running; retire(); await closeExtensionsFor(context).catch(() => {});}
+  expect(outcome?.output).toContain('unknown');
 });
 
 it('joins accepted RPC responses on EOF even while startup is cancelled', async () => {

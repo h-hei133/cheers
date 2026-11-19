@@ -21,14 +21,16 @@ import { runEventHandlers } from '../../extensions/events/dispatch.js';
 import type { CoreMcpGateway } from '../../core/mcp/gateway.js';
 import { ExtensionSessionLifecycle } from './extensions/lifecycle.js';
 import type { ExtensionSessionEvent } from '../../extensions/events/model.js';
+import { createExtensionReload, type ExtensionReloadResult } from './extensions/reload.js';
 export { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
 
 interface ExtensionRuntime {
-  readonly service: () => ExtensionService; readonly ready: () => Promise<void>; readonly close: () => Promise<void>; readonly cancel: () => Promise<void>; readonly run: ExtensionRun;
+  readonly service: () => ExtensionService; readonly ready: () => Promise<void>; readonly close: () => Promise<void>; readonly cancel: () => Promise<readonly string[]>; readonly run: ExtensionRun;
   readonly start: (reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason'], signal?: AbortSignal) => Promise<void>;
   readonly shutdown: (reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason'], settle?: () => Promise<void>) => Promise<void>;
   readonly replace: () => Promise<void>;
   readonly retire: () => Promise<void>;
+  readonly reload: (signal?: AbortSignal) => Promise<ExtensionReloadResult>;
 }
 const runtimes = new WeakMap<ShellRuntimeContext, ExtensionRuntime>();
 export function installExtensionRuntime(context: ShellRuntimeContext, runtime: ShellSessionRuntime, gate: (tool?: string) => ToolGateOptions, store?: SessionManager,
@@ -41,38 +43,57 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
   let initializing = false;
   let ready: Promise<void> = Promise.resolve();
   let lifecycle: ExtensionSessionLifecycle | undefined;
-  const retire = async () => {
+  let ownedHost: ExtensionHostBridge | undefined;
+  let retirement: Promise<void> | undefined;
+  const retire = () => retirement ??= Promise.resolve().then(async () => {
     closing = true;
     initialization?.abort();
-    cliCleanups.splice(0).forEach(unregister => unregister());
-    const results = await Promise.allSettled([...retiring, ...(service ? [service.close()] : [])]);
-    await ready.catch(() => {});
+    const retiringService = service, retiringReady = ready;
+    const results = await Promise.allSettled([...cliCleanups.splice(0).map(unregister => Promise.resolve().then(unregister)),
+      ...retiring, ...(retiringService ? [Promise.resolve().then(() => retiringService.close())] : [])]);
+    await retiringReady.catch(() => {});
     if (retiredUnknown || results.some(result => result.status === 'rejected')) {
       retiredUnknown = true;
       throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
     }
     service = undefined;
     identity = undefined;
-  };
-  const rebind = async () => {
+  });
+  const rebind = async (signal?: AbortSignal) => {
     if (closed || retiredUnknown || service || retiring.size > 0) throw new Error('Extension retirement must complete before replacement.');
     closing = false;
+    retirement = undefined;
     runtimes.get(context)!.service();
-    await ready;
+    const controller = initialization;
+    const cancel = () => controller?.abort();
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) cancel();
+    try { await ready; signal?.throwIfAborted(); }
+    finally { signal?.removeEventListener('abort', cancel); }
   };
-  runtimes.set(context, { run: operation => runtime.commands.run(operation), ready: () => ready,
+  const bound: ExtensionRuntime = { run: operation => runtime.commands.run(operation), ready: () => ready,
     start: (reason, signal) => lifecycle!.start(() => ready, reason, signal),
     shutdown: (reason, settle) => { closing = true; return lifecycle!.shutdown(settle ?? (() => runtime.cancelAndWait()), reason); },
     replace: rebind,
     retire,
-    cancel: async () => { if (initializing) initialization?.abort(); await service?.cancel(); }, close: async () => {
+    cancel: async () => {
+      const command = runtime.commands.current;
+      if (command?.kind === 'extension-reload') {
+        command.controller.abort();
+        const result = await command.settled as ExtensionReloadResult;
+        return 'reason' in result ? [result.reason] : result.diagnostics;
+      }
+      if (initializing) initialization?.abort();
+      const selected = service;
+      await selected?.cancel();
+      return [...selected?.errors ?? [], ...(retiredUnknown || closing || closed || context.workspaceIssue
+        ? ['Extension cancellation is not verified; the original runtime cannot reenter.'] : [])];
+    }, close: async () => {
     closed = true;
-    closeExtensionHost(context);
-    initialization?.abort();
-    cliCleanups.splice(0).forEach(unregister => unregister());
-    const results = await Promise.allSettled([...retiring, ...(service ? [service.close()] : [])]);
-    await ready.catch(() => {});
-    if (retiredUnknown || results.some(result => result.status === 'rejected')) throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
+    const command = runtime.commands.current;
+    if (command?.kind === 'extension-reload') command.controller.abort();
+    closeExtensionHost(context, ownedHost);
+    await retire();
   }, service: () => {
     if (closed || closing || retiredUnknown) throw new Error('Extension runtime is closing, closed or prior cleanup is unknown.');
     const key = JSON.stringify([context.session.id, context.session.createdAt, context.cwd, context.configuration.substrateRevision, context.workspaceRevision]);
@@ -84,6 +105,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
       }
       identity = key; const session = context.session.id; const root = context.cwd;
       const extensionHost = installExtensionHost(context, runtime, store, gateway);
+      ownedHost = extensionHost;
       lifecycle = new ExtensionSessionLifecycle(context);
       const check = () => { const refused = configurationAdmission(context)() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session or workspace changed.' : undefined); if (refused) throw new Error(refused); };
       service = new ExtensionService({ root, gate: tool => ({ ...gate(tool), admission: () => gate(tool).admission?.() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session changed.' : undefined) }),
@@ -105,7 +127,15 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
       });
     }
     return service;
-  } });
+  }, reload: createExtensionReload(context, runtime, {
+    current: () => !closed && runtimes.get(context) === bound,
+    ready: () => ready,
+    shutdown: signal => { closing = true; return lifecycle!.shutdown(async () => {}, 'reload', signal); },
+    retire, replace: rebind,
+    start: signal => lifecycle!.start(() => ready, 'reload', signal),
+    diagnostics: () => service?.errors ?? [],
+  }) };
+  runtimes.set(context, bound);
   runtimes.get(context)!.service();
 }
 
@@ -182,11 +212,22 @@ async function registerCliExtensions(
 export function extensionCommandFor(context: ShellRuntimeContext): NonNullable<CommandContext['extensionCommand']> {
   return async (kind, args, commandContext) => {
     if (commandContext.sessionId !== context.session.id || commandContext.cwd !== context.cwd) return { kind: 'local', output: 'Extensions refused: session or workspace changed.' };
-    const service = runtimes.get(context)?.service();
+    const owner = runtimes.get(context);
+    if (kind === 'plugin' && args.length === 1 && args[0] === 'reload' && owner) {
+      const result = await owner.reload(commandContext.signal);
+      return { kind: 'local', output: result.status === 'reloaded' ? 'Extensions reloaded from current reviewed identities and workspace grants.'
+        : result.status === 'partial' ? `Extension reload completed with withheld capabilities:\n${result.diagnostics.join('\n')}`
+          : `Extension reload ${result.status}: ${result.reason}` };
+    }
+    if (kind === 'plugin' && args.length === 1 && args[0] === 'cancel' && owner) {
+      const diagnostics = await owner.cancel();
+      return { kind: 'local', output: diagnostics.length ? `Extension cancellation is not verified:\n${diagnostics.join('\n')}` : 'Extension calls cancelled and drained.' };
+    }
+    const service = owner?.service();
     return service ? kind === 'marketplace' ? marketplaceCommand(args, service) : pluginCommand(args, service) : { kind: 'local', output: 'Extensions require a bound session runtime.' };
   };
 }
-export function cancelExtensionsFor(context: ShellRuntimeContext): void { cancelExtensionUiFor(context); void runtimes.get(context)?.cancel(); }
+export function cancelExtensionsFor(context: ShellRuntimeContext): void { cancelExtensionUiFor(context); void runtimes.get(context)?.cancel().catch(() => {}); }
 export async function closeExtensionsFor(context: ShellRuntimeContext): Promise<void> { await runtimes.get(context)?.close(); }
 export async function startExtensionsFor(context: ShellRuntimeContext, reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason'] = 'startup', signal?: AbortSignal): Promise<void> {
   const owner = runtimes.get(context);

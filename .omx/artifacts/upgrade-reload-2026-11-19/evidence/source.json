@@ -1,0 +1,16 @@
+{
+  "buildId": "7bb49e3f40cef24f3cdaa810c44b08815e96f94bf9716aa30aa4f6cc09f7d9b5",
+  "files": {
+    "packages/ts-shell/src/cli/runtime/extensions/reload.test.ts": "38160bef1870ec3db600090145d2b0b9d99d4c3ab07aa40eef4768b661cf706e",
+    "packages/ts-shell/src/cli/runtime/extensions/reload.ts": "e286ae169488af7fe8f28e9224df5578b2c3808fd0a8c81b4c54a39104d5309f",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "4a8cacc6fca8b094969eeaaca40173fbc12a1bf0493ad584dda954b66b8daefd",
+    "packages/ts-shell/src/cli/runtime/extensions/host.ts": "5d9688924dcef1ba3c8f2406d601937afa3d4c449849843ea6326829fd72981c",
+    "packages/ts-shell/src/cli/runtime/extensions/lifecycle.ts": "def54b06fcb8ec311e428a9faf838355e9dcf543d66f1262e72da799ce010cde",
+    "packages/ts-shell/src/cli/runtime/inputQueue.ts": "79e99fe97917eae6a1b03b9df91534736f970e019ed44a1d862801522c898bfc",
+    "packages/ts-shell/src/cli/runtime/inputStream.rpc.test.ts": "d1b815be8b7e8eed92cc33b7d6dd5594baa47be1c4767031fcd11e2a00eeac64",
+    "packages/ts-shell/src/cli/runtime/inputStream.ts": "185a40066ee019e1e2f30a31b3bd8d19d4ecadead909a8ad873bcf30012eb6a2",
+    "packages/ts-shell/src/core/shell/command.ts": "89798a7ecd4e575e1d49a94c5288ce8cbaceb83b7737cf55dad920545d1ffd83"
+  },
+  "productionFiles": 7,
+  "hashesMatch": true
+}

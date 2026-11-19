@@ -4,6 +4,18 @@
 
 只有一个 workspace 包。单个模块的 import 图无环不等于可以直接搬目录成为无环包：browser/core、workflow/core、planning/session/provider 的双向边存在。现有分支树、CAS 状态写入、任务日志、远端作业派发栅栏均已实现；问题是事务权威和独立模块边界未完成，不能重造另一套执行器或任务系统。
 
+## Controlled CLI extension reload (2026-11-19)
+
+原/plugin reload仅installed service.invalidate，file资源和会话通知未重载。定向参考采用idle拒绝、旧shutdown→retire→new resources→UI/start的决定；复用本项目extension service、文件loader、命令和surface owners，不动watch/grants即时撤权，不另bootstrap或改session selection。只显式/plugin reload与named reload-plugins进入唯一extension-reload命令；原多调用者join一个Promise，startup消息仍exact successor/command排队，changed或reloaded才执行。
+
+old notification等待不join自己的command；caller原signal到shutdown/start，未知后runtime封锁。retirement按generation一次Promise，所有unregister/service/初始化结算join，callback失败继续cleanup；close/cancel共用原owner。创建新UI前旧UI取消，after await复查source/root/config/host。源码审查发现同runtime配置改变漏unknown fence、installed errors被清成功、microtask后捕source、旧outer替换漏退休、cancel不truthful与close同步重入清后继；均实际反例修复。native host读旧信息允许，shutdown不再UI通知，observer误用只修probe。/plugin cancel及时abort原重载并等待，已unknown的later cancel仍not verified。partial capabilities不发clean成功且startup entry移除；外部explicit user queue保留。
+
+当前11文件179项与七静态门／2732生产模块0monoliths通过；联合之后一处TypeScript联合判别式改in，无runtime语义变化，最终影响20项及build7bb49e3f40ce输入摘要匹配通过。10有效反转10AssertionErrors，isolated exact恢复81项，主源码未反转；close的原生throw证据通过isolated等价not-toThrow断言adapter，production test字节未改，escape mismatch保留前置fixture失败。限定source APPROVE七file/hash最终核验。
+
+Linuxcompiled／Node20.3禁动态生成／installed各5场景2POST：successor TS command实际发现、UI确认/report/startup queue及继续prompt；startup abort/plugin cancel、old shutdown abort与failed file保持同session、unknown封锁、零POST；两模式PTY实际reload确认／新status／report／普通prompt各1POST和exit0。安装15strict NodeNext／skipLibCheck=false／engine-strict。最初shutdown UI observer期待错误／poll timeout仍活PID已终止纠正、两union narrowingbuild失败与不存在test selector分类保留。未新增配置模型调用，normal pinned judgeexit2/not_proven／16384图capacity保持。[当前交付](../../../.omx/artifacts/upgrade-reload-2026-11-19/delivery.json)。36/62、26开放，full E.6不勾选。
+
+SDK reload源码核实仍缺exact loader lease／新generation receipt、可替换SDK contribution、prompt/skill/theme和noToolsbuiltin旧生成allowlist、当前caller UI registration显式adoption。不得让external loader.reload静默借给旧session；SDK原inplace refusal保持。下一tree custom result沿existing summary/revert/write guard接入。
+
 ## Initial CLI input and UI readiness (2026-11-19)
 
 目标是initial session_start可使用实际输入UI，普通input等完整startup结束。原bootstrap在interactive／RPC consumer前发start；定向参考采用先subscribe、绑定UI再start的决定，复用本项目input／queue／host／lifecycle，不增加新event bus或独立启动执行器。print／batch维持原时机；interactive与stdin-stream通过onInputReady传原signal。startup拥有shared ready、pending与admitted，failed／cancelled不能因pending=false重新放行。

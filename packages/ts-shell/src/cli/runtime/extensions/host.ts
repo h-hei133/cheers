@@ -34,7 +34,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
   const sessionId = context.session.id;
   const createdAt = context.session.createdAt;
   const root = context.cwd;
-  const replacement = runtime.commands.current?.kind === 'session-change' ? runtime.commands.current : undefined;
+  const replacement = runtime.commands.current && ['session-change', 'extension-reload'].includes(runtime.commands.current.kind) ? runtime.commands.current : undefined;
   const configured = configurationAdmission(context);
   let closed = false;
   let closing = false;
@@ -65,7 +65,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
       if (typeof message !== 'string' || !message.trim()) throw new Error('Extension message must be nonempty text.');
       const input = runtime.input();
       if (input) input.followUp(message, 'extension');
-      else if (runtime.commands.current?.kind === 'session-change' && runtime.commands.current !== replacement) throw new Error('Messages are unavailable before session replacement.');
+      else if (runtime.commands.current && ['session-change', 'extension-reload'].includes(runtime.commands.current.kind) && runtime.commands.current !== replacement) throw new Error('Messages are unavailable before session replacement.');
       else if (queueExtensionMessage(runtime, message, uiAdmission)) return;
       else await runtime.executePrompt(sessionId, message, { outputMode: 'print' });
     },
@@ -81,15 +81,17 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
     },
   };
   const state: HostState = { host, admission, uiAdmission, quiesce: () => {
+    const ownedSurface = hosts.get(context) === state ? surfaces.get(context) : undefined;
     closing = true;
     state.refreshUi = undefined;
     lastUi?.release();
-    if (hosts.get(context) === state) surfaces.get(context)?.release();
+    ownedSurface?.release();
   }, close: () => {
+    const ownedSurface = hosts.get(context) === state ? surfaces.get(context) : undefined;
     closed = true;
     state.refreshUi = undefined;
     lastUi?.release();
-    if (hosts.get(context) === state) surfaces.get(context)?.release();
+    ownedSurface?.release();
   } };
   hosts.set(context, state);
   return host;
@@ -154,9 +156,11 @@ export function bindExtensionUiFor(context: ShellRuntimeContext, ui: ExtensionUi
   return release;
 }
 
-export function closeExtensionHost(context: ShellRuntimeContext): void {
-  hosts.get(context)?.close();
-  surfaces.get(context)?.release();
+export function closeExtensionHost(context: ShellRuntimeContext, expected?: ExtensionHostBridge): void {
+  const state = hosts.get(context);
+  if (expected && state?.host !== expected) return;
+  const surface = surfaces.get(context);
+  try { state?.close(); } finally { surface?.release(); }
 }
 
 /** Cancel current dialogs while keeping the same surface available for later calls. */

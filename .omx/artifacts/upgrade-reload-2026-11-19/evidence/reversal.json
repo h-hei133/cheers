@@ -1,0 +1,171 @@
+{
+  "status": "passed",
+  "source": {
+    "packages/ts-shell/src/cli/runtime/extensions/reload.test.ts": "38160bef1870ec3db600090145d2b0b9d99d4c3ab07aa40eef4768b661cf706e",
+    "packages/ts-shell/src/cli/runtime/extensions/reload.ts": "e286ae169488af7fe8f28e9224df5578b2c3808fd0a8c81b4c54a39104d5309f",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "4a8cacc6fca8b094969eeaaca40173fbc12a1bf0493ad584dda954b66b8daefd",
+    "packages/ts-shell/src/cli/runtime/extensions/host.ts": "5d9688924dcef1ba3c8f2406d601937afa3d4c449849843ea6326829fd72981c",
+    "packages/ts-shell/src/cli/runtime/extensions/lifecycle.ts": "def54b06fcb8ec311e428a9faf838355e9dcf543d66f1262e72da799ce010cde",
+    "packages/ts-shell/src/cli/runtime/inputQueue.ts": "79e99fe97917eae6a1b03b9df91534736f970e019ed44a1d862801522c898bfc",
+    "packages/ts-shell/src/cli/runtime/inputStream.rpc.test.ts": "d1b815be8b7e8eed92cc33b7d6dd5594baa47be1c4767031fcd11e2a00eeac64",
+    "packages/ts-shell/src/cli/runtime/inputStream.ts": "185a40066ee019e1e2f30a31b3bd8d19d4ecadead909a8ad873bcf30012eb6a2",
+    "packages/ts-shell/src/core/shell/command.ts": "89798a7ecd4e575e1d49a94c5288ce8cbaceb83b7737cf55dad920545d1ffd83"
+  },
+  "cases": [
+    {
+      "name": "source-capture",
+      "file": "cli/runtime/extensions/reload.ts",
+      "originalSha256": "e286ae169488af7fe8f28e9224df5578b2c3808fd0a8c81b4c54a39104d5309f",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-source-capture.log",
+      "logSha256": "2c1954eeb480ba5c31a751ef77fad709b78ad58b0c60e7d19cb3d73c308bded6",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "shutdown-order",
+      "file": "cli/runtime/extensions/reload.ts",
+      "originalSha256": "e286ae169488af7fe8f28e9224df5578b2c3808fd0a8c81b4c54a39104d5309f",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-shutdown-order.log",
+      "logSha256": "195b6e4633948426aaefe8dce44d76314e18047238d33372309cfe14883ece0d",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "retirement-join",
+      "file": "cli/runtime/extensions/reload.ts",
+      "originalSha256": "e286ae169488af7fe8f28e9224df5578b2c3808fd0a8c81b4c54a39104d5309f",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-retirement-join.log",
+      "logSha256": "b186f7d0181e0a2bfc3030363b0244e44114e4e2f86ec6cba4ccb4562e24f5d4",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "unknown-fence",
+      "file": "cli/runtime/extensions/reload.ts",
+      "originalSha256": "e286ae169488af7fe8f28e9224df5578b2c3808fd0a8c81b4c54a39104d5309f",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-unknown-fence.log",
+      "logSha256": "4e6e49695f9e81301c66f942080ccf35ed09dfba29abff17db19194a6e8ca372",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "partial-diagnostics",
+      "file": "cli/runtime/extensions/reload.ts",
+      "originalSha256": "e286ae169488af7fe8f28e9224df5578b2c3808fd0a8c81b4c54a39104d5309f",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-partial-diagnostics.log",
+      "logSha256": "03f00315d6388c8a439edf8999816590a19c4fa0c1834ff398451a5237068ff0",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "original-retirement",
+      "file": "cli/runtime/extensions/reload.ts",
+      "originalSha256": "e286ae169488af7fe8f28e9224df5578b2c3808fd0a8c81b4c54a39104d5309f",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-original-retirement.log",
+      "logSha256": "53c0f9ddb7f5e153289bd93bd9fbdbf95e8f9fb058122be093bee698cee5726b",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "shutdown-cancellation",
+      "file": "cli/runtime/extensions.ts",
+      "originalSha256": "4a8cacc6fca8b094969eeaaca40173fbc12a1bf0493ad584dda954b66b8daefd",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-shutdown-cancellation.log",
+      "logSha256": "5fa0ff7375711df8fedc4c95d319eade2f036bd84ea0e0989cd12419706d0674",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "close-generation",
+      "file": "cli/runtime/extensions.ts",
+      "originalSha256": "4a8cacc6fca8b094969eeaaca40173fbc12a1bf0493ad584dda954b66b8daefd",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-close-generation.log",
+      "logSha256": "a2d3de9a1c7b25e4bee19b676f59f5f9825f8ae921848312980a88db615ef32a",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "startup-queue",
+      "file": "cli/runtime/inputQueue.ts",
+      "originalSha256": "79e99fe97917eae6a1b03b9df91534736f970e019ed44a1d862801522c898bfc",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-startup-queue.log",
+      "logSha256": "4d370d18d3e5ad24ffafc4c7a9bf3ce391dd968b675817420c0417b395222289",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    },
+    {
+      "name": "cancel-diagnostics",
+      "file": "cli/runtime/extensions.ts",
+      "originalSha256": "4a8cacc6fca8b094969eeaaca40173fbc12a1bf0493ad584dda954b66b8daefd",
+      "exit": 1,
+      "assertionFailures": 1,
+      "log": "reversal-cancel-diagnostics.log",
+      "logSha256": "a263cc1002cd5fb27b7ddc43bce74c9444443e0372b6182b07d2f6b0ba3e9388",
+      "terminalTests": "1 failed | 19 skipped (20)"
+    }
+  ],
+  "restored": [
+    {
+      "name": "source-capture",
+      "exact": true
+    },
+    {
+      "name": "shutdown-order",
+      "exact": true
+    },
+    {
+      "name": "retirement-join",
+      "exact": true
+    },
+    {
+      "name": "unknown-fence",
+      "exact": true
+    },
+    {
+      "name": "partial-diagnostics",
+      "exact": true
+    },
+    {
+      "name": "original-retirement",
+      "exact": true
+    },
+    {
+      "name": "shutdown-cancellation",
+      "exact": true
+    },
+    {
+      "name": "close-generation",
+      "exact": true
+    },
+    {
+      "name": "close-generation",
+      "exact": true
+    },
+    {
+      "name": "startup-queue",
+      "exact": true
+    },
+    {
+      "name": "cancel-diagnostics",
+      "exact": true
+    }
+  ],
+  "restoredTests": {
+    "exit": 0,
+    "assertionFailures": 0,
+    "log": "reversal-restored.log",
+    "logSha256": "2276ef02e65954a2d06238de5a4cf8de75528e438ddd53616c615a5af7eccd3f",
+    "terminalTests": "81 passed (81)"
+  },
+  "mainSourceUnchanged": true,
+  "privateTreeRemoved": true
+}

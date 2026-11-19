@@ -13,7 +13,7 @@ import { attachInputQueue, isQueueControl } from './inputQueue.js';
 import { isGoalControl } from './goal.js';
 import { isSecurityControl } from './security.js';
 import { isAgentsControl } from './agents.js';
-import { bindExtensionUiFor, isExtensionControl, refreshExtensionsFor } from './extensions.js';
+import { bindExtensionUiFor, cancelExtensionsFor, isExtensionControl, refreshExtensionsFor } from './extensions.js';
 import { isMcpRequest, isMcpConfiguration, isMcpControl, mcpControl } from '../mcp/content.js';
 import { cancelMcpFor } from './mcp.js';
 import { sshControl } from '../ssh/control.js';
@@ -143,6 +143,14 @@ export async function runPromptInputStream(options: {
   };
   const enqueuePrompt = (prompt: string, attachments?: PromptAttachments): void => {
     if (!startup.admitted()) { queue.push(prompt, attachments); drain(); return; }
+    if (/^\/(?:plugin|plugins|extensions)\s+cancel\s*$/i.test(prompt.trim())) {
+      cancelExtensionsFor(options.runtimeContext);
+      pendingControls++;
+      localControlChain = localControlChain.then(() => dispatch(prompt))
+        .catch(() => options.renderer.renderLine('Extension cancellation is unverified; inspect retained outcomes.'))
+        .finally(() => { pendingControls--; });
+      return;
+    }
     const media = mediaControl(prompt);
     if (media) {
       if (media.stop) {

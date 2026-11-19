@@ -23,8 +23,8 @@
 ## Current status
 
 **Current phase** 按批实施。36/62 项完成 Linux 本地功能验收，26 项开放。
-**Completed batch** E.6 initial CLI input/UI readiness。interactive／RPC在实际input与UI绑定后start，普通／slash／steer／follow-up与goal等待admitted；原取消signal贯穿通知，startup错误保留、EOF结算原response。10文件215项、七静态门／2730modules／0monoliths、7反转10AssertionErrors/exact恢复104项及build1d61695fbd9f通过，两项限定APPROVE/hash核验。Linuxcompiled／Node20.3／installed各4场景7POST、15strict入口和两模式PTY各1POST通过，当前replacement回归6场景5POST通过。
-**Next batch** E.6 controlled reload沿旧shutdown／retirement／new UI/start owner；其后before-tree定制summary和其余结果consumer，SDK须显式resource adoption。36/62、26开放保持；metadata／selection仍非跨文件原子事务。
+**Completed batch** E.6 controlled CLI extension reload。旧shutdown／原retirement后重载file与installed资源、绑定新UI再start，same session/selection保持；busy／取消／unknown／partial不升级。11文件179项和七静态门2732modules/0monoliths；TypeScript-only narrowing后影响20项与build7bb49e3f40cepassed，10反转10AssertionErrors/exact恢复81项，限定APPROVE/hash核验。Linuxcompiled／Node20.3／installed各5场景2POST、15strict入口和两模式PTY各1POSTpassed。
+**Next batch** E.6 before-tree定制summary与instructions及其余result consumers；SDK controlled reload需要独立resource/Ui/政策adoption。36/62、26开放保持；metadata／selection仍非跨文件原子事务。
 **Repository gate** 当前normal judgeexit2/not_proven，16384图容量缺口；pinned输入未改。定向script29项与完整209/210为前批历史，不升为当前script验证。
 **Evidence boundary** 本批未重复调用配置模型，前批provider-auth／0requests保留历史；Linux本地HTTP／安装证据不证明真实服务或其他平台。本轮仅本地按批提交，不push或宣称CI。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
@@ -40,6 +40,8 @@
 所有仍然成立的必需任务均需实现和相应范围的当前证据；“代码已有但未验收”“部分完成”“证据不足”都不算完成。研究结论被反证时记录具体消费者与理由，不为删除任务而缩小目标。缺少某一家服务或人类授权时继续其他独立工作，保留该项状态。Linux 证据不扩展为 Windows 或全平台验证。每批更新 tasks 和本文件；总目标只在逐项审计通过后关闭。
 
 ## Adaptive control
+
+E.6 controlled CLI reload实际L，复用10/10，原commands/lifecycle/retirement/queue/UI保持，无新依赖。未预见依赖6（microtask前source捕获、partial错误、cancel原shutdown、共享retirement、旧outer退休、close同步重入）；源码审查缺口各实际red后修，10反转10AssertionErrors/exact恢复。CLI当前只Linux资格，SDK owner仍独立开放；normaljudge not_proven保持，不补造统一drift数字。
 
 E.6 initial startup实际L，复用10/10，原input／queue／UI／lifecycle／invocation owner保持，无新依赖。新增未预见依赖4（slash control绕过、live child steer、line EOF先cancel、cleanup不能覆盖primary error）；两限定复审、六实际反例红后修，7有效反转exact恢复。native GET误拦截／Python basename／PTY proxy／isolated scratch误用保留为probe失败。36/62、26开放，full E.6与goal保持active，不补造历史drift数字。
 
