@@ -50,6 +50,32 @@ function setup(overrides: Partial<LineLoopOptions> = {}) {
 }
 const turn = () => new Promise<void>(resolve => setImmediate(resolve));
 
+it('holds queue controls until initial startup completes', async () => {
+  let entered!: () => void, finish!: () => void;
+  const reached = new Promise<void>(resolve => { entered = resolve; }), held = new Promise<void>(resolve => { finish = resolve; });
+  vi.mocked(routeInteractiveCommand).mockResolvedValue({ turnNumber: 1 });
+  const loop = setup({ onInputReady: async () => { entered(); await held; } });
+  try {
+    await reached; loop.stdin.write('/queue add held\n'); await turn();
+    expect(routeInteractiveCommand).not.toHaveBeenCalled(); finish();
+    await vi.waitFor(() => expect(routeInteractiveCommand).toHaveBeenCalledOnce());
+  } finally { finish(); }
+});
+
+it('cancels pending startup and does not run queued input when the line host closes', async () => {
+  let entered!: () => void; const reached = new Promise<void>(resolve => { entered = resolve; });
+  let signal: AbortSignal | undefined;
+  const loop = setup({ onInputReady: async value => { signal = value; entered(); await new Promise<void>(() => {}); } });
+  await reached; loop.stdin.write('unstarted input\n'); await turn(); loop.stdin.end(); await loop.running;
+  expect(signal?.aborted).toBe(true); expect(routeInteractiveCommand).not.toHaveBeenCalled();
+});
+
+it('reports the original startup failure through the line host', async () => {
+  const failure = new Error('Original line startup failure');
+  const loop = setup({ onInputReady: async () => { throw failure; } });
+  await expect(loop.running).rejects.toBe(failure); expect(loop.exit).not.toHaveBeenCalled();
+});
+
 it('writes the prompt to the provided stdout and reports the first frame after it', async () => {
   const events: string[] = [];
   const stdout = new PassThrough();

@@ -12001,3 +12001,10 @@ E.1复用原worker/gate/catalog修复child退休与完整host join、普通appro
 前置guarded activation已提交934d8299。本批CLI new/resume/continue/panel/explicit/fork/workspace及RPCnew/switch/fork/clone接neutral port：before取消后inactive候选、oldshutdown/完整retirement、原registry CAS、sync publish/new UI/start/final readback。prepared target的state/目录/transcriptprefix在activation前捕获；仅startup report后缀允许，sameID activation/owner、saved history变化与postquiesce取消保持unknown并封锁。startup message只属于新host/exact command，失败cancel其entry保留user；RPC abort绕过长response等待，clear保持busy至projection且不清新chrome。SDK原resource owner明确拒绝inplace迁移。
 
 最终13文件250项、七静态门／2727modules／0monoliths、buildfe58e52bc89b与限定APPROVE通过；14有效反转14AssertionErrors／exact恢复119项，首redundant control／handler内expect隔离／isolated media目录及source CLI timeout均保留分类，原print5/5rerun。Linuxcompiled与Node20.3禁生成各6场景5POST，安装15入口strict类型／6场景5POSTpassed，原shutdown日志六warning／UI confirm/report/queued dispatch/late unknown均验证；source/config不变，private清理。未重复配置模型调用，normalpinnedjudge实际exit2/not_proven／16384图capacity缺口保持。归档upgrade-switch-2026-11-19，36/62、26任务开放，E.6initialstartup／reload／results继续，按授权本地提交、不push/CI。
+
+
+### 2026-11-19：initial CLI输入与UI启动就绪
+
+前批replacement已提交866f835a。本批interactive/RPC session_start在实际input/UI绑定后启动，ordinary/slash/steer/follow-up/goal统一原queue准入，取消原signal贯穿通知／invocation，failed ready不重入、EOF join已受理response、primary startup错误保留。两限定复审的slash/live child绕过先6AssertionErrors后修；10文件215项、七静态门／2730modules／0monoliths、build1d61695fbd9f通过，7有效反转10AssertionErrors/exact恢复104与review source hash核验。
+
+Linuxcompiled／Node20.3禁生成／installed各4场景7POST、15strict入口／skipLibCheck=false；两模式PTY实际确认／append report／普通prompt各1POST及exit0，replacement回归6场景5POST通过。原生GET误拦截／Python basename／nested proxy TTY／isolated scratch失败均保留；配置/source/build保持、私有state清理，未新增配置模型调用。normalpinnedjudge actualexit2/not_proven，16384 capacity缺口未改。归档upgrade-startup-2026-11-19，36/62、26任务开放，E.6controlledreload／results继续，按授权本地提交、不push/CI。

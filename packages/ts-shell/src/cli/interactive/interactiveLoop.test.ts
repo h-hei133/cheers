@@ -12,8 +12,28 @@ import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import type { Session, SessionReentrySummary } from "../../session/SessionManager.js";
 import { createCliShutdown } from '../runtime/shutdown.js';
 import * as processTree from '../../core/shell/platform/processTree.js';
+import { InteractiveMode } from './interactiveMode.js';
 
 describe("interactive loop", () => {
+  it('returns the original startup failure even when terminal cleanup also throws', async () => {
+    const stdin = Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.ReadStream;
+    const stdout = Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.WriteStream;
+    const terminal = new RecordingTerminal(), failure = new Error('Original startup failure');
+    const originalStart = terminal.start.bind(terminal);
+    terminal.start = (...args) => { originalStart(...args); args[3]?.onInputReady?.(); };
+    const stopping = vi.spyOn(InteractiveMode.prototype, 'stop').mockImplementation(() => { throw new Error('Secondary cleanup failure'); });
+    try {
+      const loop = runInteractiveLoop({ stdin, stdout, terminal, scheduler: new ManualScheduler(),
+        sessionManager: { sessionExists: () => false } as never, renderer: new StreamingRenderer(),
+        runtimeContext: withConfiguration({ cwd: '/workspace', projectRoot: '/workspace', session: { id: 'startup-error' },
+          gitContext: { branch: 'main' }, runtimeConfig: { provider: 'openai', tuiMode: 'fullscreen', configDiagnostics: [] } } as never),
+        sessionRuntime: { getAgentMode: () => 'build', getPermissionScope: () => 'ask', getCurrentRunController: () => null, observeEvents: () => () => {}, terminate() {} } as never,
+        logger: { error() {}, info() {}, warn() {} } as never, approvalTrustPolicy: {} as never, initialMcpGateway: {} as never,
+        setReadline() {}, onInputReady: async () => { throw failure; }, exit() {} });
+      await expect(loop).rejects.toBe(failure);
+    } finally { stopping.mockRestore(); stdin.destroy(); stdout.destroy(); }
+  });
+
   it.each(['regular', 'fullscreen'] as const)('hands MCP close to the single CLI shutdown budget on %s exit', async kind => {
     const stdin = Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.ReadStream;
     const stdout = Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.WriteStream;

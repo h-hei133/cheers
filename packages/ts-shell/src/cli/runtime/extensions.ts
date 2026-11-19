@@ -25,7 +25,7 @@ export { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
 
 interface ExtensionRuntime {
   readonly service: () => ExtensionService; readonly ready: () => Promise<void>; readonly close: () => Promise<void>; readonly cancel: () => Promise<void>; readonly run: ExtensionRun;
-  readonly start: (reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason']) => Promise<void>;
+  readonly start: (reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason'], signal?: AbortSignal) => Promise<void>;
   readonly shutdown: (reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason'], settle?: () => Promise<void>) => Promise<void>;
   readonly replace: () => Promise<void>;
   readonly retire: () => Promise<void>;
@@ -61,7 +61,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
     await ready;
   };
   runtimes.set(context, { run: operation => runtime.commands.run(operation), ready: () => ready,
-    start: reason => lifecycle!.start(() => ready, reason),
+    start: (reason, signal) => lifecycle!.start(() => ready, reason, signal),
     shutdown: (reason, settle) => { closing = true; return lifecycle!.shutdown(settle ?? (() => runtime.cancelAndWait()), reason); },
     replace: rebind,
     retire,
@@ -188,9 +188,9 @@ export function extensionCommandFor(context: ShellRuntimeContext): NonNullable<C
 }
 export function cancelExtensionsFor(context: ShellRuntimeContext): void { cancelExtensionUiFor(context); void runtimes.get(context)?.cancel(); }
 export async function closeExtensionsFor(context: ShellRuntimeContext): Promise<void> { await runtimes.get(context)?.close(); }
-export async function startExtensionsFor(context: ShellRuntimeContext, reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason'] = 'startup'): Promise<void> {
+export async function startExtensionsFor(context: ShellRuntimeContext, reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason'] = 'startup', signal?: AbortSignal): Promise<void> {
   const owner = runtimes.get(context);
-  if (owner) { owner.service(); await owner.start(reason); }
+  if (owner) { owner.service(); await owner.start(reason, signal); }
 }
 export function shutdownExtensionsFor(context: ShellRuntimeContext, reason: Extract<ExtensionSessionEvent, { type: 'session_shutdown' }>['reason'] = 'quit', settle?: () => Promise<void>): Promise<void> {
   const owner = runtimes.get(context);

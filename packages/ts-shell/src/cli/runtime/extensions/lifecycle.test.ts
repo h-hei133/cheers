@@ -54,6 +54,20 @@ it('starts the admitted CLI generation once after the complete file factory is r
   expect(observed).toEqual([{ type: 'session_start', sessionId: 'lifecycle', workspaceRoot: root, reason: 'startup' }]);
 });
 
+it('retires the original startup invocation on input cancellation and refuses its late host work', async () => {
+  const controller = new AbortController(); install();
+  let entered!: () => void, finish!: () => void;
+  const reached = new Promise<void>(resolve => { entered = resolve; }), held = new Promise<void>(resolve => { finish = resolve; });
+  let invocation: AbortSignal | undefined;
+  contribution(async (event, _payload, _aliases, signal) => { if (event !== 'session_start') return; invocation = signal; entered(); await held; });
+  const starting = extensions.startExtensionsFor(context, 'startup', controller.signal);
+  const result = starting.then(() => ({ passed: true }), error => ({ error }));
+  try {
+    await reached; controller.abort(); await vi.waitFor(() => expect(invocation?.aborted).toBe(true));
+    expect(await result).toHaveProperty('error');
+  } finally { finish(); await result; }
+});
+
 it('quiesces the old host synchronously and joins the old run before shutdown then waits for every caller', async () => {
   let finishRun!: () => void; let finishNotification!: () => void; let notified!: () => void;
   const running = new Promise<void>(resolve => { finishRun = resolve; }); const notification = new Promise<void>(resolve => { finishNotification = resolve; });

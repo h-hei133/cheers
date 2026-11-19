@@ -38,6 +38,7 @@ export interface InteractiveLoopInput {
   readonly fallbackSessionId?: string;
   readonly onFirstFrame?: () => void;
   readonly onUserIntent?: () => void;
+  readonly onInputReady?: (signal: AbortSignal) => Promise<void>;
   readonly setStartupNotice?: (
     notice: ((line: string) => void) | undefined,
   ) => void;
@@ -90,6 +91,7 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
       fallbackSessionId: input.fallbackSessionId,
       onFirstFrame: input.onFirstFrame,
       onUserIntent: input.onUserIntent,
+      onInputReady: input.onInputReady,
       initialMcpGateway: input.initialMcpGateway,
       setReadline: input.setReadline,
       exit,
@@ -115,6 +117,7 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
         fallbackSessionId: input.fallbackSessionId,
         onFirstFrame: input.onFirstFrame,
         onUserIntent: input.onUserIntent,
+        onInputReady: input.onInputReady,
         setStartupNotice: input.setStartupNotice,
         initialMcpGateway: input.initialMcpGateway,
         terminal: input.terminal,
@@ -128,7 +131,10 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
     const stop = () => { release(); mode.stop(); resolve(); };
     const release = () => input.stopSignal?.removeEventListener('abort', stop);
     input.stopSignal?.addEventListener('abort', stop, { once: true });
-    try { mode.start(); if (input.stopSignal?.aborted) stop(); }
+    try {
+      mode.start(); if (input.stopSignal?.aborted) stop();
+      void mode.inputReady.catch(error => { release(); try { mode.stop(); } catch { /* Preserve the startup failure after cleanup. */ } finally { reject(error); } });
+    }
     catch (error) { release(); mode.stop(); reject(error); }
   });
 }

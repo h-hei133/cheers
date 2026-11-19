@@ -540,6 +540,19 @@ it('attaches structured event observers before a startup extension can submit a 
   try { await fixture.run(); } finally { fixture.dispose(); }
 });
 
+it('defers interactive startup until its input host supplies readiness', async () => {
+  const fixture = outputFixture({ options: {}, plan: 'interactive' }); const order: string[] = [];
+  vi.mocked(startExtensionsFor).mockImplementation(async () => { order.push('start'); });
+  vi.mocked(runCliPrintModeRouter).mockResolvedValue(false);
+  vi.mocked(runInteractiveLoop).mockImplementation(async input => {
+    order.push('input-bound'); expect(startExtensionsFor).not.toHaveBeenCalled();
+    const ready = (input as unknown as { onInputReady?: () => Promise<void> }).onInputReady;
+    expect(ready).toBeTypeOf('function'); await ready!(); order.push('prompt-ready');
+  });
+  try { await fixture.run(); expect(order).toEqual(['input-bound', 'start', 'prompt-ready']); }
+  finally { fixture.dispose(); }
+});
+
 it.each(['root', 'bootstrap', 'router'] as const)('drains and restores before a synchronous %s exit', async exitAt => {
   const fixture = outputFixture({ options: { printMode: true }, exitAt });
   const expected = exitAt === 'router' ? 'answer\n' : `${exitAt} blocked\n`;

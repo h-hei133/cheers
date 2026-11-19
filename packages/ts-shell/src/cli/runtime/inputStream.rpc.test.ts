@@ -14,6 +14,7 @@ import { runTurn, type TurnInput } from '../../turn/session.js';
 import type { RpcResponse, RpcUiBridge } from '../rpc/protocol.js';
 import { runPromptInputStream } from './inputStream.js';
 import { ShellCommandRuntime } from '../../core/shell/command.js';
+import { registerCatalogContribution } from '../../core/catalog/contributions.js';
 
 let directory: string;
 let context: ShellRuntimeContext;
@@ -113,6 +114,108 @@ it('lets JSONL abort reach a pending session replacement while EOF still joins i
   } finally { commands.current?.controller.abort(); stdin.end(); await running; }
   expect(frames.find(frame => frame.id === 'changing')).toMatchObject({ success: true, data: { cancelled: true } });
   expect(frames.find(frame => frame.id === 'abort-changing')?.success).toBe(true); expect(context.session).toBe(source);
+});
+
+it('prepares startup only after binding RPC input and waits before dispatching ordinary prompts', async () => {
+  const stdin = new PassThrough(); inputs.push(stdin);
+  const prompts: string[] = []; let bridge: RpcUiBridge | undefined, started = false, confirmed = false;
+  let ready!: () => void; const reached = new Promise<void>(resolve => { ready = resolve; });
+  const runtime = { waitForIdle: async () => {}, getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
+  const options = { stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true,
+    onRpcUiBridge: (value: RpcUiBridge) => { bridge = value; }, runPrompt: async (prompt: string) => { prompts.push(prompt); },
+    onInputReady: async () => {
+      started = true; expect(bridge).toBeDefined();
+      const confirming = bridge!.confirm('STARTUP_READY', 'Input can answer'); ready();
+      confirmed = await confirming;
+    } };
+  const running = runPromptInputStream(options);
+  try {
+    await vi.waitFor(() => expect(started).toBe(true)); await reached;
+    stdin.write('{"id":"during-start","type":"prompt","message":"WAIT_FOR_START"}\n');
+    await vi.waitFor(() => expect(frames.some(frame => frame.id === 'during-start')).toBe(true));
+    expect(prompts).toEqual([]);
+    // The bridge is live before startup; answer its captured current request.
+    const request = (outputGuard.writeRawStdout as unknown as { mock: { calls: string[][] } }).mock.calls
+      .map(([text]) => JSON.parse(text)).find(frame => frame.type === 'extension_ui_request' && frame.title === 'STARTUP_READY');
+    stdin.write(JSON.stringify({ type: 'extension_ui_response', id: request.id, confirmed: true }) + '\n');
+    await vi.waitFor(() => expect(prompts).toEqual(['WAIT_FOR_START'])); expect(confirmed).toBe(true);
+  } finally { stdin.end(); await running; }
+});
+
+it('joins accepted RPC responses on EOF even while startup is cancelled', async () => {
+  const stdin = new PassThrough(); inputs.push(stdin);
+  let started!: () => void, finish!: () => void, entered!: () => void;
+  const startupReady = new Promise<void>(resolve => { started = resolve; }), responseReady = new Promise<void>(resolve => { entered = resolve; });
+  const held = new Promise<void>(resolve => { finish = resolve; });
+  const runtime = { waitForIdle: async () => {}, getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
+  const retire = registerCatalogContribution({ root: directory, sessionId: context.session.id, commands: [], tools: [],
+    skills: async () => { entered(); await held; return []; } });
+  const running = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true, runPrompt: async () => {},
+    onInputReady: async () => { started(); await new Promise<void>(() => {}); },
+  });
+  let returned = false; const result = running.then(() => { returned = true; }, () => { returned = true; });
+  try {
+    await startupReady; stdin.write('{"id":"held","type":"get_commands"}\n'); await responseReady;
+    stdin.end(); await new Promise(resolve => setImmediate(resolve));
+    expect(returned).toBe(false); finish(); await result;
+    expect(frames.some(frame => frame.id === 'held')).toBe(true);
+  } finally { finish(); retire(); stdin.end(); await result; }
+});
+
+it.each([
+  { type: 'steer', message: 'STARTUP_STEER' },
+  { type: 'follow_up', message: 'STARTUP_FOLLOW_UP' },
+  { type: 'prompt', message: 'STARTUP_PROMPT_STEER', streamingBehavior: 'steer' },
+  { type: 'prompt', message: 'STARTUP_PROMPT_FOLLOW_UP', streamingBehavior: 'followUp' },
+])('holds $type input outside an active startup child until startup completes', async command => {
+  const stdin = new PassThrough(); inputs.push(stdin);
+  let entered!: () => void, finish!: () => void;
+  const reached = new Promise<void>(resolve => { entered = resolve; }), held = new Promise<void>(resolve => { finish = resolve; });
+  const steer = vi.fn(), followUp = vi.fn(), prompts: string[] = [];
+  const runtime = { input: () => ({ steer, followUp }), waitForIdle: async () => {}, getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
+  const running = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true,
+    onInputReady: async () => { entered(); await held; }, runPrompt: async prompt => { prompts.push(prompt); } });
+  try {
+    await reached; stdin.write(JSON.stringify({ id: 'early-stream', ...command }) + '\n');
+    await vi.waitFor(() => expect(frames.find(frame => frame.id === 'early-stream')?.success).toBe(true));
+    expect(steer).not.toHaveBeenCalled(); expect(followUp).not.toHaveBeenCalled(); expect(prompts).toEqual([]);
+    finish(); await vi.waitFor(() => expect(prompts).toEqual([command.message]));
+  } finally { finish(); stdin.end(); await running; }
+});
+
+it('holds slash controls received as prompt input until startup completes', async () => {
+  const stdin = new PassThrough(); inputs.push(stdin);
+  let entered!: () => void, finish!: () => void;
+  const reached = new Promise<void>(resolve => { entered = resolve; }), held = new Promise<void>(resolve => { finish = resolve; });
+  const prompts: string[] = [];
+  const runtime = { waitForIdle: async () => {}, getCurrentRunController: () => null } as unknown as ShellSessionRuntime;
+  const running = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true,
+    onInputReady: async () => { entered(); await held; }, runPrompt: async prompt => { prompts.push(prompt); } });
+  try {
+    await reached; stdin.write('{"id":"early-slash","type":"prompt","message":"/queue add held"}\n');
+    await vi.waitFor(() => expect(frames.find(frame => frame.id === 'early-slash')?.success).toBe(true));
+    expect(prompts).toEqual([]); finish(); await vi.waitFor(() => expect(prompts).toEqual(['/queue add held']));
+  } finally { finish(); stdin.end(); await running; }
+});
+
+it('cancels pending startup on RPC abort and does not dispatch a later prompt', async () => {
+  const stdin = new PassThrough(); inputs.push(stdin); let entered!: () => void;
+  const reached = new Promise<void>(resolve => { entered = resolve; });
+  let finish!: () => void; const held = new Promise<void>(resolve => { finish = resolve; });
+  const prompts: string[] = [];
+  const runtime = { waitForIdle: async () => {}, getCurrentRunController: () => null, cancelCurrentRun() {} } as unknown as ShellSessionRuntime;
+  let returned = false;
+  const running = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, rpcMode: true,
+    onInputReady: async () => { entered(); await held; }, runPrompt: async prompt => { prompts.push(prompt); } }).then(() => { returned = true; }, () => { returned = true; });
+  try {
+    await reached; stdin.write('{"id":"startup-abort","type":"abort"}\n{"id":"late-start","type":"prompt","message":"UNACCEPTED_STARTUP"}\n');
+    await vi.waitFor(() => expect(returned).toBe(true)); expect(prompts).toEqual([]);
+  } finally { finish(); stdin.end(); await running; }
 });
 
 it.each([

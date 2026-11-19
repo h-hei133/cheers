@@ -29,14 +29,17 @@ export class ExtensionSessionLifecycle {
       || extensionHostFor(this.context) !== this.host ? 'Extension session or generation changed.' : this.configured();
   }
 
-  start(ready: () => Promise<void>, reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason']): Promise<void> {
+  start(ready: () => Promise<void>, reason: Extract<ExtensionSessionEvent, { type: 'session_start' }>['reason'], signal?: AbortSignal): Promise<void> {
     if (this.closing) return Promise.reject(new Error('Extension session is closing.'));
     return this.started ??= Promise.resolve().then(async () => {
+      signal?.throwIfAborted();
       await ready();
+      signal?.throwIfAborted();
       const refused = this.admission();
       if (refused || this.closing) throw new Error(refused ?? 'Extension session is closing.');
       this.audience = [...getExtensionEventRunners(this.root, this.sessionId)];
-      await this.publish({ type: 'session_start', sessionId: this.sessionId, workspaceRoot: this.root, reason });
+      await this.publish({ type: 'session_start', sessionId: this.sessionId, workspaceRoot: this.root, reason }, signal);
+      signal?.throwIfAborted();
       const retired = this.admission();
       if (retired || this.closing) throw new Error(retired ?? 'Extension session is closing.');
     });
@@ -63,9 +66,9 @@ export class ExtensionSessionLifecycle {
     return settled;
   }
 
-  private async publish(event: ExtensionSessionEvent): Promise<void> {
+  private async publish(event: ExtensionSessionEvent, signal?: AbortSignal): Promise<void> {
     await dispatchExtensionEvent(this.root, this.sessionId, event.type, Object.freeze(event), {
-      runners: this.audience, admission: () => this.admission(),
+      runners: this.audience, admission: () => this.admission(), ...(signal ? { signal } : {}),
     });
   }
 }

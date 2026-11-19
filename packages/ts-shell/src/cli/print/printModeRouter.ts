@@ -29,6 +29,7 @@ export interface RunCliPrintModeRouterInput {
   readonly stopRequested?: () => boolean;
   readonly onFirstFrame?: () => void;
   readonly onUserIntent?: () => void;
+  readonly onInputReady?: (signal: AbortSignal) => Promise<void>;
 }
 
 export async function runCliPrintModeRouter(
@@ -69,6 +70,7 @@ export async function runCliPrintModeRouter(
           rpcMode: input.options.rpcMode === true,
           onFirstFrame: input.onFirstFrame,
           onUserIntent: input.onUserIntent,
+          onInputReady: input.onInputReady,
         }),
     });
     return true;

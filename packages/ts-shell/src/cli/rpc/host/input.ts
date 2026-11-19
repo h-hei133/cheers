@@ -19,7 +19,7 @@ export function inputHost(options: RuntimeRpcHostOptions, manager: SessionManage
       options.enqueuePrompt(prompt, images?.length ? { images } : undefined);
     },
     steer: (msg, images?: readonly ImageContent[]) => {
-      const activeInput = sessionRuntime.input?.();
+      const activeInput = options.inputReady?.() === false ? undefined : sessionRuntime.input?.();
       if (activeInput) {
         if (images?.length) throw new Error("Image attachments on live steer while streaming are unsupported.");
         activeInput.steer(msg);
@@ -28,7 +28,7 @@ export function inputHost(options: RuntimeRpcHostOptions, manager: SessionManage
       }
     },
     followUp: (msg, images?: readonly ImageContent[]) => {
-      const activeInput = sessionRuntime.input?.();
+      const activeInput = options.inputReady?.() === false ? undefined : sessionRuntime.input?.();
       if (activeInput && !images?.length) {
         activeInput.followUp(msg);
       } else {

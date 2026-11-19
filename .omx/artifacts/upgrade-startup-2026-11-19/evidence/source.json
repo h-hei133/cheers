@@ -1,0 +1,25 @@
+{
+  "buildId": "1d61695fbd9f0eb34a9be1db4082464aa61616a50b2dfc720709213ddef3feaf",
+  "files": {
+    "packages/ts-shell/src/cli/runtime/startup.ts": "5d709902a9136d628b77cc0f8468e827920dc2afaad2bb9add8cc51b3bff7757",
+    "packages/ts-shell/src/cli/bootstrap/cliProcessRunner.test.ts": "20296aacb9fc951d1e736ac2a623ab2c66c07542024cd563d3620dcaf46d934f",
+    "packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts": "2e378e009f5f90ac89704afaf6cbd208af4ef46d5e60ca75b28c8e3933116b79",
+    "packages/ts-shell/src/cli/interactive/extensions.test.ts": "ef23c320b5b33d3f36948cf4c2c0f2a9dea1c720924c30cd71f1bebc0b36b5c9",
+    "packages/ts-shell/src/cli/interactive/interactiveLoop.test.ts": "15b76d6826e4212b520b1194ee01bbafb948632c68eaf3e7fb19341a1a181895",
+    "packages/ts-shell/src/cli/interactive/interactiveLoop.ts": "7b6db3458fc5967eb38b1e2ba26636ce7bc36f13a4dd6d2a5051823648a51e56",
+    "packages/ts-shell/src/cli/interactive/interactiveMode.ts": "5f23f3078603215ddd5fffdf91bc3a0f99544dd9e3dcf173a223b1c063dcbd8e",
+    "packages/ts-shell/src/cli/interactive/lineLoop.test.ts": "ebf57530d90ec0ffb5d141bb7952b2f239987830c3fd717e22329ca6f011aeee",
+    "packages/ts-shell/src/cli/interactive/lineLoop.ts": "623735ca03202800303128ce1301e215bea4b171b4f01a194dc4dd654ddb42f9",
+    "packages/ts-shell/src/cli/print/printModeRouter.ts": "f82fb009b2280f7c5768a4bb805c574dab9a5ed1b38a52f4e460e262ab2cd582",
+    "packages/ts-shell/src/cli/rpc/host/contract.ts": "496080d260bfb8baf71a3b8d8f3319b83007ca0a10e238736de2861ccef79f74",
+    "packages/ts-shell/src/cli/rpc/host/input.ts": "09ef77a4eb8e2179d78c2cefde5e3b8ca5a80f65c4877dc35685e4f51e9a883a",
+    "packages/ts-shell/src/cli/runtime/extensions.ts": "f49584d0525dbe3013e9748a70f7a45d4f4312b14900fbaca298560709f4d529",
+    "packages/ts-shell/src/cli/runtime/extensions/lifecycle.test.ts": "4dc9a5b71aac72d423bf5788a30c776be720f319c88ab37cdaf636152e7fbe47",
+    "packages/ts-shell/src/cli/runtime/extensions/lifecycle.ts": "68f20f0f16d3729a8c9a228363dbf5ba74c4f38a80578560bd667ed70e47361a",
+    "packages/ts-shell/src/cli/runtime/inputStream.rpc.test.ts": "ada9dc1dd113e43521dcc213bf25273e431cb55bcafbd3e85c5349a566309db5",
+    "packages/ts-shell/src/cli/runtime/inputStream.ts": "91f4a55f65f4596055177883b4870ba4ef0a43fdf393e0907d9f6f5bc3a68441",
+    "packages/ts-shell/src/entrypoints/cliRuntimeModule.ts": "7fc2e90e46dc1390cbf74aade6c4be41e808503301caabc6fae74291ca278267"
+  },
+  "productionFiles": 12,
+  "hashesMatch": true
+}

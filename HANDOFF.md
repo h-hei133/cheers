@@ -2887,3 +2887,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** A cancelled before callback starts a prompt, an aborted startup message remains queued, RPC abort cannot reach a switch, or clear erases a new prompt and extension chrome.
 - **Root cause:** Queued messages borrow any active replacement command, only drain is guarded, or command settlement is treated as completion of the host's screen update.
 - **Rule:** Admit startup messages only from the successor host bound to that exact command. Cancel only their captured queue IDs on abort or unsuccessful settlement; preserve explicit user input. Release the RPC control chain while joining replacement responses at EOF. Keep clear busy through its conversation projection, bind successor UI before startup, and refresh it afterward only when its admission requires it. Assert isolated handler failures from the test owner rather than inside a handler whose exceptions production deliberately contains.
+
+### Input Readiness Must Cover Every Submission Lane
+
+- **Symptom:** A slash prompt runs during initial startup, or steering enters a startup child before the other startup callbacks finish.
+- **Root cause:** Only ordinary drain waits for startup, while content controls and live TurnInput bypass it; pending=false is also true after failed startup.
+- **Rule:** Bind the actual input/UI before starting lifecycle callbacks. Before startup admission, enqueue all submitted text in the existing queue before slash routing and keep live steering/follow-up outside the child. Keep RPC UI/read/abort controls reachable without blocking their control chain. Use successful admission for every drain and goal host; preserve the original cancellation signal, cancel line startup before joining queued input on close, and retain the primary error when cleanup fails.

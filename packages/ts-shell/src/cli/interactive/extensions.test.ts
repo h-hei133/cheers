@@ -35,7 +35,7 @@ import type { Transcript } from '../../presentation/tui/transcript/container.js'
 
 function interactive(tuiMode: 'regular' | 'fullscreen' = 'fullscreen', root = '/workspace', recording?: {
   context: ShellRuntimeContext; terminal: RecordingTerminal; manager: SessionManager;
-}) {
+}, onInputReady?: () => Promise<void>) {
   const terminal = recording?.terminal ?? new RecordingTerminal();
   terminal.columns = 60; terminal.rows = 24;
   const startTerminal = terminal.start.bind(terminal);
@@ -56,12 +56,35 @@ function interactive(tuiMode: 'regular' | 'fullscreen' = 'fullscreen', root = '/
     sessionManager: recording?.manager ?? { sessionExists: () => false } as unknown as SessionManager,
     logger: { info() {}, warn() {}, error() {} } as unknown as StructuredLogger,
     approvalTrustPolicy: {} as ApprovalTrustPolicy, initialMcpGateway: {} as CliMcpGateway,
+    onInputReady,
   });
   const state = mode as unknown as { extensionUi: ReturnType<typeof createExtensionUiAdapter>; view: InteractiveSurface; extensionBinding: ExtensionUiBinding };
   return { mode, terminal, scheduler, exit, context, sessionRuntime, state, ui: state.extensionUi.host };
 }
 
 describe('interactive extension UI', () => {
+  it('runs startup after terminal UI binding and holds ordinary input until it finishes', async () => {
+    let mode!: InteractiveMode, ui!: ReturnType<typeof createExtensionUiAdapter>['host'];
+    let started = false, confirmed = false;
+    let finish!: () => void; const held = new Promise<void>(resolve => { finish = resolve; });
+    const fixture = interactive('fullscreen', '/workspace', undefined, async () => {
+      started = true; confirmed = await ui.confirm('STARTUP_BOUND', 'Ready?'); await held;
+    });
+    mode = fixture.mode; ui = fixture.ui;
+    const host = mode as unknown as { onSubmit(text: string): void; state: { transcript: Transcript }; queue: { length: number } };
+    const queued = vi.spyOn(mode as unknown as { runQueued(text: string): Promise<void> }, 'runQueued').mockResolvedValue(undefined);
+    try {
+      mode.start(); await vi.waitFor(() => expect(started).toBe(true));
+      host.onSubmit('ORDINARY_AFTER_STARTUP');
+      expect(host.queue.length).toBe(1);
+      expect(host.state.transcript.all().some(block => block.kind === 'user' && block.text === 'ORDINARY_AFTER_STARTUP')).toBe(false);
+      fixture.terminal.input('\x1b[B\r'); await new Promise(resolve => setImmediate(resolve));
+      expect(confirmed).toBe(true); expect(queued).not.toHaveBeenCalled();
+      finish(); await mode.inputReady;
+      expect(queued).toHaveBeenCalledWith('ORDINARY_AFTER_STARTUP', undefined);
+    } finally { finish(); mode.stop(); }
+  });
+
   it('finishes clear projection before queued startup work and preserves successor extension chrome', async () => {
     const fixture = mediaFixture();
     Object.assign(fixture.context, { originalCwd: fixture.root, rootMode: 'direct', targetPathBase: fixture.root,

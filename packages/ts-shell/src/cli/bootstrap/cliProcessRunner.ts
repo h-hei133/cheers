@@ -345,7 +345,10 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
         const { attachRpcEventBridge } = await import("../rpc/events.js");
         attachRpcEventBridge(sessionRuntime, output.guard?.write);
       }
-      await startExtensionsFor(runtimeContext, options.resumeSession || recovery ? 'resume' : options.forkSource ? 'fork' : 'startup');
+      const startSession = (signal?: AbortSignal) => startExtensionsFor(runtimeContext, options.resumeSession || recovery ? 'resume' : options.forkSource ? 'fork' : 'startup', signal);
+      const deferStart = ['interactive', 'stdin-stream'].includes(stdinPromptCapture.cliModePlan.kind)
+        && !(recovery && (options.printMode || !input.stdin.isTTY));
+      if (!deferStart) await startSession();
       if (recovery) {
         const saved = sessionManager.getSession(runtimeContext.session.id);
         if (!saved || saved.id !== recovery.sessionId || saved.projectRoot !== runtimeContext.projectRoot) throw new Error('Restart recovery could not verify the selected saved session.');
@@ -367,6 +370,7 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
         stopRequested: () => requested !== undefined,
         onFirstFrame: startup.onFirstFrame,
         onUserIntent: startup.onUserIntent,
+        ...(deferStart ? { onInputReady: startSession } : {}),
       });
       if (handledPrintMode) {
         return requested;
@@ -385,6 +389,7 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
         fallbackSessionId: recoveryCandidate?.id,
         onFirstFrame: startup.onFirstFrame,
         onUserIntent: startup.onUserIntent,
+        ...(deferStart ? { onInputReady: startSession } : {}),
         setStartupNotice: startup.setTranscriptWriter,
         initialMcpGateway: mcpGateway,
         setReadline: (nextReadline) => {

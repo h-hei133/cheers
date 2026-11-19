@@ -4,6 +4,18 @@
 
 只有一个 workspace 包。单个模块的 import 图无环不等于可以直接搬目录成为无环包：browser/core、workflow/core、planning/session/provider 的双向边存在。现有分支树、CAS 状态写入、任务日志、远端作业派发栅栏均已实现；问题是事务权威和独立模块边界未完成，不能重造另一套执行器或任务系统。
 
+## Initial CLI input and UI readiness (2026-11-19)
+
+目标是initial session_start可使用实际输入UI，普通input等完整startup结束。原bootstrap在interactive／RPC consumer前发start；定向参考采用先subscribe、绑定UI再start的决定，复用本项目input／queue／host／lifecycle，不增加新event bus或独立启动执行器。print／batch维持原时机；interactive与stdin-stream通过onInputReady传原signal。startup拥有shared ready、pending与admitted，failed／cancelled不能因pending=false重新放行。
+
+RPC先绑定UI和line listener再start，prompt队列等待ready／原runtime idle，UI回答、读取和abort可达；mutating RPC在未就绪时拒绝。源码复审发现slash prompt及live startup child的四种steer／follow-up可绕过，五RPC和一line /queue实际AssertionErrors后修：所有启动期文本先进入原submission queue，RPC input host的optional inputReady不触碰live TurnInput。interactive先真实terminal readiness或adoption，排队不提前echo；dialog settled／goal／resume picker同admission。line close先cancel再join；startup原signal到notification／invocation，晚回API丢权限。primary startup错误不被mode.stop覆盖。既有await api.sendMessage startup子prompt合同保留，独立runtime/UI reload不在本批资格内。
+
+最终10文件215项、七静态门／2730生产模块0monoliths及build1d61695fbd9f输入摘要匹配通过。7有效反转10AssertionErrors、isolated exact恢复104项，主源码未反转；两个源码限定APPROVE/hash核验。首次反转断言被finally取消覆盖、isolated mediaFixture预期目录缺失分类保留；没有改弱产品测试。首165项／旧构建2a76证据保持旧代际。
+
+当前Linuxcompiled与Node20.3禁动态生成各4场景7POST：initial confirm先UI后子prompt与explicit queue；held actual子POST时四种外部stream input及slash只queue，结束后各普通请求；abort／EOF零POST并exit1。installed15入口strict NodeNext／skipLibCheck=false／engine-strict和同4/7通过；两模式PTY真实确认、append report、普通请求各1POST和exit0通过；当前replacement回归6场景5POST。probe先拦截GET models超过通知deadline、Python basename遮蔽stdlib与RTK nested proxy丢TTY的失败均归档，仅修装置。未重复调用配置模型，前批provider-auth零请求保留；当前normal pinned judgeexit2/not_proven、16384 capacity missing不变。[本批交付](../../../.omx/artifacts/upgrade-startup-2026-11-19/delivery.json)。36/62、26开放，完整E.6不勾选。
+
+controlled reload已源码核实：/plugin reload仅invalidate installed service，不reload CLI file或通知。后续复用shutdown→原retirement→replace→prepareSessionSurface→start，保留watch/grant撤回立即撤权；不得join当前command，startup消息需由exact successor准入。SDK原loader/UI/callback固定generation，必须显式adoption或保持拒绝，不把external loader.reload当旧会话受控reload。
+
 ## CLI session replacement transaction (2026-11-19)
 
 参考runtime先before取消、inactive候选、旧run结算／shutdown／dispose、创建后重绑consumer的顺序采用；原参考重建整套runtime的方式不直接照搬，复用现有commands／extension service／guarded SessionManager和同步context publication。SDK resources由原loader和SessionUi固定host，CLI不能迁移其贡献，本批在SDK owner明确refused，后续如需inplace须由SDK完整rebinding。

@@ -1,0 +1,33 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "buildId": "1d61695fbd9f0eb34a9be1db4082464aa61616a50b2dfc720709213ddef3feaf",
+  "realProvider": false,
+  "physicalTerminal": false,
+  "cases": [
+    {
+      "mode": "regular",
+      "startupDialogAnswered": true,
+      "reportAccepted": true,
+      "ordinaryPromptCompleted": true,
+      "posts": 1,
+      "exit": 0,
+      "ptyBytes": 11230,
+      "ptySha256": "1f2b3649f825f402f934355d328dbf42406fc003ffdcac7cc2127487067b8e7c"
+    },
+    {
+      "mode": "fullscreen",
+      "startupDialogAnswered": true,
+      "reportAccepted": true,
+      "ordinaryPromptCompleted": true,
+      "posts": 1,
+      "exit": 0,
+      "ptyBytes": 11008,
+      "ptySha256": "f637ac7c219a7b390b692942c053ed986cd95ba44015d20534d9d9ed345c9993"
+    }
+  ],
+  "posts": 2,
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "buildUnchanged": true
+}

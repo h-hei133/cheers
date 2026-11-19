@@ -10,6 +10,7 @@ export interface RuntimeRpcHostOptions {
   readonly sessionRuntime: ShellSessionRuntime;
   readonly queue: SubmissionQueue;
   readonly isStreaming: () => boolean;
+  readonly inputReady?: () => boolean;
   readonly enqueuePrompt: (prompt: string, attachments?: PromptAttachments) => void;
   readonly switchSession?: SessionChangePort;
   readonly sessionManager?: SessionManager;

@@ -63,6 +63,7 @@ import { isExtensionControl, extensionCommandFor, extensionManagerFor } from '..
 import { createExtensionUiAdapter } from './extensions.js';
 import { ExtensionUiBinding } from './extensions/binding.js';
 import { bindSessionSurface } from '../runtime/session/surface.js';
+import { inputStartup } from '../runtime/startup.js';
 import { isMcpRequest, isMcpConfiguration, mcpControl } from '../mcp/content.js';
 import { runMcpConfigurationControl } from '../mcp/control.js';
 import { cancelMcpFor, mcpDefinitionFor } from '../runtime/mcp.js';
@@ -149,6 +150,7 @@ export interface InteractiveModeOptions {
   readonly fallbackSessionId?: string;
   /** Runs once after the first frame write has reached the output stream. */
   readonly onFirstFrame?: () => void;
+  readonly onInputReady?: (signal: AbortSignal) => Promise<void>;
   /** Lets startup suggestions yield to a user selection or submission. */
   readonly onUserIntent?: () => void;
   /** Installs a transcript writer for notices that arrive outside a turn. */
@@ -289,6 +291,8 @@ export class InteractiveMode {
   private releaseInputQueue?: () => void;
   private readonly extensionBinding: ExtensionUiBinding;
   private releaseSessionSurface?: () => void;
+  private readonly startup: ReturnType<typeof inputStartup>;
+  readonly inputReady: Promise<void>;
   private readonly extensionUi: ReturnType<typeof createExtensionUiAdapter>;
   /**
    * The theme file being followed, when the theme in use came from one.
@@ -305,6 +309,13 @@ export class InteractiveMode {
 
 
   constructor(private readonly options: InteractiveModeOptions) {
+    this.startup = inputStartup(options.onInputReady);
+    this.inputReady = this.startup.ready;
+    if (options.onInputReady) void this.inputReady.then(() => {
+      if (this.options.resumeOnStart && !this.stopped && !this.closing) { this.openPicker('/resume'); return; }
+      if (this.stopped || this.closing || this.extensionUi.active || this.busy || this.pickerPending || this.overlay.active || this.questions.question()) return;
+      const next = this.queue.shift(); if (next !== undefined) this.runQueued(next, this.queue.takeAttachments());
+    }).catch(() => {});
     this.extensionBinding = new ExtensionUiBinding(options.runtimeContext, () => this.extensionUi?.clear());
     this.alternateScreen = options.runtimeContext.runtimeConfig.tuiMode !== "regular";
     this.terminal = options.startup?.terminal ?? options.terminal ?? processTerminal;
@@ -507,7 +518,7 @@ export class InteractiveMode {
         this.tui.requestRender();
       },
       settled: () => queueMicrotask(() => {
-        if (!this.stopped && !this.closing && !this.extensionUi.active && !this.busy && !this.pickerPending && !this.overlay.active && !this.questions.question()) {
+        if (this.startup.admitted() && !this.stopped && !this.closing && !this.extensionUi.active && !this.busy && !this.pickerPending && !this.overlay.active && !this.questions.question()) {
           const next = this.queue.shift();
           if (next !== undefined) this.runQueued(next, this.queue.takeAttachments());
         }
@@ -648,9 +659,9 @@ export class InteractiveMode {
     });
     this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
     this.releaseInputQueue = attachSubmissionQueue(this.options.sessionRuntime, this.queue, text => this.runQueued(text, this.queue.takeAttachments()),
-      () => !(this.busy || this.pickerPending || this.overlay.active || this.extensionUi.active || this.stopped || this.questions.question()));
+      () => !(!this.startup.admitted() || this.busy || this.pickerPending || this.overlay.active || this.extensionUi.active || this.stopped || this.questions.question()));
     this.releaseGoalSubmission = attachGoalSubmission(this.options.sessionRuntime, {
-      ready: () => !this.stopped && !this.closing && !this.busy && !this.pickerPending && !this.overlay.active
+      ready: () => this.startup.admitted() && !this.stopped && !this.closing && !this.busy && !this.pickerPending && !this.overlay.active
         && !this.questions.question() && !this.extensionUi.active && this.queue.length === 0 && !this.state.editor.getText().trim()
         && !this.state.pastes.hasImages(this.state.editor.getText()),
       submit: (prompt, metadata) => this.run(prompt, undefined, metadata),
@@ -679,6 +690,7 @@ export class InteractiveMode {
         this.options.onFirstFrame?.();
       });
       this.extensionBinding.refresh(this.extensionUi.host);
+      this.startup.start();
       time('runtime input adopted');
       this.releaseTerminalPalette = requestTerminalPalette(this.terminal, colors => {
         if (this.stopped || this.closing || !terminalTheme.update(colors)) return;
@@ -692,6 +704,7 @@ export class InteractiveMode {
         observers.onInputReady?.();
         time('runtime input adopted');
         this.extensionBinding.refresh(this.extensionUi.host);
+        this.startup.start();
         this.releaseTerminalPalette?.();
         this.releaseTerminalPalette = requestTerminalPalette(this.terminal, colors => {
           if (this.stopped || this.closing || !terminalTheme.update(colors)) return;
@@ -709,7 +722,7 @@ export class InteractiveMode {
     // recolouring something not yet on screen.
     this.theme.refresh();
     this.promptContext.start();
-    if (this.options.resumeOnStart) {
+    if (this.options.resumeOnStart && !this.options.onInputReady) {
       this.openPicker("/resume");
     }
   }
@@ -726,6 +739,7 @@ export class InteractiveMode {
       () => { this.releaseTerminalPalette?.(); this.releaseTerminalPalette = undefined; this.terminalTheme?.dispose(); this.terminalTheme = undefined; },
       () => { this.releaseTerminalProtocol?.(); this.releaseTerminalProtocol = undefined; },
       () => this.extensionBinding.dispose(),
+      () => this.startup.cancel(),
       () => { this.releaseSessionSurface?.(); this.releaseSessionSurface = undefined; },
       () => this.extensionUi.dispose(),
       () => this.promptContext.stop(),
@@ -816,7 +830,7 @@ export class InteractiveMode {
     routeKey(event, {
       view: this.view,
       busy: this.busy,
-      interruptible: Boolean(this.options.sessionRuntime.commands?.current)
+      interruptible: this.startup.pending() || Boolean(this.options.sessionRuntime.commands?.current)
         || Boolean(schedulerForRuntime(this.options.sessionRuntime)?.ownerToken()) || directorInterruptible(this.options.runtimeContext),
       now: () => Date.now(),
       gesture: this.gesture,
@@ -954,6 +968,9 @@ export class InteractiveMode {
       this.options.onUserIntent?.();
       void this.shutdown();
       return;
+    }
+    if (!this.startup.admitted()) {
+      this.queue.push(text, attachments); this.tui.requestRender(); return;
     }
     this.toast = undefined;
     this.completionStatus = undefined;
@@ -1182,6 +1199,10 @@ export class InteractiveMode {
 
   /** Start work that was waiting: it joins the conversation as it begins. */
   private runQueued(text: string, attachments?: { readonly images: readonly ImageContent[] }): Promise<void> {
+    if (!this.startup.admitted()) return this.startup.ready.then(() => {
+      if (this.stopped || this.closing) throw new Error('The interactive input host is closing.');
+      return this.runQueued(text, attachments);
+    });
     this.echoUser(text, attachments);
     return this.run(text, attachments);
   }
@@ -1194,6 +1215,7 @@ export class InteractiveMode {
     promptMetadata?: Record<string, unknown>,
     sessionSelection?: import('../../session/navigation/selection.js').SavedSessionSelection,
   ): Promise<void> {
+    if (!this.startup.admitted()) await this.startup.ready;
     const automatic = promptMetadata !== undefined;
     if (!automatic) this.options.onUserIntent?.();
     this.pager.close();
@@ -1611,6 +1633,7 @@ export class InteractiveMode {
    */
   private async interrupt(): Promise<void> {
     this.selectionRevision++;
+    if (this.startup.pending()) { this.startup.cancel(); return; }
     if (!this.busy) {
       if (this.options.sessionRuntime.commands?.current) {
         await this.options.sessionRuntime.cancelAndWait();

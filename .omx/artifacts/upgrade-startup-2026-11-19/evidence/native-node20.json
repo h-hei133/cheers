@@ -1,0 +1,169 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "node": "v20.3.0",
+  "buildId": "1d61695fbd9f0eb34a9be1db4082464aa61616a50b2dfc720709213ddef3feaf",
+  "cases": [
+    {
+      "name": "compiled-rpc-initial-startup-confirm",
+      "status": "passed",
+      "exit": 0,
+      "signal": null,
+      "uiBeforePrompt": true,
+      "posts": 2
+    },
+    {
+      "name": "compiled-rpc-initial-startup-active-child",
+      "status": "passed",
+      "exit": 0,
+      "signal": null,
+      "externalInputQueued": true,
+      "slashHeld": true,
+      "posts": 5
+    },
+    {
+      "name": "compiled-rpc-initial-startup-abort",
+      "status": "passed",
+      "exit": 1,
+      "cancelledInvocation": true,
+      "posts": 0
+    },
+    {
+      "name": "compiled-rpc-initial-startup-eof",
+      "status": "passed",
+      "exit": 1,
+      "signal": null,
+      "cancelledInvocation": true,
+      "posts": 0
+    }
+  ],
+  "loopbackRequests": [
+    {
+      "stage": "confirm",
+      "method": "GET",
+      "path": "/models",
+      "time": 1795047299484,
+      "users": []
+    },
+    {
+      "stage": "confirm",
+      "method": "POST",
+      "path": "/chat/completions",
+      "time": 1795047299636,
+      "users": [
+        "[Environment Context: cwd=/home/wang/projects/cheers/.tmp/upgrade-startup/native-private-EDEIIX/confirm | permission_scope=ask]\n\nINITIAL_STARTUP_REQUEST"
+      ]
+    },
+    {
+      "stage": "confirm",
+      "method": "GET",
+      "path": "/models",
+      "time": 1795047299789,
+      "users": []
+    },
+    {
+      "stage": "confirm",
+      "method": "POST",
+      "path": "/chat/completions",
+      "time": 1795047299854,
+      "users": [
+        "INITIAL_STARTUP_REQUEST",
+        "[Environment Context: cwd=/home/wang/projects/cheers/.tmp/upgrade-startup/native-private-EDEIIX/confirm | permission_scope=ask]\n\nEXPLICIT_WAITING"
+      ]
+    },
+    {
+      "stage": "active-child",
+      "method": "GET",
+      "path": "/models",
+      "time": 1795047302939,
+      "users": []
+    },
+    {
+      "stage": "active-child",
+      "method": "POST",
+      "path": "/chat/completions",
+      "time": 1795047303037,
+      "users": [
+        "[Environment Context: cwd=/home/wang/projects/cheers/.tmp/upgrade-startup/native-private-EDEIIX/active-child | permission_scope=ask]\n\nINITIAL_STARTUP_REQUEST"
+      ]
+    },
+    {
+      "stage": "active-child",
+      "method": "GET",
+      "path": "/models",
+      "time": 1795047303204,
+      "users": []
+    },
+    {
+      "stage": "active-child",
+      "method": "POST",
+      "path": "/chat/completions",
+      "time": 1795047303282,
+      "users": [
+        "INITIAL_STARTUP_REQUEST",
+        "[Environment Context: cwd=/home/wang/projects/cheers/.tmp/upgrade-startup/native-private-EDEIIX/active-child | permission_scope=ask]\n\nHELD_STEER"
+      ]
+    },
+    {
+      "stage": "active-child",
+      "method": "GET",
+      "path": "/models",
+      "time": 1795047303397,
+      "users": []
+    },
+    {
+      "stage": "active-child",
+      "method": "POST",
+      "path": "/chat/completions",
+      "time": 1795047303464,
+      "users": [
+        "INITIAL_STARTUP_REQUEST",
+        "HELD_STEER",
+        "[Environment Context: cwd=/home/wang/projects/cheers/.tmp/upgrade-startup/native-private-EDEIIX/active-child | permission_scope=ask]\n\nHELD_FOLLOW"
+      ]
+    },
+    {
+      "stage": "active-child",
+      "method": "GET",
+      "path": "/models",
+      "time": 1795047303586,
+      "users": []
+    },
+    {
+      "stage": "active-child",
+      "method": "POST",
+      "path": "/chat/completions",
+      "time": 1795047303655,
+      "users": [
+        "INITIAL_STARTUP_REQUEST",
+        "HELD_STEER",
+        "HELD_FOLLOW",
+        "[Environment Context: cwd=/home/wang/projects/cheers/.tmp/upgrade-startup/native-private-EDEIIX/active-child | permission_scope=ask]\n\nHELD_PROMPT_STEER"
+      ]
+    },
+    {
+      "stage": "active-child",
+      "method": "GET",
+      "path": "/models",
+      "time": 1795047303768,
+      "users": []
+    },
+    {
+      "stage": "active-child",
+      "method": "POST",
+      "path": "/chat/completions",
+      "time": 1795047303839,
+      "users": [
+        "INITIAL_STARTUP_REQUEST",
+        "HELD_STEER",
+        "HELD_FOLLOW",
+        "HELD_PROMPT_STEER",
+        "[Environment Context: cwd=/home/wang/projects/cheers/.tmp/upgrade-startup/native-private-EDEIIX/active-child | permission_scope=ask]\n\nHELD_PROMPT_FOLLOW"
+      ]
+    }
+  ],
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "buildUnchanged": true,
+  "posts": 7
+}

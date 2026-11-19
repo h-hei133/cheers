@@ -34,6 +34,7 @@ import { isAdvisorControl } from '../runtime/advisor.js';
 import { isResearchControl } from '../runtime/research.js';
 import { bindOutputFailure } from './outputFailure.js';
 import { configurationAdmission } from '../../core/shell/configuration.js';
+import { inputStartup } from '../runtime/startup.js';
 
 /**
  * Line-oriented interactive loop for a session without a real terminal.
@@ -58,6 +59,7 @@ export interface LineLoopOptions {
   readonly fallbackSessionId?: string;
   readonly onFirstFrame?: () => void;
   readonly onUserIntent?: () => void;
+  readonly onInputReady?: (signal: AbortSignal) => Promise<void>;
   readonly initialMcpGateway: CliMcpGateway;
   readonly setReadline: (readline: ReadlineInterface | null) => void;
   readonly exit: (code?: number) => void;
@@ -66,6 +68,7 @@ export interface LineLoopOptions {
 
 /** Run until stdin closes, resolving once the loop has finished. */
 export async function runLineLoop(options: LineLoopOptions): Promise<void> {
+  const startup = inputStartup(options.onInputReady);
   const prompt = (): string =>
     buildInteractivePromptChrome({
       projectRoot: options.runtimeContext.projectRoot,
@@ -148,6 +151,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
   const cleanup = (failedBeforeCleanup: boolean): void => {
     if (cleaned) return;
     cleaned = true;
+    startup.cancel();
     attempt("input listener", () => options.stdin.off("data", noteInput));
     try {
       // A failed initialization must not turn into a successful session close.
@@ -247,6 +251,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
     };
     const scheduleDrain = (): void => {
       chain = chain.then(async () => {
+        await startup.ready;
         await roundBarrier;
         await options.sessionRuntime.waitForIdle().catch(() => undefined);
         const text = queue.shift(); if (text !== undefined) await dispatch(text);
@@ -329,7 +334,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
       }
     };
     releaseGoalSubmission = attachGoalSubmission(options.sessionRuntime, {
-      ready: () => !closed && !busy && queue.length === 0 && !input.line.trim() && !questions.question(),
+      ready: () => startup.admitted() && !closed && !busy && queue.length === 0 && !input.line.trim() && !questions.question(),
       submit: (prompt, metadata) => {
         roundBarrier = new Promise<void>(resolve => { releaseRound = resolve; });
         beginGoalRoundCompletion();
@@ -354,6 +359,11 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
     input.on("line", (line) => {
       try {
         const text = line;
+        if (!startup.admitted()) {
+          if (questions.answer(line)) return;
+          if (text.trim()) { queue.push(text); scheduleDrain(); } else input.prompt();
+          return;
+        }
         const controlSource = text.startsWith('/') ? text : '';
         const mcp = mcpControl(controlSource);
         const ssh = sshControl(controlSource);
@@ -412,6 +422,8 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
       }
     });
 
+    startup.start();
+    void startup.ready.catch(handleLineFailure);
     await new Promise<void>((resolve) => {
       let settled = false;
       const settle = (): void => {
@@ -427,6 +439,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
       }
       const stop = () => {
         closed = true;
+        startup.cancel();
         attempt("startup hint", noteInput);
         cancelPending();
         try {
@@ -441,6 +454,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
       input.on("close", () => {
         try {
           closed = true;
+          startup.cancel();
           attempt("startup hint", noteInput);
           cancelPending();
           attempt("question bridge", () => questionInput?.close());

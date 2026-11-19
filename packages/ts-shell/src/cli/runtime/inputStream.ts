@@ -32,6 +32,7 @@ import { rpcInputFailure, tryParseRpcCommand, tryParseRpcUiResponse } from '../r
 import { createRpcUiBridge, type RpcUiBridge } from '../rpc/uiBridge.js';
 import { createRuntimeRpcHost } from '../rpc/runtimeHost.js';
 import { bindSessionSurface } from './session/surface.js';
+import { inputStartup } from './startup.js';
 
 const rpcInputOwners = new WeakMap<ShellRuntimeContext, object>();
 
@@ -47,6 +48,7 @@ export async function runPromptInputStream(options: {
   readonly onRpcUiBridge?: (bridge: RpcUiBridge) => void;
   readonly onFirstFrame?: () => void;
   readonly onUserIntent?: () => void;
+  readonly onInputReady?: (signal: AbortSignal) => Promise<void>;
   readonly rpcMode?: boolean;
 }): Promise<void> {
   const contextTag = (): string =>
@@ -90,6 +92,7 @@ export async function runPromptInputStream(options: {
   } | null = null;
 
   let closed = false; let busy = false;
+  const startup = inputStartup(options.onInputReady);
   let rpcUiBridge: RpcUiBridge | undefined;
   let rpcInputOwner: object | undefined;
   let releaseUi: (() => void) | undefined;
@@ -105,6 +108,7 @@ export async function runPromptInputStream(options: {
   const stdinClosed = new Promise<void>((resolve, reject) => {
     stdinReader.once('close', () => {
       closed = true;
+      startup.cancel();
       try { closeRpcUi(); resolve(); } catch (error) { reject(error); }
     });
   });
@@ -121,6 +125,7 @@ export async function runPromptInputStream(options: {
   };
   const drain = (): void => {
     turnChain = turnChain.then(async () => {
+      await startup.ready;
       await roundBarrier;
       await options.sessionRuntime.waitForIdle().catch(() => undefined);
       // A cancellation can overtake this host's queue. Let it settle before
@@ -137,6 +142,7 @@ export async function runPromptInputStream(options: {
     }).catch(error => options.renderer.renderLine(`Run failed: ${error instanceof Error ? error.message : 'runtime failure'}`));
   };
   const enqueuePrompt = (prompt: string, attachments?: PromptAttachments): void => {
+    if (!startup.admitted()) { queue.push(prompt, attachments); drain(); return; }
     const media = mediaControl(prompt);
     if (media) {
       if (media.stop) {
@@ -187,7 +193,7 @@ export async function runPromptInputStream(options: {
   };
   const releaseQueue = attachInputQueue(options.sessionRuntime, { control: queue.control, enqueue: text => queue.push(text), drain });
   const releaseGoal = attachGoalSubmission(options.sessionRuntime, {
-    ready: () => !closed && !busy && pendingControls === 0 && queue.length === 0 && !pendingPrompt,
+    ready: () => startup.admitted() && !closed && !busy && pendingControls === 0 && queue.length === 0 && !pendingPrompt,
     submit: async (prompt, promptMetadata) => {
       busy = true; roundBarrier = new Promise<void>(resolve => { releaseRound = resolve; });
       await options.sessionRuntime.executePrompt(options.runtimeContext.session.id, prompt, { promptMetadata, outputMode: 'print' });
@@ -216,7 +222,8 @@ export async function runPromptInputStream(options: {
           sessionRuntime: options.sessionRuntime,
           sessionManager: options.sessionManager,
           queue,
-          isStreaming: () => busy,
+          isStreaming: () => busy || startup.pending(),
+          inputReady: startup.admitted,
           enqueuePrompt,
           switchSession: options.switchSession,
           ui: rpcUiBridge,
@@ -270,11 +277,18 @@ export async function runPromptInputStream(options: {
 
       const rpcCommand = options.rpcMode ? tryParseRpcCommand(normalizedLine) : undefined;
       if (rpcCommand && rpcHost) {
+        if (!startup.admitted() && !['prompt', 'steer', 'follow_up', 'get_messages', 'get_state', 'get_session_stats', 'get_last_assistant_text',
+          'get_fork_messages', 'get_entries', 'get_tree', 'get_available_models', 'get_available_thinking_levels', 'get_commands', 'abort', 'clear_queue', 'abort_retry'].includes(rpcCommand.type)) {
+          writeRawStdout(`${JSON.stringify({ ...(rpcCommand.id ? { id: rpcCommand.id } : {}), type: 'response', command: rpcCommand.type,
+            success: false, error: 'Session startup has not completed.' })}\n`);
+          return;
+        }
         pendingControls++;
         localControlChain = localControlChain
           .then(() => {
             if (rpcCommand.type === 'abort') {
               const previous = rpcReads; rpcReads = new AbortController(); previous.abort();
+              startup.cancel();
             }
             const background = options.runtimeContext.configuration.backgroundSignal;
             const pending = handleRpcCommand(rpcCommand, rpcHost, rpcCommand.type === 'get_commands' ? rpcReads.signal : undefined).then(response => {
@@ -322,6 +336,10 @@ export async function runPromptInputStream(options: {
       }
     });
 
+    startup.start();
+    let startupFailure: { readonly error: unknown } | undefined;
+    try { await startup.ready; }
+    catch (error) { startupFailure = { error }; stdinReader.close(); }
     await stdinClosed;
     flushPendingPrompt();
     for (;;) {
@@ -336,6 +354,7 @@ export async function runPromptInputStream(options: {
       if (localControls === localControlChain && controls === controlChain && turns === turnChain) break;
     }
     await schedulerForRuntime(options.sessionRuntime)?.stop('cancelled');
+    if (startupFailure) throw startupFailure.error;
     if (!options.rpcMode) {
       options.renderer.renderLine(
         `\nStdin stream closed. Processed ${processedCount} prompt(s).\n`,

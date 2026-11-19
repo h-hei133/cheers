@@ -83,6 +83,7 @@ export async function runNonTtyPromptStream(options: {
   forceTool?: import("../core/commands/types.js").CommandContext['forceTool'];
   onFirstFrame?: () => void;
   onUserIntent?: () => void;
+  onInputReady?: (signal: AbortSignal) => Promise<void>;
   rpcMode?: boolean;
 }): Promise<void> {
   await runPromptInputStream({
@@ -93,6 +94,7 @@ export async function runNonTtyPromptStream(options: {
     logger: options.logger,
     onFirstFrame: options.onFirstFrame,
     onUserIntent: options.onUserIntent,
+    onInputReady: options.onInputReady,
     rpcMode: options.rpcMode,
     runPrompt: (prompt, attachments) => runNonInteractivePrompt({ ...options, prompt, attachments, printMode: false, jsonEvents: options.rpcMode === true, awaitGoalScheduling: false }),
   });

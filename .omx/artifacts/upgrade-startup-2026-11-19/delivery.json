@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-19",
+  "batch": [
+    "E.6 initial CLI input and UI readiness"
+  ],
+  "status": "subbatch_linux_accepted_E6_open_repository_gate_not_proven",
+  "baseCommit": "866f835a820b62c0e747e20b93c42413a48dbd9c",
+  "delivery": {
+    "localCommit": "containing Git commit supplies identity",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "1d61695fbd9f0eb34a9be1db4082464aa61616a50b2dfc720709213ddef3feaf",
+    "inputsDigest": "e15a818c2241e2fbfeb1cd8b7696175a2256c495ebca22104322e541173e2bb2",
+    "inputDigestMatches": true,
+    "node": "24.15.0"
+  },
+  "source": {
+    "files": 18,
+    "productionFiles": 12,
+    "hashesMatch": true,
+    "receipt": "evidence/source.json"
+  },
+  "validation": {
+    "combined": {
+      "files": 10,
+      "passed": 215,
+      "receipt": "raw.tar.gz::joint-build-reviewed.log"
+    },
+    "static": {
+      "count": 7,
+      "passed": true,
+      "productionModules": 2730,
+      "monoliths": 0
+    },
+    "reversal": {
+      "cases": 7,
+      "assertionFailures": 10,
+      "exactRestoration": true,
+      "mainSourceUnchanged": true,
+      "restoredPassed": 104,
+      "receipt": "evidence/reversal.json"
+    },
+    "linux": {
+      "nativePassed": 4,
+      "posts": 7,
+      "receipt": "evidence/native.json"
+    },
+    "nodeFloor": {
+      "runtime": "20.3.0",
+      "codeGenerationDisabled": true,
+      "nativePassed": 4,
+      "posts": 7,
+      "receipt": "evidence/native-node20.json"
+    },
+    "installed": {
+      "publicEntries": 15,
+      "strictTypes": true,
+      "skipLibCheck": false,
+      "engineStrict": true,
+      "nativePassed": 4,
+      "posts": 7,
+      "receipt": "evidence/package.json"
+    },
+    "pty": {
+      "cases": 2,
+      "modes": [
+        "regular",
+        "fullscreen"
+      ],
+      "posts": 2,
+      "receipt": "evidence/pty.json",
+      "physicalTerminal": false
+    },
+    "replacementRegression": {
+      "cases": 6,
+      "posts": 5,
+      "receipt": "evidence/replacement-regression-final.json"
+    },
+    "configuredProvider": {
+      "status": "not_run_this_subbatch",
+      "earlierE6Attempt": "provider-auth with zero requests"
+    },
+    "normproof": {
+      "exit": 2,
+      "verdict": "not_proven",
+      "acceptedAsProof": false,
+      "reason": "pinned graph exceeds 16384 edge capacity",
+      "scopeModified": false,
+      "gateModified": false,
+      "receipt": "evidence/judge-current.json"
+    }
+  },
+  "review": {
+    "status": "APPROVE",
+    "scopeLimited": true,
+    "hashesMatch": true,
+    "validationRunByReviewer": false,
+    "receipt": "evidence/review.json"
+  },
+  "taskCount": {
+    "accepted": 36,
+    "open": 26,
+    "fullE6Accepted": false
+  },
+  "setupFailuresRetained": [
+    "active-child fixture initially held GET models and exceeded lifecycle deadline",
+    "Python probe basename shadowed pty stdlib",
+    "nested RTK proxy removed child terminal identity",
+    "first reversal primary assertion obscured by cancelled-startup cleanup",
+    "isolated restored mediaFixture needed its expected scratch directory"
+  ],
+  "remaining": [
+    "controlled reload",
+    "before-tree custom summary",
+    "event result consumers",
+    "SDK controlled resource rebinding"
+  ],
+  "boundaries": [
+    "Linux only",
+    "ordinary prompt admission acknowledges queue entry; execution follows startup",
+    "existing startup child api.sendMessage contract preserved",
+    "RPC startup abort and EOF exit 1; deliberate line close preserves normal close",
+    "no new configured-provider evidence",
+    "no push or CI"
+  ],
+  "evidenceStorage": {
+    "archive": "raw.tar.gz",
+    "index": "evidence/raw-index.json",
+    "rawBytesPreserved": true
+  }
+}
