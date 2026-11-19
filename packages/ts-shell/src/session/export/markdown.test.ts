@@ -1,9 +1,42 @@
 import { describe, expect, it } from "vitest";
 import { renderInlineHtml, renderMarkdownHtml } from "./htmlRender.js";
 
-// These are bounded conversation-rendering contracts. Passing them does not
-// establish complete CommonMark/GFM conformance for every Markdown construct.
 const compact = (html: string): string => html.replace(/>\s+</g, "><");
+
+describe("exported GFM", () => {
+  it("links bare URLs and email addresses while leaving trailing punctuation visible", () => {
+    const html = renderMarkdownHtml("See https://example.test/a_(b), www.example.test, or help@example.test.");
+    expect(html).toBe('<p>See <a href="https://example.test/a_(b)" rel="noreferrer noopener">https://example.test/a_(b)</a>, '
+      + '<a href="http://www.example.test" rel="noreferrer noopener">www.example.test</a>, '
+      + 'or <a href="mailto:help@example.test" rel="noreferrer noopener">help@example.test</a>.</p>');
+  });
+
+  it("resolves forward reference links across blocks", () => {
+    const html = renderMarkdownHtml('## [Guide][docs]\n\n> Start with [docs].\n\n[docs]: ./guide.md "User guide"');
+    expect(html).toBe('<h2><a href="./guide.md" rel="noreferrer noopener" title="User guide">Guide</a></h2>'
+      + '<blockquote><p>Start with <a href="./guide.md" rel="noreferrer noopener" title="User guide">docs</a>.</p></blockquote>');
+  });
+
+  it("retains loose list continuation and keeps quoted child blocks inside the item", () => {
+    const html = renderMarkdownHtml("- first\n\n  continuation\n\n  > quoted\n\n- second");
+    expect(compact(html)).toBe("<ul><li><p>first</p><p>continuation</p><blockquote><p>quoted</p></blockquote></li>"
+      + "<li><p>second</p></li></ul>");
+  });
+
+  it("recognizes setext headings, ticked code and escaped character references", () => {
+    const html = renderMarkdownHtml("Heading\n=======\n\n~~~js\nconst link = '<x>';\n~~~\n\nEntity: &#65;.");
+    expect(html).toContain("<h1>Heading</h1>");
+    expect(html).toContain('class="hljs language-js"');
+    expect(html).toContain("&lt;x&gt;");
+    expect(html).toContain("<p>Entity: A.</p>");
+  });
+
+  it("preserves oversized source as escaped text", () => {
+    const source = "a".repeat(512 * 1024) + "<img src=x>";
+    const html = renderMarkdownHtml(source);
+    expect(html).toBe('<pre class="fence"><code>' + "a".repeat(512 * 1024) + "&lt;img src=x&gt;</code></pre>");
+  });
+});
 
 describe("exported task lists", () => {
   it.each(["x", "X", " "])("renders the %s task marker as a disabled checkbox", marker => {
@@ -78,8 +111,13 @@ describe("exported list relationships", () => {
   });
 
   it("preserves mixed nested list kinds and the nested ordered start", () => {
+    expect(compact(renderMarkdownHtml("- 父\n\n  7. 七\n  8. 八\n- 后")))
+      .toBe('<ul><li><p>父</p><ol start="7"><li>七</li><li>八</li></ol></li><li><p>后</p></li></ul>');
+  });
+
+  it("keeps a non-initial ordered marker from interrupting an item paragraph", () => {
     expect(compact(renderMarkdownHtml("- 父\n  7. 七\n  8. 八\n- 后")))
-      .toBe('<ul><li>父<ol start="7"><li>七</li><li>八</li></ol></li><li>后</li></ul>');
+      .toBe("<ul><li>父<br>7. 七<br>8. 八</li><li>后</li></ul>");
   });
 
   it("returns from a nested unordered list to the next ordered sibling", () => {

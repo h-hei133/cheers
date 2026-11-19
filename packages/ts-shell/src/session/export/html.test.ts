@@ -25,6 +25,39 @@ describe('public standalone export projection', () => {
     expect(JSON.stringify(input)).toBe(before);
   });
 
+  it('renders GFM links, escapes raw HTML and leaves Markdown images as voluntary links', () => {
+    const content = [
+      'Read https://docs.example.test/guide or [more][ref].',
+      '',
+      '[ref]: ./notes.md',
+      '',
+      '![remote image](https://img.example.test/pixel.png)',
+      '![local image](./asset.png)',
+      '![unsafe image](javascript:alert(1))',
+      '[![linked image](https://img.example.test/embedded.png)](./outer.md)',
+      '',
+      '<script>window.sentinel=1</script>',
+      '<iframe src="https://img.example.test">Unexpected</iframe>',
+      '',
+      '[unsafe](java&#x73;cript:alert(1)) [unsafe reference][bad]',
+      '',
+      '[bad]: data:text/plain,unsafe',
+    ].join('\n');
+    const result = embedded(payload({ content })).entries[0]!;
+    expect(result.content).toBe(content);
+    expect(result.html).toContain('<a href="https://docs.example.test/guide"');
+    expect(result.html).toContain('<a href="./notes.md"');
+    expect(result.html).toContain('<a href="https://img.example.test/pixel.png"');
+    expect(result.html).toContain('<a href="./asset.png"');
+    expect(result.html).toContain('<a href="./outer.md" rel="noreferrer noopener">linked image</a>');
+    expect(result.html).not.toContain('href="https://img.example.test/embedded.png"');
+    expect(result.html).toContain('unsafe image');
+    expect(result.html).toContain('&lt;script&gt;window.sentinel=1&lt;/script&gt;');
+    expect(result.html).toContain('&lt;iframe');
+    expect(result.html).not.toMatch(/<(?:img|script|iframe)\b/i);
+    expect(result.html).not.toMatch(/href="(?:javascript|data):/i);
+  });
+
   it('applies the same text redaction to public content, calls and previews', () => {
     const result = embedded({ ...payload({ content: 'password=FAKE_CONTENT',
       toolCalls: [{ id: 'call', name: 'read', arguments: '{"password":"FAKE_ARGUMENT","path":"visible"}' }] }),

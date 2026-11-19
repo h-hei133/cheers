@@ -3,16 +3,6 @@ import { escapeHtml, renderInlineHtml, renderMarkdownHtml, safeUrl } from "./htm
 import { renderMarkdown } from "../../presentation/tui/transcript/markdown.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 
-/**
- * Markdown as the exported page renders it.
- *
- * The page and the terminal share one scanner, so what is tested here is not
- * "does it understand markdown" — that is the scanner's job. It is that the
- * second renderer over that scan produces markup, and that nothing from the
- * session can become markup itself. An exported file is opened in a browser, and
- * a tool's output can contain anything at all.
- */
-
 describe("escaping", () => {
   it("neutralises every character that could start markup", () => {
     expect(escapeHtml(`<script>alert("x")</script>`)).toBe(
@@ -207,7 +197,7 @@ describe("blocks", () => {
     // A bare `>` is how a paragraph break inside a quote is written. Joined into
     // one paragraph it would lose the break the author put there.
     expect(renderMarkdownHtml("> a\n>\n> b")).toBe("<blockquote><p>a</p><p>b</p></blockquote>");
-    expect(renderMarkdownHtml("> a\n> b")).toBe("<blockquote><p>a b</p></blockquote>");
+    expect(renderMarkdownHtml("> a\n> b")).toBe("<blockquote><p>a<br>b</p></blockquote>");
   });
 
   it("renders a rule", () => {
@@ -267,11 +257,11 @@ describe("inline spans", () => {
     const input = "[".repeat(80_000);
     expect(renderInlineHtml(input)).toBe(input);
 
-    const nested = "[[inner](https://inner.test)](https://outer.test)";
+    const nested = "[[inner](./inner.md)](./outer.md)";
     const rendered = renderInlineHtml(nested);
     expect(rendered.match(/<a /g)).toHaveLength(1);
-    expect(rendered).toContain('href="https://outer.test"');
-    expect(rendered).toContain("[inner](https://inner.test)");
+    expect(rendered).toContain('<a href="./inner.md" rel="noreferrer noopener">inner</a>');
+    expect(rendered).toContain("](./outer.md)");
   });
 
   it("keeps the exact 64 KiB budget and escapes raw source one byte over", () => {

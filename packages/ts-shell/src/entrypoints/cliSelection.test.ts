@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { startupEligible } from "../cli/interactive/startup/eligibility.js";
+import { scanCliArgs } from "../cli/options/argv.js";
 import { resolveCliCredential } from "../cli/provider/cliProviderRuntimeBridge.js";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { bootstrapShellRuntime } from "../core/shell/bootstrap.js";
@@ -84,7 +85,7 @@ describe("CLI model and session selection", () => {
     });
     appendSessionTurn({
       session: sessionCopy,
-      message: { role: "assistant", content: "hi there" },
+      message: { role: "assistant", content: "Read https://example.test/guide or [more][docs].\n\n[docs]: ./notes.md" },
       timestamp: new Date().toISOString(),
       append: (event) => appendTranscriptEvent(layout.transcriptPath, event),
       writeMetadata: (s) => writeSessionMetadataRecord({ session: s, layout }),
@@ -120,6 +121,9 @@ describe("CLI model and session selection", () => {
     expect(match).not.toBeNull();
     const decoded = Buffer.from(match![1]!, "base64").toString("utf8");
     expect(decoded).toContain("hello from source");
+    const assistant = JSON.parse(decoded).entries.find((entry: { role: string }) => entry.role === "assistant");
+    expect(assistant.html).toContain('<a href="https://example.test/guide"');
+    expect(assistant.html).toContain('<a href="./notes.md"');
 
     await expect(runCliExport("..", outHtml, root)).rejects.toThrow("Invalid session id");
     expect(() =>
@@ -135,8 +139,8 @@ describe("CLI model and session selection", () => {
     ).toThrow();
   });
   it("treats interactive selection flags as startup-eligible and excludes --list-models/--export", () => {
-    expect(startupEligible(["-c", "--model", "gpt-5.4", "--no-tools"], true)).toBe(true);
-    expect(startupEligible(["--list-models"], true)).toBe(false);
-    expect(startupEligible(["--export", "s1"], true)).toBe(false);
+    expect(startupEligible(scanCliArgs(["-c", "--model", "gpt-5.4", "--no-tools"]), true)).toBe(true);
+    expect(startupEligible(scanCliArgs(["--list-models"]), true)).toBe(false);
+    expect(startupEligible(scanCliArgs(["--export", "s1"]), true)).toBe(false);
   });
 });
