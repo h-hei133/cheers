@@ -10,6 +10,9 @@ describe('RPC command input', () => {
     { type: 'compact', field: 'customInstructions', frame: { type: 'compact', customInstructions: ['private instructions'] } },
     { type: 'get_entries', field: 'since', frame: { type: 'get_entries', since: { entryId: 'old-entry' } } },
     { type: 'navigate_tree', field: 'expectedVersion', frame: { type: 'navigate_tree', entryId: 'old-entry', expectedVersion: 17 } },
+    { type: 'annotate_session', field: 'expectedVersion', frame: { type: 'annotate_session', entryId: 'target', change: { type: 'label', label: null } } },
+    { type: 'annotate_session', field: 'change', frame: { type: 'annotate_session', entryId: 'target', expectedVersion: 'saved', change: { type: 'label', label: 'test', extra: true } } },
+    { type: 'annotate_session', field: 'label', frame: { type: 'annotate_session', entryId: 'target', expectedVersion: 'saved', change: { type: 'label', label: 'x'.repeat(257) } } },
     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash', command: 'printf private-output', excludeFromContext: 'true' } },
     { type: 'bash', field: 'excludeFromContext', frame: { type: 'bash', command: 'printf private-output', excludeFromContext: null } },
   ])('rejects malformed optional $field in $type instead of silently choosing defaults', ({ frame }) => {
@@ -24,6 +27,7 @@ describe('RPC command input', () => {
     { type: 'prompt', id: 'submit', message: 'explicit input', streamingBehavior: 'followUp' },
     { type: 'bash', id: 'shell', command: 'printf private-output', excludeFromContext: true },
     { type: 'navigate_tree', id: 'navigation', entryId: 'old-entry', expectedVersion: 'captured-version' },
+    { type: 'annotate_session', id: 'edit', entryId: 'old-entry', expectedVersion: 'captured-version', change: { type: 'context-edit', edit: { kind: 'replace', text: 'line 1\nline 2' } } },
     { type: 'get_entries', id: 'cursor', since: 0 },
     { type: 'export_html', id: 'export', outputPath: 'approved-output.html' },
     { type: 'compact', id: 'summary', customInstructions: 'retain decisions' },

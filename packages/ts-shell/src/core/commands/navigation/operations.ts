@@ -2,7 +2,7 @@ import type { CommandSyntax } from '../syntax/model.js';
 import type { CommandDefinition } from '../types.js';
 import { syntaxCompletions, syntaxHint } from '../syntax/projection.js';
 import { parseSyntax } from '../syntax/parse.js';
-import { parseNavigationArgs } from './syntax.js';
+import { historySyntax, parseNavigationArgs } from './syntax.js';
 
 import type { SessionCommandName } from './contract.js';
 export type { SessionCommandName } from './contract.js';
@@ -12,10 +12,7 @@ export const sessionSyntax: Readonly<Record<SessionCommandName, CommandSyntax>> 
   pin: { name: 'pin', defaultAction: '', actions: [{ name: '', summary: 'pin or unpin a saved session', parameters: [
     { name: 'session-id|here', kind: 'text' }, { name: 'on|off', kind: 'text', values: ['on', 'off'] },
   ], flags: [] }] },
-  history: { name: 'history', defaultAction: 'list', actions: [
-    { name: 'list', summary: 'show the complete saved conversation tree', flags: [] },
-    { name: 'export', summary: 'export a sanitized versioned history after write approval', parameters: [path], flags: [] },
-  ] },
+  history: historySyntax,
   import: { name: 'import', defaultAction: '', actions: [{ name: '', summary: 'import versioned history into a new inactive session', parameters: [path], flags: [] }] },
   open: { name: 'open', defaultAction: '', actions: [
     { name: '', summary: 'open the latest or a selected conversation link after approval', parameters: [{ name: 'link-number', kind: 'integer', minimum: 1 }], flags: [] },

@@ -7,6 +7,8 @@ import { isReadableTranscriptEvent } from "./transcript/validation.js";
 import type { ReportTranscriptEntry } from './reports/model.js';
 import { captureCustomMessage } from '../core/agent/custom.js';
 import type { BranchStoreTranscriptEntry } from './branch/store/contract.js';
+import { ANNOTATION_CAPTURE_BYTES, isAnnotationKind, isSessionAnnotation, type SessionAnnotation } from './context/annotations.js';
+import { snapshotData } from '../core/values/data.js';
 export type { BranchStoreTranscriptEntry } from './branch/store/contract.js';
 export type TranscriptLifecycleEventName =
   | "run-started"
@@ -77,7 +79,8 @@ export type TranscriptEvent =
   | ReportTranscriptEntry
   | BranchSummaryTranscriptEntry
   | CodemodeStoreTranscriptEntry
-  | BranchStoreTranscriptEntry;
+  | BranchStoreTranscriptEntry
+  | SessionAnnotation;
 
 export interface CodemodeStoreTranscriptEntry {
   readonly type: "codemode-store";
@@ -251,6 +254,11 @@ export function encodeTranscriptEvent(event: TranscriptEvent): string {
   if (!type || !('value' in type)) throw new Error('Transcript event type must be an own data property.');
   if (type.value === 'message') event = captureCustomMessage(event as Extract<TranscriptEvent, { type: 'message' }>);
   else if (Object.getOwnPropertyDescriptor(event, 'requestDeclaration')) throw new Error('Request declaration requires a message event.');
+  if (isAnnotationKind(type.value)) {
+    const captured = snapshotData(event, { bytes: ANNOTATION_CAPTURE_BYTES, nodes: 32, depth: 4 });
+    if (!isSessionAnnotation(captured)) throw new Error('Invalid session annotation.');
+    event = captured;
+  }
   // Older readers reject this new wire type instead of applying an unverified summary.
   return JSON.stringify(event.type === 'compaction' && event.publication === 'prepared'
     ? { ...event, type: 'compaction-prepared' } : event);

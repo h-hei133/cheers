@@ -2,7 +2,7 @@ import { freezeDeep } from "../../core/values/freeze.js";
 import type { Session } from "./sessionRecord.js";
 import { isSessionContextMessage, type SessionMessage } from "./sessionMessage.js";
 
-export type SessionThreadEntryKind = "session-root" | "turn-message";
+export type SessionThreadEntryKind = "session-root" | "turn-message" | "context-edit" | "label";
 
 export interface SessionThreadEntry {
   readonly id: string;

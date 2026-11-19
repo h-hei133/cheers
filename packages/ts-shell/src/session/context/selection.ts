@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { SessionMessage } from '../schema/sessionMessage.js';
 import type { Session } from '../schema/sessionRecord.js';
 import { messageToText } from '../../model-adapters/multimodal.js';
+import { isEditableMessage, type ModelContextEdit } from './annotations.js';
 
 export type ContextSelectionMode = 'elide' | 'images' | 'thinking';
 export interface ContextSelection {
@@ -9,7 +10,7 @@ export interface ContextSelection {
   readonly revision: number;
   readonly entries: readonly { readonly id: string; readonly hash: string; readonly modes: readonly ContextSelectionMode[] }[];
 }
-type ContextSelectionSession = Pick<Session, 'turns' | 'contextSelection'>;
+type ContextSelectionSession = Pick<Session, 'contextSelection' | 'contextEdits'> & { readonly turns: readonly SessionMessage[] };
 const MODES: readonly ContextSelectionMode[] = ['elide', 'images', 'thinking'];
 export const SELECTION_LIMIT = 4096;
 const effectiveSelectionCache = new WeakMap<object, {
@@ -30,14 +31,18 @@ export function decodeContextSelection(value: unknown): ContextSelection {
   return data;
 }
 
-export function selectModelContext(session: { readonly turns: readonly SessionMessage[]; readonly contextSelection?: unknown } | undefined): readonly SessionMessage[] {
+export function selectModelContext(session: ContextSelectionSession | undefined): readonly SessionMessage[] {
   if (!session) return [];
   const selection = decodeContextSelection(session.contextSelection);
-  if (!selection.entries.length) return session.turns;
+  if (!selection.entries.length && !session.contextEdits?.length) return session.turns;
   const selected = new Map(selection.entries.map(entry => [entry.id, entry]));
+  const edits = new Map(session.contextEdits?.map(edit => [edit.id, edit]));
   return session.turns.map(message => {
     const entry = message.id && selected.get(message.id);
-    return entry && entry.hash === contextMessageHash(message) ? omitContext(message, entry.modes) : message;
+    const edit = message.id ? edits.get(message.id) : undefined;
+    const hash = entry || edit ? contextMessageHash(message) : undefined;
+    const projected = applyContextEdit(message, edit, hash);
+    return entry && entry.hash === hash ? omitContext(projected, entry.modes) : projected;
   });
 }
 
@@ -46,15 +51,17 @@ export function planContextSelection(session: Session, mode: ContextSelectionMod
 } {
   const current = decodeContextSelection(session.contextSelection);
   const entries = new Map(current.entries.map(entry => [entry.id, entry]));
+  const edits = new Map(session.contextEdits?.map(edit => [edit.id, edit]));
   let changed = 0; let estimatedTokens = 0; let signed = 0;
   for (const message of session.turns) {
     if (!message.id) continue;
     if (message.reasoning?.signature || message.reasoning?.redacted) { signed++; continue; }
     const hash = contextMessageHash(message);
+    const projected = applyContextEdit(message, edits.get(message.id), hash);
     const previous = entries.get(message.id);
     const modes = [...new Set([...(previous?.hash === hash ? previous.modes : []), mode])];
-    const before = previous?.hash === hash ? omitContext(message, previous.modes) : message;
-    const after = omitContext(message, modes);
+    const before = previous?.hash === hash ? omitContext(projected, previous.modes) : projected;
+    const after = omitContext(projected, modes);
     if (contextMessageHash(before) === contextMessageHash(after)) continue;
     changed++;
     estimatedTokens += Math.max(0, Math.ceil((textLength(before) - textLength(after)) / 4));
@@ -71,17 +78,19 @@ export function contextMessageHash(message: SessionMessage): string {
 /** Return only hash-valid entries that actually change the model projection. */
 export function effectiveContextSelection(session: ContextSelectionSession): ContextSelection | undefined {
   const value = session.contextSelection;
-  const cacheKey = typeof value === 'object' && value !== null ? value : undefined;
+  const cacheKey = !session.contextEdits?.length && typeof value === 'object' && value !== null ? value : undefined;
   const selection = decodeContextSelection(value);
   const fingerprint = `${selection.revision}:${selection.entries.map(entry =>
     `${entry.id}:${entry.hash}:${entry.modes.join('+')}`).join('|')}`;
   const cached = cacheKey ? effectiveSelectionCache.get(cacheKey) : undefined;
   if (cached?.turns === session.turns && cached.fingerprint === fingerprint) return cached.selection;
   const messages = new Map(session.turns.flatMap(message => message.id ? [[message.id, message] as const] : []));
+  const edits = new Map(session.contextEdits?.map(edit => [edit.id, edit]));
   const entries = selection.entries.filter(entry => {
     const message = messages.get(entry.id);
     if (!message || entry.hash !== contextMessageHash(message)) return false;
-    return contextMessageHash(omitContext(message, entry.modes)) !== entry.hash;
+    const projected = applyContextEdit(message, edits.get(entry.id), entry.hash);
+    return contextMessageHash(omitContext(projected, entry.modes)) !== contextMessageHash(projected);
   });
   const effective = entries.length ? { ...selection, entries } : undefined;
   if (cacheKey) effectiveSelectionCache.set(cacheKey, { turns: session.turns, fingerprint, selection: effective });
@@ -91,7 +100,15 @@ export function effectiveContextSelection(session: ContextSelectionSession): Con
 /** A revision or stale entry is not a prompt identity; only effective entries are. */
 export function contextSelectionIdentity(session: ContextSelectionSession): unknown {
   const effective = effectiveContextSelection(session);
+  if (session.contextEdits?.length) return { version: 1, entries: effective?.entries ?? [], edits: session.contextEdits };
   return effective ? { version: 1, entries: effective.entries } : undefined;
+}
+
+function applyContextEdit(message: SessionMessage, edit: ModelContextEdit | undefined, hash: string | undefined): SessionMessage {
+  if (!edit) return message;
+  if (edit.hash !== hash || !isEditableMessage(message)) throw new Error('Saved context edit no longer matches its source.');
+  // Compaction reopens by message count. Keep the original slot when hiding its content.
+  return { ...message, content: edit.edit.kind === 'omit' ? '[Message content omitted from context.]' : edit.edit.text };
 }
 
 function omitContext(message: SessionMessage, modes: readonly ContextSelectionMode[]): SessionMessage {

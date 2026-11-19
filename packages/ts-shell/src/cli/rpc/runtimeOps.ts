@@ -14,7 +14,7 @@ import { captureThinkingPreference } from "../../core/models/preference.js";
 import { costModel } from "../../core/commands/cost/model.js";
 import { loadCatalog } from "../../core/models/catalogStore.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
-import { readSessionEntries, readSessionTree } from "../../session/query/sessionEntries.js";
+import { readSessionEntries } from "../../session/query/sessionEntries.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../../session/store/sessionFileLayout.js";
 import { readTranscriptEvents } from "../../session/transcript/sessionTranscript.js";
 import { loadSessionRecord } from "../../session/store/sessionStore.js";
@@ -130,15 +130,6 @@ export async function readRpcEntries(runtimeContext: ShellRuntimeContext, since?
   const result = readSessionEntries(events, leafId, since);
   if (result === "unknown-cursor") throw new Error("Unknown session entry cursor.");
   return { entries: result.entries, leafId: result.leafId };
-}
-
-export async function readRpcTree(runtimeContext: ShellRuntimeContext): Promise<Record<string, unknown>> {
-  const layout = locateExistingSessionLayout(createSessionStoreLayout(), runtimeContext.session.id);
-  const session = loadSessionRecord({ sessionId: runtimeContext.session.id, layout, cwd: runtimeContext.cwd });
-  const snapshot = readSessionThreadSnapshot({ session, layout });
-  const tree = readSessionTree(snapshot.entries);
-  if (tree === "unknown-cursor") throw new Error("Session tree unavailable.");
-  return { tree, leafId: snapshot.activeLeafId };
 }
 
 export function listRpcModels(runtimeContext?: ShellRuntimeContext): readonly Record<string, unknown>[] {

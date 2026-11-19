@@ -2,6 +2,8 @@ import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
 import type { CompactionOutcome } from "../../core/shell/compaction.js";
 import type { SessionNavigationResult } from "../runtime/navigation.js";
+import { isAnnotationChange, isAnnotationEntryId, type AnnotationChange } from '../../session/context/annotations.js';
+import type { AnnotationResult } from '../runtime/session/annotations.js';
 
 export interface RpcUiDialogOptions {
   readonly signal?: AbortSignal;
@@ -29,6 +31,12 @@ export interface RpcImageAttachment {
 }
 
 export type RpcQueueMode = "one-at-a-time" | "all";
+
+interface RpcAnnotationRequest {
+  readonly entryId: string;
+  readonly expectedVersion: string;
+  readonly change: AnnotationChange;
+}
 
 export type RpcCommand =
   | {
@@ -68,6 +76,7 @@ export type RpcCommand =
   | { readonly id?: string; readonly type: "get_entries"; readonly since?: string | number }
   | { readonly id?: string; readonly type: "get_tree" }
   | { readonly id?: string; readonly type: "navigate_tree"; readonly entryId: string; readonly expectedVersion?: string }
+  | ({ readonly id?: string; readonly type: "annotate_session" } & RpcAnnotationRequest)
   | { readonly id?: string; readonly type: "get_commands" }
   | { readonly id?: string; readonly type: "bash"; readonly command: string; readonly excludeFromContext?: boolean }
   | { readonly id?: string; readonly type: "abort_bash" };
@@ -187,6 +196,7 @@ export interface RpcHost {
   readonly getEntries?: (since?: string | number) => Promise<Record<string, unknown> | RpcReadSnapshot<Record<string, unknown>>>;
   readonly getTree?: () => Promise<Record<string, unknown> | RpcReadSnapshot<Record<string, unknown>>>;
   readonly navigateTree?: (entryId: string, expectedVersion?: string) => Promise<SessionNavigationResult>;
+  readonly annotateSession?: (request: RpcAnnotationRequest, signal?: AbortSignal) => Promise<AnnotationResult>;
   readonly getCommands?: (signal?: AbortSignal) => readonly Record<string, unknown>[] | RpcCommandSnapshot
     | Promise<readonly Record<string, unknown>[] | RpcCommandSnapshot>;
   readonly runBash?: (command: string, excludeFromContext?: boolean) => Promise<Record<string, unknown>>;
@@ -200,7 +210,7 @@ const RPC_COMMAND_TYPES = new Set([
   "set_model", "cycle_model", "get_available_models", "set_thinking_level", "cycle_thinking_level",
   "get_available_thinking_levels", "set_steering_mode", "set_follow_up_mode", "compact",
   "set_auto_compaction", "set_auto_retry", "abort_retry", "fork", "clone", "get_fork_messages",
-  "get_entries", "get_tree", "navigate_tree", "get_commands", "bash", "abort_bash",
+  "get_entries", "get_tree", "navigate_tree", "annotate_session", "get_commands", "bash", "abort_bash",
 ]);
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -322,6 +332,10 @@ export function tryParseRpcCommand(line: string): RpcCommand | undefined {
       return typeof parsed.entryId === "string"
         ? { ...base, type: "navigate_tree", entryId: parsed.entryId, ...(typeof parsed.expectedVersion === "string" ? { expectedVersion: parsed.expectedVersion } : {}) }
         : undefined;
+    case "annotate_session":
+      return isAnnotationEntryId(parsed.entryId) && typeof parsed.expectedVersion === 'string' && parsed.expectedVersion.length > 0
+        && Buffer.byteLength(parsed.expectedVersion) <= 8192 && isAnnotationChange(parsed.change)
+        ? { ...base, type: 'annotate_session', entryId: parsed.entryId, expectedVersion: parsed.expectedVersion, change: parsed.change } : undefined;
     case "bash":
       if (parsed.excludeFromContext !== undefined && typeof parsed.excludeFromContext !== "boolean") return undefined;
       return typeof parsed.command === "string"

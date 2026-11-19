@@ -10,11 +10,14 @@ import { transcriptEventToSessionMessage, type TranscriptEvent } from "../sessio
 import { readTranscriptSnapshotAsync } from "../transcript/read.js";
 import { readSessionTree, type SessionTreeNodeView } from "./sessionEntries.js";
 import { admitNavigationSource, NAVIGATION_LIMITS } from './navigation/limits.js';
+import type { SessionLabel } from '../context/annotations.js';
+import { redactReportText } from '../../core/security/redaction.js';
 
 export interface SessionNavigationPoint {
   readonly entryId: string;
   readonly depth: number;
   readonly label: string;
+  readonly bookmark?: string;
   readonly current: boolean;
   readonly prompt?: string;
   readonly unavailable?: string;
@@ -65,7 +68,7 @@ export function readSessionNavigation(sessionId: string, cwd: string, onSource?:
     throw new Error('The session changed while its navigation state was being read.');
   }
   const thread = catchUpSessionThread(state.thread ?? buildLinearSessionThreadSnapshot(session), session, NAVIGATION_LIMITS.entries);
-  const projected = projectSessionNavigation(thread, messages);
+  const projected = projectSessionNavigation(thread, messages, undefined, session.labels);
   return navigationResult(before, thread, projected, session, warnings, transcriptTruncated);
 }
 
@@ -120,7 +123,7 @@ export async function readSessionNavigationAsync(
     signal,
   );
   await yieldForAbort(signal);
-  const projected = await projectSessionNavigationAsync(thread, messages, signal);
+  const projected = await projectSessionNavigationAsync(thread, messages, signal, session.labels);
   await yieldForAbort(signal);
   if (before !== readSessionFileVersion(layout)
     || locateExistingSessionLayout(store, sessionId).sessionDir !== layout.sessionDir) {
@@ -197,12 +200,14 @@ export function projectSessionNavigation(
   thread: SessionThreadSnapshot,
   messages: readonly SessionMessage[],
   signal?: AbortSignal,
+  labels?: readonly SessionLabel[],
 ): SessionNavigationPoint[] {
   const { byId, nodes } = prepareNavigationProjection(thread, messages, signal);
+  const bookmarks = new Map(labels?.map(label => [label.id, label.text]));
   const points: SessionNavigationPoint[] = [];
   for (const candidate of nodes) {
     signal?.throwIfAborted();
-    points.push(navigationPoint(candidate, byId, thread.activeLeafId));
+    points.push(navigationPoint(candidate, byId, thread.activeLeafId, bookmarks));
   }
   return points;
 }
@@ -211,15 +216,17 @@ export async function projectSessionNavigationAsync(
   thread: SessionThreadSnapshot,
   messages: readonly SessionMessage[],
   signal?: AbortSignal,
+  labels?: readonly SessionLabel[],
 ): Promise<SessionNavigationPoint[]> {
   const { byId, nodes } = prepareNavigationProjection(thread, messages, signal);
+  const bookmarks = new Map(labels?.map(label => [label.id, label.text]));
   const points: SessionNavigationPoint[] = [];
   let index = 0;
   for (const candidate of nodes) {
     if ((index & (CONTROL_CHECK_INTERVAL - 1)) === 0) signal?.throwIfAborted();
     if ((index & (YIELD_INTERVAL - 1)) === 0) await yieldForAbort(signal);
     index += 1;
-    points.push(navigationPoint(candidate, byId, thread.activeLeafId));
+    points.push(navigationPoint(candidate, byId, thread.activeLeafId, bookmarks));
   }
   await yieldForAbort(signal);
   return points;
@@ -283,23 +290,35 @@ function navigationPoint(
   candidate: NavigationCandidate,
   byId: ReadonlyMap<string, SessionMessage>,
   activeLeafId: string | undefined,
+  bookmarks: ReadonlyMap<string, string>,
 ): SessionNavigationPoint {
   const { node, depth, parentId, valid } = candidate;
   const message = byId.get(node.entry.id);
   const text = message && (message.role !== 'custom' || message.display) ? messageToText(message.content) : "";
+  const bookmark = bookmarks.get(node.entry.id);
+  const displayBookmark = bookmark && redactReportText(bookmark, 256);
   const unavailable = !valid ? "broken ancestry"
     : node.entry.kind === "turn-message" && !message ? "message unavailable" : undefined;
   return {
     entryId: node.entry.id,
     depth,
-    label: node.entry.kind === "session-root" ? "Session start"
-      : `${node.entry.role ?? node.entry.kind}: ${text.replace(/\s+/g, " ").trim().slice(0, 96)}`,
+    label: navigationLabel(node.entry.kind, node.entry.role, text, displayBookmark),
+    ...(displayBookmark ? { bookmark: displayBookmark } : {}),
     current: activeLeafId === node.entry.id,
     ...(node.entry.parentId !== undefined ? { parentId: node.entry.parentId } : {}),
     ...(node.entry.timestamp ? { timestamp: node.entry.timestamp } : {}),
     ...(text ? { excerpt: text.slice(0, 1200) + (text.length > 1200 ? '…' : '') } : {}),
-    ...(text ? { searchText: text } : {}),
+    ...(text || displayBookmark ? { searchText: [displayBookmark, text].filter(Boolean).join(' ') } : {}),
     ...(message?.role === "user" ? { prompt: text } : {}),
     ...(unavailable ? { unavailable } : {}),
   };
+}
+
+function navigationLabel(kind: SessionThreadSnapshot['entries'][number]['kind'], role: SessionMessage['role'] | undefined,
+  text: string, bookmark?: string): string {
+  if (kind === 'session-root') return 'Session start';
+  if (kind === 'context-edit') return 'Context edit';
+  if (kind === 'label') return 'Bookmark change';
+  const base = `${role ?? kind}: ${text.replace(/\s+/g, ' ').trim().slice(0, 96)}`;
+  return bookmark ? `[${bookmark}] ${base}` : base;
 }

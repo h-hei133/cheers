@@ -4,6 +4,7 @@ import type { SessionUsageSnapshot } from "../../observability/usage/model.js";
 import type { SessionReport } from '../reports/model.js';
 import type { WorkspaceRoot } from '../../core/workspace/model.js';
 import type { ContextEntry } from '../../context/attachment/entry.js';
+import type { ModelContextEdit, SessionLabel } from '../context/annotations.js';
 
 export interface Session {
   /** Read-only reentry projection; durable planning owners validate the stored payloads. */
@@ -20,6 +21,8 @@ export interface Session {
   pinned?: boolean;
   /** Original turns remain intact; the context owner derives the model-facing view. */
   contextSelection?: unknown;
+  contextEdits?: readonly ModelContextEdit[];
+  labels?: readonly SessionLabel[];
   /** Explicit, read-only context entries retained by the session owner. */
   contextAttachments?: readonly ContextEntry[];
   /**

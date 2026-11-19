@@ -19,7 +19,9 @@ export function updateContextSelection(manager: Pick<SessionManager, 'getSession
     && sameValue(current.thread, previous.thread), current => {
     const refused = admission(); if (refused) throw new Error(refused);
     const latest = manager.getSession(session.id);
-    if (!latest || !sameValue(latest.turns, session.turns)) throw new Error('Conversation changed after the context preview.');
+    if (!latest || !sameValue(latest.turns, session.turns) || !sameValue(latest.contextEdits, session.contextEdits)) {
+      throw new Error('Conversation changed after the context preview.');
+    }
     return { ...current, contextSelection: next };
   });
   const saved = manager.getSession(session.id);

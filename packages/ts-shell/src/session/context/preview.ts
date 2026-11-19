@@ -28,7 +28,7 @@ export async function readPromptPreview(host: BoundSessionHost, expected: Sessio
   if (expectedTurns.length > 4096) throw new Error('Live session exceeds the context preview limit.');
   const expectedHistory = historyDigest(expectedTurns);
   const binding = () => JSON.stringify([expected.id, expected.createdAt, expected.projectRoot,
-    expected.workspaceRoots, expected.contextSelection]);
+    expected.workspaceRoots, expected.contextSelection, expected.contextEdits]);
   const expectedBinding = binding();
   const snapshot = await readSessionRecordSnapshotAsync({ sessionId: expected.id, layout, cwd, signal,
     limits: { metadataBytes: 256 * 1024, stateBytes: 2 * 1024 * 1024, transcriptBytes: 4 * 1024 * 1024, transcriptLines: 8192, entries: 4096 } });
@@ -44,6 +44,7 @@ export async function readPromptPreview(host: BoundSessionHost, expected: Sessio
   if (session.id !== expected.id || session.createdAt !== expected.createdAt || session.projectRoot !== expected.projectRoot
     || state.projectRoot !== expected.projectRoot || historyDigest(session.turns) !== expectedHistory
     || JSON.stringify(session.contextSelection) !== JSON.stringify(expected.contextSelection)
+    || JSON.stringify(session.contextEdits) !== JSON.stringify(expected.contextEdits)
     || JSON.stringify(session.workspaceRoots) !== JSON.stringify(expected.workspaceRoots)
     || snapshot.transcriptTruncated || snapshot.warnings.length) {
     throw new Error('No complete current session preview is available.');

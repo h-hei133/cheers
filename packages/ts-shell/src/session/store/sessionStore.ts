@@ -21,6 +21,7 @@ import {
   withSessionMetadataLock,
 } from "./sessionStateStore.js";
 import { decodeContextEntries } from '../../context/attachment/entry.js';
+import { projectSessionAnnotations } from '../context/projection.js';
 
 export function sessionExistsAtLayout(layout: Pick<SessionFileLayout, "sessionDir">): boolean {
   return fs.existsSync(layout.sessionDir);
@@ -247,6 +248,7 @@ function projectSessionRecordSnapshot(
   }
 
   const session = projectLoadedSession({ metadata, state, turns, cwd: input.cwd });
+  Object.assign(session, projectSessionAnnotations(events, state.thread, threadPath?.resolved ? threadPath.path : undefined, turns, input.signal));
   input.signal?.throwIfAborted();
   const reports = selectSessionReports(events, session.id, state.thread, input.signal);
   if (events.some((event, index) => {
@@ -304,6 +306,7 @@ async function projectSessionRecordSnapshotAsync(
 
   input.signal?.throwIfAborted();
   const session = projectLoadedSession({ metadata, state, turns, cwd: input.cwd });
+  Object.assign(session, projectSessionAnnotations(events, state.thread, threadPath?.resolved ? threadPath.path : undefined, turns, input.signal));
   const reports = selectSessionReports(events, session.id, state.thread, input.signal);
   if (events.some((event, index) => {
     if ((index & 255) === 0) input.signal?.throwIfAborted();

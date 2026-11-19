@@ -8,6 +8,18 @@ const reference = { name: "id|prefix|title|last", kind: "text" } as const;
 const entry = { name: "entry-id", kind: "text" } as const;
 const fromEntry = { name: 'from', kind: 'text', summary: 'fork from a stable saved user-message entry' } as const;
 const help = { name: "help", aliases: ["--help"], summary: "show navigation usage", flags: [] } as const;
+const target = { ...entry, required: true } as const;
+export const historySyntax: CommandSyntax = {
+  name: 'history', defaultAction: 'list', actions: [
+    { name: 'list', summary: 'show the saved conversation tree', flags: [] },
+    { name: 'export', summary: 'export a sanitized versioned history after write approval', parameters: [{ name: 'path', kind: 'text', required: true }], flags: [] },
+    { name: 'edit', summary: 'replace a message in model context on the current branch', parameters: [target, { name: 'text', kind: 'text', required: true, rest: true }], flags: [] },
+    { name: 'omit', summary: 'omit a message from model context', parameters: [target], flags: [] },
+    { name: 'restore', summary: 'restore a message in model context', parameters: [target], flags: [] },
+    { name: 'bookmark', summary: 'label a message on the current branch', parameters: [target, { name: 'label', kind: 'text', required: true, rest: true }], flags: [] },
+    { name: 'unbookmark', summary: 'remove a message bookmark', parameters: [target], flags: [] },
+  ],
+};
 export const resumeSyntax: CommandSyntax = {
   name: "resume", defaultAction: "",
   actions: [
@@ -18,7 +30,10 @@ export const resumeSyntax: CommandSyntax = {
     { name: "rename", summary: "edit a saved session title", parameters: [{ ...reference, required: true }, { name: "title", kind: "text", rest: true }], flags: [] },
     { name: "delete", summary: "preview and confirm saved session deletion", parameters: [{ ...reference, required: true }], flags: [] },
     { name: "pin", summary: "pin or unpin a saved session", parameters: [reference, { name: 'on|off', kind: 'text', values: ['on', 'off'] }], flags: [] },
-    { name: "history", summary: "show or export the current session history", parameters: [{ name: 'list|export', kind: 'text', values: ['list', 'export'] }, { name: 'path', kind: 'text' }], flags: [] },
+    { name: 'history', summary: 'view, edit or export saved history', parameters: [
+      { name: 'action', kind: 'text', values: historySyntax.actions.map(action => action.name) },
+      { name: 'arguments', kind: 'text', rest: true },
+    ], flags: [] },
     { name: "import", summary: "import a versioned history into an inactive session", parameters: [{ name: 'path', kind: 'text', required: true }], flags: [] },
     { name: "open", summary: "open a selected conversation link", parameters: [{ name: 'list|link-number', kind: 'text' }], flags: [] },
     { name: "shake", summary: "preview or apply selective context omission", parameters: [{ name: 'preview|apply|status|restore', kind: 'text' }, { name: 'mode', kind: 'text', values: ['elide', 'images', 'thinking'] }], flags: [] },

@@ -2,20 +2,20 @@ import type { SessionChangeRequest } from '../../../core/shell/replacement.js';
 import { switchActiveSession } from '../../../core/shell/runtimeContext.js';
 import type { SessionManager } from "../../../session/SessionManager.js";
 import type { RpcHost } from "../protocol.js";
+import { annotateSession } from '../../runtime/session/annotations.js';
 import {
   applyRpcSessionSwitch,
   navigateRpcTree,
   readLastAssistantText,
   readRpcEntries,
   readRpcSessionStats,
-  readRpcTree,
   resolveSessionTargetId,
 } from "../runtimeOps.js";
 import type { RuntimeRpcHostOptions } from "./contract.js";
-import { readRpcForkMessages, readRpcNavigation, readRpcSession, readSnapshot } from './read.js';
+import { readRpcForkMessages, readRpcNavigation, readRpcSession, readRpcTree, readSnapshot } from './read.js';
 
 type SessionHost = Pick<RpcHost, "newSession" | "switchSession" | "setSessionName" | "getSessionStats"
-  | "getLastAssistantText" | "fork" | "cloneSession" | "getForkMessages" | "getEntries" | "getTree" | "navigateTree">;
+  | "getLastAssistantText" | "fork" | "cloneSession" | "getForkMessages" | "getEntries" | "getTree" | "navigateTree" | "annotateSession">;
 
 /** Session candidates remain inactive until the owning runtime accepts their identity. */
 export function sessionHost(options: RuntimeRpcHostOptions, manager: SessionManager): SessionHost {
@@ -75,7 +75,14 @@ export function sessionHost(options: RuntimeRpcHostOptions, manager: SessionMana
     },
     getForkMessages: () => readRpcForkMessages(runtimeContext),
     getEntries: (since) => readSnapshot(runtimeContext, () => readRpcEntries(runtimeContext, since)),
-    getTree: () => readSnapshot(runtimeContext, () => readRpcTree(runtimeContext)),
+    getTree: () => readRpcTree(runtimeContext),
+    annotateSession: async (request, signal) => {
+      if (typeof request.expectedVersion !== 'string' || !request.expectedVersion) return {
+        status: 'unchanged', sessionId: runtimeContext.session.id, output: 'Read the current tree version before editing.',
+      };
+      return annotateSession(runtimeContext, sessionRuntime, { ...request, signal,
+        isBusy: () => options.isStreaming() || options.inputReady?.() === false });
+    },
     navigateTree: (entryId, expectedVersion) => {
       if (busy()) throw new Error('A session operation is still running.');
       return navigateRpcTree(runtimeContext, manager, sessionRuntime, entryId, expectedVersion);

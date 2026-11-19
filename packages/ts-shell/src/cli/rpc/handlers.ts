@@ -70,7 +70,7 @@ async function handleModelAndThinking(command: RpcCommand, host: RpcHost): Promi
   }
 }
 
-async function handleTreeAndExecution(command: RpcCommand, host: RpcHost): Promise<RpcHandlerOutcome> {
+async function handleTreeAndExecution(command: RpcCommand, host: RpcHost, signal?: AbortSignal): Promise<RpcHandlerOutcome> {
   switch (command.type) {
     case "set_steering_mode":
       if (!host.setSteeringMode) return unavailable(command.type);
@@ -128,6 +128,12 @@ async function handleTreeAndExecution(command: RpcCommand, host: RpcHost): Promi
       const nav = await host.navigateTree(command.entryId, command.expectedVersion);
       return { handled: true, data: { ...nav } };
     }
+    case 'annotate_session': {
+      if (!host.annotateSession) return unavailable(command.type);
+      const result = await host.annotateSession(command, signal);
+      return result.status === 'committed' ? { handled: true, data: { ...result } }
+        : { handled: true, error: result.output, data: { ...result } };
+    }
     case "bash": {
       if (!host.runBash) return unavailable(command.type);
       const data = await host.runBash(command.command, command.excludeFromContext);
@@ -151,10 +157,12 @@ async function handleTreeAndExecution(command: RpcCommand, host: RpcHost): Promi
 export async function handleExtendedRpcCommand(command: RpcCommand, host: RpcHost, signal?: AbortSignal): Promise<RpcHandlerOutcome> {
   // Register command ownership before the transport admits a following abort
   // or session command. Its response may settle much later.
-  if (command.type === 'bash' || command.type === 'abort_bash' || command.type === 'compact') return handleTreeAndExecution(command, host);
+  if (command.type === 'bash' || command.type === 'abort_bash' || command.type === 'compact' || command.type === 'annotate_session') {
+    return handleTreeAndExecution(command, host, signal);
+  }
   const sessionOutcome = await handleSessionAndStats(command, host, signal);
   if (sessionOutcome.handled) return sessionOutcome;
   const modelOutcome = await handleModelAndThinking(command, host);
   if (modelOutcome.handled) return modelOutcome;
-  return handleTreeAndExecution(command, host);
+  return handleTreeAndExecution(command, host, signal);
 }

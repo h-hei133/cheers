@@ -1,6 +1,7 @@
 import { readSessionTree, type SessionTreeNodeView } from "../query/sessionEntries.js";
 import type { SessionThreadEntry, SessionThreadSnapshot } from "../schema/sessionThread.js";
 import type { ExportEntry, ExportTreeNode } from "./model.js";
+import { isAnnotationKind } from '../context/annotations.js';
 
 export function projectExportTree(value: unknown, entries: readonly ExportEntry[]): {
   readonly nodes: readonly ExportTreeNode[];
@@ -98,7 +99,7 @@ function readableThread(value: unknown): value is Pick<SessionThreadSnapshot, "e
   return record.entries.every((entry: SessionThreadEntry | null) => {
     if (!entry || typeof entry.id !== "string" || entry.id === "" || ids.has(entry.id) ||
       (entry.parentId !== undefined && typeof entry.parentId !== "string") ||
-      (entry.kind !== "turn-message" && entry.kind !== "session-root") ||
+      (entry.kind !== "turn-message" && entry.kind !== "session-root" && !isAnnotationKind(entry.kind)) ||
       !Number.isFinite(entry.order) ||
       (entry.timestamp !== undefined && typeof entry.timestamp !== "string") ||
       (entry.role !== undefined && !["user", "assistant", "system", "tool", 'custom'].includes(entry.role))) return false;

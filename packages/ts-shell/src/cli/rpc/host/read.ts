@@ -2,6 +2,8 @@ import type { ShellRuntimeContext } from '../../../core/shell/runtimeContext.js'
 import type { SessionManager } from '../../../session/SessionManager.js';
 import type { Session } from '../../../session/schema/sessionRecord.js';
 import { readSessionNavigationAsync } from '../../../session/query/navigation.js';
+import { readSessionTree } from '../../../session/query/sessionEntries.js';
+import { readAdmission } from '../../runtime/session/admission.js';
 import type { RpcReadSnapshot } from '../protocol.js';
 
 /** Read the selected stored conversation without publishing a replacement runtime binding. */
@@ -16,21 +18,6 @@ export function readRpcSession(context: ShellRuntimeContext, manager: SessionMan
     throw new Error('The selected session changed during the read.');
   }
   return current;
-}
-
-/** Capture the binding once and carry it through every asynchronous read consumer. */
-export function readAdmission(context: ShellRuntimeContext): () => void {
-  const selected = context.session, active = context.activeSession;
-  const cwd = context.cwd, projectRoot = context.projectRoot;
-  const configuration = context.configuration, publication = configuration.current;
-  const signal = configuration.backgroundSignal;
-  return () => {
-    signal.throwIfAborted();
-    if (context.session !== selected || context.activeSession !== active || context.cwd !== cwd || context.projectRoot !== projectRoot
-      || context.configuration !== configuration || configuration.current !== publication) {
-      throw new Error('The selected session changed during the read.');
-    }
-  };
 }
 
 export async function readSnapshot<T>(context: ShellRuntimeContext, read: () => Promise<T>): Promise<RpcReadSnapshot<T>> {
@@ -61,4 +48,13 @@ export async function readRpcForkMessages(context: ShellRuntimeContext): Promise
   const data = snapshot.points.flatMap(point => point.prompt !== undefined && !point.unavailable
     ? [{ entryId: point.entryId, text: point.prompt }] : []);
   return { data, assertCurrent: snapshot.assertCurrent };
+}
+
+export async function readRpcTree(context: ShellRuntimeContext): Promise<RpcReadSnapshot<Record<string, unknown>>> {
+  const snapshot = await readRpcNavigation(context);
+  const tree = readSessionTree(snapshot.thread.entries);
+  if (tree === 'unknown-cursor') throw new Error('Session tree unavailable.');
+  const bookmarks = snapshot.points.flatMap(point => point.bookmark === undefined ? [] : [{ entryId: point.entryId, label: point.bookmark }]);
+  return { data: { tree, leafId: snapshot.thread.activeLeafId, bookmarks,
+    ...(snapshot.actionSafe ? { version: snapshot.version } : {}) }, assertCurrent: snapshot.assertCurrent };
 }

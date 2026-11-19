@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { syncBuiltinESMExports } from 'node:module';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import type { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
@@ -18,6 +19,8 @@ import type { RpcCommand } from './protocol.js';
 import { handleRpcCommand } from './rpcServer.js';
 import { createRuntimeRpcHost } from './runtimeHost.js';
 import type { SessionChangePort } from '../../core/shell/replacement.js';
+import { selectModelContext } from '../../session/context/selection.js';
+import { SessionStoreAccess } from '../../session/store/sessionStoreAccess.js';
 
 let directory: string;
 let context: ShellRuntimeContext;
@@ -43,8 +46,9 @@ afterEach(() => {
   vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(directory, { recursive: true, force: true });
 });
 
-function host(input?: TurnInput, switchSession?: SessionChangePort) {
-  const runtime = { commands: new ShellCommandRuntime(), input: () => input, cancelCurrentRun: () => {}, getState: () => input ? 'running' : 'idle',
+function host(input?: TurnInput, switchSession?: SessionChangePort, commands = new ShellCommandRuntime()) {
+  const runtime = { commands, input: () => input, isRunning: () => Boolean(input || commands.current),
+    cancelCurrentRun: () => commands.current?.controller.abort(), getState: () => input ? 'running' : 'idle',
     summarizeAbandonedTurns: async () => undefined } as unknown as ShellSessionRuntime;
   return { ...createRuntimeRpcHost({ runtimeContext: context, sessionRuntime: runtime, sessionManager: manager,
     queue, isStreaming: () => Boolean(input), enqueuePrompt: text => { queue.push(text); }, switchSession }), emitResponse: () => {} };
@@ -419,4 +423,70 @@ it('preserves legacy custom read hosts without exposing admission callbacks in r
     expect(response.data).not.toHaveProperty('assertCurrent');
     expect(JSON.stringify(response)).not.toContain('assertCurrent');
   }
+});
+
+it('requires the captured tree version, preserves the correlation ID, and projects bookmarks from the confirmed append', async () => {
+  const sessionId = context.session.id;
+  manager.addTurn(sessionId, { id: 'target', role: 'user', content: 'Original question' });
+  const rpc = host();
+  const tree = await handleRpcCommand({ type: 'get_tree' }, rpc);
+  expect(tree).toMatchObject({ success: true, data: { version: expect.any(String), leafId: 'target', bookmarks: [] } });
+  const requested = { type: 'annotate_session', id: 'replace-42', entryId: 'target', expectedVersion: tree.data!.version as string,
+    change: { type: 'context-edit', edit: { kind: 'replace', text: 'Model context only' } } } as const;
+  const edit = await handleRpcCommand(requested, rpc);
+  expect(edit).toMatchObject({ success: true, id: 'replace-42', data: { status: 'committed', sessionId, annotationId: expect.any(String), version: expect.any(String) } });
+  expect(context.session.turns[0]?.content).toBe('Original question');
+  expect(selectModelContext(context.session)[0]?.content).toBe('Model context only');
+  const before = manager.getTranscriptEvents(sessionId);
+  const bookmark = { ...requested, id: 'bookmark-42', change: { type: 'label', label: 'Review' } } as const;
+  expect(await handleRpcCommand(bookmark, rpc)).toMatchObject({ success: false, id: 'bookmark-42', data: { status: 'unchanged' } });
+  expect(manager.getTranscriptEvents(sessionId)).toEqual(before);
+  expect(await handleRpcCommand({ ...bookmark, expectedVersion: edit.data!.version as string }, rpc)).toMatchObject({ success: true });
+  expect(await handleRpcCommand({ type: 'get_tree' }, rpc)).toMatchObject({ data: { bookmarks: [{ entryId: 'target', label: 'Review' }] } });
+});
+
+it('refuses annotation during replacement and before dispatch on cancellation', async () => {
+  const sessionId = context.session.id;
+  manager.addTurn(sessionId, { id: 'target', role: 'user', content: 'Original question' });
+  const commands = new ShellCommandRuntime();
+  const rpc = host(undefined, undefined, commands);
+  const { data } = await handleRpcCommand({ type: 'get_tree' }, rpc);
+  const command = { type: 'annotate_session', id: 'bookmark-42', entryId: 'target', expectedVersion: data!.version as string,
+    change: { type: 'label', label: 'Review' } } as const;
+  const before = manager.getTranscriptEvents(sessionId);
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const replacement = commands.run(() => held, 'session-change');
+  try {
+    expect(await handleRpcCommand(command, rpc)).toMatchObject({ success: false, data: { status: 'unchanged' }, error: expect.stringContaining('still running') });
+  } finally { release(); await replacement; }
+  const pending = handleRpcCommand(command, rpc);
+  expect(commands.current?.kind).toBe('command');
+  await handleRpcCommand({ type: 'abort' }, rpc);
+  expect(await pending).toMatchObject({ success: false, id: command.id, data: { status: 'unchanged' }, error: expect.stringContaining('cancelled') });
+  expect(manager.getTranscriptEvents(sessionId)).toEqual(before);
+});
+
+it('reports an unknown annotation publication without replacing the live session', async () => {
+  const session = context.session;
+  manager.addTurn(session.id, { id: 'target', role: 'user', content: 'Original question' });
+  const rpc = host();
+  const { data } = await handleRpcCommand({ type: 'get_tree' }, rpc);
+  const layout = new SessionStoreAccess().stateLayout(session.id);
+  const rename = fs.renameSync;
+  const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+    if (to === layout.statePath) throw new Error('Private configuration detail');
+    rename(from, to);
+  });
+  syncBuiltinESMExports();
+  try {
+    const result = await handleRpcCommand({ type: 'annotate_session', id: 'uncertain', entryId: 'target', expectedVersion: data!.version as string,
+      change: { type: 'label', label: 'Unconfirmed' } }, rpc);
+    expect(result).toMatchObject({ success: false, id: 'uncertain', data: { status: 'unknown', sessionId: session.id } });
+    expect(result.error).toContain('persistence is unknown');
+    expect(result.error).not.toContain('Private configuration detail');
+  } finally { spy.mockRestore(); syncBuiltinESMExports(); }
+  expect(context.session).toBe(session);
+  expect(manager.getTranscriptEvents(session.id).at(-1)?.type).toBe('label');
+  expect(manager.getSession(session.id)?.labels).toBeUndefined();
 });

@@ -8,6 +8,7 @@ import { readSessionRecordSnapshot, type SessionReadLimits } from '../../store/s
 import { readSessionFileVersion } from '../../store/version.js';
 import { buildLinearSessionThreadSnapshot, catchUpSessionThread, sessionRootEntryId, sessionThreadPath, type SessionThreadSnapshot } from '../../schema/sessionThread.js';
 import type { TranscriptEvent } from '../../sessionEventCodec.js';
+import type { Session } from '../../schema/sessionRecord.js';
 import { readTranscriptPrefixDigest } from '../../transcript/source.js';
 import { BranchStoreError } from './contract.js';
 
@@ -18,6 +19,8 @@ export interface BranchStoreState {
   readonly branchIdentity: string;
   readonly activeEntryIds: readonly string[];
   readonly activeLeafId: string;
+  readonly thread: SessionThreadSnapshot;
+  readonly session: Session;
   readonly events: readonly TranscriptEvent[];
   readonly version: string;
   readonly transcriptPrefix: { readonly bytes: number; readonly sha256: string };
@@ -72,7 +75,7 @@ export function readBranchStoreState(store: SessionStoreLayout, sessionId: strin
     if (readSessionFileVersion(layout) !== version || pathIdentity(layout.transcriptPath) !== sourcePathIdentity) throw new BranchStoreError('conflict');
     const activeEntryIds = Object.freeze(branch.path.map(entry => entry.id));
     return Object.freeze({ bound, transcriptIdentity, sourcePathIdentity, version, activeEntryIds, transcriptPrefix,
-      activeLeafId: activeEntryIds.at(-1)!, events: snapshot.events,
+      activeLeafId: activeEntryIds.at(-1)!, events: snapshot.events, thread, session: snapshot.session,
       branchIdentity: JSON.stringify({ path: branch.path, leaf: thread.activeLeafId, branch: thread.activeBranchId,
         navigation: thread.navigationRevision }),
     });

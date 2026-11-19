@@ -16,34 +16,32 @@ import { configurationAdmission } from '../../core/shell/configuration.js';
 import { updateContextSelection } from '../../session/context/state.js';
 import { navigationLines } from '../output/navigation.js';
 import { markContextUnknown } from '../../observability/usageTelemetry.js';
+import { annotateSession } from './session/annotations.js';
+import type { AnnotationChange } from '../../session/context/annotations.js';
 
 type SessionCommandInput = {
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionManager: SessionManager;
-  readonly sessionRuntime: Pick<ShellSessionRuntime, 'getCurrentRunController'>;
+  readonly sessionRuntime: Pick<ShellSessionRuntime, 'getCurrentRunController'> & Partial<Pick<ShellSessionRuntime, 'commands' | 'isRunning'>>;
   readonly dataTransfer?: CommandDataTransfer;
 };
 
-export function sessionCommandFor(input: {
-  readonly runtimeContext: ShellRuntimeContext;
-  readonly sessionManager: SessionManager;
-  readonly sessionRuntime: Pick<ShellSessionRuntime, 'getCurrentRunController'>;
-  readonly dataTransfer?: CommandDataTransfer;
-}): CommandContext['sessionCommand'] {
-  return async (name, args) => runSessionCommand(name, args, input);
+export function sessionCommandFor(input: SessionCommandInput) {
+  return (name: SessionCommandName, args: string[], command?: CommandContext) => runSessionCommand(name, args, input, command?.signal);
 }
 
 async function runSessionCommand(
   name: SessionCommandName,
   args: readonly string[],
   input: SessionCommandInput,
+  signal?: AbortSignal,
 ): Promise<CommandExecutionResult> {
   // Direct and /session forms both receive arguments without the command name.
   const syntax = sessionSyntax[name];
   const parsed = parseSessionArgs(name, args);
   if (!parsed.ok) return local(`Invalid /${name} arguments: ${parsed.reason}\n${syntaxHelp(syntax)}`);
   if (name === 'pin') return pinSession(parsed.args, input);
-  if (name === 'history') return historyCommand([parsed.action.name, ...parsed.args], input);
+  if (name === 'history') return historyCommand([parsed.action.name, ...parsed.args], input, signal);
   if (name === 'import') return importCommand(parsed.args, input);
   if (name === 'open') return openCommand(parsed.action.name === 'list' ? ['list'] : parsed.args, input);
   return shakeCommand([parsed.action.name, ...parsed.args], input);
@@ -66,7 +64,7 @@ async function pinSession(args: readonly string[], input: SessionCommandInput): 
   return local(result.note, { status: result.status });
 }
 
-async function historyCommand(args: readonly string[], input: SessionCommandInput): Promise<LocalCommandResult> {
+async function historyCommand(args: readonly string[], input: SessionCommandInput, signal?: AbortSignal): Promise<LocalCommandResult> {
   const action = args[0]?.toLowerCase() || 'list';
   if (action === 'list') {
     try {
@@ -75,7 +73,7 @@ async function historyCommand(args: readonly string[], input: SessionCommandInpu
       return local(['Session history', '', ...lines, '', 'Branches remain persisted; use /tree <entry-id> to continue from a point.'].join('\n'));
     } catch (error) { return local(`History is unavailable: ${safe(error)}`); }
   }
-  if (action !== 'export') return local('Usage: /history [list|export <path>]');
+  if (action !== 'export') return historyAnnotation(action, args[1]!, args.slice(2).join(' '), input, signal);
   const destination = args[1];
   if (!destination) return local('Usage: /history export <path>');
   if (!input.dataTransfer) return local('History export is blocked: file authority is unavailable.');
@@ -84,6 +82,21 @@ async function historyCommand(args: readonly string[], input: SessionCommandInpu
     const result = await input.dataTransfer.write({ path: destination, content });
     return local(`History export ${result.outcome}.${result.reason ? ` ${result.reason}` : ''}`, { status: result.outcome });
   } catch (error) { return local(`History export failed: ${safe(error)}`); }
+}
+
+async function historyAnnotation(action: string, entryId: string, text: string, input: SessionCommandInput, signal?: AbortSignal): Promise<LocalCommandResult> {
+  const runtime = input.sessionRuntime;
+  if (!runtime.commands || !runtime.isRunning) return local('Session annotations require the active runtime.');
+  let change: AnnotationChange;
+  switch (action) {
+    case 'edit': change = { type: 'context-edit', edit: { kind: 'replace', text } }; break;
+    case 'omit': case 'restore': change = { type: 'context-edit', edit: { kind: action } }; break;
+    case 'bookmark': case 'unbookmark': change = { type: 'label', label: action === 'bookmark' ? text : null }; break;
+    default: return local(syntaxHelp(sessionSyntax.history));
+  }
+  const { output, ...receipt } = await annotateSession(input.runtimeContext, { commands: runtime.commands, isRunning: () => runtime.isRunning!() },
+    { entryId, change, signal });
+  return local(output, receipt);
 }
 
 async function importCommand(args: readonly string[], input: SessionCommandInput): Promise<LocalCommandResult> {

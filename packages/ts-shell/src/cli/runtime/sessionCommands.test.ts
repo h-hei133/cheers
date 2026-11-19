@@ -12,6 +12,9 @@ import { resolveProviderCredential } from '../../core/shell/providerCredentials.
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
 import { captureUsageAttribution } from '../../observability/usage/identity.js';
 import { DEFAULT_ENDPOINT_KIND } from '../../provider/endpoints/index.js';
+import { ShellCommandRuntime } from '../../core/shell/command.js';
+import { routeSlashCommand } from '../../core/commands/slashRouter.js';
+import { selectModelContext } from '../../session/context/selection.js';
 
 let root: string;
 let manager: SessionManager;
@@ -39,8 +42,9 @@ beforeEach(() => {
   } as unknown as ShellRuntimeContext);
   const binding = configurationBinding(context);
   context.configuration.publish(context.configuration.begin(binding), context.configuration.current.config, binding);
+  const commands = new ShellCommandRuntime();
   command = sessionCommandFor({ runtimeContext: context, sessionManager: manager,
-    sessionRuntime: { getCurrentRunController: () => null } });
+    sessionRuntime: { commands, isRunning: () => commands.current !== undefined, getCurrentRunController: () => commands.current?.controller ?? null } });
 });
 
 afterEach(() => {
@@ -61,6 +65,25 @@ function recordMeasurement(promptTokens: number, promptIdentity: NonNullable<She
     promptIdentity: { ...promptIdentity, provider: target.provider, model: target.model, endpoint, endpointId } });
   expect(getSessionUsage(sessionId).lastPromptTokens).toBe(promptTokens);
 }
+
+it('applies history edits and bookmarks through the slash command with the original transcript intact', async () => {
+  const target = context.session.turns[0]!;
+  const call = (text: string) => routeSlashCommand(text, { cwd: root, projectRoot: root, sessionId, sessionCommand: command });
+  recordMeasurement(9_000, { schemaDigest: 'a'.repeat(64), systemDigest: 'b'.repeat(64) });
+  const edit = await call(`/history edit ${target.id} "Replacement  text"`);
+  expect(edit).toMatchObject({ kind: 'local', state: { status: 'committed', annotationId: expect.any(String) } });
+  expect(context.session.turns[0]?.content).toBe(target.content);
+  expect(selectModelContext(context.session)[0]?.content).toBe('Replacement  text');
+  expect(getSessionUsage(sessionId).lastPromptTokens).toBeUndefined();
+  expect(await call(`/session history bookmark ${target.id} "Needs follow-up"`)).toMatchObject({ kind: 'local', state: { status: 'committed' } });
+  expect(await call('/history')).toMatchObject({ output: expect.stringContaining('[Needs follow-up]') });
+  expect(await call(`/history omit ${target.id}`)).toMatchObject({ state: { status: 'committed' } });
+  expect(selectModelContext(context.session)[0]?.content).toBe('[Message content omitted from context.]');
+  expect(await call(`/history restore ${target.id}`)).toMatchObject({ state: { status: 'committed' } });
+  expect(await call(`/history unbookmark ${target.id}`)).toMatchObject({ state: { status: 'committed' } });
+  expect(selectModelContext(context.session)[0]?.content).toBe(target.content);
+  expect(context.session.labels).toBeUndefined();
+});
 
 describe('context selection measurement lifetime', () => {
   it('withdraws the current provider measurement when apply changes the selection', async () => {
