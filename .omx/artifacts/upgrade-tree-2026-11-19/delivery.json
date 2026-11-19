@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-19",
+  "batch": [
+    "E.6 before-tree custom summary and instructions"
+  ],
+  "status": "subbatch_linux_accepted_E6_open_repository_gate_not_proven",
+  "baseCommit": "6569998598bdbd80b6b55c763d432e4c7704b616",
+  "delivery": {
+    "localCommit": "containing Git commit supplies identity",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "9018502b116f542ba583608209c26ce1f18a31240b8e29e88b280ca6f7c45a4a",
+    "inputsDigest": "1ea219ff61970a7a0308a6919e7f46f25619dbd9bc6a9e4751bb94a11cef08fa",
+    "inputDigestMatches": true,
+    "node": "24.15.0"
+  },
+  "source": {
+    "files": 20,
+    "productionFiles": 15,
+    "hashesMatch": true,
+    "receipt": "evidence/source.json"
+  },
+  "validation": {
+    "combined": {
+      "files": 11,
+      "passed": 255,
+      "receipt": "raw.tar.gz::joint-build-first.log",
+      "boundary": "Joint 255 tests preceded a TypeScript narrowing fix; final 40 affected tests and build passed afterward."
+    },
+    "finalAffected": {
+      "files": 4,
+      "passed": 40,
+      "receipt": "raw.tar.gz::type-fixed-build.log"
+    },
+    "static": {
+      "count": 7,
+      "passed": true,
+      "productionModules": 2733,
+      "monoliths": 0
+    },
+    "reversal": {
+      "cases": 10,
+      "assertionFailures": 10,
+      "exactRestoration": true,
+      "mainSourceUnchanged": true,
+      "restoredPassed": 96,
+      "fixtureAdapter": "Isolated copied compaction fixture uses same-tree temporary state instead of package-relative ../../.tmp",
+      "receipt": "evidence/reversal.json",
+      "initialFixtureFailureRaw": "First failed instruction-wire log was overwritten by corrected run; first receipt preserves its classification and digest, so raw evidence is incomplete for that attempt."
+    },
+    "linux": {
+      "nativePassed": 8,
+      "posts": 12,
+      "receipt": "evidence/native.json"
+    },
+    "nodeFloor": {
+      "runtime": "20.3.0",
+      "codeGenerationDisabled": true,
+      "nativePassed": 8,
+      "posts": 12,
+      "receipt": "evidence/native-node20.json"
+    },
+    "installed": {
+      "publicEntries": 15,
+      "strictTypes": true,
+      "skipLibCheck": false,
+      "engineStrict": true,
+      "nativePassed": 8,
+      "posts": 12,
+      "receipt": "evidence/package.json"
+    },
+    "workerBoundary": {
+      "scope": "Public ExtensionService consumes a captured fixture VersionRecord through its internal dispatcher; not a marketplace-install or UI approval claim",
+      "cases": 3,
+      "providerRequests": 0
+    },
+    "configuredProvider": {
+      "status": "not_run_this_subbatch",
+      "earlierE6Attempt": "provider-auth with zero requests"
+    },
+    "normproof": {
+      "exit": 2,
+      "verdict": "not_proven",
+      "acceptedAsProof": false,
+      "reason": "pinned graph exceeds 16384 edge capacity",
+      "scopeModified": false,
+      "gateModified": false,
+      "receipt": "evidence/judge-current.json"
+    }
+  },
+  "review": {
+    "status": "APPROVE",
+    "scopeLimited": true,
+    "hashesMatch": true,
+    "validationRunByReviewer": false,
+    "receipt": "evidence/review.json"
+  },
+  "taskCount": {
+    "accepted": 36,
+    "open": 26,
+    "fullE6Accepted": false
+  },
+  "setupFailuresRetained": [
+    "worker first native probe used unavailable private export; corrected to public ExtensionService",
+    "two early regression assertions used handler-side checks, replaced by host-owned outcomes",
+    "serialized capture factory lacked compiled name decorator; reproduced against compiled factory and fixed",
+    "TypeScript cancellation narrowing fixed without runtime semantic change",
+    "isolated compaction test expected package-relative temporary parent; corrected only copied fixture path"
+  ],
+  "remaining": [
+    "SDK controlled reload resource adoption",
+    "input/message/tool/compaction event result consumers"
+  ],
+  "boundaries": [
+    "Linux only",
+    "same session and native branch-note owner retained",
+    "custom supplied summary skips default provider acquisition even with zero abandoned turns",
+    "malformed overrides refuse before provider work or durable writes",
+    "cancellation remains monotonic across handlers and contributions",
+    "source and extension generation final guards retained",
+    "no new configured-provider evidence",
+    "no push or CI"
+  ],
+  "evidenceStorage": {
+    "archive": "raw.tar.gz",
+    "index": "evidence/raw-index.json",
+    "rawBytesPreserved": true
+  }
+}

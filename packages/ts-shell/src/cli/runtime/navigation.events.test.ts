@@ -44,6 +44,43 @@ it('honours before_tree cancellation without a summary, durable write or view ch
   expect(seen).toHaveLength(1); expect(test.summarize).not.toHaveBeenCalled(); expect(test.bytes()).toEqual(before); expect(test.context.session).toBe(context);
 });
 
+it('uses a custom before-tree summary without acquiring the default summarizer and persists its note', async () => {
+  const test=fixture(new Map([['session_before_tree',[() => ({summary:{summary:'Custom abandoned branch'}})]] ]));
+  const result=await navigateSession({runtimeContext:test.context,sessionManager:test.manager,sessionRuntime:test.runtime},test.target);
+  expect(result.changed).toBe(true); expect(test.summarize).not.toHaveBeenCalled();
+  expect(test.bytes()[2]!.toString()).toContain('Custom abandoned branch');
+});
+
+it('persists supplied custom text when moving forward with zero abandoned turns', async () => {
+  const test=fixture(new Map([['session_before_tree',[() => ({summary:{summary:'Forward custom note'}})]]]));
+  const target=test.session.turns.at(-1)!.id!;
+  await test.manager.revertTo(test.session.id,test.target);
+  test.context.session=test.manager.getSession(test.session.id)!;
+  const result=await navigateSession({runtimeContext:test.context,sessionManager:test.manager,sessionRuntime:test.runtime},target);
+  expect(result.changed).toBe(true); expect(test.summarize).not.toHaveBeenCalled(); expect(test.bytes()[2]!.toString()).toContain('Forward custom note');
+});
+
+it.each([false,true])('passes before-tree custom instructions to the existing summary owner (replace=%s)', async replaceInstructions => {
+  const test=fixture(new Map([['session_before_tree',[() => ({customInstructions:'Focus on decisions',replaceInstructions})]]]));
+  const result=await navigateSession({runtimeContext:test.context,sessionManager:test.manager,sessionRuntime:test.runtime},test.target);
+  expect(result.changed).toBe(true); expect(test.summarize).toHaveBeenCalledOnce();
+  expect(test.summarize.mock.calls[0]?.[2]).toEqual(replaceInstructions ? {prompt:'Focus on decisions'} : {instructions:'Focus on decisions'});
+});
+
+it.each([{summary:{summary:''}},{summary:{summary:'x'.repeat(128*1024+1)}},{customInstructions:42},{replaceInstructions:true}])('refuses unusable before-tree summary options without provider or write %#', async result => {
+  const test=fixture(new Map([['session_before_tree',[() => result]]])); const before=test.bytes();
+  const outcome=await navigateSession({runtimeContext:test.context,sessionManager:test.manager,sessionRuntime:test.runtime},test.target);
+  expect(outcome.changed).toBe(false); expect(test.summarize).not.toHaveBeenCalled(); expect(test.bytes()).toEqual(before);
+});
+
+it('keeps a custom summary across later handlers while every handler sees the original tree event', async () => {
+  const seen: unknown[]=[];
+  const test=fixture(new Map([['session_before_tree',[event => {seen.push(event); return {summary:{summary:'First custom summary'}};},event => {seen.push(event); return {cancel:false};}]]]));
+  const result=await navigateSession({runtimeContext:test.context,sessionManager:test.manager,sessionRuntime:test.runtime},test.target);
+  expect(result.changed).toBe(true); expect(test.summarize).not.toHaveBeenCalled(); expect(seen[0]).toBe(seen[1]);
+  expect(test.bytes()[2]!.toString()).toContain('First custom summary');
+});
+
 it('emits before_tree then confirmed tree with actual old and new leaf identities and no session restart', async () => {
   const events: Array<{ name: string; payload: unknown }> = [];
   const names = ['session_before_tree', 'session_tree', 'session_start', 'session_shutdown'];

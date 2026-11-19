@@ -1,10 +1,14 @@
 # 规划执行进展（2026-11-19）
 
-本轮接续已核实任务，完成 E.6 的 kernel结算、实际startup／shutdown、树导航、CLI replacement、initial input/UI readiness与controlled CLI reload子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
+本轮接续已核实任务，完成 E.6 的 kernel结算、实际startup／shutdown、树导航、CLI replacement、initial input/UI readiness、controlled CLI reload及before-tree定制摘要子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
 
 核查与取舍见[工程记录](design.md)，当前验收和次序见[任务清单](tasks.md)。源码按批本地提交。远端推送和本轮 CI 尚未发生。原定暂缓的原生插件与独立桌面产品不计入 62 项，T6 保留按需求开启。
 
 ## 当前批次的验证
+
+before-tree现分别合并摘要／追加或替换指令与单调取消，原event保持不可变；供给摘要沿原branch-note持久化且零默认摘要请求，零abandoned turns也保留。非法／空／超限结果拒绝provider和写入，file／installed worker使用同inert decoder与primitive桥。11文件255项、七门／2733modules／0monoliths通过；TypeScript narrowing调整后40影响项和build9018502b116fpassed，10有效反转10AssertionErrors／exact恢复96项与限定APPROVE/hash核对。Linuxcompiled／Node20.3禁生成／installed各8场景12POST，15strict公开入口／skipLibCheck=falsepassed；三Worker场景是public ExtensionService fixture record消费者资格，不冒充marketplace批准。默认judge实际exit2/not_proven，未新增配置模型调用。[当前交付](../../../.omx/artifacts/upgrade-tree-2026-11-19/delivery.json)。SDK controlled reload及其余input/message/tool/compaction结果消费者继续，E.6整项保持部分。
+
+以下controlled CLI reload已提交65699985，证据保留原source范围。
 
 controlled CLI reload现执行old shutdown→原generation退休→file/installed资源重载→新UI/start，保留same session/selection；busy拒绝，取消原signal、partial/unknown保持真实。11文件179项与七门2732modules/0monoliths通过，联合后仅TypeScript判别式调整，最终20影响项/build7bb49e3f40cepassed。10有效反转10AssertionErrors/exact恢复81项及限定APPROVE/hash通过。Linuxcompiled/Node20.3/installed各5场景2POST、15strict入口、两模式PTY各1POSTpassed；旧observer/fixture/build失败保留。未新增配置模型调用，normaljudge actualexit2/not_proven容量缺口保持。[当前交付](../../../.omx/artifacts/upgrade-reload-2026-11-19/delivery.json)。SDK controlled reload与tree/result consumers仍开，完整E.6保持部分。
 

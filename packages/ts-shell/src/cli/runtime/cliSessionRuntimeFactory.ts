@@ -201,7 +201,7 @@ export function createCliSessionRuntime(input: {
         });
       });
     }),
-    summarizeAbandonedTurns: (messages, navigationSignal) => providerResources.withConnections(() => {
+    summarizeAbandonedTurns: (messages, navigationSignal, summaryOptions) => providerResources.withConnections(() => {
       const connectionSignal = currentProviderConnections()?.signal;
       const signal = navigationSignal && connectionSignal ? AbortSignal.any([navigationSignal, connectionSignal]) : navigationSignal ?? connectionSignal;
       const operation = configurationOperation(input.runtimeContext);
@@ -247,6 +247,8 @@ export function createCliSessionRuntime(input: {
             fetchImpl: providerFetchForEndpoint(config, provider.endpoint, endpointShape, admit),
           }),
           messages: projected,
+          ...(summaryOptions?.instructions !== undefined ? { instructions: summaryOptions.instructions } : {}),
+          ...(summaryOptions?.prompt !== undefined ? { prompt: summaryOptions.prompt } : {}),
         });
       });
     }),

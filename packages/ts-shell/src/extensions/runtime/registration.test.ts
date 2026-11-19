@@ -46,6 +46,20 @@ function installed(name: string, count = 9, bytes = 490 * 1024): string {
   return path.join(owned, active.manifest.skills[0]!.path);
 }
 
+it.each([false,true])('reduces installed before-tree scripts against their original envelope (cancel=%s)', async cancel => {
+  const active={digest:digest('tree-events'),manifest:{name:'tree-events',scripts:[{name:'first',path:'first.ts'},{name:'second',path:'second.ts'}],commands:[],tools:[],skills:[]}} as unknown as VersionRecord;
+  const owned=versionPath(active,registry); fs.mkdirSync(owned,{recursive:true});
+  Object.assign(active,{files:{},directories:[],storage:storageIdentity(owned)});
+  const record={name:'tree-events',active,activation:{[workspace]:{enabled:true,grants:['script:first','script:second']}}} as unknown as PackageRecord;
+  const payload=Object.freeze({type:'session_before_tree',targetEntryId:'target'}), seen:unknown[]=[], scripts:string[]=[];
+  closes.push(registerPackage({root:workspace,sessionId:'events',file:registry,current:() => {},withheld:() => {},run:async () => '',tool:() => {throw new Error('No tool');},
+    event:async (_record,script,_event,original) => {seen.push(original);scripts.push(script);return script==='first'?{cancel,summary:{summary:'Installed custom summary'}}:{cancel:false};}},record));
+  const result=await catalogContributions(workspace,'events')[0]!.onEvent!('session_before_tree',payload);
+  expect(seen.every(event => event===payload)).toBe(true);
+  expect(result).toEqual(cancel?{cancel:true}:{cancel:false,summary:{summary:'Installed custom summary'}});
+  expect(scripts).toEqual(cancel?['first']:['first','second']);
+});
+
 it('enforces the shared manifest budget for cold and prewarmed extension catalogs', async () => {
   installed('alpha'); installed('beta');
   await expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture' })).rejects.toThrow(/no complete catalog/);

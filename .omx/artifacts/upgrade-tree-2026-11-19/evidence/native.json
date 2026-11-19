@@ -1,0 +1,65 @@
+{
+  "status": "passed",
+  "buildId": "9018502b116f542ba583608209c26ce1f18a31240b8e29e88b280ca6f7c45a4a",
+  "node": "v24.15.0",
+  "platform": "linux",
+  "cases": [
+    {
+      "name": "compiled-rpc-before-tree-custom",
+      "status": "passed",
+      "exit": 0,
+      "signal": null,
+      "posts": 2
+    },
+    {
+      "name": "compiled-rpc-before-tree-cancel",
+      "status": "passed",
+      "exit": 0,
+      "signal": null,
+      "posts": 2
+    },
+    {
+      "name": "compiled-rpc-before-tree-invalid",
+      "status": "passed",
+      "exit": 0,
+      "signal": null,
+      "posts": 2
+    },
+    {
+      "name": "compiled-rpc-before-tree-append",
+      "status": "passed",
+      "exit": 0,
+      "signal": null,
+      "posts": 3
+    },
+    {
+      "name": "compiled-rpc-before-tree-replace",
+      "status": "passed",
+      "exit": 0,
+      "signal": null,
+      "posts": 3
+    },
+    {
+      "name": "compiled-installed-worker-before-tree-summary",
+      "status": "passed",
+      "posts": 0,
+      "scope": "Public ExtensionService with tracked fixture record; internal dispatcher invocation, no marketplace approval claim"
+    },
+    {
+      "name": "compiled-installed-worker-before-tree-cancel",
+      "status": "passed",
+      "posts": 0,
+      "scope": "Public ExtensionService with tracked fixture record; internal dispatcher invocation, no marketplace approval claim"
+    },
+    {
+      "name": "compiled-installed-worker-before-tree-invalid",
+      "status": "passed",
+      "posts": 0,
+      "scope": "Public ExtensionService with tracked fixture record; internal dispatcher invocation, no marketplace approval claim"
+    }
+  ],
+  "posts": 12,
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "buildUnchanged": true
+}

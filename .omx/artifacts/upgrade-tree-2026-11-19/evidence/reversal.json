@@ -1,0 +1,205 @@
+{
+  "status": "passed",
+  "source": {
+    "packages/ts-shell/src/extensions/events/tree.ts": "f22ebe61ee4d0f46667afda327e23104885c44c81e4221f2d8459b1588ca50ed",
+    "packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts": "eb8b0b63f1b5cf049450a5df62422fc6e4b31c37af9fa2983c3722d74ca61eeb",
+    "packages/ts-shell/src/cli/runtime/compaction.test.ts": "13f859ce71a30f9f661bed99bd178c49d70fc7f612a7e13f542ca89e187ff7f7",
+    "packages/ts-shell/src/cli/runtime/extensions/navigation.ts": "897e08e94104c7de50b679dd50b5da3c420c03261a3d62e26eba04685ed8508c",
+    "packages/ts-shell/src/cli/runtime/navigation.events.test.ts": "98dada75baf05a88a3dfefa49baa63b9385d9d5be5ca9d2cdf507ffe2c6e2049",
+    "packages/ts-shell/src/cli/runtime/navigation.ts": "ecdf64a833a3ab3f22331045882874ad7352feb1725e47fb81d0d810aaf6289d",
+    "packages/ts-shell/src/core/shell/sessionRuntime.ts": "c99768c6d07de0711cf26529281ba31cb9c5fc255eb984b7d45276cd96a656c6",
+    "packages/ts-shell/src/core/values/data.ts": "eec2955944cdc872293446650faf828e303f1a6bdc23fa3b2d5ce8c5025850b4",
+    "packages/ts-shell/src/extensions/events/decision.test.ts": "338a8645d2f4ceba2f9dfdc9a5bcd5a1efc477ecdd8ec33ad1d41221d0e3125a",
+    "packages/ts-shell/src/extensions/events/dispatch.ts": "99dd96213662e0b795ccf64732111f1512084539a5c1f354904073f4faf3f981",
+    "packages/ts-shell/src/extensions/events/model.ts": "8a73d72e3d8b9dbf889801ec5e4faddb877b3a1a29b05c2bf403fc131d53b670",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.test.ts": "c17c54a7ca5f40f4c682f7b5ba83bc20d72e153f12d24427b6f35b6420886c43",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "5dfcd8423726069e892ef2fa204ae6eb19b0d3c9adeccb3a05681ab1943211ff",
+    "packages/ts-shell/src/extensions/runtime/registration.test.ts": "b040a7eb98a42a35b1ab21c117ae690e59d00084be49bda22ecc9ac90010ed1a",
+    "packages/ts-shell/src/extensions/runtime/registration.ts": "c3cfc2dddc15f62b53435af9e03e8fe016c2df8dd39cf9b33e23ddf0786f85fa",
+    "packages/ts-shell/src/extensions/runtime/workerSource.ts": "7d35113f848f45e31de43258af5c982e8f5fb28f8ca6106e3b9dc22c0fee5a97",
+    "packages/ts-shell/src/extensions/service.ts": "63ebea6562ed7971d4cd23339d6e421480a8c85753b28fbd00cbca39cf1a24ff",
+    "packages/ts-shell/src/index.ts": "0b4b08458e1bb1221c86ca629e8d881ad400d17b9b565fb43acc38a51605a54f",
+    "packages/ts-shell/src/session/SessionManager.ts": "447dcb1b248a5232396bf43bc3f6a4b63875922bcaa61e6c0f6e8cd1f32bdca4",
+    "packages/ts-shell/src/session/navigation/revert.ts": "e0158a2af9f09c76d892511f844f6e56e7e634ee98a3c778c5fa8ebdabde1f1e"
+  },
+  "cases": [
+    {
+      "name": "handler-summary",
+      "file": "extensions/events/dispatch.ts",
+      "originalSha256": "99dd96213662e0b795ccf64732111f1512084539a5c1f354904073f4faf3f981",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-handler-summary.log",
+      "logSha256": "b02400e1fdf2d57a4027d9d495cff3e4da9c13dcc6c7c3f3f5ecbb1495e9658b",
+      "terminalTests": "1 failed | 4 skipped (5)"
+    },
+    {
+      "name": "installed-envelope",
+      "file": "extensions/runtime/registration.ts",
+      "originalSha256": "c3cfc2dddc15f62b53435af9e03e8fe016c2df8dd39cf9b33e23ddf0786f85fa",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-installed-envelope.log",
+      "logSha256": "1ebc1ed47dc1a913f892c708856dbd7e2bbe02ca80730bab6374ea7442ccb370",
+      "terminalTests": "2 failed | 8 skipped (10)"
+    },
+    {
+      "name": "custom-summary",
+      "file": "cli/runtime/navigation.ts",
+      "originalSha256": "ecdf64a833a3ab3f22331045882874ad7352feb1725e47fb81d0d810aaf6289d",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-custom-summary.log",
+      "logSha256": "2eae374c4568930e179e98eee95a8a4d0dbb1fe87a3178b86b7bd201ef06ea69",
+      "terminalTests": "1 failed | 16 skipped (17)"
+    },
+    {
+      "name": "instruction-mode",
+      "file": "cli/runtime/navigation.ts",
+      "originalSha256": "ecdf64a833a3ab3f22331045882874ad7352feb1725e47fb81d0d810aaf6289d",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-instruction-mode.log",
+      "logSha256": "e8e455851c5fd0680bb5dd0b55bc0d9b453c2dca6d19182dd7e53d2d297ef00b",
+      "terminalTests": "1 failed | 1 passed | 15 skipped (17)"
+    },
+    {
+      "name": "instruction-wire",
+      "file": "cli/runtime/cliSessionRuntimeFactory.ts",
+      "originalSha256": "eb8b0b63f1b5cf049450a5df62422fc6e4b31c37af9fa2983c3722d74ca61eeb",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-instruction-wire.log",
+      "logSha256": "ef30dd761d83547b9dc08b16851483017e439c642f41b020984026bb2234e777",
+      "terminalTests": "2 failed | 54 skipped (56)"
+    },
+    {
+      "name": "empty-note",
+      "file": "session/navigation/revert.ts",
+      "originalSha256": "e0158a2af9f09c76d892511f844f6e56e7e634ee98a3c778c5fa8ebdabde1f1e",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-empty-note.log",
+      "logSha256": "e54b31b17e6c80e6e7f9c827db091eea031eb6a56780eac6f00c0ceb35cd03cc",
+      "terminalTests": "1 failed | 16 skipped (17)"
+    },
+    {
+      "name": "malformed-capture",
+      "file": "extensions/events/tree.ts",
+      "originalSha256": "f22ebe61ee4d0f46667afda327e23104885c44c81e4221f2d8459b1588ca50ed",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-malformed-capture.log",
+      "logSha256": "78bd733722ad0d0ba3793e060746963e115256357c964660883012e2da9ccd92",
+      "terminalTests": "2 failed | 2 passed | 4 skipped (8)"
+    },
+    {
+      "name": "primitive-bridge",
+      "file": "extensions/runtime/workerSource.ts",
+      "originalSha256": "7d35113f848f45e31de43258af5c982e8f5fb28f8ca6106e3b9dc22c0fee5a97",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-primitive-bridge.log",
+      "logSha256": "3546bea1940c77cb18ba4ce5c1b7772a2006d37a074ce1420b532fb262dfd42c",
+      "terminalTests": "1 failed | 7 skipped (8)"
+    },
+    {
+      "name": "replacement-without-text",
+      "file": "extensions/events/tree.ts",
+      "originalSha256": "f22ebe61ee4d0f46667afda327e23104885c44c81e4221f2d8459b1588ca50ed",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-replacement-without-text.log",
+      "logSha256": "24d8cc86e4be4681bf7d8cea5cfcd6f2c9d5e1c5bd5f50003f978115cc6c62f2",
+      "terminalTests": "1 failed | 3 passed | 13 skipped (17)"
+    },
+    {
+      "name": "cancellation",
+      "file": "extensions/events/tree.ts",
+      "originalSha256": "f22ebe61ee4d0f46667afda327e23104885c44c81e4221f2d8459b1588ca50ed",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "assertionFailures": 1,
+      "log": "reversal-cancellation.log",
+      "logSha256": "4474c94e58ed5e49381e6041ed9e5645dfa5bc61c2652bb0fbecc2e2157af45f",
+      "terminalTests": "1 failed | 16 skipped (17)"
+    }
+  ],
+  "restored": [
+    {
+      "name": "handler-summary",
+      "exact": true
+    },
+    {
+      "name": "installed-envelope",
+      "exact": true
+    },
+    {
+      "name": "custom-summary",
+      "exact": true
+    },
+    {
+      "name": "instruction-mode",
+      "exact": true
+    },
+    {
+      "name": "instruction-wire",
+      "exact": true
+    },
+    {
+      "name": "instruction-wire",
+      "exact": true
+    },
+    {
+      "name": "empty-note",
+      "exact": true
+    },
+    {
+      "name": "malformed-capture",
+      "exact": true
+    },
+    {
+      "name": "primitive-bridge",
+      "exact": true
+    },
+    {
+      "name": "replacement-without-text",
+      "exact": true
+    },
+    {
+      "name": "cancellation",
+      "exact": true
+    }
+  ],
+  "fixtureAdapter": "Isolated copied compaction fixture uses same-tree temporary state instead of package-relative ../../.tmp",
+  "restoredTests": {
+    "exit": 0,
+    "signal": null,
+    "error": null,
+    "assertionFailures": 0,
+    "log": "reversal-restored.log",
+    "logSha256": "3047ea4d0da50593a08866b5c8975f3287ea7f239dfa477412856862614e5f17",
+    "terminalTests": "96 passed (96)"
+  },
+  "mainSourceUnchanged": true,
+  "privateTreeRemoved": true
+}

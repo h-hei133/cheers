@@ -1,6 +1,20 @@
+import { createDataSnapshot } from '../../core/values/data.js';
+import { createTreeResultCapture } from '../events/tree.js';
+
 export const EXTENSION_WORKER_SOURCE = `
 const vm = require('node:vm');
 const { parentPort, workerData } = require('node:worker_threads');
+const { types } = require('node:util');
+// Compiled named functions retain this pure name decorator in their serialized bodies.
+const __name = (target, value) => Object.defineProperty(target, 'name', { value, configurable: true });
+
+// Use the same pure capture factories; their dependencies are explicit parameters.
+const captureData = (${createDataSnapshot.toString()})(types.isProxy);
+const captureTree = (${createTreeResultCapture.toString()})(captureData);
+const beforeTree = Object.setPrototypeOf(value => {
+  try { return JSON.stringify({ ok: true, value: captureTree(value) }); }
+  catch { return '{"ok":false}'; }
+}, null);
 
 const vmCtx = vm.createContext(Object.create(null), {
   name: 'extension-worker',
@@ -21,6 +35,7 @@ Object.defineProperty(vmCtx, '__onReply', { value: registerReceiver, enumerable:
 Object.defineProperty(vmCtx, '__ARGV', { value: JSON.stringify(workerData.argv), enumerable: false });
 Object.defineProperty(vmCtx, '__ROOT', { value: String(workerData.workspaceRoot), enumerable: false });
 Object.defineProperty(vmCtx, '__INVOKE', { value: workerData.invoke ? JSON.stringify(workerData.invoke) : '', enumerable: false });
+Object.defineProperty(vmCtx, '__TREE_RESULT', { value: beforeTree, enumerable: false });
 
 const bootstrap = new vm.Script(\`
 (() => {
@@ -195,11 +210,19 @@ parentPort.on('message', (msg) => {
           const aliases = Array.isArray(invoke.aliases) ? invoke.aliases : [];
           const names = [invoke.event, ...aliases];
           let decision;
+          const tree = invoke.event === 'session_before_tree';
+          const payload = tree ? Object.freeze(invoke.payload) : invoke.payload;
           for (const eventName of names) {
             const list = globalThis.__registeredHandlers.get(eventName) || [];
             for (const handler of list) {
-              const next = await handler(decision ?? invoke.payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui });
-              if (next !== undefined) decision = next;
+              const next = await handler(tree ? payload : decision ?? invoke.payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui });
+              if (tree && next !== undefined) {
+                const envelope = JSON.parse(globalThis.__TREE_RESULT(next));
+                if (!envelope.ok) throw new Error('Extension tree result must contain inert data.');
+                const captured = envelope.value;
+                if (captured.cancel) return Object.freeze({ cancel: true });
+                decision = Object.freeze({ ...decision, ...captured, cancel: false });
+              } else if (next !== undefined) decision = next;
             }
           }
           return decision;

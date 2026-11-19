@@ -19,8 +19,14 @@ export type ExtensionSessionBeforeEvent =
   | { readonly type: 'session_before_switch'; readonly sessionId: string; readonly workspaceRoot: string; readonly reason: 'new' | 'resume'; readonly targetSessionId?: string }
   | { readonly type: 'session_before_fork'; readonly sessionId: string; readonly workspaceRoot: string; readonly entryId?: string };
 export interface ExtensionSessionBeforeResult { readonly cancel?: boolean }
+export interface ExtensionBeforeTreeResult extends ExtensionSessionBeforeResult {
+  readonly summary?: { readonly summary: string };
+  readonly customInstructions?: string;
+  readonly replaceInstructions?: boolean;
+}
 export type ExtensionSessionBeforeEventName = ExtensionSessionBeforeEvent['type'];
 export type ExtensionSessionBeforeEventPayload<Name extends ExtensionSessionBeforeEventName> = Extract<ExtensionSessionBeforeEvent, { readonly type: Name }>;
+export type ExtensionSessionBeforeEventResult<Name extends ExtensionSessionBeforeEventName> = Name extends 'session_before_tree' ? ExtensionBeforeTreeResult : ExtensionSessionBeforeResult;
 
 const RUN_EVENTS = new Set<string>(['agent_start', 'agent_end', 'agent_settled', 'turn_start', 'turn_end',
   'message_start', 'message_update', 'message_end', 'tool_execution_start', 'tool_execution_update', 'tool_execution_end',

@@ -12015,3 +12015,10 @@ Linuxcompiled／Node20.3禁生成／installed各4场景7POST、15strict入口／
 前批initial readiness已提交472f23c7。CLI /plugin reload与named invocation执行旧shutdown/原generation共享retirement/file与installed重载/newUI/start，same session/selection保持。signal贯穿、cancel及时、partial和unknown不写clean成功；microtask source捕获、oldouter退休和close同步重入守卫经实际反例修复，限定七file APPROVE/hash。11文件179項与七静态门2732modules/0monoliths通过；一处TypeScript-only判别式调整后20影响项/build7bb49e3f40cepassed，10有效反转10AssertionErrors/exact恢复81项。
 
 Linuxcompiled/Node20.3/installed各5场景2POST、15strict入口/skipLibCheck=false和两模式PTY各1POSTpassed，真实command发现/UI/report/startup queue/取消及failed file零派发/未知封锁。旧probe observer/timeout loop与build夹具失败保留，原config/source/build保持、private清理。normalpinnedjudge actualexit2/not_proven/16384 capacity缺口，未新增配置模型调用。归档upgrade-reload-2026-11-19，36/62、26开放，SDKcontrolledreload/tree/result继续；按授权本地提交、不push/CI。
+
+
+### 2026-11-19：树导航摘要与指令结果消费
+
+前批CLI reload已提交65699985。本批before-tree复用原revert／summary／note，供给summary省默认请求、zeroabandoned保留note，append/replace贯穿signed bounded transport；cancel单调、原event immutable，invalid／accessor／toJSON／空与超限拒绝provider/write。host/file/installed worker同inert capture factory与primitive VM桥；compiled name decorator实际反例后修，原source/generation/readback guards保留。
+
+11/255与七门2733modules/0monoliths通过；TypeScript-only narrowing后40影响项/build9018502b116fpassed，10有效反转10AssertionErrors/exact恢复96及限定APPROVE/hash匹配。Linuxcompiled/Node20.3禁生成/installed各8场景12POST、15strict入口/skipLibCheck=false；workerpublicService fixture消费者不当marketplace批准。isolated路径／断言／私有export失败保留、private清理/source/build/config保持，未新增配置模型调用；normalpinnedjudge actualexit2/not_proven/16384 capacity，36/62、26开项继续SDKcontrolledreload及其他结果。按授权本地提交，不push/CI或关闭总目标。

@@ -16,6 +16,16 @@ it('retains the same before-event envelope for every handler and a cancellation 
   expect(seen).toEqual([payload]);
 });
 
+it('reduces supplied tree fields independently without replacing the handler envelope', async () => {
+  const payload=Object.freeze({type:'session_before_tree',targetEntryId:'target'}), seen:unknown[]=[];
+  const handlers=new Map([['session_before_tree',[
+    () => ({summary:{summary:'Preserved summary'},customInstructions:'Focus'}),
+    event => {seen.push(event); return {cancel:false};},
+  ]]]);
+  expect(await runEventHandlers({handlers,event:'session_before_tree',payload})).toEqual({cancel:false,summary:{summary:'Preserved summary'},customInstructions:'Focus'});
+  expect(seen).toEqual([payload]);
+});
+
 it('consumes a cancellation before running another contribution', async () => {
   cleanups.push(registerCatalogContribution({ root, sessionId, commands: [], tools: [], skills: () => [], onEvent: async () => ({ cancel: true }) }));
   const next = vi.fn(async () => undefined);

@@ -124,8 +124,9 @@ export class SessionManager extends SessionReentrySurface {
     summarize?: (abandoned: readonly SessionMessage[]) => Promise<string | undefined>,
     beforeWrite?: () => void,
     expectedVersion?: string,
+    summaryOptions?: { readonly includeEmpty?: boolean },
   ): Promise<number> {
-    return revertSession(this.host.store, sessionId, entryId, summarize, beforeWrite, expectedVersion);
+    return revertSession(this.host.store, sessionId, entryId, summarize, beforeWrite, expectedVersion, summaryOptions);
   }
 
   createNewWithId(

@@ -680,3 +680,9 @@ trace scoped retrieval已修/资格通过，但原研究明确typed span/event s
 | T6.1–T6.3 | 服务端已有帧窗口，主机待发队列只在内存，来宾仍轮询。SSH 每个操作独立启动连接，现有任务起停和输出保留。这三项沿原计划按需求开启。 |
 
 实现取舍以现有所有者为准。校验沿同步求值记录当前资源与退出边界，同时保留旧工具入口对相邻 Draft 7 断言和倍数的检查。追踪在已接受响应处写入类型化事件，用原存储读取并脱敏投影链接和相对时间。启动路径共享同一次参数归属，由现有语义解析决定工作区和模式。三批均沿用现有生产入口。
+
+## Before-tree summary results (2026-11-19)
+
+目标是让扩展可提供branch note或控制原summary请求，取消与非法输入在provider和durable write前拒绝。定向参考before-tree的cancel／summary／instructions三分支及供给summary省请求；接受该顺序，保留本仓选定entry语义、原source/version/generation guards和note writer，不新增details/usage/label无消费者字段或另一计费路径。每个供给字段独立后者优先、cancel单调；handlers、installed scripts和catalog contributions都读取原immutable event。空／超限／accessor／toJSON结果拒绝，replace无可用text拒绝；供给summary零abandoned也持久。原signed summary owner接受instructions/prompt，仍执行完整投影预算。
+
+共享data snapshot改显式依赖factory供worker复用，同realm primitive成功/失败回包保持；compiled toString出现name decorator已actual factory反例再修。11文件255项联合及七门2733modules/0monoliths后TS2367 narrowing修复，40影响项/build9018502b116f通过，限定15production文件APPROVE/hash核对。10行为反转10AssertionErrors/exact恢复96；isolated compaction路径漂移在副本改临时路径，原失败保留。Linuxcompiled／Node20.3禁生成／installed各五RPC树场景和三public ExtensionService worker场景共12loopback POST，15公开入口strict NodeNext/skipLibCheck=false/engine-strictpassed。无新配置模型或marketplace approval资格；normal pinned judge actualexit2/not_proven/16384 capacity仍缺，scope/gate/source未改。交付upgrade-tree-2026-11-19，36/62与26开项保持；下一SDK controlled resource reload。

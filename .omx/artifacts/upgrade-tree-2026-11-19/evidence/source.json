@@ -1,0 +1,27 @@
+{
+  "buildId": "9018502b116f542ba583608209c26ce1f18a31240b8e29e88b280ca6f7c45a4a",
+  "files": {
+    "packages/ts-shell/src/extensions/events/tree.ts": "f22ebe61ee4d0f46667afda327e23104885c44c81e4221f2d8459b1588ca50ed",
+    "packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts": "eb8b0b63f1b5cf049450a5df62422fc6e4b31c37af9fa2983c3722d74ca61eeb",
+    "packages/ts-shell/src/cli/runtime/compaction.test.ts": "13f859ce71a30f9f661bed99bd178c49d70fc7f612a7e13f542ca89e187ff7f7",
+    "packages/ts-shell/src/cli/runtime/extensions/navigation.ts": "897e08e94104c7de50b679dd50b5da3c420c03261a3d62e26eba04685ed8508c",
+    "packages/ts-shell/src/cli/runtime/navigation.events.test.ts": "98dada75baf05a88a3dfefa49baa63b9385d9d5be5ca9d2cdf507ffe2c6e2049",
+    "packages/ts-shell/src/cli/runtime/navigation.ts": "ecdf64a833a3ab3f22331045882874ad7352feb1725e47fb81d0d810aaf6289d",
+    "packages/ts-shell/src/core/shell/sessionRuntime.ts": "c99768c6d07de0711cf26529281ba31cb9c5fc255eb984b7d45276cd96a656c6",
+    "packages/ts-shell/src/core/values/data.ts": "eec2955944cdc872293446650faf828e303f1a6bdc23fa3b2d5ce8c5025850b4",
+    "packages/ts-shell/src/extensions/events/decision.test.ts": "338a8645d2f4ceba2f9dfdc9a5bcd5a1efc477ecdd8ec33ad1d41221d0e3125a",
+    "packages/ts-shell/src/extensions/events/dispatch.ts": "99dd96213662e0b795ccf64732111f1512084539a5c1f354904073f4faf3f981",
+    "packages/ts-shell/src/extensions/events/model.ts": "8a73d72e3d8b9dbf889801ec5e4faddb877b3a1a29b05c2bf403fc131d53b670",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.test.ts": "c17c54a7ca5f40f4c682f7b5ba83bc20d72e153f12d24427b6f35b6420886c43",
+    "packages/ts-shell/src/extensions/runtime/inProcessLoader.ts": "5dfcd8423726069e892ef2fa204ae6eb19b0d3c9adeccb3a05681ab1943211ff",
+    "packages/ts-shell/src/extensions/runtime/registration.test.ts": "b040a7eb98a42a35b1ab21c117ae690e59d00084be49bda22ecc9ac90010ed1a",
+    "packages/ts-shell/src/extensions/runtime/registration.ts": "c3cfc2dddc15f62b53435af9e03e8fe016c2df8dd39cf9b33e23ddf0786f85fa",
+    "packages/ts-shell/src/extensions/runtime/workerSource.ts": "7d35113f848f45e31de43258af5c982e8f5fb28f8ca6106e3b9dc22c0fee5a97",
+    "packages/ts-shell/src/extensions/service.ts": "63ebea6562ed7971d4cd23339d6e421480a8c85753b28fbd00cbca39cf1a24ff",
+    "packages/ts-shell/src/index.ts": "0b4b08458e1bb1221c86ca629e8d881ad400d17b9b565fb43acc38a51605a54f",
+    "packages/ts-shell/src/session/SessionManager.ts": "447dcb1b248a5232396bf43bc3f6a4b63875922bcaa61e6c0f6e8cd1f32bdca4",
+    "packages/ts-shell/src/session/navigation/revert.ts": "e0158a2af9f09c76d892511f844f6e56e7e634ee98a3c778c5fa8ebdabde1f1e"
+  },
+  "productionFiles": 15,
+  "hashesMatch": true
+}

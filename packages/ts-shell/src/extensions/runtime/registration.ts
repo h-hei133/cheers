@@ -11,6 +11,8 @@ import type { PackageRecord } from '../model.js';
 import type { ToolDefinition } from '../../tools/types.js';
 import type { CommandDefinition } from '../../core/commands/types.js';
 import { SkillDiscovery } from '../../core/skills/discovery.js';
+import { captureTreeResult, mergeTreeResult } from '../events/tree.js';
+import type { ExtensionBeforeTreeResult } from '../events/model.js';
 
 export interface RegistrationHost {
   readonly root: string;
@@ -65,12 +67,18 @@ export function registerPackage(host: RegistrationHost, record: PackageRecord): 
   const onEvent = jsScripts.length && host.event
     ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => {
         let currentPayload = payload;
+        let treeResult: ExtensionBeforeTreeResult = { cancel: false };
         for (const script of jsScripts) {
           host.current(record, `script:${script.name}`);
-          const next = await host.event!(record, script.name, event, currentPayload, aliases, signal);
+          const next = await host.event!(record, script.name, event, event === 'session_before_tree' ? payload : currentPayload, aliases, signal);
+          if (event === 'session_before_tree') {
+            treeResult = mergeTreeResult(treeResult, captureTreeResult(next));
+            if (treeResult.cancel) return treeResult;
+            continue;
+          }
           if (next !== undefined) currentPayload = next;
         }
-        return currentPayload;
+        return event === 'session_before_tree' ? treeResult : currentPayload;
       }
     : undefined;
   return registerCatalogContribution({ root: host.root, sessionId: host.sessionId, commands, tools, skills, ...(onEvent ? { onEvent } : {}) });

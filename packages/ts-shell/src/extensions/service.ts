@@ -197,9 +197,13 @@ export class ExtensionService implements LifecycleHost {
         { kind: 'event', event, ...(aliases ? { aliases } : {}), payload },
       );
       current();
+      if (event === 'session_before_tree' && (!result.success || result.metadata?.cleanup !== 'confirmed')) throw new Error('Extension tree callback failed or its cleanup is unverified.');
       const raw = typeof result.metadata?.eventOutput === 'string' ? result.metadata.eventOutput : '';
       if (!raw.trim()) return undefined;
-      try { return JSON.parse(raw); } catch { return undefined; }
+      try { return JSON.parse(raw); } catch {
+        if (event === 'session_before_tree') throw new Error('Extension tree callback returned invalid data.');
+        return undefined;
+      }
     }, signal);
   }
 }

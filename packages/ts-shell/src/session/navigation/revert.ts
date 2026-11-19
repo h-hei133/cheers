@@ -27,6 +27,7 @@ export async function revertSession(
   summarize?: (abandoned: readonly SessionMessage[]) => Promise<string | undefined>,
   beforeWrite?: () => void,
   expectedVersion?: string,
+  summaryOptions?: { readonly includeEmpty?: boolean },
 ): Promise<number> {
   beforeWrite?.();
   if (!store.sessionExists(sessionId)) return 0;
@@ -49,7 +50,7 @@ export async function revertSession(
     && (turn.id === undefined || !onBranch.has(turn.id)));
   let summary: string | undefined;
   let summaryFailed = false;
-  if (summarize && abandoned.length) {
+  if (summarize && (abandoned.length || summaryOptions?.includeEmpty)) {
     try { summary = await summarize(abandoned); }
     catch { summaryFailed = true; }
   }

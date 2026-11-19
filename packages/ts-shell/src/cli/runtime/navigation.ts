@@ -121,9 +121,9 @@ export async function navigateSession(input: {
     }
     if (runtime.getState() === 'running') throw new Error('The session became busy during its navigation event.');
   }, signal);
-  const accepted = await events.before({ type: 'session_before_tree', sessionId, workspaceRoot: cwd, targetEntryId: entryId,
+  const decision = await events.beforeTree({ type: 'session_before_tree', sessionId, workspaceRoot: cwd, targetEntryId: entryId,
     oldLeafId: thread.activeLeafId ?? null, version });
-  if (!accepted) return { status: 'unchanged', changed: false, output: 'Session navigation cancelled before its write.' };
+  if (decision.cancel) return { status: 'unchanged', changed: false, output: 'Session navigation cancelled before its write.' };
   validate();
   if (!isCurrent()) throw new Error('The active session changed during its navigation event.');
   events.check();
@@ -132,7 +132,8 @@ export async function navigateSession(input: {
   let warning = 'A storage error was reported while navigating.';
   try {
     dropped = await manager.revertTo(sessionId, entryId,
-      abandoned => runtime.summarizeAbandonedTurns(abandoned, signal),
+      abandoned => decision.summary ? Promise.resolve(decision.summary.summary) : runtime.summarizeAbandonedTurns(abandoned, signal,
+        decision.customInstructions === undefined ? undefined : decision.replaceInstructions ? { prompt: decision.customInstructions } : { instructions: decision.customInstructions }),
       () => {
         signal?.throwIfAborted();
         validate();
@@ -140,7 +141,7 @@ export async function navigateSession(input: {
         if (!isCurrent() || runtime.getState() === 'running') {
           throw new Error('The active session changed while preparing navigation.');
         }
-      }, version);
+      }, version, decision.summary ? { includeEmpty: true } : undefined);
   } catch (error) {
     failed = true;
     if (error instanceof SessionNavigationWarning) { warning = error.message; dropped = error.dropped; }

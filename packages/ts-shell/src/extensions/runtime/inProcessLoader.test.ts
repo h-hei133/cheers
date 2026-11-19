@@ -13,6 +13,22 @@ afterEach(() => {
 })
 
 describe('in-process TS/JS extension loader with VIRTUAL_MODULES', () => {
+  it.each(['summary', 'cancel', 'getter', 'toJSON'] as const)('keeps worker before-tree results inert and cumulative (%s)', async mode => {
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cheers-ext-tree-'));tempDirs.push(dir);const file=path.join(dir,'events.ts');
+    const first=mode==='summary'?"({summary:{summary:'Worker custom'},customInstructions:'Focus'})":mode==='cancel'?"({cancel:true})":mode==='getter'?"Object.defineProperty({}, 'summary', {enumerable:true,get(){throw new Error('GETTER_EXECUTED');}})":"({toJSON(){return {};},summary:{summary:'Invalid'}})";
+    fs.writeFileSync(file,`export default api => {api.on('session_before_tree',() => ${first});api.on('session_before_tree',event => {${mode==='summary'||mode==='cancel'?"if(event.type!=='session_before_tree') throw new Error('ENVELOPE_REPLACED');":''}return {cancel:false};});};`);
+    const result=await executeInProcessScript({root:dir,scriptFile:file,record:{manifest:{name:'tree',version:'1'},source:'fixture',digest:'a'.repeat(64)} as VersionRecord,argv:[],denyRules:() => [],context:{workspaceRoot:dir,taskId:'tree'},
+      invoke:{kind:'event',event:'session_before_tree',payload:{type:'session_before_tree',targetEntryId:'target'}}});
+    if(mode==='getter'||mode==='toJSON') {expect(result.success).toBe(false);expect(result.output).not.toContain('GETTER_EXECUTED');}
+    else {expect(result.success).toBe(true);expect(JSON.parse(String(result.metadata?.eventOutput))).toEqual(mode==='cancel'?{cancel:true}:{cancel:false,summary:{summary:'Worker custom'},customInstructions:'Focus'});}
+  });
+  it('keeps worker tree capture results primitive across the VM boundary', async () => {
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cheers-ext-tree-'));tempDirs.push(dir);const file=path.join(dir,'events.ts');
+    fs.writeFileSync(file,"export default api => api.on('session_before_tree',() => {for(const value of [{},{toJSON(){return {};}}]){const result=globalThis.__TREE_RESULT(value);if(typeof result!=='string')throw new Error('HOST_OBJECT');try{result.constructor.constructor('return process')();throw new Error('VM_ESCAPE');}catch(error){if(error.message==='VM_ESCAPE')throw error;}}return {cancel:false};});");
+    const result=await executeInProcessScript({root:dir,scriptFile:file,record:{manifest:{name:'tree',version:'1'},source:'fixture',digest:'a'.repeat(64)} as VersionRecord,argv:[],denyRules:() => [],context:{workspaceRoot:dir,taskId:'tree'},
+      invoke:{kind:'event',event:'session_before_tree',payload:{type:'session_before_tree',targetEntryId:'target'}}});
+    expect(result.success).toBe(true); expect(JSON.parse(String(result.metadata?.eventOutput))).toEqual({cancel:false});
+  });
   it('loads a TypeScript extension in-process, resolves @cheers/extension-api, blocks escape, and enforces path containment + denyRules', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-ext-ts-'))
     tempDirs.push(dir)

@@ -85,6 +85,8 @@ export {
   type ExtensionSessionBeforeEventName,
   type ExtensionSessionBeforeEventPayload,
   type ExtensionSessionBeforeResult,
+  type ExtensionBeforeTreeResult,
+  type ExtensionSessionBeforeEventResult,
   type ExtensionFactory,
   type ExtensionHostBridge,
   type LoadedInProcessExtension,

@@ -62,6 +62,7 @@ vi.mock("../../core/models/catalogStore.js", () => ({ loadCatalog: () => [{
 vi.mock("../../turn/cacheWarm.js", () => ({ createCacheWarmingRunner: vi.fn(() => ({ stop: vi.fn() })) }));
 vi.mock("../../memory/projectMemoryLocalStore.js", () => ({ createProjectMemoryLocalStore: () => ({}) }));
 vi.mock("../../core/shell/sessionRuntime.js", () => ({ ShellSessionRuntime: class {
+  readonly commands = { current: undefined, run: async <T>(operation: (signal: AbortSignal) => Promise<T>) => operation(new AbortController().signal) };
   constructor(deps: SessionRuntimeDependencies) { fixture.deps = deps; }
   getPermissionScope() { return "ask"; }
   getAgentMode() { return "plan"; }
@@ -200,6 +201,15 @@ it.each([true, false])("signs abandoned-turn summaries (apiKey=%s)", async withK
   expect(answer).toContain("SUMMARY_ANSWER");
   expect(signed).toHaveLength(1);
   expect(received[0]).toMatchObject({ path: "/model/fixture-model/converse", signature: "signed-1" });
+});
+
+it.each([false,true])('sends branch instruction overrides through the signed summary transport (replace=%s)', async replace => {
+  const text='CUSTOM_TREE_INSTRUCTIONS';
+  const result=await runtime(true).summarizeAbandonedTurns!([{role:'user',content:'Abandoned work'}],undefined,
+    replace?{prompt:text}:{instructions:text});
+  expect(result).toContain('SUMMARY_ANSWER'); expect(received).toHaveLength(1); expect(signed).toHaveLength(1);
+  const body=JSON.stringify(received[0]!.body); expect(body).toContain(text); expect(body).toContain('Abandoned work');
+  expect(body.includes('The user asked the summary to focus on:')).toBe(!replace);
 });
 
 it.each([true, false])("signs automatic history and prefix summaries (apiKey=%s)", async withKey => {
@@ -712,7 +722,7 @@ it.each([true, false])("allows signed background refresh eligibility without a s
   const options = vi.mocked(createCacheWarmingRunner).mock.calls[0]![0];
   expect(options.mode).toBe("streaming");
   expect(fixture.compaction).toBeDefined();
-  expect(options.promptCache).toEqual({ short: 300 });
+  expect(options.promptCache).toBeUndefined();
   expect(options.cost).toBeDefined();
   expect(received).toEqual([]);
 });
