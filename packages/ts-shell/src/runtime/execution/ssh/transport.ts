@@ -16,21 +16,29 @@ export interface SshTransportResult {
 /** A native SSH invocation is transport evidence; it never proves a remote job terminal state. */
 export class SshTransport {
   private blocked = false;
-  private readonly controllers = new Set<AbortController>();
+  private closing?: Promise<void>;
+  private readonly active = new Map<AbortController, Promise<void>>();
   constructor(private readonly execution: Pick<ExecutionService, 'runCommand'>, readonly profile: SshProfile,
     private readonly localRoot: string, private readonly privateParent: string) {
     bindExecutionTarget(this, profile.selection, localRoot);
   }
-  abort(): void { for (const controller of this.controllers) controller.abort(); }
+  abort(): void { for (const controller of this.active.keys()) controller.abort(); }
+  close(): Promise<void> {
+    if (this.closing) return this.closing;
+    this.closing = Promise.all([...this.active.values()]).then(() => { requireSsh(!this.blocked, 'cleanup'); });
+    this.abort();
+    return this.closing;
+  }
   async run(script: string, authority: import('../types.js').ExecutionAuthority, signal?: AbortSignal): Promise<SshTransportResult> {
     try { return await this.perform(script, authority, signal); }
     catch (error) { throw error instanceof SshError ? error : new SshError(this.blocked ? 'cleanup' : 'transport'); }
   }
   private async perform(script: string, authority: import('../types.js').ExecutionAuthority, signal?: AbortSignal): Promise<SshTransportResult> {
     requireSsh(authority.mode === 'approved-for-write', 'denied');
-    requireSsh(!this.blocked, 'cleanup'); requireSsh(this.controllers.size < 2, 'unavailable');
+    requireSsh(!this.blocked, 'cleanup'); requireSsh(!this.closing && this.active.size < 2, 'unavailable');
     requireSsh(Buffer.byteLength(script) <= 96 * 1024 && !script.includes('\0'));
     this.profile.check(); signal?.throwIfAborted();
+    requireSsh(!this.closing, 'unavailable');
     const root = executionWorkspace(this, this.profile.selection, this.localRoot);
     const parent = fs.lstatSync(this.privateParent); pathIdentity(this.privateParent);
     requireSsh(parent.isDirectory() && parent.uid === process.getuid?.() && (parent.mode & 0o022) === 0, 'denied');
@@ -38,10 +46,12 @@ export class SshTransport {
     const identity = fileIdentity(fs.lstatSync(directory)); const key = path.join(directory, 'identity'); const known = path.join(directory, 'known_hosts');
     const controller = new AbortController(); const abort = () => controller.abort(); let cleanup: 'complete' | 'unknown' = 'complete';
     let outputLimited = false; let stdoutBytes = 0; let stderrBytes = 0; const output: Buffer[] = [];
-    let result: CommandExecutionResult | undefined; this.controllers.add(controller);
+    let result: CommandExecutionResult | undefined; let settle!: () => void;
+    this.active.set(controller, new Promise<void>(resolve => { settle = resolve; }));
     signal?.addEventListener('abort', abort, { once: true }); if (signal?.aborted) controller.abort();
     try {
       const keyContent = this.profile.keySnapshot(); const knownContent = knownHostLine(this.profile.selection);
+      controller.signal.throwIfAborted();
       fs.writeFileSync(key, keyContent, { mode: 0o600, flag: 'wx' }); fs.writeFileSync(known, knownContent, { mode: 0o600, flag: 'wx' });
       this.profile.check(); controller.signal.throwIfAborted();
       requireSsh(fileIdentity(fs.lstatSync(this.privateParent)) === fileIdentity(parent)
@@ -60,15 +70,16 @@ export class SshTransport {
         env: { PATH: '/usr/bin:/bin', HOME: directory, LC_ALL: 'C', SSH_ASKPASS_REQUIRE: 'never' },
         timeoutMs: 15_000, abortSignal: controller.signal, captureOutput: false, cleanupTreeOnExit: true,
         onStdout: chunk => receive(chunk, 'stdout'), onStderr: chunk => receive(chunk, 'stderr'),
-        onStdin: input => { void input.write(Buffer.from(script)).then(() => input.end(), () => controller.abort()); } });
+        onStdin: input => { void input.write(Buffer.from(script)).then(() => input.end()).catch(() => controller.abort()); } });
       if (result.terminationFailed) cleanup = 'unknown';
     } finally {
-      this.controllers.delete(controller); signal?.removeEventListener('abort', abort);
+      signal?.removeEventListener('abort', abort);
       try {
         requireSsh(fileIdentity(fs.lstatSync(directory)) === identity, 'changed'); pathIdentity(directory);
         fs.rmSync(directory, { recursive: true });
       } catch { cleanup = 'unknown'; }
       if (cleanup === 'unknown') this.blocked = true;
+      this.active.delete(controller); settle();
     }
     if (!result) throw new SshError('transport');
     const { stdout: _stdout, stderr: _stderr, ...native } = result;

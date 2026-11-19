@@ -8,6 +8,7 @@ import { JobService, type RemoteJobBackend } from '../../workflow/jobs/service.j
 import { sshCommandFor, installSshRuntime, sshFeatureTools, closeSshFor } from '../runtime/ssh.js';
 import { sshHosts } from './state.js';
 import type { SshProfile, SshWorkspace } from '../../runtime/execution/ssh/model.js';
+import { SshClient } from '../../runtime/execution/ssh/client.js';
 import { runPreparedTool } from '../../turn/invoke.js';
 import { runSessionGoalCommand } from '../../planning/goal/command.js';
 import { ConfigState } from '../../config/state.js';
@@ -72,6 +73,35 @@ it('routes model SSH through the same approval and attributes the exact active g
   expect(result.metadata).toMatchObject({ evidence: 'remote-reported', goalCompletionProof: false, id: job.id });
   expect(new JobStore(s.manager, () => s.session).get(job.id)).toEqual(job);
 });
+
+it.each(['1:2', '1:3'])('refuses an old tool approval after reconnecting the same profile (workspace identity %s)', async directoryIdentity => {
+  const s = await setup(); s.approve(); const oldTool = sshFeatureTools(s.context)[0]!;
+  const nextWorkspace = { ...workspace, directoryIdentity };
+  const connect = vi.spyOn(SshClient.prototype, 'connect').mockResolvedValue(nextWorkspace);
+  const start = vi.spyOn(SshClient.prototype, 'start').mockResolvedValue('d'.repeat(32));
+  let entered!: () => void; const approving = new Promise<void>(resolve => { entered = resolve; });
+  let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
+  const pending = runPreparedTool(oldTool, { command: 'printf OLD' }, { ...s.gate(), escalationPromptHandler: async () => {
+    entered(); await held; return { decision: 'allow-once' as const };
+  } });
+  try {
+    await approving;
+    const disconnected = await s.command(['disconnect']);
+    expect(disconnected.kind === 'local' && disconnected.output).toContain('Local SSH binding released');
+    const rebound = await s.command(['connect']);
+    expect(rebound.kind === 'local' && rebound.output).toContain('SSH workspace verified and bound');
+    release();
+    expect((await pending).isError).toBe(true);
+    expect((await runPreparedTool(oldTool, { command: 'printf OLD AGAIN' }, s.gate())).isError).toBe(true);
+    expect(s.port.start).not.toHaveBeenCalled(); expect(start).not.toHaveBeenCalled();
+    expect(s.host.jobs.read().jobs).toHaveLength(0);
+    expect(s.host.jobs.read().remote).toEqual(nextWorkspace);
+    const next = sshFeatureTools(s.context)[0]!;
+    expect((await runPreparedTool(next, { command: 'printf CURRENT' }, s.gate())).isError).toBe(false);
+    expect(start).toHaveBeenCalledOnce();
+    expect(s.host.jobs.read().jobs[0]).toMatchObject({ binding: nextWorkspace, status: 'running', dispatchPossible: true });
+  } finally { release(); await pending; connect.mockRestore(); start.mockRestore(); }
+});
 it('aborts a held local request promptly on parent revocation and uses the separately approved exact cancellation capability', async () => {
   const s = await setup(true); s.approve(); let began!: () => void; const started = new Promise<void>(resolve => { began = resolve; });
   s.port.start = vi.fn(async (_job, _authority, signal) => { began();
@@ -123,6 +153,28 @@ it('drains a late submission and its exact parent cancellation before closing th
   release(); await pending; await closing;
   expect(s.port.cancel).toHaveBeenCalledTimes(1); expect(s.host.jobs.read().jobs[0]?.status).toBe('cancelled');
   expect(sshHosts.has(s.context)).toBe(false);
+});
+
+it('joins one shutdown and preserves a successor installed while the prior SSH request drains', async () => {
+  const s = await setup(); s.approve(); let began!: () => void; const started = new Promise<void>(resolve => { began = resolve; });
+  let interrupted!: () => void; const stopped = new Promise<void>(resolve => { interrupted = resolve; });
+  let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
+  s.port.start = vi.fn(async (_job, _authority, signal) => {
+    signal!.addEventListener('abort', interrupted, { once: true }); began();
+    await held; throw new Error('Synthetic lost start reply');
+  });
+  const running = s.command(['run', 'printf held']); await started;
+  const closed = closeSshFor(s.context);
+  try {
+    expect(closeSshFor(s.context)).toBe(closed);
+    await stopped;
+    installSshRuntime(s.context, s.manager, s.host.runtime, s.gate, s.host.report);
+    const successor = sshHosts.get(s.context);
+    release(); await running; await closed;
+    expect(sshHosts.get(s.context)).toBe(successor);
+    expect(s.port.start).toHaveBeenCalledOnce();
+    expect(s.host.jobs.read().jobs[0]).toMatchObject({ status: 'unknown', dispatchPossible: true });
+  } finally { release(); await Promise.allSettled([running, closed]); }
 });
 it('retains the configuration transition fence when the same binding becomes active again', async () => {
   const s = await setup(); const admission = operationAdmission(s.host, false, false, false);

@@ -4,6 +4,7 @@ import type { SessionManager } from '../../session/SessionManager.js';
 import type { ToolGateOptions } from '../../turn/tools.js';
 import type { SshProfile } from '../../runtime/execution/ssh/model.js';
 import type { SshClient } from '../../runtime/execution/ssh/client.js';
+import type { SshTransport } from '../../runtime/execution/ssh/transport.js';
 import type { JobStore } from '../../workflow/jobs/store.js';
 import type { JobService } from '../../workflow/jobs/service.js';
 
@@ -17,6 +18,8 @@ export interface SshComposition {
   readonly operations: Map<AbortController, Promise<void>>;
   readonly submissions: Set<Promise<unknown>>;
   closing?: boolean;
+  shutdown?: Promise<void>;
+  retiringTransport?: SshTransport;
   cancellationRevision: number;
   profile?: SshProfile;
   client?: SshClient;

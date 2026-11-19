@@ -3,11 +3,11 @@ import { sshSyntax } from '../../core/commands/ssh/syntax.js';
 import { parseSyntax } from '../../core/commands/syntax/parse.js';
 import { syntaxHelp } from '../../core/commands/syntax/projection.js';
 import type { SshComposition } from './model.js';
-import { selectProfile, connect } from './connection.js';
+import { selectProfile, connect, disconnect } from './connection.js';
 import { approveOperation } from './approval.js';
-import { sshAuthority, captureOrigin, operationAdmission } from './authority.js';
+import { sshAuthority, captureOrigin, connectedAdmission, operationAdmission } from './authority.js';
 import { jobProjection, jobResult, display, pageDisplay } from './projection.js';
-import { admittedOperation, cancelLocalOperations, lifetimePreview, releaseParentJobs, submitJob } from './lifetime.js';
+import { admittedOperation, cancelLocalOperations, lifetimePreview, submitJob } from './lifetime.js';
 
 export async function runSshCommand(host: SshComposition, args: string[], command: CommandContext): Promise<CommandExecutionResult> {
   const raw = command.rawCommandArgs;
@@ -27,24 +27,24 @@ async function control(host: SshComposition, action: string, args: readonly stri
     return 'Local SSH cancellation requested; remote termination is separate. Inspect /ssh jobs and explicitly reconcile or cancel unknown jobs.'; }
   if (action === 'profile') return selectProfile(host, args[0]!);
   if (action === 'connect') return approveOperation(host, 'connect', 'Verify the selected remote Linux/bash workspace and native user manager. No job is submitted.', async context => ({
-    success: true, output: await connect(host, context.abortSignal), metadata: { status: 'connected' } }));
-  if (action === 'disconnect') { const released = await releaseParentJobs(host); host.client?.transport.abort(); host.client = undefined; host.service = undefined; host.jobs.disconnect();
-    return `Local SSH binding released. ${released} Detached or unknown jobs may still run remotely; retained IDs were not replayed.`; }
-  if (!host.service) throw new Error('SSH workspace not connected.');
-  const admission = operationAdmission(host);
-  const service = host.service.withAdmission(admission);
+    success: true, output: await connect(host, context.abortSignal), metadata: { status: 'connected' } }), operationAdmission(host));
+  if (action === 'disconnect') return disconnect(host, host.pending?.signal);
+  const connected = host.service;
+  if (!connected) throw new Error('SSH workspace not connected.');
+  const admission = connectedAdmission(host);
+  const service = connected.withAdmission(admission);
   const origin = captureOrigin(host);
   if (action === 'run') return approveOperation(host, 'run', `Submit this exact remote shell command. Two jobs may remain active/unknown.\n${display(args[0]!, 24000)}\nOrigin: ${display(origin)}\n${lifetimePreview(origin)}`, async context => {
     if (admission()) throw new Error('SSH authority changed.');
-    return submitJob(host, args[0]!, origin, context);
-  });
+    return submitJob(host, args[0]!, origin, context, admission);
+  }, admission);
   const job = host.jobs.get(args[0]!);
   if (action === 'reconcile' || action === 'cancel') return approveOperation(host, action,
     `${action === 'cancel' ? 'Cancel the exact selected native cgroup. Output completeness is separate; escaped processes are outside this guarantee.'
       : 'Query remote status and persist matching native observation metadata; missing/replaced records stay unknown.'}\n${display(jobProjection(job))}`, async context => {
       if (admission()) throw new Error('SSH authority changed.');
       return admittedOperation(admission, context.abortSignal, async signal => jobResult(await service[action](job.id, sshAuthority, signal)), host);
-    });
+    }, admission);
   if (action === 'output') {
     const stream = args[1]; if (stream !== 'stdout' && stream !== 'stderr') throw new Error('Invalid SSH output stream.');
     return approveOperation(host, 'output', `Read the bounded retained ${stream} stream (up to 64KiB) for full-context redaction and display up to 16KiB at byte ${args[2]}. Content is untrusted; sensitive streams are withheld from reports.\n${display(jobProjection(job))}`, async context => {
@@ -52,7 +52,7 @@ async function control(host: SshComposition, action: string, args: readonly stri
       const page = await admittedOperation(admission, context.abortSignal, signal => service.output(job.id, stream, Number(args[2]), sshAuthority, signal), host);
       return { success: true, output: `Remote ${stream}; next byte ${page.nextOffset}/${page.size}; truncated ${page.truncated}.\n${pageDisplay(page)}`,
         metadata: { status: 'page', nextOffset: page.nextOffset, size: page.size, truncated: page.truncated, evidence: 'remote-reported' } };
-    });
+    }, admission);
   }
   throw new Error('Invalid SSH action.');
 }

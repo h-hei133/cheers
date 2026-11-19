@@ -15,7 +15,8 @@ it('separates remote journals with equal session, workspace and delegated SSH id
   const b = createProfileContext({ name: 'b', homeDir: home, env: {} });
   const run = vi.fn(async () => ({ cleanup: 'complete', transport: { status: 'completed', exitCode: 0 },
     stdout: Buffer.from('CHEERS_SSH_1\nroot=L3JlbW90ZQ==\nidentity=1:2\nuid=1000\nboot=00000000-0000-0000-0000-000000000000\nmanager=systemd-user\ncgroup=v2\n') }));
-  const transport = { profile: { identity: 'a'.repeat(64), fingerprint: 'SHA256:' + 'A'.repeat(43), selection: { workspace: '/remote' } }, run } as unknown as SshTransport;
+  const transport = { profile: { identity: 'a'.repeat(64), fingerprint: 'SHA256:' + 'A'.repeat(43), selection: { workspace: '/remote' },
+    check: vi.fn() }, run } as unknown as SshTransport;
   const first = withProfile(a, () => new SshClient(transport)); const second = withProfile(b, () => new SshClient(transport));
   const scope = { sessionId: 'same', workspaceRoot: '/same', createdAt: '2026-10-16' };
   const authority = { mode: 'approved-for-write', source: 'tool-runtime-approval', reason: 'synthetic SSH probe' } as const;

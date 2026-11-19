@@ -1,11 +1,13 @@
 import type { ToolExecutionContext } from '../../tools/types.js';
 import type { JobOrigin, RemoteJob } from '../../workflow/jobs/model.js';
 import type { SshComposition } from './model.js';
-import { operationAdmission, sshAuthority } from './authority.js';
+import { connectedAdmission, operationAdmission, sshAuthority } from './authority.js';
 import { jobResult } from './projection.js';
+import type { JobService } from '../../workflow/jobs/service.js';
 
 interface ParentJob { readonly release: () => Promise<RemoteJob | undefined>; }
 const parents = new WeakMap<SshComposition, Map<string, ParentJob>>();
+const releasing = new WeakMap<SshComposition, Promise<string>>();
 
 /** Only the exact local transport is aborted when its ordinary admission changes. */
 export async function admittedOperation<T>(admission: () => string | undefined, signal: AbortSignal | undefined,
@@ -30,19 +32,21 @@ export function lifetimePreview(origin: JobOrigin): string {
     : 'Approval also permits cancellation of this exact job when its parent goal or collaboration authority ends, or this runtime disconnects/exits. Cancellation is attempted once while this runtime retains its bound profile; loss or restart may leave the remote job unknown. No cancellation authority is recreated on restart.';
 }
 
-export async function submitJob(host: SshComposition, command: string, origin: JobOrigin, context: ToolExecutionContext) {
-  if (host.closing) throw new Error('SSH binding is closing.');
-  const pending = Promise.resolve().then(() => performSubmission(host, command, origin, context));
+export async function submitJob(host: SshComposition, command: string, origin: JobOrigin, context: ToolExecutionContext,
+  admission: () => string | undefined) {
+  const service = host.service;
+  if (!service || host.closing || admission()) throw new Error('SSH binding is unavailable or changed.');
+  const pending = Promise.resolve().then(() => performSubmission(host, service, command, origin, context, admission));
   host.submissions.add(pending);
   try { return await pending; } finally { host.submissions.delete(pending); }
 }
 
-async function performSubmission(host: SshComposition, command: string, origin: JobOrigin, context: ToolExecutionContext) {
-  const service = host.service; if (!service) throw new Error('SSH unavailable.');
-  const parentAdmission = operationAdmission(host, true, true, false);
-  const cancelAdmission = operationAdmission(host, true, false, false);
+async function performSubmission(host: SshComposition, service: JobService, command: string, origin: JobOrigin, context: ToolExecutionContext,
+  admission: () => string | undefined) {
+  if (admission()) throw new Error('SSH authority changed.');
+  const parentAdmission = connectedAdmission(host, operationAdmission(host, true, true, false));
+  const cancelAdmission = connectedAdmission(host, operationAdmission(host, true, false, false));
   const cancelService = service.withAdmission(cancelAdmission);
-  const admission = operationAdmission(host);
   const job = await admittedOperation(admission, context.abortSignal,
     signal => service.withAdmission(admission).run(command, origin, sshAuthority, signal), host);
   if (job.lifetime === 'parent' && ['running', 'unknown'].includes(job.status)) {
@@ -77,9 +81,11 @@ async function performSubmission(host: SshComposition, command: string, origin: 
   return jobResult(job);
 }
 
-export async function releaseParentJobs(host: SshComposition): Promise<string> {
+export function releaseParentJobs(host: SshComposition): Promise<string> {
+  const active = releasing.get(host);
+  if (active) return active;
   const closing = host.closing; host.closing = true;
-  try {
+  const settled = Promise.resolve().then(async () => {
     await Promise.allSettled([...host.submissions]);
     await Promise.allSettled([...host.operations.values()]);
     const selected = [...parents.get(host)?.values() ?? []];
@@ -89,7 +95,9 @@ export async function releaseParentJobs(host: SshComposition): Promise<string> {
     const cancelled = known.filter(job => job.cancellation === 'selected-cgroup-empty').length;
     const terminal = known.filter(job => ['completed', 'failed', 'cancelled'].includes(job.status)).length;
     return `Parent job cancellation attempts ${selected.length}; selected cgroups confirmed empty ${cancelled}; terminal observations ${terminal}; outcomes unknown ${selected.length - terminal}.`;
-  } finally { host.closing = closing; }
+  }).finally(() => { releasing.delete(host); if (!host.shutdown) host.closing = closing; });
+  releasing.set(host, settled);
+  return settled;
 }
 
 function recordCancellationUnknown(host: SshComposition, original: RemoteJob): RemoteJob | undefined {

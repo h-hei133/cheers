@@ -50,3 +50,29 @@ it('bounds transport bytes, keeps cancellation distinct from remote outcome and 
   expect(result.cleanup).toBe('complete'); expect(fs.readdirSync(s.root).filter(name => name.startsWith('ssh-'))).toEqual([]);
   expect(request.reason).not.toContain('SYNTHETIC');
 });
+
+it.each([false, true])('joins local invocation cleanup after permanent close (unverified=%s)', async unverified => {
+  const s = profile(); const authority = { mode: 'approved-for-write', source: 'tool-runtime-approval', reason: 'fixture' } as const;
+  let entered!: () => void; const started = new Promise<void>(resolve => { entered = resolve; });
+  let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
+  let request!: CommandExecutionRequest;
+  const runCommand = vi.fn(async (input: CommandExecutionRequest) => {
+    request = input; entered(); await held;
+    return { status: 'cancelled', exitCode: null, stdout: '', stderr: '', receipt: {}, ...(unverified ? { terminationFailed: true } : {}) } as CommandExecutionResult;
+  });
+  const owner = new SshTransport({ runCommand }, s.selected, s.root, s.root);
+  const running = owner.run('printf HELD\n', authority); await started;
+  const closing = owner.close();
+  try {
+    expect(owner.close()).toBe(closing);
+    expect(request.abortSignal?.aborted).toBe(true);
+    expect(fs.existsSync(request.env!.HOME!)).toBe(true);
+    await expect(owner.run('printf REFUSED\n', authority)).rejects.toMatchObject({ code: 'unavailable' });
+    expect(runCommand).toHaveBeenCalledOnce();
+    release();
+    expect((await running).cleanup).toBe(unverified ? 'unknown' : 'complete');
+    if (unverified) await expect(closing).rejects.toMatchObject({ code: 'cleanup' });
+    else await expect(closing).resolves.toBeUndefined();
+    expect(fs.existsSync(request.env!.HOME!)).toBe(false);
+  } finally { release(); await Promise.allSettled([running, closing]); }
+});

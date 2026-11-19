@@ -4,6 +4,7 @@ import { readGoalEdit } from '../../planning/goal/store.js';
 import { sameValue } from '../../config/values.js';
 import type { SshComposition } from './model.js';
 import { configurationAdmission } from '../../core/shell/configuration.js';
+import { sshHosts } from './state.js';
 
 export const sshAuthority = { mode: 'approved-for-write', source: 'tool-runtime-approval', reason: 'Exact separately approved SSH operation, including remote journal observations' } as const;
 
@@ -20,6 +21,7 @@ export function operationAdmission(host: SshComposition, bindProfile = true, bin
     try {
       if (pending?.aborted || bindPending && (host.closing || cancellationRevision !== host.cancellationRevision))
         return 'SSH operation was cancelled locally; remote outcome remains separate.';
+      if (sshHosts.get(host.context) !== host) return 'SSH runtime owner changed.';
       const blocked = configuration() ?? capability?.() ?? collab(); if (blocked) return blocked;
       if (!sameValue(host.jobs.scope(), scope) || bindProfile && host.profile !== profile) return 'SSH session, workspace or profile changed.';
       if (bindWork) {
@@ -30,4 +32,11 @@ export function operationAdmission(host: SshComposition, bindProfile = true, bin
       if (bindProfile) profile?.check(); return undefined;
     } catch { return 'SSH authority or source is unavailable or changed.'; }
   };
+}
+
+export function connectedAdmission(host: SshComposition, admission?: () => string | undefined): () => string | undefined {
+  const { client, service } = host;
+  const admit = admission ?? operationAdmission(host);
+  return () => admit() ?? (sshHosts.get(host.context) === host && host.client === client && host.service === service
+    ? undefined : 'SSH connection changed.');
 }

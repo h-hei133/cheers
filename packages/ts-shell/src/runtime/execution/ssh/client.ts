@@ -77,6 +77,7 @@ export class SshClient {
     if (this.owner) assertProfileIdentity(this.owner);
     const result = await this.transport.run(script, authority, signal);
     if (this.owner) assertProfileIdentity(this.owner);
+    signal?.throwIfAborted(); this.transport.profile.check();
     requireSsh(!result.outputLimited, 'output-limit'); requireSsh(result.cleanup === 'complete', 'cleanup');
     requireSsh(result.transport.status === 'completed' && result.transport.exitCode === 0, 'transport');
     return parseRemoteFrame(result.stdout, fields);

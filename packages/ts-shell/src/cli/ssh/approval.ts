@@ -1,15 +1,14 @@
 import { runPreparedTool } from '../../turn/invoke.js';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../../tools/types.js';
 import type { SshComposition } from './model.js';
-import { operationAdmission } from './authority.js';
 import { display, profilePreview } from './projection.js';
 
 export function preparedOperation(host: SshComposition, operation: string, preview: string,
-  execute: (context: ToolExecutionContext) => Promise<ToolExecutionResult>, bindProfile = true): ToolDefinition {
-  const admission = operationAdmission(host, bindProfile);
+  execute: (context: ToolExecutionContext) => Promise<ToolExecutionResult>, admission: () => string | undefined): ToolDefinition {
+  const profile = host.profile;
   return { name: 'ssh', description: 'Perform one explicit verified SSH operation with separate remote authority.', argsSchema: { type: 'object' },
-    prepare: () => ({ targets: [], permissionArgs: { operation, remote: host.profile?.selection.host ?? 'not-selected' },
-      previewKind: 'execution', preview: `${profilePreview(host.profile)}\n${display(preview, 24000)}`,
+    prepare: () => ({ targets: [], permissionArgs: { operation, remote: profile?.selection.host ?? 'not-selected' },
+      previewKind: 'execution', preview: `${profilePreview(profile)}\n${display(preview, 24000)}`,
       execute: async context => {
         try { const refused = admission(); if (refused) return { success: false, error: refused, metadata: { status: 'unchanged' } };
           return await execute(context); }
@@ -17,9 +16,11 @@ export function preparedOperation(host: SshComposition, operation: string, previ
       } }), resultAdmission: admission, execute: async () => ({ success: false, error: 'Prepared native SSH approval required.' }) };
 }
 export async function approveOperation(host: SshComposition, operation: string, preview: string,
-  execute: (context: ToolExecutionContext) => Promise<ToolExecutionResult>, bindProfile = true): Promise<string> {
-  const admission = operationAdmission(host, bindProfile); const options = host.gate('ssh');
-  const result = await runPreparedTool(preparedOperation(host, operation, preview, execute, bindProfile), {}, { ...options, admission },
-    host.pending?.signal, undefined, 'SSH operation', { eventKey: 'ssh' });
+  execute: (context: ToolExecutionContext) => Promise<ToolExecutionResult>, admission: () => string | undefined): Promise<string> {
+  const tool = preparedOperation(host, operation, preview, execute, admission);
+  const signal = host.pending?.signal;
+  const options = host.gate('ssh');
+  const result = await runPreparedTool(tool, {}, { ...options, admission },
+    signal, undefined, 'SSH operation', { eventKey: 'ssh' });
   return result.output;
 }

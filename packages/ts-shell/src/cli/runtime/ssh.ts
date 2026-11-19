@@ -31,8 +31,16 @@ export function sshCommandFor(context: ShellRuntimeContext): NonNullable<Command
 }
 export function sshFeatureTools(context: ShellRuntimeContext) { const host = sshHosts.get(context); return host?.service ? [remoteTool(host)] : []; }
 export function cancelSshFor(context: ShellRuntimeContext): void { const host = sshHosts.get(context); if (host) cancelLocalOperations(host); }
-export async function closeSshFor(context: ShellRuntimeContext): Promise<void> {
-  const host = sshHosts.get(context); if (!host) return;
-  host.closing = true; cancelLocalOperations(host); host.client?.transport.abort();
-  await releaseParentJobs(host); sshHosts.delete(context);
+export function closeSshFor(context: ShellRuntimeContext): Promise<void> {
+  const host = sshHosts.get(context); if (!host) return Promise.resolve();
+  if (host.shutdown) return host.shutdown;
+  const transport = host.client?.transport ?? host.retiringTransport; host.closing = true;
+  return host.shutdown = Promise.resolve().then(async () => {
+    cancelLocalOperations(host); transport?.abort();
+    try { await releaseParentJobs(host); }
+    finally {
+      try { await transport?.close(); }
+      finally { if (sshHosts.get(context) === host) sshHosts.delete(context); }
+    }
+  });
 }
