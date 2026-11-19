@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../../session/SessionManager.js';
 import { ConfigState } from '../../../config/state.js';
@@ -16,6 +17,10 @@ import { captureDagRuntime } from './runtime.js';
 import { hubProjection } from '../hub.js';
 import { decodeJournal } from '../../../workflow/jobs/codec.js';
 import { dagDigest } from '../../../workflow/jobs/dag/codec.js';
+import type { DagJob, DagOwner } from '../../../workflow/jobs/dag/model.js';
+import { captureDagOwner } from '../../../workflow/jobs/dag/resume.js';
+import { DagService } from '../../../workflow/jobs/dag/service.js';
+import { DagJournal } from '../../../workflow/jobs/dag/journal.js';
 
 let scratch: string; let root: string; let manager: SessionManager; let context: ShellRuntimeContext;
 let approve: (tool: string) => Promise<EscalationResponse>; let requests: string[];
@@ -46,6 +51,35 @@ async function command(raw: string): Promise<string> {
 async function until(check: () => boolean): Promise<void> {
   const deadline = Date.now() + 5000;
   while (!check()) { if (Date.now() > deadline) throw new Error('Native workflow did not settle.'); await new Promise(resolve => setTimeout(resolve, 10)); }
+}
+
+function previousOwner(): DagOwner {
+  const owner = captureDagOwner();
+  const child = spawnSync(process.execPath, ['-e', ''], { stdio: 'ignore', timeout: 5000 });
+  if (child.status !== 0 || !child.pid || !owner.namespace) throw new Error('Could not capture a finished scheduler process.');
+  return { ...owner, pid: child.pid };
+}
+
+/** Reopen a graph from its recorded dispatch and settlement state. */
+async function interruptedGraph(step: 'complete' | 'unsettled' | 'missing' | 'queued' | 'untouched', owner = previousOwner()): Promise<DagJob> {
+  define([{ id: 'first', run: 'printf first >> order' }, { id: 'parallel', run: 'printf parallel >> order' },
+    { id: 'join', run: 'printf join >> order', needs: ['first', 'parallel'] }]);
+  await command('queue native');
+  const host = jobsFor(context)!;
+  const saved = host.dags.journal.list()[0]!;
+  const armed = step === 'untouched' ? saved.steps[0]! : { ...saved.steps[0]!, dispatchPossible: true, status: 'running' as const };
+  const checkpoint: DagJob = { ...saved, status: 'running', dispatchPossible: true, owner, steps: [armed, ...saved.steps.slice(1)] };
+  host.jobs.update(current => ({ ...current, dags: [checkpoint] }));
+  if (step === 'complete' || step === 'unsettled') {
+    const native = captureDagRuntime(host, checkpoint.definition);
+    expect(await native.runStep({ job: checkpoint, step: armed, signal: new AbortController().signal })).toBe('completed');
+    if (step === 'complete') host.dags.journal.step(saved.id, armed.id, { status: 'completed' }, owner.id);
+  }
+  if (step === 'queued') host.local.create({ command: checkpoint.definition.steps[0]!.run, cwd: root,
+    timeoutMs: checkpoint.definition.steps[0]!.timeoutSeconds * 1000 }, { id: armed.jobId, origin: saved.origin });
+  await closeJobsFor(context);
+  install();
+  return jobsFor(context)!.dags.journal.get(saved.id);
 }
 it('keeps denied scheduling and denied ordinary command effects separate', async () => {
   define([{ id: 'first', run: 'touch DENIED' }, { id: 'after', run: 'touch AFTER', needs: ['first'] }]);
@@ -98,6 +132,75 @@ it('requires fresh scheduling and command approvals for queued restart, retainin
   expect(done.steps.map(step => step.jobId)).toEqual(saved.steps.map(step => step.jobId));
   expect(requests).toEqual(['task', 'task', 'task', 'bash']); expect(fs.readFileSync(path.join(root, 'count'), 'utf8')).toBe('once');
 });
+it.skipIf(process.platform !== 'linux')('continues a partially completed batch from its retained native result', async () => {
+  const saved = await interruptedGraph('complete');
+  const host = jobsFor(context)!;
+  const child = host.local.get(saved.steps[0]!.jobId);
+  expect(child).toMatchObject({ status: 'completed', exitCode: 0, output: 'complete' });
+  expect(saved.steps[0]!.status).toBe('completed');
+  const result = await routeSlashCommand(`/jobs resume ${saved.id}`, { cwd: root, sessionId: context.session.id, jobsCommand: jobsCommandFor(context) });
+  expect(result?.kind === 'local' && result.output).toContain('running');
+  await host.dags.drain();
+  const settled = host.dags.journal.get(saved.id);
+  expect(settled).toMatchObject({ status: 'completed', digest: saved.digest });
+  expect(settled.steps.map(step => [step.jobId, step.status])).toEqual(saved.steps.map(step => [step.jobId, 'completed']));
+  expect(host.local.get(child.id)).toEqual(child);
+  expect(requests).toEqual(['task', 'bash', 'task', 'bash', 'bash']);
+  expect(fs.readFileSync(path.join(root, 'order'), 'utf8')).toBe('firstparalleljoin');
+});
+it.skipIf(process.platform !== 'linux')('refuses restart while a finished child lacks confirmed graph settlement', async () => {
+  const saved = await interruptedGraph('unsettled');
+  const host = jobsFor(context)!;
+  expect(saved.steps[0]?.status).toBe('running');
+  expect(host.local.get(saved.steps[0]!.jobId)).toMatchObject({ status: 'completed', exitCode: 0, output: 'complete' });
+  const before = host.jobs.read();
+  expect(await command('resume ' + saved.id)).toContain('restart is unavailable');
+  expect(host.jobs.read()).toEqual(before);
+  expect(requests).toEqual(['task', 'bash']);
+  expect(fs.readFileSync(path.join(root, 'order'), 'utf8')).toBe('first');
+});
+it.skipIf(process.platform !== 'linux')('serializes restart claims and refuses a stop for the previous scheduler', async () => {
+  const saved = await interruptedGraph('untouched');
+  const host = jobsFor(context)!;
+  const other = new DagService(new DagJournal(host.jobs));
+  const native = captureDagRuntime(host, saved.definition);
+  const first = host.dags.resumePlan(saved);
+  const second = other.resumePlan(saved);
+  expect(first?.pending).toEqual(['first', 'parallel', 'join']);
+  expect(second).toEqual(first);
+  try {
+    host.dags.start(saved, native, first);
+    expect(() => other.start(saved, native, second)).toThrow();
+    await expect(host.dags.stop(saved)).rejects.toThrow('conflict');
+    await host.dags.drain();
+    expect(host.dags.journal.get(saved.id).status).toBe('completed');
+    expect(host.local.list()).toHaveLength(3);
+    expect(requests).toEqual(['task', 'bash', 'bash', 'bash']);
+  } finally { await other.close(); }
+});
+it.skipIf(process.platform !== 'linux').each(['missing', 'queued', 'live'] as const)('refuses restart when the previous scheduler has %s evidence', async evidence => {
+  const saved = await (evidence === 'live' ? interruptedGraph('untouched', captureDagOwner()) : interruptedGraph(evidence));
+  const host = jobsFor(context)!;
+  const before = host.jobs.read();
+  expect(await command('resume ' + saved.id)).toContain('restart is unavailable');
+  expect(host.jobs.read()).toEqual(before);
+  expect(requests).toEqual(['task']);
+  expect(fs.existsSync(path.join(root, 'order'))).toBe(false);
+});
+it.skipIf(process.platform !== 'linux')('requires the same confirmed child evidence after scheduling approval', async () => {
+  const saved = await interruptedGraph('complete');
+  const host = jobsFor(context)!;
+  approve = async tool => {
+    if (tool === 'task') host.jobs.update(current => ({ ...current, local: current.local?.map(child => ({ ...child,
+      stdout: Buffer.from('Changed receipt').toString('base64') })) }));
+    return { decision: 'allow-once' };
+  };
+  expect(await command('resume ' + saved.id)).toMatch(/conflict|refused/);
+  expect(host.dags.journal.get(saved.id)).toEqual(saved);
+  expect(host.local.list()).toHaveLength(1);
+  expect(requests).toEqual(['task', 'bash', 'task']);
+  expect(fs.readFileSync(path.join(root, 'order'), 'utf8')).toBe('first');
+});
 it.each(['task', 'bash'])('refuses a changed raw definition during %s approval without a native effect', async changedAt => {
   const source = define([{ id: 'one', run: 'touch STALE' }]);
   approve = async tool => { if (tool === changedAt) fs.appendFileSync(source, '\n'); return { decision: 'allow-once' }; };
@@ -135,15 +238,51 @@ it('retains unknown native cleanup without success or replay', async () => {
   expect(job.steps[1]!.status).toBe('skipped'); expect(await command('resume ' + job.id)).toContain('never resume or replay');
   expect(fs.readFileSync(path.join(root, 'count'), 'utf8')).toBe('once');
 });
+it.skipIf(process.platform !== 'linux')('refuses a completed child after post-use verification returned unknown', async () => {
+  define([{ id: 'one', run: 'printf once >> count' }]);
+  const host = jobsFor(context)!;
+  const dispatch = HookDispatcher.prototype.dispatch;
+  let completedChild: string | undefined;
+  vi.spyOn(HookDispatcher.prototype, 'dispatch').mockImplementation(async function (this: HookDispatcher, payload, options) {
+    if (payload.eventName === 'PostToolUse' && payload.toolName === 'bash') {
+      await host.registry.settled(payload.toolCallId);
+      const child = host.local.get(payload.toolCallId);
+      if (child.status === 'completed' && child.exitCode === 0 && child.output === 'complete') completedChild = child.id;
+      throw new Error('Post-use verification unavailable.');
+    }
+    return dispatch.call(this, payload, options);
+  });
+  await command('run native');
+  await host.dags.drain();
+  const saved = host.dags.journal.list()[0]!;
+  const child = host.local.get(saved.steps[0]!.jobId);
+  expect(completedChild).toBe(child.id);
+  expect(saved).toMatchObject({ status: 'unknown', steps: [{ status: 'unknown', jobId: child.id, dispatchPossible: true }] });
+  expect(child).toMatchObject({ status: 'completed', exitCode: 0, output: 'complete' });
+
+  await closeJobsFor(context);
+  install();
+  const reopened = jobsFor(context)!;
+  const owner = previousOwner();
+  for (const status of ['unknown', 'running'] as const) {
+    const checkpoint = { ...saved, status, owner };
+    reopened.jobs.update(current => ({ ...current, dags: [checkpoint] }));
+    const before = reopened.jobs.read();
+    expect(await command('resume ' + saved.id)).toContain('restart is unavailable');
+    expect(reopened.jobs.read()).toEqual(before);
+  }
+  expect(requests).toEqual(['task', 'bash']);
+  expect(fs.readFileSync(path.join(root, 'count'), 'utf8')).toBe('once');
+});
 it('aborts a native sibling on step publication failure and retains the graph until every worker settles', async () => {
   define([{ id: 'a', run: 'sleep 0.1' }, { id: 'b', run: 'printf started > started; sleep 30' }]);
   const host = jobsFor(context)!; const loaded = readWorkflow(root, 'native'); if ('error' in loaded) throw new Error(loaded.error);
   const native = captureDagRuntime(host, loaded.workflow); let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; }); let siblingSettled = false; let failed = false;
   const original = host.dags.journal.step.bind(host.dags.journal);
-  vi.spyOn(host.dags.journal, 'step').mockImplementation((id, stepId, change) => {
+  vi.spyOn(host.dags.journal, 'step').mockImplementation((id, stepId, change, owner) => {
     if (stepId === 'a' && change.status === 'completed' && !failed) { failed = true; throw new Error('Publication unavailable.'); }
-    return original(id, stepId, change);
+    return original(id, stepId, change, owner);
   });
   const job = host.dags.create(loaded.workflow, { kind: 'local' }, { ...native, runStep: async input => {
     const status = await native.runStep(input);

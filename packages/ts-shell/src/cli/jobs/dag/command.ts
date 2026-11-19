@@ -11,6 +11,7 @@ import { captureOrigin } from '../origin.js';
 import { report } from '../projection.js';
 import { captureDagRuntime, workflowFileAccess } from './runtime.js';
 import { dagProjection } from './projection.js';
+import type { JobOrigin } from '../../../workflow/jobs/contract.js';
 
 export async function runDagCommand(host: JobsComposition, args: readonly string[]): Promise<LocalCommandResult> {
   const parsed = parseSyntax(workflowSyntax, args);
@@ -29,7 +30,7 @@ export async function runDagCommand(host: JobsComposition, args: readonly string
       const origin = captureOrigin(host);
       const output = await approved(host, 'task', `Schedule workflow ${loaded.workflow.name}`, report({ definition: loaded.workflow,
         batches: graph.executionBatches, maxConcurrency: Math.min(loaded.workflow.maxConcurrency, 2),
-        permission: 'Approve scheduling only; every command still needs its ordinary bash approval.', restart: 'A dispatched graph never resumes or replays.' }),
+        permission: 'Approve scheduling only. Every command still needs its ordinary bash approval.', restart: 'After a verified restart, only undispatched commands can run.' }),
       async () => {
         const refused = runtime.admission();
         return refused ? { success: false, output: report(refused) } : { success: true,
@@ -38,24 +39,35 @@ export async function runDagCommand(host: JobsComposition, args: readonly string
       return { kind: 'local', output };
     }
     return { kind: 'local', output: await dagControl(host, action, parsed.args) };
-  } catch { return { kind: 'local', output: 'Workflow operation refused or unverified. Inspect /workflow status; dispatched graphs never replay.' }; }
+  } catch { return { kind: 'local', output: 'Workflow operation refused or unverified. Inspect /workflow status. Dispatched commands are never replayed.' }; }
 }
 export async function dagControl(host: JobsComposition, action: string, args: readonly string[]): Promise<string> {
   const job = host.dags.journal.get(args[0]!);
   if (action === 'show') return report(dagProjection(host, job));
   if (action === 'resume') {
-    if (job.dispatchPossible) return 'Dispatched graphs never resume or replay; start a new explicitly approved workflow.';
+    const restart = job.dispatchPossible ? host.dags.resumePlan(job) : undefined;
+    if (job.dispatchPossible && !restart) return 'Workflow restart is unavailable. Unconfirmed or halted commands never resume or replay.';
+    if (restart && !matchesResumeParent(host, job.origin)) return 'Workflow restart requires the original active parent.';
     const runtime = captureDagRuntime(host, job.definition, job.directory); const refused = runtime.admission(); if (refused) return report(refused);
     return approved(host, 'task', `Resume workflow ${job.definition.name}`, report({ id: job.id, definition: job.definition,
-      permission: 'Fresh scheduling approval; command effects still require ordinary bash approval.' }), async () => {
-      const refused = runtime.admission();
-      return refused ? { success: false, output: report(refused) } : { success: true, output: report(dagProjection(host, host.dags.start(job, runtime))) };
+      ...(restart ? { confirmed: restart.completed, pending: restart.pending } : {}),
+      permission: 'Fresh scheduling approval. Remaining commands still require ordinary bash approval.' }), async () => {
+      const refused = runtime.admission() ?? (restart && !matchesResumeParent(host, job.origin) ? 'The workflow parent changed.' : undefined);
+      return refused ? { success: false, output: report(refused) } : { success: true, output: report(dagProjection(host, host.dags.start(job, runtime, restart))) };
     });
   }
   if (action === 'cancel' || action === 'pause') return approved(host, 'task', `Stop workflow ${job.id}`,
-    `Halt exact workflow ${job.id} and stop only its exact live command owners. A dispatched graph cannot resume. Cleanup must settle.`, async () => {
+    `Halt exact workflow ${job.id} and stop only its exact live command owners. Cleanup must settle.`, async () => {
       const settled = await host.dags.stop(job, action === 'pause');
       return { success: settled, output: report(dagProjection(host, host.dags.journal.get(job.id))) };
     });
   return 'Inspect child command output using /jobs output <command-job-id> stdout|stderr <byte-offset>.';
+}
+
+function matchesResumeParent(host: JobsComposition, original: JobOrigin): boolean {
+  const current = captureOrigin(host);
+  if (original.goalId !== undefined && current.goalId !== original.goalId) return false;
+  if (original.kind !== 'collaboration' && current.kind !== 'collaboration') return true;
+  return original.kind === current.kind && original.principal === current.principal && original.acceptanceId === current.acceptanceId
+    && original.roomId === current.roomId && original.serviceEpoch === current.serviceEpoch && original.hostGeneration === current.hostGeneration;
 }

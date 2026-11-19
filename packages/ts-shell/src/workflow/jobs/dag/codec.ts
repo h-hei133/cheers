@@ -13,7 +13,7 @@ export function dagDigest(job: Pick<DagJob, 'id' | 'definition' | 'origin' | 'sc
     job.steps.map(step => [step.id, step.jobId])])).digest('hex');
 }
 export function validateDag(value: unknown, scope: BoundSessionScope): asserts value is DagJob {
-  valid(isRecord(value) && Object.keys(value).every(key => ['id', 'backend', 'definition', 'digest', 'origin', 'scope', 'directory', 'createdAt', 'status', 'dispatchPossible', 'steps', 'note'].includes(key)));
+  valid(isRecord(value) && Object.keys(value).every(key => ['id', 'backend', 'definition', 'digest', 'origin', 'scope', 'directory', 'createdAt', 'status', 'dispatchPossible', 'owner', 'steps', 'note'].includes(key)));
   valid(typeof value.id === 'string' && UUID.test(value.id) && value.backend === 'dag' && /^[0-9a-f]{64}$/.test(String(value.digest))
     && Number.isSafeInteger(value.createdAt) && Number(value.createdAt) > 0 && text(value.note, 1024));
   validateOrigin(value.origin); validateScope(value.scope, scope);
@@ -52,5 +52,11 @@ export function validateDag(value: unknown, scope: BoundSessionScope): asserts v
     && (value.status !== 'queued' || !value.dispatchPossible)
     && (value.dispatchPossible || job.steps.every(step => !step.dispatchPossible))
     && (value.status !== 'completed' || job.steps.every(step => step.status === 'completed')));
+  if (value.owner !== undefined) {
+    valid(value.dispatchPossible && isRecord(value.owner) && Object.keys(value.owner).every(key => ['id', 'pid', 'namespace'].includes(key))
+      && typeof value.owner.id === 'string' && UUID.test(value.owner.id) && typeof value.owner.pid === 'number'
+      && Number.isInteger(value.owner.pid) && value.owner.pid > 0 && value.owner.pid <= 2 ** 31 - 1
+      && (value.owner.namespace === undefined || typeof value.owner.namespace === 'string' && /^[0-9a-f-]{36}:pid:\[[0-9]{1,20}\]$/.test(value.owner.namespace)));
+  }
   valid(value.digest === dagDigest(job));
 }

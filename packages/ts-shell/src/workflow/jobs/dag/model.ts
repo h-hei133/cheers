@@ -9,6 +9,12 @@ export interface DagStep {
   readonly status: JobStatus | 'skipped';
   readonly dispatchPossible: boolean;
 }
+export interface DagOwner {
+  readonly id: string;
+  readonly pid: number;
+  /** Recorded only where the host can verify that the previous process is gone. */
+  readonly namespace?: string;
+}
 export interface DagJob {
   readonly id: string;
   readonly backend: 'dag';
@@ -20,6 +26,7 @@ export interface DagJob {
   readonly createdAt: number;
   readonly status: JobStatus | 'paused';
   readonly dispatchPossible: boolean;
+  readonly owner?: DagOwner;
   readonly steps: readonly DagStep[];
   readonly note: string;
 }
