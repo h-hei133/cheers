@@ -22,8 +22,8 @@
 
 ## Current status
 
-**Current phase** 按批实施。36/62 项完成 Linux 本地功能验收，26 项开放。
-**Completed batch** E.6 运行中输入经 SDK、RPC 和终端进入共享队列处理，提交 `1679b5eb`。F1.2 原生结构化流接入实际端点，提交 `52653334`。T5.1 首次会话创建的同 ID 排他预留通过 Linux 并发验收。已逐项重核 26 项开放工作，结论见 [工程记录](design.md)。
+**Current phase** 按批实施。37/62 项完成 Linux 本地功能验收，25 项开放。
+**Completed batch** F1.3 账户 HTTP 流接入请求压缩，通过 Linux Node 24 与 20.3 回环测试及隔离构建。既有 E.6 运行中输入、F1.2 原生结构化流和 T5.1 会话 ID 排他预留证据见 [任务清单](tasks.md)。
 **Next batch** E.6 剩余消息、工具和压缩结果。独立可交付缺口包括 F1.5 按调用范围等待 MCP 就绪，以及 T5.1 普通提交的跨文件事务。
 **Repository gate** 固定 NormProof 本轮实际返回 exit 2 和 `not_proven`，依赖图超过 16384 边采集上限。七项本地静态检查通过。
 **Evidence boundary** 本批通过 Linux 本地协议、合成用例与配置模型实际验证。具体服务资格见各任务的验收条目。提交保留在本地。

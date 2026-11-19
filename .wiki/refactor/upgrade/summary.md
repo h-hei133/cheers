@@ -1,12 +1,12 @@
 # 规划执行进展（2026-11-19）
 
-本轮接续已核实任务，完成 E.6 的 kernel结算、实际startup／shutdown、树导航、CLI replacement、initial input/UI readiness、controlled CLI reload、before-tree定制摘要及SDK controlled reload子批。**62 项中 36 项已完成，26 项仍开放**，E.6整项仍部分。默认依赖图判定仍为 `not_proven`。
+**62 项中 37 项已完成 Linux 本地功能验收，25 项仍开放。** F1.3 账户 HTTP 流请求压缩已通过回环与构建。E.6 的运行中输入已提交，工具和压缩结果仍在实施。默认依赖图判定仍有采集容量缺口。
 
 核查与取舍见[工程记录](design.md)，当前验收和次序见[任务清单](tasks.md)。源码按批本地提交。远端推送和本轮 CI 尚未发生。原定暂缓的原生插件与独立桌面产品不计入 62 项，T6 保留按需求开启。
 
 ## 当前批次的验证
 
-已逐项核对 26 个开放项并完成三组子批。F1.2 原生结构化流通过四套件 210 项及隔离构建 `b0bf67bd7960`。E.6 运行中输入通过 18 套件 840 项、构建 `7106ad586588`、旧源码反转和 Linux 编译 RPC。T5.1 同 ID 首次创建通过两个 Linux 进程实际竞争、10 套件 262 项及构建 `b1898375bd84`。该构建还通过配置模型的两轮 SDK 实测，确认运行中的 follow-up 只归约一次并保存变换后内容。固定 NormProof 因 16384 边容量返回 `not_proven`。整项验收仍为 36/62，26 项开放。 [逐项核查](design.md)
+F1.3 在 Linux Node 24 验证了 HTTP 直连及握手回退的 zstd 字节，Node 20.3 验证了相同请求的 JSON 回退。HTTP 415 没有触发重新派发。四套件 58 项、隔离构建 `36aa2e989113` 通过。既有 F1.2、E.6 和 T5.1 保留各自生产入口证据。固定 NormProof 上次因 16384 边容量返回 `not_proven`。 [逐项核查](design.md)
 
 SDK现公开reload()，沿原commands与extension lifecycle协调关闭／退休、captured loader reservation与完整snapshot、新shared host／UI绑定和start；保留same session及saved state/selection/transcriptprefix，仅bounded startup reports允许。独立复审实际反例修复file/explicit工具限制、队列多消息与失败结算、oldowner关闭、snapshot别名/Map与controlledbind、capture同步重入。最终16文件309项、七门／2747modules／0monoliths、buildf83dd7313313和两限定APPROVE/hash通过；13有效反转15AssertionErrors／1redundant control／exact恢复105项。Linuxcompiled/Node20.3禁生成/installed各8场景2POST，15公开入口strict NodeNext/skipLibCheck=false/engine-strictpassed；报告readback、lateinput、取消及partial均验证。opaque moduleexports保原capability引用，明确不属metadata冻结。normalpinnedjudge实际exit2/not_proven，未新增配置模型调用。[当前交付](../../../.omx/artifacts/upgrade-sdk-reload-2026-11-19/delivery.json)。其余input/message/tool/compaction事件结果继续，整项E.6仍部分。
 
@@ -105,7 +105,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | `bf01f8f` | compact同步登记原command owner，controls可达、EOF结算、失败结果保留结构化status。 |
 | `ae9a3f59` | retry专属取消及就绪代理转发；D.1整项验收在恢复后继续。 |
 
-## 已完成功能验收的36项
+## 已完成功能验收的37项
 
 | 编号 | 项数 | 已完成的所述范围 |
 | --- | ---: | --- |
@@ -116,6 +116,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | C.1、C.2、C.3、C.4、C.5、C.7、C.8、C.9 | 8 | 循环准备／结束与完整虚拟路由；消息分离与统一准备；公共累计流式快照／HTTP retry事实／已接受响应不重放；stdout隔离／有界writer与退出结算；默认正文保留／measurement／compaction消费者、缓存配置／协议能力／预热窗口，当前cache presence／captured write premium／估算报告；工具发现／mutable schema guard与实际激活消费者。 |
 | D.1–D.3、D.5 | 4 | RPC完整会话／模型／树／shell／设置／压缩／retry命令、严格输入和最终准入；队列／UI响应、导出持久token／费用并保留未知覆盖。 |
 | E.1、E.2、E.5 | 3 | 脚本完整host settlement、普通gate/hooks/child boundary/动态读写effect barrier；codemode分支状态持久化、原前缀／CAS／ABA保护、进程重启和多级fork隔离；共享SDK UI续绑／撤权。不包含确定性重放。 |
+| F1.3 | 1 | 账户 HTTP 流请求压缩、Node 20.3 回退和握手失败后的派发。 |
 | F2.2–F2.5 | 4 | 远程目录 ETag 和保存结果、无动态代码生成的校验、单次输入阶梯计价、追踪查询和类型化记录。 |
 | T2.1 | 1 | 单次参数归属、早期命令及 Linux 启动。 |
 | T3.1 | 1 | SDK资源代际绑定／撤权、并发dispose结算／首错、compact与prompt／command互斥和完整idle；安装入口／严格类型／配置模型联合验收。 |
@@ -150,7 +151,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 真实模型沿用既有active连接和凭据。用户models目录的原JSON损坏，相关新原生测试在隔离home使用原目标的最小有效目录entry；原用户配置未修改，该证据不代表原损坏目录可加载。失败、setup错误和observer错误均单独保存。没有Windows、物理终端、真实Azure／Mistral／Anthropic原生control、OAuth真人同意／续期、服务账单对照或性能收益基准。本次只跑聚焦检查，未宣称全仓测试／全仓类型通过；六静态门保留119条既有非阻断文档source提示。
 
-## 文档中尚未完成的26项功能任务
+## 文档中尚未完成的25项功能任务
 
 “已有待验收”表示代码／消费者存在，缺本轮整项证据；“部分”表示实现已有进展但仍缺行为或资格验证。以下列出每个未勾选编号，恢复时以tasks.md逐项继续。
 
@@ -160,13 +161,12 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | D.4 | 部分 | 高亮、CJK、Thinking/Diff/灯箱与离线安全已通过；完整GFM仍未验收；限定独立FIXED/APPROVE通过。 |
 | E.3 | 部分 | 声明、namespace、冻结session list/get、native image/输出预算已过；richer classify/generateImages派发与provider image缺。 |
 | E.4 | 缺口 | 固定执行环境、记录结果交付、可验证的恢复及未知副作用零重派发。 |
-| E.6 | 部分 | 新普通input转换/handled/独立veto已完成；live steering/followUp和其他message/tool/compaction结果消费者仍缺。 |
+| E.6 | 部分 | 普通输入和运行中输入的结果均已接通，工具和压缩结果仍待验收。 |
 | E.7 | 部分 | virtual注册／逻辑路由已接通；provider、MCP、renderer和其余runtime setters仍缺，worker virtual明确unsupported。 |
 | E.8 | 部分 | shortcuts／flags的CLI／SDK消费者、冲突、默认值、参数与按键生命周期。 |
 | E.9 | 部分 | npm／git／local安装adapter和顶层CLI入口、完整性／精确版本／批准边界。 |
 | F1.1 | 部分 | 增量工具JSON的实际预览UI／事件，不能恢复孤立parser。 |
 | F1.2 | 部分 | Azure 和账户 WebSocket 的真实服务资格。Mistral 独立 Conversations 协议仍缺。 |
-| F1.3 | 缺口 | 最终body准入／签名后由传输owner消费zstd，endpoint支持及未知派发不重放。 |
 | F1.4 | 部分 | 其他OAuth提供方、设备登录实际同意／续期，复用原凭据proof。 |
 | F1.5 | 已有待验收 | MCP PKCE／loopback／renewal／懒加载的OAuth fixture、撤权和tools readiness。 |
 | F2.1 | 部分 | 图片／分类器模型类别、逐端点媒体能力／预算与真实Linux输入。 |
@@ -185,7 +185,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 ## 后续工作
 
-用户要求完成当前input子批并本地提交后总结、停止。before-tree summary、CLI与SDK controlled reload及普通input结果已完成子批验收；E.6尚缺live steering/followUp、message/tool/compaction其余结果。其余26开放编号按上表保留，停止后不继续执行。
+继续逐批核实、实施、验证并本地提交开放项。扩展事件、完整导出和 MCP 就绪先验证生产消费者，账户服务和其他提供方资格按实际服务证据记录。
 
 ## 阶梯计价历史验收
 

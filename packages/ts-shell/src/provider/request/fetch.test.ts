@@ -1,7 +1,8 @@
 import http from "node:http";
 import net from "node:net";
+import * as zlib from "node:zlib";
 import type { AddressInfo } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createProviderFetchFromEnv,
   providerFetchFromTimeouts,
@@ -27,6 +28,48 @@ import { endpointShape } from "../endpoints/index.js";
  */
 
 const servers: http.Server[] = [];
+
+it.each(['sse', 'auto'] as const)('encodes only the account HTTP body with transport %s', async mode => {
+  const decompress = (zlib as typeof zlib & { zstdDecompressSync?: (body: Buffer) => Buffer }).zstdDecompressSync;
+  const requests: { encoding?: string; length?: string; bytes: Buffer }[] = [];
+  let upgrades = 0;
+  const server = http.createServer(async (request, response) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(chunk);
+    requests.push({ encoding: request.headers['content-encoding'], length: request.headers['content-length'], bytes: Buffer.concat(chunks) });
+    response.writeHead(415).end();
+  });
+  server.on('upgrade', (_request, socket) => {
+    upgrades++;
+    socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+  });
+  servers.push(server);
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/codex/responses`;
+  const body = JSON.stringify({ input: 'repeat repeated input '.repeat(1000) });
+  const init = { method: 'POST', body, headers: { 'content-type': 'application/json', authorization: 'Bearer fixture',
+    'content-length': String(Buffer.byteLength(body)) } };
+  vi.stubEnv('CHEERS_CODEX_TRANSPORT', mode);
+  vi.stubEnv('CHEERS_PROVIDER_NO_PROXY', '127.0.0.1');
+  try {
+    const beforeDispatch = vi.fn();
+    const send = providerFetchForEndpoint({}, 'openai-account-responses', endpointShape, undefined, beforeDispatch);
+    const ordinary = providerFetchForEndpoint({}, 'openai-compatible', endpointShape);
+    expect((await send(url, init)).status).toBe(415);
+    expect((await ordinary(url, init)).status).toBe(415);
+    expect(beforeDispatch).toHaveBeenCalledExactlyOnceWith(init);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+  expect(upgrades).toBe(mode === 'auto' ? 1 : 0);
+  expect(requests).toHaveLength(2);
+  expect(requests[0].encoding).toBe(decompress ? 'zstd' : undefined);
+  expect(requests[0].length).toBe(String(requests[0].bytes.length));
+  if (decompress) expect(requests[0].bytes.length).toBeLessThan(Buffer.byteLength(body));
+  expect((decompress ? decompress(requests[0].bytes) : requests[0].bytes).toString()).toBe(body);
+  expect(requests[1].encoding).toBeUndefined();
+  expect(requests[1].bytes.toString()).toBe(body);
+});
 
 it('checks admission after asynchronous signer setup and signing before HTTP dispatch', async () => {
   let requests = 0;

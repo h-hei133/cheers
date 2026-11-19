@@ -1,6 +1,7 @@
 import { admittedFetch, type Admission } from "../../core/network/admission.js";
 import { type Agent, type ProxyAgent, fetch as undiciFetch } from "undici/index.js";
 import { tryCodexWebSocketFetch } from "../endpoints/responses/codexWs.js";
+import { encodeJsonRequest } from './body.js';
 import { requestFetch, requestUrl } from './client.js';
 import { currentProviderConnections, providerDispatchers } from './connection.js';
 import { withRequestSigner, type RequestSigner } from './signing.js';
@@ -198,19 +199,25 @@ export function providerFetchForEndpoint(
   const socketConfig = resolveProviderTransportConfig(process.env, providerTimeoutsFrom(config));
   const transport = process.env.CHEERS_CODEX_TRANSPORT?.trim().toLowerCase();
   const configured = providerFetchFor(config);
+  const accountResponses = endpoint === 'openai-account-responses';
+  // Only this HTTP endpoint advertises request encoding support. Body-signing
+  // transports and the WebSocket response.create frame keep the admitted bytes.
+  const sendSse = accountResponses && !signer
+    ? admittedFetch((input, init) => configured(input, encodeJsonRequest(init)), admission)
+    : configured;
   const base = admittedFetch((input, init) => {
     init?.signal?.throwIfAborted();
     beforeDispatch?.(init);
-    const sseInit = (endpoint === 'openai-account-responses' || endpoint === 'google-account-generative-ai'
+    const sseInit = (accountResponses || endpoint === 'google-account-generative-ai'
       || endpoint === 'copilot-chat-completions' || endpoint === 'copilot-messages') ? { ...init, redirect: 'error' as const } : init;
-    if (endpoint === 'openai-account-responses' && (transport === 'websocket' || transport === 'auto')) {
+    if (accountResponses && (transport === 'websocket' || transport === 'auto')) {
       const decision = resolveTransportDecision(requestUrl(input).hostname, socketConfig);
-      return tryCodexWebSocketFetch(input, sseInit, configured, transport === 'auto', {
+      return tryCodexWebSocketFetch(input, sseInit, sendSse, transport === 'auto', {
         ...socketConfig, proxyUrl: decision.mode === 'proxy' ? socketConfig.proxyUrl : undefined, admission,
         lifetime: currentProviderConnections(),
       });
     }
-    return configured(input, sseInit);
+    return sendSse(input, sseInit);
   }, admission);
   if (!signer) return base;
 

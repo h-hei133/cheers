@@ -26,6 +26,18 @@ export function compressZstdSync(body: string | Uint8Array): Uint8Array | undefi
   }
 }
 
+export function encodeJsonRequest(init: RequestInit | undefined): RequestInit | undefined {
+  if (init?.method?.toUpperCase() !== 'POST' || typeof init.body !== 'string') return init;
+  const headers = new Headers(init.headers);
+  const mediaType = headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
+  if (headers.has('content-encoding') || mediaType !== 'application/json') return init;
+  const encoded = compressZstdSync(init.body);
+  if (!encoded || encoded.byteLength >= Buffer.byteLength(init.body)) return init;
+  headers.set('content-encoding', 'zstd');
+  headers.delete('content-length');
+  return { ...init, headers, body: new Uint8Array(encoded) };
+}
+
 /** Fetch decodes response bytes, including error responses, while retaining wire headers. */
 export function decodedBody(body: Readable, headers: Headers, signal: AbortSignal): ReadableStream<Uint8Array> {
   const encodings = (headers.get('content-encoding') ?? '').toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
