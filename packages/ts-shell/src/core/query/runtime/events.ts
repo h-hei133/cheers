@@ -10,6 +10,7 @@ import type {
   QueryRuntimeTurnSnapshot,
 } from './harness.js'
 import type { QueryRuntimeProofProjection } from './proof.js'
+import type { ToolPreview } from '../../../turn/preview/contract.js';
 
 /** Public cumulative display capture; signed or opaque replay data never travels here. */
 export interface QueryStreamingMessage {
@@ -65,6 +66,7 @@ export type QueryEvent =
     /** Arguments the call was made with, so a card can say what it is doing. */
     readonly args?: Readonly<Record<string, unknown>>
   }
+  | ({ readonly type: 'tool.preview' } & ToolPreview)
   | { readonly type: 'approval.requested'; readonly toolName: string; readonly taskId: string }
   | { readonly type: 'approval.resolved'; readonly toolName: string; readonly taskId: string; readonly outcome: 'approved' | 'denied'; readonly compensated?: boolean }
   /**
@@ -181,4 +183,5 @@ export function isDurableQueryEvent(event: QueryEvent): boolean {
     && event.type !== 'message.finished'
     && event.type !== 'input.handled'
     && event.type !== 'input.rejected'
+    && event.type !== 'tool.preview'
 }

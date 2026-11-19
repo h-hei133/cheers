@@ -1,5 +1,6 @@
 import { streamTracer } from '../observability/logs/stream.js';
 import { IncompleteStreamError, providerResponseError } from '../provider/response/error.js';
+import type { ObserveToolArguments } from './preview/model.js';
 /**
  * Reading a chat completion as it arrives.
  *
@@ -145,6 +146,7 @@ interface DeltaChunk {
 
 /** A tool call being assembled across deltas. */
 interface PendingCall {
+  readonly position: number;
   index: number | undefined;
   id: string;
   name: string;
@@ -210,6 +212,7 @@ const GRACE_EXPIRED = Symbol("finish-grace-expired");
 export async function* readCompletionStream(
   body: ReadableStream<Uint8Array>,
   readStructuredContent?: StructuredContentReader,
+  observeToolArguments?: ObserveToolArguments,
 ): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
   const traceStream = streamTracer();
   const state: StreamState = {
@@ -249,7 +252,7 @@ export async function* readCompletionStream(
         const split = nextEvent(buffer);
         if (!split) break;
         buffer = split.rest;
-        const step = absorb(split.event, state, traceStream, readStructuredContent);
+        const step = absorb(split.event, state, traceStream, readStructuredContent, observeToolArguments);
         yield* step.fragments;
         if (step.ended) {
           traceStream("stopped: [DONE] sentinel");
@@ -281,7 +284,7 @@ export async function* readCompletionStream(
   // is the answer.
   buffer += decoder.decode();
   if (!ended && buffer.trim().length > 0) {
-    const step = absorb(buffer, state, traceStream, readStructuredContent);
+    const step = absorb(buffer, state, traceStream, readStructuredContent, observeToolArguments);
     yield* step.fragments;
     ended = step.ended;
     settled ||= step.settled;
@@ -316,6 +319,7 @@ function absorb(
   state: StreamState,
   traceStream: (message: string) => void,
   readStructuredContent: StructuredContentReader | undefined,
+  observeToolArguments: ObserveToolArguments | undefined,
 ): { readonly fragments: readonly StreamFragment[]; readonly ended: boolean; readonly settled: boolean } {
   const payload = eventData(event);
   if (payload === undefined) return { fragments: [], ended: false, settled: false };
@@ -344,7 +348,7 @@ function absorb(
 
   const batch = delta.tool_calls ?? [];
   for (let offset = 0; offset < batch.length; offset++) {
-    applyCall(pickCall(state, batch[offset]!, offset, batch.length), batch[offset]!);
+    applyCall(pickCall(state, batch[offset]!, offset, batch.length), batch[offset]!, observeToolArguments);
   }
 
   const fragments: StreamFragment[] = [];
@@ -412,7 +416,7 @@ function pickCall(state: StreamState, delta: ToolCallDelta, offset: number, batc
     const positional = batch > 1 ? state.slots[offset] : state.calls[state.calls.length - 1];
     if (positional) return positional;
   }
-  const created: PendingCall = { index, id: id ?? "", name: "", args: "", object: undefined };
+  const created: PendingCall = { position: state.calls.length, index, id: id ?? "", name: "", args: "", object: undefined };
   state.calls.push(created);
   if (index !== undefined) state.byIndex.set(index, created);
   if (batch > 1) state.slots[offset] = created;
@@ -427,18 +431,20 @@ function pickCall(state: StreamState, delta: ToolCallDelta, offset: number, batc
  * `??` reads an empty string as a value, which erased the name and made the
  * assembled call unexecutable.
  */
-function applyCall(call: PendingCall, delta: ToolCallDelta): void {
+function applyCall(call: PendingCall, delta: ToolCallDelta, observe?: ObserveToolArguments): void {
+  const hadName = Boolean(call.name);
   if (typeof delta.id === "string" && delta.id.length > 0) call.id = delta.id;
   const name = delta.function?.name;
   if (typeof name === "string" && name.length > 0) call.name = name;
   const args = delta.function?.arguments;
   if (typeof args === "string") {
     call.args += args;
-    return;
-  }
-  if (args && typeof args === "object" && !Array.isArray(args)) {
+  } else if (args && typeof args === "object" && !Array.isArray(args)) {
     call.object = mergeArgs(call.object ?? {}, args);
   }
+  if (observe && call.name) observe({ index: call.position, name: call.name,
+    ...(call.object ? (args === null || typeof args !== "object" ? {} : { fields: call.object })
+      : { delta: !hadName ? call.args : typeof args === "string" ? args : undefined }) });
 }
 
 /**

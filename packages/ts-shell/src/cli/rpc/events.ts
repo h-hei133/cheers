@@ -33,6 +33,8 @@ export function toRpcEvent(event: QueryEvent): Record<string, unknown> | undefin
       return { type: "message_update", text: event.text, message: streamMessage(event, { content: event.text }) };
     case "message.finished":
       return { type: "message_end", message: { role: event.role } };
+    case "tool.preview":
+      return { ...event, type: "tool_call_preview" };
     case "tool.started":
       return { type: "tool_execution_start", toolCallId: event.taskId, toolName: event.toolName, args: event.args ?? {} };
     case "tool.output":

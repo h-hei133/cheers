@@ -16,6 +16,8 @@ import type { AssistantStep } from "../core/agent/loop.js";
 import { clearContextUsage, markContextUnknown, recordSessionUsage, type SessionUsageRecord } from "../observability/usageTelemetry.js";
 import { captureThinkingPreference } from '../core/models/preference.js';
 import { isEventStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
+import type { ToolPreview } from "./preview/contract.js";
+import { toolPreview, type ObserveToolArguments } from "./preview/model.js";
 import { endpointShape, type EndpointKind } from "../provider/endpoints/index.js";
 import { requestReplayBinding } from '../provider/request/replay.js';
 import { classifyProviderFailure, type ProviderFailureClass } from "../provider/registry/provider.js";
@@ -52,6 +54,7 @@ export interface StepListener {
   readonly onReasoningReplace?: (text: string) => void;
   /** The assembled text differs from the streamed deltas. */
   readonly onReplace?: (text: string) => void;
+  readonly onToolPreview?: (preview: ToolPreview) => void;
 }
 
 /** The model side of the kernel: the next assistant step for a context. */
@@ -432,8 +435,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
       }
       if (!response) return stamp(errorStep(refusal || "Provider returned no response."));
 
+      const preview = currentAllowTools && prepared.tools.length > 0 && listener.onToolPreview && isEventStream(response)
+        ? toolPreview(prepared.tools, listener.onToolPreview, signal, target.isCurrent) : undefined;
       try {
-        const completion = await readCompletion(response, watched, endpoint);
+        const completion = await readCompletion(response, watched, endpoint, preview?.observe);
         traceLogger.info("provider request completed", { requestId, endpoint, provider: activeProvider, model: activeModel, attempt: streamAttempts, usage: Boolean(completion.usage), durationMs: requestAcceptedAt === undefined ? undefined : Math.max(0, Date.now() - requestAcceptedAt) });
         const usage = completion.usage;
         const choice = completion.choices?.[0];
@@ -508,6 +513,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         return stamp(failedStep(failure.message, shown, failure.failureClass,
           acceptedResponse || shownAnything || streamAttempts > 0 || !failure.retryable));
       } finally {
+        preview?.close();
         // Reading ends as soon as the answer is complete, which can be before
         // the host closes the stream — a keep-alive proxy holds the connection
         // open afterwards. Releasing it here rather than leaving it to the host
@@ -523,6 +529,7 @@ async function readCompletion(
   response: Response,
   listener: StepListener,
   endpoint?: EndpointKind,
+  observeToolArguments?: ObserveToolArguments,
 ): Promise<CompletionShape> {
   if (!isEventStream(response)) {
     if (endpointShape(endpoint).simpleResponse === 'stream') {
@@ -536,7 +543,7 @@ async function readCompletion(
     const read = endpointShape(endpoint).readBody(await response.json());
     return read as CompletionShape;
   }
-  const stream = endpointShape(endpoint).readStream(response.body!);
+  const stream = endpointShape(endpoint).readStream(response.body!, observeToolArguments);
   let streamed = "";
   try {
   for (;;) {

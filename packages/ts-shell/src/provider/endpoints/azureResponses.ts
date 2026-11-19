@@ -66,5 +66,5 @@ declareEndpoint("azure-openai-responses", {
   body: (input) => responseBody(input, false),
   turnBody: (input) => responseBody(input, true),
   readBody: (body) => readResponse(body),
-  readStream: (body) => readResponseStream(body),
+  readStream: (body, observe) => readResponseStream(body, false, observe),
 });

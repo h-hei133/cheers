@@ -40,5 +40,5 @@ declareEndpoint('openai-account-responses', {
   body: accountBody,
   turnBody: accountBody,
   readBody: body => readResponse(body, true),
-  readStream: body => readResponseStream(body, true),
+  readStream: (body, observe) => readResponseStream(body, true, observe),
 });

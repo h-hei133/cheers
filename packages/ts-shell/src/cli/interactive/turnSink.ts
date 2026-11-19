@@ -6,6 +6,7 @@ import type { RendererSink } from "../../presentation/terminal/streaming.js";
 import { splitFencedDiff, type Block } from "../../presentation/tui/transcript/blocks.js";
 import { ToolCards } from "./toolCards.js";
 import { Thinking } from "./turn/thinking.js";
+import { ToolPreparation } from "./turn/preview.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";
 import type { TurnActivity } from "../../presentation/tui/transcript/live.js";
 
@@ -31,6 +32,7 @@ export class TurnSink implements RendererSink {
   private label = "working";
   private assistant: Block | undefined;
   private readonly thinking: Thinking;
+  private readonly preparation = new ToolPreparation();
   private prose: Block | undefined;
   private readonly tools: ToolCards;
   private proseKind: "command" | "error" = "command";
@@ -50,6 +52,7 @@ export class TurnSink implements RendererSink {
     this.prose = undefined;
     this.assistant = undefined;
     this.thinking.clear();
+    this.preparation.clear();
     this.tools.clear();
     this.cancelling = false;
     this.failed = false;
@@ -106,6 +109,7 @@ export class TurnSink implements RendererSink {
     }
     this.assistant = undefined;
     this.thinking.clear();
+    this.preparation.clear();
     this.prose = undefined;
     this.tools.clear();
     if (!discard) this.onChange();
@@ -135,6 +139,7 @@ export class TurnSink implements RendererSink {
   markCancelling(): void {
     if (!this.running) return;
     this.cancelling = true;
+    this.preparation.clear();
     this.onChange();
   }
 
@@ -163,7 +168,7 @@ export class TurnSink implements RendererSink {
     // provider's own numbers once the request has been accounted for.
     return {
       startedAt: this.turnStartedAt,
-      label: this.label,
+      label: this.preparation.label ?? this.label,
       tokens: 0,
       cancelling: this.cancelling,
     };
@@ -217,10 +222,12 @@ export class TurnSink implements RendererSink {
         this.onChange();
         return;
       case "message.finished":
+        this.preparation.clear();
         this.finalizeAssistant(event.hasToolCalls === true);
         this.onChange();
         return;
       case "message.started":
+        this.preparation.clear();
         this.finalizeAssistant();
         this.thinking.clear();
         this.prose = undefined;
@@ -240,7 +247,11 @@ export class TurnSink implements RendererSink {
       case "reasoning.delta":
         this.think(event.delta);
         return;
+      case "tool.preview":
+        if (this.running && !this.cancelling && this.preparation.accept(event)) this.onChange();
+        return;
       case "tool.started":
+        this.preparation.clear();
         this.openTool(event.toolName, event.taskId, event.args);
         return;
       case "approval.requested":
@@ -261,6 +272,7 @@ export class TurnSink implements RendererSink {
         this.closeTool(event.taskId, event.success, event.failureReason, event.output, event.images);
         return;
       case "query.retrying":
+        this.preparation.clear();
         this.label = `retrying (attempt ${event.attempt})`;
         this.onChange();
         return;
@@ -286,6 +298,7 @@ export class TurnSink implements RendererSink {
         }
         return;
       case 'query.completed_unproven':
+        this.preparation.clear();
         this.finalizeAssistant();
         this.label = 'completed_unproven';
         this.transcript.append({ kind: 'notice', title: 'completed_unproven', text: event.reasonCode, finalized: true });
@@ -294,6 +307,7 @@ export class TurnSink implements RendererSink {
       case "lifecycle.cancelled":
       case "lifecycle.error":
       case "query.failed":
+        this.preparation.clear();
         this.recordFailure(event);
         return;
       default:

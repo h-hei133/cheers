@@ -8,6 +8,7 @@ import type { ChatMessage } from "../../turn/prompt.js";
 import type { RequestDeclaration } from '../../core/agent/declarations/model.js';
 import type { ToolSchema } from "../../turn/tools.js";
 import type { ProviderUsage, StreamFragment, StreamedCompletion, StreamedToolCall } from "../../turn/completion.js";
+import type { ObserveToolArguments } from "../../turn/preview/model.js";
 import { anthropicBetaHeaders, declareToolChanges, insertThinkingLevelMessages } from "./anthropicCachePreservation.js";
 import { anthropicToolDefinition, projectRequestDeclarations, type DeclarationProjection, type NativeSystemMessage } from './anthropic/declarations.js';
 export { anthropicBetaHeaders };
@@ -496,6 +497,7 @@ function anthropicUsageToProvider(usage: AnthropicUsage): ProviderUsage {
  */
 export async function* readAnthropicStream(
   body: ReadableStream<Uint8Array>,
+  observeToolArguments?: ObserveToolArguments,
 ): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
   const decoder = new TextDecoder();
   const iterator = (body as unknown as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
@@ -546,6 +548,7 @@ export async function* readAnthropicStream(
       fragments.push(
         ...applyEvent(event, {
           calls,
+          observeToolArguments,
           onText: (chunk) => (text += chunk),
           onReasoning: (chunk) => (reasoning += chunk),
           onSignature: (chunk) => (reasoningSignature += chunk),
@@ -711,13 +714,14 @@ function parseEvent(raw: string): AnthropicEvent | undefined {
 /**
  * Fold one event into the accumulators, yielding whatever it says.
  *
- * Tool arguments are accumulated rather than emitted, because they arrive as
- * fragments of one JSON string and only make sense together.
+ * Tool argument bytes remain in their original accumulator. A live observer
+ * can project a display preview independently.
  */
 function applyEvent(
   event: AnthropicEvent,
   state: {
     calls: Map<number, { id: string; name: string; args: string }>;
+    observeToolArguments?: ObserveToolArguments;
     onText: (text: string) => void;
     onReasoning: (text: string) => void;
     onSignature: (signature: string) => void;
@@ -729,11 +733,13 @@ function applyEvent(
   const index = event.index ?? 0;
 
   if (event.type === "content_block_start" && event.content_block?.type === "tool_use") {
-    state.calls.set(index, {
+    const call = {
       id: event.content_block.id ?? "",
       name: event.content_block.name ?? "",
       args: "",
-    });
+    };
+    state.calls.set(index, call);
+    state.observeToolArguments?.({ index, name: call.name });
     return fragments;
   }
 
@@ -768,7 +774,12 @@ function applyEvent(
     state.onSignature(event.delta.signature);
   } else if (event.delta.type === "input_json_delta" && event.delta.partial_json !== undefined) {
     const call = state.calls.get(index);
-    if (call) call.args += event.delta.partial_json;
+    if (call) {
+      call.args += event.delta.partial_json;
+      if (typeof event.delta.partial_json === 'string') {
+        state.observeToolArguments?.({ index, name: call.name, delta: event.delta.partial_json });
+      }
+    }
   }
 
   return fragments;
@@ -900,5 +911,5 @@ declareEndpoint("anthropic-messages", {
     return { ...body, max_tokens: 1 };
   },
   readBody: (body) => readAnthropicBody(body),
-  readStream: (body) => readAnthropicStream(body),
+  readStream: readAnthropicStream,
 });

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { endpointShape, endpointTurnBody, endpointUrl } from "./index.js";
 import { crc32 } from "../aws/eventStream.js";
 import type { TurnRequest } from "./kinds.js";
+import type { ObserveToolArguments, WireToolArguments } from "../../turn/preview/model.js";
 
 /**
  * The Bedrock wire shape.
@@ -62,8 +63,8 @@ function streamOf(...frames: Uint8Array[]): ReadableStream<Uint8Array> {
   });
 }
 
-async function readAll(frames: Uint8Array[]): Promise<{ text: string; reasoning: string; calls: unknown[]; finish?: string }> {
-  const stream = endpointShape("bedrock-converse-stream").readStream(streamOf(...frames));
+async function readAll(frames: Uint8Array[], observe?: ObserveToolArguments): Promise<{ text: string; reasoning: string; calls: unknown[]; finish?: string }> {
+  const stream = endpointShape("bedrock-converse-stream").readStream(streamOf(...frames), observe);
   let step = await stream.next();
   let text = "";
   while (step.done !== true) {
@@ -389,16 +390,19 @@ describe("reading the answer", () => {
   });
 
   it("collects a tool call whose arguments arrive in pieces", async () => {
+    const previews: WireToolArguments[] = [];
     const result = await readAll([
       event("messageStart", { role: "assistant" }),
       event("contentBlockStart", { contentBlockIndex: 0, start: { toolUse: { toolUseId: "t1", name: "read" } } }),
       event("contentBlockDelta", { contentBlockIndex: 0, delta: { toolUse: { input: '{"pa' } } }),
       event("contentBlockDelta", { contentBlockIndex: 0, delta: { toolUse: { input: 'th":"a"}' } } }),
       event("messageStop", { stopReason: "tool_use" }),
-    ]);
+    ], preview => previews.push(preview));
 
     expect(result.calls).toHaveLength(1);
     expect(result.calls[0]).toMatchObject({ id: "t1", function: { name: "read", arguments: '{"path":"a"}' } });
+    expect(previews).toEqual([{ index: 0, name: "read" }, { index: 0, name: "read", delta: '{"pa' },
+      { index: 0, name: "read", delta: 'th":"a"}' }]);
   });
 
   it("reports usage under the names every other protocol uses", async () => {

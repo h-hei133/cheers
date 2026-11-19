@@ -190,6 +190,8 @@ export function createTurnRequest(
     let latestPrepared: PreparedTurnContext | undefined;
     let streamedText = "";
     let streamedReasoning = "";
+    let previewId: string | undefined;
+    let previewOpen = toolsAllowed;
     const emitStreamUpdate = (event: Extract<QueryEvent, { type: 'message.delta' | 'reasoning.delta' | 'message.replace' | 'reasoning.replace' }>, delta?: string) => {
       const partial = {
         text: streamedText,
@@ -217,6 +219,13 @@ export function createTurnRequest(
       onReplace: (text) => {
         streamedText = text;
         emitStreamUpdate({ type: "message.replace", role: "coder", text });
+      },
+      onToolPreview: preview => {
+        if (!previewOpen || (signal?.aborted && preview.phase !== 'end')) return;
+        if (preview.phase === 'start') previewId ??= preview.previewId;
+        if (preview.previewId !== previewId) return;
+        if (preview.phase === 'end') previewId = undefined;
+        channel.push({ type: 'tool.preview', ...preview });
       },
     };
     let step = await stepRequest(
@@ -270,7 +279,10 @@ export function createTurnRequest(
         onRequestSent,
         onRequestUsage,
       },
-    );
+    ).finally(() => {
+      previewOpen = false;
+      if (previewId) channel.push({ type: 'tool.preview', phase: 'end', previewId });
+    });
     if (!signal?.aborted && step.admissionFailure === 'exhausted' && options.claimBudgetSummary?.()) {
       budgetSummary = true;
       streamedText = "";

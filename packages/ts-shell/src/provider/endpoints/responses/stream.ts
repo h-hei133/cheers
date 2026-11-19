@@ -1,6 +1,7 @@
 import { isRecord } from '../../../core/values/record.js';
 import { isDeepStrictEqual } from 'node:util';
 import type { CompletedBody, StreamedCompletion, StreamFragment } from '../../../turn/completion.js';
+import type { ObserveToolArguments } from '../../../turn/preview/model.js';
 import { responseEvents } from './events.js';
 import { readResponse, responseFailure, responseOutput, responseUsage, type OutputItem } from './output.js';
 
@@ -71,7 +72,9 @@ function assembled(body: CompletedBody, shown: string): StreamedCompletion {
 }
 
 /** Only an explicit native terminal can complete a response; partial tools never execute. */
-export async function* readResponseStream(body: ReadableStream<Uint8Array>, account = false): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
+export async function* readResponseStream(
+  body: ReadableStream<Uint8Array>, account = false, observeToolArguments?: ObserveToolArguments,
+): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
   const slots = new Map<number, Slot>(); let shown = ''; let shownReasoning = '';
   let responseId: string | undefined; let responseModel: string | undefined;
   try {
@@ -133,6 +136,7 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         if ([...slots.values()].some(slot => slot.item.id === item.id)) throw new Error('Response output item identity is repeated.');
         slots.set(index, { item, text: new Map(), reasoning: new Map(), reasoningText: new Map(),
           textDone: new Map(), reasoningDone: new Map(), reasoningTextDone: new Map() });
+        if (item.type === 'function_call' && typeof item.name === 'string') observeToolArguments?.({ index, name: item.name });
       }
       if (event.type === 'response.output_item.done') {
         const index = position(event.output_index); const slot = slots.get(index); const output = responseOutput([event.item]);
@@ -143,7 +147,8 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         || event.type === 'response.reasoning_text.delta' || event.type === 'response.reasoning_text.done'
         || event.type === 'response.function_call_arguments.delta' || event.type === 'response.function_call_arguments.done'
         || event.type === 'response.output_text.done' || event.type === 'response.reasoning_summary_text.done') {
-        const slot = slots.get(position(event.output_index));
+        const outputIndex = position(event.output_index);
+        const slot = slots.get(outputIndex);
         if (!slot || slot.done || event.item_id !== slot.item.id) throw new Error('Response delta has no matching output item.');
         if (event.type === 'response.function_call_arguments.done') {
           if (slot.item.type !== 'function_call' || slot.argsDone !== undefined || typeof event.arguments !== 'string' || (slot.args !== undefined && slot.args !== event.arguments)) throw new Error('Response tool arguments contradict their deltas.');
@@ -152,7 +157,9 @@ export async function* readResponseStream(body: ReadableStream<Uint8Array>, acco
         if (event.type === 'response.function_call_arguments.delta') {
           if (typeof event.delta !== 'string') throw new Error('Response delta has no text.');
           if (slot.item.type !== 'function_call' || slot.argsDone !== undefined) throw new Error('Response tool delta changed a completed item.');
-          slot.args = (slot.args ?? '') + event.delta; continue;
+          slot.args = (slot.args ?? '') + event.delta;
+          if (typeof slot.item.name === 'string') observeToolArguments?.({ index: outputIndex, name: slot.item.name, delta: event.delta });
+          continue;
         }
         const summary = event.type === 'response.reasoning_summary_text.delta' || event.type === 'response.reasoning_summary_text.done';
         const raw = event.type === 'response.reasoning_text.delta' || event.type === 'response.reasoning_text.done';

@@ -98,7 +98,7 @@ const chatShape: EndpointShape = {
   turnBody: (input) => normalizeMistralPayload(baseShape().turnBody(input), input),
   refreshBody: (body, model) => baseShape().refreshBody?.(body, model),
   readBody: (body) => baseShape().readBody(body),
-  readStream: (body) => readCompletionStream(body, readMistralContent),
+  readStream: (body, observe) => readCompletionStream(body, readMistralContent, observe),
 };
 
 declareEndpoint("mistral-chat-completions", chatShape);

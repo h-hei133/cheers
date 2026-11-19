@@ -102,7 +102,7 @@ declareEndpoint("openai-compatible", {
     ["max_completion_tokens" in body ? "max_completion_tokens" : "max_tokens" in body ? "max_tokens" : model.maxTokensField ?? "max_tokens"]: 1,
   }),
   readBody: readBody,
-  readStream: (body) => readCompletionStream(body),
+  readStream: (body, observe) => readCompletionStream(body, undefined, observe),
 });
 
 /** Tool responses remain contiguous; this protocol accepts images in user turns. */

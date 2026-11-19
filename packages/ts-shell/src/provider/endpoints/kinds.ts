@@ -4,6 +4,7 @@ import type { ToolSchema } from "../../turn/tools.js";
 import type { ContextFields } from '../../context/request/model.js';
 import type { RequestBound } from '../../core/agent/request/model.js';
 import type { UsageInputMode } from '../response/metering.js';
+import type { ObserveToolArguments } from '../../turn/preview/model.js';
 import {
   isEventStream,
   type CompletedBody,
@@ -130,6 +131,7 @@ export interface EndpointShape {
   /** The chunks of a streamed answer, and the completion they add up to. */
   readonly readStream: (
     body: ReadableStream<Uint8Array>,
+    observeToolArguments?: ObserveToolArguments,
   ) => AsyncGenerator<StreamFragment, StreamedCompletion, undefined>;
 }
 

@@ -15,5 +15,5 @@ declareEndpoint('openai-responses', {
   turnBody: input => responseBody(input, true),
   refreshBody: body => ({ ...body, max_output_tokens: 1 }),
   readBody: readResponse,
-  readStream: readResponseStream,
+  readStream: (body, observe) => readResponseStream(body, false, observe),
 });

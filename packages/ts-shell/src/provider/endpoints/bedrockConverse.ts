@@ -22,6 +22,7 @@ import { signAwsRequest } from "../aws/signature.js";
 import type { RequestSigner } from "../request/fetch.js";
 import { convertMessages, type WireMessage } from "./bedrock/messages.js";
 import type { CompletedBody, StreamFragment, StreamedCompletion } from "../../turn/completion.js";
+import type { ObserveToolArguments } from "../../turn/preview/model.js";
 
 /**
  * The declaration sent when a request shows tool history but offers no tools.
@@ -211,6 +212,7 @@ function readConverseBody(body: unknown): CompletedBody {
  */
 async function* readConverseStream(
   body: ReadableStream<Uint8Array>,
+  observeToolArguments?: ObserveToolArguments,
 ): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
   let text = "";
   let reasoning = "";
@@ -243,11 +245,14 @@ async function* readConverseStream(
     if (type === "contentBlockStart") {
       const start = event.start as { toolUse?: { toolUseId?: string; name?: string } } | undefined;
       if (start?.toolUse) {
-        calls.set(blockIndex(event), {
+        const index = blockIndex(event);
+        const call = {
           id: start.toolUse.toolUseId ?? "",
           name: start.toolUse.name ?? "",
           args: "",
-        });
+        };
+        calls.set(index, call);
+        observeToolArguments?.({ index, name: call.name });
       }
       continue;
     }
@@ -264,8 +269,12 @@ async function* readConverseStream(
       }
       if (delta?.reasoningContent?.signature) reasoningSignature += delta.reasoningContent.signature;
       if (delta?.toolUse?.input !== undefined) {
-        const call = calls.get(blockIndex(event));
-        if (call) call.args += delta.toolUse.input;
+        const index = blockIndex(event);
+        const call = calls.get(index);
+        if (call) {
+          call.args += delta.toolUse.input;
+          if (typeof delta.toolUse.input === "string") observeToolArguments?.({ index, name: call.name, delta: delta.toolUse.input });
+        }
       }
       continue;
     }
