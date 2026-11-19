@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { selectContext } from "../../context/selection/model.js";
 import { buildExecutionPlan } from "../../planning/execution/model.js";
-import { buildTaskRequestPacket } from "../../provider/request/packet.js";
+import { buildTaskRequestPacket } from "../../planning/execution/packet.js";
 import { chooseToolStrategy } from "./strategy.js";
 
 describe("tool strategy", () => {

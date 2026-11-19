@@ -1,5 +1,5 @@
 import type { ExecutionPlan } from "../../planning/execution/model.js";
-import type { TaskRequestPacket } from "../../provider/request/packet.js";
+import type { TaskRequestPacket } from "../../planning/execution/packet.js";
 
 export type ToolStrategyState = "ready" | "blocked";
 export type ToolActionKind =

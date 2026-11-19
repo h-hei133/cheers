@@ -1,5 +1,5 @@
 import type { ContextSelection } from "../../context/selection/model.js";
-import type { ExecutionPlan } from "../../planning/execution/model.js";
+import type { ExecutionPlan } from "./model.js";
 
 export type RequestPacketState = "ready" | "blocked";
 
