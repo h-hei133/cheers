@@ -42,7 +42,8 @@ export function projectExtensions(state: ExtensionState, sources: readonly Exten
   const items = bases.map((base, index) => {
     const detail = boundedLines([
       safeText(`${base.record.name}@${base.active.manifest.version}`), safeText(base.active.manifest.description ?? ''),
-      safeText(`Source ${base.active.source}; trust ${trustOf(base.active, sources)}`), `SHA256 ${base.active.digest}`, `Trust fingerprint ${base.active.trustFingerprint}`,
+      safeText(`Source ${base.active.source}; trust ${trustOf(base.active, sources)}`), `SHA256 ${base.active.digest}`,
+      ...sourceDetails(base.active),
       base.status, safeText(`Workspace permissions: ${base.active.manifest.permissions.workspace}; network: ${base.active.manifest.permissions.network}`),
       safeText(`Grants: ${currentGrants(base.record, root, workspaceIdentity)}`),
       ...base.record.history.map(entry => safeText(`Retained ${entry.manifest.version}; source ${entry.source}; SHA256 ${entry.digest}`)),
@@ -112,9 +113,19 @@ function textBytes(...values: readonly string[]): number {
 }
 
 function trustOf(active: ExtensionState['packages'][number]['active'], sources: readonly ExtensionSource[] | undefined): string {
+  if (active.origin === 'local') return 'local content approval';
+  if (active.origin === 'npm') return 'registry integrity';
+  if (active.origin === 'git') return 'commit archive approval';
   const source = sources?.find(entry => entry.name === active.source);
   return !sources ? 'unknown' : !source ? 'missing' : !source.trust ? 'untrusted'
     : sourceIdentity(source) === active.sourceIdentity && source.trust.fingerprint === active.trustFingerprint ? 'current' : 'changed';
+}
+
+function sourceDetails(active: ExtensionState['packages'][number]['active']): string[] {
+  if (active.origin === 'local') return [];
+  if (active.origin === 'npm') return [safeText(`${active.packageName}@${active.manifest.version} from ${active.registry}`), `Integrity ${active.integrity}`];
+  if (active.origin === 'git') return [safeText(active.repository), `Commit ${active.commit}`];
+  return [`Trust fingerprint ${active.trustFingerprint}`];
 }
 
 function currentGrants(record: ExtensionState['packages'][number], root: string, workspaceIdentity: string): string {

@@ -16,6 +16,7 @@ export function cliHelpText(): string {
 
 Usage:
   cheers [options] [prompt]
+  cheers plugin install <source>
   cheers --help
   cheers --version
 
@@ -54,6 +55,7 @@ Options:
   --help, -h                        Show this help.
   --version, -v, -V                 Show the version.
 
+Extension installation accepts exact marketplace or npm releases, Git commits, and local package paths. It asks for one-time terminal approval.
 Inside an interactive session, use /help for slash-command navigation.
 `;
 }

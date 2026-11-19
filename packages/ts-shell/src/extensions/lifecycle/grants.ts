@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { canonical } from '../registry/validation.js';
-import { selectedSource, sourceIdentity } from '../registry/sources.js';
+import { assertVersionSource } from '../registry/sources.js';
 import { assertPackage, type LifecycleHost, type Operation } from './install.js';
 import type { PackageRecord } from '../model.js';
 import { getInstalledPlugins } from '../../core/commands/plugin/store.js';
@@ -22,14 +22,14 @@ export function activationOperation(host: LifecycleHost, root: string, action: '
   if (!record) throw new Error('Extension is not installed.'); const scope = rootIdentity(root); const workspaceIdentity = rootSignature(root);
   if (action !== 'disable' && action !== 'revoke') {
     assertPackage(record, host.store);
-    if (sourceIdentity(selectedSource(record.active.source)) !== record.active.sourceIdentity) throw new Error('Installed source or trust anchor changed; new reviewed installation is required.');
+    assertVersionSource(record.active);
   }
   if (grant) validGrant(record, grant);
   if ((action === 'grant' || action === 'revoke') && !grant) throw new Error('A separate declared capability grant is required.');
   return { preview: `${action} ${packageName}${grant ? ` ${grant}` : ''}\nWorkspace ${scope}\nSource ${record.active.source}; version ${record.active.manifest.version}; SHA256 ${record.active.digest}\nDeclared permissions ${canonical(record.active.manifest.permissions)}\nEnablement does not grant prompt or executable capabilities. Every execution still uses ordinary approval.`, apply: async context => {
     context.abortSignal?.throwIfAborted(); host.check(); if (rootIdentity(root) !== scope || rootSignature(root) !== workspaceIdentity) throw new Error('Approved workspace identity changed.');
     const outcome = host.store.locked(state, current => {
-      host.check(); if (action === 'enable' || action === 'grant') { assertPackage(record, host.store); if (sourceIdentity(selectedSource(record.active.source)) !== record.active.sourceIdentity) throw new Error('Approved extension source changed.'); }
+      host.check(); if (action === 'enable' || action === 'grant') { assertPackage(record, host.store); assertVersionSource(record.active); }
       const previous = record.activation[scope]; const before = previous?.workspaceIdentity === workspaceIdentity ? previous : { enabled: false, grants: [] };
       const activation = { ...record.activation, [scope]: { workspaceIdentity, enabled: action === 'enable' ? true : action === 'disable' ? false : before.enabled,
         grants: action === 'grant' ? [...new Set([...before.grants, grant!])] : action === 'revoke' ? before.grants.filter(entry => entry !== grant) : before.grants } };

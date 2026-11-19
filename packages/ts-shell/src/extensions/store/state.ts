@@ -5,6 +5,9 @@ import { withFileLock, writeJsonFileAtomic } from '../../session/store/sessionFi
 import { isRecord } from '../../core/values/record.js';
 import { readTextFile } from '../../core/workspace/files.js';
 import { canonical, digest, manifest, name, relativePath, release } from '../registry/validation.js';
+import { assertManifestFiles, inventoryDigest } from '../archive/inventory.js';
+import { npmArchiveUrl, npmIntegrity, npmPackageName, npmRegistry } from '../registry/npm.js';
+import { assertGitArchiveUrl, gitRelease } from '../registry/git.js';
 import type { ExtensionState, PackageRecord, VersionRecord, EffectOutcome } from '../model.js';
 import { assertStoragePath } from './paths.js';
 import { clearUnknownOutcomes, readUnknownOutcomes, unknownFile, writeUnknownOutcomes } from './unknown.js';
@@ -16,12 +19,42 @@ export function extensionFile(): string { return profilePathOverride('CHEERS_EXT
 export function packageRoot(file = extensionFile()): string { return path.join(path.dirname(file), 'packages'); }
 export function versionPath(record: VersionRecord, file = extensionFile()): string { return path.join(packageRoot(file), record.manifest.name, record.digest); }
 function validVersion(value: unknown): VersionRecord {
-  if (!isRecord(value) || !isRecord(value.files) || Object.keys(value.files).length > 512 || !Array.isArray(value.directories) || value.directories.length > 512 || typeof value.source !== 'string' || typeof value.sourceIdentity !== 'string' || typeof value.trustFingerprint !== 'string') throw new Error('Invalid installed extension provenance.');
+  if (!isRecord(value) || !isRecord(value.files) || Object.keys(value.files).length > 512 || !Array.isArray(value.directories) || value.directories.length > 512 || typeof value.source !== 'string') throw new Error('Invalid installed extension provenance.');
   for (const [selected, hash] of Object.entries(value.files)) if (relativePath(selected) !== selected || typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) throw new Error('Invalid installed extension inventory.');
-  const pinned = release(value); manifest(pinned.manifest); name(value.source);
-  if (!/^[a-f0-9]{64}$/.test(value.sourceIdentity) || !/^[a-f0-9]{64}$/.test(value.trustFingerprint)) throw new Error('Invalid installed extension identity.');
   if (!Array.isArray(value.storage) || !value.storage.length || value.storage.length > 128 || value.storage.some(entry => !isRecord(entry) || typeof entry.path !== 'string' || !path.isAbsolute(entry.path) || path.resolve(entry.path) !== entry.path || typeof entry.identity !== 'string' || !/^\d+:\d+:\d+$/.test(entry.identity))) throw new Error('Invalid installed storage ownership.');
-  return { ...pinned, source: value.source, sourceIdentity: value.sourceIdentity, trustFingerprint: value.trustFingerprint, files: value.files as Record<string, string>, directories: value.directories.map(relativePath), storage: value.storage as VersionRecord['storage'] };
+  const inventory = { files: value.files as Record<string, string>, directories: value.directories.map(relativePath) };
+  const storage = value.storage as VersionRecord['storage'];
+  if (value.origin === 'local') {
+    if (value.source !== 'local' || value.url !== undefined || value.sourceIdentity !== undefined || value.trustFingerprint !== undefined
+      || value.digest !== inventoryDigest(inventory) || !Object.hasOwn(inventory.files, 'extension.json')) throw new Error('Invalid installed local extension identity.');
+    const extension = manifest(value.manifest);
+    assertManifestFiles(extension, inventory.files);
+    return { ...inventory, storage, manifest: extension, digest: value.digest as string, origin: 'local', source: 'local' };
+  }
+  const pinned = release(value); name(value.source);
+  if (value.origin === 'npm') {
+    if (value.source !== 'npm' || typeof value.registry !== 'string' || value.sourceIdentity !== undefined || value.trustFingerprint !== undefined
+      || !Object.hasOwn(inventory.files, 'package.json') || !Object.hasOwn(inventory.files, 'extension.json')) throw new Error('Invalid installed npm extension provenance.');
+    const registry = npmRegistry(value.registry);
+    if (registry.url !== value.registry) throw new Error('Invalid installed npm registry identity.');
+    npmArchiveUrl(registry, pinned.url);
+    assertManifestFiles(pinned.manifest, inventory.files);
+    return { ...pinned, ...inventory, storage, origin: 'npm', source: 'npm', registry: registry.url,
+      packageName: npmPackageName(value.packageName), integrity: npmIntegrity(value.integrity) };
+  }
+  if (value.origin === 'git') {
+    const selected = gitRelease(value.repository, value.commit);
+    if (value.source !== 'git' || value.repository !== selected.repository || value.commit !== selected.commit
+      || value.sourceIdentity !== undefined || value.trustFingerprint !== undefined || !Object.hasOwn(inventory.files, 'extension.json')) {
+      throw new Error('Invalid installed Git extension provenance.');
+    }
+    assertGitArchiveUrl(selected, pinned.url);
+    assertManifestFiles(pinned.manifest, inventory.files);
+    return { ...pinned, ...inventory, ...selected, storage, origin: 'git', source: 'git' };
+  }
+  if (value.origin !== undefined || typeof value.sourceIdentity !== 'string' || typeof value.trustFingerprint !== 'string'
+    || !/^[a-f0-9]{64}$/.test(value.sourceIdentity) || !/^[a-f0-9]{64}$/.test(value.trustFingerprint)) throw new Error('Invalid installed extension identity.');
+  return { ...pinned, source: value.source, sourceIdentity: value.sourceIdentity, trustFingerprint: value.trustFingerprint, ...inventory, storage };
 }
 export function readState(file = extensionFile()): ExtensionState {
   assertStoragePath(file);

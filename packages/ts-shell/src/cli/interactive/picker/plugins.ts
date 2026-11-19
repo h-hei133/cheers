@@ -13,7 +13,7 @@ export function pluginPicker(manager: ExtensionManager | undefined): Picker {
   const refresh = (next: ExtensionInspection): readonly Option[] => {
     inspection = next; offered = next.state === 'ready' ? next.snapshot : undefined;
     if (!offered) return [];
-    return [{ id: offered.install.id, label: 'Install an exact release', detail: offered.install.detail, disabled: offered.mutationBlocked },
+    return [{ id: offered.install.id, label: 'Install extension', detail: offered.install.detail, disabled: offered.mutationBlocked },
       ...offered.items.map(item => ({ id: item.id, label: item.label, detail: item.description, note: item.status,
         searchText: [...item.detail, item.description].join(' ') }))];
   };
@@ -93,15 +93,15 @@ function projectionStatus(snapshot: ExtensionSnapshot): string | undefined {
 function releaseInput(manager: ExtensionManager, snapshot: ExtensionSnapshot, action: ExtensionAction, item?: ExtensionItem): Picker {
   let used = false;
   const validate = (text: string) => {
-    try { if (text.length > 256) throw new Error(); parseSpec(text); return undefined; }
-    catch { return 'Use source:name@exact-version, for example source:package@1.0.0.'; }
+    try { parseSpec(text); return undefined; }
+    catch (error) { return error instanceof Error ? error.message : 'Use an exact package source.'; }
   };
   return {
     title: item ? `Update ${item.label}` : 'Install extension', form: 'panel', empty: '', exclusive: true,
     isCurrent: () => manager.read().state !== 'stale',
     async load() { return []; }, apply: async () => undefined,
     previewEnd: () => { used = true; },
-    input: { initial: '', label: 'Exact signed release (source:name@version)', validate,
+    input: { initial: '', label: 'Package source', validate,
       apply: async text => {
         if (used || validate(text)) return undefined;
         used = true;

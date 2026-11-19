@@ -1,7 +1,7 @@
 import type { ExtensionService } from '../service.js';
 import { rootSignature } from '../lifecycle/grants.js';
 import { activationOperation } from '../lifecycle/grants.js';
-import { installOperation, parseSpec, removeOperation, rollbackOperation, type Operation } from '../lifecycle/install.js';
+import { installOperation, removeOperation, rollbackOperation, type Operation } from '../lifecycle/install.js';
 import { readSources, sourceFile } from '../registry/sources.js';
 import { observeDirectory } from '../../core/state/watch.js';
 import { freezeDeep } from '../../core/values/freeze.js';
@@ -85,9 +85,7 @@ export function extensionManager(service: ExtensionService, admission: () => str
 async function prepareOperation(service: ExtensionService, args: readonly string[], selection: ExtensionSelection, signal: AbortSignal): Promise<Operation> {
   const [action, name, input] = args;
   if (action === 'install' || action === 'update') {
-    const spec = selection.input!; const parsed = parseSpec(spec);
-    if (action === 'update' && parsed.name !== name) throw new Error('Update release must match the selected package.');
-    return installOperation(service, spec, action === 'update' ? name : undefined, signal);
+    return installOperation(service, selection.input!, action === 'update' ? name : undefined, signal);
   }
   if (action === 'uninstall') return removeOperation(service, name!);
   if (action === 'rollback') return rollbackOperation(service, name!, input!);

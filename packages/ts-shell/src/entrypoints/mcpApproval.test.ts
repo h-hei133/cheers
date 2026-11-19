@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import type { Interface as ReadlineInterface } from 'node:readline';
+import { createInterface, type Interface as ReadlineInterface } from 'node:readline';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { HookDispatcher } from '../core/hooks/hookDispatcher.js';
 import { ApprovalTrustPolicy } from '../core/shell/approvalTrustPolicy.js';
@@ -113,7 +115,9 @@ it('does not persist an MCP decision through direct interactive storage wiring',
 it('shows a truthful once-only readline menu and normalizes an older always key', async () => {
   const current = host(), request = prompt();
   current.policy.rememberAllowAlways(request, root);
-  const readline = { question: (_question: string, answer: (text: string) => void) => answer('a') } as ReadlineInterface;
+  const readline = Object.assign(new EventEmitter(), {
+    question: (_question: string, answer: (text: string) => void) => answer('a'),
+  }) as unknown as ReadlineInterface;
   const handle = createCliEscalationPromptHandler(current.renderer, readline, () => 'verbose', current.policy, () => root);
   expect(await handle(request)).toMatchObject({ decision: 'allow-once' });
   const output = current.renderer.lines.join('\n');
@@ -121,6 +125,20 @@ it('shows a truthful once-only readline menu and normalizes an older always key'
   expect(output).not.toContain('a=allow-always');
   expect(output).not.toContain('Decision basis: matched stored allow-always grant.');
   expect(current.policy.listGrants(root)).toHaveLength(1);
+});
+
+it('resolves a closed readline approval as a denial', async () => {
+  const current = host();
+  const input = new PassThrough();
+  const output = new PassThrough();
+  const readline = createInterface({ input, output });
+  const handle = createCliEscalationPromptHandler(current.renderer, readline, () => 'compact', current.policy, () => root);
+  const response = handle(prompt());
+  readline.close();
+  try {
+    await expect(response).resolves.toMatchObject({ decision: 'deny' });
+    expect(current.policy.listGrants(root)).toEqual([]);
+  } finally { input.destroy(); output.destroy(); }
 });
 
 it('does not widen a headless MCP approval to later arguments through the actual registry and tool gate', async () => {

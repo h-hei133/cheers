@@ -9,11 +9,20 @@ import { canonical, name, page, release, text, version } from './validation.js';
 import type { CatalogPage, ExtensionSource, Release } from '../model.js';
 
 export const ARCHIVE_BYTES = 8 * 1024 * 1024;
+export function registryUrl(source: Pick<ExtensionSource, 'url'>, input: string): URL {
+  const base = sourceUrl(source.url);
+  const prefix = `${base.pathname.replace(/\/$/, '')}/`;
+  const url = new URL(input, `${base.toString().replace(/\/$/, '')}/`);
+  if (url.origin !== base.origin || !url.pathname.startsWith(prefix) || url.username || url.password || url.hash) {
+    throw new Error('Registry destination differs from the explicitly selected source.');
+  }
+  return url;
+}
+
 export async function registryBytes(source: ExtensionSource, input: string, maxBytes: number, signal?: AbortSignal, configuredOffline = false): Promise<Buffer> {
   if (isOffline({ configuredOffline })) throw new Error('Registry is offline; no request was sent.');
-  const base = sourceUrl(source.url); const url = new URL(input, `${base.toString().replace(/\/$/, '')}/`);
-  if (url.origin !== base.origin || !url.pathname.startsWith(`${base.pathname.replace(/\/$/, '')}/`) || url.username || url.password || url.hash) throw new Error('Registry destination differs from the explicitly selected source.');
-  const loopback = ['127.0.0.1', '[::1]', 'localhost'].includes(base.hostname);
+  const url = registryUrl(source, input);
+  const loopback = ['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname);
   const scope = requestScope(15_000, signal);
   try {
     const response = await requestBrowser(url.toString(), { maxBytes, headers: { 'accept-encoding': 'identity' } }, scope, {

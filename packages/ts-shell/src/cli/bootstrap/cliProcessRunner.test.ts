@@ -55,6 +55,7 @@ vi.mock("../runtime/jobs.js", () => ({ closeJobsFor: vi.fn() }));
 vi.mock("../runtime/director.js", () => ({ closeDirectorFor: vi.fn() }));
 vi.mock("../runtime/extensions.js", () => ({
   closeExtensionsFor: vi.fn(), waitForExtensionsFor: vi.fn().mockResolvedValue(undefined), startExtensionsFor: vi.fn().mockResolvedValue(undefined),
+  extensionCommandFor: vi.fn(),
   shutdownExtensionsFor: vi.fn(async (_context, _reason, settle) => { await settle?.(); }),
 }));
 vi.mock("../../observability/traceDashboard.js", () => ({
@@ -87,7 +88,7 @@ import { runInteractiveLoop } from "../interactive/interactiveLoop.js";
 import { createCliShutdown } from "../runtime/shutdown.js";
 import { createCliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
 import { createCliSessionRuntime } from "../runtime/cliSessionRuntimeFactory.js";
-import { closeExtensionsFor, startExtensionsFor, shutdownExtensionsFor, waitForExtensionsFor } from '../runtime/extensions.js';
+import { closeExtensionsFor, extensionCommandFor, startExtensionsFor, shutdownExtensionsFor, waitForExtensionsFor } from '../runtime/extensions.js';
 import { cancelGoalRunForShutdown } from '../runtime/goalScheduling.js';
 import { captureCliStdinPrompts } from "../print/stdinPromptCapture.js";
 import { runCliPrintModeRouter } from "../print/printModeRouter.js";
@@ -493,6 +494,7 @@ function outputFixture(settings: OutputFixtureOptions = {}) {
   });
   vi.mocked(runInteractiveLoop).mockImplementation(async input => { input.renderer.renderLine('answer'); });
   const writeError = vi.fn();
+  const writeOutput = vi.fn();
   const terminalExit = new Error('fixture terminal exit');
   const exitState: { code: number; guarded: boolean; restored: boolean; stdout: string }[] = [];
   const exit = vi.fn((code: number): never => {
@@ -501,14 +503,69 @@ function outputFixture(settings: OutputFixtureOptions = {}) {
     throw terminalExit;
   });
   return {
-    output, errors, guardAtRoot, stdin, stdout, originalWrite, writeError, exit, exitState, terminalExit,
+    output, errors, guardAtRoot, stdin, stdout, originalWrite, writeError, writeOutput, exit, exitState, terminalExit,
     complete: () => completeOutput?.(),
     run: () => runCliProcess({ args: settings.args ?? [], launchCwd: projectRoot, stdin: stdin as never,
-      process: processEvents, writeOutput: vi.fn(), writeError,
+      process: processEvents, writeOutput, writeError,
       exit }),
     dispose: () => stdin.destroy(),
   };
 }
+
+it.each([true, false])('runs the standalone plugin installer with an exact terminal decision (%s)', async installConfirmed => {
+  const source = './package with spaces';
+  const fixture = outputFixture({ args: ['--project', projectRoot, 'plugin', 'install', source, '--offline'] });
+  const output = installConfirmed ? 'Published fixture' : 'Fixture refused';
+  const dispatch = vi.fn().mockResolvedValue({ kind: 'local', output, installConfirmed });
+  vi.mocked(extensionCommandFor).mockReturnValue(dispatch);
+  try {
+    if (installConfirmed) {
+      await fixture.run();
+      expect(fixture.writeOutput).toHaveBeenCalledWith(output);
+    } else {
+      await expect(fixture.run()).rejects.toBe(fixture.terminalExit);
+      expect(fixture.writeError).toHaveBeenCalledWith(output);
+      expect(fixture.exit).toHaveBeenCalledWith(1);
+    }
+    expect(parseCliArgs).toHaveBeenCalledWith(expect.objectContaining({ positionals: [] }), expect.anything());
+    expect(dispatch).toHaveBeenCalledWith('plugin', ['install', source],
+      expect.objectContaining({ sessionId: 'output-session', cwd: projectRoot, signal: expect.any(AbortSignal) }), true);
+    expect(createCliSessionRuntime).toHaveBeenCalledOnce();
+    expect(waitForExtensionsFor).toHaveBeenCalledOnce();
+    expect(startExtensionsFor).not.toHaveBeenCalled();
+    expect(captureCliStdinPrompts).not.toHaveBeenCalled();
+    expect(runCliPrintModeRouter).not.toHaveBeenCalled();
+    expect(runInteractiveLoop).not.toHaveBeenCalled();
+    expect(closeExtensionsFor).toHaveBeenCalledOnce();
+  } finally { fixture.dispose(); }
+});
+
+it.each([
+  { args: ['plugin', 'install', './package'], message: 'requires a terminal' },
+  { args: ['plugin', 'install'], message: 'Usage: cheers plugin install' },
+  { args: ['plugin', 'install', './package', '--print'], message: 'Usage: cheers plugin install' },
+  { args: ['plugin', 'install', './package', '--non-interactive-approval', 'allow-always'], message: 'Usage: cheers plugin install' },
+])('refuses unavailable standalone installation before loading extensions ($args)', async ({ args, message }) => {
+  const fixture = outputFixture({ args, stdinTty: false });
+  try {
+    await expect(fixture.run()).rejects.toBe(fixture.terminalExit);
+    expect(fixture.writeError).toHaveBeenCalledWith(expect.stringContaining(message));
+    expect(fixture.exit).toHaveBeenCalledWith(1);
+    expect(createCliRootContext).not.toHaveBeenCalled();
+    expect(extensionCommandFor).not.toHaveBeenCalled();
+    expect(captureCliStdinPrompts).not.toHaveBeenCalled();
+  } finally { fixture.dispose(); }
+});
+
+it.each([['--', 'plugin', 'install', './package'], ['plugin install ./package']].map(args => ({ args })))('preserves plugin text submitted as a prompt ($args)', async ({ args }) => {
+  const fixture = outputFixture({ args });
+  try {
+    await fixture.run();
+    expect(captureCliStdinPrompts).toHaveBeenCalledOnce();
+    expect(runCliPrintModeRouter).toHaveBeenCalledOnce();
+    expect(extensionCommandFor).not.toHaveBeenCalled();
+  } finally { fixture.dispose(); }
+});
 
 it('resolves typed startup options before choosing the prompt route', async () => {
   const fixture = outputFixture({ args: ['-e', './extension.ts', '--label', './path-value.json',

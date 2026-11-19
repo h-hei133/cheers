@@ -312,7 +312,7 @@ export function createCliEscalationPromptHandler(
           "- Tip: use /view developer to see policy and full escalation details.",
         );
       }
-      renderer.renderLine(isMcp
+      renderer.renderLine(isMcp || prompt.context.explicitApproval
         ? "Decision: y=allow-once, n=deny (default n)"
         : formatApprovalPromptDecisionMenuLine());
     }
@@ -459,8 +459,13 @@ function askReadline(
     return Promise.resolve("n");
   }
   return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      resolve(answer);
-    });
+    const closed = () => resolve('n');
+    rl.once('close', closed);
+    try {
+      rl.question(question, answer => { rl.off('close', closed); resolve(answer); });
+    } catch {
+      rl.off('close', closed);
+      closed();
+    }
   });
 }

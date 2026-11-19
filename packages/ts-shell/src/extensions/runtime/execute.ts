@@ -58,7 +58,8 @@ export async function executeScript(host: ExecutionHost, record: VersionRecord, 
     const stored = readSandboxRules(host.root);
     if ((stored.network?.allowedDomains ?? []).length) throw new Error('Extension network grant is unsupported; execution was refused.');
     if ((stored.filesystem?.allowRead ?? []).length || (stored.filesystem?.allowWrite ?? []).length) throw new Error('Extension scripts cannot inherit broader filesystem sandbox grants.');
-    const readOnly = [...(record.manifest.permissions.workspace === 'read' ? [host.root] : []), owned, host.file, sourceFile()];
+    const readOnly = [...(record.manifest.permissions.workspace === 'read' ? [host.root] : []), owned, host.file,
+      ...(record.origin === undefined ? [sourceFile()] : [])];
     const plan = planSandboxedCommand({ shell: '/bin/sh', shellArgs: [absolute, ...argv], workspaceRoot: host.root,
       rules: { enabled: true, failClosed: true, network: { allowedDomains: [] }, filesystem: { allowRead: [owned], allowWrite: [home], denyRead: [...stored.filesystem?.denyRead ?? []] } }, readOnlyRoots: readOnly, isolateProcesses: true, sessionCreated: true });
     if (plan.state !== 'isolated' || !plan.command || !plan.args) throw new Error(plan.notice ?? 'Extension sandbox unavailable; no script ran.');

@@ -9,7 +9,7 @@ import { assertSourceAccess } from '../../core/query/sourcePolicy.js';
 import { selectWorkspaceRoot } from '../../core/workspace/roots.js';
 import { ExtensionService } from '../../extensions/service.js';
 import { marketplaceCommand } from '../../extensions/command/marketplace.js';
-import { pluginCommand } from '../../extensions/command/plugin.js';
+import { pluginCommand, type PluginCommandResult } from '../../extensions/command/plugin.js';
 import { extensionManager, type ExtensionRun } from '../../extensions/view/manager.js';
 import type { ExtensionManager } from '../../extensions/view/model.js';
 import type { SessionManager } from '../../session/SessionManager.js';
@@ -231,8 +231,9 @@ async function registerCliExtensions(
 export function dispatchExtensionShortcut(context: ShellRuntimeContext, keyId: string, signal: AbortSignal, reportFailure: () => void): boolean {
   return runtimes.get(context)?.shortcuts()?.dispatch(keyId, signal, reportFailure) ?? false;
 }
-export function extensionCommandFor(context: ShellRuntimeContext): NonNullable<CommandContext['extensionCommand']> {
-  return async (kind, args, commandContext) => {
+export function extensionCommandFor(context: ShellRuntimeContext) {
+  return async (kind: 'marketplace' | 'plugin', args: string[], commandContext: Pick<CommandContext, 'sessionId' | 'cwd' | 'projectRoot' | 'interactive' | 'signal'>,
+    explicitApproval = false): Promise<PluginCommandResult> => {
     if (commandContext.sessionId !== context.session.id || commandContext.cwd !== context.cwd) return { kind: 'local', output: 'Extensions refused: session or workspace changed.' };
     const owner = runtimes.get(context);
     if (kind === 'plugin' && args.length === 1 && args[0] === 'reload' && owner) {
@@ -246,7 +247,9 @@ export function extensionCommandFor(context: ShellRuntimeContext): NonNullable<C
       return { kind: 'local', output: diagnostics.length ? `Extension cancellation is not verified:\n${diagnostics.join('\n')}` : 'Extension calls cancelled and drained.' };
     }
     const service = owner?.service();
-    return service ? kind === 'marketplace' ? marketplaceCommand(args, service) : pluginCommand(args, service) : { kind: 'local', output: 'Extensions require a bound session runtime.' };
+    return service ? kind === 'marketplace' ? marketplaceCommand(args, service)
+      : pluginCommand(args, service, { signal: commandContext.signal, explicitApproval })
+      : { kind: 'local', output: 'Extensions require a bound session runtime.' };
   };
 }
 export function cancelExtensionsFor(context: ShellRuntimeContext): void { cancelExtensionUiFor(context); void runtimes.get(context)?.cancel().catch(() => {}); }

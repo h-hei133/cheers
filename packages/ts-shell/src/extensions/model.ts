@@ -34,14 +34,18 @@ export interface CatalogPage {
   readonly packages: readonly { readonly name: string; readonly description?: string; readonly versions: readonly string[] }[];
   readonly nextCursor: string | null;
 }
-export interface VersionRecord extends Release {
-  readonly source: string;
-  readonly sourceIdentity: string;
-  readonly trustFingerprint: string;
+export type VersionSource = { readonly origin: 'local'; readonly source: 'local' }
+  | { readonly origin: 'npm'; readonly source: 'npm'; readonly registry: string; readonly packageName: string; readonly integrity: string; readonly url: string }
+  | { readonly origin: 'git'; readonly source: 'git'; readonly repository: string; readonly commit: string; readonly url: string }
+  | { readonly origin?: undefined; readonly source: string; readonly sourceIdentity: string; readonly trustFingerprint: string; readonly url: string };
+
+export type VersionRecord = VersionSource & {
+  readonly manifest: ExtensionManifest;
+  readonly digest: string;
   readonly files: Readonly<Record<string, string>>;
   readonly directories: readonly string[];
   readonly storage: StorageIdentity;
-}
+};
 export interface Activation { readonly enabled: boolean; readonly grants: readonly string[]; readonly workspaceIdentity: string }
 export interface PackageRecord {
   readonly name: string;

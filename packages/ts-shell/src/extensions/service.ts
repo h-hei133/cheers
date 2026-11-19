@@ -1,6 +1,6 @@
 import { ExtensionStore, versionPath } from './store/state.js';
 import { assertInventory } from './archive/storage.js';
-import { readSources, sourceIdentity, selectedSource } from './registry/sources.js';
+import { assertVersionSource, readSources } from './registry/sources.js';
 import { canonical } from './registry/validation.js';
 import { rootIdentity, rootSignature } from './lifecycle/grants.js';
 import { registerPackage } from './runtime/registration.js';
@@ -31,6 +31,8 @@ export interface ExtensionServiceOptions {
   readonly extensionHost?: ExtensionHostBridge;
   readonly assertWorkspace: (write: boolean) => void;
   readonly assertSourceAccess?: (absolute: string) => void;
+  readonly npmRegistry?: string;
+  readonly gitArchiveBase?: string;
 }
 export class ExtensionService implements LifecycleHost {
   readonly store: ExtensionStore;
@@ -38,6 +40,8 @@ export class ExtensionService implements LifecycleHost {
   readonly sessionId: string;
   readonly check: () => void;
   readonly offline: () => boolean;
+  readonly npmRegistry?: string;
+  readonly gitArchiveBase?: string;
   readonly errors: string[] = [];
   private epoch = 0;
   private closed = false;
@@ -52,6 +56,8 @@ export class ExtensionService implements LifecycleHost {
     const workspaceIdentity = rootSignature(this.root);
     this.check = () => { options.check(); if (this.closed || this.drainUnknown) throw new Error('Extension runtime is closed or process drainage is unknown.'); if (rootIdentity(options.root) !== this.root || rootSignature(this.root) !== workspaceIdentity) throw new Error('Extension workspace identity changed.'); };
     this.offline = options.offline;
+    this.npmRegistry = options.npmRegistry;
+    this.gitArchiveBase = options.gitArchiveBase;
     this.activate();
     this.watchers = [this.store.file, sourceFile()].map(file => observeDirectory(file, () => { if (this.snapshot() !== this.publication) void this.invalidate().catch(() => {}); }));
   }
@@ -60,7 +66,7 @@ export class ExtensionService implements LifecycleHost {
     this.check(); if (epoch !== this.epoch || this.store.outcomes.some(value => value.durability === 'unknown')) throw new Error('Extension capability has been revoked or publication is uncertain.');
     const current = this.store.read().packages.find(entry => entry.name === record.name); const activation = current?.activation[this.root];
     if (!current || canonical(current.active) !== canonical(record.active) || !activation?.enabled || activation.workspaceIdentity !== rootSignature(this.root) || !activation.grants.includes(grant)) throw new Error('Extension capability grant is absent or stale.');
-    if (sourceIdentity(selectedSource(record.active.source)) !== record.active.sourceIdentity) throw new Error('Extension source trust identity changed.');
+    assertVersionSource(record.active);
     assertInventory(versionPath(current.active, this.store.file), current.active);
   }
   private activate(): void {
@@ -72,7 +78,10 @@ export class ExtensionService implements LifecycleHost {
       for (const record of this.store.read().packages) {
         try {
           const activation = record.activation[this.root];
-          if (activation?.enabled && (activation.workspaceIdentity !== rootSignature(this.root) || sourceIdentity(selectedSource(record.active.source)) !== record.active.sourceIdentity)) throw new Error('Extension activation identity changed.');
+          if (activation?.enabled) {
+            if (activation.workspaceIdentity !== rootSignature(this.root)) throw new Error('Extension activation identity changed.');
+            assertVersionSource(record.active);
+          }
           this.registrations.push(registerPackage({ root: this.root, sessionId: this.sessionId, file: this.store.file, run: (tool, args) => this.runTool(tool, args),
           withheld: name => { const message = `${name}: prompt contribution withheld because its identity, grants, files or parsing are invalid.`; if (!this.errors.includes(message)) this.errors.push(message); },
           current: (selected, grant) => this.current(selected, grant, epoch), tool: (selected, script, grant, name) => this.tool(selected, script, grant, name),
@@ -99,7 +108,7 @@ export class ExtensionService implements LifecycleHost {
   assertSourceAccess(absolute: string): void {
     this.check(); const decision = evaluateToolPermissionScope('read', { path: absolute }, 'ask', this.root, this.options.denyRules());
     if (decision.denied) throw new Error(decision.reason);
-    if (!this.options.assertSourceAccess) throw new Error('Extension public-key source access is unavailable.'); this.options.assertSourceAccess(absolute);
+    if (!this.options.assertSourceAccess) throw new Error('Extension source access is unavailable.'); this.options.assertSourceAccess(absolute);
   }
   async close(): Promise<void> {
     this.closed = true; this.watchers.splice(0).forEach(close => close()); this.epoch++;
@@ -152,13 +161,27 @@ export class ExtensionService implements LifecycleHost {
     }, context.abortSignal);
   }
   async approve(operation: Operation, selected: 'extension_manage' | 'extension_grant' = 'extension_manage', signal?: AbortSignal): Promise<string> {
+    return (await this.approveResult(operation, selected, signal)).output;
+  }
+  async approveResult(operation: Operation, selected: 'extension_manage' | 'extension_grant' = 'extension_manage', signal?: AbortSignal,
+    explicitApproval = false): ReturnType<typeof runPreparedTool> {
     this.check(); return this.calls.run(async signal => {
     const gate = this.options.gate(selected); const admission = () => { if (signal.aborted) return 'Extension operation cancelled.'; try { this.check(); return gate.admission?.(); } catch { return 'Extension lifecycle authority changed.'; } };
+    const handler = gate.escalationPromptHandler;
+    let reviewed = !explicitApproval;
+    const escalationPromptHandler: typeof handler = explicitApproval && handler ? async prompt => {
+      const response = await handler({ ...prompt, context: { ...prompt.context, explicitApproval: true },
+        options: prompt.options.filter(option => option.value !== 'allow-always') });
+      reviewed = response.decision === 'allow-once';
+      return response.decision === 'allow-once' ? response : { ...response, decision: 'deny' };
+    } : handler;
     const tool: ToolDefinition = { name: selected, description: 'Apply the exact reviewed extension lifecycle operation.', argsSchema: { type: 'object' },
       resultAdmission: admission,
       prepare: () => ({ targets: [], permissionArgs: { operation: selected }, previewKind: 'execution', preview: operation.preview,
         execute: async context => {
-          this.check(); const effect: EffectOutcome = await operation.apply(context);
+          this.check();
+          if (!reviewed) throw new Error('Installation requires explicit one-time approval.');
+          const effect: EffectOutcome = await operation.apply(context);
           // Cleanup can become uncertain after a confirmed registry publication.
           // Retain that actual result alongside uncertain saves, so reopening a
           // view or command cannot offer a fresh mutation in the same runtime.
@@ -168,7 +191,7 @@ export class ExtensionService implements LifecycleHost {
           return { success: retained.durability === 'confirmed', output: `${retained.detail}\nEffect: ${retained.effect}; durability: ${retained.durability}.`, metadata: { effect: retained } };
         } }),
       execute: async () => { throw new Error('Extension lifecycle requires its original prepared and approved call.'); } };
-    return (await runPreparedTool(tool, {}, { ...gate, admission, permissionScope: 'ask' }, signal, undefined, 'Extension operation')).output;
+    return runPreparedTool(tool, {}, { ...gate, admission, escalationPromptHandler, permissionScope: 'ask' }, signal, undefined, 'Extension operation');
     }, signal);
   }
   async run(packageName: string, script: string, args: string[]): Promise<string> {

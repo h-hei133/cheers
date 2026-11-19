@@ -70,6 +70,7 @@ import { scanCliArgs, type CliInvocation } from '../options/argv.js';
 import { cliExtensionArguments, ExtensionOptionError, type CliExtensionArguments } from '../options/extensions.js';
 import type { PreparedExtensionFiles } from '../runtime/extensions/files.js';
 import { cliHelpText } from '../options/early.js';
+import { pluginInstallInvocation, runPluginInstall } from './plugin.js';
 import { profileSwitchPort } from './profile/port.js';
 import { freshExecutable } from './profile/invocation.js';
 import { claimSwitchChild, admitSwitchChild } from './profile/admission.js';
@@ -91,7 +92,12 @@ export async function runCliProcess(
   }
   // Explicit service mode has its own authenticated state owner and protocol.
   if (input.args[0] === 'serve') { await runCollaborationServiceMode(input); return; }
-  const parsed = parseCliArgs(invocation, { cwd: input.launchCwd, deferExtensionOptions: true });
+  const install = pluginInstallInvocation(invocation);
+  if (install && 'error' in install) { input.writeError(install.error); input.exit(1); return; }
+  if (install && (!input.stdin.isTTY || !input.process.stdout.isTTY)) {
+    input.writeError('Extension installation requires a terminal for one-time approval.'); input.exit(1); return;
+  }
+  const parsed = parseCliArgs(install ? { ...invocation, positionals: [] } : invocation, { cwd: input.launchCwd, deferExtensionOptions: true });
   if (parsed.ok === false) { input.writeError(parsed.error.message); input.exit(parsed.error.exitCode); return; }
   if (parsed.args.options.listModels !== undefined) {
     const pattern = typeof parsed.args.options.listModels === "string" ? parsed.args.options.listModels : undefined;
@@ -129,7 +135,7 @@ export async function runCliProcess(
         cycleArgs = next.args;
         launchCwd = cwd;
       }
-      const request = await runCliCycle({ ...input, launchCwd }, cycleArgs, recovery, recovery ? undefined : child, switchDepth, configInputs);
+      const request = await runCliCycle({ ...input, launchCwd }, cycleArgs, recovery, recovery ? undefined : child, switchDepth, configInputs, install?.source);
       if (!request) return;
       if ('kind' in request) { await runProfileSwitch(request, input); return; }
       recovery = request;
@@ -137,7 +143,8 @@ export async function runCliProcess(
   });
 }
 
-async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recovery?: RestartRequest, child?: SwitchReceipt, switchDepth = 0, configInputs?: ConfigInputs): Promise<RestartRequest | SwitchTicket | undefined> {
+async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recovery?: RestartRequest, child?: SwitchReceipt, switchDepth = 0,
+  configInputs?: ConfigInputs, pluginSource?: string): Promise<RestartRequest | SwitchTicket | undefined> {
   setGlobalTraceContext(createTraceContext());
   const logger = createComponentLogger("cli");
   const approvalTrustPolicy = new ApprovalTrustPolicy();
@@ -310,6 +317,14 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
       getPromptInteractiveApproval: () => interactiveApprovalPrompt,
     });
     try {
+      if (pluginSource !== undefined) {
+        const installed = await runPluginInstall(input, runtimeContext, pluginSource, terminal => {
+          readline = terminal;
+          createRuntime();
+        });
+        if (!installed) output.exit(1);
+        return;
+      }
       const stdinPromptCapture = recovery && (options.printMode || !input.stdin.isTTY) ? {
         stdinTransportMode: 'capture-batch' as const, pipedInput: null, nonInteractivePrompts: [], cliModePlan: { kind: 'stdin-batch' as const },
       } : await captureCliStdinPrompts({

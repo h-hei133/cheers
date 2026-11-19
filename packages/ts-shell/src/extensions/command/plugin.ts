@@ -7,8 +7,12 @@ import { marketplaceCommand } from './marketplace.js';
 import path from 'node:path';
 import { readPackageManifest } from '../registry/manifest.js';
 import { verifyPathContainment } from '../../core/security/pathJail.js';
+import { isRecord } from '../../core/values/record.js';
 
-export async function pluginCommand(args: string[], service: ExtensionService): Promise<LocalCommandResult> {
+export interface PluginCommandResult extends LocalCommandResult { readonly installConfirmed?: boolean }
+
+export async function pluginCommand(args: string[], service: ExtensionService,
+  options: { readonly signal?: AbortSignal; readonly explicitApproval?: boolean } = {}): Promise<PluginCommandResult> {
   try {
     service.check(); const [action = 'list', target, input, ...rest] = args;
     if (['list', 'ls'].includes(action) && !target) {
@@ -30,13 +34,18 @@ export async function pluginCommand(args: string[], service: ExtensionService): 
       return { kind: 'local', output: JSON.stringify(discovered, null, 2) };
     }
     if (rest.length) throw new Error('Too many plugin arguments.');
-    if (action === 'install' && target && !input) return { kind: 'local', output: await service.approve(await installOperation(service, target)) };
+    if (action === 'install' && target && !input) {
+      const result = await service.approveResult(await installOperation(service, target, undefined, options.signal), 'extension_manage', options.signal, options.explicitApproval);
+      const effect = result.metadata?.effect;
+      const installConfirmed = !result.isError && isRecord(effect) && effect.effect === 'published' && effect.durability === 'confirmed';
+      return { kind: 'local', output: result.output, installConfirmed };
+    }
     if (action === 'add' && target && !input) return { kind: 'local', output: await service.approve(registrationOperation(service, target)) };
     if (action === 'update' && target && input) return { kind: 'local', output: await service.approve(await installOperation(service, input, target)) };
     if (action === 'rollback' && target && input) return { kind: 'local', output: await service.approve(rollbackOperation(service, target, input)) };
     if (['uninstall', 'remove', 'rm'].includes(action) && target && !input) return { kind: 'local', output: await service.approve(removeOperation(service, target)) };
     if (['enable', 'disable', 'grant', 'revoke'].includes(action) && target && (!input || ['grant', 'revoke'].includes(action))) return { kind: 'local', output: await service.approve(activationOperation(service, service.root, action as 'enable' | 'disable' | 'grant' | 'revoke', target, input), 'extension_grant') };
     if (action === 'migrate' && !target) return { kind: 'local', output: await service.approve(migrationOperation(service)) };
-    throw new Error('Usage: /plugin list | details <name> | local <dir> | install <source>:<name>@<exactVersion> | update <name> <source>:<name>@<exactVersion> | rollback <name> <version> | uninstall <name> | enable|disable <name> | grant|revoke <name> prompt|script:<id>|command:<id>|tool:<id> | run <name> <script> [args] | reload | migrate');
+    throw new Error('Usage: /plugin list | details <name> | local <dir> | install <source> | update <name> <source> | rollback <name> <version-or-sha256> | uninstall <name> | enable|disable <name> | grant|revoke <name> prompt|script:<id>|command:<id>|tool:<id> | run <name> <script> [args] | reload | migrate. Sources: source:name@version, npm:name@version, git:https://github.com/OWNER/REPO#COMMIT, or ./package.');
   } catch (error) { return { kind: 'local', output: `Extension refused: ${error instanceof Error ? error.message : 'operation could not be confirmed'}` }; }
 }

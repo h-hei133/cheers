@@ -5,7 +5,7 @@ import { withFileLock, writeJsonFileAtomic } from '../../session/store/sessionFi
 import { isRecord } from '../../core/values/record.js';
 import { readTextFile } from '../../core/workspace/files.js';
 import { canonical, digest, name, text } from './validation.js';
-import type { ExtensionSource, TrustAnchor } from '../model.js';
+import type { ExtensionSource, TrustAnchor, VersionSource } from '../model.js';
 
 const SOURCE_CHARACTERS = 256 * 1024;
 
@@ -54,4 +54,13 @@ export function selectedSource(selected: string): ExtensionSource {
   if (!source) throw new Error('Select a registered marketplace source.');
   sourceUrl(source.url);
   return source;
+}
+
+/** Imported packages use their owned content; signed packages retain their publisher binding. */
+export function assertVersionSource(version: VersionSource): void {
+  if (version.origin !== undefined) return;
+  const current = selectedSource(version.source);
+  if (sourceIdentity(current) !== version.sourceIdentity || current.trust?.fingerprint !== version.trustFingerprint) {
+    throw new Error('Installed source or trust anchor changed; new reviewed installation is required.');
+  }
 }
