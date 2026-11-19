@@ -102,15 +102,16 @@ it('allows one first writer when two processes reach the same session reservatio
   }
 }, 20000);
 
-it.each(['file', 'dangling link', 'legacy directory', 'legacy dangling link'] as const)(
+it.each(['file', 'dangling link', 'legacy directory', 'legacy file', 'legacy dangling link'] as const)(
   'preserves an ID occupied by a %s',
   kind => {
     const canonical = createSessionStoreLayout().sessionsDir;
     const sessionsDir = kind.startsWith('legacy') ? path.join(root, '.cheer', 'sessions') : canonical;
     const occupied = path.join(sessionsDir, id);
     const missing = path.join(root, 'missing');
+    const occupiedByFile = kind.endsWith('file');
     fs.mkdirSync(sessionsDir, { recursive: true });
-    if (kind === 'file') fs.writeFileSync(occupied, 'previous content');
+    if (occupiedByFile) fs.writeFileSync(occupied, 'previous content');
     else if (kind === 'legacy directory') {
       fs.mkdirSync(occupied);
       fs.writeFileSync(path.join(occupied, 'preserved'), 'previous content');
@@ -119,7 +120,7 @@ it.each(['file', 'dangling link', 'legacy directory', 'legacy dangling link'] as
     const manager = new SessionManager();
     const store = new SessionStoreAccess();
     expect(() => manager.createNewWithId(id, root)).toThrow(`Session ${id} already exists`);
-    if (kind === 'file') expect(fs.readFileSync(occupied, 'utf8')).toBe('previous content');
+    if (occupiedByFile) expect(fs.readFileSync(occupied, 'utf8')).toBe('previous content');
     else if (kind === 'legacy directory') expect(fs.readdirSync(occupied)).toEqual(['preserved']);
     else expect(fs.readlinkSync(occupied)).toBe(missing);
     if (sessionsDir !== canonical) expect(fs.existsSync(path.join(canonical, id))).toBe(false);
@@ -136,6 +137,29 @@ it('creates in the current layout when a legacy sessions path is a regular file'
   expect(record.id).toBe(id);
   expect(new SessionStoreAccess().readCurrentSessionSelection(root)).toMatchObject({ sessionId: id });
   expect(fs.readFileSync(old, 'utf8')).toBe('old content');
+});
+
+it('surfaces a legacy lookup error before reserving a current session', () => {
+  const legacy = path.join(root, '.cheer', 'sessions');
+  fs.mkdirSync(legacy, { recursive: true });
+  const manager = new SessionManager();
+  const store = new SessionStoreAccess();
+  const target = path.join(legacy, id);
+  const failure = Object.assign(new Error('Legacy session lookup denied'), { code: 'EACCES' });
+  const stat = fs.lstatSync;
+  const spy = vi.spyOn(fs, 'lstatSync').mockImplementation((...args) => {
+    if (args[0] === target) throw failure;
+    return Reflect.apply(stat, fs, args);
+  });
+  syncBuiltinESMExports();
+  try {
+    expect(() => manager.createNewWithId(id, root)).toThrow(failure);
+  } finally {
+    spy.mockRestore();
+    syncBuiltinESMExports();
+  }
+  expect(fs.existsSync(path.join(store.sessionsDir, id))).toBe(false);
+  expect(store.readCurrentSessionSelection(root)).toBeUndefined();
 });
 
 it('keeps a partial record and reports unverified creation if the state write throws', () => {
