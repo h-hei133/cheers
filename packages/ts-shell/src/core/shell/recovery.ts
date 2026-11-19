@@ -7,7 +7,7 @@ import type {
   SessionReentrySummary,
   SessionResumeEligibility,
 } from "../../session/SessionManager.js";
-import { getWorkflowGitContext } from "../../workflow/gitContext.js";
+import { getWorkflowGitContext } from "../workspace/git.js";
 import { CONTINUATION_SAFETY_POLICY } from "../query/runtime/state.js";
 import {
   applyShellSubstrateTransition,

@@ -5,7 +5,7 @@ import { gitFixture } from '../../../test-utils/git.js';
 import { NativeGit } from './native.js';
 import { readGitSnapshot } from './snapshot.js';
 import { readGitDiff } from './diff.js';
-import { getWorkflowGitContext, getWorkflowGitDiagnostics } from '../../gitContext.js';
+import { getWorkflowGitContext, getWorkflowGitDiagnostics } from '../../../core/workspace/git.js';
 
 describe('native Git truth and safe passive inspection', () => {
   let fixture: ReturnType<typeof gitFixture>;

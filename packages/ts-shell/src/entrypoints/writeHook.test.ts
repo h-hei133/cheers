@@ -6,7 +6,7 @@ import { HookDispatcher } from '../core/hooks/hookDispatcher.js';
 import { CANONICAL_WRITE_MATCHER } from '../core/hooks/translation.js';
 import { bootstrapShellRuntime } from '../core/shell/bootstrap.js';
 import { getRuntimeConfig } from '../config/runtimeConfig.js';
-import { getWorkflowGitContext } from '../workflow/gitContext.js';
+import { getWorkflowGitContext } from '../core/workspace/git.js';
 import { SessionManager } from '../session/SessionManager.js';
 import { StreamingRenderer } from '../presentation/terminal/streaming.js';
 import { gitGateFor } from '../cli/runtime/gitGate.js';

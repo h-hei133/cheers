@@ -13,7 +13,7 @@ import { runSecurityTool } from '../../../packages/ts-shell/src/security/analysi
 import { runCliRuntimeInvocation } from '../../../packages/ts-shell/src/entrypoints/cliRuntimeInvocation.js';
 import { bootstrapShellRuntime } from '../../../packages/ts-shell/src/core/shell/bootstrap.js';
 import { getRuntimeConfig } from '../../../packages/ts-shell/src/config/runtimeConfig.js';
-import { getWorkflowGitContext } from '../../../packages/ts-shell/src/workflow/gitContext.js';
+import { getWorkflowGitContext } from '../../../packages/ts-shell/src/core/workspace/git.js';
 import { SessionManager } from '../../../packages/ts-shell/src/session/SessionManager.js';
 import { StreamingRenderer } from '../../../packages/ts-shell/src/presentation/terminal/streaming.js';
 import { gitGateFor } from '../../../packages/ts-shell/src/cli/runtime/gitGate.js';

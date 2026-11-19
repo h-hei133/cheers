@@ -5,7 +5,7 @@ import type { ResumeResult } from "../../session/SessionManager.js";
 import type { WorkspaceRootMode } from "../../session/SessionManager.js";
 import type { RuntimeConfigOverrides, RuntimeConfig } from "../../config/runtimeConfig.js";
 import type { ProviderCredentialResolution } from './providerCredentials.js';
-import type { WorkflowGitContext } from "../../workflow/gitContext.js";
+import type { WorkflowGitContext } from "../workspace/git.js";
 import {
   createShellRuntimeContext,
   createSessionRootMismatchDiagnostic,
@@ -13,7 +13,7 @@ import {
   type RootBindingDiagnostic,
   type ShellRuntimeContext,
 } from "./runtimeContext.js";
-import { getWorkflowGitContext } from "../../workflow/gitContext.js";
+import { getWorkflowGitContext } from "../workspace/git.js";
 import path from "node:path";
 import { validateSessionId } from "../../session/store/sessionFileLayout.js";
 import { replayTodosFromMessages } from "../commands/todoCommandRuntime.js";

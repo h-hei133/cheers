@@ -2,7 +2,7 @@ import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import { needsUserEndpoint } from '../../core/providers/facts.js';
 import type { CommandReport, ReportLine } from '../../core/commands/report/contract.js';
 import { createReport, span } from '../../core/commands/report/projection.js';
-import type { WorkflowGitDiagnostics } from '../gitContext.js';
+import type { WorkflowGitDiagnostics } from '../../core/workspace/git.js';
 
 export function diagnoseReport(config: RuntimeConfig, git: WorkflowGitDiagnostics, cwd: string): CommandReport {
   const providerConfig = summarizeProviderConfig(config);

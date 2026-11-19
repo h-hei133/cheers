@@ -3,7 +3,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { stubGitEnvironment, gitFixture } from '../test-utils/git.js';
-import { getWorkflowGitContext, getWorkflowGitDiagnostics } from './gitContext.js';
+import { getWorkflowGitContext, getWorkflowGitDiagnostics } from '../core/workspace/git.js';
 import { runDiagnoseCommand, runWorkflowStatusCommand } from '../core/commands/localCommandRuntime.js';
 import { getRuntimeConfig } from '../config/runtimeConfig.js';
 import { renderReport } from '../presentation/tui/report/renderer.js';

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { normalizePathIdentity } from '../../session/continuation/roots.js';
 import { resolveRootBindingDiagnostics, type RootBindingDiagnostic } from '../../core/shell/runtimeContext.js';
 import type { WorkspaceRootMode } from '../../session/SessionManager.js';
-import { getWorkflowGitContext } from '../../workflow/gitContext.js';
+import { getWorkflowGitContext } from '../../core/workspace/git.js';
 
 export function isWorkspaceInfoPromptStrict(prompt: string): boolean {
   const normalized = prompt.toLowerCase().trim();

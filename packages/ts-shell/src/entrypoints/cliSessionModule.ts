@@ -21,7 +21,7 @@ import type {
   SessionReentrySummary,
 } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
-import { getWorkflowGitContext } from "../workflow/gitContext.js";
+import { getWorkflowGitContext } from "../core/workspace/git.js";
 import {
   formatSessionPanelSwitchSuccessLines,
   formatSessionSwitchAmbiguousLine,

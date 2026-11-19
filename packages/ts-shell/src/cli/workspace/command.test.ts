@@ -6,7 +6,7 @@ import { bootstrapShellRuntime } from '../../core/shell/bootstrap.js';
 import { configurationAdmission } from '../../core/shell/configuration.js';
 import { projectTrust } from '../../core/security/trust/store.js';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
-import { getWorkflowGitContext } from '../../workflow/gitContext.js';
+import { getWorkflowGitContext } from '../../core/workspace/git.js';
 import { SessionManager } from '../../session/SessionManager.js';
 import { changeSessionWorkspaceRoots, sessionWorkspaceAdmission } from '../../session/continuation/workspace.js';
 import { SessionRootRebindError } from '../../session/continuation/sessionProjectRootRebind.js';

@@ -25,7 +25,7 @@ import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { Session } from "../session/schema/sessionRecord.js";
 import { SessionManager } from "../session/SessionManager.js";
 import type { ToolDefinition } from "../tools/types.js";
-import { getWorkflowGitContext } from "../workflow/gitContext.js";
+import { getWorkflowGitContext } from "../core/workspace/git.js";
 import { DefaultResourceLoader, type LoadExtensionsResult, type ResourceLoader } from "./resourceLoader.js";
 import { SessionUi } from './ui.js';
 import { snapshotCustomMessage } from '../core/agent/custom.js';

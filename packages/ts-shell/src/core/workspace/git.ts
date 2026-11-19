@@ -1,4 +1,4 @@
-import { inspectGitDiscovery } from '../runtime/execution/discovery.js'
+import { inspectGitDiscovery } from '../../runtime/execution/discovery.js'
 
 export interface WorkflowGitContext {
   readonly insideGit: boolean

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bootstrapShellRuntime } from '../../core/shell/bootstrap.js';
 import { createCliSessionRuntime } from '../runtime/cliSessionRuntimeFactory.js';
 import { getRuntimeConfig } from '../../config/runtimeConfig.js';
-import { getWorkflowGitContext } from '../../workflow/gitContext.js';
+import { getWorkflowGitContext } from '../../core/workspace/git.js';
 import { SessionManager } from '../../session/SessionManager.js';
 import { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 import { ApprovalTrustPolicy } from '../../core/shell/approvalTrustPolicy.js';

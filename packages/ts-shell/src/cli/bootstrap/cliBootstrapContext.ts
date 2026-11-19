@@ -16,7 +16,7 @@ import { takeOverStdout, type StdoutGuard } from "../../core/shell/outputGuard.j
 import type { StructuredLogger } from "../../observability/index.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { sessionWorkspaceAdmission } from '../../session/continuation/workspace.js';
-import { getWorkflowGitContext } from "../../workflow/gitContext.js";
+import { getWorkflowGitContext } from "../../core/workspace/git.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import { resolveCliCredential } from '../provider/cliProviderRuntimeBridge.js';
 import {

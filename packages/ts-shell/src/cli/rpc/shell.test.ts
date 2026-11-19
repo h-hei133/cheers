@@ -8,7 +8,7 @@ import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { ApprovalTrustPolicy } from '../../core/shell/approvalTrustPolicy.js';
 import { bootstrapShellRuntime } from '../../core/shell/bootstrap.js';
 import * as outputGuard from '../../core/shell/outputGuard.js';
-import { getWorkflowGitContext } from '../../workflow/gitContext.js';
+import { getWorkflowGitContext } from '../../core/workspace/git.js';
 import { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 import { SessionManager } from '../../session/SessionManager.js';
 import { convertMessages } from '../../core/agent/messages.js';

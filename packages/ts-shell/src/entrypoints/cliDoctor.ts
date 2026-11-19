@@ -3,7 +3,7 @@ import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { constrainRuntimeConfig } from "../config/constraints.js";
 import { loadCatalogSnapshot } from "../core/models/catalogStore.js";
 import { resolveProviderCredential } from "../core/shell/providerCredentials.js";
-import { getWorkflowGitContext } from "../workflow/gitContext.js";
+import { getWorkflowGitContext } from "../core/workspace/git.js";
 
 export function printCliDoctor(targetCwd: string, launchCwd: string): void {
   const runtimeConfig = getRuntimeConfig(targetCwd);

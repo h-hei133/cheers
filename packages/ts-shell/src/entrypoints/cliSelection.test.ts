@@ -13,7 +13,7 @@ import { writeSessionState } from "../session/store/sessionStateStore.js";
 import { writeSessionMetadataRecord } from "../session/store/sessionStore.js";
 import { createSessionStoreLayout, projectSessionFileLayout } from "../session/store/sessionFileLayout.js";
 import { appendSessionTurn, appendTranscriptEvent } from "../session/transcript/sessionTranscript.js";
-import { getWorkflowGitContext } from "../workflow/gitContext.js";
+import { getWorkflowGitContext } from "../core/workspace/git.js";
 import { formatCliModelList } from "./cliListModels.js";
 import { runCliExport } from "./cliExportCommand.js";
 import { parseCliArgs } from "./cliArgs.js";

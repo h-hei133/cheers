@@ -3,7 +3,7 @@ import { configurationBinding, initialConfiguration, refreshConfiguration } from
 import type { RuntimeConfig, RuntimeConfigOverrides } from '../../config/runtimeConfig.js'
 import type { ProviderCredentialResolution } from './providerCredentials.js';
 import type { Session, WorkspaceRootMode } from '../../session/SessionManager.js'
-import type { WorkflowGitContext } from '../../workflow/gitContext.js'
+import type { WorkflowGitContext } from '../workspace/git.js'
 import path from 'node:path'
 import { forgetSessionTodos, replayTodosFromMessages } from '../commands/todoCommandRuntime.js'
 import { restoreSessionUsage } from '../../observability/usageTelemetry.js'

@@ -1,6 +1,6 @@
 import { rejectArguments } from "./syntax/empty.js";
 import { getRuntimeConfig } from '../../config/runtimeConfig.js'
-import { getWorkflowGitContext, getWorkflowGitDiagnostics } from '../../workflow/gitContext.js'
+import { getWorkflowGitContext, getWorkflowGitDiagnostics } from '../workspace/git.js'
 import type { CommandContext, LocalCommandResult } from './types.js'
 import { diagnoseReport } from '../../workflow/diagnose/report.js'
 import { reportText } from './report/projection.js'
