@@ -12,6 +12,11 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 
 ## Pitfalls & Guardrails
 
+### Compatible Streams Can Carry Structured Content
+- **Symptom**: A provider stream keeps tool calls while dropping answer and reasoning fragments.
+- **Root Cause**: The compatible envelope can contain native arrays that the shared string decoder skips.
+- **Rule**: Select the content decoder at the native endpoint and keep shared tool assembly and final admission. Exercise the shipped route and a generic-endpoint control with the same response.
+
 ### Bundle Metadata Limits Need An Actual Consumer
 - **Symptom**: A pinned bundle declares a 1 MiB source-file limit, but direct judge accepts larger source files.
 - **Root Cause**: `bundle.json` is packaging metadata; the collector reads `maxFileBytes` from the evidence manifest and defaults to Infinity when it is absent. Metadata does not configure that reader.

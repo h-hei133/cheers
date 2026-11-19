@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { isRecord } from "../../core/values/record.js";
+import { readCompletionStream, type CompletionContentFragment } from "../../turn/completion.js";
 import { declareEndpoint, endpointShape, type EndpointShape, type SimpleRequest } from "./kinds.js";
 
 /**
@@ -58,6 +60,27 @@ function normalizeMistralPayload(body: Record<string, unknown>, input: Pick<Simp
   return { ...payload, messages };
 }
 
+function readMistralContent(parts: readonly unknown[]): readonly CompletionContentFragment[] {
+  const fragments: CompletionContentFragment[] = [];
+  for (const part of parts) {
+    if (typeof part === "string") {
+      if (part) fragments.push({ kind: "text", text: part });
+      continue;
+    }
+    if (!isRecord(part)) continue;
+    if (part.type === "text" && typeof part.text === "string" && part.text) {
+      fragments.push({ kind: "text", text: part.text });
+    } else if (part.type === "thinking" && Array.isArray(part.thinking)) {
+      let text = "";
+      for (const segment of part.thinking) {
+        if (isRecord(segment) && segment.type === "text" && typeof segment.text === "string") text += segment.text;
+      }
+      if (text) fragments.push({ kind: "reasoning", text });
+    }
+  }
+  return fragments;
+}
+
 const baseShape = (): ReturnType<typeof endpointShape> => endpointShape("openai-compatible");
 
 const chatShape: EndpointShape = {
@@ -75,7 +98,7 @@ const chatShape: EndpointShape = {
   turnBody: (input) => normalizeMistralPayload(baseShape().turnBody(input), input),
   refreshBody: (body, model) => baseShape().refreshBody?.(body, model),
   readBody: (body) => baseShape().readBody(body),
-  readStream: (body) => baseShape().readStream(body),
+  readStream: (body) => readCompletionStream(body, readMistralContent),
 };
 
 declareEndpoint("mistral-chat-completions", chatShape);

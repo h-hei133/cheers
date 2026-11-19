@@ -65,7 +65,7 @@
 ## F1 / F2: 协议、目录和遥测（P2）
 
 - [ ] **F1.1** 增量工具 JSON 与实际预览消费者：部分。严格最终原始字节已保留，预览支线因无消费者被删；实现预览需真实 UI／事件，不能重新添加孤立 parser。
-- [ ] **F1.2** Azure／Mistral／Responses WebSocket。部分实现。Azure 和账户 WebSocket 已接通，Mistral 当前为 Chat Completions 兼容别名。独立 Conversations 协议和实际服务、连接复用、取消、代理及 TLS 资格继续开放。
+- [ ] **F1.2** Azure／Mistral／Responses WebSocket。部分实现。Azure 和账户 WebSocket 已接通。定向对照确认 Mistral 使用 `/v1/chat/completions`。原生流现按顺序读取文本和推理块，保持工具参数与最终帧校验，通用端点保留原行为。Linux 四个套件 210 项、七项静态检查、一次有效反转及隔离构建 `b0bf67bd7960` 通过。真实服务、原生推理回放、非流式结构化响应及连接复用、取消、代理和 TLS 资格仍开放。
 - [ ] **F1.3** 请求 zstd：缺口。helper 无调用者；明确 endpoint 支持，在最终 body 准入和签名之后由传输 owner 压缩，拒绝重放未知派发。
 - [ ] **F1.4** OAuth 提供方及设备登录／更新：部分。原生 OpenAI／Google／Copilot 与设备兑换存在，其他提供方不能仅加按钮；复用凭据 proof 与更新 owner，真实同意缺失单列。
 - [ ] **F1.5** MCP PKCE／loopback／renewal 和懒加载：已有待验收。CLI 鉴权已向 gateway 注入 provider，旧“仅 Bearer”判断不成立；实际 OAuth fixture／撤权与 tools readiness。

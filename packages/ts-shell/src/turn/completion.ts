@@ -104,6 +104,9 @@ export type StreamFragment =
   /** Verified public text for the whole model message, replacing its deltas. */
   | { readonly kind: "reasoning.replace"; readonly text: string };
 
+export type CompletionContentFragment = Extract<StreamFragment, { readonly kind: "text" | "reasoning" }>;
+type StructuredContentReader = (parts: readonly unknown[]) => readonly CompletionContentFragment[];
+
 /**
  * One entry of a `tool_calls` delta.
  *
@@ -124,7 +127,7 @@ interface ToolCallDelta {
 interface DeltaChunk {
   readonly choices?: readonly {
     readonly delta?: {
-      readonly content?: string | null;
+      readonly content?: unknown;
       readonly tool_calls?: readonly ToolCallDelta[];
     };
     readonly finish_reason?: string | null;
@@ -206,6 +209,7 @@ const GRACE_EXPIRED = Symbol("finish-grace-expired");
 
 export async function* readCompletionStream(
   body: ReadableStream<Uint8Array>,
+  readStructuredContent?: StructuredContentReader,
 ): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
   const traceStream = streamTracer();
   const state: StreamState = {
@@ -245,7 +249,7 @@ export async function* readCompletionStream(
         const split = nextEvent(buffer);
         if (!split) break;
         buffer = split.rest;
-        const step = absorb(split.event, state, traceStream);
+        const step = absorb(split.event, state, traceStream, readStructuredContent);
         yield* step.fragments;
         if (step.ended) {
           traceStream("stopped: [DONE] sentinel");
@@ -277,7 +281,7 @@ export async function* readCompletionStream(
   // is the answer.
   buffer += decoder.decode();
   if (!ended && buffer.trim().length > 0) {
-    const step = absorb(buffer, state, traceStream);
+    const step = absorb(buffer, state, traceStream, readStructuredContent);
     yield* step.fragments;
     ended = step.ended;
     settled ||= step.settled;
@@ -311,6 +315,7 @@ function absorb(
   event: string,
   state: StreamState,
   traceStream: (message: string) => void,
+  readStructuredContent: StructuredContentReader | undefined,
 ): { readonly fragments: readonly StreamFragment[]; readonly ended: boolean; readonly settled: boolean } {
   const payload = eventData(event);
   if (payload === undefined) return { fragments: [], ended: false, settled: false };
@@ -343,17 +348,25 @@ function absorb(
   }
 
   const fragments: StreamFragment[] = [];
-  // Aggregating proxies can put both channels in one delta; reasoning precedes the answer.
-  const thinking = readReasoningText(delta);
+  const content = delta.content;
+  const parts = Array.isArray(content) ? readStructuredContent?.(content) : undefined;
+  // A relay can mirror the native thinking block in a standalone alias.
+  const thinking = parts?.some(part => part.kind === "reasoning") ? undefined : readReasoningText(delta);
   if (thinking) {
     state.reasoning += thinking;
     fragments.push({ kind: "reasoning", text: thinking });
   }
-  if (typeof delta.content === "string" && delta.content.length > 0) {
-    const text = visibleText(state, delta.content);
-    if (text) {
-      state.content += text;
-      fragments.push({ kind: "text", text });
+  const contentFragments = parts ?? (typeof content === "string" && content ? [{ kind: "text" as const, text: content }] : []);
+  for (const fragment of contentFragments) {
+    if (fragment.kind === "reasoning") {
+      state.reasoning += fragment.text;
+      fragments.push(fragment);
+    } else {
+      const text = visibleText(state, fragment.text);
+      if (text) {
+        state.content += text;
+        fragments.push({ kind: "text", text });
+      }
     }
   }
   // The content is complete, but a host that reports usage in its own event

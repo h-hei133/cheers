@@ -10,7 +10,7 @@ import { crc32 } from "../provider/aws/eventStream.js";
 import { runAgentLoop } from "../core/agent/loop.js";
 import { sendSentRequest, type SentRequest } from "../provider/request/sentRequest.js";
 import { historyDigest, requestIdentity } from '../context/request/identity.js';
-import { BUILTIN_PROVIDERS } from '../core/models/catalog.js';
+import { BUILTIN_PROVIDERS, providerEndpoint } from '../core/models/catalog.js';
 import { buildSystemPrompt, toChatMessages } from './prompt.js';
 import { estimateRequestTokens } from '../session/context.js';
 import { FINAL_STEP_MESSAGE, outgoingProjection } from './messages.js';
@@ -1728,6 +1728,81 @@ describe("speaking a second endpoint", () => {
     const bucket = Object.values(usage.byModel)[0];
     expect(bucket?.promptTokens).toBe(9);
     expect(bucket?.completionTokens).toBe(4);
+  });
+
+  it.each([true, false])("decodes structured Chat Completions deltas only on the native Mistral endpoint: %s", async (native) => {
+    const shipped = BUILTIN_PROVIDERS.find(provider => provider.id === "mistral")!;
+    const model = shipped.models[0]!.id;
+    const baseUrl = shipped.baseUrl!;
+    const sessionId = `sess_mistral_stream_${native}`;
+    const requests: string[] = [];
+    const fragments: Array<{ kind: string; text: string }> = [];
+    const frame = (data: unknown) => `data: ${JSON.stringify(data)}\n\n`;
+    const chunk = (delta: unknown, finish_reason: string | null = null) => frame({ choices: [{ delta, finish_reason }] });
+    const step = createStepFunction({
+      ...request,
+      sessionId,
+      catalog: BUILTIN_PROVIDERS,
+      provider: { headers: {}, baseUrl, model, provider: shipped.id,
+        endpoint: native ? providerEndpoint(BUILTIN_PROVIDERS, shipped.id, baseUrl) : "openai-compatible" },
+      fetchImpl: async (url) => {
+        requests.push(String(url));
+        const encoder = new TextEncoder();
+        return new Response(new ReadableStream<Uint8Array>({
+          start(controller) {
+            const first = chunk({
+              content: [
+                { type: "thinking", thinking: [{ type: "text", text: "Check " }, { type: "text", text: "one" }] },
+                { type: "text", text: "Look" },
+                { type: "unknown", text: "unsupported" },
+              ],
+              reasoning_content: "Duplicate alias",
+            });
+            controller.enqueue(encoder.encode(first.slice(0, 49)));
+            controller.enqueue(encoder.encode(first.slice(49)));
+            for (const event of [
+              chunk({ content: "" }),
+              chunk({ content: [
+                null,
+                { type: "thinking", thinking: [{ type: "text", text: "" }, { type: "text", text: " two" }] },
+                { type: "text", text: "" },
+                "ing",
+              ], tool_calls: [{ index: 0, id: "AbCd12345", function: { name: "read", arguments: '{"pa' } }] }),
+              chunk({ content: ".", tool_calls: [{ index: 0, function: { arguments: 'th":"a.txt"}' } }] }, "tool_calls"),
+              frame({ choices: [], usage: { prompt_tokens: 30, completion_tokens: 8, prompt_tokens_details: { cached_tokens: 10 } } }),
+              "data: [DONE]\n\n",
+            ]) controller.enqueue(encoder.encode(event));
+            controller.close();
+          },
+        }), { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    try {
+      const result = await step([{ role: "user", content: "Check the file" }], undefined, {
+        onReasoning: text => fragments.push({ kind: "reasoning", text }),
+        onText: text => fragments.push({ kind: "text", text }),
+      }, { allowTools: true });
+
+      expect(requests).toEqual(["https://api.mistral.ai/v1/chat/completions"]);
+      expect(fragments).toEqual(native ? [
+        { kind: "reasoning", text: "Check one" },
+        { kind: "text", text: "Look" },
+        { kind: "reasoning", text: " two" },
+        { kind: "text", text: "ing" },
+        { kind: "text", text: "." },
+      ] : [
+        { kind: "reasoning", text: "Duplicate alias" },
+        { kind: "text", text: "." },
+      ]);
+      expect(result).toMatchObject({ text: native ? "Looking." : ".", stopReason: "stop",
+        toolCalls: [{ id: "AbCd12345", name: "read", args: { path: "a.txt" } }] });
+      expect(result.reasoning).toEqual({ text: native ? "Check one two" : "Duplicate alias" });
+      expect(Object.values(getSessionUsage(sessionId).byModel)).toMatchObject([
+        { promptTokens: 20, completionTokens: 8, cacheReadTokens: 10 },
+      ]);
+    } finally {
+      resetSessionUsage(sessionId);
+    }
   });
 
   it("still uses the default path when no endpoint is declared", async () => {
