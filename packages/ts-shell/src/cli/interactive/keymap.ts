@@ -67,6 +67,7 @@ export interface KeymapContext {
   readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number };
   /** The bindings in force, resolved from the catalogue and the user's file. */
   readonly keybindings: Keybindings;
+  readonly shortcut?: (event: ParsedKeyEvent) => boolean;
   /** Modal editing in the prompt; Insert is the starting mode. */
   readonly vimMode?: boolean;
   /** Current workspace/session catalog ownership for exact invocation recognition. */
@@ -132,6 +133,7 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
   if (view.suggestionsOpen && consumeSuggestionKey(event, context)) return;
 
   if (action === undefined) {
+    if (!event.text && !isKeyRelease(event.raw) && context.shortcut?.(event)) return;
     // Nothing claims this key, so it is text as far as the surface is concerned.
     applyTextKey(event, context);
     return;

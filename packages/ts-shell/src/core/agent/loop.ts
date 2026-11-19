@@ -126,6 +126,7 @@ export interface AgentLoopConfig {
   readonly toolExecution?: AgentToolExecutionMode;
   readonly beforeToolCall?: ToolHooks["beforeToolCall"];
   readonly afterToolCall?: ToolHooks["afterToolCall"];
+  readonly finalizeAssistant?: (message: AgentMessage, signal?: AbortSignal) => Promise<AgentMessage>;
   readonly shouldStopAfterStep?: (snapshot: NextStepSnapshot) => boolean | Promise<boolean>;
   /**
    * Whether the request after this step may call tools.
@@ -485,7 +486,7 @@ async function driveLoop(
       signal?.throwIfAborted();
       config.onStepStart?.();
       const { step, emittedStart } = await retryStep(config, context, signal, emit);
-      const assistant: AgentMessage = {
+      const received: AgentMessage = {
         role: "assistant",
         content: step.text,
         ...(step.toolCalls.length > 0
@@ -506,8 +507,9 @@ async function driveLoop(
         ...(step.promptMeasurement ? { promptMeasurement: step.promptMeasurement } : {}),
       };
       if (!emittedStart) {
-        await emit({ type: "message_start", message: assistant });
+        await emit({ type: "message_start", message: received });
       }
+      const assistant = config.finalizeAssistant ? await config.finalizeAssistant(received, signal) : received;
       await emit({ type: "message_end", message: assistant });
       context.push(assistant);
       produced.push(assistant);

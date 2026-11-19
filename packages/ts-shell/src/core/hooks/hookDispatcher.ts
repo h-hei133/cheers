@@ -9,7 +9,7 @@ import type { StopPayload } from './types.js';
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
 import { checkWriteHookArtifact, writeHookCommand } from './artifact.js';
 import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInputs, translateWriteResult } from './translation.js';
-import { getExtensionEventRunners } from './extensionBridge.js';
+import { getExtensionEventRunners, type ExtensionEventRunner } from './extensionBridge.js';
 import {captureInputHookDecision} from './input/decision.js';
 import {callbackCancellation, captureCallbackResult} from '../values/promise.js';
 import {snapshotData} from '../values/data.js';
@@ -219,7 +219,9 @@ export class HookDispatcher {
     }
   }
 
-  async dispatch(payload: HookEventPayload, stopOptions: StopDispatchOptions = {}): Promise<HookDecision> {
+  async dispatch(payload: HookEventPayload, stopOptions: StopDispatchOptions & {
+    readonly extensionRunners?: readonly ExtensionEventRunner[];
+  } = {}): Promise<HookDecision> {
     if (payload.eventName === 'UserPromptSubmit') {
       try {payload = snapshotData(payload, {bytes:64*1024*1024, nodes:4096, depth:12}) as unknown as HookEventPayload;}
       catch {return {decision:'block', reason:'Prompt input hook payload was refused.'};}
@@ -443,7 +445,7 @@ export class HookDispatcher {
       }
     }
     const extensionDecision = !trust?.admission?.() && payload.workspaceRoot
-      ? await dispatchExtensionHooks(payload, accumulatedDecision, stopOptions.signal)
+      ? await dispatchExtensionHooks(payload, accumulatedDecision, stopOptions.signal, stopOptions.extensionRunners)
       : null;
     if (extensionDecision) return extensionDecision;
     return accumulatedDecision ?? { decision: "allow" };
@@ -452,10 +454,6 @@ export class HookDispatcher {
 
 const EXTENSION_EVENT_ALIASES: Readonly<Record<string, readonly string[]>> = {
   PreToolUse: ['tool_call'],
-  PostToolUse: ['tool_result'],
-  PostToolUseFailure: ['tool_result'],
-  PreCompact: ['session_before_compact'],
-  PostCompact: ['session_compact'],
   PreModelSwitch: ['model_select'],
   PostModelSwitch: ['model_select'],
 };
@@ -464,8 +462,8 @@ async function dispatchExtensionHooks(
   payload: HookEventPayload,
   accumulated: HookDecision | null,
   signal?: AbortSignal,
+  runners = getExtensionEventRunners(payload.workspaceRoot, payload.sessionId),
 ): Promise<HookDecision | null> {
-  const runners = getExtensionEventRunners(payload.workspaceRoot, payload.sessionId);
   const aliases = EXTENSION_EVENT_ALIASES[payload.eventName];
   let merged = accumulated;
   let updated = false;

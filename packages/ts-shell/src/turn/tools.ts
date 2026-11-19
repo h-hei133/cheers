@@ -13,8 +13,6 @@ import type { EscalationPrompt, EscalationResponse } from "../core/shell/approva
 import { approvalCallBinding } from '../core/shell/approval/binding.js';
 import type { ToolDefinition, ToolExecutionContext, ToolPreparation } from "../tools/types.js";
 import type { SubagentRunner } from "../core/subagents/runner.js";
-import { neutraliseForDisplay } from "../core/text/safety.js";
-import { redactExportText } from "../core/security/redaction.js";
 import { validateToolArguments } from "../core/tools/arguments.js";
 import { workspaceToolBinding } from '../core/workspace/tools.js';
 import type { WorkspaceRoot } from '../core/workspace/model.js';
@@ -40,6 +38,8 @@ import { bindToolScope, forgetToolScope, toolScopePolicy } from './scope.js';
 import { authorizeFileAccess, bindFileAccess, captureFileAccess, fileAccessArguments, fileAccessOptions, fileAccessPrompt, forgetFileAccess, requireFileAccess } from './workspace.js';
 import { createGatedNestedToolExecutor } from './nestedTools.js';
 import { toolExecutionMode } from './execution.js';
+import { getExtensionEventRunners } from '../core/hooks/extensionBridge.js';
+import { collectToolResult, projectToolResult } from './result.js';
 const traceLogger = createComponentLogger("tool-call");
 
 /** A tool definition in the shape a chat completion request takes. */
@@ -164,7 +164,7 @@ export function adaptTools(
       return executeTool(tool, toolCallId, args, signal, options, onUpdate, nestedCatalog
         ? createGatedNestedToolExecutor({
             tools: nestedCatalog,
-            hooks: createToolHooks(options, nestedCatalog),
+            hooks: createToolHooks(options, nestedCatalog, toolCallId),
             prepare: (nestedTool, nestedArgs, nestedSignal) => prepareArgsFor(nestedTool, nestedArgs, nestedSignal),
             execute: (nestedTool, nestedCallId, nestedArgs, nestedSignal) =>
               executeTool(nestedTool, nestedCallId, nestedArgs, nestedSignal, options),
@@ -325,7 +325,8 @@ async function executeTool(
  * feedback (a compile error after an edit, say) is attached to the result so
  * the model reads it with the output it belongs to.
  */
-export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<string, ToolDefinition> | (() => ReadonlyMap<string, ToolDefinition>)): ToolHooks {
+export function createToolHooks(options: ToolGateOptions,
+  tools?: ReadonlyMap<string, ToolDefinition> | (() => ReadonlyMap<string, ToolDefinition>), parentToolCallId?: string): ToolHooks {
   const toolFor = (name: string) => (typeof tools === 'function' ? tools() : tools)?.get(name);
   const doomLoop = new DoomLoopDetector(3);
   const approvals = new Map<string, { operation: string; decision: string }>();
@@ -393,54 +394,49 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
         finally { discardToolCall(args); forgetToolScope(args); forgetFileAccess(args); }
       } }
     },
-    afterToolCall: async ({ call, args, result, isError }) => {
+    afterToolCall: async (context, signal) => {
+      const { call, args, result, isError } = context;
       discardToolCall(args);
       forgetFileAccess(args);
       const approval = approvals.get(call.id);
       approvals.delete(call.id);
-      let output = result.output;
+      const tool = toolFor(call.name);
+      const runners = [...getExtensionEventRunners(options.workspaceRoot, options.sessionId)];
+      const registrationCurrent = runners.length ? options.hooks.captureRegistration?.() : undefined;
+      const timestamp = new Date().toISOString();
       // A call that failed is announced as a failure. Sending it on
       // `PostToolUse` alone would make the event name mean "a call finished",
       // and a hook watching for breakage would have to re-derive the outcome
       // from a field rather than being told.
-      const decision = isError
-        ? await options.hooks.dispatch({
-            eventName: "PostToolUseFailure",
-            sessionId: options.sessionId,
-            workspaceRoot: options.workspaceRoot,
-            timestamp: new Date().toISOString(),
-            toolName: call.name,
-            toolCallId: call.id,
-            args,
-            error: output,
-          })
-        : await options.hooks.dispatch({
-            eventName: "PostToolUse",
-            sessionId: options.sessionId,
-            workspaceRoot: options.workspaceRoot,
-            timestamp: new Date().toISOString(),
-            toolName: call.name,
-            toolCallId: call.id,
-            args,
-            output,
-            success: true,
-          });
-      if (decision.feedback) {
-        // Hook feedback reaches the model, and a hook's text can come from a
-        // project-supplied configuration. Neutralised so a newline or a control
-        // character cannot forge extra lines or repaint the transcript.
-        output = `${output}\n\n[Verification feedback]\n${neutraliseForDisplay(redactExportText(decision.feedback))}`;
-      }
-      let refused = toolFor(call.name)?.resultAdmission?.();
-      try { toolScopePolicy(call.name, args, options); }
-      catch { refused ??= 'Configuration scope changed before result publication.'; }
-      finally { forgetToolScope(args); }
-      if (refused) return { isError: true, output: `${output}\n${refused} Actual effect evidence remains visible.`, ...(approval ? { metadata: { approval } } : {}) };
-      if (output === result.output && !approval) return undefined;
-      return {
-        ...(output === result.output ? {} : { output }),
-        ...(approval ? { metadata: { approval } } : {}),
+      const base = { sessionId: options.sessionId, workspaceRoot: options.workspaceRoot, timestamp,
+        toolName: call.name, toolCallId: call.id, args };
+      const resultAdmission = () => {
+        let refused: string | undefined;
+        try { refused = tool?.resultAdmission?.(); }
+        catch { refused = 'Original result authority could not be verified.'; }
+        try { toolScopePolicy(call.name, args, options); }
+        catch { refused ??= 'Configuration scope changed before result publication.'; }
+        return refused;
       };
+      try {
+        const decision = await options.hooks.dispatch(isError
+          ? { ...base, eventName: "PostToolUseFailure", error: result.output }
+          : { ...base, eventName: "PostToolUse", output: result.output, success: true }, { extensionRunners: runners });
+        let refused = resultAdmission();
+        const draft = refused ? undefined : await collectToolResult({ context, workspaceRoot: options.workspaceRoot,
+          sessionId: options.sessionId, timestamp, parentToolCallId, tool,
+          protectedOutput: Boolean(approval) || decision.decision === 'block' || decision.decision === 'retry' || decision.decision === 'unknown',
+          runners, signal,
+          admission: () => options.admission?.() ?? ((registrationCurrent?.() ?? true) && toolFor(call.name) === tool
+            ? undefined : 'Tool result authority changed.'),
+        });
+        if (runners.length) refused ??= resultAdmission();
+        const output = projectToolResult(result, !refused && draft?.isCurrent() ? draft.patch : undefined, decision.feedback, refused);
+        if (!refused && output === result.output && !approval) return undefined;
+        return { ...(refused ? { isError: true } : {}),
+          ...(output === result.output ? {} : { output, preserveResultEvidence: true as const }),
+          ...(approval ? { metadata: { approval } } : {}) };
+      } finally { forgetToolScope(args); }
     },
   };
 }

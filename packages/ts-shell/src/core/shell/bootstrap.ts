@@ -15,7 +15,12 @@ import {
 } from "./runtimeContext.js";
 import { getWorkflowGitContext } from "../workspace/git.js";
 import path from "node:path";
-import { validateSessionId } from "../../session/store/sessionFileLayout.js";
+import { createSessionId, projectSessionFileLayout, validateSessionId } from "../../session/store/sessionFileLayout.js";
+import { readSessionFileVersion } from '../../session/store/version.js';
+import { sameValue } from '../../config/values.js';
+import type { WorkspaceRoot } from '../workspace/model.js';
+import { validateWorkspaceRoots } from '../workspace/roots.js';
+import { normalizePathIdentity } from '../../session/continuation/roots.js';
 import { replayTodosFromMessages } from "../commands/todoCommandRuntime.js";
 import { hasUnfinishedSessionWork } from '../../session/recovery/work.js';
 
@@ -93,7 +98,7 @@ function resolveWorkspaceRootMode(gitContext: WorkflowGitContext): WorkspaceRoot
   return gitContext.insideGit && gitContext.root ? "git-root" : "direct";
 }
 
-export function bootstrapShellRuntime(input: {
+interface ShellBootstrapInput {
   cwd: string;
   launchCwd?: string;
   runtimeConfig: RuntimeConfig;
@@ -122,7 +127,37 @@ export function bootstrapShellRuntime(input: {
    * last doing; false for an interactive launch, which is a new sitting.
    */
   adoptCurrentSession?: boolean;
-}): ShellBootstrapResult {
+}
+
+export interface ShellStartupBinding {
+  readonly projectRoot: string;
+  readonly sessionId: string;
+  readonly workspaceRoots?: readonly WorkspaceRoot[];
+  readonly assertCurrent: () => void;
+}
+
+export function bootstrapShellRuntime(input: ShellBootstrapInput): ShellBootstrapResult {
+  const result = bootstrapShell(input, false).next();
+  if (!result.done) throw new Error('Unexpected startup admission request.');
+  return result.value;
+}
+
+export function prepareShellStartup(input: ShellBootstrapInput) {
+  const startup = bootstrapShell(input, true);
+  const pending = startup.next();
+  if (pending.done) throw new Error('Startup session could not be staged.');
+  let used = false;
+  return { binding: pending.value, activate: (): ShellBootstrapResult => {
+    if (used) throw new Error('Startup session has already settled.');
+    used = true;
+    pending.value.assertCurrent();
+    const result = startup.next();
+    if (!result.done) throw new Error('Unexpected startup admission request.');
+    return result.value;
+  } };
+}
+
+function* bootstrapShell(input: ShellBootstrapInput, staged: boolean): Generator<ShellStartupBinding, ShellBootstrapResult, void> {
   const phases: ShellBootstrapPhase[] = ["fast-path-parse", "config-load"];
   const lifecycleNotices: string[] = [];
   const emitLifecycleMessage = (message: string): void => {
@@ -135,147 +170,7 @@ export function bootstrapShellRuntime(input: {
   const requestedProjectRoot = input.gitContext.root ?? input.cwd;
   const requestedRootMode = resolveWorkspaceRootMode(input.gitContext);
 
-  const session = (() => {
-    if (input.freshSessionId) {
-      if (input.requestedSessionId) throw new Error('A fresh profile session cannot also resume an existing session.');
-      return input.sessionManager.createNewWithId(input.freshSessionId, requestedProjectRoot, {
-        rootMode: requestedRootMode, requestedWorkspaceRoot: input.requestedWorkspaceRoot ?? input.cwd,
-        targetPathBase: requestedProjectRoot, gitRoot: input.gitContext.root ?? null,
-      });
-    }
-    if (input.forkSource) {
-      const sourceId = resolveForkSourceId(input.sessionManager, input.forkSource, requestedProjectRoot);
-      const forked = input.sessionManager.fork(sourceId, requestedProjectRoot, { activate: true });
-      emitLifecycleMessage(`Forked session ${sourceId} into ${forked.id}`);
-      return forked;
-    }
-    if (!input.requestedSessionId) {
-      //
-      // A one-shot `--print` invocation is a continuation of whatever the user was
-      // last doing — that is what makes `/continue` and `/resume current` mean
-      // anything from a script — so it steps into the stored pointer.
-      //
-      // An interactive launch is a new sitting and gets its own session. Adopting
-      // the pointer there meant every launch landed in the same session, with one
-      // ever-growing history and no way to tell two days of work apart. The pointer
-      // is still evaluated, because "why was it ignored" is worth saying, and it is
-      // still what `/resume` and `/continue` fall back to.
-      const currentSelection = input.sessionManager.resolveCurrentSessionForProject(
-        requestedProjectRoot,
-      );
-      // A session with unfinished business is stepped back into whatever the run
-      // kind: an interruption, an error, a prompt that never ran, or a write whose
-      // outcome was never established. That is recovery, and it is what anyone
-      // expects after a crash. A session the user simply closed is left closed, and
-      // only a one-shot run steps into it.
-      let unfinished = false;
-      if (currentSelection.ok && input.adoptCurrentSession !== true) {
-        try { unfinished = hasUnfinishedBusiness(input.sessionManager, currentSelection.session); }
-        catch {
-          emitLifecycleMessage('Current session recovery could not be verified; starting a fresh session. The saved session was retained.');
-        }
-      }
-      if (currentSelection.ok && (input.adoptCurrentSession === true || unfinished)) {
-        try {
-          const resumed = input.sessionManager.resume(
-            currentSelection.session.id,
-            requestedProjectRoot,
-          );
-          emitLifecycleMessage(`Resumed session ${resumed.id}`);
-          return resumed;
-        } catch {
-          input.sessionManager.clearCurrentSessionForProject(requestedProjectRoot);
-          emitLifecycleMessage(
-            `Current session pointer ${currentSelection.session.id} could not be resumed for ${requestedProjectRoot}; starting a fresh session.`,
-          );
-        }
-      } else if (currentSelection.ok === false && currentSelection.reason !== "none") {
-        emitLifecycleMessage(
-          `Current session pointer ignored: ${currentSelection.detail} Starting a fresh session.`,
-        );
-      }
-      return input.sessionManager.createNew(requestedProjectRoot, {
-        rootMode: requestedRootMode,
-        requestedWorkspaceRoot: input.requestedWorkspaceRoot ?? input.cwd,
-        targetPathBase: requestedProjectRoot,
-        gitRoot: input.gitContext.root ?? null,
-      });
-    }
-
-    if (!input.sessionManager.sessionExists(input.requestedSessionId)) {
-      throw new SessionBootstrapError({
-        code: "session-not-found",
-        message: `Session ${input.requestedSessionId} not found.`,
-        recoveryHint:
-          `Use an existing --session-id, or omit --session-id to start a new session in ${requestedProjectRoot}.`,
-      });
-    }
-
-    const resumeResult = input.sessionManager.tryResume(input.requestedSessionId, undefined, {
-      mode: "continuity-only",
-    });
-    if (isFailedResume(resumeResult)) {
-      throw new SessionBootstrapError({
-        code: "session-not-found",
-        message: `Failed to resume session ${input.requestedSessionId}: ${resumeResult.error}`,
-        recoveryHint: resumeResult.recoveryHint,
-      });
-    }
-
-    const resumedSession = resumeResult.session;
-    const sessionProjectRoot = resumedSession.projectRoot || requestedProjectRoot;
-    const rootsEqual = areProjectRootsEqual(
-      requestedProjectRoot,
-      sessionProjectRoot,
-    );
-    const rootsCompatible = isEquivalentOrNestedProjectRoot(
-      requestedProjectRoot,
-      sessionProjectRoot,
-    );
-
-    if (
-      input.allowSessionRootMigration &&
-      !rootsEqual
-    ) {
-      const reboundSession = input.sessionManager.rebindSessionProjectRoot(
-        resumedSession.id,
-        requestedProjectRoot,
-      );
-      emitLifecycleMessage(
-        `Resumed session ${reboundSession.id} with migrated project root ${sessionProjectRoot} -> ${requestedProjectRoot}`,
-      );
-      return reboundSession;
-    }
-
-    if (rootsCompatible) {
-      emitLifecycleMessage(`Resumed session ${resumedSession.id}`);
-      return resumedSession;
-    }
-
-    if (!input.allowSessionRootMigration) {
-      const diagnostic = createSessionRootMismatchDiagnostic({
-        sessionId: resumedSession.id,
-        sessionProjectRoot,
-        requestedWorkspaceRoot: input.requestedWorkspaceRoot ?? input.cwd,
-        resolvedProjectRoot: requestedProjectRoot,
-      });
-      throw new SessionBootstrapError({
-        code: "session-root-mismatch",
-        message: diagnostic.explanation,
-        recoveryHint: diagnostic.nextAction,
-        rootBindingDiagnostics: [diagnostic],
-      });
-    }
-
-    const reboundSession = input.sessionManager.rebindSessionProjectRoot(
-      resumedSession.id,
-      requestedProjectRoot,
-    );
-    emitLifecycleMessage(
-      `Resumed session ${reboundSession.id} with migrated project root ${sessionProjectRoot} -> ${requestedProjectRoot}`,
-    );
-    return reboundSession;
-  })();
+  const session = yield* selectStartupSession(input, requestedProjectRoot, requestedRootMode, emitLifecycleMessage, staged);
   replayTodosFromMessages(session.id, session.turns);
   const boundProjectRoot = session.projectRoot || requestedProjectRoot;
   const boundGitContext = getWorkflowGitContext(boundProjectRoot);
@@ -292,9 +187,7 @@ export function bootstrapShellRuntime(input: {
     !session.requestedWorkspaceRoot ||
     !session.targetPathBase ||
     !Object.prototype.hasOwnProperty.call(session, "gitRoot");
-  if (
-    legacyFieldsBackfilled
-  ) {
+  if (legacyFieldsBackfilled) {
     input.sessionManager.updateSessionWorkspaceBinding(session.id, {
       projectRoot: boundProjectRoot,
       rootMode: boundRootMode,
@@ -316,39 +209,216 @@ export function bootstrapShellRuntime(input: {
     gitContext: boundGitContext,
     legacyFieldsBackfilled,
   });
-
-  phases.push(
-    "workspace-session-resolution",
-    "background-services-start",
-    "interactive-shell-ready",
-  );
-
+  phases.push("workspace-session-resolution", "background-services-start", "interactive-shell-ready");
   const context = createShellRuntimeContext({
-      cwd: boundProjectRoot,
-      originalCwd,
-      projectRoot: boundProjectRoot,
-      rootMode: boundRootMode,
-      requestedWorkspaceRoot: boundRequestedWorkspaceRoot,
-      targetPathBase: boundTargetPathBase,
-      gitRoot: boundGitRoot,
-      rootBindingDiagnostics,
-      runtimeConfig: input.runtimeConfig,
-      runtimeConfigOverrides: input.runtimeConfigOverrides,
-      resolveConfigTarget: input.resolveConfigTarget,
-      deferredModel: input.deferredModel,
-      ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
-      ...(input.themePaths ? { themePaths: input.themePaths } : {}),
-      gitContext: boundGitContext,
-      session,
+    cwd: boundProjectRoot,
+    originalCwd,
+    projectRoot: boundProjectRoot,
+    rootMode: boundRootMode,
+    requestedWorkspaceRoot: boundRequestedWorkspaceRoot,
+    targetPathBase: boundTargetPathBase,
+    gitRoot: boundGitRoot,
+    rootBindingDiagnostics,
+    runtimeConfig: input.runtimeConfig,
+    runtimeConfigOverrides: input.runtimeConfigOverrides,
+    resolveConfigTarget: input.resolveConfigTarget,
+    deferredModel: input.deferredModel,
+    ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
+    ...(input.themePaths ? { themePaths: input.themePaths } : {}),
+    gitContext: boundGitContext,
+    session,
   });
-  // Resolution can replace the input snapshot after a trust or workspace change.
-  // Diagnostics describe the settings actually published for the final session.
   if (input.emitLifecycleMessages !== false) {
-    for (const diagnostic of context.runtimeConfig.configDiagnostics) {
-      input.renderer.renderLine(`Warning: ${diagnostic}`);
-    }
+    for (const diagnostic of context.runtimeConfig.configDiagnostics) input.renderer.renderLine(`Warning: ${diagnostic}`);
   }
   return { phases, lifecycleNotices, context };
+}
+
+function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot: string, requestedRootMode: WorkspaceRootMode,
+  emitLifecycleMessage: (message: string) => void, staged: boolean): Generator<ShellStartupBinding, Session, void> {
+    const manager = input.sessionManager;
+    const createOptions = { rootMode: requestedRootMode, requestedWorkspaceRoot: input.requestedWorkspaceRoot ?? input.cwd,
+      targetPathBase: requestedProjectRoot, gitRoot: input.gitContext.root ?? null };
+    const readOnly = staged ? { readOnly: true } : undefined;
+    if (input.freshSessionId) {
+      if (input.requestedSessionId) throw new Error('A fresh profile session cannot also resume an existing session.');
+      if (staged) yield captureStartupBinding(manager, input.freshSessionId, requestedProjectRoot);
+      return manager.createNewWithId(input.freshSessionId, requestedProjectRoot, createOptions);
+    }
+    if (input.forkSource) {
+      const sourceId = resolveForkSourceId(manager, input.forkSource, requestedProjectRoot, readOnly);
+      let forkOptions: Parameters<SessionManager['fork']>[2] = { activate: true };
+      if (staged) {
+        const source = captureStartupSource(manager, sourceId);
+        const id = createSessionId();
+        const roots = source.session.projectRoot === requestedProjectRoot ? source.session.workspaceRoots : undefined;
+        yield captureStartupBinding(manager, id, requestedProjectRoot, roots, source.assertCurrent);
+        forkOptions = { activate: true, sessionId: id, expectedVersion: source.version };
+      }
+      const forked = manager.fork(sourceId, requestedProjectRoot, forkOptions);
+      emitLifecycleMessage(`Forked session ${sourceId} into ${forked.id}`);
+      return forked;
+    }
+    if (!input.requestedSessionId) {
+      //
+      // A one-shot `--print` invocation is a continuation of whatever the user was
+      // last doing — that is what makes `/continue` and `/resume current` mean
+      // anything from a script — so it steps into the stored pointer.
+      //
+      // An interactive launch is a new sitting and gets its own session. Adopting
+      // the pointer there meant every launch landed in the same session, with one
+      // ever-growing history and no way to tell two days of work apart. The pointer
+      // is still evaluated, because "why was it ignored" is worth saying, and it is
+      // still what `/resume` and `/continue` fall back to.
+      const currentSelection = input.sessionManager.resolveCurrentSessionForProject(
+        requestedProjectRoot,
+        readOnly,
+      );
+      // A session with unfinished business is stepped back into whatever the run
+      // kind: an interruption, an error, a prompt that never ran, or a write whose
+      // outcome was never established. That is recovery, and it is what anyone
+      // expects after a crash. A session the user simply closed is left closed, and
+      // only a one-shot run steps into it.
+      let unfinished = false;
+      if (currentSelection.ok && input.adoptCurrentSession !== true) {
+        try { unfinished = hasUnfinishedBusiness(input.sessionManager, currentSelection.session); }
+        catch {
+          emitLifecycleMessage('Current session recovery could not be verified; starting a fresh session. The saved session was retained.');
+        }
+      }
+      if (currentSelection.ok && (input.adoptCurrentSession === true || unfinished)) {
+        if (staged) {
+          const source = captureStartupSource(manager, currentSelection.session.id);
+          const root = source.session.projectRoot || requestedProjectRoot;
+          yield captureStartupBinding(manager, source.session.id, root, source.session.workspaceRoots, source.assertCurrent);
+          const resumed = requireResume(manager.tryResume(source.session.id, requestedProjectRoot,
+            { mode: 'continuity-only', expectedVersion: source.version }), source.session.id);
+          emitLifecycleMessage(`Resumed session ${resumed.id}`);
+          return resumed;
+        }
+        try {
+          const resumed = input.sessionManager.resume(
+            currentSelection.session.id,
+            requestedProjectRoot,
+          );
+          emitLifecycleMessage(`Resumed session ${resumed.id}`);
+          return resumed;
+        } catch {
+          input.sessionManager.clearCurrentSessionForProject(requestedProjectRoot);
+          emitLifecycleMessage(
+            `Current session pointer ${currentSelection.session.id} could not be resumed for ${requestedProjectRoot}; starting a fresh session.`,
+          );
+        }
+      } else if (currentSelection.ok === false && currentSelection.reason !== "none") {
+        emitLifecycleMessage(
+          `Current session pointer ignored: ${currentSelection.detail} Starting a fresh session.`,
+        );
+      }
+      if (staged) {
+        const id = createSessionId();
+        yield captureStartupBinding(manager, id, requestedProjectRoot);
+        return manager.createNewWithId(id, requestedProjectRoot, createOptions);
+      }
+      return manager.createNew(requestedProjectRoot, createOptions);
+    }
+
+    if (!input.sessionManager.sessionExists(input.requestedSessionId)) {
+      throw new SessionBootstrapError({
+        code: "session-not-found",
+        message: `Session ${input.requestedSessionId} not found.`,
+        recoveryHint:
+          `Use an existing --session-id, or omit --session-id to start a new session in ${requestedProjectRoot}.`,
+      });
+    }
+
+    const source = staged ? captureStartupSource(manager, input.requestedSessionId) : undefined;
+    const resumedSession = source?.session ?? requireResume(manager.tryResume(input.requestedSessionId, undefined,
+      { mode: 'continuity-only' }), input.requestedSessionId);
+    const sessionProjectRoot = resumedSession.projectRoot || requestedProjectRoot;
+    const rootsEqual = areProjectRootsEqual(
+      requestedProjectRoot,
+      sessionProjectRoot,
+    );
+    const rootsCompatible = isEquivalentOrNestedProjectRoot(
+      requestedProjectRoot,
+      sessionProjectRoot,
+    );
+
+    if (input.allowSessionRootMigration && !rootsEqual) {
+      let roots: readonly WorkspaceRoot[] | undefined;
+      if (source) {
+        roots = source.session.workspaceRoots?.filter(root => normalizePathIdentity(root.path) !== normalizePathIdentity(requestedProjectRoot));
+        if (roots?.length) validateWorkspaceRoots(requestedProjectRoot, roots);
+        yield captureStartupBinding(manager, resumedSession.id, requestedProjectRoot, roots, source.assertCurrent);
+      }
+      const reboundSession = input.sessionManager.rebindSessionProjectRoot(
+        resumedSession.id,
+        requestedProjectRoot,
+        source ? { beforeCommit: source.assertCurrent, workspaceRoots: roots } : undefined,
+      );
+      emitLifecycleMessage(
+        `Resumed session ${reboundSession.id} with migrated project root ${sessionProjectRoot} -> ${requestedProjectRoot}`,
+      );
+      return reboundSession;
+    }
+
+    if (rootsCompatible) {
+      if (source) {
+        yield captureStartupBinding(manager, resumedSession.id, sessionProjectRoot, resumedSession.workspaceRoots, source.assertCurrent);
+      }
+      const session = source ? requireResume(manager.tryResume(resumedSession.id, undefined,
+        { mode: 'continuity-only', expectedVersion: source.version }), resumedSession.id) : resumedSession;
+      emitLifecycleMessage(`Resumed session ${session.id}`);
+      return session;
+    }
+
+    {
+      const diagnostic = createSessionRootMismatchDiagnostic({
+        sessionId: resumedSession.id,
+        sessionProjectRoot,
+        requestedWorkspaceRoot: input.requestedWorkspaceRoot ?? input.cwd,
+        resolvedProjectRoot: requestedProjectRoot,
+      });
+      throw new SessionBootstrapError({
+        code: "session-root-mismatch",
+        message: diagnostic.explanation,
+        recoveryHint: diagnostic.nextAction,
+        rootBindingDiagnostics: [diagnostic],
+      });
+    }
+
+}
+
+function requireResume(result: ResumeResult, id: string): Session {
+  if (!isFailedResume(result)) return result.session;
+  throw new SessionBootstrapError({ code: 'session-not-found', message: `Failed to resume session ${id}: ${result.error}`,
+    recoveryHint: result.recoveryHint });
+}
+
+function captureStartupSource(manager: SessionManager, sessionId: string) {
+  const directory = manager.getSessionDirPath(sessionId);
+  const layout = projectSessionFileLayout({ sessionsDir: path.dirname(directory), sessionId });
+  const version = readSessionFileVersion(layout);
+  const assertCurrent = () => {
+    if (manager.getSessionDirPath(sessionId) !== directory || readSessionFileVersion(layout) !== version) {
+      throw new Error('The saved session changed while preparing startup.');
+    }
+  };
+  const session = manager.getSession(sessionId);
+  if (!session || session.id !== sessionId) throw new Error('The selected startup session is unavailable.');
+  assertCurrent();
+  return { session, version, assertCurrent };
+}
+
+function captureStartupBinding(manager: SessionManager, sessionId: string, projectRoot: string,
+  workspaceRoots?: readonly WorkspaceRoot[], checkSource?: () => void): ShellStartupBinding {
+  const selection = manager.readCurrentSessionSelection(projectRoot);
+  return { projectRoot, sessionId, workspaceRoots, assertCurrent: () => {
+    checkSource?.();
+    if (!sameValue(manager.readCurrentSessionSelection(projectRoot), selection)) {
+      throw new Error('Current session selection changed while preparing startup.');
+    }
+  } };
 }
 
 /**
@@ -363,10 +433,11 @@ function resolveForkSourceId(
   sessionManager: SessionManager,
   rawSource: string,
   projectRoot: string,
+  options?: { readonly readOnly?: boolean },
 ): string {
   const source = rawSource.trim();
   if (source === "current") {
-    const current = sessionManager.resolveCurrentSessionForProject(projectRoot);
+    const current = sessionManager.resolveCurrentSessionForProject(projectRoot, options);
     if (!current.ok) {
       throw new SessionBootstrapError({
         code: "session-not-found",

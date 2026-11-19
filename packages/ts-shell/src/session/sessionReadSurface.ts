@@ -105,8 +105,13 @@ export abstract class SessionReadSurface extends SessionLifecycleWrites {
 
   resolveCurrentSessionForProject(
     projectRoot: string,
+    options?: { readonly readOnly?: boolean },
   ): CurrentSessionSelectionResolution {
-    return this.host.store.resolveCurrentSessionForProject(projectRoot);
+    return this.host.store.resolveCurrentSessionForProject(projectRoot, options);
+  }
+
+  readCurrentSessionSelection(projectRoot: string) {
+    return this.host.store.readCurrentSessionSelection(projectRoot);
   }
 
   setCurrentSessionForProject(projectRoot: string, sessionId: string, options?: SessionActivationOptions): void {

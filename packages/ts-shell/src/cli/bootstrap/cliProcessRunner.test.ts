@@ -28,6 +28,7 @@ vi.mock("../collaboration/service.js", () => ({
 vi.mock("./cliBootstrapContext.js", () => ({
   createCliRootContext: vi.fn(),
   createCliBootstrapRuntimeContext: vi.fn(),
+  prepareCliBootstrapRuntimeContext: vi.fn(),
   logCliBootstrapSessionInitialized: vi.fn(),
 }));
 vi.mock("../../core/shell/runtimeContext.js", async () => ({
@@ -80,13 +81,13 @@ vi.mock("../../config/inputs/selection.js", () => ({
 }));
 
 import { parseCliArgs } from "../../entrypoints/cliArgs.js";
-import { createCliRootContext, createCliBootstrapRuntimeContext } from "./cliBootstrapContext.js";
+import { createCliRootContext, createCliBootstrapRuntimeContext, prepareCliBootstrapRuntimeContext } from "./cliBootstrapContext.js";
 import { projectAndRenderCliStartupSurface } from "./cliStartupSurface.js";
 import { runInteractiveLoop } from "../interactive/interactiveLoop.js";
 import { createCliShutdown } from "../runtime/shutdown.js";
 import { createCliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
 import { createCliSessionRuntime } from "../runtime/cliSessionRuntimeFactory.js";
-import { closeExtensionsFor, startExtensionsFor, shutdownExtensionsFor } from '../runtime/extensions.js';
+import { closeExtensionsFor, startExtensionsFor, shutdownExtensionsFor, waitForExtensionsFor } from '../runtime/extensions.js';
 import { cancelGoalRunForShutdown } from '../runtime/goalScheduling.js';
 import { captureCliStdinPrompts } from "../print/stdinPromptCapture.js";
 import { runCliPrintModeRouter } from "../print/printModeRouter.js";
@@ -383,6 +384,7 @@ it("waits for the line-loop first-frame callback before starting the recovery hi
 type OutputPort = { write(text: string): void; flush(): Promise<void> };
 type OutputFixtureOptions = {
   options?: Record<string, unknown>;
+  args?: readonly string[];
   stdinTty?: boolean;
   stdoutTty?: boolean;
   stderrTty?: boolean;
@@ -501,12 +503,59 @@ function outputFixture(settings: OutputFixtureOptions = {}) {
   return {
     output, errors, guardAtRoot, stdin, stdout, originalWrite, writeError, exit, exitState, terminalExit,
     complete: () => completeOutput?.(),
-    run: () => runCliProcess({ args: [], launchCwd: projectRoot, stdin: stdin as never,
+    run: () => runCliProcess({ args: settings.args ?? [], launchCwd: projectRoot, stdin: stdin as never,
       process: processEvents, writeOutput: vi.fn(), writeError,
       exit }),
     dispose: () => stdin.destroy(),
   };
 }
+
+it('resolves typed startup options before choosing the prompt route', async () => {
+  const fixture = outputFixture({ args: ['-e', './extension.ts', '--label', './path-value.json',
+    '--enabled=false', '--browse', 'User question', '--print', '--', '--literal'] });
+  const actual = await vi.importActual<typeof import('../../entrypoints/cliArgs.js')>('../../entrypoints/cliArgs.js');
+  vi.mocked(parseCliArgs).mockImplementationOnce(actual.parseCliArgs).mockImplementationOnce(actual.parseCliArgs);
+  vi.mocked(prepareCliBootstrapRuntimeContext).mockImplementationOnce(async (input, startup) => {
+    expect(captureCliStdinPrompts).not.toHaveBeenCalled();
+    const flags = [{ name: 'label', type: 'string' }, { name: 'enabled', type: 'boolean' },
+      { name: 'browse', type: 'boolean' }] as const;
+    const declarations = flags.map(flag => ({ flag, source: { entry: './extension.ts', canonical: '/extension.ts' } }));
+    expect(declarations.map(declaration => startup.value(declaration))).toEqual(['./path-value.json', false, true]);
+    startup.validate(declarations);
+    return { runtime: createCliBootstrapRuntimeContext(input), extensions: { check: vi.fn(), retire: vi.fn(), bind: vi.fn() } };
+  });
+  try {
+    await fixture.run();
+    expect(createCliSessionRuntime).toHaveBeenCalledOnce();
+    expect(captureCliStdinPrompts).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({ printMode: true, promptArg: 'User question --literal' }),
+    }));
+    expect(startExtensionsFor).toHaveBeenCalledOnce();
+  } finally { fixture.dispose(); }
+});
+
+it.each([
+  { option: '--other', candidate: 'Must not dispatch', message: 'not registered' },
+  { option: '--ready', candidate: './ambiguous/workspace', message: 'positional workspace ambiguous' },
+])('refuses $option before consuming stdin, startup handlers or a prompt', async ({ option, candidate, message }) => {
+  const fixture = outputFixture({ args: ['-e', './extension.ts', option, candidate, '--print'] });
+  const actual = await vi.importActual<typeof import('../../entrypoints/cliArgs.js')>('../../entrypoints/cliArgs.js');
+  vi.mocked(parseCliArgs).mockImplementation(actual.parseCliArgs);
+  vi.mocked(prepareCliBootstrapRuntimeContext).mockImplementationOnce(async (_input, startup) => {
+    startup.validate([{ flag: { name: 'ready', type: 'boolean' }, source: { entry: './extension.ts', canonical: '/extension.ts' } }]);
+    throw new Error('Argument validation unexpectedly accepted the options.');
+  });
+  try {
+    await expect(fixture.run()).rejects.toBe(fixture.terminalExit);
+    expect(fixture.writeError).toHaveBeenCalledWith(expect.stringContaining(message));
+    expect(fixture.exit).toHaveBeenCalledWith(1);
+    expect(startExtensionsFor).not.toHaveBeenCalled();
+    expect(createCliBootstrapRuntimeContext).not.toHaveBeenCalled();
+    expect(createCliSessionRuntime).not.toHaveBeenCalled();
+    expect(captureCliStdinPrompts).not.toHaveBeenCalled();
+    expect(runCliPrintModeRouter).not.toHaveBeenCalled();
+  } finally { fixture.dispose(); }
+});
 
 it('awaits session startup before the first prompt and drains the run before session shutdown and extension retirement', async () => {
   const fixture = outputFixture({ options: { printMode: true } });

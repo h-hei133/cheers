@@ -193,6 +193,32 @@ it.each((['input', 'UserPromptSubmit'] as const).flatMap(eventName =>
     } finally { await service.close(); }
   });
 
+it.each(['confirmed', 'failed', 'unknown-cleanup', 'invalid'] as const)(
+  'binds installed tool result decoding to the private event output and confirmed worker settlement (%s)', async mode => {
+    const result: ToolExecutionResult = { success: mode !== 'failed',
+      output: JSON.stringify({ output: 'Wrong output channel' }),
+      metadata: { cleanup: mode === 'unknown-cleanup' ? 'unknown' : 'confirmed',
+        eventOutput: JSON.stringify(mode === 'invalid' ? { isError: false, output: 'Invalid replacement' }
+          : { output: 'Installed replacement', feedback: 'Installed feedback' }) } };
+    vi.spyOn(execution, 'executeScript').mockResolvedValue(result);
+    const store = new ExtensionStore(registry);
+    const service = new ExtensionService({ root: workspace, store, check: () => {}, offline: () => false,
+      denyRules: () => [], assertWorkspace: () => {}, gate: () => ({ sessionId: 'tool-result', workspaceRoot: workspace }) as never });
+    vi.spyOn(service, 'current').mockImplementation(() => {});
+    try {
+      const consumer = service as unknown as { dispatchEvent(record: PackageRecord, script: string, event: string,
+        payload: unknown, aliases: readonly string[] | undefined, epoch: number): Promise<unknown> };
+      const pending = consumer.dispatchEvent({ active: { manifest: { permissions: { workspace: 'read' } } } } as PackageRecord,
+        'result', 'tool_result', { type: 'tool_result' }, undefined, 0);
+      if (mode === 'confirmed') {
+        await expect(pending).resolves.toEqual({ output: 'Installed replacement', feedback: 'Installed feedback' });
+      } else {
+        await expect(pending).rejects.toThrow(/cleanup is unverified|returned invalid data/);
+      }
+      expect(execution.executeScript).toHaveBeenCalledOnce();
+    } finally { await service.close(); }
+  });
+
 it('enforces the shared manifest budget for cold and prewarmed extension catalogs', async () => {
   installed('alpha'); installed('beta');
   await expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture' })).rejects.toThrow(/no complete catalog/);

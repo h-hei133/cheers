@@ -9,14 +9,16 @@ import { digest } from './compaction/state.js';
 import { contextCheckpointIndex, formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
 import { generateCompaction, CompactionStepUnknown } from './compaction/generation.js';
 import type { CompactionAuthority, CompactionOperationInput, CompactionSource, SummarizeHistory, SummarizeTurnPrefix } from './compaction/contract.js';
-import { CompactionPublicationError } from './compaction/contract.js';
+import { bindCompactionSource, CompactionOperationError, CompactionPublicationError } from './compaction/contract.js';
 import { COMPACTION_DECLINE_MESSAGES, CompactionSummaryError } from './compaction/failure.js';
 import { createCompactionProgress } from './compaction/progress.js';
+import { reportCompaction, type CompactionDecision, type CompactionLifecycle, type CompactionReason } from './compaction/lifecycle.js';
 import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
 
 export type { PreparedSummaryStep, SummarizeHistory, SummarizeRequest, SummarizeTurnPrefix } from './compaction/contract.js';
 export { CONTEXT_CHECKPOINT_MARKER, formatContextCheckpoint, readContextCheckpoint } from './compaction/checkpoint.js';
 export { shouldCompact } from './compaction/budget.js';
+export type { CompactionLifecycle, CompactionReason } from './compaction/lifecycle.js';
 
 /**
  * Characters the closing instruction adds to a request that is about to be
@@ -162,29 +164,6 @@ export interface CompactionCut {
 export interface CompactionPlan extends CompactionCut {
   readonly keptMessages: number;
   readonly tokensBefore: number;
-}
-
-/** Why a compaction ran, so a hook can tell a scheduled one from a rescue. */
-export type CompactionReason = "manual" | "threshold" | "overflow";
-
-/**
- * What the caller wants told about a compaction, before and after.
- *
- * `before` may refuse: a compaction discards the wording of everything it
- * condenses, so a caller that can see the conversation is allowed to stop it.
- */
-export interface CompactionLifecycle {
-  readonly before?: (input: {
-    readonly reason: CompactionReason;
-    readonly tokensBefore: number;
-    readonly messageCount: number;
-  }) => Promise<boolean> | boolean;
-  readonly after?: (input: {
-    readonly reason: CompactionReason;
-    readonly summary: string;
-    readonly keptMessages: number;
-    readonly tokensBefore: number;
-  }) => Promise<void> | void;
 }
 
 /**
@@ -467,6 +446,7 @@ export interface CondensedContext {
   /** What the context is estimated to cost after the checkpoint replaces the head. */
   readonly tokensAfter: number;
   readonly preparedPolicy?: CompactionPolicy;
+  readonly decision?: CompactionDecision;
 }
 
 /**
@@ -485,6 +465,7 @@ export type CompactionDecline =
    * own reason rather than sharing one with the size-based declines.
    */
   | "blocked-by-hook"
+  | 'refused-by-extension'
   /**
    * The conversation already fits inside the recent-tail budget, so there is
    * nothing older than the kept tail to replace. This is the common case: a
@@ -549,6 +530,8 @@ export interface CondenseInput {
   readonly force?: boolean;
   /** A legal cut was admitted for this caller, including when generation is shared. */
   readonly onStarted?: () => void;
+  /** Recheck the original stored branch before beginning summary work. */
+  readonly checkSource?: () => void;
   /**
    * Before generation may refuse it; callers dispatch after only following verified commit.
    *
@@ -576,6 +559,7 @@ export interface CondenseInput {
 }
 
 const pendingCompactions = new Map<string, Promise<CondenseOutcome>>();
+class CompactionExtensionRefusal extends Error {}
 
 /** Identical work in this process joins one generation; other processes consult durable claims. */
 export async function condenseContext(input: CondenseInput): Promise<CondenseOutcome> {
@@ -597,7 +581,7 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
     return { status: 'declined', reason: 'below-threshold' };
   }
   const offset = source ? original.length - source.history.length : 0;
-  const captured = capturedGenerationInput(input, preparedPolicy, tokensBefore);
+  const captured = capturedGenerationInput(input, preparedPolicy);
   const plan = captured.force
     ? planCompactionCut(captured.messages, captured.policy)
     : planCompaction(captured.messages, captured.policy, captured.toolsAllowed);
@@ -609,16 +593,34 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
   }
   // Activity belongs to each caller's settlement, even when only one summary is generated.
   input.onStarted?.();
-  const key = captured.operation && !input.policy.prepare && !input.policy.estimateContextTokens
+  const material = summaryMaterial(captured.messages, plan);
+  const fact = { reason: input.lifecycleReason ?? 'manual', tokensBefore, messageCount: original.length } as const;
+  if (input.lifecycle?.before && await input.lifecycle.before(fact) === false) return { status: 'declined', reason: 'blocked-by-hook' };
+  const decision = await input.lifecycle?.decide?.({ ...fact, keptMessages: plan.keptMessages, messages: material.history,
+    turnPrefix: material.prefix, previousSummary: material.previousSummary, instructions: input.instructions }, input.signal);
+  if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
+  if (decision?.cancel === 'hook') return { status: 'declined', reason: 'blocked-by-hook' };
+  if (decision?.cancel === 'extension') return { status: 'declined', reason: 'refused-by-extension' };
+  const checkAdmission = () => {
+    if (decision?.admission?.()) throw new CompactionExtensionRefusal();
+    if (preparedPolicy.admission?.()) throw new CompactionOperationError('Compaction request ownership changed.');
+    if (decision) input.checkSource?.();
+  };
+  try { checkAdmission(); }
+  catch (error) {
+    if (error instanceof CompactionExtensionRefusal) return { status: 'declined', reason: 'refused-by-extension' };
+    throw error;
+  }
+  const key = decision?.summary === undefined && captured.operation && !input.policy.prepare && !input.policy.estimateContextTokens
     && !preparedPolicy.prepare && !preparedPolicy.estimateContextTokens ? digest([{ ...captured.operation,
     source: captured.operation.source && { sessionId: captured.operation.source.sessionId,
       identity: captured.operation.source.replayIdentity ?? captured.operation.source.identity } },
-    captured.messages, captured.instructions, captured.policy.summaryIdentity,
+    captured.messages, captured.instructions, plan, captured.policy.summaryIdentity,
     captured.policy.contextWindow, captured.policy.inputLimit, captured.policy.reserveTokens,
     captured.policy.outputTokens, captured.policy.keepRecentTokens, captured.policy.segmentTokens, captured.policy.mergeTokens,
     captured.policy.enabled, Boolean(captured.summarizeTurnPrefix)]) : undefined;
   const joined = key ? pendingCompactions.get(key) : undefined;
-  const pending = joined ?? generateContext(captured, plan);
+  const pending = joined ?? generateContext(captured, plan, material, checkAdmission, decision?.summary);
   if (key && !joined) pendingCompactions.set(key, pending);
   try {
     const result = await pending;
@@ -636,46 +638,40 @@ export async function condenseContext(input: CondenseInput): Promise<CondenseOut
       if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
       throw error;
     }
+    if (decision?.admission?.()) return { status: 'declined', reason: 'refused-by-extension' };
     const tokensAfter = estimateCompactionContext(messages, candidatePolicy, input.toolsAllowed);
     // Compare the two complete caller requests, never the source-only material
     // or a provider measurement against an estimate of the rebuilt candidate.
     if (tokensAfter >= estimatedBefore) return { status: 'declined', reason: 'would-not-shrink' };
-    return { ...result, plan, messages, tokensAfter, preparedPolicy: candidatePolicy };
+    return { ...result, plan, messages, tokensAfter, preparedPolicy: candidatePolicy, decision };
   } finally {
     if (key && !joined && pendingCompactions.get(key) === pending) pendingCompactions.delete(key);
   }
 }
 
-async function generateContext(input: CondenseInput, plan: CompactionPlan): Promise<CondenseOutcome> {
+function summaryMaterial(messages: readonly AgentMessage[], plan: CompactionPlan) {
   // A leading system message is carried over verbatim by applyCompaction, so
   // summarizing it as well would pay to restate what is still there.
-  const head = contextCheckpointIndex(input.messages);
+  const head = contextCheckpointIndex(messages);
   // A conversation that was compacted before opens with the checkpoint that
   // compaction left. That text is already a summary, so it travels back to the
   // summarizer as the summary to revise rather than as history to condense —
   // condensing a condensation sheds a little of it on every pass.
-  const existing = input.messages[head];
+  const existing = messages[head];
   const previousSummary = existing && head < plan.cut ? readContextCheckpoint(messageToText(existing.content)) : undefined;
   const historyStart = previousSummary === undefined ? head : head + 1;
   // When the cut sits inside a turn, that turn's opening message is neither kept
   // nor part of the older history, so the history stops where the turn begins
   // and the opener is summarized separately.
   const historyEnd = plan.splitsTurn ? plan.turnStart : plan.cut;
-  // Asked before the summary is requested, so a refusal costs nothing. The
-  // tokens are the same estimate the rest of this function works from.
-  const proceed = await input.lifecycle?.before?.({
-    reason: input.lifecycleReason ?? "manual",
-    tokensBefore: plan.tokensBefore,
-    messageCount: input.messages.length,
-  });
-  if (proceed === false) {
-    return { status: "declined", reason: "blocked-by-hook" };
-  }
-  if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
-  if (input.policy.admission?.()) throw new Error('Compaction request ownership changed.');
+  const history = messages.slice(historyStart, historyEnd).filter(message => !message.requestDeclaration);
+  const prefix = plan.splitsTurn ? messages.slice(Math.max(plan.turnStart, historyStart), plan.cut).filter(message => !message.requestDeclaration) : [];
+  return { history, prefix, previousSummary };
+}
 
-  const history = input.messages.slice(historyStart, historyEnd).filter(message => !message.requestDeclaration);
-  const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, historyStart), plan.cut).filter(message => !message.requestDeclaration) : [];
+async function generateContext(input: CondenseInput, plan: CompactionPlan, material: ReturnType<typeof summaryMaterial>,
+  checkAdmission: () => void, override?: string): Promise<CondenseOutcome> {
+  const { history, prefix, previousSummary } = material;
   const operation = input.operation ? { ...input.operation,
     policyDigest: digest([input.policy.contextWindow, input.policy.reserveTokens, input.policy.outputTokens, input.policy.keepRecentTokens,
       input.policy.enabled, input.policy.summaryIdentity, input.policy.segmentTokens, input.policy.mergeTokens, input.instructions, plan,
@@ -683,11 +679,12 @@ async function generateContext(input: CondenseInput, plan: CompactionPlan): Prom
       input.messages]) } : undefined;
   let summary: string | undefined;
   try {
-    summary = await generateCompaction({ history, prefix, previousSummary, instructions: input.instructions,
-      signal: input.signal, maxTokens: input.policy.segmentTokens, maxMergeTokens: input.policy.mergeTokens, operation,
+    summary = override ?? await generateCompaction({ history, prefix, previousSummary, instructions: input.instructions,
+      signal: input.signal, maxTokens: input.policy.segmentTokens, maxMergeTokens: input.policy.mergeTokens, operation, checkAdmission,
       summarize: input.summarize, summarizeTurnPrefix: input.summarizeTurnPrefix });
   } catch (error) {
     if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
+    if (error instanceof CompactionExtensionRefusal) return { status: 'declined', reason: 'refused-by-extension' };
     if (error instanceof CompactionStepUnknown) return { status: 'declined', reason: 'step-unknown' };
     throw error;
   }
@@ -783,6 +780,7 @@ export function createCompactionStep(
           summarizeTurnPrefix: summarizers.summarizeTurnPrefix,
           signal,
           ...(snapshot.toolsAllowed !== undefined ? { toolsAllowed: snapshot.toolsAllowed } : {}),
+          ...(source && options.authority ? { checkSource: bindCompactionSource(source, () => options.authority!.capture(snapshot.messages)) } : {}),
           ...(options.lifecycle ? { lifecycle: options.lifecycle } : {}),
           lifecycleReason: reason,
           ...(options.sessionId ? { operation: { sessionId: options.sessionId,
@@ -822,7 +820,7 @@ export function createCompactionStep(
       // Decisions after the threshold was crossed still need an explanation.
       // Unknown sends retain their decline state and never authorize a replay.
       if (condensed.status === "declined") {
-        if ((condensed.reason === 'blocked-by-hook' || condensed.reason === 'would-not-shrink'
+        if ((condensed.reason === 'blocked-by-hook' || condensed.reason === 'refused-by-extension' || condensed.reason === 'would-not-shrink'
           || condensed.reason === 'step-unknown') && reportedRefusal !== condensed.reason) {
           reportedRefusal = condensed.reason;
           options.onDeclined?.(COMPACTION_DECLINE_MESSAGES[condensed.reason]);
@@ -832,7 +830,7 @@ export function createCompactionStep(
       reportedRefusal = undefined;
       const { plan, summary } = condensed;
       const candidatePolicy = condensed.preparedPolicy ?? currentPolicy ?? policy;
-      const admission = (): string | undefined => candidatePolicy.admission?.() ?? options.authority?.admission?.();
+      const admission = (): string | undefined => condensed.decision?.admission?.() ?? candidatePolicy.admission?.() ?? options.authority?.admission?.();
       const blocked = admission();
       if (blocked) {
         options.onDeclined?.(`Automatic compaction was not published: ${blocked}`);
@@ -847,9 +845,10 @@ export function createCompactionStep(
           return undefined;
         }
       }
-      if (options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore }) === false) return undefined;
-      await options.lifecycle?.after?.({ reason, summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
-      if (signal?.aborted) return undefined;
+      const accepted = options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore }) !== false;
+      if (!accepted && !source) return undefined;
+      await reportCompaction(options.lifecycle, condensed, reason);
+      if (!accepted || signal?.aborted) return undefined;
       progress?.accepted(condensed.messages, plan.keptMessages, snapshot.toolsAllowed, candidatePolicy);
       return { messages: condensed.messages };
     } finally {

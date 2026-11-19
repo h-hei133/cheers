@@ -321,7 +321,7 @@ async function sendCompactionRequest(request: CompactionRequest,
     ...(request.provider.credentialId && request.provider.credentialGeneration
       ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
   const transport: ModelTransport | undefined = dispatch ? (input, init, beforeDispatch) => {
-    const handoff = (): void => { beforeDispatch(); dispatch.dispatch(); };
+    const handoff = (): void => { dispatch.checkAdmission?.(); beforeDispatch(); dispatch.dispatch(); };
     if (request.modelTransport) return request.modelTransport(input, init, handoff);
     handoff();
     return fetchImpl(input, init);

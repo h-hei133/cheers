@@ -2,6 +2,7 @@ import path from "node:path";
 import { profileName } from "../core/paths/profile/name.js";
 import { RUNTIME_PROVIDERS, isRuntimeProvider } from "../config/runtimeConfig.js";
 import { scanCliArgs, type CliInvocation } from "../cli/options/argv.js";
+import { EXTENSION_FLAG_NAME } from '../extensions/runtime/flag.js';
 import { listSlashInvocations, subscribeSlashCommands } from "./slashCommandRegistry.js";
 import type {
   CliArgParseError,
@@ -212,6 +213,12 @@ export function parseCliArgs(
   if (skillPaths.length > 0) opts.skillPaths = skillPaths;
   if (themePaths.length > 0) opts.themePaths = themePaths;
   if (extensionPaths.length > 0) opts.extensionPaths = extensionPaths;
+  const unresolved = invocation.unresolved;
+  if (unresolved.length && (!parseOptions.deferExtensionOptions || extensionPaths.length === 0
+    || doctorRequested || opts.listModels !== undefined || opts.exportTarget !== undefined
+    || unresolved.some(option => !option.name.startsWith('--') || !EXTENSION_FLAG_NAME.test(option.name.slice(2))))) {
+    return parseError("Unrecognized option. Place dash-prefixed prompt text after --.");
+  }
 
   const project = explicitProject ?? attachProject;
   if (project) {
@@ -245,7 +252,8 @@ export function parseCliArgs(
   const prompt = promptTokens.join(" ");
   opts.promptArg = prompt.trim().length > 0 ? prompt : undefined;
 
-  return { ok: true, args: { rawArgs, options: opts, versionRequested: false, doctorRequested: false } };
+  return { ok: true, args: { rawArgs, options: opts, versionRequested: false, doctorRequested: false,
+    ...(unresolved.length ? { extensionOptions: unresolved } : {}) } };
 }
 
 export function isPrintModeRequested(args: CliArgs): boolean {

@@ -17,6 +17,8 @@ import { routeSlashCommand } from '../../../core/commands/slashRouter.js';
 import {bindSessionSurface} from '../session/surface.js';
 import {bindExtensionUiFor, extensionHostFor, installExtensionHost} from './host.js';
 import {captureExtensionRuntimeFor, closeExtensionsFor, extensionCommandFor, installExtensionRuntime, startExtensionsFor} from '../extensions.js';
+import { scanCliArgs } from '../../options/argv.js';
+import { cliExtensionArguments, type CliExtensionArguments } from '../../options/extensions.js';
 
 let root: string, context: ShellRuntimeContext, runtime: ShellSessionRuntime, manager: SessionManager;
 let busy = false;
@@ -33,10 +35,37 @@ beforeEach(() => {
     executePrompt:vi.fn(async () => 'answer')} as unknown as ShellSessionRuntime;
 });
 afterEach(async () => {cleanups.splice(0).forEach(fn => fn()); await closeExtensionsFor(context).catch(() => {}); vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root,{recursive:true,force:true});});
-function install() {
-  installExtensionRuntime(context,runtime,() => ({sessionId:context.session.id,workspaceRoot:root,hooks:new HookDispatcher(),emit(){},permissionScope:'ask'}),manager);
+function install(args?: CliExtensionArguments) {
+  installExtensionRuntime(context,runtime,() => ({sessionId:context.session.id,workspaceRoot:root,hooks:new HookDispatcher(),emit(){},permissionScope:'ask'}),manager,undefined,args);
 }
 function reload(signal?: AbortSignal) {return extensionCommandFor(context)('plugin',['reload'],{cwd:root,projectRoot:root,sessionId:context.session.id,signal});}
+
+it.each(['different entry', 'retargeted symlink'] as const)('withholds invoked values on reload with a %s', async change => {
+  const first = path.join(root, 'owner.ts'), second = path.join(root, 'successor.ts'), link = path.join(root, 'entry.ts');
+  fs.writeFileSync(first, `export default api => {
+    api.registerFlag({name:'label', default:'FIRST_DEFAULT'});
+    api.registerCommand({name:'show-label', execute: () => ({kind:'local', output:api.getFlag('label')})});
+  };`);
+  fs.writeFileSync(second, `export default api => {
+    try { api.registerFlag({name:'label', default:'SECOND_DEFAULT'}); } catch {}
+    if (api.getFlag('label') !== undefined) throw new Error('Successor observed an invoked value.');
+    api.registerCommand({name:'adopted-label', execute: () => ({kind:'local', output:'unexpected'})});
+  };`);
+  if (change === 'retargeted symlink') fs.symlinkSync(first, link);
+  context.cliExtensionPaths = [change === 'retargeted symlink' ? link : first];
+  const finalize = vi.fn();
+  install(cliExtensionArguments(scanCliArgs(['--label=FIRST_EXPLICIT']).unresolved, finalize));
+  await startExtensionsFor(context);
+  const original = catalogContributions(root, context.session.id).flatMap(entry => entry.commands)[0]!;
+  expect(await original.execute([], { cwd: root, sessionId: context.session.id })).toMatchObject({output:'FIRST_EXPLICIT'});
+  expect((await reload()).output).toContain('reloaded');
+  expect(finalize).toHaveBeenCalledTimes(2);
+  if (change === 'retargeted symlink') { fs.unlinkSync(link); fs.symlinkSync(second, link); }
+  else context.cliExtensionPaths = [second];
+  expect((await reload()).output).toContain('unknown');
+  expect(finalize).toHaveBeenCalledTimes(2);
+  expect(catalogContributions(root, context.session.id)).toEqual([]);
+});
 
 it('never cancels a successor command when a captured original runtime shuts down and closes', async () => {
   install(); await startExtensionsFor(context); const original = captureExtensionRuntimeFor(context)!;

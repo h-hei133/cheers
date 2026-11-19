@@ -3,13 +3,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from '../SessionManager.js';
-import { compactSessionHistory } from '../../core/shell/compaction.js';
-import { createCompactionStep } from '../compaction.js';
+import { buildCompactionLifecycle, compactSessionHistory } from '../../core/shell/compaction.js';
+import { condenseContext, createCompactionStep, planCompactionCut } from '../compaction.js';
+import { registerCatalogContribution } from '../../core/catalog/contributions.js';
+import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
+import { runEventHandlers } from '../../extensions/events/dispatch.js';
+import type { ExtensionSessionBeforeEventPayload, ExtensionSessionEventPayload } from '../../extensions/events/model.js';
 import { sessionCompactionAuthority } from './authority.js';
 import { readSessionThreadSnapshot, switchDurableSessionActiveLeaf } from '../store/threadState.js';
 import { SessionStoreAccess } from '../store/sessionStoreAccess.js';
 import { encodeTranscriptEvent, classifyTranscriptLine } from '../sessionEventCodec.js';
-import { CompactionPublicationError } from './contract.js';
+import { CompactionPublicationError, type PreparedSummaryStep } from './contract.js';
+import { compactionOperationsPath } from './state.js';
 import { runTurn } from '../../turn/session.js';
 import type { AgentMessage } from '../../core/agent/state.js';
 
@@ -38,6 +43,164 @@ beforeEach(() => {
 });
 afterEach(() => { lockProbe.beforeRegistryLock = undefined; vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { force: true, recursive: true }); });
 const compactions = () => manager.getTranscriptEvents(sessionId).filter(event => event.type === 'compaction');
+
+function registerCompactionHandlers(handlers: Record<string, readonly ((payload: unknown) => unknown)[]>): () => void {
+  const registered = new Map(Object.entries(handlers));
+  return registerCatalogContribution({ root: home, sessionId, commands: [], tools: [], skills: () => [],
+    onEvent: (event, payload, aliases, signal) => runEventHandlers({ handlers: registered, event, payload, aliases, signal }) });
+}
+
+it.each(['manual', 'threshold', 'overflow'] as const)('publishes a custom %s summary through the original planned and verified commit', async reason => {
+  const summary = 'Extension checkpoint';
+  const summarize = vi.fn(async () => 'unexpected default');
+  const legacy = vi.fn(() => ({ decision: 'allow' as const }));
+  const hooks = new HookDispatcher({ inProcessHooks: [{ event: 'PreCompact', handler: legacy }] });
+  const before = vi.fn((event: unknown) => {
+    const plan = event as ExtensionSessionBeforeEventPayload<'session_before_compact'>;
+    expect(plan).toMatchObject({ type: 'session_before_compact', reason, sessionId, workspaceRoot: home, messageCount: 12 });
+    expect(plan.messages).not.toHaveLength(0);
+    expect(Object.isFrozen(plan.messages[0])).toBe(true);
+    expect(Object.keys(plan.messages[0]!)).toEqual(['role', 'text']);
+    return { summary, keptMessages: 0, tokensBefore: 1 };
+  });
+  const after = vi.fn((event: unknown) => {
+    const notice = event as ExtensionSessionEventPayload<'session_compact'>;
+    expect(notice).toMatchObject({ type: 'session_compact', reason, summary, fromExtension: true });
+    expect(compactions()).toHaveLength(1);
+    expect(manager.getTranscriptEvents(sessionId).some(entry => entry.type === 'compaction-commit')).toBe(true);
+    expect(new SessionManager().getSession(sessionId)!.turns[0]!.content).toContain(summary);
+  });
+  const retire = registerCompactionHandlers({ session_before_compact: [before, () => ({ cancel: false })], session_compact: [after] });
+  try {
+    const history = manager.getSession(sessionId)!.turns;
+    const planned = planCompactionCut(history, policy)!;
+    const authority = sessionCompactionAuthority({ sessionId, workspaceRoot: home, admission: () => undefined,
+      isCurrent: () => true, capture: () => manager.captureCompactionSource(sessionId), commit: input => manager.appendCompactionIfCurrent(input) });
+    if (reason === 'manual') {
+      expect(await compactSessionHistory({ store: manager, sessionId, policy, summarize, workspaceRoot: home, hooks })).toMatchObject({ status: 'compacted' });
+    } else {
+      const lifecycle = buildCompactionLifecycle({ hooks, sessionId, workspaceRoot: home, reason });
+      const step = createCompactionStep(policy, { sessionId, summarize, authority, lifecycle, reason, force: reason === 'overflow' });
+      expect(await step({ messages: history, toolResults: [] })).toMatchObject({ messages: expect.any(Array) });
+    }
+    expect(summarize).not.toHaveBeenCalled();
+    expect(legacy).toHaveBeenCalledOnce();
+    expect(before).toHaveBeenCalledOnce();
+    expect(after).toHaveBeenCalledOnce();
+    expect(compactions()[0]).toMatchObject({ summary, tokensBefore: expect.any(Number), keptMessages: planned.keptMessages });
+    expect(compactions()[0]).not.toMatchObject({ tokensBefore: 1 });
+  } finally { retire(); }
+});
+
+it.each(['cancel', 'invalid', 'legacy', 'refuse-shrink', 'stale', 'retire', 'no-plan'] as const)('refuses compaction without default dispatch or publication (%s)', async mode => {
+  let foreignGetterCalls = 0;
+  const summarize = vi.fn(async () => 'unexpected default');
+  const later = vi.fn(() => ({ cancel: false }));
+  const after = vi.fn();
+  const before = vi.fn(async () => {
+    if (mode === 'invalid') return Object.defineProperty({}, 'summary', { enumerable: true, get: () => { foreignGetterCalls++; return 'invalid'; } });
+    if (mode === 'stale') manager.addTurn(sessionId, { role: 'user', content: 'Competing saved message' });
+    if (mode === 'retire') retire();
+    return mode === 'cancel' ? { cancel: true } : { summary: mode === 'refuse-shrink' ? 'x'.repeat(20_000) : 'Extension checkpoint' };
+  });
+  const retire = registerCompactionHandlers({ session_before_compact: [() => ({ summary: 'Earlier checkpoint' }), before, later], session_compact: [after] });
+  const hooks = new HookDispatcher({ inProcessHooks: [{ event: 'PreCompact', handler: () => ({ decision: mode === 'legacy' ? 'block' : 'allow' }) }] });
+  try {
+    const budget = mode === 'no-plan' ? { ...policy, contextWindow: 30_000, keepRecentTokens: 20_000 } : policy;
+    const outcome = await compactSessionHistory({ store: manager, sessionId, policy: budget, hooks, summarize, workspaceRoot: home });
+    expect(outcome.status).toBe(mode === 'refuse-shrink' || mode === 'no-plan' ? 'nothing' : 'failed');
+    if (mode === 'legacy') expect(outcome).toMatchObject({ reason: 'Compaction was refused by a PreCompact hook.' });
+    if (mode === 'cancel' || mode === 'invalid' || mode === 'retire') {
+      expect(outcome).toMatchObject({ reason: 'Compaction was refused by a session extension.' });
+    }
+    expect(compactions()).toHaveLength(0);
+    expect(summarize).not.toHaveBeenCalled();
+    expect(after).not.toHaveBeenCalled();
+    expect(foreignGetterCalls).toBe(0);
+    expect(before).toHaveBeenCalledTimes(mode === 'no-plan' || mode === 'legacy' ? 0 : 1);
+    if (mode === 'cancel') expect(later).not.toHaveBeenCalled();
+  } finally { retire(); }
+});
+
+it.each(['prepare retirement', 'prepare replacement', 'handoff retirement', 'handoff replacement'] as const)(
+  'refuses stale native compaction before transmission after %s', async boundary => {
+    let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const transmit = vi.fn();
+    const send = vi.fn<PreparedSummaryStep['send']>(async dispatch => {
+      if (boundary.startsWith('handoff')) { entered(); await pending; }
+      dispatch!.dispatch();
+      transmit();
+      return 'Stale summary';
+    });
+    const summarize = Object.assign(vi.fn(async () => 'unexpected fallback'), {
+      prepare: async (): Promise<PreparedSummaryStep> => {
+        if (boundary.startsWith('prepare')) { entered(); await pending; }
+        return { identity: 'captured-summary-request', tokens: 1, send };
+      },
+    });
+    const after = vi.fn();
+    const retire = registerCompactionHandlers({ session_before_compact: [() => undefined], session_compact: [after] });
+    const run = compactSessionHistory({ store: manager, sessionId, policy, summarize, workspaceRoot: home });
+    try {
+      await started;
+      if (boundary.endsWith('retirement')) retire();
+      else manager.resume(sessionId);
+      release();
+      expect(await run).toMatchObject({ status: 'failed', reason: boundary.endsWith('retirement')
+        ? 'Compaction was refused by a session extension.' : expect.stringContaining('The session source changed') });
+      expect(send).toHaveBeenCalledTimes(boundary.startsWith('handoff') ? 1 : 0);
+      expect(transmit).not.toHaveBeenCalled();
+      expect(summarize).not.toHaveBeenCalled();
+      expect(compactions()).toEqual([]);
+      expect(after).not.toHaveBeenCalled();
+      const ledger = compactionOperationsPath(sessionId);
+      if (boundary.startsWith('prepare')) expect(fs.existsSync(ledger)).toBe(false);
+      else {
+        const captured = JSON.parse(fs.readFileSync(ledger, 'utf8')) as import('./contract.js').OperationFile;
+        expect(Object.values(captured.operations).flatMap(operation => Object.values(operation.steps))).toEqual([]);
+      }
+    } finally { release(); retire(); await run; }
+  },
+);
+
+it('notifies the original compaction audience when cancellation arrives after a verified write', async () => {
+  const controller = new AbortController();
+  const after = vi.fn(() => { expect(controller.signal.aborted).toBe(true); expect(compactions()).toHaveLength(1); });
+  const retire = registerCompactionHandlers({ session_before_compact: [() => ({ summary: 'Accepted checkpoint' })], session_compact: [after] });
+  const authority = sessionCompactionAuthority({ sessionId, workspaceRoot: home, admission: () => undefined,
+    isCurrent: () => true, capture: () => manager.captureCompactionSource(sessionId), commit: input => {
+      const committed = manager.appendCompactionIfCurrent(input);
+      controller.abort();
+      return committed;
+    } });
+  try {
+    const summarize = vi.fn(async () => 'unexpected default');
+    const outcome = await compactSessionHistory({ store: manager, sessionId, policy, authority, summarize, workspaceRoot: home, signal: controller.signal });
+    expect(outcome).toMatchObject({ status: 'compacted' });
+    expect(after).toHaveBeenCalledOnce();
+    expect(summarize).not.toHaveBeenCalled();
+  } finally { retire(); }
+});
+
+it('honours each caller veto or summary while an equivalent default generation is in flight', async () => {
+  let entered!: () => void, release!: () => void;
+  const started = new Promise<void>(done => { entered = done; });
+  const hold = new Promise<void>(done => { release = done; });
+  const summarize = vi.fn(async () => { entered(); await hold; return 'Default checkpoint'; });
+  const source = manager.captureCompactionSource(sessionId);
+  const input = { policy, summarize, messages: source.history, force: true, operation: { sessionId, source } };
+  const primary = condenseContext(input);
+  try {
+    await started;
+    expect(await condenseContext({ ...input, lifecycle: { before: () => false } })).toEqual({ status: 'declined', reason: 'blocked-by-hook' });
+    expect(await condenseContext({ ...input, lifecycle: { decide: () => ({ summary: 'Different checkpoint' }) } }))
+      .toMatchObject({ status: 'condensed', summary: 'Different checkpoint' });
+    expect(summarize).toHaveBeenCalledOnce();
+  } finally { release(); }
+  expect(await primary).toMatchObject({ status: 'condensed', summary: 'Default checkpoint' });
+});
 
 it('keeps replay identity stable across unchanged configuration publications and instruction touches', async () => {
   const instructions = path.join(home, 'AGENTS.md');

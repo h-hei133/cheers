@@ -226,6 +226,86 @@ describe('in-process TS/JS extension loader with VIRTUAL_MODULES', () => {
       invoke:{kind:'event',event:'session_before_tree',payload:{type:'session_before_tree',targetEntryId:'target'}}});
     expect(result.success).toBe(true); expect(JSON.parse(String(result.metadata?.eventOutput))).toEqual({cancel:false});
   });
+  it.each([true, false])('reduces worker tool results without changing protected observations (%s)', async canReplaceOutput => {
+    const root = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(root, { recursive: true });
+    const dir = fs.mkdtempSync(path.join(root, 'extension-tool-result-')); tempDirs.push(dir);
+    const file = path.join(dir, 'events.ts');
+    fs.writeFileSync(file, `export default api => {
+      let accessor = false;
+      api.on('tool_result', async () => ({ output: 'Worker replacement' }));
+      api.on('tool_result', () => Object.defineProperty({}, 'output', { enumerable: true, get() { accessor = true; return 'Invalid'; } }));
+      api.on('tool_result', event => {
+        if (accessor || event.output !== (event.canReplaceOutput ? 'Worker replacement' : 'Original')
+          || !Object.isFrozen(event.args) || event.metadata.read.page !== 1) throw new Error('UNSAFE_PROJECTION');
+        const bridge = globalThis.__TOOL_RESULT({ output: 'Worker replacement' });
+        if (typeof bridge !== 'string') throw new Error('HOST_OBJECT');
+        return { feedback: 'Worker feedback' };
+      });
+    };`);
+    const result = await executeInProcessScript({ root: dir, scriptFile: file,
+      record: { manifest: { name: 'result', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+      argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'result' },
+      invoke: { kind: 'event', event: 'tool_result', payload: {
+        type: 'tool_result', eventName: 'PostToolUse', workspaceRoot: dir, sessionId: 'tool-result',
+        timestamp: 'original', toolName: 'read', toolCallId: 'call', args: { path: 'file' }, output: 'Original',
+        success: true, isError: false, hasImages: false, canReplaceOutput, metadata: { read: { page: 1 } },
+      } } });
+    expect(result.success).toBe(true);
+    expect(JSON.parse(String(result.metadata?.eventOutput))).toEqual({
+      ...(canReplaceOutput ? { output: 'Worker replacement' } : {}), feedback: 'Worker feedback',
+    });
+  });
+  it.each([true, false])('reduces worker message text only for an admitted assistant message (%s)', async canReplace => {
+    const root = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(root, { recursive: true });
+    const dir = fs.mkdtempSync(path.join(root, 'extension-message-')); tempDirs.push(dir);
+    const file = path.join(dir, 'events.ts');
+    fs.writeFileSync(file, `export default api => {
+      let invokedGetter = false;
+      api.on('message_end', async () => ({ message: { role: 'assistant', content: 'First text', tool_calls: [] } }));
+      api.on('message_end', () => Object.defineProperty({}, 'message', { enumerable: true,
+        get() { invokedGetter = true; return { role: 'assistant', content: 'Invalid text' }; } }));
+      api.on('message_end', ({ message, canReplace }) => {
+        if (invokedGetter || message.tool_calls[0]?.id !== 'call' || !Object.isFrozen(message)) throw new Error('UNSAFE_PROJECTION');
+        return { message: { role: 'assistant', content: message.content + ' then final' } };
+      });
+    };`);
+    const result = await executeInProcessScript({ root: dir, scriptFile: file,
+      record: { manifest: { name: 'message', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+      argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'message' },
+      invoke: { kind: 'event', event: 'message_end', payload: { type: 'message_end', canReplace,
+        message: { role: 'assistant', content: 'Original', tool_calls: [{ id: 'call' }] },
+      } } });
+    expect(result.success).toBe(true);
+    const receipt = result.metadata?.eventOutput;
+    if (canReplace) expect(JSON.parse(String(receipt))).toEqual({ message: { role: 'assistant', content: 'First text then final' } });
+    else expect(receipt).toBe('');
+  });
+  it.each(['summary', 'cancel', 'getter', 'thenable'] as const)('reduces worker compaction results against the original plan (%s)', async mode => {
+    const root = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(root, { recursive: true });
+    const dir = fs.mkdtempSync(path.join(root, 'extension-compact-')); tempDirs.push(dir);
+    const file = path.join(dir, 'events.ts');
+    const first = mode === 'summary' ? "({ summary: 'Worker checkpoint' })" : mode === 'cancel' ? '({ cancel: true })'
+      : mode === 'getter' ? "Object.defineProperty({}, 'summary', { enumerable: true, get() { throw new Error('GETTER_EXECUTED'); } })"
+      : "({ then(resolve) { resolve({ summary: 'THENABLE_EXECUTED' }); } })";
+    fs.writeFileSync(file, `export default api => {
+      api.on('session_before_compact', () => ${first});
+      api.on('session_before_compact', event => {
+        if (${JSON.stringify(mode)} !== 'summary' || !Object.isFrozen(event.messages[0]) || event.messages[0].text !== 'Original') throw new Error('INVALID_SECOND_HANDLER');
+        return { cancel: false };
+      });
+    };`);
+    const result = await executeInProcessScript({ root: dir, scriptFile: file,
+      record: { manifest: { name: 'compact', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+      argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'compact' },
+      invoke: { kind: 'event', event: 'session_before_compact', payload: { type: 'session_before_compact', messages: [{ role: 'user', text: 'Original' }] } } });
+    if (mode === 'getter' || mode === 'thenable') {
+      expect(result.success).toBe(false);
+      expect(result.output).not.toMatch(/GETTER_EXECUTED|THENABLE_EXECUTED|INVALID_SECOND_HANDLER/);
+    } else {
+      expect(result.success).toBe(true);
+      expect(JSON.parse(String(result.metadata?.eventOutput))).toEqual(mode === 'cancel' ? { cancel: true } : { summary: 'Worker checkpoint' });
+    }
+  });
   it('loads a TypeScript extension in-process, resolves @cheers/extension-api, blocks escape, and enforces path containment + denyRules', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-ext-ts-'))
     tempDirs.push(dir)

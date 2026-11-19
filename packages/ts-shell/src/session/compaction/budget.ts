@@ -22,11 +22,8 @@ export function captureCompactionInput(input: CondenseInput): CondenseInput {
 }
 
 /** Generation reads stored raw history; lifecycle facts describe the complete caller. */
-export function capturedGenerationInput(input: CondenseInput, policy: CompactionPolicy, tokensBefore: number): CondenseInput {
-  return { ...input, messages: input.operation?.source?.history ?? input.messages, force: true, policy,
-    ...(input.lifecycle?.before ? { lifecycle: { ...input.lifecycle, before: event => input.lifecycle!.before!({
-      ...event, tokensBefore, messageCount: input.messages.length,
-    }) } } : {}) };
+export function capturedGenerationInput(input: CondenseInput, policy: CompactionPolicy): CondenseInput {
+  return { ...input, messages: input.operation?.source?.history ?? input.messages, force: true, policy };
 }
 
 /** Preparation carries the captured lifetime; an async result cannot adopt a successor. */

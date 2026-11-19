@@ -1,4 +1,5 @@
 import type { ImageContent } from "../model-adapters/multimodal.js";
+import { messageToText } from '../model-adapters/multimodal.js';
 import { AgentCore } from "../core/agent/agent.js";
 import { turnInput, type InputDisposition, type InputFormat, type QueuedInputOptions } from './input.js';
 import type { AgentLifecycleEvent } from "../core/agent/events.js";
@@ -33,6 +34,9 @@ import { currentTrace } from '../observability/tracing/context.js';
 import type { TelemetryContext } from '../observability/tracing/types.js';
 import { createTurnEvents } from './events.js';
 import {consumeInputAdmission, type InputAdmissionReceipt} from '../core/hooks/input/receipt.js';
+import { bindCompactionSource, CompactionPublicationError } from '../session/compaction/contract.js';
+import { reportCompaction } from '../session/compaction/lifecycle.js';
+import { COMPACTION_DECLINE_MESSAGES } from '../session/compaction/failure.js';
 
 /**
  * One user turn, driven through the kernel.
@@ -235,6 +239,8 @@ export function runTurn(options: TurnOptions): TurnRun {
     prepared: options.step.preparesContext === true, converted: Boolean(options.convertToLlm) }) : undefined;
   let preparedRequest: { readonly prepared: PreparedTurnContext; readonly context: RequestContextOwner } | undefined;
   let recoveredContext: PreparedTurnContext | undefined;
+  const extensionEvents = createTurnEvents({ workspaceRoot: options.workspaceRoot, sessionId: options.sessionId,
+    ...(options.admission ? { admission: options.admission } : {}) });
   const core = new AgentCore({
     initialState: { messages: options.history as readonly AgentMessage[] },
     // Absent means the kernel's own default, which is the same value the config
@@ -249,6 +255,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     tools: () => adaptTools(toolPool(), gate),
     beforeToolCall: hooks.beforeToolCall,
     afterToolCall: hooks.afterToolCall,
+    finalizeAssistant: extensionEvents.finalizeAssistant,
     streamStep: createTurnRequest({ ...options, prepareContext: compaction?.prepareContext,
       onPreparedContext: (prepared, context) => { preparedRequest = { prepared, context }; },
       consumePreparedContext: messages => {
@@ -275,12 +282,13 @@ export function runTurn(options: TurnOptions): TurnRun {
   });
 
   const queues = core.pendingQueues;
-  const extensionEvents = createTurnEvents({ workspaceRoot: options.workspaceRoot, sessionId: options.sessionId,
-    ...(options.admission ? { admission: options.admission } : {}) });
   const queue = queuedInput.control(queues.steering, queues.followUps);
   core.subscribe(async (event: AgentLifecycleEvent, signal) => {
     await extensionEvents.observe(event, signal);
     if (event.type === "message_end" && event.message !== opening && !queuedInput.wasPublished(event.message)) persist(options.onMessage, event.message);
+    if (event.type === 'message_end' && extensionEvents.replaced(event.message)) {
+      stop.query({ type: 'message.replace', role: 'coder', text: messageToText(event.message.content) });
+    }
     for (const projected of projection.project(event)) stop.query(projected);
     stop.observe(event, projection.stepCount);
     await options.observe?.(event, signal);
@@ -410,18 +418,26 @@ export function runTurn(options: TurnOptions): TurnRun {
         onStarted: () => { release = compaction?.begin(); },
         lifecycle,
         lifecycleReason: "overflow",
+        ...(source && options.compaction.authority ? { checkSource: bindCompactionSource(source, () => options.compaction!.authority!.capture(kept)) } : {}),
         operation: { sessionId: options.sessionId, source, identity: options.compaction.authority?.identity },
       }).catch(error => { if (error instanceof ModelAdmissionError) throw error; return undefined; });
       // A decline here leaves the run reporting the overflow it already hit: the
       // engine judged that condensing would not make the context smaller, so
       // retrying the same request would fail the same way.
-      if (!condensed || condensed.status !== "condensed") return false;
+      if (!condensed || condensed.status !== "condensed") {
+        if (condensed?.status === 'declined' && (condensed.reason === 'blocked-by-hook' || condensed.reason === 'refused-by-extension')) {
+          options.compaction.onDeclined?.(COMPACTION_DECLINE_MESSAGES[condensed.reason]);
+        }
+        return false;
+      }
       if (options.signal.aborted) return false;
       const { plan } = condensed;
+      const admission = () => condensed.decision?.admission?.() ?? condensed.preparedPolicy?.admission?.() ?? options.compaction?.authority?.admission?.();
+      if (admission()) return false;
       if (source && options.compaction.authority) {
         const committed = options.compaction.authority.commit({ source, summary: condensed.summary,
           keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore, signal: options.signal,
-          admission: () => condensed.preparedPolicy?.admission?.() ?? options.compaction?.authority?.admission?.() });
+          admission });
         if (committed.status === 'unverified') throw new CompactionPublicationError();
         if (committed.status !== 'committed') return false;
       }
@@ -431,8 +447,7 @@ export function runTurn(options: TurnOptions): TurnRun {
         tokensBefore: plan.tokensBefore,
       });
       core.state.messages = condensed.messages;
-      await lifecycle.after?.({ reason: 'overflow', summary: condensed.summary,
-        keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
+      await reportCompaction(lifecycle, condensed, 'overflow');
       return true;
     } finally {
       release?.();
@@ -578,4 +593,3 @@ function persist(onMessage: (message: SessionMessage) => void, message: AgentMes
   const { stopReason: _stopReason, errorMessage: _errorMessage, ...stored } = message;
   onMessage(stored);
 }
-import { CompactionPublicationError } from '../session/compaction/contract.js';

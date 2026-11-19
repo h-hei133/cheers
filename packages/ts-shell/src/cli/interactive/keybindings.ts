@@ -3,6 +3,7 @@ import path from "node:path";
 import { KEY_BINDINGS, PASTE_GESTURE, type KeyBinding } from "../../presentation/tui/chrome/keys.js";
 import { resolveUserDataFile, userDataDirFor } from "../../core/paths/userHome.js";
 import { assertProfileStorage } from '../../core/paths/profile/context.js';
+import { normalizeKey } from '../../presentation/tui/input/keyId.js';
 
 /**
  * Which key does what, and how a user changes it.
@@ -227,49 +228,6 @@ function entryKeys(entries: readonly string[]): readonly string[] {
     if (normalized !== undefined) keys.push(normalized);
   }
   return keys;
-}
-
-/** Modifiers the key parser can put in a key id. */
-const KNOWN_MODIFIERS = ["ctrl", "alt", "shift", "meta"] as const;
-
-/**
- * A key as the parser would report it, or nothing when it is not a key.
- *
- * Lower-cased and with modifiers ordered, so `Ctrl+Shift+Z` in a config file and
- * `ctrl+shift+z` from the terminal are the same binding. Without this a config
- * that looks right would never match.
- *
- * Returning nothing for an unrecognizable key is the whole point. The parser only
- * ever emits modifiers from {@link KNOWN_MODIFIERS}, so a segment it does not
- * know — `cmd`, `super`, or a typo like `cotrl` — describes a key that can never
- * arrive. Dropping the unknown segment instead would turn `cmd+z` into a binding
- * on the bare `z`, and the user would find their letter key hijacked by a
- * shortcut they thought they had given to a chord.
- */
-function normalizeKey(key: string): string | undefined {
-  const raw = key.trim().toLowerCase();
-  if (raw === "") return undefined;
-  // A trailing `+` is the key itself, not a separator. `+` is a key a person can
-  // bind, and the parser reports it as `+` alone or as `ctrl++` when a modifier
-  // is held; splitting first and dropping the empty segments — which is what this
-  // did — turned `+` into nothing and left `ctrl++` looking like a modifier with
-  // no key, so neither could ever be bound. A lone `ctrl+` is not one of those
-  // spellings and stays rejected, because the parser never emits it.
-  const trailingPlus = raw === "+" || raw.endsWith("++");
-  const body = trailingPlus ? raw.slice(0, -1) : raw;
-  const segments = body
-    .split("+")
-    .map((part) => part.trim())
-    .filter((part) => part !== "");
-  const name = trailingPlus ? "+" : segments.pop();
-  if (name === undefined || name === "") return undefined;
-  // A modifier with no key after it, as `ctrl+` produces.
-  if ((KNOWN_MODIFIERS as readonly string[]).includes(name)) return undefined;
-  // Every segment has to be a known modifier: one that is not names a key that
-  // cannot be typed, so the binding is rejected rather than silently narrowed.
-  if (segments.some((part) => !(KNOWN_MODIFIERS as readonly string[]).includes(part))) return undefined;
-  const modifiers = KNOWN_MODIFIERS.filter((modifier) => segments.includes(modifier));
-  return [...modifiers, name].join("+");
 }
 
 /** A key two actions both claim. */

@@ -1,5 +1,5 @@
 import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
-import { configurationAdmission } from '../../core/shell/configuration.js';
+import { configurationAdmission, initialConfiguration } from '../../core/shell/configuration.js';
 import { getRuntimeConfig, type RuntimeConfigOverrides } from "../../config/runtimeConfig.js";
 import { createConfigInputs } from '../../config/inputs/selection.js';
 import type { ConfigInputs } from '../../config/inputs/model.js';
@@ -8,6 +8,7 @@ import type {
 } from "../../core/shell/bootstrap.js";
 import {
   bootstrapShellRuntime,
+  prepareShellStartup,
 } from "../../core/shell/bootstrap.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
@@ -16,6 +17,14 @@ import { takeOverStdout, type StdoutGuard } from "../../core/shell/outputGuard.j
 import type { StructuredLogger } from "../../observability/index.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { sessionWorkspaceAdmission } from '../../session/continuation/workspace.js';
+import { currentProfile } from '../../core/paths/profile/context.js';
+import { assertSourceAccess } from '../../core/query/sourcePolicy.js';
+import { createCoreToolRegistry } from '../../core/tools/registry.js';
+import { filterVisibleToolNames } from '../../core/tools/prefilter.js';
+import { createCommandRegistry } from '../../core/commands/registry.js';
+import { sameValue } from '../../config/values.js';
+import type { CliExtensionArguments } from '../options/extensions.js';
+import { prepareExtensionFiles, type PreparedExtensionFiles } from '../runtime/extensions/files.js';
 import { getWorkflowGitContext } from "../../core/workspace/git.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import { resolveCliCredential } from '../provider/cliProviderRuntimeBridge.js';
@@ -97,6 +106,51 @@ export interface CreateCliBootstrapRuntimeContextInput {
 export function createCliBootstrapRuntimeContext(
   input: CreateCliBootstrapRuntimeContextInput,
 ): CliBootstrapRuntimeContext {
+  const resources = bootstrapResources(input);
+  try { return resources.finish(bootstrapShellRuntime(resources.shell)); }
+  catch (error) { return resources.fail(error); }
+}
+
+export async function prepareCliBootstrapRuntimeContext(input: CreateCliBootstrapRuntimeContextInput, argumentsFor: CliExtensionArguments): Promise<{
+  readonly runtime: CliBootstrapRuntimeContext; readonly extensions: PreparedExtensionFiles;
+}> {
+  const resources = bootstrapResources(input);
+  let extensions: PreparedExtensionFiles | undefined;
+  try {
+    const startup = prepareShellStartup(resources.shell);
+    const binding = startup.binding;
+    const settings = { projectRoot: binding.projectRoot, cwd: binding.projectRoot,
+      session: { id: binding.sessionId }, profile: currentProfile(),
+      runtimeConfig: resources.shell.runtimeConfig, runtimeConfigOverrides: resources.shell.runtimeConfigOverrides,
+      resolveConfigTarget: resources.shell.resolveConfigTarget, deferredModel: resources.shell.deferredModel };
+    const configuration = initialConfiguration(settings);
+    const admission = configurationAdmission({ ...settings, configuration });
+    const check = () => { binding.assertCurrent(); const refused = admission(); if (refused) throw new Error(refused); };
+    const denyRules = () => { check(); return configuration.current.config.denyRules; };
+    const allTools = () => { check(); return [...createCoreToolRegistry().keys()]; };
+    extensions = await prepareExtensionFiles({ paths: input.options.extensionPaths ?? [],
+      root: binding.projectRoot, baseDir: input.launchCwd, cliArguments: argumentsFor,
+      assertEntryAccess: absolute => assertSourceAccess(absolute, binding.projectRoot, binding.workspaceRoots, 'ask', denyRules()),
+      denyRules, inspect: {
+        getAllTools: allTools,
+        getActiveTools: () => filterVisibleToolNames(allTools(), configuration.current.config),
+        getCommands: () => { check(); return [...createCommandRegistry(binding.projectRoot, configuration.current.config).keys()]; },
+      } });
+    check();
+    extensions.check();
+    const runtime = resources.finish(startup.activate());
+    if (runtime.runtimeContext.cwd !== binding.projectRoot || runtime.runtimeContext.session.id !== binding.sessionId
+      || !sameValue(runtime.runtimeContext.session.workspaceRoots ?? [], binding.workspaceRoots ?? [])) {
+      throw new Error('The startup workspace changed before extension publication.');
+    }
+    return { runtime, extensions };
+  } catch (error) {
+    extensions?.retire();
+    return resources.fail(error);
+  }
+}
+
+function bootstrapResources(input: CreateCliBootstrapRuntimeContextInput) {
   const output = input.output ?? (input.options.printMode || input.options.jsonEvents || input.options.rpcMode
     ? takeOverStdout() : undefined);
   try {
@@ -130,65 +184,57 @@ export function createCliBootstrapRuntimeContext(
     const recoveryCandidateSummary = null;
     const recoveryBlockedNotice = null;
     let pendingModel = Boolean(input.options.model);
-    const bootstrap = (() => {
-      try {
-        return bootstrapShellRuntime({
-          cwd: input.rootContext.workspaceRoot,
-          launchCwd: input.launchCwd,
-          runtimeConfig: input.rootContext.runtimeConfig,
-          runtimeConfigOverrides: configOverrides(input.options),
-          resolveConfigTarget: (config, sessionId) => resolveCliCredential(config, input.options, process.env, sessionId),
-          deferredModel: () => pendingModel,
-          ...(input.options.skillPaths || input.options.noSkills
-            ? {
-                skillOptions: {
-                  ...(input.options.skillPaths ? { skillPaths: input.options.skillPaths } : {}),
-                  ...(input.options.noSkills ? { noSkills: true } : {}),
-                },
-              }
-            : {}),
-          ...(input.options.themePaths ? { themePaths: input.options.themePaths } : {}),
-          gitContext: input.rootContext.gitContext,
-          requestedWorkspaceRoot: input.rootContext.runtimeBaseDir,
-          sessionManager,
-          renderer,
-          requestedSessionId: input.options.sessionId,
-          freshSessionId: input.freshSessionId,
-          allowSessionRootMigration: input.options.migrateSessionRoot === true,
-          emitLifecycleMessages: false,
-          // A one-shot run or explicit `-c`/`--continue` continues where the user left off;
-          // an ordinary interactive launch starts its own fresh session.
-          adoptCurrentSession: input.options.printMode === true || input.options.continueSession === true,
-          ...(input.options.forkSource ? { forkSource: input.options.forkSource } : {}),
-        });
-      } catch (error) {
-        handleCliBootstrapError({
-          error,
-          renderer,
-          writeError: input.writeError,
-          exit: input.exit,
-        });
-      }
-    })();
-    const runtimeContext = bootstrap.context;
-    if (input.options.scopedModels?.length) runtimeContext.scopedModels = input.options.scopedModels;
-    if (input.options.extensionPaths?.length) runtimeContext.cliExtensionPaths = input.options.extensionPaths;
-    runtimeContext.workspaceAdmission = () => sessionWorkspaceAdmission(sessionManager, runtimeContext.session);
-    const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext));
-
-    return {
-      ...input.rootContext,
+    const shell: Parameters<typeof bootstrapShellRuntime>[0] = {
+      cwd: input.rootContext.workspaceRoot,
+      launchCwd: input.launchCwd,
+      runtimeConfig: input.rootContext.runtimeConfig,
+      runtimeConfigOverrides: configOverrides(input.options),
+      resolveConfigTarget: (config, sessionId) => resolveCliCredential(config, input.options, process.env, sessionId),
+      deferredModel: () => pendingModel,
+      ...(input.options.skillPaths || input.options.noSkills ? {
+        skillOptions: {
+          ...(input.options.skillPaths ? { skillPaths: input.options.skillPaths } : {}),
+          ...(input.options.noSkills ? { noSkills: true } : {}),
+        },
+      } : {}),
+      ...(input.options.themePaths ? { themePaths: input.options.themePaths } : {}),
+      gitContext: input.rootContext.gitContext,
+      requestedWorkspaceRoot: input.rootContext.runtimeBaseDir,
       sessionManager,
       renderer,
-      ...(writeJsonEvent ? { writeJsonEvent } : {}),
-      recoveryCandidate,
-      recoveryCandidateSummary,
-      recoveryBlockedNotice,
-      bootstrap,
-      runtimeContext,
-      mcpGateway,
-      settleModel: () => { pendingModel = false; },
+      requestedSessionId: input.options.sessionId,
+      freshSessionId: input.freshSessionId,
+      allowSessionRootMigration: input.options.migrateSessionRoot === true,
+      emitLifecycleMessages: false,
+      adoptCurrentSession: input.options.printMode === true || input.options.continueSession === true,
+      ...(input.options.forkSource ? { forkSource: input.options.forkSource } : {}),
     };
+    const fail = (error: unknown): never => {
+      try { return handleCliBootstrapError({ error, renderer, writeError: input.writeError, exit: input.exit }); }
+      finally { if (!input.output) output?.restore(); }
+    };
+    const finish = (bootstrap: ShellBootstrapResult): CliBootstrapRuntimeContext => {
+      const runtimeContext = bootstrap.context;
+      if (input.options.scopedModels?.length) runtimeContext.scopedModels = input.options.scopedModels;
+      if (input.options.extensionPaths?.length) runtimeContext.cliExtensionPaths = input.options.extensionPaths;
+      runtimeContext.workspaceAdmission = () => sessionWorkspaceAdmission(sessionManager, runtimeContext.session);
+      const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext));
+
+      return {
+        ...input.rootContext,
+        sessionManager,
+        renderer,
+        ...(writeJsonEvent ? { writeJsonEvent } : {}),
+        recoveryCandidate,
+        recoveryCandidateSummary,
+        recoveryBlockedNotice,
+        bootstrap,
+        runtimeContext,
+        mcpGateway,
+        settleModel: () => { pendingModel = false; },
+      };
+    };
+    return { shell, finish, fail };
   } catch (error) {
     if (!input.output) output?.restore();
     throw error;

@@ -17,6 +17,8 @@ import { sourceFile } from './registry/sources.js';
 import { ExtensionCalls } from './runtime/calls.js';
 import { evaluateToolPermissionScope } from '../core/query/toolPolicy.js';
 import { captureInputHookResult, captureInputResult, InputRefusal } from './events/input.js';
+import { captureToolResult } from './events/result.js';
+import { captureMessageResult } from './events/message.js';
 
 export interface ExtensionServiceOptions {
   readonly root: string;
@@ -200,15 +202,17 @@ export class ExtensionService implements LifecycleHost {
       current();
       const guardedInput = event === 'input' || event === 'UserPromptSubmit';
       if (guardedInput && (!result.success || result.metadata?.cleanup !== 'confirmed')) throw new InputRefusal();
-      if (event === 'session_before_tree' && (!result.success || result.metadata?.cleanup !== 'confirmed')) throw new Error('Extension tree callback failed or its cleanup is unverified.');
+      const guardedDecision = event === 'session_before_tree' || event === 'session_before_compact' || event === 'tool_result' || event === 'message_end';
+      if (guardedDecision && (!result.success || result.metadata?.cleanup !== 'confirmed')) throw new Error('Extension session callback failed or its cleanup is unverified.');
       const raw = typeof result.metadata?.eventOutput === 'string' ? result.metadata.eventOutput : '';
       if (!raw.trim()) return undefined;
       try {
         const returned: unknown = JSON.parse(raw);
-        return event === 'input' ? captureInputResult(returned) : event === 'UserPromptSubmit' ? captureInputHookResult(returned) : returned;
+        return event === 'input' ? captureInputResult(returned) : event === 'UserPromptSubmit' ? captureInputHookResult(returned)
+          : event === 'tool_result' ? captureToolResult(returned) : event === 'message_end' ? captureMessageResult(returned) : returned;
       } catch {
         if (guardedInput) throw new InputRefusal();
-        if (event === 'session_before_tree') throw new Error('Extension tree callback returned invalid data.');
+        if (guardedDecision) throw new Error('Extension session callback returned invalid data.');
         return undefined;
       }
     }, signal);

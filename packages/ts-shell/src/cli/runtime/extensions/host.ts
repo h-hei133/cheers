@@ -29,7 +29,7 @@ const surfaces = new WeakMap<ShellRuntimeContext, UiBinding>();
 
 /** Share one session host between file, installed and embedded extensions. */
 export function installExtensionHost(context: ShellRuntimeContext, runtime: ShellSessionRuntime, store?: SessionManager,
-  gateway?: Pick<CoreMcpGateway, 'peekSnapshot'>): ExtensionHostBridge {
+  gateway?: Pick<CoreMcpGateway, 'peekSnapshot'>, validateStartup?: () => boolean): ExtensionHostBridge {
   hosts.get(context)?.close();
   const sessionId = context.session.id;
   const createdAt = context.session.createdAt;
@@ -42,7 +42,11 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
   const admission = () => closed || context.session.id !== sessionId || context.session.createdAt !== createdAt || context.cwd !== root
     ? 'Extension session or workspace changed.' : configured();
   const check = () => { const refusal = admission(); if (refusal) throw new Error(refusal); };
-  const operations = () => { check(); if (closing) throw new Error('Extension session is closing.'); };
+  const operations = () => {
+    check();
+    if (closing) throw new Error('Extension session is closing.');
+    if (validateStartup?.() === false) throw new Error('Extension startup arguments have not been admitted.');
+  };
   const uiAdmission = () => admission() ?? (closing ? 'Extension session is closing.' : undefined);
   const allTools = () => {
     check();

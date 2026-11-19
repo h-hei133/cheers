@@ -59,7 +59,7 @@ import { isSecurityControl, securityCommandFor, securityInspectorFor } from '../
 import { isAgentsControl, agentsCommandFor, agentDefinitionsFor, agentDiscoveryFor } from '../runtime/agents.js';
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
 import { sshControl, runSshControl } from '../ssh/control.js';
-import { isExtensionControl, extensionCommandFor, extensionManagerFor } from '../runtime/extensions.js';
+import { isExtensionControl, extensionCommandFor, extensionManagerFor, dispatchExtensionShortcut } from '../runtime/extensions.js';
 import { createExtensionUiAdapter } from './extensions.js';
 import { ExtensionUiBinding } from './extensions/binding.js';
 import { bindSessionSurface } from '../runtime/session/surface.js';
@@ -186,6 +186,7 @@ export class InteractiveMode {
   private readonly questions: QuestionBridge;
   private readonly readline: ReadlineInterface;
   private readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number } = {};
+  private readonly shortcutLifetime = new AbortController();
   private vimSelection: SourceSelection | undefined;
   /**
    * The bindings in force.
@@ -736,6 +737,7 @@ export class InteractiveMode {
     // Keep the first failure for the caller; releasing resources is not proof
     // that every subscription or the terminal was restored.
     for (const cleanup of [
+      () => this.shortcutLifetime.abort(),
       () => { this.releaseTerminalPalette?.(); this.releaseTerminalPalette = undefined; this.terminalTheme?.dispose(); this.terminalTheme = undefined; },
       () => { this.releaseTerminalProtocol?.(); this.releaseTerminalProtocol = undefined; },
       () => this.extensionBinding.dispose(),
@@ -835,6 +837,12 @@ export class InteractiveMode {
       now: () => Date.now(),
       gesture: this.gesture,
       keybindings: this.preferences.keybindings,
+      shortcut: ({ keyId }) => this.startup.admitted() && !this.pickerPending && !this.overlay.active && !this.pager.active
+        && !this.search.active && !this.questions.question() && !this.options.sessionRuntime.commands?.current
+        && dispatchExtensionShortcut(this.options.runtimeContext, keyId, this.shortcutLifetime.signal, () => {
+          this.state.transcript.append(textBlock("notice", "Extension shortcut could not complete."));
+          this.tui.requestRender();
+        }),
       vimMode: this.options.runtimeContext.runtimeConfig.vimMode === true && !this.questions.question(),
       slashScope: catalogScope(this.options.runtimeContext),
       actions: {

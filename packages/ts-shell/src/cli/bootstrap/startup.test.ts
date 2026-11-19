@@ -15,7 +15,9 @@ import { RecordingTerminal, ManualScheduler } from '../../test-utils/terminalDou
 import {
   createCliBootstrapRuntimeContext,
   createCliRootContext,
+  prepareCliBootstrapRuntimeContext,
 } from "./cliBootstrapContext.js";
+import { cliExtensionArguments } from '../options/extensions.js';
 
 let scratch = "";
 let home = "";
@@ -113,6 +115,58 @@ it("rejects a missing explicit config before bootstrap", () => {
     launchCwd: workspace,
     options: { configPaths: [missing] },
   })).toThrow(/Explicit config input/);
+});
+
+it.each(['sessionId', 'forkSource'] as const)('keeps the real registry and source unchanged when a %s option is refused', async selection => {
+  const manager = new SessionManager();
+  const source = manager.createNew(workspace);
+  const current = manager.createNew(workspace);
+  manager.addTurn(source.id, { role: 'user', content: 'saved question' });
+  const entry = path.join(workspace, 'extension.ts');
+  fs.writeFileSync(entry, `export default async api => {
+    await api.appendEntry('initialization', 'unadmitted write').catch(() => {});
+    api.registerFlag({name:'known',type:'boolean'});
+  };`);
+  const options = { [selection]: source.id, extensionPaths: [entry] };
+  const rootContext = createCliRootContext({ launchCwd: workspace, options, ...processPorts });
+  const store = createSessionStoreLayout(home);
+  const bytes = () => ({ registry: fs.readFileSync(store.currentSessionStorePath),
+    sessions: fs.readdirSync(store.sessionsDir).sort().map(id => ({ id, records: fs.readdirSync(manager.getSessionDirPath(id)).sort()
+      .map(name => ({ name, bytes: fs.readFileSync(path.join(manager.getSessionDirPath(id), name)) })) })) });
+  const before = bytes();
+  const unresolved = cliExtensionArguments([{ name: '--unexpected' }], () => {});
+  await expect(prepareCliBootstrapRuntimeContext({ launchCwd: workspace, options, rootContext, ...processPorts }, unresolved))
+    .rejects.toThrow(/not registered/);
+  expect(bytes()).toEqual(before);
+  expect(manager.resolveCurrentSessionForProject(workspace, { readOnly: true })).toMatchObject({ ok: true, session: { id: current.id } });
+});
+
+it('attaches the admitted file instance to the new session without replaying initialization', async () => {
+  const entry = path.join(workspace, 'extension.ts');
+  fs.writeFileSync(entry, `let count = 0;
+    export default async api => {
+      count++;
+      api.registerFlag({name:'label',type:'string'});
+      const label = api.getFlag('label');
+      await api.sendMessage('unadmitted prompt').catch(() => {});
+      api.on('session_start', () => api.sendMessage(label + ':' + count));
+    };`);
+  const options = { extensionPaths: [entry] };
+  const rootContext = createCliRootContext({ launchCwd: workspace, options, ...processPorts });
+  const finalize = vi.fn();
+  const args = cliExtensionArguments([{ name: '--label', inline: 'selected' }], finalize);
+  const { runtime, extensions } = await prepareCliBootstrapRuntimeContext({ launchCwd: workspace, options, rootContext, ...processPorts }, args);
+  const sendMessage = vi.fn(async (_message: unknown) => {});
+  try {
+    expect(finalize).toHaveBeenCalledOnce();
+    expect(runtime.sessionManager.readCurrentSessionSelection(workspace)?.sessionId).toBe(runtime.runtimeContext.session.id);
+    const loaded = extensions.bind({ host: { sendMessage }, signal: new AbortController().signal,
+      assertEntryAccess: () => {}, denyRules: () => [] });
+    const registered = loaded[0]?.handlers.get('session_start');
+    expect(registered).toHaveLength(1);
+    await registered![0]({ type: 'session_start' });
+    expect(sendMessage).toHaveBeenCalledExactlyOnceWith('selected:1');
+  } finally { extensions.retire(); await runtime.mcpGateway.close(); }
 });
 
 it.each(['missing', 'file'] as const)('reports a %s project through the terminal owner before exiting', kind => {

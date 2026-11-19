@@ -58,6 +58,12 @@ interface Option {
   readonly value?: string;
 }
 
+export interface UnresolvedOption {
+  readonly name: string;
+  readonly inline?: string;
+  readonly following?: string;
+}
+
 export interface CliInvocation {
   readonly rawArgs: readonly string[];
   readonly options: readonly Option[];
@@ -66,6 +72,11 @@ export interface CliInvocation {
   readonly versionRequested: boolean;
   readonly helpRequested: boolean;
   readonly prepaint: boolean;
+  readonly unresolved: readonly UnresolvedOption[];
+}
+
+export function isBuiltinOption(name: string): boolean {
+  return optionRules.has(name);
 }
 
 function optionName(token: string): string {
@@ -81,7 +92,8 @@ function inlineValue(rule: ValueRule, value: string): string | undefined {
   return value.startsWith(rule === 'config' ? '-' : '--') ? undefined : value;
 }
 
-function optionValue(rule: ValueRule | undefined, inline: string | undefined, next: string | undefined): string | undefined {
+function optionValue(rule: ValueRule | undefined, inline: string | undefined, next: string | undefined,
+  extensionTypes?: ReadonlyMap<string, 'boolean' | 'string'>): string | undefined {
   if (!rule) return undefined;
   if (inline !== undefined) return inlineValue(rule, inline);
   if (!next) return undefined;
@@ -89,17 +101,18 @@ function optionValue(rule: ValueRule | undefined, inline: string | undefined, ne
   if (next === '--' || optionRules.get(next)?.early) return undefined;
   if (rule === 'raw') return next;
   if (rule === 'path') {
-    const candidate = optionRules.get(optionName(next));
-    return candidate && !candidate.early ? undefined : next;
+    const name = optionName(next), candidate = optionRules.get(name);
+    return candidate && !candidate.early || extensionTypes?.has(name) ? undefined : next;
   }
   if (rule === 'search' && next.startsWith('@')) return undefined;
   return next.startsWith(rule === 'word' ? '--' : '-') ? undefined : next;
 }
 
 /** Resolve token ownership before selecting an early command or loading the runtime. */
-export function scanCliArgs(rawArgs: readonly string[]): CliInvocation {
+export function scanCliArgs(rawArgs: readonly string[], extensionTypes?: ReadonlyMap<string, 'boolean' | 'string'>): CliInvocation {
   const options: Option[] = [];
   const positionals: string[] = [];
+  const unresolved: UnresolvedOption[] = [];
   let tail: readonly string[] = [];
   let versionRequested = false;
   let helpRequested = false;
@@ -119,7 +132,17 @@ export function scanCliArgs(rawArgs: readonly string[]): CliInvocation {
     const name = optionName(token);
     const inline = name === token ? undefined : token.slice(name.length + 1);
     const rule = optionRules.get(name);
-    const value = optionValue(rule?.value, inline, rawArgs[index + 1]);
+    const next = rawArgs[index + 1];
+    if (!rule) {
+      const type = extensionTypes?.get(name);
+      const following = inline === undefined && next !== undefined && !next.startsWith('-') ? next : undefined;
+      if (type === undefined) unresolved.push({ name, inline, following });
+      // Hold a potential string value until the declared type admits or releases it.
+      if (type !== 'boolean' && following !== undefined) index++;
+      prepaint = false;
+      continue;
+    }
+    const value = optionValue(rule.value, inline, next, extensionTypes);
     if (rule?.value && inline === undefined && value !== undefined) index++;
     if (inline === undefined) {
       if (rule?.early === 'version') versionRequested = true;
@@ -130,5 +153,5 @@ export function scanCliArgs(rawArgs: readonly string[]): CliInvocation {
       : inline !== undefined)) prepaint = false;
     options.push({ name, value });
   }
-  return { rawArgs, options, positionals, tail, versionRequested, helpRequested, prepaint };
+  return { rawArgs, options, positionals, tail, versionRequested, helpRequested, prepaint, unresolved };
 }

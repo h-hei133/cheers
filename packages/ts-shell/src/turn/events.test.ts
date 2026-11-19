@@ -32,7 +32,8 @@ it('dispatches the actual kernel lifecycle and one settled notification for a su
   const query = await drain(runTurn({ ...setup.options, observe: event => { kernel.push(event); } }));
   const native = setup.events.filter(row => !['agent_settled'].includes(row.name));
   expect(native.map(row => row.name)).toEqual(kernel.map(event => event.type));
-  expect(native.map(row => row.payload)).toEqual(kernel);
+  expect(native.map(row => row.payload)).toEqual(kernel.map(event =>
+    event.type === 'message_end' && event.message.role === 'assistant' ? { ...event, canReplace: true } : event));
   expect(setup.events.filter(row => row.name === 'agent_end')).toHaveLength(1);
   expect(setup.events.at(-1)).toMatchObject({ name: 'agent_settled', payload: { type: 'agent_settled', aborted: false } });
   expect(query.some(event => event.type === 'query.completed')).toBe(true);

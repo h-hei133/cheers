@@ -1,5 +1,8 @@
 import { createDataSnapshot } from '../../core/values/data.js';
 import { createTreeResultCapture } from '../events/tree.js';
+import { createCompactResultCapture } from '../events/compact.js';
+import { createToolResultCapture, createToolResultReducer } from '../events/result.js';
+import { createMessageResultCapture, projectMessageEnd } from '../events/message.js';
 import { createInputEventCapture, createInputEventProjection, createInputHookPayloadCapture, createInputHookReducer, createInputHookResultCapture, createInputResultCapture, InputRefusal } from '../events/input.js';
 import { createCallbackResultCapture } from '../../core/values/promise.js';
 
@@ -13,6 +16,9 @@ const __name = (target, value) => Object.defineProperty(target, 'name', { value,
 // Use the same pure capture factories; their dependencies are explicit parameters.
 const captureData = (${createDataSnapshot.toString()})(types.isProxy);
 const captureTree = (${createTreeResultCapture.toString()})(captureData);
+const captureCompact = (${createCompactResultCapture.toString()})(captureData);
+const captureTool = (${createToolResultCapture.toString()})(captureData);
+const captureMessage = (${createMessageResultCapture.toString()})(captureData);
 const InputRefusal = ${InputRefusal.toString()};
 const captureInput = (${createInputResultCapture.toString()})(captureData, InputRefusal);
 const captureInputHook = (${createInputHookResultCapture.toString()})(captureData, InputRefusal);
@@ -23,8 +29,20 @@ const beforeTree = Object.setPrototypeOf(value => {
   try { return JSON.stringify({ ok: true, value: captureTree(value) }); }
   catch { return '{"ok":false}'; }
 }, null);
+const compactResult = Object.setPrototypeOf(value => {
+  try { return JSON.stringify({ ok: true, value: captureCompact(value) }); }
+  catch { return '{"ok":false}'; }
+}, null);
 const inputResult = Object.setPrototypeOf(value => {
   try { return JSON.stringify({ ok: true, value: captureInput(value) }); }
+  catch { return '{"ok":false}'; }
+}, null);
+const toolResult = Object.setPrototypeOf(value => {
+  try { return JSON.stringify({ ok: true, value: captureTool(value) }); }
+  catch { return '{"ok":false}'; }
+}, null);
+const messageResult = Object.setPrototypeOf(value => {
+  try { return JSON.stringify({ ok: true, value: captureMessage(value) }); }
   catch { return '{"ok":false}'; }
 }, null);
 const inputEvent = Object.setPrototypeOf((value, result) => {
@@ -62,6 +80,9 @@ Object.defineProperty(vmCtx, '__ARGV', { value: JSON.stringify(workerData.argv),
 Object.defineProperty(vmCtx, '__ROOT', { value: String(workerData.workspaceRoot), enumerable: false });
 Object.defineProperty(vmCtx, '__INVOKE', { value: workerData.invoke ? JSON.stringify(workerData.invoke) : '', enumerable: false });
 Object.defineProperty(vmCtx, '__TREE_RESULT', { value: beforeTree, enumerable: false });
+Object.defineProperty(vmCtx, '__COMPACT_RESULT', { value: compactResult, enumerable: false });
+Object.defineProperty(vmCtx, '__TOOL_RESULT', { value: toolResult, enumerable: false });
+Object.defineProperty(vmCtx, '__MESSAGE_RESULT', { value: messageResult, enumerable: false });
 Object.defineProperty(vmCtx, '__INPUT_RESULT', { value: inputResult, enumerable: false });
 Object.defineProperty(vmCtx, '__INPUT_EVENT', { value: inputEvent, enumerable: false });
 Object.defineProperty(vmCtx, '__INPUT_HOOK_RESULT', { value: inputHookResult, enumerable: false });
@@ -91,6 +112,21 @@ const bootstrap = new vm.Script(\`
     if (!envelope.ok) throw new Error('Extension input was refused.');
     return envelope.value;
   };
+  const captureCompact = value => {
+    const envelope = JSON.parse(globalThis.__COMPACT_RESULT(value));
+    if (!envelope.ok) throw new Error('Extension compaction result was refused.');
+    return envelope.value;
+  };
+  const captureTool = value => {
+    const envelope = JSON.parse(globalThis.__TOOL_RESULT(value));
+    if (!envelope.ok) throw new Error('Extension tool result was refused.');
+    return envelope.value;
+  };
+  const captureMessage = value => {
+    const envelope = JSON.parse(globalThis.__MESSAGE_RESULT(value));
+    if (!envelope.ok) throw new Error('Extension message result was refused.');
+    return envelope.value;
+  };
   const reduceInputHook = (${createInputHookReducer.toString().replaceAll('\\', '\\\\')})(captureInputHook);
   const freezeData = value => {
     if (value && typeof value === 'object') {
@@ -110,9 +146,16 @@ const bootstrap = new vm.Script(\`
     failed: () => new Error('Extension input was refused.'),
     cancelled: () => new Error('Extension input was refused.'),
   });
+  globalThis.__captureCompactCallback = operation => captureCallback(operation, captureCompact);
+  globalThis.__captureToolCallback = operation => captureCallback(operation, captureTool);
+  globalThis.__captureMessageCallback = operation => captureCallback(operation, captureMessage);
+  globalThis.__projectMessageEnd = (${projectMessageEnd.toString()});
+  globalThis.__reduceToolResult = (${createToolResultReducer.toString()})();
+  globalThis.__freezeCompactPayload = freezeData;
   // Install completion observers before user handlers can change this realm's Promise hooks.
-  globalThis.__finishInputRunner = operation => {
-    const completed = captureCallback(operation, captureInputHook, {
+  globalThis.__finishInputRunner = (operation, event) => {
+    const capture = event === 'tool_result' ? captureTool : event === 'message_end' ? captureMessage : captureInputHook;
+    const completed = captureCallback(operation, capture, {
       invalid: () => new Error('Extension input was refused.'),
       failed: () => new Error('Extension input was refused.'),
       cancelled: () => new Error('Extension input was refused.'),
@@ -273,9 +316,9 @@ parentPort.on('message', (msg) => {
   try {
     const script = new vm.Script(workerData.code, { filename: workerData.filename });
     script.runInContext(vmCtx, { timeout: 5000 });
-    const guardedInputInvoke = Boolean(workerData.invoke && workerData.invoke.kind === 'event'
-      && (workerData.invoke.event === 'input' || workerData.invoke.event === 'UserPromptSubmit'));
-    const runner = new vm.Script((guardedInputInvoke ? 'globalThis.__finishInputRunner(() => (' : '') + \`
+    const invokeEvent = workerData.invoke?.kind === 'event' ? workerData.invoke.event : undefined;
+    const guardedInvoke = ['input', 'UserPromptSubmit', 'session_before_compact', 'tool_result', 'message_end'].includes(invokeEvent);
+    const runner = new vm.Script((guardedInvoke ? 'globalThis.__finishInputRunner(() => (' : '') + \`
       (async () => {
         const exp = module.exports || {};
         if (typeof exp.default === 'function') await exp.default(api);
@@ -292,6 +335,12 @@ parentPort.on('message', (msg) => {
           const names = [invoke.event, ...aliases];
           let decision;
           const tree = invoke.event === 'session_before_tree';
+          const compact = invoke.event === 'session_before_compact';
+          const compactNotification = invoke.event === 'session_compact';
+          const tool = invoke.event === 'tool_result';
+          let toolPayload = tool ? globalThis.__freezeCompactPayload(invoke.payload) : undefined;
+          const messageEnd = invoke.event === 'message_end';
+          let messagePayload = messageEnd ? globalThis.__freezeCompactPayload(invoke.payload) : undefined;
           const nativeInput = invoke.event === 'input';
           const guardedInput = nativeInput || invoke.event === 'UserPromptSubmit';
           const legacyInput = invoke.event === 'UserPromptSubmit';
@@ -303,7 +352,8 @@ parentPort.on('message', (msg) => {
             if (!envelope.ok) throw new Error('Extension input was refused.');
             inputPayload = freezeInput(envelope.value);
           }
-          const payload = legacyInput ? globalThis.__captureInputHookPayload(invoke.payload) : tree ? Object.freeze(invoke.payload) : invoke.payload;
+          const payload = legacyInput ? globalThis.__captureInputHookPayload(invoke.payload) : tree ? Object.freeze(invoke.payload)
+            : compact || compactNotification ? globalThis.__freezeCompactPayload(invoke.payload) : invoke.payload;
           for (const eventName of names) {
             const list = globalThis.__registeredHandlers.get(eventName) || [];
             for (const handler of list) {
@@ -311,9 +361,16 @@ parentPort.on('message', (msg) => {
               try {
                 next = guardedInput ? (await globalThis.__captureInputCallback(
                   () => handler(nativeInput ? inputPayload : payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui }), !nativeInput)).value
-                  : await handler(tree ? payload : decision ?? invoke.payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui });
+                  : compact ? (await globalThis.__captureCompactCallback(() => handler(payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui }))).value
+                  : tool ? (await globalThis.__captureToolCallback(() => handler(toolPayload, { workspaceRoot: globalThis.__ROOT, ui: api.ui }))).value
+                  : messageEnd ? (await globalThis.__captureMessageCallback(() => handler(messagePayload, { workspaceRoot: globalThis.__ROOT, ui: api.ui }))).value
+                  : await handler(tree || compactNotification ? payload : decision ?? invoke.payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui });
               }
-              catch (error) { if (guardedInput) throw new Error('Extension input was refused.'); throw error; }
+              catch (error) {
+                if (guardedInput) throw new Error('Extension input was refused.');
+                if (tool || messageEnd) continue;
+                throw error;
+              }
               if (nativeInput) {
                 const envelope = JSON.parse(globalThis.__INPUT_RESULT(next));
                 if (!envelope.ok) throw new Error('Extension input was refused.');
@@ -329,6 +386,25 @@ parentPort.on('message', (msg) => {
                 const reduced = globalThis.__reduceInputHook(decision, next);
                 decision = reduced.result;
                 if (reduced.stop) return decision;
+                continue;
+              }
+              if (compact) {
+                if (next?.cancel) return Object.freeze(Object.assign(Object.create(null), { cancel: true }));
+                if (next?.summary !== undefined) decision = Object.freeze(Object.assign(Object.create(null), { summary: next.summary }));
+                continue;
+              }
+              if (compactNotification) continue;
+              if (tool) {
+                const reduced = globalThis.__reduceToolResult(toolPayload, decision, next);
+                toolPayload = reduced.event;
+                decision = reduced.result;
+                continue;
+              }
+              if (messageEnd) {
+                if (messagePayload.canReplace && next?.message) {
+                  messagePayload = globalThis.__projectMessageEnd(messagePayload, next);
+                  decision = next;
+                }
                 continue;
               }
               if (tree && next !== undefined) {
@@ -350,8 +426,8 @@ parentPort.on('message', (msg) => {
         }
         return 'Loaded extension successfully.';
       })()
-    \` + (guardedInputInvoke ? '))' : ''), { filename: 'extension-runner.js' });
-    if (guardedInputInvoke) { runner.runInContext(vmCtx, { timeout: 5000 }); return; }
+    \` + (guardedInvoke ? '), ' + JSON.stringify(invokeEvent) + ')' : ''), { filename: 'extension-runner.js' });
+    if (guardedInvoke) { runner.runInContext(vmCtx, { timeout: 5000 }); return; }
     const value = await Promise.resolve(runner.runInContext(vmCtx, { timeout: 5000 }));
     const isEventInvoke = Boolean(workerData.invoke && workerData.invoke.kind === 'event');
     if (!isEventInvoke && value && typeof value === 'object' && typeof value.output === 'string' && typeof value.success === 'boolean') {

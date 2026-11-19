@@ -410,4 +410,35 @@ describe("requestCompactionSummary", () => {
     await expect(prepared.send({ dispatch })).rejects.toMatchObject({ name: 'AbortError' });
     expect(reserve).not.toHaveBeenCalled(); expect(fetchImpl).not.toHaveBeenCalled(); expect(dispatch).not.toHaveBeenCalled();
   });
+
+  it('settles a stale compaction attempt as unsent before either dispatch receipt', async () => {
+    let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    let stale = false;
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 503 }));
+    const providerDispatch = vi.fn(), confirmUnsent = vi.fn(), compactionDispatch = vi.fn();
+    const reserve = vi.fn(() => ({ id: 'fixture', dispatch: providerDispatch, confirmUnsent, settle: vi.fn() }));
+    const prepared = prepareCompactionRequest({ provider: { headers: {}, baseUrl: 'https://fixture.test', model: 'summary' },
+      messages: [{ role: 'user', content: 'history' }], fetchImpl, requestPolicy: { reserve },
+      modelTransport: async (_url, _init, beforeDispatch) => {
+        entered(); await pending;
+        beforeDispatch();
+        return fetchImpl();
+      } });
+    const send = prepared.send({ dispatch: compactionDispatch, checkAdmission: () => {
+      if (stale) throw new Error('Compaction source changed.');
+    } });
+    try {
+      await started;
+      stale = true;
+      release();
+      await expect(send).rejects.toThrow('Compaction source changed.');
+      expect(reserve).toHaveBeenCalledOnce();
+      expect(confirmUnsent).toHaveBeenCalledOnce();
+      expect(providerDispatch).not.toHaveBeenCalled();
+      expect(compactionDispatch).not.toHaveBeenCalled();
+      expect(fetchImpl).not.toHaveBeenCalled();
+    } finally { release(); await send.catch(() => undefined); }
+  });
 });

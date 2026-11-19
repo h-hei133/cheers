@@ -1,7 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { registerCatalogContribution, type CatalogContribution } from '../../core/catalog/contributions.js';
-import { loadInProcessExtensionAsync, type ExtensionHostBridge } from '../../extensions/runtime/inProcessLoader.js';
+import type { ExtensionHostBridge, ExtensionShortcut } from '../../extensions/runtime/inProcessLoader.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import type { ToolGateOptions } from '../../turn/tools.js';
@@ -22,6 +20,9 @@ import type { CoreMcpGateway } from '../../core/mcp/gateway.js';
 import { ExtensionSessionLifecycle } from './extensions/lifecycle.js';
 import type { ExtensionSessionEvent } from '../../extensions/events/model.js';
 import { createExtensionReload, type ExtensionReloadResult } from './extensions/reload.js';
+import { ExtensionShortcuts } from './extensions/shortcuts.js';
+import type { CliExtensionArguments } from '../options/extensions.js';
+import { loadExtensionFiles, type PreparedExtensionFiles } from './extensions/files.js';
 export { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
 
 interface ExtensionRuntime {
@@ -33,10 +34,11 @@ interface ExtensionRuntime {
   readonly reload: (signal?: AbortSignal) => Promise<ExtensionReloadResult>;
   readonly current: () => boolean;
   readonly diagnostics: () => readonly string[];
+  readonly shortcuts: () => ExtensionShortcuts | undefined;
 }
 const runtimes = new WeakMap<ShellRuntimeContext, ExtensionRuntime>();
 export function installExtensionRuntime(context: ShellRuntimeContext, runtime: ShellSessionRuntime, gate: (tool?: string) => ToolGateOptions, store?: SessionManager,
-  gateway?: Pick<CoreMcpGateway, 'peekSnapshot'>): void {
+  gateway?: Pick<CoreMcpGateway, 'peekSnapshot'>, cliArguments?: CliExtensionArguments, startupFiles?: PreparedExtensionFiles): void {
   let service: ExtensionService | undefined; let identity: string | undefined;
   let closed = false; let closing = false; let retiredUnknown = false;
   const cliCleanups: Array<() => void> = [];
@@ -46,9 +48,11 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
   let ready: Promise<void> = Promise.resolve();
   let lifecycle: ExtensionSessionLifecycle | undefined;
   let ownedHost: ExtensionHostBridge | undefined;
+  let shortcuts: ExtensionShortcuts | undefined;
   let retirement: Promise<void> | undefined;
   const retire = () => retirement ??= Promise.resolve().then(async () => {
     closing = true;
+    shortcuts?.retire();
     initialization?.abort();
     const retiringService = service, retiringReady = ready;
     const results = await Promise.allSettled([...cliCleanups.splice(0).map(unregister => Promise.resolve().then(unregister)),
@@ -78,9 +82,12 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
     }
     finally { signal?.removeEventListener('abort', cancel); }
   };
-  const bound: ExtensionRuntime = { run: operation => runtime.commands.run(operation), ready: () => ready,
+  const bound: ExtensionRuntime = { run: operation => runtime.commands.run(operation), ready: () => ready, shortcuts: () => shortcuts,
     start: (reason, signal) => lifecycle!.start(() => ready, reason, signal),
-    shutdown: (reason, settle, signal) => { closing = true; return lifecycle!.shutdown(settle ?? (() => runtimes.get(context) === bound ? runtime.cancelAndWait() : Promise.resolve()), reason, signal); },
+    shutdown: (reason, settle, signal) => {
+      closing = true; shortcuts?.retire();
+      return lifecycle!.shutdown(settle ?? (() => runtimes.get(context) === bound ? runtime.cancelAndWait() : Promise.resolve()), reason, signal);
+    },
     replace: rebind,
     retire,
     cancel: async () => {
@@ -97,6 +104,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
         ? ['Extension cancellation is not verified; the original runtime cannot reenter.'] : [])];
     }, close: async () => {
     closed = true;
+    shortcuts?.retire();
     const command = runtime.commands.current;
     if (runtimes.get(context) === bound && command?.kind === 'extension-reload') command.controller.abort();
     closeExtensionHost(context, ownedHost);
@@ -111,7 +119,8 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
         retiring.add(retirement);
       }
       identity = key; const session = context.session.id; const root = context.cwd;
-      const extensionHost = installExtensionHost(context, runtime, store, gateway);
+      let argumentsAdmitted = !cliArguments;
+      const extensionHost = installExtensionHost(context, runtime, store, gateway, () => argumentsAdmitted);
       ownedHost = extensionHost;
       lifecycle = new ExtensionSessionLifecycle(context);
       const check = () => { const refused = configurationAdmission(context)() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session or workspace changed.' : undefined); if (refused) throw new Error(refused); };
@@ -123,11 +132,19 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
       initialization = new AbortController();
       initializing = true;
       const signal = initialization.signal;
+      const configured = configurationAdmission(context);
+      const createdAt = context.session.createdAt;
+      const shortcutBinding = new ExtensionShortcuts(extensionHost, signal, () => !closed && !closing && !initializing
+        && ownedHost === extensionHost && extensionHostFor(context) === extensionHost && runtimes.get(context) === bound
+        && context.cwd === root && context.session.id === session && context.session.createdAt === createdAt && !configured());
+      shortcuts = shortcutBinding;
+      const preparedFiles = startupFiles;
+      startupFiles = undefined;
       ready = registerCliExtensions(context, root, session, cliCleanups, (absolute) => {
         signal.throwIfAborted();
         check();
         assertSourceAccess(absolute, context.projectRoot ?? root, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules);
-      }, gate, signal, extensionHost);
+      }, gate, signal, extensionHost, shortcutBinding, cliArguments, preparedFiles).then(() => { argumentsAdmitted = true; });
       // Consumers await the same initialization; observe failures during startup as well.
       void ready.then(() => { if (initialization?.signal === signal) initializing = false; }, () => {
         if (initialization?.signal === signal) { initializing = false; initialization.abort(); }
@@ -137,24 +154,13 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
   }, current: () => !closed && runtimes.get(context) === bound, diagnostics: () => service?.errors ?? [], reload: createExtensionReload(context, runtime, {
     current: () => !closed && runtimes.get(context) === bound,
     ready: () => ready,
-    shutdown: signal => { closing = true; return lifecycle!.shutdown(async () => {}, 'reload', signal); },
+    shutdown: signal => { closing = true; shortcuts?.retire(); return lifecycle!.shutdown(async () => {}, 'reload', signal); },
     retire, replace: async signal => ({ host: await rebind(signal) }),
     start: signal => lifecycle!.start(() => ready, 'reload', signal),
     diagnostics: () => service?.errors ?? [],
   }) };
   runtimes.set(context, bound);
   runtimes.get(context)!.service();
-}
-
-function resolveExtensionEntryFile(candidate: string): string {
-  const resolved = path.resolve(candidate);
-  if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-    for (const entry of ['index.ts', 'index.mts', 'index.mjs', 'index.js']) {
-      const indexFile = path.join(resolved, entry);
-      if (fs.existsSync(indexFile)) return indexFile;
-    }
-  }
-  return resolved;
 }
 
 async function registerCliExtensions(
@@ -166,24 +172,27 @@ async function registerCliExtensions(
   gate: (tool?: string) => ToolGateOptions,
   signal: AbortSignal,
   host: ExtensionHostBridge,
+  shortcuts: ExtensionShortcuts,
+  cliArguments?: CliExtensionArguments,
+  preparedFiles?: PreparedExtensionFiles,
 ): Promise<void> {
   const paths = context.cliExtensionPaths;
   if (!paths?.length) return;
-  const baseDir = context.originalCwd || root;
+  const denyRules = () => {
+    signal.throwIfAborted();
+    const refused = configurationAdmission(context)();
+    if (refused) throw new Error(refused);
+    return context.runtimeConfig.denyRules;
+  };
   const pendingCleanups: Array<() => void> = [];
   const contributions: CatalogContribution[] = [];
+  const pendingShortcuts: ExtensionShortcut[] = [];
   try {
-    for (const rawPath of paths) {
-      const filePath = resolveExtensionEntryFile(path.isAbsolute(rawPath) ? rawPath : path.join(baseDir, rawPath));
-      assertEntryAccess(filePath);
-      const loaded = await loadInProcessExtensionAsync({
-        filePath,
-        workspaceRoot: root,
-        denyRules: () => context.runtimeConfig.denyRules,
-        signal,
-        host,
-      });
-      assertEntryAccess(filePath);
+    const extensions = preparedFiles ? preparedFiles.bind({ assertEntryAccess, denyRules, signal, host })
+      : (await loadExtensionFiles({ paths, baseDir: context.originalCwd || root, root, assertEntryAccess, denyRules,
+        signal, host, cliArguments })).extensions;
+    for (const loaded of extensions) {
+      pendingShortcuts.push(...loaded.shortcuts);
       const guardedTools = loaded.tools.map((tool) => ({
         ...tool,
         execute: async (args: Record<string, unknown>, toolContext: Parameters<typeof tool.execute>[1]) => {
@@ -210,11 +219,17 @@ async function registerCliExtensions(
     }
     signal.throwIfAborted();
     for (const contribution of contributions) pendingCleanups.push(registerCatalogContribution(contribution, context.configuration.current.catalog));
+    signal.throwIfAborted();
+    shortcuts.publish(pendingShortcuts);
     cleanups.push(...pendingCleanups);
   } catch (error) {
+    preparedFiles?.retire();
     pendingCleanups.splice(0).forEach(unregister => unregister());
     throw error;
   }
+}
+export function dispatchExtensionShortcut(context: ShellRuntimeContext, keyId: string, signal: AbortSignal, reportFailure: () => void): boolean {
+  return runtimes.get(context)?.shortcuts()?.dispatch(keyId, signal, reportFailure) ?? false;
 }
 export function extensionCommandFor(context: ShellRuntimeContext): NonNullable<CommandContext['extensionCommand']> {
   return async (kind, args, commandContext) => {

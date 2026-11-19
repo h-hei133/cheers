@@ -44,6 +44,8 @@ import {
   createCliBootstrapRuntimeContext,
   createCliRootContext,
   logCliBootstrapSessionInitialized,
+  prepareCliBootstrapRuntimeContext,
+  type CliBootstrapRuntimeContext,
 } from "./cliBootstrapContext.js";
 import {
   projectAndRenderCliStartupSurface,
@@ -65,6 +67,8 @@ import type { CliProcessRunnerInput } from './contract.js';
 import { createProfileContext, currentProfile, withProfile } from '../../core/paths/profile/context.js';
 import { configurationAdmission, ConfigurationRefusalError } from '../../core/shell/configuration.js';
 import { scanCliArgs, type CliInvocation } from '../options/argv.js';
+import { cliExtensionArguments, ExtensionOptionError, type CliExtensionArguments } from '../options/extensions.js';
+import type { PreparedExtensionFiles } from '../runtime/extensions/files.js';
 import { cliHelpText } from '../options/early.js';
 import { profileSwitchPort } from './profile/port.js';
 import { freshExecutable } from './profile/invocation.js';
@@ -87,7 +91,7 @@ export async function runCliProcess(
   }
   // Explicit service mode has its own authenticated state owner and protocol.
   if (input.args[0] === 'serve') { await runCollaborationServiceMode(input); return; }
-  const parsed = parseCliArgs(invocation, { cwd: input.launchCwd });
+  const parsed = parseCliArgs(invocation, { cwd: input.launchCwd, deferExtensionOptions: true });
   if (parsed.ok === false) { input.writeError(parsed.error.message); input.exit(parsed.error.exitCode); return; }
   if (parsed.args.options.listModels !== undefined) {
     const pattern = typeof parsed.args.options.listModels === "string" ? parsed.args.options.listModels : undefined;
@@ -120,7 +124,7 @@ export async function runCliProcess(
       const cwd = recovery?.workingDirectory ?? input.launchCwd;
       if (cwd !== launchCwd) {
         // Restart admission preserves the original argv. Only its workspace can change the projection.
-        const next = parseCliArgs(invocation, { cwd });
+        const next = parseCliArgs(invocation, { cwd, deferExtensionOptions: true });
         if (next.ok === false) { input.writeError(next.error.message); input.exit(next.error.exitCode); }
         cycleArgs = next.args;
         launchCwd = cwd;
@@ -151,6 +155,7 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
   });
   let shutdown: ReturnType<typeof createCliShutdown> | undefined;
   let requested: RestartRequest | SwitchTicket | undefined;
+  let startupExtensionFiles: PreparedExtensionFiles | undefined;
   return output.run(async () => {
     const rootContext = createCliRootContext({
       configInputs,
@@ -167,7 +172,7 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
     }
 
     time("arguments parsed");
-    const bootstrapRuntime = createCliBootstrapRuntimeContext({
+    const startupInput = {
       ...(output.guard ? { output: output.guard } : {}),
       launchCwd: input.launchCwd,
       options,
@@ -175,7 +180,29 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
       writeError: input.writeError,
       exit: output.exit,
       freshSessionId: child?.targetSessionId,
-    });
+    };
+    let promptArg = options.promptArg;
+    let extensionArguments: CliExtensionArguments | undefined;
+    let bootstrapRuntime: CliBootstrapRuntimeContext;
+    try {
+      if (parsed.extensionOptions) {
+        extensionArguments = cliExtensionArguments(parsed.extensionOptions, types => {
+          const resolved = parseCliArgs(scanCliArgs(parsed.rawArgs, types), { cwd: input.launchCwd });
+          if (!resolved.ok) throw new ExtensionOptionError(resolved.error.message);
+          if (resolved.args.options.projectPath !== parsed.options.projectPath) {
+            throw new ExtensionOptionError('An extension option made the positional workspace ambiguous. Use --project explicitly.');
+          }
+          if (!recovery) promptArg = resolved.args.options.promptArg;
+        });
+        const prepared = await prepareCliBootstrapRuntimeContext(startupInput, extensionArguments);
+        startupExtensionFiles = prepared.extensions;
+        bootstrapRuntime = prepared.runtime;
+      } else bootstrapRuntime = createCliBootstrapRuntimeContext(startupInput);
+    } catch (error) {
+      if (!(error instanceof ExtensionOptionError)) throw error;
+      input.writeError(error.message);
+      return output.exit(1);
+    }
     time("runtime bootstrapped");
     const {
       sessionManager,
@@ -266,11 +293,27 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
       retire: ticket => { requested = ticket; setImmediate(() => stopSurface.abort()); },
     });
 
+    let readline: ReadlineInterface | null = null;
+    let interactiveApprovalPrompt: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined;
+    const createRuntime = () => createCliSessionRuntime({
+      mcpGateway,
+      sessionManager,
+      renderer,
+      runtimeContext,
+      options,
+      ...(extensionArguments ? { cliExtensionArguments: extensionArguments } : {}),
+      ...(startupExtensionFiles ? { startupExtensionFiles } : {}),
+      approvalTrustPolicy,
+      providerRuntimeBridge,
+      getReadline: () => readline,
+      isStdinTty: () => Boolean(input.stdin.isTTY),
+      getPromptInteractiveApproval: () => interactiveApprovalPrompt,
+    });
     try {
       const stdinPromptCapture = recovery && (options.printMode || !input.stdin.isTTY) ? {
         stdinTransportMode: 'capture-batch' as const, pipedInput: null, nonInteractivePrompts: [], cliModePlan: { kind: 'stdin-batch' as const },
       } : await captureCliStdinPrompts({
-        options,
+        options: extensionArguments ? { ...options, promptArg } : options,
         stdin: input.stdin,
       });
       time("stdin captured");
@@ -306,29 +349,7 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
         });
       }
 
-      let readline: ReadlineInterface | null = null;
-      let interactiveApprovalPrompt:
-        | ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>)
-        | undefined;
-
-      const sessionRuntime = createCliSessionRuntime({
-        mcpGateway,
-        sessionManager,
-        renderer,
-        runtimeContext,
-        options,
-        approvalTrustPolicy,
-        providerRuntimeBridge,
-        getReadline: () => readline,
-        isStdinTty: () => Boolean(input.stdin.isTTY),
-        // Reported as present only once the interactive surface has actually
-        // installed a handler. Handing over a fallback closure here would make the
-        // approval bridge treat every run as interactive and skip the
-        // non-interactive policy path entirely. The getter is read at prompt time
-        // because the interactive surface installs its handler after this runtime
-        // is built.
-        getPromptInteractiveApproval: () => interactiveApprovalPrompt,
-      });
+      const sessionRuntime = createRuntime();
       await waitForExtensionsFor(runtimeContext);
       await applyStartupModel(runtimeContext, options);
       bootstrapRuntime.settleModel();
@@ -410,17 +431,19 @@ async function runCliCycle(input: CliProcessRunnerInput, parsed: CliArgs, recove
       // printed the stack that led here and hid the cause, which the publication
       // already knew. The causes are printed instead, with the same exit code the
       // other argument-level refusals use.
-      if (error instanceof ConfigurationRefusalError) {
+      if (error instanceof ConfigurationRefusalError || error instanceof ExtensionOptionError) {
         input.writeError(error.message);
         output.exit(1);
       }
       throw error;
     }
   }, async () => {
-    if (!shutdown) return;
-    const activeShutdown = shutdown;
-    if (requested && 'kind' in requested) await drainProfileSwitch(requested, () => activeShutdown.close());
-    else await activeShutdown.close();
+    try {
+      if (!shutdown) return;
+      const activeShutdown = shutdown;
+      if (requested && 'kind' in requested) await drainProfileSwitch(requested, () => activeShutdown.close());
+      else await activeShutdown.close();
+    } finally { startupExtensionFiles?.retire(); }
   });
 }
 

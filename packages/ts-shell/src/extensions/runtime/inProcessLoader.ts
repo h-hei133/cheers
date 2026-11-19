@@ -22,8 +22,18 @@ import { createVirtualBridge } from './virtual.js'
 export type { ExtensionUiHost, ExtensionUiDialogOptions, ExtensionUiApi, ExtensionUiRequestOptions } from './ui.js'
 import type { ExtensionRunEventName, ExtensionRunEventPayload, ExtensionSessionEventName, ExtensionSessionEventPayload, ExtensionSessionBeforeEventName, ExtensionSessionBeforeEventPayload, ExtensionSessionBeforeEventResult, ExtensionInputEvent, ExtensionInputResult } from '../events/model.js'
 import { captureInputHookResult, captureInputResult, InputRefusal } from '../events/input.js'
+import { captureCompactResult } from '../events/compact.js'
+import { captureToolResult } from '../events/result.js'
+import { captureMessageResult } from '../events/message.js'
+import type { ExtensionMessageEndEvent, ExtensionMessageEndResult, ExtensionToolResult, ExtensionToolResultEvent } from '../events/model.js'
+export type { ExtensionMessageEndEvent, ExtensionMessageEndResult } from '../events/model.js'
 import { callbackCancellation, captureCallbackResult, createCallbackResultCapture } from '../../core/values/promise.js'
-export type { ExtensionRunEvent, ExtensionRunEventName, ExtensionRunEventPayload, ExtensionSessionEvent, ExtensionSessionEventName, ExtensionSessionEventPayload, ExtensionSessionBeforeEvent, ExtensionSessionBeforeEventName, ExtensionSessionBeforeEventPayload, ExtensionSessionBeforeResult, ExtensionBeforeTreeResult, ExtensionSessionBeforeEventResult, ExtensionInputEvent, ExtensionInputResult } from '../events/model.js'
+import { captureShortcut, type ExtensionShortcut } from './shortcut.js'
+import { captureFlag, type ExtensionFlag } from './flag.js'
+export type { ExtensionFlag } from './flag.js'
+export type { ExtensionShortcut } from './shortcut.js'
+export type { ExtensionRunEvent, ExtensionRunEventName, ExtensionRunEventPayload, ExtensionSessionEvent, ExtensionSessionEventName, ExtensionSessionEventPayload, ExtensionSessionBeforeEvent, ExtensionSessionBeforeEventName, ExtensionSessionBeforeEventPayload, ExtensionSessionBeforeResult, ExtensionBeforeTreeResult, ExtensionBeforeCompactResult, ExtensionCompactMessage, ExtensionSessionBeforeEventResult, ExtensionInputEvent, ExtensionInputResult } from '../events/model.js'
+export type { ExtensionToolResult, ExtensionToolResultEvent } from '../events/model.js'
 
 export interface ExtensionHostBridge {
   readonly ui?: ExtensionUiHost
@@ -32,19 +42,6 @@ export interface ExtensionHostBridge {
   readonly getCommands?: () => readonly string[]
   readonly sendMessage?: (message: unknown) => Promise<void> | void
   readonly appendEntry?: (customType: string, data: unknown) => Promise<void> | void
-}
-
-export interface ExtensionShortcut {
-  readonly key: string
-  readonly description?: string
-  readonly run?: () => unknown | Promise<unknown>
-}
-
-export interface ExtensionFlag {
-  readonly name: string
-  readonly description?: string
-  readonly type?: 'string' | 'boolean'
-  readonly default?: string | boolean
 }
 
 export interface ExtensionEventBus {
@@ -64,10 +61,12 @@ export interface ExtensionAPI {
   registerShortcut(shortcut: ExtensionShortcut): void
   registerFlag(flag: ExtensionFlag): void
   getFlag(name: string): string | boolean | undefined
+  on(event: 'message_end', handler: (payload: ExtensionMessageEndEvent) => ExtensionMessageEndResult | void | Promise<ExtensionMessageEndResult | void>): void
   on<Name extends ExtensionRunEventName>(event: Name, handler: (payload: ExtensionRunEventPayload<Name>) => void | Promise<void>): void
   on<Name extends ExtensionSessionEventName>(event: Name, handler: (payload: ExtensionSessionEventPayload<Name>) => void | Promise<void>): void
   on<Name extends ExtensionSessionBeforeEventName>(event: Name, handler: (payload: ExtensionSessionBeforeEventPayload<Name>) => ExtensionSessionBeforeEventResult<Name> | void | Promise<ExtensionSessionBeforeEventResult<Name> | void>): void
   on(event: 'input', handler: (payload: ExtensionInputEvent) => ExtensionInputResult | void | Promise<ExtensionInputResult | void>): void
+  on(event: 'tool_result', handler: (payload: ExtensionToolResultEvent) => ExtensionToolResult | void | Promise<ExtensionToolResult | void>): void
   on(event: string, handler: (payload: unknown) => unknown | Promise<unknown>): void
   readWorkspaceFile(relativePath: string): string | Promise<string>
   getActiveTools(): Promise<readonly string[]>
@@ -214,6 +213,7 @@ function createExtensionApiCollector(options: {
   readonly initialization?: ExtensionInitialization
   readonly invokeVirtual?: (callback: VirtualModelDefinition['route'], request: ModelRouteInput) => ReturnType<VirtualModelDefinition['route']>
   readonly captureCallback?: typeof captureCallbackResult
+  readonly flagValue?: (flag: ExtensionFlag) => string | boolean | undefined
 }) {
   const initialization = options.initialization ?? new ExtensionInitialization()
   const active = () => initialization.assertActive()
@@ -263,10 +263,23 @@ function createExtensionApiCollector(options: {
         })
       } }))
     }, collecting),
-    registerShortcut: nullProtoFn((shortcut: ExtensionShortcut) => shortcuts.push(shortcut), collecting),
+    registerShortcut: nullProtoFn((shortcut: ExtensionShortcut) => {
+      if (shortcuts.length >= 128) throw new Error('Shortcut registration limit exceeded.')
+      const { run, ...definition } = captureShortcut(shortcut)
+      shortcuts.push(Object.freeze({ ...definition, ...(run ? { run: () => {
+        const inherited = currentExtensionInvocation()
+        const signal = invocationSignal(inherited?.signal)
+        const capture = options.captureCallback ?? captureCallbackResult
+        return runExtensionInvocation(inherited ? inherited.ui : options.host?.ui, signal,
+          () => capture(run, () => undefined, { check: active, cancellation: callbackCancellation(signal) })).then(() => undefined)
+      } } : {}) }))
+    }, collecting),
     registerFlag: nullProtoFn((flag: ExtensionFlag) => {
-      flags.push(flag)
-      if (!flagValues.has(flag.name) && flag.default !== undefined) flagValues.set(flag.name, flag.default)
+      if (flags.length >= 128) throw new Error('Flag registration limit exceeded.')
+      const declared = captureFlag(flag)
+      if (flagValues.has(declared.name)) throw new Error('Extension flag registration collision.')
+      flagValues.set(declared.name, options.flagValue?.(declared) ?? declared.default)
+      flags.push(declared)
     }, collecting),
     getFlag: nullProtoFn((name: string) => flagValues.get(name), active),
     on: nullProtoFn((event: string, handler: (payload: unknown) => unknown | Promise<unknown>) => {
@@ -275,12 +288,16 @@ function createExtensionApiCollector(options: {
         const inherited = currentExtensionInvocation()
         const signal = invocationSignal(inherited?.signal)
         const operation = () => { active(); return handler(payload) }
-        if (event === 'input' || event === 'UserPromptSubmit') {
+        const guardedInput = event === 'input' || event === 'UserPromptSubmit'
+        const captureResult = event === 'input' ? captureInputResult : event === 'UserPromptSubmit' ? captureInputHookResult
+          : event === 'session_before_compact' ? captureCompactResult : event === 'tool_result' ? captureToolResult
+            : event === 'message_end' ? captureMessageResult : undefined
+        if (captureResult) {
           const capture = options.captureCallback ?? captureCallbackResult
           return runExtensionInvocation(inherited ? inherited.ui : options.host?.ui, signal,
-            () => capture<unknown>(operation, event === 'input' ? captureInputResult : captureInputHookResult, {
+            () => capture<unknown>(operation, captureResult, {
               cancellation: callbackCancellation(signal), check: active,
-              invalid: () => new InputRefusal(), failed: () => new InputRefusal(), cancelled: () => new InputRefusal(),
+              ...(guardedInput ? { invalid: () => new InputRefusal(), failed: () => new InputRefusal(), cancelled: () => new InputRefusal() } : {}),
             })).then(envelope => envelope.value)
         }
         return runExtensionInvocation(inherited ? inherited.ui : options.host?.ui, signal, operation)
@@ -379,6 +396,7 @@ export interface ExtensionLoadOptions extends ExtensionInitializationOptions {
   readonly workspaceRoot: string
   readonly denyRules?: () => readonly DenyRule[]
   readonly host?: ExtensionHostBridge
+  readonly flagValue?: (flag: ExtensionFlag) => string | boolean | undefined
 }
 
 /** Compatibility entry for synchronous factories. Async factories must use the awaited loader. */

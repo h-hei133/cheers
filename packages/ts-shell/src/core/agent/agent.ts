@@ -16,6 +16,7 @@ export interface AgentCoreOptions {
   readonly streamStep: AgentLoopConfig["streamStep"];
   readonly beforeToolCall?: ToolHooks["beforeToolCall"];
   readonly afterToolCall?: ToolHooks["afterToolCall"];
+  readonly finalizeAssistant?: AgentLoopConfig['finalizeAssistant'];
   readonly shouldStopAfterStep?: AgentLoopConfig["shouldStopAfterStep"];
   readonly toolsAllowedOnNextStep?: AgentLoopConfig["toolsAllowedOnNextStep"];
   readonly prepareNextStep?: AgentLoopConfig["prepareNextStep"];
@@ -191,6 +192,7 @@ export class AgentCore {
       toolExecution: this.options.toolExecution,
       beforeToolCall: this.options.beforeToolCall,
       afterToolCall: this.options.afterToolCall,
+      finalizeAssistant: this.options.finalizeAssistant,
       shouldStopAfterStep: this.options.shouldStopAfterStep,
       toolsAllowedOnNextStep: this.options.toolsAllowedOnNextStep,
       prepareNextStep: this.options.prepareNextStep,

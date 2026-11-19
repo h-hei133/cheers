@@ -24,6 +24,8 @@ import type { StreamingRenderer } from "../../presentation/terminal/streaming.js
 import type { SessionManager } from "../../session/SessionManager.js";
 import { createTranscriptEntryId } from "../../session/sessionEventCodec.js";
 import type { CliOptions } from "../options/cliOptions.js";
+import type { CliExtensionArguments } from '../options/extensions.js';
+import type { PreparedExtensionFiles } from './extensions/files.js';
 import {
   createCliApprovalEscalationBridge,
 } from "../approval/cliApprovalEscalationBridge.js";
@@ -91,6 +93,8 @@ export function createCliSessionRuntime(input: {
   readonly renderer: StreamingRenderer;
   readonly runtimeContext: ShellRuntimeContext;
   readonly options: CliOptions;
+  readonly cliExtensionArguments?: CliExtensionArguments;
+  readonly startupExtensionFiles?: PreparedExtensionFiles;
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly providerRuntimeBridge: CliProviderRuntimeBridge;
   readonly getReadline: () => ReadlineInterface | null;
@@ -202,6 +206,7 @@ export function createCliSessionRuntime(input: {
           // `overflow`, and this path is the only `manual`.
           reason: "manual",
           workspaceRoot,
+          extensionsRoot: input.runtimeContext.cwd,
           // The checkpoint is written here, after the condensation, because the
           // store it feeds is the same one the automatic path writes through.
           // Previously the command side wrote it before knowing whether any
@@ -420,7 +425,8 @@ export function createCliSessionRuntime(input: {
   installUsageRuntime(input.runtimeContext, nativeGate,
     usageResetApproval(input.runtimeContext, input.sessionManager, input.getPromptInteractiveApproval ?? (() => undefined)));
   if (input.mcpGateway) installMcpRuntime(input.runtimeContext, input.mcpGateway, nativeGate, url => input.renderer.renderLine(`Open this MCP sign-in URL in your browser:\n${url}`));
-  installExtensionRuntime(input.runtimeContext, sessionRuntime, nativeGate, input.sessionManager, input.mcpGateway);
+  installExtensionRuntime(input.runtimeContext, sessionRuntime, nativeGate, input.sessionManager, input.mcpGateway,
+    input.cliExtensionArguments, input.startupExtensionFiles);
   installSessionChange(input.runtimeContext, input.sessionManager, sessionRuntime);
   return sessionRuntime;
 }

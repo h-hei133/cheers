@@ -35,6 +35,26 @@ function expectParseError(args: readonly string[]) {
 }
 
 describe("cli args parser", () => {
+  it("refuses unknown startup options before their values can become prompts", () => {
+    expect(expectParseError(["--unknown", "send a prompt"]).message).toMatch(/unrecognized/i);
+    expect(expectParseError(["--unknown=PRIVATE_ARGUMENT"]).message).not.toContain("PRIVATE_ARGUMENT");
+    expect(expectParsed(["--", "--unknown", "send a prompt"]).options.promptArg).toBe("--unknown send a prompt");
+  });
+
+  it("holds possible extension values while preserving the selected built-ins", () => {
+    const parsed = parseCliArgs(["--extension", "./entry.ts", "--custom", "./value.txt", "--enabled=false", "--json", "--", "--tail"],
+      { cwd, deferExtensionOptions: true });
+    expect(parsed).toMatchObject({ ok: true, args: {
+      extensionOptions: [{ name: "--custom", following: "./value.txt" }, { name: "--enabled", inline: "false" }],
+      options: { extensionPaths: ["./entry.ts"], printMode: true, jsonEvents: true, promptArg: "--tail" },
+    } });
+  });
+
+  it("keeps unknown arguments out of standalone operations even with an explicit extension", () => {
+    const args = ["--extension", "./entry.ts", "--custom", "candidate", "--list-models"];
+    expect(parseCliArgs(args, { cwd, deferExtensionOptions: true })).toMatchObject({ ok: false });
+  });
+
   it.each([false, true])('preserves the explicit prompt source around composed skills (terminator=%s)', terminator => {
     const prompt = '  Compare /skill:one\nthen /skill:two /skill:one carefully  \n';
     const args = ['--project', cwd, '--print', ...(terminator ? ['--'] : []), prompt];

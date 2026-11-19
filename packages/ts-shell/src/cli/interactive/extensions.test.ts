@@ -20,6 +20,7 @@ import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 import { InteractiveMode } from './interactiveMode.js';
 import type { createExtensionUiAdapter } from './extensions.js';
 import { ExtensionUiBinding } from './extensions/binding.js';
+import type { Keybindings } from './keybindings.js';
 import { closeExtensionsFor, extensionHostFor, installExtensionRuntime, waitForExtensionsFor } from '../runtime/extensions.js';
 import { runExtensionFactory } from '../../extensions/runtime/inProcessLoader.js';
 import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
@@ -63,6 +64,106 @@ function interactive(tuiMode: 'regular' | 'fullscreen' = 'fullscreen', root = '/
 }
 
 describe('interactive extension UI', () => {
+  it.each(['regular', 'fullscreen'] as const)('dispatches only admitted free shortcuts on the %s terminal', async tuiMode => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/extension-shortcut-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const first = path.join(root, 'first.ts'), second = path.join(root, 'second.ts');
+    fs.writeFileSync(first, `export default (api) => {
+      api.registerShortcut({ key: 'alt+x', run: () => api.ui.notify('EARLIER_SHORTCUT') });
+      api.registerShortcut({ key: 'x', run: () => api.ui.notify('PRINTABLE_SHORTCUT') });
+      api.registerShortcut({ key: 'ctrl+t', run: () => api.ui.notify('BUILTIN_SHORTCUT') });
+    };`);
+    fs.writeFileSync(second, `export default (api) => {
+      const shortcut = { key: 'Alt + X', run: () => api.ui.notify('CURRENT_SHORTCUT') };
+      api.registerShortcut(shortcut);
+      shortcut.run = () => api.ui.notify('MUTATED_SHORTCUT');
+    };`);
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const { mode, context, sessionRuntime, terminal, scheduler, state, ui } = interactive(tuiMode, root, undefined, () => held);
+    context.cliExtensionPaths = [first, second];
+    const host = mode as unknown as { preferences: { keybindings: Keybindings }; state: { transcript: Transcript } };
+    const notices = () => host.state.transcript.all().flatMap(block => block.kind === 'notice' ? [block.text] : []);
+    const observed = () => notices().filter(line => line.includes('_SHORTCUT'));
+    try {
+      installExtensionRuntime(context, sessionRuntime, () => ({ sessionId: context.session.id, workspaceRoot: root,
+        hooks: new HookDispatcher(), emit() {}, permissionScope: 'ask' }));
+      await waitForExtensionsFor(context);
+      mode.start();
+      terminal.input('\x1bx');
+      expect(observed()).toEqual([]);
+      release(); await mode.inputReady;
+      terminal.input('x'); terminal.input('\x14'); terminal.input('\x1b[120;3:3u');
+      expect(state.view.editor.getText()).toBe('x');
+      expect(observed()).toEqual([]);
+      const dialog = ui.input('Dialog owns the keyboard');
+      expect(state.extensionUi.active).toBe(true);
+      terminal.input('\x1bx');
+      scheduler.flush();
+      expect(observed()).toEqual([]);
+      terminal.input('\x1b[27u');
+      scheduler.flush();
+      expect(state.extensionUi.active).toBe(false);
+      expect(await dialog).toBeUndefined();
+      terminal.input('\x1bx');
+      scheduler.flush();
+      expect(observed()).toEqual(expect.arrayContaining([expect.stringContaining('CURRENT_SHORTCUT')]));
+      expect(observed()).toHaveLength(1);
+      await new Promise(resolve => setImmediate(resolve));
+      host.preferences.keybindings.setUserConfig({ 'tui.editor.deleteToLineStart': 'alt+x' });
+      terminal.input('\x1bx');
+      expect(state.view.editor.getText()).toBe('');
+      expect(observed()).toHaveLength(1);
+      host.preferences.keybindings.setUserConfig({});
+      terminal.input('\x1bx');
+      expect(observed()).toHaveLength(2);
+    } finally {
+      release(); mode.stop(); await closeExtensionsFor(context);
+      vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('retires a running shortcut and accepts only the successor after extension reload', async () => {
+    fs.mkdirSync('/tmp/cheers-test', { recursive: true });
+    const root = fs.mkdtempSync('/tmp/cheers-test/extension-shortcut-reload-');
+    vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('CHEERS_TEST_ROOT', root);
+    const entry = path.join(root, 'shortcut.ts');
+    fs.writeFileSync(entry, `export default (api) => api.registerShortcut({ key: 'alt+x', async run() {
+      await api.ui.input('Original shortcut');
+      api.ui.notify('RETIRED_SHORTCUT');
+    } });`);
+    const { mode, context, sessionRuntime, terminal, scheduler, state } = interactive('fullscreen', root);
+    context.cliExtensionPaths = [entry];
+    sessionRuntime.isRunning = () => Boolean(sessionRuntime.commands.current);
+    const host = mode as unknown as { state: { transcript: Transcript } };
+    const notices = () => host.state.transcript.all().flatMap(block => block.kind === 'notice' ? [block.text] : []).join('\n');
+    try {
+      installExtensionRuntime(context, sessionRuntime, () => ({ sessionId: context.session.id, workspaceRoot: root,
+        hooks: new HookDispatcher(), emit() {}, permissionScope: 'ask' }));
+      mode.start(); await extensions.startExtensionsFor(context);
+      terminal.input('\x1bx');
+      scheduler.flush();
+      await vi.waitFor(() => expect(state.extensionUi.active, notices()).toBe(true));
+      fs.writeFileSync(entry, `export default (api) => api.registerShortcut({
+        key: 'alt+x', run: () => api.ui.notify('SUCCESSOR_SHORTCUT')
+      });`);
+      const reload = await extensions.extensionCommandFor(context)('plugin', ['reload'], {
+        cwd: root, projectRoot: root, sessionId: context.session.id,
+      });
+      expect(reload.output).toContain('reloaded');
+      expect(state.extensionUi.active).toBe(false);
+      expect(notices()).not.toContain('RETIRED_SHORTCUT');
+      terminal.input('\x1bx');
+      expect(notices()).toContain('SUCCESSOR_SHORTCUT');
+      mode.stop(); terminal.input('\x1bx');
+      expect(notices().match(/SUCCESSOR_SHORTCUT/g)).toHaveLength(1);
+    } finally {
+      mode.stop(); await closeExtensionsFor(context);
+      vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('runs startup after terminal UI binding and holds ordinary input until it finishes', async () => {
     let mode!: InteractiveMode, ui!: ReturnType<typeof createExtensionUiAdapter>['host'];
     let started = false, confirmed = false;

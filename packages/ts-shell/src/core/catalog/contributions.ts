@@ -13,6 +13,9 @@ import { captureVirtualDefinitions, MAX_VIRTUAL_MODELS } from '../models/virtual
 import {snapshotData} from '../values/data.js';
 import {callbackCancellation, captureCallbackResult} from '../values/promise.js';
 import {InputRefusal} from '../hooks/input/error.js';
+import {captureCompactResult} from '../../extensions/events/compact.js';
+import {captureToolResult} from '../../extensions/events/result.js';
+import { captureMessageResult } from '../../extensions/events/message.js';
 
 /** Neutral session composition port. The feature owner retains lifecycle and authority. */
 export interface CatalogContribution {
@@ -61,11 +64,16 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
     const currentSignal = callerSignal ? AbortSignal.any([eventLifetime.signal, callerSignal]) : eventLifetime.signal;
     const assertCurrentSignal = AbortSignal.prototype.throwIfAborted.bind(currentSignal);
     assertCurrentSignal();
-    const result = event === 'input' || event === 'UserPromptSubmit'
-      ? (await captureCallbackResult(() => originalOnEvent(event, payload, aliases, currentSignal),
-        value => value === undefined ? undefined : snapshotData(value, {bytes:64*1024*1024, nodes:4096, depth:12, allowCrossRealm:true}),
+    const input = event === 'input' || event === 'UserPromptSubmit';
+    const compact = event === 'session_before_compact';
+    const toolResult = event === 'tool_result';
+    const messageEnd = event === 'message_end';
+    const result = input || compact || toolResult || messageEnd
+      ? (await captureCallbackResult<unknown>(() => originalOnEvent(event, payload, aliases, currentSignal),
+        compact ? captureCompactResult : toolResult ? captureToolResult : messageEnd ? captureMessageResult
+          : value => value === undefined ? undefined : snapshotData(value, {bytes:64*1024*1024, nodes:4096, depth:12, allowCrossRealm:true}),
         {check:() => {admission(); assertCurrentSignal();}, cancellation:callbackCancellation(currentSignal),
-          invalid:() => new InputRefusal(), failed:() => new InputRefusal(), cancelled:() => new InputRefusal()})).value
+          ...(input ? { invalid:() => new InputRefusal(), failed:() => new InputRefusal(), cancelled:() => new InputRefusal() } : {})})).value
       : await originalOnEvent(event, payload, aliases, currentSignal);
     admission(); assertCurrentSignal();
     return result;

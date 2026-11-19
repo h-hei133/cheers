@@ -1,9 +1,9 @@
 import { snapshotData } from '../../core/values/data.js';
 
-export type SessionBeforeEventName = 'session_before_switch' | 'session_before_fork' | 'session_before_tree';
+export type SessionBeforeEventName = 'session_before_switch' | 'session_before_fork' | 'session_before_tree' | 'session_before_compact';
 
 export function isSessionBeforeEvent(name: string): name is SessionBeforeEventName {
-  return name === 'session_before_switch' || name === 'session_before_fork' || name === 'session_before_tree';
+  return name === 'session_before_switch' || name === 'session_before_fork' || name === 'session_before_tree' || name === 'session_before_compact';
 }
 
 /** Only an inert boolean cancellation is admitted; failed capture refuses the operation. */

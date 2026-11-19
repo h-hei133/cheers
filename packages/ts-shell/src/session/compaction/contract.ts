@@ -31,6 +31,8 @@ export interface CompactionAuthority {
   readonly admission?: () => string | undefined;
 }
 export interface CompactionDispatch {
+  /** Verify known-unsent admission before the provider records its own handoff. */
+  readonly checkAdmission?: () => void;
   /** Called at the existing attempt transport's actual handoff boundary. */
   readonly dispatch: () => void;
 }
@@ -104,6 +106,13 @@ export interface CompactionStepClaim {
   readonly profile?: import('../../core/paths/profile/context.js').ProfileContext;
 }
 export class CompactionOperationError extends Error {}
+
+/** A fresh read only confirms the original branch. The original snapshot remains the write authority. */
+export function bindCompactionSource(source: CompactionSource, read: () => CompactionSource): () => void {
+  return () => {
+    if (read().identity !== source.identity) throw new CompactionOperationError('The session source changed before the summary was generated.');
+  };
+}
 /** A local request/schedule refusal whose detail is safe to show to the caller. */
 export class SummaryAdmissionError extends Error {}
 /** Uncertain publication must stop automatic continuation until the saved history is inspected. */

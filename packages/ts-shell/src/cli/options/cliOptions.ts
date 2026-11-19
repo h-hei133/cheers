@@ -1,4 +1,5 @@
 import type { RuntimeProvider } from "../../config/runtimeConfig.js";
+import type { UnresolvedOption } from "./argv.js";
 
 export type NonInteractiveApprovalMode =
   | "deny"
@@ -101,6 +102,7 @@ export interface CliArgs {
   readonly options: CliOptions;
   readonly versionRequested: boolean;
   readonly doctorRequested: boolean;
+  readonly extensionOptions?: readonly UnresolvedOption[];
 }
 
 export interface CliArgParseError {
@@ -114,4 +116,5 @@ export type CliArgParseResult =
 
 export interface ParseCliArgsOptions {
   readonly cwd: string;
+  readonly deferExtensionOptions?: boolean;
 }

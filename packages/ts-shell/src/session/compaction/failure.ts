@@ -21,6 +21,7 @@ export function compactionErrorMessage(error: unknown, projectRoot?: string): st
 
 export const COMPACTION_DECLINE_MESSAGES = {
   'blocked-by-hook': 'Compaction was refused by a PreCompact hook.',
+  'refused-by-extension': 'Compaction was refused by a session extension.',
   'would-not-shrink': 'The summary would be at least as large as the messages it replaces, so compacting would not free any context.',
   'step-unknown': 'A previous summary step may already have been sent; it was not repeated. Add a turn or change the instructions, then retry.',
 } as const;

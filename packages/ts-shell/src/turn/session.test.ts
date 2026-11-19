@@ -4,6 +4,7 @@ import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { createTaskToolDefinition } from "../core/tools/taskTool.js";
+import { registerCatalogContribution } from '../core/catalog/contributions.js';
 import { requestPurposeFor, runTurn, type TurnOptions } from "./session.js";
 import type { StepFunction } from "./step.js";
 import { CONTEXT_OVERFLOW_PREFIX, createStepFunction } from "./step.js";
@@ -315,6 +316,57 @@ async function drain(events: AsyncIterable<QueryEvent>): Promise<QueryEvent[]> {
 }
 
 describe("runTurn", () => {
+  it('uses the reduced assistant text for the display, transcript and next model request', async () => {
+    const tail = vi.fn((messages: readonly SessionMessage[]) => {
+      expect(messages.find(message => message.role === 'assistant')).toMatchObject({
+        content: 'final text', tool_calls: [{ id: 'lookup', function: { name: 'read' } }],
+      });
+      return { text: 'done', toolCalls: [], stopReason: 'stop' as const };
+    });
+    const setup = options({ sessionId: 'extension-final-message', tools: new Map([['read', echoTool('read', 'actual result')]]),
+      step: scripted([{ text: 'draft text', toolCalls: [{ id: 'lookup', name: 'read', args: {} }], stopReason: 'stop' }, tail]) });
+    const seen: unknown[] = [];
+    const retires = ['first', 'second', 'final'].map(stage => registerCatalogContribution({
+      root: setup.workspaceRoot, sessionId: setup.sessionId, tools: [], commands: [], skills: () => [],
+      onEvent: async (name, payload) => {
+        const event = payload as { canReplace?: boolean; message?: { content?: string; tool_calls?: unknown } };
+        if (name !== 'message_end' || !event.canReplace || !event.message?.tool_calls) return;
+        seen.push(event.message.content);
+        if (stage === 'second') return { message: { role: 'user', content: 'invalid role' } };
+        return { message: { role: 'assistant', content: `${stage} text`, tool_calls: [] } };
+      },
+    }));
+    try {
+      const events = await drain(runTurn(setup).events);
+      expect(seen).toEqual(['draft text', 'first text', 'first text']);
+      expect(tail).toHaveBeenCalledOnce();
+      expect(setup.persisted[0]).toMatchObject({ role: 'assistant', content: 'final text', tool_calls: [{ id: 'lookup' }] });
+      expect(events.filter(event => event.type === 'message.replace')).toEqual([
+        { type: 'message.replace', role: 'coder', text: 'final text' },
+      ]);
+      expect(events).toContainEqual(expect.objectContaining({ type: 'tool.result', taskId: 'lookup', output: 'actual result' }));
+    } finally { retires.forEach(retire => retire()); }
+  });
+
+  it('observes signed assistant replies without publishing a replacement', async () => {
+    const setup = options({ sessionId: 'extension-signed-message', step: scripted([{
+      text: 'signed answer', stopReason: 'stop', toolCalls: [], reasoning: { text: 'plan', signature: 'opaque' },
+    }]) });
+    const decide = vi.fn((payload: unknown) => ({ message: { role: 'assistant', content: 'alternative' }, payload: undefined }));
+    const retire = registerCatalogContribution({ root: setup.workspaceRoot, sessionId: setup.sessionId,
+      tools: [], commands: [], skills: () => [], onEvent: async (name, payload) => {
+        if (name === 'message_end' && (payload as { message?: SessionMessage }).message?.role === 'assistant') return decide(payload);
+        return undefined;
+      } });
+    try {
+      const events = await drain(runTurn(setup).events);
+      expect(decide).toHaveBeenCalledOnce();
+      expect(decide.mock.calls[0][0]).not.toHaveProperty('canReplace');
+      expect(setup.persisted[0]).toMatchObject({ content: 'signed answer', reasoning: { signature: 'opaque' } });
+      expect(events.some(event => event.type === 'message.replace')).toBe(false);
+    } finally { retire(); }
+  });
+
   it.each([
     { maxSteps: 1, inline: false }, { maxSteps: 2, inline: false },
     { maxSteps: 1, inline: true }, { maxSteps: 2, inline: true },
@@ -611,6 +663,40 @@ describe("runTurn", () => {
     const terminal = events.at(-1);
     expect(terminal?.type).toBe("query.completed");
     if (terminal?.type === "query.completed") expect(terminal.result.finalOutput).toBe("answered after compaction");
+  });
+
+  it.each(['summary', 'cancel'] as const)('uses the extension decision at the raw overflow recovery boundary (%s)', async mode => {
+    const summarize = vi.fn(async () => 'unexpected default');
+    const onCompact = vi.fn();
+    const step = vi.fn<StepFunction>(async messages => {
+      if (step.mock.calls.length === 1) {
+        return { text: '', toolCalls: [], stopReason: 'error', errorMessage: `${CONTEXT_OVERFLOW_PREFIX}too big` };
+      }
+      expect(JSON.stringify(messages)).toContain('Overflow checkpoint');
+      return { text: 'Replied after overflow', toolCalls: [], stopReason: 'stop' };
+    });
+    const setup = options({ sessionId: `overflow-extension-${mode}`, step, history: Array.from({ length: 8 }, (_, index) => ({
+      role: index % 2 ? 'assistant' : 'user', content: `${index}: ${'x'.repeat(400)}`,
+    })), compaction: { policy: { contextWindow: 1_000_000, keepRecentTokens: 300 }, onCompact, summarize } });
+    const before = vi.fn(() => mode === 'summary' ? { summary: 'Overflow checkpoint' } : { cancel: true });
+    const after = vi.fn((payload: unknown) => {
+      expect(onCompact).toHaveBeenCalledOnce();
+      expect(payload).toMatchObject({ reason: 'overflow', summary: 'Overflow checkpoint', fromExtension: true });
+    });
+    const retire = registerCatalogContribution({ root: setup.workspaceRoot, sessionId: setup.sessionId,
+      tools: [], commands: [], skills: () => [], onEvent: async (event, payload) => {
+        if (event === 'session_before_compact') { expect(payload).toMatchObject({ reason: 'overflow' }); return before(); }
+        if (event === 'session_compact') after(payload);
+        return undefined;
+      } });
+    try {
+      const events = await drain(runTurn(setup).events);
+      expect(summarize).not.toHaveBeenCalled();
+      expect(before).toHaveBeenCalledOnce();
+      expect(step).toHaveBeenCalledTimes(mode === 'summary' ? 2 : 1);
+      expect(after).toHaveBeenCalledTimes(mode === 'summary' ? 1 : 0);
+      expect(events.at(-1)?.type).toBe(mode === 'summary' ? 'query.completed' : 'query.failed');
+    } finally { retire(); }
   });
 
   it("retains an overflow failure without summarizing or retrying when auto compaction is disabled", async () => {

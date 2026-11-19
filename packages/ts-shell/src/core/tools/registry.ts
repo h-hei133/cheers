@@ -16,6 +16,7 @@ import { createReadToolDefinition } from './read.js'
 import { createSkillToolDefinition, type SkillCatalog } from './skill.js'
 import { createTeamToolDefinition } from './teamTool.js'
 import { createGrepToolDefinition } from './grep.js'
+import { readOnlyTool } from './capability.js'
 import { createWebFetchToolDefinition } from './webFetch.js'
 import { createWebSearchToolDefinition } from './webSearch.js'
 import { createLspToolDefinition } from './lsp.js'
@@ -78,7 +79,7 @@ export function createCoreToolRegistry(options?: {
 }): ReadonlyMap<string, ToolDefinition> {
   const executionService = options?.executionService ?? createDefaultExecutionService()
   const tools: ToolDefinition[] = [
-    createReadToolDefinition(executionService),
+    readOnlyTool(createReadToolDefinition(executionService)),
     createPatchToolDefinition(),
     {
       name: 'write',
@@ -157,8 +158,8 @@ export function createCoreToolRegistry(options?: {
       },
     },
     createEditToolDefinition(executionService),
-    createGlobToolDefinition(executionService),
-    createGrepToolDefinition(executionService),
+    readOnlyTool(createGlobToolDefinition(executionService)),
+    readOnlyTool(createGrepToolDefinition(executionService)),
     createShellToolDefinition(executionService),
     createTeamToolDefinition(),
     createTaskOutputToolDefinition(),

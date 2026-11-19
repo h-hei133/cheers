@@ -68,6 +68,8 @@ export interface AfterToolCallUpdate {
   readonly output?: string;
   readonly isError?: boolean;
   readonly terminate?: boolean;
+  /** The result owner already preserved the original metadata and media in its projection. */
+  readonly preserveResultEvidence?: true;
 }
 
 export interface ToolHooks {
@@ -373,7 +375,7 @@ export async function finalizeExecutedCall(
     }
     const output = update.output ?? executed.output;
     const metadata = { ...executed.metadata, ...update.metadata };
-    if (output !== executed.output && !Object.hasOwn(update.metadata ?? {}, "outputNotice")) {
+    if (!update.preserveResultEvidence && output !== executed.output && !Object.hasOwn(update.metadata ?? {}, "outputNotice")) {
       // Appended hook facts must survive the same cap as the producer's notice.
       // A replacement (including redaction) invalidates the original notice.
       if (typeof executed.metadata?.outputNotice === "string" && output.startsWith(executed.output)) {
@@ -386,7 +388,8 @@ export async function finalizeExecutedCall(
       ...executed,
       ...(executed.metadata || update.metadata ? { metadata } : {}),
       output,
-      ...(update.output !== undefined && output !== executed.output && (!executed.output || !output.startsWith(executed.output)) ? { images: undefined } : {}),
+      ...(!update.preserveResultEvidence && update.output !== undefined && output !== executed.output
+        && (!executed.output || !output.startsWith(executed.output)) ? { images: undefined } : {}),
       isError: executed.isError || update.isError === true,
       terminate: update.terminate ?? executed.terminate,
     };

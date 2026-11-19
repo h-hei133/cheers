@@ -12,8 +12,13 @@ import type { ToolDefinition } from '../../tools/types.js';
 import type { CommandDefinition } from '../../core/commands/types.js';
 import { SkillDiscovery } from '../../core/skills/discovery.js';
 import { captureTreeResult, mergeTreeResult } from '../events/tree.js';
+import { captureCompactResult, mergeCompactResult } from '../events/compact.js';
+import { captureToolResult, reduceToolResult } from '../events/result.js';
+import { captureMessageResult, projectMessageEnd } from '../events/message.js';
+import type { ExtensionMessageEndEvent, ExtensionMessageEndResult } from '../events/model.js';
+import type { ExtensionToolResult, ExtensionToolResultEvent } from '../events/model.js';
 import { captureInputEvent, captureInputHookPayload, captureInputHookResult, captureInputResult, InputRefusal, projectInputEvent, reduceInputHookResult } from '../events/input.js';
-import type { ExtensionBeforeTreeResult, ExtensionInputEvent } from '../events/model.js';
+import type { ExtensionBeforeCompactResult, ExtensionBeforeTreeResult, ExtensionInputEvent } from '../events/model.js';
 import { callbackCancellation, captureCallbackResult } from '../../core/values/promise.js';
 import type { HookDecision } from '../../core/hooks/types.js';
 
@@ -71,25 +76,39 @@ export function registerPackage(host: RegistrationHost, record: PackageRecord): 
     ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => {
         const nativeInput = event === 'input';
         const guardedInput = nativeInput || event === 'UserPromptSubmit';
+        const compact = event === 'session_before_compact';
+        const toolResult = event === 'tool_result';
+        const messageEnd = event === 'message_end';
+        const captureResult = nativeInput ? captureInputResult : guardedInput ? captureInputHookResult
+          : compact ? captureCompactResult : toolResult ? captureToolResult : messageEnd ? captureMessageResult : undefined;
         let currentPayload = nativeInput ? captureInputEvent(payload) : event === 'UserPromptSubmit' ? captureInputHookPayload(payload) : payload;
         let transformed = false;
         let hookResult: HookDecision | undefined;
         let treeResult: ExtensionBeforeTreeResult = { cancel: false };
+        let compactResult: ExtensionBeforeCompactResult | undefined;
+        let toolPatch: ExtensionToolResult | undefined;
+        let messagePatch: ExtensionMessageEndResult | undefined;
         for (const script of jsScripts) {
-          if (guardedInput && signal) AbortSignal.prototype.throwIfAborted.call(signal);
+          if (captureResult && signal) AbortSignal.prototype.throwIfAborted.call(signal);
           host.current(record, `script:${script.name}`);
           let next;
           try {
-            next = guardedInput ? (await captureCallbackResult<unknown>(
+            next = captureResult ? (await captureCallbackResult<unknown>(
               () => host.event!(record, script.name, event, currentPayload, aliases, signal),
-              nativeInput ? captureInputResult : captureInputHookResult, {
+              captureResult, {
                 check: () => { if (signal) AbortSignal.prototype.throwIfAborted.call(signal); host.current(record, `script:${script.name}`); },
                 cancellation: callbackCancellation(signal),
-                invalid: () => new InputRefusal(), failed: () => new InputRefusal(), cancelled: () => new InputRefusal(),
+                ...(guardedInput ? { invalid: () => new InputRefusal(), failed: () => new InputRefusal(), cancelled: () => new InputRefusal() } : {}),
               })).value
               : await host.event!(record, script.name, event, event === 'session_before_tree' ? payload : currentPayload, aliases, signal);
           }
-          catch (error) { if (guardedInput) throw new InputRefusal(); throw error; }
+          catch (error) {
+            if (guardedInput) throw new InputRefusal();
+            if (!toolResult && !messageEnd) throw error;
+            if (signal) AbortSignal.prototype.throwIfAborted.call(signal);
+            host.current(record, `script:${script.name}`);
+            continue;
+          }
           if (nativeInput) {
             if (signal) AbortSignal.prototype.throwIfAborted.call(signal);
             host.current(record, `script:${script.name}`);
@@ -110,9 +129,34 @@ export function registerPackage(host: RegistrationHost, record: PackageRecord): 
             if (treeResult.cancel) return treeResult;
             continue;
           }
+          if (compact) {
+            compactResult = mergeCompactResult(compactResult, captureCompactResult(next));
+            if (compactResult?.cancel) return compactResult;
+            continue;
+          }
+          if (toolResult) {
+            const reduced = reduceToolResult(currentPayload as ExtensionToolResultEvent, toolPatch, captureToolResult(next));
+            currentPayload = reduced.event;
+            toolPatch = reduced.result;
+            continue;
+          }
+          if (messageEnd) {
+            const nextMessage = captureMessageResult(next);
+            const messageEvent = currentPayload as ExtensionMessageEndEvent;
+            if (messageEvent.canReplace && nextMessage?.message) {
+              currentPayload = projectMessageEnd(messageEvent, nextMessage);
+              messagePatch = nextMessage;
+            }
+            continue;
+          }
+          if (event === 'session_compact') continue;
           if (next !== undefined) currentPayload = next;
         }
         if (event === 'UserPromptSubmit') return hookResult;
+        if (compact) return compactResult;
+        if (toolResult) return toolPatch;
+        if (messageEnd) return messagePatch;
+        if (event === 'session_compact') return undefined;
         if (nativeInput) {
           const result = currentPayload as ExtensionInputEvent;
           return Object.freeze(transformed ? { action: 'transform', text: result.text, ...(result.images === undefined ? {} : { images: result.images }) }

@@ -27,7 +27,8 @@ export async function runPreparedTool(tool: ToolDefinition, input: Record<string
     startedEventAttempted = true;
     options.emit({ type: 'tool.started', toolName: tool.name, taskId: id, args: { [publication?.eventKey ?? 'operationId']: id } });
     const result = await adapted.execute(id, args, signal); observed = result;
-    const update = await hooks.afterToolCall!({ call, args, assistantMessage, result, isError: result.isError }, signal);
+    const { preserveResultEvidence: _preserve, ...update } =
+      await hooks.afterToolCall!({ call, args, assistantMessage, result, isError: result.isError }, signal) ?? {};
     const settled = { ...result, ...update, ...(publication ? { metadata: { ...result.metadata, ...update?.metadata,
       ...(update?.isError && result.metadata?.status !== 'unchanged' ? { publication: result.metadata?.status, status: 'unverified' } : {}) } }
       : update?.metadata ? { metadata: { ...result.metadata, ...update.metadata } } : {}) };

@@ -13,6 +13,8 @@ import { catalogContributions } from '../../core/catalog/contributions.js';
 import { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
 import { createProfileContext, withProfile } from '../../core/paths/profile/context.js';
 import { sessionModelCatalog, sessionVirtualModels } from '../../core/catalog/models.js';
+import { scanCliArgs } from '../options/argv.js';
+import { cliExtensionArguments, type CliExtensionArguments } from '../options/extensions.js';
 
 let directory: string; let context: ShellRuntimeContext;
 beforeEach(() => {
@@ -27,13 +29,77 @@ beforeEach(() => {
 });
 afterEach(async () => { await closeExtensionsFor(context); vi.unstubAllEnvs(); fs.rmSync(directory, { recursive: true, force: true }); });
 
-function install() {
+function install(args?: CliExtensionArguments) {
   const commands = new ShellCommandRuntime();
-  const runtime = { commands, getPermissionScope: () => 'ask' } as unknown as ShellSessionRuntime;
+  const runtime = { commands, getPermissionScope: () => 'ask', input: () => undefined, executePrompt: vi.fn(async () => 'ran') } as unknown as ShellSessionRuntime;
   installExtensionRuntime(context, runtime, () => ({ sessionId: 'view', workspaceRoot: directory,
-    hooks: new HookDispatcher(), emit: () => {}, permissionScope: 'ask' }));
+    hooks: new HookDispatcher(), emit: () => {}, permissionScope: 'ask' }), undefined, undefined, args);
   return commands;
 }
+
+it('uses typed CLI flags during factory initialization and preserves false, empty and default values', async () => {
+  const file = path.join(directory, 'flags.ts');
+  fs.writeFileSync(file, `export default async api => {
+    const declaration = { name: 'enabled', type: 'boolean', default: true };
+    api.registerFlag(declaration);
+    declaration.name = 'changed';
+    api.registerFlag({ name: 'tag' });
+    api.registerFlag({ name: 'extra', default: 'fallback' });
+    await Promise.resolve();
+    const values = [api.getFlag('enabled'), api.getFlag('tag'), api.getFlag('extra'), api.getFlag('changed')];
+    let refused = false;
+    try { await api.sendMessage('No automatic startup prompt'); } catch { refused = true; }
+    api.registerCommand({ name: 'show-flags', description: 'Read admitted values', execute: () => ({
+      kind: 'local', output: JSON.stringify({ values, refused })
+    }) });
+  };`);
+  context.cliExtensionPaths = [file];
+  const finalize = vi.fn();
+  install(cliExtensionArguments(scanCliArgs(['--enabled=false', '--tag=']).unresolved, finalize));
+  await waitForExtensionsFor(context);
+  expect(finalize).toHaveBeenCalledOnce();
+  const command = catalogContributions(directory, 'view').flatMap(entry => entry.commands)[0]!;
+  expect(await command.execute([], { cwd: directory, sessionId: 'view' })).toEqual({
+    kind: 'local', output: JSON.stringify({ values: [false, '', 'fallback', null], refused: true }),
+  });
+});
+
+it.each([
+  { declarations: ['model'], wanted: [], message: 'reserved' },
+  { declarations: ['same', 'same'], wanted: [], message: 'declared more than once' },
+  { declarations: ['first'], wanted: ['--missing', 'NO_PROMPT'], message: 'not registered' },
+  { declarations: ['first'], wanted: ['--first'], message: 'Missing value' },
+])('withholds a generation before publishing for $message', async ({ declarations, wanted, message }) => {
+  context.cliExtensionPaths = declarations.map((name, index) => {
+    const target = path.join(directory, `flags-${index}.ts`);
+    fs.writeFileSync(target, `export default api => {
+      api.registerFlag({ name: ${JSON.stringify(name)} });
+      api.registerTool({ name: 'staged_${index}' });
+    };`);
+    return target;
+  });
+  const finalize = vi.fn();
+  install(wanted.length ? cliExtensionArguments(scanCliArgs(wanted).unresolved, finalize) : undefined);
+  await expect(waitForExtensionsFor(context)).rejects.toThrow(message);
+  expect(finalize).not.toHaveBeenCalled();
+  expect(catalogContributions(directory, 'view')).toEqual([]);
+});
+
+it('denies a second declaration before its initializer can read the invoked flag value', async () => {
+  const first = path.join(directory, 'first-owner.ts'), second = path.join(directory, 'second-owner.ts');
+  fs.writeFileSync(first, `export default api => api.registerFlag({name:'label', default:'FIRST_DEFAULT'});`);
+  fs.writeFileSync(second, `export default api => {
+    try { api.registerFlag({ name:'label', default:'SECOND_DEFAULT' }); } catch {}
+    const value = api.getFlag('label');
+    if (value !== undefined) throw new Error('Second extension received a flag value.');
+  };`);
+  context.cliExtensionPaths = [first, second];
+  const finalize = vi.fn();
+  install(cliExtensionArguments(scanCliArgs(['--label=FIRST_EXPLICIT']).unresolved, finalize));
+  await expect(waitForExtensionsFor(context)).rejects.toThrow('declared more than once');
+  expect(finalize).not.toHaveBeenCalled();
+  expect(catalogContributions(directory, 'view')).toEqual([]);
+});
 
 it('awaits async file factories before publishing complete CLI contributions', async () => {
   const file = path.join(directory, 'extension.ts');

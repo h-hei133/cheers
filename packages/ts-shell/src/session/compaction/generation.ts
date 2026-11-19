@@ -15,12 +15,18 @@ async function runStep(input: {
   readonly request: SummarizeRequest;
   readonly summarize: SummarizeHistory;
   readonly prepared?: PreparedSummaryStep;
+  readonly checkAdmission?: () => void;
 }): Promise<string | undefined> {
   input.request.signal?.throwIfAborted();
   const prepared = input.prepared ?? await input.summarize.prepare?.(input.request);
   input.request.signal?.throwIfAborted();
   if (!prepared) input.summarize.preflight?.(input.request);
-  input.request.signal?.throwIfAborted();
+  const checkAdmission = () => {
+    input.request.signal?.throwIfAborted();
+    input.checkAdmission?.();
+    input.request.signal?.throwIfAborted();
+  };
+  checkAdmission();
   const claim = input.operation ? claimCompactionStep({ ...input.operation,
     stepDigest: compactionStepDigest({ history: input.request.messages, previousSummary: input.request.previousSummary,
       instructions: input.request.instructions, stage: input.stage,
@@ -30,7 +36,7 @@ async function runStep(input: {
   if (claim?.summary !== undefined) return claim.summary;
   let dispatched = false;
   const dispatch = (): void => {
-    input.request.signal?.throwIfAborted();
+    checkAdmission();
     // A failed persistence/readback is uncertain and must never be released.
     dispatched = true;
     if (claim) dispatchCompactionStep(claim);
@@ -38,8 +44,9 @@ async function runStep(input: {
   try {
     // Injected summarizers without a transport still have an explicit conservative boundary.
     if (!prepared && !input.summarize.dispatchAware) dispatch();
-    const summary = prepared ? await prepared.send({ dispatch })
-      : await input.summarize({ ...input.request, dispatch: { dispatch } });
+    const handoff = { checkAdmission, dispatch };
+    const summary = prepared ? await prepared.send(handoff)
+      : await input.summarize({ ...input.request, dispatch: handoff });
     if (summary?.trim()) {
       if (!dispatched) throw new Error('Summary transport did not verify its dispatch.');
       if (claim && input.operation) completeCompactionStep(claim, input.operation.sessionId, summary);
@@ -70,6 +77,7 @@ export async function generateCompaction(input: {
   readonly maxTokens?: number;
   readonly maxMergeTokens?: number;
   readonly operation?: CompactionOperationInput;
+  readonly checkAdmission?: () => void;
   readonly summarize: SummarizeHistory;
   readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
 }): Promise<string | undefined> {
@@ -95,7 +103,7 @@ export async function generateCompaction(input: {
   const run = async (stage: string, value: SummarizeRequest, summarize: SummarizeHistory,
     prepared?: PreparedSummaryStep): Promise<string | undefined> => {
     if (++sends > MAX_SEGMENTS * 2) throw new SummaryAdmissionError('Summary request refused: the bounded merge schedule is full.');
-    return runStep({ operation: input.operation, stage, request: value, summarize, prepared });
+    return runStep({ operation: input.operation, stage, request: value, summarize, prepared, checkAdmission: input.checkAdmission });
   };
   const summarizeSegments = async (stage: string, segments: readonly ScheduledSegment[], summarize: SummarizeHistory,
     previousSummary?: string): Promise<string | undefined> => {

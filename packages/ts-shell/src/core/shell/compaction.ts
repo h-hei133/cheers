@@ -17,9 +17,11 @@ import {
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import type { CompactionAuthority, CompactionCommit, CompactionCommitInput, CompactionSource } from '../../session/compaction/contract.js';
 import { digest } from '../../session/compaction/state.js';
-import { CompactionOperationError, SummaryAdmissionError } from '../../session/compaction/contract.js';
+import { bindCompactionSource, CompactionOperationError, SummaryAdmissionError } from '../../session/compaction/contract.js';
+import { reportCompaction } from '../../session/compaction/lifecycle.js';
 import { ModelAdmissionError } from '../agent/request/model.js';
-import { SUMMARY_MISSING } from '../../session/compaction/failure.js';
+import { COMPACTION_DECLINE_MESSAGES, SUMMARY_MISSING } from '../../session/compaction/failure.js';
+import { compactionLifecycle } from './compaction/events.js';
 
 /**
  * The lifecycle a compaction reports through, built once for both entry points.
@@ -34,36 +36,10 @@ export function buildCompactionLifecycle(input: {
   readonly hooks?: HookDispatcher;
   readonly sessionId: string;
   readonly workspaceRoot?: string;
+  readonly extensionsRoot?: string;
   readonly reason: CompactionReason;
 }): CompactionLifecycle {
-  const hooks = input.hooks ?? defaultHookDispatcher;
-  const workspaceRoot = input.workspaceRoot ?? process.cwd();
-  return {
-    before: async ({ tokensBefore, messageCount }) => {
-      const decision = await hooks.dispatch({
-        eventName: "PreCompact",
-        sessionId: input.sessionId,
-        workspaceRoot,
-        timestamp: new Date().toISOString(),
-        reason: input.reason,
-        tokensBefore,
-        messageCount,
-      });
-      return decision.decision !== "block";
-    },
-    after: async ({ summary, keptMessages, tokensBefore }) => {
-      await hooks.dispatch({
-        eventName: "PostCompact",
-        sessionId: input.sessionId,
-        workspaceRoot,
-        timestamp: new Date().toISOString(),
-        reason: input.reason,
-        summary,
-        keptMessages,
-        tokensBefore,
-      });
-    },
-  };
+  return compactionLifecycle({ ...input, hooks: input.hooks ?? defaultHookDispatcher, workspaceRoot: input.workspaceRoot ?? process.cwd() });
 }
 
 /**
@@ -119,6 +95,7 @@ export interface CompactionInput {
   readonly hooks?: HookDispatcher;
   /** Where the hook payload says the work happened. */
   readonly workspaceRoot?: string;
+  readonly extensionsRoot?: string;
   /**
    * Which trigger this is. Defaults to `manual`, which is the only caller this
    * path had before the reason was threaded through.
@@ -156,7 +133,8 @@ function declineOutcome(reason: CompactionDecline): CompactionOutcome {
       // A refusal, not an emptiness: the caller must be able to tell a project
       // rule from "there was nothing to do", or a policy that blocks every
       // compaction reads as a conversation that never needed one.
-      return { status: "failed", reason: "Compaction was refused by a PreCompact hook." };
+    case 'refused-by-extension':
+      return { status: 'failed', reason: COMPACTION_DECLINE_MESSAGES[reason] };
     case "fits-budget":
       return {
         status: "nothing",
@@ -187,12 +165,14 @@ function declineOutcome(reason: CompactionDecline): CompactionOutcome {
 }
 
 export async function compactSessionHistory(input: CompactionInput): Promise<CompactionOutcome> {
+  const readSource = input.authority ? () => input.authority!.capture()
+    : input.store.captureCompactionSource ? () => input.store.captureCompactionSource!(input.sessionId) : undefined;
   let source: CompactionSource;
   try {
     if (!input.authority && !input.store.captureCompactionSource && !input.store.syntheticCompaction) {
       return { status: 'failed', reason: 'A verified compaction storage owner is required.' };
     }
-    source = input.authority?.capture() ?? input.store.captureCompactionSource?.(input.sessionId) ?? {
+    source = readSource?.() ?? {
       sessionId: input.sessionId, identity: digest(input.store.getSession(input.sessionId)),
       history: structuredClone(selectModelContext(input.store.getSession(input.sessionId))) };
   } catch { return { status: 'failed', reason: 'Compaction source is unavailable.' }; }
@@ -202,6 +182,7 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
     ...(input.hooks ? { hooks: input.hooks } : {}),
     sessionId: input.sessionId,
     ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
+    ...(input.extensionsRoot ? { extensionsRoot: input.extensionsRoot } : {}),
     reason,
   });
 
@@ -218,7 +199,9 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
       instructions: input.instructions,
       signal: input.signal,
       lifecycle,
+      lifecycleReason: reason,
       force: true,
+      ...(readSource ? { checkSource: bindCompactionSource(source, readSource) } : {}),
       operation: { sessionId: input.sessionId, source,
         ...(input.authority?.identity ? { identity: input.authority.identity } : {}) },
     });
@@ -234,7 +217,7 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
   }
   if (condensed.status === 'failed') return { status: 'failed', reason: SUMMARY_MISSING };
   if (input.signal?.aborted) return { status: 'failed', reason: 'Compaction was cancelled.' };
-  const admission = () => condensed.preparedPolicy?.admission?.() ?? input.authority?.admission?.();
+  const admission = () => condensed.decision?.admission?.() ?? condensed.preparedPolicy?.admission?.() ?? input.authority?.admission?.();
   const blocked = admission();
   if (blocked) return { status: 'failed', reason: blocked };
   const commitInput: CompactionCommitInput = { source,
@@ -254,8 +237,7 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
   // The gauge showed the last request's context; that request predates the
   // checkpoint, so its number is no longer a fact until the next response.
   markContextUnknown(input.sessionId);
-  await lifecycle.after?.({ reason, summary: condensed.summary,
-    keptMessages: condensed.plan.keptMessages, tokensBefore: condensed.plan.tokensBefore });
+  await reportCompaction(lifecycle, condensed, reason);
   // After the entry is stored, so a reader of the checkpoint and a reader of the
   // session see the same compaction.
   if (input.checkpoint) {
