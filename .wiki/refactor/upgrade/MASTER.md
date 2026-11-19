@@ -23,10 +23,10 @@
 ## Current status
 
 **Current phase** 按批实施。36/62 项完成 Linux 本地功能验收，26 项开放。
-**Completed batch** E.6 运行中输入经 SDK、RPC 和终端进入共享队列处理。F1.2 原生结构化流接入实际端点，提交 `52653334`。已逐项重核 26 项开放工作，结论见 [工程记录](design.md)。
-**Next batch** E.6 剩余消息、工具和压缩结果。独立可交付缺口按原清单验收，包括 F1.5 按调用范围等待 MCP 就绪和 T5.1 首次会话写入预留。
-**Repository gate** 当前normal judgeexit2/not_proven，16384图容量缺口；pinned输入未改。定向script29项与完整209/210为前批历史，不升为当前script验证。
-**Evidence boundary** 本批使用 Linux 本地协议与合成验证。真实服务资格保留在各任务的验收条目。提交保留在本地。
+**Completed batch** E.6 运行中输入经 SDK、RPC 和终端进入共享队列处理，提交 `1679b5eb`。F1.2 原生结构化流接入实际端点，提交 `52653334`。T5.1 首次会话创建的同 ID 排他预留通过 Linux 并发验收。已逐项重核 26 项开放工作，结论见 [工程记录](design.md)。
+**Next batch** E.6 剩余消息、工具和压缩结果。独立可交付缺口包括 F1.5 按调用范围等待 MCP 就绪，以及 T5.1 普通提交的跨文件事务。
+**Repository gate** 固定 NormProof 本轮实际返回 exit 2 和 `not_proven`，依赖图超过 16384 边采集上限。七项本地静态检查通过。
+**Evidence boundary** 本批通过 Linux 本地协议、合成用例与配置模型实际验证。具体服务资格见各任务的验收条目。提交保留在本地。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance

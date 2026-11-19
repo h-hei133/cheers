@@ -96,6 +96,33 @@ export function projectSessionFileLayout(input: {
   };
 }
 
+/** Claim the current layout once, after checking for an occupied legacy ID. */
+export function reserveSessionLayout(layout: SessionStoreLayout, sessionId: string): SessionFileLayout {
+  const id = validateSessionId(sessionId);
+  assertSessionStoreProfile(layout, layout.sessionsDir);
+  for (const sessionsDir of layout.sessionsSearchDirs) {
+    if (sessionsDir === layout.sessionsDir) continue;
+    const candidate = projectSessionFileLayout({ sessionsDir, sessionId: id });
+    assertSessionStoreProfile(layout, candidate.sessionDir);
+    let existing: fs.Stats | undefined;
+    try {
+      existing = fs.lstatSync(candidate.sessionDir, { throwIfNoEntry: false });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOTDIR') throw error;
+    }
+    if (existing) throw new Error(`Session ${id} already exists`);
+  }
+  const reserved = projectSessionFileLayout({ sessionsDir: layout.sessionsDir, sessionId: id });
+  for (const target of Object.values(reserved)) assertSessionStoreProfile(layout, target);
+  try {
+    fs.mkdirSync(reserved.sessionDir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`Session ${id} already exists`);
+    throw error;
+  }
+  return reserved;
+}
+
 /**
  * Where a session of this id actually is, current directory first.
  *

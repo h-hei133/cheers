@@ -27,11 +27,11 @@ import {
   type SessionCatalogDiagnostic,
 } from './catalog/index.js';
 import {
+  createSessionRecord,
   deleteSessionRecord,
   loadSessionRecord,
   sessionExistsAtLayout,
   writeSessionMetadataRecord,
-  writeSessionRecord,
 } from "./sessionStore.js";
 import {
   listSessionRecords,
@@ -80,10 +80,7 @@ export class SessionStoreAccess extends SessionStorePaths {
   }
 
   writeSession(session: Session): void {
-    writeSessionRecord({
-      session,
-      layout: locateExistingSessionLayout(this.storeLayout, session.id),
-    });
+    createSessionRecord(session, this.storeLayout);
   }
 
   writeSessionMetadata(session: Session): void {

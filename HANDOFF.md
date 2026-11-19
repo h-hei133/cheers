@@ -2943,3 +2943,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Reordering repeats an extension callback or an interrupt loses already prepared drafts. A later failed append can also hide a confirmed earlier delivery.
 - **Root cause:** Queue acquisition, input preparation, and durable delivery happen at different boundaries. A queue position can change while its entry and input remain valid.
 - **Rule:** Capture the run and extension audience on enqueue. Reduce each exact revision once, retain drafts through turn-start callbacks, and check the original history before publication. Advance the saved-state check only through confirmed native audits. Emit earlier confirmed deliveries after a later failure and stop dispatching from the failed batch.
+
+### The First Session Writer Must Claim The Directory
+
+- **Symptom:** Two processes create one session ID, leaving the first transcript with the second process's metadata and selection.
+- **Root cause:** Both creators can pass the absence check before a recursive directory creation succeeds for both.
+- **Rule:** Reserve the current session directory with nonrecursive `mkdir` before initializing any files. Reject occupied compatibility paths, including dangling links, while allowing a malformed legacy parent with no possible session child. Keep partially written records after an unknown result and leave activation to the existing owner.

@@ -13,7 +13,7 @@ import { projectBranchMessages, readTranscriptSnapshot, readTranscriptSnapshotAs
 import { createTranscriptHeader, type TranscriptEvent } from "../sessionEventCodec.js";
 import { sessionThreadPath } from "../schema/sessionThread.js";
 import { readJsonFileWithRetry, readJsonFileWithRetryAsync, writeJsonFileAtomic } from "./sessionFileStore.js";
-import type { SessionFileLayout } from "./sessionFileLayout.js";
+import { reserveSessionLayout, type SessionFileLayout, type SessionStoreLayout } from "./sessionFileLayout.js";
 import {
   readStateSnapshotRequired,
   readStateSnapshotRequiredAsync,
@@ -26,15 +26,37 @@ export function sessionExistsAtLayout(layout: Pick<SessionFileLayout, "sessionDi
   return fs.existsSync(layout.sessionDir);
 }
 
-export function writeSessionRecord(input: {
+export class SessionCreationUnverifiedError extends Error {
+  constructor(readonly sessionId: string, cause: unknown) {
+    super(`Creation of session ${sessionId} is unverified.`, { cause });
+    this.name = 'SessionCreationUnverifiedError';
+  }
+}
+
+export function createSessionRecord(session: Session, store: SessionStoreLayout): void {
+  const layout = reserveSessionLayout(store, session.id);
+  try {
+    writeSessionFiles({ session, layout }, 'exclusive');
+  } catch (error) {
+    // Preserve the reservation and any files already published so the same ID cannot be retried over them.
+    throw new SessionCreationUnverifiedError(session.id, error);
+  }
+}
+
+interface SessionRecordWrite {
   readonly session: Session;
   readonly layout: SessionFileLayout;
-}): void {
+}
+
+export function writeSessionRecord(input: SessionRecordWrite): void {
   if (!fs.existsSync(input.layout.sessionDir)) {
     fs.mkdirSync(input.layout.sessionDir, { recursive: true });
   }
+  writeSessionFiles(input, 'existing');
+}
 
-  if (!fs.existsSync(input.layout.transcriptPath)) {
+function writeSessionFiles(input: SessionRecordWrite, mode: 'exclusive' | 'existing'): void {
+  if (mode === 'exclusive' || !fs.existsSync(input.layout.transcriptPath)) {
     // The header goes in at the moment the file comes into being, while it is
     // still empty. That is what keeps it compatible with append-only: a header
     // has to be the first line, and writing it to a file with nothing in it is
@@ -48,7 +70,7 @@ export function writeSessionRecord(input: {
           cwd: input.session.projectRoot,
         }),
       )}\n`,
-      "utf8",
+      { encoding: 'utf8', flag: mode === 'exclusive' ? 'wx' : 'w' },
     );
   }
 
