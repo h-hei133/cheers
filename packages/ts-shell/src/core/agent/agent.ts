@@ -23,6 +23,9 @@ export interface AgentCoreOptions {
   readonly finishTurn?: AgentLoopConfig["finishTurn"];
   readonly steeringMode?: "one-at-a-time" | "all";
   readonly followUpMode?: "one-at-a-time" | "all";
+  readonly drainInput?: (queue: PendingQueue<AgentMessage>, lane: 'steer' | 'followUp') => Promise<AgentMessage[]>;
+  readonly commitInput?: AgentLoopConfig['commitInput'];
+  readonly onStepStart?: AgentLoopConfig['onStepStart'];
   /**
    * How a failed step is retried, passed through to the loop unchanged.
    *
@@ -37,6 +40,12 @@ interface ActiveRun {
   readonly resolve: () => void;
   readonly reject: (reason?: unknown) => void;
   readonly abortController: AbortController;
+}
+
+interface PromptMessages {
+  readonly messages: readonly AgentMessage[];
+  readonly skipInitialSteeringPoll?: boolean;
+  readonly skipInitialPreparation?: boolean;
 }
 
 export class AgentCore {
@@ -71,7 +80,7 @@ export class AgentCore {
   /** A session may prepare this prompt before entry; queued restarts still prepare normally. */
   public async prompt(input: AgentMessage | readonly AgentMessage[], options: { readonly skipInitialPreparation?: boolean } = {}): Promise<void> {
     const messages = captureMessageHistory(Array.isArray(input) ? input : [input]);
-    await this.runPromptMessages(messages, options);
+    await this.runPromptMessages(() => ({ messages, ...options }));
   }
 
   public async continue(): Promise<void> {
@@ -88,17 +97,14 @@ export class AgentCore {
       // assistant; queued input is still actionable, so restart from it
       // instead of failing. Steering is drained first; only fall back to
       // follow-ups when no steering was waiting.
-      const queuedSteering = this.steeringQueue.drain();
-      if (queuedSteering.length > 0) {
-        await this.runPromptMessages(queuedSteering, { skipInitialSteeringPoll: true });
-        return;
-      }
-      const queuedFollowUps = this.followUpQueue.drain();
-      if (queuedFollowUps.length > 0) {
-        await this.runPromptMessages(queuedFollowUps);
-        return;
-      }
-      throw new Error("Cannot continue from message role: assistant");
+      if (!this.hasQueuedMessages()) throw new Error("Cannot continue from message role: assistant");
+      await this.runPromptMessages(async config => {
+        const steering = await config.getSteeringMessages?.() ?? [];
+        if (steering.length) return { messages: steering, skipInitialSteeringPoll: true };
+        const followUps = await config.getFollowUpMessages?.() ?? [];
+        return followUps.length ? { messages: followUps } : undefined;
+      });
+      return;
     }
     await this.runWithLifecycle(async (signal) => {
       await runAgentLoopContinue([...transcript], this.createLoopConfig(), (event) => this.processEvents(event), signal);
@@ -106,14 +112,17 @@ export class AgentCore {
   }
 
   private async runPromptMessages(
-    messages: readonly AgentMessage[],
-    options: { readonly skipInitialSteeringPoll?: boolean; readonly skipInitialPreparation?: boolean } = {},
+    acquire: (config: AgentLoopConfig) => PromptMessages | Promise<PromptMessages | undefined>,
   ): Promise<void> {
     await this.runWithLifecycle(async (signal) => {
+      const config = this.createLoopConfig();
+      const input = await acquire(config);
+      if (!input || signal.aborted) return;
+      const { messages, ...options } = input;
       await runAgentLoop(
         [...messages],
         [...this.internalState.messages],
-        this.createLoopConfig(),
+        config,
         (event) => this.processEvents(event),
         signal,
         options,
@@ -195,8 +204,10 @@ export class AgentCore {
       isContextCurrent: messages => sameContext(this.internalState.messages, messages),
       streamStep: this.options.streamStep,
       hasQueuedMessages: lane => (lane === 'steering' ? this.steeringQueue : this.followUpQueue).hasItems(),
-      getSteeringMessages: async () => this.steeringQueue.drain(),
-      getFollowUpMessages: async () => this.followUpQueue.drain(),
+      commitInput: this.options.commitInput,
+      onStepStart: this.options.onStepStart,
+      getSteeringMessages: async () => this.options.drainInput?.(this.steeringQueue, 'steer') ?? this.steeringQueue.drain(),
+      getFollowUpMessages: async () => this.options.drainInput?.(this.followUpQueue, 'followUp') ?? this.followUpQueue.drain(),
     };
   }
 

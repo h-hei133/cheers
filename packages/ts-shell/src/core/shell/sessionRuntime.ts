@@ -38,9 +38,10 @@ import type { CompactionOutcome } from "./compaction.js";
 import type { TurnInput } from "../../turn/session.js";
 import { hasUnfinishedSessionWork } from "../../session/recovery/work.js";
 import { normalizePathIdentity } from '../../session/continuation/roots.js';
-import type {PreparedPromptInput, PromptInputRequest} from './input/contract.js';
+import type {CaptureQueuedPromptInput, PreparedPromptInput, PromptInputRequest} from './input/contract.js';
+import {InputPreparationError} from './input/contract.js';
 import type {InputAdmissionReceipt} from '../hooks/input/receipt.js';
-import {capturePromptInput} from './input/capture.js';
+import {bindQueuedPromptInput, capturePromptInput} from './input/capture.js';
 
 /**
  * What travels with a prompt beside its text.
@@ -64,6 +65,7 @@ export type PromptRun =
 
 export interface SessionRuntimeDependencies {
   readonly prepareInput?: (input: PromptInputRequest) => Promise<PreparedPromptInput>;
+  readonly captureQueuedInput?: CaptureQueuedPromptInput;
   readonly inputSource?: PromptInputRequest['source'];
   /** Native provenance owner may validate a one-use submission before durable prompt publication. */
   readonly admitPrompt?: (prompt: string, metadata: Record<string, unknown> | undefined, signal: AbortSignal) => Promise<void>;
@@ -349,7 +351,12 @@ export class ShellSessionRuntime {
         effectivePrompt,
       );
       const events = Symbol.asyncIterator in run ? run : run.events;
-      this.currentInput = Symbol.asyncIterator in run ? undefined : run.input;
+      const input = Symbol.asyncIterator in run ? undefined : run.input;
+      const bound = input && this.deps.captureQueuedInput ? bindQueuedPromptInput(input, sessionId, () => {
+        signal.throwIfAborted();
+        if (this.currentRunController?.signal !== signal || this.currentInput !== bound) throw new InputPreparationError();
+      }, this.deps.captureQueuedInput) : input;
+      this.currentInput = bound;
       sourceEntryId = Symbol.asyncIterator in run ? undefined : run.sourceEntryId;
       settled = Symbol.asyncIterator in run ? undefined : run.settled;
       for await (const event of events) {

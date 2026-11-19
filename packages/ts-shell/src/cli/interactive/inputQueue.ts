@@ -1,9 +1,16 @@
 import { inputQueueControl, PendingQueue, type InputQueueControl } from '../../core/agent/queue.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
+import type { ImageContent } from '../../model-adapters/multimodal.js';
+import type { TurnInput } from '../../turn/session.js';
 
 export interface PendingSubmission { readonly text: string; readonly sessionId: string; readonly createdAt: string; readonly projectRoot: string;
   readonly source?: import('../../core/shell/input/contract.js').PromptInputRequest['source'];
   readonly attachments?: import('../../core/shell/sessionRuntime.js').PromptAttachments }
+
+export function recoverQueuedDrafts(input: TurnInput | undefined, queue: SubmissionQueue, hold: (image: ImageContent) => string): string[] {
+  const restore = (text: string, images: readonly ImageContent[] = []) => [text, images.map(hold).join(' ')].filter(Boolean).join('\n\n');
+  return [...(input?.clearQueue(restore) ?? []), ...queue.release().map(submission => restore(submission.text, submission.attachments?.images))];
+}
 
 /** The host's actual pending submissions, bound when the person queued them. */
 export class SubmissionQueue {

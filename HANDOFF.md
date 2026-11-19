@@ -2937,3 +2937,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Source callback tests pass, but adding a feedback reducer makes every worker fail with a syntax error.
 - **Root cause:** A function serialized into a nested `vm.Script` contains literal backslash escapes that the enclosing worker template consumes before the nested parser sees them.
 - **Rule:** Preserve backslashes when embedding that factory into the nested script and run the compiled public worker for both guarded input and existing event paths. Keep the initial syntax failure separate from behavioral counterexamples.
+
+### Queued Input Must Retain Its Entry Through Turn Admission
+
+- **Symptom:** Reordering repeats an extension callback or an interrupt loses already prepared drafts. A later failed append can also hide a confirmed earlier delivery.
+- **Root cause:** Queue acquisition, input preparation, and durable delivery happen at different boundaries. A queue position can change while its entry and input remain valid.
+- **Rule:** Capture the run and extension audience on enqueue. Reduce each exact revision once, retain drafts through turn-start callbacks, and check the original history before publication. Advance the saved-state check only through confirmed native audits. Emit earlier confirmed deliveries after a later failure and stop dispatching from the failed batch.

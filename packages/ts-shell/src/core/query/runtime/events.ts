@@ -18,7 +18,8 @@ export interface QueryStreamingMessage {
 }
 
 export type QueryEvent =
-  | {readonly type:'input.handled'; readonly sessionId: string}
+  | {readonly type:'input.handled'; readonly sessionId: string; readonly streamingBehavior?: 'steer' | 'followUp'}
+  | {readonly type:'input.rejected'; readonly sessionId: string; readonly streamingBehavior: 'steer' | 'followUp'}
   | import('./lifecycle.js').LifecycleRecord
   | { readonly type: 'execution.command'; readonly proof: import('../../../runtime/execution/proof.js').NativeCommandProof; readonly sourcePromptEntryId: string }
   | {
@@ -124,7 +125,8 @@ export type QueryEvent =
    * time would leave a question in the conversation that the model never saw.
    * This event is the delivery fact; the text is what was actually delivered.
    */
-  | { readonly type: 'message.delivered'; readonly role: 'user'; readonly text: string }
+  | { readonly type: 'message.delivered'; readonly role: 'user'; readonly text: string;
+      readonly images?: readonly import('../../../model-adapters/multimodal.js').ImageContent[] }
   /** The model message stopped producing output, including failed attempts. */
   | { readonly type: 'message.finished'; readonly role: AgentRole; readonly hasToolCalls?: true }
   /**
@@ -178,4 +180,5 @@ export function isDurableQueryEvent(event: QueryEvent): boolean {
     && event.type !== 'message.delivered'
     && event.type !== 'message.finished'
     && event.type !== 'input.handled'
+    && event.type !== 'input.rejected'
 }

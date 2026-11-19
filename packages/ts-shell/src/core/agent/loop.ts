@@ -146,6 +146,8 @@ export interface AgentLoopConfig {
   readonly isContextCurrent?: (messages: readonly AgentMessage[]) => boolean;
   /** Inspect an owned queue without taking messages before asynchronous preparation. */
   readonly hasQueuedMessages?: (lane: 'steering' | 'followUp') => boolean;
+  readonly commitInput?: (messages: readonly AgentMessage[]) => { readonly messages: readonly AgentMessage[]; readonly failure?: Error };
+  readonly onStepStart?: () => void;
   readonly getSteeringMessages?: () => Promise<AgentMessage[]>;
   readonly getFollowUpMessages?: () => Promise<AgentMessage[]>;
   /**
@@ -202,17 +204,16 @@ export async function runAgentLoop(
   options: { readonly skipInitialSteeringPoll?: boolean; readonly skipInitialPreparation?: boolean } = {},
 ): Promise<AgentMessage[]> {
   const produced: AgentMessage[] = [];
-  const context: AgentMessage[] = [...seed, ...prompts];
+  const context: AgentMessage[] = [...seed];
 
   const turnStarted = Date.now();
   await emit({ type: "agent_start" });
   await emit({ type: "turn_start" });
-  for (const prompt of prompts) {
-    await emit({ type: "message_start", message: prompt });
-    await emit({ type: "message_end", message: prompt });
-    produced.push(prompt);
-  }
   try {
+    if (!await deliverInput(prompts, config, emit, context, produced) && prompts.length) {
+      await emit({ type: 'agent_end', messages: [...produced] });
+      return produced;
+    }
     await driveLoop(context, produced, config, emit, signal, !options.skipInitialSteeringPoll, !options.skipInitialPreparation);
   } finally {
     // Flushed even when the turn failed: a run that fell over is exactly the one
@@ -460,29 +461,29 @@ async function driveLoop(
             await emit({ type: 'agent_end', messages: [...produced] });
             return;
           }
-          const starting = captureContext(context);
-          await emit({ type: 'turn_start' });
-          assertContextCurrent(context, starting, config.isContextCurrent, signal);
           pending = await pollSteering(config);
           if (pending.length === 0 && followUpAllowed) pending = await pollFollowUp(config);
           if (!withoutInput && pending.length === 0) {
             await emit({ type: 'agent_end', messages: [...produced] });
             return;
           }
+          const starting = captureContext(context);
+          await emit({ type: 'turn_start' });
+          assertContextCurrent(context, starting, config.isContextCurrent, signal);
         } else {
           if (pending.length === 0) pending = await pollSteering(config);
           await emit({ type: 'turn_start' });
         }
       }
 
-      for (const message of pending) {
-        await emit({ type: "message_start", message });
-        await emit({ type: "message_end", message });
-        context.push(message);
-        produced.push(message);
+      if (!await deliverInput(pending, config, emit, context, produced) && !withoutInput && pending.length) {
+        await emit({ type: 'agent_end', messages: [...produced] });
+        return;
       }
       pending = [];
 
+      signal?.throwIfAborted();
+      config.onStepStart?.();
       const { step, emittedStart } = await retryStep(config, context, signal, emit);
       const assistant: AgentMessage = {
         role: "assistant",
@@ -607,7 +608,21 @@ async function driveLoop(
   await emit({ type: "agent_end", messages: [...produced] });
 }
 
+async function deliverInput(pending: readonly AgentMessage[], config: AgentLoopConfig, emit: AgentEventSink,
+  context: AgentMessage[], produced: AgentMessage[]): Promise<boolean> {
+  const accepted = config.commitInput?.(pending) ?? { messages: pending };
+  for (const message of accepted.messages) {
+    await emit({ type: 'message_start', message });
+    await emit({ type: 'message_end', message });
+    context.push(message);
+    produced.push(message);
+  }
+  if (accepted.failure) throw accepted.failure;
+  return accepted.messages.length > 0;
+}
+
 async function pollSteering(config: AgentLoopConfig): Promise<AgentMessage[]> {
+  if (config.hasQueuedMessages) return (await config.getSteeringMessages?.()) ?? [];
   try {
     return (await config.getSteeringMessages?.()) ?? [];
   } catch {
@@ -616,6 +631,7 @@ async function pollSteering(config: AgentLoopConfig): Promise<AgentMessage[]> {
 }
 
 async function pollFollowUp(config: AgentLoopConfig): Promise<AgentMessage[]> {
+  if (config.hasQueuedMessages) return (await config.getFollowUpMessages?.()) ?? [];
   try {
     return (await config.getFollowUpMessages?.()) ?? [];
   } catch {

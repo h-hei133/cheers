@@ -73,7 +73,7 @@ import { decodeAdvisor } from '../../advisor/codec.js';
 import { readBoundSessionState } from '../../session/store/bound.js';
 import { isResearchControl, researchCommandFor } from '../runtime/research.js';
 import { gitWorkbenchFor } from '../runtime/git.js';
-import { SubmissionQueue } from './inputQueue.js';
+import { recoverQueuedDrafts, SubmissionQueue } from './inputQueue.js';
 import { openSettings } from "./settings.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
@@ -1163,13 +1163,18 @@ export class InteractiveMode {
       // waits for the run boundary, like any input to a run that takes none.
       const composed = needsComposition(text, [...createCommandRegistry(this.options.runtimeContext.cwd, this.options.runtimeContext.runtimeConfig).values(),
         ...catalogContributions(this.options.runtimeContext.cwd, this.options.runtimeContext.session.id).flatMap(entry => entry.commands)]);
-      const input = text.startsWith("/") || composed || attachments?.images.length ? undefined : this.options.sessionRuntime.input?.();
-      if (!input) {
+      const input = text.startsWith("/") || composed ? undefined : this.options.sessionRuntime.input?.();
+      if (!input || attachments?.images.length && !input.submit) {
         // Waiting work is not conversation: the entry is drawn above the prompt
         // by the pending band, and it becomes a user block only if it starts
         // running. Echoing it here would make a cancelled message look like a
         // question the model had already been asked.
         this.queue.push(text, attachments);
+      } else if (input.submit) {
+        try {
+          if (!input.submit(disposition ?? 'followUp', text, 'interactive', attachments?.images)) this.queue.push(text, attachments);
+        }
+        catch { this.state.transcript.append(textBlock('error', 'Queued input was refused before delivery.')); }
       } else if (disposition === "steer") {
         // No block yet: a steer is a request, and the turn takes it only when it
         // reaches its next step. The delivered message produces the block, so an
@@ -1645,10 +1650,7 @@ export class InteractiveMode {
       return;
     }
     this.sink.markCancelling();
-    const undelivered = [...(this.options.sessionRuntime.input?.()?.clearQueue() ?? []), ...this.queue.release().map(submission => {
-      const images = submission.attachments?.images.map(image => this.state.pastes.holdImage(image)).join(' ');
-      return [submission.text, images].filter(Boolean).join('\n\n');
-    })];
+    const undelivered = recoverQueuedDrafts(this.options.sessionRuntime.input?.(), this.queue, image => this.state.pastes.holdImage(image));
     await this.options.sessionRuntime.cancelAndWait();
     if (undelivered.length === 0) return;
     const draft = this.state.editor.getText();

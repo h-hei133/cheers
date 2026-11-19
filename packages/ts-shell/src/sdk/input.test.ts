@@ -103,6 +103,178 @@ it('dispatches native input and legacy submission once with the effective text',
   expect(seen[1]).toEqual(['legacy', expect.objectContaining({eventName:'UserPromptSubmit', prompt:'Changed'})]);
 });
 
+it.each(['turn_start', 'agent_end'] as const)('reduces live steering and follow-up queued at %s before adding either to the conversation', async boundary => {
+  const reached = held(), wait = held();
+  const received: string[] = [], legacy: string[] = [];
+  const {session} = await fixture(api => {
+    api.on(boundary, async () => {reached.release(); await wait.promise;});
+    api.on('input', event => {
+      if (!event.streamingBehavior) return;
+      received.push(`${event.source}:${event.streamingBehavior}:${event.text}`);
+      return event.text === 'Handled follow-up' ? {action:'handled'} : {action:'transform', text:'Effective steering'};
+    });
+    api.on('UserPromptSubmit', event => {legacy.push((event as {prompt: string}).prompt); return {decision:'allow'};});
+  });
+  const events: string[] = [];
+  session.subscribe(event => {events.push(event.type);});
+  const opening = session.prompt('Opening');
+  try {
+    await reached.promise;
+    expect(session.steer('Original steering')).toBe(true);
+    expect(session.followUp('Handled follow-up')).toBe(true);
+  } finally {wait.release();}
+  await opening;
+  expect(received).toEqual(['sdk:steer:Original steering', 'sdk:followUp:Handled follow-up']);
+  expect(legacy).toEqual(['Opening', 'Effective steering', 'Handled follow-up']);
+  expect(session.getState().turns.filter(message => message.role === 'user').map(message => message.content))
+    .toEqual(['Opening', 'Effective steering']);
+  expect(events.filter(type => type === 'input.handled')).toHaveLength(1);
+});
+
+it('keeps a prepared batch pending through a queue move and transfers the same image to history and delivery', async () => {
+  const opened = held(), start = held(), processing = held(), finish = held();
+  const calls: string[] = [], delivered: unknown[] = [];
+  const image = {type:'image' as const, mimeType:'image/png', data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='};
+  const conversion: unknown[] = [];
+  const {session} = await fixture(api => {
+    api.on('turn_start', async () => {opened.release(); await start.promise;});
+    api.on('input', async event => {
+      if (!event.streamingBehavior) return;
+      calls.push(event.text);
+      if (event.text === 'first') {processing.release(); await finish.promise;}
+      return {action:'transform', text:`effective ${event.text}`};
+    });
+  }, {convertToLlm: messages => messages.map(message => {
+    conversion.push(message.content);
+    return {role:message.role === 'custom' ? 'user' : message.role, content:message.content};
+  })});
+  session.subscribe(event => {if (event.type === 'message.delivered') delivered.push([event.text, event.images]);});
+  const opening = session.prompt('Opening');
+  try {
+    await opened.promise;
+    const input = session.sessionRuntime.input()!;
+    input.setQueueMode?.('followUp', 'all');
+    const callerImage = {...image};
+    expect(session.followUp('first', {images:[callerImage]})).toBe(true);
+    expect(session.followUp('second')).toBe(true);
+    callerImage.data = 'changed after submission';
+    const first = input.queue!.entries()[0]!;
+    start.release(); await processing.promise;
+    expect(input.queue!.move(first.id)).toBe(true);
+    expect(input.pending().followUps).toEqual(['second', 'first']);
+  } finally {start.release(); finish.release();}
+  await opening;
+  const effective = [{type:'text', text:'effective first'}, image];
+  expect(calls).toEqual(['first', 'second']);
+  expect(delivered).toEqual([['effective second', undefined], ['effective first', [image]]]);
+  expect(conversion).toContainEqual(effective);
+  expect(session.getState().turns.filter(message => message.role === 'user').map(message => message.content))
+    .toEqual(['Opening', 'effective second', effective]);
+});
+
+it('takes back every undelivered entry while a later batch callback is waiting', async () => {
+  const opened = held(), start = held(), processing = held(), finish = held();
+  const {session} = await fixture(api => {
+    api.on('turn_start', async () => {opened.release(); await start.promise;});
+    api.on('input', async event => {
+      if (!event.streamingBehavior) return;
+      if (event.text === 'second') {processing.release(); await finish.promise;}
+      return {action:'transform', text:`effective ${event.text}`};
+    });
+  });
+  const opening = session.prompt('Opening');
+  try {
+    await opened.promise;
+    const input = session.sessionRuntime.input()!;
+    input.setQueueMode?.('followUp', 'all');
+    session.followUp('first'); session.followUp('second');
+    start.release(); await processing.promise;
+    expect(input.clearQueue()).toEqual(['first', 'second']);
+    await opening;
+    expect(session.getState().turns.filter(message => message.role === 'user').map(message => message.content)).toEqual(['Opening']);
+  } finally {start.release(); finish.release();}
+});
+
+it('rejects a prepared live batch when a competing append changes its conversation during a callback', async () => {
+  const opened = held(), start = held(), processing = held(), finish = held();
+  const {session} = await fixture(api => {
+    api.on('turn_start', async () => {opened.release(); await start.promise;});
+    api.on('input', async event => {
+      if (!event.streamingBehavior) return;
+      if (event.text === 'second') {processing.release(); await finish.promise;}
+      return {action:'transform', text:`effective ${event.text}`};
+    });
+  });
+  const rejected: string[] = [];
+  session.subscribe(event => {if (event.type === 'input.rejected') rejected.push(event.streamingBehavior);});
+  const opening = session.prompt('Opening');
+  try {
+    await opened.promise;
+    const input = session.sessionRuntime.input()!;
+    input.setQueueMode?.('followUp', 'all');
+    session.followUp('first'); session.followUp('second');
+    start.release(); await processing.promise;
+    session.sessionManager.addTurn(session.sessionId, {role:'user', content:'Competing saved message'});
+  } finally {start.release(); finish.release();}
+  await opening;
+  expect(rejected).toEqual(['followUp', 'followUp']);
+  expect(session.getState().turns.filter(message => message.role === 'user').map(message => message.content))
+    .toEqual(['Opening', 'Competing saved message']);
+});
+
+it('keeps an admitted follow-up recoverable until the next turn start has settled', async () => {
+  const opened = held(), start = held(), resume = held(), next = held();
+  let starts = 0;
+  const {session} = await fixture(api => {
+    api.on('turn_start', async () => {
+      if (++starts === 1) {opened.release(); await start.promise;}
+      else {next.release(); await resume.promise;}
+    });
+    api.on('input', event => event.streamingBehavior ? {action:'transform', text:'effective next'} : undefined);
+  });
+  const run = session.prompt('Opening');
+  try {
+    await opened.promise;
+    expect(session.followUp('queued next')).toBe(true);
+    start.release(); await next.promise;
+    expect(session.sessionRuntime.input()?.clearQueue()).toEqual(['queued next']);
+    session.sessionRuntime.cancelCurrentRun();
+  } finally {start.release(); resume.release();}
+  await run.catch(() => undefined);
+  expect(session.getState().turns.filter(message => message.role === 'user').map(message => message.content)).toEqual(['Opening']);
+});
+
+it('retains confirmed delivery when a later queued append throws and never retries that append', async () => {
+  const opened = held(), start = held();
+  const {session} = await fixture(api => {
+    api.on('turn_start', async () => {opened.release(); await start.promise;});
+    api.on('input', event => event.streamingBehavior ? {action:'transform', text:`effective ${event.text}`} : undefined);
+  });
+  const delivered: string[] = [], terminal: string[] = [];
+  session.subscribe(event => {
+    if (event.type === 'message.delivered') delivered.push(event.text);
+    if (event.type === 'query.failed') terminal.push(event.error);
+  });
+  const original = session.sessionManager.addTurn.bind(session.sessionManager);
+  const failure = vi.fn(() => {throw new Error('PRIVATE_WRITE_FAILURE');});
+  vi.spyOn(session.sessionManager, 'addTurn').mockImplementation((id, message) => {
+    if (message.content === 'effective second') return failure();
+    return original(id, message);
+  });
+  const run = session.prompt('Opening');
+  try {
+    await opened.promise;
+    session.sessionRuntime.input()?.setQueueMode?.('followUp', 'all');
+    session.followUp('first'); session.followUp('second'); session.followUp('third');
+  } finally {start.release();}
+  await run.catch(() => undefined);
+  expect(failure).toHaveBeenCalledTimes(1);
+  expect(delivered).toEqual(['effective first']);
+  expect(terminal).toEqual(['Queued input persistence is unverified.']);
+  expect(session.getState().turns.filter(message => message.role === 'user').map(message => message.content))
+    .toEqual(['Opening', 'effective first']);
+});
+
 it.each(['accessor','toJSON','blank','invalid-images'] as const)('refuses malformed input results before prompt publication (%s)', async kind => {
   let getters = 0;
   const {session, bytes} = await fixture(api => api.on('input', () => {
@@ -282,18 +454,35 @@ it('does not coerce a malformed in-process submission decision into an allow', a
   finally {defaultHookDispatcher.clear();}
 });
 
-it.each(['UserPromptSubmit','SessionStart'] as const)('preserves native declared-hook approval audit during %s admission', async event => {
+it.each(['UserPromptSubmit','SessionStart','live batch'] as const)('preserves native declared-hook approval audit during %s admission', async event => {
+  const opened = held(), start = held();
+  const hook = event === 'live batch' ? 'UserPromptSubmit' : event;
   fs.mkdirSync(path.join(root,'.agents'), {recursive:true});
-  fs.writeFileSync(path.join(root,'.agents/hooks.json'), JSON.stringify({hooks:{[event]:[{hooks:[{type:'command',command:"printf '%s' '{\"decision\":\"allow\"}'"}]}]}}));
-  const {session} = await fixture(api => api.on('input', () => ({action:'transform', text:'Effective approved input'})), {nonInteractiveApproval:'allow-once'});
+  fs.writeFileSync(path.join(root,'.agents/hooks.json'), JSON.stringify({hooks:{[hook]:[{hooks:[{type:'command',command:"printf '%s' '{\"decision\":\"allow\"}'"}]}]}}));
+  const {session} = await fixture(api => {
+    api.on('input', () => ({action:'transform', text:'Effective approved input'}));
+    if (event === 'live batch') api.on('turn_start', async () => {opened.release(); await start.promise;});
+  }, {nonInteractiveApproval:'allow-once'});
   const {createCliApprovalEscalationBridge} = await import('../cli/approval/cliApprovalEscalationBridge.js');
   const approval = vi.fn(async () => 'allow-once' as const), native = createCliApprovalEscalationBridge;
   vi.spyOn(await import('../cli/approval/cliApprovalEscalationBridge.js'), 'createCliApprovalEscalationBridge').mockImplementation(input => native({...input, promptInteractiveApproval:approval}));
-  expect(await session.prompt('Original')).toContain('Effective approved input');
-  expect(approval).toHaveBeenCalledTimes(1);
+  const run = session.prompt('Original');
+  if (event === 'live batch') {
+    try {
+      await opened.promise;
+      session.sessionRuntime.input()?.setQueueMode?.('followUp', 'all');
+      expect(session.followUp('first')).toBe(true);
+      expect(session.followUp('second')).toBe(true);
+    } finally {start.release();}
+  }
+  expect(await run).toContain('Effective approved input');
+  const expected = event === 'live batch' ? 3 : 1;
+  expect(approval).toHaveBeenCalledTimes(expected);
+  expect(session.getState().turns.filter(message => message.role === 'user').map(message => message.content))
+    .toEqual(Array(expected).fill('Effective approved input'));
   const state = JSON.parse(fs.readFileSync(locateExistingSessionLayout(createSessionStoreLayout(),session.sessionId).statePath,'utf8'));
   expect(state.workingMemory.approvalAudit.decision).toBe('allow-once');
-  expect(state.workingMemory.approvalAuditHistory).toHaveLength(1);
+  expect(state.workingMemory.approvalAuditHistory).toHaveLength(expected);
 });
 
 it('settles an attempted provenance admission when its following source check refuses', async () => {

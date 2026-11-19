@@ -35,15 +35,13 @@ export class TurnProjection {
     return this.steps;
   }
 
+  startStep(): void {
+    this.steps += 1;
+  }
+
   /** The query events one kernel event maps to, in order. */
   project(event: AgentLifecycleEvent): QueryEvent[] {
     switch (event.type) {
-      case "turn_start":
-        // Counted, not reported: a started-but-unfinished turn in the transcript
-        // reads as a mid-turn interruption to session recovery, and the model
-        // step is not what that recovery boundary means.
-        this.steps += 1;
-        return [];
       case "tool_execution_start":
         this.openCalls.set(event.toolCallId, { name: event.toolName, isError: false });
         return [
@@ -90,7 +88,9 @@ export class TurnProjection {
         // reliable statement that it was delivered: submitting a steer is a
         // request, and a turn that is interrupted first never takes it.
         if (message.role === "user") {
-          return message === this.opening ? [] : [{ type: "message.delivered", role: "user", text: messageToText(message.content) }];
+          if (message === this.opening) return [];
+          const images = imagesOf(message.content);
+          return [{ type: "message.delivered", role: "user", text: messageToText(message.content), ...(images.length ? { images } : {}) }];
         }
         if (message.role !== "tool" || !message.tool_call_id) return [];
         const open = this.openCalls.get(message.tool_call_id);

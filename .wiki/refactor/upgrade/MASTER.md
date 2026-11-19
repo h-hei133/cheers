@@ -23,10 +23,10 @@
 ## Current status
 
 **Current phase** 按批实施。36/62 项完成 Linux 本地功能验收，26 项开放。
-**Completed batch** E.6 controlled CLI extension reload。旧shutdown／原retirement后重载file与installed资源、绑定新UI再start，same session/selection保持；busy／取消／unknown／partial不升级。11文件179项和七静态门2732modules/0monoliths；TypeScript-only narrowing后影响20项与build7bb49e3f40cepassed，10反转10AssertionErrors/exact恢复81项，限定APPROVE/hash核验。Linuxcompiled／Node20.3／installed各5场景2POST、15strict入口和两模式PTY各1POSTpassed。
-**Next batch** E.6 before-tree定制summary与instructions及其余result consumers；SDK controlled reload需要独立resource/Ui/政策adoption。36/62、26开放保持；metadata／selection仍非跨文件原子事务。
+**Completed batch** E.6 运行中输入经 SDK、RPC 和终端进入共享队列处理。F1.2 原生结构化流接入实际端点，提交 `52653334`。已逐项重核 26 项开放工作，结论见 [工程记录](design.md)。
+**Next batch** E.6 剩余消息、工具和压缩结果。独立可交付缺口按原清单验收，包括 F1.5 按调用范围等待 MCP 就绪和 T5.1 首次会话写入预留。
 **Repository gate** 当前normal judgeexit2/not_proven，16384图容量缺口；pinned输入未改。定向script29项与完整209/210为前批历史，不升为当前script验证。
-**Evidence boundary** 本批未重复调用配置模型，前批provider-auth／0requests保留历史；Linux本地HTTP／安装证据不证明真实服务或其他平台。本轮仅本地按批提交，不push或宣称CI。
+**Evidence boundary** 本批使用 Linux 本地协议与合成验证。真实服务资格保留在各任务的验收条目。提交保留在本地。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance

@@ -208,7 +208,12 @@ export class TurnSink implements RendererSink {
         // The kernel took a steered or queued message into the conversation.
         // This is the moment it becomes a user block: submitting it was only a
         // request, and an interrupted turn never gets here.
-        if (event.text.trim()) this.transcript.append({ kind: "user", text: event.text, finalized: true });
+        if (event.text.trim() || event.images?.length) this.transcript.append({ kind: "user", text: event.text, finalized: true,
+          ...(event.images?.length ? { images: event.images } : {}) });
+        this.onChange();
+        return;
+      case 'input.rejected':
+        this.transcript.append({ kind: 'error', text: 'Queued input was refused before delivery.', finalized: true });
         this.onChange();
         return;
       case "message.finished":

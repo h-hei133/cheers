@@ -1,5 +1,8 @@
 import type { TurnInput } from "./session.js";
 import { PendingQueue, inputQueueControl } from '../core/agent/queue.js';
+import type { QueuedInputOptions } from './input.js';
+
+type PendingInput = { readonly text: string; readonly options?: QueuedInputOptions };
 
 /**
  * A run's input handle, from before the run exists.
@@ -30,43 +33,44 @@ export interface PendingTurnInput {
 }
 
 export function pendingTurnInput(): PendingTurnInput {
-  const steering = new PendingQueue<string>('all');
-  const followUps = new PendingQueue<string>('all');
+  const steering = new PendingQueue<PendingInput>('all');
+  const followUps = new PendingQueue<PendingInput>('all');
   // The run's own handle once it exists. Everything below reads and writes
   // through it when it is set, so the queue reported and the queue drained are
   // the run's — the queue that actually holds the messages.
   let live: TurnInput | undefined;
   const modes: Partial<Record<'steering' | 'followUp', 'one-at-a-time' | 'all'>> = {};
   const buffered = inputQueueControl([
-    { lane: 'steering', queue: steering, text: text => text, replace: (_value, text) => text },
-    { lane: 'followUp', queue: followUps, text: text => text, replace: (_value, text) => text },
+    { lane: 'steering', queue: steering, text: value => value.text, replace: (value, text) => ({ ...value, text }) },
+    { lane: 'followUp', queue: followUps, text: value => value.text, replace: (value, text) => ({ ...value, text }) },
   ]);
 
   const input: TurnInput = {
     isCompacting: () => live?.isCompacting?.() ?? false,
+    isAccepting: () => live?.isAccepting?.() ?? true,
     abortRetry: () => live?.abortRetry?.(),
     activeTools: () => live?.activeTools?.() ?? [],
     setQueueMode: (lane, mode) => {
       modes[lane] = mode;
       live?.setQueueMode?.(lane, mode);
     },
-    steer: (text, id) => {
-      if (live) live.steer(text, id);
-      else steering.enqueue(text, id);
+    steer: (text, id, options) => {
+      if (live) options ? live.steer(text, id, options) : live.steer(text, id);
+      else steering.enqueue({text, options}, id);
     },
-    followUp: (text, id) => {
-      if (live) live.followUp(text, id);
-      else followUps.enqueue(text, id);
+    followUp: (text, id, options) => {
+      if (live) options ? live.followUp(text, id, options) : live.followUp(text, id);
+      else followUps.enqueue({text, options}, id);
     },
     queue: { entries: () => (live?.queue ?? buffered).entries(), edit: (id, text) => (live?.queue ?? buffered).edit(id, text),
       cancel: id => (live?.queue ?? buffered).cancel(id), move: (id, beforeId) => (live?.queue ?? buffered).move(id, beforeId) },
     pending: () =>
-      live?.pending() ?? { steering: steering.entries().map(entry => entry.value), followUps: followUps.entries().map(entry => entry.value) },
-    clearQueue: () => {
+      live?.pending() ?? { steering: steering.entries().map(entry => entry.value.text), followUps: followUps.entries().map(entry => entry.value.text) },
+    clearQueue: (format) => {
       // Emptied as it is read: the interrupt path hands this text back to the
       // editor, and a second read must not hand it over twice.
-      const taken = [...steering.drain(), ...followUps.drain()];
-      return [...taken, ...(live?.clearQueue() ?? [])];
+      const taken = [...steering.drain(), ...followUps.drain()].map(value => format?.(value.text, value.options?.images ?? []) ?? value.text);
+      return [...taken, ...(format ? live?.clearQueue(format) ?? [] : live?.clearQueue() ?? [])];
     },
   };
 
@@ -77,8 +81,8 @@ export function pendingTurnInput(): PendingTurnInput {
       live = run.input;
       if (modes.steering) live.setQueueMode?.('steering', modes.steering);
       if (modes.followUp) live.setQueueMode?.('followUp', modes.followUp);
-      for (const entry of steering.entries()) live.steer(entry.value, entry.id);
-      for (const entry of followUps.entries()) live.followUp(entry.value, entry.id);
+      for (const entry of steering.entries()) input.steer(entry.value.text, entry.id, entry.value.options);
+      for (const entry of followUps.entries()) input.followUp(entry.value.text, entry.id, entry.value.options);
       steering.clear(); followUps.clear();
     },
   };

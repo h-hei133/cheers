@@ -1,7 +1,6 @@
 import type { ImageContent } from "../model-adapters/multimodal.js";
-import { messageToText } from "../model-adapters/multimodal.js";
 import { AgentCore } from "../core/agent/agent.js";
-import { inputQueueControl } from '../core/agent/queue.js';
+import { turnInput, type InputDisposition, type InputFormat, type QueuedInputOptions } from './input.js';
 import type { AgentLifecycleEvent } from "../core/agent/events.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
@@ -161,14 +160,16 @@ export interface TurnInput {
   readonly activeTools?: () => readonly string[];
   /** Change the delivery mode on the queues owned by this live run. */
   readonly setQueueMode?: (lane: 'steering' | 'followUp', mode: 'one-at-a-time' | 'all') => void;
+  readonly isAccepting?: () => boolean;
   /** Deliver before the model's next step, inside the current work. */
-  steer(text: string, id?: string): void;
+  steer(text: string, id?: string, options?: QueuedInputOptions): void;
   /** Deliver once the current work has stopped. */
-  followUp(text: string, id?: string): void;
+  followUp(text: string, id?: string, options?: QueuedInputOptions): void;
+  readonly submit?: (lane: InputDisposition, text: string, source: 'interactive' | 'rpc' | 'sdk', images?: readonly ImageContent[]) => boolean;
   readonly queue?: import('../core/agent/queue.js').InputQueueControl;
   pending(): { readonly steering: readonly string[]; readonly followUps: readonly string[] };
   /** Take back everything not yet delivered. */
-  clearQueue(): string[];
+  clearQueue(format?: InputFormat): string[];
 }
 
 export interface TurnRun extends TurnInput {
@@ -213,6 +214,9 @@ function gateOptionsFor(
 export function runTurn(options: TurnOptions): TurnRun {
   const channel = new EventChannel<QueryEvent>();
   const stop = new StopLifecycle(event => channel.push(event));
+  const queuedInput = turnInput(options.signal, (status, streamingBehavior) => channel.push({
+    type: status === 'handled' ? 'input.handled' : 'input.rejected', sessionId: options.sessionId, streamingBehavior,
+  }), message => persist(options.onMessage, message));
   let acceptingInput = true;
   const parentGate = gateOptionsFor(options, event => stop.query(event));
   const runSubagent = options.subagentHost
@@ -238,6 +242,9 @@ export function runTurn(options: TurnOptions): TurnRun {
     // before these options had a reader.
     ...(options.steeringMode ? { steeringMode: options.steeringMode } : {}),
     ...(options.followUpMode ? { followUpMode: options.followUpMode } : {}),
+    drainInput: queuedInput.drain,
+    commitInput: queuedInput.commit,
+    onStepStart: () => projection.startStep(),
     ...(options.retry ? { retry: options.retry } : {}),
     tools: () => adaptTools(toolPool(), gate),
     beforeToolCall: hooks.beforeToolCall,
@@ -270,13 +277,10 @@ export function runTurn(options: TurnOptions): TurnRun {
   const queues = core.pendingQueues;
   const extensionEvents = createTurnEvents({ workspaceRoot: options.workspaceRoot, sessionId: options.sessionId,
     ...(options.admission ? { admission: options.admission } : {}) });
-  const queue = inputQueueControl([
-    { lane: 'steering', queue: queues.steering, text: message => messageToText(message.content), replace: (message, text) => ({ ...message, content: text }) },
-    { lane: 'followUp', queue: queues.followUps, text: message => messageToText(message.content), replace: (message, text) => ({ ...message, content: text }) },
-  ]);
+  const queue = queuedInput.control(queues.steering, queues.followUps);
   core.subscribe(async (event: AgentLifecycleEvent, signal) => {
     await extensionEvents.observe(event, signal);
-    if (event.type === "message_end" && event.message !== opening) persist(options.onMessage, event.message);
+    if (event.type === "message_end" && event.message !== opening && !queuedInput.wasPublished(event.message)) persist(options.onMessage, event.message);
     for (const projected of projection.project(event)) stop.query(projected);
     stop.observe(event, projection.stepCount);
     await options.observe?.(event, signal);
@@ -335,13 +339,13 @@ export function runTurn(options: TurnOptions): TurnRun {
       await core.prompt(opening, { skipInitialPreparation: Boolean(compaction) });
       // Input that arrived as the run was ending is still owed a run: the
       // kernel restarts from its queues rather than leaving them behind.
-      while (!options.signal.aborted && ((await recoverOverflow()) || core.hasQueuedMessages())) {
+      while (!options.signal.aborted && !queuedInput.publicationFailed() && ((await recoverOverflow()) || core.hasQueuedMessages())) {
         await core.continue();
       }
       while (!options.signal.aborted && await conclude()) {
         if (options.signal.aborted) break;
         await core.continue();
-        while (!options.signal.aborted && ((await recoverOverflow()) || core.hasQueuedMessages())) await core.continue();
+        while (!options.signal.aborted && !queuedInput.publicationFailed() && ((await recoverOverflow()) || core.hasQueuedMessages())) await core.continue();
       }
       if (options.signal.aborted) stop.finish('stopped', 'cancelled', false);
     } finally {
@@ -437,6 +441,7 @@ export function runTurn(options: TurnOptions): TurnRun {
 
   /** Report how the run ended, in the terms the shell reads. */
   const conclude = async (): Promise<boolean> => {
+    acceptingInput = false;
     const outcome = concludeRun(core.state.messages, options.prompt, options.sessionId, projection.stepCount,
       projection.stepCount >= options.maxSteps && Boolean(core.state.messages.filter(message => message.role === 'assistant').at(-1)?.tool_calls?.length));
     if (outcome.kind === "failed") {
@@ -473,6 +478,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     if (next === 'terminal') return false;
     if (next === 'repair') {
       core.state.messages = [...core.state.messages, { role: 'system', content: stop.repairMessage(decision) }];
+      acceptingInput = true;
       return true;
     }
     if (next === 'completed_unproven') {
@@ -533,26 +539,23 @@ export function runTurn(options: TurnOptions): TurnRun {
     },
     isCompacting: () => compaction?.isCompacting() ?? false,
     activeTools: () => [...toolPool().keys()],
+    isAccepting: () => acceptingInput && !options.signal.aborted,
     setQueueMode: (lane, mode) => core.setQueueMode(lane, mode),
     queue,
     abortRetry: () => core.abortRetry(),
-    steer: (text, id) => {
+    steer: (text, id, input) => {
       if (!acceptingInput) throw new Error('The run has settled; submit a new prompt after completion.');
-      if (!text.trim()) return;
-      core.steer({ role: "user", content: text }, id);
+      if (!text.trim() && !input?.images?.length) return;
+      core.steer(queuedInput.message(text, input), id);
     },
-    followUp: (text, id) => {
+    followUp: (text, id, input) => {
       if (!acceptingInput) throw new Error('The run has settled; submit a new prompt after completion.');
-      if (!text.trim()) return;
-      core.followUp({ role: "user", content: text }, id);
+      if (!text.trim() && !input?.images?.length) return;
+      core.followUp(queuedInput.message(text, input), id);
     },
     pending: () => ({ steering: queue.entries().filter(entry => entry.lane === 'steering').map(entry => entry.text),
       followUps: queue.entries().filter(entry => entry.lane === 'followUp').map(entry => entry.text) }),
-    clearQueue: () => {
-      const taken = queue.entries().map(entry => entry.text);
-      core.clearAllQueues();
-      return taken;
-    },
+    clearQueue: queue.clear,
   };
 }
 

@@ -20,7 +20,10 @@ export function inputHost(options: RuntimeRpcHostOptions, manager: SessionManage
     },
     steer: (msg, images?: readonly ImageContent[]) => {
       const activeInput = options.inputReady?.() === false ? undefined : sessionRuntime.input?.();
-      if (activeInput) {
+      if (activeInput?.submit) {
+        if (!activeInput.submit('steer', msg, 'rpc', images)) options.enqueuePrompt(msg, images?.length ? { images } : undefined);
+      }
+      else if (activeInput) {
         if (images?.length) throw new Error("Image attachments on live steer while streaming are unsupported.");
         activeInput.steer(msg);
       } else {
@@ -29,7 +32,10 @@ export function inputHost(options: RuntimeRpcHostOptions, manager: SessionManage
     },
     followUp: (msg, images?: readonly ImageContent[]) => {
       const activeInput = options.inputReady?.() === false ? undefined : sessionRuntime.input?.();
-      if (activeInput && !images?.length) {
+      if (activeInput?.submit) {
+        if (!activeInput.submit('followUp', msg, 'rpc', images)) options.enqueuePrompt(msg, images?.length ? { images } : undefined);
+      }
+      else if (activeInput && !images?.length) {
         activeInput.followUp(msg);
       } else {
         options.enqueuePrompt(msg, images?.length ? { images } : undefined);

@@ -76,7 +76,7 @@ import { installUsageRuntime, usageResetApproval } from './usage.js';
 import { captureSummaryRole } from '../provider/summary.js';
 import { currentProviderConnections } from '../../provider/request/connection.js';
 import { preparePromptRequest } from '../../core/prompts/request.js';
-import {prepareExtensionInput} from './extensions/input.js';
+import {prepareExtensionInput, captureQueuedExtensionInput} from './extensions/input.js';
 import {prepareSessionHooks} from '../../core/hooks/prepare.js';
 import { providerStepRequest, providerToolsAvailable } from '../provider/step.js';
 import { manualCompactionPolicy, manualCompactionWiring } from './compaction/context.js';
@@ -115,16 +115,18 @@ export function createCliSessionRuntime(input: {
     ref: { mode: 'explicit-local', root: projectMemoryRootFor(input.runtimeContext.projectRoot) },
   });
   input.runtimeContext.preparePromptContext = (prompt, signal) => prepareContextInjection(input.runtimeContext, projectMemoryStore, prompt, signal);
-  const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
-    inputSource: input.options.rpcMode ? 'rpc' : isStdinTty() ? 'interactive' : 'cli',
-    prepareInput: request => prepareExtensionInput(input.runtimeContext, request, (operation, auditPublication) => prepareSessionHooks({
+  const inputHooks: Parameters<typeof prepareExtensionInput>[2] = (request, operation, auditPublication) => prepareSessionHooks({
       workspaceRoot:input.runtimeContext.cwd, admission:operation.admission, allowUntrustedHooks:operation.config.allowUntrustedHooks,
       escalationPromptHandler:createCliApprovalEscalationBridge({renderer:input.renderer, readline:input.getReadline,
         getViewMode:() => sessionRuntime.getViewMode(), trustPolicy:input.approvalTrustPolicy, getProjectRoot:() => input.runtimeContext.projectRoot,
         getNonInteractiveDecision:() => !isStdinTty() ? input.options.nonInteractiveApproval : undefined,
         sessionManager:input.sessionManager, auditPublication, getSessionId:() => request.sessionId,
         getPermissionScope:() => sessionRuntime.getPermissionScope(), promptInteractiveApproval:input.getPromptInteractiveApproval?.() }),
-    })),
+  });
+  const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
+    inputSource: input.options.rpcMode ? 'rpc' : isStdinTty() ? 'interactive' : 'cli',
+    prepareInput: request => prepareExtensionInput(input.runtimeContext, request, inputHooks),
+    captureQueuedInput: binding => captureQueuedExtensionInput(input.runtimeContext, binding, inputHooks),
     admitPrompt: admitCollaborationPrompt.bind(undefined, input.runtimeContext),
     promptSettled: handoffSettlement(input.runtimeContext, settleCollaborationPrompt.bind(undefined, input.runtimeContext)),
     onCancelRequested: () => { goalScheduler?.interrupt(); cancelDirectorFor(input.runtimeContext); cancelEvaluationFor(input.runtimeContext); cancelMediaFor(input.runtimeContext); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); cancelSshFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },

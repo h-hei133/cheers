@@ -6,6 +6,8 @@
 
 ## 当前批次的验证
 
+已逐项核对 26 个开放项。当前完成两组子批。F1.2 原生结构化流的文本、推理、工具参数和用量通过四套件 210 项，隔离构建 `b0bf67bd7960` 与通用端点对照通过。E.6 运行中输入的变换、队列编辑和撤回、保存、原生审批、部分写入结算及步数预算通过 18 套件 840 项和构建 `7106ad586588`。此前构建的 Linux 编译 RPC 在 Node 24 和 20.3 均通过。两条 E.6 旧源码反转均出现预期断言失败。整项验收仍为 36/62，26 项开放。 [逐项核查](design.md)
+
 SDK现公开reload()，沿原commands与extension lifecycle协调关闭／退休、captured loader reservation与完整snapshot、新shared host／UI绑定和start；保留same session及saved state/selection/transcriptprefix，仅bounded startup reports允许。独立复审实际反例修复file/explicit工具限制、队列多消息与失败结算、oldowner关闭、snapshot别名/Map与controlledbind、capture同步重入。最终16文件309项、七门／2747modules／0monoliths、buildf83dd7313313和两限定APPROVE/hash通过；13有效反转15AssertionErrors／1redundant control／exact恢复105项。Linuxcompiled/Node20.3禁生成/installed各8场景2POST，15公开入口strict NodeNext/skipLibCheck=false/engine-strictpassed；报告readback、lateinput、取消及partial均验证。opaque moduleexports保原capability引用，明确不属metadata冻结。normalpinnedjudge实际exit2/not_proven，未新增配置模型调用。[当前交付](../../../.omx/artifacts/upgrade-sdk-reload-2026-11-19/delivery.json)。其余input/message/tool/compaction事件结果继续，整项E.6仍部分。
 
 以下before-tree摘要已提交e27ef805，证据保留原source范围。

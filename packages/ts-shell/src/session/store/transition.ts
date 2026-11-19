@@ -21,7 +21,7 @@ export type SessionTransitionReadback = ((readback: () => void) => void) & {
 };
 
 /** Startup can append observations; saved state, identity and earlier history stay pinned. */
-export function captureSessionTransition(layout: SessionFileLayout): (activated: Session) => SessionTransitionReadback {
+export function captureSessionTransition(layout: SessionFileLayout, auditVersions?: Map<string, string>): (activated: Session) => SessionTransitionReadback {
   const path = pathIdentity(layout.sessionDir), directory = fileIdentity(fs.lstatSync(layout.sessionDir));
   let state = version(layout.statePath);
   const prefix = transcript(layout.transcriptPath);
@@ -31,7 +31,7 @@ export function captureSessionTransition(layout: SessionFileLayout): (activated:
   };
   const checkSource = () => {
     checkDirectory();
-    if (version(layout.statePath) !== state) throw new Error('The saved session substrate changed during replacement.');
+    if (!followsAuditVersion(state, version(layout.statePath), auditVersions)) throw new Error('The saved session substrate changed during replacement.');
   };
   return activated => {
     checkSource();
@@ -52,6 +52,8 @@ export function captureSessionTransition(layout: SessionFileLayout): (activated:
       if (version(layout.metadataPath) !== metadata) throw new Error('The saved metadata changed before audit publication.');
       const before = transcript(layout.transcriptPath, prefix);
       admission(); checkSource();
+      const priorState = version(layout.statePath);
+      if (!followsAuditVersion(state, priorState, auditVersions)) throw new Error('Native audit source changed before publication.');
       publish();
       const nextState = version(layout.statePath), observed = readStateSnapshotRequired(layout.statePath);
       const candidate = snapshotData(expected, {bytes:64*1024*1024, nodes:250_000, depth:48});
@@ -59,9 +61,19 @@ export function captureSessionTransition(layout: SessionFileLayout): (activated:
       checkDirectory(); admission();
       if (version(layout.metadataPath) !== metadata || version(layout.statePath) !== nextState
         || before.version !== after.version || !sameValue(observed, candidate)) throw new Error('Native audit publication is unverified.');
+      if (priorState !== nextState) auditVersions?.set(priorState, nextState);
       state = nextState;
     }});
   };
+}
+
+/** Accept only a contiguous sequence confirmed by the same run's native audit writer. */
+function followsAuditVersion(source: string, current: string, versions?: ReadonlyMap<string, string>): boolean {
+  let expected: string | undefined = source;
+  for (let remaining = versions?.size ?? 0; expected !== current && expected !== undefined && remaining > 0; remaining--) {
+    expected = versions?.get(expected);
+  }
+  return expected === current;
 }
 
 function version(target: string): string {

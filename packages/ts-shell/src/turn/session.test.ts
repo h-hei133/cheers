@@ -776,6 +776,35 @@ describe("runTurn", () => {
     expect(run.pending()).toEqual({ steering: [], followUps: [] });
   });
 
+  it('does not spend a model step on a follow-up withdrawn during turn start', async () => {
+    let starts = 0;
+    let release!: () => void, entered!: () => void;
+    const waiting = new Promise<void>(resolve => { release = resolve; });
+    const reached = new Promise<void>(resolve => { entered = resolve; });
+    const allowed: boolean[] = [];
+    const setup = options({
+      maxSteps: 3,
+      step: async (_messages, _signal, _listener, request) => {
+        allowed.push(request.allowTools);
+        return { text: 'answer', toolCalls: [], stopReason: 'stop' };
+      },
+      observe: async event => {
+        if (event.type === 'turn_start' && ++starts === 2) { entered(); await waiting; }
+      },
+    });
+    const run = runTurn(setup);
+    run.followUp('withdrawn');
+    const events = drain(run.events);
+    try {
+      await reached;
+      expect(run.clearQueue()).toEqual(['withdrawn']);
+      run.followUp('successor');
+    } finally { release(); }
+    await events;
+    expect(allowed).toEqual([true, true]);
+    expect(setup.persisted.filter(message => message.role === 'user').map(message => message.content)).toEqual(['successor']);
+  });
+
   it("drops blank steering and follow-up input at the boundary", () => {
     const run = runTurn(options({ step: () => new Promise(() => {}) }));
     run.steer("   ");

@@ -154,16 +154,18 @@ export class AgentSession {
     });
   }
 
-  steer(text: string): boolean {
+  steer(text: string, attachments?: PromptAttachments): boolean {
     const handle = this.sessionRuntime.input();
     if (!handle) return false;
+    if (handle.submit) return handle.submit('steer', text, 'sdk', attachments?.images);
     handle.steer(text);
     return true;
   }
 
-  followUp(text: string): boolean {
+  followUp(text: string, attachments?: PromptAttachments): boolean {
     const handle = this.sessionRuntime.input();
     if (!handle) return false;
+    if (handle.submit) return handle.submit('followUp', text, 'sdk', attachments?.images);
     handle.followUp(text);
     return true;
   }

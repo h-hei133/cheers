@@ -56,6 +56,10 @@ export class PendingQueue<T> {
     return this.messages.length > 0;
   }
 
+  public contains(entry: PendingQueueEntry<T>): boolean {
+    return this.messages.some(current => current.id === entry.id && current.value === entry.value);
+  }
+
   public drain(): T[] {
     if (this.mode === "all") {
       const drained = this.messages.map(entry => entry.value);
