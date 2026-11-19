@@ -73,6 +73,7 @@ export interface InteractiveCommandRouterInput {
   readonly ruleControlsCommand?: import('../../core/commands/types.js').CommandContext['ruleControlsCommand'];
   readonly forceTool?: import('../../core/commands/types.js').CommandContext['forceTool'];
   readonly promptMetadata?: Record<string, unknown>;
+  readonly inputSource?: import('../../core/shell/input/contract.js').PromptInputRequest['source'];
   readonly prompt: string;
   /** Cancels line-mode control work when its owning surface closes. */
   readonly signal?: AbortSignal;
@@ -431,6 +432,7 @@ export async function routeInteractiveCommand(
     }
     nextTurnNumber += 1;
     await runInteractivePromptExecution({
+      inputSource:input.inputSource,
       ...((resolved.promptMetadata ?? input.promptMetadata) ? { promptMetadata: resolved.promptMetadata ?? input.promptMetadata } : {}),
       effectivePrompt: resolved.effectivePrompt,
       ...(resolved.attachments ? { attachments: resolved.attachments } : {}),

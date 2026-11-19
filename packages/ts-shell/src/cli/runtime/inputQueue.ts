@@ -7,7 +7,7 @@ import { syntaxHelp } from '../../core/commands/syntax/projection.js';
 import { sanitizeExecutionReportText } from '../../runtime/execution/error.js';
 import { planningBody } from '../../core/commands/planning/source.js';
 
-interface QueueHost { readonly control: InputQueueControl; enqueue(text: string, attachments?: PromptAttachments): string; drain(): void }
+interface QueueHost { readonly control: InputQueueControl; enqueue(text: string, attachments?: PromptAttachments, source?: import('../../core/shell/input/contract.js').PromptInputRequest['source']): string; drain(): void }
 const hosts = new WeakMap<ShellSessionRuntime, QueueHost>();
 
 /**
@@ -35,7 +35,7 @@ export function queueExtensionMessage(runtime: ShellSessionRuntime, text: string
   if (!command || !['session-change', 'extension-reload'].includes(command.kind) || !host) return false;
   const refused = admission();
   if (refused) throw new Error(refused);
-  const id = host.enqueue(text);
+  const id = host.enqueue(text, undefined, 'extension');
   const cancel = () => { host.control.cancel(id); };
   command.controller.signal.addEventListener('abort', cancel, { once: true });
   void command.settled.then(result => {
@@ -48,9 +48,9 @@ export function queueExtensionMessage(runtime: ShellSessionRuntime, text: string
 }
 
 export function attachSubmissionQueue(runtime: ShellSessionRuntime,
-  queue: { readonly control: InputQueueControl; push(text: string, attachments?: PromptAttachments): string; shift(): string | undefined },
+  queue: { readonly control: InputQueueControl; push(text: string, attachments?: PromptAttachments, source?: import('../../core/shell/input/contract.js').PromptInputRequest['source']): string; shift(): string | undefined },
   run: (prompt: string) => Promise<unknown>, ready: () => boolean): () => void {
-  return attachInputQueue(runtime, { control: queue.control, enqueue: (text, attachments) => attachments ? queue.push(text, attachments) : queue.push(text), drain: () => {
+  return attachInputQueue(runtime, { control: queue.control, enqueue: (text, attachments, source) => source ? queue.push(text, attachments, source) : attachments ? queue.push(text, attachments) : queue.push(text), drain: () => {
     if (!ready()) return;
     const prompt = queue.shift(); if (prompt !== undefined) void run(prompt);
   } });

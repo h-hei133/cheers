@@ -22,6 +22,16 @@ import { FINAL_STEP_MESSAGE } from './messages.js';
 
 const quietHooks = { dispatch: async () => ({ decision: "allow" as const, stopChecks: [] }) } as unknown as HookDispatcher;
 
+it('does not accept a caller boolean as authority to bypass submission hooks', async () => {
+  const step = vi.fn(async () => ({text:'Must not run', toolCalls:[], stopReason:'stop' as const}));
+  const hooks = {dispatch:vi.fn(async (payload: {eventName:string}) => ({decision:payload.eventName === 'UserPromptSubmit' ? 'block' as const : 'allow' as const,
+    reason:'Submission refused', stopChecks:[]}))} as unknown as HookDispatcher;
+  const setup = options({step, hooks, ...({inputAdmitted:true} as object)});
+  const events = await drain(runTurn(setup).events);
+  expect(step).not.toHaveBeenCalled();
+  expect(events).toContainEqual(expect.objectContaining({type:'query.failed'}));
+});
+
 it.each(['summary', 'no-room', 'tool-refusal', 'unknown'] as const)('keeps the goal budget closing instruction internal for %s', async kind => {
   const claimBudgetSummary = vi.fn(() => true);
   const execute = vi.fn(async () => ({ success: true, output: 'must not run' }));

@@ -4,23 +4,34 @@ import { readReport, REPORT_BYTES } from '../../core/commands/report/codec.js';
 import { decodeTranscriptLine } from '../sessionEventCodec.js';
 import { readTranscriptPrefixDigest } from '../transcript/source.js';
 import type { SessionFileLayout } from './sessionFileLayout.js';
-import { withSessionStateLock } from './sessionStateStore.js';
+import {readStateSnapshotRequired, withSessionStateLock} from './sessionStateStore.js';
 import { fileVersion } from './version.js';
 import { readSessionMetadataRecord } from './sessionStore.js';
 import { projectSessionMetadata } from '../schema/sessionMetadataCodec.js';
 import type { Session } from '../schema/sessionRecord.js';
 import { sameValue } from '../../config/values.js';
+import {snapshotData} from '../../core/values/data.js';
+import type {SessionStateSnapshot} from '../schema/sessionStateSnapshot.js';
 
 const REPORT_SUFFIX_BYTES = 16 * REPORT_BYTES;
 
+export type SessionTransitionReadback = ((readback: () => void) => void) & {
+  /** Called only by the original native writer while it holds the state lock. */
+  readonly publishState: (expected: SessionStateSnapshot, publish: () => void, admission: () => void) => void;
+};
+
 /** Startup can append observations; saved state, identity and earlier history stay pinned. */
-export function captureSessionTransition(layout: SessionFileLayout): (activated: Session) => (readback: () => void) => void {
+export function captureSessionTransition(layout: SessionFileLayout): (activated: Session) => SessionTransitionReadback {
   const path = pathIdentity(layout.sessionDir), directory = fileIdentity(fs.lstatSync(layout.sessionDir));
-  const state = version(layout.statePath);
+  let state = version(layout.statePath);
   const prefix = transcript(layout.transcriptPath);
-  const checkSource = () => {
+  const checkDirectory = () => {
     if (pathIdentity(layout.sessionDir) !== path || fileIdentity(fs.lstatSync(layout.sessionDir)) !== directory
-      || version(layout.statePath) !== state) throw new Error('The saved session substrate changed during replacement.');
+      ) throw new Error('The saved session substrate changed during replacement.');
+  };
+  const checkSource = () => {
+    checkDirectory();
+    if (version(layout.statePath) !== state) throw new Error('The saved session substrate changed during replacement.');
   };
   return activated => {
     checkSource();
@@ -28,7 +39,7 @@ export function captureSessionTransition(layout: SessionFileLayout): (activated:
     const metadata = version(layout.metadataPath), stored = readSessionMetadataRecord(layout.metadataPath);
     const expected = Object.fromEntries(Object.entries(projectSessionMetadata(activated)).filter(([, value]) => value !== undefined));
     if (!stored || metadata !== version(layout.metadataPath) || !sameValue(stored, expected)) throw new Error('The saved metadata does not match this activation.');
-    return readback => withSessionStateLock(layout, () => {
+    const read = (readback: () => void) => withSessionStateLock(layout, () => {
       const check = () => { checkSource(); if (version(layout.metadataPath) !== metadata) throw new Error('The saved metadata changed during replacement.'); };
       check();
       const before = transcript(layout.transcriptPath, prefix);
@@ -36,6 +47,20 @@ export function captureSessionTransition(layout: SessionFileLayout): (activated:
       check();
       if (before.version !== version(layout.transcriptPath)) throw new Error('The saved transcript changed during replacement readback.');
     }, { requireExisting: true });
+    return Object.assign(read, {publishState: (expected: SessionStateSnapshot, publish: () => void, admission: () => void) => {
+      checkSource();
+      if (version(layout.metadataPath) !== metadata) throw new Error('The saved metadata changed before audit publication.');
+      const before = transcript(layout.transcriptPath, prefix);
+      admission(); checkSource();
+      publish();
+      const nextState = version(layout.statePath), observed = readStateSnapshotRequired(layout.statePath);
+      const candidate = snapshotData(expected, {bytes:64*1024*1024, nodes:250_000, depth:48});
+      const after = transcript(layout.transcriptPath, prefix);
+      checkDirectory(); admission();
+      if (version(layout.metadataPath) !== metadata || version(layout.statePath) !== nextState
+        || before.version !== after.version || !sameValue(observed, candidate)) throw new Error('Native audit publication is unverified.');
+      state = nextState;
+    }});
   };
 }
 

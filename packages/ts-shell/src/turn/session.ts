@@ -33,6 +33,7 @@ import { runSessionTrace } from '../observability/tracing/runtime.js';
 import { currentTrace } from '../observability/tracing/context.js';
 import type { TelemetryContext } from '../observability/tracing/types.js';
 import { createTurnEvents } from './events.js';
+import {consumeInputAdmission, type InputAdmissionReceipt} from '../core/hooks/input/receipt.js';
 
 /**
  * One user turn, driven through the kernel.
@@ -46,6 +47,9 @@ import { createTurnEvents } from './events.js';
  */
 
 export interface TurnOptions {
+  /** The pre-submit owner issues this receipt after the exact input passes its hooks. */
+  readonly inputAdmission?: InputAdmissionReceipt;
+  readonly effectiveInput?: string;
   readonly modelCatalog?: ToolGateOptions['modelCatalog'];
   /** Optional recorder; CLI and SDK runs otherwise use their captured log owner. */
   readonly telemetry?: TelemetryContext;
@@ -287,7 +291,7 @@ export function runTurn(options: TurnOptions): TurnRun {
 
   let overflowRecovered = false;
   const drive = async (): Promise<void> => {
-    channel.push({
+    const startedEvent: QueryEvent = {
       type: "query.started",
       sessionId: options.sessionId,
       prompt: options.prompt,
@@ -295,7 +299,8 @@ export function runTurn(options: TurnOptions): TurnRun {
       // reconstructing the directory layout, which would make that layout part of
       // the contract by accident.
       ...(options.sessionPath !== undefined ? { sessionPath: options.sessionPath } : {}),
-    });
+    };
+    if (!options.inputAdmission) channel.push(startedEvent);
     const started = await options.hooks.dispatch({
       eventName: "SessionStart",
       sessionId: options.sessionId,
@@ -307,17 +312,20 @@ export function runTurn(options: TurnOptions): TurnRun {
       throw new Error(`SessionStart hook ${started.decision}: ${started.reason || started.feedback || "Prompt admission refused."}`);
     }
     if (options.signal.aborted) return;
-    const submitted = await options.hooks.dispatch({
+    const admittedInput = consumeInputAdmission(options.inputAdmission, {sessionId:options.sessionId, workspaceRoot:options.workspaceRoot,
+      text:options.effectiveInput ?? options.prompt, images:options.attachments?.images, signal:options.signal, hooks:options.hooks});
+    const submitted = !admittedInput ? await options.hooks.dispatch({
       eventName: "UserPromptSubmit",
       sessionId: options.sessionId,
       workspaceRoot: options.workspaceRoot,
       timestamp: new Date().toISOString(),
       prompt: options.prompt,
-    }, { signal: options.signal });
-    if (submitted.decision === "block" || submitted.decision === "retry") {
+    }, { signal: options.signal }) : {decision:'allow' as const};
+    if (submitted.decision !== 'allow') {
       throw new Error(`UserPromptSubmit hook ${submitted.decision}: ${submitted.reason || submitted.feedback || "Prompt admission refused."}`);
     }
     if (options.signal.aborted) return;
+    if (options.inputAdmission) channel.push(startedEvent);
     const onAbort = (): void => core.abort();
     options.signal.addEventListener("abort", onAbort, { once: true });
     try {

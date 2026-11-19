@@ -158,7 +158,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | D.4 | 部分 | 高亮、CJK、Thinking/Diff/灯箱与离线安全已通过；完整GFM仍未验收；限定独立FIXED/APPROVE通过。 |
 | E.3 | 部分 | 声明、namespace、冻结session list/get、native image/输出预算已过；richer classify/generateImages派发与provider image缺。 |
 | E.4 | 缺口 | 固定执行环境、记录结果交付、可验证的恢复及未知副作用零重派发。 |
-| E.6 | 部分 | 逐个完整生命周期事件的dispatch与结果消费者。 |
+| E.6 | 部分 | 新普通input转换/handled/独立veto已完成；live steering/followUp和其他message/tool/compaction结果消费者仍缺。 |
 | E.7 | 部分 | virtual注册／逻辑路由已接通；provider、MCP、renderer和其余runtime setters仍缺，worker virtual明确unsupported。 |
 | E.8 | 部分 | shortcuts／flags的CLI／SDK消费者、冲突、默认值、参数与按键生命周期。 |
 | E.9 | 部分 | npm／git／local安装adapter和顶层CLI入口、完整性／精确版本／批准边界。 |
@@ -183,8 +183,11 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 
 ## 后续工作
 
-下一批继续 E.6 before-tree定制summary／instructions和其他结果消费者；SDK controlled reload另由原资源owner显式adoption；保持原contribution、commands和普通Hook拒绝／批准／持久化边界。F2.6指标归属／跨进程传播和T5.1排他创建仍有独立已核实缺口。
+用户要求完成当前input子批并本地提交后总结、停止。before-tree summary、CLI与SDK controlled reload及普通input结果已完成子批验收；E.6尚缺live steering/followUp、message/tool/compaction其余结果。其余26开放编号按上表保留，停止后不继续执行。
 
 ## 阶梯计价历史验收
 
 F2.4已实现并完成当前Linux功能资格的单次input阈值最高档、请求前schedule/协议mode捕获、最终flat rate的v2 bucket持久化、原三入口和warm/trace/ledger消费；缺input/分类/价格、captured unknown和legacy聚合均保留unknown/partial。当前37文件765项、七门/2690modules/0monoliths、builda395e98082bc及15有效反转24AssertionErrors/exact恢复151项passed；正常pinned judge仍实际exit2/not_proven。Native/package/真实配置模型当前全部passed，32/62功能总数；独立审查收尾后本地提交，总目标active。
+
+
+2026-11-19 input子批：20文件416项，末改影响144项、反转恢复159项、CLI表面555项、七静态/结构门、buildcca13a50f2ac；11有效反转11AssertionErrors/逐字节恢复和两限定独立APPROVE。compiled/Node20.3禁生成/installed各15场景7本地POST，安装15入口strict类型/engine-strict，RPC两场景1POST；原配置模型1actual200/completed和有效输入标记通过。默认judge仍exit2/not_proven/16384capacity，不宣称全仓/Windows/全E.6/远端CI。交付：[input](../../../.omx/artifacts/upgrade-input-2026-11-19/delivery.json)。整体36/62，26开放。按用户要求该批提交后总结并停止。

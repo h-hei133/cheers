@@ -56,6 +56,7 @@ export async function runInteractiveResumeAction(input: {
 }
 
 export async function runInteractivePromptExecution(input: {
+  readonly inputSource?: import('../../core/shell/input/contract.js').PromptInputRequest['source'];
   readonly promptMetadata?: Record<string, unknown>;
   readonly effectivePrompt: string;
   /** Images the draft referred to; see `PromptAttachments`. */
@@ -68,6 +69,7 @@ export async function runInteractivePromptExecution(input: {
   readonly turnNumber: number;
 }): Promise<void> {
   await executeResolvedPromptTurn({
+    inputSource:input.inputSource,
     source: "interactive",
     effectivePrompt: input.effectivePrompt,
     ...(input.promptMetadata ? { promptMetadata: input.promptMetadata } : {}),

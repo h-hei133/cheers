@@ -16,6 +16,7 @@ import { observeDirectory } from '../core/state/watch.js';
 import { sourceFile } from './registry/sources.js';
 import { ExtensionCalls } from './runtime/calls.js';
 import { evaluateToolPermissionScope } from '../core/query/toolPolicy.js';
+import { captureInputHookResult, captureInputResult, InputRefusal } from './events/input.js';
 
 export interface ExtensionServiceOptions {
   readonly root: string;
@@ -197,10 +198,16 @@ export class ExtensionService implements LifecycleHost {
         { kind: 'event', event, ...(aliases ? { aliases } : {}), payload },
       );
       current();
+      const guardedInput = event === 'input' || event === 'UserPromptSubmit';
+      if (guardedInput && (!result.success || result.metadata?.cleanup !== 'confirmed')) throw new InputRefusal();
       if (event === 'session_before_tree' && (!result.success || result.metadata?.cleanup !== 'confirmed')) throw new Error('Extension tree callback failed or its cleanup is unverified.');
       const raw = typeof result.metadata?.eventOutput === 'string' ? result.metadata.eventOutput : '';
       if (!raw.trim()) return undefined;
-      try { return JSON.parse(raw); } catch {
+      try {
+        const returned: unknown = JSON.parse(raw);
+        return event === 'input' ? captureInputResult(returned) : event === 'UserPromptSubmit' ? captureInputHookResult(returned) : returned;
+      } catch {
+        if (guardedInput) throw new InputRefusal();
         if (event === 'session_before_tree') throw new Error('Extension tree callback returned invalid data.');
         return undefined;
       }

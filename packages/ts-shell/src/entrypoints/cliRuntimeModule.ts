@@ -96,11 +96,12 @@ export async function runNonTtyPromptStream(options: {
     onUserIntent: options.onUserIntent,
     onInputReady: options.onInputReady,
     rpcMode: options.rpcMode,
-    runPrompt: (prompt, attachments) => runNonInteractivePrompt({ ...options, prompt, attachments, printMode: false, jsonEvents: options.rpcMode === true, awaitGoalScheduling: false }),
+    runPrompt: (prompt, attachments, inputSource) => runNonInteractivePrompt({ ...options, prompt, attachments, inputSource, printMode: false, jsonEvents: options.rpcMode === true, awaitGoalScheduling: false }),
   });
 }
 
 export async function runNonInteractivePrompt(options: {
+  inputSource?: import('../core/shell/input/contract.js').PromptInputRequest['source'];
   stopRequested?: () => boolean;
   /** A live stdin host owns scheduler drainage while continuing to accept controls. */
   awaitGoalScheduling?: boolean;
@@ -127,7 +128,7 @@ export async function runNonInteractivePrompt(options: {
   forceTool?: import("../core/commands/types.js").CommandContext['forceTool'];
 }): Promise<"exit" | void> {
   const trimmedPrompt = options.prompt.trim();
-  if (!trimmedPrompt) {
+  if (!trimmedPrompt && !options.attachments?.images.length) {
     return;
   }
 
@@ -361,6 +362,7 @@ export async function runNonInteractivePrompt(options: {
   }
   await executeResolvedPromptTurn({
     source: "non-interactive",
+    inputSource:options.inputSource,
     effectivePrompt: resolved.effectivePrompt,
     ...(options.attachments ? { attachments: options.attachments } : {}),
     ...(resolved.promptMetadata ? { promptMetadata: resolved.promptMetadata } : {}),
@@ -375,6 +377,7 @@ export async function runNonInteractivePrompt(options: {
 }
 
 export async function executeResolvedPromptTurn(options: {
+  inputSource?: import('../core/shell/input/contract.js').PromptInputRequest['source'];
   promptMetadata?: Record<string, unknown>;
   source: "interactive" | "non-interactive";
   effectivePrompt: string;
@@ -449,6 +452,7 @@ export async function executeResolvedPromptTurn(options: {
         options.effectivePrompt,
         {
           outputMode: options.printMode ? "print" : "interactive",
+          ...(options.inputSource ? {inputSource:options.inputSource} : {}),
           runtimeSeed: options.runtimeSeed,
           continuityState: continuitySnapshot,
           ...(options.attachments ? { attachments: options.attachments } : {}),

@@ -43,7 +43,7 @@ export async function runPromptInputStream(options: {
   readonly sessionManager?: SessionManager;
   readonly renderer: StreamingRenderer;
   readonly logger: StructuredLogger;
-  readonly runPrompt: (prompt: string, attachments?: PromptAttachments) => Promise<'exit' | void>;
+  readonly runPrompt: (prompt: string, attachments?: PromptAttachments, inputSource?: import('../../core/shell/input/contract.js').PromptInputRequest['source']) => Promise<'exit' | void>;
   readonly switchSession?: SessionChangePort;
   readonly onRpcUiBridge?: (bridge: RpcUiBridge) => void;
   readonly onFirstFrame?: () => void;
@@ -116,11 +116,11 @@ export async function runPromptInputStream(options: {
   const queue = new SubmissionQueue(() => options.runtimeContext.session, () => {
     options.renderer.renderLine('Queued input was not executed because the session changed. Queue it again explicitly.');
   });
-  const dispatch = async (prompt: string, attachments?: PromptAttachments): Promise<void> => {
+  const dispatch = async (prompt: string, attachments?: PromptAttachments, inputSource?: import('../../core/shell/input/contract.js').PromptInputRequest['source']): Promise<void> => {
     if (exitRequested) return;
     processedCount += 1;
     withoutRecordingInput(options.runtimeContext, () => options.renderer.renderLine(`${contextTag()} > ${prompt}`));
-    const outcome = await options.runPrompt(prompt, attachments);
+    const outcome = await options.runPrompt(prompt, attachments, inputSource);
     if (outcome === 'exit') { exitRequested = true; pendingPrompt = null; queue.splice(0); stdinReader.close(); }
   };
   const drain = (): void => {
@@ -138,7 +138,7 @@ export async function runPromptInputStream(options: {
       const prompt = queue.shift(); if (prompt === undefined || exitRequested) return;
       const attachments = queue.takeAttachments();
       busy = true;
-      try { await dispatch(prompt, attachments); } finally { busy = false; }
+      try { await dispatch(prompt, attachments, queue.takeSource()); } finally { busy = false; }
     }).catch(error => options.renderer.renderLine(`Run failed: ${error instanceof Error ? error.message : 'runtime failure'}`));
   };
   const enqueuePrompt = (prompt: string, attachments?: PromptAttachments): void => {
@@ -199,7 +199,7 @@ export async function runPromptInputStream(options: {
     }
     queue.push(prompt, attachments); drain();
   };
-  const releaseQueue = attachInputQueue(options.sessionRuntime, { control: queue.control, enqueue: text => queue.push(text), drain });
+  const releaseQueue = attachInputQueue(options.sessionRuntime, { control: queue.control, enqueue: (text, attachments, source) => queue.push(text, attachments, source), drain });
   const releaseGoal = attachGoalSubmission(options.sessionRuntime, {
     ready: () => startup.admitted() && !closed && !busy && pendingControls === 0 && queue.length === 0 && !pendingPrompt,
     submit: async (prompt, promptMetadata) => {

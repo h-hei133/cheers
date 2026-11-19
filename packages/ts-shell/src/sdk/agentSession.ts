@@ -148,6 +148,7 @@ export class AgentSession {
     if (this.disposed) throw new Error("AgentSession has been disposed.");
     return this.sessionRuntime.executePrompt(this.sessionId, text, {
       outputMode: "print",
+      inputSource:'sdk',
       ...(options?.attachments ? { attachments: options.attachments } : {}),
       ...(options?.promptMetadata ? { promptMetadata: options.promptMetadata } : {}),
     });

@@ -1,5 +1,7 @@
 import { createDataSnapshot } from '../../core/values/data.js';
 import { createTreeResultCapture } from '../events/tree.js';
+import { createInputEventCapture, createInputEventProjection, createInputHookPayloadCapture, createInputHookReducer, createInputHookResultCapture, createInputResultCapture, InputRefusal } from '../events/input.js';
+import { createCallbackResultCapture } from '../../core/values/promise.js';
 
 export const EXTENSION_WORKER_SOURCE = `
 const vm = require('node:vm');
@@ -11,10 +13,34 @@ const __name = (target, value) => Object.defineProperty(target, 'name', { value,
 // Use the same pure capture factories; their dependencies are explicit parameters.
 const captureData = (${createDataSnapshot.toString()})(types.isProxy);
 const captureTree = (${createTreeResultCapture.toString()})(captureData);
+const InputRefusal = ${InputRefusal.toString()};
+const captureInput = (${createInputResultCapture.toString()})(captureData, InputRefusal);
+const captureInputHook = (${createInputHookResultCapture.toString()})(captureData, InputRefusal);
+const captureInputHookPayload = (${createInputHookPayloadCapture.toString()})(captureData, InputRefusal);
+const captureInputEvent = (${createInputEventCapture.toString()})(captureData, captureInput, InputRefusal);
+const projectInput = (${createInputEventProjection.toString()})(InputRefusal);
 const beforeTree = Object.setPrototypeOf(value => {
   try { return JSON.stringify({ ok: true, value: captureTree(value) }); }
   catch { return '{"ok":false}'; }
 }, null);
+const inputResult = Object.setPrototypeOf(value => {
+  try { return JSON.stringify({ ok: true, value: captureInput(value) }); }
+  catch { return '{"ok":false}'; }
+}, null);
+const inputEvent = Object.setPrototypeOf((value, result) => {
+  try { return JSON.stringify({ ok: true, value: projectInput(captureInputEvent(value), captureInput(result)) }); }
+  catch { return '{"ok":false}'; }
+}, null);
+const inputHookResult = Object.setPrototypeOf(value => {
+  try { return JSON.stringify({ ok: true, value: captureInputHook(value) }); }
+  catch { return '{"ok":false}'; }
+}, null);
+const inputHookPayload = Object.setPrototypeOf(value => {
+  try { return JSON.stringify({ ok: true, value: captureInputHookPayload(value) }); }
+  catch { return '{"ok":false}'; }
+}, null);
+const promiseBrand = Object.setPrototypeOf(value => { try { return types.isPromise(value); } catch { return false; } }, null);
+const proxyBrand = Object.setPrototypeOf(value => { try { return types.isProxy(value); } catch { return true; } }, null);
 
 const vmCtx = vm.createContext(Object.create(null), {
   name: 'extension-worker',
@@ -36,13 +62,66 @@ Object.defineProperty(vmCtx, '__ARGV', { value: JSON.stringify(workerData.argv),
 Object.defineProperty(vmCtx, '__ROOT', { value: String(workerData.workspaceRoot), enumerable: false });
 Object.defineProperty(vmCtx, '__INVOKE', { value: workerData.invoke ? JSON.stringify(workerData.invoke) : '', enumerable: false });
 Object.defineProperty(vmCtx, '__TREE_RESULT', { value: beforeTree, enumerable: false });
+Object.defineProperty(vmCtx, '__INPUT_RESULT', { value: inputResult, enumerable: false });
+Object.defineProperty(vmCtx, '__INPUT_EVENT', { value: inputEvent, enumerable: false });
+Object.defineProperty(vmCtx, '__INPUT_HOOK_RESULT', { value: inputHookResult, enumerable: false });
+Object.defineProperty(vmCtx, '__INPUT_HOOK_PAYLOAD', { value: inputHookPayload, enumerable: false });
+Object.defineProperty(vmCtx, '__PROMISE_BRAND', { value: promiseBrand, enumerable: false });
+Object.defineProperty(vmCtx, '__PROXY_BRAND', { value: proxyBrand, enumerable: false });
 
 const bootstrap = new vm.Script(\`
 (() => {
   const send = globalThis.__send;
   const onReply = globalThis.__onReply;
+  const promiseBrand = globalThis.__PROMISE_BRAND;
+  const proxyBrand = globalThis.__PROXY_BRAND;
   delete globalThis.__send;
   delete globalThis.__onReply;
+  delete globalThis.__PROMISE_BRAND;
+  delete globalThis.__PROXY_BRAND;
+  const __name = (target, value) => Object.defineProperty(target, 'name', { value, configurable: true });
+  const captureCallback = (${createCallbackResultCapture.toString()})(proxyBrand, promiseBrand, Promise, Promise);
+  const captureInput = value => {
+    const envelope = JSON.parse(globalThis.__INPUT_RESULT(value));
+    if (!envelope.ok) throw new Error('Extension input was refused.');
+    return envelope.value;
+  };
+  const captureInputHook = value => {
+    const envelope = JSON.parse(globalThis.__INPUT_HOOK_RESULT(value));
+    if (!envelope.ok) throw new Error('Extension input was refused.');
+    return envelope.value;
+  };
+  const reduceInputHook = (${createInputHookReducer.toString().replaceAll('\\', '\\\\')})(captureInputHook);
+  const freezeData = value => {
+    if (value && typeof value === 'object') {
+      for (const key of Object.keys(value)) freezeData(value[key]);
+      Object.freeze(value);
+    }
+    return value;
+  };
+  globalThis.__reduceInputHook = reduceInputHook;
+  globalThis.__captureInputHookPayload = value => {
+    const envelope = JSON.parse(globalThis.__INPUT_HOOK_PAYLOAD(value));
+    if (!envelope.ok) throw new Error('Extension input was refused.');
+    return freezeData(envelope.value);
+  };
+  globalThis.__captureInputCallback = (operation, legacy) => captureCallback(operation, legacy ? captureInputHook : captureInput, {
+    invalid: () => new Error('Extension input was refused.'),
+    failed: () => new Error('Extension input was refused.'),
+    cancelled: () => new Error('Extension input was refused.'),
+  });
+  // Install completion observers before user handlers can change this realm's Promise hooks.
+  globalThis.__finishInputRunner = operation => {
+    const completed = captureCallback(operation, captureInputHook, {
+      invalid: () => new Error('Extension input was refused.'),
+      failed: () => new Error('Extension input was refused.'),
+      cancelled: () => new Error('Extension input was refused.'),
+    });
+    completed.then(envelope => {
+      try { send('done', envelope.value === undefined ? '' : JSON.stringify(envelope.value)); }
+      catch { send('error', 'Extension input was refused.'); }
+    }, () => send('error', 'Extension input was refused.'));
+  };
 
   let seq = 0;
   const pending = new Map();
@@ -194,7 +273,9 @@ parentPort.on('message', (msg) => {
   try {
     const script = new vm.Script(workerData.code, { filename: workerData.filename });
     script.runInContext(vmCtx, { timeout: 5000 });
-    const runner = new vm.Script(\`
+    const guardedInputInvoke = Boolean(workerData.invoke && workerData.invoke.kind === 'event'
+      && (workerData.invoke.event === 'input' || workerData.invoke.event === 'UserPromptSubmit'));
+    const runner = new vm.Script((guardedInputInvoke ? 'globalThis.__finishInputRunner(() => (' : '') + \`
       (async () => {
         const exp = module.exports || {};
         if (typeof exp.default === 'function') await exp.default(api);
@@ -211,11 +292,45 @@ parentPort.on('message', (msg) => {
           const names = [invoke.event, ...aliases];
           let decision;
           const tree = invoke.event === 'session_before_tree';
-          const payload = tree ? Object.freeze(invoke.payload) : invoke.payload;
+          const nativeInput = invoke.event === 'input';
+          const guardedInput = nativeInput || invoke.event === 'UserPromptSubmit';
+          const legacyInput = invoke.event === 'UserPromptSubmit';
+          let inputPayload, transformed = false;
+          const freezeInput = value => Object.freeze({ ...value,
+            ...(value.images === undefined ? {} : { images: Object.freeze(value.images.map(image => Object.freeze(image))) }) });
+          if (nativeInput) {
+            const envelope = JSON.parse(globalThis.__INPUT_EVENT(invoke.payload, { action: 'continue' }));
+            if (!envelope.ok) throw new Error('Extension input was refused.');
+            inputPayload = freezeInput(envelope.value);
+          }
+          const payload = legacyInput ? globalThis.__captureInputHookPayload(invoke.payload) : tree ? Object.freeze(invoke.payload) : invoke.payload;
           for (const eventName of names) {
             const list = globalThis.__registeredHandlers.get(eventName) || [];
             for (const handler of list) {
-              const next = await handler(tree ? payload : decision ?? invoke.payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui });
+              let next;
+              try {
+                next = guardedInput ? (await globalThis.__captureInputCallback(
+                  () => handler(nativeInput ? inputPayload : payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui }), !nativeInput)).value
+                  : await handler(tree ? payload : decision ?? invoke.payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui });
+              }
+              catch (error) { if (guardedInput) throw new Error('Extension input was refused.'); throw error; }
+              if (nativeInput) {
+                const envelope = JSON.parse(globalThis.__INPUT_RESULT(next));
+                if (!envelope.ok) throw new Error('Extension input was refused.');
+                const captured = envelope.value;
+                if (captured.action === 'handled') return Object.freeze({ action: 'handled' });
+                const projected = JSON.parse(globalThis.__INPUT_EVENT(inputPayload, captured));
+                if (!projected.ok) throw new Error('Extension input was refused.');
+                inputPayload = freezeInput(projected.value);
+                transformed ||= captured.action === 'transform';
+                continue;
+              }
+              if (legacyInput) {
+                const reduced = globalThis.__reduceInputHook(decision, next);
+                decision = reduced.result;
+                if (reduced.stop) return decision;
+                continue;
+              }
               if (tree && next !== undefined) {
                 const envelope = JSON.parse(globalThis.__TREE_RESULT(next));
                 if (!envelope.ok) throw new Error('Extension tree result must contain inert data.');
@@ -225,6 +340,9 @@ parentPort.on('message', (msg) => {
               } else if (next !== undefined) decision = next;
             }
           }
+          if (nativeInput) return transformed
+            ? Object.freeze({ action: 'transform', text: inputPayload.text, ...(inputPayload.images === undefined ? {} : { images: inputPayload.images }) })
+            : Object.freeze({ action: 'continue' });
           return decision;
         }
         if (typeof exp.run === 'function') {
@@ -232,7 +350,8 @@ parentPort.on('message', (msg) => {
         }
         return 'Loaded extension successfully.';
       })()
-    \`, { filename: 'extension-runner.js' });
+    \` + (guardedInputInvoke ? '))' : ''), { filename: 'extension-runner.js' });
+    if (guardedInputInvoke) { runner.runInContext(vmCtx, { timeout: 5000 }); return; }
     const value = await Promise.resolve(runner.runInContext(vmCtx, { timeout: 5000 }));
     const isEventInvoke = Boolean(workerData.invoke && workerData.invoke.kind === 'event');
     if (!isEventInvoke && value && typeof value === 'object' && typeof value.output === 'string' && typeof value.success === 'boolean') {

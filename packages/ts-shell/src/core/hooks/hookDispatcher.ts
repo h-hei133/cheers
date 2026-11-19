@@ -10,6 +10,9 @@ import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
 import { checkWriteHookArtifact, writeHookCommand } from './artifact.js';
 import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInputs, translateWriteResult } from './translation.js';
 import { getExtensionEventRunners } from './extensionBridge.js';
+import {captureInputHookDecision} from './input/decision.js';
+import {callbackCancellation, captureCallbackResult} from '../values/promise.js';
+import {snapshotData} from '../values/data.js';
 import type {
   HookEventPayload,
   HookDecision,
@@ -78,6 +81,20 @@ export class HookDispatcher {
   private commandHooks: CommandHookConfig[] = [];
   private inProcessHooks: InProcessHookConfig[] = [];
   private trust?: CommandHookTrust;
+  private registration = Symbol();
+
+  /** An input receipt may use only the registration that admitted its submission. */
+  captureRegistration(): () => boolean {
+    const registration = this.registration;
+    return () => this.registration === registration;
+  }
+
+  /** Each prompt retains its own declarations and trust while process hooks stay available. */
+  fork(): HookDispatcher {
+    const hooks = new HookDispatcher({commandHooks:[...this.commandHooks], inProcessHooks:[...this.inProcessHooks]});
+    hooks.trust = this.trust;
+    return hooks;
+  }
 
   /**
    * How declared hooks are checked before they run.
@@ -88,6 +105,7 @@ export class HookDispatcher {
    * "nobody has been asked".
    */
   setCommandHookTrust(trust: CommandHookTrust, declaredHooks?: readonly CommandHookConfig[]): void {
+    this.registration = Symbol();
     if (declaredHooks) {
       // Registration publishes one snapshot. Preserve process-owned hooks while
       // retiring earlier declarations, including ones removed from disk.
@@ -159,20 +177,21 @@ export class HookDispatcher {
    * Register a custom in-process hook (e.g. verification compiler guard, test runner)
    */
   registerInProcessHook(hook: InProcessHookConfig): void {
-    this.inProcessHooks.push(hook);
+    this.inProcessHooks = [...this.inProcessHooks, hook]; this.registration = Symbol();
   }
 
   /**
    * Register a command-based hook (e.g. from .agents/hooks.json or settings)
    */
   registerCommandHook(hook: CommandHookConfig): void {
-    this.commandHooks.push(hook);
+    this.commandHooks = [...this.commandHooks, hook]; this.registration = Symbol();
   }
 
   /**
    * Clear all registered hooks
    */
   clear(): void {
+    this.registration = Symbol();
     this.commandHooks = [];
     this.inProcessHooks = [];
     this.trust = undefined;
@@ -201,6 +220,10 @@ export class HookDispatcher {
   }
 
   async dispatch(payload: HookEventPayload, stopOptions: StopDispatchOptions = {}): Promise<HookDecision> {
+    if (payload.eventName === 'UserPromptSubmit') {
+      try {payload = snapshotData(payload, {bytes:64*1024*1024, nodes:4096, depth:12}) as unknown as HookEventPayload;}
+      catch {return {decision:'block', reason:'Prompt input hook payload was refused.'};}
+    }
     const trust = this.trust;
     const commandHooks = this.commandHooks;
     const inProcessHooks = this.inProcessHooks;
@@ -225,7 +248,9 @@ export class HookDispatcher {
     for (const hook of this.inProcessHooks) {
       if (hook.event === relevantEvent && this.matches(hook.matcher, payload)) {
         try {
-          const returned = await hook.handler(payload);
+          const returned = relevantEvent === 'UserPromptSubmit'
+            ? (await captureCallbackResult(() => hook.handler(payload), captureInputHookDecision, {cancellation:callbackCancellation(stopOptions.signal)})).value
+            : await hook.handler(payload);
           const decision = relevantEvent === 'PreToolUse' ? normalizeHookVeto(returned) ?? returned : returned;
           if (decision) {
             if (decision.decision === "block" || decision.decision === "retry") {
@@ -242,6 +267,10 @@ export class HookDispatcher {
             }
           }
         } catch (err: unknown) {
+          if (relevantEvent === 'UserPromptSubmit') {
+            logger.error('Prompt input hook failed.');
+            return {decision:'block', reason:'Prompt input hook result was refused.'};
+          }
           logger.error(`Error in in-process hook handler: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
@@ -276,7 +305,7 @@ export class HookDispatcher {
             logger.info('Write hook result', gap.hookVerdict);
             accumulatedDecision = mergeWriteHookResult(accumulatedDecision, gap);
           }
-          const matchedInputs = inputs.inputs.filter(input => this.matches(hook.matcher, { ...payload, toolName: input.tool_name }));
+          const matchedInputs = inputs.inputs.filter(input => this.matches(hook.matcher, { ...(payload as PreToolUsePayload), toolName: input.tool_name }));
           if (matchedInputs.length === 0) continue;
           const invalidArtifact = checkWriteHookArtifact(hook.writeGate, payload.workspaceRoot);
           if (invalidArtifact) {
@@ -422,7 +451,6 @@ export class HookDispatcher {
 }
 
 const EXTENSION_EVENT_ALIASES: Readonly<Record<string, readonly string[]>> = {
-  UserPromptSubmit: ['input'],
   PreToolUse: ['tool_call'],
   PostToolUse: ['tool_result'],
   PostToolUseFailure: ['tool_result'],
@@ -444,7 +472,10 @@ async function dispatchExtensionHooks(
   for (const runExtensionEvent of runners) {
     try {
       if (signal?.aborted) return { decision: 'block', reason: 'Extension event cancelled.' };
-      const returned = await runExtensionEvent(payload.eventName, payload, aliases, signal);
+      const returned = payload.eventName === 'UserPromptSubmit'
+        ? (await captureCallbackResult(() => runExtensionEvent(payload.eventName, payload, aliases, signal), captureInputHookDecision,
+          {cancellation:callbackCancellation(signal), check:() => runExtensionEvent.admission?.()})).value
+        : await runExtensionEvent(payload.eventName, payload, aliases, signal);
       if (signal?.aborted) return { decision: 'block', reason: 'Extension event cancelled.' };
       if (!returned || typeof returned !== 'object') continue;
       const decision = payload.eventName === 'PreToolUse'
@@ -459,6 +490,7 @@ async function dispatchExtensionHooks(
       }
     } catch (err: unknown) {
       logger.error('Extension event handler failed.');
+      if (payload.eventName === 'UserPromptSubmit') return {decision:'block', reason:'Prompt input hook result was refused.'};
       if (payload.eventName === 'PreToolUse') return { decision: 'block', reason: 'Extension event handler failed; tool execution was refused.' };
     }
   }

@@ -1254,11 +1254,13 @@ export class InteractiveMode {
     // the *previous* turn failed has to be read before that happens.
     const previousTurnFailed = this.sink.lastTurnFailed;
     const command = text.startsWith("/") ? text.split(/\s+/)[0]! : "turn";
+    const inputSource = this.queue.takeSource();
     const configurationRevision = this.options.runtimeContext.configuration.current.revision;
     this.sink.begin(text.startsWith("/") ? "command" : "turn", command);
     this.options.renderer.setSink(this.sink);
     try {
       const result = await routeInteractiveCommand({
+        inputSource,
         ...(promptMetadata ? { promptMetadata } : {}),
         prompt: text,
         ...(attachments ? { attachments } : {}),

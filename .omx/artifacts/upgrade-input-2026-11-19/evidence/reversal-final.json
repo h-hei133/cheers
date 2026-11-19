@@ -1,0 +1,75 @@
+{
+  "status": "passed",
+  "cases": [
+    {
+      "name": "metadata",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    },
+    {
+      "name": "input-transform",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    },
+    {
+      "name": "handled",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    },
+    {
+      "name": "legacy-veto",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    },
+    {
+      "name": "saved-check",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    },
+    {
+      "name": "prompt-dedup",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    },
+    {
+      "name": "receipt-registration",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    },
+    {
+      "name": "legacy-chain",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    },
+    {
+      "name": "sync-callback",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    },
+    {
+      "name": "raw-callback",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    },
+    {
+      "name": "provenance-settlement",
+      "exit": 1,
+      "assertionFailures": 1,
+      "behavioral": true
+    }
+  ],
+  "assertionFailures": 11,
+  "sourceUnchanged": true,
+  "exactRestoration": true,
+  "isolatedAssertionAdapter": "Two Promise rejections use resolves assertions in isolated copies so native refusal is a behavioral assertion; product and tracked tests unchanged."
+}

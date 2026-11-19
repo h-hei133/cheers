@@ -1,0 +1,154 @@
+{
+  "status": "APPROVE",
+  "scope": "Initial and new ordinary submissions including native audit publication and attempted provenance settlement",
+  "reviewer": "events_review",
+  "files": [
+    {
+      "path": "packages/ts-shell/src/cli/approval/cliApprovalAuditBridge.ts",
+      "sha256": "e3a7f379cdcf2eece7c563151698ed7a2cfe71e09afd80cf9a0602b7b9b5dde1"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/approval/cliApprovalEscalationBridge.ts",
+      "sha256": "213cf5bce202b44d455ce734eb878084256fa68a0f90bf1674098a98464f06f3"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/interactive/inputQueue.ts",
+      "sha256": "862b495cf479ef0e1196810421135f5e97801754fe90a6058ecb4c19f69114fb"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/interactive/interactiveCommandRouter.ts",
+      "sha256": "ebe30fea8ada29215c1e31cf158a875e69399300d59b9873b71e48a7bad6d038"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/interactive/interactiveMode.ts",
+      "sha256": "d1b7aaeba72ee8be215fdb5c96168dab6ce0921a1cb89a27f12ee2debc425b89"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/interactive/interactivePromptRunner.ts",
+      "sha256": "c84ab8805c64abbabcd3e3b5a3e16b2627169c04f9043fd3f95f621e3ea222df"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/interactive/lineLoop.ts",
+      "sha256": "bb23ac86d84be834ddf5be6639187e6ba69848a49eef98e3f14bfd8e74acd0ac"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/rpc/events.ts",
+      "sha256": "7a335493b422d573480a90f9e9ee5976602895e4665d4d8598d1b590e478972b"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/runtime/cliRuntimeInvocationBridge.ts",
+      "sha256": "fda58d812cf8d27a939fc40dd0005fb331be45499ef6a0e8828e841184b45170"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts",
+      "sha256": "9e1aa297f8086e7577734e6461cee9cc994e0790677d225c44fe271d77580ca0"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/runtime/extensions/host.ts",
+      "sha256": "819de73ea16a8b99de0cfe162dce5d3ef5805cba6c0277cc96cf1b0beaaab9fa"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/runtime/extensions/input.ts",
+      "sha256": "489a90453ee546095ed8aa5a07ce1ace460d82457bc1184da93d9c45455424b8"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/runtime/inputQueue.ts",
+      "sha256": "5721cb159a11bf42a74782f4414cc946f62856a75588d22963fd1e477288171c"
+    },
+    {
+      "path": "packages/ts-shell/src/cli/runtime/inputStream.ts",
+      "sha256": "a1a08af62f348b9466deaac2c7e20e89864355a55eda226432afa99b95b43152"
+    },
+    {
+      "path": "packages/ts-shell/src/core/agent/messages.ts",
+      "sha256": "46c230d9837171ef1d16b00ebd2b327872018a718500628be5500e6ffbc71f52"
+    },
+    {
+      "path": "packages/ts-shell/src/core/catalog/contributions.ts",
+      "sha256": "c8926188011b2d58f8cfaefb41c4d3e405d0a142c66a5f53064ec0719a29fdc9"
+    },
+    {
+      "path": "packages/ts-shell/src/core/hooks/extensionBridge.ts",
+      "sha256": "1ee20c6f234f53b4c77566204879fc9e4d82373b42cf71a0039c9bf83675230a"
+    },
+    {
+      "path": "packages/ts-shell/src/core/hooks/hookDispatcher.ts",
+      "sha256": "a96bf43141c7872c21290a1c2e766e6ef94d539c01511fd326b368064731ff50"
+    },
+    {
+      "path": "packages/ts-shell/src/core/hooks/input/decision.ts",
+      "sha256": "f337232511cf56a97bafb3e3f1aa2930a72acdf93518fe70384cb5b1137c6233"
+    },
+    {
+      "path": "packages/ts-shell/src/core/hooks/input/error.ts",
+      "sha256": "22bb94170ef946676748e708f196dbe84d22489194ef14cd1de446e28c1d5968"
+    },
+    {
+      "path": "packages/ts-shell/src/core/hooks/input/receipt.ts",
+      "sha256": "5331404560510e5f822993b45dae9f2f838266e74f0c0b3fc999434437c5778d"
+    },
+    {
+      "path": "packages/ts-shell/src/core/hooks/prepare.ts",
+      "sha256": "51436fc413240f7e233cd6be402177af2386be32ee80b9ae85aa0b24d0ffe80a"
+    },
+    {
+      "path": "packages/ts-shell/src/core/query/runtime/events.ts",
+      "sha256": "ae63febd8bf4acb4f53593d47de9dcc16a85da934bc66fe334b62352df081413"
+    },
+    {
+      "path": "packages/ts-shell/src/core/shell/input/capture.ts",
+      "sha256": "4e52f48a3568efdc5c90cb1d9606a024b3135e2310e4c080af6006545c168b66"
+    },
+    {
+      "path": "packages/ts-shell/src/core/shell/input/contract.ts",
+      "sha256": "d38160336e41d0071dbf07807c11b835722e9c6f235f4175e6ed0940ad9fcd0c"
+    },
+    {
+      "path": "packages/ts-shell/src/core/shell/sessionRuntime.ts",
+      "sha256": "0f9c37cf0af2e72329aa5342ec9082369da39b298622419fee6bde77a208a477"
+    },
+    {
+      "path": "packages/ts-shell/src/core/values/promise.ts",
+      "sha256": "2c5e296bfc37bc69be5faa8175655a54a445b76ffe7f948b9cb48bb55d9813f6"
+    },
+    {
+      "path": "packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts",
+      "sha256": "4375072e64b17f8371fb601ce5487433282d705bd3230d7cb210c051251ede65"
+    },
+    {
+      "path": "packages/ts-shell/src/entrypoints/cliRuntimeModule.ts",
+      "sha256": "c1d0d5d55b8c2f6c15937030ebfcf24c1ae866e13dc5a32f87a91c31e4a4ba96"
+    },
+    {
+      "path": "packages/ts-shell/src/sdk/agentSession.ts",
+      "sha256": "f4b75b65c72d3f5c1dabf6c7bafdbe3a5c51401d344b6a859a7804c4a2eaadc6"
+    },
+    {
+      "path": "packages/ts-shell/src/sdk/resources/submission.ts",
+      "sha256": "9b8ad9c5acdc66082302e6eb4e93d37844c0a0ed79fb4ca7ad84586a24a375c3"
+    },
+    {
+      "path": "packages/ts-shell/src/session/approval/sessionApprovalMemory.ts",
+      "sha256": "c001f9769b87ccc65683d63e0c726d2a6add58904a9cfe86d7aa29f6dc963cd7"
+    },
+    {
+      "path": "packages/ts-shell/src/session/lifecycle/sessionLifecycleWrites.ts",
+      "sha256": "105b81a51f43c3c9ca038b4ef947ca5b9617e47b5a0daf78a617c78a846aa24e"
+    },
+    {
+      "path": "packages/ts-shell/src/session/store/transition.ts",
+      "sha256": "e4c03dc5bb4f47de88c20416d1d8aa133a21990a02039f01adf0912a31023e34"
+    },
+    {
+      "path": "packages/ts-shell/src/turn/session.ts",
+      "sha256": "981e325d5e2c73e0a8fc9dc0fc44f4ec1594eded42629aee0c48f48a427b20e8"
+    }
+  ],
+  "hashMatches": true,
+  "validationRunByReviewer": false,
+  "excluded": [
+    "live steer/followUp reduction",
+    "full E.6",
+    "cross-process transaction atomicity"
+  ]
+}

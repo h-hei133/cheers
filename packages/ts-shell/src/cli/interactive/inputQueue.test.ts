@@ -35,3 +35,11 @@ it('returns exact text and attachments together when interrupted pending work is
     sessionId: 'session', createdAt: 'created', projectRoot: '/workspace' }]);
   expect(queue.shift()).toBeUndefined(); expect(queue.release()).toEqual([]);
 });
+
+it('retains the original input source through editing and moving queued submissions', () => {
+  const queue = new SubmissionQueue(() => ({id:'session', createdAt:'created', projectRoot:'/workspace'}) as Session, vi.fn());
+  const first = queue.push('User text'), second = queue.push('Extension text', undefined, 'extension');
+  queue.control.edit(second, 'Edited extension text'); queue.control.move(second, first);
+  expect(queue.shift()).toBe('Edited extension text'); expect(queue.takeSource()).toBe('extension'); expect(queue.takeSource()).toBeUndefined();
+  expect(queue.shift()).toBe('User text'); expect(queue.takeSource()).toBeUndefined();
+});

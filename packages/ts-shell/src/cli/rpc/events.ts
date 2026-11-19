@@ -13,6 +13,8 @@ function streamMessage(event: { readonly role: string; readonly message?: QueryS
 /** Translate an internal `QueryEvent` into an RPC JSONL event frame when relevant. */
 export function toRpcEvent(event: QueryEvent): Record<string, unknown> | undefined {
   switch (event.type) {
+    case 'input.handled':
+      return {type:'input_handled', sessionId:event.sessionId};
     case "query.started":
       return { type: "agent_start", sessionId: event.sessionId, prompt: event.prompt, ...(event.sessionPath ? { sessionPath: event.sessionPath } : {}) };
     case "turn.started":

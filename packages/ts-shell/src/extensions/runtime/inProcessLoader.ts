@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { Worker } from 'node:worker_threads'
+import { types as nodeTypes } from 'node:util'
 import ts from 'typescript'
 import type { CommandDefinition } from '../../core/commands/types.js'
 import { evaluateToolPermissionScope } from '../../core/query/toolPolicy.js'
@@ -19,8 +20,10 @@ import { captureVirtualDefinition, MAX_VIRTUAL_MODELS } from '../../core/models/
 import type { ModelRouteInput, CapturedVirtualModelDefinition, VirtualModelDefinition } from '../../core/models/virtual/contract.js'
 import { createVirtualBridge } from './virtual.js'
 export type { ExtensionUiHost, ExtensionUiDialogOptions, ExtensionUiApi, ExtensionUiRequestOptions } from './ui.js'
-import type { ExtensionRunEventName, ExtensionRunEventPayload, ExtensionSessionEventName, ExtensionSessionEventPayload, ExtensionSessionBeforeEventName, ExtensionSessionBeforeEventPayload, ExtensionSessionBeforeEventResult } from '../events/model.js'
-export type { ExtensionRunEvent, ExtensionRunEventName, ExtensionRunEventPayload, ExtensionSessionEvent, ExtensionSessionEventName, ExtensionSessionEventPayload, ExtensionSessionBeforeEvent, ExtensionSessionBeforeEventName, ExtensionSessionBeforeEventPayload, ExtensionSessionBeforeResult, ExtensionBeforeTreeResult, ExtensionSessionBeforeEventResult } from '../events/model.js'
+import type { ExtensionRunEventName, ExtensionRunEventPayload, ExtensionSessionEventName, ExtensionSessionEventPayload, ExtensionSessionBeforeEventName, ExtensionSessionBeforeEventPayload, ExtensionSessionBeforeEventResult, ExtensionInputEvent, ExtensionInputResult } from '../events/model.js'
+import { captureInputHookResult, captureInputResult, InputRefusal } from '../events/input.js'
+import { callbackCancellation, captureCallbackResult, createCallbackResultCapture } from '../../core/values/promise.js'
+export type { ExtensionRunEvent, ExtensionRunEventName, ExtensionRunEventPayload, ExtensionSessionEvent, ExtensionSessionEventName, ExtensionSessionEventPayload, ExtensionSessionBeforeEvent, ExtensionSessionBeforeEventName, ExtensionSessionBeforeEventPayload, ExtensionSessionBeforeResult, ExtensionBeforeTreeResult, ExtensionSessionBeforeEventResult, ExtensionInputEvent, ExtensionInputResult } from '../events/model.js'
 
 export interface ExtensionHostBridge {
   readonly ui?: ExtensionUiHost
@@ -64,6 +67,7 @@ export interface ExtensionAPI {
   on<Name extends ExtensionRunEventName>(event: Name, handler: (payload: ExtensionRunEventPayload<Name>) => void | Promise<void>): void
   on<Name extends ExtensionSessionEventName>(event: Name, handler: (payload: ExtensionSessionEventPayload<Name>) => void | Promise<void>): void
   on<Name extends ExtensionSessionBeforeEventName>(event: Name, handler: (payload: ExtensionSessionBeforeEventPayload<Name>) => ExtensionSessionBeforeEventResult<Name> | void | Promise<ExtensionSessionBeforeEventResult<Name> | void>): void
+  on(event: 'input', handler: (payload: ExtensionInputEvent) => ExtensionInputResult | void | Promise<ExtensionInputResult | void>): void
   on(event: string, handler: (payload: unknown) => unknown | Promise<unknown>): void
   readWorkspaceFile(relativePath: string): string | Promise<string>
   getActiveTools(): Promise<readonly string[]>
@@ -209,6 +213,7 @@ function createExtensionApiCollector(options: {
   readonly host?: ExtensionHostBridge
   readonly initialization?: ExtensionInitialization
   readonly invokeVirtual?: (callback: VirtualModelDefinition['route'], request: ModelRouteInput) => ReturnType<VirtualModelDefinition['route']>
+  readonly captureCallback?: typeof captureCallbackResult
 }) {
   const initialization = options.initialization ?? new ExtensionInitialization()
   const active = () => initialization.assertActive()
@@ -268,7 +273,17 @@ function createExtensionApiCollector(options: {
       const list = handlers.get(event) ?? []
       list.push(payload => {
         const inherited = currentExtensionInvocation()
-        return runExtensionInvocation(inherited ? inherited.ui : options.host?.ui, invocationSignal(inherited?.signal), () => { active(); return handler(payload) })
+        const signal = invocationSignal(inherited?.signal)
+        const operation = () => { active(); return handler(payload) }
+        if (event === 'input' || event === 'UserPromptSubmit') {
+          const capture = options.captureCallback ?? captureCallbackResult
+          return runExtensionInvocation(inherited ? inherited.ui : options.host?.ui, signal,
+            () => capture<unknown>(operation, event === 'input' ? captureInputResult : captureInputHookResult, {
+              cancellation: callbackCancellation(signal), check: active,
+              invalid: () => new InputRefusal(), failed: () => new InputRefusal(), cancelled: () => new InputRefusal(),
+            })).then(envelope => envelope.value)
+        }
+        return runExtensionInvocation(inherited ? inherited.ui : options.host?.ui, signal, operation)
       })
       handlers.set(event, list)
     }, collecting),
@@ -321,8 +336,10 @@ export async function runExtensionFactory(options: ExtensionInitializationOption
 function beginExtensionLoad(options: ExtensionLoadOptions) {
   const initialization = new ExtensionInitialization(options)
   let virtualBridge: ReturnType<typeof createVirtualBridge>
+  let inputCapture: typeof captureCallbackResult
   const collector = createExtensionApiCollector({ ...options, initialization,
     invokeVirtual: (callback, request) => virtualBridge.invoke(callback, request),
+    captureCallback: (operation, capture, options) => inputCapture(operation, capture, options),
   })
   try {
     initialization.assertActive()
@@ -340,6 +357,9 @@ function beginExtensionLoad(options: ExtensionLoadOptions) {
       }),
       { name: 'extension-in-process', codeGeneration: { strings: false, wasm: false } },
     )
+    // Capture this realm's Promise intrinsics before the extension module can replace them.
+    const callbackPromise = new vm.Script('Promise').runInContext(sandbox) as PromiseConstructor
+    inputCapture = createCallbackResultCapture(nodeTypes.isProxy, nodeTypes.isPromise, Promise, callbackPromise)
     virtualBridge = createVirtualBridge(sandbox, collector.ui)
     sandbox.api = Object.freeze(Object.assign(Object.create(null) as ExtensionAPI, collector.api, { ui: virtualBridge.ui }))
     // Start the exported factory inside the same bounded VM evaluation as its module.

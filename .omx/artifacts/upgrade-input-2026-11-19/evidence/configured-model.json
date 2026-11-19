@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "realProvider": true,
+  "buildId": "cca13a50f2ac7c74cefc84a301e323c9f2adc1552ea488ecfd82bc6664142adb",
+  "bodyInspectable": false,
+  "cases": [
+    {
+      "name": "configured-model-transformed-input",
+      "status": "passed",
+      "bodySent": 1,
+      "terminal": "query.completed"
+    }
+  ],
+  "bodySent": 1,
+  "responses": [
+    200
+  ],
+  "originalPromptStored": false,
+  "replyMarker": true,
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true
+}

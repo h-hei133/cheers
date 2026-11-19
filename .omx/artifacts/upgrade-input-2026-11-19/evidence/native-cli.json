@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "buildId": "cca13a50f2ac7c74cefc84a301e323c9f2adc1552ea488ecfd82bc6664142adb",
+  "cases": [
+    {
+      "name": "rpc-handled-own-frame",
+      "status": "passed",
+      "posts": 0
+    },
+    {
+      "name": "rpc-effective-input-source",
+      "status": "passed",
+      "posts": 1
+    }
+  ],
+  "posts": 1,
+  "platform": "linux",
+  "wireEffective": true,
+  "exit": 0,
+  "stdoutSha256": "b3abe8ad6aff043be2abcde46b15d0ebf60fb65877a6f5efe926a111875b675a",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "privateStateRemoved": true
+}

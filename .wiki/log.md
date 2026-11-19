@@ -12029,3 +12029,12 @@ Linuxcompiled/Node20.3/installed各5场景2POST、15strict入口/skipLibCheck=fa
 树摘要e27ef805已本地提交。本批公开SDK reload复用原commands/coordinator，shutdown→originalretire→guardedunboundloader→snapshot/toolpolicy→newsharedhost/UI/start；same session/savedstate/selection/prefix保留，startup仅reports。两独立复审实际反例修oldownercleanup/file与explicitallowlists/queue全settlement和earlierfailure/snapshotalias与Mapcompat/controlledbind/capture同步重入；opaqueexports按原capability不伪冻，旧接口保compat。
 
 最终16/309七门2747modules/0monoliths/buildf83dd7313313、13有效反转15AssertionErrors/1绿控制/exact恢复105、两限定APPROVE21productionhash通过。Linuxcompiled/Node20.3禁生成/installed各8场景2POST、15strict入口/skipLibCheck=false/engine-strictpassed；原报告observer/typedmodelbaseline/compilationinput变化及isolated assertionadapter失败保留，private清理source/config/build不变。未新增配置模型或PTY资格，normalpinnedjudge actualexit2/not_proven/16384capacity仍缺。36/62、26开放，下一input/message/tool/compaction事件结果，按授权localcommit不push/CI不关总goal。
+
+
+### 2026-11-19：输入事件结果与提交准入
+
+前批SDKreload613d4bd9后，本批input逐handler/script/contribution传effective text/images，历史和请求一份快照；handled独立input.handled/RPC input_handled不写prompt或模型completed。legacy veto/unknown/invalid不被后续allow抹掉，native Promise捕获在assimilation前、VM primitive结果；opaque一次receipt由actual turn消费，不用callerboolean。原savedsource在准确barrier后重绑，query前失败零competing writes，原audit state锁精确投影确认，provenance尝试失败独立settle。
+
+最终20files416、末改144/恢复159/CLI表面555、七门2757modules/0monoliths/buildcca13a50f2ac与两限定APPROVE/hashpassed；11有效反转11AssertionErrors/exact恢复，首两nativeerrors在isolatedcopy用resolves观察修正。Linux compiled/floor20.3禁生成/installed各15场景7POST，15strict publicentry/engine-strict、RPC2场景1POST和原配置model1actual200/query.completed/有效标记passed；原目录/endpoint/budget/CLIextensionflag setup错误保留，private清理/config/source不变。normalpinnedjudge actualexit2/not_proven/16384graphcapacity，pinned files/scope/gate未改。
+
+当前input新普通提交子批本地验收，fullE.6/live steer/followUp/message/tool/compaction其余结果仍开，36/62、26开放。用户要求当前项完成本地提交后总结并停止；不push/CI，不继续下一批，不把总目标标complete。

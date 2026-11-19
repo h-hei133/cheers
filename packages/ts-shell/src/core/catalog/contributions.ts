@@ -10,6 +10,9 @@ import type { ExtensionEventRunner } from '../hooks/extensionBridge.js';
 import type { CatalogProvider } from '../models/catalog.js';
 import type { CapturedVirtualModelDefinition } from '../models/virtual/contract.js';
 import { captureVirtualDefinitions, MAX_VIRTUAL_MODELS } from '../models/virtual/capture.js';
+import {snapshotData} from '../values/data.js';
+import {callbackCancellation, captureCallbackResult} from '../values/promise.js';
+import {InputRefusal} from '../hooks/input/error.js';
 
 /** Neutral session composition port. The feature owner retains lifecycle and authority. */
 export interface CatalogContribution {
@@ -58,7 +61,12 @@ export function registerCatalogContribution(entry: CatalogContribution, physical
     const currentSignal = callerSignal ? AbortSignal.any([eventLifetime.signal, callerSignal]) : eventLifetime.signal;
     const assertCurrentSignal = AbortSignal.prototype.throwIfAborted.bind(currentSignal);
     assertCurrentSignal();
-    const result = await originalOnEvent(event, payload, aliases, currentSignal);
+    const result = event === 'input' || event === 'UserPromptSubmit'
+      ? (await captureCallbackResult(() => originalOnEvent(event, payload, aliases, currentSignal),
+        value => value === undefined ? undefined : snapshotData(value, {bytes:64*1024*1024, nodes:4096, depth:12, allowCrossRealm:true}),
+        {check:() => {admission(); assertCurrentSignal();}, cancellation:callbackCancellation(currentSignal),
+          invalid:() => new InputRefusal(), failed:() => new InputRefusal(), cancelled:() => new InputRefusal()})).value
+      : await originalOnEvent(event, payload, aliases, currentSignal);
     admission(); assertCurrentSignal();
     return result;
   }, { admission });

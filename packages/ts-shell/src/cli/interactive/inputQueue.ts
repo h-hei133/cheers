@@ -2,12 +2,14 @@ import { inputQueueControl, PendingQueue, type InputQueueControl } from '../../c
 import type { Session } from '../../session/schema/sessionRecord.js';
 
 export interface PendingSubmission { readonly text: string; readonly sessionId: string; readonly createdAt: string; readonly projectRoot: string;
+  readonly source?: import('../../core/shell/input/contract.js').PromptInputRequest['source'];
   readonly attachments?: import('../../core/shell/sessionRuntime.js').PromptAttachments }
 
 /** The host's actual pending submissions, bound when the person queued them. */
 export class SubmissionQueue {
   private readonly pending = new PendingQueue<PendingSubmission>();
   private deliveredAttachments?: PendingSubmission['attachments'];
+  private deliveredSource?: PendingSubmission['source'];
   readonly control: InputQueueControl;
 
   constructor(private readonly current: () => Session, private readonly refused: (text: string, attachments?: PendingSubmission['attachments']) => void) {
@@ -16,14 +18,15 @@ export class SubmissionQueue {
   }
   get length(): number { return this.pending.entries().length; }
 
-  push(text: string, attachments?: PendingSubmission['attachments']): string {
+  push(text: string, attachments?: PendingSubmission['attachments'], source?: PendingSubmission['source']): string {
     const session = this.current();
     return this.pending.enqueue({ text, sessionId: session.id, createdAt: session.createdAt, projectRoot: session.projectRoot,
-      ...(attachments ? { attachments } : {}) });
+      ...(attachments ? { attachments } : {}), ...(source ? {source} : {}) });
   }
 
   shift(): string | undefined {
     this.deliveredAttachments = undefined;
+    this.deliveredSource = undefined;
     while (this.pending.hasItems()) {
       const submission = this.pending.drain()[0]!;
       const session = this.current();
@@ -33,6 +36,7 @@ export class SubmissionQueue {
         continue;
       }
       this.deliveredAttachments = submission.attachments;
+      this.deliveredSource = submission.source;
       return submission.text;
     }
     return undefined;
@@ -40,6 +44,10 @@ export class SubmissionQueue {
 
   takeAttachments(): PendingSubmission['attachments'] {
     const attachments = this.deliveredAttachments; this.deliveredAttachments = undefined; return attachments;
+  }
+
+  takeSource(): PendingSubmission['source'] {
+    const source = this.deliveredSource; this.deliveredSource = undefined; return source;
   }
 
   splice(_start: 0): string[] {

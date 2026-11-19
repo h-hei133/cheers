@@ -1,0 +1,89 @@
+{
+  "status": "passed",
+  "buildId": "cca13a50f2ac7c74cefc84a301e323c9f2adc1552ea488ecfd82bc6664142adb",
+  "node": "v20.3.0",
+  "platform": "linux",
+  "cases": [
+    {
+      "name": "compiled-sdk-transform-cross-contribution-save-and-two-prompts",
+      "status": "passed",
+      "posts": 2
+    },
+    {
+      "name": "compiled-sdk-handled-independent-outcome-zero-wire",
+      "status": "passed",
+      "posts": 0
+    },
+    {
+      "name": "compiled-sdk-native-legacy-veto-remains-independent",
+      "status": "passed",
+      "posts": 0
+    },
+    {
+      "name": "compiled-sdk-metadata-snapshot-before-async-input",
+      "status": "passed",
+      "posts": 1
+    },
+    {
+      "name": "compiled-sdk-malformed-then-zero-effects",
+      "status": "passed",
+      "posts": 0
+    },
+    {
+      "name": "compiled-sdk-cancel-before-query-preserves-competing-state",
+      "status": "passed",
+      "posts": 0
+    },
+    {
+      "name": "compiled-sdk-images-retain",
+      "status": "passed",
+      "posts": 1
+    },
+    {
+      "name": "compiled-sdk-images-remove",
+      "status": "passed",
+      "posts": 1
+    },
+    {
+      "name": "compiled-sdk-images-image-only",
+      "status": "passed",
+      "posts": 1
+    },
+    {
+      "name": "compiled-sdk-extension-startup-queue-source",
+      "status": "passed",
+      "posts": 1
+    },
+    {
+      "name": "compiled-public-service-worker-transform",
+      "status": "passed",
+      "posts": 0
+    },
+    {
+      "name": "compiled-public-service-worker-handled",
+      "status": "passed",
+      "posts": 0
+    },
+    {
+      "name": "compiled-public-service-worker-then",
+      "status": "passed",
+      "posts": 0
+    },
+    {
+      "name": "compiled-public-service-worker-legacy-block",
+      "status": "passed",
+      "posts": 0
+    },
+    {
+      "name": "compiled-public-service-worker-legacy-feedback",
+      "status": "passed",
+      "posts": 0
+    }
+  ],
+  "posts": 7,
+  "configuredProvider": false,
+  "workerScope": "Public ExtensionService with captured fixture VersionRecord and internal dispatch consumer; no marketplace install or SDK-private gate claim",
+  "privateStateRemoved": true,
+  "originalConfigUnchanged": true,
+  "buildUnchanged": true
+}

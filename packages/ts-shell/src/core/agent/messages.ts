@@ -1,9 +1,10 @@
-import { isDeepStrictEqual, types } from 'node:util';
+import { isDeepStrictEqual } from 'node:util';
 import type { AgentMessage, StandardAgentMessage } from './state.js';
 import { captureMessageHistory } from './custom.js';
 import { snapshotData } from '../values/data.js';
 import { isProviderMessage, type ProviderMessage } from '../../model-adapters/message.js';
 import { assertDeclarationHistory } from './declarations/history.js';
+import { callbackCancellation, captureCallbackResult } from '../values/promise.js';
 
 /**
  * Convert application history for one request without rewriting durable source.
@@ -22,10 +23,6 @@ export interface MessageProjection {
 }
 
 const LIMITS = { bytes: 64 * 1024 * 1024, nodes: 250_000, depth: 48 } as const;
-const PROMISE = Promise;
-const PROMISE_PROTOTYPE = Promise.prototype;
-const PROMISE_THEN = Promise.prototype.then;
-const PROMISE_SPECIES = Object.getOwnPropertyDescriptor(Promise, Symbol.species)?.get;
 
 /** Preserve the ordinary identity path; capture both sides of any application conversion. */
 export async function convertMessages(messages: readonly AgentMessage[], converter?: MessageConverter, signal?: AbortSignal, reuse?: MessageProjection): Promise<MessageProjection> {
@@ -56,42 +53,13 @@ export async function convertMessages(messages: readonly AgentMessage[], convert
 /** Cancellation releases the request even when application work settles much later. */
 function callConverter(converter: MessageConverter, messages: readonly AgentMessage[], signal?: AbortSignal): Promise<{ readonly value: readonly ProviderMessage[] }> {
   signal?.throwIfAborted();
-  return new Promise((resolve, reject) => {
-    const abort = (): void => { signal?.removeEventListener('abort', abort); reject(new Error('Message conversion was cancelled.')); };
-    signal?.addEventListener('abort', abort, { once: true });
-    const accept = (value: unknown): void => {
-      signal?.removeEventListener('abort', abort);
-      if (signal?.aborted) { abort(); return; }
-      try {
-        // Wrapping an inert snapshot prevents Promise assimilation of source arrays.
-        resolve(Object.assign(Object.create(null), { value: captureProviderMessages(value) }));
-      } catch { reject(new Error('Message conversion returned invalid provider messages.')); }
-    };
-    const fail = (): void => {
-      signal?.removeEventListener('abort', abort);
-      reject(new Error(signal?.aborted ? 'Message conversion was cancelled.' : 'Message conversion failed.'));
-    };
-    try {
-      signal?.throwIfAborted();
-      const value = converter(messages, signal);
-      // Observe native promises directly; never probe a synchronous value's `then`.
-      // Both handlers remain attached after cancellation to observe late rejection.
-      if (canObservePromise(value)) PROMISE_THEN.call(value, accept, fail);
-      else accept(value);
-    } catch { fail(); }
+  return captureCallbackResult(() => converter(messages, signal), captureProviderMessages, {
+    cancellation: callbackCancellation(signal),
+    check: () => signal?.throwIfAborted(),
+    invalid: () => new Error('Message conversion returned invalid provider messages.'),
+    failed: () => new Error('Message conversion failed.'),
+    cancelled: () => new Error('Message conversion was cancelled.'),
   });
-}
-
-/** Native `then` reads constructor/species, so brand validation alone is insufficient. */
-function canObservePromise(value: unknown): value is Promise<unknown> {
-  if (types.isProxy(value) || !types.isPromise(value) || Object.getPrototypeOf(value) !== PROMISE_PROTOTYPE
-    || Object.getOwnPropertyDescriptor(value, 'constructor') !== undefined
-    || Object.getOwnPropertyDescriptor(value, 'then') !== undefined) return false;
-  const constructor = Object.getOwnPropertyDescriptor(PROMISE_PROTOTYPE, 'constructor');
-  const then = Object.getOwnPropertyDescriptor(PROMISE_PROTOTYPE, 'then');
-  const species = Object.getOwnPropertyDescriptor(PROMISE, Symbol.species);
-  return constructor?.value === PROMISE && then?.value === PROMISE_THEN
-    && species?.get === PROMISE_SPECIES && species?.set === undefined;
 }
 
 function captureProviderMessages(value: unknown): readonly ProviderMessage[] {

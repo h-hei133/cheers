@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-19",
+  "batch": [
+    "E.6 initial and new ordinary input result consumers"
+  ],
+  "status": "subbatch_linux_accepted_E6_open_repository_gate_not_proven",
+  "baseCommit": "613d4bd9370cda21758d4660122a9acd60164a2e",
+  "delivery": {
+    "localCommit": "containing commit supplies identity",
+    "push": false,
+    "ci": false
+  },
+  "build": {
+    "buildId": "cca13a50f2ac7c74cefc84a301e323c9f2adc1552ea488ecfd82bc6664142adb",
+    "inputsDigest": "2530042dcd11e81e7f1377d16a2e09e9bd645c343e6fbee6a5a8dd22320584c8",
+    "currentDigest": "2530042dcd11e81e7f1377d16a2e09e9bd645c343e6fbee6a5a8dd22320584c8",
+    "inputMatches": true
+  },
+  "source": {
+    "files": 50,
+    "productionFiles": 42,
+    "hashMatches": true,
+    "receipt": "evidence/source.json"
+  },
+  "validation": {
+    "combined": {
+      "files": 20,
+      "passed": 416,
+      "receipt": "raw.tar.gz::final-validation.log"
+    },
+    "lastSourceChange": {
+      "files": 5,
+      "passed": 144,
+      "receipt": "raw.tar.gz::final-source-validation.log"
+    },
+    "restored": {
+      "files": 5,
+      "passed": 159,
+      "receipt": "raw.tar.gz::restored-source.log"
+    },
+    "surface": {
+      "files": 9,
+      "passed": 555,
+      "receipt": "raw.tar.gz::surface-final.log"
+    },
+    "static": {
+      "count": 7,
+      "passed": true,
+      "productionModules": 2757,
+      "monoliths": 0
+    },
+    "reversal": {
+      "cases": 11,
+      "assertionFailures": 11,
+      "exactRestoration": true,
+      "sourceUnchanged": true,
+      "receipt": "evidence/reversal-final.json"
+    },
+    "linux": {
+      "cases": 15,
+      "loopbackPosts": 7,
+      "receipt": "evidence/native-final.json"
+    },
+    "nodeFloor": {
+      "node": "20.3.0",
+      "codeGenerationDisabled": true,
+      "cases": 15,
+      "loopbackPosts": 7,
+      "receipt": "evidence/native-node20.json"
+    },
+    "installed": {
+      "publicEntries": 15,
+      "strictTypes": true,
+      "skipLibCheck": false,
+      "engineStrict": true,
+      "cases": 15,
+      "loopbackPosts": 7,
+      "receipt": "evidence/package.json"
+    },
+    "rpc": {
+      "cases": 2,
+      "loopbackPosts": 1,
+      "receipt": "evidence/native-cli.json"
+    },
+    "configuredModel": {
+      "status": "passed",
+      "actualBodySent": 1,
+      "http": [
+        200
+      ],
+      "terminal": "query.completed",
+      "effectiveMarker": true,
+      "bodyInspectable": false,
+      "receipt": "evidence/configured-model.json"
+    },
+    "normproof": {
+      "exit": 2,
+      "verdict": "not_proven",
+      "acceptedAsProof": false,
+      "reason": "pinned source graph exceeds 16384 edge ceiling",
+      "scopeModified": false,
+      "gateModified": false,
+      "receipt": "evidence/judge-current.json"
+    }
+  },
+  "review": {
+    "status": "APPROVE",
+    "scopeLimited": true,
+    "hashMatches": true,
+    "validationRunByReviewer": false,
+    "receipts": [
+      "evidence/host-review.json",
+      "evidence/event-review.json"
+    ]
+  },
+  "taskCount": {
+    "accepted": 36,
+    "open": 26,
+    "fullE6Accepted": false
+  },
+  "stopAfterCommit": true,
+  "remaining": [
+    "live steer/followUp input reduction",
+    "message/tool/compaction remaining result consumers",
+    "E.3 image/classify dispatch",
+    "E.4 deterministic replay",
+    "E.7 additional extension APIs",
+    "E.8 shortcuts/flags",
+    "E.9 installation sources",
+    "remaining provider/media/metrics/package/storage/collaboration roadmap tasks"
+  ],
+  "boundaries": [
+    "Linux only",
+    "new ordinary submissions; live input remains open",
+    "same effective metadata/text/images capture before prompt persistence",
+    "legacy submission veto independent of native handled",
+    "native audit advances only confirmed state publication under its original lock",
+    "no cross-process multi-file atomicity claim",
+    "installed Worker probe uses public ExtensionService and fixture VersionRecord through internal dispatch; no marketplace installation or SDK-private gate claim",
+    "no push or CI"
+  ],
+  "setupFailuresRetained": [
+    "incorrect Vitest filter discovered only skips",
+    "first input framing observer expected unavailable synthetic PromptMeasurement then used captured converter",
+    "wrong messageToText import corrected in fixture",
+    "nested worker reducer escaped newline incorrectly and initially broke worker syntax",
+    "two build TypeScript contract/narrowing errors fixed",
+    "contribution callback generic error initially erased InputRefusal type, fixed in original core boundary",
+    "native fixture models.dev ignored; models.json endpoint alias/output limit corrected",
+    "initial CLI probe omitted explicit extension flag",
+    "two isolated reversals raised native errors before assertions; explicit resolves observers retain behavior evidence",
+    "build digest observer initially read sha256 instead of actual digest field; corrected current input digest matches"
+  ]
+}

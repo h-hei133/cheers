@@ -67,7 +67,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
       if (input) input.followUp(message, 'extension');
       else if (runtime.commands.current && ['session-change', 'extension-reload'].includes(runtime.commands.current.kind) && runtime.commands.current !== replacement) throw new Error('Messages are unavailable before session replacement.');
       else if (queueExtensionMessage(runtime, message, uiAdmission)) return;
-      else await runtime.executePrompt(sessionId, message, { outputMode: 'print' });
+      else await runtime.executePrompt(sessionId, message, { outputMode: 'print', inputSource:'extension' });
     },
     appendEntry: async (customType, data) => {
       operations();

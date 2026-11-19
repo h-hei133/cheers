@@ -2,10 +2,20 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { executeInProcessScript, loadInProcessExtension } from './inProcessLoader.js'
+import { executeInProcessScript, loadInProcessExtension, loadInProcessExtensionAsync, runExtensionFactory } from './inProcessLoader.js'
 import type { VersionRecord } from '../model.js'
+import { runEventHandlers } from '../events/dispatch.js'
+import { runExtensionInvocation } from './context.js'
 
 const tempDirs: string[] = []
+function inputWorkerDirectory(): string {
+  const scratch = path.join(os.tmpdir(), 'cheers-test'); fs.mkdirSync(scratch, { recursive: true });
+  const dir = fs.mkdtempSync(path.join(scratch, 'extension-input-')); tempDirs.push(dir); return dir;
+}
+function nativeInput(root: string) {
+  return Object.freeze({ type: 'input', text: 'Original', prompt: 'Original', sessionId: 'callback-input', workspaceRoot: root,
+    timestamp: 'original', source: 'sdk' });
+}
 afterEach(() => {
   while (tempDirs.length > 0) {
     fs.rmSync(tempDirs.pop()!, { recursive: true, force: true })
@@ -13,6 +23,193 @@ afterEach(() => {
 })
 
 describe('in-process TS/JS extension loader with VIRTUAL_MODULES', () => {
+  it.each(['then-getter', 'thenable', 'constructor-getter', 'then-own', 'species', 'mixed-decision'] as const)(
+    'refuses SDK collector callback %s before Promise assimilation', async kind => {
+      const dir = inputWorkerDirectory(); let touched = 0; let later = 0;
+      const result = { action: 'continue' }; let value: unknown;
+      if (kind === 'then-getter') value = Object.defineProperty(result, 'then', { get: () => { touched++; return undefined; } });
+      if (kind === 'thenable') value = { then: (resolve: (value: unknown) => void) => { touched++; resolve(result); } };
+      if (kind === 'constructor-getter') value = Object.defineProperty(Promise.resolve(result), 'constructor', { get: () => { touched++; return Promise; } });
+      if (kind === 'then-own') value = Object.defineProperty(Promise.resolve(result), 'then', { value: () => { touched++; return Promise.resolve(result); } });
+      if (kind === 'species') {
+        class CallbackPromise extends Promise<unknown> { static get [Symbol.species]() { touched++; return Promise; } }
+        value = new CallbackPromise(resolve => resolve(result));
+      }
+      if (kind === 'mixed-decision') value = { action: 'handled', decision: 'unknown' };
+      const loaded = await runExtensionFactory({ workspaceRoot: dir, factory: api => {
+        api.on('input', () => value); api.on('input', () => { later++; return { action: 'continue' }; });
+      } });
+      const outcome = await runExtensionInvocation(undefined, undefined, () => runEventHandlers({ handlers: loaded.handlers,
+        event: 'input', payload: nativeInput(dir), ownerSignal: loaded.signal })).then(result => ({ result }), error => ({ error }));
+      expect(touched).toBe(0);
+      expect(outcome).toMatchObject({ error: { name: 'InputRefusal', message: 'Extension input was refused.' } });
+      expect(later).toBe(0);
+    });
+
+  it.each((['collector', 'worker'] as const).flatMap(mode =>
+    ['then-getter', 'thenable', 'constructor-getter', 'then-own', 'prototype-constructor', 'prototype-then', 'native-species', 'species', 'mixed-decision']
+      .map(kind => ({ mode, kind }))))('refuses $kind callback results in the $mode VM without executing their hooks', async ({ mode, kind }) => {
+      const dir = inputWorkerDirectory(), file = path.join(dir, 'promise.ts'); const touched: unknown[] = [];
+      const producer = kind === 'then-getter' ? "Object.defineProperty(result,'then',{get:()=>{touch();return undefined;}})"
+        : kind === 'thenable' ? "({then:resolve=>{touch();resolve(result);}})"
+        : kind === 'constructor-getter' ? "Object.defineProperty(Promise.resolve(result),'constructor',{get:()=>{touch();return Promise;}})"
+        : kind === 'then-own' ? "Object.defineProperty(Promise.resolve(result),'then',{value:()=>{touch();return Promise.resolve(result);}})"
+        : kind === 'species' ? "new (class extends Promise {static get [Symbol.species](){touch();return Promise;}})(resolve=>resolve(result))"
+        : kind === 'mixed-decision' ? "({action:'transform',text:'Replacement',decision:'unknown'})" : 'Promise.resolve(result)';
+      const mutation = kind === 'prototype-constructor' ? "Object.defineProperty(Promise.prototype,'constructor',{get:()=>{touch();return Promise;},configurable:true});"
+        : kind === 'prototype-then' ? "const originalThen=Promise.prototype.then;Object.defineProperty(Promise.prototype,'then',{value:function(...args){touch();return originalThen.apply(this,args);},configurable:true});"
+        : kind === 'native-species' ? "Object.defineProperty(Promise,Symbol.species,{get:()=>{touch();return Promise;},configurable:true});" : '';
+      fs.writeFileSync(file, `export default api => {
+        api.on('input', () => {const result={action:'continue'};const touch=()=>{${mode === 'worker' ? "void api.sendMessage('PROMISE_HOOK_EXECUTED');" : "api.events.emit('promise-hook');"}};
+          ${mutation} return ${producer};});
+        api.on('input', () => {${mode === 'worker' ? "void api.sendMessage('LATER_HANDLER_EXECUTED');" : "api.events.emit('later-handler');"}return {action:'continue'};});
+      };`);
+      if (mode === 'collector') {
+        const loaded = await loadInProcessExtensionAsync({ filePath: file, workspaceRoot: dir });
+        loaded.events.on('promise-hook', () => { touched.push('promise-hook'); });
+        loaded.events.on('later-handler', () => { touched.push('later-handler'); });
+        const outcome = await runEventHandlers({ handlers: loaded.handlers, event: 'input', payload: nativeInput(dir), ownerSignal: loaded.signal })
+          .then(result => ({ result }), error => ({ error }));
+        expect(touched, kind).toEqual([]);
+        expect(outcome, kind).toMatchObject({ error: { name: 'InputRefusal', message: 'Extension input was refused.' } });
+      } else {
+        const result = await executeInProcessScript({ root: dir, scriptFile: file,
+          record: { manifest: { name: 'input', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+          argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'input' }, host: { sendMessage: message => { touched.push(message); } },
+          invoke: { kind: 'event', event: 'input', payload: nativeInput(dir) } });
+        expect(touched, kind).toEqual([]);
+        expect(result.success, kind).toBe(false); expect(result.output, kind).toContain('Extension input was refused.');
+        expect(result.output).not.toContain('PROMISE_HOOK_EXECUTED'); expect(result.output).not.toContain('LATER_HANDLER_EXECUTED');
+      }
+  });
+
+  it.each(['collector', 'worker'] as const)('refuses legacy UserPromptSubmit then getters in the %s callback boundary', async mode => {
+    const dir = inputWorkerDirectory(); let touched = 0;
+    if (mode === 'collector') {
+      const loaded = await runExtensionFactory({ workspaceRoot: dir, factory: api => {
+        api.on('UserPromptSubmit', () => Object.defineProperty({ decision: 'allow' }, 'then', { get: () => { touched++; return undefined; } }));
+      } });
+      const result = await runEventHandlers({ handlers: loaded.handlers, event: 'UserPromptSubmit',
+        payload: { eventName: 'UserPromptSubmit', sessionId: 'callback-input', workspaceRoot: dir, timestamp: 'original', prompt: 'Original' },
+        ownerSignal: loaded.signal }).then(result => ({ result }), error => ({ error }));
+      expect(result).toMatchObject({ error: { name: 'InputRefusal', message: 'Extension input was refused.' } });
+    } else {
+      const file = path.join(dir, 'legacy.ts');
+      fs.writeFileSync(file, `export default api => api.on('UserPromptSubmit', () => Object.defineProperty({decision:'allow'}, 'then', {
+        get:()=>{void api.sendMessage('LEGACY_THEN_EXECUTED');return undefined;}
+      }));`);
+      const result = await executeInProcessScript({ root: dir, scriptFile: file,
+        record: { manifest: { name: 'input', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+        argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'input' }, host: { sendMessage: () => { touched++; } },
+        invoke: { kind: 'event', event: 'UserPromptSubmit',
+          payload: { eventName: 'UserPromptSubmit', sessionId: 'callback-input', workspaceRoot: dir, timestamp: 'original', prompt: 'Original' } } });
+      expect(result.success).toBe(false); expect(result.output).toContain('Extension input was refused.');
+      expect(result.output).not.toContain('LEGACY_THEN_EXECUTED');
+    }
+    expect(touched).toBe(0);
+  });
+
+  it.each(['collector', 'worker'] as const)('preserves inert legacy UserPromptSubmit decisions and feedback in the %s callback boundary', async mode => {
+    const dir = inputWorkerDirectory();
+    const decision = { decision: 'block', feedback: 'Legacy refusal', hookSpecificOutput: { note: 'Exact decision' } };
+    const payload = { eventName: 'UserPromptSubmit', sessionId: 'callback-input', workspaceRoot: dir, timestamp: 'original', prompt: 'Original' };
+    if (mode === 'collector') {
+      const loaded = await runExtensionFactory({ workspaceRoot: dir, factory: api => { api.on('UserPromptSubmit', () => decision); } });
+      expect(await runEventHandlers({ handlers: loaded.handlers, event: 'UserPromptSubmit', payload, ownerSignal: loaded.signal })).toEqual(decision);
+    } else {
+      const file = path.join(dir, 'legacy.ts'); fs.writeFileSync(file, `export default api => api.on('UserPromptSubmit', () => (${JSON.stringify(decision)}));`);
+      const result = await executeInProcessScript({ root: dir, scriptFile: file,
+        record: { manifest: { name: 'input', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+        argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'input' }, invoke: { kind: 'event', event: 'UserPromptSubmit', payload } });
+      expect(result.success).toBe(true); expect(JSON.parse(String(result.metadata?.eventOutput))).toEqual(decision);
+    }
+  });
+
+  it.each(['block', 'retry', 'unknown', 'invalid'] as const)('keeps worker legacy UserPromptSubmit %s from being erased by a later handler', async decision => {
+    const dir = inputWorkerDirectory(), file = path.join(dir, 'legacy-chain.ts');
+    const payload = { eventName: 'UserPromptSubmit', sessionId: 'callback-input', workspaceRoot: dir, timestamp: 'original', prompt: 'Original' };
+    const refusal = { decision, reason: 'Original refusal', feedback: 'Keep this decision' }; const touched: unknown[] = [];
+    fs.writeFileSync(file, `export default api => {
+      api.on('UserPromptSubmit', event => {if(!Object.isFrozen(event)||event.prompt!=='Original')throw new Error('ENVELOPE_REPLACED');return ${JSON.stringify(refusal)};});
+      api.on('UserPromptSubmit', () => {void api.sendMessage('LATER_HANDLER_EXECUTED');return {decision:'allow'};});
+    };`);
+    const result = await executeInProcessScript({ root: dir, scriptFile: file,
+      record: { manifest: { name: 'input', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+      argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'input' }, host: { sendMessage: value => { touched.push(value); } },
+      invoke: { kind: 'event', event: 'UserPromptSubmit', payload } });
+    if (decision === 'invalid') { expect(result.success).toBe(false); expect(result.output).toContain('Extension input was refused.'); }
+    else { expect(result.success).toBe(true); expect(JSON.parse(String(result.metadata?.eventOutput))).toEqual(refusal); }
+    expect(touched).toEqual([]);
+  });
+
+  it('keeps the original legacy worker envelope while accumulating handler feedback', async () => {
+    const dir = inputWorkerDirectory(), file = path.join(dir, 'legacy-feedback.ts');
+    const payload = { eventName: 'UserPromptSubmit', sessionId: 'callback-input', workspaceRoot: dir, timestamp: 'original', prompt: 'Original' };
+    fs.writeFileSync(file, `export default api => {
+      for(const label of ['First','Second'])api.on('UserPromptSubmit',event=>{
+        if(!Object.isFrozen(event)||event.eventName!=='UserPromptSubmit'||event.prompt!=='Original')throw new Error('ENVELOPE_REPLACED');
+        return {decision:'allow',feedback:label+' feedback'};
+      });
+    };`);
+    const result = await executeInProcessScript({ root: dir, scriptFile: file,
+      record: { manifest: { name: 'input', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+      argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'input' }, invoke: { kind: 'event', event: 'UserPromptSubmit', payload } });
+    expect(result.success).toBe(true);
+    expect(JSON.parse(String(result.metadata?.eventOutput))).toEqual({ decision: 'allow', feedback: 'First feedback\n\nSecond feedback' });
+  });
+
+  it.each(['transform', 'handled', 'block', 'getter', 'toJSON'] as const)('keeps worker native input results chained and inert (%s)', async mode => {
+    const dir = inputWorkerDirectory();
+    const file = path.join(dir, 'events.ts');
+    const first = mode === 'transform' ? "({action:'transform',text:'First',source:'extension',sessionId:'replacement'})"
+      : mode === 'handled' ? "({action:'handled'})" : mode === 'block' ? "({decision:'block',reason:'PRIVATE_INPUT_REASON'})"
+      : mode === 'getter' ? "Object.defineProperty({action:'transform',text:'Unsafe'}, 'images', {enumerable:true,get(){throw new Error('GETTER_EXECUTED');}})"
+      : "({action:'transform',text:'Unsafe',toJSON(){throw new Error('GETTER_EXECUTED');}})";
+    fs.writeFileSync(file, `export default api => {
+      api.on('input', () => ${first});
+      api.on('input', event => {
+        if (${mode === 'transform'} && (event.type !== 'input' || event.text !== 'First' || event.prompt !== 'First'
+          || event.source !== 'sdk' || event.sessionId !== 'worker-input' || event.images.length !== 1)) throw new Error('ENVELOPE_REPLACED');
+        if (${mode !== 'transform'}) throw new Error('LATER_HANDLER_EXECUTED');
+        return {action:'transform',text:'Final',images:[]};
+      });
+    };`);
+    const result = await executeInProcessScript({ root: dir, scriptFile: file,
+      record: { manifest: { name: 'input', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+      argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'input' },
+      invoke: { kind: 'event', event: 'input', payload: { type: 'input', text: 'Original', prompt: 'Original', sessionId: 'worker-input',
+        workspaceRoot: dir, timestamp: 'original', source: 'sdk', images: [{ type: 'image', mimeType: 'image/png', data: 'opaque-image-data' }] } } });
+    if (mode === 'transform' || mode === 'handled') {
+      expect(result.success).toBe(true);
+      expect(JSON.parse(String(result.metadata?.eventOutput))).toEqual(mode === 'handled' ? { action: 'handled' } : { action: 'transform', text: 'Final', images: [] });
+    } else {
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('Extension input was refused.');
+      expect(result.output).not.toContain('GETTER_EXECUTED'); expect(result.output).not.toContain('PRIVATE_INPUT_REASON');
+      expect(result.output).not.toContain('LATER_HANDLER_EXECUTED');
+    }
+  });
+
+  it('keeps worker input capture replies primitive across the VM boundary', async () => {
+    const dir = inputWorkerDirectory();
+    const file = path.join(dir, 'events.ts');
+    fs.writeFileSync(file, `export default api => api.on('input', () => {
+      for (const value of [{action:'continue'}, {action:'transform',text:'Unsafe',toJSON(){return {};}}]) {
+        const result = globalThis.__INPUT_RESULT(value);
+        if (typeof result !== 'string') throw new Error('HOST_OBJECT');
+        try { result.constructor.constructor('return process')(); throw new Error('VM_ESCAPE'); }
+        catch (error) { if (error.message === 'VM_ESCAPE') throw error; }
+      }
+      return {action:'continue'};
+    });`);
+    const result = await executeInProcessScript({ root: dir, scriptFile: file,
+      record: { manifest: { name: 'input', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+      argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'input' },
+      invoke: { kind: 'event', event: 'input', payload: { type: 'input', text: 'Original', prompt: 'Original', sessionId: 'worker-input',
+        workspaceRoot: dir, timestamp: 'original', source: 'sdk' } } });
+    expect(result.success).toBe(true); expect(JSON.parse(String(result.metadata?.eventOutput))).toEqual({ action: 'continue' });
+  });
+
   it.each(['summary', 'cancel', 'getter', 'toJSON'] as const)('keeps worker before-tree results inert and cumulative (%s)', async mode => {
     const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cheers-ext-tree-'));tempDirs.push(dir);const file=path.join(dir,'events.ts');
     const first=mode==='summary'?"({summary:{summary:'Worker custom'},customInstructions:'Focus'})":mode==='cancel'?"({cancel:true})":mode==='getter'?"Object.defineProperty({}, 'summary', {enumerable:true,get(){throw new Error('GETTER_EXECUTED');}})":"({toJSON(){return {};},summary:{summary:'Invalid'}})";

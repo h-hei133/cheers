@@ -17,6 +17,10 @@ import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
 import { visibleWidth } from '../../presentation/tui/text/measure.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 import { capturePromptSources } from '../../context/request/sources.js';
+import { ExtensionService } from '../service.js';
+import { ExtensionStore } from '../store/state.js';
+import * as execution from './execute.js';
+import type { ToolExecutionResult } from '../../tools/types.js';
 
 let fixture: string; let workspace: string; let registry: string;
 const closes: Array<() => void> = [];
@@ -59,6 +63,135 @@ it.each([false,true])('reduces installed before-tree scripts against their origi
   expect(result).toEqual(cancel?{cancel:true}:{cancel:false,summary:{summary:'Installed custom summary'}});
   expect(scripts).toEqual(cancel?['first']:['first','second']);
 });
+
+it.each(['transform', 'handled', 'block', 'retry'] as const)('reduces native input across installed scripts (%s)', async mode => {
+  const active = { digest: digest('input-events'), manifest: { name: 'input-events',
+    scripts: [{ name: 'first', path: 'first.ts' }, { name: 'second', path: 'second.ts' }], commands: [], tools: [], skills: [] } } as unknown as VersionRecord;
+  const owned = versionPath(active, registry); fs.mkdirSync(owned, { recursive: true });
+  Object.assign(active, { files: {}, directories: [], storage: storageIdentity(owned) });
+  const record = { name: 'input-events', active, activation: { [workspace]: { enabled: true, grants: ['script:first', 'script:second'] } } } as unknown as PackageRecord;
+  const image = Object.freeze({ type: 'image', data: 'opaque-image-data', mimeType: 'image/png' });
+  const payload = Object.freeze({ type: 'input', text: 'Original', prompt: 'Original', sessionId: 'input-events',
+    workspaceRoot: workspace, timestamp: 'original', source: 'sdk', images: Object.freeze([image]) });
+  const seen: unknown[] = [], scripts: string[] = [];
+  closes.push(registerPackage({ root: workspace, sessionId: 'input-events', file: registry, current: () => {}, withheld: () => {},
+    run: async () => '', tool: () => { throw new Error('No tool'); }, event: async (_record, script, _event, value) => {
+      seen.push(value); scripts.push(script);
+      if (script === 'second') return { action: 'transform', text: 'Final', images: [] };
+      return mode === 'transform' ? { action: 'transform', text: 'First', source: 'extension', sessionId: 'replacement' }
+        : mode === 'handled' ? { action: 'handled' } : { decision: mode, reason: 'PRIVATE_INPUT_REASON' };
+    } }, record));
+  const pending = catalogContributions(workspace, 'input-events')[0]!.onEvent!('input', payload);
+  if (mode === 'block' || mode === 'retry') {
+    await expect(pending).rejects.toMatchObject({ name: 'InputRefusal', message: 'Extension input was refused.' });
+  } else {
+    expect(await pending).toEqual(mode === 'handled' ? { action: 'handled' } : { action: 'transform', text: 'Final', images: [] });
+  }
+  expect(scripts).toEqual(mode === 'transform' ? ['first', 'second'] : ['first']);
+  expect(seen).toEqual(mode === 'transform' ? [payload, { ...payload, text: 'First', prompt: 'First' }] : [payload]);
+});
+
+it.each(['then-getter', 'thenable', 'mixed-decision'] as const)('refuses installed callback %s before consuming it', async kind => {
+  const active = { digest: digest('input-callbacks'), manifest: { name: 'input-callbacks',
+    scripts: [{ name: 'first', path: 'first.ts' }, { name: 'second', path: 'second.ts' }], commands: [], tools: [], skills: [] } } as unknown as VersionRecord;
+  const owned = versionPath(active, registry); fs.mkdirSync(owned, { recursive: true });
+  Object.assign(active, { files: {}, directories: [], storage: storageIdentity(owned) });
+  const record = { name: 'input-callbacks', active, activation: { [workspace]: { enabled: true, grants: ['script:first', 'script:second'] } } } as unknown as PackageRecord;
+  const payload = Object.freeze({ type: 'input', text: 'Original', prompt: 'Original', sessionId: 'input-callbacks',
+    workspaceRoot: workspace, timestamp: 'original', source: 'sdk' });
+  let touched = 0; const scripts: string[] = [];
+  const value = kind === 'then-getter' ? Object.defineProperty({ action: 'continue' }, 'then', { get: () => { touched++; return undefined; } })
+    : kind === 'thenable' ? { then: (resolve: (value: unknown) => void) => { touched++; resolve({ action: 'continue' }); } }
+    : { action: 'handled', decision: 'unknown' };
+  closes.push(registerPackage({ root: workspace, sessionId: 'input-callbacks', file: registry, current: () => {}, withheld: () => {},
+    run: async () => '', tool: () => { throw new Error('No tool'); }, event: ((_record: PackageRecord, script: string) => {
+      scripts.push(script); return value;
+    }) as never }, record));
+  const outcome = await catalogContributions(workspace, 'input-callbacks')[0]!.onEvent!('input', payload)
+    .then(result => ({ result }), error => ({ error }));
+  expect(touched).toBe(0);
+  expect(outcome).toMatchObject({ error: { name: 'InputRefusal', message: 'Extension input was refused.' } });
+  expect(scripts).toEqual(['first']);
+});
+
+it.each(['block', 'retry', 'unknown', 'invalid'] as const)(
+  'keeps an installed legacy UserPromptSubmit %s from being erased by a later script allow', async decision => {
+    const active = { digest: digest('legacy-input-chain'), manifest: { name: 'legacy-input-chain',
+      scripts: [{ name: 'first', path: 'first.ts' }, { name: 'second', path: 'second.ts' }], commands: [], tools: [], skills: [] } } as unknown as VersionRecord;
+    const owned = versionPath(active, registry); fs.mkdirSync(owned, { recursive: true });
+    Object.assign(active, { files: {}, directories: [], storage: storageIdentity(owned) });
+    const record = { name: 'legacy-input-chain', active,
+      activation: { [workspace]: { enabled: true, grants: ['script:first', 'script:second'] } } } as unknown as PackageRecord;
+    const payload = Object.freeze({ eventName: 'UserPromptSubmit', sessionId: 'legacy-input-chain', workspaceRoot: workspace,
+      timestamp: 'original', prompt: 'Original prompt' });
+    const refusal = { decision, reason: 'Original refusal', feedback: 'Keep this decision' };
+    const seen: unknown[] = [], scripts: string[] = [];
+    closes.push(registerPackage({ root: workspace, sessionId: 'legacy-input-chain', file: registry, current: () => {}, withheld: () => {},
+      run: async () => '', tool: () => { throw new Error('No tool'); }, event: async (_record, script, _event, value) => {
+        seen.push(value); scripts.push(script);
+        return script === 'first' ? refusal : { decision: 'allow', feedback: 'Must not replace refusal' };
+      } }, record));
+    const pending = catalogContributions(workspace, 'legacy-input-chain')[0]!.onEvent!('UserPromptSubmit', payload);
+    if (decision === 'invalid') await expect(pending).rejects.toMatchObject({ name: 'InputRefusal', message: 'Extension input was refused.' });
+    else expect(await pending).toEqual(refusal);
+    expect(scripts).toEqual(['first']); expect(seen).toEqual([payload]);
+    expect(seen.every(value => Object.isFrozen(value))).toBe(true);
+  });
+
+it('keeps original legacy UserPromptSubmit data while combining installed script feedback', async () => {
+  const active = { digest: digest('legacy-input-feedback'), manifest: { name: 'legacy-input-feedback',
+    scripts: [{ name: 'first', path: 'first.ts' }, { name: 'second', path: 'second.ts' }], commands: [], tools: [], skills: [] } } as unknown as VersionRecord;
+  const owned = versionPath(active, registry); fs.mkdirSync(owned, { recursive: true });
+  Object.assign(active, { files: {}, directories: [], storage: storageIdentity(owned) });
+  const record = { name: 'legacy-input-feedback', active,
+    activation: { [workspace]: { enabled: true, grants: ['script:first', 'script:second'] } } } as unknown as PackageRecord;
+  const payload = { eventName: 'UserPromptSubmit', sessionId: 'legacy-input-feedback', workspaceRoot: workspace,
+    timestamp: 'original', prompt: 'Original prompt' };
+  const seen: unknown[] = [];
+  closes.push(registerPackage({ root: workspace, sessionId: 'legacy-input-feedback', file: registry, current: () => {}, withheld: () => {},
+    run: async () => '', tool: () => { throw new Error('No tool'); }, event: async (_record, script, _event, value) => {
+      seen.push(value); return { decision: 'allow', feedback: `${script} feedback` };
+    } }, record));
+  const result = await catalogContributions(workspace, 'legacy-input-feedback')[0]!.onEvent!('UserPromptSubmit', payload);
+  expect(seen).toEqual([payload, payload]); expect(seen.every(value => Object.isFrozen(value))).toBe(true);
+  expect(result).toMatchObject({ decision: 'allow', feedback: expect.stringContaining('first feedback') });
+  expect(result).toMatchObject({ feedback: expect.stringContaining('second feedback') });
+});
+
+it.each((['input', 'UserPromptSubmit'] as const).flatMap(eventName =>
+  (['failed', 'unknown-cleanup', 'missing-cleanup', 'invalid-json', 'legacy-block', 'transform', 'handled'] as const)
+    .map(mode => ({ eventName, mode }))))(
+  'keeps installed $eventName callback admission tied to execution and cleanup ($mode)', async ({ eventName, mode }) => {
+    const result: ToolExecutionResult = { success: mode !== 'failed', output: 'PRIVATE_EXECUTION_DETAIL',
+      metadata: {
+        ...(mode === 'missing-cleanup' ? {} : { cleanup: mode === 'unknown-cleanup' ? 'unknown' : 'confirmed' }),
+        eventOutput: mode === 'invalid-json' ? '{' : JSON.stringify(mode === 'legacy-block'
+          ? { decision: 'block', reason: 'PRIVATE_INPUT_REASON' }
+          : eventName === 'UserPromptSubmit' ? { decision: 'allow', feedback: 'Installed feedback' }
+          : mode === 'handled' ? { action: 'handled' } : { action: 'transform', text: 'Installed input' }),
+      } };
+    vi.spyOn(execution, 'executeScript').mockResolvedValue(result);
+    const store = new ExtensionStore(registry);
+    const service = new ExtensionService({ root: workspace, store, check: () => {}, offline: () => false,
+      denyRules: () => [], assertWorkspace: () => {}, gate: () => ({ sessionId: 'input-events', workspaceRoot: workspace }) as never });
+    vi.spyOn(service, 'current').mockImplementation(() => {});
+    const event = { type: 'input', text: 'Original', prompt: 'Original', sessionId: 'input-events', workspaceRoot: workspace,
+      timestamp: 'original', source: 'sdk' };
+    try {
+      const consumer = service as unknown as { dispatchEvent(record: PackageRecord, script: string, event: string,
+        payload: unknown, aliases: readonly string[] | undefined, epoch: number): Promise<unknown> };
+      const pending = consumer.dispatchEvent({ active: { manifest: { permissions: { workspace: 'read' } } } } as PackageRecord,
+        'input', eventName, event, undefined, 0);
+      if (mode === 'transform' || mode === 'handled' || eventName === 'UserPromptSubmit' && mode === 'legacy-block') {
+        expect(await pending).toEqual(mode === 'legacy-block' ? { decision: 'block', reason: 'PRIVATE_INPUT_REASON' }
+          : eventName === 'UserPromptSubmit' ? { decision: 'allow', feedback: 'Installed feedback' }
+          : mode === 'handled' ? { action: 'handled' } : { action: 'transform', text: 'Installed input' });
+      } else {
+        await expect(pending).rejects.toMatchObject({ name: 'InputRefusal', message: 'Extension input was refused.' });
+      }
+      expect(execution.executeScript).toHaveBeenCalledTimes(1);
+    } finally { await service.close(); }
+  });
 
 it('enforces the shared manifest budget for cold and prewarmed extension catalogs', async () => {
   installed('alpha'); installed('beta');

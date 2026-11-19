@@ -227,10 +227,11 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
       text: string,
       promptMetadata?: Record<string, unknown>,
       renderer: StreamingRenderer = options.renderer,
+      inputSource?: import('../../core/shell/input/contract.js').PromptInputRequest['source'],
     ): Promise<void> => {
       busy = true;
       try {
-        const result = await routeInteractiveCommand({ prompt: text, ...(promptMetadata ? { promptMetadata } : {}), readline: activeQuestionInput, mcpGateway,
+        const result = await routeInteractiveCommand({ prompt: text, inputSource, ...(promptMetadata ? { promptMetadata } : {}), readline: activeQuestionInput, mcpGateway,
           signal: controlAbort.signal,
           fallbackSessionId: options.fallbackSessionId, sessionManager: options.sessionManager,
           runtimeContext: options.runtimeContext, renderer, sessionRuntime: options.sessionRuntime,
@@ -254,11 +255,11 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
         await startup.ready;
         await roundBarrier;
         await options.sessionRuntime.waitForIdle().catch(() => undefined);
-        const text = queue.shift(); if (text !== undefined) await dispatch(text);
+        const text = queue.shift(); if (text !== undefined) await dispatch(text, undefined, options.renderer, queue.takeSource());
       }).catch(error => { options.renderer.renderLine(`Queued turn failed: ${error instanceof Error ? error.message : 'runtime failure'}`); });
     };
     releaseInputQueue = attachInputQueue(options.sessionRuntime, {
-      control: queue.control, enqueue: text => queue.push(text), drain: scheduleDrain,
+      control: queue.control, enqueue: (text, attachments, source) => queue.push(text, attachments, source), drain: scheduleDrain,
     });
     const pendingControls = new Set<Promise<void>>();
     const cancelPending = (): void => {

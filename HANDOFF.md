@@ -2914,3 +2914,21 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Caller mutations change a published skill or diagnostic, a legacy bind exposes partially loaded resources, or idle returns after one startup message and loses an earlier failure.
 - **Root cause:** Only snapshot arrays are frozen, native Map mutation remains reachable, and queue settlement borrows a single ambient Promise or replaces failed receipts with later successes.
 - **Rule:** Capture inert resource records and registration membership before the next callback or await, retaining original callable capabilities and signals. Use a true readonly map view with native callback semantics; opaque module exports stay outside the data-freeze guarantee. Join all queued submissions and retain the original failure independently of later success. Keep cancellation and exact retirement on the original owner.
+
+### Input Reduction Must Finish Before History And Promise Assimilation
+
+- **Symptom:** Transformed input reaches the model while history keeps the original text; handled input becomes a completed answer; a returned `then` getter runs before inert capture.
+- **Root cause:** Input was an alias of the submission hook, capture happened after `await`, and transient prompt framing was used to find the saved opening message.
+- **Rule:** Reduce text/images before the prompt barrier, capture synchronous callback returns before Promise assimilation in every collector/contribution/worker boundary, and carry the exact effective input into history selection. Keep legacy vetoes independent and monotone. Handled input has its own observation and no model terminal record.
+
+### Pre-Query Leases Must Admit Only Their Own Native Publications
+
+- **Symptom:** A second SDK prompt uses stale metadata; approval audit invalidates valid input; competing history is overwritten after a pending startup refuses.
+- **Root cause:** Saved-state checks used an ambient session object, stopped at the prompt barrier, or treated every native state write as either forbidden or permission to recapture the entire source.
+- **Rule:** Capture the current saved session and exact metadata before callbacks, retarget only after verifying the host's one prompt append, and recheck failures even when no query event was yielded. The existing audit writer may advance only its confirmed state version under its original lock after exact projected readback. Consume the opaque one-use receipt before publishing query start, then retire the saved-state check before legitimate kernel acceptance writes. Settle attempted provenance independently of input preparation failure.
+
+### Serialized Functions In Nested Worker Scripts Need Both Escape Layers
+
+- **Symptom:** Source callback tests pass, but adding a feedback reducer makes every worker fail with a syntax error.
+- **Root cause:** A function serialized into a nested `vm.Script` contains literal backslash escapes that the enclosing worker template consumes before the nested parser sees them.
+- **Rule:** Preserve backslashes when embedding that factory into the nested script and run the compiled public worker for both guarded input and existing event paths. Keep the initial syntax failure separate from behavioral counterexamples.

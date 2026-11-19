@@ -73,7 +73,8 @@ export async function dispatchExtensionEvent(
       // Observe both outcomes even if cancellation wins the bounded wait.
       const pending = Promise.resolve().then(() => {
         if (cancelled()) return { success: false, value: undefined };
-        return runner(event, payload, undefined, controller.signal).then(value => ({ success: true, value }));
+        const currentPayload = typeof payload === 'function' ? payload() : payload;
+        return runner(event, currentPayload, undefined, controller.signal).then(value => ({ success: true, value }));
       }).then(result => result, () => ({ success: false, value: undefined }));
       const result = await Promise.race([pending, cancellation.then(() => ({ success: false, value: undefined }))]);
       if (cancelled()) return { delivered, failed, cancelled: true };

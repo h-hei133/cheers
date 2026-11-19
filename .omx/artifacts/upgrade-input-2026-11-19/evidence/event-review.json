@@ -1,0 +1,21 @@
+{
+  "status": "APPROVE",
+  "scope": "Initial and new ordinary input event boundaries",
+  "reviewer": "cache_boundary_review",
+  "files": [
+    "core/values/promise.ts",
+    "core/agent/messages.ts",
+    "extensions/events/input.ts",
+    "extensions/events/model.ts",
+    "extensions/events/dispatch.ts",
+    "extensions/runtime/registration.ts",
+    "extensions/runtime/workerSource.ts",
+    "extensions/runtime/inProcessLoader.ts",
+    "extensions/service.ts",
+    "core/catalog/contributions.ts",
+    "core/hooks/input/error.ts"
+  ],
+  "bundleSha256": "fc002addd1b7d67b416c75e42ec81573c050a892fe3d51fefc2101aec030af8d",
+  "hashMatches": true,
+  "validationRunByReviewer": false
+}

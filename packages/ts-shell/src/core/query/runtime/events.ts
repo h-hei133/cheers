@@ -18,6 +18,7 @@ export interface QueryStreamingMessage {
 }
 
 export type QueryEvent =
+  | {readonly type:'input.handled'; readonly sessionId: string}
   | import('./lifecycle.js').LifecycleRecord
   | { readonly type: 'execution.command'; readonly proof: import('../../../runtime/execution/proof.js').NativeCommandProof; readonly sourcePromptEntryId: string }
   | {
@@ -176,4 +177,5 @@ export function isDurableQueryEvent(event: QueryEvent): boolean {
     // transcript twice.
     && event.type !== 'message.delivered'
     && event.type !== 'message.finished'
+    && event.type !== 'input.handled'
 }

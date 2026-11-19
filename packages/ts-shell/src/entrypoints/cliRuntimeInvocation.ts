@@ -9,10 +9,9 @@ import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliS
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import type { InteractiveAsk } from "../core/tools/ask/contract.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
-import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDispatcher.js";
-import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
-import { registerDeclaredHooks } from "../core/hooks/registration.js";
-import { createHookApprovalRequest } from "../core/hooks/approval.js";
+import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
+import {prepareSessionHooks} from '../core/hooks/prepare.js';
+import {readInputAdmission, type InputAdmissionReceipt} from '../core/hooks/input/receipt.js';
 import { type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
 import type { ToolDiscovery } from "../core/tools/discovery/state.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
@@ -68,6 +67,8 @@ import type { VirtualModelRegistry } from '../core/models/virtualModels.js';
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly inputAdmission?: InputAdmissionReceipt;
+  readonly effectiveInput?: string;
   readonly virtualModel?: SessionVirtualModelSelection;
   readonly virtualModels?: VirtualModelRegistry;
   readonly convertToLlm?: TurnOptions['convertToLlm'];
@@ -339,16 +340,10 @@ async function startTurn(
   request = { ...request, ...request.prepareProviderResources?.(request.providerCredentialResolution),
     providerCatalog: request.providerCatalog ?? loadCatalog(),
     ...(request.virtualModel ? { cacheWarming: undefined } : {}) };
-  const hooks = dependencies.hooks ?? defaultHookDispatcher;
-  setupBuiltinVerificationHooks(hooks);
-  // Declared hooks are registered here so the user can be asked about them; the
-  // approval itself is awaited at dispatch, where a pending answer does not hold
-  // up the start of the run.
-  registerDeclaredHooks(hooks, request.workspaceRoot, {
-    admission: request.admission,
-    requestApproval: createHookApprovalRequest(request.escalationPromptHandler),
-    bypassed: request.runtimeConfig?.allowUntrustedHooks === true,
-  });
+  const admittedHooks = readInputAdmission(request.inputAdmission, {sessionId:request.sessionId, workspaceRoot:request.workspaceRoot,
+    text:request.effectiveInput ?? request.prompt, images:request.attachments?.images, signal:request.signal});
+  const hooks = admittedHooks ?? prepareSessionHooks({workspaceRoot:request.workspaceRoot, admission:request.admission,
+    escalationPromptHandler:request.escalationPromptHandler, allowUntrustedHooks:request.runtimeConfig?.allowUntrustedHooks}, dependencies.hooks);
   const { tools, discovery, promptContext, currentOverhead } = await preparePromptRequest({
     ...request, toolsAvailable: providerToolsAvailable(request),
   }, dependencies.tools);
@@ -379,6 +374,8 @@ async function startTurn(
   const step = control?.step ?? baseStep;
 
   const run = runTurn({
+    inputAdmission:request.inputAdmission,
+    effectiveInput:request.effectiveInput,
     modelCatalog: sessionModelCatalog(request.workspaceRoot, request.sessionId, request.providerCatalog ?? []),
     ...(request.convertToLlm ? { convertToLlm: request.convertToLlm } : {}),
     configScope: toolScopeBinding(request.runtimeConfig),

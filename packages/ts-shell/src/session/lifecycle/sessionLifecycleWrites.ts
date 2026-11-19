@@ -117,6 +117,7 @@ export abstract class SessionLifecycleWrites extends SessionCompactionWrites {
     decision: Omit<ApprovalAuditMemoryState, "recordedAt"> & {
       readonly recordedAt?: string;
     },
+    publication?: (snapshot: SessionStateSnapshot, publish: () => void) => void,
   ): void {
     const session = this.host.store.load(sessionId);
     const statePath = this.host.store.statePath(session.id);
@@ -131,6 +132,7 @@ export abstract class SessionLifecycleWrites extends SessionCompactionWrites {
       buildSnapshot: (current) =>
         this.host.buildStateSnapshot(session, current),
       writeSnapshot: (snapshot) => this.host.store.writeJsonFileAtomic(statePath, snapshot),
+      publication,
     });
   }
 

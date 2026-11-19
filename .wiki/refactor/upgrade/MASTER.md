@@ -188,3 +188,6 @@ F2.4当前遥测：实际L，结构复用检查10/10，无新依赖、执行或�
 F2.5更新：原profile/store/commands/logger owner贯通，普通logger捕获session/workspace不信callerfield，六files39tests/七门0monoliths、6有效反转/11restore、build088efb、compiledpublicSDK/inputhook/actualregistrytracecommand两组原生读取及physicalprofile409passed，独立review已启动。功能仍32/62，不勾F2.5。F2.3草稿33tests/strictNodeNextpassed，标准meta和实际annotationtarget保留；fullwrappedcore3384passed/108主动准入拒绝（remote/customdialect），schema生产尚未变。各价格source55hash未动，原a395native保留其source，不代表新tracebuild全部验证。
 
 F2.3当前草稿后续33tests及strictNodeNext passed，新增official/实际default-reference保持旧验证语义，先两实际红后修。rootbaseline显示旧Ajv允许validdefaultref/拒unknownref，不为更易测试而删特性；wrapper3372→3384核心控制通过，余108外部资源/customdialect主动refusal保留。Next独立source推广需等pricing审查提交界限，或隔离combinedbuild后分批stage；不将draft验收当production完成。
+
+
+2026-11-19 当前input子批完成：沿原contribution/SDK/CLI/turn/approval/session owner修transform/handled与legacy veto、inert callback、receipt及保存前后准入；未增加执行、存储或事件bus。实际L；原新普通提交已验收，live steer/followUp另留E.6缺口。20/416、末改144/恢复159、七门/buildcca13a50f2ac、11有效反转/两限定APPROVE、Linux native/floor/installed各15场景7POST及配置1actualPOST200/completed。默认judge容量not_proven保持，功能36/62、26开放。最新用户要求当前批提交后总结并停止，停止后不执行下一批。

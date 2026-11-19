@@ -5,6 +5,7 @@ import type {
   ApprovalAuditMemoryState,
   SessionManager,
 } from "../../session/SessionManager.js";
+import type {SessionStateSnapshot} from '../../session/schema/sessionStateSnapshot.js';
 
 export function projectApprovalAuditMemoryState(
   record: ApprovalAuditRecord,
@@ -30,10 +31,12 @@ export function persistApprovalAuditDecision(input: {
   readonly sessionManager: SessionManager;
   readonly sessionId: string;
   readonly record: ApprovalAuditRecord;
+  readonly publication?: (snapshot: SessionStateSnapshot, publish: () => void) => void;
 }): void {
   input.sessionManager.recordApprovalAuditDecision(
     input.sessionId,
     projectApprovalAuditMemoryState(input.record),
+    input.publication,
   );
 }
 

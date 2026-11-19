@@ -12,6 +12,12 @@ import { TurnProjection } from '../../turn/projection.js';
 import { EventChannel } from '../../turn/stream.js';
 import { toRpcEvent } from './events.js';
 
+it('projects handled input as its own outcome without a model completion result', () => {
+  const handled: QueryEvent = {type:'input.handled', sessionId:'handled-input'};
+  expect(toRpcEvent(handled)).toEqual({type:'input_handled', sessionId:'handled-input'});
+  expect(isDurableQueryEvent(handled)).toBe(false);
+});
+
 it('projects a public reasoning replacement and an explicit empty replacement for legacy producers', () => {
   expect(toRpcEvent({ type: 'reasoning.replace', role: 'coder', text: 'Validated summary' })).toEqual({
     type: 'message_update', channel: 'reasoning', text: 'Validated summary',

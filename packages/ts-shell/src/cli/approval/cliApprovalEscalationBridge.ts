@@ -10,6 +10,7 @@ import type { EscalationPrompt, EscalationResponse } from "../../core/shell/appr
 import type { SessionManager } from "../../session/SessionManager.js";
 import { persistApprovalAuditDecision } from "./cliApprovalAuditBridge.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
+import type {SessionStateSnapshot} from '../../session/schema/sessionStateSnapshot.js';
 export function createCliApprovalEscalationBridge(input: {
   readonly renderer: StreamingRenderer;
   readonly readline: () => ReadlineInterface | null;
@@ -22,6 +23,7 @@ export function createCliApprovalEscalationBridge(input: {
     | "allow-always"
     | undefined;
   readonly sessionManager: SessionManager;
+  readonly auditPublication?: (snapshot: SessionStateSnapshot, publish: () => void) => void;
   readonly getSessionId: () => string;
   /** How much the session may do before it has to ask. */
   readonly getPermissionScope?: () => PermissionScope;
@@ -42,6 +44,7 @@ export function createCliApprovalEscalationBridge(input: {
         sessionManager: input.sessionManager,
         sessionId: input.getSessionId(),
         record,
+        publication:input.auditPublication,
       });
     },
     input.getPermissionScope,

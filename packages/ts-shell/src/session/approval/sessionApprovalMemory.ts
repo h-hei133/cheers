@@ -105,6 +105,7 @@ export function recordSessionApprovalAuditDecision(input: {
     current: SessionStateSnapshot | undefined,
   ) => SessionStateSnapshot;
   readonly writeSnapshot: (snapshot: SessionStateSnapshot) => void;
+  readonly publication?: (snapshot: SessionStateSnapshot, publish: () => void) => void;
 }): void {
   input.withStateLock(input.session.id, () => {
     const current = input.readCurrentSnapshot();
@@ -116,9 +117,11 @@ export function recordSessionApprovalAuditDecision(input: {
       historyLimit: input.historyLimit,
     });
     const snapshot = input.buildSnapshot(current);
-    input.writeSnapshot({
+    const expected = {
       ...snapshot,
       workingMemory: approvalMemory.workingMemory,
-    });
+    };
+    const publish = () => input.writeSnapshot(expected);
+    if (input.publication) input.publication(expected, publish); else publish();
   });
 }

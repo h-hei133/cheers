@@ -12,7 +12,10 @@ import type { ToolDefinition } from '../../tools/types.js';
 import type { CommandDefinition } from '../../core/commands/types.js';
 import { SkillDiscovery } from '../../core/skills/discovery.js';
 import { captureTreeResult, mergeTreeResult } from '../events/tree.js';
-import type { ExtensionBeforeTreeResult } from '../events/model.js';
+import { captureInputEvent, captureInputHookPayload, captureInputHookResult, captureInputResult, InputRefusal, projectInputEvent, reduceInputHookResult } from '../events/input.js';
+import type { ExtensionBeforeTreeResult, ExtensionInputEvent } from '../events/model.js';
+import { callbackCancellation, captureCallbackResult } from '../../core/values/promise.js';
+import type { HookDecision } from '../../core/hooks/types.js';
 
 export interface RegistrationHost {
   readonly root: string;
@@ -66,17 +69,54 @@ export function registerPackage(host: RegistrationHost, record: PackageRecord): 
   const jsScripts = manifest.scripts.filter(script => /\.(?:js|mjs|ts)$/.test(script.path) && activation.grants.includes(`script:${script.name}`));
   const onEvent = jsScripts.length && host.event
     ? async (event: string, payload: unknown, aliases?: readonly string[], signal?: AbortSignal) => {
-        let currentPayload = payload;
+        const nativeInput = event === 'input';
+        const guardedInput = nativeInput || event === 'UserPromptSubmit';
+        let currentPayload = nativeInput ? captureInputEvent(payload) : event === 'UserPromptSubmit' ? captureInputHookPayload(payload) : payload;
+        let transformed = false;
+        let hookResult: HookDecision | undefined;
         let treeResult: ExtensionBeforeTreeResult = { cancel: false };
         for (const script of jsScripts) {
+          if (guardedInput && signal) AbortSignal.prototype.throwIfAborted.call(signal);
           host.current(record, `script:${script.name}`);
-          const next = await host.event!(record, script.name, event, event === 'session_before_tree' ? payload : currentPayload, aliases, signal);
+          let next;
+          try {
+            next = guardedInput ? (await captureCallbackResult<unknown>(
+              () => host.event!(record, script.name, event, currentPayload, aliases, signal),
+              nativeInput ? captureInputResult : captureInputHookResult, {
+                check: () => { if (signal) AbortSignal.prototype.throwIfAborted.call(signal); host.current(record, `script:${script.name}`); },
+                cancellation: callbackCancellation(signal),
+                invalid: () => new InputRefusal(), failed: () => new InputRefusal(), cancelled: () => new InputRefusal(),
+              })).value
+              : await host.event!(record, script.name, event, event === 'session_before_tree' ? payload : currentPayload, aliases, signal);
+          }
+          catch (error) { if (guardedInput) throw new InputRefusal(); throw error; }
+          if (nativeInput) {
+            if (signal) AbortSignal.prototype.throwIfAborted.call(signal);
+            host.current(record, `script:${script.name}`);
+            const captured = captureInputResult(next);
+            if (captured.action === 'handled') return captured;
+            currentPayload = projectInputEvent(currentPayload as ExtensionInputEvent, captured);
+            transformed ||= captured.action === 'transform';
+            continue;
+          }
+          if (event === 'UserPromptSubmit') {
+            const reduced = reduceInputHookResult(hookResult, next);
+            hookResult = reduced.result;
+            if (reduced.stop) return hookResult;
+            continue;
+          }
           if (event === 'session_before_tree') {
             treeResult = mergeTreeResult(treeResult, captureTreeResult(next));
             if (treeResult.cancel) return treeResult;
             continue;
           }
           if (next !== undefined) currentPayload = next;
+        }
+        if (event === 'UserPromptSubmit') return hookResult;
+        if (nativeInput) {
+          const result = currentPayload as ExtensionInputEvent;
+          return Object.freeze(transformed ? { action: 'transform', text: result.text, ...(result.images === undefined ? {} : { images: result.images }) }
+            : { action: 'continue' });
         }
         return event === 'session_before_tree' ? treeResult : currentPayload;
       }

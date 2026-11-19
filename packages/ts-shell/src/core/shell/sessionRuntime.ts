@@ -38,6 +38,9 @@ import type { CompactionOutcome } from "./compaction.js";
 import type { TurnInput } from "../../turn/session.js";
 import { hasUnfinishedSessionWork } from "../../session/recovery/work.js";
 import { normalizePathIdentity } from '../../session/continuation/roots.js';
+import type {PreparedPromptInput, PromptInputRequest} from './input/contract.js';
+import type {InputAdmissionReceipt} from '../hooks/input/receipt.js';
+import {capturePromptInput} from './input/capture.js';
 
 /**
  * What travels with a prompt beside its text.
@@ -60,6 +63,8 @@ export type PromptRun =
       readonly settled?: (outcome: { readonly status: 'completed' | 'completed_unproven' | 'error'; readonly finalOutput: string }) => void };
 
 export interface SessionRuntimeDependencies {
+  readonly prepareInput?: (input: PromptInputRequest) => Promise<PreparedPromptInput>;
+  readonly inputSource?: PromptInputRequest['source'];
   /** Native provenance owner may validate a one-use submission before durable prompt publication. */
   readonly admitPrompt?: (prompt: string, metadata: Record<string, unknown> | undefined, signal: AbortSignal) => Promise<void>;
   readonly promptSettled?: (metadata: Record<string, unknown> | undefined, signal: AbortSignal, outcome: 'completed' | 'completed_unproven' | 'failed' | 'cancelled' | 'unknown') => Promise<void>;
@@ -78,6 +83,8 @@ export interface SessionRuntimeDependencies {
     attachments?: PromptAttachments,
     continuityContext?: string,
     onPromptAccepted?: () => void,
+    inputAdmission?: InputAdmissionReceipt,
+    effectiveInput?: string,
   ) => PromptRun;
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
@@ -210,6 +217,7 @@ export class ShellSessionRuntime {
       outputMode?: "interactive" | "print";
       attachments?: PromptAttachments;
       promptMetadata?: Record<string, unknown>;
+      inputSource?: PromptInputRequest['source'];
     },
   ): Promise<string> {
     if (this.isRunning()) throw new Error('A session operation is still running.');
@@ -245,6 +253,7 @@ export class ShellSessionRuntime {
       outputMode?: "interactive" | "print";
       attachments?: PromptAttachments;
       promptMetadata?: Record<string, unknown>;
+      inputSource?: PromptInputRequest['source'];
     },
   ): Promise<string> {
     this.currentRunController = new AbortController();
@@ -261,29 +270,56 @@ export class ShellSessionRuntime {
     let provenanceOutcome: 'completed' | 'completed_unproven' | 'failed' | 'cancelled' | 'unknown' = 'unknown';
     /** The run's outcome was decided; a later throw is a storage failure. */
     let terminalOutcomeRecorded = false;
+    let preparingInput = !options?.runtimeSeed && this.deps.prepareInput !== undefined;
+    let promptMetadata: Record<string, unknown> | undefined;
+    let refusedInputSource = false;
+    let preparedInput: PreparedPromptInput | undefined;
+    let provenancePending = false;
 
     try {
-      const continuityState = selectPromptContinuity(this.deps.sessionManager, sessionId, prompt, options);
+      const captured = preparingInput ? capturePromptInput({prompt, metadata:options?.promptMetadata, images:options?.attachments?.images}) : undefined;
+      promptMetadata = captured ? captured.metadata : options?.promptMetadata;
+      preparedInput = preparingInput ? await this.deps.prepareInput!({sessionId, prompt:captured!.prompt,
+        images:captured!.images, source:options?.inputSource ?? this.deps.inputSource ?? 'cli',
+        metadata:promptMetadata, signal}) : undefined;
+      preparedInput?.check();
+      if (preparedInput?.status === 'handled') {
+        this.stateMachine.completeRun();
+        this.currentRunController = null;
+        notifyObservers(this.eventObservers, {type:'input.handled', sessionId});
+        return '';
+      }
+      const effectivePrompt = preparedInput?.prompt ?? prompt;
+      const attachments = preparedInput ? preparedInput.images ? {images:preparedInput.images} : undefined : options?.attachments;
+      const continuityState = selectPromptContinuity(this.deps.sessionManager, sessionId, effectivePrompt,
+        effectivePrompt === prompt ? options : {...options, continuityState:undefined});
 
       const preparedPrompt = !options?.runtimeSeed
         ? await buildPromptWithFutureTurnInjections({
             deps: this.deps,
             sessionId,
-            prompt,
+            prompt:effectivePrompt,
           })
         : undefined;
       // Classify the submitted request, before any injected historical text can
       // supply a continuation cue of its own.
       const continuityContext = continuityState
-        ? buildSessionResumeContext({ currentPrompt: prompt, snapshot: continuityState })
+        ? buildSessionResumeContext({ currentPrompt: effectivePrompt, snapshot: continuityState })
         : undefined;
 
       if (!options?.runtimeSeed) {
-        await this.deps.admitPrompt?.(prompt, options?.promptMetadata, signal);
-        if (options?.attachments?.images.length) {
-          this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt, options.promptMetadata, options.attachments.images);
+        preparedInput?.check();
+        provenancePending = this.deps.admitPrompt !== undefined;
+        await this.deps.admitPrompt?.(effectivePrompt, promptMetadata, signal);
+        preparedInput?.check();
+        preparingInput = false;
+        if (attachments?.images.length) {
+          this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, promptMetadata, attachments.images);
         } else {
-          this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt, options?.promptMetadata);
+          this.deps.sessionManager.persistUserPromptBarrier(sessionId, effectivePrompt, promptMetadata);
+        }
+        if (preparedInput) {
+          try {preparedInput.published();} catch (error) {refusedInputSource = true; throw error;}
         }
       }
 
@@ -302,19 +338,24 @@ export class ShellSessionRuntime {
       }
 
       const run = this.deps.runPrompt(
-        preparedPrompt?.prompt ?? prompt,
+        preparedPrompt?.prompt ?? effectivePrompt,
         signal,
         options?.runtimeSeed,
         continuityState,
-        options?.attachments,
+        attachments,
         continuityContext,
         preparedPrompt?.accept,
+        preparedInput?.admission,
+        effectivePrompt,
       );
       const events = Symbol.asyncIterator in run ? run : run.events;
       this.currentInput = Symbol.asyncIterator in run ? undefined : run.input;
       sourceEntryId = Symbol.asyncIterator in run ? undefined : run.sourceEntryId;
       settled = Symbol.asyncIterator in run ? undefined : run.settled;
       for await (const event of events) {
+        if (preparedInput && !enteredQueryPhase) {
+          try {preparedInput.check();} catch (error) {refusedInputSource = true; throw error;}
+        }
         if (!enteredQueryPhase) {
           enteredQueryPhase = true;
           this.deps.sessionManager.markTurnActive(sessionId);
@@ -403,6 +444,21 @@ export class ShellSessionRuntime {
         : terminalState.terminalStatus === 'completed' ? 'completed' : 'error', finalOutput: terminalState.finalOutput });
       return terminalState.finalOutput;
     } catch (error) {
+      if (preparedInput && !enteredQueryPhase && !preparingInput) {
+        try {preparedInput.check();} catch {refusedInputSource = true;}
+      }
+      if (refusedInputSource) {
+        this.currentRunController = null; this.currentInput = undefined;
+        provenanceOutcome = signal.aborted ? 'cancelled' : 'failed';
+        if (signal.aborted) this.stateMachine.interruptRun(); else this.stateMachine.failRun();
+        throw error;
+      }
+      if (preparingInput) {
+        if (provenancePending) provenanceOutcome = signal.aborted ? 'cancelled' : 'failed';
+        this.currentRunController = null; this.currentInput = undefined;
+        if (signal.aborted) this.stateMachine.interruptRun(); else this.stateMachine.failRun();
+        throw error;
+      }
       // A failure after the terminal state was decided is a storage failure, not
       // a query failure. Report it as such and leave the durable terminal record
       // alone, rather than appending a contradicting cancellation or error.
@@ -459,7 +515,7 @@ export class ShellSessionRuntime {
         this.currentRunController = null; this.currentInput = undefined;
         if (provenanceOutcome === 'unknown') this.stateMachine.failRun();
       }
-      await this.deps.promptSettled?.(options?.promptMetadata, signal, provenanceOutcome);
+      if (!preparingInput || provenancePending) await this.deps.promptSettled?.(promptMetadata, signal, provenanceOutcome);
     }
   }
 

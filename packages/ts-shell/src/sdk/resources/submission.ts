@@ -14,11 +14,11 @@ export function attachSdkSubmissionQueue(context: ShellRuntimeContext, runtime: 
     const prompt = queue.shift();
     if (prompt === undefined) return;
     const attachments = queue.takeAttachments();
-    pending = runtime.executePrompt(context.session.id, prompt, {outputMode:'print', ...(attachments ? {attachments} : {})})
+    pending = runtime.executePrompt(context.session.id, prompt, {outputMode:'print', inputSource:queue.takeSource() ?? 'sdk', ...(attachments ? {attachments} : {})})
       .then(() => undefined, error => {failure ??= {error}; throw error;}).finally(() => {pending = undefined; drain();});
     void pending.catch(() => {});
   };
-  const detach = attachInputQueue(runtime, {control:queue.control, enqueue:(text, attachments) => queue.push(text, attachments), drain});
+  const detach = attachInputQueue(runtime, {control:queue.control, enqueue:(text, attachments, source) => queue.push(text, attachments, source), drain});
   return {
     close:() => {closed = true; queue.release(); detach();},
     wait:async () => {

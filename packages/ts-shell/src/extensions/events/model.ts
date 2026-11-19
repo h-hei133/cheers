@@ -1,4 +1,23 @@
 import type { AgentLifecycleEvent } from '../../core/agent/events.js';
+import type { ImageContent } from '../../model-adapters/multimodal.js';
+
+export interface ExtensionInputEvent {
+  readonly type: 'input';
+  readonly text: string;
+  /** Retain the prompt field for callers that used the former hook alias. */
+  readonly prompt: string;
+  readonly sessionId: string;
+  readonly workspaceRoot: string;
+  readonly timestamp: string;
+  readonly images?: readonly ImageContent[];
+  readonly source: 'interactive' | 'rpc' | 'extension' | 'sdk' | 'cli';
+  readonly streamingBehavior?: 'steer' | 'followUp';
+}
+
+export type ExtensionInputResult =
+  | { readonly action: 'continue' }
+  | { readonly action: 'handled' }
+  | { readonly action: 'transform'; readonly text: string; readonly images?: readonly ImageContent[] };
 
 /** Kernel notifications carry immutable copies; their return values grant no permissions. */
 export type ExtensionRunEvent = AgentLifecycleEvent

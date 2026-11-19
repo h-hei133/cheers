@@ -76,6 +76,8 @@ import { installUsageRuntime, usageResetApproval } from './usage.js';
 import { captureSummaryRole } from '../provider/summary.js';
 import { currentProviderConnections } from '../../provider/request/connection.js';
 import { preparePromptRequest } from '../../core/prompts/request.js';
+import {prepareExtensionInput} from './extensions/input.js';
+import {prepareSessionHooks} from '../../core/hooks/prepare.js';
 import { providerStepRequest, providerToolsAvailable } from '../provider/step.js';
 import { manualCompactionPolicy, manualCompactionWiring } from './compaction/context.js';
 import { directCompactionTarget } from './compaction/direct.js';
@@ -114,6 +116,15 @@ export function createCliSessionRuntime(input: {
   });
   input.runtimeContext.preparePromptContext = (prompt, signal) => prepareContextInjection(input.runtimeContext, projectMemoryStore, prompt, signal);
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
+    inputSource: input.options.rpcMode ? 'rpc' : isStdinTty() ? 'interactive' : 'cli',
+    prepareInput: request => prepareExtensionInput(input.runtimeContext, request, (operation, auditPublication) => prepareSessionHooks({
+      workspaceRoot:input.runtimeContext.cwd, admission:operation.admission, allowUntrustedHooks:operation.config.allowUntrustedHooks,
+      escalationPromptHandler:createCliApprovalEscalationBridge({renderer:input.renderer, readline:input.getReadline,
+        getViewMode:() => sessionRuntime.getViewMode(), trustPolicy:input.approvalTrustPolicy, getProjectRoot:() => input.runtimeContext.projectRoot,
+        getNonInteractiveDecision:() => !isStdinTty() ? input.options.nonInteractiveApproval : undefined,
+        sessionManager:input.sessionManager, auditPublication, getSessionId:() => request.sessionId,
+        getPermissionScope:() => sessionRuntime.getPermissionScope(), promptInteractiveApproval:input.getPromptInteractiveApproval?.() }),
+    })),
     admitPrompt: admitCollaborationPrompt.bind(undefined, input.runtimeContext),
     promptSettled: handoffSettlement(input.runtimeContext, settleCollaborationPrompt.bind(undefined, input.runtimeContext)),
     onCancelRequested: () => { goalScheduler?.interrupt(); cancelDirectorFor(input.runtimeContext); cancelEvaluationFor(input.runtimeContext); cancelMediaFor(input.runtimeContext); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); cancelSshFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
@@ -252,7 +263,7 @@ export function createCliSessionRuntime(input: {
         });
       });
     }),
-    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext, onPromptAccepted): PromptRun => providerResources.withConnections(() => {
+    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext, onPromptAccepted, inputAdmission, effectiveInput): PromptRun => providerResources.withConnections(() => {
       const operation = configurationOperation(input.runtimeContext);
       const publication = operation.publication;
       const config = operation.config;
@@ -299,7 +310,7 @@ export function createCliSessionRuntime(input: {
       const allTurns = selectModelContext(existingSession);
       const historyMessages =
         allTurns.length > 0 &&
-        messageToText(allTurns[allTurns.length - 1]?.content) === prompt
+        messageToText(allTurns[allTurns.length - 1]?.content) === (effectiveInput ?? prompt)
           ? allTurns.slice(0, -1)
           : allTurns;
 
@@ -320,6 +331,8 @@ export function createCliSessionRuntime(input: {
       const forcedTool = takeForcedTool(input.runtimeContext);
       const promptWithAttachments = promptWithContext(prompt, attachedContext);
       const run = streamCliRuntimePrompt({
+        inputAdmission,
+        effectiveInput,
         virtualModel,
         ...(virtualModel ? { virtualModels: sessionVirtualRegistry(input.runtimeContext.cwd, sessionId) } : {}),
         stepControl: handoff?.control,

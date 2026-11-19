@@ -1,0 +1,521 @@
+import type { CacheWarmingRunner } from "../turn/cacheWarm.js";
+import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
+import * as fs from "node:fs";
+import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
+import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
+import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
+import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
+import type { PermissionScope } from "../cli/approval/permissionScope.js";
+import type { InteractiveAsk } from "../core/tools/ask/contract.js";
+import type { SessionMessage } from "../session/schema/sessionMessage.js";
+import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
+import {prepareSessionHooks} from '../core/hooks/prepare.js';
+import {readInputAdmission, type InputAdmissionReceipt} from '../core/hooks/input/receipt.js';
+import { type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
+import type { ToolDiscovery } from "../core/tools/discovery/state.js";
+import { loadCatalog } from "../core/models/catalogStore.js";
+import { catalogProvider, type CatalogProvider } from "../core/models/catalog.js";
+import { sessionModelCatalog } from '../core/catalog/models.js';
+import type { RuntimeConfig } from "../config/runtimeConfig.js";
+import type { ToolDefinition } from "../tools/types.js";
+import type { RequestOverhead } from "../session/context.js";
+import { preparePromptRequest } from '../core/prompts/request.js';
+import { requestIdentity } from '../context/request/identity.js';
+export { requestIdentity } from '../context/request/identity.js';
+import { pendingTurnInput } from "../turn/pendingInput.js";
+import { CoreMcpGateway } from "../core/mcp/gateway.js";
+import { runTurn, type CompactionSetup, type TurnRun, type TurnOptions } from "../turn/session.js";
+import { createStepFunction, type StepFunction } from "../turn/step.js";
+import {
+  providerFetchForEndpoint,
+  providerFetchFromTimeouts,
+  providerTimeoutsFrom,
+} from "../provider/request/fetch.js";
+import { DEFAULT_ENDPOINT_KIND, endpointShape } from "../provider/endpoints/index.js";
+import { accountAuthFor, providerAuthorization } from "../provider/request/authorization.js";
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../core/auth/account/target.js';
+import { renewStoredAccount } from "../core/auth/account/renewal.js";
+import { projectAccountAuth } from '../core/auth/account/projection.js';
+import { publishAccountRotation } from '../cli/provider/publication.js';
+import type {
+  GoogleAccountAuthConfig,
+  OpenAIAccountAuthConfig,
+} from "../config/runtimeConfig.js";
+import type { RuntimeProvider } from "../config/runtimeConfig.js";
+import { createSyntheticStep } from "../turn/synthetic.js";
+import { syntheticToolIntent } from "../turn/intents.js";
+import { commandEnvironment } from "../runtime/execution/commandEnvironment.js";
+import { createSessionStoreLayout, locateExistingSessionLayout } from "../session/store/sessionFileLayout.js";
+import { captureThinkingPreference } from '../core/models/preference.js';
+import type { ThinkingPreference } from '../core/models/effort.js';
+import { toolSchemas } from "../turn/tools.js";
+import { runSubagent, type SubagentRunner } from "../core/subagents/runner.js";
+import { adaptTools } from "../turn/tools.js";
+import { assertAdmission, admittedFetch, type Admission } from '../core/network/admission.js';
+import { decodeWorkspaceRoots, type WorkspaceRoot } from '../core/workspace/model.js';
+import type { RequestPolicy } from '../core/agent/request/model.js';
+import { createProviderStep, delegatedSteps, providerToolsAvailable } from '../cli/provider/step.js';
+import { scopedRuntimeConfig, assertScopedModel } from '../config/scope/projection.js';
+import { credentialBlockMessage } from '../core/shell/providerCredentials.js';
+import { scopeAdmission } from '../config/scope/admission.js';
+import { toolScopeBinding } from '../config/scope/tools.js';
+import type { PromptIdentitySnapshot } from '../observability/usage/model.js';
+import type { SessionVirtualModelSelection } from '../session/model/contract.js';
+import type { VirtualModelRegistry } from '../core/models/virtualModels.js';
+
+type ProviderMode = "synthetic" | "real";
+
+export interface CliRuntimeInvocationInput {
+  readonly inputAdmission?: InputAdmissionReceipt;
+  readonly effectiveInput?: string;
+  readonly virtualModel?: SessionVirtualModelSelection;
+  readonly virtualModels?: VirtualModelRegistry;
+  readonly convertToLlm?: TurnOptions['convertToLlm'];
+  readonly stepControl?: import('../turn/control.js').StepControlFactory;
+  readonly catalogContent?: CatalogContent;
+  readonly onCommandSettled?: ToolCatalogInput['onCommandSettled'];
+  readonly thinkingPreference?: ReturnType<typeof captureThinkingPreference>;
+  /** Receives the exact schema/system identity prepared for this run. */
+  readonly onPromptIdentity?: (identity: PromptIdentitySnapshot) => void;
+  /** Last accepted request identity from this same live session. */
+  readonly readPromptIdentity?: () => PromptIdentitySnapshot | undefined;
+  readonly background?: TurnOptions['background'];
+  readonly featureTools?: readonly ToolDefinition[];
+  /** One-use model tool restriction selected by `/force`; ordinary gates remain active. */
+  readonly allowedTools?: readonly string[];
+  readonly requestPolicy?: RequestPolicy;
+  readonly goalObjective?: string;
+  readonly workspaceRoots?: readonly WorkspaceRoot[];
+  readonly admission?: Admission;
+  readonly onCredentialPersisted?: (rotation?: import('../cli/provider/renewal.js').AccountRotation) => boolean | void;
+  /** Built after renewal from the same captured provider binding as the main request. */
+  readonly prepareProviderResources?: (resolution: ProviderCredentialResolution) => {
+    readonly compaction?: CompactionSetup;
+    readonly cacheWarming?: CacheWarmingRunner;
+  };
+  readonly sessionId: string;
+  readonly commandProof?: TurnOptions['commandProof'];
+  readonly checkpoint?: TurnOptions['checkpoint'];
+  readonly checkpointError?: TurnOptions['checkpointError'];
+  readonly correlationId?: string;
+  readonly prompt: string;
+  /** Selected historical facts for this continuation, separate from user intent. */
+  readonly continuityContext?: string;
+  readonly onPromptAccepted?: () => void;
+  /** Images that travelled with the prompt; see `PromptAttachments`. */
+  readonly attachments?: PromptAttachments;
+  readonly workspaceRoot: string;
+  readonly mcpGateway?: CoreMcpGateway;
+  readonly signal: AbortSignal;
+  readonly maxTurns: number;
+  readonly escalationPromptHandler: (prompt: EscalationPrompt) => Promise<EscalationResponse>;
+  readonly providerCredentialResolution: ProviderCredentialResolution;
+  readonly agentMode: "plan" | "build";
+  readonly permissionScope?: PermissionScope;
+  readonly interactiveAsk?: InteractiveAsk;
+  readonly historyMessages?: readonly SessionMessage[];
+  readonly storedPrompt?: SessionMessage;
+  readonly onTurnMessage?: (message: SessionMessage) => void;
+  readonly compaction?: CompactionSetup;
+  readonly cacheWarming?: CacheWarmingRunner;
+  readonly providerModeEnv?: string;  /** Tool visibility: disabledTools / hiddenToolPrefixes are applied from here. */
+  readonly runtimeConfig?: RuntimeConfig;
+  /** The model catalogue accepted with this operation's configuration. */
+  readonly providerCatalog?: readonly CatalogProvider[];
+  /** Skill loading the run was started with: named paths, and discovery off. */
+  readonly skillOptions?: {
+    readonly skillPaths?: readonly string[];
+    readonly noSkills?: boolean;
+  };
+  /** A validated one-use tool selection for this request only. */
+  readonly forcedTool?: string;
+  readonly systemPrompt?: string;
+  readonly appendSystemPrompt?: readonly string[];
+  readonly sdkSkills?: ReadonlyMap<string, import('../core/skills/skillLoader.js').Skill>;
+}
+
+export interface CliRuntimeInvocationRequest extends Omit<CliRuntimeInvocationInput, "providerModeEnv"> {
+  readonly providerMode: ProviderMode;
+  readonly thinkingEffort?: ThinkingPreference;
+  readonly thinkingEffortExplicit?: boolean;
+}
+
+export interface CliRuntimeInvocationResult {
+  readonly events: AsyncIterable<QueryEvent>;
+  /** Input the user can hand the run while it works; absent once it is over. */
+  readonly input?: Pick<TurnRun, "steer" | "followUp" | "pending" | "clearQueue">;
+}
+
+type ProviderReadinessChecker = (
+  input: Parameters<typeof checkRealProviderReadiness>[0],
+) => ReturnType<typeof checkRealProviderReadiness>;
+
+export interface CliRuntimeInvocationDependencies {
+  readonly checkProviderReadiness: ProviderReadinessChecker;
+  readonly createReadinessTerminalEvent: typeof createProviderReadinessCliTerminalEvent;
+  /** The model behind a real run; the default speaks to the configured provider. */
+  readonly createStep?: (request: CliRuntimeInvocationRequest, tools: ReadonlyMap<string, ToolDefinition>, discovery?: ToolDiscovery) => StepFunction;
+  readonly tools?: () => ReadonlyMap<string, ToolDefinition>;
+  readonly hooks?: HookDispatcher;
+}
+
+const defaultDependencies: CliRuntimeInvocationDependencies = {
+  checkProviderReadiness: checkRealProviderReadiness,
+  createReadinessTerminalEvent: createProviderReadinessCliTerminalEvent,
+};
+
+
+export function buildCliRuntimeInvocation(input: CliRuntimeInvocationInput): CliRuntimeInvocationRequest {
+  const providerMode: ProviderMode = input.providerModeEnv === "synthetic" ? "synthetic" : "real";
+  const { providerModeEnv: _providerModeEnv, ...request } = input;
+  const runtimeConfig = input.runtimeConfig ? scopedRuntimeConfig(input.runtimeConfig, input.workspaceRoot) : undefined;
+  const scoped = scopeAdmission(runtimeConfig?.configScopes, input.workspaceRoot);
+  return { ...request, ...(input.thinkingPreference ?? captureThinkingPreference(input.workspaceRoot, input.providerCredentialResolution.thinkingEffort)), providerMode,
+    ...(runtimeConfig ? { runtimeConfig } : {}),
+    ...(runtimeConfig?.configScopes ? { maxTurns: Math.min(input.maxTurns, runtimeConfig.maxTurns), admission: () => input.admission?.() ?? scoped() } : {}) };
+}
+
+/**
+ * Run one prompt.
+ *
+ * A real provider is checked for readiness first, so a missing key stops the
+ * run with one actionable line instead of a request that fails later. Both
+ * modes then drive the same turn; only the model behind it differs.
+ */
+export async function runCliRuntimeInvocation(
+  input: CliRuntimeInvocationInput,
+  dependencies: CliRuntimeInvocationDependencies = defaultDependencies,
+): Promise<CliRuntimeInvocationResult> {
+  const gateway = input.mcpGateway ?? new CoreMcpGateway(input.workspaceRoot);
+  const request = buildCliRuntimeInvocation({ ...input, mcpGateway: gateway });
+  try {
+    if (!request.virtualModel) assertScopedModel(request.runtimeConfig, request.providerCredentialResolution);
+    const run = request.providerMode === "real" && !request.virtualModel
+      ? await deferUntilReady(request, dependencies)
+      : await startTurn(request, dependencies);
+    if (input.mcpGateway) return run;
+    return {
+      ...run,
+      events: (async function* () {
+        try { yield* run.events; }
+        finally { await gateway.close(); }
+      })(),
+    };
+  } catch (error) {
+    if (!input.mcpGateway) await gateway.close();
+    throw error;
+  }
+}
+
+function deferUntilReady(
+  request: CliRuntimeInvocationRequest,
+  dependencies: CliRuntimeInvocationDependencies,
+): CliRuntimeInvocationResult {
+  // Input typed before the run exists is held by the shared handle and handed
+  // over when `adopt` sees the run; see `pendingTurnInput`.
+  const buffered = pendingTurnInput();
+  const events = (async function* (): AsyncIterable<QueryEvent> {
+    assertAdmission(request.admission);
+    request.signal.throwIfAborted();
+    if (request.providerCredentialResolution.blocked) {
+      const reason = request.providerCredentialResolution.blocked;
+      yield dependencies.createReadinessTerminalEvent({ sessionId: request.sessionId, prompt: request.prompt,
+        stopReason: `Provider readiness failed (provider-readiness:auth): ${credentialBlockMessage(reason)}` });
+      return;
+    }
+    const catalog = request.providerCatalog ?? loadCatalog();
+    const target = request.providerCredentialResolution;
+    let baseUrl: string | undefined;
+    try { baseUrl = providerCredentialBaseUrl(catalog, target); }
+    catch {
+      yield dependencies.createReadinessTerminalEvent({ sessionId: request.sessionId, prompt: request.prompt,
+        stopReason: 'Provider readiness failed (provider-readiness:configuration): the selected endpoint conflicts with the account credential binding.' });
+      return;
+    }
+    if (catalogProvider(catalog, target.provider, baseUrl).ambiguous) {
+      yield dependencies.createReadinessTerminalEvent({ sessionId: request.sessionId, prompt: request.prompt,
+        stopReason: 'Provider readiness failed (provider-readiness:configuration): multiple model catalogue entries claim this endpoint.' });
+      return;
+    }
+    // Renewed before the readiness check, because the check is what tells the user
+    // the credential is usable: one that passes on a token about to expire produces
+    // a run that fails a minute later with no hint that the login is the reason.
+    const renewed = await renewStoredAccount({
+      admission: request.admission,
+      workspaceRoot: request.workspaceRoot,
+      sessionId: request.sessionId,
+      resolution: request.providerCredentialResolution,
+      fetchImpl: admittedFetch(providerFetch(request.runtimeConfig), request.admission),
+    });
+    if (renewed.stored) {
+      publishAccountRotation(renewed.rotation, () => request.onCredentialPersisted?.(renewed.rotation), request.checkpoint?.accountPublication);
+    }
+    if (renewed.failure) {
+      // The same terminal shape a failed readiness check produces, because it is
+      // the same class of problem: the credential cannot be used, and the run
+      // cannot start.
+      yield dependencies.createReadinessTerminalEvent({
+        sessionId: request.sessionId,
+        prompt: request.prompt,
+        stopReason: `Provider readiness failed (provider-readiness:auth): ${renewed.failure}`,
+      });
+      return;
+    }
+    assertAdmission(request.admission);
+    request.signal.throwIfAborted();
+    const resolution = request.providerCredentialResolution;
+    request = {
+      ...request,
+      providerCatalog: catalog,
+      ...(request.runtimeConfig && renewed.stored && renewed.accountAuth
+        ? { runtimeConfig: projectAccountAuth(request.runtimeConfig, resolution, renewed.accountAuth) } : {}),
+      providerCredentialResolution: {
+        ...resolution,
+        baseUrl: resolution.credential?.accountAuth ? resolution.baseUrl : baseUrl,
+        ...(renewed.accountAuth && resolution.credential ? {
+          credential: { ...resolution.credential, accountAuth: renewed.accountAuth },
+        } : {}),
+      },
+    };
+    const readiness = await dependencies.checkProviderReadiness({
+      provider: request.providerCredentialResolution.provider,
+      apiKey: request.providerCredentialResolution.credential?.apiKey ?? "",
+      accountAuth: request.providerCredentialResolution.credential?.accountAuth,
+      baseUrl,
+      model: request.providerCredentialResolution.model,
+      endpoint: providerCredentialEndpoint(catalog, request.providerCredentialResolution, baseUrl) ?? DEFAULT_ENDPOINT_KIND,
+      signal: request.signal,
+      fetchImpl: admittedFetch(providerFetch(request.runtimeConfig), request.admission),
+    });
+    if (readiness.ok === false) {
+      yield dependencies.createReadinessTerminalEvent({
+        sessionId: request.sessionId,
+        prompt: request.prompt,
+        stopReason: readiness.failure.stopReason,
+      });
+      return;
+    }
+    const run = await startTurn(request, dependencies);
+    buffered.adopt(run);
+    yield* run.events;
+  })();
+  return { events, input: buffered.input };
+}
+
+/**
+ * The compaction setup with the request's fixed overhead attached.
+ *
+ * A no-op when there is no compaction to configure. The overhead is attached to
+ * the policy rather than passed separately so every reader of that policy — the
+ * automatic threshold and the `/compact` command — sees the same number, which
+ * is the reason the two share a policy in the first place.
+ */
+export function withRequestOverhead(
+  compaction: CompactionSetup | undefined,
+  overhead: RequestOverhead,
+  currentOverhead?: () => RequestOverhead,
+  currentPromptIdentity?: () => PromptIdentitySnapshot | undefined,
+): CompactionSetup | undefined {
+  if (!compaction) return undefined;
+  const current = () => currentOverhead?.() ?? overhead;
+  const promptIdentity = () => ({ ...currentPromptIdentity?.(), ...requestIdentity(current()) });
+  return { ...compaction, policy: { ...compaction.policy,
+    get overhead() { return current(); },
+    get promptIdentity() { return promptIdentity(); } } };
+}
+
+/**
+ * Steps a delegated run gets when its definition declares none.
+ *
+ * A subagent has no user watching it, so nothing else would end one that loops.
+ */
+const SUBAGENT_DEFAULT_STEPS = 20;
+
+async function startTurn(
+  request: CliRuntimeInvocationRequest,
+  dependencies: CliRuntimeInvocationDependencies,
+): Promise<CliRuntimeInvocationResult> {
+  assertAdmission(request.admission);
+  request = { ...request, ...request.prepareProviderResources?.(request.providerCredentialResolution),
+    providerCatalog: request.providerCatalog ?? loadCatalog(),
+    ...(request.virtualModel ? { cacheWarming: undefined } : {}) };
+  const admittedHooks = readInputAdmission(request.inputAdmission, {sessionId:request.sessionId, workspaceRoot:request.workspaceRoot,
+    text:request.effectiveInput ?? request.prompt, images:request.attachments?.images, signal:request.signal});
+  const hooks = admittedHooks ?? prepareSessionHooks({workspaceRoot:request.workspaceRoot, admission:request.admission,
+    escalationPromptHandler:request.escalationPromptHandler, allowUntrustedHooks:request.runtimeConfig?.allowUntrustedHooks}, dependencies.hooks);
+  const { tools, discovery, promptContext, currentOverhead } = await preparePromptRequest({
+    ...request, toolsAvailable: providerToolsAvailable(request),
+  }, dependencies.tools);
+  let runtimePromptIdentity = request.readPromptIdentity?.();
+  const publishPromptIdentity = (identity?: PromptIdentitySnapshot): void => {
+    runtimePromptIdentity = identity ?? { ...runtimePromptIdentity, ...requestIdentity(currentOverhead()) };
+    request.onPromptIdentity?.(runtimePromptIdentity);
+  };
+  publishPromptIdentity();
+  discovery?.subscribe(publishPromptIdentity);
+  const compaction = withRequestOverhead(request.compaction, currentOverhead(), currentOverhead, () => runtimePromptIdentity);
+  // The step and the tool set both exist here, so this is where a subagent's
+  // run can be bound. The tool layer receives a function and never the model
+  // side, which is what keeps a provider out of a layer that has no business
+  // holding one.
+  // One step for the whole invocation. A second one would be a second provider
+  // resolution, and the run and its subagents would not necessarily be talking
+  // to the same model. The step and the budget are handed over as a host; the
+  // turn composes the runner from its own gate, so the user's refusals reach a
+  // subagent's tool calls too.
+  const baseStep = request.providerMode === "synthetic"
+    ? createSyntheticStep({ toolIntent: syntheticToolIntent() })
+    : dependencies.createStep
+      ? dependencies.createStep(request, tools, discovery)
+      : createProviderStep(request, tools, promptContext, discovery);
+  const forModel = delegatedSteps(request, tools, promptContext, baseStep, discovery);
+  const control = request.stepControl?.({ step: baseStep, forModel, tools, hooks });
+  const step = control?.step ?? baseStep;
+
+  const run = runTurn({
+    inputAdmission:request.inputAdmission,
+    effectiveInput:request.effectiveInput,
+    modelCatalog: sessionModelCatalog(request.workspaceRoot, request.sessionId, request.providerCatalog ?? []),
+    ...(request.convertToLlm ? { convertToLlm: request.convertToLlm } : {}),
+    configScope: toolScopeBinding(request.runtimeConfig),
+    ...(discovery ? { toolSnapshot: () => discovery.snapshot() } : {}),
+    observe: control?.observe,
+    background: request.background,
+    checkpoint: request.checkpoint,
+    checkpointError: request.checkpointError,
+    onPromptIdentity: publishPromptIdentity,
+    commandProof: request.commandProof,
+    correlationId: request.correlationId,
+    goalObjective: request.goalObjective,
+    claimBudgetSummary: request.requestPolicy?.claimBudgetSummary,
+    admission: request.admission,
+    commandEnv: commandEnvironmentFor(request),
+    subagentHost: {
+      step,
+      defaultModel: request.runtimeConfig?.sessionModelRoles?.subagent,
+      modelRoles: { ...request.runtimeConfig?.sessionModelRoles },
+      defaultMaxSteps: SUBAGENT_DEFAULT_STEPS,
+      stepForModel: (model, admission, effort, workspace) => forModel(model, admission, effort, undefined, workspace),
+      prepareModel: (model, admission, effort, workspace, publication) => forModel.prepare(model, admission, effort, workspace, publication),
+      acceptsTools: model => forModel.acceptsTools(model),
+      retry: { enabled: request.runtimeConfig?.retryEnabled, maxRetries: request.runtimeConfig?.retryMaxRetries,
+        baseDelayMs: request.runtimeConfig?.retryBaseDelayMs, maxDelayMs: request.runtimeConfig?.retryMaxDelayMs },
+    },
+    sessionId: request.sessionId,
+    // The directory the session writes to, so a consumer of the event stream can
+    // find the transcript without reconstructing the layout itself. Omitted when the
+    // session's files are not where the default layout says, in which case there is
+    // nothing true to report.
+    ...sessionPathOption(request.sessionId),
+    prompt: request.prompt,
+    ...(request.onPromptAccepted ? { onPromptAccepted: request.onPromptAccepted } : {}),
+    ...(request.continuityContext ? { continuityContext: request.continuityContext } : {}),
+    ...(request.attachments ? { attachments: request.attachments } : {}),
+    workspaceRoot: request.workspaceRoot,
+    workspaceRoots: decodeWorkspaceRoots(request.workspaceRoots),
+    agentMode: request.agentMode,
+    permissionScope: request.permissionScope,
+    escalationPromptHandler: request.escalationPromptHandler,
+    interactiveAsk: request.interactiveAsk,
+    history: request.historyMessages ?? [],
+    storedPrompt: request.storedPrompt,
+    onMessage: request.onTurnMessage ?? (() => {}),
+    step,
+    tools,
+    hooks,
+    maxSteps: request.maxTurns,
+    ...(request.allowedTools ? { allowedTools: request.allowedTools } : {}),
+    compaction,
+    ...(request.cacheWarming ? { cacheWarming: request.cacheWarming } : {}),
+    signal: request.signal,
+    // Read once per run: a policy that changed mid-run would make the number of
+    // retries depend on when the config was reloaded rather than on what the
+    // user asked for.
+    retry: {
+      enabled: request.runtimeConfig?.retryEnabled,
+      maxRetries: request.runtimeConfig?.retryMaxRetries,
+      baseDelayMs: request.runtimeConfig?.retryBaseDelayMs,
+      maxDelayMs: request.runtimeConfig?.retryMaxDelayMs,
+    },
+    denyRules: request.runtimeConfig?.denyRules ?? [],
+    ...(request.runtimeConfig?.steeringMode ? { steeringMode: request.runtimeConfig.steeringMode } : {}),
+    ...(request.runtimeConfig?.followUpMode ? { followUpMode: request.runtimeConfig.followUpMode } : {}),
+  });
+  return { events: run.events, input: run };
+}
+
+/**
+ * What a command the model runs should know about the session it runs in.
+ *
+ * Resolved here, once per turn, because this is where the workspace, the session
+ * id and the resolved provider are all in hand. Each value is read fresh rather
+ * than cached for the session: switching model or reasoning level mid-session
+ * has to reach the next command, not the one after a restart.
+ *
+ * A value that cannot be resolved is left out rather than sent empty. A command
+ * cannot tell an empty session id from a missing one, and would report the
+ * former as fact.
+ */
+function commandEnvironmentFor(request: CliRuntimeInvocationRequest): Record<string, string> {
+  const facts: Record<string, string> = {};
+  const sessionId = request.sessionId?.trim();
+  if (sessionId) facts.sessionId = sessionId;
+
+  if (sessionId) {
+    try {
+      const layout = createSessionStoreLayout();
+      const file = locateExistingSessionLayout(layout, sessionId);
+      if (file.transcriptPath) facts.sessionFile = file.transcriptPath;
+    } catch {
+      // A session file that cannot be located is not a reason to withhold the
+      // rest of the facts.
+    }
+  }
+
+  const resolution = request.providerCredentialResolution;
+  if (resolution.provider) facts.provider = resolution.provider;
+  if (resolution.model) facts.model = resolution.model;
+
+  if (request.thinkingEffort) facts.reasoningLevel = request.thinkingEffort;
+
+  return commandEnvironment(process.env, facts) as Record<string, string>;
+}
+
+/**
+ * The fetch every provider request goes through.
+ *
+ * A host with no configured timeouts still gets the built-in ones, which is the
+ * point of wiring this in at all: the live path previously used the global fetch
+ * and therefore had no deadline whatsoever.
+ */
+function providerFetch(runtimeConfig: RuntimeConfig | undefined): typeof fetch {
+  return providerFetchFromTimeouts(providerTimeoutsFrom(runtimeConfig));
+}
+
+/**
+ * The session's directory as a turn option, or nothing when it cannot be located.
+ *
+ * Resolved rather than assumed: a session created against a non-default store is the
+ * case this exists for, and reporting the default path there would be worse than
+ * reporting nothing.
+ */
+function sessionPathOption(sessionId: string): { readonly sessionPath: string } | Record<string, never> {
+  // Only a directory that exists is reported. The locator returns a path whether or
+  // not the session has been written, and reporting one that is not there would tell
+  // a consumer to look somewhere with nothing in it.
+  try {
+    const candidate = locateExistingSessionLayout(createSessionStoreLayout(), sessionId).sessionDir;
+    return fs.existsSync(candidate) ? { sessionPath: candidate } : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * The endpoint kind a provider is reached through, when the catalog names one.
+ *
+ * Read once per step function, like the request shape: a run that changed
+ * endpoint mid-answer would send half a reply to one protocol and half to
+ * another.
+ */

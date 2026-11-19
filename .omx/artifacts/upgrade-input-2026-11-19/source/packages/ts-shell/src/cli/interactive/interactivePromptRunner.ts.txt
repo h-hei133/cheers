@@ -1,0 +1,85 @@
+import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
+import { runResumeLikeShellAction } from "../../core/shell/continueShellActionRuntime.js";
+import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
+import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
+import type { ResumeLikeShellAction } from "../../core/shell/shellActionBridge.js";
+import type { StructuredLogger } from "../../observability/structuredLogger.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
+import type { SessionManager } from "../../session/SessionManager.js";
+import {
+  executeResolvedPromptTurn,
+} from "../../entrypoints/cliRuntimeModule.js";
+import { renderSessionCommandMap } from "../../entrypoints/slashCommandRegistry.js";
+import { switchRuntimeSessionProjectContext } from "../../entrypoints/cliSessionModule.js";
+
+export async function runInteractiveResumeAction(input: {
+  readonly sessionSelection?: import('../../session/navigation/selection.js').SavedSessionSelection;
+  readonly slashResult: ResumeLikeShellAction;
+  readonly fallbackSessionId?: string;
+  readonly sessionManager: SessionManager;
+  readonly runtimeContext: ShellRuntimeContext;
+  readonly renderer: StreamingRenderer;
+  readonly turnNumber: number;
+  readonly sessionRuntime: ShellSessionRuntime;
+  readonly logger: StructuredLogger;
+}): Promise<{ readonly turnNumber: number }> {
+  const resumeBridge = await runResumeLikeShellAction({
+    ...(input.sessionSelection ? { sessionSelection: input.sessionSelection } : {}),
+    slashResult: input.slashResult,
+    source: "interactive",
+    printMode: false,
+    fallbackSessionId: input.fallbackSessionId,
+    sessionManager: input.sessionManager,
+    runtimeContext: input.runtimeContext,
+    renderer: input.renderer,
+    turnNumber: input.turnNumber,
+    switchRuntimeSessionProjectContext,
+    renderSessionCommandMap,
+    executeResolvedPromptTurn: (turnInput) => {
+      return executeResolvedPromptTurn({
+        source: "interactive",
+        effectivePrompt: turnInput.effectivePrompt,
+        runtimeSeed: turnInput.runtimeSeed,
+        continuityState: turnInput.continuityState,
+        sessionManager: input.sessionManager,
+        runtimeContext: input.runtimeContext,
+        sessionRuntime: input.sessionRuntime,
+        logger: input.logger,
+        printMode: false,
+        turnNumber: turnInput.turnNumber,
+        renderer: input.renderer,
+        turnOrigin: turnInput.turnOrigin,
+      });
+    },
+  });
+  return { turnNumber: resumeBridge.turnNumber };
+}
+
+export async function runInteractivePromptExecution(input: {
+  readonly inputSource?: import('../../core/shell/input/contract.js').PromptInputRequest['source'];
+  readonly promptMetadata?: Record<string, unknown>;
+  readonly effectivePrompt: string;
+  /** Images the draft referred to; see `PromptAttachments`. */
+  readonly attachments?: PromptAttachments;
+  readonly sessionManager: SessionManager;
+  readonly runtimeContext: ShellRuntimeContext;
+  readonly sessionRuntime: ShellSessionRuntime;
+  readonly logger: StructuredLogger;
+  readonly renderer: StreamingRenderer;
+  readonly turnNumber: number;
+}): Promise<void> {
+  await executeResolvedPromptTurn({
+    inputSource:input.inputSource,
+    source: "interactive",
+    effectivePrompt: input.effectivePrompt,
+    ...(input.promptMetadata ? { promptMetadata: input.promptMetadata } : {}),
+    ...(input.attachments ? { attachments: input.attachments } : {}),
+    sessionManager: input.sessionManager,
+    runtimeContext: input.runtimeContext,
+    sessionRuntime: input.sessionRuntime,
+    logger: input.logger,
+    printMode: false,
+    turnNumber: input.turnNumber,
+    renderer: input.renderer,
+  });
+}
