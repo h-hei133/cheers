@@ -19,6 +19,16 @@ import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 let root: string;
 let log: string;
 let gateway: CoreMcpGateway;
+function addSlowServer(): string {
+  const target = path.join(root, ".cheers.mcp.json");
+  const config = JSON.parse(fs.readFileSync(target, "utf8"));
+  const slow = path.join(root, "slow.jsonl");
+  config.mcpServers = { slow: { transport: "stdio", command: process.execPath,
+    args: [path.resolve("src/core/mcp/fixtures/mockMcpServer.mjs"), "--log", slow, "--initialize-hang"] }, ...config.mcpServers };
+  fs.writeFileSync(target, JSON.stringify(config));
+  return slow;
+}
+
 function starts(): number[] {
   return fs.readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
     .filter(event => event.event === "start").map(event => event.pid);
@@ -97,10 +107,53 @@ it("shows exactly the model pool, including skills and MCP, then reflects change
   expect(filtered.output).not.toContain("| mcp__");
   configuration.publish(configuration.begin(binding), { ...runtimeConfig, allowedTools: [], enableMcpTools: false }, binding);
   expect((await runToolsCommand([], { cwd: root, getToolPool })).output).toContain("### Tools (0)");
-  expect(snapshot).toHaveBeenCalledTimes(3);
+  expect(snapshot).toHaveBeenCalledTimes(2);
   configuration.publish(configuration.begin(binding), { ...runtimeConfig, configValidation: { valid: false, securityBlocked: true } }, binding);
   await expect(getToolPool()).rejects.toThrow('Configuration cannot be used for requests');
-  expect(snapshot).toHaveBeenCalledTimes(3);
+  expect(snapshot).toHaveBeenCalledTimes(2);
+});
+
+it.each(['allowlist', 'forced', 'none'] as const)('uses the %s tool scope before starting MCP transports', async scope => {
+  const slow = addSlowServer();
+  await gateway.close();
+  gateway = new CoreMcpGateway(root, undefined, undefined, 1500);
+  const name = 'mcp__local__echo_message';
+  const base = input();
+  const runtimeConfig = scope === 'forced' ? base.runtimeConfig : { ...base.runtimeConfig!, allowedTools: scope === 'none' ? ['read'] : [name] };
+  let names: string[] = [];
+  const run = await runCliRuntimeInvocation({ ...base, runtimeConfig, mcpGateway: gateway, providerModeEnv: 'real',
+    ...(scope === 'forced' ? { forcedTool: name, allowedTools: [name] } : {}) }, {
+    checkProviderReadiness: async () => ({ ok: true }), hooks: new HookDispatcher(),
+    createStep: (_request, tools) => {
+      names = [...tools.keys()];
+      return async () => ({ text: 'finished', toolCalls: [], stopReason: 'stop' });
+    },
+  });
+  for await (const _event of run.events) { /* Consume the real turn lifecycle. */ }
+  expect(names).toEqual(scope === 'none' ? ['read'] : [name]);
+  expect(fs.existsSync(slow)).toBe(false);
+  expect(fs.existsSync(log)).toBe(scope !== 'none');
+  if (scope !== 'none') {
+    expect(gateway.peekSnapshot()).toBeUndefined();
+    expect(gateway.peekSnapshot(server => server === 'local')?.tools.map(tool => tool.qualifiedName)).toEqual([name]);
+  }
+});
+
+it('keeps discovered MCP tools in the unrestricted search and load catalogue', async () => {
+  const base = input();
+  const name = 'mcp__local__echo_message';
+  let discovered: boolean | undefined;
+  const run = await runCliRuntimeInvocation({ ...base, runtimeConfig: { ...base.runtimeConfig!, toolDiscovery: 'dynamic' },
+    mcpGateway: gateway, providerModeEnv: 'real' }, {
+    checkProviderReadiness: async () => ({ ok: true }), hooks: new HookDispatcher(),
+    createStep: (_request, tools, discovery) => {
+      discovered = discovery !== undefined && !tools.has(name) && discovery.load([name]).loaded.includes(name) && discovery.snapshot().has(name);
+      return async () => ({ text: 'finished', toolCalls: [], stopReason: 'stop' });
+    },
+  });
+  for await (const _event of run.events) { /* Consume the real turn lifecycle. */ }
+  expect(discovered).toBe(true);
+  expect(starts()).toHaveLength(1);
 });
 
 it.each(["allow-once", "deny"] as const)("runs an annotated plan MCP call only after %s", async decision => {

@@ -69,6 +69,8 @@ export interface McpClientSnapshot {
   readonly tools: McpToolDescriptor[]
 }
 
+export type McpServerFilter = (serverName: string) => boolean
+
 export interface McpToolCallResult {
   readonly content: string
   readonly isError?: boolean

@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { loadToolCatalog } from './catalog.js';
 import type { McpToolDescriptor } from '../mcp/types.js';
+import { mcpCatalogFilter } from './mcp.js';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import { registerCatalogContribution } from '../catalog/contributions.js';
 import { assertScopeToolAllowed } from '../../config/scope/tools.js';
@@ -52,6 +53,23 @@ it('keeps an empty dynamic catalogue empty without adding discovery overhead', a
   const catalog = await loadToolCatalog({ workspaceRoot: process.cwd(), discover: true,
     catalogContent: { skills: new Map(), tools: [] } }, () => new Map());
   expect(catalog.tools.size).toBe(0); expect(catalog.discovery).toBeUndefined();
+});
+
+it('retains ambiguous qualified-name prefixes until the real servers list tools', () => {
+  const config = { enableMcpTools: true, disabledTools: [], hiddenToolPrefixes: [], allowedTools: ['mcp__notes___item'] } as unknown as RuntimeConfig;
+  const filter = mcpCatalogFilter(config);
+  expect(typeof filter).toBe('function');
+  if (!filter) throw new Error('Expected selected MCP servers');
+  expect(['notes', 'notes_', 'notes-room'].filter(filter)).toEqual(['notes', 'notes_']);
+});
+
+it('limits a fixed child catalogue to the captured descriptor owners', () => {
+  const config = { enableMcpTools: true, disabledTools: [], hiddenToolPrefixes: [] } as unknown as RuntimeConfig;
+  const descriptor: McpToolDescriptor = { serverName: 'notes_', toolName: 'item', qualifiedName: 'mcp__notes___item', description: '', inputSchema: {} };
+  const filter = mcpCatalogFilter(config, 'codemode', [descriptor]);
+  expect(['notes', 'notes_'].filter(filter || (() => false))).toEqual(['notes_']);
+  expect(mcpCatalogFilter(config, 'codemode', [])).toBe(false);
+  expect(mcpCatalogFilter(config, 'codemode')).toBeUndefined();
 });
 
 it('keeps captured child content and MCP permission hints from widening at startup', async () => {

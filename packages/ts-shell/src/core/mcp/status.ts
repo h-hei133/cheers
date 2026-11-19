@@ -97,6 +97,11 @@ export function unknownServer(name: string): McpGatewayBlockedError {
   });
 }
 
+export function unavailableServer(state: Exclude<McpConnectionState, { type: 'connected' }>): McpGatewayBlockedError {
+  return new McpGatewayBlockedError({ message: describeUnavailableServer(state), blockerKind: 'environment-not-ready',
+    mcpFailureClass: failureClassForConnectionState(state), doNext: describeMcpConnectionState(state).doNext });
+}
+
 export function failureClassForConnectionState(
   state: Exclude<McpConnectionState, { type: "connected" }>,
 ): McpFailureClass {

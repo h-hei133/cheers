@@ -18,7 +18,10 @@ describe("runtime catalog source", () => {
   it("honors disabled skills and current tool visibility, reusing a pending catalog without connecting", async () => {
     const ctx = context();
     const snapshot = vi.fn(() => { throw new Error("must not connect"); });
-    const peekSnapshot = vi.fn(() => ({ clients: [], tools: [{ serverName: "fixture", toolName: "read", qualifiedName: "mcp__fixture__read", description: "Fixture read", inputSchema: { type: "object", properties: {} } }] }));
+    const peekSnapshot = vi.fn<NonNullable<CliMcpGateway['peekSnapshot']>>(filter => {
+      if (!filter?.('fixture') || filter('cold')) return undefined;
+      return { clients: [], tools: [{ serverName: "fixture", toolName: "read", qualifiedName: "mcp__fixture__read", description: "Fixture read", inputSchema: { type: "object", properties: {} } }] };
+    });
     const load = createCatalogLoader(() => ctx, { snapshot, peekSnapshot } as unknown as CliMcpGateway, []);
     expect(await load("skill", new AbortController().signal)).toEqual([]);
     const first = load("tools", new AbortController().signal);
@@ -31,6 +34,8 @@ describe("runtime catalog source", () => {
     const binding = ctx.configuration.current.binding;
     ctx.configuration.publish(ctx.configuration.begin(binding), { ...ctx.runtimeConfig, disabledTools: ["mcp__fixture__read"] }, binding);
     expect(catalogIdentity(ctx)).not.toBe(before);
+    expect(await load('tools', new AbortController().signal)).toEqual([]);
+    expect(peekSnapshot).toHaveBeenCalledOnce();
   });
 
   it("does not reuse a read that predates explicit catalog invalidation", async () => {

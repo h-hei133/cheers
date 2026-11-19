@@ -30,7 +30,7 @@ export function installRuleControlRuntime(input: { readonly runtimeContext: Shel
         && captureWorkspaceRoot(cwd, cwd, 'read').identity === root.identity && ticket === version; }
       catch { return false; }
     };
-    const available = await toolPoolFor(context, input.mcpGateway)();
+    const available = await toolPoolFor(context, input.mcpGateway, name)();
     if (!current()) throw new Error('Tool selection session, workspace or configuration changed.');
     if (!available.has(name)) throw new Error("Tool '" + name + "' is not available in the current tool pool.");
     pending = { tool: name, current };

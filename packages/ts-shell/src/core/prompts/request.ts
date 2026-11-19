@@ -10,7 +10,6 @@ export interface PromptRequestInput extends ToolCatalogInput {
   readonly agentMode?: 'plan' | 'build';
   /** Captured model capability; it changes the request, not the tool gate's pool. */
   readonly toolsAvailable?: boolean;
-  readonly forcedTool?: string;
   readonly allowedTools?: readonly string[];
   readonly systemPrompt?: string;
   readonly appendSystemPrompt?: readonly string[];

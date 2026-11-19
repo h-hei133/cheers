@@ -1,7 +1,11 @@
 import { assertAdmission, type Admission } from '../../network/admission.js';
 import { isMcpConfigLoadError } from '../config.js';
 import { McpGatewayBlockedError } from '../status.js';
-import type { ScopedMcpServerConfig } from '../types.js';
+import type { McpServerFilter, ScopedMcpServerConfig } from '../types.js';
+
+export function selectMcpServers(configs: Record<string, ScopedMcpServerConfig>, filter?: McpServerFilter) {
+  return filter ? Object.fromEntries(Object.entries(configs).filter(([name]) => filter(name))) : configs;
+}
 
 /** Keep a selected definition and its original operation owner through reconnect. */
 export function mcpSelectionAdmission(load: () => Record<string, ScopedMcpServerConfig>, name: string,

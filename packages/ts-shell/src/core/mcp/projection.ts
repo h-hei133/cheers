@@ -1,6 +1,12 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpToolCallResult } from "./types.js";
 
+export const MCP_TOOL_PREFIX = 'mcp__';
+
+export function mcpServerToolPrefix(serverName: string): string {
+  return MCP_TOOL_PREFIX + serverName + '__';
+}
+
 /** Preserve text and structured results; surface content our tool boundary cannot carry. */
 export function projectMcpResult(result: CallToolResult): McpToolCallResult {
   const parts: string[] = [];

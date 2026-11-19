@@ -65,11 +65,11 @@ export class CoreMcpConnectionManager {
     return this.close();
   }
 
-  async close(name?: string): Promise<void> {
-    const entries = name === undefined ? [...this.clients] : [...this.clients].filter(([key]) => key === name);
+  async close(target?: string | ReadonlySet<string>): Promise<void> {
+    const entries = [...this.clients].filter(([key]) => target === undefined || (typeof target === 'string' ? key === target : target.has(key)));
     const results = await Promise.allSettled(entries.map(async ([key, client]) => {
       await client.close();
-      this.clients.delete(key);
+      if (this.clients.get(key) === client) this.clients.delete(key);
     }));
     const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
     if (failures.length) throw new AggregateError(failures.map(result => result.reason), "MCP connection cleanup failed");

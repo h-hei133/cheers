@@ -8,7 +8,7 @@ import { McpHttpTransport } from './http/transport.js';
 import type { McpHttpAuthorization } from './http/fetch.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { McpToolCatalog } from "./catalog.js";
-import { projectMcpResult } from "./projection.js";
+import { mcpServerToolPrefix, projectMcpResult } from "./projection.js";
 import { McpContentChannel } from "./content/channel.js";
 import type { McpContentRequest, McpContentResult, McpNotificationSnapshot } from "./content/types.js";
 import { McpClassifiedError, classifyMcpFailure } from "./errorTaxonomy.js";
@@ -167,7 +167,7 @@ export class CoreMcpClient {
         for (const tool of result.tools) tools.push({
           serverName: this.name,
           toolName: tool.name,
-          qualifiedName: "mcp__" + this.name + "__" + tool.name,
+          qualifiedName: mcpServerToolPrefix(this.name) + tool.name,
           description: tool.description ?? "",
           inputSchema: tool.inputSchema,
           ...(tool.annotations ? { annotations: tool.annotations } : {}),

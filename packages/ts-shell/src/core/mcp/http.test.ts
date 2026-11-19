@@ -19,6 +19,7 @@ import { getRuntimeConfig } from '../../config/runtimeConfig.js';
 import { installRuleControlRuntime, takeForcedTool } from '../../cli/runtime/ruleControls.js';
 import { createCliMcpGateway } from '../../entrypoints/cliMcpModule.js';
 import { toolPoolFor } from '../../cli/runtime/tools.js';
+import { StructuredLogger } from '../../observability/structuredLogger.js';
 import * as callbackOwner from '../auth/oauth/callback.js';
 
 const cleanups: (() => Promise<void>)[] = [];
@@ -144,6 +145,9 @@ it('persists renewal before using its bearer token and never replays a lost tool
 
 it('uses the authenticated gateway for force selection and the next tool call, then refuses revoked credentials', async () => {
   const f = await fixture(); f.requireAuth(); expect((await f.auth()).report?.facts.status).toBe('persisted');
+  fs.writeFileSync(path.join(f.root, '.cheers.mcp.json'), JSON.stringify({ mcpServers: {
+    unrelated: { transport: 'http', url: f.origin + '/unrelated' }, remote: { transport: 'http', url: f.url },
+  } }));
   const context = createShellRuntimeContext({ cwd: f.root, projectRoot: f.root, gitRoot: null, originalCwd: f.root,
     rootMode: 'direct', targetPathBase: f.root, gitContext: { insideGit: false, root: null, branch: null, isClean: true },
     runtimeConfig: { ...getRuntimeConfig(f.root), enableMcpTools: true }, session: f.session });
@@ -151,14 +155,21 @@ it('uses the authenticated gateway for force selection and the next tool call, t
   installRuleControlRuntime({ runtimeContext: context, sessionManager: f.manager, mcpGateway: gateway });
   await expect(context.forceTool!('mcp__remote__echo')).resolves.toContain('Selected available tool');
   expect(takeForcedTool(context)).toBe('mcp__remote__echo');
-  const pool = await toolPoolFor(context, gateway)();
+  const pool = await toolPoolFor(context, gateway, 'mcp__remote__echo')();
   expect(await pool.get('mcp__remote__echo')!.execute({}, { taskId: 'forced', workspaceRoot: f.root })).toMatchObject({ success: true });
+  expect(f.calls.filter(call => call.route === '/unrelated')).toEqual([]);
   expect(f.calls.filter(call => call.body.includes('"method":"initialize"'))).toHaveLength(1);
   expect((await toolPoolFor(context)()).has('mcp__remote__echo')).toBe(true);
   fs.unlinkSync(f.service.target); await gateway.configurationChanged('remote');
-  await expect(context.forceTool!('mcp__remote__echo')).rejects.toThrow('not available');
+  const warnings = vi.spyOn(StructuredLogger.prototype, 'warn');
+  try {
+    await expect(context.forceTool!('mcp__remote__echo')).rejects.toThrow('not available');
+    expect(warnings).toHaveBeenCalledWith(expect.stringMatching(/remote \(needs-auth\).*\/mcp auth/));
+    expect(JSON.stringify(warnings.mock.calls)).not.toContain('RAW_REMOTE_SECRET_MUST_NOT_DISPLAY');
+  } finally { warnings.mockRestore(); }
   expect(takeForcedTool(context)).toBeUndefined();
   expect(f.calls.filter(call => call.body.includes('tools/call'))).toHaveLength(1);
+  expect(f.calls.filter(call => call.route === '/token')).toHaveLength(1);
 });
 
 it('cancels sign-in with no late token publication and refuses a mismatched callback state', async () => {

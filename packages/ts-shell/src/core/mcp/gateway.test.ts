@@ -435,6 +435,29 @@ describe("core MCP gateway (W3)", () => {
     }
   });
 
+  it('retires only the selected transports after a scoped snapshot deadline', async () => {
+    fs.writeFileSync(path.join(workspaceRoot, '.cheers.mcp.json'), JSON.stringify({ mcpServers: {
+      slow: { transport: 'stdio', command: 'never-spawn' }, ready: { transport: 'stdio', command: 'never-spawn' },
+    } }));
+    const connect = vi.spyOn(CoreMcpClient.prototype, 'connect').mockImplementation(async function () {
+      return { type: 'connected', name: this.name, config: this.config };
+    });
+    vi.spyOn(CoreMcpClient.prototype, 'listTools').mockImplementation(async function (_admission, signal) {
+      if (this.name === 'ready') return [];
+      return new Promise<never>((_, reject) => signal!.addEventListener('abort', () => reject(signal!.reason), { once: true }));
+    });
+    const close = vi.spyOn(CoreMcpClient.prototype, 'close').mockResolvedValue();
+    const gateway = new CoreMcpGateway(workspaceRoot, undefined, undefined, 100);
+    gateways.push(gateway);
+    const ready = (name: string) => name === 'ready';
+    expect((await gateway.snapshot(undefined, undefined, ready)).clients).toMatchObject([{ name: 'ready', type: 'connected' }]);
+    await expect(gateway.snapshot(undefined, undefined, name => name === 'slow')).rejects.toMatchObject({ mcpFailureClass: 'timeout-cancelled' });
+    expect(connect.mock.instances.map(client => client.name)).toEqual(['ready', 'slow']);
+    expect(close.mock.instances.map(client => client.name)).toEqual(['slow']);
+    await gateway.snapshot(undefined, undefined, ready);
+    expect(connect.mock.instances[2]).toBe(connect.mock.instances[0]);
+  });
+
   it("withholds a peeked snapshot when separate clients exceed the shared byte budget", async () => {
     const manager = new CoreMcpConnectionManager();
     const firstConfig: ScopedMcpServerConfig = { transport: "stdio", command: "never-spawn", scope: "user" };

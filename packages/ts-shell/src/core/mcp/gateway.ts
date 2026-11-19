@@ -7,11 +7,12 @@ import { projectTrust } from "../security/projectTrust.js";
 import { assertAdmission, type Admission } from '../network/admission.js';
 import type { McpContentRequest, McpContentResponse, McpNotificationSnapshot } from "./content/types.js";
 import { McpContentLifetime } from "./content/lifetime.js";
-import { mcpSelectionAdmission } from './config/selection.js';
+import { mcpSelectionAdmission, selectMcpServers } from './config/selection.js';
 import type { McpHttpAuthorization } from './http/fetch.js';
 import type {
   McpClientSnapshot,
   McpConnectionState,
+  McpServerFilter,
   McpToolCallResult,
   McpToolInvocation,
   ScopedMcpServerConfig,
@@ -27,7 +28,7 @@ import {
 } from './catalogLimit.js';
 
 export { describeMcpConnectionState, McpGatewayBlockedError, type McpGatewayBlockerKind } from "./status.js";
-import { describeMcpConnectionState, McpGatewayBlockedError, unknownServer, failureClassForConnectionState } from "./status.js";
+import { McpGatewayBlockedError, unavailableServer, unknownServer } from "./status.js";
 
 export class CoreMcpGateway {
   private workspaceRoot: string;
@@ -53,21 +54,21 @@ export class CoreMcpGateway {
     return loadMcpConfigs(this.workspaceRoot, !projectTrust.isProjectUntrusted(this.workspaceRoot));
   }
 
-  snapshot(admission = this.admissionForOperation?.(), signal?: AbortSignal): Promise<McpClientSnapshot> {
+  snapshot(admission = this.admissionForOperation?.(), signal?: AbortSignal, filter?: McpServerFilter): Promise<McpClientSnapshot> {
     return this.run(async () => {
       signal?.throwIfAborted();
       assertAdmission(admission);
       const configs = await this.prepare(admission);
       signal?.throwIfAborted();
-      return this.readSnapshot(configs, admission, signal);
+      return this.readSnapshot(selectMcpServers(configs, filter), admission, signal);
     }, signal);
   }
 
   /** Read existing catalogs only; workspace reconciliation belongs to explicit operations. */
-  peekSnapshot(): McpClientSnapshot | undefined {
+  peekSnapshot(filter?: McpServerFilter): McpClientSnapshot | undefined {
     const currentRoot = typeof this.root === "string" ? this.root : this.root();
     if (this.closed || currentRoot !== this.workspaceRoot) return undefined;
-    return this.connectionManager.peekSnapshot(this.loadConfigs());
+    return this.connectionManager.peekSnapshot(selectMcpServers(this.loadConfigs(), filter));
   }
 
   refresh(target: string = "all", options?: { exactTarget: boolean; signal?: AbortSignal;
@@ -108,13 +109,13 @@ export class CoreMcpGateway {
     return this.run(async () => {
       options?.signal?.throwIfAborted();
       assertAdmission(admission);
-      const configs = await this.prepare();
-      const config = configs[serverName];
+      const configs = await this.prepare(admission);
+      const config = Object.hasOwn(configs, serverName) ? configs[serverName] : undefined;
       if (!config) throw unknownServer(serverName);
       assertAdmission(admission);
       const client = this.connectionManager.get(serverName, config, this.workspaceRoot);
       const state = await client.connect(admission, options?.signal);
-      if (state.type !== "connected") throw this.createUnavailableServerBlockedError(state);
+      if (state.type !== "connected") throw unavailableServer(state);
       assertAdmission(admission);
       const liveTools = await client.listTools(admission, options?.signal);
       if (!liveTools.some(tool => tool.toolName === toolName && (options?.contractId === undefined || tool.contractId === options.contractId))) {
@@ -293,7 +294,7 @@ export class CoreMcpGateway {
           : undefined;
       if (limit) {
         let cleanupUnconfirmed = false;
-        try { await this.connectionManager.close(); }
+        try { await this.connectionManager.close(new Set(Object.keys(configs))); }
         catch { cleanupUnconfirmed = true; }
         throw new McpGatewayBlockedError({
           message: limit.message + (cleanupUnconfirmed ? '; MCP connection cleanup could not be confirmed.' : ''),
@@ -310,15 +311,4 @@ export class CoreMcpGateway {
     }
   }
 
-  private createUnavailableServerBlockedError(
-    state: Exclude<McpConnectionState, { type: "connected" }>,
-  ): McpGatewayBlockedError {
-    const description = describeMcpConnectionState(state);
-    return new McpGatewayBlockedError({
-      message: description.reason ?? "MCP server " + state.name + " is unavailable",
-      blockerKind: "environment-not-ready",
-      mcpFailureClass: failureClassForConnectionState(state),
-      doNext: description.doNext,
-    });
-  }
 }

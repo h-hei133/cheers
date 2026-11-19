@@ -14,6 +14,7 @@ import { createCatalogObservation } from "./observation.js";
 import { observeCatalogContributions } from '../../../core/catalog/contributions.js';
 import { sessionModelCatalog } from '../../../core/catalog/models.js';
 import { toolPoolFor } from "../../runtime/tools.js";
+import { mcpCatalogFilter } from '../../../core/tools/mcp.js';
 import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
 import type { CatalogKind } from "./request.js";
@@ -62,8 +63,9 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
     return navigationCatalog(kind, context, manager, onSource, signal);
   }
   if (kind === "theme") return [...new Set(["auto", ...listThemes(context.cwd, themePaths)])].map(value => ({ value, label: value, detail: "Select theme" }));
-  const snapshot = context.runtimeConfig.enableMcpTools ? gateway.peekSnapshot?.() : undefined;
-  if (context.runtimeConfig.enableMcpTools && !snapshot) throw new Error("Tool catalog unavailable");
+  const mcpFilter = mcpCatalogFilter(context.runtimeConfig);
+  const snapshot = mcpFilter === false ? undefined : gateway.peekSnapshot?.(mcpFilter);
+  if (mcpFilter !== false && !snapshot) throw new Error("Tool catalog unavailable");
   if (snapshot?.clients.some(client => client.type !== "connected")) throw new Error("Tool catalog unavailable");
   const tools = await toolPoolFor(context, snapshot ? { snapshot: async () => snapshot } : gateway)();
   return [...tools.values()].map(tool => ({ value: tool.name, label: tool.name, detail: tool.description.split("\n")[0]?.slice(0, 160) }));

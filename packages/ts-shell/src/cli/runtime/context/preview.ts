@@ -10,6 +10,7 @@ import { needsComposition } from '../../../core/commands/composition.js';
 import { compositionPlan } from '../../../core/commands/composition/plan.js';
 import { prepareComposition } from '../../../core/commands/composition/prepare.js';
 import { preparePromptRequest } from '../../../core/prompts/request.js';
+import { mcpCatalogFilter } from '../../../core/tools/mcp.js';
 import { foregroundTools, promptWithContext } from '../prompt.js';
 import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../../core/auth/account/target.js';
 import { DEFAULT_ENDPOINT_KIND, endpointShape, endpointTurnBody } from '../../../provider/endpoints/index.js';
@@ -95,8 +96,10 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
       && method.definition.name !== 'deep-research' && method.definition.name !== 'review'))) {
     throw new Error('Command request preparation is pending.');
   }
-  const snapshot = config.enableMcpTools ? gateway.peekSnapshot?.() : undefined;
-  if (config.enableMcpTools && (!snapshot || snapshot.clients.some(client => client.type !== 'connected'))) {
+  const forcedTool = context.peekForcedTool?.();
+  const mcpFilter = mcpCatalogFilter(config, forcedTool);
+  const snapshot = mcpFilter === false ? undefined : gateway.peekSnapshot?.(mcpFilter);
+  if (mcpFilter !== false && (!snapshot || snapshot.clients.some(client => client.type !== 'connected'))) {
     throw new Error('MCP catalogue is not ready for a complete estimate.');
   }
   const skills = await resolveSkillCatalog({ workspaceRoot: cwd, sessionId: expected.id, ...context.skillOptions, abortSignal: signal }, sources.track);
@@ -128,7 +131,6 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   assertContextBounds(entries);
   const access = sourceAccessFor(context, signal);
   for (const entry of entries) sources.track(entry.path);
-  const forcedTool = context.peekForcedTool?.();
   const ordinaryFeatures = foregroundTools(context);
   const features = research ? foregroundTools(context, researchPreviewTools(research.run)) : ordinaryFeatures;
   const featureIdentity = JSON.stringify(toolSchemas(new Map(ordinaryFeatures.map(tool => [tool.name, tool]))));
@@ -249,7 +251,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
         || selectedTarget?.replayOwner !== targetIdentity?.replayOwner) {
         throw new Error('Model request target changed.');
       }
-      if (config.enableMcpTools && JSON.stringify(gateway.peekSnapshot?.()) !== JSON.stringify(snapshot)) throw new Error('MCP catalogue changed.');
+      if (mcpFilter !== false && JSON.stringify(gateway.peekSnapshot?.(mcpFilter)) !== JSON.stringify(snapshot)) throw new Error('MCP catalogue changed.');
     } catch (error) {
       if (!suspended) review?.invalidate();
       throw error;

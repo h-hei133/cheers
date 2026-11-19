@@ -16,6 +16,7 @@ import { authorizationForMcp } from '../mcp/auth/service.js';
 export function toolPoolFor(
   context: ShellRuntimeContext,
   supplied?: ToolCatalogInput["mcpGateway"],
+  forcedTool?: string,
 ): NonNullable<CommandContext["getToolPool"]> {
   return async signal => {
     signal?.throwIfAborted();
@@ -30,7 +31,7 @@ export function toolPoolFor(
     try {
       return (await loadToolCatalog({ workspaceRoot, sessionId: context.session.id, runtimeConfig: director?.config ?? context.runtimeConfig, admission, signal,
         featureTools: [...researchInspectionTools(context), ...securityFeatureTools(context), ...sshFeatureTools(context), ...evaluationFeatureTools(context), ...director?.tools ?? []],
-        skillOptions: context.skillOptions, mcpGateway: supplied ?? owned })).tools;
+        skillOptions: context.skillOptions, forcedTool, mcpGateway: supplied ?? owned })).tools;
     } finally {
       await owned?.close();
     }

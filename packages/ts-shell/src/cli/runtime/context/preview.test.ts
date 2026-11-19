@@ -1701,6 +1701,21 @@ it('refuses unavailable MCP without connection and invalidates revoked attachmen
   await expect(load()).rejects.toThrow('MCP catalogue'); expect(gateway.snapshot).not.toHaveBeenCalled();
 });
 
+it('estimates only the eligible MCP scope without connecting a cold server', async () => {
+  const { context, gateway, load } = fixture();
+  const name = 'mcp__selected__read_data';
+  const config = { ...context.configuration.current.config, enableMcpTools: true, toolDiscovery: 'full' as const, allowedTools: [name] };
+  Object.assign(context, { configuration: new ConfigState(config, configurationBinding(context), context.configuration.current.catalog) });
+  const peekSnapshot = vi.fn<NonNullable<CliMcpGateway['peekSnapshot']>>(filter => {
+    if (!filter?.('selected') || filter('cold')) return undefined;
+    return { clients: [], tools: [{ serverName: 'selected', toolName: 'read_data', qualifiedName: name, description: '', inputSchema: {} }] };
+  });
+  Object.assign(gateway, { peekSnapshot });
+  const result = await load('question'); result.verify();
+  expect(peekSnapshot.mock.calls.length).toBeGreaterThanOrEqual(2);
+  expect(gateway.snapshot).not.toHaveBeenCalled();
+});
+
 it('estimates the exact attached snapshot with asynchronous content checks and no synchronous attachment read', async () => {
   const { cwd, context, load, layout, gateway } = fixture(); const file = path.join(cwd, 'context.txt');
   fs.writeFileSync(file, '\uFEFFattached\r\n中文 ' + 'facts '.repeat(100));
