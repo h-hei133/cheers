@@ -7,6 +7,12 @@ export interface MetricSample {
   total: number;
   max: number;
   readonly tags: Readonly<Record<string, string>>;
+  buckets?: readonly number[];
+  runId?: string;
+}
+
+export function validMetricRunId(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{16}$/.test(value) && !/^0+$/.test(value);
 }
 
 /** Preserve unit and tag boundaries even when names or values contain separators. */
@@ -21,7 +27,9 @@ export function aggregateMetrics(samples: readonly MetricSample[]): MetricSample
     const entry = groups.get(key);
     if (entry) {
       entry.count += sample.count; entry.total += sample.total; entry.max = Math.max(entry.max, sample.max);
-    } else groups.set(key, { ...sample });
+      if (sample.buckets) entry.buckets = entry.buckets?.map((count, index) => count + sample.buckets![index]!) ?? [...sample.buckets];
+      if (sample.runId) entry.runId = sample.runId;
+    } else groups.set(key, { ...sample, ...(sample.buckets ? { buckets: [...sample.buckets] } : {}) });
   }
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name) || a.unit.localeCompare(b.unit));
 }

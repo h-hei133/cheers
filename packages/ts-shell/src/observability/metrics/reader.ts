@@ -6,7 +6,8 @@ import {
   orderedLogFiles,
   tailLines,
 } from '../logs/files.js';
-import { METRIC_TAGS, type MetricSample } from './model.js';
+import { METRIC_TAGS, validMetricRunId, type MetricSample } from './model.js';
+import { readHistogram } from './histogram.js';
 
 export interface MetricRead {
   readonly samples: readonly MetricSample[];
@@ -16,10 +17,11 @@ export interface MetricRead {
   readonly limit: number;
   readonly filesTruncated?: boolean;
   readonly bytesRead?: number;
+  readonly runId?: string;
 }
 
 /** Latest matching samples from bounded file tails, including prior processes and rotations. */
-export function readMetrics(directory: string, currentPath: string, limit: number): MetricRead {
+export function readMetrics(directory: string, currentPath: string, limit: number, runId?: string): MetricRead {
   let enumerationFailed = false; let unreadableFiles = 0; let filesTruncated = false;
   const files = orderedLogFiles(directory, currentPath, {
     maxEntries: LOG_DIRECTORY_ENTRIES, maxFiles: LOG_FILE_LIMIT,
@@ -28,7 +30,7 @@ export function readMetrics(directory: string, currentPath: string, limit: numbe
       if (target === 'directory') enumerationFailed = true; else unreadableFiles++;
     },
   });
-  if (enumerationFailed) return { samples: [], status: 'unavailable', filesInspected: 0, unreadableFiles: 0, limit };
+  if (enumerationFailed) return { samples: [], status: 'unavailable', filesInspected: 0, unreadableFiles: 0, limit, runId };
   const samples: MetricSample[] = [];
   let filesInspected = unreadableFiles;
   let bytesRead = 0;
@@ -45,11 +47,11 @@ export function readMetrics(directory: string, currentPath: string, limit: numbe
     catch { unreadableFiles++; continue; }
     for (let index = lines.length - 1; index >= 0 && samples.length < limit; index--) {
       const sample = parseMetric(lines[index]!);
-      if (sample) samples.push(sample);
+      if (sample && (runId === undefined || sample.runId === runId)) samples.push(sample);
     }
     if (samples.length === limit) break;
   }
-  return { samples: samples.reverse(), filesInspected, unreadableFiles, limit, filesTruncated, bytesRead,
+  return { samples: samples.reverse(), filesInspected, unreadableFiles, limit, filesTruncated, bytesRead, runId,
     status: unreadableFiles || filesTruncated
       ? unreadableFiles === filesInspected && samples.length === 0 ? 'unavailable' : 'partial'
       : 'reported' };
@@ -65,10 +67,12 @@ function parseMetric(line: string): MetricSample | undefined {
   const total = legacy ?? fields.total;
   const count = legacy !== undefined ? 1 : fields.count;
   const max = legacy ?? fields.max;
-  if (!finite(total) || !finite(count) || !finite(max) || count < 0 || !Number.isInteger(count)) return undefined;
+  if (!finite(total) || !finite(count) || !finite(max) || count < 0 || !Number.isSafeInteger(count)) return undefined;
   const tags: Record<string, string> = {};
   for (const key of METRIC_TAGS) if (typeof fields[key] === 'string') tags[key] = fields[key];
-  return { name: parsed.message, unit: fields.metric, total, count, max, tags };
+  const buckets = fields.metric === 'ms' ? readHistogram(fields.histogram, count, max) : undefined;
+  return { name: parsed.message, unit: fields.metric, total, count, max, tags,
+    ...(buckets ? { buckets } : {}), ...(validMetricRunId(fields.runId) ? { runId: fields.runId } : {}) };
 }
 
 function object(value: unknown): value is Record<string, unknown> {

@@ -5,14 +5,17 @@ import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getGlobalRotatingFileSink } from "../../observability/rotatingFileSink.js";
 import { readMetrics } from '../../observability/metrics/reader.js';
 import { metricsReport } from '../../observability/metrics/report.js';
+import { validMetricRunId } from '../../observability/metrics/model.js';
 import { reportText } from './report/projection.js';
 
 /** Read the existing metric log; no parallel telemetry store or provider call. */
 export async function runMetricsCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
   const syntax = parseSyntax(metricsSyntax, args);
   if (!syntax.ok) return { kind: "local", output: `Invalid /metrics arguments: ${syntax.reason}\n${syntaxHelp(metricsSyntax)}` };
+  const runId = syntax.flags.get('run');
+  if (runId !== undefined && !validMetricRunId(runId)) return { kind: 'local', output: 'Invalid /metrics run ID.' };
   const sink = getGlobalRotatingFileSink();
-  const read = readMetrics(sink.getLogDir(), sink.getCurrentFilePath(), Number(syntax.args[0] ?? 2000));
+  const read = readMetrics(sink.getLogDir(), sink.getCurrentFilePath(), Number(syntax.args[0] ?? 2000), runId);
   const report = metricsReport(read, context.cwd);
   return { kind: 'local', output: reportText(report), report };
 }

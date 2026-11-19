@@ -10,6 +10,8 @@ import type { StructuredLogEntry } from "../../observability/types.js";
 import * as logFiles from '../../observability/logs/files.js';
 import { flushMetrics, recordCount, recordTiming, resetMetrics } from '../../observability/metrics.js';
 import { setStructuredLogSink } from '../../observability/structuredLogger.js';
+import { DURATION_BOUNDS_MS, durationBucket } from '../../observability/metrics/histogram.js';
+import { runSessionTrace } from '../../observability/tracing/runtime.js';
 
 /**
  * `/metrics` is the reading half of the metrics feature, not a convenience.
@@ -65,6 +67,45 @@ afterEach(() => {
 });
 
 describe("runMetricsCommand", () => {
+  it('reads native timing bucket bounds and reconstructs one captured run', async () => {
+    const sink = sinkWith([]);
+    setStructuredLogSink(entry => sink.write(entry));
+    await runSessionTrace({ sessionId: 'first-run', workspaceRoot: context.cwd }, () => {
+      recordTiming('turn.duration', 10);
+      recordTiming('turn.duration', 70_000);
+    });
+    await runSessionTrace({ sessionId: 'second-run', workspaceRoot: context.cwd }, () => {
+      recordTiming('turn.duration', 25);
+    });
+    const recent = await runMetricsCommand([], context);
+    const runId = /\/metrics --run ([a-f0-9]{16})/.exec(recent.output)?.[1];
+    expect(runId).toBeDefined();
+    const selected = await runMetricsCommand(['--run', runId!], context);
+    expect(selected.report?.facts).toMatchObject({ scope: 'run', runId, samplesRead: 1, histogramBoundsMs: DURATION_BOUNDS_MS });
+    expect(selected.report?.facts.groups).toMatchObject([{ name: 'turn.duration', count: 1, total: 25,
+      tags: { sessionId: 'second-run' }, histogram: { coverage: 'complete', p50: { boundMs: 25, exceeds: false } } }]);
+    expect(recent.output).toContain('p95 >60000ms');
+    expect(selected.output).not.toContain('first-run');
+    expect((await runMetricsCommand(['--run', 'arbitrary'], context)).output).toBe('Invalid /metrics run ID.');
+  });
+
+  it('retains aggregate timing when a histogram is from a prior format or has inconsistent counts', async () => {
+    const distribution = Array<number>(DURATION_BOUNDS_MS.length + 1).fill(0);
+    distribution[durationBucket(5)] = 1;
+    sinkWith([
+      metricEntry({ message: 'timing', metric: 'ms', count: 1, total: 5, max: 5,
+        fields: { histogram: { version: 1, counts: distribution } } }),
+      metricEntry({ message: 'timing', metric: 'ms', count: 1, total: 20, max: 20 }),
+      metricEntry({ message: 'timing', metric: 'ms', count: 1, total: 25, max: 25,
+        fields: { histogram: { version: 1, counts: distribution } } }),
+    ]);
+    const result = await runMetricsCommand([], context);
+    expect(result.report?.facts.groups).toMatchObject([{ count: 3, total: 50, max: 25,
+      histogram: { coverage: 'partial', samples: 1 } }]);
+    expect(result.output).toContain('histogram n=1 (partial)');
+    expect(result.output).not.toContain('p95');
+  });
+
   it('keeps units and delimiter-bearing names and tags separate from recording through the report', async () => {
     const sink = sinkWith([]); setStructuredLogSink(entry => sink.write(entry)); resetMetrics();
     const tags = { tool: 'a|outcome=b' };

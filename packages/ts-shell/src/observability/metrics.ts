@@ -1,147 +1,162 @@
-import { createComponentLogger } from "./structuredLogger.js";
-import { metricKey } from './metrics/model.js';
+import { randomBytes } from 'node:crypto';
+import { types } from 'node:util';
+import { createComponentLogger } from './structuredLogger.js';
+import { bindTrace, currentTrace } from './tracing/context.js';
+import { METRIC_TAGS, metricKey } from './metrics/model.js';
+import { durationBucket, emptyHistogram } from './metrics/histogram.js';
 
 export interface MetricEvent {
   readonly name: string;
   readonly value: number;
-  readonly unit: "count" | "ms";
+  readonly unit: 'count' | 'ms';
   readonly tags: Record<string, string>;
 }
 
-/**
- * Counters and timings, written where the rest of the runtime's records go.
- *
- * A metric with nowhere to go is indistinguishable from one that was never
- * taken, so these land in the same rotating file as the structured logs and are
- * readable with the same command. That keeps one place to look instead of a
- * second store nobody remembers to check.
- *
- * **Values are buffered and written once per turn, not per call.** The log sink
- * appends synchronously, so recording a tool's duration as it happens would put
- * a blocking disk write on the hot path for every tool call — dozens per turn.
- * The accumulator keeps the write count at one per turn while preserving the
- * count and the tags, which is what a reader actually wants: not "a tool ran",
- * but "this tool ran eleven times and took 4.2s in total".
- *
- * **The buffer is process-wide rather than per session.** That is safe today only
- * because every surface chains its turns — the prompt loop, the TUI, and the print
- * path each await the previous run before starting the next — so no two flushes
- * can interleave. It is not enforced anywhere: `ShellSessionRuntime.executePrompt`
- * has no busy guard, and a second call while one is running is accepted and
- * overwrites `currentRun`. Any caller that starts a prompt without awaiting the
- * last one would have the first flush attribute the second turn's counts to
- * itself, so a change in that direction has to key this by session first. The
- * comment here previously claimed the runtime refused a second prompt; it does
- * not, and a false invariant is worse than none.
- */
-const logger = createComponentLogger("metric");
+const logger = createComponentLogger('metric');
+const SERIES_LIMIT = 128;
+const RUN_LIMIT = 64;
+const LABEL_BYTES = 256;
+const DROPPED = 'metrics.dropped';
 
 interface Accumulated {
   readonly name: string;
   count: number;
   total: number;
   max: number;
-  readonly unit: MetricEvent["unit"];
+  readonly unit: MetricEvent['unit'];
   readonly tags: Record<string, string>;
+  readonly buckets?: number[];
 }
 
-let pending = new Map<string, Accumulated>();
+interface BufferOwner {
+  pending: Map<string, Accumulated>;
+  dropped: number;
+  closed: boolean;
+  readonly runId?: string;
+  readonly write: (name: string, fields: Record<string, unknown>) => void;
+}
 
-function accumulate(name: string, value: number, unit: MetricEvent["unit"], tags: Record<string, string>): void {
-  const key = metricKey(name, unit, tags);
-  const existing = pending.get(key);
-  if (existing) {
-    existing.count += 1;
-    existing.total += value;
-    existing.max = Math.max(existing.max, value);
+function buffer(runId?: string): BufferOwner {
+  return { pending: new Map(), dropped: 0, closed: false, runId,
+    write: bindTrace((name: string, fields: Record<string, unknown>) => logger.info(name, fields)) };
+}
+
+const unscoped = buffer();
+const runs = new WeakMap<object, BufferOwner | null>();
+const active = new Set<BufferOwner>();
+
+function currentBuffer(): BufferOwner | undefined {
+  const trace = currentTrace();
+  const captured = trace && runs.get(trace.scope);
+  const owner = captured === undefined ? unscoped : captured;
+  return owner?.closed ? undefined : owner ?? undefined;
+}
+
+/** One session run owns its metrics through tool calls, retries and settlement. */
+export async function runMetrics<T>(callback: () => T | Promise<T>): Promise<T> {
+  const trace = currentTrace();
+  if (!trace || runs.has(trace.scope)) return callback();
+  if (active.size >= RUN_LIMIT) {
+    runs.set(trace.scope, null);
+    unscoped.dropped++;
+    return callback();
+  }
+  const runId = trace.spanId ?? randomBytes(8).toString('hex');
+  const owner = buffer(runId);
+  runs.set(trace.scope, owner);
+  active.add(owner);
+  try { return await callback(); }
+  finally {
+    owner.closed = true;
+    active.delete(owner);
+    flush(owner);
+  }
+}
+
+function metricLabel(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= LABEL_BYTES && Buffer.byteLength(value) <= LABEL_BYTES;
+}
+
+function accumulate(name: string, value: number, unit: MetricEvent['unit'], tags: Record<string, string>): void {
+  const owner = currentBuffer();
+  if (!owner) return;
+  if (!metricLabel(name) || name === DROPPED || !Number.isFinite(value) || unit === 'ms' && value < 0
+    || !tags || typeof tags !== 'object' || types.isProxy(tags)) {
+    owner.dropped++;
     return;
   }
-  pending.set(key, { name, count: 1, total: value, max: value, unit, tags: { ...tags } });
-}
-
-/**
- * Record that something happened.
- *
- * Buffered, so this is cheap enough to call on the hot path. Nothing reaches
- * disk until {@link flushMetrics} runs.
- */
-export function recordCount(name: string, value: number, tags: Record<string, string> = {}): void {
-  accumulate(name, value, "count", tags);
-}
-
-/** Record how long something took, in milliseconds. Buffered the same way. */
-export function recordTiming(name: string, value: number, tags: Record<string, string> = {}): void {
-  accumulate(name, value, "ms", tags);
-}
-
-/**
- * Write everything accumulated since the last flush, as one record per metric.
- *
- * One `logger.info` per metric rather than one per call: a turn that ran forty
- * tool calls produces a handful of lines, not forty.
- *
- * Also runs at process exit, which is the only way a mid-turn exit keeps its
- * numbers: Ctrl+D while a turn is in flight, or a crash, leaves the promise chain
- * that would have flushed it unwound. The sink appends synchronously, so a
- * `process.on("exit")` handler can still write — an async one could not, since
- * nothing is awaited after the exit event.
- */
-export function flushMetrics(): void {
-  if (pending.size === 0) return;
-  const batch = pending;
-  // Swapped before writing: a metric recorded while these are being written
-  // belongs to the next turn, not this one.
-  pending = new Map();
-  for (const entry of batch.values()) {
-    logger.info(entry.name, {
-      metric: entry.unit,
-      count: entry.count,
-      total: entry.total,
-      max: entry.max,
-      ...entry.tags,
-    });
+  const labels: Record<string, string> = {};
+  for (const key of METRIC_TAGS) {
+    if (key === 'sessionId' && owner.runId) continue;
+    const field = Object.getOwnPropertyDescriptor(tags, key);
+    if (field && !('value' in field)) { owner.dropped++; return; }
+    const label: unknown = field?.value;
+    if (label === undefined) continue;
+    if (!metricLabel(label)) { owner.dropped++; return; }
+    labels[key] = label;
+  }
+  const key = metricKey(name, unit, labels);
+  let entry = owner.pending.get(key);
+  if (!entry) {
+    if (owner.pending.size >= SERIES_LIMIT) { owner.dropped++; return; }
+    entry = { name, unit, tags: labels, count: 0, total: 0, max: value, ...(unit === 'ms' ? { buckets: emptyHistogram() } : {}) };
+    owner.pending.set(key, entry);
+  }
+  const total = entry.total + value;
+  if (!Number.isFinite(total) || entry.count === Number.MAX_SAFE_INTEGER) { owner.dropped++; return; }
+  entry.count++;
+  entry.total = total;
+  entry.max = Math.max(entry.max, value);
+  if (entry.buckets) {
+    const index = durationBucket(value);
+    entry.buckets[index] = entry.buckets[index]! + 1;
   }
 }
 
-/**
- * What has been accumulated and not yet written.
- *
- * For tests and for the rare caller that wants the numbers without writing them.
- */
+export function recordCount(name: string, value: number, tags: Record<string, string> = {}): void {
+  accumulate(name, value, 'count', tags);
+}
+
+export function recordTiming(name: string, value: number, tags: Record<string, string> = {}): void {
+  accumulate(name, value, 'ms', tags);
+}
+
+function flush(owner: BufferOwner): void {
+  if (!owner.pending.size && !owner.dropped) return;
+  const { pending, dropped, runId } = owner;
+  owner.pending = new Map();
+  owner.dropped = 0;
+  const identity = runId ? { runId } : {};
+  for (const entry of pending.values()) {
+    owner.write(entry.name, { ...entry.tags, ...identity, metric: entry.unit, count: entry.count, total: entry.total, max: entry.max,
+      ...(entry.buckets ? { histogram: { version: 1, counts: entry.buckets } } : {}) });
+  }
+  if (dropped) owner.write(DROPPED, { ...identity, metric: 'count', count: 1, total: dropped, max: dropped });
+}
+
+/** Flush the current run's buffer, or the process buffer outside a run. */
+export function flushMetrics(): void {
+  const owner = currentBuffer();
+  if (owner) flush(owner);
+}
+
 export function pendingMetrics(): readonly MetricEvent[] {
-  return [...pending.values()].map((entry) => ({
-    name: entry.name,
-    value: entry.total,
-    unit: entry.unit,
-    tags: entry.tags,
-  }));
+  const owner = currentBuffer();
+  return owner ? [...owner.pending.values()].map(entry => ({
+    name: entry.name, value: entry.total, unit: entry.unit, tags: { ...entry.tags },
+  })) : [];
 }
 
-/** Drop everything accumulated. Only for tests that need a clean slate. */
 export function resetMetrics(): void {
-  pending = new Map();
+  for (const owner of [unscoped, ...active]) {
+    owner.pending.clear();
+    owner.dropped = 0;
+  }
 }
 
-/**
- * Flush on the way out.
- *
- * Registered here rather than from an entry point so that every process which can
- * record a metric also flushes one. Leaving it to callers means the one path that
- * exits without unwinding — the crash — is the one that forgets. The sink appends
- * synchronously, so a `process.on("exit")` handler can still write; an async one
- * could not, because nothing is awaited after the exit event.
- *
- * `once`, so importing this module more than once cannot write the buffer twice.
- */
-function registerExitFlush(): void {
-  process.once("exit", () => {
-    try {
-      flushMetrics();
-    } catch {
-      // Nothing useful can be done while exiting, and a throw here would replace
-      // the real exit reason with a metrics error.
-    }
-  });
-}
-
-registerExitFlush();
+process.once('exit', () => {
+  for (const owner of [unscoped, ...active]) {
+    owner.closed = true;
+    try { flush(owner); } catch { /* Preserve the original process exit. */ }
+  }
+});

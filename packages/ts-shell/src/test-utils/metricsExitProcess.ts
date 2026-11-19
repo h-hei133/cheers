@@ -9,7 +9,8 @@
  * Prints nothing; the log directory comes from CHEERS_LOG_DIR.
  */
 
-import { recordCount } from "../observability/metrics.js";
+import { recordCount, recordTiming } from "../observability/metrics.js";
+import { runSessionTrace } from "../observability/tracing/runtime.js";
 
 const [mode] = process.argv.slice(2);
 
@@ -18,8 +19,12 @@ const [mode] = process.argv.slice(2);
 recordCount("cli.prompts", 1, { sessionId: "s1" });
 recordCount("cli.prompts", 1, { sessionId: "s1" });
 
-if (mode === "throw") {
+if (mode === "scoped") {
+  void runSessionTrace({ sessionId: "scoped", workspaceRoot: process.cwd() }, () => {
+    recordTiming("tool.duration", 20);
+    process.exit(0);
+  });
+} else if (mode === "throw") {
   // A crash, which is the other way a turn ends without unwinding.
   throw new Error("fatal while a turn was in flight");
-}
-process.exit(0);
+} else process.exit(0);

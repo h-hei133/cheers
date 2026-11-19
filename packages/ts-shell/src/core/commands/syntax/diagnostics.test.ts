@@ -67,6 +67,7 @@ it("suggests only legal flags at direct argument positions", () => {
   expect(suggest("report", "out.zip --o")).toEqual(["--outside"]);
   expect(suggest("report", "out.zip extra ")).toEqual([]);
   expect(suggest("report", "-- -file ")).toEqual([]);
-  expect(suggest("metrics", "")).toEqual([]);
+  expect(suggest("metrics", "")).toEqual(["--run"]);
+  expect(suggest("metrics", "--run fixture ")).toEqual([]);
   expect(suggest("log", "clear ")).toEqual([]);
 });

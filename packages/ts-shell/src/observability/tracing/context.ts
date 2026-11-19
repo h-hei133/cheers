@@ -56,6 +56,12 @@ export function currentTrace(): ActiveTrace | undefined {
   return activeTrace.getStore();
 }
 
+/** A deferred instrumentation write returns to the scope it captured. */
+export function bindTrace<Args extends unknown[], T>(callback: (...args: Args) => T): (...args: Args) => T {
+  const captured = currentTrace();
+  return (...args) => captured ? activeTrace.run(captured, callback, ...args) : activeTrace.exit(callback, ...args);
+}
+
 export function runTraceScope<T>(
   recorder: TelemetryContext,
   scope: TraceScope,

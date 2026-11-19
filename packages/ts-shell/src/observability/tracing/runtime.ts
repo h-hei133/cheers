@@ -1,4 +1,5 @@
 import { getGlobalRotatingFileSink } from '../rotatingFileSink.js';
+import { runMetrics } from '../metrics.js';
 import { JsonlTraceStore } from './jsonlStore.js';
 import { runTraceScope, type TraceScope } from './context.js';
 import { InMemoryTraceStore } from './span.js';
@@ -22,11 +23,11 @@ export function runSessionTrace<T>(
     } catch { /* Tracing must remain available in memory when persistence is unavailable. */ }
   }
   context ??= new InMemoryTraceStore();
-  return runTraceScope(context, scope, { name: 'session.run', attributes: identity }, async span => {
+  return runTraceScope(context, scope, { name: 'session.run', attributes: identity }, span => runMetrics(async () => {
     try { return await callback(span); }
     catch (error) {
       span.setStatus({ status: 'error', error: { name: 'RunError', message: 'Session run failed.' } });
       throw error;
     }
-  });
+  }));
 }
