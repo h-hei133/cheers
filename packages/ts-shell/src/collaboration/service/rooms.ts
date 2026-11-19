@@ -1,7 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { Binding, Owner, Room, ServiceRequest, ServiceState, Right } from '../contract/model.js';
 import { digest, hashText, identifier, integer, keys, object, requireValue, text } from '../contract/value.js';
-import { decodeEvents, decodeSnapshot } from '../contract/snapshot.js';
+import { decodeSnapshot } from '../contract/snapshot.js';
+import { decodeFrame, frameCutover } from '../contract/frame.js';
 import { assertOwner, assertRight, rights, type Tickets } from './auth.js';
 import { proposalMetadata } from './proposals.js';
 import { decodeAcl } from '../contract/acl.js';
@@ -36,7 +37,7 @@ export function takeLease(state: ServiceState, room: Room, principal: string, da
   requireValue(!state.rooms.some(other => other.id !== room.id && !other.closed && other.owner === principal
     && other.sessionId === bound.sessionId && other.sessionCreatedAt === bound.sessionCreatedAt && other.projectId === bound.projectId
     && other.lease && other.lease.expiresAt > now), 'busy');
-  room.generation++; room.aclRevision++;
+  room.generation++; room.aclRevision++; delete room.frameDigest;
   for (const proposal of room.proposals) if (proposal.status === 'accepted' || proposal.status === 'dispatched') proposal.status = 'unknown';
   const token = randomBytes(32).toString('base64url'); room.lease = { generation: room.generation, tokenHash: hashText(token), expiresAt: now + 5_000 };
   return { roomId: room.id, binding: { sessionId: room.sessionId, sessionCreatedAt: room.sessionCreatedAt, projectId: room.projectId },
@@ -50,13 +51,15 @@ export function roomPlan(room: Room, principal: string, data: unknown, now: numb
     sequence: room.sequence, hostActive: Boolean(room.lease && room.lease.expiresAt > now) };
 }
 export function hostFrame(room: Room, principal: string, request: ServiceRequest, now: number): unknown {
-  assertOwner(room, principal, request.owner, now); const selected = object(request.data); keys(selected, ['events', 'snapshot', 'after']);
-  const after = integer(selected.after); const events = decodeEvents(selected.events); const fingerprint = digest(selected);
-  if (after < room.sequence) { requireValue(events.at(-1)?.sequence === room.sequence && room.frameDigest === fingerprint, 'stale'); return { sequence: room.sequence }; }
-  requireValue(after === room.sequence && events.every((event, index) => event.sequence === after + index + 1), 'gap');
-  room.events.push(...events); room.events = room.events.slice(-256); room.sequence = events.at(-1)?.sequence ?? after;
-  if (selected.snapshot !== undefined) { const snapshot = decodeSnapshot(selected.snapshot); requireValue(snapshot.cutover === room.sequence, 'gap'); room.snapshot = snapshot; }
-  room.frameDigest = fingerprint; return { sequence: room.sequence };
+  assertOwner(room, principal, request.owner, now);
+  const frame = decodeFrame(request.data); const sequence = frameCutover(frame); const frameDigest = digest(request.data);
+  if (sequence === room.sequence && room.frameDigest === frameDigest) return { sequence, frameDigest };
+  requireValue(frame.after >= room.sequence, 'stale');
+  requireValue(frame.after === room.sequence, 'gap');
+  room.events.push(...frame.events); room.events = room.events.slice(-256); room.sequence = sequence;
+  if (frame.snapshot) room.snapshot = frame.snapshot;
+  room.frameDigest = frameDigest;
+  return { sequence, frameDigest };
 }
 export function pollRoom(room: Room, principal: string, request: ServiceRequest, now: number, tickets: Tickets): unknown {
   tickets.check(request.ticket, room, principal, now); const selected = object(request.data); keys(selected, ['after']); const after = integer(selected.after);

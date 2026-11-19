@@ -1,4 +1,5 @@
 import type { ServiceConfig } from './config.js';
+import { createStateChanges } from '../../core/state/changes.js';
 import type { ServiceRequest, ServiceResponse, ServiceState } from '../contract/model.js';
 import { identifier, keys, object, requireValue } from '../contract/value.js';
 import { decodeSnapshot } from '../contract/snapshot.js';
@@ -10,15 +11,31 @@ import { mutate, readReceipt } from './receipt.js';
 import type { ServiceStore } from './store.js';
 
 const structural = ['begin', 'lease', 'acl', 'stop', 'propose', 'claim', 'dispatch', 'settle', 'publish', 'revoke-share', 'delete-share'];
+const roomChanges = new Set(['frame', 'lease', 'acl', 'stop']);
 export class ServiceDispatcher {
   private readonly tickets = new Tickets();
+  private readonly changes = createStateChanges();
   constructor(private readonly store: ServiceStore, private readonly config: ServiceConfig, private readonly now = Date.now) {}
   execute(principal: string, value: unknown): ServiceResponse {
     const request = decodeRequest(value); const now = this.now();
     requireValue(request.principal === principal, 'denied');
     const action = (state: ServiceState) => this.route(state, principal, request, now);
     const result = structural.includes(request.operation) ? mutate(this.store, principal, request, action) : this.store.transaction(action);
+    if (roomChanges.has(request.operation)) this.changes.notify(request.roomId);
     return { version: 1, epoch: this.store.epoch, principal, result };
+  }
+
+  observeRoom(roomId: string, wake: () => void): () => void { return this.changes.subscribe(roomId, wake); }
+
+  readRoomStream(principal: string, request: ServiceRequest, epoch: string, generation: number, after: number): ServiceResponse {
+    const result = this.store.transaction(state => {
+      requireValue(state.epoch === epoch, 'stale');
+      const room = findRoom(state, request);
+      const page = object(pollRoom(room, principal, { ...request, data: { after } }, this.now(), this.tickets));
+      requireValue(room.generation === generation, 'stale');
+      return { ...page, snapshot: room.snapshot };
+    });
+    return { version: 1, epoch, principal, result };
   }
   private route(state: ServiceState, principal: string, request: ServiceRequest, now: number): unknown {
     if (request.operation === 'hello') return { principal, protocol: 1, capabilities: ['rooms', 'shares', 'proposals', 'receipts'], limits: { events: 256, proposals: 128, rooms: 64, shares: 128, receipts: 1024 } };
@@ -29,7 +46,7 @@ export class ServiceDispatcher {
     if (request.operation === 'revoke-share' || request.operation === 'delete-share') return removeShare(state, principal, request.data, request.operation === 'delete-share');
     const room = findRoom(state, request);
     if (request.operation === 'room-plan') return roomPlan(room, principal, request.data, now);
-    if (request.operation === 'join') { keys(object(request.data), []); return { roomId: room.id, epoch: room.epoch, generation: room.generation,
+    if (request.operation === 'join') { keys(object(request.data), []); return { roomId: room.id, epoch: room.epoch, generation: room.generation, stream: 1,
       binding: { sessionId: room.sessionId, sessionCreatedAt: room.sessionCreatedAt, projectId: room.projectId }, ticket: this.tickets.issue(room, principal, now), expiresAt: now + 60_000 }; }
     if (request.operation === 'lease') {
       const selected = object(request.data); keys(selected, ['binding', 'snapshot', 'epoch', 'aclRevision', 'generation']);

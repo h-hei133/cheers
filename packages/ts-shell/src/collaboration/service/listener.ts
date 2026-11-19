@@ -1,13 +1,14 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import type { Socket } from 'node:net';
-import { CollaborationError, parseJson, requireValue } from '../contract/value.js';
+import { CollaborationError, object, parseJson, requireValue } from '../contract/value.js';
 import { WIRE_BYTES } from '../contract/model.js';
 import type { ServiceConfig } from './config.js';
 import { ServiceStore } from './store.js';
-import { ServiceDispatcher } from './dispatch.js';
+import { decodeRequest, ServiceDispatcher } from './dispatch.js';
 import { authenticate } from './auth.js';
 import { claimService } from './ownership.js';
+import { streamRoom } from './stream.js';
 
 /** Explicit foreground listener. No global providers, automatic uploads or public relay. */
 export async function startCollaborationService(config: ServiceConfig): Promise<{ close(): Promise<void>; origin: string }> {
@@ -15,15 +16,19 @@ export async function startCollaborationService(config: ServiceConfig): Promise<
   let store: ServiceStore;
   try { store = new ServiceStore(config.stateFile); } catch (error) { release(); throw error; }
   const dispatcher = new ServiceDispatcher(store, config);
-  const sockets = new Set<Socket>(); let active = 0;
+  const sockets = new Set<Socket>(); let active = 0; let streams = 0;
   const handler = (request: IncomingMessage, response: ServerResponse) => {
     if (active >= 16) { response.writeHead(503); response.end(); request.destroy(); return; }
     active++;
     const timer = setTimeout(() => { request.destroy(); response.destroy(); }, 10_000);
-    let finished = false;
-    const done = () => { if (!finished) { finished = true; clearTimeout(timer); active--; } };
+    let finished = false; let streaming = false;
+    const done = () => { if (!finished) { finished = true; clearTimeout(timer); active--; if (streaming) streams--; } };
     response.once('finish', done); response.once('close', done); response.once('error', () => { done(); request.destroy(); });
-    void handleRequest(request, response, config, dispatcher).catch(() => { done(); response.destroy(); });
+    const admitStream = () => {
+      requireValue(!finished && streams < 8, 'capacity');
+      streams++; streaming = true; clearTimeout(timer);
+    };
+    void handleRequest(request, response, config, dispatcher, admitStream).catch(() => { done(); response.destroy(); });
   };
   const options = { maxHeaderSize: 8 * 1024, requestTimeout: 10_000, headersTimeout: 5_000, keepAliveTimeout: 1_000 };
   const server = config.tls ? createHttpsServer({ ...options, ...config.tls }, handler) : createHttpServer(options, handler);
@@ -39,7 +44,8 @@ export async function startCollaborationService(config: ServiceConfig): Promise<
     finally { release(); }
   } };
 }
-async function handleRequest(request: IncomingMessage, response: ServerResponse, config: ServiceConfig, dispatcher: ServiceDispatcher): Promise<void> {
+async function handleRequest(request: IncomingMessage, response: ServerResponse, config: ServiceConfig, dispatcher: ServiceDispatcher,
+  admitStream: () => void): Promise<void> {
   try {
     requireValue(request.method === 'POST' && request.url === '/v1' && request.headers['content-type'] === 'application/json', 'denied');
     requireValue(!request.headers['content-encoding'] && (!request.headers['content-length'] || Number(request.headers['content-length']) <= WIRE_BYTES));
@@ -48,7 +54,13 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     for await (const chunk of request) { const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk); size += bytes.length;
       requireValue(size <= WIRE_BYTES, 'capacity'); chunks.push(bytes); }
     const bytes = Buffer.concat(chunks); const source = bytes.toString('utf8'); requireValue(Buffer.from(source).equals(bytes));
-    const payload = dispatcher.execute(principal, parseJson(source, WIRE_BYTES)); const result = JSON.stringify(payload);
+    const value = object(parseJson(source, WIRE_BYTES));
+    if (value.operation === 'stream') {
+      const selected = decodeRequest(value);
+      admitStream();
+      return await streamRoom(response, dispatcher, principal, selected);
+    }
+    const payload = dispatcher.execute(principal, value); const result = JSON.stringify(payload);
     requireValue(Buffer.byteLength(result) <= WIRE_BYTES, 'capacity');
     response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'content-length': Buffer.byteLength(result), 'connection': 'close' }); response.end(result);
   } catch (error) {

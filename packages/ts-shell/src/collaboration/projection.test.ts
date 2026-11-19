@@ -6,9 +6,9 @@ import { emptySnapshot } from './__tests__/fixture.js';
 it('never forwards split message/tool secrets or raw provider event graphs', () => {
   for (const event of [{ type: 'message.delta', role: 'planner', delta: 'Bear' }, { type: 'message.delta', role: 'planner', delta: 'er SYNTHETIC_SECRET' },
     { type: 'tool.output', toolName: 'tool', taskId: 'call', chunk: 'Bearer SYNTHETIC_SECRET' },
-    { type: 'reasoning.delta', role: 'planner', delta: 'Bearer SYNTHETIC_SECRET' }]) expect(projectEvent(event as never, 1, 1)).toBeUndefined();
-  expect(projectEvent({ type: 'query.started', sessionId: 'Bearer SYNTHETIC_SECRET', prompt: 'Bearer SYNTHETIC_SECRET', sessionPath: '/secret' }, 1, 1))
-    .toEqual({ sequence: 1, kind: 'query.started', timestamp: 1 });
+    { type: 'reasoning.delta', role: 'planner', delta: 'Bearer SYNTHETIC_SECRET' }]) expect(projectEvent(event as never, 1)).toBeUndefined();
+  expect(projectEvent({ type: 'query.started', sessionId: 'Bearer SYNTHETIC_SECRET', prompt: 'Bearer SYNTHETIC_SECRET', sessionPath: '/secret' }, 1))
+    .toEqual({ kind: 'query.started', timestamp: 1 });
   const snapshot = projectSnapshot({ header: { sessionId: 'private-id', workspace: '/private', exportedAt: '' }, tree: [], leafId: null, warnings: [],
     entries: [{ id: 'message', role: 'assistant', content: 'Bearer SYNTHETIC_SECRET', html: '<script>attack()</script>',
       toolCalls: [{ id: 'call', name: 'raw', arguments: 'Bearer SYNTHETIC_SECRET' }] }] }, 1);

@@ -1,29 +1,55 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { resolveUserDataFile } from '../../core/paths/userHome.js';
-import { inspectWorkspaceFile, pathIdentity, readTextFile } from '../../core/workspace/files.js';
-import { withFileLock } from '../../session/store/sessionFileStore.js';
-import { commitWorkspaceFile } from '../../edit/authority/commit.js';
-import { digest, parseJson, requireValue } from '../contract/value.js';
-import { WIRE_BYTES } from '../contract/model.js';
-import { assertProfileStorage, currentProfile, type ProfileContext } from '../../core/paths/profile/context.js';
+import type { RelayEvent, Snapshot } from '../contract/model.js';
+import { decodeEvents, decodeSnapshot } from '../contract/snapshot.js';
+import { digest, integer, requireValue } from '../contract/value.js';
 
 export function cursorPath(origin: string, principal: string, roomId: string, localIdentity: string): string {
   return resolveUserDataFile(path.join('collaboration', 'cursors', digest([origin, principal, roomId, localIdentity]) + '.json'));
 }
-export function readCursor(target: string, owner = currentProfile()): unknown {
-  assertProfileStorage(target, owner);
-  const source = readTextFile(target, WIRE_BYTES); return source === undefined ? undefined : parseJson(source, WIRE_BYTES);
+
+export interface CursorProjection {
+  readonly cursor: number;
+  readonly events: RelayEvent[];
+  readonly snapshot?: Snapshot;
+  readonly gap: boolean;
 }
-export function saveCursor(target: string, previous: unknown, value: unknown, owner: ProfileContext | undefined = currentProfile()): void {
-  assertProfileStorage(target, owner);
-  const content = JSON.stringify(value) + '\n'; requireValue(Buffer.byteLength(content) <= WIRE_BYTES, 'capacity');
-  let root = path.dirname(target); while (!fs.existsSync(root)) root = path.dirname(root);
-  const ancestry = pathIdentity(root); const relative = path.relative(root, target);
-  withFileLock(path.join(root, '.cursor-' + digest(target) + '.lock'), () => {
-    assertProfileStorage(target, owner);
-    requireValue(pathIdentity(root) === ancestry && digest(readCursor(target, owner)) === digest(previous), 'stale');
-    const baseline = inspectWorkspaceFile(root, relative, undefined, WIRE_BYTES);
-    commitWorkspaceFile({ workspaceRoot: root, relativePath: relative, expected: baseline, content, mode: 0o600 });
-  }, { createParent: false });
+
+/** Old receipts may contain deltas that their own snapshot already superseded. */
+export function restoreProjection(saved: Record<string, unknown>): CursorProjection {
+  const snapshot = saved.snapshot === undefined ? undefined : decodeSnapshot(saved.snapshot);
+  const cursor = Math.max(integer(saved.cursor), snapshot?.cutover ?? 0);
+  const events = decodeEvents(saved.events).filter(event => event.sequence > (snapshot?.cutover ?? 0));
+  requireValue(events.every((event, index) => event.sequence <= cursor && (!index || event.sequence > events[index - 1]!.sequence)), 'gap');
+  return { cursor, events, ...(snapshot ? { snapshot } : {}), gap: saved.gap === true };
+}
+
+/** Replace covered history and fold only the bounded suffix of a confirmed page. */
+export function applyPage(previous: CursorProjection, page: Record<string, unknown>): CursorProjection {
+  const limit = integer(page.sequence, previous.cursor);
+  const events = decodeEvents(page.events);
+  const cursor = integer(page.cursor, 0, limit);
+  requireValue(cursor === (events.at(-1)?.sequence ?? previous.cursor), 'gap');
+  requireValue(events.every((event, index) => !index || event.sequence > events[index - 1]!.sequence), 'gap');
+
+  const snapshot = page.snapshot === undefined ? undefined : decodeSnapshot(page.snapshot);
+  requireValue(!snapshot || snapshot.cutover <= limit, 'gap');
+  const replacement = snapshot && snapshot.cutover >= previous.cursor && digest(snapshot) !== digest(previous.snapshot) ? snapshot : undefined;
+  const base = replacement?.cutover ?? previous.cursor;
+  let gap = replacement ? false : previous.gap || page.gap === true;
+  let sequence = base;
+  const suffix: RelayEvent[] = [];
+  for (const event of events) {
+    if (event.sequence <= base) {
+      const seen = !replacement && previous.events.find(prior => prior.sequence === event.sequence);
+      requireValue(!seen || (seen.kind === event.kind && seen.timestamp === event.timestamp), 'gap');
+      continue;
+    }
+    gap ||= event.sequence !== sequence + 1 || event.kind === 'relay.gap';
+    sequence = event.sequence;
+    suffix.push(event);
+  }
+  const retained = replacement ?? previous.snapshot;
+  return { cursor: sequence, gap, events: [...(replacement ? [] : previous.events), ...suffix].slice(-128),
+    ...(retained ? { snapshot: retained } : {}) };
 }

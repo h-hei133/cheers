@@ -29,11 +29,25 @@ export async function startHost(host: CollaborationComposition, aclSource: strin
 }
 export async function joinRoom(host: CollaborationComposition, roomId: string, signal?: AbortSignal): Promise<string> {
   requireValue(host.client, 'unavailable'); identifier(roomId); const client = host.client; const bound = digest(currentBinding(host));
-  const result = await approveOperation(host, 'join', `Observe authenticated room ${roomId} at ${client.profile.origin} as ${client.profile.principal}.\nThe remote room does not attach a local workspace or grant tools. One bounded polling request receives scrubbed snapshots/metadata; its exact room/service identity and cursor persist privately.`, async context => {
-    const response = await client.request('join', { roomId, data: {} }, false, context.abortSignal ?? signal); host.guest?.close();
-    host.guest = new CollaborationGuest(client, bound, response.result, () => digest(currentBinding(host)) === bound && host.client === client);
-    await host.guest.poll(context.abortSignal ?? signal); host.guest.start();
-    return { success: true, output: `Observing room ${host.guest.roomId}; no model or tool was dispatched. Use /collab events for the bounded received projection.`, metadata: { status: 'observing', roomId } };
+  const previous = host.guest;
+  const result = await approveOperation(host, 'join', `Observe authenticated room ${roomId} at ${client.profile.origin} as ${client.profile.principal}.\nReceives scrubbed snapshots and lifecycle events. The cursor persists privately and the observation stream resumes when the service supports it.`, async context => {
+    const parent = context.abortSignal ?? signal;
+    const currentSource = () => digest(currentBinding(host)) === bound && host.client === client;
+    const response = await client.request('join', { roomId, data: {} }, false, parent);
+    const selected = object(response.result);
+    parent?.throwIfAborted(); requireValue(currentSource() && host.guest === previous && selected.roomId === roomId && selected.epoch === response.epoch, 'stale');
+    const current = () => host.guest === created && currentSource();
+    const created: CollaborationGuest = new CollaborationGuest(client, bound, selected, current);
+    previous?.close(); host.guest = created;
+    try {
+      await created.poll(parent);
+      parent?.throwIfAborted(); requireValue(current(), 'stale');
+      created.start();
+    } catch (error) {
+      created.close(); if (host.guest === created) host.guest = undefined;
+      throw error;
+    }
+    return { success: true, output: `Observing room ${created.roomId}. Use /collab events to view received updates.`, metadata: { status: 'observing', roomId } };
   });
   return result.output;
 }

@@ -1,8 +1,10 @@
 import type { QueryEvent } from '../../core/query/runtime/events.js';
 import type { Binding, Owner, Proposal, RelayEvent, Snapshot } from '../contract/model.js';
-import { integer, object, requireValue, text } from '../contract/value.js';
+import { frameCutover } from '../contract/frame.js';
+import { CollaborationError, integer, object, requireValue, text } from '../contract/value.js';
 import { CollaborationClient } from './service.js';
 import { projectEvent } from './events.js';
+import { HostOutbox } from './outbox.js';
 
 export interface HostPorts {
   observe(callback: (event: QueryEvent) => void): () => void;
@@ -16,8 +18,9 @@ export class CollaborationHost {
   readonly roomId: string;
   readonly epoch: string;
   readonly owner: Owner;
-  private sequence: number;
-  private queued: RelayEvent[] = [];
+  private readonly initialSequence: number;
+  private outbox?: HostOutbox;
+  private readonly queued: Omit<RelayEvent, 'sequence'>[] = [];
   private dirty = 0;
   private timer?: ReturnType<typeof setTimeout>;
   private unsubscribe?: () => void;
@@ -25,20 +28,20 @@ export class CollaborationHost {
   private failed = false;
   private busy = false;
   private leaseUntil: number;
-  private dropped = false;
   constructor(readonly client: CollaborationClient, readonly bound: Binding, result: unknown, private readonly ports: HostPorts) {
     const selected = object(result); this.roomId = text(selected.roomId, 128); this.epoch = text(selected.epoch, 36);
     const owner = object(selected.owner); this.owner = { generation: integer(owner.generation, 1), token: text(owner.token, 64) };
-    this.sequence = integer(selected.sequence); this.leaseUntil = integer(selected.expiresAt);
+    this.initialSequence = integer(selected.sequence); this.leaseUntil = integer(selected.expiresAt);
   }
   start(): void {
     this.unsubscribe = this.ports.observe(event => {
       try {
         if (this.closed || this.failed || !this.ports.current()) return;
         if (event.type === 'query.completed' || event.type === 'query.completed_unproven' || event.type === 'query.failed' || event.type === 'lifecycle.cancelled') this.dirty++;
-        const projected = projectEvent(event, this.sequence + this.queued.length + 1, Date.now()); if (!projected) return;
+        const projected = projectEvent(event, Date.now()); if (!projected) return;
         if (this.queued.length >= 127) {
-          if (!this.dropped && this.queued.length === 127) { this.queued.push({ ...projected, kind: 'relay.gap' }); this.dropped = true; }
+          if (this.queued.length === 127) this.queued.push({ ...projected, kind: 'relay.gap' });
+          this.dirty++;
         } else this.queued.push(projected);
       } catch { this.fail(); }
     });
@@ -60,18 +63,48 @@ export class CollaborationHost {
     if (this.busy || this.closed || this.failed) return;
     this.busy = true;
     try {
-      this.check(); const renewal = object((await this.request('renew', {}, false)).result);
-      this.leaseUntil = integer(renewal.expiresAt); requireValue(renewal.generation === this.owner.generation && Array.isArray(renewal.proposals));
+      const renewed = await this.requestForTick('renew', {});
+      if (!renewed) return;
+      const renewal = object(renewed.result); const expiresAt = integer(renewal.expiresAt);
+      requireValue(expiresAt > Date.now() && renewal.generation === this.owner.generation, 'stale');
+      requireValue(Array.isArray(renewal.proposals));
+      this.leaseUntil = expiresAt;
       this.ports.updated(renewal.proposals as Omit<Proposal, 'text'>[], this.leaseUntil);
-      const events = this.queued.slice(); const cutover = events.at(-1)?.sequence ?? this.sequence;
-      if (events.length || this.dirty) {
-        const revision = this.dirty; const snapshot = revision ? this.ports.snapshot(cutover) : undefined; const count = events.length;
-        const published = object((await this.request('frame', { after: this.sequence, events, ...(snapshot ? { snapshot } : {}) }, false)).result);
-        requireValue(published.sequence === cutover, 'gap'); this.sequence = cutover; this.queued.splice(0, count); this.dropped = false;
-        if (snapshot && this.dirty === revision) this.dirty = 0;
-      }
+      const sequence = integer(renewal.sequence, this.initialSequence);
+      const outbox = this.outbox ??= new HostOutbox({ origin: this.client.profile.origin, principal: this.client.profile.principal,
+        roomId: this.roomId, binding: this.bound, epoch: this.epoch, generation: this.owner.generation }, sequence);
+      const pending = outbox.pending();
+      requireValue(sequence === outbox.sequence || (pending && sequence === frameCutover(pending)), 'gap');
+      const frame = pending ?? this.stage(outbox);
+      if (!frame) return;
+      const reply = await this.requestForTick('frame', frame);
+      if (reply) outbox.acknowledge(frame, reply.result);
     } catch { this.fail(); }
     finally { this.busy = false; if (!this.closed && !this.failed) this.timer = setTimeout(() => { void this.tick(); }, 500); }
+  }
+  private async requestForTick(operation: 'renew' | 'frame', data: unknown) {
+    try { return await this.request(operation, data, false); }
+    catch (error) {
+      if (!(error instanceof CollaborationError) || error.code !== 'unavailable') throw error;
+      // The next tick may renew and resend the persisted frame only within this lease.
+      this.check();
+      return undefined;
+    }
+  }
+  private stage(outbox: HostOutbox) {
+    if (!this.queued.length && !this.dirty) return undefined;
+    const after = outbox.sequence; const revision = this.dirty;
+    const events = this.queued.map((event, index) => ({ ...event, sequence: after + index + 1 }));
+    const cutover = events.at(-1)?.sequence ?? after;
+    const source = revision ? this.ports.snapshot(cutover) : undefined;
+    const snapshot = source && events.some(event => event.kind === 'relay.gap')
+      ? { ...source, warnings: [...source.warnings.slice(0, 15), 'Some live events were omitted before this snapshot.'] }
+      : source;
+    this.check();
+    const frame = outbox.stage({ after, events, ...(snapshot ? { snapshot } : {}) });
+    this.queued.splice(0, events.length);
+    if (this.dirty === revision) this.dirty = 0;
+    return frame;
   }
   private fail(): void {
     if (this.closed || this.failed) return;

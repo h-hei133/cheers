@@ -5,14 +5,23 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CollaborationClient, UnknownMutation } from './client/service.js';
 import { readProfile, canonicalOrigin } from './client/profile.js';
 import { CollaborationGuest } from './client/guest.js';
+import { CollaborationHost } from './client/host.js';
+import { HostOutbox } from './client/outbox.js';
+import { cursorPath } from './client/cursor.js';
+import type { QueryEvent } from '../core/query/runtime/events.js';
 import { readServiceConfig } from './service/config.js';
 import { startCollaborationService } from './service/listener.js';
 import { emptySnapshot, bound, fixture, startFixtureService } from './__tests__/fixture.js';
-import { object } from './contract/value.js';
+import { digest, object } from './contract/value.js';
 
 const cleanups: (() => Promise<void> | void)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); vi.unstubAllEnvs(); });
 function setup() { const value = fixture(); cleanups.push(value.cleanup); return value; }
+function isolateHome(root: string): string {
+  const home = path.join(root, 'home'); fs.mkdirSync(home);
+  vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home);
+  return home;
+}
 function profile(s: ReturnType<typeof fixture>, principal: keyof typeof s.tokens, origin: string, token = s.tokens[principal]) {
   const tokenFile = path.join(s.root, principal + '.token'); const target = path.join(s.root, principal + '.profile.json');
   fs.writeFileSync(tokenFile, token + '\n', { mode: 0o600 });
@@ -70,6 +79,79 @@ it('queries a lost mutation reply without resending its remote effect', async ()
   const queried = object((await client.request('receipt', { data: { requestId: receipt } })).result);
   expect(queried.status).toBe('committed'); expect(operations).toEqual(['publish', 'receipt']); expect(s.store.transaction(state => state.shares.length)).toBe(1);
 });
+
+it.each(['disconnect', 'overloaded'] as const)('retries the persisted frame across a lost acknowledgement and %s renewal', async renewal => {
+  const s = setup(); const home = isolateHome(s.root);
+  const frames: { data: unknown; saved?: string; mode?: number }[] = [];
+  let outbox: string; let duringLostRenewal: string | undefined;
+  const started = s.begin(); const lease = object(started.owner);
+  const server = createServer(async (request, response) => {
+    try {
+      let body = ''; for await (const chunk of request) body += String(chunk);
+      if (request.headers.authorization !== 'Bearer ' + s.tokens.alice) { response.writeHead(403); response.end(); return; }
+      const value = JSON.parse(body);
+      if (value.operation === 'renew' && frames.length === 1 && duringLostRenewal === undefined) {
+        duringLostRenewal = fs.readFileSync(outbox, 'utf8');
+        if (renewal === 'disconnect') request.socket.destroy();
+        else response.writeHead(503).end();
+        return;
+      }
+      const result = s.dispatcher.execute('alice', value);
+      if (value.operation === 'frame') {
+        frames.push({ data: value.data, ...(fs.existsSync(outbox) ? { saved: fs.readFileSync(outbox, 'utf8'), mode: fs.statSync(outbox).mode & 0o777 } : {}) });
+        if (frames.length === 1) { request.socket.destroy(); return; }
+      }
+      response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify(result));
+    } catch { response.writeHead(409); response.end(); }
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  cleanups.push(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
+  const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const client = new CollaborationClient(profile(s, 'alice', origin).selected);
+  outbox = path.join(home, '.cheers', 'collaboration', 'outbox', digest([origin, 'alice', started.roomId]) + '.json');
+  let observe!: (event: QueryEvent) => void;
+  const host = new CollaborationHost(client, bound, started, { current: () => true,
+    observe: callback => { observe = callback; return () => {}; }, snapshot: cutover => ({ ...emptySnapshot, cutover }),
+    invalid() {}, updated() {} });
+  cleanups.push(async () => { await host.close(false); client.close(); });
+  host.start();
+  const event = { type: 'query.started' as const, sessionId: 's', prompt: 'local fixture' };
+  observe(event);
+  await vi.waitFor(() => expect(frames).toHaveLength(1), { timeout: 2500 });
+  for (let index = 0; index < 140; index++) observe(event);
+  await vi.waitFor(() => {
+    expect(frames).toHaveLength(3);
+    expect(object(JSON.parse(fs.readFileSync(outbox, 'utf8')))).toMatchObject({ sequence: 129 });
+    expect(object(JSON.parse(fs.readFileSync(outbox, 'utf8'))).frame).toBeUndefined();
+  }, { timeout: 3500 });
+  expect(host.status()).toBe('hosting');
+  expect(frames[0]!.mode).toBe(0o600);
+  expect(JSON.parse(frames[0]!.saved!).frame).toEqual(frames[0]!.data);
+  expect(frames[0]!.saved).not.toContain(lease.token as string);
+  expect(duringLostRenewal).toBe(frames[0]!.saved);
+  expect(frames[1]).toEqual(frames[0]);
+  const suffix = object(frames[2]!.data);
+  expect(suffix.after).toBe(1); expect(suffix.events).toHaveLength(128);
+  expect((suffix.events as unknown[]).at(-1)).toMatchObject({ kind: 'relay.gap', sequence: 129 });
+  expect(suffix.snapshot).toMatchObject({ cutover: 129, warnings: expect.arrayContaining(['Some live events were omitted before this snapshot.']) });
+  expect(s.store.transaction(state => state.rooms[0]!.events.map(event => event.sequence))).toEqual(Array.from({ length: 129 }, (_, index) => index + 1));
+}, 8000);
+
+it('reloads the pending frame within its lease and refuses to carry it into a new generation', () => {
+  const s = setup(); isolateHome(s.root);
+  const identity = { origin: 'http://127.0.0.1:24001', principal: 'alice', roomId: 'room', binding: bound, epoch: 'epoch', generation: 1 };
+  const original = new HostOutbox(identity, 0);
+  const event = { sequence: 1, kind: 'turn.started' as const, timestamp: 1 };
+  const frame = original.stage({ after: 0, events: [event] });
+  const restored = new HostOutbox(identity, 1);
+  expect(restored.pending()).toEqual(frame);
+  expect(() => restored.acknowledge(restored.pending()!, { sequence: 1, frameDigest: 'wrong' })).toThrow('gap');
+  expect(restored.pending()).toEqual(frame);
+  const successor = new HostOutbox({ ...identity, generation: 2 }, 1);
+  expect(successor.pending()).toBeUndefined();
+  expect(() => original.pending()).toThrow('stale');
+  expect(() => new HostOutbox(identity, 1)).toThrow('stale');
+});
 it('aborts a held native request and never automatically repeats it', async () => {
   const s = setup(); let received!: () => void; const ready = new Promise<void>(resolve => { received = resolve; }); let requests = 0;
   const server = createServer(async request => { for await (const _chunk of request) { /* consume the bounded fixture request */ } requests++; received(); });
@@ -107,14 +189,50 @@ it.each(['poll', 'propose'] as const)('inherits the parent cancellation through 
   await expect(pending).rejects.toThrow('cancelled');
   expect(inherited?.aborted).toBe(true);
 });
-it('explicitly rejoins a changed host generation with a visible cursor gap and no stale snapshot', async () => {
-  const s = setup(); const isolatedHome = path.join(s.root, 'home'); fs.mkdirSync(isolatedHome); vi.stubEnv('HOME', isolatedHome); vi.stubEnv('USERPROFILE', isolatedHome);
+it('explicitly rejoins a changed host generation with a fresh snapshot after its initial cursor gap', async () => {
+  const s = setup(); isolateHome(s.root);
   const selected = profile(s, 'bob', 'http://127.0.0.1:24001').selected;
   let generation = 1;
   const client = new CollaborationClient(selected); vi.spyOn(client, 'request').mockImplementation(async () => ({ version: 1, principal: 'bob', epoch: 'same-epoch',
     result: { roomId: 'room', epoch: 'same-epoch', generation, sequence: 1, cursor: 1, gap: false, events: [{ sequence: 1, kind: 'turn.started', timestamp: Date.now() }], snapshot: { ...emptySnapshot, cutover: 1 } } }));
   const joined = () => ({ roomId: 'room', epoch: 'same-epoch', generation, binding: bound, ticket: 'opaque-ticket', expiresAt: Date.now() + 60000 });
   const first = new CollaborationGuest(client, 'local-id', joined(), () => true); await first.poll(); first.close(); generation++;
-  const second = new CollaborationGuest(client, 'local-id', joined(), () => true); await second.poll();
-  expect(object(second.view()).gap).toBe(true); expect(object(second.view()).generation).toBe(2); second.close(); client.close();
+  const second = new CollaborationGuest(client, 'local-id', joined(), () => true);
+  expect(second.view()).toMatchObject({ gap: true, generation: 2, cursor: 0, events: [] });
+  expect(object(second.view()).snapshot).toBeUndefined();
+  await second.poll();
+  expect(second.view()).toMatchObject({ gap: false, generation: 2, cursor: 1, events: [], snapshot: { cutover: 1 } });
+  second.close(); client.close();
+});
+
+it('persists a snapshot reset ahead of the page cursor and folds only its exact suffix', async () => {
+  const s = setup(); isolateHome(s.root);
+  const origin = 'http://127.0.0.1:24001'; const client = new CollaborationClient(profile(s, 'bob', origin).selected);
+  const roomId = 'room'; const epoch = 'epoch'; const generation = 1;
+  const event = (sequence: number, kind = 'turn.started') => ({ sequence, kind, timestamp: sequence });
+  const pages = [
+    { sequence: 2, cursor: 2, events: [event(1), event(2, 'relay.gap')], gap: false, snapshot: emptySnapshot },
+    { sequence: 7, cursor: 4, events: [event(4)], gap: true, snapshot: { ...emptySnapshot, cutover: 6 } },
+    { sequence: 7, cursor: 7, events: [event(7)], gap: false },
+    { sequence: 7, cursor: 7, events: [event(7)], gap: false },
+    { sequence: 7, cursor: 7, events: [event(7, 'query.failed')], gap: false },
+  ];
+  const request = vi.spyOn(client, 'request').mockImplementation(async () => ({ version: 1, principal: 'bob', epoch,
+    result: { roomId, epoch, generation, ...pages.shift()! } }));
+  const selected = { roomId, epoch, generation, binding: bound, ticket: 'opaque-ticket', expiresAt: Date.now() + 60_000 };
+  const guest = new CollaborationGuest(client, 'local-id', selected, () => true);
+  cleanups.push(() => { guest.close(); client.close(); });
+  await guest.poll();
+  expect(guest.view()).toMatchObject({ gap: true, cursor: 2, events: [event(1), event(2, 'relay.gap')] });
+  await guest.poll();
+  expect(guest.view()).toMatchObject({ gap: false, cursor: 6, events: [], snapshot: { cutover: 6 } });
+  await guest.poll();
+  expect(request.mock.calls[2]?.[1]?.data).toEqual({ after: 6 });
+  const view = guest.view(); const file = cursorPath(origin, 'bob', roomId, 'local-id'); const saved = fs.readFileSync(file, 'utf8');
+  expect(view).toMatchObject({ gap: false, cursor: 7, events: [event(7)], snapshot: { cutover: 6 } });
+  await guest.poll(); expect(guest.view()).toEqual(view);
+  await expect(guest.poll()).rejects.toThrow('gap');
+  expect(fs.readFileSync(file, 'utf8')).toBe(saved);
+  const reopened = new CollaborationGuest(client, 'local-id', selected, () => true);
+  try { expect(reopened.view()).toEqual(view); } finally { reopened.close(); }
 });
