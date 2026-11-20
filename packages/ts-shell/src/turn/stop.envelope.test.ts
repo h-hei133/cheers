@@ -28,7 +28,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 
-async function execute(handler?: (count: number) => unknown, command?: string) {
+async function execute(handler?: (count: number) => unknown, command?: string, maxSteps = 3) {
   const manager = new SessionManager(); const session = manager.createNew(root);
   const hooks = new HookDispatcher();
   if (handler) hooks.registerInProcessHook({ event: 'Stop', name: 'envelope-check', handler: payload => handler((payload as { reentryCount: number }).reentryCount) as HookDecision });
@@ -41,7 +41,7 @@ async function execute(handler?: (count: number) => unknown, command?: string) {
     promptSettled: async (_metadata, _signal, outcome) => { settlements.push(outcome); },
     runPrompt: (prompt, signal) => runTurn({ sessionId: session.id, workspaceRoot: root, prompt, signal,
       step: async messages => { modelInputs.push(JSON.stringify(messages)); return { text: `Candidate ${++steps}`, toolCalls: [], stopReason: 'stop' }; },
-      history: [], onMessage: message => manager.addTurn(session.id, message), hooks, maxSteps: 3, tools: new Map() }) });
+      history: [], onMessage: message => manager.addTurn(session.id, message), hooks, maxSteps, tools: new Map() }) });
   runtime.observeEvents(event => { events.push(event); sink.handleEvent(event); }, { renders: false });
   let error: unknown; let output: string | undefined;
   try { output = await runtime.executePrompt(session.id, 'fixture', { outputMode: 'print' }); } catch (caught) { error = caught; }
@@ -92,6 +92,38 @@ function expectNeutral(result: Awaited<ReturnType<typeof execute>>, reasonCode: 
 }
 
 describe('versioned Stop envelope end-to-end', () => {
+  it('publishes and replays a neutral completion after three negotiated repairs', async () => {
+    const script = path.join(root, 'repair.mjs');
+    fs.writeFileSync(script, `let body = ''; for await (const chunk of process.stdin) body += chunk;
+      const { stop_repair_protocol, reentryCount } = JSON.parse(body);
+      const contract = ${JSON.stringify(contract)};
+      if (stop_repair_protocol !== 1) process.exit(3);
+      console.log(JSON.stringify(reentryCount < 3 ? { contract, decision: 'block', reasonCode: 'actionable_gap',
+        reason: 'Repair the open gap.', proofVerdict: 'not_proven', evidenceIdentity: ['proof:fixture'],
+        stopRepair: { version: 1, chainId: 'a'.repeat(64), round: reentryCount + 1, maxRounds: 3,
+          progressDigest: String(reentryCount + 1).repeat(64) } }
+        : { contract, decision: 'allow', reasonCode: 'already_blocked_once', proofVerdict: 'not_reported' }));`);
+    const result = await execute(undefined, `'${process.execPath}' '${script}'`, 5);
+    expectNeutral(result, 'already_blocked_once');
+    expect(result.steps).toBe(4);
+    const terminal = result.events.at(-1)!;
+    expect(terminal).toMatchObject({ reentryCount: 3, stopRepair: { round: 3, maxRounds: 3 } });
+    expect(isReadableTranscriptEvent({ type: 'query-event', timestamp: '', event: terminal })).toBe(true);
+    expect(isReadableTranscriptEvent({ type: 'query-event', timestamp: '', event: { ...terminal, stopRepair: undefined } })).toBe(false);
+  });
+
+  it.each(['skipped round', 'foreign chain', 'repeated progress', 'changed limit'] as const)(
+    'ends the repair loop on %s even when the hook keeps blocking', async defect => {
+      const result = await execute(count => ({ contract, decision: 'block', reasonCode: 'actionable_gap', proofVerdict: 'not_proven',
+        stopRepair: { version: 1, round: count === 0 ? 1 : defect === 'skipped round' ? 3 : 2,
+          maxRounds: count && defect === 'changed limit' ? 2 : 3,
+          chainId: (count && defect === 'foreign chain' ? 'b' : 'a').repeat(64),
+          progressDigest: (count && defect !== 'repeated progress' ? 'd' : 'c').repeat(64) } }));
+      expect(result.steps).toBe(2);
+      expect(result.events.at(-1)).toMatchObject({ type: 'query.failed', stopStatus: 'blocked', error: expect.stringContaining('invalid_repair_progress') });
+    },
+  );
+
   it.each([
     ['allow-default', { decision: 'allow' }, 'explicit_allow'],
     ['allow-custom', { decision: 'allow', reasonCode: 'lint_passed' }, 'lint_passed'],

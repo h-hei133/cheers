@@ -1,12 +1,14 @@
 {
   "version": "0.1.0",
   "workspace": "..",
+  "maxFileBytes": 1048576,
   "entries": [
     {
       "id": "source_module_graph",
       "source": {
         "kind": "module-graph",
-        "pattern": "packages/**/*.ts*"
+        "pattern": "packages/**/*.ts*",
+        "checkExports": true
       }
     },
     {
@@ -14,6 +16,13 @@
       "source": {
         "kind": "module-functions",
         "pattern": "packages/**/*.ts*"
+      }
+    },
+    {
+      "id": "structure_baseline",
+      "source": {
+        "kind": "baseline",
+        "path": ".normproof/baseline.json"
       }
     }
   ]

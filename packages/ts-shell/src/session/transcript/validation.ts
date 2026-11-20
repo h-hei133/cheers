@@ -5,6 +5,7 @@ import { isCustomMessage } from '../../core/agent/custom.js';
 import { captureRequestDeclaration } from '../../core/agent/declarations/codec.js';
 import { isBranchStoreNamespace } from '../branch/store/contract.js';
 import { isSessionAnnotation } from '../context/annotations.js';
+import { readableStopReentry } from '../../core/hooks/stop/model.js';
 
 const ROLES: ReadonlySet<unknown> = new Set(["system", "user", "assistant", "tool"]);
 const AGENT_ROLES: ReadonlySet<unknown> = new Set(["planner", "coder", "reviewer"]);
@@ -51,8 +52,7 @@ function queryEvent(value: unknown): boolean {
     && value.result.status !== 'completed_unproven' && value.result.terminalClassification !== 'completed_unproven'
     && value.result.terminalReason !== 'completed_unproven';
   if (value.type === 'query.completed_unproven') return typeof value.attemptId === 'string' && value.attemptId.length > 0
-    && Number.isSafeInteger(value.reentryCount) && Number(value.reentryCount) >= 0 && Number(value.reentryCount) <= 1
-    && value.stop_hook_active === (Number(value.reentryCount) > 0) && value.proofVerdict === 'not_reported'
+    && readableStopReentry(value) && value.proofVerdict === 'not_reported'
     && ['already_blocked_once', 'not_configured'].includes(String(value.reasonCode))
     && readableQueryResult(value.result) && record(value.result) && value.result.status === 'completed_unproven'
     && value.result.terminalClassification === 'completed_unproven' && value.result.terminalReason === 'completed_unproven'

@@ -22,7 +22,7 @@ export type HookEventName =
   | "Stop"
   | "StopFailure";
 
-export type HookDecisionKind = "allow" | "block" | "retry" | "ask" | "defer" | "unknown" | "unsupported";
+export type HookDecisionKind = "allow" | "allow_with_advisory" | "block" | "retry" | "ask" | "defer" | "unknown" | "unsupported";
 
 export interface HookDecision {
   /** Stop-only host disposition; it grants neither proof nor tool authority. */
@@ -31,12 +31,15 @@ export interface HookDecision {
   readonly proofVerdict?: import('./stop/model.js').ProofVerdict;
   readonly evidenceIdentity?: readonly string[];
   readonly stopChecks?: readonly import('./stop/model.js').StopCheck[];
+  readonly stopRepair?: import('./stop/model.js').StopRepairProgress;
+  readonly contract?: { readonly name: string; readonly version: string };
   readonly decision: HookDecisionKind;
   readonly reason?: string;
   readonly feedback?: string;
+  readonly additionalContext?: string;
   readonly hookSpecificOutput?: Record<string, unknown>;
   readonly hookVerdict?: {
-    readonly status: 'allow' | 'block' | 'unknown' | 'unsupported';
+    readonly status: 'allow' | 'allow_with_advisory' | 'block' | 'unknown' | 'unsupported';
     readonly source: 'adapter' | 'hook';
     readonly reasonCode: string;
     /** How this adapter outcome is consumed. Ordinary permission remains separate. */

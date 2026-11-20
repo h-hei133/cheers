@@ -1,21 +1,21 @@
 import { isRecord } from '../values/record.js';
+import { truncateTextBytes } from '../tools/truncation.js';
 import type { HookDecision, PreToolUsePayload } from './types.js';
 import { preparedWriteCandidate, preparedWriteInspection } from '../../tools/preparation.js';
 import type { PreparedWriteCandidate } from '../../tools/types.js';
 
 export const CANONICAL_WRITE_MATCHER = '^(?:Write|Edit|MultiEdit|NotebookEdit)$';
-/** C3b's opt-in experiment policy: block uncertainty, observe unsupported coverage. */
-export const WRITE_HOOK_POLICY = 'block-unknown-observe-unsupported' as const;
 
 const VERSIONED_REASON_CODES = new Set([
-  'no_violation', 'not_a_judged_write', 'not_configured', 'could_not_decide', 'violation',
+  'no_violation', 'not_a_judged_write', 'not_configured', 'could_not_decide', 'violation', 'advisory',
 ]);
+export const WRITE_HOOK_CONTEXT_BYTES = 4_000;
 const TOOLS: Readonly<Record<string, string>> = {
   write: 'Write', edit: 'Edit', multiedit: 'MultiEdit', notebookedit: 'NotebookEdit',
   Write: 'Write', Edit: 'Edit', MultiEdit: 'MultiEdit', NotebookEdit: 'NotebookEdit',
 };
 
-export interface CanonicalHookInput {
+interface CanonicalHookEnvelope {
   readonly version: 1;
   readonly event: 'PreToolUse';
   readonly workspaceRoot: string;
@@ -30,13 +30,22 @@ export interface CanonicalHookInput {
   readonly agentType?: string;
   readonly hook_event_name: 'PreToolUse';
   readonly cwd: string;
+}
+
+export interface CanonicalHookInput extends CanonicalHookEnvelope {
   readonly tool_name: string;
   readonly tool_input: { readonly file_path: string; readonly content: string };
+}
+
+interface CanonicalPatchInput extends CanonicalHookEnvelope {
+  readonly tool_name: 'apply_patch';
+  readonly tool_input: { readonly prepared_writes: readonly { readonly path: string; readonly content: string | null }[] };
 }
 
 export interface TranslatedWriteInputs {
   readonly inputs: readonly CanonicalHookInput[];
   readonly gaps: readonly HookDecision[];
+  readonly batch?: { readonly input: CanonicalPatchInput; readonly matchNames: readonly string[] };
 }
 
 export function canonicalToolName(name: string): string { return TOOLS[name] ?? name; }
@@ -50,14 +59,20 @@ function unsupported(reasonCode: string, reason: string): HookDecision {
   return { decision: 'unsupported', reasonCode, reason, hookVerdict: { status: 'unsupported', source: 'adapter', reasonCode, policy: 'observe-only' } };
 }
 
-function canonicalWriteInput(payload: PreToolUsePayload, timeoutMs: number, candidate: PreparedWriteCandidate): CanonicalHookInput {
+function canonicalEnvelope(payload: PreToolUsePayload, timeoutMs: number, args: Readonly<Record<string, unknown>>): CanonicalHookEnvelope {
   return {
     version: 1, event: 'PreToolUse', workspaceRoot: payload.workspaceRoot, sessionId: payload.sessionId,
-    toolName: payload.toolName, toolCallId: payload.toolCallId, args: { ...payload.args }, timeoutMs,
+    toolName: payload.toolName, toolCallId: payload.toolCallId, args, timeoutMs,
     reentry: { supported: false, active: false }, timestamp: payload.timestamp,
     ...(payload.agentId === undefined ? {} : { agentId: payload.agentId }),
     ...(payload.agentType === undefined ? {} : { agentType: payload.agentType }),
     hook_event_name: 'PreToolUse', cwd: payload.workspaceRoot,
+  };
+}
+
+function canonicalWriteInput(payload: PreToolUsePayload, timeoutMs: number, candidate: PreparedWriteCandidate): CanonicalHookInput {
+  return {
+    ...canonicalEnvelope(payload, timeoutMs, { ...payload.args }),
     tool_name: candidate.before.state === 'absent' ? 'Write' : 'Edit',
     tool_input: { file_path: candidate.path, content: candidate.content },
   };
@@ -94,20 +109,14 @@ export function translateWriteInput(payload: PreToolUsePayload, timeoutMs: numbe
     || !candidate && ['edits', 'oldText', 'newText', 'replaceAll'].some(key => key in args)) {
     return unsupported('ambiguous_content', 'Mixed replacement, multi-target or cell arguments cannot be reduced losslessly to one file.');
   }
-  // C3a treats missing content as an input-fidelity gap. Do not let the older pinned
-  // artifact's empty-import fallback turn a partial edit into a clean allow.
+  // A replacement judgment needs the exact complete proposal.
   if (!candidate && typeof args.content !== 'string') return hookUnknown('input_incomplete');
-  return { version: 1, event: 'PreToolUse', workspaceRoot: payload.workspaceRoot, sessionId: payload.sessionId,
-    toolName: payload.toolName, toolCallId: payload.toolCallId, args: { ...args }, timeoutMs,
-    reentry: { supported: false, active: false }, timestamp: payload.timestamp,
-    ...(payload.agentId === undefined ? {} : { agentId: payload.agentId }),
-    ...(payload.agentType === undefined ? {} : { agentType: payload.agentType }),
-    hook_event_name: 'PreToolUse', cwd: payload.workspaceRoot, tool_name: tool,
+  return { ...canonicalEnvelope(payload, timeoutMs, { ...args }), tool_name: tool,
     tool_input: { file_path: candidate?.path ?? args.path, content: candidate?.content ?? args.content as string } };
 }
 
 /** Translate single-file or multi-file prepared write operations into canonical PreToolUse hook inputs. */
-export function translateWriteInputs(payload: PreToolUsePayload, timeoutMs: number): TranslatedWriteInputs | HookDecision {
+export function translateWriteInputs(payload: PreToolUsePayload, timeoutMs: number, protocol: 1 | 2 = 1): TranslatedWriteInputs | HookDecision {
   if (payload.eventName !== 'PreToolUse' || typeof payload.workspaceRoot !== 'string' || !payload.workspaceRoot
     || typeof payload.sessionId !== 'string' || typeof payload.toolCallId !== 'string'
     || typeof payload.toolName !== 'string' || !isRecord(payload.args)
@@ -126,6 +135,18 @@ export function translateWriteInputs(payload: PreToolUsePayload, timeoutMs: numb
       || new Set(candidates.map(candidate => candidate.path)).size !== candidates.length
       || candidates.some(candidate => !writes.some(target => target.path === candidate.path))) {
       return hookUnknown('input_incomplete');
+    }
+    if (protocol === 2 && inspection.targets.length > 0) {
+      const byPath = new Map(candidates.map(candidate => [candidate.path, candidate]));
+      const matchNames = new Set(['apply_patch']);
+      const prepared_writes = inspection.targets.map(target => {
+        const candidate = byPath.get(target.path);
+        matchNames.add(candidate?.before.state === 'absent' ? 'Write' : 'Edit');
+        return { path: target.path, content: candidate?.content ?? null };
+      });
+      return { inputs: [], gaps: [], batch: { matchNames: [...matchNames], input: {
+        ...canonicalEnvelope(payload, timeoutMs, {}), tool_name: 'apply_patch', tool_input: { prepared_writes },
+      } } };
     }
     const gaps: HookDecision[] = [];
     if (inspection.targets.some(target => target.operation === 'delete')) gaps.push(unsupported('delete_effects',
@@ -166,6 +187,8 @@ export function translateWriteResult(stdout: string): HookDecision {
   if (hasReasonCode && typeof value.reasonCode !== 'string') return hookUnknown('invalid_output');
   const reasonCode = typeof value.reasonCode === 'string' ? value.reasonCode : undefined;
   const reason = typeof value.reason === 'string' ? value.reason.slice(0, 4_000) : undefined;
+  const additionalContext = typeof value.additionalContext === 'string' && value.additionalContext.trim()
+    ? truncateTextBytes(value.additionalContext.trim(), WRITE_HOOK_CONTEXT_BYTES) : undefined;
 
   // A flat result without a reasonCode is the old host contract. Preserve its
   // block/retry payloads verbatim and keep its allow distinguishable from a
@@ -182,6 +205,14 @@ export function translateWriteResult(stdout: string): HookDecision {
   // The --emit-result contract is closed. A future reason must never fall
   // through to allow, and a known reason must agree with its decision.
   if (!VERSIONED_REASON_CODES.has(reasonCode)) return hookUnknown('version_mismatch');
+  if (value.additionalContext !== undefined && (!additionalContext || !['advisory', 'could_not_decide'].includes(reasonCode))) {
+    return hookUnknown('conflicting_output');
+  }
+  if (reasonCode === 'advisory') {
+    if (value.decision !== 'allow_with_advisory' || !additionalContext) return hookUnknown('conflicting_output');
+    return { decision: 'allow_with_advisory', reasonCode, reason, additionalContext,
+      hookVerdict: { status: 'allow_with_advisory', source: 'hook', reasonCode, policy: 'permission' } };
+  }
   if (value.decision === 'block' && reasonCode === 'violation') return { decision: 'block', reasonCode,
     ...(reason === undefined ? {} : { reason }),
     hookVerdict: { status: 'block', source: 'hook', reasonCode, policy: 'block' } };
@@ -192,6 +223,7 @@ export function translateWriteResult(stdout: string): HookDecision {
         hookVerdict: { status: 'allow', source: 'hook', reasonCode, policy: 'permission' } };
     case 'could_not_decide':
       return { decision: 'unknown', reasonCode, reason: reason ?? 'The write gate could not reach a decision.',
+        ...(additionalContext === undefined ? {} : { additionalContext }),
         hookVerdict: { status: 'unknown', source: 'hook', reasonCode } };
     case 'not_configured':
       return { decision: 'allow', reasonCode, ...(reason === undefined ? {} : { reason }),
@@ -204,20 +236,27 @@ export function translateWriteResult(stdout: string): HookDecision {
   return hookUnknown('invalid_output');
 }
 
-/** Cheers chooses to block undecidable checks. This never calls or grants ordinary permission. */
-export function applyWriteHookPolicy(result: HookDecision): HookDecision {
-  return result.decision === 'unknown' ? { ...result, decision: 'block',
-    hookVerdict: { ...(result.hookVerdict ?? { status: 'unknown', source: 'adapter', reasonCode: 'unknown' }), policy: 'block' } } : result;
+/** An admitted v2 producer can decline a judgment while ordinary permission remains in force. */
+export function applyWriteHookPolicy(result: HookDecision, protocol: 1 | 2 = 1): HookDecision {
+  if (result.decision !== 'unknown') return result;
+  const verdict = result.hookVerdict ?? { status: 'unknown', source: 'adapter', reasonCode: 'unknown' };
+  if (protocol === 2 && verdict.source === 'hook' && result.reasonCode === 'could_not_decide') {
+    return { ...result, additionalContext: result.additionalContext ??
+      'The write gate could not assess this change. Check the gate configuration and use a supported operation with complete content.',
+    hookVerdict: { ...verdict, policy: 'observe-only' } };
+  }
+  return { ...result, decision: 'block', hookVerdict: { ...verdict, policy: 'block' } };
 }
 
 /** Preserve a coverage gap when several opt-in write adapters run for one call. */
 export function mergeWriteHookResult(current: HookDecision | null, next: HookDecision): HookDecision {
   if (current === null) return next;
-  const currentStatus = current.hookVerdict?.status;
-  const nextStatus = next.hookVerdict?.status;
-  if (currentStatus === 'unknown') return current;
-  if (nextStatus === 'unknown') return next;
-  if (currentStatus === 'unsupported') return current;
-  if (nextStatus === 'unsupported') return next;
-  return next;
+  const precedence = ['unknown', 'unsupported', 'allow_with_advisory'];
+  const currentRank = precedence.indexOf(current.hookVerdict?.status ?? current.decision);
+  const nextRank = precedence.indexOf(next.hookVerdict?.status ?? next.decision);
+  const chosen = currentRank >= 0 && (nextRank < 0 || currentRank <= nextRank) ? current : next;
+  const context = [current.additionalContext, next.additionalContext]
+    .filter((part): part is string => typeof part === 'string' && Boolean(part.trim()));
+  const additionalContext = truncateTextBytes([...new Set(context)].join('\n\n'), WRITE_HOOK_CONTEXT_BYTES);
+  return additionalContext && additionalContext !== chosen.additionalContext ? { ...chosen, additionalContext } : chosen;
 }

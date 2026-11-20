@@ -1,5 +1,6 @@
 import { boundText, TOOL_OUTPUT_LIMIT, type AfterToolCallContext } from '../core/agent/tools.js';
 import { dispatchExtensionEvent, type ExtensionEventRunner } from '../core/hooks/extensionBridge.js';
+import { WRITE_HOOK_CONTEXT_BYTES } from '../core/hooks/translation.js';
 import { redactExportText } from '../core/security/redaction.js';
 import { neutraliseForDisplay } from '../core/text/safety.js';
 import { readOnlyAccess } from '../core/tools/capability.js';
@@ -86,17 +87,18 @@ export async function collectToolResult(input: {
 
 /** The model and history receive the same projection, with native notices still reserved. */
 export function projectToolResult(result: AfterToolCallContext['result'], patch: ExtensionToolResult | undefined,
-  verification: string | undefined, refused: string | undefined): string {
+  verification: string | undefined, refused: string | undefined, preUseFeedback?: string): string {
   const originalNotice = typeof result.metadata?.outputNotice === 'string' ? result.metadata.outputNotice : '';
   const replacement = patch?.output === undefined ? undefined : redactExportText(patch.output)
     .replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, char => '\\x' + char.charCodeAt(0).toString(16).padStart(2, '0'));
   const advice = patch?.feedback && truncateTextBytes(neutraliseForDisplay(redactExportText(patch.feedback)), 512);
   const verified = verification && truncateTextBytes(neutraliseForDisplay(redactExportText(verification)), 512);
+  const writeAdvice = preUseFeedback && truncateTextBytes(neutraliseForDisplay(redactExportText(preUseFeedback)), WRITE_HOOK_CONTEXT_BYTES);
   const extensionFeedback = advice ? '[Extension feedback]\n' + advice : undefined;
   const verificationFeedback = verified ? '[Verification feedback]\n' + verified : undefined;
   const warning = refused ? truncateTextBytes(neutraliseForDisplay(redactExportText(refused)), 256)
     + ' Actual effect evidence remains visible.' : undefined;
-  const suffix = [verificationFeedback, extensionFeedback, warning].filter(Boolean).join('\n\n');
+  const suffix = [writeAdvice && '[Write gate feedback]\n' + writeAdvice, verificationFeedback, extensionFeedback, warning].filter(Boolean).join('\n\n');
   const content = replacement !== undefined && originalNotice && !replacement.includes(originalNotice)
     ? [replacement, originalNotice].filter(Boolean).join('\n\n') : replacement ?? result.output;
   if (!suffix && replacement === undefined) return result.output;

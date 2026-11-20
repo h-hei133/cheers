@@ -42,7 +42,9 @@ function fixture(name, broken) {
     '.normproof/evidence-manifest.json': JSON.stringify({ version: '0.1.0', workspace: '..', entries: [
       { id: 'source_module_graph', source: { kind: 'module-graph', pattern: 'src/**/*.ts' } },
       { id: 'source_module_functions', source: { kind: 'module-functions', pattern: 'src/**/*.ts' } },
+      { id: 'structure_baseline', source: { kind: 'baseline', path: '.normproof/baseline.json' } },
     ] }, null, 2),
+    '.normproof/baseline.json': JSON.stringify({ version: 2, values: {}, moduleFunctionSeed: 20, moduleFunctionCeilings: {} }),
     '.normproof/write-rules.json': JSON.stringify({ version: '0.1.0', rules: [{ kind: 'pathBoundary', id: 'protected', deny: ['target.txt'], message: 'Choose an allowed file.' }] }),
     'src/module.ts': broken ? 'import { missing } from "./missing.js";\nexport function run() { return missing; }\n' : 'export function run() { return 1; }\n',
   };

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { isRecord } from '../../values/record.js';
 import type { HookDecision } from '../types.js';
-import type { ProgressFingerprint, ProofVerdict, StopCheck } from './model.js';
+import { parseStopRepair, type ProgressFingerprint, type ProofVerdict, type StopCheck } from './model.js';
 
 const VERDICTS = new Set(['proven', 'partial', 'refuted', 'failed', 'not_proven', 'unknown', 'not_reported']);
 const UNCERTAIN = new Set(['could_not_decide', 'could_not_judge', 'invalid_output', 'empty_output', 'timeout',
@@ -10,6 +10,7 @@ const UNCERTAIN = new Set(['could_not_decide', 'could_not_judge', 'invalid_outpu
 const UNPROVEN = new Set(['already_blocked_once', 'not_configured']);
 const WIRE_REASONS = new Set(['proven', 'advisory_only', 'already_blocked_once', 'not_configured',
   'could_not_judge', 'actionable_gap', 'invalid_input', 'internal_error']);
+const WIRE_CONTRACT = Object.freeze({ name: 'normproof.completion-gate.stop', version: '0.1.0' });
 
 export function commandIdentity(command: string): string {
   return createHash('sha256').update(command.trim()).digest('hex');
@@ -23,7 +24,7 @@ export function stopUnknown(reasonCode: string): HookDecision {
 export function normalizeStopResult(value: unknown): HookDecision {
   if (!isRecord(value)) return stopUnknown('empty_output');
   if (value.contract !== undefined && (!isRecord(value.contract)
-    || value.contract.name !== 'normproof.completion-gate.stop' || value.contract.version !== '0.1.0')) {
+    || value.contract.name !== WIRE_CONTRACT.name || value.contract.version !== WIRE_CONTRACT.version)) {
     return stopUnknown('incompatible_contract');
   }
   if (value.contract !== undefined && value.proofVerdict === undefined) return stopUnknown('invalid_output');
@@ -35,6 +36,11 @@ export function normalizeStopResult(value: unknown): HookDecision {
   if (value.contract !== undefined && (!reasonCode || !WIRE_REASONS.has(reasonCode))) return stopUnknown('invalid_output');
   const proofVerdict = typeof value.proofVerdict === 'string' && VERDICTS.has(value.proofVerdict)
     ? value.proofVerdict as ProofVerdict : 'not_reported';
+  const stopRepair = value.stopRepair === undefined ? undefined : parseStopRepair(value.stopRepair);
+  if (value.stopRepair !== undefined && (!stopRepair || value.contract === undefined || value.decision !== 'block'
+    || reasonCode !== 'actionable_gap' || !['partial', 'refuted', 'failed', 'not_proven'].includes(proofVerdict))) {
+    return stopUnknown('invalid_output');
+  }
   const evidenceIdentity = Array.isArray(value.evidenceIdentity) && value.evidenceIdentity.length > 0
     && value.evidenceIdentity.every(id => typeof id === 'string' && /^[a-zA-Z0-9_:.-]{1,160}$/.test(id))
     ? [...new Set(value.evidenceIdentity as string[])].sort() : ['unspecified'];
@@ -61,6 +67,7 @@ export function normalizeStopResult(value: unknown): HookDecision {
     reasonCode: reasonCode ?? (value.decision === 'allow' ? 'explicit_allow' : 'hook_blocked'),
     proofVerdict,
     evidenceIdentity,
+    ...(stopRepair ? { stopRepair, contract: WIRE_CONTRACT } : {}),
     ...(typeof value.reason === 'string' ? { reason: value.reason.slice(0, 4_000) } : {}),
     ...(typeof value.feedback === 'string' ? { feedback: value.feedback.slice(0, 4_000) } : {}) };
 }
@@ -81,12 +88,14 @@ export function stopCheck(command: string, result: HookDecision, durationMs: num
   return { command: commandIdentity(command), decision: result.decision as StopCheck['decision'],
     reasonCode: result.reasonCode ?? 'unknown', proofVerdict: result.proofVerdict ?? 'not_reported',
     evidenceIdentity: result.evidenceIdentity ?? ['unspecified'], durationMs,
+    ...(result.stopRepair ? { stopRepair: result.stopRepair } : {}),
     ...(result.stopDisposition ? { stopDisposition: result.stopDisposition } : {}) };
 }
 
 export function progressFingerprint(checks: readonly StopCheck[]): ProgressFingerprint {
-  const identities = checks.map(({ command, reasonCode, proofVerdict, evidenceIdentity }) =>
-    ({ command, reasonCode, proofVerdict, evidenceIdentity: [...new Set(evidenceIdentity)].sort() }));
+  const identities = checks.map(({ command, reasonCode, proofVerdict, evidenceIdentity, stopRepair }) =>
+    ({ command, reasonCode, proofVerdict, evidenceIdentity: [...new Set(evidenceIdentity)].sort(),
+      ...(stopRepair ? { stopRepair } : {}) }));
   return { version: 1, checks: [...new Map(identities.map(check => [JSON.stringify(check), check])).entries()]
     .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, check]) => check) };
 }

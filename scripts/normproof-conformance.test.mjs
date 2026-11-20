@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test, { after } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { contract, extractPinned, repository, requireDigest, requireRuntime } from '../.normproof/adapter/artifact.mjs';
+import { contract, extractPinned, readBundleMetadata, repository, requireDigest, requireRuntime } from '../.normproof/adapter/artifact.mjs';
 import { runShadow } from '../.normproof/adapter/shadow.mjs';
 
 fs.mkdirSync(path.join(repository, '.tmp'), { recursive: true });
@@ -13,9 +13,10 @@ after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const identity = extractPinned(scratch);
 const load = member => import(pathToFileURL(path.join(scratch, 'package/dist', member)).href);
 const graph = await load('adapters/sidecar-file/module-graph.js');
-const evaluator = await load('engine/proof/expression/evaluate.js');
 const collector = await load('adapters/sidecar-file/evidence-collector.js');
+const { GRAPH_SAFETY } = await load('contracts/sidecar/graph-budget.js');
 const fixture = JSON.parse(fs.readFileSync(path.join(repository, '.normproof/adapter/fixtures/graph.json')));
+const nativeRuntime = { skip: Number(process.versions.node.split('.')[0]) < 24 && 'The native package requires Node 24' };
 
 function workspace(name, source = 'export function value() { return 1; }') {
   const root = path.join(scratch, name);
@@ -25,6 +26,9 @@ function workspace(name, source = 'export function value() { return 1; }') {
   for (const file of ['judge-input.json', 'evidence-manifest.json', 'norm-packs/software-structure-v0/profile.json']) {
     fs.copyFileSync(path.join(repository, '.normproof', file), path.join(root, '.normproof', file));
   }
+  fs.writeFileSync(path.join(root, '.normproof/baseline.json'), JSON.stringify({
+    version: 2, values: {}, moduleFunctionSeed: 20, moduleFunctionCeilings: {}
+  }));
   return root;
 }
 
@@ -35,9 +39,11 @@ function command(args, options = {}) {
   return run;
 }
 
-test('artifact: actual archive still carries all six pinned hunks; stale bytes and runtime are refused', () => {
-  console.log(JSON.stringify(identity));
-  assert.equal(identity.hunks, 6);
+test('artifact: the archive identifies an upstream commit and verified members', () => {
+  const metadata = readBundleMetadata();
+  assert.equal(identity.sourceCommit, metadata.baseCommit);
+  assert.deepEqual(identity.members, metadata.members);
+  assert.equal(identity.archiveSha256, metadata.archiveSha256);
   assert.equal(identity.parserVersion, '5.9.3');
   assert.throws(() => requireDigest(Buffer.from('changed'), contract.archiveSha256, 'archive'), /stale_artifact/);
   assert.throws(() => requireRuntime('v20.2.0'), /unsupported_runtime/);
@@ -49,57 +55,60 @@ test('paths: explicit .js only TS/TSX; explicit .ts/.tsx only themselves; extens
   for (const item of fixture.paths) {
     const sources = new Map([['packages/entry.ts', `import '${item.specifier}';`], ...item.modules.map(file => ['packages/' + file, ''])]);
     const result = graph.buildModuleGraph(sources);
-    assert.deepEqual(result.edges, item.target ? [{ from: 'packages/entry.ts', to: 'packages/' + item.target }] : [], item.name);
+    assert.deepEqual(result.edges, item.target ? [{ from: 'packages/entry.ts', to: 'packages/' + item.target, kind: 'value' }] : [], item.name);
     assert.deepEqual(result.unresolved, item.target ? [] : [{ from: 'packages/entry.ts', specifier: item.specifier }], item.name);
   }
 });
 
-test('ast/comment: AST declarations, escapes, literal dynamics, TSX and whole-collection syntax refusal', () => {
+test('ast: declarations, escapes, literal dynamics, TSX and whole-collection syntax refusal', () => {
   assert.deepEqual(graph.declaredSpecifiers(fixture.astSource), fixture.astTargets);
   assert.deepEqual(graph.declaredSpecifiers("import './view.js'; const view = <div/>;", 'view.tsx'), ['./view.js']);
   const result = graph.buildModuleGraph(new Map([['bad.ts', fixture.syntaxFailure], ['ok.ts', "import './ok.js';"]]));
-  assert.match(result.failure, /collection is incomplete/);
+  assert.match(result.failure, /^invalid:.*parser diagnostics/);
   assert.equal(result.edges, undefined);
-  const member = fs.readFileSync(path.join(scratch, 'package/dist/adapters/sidecar-file/module-graph.js'), 'utf8');
-  assert.match(member, /literal dynamic imports are included/);
-  assert.doesNotMatch(member, /path aliases, dynamic imports, missing/);
-  // Legacy omissions are a documented capability gap, never a claim of runtime dependency coverage.
   assert.deepEqual(graph.declaredSpecifiers(fixture.legacyBlindSpots), []);
+  const unknown = graph.buildModuleGraph(new Map([['entry.ts', fixture.legacyBlindSpots]]));
+  assert.equal(unknown.unresolved.length, 2);
 });
 
-test('capacity: 16384 edges admitted by collector and evaluator, next edge oversized without partial evidence', async () => {
-  const sources = new Map(Array.from({ length: 4096 }, (_, index) => [`packages/m${index}.ts`,
-    [1, 2, 3, 4].map(offset => `import './m${(index + offset) % 4096}.js';`).join('\n')]));
-  const exact = graph.buildModuleGraph(sources);
-  assert.equal(exact.edges.length, contract.limits.graphEdges);
-  assert.equal(evaluator.OBLIGATION_EXPRESSION_MAX_GRAPH_EDGES, contract.limits.graphEdges);
-  assert.equal(evaluator.OBLIGATION_EXPRESSION_MAX_GRAPH_STEPS, contract.limits.reachabilitySteps);
-  const listing = graph.formatModuleGraph(exact.edges, exact.unresolved);
-  const context = { inputs: { evidences: { graph: { id: 'graph', present: true, path: 'packages/**', byteSize: Buffer.byteLength(listing), contentLoaded: false } } }, reader: async () => ({ content: listing }) };
-  const accepted = await evaluator.evaluateObligationExpression({ kind: 'none', evidenceId: 'graph', matches: 'unresolved: */**' }, context);
-  assert.equal(accepted.satisfied, true);
-  sources.set('packages/m0.ts', sources.get('packages/m0.ts') + "\nimport './m5.js';");
-  const overflow = graph.buildModuleGraph(sources);
-  assert.match(overflow.failure, /^oversized:.*16384.*collection is incomplete/);
-  assert.equal(overflow.edges, undefined);
-  const refused = await evaluator.evaluateObligationExpression({ kind: 'none', evidenceId: 'graph', matches: 'unresolved: */**' },
-    { inputs: { evidences: { graph: { ...context.inputs.evidences.graph, error: overflow.failure, present: false } } }, reader: async () => { assert.fail('failed evidence must not be read'); } });
-  assert.equal(refused.satisfied, false);
-  assert.match(refused.reason, /oversized:/);
-  assert.equal(evaluator.evidenceFailureCause({ error: overflow.failure }), 'oversized');
-  console.log(JSON.stringify({ ceiling: exact.edges.length, overflow, evaluator: refused }));
+test('cycles: type-only edges remain declared, with value edges identified separately', async () => {
+  const workspaceRoot = workspace('types', "import type { Other } from './other.js'; export type Entry = Other;");
+  const other = path.join(workspaceRoot, 'packages/other.ts');
+  fs.writeFileSync(other, "import type { Entry } from './entry.js'; export type Other = Entry;");
+  const manifest = { version: '0.1.0', workspace: workspaceRoot,
+    entries: [{ id: 'graph', source: { kind: 'module-graph', pattern: 'packages/**/*.ts' } }] };
+  const pure = await collector.collectEvidence(manifest, workspaceRoot);
+  assert.deepEqual(pure.moduleEdges.graph.map(edge => edge.kind), ['type-only', 'type-only']);
+  fs.appendFileSync(other, "\nimport './entry.js';");
+  const mixed = await collector.collectEvidence(manifest, workspaceRoot);
+  assert.deepEqual(mixed.moduleEdges.graph.map(edge => edge.kind), ['type-only', 'value']);
+  const { evaluateObligationExpression } = await load('engine/proof/expression/evaluate.js');
+  for (const [capture, satisfied] of [[pure, true], [mixed, false]]) {
+    const result = await evaluateObligationExpression({ kind: 'acyclic', evidenceId: 'graph' },
+      { inputs: { evidences: capture.evidences }, graphBudgets: capture.graphBudgets,
+        reader: async () => ({ content: capture.fileSetListings.graph }) });
+    assert.equal(result.satisfied, satisfied, result.reason);
+  }
 });
 
-test('capacity: 4096 paths admitted, 4097 refused; 1 MiB enforced by shadow manifest and native verdict is not_proven', async () => {
+test('capacity: a committed path allowance is admitted through its exact bound', async () => {
   const root = workspace('paths');
-  for (let index = 1; index < 4096; index++) fs.writeFileSync(path.join(root, `packages/m${index}.ts`), '');
-  const manifest = { version: '0.1.0', workspace: root, maxFileBytes: 1048576, entries: [{ id: 'graph', source: { kind: 'module-graph', pattern: 'packages/**/*.ts*' } }] };
+  for (let index = 1; index < 4; index++) fs.writeFileSync(path.join(root, `packages/m${index}.ts`), '');
+  const manifest = { version: '0.1.0', workspace: root, entries: [{ id: 'graph', source: {
+    kind: 'module-graph', pattern: 'packages/**/*.ts*', resources: {
+      version: '1', sourceSnapshot: 'sha256:' + '0'.repeat(64),
+      accepted: { ...GRAPH_SAFETY, paths: 2 }, growth: { paths: 2 }
+    }
+  } }] };
   const exact = await collector.collectEvidence(manifest, root);
   assert.equal(exact.evidences.graph.error, undefined);
   fs.writeFileSync(path.join(root, 'packages/extra.ts'), '');
   const oversized = await collector.collectEvidence(manifest, root);
   assert.match(oversized.evidences.graph.error, /^oversized:/);
   assert.equal(oversized.fileSetListings.graph, undefined);
+});
+
+test('capacity: source overflow remains a native not_proven verdict in shadow observation', nativeRuntime, () => {
   const large = workspace('large', ' '.repeat(1048577));
   const extract = path.join(scratch, 'large-extract'); fs.mkdirSync(extract);
   const result = runShadow(large, path.join(scratch, 'large-out'), extract);
@@ -108,10 +117,9 @@ test('capacity: 4096 paths admitted, 4097 refused; 1 MiB enforced by shadow mani
   assert.equal(result.hostExitCode, 0);
   const ledger = JSON.parse(fs.readFileSync(path.join(repository, result.artifacts, 'ledger.json')));
   assert.match(JSON.stringify(ledger), /oversized:/);
-  console.log(JSON.stringify({ paths: oversized.evidences.graph, sourceFileBytes: 1048577, shadow: { underlyingExitCode: result.underlyingExitCode, hostExitCode: result.hostExitCode, proofVerdict: result.proofVerdict } }));
 });
 
-test('report: native advisory cycle/name ceiling remain visible with partial verdict and exit 0', () => {
+test('report: native advisory cycle/name ceiling remain visible with partial verdict and exit 0', nativeRuntime, () => {
   const root = workspace('advisory', "import './entry.js';\n" + Array.from({ length: 21 }, (_, i) => `export function f${i}() { return ${i}; }`).join('\n'));
   const output = path.join(scratch, 'advisory-out');
   const run = command([path.join(scratch, 'package/dist/adapters/cli/normproof.js'), 'judge', path.join(root, '.normproof/judge-input.json'), output,
@@ -124,50 +132,66 @@ test('report: native advisory cycle/name ceiling remain visible with partial ver
     assert.equal(verdict.obligations.find(item => item.id === id).blocking, false);
     assert.equal(verdict.obligations.find(item => item.id === id).status, 'failed');
     assert.match(report.split('## Obligations')[1].split('## Evidence')[0], new RegExp(`${id}: failed`));
-    assert.doesNotMatch(report.split('## Missing Or Failed Obligations')[1], new RegExp(id));
+    assert.match(report.split('## Missing Or Failed Obligations (All Severities)')[1], new RegExp(`${id}: failed`));
   }
-  console.log(JSON.stringify({ exitCode: run.status, verdict: verdict.status, advisoryVisible: true, failedOnlySectionIncludesAdvisory: false }));
+  console.log(JSON.stringify({ exitCode: run.status, verdict: verdict.status, advisoryVisible: true }));
 });
 
-test('hooks: pinned write allow/block JSON; legacy Stop silence and block lack R0a envelope', () => {
-  const clean = workspace('clean'), bad = workspace('bad', "import './missing.js';");
+test('hooks: pinned write CLI emits allow and block JSON with process exit 0', () => {
+  const artifact = JSON.parse(fs.readFileSync(path.join(repository, '.normproof/write-gate/artifact.json'), 'utf8'));
+  const projectHooks = JSON.parse(fs.readFileSync(path.join(repository, '.agents/hooks.json'), 'utf8'));
+  const { provenance, ...descriptor } = artifact;
+  assert.deepEqual(projectHooks.hooks.PreToolUse[0].hooks[0].writeGate, descriptor);
+  assert.equal(provenance.commit, readBundleMetadata().baseCommit);
+  const clean = workspace('write');
   fs.writeFileSync(path.join(clean, '.normproof/write-rules.json'), JSON.stringify({ version: '0.1.0', rules: [{ kind: 'pathBoundary', id: 'protected', deny: ['target.ts'], message: 'protected' }] }));
   for (const [file, expected] of [['allowed.ts', 'allow'], ['target.ts', 'block']]) {
     const run = command([path.join(repository, '.normproof/write-gate/cli.mjs'), '--emit-result'], { input: JSON.stringify({ cwd: clean, tool_name: 'Write', tool_input: { file_path: file, content: 'fixture' } }) });
     assert.equal(run.status, 0); assert.equal(JSON.parse(run.stdout).decision, expected);
   }
+});
+
+test('hooks: the native Stop emits a versioned decision for both clean and blocked workspaces', nativeRuntime, () => {
+  const clean = workspace('clean');
+  const bad = workspace('bad', "import './missing.js';");
   const cli = path.join(scratch, 'package/dist/adapters/cli/normproof.js');
-  for (const [root, expected] of [[clean, null], [bad, 'block']]) {
+  for (const [root, expected] of [[clean, 'allow'], [bad, 'block']]) {
     const run = command([cli, 'gate', 'stop', '--emit-result'], { cwd: root, input: JSON.stringify({ cwd: root, hook_event_name: 'Stop', stop_hook_active: false }) });
     assert.equal(run.status, 0);
-    if (expected === null) assert.equal(run.stdout, '');
-    else { const wire = JSON.parse(run.stdout); assert.equal(wire.decision, expected); assert.equal(wire.contract, undefined); }
-    console.log(JSON.stringify({ surface: 'pinned Stop', output: run.stdout.trim() || null, capability: 'unsupported R0a envelope' }));
+    const wire = JSON.parse(run.stdout);
+    assert.equal(wire.decision, expected);
+    assert.deepEqual(wire.contract, { name: 'normproof.completion-gate.stop', version: '0.1.0' });
+    if (expected === 'block') assert.equal(wire.reasonCode, 'actionable_gap');
   }
 });
 
 test('hooks: current host consumes captured R0a envelopes; fixture producer is not the pinned release', () => {
-  const run = command([path.join(repository, 'node_modules/tsx/dist/cli.mjs'), path.join(repository, 'scripts/normproof/host.test.mts')]);
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  const run = command([path.join(repository, 'node_modules/tsx/dist/cli.mjs'), path.join(repository, 'scripts/normproof/host.test.mts')], { env });
   assert.equal(run.status, 0, run.stdout + run.stderr);
   assert.match(run.stdout, /tests 2/);
   assert.match(run.stdout, /pass 2/);
-  console.log(run.stdout);
 });
 
-test('MCP initialize: old pinned server returns explicit unsupported for known and unknown versions', () => {
+test('MCP initialize: the pinned server negotiates supported revisions and rejects an unknown one', nativeRuntime, () => {
   const server = path.join(scratch, 'package/dist/adapters/protocol/stdio-server.js');
   for (const protocolVersion of ['2025-11-25', '2026-07-28', 'unknown-version']) {
     const frame = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion, capabilities: {}, clientInfo: { name: 'adapter-conformance', version: '1.0.0' } } };
     const run = command([server], { input: JSON.stringify(frame) + '\n' });
     assert.equal(run.status, 0);
     const output = JSON.parse(run.stdout);
-    assert.equal(output.error.code, -32601); assert.match(output.error.message, /initialize/);
-    assert.equal(output.result, undefined);
-    console.log(JSON.stringify({ protocolVersion, output, capability: 'unsupported' }));
+    if (protocolVersion === 'unknown-version') {
+      assert.equal(output.error.code, -32602);
+      assert.equal(output.result, undefined);
+    } else {
+      assert.equal(output.result.protocolVersion, protocolVersion);
+      assert.equal(output.error, undefined);
+    }
   }
 });
 
-test('shadow: a real blocking failure remains failed while observation exits 0; blocking command is unavailable', () => {
+test('shadow: a real blocking failure remains failed while observation exits 0; blocking command is unavailable', nativeRuntime, () => {
   const root = workspace('shadow', "import './missing.js';");
   const run = command([path.join(repository, '.normproof/adapter/cli.mjs'), 'shadow', root, path.join(scratch, 'shadow-output')]);
   assert.equal(run.status, 0);

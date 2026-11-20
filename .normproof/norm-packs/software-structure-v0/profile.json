@@ -40,6 +40,22 @@
       "repair": "Fix or remove imports that do not resolve to a collected file — path aliases, bare package specifiers written as relative paths, and escapes from the detected root all leave a hole in the graph every other rule reads."
     },
     {
+      "id": "execution_does_not_reach_cli",
+      "title": "Execution does not depend on the CLI",
+      "severity": "advisory",
+      "requiredWhen": { "kind": "always" },
+      "requiredEvidence": ["source_module_graph"],
+      "requiredAuthority": "A0",
+      "expression": {
+        "kind": "noDependency",
+        "evidenceId": "source_module_graph",
+        "from": "packages/ts-shell/src/runtime/execution/**",
+        "to": "packages/ts-shell/src/cli/**",
+        "reachable": true
+      },
+      "repair": "Inject the runtime implementation from the composition entry."
+    },
+    {
       "id": "declared_functions_within_module_ceiling",
       "title": "No module declares more function-like names than the responsibility ceiling allows",
       "severity": "advisory",
@@ -47,16 +63,17 @@
         "kind": "always"
       },
       "requiredEvidence": [
-        "source_module_functions"
+        "source_module_functions",
+        "structure_baseline"
       ],
       "requiredAuthority": "A0",
       "expression": {
         "kind": "groupSizeUnder",
         "evidenceId": "source_module_functions",
-        "ceiling": 20,
+        "ceiling": { "kind": "baseline", "evidenceId": "structure_baseline" },
         "onEmpty": "unsatisfied"
       },
-      "repair": "Split packages modules that accumulate more than 20 declared names into narrower responsibilities."
+      "repair": "Extract one responsibility from the module to satisfy its accepted ceiling."
     }
   ]
 }

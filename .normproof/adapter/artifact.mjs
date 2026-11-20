@@ -19,6 +19,68 @@ export function requireRuntime(version) {
   }
 }
 
+export function readBundleMetadata() {
+  const bytes = fs.readFileSync(path.join(repository, '.normproof/bundle.json'));
+  requireDigest(bytes, contract.bundleMetadataSha256, 'bundle metadata');
+  const metadata = JSON.parse(bytes);
+  if (metadata?.version === 1 && contract.version === '1.0.0') return metadata;
+  validateUpstreamMetadata(metadata);
+  return metadata;
+}
+
+const requiredMembers = [
+  'package/package.json',
+  'package/dist/adapters/cli/normproof.js',
+  'package/dist/adapters/sidecar-file/module-graph.js',
+  'package/dist/contracts/sidecar/graph-budget.js',
+  'package/dist/engine/proof/expression/evidence-readers.js'
+];
+
+const sha256 = /^[a-f0-9]{64}$/;
+const isPackageMember = value => /^package(?:\/[a-zA-Z0-9@._-]+)+\/?$/.test(value)
+  && !value.split('/').some(segment => segment === '.' || segment === '..');
+
+function validateUpstreamMetadata(metadata) {
+  const keys = ['version', 'package', 'packageVersion', 'baseCommit', 'sourceArchive', 'archiveSha256', 'members'];
+  if (!metadata || typeof metadata !== 'object' || metadata.version !== 2 || Object.keys(metadata).length !== keys.length
+    || contract.version !== '2.0.0' || contract.mode !== 'shadow'
+    || keys.some(key => !Object.hasOwn(metadata, key)) || metadata.package !== 'normproof'
+    || typeof metadata.packageVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(metadata.packageVersion)
+    || metadata.sourceArchive !== `.normproof/normproof-${metadata.packageVersion}.tgz`
+    || typeof metadata.baseCommit !== 'string' || !/^[a-f0-9]{40}$/.test(metadata.baseCommit)
+    || !sha256.test(metadata.archiveSha256) || metadata.archiveSha256 !== contract.archiveSha256
+    || !metadata.members || Array.isArray(metadata.members) || typeof metadata.members !== 'object'
+    || requiredMembers.some(member => !Object.hasOwn(metadata.members, member))
+    || Object.entries(metadata.members).some(([member, hash]) => !isPackageMember(member) || typeof hash !== 'string' || !sha256.test(hash))) {
+    throw new Error('invalid_contract: upstream archive metadata');
+  }
+}
+
+export function extractUpstream(bytes, metadata, destination) {
+  validateUpstreamMetadata(metadata);
+  requireDigest(bytes, metadata.archiveSha256, 'archive');
+  const options = { input: bytes, encoding: 'utf8', maxBuffer: contract.limits.processOutputBytes };
+  const entries = execFileSync('tar', ['-tzf', '-'], options).trimEnd().split('\n');
+  const descriptions = execFileSync('tar', ['-tvzf', '-'], options).trimEnd().split('\n');
+  const unique = new Set(entries.map(member => member.replace(/\/$/, '')));
+  if (unique.size !== entries.length || entries.length !== descriptions.length
+    || entries.some(entry => !isPackageMember(entry)) || descriptions.some(description => !/^[d-]/.test(description))
+    || Object.keys(metadata.members).some(member => !unique.has(member))) {
+    throw new Error('invalid_archive: unexpected package members');
+  }
+  execFileSync('tar', ['-xzf', '-', '--no-same-owner', '--no-same-permissions', '-C', destination], options);
+  for (const [member, hash] of Object.entries(metadata.members)) {
+    requireDigest(fs.readFileSync(path.join(destination, member)), hash, member);
+  }
+  const pkg = JSON.parse(fs.readFileSync(path.join(destination, 'package/package.json')));
+  if (pkg.name !== metadata.package || pkg.version !== metadata.packageVersion
+    || pkg.engines?.node !== contract.packageNodeEngine || pkg.dependencies?.typescript !== contract.parserVersion) {
+    throw new Error('invalid_contract: package identity, runtime or parser dependency');
+  }
+  return { archiveSha256: metadata.archiveSha256, sourceCommit: metadata.baseCommit, members: metadata.members,
+    parserVersion: contract.parserVersion, packageNodeEngine: pkg.engines.node, node: process.version };
+}
+
 /** Byte identity only: this walk makes no claim about dependencies or proof. */
 export function sourceSnapshot(workspace) {
   const members = {};
@@ -36,11 +98,7 @@ export function sourceSnapshot(workspace) {
 }
 
 /** Verify deployment bytes, never import the independent producer's source tree. */
-export function extractPinned(destination) {
-  requireRuntime(process.version);
-  const metadataBytes = fs.readFileSync(path.join(repository, '.normproof/bundle.json'));
-  requireDigest(metadataBytes, contract.bundleMetadataSha256, 'bundle metadata');
-  const metadata = JSON.parse(metadataBytes);
+function extractPatched(metadata, destination) {
   const archive = path.join(repository, metadata.sourceArchive);
   requireDigest(fs.readFileSync(archive), contract.archiveSha256, 'archive');
   const patch = fs.readFileSync(path.join(repository, metadata.patch));
@@ -66,15 +124,23 @@ export function extractPinned(destination) {
   for (const vendor of metadata.vendor.files) {
     requireDigest(fs.readFileSync(path.join(destination, vendor.target)), vendor.sha256, vendor.target);
   }
+  const pkg = JSON.parse(fs.readFileSync(path.join(destination, 'package/package.json')));
+  if (pkg.engines.node !== contract.packageNodeEngine) throw new Error('invalid_contract: package Node engine');
+  return { archiveSha256: digest(fs.readFileSync(archive)), patchSha256: digest(patch),
+    members: Object.fromEntries(Object.keys(metadata.members).map(member => [member, digest(fs.readFileSync(path.join(destination, member)))])),
+    parserVersion: contract.parserVersion, packageNodeEngine: pkg.engines.node, node: process.version, hunks: headers.length };
+}
+
+export function extractPinned(destination) {
+  requireRuntime(process.version);
+  const metadata = readBundleMetadata();
+  const identity = metadata.version === 1 && contract.version === '1.0.0'
+    ? extractPatched(metadata, destination)
+    : extractUpstream(fs.readFileSync(path.join(repository, metadata.sourceArchive)), metadata, destination);
   const artifact = JSON.parse(fs.readFileSync(path.join(repository, '.normproof/write-gate/artifact.json')));
   if (artifact.sha256 !== contract.writeArtifactSha256 || artifact.nodeFloor !== contract.nodeFloor) {
     throw new Error('stale_artifact: write provenance');
   }
   requireDigest(fs.readFileSync(path.join(repository, artifact.path)), contract.writeArtifactSha256, 'write CLI');
-  const pkg = JSON.parse(fs.readFileSync(path.join(destination, 'package/package.json')));
-  if (pkg.engines.node !== contract.packageNodeEngine) throw new Error('invalid_contract: package Node engine');
-  return { archiveSha256: digest(fs.readFileSync(archive)), patchSha256: digest(patch),
-    members: Object.fromEntries(Object.keys(metadata.members).map(member => [member, digest(fs.readFileSync(path.join(destination, member)))])),
-    parserVersion: contract.parserVersion, packageNodeEngine: pkg.engines.node, node: process.version,
-    writeArtifactSha256: artifact.sha256, writeProvenance: artifact.provenance, hunks: headers.length };
+  return { ...identity, writeArtifactSha256: artifact.sha256, writeProvenance: artifact.provenance };
 }

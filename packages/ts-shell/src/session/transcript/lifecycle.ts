@@ -1,4 +1,5 @@
 import { isRecord } from '../../core/values/record.js';
+import { parseStopRepair, readableStopReentry } from '../../core/hooks/stop/model.js';
 
 const VERDICTS = new Set<unknown>(['proven', 'partial', 'refuted', 'failed', 'not_proven', 'unknown', 'not_reported']);
 const STATES = new Set<unknown>(['checking', 'blocked', 'repairing', 'accepted', 'stopped', 'unknown', 'completed_unproven']);
@@ -10,15 +11,15 @@ function strings(value: unknown): boolean {
 
 function check(value: unknown): boolean {
   return isRecord(value) && typeof value.command === 'string' && HASH.test(value.command)
-    && typeof value.reasonCode === 'string' && VERDICTS.has(value.proofVerdict) && strings(value.evidenceIdentity);
+    && typeof value.reasonCode === 'string' && VERDICTS.has(value.proofVerdict) && strings(value.evidenceIdentity)
+    && (value.stopRepair === undefined || parseStopRepair(value.stopRepair) !== undefined);
 }
 
 /** New lifecycle facts have an explicit read contract, including attempt ordering identity. */
 export function readableLifecycleRecord(value: Record<string, unknown>): boolean {
   const fingerprint = value.progressFingerprint;
   if (typeof value.attemptId !== 'string' || !value.attemptId || !Number.isSafeInteger(value.sequence) || Number(value.sequence) < 1
-    || !Number.isSafeInteger(value.reentryCount) || Number(value.reentryCount) < 0
-    || value.stop_hook_active !== (Number(value.reentryCount) > 0)
+    || !readableStopReentry(value)
     || !isRecord(fingerprint) || fingerprint.version !== 1 || !Array.isArray(fingerprint.checks)
     || !fingerprint.checks.every(check)) return false;
   switch (value.kind) {

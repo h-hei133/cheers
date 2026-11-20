@@ -35,6 +35,7 @@ rtk/
 
 # NormProof judge output
 .normproof/out/
+.normproof/cache/
 
 # Project memory written by /memory save. The directory holds what a session
 # recorded about this project, which is per-machine working state rather than

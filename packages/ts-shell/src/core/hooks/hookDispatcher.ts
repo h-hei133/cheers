@@ -7,7 +7,7 @@ import { dispatchStop } from './stop/dispatch.js';
 import type { StopDispatchOptions } from './stop/model.js';
 import type { StopPayload } from './types.js';
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
-import { checkWriteHookArtifact, writeHookCommand } from './artifact.js';
+import { checkWriteHookArtifact, writeHookCommand, writeHookProtocol } from './artifact.js';
 import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInputs, translateWriteResult } from './translation.js';
 import { getExtensionEventRunners, type ExtensionEventRunner } from './extensionBridge.js';
 import {captureInputHookDecision} from './input/decision.js';
@@ -294,9 +294,10 @@ export class HookDispatcher {
         if (trust !== this.trust || commandHooks !== this.commandHooks || trust?.admission?.()) continue;
         if (sourceRevision !== undefined && trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') !== sourceRevision) continue;
         const timeoutMs = hook.timeoutMs ?? hookTimeoutMs(relevantEvent);
+        const protocol = writeHookProtocol(hook.writeGate);
         let jsonPayloads: string[];
         if (translated) {
-          const inputs = translateWriteInputs(payload as PreToolUsePayload, timeoutMs);
+          const inputs = translateWriteInputs(payload as PreToolUsePayload, timeoutMs, protocol);
           if ('decision' in inputs) {
             logger.info('Write hook result', inputs.hookVerdict);
             if (inputs.decision === 'block') return inputs;
@@ -307,7 +308,10 @@ export class HookDispatcher {
             logger.info('Write hook result', gap.hookVerdict);
             accumulatedDecision = mergeWriteHookResult(accumulatedDecision, gap);
           }
-          const matchedInputs = inputs.inputs.filter(input => this.matches(hook.matcher, { ...(payload as PreToolUsePayload), toolName: input.tool_name }));
+          const matchesInput = (toolName: string) => this.matches(hook.matcher, { ...(payload as PreToolUsePayload), toolName });
+          const matchedInputs = inputs.batch
+            ? inputs.batch.matchNames.some(matchesInput) ? [inputs.batch.input] : []
+            : inputs.inputs.filter(input => matchesInput(input.tool_name));
           if (matchedInputs.length === 0) continue;
           const invalidArtifact = checkWriteHookArtifact(hook.writeGate, payload.workspaceRoot);
           if (invalidArtifact) {
@@ -388,7 +392,7 @@ export class HookDispatcher {
             });
 
             if (translated) {
-              const result = applyWriteHookPolicy(translateWriteResult(stdout));
+              const result = applyWriteHookPolicy(translateWriteResult(stdout), protocol);
               logger.info('Write hook result', result.hookVerdict ?? { status: result.decision });
               if (result.decision === 'block' || result.decision === 'retry') return result;
               accumulatedDecision = mergeWriteHookResult(accumulatedDecision, result);

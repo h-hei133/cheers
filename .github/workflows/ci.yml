@@ -29,9 +29,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The gates below exit non-zero on a violation, unlike the NormProof judge
-      # step further down, which runs in shadow mode and never fails the build.
-      # None needs the compiled output, so they run before the build: a
+      # These gates need no compiled output, so they run before the build: a
       # dependency cycle should fail the run in seconds, not after 187s of
       # tests. See .wiki/refactor/plan.md section 9.27 for the measurements.
       - name: Check for dependency cycles
@@ -80,6 +78,11 @@ jobs:
       - name: Run Focused & Unit Tests
         run: npm run test:ts
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Validate NormProof Architecture
         run: |
+          node --test --test-concurrency=1 scripts/normproof.test.mjs scripts/normproof-conformance.test.mjs
           npx --package .normproof/normproof-*.tgz normproof judge

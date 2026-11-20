@@ -7,13 +7,16 @@ export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const fileHash = file => sha256(fs.readFileSync(file));
 
 export function treeIdentity(root, files) {
-  const members = Object.fromEntries([...files].sort().map(file => [file, fileHash(path.join(root, file))]));
+  const members = Object.fromEntries([...files].sort().map(file => {
+    try { return [file, fileHash(path.join(root, file))]; }
+    catch (error) { if (error.code === 'ENOENT') return [file, null]; throw error; }
+  }));
   return { sha256: sha256(JSON.stringify(members)), members };
 }
 
 export function sourceIdentity(root) {
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-  const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', 'packages', 'scripts', '.github/workflows', '.normproof/judge-input.json', '.normproof/evidence-manifest.json', '.normproof/write-rules.json', 'package.json', 'package-lock.json'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+  const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', 'packages', 'scripts', '.github/workflows', '.normproof/judge-input.json', '.normproof/evidence-manifest.json', '.normproof/write-rules.json', '.normproof/baseline.json', 'package.json', 'package-lock.json'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
   return { commit, ...treeIdentity(root, files) };
 }
 

@@ -1,5 +1,6 @@
 {
   "runId": "generated-structure-judge",
+  "generatedAt": "2026-11-20T00:00:00.000Z",
   "taskText": "Judge this workspace against its declared structural norms.",
   "taskAllowsMutation": false,
   "evidences": {},

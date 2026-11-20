@@ -30,9 +30,10 @@ function artifact(script: string) {
   const file = path.join(root, 'gate.mjs'); fs.writeFileSync(file, script);
   return { version: 1, path: file, sha256: digest(script), nodeFloor: '20.3.0' };
 }
-function dispatcher(script: string, timeoutMs = 15000) {
+function dispatcher(script: string, timeoutMs = 15000, protocolVersion?: 2) {
   const hooks = new HookDispatcher();
-  hooks.registerCommandHook({ event: 'PreToolUse', matcher: CANONICAL_WRITE_MATCHER, command: 'unused', writeGate: artifact(script), timeoutMs });
+  hooks.registerCommandHook({ event: 'PreToolUse', matcher: CANONICAL_WRITE_MATCHER, command: 'unused',
+    writeGate: { ...artifact(script), ...(protocolVersion && { protocolVersion }) }, timeoutMs });
   return hooks;
 }
 const reply = (value: unknown) => `process.stdout.write(${JSON.stringify(JSON.stringify(value))});`;
@@ -91,6 +92,24 @@ describe('write hook through the native tool gate', () => {
   it('applies Cheers policy to a real could_not_decide response', async () => {
     expect(await dispatcher(reply({ decision: 'allow', reasonCode: 'could_not_decide' })).dispatch(payload()))
       .toMatchObject({ decision: 'block', hookVerdict: { status: 'unknown', reasonCode: 'could_not_decide', policy: 'block' } });
+  });
+  it('keeps v2 producer uncertainty actionable and cannot bypass an ordinary permission refusal', async () => {
+    const additionalContext = 'Supply the complete file content and retry.';
+    const hooks = dispatcher(reply({ decision: 'allow', reasonCode: 'could_not_decide', additionalContext }), 15000, 2);
+    const input = payload();
+    expect(await hooks.dispatch(input)).toMatchObject({ decision: 'unknown', reasonCode: 'could_not_decide', additionalContext,
+      hookVerdict: { source: 'hook', status: 'unknown', policy: 'observe-only' } });
+    const tools = createCoreToolRegistry();
+    const decide = vi.fn(async (prompt: { id: string }) => ({ promptId: prompt.id, decision: 'deny' as const, respondedAt: 1 }));
+    const options = { sessionId: input.sessionId, workspaceRoot: root, hooks, permissionScope: 'ask' as const,
+      escalationPromptHandler: decide, emit() {} };
+    const dispatch = vi.spyOn(hooks, 'dispatch');
+    const result = await executeToolBatch(adaptTools(tools, options), { role: 'assistant', content: '' },
+      [{ id: input.toolCallId, name: input.toolName, args: input.args }], createToolHooks(options, tools), 'sequential', undefined, () => {});
+    expect(decide).toHaveBeenCalledOnce();
+    expect(dispatch.mock.calls.some(([event]) => event.eventName === 'PreToolUse')).toBe(false);
+    expect(result.messages[0]?.content).not.toContain(additionalContext);
+    expect(fs.existsSync(path.join(root, 'target.txt'))).toBe(false);
   });
   it('blocks a partial edit before the older artifact can call it clean', async () => {
     const result = await dispatcher(reply({ decision: 'allow', reasonCode: 'no_violation' })).dispatch({
@@ -159,7 +178,7 @@ describe('write hook through the native tool gate', () => {
     fs.mkdirSync(path.join(root, '.normproof'));
     fs.mkdirSync(path.join(root, 'src/runtime'), { recursive: true });
     fs.writeFileSync(path.join(root, 'src/runtime/legacy-temp.ts'), 'export const oldValue = 1;');
-    fs.writeFileSync(path.join(root, '.normproof/write-rules.json'), JSON.stringify({ version: '0.1.0', rules: [
+    fs.writeFileSync(path.join(root, '.normproof/write-rules.json'), JSON.stringify({ version: '0.2.0', rules: [
       { id: 'no-temp', kind: 'filenameTokens', tokens: ['-temp', '-new'], pattern: 'src/runtime/**', message: 'Use a responsibility-based filename.' },
       { id: 'no-adapter-import', kind: 'forbiddenImport', from: 'src/runtime/**', to: 'src/adapters/**', message: 'Keep the adapter behind a runtime boundary.' },
     ] }));
@@ -175,9 +194,10 @@ describe('write hook through the native tool gate', () => {
     expect(existingFilename).toMatchObject({ decision: 'allow', reasonCode: 'no_violation' });
     expect(legalAlias).toMatchObject({ decision: 'allow', reasonCode: 'no_violation' });
     expect(empty).toMatchObject({ decision: 'allow', reasonCode: 'no_violation' });
-    // The pinned artifact predates C3a's invalid-content fix; retain this observed gap for C5a.
-    expect(invalid).toMatchObject({ decision: 'allow', reasonCode: 'no_violation' });
-    expect(wrongRoot).toMatchObject({ decision: 'block', reasonCode: 'could_not_decide', hookVerdict: { status: 'unknown', policy: 'block' } });
+    for (const unknown of [invalid, wrongRoot]) {
+      expect(unknown).toMatchObject({ decision: 'unknown', reasonCode: 'could_not_decide', additionalContext: expect.any(String),
+        hookVerdict: { status: 'unknown', policy: 'observe-only' } });
+    }
     fs.unlinkSync(path.join(root, '.normproof/write-rules.json'));
     const missingConfig = await run('write', 'src/runtime/config.ts', 'export const value = 1;');
     expect(missingConfig).toMatchObject({ decision: 'allow', reasonCode: 'not_configured', hookVerdict: { status: 'unknown', policy: 'observe-only' } });

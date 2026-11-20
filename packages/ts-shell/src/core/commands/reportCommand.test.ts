@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { inflateRawSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runReportCommand } from "./reportCommandRuntime.js";
 import { createZipArchive } from "../../observability/zipArchive.js";
@@ -237,7 +238,6 @@ describe("createZipArchive", () => {
     expect(nameAt).toBeGreaterThan(0);
     // Deflate stream follows the 30-byte local header and the name.
     const start = nameAt + "a.txt".length;
-    const { inflateRawSync } = require("node:zlib") as typeof import("node:zlib");
     const compressedLength = archive.readUInt32LE(nameAt - 12);
     const restored = inflateRawSync(archive.subarray(start, start + compressedLength)).toString("utf8");
     expect(restored).toBe("hello world");

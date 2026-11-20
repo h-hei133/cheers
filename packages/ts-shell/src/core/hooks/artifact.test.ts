@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { checkWriteHookArtifact } from './artifact.js';
+import { checkWriteHookArtifact, writeHookProtocol } from './artifact.js';
 
 let root: string;
 beforeEach(() => {
@@ -21,6 +21,16 @@ function artifact(bytes: number) {
 }
 
 describe('pinned write hook artifact', () => {
+  it('selects joint patch support from the admitted artifact protocol', () => {
+    const legacy = artifact(128);
+    expect(writeHookProtocol(legacy)).toBe(1);
+    const current = { ...legacy, protocolVersion: 2 };
+    expect(checkWriteHookArtifact(current, root)).toBeUndefined();
+    expect(writeHookProtocol(current)).toBe(2);
+    expect(checkWriteHookArtifact({ ...current, protocolVersion: 3 }, root))
+      .toMatchObject({ decision: 'block', reasonCode: 'version_mismatch' });
+  });
+
   it('accepts a parser-sized 3.6 MiB artifact with its matching digest', () => {
     expect(checkWriteHookArtifact(artifact(Math.ceil(3.6 * 1024 * 1024)), root)).toBeUndefined();
   });

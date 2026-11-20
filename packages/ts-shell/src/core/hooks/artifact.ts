@@ -7,6 +7,7 @@ import type { HookDecision } from './types.js';
 
 export interface WriteHookArtifact {
   readonly version: 1;
+  readonly protocolVersion?: 2;
   readonly path: string;
   readonly sha256: string;
   readonly nodeFloor: '20.3.0';
@@ -17,9 +18,14 @@ const MAX_ARTIFACT_BYTES = 8 * 1024 * 1024;
 const READ_CHUNK_BYTES = 64 * 1024;
 
 function validArtifact(value: unknown): value is WriteHookArtifact {
-  return isRecord(value) && Object.keys(value).every(key => ['version', 'path', 'sha256', 'nodeFloor'].includes(key))
+  return isRecord(value) && Object.keys(value).every(key => ['version', 'protocolVersion', 'path', 'sha256', 'nodeFloor'].includes(key))
+    && (value.protocolVersion === undefined || value.protocolVersion === 2)
     && value.version === 1 && typeof value.path === 'string' && value.path.length > 0
     && typeof value.sha256 === 'string' && /^[a-f0-9]{64}$/.test(value.sha256) && value.nodeFloor === '20.3.0';
+}
+
+export function writeHookProtocol(value: unknown): 1 | 2 {
+  return validArtifact(value) ? value.protocolVersion ?? 1 : 1;
 }
 
 function quote(value: string): string { return `'${value.replaceAll("'", "'\\''")}'`; }

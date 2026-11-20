@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createMessageTranscriptEvent,
@@ -170,9 +173,6 @@ describe("reading a transcript file", () => {
   it("keeps an image message alongside the text around it", () => {
     // End to end through the file reader, which is where a dropped line would
     // actually go missing.
-    const fs = require("node:fs") as typeof import("node:fs");
-    const os = require("node:os") as typeof import("node:os");
-    const path = require("node:path") as typeof import("node:path");
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codec-"));
     const file = path.join(dir, "transcript.jsonl");
 

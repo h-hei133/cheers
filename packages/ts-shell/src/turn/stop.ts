@@ -1,13 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { AgentLifecycleEvent } from '../core/agent/events.js';
 import type { HookDecision } from '../core/hooks/types.js';
-import { MAX_STOP_REENTRIES, type StopAttempt, type StopCheck } from '../core/hooks/stop/model.js';
+import { MAX_STOP_REENTRIES, type StopAttempt, type StopCheck, type StopRepairProgress } from '../core/hooks/stop/model.js';
 import { normalizeStopResult, progressFingerprint, stopCheck } from '../core/hooks/stop/result.js';
 import type { QueryEvent } from '../core/query/runtime/events.js';
 import type { LifecycleFact, StopState, StopTerminalStatus } from '../core/query/runtime/lifecycle.js';
 import { redactExportText } from '../core/security/redaction.js';
 
-/** One completion attempt, including its single repair, stays in the same running session. */
+/** One completion attempt and its bounded repairs stay in the same running session. */
 export class StopLifecycle {
   readonly attemptId = randomUUID();
   private reentryCount = 0;
@@ -17,12 +17,15 @@ export class StopLifecycle {
   private fingerprint = progressFingerprint([]);
   private blockedFingerprint?: string;
   private blockedCommand?: string;
+  private stopRepair?: StopRepairProgress;
+  private readonly repairDigests = new Set<string>();
   private ended = false;
 
   constructor(private readonly emit: (event: QueryEvent) => void) {}
 
   attempt(): StopAttempt {
-    return { attemptId: this.attemptId, reentryCount: this.reentryCount, stop_hook_active: this.reentryCount > 0 };
+    return { attemptId: this.attemptId, reentryCount: this.reentryCount, stop_hook_active: this.reentryCount > 0,
+      ...(this.stopRepair ? { stopRepair: this.stopRepair } : {}) };
   }
 
   record(fact: LifecycleFact): void {
@@ -86,15 +89,30 @@ export class StopLifecycle {
     }
     this.state('blocked', result.reasonCode ?? 'hook_blocked');
     const fingerprint = JSON.stringify(this.fingerprint);
+    const checker = this.checks.find(check => check.decision === 'block' || check.decision === 'retry');
+    const repair = result.stopRepair;
+    const recorded = checker?.stopRepair;
+    const previous = this.stopRepair;
+    const validRepair = repair && recorded?.chainId === repair.chainId && recorded.round === repair.round
+      && recorded.maxRounds === repair.maxRounds && recorded.progressDigest === repair.progressDigest
+      && repair.round === this.reentryCount + 1 && !this.repairDigests.has(repair.progressDigest)
+      && (this.reentryCount === 0 || previous?.chainId === repair.chainId
+        && previous.maxRounds === repair.maxRounds && this.blockedCommand === checker?.command);
+    const repairLimit = repair && validRepair ? repair.maxRounds : MAX_STOP_REENTRIES;
     const exhausted = fingerprint === this.blockedFingerprint ? 'repeated_block'
-      : this.reentryCount >= MAX_STOP_REENTRIES ? 'reentry_limit' : !canRepair ? 'step_limit' : undefined;
+      : repair && !validRepair ? 'invalid_repair_progress'
+        : this.reentryCount >= repairLimit ? 'reentry_limit' : !canRepair ? 'step_limit' : undefined;
     if (exhausted) { this.finish('blocked', exhausted); return 'terminal'; }
     this.blockedFingerprint = fingerprint;
-    this.blockedCommand = this.checks.find(check => check.decision === 'block' || check.decision === 'retry')?.command;
+    this.blockedCommand = checker?.command;
+    if (repair && validRepair) {
+      this.stopRepair = repair;
+      this.repairDigests.add(repair.progressDigest);
+    }
     this.reentryCount += 1;
     this.state('repairing', 'hook_blocked');
     this.emit({ type: 'query.retrying', role: 'coder', turn: this.step, attempt: this.reentryCount,
-      reason: `Stop check blocked completion; attempting repair (${this.reentryCount}/${MAX_STOP_REENTRIES}).` });
+      reason: `Stop check blocked completion; attempting repair (${this.reentryCount}/${repairLimit}).` });
     return 'repair';
   }
 

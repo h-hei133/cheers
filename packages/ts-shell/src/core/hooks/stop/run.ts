@@ -3,6 +3,7 @@ import { planSandboxedCommand } from '../../../sandbox/osSandbox.js';
 import type { HookDecision, StopPayload } from '../types.js';
 import { normalizeStopResult, stopUnknown } from './result.js';
 import { stopDeadline } from './deadline.js';
+import { STOP_REPAIR_PROTOCOL } from './model.js';
 
 /** Late handler/approval results cannot resume a cancelled or expired check. */
 export async function boundedStopOperation(
@@ -72,7 +73,8 @@ export async function runStopCommand(command: string, payload: StopPayload, time
     cancelDeadline = stopDeadline(timeoutMs, () => stop('timeout'));
     signal?.addEventListener('abort', abort, { once: true });
     child.stdin?.on('error', () => {});
-    child.stdin?.end(JSON.stringify({ ...payload, hook_event_name: 'Stop', cwd: payload.workspaceRoot }));
+    child.stdin?.end(JSON.stringify({ ...payload, hook_event_name: 'Stop', cwd: payload.workspaceRoot, session_id: payload.sessionId,
+      stop_repair_protocol: STOP_REPAIR_PROTOCOL }));
     if (signal?.aborted) abort();
   });
 }

@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install normproof from self-contained bundle
+      - name: Install pinned normproof archive
         run: |
           npm install -g .normproof/normproof-*.tgz
 

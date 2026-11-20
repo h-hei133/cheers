@@ -175,6 +175,17 @@ describe('hook output authority', () => {
     expect(mergeWriteHookResult(unsupported, unknown)).toBe(unknown);
     expect(mergeWriteHookResult(unknown, unsupported)).toBe(unknown);
   });
+  it('merges advisory feedback without hiding an unsupported or uncertain result', () => {
+    const warning = translateWriteResult('{"decision":"allow_with_advisory","reasonCode":"advisory","additionalContext":"Repair dependent references."}');
+    const unknown = applyWriteHookPolicy(translateWriteResult('{"decision":"allow","reasonCode":"could_not_decide","additionalContext":"Use full content."}'), 2);
+    expect(warning).toMatchObject({ decision: 'allow_with_advisory', hookVerdict: { status: 'allow_with_advisory', policy: 'permission' } });
+    const first = mergeWriteHookResult(warning, translateWriteResult('{"decision":"allow","reasonCode":"not_a_judged_write"}'));
+    expect(first).toMatchObject({ decision: 'unsupported', additionalContext: 'Repair dependent references.' });
+    expect(mergeWriteHookResult(first, unknown)).toMatchObject({ decision: 'unknown',
+      additionalContext: 'Repair dependent references.\n\nUse full content.' });
+    expect(translateWriteResult('{"decision":"allow","reasonCode":"advisory","additionalContext":"Contradiction."}'))
+      .toMatchObject({ decision: 'block', reasonCode: 'conflicting_output' });
+  });
   it.each(['', 'payload-secret\n at private.stack', '{}', 'null', '{"decision":"allow","reasonCode":"future_version"}'])('blocks malformed or versionless output safely: %s', stdout => {
     const result = translateWriteResult(stdout);
     expect(result.decision).toBe('block');

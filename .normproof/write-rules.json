@@ -1,5 +1,6 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "graphPattern": "packages/**/*.ts*",
   "rules": [
     {
       "kind": "filenameTokens",
@@ -18,6 +19,30 @@
         "-phase"
       ],
       "pattern": "packages/**/*.ts"
+    },
+    {
+      "kind": "moduleFunctionBaseline",
+      "id": "declared_functions_within_module_ceiling",
+      "message": "Keep the accepted function count or extract an owned responsibility into a sibling module.",
+      "pattern": "packages/**/*.ts*"
+    },
+    {
+      "kind": "noNewCycle",
+      "id": "source_graph_is_acyclic",
+      "message": "Move the shared contract to the nearest owner both modules can import."
+    },
+    {
+      "kind": "noReachableDependency",
+      "id": "execution_does_not_reach_cli",
+      "message": "Pass the required runtime service through the execution interface from the composition entry.",
+      "from": "packages/ts-shell/src/runtime/execution/**",
+      "to": "packages/ts-shell/src/cli/**",
+      "allowed": ["packages/ts-shell/src/runtime/execution/**", "packages/ts-shell/src/tools/types.ts"]
+    },
+    {
+      "kind": "breakingExportImpact",
+      "id": "source_export_references_resolve",
+      "message": "Update the affected imports with the export change, or keep the previous export until callers move."
     }
   ]
 }

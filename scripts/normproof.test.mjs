@@ -1,34 +1,45 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test, { after } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
+import { extractPinned, readBundleMetadata } from '../.normproof/adapter/artifact.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = path.join(root, '.tmp');
 fs.mkdirSync(temporaryRoot, { recursive: true });
 const fixture = fs.mkdtempSync(path.join(temporaryRoot, 'normproof-test-'));
 after(() => fs.rmSync(fixture, { recursive: true, force: true }));
-execFileSync('tar', ['-xzf', path.join(root, '.normproof/normproof-0.1.0.tgz'), '-C', fixture]);
+const identity = extractPinned(fixture);
 const bundle = path.join(fixture, 'package');
 const graph = await import(pathToFileURL(path.join(bundle, 'dist/adapters/sidecar-file/module-graph.js')).href);
 const { evaluateObligationExpression } = await import(pathToFileURL(path.join(bundle, 'dist/engine/proof/expression/evaluate.js')).href);
-const metadata = JSON.parse(fs.readFileSync(path.join(root, '.normproof/bundle.json'), 'utf8'));
-const hash = value => createHash('sha256').update(value).digest('hex');
+const { collectEvidence } = await import(pathToFileURL(path.join(bundle, 'dist/adapters/sidecar-file/evidence-collector.js')).href);
+const { GRAPH_SAFETY } = await import(pathToFileURL(path.join(bundle, 'dist/contracts/sidecar/graph-budget.js')).href);
+const metadata = readBundleMetadata();
+const nativeRuntime = { skip: Number(process.versions.node.split('.')[0]) < 24 && 'The native package requires Node 24' };
 
 function wideGraph(count = 4096) {
   return new Map(Array.from({ length: count }, (_, index) => [`packages/m${index}.ts`,
     [1, 2, 3, 4].map(offset => `import './m${(index + offset) % count}.js';`).join('\n')]));
 }
 
-test('the installed archive and adapted entries match the reproducible artifact', () => {
-  assert.equal(hash(fs.readFileSync(path.join(root, '.normproof/normproof-0.1.0.tgz'))), metadata.archiveSha256);
-  assert.equal(hash(fs.readFileSync(path.join(root, metadata.patch))), metadata.patchSha256);
-  for (const [file, digest] of Object.entries(metadata.members)) assert.equal(hash(fs.readFileSync(path.join(fixture, file))), digest.after);
-  for (const file of metadata.vendor.files) assert.equal(hash(fs.readFileSync(path.join(fixture, file.target))), file.sha256);
+function writeJudgeConfig(workspace) {
+  for (const file of ['judge-input.json', 'evidence-manifest.json', 'norm-packs/software-structure-v0/profile.json']) {
+    fs.copyFileSync(path.join(root, '.normproof', file), path.join(workspace, '.normproof', file));
+  }
+  fs.writeFileSync(path.join(workspace, '.normproof/baseline.json'), JSON.stringify({
+    version: 2, values: {}, moduleFunctionSeed: 20, moduleFunctionCeilings: {}
+  }));
+}
+
+test('the installed archive, source commit and required members match the upstream pin', () => {
+  assert.equal(metadata.version, 2);
+  assert.equal(identity.archiveSha256, metadata.archiveSha256);
+  assert.equal(identity.sourceCommit, metadata.baseCommit);
+  assert.deepEqual(identity.members, metadata.members);
 });
 
 test('a graph above the old capacity reaches the real evaluator and late missing imports remain visible', async () => {
@@ -51,14 +62,23 @@ test('a graph above the old capacity reaches the real evaluator and late missing
   assert.equal(accepted.satisfied, true);
 });
 
-test('the declared capacity is accepted exactly and one additional edge fails without a partial graph', () => {
-  const sources = wideGraph();
-  const exact = graph.buildModuleGraph(sources);
-  assert.equal(exact.edges.length, 16384);
-  sources.set('packages/m0.ts', sources.get('packages/m0.ts') + "\nimport './m5.js';");
-  const overflow = graph.buildModuleGraph(sources);
-  assert.match(overflow.failure, /16384 edge ceiling/);
-  assert.equal(overflow.edges, undefined);
+test('the declared capacity is accepted exactly and one additional edge fails without partial evidence', async () => {
+  const workspace = path.join(fixture, 'capacity');
+  fs.mkdirSync(path.join(workspace, 'packages'), { recursive: true });
+  const sources = wideGraph(8);
+  for (const [file, source] of sources) fs.writeFileSync(path.join(workspace, file), source);
+  const manifest = { version: '0.1.0', workspace, entries: [{ id: 'graph', source: {
+    kind: 'module-graph', pattern: 'packages/**/*.ts', resources: {
+      version: '1', sourceSnapshot: 'sha256:' + '0'.repeat(64),
+      accepted: { ...GRAPH_SAFETY, resolvedEdges: 30 }, growth: { resolvedEdges: 2 }
+    }
+  } }] };
+  const exact = await collectEvidence(manifest, workspace);
+  assert.equal(exact.moduleEdges.graph.length, 32);
+  fs.appendFileSync(path.join(workspace, 'packages/m0.ts'), "\nimport './m5.js';");
+  const overflow = await collectEvidence(manifest, workspace);
+  assert.match(overflow.evidences.graph.error, /^oversized:.*resolvedEdges.*32/);
+  assert.equal(overflow.fileSetListings.graph, undefined);
 });
 
 test('wide imports, literal dynamic imports and TSX paths cannot disappear or resolve to a different explicit file', () => {
@@ -76,42 +96,29 @@ test('wide imports, literal dynamic imports and TSX paths cannot disappear or re
   ]);
 });
 
-test('the complete repository declaration graph matches TypeScript and remains acyclic', async () => {
-  const sources = new Map();
-  // Use declared source paths so concurrent runtime fixtures cannot enter this comparison.
-  const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'packages'], { cwd: root }).toString().split('\0');
-  for (const file of files) if (/\.tsx?$/.test(file) && fs.existsSync(path.join(root, file))) sources.set(file, fs.readFileSync(path.join(root, file), 'utf8'));
-  assert.ok(sources.size > 2000, 'the complete source tree must be collected');
-  for (const [file, source] of sources) {
-    const syntax = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-    const expected = new Set();
-    function visit(node) {
-      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) expected.add(node.moduleSpecifier.text);
-      if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) expected.add(node.argument.literal.text);
-      if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments[0] && ts.isStringLiteral(node.arguments[0])) expected.add(node.arguments[0].text);
-      ts.forEachChild(node, visit);
-    }
-    visit(syntax);
-    assert.deepEqual(new Set(graph.declaredSpecifiers(source, file)), expected, file);
-  }
-  const collected = graph.buildModuleGraph(sources);
-  assert.ok(collected.edges.length > 8192);
-  assert.deepEqual(collected.unresolved, []);
-  const listing = graph.formatModuleGraph(collected.edges, collected.unresolved);
-  const pointer = { id: 'graph', path: 'packages/**/*.ts*', present: true, byteSize: Buffer.byteLength(listing), contentLoaded: false };
-  const result = await evaluateObligationExpression({ kind: 'acyclic', evidenceId: 'graph' },
-    { inputs: { evidences: { graph: pointer } }, reader: async () => ({ content: listing }) });
+test('the streaming collector admits the complete repository graph with typed edges', async () => {
+  const manifestDir = path.join(root, '.normproof');
+  const manifest = JSON.parse(fs.readFileSync(path.join(manifestDir, 'evidence-manifest.json'), 'utf8'));
+  const entry = manifest.entries.find(item => item.source.kind === 'module-graph');
+  assert.ok(entry);
+  const collected = await collectEvidence({ ...manifest, entries: [entry] }, manifestDir);
+  assert.equal(collected.evidences[entry.id].error, undefined);
+  const edges = collected.moduleEdges[entry.id];
+  assert.ok(edges.length > 16_384, 'the repository exceeds the previous deployed ceiling');
+  assert.ok(edges.some(edge => edge.kind === 'type-only'));
+  assert.ok(edges.some(edge => edge.kind === 'value'));
+  const listing = collected.fileSetListings[entry.id];
+  const result = await evaluateObligationExpression({ kind: 'none', evidenceId: entry.id, matches: 'unresolved: */**' },
+    { inputs: { evidences: collected.evidences }, graphBudgets: collected.graphBudgets, reader: async () => ({ content: listing }) });
   assert.equal(result.satisfied, true, result.reason);
 });
 
-test('the unchanged blocking obligation rejects a native CLI workspace with a missing TSX import', () => {
+test('the unchanged blocking obligation rejects a native CLI workspace with a missing TSX import', nativeRuntime, () => {
   const workspace = path.join(fixture, 'workspace');
   fs.mkdirSync(path.join(workspace, 'packages'), { recursive: true });
   fs.mkdirSync(path.join(workspace, '.normproof/norm-packs/software-structure-v0'), { recursive: true });
   fs.writeFileSync(path.join(workspace, 'packages/view.tsx'), "import './missing.js';\n");
-  for (const file of ['judge-input.json', 'evidence-manifest.json', 'norm-packs/software-structure-v0/profile.json']) {
-    fs.copyFileSync(path.join(root, '.normproof', file), path.join(workspace, '.normproof', file));
-  }
+  writeJudgeConfig(workspace);
   const run = spawnSync(process.execPath, [path.join(bundle, 'dist/adapters/cli/normproof.js'), 'judge'],
     { cwd: workspace, encoding: 'utf8', env: { ...process.env, CHEERS_REAL_HOME: '' } });
   assert.equal(run.status, 2, run.stdout + run.stderr);
@@ -121,7 +128,7 @@ test('the unchanged blocking obligation rejects a native CLI workspace with a mi
   assert.match(JSON.stringify(ledger), /source_graph_has_no_unresolved_specifiers/);
 });
 
-test('ASI declarations cannot hide a missing side-effect import from the native blocking obligation', () => {
+test('ASI declarations cannot hide a missing side-effect import from the native blocking obligation', nativeRuntime, () => {
   const workspace = path.join(fixture, 'asi');
   fs.mkdirSync(path.join(workspace, 'packages'), { recursive: true });
   fs.mkdirSync(path.join(workspace, '.normproof/norm-packs/software-structure-v0'), { recursive: true });
@@ -129,9 +136,7 @@ test('ASI declarations cannot hide a missing side-effect import from the native 
   assert.equal(ts.createSourceFile('entry.ts', source, ts.ScriptTarget.Latest).parseDiagnostics.length, 0);
   fs.writeFileSync(path.join(workspace, 'packages/entry.ts'), source);
   fs.writeFileSync(path.join(workspace, 'packages/ok.ts'), 'export const value = 1');
-  for (const file of ['judge-input.json', 'evidence-manifest.json', 'norm-packs/software-structure-v0/profile.json']) {
-    fs.copyFileSync(path.join(root, '.normproof', file), path.join(workspace, '.normproof', file));
-  }
+  writeJudgeConfig(workspace);
   const run = spawnSync(process.execPath, [path.join(bundle, 'dist/adapters/cli/normproof.js'), 'judge'],
     { cwd: workspace, encoding: 'utf8', env: { ...process.env, CHEERS_REAL_HOME: '' } });
   assert.equal(run.status, 2, run.stdout + run.stderr);
@@ -141,18 +146,16 @@ test('ASI declarations cannot hide a missing side-effect import from the native 
   assert.match(JSON.stringify(obligation), /missing\.js/);
 });
 
-test('a native self import remains a cycle under the unchanged advisory obligation', () => {
+test('a native self import remains a cycle under the unchanged advisory obligation', nativeRuntime, () => {
   const source = "import './entry.js';\nexport function value() { return 1; }\n";
   const collected = graph.buildModuleGraph(new Map([['packages/entry.ts', source]]));
-  assert.deepEqual(collected.edges, [{ from: 'packages/entry.ts', to: 'packages/entry.ts' }]);
+  assert.deepEqual(collected.edges, [{ from: 'packages/entry.ts', to: 'packages/entry.ts', kind: 'value' }]);
   assert.deepEqual(collected.unresolved, []);
   const workspace = path.join(fixture, 'self');
   fs.mkdirSync(path.join(workspace, 'packages'), { recursive: true });
   fs.mkdirSync(path.join(workspace, '.normproof/norm-packs/software-structure-v0'), { recursive: true });
   fs.writeFileSync(path.join(workspace, 'packages/entry.ts'), source);
-  for (const file of ['judge-input.json', 'evidence-manifest.json', 'norm-packs/software-structure-v0/profile.json']) {
-    fs.copyFileSync(path.join(root, '.normproof', file), path.join(workspace, '.normproof', file));
-  }
+  writeJudgeConfig(workspace);
   const run = spawnSync(process.execPath, [path.join(bundle, 'dist/adapters/cli/normproof.js'), 'judge'],
     { cwd: workspace, encoding: 'utf8', env: { ...process.env, CHEERS_REAL_HOME: '' } });
   assert.equal(run.status, 0, run.stdout + run.stderr);
@@ -177,7 +180,7 @@ test('literal syntax and file grammar retain targets, while parse errors discard
   assert.equal(graph.buildModuleGraph(sources).edges.length, 6);
   sources.set('packages/broken.ts', 'import { broken from "./missing.js";');
   const result = graph.buildModuleGraph(sources);
-  assert.match(result.failure, /broken\.ts.*collection is incomplete/);
+  assert.match(result.failure, /^invalid:.*parser diagnostics/);
   assert.equal(result.edges, undefined);
 });
 

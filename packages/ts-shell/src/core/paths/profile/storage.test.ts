@@ -16,7 +16,8 @@ import { appendPromptHistory, loadPromptHistory } from '../../../cli/interactive
 import { projectStatePath, writeProjectState } from '../../state/projectState.js';
 import { currentBinding } from '../../../cli/collaboration/projection.js';
 import type { CollaborationComposition } from '../../../cli/collaboration/model.js';
-import { cursorPath, readCursor, saveCursor } from '../../../collaboration/client/cursor.js';
+import { cursorPath } from '../../../collaboration/client/cursor.js';
+import { readRelayRecord, saveRelayRecord } from '../../../collaboration/storage/record.js';
 import { accessToken, forgetAccessToken } from '../../../provider/google/auth.js';
 
 let home: string;
@@ -120,10 +121,10 @@ it('binds shared collaboration routes and captured cursors to the owning profile
     session: { id: 'same', createdAt: '2026-10-16' } } } as CollaborationComposition));
   expect(binding(a).projectId).not.toBe(binding(b).projectId);
   const target = withProfile(a, () => cursorPath('https://relay.example', 'same', 'room', 'local'));
-  saveCursor(target, undefined, { cursor: 1 }, a);
-  expect(readCursor(target, a)).toEqual({ cursor: 1 });
+  saveRelayRecord(target, undefined, { cursor: 1 }, a);
+  expect(readRelayRecord(target, a)).toEqual({ cursor: 1 });
   fs.renameSync(a.root, `${a.root}-retired`); fs.mkdirSync(a.root);
-  expect(() => saveCursor(target, { cursor: 1 }, { cursor: 2 }, a)).toThrow('changed identity');
+  expect(() => saveRelayRecord(target, { cursor: 1 }, { cursor: 2 }, a)).toThrow('changed identity');
 });
 
 it('separates delegated Google token caches by profile and explicit credential source', async () => {

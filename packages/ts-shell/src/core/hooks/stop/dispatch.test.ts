@@ -107,7 +107,8 @@ describe('Stop command boundary', () => {
     controller.abort();
     expect(await promise).toMatchObject({ decision: 'unknown', reasonCode: 'cancelled' });
     expect(JSON.parse(fs.readFileSync(path.join(root, 'received.json'), 'utf8'))).toMatchObject({
-      hook_event_name: 'Stop', attemptId: 'attempt', reentryCount: 1, stop_hook_active: true, cwd: root,
+      hook_event_name: 'Stop', session_id: 'test', stop_repair_protocol: 1,
+      attemptId: 'attempt', reentryCount: 1, stop_hook_active: true, cwd: root,
     });
   });
 

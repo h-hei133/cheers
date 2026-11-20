@@ -41,14 +41,14 @@ afterEach(() => {
   fs.rmSync(temporary, { recursive: true, force: true });
 });
 
-function dispatcher(response = '{ decision: "allow", reasonCode: "no_violation" }') {
+function dispatcher(response = '{ decision: "allow", reasonCode: "no_violation" }', protocolVersion?: 2) {
   const script = `import fs from 'node:fs'; let raw=''; for await (const chunk of process.stdin) raw+=chunk;
     const input=JSON.parse(raw); fs.appendFileSync(${JSON.stringify(captured)}, JSON.stringify(input)+'\\n');
     const result=${response}; process.stdout.write(JSON.stringify(result));`;
   const artifact = path.join(workspace, 'gate.mjs'); fs.writeFileSync(artifact, script);
   const hooks = new HookDispatcher();
   hooks.registerCommandHook({ event: 'PreToolUse', matcher: CANONICAL_WRITE_MATCHER, command: 'unused',
-    writeGate: { version: 1, path: artifact, sha256: digest(script), nodeFloor: '20.3.0' } });
+    writeGate: { version: 1, path: artifact, sha256: digest(script), nodeFloor: '20.3.0', ...(protocolVersion && { protocolVersion }) } });
   return hooks;
 }
 
@@ -80,6 +80,43 @@ function inputs(): CanonicalHookInput[] {
 const records = () => readOperations(captureOperationScope({ sessionId, workspaceRoot: workspace }));
 
 describe('prepared patch write hook coverage', () => {
+  it('sends one v2 decision the complete selected patch, including deletions, and surfaces its guidance', async () => {
+    fs.writeFileSync(path.join(workspace, 'c.txt'), 'before-c\n');
+    const hooks = dispatcher('{ decision: "allow_with_advisory", reasonCode: "advisory", additionalContext: "Update the remaining references." }', 2);
+    const { result, observed, approve } = await run(patch(update('a.txt', 'before-a', 'after-a'),
+      '*** Delete File: b.txt', update('c.txt', 'before-c', 'after-c')), { hooks, approve: async prompt => {
+      const selected = prompt.context.selections!.filter(group => !group.files?.some(file => file.endsWith('c.txt'))).map(group => group.id);
+      const preview = prompt.context.selectionPreview!(selected);
+      return { promptId: prompt.id, decision: 'allow-once', respondedAt: 1, selected, selectionRevision: preview.revision };
+    } });
+    expect(approve).toHaveBeenCalledOnce();
+    expect(inputs()).toEqual([expect.objectContaining({ tool_name: 'apply_patch', args: {}, tool_input: {
+      prepared_writes: expect.arrayContaining([
+        { path: path.join(workspace, 'a.txt'), content: 'after-a\n' }, { path: path.join(workspace, 'b.txt'), content: null },
+      ]),
+    } })]);
+    expect(inputs()[0]).toMatchObject({ tool_input: { prepared_writes: expect.not.arrayContaining([
+      expect.objectContaining({ path: path.join(workspace, 'c.txt') }),
+    ]) } });
+    expect(observed[0]).toMatchObject({ decision: 'allow_with_advisory', hookVerdict: { policy: 'permission' } });
+    expect(result.messages[0]?.content).toContain(': committed.');
+    expect(result.messages[0]?.content).toContain('Update the remaining references.');
+    expect(fs.readFileSync(path.join(workspace, 'a.txt'), 'utf8')).toBe('after-a\n');
+    expect(fs.existsSync(path.join(workspace, 'b.txt'))).toBe(false);
+    expect(fs.readFileSync(path.join(workspace, 'c.txt'), 'utf8')).toBe('before-c\n');
+  });
+
+  it('lets a v2 joint veto prevent the entire selected patch', async () => {
+    const hooks = dispatcher('input.tool_input.prepared_writes.length === 2 ? { decision: "block", reasonCode: "violation", reason: "joint violation" } : { decision: "allow", reasonCode: "no_violation" }', 2);
+    const { result, observed } = await run(patch(update('a.txt', 'before-a', 'after-a'), '*** Delete File: b.txt'), { hooks });
+    expect(inputs()).toHaveLength(1);
+    expect(observed[0]).toMatchObject({ decision: 'block', reasonCode: 'violation' });
+    expect(result.messages[0]?.content).toContain('joint violation');
+    expect(fs.readFileSync(path.join(workspace, 'a.txt'), 'utf8')).toBe('before-a\n');
+    expect(fs.readFileSync(path.join(workspace, 'b.txt'), 'utf8')).toBe('before-b\n');
+    expect(records()).toEqual([]);
+  });
+
   it('keeps delete coverage unsupported after an allowed native update in a saved session', async () => {
     const { result, observed, approve } = await run(patch('*** Delete File: b.txt', update('a.txt', 'before-a', 'after-a')));
     expect(approve).toHaveBeenCalledOnce();

@@ -330,6 +330,7 @@ export function createToolHooks(options: ToolGateOptions,
   const toolFor = (name: string) => (typeof tools === 'function' ? tools() : tools)?.get(name);
   const doomLoop = new DoomLoopDetector(3);
   const approvals = new Map<string, { operation: string; decision: string }>();
+  const writeContext = new WeakMap<object, string>();
   return {
     beforeToolCall: async ({ call, args }, signal) => {
       let authorized = false;
@@ -387,6 +388,7 @@ export function createToolHooks(options: ToolGateOptions,
       }
       authorizeToolCall(args, options, call.name, call.id);
       authorizeFileAccess(args, call.id);
+      if (typeof decision.additionalContext === 'string') writeContext.set(args, decision.additionalContext);
       authorized = true;
       return undefined;
       } finally { if (!authorized) {
@@ -396,6 +398,8 @@ export function createToolHooks(options: ToolGateOptions,
     },
     afterToolCall: async (context, signal) => {
       const { call, args, result, isError } = context;
+      const preUseFeedback = writeContext.get(args);
+      writeContext.delete(args);
       discardToolCall(args);
       forgetFileAccess(args);
       const approval = approvals.get(call.id);
@@ -431,7 +435,8 @@ export function createToolHooks(options: ToolGateOptions,
             ? undefined : 'Tool result authority changed.'),
         });
         if (runners.length) refused ??= resultAdmission();
-        const output = projectToolResult(result, !refused && draft?.isCurrent() ? draft.patch : undefined, decision.feedback, refused);
+        const output = projectToolResult(result, !refused && draft?.isCurrent() ? draft.patch : undefined, decision.feedback,
+          refused, preUseFeedback);
         if (!refused && output === result.output && !approval) return undefined;
         return { ...(refused ? { isError: true } : {}),
           ...(output === result.output ? {} : { output, preserveResultEvidence: true as const }),
