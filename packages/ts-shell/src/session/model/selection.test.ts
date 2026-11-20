@@ -235,8 +235,8 @@ it("persists a session-only selection through lifecycle writes, restart and sess
   const configPath = getUserRuntimeConfigPath(); const original = fs.readFileSync(configPath); const stamp = fs.statSync(configPath).mtimeMs;
   const context = createShellRuntimeContext({ cwd: home, originalCwd: home, projectRoot: home, targetPathBase: home,
     rootMode: "direct", gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
-    session: one, runtimeConfig: getRuntimeConfig(home) });
-  context.runtimeConfigOverrides = { allowedTools: ["Read"], offline: true, instructionBudgetBytes: 0 };
+    session: one, runtimeConfig: getRuntimeConfig(home),
+    runtimeConfigOverrides: { allowedTools: ["Read"], offline: true, instructionBudgetBytes: 0 } });
   refreshShellRuntimeConfig(context);
   const bridge = createCliProviderRuntimeBridge({ runtimeConfig: () => context.runtimeConfig, options: {}, env: {} });
   expect(bridge.resolveCredentialSnapshot().model).toBe("base-model");

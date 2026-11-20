@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
+import { getRuntimeConfig } from '../../../../config/runtimeConfig.js';
+import { createShellRuntimeContext } from '../../../../core/shell/runtimeContext.js';
 import { SessionManager } from '../../../../session/SessionManager.js';
 import { createSessionStoreLayout, locateExistingSessionLayout } from '../../../../session/store/sessionFileLayout.js';
 import { navigateSession, readBackSource } from '../../../runtime/navigation.js';
@@ -28,7 +30,11 @@ function saved(units: number) {
   for (let index = 0; index < 26; index++) manager.addTurn(session.id, {
     role: 'user', content: `question-${index}\nneedle 界 e\u0301 👩‍💻 ${index === 0 ? 'x'.repeat(units) : ''}`,
   });
-  const context = { session: manager.getSession(session.id)!, cwd: root, projectRoot: root };
+  const context = createShellRuntimeContext({ session: manager.getSession(session.id)!,
+    cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root, rootMode: 'direct',
+    gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+    runtimeConfig: getRuntimeConfig(root),
+  });
   const layout = locateExistingSessionLayout(createSessionStoreLayout(), session.id);
   const targets = [layout.metadataPath, layout.statePath, layout.transcriptPath];
   const before = targets.map(target => fs.readFileSync(target));
@@ -45,8 +51,8 @@ it('navigates a saved image question through the original branch owner without d
   fixture.context.session = manager.getSession(id)!;
   const original = fs.readFileSync(fixture.targets[2]!, 'utf8');
   const picker = rewindPicker({ readTurns: signal => readBackSource(fixture.context, signal), rewind: async point => {
-    const result = await navigateSession({ runtimeContext: fixture.context as never, sessionManager: manager,
-      sessionRuntime: { getState: () => 'idle', summarizeAbandonedTurns: async () => undefined } as never }, point.entryId, point.version);
+    const result = await navigateSession({ runtimeContext: fixture.context, sessionManager: manager,
+      sessionRuntime: { getState: () => 'idle', summarizeAbandonedTurns: async () => undefined } }, point.entryId, point.version);
     return { note: result.output, ...(result.draft !== undefined ? { draft: result.draft } : {}) };
   } });
   const rows = await picker.load();

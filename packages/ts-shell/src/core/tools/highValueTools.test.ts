@@ -11,12 +11,12 @@ import { createDefaultExecutionService } from "../../runtime/execution/service.j
 import { backgroundTasks } from "../shell/background/tasks.js";
 import { createCoreToolRegistry } from "./registry.js";
 describe("High-Value Modern Built-in Tools Subsystem", () => {
-  it("states the multi-file failure and explicit recovery boundary in the edit tool contract", () => {
+  it("declares single-file targeted edits and their recovery commands", () => {
     const edit = createCoreToolRegistry().get("edit");
-    expect(edit?.description).toContain("Each file commits independently");
-    expect(edit?.description).toContain("multi-file edits are not atomic");
-    expect(edit?.description).toContain("earlier changes remain");
-    expect(edit?.description).toContain("/restore to explicitly restore individual recorded edits");
+    expect(edit?.argsSchema).toMatchObject({ required: ["path", "edits"], additionalProperties: false });
+    expect(Object.keys(edit!.argsSchema!.properties!).sort()).toEqual(["edits", "path"]);
+    expect(edit?.description).toContain("/undo to inspect the latest snapshot");
+    expect(edit?.description).toContain("/restore to restore recorded edits");
   });
   it("waits for a background stop request without claiming observed exit", async () => {
     let release!: (value: boolean) => void;
@@ -325,7 +325,7 @@ describe("concurrent edits of one file", () => {
         { path: "target.txt", content: "wholesale", edits: [{ oldText: "ALPHA", newText: "AAA" }] },
         context,
       ),
-    ).rejects.toThrow('Invalid tool arguments: not constraint failed.');
+    ).rejects.toThrow('Invalid tool arguments for edit: provide path and edits');
     expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
   });
 
@@ -348,7 +348,7 @@ describe("concurrent edits of one file", () => {
         { path: "target.txt", edits: [{ oldText: "ALPHA", newText: "AAA" }], oldText: "BETA", newText: "BBB" },
         context,
       ),
-    ).rejects.toThrow('Invalid tool arguments: not constraint failed.');
+    ).rejects.toThrow('Invalid tool arguments for edit: provide path and edits');
     expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
   });
 
@@ -363,7 +363,7 @@ describe("concurrent edits of one file", () => {
         { path: "target.txt", content: "wholesale", oldText: "BETA", newText: "BBB" },
         context,
       ),
-    ).rejects.toThrow('Invalid tool arguments: not constraint failed.');
+    ).rejects.toThrow('Invalid tool arguments for edit: provide path and edits');
     expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
   });
 
@@ -378,7 +378,7 @@ describe("concurrent edits of one file", () => {
         { path: "target.txt", edits: [{ oldText: "ALPHA", newText: "AAA" }], replaceAll: true },
         context,
       ),
-    ).rejects.toThrow('Invalid tool arguments: not constraint failed.');
+    ).rejects.toThrow('Invalid tool arguments for edit: provide path and edits');
     expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
   });
 });

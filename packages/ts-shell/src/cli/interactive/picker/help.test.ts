@@ -3,7 +3,6 @@ import { listSlashInvocations, registerSlashCommand, renderUserHelp, getSlashInv
 import * as registry from "../../../entrypoints/slashCommandRegistry.js";
 import { registerCatalogContribution } from '../../../core/catalog/contributions.js';
 import * as configuration from "../../../config/runtimeConfig.js";
-import { OptionModel } from "../../../presentation/tui/chrome/options.js";
 import { parseKeyEvent } from "../../../presentation/tui/input/keys.js";
 import { stripAnsi } from "../../../presentation/tui/text/ansi.js";
 import { OverlayHost } from "../overlay.js";
@@ -42,11 +41,11 @@ describe("command guide", () => {
   });
 
   it("projects the shared inventory and matches aliases without duplicate choices", async () => {
-    const options = await helpPicker().load();
+    const picker = helpPicker();
+    const options = await picker.load();
     expect(options.map(option => option.id)).toEqual(listSlashInvocations().filter(item => item.kind !== "alias").map(item => item.invocation));
     expect(options.find(option => option.id === "/back")?.note).toBe("session · interactive");
-    const model = new OptionModel(); model.setOptions(options); model.setFilter("/models");
-    expect(model.visible.map(option => option.id)).toEqual(["/model"]);
+    expect(picker.filterOptions!("/models", options).map(option => option.id)).toEqual(["/model"]);
     expect(await helpPicker().apply(["/model"])).toEqual({ draft: "/model " });
     expect(await helpPicker().apply(["/recall"])).toEqual({ draft: "/recall " });
     expect(await helpPicker().apply(["/exit"])).toEqual({ draft: "/exit " });

@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createLspToolDefinition } from '../core/tools/lsp.js';
 import { createDefaultExecutionService } from '../runtime/execution/service.js';
+import { TOOL_OUTPUT_LIMIT } from '../core/agent/tools.js';
 import { createPatchToolDefinition } from '../edit/patch/tool.js';
 import { SessionManager } from '../session/SessionManager.js';
 import { adaptTools, createToolHooks, type ToolGateOptions } from '../turn/tools.js';
@@ -166,11 +167,13 @@ it('refuses overlapping edits and unrepresentable newline changes before any pat
 });
 
 it('refuses a rename proposal too large to reach the model intact, with no partial patch metadata', async () => {
-  const test = setup(); fs.writeFileSync(test.file, test.source + '// ' + 'padding'.repeat(1200) + '\n');
+  const test = setup();
+  const source = test.source.trimEnd() + ' // ' + 'x'.repeat(TOOL_OUTPUT_LIMIT + 1) + '\n';
+  fs.writeFileSync(test.file, source);
   const result = await test.tool.execute({ ...test.args, operation: 'rename', newName: 'bravo' }, test.context);
   expect(result).toMatchObject({ success: false, metadata: { status: 'unsupported' } });
   expect(result.error).toContain('complete tool-message limit'); expect(result.metadata).not.toHaveProperty('editPlan');
-  expect(fs.readFileSync(test.file, 'utf8')).toContain('alpha');
+  expect(fs.readFileSync(test.file, 'utf8')).toBe(source);
 });
 
 it('reclaims verified idle-stopped historical clients on admission without evicting live servers', async () => {

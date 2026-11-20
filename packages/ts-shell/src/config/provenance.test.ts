@@ -147,7 +147,7 @@ it('marks only matching session model leaves without attributing credentials to 
   user({ activeProviderConnectionId: 'private-id', providerConnections: [{ id: 'private-id', provider: 'openai', apiKey: 'private-key', model: 'private-base' },
     { id: 'private-other', provider: 'openai', model: 'private-second' }] });
   const config = getRuntimeConfig(root);
-  vi.spyOn(selection, 'readSessionModel').mockReturnValue({ connectionId: 'private-id', provider: 'openai', model: 'private-session-model' });
+  vi.spyOn(selection, 'readSessionModelStrict').mockReturnValue({ connectionId: 'private-id', provider: 'openai', model: 'private-session-model' });
   const projected = projectSessionModel(config, 'one'); const trace = projected.configProvenance;
   expect(projected.providerConnections[0].model).toBe('private-session-model');
   expect(trace.providerConnections.children?.['0'].children?.model).toMatchObject({ sources: ['session'], shadowed: ['user'] });

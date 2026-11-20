@@ -232,7 +232,8 @@ it('applies final byte admission to compaction and captured cache refresh bodies
   const requestPolicy = policy();
   const fetchImpl = vi.fn(async () => answer('openai-compatible')) as unknown as typeof fetch;
   await expect(requestCompactionSummary({ provider: { ...provider, shape: { ...shape(), inputLimits: { maxRequestBytes: 1 } } },
-    messages: [{ role: 'user', content: 'summarize' }], fetchImpl, requestPolicy })).rejects.toThrow(/byte limit/);
+    messages: [{ role: 'user', content: 'summarize' }], fetchImpl, requestPolicy }))
+    .rejects.toThrow('Summary request refused: the complete input exceeds the selected model limits.');
   await expect(sendSentRequest({ url: provider.baseUrl, headers: {}, endpoint: provider.endpoint,
     body: JSON.stringify({ model: 'm', messages: [{ role: 'user', content: 'cached' }], max_tokens: 2 }), inputLimits: { maxRequestBytes: 1 } },
   undefined, fetchImpl, { provider: 'fixture', model: 'm', policy: requestPolicy })).rejects.toThrow(/byte limit/);

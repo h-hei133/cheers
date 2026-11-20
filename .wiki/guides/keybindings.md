@@ -85,6 +85,8 @@ In Settings, Left/Right changes the top category; Tab or Shift+Tab toggles rows 
 | `tui.overlay.previousGroup` | `shift+tab` | Previous picker group |
 | `tui.altScreen.top` | `ctrl+home` | Go to the oldest rows, or the start of the draft |
 | `tui.altScreen.bottom` | `ctrl+end` | Go to the newest rows, or the end of the draft |
+| `tui.altScreen.previousPrompt` | `ctrl+up` / `ctrl+shift+up` | Jump to the previous prompt or answer in fullscreen mode |
+| `tui.altScreen.nextPrompt` | `ctrl+down` / `ctrl+shift+down` | Jump to the next prompt or answer in fullscreen mode |
 | `tui.altScreen.search` | `ctrl+shift+f` | Find text in the transcript |
 | `app.interrupt` | `escape` | Dismiss a list, interrupt a run, or go back |
 | `app.clear` | `ctrl+c` | Clear the draft, then exit on a second press |
