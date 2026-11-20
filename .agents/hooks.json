@@ -10,10 +10,21 @@
               "protocolVersion": 2,
               "workerProtocol": 1,
               "path": ".normproof/write-gate/cli.mjs",
-              "sha256": "44d266176a9acd31e8693ad7026c66d19adbfdb34a61615bbbded648276f8c3f",
+              "sha256": "e76dac23e7a890aa2075a342d8f1009ae1b25c7079e7003804a70935cc952e16",
               "nodeFloor": "20.3.0"
             },
             "timeoutMs": 15000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx --yes --package .normproof/normproof-0.1.0.tgz normproof gate stop --emit-result",
+            "timeoutMs": 20000
           }
         ]
       }

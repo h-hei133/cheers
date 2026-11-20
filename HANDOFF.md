@@ -2979,3 +2979,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** The write hook starts the standalone CLI again and never returns its decision frame.
 - **Root cause** Launching the standalone executable normally reenters its packaged entrypoint, even when the argument names a script.
 - **Rule** Bind both hook transports to the embedded script runner when launching from a standalone executable. Exercise the pinned artifact through the real native write gate to verify denial, unchanged bytes and a later allowed write.
+
+### Idle Write Workers Must Release Their Pipes
+
+- **Symptom** A one-shot host waits after its last write decision arrives.
+- **Root cause** An idle timer and child stream handles each keep the event loop live.
+- **Rule** Unreference the idle deadline, child, and both pipes. Keep the pending reply deadline live. On retirement, close stdin and allow a bounded EOF shutdown before forcing exit.
+
+### Stop Repairs Require Explicit Result Output
+
+- **Symptom** The Stop process runs but the host cannot advance a negotiated repair chain.
+- **Root cause** The default hook projection omits the proof verdict and repair receipt.
+- **Rule** Use the pinned CLI with `gate stop --emit-result` on its declared runtime. Verify a single-file export advisory followed by completion blocking, bounded repair rounds, and a final re-judgement.

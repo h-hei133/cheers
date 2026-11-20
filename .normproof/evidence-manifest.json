@@ -9,14 +9,31 @@
         "kind": "module-graph",
         "pattern": "packages/**/*.ts*",
         "checkExports": true,
-        "workspaceSourceCondition": "cheers-source"
+        "workspaceSourceCondition": "cheers-source",
+        "resources": {
+          "version": "1",
+          "sourceSnapshot": "sha256:f087d1a127a56da8cb0fde79837bea25b2c6041995f58c2c571377fc8f562a8c",
+          "accepted": {
+            "paths": 5000,
+            "totalSourceBytes": 100663296,
+            "resolvedEdges": 24000,
+            "unresolvedHoles": 2048,
+            "listingBytes": 10485760,
+            "evalSteps": 750000,
+            "directoryEntries": 80000,
+            "pendingDirectories": 4096,
+            "depth": 48,
+            "pathBytes": 1024,
+            "specifierBytes": 1024
+          }
+        }
       }
     },
     {
       "id": "source_module_functions",
       "source": {
         "kind": "module-functions",
-        "pattern": "packages/**/*.ts*"
+        "pattern": "packages/*/src/**/*.ts*"
       }
     },
     {

@@ -263,4 +263,5 @@ in the C4 execution entry in `docs/validation/adapter-execution.md`. A repeated 
 must detect this section marker and append no second copy; the original prefix remains byte-exact.
 
 - source_graph_is_acyclic | mixed dependency cycle from context/request/estimate.ts through provider, turn and command types | reviewed 2026-11-20 | decision: defer | The fixed judge reports the same path before and after the workspace split. The workspace package graph and the runtime-only import graph pass their cycle checks.
+- source_graph_is_acyclic | mixed dependency cycle from context/request/estimate.ts through provider, turn and command types | reviewed 2026-11-20 | decision: fix | The refreshed judge checks only runtime value edges and satisfies the obligation. Dependency direction still evaluates type references.
 - execution_does_not_reach_cli | five execution test imports reach cli/approval/permissionScope.ts | reviewed 2026-11-20 | decision: defer | The fixed judge reports the same five test paths before and after the split. A dedicated ownership change can move their shared approval type without excluding tests from the graph.

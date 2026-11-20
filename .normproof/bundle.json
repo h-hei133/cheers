@@ -2,9 +2,9 @@
   "version": 2,
   "package": "normproof",
   "packageVersion": "0.1.0",
-  "baseCommit": "617319789042372f872fea3505b00cc489536969",
+  "baseCommit": "96ea16b6e60c989f7486cc72f9f726fcf1819aee",
   "sourceArchive": ".normproof/normproof-0.1.0.tgz",
-  "archiveSha256": "a2cf0f3a5fa49b8054fb3930719b5f455f01c339438386f5bbd4e7919decdd04",
+  "archiveSha256": "92536c4d76345ac6e2991998095b60f67345173544c3648c7f2279479c7069ad",
   "members": {
     "package/package.json": "174949e493e7f90f5dd43d38d0ee1f315046951ca2fcddd56c41ca9adeb4c346",
     "package/dist/adapters/cli/normproof.js": "8821e6fe50ffc0602f8c3afdd6fe544abb8e426c739646a218dd574450e8409a",

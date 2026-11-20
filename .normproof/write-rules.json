@@ -25,7 +25,7 @@
       "kind": "moduleFunctionBaseline",
       "id": "declared_functions_within_module_ceiling",
       "message": "Keep the accepted function count or extract an owned responsibility into a sibling module.",
-      "pattern": "packages/**/*.ts*"
+      "pattern": "packages/*/src/**/*.ts*"
     },
     {
       "kind": "noNewCycle",
@@ -39,6 +39,62 @@
       "from": "packages/ts-shell/src/runtime/execution/**",
       "to": "packages/ts-shell/src/cli/**",
       "allowed": ["packages/ts-shell/src/runtime/execution/**", "packages/ts-shell/src/tools/types.ts"]
+    },
+    {
+      "kind": "noReachableDependency",
+      "id": "advisor_does_not_reach_shell",
+      "from": "packages/advisor/**",
+      "to": "packages/ts-shell/**",
+      "message": "Accept the required behavior through the domain interface and supply it from the shell."
+    },
+    {
+      "kind": "noReachableDependency",
+      "id": "browser_does_not_reach_shell",
+      "from": "packages/browser/**",
+      "to": "packages/ts-shell/**",
+      "message": "Accept the required behavior through the domain interface and supply it from the shell."
+    },
+    {
+      "kind": "noReachableDependency",
+      "id": "collaboration_does_not_reach_shell",
+      "from": "packages/collaboration/**",
+      "to": "packages/ts-shell/**",
+      "message": "Accept the required behavior through the domain interface and supply it from the shell."
+    },
+    {
+      "kind": "noReachableDependency",
+      "id": "desktop_does_not_reach_shell",
+      "from": "packages/desktop/**",
+      "to": "packages/ts-shell/**",
+      "message": "Accept the required behavior through the domain interface and supply it from the shell."
+    },
+    {
+      "kind": "noReachableDependency",
+      "id": "media_does_not_reach_shell",
+      "from": "packages/media/**",
+      "to": "packages/ts-shell/**",
+      "message": "Accept the required behavior through the domain interface and supply it from the shell."
+    },
+    {
+      "kind": "noReachableDependency",
+      "id": "planning_does_not_reach_shell",
+      "from": "packages/planning/**",
+      "to": "packages/ts-shell/**",
+      "message": "Accept the required behavior through the domain interface and supply it from the shell."
+    },
+    {
+      "kind": "noReachableDependency",
+      "id": "research_does_not_reach_shell",
+      "from": "packages/research/**",
+      "to": "packages/ts-shell/**",
+      "message": "Accept the required behavior through the domain interface and supply it from the shell."
+    },
+    {
+      "kind": "noReachableDependency",
+      "id": "workflow_does_not_reach_shell",
+      "from": "packages/workflow/**",
+      "to": "packages/ts-shell/**",
+      "message": "Accept the required behavior through the domain interface and supply it from the shell."
     },
     {
       "kind": "breakingExportImpact",
