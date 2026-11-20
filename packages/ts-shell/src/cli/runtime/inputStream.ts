@@ -308,7 +308,7 @@ export async function runPromptInputStream(options: {
               if (closed || exitRequested || rpcInputOwners.get(options.runtimeContext) !== rpcInputOwner) return;
               releaseUi = bindExtensionUiFor(options.runtimeContext, rpcUiBridge);
             }).finally(() => { pendingControls--; });
-            if (!['bash', 'compact', 'get_commands', 'new_session', 'switch_session', 'fork', 'clone'].includes(rpcCommand.type)) return pending;
+            if (!['bash', 'compact', 'get_commands', 'new_session', 'switch_session', 'fork', 'clone', 'annotate_session'].includes(rpcCommand.type)) return pending;
             // The session's command owner joins execution. This set only joins
             // response writes at EOF while later controls can reach cancellation.
             rpcResponses.add(pending);
