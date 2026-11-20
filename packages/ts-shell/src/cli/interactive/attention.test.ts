@@ -107,6 +107,9 @@ it('connects actual Settings input and confirmation to the accepted value and ne
   terminal.input('\r');
   await vi.waitFor(() => expect(context.runtimeConfig.attentionOnIdle).toBe(true));
   expect(getRuntimeConfig(root).attentionOnIdle).toBe(true);
+  await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Settings'));
+  terminal.input('\x1b'); terminal.input('\x1b');
+  await vi.waitFor(() => expect(host.overlay.render(80, 24)).toEqual([]));
   vi.spyOn(router, 'routeInteractiveCommand').mockImplementation(async input => { now += 30000; return { turnNumber: input.turnNumber + 1 }; });
   await host.run('synthetic turn'); expect(notifications()).toHaveLength(1);
 });

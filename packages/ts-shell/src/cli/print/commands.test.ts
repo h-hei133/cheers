@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildProjectCliProcessSpec, runAgentCliProcess } from "../../test-utils/cli/process.js";
@@ -6,7 +7,9 @@ import { reportText } from '../../core/commands/report/projection.js';
 
 let root: string;
 beforeEach(async () => {
-  root = await fs.mkdtemp(path.join(process.cwd(), ".tmp-print-commands-"));
+  const temporary = path.join(os.tmpdir(), "cheers-test");
+  await fs.mkdir(temporary, { recursive: true });
+  root = await fs.mkdtemp(path.join(temporary, "print-commands-"));
   await fs.mkdir(path.join(root, "workspace"));
 });
 afterEach(async () => {
@@ -17,6 +20,7 @@ describe("scripted session commands", () => {
   it.each([[false, false], [true, false], [false, true]])("emits JSON reports across commands and turns (turn=%s, print=%s)", async (includeTurn, printMode) => {
     const spec = buildProjectCliProcessSpec({
       prompt: "", projectPath: path.join(root, "workspace"), homeDir: path.join(root, "home"),
+      cwd: path.join(root, "workspace"),
       args: ["--json", "--offline"],
       env: { CHEERS_PROVIDER_MODE: "synthetic", CHEERS_TEST_ROOT: root, FORCE_COLOR: '3' }, timeoutMs: 20_000,
     });
@@ -52,6 +56,7 @@ describe("scripted session commands", () => {
   it.each([true, false])("starts a fresh session and stops queued input (print=%s)", async (printMode) => {
     const spec = buildProjectCliProcessSpec({
       prompt: "", projectPath: path.join(root, "workspace"), homeDir: path.join(root, "home"),
+      cwd: path.join(root, "workspace"),
       env: { CHEERS_PROVIDER_MODE: "synthetic", CHEERS_TEST_ROOT: root }, timeoutMs: 15_000,
     });
     const result = await runAgentCliProcess({

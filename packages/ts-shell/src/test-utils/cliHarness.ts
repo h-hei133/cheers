@@ -33,7 +33,7 @@ export type InteractiveEofSmokeResult = {
   sessionId: string | null;
 };
 
-export function createGitRepoFixture(root: string): void {
+export function createGitRepoFixture(root: string): string {
   fs.mkdirSync(root, { recursive: true });
   const initialized = spawnSync("git", ["init", "-q"], {
     cwd: root,
@@ -45,6 +45,7 @@ export function createGitRepoFixture(root: string): void {
       `Failed to initialize git repo at ${root}: ${initialized.stderr || initialized.error?.message || "unknown error"}`,
     );
   }
+  return root;
 }
 
 export function normalizeCliOutput(output: string): string {

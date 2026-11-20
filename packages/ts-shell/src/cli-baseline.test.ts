@@ -5,6 +5,7 @@ import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { setImmediate } from "node:timers/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { handleShellSigint } from "./core/shell/signalHandlers.js";
 import { createLongSessionContinuityFixture } from "./test-utils/longSessionContinuityFixtures.js";
@@ -42,7 +43,7 @@ describe("CLI streaming baseline (T3)", () => {
     fs.mkdirSync(sessionsDir, { recursive: true });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // The child processes these tests spawn write into the fake home, and one can
     // still be finishing as the test ends: removing a session directory while a
     // writer is recreating a file inside it fails with ENOTEMPTY, which `force`
@@ -50,9 +51,11 @@ describe("CLI streaming baseline (T3)", () => {
     // whole removal, rather than a single call, is what makes the cleanup keep up
     // with a writer that is still going.
     removeWithRetry(fakeHomeDir);
+    // Let the runner receive worker acknowledgments between synchronous CLI cases.
+    await setImmediate();
   });
 
-  function seedInterruptedSessionForRecovery(sessionId: string): void {
+  function seedInterruptedSessionForRecovery(sessionId: string, projectRoot = repoRoot): void {
     const sessionDir = path.join(sessionsDir, sessionId);
     fs.mkdirSync(sessionDir, { recursive: true });
     const now = new Date().toISOString();
@@ -61,7 +64,7 @@ describe("CLI streaming baseline (T3)", () => {
       JSON.stringify(
         {
           id: sessionId,
-          projectRoot: repoRoot,
+          projectRoot,
           createdAt: now,
           updatedAt: now,
         },
@@ -75,7 +78,7 @@ describe("CLI streaming baseline (T3)", () => {
       JSON.stringify(
         {
           status: "interrupted",
-          projectRoot: repoRoot,
+          projectRoot,
           pendingPrompt: "recover me",
           runPhase: "prompt-persisted",
           interruptedKind: "prompt",
@@ -645,7 +648,7 @@ describe("CLI streaming baseline (T3)", () => {
     const result = await runCliCommandToClose({
       spawnCli,
       fakeHome: fakeHomeDir,
-      args: ["--print", "hello"],
+      args: ["--project", createGitRepoFixture(path.join(fakeHomeDir, "workspace")), "--print", "hello"],
       envOverrides: { CHEERS_PROVIDER_MODE: "synthetic" },
       timeoutMs: 30000,
     });
@@ -1588,6 +1591,7 @@ describe("CLI streaming baseline (T3)", () => {
 
 
   it("proves default real CLI non-node allowlisted intent can sustain two consecutive tasks in one session with continuous durable evidence", async () => {
+    const projectRoot = createGitRepoFixture(path.join(fakeHomeDir, "workspace"));
     const mockServer = await createOpenAiHttpServer();
     writeOpenAiMockConfig({
       fakeHome: fakeHomeDir,
@@ -1597,7 +1601,7 @@ describe("CLI streaming baseline (T3)", () => {
 
     try {
       await new Promise<void>((resolve, reject) => {
-      const cli = spawnCli(fakeHomeDir, [], {
+      const cli = spawnCli(fakeHomeDir, ["--project", projectRoot], {
         CHEERS_PROVIDER_MODE: "real",
         OPENAI_API_KEY: "test-real-cli-key",
         CHEERS_REAL_HOME: "",
@@ -3126,15 +3130,16 @@ describe("CLI streaming baseline (T3)", () => {
   }, 35000);
 
   it("GOLDEN_MAIN_PATH: user-minimal real main path unified gate", async () => {
+    const projectRoot = createGitRepoFixture(path.join(fakeHomeDir, "workspace"));
     const recoverableSessionId = "sess_recoverable_golden";
-    seedInterruptedSessionForRecovery(recoverableSessionId);
+    seedInterruptedSessionForRecovery(recoverableSessionId, projectRoot);
     seedBrokenSessionDir("sess_broken_golden_1");
     seedBrokenSessionDir("sess_broken_golden_2");
 
     await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(
         fakeHomeDir,
-        ["--non-interactive-approval", "allow-once"],
+        ["--project", projectRoot, "--non-interactive-approval", "allow-once"],
         {
           CHEERS_PROVIDER_MODE: "synthetic",
         },
@@ -3322,6 +3327,7 @@ describe("CLI streaming baseline (T3)", () => {
   }, 50000);
 
   it("gates resume continuity: interrupt once, resume once, then persist completed terminal state", async () => {
+    const projectRoot = createGitRepoFixture(path.join(fakeHomeDir, "workspace"));
     const mockServer = await createDelayedOpenAiHttpServer(1000);
     writeOpenAiMockConfig({
       fakeHome: fakeHomeDir,
@@ -3335,7 +3341,7 @@ describe("CLI streaming baseline (T3)", () => {
 
     try {
       await new Promise<void>((resolve, reject) => {
-      const cli = spawnCli(fakeHomeDir, [], {
+      const cli = spawnCli(fakeHomeDir, ["--project", projectRoot], {
         CHEERS_PROVIDER_MODE: "real",
         OPENAI_API_KEY: "test-resume-continuity-key",
       });
@@ -3446,7 +3452,7 @@ describe("CLI streaming baseline (T3)", () => {
       const followUpPrompt = "Resume continuity gate: second turn after resume";
       const cli = spawnCli(
         fakeHomeDir,
-        ["--session-id", interruptedSessionId],
+        ["--project", projectRoot, "--session-id", interruptedSessionId],
         {
           CHEERS_PROVIDER_MODE: "real",
           OPENAI_API_KEY: "test-resume-continuity-key",

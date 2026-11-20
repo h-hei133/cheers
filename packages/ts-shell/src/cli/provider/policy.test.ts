@@ -38,6 +38,7 @@ async function fixture(definition = '') {
   servers.push(server); await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('No fixture address');
   writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'a', maxOutputTokens: 10, reserveTokens: 100,
+    toolDiscovery: 'full',
     retryEnabled: false, retryMaxRetries: 0, providerRetryMaxRetries: 0,
     providerConnections: ['a', 'b'].map(id => ({ id, provider: 'openai', authType: 'api-key', apiKey: `synthetic-${id}`,
       model: 'main', baseUrl: `http://127.0.0.1:${address.port}/${id}/v1`, status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01' })) },
@@ -71,6 +72,7 @@ it.each([
 ])('applies the active subagent policy through real CLI invocation with definition %j', async (definition, requestPath, model, effort, credential) => {
   const setup = await fixture(definition); const global = fs.readFileSync(getUserRuntimeConfigPath());
   await invoke(setup);
+  expect(setup.requests[0]?.tools).toContainEqual(expect.objectContaining({ function: expect.objectContaining({ name: 'task' }) }));
   expect(setup.requests.map(({ path, model, effort, credential }) => ({ path, model, effort, credential }))).toEqual([
     { path: '/a/v1/chat/completions', model: 'main', effort: 'low', credential: 'Bearer synthetic-a' },
     { path: requestPath, model, effort, credential: `Bearer ${credential}` },

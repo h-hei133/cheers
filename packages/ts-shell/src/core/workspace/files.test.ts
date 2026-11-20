@@ -36,7 +36,9 @@ function modelAlias(alias: string, destination: string): void {
   // Model links on filesystems that cannot create them without extra privileges.
   vi.spyOn(fs, 'lstatSync').mockImplementation(file => String(file) === alias ? link : lstat(redirect(file)));
   vi.spyOn(fs, 'existsSync').mockImplementation(file => exists(redirect(file)));
-  vi.spyOn(fs, 'realpathSync').mockImplementation(file => realpath(redirect(file)));
+  Object.assign(vi.spyOn(fs, 'realpathSync').mockImplementation(file => realpath(redirect(file))), {
+    native: (file: fs.PathLike) => realpath.native(redirect(file)),
+  });
 }
 
 it.each(['outside.txt', 'new.txt', 'missing/new.txt'])('rejects a distinct sibling for %s despite lexical folding', name => {
