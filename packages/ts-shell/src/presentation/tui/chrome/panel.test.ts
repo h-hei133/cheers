@@ -49,7 +49,8 @@ it.each([[18, 15], [34, 31], [54, 51]])('uses a %i-row budget to show %i candida
 
 it('uses the available detail height when filtering leaves only one candidate', () => {
   const value = model();
-  value.setFilter('Option 11');
+  value.setOptions(options.map(option => option.id === 'id-11' ? { ...option, label: 'Selected model' } : option));
+  value.setFilter('selected');
   const hits: Array<[number, string]> = [];
   const rows = renderPanel(value, { title: 'Pick', empty: 'none', multiple: false,
     detail: () => ['Model: selected', 'Connection: personal', 'Status: unavailable', 'Reason: sign in required'],

@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import type { SettlementDiagnostic } from '../../session/store/prompt/commit.js';
 import type { QueryEvent } from '../query/runtime/events.js';
 import { ShellSessionRuntime } from './sessionRuntime.js';
 
@@ -9,7 +10,10 @@ it.each([false, true])('keeps cancellation delivery and its original error after
   const runtime = new ShellSessionRuntime({
     sessionManager: { persistUserPromptBarrier() {}, markTurnActive() {},
       appendQueryEvent(_id: string, event: QueryEvent) { recorded.push(event.type); },
-      saveInterrupted(_id: string, boundary: string) { settled.push(boundary); } } as never,
+      saveInterrupted(_id: string, boundary: string, diagnostic?: SettlementDiagnostic) {
+        settled.push(boundary);
+        if (diagnostic) recorded.push(diagnostic.event.type);
+      } } as never,
     renderer: { renderLine() {}, renderChunk() {} } as never,
     runPrompt: async function* () {
       if (entered) yield { type: 'message.delta', role: 'coder', delta: 'partial' } as const;
@@ -37,7 +41,10 @@ it.each(['completed', 'cancelled'] as const)('isolates rejected observer promise
   const pending = new Promise<void>(resolve => { release = resolve; });
   const runtime = new ShellSessionRuntime({
     sessionManager: { persistUserPromptBarrier() {}, markTurnActive() {}, saveCompleted() { settled.push('completed'); },
-      saveInterrupted() { settled.push('interrupted'); }, appendQueryEvent(_id: string, event: QueryEvent) { recorded.push(event.type); } } as never,
+      saveInterrupted(_id: string, _boundary: string, diagnostic?: SettlementDiagnostic) {
+        settled.push('interrupted');
+        if (diagnostic) recorded.push(diagnostic.event.type);
+      }, appendQueryEvent(_id: string, event: QueryEvent) { recorded.push(event.type); } } as never,
     renderer: { renderLine() {}, renderChunk() {} } as never,
     runPrompt: async function* () {
       if (outcome === 'cancelled') { runtime.cancelCurrentRun(); throw original; }

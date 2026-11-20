@@ -54,10 +54,10 @@ describe("inline panel", () => {
 
   it("shows the live filter and the match count in the title row", () => {
     const list = model();
-    list.setFilter("option 1");
+    list.setFilter("n1");
     const head = stripAnsi(renderPanel(list, { title: "Pick", empty: "none", multiple: false }, 60, 8)[0]!);
     expect(head).toContain("Pick");
-    expect(head).toContain("option 1");
+    expect(head).toContain("n1");
     expect(head.trimEnd().endsWith("11")).toBe(true);
   });
 

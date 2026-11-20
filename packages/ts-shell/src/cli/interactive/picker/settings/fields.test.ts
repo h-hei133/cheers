@@ -24,7 +24,7 @@ const choices: Readonly<Record<string, unknown>> = {
   attentionOnIdle: true, offline: true, maxTurns: 24, temperature: 0.2, topP: 0.8, maxOutputTokens: 2048,
   contextWindow: 65536, reserveTokens: 1000, keepRecentTokens: 2000, compactionEnabled: false, pruneToolText: false,
   modelTokenBudgets: { 'openai/fixture': { reserveTokens: 1000, keepRecentTokens: 2000 } },
-  instructionBudgetBytes: 1024, cacheWarming: 'off', agentMode: 'plan', steeringMode: 'all', followUpMode: 'all',
+  instructionBudgetBytes: 1024, cacheWarming: 'off', cacheRetention: 'long', agentMode: 'plan', steeringMode: 'all', followUpMode: 'all',
   retryEnabled: false, retryMaxRetries: 2, providerRetryMaxRetries: 1, retryBaseDelayMs: 1000, retryMaxDelayMs: 10000,
   providerConnectTimeoutMs: 1000, providerHeadersTimeoutMs: 2000, providerBodyTimeoutMs: 3000,
   allowedTools: ['read', 'write'], allowedModels: ['openai/fixture'],
@@ -100,8 +100,10 @@ function surface(scope: SettingsScope) {
 
 it('requires an explicit valid exercise for every real setting and every editable scope', () => {
   expect(Object.keys(choices).sort()).toEqual(CONFIG_SETTINGS.map(setting => setting.key).sort());
-  expect(cases).toHaveLength(81);
-  expect(cases.filter(test => test.scope === 'project').map(test => test.key)).not.toContain('cacheWarming');
+  expect(cases).toHaveLength(82);
+  const projectKeys = cases.filter(test => test.scope === 'project').map(test => test.key);
+  expect(projectKeys).not.toContain('cacheWarming');
+  expect(projectKeys).not.toContain('cacheRetention');
 });
 
 it.each(['session', 'workspace', 'workspace-return'] as const)('does not carry a failed staged project setting into another %s binding on retry', async change => {
@@ -454,7 +456,7 @@ it.each([
   try {
     expect(view.host.openSettings('user').values[test.key].stored).toEqual(test.user);
     const saved = await view.host.openSettings('user').save(test.key, test.changed);
-    expect(saved.applied).toBe(true);
+    expect(saved.applied, saved.note).toBe(true);
     expect(view.host.openSettings('user').values[test.key]).toMatchObject({
       stored: test.changed, effective: test.effective, source: test.source,
     });
@@ -465,4 +467,16 @@ it.each([
     expect(fs.readFileSync(projectFile)).toEqual(projectBefore);
     if (leaf) expect(readRuntimeConfigEditAt(userFile).values.tui?.diagrams).toBe('streaming');
   } finally { view.overlay.close(); }
+});
+
+it('keeps a path rule write distinct from a later session transition during notification', async () => {
+  const view = surface('user');
+  const pathRules = [{ path: '.', settings: { maxTurns: 3 } }];
+  const draft = openSettings(view.runtime, () => {
+    applyShellSubstrateTransition(view.runtime, { session: { ...view.runtime.session, id: 'other-session' } });
+  }, 'user');
+  const result = await draft.save('pathRules', pathRules);
+  expect(result).toMatchObject({ applied: false, note: expect.stringContaining('application is unconfirmed') });
+  expect(readRuntimeConfigEditAt(userFile).values.pathRules).toEqual(pathRules);
+  expect(draft.reopen()).toBeUndefined();
 });

@@ -3009,3 +3009,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** Raw Node child probes fail before their reported assertions on Node 20.3.
 - **Root cause** Loader registration through `--import tsx` does not handle TypeScript imports on that version.
 - **Rule** Use the shared source launcher and still require the child's exit and terminal observations.
+
+### Path Rule Saves Retire The Previous Configuration Generation
+
+- **Symptom** Settings reports an unconfirmed application after a path rule has been saved and accepted.
+- **Root cause** Publishing changed path scopes advances the admission generation. The saving draft still expects its previous generation.
+- **Rule** Verify the expected generation and original binding before and after notifying the caller. Retire the old draft and preserve the unconfirmed application outcome if the caller switches sessions.

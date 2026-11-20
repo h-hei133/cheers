@@ -99,11 +99,11 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
   const substrate = context.configuration.substrateRevision;
   const binding = configurationBinding(context);
   const profile = context.profile ?? currentProfile();
-  const ownerCurrent = (): boolean => {
+  const ownerCurrent = (expectedSubstrate = substrate): boolean => {
     try {
       if (profile) assertCurrentProfile(profile);
       else if (currentProfile()) return false;
-      return substrate === context.configuration.substrateRevision && sameValue(binding, configurationBinding(context));
+      return expectedSubstrate === context.configuration.substrateRevision && sameValue(binding, configurationBinding(context));
     } catch { return false; }
   };
   const sourceCurrent = (): boolean => {
@@ -137,12 +137,17 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
         if (!sameValue(settingValue(readRuntimeConfigEditAt(edit.path).values, setting), value)) return unapplied(`The selected value is not confirmed in your ${scope} configuration. Current settings were not refreshed; reopen Settings.`);
       } catch { return unapplied(`The selected value could not be verified in your ${scope} configuration. Current settings were not refreshed; reopen Settings.`); }
       const saved = `Saved to your ${scope} configuration.`;
-      if (!ownerCurrent() || !sourceCurrent()) return unapplied(`${saved} Settings binding or source changed; application is unconfirmed. Reopen Settings.`);
+      const bindingChanged = `${saved} Settings binding or source changed; application is unconfirmed. Reopen Settings.`;
+      if (!ownerCurrent() || !sourceCurrent()) return unapplied(bindingChanged);
       try {
+        const scopeRevision = context.runtimeConfig.configScopes?.revision;
         const result = refreshShellRuntimeConfig(context);
         if (result.status !== 'applied') return unapplied(`${saved} Configuration was not applied (${result.status}).${result.admissionBlocked ? ' New actions are blocked until a valid configuration is loaded.' : ''}`);
+        // Publishing changed path rules retires the prior admission generation.
+        const appliedSubstrate = substrate + Number(scopeRevision !== context.runtimeConfig.configScopes?.revision);
+        if (!ownerCurrent(appliedSubstrate) || !sourceCurrent()) return unapplied(bindingChanged);
         onApplied();
-        if (!ownerCurrent() || !sourceCurrent()) return unapplied(`${saved} Settings binding or source changed; application is unconfirmed. Reopen Settings.`);
+        if (!ownerCurrent(appliedSubstrate) || !sourceCurrent()) return unapplied(bindingChanged);
         return { note: `${saved} ${applicationNotice(context, setting, value, scope)}`, applied: true,
           value: settingSnapshot(context, setting, value), application: setting.policy.application };
       } catch { return unapplied(`${saved} Configuration application outcome is unverified.`); }
