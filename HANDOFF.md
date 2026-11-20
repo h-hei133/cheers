@@ -2997,3 +2997,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** Script tests pass on the development runtime and CI rejects the test command before discovering any files.
 - **Root cause** The Node 20.3 test runner supports programmatic concurrency but lacks the corresponding command-line flag.
 - **Rule** Keep the script suite serial through the supported runner API. Observe the exact Node version and completed test counts on the supported floor.
+
+### Large Byte Assertions Need A Bounded Comparison
+
+- **Symptom** A serial Vitest worker exhausts its heap at the session state size boundary.
+- **Root cause** The generic deep assertion enumerates the indices of an 8 MiB buffer as object properties.
+- **Rule** Use `Buffer.equals()` for exact equality of large byte fixtures and assert its boolean result. Enable native codecs in Linux CI so media assertions exercise the real path.
+
+### Native TypeScript Probes Need The Source Launcher
+
+- **Symptom** Raw Node child probes fail before their reported assertions on Node 20.3.
+- **Root cause** Loader registration through `--import tsx` does not handle TypeScript imports on that version.
+- **Rule** Use the shared source launcher and still require the child's exit and terminal observations.

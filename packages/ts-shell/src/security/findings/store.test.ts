@@ -43,7 +43,8 @@ it('keeps oversized embedded session input unavailable in the runtime inspector 
   const over = Buffer.concat([original, Buffer.alloc(SECURITY_SESSION_READ_LIMITS.stateBytes + 1 - original.length, 0x20)]);
   fs.writeFileSync(statePath, over);
   expect(inspector.read()).toEqual({ state: 'unavailable' });
-  expect(fs.readFileSync(statePath)).toEqual(over); expect(fs.readFileSync(h.file)).toEqual(file);
+  expect(fs.readFileSync(statePath).equals(over)).toBe(true);
+  expect(fs.readFileSync(h.file)).toEqual(file);
   fs.writeFileSync(statePath, original);
   expect(inspector.read()).toMatchObject({ state: 'ready', snapshot: { items: [{ id }] } });
   expect(gate).not.toHaveBeenCalled(); expect(h.run).not.toHaveBeenCalled();

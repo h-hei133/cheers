@@ -14,6 +14,7 @@ import type { EndpointKind } from '../../../provider/endpoints/index.js';
 import { captureBranchStore } from '../../../session/branch/store/index.js';
 import { readSessionModelEdit, writeSessionModel } from '../../../session/model/state.js';
 import type { SessionRuntimeDependencies } from '../../../core/shell/sessionRuntime.js';
+import { ShellCommandRuntime } from '../../../core/shell/command.js';
 import type { CliRuntimeInvocationInput } from '../../../entrypoints/cliRuntimeInvocation.js';
 import { createCliSessionRuntime } from '../cliSessionRuntimeFactory.js';
 
@@ -21,6 +22,7 @@ const observed = vi.hoisted(() => ({ deps: undefined as SessionRuntimeDependenci
   resources: undefined as ReturnType<NonNullable<CliRuntimeInvocationInput['prepareProviderResources']>> | undefined }));
 vi.mock('../goalScheduling.js', () => ({ installGoalScheduler: () => undefined, schedulerForContext: () => undefined }));
 vi.mock('../../../core/shell/sessionRuntime.js', () => ({ ShellSessionRuntime: class {
+  readonly commands = new ShellCommandRuntime();
   constructor(deps: SessionRuntimeDependencies) { observed.deps = deps; }
   getPermissionScope() { return 'ask'; }
   getAgentMode() { return 'plan'; }

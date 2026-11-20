@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { expect, it } from 'vitest';
+import { sourceTsxArgs } from '../../../test-utils/cli/process.js';
 
 /** A fresh process reads its test CA at startup; no global TLS verification bypass. */
 it('verifies target TLS and keeps bearer credentials outside CONNECT headers', async () => {
@@ -70,7 +71,7 @@ it('verifies target TLS and keeps bearer credentials outside CONNECT headers', a
     !/^(?:http_proxy|https_proxy|all_proxy|no_proxy|cheers_|openai_|anthropic_|google_|node_extra_ca_certs|node_tls_reject_unauthorized)/i.test(name)));
   const run = promisify(execFile);
   for (const trusted of [true, false]) {
-    const result = await run(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', source], {
+    const result = await run(process.execPath, [...sourceTsxArgs, '--input-type=module', '--eval', source], {
       env: { ...env, TEST_TRUSTED_CA: trusted ? '1' : '0',
         ...(trusted ? { NODE_EXTRA_CA_CERTS: new URL('../../../test-utils/network/cert.pem', import.meta.url).pathname } : {}) },
       timeout: 8000,
@@ -151,7 +152,7 @@ it.each(['handshake', 'cached'] as const)('cancels an open SSE fallback when its
   `;
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) =>
     !/^(?:http_proxy|https_proxy|all_proxy|no_proxy|cheers_|openai_|anthropic_|google_|node_extra_ca_certs|node_tls_reject_unauthorized)/i.test(name)));
-  const result = await promisify(execFile)(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', source], {
+  const result = await promisify(execFile)(process.execPath, [...sourceTsxArgs, '--input-type=module', '--eval', source], {
     env, timeout: 8000,
   });
   expect(result.stdout).toContain('SSE fallback owner cancellation passed');

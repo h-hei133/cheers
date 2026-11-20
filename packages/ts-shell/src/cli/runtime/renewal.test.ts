@@ -16,12 +16,14 @@ import * as store from '../../session/store/sessionFileStore.js';
 import * as persistence from '../../config/persistence.js';
 import { createCacheWarmingRunner } from '../../turn/cacheWarm.js';
 import { createCliSessionRuntime } from './cliSessionRuntimeFactory.js';
+import { ShellCommandRuntime } from '../../core/shell/command.js';
 
 const fixture = vi.hoisted(() => ({ deps: undefined as SessionRuntimeDependencies | undefined }));
 vi.mock('./goalScheduling.js', () => ({ installGoalScheduler: () => undefined }));
 // This credential/transport fixture has no active goal scheduler.
 vi.mock('./goal.js', () => ({ prepareGoalSession: () => undefined, goalObjectiveFor: () => undefined, goalPolicyFor: () => undefined }));
 vi.mock('../../core/shell/sessionRuntime.js', () => ({ ShellSessionRuntime: class {
+  readonly commands = new ShellCommandRuntime();
   constructor(deps: SessionRuntimeDependencies) { fixture.deps = deps; }
   getPermissionScope() { return 'ask'; }
   getAgentMode() { return 'plan'; }

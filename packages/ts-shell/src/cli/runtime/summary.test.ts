@@ -15,6 +15,7 @@ import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../..
 import { condenseContext } from '../../session/compaction.js';
 import { createCliSessionRuntime } from './cliSessionRuntimeFactory.js';
 import type { SessionRuntimeDependencies } from '../../core/shell/sessionRuntime.js';
+import { ShellCommandRuntime } from '../../core/shell/command.js';
 import type { CliRuntimeInvocationInput } from '../../entrypoints/cliRuntimeInvocation.js';
 import type { CompactionSetup } from '../../turn/session.js';
 import { readGoalEdit, writeGoal } from '../../planning/goal/store.js';
@@ -36,6 +37,7 @@ const observed = vi.hoisted(() => ({ deps: undefined as SessionRuntimeDependenci
 // Exercise the production composition and real summary engine without starting UI/scheduling loops.
 vi.mock('./goalScheduling.js', () => ({ installGoalScheduler: () => undefined, schedulerForContext: () => undefined }));
 vi.mock('../../core/shell/sessionRuntime.js', () => ({ ShellSessionRuntime: class {
+  readonly commands = new ShellCommandRuntime();
   constructor(deps: SessionRuntimeDependencies) { observed.deps = deps; }
   getPermissionScope() { return 'ask'; }
   getAgentMode() { return 'plan'; }

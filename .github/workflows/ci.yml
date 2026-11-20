@@ -66,7 +66,7 @@ jobs:
       - name: Install native execution test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y ripgrep bubblewrap
+          sudo apt-get install --no-install-recommends -y ripgrep bubblewrap ffmpeg poppler-utils util-linux
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
@@ -78,11 +78,25 @@ jobs:
       - name: Run Focused & Unit Tests
         run: npm run test:ts
 
+  normproof:
+    name: Validate NormProof Architecture
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
 
-      - name: Validate NormProof Architecture
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check pinned package conformance
+        run: node --test --test-concurrency=1 scripts/normproof.test.mjs scripts/normproof-conformance.test.mjs
+
+      - name: Install and run the pinned archive
         run: |
-          node --test --test-concurrency=1 scripts/normproof.test.mjs scripts/normproof-conformance.test.mjs
-          npx --package .normproof/normproof-*.tgz normproof judge
+          npm install --prefix "$RUNNER_TEMP/normproof" --no-audit --no-fund .normproof/normproof-0.1.0.tgz
+          npm ls --prefix "$RUNNER_TEMP/normproof" --depth=1 typescript
+          "$RUNNER_TEMP/normproof/node_modules/.bin/normproof" judge

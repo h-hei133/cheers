@@ -1,12 +1,10 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
+import { sourceTsxArgs } from '../../test-utils/cli/process.js';
 
 const directories: string[] = [];
-const loader = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href;
 
 afterEach(() => {
   for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
@@ -29,7 +27,7 @@ function runChild(source: string, directory: string, expectedReports: readonly s
   // A fresh, isolated environment preserves Node's default rejection policy and
   // enables product persistence without borrowing credentials or profile state.
   return new Promise(resolve => {
-    execFile(process.execPath, ['--import', loader, '--input-type=module', '--eval', source], {
+    execFile(process.execPath, [...sourceTsxArgs, '--input-type=module', '--eval', source], {
       cwd: directory,
       env: { PATH: process.env.PATH, HOME: directory, USERPROFILE: directory,
         TMPDIR: directory, TSX_DISABLE_CACHE: '1' },
