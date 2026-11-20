@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
+import { Socket } from 'node:net';
 import type { Readable, Writable } from 'node:stream';
 
 type WorkerProcess = ChildProcessByStdio<Writable, Readable, null>;
@@ -16,6 +17,7 @@ type Connection = {
 const MAX_REPLY_BYTES = 16 * 1024;
 const MAX_CALLS = 48;
 const IDLE_MS = 8_000;
+const RETIRE_GRACE_MS = 250;
 
 export class WriteHookWorker {
   private connection?: Connection;
@@ -49,6 +51,10 @@ export class WriteHookWorker {
     } catch { return undefined; }
     const current: Connection = { child, key: target.key, count: 0, output: Buffer.alloc(0) };
     this.connection = current;
+    // The pending reply timeout keeps the host live while a decision is in flight.
+    child.unref();
+    if (child.stdin instanceof Socket) child.stdin.unref();
+    if (child.stdout instanceof Socket) child.stdout.unref();
     child.once('error', () => this.retire(current));
     child.once('exit', () => this.retire(current));
     child.stdin.on('error', () => this.retire(current));
@@ -75,7 +81,7 @@ export class WriteHookWorker {
       current.output = Buffer.alloc(0);
       current.pending = undefined;
       clearTimeout(pending.timeout);
-      current.idle = setTimeout(() => this.retire(current), IDLE_MS);
+      current.idle = setTimeout(() => this.retire(current), IDLE_MS).unref();
       pending.finish(JSON.stringify(raw.result));
     } catch { this.retire(current); }
   }
@@ -89,8 +95,10 @@ export class WriteHookWorker {
       current.pending.finish();
       current.pending = undefined;
     }
-    current.child.stdin.destroy();
-    current.child.stdout.destroy();
-    current.child.kill('SIGKILL');
+    const { child } = current;
+    child.stdin.end();
+    if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
+    const force = setTimeout(() => child.kill('SIGKILL'), RETIRE_GRACE_MS);
+    child.once('exit', () => clearTimeout(force));
   }
 }
