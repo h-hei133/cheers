@@ -1,7 +1,7 @@
 import { runPreparedTool } from '../../turn/invoke.js';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult, ToolPreparation } from '../../tools/types.js';
 import type { CollaborationComposition } from './model.js';
-import { digest, requireValue } from '../../collaboration/contract/value.js';
+import { digest, requireValue } from '@cheers/collaboration';
 import { currentBinding } from './projection.js';
 import { UnknownMutation } from '../../collaboration/client/service.js';
 

@@ -1,5 +1,5 @@
-/** Compatibility imports delegate to the owning local jobs domain. */
-export { TaskRegistry } from '../../../workflow/jobs/local/registry.js';
-export { backgroundTasks } from '../../../workflow/jobs/local/legacy.js';
-export { renderTask, renderTaskNotice } from '../../../workflow/jobs/local/projection.js';
-export type { BackgroundTask, BackgroundRunner } from '../../../workflow/jobs/local/model.js';
+/** Compatibility imports for the shared background execution owner. */
+export { TaskRegistry } from '../../../runtime/execution/background/registry.js';
+export { backgroundTasks } from '../../../runtime/execution/background/shared.js';
+export { renderTask, renderTaskNotice } from './projection.js';
+export type { BackgroundTask, BackgroundRunner } from '../../../runtime/execution/background/model.js';

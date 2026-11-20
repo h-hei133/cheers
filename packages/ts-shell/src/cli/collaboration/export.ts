@@ -1,8 +1,8 @@
 import path from 'node:path';
 import type { CommandContext } from '../../core/commands/types.js';
 import type { CollaborationComposition } from './model.js';
-import { identifier, integer, object, requireValue } from '../../collaboration/contract/value.js';
-import { decodeSnapshot } from '../../collaboration/contract/snapshot.js';
+import { identifier, integer, object, requireValue, digest } from '@cheers/collaboration';
+import { decodeSnapshot } from '../../collaboration/snapshot.js';
 import { snapshotFor, snapshotPreview, currentBinding, display } from './projection.js';
 import { approveOperation } from './approval.js';
 import { readExportSource } from '../../session/export/source.js';
@@ -10,7 +10,6 @@ import { runCopyCommand } from '../../core/commands/copyCommandRuntime.js';
 import { selectWorkspaceRoot } from '../../core/workspace/roots.js';
 import { inspectWorkspaceFile } from '../../core/workspace/files.js';
 import { commitWorkspaceFile } from '../../edit/authority/commit.js';
-import { digest } from '../../collaboration/contract/value.js';
 
 export async function runShare(host: CollaborationComposition, action: string, args: readonly string[], signal?: AbortSignal): Promise<string> {
   if (action === 'preview') return snapshotPreview(snapshotFor(host));

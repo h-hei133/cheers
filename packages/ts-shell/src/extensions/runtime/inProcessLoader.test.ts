@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { executeInProcessScript, loadInProcessExtension, loadInProcessExtensionAsync, runExtensionFactory } from './inProcessLoader.js'
 import type { VersionRecord } from '../model.js'
 import { runEventHandlers } from '../events/dispatch.js'
@@ -23,6 +23,27 @@ afterEach(() => {
 })
 
 describe('in-process TS/JS extension loader with VIRTUAL_MODULES', () => {
+  it('refuses session model control in an installed script before contacting the host', async () => {
+    const dir = inputWorkerDirectory();
+    const file = path.join(dir, 'effort.ts');
+    const setThinkingLevel = vi.fn(async () => ({ status: 'applied' as const, level: 'high' as const }));
+    const sendMessage = vi.fn();
+    fs.writeFileSync(file, `export default api => api.on('session_start', async () => {
+      try { await api.setThinkingLevel('high'); }
+      catch (error) {
+        if (error instanceof Error && error.message.includes('no session model control')) await api.sendMessage('refused');
+      }
+    });`);
+    const result = await executeInProcessScript({ root: dir, scriptFile: file,
+      record: { manifest: { name: 'effort', version: '1' }, source: 'fixture', digest: 'a'.repeat(64) } as VersionRecord,
+      argv: [], denyRules: () => [], context: { workspaceRoot: dir, taskId: 'effort' }, host: { setThinkingLevel, sendMessage },
+      invoke: { kind: 'event', event: 'session_start', payload: { type: 'session_start', sessionId: 'effort', workspaceRoot: dir, reason: 'startup' } },
+    });
+    expect(result.success).toBe(true);
+    expect(sendMessage).toHaveBeenCalledWith('refused');
+    expect(setThinkingLevel).not.toHaveBeenCalled();
+  });
+
   it.each(['then-getter', 'thenable', 'constructor-getter', 'then-own', 'species', 'mixed-decision'] as const)(
     'refuses SDK collector callback %s before Promise assimilation', async kind => {
       const dir = inputWorkerDirectory(); let touched = 0; let later = 0;

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { GitWorktreeManager } from '../../../core/workflow/gitWorktreeManager.js';
+import { GitWorktreeManager } from './manager.js';
 import { NativeGit } from '../read/native.js';
 import type { GitSnapshot } from '../read/model.js';
 import { readGitSnapshot, assertGitSnapshot } from '../read/snapshot.js';

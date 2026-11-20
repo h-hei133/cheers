@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { expect, it } from 'vitest';
 import type { TranscriptEvent } from '../../session/sessionEventCodec.js';
+import { sourceTsxArgs } from '../../test-utils/cli/process.js';
 
 const run = promisify(execFile);
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..');
@@ -92,7 +93,7 @@ it.each<Mode>(['line', 'pipe'])('%s isolates profile connections and one-time ap
         if (error.code === 'ENOENT') return {}; throw error;
       });
       const firstRequest = requests.length;
-      const child = run(process.execPath, ['--max-old-space-size=512', path.join(repo, 'node_modules/tsx/dist/cli.mjs'),
+      const child = run(process.execPath, ['--max-old-space-size=512', ...sourceTsxArgs,
         path.join(repo, 'packages/ts-shell/src/entrypoints/cli.tsx'), '--profile', profile, '--project', workspace,
         ...(mode === 'pipe' ? ['--print'] : []), ...(allowed ? ['--non-interactive-approval', 'allow-once'] : []),
       ], { cwd: workspace, env: environment(home, tmp), timeout: 30000, maxBuffer: 1024 * 1024 });

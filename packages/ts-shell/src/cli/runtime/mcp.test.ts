@@ -143,15 +143,26 @@ it('keeps discovered MCP tools in the unrestricted search and load catalogue', a
   const base = input();
   const name = 'mcp__local__echo_message';
   let discovered: boolean | undefined;
+  let requested = false;
   const run = await runCliRuntimeInvocation({ ...base, runtimeConfig: { ...base.runtimeConfig!, toolDiscovery: 'dynamic' },
-    mcpGateway: gateway, providerModeEnv: 'real' }, {
+    mcpGateway: gateway, providerModeEnv: 'real', permissionScope: 'allow-all' }, {
     checkProviderReadiness: async () => ({ ok: true }), hooks: new HookDispatcher(),
     createStep: (_request, tools, discovery) => {
-      discovered = discovery !== undefined && !tools.has(name) && discovery.load([name]).loaded.includes(name) && discovery.snapshot().has(name);
-      return async () => ({ text: 'finished', toolCalls: [], stopReason: 'stop' });
+      return async () => {
+        if (!requested) {
+          expect(tools.has(name)).toBe(false);
+          expect(fs.existsSync(log)).toBe(false);
+          requested = true;
+          return { text: '', toolCalls: [{ id: 'load-mcp', name: 'tool_load', args: { names: [name] } }], stopReason: 'toolUse' };
+        }
+        discovered = discovery?.snapshot().has(name);
+        return { text: 'finished', toolCalls: [], stopReason: 'stop' };
+      };
     },
   });
-  for await (const _event of run.events) { /* Consume the real turn lifecycle. */ }
+  for await (const event of run.events) {
+    if (event.type === 'tool.result' && event.toolName === 'tool_load') expect(event.success, event.output).toBe(true);
+  }
   expect(discovered).toBe(true);
   expect(starts()).toHaveLength(1);
 });

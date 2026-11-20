@@ -1,6 +1,6 @@
 import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 import { AgentRegistryScanner } from "../../core/messaging/agentRegistryScanner.js";
-import type { BackgroundRunner } from '../../workflow/jobs/local/model.js';
+import type { BackgroundRunner } from '../../runtime/execution/background/model.js';
 import type { AmbientContext } from "../../presentation/tui/chrome/hints.js";
 
 /**

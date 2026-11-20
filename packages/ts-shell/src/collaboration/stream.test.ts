@@ -7,8 +7,7 @@ import { CollaborationClient } from './client/service.js';
 import { CollaborationGuest } from './client/guest.js';
 import { cursorPath } from './client/cursor.js';
 import { readRoomStream } from './client/stream.js';
-import { WIRE_BYTES, type Owner } from './contract/model.js';
-import { object } from './contract/value.js';
+import { WIRE_BYTES, type Owner, object } from '@cheers/collaboration';
 import { streamRoom } from './service/stream.js';
 import { bound, emptySnapshot, fixture, startFixtureService } from './__tests__/fixture.js';
 

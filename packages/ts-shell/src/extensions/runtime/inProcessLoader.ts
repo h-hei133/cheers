@@ -23,13 +23,18 @@ export type { ExtensionUiHost, ExtensionUiDialogOptions, ExtensionUiApi, Extensi
 import type { ExtensionRunEventName, ExtensionRunEventPayload, ExtensionSessionEventName, ExtensionSessionEventPayload, ExtensionSessionBeforeEventName, ExtensionSessionBeforeEventPayload, ExtensionSessionBeforeEventResult, ExtensionInputEvent, ExtensionInputResult } from '../events/model.js'
 import { captureInputHookResult, captureInputResult, InputRefusal } from '../events/input.js'
 import { captureCompactResult } from '../events/compact.js'
+import { isNotificationEvent } from '../events/model.js'
+import { isSessionTransitionEvent } from '../events/decision.js'
 import { captureToolResult } from '../events/result.js'
 import { captureMessageResult } from '../events/message.js'
 import type { ExtensionMessageEndEvent, ExtensionMessageEndResult, ExtensionToolResult, ExtensionToolResultEvent } from '../events/model.js'
 export type { ExtensionMessageEndEvent, ExtensionMessageEndResult } from '../events/model.js'
 import { callbackCancellation, captureCallbackResult, createCallbackResultCapture } from '../../core/values/promise.js'
-import { captureShortcut, type ExtensionShortcut } from './shortcut.js'
-import { captureFlag, type ExtensionFlag } from './flag.js'
+import { captureShortcut, MAX_SHORTCUTS, type ExtensionShortcut } from './shortcut.js'
+import { captureFlag, type ExtensionFlag, type WorkerFlag } from './flag.js'
+import { isThinkingPreference, type ThinkingPreference } from '../../core/models/effort.js'
+import { createThinkingBridge, ExtensionThinkingError, type ExtensionThinkingUpdate } from './model.js'
+export type { ExtensionThinkingUpdate } from './model.js'
 export type { ExtensionFlag } from './flag.js'
 export type { ExtensionShortcut } from './shortcut.js'
 export type { ExtensionRunEvent, ExtensionRunEventName, ExtensionRunEventPayload, ExtensionSessionEvent, ExtensionSessionEventName, ExtensionSessionEventPayload, ExtensionSessionBeforeEvent, ExtensionSessionBeforeEventName, ExtensionSessionBeforeEventPayload, ExtensionSessionBeforeResult, ExtensionBeforeTreeResult, ExtensionBeforeCompactResult, ExtensionCompactMessage, ExtensionSessionBeforeEventResult, ExtensionInputEvent, ExtensionInputResult } from '../events/model.js'
@@ -40,6 +45,7 @@ export interface ExtensionHostBridge {
   readonly getActiveTools?: () => readonly string[]
   readonly getAllTools?: () => readonly string[]
   readonly getCommands?: () => readonly string[]
+  readonly setThinkingLevel?: (level: ThinkingPreference, signal: AbortSignal) => Promise<ExtensionThinkingUpdate>
   readonly sendMessage?: (message: unknown) => Promise<void> | void
   readonly appendEntry?: (customType: string, data: unknown) => Promise<void> | void
 }
@@ -72,6 +78,8 @@ export interface ExtensionAPI {
   getActiveTools(): Promise<readonly string[]>
   getAllTools(): Promise<readonly string[]>
   getCommands(): Promise<readonly string[]>
+  /** Save the current session's reasoning effort from an idle callback. Null selects automatic effort. */
+  setThinkingLevel(level: ThinkingPreference): Promise<ExtensionThinkingUpdate>
   sendMessage(message: unknown): Promise<void>
   appendEntry(customType: string, data: unknown): Promise<void>
 }
@@ -93,7 +101,7 @@ export type ExtensionFactory = (api: ExtensionAPI) => void | Promise<void>
 
 export type InProcessExtensionInvoke =
   | { readonly kind: 'tool'; readonly name: string; readonly args?: Record<string, unknown> }
-  | { readonly kind: 'command'; readonly name: string; readonly args?: readonly string[] }
+  | { readonly kind: 'command'; readonly name: string; readonly args?: readonly string[]; readonly shortcutKey?: string }
   | { readonly kind: 'event'; readonly event: string; readonly aliases?: readonly string[]; readonly payload?: unknown }
 export const VIRTUAL_MODULES: Readonly<Record<string, Record<string, unknown>>> = Object.freeze(
   Object.assign(Object.create(null) as Record<string, Record<string, unknown>>, {
@@ -151,9 +159,11 @@ function createEventBus(admission?: () => void): ExtensionEventBus {
 async function handleWorkerHostRpc(
   op: string,
   payload: Record<string, unknown>,
-  options: { readonly root: string; readonly denyRules: () => readonly DenyRule[]; readonly host?: ExtensionHostBridge; readonly signal: AbortSignal },
+  options: { readonly root: string; readonly denyRules: () => readonly DenyRule[]; readonly host?: ExtensionHostBridge;
+    readonly signal: AbortSignal; readonly check?: () => void },
 ): Promise<unknown> {
   options.signal.throwIfAborted()
+  options.check?.()
   const ui = resolveUiHost(() => ({ host: options.host?.ui, signal: options.signal }))
   switch (op) {
     case 'readWorkspaceFile':
@@ -264,8 +274,9 @@ function createExtensionApiCollector(options: {
       } }))
     }, collecting),
     registerShortcut: nullProtoFn((shortcut: ExtensionShortcut) => {
-      if (shortcuts.length >= 128) throw new Error('Shortcut registration limit exceeded.')
+      if (shortcuts.length >= MAX_SHORTCUTS) throw new Error('Shortcut registration limit exceeded.')
       const { run, ...definition } = captureShortcut(shortcut)
+      if (definition.command !== undefined) throw new Error('Command shortcuts require an installed extension.')
       shortcuts.push(Object.freeze({ ...definition, ...(run ? { run: () => {
         const inherited = currentExtensionInvocation()
         const signal = invocationSignal(inherited?.signal)
@@ -308,6 +319,16 @@ function createExtensionApiCollector(options: {
     getActiveTools: nullProtoFn(async () => options.host?.getActiveTools?.() ?? [], active),
     getAllTools: nullProtoFn(async () => options.host?.getAllTools?.() ?? [], active),
     getCommands: nullProtoFn(async () => options.host?.getCommands?.() ?? [], active),
+    setThinkingLevel: nullProtoFn(async (level: ThinkingPreference) => {
+      active()
+      if (!isThinkingPreference(level)) throw new ExtensionThinkingError('Invalid extension thinking level.')
+      const invocation = currentExtensionInvocation()
+      if (!invocation) throw new ExtensionThinkingError('Session thinking level is unavailable outside an extension callback.')
+      if (!options.host?.setThinkingLevel) throw new ExtensionThinkingError('Session thinking level is unavailable from this host.')
+      const signal = invocationSignal(invocation.signal)
+      signal.throwIfAborted()
+      return await options.host.setThinkingLevel(level, signal)
+    }),
     sendMessage: nullProtoFn(async (msg: unknown) => { currentExtensionInvocation()?.signal.throwIfAborted(); if (!options.host?.sendMessage) throw new Error('Extension message host is unavailable.'); await options.host.sendMessage(msg) }, active),
     appendEntry: nullProtoFn(async (customType: string, data: unknown) => { currentExtensionInvocation()?.signal.throwIfAborted(); if (!options.host?.appendEntry) throw new Error('Extension entry storage is unavailable.'); await options.host.appendEntry(customType, data) }, active),
   }))
@@ -378,7 +399,9 @@ function beginExtensionLoad(options: ExtensionLoadOptions) {
     const callbackPromise = new vm.Script('Promise').runInContext(sandbox) as PromiseConstructor
     inputCapture = createCallbackResultCapture(nodeTypes.isProxy, nodeTypes.isPromise, Promise, callbackPromise)
     virtualBridge = createVirtualBridge(sandbox, collector.ui)
-    sandbox.api = Object.freeze(Object.assign(Object.create(null) as ExtensionAPI, collector.api, { ui: virtualBridge.ui }))
+    sandbox.api = Object.freeze(Object.assign(Object.create(null) as ExtensionAPI, collector.api, {
+      ui: virtualBridge.ui, setThinkingLevel: createThinkingBridge(sandbox, collector.api.setThinkingLevel),
+    }))
     // Start the exported factory inside the same bounded VM evaluation as its module.
     const startFactory = '\n; ((factory) => typeof factory === "function" ? factory(api) : undefined)' +
       '(module.exports.default ?? module.exports.activate);'
@@ -433,6 +456,8 @@ export async function executeInProcessScript(options: {
   readonly context: ToolExecutionContext
   readonly invoke?: InProcessExtensionInvoke
   readonly host?: ExtensionHostBridge
+  readonly check?: () => void
+  readonly flags?: readonly WorkerFlag[]
 }): Promise<ToolExecutionResult> {
   options.context.abortSignal?.throwIfAborted()
   const rawSource = fs.readFileSync(options.scriptFile, 'utf8')
@@ -440,8 +465,8 @@ export async function executeInProcessScript(options: {
   const timeoutMs = 30_000
   const registeredTools: Array<{ readonly name: string; readonly description: string }> = []
   const registeredCommands: Array<{ readonly name: string; readonly description: string; readonly aliases: readonly string[] }> = []
-  const registeredShortcuts: Array<{ readonly key: string; readonly description: string }> = []
-  const registeredFlags: Array<{ readonly name: string; readonly type: string }> = []
+  const registeredShortcuts: Array<Omit<ExtensionShortcut, 'run'>> = []
+  const registeredFlags: Array<Pick<ExtensionFlag, 'name' | 'type'>> = []
   const registeredEvents: string[] = []
   const hostCalls = new AbortController()
   const invocationUi = options.host?.ui
@@ -456,7 +481,12 @@ export async function executeInProcessScript(options: {
       filename: options.scriptFile,
       argv: [...options.argv],
       workspaceRoot: options.root,
+      ...(options.flags?.length ? { flags: options.flags } : {}),
       ...(options.invoke ? { invoke: options.invoke } : {}),
+      ...(options.invoke?.kind === 'event' ? {
+        notification: isNotificationEvent(options.invoke.event),
+        transition: isSessionTransitionEvent(options.invoke.event),
+      } : {}),
     },
   })
 
@@ -494,17 +524,22 @@ export async function executeInProcessScript(options: {
           const info = JSON.parse(msg.json) as { name: string; description?: string; aliases?: string[] }
           registeredCommands.push({ name: info.name, description: String(info.description ?? ''), aliases: Array.isArray(info.aliases) ? info.aliases.map(String) : [] })
         } else if (msg.kind === 'registerShortcut') {
-          const info = JSON.parse(msg.json) as { key: string; description?: string }
-          registeredShortcuts.push({ key: info.key, description: String(info.description ?? '') })
+          if (registeredShortcuts.length >= MAX_SHORTCUTS || msg.json.length > 4096) return
+          try {
+            const { key, description, command } = captureShortcut(JSON.parse(msg.json))
+            registeredShortcuts.push({ key, description: description ?? '', ...(command === undefined ? {} : { command }) })
+          } catch { /* Invalid metadata offers no binding. */ }
         } else if (msg.kind === 'registerFlag') {
-          const info = JSON.parse(msg.json) as { name: string; type?: string }
-          registeredFlags.push({ name: info.name, type: String(info.type ?? 'string') })
+          if (registeredFlags.length >= 32 || msg.json.length > 8192) return
+          try { const { name, type } = captureFlag(JSON.parse(msg.json)); registeredFlags.push({ name, type }) }
+          catch { /* Invalid metadata offers no option. */ }
         } else if (msg.kind === 'registerEvent') {
           const info = JSON.parse(msg.json) as { event: string }
           if (!registeredEvents.includes(info.event)) registeredEvents.push(info.event)
         } else if (msg.kind === 'rpc') {
           const parsed = JSON.parse(msg.json) as { id: number; op: string; payload?: Record<string, unknown> }
-          void handleWorkerHostRpc(parsed.op, parsed.payload ?? {}, { root: options.root, denyRules: options.denyRules, host, signal: hostCalls.signal })
+          void handleWorkerHostRpc(parsed.op, parsed.payload ?? {}, { root: options.root, denyRules: options.denyRules,
+            host, signal: hostCalls.signal, check: options.check })
             .then(value => {
               if (!settled) worker.postMessage({ kind: 'reply', id: parsed.id, ok: true, json: value === undefined ? '' : JSON.stringify(value) })
             })

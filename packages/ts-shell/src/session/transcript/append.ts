@@ -24,12 +24,7 @@ export function captureTranscriptAppend(path: string): TranscriptAppendSource {
 export function reconcileTranscriptAppend(path: string, source: TranscriptAppendSource, rows: string, commit = true): boolean {
   const append = Buffer.from(`${source.separator ? '\n' : ''}${rows}`, 'utf8');
   return withTranscript(path, commit, (fd, stat) => {
-    const present = stat.size - source.bytes;
-    if (fileIdentity(stat) !== source.identity || present < 0 || present > append.length
-      || readTranscriptPrefixDigest(fd, source.bytes) !== source.sha256 || !matches(fd, source.bytes, append.subarray(0, present))) {
-      throw new Error('The saved transcript append cannot be reconciled.');
-    }
-    assertStable(path, fd, stat);
+    const present = verifyAppend(path, fd, stat, source, append);
     if (!commit) return present === append.length;
     if (present < append.length) fs.appendFileSync(fd, append.subarray(present));
     fs.fsyncSync(fd);
@@ -38,6 +33,34 @@ export function reconcileTranscriptAppend(path: string, source: TranscriptAppend
     assertStable(path, fd, after);
     return true;
   });
+}
+
+/** Read the admitted prefix and pending rows through the same retained descriptor. */
+export function previewTranscriptAppend(path: string, source: TranscriptAppendSource, rows: string): { text: string; complete: boolean } {
+  const appended = `${source.separator ? '\n' : ''}${rows}`;
+  const append = Buffer.from(appended, 'utf8');
+  return withTranscript(path, false, (fd, stat) => {
+    const present = verifyAppend(path, fd, stat, source, append);
+    const prefix = Buffer.alloc(source.bytes);
+    let offset = 0;
+    while (offset < prefix.length) {
+      const count = fs.readSync(fd, prefix, offset, Math.min(64 * 1024, prefix.length - offset), offset);
+      if (count === 0) throw new Error('The saved transcript changed during recovery preview.');
+      offset += count;
+    }
+    assertStable(path, fd, stat);
+    return { text: prefix.toString('utf8') + appended, complete: present === append.length };
+  });
+}
+
+function verifyAppend(path: string, fd: number, stat: fs.Stats, source: TranscriptAppendSource, append: Buffer): number {
+  const present = stat.size - source.bytes;
+  if (fileIdentity(stat) !== source.identity || present < 0 || present > append.length
+    || readTranscriptPrefixDigest(fd, source.bytes) !== source.sha256 || !matches(fd, source.bytes, append.subarray(0, present))) {
+    throw new Error('The saved transcript append cannot be reconciled.');
+  }
+  assertStable(path, fd, stat);
+  return present;
 }
 
 function withTranscript<T>(path: string, write: boolean, operation: (fd: number, stat: fs.Stats) => T): T {

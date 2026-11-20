@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { advisorReviewPacket } from '@cheers/advisor';
 import type { Session } from '../session/schema/sessionRecord.js';
 import type { SubagentRunResult, SubagentRunInput } from '../core/subagents/runner.js';
 import { advisorText, transcriptFrontier } from './checkpoint.js';
@@ -18,10 +19,7 @@ export async function runAdvisorReview(host: ReviewHost, request: AdvisorReview,
   let target = request.target;
   let preparing = Boolean(request.runner.prepare);
   const checkpoints = initial.advisor.checkpoints;
-  const allocation = Math.floor(32768 / Math.max(1, checkpoints.length));
-  const coverage = { checkpoints: checkpoints.map(item => ({ id: item.id, digest: item.digest })),
-    truncated: initial.advisor.captured > checkpoints.length || checkpoints.some(item => item.truncated || item.text.length > allocation) };
-  const context = checkpoints.map(item => `Checkpoint ${item.id}; digest ${item.digest}; step ${item.step}; ${item.willContinue ? 'continuing' : 'end'}${item.truncated || item.text.length > allocation ? '; snapshot text truncated' : ''}:\n${item.text.slice(-allocation)}`).join('\n\n');
+  const { context, coverage } = advisorReviewPacket(initial.advisor);
   const admission = (): string | undefined => {
     try {
       const edit = readAdvisor(store, current());

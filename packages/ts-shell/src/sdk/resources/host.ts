@@ -1,4 +1,5 @@
 import type { ExtensionHostBridge } from '../../extensions/runtime/inProcessLoader.js';
+import { ExtensionThinkingError } from '../../extensions/runtime/model.js';
 import type { ResourceGeneration } from './contract.js';
 
 /** Extensions retain only their own generation's host, including an unbound fallback. */
@@ -12,6 +13,11 @@ export function resourceHost(generation: ResourceGeneration): ExtensionHostBridg
     getActiveTools: () => currentHost()?.getActiveTools?.() ?? [],
     getAllTools: () => currentHost()?.getAllTools?.() ?? [],
     getCommands: () => currentHost()?.getCommands?.() ?? [],
+    setThinkingLevel: (level, signal) => {
+      const host = currentHost();
+      if (!host?.setThinkingLevel) throw new ExtensionThinkingError('Session thinking level is unavailable from this host.');
+      return host.setThinkingLevel(level, signal);
+    },
     sendMessage: message => {
       const host = currentHost();
       if (!host?.sendMessage) throw new Error('Extension message host is unavailable.');

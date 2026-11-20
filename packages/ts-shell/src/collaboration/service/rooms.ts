@@ -1,11 +1,9 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import type { Binding, Owner, Room, ServiceRequest, ServiceState, Right } from '../contract/model.js';
-import { digest, hashText, identifier, integer, keys, object, requireValue, text } from '../contract/value.js';
-import { decodeSnapshot } from '../contract/snapshot.js';
-import { decodeFrame, frameCutover } from '../contract/frame.js';
+import { decodeAcl, digest, frameCutover, hashText, identifier, integer, keys, object, requireValue, text,
+  type Binding, type Owner, type Right, type Room, type ServiceRequest, type ServiceState } from '@cheers/collaboration';
+import { decodeSnapshot, decodeFrame } from '../snapshot.js';
 import { assertOwner, assertRight, rights, type Tickets } from './auth.js';
 import { proposalMetadata } from './proposals.js';
-import { decodeAcl } from '../contract/acl.js';
 
 export function binding(value: unknown): Binding {
   const selected = object(value); keys(selected, ['sessionId', 'sessionCreatedAt', 'projectId']);

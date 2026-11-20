@@ -19,8 +19,14 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { packageBoundaryFindings, stronglyConnected } from "./build/imports.mjs";
+import { workspacePackages } from "./build/workspaces.mjs";
 
-const ROOT = path.resolve(process.argv[2] ?? "packages/ts-shell/src");
+const root = process.cwd();
+const selectedRoot = process.argv[2];
+const workspaces = selectedRoot === undefined ? workspacePackages(root) : [];
+const sourceRoots = selectedRoot === undefined ? workspaces.map(entry => path.resolve(root, entry.directory, "src"))
+  : [path.resolve(root, selectedRoot)];
 
 function collectFiles(dir, acc = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -77,44 +83,11 @@ function buildGraph(files, known) {
   return { runtime, typeOnly };
 }
 
-function stronglyConnected(edges, count) {
-  let index = 0;
-  const stack = [];
-  const onStack = new Set();
-  const indices = new Array(count).fill(-1);
-  const low = new Array(count).fill(0);
-  const components = [];
-  const visit = (v) => {
-    indices[v] = low[v] = index++;
-    stack.push(v);
-    onStack.add(v);
-    for (const w of edges[v]) {
-      if (indices[w] < 0) {
-        visit(w);
-        low[v] = Math.min(low[v], low[w]);
-      } else if (onStack.has(w)) {
-        low[v] = Math.min(low[v], indices[w]);
-      }
-    }
-    if (low[v] === indices[v]) {
-      const component = [];
-      let w;
-      do {
-        w = stack.pop();
-        onStack.delete(w);
-        component.push(w);
-      } while (w !== v);
-      components.push(component);
-    }
-  };
-  for (let v = 0; v < count; v += 1) if (indices[v] < 0) visit(v);
-  return components.filter((component) => component.length > 1);
-}
-
-const files = collectFiles(ROOT);
+const files = sourceRoots.flatMap(directory => collectFiles(directory));
 const shown = new Map(files.map((file, i) => [file, i]));
 const { runtime, typeOnly } = buildGraph(files, shown);
 const runtimeCycles = stronglyConnected(runtime, files.length);
+const displayRoot = selectedRoot === undefined ? root : sourceRoots[0];
 
 // Guard the path-form regression directly: both forms of the same file must agree.
 const probe = files[0];
@@ -123,11 +96,11 @@ if (probe && shown.get(path.resolve(probe)) !== shown.get(probe)) {
   process.exit(2);
 }
 
-console.log(`scc-gate root=${path.relative(process.cwd(), ROOT)} files=${files.length}`);
+console.log(`scc-gate roots=${sourceRoots.map(directory => path.relative(root, directory)).join(",")} files=${files.length}`);
 for (const component of runtimeCycles) {
   console.error("  runtime cycle:");
   for (const node of component) {
-    console.error(`    ${path.relative(ROOT, files[node])}`);
+    console.error(`    ${path.relative(displayRoot, files[node])}`);
   }
 }
 const typeOnlyCycles = stronglyConnected(typeOnly, files.length).filter((component) =>
@@ -139,12 +112,18 @@ if (typeOnlyCycles.length > 0) {
   console.log("[note] type-only back-edges are erased at emit and cannot fault; they become");
   console.log("       runtime cycles the moment one is converted to a value import:");
   for (const component of typeOnlyCycles) {
-    console.log(`  - ${component.map((n) => path.relative(ROOT, files[n])).join(" <-> ")}`);
+    console.log(`  - ${component.map((n) => path.relative(displayRoot, files[n])).join(" <-> ")}`);
   }
 }
 
 if (runtimeCycles.length > 0) {
   console.error(`[fail] no-dependency-cycles - ${runtimeCycles.length} runtime cycle(s)`);
-  process.exit(1);
+  process.exitCode = 1;
+} else console.log("[pass] no-dependency-cycles - no runtime import cycles in the selected source roots");
+
+if (selectedRoot === undefined) {
+  const boundary = packageBoundaryFindings(root, workspaces);
+  for (const finding of boundary) console.error(`[fail] package-boundary - ${finding}`);
+  if (boundary.length > 0) process.exitCode = 1;
+  else console.log("[pass] package-boundary - workspace dependencies are acyclic and imports use declared public entries");
 }
-console.log("[pass] no-dependency-cycles - every module import resolves acyclically");

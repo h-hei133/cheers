@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { domainPackages } from "./build/workspaces.mjs";
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".json"]);
 
@@ -27,6 +28,8 @@ export const REQUIRED_BUILD_INPUTS = [
   "scripts/build/bundle.mjs",
   "scripts/build/exports.mjs",
   "scripts/build/transaction.mjs",
+  "scripts/build/types.mjs",
+  "scripts/build/workspaces.mjs",
   "scripts/start-lib.mjs",
   "scripts/start.mjs",
 ];
@@ -80,16 +83,19 @@ function digestFiles(root, files) {
 }
 
 export function listCompilerFiles(root) {
-  const result = spawnSync(process.execPath, [
-    path.join(root, "node_modules/typescript/bin/tsc"),
-    "-p", path.join(root, "packages/ts-shell/tsconfig.build.json"),
-    "--listFilesOnly",
-  ], { cwd: root, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`Could not enumerate compiler inputs (exit ${result.status ?? "unknown"}).`);
+  const configs = ["packages/ts-shell/tsconfig.build.json", ...domainPackages(root, assertNoSymlinkPath).map(entry => entry.config)];
+  const files = configs.flatMap(config => {
+    const result = spawnSync(process.execPath, [
+      path.join(root, "node_modules/typescript/bin/tsc"),
+      "-p", path.join(root, config),
+      "--listFilesOnly",
+    ], { cwd: root, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(`Could not enumerate compiler inputs for ${config} (exit ${result.status ?? "unknown"}).`);
+    return result.stdout.split(/\r?\n/);
+  });
   const rootPath = path.resolve(root);
-  return [...new Set(result.stdout
-    .split(/\r?\n/)
+  return [...new Set(files
     .map(line => line.trim())
     .filter(line => path.isAbsolute(line))
     .map(line => path.resolve(line))
@@ -101,20 +107,22 @@ export function listCompilerFiles(root) {
 export function buildInputDigest(root, compilerInputs = []) {
   if (process.env.ESBUILD_BINARY_PATH) throw new Error("A custom esbuild binary cannot be used for a verified build.");
   const rootPath = path.resolve(root);
-  const sourceRoot = path.join(root, "packages/ts-shell/src");
+  const domains = domainPackages(rootPath, assertNoSymlinkPath);
+  const sourceRoots = [path.join(root, "packages/ts-shell/src"), ...domains.map(entry => path.join(root, entry.directory, "src"))];
   const typeScriptLib = path.join(root, "node_modules/typescript/lib");
   const typesRoot = path.join(root, "node_modules/@types");
   const bundlerRoot = path.join(root, "node_modules/@esbuild");
   const bundlerLib = path.join(root, "node_modules/esbuild/lib");
-  for (const directory of [sourceRoot, typeScriptLib, typesRoot, bundlerRoot, bundlerLib]) assertNoSymlinkPath(rootPath, directory);
-  const sources = filesUnder(sourceRoot, file => SOURCE_EXTENSIONS.has(path.extname(file)));
+  for (const directory of [...sourceRoots, typeScriptLib, typesRoot, bundlerRoot, bundlerLib]) assertNoSymlinkPath(rootPath, directory);
+  const sources = sourceRoots.flatMap(directory => filesUnder(directory, file => SOURCE_EXTENSIONS.has(path.extname(file))));
   const compilerFiles = [
     ...filesUnder(typeScriptLib, file => file.endsWith(".d.ts")),
     ...filesUnder(typesRoot),
     ...filesUnder(bundlerRoot),
     ...filesUnder(bundlerLib),
   ];
-  const inputs = REQUIRED_BUILD_INPUTS.map(file => path.join(root, file));
+  const inputs = [...REQUIRED_BUILD_INPUTS, ...domains.flatMap(entry => [entry.file, entry.config, entry.types])]
+    .map(file => path.join(root, file));
   for (const file of inputs) {
     assertNoSymlinkPath(rootPath, file);
     if (!existsSync(file)) throw new Error(`Required build input is missing: ${relative(root, file)}`);

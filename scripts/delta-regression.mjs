@@ -122,7 +122,7 @@ function runProcess(command, args, options = {}) {
 }
 
 async function runCli(args, options = {}) {
-  return runProcess(process.execPath, [tsxCliPath, cliEntryPath, ...args], {
+  return runProcess(process.execPath, [tsxCliPath, "--conditions=cheers-source", cliEntryPath, ...args], {
     cwd: tsShellCwd,
     env: {
       ...process.env,
@@ -556,7 +556,7 @@ async function runN3FaultSuite(currentRunSessionIds, faultReport) {
 
   const missingHome = path.join(testRoot, `home-delta-missing-${runId}`)
   fs.mkdirSync(path.join(missingHome, '.cheers'), { recursive: true })
-  const missingCredRun = await runProcess(process.execPath, [tsxCliPath, cliEntryPath, '--project', projectRoot, '--provider', 'openai-compatible', '--print', 'reply exactly: probe'], {
+  const missingCredRun = await runProcess(process.execPath, [tsxCliPath, "--conditions=cheers-source", cliEntryPath, '--project', projectRoot, '--provider', 'openai-compatible', '--print', 'reply exactly: probe'], {
     cwd: tsShellCwd,
     env: {
       ...process.env,

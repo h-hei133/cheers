@@ -2,7 +2,7 @@ import { registerCatalogContribution } from '../../core/catalog/contributions.js
 import { SkillLoader, type Skill } from '../../core/skills/skillLoader.js';
 import { createCommandRegistry } from '../../core/commands/registry.js';
 import { commandInvocations } from '../../core/commands/invocation.js';
-import { createCoreToolRegistry } from '../../core/tools/registry.js';
+import { createCoreToolRegistry } from '../../tools/registry.js';
 import { versionPath } from '../store/state.js';
 import { assertInventory } from '../archive/storage.js';
 import { scriptArgs } from './execute.js';
@@ -21,6 +21,8 @@ import { captureInputEvent, captureInputHookPayload, captureInputHookResult, cap
 import type { ExtensionBeforeCompactResult, ExtensionBeforeTreeResult, ExtensionInputEvent } from '../events/model.js';
 import { callbackCancellation, captureCallbackResult } from '../../core/values/promise.js';
 import type { HookDecision } from '../../core/hooks/types.js';
+import { isNotificationEvent } from '../events/model.js';
+import { isSessionTransitionEvent, sessionCancellation } from '../events/decision.js';
 
 export interface RegistrationHost {
   readonly root: string;
@@ -79,8 +81,11 @@ export function registerPackage(host: RegistrationHost, record: PackageRecord): 
         const compact = event === 'session_before_compact';
         const toolResult = event === 'tool_result';
         const messageEnd = event === 'message_end';
+        const notification = isNotificationEvent(event);
+        const transition = isSessionTransitionEvent(event);
         const captureResult = nativeInput ? captureInputResult : guardedInput ? captureInputHookResult
-          : compact ? captureCompactResult : toolResult ? captureToolResult : messageEnd ? captureMessageResult : undefined;
+          : compact ? captureCompactResult : toolResult ? captureToolResult : messageEnd ? captureMessageResult
+          : transition ? sessionCancellation : undefined;
         let currentPayload = nativeInput ? captureInputEvent(payload) : event === 'UserPromptSubmit' ? captureInputHookPayload(payload) : payload;
         let transformed = false;
         let hookResult: HookDecision | undefined;
@@ -104,7 +109,7 @@ export function registerPackage(host: RegistrationHost, record: PackageRecord): 
           }
           catch (error) {
             if (guardedInput) throw new InputRefusal();
-            if (!toolResult && !messageEnd) throw error;
+            if (!toolResult && !notification) throw error;
             if (signal) AbortSignal.prototype.throwIfAborted.call(signal);
             host.current(record, `script:${script.name}`);
             continue;
@@ -149,14 +154,19 @@ export function registerPackage(host: RegistrationHost, record: PackageRecord): 
             }
             continue;
           }
-          if (event === 'session_compact') continue;
+          if (notification) continue;
+          if (transition) {
+            if (next === true) return Object.freeze({ cancel: true });
+            continue;
+          }
           if (next !== undefined) currentPayload = next;
         }
         if (event === 'UserPromptSubmit') return hookResult;
         if (compact) return compactResult;
         if (toolResult) return toolPatch;
         if (messageEnd) return messagePatch;
-        if (event === 'session_compact') return undefined;
+        if (notification) return undefined;
+        if (transition) return Object.freeze({ cancel: false });
         if (nativeInput) {
           const result = currentPayload as ExtensionInputEvent;
           return Object.freeze(transformed ? { action: 'transform', text: result.text, ...(result.images === undefined ? {} : { images: result.images }) }

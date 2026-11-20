@@ -1,8 +1,7 @@
 import { afterEach, expect, it } from 'vitest';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { Owner, ServiceRequest } from './contract/model.js';
-import { digest, object } from './contract/value.js';
+import { type Owner, type ServiceRequest, digest, object } from '@cheers/collaboration';
 import { ServiceStore } from './service/store.js';
 import { ServiceDispatcher } from './service/dispatch.js';
 import { emptySnapshot, bound, fixture } from './__tests__/fixture.js';

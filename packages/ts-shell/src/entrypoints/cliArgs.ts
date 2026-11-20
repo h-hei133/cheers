@@ -216,7 +216,7 @@ export function parseCliArgs(
   if (themePaths.length > 0) opts.themePaths = themePaths;
   if (extensionPaths.length > 0) opts.extensionPaths = extensionPaths;
   const unresolved = invocation.unresolved;
-  if (unresolved.length && (!parseOptions.deferExtensionOptions || extensionPaths.length === 0
+  if (unresolved.length && (!parseOptions.deferExtensionOptions
     || doctorRequested || opts.listModels !== undefined || opts.exportTarget !== undefined
     || unresolved.some(option => !option.name.startsWith('--') || !EXTENSION_FLAG_NAME.test(option.name.slice(2))))) {
     return parseError("Unrecognized option. Place dash-prefixed prompt text after --.");

@@ -1,7 +1,5 @@
-import type { Binding, ServiceResponse } from '../contract/model.js';
-import { ROOM_STREAM_WINDOW_MS } from '../contract/stream.js';
+import { type Binding, type ServiceResponse, ROOM_STREAM_WINDOW_MS, CollaborationError, digest, integer, object, requireValue, text } from '@cheers/collaboration';
 import { CollaborationClient } from './service.js';
-import { CollaborationError, digest, integer, object, requireValue, text } from '../contract/value.js';
 import { currentProfile } from '../../core/paths/profile/context.js';
 import { readRelayRecord, saveRelayRecord } from '../storage/record.js';
 import { applyPage, cursorPath, restoreProjection, type CursorProjection } from './cursor.js';

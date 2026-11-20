@@ -11,6 +11,7 @@ import type { ToolExecutionContext, ToolExecutionResult } from '../../tools/type
 import type { DenyRule } from '../../core/shell/approval/deny.js';
 import { sourceFile } from '../registry/sources.js';
 import { executeInProcessScript, type ExtensionHostBridge, type InProcessExtensionInvoke } from './inProcessLoader.js';
+import type { WorkerFlag } from './flag.js';
 export interface ExecutionHost {
   readonly file: string;
   readonly root: string;
@@ -18,6 +19,7 @@ export interface ExecutionHost {
   readonly denyRules: () => readonly DenyRule[];
   readonly execution?: ExecutionService;
   readonly extensionHost?: ExtensionHostBridge;
+  readonly flags?: readonly WorkerFlag[];
 }
 export function scriptArgs(value: unknown): string[] {
   if (value === undefined) return [];
@@ -42,6 +44,8 @@ export async function executeScript(host: ExecutionHost, record: VersionRecord, 
       denyRules: host.denyRules,
       context,
       ...(invoke ? { invoke } : {}),
+      ...(invoke?.kind === 'command' && invoke.shortcutKey !== undefined ? { check: current } : {}),
+      ...(host.flags?.length ? { flags: host.flags } : {}),
       ...(host.extensionHost ? { host: host.extensionHost } : {}),
     });
   }

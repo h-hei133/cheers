@@ -1,7 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { ServiceConfig } from './config.js';
-import type { Room, Owner, Ticket, Right } from '../contract/model.js';
-import { hashText, object, parseJson, requireValue, text } from '../contract/value.js';
+import { type Room, type Owner, type Ticket, type Right, hashText, object, parseJson, requireValue, text } from '@cheers/collaboration';
 
 export function authenticate(config: ServiceConfig, authorization: string | undefined): string {
   requireValue(typeof authorization === 'string' && authorization.startsWith('Bearer ') && authorization.length <= 256, 'denied');

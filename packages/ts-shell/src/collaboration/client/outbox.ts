@@ -1,9 +1,8 @@
 import path from 'node:path';
 import { currentProfile } from '../../core/paths/profile/context.js';
 import { userDataDir } from '../../core/paths/userHome.js';
-import { decodeFrame, frameCutover, type RelayFrame } from '../contract/frame.js';
-import type { Binding } from '../contract/model.js';
-import { digest, integer, keys, object, requireValue } from '../contract/value.js';
+import { frameCutover, type RelayFrame, type Binding, digest, integer, keys, object, requireValue } from '@cheers/collaboration';
+import { decodeFrame } from '../snapshot.js';
 import { readRelayRecord, saveRelayRecord } from '../storage/record.js';
 
 interface OutboxIdentity {

@@ -6,7 +6,7 @@ import { projectTrust } from '../../../core/security/projectTrust.js';
 import { loadHookDeclarations } from '../../../core/hooks/config.js';
 import { createCoreToolRegistry } from '../../../core/tools/registry.js';
 import { runPreparedTool } from '../../../turn/invoke.js';
-import type { BackgroundInput, BackgroundRunner } from '../../../workflow/jobs/local/model.js';
+import type { BackgroundInput, BackgroundRunner } from '../../../runtime/execution/background/model.js';
 import type { DagJob, DagRuntime } from '../../../workflow/jobs/dag/model.js';
 import type { JobsComposition } from '../model.js';
 import { jobAdmission } from '../authority.js';

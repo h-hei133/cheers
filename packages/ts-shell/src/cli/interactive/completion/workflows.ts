@@ -1,5 +1,5 @@
 import { listWorkflowNames, readWorkflow } from "../../../core/workflow/definition.js";
-import { DAGResolver } from "../../../core/workflow/dagResolver.js";
+import { DAGResolver } from '@cheers/workflow';
 import { projectTrust } from "../../../core/security/projectTrust.js";
 import type { Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 

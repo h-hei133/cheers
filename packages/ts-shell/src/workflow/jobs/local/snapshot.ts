@@ -1,5 +1,5 @@
 import type { LocalJob } from '../model.js';
-import type { BackgroundTask } from './model.js';
+import type { BackgroundTask } from '../../../runtime/execution/background/model.js';
 import { redactReportText } from '../../../core/security/redaction.js';
 
 /** Retained context is redacted before any report or notice can select a fragment. */

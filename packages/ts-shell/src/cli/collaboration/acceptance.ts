@@ -1,6 +1,5 @@
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
-import { digest, keys, object, requireValue } from '../../collaboration/contract/value.js';
-import type { Acceptance, Proposal } from '../../collaboration/contract/model.js';
+import { digest, keys, object, requireValue, type Acceptance, type Proposal } from '@cheers/collaboration';
 import { collaborationHosts } from './state.js';
 import { currentBinding } from './projection.js';
 import type { CollaborationComposition } from './model.js';

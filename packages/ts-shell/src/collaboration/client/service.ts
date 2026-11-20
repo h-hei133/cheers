@@ -2,9 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { requestBrowser } from '../../core/network/connection.js';
 import { NetworkError } from '../../core/network/error.js';
 import { requestScope, type RequestScope } from '../../core/network/request.js';
-import { STATE_BYTES, WIRE_BYTES, type ServiceRequest, type ServiceResponse } from '../contract/model.js';
-import { ROOM_STREAM_TYPE, ROOM_STREAM_WINDOW_MS } from '../contract/stream.js';
-import { CollaborationError, parseJson, requireValue } from '../contract/value.js';
+import { CollaborationError, parseJson, requireValue, ROOM_STREAM_TYPE, ROOM_STREAM_WINDOW_MS, STATE_BYTES, WIRE_BYTES,
+  type ServiceRequest, type ServiceResponse } from '@cheers/collaboration';
 import type { Profile } from './profile.js';
 import { decodeResponse, readRoomStream } from './stream.js';
 

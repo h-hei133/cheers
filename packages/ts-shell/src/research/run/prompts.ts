@@ -1,7 +1,5 @@
+import { briefSchema, draftSchema, reviewOutputSchema } from '@cheers/research';
 import type { ResearchRun, ResearchStage } from './model.js';
-import { briefSchema } from '../brief/schema.js';
-import { draftSchema } from '../evidence/schema.js';
-import { reviewOutputSchema } from '../review/schema.js';
 import { reportFragmentSchema } from './schema.js';
 import { digestOf } from '../evidence/producer.js';
 import { skillBlock } from '../../core/prompts/skills.js';

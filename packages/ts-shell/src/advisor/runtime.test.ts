@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses, advisorResult } from '../test-utils/advisor.js';
+import { sourceTsxArgs } from '../test-utils/cli/process.js';
 import { AdvisorRuntime } from './runtime.js';
 import { readAdvisor } from './store.js';
 import { readBoundSessionState } from '../session/store/bound.js';
@@ -27,7 +28,7 @@ else {runtime.configure({target:'openai/review-model',every:1,timeoutMs:100,mode
 await runtime.capture({sourcePromptEntryId:input.sourcePromptEntryId,step:1,willContinue:false,failed:false,messages:[{role:'assistant',content:'abandoned checkpoint'}]},()=>new Promise(()=>{}),new AbortController().signal);process.exit(0);}
 `);
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(process.execPath, [path.resolve('../../node_modules/tsx/dist/cli.mjs'), script, input, action], { cwd: process.cwd(), env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, [...sourceTsxArgs, script, input, action], { cwd: process.cwd(), env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
     let errors = ''; child.stderr.on('data', chunk => { errors += String(chunk); }); child.on('error', reject);
     child.on('exit', code => code === 0 ? resolve() : reject(new Error(`isolated advisor child ${code}: ${errors}`)));
   });

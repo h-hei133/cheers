@@ -3,7 +3,7 @@ import { ModelAdmissionError, type RequestPolicy } from '../../core/agent/reques
 import { createRequestPolicy } from '../../core/agent/request/policy.js';
 import { captureWorkspaceRoot } from '../../core/workspace/roots.js';
 import { sessionRequestStore } from '../../session/store/requests.js';
-import { requireValue } from '../../collaboration/contract/value.js';
+import { requireValue } from '@cheers/collaboration';
 import { collaborationHosts } from './state.js';
 import type { CollaborationComposition } from './model.js';
 

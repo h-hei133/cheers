@@ -1,7 +1,7 @@
 import which from 'which'
 import { executeLocally } from '../local.js'
 import { MediaReadError } from './model.js'
-import type { MediaSource } from './source.js'
+import type { MediaSource } from '@cheers/media'
 
 /** One execution path, one deadline, bounded output and a native address-space ceiling. */
 export async function runMediaProcess(source: MediaSource, cwd: string, command: string, args: readonly string[], outputLimit: number, signal?: AbortSignal, permissionExitCode?: number): Promise<Buffer> {

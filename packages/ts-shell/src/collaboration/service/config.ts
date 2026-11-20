@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isIP } from 'node:net';
 import { readTextFile, pathIdentity } from '../../core/workspace/files.js';
-import { identifier, integer, keys, object, parseJson, requireValue, text } from '../contract/value.js';
+import { identifier, integer, keys, object, parseJson, requireValue, text } from '@cheers/collaboration';
 import { privateText } from '../storage/private.js';
 
 export interface ServiceConfig {

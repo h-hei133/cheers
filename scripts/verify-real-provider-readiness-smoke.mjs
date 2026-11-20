@@ -461,7 +461,7 @@ async function runSmoke(config) {
   console.log('CHEERS_REAL_HOME=unset')
 
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     cliEntryPath,
     '--project',
     workspace,

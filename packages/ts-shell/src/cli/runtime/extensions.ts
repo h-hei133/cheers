@@ -49,6 +49,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
   let lifecycle: ExtensionSessionLifecycle | undefined;
   let ownedHost: ExtensionHostBridge | undefined;
   let shortcuts: ExtensionShortcuts | undefined;
+  let installedValues = startupFiles?.installedValues;
   let retirement: Promise<void> | undefined;
   const retire = () => retirement ??= Promise.resolve().then(async () => {
     closing = true;
@@ -125,7 +126,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
       lifecycle = new ExtensionSessionLifecycle(context);
       const check = () => { const refused = configurationAdmission(context)() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session or workspace changed.' : undefined); if (refused) throw new Error(refused); };
       service = new ExtensionService({ root, gate: tool => ({ ...gate(tool), admission: () => gate(tool).admission?.() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session changed.' : undefined) }),
-        check, extensionHost, offline: () => context.runtimeConfig.offline === true, denyRules: () => context.runtimeConfig.denyRules,
+        check, extensionHost, installedValues: () => installedValues, offline: () => context.runtimeConfig.offline === true, denyRules: () => context.runtimeConfig.denyRules,
         assertSourceAccess: absolute => { check(); assertSourceAccess(absolute, context.projectRoot ?? root, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules); },
         assertWorkspace: write => { check(); const primary = context.projectRoot ?? root; assertSourceAccess(root, primary, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules); if (write) selectWorkspaceRoot(primary, context.session.workspaceRoots ?? [], root, 'write'); } });
       cliCleanups.splice(0).forEach(unregister => unregister());
@@ -134,9 +135,10 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
       const signal = initialization.signal;
       const configured = configurationAdmission(context);
       const createdAt = context.session.createdAt;
+      const installed = service;
       const shortcutBinding = new ExtensionShortcuts(extensionHost, signal, () => !closed && !closing && !initializing
         && ownedHost === extensionHost && extensionHostFor(context) === extensionHost && runtimes.get(context) === bound
-        && context.cwd === root && context.session.id === session && context.session.createdAt === createdAt && !configured());
+        && context.cwd === root && context.session.id === session && context.session.createdAt === createdAt && !configured(), key => installed.shortcut(key));
       shortcuts = shortcutBinding;
       const preparedFiles = startupFiles;
       startupFiles = undefined;
@@ -144,7 +146,7 @@ export function installExtensionRuntime(context: ShellRuntimeContext, runtime: S
         signal.throwIfAborted();
         check();
         assertSourceAccess(absolute, context.projectRoot ?? root, context.session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules);
-      }, gate, signal, extensionHost, shortcutBinding, cliArguments, preparedFiles).then(() => { argumentsAdmitted = true; });
+      }, gate, signal, extensionHost, shortcutBinding, cliArguments, preparedFiles).then(values => { installedValues = values; argumentsAdmitted = true; });
       // Consumers await the same initialization; observe failures during startup as well.
       void ready.then(() => { if (initialization?.signal === signal) initializing = false; }, () => {
         if (initialization?.signal === signal) { initializing = false; initialization.abort(); }
@@ -175,9 +177,9 @@ async function registerCliExtensions(
   shortcuts: ExtensionShortcuts,
   cliArguments?: CliExtensionArguments,
   preparedFiles?: PreparedExtensionFiles,
-): Promise<void> {
-  const paths = context.cliExtensionPaths;
-  if (!paths?.length) return;
+): Promise<PreparedExtensionFiles['installedValues']> {
+  const paths = context.cliExtensionPaths ?? [];
+  if (!paths.length && !preparedFiles && !cliArguments) return [];
   const denyRules = () => {
     signal.throwIfAborted();
     const refused = configurationAdmission(context)();
@@ -188,9 +190,9 @@ async function registerCliExtensions(
   const contributions: CatalogContribution[] = [];
   const pendingShortcuts: ExtensionShortcut[] = [];
   try {
-    const extensions = preparedFiles ? preparedFiles.bind({ assertEntryAccess, denyRules, signal, host })
-      : (await loadExtensionFiles({ paths, baseDir: context.originalCwd || root, root, assertEntryAccess, denyRules,
-        signal, host, cliArguments })).extensions;
+    const loaded = preparedFiles ? { extensions: preparedFiles.bind({ assertEntryAccess, denyRules, signal, host }), installedValues: preparedFiles.installedValues }
+      : await loadExtensionFiles({ paths, baseDir: context.originalCwd || root, root, assertEntryAccess, denyRules, signal, host, cliArguments });
+    const { extensions, installedValues } = loaded;
     for (const loaded of extensions) {
       pendingShortcuts.push(...loaded.shortcuts);
       const guardedTools = loaded.tools.map((tool) => ({
@@ -222,6 +224,7 @@ async function registerCliExtensions(
     signal.throwIfAborted();
     shortcuts.publish(pendingShortcuts);
     cleanups.push(...pendingCleanups);
+    return installedValues;
   } catch (error) {
     preparedFiles?.retire();
     pendingCleanups.splice(0).forEach(unregister => unregister());

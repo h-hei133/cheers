@@ -1,4 +1,5 @@
 import type { StorageIdentity } from './store/paths.js';
+import type { ExtensionFlag } from './runtime/flag.js';
 
 export interface ExtensionManifest {
   readonly schema: 1;
@@ -10,6 +11,7 @@ export interface ExtensionManifest {
   readonly scripts: readonly { readonly name: string; readonly path: string }[];
   readonly commands: readonly { readonly name: string; readonly aliases?: readonly string[]; readonly description: string; readonly script: string }[];
   readonly tools: readonly { readonly name: string; readonly description: string; readonly script: string }[];
+  readonly flags?: readonly (ExtensionFlag & { readonly script: string })[];
 }
 export interface TrustAnchor {
   readonly keyId: string;

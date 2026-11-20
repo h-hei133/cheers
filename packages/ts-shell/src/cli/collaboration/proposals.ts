@@ -1,6 +1,5 @@
 import type { CommandExecutionResult } from '../../core/commands/types.js';
-import type { Acceptance, Proposal } from '../../collaboration/contract/model.js';
-import { digest, identifier, object, requireValue, text, uuid } from '../../collaboration/contract/value.js';
+import { type Acceptance, type Proposal, digest, identifier, object, requireValue, text, uuid } from '@cheers/collaboration';
 import type { CollaborationComposition } from './model.js';
 import { currentBinding, display, promptPreview } from './projection.js';
 import { approveOperation } from './approval.js';

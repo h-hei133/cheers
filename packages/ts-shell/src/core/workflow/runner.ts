@@ -1,5 +1,5 @@
 import type { WorkflowFile } from "./definition.js";
-import { DAGResolver } from './dagResolver.js';
+import { DAGResolver } from '@cheers/workflow';
 
 /**
  * Running a workflow.

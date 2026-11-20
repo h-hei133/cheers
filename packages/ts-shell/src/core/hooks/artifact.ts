@@ -38,7 +38,10 @@ function quote(value: string): string { return `'${value.replaceAll("'", "'\\''"
 
 /** The declared command and actual invocation are derived from the same pinned artifact. */
 export function writeHookCommand(value: unknown, transport: 'single' | 'stdio' = 'single'): string {
-  return validArtifact(value) ? `exec ${quote(process.execPath)} ${quote(value.path)} gate write ${transport === 'stdio' ? '--stdio' : '--emit-result'}` : 'false';
+  if (!validArtifact(value)) return 'false';
+  // A standalone executable normally dispatches to the bundled CLI on every invocation.
+  const scriptRuntime = process.versions.bun ? 'BUN_BE_BUN=1 ' : '';
+  return `${scriptRuntime}exec ${quote(process.execPath)} ${quote(value.path)} gate write ${transport === 'stdio' ? '--stdio' : '--emit-result'}`;
 }
 
 /** Compatibility belongs to the selected artifact, never to the tool's semantic capability. */

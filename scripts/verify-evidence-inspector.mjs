@@ -124,7 +124,7 @@ function ensureFixture(projectRoot) {
 async function runCli(projectRoot, prompt, approval) {
   ensureFixture(projectRoot)
   return run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     cliEntryPath,
     '--project',
     projectRoot,

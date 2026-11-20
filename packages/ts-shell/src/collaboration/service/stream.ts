@@ -1,10 +1,8 @@
 import { once } from 'node:events';
 import type { ServerResponse } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { ServiceRequest } from '../contract/model.js';
-import { STATE_BYTES, WIRE_BYTES } from '../contract/model.js';
-import { ROOM_STREAM_TYPE, ROOM_STREAM_WINDOW_MS, type RoomStreamFrame } from '../contract/stream.js';
-import { CollaborationError, digest, identifier, integer, keys, object, requireValue, text } from '../contract/value.js';
+import { CollaborationError, digest, identifier, integer, keys, object, requireValue, ROOM_STREAM_TYPE, ROOM_STREAM_WINDOW_MS,
+  STATE_BYTES, text, WIRE_BYTES, type RoomStreamFrame, type ServiceRequest } from '@cheers/collaboration';
 import type { ServiceDispatcher } from './dispatch.js';
 
 const HEARTBEAT_MS = 2_000;

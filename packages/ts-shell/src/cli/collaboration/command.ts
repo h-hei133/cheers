@@ -5,7 +5,7 @@ import { syntaxHelp } from '../../core/commands/syntax/projection.js';
 import { evaluateToolPermissionScope } from '../../core/query/toolPolicy.js';
 import { readProfile } from '../../collaboration/client/profile.js';
 import { CollaborationClient, UnknownMutation } from '../../collaboration/client/service.js';
-import { requireValue, uuid } from '../../collaboration/contract/value.js';
+import { requireValue, uuid } from '@cheers/collaboration';
 import type { CollaborationComposition } from './model.js';
 import { approveOperation } from './approval.js';
 import { display } from './projection.js';

@@ -1,7 +1,6 @@
 import { CollaborationHost } from '../../collaboration/client/host.js';
 import { CollaborationGuest } from '../../collaboration/client/guest.js';
-import { decodeAcl } from '../../collaboration/contract/acl.js';
-import { digest, identifier, object, parseJson, requireValue } from '../../collaboration/contract/value.js';
+import { decodeAcl, digest, identifier, object, parseJson, requireValue } from '@cheers/collaboration';
 import type { CollaborationComposition } from './model.js';
 import { currentBinding, display, snapshotFor, snapshotPreview, aclPreview } from './projection.js';
 import { approveOperation } from './approval.js';

@@ -1,23 +1,11 @@
 import type { BrowserAccessibilityNodeInput } from "./accessibilitySnapshot.js";
 import type { BrowserExecutionRequest } from "./executionContract.js";
+import type { PwFailureCode } from "@cheers/browser";
+export type { PwFailureCode } from "@cheers/browser";
 
 export type PwEvidenceStatus = "ok" | "blocked" | "unavailable" | "timed-out" | "failed";
 
 export type PwCleanupStatus = "closed" | "close-failed" | "not-started";
-
-export type PwFailureCode =
-  | "runtime-package-missing"
-  | "runtime-binary-missing"
-  | "runtime-disabled"
-  | "navigation-timeout"
-  | "observe-failed"
-  | "extract-failed"
-  | "action-target-missing"
-  | "action-timeout"
-  | "policy-blocked"
-  | "cleanup-failed"
-  | "adapter-invalid-result"
-  | "unknown";
 
 export interface PwPageEvidence {
   readonly status: PwEvidenceStatus;

@@ -26,9 +26,9 @@
       "default": "./dist/core/models/virtualModels.js"
     },
     "./core/tools": {
-      "types": "./dist/types/core/tools/registry.d.ts",
-      "import": "./dist/core/tools/registry.js",
-      "default": "./dist/core/tools/registry.js"
+      "types": "./dist/types/tools/registry.d.ts",
+      "import": "./dist/tools/registry.js",
+      "default": "./dist/tools/registry.js"
     },
     "./core/tools/codemode": {
       "types": "./dist/types/core/tools/codemode/tool.d.ts",
@@ -86,8 +86,8 @@
   ],
   "scripts": {
     "build": "node ../../scripts/build-cli.mjs",
-    "dev": "tsx watch src/entrypoints/cli.tsx",
-    "start": "tsx src/entrypoints/cli.tsx",
+    "dev": "tsx watch --conditions=cheers-source src/entrypoints/cli.tsx",
+    "start": "tsx --conditions=cheers-source src/entrypoints/cli.tsx",
     "test": "vitest run",
     "test:gate:golden-main-path": "vitest run src/cli-baseline.test.ts -t \"GOLDEN_MAIN_PATH\"",
     "test:watch": "vitest"
@@ -117,6 +117,14 @@
     "ws": "8.22.0"
   },
   "devDependencies": {
+    "@cheers/advisor": "0.1.0",
+    "@cheers/browser": "0.1.0",
+    "@cheers/collaboration": "0.1.0",
+    "@cheers/desktop": "0.1.0",
+    "@cheers/media": "0.1.0",
+    "@cheers/planning": "0.1.0",
+    "@cheers/research": "0.1.0",
+    "@cheers/workflow": "0.1.0",
     "@types/picomatch": "^4.0.3",
     "@types/which": "3.0.4",
     "tsx": "^4.0.0",

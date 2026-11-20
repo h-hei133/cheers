@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { sourceTsxArgs } from "./process.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 export const repoRoot = path.resolve(currentDir, "..", "..", "..", "..", "..");
@@ -23,13 +24,6 @@ export function stdioServerFixture(): { transport: string; command: string; args
   };
 }
 
-export const tsxCliPath = path.join(
-  repoRoot,
-  "node_modules",
-  "tsx",
-  "dist",
-  "cli.mjs",
-);
 export const nodeExe = process.execPath;
 
 export type ParsedTranscriptEntry = {
@@ -126,7 +120,7 @@ export function spawnCli(
     process.env.RUSTUP_HOME ??
     (hostHome ? path.join(hostHome, ".rustup") : undefined);
 
-  return spawn(nodeExe, [tsxCliPath, cliPath, ...args], {
+  return spawn(nodeExe, [...sourceTsxArgs, cliPath, ...args], {
     cwd: repoRoot,
     stdio: ["pipe", "pipe", "pipe"],
     env: {

@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadInProcessExtensionAsync, type ExtensionFlag, type ExtensionHostBridge, type LoadedInProcessExtension } from '../../../extensions/runtime/inProcessLoader.js';
+import { ExtensionThinkingError } from '../../../extensions/runtime/model.js';
+import { installedOptions, type InstalledOptionValue } from '../../../extensions/runtime/options.js';
 import type { DenyRule } from '../../../core/shell/approval/deny.js';
 import { assertExtensionOption, ExtensionOptionError, type CliExtensionArguments, type ExtensionOptionDeclaration } from '../../options/extensions.js';
 
@@ -19,6 +21,7 @@ type SourceAccess = Pick<ExtensionFilesInput, 'assertEntryAccess' | 'denyRules'>
 
 export interface PreparedExtensionFiles {
   readonly check: () => void;
+  readonly installedValues: readonly InstalledOptionValue[];
   readonly retire: () => void;
   readonly bind: (input: SourceAccess & { readonly host: ExtensionHostBridge; readonly signal: AbortSignal }) => readonly LoadedInProcessExtension[];
 }
@@ -35,6 +38,11 @@ export async function prepareExtensionFiles(input: Omit<ExtensionFilesInput, 'si
     getAllTools: () => (active ?? input.inspect).getAllTools?.() ?? [],
     getActiveTools: () => (active ?? input.inspect).getActiveTools?.() ?? [],
     getCommands: () => (active ?? input.inspect).getCommands?.() ?? [],
+    setThinkingLevel: (level, signal) => {
+      const host = requireActive(active);
+      if (!host.setThinkingLevel) throw new ExtensionThinkingError('Session thinking level is unavailable from this host.');
+      return host.setThinkingLevel(level, signal);
+    },
     sendMessage: async message => { await requireActive(active).sendMessage?.(message); },
     appendEntry: async (type, data) => { await requireActive(active).appendEntry?.(type, data); },
   };
@@ -42,7 +50,7 @@ export async function prepareExtensionFiles(input: Omit<ExtensionFilesInput, 'si
   try {
     const loaded = await loadExtensionFiles({ ...input, signal: retirement.signal, host,
       assertEntryAccess: value => access.assertEntryAccess(value), denyRules: () => access.denyRules() });
-    return { check: loaded.check, retire, bind: next => {
+    return { check: loaded.check, installedValues: loaded.installedValues, retire, bind: next => {
       retirement.signal.throwIfAborted();
       next.signal.throwIfAborted();
       if (active) throw new Error('Startup extension instances have already been bound.');
@@ -68,10 +76,28 @@ export async function loadExtensionFiles(input: ExtensionFilesInput) {
   const checks: Array<() => void> = [];
   const flags = new Map<string, ExtensionOptionDeclaration>();
   let flagError: { readonly cause: unknown } | undefined;
+  const installedValues: InstalledOptionValue[] = [];
   const check = () => {
     input.signal.throwIfAborted();
     checks.forEach(assertSource => assertSource());
   };
+  if (input.cliArguments) {
+    try {
+      for (const option of installedOptions(input.root)) {
+        assertExtensionOption(option.flag);
+        if (flags.has(option.flag.name)) throw new ExtensionOptionError(`Extension option --${option.flag.name} is declared more than once.`);
+        flags.set(option.flag.name, option);
+        const value = input.cliArguments.value(option);
+        if (value !== undefined) {
+          installedValues.push(Object.freeze({ option, value }));
+          checks.push(option.check);
+        }
+      }
+    } catch (error) {
+      if (error instanceof ExtensionOptionError) throw error;
+      throw new ExtensionOptionError('Installed extension options could not be verified.');
+    }
+  }
   for (const rawPath of input.paths) {
     const filePath = resolveEntry(path.resolve(input.baseDir, rawPath));
     input.assertEntryAccess(filePath);
@@ -103,7 +129,7 @@ export async function loadExtensionFiles(input: ExtensionFilesInput) {
   }
   check();
   input.cliArguments?.validate([...flags.values()]);
-  return { extensions: Object.freeze(extensions), check };
+  return { extensions: Object.freeze(extensions), check, installedValues: Object.freeze(installedValues) };
 }
 
 function resolveEntry(candidate: string): string {

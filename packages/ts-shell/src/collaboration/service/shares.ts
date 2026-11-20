@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { ServiceState, Share } from '../contract/model.js';
-import { identifier, integer, keys, object, requireValue } from '../contract/value.js';
-import { decodeSnapshot } from '../contract/snapshot.js';
+import { type ServiceState, type Share, identifier, integer, keys, object, requireValue } from '@cheers/collaboration';
+import { decodeSnapshot } from '../snapshot.js';
 import { binding } from './rooms.js';
 
 export function publishShare(state: ServiceState, principal: string, data: unknown, now: number): unknown {

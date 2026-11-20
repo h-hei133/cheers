@@ -1,5 +1,4 @@
-import { CollaborationError, digest, requireValue, uuid } from '../contract/value.js';
-import type { Receipt, ServiceRequest, ServiceState } from '../contract/model.js';
+import { CollaborationError, digest, requireValue, uuid, type Receipt, type ServiceRequest, type ServiceState } from '@cheers/collaboration';
 import type { ServiceStore } from './store.js';
 
 /** Persist intent before a structural mutation. Lost replies are queryable, never resent automatically. */

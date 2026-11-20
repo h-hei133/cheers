@@ -4,12 +4,13 @@ import { configurationAdmission } from '../../../core/shell/configuration.js';
 import type { ShellRuntimeContext } from '../../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../../core/shell/sessionRuntime.js';
 import { filterVisibleToolNames } from '../../../core/tools/prefilter.js';
-import { createCoreToolRegistry } from '../../../core/tools/registry.js';
+import { createCoreToolRegistry } from '../../../tools/registry.js';
 import type { ExtensionHostBridge } from '../../../extensions/runtime/inProcessLoader.js';
 import { resolveUiHost, type ExtensionUiHost } from '../../../extensions/runtime/ui.js';
 import type { SessionManager } from '../../../session/SessionManager.js';
 import type { CoreMcpGateway } from '../../../core/mcp/gateway.js';
 import { queueExtensionMessage } from '../inputQueue.js';
+import { sessionThinkingSetter } from './model.js';
 
 interface UiBinding {
   host: Required<ExtensionUiHost>;
@@ -64,6 +65,7 @@ export function installExtensionHost(context: ShellRuntimeContext, runtime: Shel
     getAllTools: allTools,
     getCommands: () => { check(); return [...new Set([...createCommandRegistry(root, context.runtimeConfig).keys(),
       ...catalogContributions(root, sessionId).flatMap(entry => entry.commands.map(command => command.name))])]; },
+    setThinkingLevel: sessionThinkingSetter(context, runtime, operations),
     sendMessage: async message => {
       operations();
       if (typeof message !== 'string' || !message.trim()) throw new Error('Extension message must be nonempty text.');

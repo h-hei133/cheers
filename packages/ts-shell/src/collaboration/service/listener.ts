@@ -1,8 +1,7 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import type { Socket } from 'node:net';
-import { CollaborationError, object, parseJson, requireValue } from '../contract/value.js';
-import { WIRE_BYTES } from '../contract/model.js';
+import { CollaborationError, object, parseJson, requireValue, WIRE_BYTES } from '@cheers/collaboration';
 import type { ServiceConfig } from './config.js';
 import { ServiceStore } from './store.js';
 import { decodeRequest, ServiceDispatcher } from './dispatch.js';

@@ -4,7 +4,8 @@ import { execFileSync } from "node:child_process";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createTaskToolDefinition } from "./taskTool.js";
 import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
-import type { WorktreeAllocation, WorktreeRelease } from "../workflow/gitWorktreeManager.js";
+import type { WorktreeAllocation, WorktreeRelease } from "../../tools/worktree.js";
+import { createTaskWorktree } from "../../workflow/git/worktree/manager.js";
 import { createSubagentRunner } from "../../turn/subagent.js";
 import { createCoreToolRegistry } from "./registry.js";
 
@@ -19,7 +20,7 @@ const answer = { text: "child answer", failed: false, allowedTools: [], steps: 1
 function setup(release: WorktreeRelease = { outcome: "removed" }) {
   const manager = { allocateWorktree: vi.fn(async () => allocation), releaseWorktree: vi.fn(async () => release) };
   const runSubagent = vi.fn(async () => answer);
-  return { manager, runSubagent, tool: createTaskToolDefinition(manager), context: { workspaceRoot, taskId: "outer", runSubagent } };
+  return { manager, runSubagent, tool: createTaskToolDefinition(() => manager), context: { workspaceRoot, taskId: "outer", runSubagent } };
 }
 
 beforeEach(() => { vi.spyOn(defaultHookDispatcher, "dispatch").mockResolvedValue({ decision: "allow" }); });
@@ -38,6 +39,15 @@ it("rejects invalid isolation before lifecycle effects", async () => {
   const { manager, runSubagent, tool, context } = setup();
   expect((await tool.execute({ ...args, isolation: "anything" }, context)).success).toBe(false);
   expect(manager.allocateWorktree).not.toHaveBeenCalled();
+  expect(runSubagent).not.toHaveBeenCalled();
+  expect(defaultHookDispatcher.dispatch).not.toHaveBeenCalled();
+});
+
+it("refuses requested isolation without a host worktree factory", async () => {
+  const runSubagent = vi.fn(async () => answer);
+  const result = await createTaskToolDefinition().execute(args, { workspaceRoot, taskId: "outer", runSubagent });
+  expect(result.success).toBe(false);
+  expect(result.error).toContain("worktree isolation is unavailable");
   expect(runSubagent).not.toHaveBeenCalled();
   expect(defaultHookDispatcher.dispatch).not.toHaveBeenCalled();
 });
@@ -129,7 +139,9 @@ it("cleans up an allocated worktree after cancellation without launching the chi
 });
 
 it("allocates from the task workspace and leaves actual child writes outside the parent checkout", async () => {
-  const root = fs.mkdtempSync(path.join(process.cwd(), ".task-worktree-"));
+  const temp = "/tmp/cheers-test";
+  fs.mkdirSync(temp, { recursive: true });
+  const root = fs.mkdtempSync(path.join(temp, "task-worktree-"));
   const git = (...argv: string[]) => execFileSync("git", argv, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   try {
     git("init", "-q"); git("config", "user.email", "test@example.test"); git("config", "user.name", "Test");
@@ -143,7 +155,8 @@ it("allocates from the task workspace and leaves actual child writes outside the
     } : { text: "done", toolCalls: [], stopReason: "stop" } }, createCoreToolRegistry(), {
       workspaceRoot: root, sessionId: "worktree", agentMode: "build", permissionScope: "allow-all", hooks: defaultHookDispatcher, emit: () => {},
     });
-    const result = await createTaskToolDefinition().execute(args, { workspaceRoot: root, taskId: "worktree", runSubagent: async (input) => {
+    const task = createCoreToolRegistry({ worktrees: createTaskWorktree }).get('task')!;
+    const result = await task.execute(args, { workspaceRoot: root, taskId: "worktree", runSubagent: async (input) => {
       expect(input.workspace.startsWith(path.join(root, ".git", "agent-worktrees") + path.sep)).toBe(true);
       child = input.workspace;
       return run(input);

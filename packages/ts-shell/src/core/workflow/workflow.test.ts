@@ -2,13 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import nodeFs from "node:fs";
 import nodeOs from "node:os";
 import nodePath from "node:path";
-import { DAGResolver } from "./dagResolver.js";
-import { ParallelDispatcher } from "./parallelDispatcher.js";
+import { DAGResolver, ParallelDispatcher } from '@cheers/workflow';
 import { runWorkflowCommand } from "../commands/workflowCommandRuntime.js";
 import { routeSlashCommand } from "../commands/slashRouter.js";
 import { readWorkflow } from './definition.js';
 import { runRecordPath } from './runStore.js';
-import type { WorkflowTask, WorkflowStage } from "./types.js";
+import type { WorkflowTask, WorkflowStage } from '@cheers/workflow';
 
 describe("Workflow & Agentic SDLC Subsystem Test Suite", () => {
 

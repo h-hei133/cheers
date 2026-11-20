@@ -1,9 +1,8 @@
 import fs from 'node:fs';
 import { gatherExport } from '../../session/export/collect.js';
 import { readExportSource } from '../../session/export/source.js';
-import { projectSnapshot } from '../../collaboration/contract/snapshot.js';
-import { digest, identifier, requireValue } from '../../collaboration/contract/value.js';
-import type { Binding, Snapshot, Right } from '../../collaboration/contract/model.js';
+import { digest, identifier, requireValue, type Binding, type Snapshot, type Right } from '@cheers/collaboration';
+import { projectSnapshot } from '../../collaboration/snapshot.js';
 import type { CollaborationComposition } from './model.js';
 import { neutraliseForDisplay } from '../../core/text/safety.js';
 import { redactReportText } from '../../core/security/redaction.js';

@@ -2,7 +2,7 @@ import path from 'node:path';
 import { isIP } from 'node:net';
 import { readTextFile, pathIdentity } from '../../core/workspace/files.js';
 import { privateText } from '../storage/private.js';
-import { identifier, keys, object, parseJson, requireValue, text } from '../contract/value.js';
+import { identifier, keys, object, parseJson, requireValue, text } from '@cheers/collaboration';
 
 export interface Profile {
   version: 1; origin: string; principal: string; token: string; addresses: string[];

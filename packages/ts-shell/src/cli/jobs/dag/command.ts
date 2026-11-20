@@ -1,6 +1,6 @@
 import { workflowSyntax } from '../../../core/workflow/syntax.js';
 import { readWorkflow } from '../../../core/workflow/definition.js';
-import { DAGResolver } from '../../../core/workflow/dagResolver.js';
+import { DAGResolver } from '@cheers/workflow';
 import { parseSyntax } from '../../../core/commands/syntax/parse.js';
 import { syntaxHelp } from '../../../core/commands/syntax/projection.js';
 import { renderList } from '../../../core/commands/workflowCommandRuntime.js';

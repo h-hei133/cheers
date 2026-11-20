@@ -199,7 +199,7 @@ async function runCli(args, options = {}) {
     CHEERS_SYNTHETIC_TOOLS: '1',
     ...(options.env ?? {}),
   }
-  return run(process.execPath, [tsxCliPath, cliEntryPath, ...args], {
+  return run(process.execPath, [tsxCliPath, "--conditions=cheers-source", cliEntryPath, ...args], {
     cwd: tsShellRoot,
     env,
     stdin: options.stdin,

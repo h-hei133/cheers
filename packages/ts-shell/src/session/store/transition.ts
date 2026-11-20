@@ -6,8 +6,8 @@ import { readTranscriptPrefixDigest } from '../transcript/source.js';
 import type { SessionFileLayout } from './sessionFileLayout.js';
 import {readStateSnapshotRequired, withSessionStateLock} from './sessionStateStore.js';
 import { fileVersion } from './version.js';
-import { readSessionMetadataRecord } from './sessionStore.js';
-import { projectSessionMetadata } from '../schema/sessionMetadataCodec.js';
+import { readSessionMetadataRecord, readSessionRecordSnapshot } from './sessionStore.js';
+import { projectSessionMetadata, type SessionMetadata } from '../schema/sessionMetadataCodec.js';
 import type { Session } from '../schema/sessionRecord.js';
 import { sameValue } from '../../config/values.js';
 import {snapshotData} from '../../core/values/data.js';
@@ -39,8 +39,9 @@ export function captureSessionTransition(layout: SessionFileLayout, auditVersion
     checkSource();
     if (transcript(layout.transcriptPath, prefix).version !== prefix.version) throw new Error('The prepared transcript changed during activation.');
     const metadata = version(layout.metadataPath), stored = readSessionMetadataRecord(layout.metadataPath);
-    const expected = Object.fromEntries(Object.entries(projectSessionMetadata(activated)).filter(([, value]) => value !== undefined));
-    if (!stored || metadata !== version(layout.metadataPath) || !sameValue(stored, expected)) throw new Error('The saved metadata does not match this activation.');
+    if (!stored || !matchesActivationMetadata(layout, activated, stored) || metadata !== version(layout.metadataPath)
+      || version(layout.transcriptPath) !== prefix.version) throw new Error('The saved metadata does not match this activation.');
+    checkSource();
     const verifyLocked = (readback: () => void) => {
       const check = () => { checkSource(); if (version(layout.metadataPath) !== metadata) throw new Error('The saved metadata changed during replacement.'); };
       check();
@@ -68,6 +69,18 @@ export function captureSessionTransition(layout: SessionFileLayout, auditVersion
       state = nextState;
     }});
   };
+}
+
+function matchesActivationMetadata(layout: SessionFileLayout, activated: Session, stored: SessionMetadata): boolean {
+  const { updatedAt, ...projected } = projectSessionMetadata(activated);
+  const expected = Object.fromEntries(Object.entries(projected).filter(([, value]) => value !== undefined));
+  if (!sameValue(stored, { ...expected, updatedAt: stored.updatedAt })) return false;
+  if (updatedAt === stored.updatedAt) return true;
+  if (!(Date.parse(updatedAt) > Date.parse(stored.updatedAt))) return false;
+  // Reports can advance the displayed activity time without writing metadata. Prove the exact
+  // projected time from the saved ancestry, then recheck the pinned files in the caller.
+  const { session } = readSessionRecordSnapshot({ layout, sessionId: activated.id, cwd: activated.projectRoot });
+  return session.updatedAt === updatedAt;
 }
 
 /** Accept only a contiguous sequence confirmed by the same run's native audit writer. */

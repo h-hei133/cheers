@@ -3,8 +3,21 @@ import { createAdvisorHarness, cleanupAdvisorHarnesses, advisorResult } from '..
 import { readAdvisor, writeAdvisor } from './store.js';
 import { AdvisorRuntime } from './runtime.js';
 import { readGoalEdit, writeGoal } from '../planning/goal/store.js';
+import { decodeAdvisor } from './codec.js';
 
 afterEach(cleanupAdvisorHarnesses);
+
+it('decodes retained advisor records without rewriting them and rejects malformed pending owners', async () => {
+  const setup = createAdvisorHarness();
+  await setup.runtime.capture(setup.boundary('bounded review'), async () => advisorResult(), setup.signal);
+  const state = JSON.parse(JSON.stringify(readAdvisor(setup.manager, setup.session).advisor));
+  expect(state.notes).toHaveLength(1);
+  expect(decodeAdvisor(state)).toBe(state);
+  expect(decodeAdvisor({ ...state, pending: {
+    id: 'pending', epoch: state.epoch, checkpointId: state.checkpoints[0].id, startedAt: state.sessionCreatedAt,
+    owner: { token: 'owner', pid: 0, hostname: 'fixture', startedAt: state.sessionCreatedAt },
+  } })).toBeUndefined();
+});
 
 it('ordinary session saves preserve advisor state while new and forked sessions start off without its payload', async () => {
   const setup = createAdvisorHarness(); await setup.runtime.capture(setup.boundary('durable'), async () => advisorResult(), setup.signal);

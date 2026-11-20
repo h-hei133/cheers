@@ -1,4 +1,5 @@
-import { stdioServerFixture, parseTranscriptJsonl, isReadableJsonFile, readJsonFileEventually, spawnCli, whenOutputContains, removeWithRetry, nodeExe, repoRoot, cliPath, tsxCliPath } from "./test-utils/cli/baseline.js";
+import { stdioServerFixture, parseTranscriptJsonl, isReadableJsonFile, readJsonFileEventually, spawnCli, whenOutputContains, removeWithRetry, nodeExe, repoRoot, cliPath } from "./test-utils/cli/baseline.js";
+import { sourceTsxArgs } from "./test-utils/cli/process.js";
 import { createOpenAiHttpServer, createDelayedOpenAiHttpServer, createReadinessNetworkFailureOpenAiHttpServer, writeOpenAiMockConfig } from "./test-utils/cli/http.js";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
@@ -1962,7 +1963,7 @@ describe("CLI streaming baseline (T3)", () => {
     const result = spawnSync(
       nodeExe,
       [
-        tsxCliPath,
+        ...sourceTsxArgs,
         cliPath,
         "--project",
         projectRoot,
@@ -2013,7 +2014,7 @@ describe("CLI streaming baseline (T3)", () => {
     const result = spawnSync(
       nodeExe,
       [
-        tsxCliPath,
+        ...sourceTsxArgs,
         cliPath,
         "--project",
         projectRoot,
@@ -2056,7 +2057,7 @@ describe("CLI streaming baseline (T3)", () => {
     });
 
     const runPrint = (prompt: string) =>
-      spawnSync(nodeExe, [tsxCliPath, cliPath, "--project", projectRoot, "--print", prompt], {
+      spawnSync(nodeExe, [...sourceTsxArgs, cliPath, "--project", projectRoot, "--print", prompt], {
         cwd: repoRoot,
         env: {
           ...process.env,
@@ -2251,7 +2252,7 @@ describe("CLI streaming baseline (T3)", () => {
     );
 
     const runPrint = (prompt: string) =>
-      spawnSync(nodeExe, [tsxCliPath, cliPath, "--project", projectRoot, "--print", prompt], {
+      spawnSync(nodeExe, [...sourceTsxArgs, cliPath, "--project", projectRoot, "--print", prompt], {
         cwd: repoRoot,
         env: {
           ...process.env,
@@ -2396,7 +2397,7 @@ describe("CLI streaming baseline (T3)", () => {
       const result = spawnSync(
         nodeExe,
         [
-          tsxCliPath,
+          ...sourceTsxArgs,
           cliPath,
           "--project",
           projectRoot,
@@ -2604,7 +2605,7 @@ describe("CLI streaming baseline (T3)", () => {
     );
 
     const runPrint = (prompt: string) =>
-      spawnSync(nodeExe, [tsxCliPath, cliPath, "--project", projectRoot, "--print", prompt], {
+      spawnSync(nodeExe, [...sourceTsxArgs, cliPath, "--project", projectRoot, "--print", prompt], {
         cwd: repoRoot,
         env: {
           ...process.env,
@@ -2691,7 +2692,7 @@ describe("CLI streaming baseline (T3)", () => {
       spawnSync(
         nodeExe,
         [
-          tsxCliPath,
+          ...sourceTsxArgs,
           cliPath,
           "--project",
           projectRoot,
@@ -2776,7 +2777,7 @@ describe("CLI streaming baseline (T3)", () => {
         spawnSync(
           nodeExe,
           [
-            tsxCliPath,
+            ...sourceTsxArgs,
             cliPath,
             "--project",
             projectRoot,
@@ -2869,7 +2870,7 @@ describe("CLI streaming baseline (T3)", () => {
         spawnSync(
           nodeExe,
           [
-            tsxCliPath,
+            ...sourceTsxArgs,
             cliPath,
             "--project",
             projectRoot,
@@ -3025,7 +3026,7 @@ describe("CLI streaming baseline (T3)", () => {
     const attachResult = spawnSync(
       nodeExe,
       [
-        tsxCliPath,
+        ...sourceTsxArgs,
         cliPath,
         "--project",
         baseProject,
@@ -3062,7 +3063,7 @@ describe("CLI streaming baseline (T3)", () => {
     const currentResult = spawnSync(
       nodeExe,
       [
-        tsxCliPath,
+        ...sourceTsxArgs,
         cliPath,
         "--project",
         attachedProject,
@@ -3091,7 +3092,7 @@ describe("CLI streaming baseline (T3)", () => {
     const switchResult = spawnSync(
       nodeExe,
       [
-        tsxCliPath,
+        ...sourceTsxArgs,
         cliPath,
         "--project",
         baseProject,

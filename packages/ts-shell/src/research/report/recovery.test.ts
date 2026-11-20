@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
 import { cleanupResearch, finishResearch, researchHarness } from '../../test-utils/research.js';
+import { sourceTsxArgs } from '../../test-utils/cli/process.js';
 import { SessionManager } from '../../session/SessionManager.js';
 import { ResearchRuntime } from '../run/runtime.js';
 import { researchSaveTool } from './save.js';
@@ -17,7 +18,7 @@ afterEach(cleanupResearch);
 it.each(['prepared', 'intent', 'target', 'receipt'])('recovers the original native report save after process exit at %s', phase => {
   const setup = finishResearch(researchHarness());
   setup.manager.saveInterrupted(setup.session.id);
-  const child = spawnSync(process.execPath, [fileURLToPath(new URL('../../../../../node_modules/tsx/dist/cli.mjs', import.meta.url)),
+  const child = spawnSync(process.execPath, [...sourceTsxArgs,
     fileURLToPath(new URL('../../test-utils/research/save.ts', import.meta.url)), setup.root, setup.session.id, phase],
   { env: { ...process.env, CHEERS_PROVIDER_MODE: 'synthetic', CHEERS_REAL_HOME: '' }, encoding: 'utf8', timeout: 30000 });
   expect(child.status, child.stderr).toBe(81);

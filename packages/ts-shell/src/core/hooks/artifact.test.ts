@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { checkWriteHookArtifact, writeHookProtocol } from './artifact.js';
+import { checkWriteHookArtifact, writeHookCommand, writeHookProtocol } from './artifact.js';
 
 let root: string;
 beforeEach(() => {
@@ -21,6 +21,19 @@ function artifact(bytes: number) {
 }
 
 describe('pinned write hook artifact', () => {
+  it('runs the artifact as a script when the host is a standalone executable', () => {
+    const previous = Object.getOwnPropertyDescriptor(process.versions, 'bun');
+    Object.defineProperty(process.versions, 'bun', { configurable: true, value: '1.3.0' });
+    try {
+      const pinned = { ...artifact(128), protocolVersion: 2, workerProtocol: 1 };
+      expect(writeHookCommand(pinned)).toMatch(/^BUN_BE_BUN=1 exec .+ gate write --emit-result$/);
+      expect(writeHookCommand(pinned, 'stdio')).toMatch(/^BUN_BE_BUN=1 exec .+ gate write --stdio$/);
+    } finally {
+      if (previous) Object.defineProperty(process.versions, 'bun', previous);
+      else Reflect.deleteProperty(process.versions, 'bun');
+    }
+  });
+
   it('selects joint patch support from the admitted artifact protocol', () => {
     const legacy = artifact(128);
     expect(writeHookProtocol(legacy)).toBe(1);

@@ -258,7 +258,7 @@ console.log('running'); process.stdin.resume();
 `);
     const [major, minor] = process.versions.node.split('.').map(Number);
     const loading = major! > 20 || major === 20 && minor! >= 6 ? '--import' : '--loader';
-    const child = spawn(process.execPath, [loading, path.resolve('../../node_modules/tsx/dist/loader.mjs'), script, inputFile, manager.getSessionDirPath(session.id)], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, ['--conditions=cheers-source', loading, path.resolve('../../node_modules/tsx/dist/loader.mjs'), script, inputFile, manager.getSessionDirPath(session.id)], { stdio: ['pipe', 'pipe', 'pipe'] });
     const exited = new Promise<void>(resolve => child.once('exit', () => resolve()));
     try {
       await new Promise<void>((resolve, reject) => {

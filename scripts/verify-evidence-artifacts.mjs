@@ -174,7 +174,7 @@ async function runSuccessEvidenceCheck() {
   const startedAtMs = Date.now()
   const prompt = `Create file ${successRelativePath} with content:\n\`\`\`python\nprint('evidence artifact success')\n\`\`\``
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     cliEntryPath,
     '--project',
     targetProject,
@@ -249,7 +249,7 @@ async function runDeniedEvidenceCheck() {
   ensureFixture()
   const startedAtMs = Date.now()
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     cliEntryPath,
     '--project',
     targetProject,

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BrowserSessionManager } from "../../browser/sessionManager.js";
 import type { PwPage } from "../../browser/playwrightRuntime.js";
-import { createUnifiedBrowserToolDefinition } from "./browserToolUnified.js";
+import { createUnifiedBrowserToolDefinition } from "../../browser/tool/definition.js";
 
 /**
  * A page double, not a simulation inside the tool.

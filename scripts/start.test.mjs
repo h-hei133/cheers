@@ -309,6 +309,23 @@ test("binds enumerated compiler inputs outside known type roots", () => {
   rmSync(value.root, { recursive: true, force: true });
 });
 
+test("binds the media workspace source into the release build identity", () => {
+  const value = fixture();
+  try {
+    write(path.join(value.root, 'package.json'), JSON.stringify({ workspaces: ['packages/media'] }));
+    write(path.join(value.root, 'packages/media/package.json'), JSON.stringify({ private: true, name: '@cheers/media', exports: {
+      '.': { types: './api.d.ts', bun: './src/index.ts', 'cheers-source': './src/index.ts', default: './dist/index.js' },
+    } }));
+    write(path.join(value.root, 'packages/media/tsconfig.json'), '{}');
+    write(path.join(value.root, 'packages/media/api.d.ts'), 'export declare const decoder: string;');
+    const source = path.join(value.root, 'packages/media/src/index.ts');
+    write(source, 'export const decoder = "before";\n');
+    const before = buildInputDigest(value.root).digest;
+    write(source, 'export const decoder = "after";\n');
+    assert.notEqual(buildInputDigest(value.root).digest, before);
+  } finally { rmSync(value.root, { recursive: true, force: true }); }
+});
+
 test("rejects missing, outdated and version-mismatched manifests", async () => {
   const value = await buildFixture();
   assert.equal(checkBuild({ root: value.root, dist: path.join(value.root, "none"), version: value.version }).state, "missing");

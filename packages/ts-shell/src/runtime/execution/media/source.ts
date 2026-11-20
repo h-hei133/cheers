@@ -5,15 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { closeReadHandle, ReadChangedError, ReadCleanupError, readRevision, withVerifiedReadTarget } from '../read.js'
 import { MediaReadError, type MediaReadRequest } from './model.js'
-
-export interface MediaSource {
-  readonly fd: number
-  readonly bytes: number
-  readonly hash: string
-  readonly signature: Buffer
-  readonly deadline: number
-  readonly verify: () => Promise<void>
-}
+import type { MediaSource } from '@cheers/media'
 
 /** Inline images share the same bounded, private descriptor consumed by native decoders. */
 export async function withInlineMediaSource<T>(data: string, signal: AbortSignal | undefined,

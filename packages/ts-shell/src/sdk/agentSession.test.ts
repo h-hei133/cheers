@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
-import { createAgentSession, DefaultResourceLoader, getRuntimeConfig, type ExtensionAPI, type QueryEvent } from "../index.js";
+import { createAgentSession, DefaultResourceLoader, getRuntimeConfig, type ExtensionAPI, type ExtensionThinkingUpdate, type QueryEvent } from "../index.js";
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../session/model/state.js';
 
 const tempDirs: string[] = [];
@@ -109,6 +109,43 @@ describe("DefaultResourceLoader", () => {
 });
 
 describe("createAgentSession & AgentSession", () => {
+  it('saves virtual effort from an admitted SDK callback and refuses busy or retired invocations', async () => {
+    const { work } = makeEnv();
+    const route = vi.fn(() => ({ provider: 'openai', modelId: 'physical' }));
+    const updates: ExtensionThinkingUpdate[] = [];
+    let captured: ExtensionAPI | undefined;
+    let unsupported: unknown;
+    const resourceLoader = new DefaultResourceLoader({ cwd: work, noContextFiles: true, extensionFactories: [api => {
+      captured = api;
+      api.registerVirtualModel({ provider: 'adaptive', id: 'auto', name: 'Adaptive', thinkingLevels: ['high'], route });
+      api.on('session_start', async () => {
+        updates.push(await api.setThinkingLevel('high'));
+        try { await api.setThinkingLevel('max'); } catch (error) { unsupported = error; }
+        updates.push(await api.setThinkingLevel(null));
+      });
+      api.registerCommand({ name: 'update-effort', kind: 'local', summary: 'Update effort', group: 'session', execute: async () => {
+        await api.setThinkingLevel('high');
+        return { kind: 'local', output: 'changed' };
+      } });
+    }] });
+    await resourceLoader.reload();
+    const { session, extensionsResult } = await createAgentSession({ cwd: work, resourceLoader, provider: 'google', model: 'adaptive/auto' });
+    try {
+      expect(updates).toEqual([{ status: 'applied', level: 'high' }, { status: 'applied', level: null }]);
+      expect(unsupported).toMatchObject({ message: expect.stringContaining('does not support the selected reasoning effort') });
+      const persisted = readSessionModel(session.sessionId);
+      expect(persisted).toEqual({ provider: 'google', connectionScope: 'provider', virtualModel: { provider: 'adaptive', model: 'auto', thinkingEffort: null } });
+      expect(route).not.toHaveBeenCalled();
+      await expect(captured!.setThinkingLevel('high')).rejects.toThrow('outside an extension callback');
+      const command = extensionsResult.extensions[0]!.extension.commands[0]!;
+      await session.sessionRuntime.commands.run(async () => {
+        await expect(command.execute([], { cwd: work, sessionId: session.sessionId })).rejects.toThrow('Finish the current session operation');
+      });
+      expect(readSessionModel(session.sessionId)).toEqual(persisted);
+    } finally { await session.dispose(); }
+    await expect(captured!.setThinkingLevel('high')).rejects.toThrow(/retired/);
+  });
+
   it('selects a staged virtual startup option without inventing a physical model or replacing provider authority', async () => {
     const { work } = makeEnv();
     const route = vi.fn(() => ({ provider: 'openai', modelId: 'physical' }));

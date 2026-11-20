@@ -2,7 +2,7 @@
 
 > **Task**: 核实研究规划，实施仍然成立的任务，并按实际生产路径验收。
 > **Started**: 2026-11-14
-> **Last Updated**: 2026-11-19
+> **Last Updated**: 2026-11-20
 > **Mode**: LOCAL_ONLY
 
 ## Scope and authority
@@ -18,15 +18,15 @@
 - [Task inventory](tasks.md)：唯一任务与验收清单。
 - [Design and evidence](design.md)：结构事实、参考决策、复用与实施顺序。
 - [Earlier repair evidence](../../wiki/references/runtime-upgrade-review-2026-11.md)：上一轮证据，不能替代本轮任务验收。
-- [Progress summary](summary.md) 记录当前验收、26 个未完成任务和仓库门禁结果。
+- [Progress summary](summary.md) 记录当前验收、开放任务和仓库门禁结果。
 
 ## Current status
 
-**Current phase** 按批实施。37/62 项完成 Linux 本地功能验收，25 项开放。
-**Completed batch** F1.3 账户 HTTP 流接入请求压缩，通过 Linux Node 24 与 20.3 回环测试及隔离构建。既有 E.6 运行中输入、F1.2 原生结构化流和 T5.1 会话 ID 排他预留证据见 [任务清单](tasks.md)。
-**Next batch** E.6 剩余消息、工具和压缩结果。独立可交付缺口包括 F1.5 按调用范围等待 MCP 就绪，以及 T5.1 普通提交的跨文件事务。
-**Repository gate** 固定 NormProof 本轮实际返回 exit 2 和 `not_proven`，依赖图超过 16384 边采集上限。七项本地静态检查通过。
-**Evidence boundary** 本批通过 Linux 本地协议、合成用例与配置模型实际验证。具体服务资格见各任务的验收条目。提交保留在本地。
+**Current phase** 49/62 项通过 Linux 本地功能验收，13 项开放。
+**Completed batch** E.6、E.8、T4.1–T4.4 和 T5.1 的普通提示事务子批。八个领域包独立编译，原宿主入口通过隔离安装校验。详情见 [任务清单](tasks.md)。
+**Open work** T5.1 的其他多文件事务继续开放。原生服务资格、确定性重放、旧格式迁移、远程文件能力按需推进。两层包图分解和持续工程狗食保留后续实测条件。
+**Repository gate** 固定 `6173197`。默认冷判定两次退出 0，结果均为 `partial`。全仓未解析引用规则已满足，既有混合依赖环和测试越层仍作为建议显示。
+**Evidence boundary** Linux 上已通过聚焦回归、独立安装、编译入口、PTY、单文件发行和配置模型一次自行修复。提交保留在本地。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
 ## Governance

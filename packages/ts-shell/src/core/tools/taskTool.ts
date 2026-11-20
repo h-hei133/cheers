@@ -1,6 +1,6 @@
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
-import { GitWorktreeManager, type WorktreeAllocation, type WorktreeRelease } from "../workflow/gitWorktreeManager.js";
+import type { TaskWorktree, TaskWorktreeFactory, WorktreeAllocation, WorktreeRelease } from "../../tools/worktree.js";
 import { SubagentLoader } from "../subagents/subagentLoader.js";
 import { AgentMemoryManager } from "../subagents/agentMemoryManager.js";
 import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
@@ -15,7 +15,7 @@ import { taskPreview } from '../subagents/task/preview.js';
  * Integrates .agents/*.md frontmatter loader, worktree isolation, persistent agent-memory, and lifecycle hooks.
  */
 export function createTaskToolDefinition(
-  worktreeManager?: Pick<GitWorktreeManager, "allocateWorktree" | "releaseWorktree">,
+  worktrees?: TaskWorktreeFactory,
 ): ToolDefinition {
   const tool: ToolDefinition = {
     name: "task",
@@ -77,7 +77,7 @@ export function createTaskToolDefinition(
       const agentType = subagentDef?.name || requestedType;
       const contextStr = typeof args.context === "string" ? args.context.trim() : "";
       const shouldIsolate = (args.isolation || subagentDef?.isolation) === "worktree";
-      const manager = shouldIsolate ? worktreeManager ?? new GitWorktreeManager(context.workspaceRoot) : undefined;
+      let manager: TaskWorktree | undefined;
       let allocated: WorktreeAllocation | undefined;
       let release: WorktreeRelease | undefined;
       let effectiveWorkspace = context.workspaceRoot;
@@ -96,6 +96,8 @@ export function createTaskToolDefinition(
       try {
         if (!context.runSubagent) {
           fail("no model is available to this session, so the subagent was not started");
+        } else if (shouldIsolate && !worktrees) {
+          fail("worktree isolation is unavailable for this session, so the subagent was not started");
         } else {
           startAttempted = true;
           await defaultHookDispatcher.dispatch({ eventName: "SubagentStart", sessionId: context.taskId || subtaskId,
@@ -106,7 +108,8 @@ export function createTaskToolDefinition(
             const mem = await new AgentMemoryManager(context.workspaceRoot, context.assertSourceAccess).loadMemory(agentType, subagentDef.memory, role.signal);
             if (mem.content) memoryContext = `[Agent Persistent Memory (${subagentDef.memory})]:\n${mem.content.slice(0, 1000)}`;
           }
-          if (manager) {
+          if (shouldIsolate && worktrees) {
+            manager = await worktrees(context.workspaceRoot);
             const candidate = await manager.allocateWorktree(subtaskId, role.signal);
             if (!candidate.isIsolated || candidate.worktreePath === context.workspaceRoot) {
               throw new Error("An isolated worktree was not established; the subagent was not started.");

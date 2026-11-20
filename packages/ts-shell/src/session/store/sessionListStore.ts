@@ -24,6 +24,7 @@ export function listSessionRecords(input: {
    * loading and discarding keeps a duplicate from being reported as unreadable.
    */
   readonly skipSessionIds?: ReadonlySet<string>;
+  readonly idPrefix?: string;
   readonly onSource?: (target: string) => void;
 }): Session[] {
   input.onSource?.(input.sessionsDir);
@@ -33,7 +34,7 @@ export function listSessionRecords(input: {
     const newlyUnreadableSessionDirs: string[] = [];
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) {
+      if (!entry.isDirectory() || (input.idPrefix !== undefined && !entry.name.startsWith(input.idPrefix))) {
         continue;
       }
       input.onSource?.(path.join(input.sessionsDir, entry.name));

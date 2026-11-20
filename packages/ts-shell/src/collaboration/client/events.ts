@@ -1,5 +1,5 @@
 import type { QueryEvent } from '../../core/query/runtime/events.js';
-import type { EventKind, RelayEvent } from '../contract/model.js';
+import type { EventKind, RelayEvent } from '@cheers/collaboration';
 
 /** Deliberately omit all strings from the runtime except the fixed event discriminator. */
 export function projectEvent(event: QueryEvent, timestamp: number): Omit<RelayEvent, 'sequence'> | undefined {

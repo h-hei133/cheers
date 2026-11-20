@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync, readlinkSync } from 'node:fs';
-import { DAGResolver } from '../../../core/workflow/dagResolver.js';
+import { DAGResolver } from '@cheers/workflow';
 import type { LocalJob } from '../model.js';
 import type { DagJob, DagOwner } from './model.js';
 

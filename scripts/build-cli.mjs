@@ -7,6 +7,7 @@ import { assertNoSymlinkPath, buildInputDigest, listCompilerFiles, REQUIRED_BUIL
 import { restoreCliLauncher, writeCliLauncher } from "./build-cli-bin.mjs";
 import { acquireBuildLock, publishBuild } from "./build-manifest.mjs";
 import { packageEntries, PUBLIC_RECORD } from "./build/exports.mjs";
+import { domainPackages } from "./build/workspaces.mjs";
 
 const SCRIPT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD_MODE = "production";
@@ -19,22 +20,39 @@ export class BuildError extends Error {
   }
 }
 
-export function compileTypeScript({ root, staging }) {
+function runCompiler(root, arguments_) {
   const result = spawnSync(process.execPath, [
     path.join(root, "node_modules/typescript/bin/tsc"),
-    "-p", path.join(root, "packages/ts-shell/tsconfig.build.json"),
-    "--outDir", path.join(staging, "types"),
-    "--declaration", "--emitDeclarationOnly",
+    ...arguments_,
   ], { cwd: root, stdio: "inherit" });
   if (result.error) throw new BuildError(result.error.message, 1);
   if (result.status !== 0) throw new BuildError(`TypeScript build failed with exit ${result.status ?? "unknown"}.`, result.status || 1);
 }
 
+export function compileTypeScript({ root, staging }) {
+  runCompiler(root, [
+    "-p", path.join(root, "packages/ts-shell/tsconfig.build.json"),
+    "--outDir", path.join(staging, "types"),
+    "--declaration", "--emitDeclarationOnly",
+  ]);
+}
+
 async function compileModules(options) {
   const entries = packageEntries(options.root);
+  const domains = domainPackages(options.root, assertNoSymlinkPath);
   compileTypeScript(options);
+  const domainRoot = path.join(options.staging, ".domains");
+  const domainEntries = new Map();
+  for (const domain of domains) {
+    const output = path.join(domainRoot, path.basename(domain.directory));
+    runCompiler(options.root, ["-p", path.join(options.root, domain.config), "--outDir", output]);
+    domainEntries.set(domain.pkg.name, path.join(output, "index.js"));
+  }
   const { bundleModules } = await import("./build/bundle.mjs");
-  const record = await bundleModules({ ...options, entries });
+  const record = await bundleModules({ ...options, entries, domainEntries });
+  rmSync(domainRoot, { recursive: true, force: true });
+  const { bundleDomainTypes } = await import("./build/types.mjs");
+  bundleDomainTypes(options.root, options.staging, domains);
   for (const asset of REQUIRED_BUILD_ASSETS) {
     const target = path.join(options.staging, "types", asset);
     mkdirSync(path.dirname(target), { recursive: true });

@@ -7,8 +7,9 @@ import { validateOrigin } from '../validation.js';
 import { localDigest } from './codec.js';
 import { captureWorkspaceRoot } from '../../../core/workspace/roots.js';
 import { verifyPathContainment } from '../../../core/security/pathJail.js';
-import type { BackgroundInput, LocalJournalPort } from './model.js';
-export class LocalJournal implements LocalJournalPort {
+import type { BackgroundInput, BackgroundJournal, BackgroundTask } from '../../../runtime/execution/background/model.js';
+import { taskSnapshot } from './snapshot.js';
+export class LocalJournal implements BackgroundJournal {
   readonly ownerId = randomUUID();
   private readonly admissions = new Map<string, () => string | undefined>();
   constructor(readonly store: JobStore, private readonly origin: () => JobOrigin,
@@ -88,6 +89,17 @@ export class LocalJournal implements LocalJournalPort {
     const job = this.store.read().local?.find(value => value.id === id); if (!job) throw new JobStateError('unavailable'); return job;
   }
   list(): readonly LocalJob[] { return this.store.read().local ?? []; }
+  readTask(id: string, live?: BackgroundTask): BackgroundTask { return taskSnapshot(this.get(id), live); }
+  listTasks(live: (id: string) => BackgroundTask | undefined): readonly BackgroundTask[] {
+    return this.list().map(job => taskSnapshot(job, live(job.id)));
+  }
+  assertResume(id: string, input: BackgroundInput): void {
+    const job = this.get(id);
+    if (job.dispatchPossible || job.status !== 'queued') throw new Error('Only an undispatched queued job may resume.');
+    if (job.command !== input.command || job.directory.path !== input.cwd || job.timeoutMs !== (input.timeoutMs ?? 300000)) {
+      throw new Error('The queued command or directory changed.');
+    }
+  }
   unverified(id: string): void {
     this.change(this.get(id), { status: 'unknown', output: 'unknown', note: 'Native settlement or output publication is unavailable; no replay is permitted.' });
     this.admissions.delete(id);

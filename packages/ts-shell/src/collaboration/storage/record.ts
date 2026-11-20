@@ -4,8 +4,7 @@ import { inspectWorkspaceFile, pathIdentity } from '../../core/workspace/files.j
 import { assertProfileStorage, type ProfileContext } from '../../core/paths/profile/context.js';
 import { withFileLock } from '../../session/store/sessionFileStore.js';
 import { commitWorkspaceFile } from '../../edit/authority/commit.js';
-import { digest, parseJson, requireValue } from '../contract/value.js';
-import { WIRE_BYTES } from '../contract/model.js';
+import { digest, parseJson, requireValue, WIRE_BYTES } from '@cheers/collaboration';
 
 export function readRelayRecord(target: string, owner: ProfileContext | undefined): unknown {
   assertProfileStorage(target, owner);

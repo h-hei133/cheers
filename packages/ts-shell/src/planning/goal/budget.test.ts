@@ -4,6 +4,7 @@ import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { SessionManager } from '../../session/SessionManager.js';
+import { sourceTsxArgs } from '../../test-utils/cli/process.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
 import { readStateSnapshotRequired } from '../../session/store/sessionStateStore.js';
 import { writeJsonFileAtomic } from '../../session/store/sessionFileStore.js';
@@ -148,7 +149,7 @@ catch (error) { console.log(error.code); }
 `);
     const children: ReturnType<typeof spawn>[] = []; let ready = 0;
     const run = () => new Promise<string>((resolve, reject) => {
-      const child = spawn(process.execPath, [path.resolve('../../node_modules/tsx/dist/cli.mjs'), script, sessionFile, manager.getSessionDirPath(session.id)], {
+      const child = spawn(process.execPath, [...sourceTsxArgs, script, sessionFile, manager.getSessionDirPath(session.id)], {
         cwd: process.cwd(), env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'],
       });
       children.push(child);

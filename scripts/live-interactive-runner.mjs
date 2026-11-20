@@ -30,7 +30,7 @@ function main() {
 
   const child = spawn(
     process.execPath,
-    [tsxCliPath, cliEntrypoint, ...runnerArgs],
+    [tsxCliPath, "--conditions=cheers-source", cliEntrypoint, ...runnerArgs],
     {
       cwd: shellCwd,
       env: process.env,

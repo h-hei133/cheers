@@ -23,6 +23,7 @@ import { sessionHasReentrySurface } from "./presentation/sessionReentrySurface.j
 import type { SessionFiles } from './store/files.js';
 import type { SessionCatalog } from './store/catalog/index.js';
 import type { SessionActivationOptions } from './store/activation.js';
+import type { SessionListOptions } from './store/sessionStoreAccess.js';
 import { buildRecoverySnapshotForSession } from "./recovery/sessionRecoveryRuntime.js";
 import {
   SessionLifecycleWrites,
@@ -122,8 +123,8 @@ export abstract class SessionReadSurface extends SessionLifecycleWrites {
     this.host.store.clearCurrentSessionForProject(projectRoot);
   }
 
-  listSessions(onSource?: (target: string) => void): Session[] {
-    return this.host.store.listSessions(onSource);
+  listSessions(onSource?: (target: string) => void, options?: SessionListOptions): Session[] {
+    return this.host.store.listSessions(onSource, options);
   }
 
   /**

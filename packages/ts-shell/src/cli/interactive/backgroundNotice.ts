@@ -1,4 +1,4 @@
-import type { BackgroundTask } from '../../workflow/jobs/local/model.js';
+import type { BackgroundTask } from '../../runtime/execution/background/model.js';
 import { redactReportText } from '../../core/security/redaction.js';
 
 const OUTPUT_LIMIT = 4000;

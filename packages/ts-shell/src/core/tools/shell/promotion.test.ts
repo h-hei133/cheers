@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createCoreToolRegistry } from '../registry.js';
 import type { ExecutionService } from '../../../runtime/execution/types.js';
-import type { BackgroundRunner } from '../../../workflow/jobs/local/model.js';
+import type { BackgroundRunner } from '../../../runtime/execution/background/model.js';
 import type { ToolExecutionContext } from '../../../tools/types.js';
 
 afterEach(() => vi.useRealTimers());

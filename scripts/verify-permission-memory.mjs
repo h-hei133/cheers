@@ -295,7 +295,7 @@ function ensureSyntheticPermissionMemoryFixture() {
 }
 
 async function runCli(args, env, timeoutMs = 240000) {
-  return run(process.execPath, [tsxCliPath, cliEntryPath, ...args], {
+  return run(process.execPath, [tsxCliPath, "--conditions=cheers-source", cliEntryPath, ...args], {
     cwd: tsShellRoot,
     env,
     timeoutMs,

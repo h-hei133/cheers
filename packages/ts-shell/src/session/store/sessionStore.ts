@@ -1,11 +1,8 @@
 import * as fs from "node:fs";
-import { decodeWorkspaceRoots } from '../../core/workspace/model.js';
 import { selectSessionReports } from '../reports/projection.js';
-import { recoverUsageSnapshot } from "../../observability/usage/recovery.js";
 import type { SessionMetadata } from "../schema/sessionMetadataCodec.js";
 import { projectSessionMetadata } from "../schema/sessionMetadataCodec.js";
 import type { Session } from "../schema/sessionRecord.js";
-import type { SessionMessage } from "../schema/sessionMessage.js";
 import { isSessionContextMessage } from '../schema/sessionMessage.js';
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { buildSessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
@@ -20,9 +17,13 @@ import {
   writeSessionState,
   withSessionMetadataLock,
 } from "./sessionStateStore.js";
-import { decodeContextEntries } from '../../context/attachment/entry.js';
 import { projectSessionAnnotations } from '../context/projection.js';
-import { capturePromptRead, PromptPublicationError } from './prompt/intent.js';
+import { capturePromptRead, identifyPromptFile, PromptPublicationError, promptIntentPath, readPromptIntent } from './prompt/intent.js';
+import { pathIdentity } from '../../core/workspace/files.js';
+import { previewTranscriptAppend } from '../transcript/append.js';
+import { parseTranscript } from '../transcript/read.js';
+import { fileVersion, readSessionFileVersion } from './version.js';
+import { projectLoadedSession } from './projection.js';
 
 export function sessionExistsAtLayout(layout: Pick<SessionFileLayout, "sessionDir">): boolean {
   return fs.existsSync(layout.sessionDir);
@@ -165,6 +166,33 @@ export interface SessionRecordSnapshot {
 
 export function loadSessionRecord(input: SessionReadInput): Session {
   return readSessionRecordSnapshot(input).session;
+}
+
+export function previewPendingSessionRecord(input: SessionReadInput): { snapshot: SessionRecordSnapshot; assertCurrent: () => void } | undefined {
+  const marker = promptIntentPath(input.layout);
+  try {
+    const version = fs.lstatSync(marker, { throwIfNoEntry: false });
+    if (!version) return undefined;
+    if (!version.isFile()) throw new PromptPublicationError('unknown');
+    const identity = pathIdentity(marker);
+    const markerVersion = fileVersion(version).join(':');
+    const sourceVersion = readSessionFileVersion(input.layout);
+    const assertCurrent = () => {
+      if (pathIdentity(marker) !== identity || fileVersion(fs.lstatSync(marker)).join(':') !== markerVersion
+        || readSessionFileVersion(input.layout) !== sourceVersion) throw new PromptPublicationError('unknown');
+    };
+    const intent = readPromptIntent(input.layout, input.sessionId);
+    if (!intent || pathIdentity(input.layout.sessionDir) !== intent.directory) throw new PromptPublicationError('unknown');
+    const metadata = identifyPromptFile(input.layout.metadataPath, 'metadata', intent.metadata);
+    const state = identifyPromptFile(input.layout.statePath, 'state', intent.state);
+    const transcript = previewTranscriptAppend(input.layout.transcriptPath, intent.transcript, intent.rows);
+    if (!transcript.complete && (metadata === 'after' || state === 'after')) throw new PromptPublicationError('unknown');
+    const parsed = parseTranscript(transcript.text);
+    if (parsed.warnings.length) throw new PromptPublicationError('unknown');
+    const snapshot = projectSessionRecordSnapshot(input, JSON.parse(intent.metadata.after), JSON.parse(intent.state.after), { ...parsed, truncated: false });
+    assertCurrent();
+    return { snapshot, assertCurrent };
+  } catch { throw new PromptPublicationError('unknown'); }
 }
 
 /** All projections share these acquired values; no second transcript or state read. */
@@ -335,50 +363,6 @@ function sessionReadError(sessionId: string, error: unknown): Error {
 async function yieldForAbort(signal?: AbortSignal): Promise<void> {
   await new Promise<void>(resolve => setImmediate(resolve));
   signal?.throwIfAborted();
-}
-
-export function projectLoadedSession(input: {
-  readonly metadata: SessionMetadata | undefined;
-  readonly state: SessionStateSnapshot;
-  readonly turns: SessionMessage[];
-  readonly cwd: string;
-}): Session {
-  const metadata = input.metadata;
-  if (!metadata) {
-    throw new Error("Session metadata missing");
-  }
-  return {
-    id: metadata.id,
-    ...(input.state.contextSelection === undefined ? {} : { contextSelection: input.state.contextSelection }),
-    ...(input.state.contextAttachments === undefined ? {} : { contextAttachments: decodeContextEntries(input.state.contextAttachments) }),
-    ...([input.state.goal, input.state.plan, input.state.goalDraft, input.state.goalAcceptance, input.state.advisor, input.state.research, input.state.gitWorkflow, input.state.security, input.state.jobs].some(value => value !== undefined)
-      ? { hasPlanningState: true } : {}),
-    ...(input.state.workspaceRoots !== undefined ? { workspaceRoots: decodeWorkspaceRoots(input.state.workspaceRoots) } : {}),
-    projectRoot:
-      metadata.projectRoot?.trim() ||
-      input.state.projectRoot?.trim() ||
-      input.cwd,
-    ...(metadata.rootMode ? { rootMode: metadata.rootMode } : {}),
-    ...(metadata.requestedWorkspaceRoot?.trim()
-      ? { requestedWorkspaceRoot: metadata.requestedWorkspaceRoot.trim() }
-      : {}),
-    ...(metadata.targetPathBase?.trim()
-      ? { targetPathBase: metadata.targetPathBase.trim() }
-      : {}),
-    ...(Object.prototype.hasOwnProperty.call(metadata, "gitRoot")
-      ? { gitRoot: metadata.gitRoot?.trim() || null }
-      : {}),
-    title: metadata.title,
-    ...(metadata.pinned === true ? { pinned: true } : {}),
-    ...(metadata.parentSession ? { parentSession: metadata.parentSession } : {}),
-    createdAt: metadata.createdAt,
-    updatedAt: metadata.updatedAt,
-    status: input.state.status,
-    usage: recoverUsageSnapshot(input.state.usage),
-    pendingPrompt: input.state.pendingPrompt,
-    lastError: input.state.lastError,
-    turns: input.turns,
-  };
 }
 
 export function projectInitialStateSnapshot(session: Session): SessionStateSnapshot {

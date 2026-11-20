@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { bundleModules } from "./build/bundle.mjs";
 import { bindingName } from "./build/exports.mjs";
+import { bundleDomainTypes } from "./build/types.mjs";
 
 function write(file, contents) {
   mkdirSync(path.dirname(file), { recursive: true });
@@ -27,6 +28,31 @@ function fixture() {
   return { root, source, staging, entries: [{ specifier: ".", path: "index.js", types: "types/index.d.ts" }],
     version: "1.2.3", name: "@cheers/fixture" };
 }
+
+test("links emitted public types to packaged workspace declarations", () => {
+  const input = fixture();
+  try {
+    const packageTypes = "packages/media/api.d.ts";
+    const declaration = path.join(input.staging, "types/runtime/reader.d.ts");
+    write(path.join(input.root, packageTypes), "export type Sample = number;\n");
+    write(declaration, [
+      'export type { Sample } from "@cheers/media";',
+      'export type Media = typeof import("@cheers/media");',
+      'export type Label = "@cheers/media";',
+      'export type { External } from "external";',
+    ].join("\n"));
+    bundleDomainTypes(input.root, input.staging, [{ pkg: { name: "@cheers/media" }, types: packageTypes }]);
+    assert.equal(readFileSync(declaration, "utf8"), [
+      'export type { Sample } from "../.domains/media.js";',
+      'export type Media = typeof import("../.domains/media.js");',
+      'export type Label = "@cheers/media";',
+      'export type { External } from "external";',
+    ].join("\n"));
+    assert.equal(readFileSync(path.join(input.staging, "types/.domains/media.d.ts"), "utf8"), "export type Sample = number;\n");
+  } finally {
+    rmSync(input.root, { recursive: true, force: true });
+  }
+});
 
 test("bundled public entries share live bindings and lazy owners in a deployed graph", async () => {
   const input = fixture();
@@ -117,6 +143,44 @@ test("public aggregation preserves side effects of an entry with no runtime expo
     await import(pathToFileURL(path.join(input.staging, "public.js")).href);
     assert.equal(globalThis[key], true);
   } finally { delete globalThis[key]; rmSync(input.root, { recursive: true, force: true }); }
+});
+
+test("bundles the independently compiled media workspace as a lazy feature", async () => {
+  const input = fixture();
+  const mediaEntry = path.join(input.staging, ".media", "index.js");
+  try {
+    write(mediaEntry, 'export const value = "media workspace fixture";\n');
+    write(path.join(input.source, "index.ts"), `
+export const core = 1;
+export async function media() {
+  try { return (await import('@cheers/media')).value; }
+  catch (error) { if (error.code === 'ERR_MODULE_NOT_FOUND') return 'unavailable'; throw error; }
+}
+`);
+    await bundleModules({ ...input, domainEntries: new Map([['@cheers/media', mediaEntry]]) });
+    const mediaChunk = readdirSync(path.join(input.staging, 'chunks')).find(name =>
+      readFileSync(path.join(input.staging, 'chunks', name), 'utf8').includes('media workspace fixture'));
+    assert.ok(mediaChunk, 'media implementation must be in a shipped chunk');
+    const entry = pathToFileURL(path.join(input.staging, 'index.js')).href;
+    assert.equal((await import(entry)).core, 1);
+    assert.equal(await (await import(entry)).media(), 'media workspace fixture');
+
+    const missing = fixture();
+    try {
+      write(path.join(missing.source, 'index.ts'), readFileSync(path.join(input.source, 'index.ts')));
+      const missingEntry = path.join(missing.staging, '.media', 'index.js');
+      write(missingEntry, 'export const value = "media workspace fixture";\n');
+      await bundleModules({ ...missing, domainEntries: new Map([['@cheers/media', missingEntry]]) });
+      for (const name of readdirSync(path.join(missing.staging, 'chunks'))) {
+        if (readFileSync(path.join(missing.staging, 'chunks', name), 'utf8').includes('media workspace fixture')) {
+          rmSync(path.join(missing.staging, 'chunks', name));
+        }
+      }
+      const api = await import(pathToFileURL(path.join(missing.staging, 'index.js')).href);
+      assert.equal(api.core, 1);
+      assert.equal(await api.media(), 'unavailable');
+    } finally { rmSync(missing.root, { recursive: true, force: true }); }
+  } finally { rmSync(input.root, { recursive: true, force: true }); }
 });
 
 test("missing, ambiguous and unsafe public sources refuse bundling before staging changes", async () => {

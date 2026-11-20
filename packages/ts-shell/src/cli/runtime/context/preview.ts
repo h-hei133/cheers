@@ -10,6 +10,7 @@ import { needsComposition } from '../../../core/commands/composition.js';
 import { compositionPlan } from '../../../core/commands/composition/plan.js';
 import { prepareComposition } from '../../../core/commands/composition/prepare.js';
 import { preparePromptRequest } from '../../../core/prompts/request.js';
+import { browserTools } from '../../../tools/registry.js';
 import { mcpCatalogFilter } from '../../../core/tools/mcp.js';
 import { defersMcpDiscovery } from '../../../core/tools/catalog.js';
 import { foregroundTools, promptWithContext } from '../prompt.js';
@@ -144,6 +145,7 @@ export async function previewContext(context: ShellRuntimeContext, manager: Sess
   const prepared = await preparePromptRequest({ workspaceRoot: cwd, sessionId: expected.id, runtimeConfig: config, agentMode: review ? 'plan' : agentMode,
     catalogContent: { skills: skills.skills, tools: contributions.flatMap(entry => entry.tools), ...(snapshot ? { mcpTools: snapshot.tools } : {}) },
     ...(snapshot ? { mcpGateway: { snapshot: async () => snapshot } } : {}),
+    builtinTools: browserTools(),
     featureTools: features, admission, signal, onSource: sources.track,
     ...(forcedTool ? { forcedTool, allowedTools: [forcedTool] } : {}) });
   const resolution = context.resolveConfigTarget?.(config, expected.id)

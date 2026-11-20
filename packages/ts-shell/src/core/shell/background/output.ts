@@ -1,2 +1,2 @@
-export { createOutputSink } from '../../../workflow/jobs/local/output.js';
-export type { OutputSink, OutputSinkOptions } from '../../../workflow/jobs/local/output.js';
+export { createOutputSink } from '../../../runtime/execution/output/sink.js';
+export type { OutputSink, OutputSinkOptions } from '../../../runtime/execution/output/sink.js';

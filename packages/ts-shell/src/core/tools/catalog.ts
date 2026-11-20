@@ -1,5 +1,6 @@
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import type { ToolDefinition } from "../../tools/types.js";
+import type { TaskWorktreeFactory } from "../../tools/worktree.js";
 import type { McpToolDescriptor } from "../mcp/types.js";
 import { MCP_TOOL_PREFIX } from '../mcp/projection.js';
 import type { Skill } from "../skills/skillLoader.js";
@@ -17,6 +18,8 @@ import { deferredMcpTools, mcpCatalogFilter, mcpToolsForRun, type ToolMcpGateway
 const DISCOVERY_NAMES = [DISCOVERY_SEARCH_TOOL, DISCOVERY_LOAD_TOOL] as const;
 
 export interface ToolCatalogInput {
+  readonly worktrees?: TaskWorktreeFactory;
+  readonly builtinTools?: readonly ToolDefinition[];
   /** Fixed content for an independently approved run; executable contributions remain owner-bound. */
   readonly catalogContent?: CatalogContent;
   readonly onCommandSettled?: Parameters<typeof createDefaultExecutionService>[0];
@@ -73,7 +76,7 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
   const mcp = deferred ? undefined : await mcpToolsForRun(input);
   input.signal?.throwIfAborted();
   assertAdmission(input.admission);
-  const registry = override?.() ?? createCoreToolRegistry({ skills,
+  const registry = override?.() ?? createCoreToolRegistry({ skills, worktrees: input.worktrees, builtinTools: input.builtinTools,
     ...(input.onCommandSettled ? { executionService: createDefaultExecutionService(input.onCommandSettled) } : {}),
     ...(mcp ? { mcpTools: mcp.tools, mcpGateway: mcp.gateway } : {}),
   });

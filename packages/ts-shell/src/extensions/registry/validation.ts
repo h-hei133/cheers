@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { isRecord } from '../../core/values/record.js';
 import type { ExtensionManifest, Release, CatalogPage } from '../model.js';
+import { captureFlag } from '../runtime/flag.js';
 
 export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -42,10 +43,22 @@ export function manifest(value: unknown): ExtensionManifest {
     return { name: name(entry.name), description: text(entry.description), script: name(entry.script), ...(entry.aliases ? { aliases: (entry.aliases as unknown[]).map(name) } : {}) };
   });
   const tools = list(value.tools).map(entry => ({ name: name(entry.name), description: text(entry.description), script: name(entry.script) }));
+  const flags = value.flags === undefined ? undefined : list(value.flags).map(entry => {
+    const flag = captureFlag(entry);
+    if (entry.type === undefined) throw new Error('An installed extension flag requires its type.');
+    return { ...flag, script: name(entry.script) };
+  });
   unique(scripts.map(entry => entry.name)); unique(skills.map(entry => entry.path)); unique(commands.flatMap(entry => [entry.name, ...entry.aliases ?? []])); unique(tools.map(entry => entry.name));
   if ([...commands, ...tools].some(entry => !scripts.some(script => script.name === entry.script))) throw new Error('Unknown extension script.');
+  if (flags) {
+    unique(flags.map(entry => entry.name));
+    if (flags.some(entry => !scripts.some(script => script.name === entry.script && /\.(?:js|mjs|ts)$/.test(script.path)))) {
+      throw new Error('Installed extension flags require a declared JavaScript or TypeScript script.');
+    }
+  }
   const result: ExtensionManifest = { schema: 1, name: name(value.name), version: version(value.version), ...(value.description !== undefined ? { description: text(value.description) } : {}),
-    permissions: { workspace: value.permissions.workspace as 'read' | 'write', network: 'none' }, skills, scripts, commands, tools };
+    permissions: { workspace: value.permissions.workspace as 'read' | 'write', network: 'none' }, skills, scripts, commands, tools,
+    ...(flags ? { flags } : {}) };
   // Unknown fields are refused: a signed permission must not be silently ignored.
   if (canonical(result) !== canonical(value)) throw new Error('Unknown or noncanonical extension manifest fields.');
   return result;

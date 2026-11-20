@@ -100,6 +100,7 @@ export {
   type ExtensionSessionBeforeEventResult,
   type ExtensionFactory,
   type ExtensionHostBridge,
+  type ExtensionThinkingUpdate,
   type LoadedInProcessExtension,
 } from "./extensions/runtime/inProcessLoader.js";
 export { SessionManager } from "./session/SessionManager.js";

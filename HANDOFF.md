@@ -2950,8 +2950,32 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Root cause:** Both creators can pass the absence check before a recursive directory creation succeeds for both.
 - **Rule:** Reserve the current session directory with nonrecursive `mkdir` before initializing any files. Reject occupied compatibility paths, including dangling links, while allowing a malformed legacy parent with no possible session child. Keep partially written records after an unknown result and leave activation to the existing owner.
 
+### Effort Changes Preserve The Selected Model's Request Controls
+
+- **Symptom** Adjusting only the reasoning effort silently resets the saved service tier and context window. A saved effort may also differ from the current request's effective level.
+- **Root cause** The shared model writer rebuilt the selection through the same path as a target change. A successful save can still leave a startup override in effect.
+- **Rule** Retain model-specific controls for an effort-only write on the same model and credential binding. Compare the accepted request to the durable preference before reporting it as applied.
+
 ### Prompt Publication Uncertainty Survives Startup
 
 - **Symptom** Restarting after a failed prompt write activates a new session over the unresolved transaction's selection.
 - **Root cause** The registry preserves the marker but reports an ordinary load failure, so startup follows its stale-session fallback.
-- **Rule** Preserve the typed publication outcome through selection and resume. Reconcile a matching intent before capturing startup files. Keep unresolved bytes and selection intact until explicit replacement. A terminal journal must treat unchanged metadata as both before and after, including when timestamps match within one millisecond.
+- **Rule** Preserve the typed publication outcome through selection and resume. During staged startup, project the matching intent read-only, including fork prefix matches. Replay only after startup arguments pass validation and the state lock confirms the original files and marker. Keep unresolved bytes and selection intact until explicit replacement. A terminal journal must treat unchanged metadata as both before and after, including when timestamps match within one millisecond.
+
+### Report Activity Time Can Exceed Saved Metadata Time
+
+- **Symptom** A command prints and saves its report, then activation validation fails with a metadata mismatch.
+- **Root cause** The session read projects the latest visible report timestamp into `updatedAt`. Report persistence appends to the transcript and leaves metadata untouched.
+- **Rule** Keep exact comparisons for the other metadata fields. Accept a later activity time only when the pinned saved state and transcript reproduce that exact projection.
+
+### Workspace Declarations Travel With Bundled Code
+
+- **Symptom** A workspace consumer compiles, but an isolated installation cannot resolve a private package from a public declaration.
+- **Root cause** Bundling the implementations moves runtime ownership into the published build, while emitted imports still name packages only installed in the source workspace.
+- **Rule** Bundle each package's checked public declarations with the same build and link its emitted type references. Verify a strict type consumer in an isolated installation outside the repository.
+
+### Standalone Write Hooks Use The Embedded Script Runner
+
+- **Symptom** The write hook starts the standalone CLI again and never returns its decision frame.
+- **Root cause** Launching the standalone executable normally reenters its packaged entrypoint, even when the argument names a script.
+- **Rule** Bind both hook transports to the embedded script runner when launching from a standalone executable. Exercise the pinned artifact through the real native write gate to verify denial, unchanged bytes and a later allowed write.

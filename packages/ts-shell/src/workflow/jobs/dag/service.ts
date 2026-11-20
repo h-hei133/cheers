@@ -1,5 +1,4 @@
-import { DAGResolver } from '../../../core/workflow/dagResolver.js';
-import { ParallelDispatcher } from '../../../core/workflow/parallelDispatcher.js';
+import { DAGResolver, ParallelDispatcher } from '@cheers/workflow';
 import { sameValue } from '../../../config/values.js';
 import type { WorkflowFile } from '../../../core/workflow/definition.js';
 import { JobStateError } from '../model.js';

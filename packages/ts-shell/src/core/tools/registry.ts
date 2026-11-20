@@ -20,14 +20,13 @@ import { readOnlyTool } from './capability.js'
 import { createWebFetchToolDefinition } from './webFetch.js'
 import { createWebSearchToolDefinition } from './webSearch.js'
 import { createLspToolDefinition } from './lsp.js'
-import { createUnifiedBrowserToolDefinition } from './browserToolUnified.js'
 import { createDesktopToolDefinition } from '../../desktop/tool.js'
 import { createAskToolDefinition } from './ask.js'
 import { createTodoToolDefinition } from './todoTool.js'
 import { createTaskToolDefinition } from './taskTool.js'
-import type { PwRuntimeStatus } from '../../browser/playwrightRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
+import type { TaskWorktreeFactory } from '../../tools/worktree.js'
 import { resolveToolTarget } from './permissionContext.js'
 import { validateToolArguments } from './arguments.js'
 import { approvedResult } from './toolResultLifecycle.js'
@@ -66,8 +65,10 @@ function outsideWorkspaceMessage(reason: string | undefined, target: string, wor
 export function createCoreToolRegistry(options?: {
   mcpTools?: readonly McpToolDescriptor[]
   mcpGateway?: Pick<CoreMcpGateway, 'invokeTool'>
-  browserRuntimeStatus?: PwRuntimeStatus
+  /** Built-in tools supplied by the host composition. */
+  builtinTools?: readonly ToolDefinition[]
   executionService?: ExecutionService
+  worktrees?: TaskWorktreeFactory
   /**
    * Skills the skill tool may load.
    *
@@ -170,8 +171,8 @@ export function createCoreToolRegistry(options?: {
     createLspToolDefinition(executionService),
     createAskToolDefinition(),
     createTodoToolDefinition(),
-    createTaskToolDefinition(),
-    createUnifiedBrowserToolDefinition(),
+    createTaskToolDefinition(options?.worktrees),
+    ...(options?.builtinTools ?? []),
     createDesktopToolDefinition(executionService),
   ]
 

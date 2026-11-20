@@ -107,12 +107,14 @@ function commitPromptTransaction(
 }
 
 /** Reopen the existing session under its lock and reconcile only the recorded intent. */
-export function recoverSessionPrompt(layout: SessionFileLayout, sessionId: string): void {
-  if (!hasPromptIntent(layout)) return;
+export function recoverSessionPrompt(layout: SessionFileLayout, sessionId: string, beforeReplay?: () => void): void {
+  if (!beforeReplay && !hasPromptIntent(layout)) return;
   try {
     withSessionStateLock(layout, () => {
+      beforeReplay?.();
       const intent = readPromptIntent(layout, sessionId);
       if (intent) finishSessionPrompt(layout, intent);
+      else if (beforeReplay) throw new PromptPublicationError('unknown');
     }, lock);
   } catch { throw new PromptPublicationError('unknown'); }
 }

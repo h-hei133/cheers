@@ -1,6 +1,12 @@
 import { defineConfig } from 'vitest/config';
+import { defaultClientConditions, defaultServerConditions } from 'vite';
 
 export default defineConfig({
+  resolve: { conditions: ['cheers-source', ...defaultClientConditions] },
+  ssr: {
+    noExternal: /^@cheers\//,
+    resolve: { conditions: ['cheers-source', ...defaultServerConditions] },
+  },
   test: {
     environment: 'node',
     globals: true,

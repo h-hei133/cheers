@@ -1,6 +1,4 @@
-import { briefSchema, requestSchema, identifier, text, texts } from '../brief/schema.js';
-import { claimSchema, sourceSchema, draftSchema } from '../evidence/schema.js';
-import { reviewSchema } from '../review/schema.js';
+import { briefSchema, requestSchema, identifier, text, texts, claimSchema, sourceSchema, draftSchema, reviewSchema } from '@cheers/research';
 
 const count = { type: 'integer', minimum: 0 };
 const scope = { sessionId: identifier, sessionCreatedAt: text,

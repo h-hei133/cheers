@@ -13,8 +13,8 @@ vi.mock("node:child_process", async () => {
   launch.mockImplementation(actual.spawn);
   return { ...actual, spawn: launch };
 });
-vi.mock("../../../workflow/jobs/local/output.js", async () => {
-  const actual = await vi.importActual<typeof import("./output.js")>("../../../workflow/jobs/local/output.js");
+vi.mock("../../../runtime/execution/output/sink.js", async () => {
+  const actual = await vi.importActual<typeof import("../../../runtime/execution/output/sink.js")>("../../../runtime/execution/output/sink.js");
   makeSink.mockImplementation(actual.createOutputSink);
   return { ...actual, createOutputSink: makeSink };
 });
@@ -22,7 +22,7 @@ vi.mock('../platform/processTree.js', () => ({ trackChildPid: vi.fn(), untrackCh
 
 afterEach(async () => {
   launch.mockReset().mockImplementation((await vi.importActual<typeof import("node:child_process")>("node:child_process")).spawn);
-  makeSink.mockReset().mockImplementation((await vi.importActual<typeof import("./output.js")>("../../../workflow/jobs/local/output.js")).createOutputSink);
+  makeSink.mockReset().mockImplementation((await vi.importActual<typeof import("../../../runtime/execution/output/sink.js")>("../../../runtime/execution/output/sink.js")).createOutputSink);
 });
 
 async function until(check: () => boolean): Promise<void> {

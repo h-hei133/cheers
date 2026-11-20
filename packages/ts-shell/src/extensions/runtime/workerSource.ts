@@ -5,6 +5,10 @@ import { createToolResultCapture, createToolResultReducer } from '../events/resu
 import { createMessageResultCapture, projectMessageEnd } from '../events/message.js';
 import { createInputEventCapture, createInputEventProjection, createInputHookPayloadCapture, createInputHookReducer, createInputHookResultCapture, createInputResultCapture, InputRefusal } from '../events/input.js';
 import { createCallbackResultCapture } from '../../core/values/promise.js';
+import { createShortcutCapture, MAX_SHORTCUTS } from './shortcut.js';
+import { createSessionCancellationCapture } from '../events/decision.js';
+import { createFlagCapture, EXTENSION_FLAG_NAME } from './flag.js';
+import { normalizeKey } from '../../presentation/tui/input/keyId.js';
 
 export const EXTENSION_WORKER_SOURCE = `
 const vm = require('node:vm');
@@ -16,6 +20,7 @@ const __name = (target, value) => Object.defineProperty(target, 'name', { value,
 // Use the same pure capture factories; their dependencies are explicit parameters.
 const captureData = (${createDataSnapshot.toString()})(types.isProxy);
 const captureTree = (${createTreeResultCapture.toString()})(captureData);
+const captureCancellation = (${createSessionCancellationCapture.toString()})(captureData);
 const captureCompact = (${createCompactResultCapture.toString()})(captureData);
 const captureTool = (${createToolResultCapture.toString()})(captureData);
 const captureMessage = (${createMessageResultCapture.toString()})(captureData);
@@ -32,6 +37,10 @@ const beforeTree = Object.setPrototypeOf(value => {
 const compactResult = Object.setPrototypeOf(value => {
   try { return JSON.stringify({ ok: true, value: captureCompact(value) }); }
   catch { return '{"ok":false}'; }
+}, null);
+const sessionCancellation = Object.setPrototypeOf(value => {
+  try { return captureCancellation(value) ? 1 : 0; }
+  catch { return -1; }
 }, null);
 const inputResult = Object.setPrototypeOf(value => {
   try { return JSON.stringify({ ok: true, value: captureInput(value) }); }
@@ -59,6 +68,8 @@ const inputHookPayload = Object.setPrototypeOf(value => {
 }, null);
 const promiseBrand = Object.setPrototypeOf(value => { try { return types.isPromise(value); } catch { return false; } }, null);
 const proxyBrand = Object.setPrototypeOf(value => { try { return types.isProxy(value); } catch { return true; } }, null);
+const normalizeShortcut = Object.setPrototypeOf(value => typeof value === 'string'
+  ? (${normalizeKey.toString()})(value) : undefined, null);
 
 const vmCtx = vm.createContext(Object.create(null), {
   name: 'extension-worker',
@@ -79,8 +90,15 @@ Object.defineProperty(vmCtx, '__onReply', { value: registerReceiver, enumerable:
 Object.defineProperty(vmCtx, '__ARGV', { value: JSON.stringify(workerData.argv), enumerable: false });
 Object.defineProperty(vmCtx, '__ROOT', { value: String(workerData.workspaceRoot), enumerable: false });
 Object.defineProperty(vmCtx, '__INVOKE', { value: workerData.invoke ? JSON.stringify(workerData.invoke) : '', enumerable: false });
+Object.defineProperty(vmCtx, '__SHORTCUT_INVOKE', { value: workerData.invoke?.kind === 'command' && workerData.invoke.shortcutKey !== undefined
+  ? JSON.stringify(workerData.invoke) : '', enumerable: false });
+Object.defineProperty(vmCtx, '__NORMALIZE_SHORTCUT', { value: normalizeShortcut, enumerable: false });
 Object.defineProperty(vmCtx, '__TREE_RESULT', { value: beforeTree, enumerable: false });
 Object.defineProperty(vmCtx, '__COMPACT_RESULT', { value: compactResult, enumerable: false });
+Object.defineProperty(vmCtx, '__SESSION_CANCELLATION', { value: sessionCancellation, enumerable: false });
+Object.defineProperty(vmCtx, '__EVENT_NOTIFICATION', { value: workerData.notification === true, enumerable: false });
+Object.defineProperty(vmCtx, '__EVENT_TRANSITION', { value: workerData.transition === true, enumerable: false });
+Object.defineProperty(vmCtx, '__WORKER_FLAGS', { value: JSON.stringify(workerData.flags ?? []), enumerable: false });
 Object.defineProperty(vmCtx, '__TOOL_RESULT', { value: toolResult, enumerable: false });
 Object.defineProperty(vmCtx, '__MESSAGE_RESULT', { value: messageResult, enumerable: false });
 Object.defineProperty(vmCtx, '__INPUT_RESULT', { value: inputResult, enumerable: false });
@@ -101,6 +119,10 @@ const bootstrap = new vm.Script(\`
   delete globalThis.__PROMISE_BRAND;
   delete globalThis.__PROXY_BRAND;
   const __name = (target, value) => Object.defineProperty(target, 'name', { value, configurable: true });
+  const captureShortcut = (${createShortcutCapture.toString()})(proxyBrand);
+  const shortcutInvocation = globalThis.__SHORTCUT_INVOKE ? JSON.parse(globalThis.__SHORTCUT_INVOKE) : undefined;
+  const normalizeShortcut = globalThis.__NORMALIZE_SHORTCUT;
+  const captureFlag = (${createFlagCapture.toString()})(proxyBrand, new RegExp(${JSON.stringify(EXTENSION_FLAG_NAME.source)}));
   const captureCallback = (${createCallbackResultCapture.toString()})(proxyBrand, promiseBrand, Promise, Promise);
   const captureInput = value => {
     const envelope = JSON.parse(globalThis.__INPUT_RESULT(value));
@@ -116,6 +138,11 @@ const bootstrap = new vm.Script(\`
     const envelope = JSON.parse(globalThis.__COMPACT_RESULT(value));
     if (!envelope.ok) throw new Error('Extension compaction result was refused.');
     return envelope.value;
+  };
+  const captureCancellation = value => {
+    const status = globalThis.__SESSION_CANCELLATION(value);
+    if (status === -1) throw new Error('Extension session result was refused.');
+    return status === 1;
   };
   const captureTool = value => {
     const envelope = JSON.parse(globalThis.__TOOL_RESULT(value));
@@ -147,6 +174,8 @@ const bootstrap = new vm.Script(\`
     cancelled: () => new Error('Extension input was refused.'),
   });
   globalThis.__captureCompactCallback = operation => captureCallback(operation, captureCompact);
+  globalThis.__captureCancellationCallback = operation => captureCallback(operation, captureCancellation);
+  globalThis.__captureNotificationCallback = operation => captureCallback(operation, () => undefined);
   globalThis.__captureToolCallback = operation => captureCallback(operation, captureTool);
   globalThis.__captureMessageCallback = operation => captureCallback(operation, captureMessage);
   globalThis.__projectMessageEnd = (${projectMessageEnd.toString()});
@@ -195,15 +224,26 @@ const bootstrap = new vm.Script(\`
   const registeredTools = new Map();
   const registeredCommands = new Map();
   const registeredHandlers = new Map();
-  const registeredShortcuts = new Map();
+  let actualShortcutCommand;
+  let registeredShortcutCommand;
+  let shortcutCount = 0;
   const registeredFlags = new Map();
+  const declaredFlags = new Map(JSON.parse(globalThis.__WORKER_FLAGS).map(entry => [entry.definition.name, entry]));
   const flagValues = new Map();
+  let flagError = false;
   const busListeners = new Map();
   globalThis.__registeredTools = registeredTools;
   globalThis.__registeredCommands = registeredCommands;
   globalThis.__registeredHandlers = registeredHandlers;
-  globalThis.__registeredShortcuts = registeredShortcuts;
-  globalThis.__registeredFlags = registeredFlags;
+  Object.defineProperty(globalThis, '__runInstalledShortcut', { value: shortcutInvocation ? () => {
+    if (actualShortcutCommand !== shortcutInvocation.name || !registeredShortcutCommand) {
+      throw new Error('The installed shortcut binding changed.');
+    }
+    return registeredShortcutCommand.execute(shortcutInvocation.args || [], { workspaceRoot: globalThis.__ROOT, ui });
+  } : undefined });
+  Object.defineProperty(globalThis, '__checkWorkerFlags', { value: () => {
+    if (flagError || [...declaredFlags].some(([name]) => !registeredFlags.has(name))) throw new Error('Installed flag declarations changed.');
+  } });
 
   const eventsBus = Object.freeze({
     on: (channel, listener) => {
@@ -263,6 +303,7 @@ const bootstrap = new vm.Script(\`
         throw new Error('Extension registerCommand requires { name, execute }.');
       }
       registeredCommands.set(cmd.name, cmd);
+      if (shortcutInvocation?.name === cmd.name) registeredShortcutCommand = cmd;
       send('registerCommand', JSON.stringify({
         name: cmd.name,
         description: String(cmd.description ?? ''),
@@ -270,19 +311,26 @@ const bootstrap = new vm.Script(\`
       }));
     },
     registerShortcut: (shortcut) => {
-      if (!shortcut || typeof shortcut.key !== 'string' || !shortcut.key.trim()) {
-        throw new Error('Extension registerShortcut requires { key }.');
+      if (shortcutCount >= ${MAX_SHORTCUTS}) throw new Error('Shortcut registration limit exceeded.');
+      const { key, description, command } = captureShortcut(shortcut);
+      shortcutCount++;
+      if (shortcutInvocation && command !== undefined && normalizeShortcut(key) === shortcutInvocation.shortcutKey) {
+        actualShortcutCommand = command;
       }
-      registeredShortcuts.set(shortcut.key, shortcut);
-      send('registerShortcut', JSON.stringify({ key: shortcut.key, description: String(shortcut.description ?? '') }));
+      send('registerShortcut', JSON.stringify({ key, description: description ?? '', command }));
     },
     registerFlag: (flag) => {
-      if (!flag || typeof flag.name !== 'string' || !flag.name.trim()) {
-        throw new Error('Extension registerFlag requires { name }.');
-      }
-      registeredFlags.set(flag.name, flag);
-      if (!flagValues.has(flag.name) && 'default' in flag) flagValues.set(flag.name, flag.default);
-      send('registerFlag', JSON.stringify({ name: flag.name, type: flag.type ?? 'string', description: String(flag.description ?? '') }));
+      try {
+        const captured = captureFlag(flag);
+        const declared = declaredFlags.get(captured.name);
+        if (registeredFlags.size >= 32 || registeredFlags.has(captured.name)
+          || declared && (captured.type !== declared.definition.type || captured.default !== declared.definition.default)) {
+          throw new Error('Installed flag declarations changed.');
+        }
+        registeredFlags.set(captured.name, captured);
+        flagValues.set(captured.name, declared?.value ?? captured.default);
+        send('registerFlag', JSON.stringify(captured));
+      } catch (error) { flagError = true; throw error; }
     },
     getFlag: (name) => flagValues.get(String(name ?? '')),
     on: (event, handler) => {
@@ -298,6 +346,7 @@ const bootstrap = new vm.Script(\`
     getActiveTools: () => rpc('host.getActiveTools', {}),
     getAllTools: () => rpc('host.getAllTools', {}),
     getCommands: () => rpc('host.getCommands', {}),
+    setThinkingLevel: async () => { throw new Error('Installed extension scripts have no session model control.'); },
     sendMessage: (msg) => rpc('host.sendMessage', { msg }),
     appendEntry: (customType, data) => rpc('host.appendEntry', { customType: String(customType ?? ''), data }),
   };
@@ -317,12 +366,14 @@ parentPort.on('message', (msg) => {
     const script = new vm.Script(workerData.code, { filename: workerData.filename });
     script.runInContext(vmCtx, { timeout: 5000 });
     const invokeEvent = workerData.invoke?.kind === 'event' ? workerData.invoke.event : undefined;
-    const guardedInvoke = ['input', 'UserPromptSubmit', 'session_before_compact', 'tool_result', 'message_end'].includes(invokeEvent);
+    const guardedInvoke = workerData.transition === true || ['input', 'UserPromptSubmit', 'session_before_compact', 'tool_result', 'message_end'].includes(invokeEvent);
     const runner = new vm.Script((guardedInvoke ? 'globalThis.__finishInputRunner(() => (' : '') + \`
       (async () => {
         const exp = module.exports || {};
         if (typeof exp.default === 'function') await exp.default(api);
         else if (typeof exp.activate === 'function') await exp.activate(api);
+        globalThis.__checkWorkerFlags();
+        if (globalThis.__runInstalledShortcut) return await globalThis.__runInstalledShortcut();
         const invoke = globalThis.__INVOKE ? JSON.parse(globalThis.__INVOKE) : null;
         if (invoke && invoke.kind === 'tool') {
           const tool = globalThis.__registeredTools.get(invoke.name);
@@ -336,7 +387,8 @@ parentPort.on('message', (msg) => {
           let decision;
           const tree = invoke.event === 'session_before_tree';
           const compact = invoke.event === 'session_before_compact';
-          const compactNotification = invoke.event === 'session_compact';
+          const notification = globalThis.__EVENT_NOTIFICATION;
+          const transition = globalThis.__EVENT_TRANSITION;
           const tool = invoke.event === 'tool_result';
           let toolPayload = tool ? globalThis.__freezeCompactPayload(invoke.payload) : undefined;
           const messageEnd = invoke.event === 'message_end';
@@ -352,8 +404,9 @@ parentPort.on('message', (msg) => {
             if (!envelope.ok) throw new Error('Extension input was refused.');
             inputPayload = freezeInput(envelope.value);
           }
-          const payload = legacyInput ? globalThis.__captureInputHookPayload(invoke.payload) : tree ? Object.freeze(invoke.payload)
-            : compact || compactNotification ? globalThis.__freezeCompactPayload(invoke.payload) : invoke.payload;
+          const payload = legacyInput ? globalThis.__captureInputHookPayload(invoke.payload)
+            : tree || compact || notification || transition ? globalThis.__freezeCompactPayload(invoke.payload) : invoke.payload;
+          const context = { workspaceRoot: globalThis.__ROOT, ui: api.ui };
           for (const eventName of names) {
             const list = globalThis.__registeredHandlers.get(eventName) || [];
             for (const handler of list) {
@@ -364,11 +417,13 @@ parentPort.on('message', (msg) => {
                   : compact ? (await globalThis.__captureCompactCallback(() => handler(payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui }))).value
                   : tool ? (await globalThis.__captureToolCallback(() => handler(toolPayload, { workspaceRoot: globalThis.__ROOT, ui: api.ui }))).value
                   : messageEnd ? (await globalThis.__captureMessageCallback(() => handler(messagePayload, { workspaceRoot: globalThis.__ROOT, ui: api.ui }))).value
-                  : await handler(tree || compactNotification ? payload : decision ?? invoke.payload, { workspaceRoot: globalThis.__ROOT, ui: api.ui });
+                  : transition ? (await globalThis.__captureCancellationCallback(() => handler(payload, context))).value
+                  : notification ? await globalThis.__captureNotificationCallback(() => handler(payload, context))
+                  : await handler(tree ? payload : decision ?? invoke.payload, context);
               }
               catch (error) {
                 if (guardedInput) throw new Error('Extension input was refused.');
-                if (tool || messageEnd) continue;
+                if (tool || notification) continue;
                 throw error;
               }
               if (nativeInput) {
@@ -393,7 +448,6 @@ parentPort.on('message', (msg) => {
                 if (next?.summary !== undefined) decision = Object.freeze(Object.assign(Object.create(null), { summary: next.summary }));
                 continue;
               }
-              if (compactNotification) continue;
               if (tool) {
                 const reduced = globalThis.__reduceToolResult(toolPayload, decision, next);
                 toolPayload = reduced.event;
@@ -405,6 +459,11 @@ parentPort.on('message', (msg) => {
                   messagePayload = globalThis.__projectMessageEnd(messagePayload, next);
                   decision = next;
                 }
+                continue;
+              }
+              if (notification) continue;
+              if (transition) {
+                if (next === true) return Object.freeze({ cancel: true });
                 continue;
               }
               if (tree && next !== undefined) {
@@ -419,7 +478,7 @@ parentPort.on('message', (msg) => {
           if (nativeInput) return transformed
             ? Object.freeze({ action: 'transform', text: inputPayload.text, ...(inputPayload.images === undefined ? {} : { images: inputPayload.images }) })
             : Object.freeze({ action: 'continue' });
-          return decision;
+          return transition ? Object.freeze({ cancel: false }) : decision;
         }
         if (typeof exp.run === 'function') {
           return await exp.run({ args: JSON.parse(globalThis.__ARGV), workspaceRoot: globalThis.__ROOT, api });

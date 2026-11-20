@@ -1,8 +1,7 @@
+import type { ClaimRecord, ReportFragment, ResearchBrief, ResearchDraft, ReviewRecord, SourceRecord } from '@cheers/research';
 import type { BoundSessionScope } from '../../session/store/contract.js';
 import type { ProcessOwner } from '../../core/state/owner.js';
-import type { ResearchBrief, ResearchRequest } from '../brief/model.js';
-import type { SourceRecord, ClaimRecord, ResearchDraft } from '../evidence/model.js';
-import type { ReviewRecord } from '../review/model.js';
+import type { ResearchRequest } from '../brief/model.js';
 
 export type ResearchStage = 'brief' | 'investigate' | 'gaps' | 'draft' | 'review' | 'report' | 'reconcile';
 export type ResearchStatus = 'ready' | 'running' | 'paused' | 'partial' | 'completed';
@@ -24,14 +23,7 @@ export interface ResearchEvent {
   readonly stage: ResearchStage;
   readonly detail: string;
 }
-export interface ReportFragment {
-  readonly index: number;
-  readonly title: string;
-  readonly text: string;
-  readonly claimIds: readonly string[];
-  readonly sourceIds: readonly string[];
-  readonly inputDigest: string;
-}
+export type { ReportFragment } from '@cheers/research';
 export interface ResearchRun extends BoundSessionScope {
   readonly schemaVersion: 1;
   readonly id: string;

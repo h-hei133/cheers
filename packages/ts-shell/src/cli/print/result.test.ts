@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import type { TranscriptEvent } from "../../session/sessionEventCodec.js";
+import { sourceTsxArgs } from "../../test-utils/cli/process.js";
 
 const run = promisify(execFile);
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
@@ -87,7 +88,7 @@ async function scenario(kind: Scenario): Promise<void> {
     const prompt = writing ? `Write the requested fixture to ${written}.` : `Read ${fixture}.`;
     const replay = path.join(workspace, "replay.txt");
     await fs.writeFile(replay, `${prompt}\n`);
-    const child = run(process.execPath, [path.join(repo, "node_modules/tsx/dist/cli.mjs"),
+    const child = run(process.execPath, [...sourceTsxArgs,
       path.join(repo, "packages/ts-shell/src/entrypoints/cli.tsx"), "--project", workspace,
       "--non-interactive-approval", denied ? "deny" : "allow-once",
       ...(kind === "replay-read" ? ["--replay-file", replay] : ["--print", prompt]),

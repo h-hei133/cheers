@@ -60,6 +60,13 @@ describe("cli args parser", () => {
     expect(parseCliArgs(args, { cwd, deferExtensionOptions: true })).toMatchObject({ ok: false });
   });
 
+  it('holds an installed extension option for validation before startup activation', () => {
+    const parsed = parseCliArgs(['--project', cwd, '--print', '--installed-label=chosen', '--', 'prompt'],
+      { cwd, deferExtensionOptions: true });
+    expect(parsed).toMatchObject({ ok: true, args: { options: { projectPath: cwd, promptArg: 'prompt' },
+      extensionOptions: [{ name: '--installed-label', inline: 'chosen' }] } });
+  });
+
   it.each([false, true])('preserves the explicit prompt source around composed skills (terminator=%s)', terminator => {
     const prompt = '  Compare /skill:one\nthen /skill:two /skill:one carefully  \n';
     const args = ['--project', cwd, '--print', ...(terminator ? ['--'] : []), prompt];

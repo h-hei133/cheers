@@ -30,6 +30,7 @@ import {
   createSessionRecord,
   deleteSessionRecord,
   loadSessionRecord,
+  previewPendingSessionRecord,
   sessionExistsAtLayout,
   writeSessionMetadataRecord,
 } from "./sessionStore.js";
@@ -49,6 +50,11 @@ import {
 } from "../presentation/sessionWarningSurface.js";
 import { ArtifactManager } from "../../core/session/artifactManager.js";
 import { recoverSessionPrompt } from './prompt/commit.js';
+
+export interface SessionListOptions {
+  /** Resolve an ID prefix before startup admission, including recoverable sessions. */
+  readonly previewPrefix: string;
+}
 
 export class SessionStoreAccess extends SessionStorePaths {
   readonly files: SessionFiles;
@@ -123,7 +129,7 @@ export class SessionStoreAccess extends SessionStorePaths {
     }
   }
 
-  listSessions(onSource?: (target: string) => void): Session[] {
+  listSessions(onSource?: (target: string) => void, options?: SessionListOptions): Session[] {
     assertSessionStoreProfile(this.storeLayout, this.storeLayout.sessionsDir);
     // Every directory that may hold sessions, so a listing does not hide the ones
     // written before the directory was renamed. Ids are unique, so an id present
@@ -133,10 +139,16 @@ export class SessionStoreAccess extends SessionStorePaths {
     for (const sessionsDir of this.storeLayout.sessionsSearchDirs) {
       for (const session of listSessionRecords({
         sessionsDir,
-        loadSession: (sessionId) => this.load(sessionId),
+        loadSession: (sessionId) => {
+          if (!options) return this.load(sessionId);
+          const layout = locateExistingSessionLayout(this.storeLayout, sessionId);
+          const input = { sessionId, layout, cwd: process.cwd() };
+          return previewPendingSessionRecord(input)?.snapshot.session ?? loadSessionRecord(input);
+        },
         warningState: this.listWarningState,
         warn: (message) => console.warn(message),
         skipSessionIds: seen,
+        idPrefix: options?.previewPrefix,
         onSource,
       })) {
         seen.add(session.id);

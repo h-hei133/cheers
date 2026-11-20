@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { createUnifiedBrowserToolDefinition } from "./browserToolUnified.js";
+import { createUnifiedBrowserToolDefinition } from "../../browser/tool/definition.js";
 import { defaultBrowserSessionManager as manager } from "../../browser/sessionManager.js";
 
 const page = vi.hoisted(() => ({

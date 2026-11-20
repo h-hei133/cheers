@@ -1,5 +1,4 @@
-import { WIRE_BYTES, type ServiceResponse } from '../contract/model.js';
-import { CollaborationError, keys, object, parseJson, requireValue } from '../contract/value.js';
+import { WIRE_BYTES, type ServiceResponse, CollaborationError, keys, object, parseJson, requireValue } from '@cheers/collaboration';
 
 function decodeLine(line: Buffer, principal: string): ServiceResponse | undefined {
   const source = line.toString('utf8'); requireValue(Buffer.from(source).equals(line));

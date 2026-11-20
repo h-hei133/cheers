@@ -13,7 +13,7 @@ import { credentialIdentityFor } from '../../../core/auth/account/pool.js';
 import type { AgentRuntime, AgentOutcome, AgentChild } from '../../../workflow/jobs/agent/model.js';
 import { JobStore } from '../../../workflow/jobs/store.js';
 import { LocalJournal } from '../../../workflow/jobs/local/journal.js';
-import { TaskRegistry } from '../../../workflow/jobs/local/registry.js';
+import { TaskRegistry } from '../../../runtime/execution/background/registry.js';
 import { AgentSessions } from './session.js';
 import { captureOrigin } from '../origin.js';
 import { forgetSessionTodos } from '../../../core/commands/todoCommandRuntime.js';

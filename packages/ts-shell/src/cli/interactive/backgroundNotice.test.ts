@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createBackgroundFollowUp } from './backgroundNotice.js';
-import type { BackgroundTask } from '../../workflow/jobs/local/model.js';
+import type { BackgroundTask } from '../../runtime/execution/background/model.js';
 
 const task = (id: string, state: BackgroundTask['state'] = 'exited', output = 'done'): BackgroundTask =>
   ({ id, command: 'build', cwd: '/tmp', pid: 1, startedAt: 0, state, output });

@@ -248,7 +248,7 @@ function runClassificationSelfTest() {
 async function runRealProviderSmoke() {
   writeFixture()
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     cliEntryPath,
     '--project',
     projectRoot,

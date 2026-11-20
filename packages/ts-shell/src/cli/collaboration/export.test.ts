@@ -7,7 +7,7 @@ import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { CollaborationComposition } from './model.js';
 import { runDump } from './export.js';
-import { digest } from '../../collaboration/contract/value.js';
+import { digest } from '@cheers/collaboration';
 import { readExportSource } from '../../session/export/source.js';
 import { snapshotPreview } from './projection.js';
 

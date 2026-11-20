@@ -1,6 +1,6 @@
 import { createWebSearchToolDefinition } from "../tools/webSearch.js";
 import { createWebFetchToolDefinition } from "../tools/webFetch.js";
-import { ParallelDispatcher } from "../workflow/parallelDispatcher.js";
+import { ParallelDispatcher } from '@cheers/workflow';
 import type { ToolExecutionContext } from "../../tools/types.js";
 import type { CollectedPage, CollectionReport } from "./types.js";
 

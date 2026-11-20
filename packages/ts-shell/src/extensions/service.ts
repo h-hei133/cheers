@@ -19,6 +19,10 @@ import { evaluateToolPermissionScope } from '../core/query/toolPolicy.js';
 import { captureInputHookResult, captureInputResult, InputRefusal } from './events/input.js';
 import { captureToolResult } from './events/result.js';
 import { captureMessageResult } from './events/message.js';
+import { isNotificationEvent } from './events/model.js';
+import { isSessionTransitionEvent, sessionCancellation } from './events/decision.js';
+import { InstalledShortcuts, type InstalledShortcut } from './runtime/shortcut.js';
+import { scriptOptions, type InstalledOptionValue } from './runtime/options.js';
 
 export interface ExtensionServiceOptions {
   readonly root: string;
@@ -29,6 +33,7 @@ export interface ExtensionServiceOptions {
   readonly denyRules: () => readonly DenyRule[];
   readonly execution?: ExecutionHost['execution'];
   readonly extensionHost?: ExtensionHostBridge;
+  readonly installedValues?: () => readonly InstalledOptionValue[] | undefined;
   readonly assertWorkspace: (write: boolean) => void;
   readonly assertSourceAccess?: (absolute: string) => void;
   readonly npmRegistry?: string;
@@ -49,6 +54,7 @@ export class ExtensionService implements LifecycleHost {
   private processCleanupUnknown = false;
   private registrations: Array<() => void> = [];
   private readonly calls = new ExtensionCalls();
+  private readonly shortcuts = new InstalledShortcuts();
   private watchers: Array<() => void> = [];
   private publication = '';
   constructor(readonly options: ExtensionServiceOptions) {
@@ -82,16 +88,19 @@ export class ExtensionService implements LifecycleHost {
             if (activation.workspaceIdentity !== rootSignature(this.root)) throw new Error('Extension activation identity changed.');
             assertVersionSource(record.active);
           }
-          this.registrations.push(registerPackage({ root: this.root, sessionId: this.sessionId, file: this.store.file, run: (tool, args) => this.runTool(tool, args),
+          this.registrations.push(registerPackage({ root: this.root, sessionId: this.sessionId, file: this.store.file, run: async (tool, args) => (await this.runTool(tool, args)).output,
           withheld: name => { const message = `${name}: prompt contribution withheld because its identity, grants, files or parsing are invalid.`; if (!this.errors.includes(message)) this.errors.push(message); },
           current: (selected, grant) => this.current(selected, grant, epoch), tool: (selected, script, grant, name) => this.tool(selected, script, grant, name),
-          event: (selected, script, eventName, payload, aliases, signal) => this.dispatchEvent(selected, script, eventName, payload, aliases, epoch, signal) }, record)); }
+          event: (selected, script, eventName, payload, aliases, signal) => this.dispatchEvent(selected, script, eventName, payload, aliases, epoch, signal) }, record));
+          this.shortcuts.register(record, this.root);
+        }
         catch { this.errors.push(`${record.name}: registration withheld because its identity, permissions, files or capability names are invalid.`); }
       }
     } catch { this.errors.push('Extension state unavailable; all capabilities withheld.'); }
   }
   async invalidate(except?: AbortSignal): Promise<void> {
     const revision = ++this.epoch; this.registrations.splice(0).forEach(unregister => unregister());
+    this.shortcuts.retire();
     await this.cancel(except); if (revision === this.epoch && !this.closed && !this.drainUnknown) this.activate();
   }
   async cancel(except?: AbortSignal): Promise<void> {
@@ -112,6 +121,7 @@ export class ExtensionService implements LifecycleHost {
   }
   async close(): Promise<void> {
     this.closed = true; this.watchers.splice(0).forEach(close => close()); this.epoch++;
+    this.shortcuts.retire();
     this.registrations.splice(0).forEach(close => close());
     const drained = await this.calls.cancel();
     if (!drained) {
@@ -124,40 +134,47 @@ export class ExtensionService implements LifecycleHost {
     }
     if (!drained || this.processCleanupUnknown) throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
   }
-  tool(record: PackageRecord, script: string, grant: string, selected = 'extension_run'): ToolDefinition {
+  tool(record: PackageRecord, script: string, grant: string, selected = 'extension_run', shortcut?: InstalledShortcut): ToolDefinition {
     const epoch = this.epoch;
+    const currentShortcut = () => {
+      if (shortcut && this.shortcuts.find(shortcut.key) !== shortcut) throw new Error('The installed shortcut binding changed.');
+    };
     const declared = record.active.manifest.tools.find(entry => grant === `tool:${entry.name}`)?.description;
     return { name: selected, description: `${declared ? `${declared}\n` : ''}Run ${record.name} declared capability ${grant} in its OS sandbox; requires separate grants and ordinary approval.`,
-      resultAdmission: () => { try { this.current(record, grant, epoch); this.current(record, `script:${script}`, epoch); this.options.assertWorkspace(record.active.manifest.permissions.workspace === 'write'); const blocked = this.options.gate(selected).admission?.() ?? this.options.gate('bash').admission?.(); if (blocked) throw new Error(blocked); return undefined; } catch { return 'Extension execution authority changed after ordinary hooks.'; } },
+      resultAdmission: () => { try { currentShortcut(); this.current(record, grant, epoch); this.current(record, `script:${script}`, epoch); this.options.assertWorkspace(record.active.manifest.permissions.workspace === 'write'); const blocked = this.options.gate(selected).admission?.() ?? this.options.gate('bash').admission?.(); if (blocked) throw new Error(blocked); return undefined; } catch { return 'Extension execution authority changed after ordinary hooks.'; } },
       argsSchema: { type: 'object', properties: { args: { type: 'array', items: { type: 'string', maxLength: 1024 }, maxItems: 32 } }, additionalProperties: false },
       prepare: (args, context) => {
         if (context.sessionId !== undefined && context.sessionId !== this.sessionId) throw new Error('Extension tool belongs to another session.');
-        const argv = scriptArgs(args.args); this.current(record, grant, epoch); this.current(record, `script:${script}`, epoch); this.options.assertWorkspace(record.active.manifest.permissions.workspace === 'write');
+        const argv = scriptArgs(args.args); currentShortcut(); this.current(record, grant, epoch); this.current(record, `script:${script}`, epoch); this.options.assertWorkspace(record.active.manifest.permissions.workspace === 'write');
         const native = this.options.gate('bash').admission?.(); if (native) throw new Error(native);
         return { targets: [], previewKind: 'execution', permissionToolName: 'bash', permissionArgs: { command: `extension:${record.active.source}:${record.name}@${record.active.manifest.version}:${record.active.digest}:${script} ${JSON.stringify(argv)}` },
           preview: `Execute isolated /bin/sh script ${script}\nSource ${record.active.source}; version ${record.active.manifest.version}; SHA256 ${record.active.digest}\nWorkspace ${this.root}; declared ${canonical(record.active.manifest.permissions)}; args ${JSON.stringify(argv)}`,
-          execute: context => this.invoke(record, script, grant, argv, epoch, context) };
+          execute: context => this.invoke(record, script, grant, argv, epoch, context, shortcut) };
       }, execute: async () => { throw new Error('Extension execution requires its original prepared and approved call.'); } };
   }
-  private async invoke(record: PackageRecord, script: string, grant: string, args: string[], epoch: number, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+  private async invoke(record: PackageRecord, script: string, grant: string, args: string[], epoch: number, context: ToolExecutionContext, shortcut?: InstalledShortcut): Promise<ToolExecutionResult> {
     if (context.sessionId !== undefined && context.sessionId !== this.sessionId) throw new Error('Extension execution belongs to another session.');
-    const current = () => { this.current(record, grant, epoch); this.current(record, `script:${script}`, epoch); this.options.assertWorkspace(record.active.manifest.permissions.workspace === 'write'); const blocked = this.options.gate('bash').admission?.(); if (blocked) throw new Error(blocked); };
+    const current = () => { if (shortcut && this.shortcuts.find(shortcut.key) !== shortcut) throw new Error('The installed shortcut binding changed.'); this.current(record, grant, epoch); this.current(record, `script:${script}`, epoch); this.options.assertWorkspace(record.active.manifest.permissions.workspace === 'write'); const blocked = this.options.gate('bash').admission?.(); if (blocked) throw new Error(blocked); };
     current();
     return this.calls.run(async signal => {
       const invoke: InProcessExtensionInvoke | undefined = grant.startsWith('tool:')
         ? { kind: 'tool', name: grant.slice(5), args: { args } }
         : grant.startsWith('command:')
-          ? { kind: 'command', name: grant.slice(8), args }
+          ? { kind: 'command', name: grant.slice(8), args, ...(shortcut ? { shortcutKey: shortcut.key } : {}) }
           : undefined;
-      const result = await executeScript({ file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution, extensionHost: this.options.extensionHost }, record.active, script, args, current, { ...context, abortSignal: signal }, invoke);
+      const flags = scriptOptions(record, this.store.file, script, this.options.installedValues?.());
+      const result = await executeScript({ file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution, extensionHost: this.options.extensionHost, flags }, record.active, script, args, current, { ...context, abortSignal: signal }, invoke);
       if (result.metadata?.cleanup === 'unknown') {
         this.drainUnknown = true; this.processCleanupUnknown = true; this.epoch++;
         this.registrations.splice(0).forEach(unregister => unregister());
+        this.shortcuts.retire();
         const detail = 'Extension process or runtime-home cleanup is unknown; capabilities withheld.';
         this.errors.push(detail);
         try { this.store.recordUnknown({ effect: 'executed', detail }); } catch { /* The in-process flag still blocks. */ }
       }
-      try { current(); } catch { return { ...result, success: false, output: `${result.output}\nExtension authority changed after execution; actual receipt remains visible.` }; } return result;
+      try { current(); } catch { return { ...result, success: false, output: `${result.output}\nExtension authority changed after execution; actual receipt remains visible.` }; }
+      this.shortcuts.publish(record, script, result);
+      return result;
     }, context.abortSignal);
   }
   async approve(operation: Operation, selected: 'extension_manage' | 'extension_grant' = 'extension_manage', signal?: AbortSignal): Promise<string> {
@@ -197,14 +214,23 @@ export class ExtensionService implements LifecycleHost {
   async run(packageName: string, script: string, args: string[]): Promise<string> {
     const record = this.store.read().packages.find(entry => entry.name === packageName); if (!record) throw new Error('Extension is not installed.');
     const tool = this.tool(record, script, `script:${script}`);
-    return this.runTool(tool, args);
+    return (await this.runTool(tool, args)).output;
   }
-  private runTool(tool: ToolDefinition, args: string[]): Promise<string> {
+  shortcut(key: string): ((signal: AbortSignal) => Promise<void>) | undefined {
+    const binding = this.shortcuts.find(key);
+    if (!binding) return undefined;
+    const tool = this.tool(binding.record, binding.script, `command:${binding.command}`, 'extension_run', binding);
+    return async signal => {
+      const result = await this.runTool(tool, [], signal);
+      if (result.isError || result.metadata?.cleanup !== 'confirmed') throw new Error('The installed shortcut did not complete.');
+    };
+  }
+  private runTool(tool: ToolDefinition, args: string[], signal?: AbortSignal): ReturnType<typeof runPreparedTool> {
     return this.calls.run(async signal => {
       const gate = this.options.gate(tool.name);
       const admission = () => { if (signal.aborted) return 'Extension execution cancelled.'; try { this.check(); return gate.admission?.(); } catch { return 'Extension execution authority changed.'; } };
-      return (await runPreparedTool(tool, { args }, { ...gate, admission, permissionScope: 'ask' }, signal, undefined, 'Extension execution')).output;
-    });
+      return runPreparedTool(tool, { args }, { ...gate, admission, permissionScope: 'ask' }, signal, undefined, 'Extension execution');
+    }, signal);
   }
   private async dispatchEvent(record: PackageRecord, script: string, event: string, payload: unknown, aliases: readonly string[] | undefined, epoch: number, signal?: AbortSignal): Promise<unknown> {
     const current = () => {
@@ -213,8 +239,9 @@ export class ExtensionService implements LifecycleHost {
     };
     current();
     return this.calls.run(async runSignal => {
+      const flags = scriptOptions(record, this.store.file, script, this.options.installedValues?.());
       const result = await executeScript(
-        { file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution, extensionHost: this.options.extensionHost },
+        { file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution, extensionHost: this.options.extensionHost, flags },
         record.active,
         script,
         [],
@@ -223,16 +250,20 @@ export class ExtensionService implements LifecycleHost {
         { kind: 'event', event, ...(aliases ? { aliases } : {}), payload },
       );
       current();
+      this.shortcuts.publish(record, script, result);
       const guardedInput = event === 'input' || event === 'UserPromptSubmit';
       if (guardedInput && (!result.success || result.metadata?.cleanup !== 'confirmed')) throw new InputRefusal();
-      const guardedDecision = event === 'session_before_tree' || event === 'session_before_compact' || event === 'tool_result' || event === 'message_end';
+      const transition = isSessionTransitionEvent(event);
+      const guardedDecision = transition || event === 'session_before_tree' || event === 'session_before_compact' || event === 'tool_result' || event === 'message_end';
       if (guardedDecision && (!result.success || result.metadata?.cleanup !== 'confirmed')) throw new Error('Extension session callback failed or its cleanup is unverified.');
+      if (!result.success && isNotificationEvent(event)) throw new Error('Extension session notification failed.');
       const raw = typeof result.metadata?.eventOutput === 'string' ? result.metadata.eventOutput : '';
       if (!raw.trim()) return undefined;
       try {
         const returned: unknown = JSON.parse(raw);
         return event === 'input' ? captureInputResult(returned) : event === 'UserPromptSubmit' ? captureInputHookResult(returned)
-          : event === 'tool_result' ? captureToolResult(returned) : event === 'message_end' ? captureMessageResult(returned) : returned;
+          : event === 'tool_result' ? captureToolResult(returned) : event === 'message_end' ? captureMessageResult(returned)
+          : transition ? Object.freeze({ cancel: sessionCancellation(returned) }) : returned;
       } catch {
         if (guardedInput) throw new InputRefusal();
         if (guardedDecision) throw new Error('Extension session callback returned invalid data.');

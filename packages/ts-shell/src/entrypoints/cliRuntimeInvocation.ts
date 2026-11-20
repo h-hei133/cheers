@@ -21,6 +21,7 @@ import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { RequestOverhead } from "../session/context.js";
 import { preparePromptRequest } from '../core/prompts/request.js';
+import { browserTools } from '../tools/registry.js';
 import { requestIdentity } from '../context/request/identity.js';
 export { requestIdentity } from '../context/request/identity.js';
 import { pendingTurnInput } from "../turn/pendingInput.js";
@@ -348,7 +349,9 @@ async function startTurn(
   const imageTool = imageGenerationTool(request);
   const { tools, discovery, promptContext, currentOverhead } = await preparePromptRequest({
     ...request, ...(imageTool ? { featureTools: [...request.featureTools ?? [], imageTool] } : {}),
+    builtinTools: browserTools(),
     toolsAvailable: providerToolsAvailable(request),
+    worktrees: async workspace => (await import("../workflow/git/worktree/manager.js")).createTaskWorktree(workspace),
   }, dependencies.tools);
   let runtimePromptIdentity = request.readPromptIdentity?.();
   const publishPromptIdentity = (identity?: PromptIdentitySnapshot): void => {

@@ -27,6 +27,7 @@ const tsxCliPath = path.join(
   "dist",
   "cli.mjs",
 );
+export const sourceTsxArgs = [tsxCliPath, '--conditions=cheers-source'] as const;
 
 const SENSITIVE_ENV_PATTERNS = [
   /api[_-]?key/i,
@@ -58,7 +59,7 @@ export function buildProjectCliProcessSpec(
   return {
     command: process.execPath,
     args: [
-      tsxCliPath,
+      ...sourceTsxArgs,
       cliPath,
       "--project",
       input.projectPath,

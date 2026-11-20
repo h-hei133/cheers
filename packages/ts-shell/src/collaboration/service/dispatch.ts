@@ -1,8 +1,7 @@
 import type { ServiceConfig } from './config.js';
 import { createStateChanges } from '../../core/state/changes.js';
-import type { ServiceRequest, ServiceResponse, ServiceState } from '../contract/model.js';
-import { identifier, keys, object, requireValue } from '../contract/value.js';
-import { decodeSnapshot } from '../contract/snapshot.js';
+import { type ServiceRequest, type ServiceResponse, type ServiceState, identifier, keys, object, requireValue } from '@cheers/collaboration';
+import { decodeSnapshot } from '../snapshot.js';
 import { Tickets } from './auth.js';
 import { decodeOwner, findRoom, beginRoom, takeLease, roomPlan, changeAcl, hostFrame, pollRoom, renewRoom, stopRoom } from './rooms.js';
 import { claim, dispatchProposal, inspectProposal, propose, settleProposal } from './proposals.js';

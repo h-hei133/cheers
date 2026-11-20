@@ -7,7 +7,7 @@ import type { Session } from '../../schema/sessionRecord.js';
 import type { SessionStateSnapshot } from '../../schema/sessionStateSnapshot.js';
 import { sessionThreadPath } from '../../schema/sessionThread.js';
 import { parseTranscriptAsync, projectBranchMessages } from '../../transcript/sessionTranscript.js';
-import { projectLoadedSession } from '../sessionStore.js';
+import { projectLoadedSession } from '../projection.js';
 import type { SessionSummary } from './model.js';
 
 export function summarizeSession(session: Session, version: string, limited = false): SessionSummary {

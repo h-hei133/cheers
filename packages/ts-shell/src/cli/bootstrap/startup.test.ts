@@ -1,9 +1,12 @@
 import fs from "node:fs";
+import { syncBuiltinESMExports } from 'node:module';
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionManager } from "../../session/SessionManager.js";
 import { createSessionStoreLayout } from "../../session/store/sessionFileLayout.js";
+import { SessionStoreAccess } from '../../session/store/sessionStoreAccess.js';
+import { promptIntentPath } from '../../session/store/prompt/intent.js';
 import {
   getUserRuntimeConfigPath,
   readRuntimeConfigEditAt,
@@ -139,6 +142,110 @@ it.each(['sessionId', 'forkSource'] as const)('keeps the real registry and sourc
     .rejects.toThrow(/not registered/);
   expect(bytes()).toEqual(before);
   expect(manager.resolveCurrentSessionForProject(workspace, { readOnly: true })).toMatchObject({ ok: true, session: { id: current.id } });
+});
+
+function interruptPromptAppend(publish: () => void): void {
+  const append = fs.appendFileSync;
+  const failure = vi.spyOn(fs, 'appendFileSync').mockImplementation((file, data, options) => {
+    if (typeof file === 'number' && Buffer.isBuffer(data)) throw new Error('Interrupted prompt append.');
+    return append(file, data, options);
+  });
+  syncBuiltinESMExports();
+  try { expect(publish).toThrow(/persistence is unknown/i); }
+  finally { failure.mockRestore(); syncBuiltinESMExports(); }
+}
+
+it.each(['current', 'sessionId', 'forkSource', 'forkCurrent', 'forkPrefix', 'settled'] as const)(
+  'leaves a recoverable prompt transaction untouched until %s startup options pass', async selection => {
+    const manager = new SessionManager();
+    const access = new SessionStoreAccess();
+    const unrelated = selection === 'forkPrefix' ? manager.createNewWithId('unrelated-session', workspace) : undefined;
+    if (unrelated) interruptPromptAppend(() => manager.persistUserPromptBarrier(unrelated.id, 'Other prompt'));
+    const unrelatedMarker = unrelated && promptIntentPath(access.stateLayout(unrelated.id));
+    const session = manager.createNewWithId('selected-session', workspace);
+    const layout = access.stateLayout(session.id);
+    if (selection === 'settled') {
+      manager.persistUserPromptBarrier(session.id, 'Recovered prompt');
+      interruptPromptAppend(() => manager.saveCompleted(session.id));
+    } else interruptPromptAppend(() => manager.persistUserPromptBarrier(session.id, 'Recovered prompt'));
+
+    const marker = promptIntentPath(layout);
+    const store = createSessionStoreLayout(home);
+    const bytes = () => [layout.transcriptPath, layout.metadataPath, layout.statePath, marker, store.currentSessionStorePath,
+      ...(unrelatedMarker ? [unrelatedMarker] : [])]
+      .map(file => fs.readFileSync(file));
+    const before = bytes();
+    const entry = path.join(workspace, 'extension.ts');
+    fs.writeFileSync(entry, `export default api => api.registerFlag({name:'known',type:'boolean'});`);
+    const options = { extensionPaths: [entry], ...(selection === 'sessionId' ? { sessionId: session.id }
+      : selection === 'forkSource' ? { forkSource: session.id } : selection === 'forkCurrent' ? { forkSource: 'current' }
+      : selection === 'forkPrefix' ? { forkSource: 'selected-' } : {}) };
+    const rootContext = createCliRootContext({ launchCwd: workspace, options, ...processPorts });
+    const startup = { launchCwd: workspace, options, rootContext, ...processPorts };
+    const unresolved = cliExtensionArguments([{ name: '--unexpected' }], vi.fn());
+    await expect(prepareCliBootstrapRuntimeContext(startup, unresolved)).rejects.toThrow(/not registered/);
+    expect(bytes()).toEqual(before);
+    expect(fs.readdirSync(store.sessionsDir).sort()).toEqual(unrelated ? [session.id, unrelated.id] : [session.id]);
+
+    const accepted = cliExtensionArguments([{ name: '--known' }], () => { expect(bytes()).toEqual(before); });
+    const prepared = await prepareCliBootstrapRuntimeContext(startup, accepted);
+    try {
+      expect(fs.existsSync(marker)).toBe(false);
+      expect(manager.getTranscriptEvents(session.id).filter(event => event.type === 'message' && event.role === 'user')).toHaveLength(1);
+      if (selection === 'settled') {
+        expect(prepared.runtime.runtimeContext.session.id).not.toBe(session.id);
+        expect(manager.getSession(session.id)?.status).toBe('completed');
+      } else if (selection === 'current' || selection === 'sessionId') expect(prepared.runtime.runtimeContext.session.id).toBe(session.id);
+      else expect(prepared.runtime.runtimeContext.session).toMatchObject({ parentSession: session.id });
+      if (unrelatedMarker) expect(fs.readFileSync(unrelatedMarker)).toEqual(before.at(-1));
+    } finally { prepared.extensions.retire(); await prepared.runtime.mcpGateway.close(); }
+  },
+);
+
+it('keeps a pending match in an ambiguous fork prefix without replaying it', async () => {
+  const manager = new SessionManager();
+  const pending = manager.createNewWithId('matching-pending', workspace);
+  manager.createNewWithId('matching-clean', workspace);
+  interruptPromptAppend(() => manager.persistUserPromptBarrier(pending.id, 'Pending prompt'));
+  const layout = new SessionStoreAccess().stateLayout(pending.id);
+  const store = createSessionStoreLayout(home);
+  const files = [layout.transcriptPath, layout.metadataPath, layout.statePath, promptIntentPath(layout), store.currentSessionStorePath];
+  const before = files.map(file => fs.readFileSync(file));
+  const options = { forkSource: 'matching-' };
+  const writeError = vi.fn();
+  const rootContext = createCliRootContext({ launchCwd: workspace, options, ...processPorts });
+  await expect(prepareCliBootstrapRuntimeContext({ launchCwd: workspace, options, rootContext, ...processPorts, writeError },
+    cliExtensionArguments([], vi.fn())))
+    .rejects.toThrow('root context unexpectedly exited');
+  expect(writeError.mock.calls.flat().join(' ')).toContain('Ambiguous --fork session prefix');
+  expect(files.map(file => fs.readFileSync(file))).toEqual(before);
+  expect(fs.readdirSync(store.sessionsDir).sort()).toEqual(['matching-clean', 'matching-pending']);
+});
+
+it('refuses to replay a different prompt marker after extension option validation', async () => {
+  const manager = new SessionManager();
+  const session = manager.createNew(workspace);
+  interruptPromptAppend(() => manager.persistUserPromptBarrier(session.id, 'Pending prompt'));
+  const layout = new SessionStoreAccess().stateLayout(session.id);
+  const marker = promptIntentPath(layout);
+  const store = createSessionStoreLayout(home);
+  const files = [layout.transcriptPath, layout.metadataPath, layout.statePath, store.currentSessionStorePath];
+  const before = files.map(file => fs.readFileSync(file));
+  const original = fs.readFileSync(marker);
+  const options = { sessionId: session.id };
+  const writeError = vi.fn();
+  const rootContext = createCliRootContext({ launchCwd: workspace, options, ...processPorts });
+  const replaceMarker = vi.fn(() => {
+    const replacement = path.join(layout.sessionDir, 'replacement.json');
+    fs.writeFileSync(replacement, original);
+    fs.renameSync(replacement, marker);
+  });
+  await expect(prepareCliBootstrapRuntimeContext({ launchCwd: workspace, options, rootContext, ...processPorts, writeError },
+    cliExtensionArguments([], replaceMarker))).rejects.toThrow('root context unexpectedly exited');
+  expect(replaceMarker).toHaveBeenCalledOnce();
+  expect(writeError.mock.calls.flat().join(' ')).toContain('Prompt persistence is unknown');
+  expect(files.map(file => fs.readFileSync(file))).toEqual(before);
+  expect(fs.readFileSync(marker)).toEqual(original);
 });
 
 it('attaches the admitted file instance to the new session without replaying initialization', async () => {

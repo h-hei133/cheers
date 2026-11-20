@@ -10,6 +10,7 @@ import { gatherExport } from '../export/collect.js';
 import { renderReport } from '../../presentation/tui/report/renderer.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 import { SessionStoreAccess } from '../store/sessionStoreAccess.js';
+import { captureSessionTransition } from '../store/transition.js';
 import { restoreReport } from './projection.js';
 
 let root: string; let manager: SessionManager;
@@ -70,6 +71,26 @@ it('keeps ancestor annotations on their path and preserves copied thread ancestr
   expect(restoreConversation(current.turns, current.reports).blocks.at(-1)?.kind).toBe('command');
   const events = manager.getTranscriptEvents(session.id);
   expect(events.filter(event => event.type === 'command-output')).toHaveLength(2);
+});
+
+it('admits the exact report activity time when the durable activation metadata is older', () => {
+  const session = manager.createNew(root, { rootMode: 'direct', requestedWorkspaceRoot: root, targetPathBase: root, gitRoot: null });
+  const layout = new SessionStoreAccess().stateLayout(session.id);
+  const before = fs.readFileSync(layout.metadataPath);
+  const timestamp = new Date(Date.parse(session.updatedAt) + 1000).toISOString();
+  appendTranscriptEvent(layout.transcriptPath, { type: 'command-output', id: 'activity-report', sourceEntryId: `${session.id}:root`,
+    timestamp, text: reportText(report), report });
+  const loaded = manager.getSession(session.id)!;
+  expect(loaded.updatedAt).toBe(timestamp);
+  expect(fs.readFileSync(layout.metadataPath)).toEqual(before);
+  const transition = captureSessionTransition(layout);
+  const readback = vi.fn();
+  transition(loaded)(readback);
+  expect(readback).toHaveBeenCalledOnce();
+  expect(() => transition({ ...loaded, updatedAt: new Date(Date.parse(timestamp) + 1000).toISOString() }))
+    .toThrow('The saved metadata does not match this activation.');
+  expect(() => transition({ ...loaded, title: 'Changed metadata' }))
+    .toThrow('The saved metadata does not match this activation.');
 });
 
 it('falls back to safe text for unknown or malformed stored report versions', () => {

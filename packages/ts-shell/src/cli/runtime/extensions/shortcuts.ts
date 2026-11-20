@@ -11,7 +11,7 @@ export class ExtensionShortcuts {
   private running = false;
 
   constructor(private readonly host: ExtensionHostBridge, private readonly signal: AbortSignal,
-    private readonly admitted: () => boolean) {}
+    private readonly admitted: () => boolean, private readonly installed?: (key: string) => ((signal: AbortSignal) => Promise<void>) | undefined) {}
 
   publish(shortcuts: readonly ExtensionShortcut[]): void {
     for (const shortcut of shortcuts) {
@@ -23,9 +23,10 @@ export class ExtensionShortcuts {
   retire(): void { this.lifetime.abort(); }
 
   dispatch(keyId: string, surface: AbortSignal, reportFailure: () => void): boolean {
-    const run = this.commands.get(keyId);
     const active = () => !this.signal.aborted && !this.lifetime.signal.aborted && !surface.aborted && this.admitted();
-    if (!run || !active()) return false;
+    if (!active()) return false;
+    const run = this.commands.get(keyId) ?? this.installed?.(keyId);
+    if (!run) return false;
     if (this.running) return true;
     const ui = this.host.ui;
     if (!ui || !active()) return false;
@@ -33,7 +34,7 @@ export class ExtensionShortcuts {
     const lifetime = AbortSignal.any([this.signal, this.lifetime.signal, surface, timeout]);
     this.running = true;
     // The captured loader callback observes the original realm and retires late continuations.
-    void runExtensionInvocation(ui, lifetime, () => run()).catch(() => {
+    void runExtensionInvocation(ui, lifetime, () => run(lifetime)).catch(() => {
       if (active()) reportFailure();
     }).finally(() => { this.running = false; });
     return true;

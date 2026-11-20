@@ -28,6 +28,7 @@ async function runCli(project, prompt) {
   const home = process.env.CHEERS_REAL_HOME || defaultRealHome;
   const args = [
     path.join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs"),
+    "--conditions=cheers-source",
     "src/entrypoints/cli.tsx",
     "--project",
     project,

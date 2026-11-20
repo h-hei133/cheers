@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { aclPreview, promptPreview } from './projection.js';
-import { decodeAcl } from '../../collaboration/contract/acl.js';
+import { decodeAcl } from '@cheers/collaboration';
 
 it('shows every authorized recipient and right without a long approval line', () => {
   const principals = Array.from({ length: 32 }, (_, index) => `guest${String(index).padStart(2, '0')}${'x'.repeat(121)}`);

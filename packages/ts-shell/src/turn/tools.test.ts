@@ -4,7 +4,8 @@ import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { adaptTools, createToolHooks, PARSE_ERROR_KEY, type ToolGateOptions } from "./tools.js";
-import { createCoreToolRegistry } from "../core/tools/registry.js";
+import { createCoreToolRegistry as createRegistry } from "../core/tools/registry.js";
+import { createCoreToolRegistry } from "../tools/registry.js";
 import { runToolsCommand } from "../core/commands/toolsCommandRuntime.js";
 import { executeToolBatch } from '../core/agent/tools.js';
 
@@ -116,9 +117,11 @@ describe("createToolHooks", () => {
   });
 
   it("shows the same plan eligibility that the execution gate enforces for every built-in", async () => {
-    const report = await runToolsCommand([], { cwd: process.cwd() });
+    expect(createRegistry().has('browser')).toBe(false);
+    const pool = createCoreToolRegistry();
+    const report = await runToolsCommand([], { cwd: process.cwd(), getToolPool: () => pool });
     const hooks = createToolHooks(gate({ agentMode: "plan", permissionScope: "allow-all" }));
-    for (const tool of createCoreToolRegistry().values()) {
+    for (const tool of pool.values()) {
       const row = (report.report!.facts.tools as { name: string; planMode: string }[]).find(item => item.name === tool.name);
       expect(row).toBeDefined();
       const mode = row!.planMode;

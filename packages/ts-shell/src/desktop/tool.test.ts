@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { createDesktopToolDefinition } from './tool.js';
-import { desktopConfig } from './config.js';
+import * as desktopDomain from './domain.js';
 import { desktopState } from './state.js';
 import { createDefaultExecutionService } from '../runtime/execution/service.js';
 import { evaluateToolPermissionScope, planModeBlock } from '../core/query/toolPolicy.js';
@@ -20,7 +20,9 @@ let focus: string;
 const requests: CommandExecutionRequest[] = [];
 const contexts: Array<{ workspaceRoot: string; sessionId: string; taskId: string }> = [];
 beforeEach(async () => {
-  root = await fs.mkdtemp(path.join(os.tmpdir(), 'desktop-tool-')); focus = '42'; requests.length = 0;
+  const parent = path.join(os.tmpdir(), 'cheers-test');
+  await fs.mkdir(parent, { recursive: true });
+  root = await fs.mkdtemp(path.join(parent, 'desktop-tool-')); focus = '42'; requests.length = 0;
   for (const utility of ['xdotool', 'ffmpeg', 'xclip']) { const target = path.join(root, utility); await fs.writeFile(target, '#!/bin/sh\nexit 0\n', { mode: 0o700 }); vi.stubEnv(`CHEERS_DESKTOP_${utility.toUpperCase()}_PATH`, target); }
   const authority = path.join(root, 'authority'); await fs.writeFile(authority, 'synthetic-secret-cookie');
   vi.stubEnv('CHEERS_DESKTOP_DISPLAY', '127.0.0.1:99'); vi.stubEnv('CHEERS_DESKTOP_XAUTHORITY', authority);
@@ -50,7 +52,7 @@ function setup() {
     return { status: 'completed', exitCode: 0, stdout: '', stderr: '' } as CommandExecutionResult;
   });
   const tool = createDesktopToolDefinition(service);
-  const execute = (args: Record<string, unknown>) => tool.prepare!(args, context).execute(context);
+  const execute = async (args: Record<string, unknown>) => (await tool.prepare!(args, context)).execute(context);
   return { context, tool, run, execute };
 }
 
@@ -91,8 +93,25 @@ it('requires explicit opt-in config and executable identity; capabilities is pas
   expect(deniedAccess).toMatchObject({ success: false, metadata: { desktopAction: { state: 'unavailable', code: 'unavailable', effect: 'none', cleanup: 'complete' } } });
   expect(JSON.stringify(deniedAccess)).not.toContain('synthetic-private-authority-denied');
   vi.stubEnv('CHEERS_DESKTOP_DISPLAY', undefined); vi.stubEnv('DISPLAY', ':0'); vi.stubEnv('WAYLAND_DISPLAY', 'real-wayland');
+  const { desktopConfig } = await desktopDomain.loadDesktop();
   expect(() => desktopConfig()).toThrow('explicit local X11'); expect(() => desktopConfig({}, 'darwin')).toThrow('unavailable');
   expect((await item.execute({ action: 'observe', scope: 'screen' })).metadata?.desktopAction).toMatchObject({ state: 'unavailable', effect: 'none' });
+});
+
+it('keeps the tool and close available when native desktop cannot load', async () => {
+  const load = vi.spyOn(desktopDomain, 'loadDesktop').mockRejectedValue(
+    new desktopDomain.DesktopAdmissionError('unavailable', 'Native desktop package is unavailable.')
+  );
+  const item = setup();
+  expect(item.tool.name).toBe('desktop');
+  expect(load).not.toHaveBeenCalled();
+  expect(await item.execute({ action: 'observe', scope: 'screen' })).toMatchObject({
+    success: false, error: 'Native desktop package is unavailable.',
+    metadata: { desktopAction: { state: 'unavailable', effect: 'none', cleanup: 'complete' } }
+  });
+  expect(await item.tool.execute({ action: 'close' }, item.context)).toMatchObject({ success: true });
+  expect(load).toHaveBeenCalledOnce();
+  expect(requests).toHaveLength(0);
 });
 
 it('captures bounded native masks and maps clicks exactly from a current image revision', async () => {
@@ -102,12 +121,15 @@ it('captures bounded native masks and maps clicks exactly from a current image r
   const frame = JSON.parse(image.output!); expect(frame).toMatchObject({ frame: { x: 20, y: 30, width: 400, height: 300 }, coordinatesAvailable: true });
   expect(frame.snapshotId).not.toBe(snapshotId);
   const native = requests.find(request => path.basename(request.command) === 'ffmpeg')!;
+  expect(native).toMatchObject({ operationKind: 'command.run', cwd: root, workspaceRoot: root, caller: 'desktop',
+    reportSafeCommand: 'desktop:inspect', captureOutput: false, cleanupTreeOnExit: true,
+    authority: { mode: 'command-allowlisted', source: 'tool-runtime-approval' } });
   expect(native.args).toContain('127.0.0.1:99+20,30'); expect(native.args).toContain('drawbox=x=0:y=0:w=40:h=20:color=black:t=fill');
   expect(native.env).toEqual({ DISPLAY: '127.0.0.1:99', XAUTHORITY: path.join(root, 'authority'), PATH: '/usr/bin:/bin', LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' });
   const result = await item.execute({ action: 'click', snapshotId: frame.snapshotId, x: 5, y: 7 });
   expect(result).toMatchObject({ success: true, metadata: { desktopAction: { effect: 'confirmed', cleanup: 'complete' } } });
   expect(requests.find(request => request.args[0] === 'mousemove')!.args).toEqual(['mousemove', '--sync', '25', '37', 'click', '--clearmodifiers', '1']);
-  expect(() => item.tool.prepare!({ action: 'click', snapshotId: frame.snapshotId, x: 5, y: 7 }, item.context)).toThrow('current desktop snapshotId');
+  await expect(item.tool.prepare!({ action: 'click', snapshotId: frame.snapshotId, x: 5, y: 7 }, item.context)).rejects.toThrow('current desktop snapshotId');
 });
 
 it('fully redacts unreviewed screenshots and refuses their coordinates or changed focus/auth after approval', async () => {
@@ -116,17 +138,18 @@ it('fully redacts unreviewed screenshots and refuses their coordinates or change
   expect(JSON.parse(image.output!).coordinatesAvailable).toBe(false);
   expect(requests.find(request => path.basename(request.command) === 'ffmpeg')!.args).toContain('drawbox=x=0:y=0:w=400:h=300:color=black:t=fill');
   expect(await item.execute({ action: 'click', snapshotId: revision, x: 1, y: 1 })).toMatchObject({ success: false, error: expect.stringContaining('reviewed screenshot') });
-  const current = await observe(item); const prepared = item.tool.prepare!({ action: 'type', snapshotId: current, text: 'approved' }, item.context);
+  const current = await observe(item); const prepared = await item.tool.prepare!({ action: 'type', snapshotId: current, text: 'approved' }, item.context);
   focus = '99'; expect(await prepared.execute(item.context)).toMatchObject({ success: false, error: expect.stringContaining('focus, window identity or geometry changed') });
   expect(requests.some(request => request.args[0] === 'type')).toBe(false);
-  focus = '42'; const authBound = item.tool.prepare!({ action: 'key', snapshotId: current, key: 'Return' }, item.context);
+  focus = '42'; const authBound = await item.tool.prepare!({ action: 'key', snapshotId: current, key: 'Return' }, item.context);
   await fs.writeFile(path.join(root, 'authority'), 'changed-cookie');
   expect(await authBound.execute(item.context)).toMatchObject({ success: false, error: expect.stringContaining('authority changed after approval') });
 });
 
 it('owns immutable approval arguments and sends literal type bytes through stdin; clipboard plaintext stays redacted', async () => {
   const item = setup(); const snapshotId = await observe(item); const args = { action: 'type', snapshotId, text: 'literal $()\n-flag' };
-  const prepared = item.tool.prepare!(args, item.context); args.text = 'changed';
+  const preparing = item.tool.prepare!(args, item.context); args.text = 'changed';
+  const prepared = await preparing;
   expect(prepared.preview).toContain('literal $()'); expect(prepared.preview).not.toContain('synthetic-secret-cookie');
   const input: Buffer[] = []; const existing = item.run.getMockImplementation()!;
   item.run.mockImplementation(async request => {
@@ -149,7 +172,7 @@ it('retains possible input effects during cancellation and does not complete clo
     started(); await new Promise<void>(resolve => { finish = resolve; });
     return { status: 'cancelled', exitCode: null, stdout: '', stderr: '' } as CommandExecutionResult;
   });
-  const prepared = item.tool.prepare!({ action: 'type', snapshotId, text: 'pending' }, item.context);
+  const prepared = await item.tool.prepare!({ action: 'type', snapshotId, text: 'pending' }, item.context);
   const work = prepared.execute({ ...item.context, abortSignal: controller.signal }); await ready; controller.abort();
   let closed = false; const close = item.tool.execute({ action: 'close' }, item.context).then(result => { closed = true; return result; });
   await Promise.resolve(); expect(closed).toBe(false); finish();
@@ -162,7 +185,7 @@ it('reports native cleanup uncertainty and blocks subsequent actions without cla
     if (request.args[0] !== 'key') return original(request);
     controller.abort(); return { status: 'failed', exitCode: null, stdout: '', stderr: '', terminationFailed: true } as CommandExecutionResult;
   });
-  const work = item.tool.prepare!({ action: 'key', snapshotId, key: 'Return' }, item.context);
+  const work = await item.tool.prepare!({ action: 'key', snapshotId, key: 'Return' }, item.context);
   expect(await work.execute({ ...item.context, abortSignal: controller.signal })).toMatchObject({ success: false, metadata: { desktopAction: { state: 'cancelled', effect: 'possible', cleanup: 'unknown' } } });
   const calls = requests.length;
   expect((await item.execute({ action: 'observe', scope: 'window', windowId: '42' })).success).toBe(false); expect(requests).toHaveLength(calls);

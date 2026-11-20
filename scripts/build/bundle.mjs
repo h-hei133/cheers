@@ -80,10 +80,18 @@ function publicModule(entries) {
 }
 
 /** Build every public entry and the CLI together, so shared owners have one module identity. */
-export async function bundleModules({ root, staging, version, name, entries }) {
+export async function bundleModules({ root, staging, version, name, entries, domainEntries = new Map() }) {
   root = path.resolve(root);
   staging = path.resolve(staging);
   assertNoSymlinkPath(root, staging);
+  const linkedDomains = new Map();
+  for (const [specifier, entry] of domainEntries) {
+    if (!/^@cheers\/[a-z0-9-]+$/.test(specifier)) throw new Error("Invalid domain build specifier.");
+    const absolute = path.resolve(root, entry);
+    assertNoSymlinkPath(staging, absolute);
+    if (!lstatSync(absolute).isFile()) throw new Error(`Build entry for ${specifier} is not a regular file.`);
+    linkedDomains.set(specifier, { path: absolute });
+  }
   if (typeof version !== "string" || !version.trim() || typeof name !== "string" || !name.trim()) {
     throw new Error("Bundle version and package name must be nonempty strings.");
   }
@@ -108,6 +116,9 @@ export async function bundleModules({ root, staging, version, name, entries }) {
     target: "node20.3",
     keepNames: true,
     packages: "external",
+    ...(linkedDomains.size > 0 ? { plugins: [{ name: "domain-workspaces", setup(builder) {
+      builder.onResolve({ filter: /^@cheers\// }, ({ path: specifier }) => linkedDomains.get(specifier));
+    } }] } : {}),
     chunkNames: "chunks/[name]-[hash]",
     assetNames: "assets/[name]-[hash]",
     banner: { js: REQUIRE_BANNER },

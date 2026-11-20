@@ -6,8 +6,7 @@ import { ServiceStore } from '../service/store.js';
 import { ServiceDispatcher } from '../service/dispatch.js';
 import { startCollaborationService } from '../service/listener.js';
 import type { ServiceConfig } from '../service/config.js';
-import type { ServiceRequest, Snapshot } from '../contract/model.js';
-import { hashText, object } from '../contract/value.js';
+import { type ServiceRequest, type Snapshot, hashText, object } from '@cheers/collaboration';
 
 type FixtureService = Awaited<ReturnType<typeof startCollaborationService>>;
 export const bound = { sessionId: 'session-fixture', sessionCreatedAt: '2026-10-09T00:00:00.000Z', projectId: 'a'.repeat(64) };

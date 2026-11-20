@@ -1,11 +1,9 @@
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../tools/types.js';
 import type { ExecutionService } from '../runtime/execution/types.js';
-import { desktopConfig } from './config.js';
+import type { DesktopEvidence } from '@cheers/desktop';
+import { DesktopAdmissionError, desktopRunner, loadDesktop, type DesktopDomain } from './domain.js';
 import { desktopState } from './state.js';
-import { prepareDesktop, verifyDesktopCall } from './preparation.js';
-import { desktopOperation } from './operation.js';
-import { X11Adapter } from './adapter.js';
-import { DesktopError, type DesktopEvidence } from './model.js';
+import { boundDesktopCall, prepareDesktop } from './preparation.js';
 
 export function createDesktopToolDefinition(service: ExecutionService): ToolDefinition {
   const execute = (args: Record<string, unknown>, context: ToolExecutionContext) => executeDesktop(service, args, context);
@@ -21,9 +19,12 @@ export function createDesktopToolDefinition(service: ExecutionService): ToolDefi
 
 async function executeDesktop(service: ExecutionService, args: Record<string, unknown>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
   const evidence: DesktopEvidence = { state: 'completed', effect: 'none', cleanup: 'complete' };
+  let domain: DesktopDomain | undefined;
   try {
     if (args.action === 'capabilities') {
-      const config = desktopConfig();
+      domain = await loadDesktop();
+      context.abortSignal?.throwIfAborted();
+      const config = domain.desktopConfig();
       return { success: true, output: JSON.stringify({ platform: 'linux', adapter: 'x11', display: config.display, capture: 'configured, system permission unverified',
         input: 'configured, system permission unverified', clipboard: config.xclip ? 'configured, plaintext redacted' : 'unavailable', automaticSecretDetection: false }), metadata: { desktopAction: evidence } };
     }
@@ -31,19 +32,30 @@ async function executeDesktop(service: ExecutionService, args: Record<string, un
     if (args.action === 'close') { await state.close(); return { success: !state.blocked, output: 'Desktop control revoked and snapshots invalidated.', ...(state.blocked ? { error: 'Desktop process cleanup is unconfirmed; restart is required.' } : {}), metadata: { desktopAction: { ...evidence, state: state.blocked ? 'failed' : 'completed', cleanup: state.blocked ? 'unknown' : 'complete' } } }; }
     return await state.run(context.abortSignal, async scope => {
       try {
-        const call = verifyDesktopCall(args, context);
-        const result = await desktopOperation(args, context, scope, state, new X11Adapter(call.config, service, context.workspaceRoot), call);
+        const call = boundDesktopCall(args, context);
+        domain = call.domain;
+        const verify = () => {
+          boundDesktopCall(args, context);
+          call.domain.verifyDesktopConfig(call.config);
+        };
+        verify();
+        const result = await domain.desktopOperation(args, {
+          run: desktopRunner(service), root: context.workspaceRoot, config: call.config, scope, snapshot: call.snapshot, verify,
+          setSnapshot: snapshot => state.setSnapshot(snapshot),
+          invalidateSnapshot: () => { state.snapshot = undefined; },
+        });
         return { ...result, metadata: { ...result.metadata, desktopAction: { ...scope.evidence } } };
       } catch (error) {
-        return failure(error, scope.evidence);
+        return failure(error, scope.evidence, domain);
       }
     });
-  } catch (error) { return failure(error, evidence); }
+  } catch (error) { return failure(error, evidence, domain); }
 }
 
-function failure(error: unknown, evidence: DesktopEvidence): ToolExecutionResult {
-  const code = error instanceof DesktopError ? error.code : 'command';
-  return { success: false, error: error instanceof DesktopError ? error.message : 'Native desktop operation failed.', metadata: { desktopAction: {
+function failure(error: unknown, evidence: DesktopEvidence, domain?: DesktopDomain): ToolExecutionResult {
+  const known = error instanceof DesktopAdmissionError || domain && error instanceof domain.DesktopError;
+  const code = known ? error.code : 'command';
+  return { success: false, error: known ? error.message : 'Native desktop operation failed.', metadata: { desktopAction: {
     ...evidence, state: evidence.state === 'cancelled' || code === 'cancelled' ? 'cancelled' : code === 'unavailable' ? 'unavailable' : 'failed', code,
   } } };
 }

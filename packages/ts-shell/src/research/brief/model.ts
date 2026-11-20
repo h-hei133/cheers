@@ -1,4 +1,6 @@
-export type ResearchMode = 'software' | 'paper' | 'mixed';
+import type { ResearchMode } from '@cheers/research';
+export type { ResearchBrief, ResearchMode } from '@cheers/research';
+
 export interface ResearchRequest {
   readonly question: string;
   readonly mode?: ResearchMode;
@@ -12,17 +14,6 @@ export interface ResearchRequest {
     readonly modifiers: readonly { readonly name: string; readonly instruction: string }[];
   };
 }
-export interface ResearchBrief {
-  readonly revision: number;
-  readonly question: string;
-  readonly mode: ResearchMode;
-  readonly questions: readonly { readonly id: string; readonly text: string }[];
-  /** Requested applicability, never proof that a source actually meets it. */
-  readonly anchors: { readonly versions: readonly string[]; readonly platforms: readonly string[]; readonly conditions: readonly string[] };
-  readonly scope: string;
-  readonly exclusions: readonly string[];
-}
-
 export const researchLimits = {
   quick: { deadlineMs: 5 * 60_000, investigationSteps: 8, rounds: 2, reviewSteps: 5, fragments: 3 },
   deep: { deadlineMs: 15 * 60_000, investigationSteps: 16, rounds: 3, reviewSteps: 8, fragments: 6 },

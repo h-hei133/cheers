@@ -23,8 +23,10 @@ import { validateWorkspaceRoots } from '../workspace/roots.js';
 import { normalizePathIdentity } from '../../session/continuation/roots.js';
 import { replayTodosFromMessages } from "../commands/todoCommandRuntime.js";
 import { hasUnfinishedSessionWork } from '../../session/recovery/work.js';
-import { PromptPublicationError } from '../../session/store/prompt/intent.js';
+import { assertNoPromptIntent, PromptPublicationError } from '../../session/store/prompt/intent.js';
 import { recoverSessionPrompt } from '../../session/store/prompt/commit.js';
+import { previewPendingSessionRecord, readSessionRecordSnapshot } from '../../session/store/sessionStore.js';
+import { buildRecoverySnapshotForSession } from '../../session/recovery/sessionRecoveryRuntime.js';
 
 export type ShellBootstrapPhase =
   | "fast-path-parse"
@@ -257,7 +259,10 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
         const id = createSessionId();
         const roots = source.session.projectRoot === requestedProjectRoot ? source.session.workspaceRoots : undefined;
         yield captureStartupBinding(manager, id, requestedProjectRoot, roots, source.assertCurrent);
-        forkOptions = { activate: true, sessionId: id, expectedVersion: source.version };
+        if (resolveForkSourceId(manager, input.forkSource, requestedProjectRoot, readOnly) !== sourceId) {
+          throw new Error('The fork source changed while preparing startup. Pass the full session id.');
+        }
+        forkOptions = { activate: true, sessionId: id, expectedVersion: source.settle() };
       }
       const forked = manager.fork(sourceId, requestedProjectRoot, forkOptions);
       emitLifecycleMessage(`Forked session ${sourceId} into ${forked.id}`);
@@ -274,63 +279,62 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
       // ever-growing history and no way to tell two days of work apart. The pointer
       // is still evaluated, because "why was it ignored" is worth saying, and it is
       // still what `/resume` and `/continue` fall back to.
-      let currentSelection = input.sessionManager.resolveCurrentSessionForProject(
+      const currentSelection = input.sessionManager.resolveCurrentSessionForProject(
         requestedProjectRoot,
         readOnly,
       );
-      if (!currentSelection.ok && currentSelection.reason === 'prompt-publication-unknown') {
-        if (!staged || !currentSelection.sessionId) throw unknownPromptPublication(currentSelection.sessionId);
-        recoverStartupPrompt(manager, currentSelection.sessionId);
-        currentSelection = manager.resolveCurrentSessionForProject(requestedProjectRoot, readOnly);
-        if (!currentSelection.ok && currentSelection.reason === 'prompt-publication-unknown') {
-          throw unknownPromptPublication(currentSelection.sessionId);
-        }
-      }
+      const unresolved = !currentSelection.ok && currentSelection.reason === 'prompt-publication-unknown';
+      if (unresolved && (!staged || !currentSelection.sessionId)) throw unknownPromptPublication(currentSelection.sessionId);
+      const source = staged && (currentSelection.ok || unresolved)
+        ? captureStartupSource(manager, currentSelection.ok ? currentSelection.session.id : currentSelection.sessionId!)
+        : undefined;
+      const selected = source
+        ? normalizePathIdentity(source.session.projectRoot) === normalizePathIdentity(requestedProjectRoot) ? source.session : undefined
+        : currentSelection.ok ? currentSelection.session : undefined;
       // A session with unfinished business is stepped back into whatever the run
       // kind: an interruption, an error, a prompt that never ran, or a write whose
       // outcome was never established. That is recovery, and it is what anyone
       // expects after a crash. A session the user simply closed is left closed, and
       // only a one-shot run steps into it.
       let unfinished = false;
-      if (currentSelection.ok && input.adoptCurrentSession !== true) {
-        try { unfinished = hasUnfinishedBusiness(input.sessionManager, currentSelection.session); }
+      if (selected && input.adoptCurrentSession !== true) {
+        try { unfinished = source ? source.hasUnfinishedWork() : hasUnfinishedBusiness(manager, selected); }
         catch (error) {
-          if (error instanceof PromptPublicationError) throw unknownPromptPublication(currentSelection.session.id);
+          if (error instanceof PromptPublicationError) throw unknownPromptPublication(selected.id);
           emitLifecycleMessage('Current session recovery could not be verified; starting a fresh session. The saved session was retained.');
         }
       }
-      if (currentSelection.ok && (input.adoptCurrentSession === true || unfinished)) {
-        if (staged) {
-          const source = captureStartupSource(manager, currentSelection.session.id);
-          const root = source.session.projectRoot || requestedProjectRoot;
-          yield captureStartupBinding(manager, source.session.id, root, source.session.workspaceRoots, source.assertCurrent);
-          const resumed = requireResume(manager.tryResume(source.session.id, requestedProjectRoot,
-            { mode: 'continuity-only', expectedVersion: source.version }), source.session.id);
+      if (selected && (input.adoptCurrentSession === true || unfinished)) {
+        if (source) {
+          yield captureStartupBinding(manager, selected.id, selected.projectRoot || requestedProjectRoot, selected.workspaceRoots, source.assertCurrent);
+          const resumed = requireResume(manager.tryResume(selected.id, requestedProjectRoot,
+            { mode: 'continuity-only', expectedVersion: source.settle() }), selected.id);
           emitLifecycleMessage(`Resumed session ${resumed.id}`);
           return resumed;
         }
         try {
           const resumed = input.sessionManager.resume(
-            currentSelection.session.id,
+            selected.id,
             requestedProjectRoot,
           );
           emitLifecycleMessage(`Resumed session ${resumed.id}`);
           return resumed;
         } catch (error) {
-          if (error instanceof PromptPublicationError) throw unknownPromptPublication(currentSelection.session.id);
+          if (error instanceof PromptPublicationError) throw unknownPromptPublication(selected.id);
           input.sessionManager.clearCurrentSessionForProject(requestedProjectRoot);
           emitLifecycleMessage(
-            `Current session pointer ${currentSelection.session.id} could not be resumed for ${requestedProjectRoot}; starting a fresh session.`,
+            `Current session pointer ${selected.id} could not be resumed for ${requestedProjectRoot}; starting a fresh session.`,
           );
         }
-      } else if (currentSelection.ok === false && currentSelection.reason !== "none") {
+      } else if (!unresolved && currentSelection.ok === false && currentSelection.reason !== "none") {
         emitLifecycleMessage(
           `Current session pointer ignored: ${currentSelection.detail} Starting a fresh session.`,
         );
       }
       if (staged) {
         const id = createSessionId();
-        yield captureStartupBinding(manager, id, requestedProjectRoot);
+        yield captureStartupBinding(manager, id, requestedProjectRoot, undefined, source?.assertCurrent);
+        source?.settle();
         return manager.createNewWithId(id, requestedProjectRoot, createOptions);
       }
       return manager.createNew(requestedProjectRoot, createOptions);
@@ -360,15 +364,18 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
 
     if (input.allowSessionRootMigration && !rootsEqual) {
       let roots: readonly WorkspaceRoot[] | undefined;
+      let beforeCommit: (() => void) | undefined;
       if (source) {
         roots = source.session.workspaceRoots?.filter(root => normalizePathIdentity(root.path) !== normalizePathIdentity(requestedProjectRoot));
         if (roots?.length) validateWorkspaceRoots(requestedProjectRoot, roots);
         yield captureStartupBinding(manager, resumedSession.id, requestedProjectRoot, roots, source.assertCurrent);
+        const version = source.settle();
+        beforeCommit = () => source.assertVersion(version);
       }
       const reboundSession = input.sessionManager.rebindSessionProjectRoot(
         resumedSession.id,
         requestedProjectRoot,
-        source ? { beforeCommit: source.assertCurrent, workspaceRoots: roots } : undefined,
+        beforeCommit ? { beforeCommit, workspaceRoots: roots } : undefined,
       );
       emitLifecycleMessage(
         `Resumed session ${reboundSession.id} with migrated project root ${sessionProjectRoot} -> ${requestedProjectRoot}`,
@@ -381,7 +388,7 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
         yield captureStartupBinding(manager, resumedSession.id, sessionProjectRoot, resumedSession.workspaceRoots, source.assertCurrent);
       }
       const session = source ? requireResume(manager.tryResume(resumedSession.id, undefined,
-        { mode: 'continuity-only', expectedVersion: source.version }), resumedSession.id) : resumedSession;
+        { mode: 'continuity-only', expectedVersion: source.settle() }), resumedSession.id) : resumedSession;
       emitLifecycleMessage(`Resumed session ${session.id}`);
       return session;
     }
@@ -418,26 +425,49 @@ function unknownPromptPublication(id?: string): SessionBootstrapError {
   });
 }
 
-function recoverStartupPrompt(manager: SessionManager, sessionId: string): void {
-  const directory = manager.getSessionDirPath(sessionId);
-  try { recoverSessionPrompt(projectSessionFileLayout({ sessionsDir: path.dirname(directory), sessionId }), sessionId); }
-  catch { throw unknownPromptPublication(sessionId); }
-}
-
 function captureStartupSource(manager: SessionManager, sessionId: string) {
   const directory = manager.getSessionDirPath(sessionId);
   const layout = projectSessionFileLayout({ sessionsDir: path.dirname(directory), sessionId });
-  recoverStartupPrompt(manager, sessionId);
   const version = readSessionFileVersion(layout);
-  const assertCurrent = () => {
-    if (manager.getSessionDirPath(sessionId) !== directory || readSessionFileVersion(layout) !== version) {
+  const assertVersion = (expected: string) => {
+    if (manager.getSessionDirPath(sessionId) !== directory || readSessionFileVersion(layout) !== expected) {
       throw new Error('The saved session changed while preparing startup.');
     }
   };
-  const session = manager.getSession(sessionId);
-  if (!session || session.id !== sessionId) throw new Error('The selected startup session is unavailable.');
+  const input = { layout, sessionId, cwd: process.cwd() };
+  let pending: ReturnType<typeof previewPendingSessionRecord>;
+  try { pending = previewPendingSessionRecord(input); }
+  catch { throw unknownPromptPublication(sessionId); }
+  const assertCurrent = () => {
+    try {
+      assertVersion(version);
+      if (pending) pending.assertCurrent();
+      else assertNoPromptIntent(layout);
+    } catch (error) {
+      if (pending || error instanceof PromptPublicationError) throw unknownPromptPublication(sessionId);
+      throw error;
+    }
+  };
+  const snapshot = pending?.snapshot ?? readSessionRecordSnapshot(input);
+  const { session, state, events } = snapshot;
+  if (session.id !== sessionId) throw new Error('The selected startup session is unavailable.');
   assertCurrent();
-  return { session, version, assertCurrent };
+  return { session, assertCurrent, assertVersion,
+    hasUnfinishedWork: () => Boolean(session.pendingPrompt?.trim()) || hasUnfinishedSessionWork(buildRecoverySnapshotForSession({
+      sessionId, session, state, transcriptEvents: events,
+    })),
+    settle: () => {
+      assertCurrent();
+      if (!pending) return version;
+      try { recoverSessionPrompt(layout, sessionId, assertCurrent); }
+      catch { throw unknownPromptPublication(sessionId); }
+      const settled = readSessionFileVersion(layout);
+      const actual = readSessionRecordSnapshot(input).session;
+      assertVersion(settled);
+      if (!sameValue(actual, session)) throw unknownPromptPublication(sessionId);
+      return settled;
+    },
+  };
 }
 
 function captureStartupBinding(manager: SessionManager, sessionId: string, projectRoot: string,
@@ -469,7 +499,10 @@ function resolveForkSourceId(
   if (source === "current") {
     const current = sessionManager.resolveCurrentSessionForProject(projectRoot, options);
     if (!current.ok) {
-      if (current.reason === 'prompt-publication-unknown') throw unknownPromptPublication(current.sessionId);
+      if (current.reason === 'prompt-publication-unknown') {
+        if (options?.readOnly && current.sessionId) return current.sessionId;
+        throw unknownPromptPublication(current.sessionId);
+      }
       throw new SessionBootstrapError({
         code: "session-not-found",
         message: `No current session found to fork for ${projectRoot}.`,
@@ -500,7 +533,8 @@ function resolveForkSourceId(
   }
   if (sessionManager.sessionExists(validCandidate)) return validCandidate;
   if (!isPath) {
-    const prefixMatches = sessionManager.listSessions().filter((entry) => entry.projectRoot === projectRoot && entry.id.startsWith(validCandidate));
+    const prefixMatches = sessionManager.listSessions(undefined, options?.readOnly ? { previewPrefix: validCandidate } : undefined)
+      .filter((entry) => entry.projectRoot === projectRoot && entry.id.startsWith(validCandidate));
     if (prefixMatches.length === 1) return prefixMatches[0]!.id;
     if (prefixMatches.length > 1) {
       throw new SessionBootstrapError({

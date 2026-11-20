@@ -1,7 +1,6 @@
 import type { QueryEvent } from '../../core/query/runtime/events.js';
-import type { Binding, Owner, Proposal, RelayEvent, Snapshot } from '../contract/model.js';
-import { frameCutover } from '../contract/frame.js';
-import { CollaborationError, integer, object, requireValue, text } from '../contract/value.js';
+import { CollaborationError, frameCutover, integer, object, requireValue, text,
+  type Binding, type Owner, type Proposal, type RelayEvent, type Snapshot } from '@cheers/collaboration';
 import { CollaborationClient } from './service.js';
 import { projectEvent } from './events.js';
 import { HostOutbox } from './outbox.js';

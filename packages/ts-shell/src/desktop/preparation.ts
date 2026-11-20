@@ -1,32 +1,38 @@
 import { freezeDeep } from '../core/values/freeze.js';
 import { bindExecutionTarget, executionWorkspaceKey } from '../runtime/execution/binding.js';
 import type { ToolExecutionContext, ToolExecutionResult, ToolPreparation } from '../tools/types.js';
-import { desktopConfig, verifyDesktopConfig, type DesktopConfig } from './config.js';
+import type { DesktopConfig, DesktopSnapshot } from '@cheers/desktop';
+import { DesktopAdmissionError, loadDesktop, type DesktopDomain } from './domain.js';
 import { desktopState } from './state.js';
-import { DesktopError, type DesktopSnapshot } from './model.js';
 
-export interface DesktopCall { readonly config: DesktopConfig; readonly snapshot?: DesktopSnapshot }
+export interface DesktopCall { readonly domain: DesktopDomain; readonly config: DesktopConfig; readonly snapshot?: DesktopSnapshot }
 const calls = new WeakMap<object, DesktopCall>();
-export function desktopCall(args: object): DesktopCall | undefined { return calls.get(args); }
 
-export function prepareDesktop(args: Record<string, unknown>, context: ToolExecutionContext,
-  execute: (args: Record<string, unknown>, context: ToolExecutionContext) => Promise<ToolExecutionResult>): ToolPreparation {
+export async function prepareDesktop(args: Record<string, unknown>, context: ToolExecutionContext,
+  execute: (args: Record<string, unknown>, context: ToolExecutionContext) => Promise<ToolExecutionResult>): Promise<ToolPreparation> {
   const selected = freezeDeep(JSON.parse(JSON.stringify(args))) as Record<string, unknown>;
   bindExecutionTarget(selected, selected, context.workspaceRoot);
   if (selected.action === 'close') return { targets: [], permissionArgs: selected, previewKind: 'execution',
     preview: 'Revoke native desktop control, cancel pending input and invalidate snapshots. Applied external effects are preserved.',
     execute: current => { executionWorkspaceKey(selected, selected, current.workspaceRoot); return execute(selected, current); } };
+  let domain: DesktopDomain | undefined;
   let config: DesktopConfig;
-  try { config = desktopConfig(); } catch (error) {
-    return { targets: [], permissionArgs: selected, previewKind: 'execution', preview: `Native desktop unavailable: ${(error as Error).message}`,
-      execute: async () => ({ success: false, error: (error as Error).message, metadata: { desktopAction: { state: 'unavailable', effect: 'none', cleanup: 'complete' } } }) };
+  try {
+    domain = await loadDesktop();
+    config = domain.desktopConfig();
+  } catch (error) {
+    if (!(error instanceof DesktopAdmissionError) && !(domain && error instanceof domain.DesktopError)) throw error;
+    return { targets: [], permissionArgs: selected, previewKind: 'execution', preview: `Native desktop unavailable: ${error.message}`,
+      execute: async () => ({ success: false, error: error.message, metadata: { desktopAction: { state: 'unavailable', effect: 'none', cleanup: 'complete' } } }) };
   }
+  context.abortSignal?.throwIfAborted();
+  executionWorkspaceKey(selected, selected, context.workspaceRoot);
   const action = String(selected.action);
   const snapshot = desktopState(context).snapshot;
   if (!['capabilities', 'windows', 'observe', 'close'].includes(action) && (!snapshot || selected.snapshotId !== snapshot.id)) {
-    throw new DesktopError('changed', 'A current desktop snapshotId is required. Observe the selected scope first.');
+    throw new DesktopAdmissionError('changed', 'A current desktop snapshotId is required. Observe the selected scope first.');
   }
-  const call = Object.freeze({ config, ...(!['capabilities', 'windows', 'observe', 'close'].includes(action) ? { snapshot } : {}) });
+  const call = Object.freeze({ domain, config, ...(!['capabilities', 'windows', 'observe', 'close'].includes(action) ? { snapshot } : {}) });
   calls.set(selected, call);
   const preview = ['Native desktop request', `Action: ${JSON.stringify(action)}`, `Project: ${JSON.stringify(context.workspaceRoot)}`,
     `Display: ${JSON.stringify(config.display)}`, `Authority file: ${JSON.stringify(config.authority ?? '(none configured)')}`,
@@ -38,10 +44,10 @@ export function prepareDesktop(args: Record<string, unknown>, context: ToolExecu
   return { targets: [], permissionArgs: selected, previewKind: 'execution', preview, execute: current => execute(selected, current) };
 }
 
-export function verifyDesktopCall(args: Record<string, unknown>, context: ToolExecutionContext): DesktopCall {
+export function boundDesktopCall(args: Record<string, unknown>, context: ToolExecutionContext): DesktopCall {
   const call = calls.get(args);
-  if (!call) throw new DesktopError('invalid', 'A prepared and approved desktop request is required.');
-  executionWorkspaceKey(args, args, context.workspaceRoot); verifyDesktopConfig(call.config);
-  if (call.snapshot && desktopState(context).snapshot !== call.snapshot) throw new DesktopError('changed', 'Desktop snapshot changed after approval. Observe and approve a current snapshot.');
+  if (!call) throw new DesktopAdmissionError('invalid', 'A prepared and approved desktop request is required.');
+  executionWorkspaceKey(args, args, context.workspaceRoot);
+  if (call.snapshot && desktopState(context).snapshot !== call.snapshot) throw new DesktopAdmissionError('changed', 'Desktop snapshot changed after approval. Observe and approve a current snapshot.');
   return call;
 }

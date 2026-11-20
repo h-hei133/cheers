@@ -155,7 +155,7 @@ try {
     for (const consumer of ['normal', 'prepared', 'security', 'git']) for (const mode of ['block', 'allow']) fs.rmSync(path.join(scratch, `${consumer}-${mode}`), { recursive: true, force: true });
     fs.rmSync(path.join(scratch, 'config'), { recursive: true, force: true });
     for (const scenario of ['proven', 'blocked', 'repair', 'not-configured', 'repeated-block']) fs.rmSync(path.join(scratch, `completion-${scenario}`), { recursive: true, force: true });
-    const record = command(id, executable, [path.join(root, 'node_modules/tsx/dist/cli.mjs'), path.join(root, 'scripts/hooks/capabilities/host.mts')]);
+    const record = command(id, executable, [path.join(root, 'node_modules/tsx/dist/cli.mjs'), '--conditions=cheers-source', path.join(root, 'scripts/hooks/capabilities/host.mts')]);
     if (fs.existsSync(path.join(scratch, 'host.json'))) {
       const hostRows = JSON.parse(fs.readFileSync(path.join(scratch, 'host.json'), 'utf8'));
       for (const row of hostRows) {

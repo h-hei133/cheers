@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { inspectWorkspaceFile } from '../../core/workspace/files.js';
 import { withFileLock } from '../../session/store/sessionFileStore.js';
 import { commitWorkspaceFile } from '../../edit/authority/commit.js';
-import { integer, object, parseJson, requireValue } from '../contract/value.js';
+import { integer, object, parseJson, requireValue } from '@cheers/collaboration';
 
 /** Exactly one foreground listener may own a state file; only a provably dead local PID is recovered. */
 export function claimService(target: string): () => void {

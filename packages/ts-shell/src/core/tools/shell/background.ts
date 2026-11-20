@@ -1,11 +1,11 @@
-import { backgroundTasks } from '../../../workflow/jobs/local/legacy.js';
-import { TaskRegistry } from '../../../workflow/jobs/local/registry.js';
-import { renderTask } from '../../../workflow/jobs/local/projection.js';
+import { backgroundTasks } from '../../../runtime/execution/background/shared.js';
+import { TaskRegistry } from '../../../runtime/execution/background/registry.js';
+import { renderTask } from '../../shell/background/projection.js';
 import { ArtifactManager } from '../../session/artifactManager.js';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../../../tools/types.js';
 import { approvedResult, deniedResult } from '../toolResultLifecycle.js';
 import { planCommandLaunch } from './launch.js';
-import type { BackgroundRunner, BackgroundTask } from '../../../workflow/jobs/local/model.js';
+import type { BackgroundRunner, BackgroundTask } from '../../../runtime/execution/background/model.js';
 import { TOOL_APPROVED_COMMAND_AUTHORITY } from './authority.js';
 
 /** Launch through the ordinary sandbox, returning a handle whose owner enforces its deadline. */

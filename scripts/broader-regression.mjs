@@ -136,7 +136,7 @@ function runProcess(command, args, options = {}) {
 }
 
 async function runCli(args, options = {}) {
-  return runProcess(process.execPath, [tsxCliPath, cliEntryPath, ...args], {
+  return runProcess(process.execPath, [tsxCliPath, "--conditions=cheers-source", cliEntryPath, ...args], {
     cwd: tsShellCwd,
     env: {
       ...process.env,
@@ -245,7 +245,7 @@ function evaluateAmbiguousContinuity(output) {
 
 async function runNonTtyCheck() {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [tsxCliPath, cliEntryPath, '--project', projectRoot, '--provider', 'openai-compatible'], {
+    const child = spawn(process.execPath, [tsxCliPath, "--conditions=cheers-source", cliEntryPath, '--project', projectRoot, '--provider', 'openai-compatible'], {
       cwd: tsShellCwd,
       env: {
         ...process.env,

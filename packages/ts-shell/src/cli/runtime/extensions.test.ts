@@ -5,9 +5,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import { configurationAdmission, initialConfiguration } from '../../core/shell/configuration.js';
-import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { ShellCommandRuntime } from '../../core/shell/command.js';
-import { closeExtensionsFor, extensionManagerFor, installExtensionRuntime, isExtensionControl, waitForExtensionsFor } from './extensions.js';
+import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
+import { closeExtensionsFor, extensionManagerFor, installExtensionRuntime, isExtensionControl, startExtensionsFor, waitForExtensionsFor } from './extensions.js';
 import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { catalogContributions } from '../../core/catalog/contributions.js';
 import { bindExtensionUiFor, extensionHostFor } from './extensions/host.js';
@@ -15,6 +16,9 @@ import { createProfileContext, withProfile } from '../../core/paths/profile/cont
 import { sessionModelCatalog, sessionVirtualModels } from '../../core/catalog/models.js';
 import { scanCliArgs } from '../options/argv.js';
 import { cliExtensionArguments, type CliExtensionArguments } from '../options/extensions.js';
+import { writeCatalogCache } from '../../core/models/catalogStore.js';
+import { SessionManager } from '../../session/SessionManager.js';
+import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../session/model/state.js';
 
 let directory: string; let context: ShellRuntimeContext;
 beforeEach(() => {
@@ -31,11 +35,61 @@ afterEach(async () => { await closeExtensionsFor(context); vi.unstubAllEnvs(); f
 
 function install(args?: CliExtensionArguments) {
   const commands = new ShellCommandRuntime();
-  const runtime = { commands, getPermissionScope: () => 'ask', input: () => undefined, executePrompt: vi.fn(async () => 'ran') } as unknown as ShellSessionRuntime;
-  installExtensionRuntime(context, runtime, () => ({ sessionId: 'view', workspaceRoot: directory,
+  const runtime = { commands, isRunning: () => Boolean(commands.current), getPermissionScope: () => 'ask', input: () => undefined,
+    executePrompt: vi.fn(async () => 'ran') } as unknown as ShellSessionRuntime;
+  installExtensionRuntime(context, runtime, () => ({ sessionId: context.session.id, workspaceRoot: directory,
     hooks: new HookDispatcher(), emit: () => {}, permissionScope: 'ask' }), undefined, undefined, args);
   return commands;
 }
+
+it.each(['applied', 'saved'] as const)('reports %s effort through the file callback host while preserving model controls', async status => {
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'test-model', reasoning: true, maxTokens: 4096, contextWindow: 128_000 }] }]);
+  writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'fixture', providerConnections: [{
+    id: 'fixture', provider: 'openai', model: 'test-model', authType: 'api-key', apiKey: 'synthetic-key', status: 'connected',
+    createdAt: '2026-01-01', updatedAt: '2026-01-01',
+  }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  const session = new SessionManager().createNew(directory);
+  const initial = { connectionId: 'fixture', provider: 'openai', model: 'test-model', thinkingEffort: 'low' as const,
+    serviceTier: 'flex', contextWindow: 128_000, skillful: false };
+  writeSessionModel(session.id, initial, readSessionModelEdit(session.id));
+  const seed: ShellRuntimeContext = { ...context, session, runtimeConfig: getRuntimeConfig(directory),
+    ...(status === 'saved' ? { resolveConfigTarget: (config: ShellRuntimeContext['runtimeConfig'], sessionId?: string) => ({
+      ...resolveProviderCredential({ runtimeConfig: config, pool: { sessionId } }), thinkingEffort: 'low' as const,
+    }) } : {}),
+  };
+  context = { ...seed, configuration: initialConfiguration(seed) };
+
+  const file = path.join(directory, 'effort.ts');
+  fs.writeFileSync(file, `export default async api => {
+    let initialized = false, receipt, localPromise, isolatedReceipt, refusal;
+    try { await api.setThinkingLevel(null); } catch (error) {
+      initialized = error instanceof Error && error.message.includes('outside an extension callback');
+    }
+    api.on('session_start', async () => {
+      const result = api.setThinkingLevel('high');
+      localPromise = Object.getPrototypeOf(result) === Promise.prototype;
+      receipt = await result;
+      isolatedReceipt = Object.getPrototypeOf(receipt) === null && Object.isFrozen(receipt);
+      try { await api.setThinkingLevel('max'); } catch (error) {
+        refusal = error instanceof Error && error.message.includes('does not support the selected reasoning effort');
+      }
+    });
+    api.registerCommand({ name: 'show-effort', kind: 'local', summary: 'Read effort receipt', group: 'session', execute: async () => ({
+      kind: 'local', output: JSON.stringify({ initialized, receipt, localPromise, isolatedReceipt, refusal })
+    }) });
+  };`);
+  context.cliExtensionPaths = [file];
+  install();
+  await startExtensionsFor(context);
+
+  const command = catalogContributions(directory, session.id).flatMap(entry => entry.commands).find(entry => entry.name === 'show-effort')!;
+  expect(await command.execute([], { cwd: directory, sessionId: session.id })).toEqual({ kind: 'local', output: JSON.stringify({
+    initialized: true, receipt: { status, level: 'high' }, localPromise: true, isolatedReceipt: true, refusal: true,
+  }) });
+  expect(readSessionModel(session.id)).toEqual({ ...initial, thinkingEffort: 'high' });
+  expect(context.configuration.current.config.providerConnections.find(item => item.id === 'fixture')?.thinkingEffort).toBe('high');
+  if (status === 'saved') expect(context.resolveConfigTarget!(context.configuration.current.config, session.id).thinkingEffort).toBe('low');
+});
 
 it('uses typed CLI flags during factory initialization and preserves false, empty and default values', async () => {
   const file = path.join(directory, 'flags.ts');

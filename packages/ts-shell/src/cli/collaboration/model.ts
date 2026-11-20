@@ -4,7 +4,7 @@ import type { SessionManager } from '../../session/SessionManager.js';
 import type { ToolGateOptions } from '../../turn/tools.js';
 import type { CollaborationClient } from '../../collaboration/client/service.js';
 import type { CollaborationHost } from '../../collaboration/client/host.js';
-import type { Acceptance, Binding, Proposal } from '../../collaboration/contract/model.js';
+import type { Acceptance, Binding, Proposal } from '@cheers/collaboration';
 import type { CollaborationGuest } from '../../collaboration/client/guest.js';
 
 export interface CollaborationComposition {

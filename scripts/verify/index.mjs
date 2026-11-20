@@ -1108,7 +1108,7 @@ async function runCliTurn(scenario, turnIndex, prompt) {
     ? `/continue ${prompt}`
     : prompt
   return run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     cliEntryPath,
     '--project',
     scenario.projectDir,
@@ -1125,7 +1125,7 @@ async function runCliTurn(scenario, turnIndex, prompt) {
 
 async function readCurrentSessionId(scenario) {
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     cliEntryPath,
     '--project',
     scenario.projectDir,
@@ -2193,7 +2193,7 @@ async function runMultiFileUpdatePlanningDryRun({ fixtureDir, patchPath }) {
     }));
   `
   return run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     '-e',
     script,
     fixtureDir,
@@ -4343,7 +4343,7 @@ function directProviderExplanationEvalScriptUsesAsyncWrapper(script) {
 
 async function runDirectProviderExplanationTurn({ prompt, runtimeHome, realHome, fixtureDir }) {
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     '--eval',
     buildDirectProviderExplanationEvalScript(),
   ], {
@@ -5086,7 +5086,7 @@ function fallbackOutcomeForReadonlyAttempt(attempt) {
 async function runReadonlyModelTurnAttempt({ fixture, providerEnv }) {
   const before = snapshotReadonlyFixture(fixture.fixtureDir)
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     cliEntryPath,
     '--project',
     fixture.fixtureDir,
@@ -5483,7 +5483,7 @@ async function runRealCodingFlowSmoke() {
     const noteStatusBefore = readCodingFlowNoteStatus(fixture.fixtureDir)
     const before = snapshotCodingFlowFixture(fixture.fixtureDir)
     const result = await run(process.execPath, [
-      tsxCliPath,
+      tsxCliPath, "--conditions=cheers-source",
       cliEntryPath,
       '--project',
       fixture.fixtureDir,
@@ -5936,7 +5936,7 @@ function buildApplyPatchDryRunProviderEvalScript() {
 
 async function runApplyPatchDryRunProviderTurn({ prompt, runtimeHome, realHome, fixtureDir, auditLogPath }) {
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     '--eval',
     buildApplyPatchDryRunProviderEvalScript(),
   ], {
@@ -6058,7 +6058,7 @@ function buildApplyPatchDryRunRouteEvalScript() {
 
 async function runApplyPatchDryRunRoute({ fixtureDir, patchText, redaction }) {
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     '--eval',
     buildApplyPatchDryRunRouteEvalScript(),
   ], {
@@ -6188,7 +6188,7 @@ function buildApplyPatchPermissionUxRouteEvalScript() {
 
 async function runApplyPatchPermissionUxRoute({ fixtureDir, patchText, redaction }) {
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     '--eval',
     buildApplyPatchPermissionUxRouteEvalScript(),
   ], {
@@ -6280,7 +6280,7 @@ async function runApplyPatchRuntimeNoWriteRoute({
   repositoryClean,
 }) {
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     '--eval',
     buildApplyPatchRuntimeNoWriteRouteEvalScript(),
   ], {
@@ -6419,7 +6419,7 @@ async function runApplyPatchWriteFixtureRoute({
   protectedFilesUnchanged,
 }) {
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     '--eval',
     buildApplyPatchWriteFixtureEvalScript(),
   ], {
@@ -6577,7 +6577,7 @@ async function runApplyPatchGuardedWriteRoute({
   repositoryClean,
 }) {
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     '--eval',
     buildApplyPatchGuardedWriteEvalScript(),
   ], {
@@ -6745,7 +6745,7 @@ async function runApplyPatchGuardedRouteRoute({
   repositoryClean,
 }) {
   const result = await run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     '--eval',
     buildApplyPatchGuardedRouteEvalScript(),
   ], {
@@ -9502,6 +9502,7 @@ function route03CommandDisplay() {
   return [
     process.execPath,
     path.relative(repoRoot, tsxCliPath),
+    '--conditions=cheers-source',
     path.relative(repoRoot, cliEntryPath),
     '--project',
     '<isolated-selected-workspace>',
@@ -11494,7 +11495,7 @@ async function runApplyPatchWorkspaceWriteCli({
   auditLogPath,
 }) {
   return run(process.execPath, [
-    tsxCliPath,
+    tsxCliPath, "--conditions=cheers-source",
     cliEntryPath,
     '--project',
     fixtureDir,

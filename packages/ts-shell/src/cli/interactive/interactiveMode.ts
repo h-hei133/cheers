@@ -7,7 +7,7 @@ import type { StartupSurface } from './startup.js';
 import { catalogIdentity, createCatalogLoader } from "./completion/catalog.js";
 import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
 import { configurationAdmission } from '../../core/shell/configuration.js';
-import { renderTaskNotice } from '../../workflow/jobs/local/projection.js';
+import { renderTaskNotice } from '../../core/shell/background/projection.js';
 import { jobsFor, watchJobsFor } from '../runtime/jobs.js';
 import { createBackgroundFollowUp } from './backgroundNotice.js';
 import { jobsControl, runJobsControl } from '../jobs/control.js';

@@ -11,6 +11,7 @@ import { sshFeatureTools } from './ssh.js';
 import { directorInspectionFor } from './director.js';
 import { evaluationFeatureTools } from './evaluation.js';
 import { authorizationForMcp } from '../mcp/auth/service.js';
+import { browserTools } from '../../tools/registry.js';
 
 /** Resolve on each inspection, including after reload or project navigation. */
 export function toolPoolFor(
@@ -30,6 +31,7 @@ export function toolPoolFor(
     const owned = !supplied && context.runtimeConfig.enableMcpTools ? new CoreMcpGateway(workspaceRoot, undefined, authorizationForMcp) : undefined;
     try {
       return (await loadToolCatalog({ workspaceRoot, sessionId: context.session.id, runtimeConfig: director?.config ?? context.runtimeConfig, admission, signal,
+        builtinTools: browserTools(),
         featureTools: [...researchInspectionTools(context), ...securityFeatureTools(context), ...sshFeatureTools(context), ...evaluationFeatureTools(context), ...director?.tools ?? []],
         skillOptions: context.skillOptions, forcedTool, mcpGateway: supplied ?? owned })).tools;
     } finally {

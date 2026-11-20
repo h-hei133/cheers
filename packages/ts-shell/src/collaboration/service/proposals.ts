@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Proposal, Room, ServiceRequest } from '../contract/model.js';
-import { digest, identifier, keys, object, requireValue, text, uuid } from '../contract/value.js';
+import { type Proposal, type Room, type ServiceRequest, digest, identifier, keys, object, requireValue, text, uuid } from '@cheers/collaboration';
 import { assertOwner, assertRight, type Tickets } from './auth.js';
 
 export function proposalMetadata(proposal: Proposal): Omit<Proposal, 'text'> {

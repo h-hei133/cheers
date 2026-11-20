@@ -1,13 +1,8 @@
-import type { ResearchBrief } from '../brief/model.js';
+import { briefSchema, draftSchema, reviewOutputSchema, type ResearchBrief, type ResearchDraft, type ReviewFinding } from '@cheers/research';
 import { researchLimits } from '../brief/model.js';
-import { briefSchema } from '../brief/schema.js';
-import type { ResearchDraft } from '../evidence/model.js';
-import { draftSchema } from '../evidence/schema.js';
 import { validateDraft } from '../evidence/validation.js';
 import { safeText } from '../evidence/producer.js';
-import { reviewOutputSchema } from '../review/schema.js';
 import { validateReview } from '../review/validation.js';
-import type { ReviewFinding } from '../review/model.js';
 import { validateFragment } from '../report/validation.js';
 import { parseResearchOutput } from './parse.js';
 import { gapsSchema, reconciliationSchema, researchInputDigest } from './prompts.js';

@@ -43,13 +43,20 @@ describe("starting a command in the background", () => {
    * Both go through one launcher plan, so a background command cannot end up
    * running bare on the host while its foreground twin is confined.
    */
-  it("is launched through the same planner as a foreground command", async () => {
+  it("uses the shell planner and shares the live task across standalone registries", async () => {
     const result = await tool("bash").execute(
       { command: "echo backgrounded", runInBackground: true },
       context,
     );
 
-    expect(result.output).toMatch(/^Started bg_/);
+    const taskId = /^Started (bg_\d+)/.exec(result.output ?? "")?.[1];
+    expect(taskId).toBeDefined();
+    const inspect = tool("taskOutput");
+    await vi.waitFor(async () => {
+      const observed = await inspect.execute({ taskId }, context);
+      expect(observed.output).toContain("finished with exit code 0");
+      expect(observed.output).toMatch(/output so far:\\x0a[ \t]*backgrounded$/);
+    }, { timeout: 3000 });
   });
 });
 

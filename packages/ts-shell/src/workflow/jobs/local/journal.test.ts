@@ -7,7 +7,7 @@ import { createDefaultExecutionService } from '../../../runtime/execution/servic
 import type { CommandExecutionResult, LocalExecutionHandle } from '../../../runtime/execution/types.js';
 import { JobStore } from '../store.js';
 import { LocalJournal } from './journal.js';
-import { TaskRegistry } from './registry.js';
+import { TaskRegistry } from '../../../runtime/execution/background/registry.js';
 import { localPage } from '../../../cli/jobs/projection.js';
 
 let scratch: string; let root: string; let manager: SessionManager; let session: Session; let store: JobStore;
@@ -235,6 +235,9 @@ it('resumes only freshly admitted undispatched intent, preserves cwd and keeps u
   restarted.adopt(id);
   expect(() => owner.resume(id, { command: 'different', cwd: subdir })).toThrow(/changed/);
   expect(() => owner.resume(id, { command: 'pwd', cwd: root })).toThrow(/changed/);
+  expect(() => owner.resume(id, { command: 'pwd', cwd: subdir, timeoutMs: 1000 })).toThrow(/changed/);
+  expect(restarted.get(id)).toMatchObject({ status: 'queued', dispatchPossible: false });
+  expect(runCommand).not.toHaveBeenCalled();
   owner.resume(id, { command: 'pwd', cwd: subdir }); await until(() => !owner.hasLive(id));
   expect(runCommand).toHaveBeenCalledWith(expect.objectContaining({ cwd: subdir }));
   const other = manager.createNew(root); const foreign = new TaskRegistry(undefined, journal(new JobStore(manager, () => other))); owners.push(foreign);

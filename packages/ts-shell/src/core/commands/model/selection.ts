@@ -261,7 +261,9 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     } } : {}),
   };
   let receipt: SessionModelReceipt | undefined;
-  const roles = exact?.roles ?? sessionEdit?.selection?.roles;
+  const saved = sessionEdit?.selection;
+  const roles = exact?.roles ?? saved?.roles;
+  const sameTarget = !target && saved?.provider === provider && saved.model === model && saved.connectionId === activeId;
   if (context.sessionId) {
     try {
       receipt = writeSessionModel(context.sessionId, {
@@ -273,12 +275,11 @@ async function selectModel(args: string[], context: CommandContext, global: bool
         // Presets are session-owned named roles, not the active model. Preserve
         // them when switching the active target; a switch must not silently
         // delete resume-scoped controls.
-        ...(sessionEdit?.selection?.presets ? { presets: sessionEdit.selection.presets } : {}),
+        ...(saved?.presets ? { presets: saved.presets } : {}),
         ...(roles ? { roles } : {}),
-        // Skill listing is a session control and follows the session across
-        // model changes. Service tier and context window are model-specific;
-        // omitting them makes the new model resolve its own defaults.
-        ...(sessionEdit?.selection?.skillful !== undefined ? { skillful: sessionEdit.selection.skillful } : {}),
+        ...(saved?.skillful !== undefined ? { skillful: saved.skillful } : {}),
+        // Request controls belong to the same model and credential binding.
+        ...(sameTarget ? { serviceTier: saved.serviceTier, contextWindow: saved.contextWindow } : {}),
       }, sessionEdit!, beforeCommit);
     } catch (error) {
       return sessionFailure(error);

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { writeProjectState } from '../core/state/projectState.js';
 import { captureThinkingPreference } from '../core/models/preference.js';
 import * as turnSession from '../turn/session.js';
@@ -434,6 +435,31 @@ describe("CLI runtime invocation", () => {
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  });
+
+  it("supplies the task worktree through the normal run without a registry override", async () => {
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: workspaceRoot, encoding: 'utf8' });
+    git('-c', 'user.email=fixture@example.test', '-c', 'user.name=Fixture', 'commit', '--allow-empty', '-qm', 'Initial commit');
+    const head = git('rev-parse', 'HEAD');
+    let dispatched = false;
+    const { deps } = dependencies();
+    const run = await runCliRuntimeInvocation(baseInput({
+      providerModeEnv: 'synthetic', permissionScope: 'allow-all',
+      runtimeConfig: { ...getRuntimeConfig(workspaceRoot), toolDiscovery: 'full' },
+      stepControl: () => ({ observe: () => {}, step: async () => {
+        if (dispatched) return { text: 'Finished', toolCalls: [], stopReason: 'stop' };
+        dispatched = true;
+        return { text: '', toolCalls: [{ id: 'task-checkout', name: 'task', args: {
+          description: 'Review a checkout', prompt: 'Reply with a short status.', isolation: 'worktree',
+        } }], stopReason: 'stop' };
+      } }),
+    }), { ...deps, tools: undefined });
+    const events = await collect(run.events);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'tool.result', toolName: 'task', success: true,
+      output: expect.stringContaining('Worktree cleanup**: removed') }));
+    expect(git('worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(1);
+    expect(git('branch', '--list', 'subagent/*')).toBe('');
+    expect(git('rev-parse', 'HEAD')).toBe(head);
   });
 
   it("packages provider mode from the existing CLI environment convention", () => {

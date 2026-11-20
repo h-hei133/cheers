@@ -12,7 +12,7 @@ import type { QueryEvent } from '../core/query/runtime/events.js';
 import { readServiceConfig } from './service/config.js';
 import { startCollaborationService } from './service/listener.js';
 import { emptySnapshot, bound, fixture, startFixtureService } from './__tests__/fixture.js';
-import { digest, object } from './contract/value.js';
+import { digest, object } from '@cheers/collaboration';
 
 const cleanups: (() => Promise<void> | void)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); vi.unstubAllEnvs(); });

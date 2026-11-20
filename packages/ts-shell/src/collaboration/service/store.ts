@@ -4,8 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { withFileLock } from '../../session/store/sessionFileStore.js';
 import { commitWorkspaceFile } from '../../edit/authority/commit.js';
 import { inspectWorkspaceFile, pathIdentity } from '../../core/workspace/files.js';
-import { STATE_BYTES, type ServiceState } from '../contract/model.js';
-import { object, parseJson, requireValue } from '../contract/value.js';
+import { STATE_BYTES, type ServiceState, object, parseJson, requireValue } from '@cheers/collaboration';
 
 /** One persisted transaction owns ACLs, fencing, frame cutover and mutation receipts. */
 export class ServiceStore {

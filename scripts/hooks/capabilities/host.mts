@@ -6,7 +6,7 @@ import { loadHookDeclarations } from '../../../packages/ts-shell/src/core/hooks/
 import { registerDeclaredHooks } from '../../../packages/ts-shell/src/core/hooks/registration.js';
 import { HookTrustStore } from '../../../packages/ts-shell/src/core/hooks/trust.js';
 import { createProfileContext, withProfile } from '../../../packages/ts-shell/src/core/paths/profile/context.js';
-import { createCoreToolRegistry } from '../../../packages/ts-shell/src/core/tools/registry.js';
+import { createCoreToolRegistry } from '../../../packages/ts-shell/src/tools/registry.js';
 import { CANONICAL_WRITE_MATCHER } from '../../../packages/ts-shell/src/core/hooks/translation.js';
 import { runPreparedTool } from '../../../packages/ts-shell/src/turn/invoke.js';
 import { runSecurityTool } from '../../../packages/ts-shell/src/security/analysis/gate.js';

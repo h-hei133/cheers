@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import * as todos from '../../core/commands/todoCommandRuntime.js';
 import { AgentRegistryScanner } from '../../core/messaging/agentRegistryScanner.js';
-import type { BackgroundRunner } from '../../workflow/jobs/local/model.js';
+import type { BackgroundRunner } from '../../runtime/execution/background/model.js';
 import { renderHints } from '../../presentation/tui/chrome/hints.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 import { readAmbientFacts, readPeerSessionCount } from './ambientFacts.js';

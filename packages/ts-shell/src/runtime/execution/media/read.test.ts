@@ -5,6 +5,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as local from '../local.js'
 import { createMediaReader } from './index.js'
+import { createReader } from './reader.js'
 import { runMediaProcess } from './process.js'
 import { withMediaSource } from './source.js'
 import type { MediaReadRequest } from './model.js'
@@ -62,6 +63,27 @@ it('refuses oversized input and format disguises before any native launch', asyn
   const handle = await fs.open(path.join(root, 'pixel.png'), 'w'); await handle.truncate(16 * 1024 * 1024 + 1); await handle.close()
   await expect(readMedia(request())).rejects.toMatchObject({ reason: 'bytes' })
   expect(execute).not.toHaveBeenCalled()
+})
+
+it('supplies the decoder only a verified staged descriptor and keeps source admission in the reader', async () => {
+  const execute = vi.spyOn(local, 'executeLocally')
+  const commands: string[] = []
+  const read = createReader(async (source, cwd, command) => {
+    commands.push(command)
+    expect(cwd).toBe(root)
+    await source.verify()
+    expect(await fs.readFile(`/proc/self/fd/${source.fd}`)).toEqual(png)
+    expect(await fs.readlink(`/proc/self/fd/${source.fd}`)).toContain('(deleted)')
+    return command === 'ffprobe'
+      ? Buffer.from('{"streams":[{"codec_name":"png","width":1,"height":1}]}')
+      : Buffer.from([255, 216, 0, 255, 217])
+  })
+  const access = vi.fn()
+  const result = await read({ ...request(), assertFileAccess: access })
+  expect(access).toHaveBeenCalled()
+  expect(execute).not.toHaveBeenCalled()
+  expect(commands).toEqual(['ffprobe', 'ffmpeg'])
+  expect(result.metadata.media).toMatchObject({ kind: 'image', sourceHash: createHash('sha256').update(png).digest('hex') })
 })
 
 it('checks cancellation after asynchronous preparation and before native launch', async () => {

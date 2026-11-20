@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createTaskWaitToolDefinition } from './shell/background.js';
-import type { BackgroundTask } from '../../workflow/jobs/local/model.js';
+import type { BackgroundTask } from '../../runtime/execution/background/model.js';
 import type { ToolExecutionContext } from '../../tools/types.js';
 
 const controllers: AbortController[] = [];

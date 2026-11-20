@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { projectEvent } from './client/events.js';
-import { decodeSnapshot, projectSnapshot } from './contract/snapshot.js';
+import { decodeSnapshot, projectSnapshot } from './snapshot.js';
 import { emptySnapshot } from './__tests__/fixture.js';
 
 it('never forwards split message/tool secrets or raw provider event graphs', () => {

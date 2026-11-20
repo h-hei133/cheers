@@ -1,8 +1,7 @@
 import path from 'node:path';
 import { resolveUserDataFile } from '../../core/paths/userHome.js';
-import type { RelayEvent, Snapshot } from '../contract/model.js';
-import { decodeEvents, decodeSnapshot } from '../contract/snapshot.js';
-import { digest, integer, requireValue } from '../contract/value.js';
+import { type RelayEvent, type Snapshot, decodeEvents, digest, integer, requireValue } from '@cheers/collaboration';
+import { decodeSnapshot } from '../snapshot.js';
 
 export function cursorPath(origin: string, principal: string, roomId: string, localIdentity: string): string {
   return resolveUserDataFile(path.join('collaboration', 'cursors', digest([origin, principal, roomId, localIdentity]) + '.json'));

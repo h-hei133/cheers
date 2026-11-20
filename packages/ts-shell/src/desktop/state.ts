@@ -1,8 +1,9 @@
 import { realpathSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { ToolExecutionContext } from '../tools/types.js';
-import { DesktopError, type DesktopSnapshot } from './model.js';
-import { DesktopScope } from './command.js';
+import type { DesktopSnapshot } from '@cheers/desktop';
+import { DesktopAdmissionError } from './domain.js';
+import { DesktopScope } from './scope.js';
 import { freezeDeep } from '../core/values/freeze.js';
 
 export class DesktopState {
@@ -23,8 +24,8 @@ export class DesktopState {
     const admitted = await Promise.race([previous.then(() => true), scope.stopped.then(() => false)]);
     let active = false;
     try {
-      scope.check(); if (!admitted || epoch !== this.epoch) throw new DesktopError('cancelled', 'Desktop session was closed while this action was queued.');
-      if (this.blocked) throw new DesktopError('cleanup', 'Desktop process cleanup is unconfirmed. Restart the runtime before continuing.');
+      scope.check(); if (!admitted || epoch !== this.epoch) throw new DesktopAdmissionError('cancelled', 'Desktop session was closed while this action was queued.');
+      if (this.blocked) throw new DesktopAdmissionError('cleanup', 'Desktop process cleanup is unconfirmed. Restart the runtime before continuing.');
       this.active = scope;
       active = true;
       return await operation(scope);
@@ -41,7 +42,7 @@ export class DesktopState {
     return this.snapshot = freezeDeep({ ...snapshot, id: `d${this.identity}-${++this.sequence}` });
   }
   async close(): Promise<void> {
-    this.epoch++; this.active?.controller.abort(); this.snapshot = undefined;
+    this.epoch++; this.active?.cancel(); this.snapshot = undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const settled = await Promise.race([this.tail.then(() => true), new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), 4000); })]);
@@ -58,7 +59,7 @@ export function desktopState(context: Pick<ToolExecutionContext, 'workspaceRoot'
   let state = states.get(key);
   if (!state) {
     if (states.size >= 16) for (const [identity, owner] of states) if (owner.inactive()) states.delete(identity);
-    if (states.size >= 16) throw new DesktopError('unavailable', 'Desktop session owner capacity is exhausted. Close inactive sessions.');
+    if (states.size >= 16) throw new DesktopAdmissionError('unavailable', 'Desktop session owner capacity is exhausted. Close inactive sessions.');
     state = new DesktopState(); states.set(key, state);
   }
   return state;
