@@ -1,5 +1,6 @@
 import { runAgentLoop, runAgentLoopContinue, type AgentLoopConfig } from "./loop.js";
 import { PendingQueue } from "./queue.js";
+import { reserveQueueInput } from './input.js';
 import { createAgentState, type AgentMessage, type AgentState, type InitialAgentState } from "./state.js";
 import type { AgentEventListener } from "./events.js";
 import type { AgentTool, AgentToolExecutionMode, ToolHooks } from "./tools.js";
@@ -121,7 +122,7 @@ export class AgentCore {
       if (!input || signal.aborted) return;
       const { messages, ...options } = input;
       await runAgentLoop(
-        [...messages],
+        messages,
         [...this.internalState.messages],
         config,
         (event) => this.processEvents(event),
@@ -187,6 +188,7 @@ export class AgentCore {
   }
 
   private createLoopConfig(): AgentLoopConfig {
+    const queued = reserveQueueInput<AgentMessage>();
     return {
       tools: this.options.tools,
       toolExecution: this.options.toolExecution,
@@ -206,10 +208,13 @@ export class AgentCore {
       isContextCurrent: messages => sameContext(this.internalState.messages, messages),
       streamStep: this.options.streamStep,
       hasQueuedMessages: lane => (lane === 'steering' ? this.steeringQueue : this.followUpQueue).hasItems(),
-      commitInput: this.options.commitInput,
+      commitInput: messages => {
+        const accepted = queued.commit(messages);
+        return this.options.commitInput?.(accepted) ?? { messages: accepted };
+      },
       onStepStart: this.options.onStepStart,
-      getSteeringMessages: async () => this.options.drainInput?.(this.steeringQueue, 'steer') ?? this.steeringQueue.drain(),
-      getFollowUpMessages: async () => this.options.drainInput?.(this.followUpQueue, 'followUp') ?? this.followUpQueue.drain(),
+      getSteeringMessages: async () => this.options.drainInput?.(this.steeringQueue, 'steer') ?? queued.reserve(this.steeringQueue),
+      getFollowUpMessages: async () => this.options.drainInput?.(this.followUpQueue, 'followUp') ?? queued.reserve(this.followUpQueue),
     };
   }
 

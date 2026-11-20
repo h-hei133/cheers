@@ -27,7 +27,7 @@ export interface ConfigPublication {
   readonly binding: ConfigBinding;
   readonly admissionBlocked: boolean;
   /** Only the initial selected-model constraints may be repaired through a logical selection. */
-  readonly modelConstraintsOnly?: boolean;
+  readonly modelConstraintsOnly: boolean;
   readonly diagnostics: readonly string[];
 }
 
@@ -116,7 +116,7 @@ export class ConfigState {
     if (this.publication.config.configScopes?.revision !== config.configScopes?.revision) this.transition(actual);
     this.publication = freezeDeep({ revision: this.publication.revision + 1, config, requested: candidate, catalog: structuredClone(catalog),
       catalogDiagnostics: [...catalogDiagnostics],
-      binding: structuredClone(actual), admissionBlocked: false, diagnostics: candidate.configDiagnostics });
+      binding: structuredClone(actual), admissionBlocked: false, modelConstraintsOnly: false, diagnostics: candidate.configDiagnostics });
     return this.result('applied', before);
   }
 

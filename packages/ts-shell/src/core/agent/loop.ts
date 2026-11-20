@@ -208,9 +208,11 @@ export async function runAgentLoop(
   const context: AgentMessage[] = [...seed];
 
   const turnStarted = Date.now();
+  const starting = config.isContextCurrent ? captureContext(context) : undefined;
   await emit({ type: "agent_start" });
   await emit({ type: "turn_start" });
   try {
+    if (starting) assertContextCurrent(context, starting, config.isContextCurrent, signal);
     if (!await deliverInput(prompts, config, emit, context, produced) && prompts.length) {
       await emit({ type: 'agent_end', messages: [...produced] });
       return produced;

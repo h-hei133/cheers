@@ -3015,3 +3015,21 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** Settings reports an unconfirmed application after a path rule has been saved and accepted.
 - **Root cause** Publishing changed path scopes advances the admission generation. The saving draft still expects its previous generation.
 - **Rule** Verify the expected generation and original binding before and after notifying the caller. Retire the old draft and preserve the unconfirmed application outcome if the caller switches sessions.
+
+### Verified Renewals Compare The Full Configuration Publication
+
+- **Symptom** The main request uses its renewed credential, but an eligible Advisor review is skipped.
+- **Root cause** The initial configuration contained `modelConstraintsOnly: false`. Refresh omitted it, so the Advisor's exact publication comparison rejected a credential-only update.
+- **Rule** Publish the same admission fields at startup and after refresh. Exercise the actual configuration owner and verify that unrelated settings, catalogue, or model changes still invalidate the captured request.
+
+### Queue Polling Must Preserve The Unaccepted Prefix
+
+- **Symptom** A follow-up disappears when a `turn_start` observer replaces history during a direct agent run or restart.
+- **Root cause** The default queue drained during polling. The history check could refuse delivery only after ownership had been lost.
+- **Rule** Reserve the current prefix during polling and consume its matching entries at input acceptance. Check the captured history after startup observers, including on queued restarts.
+
+### Serial CLI Fixtures Need An Event Loop Turn Between Cases
+
+- **Symptom** Every CLI assertion passes, but the test worker times out waiting for a task update acknowledgement.
+- **Root cause** Consecutive cases with synchronous child processes can keep the worker out of its event loop beyond the reporting deadline.
+- **Rule** Let the worker process IPC after fixture cleanup. Rerun the contiguous cases for longer than the reporting deadline and require the normal suite exit code.

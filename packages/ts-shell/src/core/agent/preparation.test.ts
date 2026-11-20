@@ -174,17 +174,21 @@ it('takes one late steering message before an untouched follow-up after long pre
   expect(core.hasQueuedMessages()).toBe(false);
 });
 
-it('does not deliver an old queue entry into history replaced by a turn_start observer', async () => {
+it.each([false, true])('retains queued input when a turn_start observer replaces history (restart=%s)', async restart => {
   let calls = 0;
   let starts = 0;
   const core = new AgentCore({ streamStep: async () => {
-    if (++calls === 1) core.followUp({ role: 'user', content: 'Queued request' });
+    if (++calls === 1 && !restart) core.followUp({ role: 'user', content: 'Queued request' });
     return answer(`Answer ${calls}`);
   } });
   core.subscribe(event => {
     if (event.type === 'turn_start' && ++starts === 2) core.state.messages = [{ role: 'user', content: 'Successor history' }];
   });
   await core.prompt(prompt);
+  if (restart) {
+    core.followUp({ role: 'user', content: 'Queued request' });
+    await core.continue();
+  }
   expect(core.pendingQueues.followUps.entries().map(entry => entry.value.content)).toEqual(['Queued request']);
   expect(core.state.messages[0]?.content).toBe('Successor history');
   expect(core.state.messages.some(message => message.content === 'Queued request')).toBe(false);

@@ -60,18 +60,12 @@ export class PendingQueue<T> {
     return this.messages.some(current => current.id === entry.id && current.value === entry.value);
   }
 
-  public drain(): T[] {
-    if (this.mode === "all") {
-      const drained = this.messages.map(entry => entry.value);
-      this.messages = [];
-      return drained;
-    }
-    const first = this.messages[0];
-    if (first === undefined) {
-      return [];
-    }
-    this.messages = this.messages.slice(1);
-    return [first.value];
+  public drain(entries: readonly PendingQueueEntry<T>[] = this.mode === 'all' ? this.messages : this.messages.slice(0, 1)): T[] {
+    const changed = entries.findIndex((entry, index) => {
+      const current = this.messages[index];
+      return current?.id !== entry.id || current.value !== entry.value;
+    });
+    return this.messages.splice(0, changed === -1 ? entries.length : changed).map(entry => entry.value);
   }
 
   public clear(): void {

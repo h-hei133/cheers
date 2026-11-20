@@ -5,8 +5,7 @@ import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses, advisorResult } from '../../test-utils/advisor.js';
 import { getRuntimeConfig, getUserAuthPath, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
-import { ConfigState } from '../../config/state.js';
-import { configurationAdmission, configurationBinding, refreshConfiguration } from '../../core/shell/configuration.js';
+import { configurationAdmission, initialConfiguration, refreshConfiguration } from '../../core/shell/configuration.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import { loadCatalog, writeCatalogCache } from '../../core/models/catalogStore.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
@@ -75,9 +74,8 @@ async function fixture(account: boolean | 'environment' | 'scope' | 'main' | 'ma
   const command = { cwd: setup.root, projectRoot: setup.root, sessionId: setup.session.id };
   expect((await runModelPresetCommand(['save', 'work', '--profile', `default=a/${mainModel}@low`, `advisor=b/${advisorModel}@high`], command)).output).toContain('saved');
   expect((await runModelPresetCommand(['apply', 'work', '--all'], command)).output).toContain('all roles applied');
-  const config = projectSessionModel(getRuntimeConfig(setup.root), setup.session.id);
   const binding = { projectRoot: setup.root, session: setup.session };
-  const configuration = new ConfigState(config, configurationBinding(binding), loadCatalog());
+  const configuration = initialConfiguration({ ...binding, runtimeConfig: getRuntimeConfig(setup.root) });
   const context = { ...binding, cwd: setup.root, configuration } as ShellRuntimeContext;
   const reports: string[] = [];
   const renderer = { renderLine: (text: string) => reports.push(text) };
@@ -236,7 +234,7 @@ it.each(['main', 'main-environment', 'main-scope'] as const)('keeps the current 
   const renew = observeOAuthRenewal(freshAccount);
   await invoke(setup);
   expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(1);
-  expect(setup.requests.map(row => row.model)).toEqual(['gpt-5.4', 'namespace/advisor']);
+  expect(setup.requests.map(row => row.model), setup.reports.join('\n')).toEqual(['gpt-5.4', 'namespace/advisor']);
   expect(setup.requests[0]).toMatchObject({ credential: `Bearer ${freshAccount.accessToken}`, effort: 'low' });
   expect(setup.requests[1]).toMatchObject({ credential: 'Bearer synthetic-b', effort: 'high', tools: undefined });
   expect(setup.advisor.view().notes).toHaveLength(1);
@@ -262,8 +260,7 @@ it('keeps a renewed auth-only profile checkpoint eligible without creating a set
   for (const record of auth.providerConnections) delete record.model;
   fs.writeFileSync(getUserAuthPath(), JSON.stringify(auth), { mode: 0o600 });
   fs.unlinkSync(getUserRuntimeConfigPath());
-  const config = projectSessionModel(getRuntimeConfig(setup.root), setup.session.id);
-  setup.context.configuration = new ConfigState(config, configurationBinding(setup.context), loadCatalog());
+  setup.context.configuration = initialConfiguration({ ...setup.context, runtimeConfig: getRuntimeConfig(setup.root) });
   setup.advisor = advisorFor(setup.context, setup.manager, setup.renderer);
   setup.advisor.setEnabled(true);
   observeOAuthRenewal(freshAccount);
@@ -355,7 +352,7 @@ it.each([true, 'environment', 'scope'] as const)('prepares an expired independen
   expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(0);
   await invoke(setup);
   expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(1);
-  expect(setup.requests.map(row => row.model)).toEqual(['main', 'main', 'main', 'gpt-5.4']);
+  expect(setup.requests.map(row => row.model), setup.reports.join('\n')).toEqual(['main', 'main', 'main', 'gpt-5.4']);
   expect(setup.requests.at(-1)).toMatchObject({ credential: `Bearer ${freshAccount.accessToken}`, effort: 'high' });
   expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'b')?.accountAuth?.openai).toMatchObject({ ...freshAccount, expiresAt: expect.any(Number) });
   expect(setup.advisor.view().status).toBe('reviewed');
