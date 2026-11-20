@@ -8,6 +8,7 @@ import {
   createLifecycleTranscriptEvent,
   type TranscriptEvent,
 } from "../sessionEventCodec.js";
+import { publishSettlement, type SessionSettlement } from './sessionTerminalStore.js';
 
 interface SessionLifecycleCallbacks {
   readonly loadSession: (sessionId: string) => Session;
@@ -130,26 +131,27 @@ export function saveSessionInterrupted(
   sessionId: string,
   interruptedKind: "prompt" | "turn" = "prompt",
 ): void {
-  const session = callbacks.loadSession(sessionId);
+  publishSettlement(callbacks, prepareSessionInterrupted(callbacks.loadSession(sessionId), callbacks.now(), interruptedKind));
+}
+
+export function prepareSessionInterrupted(
+  session: Session, timestamp: string, interruptedKind: "prompt" | "turn"
+): SessionSettlement {
   session.status = "interrupted";
   delete session.lastError;
-  session.updatedAt = callbacks.now();
-  callbacks.appendTranscriptEvent(
-    sessionId,
-    createLifecycleTranscriptEvent({
+  session.updatedAt = timestamp;
+  return { session,
+    event: createLifecycleTranscriptEvent({
       event: "run-interrupted",
       timestamp: session.updatedAt,
       detail: session.pendingPrompt,
-    }),
-  );
-  callbacks.writeSessionMetadata(session);
-  callbacks.writeSessionState(session, {
+    }), overrides: {
     interruptedKind,
     terminalReason: undefined,
     terminalClassification: undefined,
     terminalReasonCode: undefined,
     lastContinuationReason: undefined,
-  });
+  } };
 }
 
 export function saveSessionTerminated(

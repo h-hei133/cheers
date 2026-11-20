@@ -119,6 +119,8 @@ export function parseCliArgs(
     } else if (name === "--session-id") {
       if (!value) return parseError("Missing value for --session-id. Example: --session-id <id>");
       opts.sessionId = value;
+    } else if (name === "--new-session") {
+      opts.startNewSession = true;
     } else if (name === "--continue" || name === "-c") {
       opts.continueSession = true;
     } else if (name === "--resume" || name === "-r") {
@@ -238,6 +240,9 @@ export function parseCliArgs(
 
   if (opts.forkSource && (opts.sessionId || opts.continueSession || opts.resumeSession)) {
     return parseError("--fork cannot be combined with --session-id, --continue, or --resume.");
+  }
+  if (opts.startNewSession && (opts.sessionId || opts.continueSession || opts.resumeSession || opts.forkSource)) {
+    return parseError("--new-session cannot be combined with --session-id, --continue, --resume, or --fork.");
   }
 
   const promptTokens = [...positionals];

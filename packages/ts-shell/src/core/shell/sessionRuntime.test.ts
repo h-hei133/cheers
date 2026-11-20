@@ -49,7 +49,10 @@ describe("shell session runtime (W5)", () => {
       sessionManager: {
         persistUserPromptBarrier() {}, markTurnActive() {},
         appendQueryEvent(_id: string, event: unknown) { recorded.push(event); },
-        saveInterrupted(_id: string, kind: string) { settled.push(kind); },
+        saveInterrupted(_id: string, kind: string, diagnostic: { event: unknown }) {
+          recorded.push(diagnostic.event);
+          settled.push(kind);
+        },
       } as never,
       renderer: { renderLine() {}, renderChunk() {} } as never,
       runPrompt: async function* () {
@@ -149,7 +152,10 @@ describe("shell session runtime (W5)", () => {
     const recorded: unknown[] = [];
     const runtime = new ShellSessionRuntime({
       sessionManager: {
-        persistUserPromptBarrier() {}, markTurnActive() {}, saveError() {},
+        persistUserPromptBarrier() {}, markTurnActive() {},
+        saveError(_id: string, _error: string, _terminal: unknown, diagnostic: { sourceEntryId?: string }) {
+          recorded.push({ entryId: diagnostic.sourceEntryId });
+        },
         appendQueryEvent(_sessionId: string, _event: unknown, source: unknown) { recorded.push(source); },
       } as never,
       renderer: { renderLine() {}, renderChunk() {} } as never,

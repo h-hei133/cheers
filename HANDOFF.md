@@ -2949,3 +2949,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom:** Two processes create one session ID, leaving the first transcript with the second process's metadata and selection.
 - **Root cause:** Both creators can pass the absence check before a recursive directory creation succeeds for both.
 - **Rule:** Reserve the current session directory with nonrecursive `mkdir` before initializing any files. Reject occupied compatibility paths, including dangling links, while allowing a malformed legacy parent with no possible session child. Keep partially written records after an unknown result and leave activation to the existing owner.
+
+### Prompt Publication Uncertainty Survives Startup
+
+- **Symptom** Restarting after a failed prompt write activates a new session over the unresolved transaction's selection.
+- **Root cause** The registry preserves the marker but reports an ordinary load failure, so startup follows its stale-session fallback.
+- **Rule** Preserve the typed publication outcome through selection and resume. Reconcile a matching intent before capturing startup files. Keep unresolved bytes and selection intact until explicit replacement. A terminal journal must treat unchanged metadata as both before and after, including when timestamps match within one millisecond.

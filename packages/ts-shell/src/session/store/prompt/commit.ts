@@ -2,10 +2,14 @@ import fs from 'node:fs';
 import { hashContent, pathIdentity } from '../../../core/workspace/files.js';
 import { persistSessionUsage } from '../../../observability/usageTelemetry.js';
 import { prepareSessionUserPromptBarrier } from '../../lifecycle/sessionPromptBarrier.js';
+import type { SessionSettlement } from '../../lifecycle/sessionTerminalStore.js';
 import type { ImageContent } from '../../../model-adapters/multimodal.js';
+import type { QueryEvent } from '../../../core/query/runtime/events.js';
+import type { Session } from '../../schema/sessionRecord.js';
+import type { SessionStateSnapshotOverrides } from '../../schema/sessionStateSnapshot.js';
 import { projectSessionMetadata } from '../../schema/sessionMetadataCodec.js';
 import { buildSessionStateSnapshot } from '../../schema/sessionStateSnapshot.js';
-import { encodeTranscriptEvent } from '../../sessionEventCodec.js';
+import { createQueryTranscriptEvent, encodeTranscriptEvent, type TranscriptEvent } from '../../sessionEventCodec.js';
 import { captureTranscriptAppend, reconcileTranscriptAppend } from '../../transcript/append.js';
 import { writeTextFileAtomic } from '../sessionFileStore.js';
 import type { SessionFileLayout } from '../sessionFileLayout.js';
@@ -24,6 +28,37 @@ export function commitSessionPrompt(layout: SessionFileLayout, sessionId: string
   readonly images?: readonly ImageContent[];
   readonly admission?: () => void;
 }): void {
+  commitPromptTransaction(layout, sessionId, 1, (session, timestamp) =>
+    prepareSessionUserPromptBarrier({ ...input, session, timestamp }), input.admission);
+}
+
+export type SettlementDiagnostic = {
+  readonly event: Extract<QueryEvent, { type: 'lifecycle.cancelled' | 'lifecycle.error' }>;
+  readonly sourceEntryId?: string;
+};
+
+export function commitSessionSettlement(
+  layout: SessionFileLayout, sessionId: string,
+  prepare: (session: Session, timestamp: string) => SessionSettlement,
+  diagnostic?: SettlementDiagnostic,
+): void {
+  commitPromptTransaction(layout, sessionId, 2, (session, timestamp) => {
+    const settlement = prepare(session, timestamp);
+    const events: TranscriptEvent[] = diagnostic
+      ? [createQueryTranscriptEvent({ ...diagnostic, sourceEntryId: diagnostic.sourceEntryId ?? '', timestamp }), settlement.event]
+      : [settlement.event];
+    return { ...settlement, events };
+  });
+}
+
+function commitPromptTransaction(
+  layout: SessionFileLayout, sessionId: string, journalVersion: PromptIntent['version'],
+  prepare: (session: Session, timestamp: string) => {
+    session: Session; events: readonly TranscriptEvent[]; overrides: SessionStateSnapshotOverrides;
+  },
+  admission?: () => void,
+): void {
+  const kind = journalVersion === 1 ? 'prompt' : 'outcome';
   let attempted = false;
   let persisted = false;
   let cleanupFailed = false;
@@ -37,19 +72,19 @@ export function commitSessionPrompt(layout: SessionFileLayout, sessionId: string
       const current = readSessionRecordSnapshot({ layout, sessionId, cwd: process.cwd() });
       if (current.session.id !== sessionId || current.transcriptTruncated || current.warnings.length) throw new PromptPublicationError('unchanged');
       const transcript = captureTranscriptAppend(layout.transcriptPath);
-      const prepared = prepareSessionUserPromptBarrier({ ...input, session: current.session, timestamp: new Date().toISOString() });
+      const prepared = prepare(current.session, new Date().toISOString());
       const rows = `${prepared.events.map(encodeTranscriptEvent).join('\n')}\n`;
       const metadata = JSON.stringify(projectSessionMetadata(prepared.session), null, 2);
       const snapshot = buildSessionStateSnapshot(prepared.session, current.state, prepared.overrides);
       persistSessionUsage(sessionId, current.state.usage, usage => {
-        const intent: PromptIntent = { version: 1, sessionId, directory, transcript, rows,
+        const intent: PromptIntent = { version: journalVersion, sessionId, directory, transcript, rows,
           metadata: { before: metadataBefore, after: metadata },
           state: { before: stateBefore, after: JSON.stringify({ ...snapshot, usage }, null, 2) } };
         const encoded = encodePromptIntent(intent);
         writeTextFileAtomic(promptIntentPath(layout), encoded, 0o600, {
           createParent: false,
           beforeRename: () => {
-            input.admission?.();
+            admission?.();
             assertNoPromptIntent(layout);
             if (pathIdentity(layout.sessionDir) !== directory || readSessionFileVersion(layout) !== version) throw new PromptPublicationError('unchanged');
           },
@@ -66,8 +101,8 @@ export function commitSessionPrompt(layout: SessionFileLayout, sessionId: string
       if (cleanupFailed) throw new PromptPublicationError('persisted');
     }, lock);
   } catch (error) {
-    if (!attempted && error instanceof PromptPublicationError) throw error;
-    throw new PromptPublicationError(persisted ? 'persisted' : attempted ? 'unknown' : 'unchanged');
+    if (!attempted && error instanceof PromptPublicationError && error.persistence === 'unknown') throw error;
+    throw new PromptPublicationError(persisted ? 'persisted' : attempted ? 'unknown' : 'unchanged', kind);
   }
 }
 
@@ -104,8 +139,8 @@ function finishSessionPrompt(layout: SessionFileLayout, intent: PromptIntent, on
     beforeRename: () => { check(); identifyPromptFile(layout.statePath, 'state', intent.state); },
   });
   check();
-  if (identifyPromptFile(layout.metadataPath, 'metadata', intent.metadata) !== 'after'
-    || identifyPromptFile(layout.statePath, 'state', intent.state) !== 'after'
+  if (identifyPromptFile(layout.metadataPath, 'metadata', intent.metadata) === 'before'
+    || identifyPromptFile(layout.statePath, 'state', intent.state) === 'before'
     || !reconcileTranscriptAppend(layout.transcriptPath, intent.transcript, intent.rows, false)) throw new PromptPublicationError('unknown');
   syncSessionDirectory(layout, intent.directory);
   check();

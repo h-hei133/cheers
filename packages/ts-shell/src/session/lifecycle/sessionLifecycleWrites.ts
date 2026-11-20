@@ -33,9 +33,6 @@ import {
   handleMarkRecoveryReentry,
   handleMarkRunStarted,
   handleMarkTurnActive,
-  handleSaveCompleted,
-  handleSaveError,
-  handleSaveInterrupted,
   handleSaveTerminated,
 } from "../agent/lifecycle.js";
 import {
@@ -49,7 +46,9 @@ import { sessionHasConversation } from "../presentation/sessionReentrySurface.js
 import { captureReportWriter } from '../reports/persistence.js';
 import type { ReportWriter } from '../reports/model.js';
 import { SessionCompactionWrites } from '../compaction/writes.js';
-import { commitSessionPrompt } from '../store/prompt/commit.js';
+import { commitSessionPrompt, commitSessionSettlement, type SettlementDiagnostic } from '../store/prompt/commit.js';
+import { prepareSessionInterrupted } from './sessionLifecycleStore.js';
+import { prepareSessionCompleted, prepareSessionError } from './sessionTerminalStore.js';
 
 const sessionLogger = createComponentLogger("SessionManager");
 
@@ -162,33 +161,25 @@ export abstract class SessionLifecycleWrites extends SessionCompactionWrites {
   saveInterrupted(
     sessionId: string,
     interruptedKind: "prompt" | "turn" = "prompt",
+    diagnostic?: SettlementDiagnostic,
   ): void {
-    handleSaveInterrupted(
-      this.createSessionLifecycleCallbacks(),
-      sessionId,
-      interruptedKind,
-    );
+    commitSessionSettlement(this.host.store.stateLayout(sessionId), sessionId,
+      (session, timestamp) => prepareSessionInterrupted(session, timestamp, interruptedKind), diagnostic);
   }
 
   saveCompleted(sessionId: string, terminal?: TerminalPersistence): void {
-    handleSaveCompleted(
-      this.createSessionLifecycleCallbacks(),
-      sessionId,
-      terminal,
-    );
+    commitSessionSettlement(this.host.store.stateLayout(sessionId), sessionId,
+      (session, timestamp) => prepareSessionCompleted(session, timestamp, terminal));
   }
 
   saveError(
     sessionId: string,
     error: string,
     terminal?: TerminalPersistence,
+    diagnostic?: SettlementDiagnostic,
   ): void {
-    handleSaveError(
-      this.createSessionLifecycleCallbacks(),
-      sessionId,
-      error,
-      terminal,
-    );
+    commitSessionSettlement(this.host.store.stateLayout(sessionId), sessionId,
+      (session, timestamp) => prepareSessionError(session, timestamp, error, terminal), diagnostic);
   }
 
   /**

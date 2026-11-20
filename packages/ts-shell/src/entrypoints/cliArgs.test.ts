@@ -35,6 +35,11 @@ function expectParseError(args: readonly string[]) {
 }
 
 describe("cli args parser", () => {
+  it("admits an explicit fresh conversation without consuming its prompt", () => {
+    expect(expectParsed(["--new-session", "--print", "separate conversation"]).options)
+      .toMatchObject({ startNewSession: true, printMode: true, promptArg: "separate conversation" });
+    expect(expectParseError(["--new-session", "--session-id", "session"]).message).toContain("--new-session");
+  });
   it("refuses unknown startup options before their values can become prompts", () => {
     expect(expectParseError(["--unknown", "send a prompt"]).message).toMatch(/unrecognized/i);
     expect(expectParseError(["--unknown=PRIVATE_ARGUMENT"]).message).not.toContain("PRIVATE_ARGUMENT");

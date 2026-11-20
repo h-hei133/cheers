@@ -25,27 +25,32 @@ interface SessionTerminalCallbacks {
   readonly now: () => string;
 }
 
+export type SessionSettlement = {
+  session: Session;
+  event: Extract<TranscriptEvent, { type: 'lifecycle' }>;
+  overrides: SessionStateSnapshotOverrides;
+};
+
 export function saveSessionCompleted(
   callbacks: SessionTerminalCallbacks,
   sessionId: string,
   terminal?: TerminalPersistence,
 ): void {
-  const session = callbacks.loadSession(sessionId);
+  publishSettlement(callbacks, prepareSessionCompleted(callbacks.loadSession(sessionId), callbacks.now(), terminal));
+}
+
+export function prepareSessionCompleted(session: Session, timestamp: string, terminal?: TerminalPersistence): SessionSettlement {
   const unproven = terminal?.terminalClassification === 'completed_unproven';
   session.status = unproven ? 'completed_unproven' : "completed";
   delete session.lastError;
   delete session.pendingPrompt;
-  session.updatedAt = callbacks.now();
-  callbacks.appendTranscriptEvent(
-    sessionId,
-    createLifecycleTranscriptEvent({
+  session.updatedAt = timestamp;
+  return { session,
+    event: createLifecycleTranscriptEvent({
       event: unproven ? 'run-completed-unproven' : "run-completed",
       ...(unproven ? { detail: terminal?.terminalReasonCode } : {}),
       timestamp: session.updatedAt,
-    }),
-  );
-  callbacks.writeSessionMetadata(session);
-  callbacks.writeSessionState(session, {
+    }), overrides: {
     runPhase: "idle",
     interruptedKind: undefined,
     terminalReason: terminal?.terminalReason ?? "completed",
@@ -53,7 +58,7 @@ export function saveSessionCompleted(
     terminalReasonCode: terminal?.terminalReasonCode,
     lastContinuationReason: terminal?.lastContinuationReason,
     pendingLifecycle: createEmptyLifecycleIndex(),
-  });
+  } };
 }
 
 export function saveSessionError(
@@ -62,7 +67,10 @@ export function saveSessionError(
   error: string,
   terminal?: TerminalPersistence,
 ): void {
-  const session = callbacks.loadSession(sessionId);
+  publishSettlement(callbacks, prepareSessionError(callbacks.loadSession(sessionId), callbacks.now(), error, terminal));
+}
+
+export function prepareSessionError(session: Session, timestamp: string, error: string, terminal?: TerminalPersistence): SessionSettlement {
   const terminalClassification = terminal?.terminalClassification ?? "error";
   session.status = "error";
   delete session.pendingPrompt;
@@ -71,17 +79,13 @@ export function saveSessionError(
   } else {
     session.lastError = error;
   }
-  session.updatedAt = callbacks.now();
-  callbacks.appendTranscriptEvent(
-    sessionId,
-    createLifecycleTranscriptEvent({
+  session.updatedAt = timestamp;
+  return { session,
+    event: createLifecycleTranscriptEvent({
       event: "run-error",
       timestamp: session.updatedAt,
       detail: error,
-    }),
-  );
-  callbacks.writeSessionMetadata(session);
-  callbacks.writeSessionState(session, {
+    }), overrides: {
     runPhase: "idle",
     interruptedKind: undefined,
     terminalReason: terminal?.terminalReason,
@@ -89,5 +93,12 @@ export function saveSessionError(
     terminalReasonCode: undefined,
     lastContinuationReason: terminal?.lastContinuationReason,
     pendingLifecycle: createEmptyLifecycleIndex(),
-  });
+  } };
+}
+
+export function publishSettlement(callbacks: SessionTerminalCallbacks, settlement: SessionSettlement): void {
+  const { session, event, overrides } = settlement;
+  callbacks.appendTranscriptEvent(session.id, event);
+  callbacks.writeSessionMetadata(session);
+  callbacks.writeSessionState(session, overrides);
 }

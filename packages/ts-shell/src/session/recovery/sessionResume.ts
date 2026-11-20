@@ -8,10 +8,11 @@ import { normalizePathIdentity } from '../continuation/roots.js';
 import type { SessionActivationOptions } from '../store/activation.js';
 import { captureActivationGuard } from '../store/activation.js';
 import type { CurrentSessionSelectionRecord } from '../store/currentSelection.js';
+import { PromptPublicationError } from '../store/prompt/intent.js';
 
 export type SessionResumeResult =
   | { ok: true; session: Session; warning?: string }
-  | { ok: false; error: string; recoveryHint: string; activation?: 'unknown' };
+  | { ok: false; error: string; recoveryHint: string; activation?: 'unknown'; promptPublication?: 'unknown' };
 
 export interface SessionResumeOptions {
   readonly mode?: "runtime-recovery" | "continuity-only";
@@ -51,6 +52,7 @@ export function resumeSession(
   try {
     return activateSession(callbacks, callbacks.loadSession(sessionId), projectRoot);
   } catch (error) {
+    if (error instanceof PromptPublicationError) throw error;
     throw new Error(
       `Failed to resume session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
     );
@@ -122,6 +124,10 @@ export function tryResumeSession(
       : withSessionStateLock(projectSessionFileLayout({ sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId }),
         activate, { requireExisting: true });
   } catch (error) {
+    if (error instanceof PromptPublicationError && !activationStarted) {
+      return { ok: false, promptPublication: 'unknown', error: error.message,
+        recoveryHint: 'Inspect the saved session before retrying.' };
+    }
     if (publishedSession && candidate && options?.expectedVersion !== undefined && activationOptions) {
       try {
         const layout = projectSessionFileLayout({ sessionsDir: dirname(callbacks.sessionDir(sessionId)), sessionId });

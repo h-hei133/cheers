@@ -23,6 +23,8 @@ import { validateWorkspaceRoots } from '../workspace/roots.js';
 import { normalizePathIdentity } from '../../session/continuation/roots.js';
 import { replayTodosFromMessages } from "../commands/todoCommandRuntime.js";
 import { hasUnfinishedSessionWork } from '../../session/recovery/work.js';
+import { PromptPublicationError } from '../../session/store/prompt/intent.js';
+import { recoverSessionPrompt } from '../../session/store/prompt/commit.js';
 
 export type ShellBootstrapPhase =
   | "fast-path-parse"
@@ -37,15 +39,15 @@ export interface ShellBootstrapResult {
   readonly lifecycleNotices: readonly string[];
 }
 
+type SessionBootstrapCode = 'session-not-found' | 'session-root-mismatch' | 'prompt-publication-unknown';
+
 export class SessionBootstrapError extends Error {
-  readonly code:
-    | "session-not-found"
-    | "session-root-mismatch";
+  readonly code: SessionBootstrapCode;
   readonly recoveryHint: string;
   readonly rootBindingDiagnostics: readonly RootBindingDiagnostic[];
 
   constructor(input: {
-    code: "session-not-found" | "session-root-mismatch";
+    code: SessionBootstrapCode;
     message: string;
     recoveryHint: string;
     rootBindingDiagnostics?: readonly RootBindingDiagnostic[];
@@ -119,6 +121,7 @@ interface ShellBootstrapInput {
   requestedSessionId?: string;
   /** A validated new-process profile handoff always starts a fresh native identity. */
   freshSessionId?: string;
+  startNewSession?: boolean;
   forkSource?: string;
   allowSessionRootMigration?: boolean;
   emitLifecycleMessages?: boolean;
@@ -240,10 +243,11 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
     const createOptions = { rootMode: requestedRootMode, requestedWorkspaceRoot: input.requestedWorkspaceRoot ?? input.cwd,
       targetPathBase: requestedProjectRoot, gitRoot: input.gitContext.root ?? null };
     const readOnly = staged ? { readOnly: true } : undefined;
-    if (input.freshSessionId) {
-      if (input.requestedSessionId) throw new Error('A fresh profile session cannot also resume an existing session.');
-      if (staged) yield captureStartupBinding(manager, input.freshSessionId, requestedProjectRoot);
-      return manager.createNewWithId(input.freshSessionId, requestedProjectRoot, createOptions);
+    if (input.freshSessionId || input.startNewSession) {
+      if (input.requestedSessionId || input.forkSource) throw new Error('A new session cannot also resume or fork an existing session.');
+      const id = input.freshSessionId ?? createSessionId();
+      if (staged) yield captureStartupBinding(manager, id, requestedProjectRoot);
+      return manager.createNewWithId(id, requestedProjectRoot, createOptions);
     }
     if (input.forkSource) {
       const sourceId = resolveForkSourceId(manager, input.forkSource, requestedProjectRoot, readOnly);
@@ -270,10 +274,18 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
       // ever-growing history and no way to tell two days of work apart. The pointer
       // is still evaluated, because "why was it ignored" is worth saying, and it is
       // still what `/resume` and `/continue` fall back to.
-      const currentSelection = input.sessionManager.resolveCurrentSessionForProject(
+      let currentSelection = input.sessionManager.resolveCurrentSessionForProject(
         requestedProjectRoot,
         readOnly,
       );
+      if (!currentSelection.ok && currentSelection.reason === 'prompt-publication-unknown') {
+        if (!staged || !currentSelection.sessionId) throw unknownPromptPublication(currentSelection.sessionId);
+        recoverStartupPrompt(manager, currentSelection.sessionId);
+        currentSelection = manager.resolveCurrentSessionForProject(requestedProjectRoot, readOnly);
+        if (!currentSelection.ok && currentSelection.reason === 'prompt-publication-unknown') {
+          throw unknownPromptPublication(currentSelection.sessionId);
+        }
+      }
       // A session with unfinished business is stepped back into whatever the run
       // kind: an interruption, an error, a prompt that never ran, or a write whose
       // outcome was never established. That is recovery, and it is what anyone
@@ -282,7 +294,8 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
       let unfinished = false;
       if (currentSelection.ok && input.adoptCurrentSession !== true) {
         try { unfinished = hasUnfinishedBusiness(input.sessionManager, currentSelection.session); }
-        catch {
+        catch (error) {
+          if (error instanceof PromptPublicationError) throw unknownPromptPublication(currentSelection.session.id);
           emitLifecycleMessage('Current session recovery could not be verified; starting a fresh session. The saved session was retained.');
         }
       }
@@ -303,7 +316,8 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
           );
           emitLifecycleMessage(`Resumed session ${resumed.id}`);
           return resumed;
-        } catch {
+        } catch (error) {
+          if (error instanceof PromptPublicationError) throw unknownPromptPublication(currentSelection.session.id);
           input.sessionManager.clearCurrentSessionForProject(requestedProjectRoot);
           emitLifecycleMessage(
             `Current session pointer ${currentSelection.session.id} could not be resumed for ${requestedProjectRoot}; starting a fresh session.`,
@@ -391,13 +405,29 @@ function* selectStartupSession(input: ShellBootstrapInput, requestedProjectRoot:
 
 function requireResume(result: ResumeResult, id: string): Session {
   if (!isFailedResume(result)) return result.session;
+  if (result.promptPublication === 'unknown') throw unknownPromptPublication(id);
   throw new SessionBootstrapError({ code: 'session-not-found', message: `Failed to resume session ${id}: ${result.error}`,
     recoveryHint: result.recoveryHint });
+}
+
+function unknownPromptPublication(id?: string): SessionBootstrapError {
+  return new SessionBootstrapError({
+    code: 'prompt-publication-unknown',
+    message: id ? `Prompt persistence is unknown for saved session ${id}.` : 'Prompt persistence is unknown for the current saved session.',
+    recoveryHint: 'Inspect the saved session before retrying. Use --new-session to start a separate conversation.',
+  });
+}
+
+function recoverStartupPrompt(manager: SessionManager, sessionId: string): void {
+  const directory = manager.getSessionDirPath(sessionId);
+  try { recoverSessionPrompt(projectSessionFileLayout({ sessionsDir: path.dirname(directory), sessionId }), sessionId); }
+  catch { throw unknownPromptPublication(sessionId); }
 }
 
 function captureStartupSource(manager: SessionManager, sessionId: string) {
   const directory = manager.getSessionDirPath(sessionId);
   const layout = projectSessionFileLayout({ sessionsDir: path.dirname(directory), sessionId });
+  recoverStartupPrompt(manager, sessionId);
   const version = readSessionFileVersion(layout);
   const assertCurrent = () => {
     if (manager.getSessionDirPath(sessionId) !== directory || readSessionFileVersion(layout) !== version) {
@@ -439,6 +469,7 @@ function resolveForkSourceId(
   if (source === "current") {
     const current = sessionManager.resolveCurrentSessionForProject(projectRoot, options);
     if (!current.ok) {
+      if (current.reason === 'prompt-publication-unknown') throw unknownPromptPublication(current.sessionId);
       throw new SessionBootstrapError({
         code: "session-not-found",
         message: `No current session found to fork for ${projectRoot}.`,

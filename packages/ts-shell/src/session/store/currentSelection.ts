@@ -1,4 +1,5 @@
 import type { Session } from "../schema/sessionRecord.js";
+import { PromptPublicationError } from './prompt/intent.js';
 
 export interface CurrentSessionSelectionRecord {
   readonly sessionId: string;
@@ -17,6 +18,7 @@ export type CurrentSessionSelectionReason =
   | "store-invalid"
   | "missing-session"
   | "load-failed"
+  | "prompt-publication-unknown"
   | "project-root-mismatch";
 
 export type CurrentSessionSelectionResolution =
@@ -104,6 +106,12 @@ export function selectCurrentSession(
   }
 
   if (Object.prototype.hasOwnProperty.call(input, "loadError")) {
+    if (input.loadError instanceof PromptPublicationError) {
+      return {
+        resolution: { ok: false, reason: 'prompt-publication-unknown', sessionId, detail: input.loadError.message },
+        clearSelection: false,
+      };
+    }
     return {
       resolution: resolveCurrentSessionLoadFailed(
         input.projectRoot,

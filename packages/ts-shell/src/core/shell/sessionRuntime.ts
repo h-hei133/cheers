@@ -384,7 +384,10 @@ export class ShellSessionRuntime {
         updateRuntimeEventDigest(eventDigest, event);
         notifyObservers(this.eventObservers, event);
         if (isDurableQueryEvent(event)) {
+          terminalOutcomeRecorded = event.type === "query.completed" || event.type === "query.completed_unproven"
+            || event.type === "query.failed";
           this.deps.sessionManager.appendQueryEvent(sessionId, event, sourceEntryId ? { entryId: sourceEntryId() } : undefined);
+          terminalOutcomeRecorded = false;
         }
         if (!structuredOutput) {
           const renderResult = renderSessionQueryEventSurface({
@@ -455,7 +458,9 @@ export class ShellSessionRuntime {
       return terminalState.finalOutput;
     } catch (error) {
       if (error instanceof PromptPublicationError) {
-        if (error.persistence === 'unchanged') provenanceOutcome = signal.aborted ? 'cancelled' : 'failed';
+        if (error.kind === 'prompt' && error.persistence === 'unchanged' && !terminalOutcomeRecorded) {
+          provenanceOutcome = signal.aborted ? 'cancelled' : 'failed';
+        }
         if (signal.aborted) this.stateMachine.interruptRun(); else this.stateMachine.failRun();
         throw error;
       }
@@ -495,10 +500,10 @@ export class ShellSessionRuntime {
           type: "lifecycle.cancelled",
           reason: "AbortSignal triggered during shell session runtime",
         };
-        this.deps.sessionManager.appendQueryEvent(sessionId, cancellation, { entryId: sourceEntryId?.() });
         this.deps.sessionManager.saveInterrupted(
           sessionId,
           enteredQueryPhase ? "turn" : "prompt",
+          { event: cancellation, sourceEntryId: sourceEntryId?.() },
         );
         this.stateMachine.interruptRun();
         provenanceOutcome = 'cancelled';
@@ -507,14 +512,11 @@ export class ShellSessionRuntime {
           error,
           lastContinuationReason: terminalState.lastContinuationReason,
         });
-        this.deps.sessionManager.appendQueryEvent(sessionId, {
-          type: "lifecycle.error",
-          error: errorSave.error,
-        }, { entryId: sourceEntryId?.() });
         this.deps.sessionManager.saveError(
           sessionId,
           errorSave.error,
           errorSave.options,
+          { event: { type: "lifecycle.error", error: errorSave.error }, sourceEntryId: sourceEntryId?.() },
         );
         this.stateMachine.failRun();
         provenanceOutcome = 'failed';

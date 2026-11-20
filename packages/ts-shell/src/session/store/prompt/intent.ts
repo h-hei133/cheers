@@ -12,7 +12,7 @@ const MAX_METADATA_BYTES = 1024 * 1024;
 const MAX_STATE_BYTES = 64 * 1024 * 1024;
 
 export interface PromptIntent {
-  readonly version: 1;
+  readonly version: 1 | 2;
   readonly sessionId: string;
   readonly directory: string;
   readonly transcript: TranscriptAppendSource;
@@ -27,9 +27,11 @@ export interface PromptFileChange {
 }
 
 export class PromptPublicationError extends Error {
-  constructor(readonly persistence: 'unchanged' | 'unknown' | 'persisted') {
-    super(persistence === 'persisted' ? 'The prompt was saved. Reopen the saved session before continuing.'
-      : persistence === 'unknown' ? 'Prompt persistence is unknown. Reopen the saved session to check it.' : 'The prompt could not be saved.');
+  constructor(readonly persistence: 'unchanged' | 'unknown' | 'persisted', readonly kind: 'prompt' | 'outcome' = 'prompt') {
+    const subject = kind === 'prompt' ? 'prompt' : 'prompt outcome';
+    super(persistence === 'persisted' ? `The ${subject} was saved. Reopen the saved session before continuing.`
+      : persistence === 'unknown' ? `${subject[0]!.toUpperCase()}${subject.slice(1)} persistence is unknown. Reopen the saved session to check it.`
+      : `The ${subject} could not be saved.`);
     this.name = 'PromptPublicationError';
   }
 }
@@ -44,7 +46,10 @@ export function assertNoPromptIntent(layout: Pick<SessionFileLayout, 'stateLockP
 
 export function hasPromptIntent(layout: Pick<SessionFileLayout, 'stateLockPath'>): boolean {
   try { fs.lstatSync(promptIntentPath(layout)); return true; }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw new PromptPublicationError('unknown');
+  }
 }
 
 /** Keep read-only projections out of a prompt that begins or survives the read. */
@@ -62,19 +67,25 @@ export function readPromptIntent(layout: SessionFileLayout, sessionId: string): 
   const text = readTextFile(promptIntentPath(layout), MAX_INTENT_BYTES);
   if (text === undefined) return undefined;
   const value: unknown = JSON.parse(text);
-  if (!isRecord(value) || value.version !== 1 || value.sessionId !== sessionId || typeof value.directory !== 'string'
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2) || value.sessionId !== sessionId || typeof value.directory !== 'string'
     || !isRecord(value.transcript) || typeof value.transcript.identity !== 'string' || typeof value.transcript.bytes !== 'number'
     || !Number.isSafeInteger(value.transcript.bytes) || value.transcript.bytes < 0 || !isDigest(value.transcript.sha256)
     || typeof value.transcript.separator !== 'boolean' || typeof value.rows !== 'string'
     || !isFileChange(value.metadata, MAX_METADATA_BYTES) || !isFileChange(value.state, MAX_STATE_BYTES)) throw new PromptPublicationError('unknown');
+  const metadata: unknown = JSON.parse(value.metadata.after), state: unknown = JSON.parse(value.state.after);
+  if (!isRecord(metadata) || metadata.id !== sessionId || !isRecord(state) || state.projectRoot !== metadata.projectRoot) {
+    throw new PromptPublicationError('unknown');
+  }
+  if (value.version === 2) {
+    if (!isSettlementIntent(value.rows, metadata, state)) throw new PromptPublicationError('unknown', 'outcome');
+    return value as unknown as PromptIntent;
+  }
   const [lifecycle, message, end, extra] = value.rows.split('\n', 4);
   if (!lifecycle || !message || end !== '' || extra !== undefined) throw new PromptPublicationError('unknown');
   const started = decodeTranscriptLine(lifecycle), saved = decodeTranscriptLine(message);
-  const metadata: unknown = JSON.parse(value.metadata.after), state: unknown = JSON.parse(value.state.after);
   if (started.type !== 'lifecycle' || started.event !== 'run-started' || saved.type !== 'message' || saved.role !== 'user'
     || !saved.id || started.sourceEntryId !== saved.id || started.timestamp !== saved.timestamp
-    || !isRecord(metadata) || metadata.id !== sessionId || metadata.updatedAt !== started.timestamp
-    || !isRecord(state) || state.projectRoot !== metadata.projectRoot || state.status !== 'active'
+    || metadata.updatedAt !== started.timestamp || state.status !== 'active'
     || state.runPhase !== 'prompt-persisted' || state.pendingPromptEntryId !== saved.id || state.pendingPrompt !== started.detail
     || (typeof saved.content === 'string' ? saved.content : saved.content[0]?.type === 'text' ? saved.content[0].text : undefined) !== started.detail) {
     throw new PromptPublicationError('unknown');
@@ -82,8 +93,37 @@ export function readPromptIntent(layout: SessionFileLayout, sessionId: string): 
   return value as unknown as PromptIntent;
 }
 
+function isSettlementIntent(rows: string, metadata: Record<string, unknown>, state: Record<string, unknown>): boolean {
+  const lines = rows.split('\n', 4);
+  if ((lines.length !== 2 && lines.length !== 3) || lines.pop() !== '') return false;
+  const lifecycle = decodeTranscriptLine(lines.pop()!);
+  if (lifecycle.type !== 'lifecycle' || lifecycle.timestamp !== metadata.updatedAt) return false;
+  const diagnostic = lines.length ? decodeTranscriptLine(lines[0]!) : undefined;
+  if (diagnostic && (diagnostic.type !== 'query-event' || diagnostic.timestamp !== lifecycle.timestamp)) return false;
+  const event = diagnostic?.event;
+  switch (lifecycle.event) {
+    case 'run-completed':
+    case 'run-completed-unproven': {
+      const status = lifecycle.event === 'run-completed' ? 'completed' : 'completed_unproven';
+      return event === undefined && state.status === status && state.runPhase === 'idle' &&
+        state.pendingPrompt === undefined && state.pendingPromptEntryId === undefined;
+    }
+    case 'run-error':
+      return (event === undefined || (event.type === 'lifecycle.error' && event.error === lifecycle.detail)) &&
+        state.status === 'error' && state.runPhase === 'idle' && state.pendingPrompt === undefined &&
+        state.pendingPromptEntryId === undefined;
+    case 'run-interrupted':
+      return (event === undefined || event.type === 'lifecycle.cancelled') && state.status === 'interrupted' &&
+        (state.interruptedKind === 'prompt' || state.interruptedKind === 'turn') && state.pendingPrompt === lifecycle.detail;
+    default: return false;
+  }
+}
+
 export function encodePromptIntent(intent: PromptIntent): string {
   if (!isFileChange(intent.metadata, MAX_METADATA_BYTES) || !isFileChange(intent.state, MAX_STATE_BYTES)) throw new PromptPublicationError('unchanged');
+  if (intent.version === 2 && !isSettlementIntent(intent.rows, JSON.parse(intent.metadata.after), JSON.parse(intent.state.after))) {
+    throw new PromptPublicationError('unchanged', 'outcome');
+  }
   const text = JSON.stringify(intent);
   if (Buffer.byteLength(text) > MAX_INTENT_BYTES) throw new PromptPublicationError('unchanged');
   return text;
@@ -95,9 +135,9 @@ export function promptFileText(path: string, kind: 'metadata' | 'state'): string
   return text;
 }
 
-export function identifyPromptFile(path: string, kind: 'metadata' | 'state', change: PromptFileChange): 'before' | 'after' {
+export function identifyPromptFile(path: string, kind: 'metadata' | 'state', change: PromptFileChange): 'before' | 'after' | 'both' {
   const current = promptFileText(path, kind);
-  if (current === change.after) return 'after';
+  if (current === change.after) return hashContent(current) === change.before ? 'both' : 'after';
   if (hashContent(current) === change.before) return 'before';
   throw new PromptPublicationError('unknown');
 }

@@ -19,7 +19,7 @@ import { SessionManager } from "../../session/SessionManager.js";
 import { sessionWorkspaceAdmission } from '../../session/continuation/workspace.js';
 import { currentProfile } from '../../core/paths/profile/context.js';
 import { assertSourceAccess } from '../../core/query/sourcePolicy.js';
-import { createCoreToolRegistry } from '../../core/tools/registry.js';
+import { createCoreToolRegistry } from '../../tools/registry.js';
 import { filterVisibleToolNames } from '../../core/tools/prefilter.js';
 import { createCommandRegistry } from '../../core/commands/registry.js';
 import { sameValue } from '../../config/values.js';
@@ -204,6 +204,7 @@ function bootstrapResources(input: CreateCliBootstrapRuntimeContextInput) {
       renderer,
       requestedSessionId: input.options.sessionId,
       freshSessionId: input.freshSessionId,
+      startNewSession: input.options.startNewSession,
       allowSessionRootMigration: input.options.migrateSessionRoot === true,
       emitLifecycleMessages: false,
       adoptCurrentSession: input.options.printMode === true || input.options.continueSession === true,

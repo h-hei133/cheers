@@ -25,6 +25,7 @@ Options:
   --config <file>                   Add a personal JSONC input; repeatable.
   --project, --attach <path>        Select the workspace.
   --session-id <id>                 Resume a specific session.
+  --new-session                     Start a separate conversation.
   --continue, -c                    Continue the most recent session.
   --resume, -r                      Open the interactive session resume picker.
   --fork <id-or-path>               Fork an existing session into a new session.

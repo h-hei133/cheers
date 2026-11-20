@@ -12,6 +12,7 @@ const optionRules = new Map<string, OptionRule>([
   ['--project', { value: 'path', prepaint: true }],
   ['--attach', { value: 'path', prepaint: true }],
   ['--session-id', { value: 'path', prepaint: true }],
+  ['--new-session', { prepaint: true }],
   ['--fork', { value: 'word', prepaint: true }],
   ['--provider', { value: 'raw', prepaint: true }],
   ['--model', { value: 'word', prepaint: true }],

@@ -7,8 +7,9 @@ import { getRuntimeConfig } from '../../config/runtimeConfig.js'
 import { StreamingRenderer } from '../../presentation/terminal/streaming.js'
 import { SessionManager } from '../../session/SessionManager.js'
 import { getWorkflowGitContext } from '../workspace/git.js'
-import { bootstrapShellRuntime } from './bootstrap.js'
-import { SessionBootstrapError } from './bootstrap.js'
+import { bootstrapShellRuntime, prepareShellStartup, SessionBootstrapError } from './bootstrap.js'
+import { SessionStoreAccess } from '../../session/store/sessionStoreAccess.js'
+import { promptIntentPath } from '../../session/store/prompt/intent.js'
 import { forgetSessionTodos, getSessionTodos } from '../commands/todoCommandRuntime.js'
 import { projectTrust } from '../security/trust/store.js'
 import { renderStartupSurface } from './startupSurfaceRenderer.js'
@@ -376,6 +377,31 @@ describe('shell bootstrap', () => {
     expect(result.lifecycleNotices).toContain('Current session recovery could not be verified; starting a fresh session. The saved session was retained.');
     expect(result.lifecycleNotices.join(' ')).not.toContain('private fixture');
     snapshot.mockRestore();
+  });
+
+  it.each([false, true])('preserves an uncertain prompt and its current selection at startup (staged=%s)', staged => {
+    const sessionManager = new SessionManager();
+    const cwd = fs.mkdtempSync(path.join(fakeHome, 'project-prompt-unknown-'));
+    const selected = sessionManager.createNew(cwd);
+    const layout = new SessionStoreAccess().stateLayout(selected.id);
+    const marker = promptIntentPath(layout);
+    fs.writeFileSync(marker, 'invalid persisted intent');
+    const selection = sessionManager.readCurrentSessionSelection(cwd);
+    const files = [marker, layout.transcriptPath, layout.metadataPath, layout.statePath];
+    const original = files.map(file => fs.readFileSync(file));
+    const input = { cwd, runtimeConfig: getRuntimeConfig(cwd), gitContext: getWorkflowGitContext(cwd),
+      sessionManager, renderer: new StreamingRenderer(), emitLifecycleMessages: false };
+    const launch = staged ? prepareShellStartup : bootstrapShellRuntime;
+    expect(() => launch(input)).toThrow(expect.objectContaining({ code: 'prompt-publication-unknown' }));
+    expect(() => launch({ ...input, requestedSessionId: selected.id }))
+      .toThrow(expect.objectContaining({ code: 'prompt-publication-unknown' }));
+    expect(sessionManager.readCurrentSessionSelection(cwd)).toEqual(selection);
+    expect(files.map(file => fs.readFileSync(file))).toEqual(original);
+    const next = { ...input, startNewSession: true };
+    const fresh = staged ? prepareShellStartup(next).activate() : bootstrapShellRuntime(next);
+    expect(fresh.context.session.id).not.toBe(selected.id);
+    expect(sessionManager.readCurrentSessionSelection(cwd)?.sessionId).toBe(fresh.context.session.id);
+    expect(files.map(file => fs.readFileSync(file))).toEqual(original);
   });
 
   it.each(['prompt', 'turn', 'pending-tool', 'unknown-mutation'] as const)('retains actual %s recovery on an ordinary interactive launch', kind => {

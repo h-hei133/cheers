@@ -11,6 +11,7 @@ export interface CliOptions {
   /** Ordered, personal, read-only JSONC inputs resolved against launch cwd. */
   readonly configPaths?: readonly string[];
   readonly sessionId?: string;
+  readonly startNewSession?: boolean;
   readonly continueSession?: boolean;
   readonly resumeSession?: boolean;
   readonly forkSource?: string;

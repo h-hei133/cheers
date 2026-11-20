@@ -116,3 +116,54 @@ it('retains a competing state or transcript without applying a conflicting inten
   expect(reopened.readCurrentSessionSelection(root)?.sessionId).toBe(sessionId);
   expect(paths.map(file => fs.readFileSync(file))).toEqual(exact);
 });
+
+it.each(['completed', 'completed_unproven', 'error', 'interrupted'] as const)(
+  'reopens one exact %s prompt settlement after state publication fails', outcome => {
+    manager.persistUserPromptBarrier(sessionId, 'Recover this run');
+    const sourceEntryId = manager.getRecoverySnapshot(sessionId).lastUserMessage?.id;
+    const before = fs.readFileSync(layout.transcriptPath);
+    const rename = fs.renameSync;
+    const failure = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (to === layout.statePath) throw new Error('State is temporarily unavailable.');
+      return rename(from, to);
+    });
+    syncBuiltinESMExports();
+    try {
+      const publish = () => {
+        switch (outcome) {
+          case 'completed': return manager.saveCompleted(sessionId);
+          case 'completed_unproven': return manager.saveCompleted(sessionId, {
+            terminalClassification: 'completed_unproven', terminalReason: 'completed_unproven',
+            terminalReasonCode: 'already_blocked_once',
+          });
+          case 'error': return manager.saveError(sessionId, 'Run stopped', undefined, {
+            event: { type: 'lifecycle.error', error: 'Run stopped' }, sourceEntryId,
+          });
+          case 'interrupted': return manager.saveInterrupted(sessionId, 'turn', {
+            event: { type: 'lifecycle.cancelled', reason: 'Interrupted during execution' }, sourceEntryId,
+          });
+        }
+      };
+      expect(publish).toThrow(expect.objectContaining({ persistence: 'unknown', kind: 'outcome' }));
+    } finally { failure.mockRestore(); syncBuiltinESMExports(); }
+    expect(fs.existsSync(promptIntentPath(layout))).toBe(true);
+    const reopen = new SessionStoreAccess();
+    expect(reopen.resolveCurrentSessionForProject(root, { readOnly: true }))
+      .toMatchObject({ ok: false, reason: 'prompt-publication-unknown', sessionId });
+    const saved = reopen.load(sessionId);
+    expect(saved.status).toBe(outcome);
+    expect(saved.pendingPrompt).toBe(outcome === 'interrupted' ? 'Recover this run' : undefined);
+    expect(fs.existsSync(promptIntentPath(layout))).toBe(false);
+    const events = manager.getTranscriptEvents(sessionId);
+    const finalEvent = outcome === 'completed_unproven' ? 'run-completed-unproven' : `run-${outcome}`;
+    expect(events.filter(event => event.type === 'lifecycle' && event.event === finalEvent)).toHaveLength(1);
+    if (outcome === 'error' || outcome === 'interrupted') {
+      expect(events.at(-2)).toMatchObject({ type: 'query-event', sourceEntryId,
+        event: { type: outcome === 'error' ? 'lifecycle.error' : 'lifecycle.cancelled' } });
+    }
+    const after = fs.readFileSync(layout.transcriptPath);
+    expect(after.subarray(0, before.length)).toEqual(before);
+    expect(reopen.load(sessionId)).toEqual(saved);
+    expect(fs.readFileSync(layout.transcriptPath)).toEqual(after);
+  },
+);
