@@ -2991,3 +2991,9 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** The Stop process runs but the host cannot advance a negotiated repair chain.
 - **Root cause** The default hook projection omits the proof verdict and repair receipt.
 - **Rule** Use the pinned CLI with `gate stop --emit-result` on its declared runtime. Verify a single-file export advisory followed by completion blocking, bounded repair rounds, and a final re-judgement.
+
+### Script Test Concurrency Has A Runtime-Specific CLI Flag
+
+- **Symptom** Script tests pass on the development runtime and CI rejects the test command before discovering any files.
+- **Root cause** The Node 20.3 test runner supports programmatic concurrency but lacks the corresponding command-line flag.
+- **Rule** Keep the script suite serial through the supported runner API. Observe the exact Node version and completed test counts on the supported floor.

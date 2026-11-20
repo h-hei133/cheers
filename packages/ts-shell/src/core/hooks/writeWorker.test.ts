@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -24,6 +25,7 @@ const args = ['--input-type=module', '-e', `
 describe('write hook worker', () => {
   it('lets the host process exit with an idle connection', async () => {
     const workerModule = new URL('./writeWorker.ts', import.meta.url).href;
+    const tsx = createRequire(import.meta.url).resolve('tsx/cli');
     const source = `
       import { WriteHookWorker } from ${JSON.stringify(workerModule)};
       const worker = new WriteHookWorker();
@@ -32,7 +34,7 @@ describe('write hook worker', () => {
       }, '{}', 2000);
       process.stdout.write(result ?? '');
     `;
-    const { stdout } = await promisify(execFile)(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', source], { timeout: 4000 });
+    const { stdout } = await promisify(execFile)(process.execPath, [tsx, '--input-type=module', '-e', source], { timeout: 4000 });
     expect(JSON.parse(stdout).params).toEqual({});
   });
 

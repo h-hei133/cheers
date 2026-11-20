@@ -33,7 +33,7 @@
     "build:exe": "node scripts/build-cli-executable.mjs",
     "test": "npm run test:gate:golden-main-path && node scripts/test-all-stacks.mjs",
     "test:ts": "npm run test -w packages/ts-shell",
-    "test:scripts": "node --test --test-concurrency=1 scripts/*.test.mjs",
+    "test:scripts": "node scripts/test-scripts.mjs",
     "test:gate:golden-main-path": "npm run test:gate:golden-main-path -w packages/ts-shell",
     "test:all": "npm run test --",
     "dev": "npm run dev -w packages/ts-shell --",
