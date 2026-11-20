@@ -1,6 +1,7 @@
 {
   "version": "0.2.0",
   "graphPattern": "packages/**/*.ts*",
+  "workspaceSourceCondition": "cheers-source",
   "rules": [
     {
       "kind": "filenameTokens",

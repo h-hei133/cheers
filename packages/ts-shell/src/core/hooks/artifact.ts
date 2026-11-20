@@ -8,6 +8,7 @@ import type { HookDecision } from './types.js';
 export interface WriteHookArtifact {
   readonly version: 1;
   readonly protocolVersion?: 2;
+  readonly workerProtocol?: 1;
   readonly path: string;
   readonly sha256: string;
   readonly nodeFloor: '20.3.0';
@@ -18,8 +19,9 @@ const MAX_ARTIFACT_BYTES = 8 * 1024 * 1024;
 const READ_CHUNK_BYTES = 64 * 1024;
 
 function validArtifact(value: unknown): value is WriteHookArtifact {
-  return isRecord(value) && Object.keys(value).every(key => ['version', 'protocolVersion', 'path', 'sha256', 'nodeFloor'].includes(key))
+  return isRecord(value) && Object.keys(value).every(key => ['version', 'protocolVersion', 'workerProtocol', 'path', 'sha256', 'nodeFloor'].includes(key))
     && (value.protocolVersion === undefined || value.protocolVersion === 2)
+    && (value.workerProtocol === undefined || (value.protocolVersion === 2 && value.workerProtocol === 1))
     && value.version === 1 && typeof value.path === 'string' && value.path.length > 0
     && typeof value.sha256 === 'string' && /^[a-f0-9]{64}$/.test(value.sha256) && value.nodeFloor === '20.3.0';
 }
@@ -28,11 +30,15 @@ export function writeHookProtocol(value: unknown): 1 | 2 {
   return validArtifact(value) ? value.protocolVersion ?? 1 : 1;
 }
 
+export function writeWorkerIdentity(value: unknown): string | undefined {
+  return validArtifact(value) && value.workerProtocol === 1 ? value.sha256 : undefined;
+}
+
 function quote(value: string): string { return `'${value.replaceAll("'", "'\\''")}'`; }
 
 /** The declared command and actual invocation are derived from the same pinned artifact. */
-export function writeHookCommand(value: unknown): string {
-  return validArtifact(value) ? `exec ${quote(process.execPath)} ${quote(value.path)} gate write --emit-result` : 'false';
+export function writeHookCommand(value: unknown, transport: 'single' | 'stdio' = 'single'): string {
+  return validArtifact(value) ? `exec ${quote(process.execPath)} ${quote(value.path)} gate write ${transport === 'stdio' ? '--stdio' : '--emit-result'}` : 'false';
 }
 
 /** Compatibility belongs to the selected artifact, never to the tool's semantic capability. */

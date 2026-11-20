@@ -8,8 +8,9 @@
             "writeGate": {
               "version": 1,
               "protocolVersion": 2,
+              "workerProtocol": 1,
               "path": ".normproof/write-gate/cli.mjs",
-              "sha256": "0aba650697cf9d13f6d43a73100de4a346919b4fd8ee55ca6a975d40e097401c",
+              "sha256": "44d266176a9acd31e8693ad7026c66d19adbfdb34a61615bbbded648276f8c3f",
               "nodeFloor": "20.3.0"
             },
             "timeoutMs": 15000

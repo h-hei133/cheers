@@ -8,7 +8,8 @@
       "source": {
         "kind": "module-graph",
         "pattern": "packages/**/*.ts*",
-        "checkExports": true
+        "checkExports": true,
+        "workspaceSourceCondition": "cheers-source"
       }
     },
     {

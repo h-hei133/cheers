@@ -27,6 +27,7 @@ function wideGraph(count = 4096) {
 }
 
 function writeJudgeConfig(workspace) {
+  fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ workspaces: [] }));
   for (const file of ['judge-input.json', 'evidence-manifest.json', 'norm-packs/software-structure-v0/profile.json']) {
     fs.copyFileSync(path.join(root, '.normproof', file), path.join(workspace, '.normproof', file));
   }

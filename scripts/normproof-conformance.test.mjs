@@ -22,6 +22,7 @@ function workspace(name, source = 'export function value() { return 1; }') {
   const root = path.join(scratch, name);
   fs.mkdirSync(path.join(root, 'packages'), { recursive: true });
   fs.mkdirSync(path.join(root, '.normproof/norm-packs/software-structure-v0'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ workspaces: [] }));
   fs.writeFileSync(path.join(root, 'packages/entry.ts'), source);
   for (const file of ['judge-input.json', 'evidence-manifest.json', 'norm-packs/software-structure-v0/profile.json']) {
     fs.copyFileSync(path.join(repository, '.normproof', file), path.join(root, '.normproof', file));
@@ -145,9 +146,23 @@ test('hooks: pinned write CLI emits allow and block JSON with process exit 0', (
   assert.equal(provenance.commit, readBundleMetadata().baseCommit);
   const clean = workspace('write');
   fs.writeFileSync(path.join(clean, '.normproof/write-rules.json'), JSON.stringify({ version: '0.1.0', rules: [{ kind: 'pathBoundary', id: 'protected', deny: ['target.ts'], message: 'protected' }] }));
-  for (const [file, expected] of [['allowed.ts', 'allow'], ['target.ts', 'block']]) {
-    const run = command([path.join(repository, '.normproof/write-gate/cli.mjs'), '--emit-result'], { input: JSON.stringify({ cwd: clean, tool_name: 'Write', tool_input: { file_path: file, content: 'fixture' } }) });
-    assert.equal(run.status, 0); assert.equal(JSON.parse(run.stdout).decision, expected);
+  const entry = path.join(repository, descriptor.path);
+  const cases = [['allowed.ts', 'allow'], ['target.ts', 'block']].map(([file, decision], id) => ({
+    decision, request: { jsonrpc: '2.0', id, method: 'writeGate/check', params: {
+      cwd: clean, tool_name: 'Write', tool_input: { file_path: file, content: 'fixture' },
+    } },
+  }));
+  assert.equal(descriptor.workerProtocol, 1);
+  const batch = command([entry, 'gate', 'write', '--stdio'], { input: cases.map(({ request }) => JSON.stringify(request)).join('\n') + '\n' });
+  assert.equal(batch.status, 0);
+  const replies = batch.stdout.trim().split('\n').map(line => JSON.parse(line));
+  assert.equal(replies.length, cases.length);
+  for (const { decision, request } of cases) {
+    const single = command([entry, 'gate', 'write', '--emit-result'], { input: JSON.stringify(request.params) });
+    assert.equal(single.status, 0);
+    const result = JSON.parse(single.stdout);
+    assert.equal(result.decision, decision);
+    assert.deepEqual(replies[request.id], { jsonrpc: '2.0', id: request.id, result });
   }
 });
 
@@ -168,7 +183,7 @@ test('hooks: the native Stop emits a versioned decision for both clean and block
 test('hooks: current host consumes captured R0a envelopes; fixture producer is not the pinned release', () => {
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT;
-  const run = command([path.join(repository, 'node_modules/tsx/dist/cli.mjs'), path.join(repository, 'scripts/normproof/host.test.mts')], { env });
+  const run = command([path.join(repository, 'node_modules/tsx/dist/cli.mjs'), '--conditions=cheers-source', path.join(repository, 'scripts/normproof/host.test.mts')], { env });
   assert.equal(run.status, 0, run.stdout + run.stderr);
   assert.match(run.stdout, /tests 2/);
   assert.match(run.stdout, /pass 2/);

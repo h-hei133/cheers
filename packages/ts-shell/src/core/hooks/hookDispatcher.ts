@@ -7,7 +7,8 @@ import { dispatchStop } from './stop/dispatch.js';
 import type { StopDispatchOptions } from './stop/model.js';
 import type { StopPayload } from './types.js';
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
-import { checkWriteHookArtifact, writeHookCommand, writeHookProtocol } from './artifact.js';
+import { checkWriteHookArtifact, writeHookCommand, writeHookProtocol, writeWorkerIdentity } from './artifact.js';
+import { WriteHookWorker } from './writeWorker.js';
 import { applyWriteHookPolicy, canonicalToolName, hookUnknown, mergeWriteHookResult, normalizeHookVeto, translateWriteInputs, translateWriteResult } from './translation.js';
 import { getExtensionEventRunners, type ExtensionEventRunner } from './extensionBridge.js';
 import {captureInputHookDecision} from './input/decision.js';
@@ -82,6 +83,7 @@ export class HookDispatcher {
   private inProcessHooks: InProcessHookConfig[] = [];
   private trust?: CommandHookTrust;
   private registration = Symbol();
+  private writeWorker = new WriteHookWorker();
 
   /** An input receipt may use only the registration that admitted its submission. */
   captureRegistration(): () => boolean {
@@ -93,6 +95,7 @@ export class HookDispatcher {
   fork(): HookDispatcher {
     const hooks = new HookDispatcher({commandHooks:[...this.commandHooks], inProcessHooks:[...this.inProcessHooks]});
     hooks.trust = this.trust;
+    hooks.writeWorker = this.writeWorker;
     return hooks;
   }
 
@@ -105,6 +108,7 @@ export class HookDispatcher {
    * "nobody has been asked".
    */
   setCommandHookTrust(trust: CommandHookTrust, declaredHooks?: readonly CommandHookConfig[]): void {
+    this.writeWorker.close();
     this.registration = Symbol();
     if (declaredHooks) {
       // Registration publishes one snapshot. Preserve process-owned hooks while
@@ -191,6 +195,7 @@ export class HookDispatcher {
    * Clear all registered hooks
    */
   clear(): void {
+    this.writeWorker.close();
     this.registration = Symbol();
     this.commandHooks = [];
     this.inProcessHooks = [];
@@ -222,6 +227,7 @@ export class HookDispatcher {
   async dispatch(payload: HookEventPayload, stopOptions: StopDispatchOptions & {
     readonly extensionRunners?: readonly ExtensionEventRunner[];
   } = {}): Promise<HookDecision> {
+    if (payload.eventName === 'SessionEnd') this.writeWorker.close();
     if (payload.eventName === 'UserPromptSubmit') {
       try {payload = snapshotData(payload, {bytes:64*1024*1024, nodes:4096, depth:12}) as unknown as HookEventPayload;}
       catch {return {decision:'block', reason:'Prompt input hook payload was refused.'};}
@@ -352,6 +358,30 @@ export class HookDispatcher {
         const programArgs = sandbox.args ?? ["-c", command];
 
         const batchDeadline = Date.now() + timeoutMs;
+        const workerIdentity = translated ? writeWorkerIdentity(hook.writeGate) : undefined;
+        if (workerIdentity !== undefined && jsonPayloads.length === 1) {
+          const workerCommand = writeHookCommand(hook.writeGate, 'stdio');
+          const workerSandbox = planSandboxedCommand({ shell: SHELL_BIN, shellArgs: ['-c', workerCommand], workspaceRoot: payload.workspaceRoot });
+          if (workerSandbox.state !== 'refused') {
+            const workerProgram = workerSandbox.command ?? SHELL_BIN;
+            const workerArgs = workerSandbox.args ?? ['-c', workerCommand];
+            const stdout = await this.writeWorker.request({
+              key: JSON.stringify([payload.sessionId, payload.workspaceRoot, workerIdentity, sourceRevision, workerProgram, workerArgs]),
+              program: workerProgram, args: workerArgs, cwd: payload.workspaceRoot,
+            }, jsonPayloads[0]!, Math.max(1, batchDeadline - Date.now()));
+            if (trust !== this.trust || commandHooks !== this.commandHooks || trust?.admission?.() ||
+                (sourceRevision !== undefined && trust?.store.sourceRevision(hook.sourcePath ?? '(unknown)') !== sourceRevision)) {
+              return hookUnknown('invalid_input');
+            }
+            if (stdout !== undefined) {
+              const result = applyWriteHookPolicy(translateWriteResult(stdout), protocol);
+              logger.info('Write hook result', result.hookVerdict ?? { status: result.decision });
+              if (result.decision === 'block' || result.decision === 'retry') return result;
+              accumulatedDecision = mergeWriteHookResult(accumulatedDecision, result);
+              continue;
+            }
+          }
+        }
         for (const jsonPayload of jsonPayloads) {
           const remainingMs = Math.max(1, batchDeadline - Date.now());
           if (Date.now() > batchDeadline) return hookUnknown('timeout');

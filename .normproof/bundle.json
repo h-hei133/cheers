@@ -2,13 +2,13 @@
   "version": 2,
   "package": "normproof",
   "packageVersion": "0.1.0",
-  "baseCommit": "d7ec40558ad1c22f276fedec98f58ce149d96cb6",
+  "baseCommit": "617319789042372f872fea3505b00cc489536969",
   "sourceArchive": ".normproof/normproof-0.1.0.tgz",
-  "archiveSha256": "3af6fb3ed19f5f0a05f81982328edc257d6600bb15c1d54f3a6b2f13f41838a3",
+  "archiveSha256": "a2cf0f3a5fa49b8054fb3930719b5f455f01c339438386f5bbd4e7919decdd04",
   "members": {
     "package/package.json": "174949e493e7f90f5dd43d38d0ee1f315046951ca2fcddd56c41ca9adeb4c346",
     "package/dist/adapters/cli/normproof.js": "8821e6fe50ffc0602f8c3afdd6fe544abb8e426c739646a218dd574450e8409a",
-    "package/dist/adapters/sidecar-file/module-graph.js": "36806cc7549117a7076d9c0938e8964b37736fd012f7dd89d7b33e2fd754997a",
+    "package/dist/adapters/sidecar-file/module-graph.js": "c23aa7c758db5823d67a36a9f4f6dd3f44d41fe8b22c2c7ffdc70fc7f247a00d",
     "package/dist/contracts/sidecar/graph-budget.js": "2b1db0bfcc5e9d46d34bf7ab42d416fd99e102c6c9b6f2b254e0f9fb42f95389",
     "package/dist/engine/proof/expression/evidence-readers.js": "5f0280ddc99b09f697057339acdaa7aa2ead1fac09a69b22d175f1158f0fe2b3"
   }
