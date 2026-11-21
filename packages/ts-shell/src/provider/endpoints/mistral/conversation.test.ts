@@ -96,3 +96,23 @@ it('validates and normalizes complete JSON function calls through the same resul
   expect(() => shape.readBody({ conversation_id: 'fixture-id', usage, outputs: [{ type: 'tool.execution' }] }))
     .toThrow(/invalid or unsupported/i);
 });
+
+it('accepts documented guardrail metadata alongside the answer without returning it', () => {
+  const result = shape.readBody({ conversation_id: 'fixture-id', usage,
+    outputs: [{ type: 'message.output', content: 'Answer.' }],
+    guardrails: [{ category: 'private fixture detail' }],
+  });
+  expect(result).toMatchObject({ choices: [{ message: { content: 'Answer.' } }], usage });
+  expect(JSON.stringify(result)).not.toContain('private fixture detail');
+});
+
+it.each([
+  { code: 401, failureClass: 'provider_auth' },
+  { code: 429, failureClass: 'provider_rate_limited' },
+])('retains the in-band $code failure class without publishing a queued tool call', async ({ code, failureClass }) => {
+  const reader = shape.readStream(streaming(start, firstArgs, lastArgs, {
+    type: 'conversation.response.error', code, message: 'private fixture detail',
+  }).body!);
+  await expect(reader.next()).rejects.toMatchObject({ failureClass,
+    message: `Provider reported an error: ${failureClass}. Response details withheld.` });
+});

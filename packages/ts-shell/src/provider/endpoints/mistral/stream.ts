@@ -1,7 +1,8 @@
 import { isRecord } from '../../../core/values/record.js';
 import type { CompletedBody, ProviderUsage, StreamedCompletion, StreamedToolCall, StreamFragment } from '../../../turn/completion.js';
 import type { ObserveToolArguments } from '../../../turn/preview/model.js';
-import { IncompleteStreamError, providerResponseError } from '../../response/error.js';
+import { classifyProviderFailure } from '../../registry/provider.js';
+import { IncompleteStreamError, ProviderResponseError, providerResponseError } from '../../response/error.js';
 import { responseEvents } from '../../response/events.js';
 import { projectContent, readContent } from './content.js';
 import { captureReplay } from './replay.js';
@@ -80,7 +81,7 @@ export function readConversation(body: unknown, protocol: string): CompletedBody
   if (body.object !== undefined && body.object !== 'conversation.response') return invalid();
   identifier(body.conversation_id);
   if (!Array.isArray(body.outputs) || body.outputs.length > MAX_PARTS || Buffer.byteLength(JSON.stringify(body)) > MAX_BYTES
-    || (body.guardrails != null && (!Array.isArray(body.guardrails) || body.guardrails.length))) return invalid();
+    || (body.guardrails != null && (!Array.isArray(body.guardrails) || !body.guardrails.every(isRecord)))) return invalid();
   const parts: unknown[] = [];
   const calls: StreamedToolCall[] = [];
   for (const output of body.outputs as unknown[]) {
@@ -106,6 +107,15 @@ interface ContentSlot {
   readonly output: number;
   readonly index: number;
   readonly part: Record<string, unknown>;
+}
+
+function conversationError(event: Record<string, unknown>): ProviderResponseError {
+  const { code } = event;
+  // The stream carries a numeric protocol code, independent of the HTTP response status.
+  if (code === 401 || code === 403 || code === 408 || code === 429) {
+    return new ProviderResponseError(classifyProviderFailure({ status: code }));
+  }
+  return providerResponseError(event);
 }
 
 function appendPart(parts: ContentSlot[], event: Record<string, unknown>, output: number): readonly StreamFragment[] {
@@ -143,7 +153,7 @@ export async function* readConversationStream(body: ReadableStream<Uint8Array>, 
   const calls = new Map<number, CallSlot>();
   const parts: ContentSlot[] = [];
   for await (const event of responseEvents(body)) {
-    if (event.type === 'conversation.response.error') throw providerResponseError(event);
+    if (event.type === 'conversation.response.error') throw conversationError(event);
     if (event.type === 'conversation.response.started') {
       if (started) return invalid();
       identifier(event.conversation_id);
