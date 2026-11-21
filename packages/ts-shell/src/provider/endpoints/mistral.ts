@@ -6,6 +6,7 @@ import { declareEndpoint, endpointShape, type EndpointShape, type SimpleRequest 
 import { compatibleBody, compatibleTurnBody } from './openaiCompatible.js';
 import { projectContent, readContent } from './mistral/content.js';
 import { captureReplay, replayContent } from './mistral/replay.js';
+import './mistral/conversation.js';
 
 /**
  * Mistral Chat Completions endpoint.

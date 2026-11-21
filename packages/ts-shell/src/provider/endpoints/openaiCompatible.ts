@@ -109,7 +109,7 @@ export function compatibleTurnBody(input: TurnRequest, assistantContent?: Assist
 }
 
 /** Tool responses remain contiguous; this protocol accepts images in user turns. */
-function wireMessages(input: SimpleRequest, vision: boolean, bridge: boolean, assistantContent?: AssistantContent): Record<string, unknown>[] {
+export function wireMessages(input: SimpleRequest, vision: boolean, bridge: boolean, assistantContent?: AssistantContent): Record<string, unknown>[] {
   const result: Record<string, unknown>[] = [];
   let pending: MultimodalContentBlock[] = [];
   const flush = (): void => {

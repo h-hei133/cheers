@@ -65,7 +65,7 @@
 ## F1 / F2: 协议、目录和遥测（P2）
 
 - [x] **F1.1** 增量工具参数预览。提交 `6b15fd60` 接通 TUI 活动行、查询事件及 RPC。并行调用按流索引隔离，取消和结束清除预览。原始参数仍通过最终准入。回环 HTTP 与各端点分片用例、隔离构建 `2c0ea6792acc` 通过。对象型调用没有独立 JSON 字节分片。
-- [ ] **F1.2** Azure、Mistral 与 Responses WebSocket。Azure 和账户 WebSocket 已接通，当前 Linux 配置缺少可用于实测的对应连接。`mistral-conversations` 保留已发布的 `/v1/chat/completions` 行为。独立 Conversations v1 已进入官方弃用路线，本轮保留既有兼容入口，真实服务验收开放。[服务端迁移说明](https://docs.mistral.ai/studio/agents/getting-started/from-agents-api)
+- [ ] **F1.2** Azure、Mistral 与 Responses WebSocket。通过 `endpoint: "mistral-conversations-native"` 显式启用 `/v1/conversations`。适配器提交本地历史并设置 `store: false`，覆盖流式文本、函数调用与结果回填、签名推理重放。`mistral-conversations` 保留已发布的 `/v1/chat/completions` 行为。六项静态检查、8 套件 308 项和构建 `31a10b526784` 通过。Linux 编译 CLI 回环观察到模型目录 GET、一次 Conversations POST 和 `completed`。当前配置缺少供实测的 Mistral、Azure 或账户 WebSocket 连接。服务端续聊和真实服务验收仍开放。[协议定义](https://docs.mistral.ai/openapi.yaml)
 - [x] **F1.3** 请求 zstd。账户 HTTP 流在最终请求准入后压缩可缩小的 JSON，直连和握手失败后的 HTTP 路径共用编码。签名请求和 WebSocket 继续发送原始数据。Linux Node 24 回环解压逐字节匹配，Node 20.3 使用原始 JSON，HTTP 415 各只派发一次。四套件 58 项、两项旧实现反例、六项静态及结构检查、隔离构建 `36aa2e989113` 通过。账户服务的实际编码资格无新增实测。
 - [ ] **F1.4** OAuth 提供方及设备登录／更新：部分。原生 OpenAI／Google／Copilot、设备兑换及 OpenRouter 浏览器授权密钥（单次尝试随机回环路径 + S256 PKCE + 端点绑定与配置锁写）已合并至主线并经 8 套件 274 项及隔离构建验证；真实账户人类同意、登录后实际模型请求及设备续期仍缺实测，保持开项。
 - [x] **F1.5** MCP PKCE、续期和懒加载。明确范围与已命名调用等待自己的服务端。宽搜索立即返回已就绪目录及不完整标记，后台最多并行初始化四个服务端。Linux stdio 回归并行运行滞留握手、宽搜索、精确加载和调用，并验证关闭后两个子进程均退出。沿用 OAuth、信任与请求级准入。

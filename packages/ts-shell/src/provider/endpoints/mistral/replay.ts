@@ -47,22 +47,22 @@ function toolEvidence(value: unknown): readonly unknown[] | undefined {
   return calls;
 }
 
-export function captureReplay(parts: readonly unknown[], calls: unknown): string | undefined {
+export function captureReplay(parts: readonly unknown[], calls: unknown, protocol = PROTOCOL): string | undefined {
   if (!replayableContent(parts)) return;
   const evidence = toolEvidence(calls);
   if (!evidence) return;
-  const packet = JSON.stringify({ protocol: PROTOCOL, version: 1, parts, calls: evidence });
+  const packet = JSON.stringify({ protocol, version: 1, parts, calls: evidence });
   return Buffer.byteLength(packet) <= MAX_BYTES ? packet : undefined;
 }
 
-export function replayContent(message: ChatMessage, request: SimpleRequest): readonly unknown[] | undefined {
+export function replayContent(message: ChatMessage, request: SimpleRequest, protocol = PROTOCOL): readonly unknown[] | undefined {
   const { signature, text, redacted } = message.reasoning ?? {};
   if (message.role !== 'assistant' || !signature || redacted || Buffer.byteLength(signature) > MAX_BYTES
     || !request.provider || !request.replayBinding || message.origin?.provider !== request.provider
     || message.origin.model !== request.model || message.origin.replayBinding !== request.replayBinding) return;
   try {
     const value: unknown = JSON.parse(signature);
-    if (!isRecord(value) || value.protocol !== PROTOCOL || value.version !== 1 || !replayableContent(value.parts)
+    if (!isRecord(value) || value.protocol !== protocol || value.version !== 1 || !replayableContent(value.parts)
       || !Array.isArray(value.calls) || Object.keys(value).length !== 4) return;
     const projected = projectContent(value.parts);
     if (projected.text !== (message.content ?? '') || projected.reasoning !== text
