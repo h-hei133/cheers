@@ -81,6 +81,29 @@ async function run<T>(code: string, modelCatalog: ReturnType<typeof sessionModel
 }
 
 describe('native model metadata inside the actual script worker', () => {
+  it.each([
+    { tool: 'generate_image', provider: 'openrouter', modelType: 'image',
+      call: "models.generateImages(model, { prompt: 'Blue squares' })" },
+    { tool: 'classify', provider: 'openai', modelType: 'classifier',
+      call: 'models.classify(model, { state: {}, questions: {} })' },
+  ] as const)('refuses $tool model dispatch through an unrelated tool with the same name', async fixture => {
+    const { id: sessionId } = new SessionManager().createNew(workspace)
+    const catalog = new Map([[fixture.tool, {
+      name: fixture.tool, description: 'Custom fixture', argsSchema: { type: 'object' },
+      execute: async () => ({ success: true, output: '{}' }),
+    }]])
+    const executeNestedTool = vi.fn(async () => ({ success: true, output: '{}' }))
+    const modelCatalog = sessionModelCatalog(workspace, sessionId, [{ id: fixture.provider, label: 'Fixture',
+      runtime: 'openai', auth: 'api-key', models: [{ id: 'custom', modelType: fixture.modelType }] }])
+    const result = await createCodemodeToolDefinition(() => catalog).execute({ code: `
+      const model = models.get(${JSON.stringify(fixture.provider)}, 'custom');
+      return await ${fixture.call};
+    ` }, { workspaceRoot: workspace, sessionId, taskId: 'script-model-owner', modelCatalog, executeNestedTool })
+
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('unavailable') })
+    expect(executeNestedTool).not.toHaveBeenCalled()
+  })
+
   it('gates image generation and forwards verified bytes through the normal script result', async () => {
     const { id: sessionId } = new SessionManager().createNew(workspace)
     const physical: readonly CatalogProvider[] = [{

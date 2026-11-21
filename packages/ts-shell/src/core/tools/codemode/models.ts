@@ -1,4 +1,5 @@
 import { types } from 'node:util'
+import type { ToolDefinition } from '../../../tools/types.js'
 import type { sessionModelCatalog } from '../../catalog/models.js'
 import { THINKING_LEVELS } from '../../models/effort.js'
 import { snapshotData, type JsonValue } from '../../values/data.js'
@@ -6,6 +7,14 @@ import { snapshotData, type JsonValue } from '../../values/data.js'
 export type CodemodeModel = Readonly<Record<string, JsonValue>> & {
   readonly provider: string
   readonly id: string
+}
+
+/** Only the host's admitted media tools can serve the script model helpers. */
+export const MODEL_DISPATCH_TOOL = Symbol('modelDispatchTool')
+export type ModelDispatchTool = ToolDefinition & { readonly [MODEL_DISPATCH_TOOL]: true }
+
+export function isModelDispatchTool(tool: ToolDefinition | undefined): tool is ModelDispatchTool {
+  return tool !== undefined && Object.getOwnPropertyDescriptor(tool, MODEL_DISPATCH_TOOL)?.value === true
 }
 
 type FieldRule = 'string' | 'number' | 'boolean' | 'strings' | 'stringOrFalse' | 'stringOrNull'

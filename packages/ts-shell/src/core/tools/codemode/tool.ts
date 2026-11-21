@@ -11,7 +11,7 @@ import { loadCodemodeStore, MAX_STORE_TOTAL_CHARS, MAX_STORE_VALUE_CHARS } from 
 import { CodemodeStoreError, type CodemodeStoreStatus } from './state.js'
 import { runCodemodeWorker, type ScriptReply, type ScriptRpc } from './execution.js'
 import { projectCallableCatalog } from './catalog.js'
-import { projectCodemodeModels } from './models.js'
+import { isModelDispatchTool, projectCodemodeModels } from './models.js'
 import { parseReplayMode, prepareReplay, REPLAY_ID_PATTERN, replayFailure, settleReplay, type ReplayRun } from './replay/index.js'
 
 export const CODEMODE_TOOL_NAME = 'codemode'
@@ -158,13 +158,17 @@ export function createCodemodeToolDefinition(resolveTools: () => ReadonlyMap<str
               ...(runner.terminate ? { terminate: true } : {}) }
           }
           if (op === 'generateImages') {
-            if (!context.executeNestedTool || !catalog.has('generate_image')) throw new Error('Image generation is unavailable in this script.');
+            if (!context.executeNestedTool || !isModelDispatchTool(catalog.get('generate_image'))) {
+              throw new Error('Image generation is unavailable in this script.')
+            }
             return { ok: true, json: JSON.stringify(await runner.call('generate_image', { model: payload.model, prompt: payload.prompt,
               ...(payload.references !== undefined ? { references: payload.references } : {}) })),
               ...(runner.terminate ? { terminate: true } : {}) }
           }
           if (op === 'classify') {
-            if (!context.executeNestedTool || !catalog.has('classify')) throw new Error('Classification is unavailable in this script.')
+            if (!context.executeNestedTool || !isModelDispatchTool(catalog.get('classify'))) {
+              throw new Error('Classification is unavailable in this script.')
+            }
             const result = await runner.call('classify', { model: payload.model, state: payload.state, questions: payload.questions,
               ...(payload.images !== undefined ? { images: payload.images } : {}) })
             if (typeof result !== 'string') throw new Error('Classification result could not be verified.')

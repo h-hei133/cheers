@@ -109,6 +109,10 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 - **Symptom**: SDK resource reload rejects a session after its first saved prompt.
 - **Rule**: Use the saved title and activity time when verifying reload metadata. Keep the live session binding and pin saved file versions through replacement.
 
+### Script Model Helpers Require The Host's Media Tool
+- **Symptom**: A script calling a model helper invokes an unrelated tool that has the same name as a media tool.
+- **Rule**: Require the captured host media definition before dispatch. Keep the nested call on the ordinary permission path.
+
 ### Discovery Shutdown Must Match The Owner's Abort Reason
 - **Symptom**: Closing MCP misreports a cancelled handshake as a cleanup failure.
 - **Rule**: Match rejection to the captured cancellation reason. Join transport disposal and report any separate cleanup failure.

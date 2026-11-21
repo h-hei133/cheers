@@ -6,12 +6,13 @@ import { catalogProvider, type CatalogModel, type CatalogProvider } from '../../
 import { captureInputLimits, modelSupportsVision, withDefaultImageLimits } from '../../core/models/modalities.js';
 import type { Admission } from '../../core/network/admission.js';
 import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
+import { MODEL_DISPATCH_TOOL, type ModelDispatchTool } from '../../core/tools/codemode/models.js';
 import { approvedResult, deniedResult } from '../../core/tools/toolResultLifecycle.js';
 import { DECISIONS_ENDPOINT } from '../../provider/endpoints/decisions.js';
 import { InputLimitError } from '../../provider/request/input.js';
 import { ClassificationRequestError, ImageRequestError, requestClassification, requestGeneratedImages } from '../../provider/request/media.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
-import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js';
+import type { ToolExecutionContext } from '../../tools/types.js';
 import { captureMediaImages, captureQuestions, mediaImageProof, mediaImagesSchema, questionsSchema } from './mediaInput.js';
 import { providerRequestTarget } from './requestTarget.js';
 
@@ -74,7 +75,7 @@ function refused(error: unknown, fallback: string) {
   return deniedResult(fallback);
 }
 
-export function imageGenerationTool(host: MediaHost): ToolDefinition | undefined {
+export function imageGenerationTool(host: MediaHost): ModelDispatchTool | undefined {
   if (host.providerCredentialResolution.provider !== IMAGE_ENDPOINT) return undefined;
   const models = activeModels(host, 'openrouter', IMAGE_BASE);
   for (const [id, model] of models) {
@@ -106,6 +107,7 @@ export function imageGenerationTool(host: MediaHost): ToolDefinition | undefined
     };
   };
   return {
+    [MODEL_DISPATCH_TOOL]: true,
     name: 'generate_image',
     resultAdmission: host.admission,
     description: 'Generate an image with an admitted model on the active connection. Include verified inline references for models that accept images.',
@@ -115,7 +117,7 @@ export function imageGenerationTool(host: MediaHost): ToolDefinition | undefined
   };
 }
 
-export function classificationTool(host: MediaHost): ToolDefinition | undefined {
+export function classificationTool(host: MediaHost): ModelDispatchTool | undefined {
   if (host.providerCredentialResolution.provider !== 'openai') return undefined;
   const models = activeModels(host, 'openai', DECISIONS_BASE);
   for (const [id, model] of models) {
@@ -141,6 +143,7 @@ export function classificationTool(host: MediaHost): ToolDefinition | undefined 
     };
   };
   return {
+    [MODEL_DISPATCH_TOOL]: true,
     name: 'classify',
     resultAdmission: host.admission,
     description: 'Classify state and optional inline images with an admitted classification model on the active connection.',
