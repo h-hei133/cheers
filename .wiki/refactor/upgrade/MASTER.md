@@ -25,7 +25,7 @@
 **Current phase** 55/62 项通过 Linux 本地功能验收，7 项开放。
 **Completed batch** 本轮关闭 E.9、F1.5、F2.6、T6.3。此前 E.4 和 T5.2 已计入轮前 51 项。按实际证据更新 [任务清单](tasks.md)。
 **Open work** C.6、E.3、E.7、F1.2、F1.4、F2.1、T5.1。T5.1 单文件迁移需要保留旧转录、字节预算和前缀身份。会话和注册表需要共同的持久提交点以及进程终止恢复证据。外部资格缺口见 [进展摘要](summary.md)。
-**Repository gate** 固定 `96ea16b`（含离线 `completion-gate` 与 `write-gate` 固定产物）。`PermissionScope` 下沉至 `core/shell/approval/scope.ts` 后，默认 `normproof judge` 与离线 `Stop` 门禁均返回 `proven`（0 阻断、0 告警）。
+**Repository gate** `441786e6` 固定快照通过六项静态检查、26 个文件 713 项和 Linux 构建 `b78d1e67b4a5`。当前结构判定为 `partial`，0 阻断，`core/shell/bootstrap.ts` 超出函数上限 1 个。续接顺序见 [进展摘要](summary.md#后续工作)。
 **Evidence boundary** Linux 上已通过聚焦回归、独立安装、编译入口、PTY、单文件发行和配置模型一次自行修复。提交保留在本地。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 

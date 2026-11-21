@@ -41,8 +41,8 @@ This file is the curated, compact index of reusable engineering pitfalls, enviro
 
 ### Capability Evidence Must Retire When Another Task Changes Its Source
 - **Symptom**: A verification probe passed, then a later full suite fails while uncommitted edits mutate the shared worktree.
-- **Root Cause**: Commit SHA stayed constant while working-tree bytes changed across processes.
-- **Rule**: Bind verification evidence to actual source bytes, isolate temporary fixtures inside `.tmp/` or `/tmp/cheers-test/`, and never leave `.tmp-*` files in the repo root.
+- **Root Cause**: Working-tree bytes may change under the same commit SHA. The build can retain the previous generation when it detects changes during compilation.
+- **Rule**: Verify a fixed source snapshot and compare its tree with the delivered commit. Keep temporary fixtures inside `.tmp/` or `/tmp/cheers-test/`.
 
 ---
 
