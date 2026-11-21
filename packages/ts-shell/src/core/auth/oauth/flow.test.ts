@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createPkcePair, createState } from "./pkce.js";
 import { startCallbackServer } from "./callback.js";
 import { nativeOAuthLogin, isExpiring, refreshOAuthTokens, runOAuthLogin, type OAuthProviderConfig } from "./flow.js";
 import { oauthConfigFor, oauthProviderIds } from "./providers.js";
 import { accountToken } from '../../../test-utils/oauth.js';
+import { loginOpenRouter } from './openrouter/flow.js';
 
 const CONFIG: OAuthProviderConfig = {
   id: "test",
@@ -23,6 +24,8 @@ const opened: string[] = [];
 let squatter: Server | undefined;
 
 afterEach(async () => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   opened.length = 0;
   if (squatter) {
     await new Promise<void>((resolve) => squatter!.close(() => resolve()));
@@ -47,15 +50,104 @@ function tokenEndpoint(payload: unknown, status = 200): {
 }
 
 /** Complete the browser half of the flow by fetching the redirect ourselves. */
-function browserThatRedirects(query: (state: string) => string): (url: string) => Promise<void> {
+function browserThatRedirects(query: (state: string) => string, callbackField = 'redirect_uri'): (url: string) => Promise<void> {
   return async (url: string) => {
     opened.push(url);
     const authorize = new URL(url);
-    const redirect = new URL(authorize.searchParams.get("redirect_uri")!);
+    const redirect = new URL(authorize.searchParams.get(callbackField)!);
     redirect.search = query(authorize.searchParams.get("state") ?? "");
     await fetch(redirect.toString()).catch(() => undefined);
   };
 }
+
+describe('OpenRouter browser authorization', () => {
+  it('exchanges a code-only callback at its fixed issuer using the original S256 verifier', async () => {
+    const exchange = vi.fn(async (_address: RequestInfo | URL, _request?: RequestInit) => Response.json({ key: 'synthetic-issued-key' }));
+    const progress = vi.fn();
+    await expect(loginOpenRouter({ openBrowser: browserThatRedirects(() => '?code=synthetic-code', 'callback_url'),
+      onProgress: progress, fetchImpl: exchange })).resolves.toBe('synthetic-issued-key');
+    const authorization = new URL(opened[0]!);
+    const callback = new URL(authorization.searchParams.get('callback_url')!);
+    expect(authorization.origin + authorization.pathname).toBe('https://openrouter.ai/auth');
+    expect(callback).toMatchObject({ protocol: 'http:', hostname: 'localhost', search: '' });
+    expect(callback.pathname).toMatch(/^\/callback\/[A-Za-z0-9_-]{24,}$/);
+    expect(callback.port).toMatch(/^[1-9]\d*$/);
+    expect(authorization.searchParams.has('state')).toBe(false);
+    expect(authorization.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(progress).toHaveBeenCalledExactlyOnceWith({ authorizeUrl: opened[0] });
+    expect(exchange).toHaveBeenCalledOnce();
+    const [address, request] = exchange.mock.calls[0]!;
+    expect(address).toBe('https://openrouter.ai/api/v1/auth/keys');
+    expect(request).toMatchObject({ method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json' } });
+    const payload = JSON.parse(String(request?.body));
+    expect(payload).toEqual({ code: 'synthetic-code', code_verifier: expect.stringMatching(/^[A-Za-z0-9._~-]{43,128}$/), code_challenge_method: 'S256' });
+    expect(authorization.searchParams.get('code_challenge')).toBe(createHash('sha256').update(payload.code_verifier).digest('base64url'));
+    expect(opened[0]).not.toContain(payload.code_verifier);
+  });
+
+  it('ignores a callback sent to a different login path on the same listener', async () => {
+    const exchange = vi.fn(async () => Response.json({ key: 'synthetic-issued-key' }));
+    const redirect = browserThatRedirects(() => '?code=synthetic-code', 'callback_url');
+    await expect(loginOpenRouter({ fetchImpl: exchange, openBrowser: async address => {
+      const wrong = new URL(new URL(address).searchParams.get('callback_url')!);
+      wrong.pathname = '/callback/other-login';
+      wrong.searchParams.set('code', 'unrelated-code');
+      const response = await fetch(wrong);
+      expect(response.status).toBe(404);
+      await response.arrayBuffer();
+      expect(exchange).not.toHaveBeenCalled();
+      await redirect(address);
+    } })).resolves.toBe('synthetic-issued-key');
+    expect(exchange).toHaveBeenCalledOnce();
+  });
+
+  it.each(['?code=', '?error=denied&error_description=private-detail'])(
+    'refuses a callback without an authorization code', async query => {
+      const exchange = vi.fn();
+      await expect(loginOpenRouter({ openBrowser: browserThatRedirects(() => query, 'callback_url'), fetchImpl: exchange }))
+        .rejects.toMatchObject({ message: 'OpenRouter: browser authorization transport failed.' });
+      expect(exchange).not.toHaveBeenCalled();
+    });
+
+  it.each([307, 403])('withholds the body of a failed exchange with HTTP %s', async status => {
+    const response = Response.json({ key: 'private-reply' }, { status, headers: { location: 'https://foreign.invalid/collect' } });
+    const release = vi.spyOn(response.body!, 'cancel');
+    const exchange = vi.fn(async () => response);
+    await expect(loginOpenRouter({ openBrowser: browserThatRedirects(() => '?code=synthetic-code', 'callback_url'), fetchImpl: exchange }))
+      .rejects.toMatchObject({ code: 'http', status, message: `OpenRouter: API key exchange failed with HTTP ${status}.` });
+    expect(exchange).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('expires stalled exchange headers under the longer browser deadline and discards a late key', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const controller = new AbortController();
+    let enter!: () => void, release!: (response: Response) => void;
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const headers = new Promise<Response>(resolve => { release = resolve; });
+    const exchange = vi.fn((_address: RequestInfo | URL, _request?: RequestInit) => { enter(); return headers; });
+    const response = Response.json({ key: 'synthetic-late-key' });
+    const discarded = vi.spyOn(response.body!, 'cancel');
+    const delivered = vi.fn(), rejected = vi.fn();
+    const settled = loginOpenRouter({ signal: controller.signal, fetchImpl: exchange,
+      openBrowser: browserThatRedirects(() => '?code=synthetic-code', 'callback_url') }).then(delivered, rejected);
+    try {
+      await Promise.race([entered, settled.then(() => { throw new Error('Authorization settled before exchange.'); })]);
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect(rejected).not.toHaveBeenCalled();
+      expect(exchange.mock.calls[0]?.[1]?.signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await settled;
+      expect(rejected).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ code: 'timeout', message: 'OpenRouter: API key exchange timed out.' }));
+      expect(exchange.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+      release(response);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(discarded).toHaveBeenCalledOnce();
+      expect(delivered).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { controller.abort(); release(response); await settled; }
+  });
+});
 
 it.each(['missing', 'subject', 'organization', 'namespace', 'malformed'])('refuses a new OpenAI login with %s access identity despite an exact ID-token claim', async kind => {
   const claims = kind === 'subject' ? { sub: 'account' } : kind === 'organization' ? { organizations: [{ id: 'account' }] }

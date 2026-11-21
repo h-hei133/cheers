@@ -70,6 +70,7 @@ export function isRuntimeProvider(value: unknown): value is RuntimeProvider {
 export type ProviderConnectionAuthType =
   | "api-key"
   | "account-auth"
+  | "oauth-api-key"
   | "browser-assisted-capture";
 
 export interface ProviderCredentialConfig {
@@ -821,8 +822,8 @@ function normalizeProviderConnections(
     }
 
     const authType: ProviderConnectionAuthType =
-      connection.authType === "account-auth"
-        ? "account-auth"
+      connection.authType === "account-auth" || connection.authType === "oauth-api-key"
+        ? connection.authType
         : connection.authType === "browser-assisted-capture" ||
             String(connection.authType) === "browser-oauth"
           ? "browser-assisted-capture"

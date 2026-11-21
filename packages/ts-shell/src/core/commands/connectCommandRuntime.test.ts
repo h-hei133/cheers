@@ -14,6 +14,8 @@ import { refreshLeasesPath } from '../auth/account/lease.js';
 import { renewStoredAccount } from '../auth/account/renewal.js';
 import { ConfigWriteError } from '../../config/outcome.js';
 import { __setOpenAIProviderAuthLoginForTest } from '../auth/providerAuthRuntime.js';
+import * as openRouterLogin from '../auth/oauth/openrouter/flow.js';
+import { OPENROUTER_BASE_URL } from '../auth/oauth/openrouter/policy.js';
 import {
   getUserRuntimeConfigPath,
   writeUserRuntimeConfigFile,
@@ -67,6 +69,75 @@ describe("connect command runtime", () => {
     __setOpenAIAccountAuthRunnerForTest(undefined);
     fs.rmSync(fakeHome, { recursive: true, force: true });
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('stores a browser-authorized key without selecting it when the caller requests a save', async () => {
+    const context = { cwd: workspaceRoot };
+    await runConnectCommand(['login', 'anthropic', '--api-key', 'existing-fixture-key'], context);
+    const source = getUserRuntimeConfigPath();
+    const previous = readRuntimeConfigEditAt(source).values;
+    const key = 'issued-fixture-key';
+    const login = vi.spyOn(openRouterLogin, 'loginOpenRouter').mockResolvedValue(key);
+
+    const result = await runConnectCommand(['login', 'openrouter', '--browser', '--label', 'My relay'], context, undefined, { activate: false });
+    expect(login).toHaveBeenCalledOnce();
+    expect(result.output).toContain('Connection saved. Select a model to enable it.');
+    expect(result.output).not.toContain(key);
+    const saved = readRuntimeConfigEditAt(source).values;
+    expect(saved.activeProviderConnectionId).toBe(previous.activeProviderConnectionId);
+    expect(saved.provider).toBe(previous.provider);
+    const [connection, ...retained] = saved.providerConnections!;
+    expect(retained).toEqual(previous.providerConnections);
+    expect(connection).toMatchObject({
+      provider: 'openai-compatible', label: 'My relay', authType: 'oauth-api-key',
+      baseUrl: OPENROUTER_BASE_URL, apiKey: key, autoSelect: false, status: 'connected',
+    });
+    expect(fs.statSync(getUserAuthPath()).mode & 0o777).toBe(0o600);
+    await runConnectCommand(['use', connection!.id], context);
+    const runtimeConfig = configStore.getRuntimeConfig(workspaceRoot);
+    expect(resolveProviderCredential({ runtimeConfig, env: {} })).toMatchObject({
+      credential: { authMode: 'api-key', apiKey: key, baseUrl: OPENROUTER_BASE_URL, connectionId: connection!.id },
+    });
+    const foreign = resolveProviderCredential({ runtimeConfig, cliBaseUrl: 'https://foreign.invalid/v1', env: {} });
+    expect(foreign.blocked).toBe('connection-overridden');
+    expect(foreign.credential).toBeUndefined();
+
+    const status = await runConnectCommand(['status'], context);
+    expect(status.output).toContain('api-key:redacted');
+    expect(status.output).not.toContain(key);
+  });
+
+  it('refuses key publication after the login is cancelled', async () => {
+    const context = { cwd: workspaceRoot };
+    await runConnectCommand(['login', 'anthropic', '--api-key', 'existing-fixture-key'], context);
+    const source = getUserRuntimeConfigPath();
+    const previous = readRuntimeConfigEditAt(source).revision;
+    const controller = new AbortController();
+    vi.spyOn(openRouterLogin, 'loginOpenRouter').mockImplementation(async () => {
+      controller.abort('private cancellation reason');
+      return 'late-fixture-key';
+    });
+
+    const result = await runConnectCommand(['login', 'openrouter', '--browser'], { ...context, signal: controller.signal });
+    expect(result.output).toContain('sign-in cancelled');
+    expect(result.output).not.toMatch(/late-fixture-key|private cancellation reason/);
+    expect(readRuntimeConfigEditAt(source).revision).toBe(previous);
+  });
+
+  it('preserves a newer provider selection when browser authorization finishes late', async () => {
+    const context = { cwd: workspaceRoot };
+    await runConnectCommand(['login', 'anthropic', '--api-key', 'existing-fixture-key'], context);
+    const source = getUserRuntimeConfigPath();
+    vi.spyOn(openRouterLogin, 'loginOpenRouter').mockImplementation(async () => {
+      await runConnectCommand(['login', 'openai', '--api-key', 'newer-fixture-key'], context);
+      return 'late-fixture-key';
+    });
+
+    await expect(runConnectCommand(['login', 'openrouter', '--browser'], context))
+      .rejects.toMatchObject({ code: 'conflict', state: 'unchanged' });
+    const current = readRuntimeConfigEditAt(source).values;
+    expect(current.provider).toBe('openai');
+    expect(current.providerConnections?.map(connection => connection.provider)).toEqual(['openai', 'anthropic']);
   });
 
   it('does not insert a pending connection when cancellation preceded native login admission', async () => {

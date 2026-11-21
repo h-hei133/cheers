@@ -16,7 +16,7 @@ export const connectSyntax: CommandSyntax = {
       { name: "api-key", aliases: ["key"], kind: "text", summary: "use an API key", conflicts: ["account", "browser"] },
       { name: "account", kind: "boolean", summary: "start supported account authentication", conflicts: ["api-key", "browser", "base-url", "model"] },
       { name: "device-code", kind: "boolean", summary: "use OpenAI device sign-in with --account", conflicts: ["api-key", "browser", "base-url", "model"] },
-      { name: "browser", kind: "boolean", summary: "capture a key with a local browser", conflicts: ["api-key", "account", "base-url", "model"] },
+      { name: "browser", kind: "boolean", summary: "connect through a local browser", conflicts: ["api-key", "account", "base-url", "model"] },
       { name: "base-url", kind: "text", summary: "set the API endpoint", conflicts: ["account", "browser"] },
       { name: "model", kind: "text", summary: "set the connection model", conflicts: ["account", "browser"] },
       { name: "label", kind: "text", summary: "label this connection" },

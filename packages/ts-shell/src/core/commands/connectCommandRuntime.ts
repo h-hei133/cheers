@@ -29,6 +29,7 @@ import {
 import { needsUserEndpoint } from "../providers/facts.js";
 import { endpointLabel } from '../models/availability.js';
 import { withoutConnectionCredentials } from './connect/credentials.js';
+import { connectOpenRouter, saveKeyConnection } from './connect/key.js';
 import {
   getConnectHelpText,
   renderConnectionStatus,
@@ -121,9 +122,10 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
   if (!target) {
     return [
       "Invalid /connect login usage.",
-      "API key: /connect login <openai|anthropic|openai-compatible|siliconflow|google|antigravity|claudecode> --api-key <key> [--base-url <url>] [--model <model>] [--label <name>]",
+      "API key: /connect login <openai|anthropic|openai-compatible|siliconflow|openrouter|google|antigravity|claudecode> --api-key <key> [--base-url <url>] [--model <model>] [--label <name>]",
       "Account auth: /connect login openai --account [--device-code] [--label <name>]",
       "Browser-assisted local key capture: /connect login <provider> --browser [--label <name>]",
+      "OpenRouter browser authorization: /connect login openrouter --browser [--label <name>]",
     ].join("\n");
   }
 
@@ -133,6 +135,7 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
   }
 
   if (parsed.flags.browser === true) {
+    if (target.id === 'openrouter') return connectOpenRouter(target, parseFlagValue(parsed.flags.label), onPersisted, options ?? {});
     return await runBrowserAssistedCaptureConnection(target, parsed.flags.label, onPersisted, options);
   }
 
@@ -157,50 +160,7 @@ export async function addConnection(args: string[], onPersisted?: () => void, wo
     return `${target.provider} requires --model (or a preset that provides one).`;
   }
 
-  const now = new Date().toISOString();
-  const connection: ProviderConnectionConfig = {
-    id: buildConnectionId(target.provider),
-    provider: target.provider,
-    authType: "api-key",
-    ...(options?.activate === false ? { autoSelect: false } : {}),
-    ...(normalizeOptional(parseFlagValue(parsed.flags.label))
-      ? { label: normalizeOptional(parseFlagValue(parsed.flags.label)) }
-      : { label: target.label }),
-    apiKey,
-    ...(baseUrl ? { baseUrl } : {}),
-    ...(model ? { model } : {}),
-    status: "connected",
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
-  const userConfig = edit.values;
-  const connections = normalizeConnections(userConfig);
-  const nextConnections = [connection, ...connections];
-  const next: RuntimeConfigFile = {
-    ...userConfig,
-    providerConnections: nextConnections,
-    ...(options?.activate !== false ? {
-      provider: target.provider,
-      activeProviderConnectionId: connection.id,
-    } : {}),
-  };
-  const configPath = getUserAuthPath();
-  writeUserRuntimeConfigFile(next, edit);
-  onPersisted?.();
-
-  return [
-    `Connected provider ${target.provider}.`,
-    `Connection ID: ${connection.id}`,
-    `Connection type: api-key`,
-    `Saved key: ${maskApiKey(apiKey)}`,
-    ...(endpointLabel(baseUrl) ? [`Endpoint: ${endpointLabel(baseUrl)}`] : []),
-    ...(model ? [`Model: ${model}`] : []),
-    options?.activate === false ? 'Connection saved. Select a model to enable it.' : `Stored provider default: ${target.provider}.`,
-    `Stored at: ${configPath}`,
-    "Use /connect status to inspect active connection details.",
-  ].join("\n");
+  return saveKeyConnection({ target, apiKey, baseUrl, model, label: parseFlagValue(parsed.flags.label), activate: options?.activate, onPersisted });
 }
 
 export async function addConnectionFromLegacyAuthSet(args: string[], onPersisted?: () => void): Promise<string> {

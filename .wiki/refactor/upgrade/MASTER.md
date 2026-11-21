@@ -25,7 +25,7 @@
 **Current phase** 49/62 项通过 Linux 本地功能验收，13 项开放。
 **Completed batch** E.6、E.8、T4.1–T4.4 和 T5.1 的普通提示事务子批。八个领域包独立编译，原宿主入口通过隔离安装校验。详情见 [任务清单](tasks.md)。
 **Open work** T5.1 的其他多文件事务继续开放。原生服务资格、确定性重放、旧格式迁移、远程文件能力按需推进。两层包图分解和持续工程狗食保留后续实测条件。
-**Repository gate** 固定 `6173197`。默认冷判定两次退出 0，结果均为 `partial`。全仓未解析引用规则已满足，既有混合依赖环和测试越层仍作为建议显示。
+**Repository gate** 固定 `96ea16b`（含离线 `completion-gate` 与 `write-gate` 固定产物）。`PermissionScope` 下沉至 `core/shell/approval/scope.ts` 后，默认 `normproof judge` 与离线 `Stop` 门禁均返回 `proven`（0 阻断、0 告警）。
 **Evidence boundary** Linux 上已通过聚焦回归、独立安装、编译入口、PTY、单文件发行和配置模型一次自行修复。提交保留在本地。
 **Validation**: 只在 Linux 侧；子代理只读或编辑，所有安装、构建、测试、门禁与真实模型调用由主线程串行执行。真实模型使用已配置凭据的原生入口，报告不包含秘密。
 
@@ -85,6 +85,7 @@ E.5本批实际L／额外依赖3（blocked publication独立撤权、原共享ho
 
 | Date | Evidence and next action |
 | --- | --- |
+| 2026-11-21 | Batch 1 (`d49c2ab0`) 落地离线 Node 20.3 `completion-gate` 固定产物并下沉 `PermissionScope` 至 `core/shell/approval/scope.ts`，默认 `normproof judge` 转绿为 `proven`（0 open obligations）；Batch 2 合并 OpenRouter 浏览器授权密钥（F1.4 部分），六门、8 套件 274 项、build `924191a436aa` 与 `normproof judge` `proven` 通过；真实人类同意仍缺，F1.4 保持开项。 |
 | 2026-11-19 | C.5本地功能验收，27／848、七静态门、十一反转13AssertionErrors／exact恢复6／138、buildecdb41348d63、Linuxcompiled13／34加sourcewarm2POST、Node20.3禁生成compiled13／34及安装15入口strict／12场景32POST通过；两独立限定APPROVE，旧广审无报告unavailable。配置模型auth零requests、默认judge容量not_proven；36／62、26开放，下一E.6typed内核事件与settlement，按批本地提交不push。 |
 | 2026-11-18 | 核实此前 30 个开放项，三个生产批次完成验收并本地提交。最终 35/62，下一批 C.5。基线和当前图均超出锁定容量，当前配置模型鉴权未完成。 |
 | 2026-11-17 | E.5／C.8最终25文件355项／七门／0monoliths、build89344ffebd35、UI三反转／串行4/29恢复和发现三反转／2/22恢复passed，两限定独立APPROVE及10hash匹配；当前npm15入口strict类型、实际async TS／签名安装共享host两模式、配置模型8actual发现请求passed。29/62功能验收；33任务及默认NormProof not_proven保留，继续E.1／E.3，不push。 |

@@ -3033,3 +3033,15 @@ This file records non-obvious technical pitfalls, environment hazards, and opera
 - **Symptom** Every CLI assertion passes, but the test worker times out waiting for a task update acknowledgement.
 - **Root cause** Consecutive cases with synchronous child processes can keep the worker out of its event loop beyond the reporting deadline.
 - **Rule** Let the worker process IPC after fixture cleanup. Rerun the contiguous cases for longer than the reporting deadline and require the normal suite exit code.
+
+### Code-Only Browser Redirects Need Attempt Binding
+
+- **Symptom** The service returns a valid authorization code and the desktop login rejects the redirect.
+- **Root cause** The service redirects with a code and does not echo a state query parameter.
+- **Rule** Bind that flow to an unpredictable path on its loopback listener and redeem the code with its original S256 verifier. Exercise a code-only redirect and an unrelated path on the same listener. Check the captured configuration again before publishing the credential.
+
+### Bundled ESM Gate Scripts Share One `import.meta.url`
+
+- **Symptom** A standalone `esbuild` bundle for a secondary hook entrypoint exits with the usage message of an imported CLI module.
+- **Root cause** Combining multiple modules into one ESM file makes every module's `import.meta.url === pathToFileURL(resolve(process.argv[1])).href` self-execution guard evaluate to `true` at once.
+- **Rule** Disable secondary imported modules' top-level self-execution guards explicitly in the bundler plugin (failing loudly if the expected guard pattern changes) and verify the bundled CLI end-to-end on real payloads.

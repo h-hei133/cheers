@@ -1,6 +1,7 @@
 import type { AccountAuthConfig, ProviderConnectionConfig, ProviderCredentialConfig, RuntimeProvider } from '../../../config/runtimeConfig.js';
 import { providerFacts } from '../../providers/facts.js';
 import { assertCopilotAccount } from '../oauth/copilot/policy.js';
+import { isOpenRouterAddress } from '../oauth/openrouter/policy.js';
 
 /** The subset of availability a single connection can establish locally. */
 export type ConnectionCredentialState = 'ready' | 'credential-missing' | 'pending' | 'error';
@@ -14,6 +15,10 @@ export interface CredentialPresenceConfig {
 export function ownedConnectionCredential(connection: ProviderConnectionConfig): {
   connectionId: string; accountAuth?: AccountAuthConfig; apiKey?: string;
 } {
+  if (connection.authType === 'oauth-api-key') {
+    const apiKey = connection.provider === 'openai-compatible' && isOpenRouterAddress(connection.baseUrl) ? connection.apiKey?.trim() : undefined;
+    return { connectionId: connection.id, ...(apiKey ? { apiKey } : {}) };
+  }
   const facts = providerFacts(connection.provider);
   const stored = facts.accountAuthKey ? connection.accountAuth?.[facts.accountAuthKey] : undefined;
   if (stored?.type === 'subscription') {
@@ -49,6 +54,7 @@ export function connectionCredentialState(config: CredentialPresenceConfig, conn
     return { state: 'ready', reason: 'Account credential is stored on this connection.' };
   }
   if (owned.apiKey) return { state: 'ready', reason: 'API key is stored on this connection.' };
+  if (connection.authType === 'oauth-api-key') return { state: 'credential-missing', reason: 'The authorized key or its provider endpoint is unavailable. Reconnect before requests.' };
   if (connection.authType === 'account-auth') return { state: 'credential-missing', reason: 'The selected account credential is unavailable. Reconnect before requests.' };
   const legacy = credentialSources(config, connection.provider, env);
   if (legacy.env) return { state: 'ready', reason: `Credential comes from ${providerFacts(connection.provider).apiKeyEnvVar}.` };

@@ -13,6 +13,7 @@ import { BUILTIN_PROVIDERS } from '../models/catalog.js';
 import type { ProviderCredentialResolution } from '../auth/credential.js';
 import { accountProtocol, assertAccountAddress } from '../auth/account/policy.js';
 import { assertCopilotAccount } from '../auth/oauth/copilot/policy.js';
+import { isOpenRouterAddress, OPENROUTER_BASE_URL } from '../auth/oauth/openrouter/policy.js';
 export type {
   ProviderCredentialSource, ProviderCredentialAuthMode,
   ResolvedProviderCredential, ProviderCredentialResolution,
@@ -168,6 +169,17 @@ function resolveCredential(
   // that account with a different principal.
   if (activeConnectionProfile?.authType === 'account-auth' && !connectionAccountAuth) {
     return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: 'connection-unavailable' };
+  }
+
+  if (activeConnectionProfile?.authType === 'oauth-api-key') {
+    const owned = ownedConnectionCredential(activeConnectionProfile);
+    const selected = { ...preference, provider, expectedEnvVarName, model };
+    if (!owned.apiKey) return { ...selected, blocked: 'connection-unavailable' };
+    if (!isOpenRouterAddress(baseUrl) || (input.cliApiKey?.trim() && input.cliApiKey.trim() !== owned.apiKey)) {
+      return { ...selected, blocked: 'connection-overridden' };
+    }
+    return { ...selected, baseUrl: OPENROUTER_BASE_URL, credential: { provider, authMode: 'api-key', apiKey: owned.apiKey,
+      baseUrl: OPENROUTER_BASE_URL, model, source: 'connection', connectionId: owned.connectionId, envVarName: expectedEnvVarName } };
   }
 
   // A pool member's credential is the connection's own. An environment key or a

@@ -6,6 +6,7 @@ import {
 } from "../../../config/runtimeConfig.js";
 import { needsUserEndpoint } from "../../providers/facts.js";
 import { endpointLabel } from "../../models/availability.js";
+import { ownedConnectionCredential } from '../../auth/account/presence.js';
 import {
   CONNECT_PRESETS,
   normalizeConnections,
@@ -40,6 +41,7 @@ export function renderPresetCatalog(): string {
   lines.push("- account-auth connection: /connect login openai --account");
   lines.push("- OpenAI device sign-in: /connect login openai --account --device-code");
   lines.push("- browser-assisted local capture: /connect login <provider> --browser");
+  lines.push("- OpenRouter browser authorization: /connect login openrouter --browser");
   return lines.join("\n");
 }
 
@@ -124,9 +126,10 @@ export function renderReadinessGuidance(input: {
     return lines;
   }
 
-  const missingCredential =
-    activeConnection.authType !== "account-auth" &&
-    !activeConnection.apiKey?.trim();
+  const authorizedKey = activeConnection.authType === 'oauth-api-key';
+  const missingCredential = authorizedKey
+    ? !ownedConnectionCredential(activeConnection).apiKey
+    : activeConnection.authType !== 'account-auth' && !activeConnection.apiKey?.trim();
   const missingBaseUrl =
     needsUserEndpoint(activeConnection.provider) &&
     !activeConnection.baseUrl?.trim();
@@ -149,7 +152,8 @@ export function renderReadinessGuidance(input: {
   if (missingCredential) {
     lines.push("- Config status: credential missing for active connection.");
     lines.push(
-      `- Next: run /connect login ${activeConnection.provider} --api-key <key>.`,
+      authorizedKey ? '- Next: run /connect login openrouter --browser.'
+        : `- Next: run /connect login ${activeConnection.provider} --api-key <key>.`,
     );
     return lines;
   }
@@ -193,10 +197,11 @@ export function getConnectHelpText(): string {
     "/connect login openai --account --device-code [--label <name>]   (headless OpenAI sign-in)",
     "/connect login google --account [--label <name>]                 (Google OAuth; requires GOOGLE_OAUTH_CLIENT_ID)",
     "/connect login <provider|preset> --browser [--label <name>]      (browser-assisted local key capture)",
+    "/connect login openrouter --browser [--label <name>]             (OpenRouter API key authorization)",
     "/connect use <connection-id|provider>",
     "/connect logout <connection-id|provider>",
     "",
-    "Providers: openai | anthropic | openai-compatible | siliconflow | google | antigravity | claudecode",
+    "Providers: openai | anthropic | openai-compatible | siliconflow | openrouter | google | antigravity | claudecode",
     "Examples:",
     "- /connect login siliconflow --api-key sk-xxxx",
     "- /connect login google --api-key <key>",

@@ -170,7 +170,7 @@ C.9在bootstrap前捕获print／JSON／RPC／非TTY输入或输出，保留仅st
 | E.7 | 部分 | virtual注册／逻辑路由已接通；provider、MCP、renderer和其余runtime setters仍缺，worker virtual明确unsupported。 |
 | E.9 | 部分 | npm／git／local安装adapter和顶层CLI入口、完整性／精确版本／批准边界。 |
 | F1.2 | 部分 | Azure 和账户 WebSocket 的真实服务资格。Mistral 独立 Conversations 协议仍缺。 |
-| F1.4 | 部分 | 其他OAuth提供方、设备登录实际同意／续期，复用原凭据proof。 |
+| F1.4 | 部分 | OpenRouter 浏览器授权密钥已合并主线；真实人类同意、登录后实际请求及设备登录实际同意／续期仍待实测。 |
 | F1.5 | 部分 | 真实网关已按明确调用范围等待。无范围限制的搜索仍等待完整目录，缺后台发现及按调用等待。 |
 | F2.1 | 部分 | 图片／分类器模型类别、逐端点媒体能力／预算与真实Linux输入。 |
 | F2.6 | 部分 | 运行归属和有界直方图已交付。缺跨进程 trace 接收与跨进程测试。 |

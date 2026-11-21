@@ -3,6 +3,7 @@ import type {
   RuntimeProvider,
 } from "../../../config/runtimeConfig.js";
 import type { ConnectPreset } from "./types.js";
+import { OPENROUTER_BASE_URL } from '../../auth/oauth/openrouter/policy.js';
 
 export const CONNECT_PRESETS: readonly ConnectPreset[] = [
   {
@@ -27,6 +28,13 @@ export const CONNECT_PRESETS: readonly ConnectPreset[] = [
     provider: "openai-compatible",
     defaultBaseUrl: "https://api.siliconflow.cn/v1",
     defaultModel: "deepseek-ai/DeepSeek-V4-Flash",
+  },
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    provider: 'openai-compatible',
+    defaultBaseUrl: OPENROUTER_BASE_URL,
+    defaultModel: 'deepseek/deepseek-chat',
   },
   {
     id: "google",

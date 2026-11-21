@@ -1,7 +1,5 @@
-import { spawn } from "node:child_process";
 import { createHash } from 'node:crypto';
-import { createPkcePair, createState } from "./pkce.js";
-import { startCallbackServer } from "./callback.js";
+import { authorizeLoopback } from './browser.js';
 import { loginLifetime, waitForLogin } from './lifetime.js';
 import type { SignInProgress } from '../providerAuthContract.js';
 import { requestScope, withinRequest } from '../../network/request.js';
@@ -158,50 +156,31 @@ export async function runOAuthLogin(
   }
   const timeoutMs = Math.max(MIN_TIMEOUT_MS, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const lifetime = loginLifetime(timeoutMs, options.signal);
-  let server: Awaited<ReturnType<typeof startCallbackServer>> | undefined;
   try {
-    lifetime.signal.throwIfAborted();
-    const state = createState();
-    const pkce = createPkcePair();
-    server = await startCallbackServer({
-      path: config.callbackPath, port: config.callbackPort, expectedState: state, timeoutMs,
+    const authorization = await authorizeLoopback({
+      path: config.callbackPath, port: config.callbackPort, timeoutMs,
       ...(config.requireState === false ? { requireState: false } : {}),
       label: config.label, signal: lifetime.signal,
-    });
+    }, input => buildAuthorizeUrl(config, input), options);
     lifetime.signal.throwIfAborted();
-    const authorizeUrl = buildAuthorizeUrl(config, {
-      redirectUri: server.redirectUri,
-      state,
-      challenge: pkce.challenge,
-    });
-    options.onAuthorizeUrl?.(authorizeUrl);
-    lifetime.signal.throwIfAborted();
-    options.onProgress?.({ authorizeUrl });
-    lifetime.signal.throwIfAborted();
-    await waitForLogin((options.openBrowser ?? openInBrowser)(authorizeUrl), lifetime.signal);
-
-    const callback = await waitForLogin(server.received, lifetime.signal);
     const tokens = await exchangeCode(config, {
-      code: callback.code,
-      verifier: pkce.verifier,
-      redirectUri: server.redirectUri,
+      code: authorization.code,
+      verifier: authorization.verifier,
+      redirectUri: authorization.redirectUri,
       fetchImpl: options.fetchImpl ?? fetch,
       signal: lifetime.signal,
     });
     lifetime.signal.throwIfAborted();
     return {
       ...tokens,
-      authorizeUrl,
-      callbackUrl: server.redirectUri,
+      authorizeUrl: authorization.authorizeUrl,
+      callbackUrl: authorization.redirectUri,
       clientId: config.clientId,
     };
   } catch (error) {
     if (lifetime.signal.aborted) throw new OAuthExchangeError(lifetime.signal.reason?.name === 'TimeoutError' ? 'timeout' : 'cancelled', config.label, 'sign-in');
     throw error;
-  } finally {
-    server?.close();
-    lifetime.close();
-  }
+  } finally { lifetime.close(); }
 }
 
 /** Trade a refresh token for a fresh access token. */
@@ -406,21 +385,4 @@ function accountIdFrom(claims: Record<string, unknown>): string | undefined {
   if (!auth || typeof auth !== 'object' || Array.isArray(auth)) return undefined;
   const id = (auth as Record<string, unknown>).chatgpt_account_id;
   return typeof id === 'string' && id.trim() ? id.trim() : undefined;
-}
-
-/** Hand the URL to whatever opens links on this platform. */
-async function openInBrowser(url: string): Promise<void> {
-  const command =
-    process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
-  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
-  try {
-    // Detached and with its own streams: the launcher must not hold the terminal
-    // or write into a frame the interface is painting.
-    const child = spawn(command, args, { detached: true, stdio: "ignore" });
-    child.once('error', () => undefined);
-    child.unref();
-  } catch {
-    // A machine with no browser launcher is not a failed login — the authorize URL
-    // was already reported, and it can be opened by hand.
-  }
 }

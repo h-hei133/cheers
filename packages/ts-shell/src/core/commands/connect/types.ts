@@ -5,6 +5,7 @@ export type ConnectPresetId =
   | "openai"
   | "anthropic"
   | "siliconflow"
+  | "openrouter"
   | "google"
   | "google-ai"
   | "vertex"
